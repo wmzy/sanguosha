@@ -6,7 +6,7 @@ import {
   创建标准牌堆,
   是武器牌, 是防具牌, 是马牌, 是装备牌, 是锦囊牌, 是延时锦囊,
   是黑色花色, 是红色花色,
-} from '@shared/卡牌';
+} from '@shared/cards';
 
 describe('装备牌', () => {
   describe('武器牌', () => {

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { GameLogger } from '@engine/logger';
 import { ReplayEngine } from '@engine/replay';
-import { 创建游戏, 开始游戏 } from '@engine/状态';
-import { 进入下一阶段, 摸牌阶段 } from '@engine/回合';
-import { 使用杀 } from '@engine/效果';
-import { 曹操, 刘备 } from '@shared/角色';
+import { 创建游戏, 开始游戏 } from '@engine/state';
+import { 进入下一阶段, 摸牌阶段 } from '@engine/turn';
+import { 使用杀 } from '@engine/effect';
+import { 曹操, 刘备 } from '@shared/characters';
 
 describe('完整重播流程', () => {
   it('完整游戏 → 导出日志 → 导入 → 重播 → 验证状态一致', () => {

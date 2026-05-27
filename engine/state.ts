@@ -1,8 +1,8 @@
 // engine/状态.ts
-import type { GameState, Player, PublicGameState, CharacterConfig, Role } from '../shared/类型';
+import type { GameState, Player, PublicGameState, CharacterConfig, Role } from '../shared/types';
 import type { GameLogger } from './logger';
-import { 创建标准牌堆 } from '../shared/卡牌';
-import { 洗牌 } from '../shared/牌组';
+import { 创建标准牌堆 } from '../shared/cards';
+import { 洗牌 } from '../shared/deck';
 import { createRng } from '../shared/rng';
 
 export function 创建游戏(角色列表: CharacterConfig[], seed?: number, logger?: GameLogger): GameState {

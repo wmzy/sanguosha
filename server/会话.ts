@@ -1,10 +1,10 @@
 // server/会话.ts
-import type { GameState, PlayerAction } from '../shared/类型';
+import type { GameState, PlayerAction } from '../shared/types';
 import type { Room } from './房间';
-import { 创建游戏, 获取公开状态, 开始游戏 } from '../engine/状态';
-import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../engine/回合';
-import { 使用杀, 使用桃 } from '../engine/效果';
-import { 所有角色 } from '../shared/角色';
+import { 创建游戏, 获取公开状态, 开始游戏 } from '../engine/state';
+import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../engine/turn';
+import { 使用杀, 使用桃 } from '../engine/effect';
+import { 所有角色 } from '../shared/characters';
 import { serialize } from './协议';
 import { 设置房间状态 } from './房间';
 
@@ -183,7 +183,7 @@ export class GameSession {
     this.notifyCurrentPlayer();
   }
 
-  private checkGameEnd(): import('../shared/类型').Role | null {
+  private checkGameEnd(): import('../shared/types').Role | null {
     if (!this.state) return null;
 
     const _存活玩家 = this.state.玩家列表.filter(p => p.存活);
@@ -211,7 +211,7 @@ export class GameSession {
     return null;
   }
 
-  private removeCardFromHand(playerName: string, card: import('../shared/类型').Card): void {
+  private removeCardFromHand(playerName: string, card: import('../shared/types').Card): void {
     if (!this.state) return;
     this.state = {
       ...this.state,

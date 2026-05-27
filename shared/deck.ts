@@ -1,5 +1,5 @@
 // shared/牌组.ts
-import type { Card } from './类型';
+import type { Card } from './types';
 import type { Rng } from './rng';
 
 // Fisher-Yates 洗牌算法

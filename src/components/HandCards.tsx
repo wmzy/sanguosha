@@ -1,5 +1,5 @@
 // src/components/HandCards.tsx
-import type { Card } from '../../shared/类型';
+import type { Card } from '../../shared/types';
 
 interface HandCardsProps {
   手牌: Card[];

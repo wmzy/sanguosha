@@ -1,5 +1,5 @@
 // engine/提示.ts
-import type { Prompt, PromptType } from '../shared/类型';
+import type { Prompt, PromptType } from '../shared/types';
 
 export function 创建提示(name: string, 玩家名: string, 选项: unknown[]): Prompt {
   let 类型: PromptType = 'select_option';

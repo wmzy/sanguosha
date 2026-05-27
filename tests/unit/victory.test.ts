@@ -1,8 +1,8 @@
 // tests/unit/胜利条件.test.ts
 import { describe, it, expect } from 'vitest';
-import { 创建游戏, 检查胜利, 玩家死亡 } from '@engine/状态';
-import { 曹操, 刘备, 孙权, 吕布, 貂蝉 } from '@shared/角色';
-import type { GameState, Role } from '@shared/类型';
+import { 创建游戏, 检查胜利, 玩家死亡 } from '@engine/state';
+import { 曹操, 刘备, 孙权, 吕布, 貂蝉 } from '@shared/characters';
+import type { GameState, Role } from '@shared/types';
 
 function 设置玩家身份(游戏: GameState, 身份映射: Record<string, Role>): GameState {
   const 新玩家列表 = 游戏.玩家列表.map(p => ({

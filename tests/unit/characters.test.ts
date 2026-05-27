@@ -1,6 +1,6 @@
 // tests/unit/角色.test.ts
 import { describe, it, expect } from 'vitest';
-import { 所有角色, 魏国角色, 蜀国角色, 吴国角色, 群雄角色 } from '@shared/角色';
+import { 所有角色, 魏国角色, 蜀国角色, 吴国角色, 群雄角色 } from '@shared/characters';
 
 describe('角色配置', () => {
   describe('所有角色配置有效性', () => {

@@ -1,11 +1,11 @@
 // src/components/GameBoard.tsx
 import { useState, useCallback } from 'react';
-import type { GameState } from '../../shared/类型';
-import { 创建游戏, 开始游戏, 获取当前玩家 } from '../../engine/状态';
-import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../../engine/回合';
-import { 使用杀, 使用桃 } from '../../engine/效果';
+import type { GameState } from '../../shared/types';
+import { 创建游戏, 开始游戏, 获取当前玩家 } from '../../engine/state';
+import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../../engine/turn';
+import { 使用杀, 使用桃 } from '../../engine/effect';
 import { GameLogger } from '../../engine/logger';
-import { 曹操, 刘备 } from '../../shared/角色';
+import { 曹操, 刘备 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';

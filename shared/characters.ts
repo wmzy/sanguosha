@@ -1,4 +1,4 @@
-import type { CharacterConfig } from './类型';
+import type { CharacterConfig } from './types';
 
 // ============================================================
 // 魏国

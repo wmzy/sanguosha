@@ -1,9 +1,9 @@
-import type { GameState, PublicGameState, TurnPhase, Card } from '../shared/类型';
+import type { GameState, PublicGameState, TurnPhase, Card } from '../shared/types';
 import type { GameLog, Operation } from '../shared/log';
 import type { Rng } from '../shared/rng';
 import { createRng } from '../shared/rng';
-import { 创建游戏, 获取公开状态, 开始游戏 } from './状态';
-import { 所有角色 } from '../shared/角色';
+import { 创建游戏, 获取公开状态, 开始游戏 } from './state';
+import { 所有角色 } from '../shared/characters';
 
 export class ReplayEngine {
   private log: GameLog;

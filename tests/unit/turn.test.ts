@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查 } from '@engine/回合';
-import { 创建游戏 } from '@engine/状态';
-import { 曹操, 刘备 } from '@shared/角色';
+import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查 } from '@engine/turn';
+import { 创建游戏 } from '@engine/state';
+import { 曹操, 刘备 } from '@shared/characters';
 
 describe('回合阶段', () => {
   describe('阶段流转', () => {

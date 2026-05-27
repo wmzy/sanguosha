@@ -1,5 +1,5 @@
 // engine/效果.ts
-import type { GameState } from '../shared/类型';
+import type { GameState } from '../shared/types';
 import type { GameLogger } from './logger';
 
 interface EffectResult {

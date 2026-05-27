@@ -1,7 +1,7 @@
-import type { GameState, TurnPhase } from '../shared/类型';
+import type { GameState, TurnPhase } from '../shared/types';
 import type { GameLogger } from './logger';
-import { 获取当前玩家, 获取存活玩家 } from './状态';
-import { 摸牌 } from '../shared/牌组';
+import { 获取当前玩家, 获取存活玩家 } from './state';
+import { 摸牌 } from '../shared/deck';
 
 const 阶段顺序: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '结束'];
 

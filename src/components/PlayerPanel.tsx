@@ -1,5 +1,5 @@
 // src/components/PlayerPanel.tsx
-import type { Player } from '../../shared/类型';
+import type { Player } from '../../shared/types';
 
 interface PlayerPanelProps {
   玩家: Player;

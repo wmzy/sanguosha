@@ -1,4 +1,4 @@
-import type { Card, Suit, Rank } from './类型';
+import type { Card, Suit, Rank } from './types';
 
 // ============================================================
 // 武器牌定义

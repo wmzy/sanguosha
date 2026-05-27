@@ -1,6 +1,6 @@
 // tests/unit/提示.test.ts
 import { describe, it, expect } from 'vitest';
-import { 创建提示, 处理响应 } from '@engine/提示';
+import { 创建提示, 处理响应 } from '@engine/prompt';
 
 describe('提示系统', () => {
   describe('创建提示', () => {

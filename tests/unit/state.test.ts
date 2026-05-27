@@ -1,7 +1,7 @@
 // tests/unit/状态.test.ts
 import { describe, it, expect } from 'vitest';
-import { 创建游戏, 获取公开状态 } from '@engine/状态';
-import { 曹操, 刘备 } from '@shared/角色';
+import { 创建游戏, 获取公开状态 } from '@engine/state';
+import { 曹操, 刘备 } from '@shared/characters';
 
 describe('游戏状态', () => {
   describe('创建游戏', () => {

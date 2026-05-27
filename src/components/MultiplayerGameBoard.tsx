@@ -1,7 +1,7 @@
 // src/components/MultiplayerGameBoard.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import type { PublicGameState, PlayerAction } from '../../shared/类型';
+import type { PublicGameState, PlayerAction } from '../../shared/types';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';

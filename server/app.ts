@@ -167,7 +167,7 @@ function handleStartGame(playerId: string): void {
   }
 }
 
-function handleAction(playerId: string, action: import('../shared/类型').PlayerAction): void {
+function handleAction(playerId: string, action: import('../shared/types').PlayerAction): void {
   const roomId = 玩家房间映射.get(playerId);
   if (!roomId) return;
 

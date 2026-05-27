@@ -1,9 +1,9 @@
 // tests/integration/双人对战.test.ts
 import { describe, it, expect } from 'vitest';
-import { 创建游戏, 开始游戏 } from '@engine/状态';
-import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '@engine/回合';
-import { 使用杀, 使用桃 } from '@engine/效果';
-import { 曹操, 刘备 } from '@shared/角色';
+import { 创建游戏, 开始游戏 } from '@engine/state';
+import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '@engine/turn';
+import { 使用杀, 使用桃 } from '@engine/effect';
+import { 曹操, 刘备 } from '@shared/characters';
 
 describe('双人对战', () => {
   it('应该能完成一局完整的2人游戏流程', () => {

@@ -1,7 +1,7 @@
 // tests/unit/牌组.test.ts
 import { describe, it, expect } from 'vitest';
-import { 洗牌, 摸牌, 弃牌 } from '@shared/牌组';
-import { 创建标准牌堆 } from '@shared/卡牌';
+import { 洗牌, 摸牌, 弃牌 } from '@shared/deck';
+import { 创建标准牌堆 } from '@shared/cards';
 import { createRng } from '@shared/rng';
 
 describe('牌组管理', () => {

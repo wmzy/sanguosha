@@ -1,5 +1,5 @@
 // server/协议.ts
-import type { PublicGameState, TurnPhase, PlayerAction, Role } from '../shared/类型';
+import type { PublicGameState, TurnPhase, PlayerAction, Role } from '../shared/types';
 
 // 服务端 → 客户端
 export type ServerMessage =
