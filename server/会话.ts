@@ -183,8 +183,6 @@ export class GameSession {
   private checkGameEnd(): import('../shared/types').Role | null {
     if (!this.state) return null;
 
-    const _存活玩家 = this.state.玩家列表.filter(p => p.存活);
-
     // 检查体力为0的玩家
     for (const player of this.state.玩家列表) {
       if (player.体力 <= 0 && player.存活) {
@@ -245,13 +243,12 @@ export class GameSession {
     }
   }
 
-  handleDisconnect(_playerId: string): void {
-    // 暂停游戏，等待重连
-    // 简化实现：直接结束游戏
+  handleDisconnect(playerId: string): void {
+    const playerName = this.playerNames.get(playerId) ?? '未知玩家';
     if (this.state?.状态 === '进行中') {
       this.state = { ...this.state, 状态: '已结束' };
       设置房间状态(this.room.id, '已结束');
-      this.broadcast({ type: 'error', message: '玩家断开连接，游戏结束' });
+      this.broadcast({ type: 'error', message: `${playerName} 断开连接，游戏结束` });
     }
   }
 
