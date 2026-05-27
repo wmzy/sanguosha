@@ -131,7 +131,8 @@ export function GameBoard() {
         backgroundColor: '#2c3e50',
         borderRadius: 8,
         padding: 12,
-      }}>
+      }}
+      >
         {消息日志.map((消息, i) => (
           <div key={i} style={{ fontSize: 13, color: '#bdc3c7', marginBottom: 2 }}>{消息}</div>
         ))}

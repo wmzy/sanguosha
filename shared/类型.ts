@@ -12,7 +12,7 @@ export type CardSubType = '杀' | '闪' | '桃' | '锦囊' | '武器' | '防具'
 
 // 卡牌
 export interface Card {
-  name: string;           // "杀", "闪", "桃" — 唯一标识
+  name: string; // "杀", "闪", "桃" — 唯一标识
   类型: CardType;
   子类型: CardSubType;
   花色: Suit;
@@ -73,7 +73,7 @@ export interface Condition {
 
 // 技能配置
 export interface AbilityConfig {
-  name: string;           // "奸雄", "仁德" — 唯一标识
+  name: string; // "奸雄", "仁德" — 唯一标识
   description: string;
   trigger: TriggerType;
   condition?: Condition;
@@ -84,7 +84,7 @@ export interface AbilityConfig {
 
 // 角色配置
 export interface CharacterConfig {
-  name: string;           // "曹操", "刘备" — 唯一标识
+  name: string; // "曹操", "刘备" — 唯一标识
   maxHealth: number;
   gender: Gender;
   faction: Faction;
@@ -95,8 +95,8 @@ export interface CharacterConfig {
 export interface Equipment {
   武器?: Card;
   防具?: Card;
-  马加?: Card;   // +1马
-  马减?: Card;   // -1马
+  马加?: Card; // +1马
+  马减?: Card; // -1马
 }
 
 // 玩家
@@ -116,7 +116,7 @@ export interface GameState {
   玩家列表: Player[];
   牌堆: Card[];
   弃牌堆: Card[];
-  当前玩家: string;       // player name
+  当前玩家: string; // player name
   当前阶段: TurnPhase;
   回合数: number;
   状态: '等待中' | '进行中' | '已结束';
@@ -152,7 +152,7 @@ export type PlayerActionType = '出牌' | '发动技能' | '结束回合' | '弃
 export interface PlayerAction {
   类型: PlayerActionType;
   卡牌?: Card;
-  目标?: string;       // player name
+  目标?: string; // player name
   技能名?: string;
   [key: string]: unknown;
 }
