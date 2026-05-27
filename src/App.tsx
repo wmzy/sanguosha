@@ -43,7 +43,8 @@ export function App() {
         zIndex: 100,
         display: 'flex',
         gap: 10,
-      }}>
+      }}
+      >
         <button
           onClick={() => setMode('lobby')}
           style={{

@@ -13,7 +13,8 @@ interface MultiplayerGameBoardProps {
 }
 
 export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: MultiplayerGameBoardProps) {
-  const wsUrl = `ws://${window.location.hostname}:3001/ws`;
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);
 
   const [gameState, setGameState] = useState<PublicGameState | null>(null);

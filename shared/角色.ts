@@ -78,7 +78,7 @@ export const 张辽: CharacterConfig = {
       effect: { type: 'sequence', steps: [
         { type: 'skipDraw' },
         { type: 'gainCard', source: 'otherPlayers', count: 2 },
-      ]},
+      ] },
     },
   ],
 };
@@ -97,7 +97,7 @@ export const 许褚: CharacterConfig = {
       effect: { type: 'sequence', steps: [
         { type: 'skipDraw' },
         { type: 'dealDamage', bonusDamage: 1, condition: '杀或决斗' },
-      ]},
+      ] },
     },
   ],
 };
@@ -145,7 +145,7 @@ export const 甄姬: CharacterConfig = {
       effect: { type: 'sequence', steps: [
         { type: 'judge', repeatOnBlack: true },
         { type: 'gainCard', source: 'judgeCard' },
-      ]},
+      ] },
     },
   ],
 };
@@ -293,7 +293,7 @@ export const 马超: CharacterConfig = {
       trigger: 'onDamageDealt',
       effect: { type: 'sequence', steps: [
         { type: 'judge', redResult: 'prevent闪' },
-      ]},
+      ] },
     },
   ],
 };
@@ -468,7 +468,7 @@ export const 孙尚香: CharacterConfig = {
       effect: { type: 'sequence', steps: [
         { type: 'discard', count: 2 },
         { type: 'heal', target: 'injuredMaleAlly', amount: 1 },
-      ]},
+      ] },
     },
     {
       name: '枭姬',
@@ -503,7 +503,7 @@ export const 华佗: CharacterConfig = {
       effect: { type: 'sequence', steps: [
         { type: 'discard', count: 1 },
         { type: 'heal', target: 'anyPlayer', amount: 1 },
-      ]},
+      ] },
       oncePerTurn: true,
     },
   ],
@@ -539,7 +539,7 @@ export const 貂蝉: CharacterConfig = {
       effect: { type: 'sequence', steps: [
         { type: 'discard', count: 1 },
         { type: 'dealDamage', condition: '决斗', target: 'malePlayer' },
-      ]},
+      ] },
       oncePerTurn: true,
     },
     {

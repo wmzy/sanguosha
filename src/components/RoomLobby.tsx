@@ -8,7 +8,8 @@ interface RoomLobbyProps {
 }
 
 export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
-  const wsUrl = `ws://${window.location.hostname}:3001/ws`;
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);
 
   const [rooms, setRooms] = useState<RoomInfo[]>([]);

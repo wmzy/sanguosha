@@ -72,7 +72,7 @@ export function 离开房间(roomId: string, playerId: string): Room | null {
 
 export function 设置准备(roomId: string, playerId: string): boolean {
   const room = 房间列表.get(roomId);
-  if (!room || room.status !== '等待中') return false;
+  if (room?.status !== '等待中') return false;
 
   room.readyPlayers.add(playerId);
   return true;

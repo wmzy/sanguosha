@@ -17,8 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "server": "tsx server/index.ts",
-    "dev:all": "concurrently \"pnpm dev\" \"pnpm server\""
+    "server": "tsx server/index.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.2",
@@ -28,7 +27,8 @@
     "@wyw-in-js/shared": "^1.1.0",
     "hono": "^4.12.18",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@babel/plugin-transform-react-jsx": "^7.28.6",
@@ -42,6 +42,7 @@
     "@types/node": "^25.7.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.59.3",
     "@typescript-eslint/parser": "^8.59.3",
     "@vitejs/plugin-react": "^6.0.1",

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import wyw from '@wyw-in-js/vite';
 import path from 'path';
+import { honoApiPlugin } from './server/vite-plugin';
 
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/',
@@ -13,6 +14,7 @@ export default defineConfig({
       exclude: ['node_modules/**'],
       evaluate: false,
     }),
+    honoApiPlugin(),
   ],
   resolve: {
     alias: {
