@@ -4,19 +4,36 @@ import type { GameState } from '../../shared/类型';
 import { 创建游戏, 开始游戏, 获取当前玩家 } from '../../engine/状态';
 import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../../engine/回合';
 import { 使用杀, 使用桃 } from '../../engine/效果';
+import { GameLogger } from '../../engine/logger';
 import { 曹操, 刘备 } from '../../shared/角色';
+import type { Operation } from '../../shared/log';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
+import { LogPanel } from './LogPanel';
 
 export function GameBoard() {
+  const [logger] = useState(() => new GameLogger({
+    version: '1.0.0',
+    createdAt: Date.now(),
+    playerCount: 2,
+    characters: ['曹操', '刘备'],
+    seed: Date.now(),
+  }));
+  const [playerOps, setPlayerOps] = useState<Operation[]>([]);
+
   const [游戏, set游戏] = useState<GameState>(() => {
-    const 初始 = 创建游戏([曹操, 刘备]);
+    const 初始 = 创建游戏([曹操, 刘备], undefined, logger);
+    setPlayerOps(logger.export().playerOps['曹操'] ?? []);
     return 开始游戏(初始);
   });
 
   const [选中的卡牌, set选中的卡牌] = useState<number | null>(null);
   const [消息日志, set消息日志] = useState<string[]>(['游戏开始！']);
+
+  const 更新操作记录 = useCallback(() => {
+    setPlayerOps(logger.export().playerOps['曹操'] ?? []);
+  }, [logger]);
 
   const 添加日志 = useCallback((消息: string) => {
     set消息日志(prev => [...prev, 消息]);
@@ -33,7 +50,7 @@ export function GameBoard() {
     if (卡牌.name === '杀') {
       const 目标 = 游戏.玩家列表.find(p => p.name !== 当前玩家.name && p.存活);
       if (目标) {
-        const 结果 = 使用杀(游戏, 当前玩家.name, 目标.name);
+        const 结果 = 使用杀(游戏, 当前玩家.name, 目标.name, logger);
         if (结果.成功) {
           添加日志(结果.消息);
           const 新手牌 = [...当前玩家.手牌];
@@ -44,12 +61,13 @@ export function GameBoard() {
               p.name === 当前玩家.name ? { ...p, 手牌: 新手牌 } : p,
             ),
           }));
+          更新操作记录();
         } else {
           添加日志(结果.消息);
         }
       }
     } else if (卡牌.name === '桃') {
-      const 结果 = 使用桃(游戏, 当前玩家.name);
+      const 结果 = 使用桃(游戏, 当前玩家.name, logger);
       if (结果.成功) {
         添加日志(结果.消息);
         const 新手牌 = [...当前玩家.手牌];
@@ -60,34 +78,36 @@ export function GameBoard() {
             p.name === 当前玩家.name ? { ...p, 手牌: 新手牌 } : p,
           ),
         }));
+        更新操作记录();
       } else {
         添加日志(结果.消息);
       }
     }
 
     set选中的卡牌(null);
-  }, [游戏, 选中的卡牌, 当前玩家, 添加日志]);
+  }, [游戏, 选中的卡牌, 当前玩家, 添加日志, logger, 更新操作记录]);
 
   const 处理结束回合 = useCallback(() => {
     let 新游戏 = 游戏;
     while (新游戏.当前阶段 !== '准备' || 新游戏.当前玩家 === 当前玩家.name) {
       if (新游戏.当前阶段 === '摸牌') {
-        const 结果 = 摸牌阶段(新游戏);
+        const 结果 = 摸牌阶段(新游戏, logger);
         新游戏 = 结果.状态;
         添加日志(结果.消息);
       }
       if (新游戏.当前阶段 === '弃牌') {
         const 需要弃牌 = 弃牌阶段检查(新游戏);
         if (需要弃牌) {
-          新游戏 = 弃牌阶段执行(新游戏, [0]);
+          新游戏 = 弃牌阶段执行(新游戏, [0], logger);
         }
       }
-      新游戏 = 进入下一阶段(新游戏);
+      新游戏 = 进入下一阶段(新游戏, logger);
       if (新游戏.当前阶段 === '准备' && 新游戏.当前玩家 !== 当前玩家.name) break;
     }
     set游戏(新游戏);
     添加日志(`轮到 ${新游戏.当前玩家} 的回合`);
-  }, [游戏, 当前玩家, 添加日志]);
+    更新操作记录();
+  }, [游戏, 当前玩家, 添加日志, logger, 更新操作记录]);
 
   return (
     <div style={{ padding: 20, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee' }}>
@@ -125,18 +145,7 @@ export function GameBoard() {
         />
       </div>
 
-      <div style={{
-        maxHeight: 200,
-        overflow: 'auto',
-        backgroundColor: '#2c3e50',
-        borderRadius: 8,
-        padding: 12,
-      }}
-      >
-        {消息日志.map((消息, i) => (
-          <div key={i} style={{ fontSize: 13, color: '#bdc3c7', marginBottom: 2 }}>{消息}</div>
-        ))}
-      </div>
+      <LogPanel operations={playerOps} />
     </div>
   );
 }
