@@ -50,9 +50,10 @@ app.get(
   }),
 );
 
-const port = parseInt(process.env.PORT ?? '3001');
-const server = serve({ fetch: app.fetch, port });
+const port = parseInt(process.env.PORT ?? '3930');
+const host = process.env.HOST ?? '0.0.0.0';
+const server = serve({ fetch: app.fetch, port, hostname: host });
 injectWebSocket(server);
 
-console.warn(`服务器运行在 http://localhost:${port}`);
-console.warn(`WebSocket端点: ws://localhost:${port}/ws`);
+console.warn(`服务器运行在 http://${host}:${port}`);
+console.warn(`WebSocket端点: ws://${host}:${port}/ws`);

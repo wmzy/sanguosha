@@ -30,7 +30,7 @@ export default defineConfig({
     target: 'esnext',
   },
   server: {
-    port: parseInt(process.env.PORT || '3000'),
-    host: true,
+    port: parseInt(process.env.PORT ?? '3930'),
+    host: process.env.HOST ?? true,
   },
 });
