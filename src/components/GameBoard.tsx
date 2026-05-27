@@ -35,7 +35,6 @@ export function GameBoard() {
     setPlayerOps(logger.export().playerOps['曹操'] ?? []);
   }, [logger]);
 
-
   const 当前玩家 = 获取当前玩家(游戏);
 
   const handleSaveLog = useCallback(() => {

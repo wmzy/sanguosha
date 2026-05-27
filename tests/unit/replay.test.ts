@@ -20,7 +20,7 @@ describe('ReplayEngine', () => {
     游戏 = 进入下一阶段(游戏, logger); // 准备 → 判定
     游戏 = 进入下一阶段(游戏, logger); // 判定 → 摸牌
     const 摸牌结果 = 摸牌阶段(游戏, logger);
-    游戏 = 摸牌结果.状态;
+    void 摸牌结果;
 
     return logger.export();
   }

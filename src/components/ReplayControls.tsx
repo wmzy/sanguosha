@@ -58,7 +58,8 @@ export function ReplayControls({
       borderRadius: 8,
       padding: 16,
       marginBottom: 16,
-    }}>
+    }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <button onClick={onPrev} disabled={currentStep <= 0} style={btnStyle}>
           上一步

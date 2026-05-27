@@ -60,7 +60,8 @@ export function ReplayBoard({ log, onExit }: ReplayBoardProps) {
           padding: 12,
           marginBottom: 16,
           fontSize: 14,
-        }}>
+        }}
+        >
           <span style={{ color: '#e74c3c' }}>当前操作:</span> {currentOp.description}
         </div>
       )}

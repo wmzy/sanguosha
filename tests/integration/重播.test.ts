@@ -28,9 +28,7 @@ describe('完整重播流程', () => {
 
     // 使用杀
     const 杀结果 = 使用杀(游戏, '曹操', '刘备', logger);
-    if (杀结果.成功) {
-      游戏 = 杀结果.状态;
-    }
+    expect(杀结果.成功).toBe(true);
 
     // 导出日志
     const log = logger.export();
@@ -67,7 +65,7 @@ describe('完整重播流程', () => {
       游戏 = 进入下一阶段(游戏, logger);
       游戏 = 进入下一阶段(游戏, logger);
       const 摸牌结果 = 摸牌阶段(游戏, logger);
-      游戏 = 摸牌结果.状态;
+      void 摸牌结果;
       return logger.export();
     }
 
