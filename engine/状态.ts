@@ -2,9 +2,11 @@
 import type { GameState, Player, PublicGameState, CharacterConfig, Role } from '../shared/类型';
 import { 创建标准牌堆 } from '../shared/卡牌';
 import { 洗牌 } from '../shared/牌组';
+import { createRng } from '../shared/rng';
 
-export function 创建游戏(角色列表: CharacterConfig[]): GameState {
-  const 牌堆 = 洗牌(创建标准牌堆());
+export function 创建游戏(角色列表: CharacterConfig[], seed?: number): GameState {
+  const rng = createRng(seed ?? Date.now());
+  const 牌堆 = 洗牌(创建标准牌堆(), rng);
 
   const 身份列表 = 分配身份(角色列表.length);
 

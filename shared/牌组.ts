@@ -1,11 +1,12 @@
 // shared/牌组.ts
 import type { Card } from './类型';
+import type { Rng } from './rng';
 
 // Fisher-Yates 洗牌算法
-export function 洗牌(牌堆: Card[]): Card[] {
+export function 洗牌(牌堆: Card[], rng: Rng): Card[] {
   const 结果 = [...牌堆];
   for (let i = 结果.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = rng.nextInt(i + 1);
     [结果[i], 结果[j]] = [结果[j], 结果[i]];
   }
   return 结果;
