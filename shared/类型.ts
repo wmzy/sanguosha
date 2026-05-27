@@ -42,6 +42,7 @@ export type TriggerType =
   | 'onCardDrawn'
   | 'onKill'
   | 'onDeath'
+  | 'onHealReceived'
   | 'manual';
 
 // 效果类型
