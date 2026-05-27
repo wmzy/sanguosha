@@ -151,11 +151,11 @@ describe('房间管理', () => {
 
   it('应该根据玩家ID查找房间', () => {
     const hostWS = createMockWS();
-    const room = 创建房间('唯一房间_' + Date.now(), 4, 'unique_host_' + Date.now(), hostWS);
+    const uniqueId = 'unique_host_' + Date.now();
+    const room = 创建房间('唯一房间_' + Date.now(), 4, uniqueId, hostWS);
 
-    const result = 根据玩家ID查找房间('unique_host_' + Date.now());
-    // 注意：由于全局状态共享，这个测试可能找到其他房间
-    // 在实际应用中，应该使用依赖注入来隔离状态
+    const result = 根据玩家ID查找房间(uniqueId);
     expect(result).not.toBeNull();
+    expect(result!.id).toBe(room.id);
   });
 });
