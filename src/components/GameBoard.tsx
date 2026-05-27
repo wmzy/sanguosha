@@ -6,6 +6,8 @@ import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执�
 import { 使用杀, 使用桃 } from '../../engine/效果';
 import { 曹操, 刘备 } from '../../shared/角色';
 import { PlayerPanel } from './PlayerPanel';
+import { HandCards } from './HandCards';
+import { ActionPanel } from './ActionPanel';
 
 export function GameBoard() {
   const [游戏, set游戏] = useState<GameState>(() => {
@@ -106,55 +108,21 @@ export function GameBoard() {
         <span>回合 {游戏.回合数} | 阶段: {游戏.当前阶段} | 当前玩家: {游戏.当前玩家}</span>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
-        {当前玩家.手牌.map((卡牌, 索引) => (
-          <div
-            key={索引}
-            onClick={() => set选中的卡牌(选中的卡牌 === 索引 ? null : 索引)}
-            style={{
-              border: 选中的卡牌 === 索引 ? '2px solid #e74c3c' : '2px solid #7f8c8d',
-              borderRadius: 8,
-              padding: 12,
-              backgroundColor: '#2c3e50',
-              cursor: 'pointer',
-              minWidth: 80,
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{卡牌.name}</div>
-            <div style={{ fontSize: 12, color: '#95a5a6' }}>{卡牌.花色}{卡牌.点数}</div>
-          </div>
-        ))}
+      <div style={{ marginBottom: 20 }}>
+        <HandCards
+          手牌={当前玩家.手牌}
+          选中索引={选中的卡牌}
+          选择卡牌={(索引) => set选中的卡牌(索引 === -1 ? null : 索引)}
+        />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
-        <button
-          onClick={处理出牌}
-          disabled={选中的卡牌 === null}
-          style={{
-            padding: '8px 24px',
-            backgroundColor: 选中的卡牌 !== null ? '#e74c3c' : '#7f8c8d',
-            color: 'white',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 选中的卡牌 !== null ? 'pointer' : 'not-allowed',
-          }}
-        >
-          出牌
-        </button>
-        <button
-          onClick={处理结束回合}
-          style={{
-            padding: '8px 24px',
-            backgroundColor: '#3498db',
-            color: 'white',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-          }}
-        >
-          结束回合
-        </button>
+      <div style={{ marginBottom: 20 }}>
+        <ActionPanel
+          能出牌={选中的卡牌 !== null && 游戏.当前阶段 === '出牌'}
+          能结束回合={游戏.当前玩家 === '曹操' && 游戏.当前阶段 === '出牌'}
+          出牌={处理出牌}
+          结束回合={处理结束回合}
+        />
       </div>
 
       <div style={{
