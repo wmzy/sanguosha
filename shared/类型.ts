@@ -8,7 +8,10 @@ export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 
 export type CardType = '基本牌' | '锦囊牌' | '装备牌';
 
 // 卡牌子类型
-export type CardSubType = '杀' | '闪' | '桃' | '锦囊' | '武器' | '防具' | '马';
+export type CardSubType = '杀' | '闪' | '桃' | '锦囊' | '武器' | '防具' | '马' | '进攻马' | '防御马';
+
+// 锦囊子类型
+export type TrickSubType = '普通锦囊' | '延时锦囊' | '响应锦囊';
 
 // 卡牌
 export interface Card {
@@ -18,6 +21,8 @@ export interface Card {
   花色: Suit;
   点数: Rank;
   描述: string;
+  距离?: number; // 武器攻击范围
+  锦囊子类型?: TrickSubType;
 }
 
 // 角色性别
@@ -43,6 +48,10 @@ export type TriggerType =
   | 'onKill'
   | 'onDeath'
   | 'onHealReceived'
+  | 'onJudge'
+  | 'onTargeted'
+  | 'onHandEmpty'
+  | 'onEquipChange'
   | 'manual';
 
 // 效果类型
@@ -55,7 +64,12 @@ export type EffectType =
   | 'skipPhase'
   | 'conditional'
   | 'sequence'
-  | 'giveCards';
+  | 'giveCards'
+  | 'skipDraw'
+  | 'judge'
+  | 'convert'
+  | 'redirect'
+  | 'lookAtTopCards';
 
 // 效果定义
 export interface Effect {
