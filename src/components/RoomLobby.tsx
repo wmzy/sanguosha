@@ -1,7 +1,7 @@
 // src/components/RoomLobby.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import type { ServerMessage, RoomInfo } from '../../server/协议';
+import type { RoomInfo } from '../../server/协议';
 
 interface RoomLobbyProps {
   onJoinRoom: (roomId: string, playerId: string) => void;
@@ -37,7 +37,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
   useEffect(() => {
     if (!lastMessage) return;
 
-    const message = lastMessage as ServerMessage;
+    const message = lastMessage;
 
     switch (message.type) {
       case 'room_list':
@@ -113,7 +113,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-      }}>
+      }}
+      >
         <h1 style={{ marginBottom: 30 }}>房间: {currentRoom}</h1>
 
         <div style={{
@@ -122,7 +123,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
           padding: 30,
           minWidth: 300,
           marginBottom: 20,
-        }}>
+        }}
+        >
           <h2 style={{ marginBottom: 20 }}>玩家列表</h2>
           <div style={{ marginBottom: 20 }}>
             <div style={{ padding: '8px 0', borderBottom: '1px solid #34495e' }}>
@@ -193,7 +195,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
             padding: '10px 20px',
             borderRadius: 6,
             marginTop: 10,
-          }}>
+          }}
+          >
             {error}
           </div>
         )}
@@ -208,7 +211,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
       backgroundColor: '#1a1a2e',
       minHeight: '100vh',
       color: '#eee',
-    }}>
+    }}
+    >
       <h1 style={{ textAlign: 'center', marginBottom: 40 }}>三国杀 - 多人对战</h1>
 
       <div style={{
@@ -216,14 +220,16 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
         justifyContent: 'center',
         gap: 40,
         flexWrap: 'wrap',
-      }}>
+      }}
+      >
         {/* 创建房间 */}
         <div style={{
           backgroundColor: '#2c3e50',
           borderRadius: 12,
           padding: 30,
           minWidth: 300,
-        }}>
+        }}
+        >
           <h2 style={{ marginBottom: 20 }}>创建房间</h2>
 
           <div style={{ marginBottom: 15 }}>
@@ -293,7 +299,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
           padding: 30,
           minWidth: 300,
           maxWidth: 400,
-        }}>
+        }}
+        >
           <h2 style={{ marginBottom: 20 }}>房间列表</h2>
 
           <div style={{ marginBottom: 15 }}>
@@ -365,7 +372,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
         textAlign: 'center',
         marginTop: 30,
         color: connected ? '#2ecc71' : '#e74c3c',
-      }}>
+      }}
+      >
         {connected ? '已连接到服务器' : '未连接，请检查服务器是否启动'}
       </div>
 
@@ -378,7 +386,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
           padding: '15px 25px',
           borderRadius: 8,
           zIndex: 1000,
-        }}>
+        }}
+        >
           {error}
         </div>
       )}

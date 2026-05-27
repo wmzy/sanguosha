@@ -1,8 +1,7 @@
 // src/components/MultiplayerGameBoard.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import type { ServerMessage, ClientMessage } from '../../server/协议';
-import type { PublicGameState, PlayerAction, Card } from '../../shared/类型';
+import type { PublicGameState, PlayerAction } from '../../shared/类型';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
@@ -13,7 +12,7 @@ interface MultiplayerGameBoardProps {
   onLeave: () => void;
 }
 
-export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerGameBoardProps) {
+export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: MultiplayerGameBoardProps) {
   const wsUrl = `ws://${window.location.hostname}:3001/ws`;
   const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);
 
@@ -39,7 +38,7 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
   useEffect(() => {
     if (!lastMessage) return;
 
-    const message = lastMessage as ServerMessage;
+    const message = lastMessage;
 
     switch (message.type) {
       case 'state_update':
@@ -76,7 +75,6 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
   }, [lastMessage]);
 
   // 获取当前玩家信息
-  const currentPlayer = gameState?.玩家列表.find(p => p.name === gameState.当前玩家);
   const myPlayer = gameState?.玩家列表.find(p => {
     // 通过位置匹配，因为playerId和playerName不同
     const index = gameState.玩家列表.indexOf(p);
@@ -123,7 +121,8 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-      }}>
+      }}
+      >
         <div style={{ textAlign: 'center' }}>
           <h2>等待游戏开始...</h2>
           <p style={{ color: '#95a5a6' }}>房间号: {roomId}</p>
@@ -172,7 +171,7 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
             key={player.name}
             玩家={{
               ...player,
-              手牌: player.手牌 || [],
+              手牌: player.手牌 ?? [],
             }}
             是当前玩家={player.name === gameState.当前玩家}
             是自己={index === 0} // 简化：第一个玩家是自己
@@ -214,7 +213,8 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
         backgroundColor: '#2c3e50',
         borderRadius: 8,
         padding: 12,
-      }}>
+      }}
+      >
         {log.map((msg, i) => (
           <div key={i} style={{ fontSize: 13, color: '#bdc3c7', marginBottom: 2 }}>{msg}</div>
         ))}
@@ -233,13 +233,15 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1000,
-        }}>
+        }}
+        >
           <div style={{
             backgroundColor: '#2c3e50',
             borderRadius: 12,
             padding: 40,
             textAlign: 'center',
-          }}>
+          }}
+          >
             <h2 style={{ marginBottom: 20 }}>游戏结束！</h2>
             <p style={{ fontSize: 24, color: '#f1c40f', marginBottom: 30 }}>{gameOver.winner} 获胜！</p>
             <button
@@ -270,7 +272,8 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
           padding: '15px 25px',
           borderRadius: 8,
           zIndex: 1000,
-        }}>
+        }}
+        >
           {error}
         </div>
       )}
@@ -284,7 +287,8 @@ export function MultiplayerGameBoard({ roomId, playerId, onLeave }: MultiplayerG
           backgroundColor: '#e74c3c',
           padding: '10px 20px',
           borderRadius: 6,
-        }}>
+        }}
+        >
           连接断开，正在重连...
         </div>
       )}

@@ -1,5 +1,6 @@
 // tests/unit/会话.test.ts
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import type { WSContext } from 'hono/ws';
 import { GameSession } from '../../server/会话';
 import type { Room } from '../../server/房间';
 
@@ -10,14 +11,13 @@ function createMockWS() {
     send: (data: string) => messages.push(data),
     close: () => {},
     getMessages: () => messages,
-  } as any;
+  } as unknown as WSContext & { getMessages: () => string[] };
 }
 
 function createMockRoom(players: string[]): Room {
-  const playerMap = new Map<string, any>();
-  players.forEach(id => {
-    playerMap.set(id, createMockWS());
-  });
+  const playerMap = new Map(
+    players.map(id => [id, createMockWS()] as [string, WSContext]),
+  );
 
   return {
     id: 'test-room',
@@ -124,8 +124,8 @@ describe('GameSession', () => {
     ws2.getMessages().length = 0;
 
     // 找出当前玩家
-    const player1Name = session.getPlayerName('player1');
-    const player2Name = session.getPlayerName('player2');
+    const _player1Name = session.getPlayerName('player1');
+    const _player2Name = session.getPlayerName('player2');
 
     // 尝试让非当前玩家执行动作
     // 这里需要根据实际游戏状态来判断谁是当前玩家

@@ -36,8 +36,8 @@ const 玩家房间映射 = new Map<string, string>();
 // REST API
 app.post('/api/rooms', async (c) => {
   const body = await c.req.json<{ name?: string; maxPlayers?: number }>();
-  const name = body.name || '新房间';
-  const maxPlayers = body.maxPlayers || 2;
+  const _name = body.name ?? '新房间';
+  const _maxPlayers = body.maxPlayers ?? 2;
   const hostId = 生成玩家号();
 
   // 这里需要WebSocket连接才能创建房间，所以实际创建在WebSocket连接时进行
@@ -64,13 +64,13 @@ app.get('/api/rooms/:id', (c) => {
 // WebSocket端点
 app.get(
   '/ws',
-  upgradeWebSocket((c) => {
+  upgradeWebSocket((_c) => {
     let 当前玩家ID: string | null = null;
 
     return {
-      onOpen(_event, ws) {
+      onOpen(_event, _ws) {
         当前玩家ID = 生成玩家ID();
-        console.log(`玩家 ${当前玩家ID} 已连接`);
+        console.warn(`玩家 ${当前玩家ID} 已连接`);
       },
 
       onMessage(event, ws) {
@@ -92,18 +92,18 @@ app.get(
 
       onClose(_event, _ws) {
         if (当前玩家ID) {
-          console.log(`玩家 ${当前玩家ID} 已断开`);
+          console.warn(`玩家 ${当前玩家ID} 已断开`);
           handleDisconnect(当前玩家ID);
         }
       },
     };
-  })
+  }),
 );
 
 function handleMessage(
   playerId: string,
   message: import('./协议').ClientMessage,
-  ws: WSContext
+  ws: WSContext,
 ): void {
   switch (message.type) {
     case 'create_room':
@@ -144,7 +144,7 @@ function handleCreateRoom(
   playerId: string,
   name: string,
   maxPlayers: number,
-  ws: WSContext
+  ws: WSContext,
 ): void {
   // 如果玩家已在房间中，先离开
   const existingRoom = 根据玩家ID查找房间(playerId);
@@ -189,7 +189,7 @@ function handleJoinRoom(playerId: string, roomId: string, ws: WSContext): void {
   广播消息(
     room,
     serialize({ type: 'player_joined', playerId }),
-    playerId
+    playerId,
   );
 }
 
@@ -240,7 +240,7 @@ function handleAction(playerId: string, action: import('../shared/类型').Playe
 
 function handleResponse(playerId: string, promptId: string, choice: unknown): void {
   // 简化实现
-  console.log(`玩家 ${playerId} 响应 ${promptId}:`, choice);
+  console.warn(`玩家 ${playerId} 响应 ${promptId}:`, choice);
 }
 
 function handleLeaveRoom(playerId: string): void {
@@ -282,9 +282,9 @@ function 生成玩家号(): string {
 }
 
 // 启动服务器
-const port = parseInt(process.env.PORT || '3001');
+const port = parseInt(process.env.PORT ?? '3001');
 const server = serve({ fetch: app.fetch, port });
 injectWebSocket(server);
 
-console.log(`服务器运行在 http://localhost:${port}`);
-console.log(`WebSocket端点: ws://localhost:${port}/ws`);
+console.warn(`服务器运行在 http://localhost:${port}`);
+console.warn(`WebSocket端点: ws://localhost:${port}/ws`);

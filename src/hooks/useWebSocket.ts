@@ -23,7 +23,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
     ws.onopen = () => {
       setConnected(true);
-      console.log('WebSocket 已连接');
+      console.warn('WebSocket 已连接');
     };
 
     ws.onmessage = (event) => {
@@ -38,11 +38,11 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     ws.onclose = () => {
       setConnected(false);
       wsRef.current = null;
-      console.log('WebSocket 已断开');
+      console.warn('WebSocket 已断开');
 
       // 自动重连
       reconnectTimeoutRef.current = setTimeout(() => {
-        console.log('尝试重新连接...');
+        console.warn('尝试重新连接...');
         connect();
       }, 3000);
     };

@@ -1,6 +1,5 @@
 // server/会话.ts
-import type { WSContext } from 'hono/ws';
-import type { GameState, PublicGameState, PlayerAction } from '../shared/类型';
+import type { GameState, PlayerAction } from '../shared/类型';
 import type { Room } from './房间';
 import { 创建游戏, 获取公开状态, 开始游戏 } from '../engine/状态';
 import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../engine/回合';
@@ -187,7 +186,7 @@ export class GameSession {
   private checkGameEnd(): import('../shared/类型').Role | null {
     if (!this.state) return null;
 
-    const 存活玩家 = this.state.玩家列表.filter(p => p.存活);
+    const _存活玩家 = this.state.玩家列表.filter(p => p.存活);
 
     // 检查体力为0的玩家
     for (const player of this.state.玩家列表) {
@@ -249,10 +248,10 @@ export class GameSession {
     }
   }
 
-  handleDisconnect(playerId: string): void {
+  handleDisconnect(_playerId: string): void {
     // 暂停游戏，等待重连
     // 简化实现：直接结束游戏
-    if (this.state && this.state.状态 === '进行中') {
+    if (this.state?.状态 === '进行中') {
       this.state = { ...this.state, 状态: '已结束' };
       设置房间状态(this.room.id, '已结束');
       this.broadcast({ type: 'error', message: '玩家断开连接，游戏结束' });

@@ -1,5 +1,6 @@
 // tests/unit/房间.test.ts
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { WSContext } from 'hono/ws';
 import {
   创建房间,
   加入房间,
@@ -12,11 +13,11 @@ import {
 } from '../../server/房间';
 
 // Mock WebSocket context
-function createMockWS() {
+function createMockWS(): WSContext {
   return {
     send: () => {},
     close: () => {},
-  } as any;
+  } as unknown as WSContext;
 }
 
 describe('房间管理', () => {
@@ -151,8 +152,8 @@ describe('房间管理', () => {
 
   it('应该根据玩家ID查找房间', () => {
     const hostWS = createMockWS();
-    const uniqueId = 'unique_host_' + Date.now();
-    const room = 创建房间('唯一房间_' + Date.now(), 4, uniqueId, hostWS);
+    const uniqueId = `unique_host_${Date.now()}`;
+    const room = 创建房间(`唯一房间_${Date.now()}`, 4, uniqueId, hostWS);
 
     const result = 根据玩家ID查找房间(uniqueId);
     expect(result).not.toBeNull();
