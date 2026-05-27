@@ -1,6 +1,6 @@
 // tests/unit/效果.test.ts
 import { describe, it, expect } from 'vitest';
-import { 使用杀, 使用桃, 解析效果 } from '@engine/效果';
+import { 使用杀, 使用桃 } from '@engine/效果';
 import { 创建游戏 } from '@engine/状态';
 import { 曹操, 刘备 } from '@shared/角色';
 

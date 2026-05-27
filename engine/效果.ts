@@ -1,6 +1,5 @@
 // engine/效果.ts
-import type { GameState, Player } from '../shared/类型';
-import { 获取当前玩家 } from './状态';
+import type { GameState } from '../shared/类型';
 
 interface EffectResult {
   成功: boolean;
@@ -64,7 +63,7 @@ export function 使用桃(游戏: GameState, 使用者名: string): EffectResult
   };
 }
 
-export function 解析效果(游戏: GameState, 效果: Record<string, unknown>): EffectResult {
+export function 解析效果(游戏: GameState, _效果: Record<string, unknown>): EffectResult {
   // 通用效果解析器，后续扩展
   return { 成功: false, 状态: 游戏, 消息: '未实现的效果类型' };
 }
