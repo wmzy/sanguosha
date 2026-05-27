@@ -11,6 +11,7 @@ import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
 import { LogPanel } from './LogPanel';
+import { saveLog } from '../utils/logFile';
 
 export function GameBoard() {
   const [logger] = useState(() => new GameLogger({
@@ -36,6 +37,10 @@ export function GameBoard() {
 
 
   const 当前玩家 = 获取当前玩家(游戏);
+
+  const handleSaveLog = useCallback(() => {
+    saveLog(logger.export());
+  }, [logger]);
 
   const 处理出牌 = useCallback(() => {
     if (选中的卡牌 === null) return;
@@ -131,6 +136,12 @@ export function GameBoard() {
           出牌={处理出牌}
           结束回合={处理结束回合}
         />
+      </div>
+
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <button onClick={handleSaveLog} style={{ padding: '8px 20px', backgroundColor: '#9b59b6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+          保存日志
+        </button>
       </div>
 
       <LogPanel operations={playerOps} />
