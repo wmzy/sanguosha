@@ -86,13 +86,9 @@ export class GameSession {
 
   private handlePlayCard(playerName: string, action: PlayerAction): void {
     if (!this.state) return;
+    if (action.类型 !== '出牌') return;
 
     const card = action.卡牌;
-    if (!card) {
-      this.sendToPlayerByName(playerName, { type: 'error', message: '未选择卡牌' });
-      return;
-    }
-
     if (card.name === '杀') {
       const target = action.目标;
       if (!target) {
@@ -142,8 +138,9 @@ export class GameSession {
 
   private handleDiscard(playerName: string, action: PlayerAction): void {
     if (!this.state) return;
+    if (action.类型 !== '弃牌') return;
     // 简化：弃第一张牌
-    const card = action.卡牌;
+    const card = action.卡牌[0];
     if (card) {
       const player = this.state.玩家列表.find(p => p.name === playerName);
       if (player) {

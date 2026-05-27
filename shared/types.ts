@@ -54,34 +54,29 @@ export type TriggerType =
   | 'onEquipChange'
   | 'manual';
 
-// 效果类型
-export type EffectType =
-  | 'draw'
-  | 'dealDamage'
-  | 'heal'
-  | 'discard'
-  | 'gainCard'
-  | 'skipPhase'
-  | 'conditional'
-  | 'sequence'
-  | 'giveCards'
-  | 'skipDraw'
-  | 'judge'
-  | 'convert'
-  | 'redirect'
-  | 'lookAtTopCards';
-
-// 效果定义
-export interface Effect {
-  type: EffectType;
-  [key: string]: unknown;
-}
+// 效果定义（可辨识联合类型）
+export type Effect =
+  | { type: 'draw'; count: number | 'sameAsDiscarded' }
+  | { type: 'dealDamage'; amount?: number; target?: string; condition?: string; bonusDamage?: number }
+  | { type: 'heal'; target: string; amount: number }
+  | { type: 'discard'; count: number | 'any'; target?: string }
+  | { type: 'gainCard'; source: string; count?: number }
+  | { type: 'skipPhase'; target?: string }
+  | { type: 'conditional'; condition: Condition; then: Effect; else?: Effect }
+  | { type: 'sequence'; steps: Effect[] }
+  | { type: 'giveCards'; count: number | 'any'; target: string }
+  | { type: 'skipDraw' }
+  | { type: 'judge'; condition?: string; expectedSuit?: string; repeatOnBlack?: boolean; redResult?: string; failEffect?: string }
+  | { type: 'convert'; from: string; to: string }
+  | { type: 'redirect'; from: string; to: string }
+  | { type: 'lookAtTopCards'; count: number | string };
 
 // 条件定义
 export interface Condition {
   phase?: TurnPhase;
   hasHandCards?: boolean;
   cardsGivenThisPhase?: { gte?: number; lte?: number };
+  targetCard?: string;
   [key: string]: unknown;
 }
 
@@ -160,13 +155,10 @@ export interface Prompt {
   超时?: number;
 }
 
-// 玩家动作
-export type PlayerActionType = '出牌' | '发动技能' | '结束回合' | '弃牌' | '响应';
-
-export interface PlayerAction {
-  类型: PlayerActionType;
-  卡牌?: Card;
-  目标?: string; // player name
-  技能名?: string;
-  [key: string]: unknown;
-}
+// 玩家动作（可辨识联合类型）
+export type PlayerAction =
+  | { 类型: '出牌'; 卡牌: Card; 目标?: string }
+  | { 类型: '发动技能'; 技能名: string; 目标?: string }
+  | { 类型: '结束回合' }
+  | { 类型: '弃牌'; 卡牌: Card[] }
+  | { 类型: '响应'; 卡牌?: Card; 目标?: string };
