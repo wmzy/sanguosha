@@ -10,25 +10,52 @@ export function GameBoard() {
     me,
     isMyTurn,
     selectedCard,
-    setSelectedCard,
+    selectCard,
+    selectedTarget,
+    setSelectedTarget,
+    canPlay,
     playerOps,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,
   } = useGame();
 
+  // 判断选中的牌是否需要选择目标
+  const selectedCardData = selectedCard !== null ? me.hand[selectedCard] : null;
+  const needsTarget = selectedCardData && ['杀', '过河拆桥', '顺手牵羊', '决斗'].includes(selectedCardData.name);
+
   return (
     <div style={{ padding: 20, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee' }}>
       <h1 style={{ textAlign: 'center', marginBottom: 20 }}>三国杀</h1>
 
+      {needsTarget && (
+        <div style={{ textAlign: 'center', marginBottom: 16, color: '#f39c12', fontSize: 14 }}>
+          请选择目标玩家（点击玩家面板）
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 30 }}>
         {game.players.map(player => (
-          <PlayerPanel
+          <div
             key={player.name}
-            player={player}
-            isCurrentPlayer={player.name === game.currentPlayer}
-            isSelf={player.name === '曹操'}
-          />
+            onClick={() => {
+              if (needsTarget && player.name !== '曹操' && player.alive) {
+                setSelectedTarget(player.name === selectedTarget ? null : player.name);
+              }
+            }}
+            style={{
+              cursor: needsTarget && player.name !== '曹操' && player.alive ? 'pointer' : 'default',
+              outline: selectedTarget === player.name ? '3px solid #e74c3c' : 'none',
+              borderRadius: 12,
+              transition: 'outline 0.2s',
+            }}
+          >
+            <PlayerPanel
+              player={player}
+              isCurrentPlayer={player.name === game.currentPlayer}
+              isSelf={player.name === '曹操'}
+            />
+          </div>
         ))}
       </div>
 
@@ -41,13 +68,13 @@ export function GameBoard() {
         <HandCards
           hand={me.hand}
           selectedIndex={selectedCard}
-          onSelectCard={(index) => setSelectedCard(index === -1 ? null : index)}
+          onSelectCard={selectCard}
         />
       </div>
 
       <div style={{ marginBottom: 20 }}>
         <ActionPanel
-          canPlay={selectedCard !== null && isMyTurn && game.phase === '出牌'}
+          canPlay={canPlay}
           canEndTurn={isMyTurn && game.phase === '出牌'}
           onPlayCard={handlePlayCard}
           onEndTurn={handleEndTurn}

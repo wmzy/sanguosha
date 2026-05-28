@@ -55,6 +55,7 @@ export function useGame() {
   });
 
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
 
   const updateOps = useCallback(() => {
     setPlayerOps(logger.export().playerOps['曹操'] ?? []);
@@ -69,19 +70,44 @@ export function useGame() {
 
   const isMyTurn = game.currentPlayer === '曹操';
 
+  // 判断选中的牌是否需要选择目标
+  const needsTarget = useCallback((cardName: string): boolean => {
+    return ['杀', '过河拆桥', '顺手牵羊', '决斗'].includes(cardName);
+  }, []);
+
+  // 判断选中的牌是否可以主动使用
+  const isPlayable = useCallback((card: typeof me.hand[0]): boolean => {
+    if (card.name === '杀') return true; // 需要目标，但可以出
+    if (card.name === '桃') return me.health < me.maxHealth; // 满血不能用
+    if (card.name === '闪') return false; // 响应牌，不能主动出
+    if (card.name === '无懈可击') return false; // 响应牌
+    if (card.subtype === '武器' || card.subtype === '防具' || card.subtype === '进攻马' || card.subtype === '防御马') return true;
+    if (['过河拆桥', '顺手牵羊', '无中生有', '决斗', '万箭齐发', '南蛮入侵', '桃园结义', '五谷丰登'].includes(card.name)) return true;
+    return false;
+  }, [me.health, me.maxHealth]);
+
+  // 当前选中的牌是否可以出
+  const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && (() => {
+    const card = me.hand[selectedCard];
+    if (!card) return false;
+    if (!isPlayable(card)) return false;
+    if (needsTarget(card.name) && !selectedTarget) return false;
+    return true;
+  })();
+
   const handlePlayCard = useCallback(() => {
     if (selectedCard === null || !isMyTurn) return;
 
     const card = me.hand[selectedCard];
-    if (!card) return;
+    if (!card || !isPlayable(card)) return;
 
     let newGame = game;
     let success = false;
 
     if (card.name === '杀') {
-      const target = game.players.find(p => p.name !== me.name && p.alive);
+      const target = selectedTarget || game.players.find(p => p.name !== me.name && p.alive)?.name;
       if (target) {
-        const result = playKill(game, me.name, target.name, logger);
+        const result = playKill(game, me.name, target, logger);
         if (result.success) {
           newGame = result.status;
           success = true;
@@ -110,18 +136,18 @@ export function useGame() {
       logger.logServerOp('equip', { player: me.name, card: card.name }, `${me.name} 装备了 ${card.name}`);
       logger.logPlayerOp(me.name, 'equip', { player: me.name, card: card.name }, `你装备了 ${card.name}`);
     } else if (card.name === '过河拆桥') {
-      const target = game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0);
+      const target = selectedTarget || game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0)?.name;
       if (target) {
-        const result = playDismantle(game, me.name, target.name, logger);
+        const result = playDismantle(game, me.name, target, logger);
         if (result.success) {
           newGame = result.status;
           success = true;
         }
       }
     } else if (card.name === '顺手牵羊') {
-      const target = game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0);
+      const target = selectedTarget || game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0)?.name;
       if (target) {
-        const result = playSteal(game, me.name, target.name, logger);
+        const result = playSteal(game, me.name, target, logger);
         if (result.success) {
           newGame = result.status;
           success = true;
@@ -166,7 +192,8 @@ export function useGame() {
     }
 
     setSelectedCard(null);
-  }, [game, selectedCard, me, isMyTurn, logger, updateOps]);
+    setSelectedTarget(null);
+  }, [game, selectedCard, selectedTarget, me, isMyTurn, logger, updateOps, isPlayable]);
 
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn) return;
@@ -189,13 +216,21 @@ export function useGame() {
     updateOps();
   }, [game, isMyTurn, logger, updateOps]);
 
+  const selectCard = useCallback((index: number | null) => {
+    setSelectedCard(index);
+    setSelectedTarget(null); // 切换卡牌时清除目标选择
+  }, []);
+
   return {
     game,
     currentPlayer,
     me,
     isMyTurn,
     selectedCard,
-    setSelectedCard,
+    selectCard,
+    selectedTarget,
+    setSelectedTarget,
+    canPlay,
     playerOps,
     handlePlayCard,
     handleEndTurn,
