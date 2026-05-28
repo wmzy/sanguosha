@@ -437,7 +437,8 @@ export function useGame() {
   const selectCard = useCallback((index: number | null) => {
     setSelectedCard(index);
     setSelectedTarget(null);
-  }, []);
+    resetTimer();
+  }, [resetTimer]);
 
   // 有 pendingResponse 时，检查目标是否有闪
   const targetHasDodge = pendingResponse
