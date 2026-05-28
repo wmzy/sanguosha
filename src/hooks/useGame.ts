@@ -61,6 +61,9 @@ export function useGame() {
   // 本回合是否已出过杀
   const [hasUsedKillThisTurn, setHasUsedKillThisTurn] = useState(false);
 
+  // 弃牌选择
+  const [selectedForDiscard, setSelectedForDiscard] = useState<Set<number>>(new Set());
+
   // 计时器
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerPaused, setTimerPaused] = useState(false);
@@ -128,6 +131,33 @@ export function useGame() {
     if (needsTarget && !selectedTarget) return false;
     return true;
   })();
+
+  // 弃牌阶段逻辑
+  const needsDiscard = isMyTurn && game.phase === '弃牌' && me.hand.length > me.maxHealth;
+  const discardCount = needsDiscard ? me.hand.length - me.maxHealth : 0;
+
+  const toggleDiscardSelection = useCallback((index: number) => {
+    setSelectedForDiscard(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else if (next.size < discardCount) {
+        next.add(index);
+      }
+      return next;
+    });
+  }, [discardCount]);
+
+  const handleDiscard = useCallback(() => {
+    if (!needsDiscard || selectedForDiscard.size !== discardCount) return;
+
+    const indices = Array.from(selectedForDiscard).sort((a, b) => b - a);
+    const newGame = executeDiscard(game, indices, logger);
+    setGame(newGame);
+    setSelectedForDiscard(new Set());
+    setSelectedCard(null);
+    updateOps();
+  }, [game, needsDiscard, selectedForDiscard, discardCount, logger, updateOps]);
 
   // 切换视角（旋转座位）
   const switchPerspective = useCallback(() => {
@@ -342,11 +372,13 @@ export function useGame() {
 
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn || pendingResponse) return;
-    let newGame = game;
-    if (newGame.phase === '弃牌') {
-      const needsDiscard = checkDiscard(newGame);
-      if (needsDiscard) newGame = executeDiscard(newGame, [0], logger);
+
+    // 如果在弃牌阶段且需要弃牌，必须先弃牌
+    if (game.phase === '弃牌' && checkDiscard(game)) {
+      return; // 等待玩家通过弃牌 UI 弃牌
     }
+
+    let newGame = game;
     newGame = nextPhase(newGame, logger);
     newGame = nextPhase(newGame, logger);
     newGame = nextPhase(newGame, logger);
@@ -354,6 +386,7 @@ export function useGame() {
     setGame(newGame);
     setSelectedCard(null);
     setSelectedTarget(null);
+    setSelectedForDiscard(new Set());
     updateOps();
   }, [game, isMyTurn, pendingResponse, logger, updateOps]);
 
@@ -389,6 +422,11 @@ export function useGame() {
     pendingResponse,
     targetHasDodge,
     respondToKill,
+    needsDiscard,
+    discardCount,
+    selectedForDiscard,
+    toggleDiscardSelection,
+    handleDiscard,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,

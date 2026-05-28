@@ -4,27 +4,51 @@ interface HandCardsProps {
   hand: Card[];
   selectedIndex: number | null;
   onSelectCard: (index: number) => void;
-  playableIndices?: number[]; // 可出的牌的索引
+  playableIndices?: number[];
+  discardSelectedIndices?: Set<number>;
+  onToggleDiscard?: (index: number) => void;
 }
 
-export function HandCards({ hand, selectedIndex, onSelectCard, playableIndices }: HandCardsProps) {
+export function HandCards({
+  hand,
+  selectedIndex,
+  onSelectCard,
+  playableIndices,
+  discardSelectedIndices,
+  onToggleDiscard,
+}: HandCardsProps) {
   const playableSet = new Set(playableIndices ?? []);
+  const isDiscardMode = discardSelectedIndices !== undefined;
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
       {hand.map((card, index) => {
-        const isSelected = selectedIndex === index;
-        const isPlayable = playableSet.size === 0 || playableSet.has(index); // 没有指定时全部可选
+        const isSelected = isDiscardMode
+          ? discardSelectedIndices.has(index)
+          : selectedIndex === index;
+        const isPlayable = isDiscardMode || playableSet.size === 0 || playableSet.has(index);
+
+        const handleClick = () => {
+          if (isDiscardMode && onToggleDiscard) {
+            onToggleDiscard(index);
+          } else {
+            onSelectCard(isSelected ? -1 : index);
+          }
+        };
 
         return (
           <div
             key={index}
-            onClick={() => onSelectCard(isSelected ? -1 : index)}
+            onClick={handleClick}
             style={{
-              border: isSelected ? '2px solid #e74c3c' : isPlayable ? '2px solid #555' : '2px solid #333',
+              border: isSelected
+                ? isDiscardMode ? '2px solid #8e44ad' : '2px solid #e74c3c'
+                : isPlayable ? '2px solid #555' : '2px solid #333',
               borderRadius: 8,
               padding: '12px 16px',
-              backgroundColor: isSelected ? '#34495e' : isPlayable ? '#2c3e50' : '#1a1a2e',
+              backgroundColor: isSelected
+                ? isDiscardMode ? '#4a235a' : '#34495e'
+                : isPlayable ? '#2c3e50' : '#1a1a2e',
               cursor: isPlayable ? 'pointer' : 'not-allowed',
               minWidth: 80,
               textAlign: 'center',

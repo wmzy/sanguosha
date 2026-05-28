@@ -27,6 +27,11 @@ export function GameBoard() {
     pendingResponse,
     targetHasDodge,
     respondToKill,
+    needsDiscard,
+    discardCount,
+    selectedForDiscard,
+    toggleDiscardSelection,
+    handleDiscard,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,
@@ -151,6 +156,38 @@ export function GameBoard() {
         </div>
       )}
 
+      {/* 弃牌提示 */}
+      {needsDiscard && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: 12,
+          backgroundColor: '#8e44ad',
+          borderRadius: 8,
+          fontSize: 14,
+        }}>
+          <div style={{ marginBottom: 8 }}>
+            手牌超过体力上限，请弃 {discardCount} 张牌（已选 {selectedForDiscard.size}/{discardCount}）
+          </div>
+          <button
+            onClick={handleDiscard}
+            disabled={selectedForDiscard.size !== discardCount}
+            style={{
+              padding: '8px 24px',
+              backgroundColor: selectedForDiscard.size === discardCount ? '#2ecc71' : '#555',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              cursor: selectedForDiscard.size === discardCount ? 'pointer' : 'not-allowed',
+              fontSize: 14,
+              fontWeight: 'bold',
+            }}
+          >
+            确认弃牌
+          </button>
+        </div>
+      )}
+
       {/* 上方玩家 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
         {topLeftPlayer && renderPlayerPanel(topLeftPlayer)}
@@ -192,7 +229,9 @@ export function GameBoard() {
           hand={me.hand}
           selectedIndex={selectedCard}
           onSelectCard={selectCard}
-          playableIndices={isMyTurn && !pendingResponse ? validActions.playableCardIndices : undefined}
+          playableIndices={isMyTurn && !pendingResponse && !needsDiscard ? validActions.playableCardIndices : undefined}
+          discardSelectedIndices={needsDiscard ? selectedForDiscard : undefined}
+          onToggleDiscard={needsDiscard ? toggleDiscardSelection : undefined}
         />
       </div>
 
