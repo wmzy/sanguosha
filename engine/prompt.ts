@@ -1,25 +1,25 @@
-// engine/提示.ts
+// engine/prompt.ts
 import type { Prompt, PromptType } from '../shared/types';
 
-export function 创建提示(name: string, 玩家名: string, 选项: unknown[]): Prompt {
-  let 类型: PromptType = 'select_option';
+export function createPrompt(name: string, playerName: string, options: unknown[]): Prompt {
+  let type: PromptType = 'select_option';
 
   if (name === '选择目标' || name === '选择玩家') {
-    类型 = 'select_player';
-  } else if (选项.length === 2 && 选项.includes('是') && 选项.includes('否')) {
-    类型 = 'select_yes_no';
+    type = 'select_player';
+  } else if (options.length === 2 && options.includes('是') && options.includes('否')) {
+    type = 'select_yes_no';
   } else if (name === '出牌' || name === '选择卡牌' || name === '弃牌') {
-    类型 = 'select_card';
+    type = 'select_card';
   }
 
   return {
     name,
-    描述: `请为 ${玩家名} 做出选择`,
-    类型,
-    选项,
+    description: `请为 ${playerName} 做出选择`,
+    type,
+    options,
   };
 }
 
-export function 处理响应(提示: Prompt, 响应: unknown): boolean {
-  return 提示.选项.includes(响应);
+export function handleResponse(prompt: Prompt, response: unknown): boolean {
+  return prompt.options.includes(response);
 }

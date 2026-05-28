@@ -2,8 +2,8 @@ import type { GameState, PublicGameState, TurnPhase, Card } from '../shared/type
 import type { GameLog, Operation } from '../shared/log';
 import type { Rng } from '../shared/rng';
 import { createRng } from '../shared/rng';
-import { 创建游戏, 获取公开状态, 开始游戏 } from './state';
-import { 所有角色 } from '../shared/characters';
+import { createGame, getPublicState, startGame } from './state';
+import { 所有character as allCharacters } from '../shared/characters';
 
 export class ReplayEngine {
   private log: GameLog;
@@ -26,10 +26,10 @@ export class ReplayEngine {
 
     // Create initial state
     const characters = log.meta.characters.map(name =>
-      所有角色.find(c => c.name === name)!,
+      allCharacters.find(c => c.name === name)!,
     );
-    let state = 创建游戏(characters, log.meta.seed);
-    state = 开始游戏(state);
+    let state = createGame(characters, log.meta.seed);
+    state = startGame(state);
     states.push(state);
 
     // Replay each operation
@@ -49,33 +49,33 @@ export class ReplayEngine {
 
       case 'phaseChange': {
         const data = op.data as { phase: string; player: string };
-        return { ...state, 当前阶段: data.phase as TurnPhase };
+        return { ...state, phase: data.phase as TurnPhase };
       }
 
       case 'turnChange': {
         const data = op.data as { from: string; to: string; round: number };
-        return { ...state, 当前玩家: data.to, 回合数: data.round };
+        return { ...state, currentPlayer: data.to, round: data.round };
       }
 
       case 'draw': {
         const data = op.data as {
           player: string;
-          cards: Array<{ name: string; 花色: string; 点数: string }>;
+          cards: Array<{ name: string; suit: string; rank: string }>;
         };
         const drawnCards: Card[] = data.cards.map(c => ({
           name: c.name,
-          类型: '基本牌' as const,
-          子类型: c.name as Card['子类型'],
-          花色: c.花色 as Card['花色'],
-          点数: c.点数 as Card['点数'],
-          描述: '',
+          type: '基本牌' as const,
+          subtype: c.name as Card['subtype'],
+          suit: c.suit as Card['suit'],
+          rank: c.rank as Card['rank'],
+          description: '',
         }));
         return {
           ...state,
-          牌堆: state.牌堆.slice(data.cards.length),
-          玩家列表: state.玩家列表.map(p =>
+          deck: state.deck.slice(data.cards.length),
+          players: state.players.map(p =>
             p.name === data.player
-              ? { ...p, 手牌: [...p.手牌, ...drawnCards] }
+              ? { ...p, hand: [...p.hand, ...drawnCards] }
               : p,
           ),
         };
@@ -85,9 +85,9 @@ export class ReplayEngine {
         const data = op.data as { target: string; amount: number };
         return {
           ...state,
-          玩家列表: state.玩家列表.map(p =>
+          players: state.players.map(p =>
             p.name === data.target
-              ? { ...p, 体力: p.体力 - data.amount }
+              ? { ...p, health: p.health - data.amount }
               : p,
           ),
         };
@@ -97,9 +97,9 @@ export class ReplayEngine {
         const data = op.data as { player: string; amount: number };
         return {
           ...state,
-          玩家列表: state.玩家列表.map(p =>
+          players: state.players.map(p =>
             p.name === data.player
-              ? { ...p, 体力: Math.min(p.体力 + data.amount, p.体力上限) }
+              ? { ...p, health: Math.min(p.health + data.amount, p.maxHealth) }
               : p,
           ),
         };
@@ -109,8 +109,8 @@ export class ReplayEngine {
         const data = op.data as { winner: string };
         return {
           ...state,
-          状态: '已结束' as const,
-          获胜身份: data.winner as GameState['获胜身份'],
+          status: '已结束' as const,
+          winner: data.winner as GameState['winner'],
         };
       }
 
@@ -151,7 +151,7 @@ export class ReplayEngine {
   }
 
   getPlayerView(playerName: string): PublicGameState {
-    return 获取公开状态(this.states[this.currentStep], playerName);
+    return getPublicState(this.states[this.currentStep], playerName);
   }
 
   getCurrentOp(): Operation | null {
