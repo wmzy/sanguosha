@@ -176,7 +176,7 @@ test.describe('保存日志', () => {
 test.describe('回放功能', () => {
   let logFile: string;
 
-  test.beforeEach((_fixtures, testInfo) => {
+  test.beforeEach(({}, testInfo) => { // eslint-disable-line no-empty-pattern
     // 使用唯一文件名避免并行冲突
     fs.mkdirSync(LOG_DIR, { recursive: true });
     logFile = path.join(LOG_DIR, `test-${testInfo.retry}-${Date.now()}.json`);

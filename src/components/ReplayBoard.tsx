@@ -78,7 +78,7 @@ export function ReplayBoard({ log, onExit }: ReplayBoardProps) {
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        回合 {state.round} | 阶段: {state.phase} | currentPlayer: {state.currentPlayer}
+        回合 {state.round} | 阶段: {state.phase} | 当前玩家: {state.currentPlayer}
       </div>
 
       <LogPanel operations={log.playerOps[selectedPlayer] ?? []} maxHeight={300} />

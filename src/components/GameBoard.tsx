@@ -33,7 +33,7 @@ export function GameBoard() {
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span>回合 {game.round} | 阶段: {game.phase} | currentPlayer: {game.currentPlayer}</span>
+        <span>回合 {game.round} | 阶段: {game.phase} | 当前玩家: {game.currentPlayer}</span>
         {!isMyTurn && <span style={{ color: '#f39c12', marginLeft: 12 }}>等待对手...</span>}
       </div>
 

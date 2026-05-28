@@ -182,7 +182,7 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
 
       {/* 游戏信息 */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span>回合 {gameState.round} | 阶段: {gameState.phase} | currentPlayer: {gameState.currentPlayer}</span>
+        <span>回合 {gameState.round} | 阶段: {gameState.phase} | 当前玩家: {gameState.currentPlayer}</span>
         {isMyTurn && <span style={{ color: '#2ecc71', marginLeft: 10 }}>- 你的回合！</span>}
       </div>
 
