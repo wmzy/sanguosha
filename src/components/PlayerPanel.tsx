@@ -29,7 +29,7 @@ export function PlayerPanel({ player, isCurrentPlayer, isSelf }: PlayerPanelProp
         <span style={{ fontSize: 12 }}> {player.health}/{player.maxHealth}</span>
       </div>
       <div style={{ fontSize: 12, color: '#95a5a6' }}>
-        身份: {isSelf ? player.role : '???'}
+        身份: {isSelf || !player.alive ? player.role : '???'}
       </div>
       <div style={{ fontSize: 12, color: '#bdc3c7' }}>
         手牌: {player.hand.length} 张

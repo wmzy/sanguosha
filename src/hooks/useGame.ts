@@ -58,6 +58,9 @@ export function useGame() {
   // 待响应状态（杀 → 闪）
   const [pendingResponse, setPendingResponse] = useState<PendingResponse | null>(null);
 
+  // 本回合是否已出过杀
+  const [hasUsedKillThisTurn, setHasUsedKillThisTurn] = useState(false);
+
   // 计时器
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerPaused, setTimerPaused] = useState(false);
@@ -107,12 +110,20 @@ export function useGame() {
     }
   }, [timerSeconds, isMyTurn, game.phase, pendingResponse]);
 
+  // 回合切换时重置杀的使用状态
+  useEffect(() => {
+    setHasUsedKillThisTurn(false);
+  }, [game.currentPlayer, game.round]);
+
   const validActions = useMemo(() => getValidActions(game, myName), [game, myName]);
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
 
   const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && !pendingResponse && (() => {
     const card = me.hand[selectedCard];
     if (!card) return false;
+    // 诸葛连弩可以无限出杀
+    const hasUnlimitedKill = me.equipment.weapon?.name === '诸葛连弩';
+    if (card.name === '杀' && hasUsedKillThisTurn && !hasUnlimitedKill) return false;
     if (!isCardPlayable(game, me, card)) return false;
     if (needsTarget && !selectedTarget) return false;
     return true;
@@ -224,6 +235,7 @@ export function useGame() {
       logger.logPlayerOp(target, 'play', { player: me.name, card: card.name, target }, `${me.name} 对你使用杀，请响应`);
 
       setPendingResponse({ type: '杀', attacker: me.name, target, card });
+      setHasUsedKillThisTurn(true);
       setMyName(target);
       setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
       setPlayerOps(logger.export().playerOps[target] ?? []);
