@@ -1,111 +1,111 @@
 import type { GameState, TurnPhase } from '../shared/types';
 import type { GameLogger } from './logger';
-import { 获取当前玩家, 获取存活玩家 } from './state';
-import { 摸牌 } from '../shared/deck';
+import { getCurrentPlayer, getAlivePlayers } from './state';
+import { drawCards } from '../shared/deck';
 
-const 阶段顺序: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '结束'];
+const phaseOrder: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '结束'];
 
-export function 进入下一阶段(游戏: GameState, logger?: GameLogger): GameState {
-  const 当前索引 = 阶段顺序.indexOf(游戏.当前阶段);
-  const 下一索引 = (当前索引 + 1) % 阶段顺序.length;
-  const 下一阶段 = 阶段顺序[下一索引];
+export function nextPhase(game: GameState, logger?: GameLogger): GameState {
+  const currentIndex = phaseOrder.indexOf(game.phase);
+  const nextIndex = (currentIndex + 1) % phaseOrder.length;
+  const nextPhaseName = phaseOrder[nextIndex];
 
-  // 如果回到准备阶段，说明一个回合结束
-  if (下一阶段 === '准备' && 当前索引 === 阶段顺序.length - 1) {
-    const 存活玩家 = 获取存活玩家(游戏);
-    const 当前玩家索引 = 存活玩家.findIndex(p => p.name === 游戏.当前玩家);
-    const 下一玩家索引 = (当前玩家索引 + 1) % 存活玩家.length;
-    const 下一玩家 = 存活玩家[下一玩家索引];
+  // If returning to the prepare phase, the round is over
+  if (nextPhaseName === '准备' && currentIndex === phaseOrder.length - 1) {
+    const alivePlayers = getAlivePlayers(game);
+    const currentPlayerIndex = alivePlayers.findIndex(p => p.name === game.currentPlayer);
+    const nextPlayerIndex = (currentPlayerIndex + 1) % alivePlayers.length;
+    const nextPlayer = alivePlayers[nextPlayerIndex];
 
     const newState = {
-      ...游戏,
-      当前阶段: 下一阶段,
-      当前玩家: 下一玩家.name,
-      回合数: 游戏.回合数 + 1,
+      ...game,
+      phase: nextPhaseName,
+      currentPlayer: nextPlayer.name,
+      round: game.round + 1,
     };
 
     if (logger) {
-      logger.logServerOp('phaseChange', { phase: 下一阶段, player: 下一玩家.name }, `进入${下一阶段}阶段`);
-      logger.logServerOp('turnChange', { from: 游戏.当前玩家, to: 下一玩家.name, round: newState.回合数 }, `轮到 ${下一玩家.name} 的回合`);
+      logger.logServerOp('phaseChange', { phase: nextPhaseName, player: nextPlayer.name }, `进入${nextPhaseName}阶段`);
+      logger.logServerOp('turnChange', { from: game.currentPlayer, to: nextPlayer.name, round: newState.round }, `轮到 ${nextPlayer.name} 的回合`);
     }
 
     return newState;
   }
 
   const newState = {
-    ...游戏,
-    当前阶段: 下一阶段,
+    ...game,
+    phase: nextPhaseName,
   };
 
   if (logger) {
-    logger.logServerOp('phaseChange', { phase: 下一阶段, player: 游戏.当前玩家 }, `进入${下一阶段}阶段`);
+    logger.logServerOp('phaseChange', { phase: nextPhaseName, player: game.currentPlayer }, `进入${nextPhaseName}阶段`);
   }
 
   return newState;
 }
 
-export function 摸牌阶段(游戏: GameState, logger?: GameLogger): { 状态: GameState; 消息: string } {
-  const 当前玩家 = 获取当前玩家(游戏);
-  const { 摸到的牌, 剩余牌堆 } = 摸牌(游戏.牌堆, 2);
+export function drawPhase(game: GameState, logger?: GameLogger): { status: GameState; message: string } {
+  const currentPlayer = getCurrentPlayer(game);
+  const { drawn: drawnCards, remaining: remainingDeck } = drawCards(game.deck, 2);
 
-  const 新玩家列表 = 游戏.玩家列表.map(p => {
-    if (p.name === 当前玩家.name) {
-      return { ...p, 手牌: [...p.手牌, ...摸到的牌] };
+  const newPlayers = game.players.map(p => {
+    if (p.name === currentPlayer.name) {
+      return { ...p, hand: [...p.hand, ...drawnCards] };
     }
     return p;
   });
 
-  const 状态 = { ...游戏, 玩家列表: 新玩家列表, 牌堆: 剩余牌堆 };
+  const status = { ...game, players: newPlayers, deck: remainingDeck };
 
   if (logger) {
     logger.logServerOp('draw', {
-      player: 当前玩家.name,
-      cards: 摸到的牌.map(c => ({ name: c.name, 花色: c.花色, 点数: c.点数 })),
-    }, `${当前玩家.name} 摸了 ${摸到的牌.length} 张牌`);
-    logger.logPlayerOp(当前玩家.name, 'draw', {
-      player: 当前玩家.name,
-      cards: 摸到的牌.map(c => ({ name: c.name, 花色: c.花色, 点数: c.点数 })),
-    }, `你摸了 ${摸到的牌.map(c => c.name).join('、')}`);
+      player: currentPlayer.name,
+      cards: drawnCards.map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
+    }, `${currentPlayer.name} 摸了 ${drawnCards.length} 张牌`);
+    logger.logPlayerOp(currentPlayer.name, 'draw', {
+      player: currentPlayer.name,
+      cards: drawnCards.map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
+    }, `你摸了 ${drawnCards.map(c => c.name).join('、')}`);
   }
 
   return {
-    状态,
-    消息: `${当前玩家.name} 摸了 ${摸到的牌.length} 张牌`,
+    status,
+    message: `${currentPlayer.name} 摸了 ${drawnCards.length} 张牌`,
   };
 }
 
-export function 弃牌阶段检查(游戏: GameState): boolean {
-  const 当前玩家 = 获取当前玩家(游戏);
-  return 当前玩家.手牌.length > 当前玩家.体力上限;
+export function checkDiscard(game: GameState): boolean {
+  const currentPlayer = getCurrentPlayer(game);
+  return currentPlayer.hand.length > currentPlayer.maxHealth;
 }
 
-export function 弃牌阶段执行(游戏: GameState, 弃的牌索引: number[], logger?: GameLogger): GameState {
-  const 当前玩家 = 获取当前玩家(游戏);
-  const 弃的牌 = 弃的牌索引.map(i => 当前玩家.手牌[i]).filter(Boolean);
-  const 剩余手牌 = 当前玩家.手牌.filter((_, i) => !弃的牌索引.includes(i));
+export function executeDiscard(game: GameState, discardIndices: number[], logger?: GameLogger): GameState {
+  const currentPlayer = getCurrentPlayer(game);
+  const discardedCards = discardIndices.map(i => currentPlayer.hand[i]).filter(Boolean);
+  const remainingHand = currentPlayer.hand.filter((_, i) => !discardIndices.includes(i));
 
-  const 新玩家列表 = 游戏.玩家列表.map(p => {
-    if (p.name === 当前玩家.name) {
-      return { ...p, 手牌: 剩余手牌 };
+  const newPlayers = game.players.map(p => {
+    if (p.name === currentPlayer.name) {
+      return { ...p, hand: remainingHand };
     }
     return p;
   });
 
   const newState = {
-    ...游戏,
-    玩家列表: 新玩家列表,
-    弃牌堆: [...游戏.弃牌堆, ...弃的牌],
+    ...game,
+    players: newPlayers,
+    discardPile: [...game.discardPile, ...discardedCards],
   };
 
   if (logger) {
     logger.logServerOp('discard', {
-      player: 当前玩家.name,
-      cards: 弃的牌.map(c => ({ name: c.name, 花色: c.花色, 点数: c.点数 })),
-    }, `${当前玩家.name} 弃了 ${弃的牌.length} 张牌`);
-    logger.logPlayerOp(当前玩家.name, 'discard', {
-      player: 当前玩家.name,
-      cards: 弃的牌.map(c => ({ name: c.name, 花色: c.花色, 点数: c.点数 })),
-    }, `你弃了 ${弃的牌.map(c => c.name).join('、')}`);
+      player: currentPlayer.name,
+      cards: discardedCards.map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
+    }, `${currentPlayer.name} 弃了 ${discardedCards.length} 张牌`);
+    logger.logPlayerOp(currentPlayer.name, 'discard', {
+      player: currentPlayer.name,
+      cards: discardedCards.map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
+    }, `你弃了 ${discardedCards.map(c => c.name).join('、')}`);
   }
 
   return newState;
