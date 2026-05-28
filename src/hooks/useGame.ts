@@ -161,13 +161,19 @@ export function useGame() {
     if (!needsDiscard || selectedForDiscard.size !== discardCount) return;
 
     const indices = Array.from(selectedForDiscard).sort((a, b) => b - a);
-    const newGame = executeDiscard(game, indices, logger);
+    let newGame = executeDiscard(game, indices, logger);
+
+    // 弃牌后自动推进到下一个玩家的出牌阶段
+    newGame = nextPhase(newGame, logger); // 弃牌 → 结束
+    newGame = nextPhase(newGame, logger); // 结束 → 准备
+    newGame = advanceToPlayPhase(newGame, logger);
+
     setGame(newGame);
     setSelectedForDiscard(new Set());
     setSelectedCard(null);
     updateOps();
     resetTimer();
-  }, [game, needsDiscard, selectedForDiscard, discardCount, logger, updateOps]);
+  }, [game, needsDiscard, selectedForDiscard, discardCount, logger, updateOps, resetTimer]);
 
   // 切换视角（旋转座位）
   const switchPerspective = useCallback(() => {
