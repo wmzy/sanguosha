@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import type { GameState, Card } from '../../shared/types';
 import { createGame, startGame, getCurrentPlayer } from '../../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine/turn';
-import { playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden } from '../../engine/effect';
+import { playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden, playAbundance } from '../../engine/effect';
 import { getValidActions, getValidTargetsForCard, isCardPlayable } from '../../engine/rules';
 import { GameLogger } from '../../engine/logger';
 import { checkDying, getDyingOptions, applyDying, applyPeachSave } from '../../engine/dying';
@@ -393,20 +393,27 @@ export function useGame() {
         newGame = result.status;
         success = true;
       }
+    } else if (card.name === '五谷丰登') {
+      const result = playAbundance(game, me.name, logger);
+      if (result.success) {
+        newGame = result.status;
+        success = true;
+      }
     }
 
     if (success) {
+      const playedCard = me.hand[selectedCard];
       const newHand = [...me.hand];
       newHand.splice(selectedCard, 1);
-      // 合并装备更新和手牌更新
       setGame({
         ...newGame,
         players: newGame.players.map(p =>
           p.name === me.name ? { ...p, hand: newHand } : p,
         ),
+        discardPile: [...newGame.discardPile, playedCard],
       });
       updateOps();
-    resetTimer();
+      resetTimer();
     }
 
     setSelectedCard(null);
@@ -416,15 +423,29 @@ export function useGame() {
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn || pendingResponse || pendingDying) return;
 
+    let newGame = game;
+
     // 如果在弃牌阶段且需要弃牌，必须先弃牌
-    if (game.phase === '弃牌' && checkDiscard(game)) {
+    if (newGame.phase === '弃牌' && checkDiscard(newGame)) {
       return; // 等待玩家通过弃牌 UI 弃牌
     }
 
-    let newGame = game;
+    // 推进到下一阶段
     newGame = nextPhase(newGame, logger);
-    newGame = nextPhase(newGame, logger);
-    newGame = nextPhase(newGame, logger);
+
+    // 如果进入弃牌阶段且需要弃牌，停下来等玩家弃牌
+    if (newGame.phase === '弃牌' && checkDiscard(newGame)) {
+      setGame(newGame);
+      setSelectedCard(null);
+      setSelectedTarget(null);
+      updateOps();
+      resetTimer();
+      return;
+    }
+
+    // 否则跳过弃牌和结束阶段，进入下一个玩家的出牌阶段
+    newGame = nextPhase(newGame, logger); // 弃牌 → 结束
+    newGame = nextPhase(newGame, logger); // 结束 → 准备
     newGame = advanceToPlayPhase(newGame, logger);
     setGame(newGame);
     setSelectedCard(null);
