@@ -42,17 +42,22 @@ export function GameBoard() {
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
   const validTargets = selectedCard !== null ? (validActions.validTargets.get(selectedCard) ?? []) : [];
 
-  // 按 playerOrder 排列玩家（旋转后的顺序）
+  // 按 playerOrder 排列玩家（逆时针顺序）
   const orderedPlayers = playerOrder
     .map(name => game.players.find(p => p.name === name))
     .filter(Boolean) as typeof game.players;
 
-  // 座位布局: [0]底部, [1]左上, [2]右上, [3]左, [4]右
+  // 座位布局（逆时针）: [0]底部, [1]右下, [2]右上, [3]左上, [4]左下
   const bottomPlayer = orderedPlayers[0];
-  const topLeftPlayer = orderedPlayers[1];
-  const topRightPlayer = orderedPlayers[2];
-  const leftPlayer = orderedPlayers[3];
-  const rightPlayer = orderedPlayers[4];
+  const rightBottomPlayer = orderedPlayers[1];
+  const rightTopPlayer = orderedPlayers[2];
+  const leftTopPlayer = orderedPlayers[3];
+  const leftBottomPlayer = orderedPlayers[4];
+
+  // 获取玩家在原始数组中的座次号
+  const getSeatNumber = (playerName: string): number => {
+    return game.players.findIndex(p => p.name === playerName) + 1;
+  };
 
   const renderPlayerPanel = (player: typeof game.players[0]) => (
     <div
@@ -73,6 +78,7 @@ export function GameBoard() {
         player={player}
         isCurrentPlayer={player.name === game.currentPlayer}
         isSelf={player.name === myName}
+        seatNumber={getSeatNumber(player.name)}
       />
     </div>
   );
@@ -239,16 +245,16 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 上方玩家 */}
+      {/* 上方玩家（逆时针） */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
-        {topLeftPlayer && renderPlayerPanel(topLeftPlayer)}
-        {topRightPlayer && renderPlayerPanel(topRightPlayer)}
+        {leftTopPlayer && renderPlayerPanel(leftTopPlayer)}
+        {rightTopPlayer && renderPlayerPanel(rightTopPlayer)}
       </div>
 
       {/* 中间: 左 + 信息 + 右 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1, marginBottom: 12 }}>
         <div style={{ width: 160 }}>
-          {leftPlayer && renderPlayerPanel(leftPlayer)}
+          {leftBottomPlayer && renderPlayerPanel(leftBottomPlayer)}
         </div>
 
         <div style={{ textAlign: 'center', flex: 1 }}>
@@ -265,7 +271,7 @@ export function GameBoard() {
         </div>
 
         <div style={{ width: 160 }}>
-          {rightPlayer && renderPlayerPanel(rightPlayer)}
+          {rightBottomPlayer && renderPlayerPanel(rightBottomPlayer)}
         </div>
       </div>
 
