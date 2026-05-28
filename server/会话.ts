@@ -3,7 +3,7 @@ import type { GameState, PlayerAction } from '../shared/types';
 import type { Room } from './房间';
 import { createGame, getPublicState, startGame } from '../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../engine/turn';
-import { useKill, usePeach } from '../engine/effect';
+import { playKill, playPeach } from '../engine/effect';
 import { allCharacters } from '../shared/characters';
 import { serialize } from './协议';
 import { setRoomStatus } from './房间';
@@ -95,7 +95,7 @@ export class GameSession {
         this.sendToPlayerByName(playerName, { type: 'error', message: '未选择目标' });
         return;
       }
-      const result = useKill(this.state, playerName, target);
+      const result = playKill(this.state, playerName, target);
       if (result.success) {
         this.state = result.status;
         this.removeCardFromHand(playerName, card);
@@ -104,7 +104,7 @@ export class GameSession {
         this.sendToPlayerByName(playerName, { type: 'error', message: result.message });
       }
     } else if (card.name === '桃') {
-      const result = usePeach(this.state, playerName);
+      const result = playPeach(this.state, playerName);
       if (result.success) {
         this.state = result.status;
         this.removeCardFromHand(playerName, card);
@@ -163,7 +163,7 @@ export class GameSession {
     // 检查游戏是否结束
     const winner = this.checkGameEnd();
     if (winner) {
-      this.state = { ...this.state, status: '已结束', winner: winner };
+      this.state = { ...this.state, status: '已结束', winner };
       setRoomStatus(this.room.id, '已结束');
       this.broadcast({ type: 'game_over', winner });
       this.broadcastState();

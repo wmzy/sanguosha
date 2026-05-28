@@ -23,12 +23,12 @@ function createTestLog() {
       { seq: 5, timestamp: Date.now(), type: 'damage', data: { source: '曹操', target: '刘备', amount: 1, cardName: '杀' }, description: '曹操对刘备使用杀，造成1点伤害' },
     ],
     playerOps: {
-      '曹操': [
+      曹操: [
         { seq: 0, timestamp: Date.now(), type: 'gameStart', data: {}, description: '游戏开始，你是 曹操（主公）' },
         { seq: 1, timestamp: Date.now(), type: 'draw', data: {}, description: '你摸了 杀、闪' },
         { seq: 2, timestamp: Date.now(), type: 'damage', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
       ],
-      '刘备': [
+      刘备: [
         { seq: 0, timestamp: Date.now(), type: 'gameStart', data: {}, description: '游戏开始，你是 刘备（反贼）' },
         { seq: 1, timestamp: Date.now(), type: 'damage', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
       ],
@@ -176,7 +176,7 @@ test.describe('保存日志', () => {
 test.describe('回放功能', () => {
   let logFile: string;
 
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_fixtures, testInfo) => {
     // 使用唯一文件名避免并行冲突
     fs.mkdirSync(LOG_DIR, { recursive: true });
     logFile = path.join(LOG_DIR, `test-${testInfo.retry}-${Date.now()}.json`);

@@ -8,7 +8,7 @@ interface EffectResult {
   message: string;
 }
 
-export function useKill(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
+export function playKill(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
   const target = game.players.find(p => p.name === targetName);
 
@@ -57,7 +57,7 @@ export function useKill(game: GameState, userName: string, targetName: string, l
   return result;
 }
 
-export function usePeach(game: GameState, userName: string, logger?: GameLogger): EffectResult {
+export function playPeach(game: GameState, userName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
@@ -102,7 +102,7 @@ export function usePeach(game: GameState, userName: string, logger?: GameLogger)
 // 普通锦囊 - 单目标
 // ============================================================
 
-export function useDismantle(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
+export function playDismantle(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
   const target = game.players.find(p => p.name === targetName);
 
@@ -161,7 +161,7 @@ export function useDismantle(game: GameState, userName: string, targetName: stri
   return result;
 }
 
-export function useSteal(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
+export function playSteal(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
   const target = game.players.find(p => p.name === targetName);
 
@@ -226,7 +226,7 @@ export function useSteal(game: GameState, userName: string, targetName: string, 
   return { success: false, status: game, message: `${targetName} 没有手牌` };
 }
 
-export function useDrawTwo(game: GameState, userName: string, logger?: GameLogger): EffectResult {
+export function playDrawTwo(game: GameState, userName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
@@ -269,7 +269,7 @@ export function useDrawTwo(game: GameState, userName: string, logger?: GameLogge
   return result;
 }
 
-export function useDuel(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
+export function playDuel(game: GameState, userName: string, targetName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
   const target = game.players.find(p => p.name === targetName);
 
@@ -322,7 +322,7 @@ export function useDuel(game: GameState, userName: string, targetName: string, l
 // 普通锦囊 - 全体
 // ============================================================
 
-export function useArrowBarrage(game: GameState, userName: string, logger?: GameLogger): EffectResult {
+export function playArrowBarrage(game: GameState, userName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
@@ -370,7 +370,7 @@ export function useArrowBarrage(game: GameState, userName: string, logger?: Game
   return result;
 }
 
-export function useBarbarianInvasion(game: GameState, userName: string, logger?: GameLogger): EffectResult {
+export function playBarbarianInvasion(game: GameState, userName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
@@ -418,7 +418,7 @@ export function useBarbarianInvasion(game: GameState, userName: string, logger?:
   return result;
 }
 
-export function usePeachGarden(game: GameState, userName: string, logger?: GameLogger): EffectResult {
+export function playPeachGarden(game: GameState, userName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
@@ -465,7 +465,7 @@ export function usePeachGarden(game: GameState, userName: string, logger?: GameL
   return result;
 }
 
-export function useAbundance(game: GameState, userName: string, logger?: GameLogger): EffectResult {
+export function playAbundance(game: GameState, userName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {

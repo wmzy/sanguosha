@@ -43,7 +43,8 @@ function HomePage() {
       alignItems: 'center',
       justifyContent: 'center',
       color: '#eee',
-    }}>
+    }}
+    >
       <h1 style={{ fontSize: 48, marginBottom: 8 }}>三国杀</h1>
       <p style={{ color: '#95a5a6', marginBottom: 40 }}>数字卡牌游戏</p>
 

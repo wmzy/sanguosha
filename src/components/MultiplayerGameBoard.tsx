@@ -90,7 +90,7 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
 
     const action: PlayerAction = {
       type: '出牌',
-      card: card,
+      card,
       target: gameState?.players.find(p => p.name !== myPlayer.name && p.alive)?.name,
     };
 

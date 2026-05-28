@@ -3,7 +3,7 @@ import { GameLogger } from '@engine/logger';
 import { ReplayEngine } from '@engine/replay';
 import { createGame, startGame } from '@engine/state';
 import { nextPhase, drawPhase } from '@engine/turn';
-import { useKill } from '@engine/effect';
+import { playKill } from '@engine/effect';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('完整重播流程', () => {
@@ -27,7 +27,7 @@ describe('完整重播流程', () => {
     game = nextPhase(game, logger); // 摸牌 → 出牌
 
     // 使用杀
-    const killResult = useKill(game, '曹操', '刘备', logger);
+    const killResult = playKill(game, '曹操', '刘备', logger);
     expect(killResult.success).toBe(true);
 
     // 导出日志

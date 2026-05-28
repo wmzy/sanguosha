@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, startGame } from '@engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '@engine/turn';
-import { useKill, usePeach } from '@engine/effect';
+import { playKill, playPeach } from '@engine/effect';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('双人对战', () => {
@@ -36,7 +36,7 @@ describe('双人对战', () => {
     // 找到一张杀
     const killCard = game.players[0].hand.find(c => c.name === '杀');
     if (killCard) {
-      const killResult = useKill(game, '曹操', '刘备');
+      const killResult = playKill(game, '曹操', '刘备');
       expect(killResult.success).toBe(true);
       game = killResult.status;
       expect(game.players[1].health).toBe(3);
@@ -68,7 +68,7 @@ describe('双人对战', () => {
     // 对刘备造成4点伤害 (致命)
     let currentGame = game;
     for (let i = 0; i < 4; i++) {
-      const result = useKill(currentGame, '曹操', '刘备');
+      const result = playKill(currentGame, '曹操', '刘备');
       currentGame = result.status;
     }
 
@@ -82,7 +82,7 @@ describe('双人对战', () => {
     game.currentPlayer = '曹操';
 
     // 先受伤
-    const damageResult = useKill(game, '曹操', '刘备');
+    const damageResult = playKill(game, '曹操', '刘备');
     expect(damageResult.status.players[1].health).toBe(3);
 
     // 给刘备一张桃 (注: 使用桃仅检查体力上限，不检查手牌)
@@ -90,7 +90,7 @@ describe('双人对战', () => {
     damagedGame.players[1].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
 
     // 刘备使用桃
-    const peachResult = usePeach(damagedGame, '刘备');
+    const peachResult = playPeach(damagedGame, '刘备');
     expect(peachResult.success).toBe(true);
     expect(peachResult.status.players[1].health).toBe(4);
   });

@@ -3,9 +3,9 @@ import type { GameState } from '../../shared/types';
 import { createGame, startGame, getCurrentPlayer } from '../../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine/turn';
 import {
-  useKill, usePeach,
-  useDismantle, useSteal, useDrawTwo,
-  useArrowBarrage, useBarbarianInvasion, usePeachGarden,
+  playKill, playPeach,
+  playDismantle, playSteal, playDrawTwo,
+  playArrowBarrage, playBarbarianInvasion, playPeachGarden,
 } from '../../engine/effect';
 import { GameLogger } from '../../engine/logger';
 import { 曹操, 刘备 } from '../../shared/characters';
@@ -70,14 +70,14 @@ export function useGame() {
     if (card.name === '杀') {
       const target = game.players.find(p => p.name !== me.name && p.alive);
       if (target) {
-        const result = useKill(game, me.name, target.name, logger);
+        const result = playKill(game, me.name, target.name, logger);
         if (result.success) {
           newGame = result.status;
           success = true;
         }
       }
     } else if (card.name === '桃') {
-      const result = usePeach(game, me.name, logger);
+      const result = playPeach(game, me.name, logger);
       if (result.success) {
         newGame = result.status;
         success = true;
@@ -101,7 +101,7 @@ export function useGame() {
     } else if (card.name === '过河拆桥') {
       const target = game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0);
       if (target) {
-        const result = useDismantle(game, me.name, target.name, logger);
+        const result = playDismantle(game, me.name, target.name, logger);
         if (result.success) {
           newGame = result.status;
           success = true;
@@ -110,32 +110,32 @@ export function useGame() {
     } else if (card.name === '顺手牵羊') {
       const target = game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0);
       if (target) {
-        const result = useSteal(game, me.name, target.name, logger);
+        const result = playSteal(game, me.name, target.name, logger);
         if (result.success) {
           newGame = result.status;
           success = true;
         }
       }
     } else if (card.name === '无中生有') {
-      const result = useDrawTwo(game, me.name, logger);
+      const result = playDrawTwo(game, me.name, logger);
       if (result.success) {
         newGame = result.status;
         success = true;
       }
     } else if (card.name === '桃园结义') {
-      const result = usePeachGarden(game, me.name, logger);
+      const result = playPeachGarden(game, me.name, logger);
       if (result.success) {
         newGame = result.status;
         success = true;
       }
     } else if (card.name === '万箭齐发') {
-      const result = useArrowBarrage(game, me.name, logger);
+      const result = playArrowBarrage(game, me.name, logger);
       if (result.success) {
         newGame = result.status;
         success = true;
       }
     } else if (card.name === '南蛮入侵') {
-      const result = useBarbarianInvasion(game, me.name, logger);
+      const result = playBarbarianInvasion(game, me.name, logger);
       if (result.success) {
         newGame = result.status;
         success = true;
