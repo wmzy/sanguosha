@@ -6,6 +6,7 @@ import { playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, pla
 import { getValidActions, getValidTargetsForCard, isCardPlayable } from '../../engine/rules';
 import { GameLogger } from '../../engine/logger';
 import { checkDying, getDyingOptions, applyDying, applyPeachSave } from '../../engine/dying';
+import { getAvailableSkills, executeSkill } from '../../engine/skill';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
 import { saveLog } from '../utils/logFile';
@@ -438,6 +439,27 @@ export function useGame() {
     setSelectedTarget(null);
   }, [game, selectedCard, selectedTarget, me, isMyTurn, pendingResponse, pendingDying, logger, updateOps]);
 
+  // 技能系统
+  const availableSkills = useMemo(() => {
+    if (!isMyTurn || game.phase !== '出牌' || pendingResponse || pendingDying) return [];
+    return getAvailableSkills(game, myName).filter(s => s.canActivate);
+  }, [game, myName, isMyTurn, pendingResponse, pendingDying]);
+
+  const handleActivateSkill = useCallback((skillIndex: number) => {
+    if (!isMyTurn || skillIndex >= availableSkills.length) return;
+
+    const skill = availableSkills[skillIndex];
+    const result = executeSkill(game, myName, skill.ability);
+
+    if (result.success) {
+      setGame(result.game);
+      logger.logServerOp('skillActivate', { player: myName, skill: skill.ability.name }, result.message);
+      logger.logPlayerOp(myName, 'skillActivate', { player: myName, skill: skill.ability.name }, `你发动了 ${skill.ability.name}`);
+      updateOps();
+      resetTimer();
+    }
+  }, [game, myName, isMyTurn, availableSkills, logger, updateOps, resetTimer]);
+
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn || pendingResponse || pendingDying) return;
 
@@ -503,6 +525,8 @@ export function useGame() {
     toggleTimer,
     switchPerspective,
     goToCurrentPlayer,
+    availableSkills,
+    handleActivateSkill,
     pendingResponse,
     targetHasDodge,
     respondToKill,

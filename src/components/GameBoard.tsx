@@ -24,6 +24,8 @@ export function GameBoard() {
     toggleTimer,
     switchPerspective,
     goToCurrentPlayer,
+    availableSkills,
+    handleActivateSkill,
     pendingResponse,
     targetHasDodge,
     respondToKill,
@@ -301,6 +303,29 @@ export function GameBoard() {
           onEndTurn={handleEndTurn}
         />
       </div>
+
+      {/* 技能发动 */}
+      {availableSkills.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
+          {availableSkills.map((skill, index) => (
+            <button
+              key={skill.ability.name}
+              onClick={() => handleActivateSkill(index)}
+              style={{
+                padding: '6px 16px',
+                backgroundColor: '#e67e22',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 13,
+              }}
+            >
+              发动 {skill.ability.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 工具栏 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
