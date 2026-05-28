@@ -6,14 +6,14 @@ import { LogPanel } from './LogPanel';
 
 export function GameBoard() {
   const {
-    游戏,
-    我自己,
-    是我的回合,
-    选中的卡牌,
-    set选中的卡牌,
+    game,
+    me,
+    isMyTurn,
+    selectedCard,
+    setSelectedCard,
     playerOps,
-    处理出牌,
-    处理结束回合,
+    handlePlayCard,
+    handleEndTurn,
     handleSaveLog,
   } = useGame();
 
@@ -22,35 +22,35 @@ export function GameBoard() {
       <h1 style={{ textAlign: 'center', marginBottom: 20 }}>三国杀</h1>
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 30 }}>
-        {游戏.玩家列表.map(玩家 => (
+        {game.players.map(player => (
           <PlayerPanel
-            key={玩家.name}
-            玩家={玩家}
-            是当前玩家={玩家.name === 游戏.当前玩家}
-            是自己={玩家.name === '曹操'}
+            key={player.name}
+            player={player}
+            isCurrentPlayer={player.name === game.currentPlayer}
+            isSelf={player.name === '曹操'}
           />
         ))}
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span>回合 {游戏.回合数} | 阶段: {游戏.当前阶段} | 当前玩家: {游戏.当前玩家}</span>
-        {!是我的回合 && <span style={{ color: '#f39c12', marginLeft: 12 }}>等待对手...</span>}
+        <span>回合 {game.round} | 阶段: {game.phase} | currentPlayer: {game.currentPlayer}</span>
+        {!isMyTurn && <span style={{ color: '#f39c12', marginLeft: 12 }}>等待对手...</span>}
       </div>
 
       <div style={{ marginBottom: 20 }}>
         <HandCards
-          手牌={我自己.手牌}
-          选中索引={选中的卡牌}
-          选择卡牌={(索引) => set选中的卡牌(索引 === -1 ? null : 索引)}
+          hand={me.hand}
+          selectedIndex={selectedCard}
+          onSelectCard={(index) => setSelectedCard(index === -1 ? null : index)}
         />
       </div>
 
       <div style={{ marginBottom: 20 }}>
         <ActionPanel
-          能出牌={选中的卡牌 !== null && 是我的回合 && 游戏.当前阶段 === '出牌'}
-          能结束回合={是我的回合 && 游戏.当前阶段 === '出牌'}
-          出牌={处理出牌}
-          结束回合={处理结束回合}
+          canPlay={selectedCard !== null && isMyTurn && game.phase === '出牌'}
+          canEndTurn={isMyTurn && game.phase === '出牌'}
+          onPlayCard={handlePlayCard}
+          onEndTurn={handleEndTurn}
         />
       </div>
 

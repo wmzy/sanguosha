@@ -3,7 +3,7 @@ import type { GameLog, Operation } from '../shared/log';
 import type { Rng } from '../shared/rng';
 import { createRng } from '../shared/rng';
 import { createGame, getPublicState, startGame } from './state';
-import { 所有character as allCharacters } from '../shared/characters';
+import { allCharacters } from '../shared/characters';
 
 export class ReplayEngine {
   private log: GameLog;
@@ -62,7 +62,7 @@ export class ReplayEngine {
           player: string;
           cards: Array<{ name: string; suit: string; rank: string }>;
         };
-        const drawnCards: Card[] = data.cards.map(c => ({
+        const drawnCards: Card[] = data.cards.map((c: { name: string; suit: string; rank: string }) => ({
           name: c.name,
           type: '基本牌' as const,
           subtype: c.name as Card['subtype'],

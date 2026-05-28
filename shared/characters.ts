@@ -555,14 +555,14 @@ export const 貂蝉: CharacterConfig = {
 // 所有角色列表
 // ============================================================
 
-export const 魏国角色: CharacterConfig[] = [曹操, 司马懿, 夏侯惇, 张辽, 许褚, 郭嘉, 甄姬];
-export const 蜀国角色: CharacterConfig[] = [刘备, 关羽, 张飞, 赵云, 诸葛亮, 黄月英, 马超];
-export const 吴国角色: CharacterConfig[] = [孙权, 甘宁, 吕蒙, 黄盖, 周瑜, 大乔, 陆逊, 孙尚香];
-export const 群雄角色: CharacterConfig[] = [华佗, 吕布, 貂蝉];
+export const weiCharacters: CharacterConfig[] = [曹操, 司马懿, 夏侯惇, 张辽, 许褚, 郭嘉, 甄姬];
+export const shuCharacters: CharacterConfig[] = [刘备, 关羽, 张飞, 赵云, 诸葛亮, 黄月英, 马超];
+export const wuCharacters: CharacterConfig[] = [孙权, 甘宁, 吕蒙, 黄盖, 周瑜, 大乔, 陆逊, 孙尚香];
+export const qunCharacters: CharacterConfig[] = [华佗, 吕布, 貂蝉];
 
-export const 所有角色: CharacterConfig[] = [
-  ...魏国角色,
-  ...蜀国角色,
-  ...吴国角色,
-  ...群雄角色,
+export const allCharacters: CharacterConfig[] = [
+  ...weiCharacters,
+  ...shuCharacters,
+  ...wuCharacters,
+  ...qunCharacters,
 ];

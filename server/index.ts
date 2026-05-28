@@ -7,21 +7,16 @@ import { generatePlayerId } from './utils';
 
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
-// 玩家ID生成
-function 生成玩家ID(): string {
-  return generatePlayerId();
-}
-
 // WebSocket端点
 app.get(
   '/ws',
   upgradeWebSocket(() => {
-    let 当前玩家ID: string | null = null;
+    let currentPlayerId: string | null = null;
 
     return {
       onOpen() {
-        当前玩家ID = 生成玩家ID();
-        handleWsOpen(当前玩家ID);
+        currentPlayerId = generatePlayerId();
+        handleWsOpen(currentPlayerId);
       },
 
       onMessage(event, ws) {
@@ -33,17 +28,17 @@ app.get(
           return;
         }
 
-        if (!当前玩家ID) {
+        if (!currentPlayerId) {
           ws.send(serialize({ type: 'error', message: '未初始化' }));
           return;
         }
 
-        handleWsMessage(当前玩家ID, message, ws);
+        handleWsMessage(currentPlayerId, message, ws);
       },
 
       onClose() {
-        if (当前玩家ID) {
-          handleWsClose(当前玩家ID);
+        if (currentPlayerId) {
+          handleWsClose(currentPlayerId);
         }
       },
     };

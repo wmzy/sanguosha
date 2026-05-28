@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { ReplayEngine } from '@engine/replay';
 import { GameLogger } from '@engine/logger';
-import { 创建游戏, 开始游戏 } from '@engine/state';
-import { 进入下一阶段, 摸牌阶段 } from '@engine/turn';
+import { createGame, startGame } from '@engine/state';
+import { nextPhase, drawPhase } from '@engine/turn';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('ReplayEngine', () => {
@@ -15,12 +15,12 @@ describe('ReplayEngine', () => {
       seed: 12345,
     });
 
-    let 游戏 = 创建游戏([曹操, 刘备], 12345, logger);
-    游戏 = 开始游戏(游戏);
-    游戏 = 进入下一阶段(游戏, logger); // 准备 → 判定
-    游戏 = 进入下一阶段(游戏, logger); // 判定 → 摸牌
-    const 摸牌结果 = 摸牌阶段(游戏, logger);
-    void 摸牌结果;
+    let game = createGame([曹操, 刘备], 12345, logger);
+    game = startGame(game);
+    game = nextPhase(game, logger); // 准备 → 判定
+    game = nextPhase(game, logger); // 判定 → 摸牌
+    const drawResult = drawPhase(game, logger);
+    void drawResult;
 
     return logger.export();
   }
@@ -38,7 +38,7 @@ describe('ReplayEngine', () => {
     const state1 = engine.next();
     expect(state1).not.toBe(state0);
     const state0Again = engine.prev();
-    expect(state0Again.当前阶段).toBe(state0.当前阶段);
+    expect(state0Again.phase).toBe(state0.phase);
   });
 
   it('应该能跳转到指定步骤', () => {
@@ -54,7 +54,7 @@ describe('ReplayEngine', () => {
     engine.goTo(engine.getTotalSteps() - 1);
     const view = engine.getPlayerView('曹操');
     expect(view).toBeDefined();
-    expect(view.当前玩家).toBeDefined();
+    expect(view.currentPlayer).toBeDefined();
   });
 
   it('相同种子的重播结果应该相同', () => {
@@ -66,7 +66,7 @@ describe('ReplayEngine', () => {
     for (let i = 0; i < engine1.getTotalSteps(); i++) {
       engine1.goTo(i);
       engine2.goTo(i);
-      expect(engine1.getCurrentState().当前阶段).toBe(engine2.getCurrentState().当前阶段);
+      expect(engine1.getCurrentState().phase).toBe(engine2.getCurrentState().phase);
     }
   });
 });

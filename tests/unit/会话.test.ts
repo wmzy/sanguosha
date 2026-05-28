@@ -96,7 +96,7 @@ describe('GameSession', () => {
     expect(playerName).toBeDefined();
 
     // 尝试结束回合（如果不是当前玩家会收到错误）
-    session.handleAction('player1', { 类型: '结束回合' });
+    session.handleAction('player1', { type: '结束回合' });
 
     // 检查是否发送了消息
     const messages = ws1.getMessages();
@@ -130,7 +130,7 @@ describe('GameSession', () => {
     // 尝试让非当前玩家执行动作
     // 这里需要根据实际游戏状态来判断谁是当前玩家
     // 简化测试：直接检查错误处理
-    session.handleAction('player1', { 类型: '出牌', 卡牌: { name: '杀', 类型: '基本牌', 子类型: '杀', 花色: '♠', 点数: '3', 描述: '' } });
+    session.handleAction('player1', { type: '出牌', card: { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' } });
 
     // 应该有消息发送
     const messages1 = ws1.getMessages();

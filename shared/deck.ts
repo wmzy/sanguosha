@@ -1,25 +1,21 @@
-// shared/牌组.ts
 import type { Card } from './types';
 import type { Rng } from './rng';
 
-// Fisher-Yates 洗牌算法
-export function 洗牌(牌堆: Card[], rng: Rng): Card[] {
-  const 结果 = [...牌堆];
-  for (let i = 结果.length - 1; i > 0; i--) {
+export function shuffle(deck: Card[], rng: Rng): Card[] {
+  const result = [...deck];
+  for (let i = result.length - 1; i > 0; i--) {
     const j = rng.nextInt(i + 1);
-    [结果[i], 结果[j]] = [结果[j], 结果[i]];
+    [result[i], result[j]] = [result[j], result[i]];
   }
-  return 结果;
+  return result;
 }
 
-// 从牌堆摸牌
-export function 摸牌(牌堆: Card[], 数量: number): { 摸到的牌: Card[]; 剩余牌堆: Card[] } {
-  const 摸到的牌 = 牌堆.slice(0, 数量);
-  const 剩余牌堆 = 牌堆.slice(数量);
-  return { 摸到的牌, 剩余牌堆 };
+export function drawCards(deck: Card[], count: number): { drawn: Card[]; remaining: Card[] } {
+  const drawn = deck.slice(0, count);
+  const remaining = deck.slice(count);
+  return { drawn, remaining };
 }
 
-// 弃牌
-export function 弃牌(弃牌堆: Card[], 弃的牌: Card[]): Card[] {
-  return [...弃牌堆, ...弃的牌];
+export function discardCards(discardPile: Card[], cards: Card[]): Card[] {
+  return [...discardPile, ...cards];
 }

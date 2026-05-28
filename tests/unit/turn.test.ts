@@ -1,71 +1,71 @@
 import { describe, it, expect } from 'vitest';
-import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查 } from '@engine/turn';
-import { 创建游戏 } from '@engine/state';
+import { nextPhase, drawPhase, checkDiscard } from '@engine/turn';
+import { createGame } from '@engine/state';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('回合阶段', () => {
   describe('阶段流转', () => {
     it('应该按顺序进入下一阶段', () => {
-      const 游戏 = 创建游戏([曹操, 刘备]);
-      游戏.状态 = '进行中';
+      const game = createGame([曹操, 刘备]);
+      game.status = '进行中';
 
-      const 阶段顺序 = ['准备', '判定', '摸牌', '出牌', '弃牌', '结束'];
-      let 当前游戏 = 游戏;
+      const phaseOrder = ['准备', '判定', '摸牌', '出牌', '弃牌', '结束'];
+      let currentGame = game;
 
-      for (const 预期阶段 of 阶段顺序) {
-        expect(当前游戏.当前阶段).toBe(预期阶段);
-        当前游戏 = 进入下一阶段(当前游戏);
+      for (const expectedPhase of phaseOrder) {
+        expect(currentGame.phase).toBe(expectedPhase);
+        currentGame = nextPhase(currentGame);
       }
       // 结束阶段后应回到准备阶段，回合数+1
-      expect(当前游戏.当前阶段).toBe('准备');
-      expect(当前游戏.回合数).toBe(2);
+      expect(currentGame.phase).toBe('准备');
+      expect(currentGame.round).toBe(2);
     });
 
     it('结束阶段后应切换到下一个玩家', () => {
-      const 游戏 = 创建游戏([曹操, 刘备]);
-      游戏.状态 = '进行中';
-      游戏.当前阶段 = '结束';
+      const game = createGame([曹操, 刘备]);
+      game.status = '进行中';
+      game.phase = '结束';
 
-      const 下一回合 = 进入下一阶段(游戏);
-      expect(下一回合.当前玩家).toBe('刘备');
+      const nextRound = nextPhase(game);
+      expect(nextRound.currentPlayer).toBe('刘备');
     });
   });
 
   describe('摸牌阶段', () => {
     it('应该摸2张牌', () => {
-      const 游戏 = 创建游戏([曹操, 刘备]);
-      游戏.状态 = '进行中';
-      游戏.当前阶段 = '摸牌';
+      const game = createGame([曹操, 刘备]);
+      game.status = '进行中';
+      game.phase = '摸牌';
 
-      const 结果 = 摸牌阶段(游戏);
-      expect(结果.状态.玩家列表[0].手牌.length).toBe(2);
-      expect(结果.状态.牌堆.length).toBe(游戏.牌堆.length - 2);
+      const result = drawPhase(game);
+      expect(result.status.players[0].hand.length).toBe(2);
+      expect(result.status.deck.length).toBe(game.deck.length - 2);
     });
   });
 
   describe('弃牌阶段', () => {
     it('手牌超过上限时需要弃牌', () => {
-      const 游戏 = 创建游戏([曹操, 刘备]);
-      游戏.状态 = '进行中';
-      游戏.当前阶段 = '弃牌';
+      const game = createGame([曹操, 刘备]);
+      game.status = '进行中';
+      game.phase = '弃牌';
       // 给曹操5张手牌（体力上限4，需弃1张）
-      游戏.玩家列表[0].手牌 = 游戏.牌堆.slice(0, 5);
-      游戏.牌堆 = 游戏.牌堆.slice(5);
+      game.players[0].hand = game.deck.slice(0, 5);
+      game.deck = game.deck.slice(5);
 
-      const 需要弃牌 = 弃牌阶段检查(游戏);
-      expect(需要弃牌).toBe(true);
+      const needsDiscard = checkDiscard(game);
+      expect(needsDiscard).toBe(true);
     });
 
     it('手牌不超过上限时不需要弃牌', () => {
-      const 游戏 = 创建游戏([曹操, 刘备]);
-      游戏.状态 = '进行中';
-      游戏.当前阶段 = '弃牌';
+      const game = createGame([曹操, 刘备]);
+      game.status = '进行中';
+      game.phase = '弃牌';
       // 给曹操3张手牌（体力上限4，不需要弃）
-      游戏.玩家列表[0].手牌 = 游戏.牌堆.slice(0, 3);
-      游戏.牌堆 = 游戏.牌堆.slice(3);
+      game.players[0].hand = game.deck.slice(0, 3);
+      game.deck = game.deck.slice(3);
 
-      const 需要弃牌 = 弃牌阶段检查(游戏);
-      expect(需要弃牌).toBe(false);
+      const needsDiscard = checkDiscard(game);
+      expect(needsDiscard).toBe(false);
     });
   });
 });

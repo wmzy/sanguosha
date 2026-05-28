@@ -5,7 +5,7 @@ import type { PublicGameState, TurnPhase, PlayerAction, Role } from '../shared/t
 export type ServerMessage =
   | { type: 'state_update'; state: PublicGameState }
   | { type: 'your_turn'; phase: TurnPhase }
-  | { type: 'prompt'; promptId: string; prompt: { name: string; 描述: string; 类型: string; 选项: unknown[] } }
+  | { type: 'prompt'; promptId: string; prompt: { name: string; description: string; type: string; options: unknown[] } }
   | { type: 'game_over'; winner: Role }
   | { type: 'error'; message: string }
   | { type: 'room_joined'; roomId: string; playerId: string }

@@ -1,12 +1,12 @@
 // server/会话.ts
 import type { GameState, PlayerAction } from '../shared/types';
 import type { Room } from './房间';
-import { 创建游戏, 获取公开状态, 开始游戏 } from '../engine/state';
-import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../engine/turn';
+import { createGame, getPublicState, startGame } from '../engine/state';
+import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../engine/turn';
 import { useKill, usePeach } from '../engine/effect';
-import { 所有角色 } from '../shared/characters';
+import { allCharacters } from '../shared/characters';
 import { serialize } from './协议';
-import { 设置房间状态 } from './房间';
+import { setRoomStatus } from './房间';
 
 export class GameSession {
   private state: GameState | null = null;
@@ -21,7 +21,7 @@ export class GameSession {
     if (this.room.players.size < 2) return false;
 
     // 随机分配角色
-    const shuffled = [...所有角色].sort(() => Math.random() - 0.5);
+    const shuffled = [...allCharacters].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, this.room.players.size);
 
     // 映射 playerId -> playerName
@@ -30,16 +30,16 @@ export class GameSession {
       this.playerNames.set(playerIds[i], selected[i].name);
     }
 
-    this.state = 创建游戏(selected);
-    this.state = 开始游戏(this.state);
+    this.state = createGame(selected);
+    this.state = startGame(this.state);
 
     // 初始摸牌
     for (let i = 0; i < this.state.players.length; i++) {
-      this.state = this.摸牌给当前玩家();
-      this.state = 进入下一阶段(this.state);
+      this.state = this.drawForCurrentPlayer();
+      this.state = nextPhase(this.state);
     }
 
-    设置房间状态(this.room.id, '进行中');
+    setRoomStatus(this.room.id, '进行中');
     this.broadcastState();
 
     // 通知当前玩家
@@ -47,9 +47,9 @@ export class GameSession {
     return true;
   }
 
-  private 摸牌给当前玩家(): GameState {
+  private drawForCurrentPlayer(): GameState {
     if (!this.state) throw new Error('游戏未开始');
-    const result = 摸牌阶段(this.state);
+    const result = drawPhase(this.state);
     this.state = result.status;
     return this.state;
   }
@@ -122,7 +122,7 @@ export class GameSession {
     this.state = { ...this.state, phase: '弃牌' };
 
     // 检查是否需要弃牌
-    if (弃牌阶段检查(this.state)) {
+    if (checkDiscard(this.state)) {
       // 通知玩家需要弃牌
       this.sendToPlayerByName(playerName, {
         type: 'prompt',
@@ -140,13 +140,13 @@ export class GameSession {
     if (!this.state) return;
     if (action.type !== '弃牌') return;
     // 简化：弃第一张牌
-    const card = action.card[0];
+    const card = action.cards[0];
     if (card) {
       const player = this.state.players.find(p => p.name === playerName);
       if (player) {
         const index = player.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
         if (index >= 0) {
-          this.state = 弃牌阶段执行(this.state, [index]);
+          this.state = executeDiscard(this.state, [index]);
         }
       }
     }
@@ -157,24 +157,24 @@ export class GameSession {
     if (!this.state) return;
 
     // 跳过弃牌和结束阶段，进入下一玩家的准备阶段
-    this.state = 进入下一阶段(this.state); // 弃牌 -> 结束
-    this.state = 进入下一阶段(this.state); // 结束 -> 准备（下一玩家）
+    this.state = nextPhase(this.state); // 弃牌 -> 结束
+    this.state = nextPhase(this.state); // 结束 -> 准备（下一玩家）
 
     // 检查游戏是否结束
     const winner = this.checkGameEnd();
     if (winner) {
       this.state = { ...this.state, status: '已结束', winner: winner };
-      设置房间状态(this.room.id, '已结束');
+      setRoomStatus(this.room.id, '已结束');
       this.broadcast({ type: 'game_over', winner });
       this.broadcastState();
       return;
     }
 
     // 新回合摸牌
-    this.state = 进入下一阶段(this.state); // 准备 -> 判定
-    this.state = 进入下一阶段(this.state); // 判定 -> 摸牌
-    this.state = this.摸牌给当前玩家();
-    this.state = 进入下一阶段(this.state); // 摸牌 -> 出牌
+    this.state = nextPhase(this.state); // 准备 -> 判定
+    this.state = nextPhase(this.state); // 判定 -> 摸牌
+    this.state = this.drawForCurrentPlayer();
+    this.state = nextPhase(this.state); // 摸牌 -> 出牌
 
     this.broadcastState();
     this.notifyCurrentPlayer();
@@ -190,18 +190,18 @@ export class GameSession {
       }
     }
 
-    const 仍然存活 = this.state.players.filter(p => p.alive);
+    const alivePlayers = this.state.players.filter(p => p.alive);
 
     // 主公死了，反贼赢
-    const 主公 = this.state.players.find(p => p.role === '主公');
-    if (主公 && !主公.alive) return '反贼';
+    const lord = this.state.players.find(p => p.role === '主公');
+    if (lord && !lord.alive) return '反贼';
 
     // 只剩主公和内奸，主公赢
-    if (仍然存活.length === 1) return 仍然存活[0].role;
+    if (alivePlayers.length === 1) return alivePlayers[0].role;
 
     // 反贼全死，主公赢
-    const 反贼存活 = 仍然存活.filter(p => p.role === '反贼');
-    if (反贼存活.length === 0 && 仍然存活.length > 0) return '主公';
+    const aliveRebels = alivePlayers.filter(p => p.role === '反贼');
+    if (aliveRebels.length === 0 && alivePlayers.length > 0) return '主公';
 
     return null;
   }
@@ -228,7 +228,7 @@ export class GameSession {
     if (!this.state) return;
 
     for (const [playerId, playerName] of this.playerNames) {
-      const publicState = 获取公开状态(this.state, playerName);
+      const publicState = getPublicState(this.state, playerName);
       this.sendToPlayer(playerId, { type: 'state_update', state: publicState });
     }
   }
@@ -247,7 +247,7 @@ export class GameSession {
     const playerName = this.playerNames.get(playerId) ?? '未知玩家';
     if (this.state?.status === '进行中') {
       this.state = { ...this.state, status: '已结束' };
-      设置房间状态(this.room.id, '已结束');
+      setRoomStatus(this.room.id, '已结束');
       this.broadcast({ type: 'error', message: `${playerName} 断开连接，游戏结束` });
     }
   }

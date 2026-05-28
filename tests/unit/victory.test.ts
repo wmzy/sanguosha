@@ -1,128 +1,128 @@
-// tests/unit/胜利条件.test.ts
+// tests/unit/victory.test.ts
 import { describe, it, expect } from 'vitest';
-import { 创建游戏, 检查胜利, 玩家死亡 } from '@engine/state';
+import { createGame, checkVictory, playerDeath } from '@engine/state';
 import { 曹操, 刘备, 孙权, 吕布, 貂蝉 } from '@shared/characters';
 import type { GameState, Role } from '@shared/types';
 
-function 设置玩家身份(游戏: GameState, 身份映射: Record<string, Role>): GameState {
-  const 新玩家列表 = 游戏.玩家列表.map(p => ({
+function setPlayerRoles(game: GameState, roleMap: Record<string, Role>): GameState {
+  const newPlayers = game.players.map(p => ({
     ...p,
-    身份: 身份映射[p.name] ?? p.身份,
+    role: roleMap[p.name] ?? p.role,
   }));
-  return { ...游戏, 玩家列表: 新玩家列表 };
+  return { ...game, players: newPlayers };
 }
 
 describe('胜利条件', () => {
   describe('主公获胜', () => {
     it('所有反贼和内奸死亡时，主公获胜', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权, 吕布]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼', 吕布: '内奸' });
+      let game = createGame([曹操, 刘备, 孙权, 吕布]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼', 吕布: '内奸' });
 
       // 反贼和内奸死亡
-      游戏 = 玩家死亡(游戏, '孙权');
-      游戏 = 玩家死亡(游戏, '吕布');
+      game = playerDeath(game, '孙权');
+      game = playerDeath(game, '吕布');
 
-      expect(游戏.状态).toBe('已结束');
-      expect(游戏.获胜身份).toBe('主公');
+      expect(game.status).toBe('已结束');
+      expect(game.winner).toBe('主公');
     });
 
     it('只剩主公和忠臣时，主公获胜', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼' });
+      let game = createGame([曹操, 刘备, 孙权]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼' });
 
       // 反贼死亡
-      游戏 = 玩家死亡(游戏, '孙权');
+      game = playerDeath(game, '孙权');
 
-      expect(游戏.状态).toBe('已结束');
-      expect(游戏.获胜身份).toBe('主公');
+      expect(game.status).toBe('已结束');
+      expect(game.winner).toBe('主公');
     });
   });
 
   describe('反贼获胜', () => {
     it('主公死亡时，反贼获胜', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼' });
+      let game = createGame([曹操, 刘备, 孙权]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼' });
 
       // 主公死亡
-      游戏 = 玩家死亡(游戏, '曹操');
+      game = playerDeath(game, '曹操');
 
-      expect(游戏.状态).toBe('已结束');
-      expect(游戏.获胜身份).toBe('反贼');
+      expect(game.status).toBe('已结束');
+      expect(game.winner).toBe('反贼');
     });
 
     it('2人局主公死亡时，反贼获胜', () => {
-      let 游戏 = 创建游戏([曹操, 刘备]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '反贼' });
+      let game = createGame([曹操, 刘备]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '反贼' });
 
-      游戏 = 玩家死亡(游戏, '曹操');
+      game = playerDeath(game, '曹操');
 
-      expect(游戏.状态).toBe('已结束');
-      expect(游戏.获胜身份).toBe('反贼');
+      expect(game.status).toBe('已结束');
+      expect(game.winner).toBe('反贼');
     });
   });
 
   describe('内奸获胜', () => {
     it('只剩内奸时，内奸获胜', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权, 吕布, 貂蝉]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼', 吕布: '反贼', 貂蝉: '内奸' });
+      let game = createGame([曹操, 刘备, 孙权, 吕布, 貂蝉]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼', 吕布: '反贼', 貂蝉: '内奸' });
 
       // 先杀反贼
-      游戏 = 玩家死亡(游戏, '孙权');
-      游戏 = 玩家死亡(游戏, '吕布');
+      game = playerDeath(game, '孙权');
+      game = playerDeath(game, '吕布');
       // 再杀忠臣
-      游戏 = 玩家死亡(游戏, '刘备');
+      game = playerDeath(game, '刘备');
       // 最后杀主公
-      游戏 = 玩家死亡(游戏, '曹操');
+      game = playerDeath(game, '曹操');
 
-      expect(游戏.状态).toBe('已结束');
-      expect(游戏.获胜身份).toBe('内奸');
+      expect(game.status).toBe('已结束');
+      expect(game.winner).toBe('内奸');
     });
   });
 
   describe('游戏未结束', () => {
     it('反贼存活时游戏继续', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼' });
+      let game = createGame([曹操, 刘备, 孙权]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '忠臣', 孙权: '反贼' });
 
       // 没有人死亡
-      游戏 = 检查胜利(游戏);
+      game = checkVictory(game);
 
-      expect(游戏.状态).not.toBe('已结束');
-      expect(游戏.获胜身份).toBeUndefined();
+      expect(game.status).not.toBe('已结束');
+      expect(game.winner).toBeUndefined();
     });
 
     it('内奸存活且主公存活时游戏继续', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权, 吕布]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼', 吕布: '内奸' });
+      let game = createGame([曹操, 刘备, 孙权, 吕布]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼', 吕布: '内奸' });
 
       // 杀一个反贼
-      游戏 = 玩家死亡(游戏, '刘备');
+      game = playerDeath(game, '刘备');
       // 还有一个反贼存活
 
-      expect(游戏.状态).not.toBe('已结束');
-      expect(游戏.获胜身份).toBeUndefined();
+      expect(game.status).not.toBe('已结束');
+      expect(game.winner).toBeUndefined();
     });
   });
 
   describe('玩家死亡', () => {
     it('应将玩家标记为死亡', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权, 吕布]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼', 吕布: '内奸' });
+      let game = createGame([曹操, 刘备, 孙权, 吕布]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼', 吕布: '内奸' });
 
-      游戏 = 玩家死亡(游戏, '刘备');
+      game = playerDeath(game, '刘备');
 
-      const 刘备玩家 = 游戏.玩家列表.find(p => p.name === '刘备')!;
-      expect(刘备玩家.存活).toBe(false);
+      const liuBei = game.players.find(p => p.name === '刘备')!;
+      expect(liuBei.alive).toBe(false);
     });
 
     it('不影响其他玩家存活状态', () => {
-      let 游戏 = 创建游戏([曹操, 刘备, 孙权, 吕布]);
-      游戏 = 设置玩家身份(游戏, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼', 吕布: '内奸' });
+      let game = createGame([曹操, 刘备, 孙权, 吕布]);
+      game = setPlayerRoles(game, { 曹操: '主公', 刘备: '反贼', 孙权: '反贼', 吕布: '内奸' });
 
-      游戏 = 玩家死亡(游戏, '刘备');
+      game = playerDeath(game, '刘备');
 
-      const 曹操玩家 = 游戏.玩家列表.find(p => p.name === '曹操')!;
-      expect(曹操玩家.存活).toBe(true);
+      const caoCao = game.players.find(p => p.name === '曹操')!;
+      expect(caoCao.alive).toBe(true);
     });
   });
 });

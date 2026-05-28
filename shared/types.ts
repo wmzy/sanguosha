@@ -16,13 +16,13 @@ export type TrickSubType = '普通锦囊' | '延时锦囊' | '响应锦囊';
 // 卡牌
 export interface Card {
   name: string; // "杀", "闪", "桃" — 唯一标识
-  类型: CardType;
-  子类型: CardSubType;
-  花色: Suit;
-  点数: Rank;
-  描述: string;
-  距离?: number; // 武器攻击范围
-  锦囊子类型?: TrickSubType;
+  type: CardType;
+  subtype: CardSubType;
+  suit: Suit;
+  rank: Rank;
+  description: string;
+  range?: number; // 武器攻击范围
+  trickSubtype?: TrickSubType;
 }
 
 // 角色性别
@@ -102,45 +102,45 @@ export interface CharacterConfig {
 
 // 装备槽
 export interface Equipment {
-  武器?: Card;
-  防具?: Card;
-  马加?: Card; // +1马
-  马减?: Card; // -1马
+  weapon?: Card;
+  armor?: Card;
+  horsePlus?: Card; // +1马
+  horseMinus?: Card; // -1马
 }
 
 // 玩家
 export interface Player {
   name: string;
-  角色: CharacterConfig;
-  身份: Role;
-  体力: number;
-  体力上限: number;
-  手牌: Card[];
-  装备: Equipment;
-  存活: boolean;
+  character: CharacterConfig;
+  role: Role;
+  health: number;
+  maxHealth: number;
+  hand: Card[];
+  equipment: Equipment;
+  alive: boolean;
 }
 
 // 游戏状态
 export interface GameState {
-  玩家列表: Player[];
-  牌堆: Card[];
-  弃牌堆: Card[];
-  当前玩家: string; // player name
-  当前阶段: TurnPhase;
-  回合数: number;
-  状态: '等待中' | '进行中' | '已结束';
-  获胜身份?: Role;
+  players: Player[];
+  deck: Card[];
+  discardPile: Card[];
+  currentPlayer: string; // player name
+  phase: TurnPhase;
+  round: number;
+  status: '等待中' | '进行中' | '已结束';
+  winner?: Role;
 }
 
 // 玩家可见状态（隐藏他人手牌）
 export interface PublicGameState {
-  玩家列表: Array<Omit<Player, '手牌'> & { 手牌数量: number; 手牌?: Card[] }>;
-  弃牌堆: Card[];
-  当前玩家: string;
-  当前阶段: TurnPhase;
-  回合数: number;
-  状态: '等待中' | '进行中' | '已结束';
-  获胜身份?: Role;
+  players: Array<Omit<Player, 'hand'> & { handCount: number; hand?: Card[] }>;
+  discardPile: Card[];
+  currentPlayer: string;
+  phase: TurnPhase;
+  round: number;
+  status: '等待中' | '进行中' | '已结束';
+  winner?: Role;
 }
 
 // 提示类型
@@ -149,16 +149,16 @@ export type PromptType = 'select_player' | 'select_card' | 'select_yes_no' | 'se
 // 提示
 export interface Prompt {
   name: string;
-  描述: string;
-  类型: PromptType;
-  选项: unknown[];
-  超时?: number;
+  description: string;
+  type: PromptType;
+  options: unknown[];
+  timeout?: number;
 }
 
 // 玩家动作（可辨识联合类型）
 export type PlayerAction =
-  | { 类型: '出牌'; 卡牌: Card; 目标?: string }
-  | { 类型: '发动技能'; 技能名: string; 目标?: string }
-  | { 类型: '结束回合' }
-  | { 类型: '弃牌'; 卡牌: Card[] }
-  | { 类型: '响应'; 卡牌?: Card; 目标?: string };
+  | { type: '出牌'; card: Card; target?: string }
+  | { type: '发动技能'; skillName: string; target?: string }
+  | { type: '结束回合' }
+  | { type: '弃牌'; cards: Card[] }
+  | { type: '响应'; card?: Card; target?: string };

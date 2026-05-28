@@ -67,18 +67,18 @@ export function ReplayBoard({ log, onExit }: ReplayBoardProps) {
       )}
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 20 }}>
-        {playerView.玩家列表.map(玩家 => (
+        {playerView.players.map(player => (
           <PlayerPanel
-            key={玩家.name}
-            玩家={{ ...玩家, 手牌: 玩家.手牌 ?? [] }}
-            是当前玩家={玩家.name === state.当前玩家}
-            是自己={玩家.name === selectedPlayer}
+            key={player.name}
+            player={{ ...player, hand: player.hand ?? [] }}
+            isCurrentPlayer={player.name === state.currentPlayer}
+            isSelf={player.name === selectedPlayer}
           />
         ))}
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        回合 {state.回合数} | 阶段: {state.当前阶段} | 当前玩家: {state.当前玩家}
+        回合 {state.round} | 阶段: {state.phase} | currentPlayer: {state.currentPlayer}
       </div>
 
       <LogPanel operations={log.playerOps[selectedPlayer] ?? []} maxHeight={300} />

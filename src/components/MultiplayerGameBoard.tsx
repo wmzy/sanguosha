@@ -76,22 +76,22 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
   }, [lastMessage]);
 
   // 获取当前玩家信息
-  const myPlayer = gameState?.玩家列表.find(p => {
+  const myPlayer = gameState?.players.find(p => {
     // 通过位置匹配，因为playerId和playerName不同
-    const index = gameState.玩家列表.indexOf(p);
+    const index = gameState.players.indexOf(p);
     return index === 0; // 简化：假设第一个玩家是自己
   });
 
   const handlePlayCard = useCallback(() => {
     if (selectedCard === null || !myPlayer || !isMyTurn) return;
 
-    const card = myPlayer.手牌?.[selectedCard];
+    const card = myPlayer.hand?.[selectedCard];
     if (!card) return;
 
     const action: PlayerAction = {
-      类型: '出牌',
-      卡牌: card,
-      目标: gameState?.玩家列表.find(p => p.name !== myPlayer.name && p.存活)?.name,
+      type: '出牌',
+      card: card,
+      target: gameState?.players.find(p => p.name !== myPlayer.name && p.alive)?.name,
     };
 
     send({ type: 'action', action });
@@ -102,7 +102,7 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn) return;
 
-    const action: PlayerAction = { 类型: '结束回合' };
+    const action: PlayerAction = { type: '结束回合' };
     send({ type: 'action', action });
     setIsMyTurn(false);
   }, [isMyTurn, send]);
@@ -167,32 +167,32 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
 
       {/* 玩家面板 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 30, flexWrap: 'wrap' }}>
-        {gameState.玩家列表.map((player, index) => (
+        {gameState.players.map((player, index) => (
           <PlayerPanel
             key={player.name}
-            玩家={{
+            player={{
               ...player,
-              手牌: player.手牌 ?? [],
+              hand: player.hand ?? [],
             }}
-            是当前玩家={player.name === gameState.当前玩家}
-            是自己={index === 0} // 简化：第一个玩家是自己
+            isCurrentPlayer={player.name === gameState.currentPlayer}
+            isSelf={index === 0} // 简化：第一个玩家是自己
           />
         ))}
       </div>
 
       {/* 游戏信息 */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span>回合 {gameState.回合数} | 阶段: {gameState.当前阶段} | 当前玩家: {gameState.当前玩家}</span>
+        <span>回合 {gameState.round} | 阶段: {gameState.phase} | currentPlayer: {gameState.currentPlayer}</span>
         {isMyTurn && <span style={{ color: '#2ecc71', marginLeft: 10 }}>- 你的回合！</span>}
       </div>
 
       {/* 手牌 */}
-      {myPlayer?.手牌 && (
+      {myPlayer?.hand && (
         <div style={{ marginBottom: 20 }}>
           <HandCards
-            手牌={myPlayer.手牌}
-            选中索引={selectedCard}
-            选择卡牌={(索引) => setSelectedCard(索引 === -1 ? null : 索引)}
+            hand={myPlayer.hand}
+            selectedIndex={selectedCard}
+            onSelectCard={(index) => setSelectedCard(index === -1 ? null : index)}
           />
         </div>
       )}
@@ -200,10 +200,10 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
       {/* 操作面板 */}
       <div style={{ marginBottom: 20 }}>
         <ActionPanel
-          能出牌={selectedCard !== null && isMyTurn && gameState.当前阶段 === '出牌'}
-          能结束回合={isMyTurn && gameState.当前阶段 === '出牌'}
-          出牌={handlePlayCard}
-          结束回合={handleEndTurn}
+          canPlay={selectedCard !== null && isMyTurn && gameState.phase === '出牌'}
+          canEndTurn={isMyTurn && gameState.phase === '出牌'}
+          onPlayCard={handlePlayCard}
+          onEndTurn={handleEndTurn}
         />
       </div>
 

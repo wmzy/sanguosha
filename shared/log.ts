@@ -34,12 +34,12 @@ export interface GameLog {
 
 export interface DrawData {
   player: string;
-  cards: Array<{ name: string; 花色: string; 点数: string }>;
+  cards: Array<{ name: string; suit: string; rank: string }>;
 }
 
 export interface PlayData {
   player: string;
-  card: { name: string; 花色: string; 点数: string };
+  card: { name: string; suit: string; rank: string };
   target?: string;
 }
 
@@ -58,7 +58,7 @@ export interface HealData {
 
 export interface DiscardData {
   player: string;
-  cards: Array<{ name: string; 花色: string; 点数: string }>;
+  cards: Array<{ name: string; suit: string; rank: string }>;
 }
 
 export interface TurnChangeData {

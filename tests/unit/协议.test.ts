@@ -9,12 +9,12 @@ describe('消息协议', () => {
       const message: ServerMessage = {
         type: 'state_update',
         state: {
-          玩家列表: [],
-          弃牌堆: [],
-          当前玩家: '曹操',
-          当前阶段: '出牌',
-          回合数: 1,
-          状态: '进行中',
+          players: [],
+          discardPile: [],
+          currentPlayer: '曹操',
+          phase: '出牌',
+          round: 1,
+          status: '进行中',
         },
       };
 
@@ -66,7 +66,7 @@ describe('消息协议', () => {
     it('应该反序列化 action 消息', () => {
       const message: ClientMessage = {
         type: 'action',
-        action: { 类型: '出牌', 卡牌: { name: '杀', 类型: '基本牌', 子类型: '杀', 花色: '♠', 点数: '3', 描述: '' } },
+        action: { type: '出牌', card: { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' } },
       };
 
       const data = JSON.stringify(message);
@@ -127,7 +127,7 @@ describe('消息协议', () => {
     it('应该验证有效的 action 消息', () => {
       const message = {
         type: 'action',
-        action: { 类型: '出牌' },
+        action: { type: '出牌' },
       };
       expect(isValidClientMessage(message)).toBe(true);
     });

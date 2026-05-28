@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { GameLogger } from '@engine/logger';
 import { ReplayEngine } from '@engine/replay';
-import { 创建游戏, 开始游戏 } from '@engine/state';
-import { 进入下一阶段, 摸牌阶段 } from '@engine/turn';
+import { createGame, startGame } from '@engine/state';
+import { nextPhase, drawPhase } from '@engine/turn';
 import { useKill } from '@engine/effect';
 import { 曹操, 刘备 } from '@shared/characters';
 
@@ -18,17 +18,17 @@ describe('完整重播流程', () => {
     });
 
     // 进行一局游戏
-    let 游戏 = 创建游戏([曹操, 刘备], seed, logger);
-    游戏 = 开始游戏(游戏);
-    游戏 = 进入下一阶段(游戏, logger); // 准备 → 判定
-    游戏 = 进入下一阶段(游戏, logger); // 判定 → 摸牌
-    const 摸牌结果 = 摸牌阶段(游戏, logger);
-    游戏 = 摸牌结果.status;
-    游戏 = 进入下一阶段(游戏, logger); // 摸牌 → 出牌
+    let game = createGame([曹操, 刘备], seed, logger);
+    game = startGame(game);
+    game = nextPhase(game, logger); // 准备 → 判定
+    game = nextPhase(game, logger); // 判定 → 摸牌
+    const drawResult = drawPhase(game, logger);
+    game = drawResult.status;
+    game = nextPhase(game, logger); // 摸牌 → 出牌
 
     // 使用杀
-    const 杀结果 = useKill(游戏, '曹操', '刘备', logger);
-    expect(杀结果.success).toBe(true);
+    const killResult = useKill(game, '曹操', '刘备', logger);
+    expect(killResult.success).toBe(true);
 
     // 导出日志
     const log = logger.export();
@@ -60,12 +60,12 @@ describe('完整重播流程', () => {
         characters: ['曹操', '刘备'],
         seed,
       });
-      let 游戏 = 创建游戏([曹操, 刘备], seed, logger);
-      游戏 = 开始游戏(游戏);
-      游戏 = 进入下一阶段(游戏, logger);
-      游戏 = 进入下一阶段(游戏, logger);
-      const 摸牌结果 = 摸牌阶段(游戏, logger);
-      void 摸牌结果;
+      let game = createGame([曹操, 刘备], seed, logger);
+      game = startGame(game);
+      game = nextPhase(game, logger);
+      game = nextPhase(game, logger);
+      const drawResult = drawPhase(game, logger);
+      void drawResult;
       return logger.export();
     }
 
