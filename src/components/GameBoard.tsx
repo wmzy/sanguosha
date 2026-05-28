@@ -14,6 +14,7 @@ export function GameBoard() {
     selectedTarget,
     setSelectedTarget,
     canPlay,
+    validActions,
     playerOps,
     handlePlayCard,
     handleEndTurn,
@@ -21,8 +22,8 @@ export function GameBoard() {
   } = useGame();
 
   // 判断选中的牌是否需要选择目标
-  const selectedCardData = selectedCard !== null ? me.hand[selectedCard] : null;
-  const needsTarget = selectedCardData && ['杀', '过河拆桥', '顺手牵羊', '决斗'].includes(selectedCardData.name);
+  const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
+  const validTargets = selectedCard !== null ? (validActions.validTargets.get(selectedCard) ?? []) : [];
 
   return (
     <div style={{ padding: 20, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee' }}>
@@ -39,15 +40,16 @@ export function GameBoard() {
           <div
             key={player.name}
             onClick={() => {
-              if (needsTarget && player.name !== '曹操' && player.alive) {
+              if (needsTarget && player.name !== '曹操' && player.alive && validTargets.includes(player.name)) {
                 setSelectedTarget(player.name === selectedTarget ? null : player.name);
               }
             }}
             style={{
-              cursor: needsTarget && player.name !== '曹操' && player.alive ? 'pointer' : 'default',
+              cursor: needsTarget && player.name !== '曹操' && player.alive && validTargets.includes(player.name) ? 'pointer' : 'default',
               outline: selectedTarget === player.name ? '3px solid #e74c3c' : 'none',
               borderRadius: 12,
               transition: 'outline 0.2s',
+              opacity: needsTarget && !validTargets.includes(player.name) && player.name !== '曹操' ? 0.5 : 1,
             }}
           >
             <PlayerPanel
@@ -69,6 +71,7 @@ export function GameBoard() {
           hand={me.hand}
           selectedIndex={selectedCard}
           onSelectCard={selectCard}
+          playableIndices={isMyTurn ? validActions.playableCardIndices : undefined}
         />
       </div>
 

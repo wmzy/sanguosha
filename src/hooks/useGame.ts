@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import type { GameState } from '../../shared/types';
 import { createGame, startGame, getCurrentPlayer } from '../../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine/turn';
@@ -7,6 +7,7 @@ import {
   playDismantle, playSteal, playDrawTwo,
   playArrowBarrage, playBarbarianInvasion, playPeachGarden,
 } from '../../engine/effect';
+import { getValidActions, getValidTargetsForCard, isCardPlayable } from '../../engine/rules';
 import { GameLogger } from '../../engine/logger';
 import { 曹操, 刘备 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
@@ -14,7 +15,6 @@ import { saveLog } from '../utils/logFile';
 
 function advanceToPlayPhase(game: GameState, logger: InstanceType<typeof GameLogger>): GameState {
   let state = game;
-  // 自动跳过准备和判定阶段，摸牌阶段自动摸牌
   while (state.phase !== '出牌') {
     if (state.phase === '摸牌') {
       const result = drawPhase(state, logger);
@@ -27,15 +27,13 @@ function advanceToPlayPhase(game: GameState, logger: InstanceType<typeof GameLog
 
 export function useGame() {
   const loggerRef = useRef<GameLogger | null>(null);
-  if (!loggerRef.current) {
-    loggerRef.current = new GameLogger({
-      version: '1.0.0',
-      createdAt: Date.now(),
-      playerCount: 2,
-      characters: ['曹操', '刘备'],
-      seed: Date.now(),
-    });
-  }
+  loggerRef.current ??= new GameLogger({
+    version: '1.0.0',
+    createdAt: Date.now(),
+    playerCount: 2,
+    characters: ['曹操', '刘备'],
+    seed: Date.now(),
+  });
   const logger = loggerRef.current;
 
   const initRef = useRef(false);
@@ -43,7 +41,6 @@ export function useGame() {
 
   const [game, setGame] = useState<GameState>(() => {
     if (initRef.current) {
-      // StrictMode double-init: return a dummy, will be overwritten
       return createGame([曹操, 刘备]);
     }
     initRef.current = true;
@@ -63,49 +60,39 @@ export function useGame() {
 
   const currentPlayer = getCurrentPlayer(game);
   const me = game.players.find(p => p.name === '曹操')!;
-
-  const handleSaveLog = useCallback(() => {
-    saveLog(logger.export());
-  }, [logger]);
-
   const isMyTurn = game.currentPlayer === '曹操';
 
-  // 判断选中的牌是否需要选择目标
-  const needsTarget = useCallback((cardName: string): boolean => {
-    return ['杀', '过河拆桥', '顺手牵羊', '决斗'].includes(cardName);
-  }, []);
+  // 使用规则引擎获取可用操作
+  const validActions = useMemo(() => getValidActions(game, '曹操'), [game]);
 
-  // 判断选中的牌是否可以主动使用
-  const isPlayable = useCallback((card: typeof me.hand[0]): boolean => {
-    if (card.name === '杀') return true; // 需要目标，但可以出
-    if (card.name === '桃') return me.health < me.maxHealth; // 满血不能用
-    if (card.name === '闪') return false; // 响应牌，不能主动出
-    if (card.name === '无懈可击') return false; // 响应牌
-    if (card.subtype === '武器' || card.subtype === '防具' || card.subtype === '进攻马' || card.subtype === '防御马') return true;
-    if (['过河拆桥', '顺手牵羊', '无中生有', '决斗', '万箭齐发', '南蛮入侵', '桃园结义', '五谷丰登'].includes(card.name)) return true;
-    return false;
-  }, [me.health, me.maxHealth]);
+  // 选中的牌是否需要目标
+  const selectedCardData = selectedCard !== null ? me.hand[selectedCard] : null;
+  const needsTarget = selectedCardData ? getValidTargetsForCard(game, me, selectedCardData).length > 0 : false;
 
   // 当前选中的牌是否可以出
   const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && (() => {
     const card = me.hand[selectedCard];
     if (!card) return false;
-    if (!isPlayable(card)) return false;
-    if (needsTarget(card.name) && !selectedTarget) return false;
+    if (!isCardPlayable(game, me, card)) return false;
+    if (needsTarget && !selectedTarget) return false;
     return true;
   })();
+
+  const handleSaveLog = useCallback(() => {
+    saveLog(logger.export());
+  }, [logger]);
 
   const handlePlayCard = useCallback(() => {
     if (selectedCard === null || !isMyTurn) return;
 
     const card = me.hand[selectedCard];
-    if (!card || !isPlayable(card)) return;
+    if (!card || !isCardPlayable(game, me, card)) return;
 
     let newGame = game;
     let success = false;
 
     if (card.name === '杀') {
-      const target = selectedTarget || game.players.find(p => p.name !== me.name && p.alive)?.name;
+      const target = selectedTarget ?? getValidTargetsForCard(game, me, card)[0];
       if (target) {
         const result = playKill(game, me.name, target, logger);
         if (result.success) {
@@ -121,22 +108,16 @@ export function useGame() {
       }
     } else if (card.subtype === '武器' || card.subtype === '防具' || card.subtype === '进攻马' || card.subtype === '防御马') {
       success = true;
-      const equipmentUpdate = { ...me.equipment };
-      if (card.subtype === '武器') equipmentUpdate.weapon = card;
-      else if (card.subtype === '防具') equipmentUpdate.armor = card;
-      else if (card.subtype === '进攻马') equipmentUpdate.horseMinus = card;
-      else if (card.subtype === '防御马') equipmentUpdate.horsePlus = card;
-
-      newGame = {
-        ...game,
-        players: game.players.map(p =>
-          p.name === me.name ? { ...p, equipment: equipmentUpdate } : p,
-        ),
-      };
+      const eq = { ...me.equipment };
+      if (card.subtype === '武器') eq.weapon = card;
+      else if (card.subtype === '防具') eq.armor = card;
+      else if (card.subtype === '进攻马') eq.horseMinus = card;
+      else if (card.subtype === '防御马') eq.horsePlus = card;
+      newGame = { ...game, players: game.players.map(p => p.name === me.name ? { ...p, equipment: eq } : p) };
       logger.logServerOp('equip', { player: me.name, card: card.name }, `${me.name} 装备了 ${card.name}`);
       logger.logPlayerOp(me.name, 'equip', { player: me.name, card: card.name }, `你装备了 ${card.name}`);
     } else if (card.name === '过河拆桥') {
-      const target = selectedTarget || game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0)?.name;
+      const target = selectedTarget ?? getValidTargetsForCard(game, me, card)[0];
       if (target) {
         const result = playDismantle(game, me.name, target, logger);
         if (result.success) {
@@ -145,7 +126,7 @@ export function useGame() {
         }
       }
     } else if (card.name === '顺手牵羊') {
-      const target = selectedTarget || game.players.find(p => p.name !== me.name && p.alive && p.hand.length > 0)?.name;
+      const target = selectedTarget ?? getValidTargetsForCard(game, me, card)[0];
       if (target) {
         const result = playSteal(game, me.name, target, logger);
         if (result.success) {
@@ -182,43 +163,34 @@ export function useGame() {
     if (success) {
       const newHand = [...me.hand];
       newHand.splice(selectedCard, 1);
-      setGame(prev => ({
-        ...newGame,
-        players: prev.players.map(p =>
-          p.name === me.name ? { ...p, hand: newHand } : p,
-        ),
-      }));
+      setGame(prev => ({ ...newGame, players: prev.players.map(p => p.name === me.name ? { ...p, hand: newHand } : p) }));
       updateOps();
     }
 
     setSelectedCard(null);
     setSelectedTarget(null);
-  }, [game, selectedCard, selectedTarget, me, isMyTurn, logger, updateOps, isPlayable]);
+  }, [game, selectedCard, selectedTarget, me, isMyTurn, logger, updateOps]);
 
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn) return;
     let newGame = game;
-    // 弃牌阶段检查
     if (newGame.phase === '弃牌') {
       const needsDiscard = checkDiscard(newGame);
-      if (needsDiscard) {
-        newGame = executeDiscard(newGame, [0], logger);
-      }
+      if (needsDiscard) newGame = executeDiscard(newGame, [0], logger);
     }
-    // 推进到下一个玩家的出牌阶段
-    newGame = nextPhase(newGame, logger); // 出牌 → 弃牌
-    newGame = nextPhase(newGame, logger); // 弃牌 → 结束
-    newGame = nextPhase(newGame, logger); // 结束 → 准备
-    // 自动跳过下一个玩家的准备和判定阶段，摸牌
+    newGame = nextPhase(newGame, logger);
+    newGame = nextPhase(newGame, logger);
+    newGame = nextPhase(newGame, logger);
     newGame = advanceToPlayPhase(newGame, logger);
     setGame(newGame);
     setSelectedCard(null);
+    setSelectedTarget(null);
     updateOps();
   }, [game, isMyTurn, logger, updateOps]);
 
   const selectCard = useCallback((index: number | null) => {
     setSelectedCard(index);
-    setSelectedTarget(null); // 切换卡牌时清除目标选择
+    setSelectedTarget(null);
   }, []);
 
   return {
@@ -231,6 +203,7 @@ export function useGame() {
     selectedTarget,
     setSelectedTarget,
     canPlay,
+    validActions,
     playerOps,
     handlePlayCard,
     handleEndTurn,

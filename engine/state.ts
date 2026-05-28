@@ -33,7 +33,7 @@ export function createGame(characters: CharacterConfig[], seed?: number): GameSt
 }
 
 export function dealInitialCards(game: GameState, count: number, logger?: GameLogger): GameState {
-  let deck = [...game.deck];
+  const deck = [...game.deck];
   const newPlayers = game.players.map(player => {
     const drawn = deck.splice(0, count);
     return { ...player, hand: [...player.hand, ...drawn] };
