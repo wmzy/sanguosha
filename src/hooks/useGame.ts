@@ -57,7 +57,6 @@ export function useGame() {
   const [myName, setMyName] = useState('曹操');
   const [playerOrder, setPlayerOrder] = useState<string[]>(PLAYER_NAMES);
 
-  const interruptStackRef = useRef(new InterruptStack());
 
   // 待响应状态（杀 → 闪）
   const [pendingResponse, setPendingResponse] = useState<PendingResponse | null>(null);
