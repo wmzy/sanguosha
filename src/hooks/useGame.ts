@@ -5,7 +5,6 @@ import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine
 import { playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden } from '../../engine/effect';
 import { getValidActions, getValidTargetsForCard, isCardPlayable } from '../../engine/rules';
 import { GameLogger } from '../../engine/logger';
-import { InterruptStack } from '../../engine/interrupt';
 import { checkDying, getDyingOptions, applyDying, applyPeachSave } from '../../engine/dying';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
@@ -56,7 +55,6 @@ export function useGame() {
   const [playerOps, setPlayerOps] = useState<Operation[]>([]);
   const [myName, setMyName] = useState('曹操');
   const [playerOrder, setPlayerOrder] = useState<string[]>(PLAYER_NAMES);
-
 
   // 待响应状态（杀 → 闪）
   const [pendingResponse, setPendingResponse] = useState<PendingResponse | null>(null);

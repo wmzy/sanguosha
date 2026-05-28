@@ -167,7 +167,8 @@ export function GameBoard() {
           backgroundColor: '#c0392b',
           borderRadius: 8,
           fontSize: 16,
-        }}>
+        }}
+        >
           <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
             {pendingDying.player} 濒死！需要桃来救援
           </div>
@@ -214,7 +215,8 @@ export function GameBoard() {
           backgroundColor: '#8e44ad',
           borderRadius: 8,
           fontSize: 14,
-        }}>
+        }}
+        >
           <div style={{ marginBottom: 8 }}>
             手牌超过体力上限，请弃 {discardCount} 张牌（已选 {selectedForDiscard.size}/{discardCount}）
           </div>
