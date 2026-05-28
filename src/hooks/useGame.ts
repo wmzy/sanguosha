@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { GameState } from '../../shared/types';
 import { createGame, startGame, getCurrentPlayer } from '../../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine/turn';
@@ -26,16 +26,27 @@ function advanceToPlayPhase(game: GameState, logger: InstanceType<typeof GameLog
 }
 
 export function useGame() {
-  const [logger] = useState(() => new GameLogger({
-    version: '1.0.0',
-    createdAt: Date.now(),
-    playerCount: 2,
-    characters: ['曹操', '刘备'],
-    seed: Date.now(),
-  }));
+  const loggerRef = useRef<GameLogger | null>(null);
+  if (!loggerRef.current) {
+    loggerRef.current = new GameLogger({
+      version: '1.0.0',
+      createdAt: Date.now(),
+      playerCount: 2,
+      characters: ['曹操', '刘备'],
+      seed: Date.now(),
+    });
+  }
+  const logger = loggerRef.current;
+
+  const initRef = useRef(false);
   const [playerOps, setPlayerOps] = useState<Operation[]>([]);
 
   const [game, setGame] = useState<GameState>(() => {
+    if (initRef.current) {
+      // StrictMode double-init: return a dummy, will be overwritten
+      return createGame([曹操, 刘备]);
+    }
+    initRef.current = true;
     const initial = createGame([曹操, 刘备]);
     const started = startGame(initial, logger);
     const advanced = advanceToPlayPhase(started, logger);
