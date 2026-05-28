@@ -38,6 +38,7 @@ export function useGame() {
 
   const initRef = useRef(false);
   const [playerOps, setPlayerOps] = useState<Operation[]>([]);
+  const [myName, setMyName] = useState('曹操');
 
   const [game, setGame] = useState<GameState>(() => {
     if (initRef.current) {
@@ -55,19 +56,18 @@ export function useGame() {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
 
   const updateOps = useCallback(() => {
-    setPlayerOps(logger.export().playerOps['曹操'] ?? []);
-  }, [logger]);
+    setPlayerOps(logger.export().playerOps[myName] ?? []);
+  }, [logger, myName]);
 
   const currentPlayer = getCurrentPlayer(game);
-  const me = game.players.find(p => p.name === '曹操')!;
-  const isMyTurn = game.currentPlayer === '曹操';
+  const me = game.players.find(p => p.name === myName)!;
+  const isMyTurn = game.currentPlayer === myName;
 
   // 使用规则引擎获取可用操作
-  const validActions = useMemo(() => getValidActions(game, '曹操'), [game]);
+  const validActions = useMemo(() => getValidActions(game, myName), [game, myName]);
 
   // 选中的牌是否需要目标
-  const selectedCardData = selectedCard !== null ? me.hand[selectedCard] : null;
-  const needsTarget = selectedCardData ? getValidTargetsForCard(game, me, selectedCardData).length > 0 : false;
+  const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
 
   // 当前选中的牌是否可以出
   const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && (() => {
@@ -77,6 +77,14 @@ export function useGame() {
     if (needsTarget && !selectedTarget) return false;
     return true;
   })();
+
+  const switchPerspective = useCallback(() => {
+    const nextName = myName === '曹操' ? '刘备' : '曹操';
+    setMyName(nextName);
+    setPlayerOps(logger.export().playerOps[nextName] ?? []);
+    setSelectedCard(null);
+    setSelectedTarget(null);
+  }, [myName, logger]);
 
   const handleSaveLog = useCallback(() => {
     saveLog(logger.export());
@@ -197,6 +205,7 @@ export function useGame() {
     game,
     currentPlayer,
     me,
+    myName,
     isMyTurn,
     selectedCard,
     selectCard,
@@ -205,6 +214,7 @@ export function useGame() {
     canPlay,
     validActions,
     playerOps,
+    switchPerspective,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,

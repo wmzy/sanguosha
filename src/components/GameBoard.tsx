@@ -8,6 +8,7 @@ export function GameBoard() {
   const {
     game,
     me,
+    myName,
     isMyTurn,
     selectedCard,
     selectCard,
@@ -16,18 +17,27 @@ export function GameBoard() {
     canPlay,
     validActions,
     playerOps,
+    switchPerspective,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,
   } = useGame();
 
-  // 判断选中的牌是否需要选择目标
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
   const validTargets = selectedCard !== null ? (validActions.validTargets.get(selectedCard) ?? []) : [];
 
   return (
     <div style={{ padding: 20, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: 20 }}>三国杀</h1>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+        <h1 style={{ margin: 0 }}>三国杀</h1>
+        <button
+          onClick={switchPerspective}
+          style={{ padding: '4px 12px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+        >
+          切换到 {myName === '曹操' ? '刘备' : '曹操'}
+        </button>
+        <span style={{ color: '#95a5a6', fontSize: 13 }}>当前视角: {myName}</span>
+      </div>
 
       {needsTarget && (
         <div style={{ textAlign: 'center', marginBottom: 16, color: '#f39c12', fontSize: 14 }}>
@@ -40,22 +50,22 @@ export function GameBoard() {
           <div
             key={player.name}
             onClick={() => {
-              if (needsTarget && player.name !== '曹操' && player.alive && validTargets.includes(player.name)) {
+              if (needsTarget && player.name !== myName && player.alive && validTargets.includes(player.name)) {
                 setSelectedTarget(player.name === selectedTarget ? null : player.name);
               }
             }}
             style={{
-              cursor: needsTarget && player.name !== '曹操' && player.alive && validTargets.includes(player.name) ? 'pointer' : 'default',
+              cursor: needsTarget && player.name !== myName && player.alive && validTargets.includes(player.name) ? 'pointer' : 'default',
               outline: selectedTarget === player.name ? '3px solid #e74c3c' : 'none',
               borderRadius: 12,
               transition: 'outline 0.2s',
-              opacity: needsTarget && !validTargets.includes(player.name) && player.name !== '曹操' ? 0.5 : 1,
+              opacity: needsTarget && !validTargets.includes(player.name) && player.name !== myName ? 0.5 : 1,
             }}
           >
             <PlayerPanel
               player={player}
               isCurrentPlayer={player.name === game.currentPlayer}
-              isSelf={player.name === '曹操'}
+              isSelf={player.name === myName}
             />
           </div>
         ))}
