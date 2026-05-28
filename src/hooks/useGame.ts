@@ -1,12 +1,8 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import type { GameState } from '../../shared/types';
+import type { GameState, Card } from '../../shared/types';
 import { createGame, startGame, getCurrentPlayer } from '../../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine/turn';
-import {
-  playKill, playPeach,
-  playDismantle, playSteal, playDrawTwo,
-  playArrowBarrage, playBarbarianInvasion, playPeachGarden,
-} from '../../engine/effect';
+import { playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden } from '../../engine/effect';
 import { getValidActions, getValidTargetsForCard, isCardPlayable } from '../../engine/rules';
 import { GameLogger } from '../../engine/logger';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
@@ -15,6 +11,14 @@ import { saveLog } from '../utils/logFile';
 
 const CHARACTERS = [曹操, 刘备, 孙权, 诸葛亮, 司马懿];
 const PLAYER_NAMES = CHARACTERS.map(c => c.name);
+
+// 待响应状态
+interface PendingResponse {
+  type: '杀';
+  attacker: string;
+  target: string;
+  card: Card;
+}
 
 function advanceToPlayPhase(game: GameState, logger: InstanceType<typeof GameLogger>): GameState {
   let state = game;
@@ -26,6 +30,13 @@ function advanceToPlayPhase(game: GameState, logger: InstanceType<typeof GameLog
     state = nextPhase(state, logger);
   }
   return state;
+}
+
+// 旋转数组，使指定名字的玩家在首位
+function rotatePlayers(names: string[], startName: string): string[] {
+  const idx = names.indexOf(startName);
+  if (idx <= 0) return names;
+  return [...names.slice(idx), ...names.slice(0, idx)];
 }
 
 export function useGame() {
@@ -42,6 +53,10 @@ export function useGame() {
   const initRef = useRef(false);
   const [playerOps, setPlayerOps] = useState<Operation[]>([]);
   const [myName, setMyName] = useState('曹操');
+  const [playerOrder, setPlayerOrder] = useState<string[]>(PLAYER_NAMES);
+
+  // 待响应状态（杀 → 闪）
+  const [pendingResponse, setPendingResponse] = useState<PendingResponse | null>(null);
 
   // 计时器
   const [timerSeconds, setTimerSeconds] = useState(60);
@@ -77,37 +92,25 @@ export function useGame() {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
-
-    // 重置计时器（回合切换时）
     setTimerSeconds(60);
-
     timerRef.current = setInterval(() => {
-      setTimerSeconds(prev => {
-        if (prev <= 1) {
-          // 时间到，自动结束回合
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimerSeconds(prev => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
-
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [game.currentPlayer, game.round, timerPaused, game.status]);
 
-  // 时间到自动结束回合
   useEffect(() => {
-    if (timerSeconds === 0 && isMyTurn && game.phase === '出牌') {
+    if (timerSeconds === 0 && isMyTurn && game.phase === '出牌' && !pendingResponse) {
       handleEndTurn();
     }
-  }, [timerSeconds, isMyTurn, game.phase]);
+  }, [timerSeconds, isMyTurn, game.phase, pendingResponse]);
 
   const validActions = useMemo(() => getValidActions(game, myName), [game, myName]);
-
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
 
-  const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && (() => {
+  const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && !pendingResponse && (() => {
     const card = me.hand[selectedCard];
     if (!card) return false;
     if (!isCardPlayable(game, me, card)) return false;
@@ -115,11 +118,13 @@ export function useGame() {
     return true;
   })();
 
+  // 切换视角（旋转座位）
   const switchPerspective = useCallback(() => {
     const currentIndex = PLAYER_NAMES.indexOf(myName);
     const nextIndex = (currentIndex + 1) % PLAYER_NAMES.length;
     const nextName = PLAYER_NAMES[nextIndex];
     setMyName(nextName);
+    setPlayerOrder(rotatePlayers(PLAYER_NAMES, nextName));
     setPlayerOps(logger.export().playerOps[nextName] ?? []);
     setSelectedCard(null);
     setSelectedTarget(null);
@@ -127,38 +132,111 @@ export function useGame() {
 
   const goToCurrentPlayer = useCallback(() => {
     setMyName(game.currentPlayer);
+    setPlayerOrder(rotatePlayers(PLAYER_NAMES, game.currentPlayer));
     setPlayerOps(logger.export().playerOps[game.currentPlayer] ?? []);
     setSelectedCard(null);
     setSelectedTarget(null);
   }, [game.currentPlayer, logger]);
 
-  const toggleTimer = useCallback(() => {
-    setTimerPaused(prev => !prev);
-  }, []);
+  const toggleTimer = useCallback(() => setTimerPaused(prev => !prev), []);
 
-  const handleSaveLog = useCallback(() => {
-    saveLog(logger.export());
-  }, [logger]);
+  const handleSaveLog = useCallback(() => saveLog(logger.export()), [logger]);
+
+  // 响应杀（出闪或不出）
+  const respondToKill = useCallback((playDodge: boolean) => {
+    if (!pendingResponse) return;
+
+    const { attacker, target, card } = pendingResponse;
+
+    if (playDodge) {
+      // 目标出闪，取消伤害
+      logger.logServerOp('play', { player: target, card: '闪', response: '杀' }, `${target} 出了闪，抵消了杀`);
+      logger.logPlayerOp(target, 'play', { player: target, card: '闪' }, `你出了闪，抵消了 ${attacker} 的杀`);
+      logger.logPlayerOp(attacker, 'play', { player: target, card: '闪', response: '杀' }, `${target} 出了闪，你的杀被抵消`);
+
+      // 从目标手牌移除一张闪
+      setGame(prev => ({
+        ...prev,
+        players: prev.players.map(p => {
+          if (p.name === target) {
+            const idx = p.hand.findIndex(c => c.name === '闪');
+            if (idx >= 0) {
+              const newHand = [...p.hand];
+              newHand.splice(idx, 1);
+              return { ...p, hand: newHand };
+            }
+          }
+          return p;
+        }),
+      }));
+    } else {
+      // 目标不出闪，受到伤害
+      logger.logServerOp('damage', { source: attacker, target, amount: 1, cardName: '杀' }, `${attacker} 对 ${target} 使用杀，造成1点伤害`);
+      for (const p of game.players) {
+        logger.logPlayerOp(p.name, 'damage', { source: attacker, target, amount: 1 }, `${attacker} 对 ${target} 使用杀，造成1点伤害`);
+      }
+
+      setGame(prev => ({
+        ...prev,
+        players: prev.players.map(p => {
+          if (p.name === target) {
+            const newHealth = p.health - 1;
+            return { ...p, health: newHealth, alive: newHealth > 0 };
+          }
+          return p;
+        }),
+      }));
+    }
+
+    // 从攻击者手牌移除杀
+    setGame(prev => ({
+      ...prev,
+      玩家列表: prev.players.map(p => {
+        if (p.name === attacker) {
+          const idx = p.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
+          if (idx >= 0) {
+            const newHand = [...p.hand];
+            newHand.splice(idx, 1);
+            return { ...p, hand: newHand };
+          }
+        }
+        return p;
+      }),
+    }));
+
+    setPendingResponse(null);
+    updateOps();
+  }, [pendingResponse, game, logger, updateOps]);
 
   const handlePlayCard = useCallback(() => {
-    if (selectedCard === null || !isMyTurn) return;
+    if (selectedCard === null || !isMyTurn || pendingResponse) return;
 
     const card = me.hand[selectedCard];
     if (!card || !isCardPlayable(game, me, card)) return;
 
+    if (card.name === '杀') {
+      const target = selectedTarget ?? getValidTargetsForCard(game, me, card)[0];
+      if (!target) return;
+
+      // 设置待响应状态，切换到目标视角
+      logger.logServerOp('play', { player: me.name, card: card.name, target }, `${me.name} 对 ${target} 使用杀`);
+      logger.logPlayerOp(me.name, 'play', { player: me.name, card: card.name, target }, `你对 ${target} 使用杀`);
+      logger.logPlayerOp(target, 'play', { player: me.name, card: card.name, target }, `${me.name} 对你使用杀，请响应`);
+
+      setPendingResponse({ type: '杀', attacker: me.name, target, card });
+      setMyName(target);
+      setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
+      setPlayerOps(logger.export().playerOps[target] ?? []);
+      setSelectedCard(null);
+      setSelectedTarget(null);
+      return;
+    }
+
+    // 其他卡牌的处理
     let newGame = game;
     let success = false;
 
-    if (card.name === '杀') {
-      const target = selectedTarget ?? getValidTargetsForCard(game, me, card)[0];
-      if (target) {
-        const result = playKill(game, me.name, target, logger);
-        if (result.success) {
-          newGame = result.status;
-          success = true;
-        }
-      }
-    } else if (card.name === '桃') {
+    if (card.name === '桃') {
       const result = playPeach(game, me.name, logger);
       if (result.success) {
         newGame = result.status;
@@ -227,10 +305,10 @@ export function useGame() {
 
     setSelectedCard(null);
     setSelectedTarget(null);
-  }, [game, selectedCard, selectedTarget, me, isMyTurn, logger, updateOps]);
+  }, [game, selectedCard, selectedTarget, me, isMyTurn, pendingResponse, logger, updateOps]);
 
   const handleEndTurn = useCallback(() => {
-    if (!isMyTurn) return;
+    if (!isMyTurn || pendingResponse) return;
     let newGame = game;
     if (newGame.phase === '弃牌') {
       const needsDiscard = checkDiscard(newGame);
@@ -244,18 +322,24 @@ export function useGame() {
     setSelectedCard(null);
     setSelectedTarget(null);
     updateOps();
-  }, [game, isMyTurn, logger, updateOps]);
+  }, [game, isMyTurn, pendingResponse, logger, updateOps]);
 
   const selectCard = useCallback((index: number | null) => {
     setSelectedCard(index);
     setSelectedTarget(null);
   }, []);
 
+  // 有 pendingResponse 时，检查目标是否有闪
+  const targetHasDodge = pendingResponse
+    ? game.players.find(p => p.name === pendingResponse.target)?.hand.some(c => c.name === '闪') ?? false
+    : false;
+
   return {
     game,
     currentPlayer,
     me,
     myName,
+    playerOrder,
     isMyTurn,
     selectedCard,
     selectCard,
@@ -269,6 +353,9 @@ export function useGame() {
     toggleTimer,
     switchPerspective,
     goToCurrentPlayer,
+    pendingResponse,
+    targetHasDodge,
+    respondToKill,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,

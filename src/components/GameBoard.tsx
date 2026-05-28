@@ -10,6 +10,7 @@ export function GameBoard() {
     game,
     me,
     myName,
+    playerOrder,
     isMyTurn,
     selectedCard,
     selectCard,
@@ -23,6 +24,9 @@ export function GameBoard() {
     toggleTimer,
     switchPerspective,
     goToCurrentPlayer,
+    pendingResponse,
+    targetHasDodge,
+    respondToKill,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,
@@ -31,15 +35,19 @@ export function GameBoard() {
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
   const validTargets = selectedCard !== null ? (validActions.validTargets.get(selectedCard) ?? []) : [];
 
-  // 固定座次：按 game.players 顺序分配位置
-  const players = game.players;
-  const bottomPlayer = players[0]; // 始终是第一个玩家
-  const topLeftPlayer = players[1];
-  const topRightPlayer = players[2];
-  const leftPlayer = players[3];
-  const rightPlayer = players[4];
+  // 按 playerOrder 排列玩家（旋转后的顺序）
+  const orderedPlayers = playerOrder
+    .map(name => game.players.find(p => p.name === name))
+    .filter(Boolean) as typeof game.players;
 
-  const renderPlayerPanel = (player: typeof players[0]) => (
+  // 座位布局: [0]底部, [1]左上, [2]右上, [3]左, [4]右
+  const bottomPlayer = orderedPlayers[0];
+  const topLeftPlayer = orderedPlayers[1];
+  const topRightPlayer = orderedPlayers[2];
+  const leftPlayer = orderedPlayers[3];
+  const rightPlayer = orderedPlayers[4];
+
+  const renderPlayerPanel = (player: typeof game.players[0]) => (
     <div
       onClick={() => {
         if (needsTarget && player.name !== myName && player.alive && validTargets.includes(player.name)) {
@@ -74,7 +82,7 @@ export function GameBoard() {
           >
             切换视角 ({myName})
           </button>
-          {myName !== game.currentPlayer && (
+          {myName !== game.currentPlayer && !pendingResponse && (
             <button
               onClick={goToCurrentPlayer}
               style={{ padding: '4px 12px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
@@ -86,13 +94,64 @@ export function GameBoard() {
         <Timer seconds={timerSeconds} paused={timerPaused} onToggle={toggleTimer} />
       </div>
 
+      {/* 提示信息 */}
       {needsTarget && (
         <div style={{ textAlign: 'center', marginBottom: 12, color: '#f39c12', fontSize: 14 }}>
           请选择目标玩家（点击玩家面板）
         </div>
       )}
 
-      {/* 上方: 2个玩家 */}
+      {/* 待响应提示 */}
+      {pendingResponse && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: 12,
+          backgroundColor: '#c0392b',
+          borderRadius: 8,
+          fontSize: 16,
+        }}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+            {pendingResponse.attacker} 对你使用了杀！
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+            <button
+              onClick={() => respondToKill(true)}
+              disabled={!targetHasDodge}
+              style={{
+                padding: '8px 24px',
+                backgroundColor: targetHasDodge ? '#2ecc71' : '#555',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: targetHasDodge ? 'pointer' : 'not-allowed',
+                fontSize: 14,
+                fontWeight: 'bold',
+              }}
+            >
+              出闪 {targetHasDodge ? '' : '(无闪)'}
+            </button>
+            <button
+              onClick={() => respondToKill(false)}
+              style={{
+                padding: '8px 24px',
+                backgroundColor: '#e74c3c',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 'bold',
+              }}
+            >
+              不出，受伤害
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 上方玩家 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
         {topLeftPlayer && renderPlayerPanel(topLeftPlayer)}
         {topRightPlayer && renderPlayerPanel(topRightPlayer)}
@@ -109,7 +168,7 @@ export function GameBoard() {
             回合 {game.round} | 阶段: {game.phase} | 当前玩家: {game.currentPlayer}
           </div>
           <div style={{ marginBottom: 8 }}>
-            {!isMyTurn && <span style={{ color: '#f39c12' }}>等待对手...</span>}
+            {!isMyTurn && !pendingResponse && <span style={{ color: '#f39c12' }}>等待对手...</span>}
             {game.status === '已结束' && <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>游戏结束</span>}
           </div>
           <div style={{ fontSize: 12, color: '#7f8c8d' }}>
@@ -124,7 +183,7 @@ export function GameBoard() {
 
       {/* 下方: 自己的面板 */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-        {renderPlayerPanel(bottomPlayer)}
+        {bottomPlayer && renderPlayerPanel(bottomPlayer)}
       </div>
 
       {/* 手牌区 */}
@@ -133,7 +192,7 @@ export function GameBoard() {
           hand={me.hand}
           selectedIndex={selectedCard}
           onSelectCard={selectCard}
-          playableIndices={isMyTurn ? validActions.playableCardIndices : undefined}
+          playableIndices={isMyTurn && !pendingResponse ? validActions.playableCardIndices : undefined}
         />
       </div>
 
@@ -141,7 +200,7 @@ export function GameBoard() {
       <div style={{ marginBottom: 12 }}>
         <ActionPanel
           canPlay={canPlay}
-          canEndTurn={isMyTurn && game.phase === '出牌'}
+          canEndTurn={isMyTurn && game.phase === '出牌' && !pendingResponse}
           onPlayCard={handlePlayCard}
           onEndTurn={handleEndTurn}
         />
