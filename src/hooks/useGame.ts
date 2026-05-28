@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import type { GameState } from '../../shared/types';
 import { createGame, startGame, getCurrentPlayer } from '../../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine/turn';
@@ -9,9 +9,12 @@ import {
 } from '../../engine/effect';
 import { getValidActions, getValidTargetsForCard, isCardPlayable } from '../../engine/rules';
 import { GameLogger } from '../../engine/logger';
-import { 曹操, 刘备 } from '../../shared/characters';
+import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
 import { saveLog } from '../utils/logFile';
+
+const CHARACTERS = [曹操, 刘备, 孙权, 诸葛亮, 司马懿];
+const PLAYER_NAMES = CHARACTERS.map(c => c.name);
 
 function advanceToPlayPhase(game: GameState, logger: InstanceType<typeof GameLogger>): GameState {
   let state = game;
@@ -30,8 +33,8 @@ export function useGame() {
   loggerRef.current ??= new GameLogger({
     version: '1.0.0',
     createdAt: Date.now(),
-    playerCount: 2,
-    characters: ['曹操', '刘备'],
+    playerCount: CHARACTERS.length,
+    characters: PLAYER_NAMES,
     seed: Date.now(),
   });
   const logger = loggerRef.current;
@@ -40,12 +43,17 @@ export function useGame() {
   const [playerOps, setPlayerOps] = useState<Operation[]>([]);
   const [myName, setMyName] = useState('曹操');
 
+  // 计时器
+  const [timerSeconds, setTimerSeconds] = useState(60);
+  const [timerPaused, setTimerPaused] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [game, setGame] = useState<GameState>(() => {
     if (initRef.current) {
-      return createGame([曹操, 刘备]);
+      return createGame(CHARACTERS);
     }
     initRef.current = true;
-    const initial = createGame([曹操, 刘备]);
+    const initial = createGame(CHARACTERS);
     const started = startGame(initial, logger);
     const advanced = advanceToPlayPhase(started, logger);
     setPlayerOps(logger.export().playerOps['曹操'] ?? []);
@@ -63,13 +71,42 @@ export function useGame() {
   const me = game.players.find(p => p.name === myName)!;
   const isMyTurn = game.currentPlayer === myName;
 
-  // 使用规则引擎获取可用操作
+  // 计时器逻辑
+  useEffect(() => {
+    if (game.status !== '进行中' || timerPaused) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+
+    // 重置计时器（回合切换时）
+    setTimerSeconds(60);
+
+    timerRef.current = setInterval(() => {
+      setTimerSeconds(prev => {
+        if (prev <= 1) {
+          // 时间到，自动结束回合
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [game.currentPlayer, game.round, timerPaused, game.status]);
+
+  // 时间到自动结束回合
+  useEffect(() => {
+    if (timerSeconds === 0 && isMyTurn && game.phase === '出牌') {
+      handleEndTurn();
+    }
+  }, [timerSeconds, isMyTurn, game.phase]);
+
   const validActions = useMemo(() => getValidActions(game, myName), [game, myName]);
 
-  // 选中的牌是否需要目标
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
 
-  // 当前选中的牌是否可以出
   const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && (() => {
     const card = me.hand[selectedCard];
     if (!card) return false;
@@ -79,12 +116,18 @@ export function useGame() {
   })();
 
   const switchPerspective = useCallback(() => {
-    const nextName = myName === '曹操' ? '刘备' : '曹操';
+    const currentIndex = PLAYER_NAMES.indexOf(myName);
+    const nextIndex = (currentIndex + 1) % PLAYER_NAMES.length;
+    const nextName = PLAYER_NAMES[nextIndex];
     setMyName(nextName);
     setPlayerOps(logger.export().playerOps[nextName] ?? []);
     setSelectedCard(null);
     setSelectedTarget(null);
   }, [myName, logger]);
+
+  const toggleTimer = useCallback(() => {
+    setTimerPaused(prev => !prev);
+  }, []);
 
   const handleSaveLog = useCallback(() => {
     saveLog(logger.export());
@@ -214,6 +257,9 @@ export function useGame() {
     canPlay,
     validActions,
     playerOps,
+    timerSeconds,
+    timerPaused,
+    toggleTimer,
     switchPerspective,
     handlePlayCard,
     handleEndTurn,

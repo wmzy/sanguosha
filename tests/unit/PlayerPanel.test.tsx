@@ -23,7 +23,7 @@ describe('PlayerPanel', () => {
 
   it('显示体力', () => {
     render(<PlayerPanel player={mockPlayer} isCurrentPlayer={false} isSelf={false} />);
-    expect(screen.getByText(/health/)).toBeInTheDocument();
+    expect(screen.getByText(/体力/)).toBeInTheDocument();
   });
 
   it('自己视角显示身份', () => {
