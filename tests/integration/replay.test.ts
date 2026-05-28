@@ -3,7 +3,7 @@ import { GameLogger } from '@engine/logger';
 import { ReplayEngine } from '@engine/replay';
 import { 创建游戏, 开始游戏 } from '@engine/state';
 import { 进入下一阶段, 摸牌阶段 } from '@engine/turn';
-import { 使用杀 } from '@engine/effect';
+import { useKill } from '@engine/effect';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('完整重播流程', () => {
@@ -23,12 +23,12 @@ describe('完整重播流程', () => {
     游戏 = 进入下一阶段(游戏, logger); // 准备 → 判定
     游戏 = 进入下一阶段(游戏, logger); // 判定 → 摸牌
     const 摸牌结果 = 摸牌阶段(游戏, logger);
-    游戏 = 摸牌结果.状态;
+    游戏 = 摸牌结果.status;
     游戏 = 进入下一阶段(游戏, logger); // 摸牌 → 出牌
 
     // 使用杀
-    const 杀结果 = 使用杀(游戏, '曹操', '刘备', logger);
-    expect(杀结果.成功).toBe(true);
+    const 杀结果 = useKill(游戏, '曹操', '刘备', logger);
+    expect(杀结果.success).toBe(true);
 
     // 导出日志
     const log = logger.export();
@@ -46,7 +46,7 @@ describe('完整重播流程', () => {
     expect(engine.getTotalSteps()).toBe(log.serverOps.length + 1);
     engine.goTo(engine.getTotalSteps() - 1);
     const finalState = engine.getCurrentState();
-    expect(finalState.玩家列表.find(p => p.name === '刘备')!.体力).toBe(3);
+    expect(finalState.players.find(p => p.name === '刘备')!.health).toBe(3);
   });
 
   it('相同种子的重播结果应该相同', () => {
@@ -80,8 +80,8 @@ describe('完整重播流程', () => {
       engine2.goTo(i);
       const s1 = engine1.getCurrentState();
       const s2 = engine2.getCurrentState();
-      expect(s1.当前阶段).toBe(s2.当前阶段);
-      expect(s1.当前玩家).toBe(s2.当前玩家);
+      expect(s1.phase).toBe(s2.phase);
+      expect(s1.currentPlayer).toBe(s2.currentPlayer);
     }
   });
 });

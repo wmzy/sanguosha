@@ -3,7 +3,7 @@ import type { GameState, PlayerAction } from '../shared/types';
 import type { Room } from './房间';
 import { 创建游戏, 获取公开状态, 开始游戏 } from '../engine/state';
 import { 进入下一阶段, 摸牌阶段, 弃牌阶段检查, 弃牌阶段执行 } from '../engine/turn';
-import { 使用杀, 使用桃 } from '../engine/effect';
+import { useKill, usePeach } from '../engine/effect';
 import { 所有角色 } from '../shared/characters';
 import { serialize } from './协议';
 import { 设置房间状态 } from './房间';
@@ -34,7 +34,7 @@ export class GameSession {
     this.state = 开始游戏(this.state);
 
     // 初始摸牌
-    for (let i = 0; i < this.state.玩家列表.length; i++) {
+    for (let i = 0; i < this.state.players.length; i++) {
       this.state = this.摸牌给当前玩家();
       this.state = 进入下一阶段(this.state);
     }
@@ -50,7 +50,7 @@ export class GameSession {
   private 摸牌给当前玩家(): GameState {
     if (!this.state) throw new Error('游戏未开始');
     const result = 摸牌阶段(this.state);
-    this.state = result.状态;
+    this.state = result.status;
     return this.state;
   }
 
@@ -66,12 +66,12 @@ export class GameSession {
       return;
     }
 
-    if (this.state.当前玩家 !== playerName) {
+    if (this.state.currentPlayer !== playerName) {
       this.sendToPlayer(playerId, { type: 'error', message: '不是你的回合' });
       return;
     }
 
-    switch (action.类型) {
+    switch (action.type) {
       case '出牌':
         this.handlePlayCard(playerName, action);
         break;
@@ -86,31 +86,31 @@ export class GameSession {
 
   private handlePlayCard(playerName: string, action: PlayerAction): void {
     if (!this.state) return;
-    if (action.类型 !== '出牌') return;
+    if (action.type !== '出牌') return;
 
-    const card = action.卡牌;
+    const card = action.card;
     if (card.name === '杀') {
-      const target = action.目标;
+      const target = action.target;
       if (!target) {
         this.sendToPlayerByName(playerName, { type: 'error', message: '未选择目标' });
         return;
       }
-      const result = 使用杀(this.state, playerName, target);
-      if (result.成功) {
-        this.state = result.状态;
+      const result = useKill(this.state, playerName, target);
+      if (result.success) {
+        this.state = result.status;
         this.removeCardFromHand(playerName, card);
         this.broadcastState();
       } else {
-        this.sendToPlayerByName(playerName, { type: 'error', message: result.消息 });
+        this.sendToPlayerByName(playerName, { type: 'error', message: result.message });
       }
     } else if (card.name === '桃') {
-      const result = 使用桃(this.state, playerName);
-      if (result.成功) {
-        this.state = result.状态;
+      const result = usePeach(this.state, playerName);
+      if (result.success) {
+        this.state = result.status;
         this.removeCardFromHand(playerName, card);
         this.broadcastState();
       } else {
-        this.sendToPlayerByName(playerName, { type: 'error', message: result.消息 });
+        this.sendToPlayerByName(playerName, { type: 'error', message: result.message });
       }
     }
   }
@@ -119,7 +119,7 @@ export class GameSession {
     if (!this.state) return;
 
     // 跳过当前出牌阶段，进入弃牌阶段
-    this.state = { ...this.state, 当前阶段: '弃牌' };
+    this.state = { ...this.state, phase: '弃牌' };
 
     // 检查是否需要弃牌
     if (弃牌阶段检查(this.state)) {
@@ -127,7 +127,7 @@ export class GameSession {
       this.sendToPlayerByName(playerName, {
         type: 'prompt',
         promptId: 'discard',
-        prompt: { name: '弃牌', 描述: '手牌超过体力上限，请弃牌', 类型: 'select_card', 选项: [] },
+        prompt: { name: '弃牌', description: '手牌超过体力上限，请弃牌', type: 'select_card', options: [] },
       });
       return;
     }
@@ -138,13 +138,13 @@ export class GameSession {
 
   private handleDiscard(playerName: string, action: PlayerAction): void {
     if (!this.state) return;
-    if (action.类型 !== '弃牌') return;
+    if (action.type !== '弃牌') return;
     // 简化：弃第一张牌
-    const card = action.卡牌[0];
+    const card = action.card[0];
     if (card) {
-      const player = this.state.玩家列表.find(p => p.name === playerName);
+      const player = this.state.players.find(p => p.name === playerName);
       if (player) {
-        const index = player.手牌.findIndex(c => c.name === card.name && c.花色 === card.花色 && c.点数 === card.点数);
+        const index = player.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
         if (index >= 0) {
           this.state = 弃牌阶段执行(this.state, [index]);
         }
@@ -163,7 +163,7 @@ export class GameSession {
     // 检查游戏是否结束
     const winner = this.checkGameEnd();
     if (winner) {
-      this.state = { ...this.state, 状态: '已结束', 获胜身份: winner };
+      this.state = { ...this.state, status: '已结束', winner: winner };
       设置房间状态(this.room.id, '已结束');
       this.broadcast({ type: 'game_over', winner });
       this.broadcastState();
@@ -184,23 +184,23 @@ export class GameSession {
     if (!this.state) return null;
 
     // 检查体力为0的玩家
-    for (const player of this.state.玩家列表) {
-      if (player.体力 <= 0 && player.存活) {
-        player.存活 = false;
+    for (const player of this.state.players) {
+      if (player.health <= 0 && player.alive) {
+        player.alive = false;
       }
     }
 
-    const 仍然存活 = this.state.玩家列表.filter(p => p.存活);
+    const 仍然存活 = this.state.players.filter(p => p.alive);
 
     // 主公死了，反贼赢
-    const 主公 = this.state.玩家列表.find(p => p.身份 === '主公');
-    if (主公 && !主公.存活) return '反贼';
+    const 主公 = this.state.players.find(p => p.role === '主公');
+    if (主公 && !主公.alive) return '反贼';
 
     // 只剩主公和内奸，主公赢
-    if (仍然存活.length === 1) return 仍然存活[0].身份;
+    if (仍然存活.length === 1) return 仍然存活[0].role;
 
     // 反贼全死，主公赢
-    const 反贼存活 = 仍然存活.filter(p => p.身份 === '反贼');
+    const 反贼存活 = 仍然存活.filter(p => p.role === '反贼');
     if (反贼存活.length === 0 && 仍然存活.length > 0) return '主公';
 
     return null;
@@ -210,13 +210,13 @@ export class GameSession {
     if (!this.state) return;
     this.state = {
       ...this.state,
-      玩家列表: this.state.玩家列表.map(p => {
+      players: this.state.players.map(p => {
         if (p.name === playerName) {
-          const index = p.手牌.findIndex(c => c.name === card.name && c.花色 === card.花色 && c.点数 === card.点数);
+          const index = p.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
           if (index >= 0) {
-            const newHand = [...p.手牌];
+            const newHand = [...p.hand];
             newHand.splice(index, 1);
-            return { ...p, 手牌: newHand };
+            return { ...p, hand: newHand };
           }
         }
         return p;
@@ -237,16 +237,16 @@ export class GameSession {
     if (!this.state) return;
 
     for (const [playerId, playerName] of this.playerNames) {
-      if (playerName === this.state.当前玩家) {
-        this.sendToPlayer(playerId, { type: 'your_turn', phase: this.state.当前阶段 });
+      if (playerName === this.state.currentPlayer) {
+        this.sendToPlayer(playerId, { type: 'your_turn', phase: this.state.phase });
       }
     }
   }
 
   handleDisconnect(playerId: string): void {
     const playerName = this.playerNames.get(playerId) ?? '未知玩家';
-    if (this.state?.状态 === '进行中') {
-      this.state = { ...this.state, 状态: '已结束' };
+    if (this.state?.status === '进行中') {
+      this.state = { ...this.state, status: '已结束' };
       设置房间状态(this.room.id, '已结束');
       this.broadcast({ type: 'error', message: `${playerName} 断开连接，游戏结束` });
     }
