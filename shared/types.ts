@@ -23,6 +23,30 @@ export interface Card {
   description: string;
   range?: number; // 武器攻击范围
   trickSubtype?: TrickSubType;
+  _original?: Card;
+  _conversion?: string;
+}
+
+// 延时锦囊（判定区等待判定的锦囊）
+export interface PendingTrick {
+  name: string;
+  source: string;
+  card: Card;
+}
+
+// 卡牌转换技能过滤器
+export interface CardFilter {
+  name?: string[];
+  suit?: Suit[];
+  color?: 'red' | 'black';
+}
+
+// 卡牌转换技能配置
+export interface CardConversion {
+  name: string;
+  from: CardFilter;
+  to: string;
+  context: 'play' | 'response' | 'any';
 }
 
 // 角色性别
@@ -118,6 +142,7 @@ export interface Player {
   hand: Card[];
   equipment: Equipment;
   alive: boolean;
+  pendingTricks?: PendingTrick[];
 }
 
 // 游戏状态
