@@ -187,22 +187,37 @@ export function useGame() {
         logger.logPlayerOp(p.name, 'damage', { source: attacker, target, amount: 1 }, `${attacker} 对 ${target} 使用杀，造成1点伤害`);
       }
 
-      setGame(prev => ({
-        ...prev,
-        players: prev.players.map(p => {
+      setGame(prev => {
+        const newPlayers = prev.players.map(p => {
           if (p.name === target) {
             const newHealth = p.health - 1;
-            return { ...p, health: newHealth, alive: newHealth > 0 };
+            // 濒死：检查是否有桃自救
+            if (newHealth <= 0) {
+              const peachIdx = p.hand.findIndex(c => c.name === '桃');
+              if (peachIdx >= 0) {
+                // 有桃，自救
+                logger.logServerOp('heal', { player: target, amount: 1 }, `${target} 使用桃自救`);
+                logger.logPlayerOp(target, 'heal', { player: target, amount: 1 }, `你使用桃自救`);
+                const newHand = [...p.hand];
+                newHand.splice(peachIdx, 1);
+                return { ...p, health: 1, hand: newHand, alive: true };
+              }
+              // 没有桃，死亡
+              logger.logServerOp('gameEnd', { player: target }, `${target} 阵亡`);
+              return { ...p, health: 0, alive: false };
+            }
+            return { ...p, health: newHealth };
           }
           return p;
-        }),
-      }));
+        });
+        return { ...prev, players: newPlayers };
+      });
     }
 
     // 从攻击者手牌移除杀
     setGame(prev => ({
       ...prev,
-      玩家列表: prev.players.map(p => {
+      players: prev.players.map(p => {
         if (p.name === attacker) {
           const idx = p.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
           if (idx >= 0) {
