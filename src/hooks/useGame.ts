@@ -299,7 +299,13 @@ export function useGame() {
     if (success) {
       const newHand = [...me.hand];
       newHand.splice(selectedCard, 1);
-      setGame(prev => ({ ...newGame, players: prev.players.map(p => p.name === me.name ? { ...p, hand: newHand } : p) }));
+      // 合并装备更新和手牌更新
+      setGame({
+        ...newGame,
+        players: newGame.players.map(p =>
+          p.name === me.name ? { ...p, hand: newHand } : p,
+        ),
+      });
       updateOps();
     }
 
