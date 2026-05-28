@@ -27,6 +27,8 @@ export function GameBoard() {
     pendingResponse,
     targetHasDodge,
     respondToKill,
+    pendingDying,
+    respondToDying,
     needsDiscard,
     discardCount,
     selectedForDiscard,
@@ -87,7 +89,7 @@ export function GameBoard() {
           >
             切换视角 ({myName})
           </button>
-          {myName !== game.currentPlayer && !pendingResponse && (
+          {myName !== game.currentPlayer && !pendingResponse && !pendingDying && (
             <button
               onClick={goToCurrentPlayer}
               style={{ padding: '4px 12px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
@@ -156,6 +158,53 @@ export function GameBoard() {
         </div>
       )}
 
+      {/* 濒死救援提示 */}
+      {pendingDying && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: 12,
+          backgroundColor: '#c0392b',
+          borderRadius: 8,
+          fontSize: 16,
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+            {pendingDying.player} 濒死！需要桃来救援
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+            {pendingDying.savers.map(saver => (
+              <button
+                key={saver}
+                onClick={() => respondToDying(saver)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#2ecc71',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                {saver} 使用桃
+              </button>
+            ))}
+            <button
+              onClick={() => respondToDying(null)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#e74c3c',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              无人救援
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 弃牌提示 */}
       {needsDiscard && (
         <div style={{
@@ -205,7 +254,7 @@ export function GameBoard() {
             回合 {game.round} | 阶段: {game.phase} | 当前玩家: {game.currentPlayer}
           </div>
           <div style={{ marginBottom: 8 }}>
-            {!isMyTurn && !pendingResponse && <span style={{ color: '#f39c12' }}>等待对手...</span>}
+            {!isMyTurn && !pendingResponse && !pendingDying && <span style={{ color: '#f39c12' }}>等待对手...</span>}
             {game.status === '已结束' && <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>游戏结束</span>}
           </div>
           <div style={{ fontSize: 12, color: '#7f8c8d' }}>
@@ -229,7 +278,7 @@ export function GameBoard() {
           hand={me.hand}
           selectedIndex={selectedCard}
           onSelectCard={selectCard}
-          playableIndices={isMyTurn && !pendingResponse && !needsDiscard ? validActions.playableCardIndices : undefined}
+          playableIndices={isMyTurn && !pendingResponse && !pendingDying && !needsDiscard ? validActions.playableCardIndices : undefined}
           discardSelectedIndices={needsDiscard ? selectedForDiscard : undefined}
           onToggleDiscard={needsDiscard ? toggleDiscardSelection : undefined}
         />
@@ -239,7 +288,7 @@ export function GameBoard() {
       <div style={{ marginBottom: 12 }}>
         <ActionPanel
           canPlay={canPlay}
-          canEndTurn={isMyTurn && game.phase === '出牌' && !pendingResponse}
+          canEndTurn={isMyTurn && game.phase === '出牌' && !pendingResponse && !pendingDying}
           onPlayCard={handlePlayCard}
           onEndTurn={handleEndTurn}
         />

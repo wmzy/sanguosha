@@ -5,6 +5,8 @@ import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../../engine
 import { playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden } from '../../engine/effect';
 import { getValidActions, getValidTargetsForCard, isCardPlayable } from '../../engine/rules';
 import { GameLogger } from '../../engine/logger';
+import { InterruptStack } from '../../engine/interrupt';
+import { checkDying, getDyingOptions, applyDying, applyPeachSave } from '../../engine/dying';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
 import { saveLog } from '../utils/logFile';
@@ -55,8 +57,13 @@ export function useGame() {
   const [myName, setMyName] = useState('曹操');
   const [playerOrder, setPlayerOrder] = useState<string[]>(PLAYER_NAMES);
 
+  const interruptStackRef = useRef(new InterruptStack());
+
   // 待响应状态（杀 → 闪）
   const [pendingResponse, setPendingResponse] = useState<PendingResponse | null>(null);
+
+  // 濒死救援状态
+  const [pendingDying, setPendingDying] = useState<{ player: string; savers: string[] } | null>(null);
 
   // 本回合是否已出过杀
   const [hasUsedKillThisTurn, setHasUsedKillThisTurn] = useState(false);
@@ -108,10 +115,10 @@ export function useGame() {
   }, [game.currentPlayer, game.round, timerPaused, game.status]);
 
   useEffect(() => {
-    if (timerSeconds === 0 && isMyTurn && game.phase === '出牌' && !pendingResponse) {
+    if (timerSeconds === 0 && isMyTurn && game.phase === '出牌' && !pendingResponse && !pendingDying) {
       handleEndTurn();
     }
-  }, [timerSeconds, isMyTurn, game.phase, pendingResponse]);
+  }, [timerSeconds, isMyTurn, game.phase, pendingResponse, pendingDying]);
 
   // 回合切换时重置杀的使用状态
   useEffect(() => {
@@ -121,7 +128,7 @@ export function useGame() {
   const validActions = useMemo(() => getValidActions(game, myName), [game, myName]);
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
 
-  const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && !pendingResponse && (() => {
+  const canPlay = selectedCard !== null && isMyTurn && game.phase === '出牌' && !pendingResponse && !pendingDying && (() => {
     const card = me.hand[selectedCard];
     if (!card) return false;
     // 诸葛连弩可以无限出杀
@@ -217,31 +224,40 @@ export function useGame() {
         logger.logPlayerOp(p.name, 'damage', { source: attacker, target, amount: 1 }, `${attacker} 对 ${target} 使用杀，造成1点伤害`);
       }
 
-      setGame(prev => {
-        const newPlayers = prev.players.map(p => {
-          if (p.name === target) {
-            const newHealth = p.health - 1;
-            // 濒死：检查是否有桃自救
-            if (newHealth <= 0) {
-              const peachIdx = p.hand.findIndex(c => c.name === '桃');
-              if (peachIdx >= 0) {
-                // 有桃，自救
-                logger.logServerOp('heal', { player: target, amount: 1 }, `${target} 使用桃自救`);
-                logger.logPlayerOp(target, 'heal', { player: target, amount: 1 }, `你使用桃自救`);
-                const newHand = [...p.hand];
-                newHand.splice(peachIdx, 1);
-                return { ...p, health: 1, hand: newHand, alive: true };
-              }
-              // 没有桃，死亡
-              logger.logServerOp('gameEnd', { player: target }, `${target} 阵亡`);
-              return { ...p, health: 0, alive: false };
-            }
-            return { ...p, health: newHealth };
+      // Apply damage and check for dying
+      const targetPlayer = game.players.find(p => p.name === target);
+      if (targetPlayer) {
+        const newHealth = targetPlayer.health - 1;
+        if (checkDying(newHealth)) {
+          // Player is dying - get rescue options from current game state
+          const options = getDyingOptions(game, target);
+
+          // Apply damage (reduce health)
+          setGame(prev => ({
+            ...prev,
+            players: prev.players.map(p =>
+              p.name === target ? { ...p, health: newHealth } : p,
+            ),
+          }));
+
+          if (options.savers.length > 0) {
+            // Show rescue prompt
+            setPendingDying({ player: target, savers: options.savers });
+          } else {
+            // No savers, player dies immediately
+            logger.logServerOp('gameEnd', { player: target }, `${target} 阵亡`);
+            setGame(prev => applyDying(prev, target));
           }
-          return p;
-        });
-        return { ...prev, players: newPlayers };
-      });
+        } else {
+          // Not dying, just apply damage normally
+          setGame(prev => ({
+            ...prev,
+            players: prev.players.map(p =>
+              p.name === target ? { ...p, health: newHealth } : p,
+            ),
+          }));
+        }
+      }
     }
 
     // 从攻击者手牌移除杀
@@ -264,8 +280,30 @@ export function useGame() {
     updateOps();
   }, [pendingResponse, game, logger, updateOps]);
 
+  // 响应濒死救援
+  const respondToDying = useCallback((saverName: string | null) => {
+    if (!pendingDying) return;
+
+    if (saverName) {
+      // Someone uses 桃 to save
+      const newGame = applyPeachSave(game, saverName, pendingDying.player);
+      setGame(newGame);
+      logger.logServerOp('heal', { player: saverName, target: pendingDying.player, amount: 1 }, `${saverName} 使用桃救援 ${pendingDying.player}`);
+      logger.logPlayerOp(saverName, 'heal', { player: saverName, target: pendingDying.player, amount: 1 }, `你使用桃救援 ${pendingDying.player}`);
+      logger.logPlayerOp(pendingDying.player, 'heal', { player: saverName, target: pendingDying.player, amount: 1 }, `${saverName} 使用桃救援了你`);
+    } else {
+      // No one saves, player dies
+      const newGame = applyDying(game, pendingDying.player);
+      setGame(newGame);
+      logger.logServerOp('gameEnd', { player: pendingDying.player }, `${pendingDying.player} 阵亡`);
+    }
+
+    setPendingDying(null);
+    updateOps();
+  }, [game, pendingDying, logger, updateOps]);
+
   const handlePlayCard = useCallback(() => {
-    if (selectedCard === null || !isMyTurn || pendingResponse) return;
+    if (selectedCard === null || !isMyTurn || pendingResponse || pendingDying) return;
 
     const card = me.hand[selectedCard];
     if (!card || !isCardPlayable(game, me, card)) return;
@@ -368,10 +406,10 @@ export function useGame() {
 
     setSelectedCard(null);
     setSelectedTarget(null);
-  }, [game, selectedCard, selectedTarget, me, isMyTurn, pendingResponse, logger, updateOps]);
+  }, [game, selectedCard, selectedTarget, me, isMyTurn, pendingResponse, pendingDying, logger, updateOps]);
 
   const handleEndTurn = useCallback(() => {
-    if (!isMyTurn || pendingResponse) return;
+    if (!isMyTurn || pendingResponse || pendingDying) return;
 
     // 如果在弃牌阶段且需要弃牌，必须先弃牌
     if (game.phase === '弃牌' && checkDiscard(game)) {
@@ -388,7 +426,7 @@ export function useGame() {
     setSelectedTarget(null);
     setSelectedForDiscard(new Set());
     updateOps();
-  }, [game, isMyTurn, pendingResponse, logger, updateOps]);
+  }, [game, isMyTurn, pendingResponse, pendingDying, logger, updateOps]);
 
   const selectCard = useCallback((index: number | null) => {
     setSelectedCard(index);
@@ -422,6 +460,8 @@ export function useGame() {
     pendingResponse,
     targetHasDodge,
     respondToKill,
+    pendingDying,
+    respondToDying,
     needsDiscard,
     discardCount,
     selectedForDiscard,
