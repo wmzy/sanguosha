@@ -14,9 +14,53 @@ export interface ValidationResult {
 // ============================================================
 
 export interface ValidActions {
-  playableCardIndices: number[]; // 可出的牌的索引
-  validTargets: Map<number, string[]>; // 牌索引 → 可选目标玩家名
+  playableCardIndices: number[];
+  validTargets: Map<number, string[]>;
   canEndTurn: boolean;
+}
+
+// ============================================================
+// 距离计算
+// ============================================================
+
+/**
+ * 计算两个玩家之间的距离
+ * 距离 = 两个玩家之间存活玩家数的最小值
+ * +1马增加别人到你的距离，-1马减少你到别人的距离
+ */
+export function getDistance(game: GameState, from: string, to: string): number {
+  const alivePlayers = game.players.filter(p => p.alive);
+  const n = alivePlayers.length;
+  if (n < 2) return 1;
+
+  const fromIdx = alivePlayers.findIndex(p => p.name === from);
+  const toIdx = alivePlayers.findIndex(p => p.name === to);
+  if (fromIdx === -1 || toIdx === -1) return Infinity;
+
+  // 顺时针和逆时针距离取最小值
+  const clockwise = (toIdx - fromIdx + n) % n;
+  const counterClockwise = (fromIdx - toIdx + n) % n;
+  let distance = Math.min(clockwise, counterClockwise);
+
+  // -1马：减少你到别人的距离
+  const fromPlayer = game.players.find(p => p.name === from)!;
+  if (fromPlayer.equipment.horseMinus) distance -= 1;
+
+  // +1马：增加别人到你的距离
+  const toPlayer = game.players.find(p => p.name === to)!;
+  if (toPlayer.equipment.horsePlus) distance += 1;
+
+  return Math.max(distance, 1);
+}
+
+/**
+ * 获取攻击范围（默认1，武器可增加）
+ */
+export function getAttackRange(player: Player): number {
+  if (player.equipment.weapon?.range) {
+    return player.equipment.weapon.range;
+  }
+  return 1;
 }
 
 // ============================================================
@@ -32,12 +76,15 @@ export function isCardPlayable(game: GameState, player: Player, card: Card): boo
 
   switch (card.name) {
     case '杀':
+      // 每回合只能出一张杀（除非有诸葛连弩）
+      // TODO: 需要跟踪本回合是否已出过杀
       return getValidTargetsForCard(game, player, card).length > 0;
     case '桃':
+      // 可以给自己用（非满血），也可以给濒死队友用（暂不实现）
       return player.health < player.maxHealth;
     case '闪':
     case '无懈可击':
-      return false; // 响应牌，不能主动出
+      return false; // 响应牌
     case '过河拆桥':
     case '顺手牵羊':
       return getValidTargetsForCard(game, player, card).length > 0;
@@ -66,21 +113,33 @@ export function isCardPlayable(game: GameState, player: Player, card: Card): boo
  */
 export function getValidTargetsForCard(game: GameState, player: Player, card: Card): string[] {
   const others = game.players.filter(p => p.name !== player.name && p.alive);
+  const attackRange = getAttackRange(player);
 
   switch (card.name) {
     case '杀':
-      // 杀的范围检查（简化：不考虑武器距离）
-      return others.map(p => p.name);
+      // 杀的范围 = 攻击范围
+      return others
+        .filter(p => getDistance(game, player.name, p.name) <= attackRange)
+        .map(p => p.name);
     case '过河拆桥':
-      return others.filter(p => p.hand.length > 0 || Object.values(p.equipment).some(Boolean)).map(p => p.name);
+      return others
+        .filter(p => p.hand.length > 0 || hasEquipment(p))
+        .map(p => p.name);
     case '顺手牵羊':
-      // 距离1以内（简化：所有人）
-      return others.filter(p => p.hand.length > 0 || Object.values(p.equipment).some(Boolean)).map(p => p.name);
+      // 距离1以内
+      return others
+        .filter(p => getDistance(game, player.name, p.name) <= 1)
+        .filter(p => p.hand.length > 0 || hasEquipment(p))
+        .map(p => p.name);
     case '决斗':
       return others.map(p => p.name);
     default:
       return [];
   }
+}
+
+function hasEquipment(player: Player): boolean {
+  return Object.values(player.equipment).some(Boolean);
 }
 
 /**
@@ -116,7 +175,6 @@ export function validateAction(game: GameState, playerName: string, action: Play
         return { valid: false, reason: '这张牌不能使用' };
       }
 
-      // 需要目标的牌
       const needsTarget = ['杀', '过河拆桥', '顺手牵羊', '决斗'].includes(card.name);
       if (needsTarget) {
         if (!action.target) {
@@ -146,9 +204,6 @@ export function validateAction(game: GameState, playerName: string, action: Play
 // 组合查询
 // ============================================================
 
-/**
- * 获取当前玩家的所有可用操作
- */
 export function getValidActions(game: GameState, playerName: string): ValidActions {
   const player = game.players.find(p => p.name === playerName);
   if (!player || game.currentPlayer !== playerName) {

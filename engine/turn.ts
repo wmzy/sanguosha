@@ -46,7 +46,21 @@ export function nextPhase(game: GameState, logger?: GameLogger): GameState {
 
 export function drawPhase(game: GameState, logger?: GameLogger): { status: GameState; message: string } {
   const currentPlayer = getCurrentPlayer(game);
-  const { drawn: drawnCards, remaining: remainingDeck } = drawCards(game.deck, 2);
+
+  // 如果牌堆不够，把弃牌堆洗回牌堆
+  let deck = [...game.deck];
+  let discardPile = [...game.discardPile];
+  if (deck.length < 2 && discardPile.length > 0) {
+    deck = [...deck, ...discardPile];
+    discardPile = [];
+    // 简单洗牌（不引入 rng 依赖）
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+  }
+
+  const { drawn: drawnCards, remaining: remainingDeck } = drawCards(deck, 2);
 
   const newPlayers = game.players.map(p => {
     if (p.name === currentPlayer.name) {
@@ -55,7 +69,7 @@ export function drawPhase(game: GameState, logger?: GameLogger): { status: GameS
     return p;
   });
 
-  const status = { ...game, players: newPlayers, deck: remainingDeck };
+  const status = { ...game, players: newPlayers, deck: remainingDeck, discardPile };
 
   if (logger) {
     logger.logServerOp('draw', {
