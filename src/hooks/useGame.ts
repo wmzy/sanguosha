@@ -68,10 +68,14 @@ export function useGame() {
   // 弃牌选择
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<number>>(new Set());
 
-  // 计时器
+  // 计时器 — 每次操作后重置
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerPaused, setTimerPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const resetTimer = useCallback(() => {
+    setTimerSeconds(60);
+  }, []);
 
   const [game, setGame] = useState<GameState>(() => {
     if (initRef.current) {
@@ -98,7 +102,7 @@ export function useGame() {
 
   // 计时器逻辑
   useEffect(() => {
-    if (game.status !== '进行中' || timerPaused) {
+    if (game.status !== '进行中' || timerPaused || !isMyTurn) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -109,7 +113,7 @@ export function useGame() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [game.currentPlayer, game.round, timerPaused, game.status]);
+  }, [game.currentPlayer, game.round, timerPaused, game.status, isMyTurn]);
 
   useEffect(() => {
     if (timerSeconds === 0 && isMyTurn && game.phase === '出牌' && !pendingResponse && !pendingDying) {
@@ -161,6 +165,7 @@ export function useGame() {
     setSelectedForDiscard(new Set());
     setSelectedCard(null);
     updateOps();
+    resetTimer();
   }, [game, needsDiscard, selectedForDiscard, discardCount, logger, updateOps]);
 
   // 切换视角（旋转座位）
@@ -275,6 +280,7 @@ export function useGame() {
 
     setPendingResponse(null);
     updateOps();
+    resetTimer();
   }, [pendingResponse, game, logger, updateOps]);
 
   // 响应濒死救援
@@ -297,6 +303,7 @@ export function useGame() {
 
     setPendingDying(null);
     updateOps();
+    resetTimer();
   }, [game, pendingDying, logger, updateOps]);
 
   const handlePlayCard = useCallback(() => {
@@ -399,6 +406,7 @@ export function useGame() {
         ),
       });
       updateOps();
+    resetTimer();
     }
 
     setSelectedCard(null);
@@ -423,6 +431,7 @@ export function useGame() {
     setSelectedTarget(null);
     setSelectedForDiscard(new Set());
     updateOps();
+    resetTimer();
   }, [game, isMyTurn, pendingResponse, pendingDying, logger, updateOps]);
 
   const selectCard = useCallback((index: number | null) => {
