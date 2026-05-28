@@ -96,6 +96,10 @@ export function isCardPlayable(game: GameState, player: Player, card: Card): boo
     case '桃园结义':
     case '五谷丰登':
       return true;
+    case '乐不思蜀':
+    case '兵粮寸断':
+    case '闪电':
+      return getValidTargetsForCard(game, player, card).length > 0;
     default:
       break;
   }
@@ -132,6 +136,11 @@ export function getValidTargetsForCard(game: GameState, player: Player, card: Ca
         .filter(p => p.hand.length > 0 || hasEquipment(p))
         .map(p => p.name);
     case '决斗':
+      return others.map(p => p.name);
+    case '乐不思蜀':
+    case '兵粮寸断':
+    case '闪电':
+      // 延时锦囊可以对任何其他玩家使用
       return others.map(p => p.name);
     default:
       return [];
@@ -175,7 +184,7 @@ export function validateAction(game: GameState, playerName: string, action: Play
         return { valid: false, reason: '这张牌不能使用' };
       }
 
-      const needsTarget = ['杀', '过河拆桥', '顺手牵羊', '决斗'].includes(card.name);
+      const needsTarget = ['杀', '过河拆桥', '顺手牵羊', '决斗', '乐不思蜀', '兵粮寸断', '闪电'].includes(card.name);
       if (needsTarget) {
         if (!action.target) {
           return { valid: false, reason: '需要选择目标' };

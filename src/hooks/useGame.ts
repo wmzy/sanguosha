@@ -399,6 +399,24 @@ export function useGame() {
         newGame = result.status;
         success = true;
       }
+    } else if (card.name === '乐不思蜀' || card.name === '兵粮寸断' || card.name === '闪电') {
+      // 延时锦囊：添加到目标的判定区
+      const target = selectedTarget ?? getValidTargetsForCard(game, me, card)[0];
+      if (target) {
+        const pendingTrick = { name: card.name, source: me.name, card };
+        newGame = {
+          ...game,
+          players: game.players.map(p =>
+            p.name === target
+              ? { ...p, pendingTricks: [...(p.pendingTricks ?? []), pendingTrick] }
+              : p,
+          ),
+        };
+        success = true;
+        logger.logServerOp('play', { player: me.name, card: card.name, target }, `${me.name} 对 ${target} 使用了 ${card.name}`);
+        logger.logPlayerOp(me.name, 'play', { player: me.name, card: card.name, target }, `你对 ${target} 使用了 ${card.name}`);
+        logger.logPlayerOp(target, 'play', { player: me.name, card: card.name, target }, `${me.name} 对你使用了 ${card.name}`);
+      }
     }
 
     if (success) {
