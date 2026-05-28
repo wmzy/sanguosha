@@ -36,6 +36,17 @@ export function PlayerPanel({ player, isCurrentPlayer, isSelf, seatNumber }: Pla
       <div style={{ fontSize: 12, color: '#bdc3c7' }}>
         手牌: {player.hand.length} 张
       </div>
+      {player.character.abilities.length > 0 && (
+        <div style={{ marginTop: 6, borderTop: '1px solid #34495e', paddingTop: 6 }}>
+          <div style={{ fontSize: 11, color: '#7f8c8d', marginBottom: 2 }}>技能:</div>
+          {player.character.abilities.map((ability, i) => (
+            <div key={i} style={{ fontSize: 11, color: '#e0e0e0', marginBottom: 2 }}>
+              <span style={{ color: '#f39c12', fontWeight: 'bold' }}>{ability.name}</span>
+              <span style={{ color: '#95a5a6', marginLeft: 4 }}>{ability.description}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {(Object.values(player.equipment).some(Boolean)) && (
         <div style={{ marginTop: 6, borderTop: '1px solid #34495e', paddingTop: 6 }}>
           <div style={{ fontSize: 11, color: '#7f8c8d', marginBottom: 2 }}>装备:</div>
