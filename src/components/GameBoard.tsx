@@ -7,7 +7,8 @@ import { LogPanel } from './LogPanel';
 export function GameBoard() {
   const {
     游戏,
-    当前玩家,
+    我自己,
+    是我的回合,
     选中的卡牌,
     set选中的卡牌,
     playerOps,
@@ -33,11 +34,12 @@ export function GameBoard() {
 
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <span>回合 {游戏.回合数} | 阶段: {游戏.当前阶段} | 当前玩家: {游戏.当前玩家}</span>
+        {!是我的回合 && <span style={{ color: '#f39c12', marginLeft: 12 }}>等待对手...</span>}
       </div>
 
       <div style={{ marginBottom: 20 }}>
         <HandCards
-          手牌={当前玩家.手牌}
+          手牌={我自己.手牌}
           选中索引={选中的卡牌}
           选择卡牌={(索引) => set选中的卡牌(索引 === -1 ? null : 索引)}
         />
@@ -45,8 +47,8 @@ export function GameBoard() {
 
       <div style={{ marginBottom: 20 }}>
         <ActionPanel
-          能出牌={选中的卡牌 !== null && 游戏.当前阶段 === '出牌'}
-          能结束回合={游戏.当前玩家 === '曹操' && 游戏.当前阶段 === '出牌'}
+          能出牌={选中的卡牌 !== null && 是我的回合 && 游戏.当前阶段 === '出牌'}
+          能结束回合={是我的回合 && 游戏.当前阶段 === '出牌'}
           出牌={处理出牌}
           结束回合={处理结束回合}
         />
