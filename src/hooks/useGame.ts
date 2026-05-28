@@ -125,6 +125,13 @@ export function useGame() {
     setSelectedTarget(null);
   }, [myName, logger]);
 
+  const goToCurrentPlayer = useCallback(() => {
+    setMyName(game.currentPlayer);
+    setPlayerOps(logger.export().playerOps[game.currentPlayer] ?? []);
+    setSelectedCard(null);
+    setSelectedTarget(null);
+  }, [game.currentPlayer, logger]);
+
   const toggleTimer = useCallback(() => {
     setTimerPaused(prev => !prev);
   }, []);
@@ -261,6 +268,7 @@ export function useGame() {
     timerPaused,
     toggleTimer,
     switchPerspective,
+    goToCurrentPlayer,
     handlePlayCard,
     handleEndTurn,
     handleSaveLog,
