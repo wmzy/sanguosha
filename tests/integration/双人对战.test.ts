@@ -27,7 +27,7 @@ describe('双人对战', () => {
     expect(game.phase).toBe('摸牌');
     const drawResult = drawPhase(game);
     game = drawResult.status;
-    expect(game.players[0].hand.length).toBe(2);
+    expect(game.players[0].hand.length).toBe(6); // 4 initial + 2 drawn
 
     // 出牌阶段 - 使用杀
     game = nextPhase(game);

@@ -4,7 +4,7 @@ import { createDeck } from '../shared/cards';
 import { shuffle } from '../shared/deck';
 import { createRng } from '../shared/rng';
 
-export function createGame(characters: CharacterConfig[], seed?: number, logger?: GameLogger): GameState {
+export function createGame(characters: CharacterConfig[], seed?: number): GameState {
   const rng = createRng(seed ?? Date.now());
   const deck = shuffle(createDeck(), rng);
 
@@ -21,7 +21,7 @@ export function createGame(characters: CharacterConfig[], seed?: number, logger?
     alive: true,
   }));
 
-  const gameState: GameState = {
+  return {
     players,
     deck,
     discardPile: [],
@@ -30,21 +30,37 @@ export function createGame(characters: CharacterConfig[], seed?: number, logger?
     round: 1,
     status: '等待中',
   };
+}
+
+export function dealInitialCards(game: GameState, count: number, logger?: GameLogger): GameState {
+  let deck = [...game.deck];
+  const newPlayers = game.players.map(player => {
+    const drawn = deck.splice(0, count);
+    return { ...player, hand: [...player.hand, ...drawn] };
+  });
 
   if (logger) {
     logger.logServerOp('gameStart', {
-      players: players.map(p => ({ name: p.name, character: p.character.name, role: p.role })),
-    }, `游戏开始: ${players.map(p => p.name).join(', ')}`);
-    for (const player of players) {
+      players: newPlayers.map(p => ({ name: p.name, character: p.character.name, role: p.role })),
+    }, `游戏开始: ${newPlayers.map(p => p.name).join(', ')}`);
+    for (const player of newPlayers) {
       logger.logPlayerOp(player.name, 'gameStart', {
         player: player.name,
         character: player.character.name,
         role: player.role,
       }, `游戏开始，你是 ${player.character.name}（${player.role}）`);
+      logger.logServerOp('draw', {
+        player: player.name,
+        cards: player.hand.slice(-count).map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
+      }, `${player.name} 摸了 ${count} 张牌`);
+      logger.logPlayerOp(player.name, 'draw', {
+        player: player.name,
+        cards: player.hand.slice(-count).map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
+      }, `你摸了 ${player.hand.slice(-count).map(c => c.name).join('、')}`);
     }
   }
 
-  return gameState;
+  return { ...game, players: newPlayers, deck };
 }
 
 function assignRoles(playerCount: number): Role[] {
@@ -77,8 +93,9 @@ export function getPublicState(game: GameState, observerName: string): PublicGam
   };
 }
 
-export function startGame(game: GameState): GameState {
-  return { ...game, status: '进行中' };
+export function startGame(game: GameState, logger?: GameLogger): GameState {
+  const withCards = dealInitialCards(game, 4, logger);
+  return { ...withCards, status: '进行中' };
 }
 
 export function getCurrentPlayer(game: GameState): Player {

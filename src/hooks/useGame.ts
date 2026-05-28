@@ -36,8 +36,8 @@ export function useGame() {
   const [playerOps, setPlayerOps] = useState<Operation[]>([]);
 
   const [game, setGame] = useState<GameState>(() => {
-    const initial = createGame([曹操, 刘备], undefined, logger);
-    const started = startGame(initial);
+    const initial = createGame([曹操, 刘备]);
+    const started = startGame(initial, logger);
     const advanced = advanceToPlayPhase(started, logger);
     setPlayerOps(logger.export().playerOps['曹操'] ?? []);
     return advanced;

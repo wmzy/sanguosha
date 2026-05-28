@@ -18,8 +18,8 @@ describe('完整重播流程', () => {
     });
 
     // 进行一局游戏
-    let game = createGame([曹操, 刘备], seed, logger);
-    game = startGame(game);
+    let game = createGame([曹操, 刘备], seed);
+    game = startGame(game, logger);
     game = nextPhase(game, logger); // 准备 → 判定
     game = nextPhase(game, logger); // 判定 → 摸牌
     const drawResult = drawPhase(game, logger);
@@ -60,8 +60,8 @@ describe('完整重播流程', () => {
         characters: ['曹操', '刘备'],
         seed,
       });
-      let game = createGame([曹操, 刘备], seed, logger);
-      game = startGame(game);
+      let game = createGame([曹操, 刘备], seed);
+      game = startGame(game, logger);
       game = nextPhase(game, logger);
       game = nextPhase(game, logger);
       const drawResult = drawPhase(game, logger);

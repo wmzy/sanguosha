@@ -15,8 +15,8 @@ describe('ReplayEngine', () => {
       seed: 12345,
     });
 
-    let game = createGame([曹操, 刘备], 12345, logger);
-    game = startGame(game);
+    let game = createGame([曹操, 刘备], 12345);
+    game = startGame(game, logger);
     game = nextPhase(game, logger); // 准备 → 判定
     game = nextPhase(game, logger); // 判定 → 摸牌
     const drawResult = drawPhase(game, logger);
