@@ -53,7 +53,6 @@ describe('杀→闪→dying 完整流程', () => {
   });
 
   it('濒死后可用桃自救', async () => {
-    const stack = new InterruptStack();
     const game = createTestGame();
     game.players[1].health = 1;
     game.players[1].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
