@@ -8,6 +8,19 @@ import { 曹操, 刘备 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
 import { saveLog } from '../utils/logFile';
 
+function advanceToPlayPhase(游戏: GameState, logger: InstanceType<typeof GameLogger>): GameState {
+  let state = 游戏;
+  // 自动跳过准备和判定阶段，摸牌阶段自动摸牌
+  while (state.当前阶段 !== '出牌') {
+    if (state.当前阶段 === '摸牌') {
+      const result = 摸牌阶段(state, logger);
+      state = result.状态;
+    }
+    state = 进入下一阶段(state, logger);
+  }
+  return state;
+}
+
 export function useGame() {
   const [logger] = useState(() => new GameLogger({
     version: '1.0.0',
@@ -20,8 +33,10 @@ export function useGame() {
 
   const [游戏, set游戏] = useState<GameState>(() => {
     const 初始 = 创建游戏([曹操, 刘备], undefined, logger);
+    const started = 开始游戏(初始);
+    const advanced = advanceToPlayPhase(started, logger);
     setPlayerOps(logger.export().playerOps['曹操'] ?? []);
-    return 开始游戏(初始);
+    return advanced;
   });
 
   const [选中的卡牌, set选中的卡牌] = useState<number | null>(null);
@@ -78,20 +93,19 @@ export function useGame() {
 
   const 处理结束回合 = useCallback(() => {
     let 新游戏 = 游戏;
-    while (新游戏.当前阶段 !== '准备' || 新游戏.当前玩家 === 当前玩家.name) {
-      if (新游戏.当前阶段 === '摸牌') {
-        const 结果 = 摸牌阶段(新游戏, logger);
-        新游戏 = 结果.状态;
+    // 弃牌阶段检查
+    if (新游戏.当前阶段 === '弃牌') {
+      const 需要弃牌 = 弃牌阶段检查(新游戏);
+      if (需要弃牌) {
+        新游戏 = 弃牌阶段执行(新游戏, [0], logger);
       }
-      if (新游戏.当前阶段 === '弃牌') {
-        const 需要弃牌 = 弃牌阶段检查(新游戏);
-        if (需要弃牌) {
-          新游戏 = 弃牌阶段执行(新游戏, [0], logger);
-        }
-      }
-      新游戏 = 进入下一阶段(新游戏, logger);
-      if (新游戏.当前阶段 === '准备' && 新游戏.当前玩家 !== 当前玩家.name) break;
     }
+    // 推进到下一个玩家的出牌阶段
+    新游戏 = 进入下一阶段(新游戏, logger); // 出牌 → 弃牌
+    新游戏 = 进入下一阶段(新游戏, logger); // 弃牌 → 结束
+    新游戏 = 进入下一阶段(新游戏, logger); // 结束 → 准备
+    // 自动跳过下一个玩家的准备和判定阶段，摸牌
+    新游戏 = advanceToPlayPhase(新游戏, logger);
     set游戏(新游戏);
     更新操作记录();
   }, [游戏, 当前玩家, logger, 更新操作记录]);
