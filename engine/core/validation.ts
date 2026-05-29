@@ -50,7 +50,7 @@ export function targetValidator(ctx: ValidationContext): ValidationResult | null
       return { valid: false, reason: '不能对自己使用杀' };
     }
     const target = ctx.game.players.find(p => p.name === action.target);
-    if (!target || !target.alive) {
+    if (!target?.alive) {
       return { valid: false, reason: '目标不存在或已死亡' };
     }
   }

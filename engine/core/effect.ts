@@ -35,7 +35,7 @@ export function executeEffect(
     case 'dealDamage':
       return executeDamage(game, context, effect.amount ?? 1);
     case 'sequence':
-      return (effect.steps as Effect[]).reduce(
+      return (effect.steps).reduce(
         (state, step) => executeEffect(state, step, context),
         game,
       );
@@ -113,7 +113,7 @@ function executeGainCard(game: GameState, ctx: EffectContext, from: 'deck' | 'di
   return {
     ...newGame,
     players: newGame.players.map(p =>
-      p.name === ctx.player ? { ...p, hand: [...p.hand, card!] } : p,
+      p.name === ctx.player ? { ...p, hand: [...p.hand, card] } : p,
     ),
   };
 }
