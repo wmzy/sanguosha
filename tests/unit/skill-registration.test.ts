@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { TriggerSystem } from '@engine/core/trigger';
 import { registerCharacterSkills } from '@engine/core/skill';
-import type { GameState, CharacterConfig, Effect } from '@shared/types';
 import { createGame } from '@engine/state';
 import { 曹操, 刘备, 郭嘉, 夏侯惇 } from '@shared/characters';
+import type { CharacterConfig, GameState } from '@shared/types';
 
 function makeGame(characters: CharacterConfig[] = [曹操, 刘备]): GameState {
   const game = createGame(characters);

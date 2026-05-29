@@ -4,10 +4,10 @@ export type ResponseWindowType = 'kill_response' | 'trick_response' | 'dying' | 
 
 export interface ResponseWindow {
   type: ResponseWindowType;
-  requester: string;           // Who is waiting for responses
-  validResponders: string[];   // Who can respond
-  validCards: string[];        // Card names that can be played as response
-  sourceCard?: Card;           // The card that triggered this response
+  requester: string; // Who is waiting for responses
+  validResponders: string[]; // Who can respond
+  validCards: string[]; // Card names that can be played as response
+  sourceCard?: Card; // The card that triggered this response
   onResolve: (game: GameState, responses: Map<string, Card | null>) => GameState;
 }
 
@@ -94,8 +94,8 @@ export function createKillResponseWindow(
 
 export function createTrickResponseWindow(
   source: string,
-  trickName: string,
-  target?: string,
+  _trickName: string,
+  _target?: string,
 ): ResponseWindow {
   return {
     type: 'trick_response',

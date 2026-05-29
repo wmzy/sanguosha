@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TriggerSystem, type GameEvent, type HookHandler } from '@engine/core/trigger';
 import type { GameState, Effect } from '@shared/types';
 import { createGame } from '@engine/state';
-import { 曹操, 刘备, 郭嘉 } from '@shared/characters';
+import { 曹操, 刘备 } from '@shared/characters';
 
 function makeGame(): GameState {
   const game = createGame([曹操, 刘备]);

@@ -49,13 +49,13 @@ function matchesTrigger(abilityTrigger: string, eventType: string): boolean {
 
 function triggerToEventType(trigger: string): string | undefined {
   const mapping: Record<string, string> = {
-    'onDamageReceived': 'damageReceived',
-    'onDamageDealt': 'damageDealt',
-    'onTurnStart': 'turnStart',
-    'onTurnEnd': 'turnEnd',
-    'onCardPlayed': 'cardPlayed',
-    'onKill': 'death',
-    'onDeath': 'death',
+    onDamageReceived: 'damageReceived',
+    onDamageDealt: 'damageDealt',
+    onTurnStart: 'turnStart',
+    onTurnEnd: 'turnEnd',
+    onCardPlayed: 'cardPlayed',
+    onKill: 'death',
+    onDeath: 'death',
   };
   return mapping[trigger];
 }
