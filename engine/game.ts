@@ -17,9 +17,9 @@ import type { GameState, Card } from '../shared/types';
 import { GameLogger } from './logger';
 import { createGame, startGame } from './state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from './turn';
-import { playKill, playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden, playAbundance } from './effect';
+import { playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden, playAbundance } from './effect';
 import { getValidTargetsForCard, isCardPlayable } from './rules';
-import { getDyingOptions, applyDying, applyPeachSave } from './dying';
+import { applyDying, applyPeachSave } from './dying';
 import { getAvailableSkills, executeSkill } from './skill';
 
 // ============================================================

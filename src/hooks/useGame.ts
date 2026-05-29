@@ -5,7 +5,7 @@ import { GameController } from '../../engine/game';
 import { createGame, getCurrentPlayer } from '../../engine/state';
 import { checkDiscard } from '../../engine/turn';
 import { getValidActions } from '../../engine/rules';
-import { getDistance, getAttackRange, isInAttackRange } from '../../engine/core/distance';
+import { getDistance, getAttackRange } from '../../engine/core/distance';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
 import { saveLog } from '../utils/logFile';
