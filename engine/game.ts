@@ -157,9 +157,10 @@ export class GameController {
         }
     }
 
-    // 杀的卡牌移除由 executeKill 处理（因为需要等待响应）
-    // 其他卡牌在这里移除
-    if (result.success && card.name !== '杀') {
+    // 杀和装备牌的移除由各自的 execute* 方法处理
+    // 其他卡牌在这里移除并加入弃牌堆
+    const selfManaged = card.name === '杀' || card.subtype === '武器' || card.subtype === '防具' || card.subtype === '进攻马' || card.subtype === '防御马';
+    if (result.success && !selfManaged) {
       const newHand = [...player.hand];
       newHand.splice(cardIndex, 1);
       this.state = {
@@ -494,10 +495,15 @@ export class GameController {
     else if (card.subtype === '进攻马') equipment.horseMinus = card;
     else if (card.subtype === '防御马') equipment.horsePlus = card;
 
+    // 从手牌移除并装备
+    const cardIndex = player.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
+    const newHand = [...player.hand];
+    if (cardIndex >= 0) newHand.splice(cardIndex, 1);
+
     this.state = {
       ...this.state,
       players: this.state.players.map(p =>
-        p.name === playerName ? { ...p, equipment } : p,
+        p.name === playerName ? { ...p, hand: newHand, equipment } : p,
       ),
     };
 
