@@ -1,6 +1,6 @@
 // src/hooks/useWebSocket.ts
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ServerMessage, ClientMessage } from '../../server/协议';
+import type { ServerMessage, ClientMessage } from '../../server/protocol';
 
 export interface UseWebSocketReturn {
   connected: boolean;

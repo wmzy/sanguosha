@@ -81,7 +81,7 @@ export function isCardPlayable(game: GameState, player: Player, card: Card): boo
       const hasZhuge = player.equipment.weapon?.name === '诸葛连弩';
       if (!hasZhuge) {
         // 没有诸葛连弩，限制每回合只能出一张杀
-        const killsPlayed = game.killsPlayedThisTurn ?? 0;
+        const killsPlayed = game.killsPlayedThisTurn;
         if (killsPlayed >= 1) return false;
       }
       return getValidTargetsForCard(game, player, card).length > 0;

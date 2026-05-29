@@ -4,11 +4,11 @@ import { createGame, startGame } from '@engine/state';
 import { 曹操, 刘备 } from '@shared/characters';
 import type { Card } from '@shared/types';
 
-const 杀: Card = { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' };
-const 闪: Card = { name: '闪', type: '基本牌', subtype: '闪', suit: '♥', rank: '5', description: '' };
-const 桃: Card = { name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' };
-const 过河拆桥: Card = { name: '过河拆桥', type: '锦囊牌', subtype: '锦囊', suit: '♠', rank: '3', description: '' };
-const 武器: Card = { name: '诸葛连弩', type: '装备牌', subtype: '武器', suit: '♠', rank: 'A', description: '', range: 1 };
+const 杀: Card = { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' };
+const 闪: Card = { id: '闪-♥-5', name: '闪', type: '基本牌', subtype: '闪', suit: '♥', rank: '5', description: '' };
+const 桃: Card = { id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' };
+const 过河拆桥: Card = { id: '过河拆桥-♠-3', name: '过河拆桥', type: '锦囊牌', subtype: '锦囊', suit: '♠', rank: '3', description: '' };
+const 武器: Card = { id: '诸葛连弩-♠-A', name: '诸葛连弩', type: '装备牌', subtype: '武器', suit: '♠', rank: 'A', description: '', range: 1 };
 
 function createTestGame() {
   const game = createGame([曹操, 刘备], 12345);

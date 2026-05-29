@@ -55,7 +55,7 @@ describe('杀→闪→dying 完整流程', () => {
   it('濒死后可用桃自救', async () => {
     const game = createTestGame();
     game.players[1].health = 1;
-    game.players[1].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
+    game.players[1].hand = [{ id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
 
     expect(checkDying(0)).toBe(true);
     const options = getDyingOptions(game, '刘备');
@@ -71,7 +71,7 @@ describe('杀→闪→dying 完整流程', () => {
     const game = createTestGame();
     game.players[1].health = 1;
     game.players[1].hand = [];
-    game.players[0].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
+    game.players[0].hand = [{ id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
 
     expect(checkDying(0)).toBe(true);
     const options = getDyingOptions(game, '刘备');

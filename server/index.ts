@@ -2,7 +2,7 @@
 import { serve } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 import app, { handleWsOpen, handleWsClose, handleWsMessage } from './app';
-import { deserialize, serialize } from './协议';
+import { deserialize, serialize } from './protocol';
 import { generatePlayerId } from './utils';
 
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });

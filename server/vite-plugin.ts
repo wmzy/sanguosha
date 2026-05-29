@@ -5,7 +5,7 @@ import type { Duplex } from 'stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import app from './app';
 import { handleWsOpen, handleWsClose, handleWsMessage } from './app';
-import { deserialize } from './协议';
+import { deserialize } from './protocol';
 import { generatePlayerId } from './utils';
 
 export function honoApiPlugin(): Plugin {

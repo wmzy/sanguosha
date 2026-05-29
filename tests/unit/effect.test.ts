@@ -59,7 +59,7 @@ describe('卡牌效果', () => {
       game.status = '进行中';
       game.currentPlayer = '曹操';
       game.players[1].hand = [
-        { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
+        { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
       ];
 
       const result = playDismantle(game, '曹操', '刘备');
@@ -91,7 +91,7 @@ describe('卡牌效果', () => {
       game.status = '进行中';
       game.currentPlayer = '曹操';
       game.players[1].hand = [
-        { name: '闪', type: '基本牌', subtype: '闪', suit: '♥', rank: '3', description: '' },
+        { id: '闪-♥-3', name: '闪', type: '基本牌', subtype: '闪', suit: '♥', rank: '3', description: '' },
       ];
 
       const result = playSteal(game, '曹操', '刘备');
@@ -223,7 +223,7 @@ describe('卡牌效果', () => {
     it('牌堆不足时失败', () => {
       const game = createGame([曹操, 刘备]);
       game.status = '进行中';
-      game.deck = [{ name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' }];
+      game.deck = [{ id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' }];
 
       const result = playAbundance(game, '曹操');
       expect(result.success).toBe(false);

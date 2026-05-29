@@ -3,6 +3,7 @@ import { ReplayEngine } from '@engine/replay';
 import { GameLogger } from '@engine/logger';
 import { createGame, startGame } from '@engine/state';
 import { nextPhase, drawPhase } from '@engine/turn';
+import { createRng } from '@shared/rng';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('ReplayEngine', () => {
@@ -16,10 +17,11 @@ describe('ReplayEngine', () => {
     });
 
     let game = createGame([曹操, 刘备], 12345);
+    const rng = createRng(12345);
     game = startGame(game, logger);
     game = nextPhase(game, logger); // 准备 → 判定
     game = nextPhase(game, logger); // 判定 → 摸牌
-    const drawResult = drawPhase(game, logger);
+    const drawResult = drawPhase(game, rng, logger);
     void drawResult;
 
     return logger.export();

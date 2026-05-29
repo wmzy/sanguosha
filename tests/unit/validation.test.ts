@@ -31,7 +31,7 @@ describe('ValidationPipeline', () => {
     const game = createTestGame();
     const action: PlayerAction = {
       type: '出牌',
-      card: { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
+      card: { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
       target: '曹操',
     };
     const result = targetValidator({ game, player: '曹操', action, phase: '出牌' });
@@ -43,7 +43,7 @@ describe('ValidationPipeline', () => {
     const game = createTestGame();
     const action: PlayerAction = {
       type: '出牌',
-      card: { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
+      card: { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
       target: '刘备',
     };
     const result = targetValidator({ game, player: '曹操', action, phase: '出牌' });

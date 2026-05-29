@@ -1,86 +1,107 @@
-import type { GameState, Player, PublicGameState, CharacterConfig, Role } from '../shared/types';
-import type { GameLogger } from './logger';
+import type { CharacterConfig, GameState, Player, PublicGameState, Role } from '../shared/types';
+import type { Rng } from '../shared/rng';
+import { createRng } from '../shared/rng';
 import { createDeck } from '../shared/cards';
 import { shuffle } from '../shared/deck';
-import { createRng } from '../shared/rng';
+import type { GameLogger } from './logger';
 
-export function createGame(characters: CharacterConfig[], seed?: number): GameState {
-  const rng = createRng(seed ?? Date.now());
+function shuffleArray<T>(arr: T[], rng: Rng): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = rng.nextInt(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+export function assignRoles(count: number): Role[] {
+  if (count < 2) throw new Error('至少需要2名玩家');
+  const roles: Role[] = ['主公'];
+  const rebels = Math.max(1, Math.floor(count / 2));
+  const traitors = count >= 5 ? 1 : 0;
+  const loyal = count - 1 - rebels - traitors;
+  for (let i = 0; i < loyal; i++) roles.push('忠臣');
+  for (let i = 0; i < rebels; i++) roles.push('反贼');
+  for (let i = 0; i < traitors; i++) roles.push('内奸');
+  return roles;
+}
+
+export function createGame(
+  characters: CharacterConfig[],
+  seed?: number,
+  logger?: GameLogger,
+): GameState {
+  const actualSeed = seed ?? Date.now();
+  const rng = createRng(actualSeed);
   const deck = shuffle(createDeck(), rng);
+  const roles = shuffleArray(assignRoles(characters.length), rng);
 
-  const roles = assignRoles(characters.length);
-
-  const players: Player[] = characters.map((character, i) => ({
-    name: character.name,
-    character,
+  const players: Player[] = characters.map((char, i) => ({
+    name: char.name,
+    character: char,
     role: roles[i],
-    health: character.maxHealth,
-    maxHealth: character.maxHealth,
+    health: char.maxHealth,
+    maxHealth: char.maxHealth,
     hand: [],
     equipment: {},
     alive: true,
+    pendingTricks: [],
   }));
+
+  const 主公 = players.find(p => p.role === '主公');
+
+  logger?.logServerOp('gameStart', { playerCount: characters.length }, '创建游戏');
 
   return {
     players,
     deck,
     discardPile: [],
-    currentPlayer: players[0].name,
+    currentPlayer: 主公?.name ?? players[0].name,
     phase: '准备',
     round: 1,
     status: '等待中',
+    seed: actualSeed,
+    killsPlayedThisTurn: 0,
+    skillsUsedThisTurn: [],
   };
 }
 
-export function dealInitialCards(game: GameState, count: number, logger?: GameLogger): GameState {
-  const deck = [...game.deck];
-  const newPlayers = game.players.map(player => {
-    const drawn = deck.splice(0, count);
-    return { ...player, hand: [...player.hand, ...drawn] };
+export function startGame(game: GameState, logger?: GameLogger): GameState {
+  const handSize = 4;
+  let deck = [...game.deck];
+  const players = game.players.map(p => {
+    const hand = deck.slice(0, handSize);
+    deck = deck.slice(handSize);
+    return { ...p, hand };
   });
 
-  if (logger) {
-    logger.logServerOp('gameStart', {
-      players: newPlayers.map(p => ({ name: p.name, character: p.character.name, role: p.role })),
-    }, `游戏开始: ${newPlayers.map(p => p.name).join(', ')}`);
-    for (const player of newPlayers) {
-      logger.logPlayerOp(player.name, 'gameStart', {
-        player: player.name,
-        character: player.character.name,
-        role: player.role,
-      }, `游戏开始，你是 ${player.character.name}（${player.role}）`);
-      logger.logServerOp('draw', {
-        player: player.name,
-        cards: player.hand.slice(-count).map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
-      }, `${player.name} 摸了 ${count} 张牌`);
-      logger.logPlayerOp(player.name, 'draw', {
-        player: player.name,
-        cards: player.hand.slice(-count).map(c => ({ name: c.name, suit: c.suit, rank: c.rank })),
-      }, `你摸了 ${player.hand.slice(-count).map(c => c.name).join('、')}`);
-    }
-  }
+  logger?.logServerOp('gameStart', {
+    players: players.map(p => ({ name: p.name, character: p.character.name, role: p.role })),
+  }, '发初始牌');
 
-  return { ...game, players: newPlayers, deck };
+  return { ...game, players, deck, status: '进行中' };
 }
 
-function assignRoles(playerCount: number): Role[] {
-  if (playerCount === 2) {
-    return ['主公', '反贼'];
-  }
-  const roles: Role[] = ['主公'];
-  if (playerCount >= 4) roles.push('忠臣');
-  const rebelCount = playerCount >= 5 ? 2 : 1;
-  for (let i = 0; i < rebelCount; i++) roles.push('反贼');
-  if (playerCount >= 4) roles.push('内奸');
-  return roles.slice(0, playerCount);
+export function getPlayer(game: GameState, name: string): Player {
+  const player = game.players.find(p => p.name === name);
+  if (!player) throw new Error(`玩家 ${name} 不存在`);
+  return player;
+}
+
+export function getCurrentPlayer(game: GameState): Player {
+  return getPlayer(game, game.currentPlayer);
+}
+
+export function getAlivePlayers(game: GameState): Player[] {
+  return game.players.filter(p => p.alive);
 }
 
 export function getPublicState(game: GameState, observerName: string): PublicGameState {
   return {
-    players: game.players.map(player => {
-      const { hand, ...rest } = player;
-      if (player.name === observerName) {
-        return { ...rest, hand, handCount: hand.length };
+    players: game.players.map(p => {
+      const { hand, ...rest } = p;
+      if (p.name === observerName) {
+        return { ...rest, handCount: hand.length, hand };
       }
       return { ...rest, handCount: hand.length };
     }),
@@ -93,81 +114,59 @@ export function getPublicState(game: GameState, observerName: string): PublicGam
   };
 }
 
-export function startGame(game: GameState, logger?: GameLogger): GameState {
-  const withCards = dealInitialCards(game, 4, logger);
-  return { ...withCards, status: '进行中' };
-}
-
-export function getCurrentPlayer(game: GameState): Player {
-  const player = game.players.find(p => p.name === game.currentPlayer);
-  if (!player) throw new Error(`找不到玩家: ${game.currentPlayer}`);
-  return player;
-}
-
-export function getAlivePlayers(game: GameState): Player[] {
-  return game.players.filter(p => p.alive);
-}
-
 export function checkVictory(game: GameState, logger?: GameLogger): GameState {
   const alive = getAlivePlayers(game);
-  const lord = game.players.find(p => p.role === '主公');
+  const aliveRoles = new Set(alive.map(p => p.role));
 
-  const aliveRoles = alive.map(p => p.role);
-  const hasRebel = aliveRoles.includes('反贼');
-  const hasSpy = aliveRoles.includes('内奸');
+  let winner: string | undefined;
 
-  function logGameEnd(winner: Role): void {
-    if (logger) {
-      const reason = `${winner}获胜`;
-      logger.logServerOp('gameEnd', { winner, reason }, `游戏结束: ${reason}`);
-      for (const player of game.players) {
-        logger.logPlayerOp(player.name, 'gameEnd', { winner, reason }, `游戏结束: ${reason}`);
-      }
-    }
+  if (!alive.some(p => p.role === '主公')) {
+    winner = alive.length === 1 && alive[0].role === '内奸' ? '内奸' : '反贼';
   }
 
-  if (lord && !lord.alive) {
-    if (hasRebel) {
-      logGameEnd('反贼');
-      return { ...game, status: '已结束', winner: '反贼' };
-    }
-    if (hasSpy && alive.length === 1) {
-      logGameEnd('内奸');
-      return { ...game, status: '已结束', winner: '内奸' };
-    }
-    logGameEnd('反贼');
-    return { ...game, status: '已结束', winner: '反贼' };
+  if (!aliveRoles.has('反贼') && !aliveRoles.has('内奸')) {
+    winner = '主公';
   }
 
-  if (lord?.alive && !hasRebel && !hasSpy) {
-    logGameEnd('主公');
-    return { ...game, status: '已结束', winner: '主公' };
-  }
-
-  if (alive.length === 1) {
-    logGameEnd(alive[0].role);
-    return { ...game, status: '已结束', winner: alive[0].role };
+  if (winner) {
+    logger?.logServerOp('gameEnd', { winner }, `${winner}阵营胜利`);
+    return { ...game, status: '已结束', winner: winner as GameState['winner'] };
   }
 
   return game;
 }
 
 export function playerDeath(game: GameState, playerName: string, logger?: GameLogger): GameState {
-  const newPlayers = game.players.map(p => {
-    if (p.name === playerName) {
-      return { ...p, alive: false };
-    }
-    return p;
-  });
+  const player = getPlayer(game, playerName);
+  if (!player.alive) return game;
 
-  const newGame = { ...game, players: newPlayers };
+  logger?.logServerOp('play', { player: playerName }, `${playerName} 阵亡`);
 
-  if (logger) {
-    logger.logServerOp('gameEnd', { player: playerName }, `${playerName} 已死亡`);
-    for (const player of newGame.players) {
-      logger.logPlayerOp(player.name, 'gameEnd', { player: playerName }, `${playerName} 已死亡`);
-    }
-  }
+  const newDiscardPile = [...game.discardPile, ...player.hand];
 
-  return checkVictory(newGame, logger);
+  let state: GameState = {
+    ...game,
+    players: game.players.map(p =>
+      p.name === playerName
+        ? { ...p, alive: false, health: 0, hand: [], pendingTricks: [] }
+        : p,
+    ),
+    discardPile: newDiscardPile,
+  };
+
+  state = checkVictory(state, logger);
+  return state;
+}
+
+export function updatePlayer(
+  game: GameState,
+  playerName: string,
+  updates: Partial<Player>,
+): GameState {
+  return {
+    ...game,
+    players: game.players.map(p =>
+      p.name === playerName ? { ...p, ...updates } : p,
+    ),
+  };
 }

@@ -267,16 +267,16 @@ describe('卡牌分类辅助函数', () => {
   });
 
   it('isBlackSuit应正确识别', () => {
-    expect(isBlackSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' })).toBe(true);
-    expect(isBlackSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♣', rank: 'A', description: '' })).toBe(true);
-    expect(isBlackSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♥', rank: 'A', description: '' })).toBe(false);
-    expect(isBlackSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♦', rank: 'A', description: '' })).toBe(false);
+    expect(isBlackSuit({ id: '测试-♠-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' })).toBe(true);
+    expect(isBlackSuit({ id: '测试-♣-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♣', rank: 'A', description: '' })).toBe(true);
+    expect(isBlackSuit({ id: '测试-♥-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♥', rank: 'A', description: '' })).toBe(false);
+    expect(isBlackSuit({ id: '测试-♦-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♦', rank: 'A', description: '' })).toBe(false);
   });
 
   it('isRedSuit应正确识别', () => {
-    expect(isRedSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♥', rank: 'A', description: '' })).toBe(true);
-    expect(isRedSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♦', rank: 'A', description: '' })).toBe(true);
-    expect(isRedSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' })).toBe(false);
-    expect(isRedSuit({ name: '测试', type: '基本牌', subtype: '杀', suit: '♣', rank: 'A', description: '' })).toBe(false);
+    expect(isRedSuit({ id: '测试-♥-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♥', rank: 'A', description: '' })).toBe(true);
+    expect(isRedSuit({ id: '测试-♦-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♦', rank: 'A', description: '' })).toBe(true);
+    expect(isRedSuit({ id: '测试-♠-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' })).toBe(false);
+    expect(isRedSuit({ id: '测试-♣-A', name: '测试', type: '基本牌', subtype: '杀', suit: '♣', rank: 'A', description: '' })).toBe(false);
   });
 });

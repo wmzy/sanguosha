@@ -1,4 +1,4 @@
-// tests/unit/房间.test.ts
+// tests/unit/room.test.ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { WSContext } from 'hono/ws';
 import {
@@ -10,7 +10,7 @@ import {
   getRoom,
   getRoomList,
   findRoomByPlayerId,
-} from '../../server/房间';
+} from '../../server/room';
 
 // Mock WebSocket context
 function createMockWS(): WSContext {

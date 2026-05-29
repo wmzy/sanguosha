@@ -1,6 +1,6 @@
-// server/房间.ts
+// server/room.ts
 import type { WSContext } from 'hono/ws';
-import type { RoomInfo } from './协议';
+import type { RoomInfo } from './protocol';
 
 export interface Room {
   id: string;

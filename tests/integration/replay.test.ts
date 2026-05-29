@@ -4,11 +4,13 @@ import { ReplayEngine } from '@engine/replay';
 import { createGame, startGame } from '@engine/state';
 import { nextPhase, drawPhase } from '@engine/turn';
 import { playKill } from '@engine/effect';
+import { createRng } from '@shared/rng';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('完整重播流程', () => {
   it('完整游戏 → 导出日志 → 导入 → 重播 → 验证状态一致', () => {
     const seed = 12345;
+    const rng = createRng(seed);
     const logger = new GameLogger({
       version: '1.0.0',
       createdAt: Date.now(),
@@ -22,12 +24,12 @@ describe('完整重播流程', () => {
     game = startGame(game, logger);
     game = nextPhase(game, logger); // 准备 → 判定
     game = nextPhase(game, logger); // 判定 → 摸牌
-    const drawResult = drawPhase(game, logger);
+    const drawResult = drawPhase(game, rng, logger);
     game = drawResult.state;
     game = nextPhase(game, logger); // 摸牌 → 出牌
 
     // 使用杀
-    const killResult = playKill(game, '曹操', '刘备', logger);
+    const killResult = playKill(game, '曹操', '刘备');
     expect(killResult.success).toBe(true);
 
     // 导出日志
@@ -53,6 +55,7 @@ describe('完整重播流程', () => {
     const seed = 99999;
 
     function runGame() {
+      const rng = createRng(seed);
       const logger = new GameLogger({
         version: '1.0.0',
         createdAt: Date.now(),
@@ -64,7 +67,7 @@ describe('完整重播流程', () => {
       game = startGame(game, logger);
       game = nextPhase(game, logger);
       game = nextPhase(game, logger);
-      const drawResult = drawPhase(game, logger);
+      const drawResult = drawPhase(game, rng, logger);
       void drawResult;
       return logger.export();
     }

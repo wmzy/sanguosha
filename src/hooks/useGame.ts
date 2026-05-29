@@ -164,19 +164,26 @@ export function useGame() {
   const handlePlayCard = useCallback(() => {
     if (selectedCard === null || !isMyTurn) return;
 
-    const result = controller.playCard(myName, selectedCard, selectedTarget ?? undefined);
+    const card = me.hand[selectedCard];
+    if (!card) return;
 
-    // 处理需要输入的情况（如杀→闪）
-    if (result.needsInput?.type === 'respond_kill') {
+    const result = controller.playCard(myName, card.id, selectedTarget ?? undefined);
+
+    // 处理需要响应窗口的情况
+    if (result.responseWindow) {
       setGame(result.state);
       setSelectedCard(null);
       setSelectedTarget(null);
       updateOps();
       resetTimer();
-      const { attacker, target, card } = result.needsInput.data;
-      setPendingResponse({ attacker, target, card });
-      setMyName(target);
-      setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
+      // 根据响应窗口类型设置 pending 状态
+      if (result.responseWindow.type === 'kill_response') {
+        setPendingResponse({
+          attacker: result.responseWindow.requester,
+          target: result.responseWindow.validResponders[0],
+          card: result.responseWindow.sourceCard!,
+        });
+      }
       return;
     }
 
@@ -206,16 +213,6 @@ export function useGame() {
 
     const result = controller.endTurn(myName);
 
-    if (result.needsInput?.type === 'select_cards') {
-      // 需要弃牌
-      setGame(result.state);
-      setSelectedCard(null);
-      setSelectedTarget(null);
-      updateOps();
-      resetTimer();
-      return;
-    }
-
     if (result.success) {
       setGame(result.state);
       setSelectedCard(null);
@@ -242,13 +239,28 @@ export function useGame() {
   const respondToKill = useCallback((playDodge: boolean) => {
     if (!pendingResponse) return;
 
-    const result = controller.respondToKill(pendingResponse.target, playDodge, pendingResponse.attacker, pendingResponse.card);
+    // 构建响应 Map
+    const responses = new Map<string, Card | null>();
+    if (playDodge) {
+      // 找到一张闪
+      const targetPlayer = game.players.find(p => p.name === pendingResponse.target);
+      const dodgeCard = targetPlayer?.hand.find(c => c.name === '闪');
+      responses.set(pendingResponse.target, dodgeCard ?? null);
+    } else {
+      responses.set(pendingResponse.target, null);
+    }
+
+    const result = controller.respondToWindow(responses);
 
     setGame(result.state);
     updateOps();
 
-    if (result.needsInput?.type === 'respond_dying') {
-      setPendingDying(result.needsInput.data);
+    // 检查是否触发濒死
+    if (result.responseWindow?.type === 'dying') {
+      setPendingDying({
+        player: result.responseWindow.requester,
+        savers: result.responseWindow.validResponders,
+      });
     } else {
       setPendingResponse(null);
       setPendingDying(null);
@@ -261,7 +273,16 @@ export function useGame() {
   const respondToDying = useCallback((saverName: string | null) => {
     if (!pendingDying) return;
 
-    const result = controller.respondToDying(pendingDying.player, saverName);
+    // 构建响应 Map
+    const responses = new Map<string, Card | null>();
+    if (saverName) {
+      // 找到一张桃
+      const saverPlayer = game.players.find(p => p.name === saverName);
+      const peachCard = saverPlayer?.hand.find(c => c.name === '桃');
+      responses.set(saverName, peachCard ?? null);
+    }
+
+    const result = controller.respondToWindow(responses);
 
     setGame(result.state);
     setPendingDying(null);

@@ -1,7 +1,7 @@
-// tests/unit/协议.test.ts
+// tests/unit/protocol.test.ts
 import { describe, it, expect } from 'vitest';
-import { serialize, deserialize, isValidClientMessage } from '../../server/协议';
-import type { ServerMessage, ClientMessage } from '../../server/协议';
+import { serialize, deserialize, isValidClientMessage } from '../../server/protocol';
+import type { ServerMessage, ClientMessage } from '../../server/protocol';
 
 describe('消息协议', () => {
   describe('序列化', () => {
@@ -66,7 +66,7 @@ describe('消息协议', () => {
     it('应该反序列化 action 消息', () => {
       const message: ClientMessage = {
         type: 'action',
-        action: { type: '出牌', card: { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' } },
+        action: { type: '出牌', card: { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' } },
       };
 
       const data = JSON.stringify(message);

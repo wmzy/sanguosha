@@ -1,7 +1,7 @@
 // server/app.ts
 import { Hono } from 'hono';
 import type { WSContext } from 'hono/ws';
-import { serialize } from './协议';
+import { serialize } from './protocol';
 import {
   createRoom,
   joinRoom,
@@ -12,8 +12,8 @@ import {
   getRoomList,
   findRoomByPlayerId,
   broadcastMessage,
-} from './房间';
-import { GameSession } from './会话';
+} from './room';
+import { GameSession } from './session';
 
 const app = new Hono();
 
@@ -44,7 +44,7 @@ app.get('/api/rooms/:id', (c) => {
 // WebSocket 消息处理
 export function handleWsMessage(
   playerId: string,
-  message: import('./协议').ClientMessage,
+  message: import('./protocol').ClientMessage,
   ws: WSContext,
 ): void {
   switch (message.type) {

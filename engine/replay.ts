@@ -62,7 +62,8 @@ export class ReplayEngine {
           player: string;
           cards: Array<{ name: string; suit: string; rank: string }>;
         };
-        const drawnCards: Card[] = data.cards.map((c: { name: string; suit: string; rank: string }) => ({
+        const drawnCards: Card[] = data.cards.map((c: { name: string; suit: string; rank: string }, i: number) => ({
+          id: `${c.name}-${c.suit}-${c.rank}-${i}`,
           name: c.name,
           type: '基本牌' as const,
           subtype: c.name as Card['subtype'],

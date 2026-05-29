@@ -1,7 +1,7 @@
 // src/components/RoomLobby.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import type { RoomInfo } from '../../server/协议';
+import type { RoomInfo } from '../../server/protocol';
 
 interface RoomLobbyProps {
   onJoinRoom: (roomId: string, playerId: string) => void;

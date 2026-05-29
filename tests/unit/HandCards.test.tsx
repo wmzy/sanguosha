@@ -4,9 +4,9 @@ import { HandCards } from '../../src/components/HandCards';
 import type { Card } from '../../shared/types';
 
 const mockCards: Card[] = [
-  { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
-  { name: '闪', type: '基本牌', subtype: '闪', suit: '♥', rank: '5', description: '' },
-  { name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' },
+  { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
+  { id: '闪-♥-5', name: '闪', type: '基本牌', subtype: '闪', suit: '♥', rank: '5', description: '' },
+  { id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' },
 ];
 
 describe('HandCards', () => {

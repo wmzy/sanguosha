@@ -1,17 +1,22 @@
-// server/会话.ts
+// server/session.ts
 import type { GameState, PlayerAction } from '../shared/types';
-import type { Room } from './房间';
+import type { Rng } from '../shared/rng';
+import type { Room } from './room';
 import { createGame, getPublicState, startGame } from '../engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../engine/turn';
 import { playKill, playPeach } from '../engine/effect';
 import { allCharacters } from '../shared/characters';
-import { serialize } from './协议';
-import { setRoomStatus } from './房间';
+import { serialize } from './protocol';
+import { setRoomStatus } from './room';
 
 export class GameSession {
   private state: GameState | null = null;
   private room: Room;
   private playerNames = new Map<string, string>(); // playerId -> playerName
+  private rng: Rng = {
+    next: () => Math.random(),
+    nextInt: (max: number) => Math.floor(Math.random() * max),
+  };
 
   constructor(room: Room) {
     this.room = room;
@@ -49,7 +54,7 @@ export class GameSession {
 
   private drawForCurrentPlayer(): GameState {
     if (!this.state) throw new Error('游戏未开始');
-    const result = drawPhase(this.state);
+    const result = drawPhase(this.state, this.rng);
     this.state = result.state;
     return this.state;
   }
@@ -101,7 +106,7 @@ export class GameSession {
         this.removeCardFromHand(playerName, card);
         this.broadcastState();
       } else {
-        this.sendToPlayerByName(playerName, { type: 'error', message: result.message });
+        this.sendToPlayerByName(playerName, { type: 'error', message: result.message ?? '操作失败' });
       }
     } else if (card.name === '桃') {
       const result = playPeach(this.state, playerName);
@@ -110,7 +115,7 @@ export class GameSession {
         this.removeCardFromHand(playerName, card);
         this.broadcastState();
       } else {
-        this.sendToPlayerByName(playerName, { type: 'error', message: result.message });
+        this.sendToPlayerByName(playerName, { type: 'error', message: result.message ?? '操作失败' });
       }
     }
   }
@@ -256,7 +261,7 @@ export class GameSession {
     return this.playerNames.get(playerId);
   }
 
-  private sendToPlayer(playerId: string, message: import('./协议').ServerMessage): void {
+  private sendToPlayer(playerId: string, message: import('./protocol').ServerMessage): void {
     const ws = this.room.players.get(playerId);
     if (ws) {
       try {
@@ -267,7 +272,7 @@ export class GameSession {
     }
   }
 
-  private sendToPlayerByName(playerName: string, message: import('./协议').ServerMessage): void {
+  private sendToPlayerByName(playerName: string, message: import('./protocol').ServerMessage): void {
     for (const [playerId, name] of this.playerNames) {
       if (name === playerName) {
         this.sendToPlayer(playerId, message);
@@ -276,7 +281,7 @@ export class GameSession {
     }
   }
 
-  private broadcast(message: import('./协议').ServerMessage): void {
+  private broadcast(message: import('./protocol').ServerMessage): void {
     const data = serialize(message);
     for (const [, ws] of this.room.players) {
       try {

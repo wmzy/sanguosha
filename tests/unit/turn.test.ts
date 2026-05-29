@@ -26,8 +26,10 @@ describe('回合阶段', () => {
       game.status = '进行中';
       game.phase = '结束';
 
+      const firstPlayer = game.currentPlayer;
       const nextRound = nextPhase(game);
-      expect(nextRound.currentPlayer).toBe('刘备');
+      // 应该切换到另一个玩家
+      expect(nextRound.currentPlayer).not.toBe(firstPlayer);
     });
   });
 
@@ -37,8 +39,11 @@ describe('回合阶段', () => {
       game.status = '进行中';
       game.phase = '摸牌';
 
-      const result = drawPhase(game);
-      expect(result.state.players[0].hand.length).toBe(2);
+      const currentName = game.currentPlayer;
+      const rng = { next: () => Math.random(), nextInt: (max: number) => Math.floor(Math.random() * max) };
+      const result = drawPhase(game, rng);
+      const currentPlayer = result.state.players.find(p => p.name === currentName)!;
+      expect(currentPlayer.hand.length).toBe(2);
       expect(result.state.deck.length).toBe(game.deck.length - 2);
     });
   });
@@ -48,8 +53,9 @@ describe('回合阶段', () => {
       const game = createGame([曹操, 刘备]);
       game.status = '进行中';
       game.phase = '弃牌';
-      // 给曹操5张手牌（体力上限4，需弃1张）
-      game.players[0].hand = game.deck.slice(0, 5);
+      // 给当前玩家5张手牌（体力上限4，需弃1张）
+      const currentIdx = game.players.findIndex(p => p.name === game.currentPlayer);
+      game.players[currentIdx].hand = game.deck.slice(0, 5);
       game.deck = game.deck.slice(5);
 
       const needsDiscard = checkDiscard(game);

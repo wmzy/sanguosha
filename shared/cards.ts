@@ -5,6 +5,7 @@ import type { Card, Suit, Rank } from './types';
 // ============================================================
 
 export const 诸葛连弩: Card = {
+  id: '',
   name: '诸葛连弩',
   type: '装备牌',
   subtype: '武器',
@@ -15,6 +16,7 @@ export const 诸葛连弩: Card = {
 };
 
 export const 青釭剑: Card = {
+  id: '',
   name: '青釭剑',
   type: '装备牌',
   subtype: '武器',
@@ -25,6 +27,7 @@ export const 青釭剑: Card = {
 };
 
 export const 雌雄双股剑: Card = {
+  id: '',
   name: '雌雄双股剑',
   type: '装备牌',
   subtype: '武器',
@@ -35,6 +38,7 @@ export const 雌雄双股剑: Card = {
 };
 
 export const 贯石斧: Card = {
+  id: '',
   name: '贯石斧',
   type: '装备牌',
   subtype: '武器',
@@ -45,6 +49,7 @@ export const 贯石斧: Card = {
 };
 
 export const 青龙偃月刀: Card = {
+  id: '',
   name: '青龙偃月刀',
   type: '装备牌',
   subtype: '武器',
@@ -55,6 +60,7 @@ export const 青龙偃月刀: Card = {
 };
 
 export const 丈八蛇矛: Card = {
+  id: '',
   name: '丈八蛇矛',
   type: '装备牌',
   subtype: '武器',
@@ -65,6 +71,7 @@ export const 丈八蛇矛: Card = {
 };
 
 export const 方天画戟: Card = {
+  id: '',
   name: '方天画戟',
   type: '装备牌',
   subtype: '武器',
@@ -75,6 +82,7 @@ export const 方天画戟: Card = {
 };
 
 export const 麒麟弓: Card = {
+  id: '',
   name: '麒麟弓',
   type: '装备牌',
   subtype: '武器',
@@ -84,16 +92,8 @@ export const 麒麟弓: Card = {
   range: 5,
 };
 
-export const weapons: Card[] = [
-  诸葛连弩, 青釭剑, 雌雄双股剑, 贯石斧,
-  青龙偃月刀, 丈八蛇矛, 方天画戟, 麒麟弓,
-];
-
-// ============================================================
-// 防具牌定义
-// ============================================================
-
 export const 八卦阵: Card = {
+  id: '',
   name: '八卦阵',
   type: '装备牌',
   subtype: '防具',
@@ -103,6 +103,7 @@ export const 八卦阵: Card = {
 };
 
 export const 仁王盾: Card = {
+  id: '',
   name: '仁王盾',
   type: '装备牌',
   subtype: '防具',
@@ -111,13 +112,8 @@ export const 仁王盾: Card = {
   description: '锁定技，黑色的【杀】对你无效。',
 };
 
-export const armors: Card[] = [八卦阵, 仁王盾];
-
-// ============================================================
-// 马牌定义
-// ============================================================
-
 export const 绝影: Card = {
+  id: '',
   name: '绝影',
   type: '装备牌',
   subtype: '防御马',
@@ -127,6 +123,7 @@ export const 绝影: Card = {
 };
 
 export const 爪黄飞电: Card = {
+  id: '',
   name: '爪黄飞电',
   type: '装备牌',
   subtype: '防御马',
@@ -136,6 +133,7 @@ export const 爪黄飞电: Card = {
 };
 
 export const 的卢: Card = {
+  id: '',
   name: '的卢',
   type: '装备牌',
   subtype: '防御马',
@@ -145,6 +143,7 @@ export const 的卢: Card = {
 };
 
 export const 赤兔: Card = {
+  id: '',
   name: '赤兔',
   type: '装备牌',
   subtype: '进攻马',
@@ -154,6 +153,7 @@ export const 赤兔: Card = {
 };
 
 export const 紫骍: Card = {
+  id: '',
   name: '紫骍',
   type: '装备牌',
   subtype: '进攻马',
@@ -163,6 +163,7 @@ export const 紫骍: Card = {
 };
 
 export const 大宛: Card = {
+  id: '',
   name: '大宛',
   type: '装备牌',
   subtype: '进攻马',
@@ -170,6 +171,13 @@ export const 大宛: Card = {
   rank: 'K',
   description: '你计算与其他角色的距离时，始终-1。',
 };
+
+export const weapons: Card[] = [
+  诸葛连弩, 青釭剑, 雌雄双股剑, 贯石斧,
+  青龙偃月刀, 丈八蛇矛, 方天画戟, 麒麟弓,
+];
+
+export const armors: Card[] = [八卦阵, 仁王盾];
 
 export const horses: Card[] = [
   绝影, 爪黄飞电, 的卢, 赤兔, 紫骍, 大宛,
@@ -181,6 +189,7 @@ export const horses: Card[] = [
 
 // 普通锦囊 - 单目标
 export const 过河拆桥: Card = {
+  id: '',
   name: '过河拆桥',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -191,6 +200,7 @@ export const 过河拆桥: Card = {
 };
 
 export const 顺手牵羊: Card = {
+  id: '',
   name: '顺手牵羊',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -201,6 +211,7 @@ export const 顺手牵羊: Card = {
 };
 
 export const 决斗: Card = {
+  id: '',
   name: '决斗',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -211,6 +222,7 @@ export const 决斗: Card = {
 };
 
 export const 无中生有: Card = {
+  id: '',
   name: '无中生有',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -222,6 +234,7 @@ export const 无中生有: Card = {
 
 // 普通锦囊 - 全体
 export const 万箭齐发: Card = {
+  id: '',
   name: '万箭齐发',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -232,6 +245,7 @@ export const 万箭齐发: Card = {
 };
 
 export const 南蛮入侵: Card = {
+  id: '',
   name: '南蛮入侵',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -242,6 +256,7 @@ export const 南蛮入侵: Card = {
 };
 
 export const 桃园结义: Card = {
+  id: '',
   name: '桃园结义',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -252,6 +267,7 @@ export const 桃园结义: Card = {
 };
 
 export const 五谷丰登: Card = {
+  id: '',
   name: '五谷丰登',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -268,6 +284,7 @@ export const normalTricks: Card[] = [
 
 // 延时锦囊
 export const 乐不思蜀: Card = {
+  id: '',
   name: '乐不思蜀',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -278,6 +295,7 @@ export const 乐不思蜀: Card = {
 };
 
 export const 兵粮寸断: Card = {
+  id: '',
   name: '兵粮寸断',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -288,6 +306,7 @@ export const 兵粮寸断: Card = {
 };
 
 export const 闪电: Card = {
+  id: '',
   name: '闪电',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -301,6 +320,7 @@ export const delayedTricks: Card[] = [乐不思蜀, 兵粮寸断, 闪电];
 
 // 响应锦囊
 export const 无懈可击: Card = {
+  id: '',
   name: '无懈可击',
   type: '锦囊牌',
   subtype: '锦囊',
@@ -325,6 +345,13 @@ export const allTricks: Card[] = [
 
 export function createDeck(): Card[] {
   const deck: Card[] = [];
+  let counter = 0;
+
+  const add = (card: Omit<Card, 'id'>): Card => {
+    const withId = { ...card, id: `${card.name}-${card.suit}-${card.rank}-${counter++}` };
+    deck.push(withId);
+    return withId;
+  };
 
   // 基本牌
   // 杀: ♠3-7, ♣3-7, ♥10-11, ♦6-10
@@ -336,7 +363,7 @@ export function createDeck(): Card[] {
   ];
 
   for (const [suit, rank] of killSuits) {
-    deck.push({
+    add({
       name: '杀',
       type: '基本牌',
       subtype: '杀',
@@ -353,7 +380,7 @@ export function createDeck(): Card[] {
   ];
 
   for (const [suit, rank] of dodgeSuits) {
-    deck.push({
+    add({
       name: '闪',
       type: '基本牌',
       subtype: '闪',
@@ -370,7 +397,7 @@ export function createDeck(): Card[] {
   ];
 
   for (const [suit, rank] of peachSuits) {
-    deck.push({
+    add({
       name: '桃',
       type: '基本牌',
       subtype: '桃',
@@ -381,10 +408,15 @@ export function createDeck(): Card[] {
   }
 
   // 装备牌 - 每种各1张
-  deck.push(...weapons, ...armors, ...horses);
+  const allEquip = [...weapons, ...armors, ...horses];
+  for (const equip of allEquip) {
+    add(equip);
+  }
 
-  // 锦囊牌 - 普通锦囊每种各1张，延时锦囊每种各1张，无懈可击1张
-  deck.push(...allTricks);
+  // 锦囊牌
+  for (const trick of allTricks) {
+    add(trick);
+  }
 
   return deck;
 }

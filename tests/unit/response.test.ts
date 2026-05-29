@@ -16,6 +16,7 @@ function makeCard(name: string, overrides?: Partial<Card>): Card {
     suit: '♠',
     rank: 'A',
     description: '',
+    id: `${name}-♠-A`,
     ...overrides,
   };
 }
@@ -49,6 +50,9 @@ function makeGame(overrides?: Partial<GameState>): GameState {
     phase: '出牌',
     round: 1,
     status: '进行中',
+    seed: 12345,
+    killsPlayedThisTurn: 0,
+    skillsUsedThisTurn: [],
     ...overrides,
   };
 }

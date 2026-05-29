@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, startGame } from '@engine/state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '@engine/turn';
 import { playKill, playPeach } from '@engine/effect';
+import { createRng } from '@shared/rng';
 import { 曹操, 刘备 } from '@shared/characters';
 
 describe('双人对战', () => {
@@ -25,7 +26,8 @@ describe('双人对战', () => {
 
     // 摸牌阶段
     expect(game.phase).toBe('摸牌');
-    const drawResult = drawPhase(game);
+    const rng = createRng(12345);
+    const drawResult = drawPhase(game, rng);
     game = drawResult.state;
     expect(game.players[0].hand.length).toBe(6); // 4 initial + 2 drawn
 
@@ -87,7 +89,7 @@ describe('双人对战', () => {
 
     // 给刘备一张桃 (注: 使用桃仅检查体力上限，不检查手牌)
     const damagedGame = damageResult.state;
-    damagedGame.players[1].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
+    damagedGame.players[1].hand = [{ id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
 
     // 刘备使用桃
     const peachResult = playPeach(damagedGame, '刘备');

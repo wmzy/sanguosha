@@ -1,8 +1,8 @@
-// tests/unit/会话.test.ts
+// tests/unit/session.test.ts
 import { describe, it, expect } from 'vitest';
 import type { WSContext } from 'hono/ws';
-import { GameSession } from '../../server/会话';
-import type { Room } from '../../server/房间';
+import { GameSession } from '../../server/session';
+import type { Room } from '../../server/room';
 
 // Mock WebSocket context
 function createMockWS() {
@@ -130,7 +130,7 @@ describe('GameSession', () => {
     // 尝试让非当前玩家执行动作
     // 这里需要根据实际游戏状态来判断谁是当前玩家
     // 简化测试：直接检查错误处理
-    session.handleAction('player1', { type: '出牌', card: { name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' } });
+    session.handleAction('player1', { type: '出牌', card: { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' } });
 
     // 应该有消息发送
     const messages1 = ws1.getMessages();

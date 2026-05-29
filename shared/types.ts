@@ -15,7 +15,8 @@ export type TrickSubType = '普通锦囊' | '延时锦囊' | '响应锦囊';
 
 // 卡牌
 export interface Card {
-  name: string; // "杀", "闪", "桃" — 唯一标识
+  id: string; // 唯一标识，格式 "杀-♠-7" 等
+  name: string; // "杀", "闪", "桃"
   type: CardType;
   subtype: CardSubType;
   suit: Suit;
@@ -188,12 +189,14 @@ export interface GameState {
   players: Player[];
   deck: Card[];
   discardPile: Card[];
-  currentPlayer: string; // player name
+  currentPlayer: string;
   phase: TurnPhase;
   round: number;
   status: '等待中' | '进行中' | '已结束';
   winner?: Role;
-  killsPlayedThisTurn?: number; // 本回合已出杀的次数（用于诸葛连弩限制判断）
+  seed: number;
+  killsPlayedThisTurn: number;
+  skillsUsedThisTurn: string[];
 }
 
 // 玩家可见状态（隐藏他人手牌）

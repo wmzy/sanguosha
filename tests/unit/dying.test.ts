@@ -23,7 +23,7 @@ describe('dying', () => {
   describe('getDyingOptions', () => {
     it('player with 桃 can self-save', () => {
       const game = createTestGame();
-      game.players[1].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
+      game.players[1].hand = [{ id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
       const options = getDyingOptions(game, '刘备');
       expect(options.canSelfSave).toBe(true);
       expect(options.savers).toContain('刘备');
@@ -39,7 +39,7 @@ describe('dying', () => {
     it('other players with 桃 can save', () => {
       const game = createTestGame();
       game.players[1].hand = [];
-      game.players[0].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
+      game.players[0].hand = [{ id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
       const options = getDyingOptions(game, '刘备');
       expect(options.savers).toContain('曹操');
     });
@@ -66,7 +66,7 @@ describe('dying', () => {
     it('self-save restores health and removes peach', () => {
       const game = createTestGame();
       game.players[1].health = 0;
-      game.players[1].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
+      game.players[1].hand = [{ id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
       const result = applyPeachSave(game, '刘备', '刘备');
       expect(result.players[1].health).toBe(1);
       expect(result.players[1].alive).toBe(true);
@@ -76,7 +76,7 @@ describe('dying', () => {
     it('teammate save restores dying player health and removes peach from saver', () => {
       const game = createTestGame();
       game.players[1].health = 0;
-      game.players[0].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
+      game.players[0].hand = [{ id: '桃-♥-7', name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
       const result = applyPeachSave(game, '曹操', '刘备');
       expect(result.players[1].health).toBe(1);
       expect(result.players[1].alive).toBe(true);
