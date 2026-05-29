@@ -1,0 +1,109 @@
+import type { CardDef } from '../types';
+
+export const 过河拆桥: CardDef = {
+  name: '过河拆桥',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'other', condition: (p) => p.hand.length > 0 },
+  effect: { type: 'discard', source: 'hand', count: 1, target: 'selected' },
+  responseWindow: 'trick_response',
+};
+
+export const 顺手牵羊: CardDef = {
+  name: '顺手牵羊',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'inRange' },
+  effect: { type: 'gainCard', from: 'player', source: 'selected' },
+  responseWindow: 'trick_response',
+};
+
+export const 无中生有: CardDef = {
+  name: '无中生有',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'self' },
+  effect: { type: 'draw', count: 2 },
+  responseWindow: 'trick_response',
+};
+
+export const 决斗: CardDef = {
+  name: '决斗',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'other' },
+  effect: { type: 'damage', amount: 1 },
+  responseWindow: 'trick_response',
+};
+
+export const 万箭齐发: CardDef = {
+  name: '万箭齐发',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'none' },
+  effect: { type: 'damage', amount: 1 },
+};
+
+export const 南蛮入侵: CardDef = {
+  name: '南蛮入侵',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'none' },
+  effect: { type: 'damage', amount: 1 },
+};
+
+export const 桃园结义: CardDef = {
+  name: '桃园结义',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'none' },
+  effect: { type: 'heal', amount: 1 },
+};
+
+export const 五谷丰登: CardDef = {
+  name: '五谷丰登',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'none' },
+  effect: { type: 'draw', count: 1 },
+};
+
+export const 乐不思蜀: CardDef = {
+  name: '乐不思蜀',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'other' },
+  effect: { type: 'addPendingTrick', trickName: '乐不思蜀', target: 'selected' },
+  responseWindow: 'trick_response',
+};
+
+export const 兵粮寸断: CardDef = {
+  name: '兵粮寸断',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'other' },
+  effect: { type: 'addPendingTrick', trickName: '兵粮寸断', target: 'selected' },
+  responseWindow: 'trick_response',
+};
+
+export const 闪电: CardDef = {
+  name: '闪电',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'self' },
+  effect: { type: 'addPendingTrick', trickName: '闪电', target: 'self' },
+};
+
+export const 无懈可击: CardDef = {
+  name: '无懈可击',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'none' },
+  effect: { type: 'sequence', steps: [] },
+};
+
+export const 锦囊牌列表: CardDef[] = [
+  过河拆桥, 顺手牵羊, 无中生有, 决斗,
+  万箭齐发, 南蛮入侵, 桃园结义, 五谷丰登,
+  乐不思蜀, 兵粮寸断, 闪电, 无懈可击,
+];
