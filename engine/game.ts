@@ -44,7 +44,9 @@ export type InputRequest =
   | { type: 'select_cards'; data: { count: number } }
   | { type: 'respond_kill'; data: { attacker: string; target: string; card: Card } }
   | { type: 'respond_dying'; data: { player: string; savers: string[] } }
-  | { type: 'activate_skill'; data: { skillIndex: number } };
+  | { type: 'activate_skill'; data: { skillIndex: number } }
+  | { type: 'weapon_guanshifu'; data: { attacker: string; target: string; killCard: Card } }
+  | { type: 'weapon_qilinbow'; data: { attacker: string; target: string; killCard: Card } };
 
 // ============================================================
 // 游戏控制器
@@ -259,6 +261,153 @@ export class GameController {
   }
 
   // ============================================================
+  // 贯石斧效果响应
+  // ============================================================
+
+  respondToGuanshifu(attackerName: string, targetName: string, discard: boolean, cardIndices?: number[]): ActionResult {
+    if (!discard) {
+      // 放弃发动贯石斧效果
+      return {
+        success: true,
+        state: this.state,
+        events: [{ type: 'weapon_skip', data: { player: attackerName, weapon: '贯石斧' }, description: `${attackerName} 放弃发动贯石斧效果` }],
+      };
+    }
+
+    // 发动贯石斧效果：弃2张牌强制命中
+    const attacker = this.state.players.find(p => p.name === attackerName);
+    if (!attacker || cardIndices?.length !== 2) {
+      return this.fail('需要弃2张牌');
+    }
+
+    // 验证卡牌索引
+    const validIndices = cardIndices.filter(i => i >= 0 && i < attacker.hand.length);
+    if (validIndices.length !== 2) {
+      return this.fail('无效的卡牌选择');
+    }
+
+    // 弃牌
+    const discardedCards = validIndices.map(i => attacker.hand[i]);
+    const newHand = attacker.hand.filter((_, i) => !validIndices.includes(i));
+    this.state = {
+      ...this.state,
+      players: this.state.players.map(p =>
+        p.name === attackerName ? { ...p, hand: newHand } : p,
+      ),
+      discardPile: [...this.state.discardPile, ...discardedCards],
+    };
+
+    const events: GameEvent[] = [
+      { type: 'weapon_effect', data: { player: attackerName, weapon: '贯石斧', discardedCards: discardedCards.map(c => c.name) }, description: `${attackerName} 发动贯石斧，弃了${discardedCards.map(c => c.name).join('、')}` },
+    ];
+
+    // 强制命中，造成伤害
+    const target = this.state.players.find(p => p.name === targetName);
+    if (target) {
+      const newHealth = target.health - 1;
+      this.state = {
+        ...this.state,
+        players: this.state.players.map(p =>
+          p.name === targetName ? { ...p, health: newHealth, alive: newHealth > 0 } : p,
+        ),
+      };
+      events.push({ type: 'damage', data: { target: targetName, amount: 1 }, description: `${targetName} 受到1点伤害` });
+
+      // 被动技能：奸雄（曹操）— 受到伤害后获得造成伤害的牌
+      if (target.character.name === '曹操') {
+        const killCardIdx = this.state.discardPile.findIndex(
+          c => c.name === '杀',
+        );
+        if (killCardIdx >= 0) {
+          const newDiscard = [...this.state.discardPile];
+          const gainedCard = newDiscard.splice(killCardIdx, 1)[0];
+          this.state = {
+            ...this.state,
+            players: this.state.players.map(p =>
+              p.name === targetName ? { ...p, hand: [...p.hand, gainedCard] } : p,
+            ),
+            discardPile: newDiscard,
+          };
+          events.push({ type: 'skill', data: { player: targetName, skill: '奸雄' }, description: `${targetName} 发动奸雄，获得了 ${gainedCard.name}` });
+        }
+      }
+    }
+
+    return { success: true, state: this.state, events };
+  }
+
+  // ============================================================
+  // 麒麟弓效果响应
+  // ============================================================
+
+  respondToQilinbow(attackerName: string, targetName: string, discard: boolean, cardIndex?: number): ActionResult {
+    if (!discard) {
+      // 放弃发动麒麟弓效果
+      return {
+        success: true,
+        state: this.state,
+        events: [{ type: 'weapon_skip', data: { player: attackerName, weapon: '麒麟弓' }, description: `${attackerName} 放弃发动麒麟弓效果` }],
+      };
+    }
+
+    // 发动麒麟弓效果：弃1张牌造成+1伤害
+    const attacker = this.state.players.find(p => p.name === attackerName);
+    if (!attacker || cardIndex === undefined || cardIndex < 0 || cardIndex >= attacker.hand.length) {
+      return this.fail('需要弃1张牌');
+    }
+
+    // 弃牌
+    const discardedCard = attacker.hand[cardIndex];
+    const newHand = [...attacker.hand];
+    newHand.splice(cardIndex, 1);
+    this.state = {
+      ...this.state,
+      players: this.state.players.map(p =>
+        p.name === attackerName ? { ...p, hand: newHand } : p,
+      ),
+      discardPile: [...this.state.discardPile, discardedCard],
+    };
+
+    const events: GameEvent[] = [
+      { type: 'weapon_effect', data: { player: attackerName, weapon: '麒麟弓', discardedCard: discardedCard.name }, description: `${attackerName} 发动麒麟弓，弃了${discardedCard.name}` },
+    ];
+
+    // 造成+1伤害
+    const target = this.state.players.find(p => p.name === targetName);
+    if (target) {
+      const newHealth = target.health - 1;
+      this.state = {
+        ...this.state,
+        players: this.state.players.map(p =>
+          p.name === targetName ? { ...p, health: newHealth, alive: newHealth > 0 } : p,
+        ),
+      };
+      events.push({ type: 'damage', data: { target: targetName, amount: 1 }, description: `${targetName} 受到1点伤害（麒麟弓效果）` });
+
+      // 被动技能：奸雄（曹操）— 受到伤害后获得造成伤害的牌
+      if (target.character.name === '曹操') {
+        const killCardIdx = this.state.discardPile.findIndex(
+          c => c.name === '杀',
+        );
+        if (killCardIdx >= 0) {
+          const newDiscard = [...this.state.discardPile];
+          const gainedCard = newDiscard.splice(killCardIdx, 1)[0];
+          this.state = {
+            ...this.state,
+            players: this.state.players.map(p =>
+              p.name === targetName ? { ...p, hand: [...p.hand, gainedCard] } : p,
+            ),
+            discardPile: newDiscard,
+          };
+          events.push({ type: 'skill', data: { player: targetName, skill: '奸雄' }, description: `${targetName} 发动奸雄，获得了 ${gainedCard.name}` });
+        }
+      }
+    }
+
+    return { success: true, state: this.state, events };
+  }
+
+  // ============================================================
   // 濒死救援
   // ============================================================
 
@@ -319,6 +468,8 @@ export class GameController {
   private advanceToNextPlayer(): void {
     this.state = nextPhase(this.state, this.logger); // → 结束
     this.state = nextPhase(this.state, this.logger); // → 准备
+    // 重置本回合杀的计数
+    this.state = { ...this.state, killsPlayedThisTurn: 0 };
     this.advanceToPlayPhase();
   }
 
@@ -331,17 +482,24 @@ export class GameController {
 
     const newHand = [...player.hand];
     newHand.splice(cardIndex, 1);
+    // 增加本回合杀的计数
+    const killsPlayed = (this.state.killsPlayedThisTurn ?? 0) + 1;
     this.state = {
       ...this.state,
       players: this.state.players.map(p =>
         p.name === playerName ? { ...p, hand: newHand } : p,
       ),
       discardPile: [...this.state.discardPile, card],
+      killsPlayedThisTurn: killsPlayed,
     };
 
-    // 检查装备效果
+    // 检查攻击者是否有青釭剑（杀无视防具）
+    const attackerPlayer = this.state.players.find(p => p.name === playerName);
+    const hasQinggang = attackerPlayer?.equipment.weapon?.name === '青釭剑';
+
+    // 检查装备效果（青釭剑无视防具）
     const targetPlayer = this.state.players.find(p => p.name === target);
-    if (targetPlayer) {
+    if (targetPlayer && !hasQinggang) {
       // 仁王盾：黑色杀（♠♣）自动无效
       if (targetPlayer.equipment.armor?.name === '仁王盾') {
         const isBlack = card.suit === '♠' || card.suit === '♣';
@@ -370,6 +528,10 @@ export class GameController {
           }
         }
       }
+    }
+
+    if (hasQinggang) {
+      this.logger.logServerOp('equip_effect', { player: playerName, equipment: '青釭剑' }, `${playerName} 的青釭剑无视防具效果`);
     }
 
     return {
@@ -404,6 +566,19 @@ export class GameController {
         }
       }
       events.push({ type: 'dodge', data: { player: targetName }, description: `${targetName} 出了闪` });
+
+      // 贯石斧效果：出闪后，攻击者可以弃2张牌强制命中
+      if (attackerName && damageCard) {
+        const attacker = this.state.players.find(p => p.name === attackerName);
+        if (attacker?.equipment.weapon?.name === '贯石斧' && attacker.hand.length >= 2) {
+          return {
+            success: true,
+            state: this.state,
+            events,
+            needsInput: { type: 'weapon_guanshifu', data: { attacker: attackerName, target: targetName, killCard: damageCard } },
+          };
+        }
+      }
     } else {
       // 受伤害
       const target = this.state.players.find(p => p.name === targetName);
@@ -434,6 +609,19 @@ export class GameController {
               discardPile: newDiscard,
             };
             events.push({ type: 'skill', data: { player: targetName, skill: '奸雄' }, description: `${targetName} 发动奸雄，获得了 ${gainedCard.name}` });
+          }
+        }
+
+        // 麒麟弓效果：命中后，攻击者可以弃1张牌造成+1伤害
+        if (attackerName && damageCard) {
+          const attacker = this.state.players.find(p => p.name === attackerName);
+          if (attacker?.equipment.weapon?.name === '麒麟弓' && attacker.hand.length >= 1) {
+            return {
+              success: true,
+              state: this.state,
+              events,
+              needsInput: { type: 'weapon_qilinbow', data: { attacker: attackerName, target: targetName, killCard: damageCard } },
+            };
           }
         }
       }

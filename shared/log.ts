@@ -6,6 +6,7 @@ export type OperationType =
   | 'damage'
   | 'heal'
   | 'equip'
+  | 'equip_effect'
   | 'phaseChange'
   | 'turnChange'
   | 'skillActivate'

@@ -193,6 +193,7 @@ export interface GameState {
   round: number;
   status: '等待中' | '进行中' | '已结束';
   winner?: Role;
+  killsPlayedThisTurn?: number; // 本回合已出杀的次数（用于诸葛连弩限制判断）
 }
 
 // 玩家可见状态（隐藏他人手牌）

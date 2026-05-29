@@ -76,10 +76,16 @@ export function isCardPlayable(game: GameState, player: Player, card: Card): boo
 
   switch (card.name) {
     case '杀':
-      // 每回合只能出一张杀（除非有诸葛连弩）
-      // TODO: 需要跟踪本回合是否已出过杀
-      // 暂时不限制次数
+    // 每回合只能出一张杀（除非有诸葛连弩）
+    {
+      const hasZhuge = player.equipment.weapon?.name === '诸葛连弩';
+      if (!hasZhuge) {
+        // 没有诸葛连弩，限制每回合只能出一张杀
+        const killsPlayed = game.killsPlayedThisTurn ?? 0;
+        if (killsPlayed >= 1) return false;
+      }
       return getValidTargetsForCard(game, player, card).length > 0;
+    }
     case '桃':
       // 可以给自己用（非满血），也可以给濒死队友用（暂不实现）
       return player.health < player.maxHealth;

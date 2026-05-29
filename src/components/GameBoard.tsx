@@ -359,13 +359,16 @@ export function GameBoard() {
               </div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {player.hand.map((card, i) => (
-                  <span key={i} style={{
-                    fontSize: 11,
-                    padding: '2px 6px',
-                    backgroundColor: '#2c3e50',
-                    borderRadius: 4,
-                    color: '#ecf0f1',
-                  }}>
+                  <span
+                    key={i}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      backgroundColor: '#2c3e50',
+                      borderRadius: 4,
+                      color: '#ecf0f1',
+                    }}
+                  >
                     {card.name}{card.suit}{card.rank}
                   </span>
                 ))}
