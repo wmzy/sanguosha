@@ -5,9 +5,10 @@ interface PlayerPanelProps {
   isCurrentPlayer: boolean;
   isSelf: boolean;
   seatNumber?: number;
+  distance?: number;
 }
 
-export function PlayerPanel({ player, isCurrentPlayer, isSelf, seatNumber }: PlayerPanelProps) {
+export function PlayerPanel({ player, isCurrentPlayer, isSelf, seatNumber, distance }: PlayerPanelProps) {
   return (
     <div
       style={{
@@ -36,6 +37,11 @@ export function PlayerPanel({ player, isCurrentPlayer, isSelf, seatNumber }: Pla
       <div style={{ fontSize: 12, color: '#bdc3c7' }}>
         手牌: {player.hand.length} 张
       </div>
+      {distance !== undefined && (
+        <div style={{ fontSize: 11, color: '#e67e22' }}>
+          距离: {distance}
+        </div>
+      )}
       {player.character.abilities.length > 0 && (
         <div style={{ marginTop: 6, borderTop: '1px solid #34495e', paddingTop: 6 }}>
           <div style={{ fontSize: 11, color: '#7f8c8d', marginBottom: 2 }}>技能:</div>

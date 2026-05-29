@@ -1,4 +1,5 @@
-import { useGame } from '../hooks/useGame';
+import { useGame, getValidTargets } from '../hooks/useGame';
+import { getDistance } from '../../engine/core/distance';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
@@ -42,7 +43,9 @@ export function GameBoard() {
   } = useGame();
 
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
-  const validTargets = selectedCard !== null ? (validActions.validTargets.get(selectedCard) ?? []) : [];
+  const validTargets = selectedCard !== null
+    ? getValidTargets(game, myName, me.hand[selectedCard])
+    : [];
 
   // 按 playerOrder 排列玩家（逆时针顺序）
   const orderedPlayers = playerOrder
@@ -81,6 +84,7 @@ export function GameBoard() {
         isCurrentPlayer={player.name === game.currentPlayer}
         isSelf={player.name === myName}
         seatNumber={getSeatNumber(player.name)}
+        distance={selectedCard !== null && player.name !== myName ? getDistance(game, myName, player.name) : undefined}
       />
     </div>
   );

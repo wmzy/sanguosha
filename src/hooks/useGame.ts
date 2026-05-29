@@ -5,12 +5,38 @@ import { GameController } from '../../engine/game';
 import { getCurrentPlayer } from '../../engine/state';
 import { checkDiscard } from '../../engine/turn';
 import { getValidActions } from '../../engine/rules';
+import { getDistance, getAttackRange, isInAttackRange } from '../../engine/core/distance';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import type { Operation } from '../../shared/log';
 import { saveLog } from '../utils/logFile';
 
 const CHARACTERS = [曹操, 刘备, 孙权, 诸葛亮, 司马懿];
 const PLAYER_NAMES = CHARACTERS.map(c => c.name);
+
+export function getValidTargets(game: GameState, playerName: string, card: Card): string[] {
+  const player = game.players.find(p => p.name === playerName)!;
+  const others = game.players.filter(p => p.name !== playerName && p.alive);
+
+  switch (card.name) {
+    case '杀':
+      return others
+        .filter(p => getDistance(game, playerName, p.name) <= getAttackRange(player))
+        .map(p => p.name);
+    case '过河拆桥':
+      return others.filter(p => p.hand.length > 0 || Object.values(p.equipment).some(Boolean)).map(p => p.name);
+    case '顺手牵羊':
+      return others
+        .filter(p => getDistance(game, playerName, p.name) <= 1)
+        .filter(p => p.hand.length > 0 || Object.values(p.equipment).some(Boolean))
+        .map(p => p.name);
+    case '决斗':
+    case '乐不思蜀':
+    case '兵粮寸断':
+      return others.map(p => p.name);
+    default:
+      return [];
+  }
+}
 
 function rotatePlayers(names: string[], startName: string): string[] {
   const idx = names.indexOf(startName);
