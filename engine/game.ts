@@ -250,7 +250,31 @@ export class GameController {
     let state = this.responses.resolve(this.state, responses);
     const events: GameEvent[] = [];
 
-    // 杀响应后检查濒死
+    // 杀响应后触发伤害事件
+    if (window.type === 'kill_response') {
+      const target = window.validResponders[0];
+      const targetPlayer = getPlayer(state, target);
+      const originalTarget = getPlayer(this.state, target);
+
+      // 检查是否受到伤害
+      if (targetPlayer.health < originalTarget.health) {
+        const damageAmount = originalTarget.health - targetPlayer.health;
+        const ctx = this.buildContext(window.requester, target, window.sourceCard);
+        ctx.amount = damageAmount;
+
+        // 触发伤害相关事件
+        state = this.triggerHooks(state, 'damageDealt', ctx);
+        state = this.triggerHooks(state, 'damageReceived', {
+          ...ctx,
+          player: target,
+          target,
+          attacker: window.requester,
+          amount: damageAmount,
+        });
+      }
+    }
+
+    // 检查濒死
     if (window.type === 'kill_response' || window.type === 'aoe_response') {
       const dyingCheck = this.checkDying(state);
       if (dyingCheck) {
@@ -334,6 +358,7 @@ export class GameController {
       target,
       card,
       rng: this.rng,
+      _skipFlags: { draw: false, phases: new Set() },
     };
   }
 
@@ -370,6 +395,12 @@ export class GameController {
 
   private advanceToPlayPhase(): void {
     while (this.state.phase !== '出牌' && this.state.status === '进行中') {
+      // 触发回合开始事件（在摸牌阶段触发，以支持突袭等技能）
+      if (this.state.phase === '摸牌') {
+        const ctx = this.buildContext(this.state.currentPlayer);
+        this.state = this.triggerHooks(this.state, 'turnStart', ctx);
+      }
+
       if (this.state.phase === '判定') {
         const result = handleJudgePhase(this.state, this.rng, this.logger);
         this.state = result.state;
