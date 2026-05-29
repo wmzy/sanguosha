@@ -375,10 +375,9 @@ export class GameController {
   private executePeach(playerName: string, card: Card): ActionResult {
     const result = playPeach(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name }, description: `${playerName} 使用桃` }],
       };
     }
@@ -388,10 +387,9 @@ export class GameController {
   private executeDismantle(playerName: string, card: Card, target: string): ActionResult {
     const result = playDismantle(this.state, playerName, target, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name, target }, description: `${playerName} 对 ${target} 使用过河拆桥` }],
       };
     }
@@ -401,10 +399,9 @@ export class GameController {
   private executeSteal(playerName: string, card: Card, target: string): ActionResult {
     const result = playSteal(this.state, playerName, target, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name, target }, description: `${playerName} 对 ${target} 使用顺手牵羊` }],
       };
     }
@@ -414,10 +411,9 @@ export class GameController {
   private executeDrawTwo(playerName: string, card: Card): ActionResult {
     const result = playDrawTwo(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name }, description: `${playerName} 使用无中生有` }],
       };
     }
@@ -427,10 +423,9 @@ export class GameController {
   private executeArrowBarrage(playerName: string, card: Card): ActionResult {
     const result = playArrowBarrage(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name }, description: `${playerName} 使用万箭齐发` }],
       };
     }
@@ -440,10 +435,9 @@ export class GameController {
   private executeBarbarianInvasion(playerName: string, card: Card): ActionResult {
     const result = playBarbarianInvasion(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name }, description: `${playerName} 使用南蛮入侵` }],
       };
     }
@@ -453,10 +447,9 @@ export class GameController {
   private executePeachGarden(playerName: string, card: Card): ActionResult {
     const result = playPeachGarden(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name }, description: `${playerName} 使用桃园结义` }],
       };
     }
@@ -466,10 +459,9 @@ export class GameController {
   private executeAbundance(playerName: string, card: Card): ActionResult {
     const result = playAbundance(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.state;
       return {
         success: true,
-        state: this.state,
+        state: result.state,
         events: [{ type: 'play', data: { player: playerName, card: card.name }, description: `${playerName} 使用五谷丰登` }],
       };
     }
