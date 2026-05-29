@@ -151,10 +151,10 @@ export function useGame() {
 
       // 处理需要输入的情况（如杀→闪）
       if (result.needsInput?.type === 'respond_kill') {
-        const data = result.needsInput.data as { attacker: string; target: string; card: Card };
-        setPendingResponse(data);
-        setMyName(data.target);
-        setPlayerOrder(rotatePlayers(PLAYER_NAMES, data.target));
+        const { attacker, target, card } = result.needsInput.data;
+        setPendingResponse({ attacker, target, card });
+        setMyName(target);
+        setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
       }
     }
   }, [game, selectedCard, selectedTarget, isMyTurn, controller, updateOps, resetTimer]);
@@ -206,8 +206,7 @@ export function useGame() {
     updateOps();
 
     if (result.needsInput?.type === 'respond_dying') {
-      const data = result.needsInput.data as { player: string; savers: string[] };
-      setPendingDying(data);
+      setPendingDying(result.needsInput.data);
     } else {
       setPendingResponse(null);
       setPendingDying(null);

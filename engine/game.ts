@@ -39,10 +39,12 @@ export interface GameEvent {
   description: string;
 }
 
-export interface InputRequest {
-  type: 'select_target' | 'select_cards' | 'respond_kill' | 'respond_dying' | 'activate_skill';
-  data: unknown;
-}
+export type InputRequest =
+  | { type: 'select_target'; data: { validTargets: string[]; card: Card } }
+  | { type: 'select_cards'; data: { count: number } }
+  | { type: 'respond_kill'; data: { attacker: string; target: string; card: Card } }
+  | { type: 'respond_dying'; data: { player: string; savers: string[] } }
+  | { type: 'activate_skill'; data: { skillIndex: number } };
 
 // ============================================================
 // 游戏控制器
