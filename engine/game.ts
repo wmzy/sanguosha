@@ -457,11 +457,110 @@ export class GameController {
    */
   advanceToPlayPhase(): void {
     while (this.state.phase !== '出牌') {
+      // 准备阶段：甄姬 洛神
+      if (this.state.phase === '准备') {
+        this.handleLuoshen();
+      }
+      // 摸牌阶段
       if (this.state.phase === '摸牌') {
-        const result = drawPhase(this.state, this.logger);
-        this.state = result.state;
+        const currentPlayer = this.state.players.find(p => p.name === this.state.currentPlayer);
+        // 张辽 突袭 — 放弃摸牌，改为从其他角色各获得一张手牌
+        if (currentPlayer?.character.name === '张辽') {
+          this.handleTuxi();
+        } else {
+          const result = drawPhase(this.state, this.logger);
+          this.state = result.state;
+        }
       }
       this.state = nextPhase(this.state, this.logger);
+    }
+  }
+
+  /**
+   * 甄姬 洛神 — 准备阶段判定，黑色获得并重复，红色停止
+   */
+  private handleLuoshen(): void {
+    while (true) {
+      if (this.state.deck.length === 0) break;
+      const card = this.state.deck[0];
+      this.state = { ...this.state, deck: this.state.deck.slice(1) };
+
+      const isBlack = card.suit === '♠' || card.suit === '♣';
+      if (isBlack) {
+        // 黑色，获得判定牌（直接加入手牌，不经过弃牌堆）
+        this.state = {
+          ...this.state,
+          players: this.state.players.map(p =>
+            p.name === this.state.currentPlayer ? { ...p, hand: [...p.hand, card] } : p,
+          ),
+        };
+        if (this.logger) {
+          this.logger.logServerOp('skillActivate',
+            { player: this.state.currentPlayer, skill: '洛神', card: card.name },
+            `${this.state.currentPlayer} 发动洛神，判定 ${card.suit}${card.rank}（黑色），获得 ${card.name}`,
+          );
+        }
+      } else {
+        // 红色，放入弃牌堆，停止
+        this.state = { ...this.state, discardPile: [...this.state.discardPile, card] };
+        if (this.logger) {
+          this.logger.logServerOp('skillActivate',
+            { player: this.state.currentPlayer, skill: '洛神', card: card.name },
+            `${this.state.currentPlayer} 发动洛神，判定 ${card.suit}${card.rank}（红色），停止`,
+          );
+        }
+        break;
+      }
+    }
+  }
+
+  /**
+   * 张辽 突袭 — 放弃摸牌，从其他存活角色各获得一张手牌
+   */
+  private handleTuxi(): void {
+    const otherPlayers = this.state.players.filter(
+      p => p.name !== this.state.currentPlayer && p.alive && p.hand.length > 0,
+    );
+
+    if (otherPlayers.length === 0) return;
+
+    const targets = otherPlayers.slice(0, 2);
+    const stolenCards: Array<{ from: string; card: Card }> = [];
+
+    for (const target of targets) {
+      const randomIdx = Math.floor(Math.random() * target.hand.length);
+      const card = target.hand[randomIdx];
+      stolenCards.push({ from: target.name, card });
+    }
+
+    // 从目标手牌中移除
+    for (const { from, card } of stolenCards) {
+      this.state = {
+        ...this.state,
+        players: this.state.players.map(p => {
+          if (p.name === from) {
+            const idx = p.hand.findIndex(
+              c => c.name === card.name && c.suit === card.suit && c.rank === card.rank,
+            );
+            if (idx >= 0) {
+              const newHand = [...p.hand];
+              newHand.splice(idx, 1);
+              return { ...p, hand: newHand };
+            }
+          }
+          if (p.name === this.state.currentPlayer) {
+            return { ...p, hand: [...p.hand, card] };
+          }
+          return p;
+        }),
+      };
+    }
+
+    if (this.logger) {
+      this.logger.logServerOp('skillActivate',
+        { player: this.state.currentPlayer, skill: '突袭', targets: targets.map(t => t.name) },
+        `${this.state.currentPlayer} 发动突袭，从 ${targets.map(t => t.name).join('、')} 各获得一张牌`,
+      );
     }
   }
 
@@ -549,10 +648,15 @@ export class GameController {
     const events: GameEvent[] = [];
 
     if (dodge) {
-      // 出闪，移除一张闪
+      // 出闪，移除一张闪（或甄姬 倾国：黑色手牌当闪）
       const target = this.state.players.find(p => p.name === targetName);
       if (target) {
-        const dodgeIdx = target.hand.findIndex(c => c.name === '闪');
+        const dodgeIdx = target.hand.findIndex(c => {
+          if (c.name === '闪') return true;
+          // 甄姬 倾国：黑色手牌可以当闪
+          if (target.character.name === '甄姬' && (c.suit === '♠' || c.suit === '♣')) return true;
+          return false;
+        });
         if (dodgeIdx >= 0) {
           const newHand = [...target.hand];
           const dodgeCard = newHand.splice(dodgeIdx, 1)[0];
@@ -563,9 +667,16 @@ export class GameController {
             ),
             discardPile: [...this.state.discardPile, dodgeCard],
           };
+          const isConversion = dodgeCard.name !== '闪';
+          events.push({
+            type: 'dodge',
+            data: { player: targetName, conversion: isConversion },
+            description: isConversion
+              ? `${targetName} 将 ${dodgeCard.suit}${dodgeCard.rank}${dodgeCard.name} 当闪使用（倾国）`
+              : `${targetName} 出了闪`,
+          });
         }
       }
-      events.push({ type: 'dodge', data: { player: targetName }, description: `${targetName} 出了闪` });
 
       // 贯石斧效果：出闪后，攻击者可以弃2张牌强制命中
       if (attackerName && damageCard) {
@@ -609,6 +720,80 @@ export class GameController {
               discardPile: newDiscard,
             };
             events.push({ type: 'skill', data: { player: targetName, skill: '奸雄' }, description: `${targetName} 发动奸雄，获得了 ${gainedCard.name}` });
+          }
+        }
+
+        // 被动技能：反馈（司马懿）— 受到伤害后获得伤害来源的一张牌
+        if (target.character.name === '司马懿' && attackerName) {
+          const attacker = this.state.players.find(p => p.name === attackerName);
+          if (attacker && attacker.hand.length > 0) {
+            const randomIdx = Math.floor(Math.random() * attacker.hand.length);
+            const gainedCard = attacker.hand[randomIdx];
+            const newAttackerHand = [...attacker.hand];
+            newAttackerHand.splice(randomIdx, 1);
+            this.state = {
+              ...this.state,
+              players: this.state.players.map(p => {
+                if (p.name === attackerName) return { ...p, hand: newAttackerHand };
+                if (p.name === targetName) return { ...p, hand: [...p.hand, gainedCard] };
+                return p;
+              }),
+            };
+            events.push({ type: 'skill', data: { player: targetName, skill: '反馈' }, description: `${targetName} 发动反馈，获得了 ${attackerName} 的一张牌` });
+          }
+        }
+
+        // 被动技能：刚烈（夏侯惇）— 受到伤害后判定，♥♦则攻击者弃一张牌
+        if (target.character.name === '夏侯惇' && attackerName) {
+          const judgeCard = this.performJudgment();
+          if (judgeCard) {
+            const isRed = judgeCard.suit === '♥' || judgeCard.suit === '♦';
+            if (isRed) {
+              // 攻击者弃一张牌
+              const attacker = this.state.players.find(p => p.name === attackerName);
+              if (attacker && attacker.hand.length > 0) {
+                const discardIdx = Math.floor(Math.random() * attacker.hand.length);
+                const discarded = attacker.hand[discardIdx];
+                const newAttackerHand = [...attacker.hand];
+                newAttackerHand.splice(discardIdx, 1);
+                this.state = {
+                  ...this.state,
+                  players: this.state.players.map(p =>
+                    p.name === attackerName ? { ...p, hand: newAttackerHand } : p,
+                  ),
+                  discardPile: [...this.state.discardPile, discarded],
+                };
+                events.push({ type: 'skill', data: { player: targetName, skill: '刚烈' }, description: `${targetName} 发动刚烈，判定 ${judgeCard.suit}${judgeCard.rank}（红色），${attackerName} 弃了一张牌` });
+              }
+            } else {
+              events.push({ type: 'skill', data: { player: targetName, skill: '刚烈' }, description: `${targetName} 发动刚烈，判定 ${judgeCard.suit}${judgeCard.rank}（黑色），无事发生` });
+            }
+          }
+        }
+
+        // 被动技能：遗计（郭嘉）— 受到伤害后摸两张牌
+        if (target.character.name === '郭嘉') {
+          let deck = [...this.state.deck];
+          let discardPile = [...this.state.discardPile];
+          if (deck.length < 2 && discardPile.length > 0) {
+            deck = [...deck, ...discardPile];
+            discardPile = [];
+            for (let i = deck.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+          }
+          const drawn = deck.slice(0, 2);
+          if (drawn.length > 0) {
+            this.state = {
+              ...this.state,
+              players: this.state.players.map(p =>
+                p.name === targetName ? { ...p, hand: [...p.hand, ...drawn] } : p,
+              ),
+              deck: deck.slice(drawn.length),
+              discardPile,
+            };
+            events.push({ type: 'skill', data: { player: targetName, skill: '遗计' }, description: `${targetName} 发动遗计，摸了 ${drawn.length} 张牌` });
           }
         }
 
@@ -769,6 +954,24 @@ export class GameController {
       state: this.state,
       events: [{ type: 'equip', data: { player: playerName, card: card.name }, description: `${playerName} 装备了 ${card.name}` }],
     };
+  }
+
+  // ============================================================
+  // 判定辅助
+  // ============================================================
+
+  /**
+   * 从牌堆顶翻一张判定牌，放入弃牌堆
+   */
+  private performJudgment(): Card | null {
+    if (this.state.deck.length === 0) return null;
+    const card = this.state.deck[0];
+    this.state = {
+      ...this.state,
+      deck: this.state.deck.slice(1),
+      discardPile: [...this.state.discardPile, card],
+    };
+    return card;
   }
 
   private fail(_message: string): ActionResult {

@@ -154,9 +154,80 @@ function executeGainCard(
       break;
     }
 
-    case 'judgeCard':
-      // 获得判定牌（暂不实现）
-      return { success: false, game, message: '判定牌获取暂未实现' };
+    case 'judgeCard': {
+      // 获得判定牌 — 由调用方通过 context.judgeCard 传入
+      card = context?.card;
+      if (!card) {
+        return { success: false, game, message: '没有判定牌' };
+      }
+      // 从弃牌堆移除该牌（如果在那里）
+      const judgeIdx = newGame.discardPile.findIndex(
+        c => c.name === card!.name && c.suit === card!.suit && c.rank === card!.rank,
+      );
+      if (judgeIdx >= 0) {
+        newGame = {
+          ...newGame,
+          discardPile: newGame.discardPile.filter((_, i) => i !== judgeIdx),
+        };
+      }
+      break;
+    }
+
+    case 'otherPlayers': {
+      // 从其他存活玩家各获得 count 张手牌（突袭）
+      const count = effect.count ?? 2;
+      const otherPlayers = newGame.players.filter(
+        p => p.name !== player.name && p.alive && p.hand.length > 0,
+      );
+      const cards: Card[] = [];
+      const playersToSteal = otherPlayers.slice(0, typeof count === 'number' ? count : 2);
+
+      for (const target of playersToSteal) {
+        const randomIdx = Math.floor(Math.random() * target.hand.length);
+        cards.push(target.hand[randomIdx]);
+      }
+
+      if (cards.length === 0) {
+        return { success: false, game, message: '其他角色没有手牌' };
+      }
+
+      // 移除被偷的牌
+      const stolenSet = new Set(cards.map(c => `${c.name}:${c.suit}:${c.rank}`));
+      newGame = {
+        ...newGame,
+        players: newGame.players.map(p => {
+          if (playersToSteal.some(t => t.name === p.name)) {
+            let removed = false;
+            const newHand = p.hand.filter(c => {
+              if (!removed && stolenSet.has(`${c.name}:${c.suit}:${c.rank}`)) {
+                removed = true;
+                return false;
+              }
+              return true;
+            });
+            return { ...p, hand: newHand };
+          }
+          return p;
+        }),
+      };
+
+      // 将偷来的牌加入玩家手牌
+      card = cards[0]; // for message
+      newGame = {
+        ...newGame,
+        players: newGame.players.map(p =>
+          p.name === player.name
+            ? { ...p, hand: [...p.hand, ...cards] }
+            : p,
+        ),
+      };
+
+      return {
+        success: true,
+        game: newGame,
+        message: `${player.name} 发动 ${ability.name}，从 ${playersToSteal.map(t => t.name).join('、')} 各获得一张牌`,
+      };
+    }
 
     default:
       // 从弃牌堆获得
