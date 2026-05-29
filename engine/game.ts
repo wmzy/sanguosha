@@ -161,15 +161,31 @@ export class GameController {
     // 其他卡牌在这里移除并加入弃牌堆
     const selfManaged = card.name === '杀' || card.subtype === '武器' || card.subtype === '防具' || card.subtype === '进攻马' || card.subtype === '防御马';
     if (result.success && !selfManaged) {
-      const newHand = [...player.hand];
-      newHand.splice(cardIndex, 1);
-      this.state = {
-        ...this.state,
-        players: this.state.players.map(p =>
-          p.name === playerName ? { ...p, hand: newHand } : p,
-        ),
-        discardPile: [...this.state.discardPile, card],
-      };
+      // 使用 execute* 返回的状态（包含效果结果），再移除手牌
+      const baseState = result.state;
+      const currentPlayerInResult = baseState.players.find(p => p.name === playerName);
+      if (currentPlayerInResult) {
+        const cardIdx = currentPlayerInResult.hand.findIndex(
+          c => c.name === card.name && c.suit === card.suit && c.rank === card.rank,
+        );
+        if (cardIdx >= 0) {
+          const newHand = [...currentPlayerInResult.hand];
+          newHand.splice(cardIdx, 1);
+          this.state = {
+            ...baseState,
+            players: baseState.players.map(p =>
+              p.name === playerName ? { ...p, hand: newHand } : p,
+            ),
+            discardPile: [...baseState.discardPile, card],
+          };
+        } else {
+          this.state = baseState;
+        }
+      } else {
+        this.state = baseState;
+      }
+    } else if (result.success) {
+      this.state = result.state;
     }
 
     return result;
