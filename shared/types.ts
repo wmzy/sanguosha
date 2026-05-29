@@ -84,14 +84,20 @@ export type TriggerType =
 
 // 基础效果原语
 export type EffectPrimitive =
-  | { type: 'draw'; count: number }
+  | { type: 'draw'; count: number | string }
   | { type: 'damage'; amount: number; damageType?: '普通' | '雷电' | '火焰' }
   | { type: 'heal'; amount: number; target?: string }
-  | { type: 'discard'; source: 'hand' | 'equipment' | 'judge'; count: number; target?: string }
-  | { type: 'gainCard'; from: 'deck' | 'discard' | 'player'; source?: string }
-  | { type: 'skipPhase'; phase: TurnPhase }
-  | { type: 'judge'; condition?: string; onSuccess?: Effect; onFail?: Effect }
-  | { type: 'addPendingTrick'; trickName: string; target: string };
+  | { type: 'discard'; source?: string; count: number | 'any'; target?: string }
+  | { type: 'gainCard'; from?: string; source?: string; count?: number }
+  | { type: 'skipPhase'; phase?: TurnPhase; target?: string }
+  | { type: 'skipDraw' }
+  | { type: 'judge'; condition?: string; expectedSuit?: string; repeatOnBlack?: boolean; redResult?: string; failEffect?: string; onSuccess?: Effect; onFail?: Effect }
+  | { type: 'addPendingTrick'; trickName: string; target: string }
+  | { type: 'convert'; from: string; to: string }
+  | { type: 'redirect'; from: string; to: string }
+  | { type: 'giveCards'; count: number | 'any'; target: string }
+  | { type: 'lookAtTopCards'; count: number | string }
+  | { type: 'dealDamage'; amount?: number; target?: string; condition?: string; bonusDamage?: number };
 
 // 复合效果
 export type Effect =
