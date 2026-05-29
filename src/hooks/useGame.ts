@@ -167,24 +167,26 @@ export function useGame() {
 
     const result = controller.playCard(myName, selectedCard, selectedTarget ?? undefined);
 
+    // 处理需要输入的情况（如杀→闪）
+    if (result.needsInput?.type === 'respond_kill') {
+      setGame(result.state);
+      setSelectedCard(null);
+      setSelectedTarget(null);
+      updateOps();
+      resetTimer();
+      const { attacker, target, card } = result.needsInput.data;
+      setPendingResponse({ attacker, target, card });
+      setMyName(target);
+      setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
+      return;
+    }
+
     if (result.success) {
       setGame(result.state);
       setSelectedCard(null);
       setSelectedTarget(null);
       updateOps();
       resetTimer();
-
-      // 处理需要输入的情况（如杀→闪）
-      if (result.needsInput?.type === 'respond_kill') {
-        const { attacker, target, card } = result.needsInput.data;
-        setPendingResponse({ attacker, target, card });
-        setMyName(target);
-        setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
-      }
-    } else if (result.needsInput?.type === 'select_target') {
-      // 需要选择目标（过河拆桥、兵粮寸断等）
-      // 提示已在 GameBoard 中通过 needsTarget 显示
-      // 等待玩家选择目标后再次点击出牌
     }
   }, [game, selectedCard, selectedTarget, isMyTurn, controller, updateOps, resetTimer]);
 
