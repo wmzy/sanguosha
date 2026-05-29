@@ -5,12 +5,12 @@ import type { GameState, Player, AbilityConfig, Card, Condition } from '../share
 // ============================================================
 
 export interface SkillContext {
-  player?: string;        // 触发技能的玩家
-  attacker?: string;      // 攻击者
-  target?: string;        // 目标
-  card?: Card;            // 相关卡牌
+  player?: string; // 触发技能的玩家
+  attacker?: string; // 攻击者
+  target?: string; // 目标
+  card?: Card; // 相关卡牌
   damageSourceCard?: Card; // 造成伤害的牌
-  amount?: number;        // 伤害/回复数值
+  amount?: number; // 伤害/回复数值
 }
 
 // ============================================================
@@ -26,7 +26,7 @@ export interface SkillAvailability {
 
 export function getAvailableSkills(game: GameState, playerName: string): SkillAvailability[] {
   const player = game.players.find(p => p.name === playerName);
-  if (!player || !player.alive) return [];
+  if (!player?.alive) return [];
 
   return player.character.abilities.map(ability =>
     checkSkillAvailability(game, player, ability),
@@ -110,23 +110,24 @@ function executeGainCard(
   let newGame = game;
 
   switch (source) {
-    case 'damageSourceCard':
+    case 'damageSourceCard': {
       // 获得造成伤害的牌
       card = context?.damageSourceCard;
       if (!card) {
         return { success: false, game, message: '没有造成伤害的牌' };
       }
       // 从弃牌堆移除该牌（如果在那里）
-      const idx = newGame.discardPile.findIndex(c => c.name === card!.name && c.suit === card!.suit && c.rank === card!.rank);
-      if (idx >= 0) {
+      const discardIdx = newGame.discardPile.findIndex(c => c.name === card!.name && c.suit === card!.suit && c.rank === card!.rank);
+      if (discardIdx >= 0) {
         newGame = {
           ...newGame,
-          discardPile: newGame.discardPile.filter((_, i) => i !== idx),
+          discardPile: newGame.discardPile.filter((_, i) => i !== discardIdx),
         };
       }
       break;
+    }
 
-    case 'attacker':
+    case 'attacker': {
       // 获得攻击者的一张牌
       const attackerName = context?.attacker;
       if (!attackerName) {
@@ -151,6 +152,7 @@ function executeGainCard(
         }),
       };
       break;
+    }
 
     case 'judgeCard':
       // 获得判定牌（暂不实现）
@@ -178,7 +180,7 @@ function executeGainCard(
     ...newGame,
     players: newGame.players.map(p =>
       p.name === player.name
-        ? { ...p, hand: [...p.hand, card!] }
+        ? { ...p, hand: [...p.hand, card] }
         : p,
     ),
   };
@@ -340,7 +342,7 @@ function executeGiveCards(
   }
 
   const target = game.players.find(p => p.name === targetName);
-  if (!target || !target.alive) {
+  if (!target?.alive) {
     return { success: false, game, message: '目标不存在或已死亡' };
   }
 
@@ -422,7 +424,7 @@ function checkCondition(
   // 检查攻击者条件（如孙权救援：吴势力角色对你使用桃）
   if (condition.faction && context.attacker) {
     const attacker = game.players.find(p => p.name === context.attacker);
-    if (!attacker || attacker.character.faction !== condition.faction) {
+    if (attacker?.character.faction !== condition.faction) {
       return false;
     }
   }
