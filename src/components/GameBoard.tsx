@@ -42,9 +42,10 @@ export function GameBoard() {
     handleSaveLog,
   } = useGame();
 
+  const selectedCardData = selectedCard !== null ? me.hand[selectedCard] : null;
   const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
-  const validTargets = selectedCard !== null
-    ? getValidTargets(game, myName, me.hand[selectedCard])
+  const validTargets = selectedCardData
+    ? getValidTargets(game, myName, selectedCardData)
     : [];
 
   // 按 playerOrder 排列玩家（逆时针顺序）

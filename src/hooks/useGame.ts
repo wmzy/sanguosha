@@ -14,7 +14,8 @@ const CHARACTERS = [曹操, 刘备, 孙权, 诸葛亮, 司马懿];
 const PLAYER_NAMES = CHARACTERS.map(c => c.name);
 
 export function getValidTargets(game: GameState, playerName: string, card: Card): string[] {
-  const player = game.players.find(p => p.name === playerName)!;
+  const player = game.players.find(p => p.name === playerName);
+  if (!player) return [];
   const others = game.players.filter(p => p.name !== playerName && p.alive);
 
   switch (card.name) {
