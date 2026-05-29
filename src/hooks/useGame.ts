@@ -180,6 +180,10 @@ export function useGame() {
         setMyName(target);
         setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
       }
+    } else if (result.needsInput?.type === 'select_target') {
+      // 需要选择目标（过河拆桥、兵粮寸断等）
+      // 提示已在 GameBoard 中通过 needsTarget 显示
+      // 等待玩家选择目标后再次点击出牌
     }
   }, [game, selectedCard, selectedTarget, isMyTurn, controller, updateOps, resetTimer]);
 
