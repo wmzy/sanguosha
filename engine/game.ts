@@ -15,7 +15,7 @@
 
 import type { GameState, Card } from '../shared/types';
 import { GameLogger } from './logger';
-import { createGame } from './state';
+import { createGame, startGame } from './state';
 import { nextPhase, drawPhase, checkDiscard, executeDiscard } from './turn';
 import { playKill, playPeach, playDismantle, playSteal, playDrawTwo, playArrowBarrage, playBarbarianInvasion, playPeachGarden, playAbundance } from './effect';
 import { getValidTargetsForCard, isCardPlayable } from './rules';
@@ -68,7 +68,7 @@ export class GameController {
   // ============================================================
 
   static createGame(characters: import('../shared/types').CharacterConfig[], seed?: number): { state: GameState; controller: GameController } {
-    const state = createGame(characters, seed);
+    const rawState = createGame(characters, seed);
     const logger = new GameLogger({
       version: '1.0.0',
       createdAt: Date.now(),
@@ -76,8 +76,12 @@ export class GameController {
       characters: characters.map(c => c.name),
       seed: seed ?? Date.now(),
     });
-    const controller = new GameController(state, logger);
-    return { state, controller };
+    const controller = new GameController(rawState, logger);
+    // Start game and deal initial cards
+    controller.state = startGame(controller.state, logger);
+    // Advance to play phase (auto-draw for first player)
+    controller.advanceToPlayPhase();
+    return { state: controller.state, controller };
   }
 
   // ============================================================
@@ -333,10 +337,10 @@ export class GameController {
   // 内部方法
   // ============================================================
 
-  private advanceToNextPlayer(): void {
-    this.state = nextPhase(this.state, this.logger); // → 结束
-    this.state = nextPhase(this.state, this.logger); // → 准备
-    // 自动跳过准备和判定阶段，摸牌
+  /**
+   * 从当前状态推进到出牌阶段（自动摸牌）
+   */
+  advanceToPlayPhase(): void {
     while (this.state.phase !== '出牌') {
       if (this.state.phase === '摸牌') {
         const result = drawPhase(this.state, this.logger);
@@ -344,6 +348,12 @@ export class GameController {
       }
       this.state = nextPhase(this.state, this.logger);
     }
+  }
+
+  private advanceToNextPlayer(): void {
+    this.state = nextPhase(this.state, this.logger); // → 结束
+    this.state = nextPhase(this.state, this.logger); // → 准备
+    this.advanceToPlayPhase();
   }
 
   private executeKill(playerName: string, card: Card, target: string): ActionResult {
