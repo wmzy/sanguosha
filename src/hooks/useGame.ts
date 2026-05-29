@@ -61,11 +61,11 @@ export function useGame() {
   const [game, setGame] = useState<GameState>(() => {
     if (initRef.current) {
       // StrictMode double-init: return dummy state
-      const { state } = GameController.createGame(CHARACTERS);
+      const { state } = GameController.createGame(CHARACTERS, undefined, logger);
       return state;
     }
     initRef.current = true;
-    const { state, controller } = GameController.createGame(CHARACTERS);
+    const { state, controller } = GameController.createGame(CHARACTERS, undefined, logger);
     controllerRef.current = controller;
     return state;
   });

@@ -67,9 +67,9 @@ export class GameController {
   // 游戏初始化
   // ============================================================
 
-  static createGame(characters: import('../shared/types').CharacterConfig[], seed?: number): { state: GameState; controller: GameController } {
+  static createGame(characters: import('../shared/types').CharacterConfig[], seed?: number, externalLogger?: GameLogger): { state: GameState; controller: GameController } {
     const rawState = createGame(characters, seed);
-    const logger = new GameLogger({
+    const logger = externalLogger ?? new GameLogger({
       version: '1.0.0',
       createdAt: Date.now(),
       playerCount: characters.length,
@@ -157,8 +157,9 @@ export class GameController {
         }
     }
 
-    if (result.success) {
-      // 从手牌移除
+    // 杀的卡牌移除由 executeKill 处理（因为需要等待响应）
+    // 其他卡牌在这里移除
+    if (result.success && card.name !== '杀') {
       const newHand = [...player.hand];
       newHand.splice(cardIndex, 1);
       this.state = {
