@@ -237,59 +237,7 @@ export class GameController {
   // ============================================================
 
   respondToKill(targetName: string, playDodge: boolean): ActionResult {
-    const events: GameEvent[] = [];
-
-    if (playDodge) {
-      events.push({ type: 'dodge', data: { player: targetName }, description: `${targetName} 出了闪` });
-      // 从手牌移除闪
-      this.state = {
-        ...this.state,
-        players: this.state.players.map(p => {
-          if (p.name === targetName) {
-            const idx = p.hand.findIndex(c => c.name === '闪');
-            if (idx >= 0) {
-              const newHand = [...p.hand];
-              newHand.splice(idx, 1);
-              return { ...p, hand: newHand };
-            }
-          }
-          return p;
-        }),
-      };
-      return { success: true, state: this.state, events };
-    }
-
-    // 受到伤害
-    const player = this.state.players.find(p => p.name === targetName);
-    if (!player) return this.fail('玩家不存在');
-
-    const newHealth = player.health - 1;
-    events.push({ type: 'damage', data: { target: targetName, amount: 1 }, description: `${targetName} 受到1点伤害` });
-
-    if (newHealth <= 0) {
-      // 濒死
-      const dyingOptions = getDyingOptions(this.state, targetName);
-      if (dyingOptions.savers.length > 0) {
-        return {
-          success: false,
-          state: this.state,
-          events,
-          needsInput: { type: 'respond_dying', data: { player: targetName, savers: dyingOptions.savers } },
-        };
-      }
-      // 无人救援，死亡
-      this.state = applyDying(this.state, targetName);
-      events.push({ type: 'death', data: { player: targetName }, description: `${targetName} 阵亡` });
-    } else {
-      this.state = {
-        ...this.state,
-        players: this.state.players.map(p =>
-          p.name === targetName ? { ...p, health: newHealth } : p,
-        ),
-      };
-    }
-
-    return { success: true, state: this.state, events };
+    return this.resolveKillResponse(targetName, playDodge);
   }
 
   // ============================================================
@@ -357,17 +305,70 @@ export class GameController {
   }
 
   private executeKill(playerName: string, card: Card, target: string): ActionResult {
-    const result = playKill(this.state, playerName, target, this.logger);
-    if (result.success) {
-      this.state = result.state;
-      return {
-        success: true,
-        state: this.state,
-        events: [{ type: 'play', data: { player: playerName, card: card.name, target }, description: `${playerName} 对 ${target} 使用杀` }],
-        needsInput: { type: 'respond_kill', data: { attacker: playerName, target, card } },
-      };
+    // 杀不直接扣血，先发起响应窗口
+    // 从手牌移除杀
+    const player = this.state.players.find(p => p.name === playerName)!;
+    const cardIndex = player.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
+    if (cardIndex === -1) return this.fail('没有这张牌');
+
+    const newHand = [...player.hand];
+    newHand.splice(cardIndex, 1);
+    this.state = {
+      ...this.state,
+      players: this.state.players.map(p =>
+        p.name === playerName ? { ...p, hand: newHand } : p,
+      ),
+      discardPile: [...this.state.discardPile, card],
+    };
+
+    return {
+      success: true,
+      state: this.state,
+      events: [{ type: 'play', data: { player: playerName, card: card.name, target }, description: `${playerName} 对 ${target} 使用杀` }],
+      needsInput: { type: 'respond_kill', data: { attacker: playerName, target, card } },
+    };
+  }
+
+  /**
+   * 处理杀的响应（出闪或受伤害）
+   */
+  resolveKillResponse(targetName: string, dodge: boolean): ActionResult {
+    const events: GameEvent[] = [];
+
+    if (dodge) {
+      // 出闪，移除一张闪
+      const target = this.state.players.find(p => p.name === targetName);
+      if (target) {
+        const dodgeIdx = target.hand.findIndex(c => c.name === '闪');
+        if (dodgeIdx >= 0) {
+          const newHand = [...target.hand];
+          const dodgeCard = newHand.splice(dodgeIdx, 1)[0];
+          this.state = {
+            ...this.state,
+            players: this.state.players.map(p =>
+              p.name === targetName ? { ...p, hand: newHand } : p,
+            ),
+            discardPile: [...this.state.discardPile, dodgeCard],
+          };
+        }
+      }
+      events.push({ type: 'dodge', data: { player: targetName }, description: `${targetName} 出了闪` });
+    } else {
+      // 受伤害
+      const target = this.state.players.find(p => p.name === targetName);
+      if (target) {
+        const newHealth = target.health - 1;
+        this.state = {
+          ...this.state,
+          players: this.state.players.map(p =>
+            p.name === targetName ? { ...p, health: newHealth, alive: newHealth > 0 } : p,
+          ),
+        };
+        events.push({ type: 'damage', data: { target: targetName, amount: 1 }, description: `${targetName} 受到1点伤害` });
+      }
     }
-    return this.fail(result.message);
+
+    return { success: true, state: this.state, events };
   }
 
   private executePeach(playerName: string, card: Card): ActionResult {
