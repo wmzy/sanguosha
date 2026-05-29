@@ -41,14 +41,14 @@ test.describe('首页', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: '三国杀' })).toBeVisible();
     await expect(page.getByText('数字卡牌游戏')).toBeVisible();
-    await expect(page.getByRole('link', { name: '本地游戏' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '调试游戏' })).toBeVisible();
     await expect(page.getByRole('link', { name: '多人对战' })).toBeVisible();
     await expect(page.getByRole('button', { name: '回放' })).toBeVisible();
   });
 
-  test('点击本地游戏进入游戏页面', async ({ page }) => {
+  test('点击调试游戏进入游戏页面', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: '本地游戏' }).click();
+    await page.getByRole('link', { name: '调试游戏' }).click();
     await expect(page).toHaveURL('/game');
   });
 
@@ -59,7 +59,7 @@ test.describe('首页', () => {
   });
 });
 
-test.describe('本地游戏 — 真实游戏流程', () => {
+test.describe('调试游戏 — 真实游戏流程', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/game');
     await page.waitForSelector('text=出牌');

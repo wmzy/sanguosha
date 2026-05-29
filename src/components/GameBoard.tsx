@@ -340,6 +340,45 @@ export function GameBoard() {
 
       {/* 日志 */}
       <LogPanel operations={playerOps} maxHeight={150} />
+
+      {/* 调试面板 - 显示所有玩家手牌 */}
+      <details style={{ marginTop: 16, backgroundColor: '#16213e', borderRadius: 8, padding: 12 }}>
+        <summary style={{ cursor: 'pointer', color: '#f39c12', fontSize: 14, fontWeight: 'bold' }}>
+          调试信息（点击展开）
+        </summary>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: '#95a5a6', marginBottom: 8 }}>
+            牌堆: {game.deck.length} 张 | 弃牌堆: {game.discardPile.length} 张
+          </div>
+          {game.players.map(player => (
+            <div key={player.name} style={{ marginBottom: 8, padding: 8, backgroundColor: '#1a1a2e', borderRadius: 4 }}>
+              <div style={{ fontSize: 13, color: player.name === myName ? '#3498db' : '#bdc3c7', fontWeight: 'bold', marginBottom: 4 }}>
+                {player.name} ({player.character.name}) - {player.health}/{player.maxHealth} HP
+                {!player.alive && <span style={{ color: '#e74c3c' }}> [阵亡]</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {player.hand.map((card, i) => (
+                  <span key={i} style={{
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    backgroundColor: '#2c3e50',
+                    borderRadius: 4,
+                    color: '#ecf0f1',
+                  }}>
+                    {card.name}{card.suit}{card.rank}
+                  </span>
+                ))}
+                {player.hand.length === 0 && <span style={{ fontSize: 11, color: '#7f8c8d' }}>无手牌</span>}
+              </div>
+              {Object.values(player.equipment).some(Boolean) && (
+                <div style={{ fontSize: 11, color: '#f39c12', marginTop: 4 }}>
+                  装备: {player.equipment.weapon?.name} {player.equipment.armor?.name} {player.equipment.horsePlus?.name} {player.equipment.horseMinus?.name}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

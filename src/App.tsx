@@ -49,8 +49,8 @@ function HomePage() {
       <p style={{ color: '#95a5a6', marginBottom: 40 }}>数字卡牌游戏</p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 280 }}>
-        <Link to="/game" style={linkBtnStyle('#e74c3c')}>
-          本地游戏
+        <Link to="/game" style={linkBtnStyle('#e67e22')}>
+          调试游戏
         </Link>
         <Link to="/lobby" style={linkBtnStyle('#3498db')}>
           多人对战
@@ -100,12 +100,12 @@ function MultiplayerPage() {
   );
 }
 
-function LocalGamePage() {
+function DebugGamePage() {
   return (
     <div>
       <nav style={navStyle}>
         <Link to="/" style={navLinkStyle}>← 返回</Link>
-        <span style={{ color: '#95a5a6' }}>本地游戏</span>
+        <span style={{ color: '#95a5a6' }}>调试游戏</span>
       </nav>
       <GameBoard />
     </div>
@@ -117,7 +117,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/game" element={<LocalGamePage />} />
+        <Route path="/game" element={<DebugGamePage />} />
         <Route path="/lobby" element={<LobbyPage />} />
         <Route path="/game/:roomId" element={<MultiplayerPage />} />
       </Routes>
