@@ -243,7 +243,7 @@ export function useGame() {
   const respondToKill = useCallback((playDodge: boolean) => {
     if (!pendingResponse) return;
 
-    const result = controller.respondToKill(pendingResponse.target, playDodge);
+    const result = controller.respondToKill(pendingResponse.target, playDodge, pendingResponse.attacker, pendingResponse.card);
 
     setGame(result.state);
     updateOps();

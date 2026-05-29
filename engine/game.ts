@@ -254,8 +254,8 @@ export class GameController {
   // 响应杀
   // ============================================================
 
-  respondToKill(targetName: string, playDodge: boolean): ActionResult {
-    return this.resolveKillResponse(targetName, playDodge);
+  respondToKill(targetName: string, playDodge: boolean, attackerName?: string, damageCard?: Card): ActionResult {
+    return this.resolveKillResponse(targetName, playDodge, attackerName, damageCard);
   }
 
   // ============================================================
@@ -383,7 +383,7 @@ export class GameController {
   /**
    * 处理杀的响应（出闪或受伤害）
    */
-  resolveKillResponse(targetName: string, dodge: boolean): ActionResult {
+  resolveKillResponse(targetName: string, dodge: boolean, attackerName?: string, damageCard?: Card): ActionResult {
     const events: GameEvent[] = [];
 
     if (dodge) {
@@ -416,6 +416,26 @@ export class GameController {
           ),
         };
         events.push({ type: 'damage', data: { target: targetName, amount: 1 }, description: `${targetName} 受到1点伤害` });
+
+        // 被动技能：奸雄（曹操）— 受到伤害后获得造成伤害的牌
+        if (target.character.name === '曹操' && damageCard) {
+          // 从弃牌堆移除伤害牌并加入手牌
+          const cardIdx = this.state.discardPile.findIndex(
+            c => c.name === damageCard.name && c.suit === damageCard.suit && c.rank === damageCard.rank,
+          );
+          if (cardIdx >= 0) {
+            const newDiscard = [...this.state.discardPile];
+            const gainedCard = newDiscard.splice(cardIdx, 1)[0];
+            this.state = {
+              ...this.state,
+              players: this.state.players.map(p =>
+                p.name === targetName ? { ...p, hand: [...p.hand, gainedCard] } : p,
+              ),
+              discardPile: newDiscard,
+            };
+            events.push({ type: 'skill', data: { player: targetName, skill: '奸雄' }, description: `${targetName} 发动奸雄，获得了 ${gainedCard.name}` });
+          }
+        }
       }
     }
 
