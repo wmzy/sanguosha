@@ -302,7 +302,7 @@ export function GameBoard() {
       <div style={{ marginBottom: 12 }}>
         <ActionPanel
           canPlay={canPlay}
-          canEndTurn={isMyTurn && game.phase === '出牌' && !pendingResponse && !pendingDying}
+          canEndTurn={isMyTurn && (game.phase === '出牌' || game.phase === '弃牌') && !pendingResponse && !pendingDying}
           onPlayCard={handlePlayCard}
           onEndTurn={handleEndTurn}
         />

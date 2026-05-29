@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import type { GameState, Card } from '../../shared/types';
 import { GameLogger } from '../../engine/logger';
 import { GameController } from '../../engine/game';
-import { getCurrentPlayer } from '../../engine/state';
+import { createGame, getCurrentPlayer } from '../../engine/state';
 import { checkDiscard } from '../../engine/turn';
 import { getValidActions } from '../../engine/rules';
 import { getDistance, getAttackRange, isInAttackRange } from '../../engine/core/distance';
@@ -60,12 +60,10 @@ export function useGame() {
   const initRef = useRef(false);
   const [game, setGame] = useState<GameState>(() => {
     if (initRef.current) {
-      // StrictMode double-init: return dummy state
-      const { state } = GameController.createGame(CHARACTERS, undefined, logger);
-      return state;
+      return createGame(CHARACTERS);
     }
     initRef.current = true;
-    const { state, controller } = GameController.createGame(CHARACTERS, undefined, logger);
+    const { state, controller } = GameController.createGame(CHARACTERS, undefined, loggerRef.current!);
     controllerRef.current = controller;
     return state;
   });
@@ -188,6 +186,18 @@ export function useGame() {
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn || pendingResponse || pendingDying) return;
 
+    // 如果需要弃牌，先弃牌
+    if (needsDiscard && selectedForDiscard.size === discardCount) {
+      const indices = Array.from(selectedForDiscard).sort((a, b) => b - a);
+      const result = controller.discard(myName, indices);
+      setGame(result.state);
+      setSelectedForDiscard(new Set());
+      setSelectedCard(null);
+      updateOps();
+      resetTimer();
+      return;
+    }
+
     const result = controller.endTurn(myName);
 
     if (result.needsInput?.type === 'select_cards') {
@@ -208,7 +218,7 @@ export function useGame() {
       updateOps();
       resetTimer();
     }
-  }, [game, isMyTurn, pendingResponse, pendingDying, controller, updateOps, resetTimer]);
+  }, [game, isMyTurn, pendingResponse, pendingDying, needsDiscard, selectedForDiscard, discardCount, controller, updateOps, resetTimer]);
 
   const handleDiscard = useCallback(() => {
     if (!needsDiscard || selectedForDiscard.size !== discardCount) return;
