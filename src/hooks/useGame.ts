@@ -445,9 +445,9 @@ export function useGame() {
     setSelectedTarget(null);
   }, [game, selectedCard, selectedTarget, me, isMyTurn, pendingResponse, pendingDying, logger, updateOps]);
 
-  // 技能系统
+  // 技能系统 — 在所有阶段都检查可用技能
   const availableSkills = useMemo(() => {
-    if (!isMyTurn || game.phase !== '出牌' || pendingResponse || pendingDying) return [];
+    if (!isMyTurn || pendingResponse || pendingDying) return [];
     return getAvailableSkills(game, myName).filter(s => s.canActivate);
   }, [game, myName, isMyTurn, pendingResponse, pendingDying]);
 

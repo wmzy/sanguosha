@@ -83,6 +83,10 @@ export function executeSkill(
       return executeDiscard(game, player, ability);
     case 'skipPhase':
       return executeSkipPhase(game, player, ability);
+    case 'lookAtTopCards':
+      return executeLookAtTopCards(game, player, ability);
+    case 'giveCards':
+      return executeGiveCards(game, player, ability, context);
     default:
       return { success: false, game, message: `未实现的效果类型: ${ability.effect.type}` };
   }
@@ -284,6 +288,87 @@ function executeSkipPhase(
     success: true,
     game,
     message: `${player.name} 发动 ${ability.name}，跳过${effect.target ?? '当前'}阶段`,
+  };
+}
+
+// ============================================================
+// 观星：查看牌堆顶N张牌，重新排序
+// ============================================================
+
+function executeLookAtTopCards(
+  game: GameState,
+  player: Player,
+  ability: AbilityConfig,
+): SkillResult {
+  const effect = ability.effect;
+  if (effect.type !== 'lookAtTopCards') return { success: false, game, message: '效果类型不匹配' };
+
+  // 计算查看数量：存活角色数，最多5张
+  const aliveCount = game.players.filter(p => p.alive).length;
+  const count = Math.min(aliveCount, 5);
+  const topCards = game.deck.slice(0, count);
+
+  if (topCards.length === 0) {
+    return { success: false, game, message: '牌堆为空' };
+  }
+
+  // 简化实现：自动将所有牌放回牌堆顶（不做排序）
+  // 完整实现需要 UI 交互让玩家选择排序
+  return {
+    success: true,
+    game, // 牌堆不变（简化）
+    message: `${player.name} 发动 ${ability.name}，查看了牌堆顶 ${topCards.length} 张牌：${topCards.map(c => c.name).join('、')}`,
+  };
+}
+
+// ============================================================
+// 仁德：将手牌交给其他角色
+// ============================================================
+
+function executeGiveCards(
+  game: GameState,
+  player: Player,
+  ability: AbilityConfig,
+  context?: SkillContext,
+): SkillResult {
+  const effect = ability.effect;
+  if (effect.type !== 'giveCards') return { success: false, game, message: '效果类型不匹配' };
+
+  const targetName = context?.target;
+  if (!targetName) {
+    return { success: false, game, message: '需要选择目标' };
+  }
+
+  const target = game.players.find(p => p.name === targetName);
+  if (!target || !target.alive) {
+    return { success: false, game, message: '目标不存在或已死亡' };
+  }
+
+  if (player.hand.length === 0) {
+    return { success: false, game, message: '没有手牌' };
+  }
+
+  // 给出最后一张牌（简化实现）
+  const card = player.hand[player.hand.length - 1];
+  const newHand = player.hand.slice(0, -1);
+
+  const newPlayers = game.players.map(p => {
+    if (p.name === player.name) {
+      return { ...p, hand: newHand };
+    }
+    if (p.name === targetName) {
+      return { ...p, hand: [...p.hand, card] };
+    }
+    return p;
+  });
+
+  // 检查是否给出了2张或更多（仁德回血条件）
+  // 简化：不跟踪本阶段给出的牌数
+
+  return {
+    success: true,
+    game: { ...game, players: newPlayers },
+    message: `${player.name} 发动 ${ability.name}，将 ${card.name} 交给了 ${targetName}`,
   };
 }
 
