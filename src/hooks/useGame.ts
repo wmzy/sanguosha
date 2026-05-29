@@ -125,9 +125,8 @@ export function useGame() {
       setSelectedForDiscard(new Set());
       setSelectedCard(null);
       updateOps();
-    } else if (game.phase === '出牌') {
-      handleEndTurn();
     }
+    // 出牌阶段不自动结束回合，让玩家手动结束
   }, [timerSeconds, isMyTurn, game.phase, pendingResponse, pendingDying]);
 
   // 更新操作日志
