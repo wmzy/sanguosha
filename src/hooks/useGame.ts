@@ -116,11 +116,27 @@ export function useGame() {
     };
   }, [game.currentPlayer, game.round, timerPaused, game.status, isMyTurn]);
 
+  // 计时器到期处理
   useEffect(() => {
-    if (timerSeconds === 0 && isMyTurn && game.phase === '出牌' && !pendingResponse && !pendingDying) {
+    if (timerSeconds !== 0 || !isMyTurn || pendingResponse || pendingDying) return;
+
+    if (game.phase === '弃牌' && checkDiscard(game)) {
+      // 弃牌阶段超时：自动弃掉多余的牌
+      const excess = me.hand.length - me.maxHealth;
+      const indices = Array.from({ length: excess }, (_, i) => me.hand.length - 1 - i);
+      const newGame = executeDiscard(game, indices, logger);
+      // 自动推进到下一个玩家
+      let finalGame = nextPhase(newGame, logger);
+      finalGame = nextPhase(finalGame, logger);
+      finalGame = advanceToPlayPhase(finalGame, logger);
+      setGame(finalGame);
+      setSelectedForDiscard(new Set());
+      setSelectedCard(null);
+      updateOps();
+    } else if (game.phase === '出牌') {
       handleEndTurn();
     }
-  }, [timerSeconds, isMyTurn, game.phase, pendingResponse, pendingDying]);
+  }, [timerSeconds, isMyTurn, game.phase, pendingResponse, pendingDying, me, logger, updateOps]);
 
   // 回合切换时重置杀的使用状态
   useEffect(() => {
