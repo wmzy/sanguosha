@@ -78,22 +78,54 @@ export type TriggerType =
   | 'onEquipChange'
   | 'manual';
 
-// 效果定义（可辨识联合类型）
+// ============================================================
+// 效果系统（可组合）
+// ============================================================
+
+// 基础效果原语
+export type EffectPrimitive =
+  | { type: 'draw'; count: number }
+  | { type: 'damage'; amount: number; damageType?: '普通' | '雷电' | '火焰' }
+  | { type: 'heal'; amount: number; target?: string }
+  | { type: 'discard'; source: 'hand' | 'equipment' | 'judge'; count: number; target?: string }
+  | { type: 'gainCard'; from: 'deck' | 'discard' | 'player'; source?: string }
+  | { type: 'skipPhase'; phase: TurnPhase }
+  | { type: 'judge'; condition?: string; onSuccess?: Effect; onFail?: Effect }
+  | { type: 'addPendingTrick'; trickName: string; target: string };
+
+// 复合效果
 export type Effect =
-  | { type: 'draw'; count: number | 'sameAsDiscarded' }
-  | { type: 'dealDamage'; amount?: number; target?: string; condition?: string; bonusDamage?: number }
-  | { type: 'heal'; target: string; amount: number }
-  | { type: 'discard'; count: number | 'any'; target?: string }
-  | { type: 'gainCard'; source: string; count?: number }
-  | { type: 'skipPhase'; target?: string }
-  | { type: 'conditional'; condition: Condition; then: Effect; else?: Effect }
+  | EffectPrimitive
   | { type: 'sequence'; steps: Effect[] }
-  | { type: 'giveCards'; count: number | 'any'; target: string }
-  | { type: 'skipDraw' }
-  | { type: 'judge'; condition?: string; expectedSuit?: string; repeatOnBlack?: boolean; redResult?: string; failEffect?: string }
-  | { type: 'convert'; from: string; to: string }
-  | { type: 'redirect'; from: string; to: string }
-  | { type: 'lookAtTopCards'; count: number | string };
+  | { type: 'conditional'; condition: Condition; then: Effect; else?: Effect };
+
+// 效果执行上下文
+export interface EffectContext {
+  player: string;
+  target?: string;
+  card?: Card;
+  damageSourceCard?: Card;
+  attacker?: string;
+  amount?: number;
+}
+
+// 卡牌定义（纯数据）
+export interface CardDef {
+  name: string;
+  type: CardType;
+  subtype: CardSubType;
+  targetFilter?: TargetFilter;
+  effect: Effect;
+  responseWindow?: 'kill_response' | 'trick_response';
+  usageLimit?: { perTurn?: number };
+  range?: number;
+}
+
+// 目标过滤器
+export interface TargetFilter {
+  type: 'self' | 'other' | 'all' | 'none' | 'inRange';
+  condition?: (player: Player) => boolean;
+}
 
 // 条件定义
 export interface Condition {
