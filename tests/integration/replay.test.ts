@@ -23,7 +23,7 @@ describe('完整重播流程', () => {
     game = nextPhase(game, logger); // 准备 → 判定
     game = nextPhase(game, logger); // 判定 → 摸牌
     const drawResult = drawPhase(game, logger);
-    game = drawResult.status;
+    game = drawResult.state;
     game = nextPhase(game, logger); // 摸牌 → 出牌
 
     // 使用杀

@@ -38,8 +38,8 @@ describe('回合阶段', () => {
       game.phase = '摸牌';
 
       const result = drawPhase(game);
-      expect(result.status.players[0].hand.length).toBe(2);
-      expect(result.status.deck.length).toBe(game.deck.length - 2);
+      expect(result.state.players[0].hand.length).toBe(2);
+      expect(result.state.deck.length).toBe(game.deck.length - 2);
     });
   });
 

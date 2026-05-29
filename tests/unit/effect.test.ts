@@ -17,7 +17,7 @@ describe('卡牌效果', () => {
 
       const result = playKill(game, '曹操', '刘备');
       expect(result.success).toBe(true);
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
       expect(liuBei.health).toBe(3);
     });
 
@@ -39,7 +39,7 @@ describe('卡牌效果', () => {
 
       const result = playPeach(game, '曹操');
       expect(result.success).toBe(true);
-      expect(result.status.players[0].health).toBe(4);
+      expect(result.state.players[0].health).toBe(4);
     });
 
     it('不能超过体力上限', () => {
@@ -64,9 +64,9 @@ describe('卡牌效果', () => {
 
       const result = playDismantle(game, '曹操', '刘备');
       expect(result.success).toBe(true);
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
       expect(liuBei.hand.length).toBe(0);
-      expect(result.status.discardPile.length).toBe(1);
+      expect(result.state.discardPile.length).toBe(1);
     });
 
     it('目标没有手牌时失败', () => {
@@ -96,8 +96,8 @@ describe('卡牌效果', () => {
 
       const result = playSteal(game, '曹操', '刘备');
       expect(result.success).toBe(true);
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
-      const caoCao = result.status.players.find(p => p.name === '曹操')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
+      const caoCao = result.state.players.find(p => p.name === '曹操')!;
       expect(liuBei.hand.length).toBe(0);
       expect(caoCao.hand.length).toBe(1);
     });
@@ -119,9 +119,9 @@ describe('卡牌效果', () => {
 
       const result = playDrawTwo(game, '曹操');
       expect(result.success).toBe(true);
-      const caoCao = result.status.players.find(p => p.name === '曹操')!;
+      const caoCao = result.state.players.find(p => p.name === '曹操')!;
       expect(caoCao.hand.length).toBe(2);
-      expect(result.status.deck.length).toBe(deckSize - 2);
+      expect(result.state.deck.length).toBe(deckSize - 2);
     });
 
     it('牌堆不足时失败', () => {
@@ -141,7 +141,7 @@ describe('卡牌效果', () => {
 
       const result = playDuel(game, '曹操', '刘备');
       expect(result.success).toBe(true);
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
       expect(liuBei.health).toBe(3);
     });
 
@@ -159,8 +159,8 @@ describe('卡牌效果', () => {
 
       const result = playArrowBarrage(game, '曹操');
       expect(result.success).toBe(true);
-      const caoCao = result.status.players.find(p => p.name === '曹操')!;
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
+      const caoCao = result.state.players.find(p => p.name === '曹操')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
       expect(caoCao.health).toBe(4); // 使用者不受伤害
       expect(liuBei.health).toBe(3); // 目标受伤
     });
@@ -173,8 +173,8 @@ describe('卡牌效果', () => {
 
       const result = playBarbarianInvasion(game, '曹操');
       expect(result.success).toBe(true);
-      const caoCao = result.status.players.find(p => p.name === '曹操')!;
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
+      const caoCao = result.state.players.find(p => p.name === '曹操')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
       expect(caoCao.health).toBe(4);
       expect(liuBei.health).toBe(3);
     });
@@ -189,8 +189,8 @@ describe('卡牌效果', () => {
 
       const result = playPeachGarden(game, '曹操');
       expect(result.success).toBe(true);
-      const caoCao = result.status.players.find(p => p.name === '曹操')!;
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
+      const caoCao = result.state.players.find(p => p.name === '曹操')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
       expect(caoCao.health).toBe(4);
       expect(liuBei.health).toBe(3);
     });
@@ -213,11 +213,11 @@ describe('卡牌效果', () => {
 
       const result = playAbundance(game, '曹操');
       expect(result.success).toBe(true);
-      const caoCao = result.status.players.find(p => p.name === '曹操')!;
-      const liuBei = result.status.players.find(p => p.name === '刘备')!;
+      const caoCao = result.state.players.find(p => p.name === '曹操')!;
+      const liuBei = result.state.players.find(p => p.name === '刘备')!;
       expect(caoCao.hand.length).toBe(1);
       expect(liuBei.hand.length).toBe(1);
-      expect(result.status.deck.length).toBe(deckSize - 2);
+      expect(result.state.deck.length).toBe(deckSize - 2);
     });
 
     it('牌堆不足时失败', () => {

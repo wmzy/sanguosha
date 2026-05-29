@@ -44,7 +44,7 @@ export function nextPhase(game: GameState, logger?: GameLogger): GameState {
   return newState;
 }
 
-export function drawPhase(game: GameState, logger?: GameLogger): { status: GameState; message: string } {
+export function drawPhase(game: GameState, logger?: GameLogger): { state: GameState; message: string } {
   const currentPlayer = getCurrentPlayer(game);
 
   // 如果牌堆不够，把弃牌堆洗回牌堆
@@ -69,7 +69,7 @@ export function drawPhase(game: GameState, logger?: GameLogger): { status: GameS
     return p;
   });
 
-  const status = { ...game, players: newPlayers, deck: remainingDeck, discardPile };
+  const state = { ...game, players: newPlayers, deck: remainingDeck, discardPile };
 
   if (logger) {
     logger.logServerOp('draw', {
@@ -83,7 +83,7 @@ export function drawPhase(game: GameState, logger?: GameLogger): { status: GameS
   }
 
   return {
-    status,
+    state,
     message: `${currentPlayer.name} 摸了 ${drawnCards.length} 张牌`,
   };
 }

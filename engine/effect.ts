@@ -4,7 +4,7 @@ import type { GameLogger } from './logger';
 
 interface EffectResult {
   success: boolean;
-  status: GameState;
+  state: GameState;
   message: string;
 }
 
@@ -13,15 +13,15 @@ export function playKill(game: GameState, userName: string, targetName: string, 
   const target = game.players.find(p => p.name === targetName);
 
   if (!user || !target) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   if (userName === targetName) {
-    return { success: false, status: game, message: '不能对自己使用杀' };
+    return { success: false, state: game, message: '不能对自己使用杀' };
   }
 
   if (!target.alive) {
-    return { success: false, status: game, message: '目标已死亡' };
+    return { success: false, state: game, message: '目标已死亡' };
   }
 
   // 造成1点伤害
@@ -34,7 +34,7 @@ export function playKill(game: GameState, userName: string, targetName: string, 
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers },
+    state: { ...game, players: newPlayers },
     message: `${userName} 对 ${targetName} 使用杀，造成1点伤害`,
   };
 
@@ -61,11 +61,11 @@ export function playPeach(game: GameState, userName: string, logger?: GameLogger
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   if (user.health >= user.maxHealth) {
-    return { success: false, status: game, message: '体力已满，不能使用桃' };
+    return { success: false, state: game, message: '体力已满，不能使用桃' };
   }
 
   const newPlayers = game.players.map(p => {
@@ -77,7 +77,7 @@ export function playPeach(game: GameState, userName: string, logger?: GameLogger
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers },
+    state: { ...game, players: newPlayers },
     message: `${userName} 使用桃，恢复1点体力`,
   };
 
@@ -107,19 +107,19 @@ export function playDismantle(game: GameState, userName: string, targetName: str
   const target = game.players.find(p => p.name === targetName);
 
   if (!user || !target) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   if (userName === targetName) {
-    return { success: false, status: game, message: '不能对自己使用过河拆桥' };
+    return { success: false, state: game, message: '不能对自己使用过河拆桥' };
   }
 
   if (!target.alive) {
-    return { success: false, status: game, message: '目标已死亡' };
+    return { success: false, state: game, message: '目标已死亡' };
   }
 
   if (target.hand.length === 0) {
-    return { success: false, status: game, message: `${targetName} 没有手牌` };
+    return { success: false, state: game, message: `${targetName} 没有手牌` };
   }
 
   // 随机弃置目标一张手牌
@@ -135,7 +135,7 @@ export function playDismantle(game: GameState, userName: string, targetName: str
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers, discardPile: [...game.discardPile, discardedCard] },
+    state: { ...game, players: newPlayers, discardPile: [...game.discardPile, discardedCard] },
     message: `${userName} 对 ${targetName} 使用过河拆桥，弃置了一张牌`,
   };
 
@@ -166,19 +166,19 @@ export function playSteal(game: GameState, userName: string, targetName: string,
   const target = game.players.find(p => p.name === targetName);
 
   if (!user || !target) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   if (userName === targetName) {
-    return { success: false, status: game, message: '不能对自己使用顺手牵羊' };
+    return { success: false, state: game, message: '不能对自己使用顺手牵羊' };
   }
 
   if (!target.alive) {
-    return { success: false, status: game, message: '目标已死亡' };
+    return { success: false, state: game, message: '目标已死亡' };
   }
 
   if (target.hand.length === 0 && !target.equipment.weapon && !target.equipment.armor && !target.equipment.horsePlus && !target.equipment.horseMinus) {
-    return { success: false, status: game, message: `${targetName} 没有任何牌` };
+    return { success: false, state: game, message: `${targetName} 没有任何牌` };
   }
 
   // 优先从手牌中随机获得，简化实现不考虑距离
@@ -198,7 +198,7 @@ export function playSteal(game: GameState, userName: string, targetName: string,
 
     const result: EffectResult = {
       success: true,
-      status: { ...game, players: newPlayers },
+      state: { ...game, players: newPlayers },
       message: `${userName} 对 ${targetName} 使用顺手牵羊，获得了一张牌`,
     };
 
@@ -223,18 +223,18 @@ export function playSteal(game: GameState, userName: string, targetName: string,
     return result;
   }
 
-  return { success: false, status: game, message: `${targetName} 没有手牌` };
+  return { success: false, state: game, message: `${targetName} 没有手牌` };
 }
 
 export function playDrawTwo(game: GameState, userName: string, logger?: GameLogger): EffectResult {
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   if (game.deck.length < 2) {
-    return { success: false, status: game, message: '牌堆不足' };
+    return { success: false, state: game, message: '牌堆不足' };
   }
 
   const drawnCards = game.deck.slice(0, 2);
@@ -249,7 +249,7 @@ export function playDrawTwo(game: GameState, userName: string, logger?: GameLogg
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers, deck: newDeck },
+    state: { ...game, players: newPlayers, deck: newDeck },
     message: `${userName} 使用无中生有，摸了2张牌`,
   };
 
@@ -274,15 +274,15 @@ export function playDuel(game: GameState, userName: string, targetName: string, 
   const target = game.players.find(p => p.name === targetName);
 
   if (!user || !target) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   if (userName === targetName) {
-    return { success: false, status: game, message: '不能对自己使用决斗' };
+    return { success: false, state: game, message: '不能对自己使用决斗' };
   }
 
   if (!target.alive) {
-    return { success: false, status: game, message: '目标已死亡' };
+    return { success: false, state: game, message: '目标已死亡' };
   }
 
   // 简化实现：直接对目标造成1点伤害（完整实现需要轮流出杀）
@@ -295,7 +295,7 @@ export function playDuel(game: GameState, userName: string, targetName: string, 
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers },
+    state: { ...game, players: newPlayers },
     message: `${userName} 对 ${targetName} 使用决斗，造成1点伤害`,
   };
 
@@ -326,13 +326,13 @@ export function playArrowBarrage(game: GameState, userName: string, logger?: Gam
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   const otherAlivePlayers = game.players.filter(p => p.alive && p.name !== userName);
 
   if (otherAlivePlayers.length === 0) {
-    return { success: false, status: game, message: '没有其他存活的玩家' };
+    return { success: false, state: game, message: '没有其他存活的玩家' };
   }
 
   // 简化实现：所有其他存活玩家各受1点伤害（完整实现需要每名角色响应闪）
@@ -347,7 +347,7 @@ export function playArrowBarrage(game: GameState, userName: string, logger?: Gam
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers },
+    state: { ...game, players: newPlayers },
     message: `${userName} 使用万箭齐发，${injuredNames} 各受到1点伤害`,
   };
 
@@ -374,13 +374,13 @@ export function playBarbarianInvasion(game: GameState, userName: string, logger?
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   const otherAlivePlayers = game.players.filter(p => p.alive && p.name !== userName);
 
   if (otherAlivePlayers.length === 0) {
-    return { success: false, status: game, message: '没有其他存活的玩家' };
+    return { success: false, state: game, message: '没有其他存活的玩家' };
   }
 
   // 简化实现：所有其他存活玩家各受1点伤害（完整实现需要每名角色响应杀）
@@ -395,7 +395,7 @@ export function playBarbarianInvasion(game: GameState, userName: string, logger?
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers },
+    state: { ...game, players: newPlayers },
     message: `${userName} 使用南蛮入侵，${injuredNames} 各受到1点伤害`,
   };
 
@@ -422,14 +422,14 @@ export function playPeachGarden(game: GameState, userName: string, logger?: Game
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   const alivePlayers = game.players.filter(p => p.alive);
   const needHealing = alivePlayers.filter(p => p.health < p.maxHealth);
 
   if (needHealing.length === 0) {
-    return { success: false, status: game, message: '所有存活玩家体力已满' };
+    return { success: false, state: game, message: '所有存活玩家体力已满' };
   }
 
   const newPlayers = game.players.map(p => {
@@ -443,7 +443,7 @@ export function playPeachGarden(game: GameState, userName: string, logger?: Game
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers },
+    state: { ...game, players: newPlayers },
     message: `${userName} 使用桃园结义，${healedNames} 各恢复1点体力`,
   };
 
@@ -469,13 +469,13 @@ export function playAbundance(game: GameState, userName: string, logger?: GameLo
   const user = game.players.find(p => p.name === userName);
 
   if (!user) {
-    return { success: false, status: game, message: '玩家不存在' };
+    return { success: false, state: game, message: '玩家不存在' };
   }
 
   const alivePlayers = game.players.filter(p => p.alive);
 
   if (game.deck.length < alivePlayers.length) {
-    return { success: false, status: game, message: '牌堆不足' };
+    return { success: false, state: game, message: '牌堆不足' };
   }
 
   // 简化实现：每人直接从牌堆摸1张（完整实现需要展示后依次选择）
@@ -494,7 +494,7 @@ export function playAbundance(game: GameState, userName: string, logger?: GameLo
 
   const result: EffectResult = {
     success: true,
-    status: { ...game, players: newPlayers, deck: newDeck },
+    state: { ...game, players: newPlayers, deck: newDeck },
     message: `${userName} 使用五谷丰登，${distributionInfo}`,
   };
 
@@ -520,5 +520,5 @@ export function playAbundance(game: GameState, userName: string, logger?: GameLo
 
 export function resolveEffect(game: GameState, _effect: Record<string, unknown>): EffectResult {
   // 通用效果解析器，后续扩展
-  return { success: false, status: game, message: '未实现的效果类型' };
+  return { success: false, state: game, message: '未实现的效果类型' };
 }

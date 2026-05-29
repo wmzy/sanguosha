@@ -50,7 +50,7 @@ export class GameSession {
   private drawForCurrentPlayer(): GameState {
     if (!this.state) throw new Error('游戏未开始');
     const result = drawPhase(this.state);
-    this.state = result.status;
+    this.state = result.state;
     return this.state;
   }
 
@@ -97,7 +97,7 @@ export class GameSession {
       }
       const result = playKill(this.state, playerName, target);
       if (result.success) {
-        this.state = result.status;
+        this.state = result.state;
         this.removeCardFromHand(playerName, card);
         this.broadcastState();
       } else {
@@ -106,7 +106,7 @@ export class GameSession {
     } else if (card.name === '桃') {
       const result = playPeach(this.state, playerName);
       if (result.success) {
-        this.state = result.status;
+        this.state = result.state;
         this.removeCardFromHand(playerName, card);
         this.broadcastState();
       } else {

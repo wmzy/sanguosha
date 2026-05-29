@@ -26,7 +26,7 @@ describe('双人对战', () => {
     // 摸牌阶段
     expect(game.phase).toBe('摸牌');
     const drawResult = drawPhase(game);
-    game = drawResult.status;
+    game = drawResult.state;
     expect(game.players[0].hand.length).toBe(6); // 4 initial + 2 drawn
 
     // 出牌阶段 - 使用杀
@@ -38,7 +38,7 @@ describe('双人对战', () => {
     if (killCard) {
       const killResult = playKill(game, '曹操', '刘备');
       expect(killResult.success).toBe(true);
-      game = killResult.status;
+      game = killResult.state;
       expect(game.players[1].health).toBe(3);
     }
 
@@ -69,7 +69,7 @@ describe('双人对战', () => {
     let currentGame = game;
     for (let i = 0; i < 4; i++) {
       const result = playKill(currentGame, '曹操', '刘备');
-      currentGame = result.status;
+      currentGame = result.state;
     }
 
     const liuBei = currentGame.players.find(p => p.name === '刘备')!;
@@ -83,15 +83,15 @@ describe('双人对战', () => {
 
     // 先受伤
     const damageResult = playKill(game, '曹操', '刘备');
-    expect(damageResult.status.players[1].health).toBe(3);
+    expect(damageResult.state.players[1].health).toBe(3);
 
     // 给刘备一张桃 (注: 使用桃仅检查体力上限，不检查手牌)
-    const damagedGame = damageResult.status;
+    const damagedGame = damageResult.state;
     damagedGame.players[1].hand = [{ name: '桃', type: '基本牌', subtype: '桃', suit: '♥', rank: '7', description: '' }];
 
     // 刘备使用桃
     const peachResult = playPeach(damagedGame, '刘备');
     expect(peachResult.success).toBe(true);
-    expect(peachResult.status.players[1].health).toBe(4);
+    expect(peachResult.state.players[1].health).toBe(4);
   });
 });

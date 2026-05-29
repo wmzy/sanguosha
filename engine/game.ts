@@ -340,7 +340,7 @@ export class GameController {
     while (this.state.phase !== '出牌') {
       if (this.state.phase === '摸牌') {
         const result = drawPhase(this.state, this.logger);
-        this.state = result.status;
+        this.state = result.state;
       }
       this.state = nextPhase(this.state, this.logger);
     }
@@ -349,7 +349,7 @@ export class GameController {
   private executeKill(playerName: string, card: Card, target: string): ActionResult {
     const result = playKill(this.state, playerName, target, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -363,7 +363,7 @@ export class GameController {
   private executePeach(playerName: string, card: Card): ActionResult {
     const result = playPeach(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -376,7 +376,7 @@ export class GameController {
   private executeDismantle(playerName: string, card: Card, target: string): ActionResult {
     const result = playDismantle(this.state, playerName, target, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -389,7 +389,7 @@ export class GameController {
   private executeSteal(playerName: string, card: Card, target: string): ActionResult {
     const result = playSteal(this.state, playerName, target, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -402,7 +402,7 @@ export class GameController {
   private executeDrawTwo(playerName: string, card: Card): ActionResult {
     const result = playDrawTwo(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -415,7 +415,7 @@ export class GameController {
   private executeArrowBarrage(playerName: string, card: Card): ActionResult {
     const result = playArrowBarrage(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -428,7 +428,7 @@ export class GameController {
   private executeBarbarianInvasion(playerName: string, card: Card): ActionResult {
     const result = playBarbarianInvasion(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -441,7 +441,7 @@ export class GameController {
   private executePeachGarden(playerName: string, card: Card): ActionResult {
     const result = playPeachGarden(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
@@ -454,7 +454,7 @@ export class GameController {
   private executeAbundance(playerName: string, card: Card): ActionResult {
     const result = playAbundance(this.state, playerName, this.logger);
     if (result.success) {
-      this.state = result.status;
+      this.state = result.state;
       return {
         success: true,
         state: this.state,
