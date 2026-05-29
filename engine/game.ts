@@ -339,6 +339,39 @@ export class GameController {
       discardPile: [...this.state.discardPile, card],
     };
 
+    // 检查装备效果
+    const targetPlayer = this.state.players.find(p => p.name === target);
+    if (targetPlayer) {
+      // 仁王盾：黑色杀（♠♣）自动无效
+      if (targetPlayer.equipment.armor?.name === '仁王盾') {
+        const isBlack = card.suit === '♠' || card.suit === '♣';
+        if (isBlack) {
+          return {
+            success: true,
+            state: this.state,
+            events: [{ type: 'equip_effect', data: { player: target, equipment: '仁王盾' }, description: `${target} 的仁王盾挡住了黑色杀` }],
+          };
+        }
+      }
+
+      // 八卦阵：判定，红色（♥♦）自动闪避
+      if (targetPlayer.equipment.armor?.name === '八卦阵') {
+        const judgeCard = this.state.deck[0];
+        if (judgeCard) {
+          const newDeck = this.state.deck.slice(1);
+          const isRed = judgeCard.suit === '♥' || judgeCard.suit === '♦';
+          this.state = { ...this.state, deck: newDeck, discardPile: [...this.state.discardPile, judgeCard] };
+          if (isRed) {
+            return {
+              success: true,
+              state: this.state,
+              events: [{ type: 'equip_effect', data: { player: target, equipment: '八卦阵', judgeCard: judgeCard.name }, description: `${target} 的八卦阵判定${judgeCard.suit}${judgeCard.rank}（红色），自动闪避` }],
+            };
+          }
+        }
+      }
+    }
+
     return {
       success: true,
       state: this.state,
