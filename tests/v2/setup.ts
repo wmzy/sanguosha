@@ -2,10 +2,11 @@
  * tests/v2/setup.ts — V2 引擎集成测试共享工具
  */
 import { createInitialState } from '@engine/v2/state';
-import { engine } from '@engine/v2/engine';
+import { engine as rawEngine } from '@engine/v2/engine';
 import { computeValidActions } from '@engine/v2/validate';
 import { serialize, deserialize } from '@engine/v2/serializer';
 import { allCharacters } from '@shared/characters';
+import { safeEngine } from './invariants';
 import type { GameState, GameAction } from '@engine/v2/types';
 import type { CharacterConfig } from '@shared/types';
 
@@ -210,7 +211,7 @@ export function setHealth(state: GameState, playerName: string, health: number):
  * 执行一个动作，断言没有错误，返回新状态。
  */
 export function act(state: GameState, action: GameAction): GameState {
-  const result = engine(state, action);
+  const result = safeEngine(state, action);
   if (result.error) {
     throw new Error(`Engine error: ${result.error}`);
   }
@@ -221,7 +222,7 @@ export function act(state: GameState, action: GameAction): GameState {
  * 执行一个动作，期望返回错误。
  */
 export function expectError(state: GameState, action: GameAction): string {
-  const result = engine(state, action);
+  const result = safeEngine(state, action);
   return result.error ?? '';
 }
 
