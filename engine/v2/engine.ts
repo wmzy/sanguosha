@@ -34,6 +34,7 @@ import { 装备牌列表 } from '../../shared/cards/equipment';
 // 注册所有 atom 和 phase 处理器
 import './atoms/index';
 import './phases/index';
+import './skills/index';
 
 // ─── 卡牌定义查找表 ───────────────────────────────────────────
 

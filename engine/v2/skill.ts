@@ -27,22 +27,6 @@ export function getSkill(id: string): SkillDef {
   return def;
 }
 
-const TRIGGER_TYPE_TO_EVENT: Record<string, string> = {
-  onDamageReceived: 'damageReceived',
-  onDamageDealt: 'damageDealt',
-  onTurnStart: 'turnStart',
-  onTurnEnd: 'turnEnd',
-  onCardPlayed: 'cardPlayed',
-  onCardDrawn: 'cardDrawn',
-  onKill: 'killHit',
-  onDeath: 'death',
-  onHealReceived: 'heal',
-  onJudge: 'judgeResult',
-  onTargeted: 'cardPlayed',
-  onHandEmpty: 'cardDiscarded',
-  onEquipChange: 'equipChanged',
-};
-
 interface CharacterMapSource {
   characterMap: Record<string, CharacterConfig>;
 }
@@ -56,13 +40,18 @@ export function registerCharacterTriggers(
   const character = source.characterMap[characterId];
   if (!character) return state;
 
-  const newTriggers: TriggerRule[] = character.abilities.map((ability) => ({
-    event: TRIGGER_TYPE_TO_EVENT[ability.trigger] ?? ability.trigger,
-    source: 'character' as const,
-    skillId: ability.name,
-    player,
-    priority: ability.passive ? 0 : 5,
-  }));
+  const newTriggers: TriggerRule[] = [];
+  for (const ability of character.abilities) {
+    const def = registry.get(ability.name);
+    if (!def) continue;
+    newTriggers.push({
+      event: def.trigger.event,
+      source: 'character' as const,
+      skillId: ability.name,
+      player,
+      priority: ability.passive ? 0 : 5,
+    });
+  }
 
   return { ...state, triggers: [...state.triggers, ...newTriggers] };
 }
@@ -135,6 +124,12 @@ export function emitEvent(
   for (const trigger of matched) {
     const def = registry.get(trigger.skillId);
     if (!def) continue;
+
+    // 检查技能定义的阶段过滤条件
+    if (def.trigger.phase && event.type === 'phaseBegin') {
+      const phaseEvent = event as { type: 'phaseBegin'; phase: string; player: string };
+      if (phaseEvent.phase !== def.trigger.phase) continue;
+    }
 
     const ctx = buildSkillContext(s, event, trigger);
     const phases = def.handler(ctx, s);
