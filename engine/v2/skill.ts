@@ -21,6 +21,10 @@ export function registerSkill(def: SkillDef): void {
   registry.set(def.id, def);
 }
 
+export function getSkillRegistry(): Map<string, SkillDef> {
+  return registry;
+}
+
 export function getSkill(id: string): SkillDef {
   const def = registry.get(id);
   if (!def) throw new Error(`Unknown skill: "${id}"`);

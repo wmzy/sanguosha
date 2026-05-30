@@ -12,18 +12,20 @@ const timeoutByType: Record<ResponseWindowDef['type'], number> = {
   duelResponse: timeouts.killResponse,
 };
 
-registerPhase<RespondPhase>({
-  type: 'respond',
-  execute(state: GameState, phase: RespondPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
-    const timeout = timeoutByType[phase.window.type];
-    const deadline = Date.now() + timeout;
-    const pending: PendingResponseWindow = {
-      type: 'responseWindow',
-      window: { ...phase.window, timeout, deadline },
-      timeout,
-      deadline,
-      onTimeout: { type: 'respond', player: phase.window.defender },
-    };
-    return { state: { ...state, pending }, events: [] };
-  },
-});
+export function register() {
+  registerPhase<RespondPhase>({
+    type: 'respond',
+    execute(state: GameState, phase: RespondPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
+      const timeout = timeoutByType[phase.window.type];
+      const deadline = Date.now() + timeout;
+      const pending: PendingResponseWindow = {
+        type: 'responseWindow',
+        window: { ...phase.window, timeout, deadline },
+        timeout,
+        deadline,
+        onTimeout: { type: 'respond', player: phase.window.defender },
+      };
+      return { state: { ...state, pending }, events: [] };
+    },
+  });
+}

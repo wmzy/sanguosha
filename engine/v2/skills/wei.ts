@@ -236,15 +236,24 @@ registerSkill({
   },
   handler(ctx, state) {
     return [
+      // 预置初始判定结果为黑色，确保首次进入循环
+      { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: '洛神/judgeResult', value: 'black' }] },
       {
         type: 'loop',
-        while: { not: { equals: [1, 0] } }, // 永真循环，靠 break 退出
+        // 检查上次判定结果：红色则退出循环，黑色继续
+        while: { notEquals: [{ $: 'var', player: { $: 'ctx', path: 'self' }, key: '洛神/judgeResult' }, 'red'] },
         body: [
-          { type: 'atoms', ops: [{ type: 'judge', player: ctx.self }] },
-          // TODO: 检查判定结果颜色
-          // 若红色 → break（需要 loop 退出机制）
-          // 若黑色 → gainCard，继续循环
-          // 当前 loop 的 while 是条件判断，需要用 var 记录判定结果
+          // 判定（varKey 自动将结果存储到玩家变量）
+          { type: 'atoms', ops: [{ type: 'judge', player: ctx.self, varKey: '洛神/judgeResult' }] },
+          // 黑色 → 获得此牌（TODO: 需动态引用判定牌 ID）
+          {
+            type: 'condition',
+            check: { equals: [{ $: 'var', player: { $: 'ctx', path: 'self' }, key: '洛神/judgeResult' }, 'black'] },
+            then: [
+              // TODO: gainCard 需已知 cardId，当前基础设施不支持动态引用
+              // 需要在 gainCard 增加 fromRecentJudge 等特殊处理
+            ],
+          },
         ],
       },
     ];

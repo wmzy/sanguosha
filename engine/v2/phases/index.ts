@@ -1,8 +1,17 @@
-import './atoms';
-import './condition';
-import './prompt';
-import './respond';
-import './loop';
-import './emit';
-import './foreach';
-import './checkDying';
+import * as atoms from './atoms';
+import * as condition from './condition';
+import * as prompt from './prompt';
+import * as respond from './respond';
+import * as loop from './loop';
+import * as emit from './emit';
+import * as foreach from './foreach';
+import * as checkDying from './checkDying';
+
+atoms.register();
+condition.register();
+prompt.register();
+respond.register();
+loop.register();
+emit.register();
+foreach.register();
+checkDying.register();
