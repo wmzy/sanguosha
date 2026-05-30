@@ -52,7 +52,7 @@ export function createTestGame(opts: TestGameOptions = {}): GameState {
     players: characters.map((charId, i) => ({
       name: `P${i + 1}`,
       characterId: charId,
-      role: roles[i % roles.length] as '主公' | '反贼' | '忠臣' | '内奸',
+      role: roles[i % roles.length],
     })),
     seed,
     characterMap,

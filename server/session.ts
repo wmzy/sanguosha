@@ -221,10 +221,10 @@ export class GameSession {
   }
 
   private broadcastGameView(): void {
-    if (!this.state || this.state.meta.status !== '进行中') return;
+    if (this.state?.meta.status !== '进行中') return;
 
     for (const [playerId, playerName] of this.playerNames) {
-      const view = buildGameView(this.state!, playerName);
+      const view = buildGameView(this.state, playerName);
       this.sendToPlayer(playerId, { type: 'gameView', view });
     }
   }

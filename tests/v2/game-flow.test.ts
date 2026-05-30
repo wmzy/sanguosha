@@ -17,7 +17,7 @@ import type { GameState } from '@engine/v2/types';
 describe('脚本化游戏流程', () => {
   it('2人局完整一回合：出杀→受伤→回合结束→换人', () => {
     // 创建游戏，手动进入出牌阶段
-    let state = createTestGame({ playPhase: true });
+    const state = createTestGame({ playPhase: true });
 
     // P1 手牌中找杀
     const killId = state.players.P1.hand.find(
@@ -212,7 +212,7 @@ describe('随机打谱', () => {
    */
   function tryPlayCard(state: GameState, player: string): GameState | null {
     const p = state.players[player];
-    if (!p || !p.info.alive) return null;
+    if (!p?.info.alive) return null;
 
     // 优先出杀（如果有且能出）
     const kill = p.hand.find(id => state.cardMap[id]?.name === '杀');
@@ -254,7 +254,7 @@ describe('随机打谱', () => {
 
         const current = state.currentPlayer;
         const player = state.players[current];
-        if (!player || !player.info.alive) break;
+        if (!player?.info.alive) break;
 
         // 有 pending 时处理
         if (state.pending) {
@@ -333,7 +333,7 @@ describe('随机打谱', () => {
 
         const current = state.currentPlayer;
         const player = state.players[current];
-        if (!player || !player.info.alive) break;
+        if (!player?.info.alive) break;
 
         if (state.pending) {
           const p = state.pending;

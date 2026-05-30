@@ -1,27 +1,9 @@
-/**
- * tests/v2/event.test.ts — 事件工厂函数
- */
-import { describe, it, expect } from 'vitest';
-import { genId, makeServerEvent, makePlayerEvent } from '@engine/v2/event';
-
-describe('genId', () => {
-  it('returns a string', () => {
-    expect(typeof genId()).toBe('string');
-  });
-
-  it('returns unique IDs on successive calls', () => {
-    const id1 = genId();
-    const id2 = genId();
-    expect(id1).not.toBe(id2);
-  });
-
-  it('follows the evt_ prefix pattern', () => {
-    const id = genId();
-    expect(id).toMatch(/^evt_/);
-  });
-});
+import { describe, it, expect, beforeEach } from 'vitest';
+import { makeServerEvent, makePlayerEvent, resetEventCounter } from '@engine/v2/event';
 
 describe('makeServerEvent', () => {
+  beforeEach(() => resetEventCounter(0));
+
   it('has correct type and payload', () => {
     const evt = makeServerEvent('damage', { target: 'P1', amount: 2 });
     expect(evt.type).toBe('damage');
@@ -31,7 +13,13 @@ describe('makeServerEvent', () => {
   it('has an id string', () => {
     const evt = makeServerEvent('test', {});
     expect(typeof evt.id).toBe('string');
-    expect(evt.id).toMatch(/^evt_/);
+    expect(evt.id).toMatch(/^evt-/);
+  });
+
+  it('produces unique IDs', () => {
+    const evt1 = makeServerEvent('test', {});
+    const evt2 = makeServerEvent('test', {});
+    expect(evt1.id).not.toBe(evt2.id);
   });
 
   it('has a timestamp close to now', () => {
@@ -44,6 +32,8 @@ describe('makeServerEvent', () => {
 });
 
 describe('makePlayerEvent', () => {
+  beforeEach(() => resetEventCounter(0));
+
   it('has correct type and payload', () => {
     const evt = makePlayerEvent('draw', { player: 'P1', count: 2 });
     expect(evt.type).toBe('draw');

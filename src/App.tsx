@@ -114,12 +114,12 @@ export function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/game" element={<DebugGamePage />} />
-        <Route path="/lobby" element={<LobbyPage />} />
-        <Route path="/game/:roomId" element={<MultiplayerPage />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/game" element={<DebugGamePage />} />
+          <Route path="/lobby" element={<LobbyPage />} />
+          <Route path="/game/:roomId" element={<MultiplayerPage />} />
+        </Routes>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

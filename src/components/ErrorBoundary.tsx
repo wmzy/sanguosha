@@ -61,7 +61,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               color: colors.accent.red,
               overflow: 'auto',
               maxHeight: 300,
-            }}>
+            }}
+            >
               {this.state.error?.message}
               {'\n'}
               {this.state.error?.stack}

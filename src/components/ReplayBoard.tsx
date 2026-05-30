@@ -17,7 +17,8 @@ export function ReplayBoard({ onExit }: ReplayBoardProps) {
         padding: 60,
         backgroundColor: colors.bg.panel,
         borderRadius: 12,
-      }}>
+      }}
+      >
         <div style={{ fontSize: 24, marginBottom: 16, color: colors.accent.amber }}>
           重播功能暂未适配 V2 引擎
         </div>

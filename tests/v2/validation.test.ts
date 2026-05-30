@@ -74,7 +74,7 @@ describe('V2 Engine - 动作验证', () => {
       const state = setPlayPhase(createTestGame({ playerCount: 2 }));
       const actions = computeValidActions(state, 'P1');
       const playAction = actions.find((a) => a.type === 'playCard');
-      if (!playAction || playAction.type !== 'playCard') return;
+      if (playAction?.type !== 'playCard') return;
 
       const killCard = playAction.cards.find((c) => {
         const card = state.cardMap[c.cardId];
