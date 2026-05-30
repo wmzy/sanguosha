@@ -24,28 +24,30 @@ function removeCardFromZone(state: GameState, cardId: string, from: ZoneLoc): Ga
   }
 }
 
-registerAtom({
-  type: 'gainCard',
-  apply(state: GameState, atom: Atom & { type: 'gainCard' }): GameState {
-    const player = atom.player as string;
-    const cardId = atom.cardId as string;
-    const { from } = atom;
+export function register() {
+  registerAtom({
+    type: 'gainCard',
+    apply(state: GameState, atom: Atom & { type: 'gainCard' }): GameState {
+      const player = atom.player as string;
+      const cardId = atom.cardId as string;
+      const { from } = atom;
 
-    const removed = removeCardFromZone(state, cardId, from as ZoneLoc);
-    return updatePlayer(removed, player, p => ({
-      hand: [...p.hand, cardId],
-    }));
-  },
-  toEvents(state: GameState, atom: Atom & { type: 'gainCard' }): AtomEventResult {
-    const player = atom.player as string;
-    const cardId = atom.cardId as string;
-    const { from } = atom;
-    const card = state.cardMap[cardId];
+      const removed = removeCardFromZone(state, cardId, from);
+      return updatePlayer(removed, player, p => ({
+        hand: [...p.hand, cardId],
+      }));
+    },
+    toEvents(state: GameState, atom: Atom & { type: 'gainCard' }): AtomEventResult {
+      const player = atom.player as string;
+      const cardId = atom.cardId as string;
+      const { from } = atom;
+      const card = state.cardMap[cardId];
 
-    const server = makeServerEvent('cardGained', { player, cardId, card: card as unknown as Json, from: from as unknown as Json });
-    const ownerEvent = makePlayerEvent('cardGained', { player, cardId, card: card as unknown as Json, from: from as unknown as Json });
-    const otherEvent = makePlayerEvent('cardGained', { player, cardId, from: from as unknown as Json });
+      const server = makeServerEvent('cardGained', { player, cardId, card: card as unknown as Json, from: from as unknown as Json });
+      const ownerEvent = makePlayerEvent('cardGained', { player, cardId, card: card as unknown as Json, from: from as unknown as Json });
+      const otherEvent = makePlayerEvent('cardGained', { player, cardId, from: from as unknown as Json });
 
-    return [server, new Map([[player, ownerEvent]]), otherEvent];
-  },
-});
+      return [server, new Map([[player, ownerEvent]]), otherEvent];
+    },
+  });
+}

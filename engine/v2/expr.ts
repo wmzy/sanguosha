@@ -37,7 +37,7 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     }
 
     case 'count': {
-      const source = resolve(e.source as Expr<unknown>, state, ctx, depth + 1);
+      const source = resolve(e.source, state, ctx, depth + 1);
       // source 可能是数组（从 ctx 获取），也可能是玩家名
       if (Array.isArray(source)) return source.length as T;
       const player = getPlayer(state, source as string);

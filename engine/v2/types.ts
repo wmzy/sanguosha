@@ -124,6 +124,7 @@ export interface PendingDyingWindow {
 export interface SkillExecution {
   phaseIndex: number;
   ctx: SkillContext;
+  plan: SkillPhase[];
 }
 /**
  * Atom 是唯一修改 GameState 的通道。
@@ -151,7 +152,8 @@ export type Atom =
   | { type: 'addTag'; player: Expr<string>; tag: string }
   | { type: 'removeTag'; player: Expr<string>; tag: string }
   | { type: 'kill'; player: Expr<string>; source?: Expr<string> }
-  | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc };
+  | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
+  | { type: 'setCtxVar'; key: string; value: Json };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog
