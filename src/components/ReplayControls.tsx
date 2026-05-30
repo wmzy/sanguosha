@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { colors } from '../theme';
 
 interface ReplayControlsProps {
   currentStep: number;
@@ -54,7 +55,7 @@ export function ReplayControls({
 
   return (
     <div style={{
-      backgroundColor: '#1a1a2e',
+      backgroundColor: colors.bg.page,
       borderRadius: 8,
       padding: 16,
       marginBottom: 16,
@@ -80,33 +81,33 @@ export function ReplayControls({
           style={{ flex: 1 }}
         />
 
-        <span style={{ color: '#bdc3c7', fontSize: 13, minWidth: 80 }}>
+        <span style={{ color: colors.text.secondary, fontSize: 13, minWidth: 80 }}>
           {currentStep + 1}/{totalSteps}
         </span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ color: '#95a5a6', fontSize: 13 }}>速度:</span>
+        <span style={{ color: colors.text.muted, fontSize: 13 }}>速度:</span>
         {speeds.map(s => (
           <button
             key={s}
             onClick={() => setSpeed(s)}
             style={{
               ...btnStyle,
-              backgroundColor: speed === s ? '#e74c3c' : '#34495e',
+              backgroundColor: speed === s ? colors.accent.red : colors.bg.input,
             }}
           >
             {s}x
           </button>
         ))}
 
-        <span style={{ color: '#95a5a6', fontSize: 13, marginLeft: 16 }}>视角:</span>
+        <span style={{ color: colors.text.muted, fontSize: 13, marginLeft: 16 }}>视角:</span>
         <select
           value={selectedPlayer}
           onChange={e => onSelectPlayer(e.target.value)}
           style={{
-            backgroundColor: '#34495e',
-            color: '#ecf0f1',
+            backgroundColor: colors.bg.input,
+            color: colors.text.input,
             border: 'none',
             borderRadius: 4,
             padding: '4px 8px',
@@ -123,8 +124,8 @@ export function ReplayControls({
 
 const btnStyle: React.CSSProperties = {
   padding: '6px 16px',
-  backgroundColor: '#34495e',
-  color: '#ecf0f1',
+  backgroundColor: colors.bg.input,
+  color: colors.text.input,
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Operation } from '../../shared/log';
+import { colors } from '../theme';
 
 interface LogPanelProps {
   operations: Operation[];
@@ -21,26 +22,26 @@ export function LogPanel({ operations, maxHeight = 200 }: LogPanelProps) {
       style={{
         maxHeight,
         overflow: 'auto',
-        backgroundColor: '#2c3e50',
+        backgroundColor: colors.bg.panel,
         borderRadius: 8,
         padding: 12,
       }}
     >
       {operations.length === 0 && (
-        <div style={{ color: '#7f8c8d', fontSize: 13 }}>暂无操作记录</div>
+        <div style={{ color: colors.text.dim, fontSize: 13 }}>暂无操作记录</div>
       )}
       {operations.map((op, i) => (
         <div
           key={i}
           style={{
             fontSize: 13,
-            color: '#bdc3c7',
+            color: colors.text.secondary,
             marginBottom: 4,
             padding: '2px 0',
-            borderBottom: '1px solid #34495e',
+            borderBottom: `1px solid ${colors.bg.input}`,
           }}
         >
-          <span style={{ color: '#7f8c8d', marginRight: 8 }}>{op.seq}.</span>
+          <span style={{ color: colors.text.dim, marginRight: 8 }}>{op.seq}.</span>
           {op.description}
         </div>
       ))}

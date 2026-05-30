@@ -4,6 +4,7 @@ import type { GameView, GameAction } from '../../engine/v2/types';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
+import { colors, styles } from '../theme';
 
 interface MultiplayerGameBoardProps {
   roomId: string;
@@ -106,9 +107,9 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
     return (
       <div style={{
         padding: 40,
-        backgroundColor: '#1a1a2e',
+        backgroundColor: colors.bg.page,
         minHeight: '100vh',
-        color: '#eee',
+        color: colors.text.primary,
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -116,13 +117,13 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
       >
         <div style={{ textAlign: 'center' }}>
           <h2>等待游戏开始...</h2>
-          <p style={{ color: '#95a5a6' }}>房间号: {roomId}</p>
+          <p style={{ color: colors.text.muted }}>房间号: {roomId}</p>
           <button
             onClick={handleLeave}
             style={{
               padding: '10px 24px',
-              backgroundColor: '#7f8c8d',
-              color: 'white',
+              backgroundColor: colors.text.dim,
+              color: colors.white,
               border: 'none',
               borderRadius: 6,
               cursor: 'pointer',
@@ -141,19 +142,12 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
   const playerNames = Object.keys(view.players);
 
   return (
-    <div style={{ padding: 20, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee' }}>
+    <div style={styles.page()}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1>三国杀 - 房间 {roomId}</h1>
         <button
           onClick={handleLeave}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#7f8c8d',
-            color: 'white',
-            border: 'none',
-            borderRadius: 6,
-            cursor: 'pointer',
-          }}
+          style={styles.btn(colors.text.dim, { padding: '8px 16px' })}
         >
           离开
         </button>
@@ -198,7 +192,7 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
 
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <span>阶段: {view.phase} | 当前玩家: {view.currentPlayer}</span>
-        {isMyTurn && <span style={{ color: '#2ecc71', marginLeft: 10 }}>- 你的回合！</span>}
+        {isMyTurn && <span style={{ color: colors.accent.green, marginLeft: 10 }}>- 你的回合！</span>}
       </div>
 
       {myPlayer && (
@@ -220,16 +214,9 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
         />
       </div>
 
-      <div style={{
-        maxHeight: 200,
-        overflow: 'auto',
-        backgroundColor: '#2c3e50',
-        borderRadius: 8,
-        padding: 12,
-      }}
-      >
+      <div style={styles.logContainer()}>
         {log.map((msg, i) => (
-          <div key={i} style={{ fontSize: 13, color: '#bdc3c7', marginBottom: 2 }}>{msg}</div>
+          <div key={i} style={{ fontSize: 13, color: colors.text.secondary, marginBottom: 2 }}>{msg}</div>
         ))}
       </div>
 
@@ -240,7 +227,7 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.8)',
+          backgroundColor: colors.overlay,
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
@@ -248,25 +235,17 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
         }}
         >
           <div style={{
-            backgroundColor: '#2c3e50',
+            backgroundColor: colors.bg.panel,
             borderRadius: 12,
             padding: 40,
             textAlign: 'center',
           }}
           >
             <h2 style={{ marginBottom: 20 }}>游戏结束！</h2>
-            <p style={{ fontSize: 24, color: '#f1c40f', marginBottom: 30 }}>{gameOver.winner} 获胜！</p>
+            <p style={{ fontSize: 24, color: colors.accent.gold, marginBottom: 30 }}>{gameOver.winner} 获胜！</p>
             <button
               onClick={handleLeave}
-              style={{
-                padding: '12px 32px',
-                backgroundColor: '#3498db',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 16,
-              }}
+              style={styles.btn(colors.accent.blue, { padding: '12px 32px', fontSize: 16 })}
             >
               返回大厅
             </button>
@@ -275,16 +254,7 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
       )}
 
       {error && (
-        <div style={{
-          position: 'fixed',
-          top: 20,
-          right: 20,
-          backgroundColor: '#e74c3c',
-          padding: '15px 25px',
-          borderRadius: 8,
-          zIndex: 1000,
-        }}
-        >
+        <div style={styles.errorToast()}>
           {error}
         </div>
       )}
@@ -294,7 +264,7 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
           position: 'fixed',
           bottom: 20,
           right: 20,
-          backgroundColor: '#e74c3c',
+          backgroundColor: colors.accent.red,
           padding: '10px 20px',
           borderRadius: 6,
         }}

@@ -1,4 +1,5 @@
 import type { Card } from '../../shared/types';
+import { colors, styles } from '../theme';
 
 interface HandCardsProps {
   hand: Card[];
@@ -36,36 +37,32 @@ export function HandCards({
           }
         };
 
+        const cardStyle = styles.card({ selected: isSelected, playable: isPlayable, discardMode: isDiscardMode });
+
         return (
           <div
             key={index}
             onClick={handleClick}
             style={{
-              border: isSelected
-                ? isDiscardMode ? '2px solid #8e44ad' : '2px solid #e74c3c'
-                : isPlayable ? '2px solid #555' : '2px solid #333',
-              borderRadius: 8,
+              ...cardStyle,
               padding: '12px 16px',
-              backgroundColor: isSelected
-                ? isDiscardMode ? '#4a235a' : '#34495e'
-                : isPlayable ? '#2c3e50' : '#1a1a2e',
-              cursor: isPlayable ? 'pointer' : 'not-allowed',
               minWidth: 80,
               textAlign: 'center',
               transition: 'all 0.2s',
               transform: isSelected ? 'translateY(-8px)' : 'none',
               opacity: isPlayable ? 1 : 0.5,
+              cursor: isPlayable ? 'pointer' : 'not-allowed',
             }}
           >
             <div style={{ fontSize: 18, fontWeight: 'bold', color: cardColor(card) }}>
               {card.name}
             </div>
-            <div style={{ fontSize: 12, color: '#95a5a6' }}>{card.suit}{card.rank}</div>
+            <div style={{ fontSize: 12, color: colors.text.muted }}>{card.suit}{card.rank}</div>
           </div>
         );
       })}
       {hand.length === 0 && (
-        <div style={{ color: '#7f8c8d', fontSize: 14 }}>没有手牌</div>
+        <div style={{ color: colors.text.dim, fontSize: 14 }}>没有手牌</div>
       )}
     </div>
   );
@@ -73,9 +70,9 @@ export function HandCards({
 
 function cardColor(card: Card): string {
   switch (card.name) {
-    case '杀': return '#e74c3c';
-    case '闪': return '#f1c40f';
-    case '桃': return '#2ecc71';
-    default: return '#ecf0f1';
+    case '杀': return colors.accent.red;
+    case '闪': return colors.accent.gold;
+    case '桃': return colors.accent.green;
+    default: return colors.text.input;
   }
 }

@@ -1,3 +1,5 @@
+import { colors } from '../theme';
+
 interface TimerProps {
   seconds: number;
   paused: boolean;
@@ -15,7 +17,7 @@ export function Timer({ seconds, paused, onToggle }: TimerProps) {
         fontSize: 20,
         fontWeight: 'bold',
         fontFamily: 'monospace',
-        color: isLow ? '#e74c3c' : paused ? '#f39c12' : '#2ecc71',
+        color: isLow ? colors.accent.red : paused ? colors.accent.amber : colors.accent.green,
         minWidth: 60,
         textAlign: 'center',
       }}
@@ -26,8 +28,8 @@ export function Timer({ seconds, paused, onToggle }: TimerProps) {
         onClick={onToggle}
         style={{
           padding: '2px 8px',
-          backgroundColor: paused ? '#2ecc71' : '#f39c12',
-          color: 'white',
+          backgroundColor: paused ? colors.accent.green : colors.accent.amber,
+          color: colors.white,
           border: 'none',
           borderRadius: 4,
           cursor: 'pointer',

@@ -6,6 +6,7 @@ import { LogPanel } from './LogPanel';
 import { Timer } from './Timer';
 import type { PlayerState } from '../../engine/v2/types';
 import type { Operation } from '../../shared/log';
+import { colors, styles } from '../theme';
 
 export function GameBoard() {
   const {
@@ -74,7 +75,7 @@ export function GameBoard() {
         }}
         style={{
           cursor: needsTarget && name !== myName && player.info.alive && validTargetList.includes(name) ? 'pointer' : 'default',
-          outline: selectedTarget === name ? '3px solid #e74c3c' : 'none',
+          outline: selectedTarget === name ? `3px solid ${colors.accent.red}` : 'none',
           borderRadius: 12,
           transition: 'outline 0.2s',
           opacity: needsTarget && !validTargetList.includes(name) && name !== myName ? 0.5 : 1,
@@ -96,21 +97,21 @@ export function GameBoard() {
   const playerOps: Operation[] = [];
 
   return (
-    <div style={{ padding: 16, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ ...styles.page(16), display: 'flex', flexDirection: 'column' }}>
       {/* 顶部栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <h1 style={{ margin: 0, fontSize: 20 }}>三国杀</h1>
           <button
             onClick={switchPerspective}
-            style={{ padding: '4px 12px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+            style={styles.smallBtn(colors.accent.blue)}
           >
             切换视角 ({myName})
           </button>
           {myName !== state.currentPlayer && !isKillResponse && !isDyingWindow && (
             <button
               onClick={goToCurrentPlayer}
-              style={{ padding: '4px 12px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+              style={styles.smallBtn(colors.accent.green)}
             >
               查看当前玩家 ({state.currentPlayer})
             </button>
@@ -121,7 +122,7 @@ export function GameBoard() {
 
       {/* 提示信息 */}
       {needsTarget && (
-        <div style={{ textAlign: 'center', marginBottom: 12, color: '#f39c12', fontSize: 14 }}>
+        <div style={{ textAlign: 'center', marginBottom: 12, color: colors.accent.amber, fontSize: 14 }}>
           请选择目标玩家（点击玩家面板）
         </div>
       )}
@@ -132,7 +133,7 @@ export function GameBoard() {
           textAlign: 'center',
           marginBottom: 16,
           padding: 12,
-          backgroundColor: '#c0392b',
+          backgroundColor: colors.accent.darkRed,
           borderRadius: 8,
           fontSize: 16,
         }}
@@ -144,31 +145,15 @@ export function GameBoard() {
             <button
               onClick={() => respondToKill(true)}
               disabled={!hasDodge}
-              style={{
-                padding: '8px 24px',
-                backgroundColor: hasDodge ? '#2ecc71' : '#555',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
+              style={styles.btn(hasDodge ? colors.accent.green : colors.disabled, {
                 cursor: hasDodge ? 'pointer' : 'not-allowed',
-                fontSize: 14,
-                fontWeight: 'bold',
-              }}
+              })}
             >
               出闪 {hasDodge ? '' : '(无闪)'}
             </button>
             <button
               onClick={() => respondToKill(false)}
-              style={{
-                padding: '8px 24px',
-                backgroundColor: '#e74c3c',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 'bold',
-              }}
+              style={styles.btn(colors.accent.red)}
             >
               不出，受伤害
             </button>
@@ -182,7 +167,7 @@ export function GameBoard() {
           textAlign: 'center',
           marginBottom: 16,
           padding: 12,
-          backgroundColor: '#c0392b',
+          backgroundColor: colors.accent.darkRed,
           borderRadius: 8,
           fontSize: 16,
         }}
@@ -199,14 +184,10 @@ export function GameBoard() {
                   key={saver}
                   onClick={() => respondToDying(saver)}
                   disabled={!hasPeach}
-                  style={{
+                  style={styles.btn(hasPeach ? colors.accent.green : colors.disabled, {
                     padding: '8px 16px',
-                    backgroundColor: hasPeach ? '#2ecc71' : '#555',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 6,
                     cursor: hasPeach ? 'pointer' : 'not-allowed',
-                  }}
+                  })}
                 >
                   {saver} 使用桃
                 </button>
@@ -214,14 +195,7 @@ export function GameBoard() {
             })}
             <button
               onClick={() => respondToDying(null)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#e74c3c',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
+              style={styles.btn(colors.accent.red, { padding: '8px 16px' })}
             >
               无人救援
             </button>
@@ -235,7 +209,7 @@ export function GameBoard() {
           textAlign: 'center',
           marginBottom: 16,
           padding: 12,
-          backgroundColor: '#8e44ad',
+          backgroundColor: colors.accent.purple,
           borderRadius: 8,
           fontSize: 14,
         }}
@@ -246,16 +220,9 @@ export function GameBoard() {
           <button
             onClick={handleDiscard}
             disabled={selectedForDiscard.size !== discardCount}
-            style={{
-              padding: '8px 24px',
-              backgroundColor: selectedForDiscard.size === discardCount ? '#2ecc71' : '#555',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
+            style={styles.btn(selectedForDiscard.size === discardCount ? colors.accent.green : colors.disabled, {
               cursor: selectedForDiscard.size === discardCount ? 'pointer' : 'not-allowed',
-              fontSize: 14,
-              fontWeight: 'bold',
-            }}
+            })}
           >
             确认弃牌
           </button>
@@ -275,14 +242,14 @@ export function GameBoard() {
         </div>
 
         <div style={{ textAlign: 'center', flex: 1 }}>
-          <div style={{ marginBottom: 8, fontSize: 14, color: '#95a5a6' }}>
+          <div style={{ marginBottom: 8, fontSize: 14, color: colors.text.muted }}>
             回合 {state.meta.round} | 阶段: {state.phase} | 当前玩家: {state.currentPlayer}
           </div>
           <div style={{ marginBottom: 8 }}>
-            {!isMyTurn && !isKillResponse && !isDyingWindow && <span style={{ color: '#f39c12' }}>等待对手...</span>}
-            {state.meta.status === '已结束' && <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>游戏结束</span>}
+            {!isMyTurn && !isKillResponse && !isDyingWindow && <span style={{ color: colors.accent.amber }}>等待对手...</span>}
+            {state.meta.status === '已结束' && <span style={{ color: colors.accent.red, fontWeight: 'bold' }}>游戏结束</span>}
           </div>
-          <div style={{ fontSize: 12, color: '#7f8c8d' }}>
+          <div style={{ fontSize: 12, color: colors.text.dim }}>
             弃牌堆: {state.zones.discardPile.length} 张 | 牌堆: {state.zones.deck.length} 张
           </div>
         </div>
@@ -354,15 +321,7 @@ export function GameBoard() {
             <button
               key={skill.skillId}
               onClick={() => handleActivateSkill(skill.skillId)}
-              style={{
-                padding: '6px 16px',
-                backgroundColor: '#e67e22',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 13,
-              }}
+              style={styles.btn(colors.accent.orange, { padding: '6px 16px', fontSize: 13 })}
             >
               发动 {skill.name}
             </button>
@@ -372,7 +331,7 @@ export function GameBoard() {
 
       {/* 工具栏 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
-        <button onClick={handleSaveLog} style={{ padding: '6px 16px', backgroundColor: '#9b59b6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}>
+        <button onClick={handleSaveLog} style={styles.smallBtn(colors.accent.purpleLight)}>
           保存日志
         </button>
       </div>
@@ -381,22 +340,21 @@ export function GameBoard() {
       <LogPanel operations={playerOps} maxHeight={150} />
 
       {/* 调试面板 */}
-      <details style={{ marginTop: 16, backgroundColor: '#16213e', borderRadius: 8, padding: 12 }}>
-        <summary style={{ cursor: 'pointer', color: '#f39c12', fontSize: 14, fontWeight: 'bold' }}>
+      <details style={{ marginTop: 16, backgroundColor: colors.bg.nav, borderRadius: 8, padding: 12 }}>
+        <summary style={{ cursor: 'pointer', color: colors.accent.amber, fontSize: 14, fontWeight: 'bold' }}>
           调试信息（点击展开）
         </summary>
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: '#95a5a6', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: colors.text.muted, marginBottom: 8 }}>
             牌堆: {state.zones.deck.length} 张 | 弃牌堆: {state.zones.discardPile.length} 张
           </div>
           {state.playerOrder.map(name => {
             const player = state.players[name];
-            const character = state.cardMap[player.info.characterId];
             return (
-              <div key={name} style={{ marginBottom: 8, padding: 8, backgroundColor: '#1a1a2e', borderRadius: 4 }}>
-                <div style={{ fontSize: 13, color: name === myName ? '#3498db' : '#bdc3c7', fontWeight: 'bold', marginBottom: 4 }}>
+              <div key={name} style={{ marginBottom: 8, padding: 8, backgroundColor: colors.bg.page, borderRadius: 4 }}>
+                <div style={{ fontSize: 13, color: name === myName ? colors.accent.blue : colors.text.secondary, fontWeight: 'bold', marginBottom: 4 }}>
                   {name} ({player.info.characterId}) - {player.health}/{player.maxHealth} HP
-                  {!player.info.alive && <span style={{ color: '#e74c3c' }}> [阵亡]</span>}
+                  {!player.info.alive && <span style={{ color: colors.accent.red }}> [阵亡]</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {player.hand.map((cardId) => {
@@ -408,19 +366,19 @@ export function GameBoard() {
                         style={{
                           fontSize: 11,
                           padding: '2px 6px',
-                          backgroundColor: '#2c3e50',
+                          backgroundColor: colors.bg.panel,
                           borderRadius: 4,
-                          color: '#ecf0f1',
+                          color: colors.text.input,
                         }}
                       >
                         {card.name}{card.suit}{card.rank}
                       </span>
                     );
                   })}
-                  {player.hand.length === 0 && <span style={{ fontSize: 11, color: '#7f8c8d' }}>无手牌</span>}
+                  {player.hand.length === 0 && <span style={{ fontSize: 11, color: colors.text.dim }}>无手牌</span>}
                 </div>
                 {Object.values(player.equipment).some(Boolean) && (
-                  <div style={{ fontSize: 11, color: '#f39c12', marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: colors.accent.amber, marginTop: 4 }}>
                     装备: {player.equipment.weapon && state.cardMap[player.equipment.weapon]?.name} {player.equipment.armor && state.cardMap[player.equipment.armor]?.name} {player.equipment.horsePlus && state.cardMap[player.equipment.horsePlus]?.name} {player.equipment.horseMinus && state.cardMap[player.equipment.horseMinus]?.name}
                   </div>
                 )}

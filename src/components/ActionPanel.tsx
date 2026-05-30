@@ -1,4 +1,5 @@
 // src/components/ActionPanel.tsx
+import { colors, styles } from '../theme';
 
 interface ActionPanelProps {
   canPlay: boolean;
@@ -13,32 +14,20 @@ export function ActionPanel({ canPlay, canEndTurn, onPlayCard, onEndTurn }: Acti
       <button
         onClick={onPlayCard}
         disabled={!canPlay}
-        style={{
+        style={styles.btn(canPlay ? colors.accent.red : colors.text.dim, {
           padding: '10px 28px',
-          backgroundColor: canPlay ? '#e74c3c' : '#7f8c8d',
-          color: 'white',
-          border: 'none',
-          borderRadius: 6,
           cursor: canPlay ? 'pointer' : 'not-allowed',
-          fontSize: 14,
-          fontWeight: 'bold',
-        }}
+        })}
       >
         出牌
       </button>
       <button
         onClick={onEndTurn}
         disabled={!canEndTurn}
-        style={{
+        style={styles.btn(canEndTurn ? colors.accent.blue : colors.text.dim, {
           padding: '10px 28px',
-          backgroundColor: canEndTurn ? '#3498db' : '#7f8c8d',
-          color: 'white',
-          border: 'none',
-          borderRadius: 6,
           cursor: canEndTurn ? 'pointer' : 'not-allowed',
-          fontSize: 14,
-          fontWeight: 'bold',
-        }}
+        })}
       >
         结束回合
       </button>

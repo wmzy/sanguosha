@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type { RoomInfo } from '../../server/protocol';
+import { colors, styles } from '../theme';
 
 interface RoomLobbyProps {
   onJoinRoom: (roomId: string, playerId: string) => void;
@@ -108,9 +109,9 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
     return (
       <div style={{
         padding: 40,
-        backgroundColor: '#1a1a2e',
+        backgroundColor: colors.bg.page,
         minHeight: '100vh',
-        color: '#eee',
+        color: colors.text.primary,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -119,7 +120,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
         <h1 style={{ marginBottom: 30 }}>房间: {currentRoom}</h1>
 
         <div style={{
-          backgroundColor: '#2c3e50',
+          backgroundColor: colors.bg.panel,
           borderRadius: 12,
           padding: 30,
           minWidth: 300,
@@ -128,11 +129,11 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
         >
           <h2 style={{ marginBottom: 20 }}>玩家列表</h2>
           <div style={{ marginBottom: 20 }}>
-            <div style={{ padding: '8px 0', borderBottom: '1px solid #34495e' }}>
+            <div style={{ padding: '8px 0', borderBottom: `1px solid ${colors.bg.input}` }}>
               {playerId} (你) {isHost ? '- 房主' : ''} {isReady ? '- 已准备' : ''}
             </div>
             {playersInRoom.map(id => (
-              <div key={id} style={{ padding: '8px 0', borderBottom: '1px solid #34495e' }}>
+              <div key={id} style={{ padding: '8px 0', borderBottom: `1px solid ${colors.bg.input}` }}>
                 {id}
               </div>
             ))}
@@ -142,15 +143,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
             {!isReady && (
               <button
                 onClick={handleReady}
-                style={{
-                  padding: '10px 24px',
-                  backgroundColor: '#2ecc71',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                }}
+                style={styles.btn(colors.accent.green, { padding: '10px 24px' })}
               >
                 准备
               </button>
@@ -159,15 +152,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
             {isHost && (
               <button
                 onClick={handleStartGame}
-                style={{
-                  padding: '10px 24px',
-                  backgroundColor: '#e74c3c',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                }}
+                style={styles.btn(colors.accent.red, { padding: '10px 24px' })}
               >
                 开始游戏
               </button>
@@ -175,15 +160,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
 
             <button
               onClick={handleLeaveRoom}
-              style={{
-                padding: '10px 24px',
-                backgroundColor: '#7f8c8d',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 14,
-              }}
+              style={styles.btn(colors.text.dim, { padding: '10px 24px' })}
             >
               离开房间
             </button>
@@ -192,7 +169,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
 
         {error && (
           <div style={{
-            backgroundColor: '#e74c3c',
+            backgroundColor: colors.accent.red,
             padding: '10px 20px',
             borderRadius: 6,
             marginTop: 10,
@@ -207,13 +184,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
 
   // 大厅界面
   return (
-    <div style={{
-      padding: 40,
-      backgroundColor: '#1a1a2e',
-      minHeight: '100vh',
-      color: '#eee',
-    }}
-    >
+    <div style={styles.page(40)}>
       <h1 style={{ textAlign: 'center', marginBottom: 40 }}>三国杀 - 多人对战</h1>
 
       <div style={{
@@ -225,7 +196,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
       >
         {/* 创建房间 */}
         <div style={{
-          backgroundColor: '#2c3e50',
+          backgroundColor: colors.bg.panel,
           borderRadius: 12,
           padding: 30,
           minWidth: 300,
@@ -240,15 +211,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
               placeholder="输入房间名称"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: '#34495e',
-                border: 'none',
-                borderRadius: 6,
-                color: 'white',
-                fontSize: 14,
-              }}
+              style={styles.input()}
             />
           </div>
 
@@ -257,15 +220,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
             <select
               value={maxPlayers}
               onChange={(e) => setMaxPlayers(Number(e.target.value))}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: '#34495e',
-                border: 'none',
-                borderRadius: 6,
-                color: 'white',
-                fontSize: 14,
-              }}
+              style={styles.input()}
             >
               <option value={2}>2人</option>
               <option value={3}>3人</option>
@@ -280,8 +235,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
             style={{
               width: '100%',
               padding: '12px',
-              backgroundColor: connected ? '#e74c3c' : '#7f8c8d',
-              color: 'white',
+              backgroundColor: connected ? colors.accent.red : colors.text.dim,
+              color: colors.white,
               border: 'none',
               borderRadius: 6,
               cursor: connected ? 'pointer' : 'not-allowed',
@@ -295,7 +250,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
 
         {/* 房间列表 */}
         <div style={{
-          backgroundColor: '#2c3e50',
+          backgroundColor: colors.bg.panel,
           borderRadius: 12,
           padding: 30,
           minWidth: 300,
@@ -307,15 +262,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
           <div style={{ marginBottom: 15 }}>
             <button
               onClick={() => send({ type: 'list_rooms' })}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#3498db',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 13,
-              }}
+              style={styles.btn(colors.accent.blue, { padding: '8px 16px', fontSize: 13 })}
             >
               刷新列表
             </button>
@@ -323,7 +270,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
 
           <div style={{ maxHeight: 300, overflow: 'auto' }}>
             {rooms.length === 0 ? (
-              <div style={{ color: '#7f8c8d', textAlign: 'center', padding: 20 }}>
+              <div style={{ color: colors.text.dim, textAlign: 'center', padding: 20 }}>
                 暂无房间
               </div>
             ) : (
@@ -331,7 +278,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
                 <div
                   key={room.id}
                   style={{
-                    backgroundColor: '#34495e',
+                    backgroundColor: colors.bg.input,
                     borderRadius: 8,
                     padding: 15,
                     marginBottom: 10,
@@ -342,22 +289,17 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
                 >
                   <div>
                     <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{room.name}</div>
-                    <div style={{ fontSize: 12, color: '#95a5a6' }}>
+                    <div style={{ fontSize: 12, color: colors.text.muted }}>
                       {room.playerCount}/{room.maxPlayers} 玩家 | {room.status}
                     </div>
                   </div>
                   <button
                     onClick={() => handleJoinRoom(room.id)}
                     disabled={room.status !== '等待中' || room.playerCount >= room.maxPlayers}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: room.status === '等待中' && room.playerCount < room.maxPlayers ? '#2ecc71' : '#7f8c8d',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 6,
-                      cursor: room.status === '等待中' && room.playerCount < room.maxPlayers ? 'pointer' : 'not-allowed',
-                      fontSize: 13,
-                    }}
+                    style={styles.btn(
+                      room.status === '等待中' && room.playerCount < room.maxPlayers ? colors.accent.green : colors.text.dim,
+                      { padding: '8px 16px', fontSize: 13, cursor: room.status === '等待中' && room.playerCount < room.maxPlayers ? 'pointer' : 'not-allowed' },
+                    )}
                   >
                     加入
                   </button>
@@ -372,23 +314,14 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
       <div style={{
         textAlign: 'center',
         marginTop: 30,
-        color: connected ? '#2ecc71' : '#e74c3c',
+        color: connected ? colors.accent.green : colors.accent.red,
       }}
       >
         {connected ? '已连接到服务器' : '未连接，请检查服务器是否启动'}
       </div>
 
       {error && (
-        <div style={{
-          position: 'fixed',
-          top: 20,
-          right: 20,
-          backgroundColor: '#e74c3c',
-          padding: '15px 25px',
-          borderRadius: 8,
-          zIndex: 1000,
-        }}
-        >
+        <div style={styles.errorToast()}>
           {error}
         </div>
       )}
