@@ -1,0 +1,39 @@
+import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, ServerEvent } from './types';
+
+const registry = new Map<string, PhaseDefinition>();
+
+export function registerPhase<P>(def: PhaseDefinition<P>): void {
+  if (registry.has(def.type)) {
+    throw new Error(`Phase type "${def.type}" already registered`);
+  }
+  registry.set(def.type, def as PhaseDefinition);
+}
+
+export function getPhaseDef(type: string): PhaseDefinition {
+  const def = registry.get(type);
+  if (!def) throw new Error(`Unknown phase type: "${type}"`);
+  return def;
+}
+
+export function executePlan(
+  state: GameState,
+  phases: SkillPhase[],
+  ctx: SkillContext,
+  resumeFrom?: number,
+): EngineResult {
+  let s = state;
+  const events: ServerEvent[] = [];
+
+  for (let i = resumeFrom ?? 0; i < phases.length; i++) {
+    const phase = phases[i];
+    const def = getPhaseDef(phase.type);
+    const result = def.execute(s, phase, ctx, phases, i);
+    s = result.state;
+    events.push(...result.events);
+    if (s.pending !== null) {
+      return { state: s, events };
+    }
+  }
+
+  return { state: s, events };
+}

@@ -1,0 +1,14 @@
+import './damage';
+import './draw';
+import './heal';
+import './discard';
+import './moveCard';
+import './equip';
+import './var';
+import './phase';
+import './tag';
+import './pending';
+import './judge';
+import './pendingTrick';
+import './kill';
+import './gainCard';
