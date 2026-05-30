@@ -2,6 +2,7 @@ import './damage';
 import './draw';
 import './heal';
 import './discard';
+import './discardRandom';
 import './moveCard';
 import './equip';
 import './var';
