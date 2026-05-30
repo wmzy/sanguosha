@@ -167,7 +167,7 @@ function handleStartGame(playerId: string): void {
   }
 }
 
-function handleAction(playerId: string, action: import('../shared/types').PlayerAction): void {
+function handleAction(playerId: string, action: import('../engine/v2/types').GameAction): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 

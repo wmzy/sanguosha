@@ -1,22 +1,26 @@
-// server/协议.ts
-import type { PublicGameState, TurnPhase, PlayerAction, Role } from '../shared/types';
+import type { GameAction, GameView, ServerEvent } from '../engine/v2/types';
+import type { Role } from '../shared/types';
 
-// 服务端 → 客户端
+export interface PlayerEvent {
+  id: string;
+  type: string;
+  timestamp: number;
+  payload: unknown;
+}
+
 export type ServerMessage =
-  | { type: 'state_update'; state: PublicGameState }
-  | { type: 'your_turn'; phase: TurnPhase }
-  | { type: 'prompt'; promptId: string; prompt: { name: string; description: string; type: string; options: unknown[] } }
-  | { type: 'game_over'; winner: Role }
+  | { type: 'gameView'; view: GameView }
+  | { type: 'events'; events: PlayerEvent[] }
   | { type: 'error'; message: string }
+  | { type: 'gameOver'; winner: string }
   | { type: 'room_joined'; roomId: string; playerId: string }
   | { type: 'player_joined'; playerId: string }
   | { type: 'player_left'; playerId: string }
   | { type: 'game_started' }
   | { type: 'room_list'; rooms: RoomInfo[] };
 
-// 客户端 → 服务端
 export type ClientMessage =
-  | { type: 'action'; action: PlayerAction }
+  | { type: 'action'; action: GameAction }
   | { type: 'response'; promptId: string; choice: unknown }
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
@@ -25,7 +29,6 @@ export type ClientMessage =
   | { type: 'leave_room' }
   | { type: 'list_rooms' };
 
-// 房间信息（用于列表展示）
 export interface RoomInfo {
   id: string;
   name: string;
@@ -34,7 +37,6 @@ export interface RoomInfo {
   status: '等待中' | '进行中' | '已结束';
 }
 
-// 验证消息格式
 export function isValidClientMessage(data: unknown): data is ClientMessage {
   if (typeof data !== 'object' || data === null) return false;
   const msg = data as Record<string, unknown>;
@@ -59,12 +61,10 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
   }
 }
 
-// 序列化消息
 export function serialize(msg: ServerMessage): string {
   return JSON.stringify(msg);
 }
 
-// 反序列化消息
 export function deserialize(data: string): ClientMessage | null {
   try {
     const parsed: unknown = JSON.parse(data);

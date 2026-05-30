@@ -1,40 +1,8 @@
-import { useState, useCallback } from 'react';
-import type { GameLog } from '../../shared/log';
-import { ReplayEngine } from '../../engine/replay';
-import { ReplayControls } from './ReplayControls';
-import { PlayerPanel } from './PlayerPanel';
-import { LogPanel } from './LogPanel';
-
 interface ReplayBoardProps {
-  log: GameLog;
   onExit: () => void;
 }
 
-export function ReplayBoard({ log, onExit }: ReplayBoardProps) {
-  const [engine] = useState(() => ReplayEngine.create(log));
-  const [currentStep, setCurrentStep] = useState(0);
-  const [selectedPlayer, setSelectedPlayer] = useState(log.meta.characters[0]);
-
-  const state = engine.getCurrentState();
-  const playerView = engine.getPlayerView(selectedPlayer);
-
-  const handlePrev = useCallback(() => {
-    engine.prev();
-    setCurrentStep(engine.getCurrentStep());
-  }, [engine]);
-
-  const handleNext = useCallback(() => {
-    engine.next();
-    setCurrentStep(engine.getCurrentStep());
-  }, [engine]);
-
-  const handleGoTo = useCallback((step: number) => {
-    engine.goTo(step);
-    setCurrentStep(engine.getCurrentStep());
-  }, [engine]);
-
-  const currentOp = engine.getCurrentOp();
-
+export function ReplayBoard({ onExit }: ReplayBoardProps) {
   return (
     <div style={{ padding: 20, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -42,46 +10,19 @@ export function ReplayBoard({ log, onExit }: ReplayBoardProps) {
         <button onClick={onExit} style={exitBtnStyle}>退出重播</button>
       </div>
 
-      <ReplayControls
-        currentStep={currentStep}
-        totalSteps={engine.getTotalSteps()}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onGoTo={handleGoTo}
-        players={log.meta.characters}
-        selectedPlayer={selectedPlayer}
-        onSelectPlayer={setSelectedPlayer}
-      />
-
-      {currentOp && (
-        <div style={{
-          backgroundColor: '#2c3e50',
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 16,
-          fontSize: 14,
-        }}
-        >
-          <span style={{ color: '#e74c3c' }}>当前操作:</span> {currentOp.description}
+      <div style={{
+        textAlign: 'center',
+        padding: 60,
+        backgroundColor: '#2c3e50',
+        borderRadius: 12,
+      }}>
+        <div style={{ fontSize: 24, marginBottom: 16, color: '#f39c12' }}>
+          重播功能暂未适配 V2 引擎
         </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 20 }}>
-        {playerView.players.map(player => (
-          <PlayerPanel
-            key={player.name}
-            player={{ ...player, hand: player.hand ?? [] }}
-            isCurrentPlayer={player.name === state.currentPlayer}
-            isSelf={player.name === selectedPlayer}
-          />
-        ))}
+        <div style={{ fontSize: 14, color: '#95a5a6' }}>
+          新的重播系统将基于 V2 引擎的事件日志重建，敬请期待。
+        </div>
       </div>
-
-      <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        回合 {state.round} | 阶段: {state.phase} | 当前玩家: {state.currentPlayer}
-      </div>
-
-      <LogPanel operations={log.playerOps[selectedPlayer] ?? []} maxHeight={300} />
     </div>
   );
 }

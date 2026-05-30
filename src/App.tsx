@@ -3,35 +3,32 @@ import { GameBoard } from './components/GameBoard';
 import { RoomLobby } from './components/RoomLobby';
 import { ReplayBoard } from './components/ReplayBoard';
 import { useState, useCallback } from 'react';
-import type { GameLog } from '../shared/log';
+import { loadState } from './utils/logFile';
+import type { GameState } from '../engine/v2/types';
 
 function HomePage() {
-  const [replayLog, setReplayLog] = useState<GameLog | null>(null);
+  const [replayState, setReplayState] = useState<GameState | null>(null);
 
   const handleLoadLog = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const data = JSON.parse(reader.result as string);
-            setReplayLog(data as GameLog);
-          } catch {
-            alert('无效的日志文件');
-          }
-        };
-        reader.readAsText(file);
+        try {
+          const data = await loadState(file);
+          setReplayState(data);
+        } catch {
+          alert('无效的日志文件');
+        }
       }
     };
     input.click();
   }, []);
 
-  if (replayLog) {
-    return <ReplayBoard log={replayLog} onExit={() => setReplayLog(null)} />;
+  if (replayState) {
+    return <ReplayBoard onExit={() => setReplayState(null)} />;
   }
 
   return (
@@ -83,8 +80,6 @@ function LobbyPage() {
 
 function MultiplayerPage() {
   const navigate = useNavigate();
-  // roomId comes from URL params, playerId from location state
-  // For now, use a simplified approach
 
   return (
     <div>

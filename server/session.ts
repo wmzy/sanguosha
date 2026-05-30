@@ -1,15 +1,133 @@
-// server/session.ts
-import type { PlayerAction, Card } from '../shared/types';
+import type { GameAction, GameState, ClientPlayer, GameView, ValidAction, PendingView } from '../engine/v2/types';
+import type { ServerMessage } from './protocol';
 import type { Room } from './room';
-import { GameController } from '../engine/game';
+import { createInitialState, getPlayer, getAlivePlayerNames } from '../engine/v2/state';
+import { engine } from '../engine/v2/engine';
+import { serialize as serializeState, deserialize as deserializeState } from '../engine/v2/serializer';
+import { registerCharacterTriggers } from '../engine/v2/skill';
+import { computeValidActions } from '../engine/v2/validate';
 import { allCharacters } from '../shared/characters';
 import { serialize } from './protocol';
 import { setRoomStatus } from './room';
+import type { Role } from '../shared/types';
+
+const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
+
+function assignRoles(count: number): Role[] {
+  if (count === 2) return ['主公', '反贼'];
+  if (count === 3) return ['主公', '反贼', '内奸'];
+  if (count === 4) return ['主公', '忠臣', '反贼', '反贼'];
+  const roles: Role[] = ['主公', '忠臣', '内奸'];
+  for (let i = 3; i < count; i++) roles.push('反贼');
+  return roles;
+}
+
+function buildGameView(state: GameState, playerName: string): GameView {
+  const clientPlayers: Record<string, ClientPlayer> = {};
+
+  for (const name of state.playerOrder) {
+    const p = getPlayer(state, name);
+    const isSelf = name === playerName;
+    const hand = isSelf
+      ? p.hand.map(id => state.cardMap[id])
+      : [];
+    const equipment: Record<string, import('../shared/types').Card | undefined> = {};
+    if (p.equipment.weapon) equipment.weapon = state.cardMap[p.equipment.weapon];
+    if (p.equipment.armor) equipment.armor = state.cardMap[p.equipment.armor];
+    if (p.equipment.horsePlus) equipment.horsePlus = state.cardMap[p.equipment.horsePlus];
+    if (p.equipment.horseMinus) equipment.horseMinus = state.cardMap[p.equipment.horseMinus];
+
+    clientPlayers[name] = {
+      name,
+      health: p.health,
+      maxHealth: p.maxHealth,
+      hand,
+      handCount: p.hand.length,
+      equipment,
+      characterId: p.info.characterId,
+      role: p.info.role,
+      alive: p.info.alive,
+      gender: p.info.gender,
+      faction: p.info.faction,
+      vars: p.vars,
+    };
+  }
+
+  let pending: PendingView | undefined;
+  if (state.pending) {
+    const p = state.pending;
+    switch (p.type) {
+      case 'responseWindow':
+        pending = {
+          type: p.window.type,
+          prompt: getPendingPrompt(p.window.type),
+          validCards: p.window.validCards,
+          timeout: p.timeout,
+          deadline: p.deadline,
+        };
+        break;
+      case 'discardPhase':
+        pending = {
+          type: 'discard',
+          prompt: `请弃掉 ${p.min}~${p.max} 张牌`,
+          timeout: p.timeout,
+          deadline: p.deadline,
+        };
+        break;
+      case 'dyingWindow':
+        pending = {
+          type: 'dying',
+          prompt: `${p.dyingPlayer} 濒死，是否出桃？`,
+          timeout: p.timeout,
+          deadline: p.deadline,
+        };
+        break;
+      case 'skillPrompt':
+        pending = {
+          type: 'skillChoice',
+          prompt: p.prompt.text,
+          options: p.prompt.options,
+          timeout: p.timeout,
+          deadline: p.deadline,
+        };
+        break;
+    }
+  }
+
+  const actions: ValidAction[] = computeValidActions(state, playerName);
+
+  return {
+    state: {
+      self: playerName,
+      players: clientPlayers,
+      phase: state.phase,
+      currentPlayer: state.currentPlayer,
+      turn: { killsPlayed: state.turn.killsPlayed },
+      zones: {
+        discardPile: state.zones.discardPile.map(id => state.cardMap[id]),
+        deckCount: state.zones.deck.length,
+      },
+    },
+    pending,
+    actions,
+  };
+}
+
+function getPendingPrompt(windowType: string): string {
+  switch (windowType) {
+    case 'killResponse': return '请选择是否出闪';
+    case 'aoeResponse': return '请选择是否响应';
+    case 'dyingResponse': return '请选择是否出桃';
+    case 'duelResponse': return '请选择是否出杀';
+    case 'trickResponse': return '请选择是否响应';
+    default: return '请响应';
+  }
+}
 
 export class GameSession {
-  private controller: GameController | null = null;
+  private state: GameState | null = null;
   private room: Room;
-  private playerNames = new Map<string, string>(); // playerId -> playerName
+  private playerNames = new Map<string, string>();
 
   constructor(room: Room) {
     this.room = room;
@@ -21,24 +139,40 @@ export class GameSession {
     const seed = Date.now();
     const shuffled = [...allCharacters].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, this.room.players.size);
+    const roles = assignRoles(this.room.players.size);
 
     const playerIds = [...this.room.players.keys()];
+    const players = playerIds.map((id, i) => ({
+      name: selected[i].name,
+      characterId: selected[i].name,
+      role: roles[i],
+    }));
+
     for (let i = 0; i < playerIds.length; i++) {
       this.playerNames.set(playerIds[i], selected[i].name);
     }
 
-    // GameController 管理种子化 RNG、技能注册、初始摸牌、回合推进
-    const { controller } = GameController.createGame(selected, seed);
-    this.controller = controller;
+    let state = createInitialState({
+      players,
+      seed,
+      characterMap,
+    });
+
+    for (const playerName of state.playerOrder) {
+      state = registerCharacterTriggers(state, playerName, { characterMap });
+    }
+
+    this.state = state;
+
+    import('../engine/v2/skills/index');
 
     setRoomStatus(this.room.id, '进行中');
-    this.broadcastState();
-    this.notifyCurrentPlayer();
+    this.broadcastGameView();
     return true;
   }
 
-  handleAction(playerId: string, action: PlayerAction): void {
-    if (!this.controller) {
+  handleAction(playerId: string, action: GameAction): void {
+    if (!this.state) {
       this.sendToPlayer(playerId, { type: 'error', message: '游戏未开始' });
       return;
     }
@@ -49,210 +183,66 @@ export class GameSession {
       return;
     }
 
-    const state = this.controller.getState();
-    if (state.status === '已结束') {
+    if (this.state.meta.status === '已结束') {
       this.sendToPlayer(playerId, { type: 'error', message: '游戏已结束' });
       return;
     }
 
-    const responseWindow = this.controller.getCurrentResponseWindow();
-    if (responseWindow && action.type === '响应') {
-      this.handleResponse(playerName, action);
+    const fullAction: GameAction = { ...action, player: playerName };
+
+    const result = engine(this.state, fullAction);
+
+    if (result.error) {
+      this.sendToPlayer(playerId, { type: 'error', message: result.error });
       return;
     }
 
-    if (state.currentPlayer !== playerName) {
-      this.sendToPlayer(playerId, { type: 'error', message: '不是你的回合' });
-      return;
-    }
+    this.state = result.state;
 
-    switch (action.type) {
-      case '出牌':
-        this.handlePlayCard(playerName, action);
-        break;
-      case '结束回合':
-        this.handleEndTurn(playerName);
-        break;
-      case '弃牌':
-        this.handleDiscard(playerName, action);
-        break;
-      case '发动技能':
-        this.handleActivateSkill(playerName, action);
-        break;
-      default:
-        this.sendToPlayer(playerId, { type: 'error', message: '未知操作' });
-    }
-  }
-
-  private handlePlayCard(playerName: string, action: PlayerAction): void {
-    if (!this.controller || action.type !== '出牌') return;
-
-    const result = this.controller.playCard(playerName, action.card.id, action.target);
-
-    if (!result.success) {
-      this.sendToPlayerByName(playerName, { type: 'error', message: '操作失败' });
-      return;
-    }
-
-    if (result.responseWindow) {
-      this.notifyResponders(result.responseWindow);
-    }
-
+    this.broadcastEvents(result.events);
     this.checkGameEnd();
-    this.broadcastState();
+    this.broadcastGameView();
   }
 
-  private handleEndTurn(playerName: string): void {
-    if (!this.controller) return;
+  private broadcastEvents(events: import('../engine/v2/types').ServerEvent[]): void {
+    if (events.length === 0) return;
 
-    const result = this.controller.endTurn(playerName);
-
-    if (!result.success) {
-      const state = this.controller.getState();
-      if (state.phase === '弃牌') {
-        this.sendToPlayerByName(playerName, {
-          type: 'prompt',
-          promptId: 'discard',
-          prompt: {
-            name: '弃牌',
-            description: '手牌超过体力上限，请弃牌',
-            type: 'select_card',
-            options: [],
-          },
-        });
-        this.broadcastState();
-        return;
-      }
-
-      this.sendToPlayerByName(playerName, { type: 'error', message: '无法结束回合' });
-      return;
+    for (const [pid] of this.playerNames) {
+      this.sendToPlayer(pid, {
+        type: 'events',
+        events: events.map(ev => ({
+          id: ev.id,
+          type: ev.type,
+          timestamp: ev.timestamp,
+          payload: ev.payload,
+        })),
+      });
     }
-
-    this.checkGameEnd();
-    this.broadcastState();
-    this.notifyCurrentPlayer();
   }
 
-  private handleDiscard(playerName: string, action: PlayerAction): void {
-    if (!this.controller || action.type !== '弃牌') return;
+  private broadcastGameView(): void {
+    if (!this.state || this.state.meta.status !== '进行中') return;
 
-    const state = this.controller.getState();
-    const player = state.players.find(p => p.name === playerName);
-    if (!player) return;
-
-    const indices: number[] = [];
-    for (const card of action.cards) {
-      const idx = player.hand.findIndex(c => c.id === card.id);
-      if (idx >= 0) indices.push(idx);
-    }
-
-    if (indices.length === 0) return;
-
-    const result = this.controller.discard(playerName, indices);
-
-    this.checkGameEnd();
-    this.broadcastState();
-    this.notifyCurrentPlayer();
-  }
-
-  private handleActivateSkill(playerName: string, action: PlayerAction): void {
-    if (!this.controller || action.type !== '发动技能') return;
-
-    const skills = this.controller.getValidActionsForPlayer(playerName).skills;
-    const skillIndex = skills.findIndex(s => s.name === action.skillName);
-
-    if (skillIndex === -1) {
-      this.sendToPlayerByName(playerName, { type: 'error', message: '技能不可用' });
-      return;
-    }
-
-    const result = this.controller.activateSkill(playerName, skillIndex, action.target);
-
-    if (!result.success) {
-      this.sendToPlayerByName(playerName, { type: 'error', message: '技能发动失败' });
-      return;
-    }
-
-    this.checkGameEnd();
-    this.broadcastState();
-  }
-
-  private handleResponse(playerName: string, action: PlayerAction): void {
-    if (!this.controller || action.type !== '响应') return;
-
-    const responses = new Map<string, Card | null>();
-    responses.set(playerName, action.card ?? null);
-
-    const result = this.controller.respondToWindow(responses);
-
-    if (result.responseWindow) {
-      this.notifyResponders(result.responseWindow);
-    }
-
-    this.checkGameEnd();
-    this.broadcastState();
-  }
-
-  private notifyResponders(window: import('../engine/types').ResponseWindow): void {
-    for (const responderName of window.validResponders) {
-      for (const [playerId, name] of this.playerNames) {
-        if (name === responderName) {
-          this.sendToPlayer(playerId, {
-            type: 'prompt',
-            promptId: `response_${window.type}`,
-            prompt: {
-              name: window.type === 'kill_response' ? '请出闪' :
-                window.type === 'aoe_response' ? `请出${window.validCards[0] ?? '牌'}` :
-                  window.type === 'dying' ? '请出桃' : '请响应',
-              description: `${window.requester} 对你使用了牌，请选择是否响应`,
-              type: 'select_card',
-              options: window.validCards,
-            },
-          });
-        }
-      }
+    for (const [playerId, playerName] of this.playerNames) {
+      const view = buildGameView(this.state!, playerName);
+      this.sendToPlayer(playerId, { type: 'gameView', view });
     }
   }
 
   private checkGameEnd(): void {
-    if (!this.controller) return;
+    if (!this.state) return;
 
-    const state = this.controller.getState();
-    if (state.status === '已结束') {
+    if (this.state.meta.status === '已结束') {
       setRoomStatus(this.room.id, '已结束');
-      this.broadcast({ type: 'game_over', winner: state.winner! });
-    }
-  }
-
-  broadcastState(): void {
-    if (!this.controller) return;
-
-    const state = this.controller.getState();
-    if (state.status !== '进行中') return;
-
-    for (const [playerId, playerName] of this.playerNames) {
-      const publicState = this.controller.getPublicState(playerName);
-      this.sendToPlayer(playerId, { type: 'state_update', state: publicState });
-    }
-  }
-
-  notifyCurrentPlayer(): void {
-    if (!this.controller) return;
-
-    const state = this.controller.getState();
-    for (const [playerId, playerName] of this.playerNames) {
-      if (playerName === state.currentPlayer) {
-        this.sendToPlayer(playerId, { type: 'your_turn', phase: state.phase });
-      }
+      this.broadcast({ type: 'gameOver', winner: this.state.meta.winner ?? '未知' });
     }
   }
 
   handleDisconnect(playerId: string): void {
-    if (!this.controller) return;
+    if (!this.state) return;
 
     const playerName = this.playerNames.get(playerId) ?? '未知玩家';
-    const state = this.controller.getState();
-    if (state.status === '进行中') {
+    if (this.state.meta.status === '进行中') {
       setRoomStatus(this.room.id, '已结束');
       this.broadcast({ type: 'error', message: `${playerName} 断开连接，游戏结束` });
     }
@@ -262,7 +252,21 @@ export class GameSession {
     return this.playerNames.get(playerId);
   }
 
-  private sendToPlayer(playerId: string, message: import('./protocol').ServerMessage): void {
+  serializeState(): string | null {
+    if (!this.state) return null;
+    return serializeState(this.state);
+  }
+
+  deserializeAndRestore(json: string): boolean {
+    try {
+      this.state = deserializeState(json);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private sendToPlayer(playerId: string, message: ServerMessage): void {
     const ws = this.room.players.get(playerId);
     if (ws) {
       try {
@@ -273,16 +277,7 @@ export class GameSession {
     }
   }
 
-  private sendToPlayerByName(playerName: string, message: import('./protocol').ServerMessage): void {
-    for (const [playerId, name] of this.playerNames) {
-      if (name === playerName) {
-        this.sendToPlayer(playerId, message);
-        return;
-      }
-    }
-  }
-
-  private broadcast(message: import('./protocol').ServerMessage): void {
+  private broadcast(message: ServerMessage): void {
     const data = serialize(message);
     for (const [, ws] of this.room.players) {
       try {

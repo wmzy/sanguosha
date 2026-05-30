@@ -1,7 +1,6 @@
-// src/components/MultiplayerGameBoard.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import type { PublicGameState, PlayerAction } from '../../shared/types';
+import type { GameView, GameAction } from '../../engine/v2/types';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
@@ -17,14 +16,12 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);
 
-  const [gameState, setGameState] = useState<PublicGameState | null>(null);
+  const [gameView, setGameView] = useState<GameView | null>(null);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
-  const [log, setLog] = useState<string[]>(['游戏开始！']);
-  const [isMyTurn, setIsMyTurn] = useState(false);
+  const [log, setLog] = useState<string[]>(['等待游戏开始...']);
   const [error, setError] = useState<string | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
 
-  // 连接并加入房间
   useEffect(() => {
     connect();
   }, [connect]);
@@ -35,27 +32,20 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
     }
   }, [connected, roomId, send]);
 
-  // 处理消息
   useEffect(() => {
     if (!lastMessage) return;
 
     const message = lastMessage;
 
     switch (message.type) {
-      case 'state_update':
-        setGameState(message.state);
+      case 'gameView':
+        setGameView(message.view);
         break;
 
-      case 'your_turn':
-        setIsMyTurn(true);
-        setLog(prev => [...prev, `轮到你的回合 (${message.phase})`]);
+      case 'events':
         break;
 
-      case 'game_started':
-        setLog(prev => [...prev, '游戏开始！']);
-        break;
-
-      case 'game_over':
+      case 'gameOver':
         setGameOver({ winner: message.winner });
         setLog(prev => [...prev, `游戏结束！${message.winner}获胜！`]);
         break;
@@ -72,47 +62,47 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
       case 'player_left':
         setLog(prev => [...prev, `玩家 ${message.playerId} 离开`]);
         break;
+
+      case 'game_started':
+        setLog(prev => [...prev, '游戏开始！']);
+        break;
     }
   }, [lastMessage]);
 
-  // 获取当前玩家信息
-  const myPlayer = gameState?.players.find(p => {
-    // 通过位置匹配，因为playerId和playerName不同
-    const index = gameState.players.indexOf(p);
-    return index === 0; // 简化：假设第一个玩家是自己
-  });
+  const isMyTurn = gameView?.state.self === gameView?.state.currentPlayer;
 
-  const handlePlayCard = useCallback(() => {
-    if (selectedCard === null || !myPlayer || !isMyTurn) return;
-
-    const card = myPlayer.hand?.[selectedCard];
-    if (!card) return;
-
-    const action: PlayerAction = {
-      type: '出牌',
-      card,
-      target: gameState?.players.find(p => p.name !== myPlayer.name && p.alive)?.name,
-    };
-
+  const sendAction = useCallback((action: GameAction) => {
     send({ type: 'action', action });
     setSelectedCard(null);
-    setIsMyTurn(false);
-  }, [selectedCard, myPlayer, isMyTurn, gameState, send]);
+  }, [send]);
+
+  const handlePlayCard = useCallback(() => {
+    if (selectedCard === null || !gameView || !isMyTurn) return;
+
+    const myPlayer = gameView.state.players[gameView.state.self];
+    if (!myPlayer) return;
+
+    const card = myPlayer.hand[selectedCard];
+    if (!card) return;
+
+    const playAction = gameView.actions.find(a => a.type === 'playCard');
+    const cardEntry = playAction?.type === 'playCard' ? playAction.cards.find(c => c.cardId === card.id) : undefined;
+    const target = cardEntry?.targets.length ? cardEntry.targets[0] : undefined;
+
+    sendAction({ type: 'playCard', player: gameView.state.self, cardId: card.id, target });
+  }, [selectedCard, gameView, isMyTurn, sendAction]);
 
   const handleEndTurn = useCallback(() => {
-    if (!isMyTurn) return;
-
-    const action: PlayerAction = { type: '结束回合' };
-    send({ type: 'action', action });
-    setIsMyTurn(false);
-  }, [isMyTurn, send]);
+    if (!gameView || !isMyTurn) return;
+    sendAction({ type: 'endTurn', player: gameView.state.self });
+  }, [gameView, isMyTurn, sendAction]);
 
   const handleLeave = useCallback(() => {
     send({ type: 'leave_room' });
     onLeave();
   }, [send, onLeave]);
 
-  if (!gameState) {
+  if (!gameView) {
     return (
       <div style={{
         padding: 40,
@@ -146,6 +136,10 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
     );
   }
 
+  const { state: view } = gameView;
+  const myPlayer = view.players[view.self];
+  const playerNames = Object.keys(view.players);
+
   return (
     <div style={{ padding: 20, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -165,29 +159,49 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
         </button>
       </div>
 
-      {/* 玩家面板 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 30, flexWrap: 'wrap' }}>
-        {gameState.players.map((player, index) => (
-          <PlayerPanel
-            key={player.name}
-            player={{
-              ...player,
-              hand: player.hand ?? [],
-            }}
-            isCurrentPlayer={player.name === gameState.currentPlayer}
-            isSelf={index === 0} // 简化：第一个玩家是自己
-          />
-        ))}
+        {playerNames.map((name) => {
+          const player = view.players[name];
+          return (
+            <PlayerPanel
+              key={name}
+              playerName={name}
+              player={{
+                info: {
+                  name,
+                  characterId: player.characterId,
+                  role: player.role,
+                  alive: player.alive,
+                  gender: player.gender,
+                  faction: player.faction,
+                },
+                health: player.health,
+                maxHealth: player.maxHealth,
+                hand: player.hand.map(c => c.id),
+                equipment: {
+                  weapon: player.equipment.weapon?.id,
+                  armor: player.equipment.armor?.id,
+                  horsePlus: player.equipment.horsePlus?.id,
+                  horseMinus: player.equipment.horseMinus?.id,
+                },
+                pendingTricks: [],
+                vars: player.vars,
+                tags: [],
+              }}
+              cardMap={Object.fromEntries(player.hand.map(c => [c.id, c]))}
+              isCurrentPlayer={name === view.currentPlayer}
+              isSelf={name === view.self}
+            />
+          );
+        })}
       </div>
 
-      {/* 游戏信息 */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span>回合 {gameState.round} | 阶段: {gameState.phase} | 当前玩家: {gameState.currentPlayer}</span>
+        <span>阶段: {view.phase} | 当前玩家: {view.currentPlayer}</span>
         {isMyTurn && <span style={{ color: '#2ecc71', marginLeft: 10 }}>- 你的回合！</span>}
       </div>
 
-      {/* 手牌 */}
-      {myPlayer?.hand && (
+      {myPlayer && (
         <div style={{ marginBottom: 20 }}>
           <HandCards
             hand={myPlayer.hand}
@@ -197,17 +211,15 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
         </div>
       )}
 
-      {/* 操作面板 */}
       <div style={{ marginBottom: 20 }}>
         <ActionPanel
-          canPlay={selectedCard !== null && isMyTurn && gameState.phase === '出牌'}
-          canEndTurn={isMyTurn && gameState.phase === '出牌'}
+          canPlay={selectedCard !== null && isMyTurn && view.phase === '出牌'}
+          canEndTurn={isMyTurn && view.phase === '出牌'}
           onPlayCard={handlePlayCard}
           onEndTurn={handleEndTurn}
         />
       </div>
 
-      {/* 日志 */}
       <div style={{
         maxHeight: 200,
         overflow: 'auto',
@@ -221,7 +233,6 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
         ))}
       </div>
 
-      {/* 游戏结束 */}
       {gameOver && (
         <div style={{
           position: 'fixed',
@@ -263,7 +274,6 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
         </div>
       )}
 
-      {/* 错误提示 */}
       {error && (
         <div style={{
           position: 'fixed',
@@ -279,7 +289,6 @@ export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: M
         </div>
       )}
 
-      {/* 连接状态 */}
       {!connected && (
         <div style={{
           position: 'fixed',

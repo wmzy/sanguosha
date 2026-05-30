@@ -1,25 +1,30 @@
 import { useGame } from '../hooks/useGame';
-import { getDistance } from '../../engine/distance';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
 import { LogPanel } from './LogPanel';
 import { Timer } from './Timer';
+import type { PlayerState } from '../../engine/v2/types';
+import type { Operation } from '../../shared/log';
 
 export function GameBoard() {
   const {
-    game,
+    state,
     me,
     myName,
     playerOrder,
     isMyTurn,
-    selectedCard,
+    selectedCardId,
+    selectedCardIndex,
     selectCard,
     selectedTarget,
     setSelectedTarget,
     canPlay,
-    validActions,
-    playerOps,
+    playableCardIds,
+    needsTarget,
+    validTargetList,
+    handlePlayCard,
+    handleEndTurn,
     timerSeconds,
     timerPaused,
     toggleTimer,
@@ -27,69 +32,68 @@ export function GameBoard() {
     goToCurrentPlayer,
     availableSkills,
     handleActivateSkill,
-    pendingResponse,
-    targetHasDodge,
+    pendingPrompt,
+    hasDodge,
     respondToKill,
-    pendingDying,
     respondToDying,
     needsDiscard,
     discardCount,
     selectedForDiscard,
     toggleDiscardSelection,
     handleDiscard,
-    handlePlayCard,
-    handleEndTurn,
     handleSaveLog,
+    myHand,
+    orderedPlayers,
+    getDistance,
   } = useGame();
 
-  const selectedCardData = selectedCard !== null ? me.hand[selectedCard] : null;
-  const selectedCardEntry = selectedCard !== null
-    ? validActions.playableCards.find(pc => pc.card.id === me.hand[selectedCard]?.id)
-    : undefined;
-  const needsTarget = selectedCard !== null && !!selectedCardEntry && selectedCardEntry.targets.length > 0;
-  const validTargets = selectedCardEntry?.targets ?? [];
+  const ordered = orderedPlayers;
 
-  // 按 playerOrder 排列玩家（逆时针顺序）
-  const orderedPlayers = playerOrder
-    .map(name => game.players.find(p => p.name === name))
-    .filter(Boolean) as typeof game.players;
+  const bottomPlayer = ordered[0];
+  const rightBottomPlayer = ordered[1];
+  const rightTopPlayer = ordered[2];
+  const leftTopPlayer = ordered[3];
+  const leftBottomPlayer = ordered[4];
 
-  // 座位布局（逆时针）: [0]底部, [1]右下, [2]右上, [3]左上, [4]左下
-  const bottomPlayer = orderedPlayers[0];
-  const rightBottomPlayer = orderedPlayers[1];
-  const rightTopPlayer = orderedPlayers[2];
-  const leftTopPlayer = orderedPlayers[3];
-  const leftBottomPlayer = orderedPlayers[4];
-
-  // 获取玩家在原始数组中的座次号
   const getSeatNumber = (playerName: string): number => {
-    return game.players.findIndex(p => p.name === playerName) + 1;
+    return state.playerOrder.indexOf(playerName) + 1;
   };
 
-  const renderPlayerPanel = (player: typeof game.players[0]) => (
-    <div
-      onClick={() => {
-        if (needsTarget && player.name !== myName && player.alive && validTargets.includes(player.name)) {
-          setSelectedTarget(player.name === selectedTarget ? null : player.name);
-        }
-      }}
-      style={{
-        cursor: needsTarget && player.name !== myName && player.alive && validTargets.includes(player.name) ? 'pointer' : 'default',
-        outline: selectedTarget === player.name ? '3px solid #e74c3c' : 'none',
-        borderRadius: 12,
-        transition: 'outline 0.2s',
-        opacity: needsTarget && !validTargets.includes(player.name) && player.name !== myName ? 0.5 : 1,
-      }}
-    >
-      <PlayerPanel
-        player={player}
-        isCurrentPlayer={player.name === game.currentPlayer}
-        isSelf={player.name === myName}
-        seatNumber={getSeatNumber(player.name)}
-        distance={selectedCard !== null && player.name !== myName ? getDistance(game, myName, player.name) : undefined}
-      />
-    </div>
-  );
+  const isKillResponse = pendingPrompt?.type === 'killResponse';
+  const isDyingWindow = pendingPrompt?.type === 'dyingWindow';
+
+  const renderPlayerPanel = (entry: { name: string; player: PlayerState }) => {
+    const { name, player } = entry;
+    return (
+      <div
+        key={name}
+        onClick={() => {
+          if (needsTarget && name !== myName && player.info.alive && validTargetList.includes(name)) {
+            setSelectedTarget(name === selectedTarget ? null : name);
+          }
+        }}
+        style={{
+          cursor: needsTarget && name !== myName && player.info.alive && validTargetList.includes(name) ? 'pointer' : 'default',
+          outline: selectedTarget === name ? '3px solid #e74c3c' : 'none',
+          borderRadius: 12,
+          transition: 'outline 0.2s',
+          opacity: needsTarget && !validTargetList.includes(name) && name !== myName ? 0.5 : 1,
+        }}
+      >
+        <PlayerPanel
+          playerName={name}
+          player={player}
+          cardMap={state.cardMap}
+          isCurrentPlayer={name === state.currentPlayer}
+          isSelf={name === myName}
+          seatNumber={getSeatNumber(name)}
+          distance={selectedCardId !== null && name !== myName ? getDistance(myName, name) : undefined}
+        />
+      </div>
+    );
+  };
+
+  const playerOps: Operation[] = [];
 
   return (
     <div style={{ padding: 16, backgroundColor: '#1a1a2e', minHeight: '100vh', color: '#eee', display: 'flex', flexDirection: 'column' }}>
@@ -103,12 +107,12 @@ export function GameBoard() {
           >
             切换视角 ({myName})
           </button>
-          {myName !== game.currentPlayer && !pendingResponse && !pendingDying && (
+          {myName !== state.currentPlayer && !isKillResponse && !isDyingWindow && (
             <button
               onClick={goToCurrentPlayer}
               style={{ padding: '4px 12px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
             >
-              查看当前玩家 ({game.currentPlayer})
+              查看当前玩家 ({state.currentPlayer})
             </button>
           )}
         </div>
@@ -122,8 +126,8 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 待响应提示 */}
-      {pendingResponse && (
+      {/* 待响应提示 - 杀响应 */}
+      {isKillResponse && pendingPrompt && (
         <div style={{
           textAlign: 'center',
           marginBottom: 16,
@@ -134,24 +138,24 @@ export function GameBoard() {
         }}
         >
           <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
-            {pendingResponse.attacker} 对你使用了杀！
+            {pendingPrompt.text}
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
             <button
               onClick={() => respondToKill(true)}
-              disabled={!targetHasDodge}
+              disabled={!hasDodge}
               style={{
                 padding: '8px 24px',
-                backgroundColor: targetHasDodge ? '#2ecc71' : '#555',
+                backgroundColor: hasDodge ? '#2ecc71' : '#555',
                 color: 'white',
                 border: 'none',
                 borderRadius: 6,
-                cursor: targetHasDodge ? 'pointer' : 'not-allowed',
+                cursor: hasDodge ? 'pointer' : 'not-allowed',
                 fontSize: 14,
                 fontWeight: 'bold',
               }}
             >
-              出闪 {targetHasDodge ? '' : '(无闪)'}
+              出闪 {hasDodge ? '' : '(无闪)'}
             </button>
             <button
               onClick={() => respondToKill(false)}
@@ -173,7 +177,7 @@ export function GameBoard() {
       )}
 
       {/* 濒死救援提示 */}
-      {pendingDying && (
+      {isDyingWindow && pendingPrompt && state.pending?.type === 'dyingWindow' && (
         <div style={{
           textAlign: 'center',
           marginBottom: 16,
@@ -184,25 +188,30 @@ export function GameBoard() {
         }}
         >
           <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
-            {pendingDying.player} 濒死！需要桃来救援
+            {pendingPrompt.text}
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-            {pendingDying.savers.map(saver => (
-              <button
-                key={saver}
-                onClick={() => respondToDying(saver)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#2ecc71',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                }}
-              >
-                {saver} 使用桃
-              </button>
-            ))}
+            {state.pending.savers.map(saver => {
+              const saverPlayer = state.players[saver];
+              const hasPeach = saverPlayer.hand.some(id => state.cardMap[id]?.name === '桃');
+              return (
+                <button
+                  key={saver}
+                  onClick={() => respondToDying(saver)}
+                  disabled={!hasPeach}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: hasPeach ? '#2ecc71' : '#555',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: hasPeach ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {saver} 使用桃
+                </button>
+              );
+            })}
             <button
               onClick={() => respondToDying(null)}
               style={{
@@ -267,14 +276,14 @@ export function GameBoard() {
 
         <div style={{ textAlign: 'center', flex: 1 }}>
           <div style={{ marginBottom: 8, fontSize: 14, color: '#95a5a6' }}>
-            回合 {game.round} | 阶段: {game.phase} | 当前玩家: {game.currentPlayer}
+            回合 {state.meta.round} | 阶段: {state.phase} | 当前玩家: {state.currentPlayer}
           </div>
           <div style={{ marginBottom: 8 }}>
-            {!isMyTurn && !pendingResponse && !pendingDying && <span style={{ color: '#f39c12' }}>等待对手...</span>}
-            {game.status === '已结束' && <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>游戏结束</span>}
+            {!isMyTurn && !isKillResponse && !isDyingWindow && <span style={{ color: '#f39c12' }}>等待对手...</span>}
+            {state.meta.status === '已结束' && <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>游戏结束</span>}
           </div>
           <div style={{ fontSize: 12, color: '#7f8c8d' }}>
-            弃牌堆: {game.discardPile.length} 张 | 牌堆: {game.deck.length} 张
+            弃牌堆: {state.zones.discardPile.length} 张 | 牌堆: {state.zones.deck.length} 张
           </div>
         </div>
 
@@ -291,12 +300,40 @@ export function GameBoard() {
       {/* 手牌区 */}
       <div style={{ marginBottom: 12 }}>
         <HandCards
-          hand={me.hand}
-          selectedIndex={selectedCard}
-          onSelectCard={selectCard}
-          playableIndices={isMyTurn && !pendingResponse && !pendingDying && !needsDiscard ? validActions.playableCards.map(pc => me.hand.findIndex(c => c.id === pc.card.id)).filter(i => i >= 0) : undefined}
-          discardSelectedIndices={needsDiscard ? selectedForDiscard : undefined}
-          onToggleDiscard={needsDiscard ? toggleDiscardSelection : undefined}
+          hand={myHand}
+          selectedIndex={selectedCardIndex}
+          onSelectCard={(index) => {
+            if (index === -1) {
+              selectCard(null);
+            } else {
+              const cardId = me.hand[index];
+              if (cardId) selectCard(cardId);
+            }
+          }}
+          playableIndices={
+            isMyTurn && !isKillResponse && !isDyingWindow && !needsDiscard
+              ? me.hand
+                  .map((id, idx) => playableCardIds.has(id) ? idx : -1)
+                  .filter(i => i >= 0)
+              : undefined
+          }
+          discardSelectedIndices={
+            needsDiscard
+              ? new Set(
+                  me.hand
+                    .map((id, idx) => selectedForDiscard.has(id) ? idx : -1)
+                    .filter(i => i >= 0),
+                )
+              : undefined
+          }
+          onToggleDiscard={
+            needsDiscard
+              ? (index) => {
+                  const cardId = me.hand[index];
+                  if (cardId) toggleDiscardSelection(cardId);
+                }
+              : undefined
+          }
         />
       </div>
 
@@ -304,7 +341,7 @@ export function GameBoard() {
       <div style={{ marginBottom: 12 }}>
         <ActionPanel
           canPlay={canPlay}
-          canEndTurn={isMyTurn && (game.phase === '出牌' || game.phase === '弃牌') && !pendingResponse && !pendingDying}
+          canEndTurn={isMyTurn && (state.phase === '出牌' || state.phase === '弃牌') && !isKillResponse && !isDyingWindow}
           onPlayCard={handlePlayCard}
           onEndTurn={handleEndTurn}
         />
@@ -313,10 +350,10 @@ export function GameBoard() {
       {/* 技能发动 */}
       {availableSkills.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
-          {availableSkills.map((skill, index) => (
+          {availableSkills.map(skill => (
             <button
-              key={skill.ability.name}
-              onClick={() => handleActivateSkill(index)}
+              key={skill.skillId}
+              onClick={() => handleActivateSkill(skill.skillId)}
               style={{
                 padding: '6px 16px',
                 backgroundColor: '#e67e22',
@@ -327,7 +364,7 @@ export function GameBoard() {
                 fontSize: 13,
               }}
             >
-              发动 {skill.ability.name}
+              发动 {skill.name}
             </button>
           ))}
         </div>
@@ -343,45 +380,53 @@ export function GameBoard() {
       {/* 日志 */}
       <LogPanel operations={playerOps} maxHeight={150} />
 
-      {/* 调试面板 - 显示所有玩家手牌 */}
+      {/* 调试面板 */}
       <details style={{ marginTop: 16, backgroundColor: '#16213e', borderRadius: 8, padding: 12 }}>
         <summary style={{ cursor: 'pointer', color: '#f39c12', fontSize: 14, fontWeight: 'bold' }}>
           调试信息（点击展开）
         </summary>
         <div style={{ marginTop: 12 }}>
           <div style={{ fontSize: 12, color: '#95a5a6', marginBottom: 8 }}>
-            牌堆: {game.deck.length} 张 | 弃牌堆: {game.discardPile.length} 张
+            牌堆: {state.zones.deck.length} 张 | 弃牌堆: {state.zones.discardPile.length} 张
           </div>
-          {game.players.map(player => (
-            <div key={player.name} style={{ marginBottom: 8, padding: 8, backgroundColor: '#1a1a2e', borderRadius: 4 }}>
-              <div style={{ fontSize: 13, color: player.name === myName ? '#3498db' : '#bdc3c7', fontWeight: 'bold', marginBottom: 4 }}>
-                {player.name} ({player.character.name}) - {player.health}/{player.maxHealth} HP
-                {!player.alive && <span style={{ color: '#e74c3c' }}> [阵亡]</span>}
-              </div>
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {player.hand.map((card, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      fontSize: 11,
-                      padding: '2px 6px',
-                      backgroundColor: '#2c3e50',
-                      borderRadius: 4,
-                      color: '#ecf0f1',
-                    }}
-                  >
-                    {card.name}{card.suit}{card.rank}
-                  </span>
-                ))}
-                {player.hand.length === 0 && <span style={{ fontSize: 11, color: '#7f8c8d' }}>无手牌</span>}
-              </div>
-              {Object.values(player.equipment).some(Boolean) && (
-                <div style={{ fontSize: 11, color: '#f39c12', marginTop: 4 }}>
-                  装备: {player.equipment.weapon?.name} {player.equipment.armor?.name} {player.equipment.horsePlus?.name} {player.equipment.horseMinus?.name}
+          {state.playerOrder.map(name => {
+            const player = state.players[name];
+            const character = state.cardMap[player.info.characterId];
+            return (
+              <div key={name} style={{ marginBottom: 8, padding: 8, backgroundColor: '#1a1a2e', borderRadius: 4 }}>
+                <div style={{ fontSize: 13, color: name === myName ? '#3498db' : '#bdc3c7', fontWeight: 'bold', marginBottom: 4 }}>
+                  {name} ({player.info.characterId}) - {player.health}/{player.maxHealth} HP
+                  {!player.info.alive && <span style={{ color: '#e74c3c' }}> [阵亡]</span>}
                 </div>
-              )}
-            </div>
-          ))}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {player.hand.map((cardId) => {
+                    const card = state.cardMap[cardId];
+                    if (!card) return null;
+                    return (
+                      <span
+                        key={cardId}
+                        style={{
+                          fontSize: 11,
+                          padding: '2px 6px',
+                          backgroundColor: '#2c3e50',
+                          borderRadius: 4,
+                          color: '#ecf0f1',
+                        }}
+                      >
+                        {card.name}{card.suit}{card.rank}
+                      </span>
+                    );
+                  })}
+                  {player.hand.length === 0 && <span style={{ fontSize: 11, color: '#7f8c8d' }}>无手牌</span>}
+                </div>
+                {Object.values(player.equipment).some(Boolean) && (
+                  <div style={{ fontSize: 11, color: '#f39c12', marginTop: 4 }}>
+                    装备: {player.equipment.weapon && state.cardMap[player.equipment.weapon]?.name} {player.equipment.armor && state.cardMap[player.equipment.armor]?.name} {player.equipment.horsePlus && state.cardMap[player.equipment.horsePlus]?.name} {player.equipment.horseMinus && state.cardMap[player.equipment.horseMinus]?.name}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </details>
     </div>
