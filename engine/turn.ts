@@ -7,6 +7,17 @@ import { resolvePendingTrick } from './judge';
 
 export const phaseOrder: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '结束'];
 
+export type PhaseMode = 'auto' | 'wait';
+
+export const phaseModes: Record<TurnPhase, PhaseMode> = {
+  准备: 'auto',
+  判定: 'auto',
+  摸牌: 'auto',
+  出牌: 'wait',
+  弃牌: 'wait',
+  结束: 'wait',
+};
+
 export function nextPhase(game: GameState, logger?: GameLogger): GameState {
   const currentIndex = phaseOrder.indexOf(game.phase);
   const nextIndex = (currentIndex + 1) % phaseOrder.length;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TriggerSystem } from '@engine/core/trigger';
-import { registerCharacterSkills } from '@engine/core/skill';
+import { TriggerSystem } from '@engine/trigger';
+import { registerCharacterSkills } from '@engine/skill';
 import { createGame } from '@engine/state';
 import { 曹操, 刘备, 郭嘉, 夏侯惇 } from '@shared/characters';
 import type { CharacterConfig, GameState } from '@shared/types';
@@ -18,7 +18,7 @@ describe('registerCharacterSkills', () => {
 
     // 曹操的奸雄是 passive + onDamageReceived
     const game = makeGame();
-    const effects = ts.emit(game, {
+    const effects = ts.collectEffects(game, {
       type: 'damageReceived',
       player: '曹操',
       attacker: '刘备',
@@ -50,7 +50,7 @@ describe('registerCharacterSkills', () => {
     registerCharacterSkills(ts, [张辽]);
 
     const game = makeGame([张辽, 刘备]);
-    const effects = ts.emit(game, {
+    const effects = ts.collectEffects(game, {
       type: 'turnStart',
       player: '张辽',
     });
@@ -64,7 +64,7 @@ describe('registerCharacterSkills', () => {
 
     const game = makeGame();
     // 刘备受伤，不应触发曹操的奸雄
-    const effects = ts.emit(game, {
+    const effects = ts.collectEffects(game, {
       type: 'damageReceived',
       player: '刘备',
       attacker: '曹操',
@@ -79,7 +79,7 @@ describe('registerCharacterSkills', () => {
     registerCharacterSkills(ts, [曹操]);
 
     const game = makeGame();
-    const effects = ts.emit(game, {
+    const effects = ts.collectEffects(game, {
       type: 'damageReceived',
       target: '曹操',
       attacker: '刘备',
@@ -95,7 +95,7 @@ describe('registerCharacterSkills', () => {
 
     const game = makeGame();
     // 曹操的奸雄是 onDamageReceived，用 turnStart 不应触发
-    const effects = ts.emit(game, {
+    const effects = ts.collectEffects(game, {
       type: 'turnStart',
       player: '曹操',
     });
@@ -110,7 +110,7 @@ describe('registerCharacterSkills', () => {
     const game = makeGame([曹操, 夏侯惇]);
 
     // 曹操受伤 -> 触发奸雄
-    const effectsCaoCao = ts.emit(game, {
+    const effectsCaoCao = ts.collectEffects(game, {
       type: 'damageReceived',
       player: '曹操',
       amount: 1,
@@ -119,7 +119,7 @@ describe('registerCharacterSkills', () => {
     expect(effectsCaoCao[0]).toEqual({ type: 'gainCard', source: 'damageSourceCard' });
 
     // 夏侯惇受伤 -> 触发刚烈
-    const effectsXiahou = ts.emit(game, {
+    const effectsXiahou = ts.collectEffects(game, {
       type: 'damageReceived',
       player: '夏侯惇',
       amount: 1,
@@ -136,7 +136,7 @@ describe('registerCharacterSkills', () => {
     const game = makeGame([郭嘉, 刘备]);
 
     // 触发 onDamageReceived -> 遗计
-    const damageEffects = ts.emit(game, {
+    const damageEffects = ts.collectEffects(game, {
       type: 'damageReceived',
       player: '郭嘉',
       amount: 1,

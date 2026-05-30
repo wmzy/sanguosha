@@ -6,7 +6,7 @@ export function registerPhase<P>(def: PhaseDefinition<P>): void {
   if (registry.has(def.type)) {
     throw new Error(`Phase type "${def.type}" already registered`);
   }
-  registry.set(def.type, def as PhaseDefinition);
+  registry.set(def.type, def);
 }
 
 export function getPhaseDef(type: string): PhaseDefinition {

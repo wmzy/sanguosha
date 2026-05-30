@@ -59,9 +59,9 @@ registerAtom({
     const player = atom.player as string;
     const count = atom.count as number;
     const drawn = state.zones.deck.slice(0, count);
-    const server = makeServerEvent('draw', { player, count, cards: drawn } as Json);
-    const ownerEvent = makePlayerEvent('draw', { player, count, cards: drawn } as Json);
-    const defaultEvent = makePlayerEvent('draw', { player, count } as Json);
+    const server = makeServerEvent('draw', { player, count, cards: drawn });
+    const ownerEvent = makePlayerEvent('draw', { player, count, cards: drawn });
+    const defaultEvent = makePlayerEvent('draw', { player, count });
     return [server, new Map([[player, ownerEvent]]), defaultEvent];
   },
 });

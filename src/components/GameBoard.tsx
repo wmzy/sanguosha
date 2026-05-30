@@ -1,5 +1,5 @@
-import { useGame, getValidTargets } from '../hooks/useGame';
-import { getDistance } from '../../engine/core/distance';
+import { useGame } from '../hooks/useGame';
+import { getDistance } from '../../engine/distance';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
@@ -43,10 +43,11 @@ export function GameBoard() {
   } = useGame();
 
   const selectedCardData = selectedCard !== null ? me.hand[selectedCard] : null;
-  const needsTarget = selectedCard !== null && validActions.validTargets.has(selectedCard);
-  const validTargets = selectedCardData
-    ? getValidTargets(game, myName, selectedCardData)
-    : [];
+  const selectedCardEntry = selectedCard !== null
+    ? validActions.playableCards.find(pc => pc.card.id === me.hand[selectedCard]?.id)
+    : undefined;
+  const needsTarget = selectedCard !== null && !!selectedCardEntry && selectedCardEntry.targets.length > 0;
+  const validTargets = selectedCardEntry?.targets ?? [];
 
   // 按 playerOrder 排列玩家（逆时针顺序）
   const orderedPlayers = playerOrder
@@ -293,7 +294,7 @@ export function GameBoard() {
           hand={me.hand}
           selectedIndex={selectedCard}
           onSelectCard={selectCard}
-          playableIndices={isMyTurn && !pendingResponse && !pendingDying && !needsDiscard ? validActions.playableCardIndices : undefined}
+          playableIndices={isMyTurn && !pendingResponse && !pendingDying && !needsDiscard ? validActions.playableCards.map(pc => me.hand.findIndex(c => c.id === pc.card.id)).filter(i => i >= 0) : undefined}
           discardSelectedIndices={needsDiscard ? selectedForDiscard : undefined}
           onToggleDiscard={needsDiscard ? toggleDiscardSelection : undefined}
         />

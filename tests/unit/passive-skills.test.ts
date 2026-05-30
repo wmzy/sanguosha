@@ -60,7 +60,7 @@ const 夏侯惇char = makeCharacter({
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'judge', expectedSuit: '♥', failEffect: 'attackerDiscardOrDamage' },
+          { type: 'judge', expectedSuit: '♥', onFail: { type: 'discard', count: 2, target: 'attacker' } },
         ],
       },
       passive: true,
@@ -244,15 +244,10 @@ describe('司马懿 反馈', () => {
 // ============================================================
 
 describe('夏侯惇 刚烈', () => {
-  it.skip('受到伤害后判定，♥♦时攻击者弃一张牌 - 需要实现 failEffect', () => {
-    // 刚烈的 failEffect 'attackerDiscardOrDamage' 未实现
-    // 跳过此测试
-  });
-
-  it('受到伤害后判定，黑色时刚烈不发动弃牌效果', () => {
+  it('受到伤害后判定，非♥时攻击者弃两张牌', () => {
     const killCard = makeCard('杀', '♣', '5');
-    const judgeCard = makeCard('杀', '♠', '3'); // black -> 刚烈 judgment happens but no discard
-    const attackerCards = [killCard, makeCard('闪', '♥', '3'), makeCard('桃', '♥', '7')];
+    const judgeCard = makeCard('杀', '♣', '3'); // ♣ = 非红心 → 判定失败 → 刚烈发动
+    const attackerCards = [killCard, makeCard('闪', '♥', '3'), makeCard('桃', '♥', '7'), makeCard('杀', '♠', '7')];
 
     const controller = GameController.createForTesting(
       {
@@ -280,16 +275,55 @@ describe('夏侯惇 刚烈', () => {
       },
     );
 
-    // 曹操对夏侯惇使用杀
     const playResult = controller.playCard('曹操', killCard.id, '夏侯惇');
     expect(playResult.success).toBe(true);
 
-    // 夏侯惇不出闪
     const responses = new Map<string, Card | null>();
     responses.set('夏侯惇', null);
     const result = controller.respondToWindow(responses);
 
-    // Only took damage, 刚烈 judgment happened but no discard (black card)
+    const caocao = result.state.players.find(p => p.name === '曹操')!;
+    expect(caocao.hand.length).toBe(1); // started with 4, kill removed 1, 刚烈 discard 2
+  });
+
+  it('受到伤害后判定，♥时刚烈不发动', () => {
+    const killCard = makeCard('杀', '♣', '5');
+    const judgeCard = makeCard('桃', '♥', '7'); // ♥ = 判定成功 → 刚烈不发动
+    const attackerCards = [killCard, makeCard('闪', '♥', '3'), makeCard('桃', '♥', '8')];
+
+    const controller = GameController.createForTesting(
+      {
+        players: [
+          {
+            name: '夏侯惇', character: 夏侯惇char, role: '反贼',
+            health: 4, maxHealth: 4, hand: [], equipment: {}, alive: true,
+          },
+          {
+            name: '曹操', character: 曹操char, role: '主公',
+            health: 4, maxHealth: 4,
+            hand: attackerCards,
+            equipment: {}, alive: true,
+          },
+        ],
+        deck: [judgeCard],
+        discardPile: [],
+        currentPlayer: '曹操',
+        phase: '出牌',
+        round: 1,
+        status: '进行中',
+        seed: 12345,
+        killsPlayedThisTurn: 0,
+        skillsUsedThisTurn: [],
+      },
+    );
+
+    const playResult = controller.playCard('曹操', killCard.id, '夏侯惇');
+    expect(playResult.success).toBe(true);
+
+    const responses = new Map<string, Card | null>();
+    responses.set('夏侯惇', null);
+    const result = controller.respondToWindow(responses);
+
     const caocao = result.state.players.find(p => p.name === '曹操')!;
     expect(caocao.hand.length).toBe(2); // started with 3, kill removed, no discard from 刚烈
   });
@@ -440,9 +474,43 @@ describe('郭嘉 遗计', () => {
 // ============================================================
 
 describe('甄姬 倾国', () => {
-  it.skip('可以用黑色手牌当闪使用 - 需要实现倾国技能的手动触发', () => {
-    // 倾国是手动技能，需要在响应窗口中实现转换逻辑
-    // 目前未实现，跳过此测试
+  it('可以用黑色手牌当闪使用', () => {
+    const blackCard = makeCard('杀', '♠', '10');
+    const killCard = makeCard('杀', '♠', '5');
+
+    const controller = GameController.createForTesting(
+      {
+        players: [
+          {
+            name: '甄姬', character: 甄姬char, role: '反贼',
+            health: 3, maxHealth: 3, hand: [blackCard], equipment: {}, alive: true,
+          },
+          {
+            name: '曹操', character: 曹操char, role: '主公',
+            health: 4, maxHealth: 4, hand: [killCard], equipment: {}, alive: true,
+          },
+        ],
+        deck: [],
+        discardPile: [],
+        currentPlayer: '曹操',
+        phase: '出牌',
+        round: 1,
+        status: '进行中',
+        seed: 12345,
+        killsPlayedThisTurn: 0,
+        skillsUsedThisTurn: [],
+      },
+    );
+
+    const playResult = controller.playCard('曹操', killCard.id, '甄姬');
+    expect(playResult.success).toBe(true);
+    expect(playResult.responseWindow).toBeDefined();
+
+    const result = controller.respondToKill('甄姬', true, '曹操', killCard);
+
+    const zhenji = result.state.players.find(p => p.name === '甄姬')!;
+    expect(zhenji.hand.length).toBe(0); // 黑色牌被消耗
+    expect(zhenji.health).toBe(3); // 成功闪避
   });
 
   it('红色手牌不能当闪使用', () => {

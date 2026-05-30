@@ -1,64 +1,50 @@
 import { describe, it, expect } from 'vitest';
-import { ValidationPipeline, phaseValidator, targetValidator } from '@engine/core/validation';
+import { ValidationPipeline } from '@engine/validation';
 import { createGame, startGame } from '@engine/state';
 import { 曹操, 刘备 } from '@shared/characters';
-import type { PlayerAction } from '@shared/types';
+import type { PlayerAction, GameState } from '@shared/types';
 
 describe('ValidationPipeline', () => {
-  function createTestGame() {
+  function createTestGame(): GameState {
     const game = createGame([曹操, 刘备], 12345);
-    return startGame(game);
+    const started = startGame(game);
+    return {
+      ...started,
+      phase: '出牌',
+      currentPlayer: '曹操',
+    };
   }
 
-  it('phaseValidator blocks actions in wrong phase', () => {
+  it('blocks card play in wrong phase', () => {
     const game = createTestGame();
     game.phase = '摸牌';
-    const action: PlayerAction = { type: '出牌', card: game.players[0].hand[0] };
-    const result = phaseValidator({ game, player: '曹操', action, phase: game.phase });
-    expect(result).not.toBeNull();
-    expect(result!.valid).toBe(false);
-  });
-
-  it('phaseValidator allows actions in correct phase', () => {
-    const game = createTestGame();
-    game.phase = '出牌';
-    const action: PlayerAction = { type: '出牌', card: game.players[0].hand[0] };
-    const result = phaseValidator({ game, player: '曹操', action, phase: game.phase });
-    expect(result).toBeNull();
-  });
-
-  it('targetValidator blocks self-target for 杀', () => {
-    const game = createTestGame();
-    const action: PlayerAction = {
-      type: '出牌',
-      card: { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
-      target: '曹操',
-    };
-    const result = targetValidator({ game, player: '曹操', action, phase: '出牌' });
-    expect(result).not.toBeNull();
-    expect(result!.valid).toBe(false);
-  });
-
-  it('targetValidator allows valid target', () => {
-    const game = createTestGame();
-    const action: PlayerAction = {
-      type: '出牌',
-      card: { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },
-      target: '刘备',
-    };
-    const result = targetValidator({ game, player: '曹操', action, phase: '出牌' });
-    expect(result).toBeNull();
-  });
-
-  it('pipeline runs all validators', () => {
     const pipeline = new ValidationPipeline();
-    pipeline.addValidator(phaseValidator);
-    pipeline.addValidator(targetValidator);
-
-    const game = createTestGame();
-    game.phase = '摸牌';
     const action: PlayerAction = { type: '出牌', card: game.players[0].hand[0] };
-    const result = pipeline.validate({ game, player: '曹操', action, phase: game.phase });
+    const result = pipeline.validateAction(game, '曹操', action);
     expect(result.valid).toBe(false);
+  });
+
+  it('allows card play in correct phase', () => {
+    const game = createTestGame();
+    const pipeline = new ValidationPipeline();
+    const action: PlayerAction = { type: '出牌', card: game.players[0].hand[0] };
+    const result = pipeline.validateAction(game, '曹操', action);
+    expect(result.valid).toBe(true);
+  });
+
+  it('blocks end turn for wrong player', () => {
+    const game = createTestGame();
+    const pipeline = new ValidationPipeline();
+    const action: PlayerAction = { type: '结束回合' };
+    const result = pipeline.validateAction(game, '刘备', action);
+    expect(result.valid).toBe(false);
+  });
+
+  it('allows end turn for current player in play phase', () => {
+    const game = createTestGame();
+    const pipeline = new ValidationPipeline();
+    const action: PlayerAction = { type: '结束回合' };
+    const result = pipeline.validateAction(game, '曹操', action);
+    expect(result.valid).toBe(true);
   });
 });

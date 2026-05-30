@@ -89,7 +89,7 @@ export type EffectPrimitive =
   | { type: 'damage'; amount: number; damageType?: '普通' | '雷电' | '火焰' }
   | { type: 'heal'; amount: number; target?: string }
   | { type: 'discard'; source?: string; count: number | 'any'; target?: string }
-  | { type: 'gainCard'; from?: string; source?: string; count?: number }
+  | { type: 'gainCard'; from?: string; source?: 'damageSourceCard' | 'attacker' | 'judgeCard' | 'otherPlayers' | 'selected' | 'deck'; count?: number }
   | { type: 'skipPhase'; phase?: TurnPhase; target?: string }
   | { type: 'skipDraw' }
   | { type: 'judge'; condition?: string; expectedSuit?: string; repeatOnBlack?: boolean; redResult?: string; failEffect?: string; onSuccess?: Effect; onFail?: Effect }
@@ -124,8 +124,11 @@ export interface CardDef {
   targetFilter?: TargetFilter;
   effect: Effect;
   responseWindow?: 'kill_response' | 'trick_response';
+  aoeResponse?: string;
   usageLimit?: { perTurn?: number };
   range?: number;
+  weaponEffect?: WeaponEffect;
+  armorEffect?: ArmorEffect;
 }
 
 // 目标过滤器
@@ -134,24 +137,34 @@ export interface TargetFilter {
   condition?: (player: Player) => boolean;
 }
 
+export interface WeaponEffect {
+  type: 'unlimitedKills' | 'ignoreArmor' | 'chaseDodge' | 'forceHit' | 'dualWeapon';
+}
+
+export interface ArmorEffect {
+  type: 'judgeDodge' | 'blockBlackKill';
+}
+
 // 条件定义
 export interface Condition {
   phase?: TurnPhase;
   hasHandCards?: boolean;
   cardsGivenThisPhase?: { gte?: number; lte?: number };
   targetCard?: string;
-  [key: string]: unknown;
+  cardType?: string;
+  杀UsedThisTurn?: boolean;
 }
 
 // 技能配置
 export interface AbilityConfig {
-  name: string; // "奸雄", "仁德" — 唯一标识
+  name: string;
   description: string;
   trigger: TriggerType;
   condition?: Condition;
   effect: Effect;
   oncePerTurn?: boolean;
   passive?: boolean;
+  modifiers?: string[];
 }
 
 // 角色配置

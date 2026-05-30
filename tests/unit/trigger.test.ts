@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TriggerSystem, type GameEvent, type HookHandler } from '@engine/core/trigger';
+import { TriggerSystem, type GameEvent, type HookHandler } from '@engine/trigger';
+import { triggerToEventType } from '@engine/trigger';
 import type { GameState, Effect } from '@shared/types';
 import { createGame } from '@engine/state';
 import { 曹操, 刘备 } from '@shared/characters';
@@ -20,7 +21,7 @@ describe('TriggerSystem', () => {
 
     const game = makeGame();
     const event: GameEvent = { type: 'damageReceived', player: '曹操', amount: 1 };
-    const result = ts.emit(game, event);
+    const result = ts.collectEffects(game, event);
 
     expect(result).toEqual(effects);
   });
@@ -29,7 +30,7 @@ describe('TriggerSystem', () => {
     const ts = new TriggerSystem();
     const game = makeGame();
     const event: GameEvent = { type: 'damageReceived', player: '曹操' };
-    const result = ts.emit(game, event);
+    const result = ts.collectEffects(game, event);
 
     expect(result).toEqual([]);
   });
@@ -47,7 +48,7 @@ describe('TriggerSystem', () => {
 
     const game = makeGame();
     const event: GameEvent = { type: 'damageReceived', player: '曹操', amount: 1 };
-    const result = ts.emit(game, event);
+    const result = ts.collectEffects(game, event);
 
     expect(result).toEqual([effect1, effect2]);
   });
@@ -62,10 +63,10 @@ describe('TriggerSystem', () => {
 
     const game = makeGame();
 
-    const damageResult = ts.emit(game, { type: 'damageReceived', player: '曹操' });
+    const damageResult = ts.collectEffects(game, { type: 'damageReceived', player: '曹操' });
     expect(damageResult).toEqual([damageEffect]);
 
-    const turnResult = ts.emit(game, { type: 'turnStart', player: '曹操' });
+    const turnResult = ts.collectEffects(game, { type: 'turnStart', player: '曹操' });
     expect(turnResult).toEqual([turnEffect]);
   });
 
@@ -78,7 +79,7 @@ describe('TriggerSystem', () => {
     ts.off('damageReceived', handler);
 
     const game = makeGame();
-    const result = ts.emit(game, { type: 'damageReceived', player: '曹操' });
+    const result = ts.collectEffects(game, { type: 'damageReceived', player: '曹操' });
     expect(result).toEqual([]);
   });
 
@@ -95,7 +96,7 @@ describe('TriggerSystem', () => {
     ts.off('damageReceived', handler1);
 
     const game = makeGame();
-    const result = ts.emit(game, { type: 'damageReceived', player: '曹操' });
+    const result = ts.collectEffects(game, { type: 'damageReceived', player: '曹操' });
     expect(result).toEqual([effect2]);
   });
 
@@ -104,7 +105,7 @@ describe('TriggerSystem', () => {
     ts.on('damageReceived', () => []);
 
     const game = makeGame();
-    const result = ts.emit(game, { type: 'damageReceived', player: '曹操' });
+    const result = ts.collectEffects(game, { type: 'damageReceived', player: '曹操' });
     expect(result).toEqual([]);
   });
 
@@ -117,7 +118,7 @@ describe('TriggerSystem', () => {
     ts.on('damageReceived', () => effects);
 
     const game = makeGame();
-    const result = ts.emit(game, { type: 'damageReceived', player: '曹操' });
+    const result = ts.collectEffects(game, { type: 'damageReceived', player: '曹操' });
     expect(result).toHaveLength(2);
     expect(result).toEqual(effects);
   });
@@ -135,7 +136,7 @@ describe('TriggerSystem', () => {
 
     const game = makeGame();
     const event: GameEvent = { type: 'damageReceived', player: '曹操', attacker: '刘备', amount: 2 };
-    ts.emit(game, event);
+    ts.collectEffects(game, event);
 
     expect(receivedGame).toBe(game);
     expect(receivedEvent).toBe(event);

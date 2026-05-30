@@ -4,10 +4,12 @@ import {
   createKillResponseWindow,
   createTrickResponseWindow,
   createDyingResponseWindow,
-} from '@engine/core/response';
+  resolveKillResponse,
+  resolveTrickResponse,
+  resolveDyingResponse,
+} from '@engine/response';
 import type { GameState, Card, Player } from '@shared/types';
 
-// Helper to create a minimal game state for testing
 function makeCard(name: string, overrides?: Partial<Card>): Card {
   return {
     name,
@@ -82,26 +84,21 @@ describe('ResponseSystem', () => {
     expect(system.getPendingResponders()).toEqual(['刘备']);
   });
 
-  it('should resolve a window and apply onResolve', () => {
+  it('should pop a window from the stack', () => {
     const system = new ResponseSystem();
     const killCard = makeCard('杀');
     const window = createKillResponseWindow('曹操', '刘备', killCard);
     system.push(window);
 
-    const game = makeGame();
-    const responses = new Map<string, Card | null>();
-    // No dodge — 刘备 takes damage
-    const result = system.resolve(game, responses);
-
+    const popped = system.pop();
+    expect(popped).toBe(window);
     expect(system.isEmpty()).toBe(true);
-    const liuBei = result.players.find(p => p.name === '刘备')!;
-    expect(liuBei.health).toBe(3);
   });
 
   it('should support nested windows (stack)', () => {
     const system = new ResponseSystem();
     const window1 = createKillResponseWindow('曹操', '刘备', makeCard('杀'));
-    const window2 = createTrickResponseWindow('曹操', '过河拆桥');
+    const window2 = createTrickResponseWindow('曹操');
 
     system.push(window1);
     system.push(window2);
@@ -109,30 +106,28 @@ describe('ResponseSystem', () => {
     expect(system.current()?.type).toBe('trick_response');
     expect(system.getPendingResponders()).toEqual([]);
 
-    system.resolve(makeGame(), new Map());
+    system.pop();
     expect(system.current()?.type).toBe('kill_response');
     expect(system.getPendingResponders()).toEqual(['刘备']);
   });
 
-  it('should return game unchanged when resolving empty stack', () => {
+  it('should return undefined when popping empty stack', () => {
     const system = new ResponseSystem();
-    const game = makeGame();
-    const result = system.resolve(game, new Map());
-    expect(result).toBe(game);
+    expect(system.pop()).toBeUndefined();
   });
 });
 
 // ============================================================
-// createKillResponseWindow
+// resolveKillResponse
 // ============================================================
 
-describe('createKillResponseWindow', () => {
+describe('resolveKillResponse', () => {
   it('should apply damage when target does not dodge', () => {
     const window = createKillResponseWindow('曹操', '刘备', makeCard('杀'));
     const game = makeGame();
     const responses = new Map<string, Card | null>();
 
-    const result = window.onResolve(game, responses);
+    const result = resolveKillResponse(game, window, responses);
 
     const liuBei = result.players.find(p => p.name === '刘备')!;
     expect(liuBei.health).toBe(3);
@@ -150,12 +145,12 @@ describe('createKillResponseWindow', () => {
     const responses = new Map<string, Card | null>();
     responses.set('刘备', dodgeCard);
 
-    const result = window.onResolve(game, responses);
+    const result = resolveKillResponse(game, window, responses);
 
     const liuBei = result.players.find(p => p.name === '刘备')!;
-    expect(liuBei.health).toBe(4); // No damage
-    expect(liuBei.hand.length).toBe(1); // 闪 removed
-    expect(liuBei.hand[0].name).toBe('杀'); // Only 杀 remains
+    expect(liuBei.health).toBe(4);
+    expect(liuBei.hand.length).toBe(1);
+    expect(liuBei.hand[0].name).toBe('杀');
   });
 
   it('should not affect other players', () => {
@@ -163,7 +158,7 @@ describe('createKillResponseWindow', () => {
     const game = makeGame();
     const responses = new Map<string, Card | null>();
 
-    const result = window.onResolve(game, responses);
+    const result = resolveKillResponse(game, window, responses);
 
     const caoCao = result.players.find(p => p.name === '曹操')!;
     expect(caoCao.health).toBe(4);
@@ -178,57 +173,51 @@ describe('createKillResponseWindow', () => {
 });
 
 // ============================================================
-// createTrickResponseWindow
+// resolveTrickResponse
 // ============================================================
 
-describe('createTrickResponseWindow', () => {
+describe('resolveTrickResponse', () => {
   it('should return game unchanged when no one nullifies', () => {
-    const window = createTrickResponseWindow('曹操', '过河拆桥', '刘备');
     const game = makeGame();
     const responses = new Map<string, Card | null>();
 
-    const result = window.onResolve(game, responses);
+    const { state: result, nullified } = resolveTrickResponse(game, responses);
 
+    expect(nullified).toBe(false);
     expect(result).toEqual(game);
   });
 
   it('should nullify trick when 无懈可击 is played', () => {
-    const window = createTrickResponseWindow('曹操', '过河拆桥', '刘备');
-    const game = makeGame();
     const nullifyCard = makeCard('无懈可击', { type: '锦囊牌', subtype: '锦囊' });
+    const savior = makePlayer('刘备', { hand: [nullifyCard] });
+    const game = makeGame({ players: [makePlayer('曹操'), savior] });
     const responses = new Map<string, Card | null>();
     responses.set('刘备', nullifyCard);
 
-    const result = window.onResolve(game, responses);
+    const { state: result, nullified } = resolveTrickResponse(game, responses);
 
-    // Game state should be unchanged (trick nullified)
-    expect(result).toEqual(game);
+    expect(nullified).toBe(true);
+    const liuBei = result.players.find(p => p.name === '刘备')!;
+    expect(liuBei.hand.length).toBe(0);
   });
 
   it('should not nullify when non-无懈可击 card is played', () => {
-    const window = createTrickResponseWindow('曹操', '过河拆桥', '刘备');
     const game = makeGame();
     const responses = new Map<string, Card | null>();
     responses.set('刘备', makeCard('杀'));
 
-    const result = window.onResolve(game, responses);
+    const { state: result, nullified } = resolveTrickResponse(game, responses);
 
-    // Should return game as-is (not nullified, trick proceeds)
+    expect(nullified).toBe(false);
     expect(result).toEqual(game);
-  });
-
-  it('should have empty validResponders (all players can respond)', () => {
-    const window = createTrickResponseWindow('曹操', '过河拆桥');
-    expect(window.validResponders).toEqual([]);
-    expect(window.validCards).toEqual(['无懈可击']);
   });
 });
 
 // ============================================================
-// createDyingResponseWindow
+// resolveDyingResponse
 // ============================================================
 
-describe('createDyingResponseWindow', () => {
+describe('resolveDyingResponse', () => {
   it('should save player when 桃 is played', () => {
     const peachCard = makeCard('桃', { type: '基本牌', subtype: '桃', suit: '♥' });
     const dyingPlayer = makePlayer('刘备', { health: 0, alive: false });
@@ -239,13 +228,13 @@ describe('createDyingResponseWindow', () => {
     const responses = new Map<string, Card | null>();
     responses.set('曹操', peachCard);
 
-    const result = window.onResolve(game, responses);
+    const result = resolveDyingResponse(game, window, responses);
 
     const liuBei = result.players.find(p => p.name === '刘备')!;
     const caoCao = result.players.find(p => p.name === '曹操')!;
     expect(liuBei.health).toBe(1);
     expect(liuBei.alive).toBe(true);
-    expect(caoCao.hand.length).toBe(0); // 桃 consumed
+    expect(caoCao.hand.length).toBe(0);
   });
 
   it('should let player die when no one plays 桃', () => {
@@ -255,7 +244,7 @@ describe('createDyingResponseWindow', () => {
     const game = makeGame({ players: [makePlayer('曹操'), dyingPlayer] });
     const responses = new Map<string, Card | null>();
 
-    const result = window.onResolve(game, responses);
+    const result = resolveDyingResponse(game, window, responses);
 
     const liuBei = result.players.find(p => p.name === '刘备')!;
     expect(liuBei.alive).toBe(false);
@@ -271,12 +260,12 @@ describe('createDyingResponseWindow', () => {
     const responses = new Map<string, Card | null>();
     responses.set('刘备', peachCard);
 
-    const result = window.onResolve(game, responses);
+    const result = resolveDyingResponse(game, window, responses);
 
     const liuBei = result.players.find(p => p.name === '刘备')!;
     expect(liuBei.health).toBe(1);
     expect(liuBei.alive).toBe(true);
-    expect(liuBei.hand.length).toBe(0); // Self-played 桃 consumed
+    expect(liuBei.hand.length).toBe(0);
   });
 
   it('should accept all players as valid responders', () => {

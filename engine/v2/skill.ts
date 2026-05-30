@@ -68,13 +68,13 @@ export function registerCharacterTriggers(
 }
 
 const EQUIPMENT_SKILL_MAP: Record<string, string> = {
-  '诸葛连弩': 'unlimitedKills',
-  '八卦阵': 'judgeDodge',
-  '仁王盾': 'blockBlackKill',
-  '青龙偃月刀': 'chaseDodge',
-  '丈八蛇矛': 'dualWeapon',
-  '青釭剑': 'ignoreArmor',
-  '贯石斧': 'forceHit',
+  诸葛连弩: 'unlimitedKills',
+  八卦阵: 'judgeDodge',
+  仁王盾: 'blockBlackKill',
+  青龙偃月刀: 'chaseDodge',
+  丈八蛇矛: 'dualWeapon',
+  青釭剑: 'ignoreArmor',
+  贯石斧: 'forceHit',
 };
 
 export function registerEquipmentTriggers(

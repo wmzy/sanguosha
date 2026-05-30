@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getDistance, getAttackRange, isInAttackRange } from '@engine/core/distance';
+import { getDistance, getAttackRange, isInAttackRange } from '@engine/distance';
 import { createGame, startGame } from '@engine/state';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '@shared/characters';
 

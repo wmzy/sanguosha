@@ -12,7 +12,7 @@ registerAtom({
   apply(state: GameState, atom: Atom & { type: 'judge' }) {
     const player = atom.player as string;
     const cardId = state.zones.deck[state.zones.deck.length - 1];
-    const card = state.cardMap[cardId] as Card;
+    const card = state.cardMap[cardId];
     const result: 'red' | 'black' = redSuits.includes(card.suit) ? 'red' : 'black';
 
     let s: GameState = {
@@ -35,7 +35,7 @@ registerAtom({
   toEvents(state: GameState, atom: Atom & { type: 'judge' }): AtomEventResult {
     const player = atom.player as string;
     const cardId = state.zones.deck[state.zones.deck.length - 1];
-    const card = state.cardMap[cardId] as Card;
+    const card = state.cardMap[cardId];
     const result: 'red' | 'black' = redSuits.includes(card.suit) ? 'red' : 'black';
     const payload = { player, cardId, result, suit: card.suit, rank: card.rank };
     const server = makeServerEvent('judge', payload);

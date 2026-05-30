@@ -30,6 +30,9 @@ export interface EffectExecContext {
   rng: Rng;
   _judgeCard?: Card;
   _skipFlags?: SkipFlags;
+  _discardedCount?: number;
+  _aliveCount?: number;
+  _裸衣Active?: boolean;
 }
 
 export interface SkipFlags {
@@ -67,7 +70,7 @@ export interface ResponseWindow {
   validResponders: string[];
   validCards: string[];
   sourceCard?: Card;
-  onResolve: (game: GameState, responses: Map<string, Card | null>) => GameState;
+  aoeResponseType?: string;
 }
 
 export interface ValidationResult {

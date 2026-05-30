@@ -34,7 +34,7 @@ export function executeEffect(
     case 'convert':
       return execConvert(game, ctx, effect);
     case 'redirect':
-      return game;
+      return execRedirect(game, ctx, effect);
     case 'giveCards':
       return execGiveCards(game, ctx, effect);
     case 'lookAtTopCards':
@@ -52,6 +52,8 @@ export function executeEffect(
 
 function resolveCount(count: number | string, ctx: EffectExecContext): number {
   if (typeof count === 'number') return count;
+  if (count === 'sameAsDiscarded') return ctx._discardedCount ?? 0;
+  if (count === 'alivePlayers') return ctx._aliveCount ?? 0;
   return ctx.amount ?? 1;
 }
 
@@ -105,11 +107,15 @@ function execDiscard(
   ctx: EffectExecContext,
   effect: { source?: string; count: number | 'any'; target?: string },
 ): GameState {
-  const discardTarget = effect.target ?? ctx.player;
-  if (effect.target === 'selected') {
-    const t = ctx.target;
-    if (!t) return game;
-    return discardFromPlayer(game, ctx, t, effect.count);
+  let discardTarget: string;
+  if (effect.target === 'attacker') {
+    if (!ctx.attacker) return game;
+    discardTarget = ctx.attacker;
+  } else if (effect.target === 'selected') {
+    if (!ctx.target) return game;
+    return discardFromPlayer(game, ctx, ctx.target, effect.count);
+  } else {
+    discardTarget = effect.target ?? ctx.player;
   }
   return discardFromPlayer(game, ctx, discardTarget, effect.count);
 }
@@ -135,6 +141,8 @@ function discardFromPlayer(
 
   const discarded = indices.map(i => target.hand[i]);
   const remaining = target.hand.filter((_, i) => !indices.includes(i));
+
+  ctx._discardedCount = (ctx._discardedCount ?? 0) + discardCount;
 
   return {
     ...updatePlayer(game, targetName, { hand: remaining }),
@@ -369,12 +377,50 @@ function execGiveCards(
   return state;
 }
 
+function execRedirect(
+  game: GameState,
+  ctx: EffectExecContext,
+  effect: { from: string; to: string },
+): GameState {
+  if (!ctx.target) return game;
+  const fromPlayer = getPlayer(game, ctx.player);
+  const discardCard = fromPlayer.hand[0];
+  if (!discardCard) return game;
+
+  const newHand = [...fromPlayer.hand];
+  newHand.splice(0, 1);
+
+  const targetPlayer = getPlayer(game, effect.to === 'adjacentPlayer' ? findAdjacentPlayer(game, ctx.player) : effect.to);
+  if (!targetPlayer) return game;
+
+  return {
+    ...updatePlayer(updatePlayer(game, ctx.player, { hand: newHand }), targetPlayer.name, {
+      health: targetPlayer.health - 1,
+    }),
+    discardPile: [...game.discardPile, discardCard],
+  };
+}
+
+function findAdjacentPlayer(game: GameState, playerName: string): string {
+  const alive = game.players.filter(p => p.alive);
+  const idx = alive.findIndex(p => p.name === playerName);
+  if (idx === -1 || alive.length < 2) return playerName;
+  return alive[(idx + 1) % alive.length].name;
+}
+
 function execLookAtTopCards(
   game: GameState,
-  _ctx: EffectExecContext,
-  _effect: { count: number | string },
+  ctx: EffectExecContext,
+  effect: { count: number | string },
 ): GameState {
-  return game;
+  const count = resolveCount(effect.count, ctx);
+  const available = Math.min(count, game.deck.length);
+  if (available === 0) return game;
+
+  const player = getPlayer(game, ctx.player);
+  return updatePlayer(game, ctx.player, {
+    hand: [...player.hand, ...game.deck.slice(0, available)],
+  });
 }
 
 function execDealDamage(
@@ -393,6 +439,8 @@ function execDealDamage(
 function matchesDamageCondition(condition: string, card?: Card): boolean {
   if (!card) return false;
   if (condition === '杀或决斗') return card.name === '杀' || card.name === '决斗';
+  if (condition === '决斗') return card.name === '决斗';
+  if (condition === '反间判定') return true;
   return card.name === condition;
 }
 
@@ -428,183 +476,15 @@ function checkCondition(
     if (ctx.card?.name !== condition.targetCard) return false;
   }
 
-  const keys = Object.keys(condition);
-  for (const key of keys) {
-    if (key === 'phase' || key === 'hasHandCards' || key === 'cardsGivenThisPhase' || key === 'targetCard') continue;
+  if (condition.cardType !== undefined) {
+    if (!ctx.card) return false;
+    if (condition.cardType === '判定牌' && ctx.card.type !== '锦囊牌') return false;
+  }
 
-    if (key === 'cardType' && condition.cardType) {
-      if (!ctx.card) return false;
-      if (condition.cardType === '判定牌' && ctx.card.type !== '锦囊牌') return false;
-    }
+  if (condition.杀UsedThisTurn !== undefined) {
+    if (condition.杀UsedThisTurn && game.killsPlayedThisTurn > 0) return false;
+    if (!condition.杀UsedThisTurn && game.killsPlayedThisTurn === 0) return false;
   }
 
   return true;
-}
-
-// 便捷函数，返回统一的结果格式
-export interface EffectResult {
-  success: boolean;
-  state: GameState;
-  message?: string;
-}
-
-function makeCtx(player: string, target?: string): EffectExecContext {
-  return {
-    player,
-    target,
-    rng: createRng(Date.now()),
-  };
-}
-
-export function playKill(game: GameState, player: string, target: string): EffectResult {
-  if (player === target) {
-    return { success: false, state: game, message: '不能对自己使用杀' };
-  }
-  try {
-    const ctx = makeCtx(player, target);
-    const state = executeEffect(game, { type: 'damage', amount: 1 }, ctx);
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playPeach(game: GameState, player: string): EffectResult {
-  const p = getPlayer(game, player);
-  if (p.health >= p.maxHealth) {
-    return { success: false, state: game, message: '体力已满' };
-  }
-  try {
-    const ctx = makeCtx(player);
-    const state = executeEffect(game, { type: 'heal', amount: 1 }, ctx);
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playDismantle(game: GameState, player: string, target: string): EffectResult {
-  if (player === target) {
-    return { success: false, state: game, message: '不能对自己使用' };
-  }
-  const t = getPlayer(game, target);
-  if (t.hand.length === 0) {
-    return { success: false, state: game, message: '目标没有手牌' };
-  }
-  try {
-    const ctx = makeCtx(player, target);
-    const state = executeEffect(game, { type: 'discard', count: 1, target: 'selected' }, ctx);
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playSteal(game: GameState, player: string, target: string): EffectResult {
-  const t = getPlayer(game, target);
-  if (t.hand.length === 0) {
-    return { success: false, state: game, message: '目标没有牌' };
-  }
-  try {
-    const ctx = makeCtx(player, target);
-    const state = executeEffect(game, { type: 'gainCard', source: 'selected' }, ctx);
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playDrawTwo(game: GameState, player: string): EffectResult {
-  if (game.deck.length < 2) {
-    return { success: false, state: game, message: '牌堆不足' };
-  }
-  try {
-    const ctx = makeCtx(player);
-    const state = executeEffect(game, { type: 'draw', count: 2 }, ctx);
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playDuel(game: GameState, player: string, target: string): EffectResult {
-  if (player === target) {
-    return { success: false, state: game, message: '不能对自己使用' };
-  }
-  try {
-    const ctx = makeCtx(player, target);
-    const state = executeEffect(game, { type: 'damage', amount: 1 }, ctx);
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playArrowBarrage(game: GameState, player: string): EffectResult {
-  try {
-    const ctx = makeCtx(player);
-    let state = game;
-    for (const p of state.players) {
-      if (p.alive && p.name !== player) {
-        state = executeEffect(state, { type: 'damage', amount: 1 }, { ...ctx, target: p.name });
-      }
-    }
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playBarbarianInvasion(game: GameState, player: string): EffectResult {
-  try {
-    const ctx = makeCtx(player);
-    let state = game;
-    for (const p of state.players) {
-      if (p.alive && p.name !== player) {
-        state = executeEffect(state, { type: 'damage', amount: 1 }, { ...ctx, target: p.name });
-      }
-    }
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playPeachGarden(game: GameState, player: string): EffectResult {
-  // 检查是否所有人都满血
-  const allFull = game.players.filter(p => p.alive).every(p => p.health >= p.maxHealth);
-  if (allFull) {
-    return { success: false, state: game, message: '所有人都满血' };
-  }
-  try {
-    const ctx = makeCtx(player);
-    let state = game;
-    for (const p of state.players) {
-      if (p.alive && p.health < p.maxHealth) {
-        state = executeEffect(state, { type: 'heal', amount: 1 }, { ...ctx, player: p.name });
-      }
-    }
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
-}
-
-export function playAbundance(game: GameState, player: string): EffectResult {
-  const aliveCount = game.players.filter(p => p.alive).length;
-  if (game.deck.length < aliveCount) {
-    return { success: false, state: game, message: '牌堆不足' };
-  }
-  try {
-    const ctx = makeCtx(player);
-    let state = game;
-    for (const p of state.players) {
-      if (p.alive) {
-        state = executeEffect(state, { type: 'draw', count: 1 }, { ...ctx, player: p.name });
-      }
-    }
-    return { success: true, state };
-  } catch (e) {
-    return { success: false, state: game, message: String(e) };
-  }
 }

@@ -52,7 +52,7 @@ export const 夏侯惇: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'judge', expectedSuit: '♥', failEffect: 'attackerDiscardOrDamage' },
+          { type: 'judge', expectedSuit: '♥', onFail: { type: 'discard', count: 2, target: 'attacker' } },
         ],
       },
       passive: true,
@@ -92,8 +92,8 @@ export const 许褚: CharacterConfig = {
       condition: { phase: '摸牌' },
       effect: { type: 'sequence', steps: [
         { type: 'skipDraw' },
-        { type: 'dealDamage', bonusDamage: 1, condition: '杀或决斗' },
       ] },
+      modifiers: ['裸衣Bonus'],
     },
   ],
 };

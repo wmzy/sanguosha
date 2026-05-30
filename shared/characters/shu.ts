@@ -51,8 +51,9 @@ export const 张飞: CharacterConfig = {
       name: '咆哮',
       description: '锁定技，出牌阶段，你使用【杀】无次数限制。',
       trigger: 'manual',
-      effect: { type: 'draw', count: 0 },
+      effect: { type: 'sequence', steps: [] },
       passive: true,
+      modifiers: ['unlimitedKills'],
     },
   ],
 };
@@ -130,8 +131,9 @@ export const 马超: CharacterConfig = {
       name: '马术',
       description: '锁定技，你计算与其他角色的距离时，始终-1。',
       trigger: 'manual',
-      effect: { type: 'draw', count: 0 },
+      effect: { type: 'sequence', steps: [] },
       passive: true,
+      modifiers: ['distanceMinus1'],
     },
     {
       name: '铁骑',

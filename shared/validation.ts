@@ -10,7 +10,7 @@ import type { Card } from './types';
 
 export function canPlayCard(state: ClientGameState, cardId: string): boolean {
   const selfPlayer = state.players[state.self];
-  if (!selfPlayer || !selfPlayer.alive) return false;
+  if (!selfPlayer?.alive) return false;
 
   const card = selfPlayer.hand.find((c) => c.id === cardId);
   if (!card) return false;
@@ -42,7 +42,7 @@ export function canPlayCard(state: ClientGameState, cardId: string): boolean {
 export function getValidTargets(state: ClientGameState, cardName: string): string[] {
   const selfName = state.self;
   const selfPlayer = state.players[selfName];
-  if (!selfPlayer || !selfPlayer.alive) return [];
+  if (!selfPlayer?.alive) return [];
 
   const targets: string[] = [];
 
@@ -79,7 +79,7 @@ export function canUseSkill(state: ClientGameState, _skillId: string): boolean {
   if (state.currentPlayer !== state.self) return false;
 
   const selfPlayer = state.players[state.self];
-  if (!selfPlayer || !selfPlayer.alive) return false;
+  if (!selfPlayer?.alive) return false;
 
   return true;
 }

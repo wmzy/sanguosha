@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { executeEffect } from '@engine/core/effect';
+import { executeEffect } from '@engine/effect';
 import { createGame, startGame } from '@engine/state';
 import { 曹操, 刘备 } from '@shared/characters';
-import type { Effect, EffectContext } from '@shared/types';
+import type { Effect } from '@shared/types';
+import type { EffectExecContext } from '@engine/types';
+import { createRng } from '@shared/rng';
 
 describe('executeEffect', () => {
   function createTestGame() {
@@ -10,10 +12,18 @@ describe('executeEffect', () => {
     return startGame(game);
   }
 
+  function makeCtx(player: string, target?: string): EffectExecContext {
+    return {
+      player,
+      target,
+      rng: createRng(12345),
+    };
+  }
+
   it('draw effect draws cards', () => {
     const game = createTestGame();
     const effect: Effect = { type: 'draw', count: 2 };
-    const ctx: EffectContext = { player: '曹操' };
+    const ctx = makeCtx('曹操');
     const result = executeEffect(game, effect, ctx);
     const caocao = result.players.find(p => p.name === '曹操')!;
     expect(caocao.hand.length).toBe(6); // 4 initial + 2 drawn
@@ -22,7 +32,7 @@ describe('executeEffect', () => {
   it('damage effect reduces health', () => {
     const game = createTestGame();
     const effect: Effect = { type: 'damage', amount: 1 };
-    const ctx: EffectContext = { player: '曹操', target: '刘备' };
+    const ctx = makeCtx('曹操', '刘备');
     const result = executeEffect(game, effect, ctx);
     const liubei = result.players.find(p => p.name === '刘备')!;
     expect(liubei.health).toBe(3);
@@ -32,7 +42,7 @@ describe('executeEffect', () => {
     const game = createTestGame();
     game.players[1].health = 2;
     const effect: Effect = { type: 'heal', amount: 1 };
-    const ctx: EffectContext = { player: '刘备' };
+    const ctx = makeCtx('刘备');
     const result = executeEffect(game, effect, ctx);
     const liubei = result.players.find(p => p.name === '刘备')!;
     expect(liubei.health).toBe(3);
@@ -41,7 +51,7 @@ describe('executeEffect', () => {
   it('heal cannot exceed maxHealth', () => {
     const game = createTestGame();
     const effect: Effect = { type: 'heal', amount: 5 };
-    const ctx: EffectContext = { player: '曹操' };
+    const ctx = makeCtx('曹操');
     const result = executeEffect(game, effect, ctx);
     const caocao = result.players.find(p => p.name === '曹操')!;
     expect(caocao.health).toBe(caocao.maxHealth);
@@ -49,6 +59,7 @@ describe('executeEffect', () => {
 
   it('sequence effect executes steps in order', () => {
     const game = createTestGame();
+    game.players[0].health = 3;
     const effect: Effect = {
       type: 'sequence',
       steps: [
@@ -56,10 +67,12 @@ describe('executeEffect', () => {
         { type: 'heal', amount: 1 },
       ],
     };
-    const ctx: EffectContext = { player: '曹操', target: '刘备' };
+    const ctx = makeCtx('曹操', '刘备');
     const result = executeEffect(game, effect, ctx);
     const liubei = result.players.find(p => p.name === '刘备')!;
-    expect(liubei.health).toBe(4);
+    expect(liubei.health).toBe(3);
+    const caocao = result.players.find(p => p.name === '曹操')!;
+    expect(caocao.health).toBe(4);
   });
 
   it('conditional effect branches correctly', () => {
@@ -71,7 +84,7 @@ describe('executeEffect', () => {
       then: { type: 'heal', amount: 1 },
       else: { type: 'draw', count: 1 },
     };
-    const ctx: EffectContext = { player: '刘备' };
+    const ctx = makeCtx('刘备');
     const result = executeEffect(game, effect, ctx);
     const liubei = result.players.find(p => p.name === '刘备')!;
     expect(liubei.health).toBe(3);

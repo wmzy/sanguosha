@@ -15,6 +15,7 @@ export function getDistance(game: GameState, from: string, to: string): number {
 
   const fromPlayer = game.players.find(p => p.name === from)!;
   if (fromPlayer.equipment.horseMinus) distance -= 1;
+  if (fromPlayer.character.abilities.some(a => a.modifiers?.includes('distanceMinus1'))) distance -= 1;
 
   const toPlayer = game.players.find(p => p.name === to)!;
   if (toPlayer.equipment.horsePlus) distance += 1;

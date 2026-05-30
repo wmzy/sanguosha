@@ -109,15 +109,15 @@ export function checkCondition(condition: Condition, state: GameState, ctx?: Ski
 
   if ('equals' in condition) {
     const [a, b] = condition.equals;
-    const ra = isExpr(a) ? resolve(a as Expr<unknown>, state, ctx, depth + 1) : a;
-    const rb = isExpr(b) ? resolve(b as Expr<unknown>, state, ctx, depth + 1) : b;
+    const ra = isExpr(a) ? resolve(a, state, ctx, depth + 1) : a;
+    const rb = isExpr(b) ? resolve(b, state, ctx, depth + 1) : b;
     return deepEqual(ra, rb);
   }
 
   if ('notEquals' in condition) {
     const [a, b] = condition.notEquals;
-    const ra = isExpr(a) ? resolve(a as Expr<unknown>, state, ctx, depth + 1) : a;
-    const rb = isExpr(b) ? resolve(b as Expr<unknown>, state, ctx, depth + 1) : b;
+    const ra = isExpr(a) ? resolve(a, state, ctx, depth + 1) : a;
+    const rb = isExpr(b) ? resolve(b, state, ctx, depth + 1) : b;
     return !deepEqual(ra, rb);
   }
 

@@ -9,7 +9,7 @@ registerPhase<AtomsPhase>({
   execute(state: GameState, phase: AtomsPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
     let s = state;
     for (const atom of phase.ops) {
-      s = applyAtom(s, atom as Atom);
+      s = applyAtom(s, atom);
     }
     return { state: s, events: [] };
   },

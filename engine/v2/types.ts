@@ -64,7 +64,7 @@ export interface PlayerInfo {
 }
 
 export interface EquipmentSlots {
-  weapon?: string; 
+  weapon?: string;
   armor?: string;
   horsePlus?: string;
   horseMinus?: string;
@@ -74,7 +74,7 @@ export type EquipSlot = keyof EquipmentSlots;
 export interface TurnState {
   killsPlayed: number;
   skillsUsed: string[];
-  phaseFlags: string[];  // 'skipDraw', 'skipPlay', etc.
+  phaseFlags: string[]; // 'skipDraw', 'skipPlay', etc.
 }
 export type PendingAction =
   | PendingResponseWindow
@@ -354,7 +354,7 @@ export interface ServerEvent {
   payload: Json;
 }
 
-export type PlayerEvent = ServerEvent;  // 结构相同，但 payload 内容可能被裁剪
+export type PlayerEvent = ServerEvent; // 结构相同，但 payload 内容可能被裁剪
 export interface PromptDef {
   text: string;
   options: PromptOption[];

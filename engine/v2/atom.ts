@@ -6,7 +6,7 @@ export function registerAtom<A>(def: AtomDefinition<A>): void {
   if (registry.has(def.type)) {
     throw new Error(`Atom type "${def.type}" already registered`);
   }
-  registry.set(def.type, def as AtomDefinition);
+  registry.set(def.type, def);
 }
 
 export function getAtomDef(type: string): AtomDefinition {

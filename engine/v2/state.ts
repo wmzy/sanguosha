@@ -50,7 +50,7 @@ export function createInitialState(config: GameConfig): GameState {
       health: char.maxHealth,
       maxHealth: char.maxHealth,
       hand,
-      equipment: {} as EquipmentSlots,
+      equipment: {},
       pendingTricks: [],
       vars: {},
       tags: [],

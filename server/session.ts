@@ -1,22 +1,15 @@
 // server/session.ts
-import type { GameState, PlayerAction } from '../shared/types';
-import type { Rng } from '../shared/rng';
+import type { PlayerAction, Card } from '../shared/types';
 import type { Room } from './room';
-import { createGame, getPublicState, startGame } from '../engine/state';
-import { nextPhase, drawPhase, checkDiscard, executeDiscard } from '../engine/turn';
-import { playKill, playPeach } from '../engine/effect';
+import { GameController } from '../engine/game';
 import { allCharacters } from '../shared/characters';
 import { serialize } from './protocol';
 import { setRoomStatus } from './room';
 
 export class GameSession {
-  private state: GameState | null = null;
+  private controller: GameController | null = null;
   private room: Room;
   private playerNames = new Map<string, string>(); // playerId -> playerName
-  private rng: Rng = {
-    next: () => Math.random(),
-    nextInt: (max: number) => Math.floor(Math.random() * max),
-  };
 
   constructor(room: Room) {
     this.room = room;
@@ -25,42 +18,27 @@ export class GameSession {
   startGame(): boolean {
     if (this.room.players.size < 2) return false;
 
-    // 随机分配角色
+    const seed = Date.now();
     const shuffled = [...allCharacters].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, this.room.players.size);
 
-    // 映射 playerId -> playerName
     const playerIds = [...this.room.players.keys()];
     for (let i = 0; i < playerIds.length; i++) {
       this.playerNames.set(playerIds[i], selected[i].name);
     }
 
-    this.state = createGame(selected);
-    this.state = startGame(this.state);
-
-    // 初始摸牌
-    for (let i = 0; i < this.state.players.length; i++) {
-      this.state = this.drawForCurrentPlayer();
-      this.state = nextPhase(this.state);
-    }
+    // GameController 管理种子化 RNG、技能注册、初始摸牌、回合推进
+    const { controller } = GameController.createGame(selected, seed);
+    this.controller = controller;
 
     setRoomStatus(this.room.id, '进行中');
     this.broadcastState();
-
-    // 通知当前玩家
     this.notifyCurrentPlayer();
     return true;
   }
 
-  private drawForCurrentPlayer(): GameState {
-    if (!this.state) throw new Error('游戏未开始');
-    const result = drawPhase(this.state, this.rng);
-    this.state = result.state;
-    return this.state;
-  }
-
   handleAction(playerId: string, action: PlayerAction): void {
-    if (!this.state) {
+    if (!this.controller) {
       this.sendToPlayer(playerId, { type: 'error', message: '游戏未开始' });
       return;
     }
@@ -71,7 +49,19 @@ export class GameSession {
       return;
     }
 
-    if (this.state.currentPlayer !== playerName) {
+    const state = this.controller.getState();
+    if (state.status === '已结束') {
+      this.sendToPlayer(playerId, { type: 'error', message: '游戏已结束' });
+      return;
+    }
+
+    const responseWindow = this.controller.getCurrentResponseWindow();
+    if (responseWindow && action.type === '响应') {
+      this.handleResponse(playerName, action);
+      return;
+    }
+
+    if (state.currentPlayer !== playerName) {
       this.sendToPlayer(playerId, { type: 'error', message: '不是你的回合' });
       return;
     }
@@ -86,172 +76,183 @@ export class GameSession {
       case '弃牌':
         this.handleDiscard(playerName, action);
         break;
+      case '发动技能':
+        this.handleActivateSkill(playerName, action);
+        break;
+      default:
+        this.sendToPlayer(playerId, { type: 'error', message: '未知操作' });
     }
   }
 
   private handlePlayCard(playerName: string, action: PlayerAction): void {
-    if (!this.state) return;
-    if (action.type !== '出牌') return;
+    if (!this.controller || action.type !== '出牌') return;
 
-    const card = action.card;
-    if (card.name === '杀') {
-      const target = action.target;
-      if (!target) {
-        this.sendToPlayerByName(playerName, { type: 'error', message: '未选择目标' });
-        return;
-      }
-      const result = playKill(this.state, playerName, target);
-      if (result.success) {
-        this.state = result.state;
-        this.removeCardFromHand(playerName, card);
-        this.broadcastState();
-      } else {
-        this.sendToPlayerByName(playerName, { type: 'error', message: result.message ?? '操作失败' });
-      }
-    } else if (card.name === '桃') {
-      const result = playPeach(this.state, playerName);
-      if (result.success) {
-        this.state = result.state;
-        this.removeCardFromHand(playerName, card);
-        this.broadcastState();
-      } else {
-        this.sendToPlayerByName(playerName, { type: 'error', message: result.message ?? '操作失败' });
-      }
+    const result = this.controller.playCard(playerName, action.card.id, action.target);
+
+    if (!result.success) {
+      this.sendToPlayerByName(playerName, { type: 'error', message: '操作失败' });
+      return;
     }
+
+    if (result.responseWindow) {
+      this.notifyResponders(result.responseWindow);
+    }
+
+    this.checkGameEnd();
+    this.broadcastState();
   }
 
   private handleEndTurn(playerName: string): void {
-    if (!this.state) return;
+    if (!this.controller) return;
 
-    // 跳过当前出牌阶段，进入弃牌阶段
-    this.state = { ...this.state, phase: '弃牌' };
+    const result = this.controller.endTurn(playerName);
 
-    // 检查是否需要弃牌
-    if (checkDiscard(this.state)) {
-      // 通知玩家需要弃牌
-      this.sendToPlayerByName(playerName, {
-        type: 'prompt',
-        promptId: 'discard',
-        prompt: { name: '弃牌', description: '手牌超过体力上限，请弃牌', type: 'select_card', options: [] },
-      });
-      return;
-    }
-
-    // 完成回合
-    this.completeTurn();
-  }
-
-  private handleDiscard(playerName: string, action: PlayerAction): void {
-    if (!this.state) return;
-    if (action.type !== '弃牌') return;
-    // 简化：弃第一张牌
-    const card = action.cards[0];
-    if (card) {
-      const player = this.state.players.find(p => p.name === playerName);
-      if (player) {
-        const index = player.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
-        if (index >= 0) {
-          this.state = executeDiscard(this.state, [index]);
-        }
+    if (!result.success) {
+      const state = this.controller.getState();
+      if (state.phase === '弃牌') {
+        this.sendToPlayerByName(playerName, {
+          type: 'prompt',
+          promptId: 'discard',
+          prompt: {
+            name: '弃牌',
+            description: '手牌超过体力上限，请弃牌',
+            type: 'select_card',
+            options: [],
+          },
+        });
+        this.broadcastState();
+        return;
       }
-    }
-    this.completeTurn();
-  }
 
-  private completeTurn(): void {
-    if (!this.state) return;
-
-    // 跳过弃牌和结束阶段，进入下一玩家的准备阶段
-    this.state = nextPhase(this.state); // 弃牌 -> 结束
-    this.state = nextPhase(this.state); // 结束 -> 准备（下一玩家）
-
-    // 检查游戏是否结束
-    const winner = this.checkGameEnd();
-    if (winner) {
-      this.state = { ...this.state, status: '已结束', winner };
-      setRoomStatus(this.room.id, '已结束');
-      this.broadcast({ type: 'game_over', winner });
-      this.broadcastState();
+      this.sendToPlayerByName(playerName, { type: 'error', message: '无法结束回合' });
       return;
     }
 
-    // 新回合摸牌
-    this.state = nextPhase(this.state); // 准备 -> 判定
-    this.state = nextPhase(this.state); // 判定 -> 摸牌
-    this.state = this.drawForCurrentPlayer();
-    this.state = nextPhase(this.state); // 摸牌 -> 出牌
-
+    this.checkGameEnd();
     this.broadcastState();
     this.notifyCurrentPlayer();
   }
 
-  private checkGameEnd(): import('../shared/types').Role | null {
-    if (!this.state) return null;
+  private handleDiscard(playerName: string, action: PlayerAction): void {
+    if (!this.controller || action.type !== '弃牌') return;
 
-    // 检查体力为0的玩家
-    for (const player of this.state.players) {
-      if (player.health <= 0 && player.alive) {
-        player.alive = false;
-      }
+    const state = this.controller.getState();
+    const player = state.players.find(p => p.name === playerName);
+    if (!player) return;
+
+    const indices: number[] = [];
+    for (const card of action.cards) {
+      const idx = player.hand.findIndex(c => c.id === card.id);
+      if (idx >= 0) indices.push(idx);
     }
 
-    const alivePlayers = this.state.players.filter(p => p.alive);
+    if (indices.length === 0) return;
 
-    // 主公死了，反贼赢
-    const lord = this.state.players.find(p => p.role === '主公');
-    if (lord && !lord.alive) return '反贼';
+    const result = this.controller.discard(playerName, indices);
 
-    // 只剩主公和内奸，主公赢
-    if (alivePlayers.length === 1) return alivePlayers[0].role;
-
-    // 反贼全死，主公赢
-    const aliveRebels = alivePlayers.filter(p => p.role === '反贼');
-    if (aliveRebels.length === 0 && alivePlayers.length > 0) return '主公';
-
-    return null;
+    this.checkGameEnd();
+    this.broadcastState();
+    this.notifyCurrentPlayer();
   }
 
-  private removeCardFromHand(playerName: string, card: import('../shared/types').Card): void {
-    if (!this.state) return;
-    this.state = {
-      ...this.state,
-      players: this.state.players.map(p => {
-        if (p.name === playerName) {
-          const index = p.hand.findIndex(c => c.name === card.name && c.suit === card.suit && c.rank === card.rank);
-          if (index >= 0) {
-            const newHand = [...p.hand];
-            newHand.splice(index, 1);
-            return { ...p, hand: newHand };
-          }
+  private handleActivateSkill(playerName: string, action: PlayerAction): void {
+    if (!this.controller || action.type !== '发动技能') return;
+
+    const skills = this.controller.getValidActionsForPlayer(playerName).skills;
+    const skillIndex = skills.findIndex(s => s.name === action.skillName);
+
+    if (skillIndex === -1) {
+      this.sendToPlayerByName(playerName, { type: 'error', message: '技能不可用' });
+      return;
+    }
+
+    const result = this.controller.activateSkill(playerName, skillIndex, action.target);
+
+    if (!result.success) {
+      this.sendToPlayerByName(playerName, { type: 'error', message: '技能发动失败' });
+      return;
+    }
+
+    this.checkGameEnd();
+    this.broadcastState();
+  }
+
+  private handleResponse(playerName: string, action: PlayerAction): void {
+    if (!this.controller || action.type !== '响应') return;
+
+    const responses = new Map<string, Card | null>();
+    responses.set(playerName, action.card ?? null);
+
+    const result = this.controller.respondToWindow(responses);
+
+    if (result.responseWindow) {
+      this.notifyResponders(result.responseWindow);
+    }
+
+    this.checkGameEnd();
+    this.broadcastState();
+  }
+
+  private notifyResponders(window: import('../engine/types').ResponseWindow): void {
+    for (const responderName of window.validResponders) {
+      for (const [playerId, name] of this.playerNames) {
+        if (name === responderName) {
+          this.sendToPlayer(playerId, {
+            type: 'prompt',
+            promptId: `response_${window.type}`,
+            prompt: {
+              name: window.type === 'kill_response' ? '请出闪' :
+                window.type === 'aoe_response' ? `请出${window.validCards[0] ?? '牌'}` :
+                  window.type === 'dying' ? '请出桃' : '请响应',
+              description: `${window.requester} 对你使用了牌，请选择是否响应`,
+              type: 'select_card',
+              options: window.validCards,
+            },
+          });
         }
-        return p;
-      }),
-    };
+      }
+    }
+  }
+
+  private checkGameEnd(): void {
+    if (!this.controller) return;
+
+    const state = this.controller.getState();
+    if (state.status === '已结束') {
+      setRoomStatus(this.room.id, '已结束');
+      this.broadcast({ type: 'game_over', winner: state.winner! });
+    }
   }
 
   broadcastState(): void {
-    if (!this.state) return;
+    if (!this.controller) return;
+
+    const state = this.controller.getState();
+    if (state.status !== '进行中') return;
 
     for (const [playerId, playerName] of this.playerNames) {
-      const publicState = getPublicState(this.state, playerName);
+      const publicState = this.controller.getPublicState(playerName);
       this.sendToPlayer(playerId, { type: 'state_update', state: publicState });
     }
   }
 
   notifyCurrentPlayer(): void {
-    if (!this.state) return;
+    if (!this.controller) return;
 
+    const state = this.controller.getState();
     for (const [playerId, playerName] of this.playerNames) {
-      if (playerName === this.state.currentPlayer) {
-        this.sendToPlayer(playerId, { type: 'your_turn', phase: this.state.phase });
+      if (playerName === state.currentPlayer) {
+        this.sendToPlayer(playerId, { type: 'your_turn', phase: state.phase });
       }
     }
   }
 
   handleDisconnect(playerId: string): void {
+    if (!this.controller) return;
+
     const playerName = this.playerNames.get(playerId) ?? '未知玩家';
-    if (this.state?.status === '进行中') {
-      this.state = { ...this.state, status: '已结束' };
+    const state = this.controller.getState();
+    if (state.status === '进行中') {
       setRoomStatus(this.room.id, '已结束');
       this.broadcast({ type: 'error', message: `${playerName} 断开连接，游戏结束` });
     }

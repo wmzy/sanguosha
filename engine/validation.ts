@@ -3,6 +3,7 @@ import type { ValidationResult, ValidActions } from './types';
 import { getAlivePlayers, getPlayer } from './state';
 import { isInAttackRange } from './distance';
 import { getAvailableSkills } from './skill';
+import { getConversionTargets } from './convert';
 import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../shared/cards/index';
 
 const allCardDefs: CardDef[] = [...基本牌列表, ...锦囊牌列表, ...装备牌列表];
@@ -93,7 +94,11 @@ export function isCardPlayable(game: GameState, player: import('../shared/types'
   if (!def) return false;
 
   if (card.name === '杀') {
-    if (game.killsPlayedThisTurn >= 1 && player.equipment.weapon?.name !== '诸葛连弩') {
+    const hasUnlimitedWeapon = player.equipment.weapon
+      ? cardDefMap.get(player.equipment.weapon.name)?.weaponEffect?.type === 'unlimitedKills'
+      : false;
+    const hasUnlimitedSkill = player.character.abilities.some(a => a.modifiers?.includes('unlimitedKills'));
+    if (game.killsPlayedThisTurn >= 1 && !hasUnlimitedWeapon && !hasUnlimitedSkill) {
       return false;
     }
   }
@@ -120,26 +125,49 @@ export function getValidTargetsForCard(
   const filter = def.targetFilter;
   const alivePlayers = getAlivePlayers(game);
 
-  switch (filter.type) {
-    case 'self':
-      return [player.name];
-    case 'none':
-      return [];
-    case 'other':
-      return alivePlayers
-        .filter(p => p.name !== player.name)
-        .filter(p => !filter.condition || filter.condition(p))
-        .map(p => p.name);
-    case 'inRange':
-      return alivePlayers
-        .filter(p => p.name !== player.name)
-        .filter(p => isInAttackRange(game, player.name, p.name))
-        .map(p => p.name);
-    case 'all':
-      return alivePlayers.map(p => p.name);
-    default:
-      return [];
+  const candidates = (() => {
+    switch (filter.type) {
+      case 'self':
+        return [player.name];
+      case 'none':
+        return [];
+      case 'other':
+        return alivePlayers
+          .filter(p => p.name !== player.name)
+          .filter(p => !filter.condition || filter.condition(p))
+          .map(p => p.name);
+      case 'inRange':
+        return alivePlayers
+          .filter(p => p.name !== player.name)
+          .filter(p => isInAttackRange(game, player.name, p.name))
+          .map(p => p.name);
+      case 'all':
+        return alivePlayers.map(p => p.name);
+      default:
+        return [];
+    }
+  })();
+
+  return candidates.filter(targetName => !isTargetImmune(game, targetName, card));
+}
+
+function isTargetImmune(game: GameState, targetName: string, card: Card): boolean {
+  const target = game.players.find(p => p.name === targetName);
+  if (!target) return false;
+
+  for (const ability of target.character.abilities) {
+    if (ability.trigger !== 'onTargeted' || !ability.passive) continue;
+
+    if (ability.name === '空城' && target.hand.length === 0) {
+      if (card.name === '杀' || card.name === '决斗') return true;
+    }
+
+    if (ability.name === '谦逊') {
+      if (card.name === '过河拆桥' || card.name === '顺手牵羊') return true;
+    }
   }
+
+  return false;
 }
 
 export function getValidActions(game: GameState, playerName: string): ValidActions {
@@ -152,6 +180,14 @@ export function getValidActions(game: GameState, playerName: string): ValidActio
       if (isCardPlayable(game, player, card)) {
         const targets = getValidTargetsForCard(game, player, card);
         playableCards.push({ card, targets });
+      }
+    }
+
+    const conversions = getConversionTargets(player, 'play');
+    for (const conv of conversions) {
+      if (isCardPlayable(game, player, conv.convertedCard)) {
+        const targets = getValidTargetsForCard(game, player, conv.convertedCard);
+        playableCards.push({ card: conv.convertedCard, targets });
       }
     }
   }

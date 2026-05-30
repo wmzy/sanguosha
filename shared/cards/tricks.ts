@@ -42,6 +42,7 @@ export const 万箭齐发: CardDef = {
   subtype: '锦囊',
   targetFilter: { type: 'none' },
   effect: { type: 'damage', amount: 1 },
+  aoeResponse: '闪',
 };
 
 export const 南蛮入侵: CardDef = {
@@ -50,6 +51,7 @@ export const 南蛮入侵: CardDef = {
   subtype: '锦囊',
   targetFilter: { type: 'none' },
   effect: { type: 'damage', amount: 1 },
+  aoeResponse: '杀',
 };
 
 export const 桃园结义: CardDef = {
