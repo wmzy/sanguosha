@@ -24,6 +24,12 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
       return (ctx as unknown as Record<string, unknown>)[path] as T;
     }
 
+    case 'event': {
+      const path = e.path as string;
+      if (!ctx) throw new Error('resolve event: no SkillContext provided');
+      return (ctx.event as unknown as Record<string, unknown>)[path] as T;
+    }
+
     case 'var': {
       const playerName = resolve(e.player as Expr<string>, state, ctx, depth + 1);
       const player = getPlayer(state, playerName);
@@ -31,8 +37,11 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     }
 
     case 'count': {
-      const source = resolve(e.source as Expr<string>, state, ctx, depth + 1);
-      const player = getPlayer(state, source);
+      const source = resolve(e.source as Expr<unknown>, state, ctx, depth + 1);
+      // source 可能是数组（从 ctx 获取），也可能是玩家名
+      if (Array.isArray(source)) return source.length as T;
+      const player = getPlayer(state, source as string);
+      if (!player) return 0 as T;
       const zone = player[source as keyof typeof player];
       if (Array.isArray(zone)) return zone.length as T;
       return 0 as T;
