@@ -4,6 +4,7 @@ import type {
   EngineResult,
   Atom,
   PendingResponseWindow,
+  PendingSelectCard,
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import type { Card } from '../../../shared/types';
@@ -196,21 +197,21 @@ function handleTrickCard(
       if (targetPlayer.hand.length === 0) {
         return { state, events: [], error: '目标没有手牌' };
       }
-      // 简化：弃第一张
-      const discardCardId = targetPlayer.hand[0];
+      // 创建选牌 pending，让玩家选择一张目标的手牌弃掉
+      const pending: PendingSelectCard = {
+        type: 'selectCard',
+        player,
+        target,
+        cardIds: targetPlayer.hand,
+        min: 1,
+        max: 1,
+        sourceCard: action.cardId,
+        timeout: TIMEOUT_DEFAULTS.selectCard,
+        deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
+        onTimeout: { type: 'respond', player, cardIds: [targetPlayer.hand[0]] },
+      };
       const atoms: Atom[] = [
-        {
-          type: 'moveCard',
-          cardId: action.cardId,
-          from: { zone: 'hand', player },
-          to: { zone: 'discardPile' },
-        },
-        {
-          type: 'moveCard',
-          cardId: discardCardId,
-          from: { zone: 'hand', player: target },
-          to: { zone: 'discardPile' },
-        },
+        { type: 'pushPending', action: pending },
       ];
       const result = applyAtoms(state, atoms);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };

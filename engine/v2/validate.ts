@@ -16,6 +16,7 @@ import type {
   PendingSkillPrompt,
   PendingDiscardPhase,
   PendingDyingWindow,
+  PendingSelectCard,
   PromptOption,
 } from './types';
 import { getPlayer, getAlivePlayerNames } from './state';
@@ -211,6 +212,8 @@ function validatePendingAction(state: GameState, action: GameAction): string | n
       return validateDiscardPhase(state, action, pending);
     case 'dyingWindow':
       return validateDyingWindow(state, action, pending);
+    case 'selectCard':
+      return null;
   }
 }
 
@@ -381,6 +384,8 @@ function computePendingActions(state: GameState, player: string): ValidAction[] 
       return computeDiscardPhaseActions(state, player, pending);
     case 'dyingWindow':
       return computeDyingWindowActions(state, player, pending);
+    case 'selectCard':
+      return computeSelectCardActions(state, player, pending);
   }
 }
 
@@ -488,6 +493,21 @@ function computeDyingWindowActions(
     required: false,
     cards: peachCards,
     canPass: true,
+  }];
+}
+
+function computeSelectCardActions(
+  state: GameState,
+  player: string,
+  pending: PendingSelectCard,
+): ValidAction[] {
+  if (player !== pending.player) return [];
+  return [{
+    type: 'respond',
+    prompt: `请选择 ${pending.target} 的一张手牌`,
+    required: true,
+    cards: pending.cardIds,
+    canPass: false,
   }];
 }
 

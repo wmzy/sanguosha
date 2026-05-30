@@ -80,7 +80,8 @@ export type PendingAction =
   | PendingResponseWindow
   | PendingSkillPrompt
   | PendingDiscardPhase
-  | PendingDyingWindow;
+  | PendingDyingWindow
+  | PendingSelectCard;
 
 export interface PendingResponseWindow {
   type: 'responseWindow';
@@ -116,6 +117,19 @@ export interface PendingDyingWindow {
   dyingPlayer: string;
   currentSaverIndex: number;
   savers: string[];
+  timeout: number;
+  deadline: number;
+  onTimeout: GameAction;
+}
+
+export interface PendingSelectCard {
+  type: 'selectCard';
+  player: string;
+  target: string;
+  cardIds: string[];
+  min: number;
+  max: number;
+  sourceCard: string;
   timeout: number;
   deadline: number;
   onTimeout: GameAction;
@@ -326,7 +340,7 @@ export interface TriggerRule {
 }
 export type GameAction =
   | { type: 'playCard'; player: string; cardId: string; target?: string }
-  | { type: 'respond'; player: string; cardId?: string }
+  | { type: 'respond'; player: string; cardId?: string; cardIds?: string[] }
   | { type: 'endTurn'; player: string }
   | { type: 'discard'; player: string; cardIds: string[] }
   | { type: 'useSkill'; player: string; skillId: string; target?: string }
@@ -460,6 +474,7 @@ export interface TimeoutConfig {
   dyingResponse: number;
   skillPrompt: number;
   playPhase: number;
+  selectCard: number;
   discardPhase: number;
 }
 
@@ -469,5 +484,6 @@ export const TIMEOUT_DEFAULTS: TimeoutConfig = {
   dyingResponse: 20000,
   skillPrompt: 15000,
   playPhase: 60000,
+  selectCard: 30000,
   discardPhase: 30000,
 };

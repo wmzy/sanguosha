@@ -6,13 +6,14 @@ import type {
   PendingSkillPrompt,
   PendingDiscardPhase,
   PendingDyingWindow,
+  PendingSelectCard,
   SkillDef,
 } from './types';
 import { validateAction } from './validate';
 import './atoms/index';
 import './phases/index';
 import './skills/index';
-import { resolveResponse } from './handlers/response-handlers';
+import { resolveResponse, resolveSelectCard } from './handlers/response-handlers';
 import { resumeSkill, handleUseSkill } from './handlers/skill-handlers';
 import { resolveDiscardPhase, handleEndTurn } from './handlers/turn-handlers';
 import { resolveDying } from './handlers/dying-handlers';
@@ -59,5 +60,7 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
       return resolveDiscardPhase(state, action, pending);
     case 'dyingWindow':
       return resolveDying(state, action, pending);
+    case 'selectCard':
+      return resolveSelectCard(state, action, pending);
   }
 }

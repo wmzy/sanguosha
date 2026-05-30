@@ -214,14 +214,29 @@ describe('V2 Engine - 卡牌效果', () => {
         (id) => state.cardMap[id].name === '过河拆桥',
       )!;
 
-      const result = engine(state, {
+      // 第 1 步：出牌 → 进入选牌 pending
+      const step1 = engine(state, {
         type: 'playCard',
         player: 'P1',
         cardId,
         target: 'P2',
       });
-      expect(result.error).toBeUndefined();
-      expect(result.state.players['P2'].hand.length).toBe(targetHandBefore - 1);
+      expect(step1.error).toBeUndefined();
+      expect(step1.state.pending).not.toBeNull();
+      expect(step1.state.pending!.type).toBe('selectCard');
+      // 手牌尚未减少
+      expect(step1.state.players['P2'].hand.length).toBe(targetHandBefore);
+
+      // 第 2 步：选择一张目标手牌 → 弃牌
+      const selectedCardId = step1.state.players['P2'].hand[0];
+      const step2 = engine(step1.state, {
+        type: 'respond',
+        player: 'P1',
+        cardIds: [selectedCardId],
+      });
+      expect(step2.error).toBeUndefined();
+      expect(step2.state.pending).toBeNull();
+      expect(step2.state.players['P2'].hand.length).toBe(targetHandBefore - 1);
     });
 
     it('目标没有手牌时不能使用', () => {

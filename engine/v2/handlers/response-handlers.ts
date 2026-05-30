@@ -4,6 +4,7 @@ import type {
   EngineResult,
   Atom,
   PendingResponseWindow,
+  PendingSelectCard,
   GameEvent,
   ServerEvent,
 } from '../types';
@@ -247,6 +248,51 @@ function resolveDyingResponse(
 ): EngineResult {
   // 濒死桃响应在 resolveDying 中处理，此处不应到达
   const atoms: Atom[] = [{ type: 'popPending' }];
+  const result = applyAtoms(state, atoms);
+  return { state: result.state, events: result.events };
+}
+
+export function resolveSelectCard(
+  state: GameState,
+  action: GameAction,
+  pending: PendingSelectCard,
+): EngineResult {
+  if (action.type !== 'respond') {
+    return { state, events: [], error: '选牌需要 respond 动作' };
+  }
+  if (action.player !== pending.player) {
+    return { state, events: [], error: '只有出牌者可以选择' };
+  }
+
+  const selectedIds = action.cardIds ?? (action.cardId ? [action.cardId] : []);
+  if (selectedIds.length < pending.min || selectedIds.length > pending.max) {
+    return { state, events: [], error: '选择的卡牌数量不符' };
+  }
+
+  // 校验所选卡牌确实在目标手中
+  const targetPlayer = getPlayer(state, pending.target);
+  for (const cardId of selectedIds) {
+    if (!targetPlayer.hand.includes(cardId)) {
+      return { state, events: [], error: '所选卡牌不在目标手牌中' };
+    }
+  }
+
+  // 弃掉过河拆桥牌 + 所选目标牌
+  const atoms: Atom[] = [
+    {
+      type: 'moveCard',
+      cardId: pending.sourceCard,
+      from: { zone: 'hand', player: pending.player },
+      to: { zone: 'discardPile' },
+    },
+    ...selectedIds.map(cardId => ({
+      type: 'moveCard' as const,
+      cardId,
+      from: { zone: 'hand' as const, player: pending.target },
+      to: { zone: 'discardPile' as const },
+    })),
+    { type: 'popPending' },
+  ];
   const result = applyAtoms(state, atoms);
   return { state: result.state, events: result.events };
 }
