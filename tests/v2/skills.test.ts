@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { registerCharacterTriggers, emitEvent } from '@engine/v2/skill';
-import { engine } from '@engine/v2/engine';
+import { safeEngine as engine } from './invariants';
 import { getCharacterMap, createTestGame, setPlayPhase } from './setup';
 
 describe('V2 Engine - 技能注册与触发', () => {

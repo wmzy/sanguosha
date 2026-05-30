@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { engine } from '@engine/v2/engine';
+import { safeEngine as engine } from './invariants';
 import {
   createTestGame,
   setPlayPhase,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { engine } from '@engine/v2/engine';
+import { safeEngine as engine } from './invariants';
 import { createInitialState } from '@engine/v2/state';
 import { serialize, deserialize } from '@engine/v2/serializer';
 import { getCharacterMap, createTestGame, setPlayPhase, findCardInHand, injectCard, act } from './setup';
