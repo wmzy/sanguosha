@@ -427,14 +427,27 @@ export interface ResponseWindowDef {
   requiredCard?: string;
   /** trickResponse 链：原锦囊目标（区别于 defender 当前响应者） */
   trickTarget?: string;
-  /** trickResponse 链：剩余待询问玩家 */
+  /** @deprecated 旧顺序链式字段，保留兼容 */
   remainingPlayers?: string[];
-  /** trickResponse 链：当前是否已被无懈 */
+  /** @deprecated 旧顺序链式字段，保留兼容 */
   negated?: boolean;
   /** 判定阶段无懈上下文：当前 trickResponse 是为判定阶段的延时锦囊开的窗口 */
   judgmentContext?: {
     player: string;
     trickIndex: number;
+  };
+  /** 抢占式无懈可击：所有可响应的玩家（按行动顺序） */
+  responders?: string[];
+  /** 抢占式无懈可击：已 pass 的玩家 */
+  passedResponders?: string[];
+  /** 嵌套深度：0=原锦囊被无懈, 1=无懈被无懈, ... */
+  depth?: number;
+  /** AOE 无懈上下文：无懈通过后需要恢复 AOE 流程 */
+  aoeResume?: {
+    attacker: string;
+    remainingTargets: string[];
+    requiredCard: string;
+    sourceCard: string;
   };
 }
 

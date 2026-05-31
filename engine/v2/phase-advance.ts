@@ -14,6 +14,7 @@ import type { TurnPhase } from '../../shared/types';
 import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';
 import { getPlayer, getAlivePlayerNames } from './state';
+import { createConcurrentTrickResponse } from './handlers/response-handlers';
 
 /**
  * 处理判定阶段的延迟锦囊（乐不思蜀、兵粮寸断）
@@ -36,7 +37,14 @@ function processJudgmentPhase(state: GameState, player: string): EngineResult {
 
   const lastIndex = pendingTricks.length - 1;
   const trick = pendingTricks[lastIndex];
-  const pending = createJudgmentTrickResponse(state, player, lastIndex, trick, aliveOthers);
+  const pending = createConcurrentTrickResponse(state, {
+    sourceCard: trick.card.id,
+    attacker: trick.source,
+    trickTarget: player,
+    responders: aliveOthers,
+    depth: 0,
+    judgmentContext: { player, trickIndex: lastIndex },
+  });
   const result = applyAtoms(state, [{ type: 'pushPending', action: pending }]);
   return { state: result.state, events: result.events };
 }
@@ -78,53 +86,6 @@ function batchProcessJudgments(
   }
 
   return { state: s, events: actionResult.events };
-}
-
-export function createJudgmentTrickResponse(
-  state: GameState,
-  player: string,
-  trickIndex: number,
-  trick: import('../../shared/types').PendingTrick,
-  aliveOthers: string[],
-): PendingResponseWindow {
-  const attackerIndex = state.playerOrder.indexOf(trick.source);
-  const afterAttacker = state.playerOrder.slice(attackerIndex + 1).filter(
-    p => getPlayer(state, p).info.alive && p !== player,
-  );
-  const beforeAttacker = state.playerOrder.slice(0, attackerIndex).filter(
-    p => getPlayer(state, p).info.alive && p !== player,
-  );
-  const allPlayers = [...afterAttacker, ...beforeAttacker];
-
-  if (allPlayers.length === 0) {
-    allPlayers.push(...aliveOthers);
-  }
-
-  const firstTarget = allPlayers[0];
-  const remaining = allPlayers.slice(1);
-  const firstPlayerState = getPlayer(state, firstTarget);
-  const validWuxie = firstPlayerState.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
-  const timeout = TIMEOUT_DEFAULTS.trickResponse;
-
-  return {
-    type: 'responseWindow',
-    window: {
-      type: 'trickResponse',
-      attacker: trick.source,
-      defender: firstTarget,
-      validCards: validWuxie,
-      sourceCard: trick.card.id,
-      trickTarget: player,
-      remainingPlayers: remaining,
-      negated: false,
-      judgmentContext: { player, trickIndex },
-      timeout,
-      deadline: Date.now() + timeout,
-    },
-    timeout,
-    deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: firstTarget },
-  };
 }
 
 export function isAutoPhase(phase: string): boolean {

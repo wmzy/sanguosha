@@ -27,14 +27,13 @@ interface PendingPrompt {
   type: string;
   text: string;
   responder?: string;
+  responders?: string[];
   attacker?: string;
   validCards?: string[];
   dyingPlayer?: string;
   savers?: string[];
   currentSaver?: string;
-  /** aoeResponse 需要的响应牌（杀/闪） */
   requiredCard?: string;
-  /** selectCard 数据 */
   targetPlayer?: string;
   targetCardIds?: string[];
   selectMode?: 'discard' | 'steal';
@@ -78,13 +77,26 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
             responder: pending.window.defender,
             validCards: pending.window.validCards,
           };
-        case 'trickResponse':
+        case 'trickResponse': {
+          const passedResponders = pending.window.passedResponders ?? [];
+          const activeResponders = pending.window.responders
+            ?.filter(p => !passedResponders.includes(p));
+          if (activeResponders && activeResponders.length > 0) {
+            return {
+              type: 'trickResponse',
+              text: '请响应锦囊',
+              responders: activeResponders,
+              responder: pending.window.defender,
+              validCards: pending.window.validCards,
+            };
+          }
           return {
             type: 'trickResponse',
             text: '请响应锦囊',
             responder: pending.window.defender,
             validCards: pending.window.validCards,
           };
+        }
       }
       break;
     case 'discardPhase':
@@ -335,7 +347,14 @@ export function useGame() {
   /** 通用响应：响应杀/锦囊/决斗/AOE 等 responseWindow */
   const respond = useCallback((cardId?: string) => {
     if (state.pending?.type !== 'responseWindow') return;
-    if (state.pending.window.defender !== myName) return;
+    // 并发 trickResponse：任意 responder 都可以响应
+    if (state.pending.window.type === 'trickResponse' && state.pending.window.responders) {
+      const passed = state.pending.window.passedResponders ?? [];
+      const active = state.pending.window.responders.filter(p => !passed.includes(p));
+      if (!active.includes(myName)) return;
+    } else {
+      if (state.pending.window.defender !== myName) return;
+    }
     dispatch({ type: 'respond', player: myName, cardId });
   }, [state, myName, dispatch]);
 

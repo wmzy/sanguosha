@@ -16,6 +16,7 @@ import { getDistance, isInAttackRange } from '../distance';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
 import { emitEvent } from '../skill';
+import { createConcurrentTrickResponse } from './response-handlers';
 
 export function handlePlayCard(
   state: GameState,
@@ -212,7 +213,7 @@ function handleTrickCard(
         to: { zone: 'discardPile' },
       };
 
-      // 2. 开 trickResponse 窗口（所有存活玩家依次出无懈可击）
+      // 2. 开 trickResponse 窗口（抢占式并发：所有存活玩家同时可出无懈可击）
       const attackerIndex = state.playerOrder.indexOf(player);
       const afterAttacker = state.playerOrder.slice(attackerIndex + 1).filter(
         p => getPlayer(state, p).info.alive,
@@ -223,34 +224,17 @@ function handleTrickCard(
       const allPlayers = [...afterAttacker, ...beforeAttacker];
 
       if (allPlayers.length === 0) {
-        // 没有其他存活玩家，跳过无懈流程直接放行
         const trickResult = applyAtoms(state, [moveAtom]);
         return { state: trickResult.state, events: [...trickResult.events, cardPlayedEvent] };
       }
 
-      const firstTarget = allPlayers[0];
-      const remaining = allPlayers.slice(1);
-      const firstPlayerState = getPlayer(state, firstTarget);
-      const validWuxie = firstPlayerState.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
-      const timeout = TIMEOUT_DEFAULTS.trickResponse;
-      const trickResponse: PendingResponseWindow = {
-        type: 'responseWindow',
-        window: {
-          type: 'trickResponse',
-          attacker: player,
-          defender: firstTarget,
-          validCards: validWuxie,
-          sourceCard: action.cardId,
-          trickTarget: target,
-          remainingPlayers: remaining,
-          negated: false,
-          timeout,
-          deadline: Date.now() + timeout,
-        },
-        timeout,
-        deadline: Date.now() + timeout,
-        onTimeout: { type: 'respond', player: firstTarget },
-      };
+      const trickResponse = createConcurrentTrickResponse(state, {
+        sourceCard: action.cardId,
+        attacker: player,
+        trickTarget: target,
+        responders: allPlayers,
+        depth: 0,
+      });
 
       const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
@@ -274,56 +258,115 @@ function handleTrickCard(
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
-    // ── AOE：每个其他玩家依次响应（南蛮入侵→出杀，万箭齐发→出闪） ──
+    // ── AOE：先问无懈可击，再每个其他玩家依次响应（南蛮入侵→出杀，万箭齐发→出闪） ──
     case '南蛮入侵':
     case '万箭齐发': {
       const requiredCard = card.name === '南蛮入侵' ? '杀' : '闪';
 
-      // 按 playerOrder 依次响应
       const affected = state.playerOrder.filter(
         p => p !== player && getPlayer(state, p).info.alive,
       );
 
-      // 只创建第一个 aoeResponse，后续通过 resolveAoeResponse 链式创建
-      const firstTarget = affected[0];
-      if (!firstTarget) {
-        // 没有其他存活玩家，只弃牌
-        const result = applyAtoms(state, [
-          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
-        ]);
+      // 先弃源牌
+      const moveAtom: Atom = {
+        type: 'moveCard',
+        cardId: action.cardId,
+        from: { zone: 'hand', player },
+        to: { zone: 'discardPile' },
+      };
+
+      if (affected.length === 0) {
+        const result = applyAtoms(state, [moveAtom]);
         return { state: result.state, events: [...result.events, cardPlayedEvent] };
       }
 
-      const remaining = affected.slice(1);
-      const firstPlayer = getPlayer(state, firstTarget);
-      const validCards = firstPlayer.hand.filter(
-        id => state.cardMap[id]?.name === requiredCard,
+      // 开无懈可击窗口，附带 aoeResume 上下文
+      const attackerIndex = state.playerOrder.indexOf(player);
+      const afterAttacker = state.playerOrder.slice(attackerIndex + 1).filter(
+        p => getPlayer(state, p).info.alive,
       );
-      const timeout = TIMEOUT_DEFAULTS.aoeResponse;
+      const beforeAttacker = state.playerOrder.slice(0, attackerIndex).filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const allPlayers = [...afterAttacker, ...beforeAttacker];
 
-      const responseWindow = {
-        type: 'responseWindow' as const,
-        window: {
-          type: 'aoeResponse' as const,
-          attacker: player,
-          defender: firstTarget,
-          validCards,
-          sourceCard: action.cardId,
-          remainingTargets: remaining,
-          requiredCard,
+      if (allPlayers.length === 0) {
+        // 无其他人可出无懈，直接进入 AOE 响应链
+        const firstTarget = affected[0];
+        const remaining = affected.slice(1);
+        const firstPlayer = getPlayer(state, firstTarget);
+        const validCards = firstPlayer.hand.filter(
+          id => state.cardMap[id]?.name === requiredCard,
+        );
+        const timeout = TIMEOUT_DEFAULTS.aoeResponse;
+        const responseWindow: PendingResponseWindow = {
+          type: 'responseWindow',
+          window: {
+            type: 'aoeResponse',
+            attacker: player,
+            defender: firstTarget,
+            validCards,
+            sourceCard: action.cardId,
+            remainingTargets: remaining,
+            requiredCard,
+            timeout,
+            deadline: Date.now() + timeout,
+          },
           timeout,
           deadline: Date.now() + timeout,
-        },
-        timeout,
-        deadline: Date.now() + timeout,
-        onTimeout: { type: 'respond' as const, player: firstTarget },
-      };
+          onTimeout: { type: 'respond', player: firstTarget },
+        };
+        const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: responseWindow }]);
+        return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      }
 
-      const atoms: Atom[] = [
-        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
-        { type: 'pushPending', action: responseWindow },
-      ];
-      const result = applyAtoms(state, atoms);
+      // 检查是否有人手中有无懈可击，若无人有则跳过 trickResponse 直接进入 AOE
+      const hasWuxieHolder = allPlayers.some(p =>
+        getPlayer(state, p).hand.some(id => state.cardMap[id]?.name === '无懈可击'),
+      );
+      if (!hasWuxieHolder) {
+        const firstTarget = affected[0];
+        const remaining = affected.slice(1);
+        const firstPlayer = getPlayer(state, firstTarget);
+        const validCards = firstPlayer.hand.filter(
+          id => state.cardMap[id]?.name === requiredCard,
+        );
+        const timeout = TIMEOUT_DEFAULTS.aoeResponse;
+        const responseWindow: PendingResponseWindow = {
+          type: 'responseWindow',
+          window: {
+            type: 'aoeResponse',
+            attacker: player,
+            defender: firstTarget,
+            validCards,
+            sourceCard: action.cardId,
+            remainingTargets: remaining,
+            requiredCard,
+            timeout,
+            deadline: Date.now() + timeout,
+          },
+          timeout,
+          deadline: Date.now() + timeout,
+          onTimeout: { type: 'respond', player: firstTarget },
+        };
+        const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: responseWindow }]);
+        return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      }
+
+      const trickResponse = createConcurrentTrickResponse(state, {
+        sourceCard: action.cardId,
+        attacker: player,
+        responders: allPlayers,
+        depth: 0,
+        aoeResume: {
+          attacker: player,
+          remainingTargets: affected,
+          requiredCard,
+          sourceCard: action.cardId,
+        },
+      });
+
+      const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 

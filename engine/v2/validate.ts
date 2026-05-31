@@ -235,17 +235,36 @@ function validateResponseWindow(
     return '当前需要响应动作';
   }
 
+  if (!action.player) return '缺少玩家标识';
+
+  // 并发 trickResponse：任意 responder（非 passed）都可以响应
+  if (pending.window.type === 'trickResponse' && pending.window.responders) {
+    const { responders, passedResponders } = pending.window;
+    if (!responders.includes(action.player)) {
+      return '你不是可响应的玩家';
+    }
+    if (passedResponders?.includes(action.player)) {
+      return '你已经 pass 了';
+    }
+
+    const responder = getPlayer(state, action.player);
+    if (!responder.info.alive) return '你已阵亡';
+    if (!action.cardId) return null;
+    if (!responder.hand.includes(action.cardId)) return '手牌中没有该卡牌';
+    const card = state.cardMap[action.cardId];
+    if (!card) return '未知卡牌';
+    if (card.name !== '无懈可击') return '只能用无懈可击响应锦囊';
+    return null;
+  }
+
   const { defender } = pending.window;
   if (action.player !== defender) {
     return '只有被指定者可以响应';
   }
 
-  if (!action.player) return '缺少玩家标识';
-
   const responder = getPlayer(state, action.player);
   if (!responder.info.alive) return '你已阵亡';
 
-  // 不出牌（pass）总是合法的
   if (!action.cardId) return null;
 
   if (!responder.hand.includes(action.cardId)) return '手牌中没有该卡牌';
@@ -253,13 +272,11 @@ function validateResponseWindow(
   const card = state.cardMap[action.cardId];
   if (!card) return '未知卡牌';
 
-  // 根据响应窗口类型检查卡牌是否合法
   switch (pending.window.type) {
     case 'killResponse':
       if (card.name !== '闪') return '只能用闪响应杀';
       break;
     case 'aoeResponse':
-      // AOE 响应要求特定牌（万箭→闪，南蛮→杀）
       if (pending.window.validCards.length > 0 && !pending.window.validCards.includes(action.cardId)) {
         return '该牌不能用于此响应';
       }
@@ -271,7 +288,6 @@ function validateResponseWindow(
       if (card.name !== '杀') return '只能用杀响应决斗';
       break;
     case 'trickResponse':
-      // 锦囊响应检查 validCards
       if (pending.window.validCards.length > 0 && !pending.window.validCards.includes(action.cardId)) {
         return '该牌不能用于此响应';
       }
@@ -427,13 +443,29 @@ function computeResponseWindowActions(
   player: string,
   pending: PendingResponseWindow,
 ): ValidAction[] {
+  // 并发 trickResponse：所有未 pass 的 responder 都可以响应
+  if (pending.window.type === 'trickResponse' && pending.window.responders) {
+    const { responders, passedResponders } = pending.window;
+    const passed = passedResponders ?? [];
+    if (!responders.includes(player) || passed.includes(player)) return [];
+
+    const responder = getPlayer(state, player);
+    const validCards = responder.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
+    return [{
+      type: 'respond',
+      prompt: '请选择是否响应',
+      required: false,
+      cards: validCards,
+      canPass: true,
+    }];
+  }
+
   if (player !== pending.window.defender) return [];
 
   const responder = getPlayer(state, player);
   const validCards: string[] = [];
 
   for (const cardId of responder.hand) {
-    // aoeResponse 精确匹配窗口 validCards
     if (pending.window.type === 'aoeResponse') {
       if (pending.window.validCards.includes(cardId)) {
         validCards.push(cardId);
