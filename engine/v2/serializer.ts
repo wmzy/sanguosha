@@ -1,4 +1,5 @@
 import type { GameState } from './types';
+import { restoreEventCounterFromLog } from './event';
 
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
@@ -9,7 +10,9 @@ export function deserialize(json: string): GameState {
   if (!validateGameState(obj)) {
     throw new Error('Invalid GameState structure');
   }
-  return obj;
+  const state = obj;
+  restoreEventCounterFromLog(state.serverLog);
+  return state;
 }
 
 export function validateGameState(obj: unknown): obj is GameState {
@@ -38,6 +41,22 @@ export function validateGameState(obj: unknown): obj is GameState {
   if (typeof meta['status'] !== 'string') return false;
 
   if (o['pending'] !== null && typeof o['pending'] !== 'object') return false;
+
+  // 验证 zones 内部结构
+  const zones = o['zones'] as Record<string, unknown>;
+  if (!Array.isArray(zones['deck'])) return false;
+  if (!Array.isArray(zones['discardPile'])) return false;
+
+  // 验证 playerOrder 中的玩家存在于 players 中
+  const players = o['players'] as Record<string, unknown>;
+  const playerOrder = o['playerOrder'] as string[];
+  for (const name of playerOrder) {
+    if (typeof name !== 'string') return false;
+    if (!(name in players)) return false;
+  }
+
+  // 验证 currentPlayer 在 playerOrder 中
+  if (!playerOrder.includes(o['currentPlayer'])) return false;
 
   return true;
 }
