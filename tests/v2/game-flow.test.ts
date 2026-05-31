@@ -416,15 +416,17 @@ describe('回合流程缺陷', () => {
     }
   });
 
-  it('meta.round 不递增（整轮完成后仍为 1）', () => {
+  it('meta.round 在整轮完成后递增', () => {
     const state = createTestGame({ playPhase: true });
     expect(state.meta.round).toBe(1);
     const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
-    const r2state = { ...r1.state, phase: '出牌' as const };
+    // P2 摸牌阶段抽了 2 张，设高体力避免弃牌
+    const p2high = setHealth(r1.state, 'P2', 10);
+    const r2state = { ...p2high, phase: '出牌' as const };
     const r2 = safeEngine(r2state, { type: 'endTurn', player: 'P2' });
     expect(r2.state.currentPlayer).toBe('P1');
-    // nextPlayer atom 从不过递增 meta.round
-    expect(r2.state.meta.round).toBe(1);
+    // nextPlayer atom 在整轮完成后递增 meta.round
+    expect(r2.state.meta.round).toBe(2);
   });
 
   it('弃牌阶段结束回合不触发 turnEnd 事件', () => {

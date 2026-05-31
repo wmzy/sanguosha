@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { safeEngine as engine } from './invariants';
 import { createInitialState } from '@engine/v2/state';
 import { serialize, deserialize } from '@engine/v2/serializer';
-import { getCharacterMap, createTestGame, setPlayPhase, findCardInHand, injectCard, act } from './setup';
+import { getCharacterMap, createTestGame, setPlayPhase, setHealth, findCardInHand, injectCard, act } from './setup';
 
 describe('V2 Engine - 核心引擎', () => {
   const charMap = getCharacterMap();
@@ -97,11 +97,13 @@ describe('V2 Engine - 核心引擎', () => {
       const state = setPlayPhase(createTestGame({ playerCount: 2 }));
       const r1 = engine(state, { type: 'endTurn', player: 'P1' });
       expect(r1.state.currentPlayer).toBe('P2');
-      // P2 结束回合 → 回到 P1
+      // P2 摸牌阶段抽了 2 张，设高体力避免弃牌
+      const p2HighHealth = setHealth(r1.state, 'P2', 10);
       const r2 = engine(
-        { ...r1.state, phase: '出牌' },
+        { ...p2HighHealth, phase: '出牌' },
         { type: 'endTurn', player: 'P2' },
       );
+      // 整轮完成，回到 P1
       expect(r2.state.currentPlayer).toBe('P1');
     });
 

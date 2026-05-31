@@ -81,14 +81,18 @@ describe('V2 Engine - 回合流程', () => {
       const r1 = engine(state, { type: 'endTurn', player: 'P1' });
       expect(r1.state.currentPlayer).toBe('P2');
 
+      // P2 摸牌阶段抽了 2 张，设高体力避免弃牌
+      const p2high = setHealth(r1.state, 'P2', 10);
       const r2 = engine(
-        { ...r1.state, phase: '出牌' },
+        { ...p2high, phase: '出牌' },
         { type: 'endTurn', player: 'P2' },
       );
       expect(r2.state.currentPlayer).toBe('P3');
 
+      // P3 同样设高体力
+      const p3high = setHealth(r2.state, 'P3', 10);
       const r3 = engine(
-        { ...r2.state, phase: '出牌' },
+        { ...p3high, phase: '出牌' },
         { type: 'endTurn', player: 'P3' },
       );
       expect(r3.state.currentPlayer).toBe('P1');
