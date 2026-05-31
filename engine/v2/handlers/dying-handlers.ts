@@ -1,4 +1,5 @@
-import type { GameState, GameAction, EngineResult, Atom, PendingDyingWindow } from '../types';
+import type { GameState, GameAction, EngineResult, Atom, PendingDyingWindow, PendingResponseWindow, ServerEvent } from '../types';
+import { TIMEOUT_DEFAULTS } from '../types';
 import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
@@ -53,7 +54,11 @@ export function resolveDying(
     const dyingState = getPlayer(healResult.state, pending.dyingPlayer);
     if (dyingState.health > 0) {
       const popResult = applyAtoms(healResult.state, [{ type: 'popPending' }]);
-      return { state: popResult.state, events: [...healResult.events, healEvent] };
+      const resumed = resumeAoeChain(popResult.state, pending);
+      return {
+        state: resumed.state,
+        events: [...healResult.events, healEvent, ...resumed.events],
+      };
     }
 
     // 还没救活 → 尝试下一个救助者
@@ -65,7 +70,11 @@ export function resolveDying(
       ];
       const deathResult = applyAtoms(healResult.state, deathAtoms);
       const deathEvent = makeServerEvent('death', { player: pending.dyingPlayer });
-      return { state: deathResult.state, events: [...healResult.events, healEvent, deathEvent] };
+      const resumed = resumeAoeChain(deathResult.state, pending);
+      return {
+        state: resumed.state,
+        events: [...healResult.events, healEvent, deathEvent, ...resumed.events],
+      };
     }
 
     return {
@@ -85,7 +94,8 @@ export function resolveDying(
     ];
     const result = applyAtoms(state, atoms);
     const deathEvent = makeServerEvent('death', { player: pending.dyingPlayer });
-    return { state: result.state, events: [...result.events, deathEvent] };
+    const resumed = resumeAoeChain(result.state, pending);
+    return { state: resumed.state, events: [...result.events, deathEvent, ...resumed.events] };
   }
 
   // 移到下一个救助者
@@ -96,4 +106,44 @@ export function resolveDying(
     },
     events: [],
   };
+}
+
+function resumeAoeChain(
+  state: GameState,
+  dyingPending: PendingDyingWindow,
+): { state: GameState; events: ServerEvent[] } {
+  const aoe = dyingPending.resumeAoe;
+  if (!aoe || aoe.remainingTargets.length === 0) return { state, events: [] };
+
+  const aliveTargets = aoe.remainingTargets.filter(
+    t => state.players[t]?.info.alive,
+  );
+  if (aliveTargets.length === 0) return { state, events: [] };
+
+  const nextTarget = aliveTargets[0];
+  const rest = aliveTargets.slice(1);
+  const targetPlayer = getPlayer(state, nextTarget);
+  const validCards = targetPlayer.hand.filter(
+    id => state.cardMap[id]?.name === aoe.requiredCard,
+  );
+  const timeout = TIMEOUT_DEFAULTS.aoeResponse;
+  const nextPending: PendingResponseWindow = {
+    type: 'responseWindow',
+    window: {
+      type: 'aoeResponse',
+      attacker: aoe.attacker,
+      defender: nextTarget,
+      validCards,
+      sourceCard: aoe.sourceCard,
+      remainingTargets: rest,
+      requiredCard: aoe.requiredCard,
+      timeout,
+      deadline: Date.now() + timeout,
+    },
+    timeout,
+    deadline: Date.now() + timeout,
+    onTimeout: { type: 'respond', player: nextTarget },
+  };
+
+  return applyAtoms(state, [{ type: 'pushPending', action: nextPending }]);
 }

@@ -5,6 +5,8 @@ import type {
   Atom,
   PendingResponseWindow,
   PendingSelectCard,
+  PendingHarvestSelection,
+  ServerEvent,
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import type { Card } from '../../../shared/types';
@@ -309,7 +311,74 @@ function handleTrickCard(
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
-    // ── 其他锦囊（桃园结义、五谷丰登、无懈可击等） ──
+    // ── 桃园结义：所有存活玩家各回 1 点体力 ──
+    case '桃园结义': {
+      const alivePlayers = state.playerOrder.filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const healAtoms: Atom[] = alivePlayers.flatMap(p => {
+        const ps = getPlayer(state, p);
+        if (ps.health >= ps.maxHealth) return [];
+        return [{ type: 'heal' as const, target: p, amount: 1, source: player }];
+      });
+      const result = applyAtoms(state, [
+        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        ...healAtoms,
+      ]);
+      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+    }
+
+    // ── 五谷丰登：翻出 N 张牌（N=存活玩家数），存活玩家逆时针依次选一张 ──
+    case '五谷丰登': {
+      const alivePlayerNames = state.playerOrder.filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const count = Math.min(alivePlayerNames.length, state.zones.deck.length);
+      if (count === 0) {
+        const result = applyAtoms(state, [
+          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        ]);
+        return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      }
+
+      // 翻出 count 张牌
+      const revealedCards = state.zones.deck.slice(0, count);
+      const remainingDeck = state.zones.deck.slice(count);
+
+      // 生成逆时针选牌顺序（从当前回合玩家开始）
+      const startIdx = state.playerOrder.indexOf(state.currentPlayer);
+      const pickOrder: string[] = [];
+      for (let i = 0; i < state.playerOrder.length; i++) {
+        const p = state.playerOrder[(startIdx - i + state.playerOrder.length) % state.playerOrder.length];
+        if (getPlayer(state, p).info.alive) {
+          pickOrder.push(p);
+        }
+      }
+
+      const timeout = TIMEOUT_DEFAULTS.harvestSelection;
+      const harvestPending: PendingHarvestSelection = {
+        type: 'harvestSelection',
+        revealedCards,
+        currentPickerIndex: 0,
+        pickOrder,
+        player,
+        timeout,
+        deadline: Date.now() + timeout,
+        onTimeout: { type: 'respond', player: pickOrder[0], cardId: revealedCards[0] },
+      };
+
+      const result = applyAtoms(
+        { ...state, zones: { ...state.zones, deck: remainingDeck } },
+        [
+          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+          { type: 'pushPending', action: harvestPending },
+        ],
+      );
+      const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
+      return { state: result.state, events: [...result.events, cardPlayedEvent, harvestRevealEvent] };
+    }
+
+    // ── 其他锦囊（无懈可击等） ──
     default: {
       const atoms: Atom[] = [
         {
@@ -338,4 +407,85 @@ function handleEquipCard(
     cardId: action.cardId,
   });
   return { state: result.state, events: [...result.events, cardPlayedEvent] };
+}
+
+// ── 五谷丰登选牌处理 ──────────────────────────────────────
+
+export function resolveHarvestSelection(
+  state: GameState,
+  action: GameAction,
+  pending: PendingHarvestSelection,
+): EngineResult {
+  if (action.type !== 'respond') {
+    return { state, events: [], error: '选牌需要 respond 动作' };
+  }
+
+  const currentPicker = pending.pickOrder[pending.currentPickerIndex];
+  if (action.player !== currentPicker) {
+    return { state, events: [], error: '还没轮到你选牌' };
+  }
+
+  const selectedId = action.cardId ?? pending.revealedCards[0];
+  let newRevealed = pending.revealedCards;
+
+  if (!newRevealed.includes(selectedId)) {
+    return { state, events: [], error: '选择的卡牌不在翻出的牌中' };
+  }
+  newRevealed = newRevealed.filter(id => id !== selectedId);
+
+  const nextIndex = pending.currentPickerIndex + 1;
+
+  if (nextIndex >= pending.pickOrder.length) {
+    // 所有人都选完了，剩余牌进弃牌堆
+    const atoms: Atom[] = [
+      { type: 'popPending' },
+      ...newRevealed.map(id => ({
+        type: 'moveCard' as const,
+        cardId: id,
+        from: { zone: 'deck' as const },
+        to: { zone: 'discardPile' as const },
+      })),
+    ];
+    if (selectedId) {
+      atoms.unshift({
+        type: 'moveCard',
+        cardId: selectedId,
+        from: { zone: 'deck' },
+        to: { zone: 'hand', player: action.player },
+      });
+    }
+    const result = applyAtoms(state, atoms);
+    const harvestDoneEvent = makeServerEvent('harvestDone', {
+      player: action.player,
+      cardId: selectedId ?? null,
+    });
+    return { state: result.state, events: [...result.events, harvestDoneEvent] };
+  }
+
+  // 还有下一位选牌者
+  const nextPicker = pending.pickOrder[nextIndex];
+  const atoms: Atom[] = [];
+  if (selectedId) {
+    atoms.push({
+      type: 'moveCard',
+      cardId: selectedId,
+      from: { zone: 'deck' },
+      to: { zone: 'hand', player: action.player },
+    });
+  }
+  const timeout = TIMEOUT_DEFAULTS.harvestSelection;
+  const nextPending: PendingHarvestSelection = {
+    ...pending,
+    revealedCards: newRevealed,
+    currentPickerIndex: nextIndex,
+    timeout,
+    deadline: Date.now() + timeout,
+    onTimeout: { type: 'respond', player: nextPicker, cardId: newRevealed[0] },
+  };
+  atoms.push({ type: 'pushPending', action: nextPending });
+
+  // 如果在同一个调用中既有 moveCard 又有 pushPending，先 pop 再 push
+  const popThenPush = [{ type: 'popPending' as const }, ...atoms];
+  const result = applyAtoms(state, popThenPush);
+  return { state: result.state, events: result.events };
 }

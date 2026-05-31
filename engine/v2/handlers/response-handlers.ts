@@ -184,17 +184,19 @@ function resolveAoeResponse(
   // 检查濒死
   const defState = getPlayer(currentState, defender);
   if (defState.health <= 0 && defState.info.alive) {
-    // 有濒死，等濒死解决完后再继续链
     const dyingPending = createDyingPending(currentState, defender, attacker);
+    const resumeAoe = remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard
+      ? { attacker, remainingTargets, requiredCard, sourceCard }
+      : undefined;
+    const dyingWithResume = { ...dyingPending, resumeAoe };
     const { state: dyingState, events: dyingEvents } = applyAtoms(currentState, [
-      { type: 'pushPending', action: dyingPending },
-      // 标记剩余响应链需要继续
+      { type: 'pushPending', action: dyingWithResume },
     ]);
     return { state: dyingState, events: [...currentEvents, ...dyingEvents] };
   }
 
   // 还有剩余玩家需要响应 → 创建下一个 aoeResponse
-  if (remainingTargets && remainingTargets.length > 0) {
+  if (remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard) {
     const nextTarget = remainingTargets[0];
     const nextRemaining = remainingTargets.slice(1);
     const targetPlayer = getPlayer(currentState, nextTarget);
@@ -206,7 +208,7 @@ function resolveAoeResponse(
       type: 'responseWindow',
       window: {
         type: 'aoeResponse',
-        attacker: attacker!,
+        attacker,
         defender: nextTarget,
         validCards,
         sourceCard,
@@ -236,6 +238,7 @@ function resolveTrickResponse(
   const cardId = action.type === 'respond' ? action.cardId : undefined;
   const { attacker, defender, sourceCard, trickTarget, remainingPlayers, negated } = pending.window;
   if (!sourceCard) return { state, events: [], error: 'trickResponse 缺少 sourceCard' };
+  if (!attacker) return { state, events: [], error: 'trickResponse 缺少 attacker' };
   const trickCard = state.cardMap[sourceCard];
   if (!trickCard) return { state, events: [], error: 'trickResponse 源卡牌不存在' };
   const trickName = trickCard.name;
@@ -278,7 +281,7 @@ function resolveTrickResponse(
       type: 'responseWindow',
       window: {
         type: 'trickResponse',
-        attacker: attacker!,
+        attacker,
         defender: nextTarget,
         validCards: validWuxie,
         sourceCard,
@@ -312,7 +315,7 @@ function resolveTrickResponse(
       }
       const selectPending: PendingSelectCard = {
         type: 'selectCard',
-        player: attacker!,
+        player: attacker,
         target,
         cardIds: targetPlayer.hand,
         min: 1,
@@ -321,7 +324,7 @@ function resolveTrickResponse(
         mode: 'discard',
         timeout: TIMEOUT_DEFAULTS.selectCard,
         deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
-        onTimeout: { type: 'respond', player: attacker!, cardIds: [targetPlayer.hand[0]] },
+        onTimeout: { type: 'respond', player: attacker, cardIds: [targetPlayer.hand[0]] },
       };
       return applyAtoms(state, [{ type: 'pushPending', action: selectPending }]);
     }
@@ -333,7 +336,7 @@ function resolveTrickResponse(
       }
       const selectPending: PendingSelectCard = {
         type: 'selectCard',
-        player: attacker!,
+        player: attacker,
         target,
         cardIds: targetPlayer.hand,
         min: 1,
@@ -342,7 +345,7 @@ function resolveTrickResponse(
         mode: 'steal',
         timeout: TIMEOUT_DEFAULTS.selectCard,
         deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
-        onTimeout: { type: 'respond', player: attacker!, cardIds: [targetPlayer.hand[0]] },
+        onTimeout: { type: 'respond', player: attacker, cardIds: [targetPlayer.hand[0]] },
       };
       return applyAtoms(state, [{ type: 'pushPending', action: selectPending }]);
     }
@@ -356,7 +359,7 @@ function resolveTrickResponse(
         type: 'responseWindow',
         window: {
           type: 'duelResponse',
-          attacker: attacker!,
+          attacker,
           defender: target,
           validCards: validKills,
           sourceCard,
@@ -371,14 +374,14 @@ function resolveTrickResponse(
     }
 
     case '乐不思蜀': {
-      const trick = { name: '乐不思蜀', source: attacker!, card: trickCard };
+      const trick = { name: '乐不思蜀', source: attacker, card: trickCard };
       return applyAtoms(state, [
         { type: 'addPendingTrick', player: target, trick },
       ]);
     }
 
     case '兵粮寸断': {
-      const trick = { name: '兵粮寸断', source: attacker!, card: trickCard };
+      const trick = { name: '兵粮寸断', source: attacker, card: trickCard };
       return applyAtoms(state, [
         { type: 'addPendingTrick', player: target, trick },
       ]);
@@ -395,6 +398,9 @@ function resolveDuelResponse(
   pending: PendingResponseWindow,
 ): EngineResult {
   const { defender, attacker, sourceCard } = pending.window;
+  if (!attacker || !sourceCard) {
+    return { state, events: [], error: '决斗响应窗口缺少必要参数' };
+  }
 
   const cardId = action.type === 'respond' ? action.cardId : undefined;
 
@@ -421,7 +427,7 @@ function resolveDuelResponse(
     ]);
 
     // 轮到对方出杀：交换 attacker/defender
-    const nextDefender = attacker!;
+    const nextDefender = attacker;
     const nextAttacker = defender;
     const validKills = getPlayer(moveResult.state, nextDefender).hand.filter(
       id => moveResult.state.cardMap[id]?.name === '杀',
@@ -434,7 +440,7 @@ function resolveDuelResponse(
         attacker: nextAttacker,
         defender: nextDefender,
         validCards: validKills,
-        sourceCard: sourceCard!,
+        sourceCard,
         timeout: duelTimeout,
         deadline: Date.now() + duelTimeout,
       },
