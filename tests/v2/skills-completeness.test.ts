@@ -142,12 +142,12 @@ describe('技能完整性审计', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('技能实现状态', () => {
-  it('观星 handler 已实现（包含 orderCards + aliveCount）', () => {
+  it('观星 handler 已实现（包含 buildRearrangeTree + aliveCount）', () => {
     const registry = getSkillRegistry();
     const def = registry.get('观星');
     if (!def) return;
     const handlerStr = def.handler.toString();
-    expect(handlerStr).toContain('orderCards');
+    expect(handlerStr).toContain('buildRearrangeTree');
     expect(handlerStr).toContain('aliveCount');
   });
 
