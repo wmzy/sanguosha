@@ -245,7 +245,7 @@ export class GameSession {
   }
 
   private checkTimeout(): void {
-    if (!this.state || !this.state.pending) return;
+    if (!this.state?.pending) return;
     if (Date.now() < this.state.pending.deadline) return;
 
     const onTimeout = this.state.pending.onTimeout;
@@ -289,7 +289,7 @@ export class GameSession {
   }
 
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext): boolean {
-    if (!this.state || this.state.meta.status !== '进行中') return false;
+    if (this.state?.meta.status !== '进行中') return false;
     this.room.players.set(playerId, ws);
     this.broadcastGameView();
     return true;

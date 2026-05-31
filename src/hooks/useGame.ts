@@ -5,12 +5,13 @@ import { computeValidActions } from '../../engine/v2/validate';
 import { getDistance } from '../../engine/v2/distance';
 import { serialize } from '../../engine/v2/serializer';
 import type { GameState as V2GameState, GameAction, ValidAction, PendingAction } from '../../engine/v2/types';
-import type { Card } from '../../shared/types';
+import type { Card, Role } from '../../shared/types';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import { saveState } from '../utils/logFile';
 
 const CHARACTERS = [曹操, 刘备, 孙权, 诸葛亮, 司马懿];
 const PLAYER_NAMES = CHARACTERS.map(c => c.name);
+const PLAYER_ROLES: Role[] = ['主公', '反贼', '忠臣', '内奸', '反贼'];
 
 /** 构建角色映射表（characterId → CharacterConfig） */
 const characterMap = Object.fromEntries(CHARACTERS.map(c => [c.name, c]));
@@ -30,6 +31,7 @@ interface PendingPrompt {
   validCards?: string[];
   dyingPlayer?: string;
   savers?: string[];
+  currentSaver?: string;
   /** aoeResponse 需要的响应牌（杀/闪） */
   requiredCard?: string;
   /** selectCard 数据 */
@@ -96,6 +98,7 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
         text: `${pending.dyingPlayer} 濒死！需要桃来救援`,
         dyingPlayer: pending.dyingPlayer,
         savers: pending.savers,
+        currentSaver: pending.savers[pending.currentSaverIndex],
       };
     case 'skillPrompt':
       return {
@@ -110,6 +113,14 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
         targetCardIds: pending.cardIds,
         selectMode: pending.mode,
       };
+    case 'harvestSelection':
+      return {
+        type: 'harvestSelection',
+        text: `五谷丰登：${pending.pickOrder[pending.currentPickerIndex]} 选牌`,
+        responder: pending.pickOrder[pending.currentPickerIndex],
+        targetCardIds: pending.revealedCards,
+        targetPlayer: pending.pickOrder[pending.currentPickerIndex],
+      };
   }
   return null;
 }
@@ -121,7 +132,7 @@ export function useGame() {
       players: CHARACTERS.map((c, i) => ({
         name: c.name,
         characterId: c.name,
-        role: '主公' as const,
+        role: PLAYER_ROLES[i],
       })),
       seed: Date.now(),
       characterMap,
@@ -143,6 +154,8 @@ export function useGame() {
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerPaused, setTimerPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // ── 派生状态 ────────────────────────────────────────────────
   const me = getPlayer(state, myName);
@@ -206,19 +219,23 @@ export function useGame() {
 
   // 超时自动弃牌
   useEffect(() => {
-    if (timerSeconds !== 0 || !isMyTurn || state.pending) return;
+    if (timerSeconds !== 0 || !isMyTurn) return;
+    const currentState = stateRef.current;
+    const currentPending = currentState.pending;
+    if (currentPending?.type !== 'discardPhase') return;
 
-    if (needsDiscard && discardAction) {
-      const excess = me.hand.length - me.health;
-      const cardIds = me.hand.slice(-excess);
-      const result = engine(state, { type: 'discard', player: myName, cardIds });
-      if (!result.error) {
-        setState(result.state);
-        setSelectedForDiscard(new Set());
-        setSelectedCardId(null);
-      }
+    const currentPlayerState = getPlayer(currentState, myName);
+    const excess = currentPlayerState.hand.length - currentPlayerState.health;
+    if (excess <= 0) return;
+
+    const cardIds = currentPlayerState.hand.slice(-excess);
+    const result = engine(currentState, { type: 'discard', player: myName, cardIds });
+    if (!result.error) {
+      setState(result.state);
+      setSelectedForDiscard(new Set());
+      setSelectedCardId(null);
     }
-  }, [timerSeconds, isMyTurn, needsDiscard, discardAction, state, myName, me]);
+  }, [timerSeconds, isMyTurn, myName]);
 
   // ── dispatch helper ─────────────────────────────────────────
   const dispatch = useCallback((action: GameAction) => {
@@ -302,6 +319,7 @@ export function useGame() {
 
   const respondToKill = useCallback((playDodge: boolean) => {
     if (state.pending?.type !== 'responseWindow') return;
+    if (state.pending.window.defender !== myName) return;
 
     const cardId = playDodge
       ? me.hand.find(id => state.cardMap[id]?.name === '闪')
@@ -317,6 +335,7 @@ export function useGame() {
   /** 通用响应：响应杀/锦囊/决斗/AOE 等 responseWindow */
   const respond = useCallback((cardId?: string) => {
     if (state.pending?.type !== 'responseWindow') return;
+    if (state.pending.window.defender !== myName) return;
     dispatch({ type: 'respond', player: myName, cardId });
   }, [state, myName, dispatch]);
 
@@ -326,17 +345,28 @@ export function useGame() {
     dispatch({ type: 'respond', player: myName, cardIds: [cardId] });
   }, [state, myName, dispatch]);
 
+  /** 五谷丰登选牌：从翻出的牌中选择一张 */
+  const selectHarvestCard = useCallback((cardId: string) => {
+    if (state.pending?.type !== 'harvestSelection') return;
+    const currentPicker = state.pending.pickOrder[state.pending.currentPickerIndex];
+    if (currentPicker !== myName) return;
+    dispatch({ type: 'respond', player: myName, cardId });
+  }, [state, myName, dispatch]);
+
   const respondToDying = useCallback((saverName: string | null) => {
     if (state.pending?.type !== 'dyingWindow') return;
 
+    const currentSaver = state.pending.savers[state.pending.currentSaverIndex];
+
     if (!saverName) {
-      // 无人救援
       dispatch({
         type: 'respond',
-        player: state.pending.savers[state.pending.currentSaverIndex],
+        player: currentSaver,
       });
       return;
     }
+
+    if (saverName !== currentSaver) return;
 
     const saver = getPlayer(state, saverName);
     const peachId = saver.hand.find(id => state.cardMap[id]?.name === '桃');
@@ -469,6 +499,7 @@ export function useGame() {
     respond,
     respondToDying,
     selectTargetCard,
+    selectHarvestCard,
 
     // 技能
     availableSkills,
