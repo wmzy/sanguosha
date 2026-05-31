@@ -23,10 +23,15 @@ export function register() {
       const currentIdx = alive.indexOf(state.currentPlayer);
       const nextIdx = (Math.max(0, currentIdx) + 1) % alive.length;
       const nextPlayer = alive[nextIdx];
+      const wrappedAround = currentIdx === -1 || nextIdx <= currentIdx;
       return {
         ...state,
         currentPlayer: nextPlayer,
-        meta: { ...state.meta, turnNumber: state.meta.turnNumber + 1 },
+        meta: {
+          ...state.meta,
+          turnNumber: state.meta.turnNumber + 1,
+          round: wrappedAround ? state.meta.round + 1 : state.meta.round,
+        },
         turn: { killsPlayed: 0, skillsUsed: [], phaseFlags: [] },
       };
     },
@@ -39,7 +44,7 @@ export function register() {
       const currentIdx = alive.indexOf(state.currentPlayer);
       const nextIdx = (Math.max(0, currentIdx) + 1) % alive.length;
       const nextPlayer = alive[nextIdx];
-      const payload: Json = { from: state.currentPlayer, to: nextPlayer, turnNumber: state.meta.turnNumber + 1 };
+      const payload: Json = { from: state.currentPlayer, to: nextPlayer, turnNumber: state.meta.turnNumber + 1, round: currentIdx === -1 || nextIdx <= currentIdx ? state.meta.round + 1 : state.meta.round };
       const server = makeServerEvent('nextPlayer', payload);
       return [server, new Map(), makePlayerEvent('nextPlayer', payload)];
     },

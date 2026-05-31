@@ -349,7 +349,8 @@ export type GameAction =
   | { type: 'endTurn'; player: string }
   | { type: 'discard'; player: string; cardIds: string[] }
   | { type: 'useSkill'; player: string; skillId: string; target?: string }
-  | { type: 'skillChoice'; player: string; choice: Json };
+  | { type: 'skillChoice'; player: string; choice: Json }
+  | { type: 'startGame' };
 export type GameEvent =
   | { type: 'turnStart'; player: string }
   | { type: 'turnEnd'; player: string }
