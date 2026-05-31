@@ -84,7 +84,8 @@ export type PendingAction =
   | PendingSkillPrompt
   | PendingDiscardPhase
   | PendingDyingWindow
-  | PendingSelectCard;
+  | PendingSelectCard
+  | PendingHarvestSelection;
 
 export interface PendingResponseWindow {
   type: 'responseWindow';
@@ -123,6 +124,13 @@ export interface PendingDyingWindow {
   timeout: number;
   deadline: number;
   onTimeout: GameAction;
+  /** AOE 濒死后恢复上下文：记录剩余目标和需要的牌 */
+  resumeAoe?: {
+    attacker: string;
+    remainingTargets: string[];
+    requiredCard: string;
+    sourceCard: string;
+  };
 }
 
 export interface PendingSelectCard {
@@ -134,6 +142,21 @@ export interface PendingSelectCard {
   max: number;
   sourceCard: string;
   mode: 'discard' | 'steal';
+  timeout: number;
+  deadline: number;
+  onTimeout: GameAction;
+}
+
+export interface PendingHarvestSelection {
+  type: 'harvestSelection';
+  /** 翻出的待选牌 ID 列表 */
+  revealedCards: string[];
+  /** 当前选牌者在 pickOrder 中的索引 */
+  currentPickerIndex: number;
+  /** 选牌顺序列表（逆时针，从当前回合玩家开始） */
+  pickOrder: string[];
+  /** 出牌者（五谷丰登使用者） */
+  player: string;
   timeout: number;
   deadline: number;
   onTimeout: GameAction;
@@ -495,6 +518,7 @@ export interface TimeoutConfig {
   playPhase: number;
   selectCard: number;
   discardPhase: number;
+  harvestSelection: number;
 }
 
 export const TIMEOUT_DEFAULTS: TimeoutConfig = {
@@ -506,4 +530,5 @@ export const TIMEOUT_DEFAULTS: TimeoutConfig = {
   playPhase: 60000,
   selectCard: 30000,
   discardPhase: 30000,
+  harvestSelection: 30000,
 };

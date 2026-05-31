@@ -17,6 +17,7 @@ import type {
   PendingDiscardPhase,
   PendingDyingWindow,
   PendingSelectCard,
+  PendingHarvestSelection,
   PromptOption,
 } from './types';
 import { getPlayer, getAlivePlayerNames } from './state';
@@ -219,7 +220,10 @@ function validatePendingAction(state: GameState, action: GameAction): string | n
       return validateDyingWindow(state, action, pending);
     case 'selectCard':
       return validateSelectCard(state, action, pending);
+    case 'harvestSelection':
+      return null;
   }
+  return null;
 }
 
 function validateResponseWindow(
@@ -412,7 +416,10 @@ function computePendingActions(state: GameState, player: string): ValidAction[] 
       return computeDyingWindowActions(state, player, pending);
     case 'selectCard':
       return computeSelectCardActions(state, player, pending);
+    case 'harvestSelection':
+      return computeHarvestSelectionActions(state, player, pending);
   }
+  return [];
 }
 
 function computeResponseWindowActions(
@@ -538,6 +545,22 @@ function computeSelectCardActions(
     prompt: `请选择 ${pending.target} 的一张手牌`,
     required: true,
     cards: pending.cardIds,
+    canPass: false,
+  }];
+}
+
+function computeHarvestSelectionActions(
+  state: GameState,
+  player: string,
+  pending: PendingHarvestSelection,
+): ValidAction[] {
+  const currentPicker = pending.pickOrder[pending.currentPickerIndex];
+  if (player !== currentPicker) return [];
+  return [{
+    type: 'respond',
+    prompt: `五谷丰登选牌：从 ${pending.revealedCards.length} 张牌中选择一张`,
+    required: true,
+    cards: pending.revealedCards,
     canPass: false,
   }];
 }

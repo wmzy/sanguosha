@@ -130,3 +130,41 @@ export function nextRngState(state: GameState): { state: GameState; rng: import(
   rng.next();
   return { state: { ...state, rngState: state.rngState + 1 }, rng };
 }
+
+/** 身份局胜利条件检查。返回 { winner, reason } 或 null。 */
+export function checkWinCondition(
+  state: GameState,
+): { winner: string; reason: string } | null {
+  if (state.meta.status === '已结束') return null;
+
+  const alive = getAlivePlayers(state);
+  if (alive.length === 0) return { winner: '无', reason: '平局：所有玩家阵亡' };
+
+  const lord = alive.find(p => p.info.role === '主公');
+  const loyalists = alive.filter(p => p.info.role === '忠臣');
+  const spy = alive.find(p => p.info.role === '内奸');
+
+  const lordPlayer = state.playerOrder.find(n => state.players[n].info.role === '主公');
+  const lordDead = lordPlayer != null && !state.players[lordPlayer].info.alive;
+
+  if (lordDead) {
+    const aliveNonLord = alive.filter(p => p.info.role !== '主公');
+    if (aliveNonLord.length === 1 && aliveNonLord[0].info.role === '内奸') {
+      return { winner: aliveNonLord[0].info.name, reason: '内奸获胜：主公阵亡，内奸是唯一存活者' };
+    }
+    return { winner: '反贼', reason: '反贼获胜：主公阵亡' };
+  }
+
+  const allRebelsDead = state.playerOrder
+    .filter(n => state.players[n].info.role === '反贼')
+    .every(n => !state.players[n].info.alive);
+
+  if (allRebelsDead) {
+    if (spy && lord && alive.length === 2) return null;
+    if (spy && lord && loyalists.length > 0) return null;
+    if (spy && lord) return null;
+    return { winner: '主公', reason: '主公阵营获胜：所有反贼阵亡' };
+  }
+
+  return null;
+}
