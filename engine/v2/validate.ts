@@ -82,7 +82,11 @@ export function validateAction(state: GameState, action: GameAction): string | n
       return validateUseSkill(state, action);
     case 'skillChoice':
       return '技能选择仅在技能提示中有效';
+    case 'startGame':
+      return null; // startGame 不需要验证
   }
+
+  return null; // 其他 action type 默认通过
 }
 
 // ─── playCard 验证 ────────────────────────────────────────────

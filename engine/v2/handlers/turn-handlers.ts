@@ -52,10 +52,10 @@ export function handleEndTurn(
     return { state: result.state, events: [...turnEndResult.events, ...result.events, turnEndLogEvent] };
   }
 
-  // 不需要弃牌 → 下一玩家
+  // 不需要弃牌 → 下一玩家，从准备阶段开始
   const atoms: Atom[] = [
     { type: 'nextPlayer' },
-    { type: 'setPhase', phase: '出牌' },
+    { type: 'setPhase', phase: '准备' },
   ];
   const result = applyAtoms(s, atoms);
   const turnStartEvent = makeServerEvent('turnStart', {
@@ -90,7 +90,7 @@ export function resolveDiscardPhase(
     }
   }
 
-  // 弃牌 → 弹出 pending → 下一玩家
+  // 弃牌 → 弹出 pending → 下一玩家，从准备阶段开始
   const discardAtoms: Atom[] = [
     ...action.cardIds.map(
       (cardId) =>
@@ -103,7 +103,7 @@ export function resolveDiscardPhase(
     ),
     { type: 'popPending' },
     { type: 'nextPlayer' },
-    { type: 'setPhase', phase: '出牌' },
+    { type: 'setPhase', phase: '准备' },
   ];
   const result = applyAtoms(state, discardAtoms);
   const discardEvent = makeServerEvent('cardDiscarded', {
