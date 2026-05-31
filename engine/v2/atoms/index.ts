@@ -14,6 +14,7 @@ import * as pendingTrick from './pendingTrick';
 import * as kill from './kill';
 import * as gainCard from './gainCard';
 import * as ctxVar from './ctxVar';
+import * as turn from './turn';
 
 damage.register();
 draw.register();
@@ -31,3 +32,4 @@ pendingTrick.register();
 kill.register();
 gainCard.register();
 ctxVar.register();
+turn.register();

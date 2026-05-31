@@ -16,7 +16,6 @@ export function register() {
             info: { ...state.players[player].info, alive: false },
           },
         },
-        playerOrder: state.playerOrder.filter(name => name !== player),
       };
     },
     toEvents(state: GameState, atom: Atom & { type: 'kill' }): AtomEventResult {

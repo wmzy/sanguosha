@@ -19,10 +19,25 @@ export function register() {
       const cardId = atom.cardId as string;
       const card = state.cardMap[cardId];
       const slot = subtypeToSlot[card.subtype];
-      return updatePlayer(state, player, p => ({
+      const p = state.players[player];
+      const oldEquipId = p.equipment[slot];
+
+      let s: GameState = updatePlayer(state, player, p => ({
         hand: p.hand.filter(id => id !== cardId),
         equipment: { ...p.equipment, [slot]: cardId },
       }));
+
+      if (oldEquipId) {
+        s = {
+          ...s,
+          zones: {
+            ...s.zones,
+            discardPile: [...s.zones.discardPile, oldEquipId],
+          },
+        };
+      }
+
+      return s;
     },
     toEvents(state: GameState, atom: Atom & { type: 'equip' }): AtomEventResult {
       const player = atom.player as string;

@@ -39,19 +39,23 @@ export function broadcast(state: GameState, atoms: Atom[]): BroadcastResult {
   for (const atom of atoms) {
     const [serverEvent, playerMap, defaultEvent] = atomToEvents(s, atom);
 
-    s = {
-      ...s,
-      serverLog: [...s.serverLog, serverEvent],
-    };
+    const updatedPlayerLogs = { ...s.playerLogs };
+    const logEventId = serverEvent.id;
 
     for (const player of s.playerOrder) {
       const specific = playerMap.get(player);
-      if (specific) {
-        playerEvents.get(player)!.push(specific);
-      } else if (defaultEvent) {
-        playerEvents.get(player)!.push(defaultEvent);
+      const evt = specific ?? defaultEvent;
+      if (evt) {
+        playerEvents.get(player)!.push(evt);
+        updatedPlayerLogs[player] = [...(updatedPlayerLogs[player] ?? []), evt.id];
       }
     }
+
+    s = {
+      ...s,
+      serverLog: [...s.serverLog, serverEvent],
+      playerLogs: updatedPlayerLogs,
+    };
 
     s = applyAtom(s, atom);
   }

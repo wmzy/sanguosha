@@ -1,10 +1,7 @@
 import type { GameState, Atom, AtomEventResult, Json } from '../types';
 import { registerAtom } from '../atom';
+import { makeServerEvent } from '../event';
 
-/**
- * setCtxVar — 将值写入 SkillContext.localVars。
- * 不修改 GameState，仅作为信号 atom 由 executePlan 处理。
- */
 export function register() {
   registerAtom({
     type: 'setCtxVar',
@@ -14,7 +11,7 @@ export function register() {
     toEvents(_state: GameState, atom: Atom): AtomEventResult {
       const a = atom as unknown as { type: 'setCtxVar'; key: string; value: Json };
       const payload: Json = { key: a.key, value: a.value };
-      const server = { id: `evt_${Date.now().toString(36)}`, type: 'setCtxVar', timestamp: Date.now(), payload };
+      const server = makeServerEvent('setCtxVar', payload);
       return [server, new Map(), null] as const;
     },
   });
