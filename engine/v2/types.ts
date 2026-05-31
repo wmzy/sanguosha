@@ -396,6 +396,16 @@ export interface ResponseWindowDef {
   defender: string;
   validCards: string[];
   sourceCard?: string;
+  /** aoeResponse 链：剩余需要响应的玩家（不含当前 defender） */
+  remainingTargets?: string[];
+  /** aoeResponse 链：需要的牌（杀/闪） */
+  requiredCard?: string;
+  /** trickResponse 链：原锦囊目标（区别于 defender 当前响应者） */
+  trickTarget?: string;
+  /** trickResponse 链：剩余待询问玩家 */
+  remainingPlayers?: string[];
+  /** trickResponse 链：当前是否已被无懈 */
+  negated?: boolean;
 }
 
 export interface ResponseWindowData extends ResponseWindowDef {
@@ -477,6 +487,7 @@ export interface PendingView {
 export interface TimeoutConfig {
   killResponse: number;
   aoeResponse: number;
+  trickResponse: number;
   dyingResponse: number;
   skillPrompt: number;
   playPhase: number;
@@ -487,6 +498,7 @@ export interface TimeoutConfig {
 export const TIMEOUT_DEFAULTS: TimeoutConfig = {
   killResponse: 15000,
   aoeResponse: 10000,
+  trickResponse: 10000,
   dyingResponse: 20000,
   skillPrompt: 15000,
   playPhase: 60000,

@@ -35,8 +35,11 @@ export function GameBoard() {
     handleActivateSkill,
     pendingPrompt,
     hasDodge,
+    respondAction,
     respondToKill,
+    respond,
     respondToDying,
+    selectTargetCard,
     needsDiscard,
     discardCount,
     selectedForDiscard,
@@ -61,6 +64,10 @@ export function GameBoard() {
   };
 
   const isKillResponse = pendingPrompt?.type === 'killResponse';
+  const isAoeResponse = pendingPrompt?.type === 'aoeResponse';
+  const isTrickResponse = pendingPrompt?.type === 'trickResponse';
+  const isDuelResponse = pendingPrompt?.type === 'duelResponse';
+  const isSelectCard = pendingPrompt?.type === 'selectCard';
   const isDyingWindow = pendingPrompt?.type === 'dyingWindow';
 
   const renderPlayerPanel = (entry: { name: string; player: PlayerState }) => {
@@ -161,6 +168,48 @@ export function GameBoard() {
         </div>
       )}
 
+      {/* 待响应提示 - AOE（南蛮入侵/万箭齐发） */}
+      {isAoeResponse && pendingPrompt && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: 12,
+          backgroundColor: colors.accent.orange,
+          borderRadius: 8,
+          fontSize: 16,
+        }}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+            {pendingPrompt.text}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {(respondAction?.cards ?? []).length > 0 ? (
+              respondAction!.cards.map(cardId => {
+                const card = state.cardMap[cardId];
+                const required = pendingPrompt.requiredCard || '杀';
+                return (
+                  <button
+                    key={cardId}
+                    onClick={() => respond(cardId)}
+                    style={styles.btn(colors.accent.green)}
+                  >
+                    出{required} ({card?.suit}{card?.rank})
+                  </button>
+                );
+              })
+            ) : (
+              <span style={{ color: colors.text.dim, fontSize: 14 }}>（无{pendingPrompt.requiredCard || '杀'}）</span>
+            )}
+            <button
+              onClick={() => respond()}
+              style={styles.btn(colors.accent.red)}
+            >
+              不出，受伤害
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 濒死救援提示 */}
       {isDyingWindow && pendingPrompt && state.pending?.type === 'dyingWindow' && (
         <div style={{
@@ -199,6 +248,123 @@ export function GameBoard() {
             >
               无人救援
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 待响应提示 - 锦囊（无懈可击） */}
+      {isTrickResponse && pendingPrompt && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: 12,
+          backgroundColor: colors.accent.purple,
+          borderRadius: 8,
+          fontSize: 16,
+        }}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+            对方对你使用了锦囊，是否出无懈可击？
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {(respondAction?.cards ?? []).length > 0 ? (
+              respondAction!.cards.map(cardId => {
+                const card = state.cardMap[cardId];
+                return (
+                  <button
+                    key={cardId}
+                    onClick={() => respond(cardId)}
+                    style={styles.btn(colors.accent.green)}
+                  >
+                    出无懈可击 ({card?.suit}{card?.rank})
+                  </button>
+                );
+              })
+            ) : (
+              <span style={{ color: colors.text.dim, fontSize: 14 }}>（无无懈可击）</span>
+            )}
+            <button
+              onClick={() => respond()}
+              style={styles.btn(colors.accent.red)}
+            >
+              不出
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 待响应提示 - 决斗 */}
+      {isDuelResponse && pendingPrompt && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: 12,
+          backgroundColor: colors.accent.orange,
+          borderRadius: 8,
+          fontSize: 16,
+        }}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+            {pendingPrompt.text}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {(respondAction?.cards ?? []).length > 0 ? (
+              respondAction!.cards.map(cardId => {
+                const card = state.cardMap[cardId];
+                return (
+                  <button
+                    key={cardId}
+                    onClick={() => respond(cardId)}
+                    style={styles.btn(colors.accent.green)}
+                  >
+                    出杀 ({card?.suit}{card?.rank})
+                  </button>
+                );
+              })
+            ) : (
+              <span style={{ color: colors.text.dim, fontSize: 14 }}>（无杀）</span>
+            )}
+            <button
+              onClick={() => respond()}
+              style={styles.btn(colors.accent.red)}
+            >
+              不出，受伤害
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 待响应提示 - 选牌（顺手牵羊/过河拆桥） */}
+      {isSelectCard && pendingPrompt && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: 12,
+          backgroundColor: colors.accent.purple,
+          borderRadius: 8,
+          fontSize: 16,
+        }}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+            {pendingPrompt.text}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {(pendingPrompt.targetCardIds ?? []).map((cardId, idx) => {
+              const showFaceDown = pendingPrompt.selectMode === 'steal' || pendingPrompt.selectMode === 'discard';
+              return (
+                <button
+                  key={cardId}
+                  onClick={() => selectTargetCard(cardId)}
+                  style={{
+                    ...styles.btn(showFaceDown ? colors.accent.amber : colors.accent.blue),
+                    minWidth: showFaceDown ? 60 : 'auto',
+                    fontSize: showFaceDown ? 13 : 14,
+                  }}
+                >
+                  {showFaceDown ? `第 ${idx + 1} 张` : `${state.cardMap[cardId]?.name} (${state.cardMap[cardId]?.suit}${state.cardMap[cardId]?.rank})`}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -246,7 +412,7 @@ export function GameBoard() {
             回合 {state.meta.round} | 阶段: {state.phase} | 当前玩家: {state.currentPlayer}
           </div>
           <div style={{ marginBottom: 8 }}>
-            {!isMyTurn && !isKillResponse && !isDyingWindow && <span style={{ color: colors.accent.amber }}>等待对手...</span>}
+            {!isMyTurn && !isKillResponse && !isAoeResponse && !isDyingWindow && <span style={{ color: colors.accent.amber }}>等待对手...</span>}
             {state.meta.status === '已结束' && <span style={{ color: colors.accent.red, fontWeight: 'bold' }}>游戏结束</span>}
           </div>
           <div style={{ fontSize: 12, color: colors.text.dim }}>

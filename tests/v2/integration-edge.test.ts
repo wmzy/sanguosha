@@ -125,8 +125,9 @@ describe('边界: 多人局距离', () => {
       type: 'playCard', player: 'P1', cardId: trickId, target: 'P2',
     });
     expect(r1.error).toBeUndefined();
-    // 应该弹出选牌 pending
-    expect(r1.state.pending?.type).toBe('selectCard');
+    // 弹出 trickResponse 窗口（目标可出无懈可击）
+    expect(r1.state.pending?.type).toBe('responseWindow');
+    expect((r1.state.pending! as any).window.type).toBe('trickResponse');
   });
 });
 
@@ -234,21 +235,58 @@ describe('边界: 卡牌目标验证', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('边界: AOE/决斗', () => {
-  it('南蛮入侵等非标准锦囊走 default 分支直接弃牌（未实现）', () => {
-    let state = setPlayPhase(createTestGame({ playerCount: 2 }));
+  it('南蛮入侵触发 aoeResponse 窗口链', () => {
+    let state = setPlayPhase(createTestGame({ playerCount: 4 }));
+    // 给 P2 注入一张杀，让 P2 可以出杀响应
+    state = injectCard(state, 'P2', '杀');
     state = injectTrickCard(state, 'P1', '南蛮入侵');
     const trickId = findCardInHand(state, 'P1', '南蛮入侵')!;
 
-    const result = engine(state, {
+    const r1 = engine(state, {
       type: 'playCard', player: 'P1', cardId: trickId,
     });
-    // handleTrickCard default 分支（line 243-256）：
-    // 直接把牌 moveCard 到弃牌堆
-    expect(result.error).toBeUndefined();
-    expect(result.state.zones.discardPile.includes(trickId)).toBe(true);
+    expect(r1.error).toBeUndefined();
+    // 源牌进入弃牌堆
+    expect(r1.state.zones.discardPile.includes(trickId)).toBe(true);
 
-    // ⚠️ BUG: 南蛮入侵作为 AOE 应该让所有其他玩家响应出杀
-    // 但实际只被当作无效锦囊丢掉了
+    // 创建了 aoeResponse 窗口（栈顶是 P2→P3→P4 中的第一个）
+    expect(r1.state.pending).not.toBeNull();
+    expect(r1.state.pending?.type).toBe('responseWindow');
+    if (r1.state.pending?.type === 'responseWindow') {
+      expect(r1.state.pending.window.type).toBe('aoeResponse');
+      // 按 playerOrder，第一个受影响的是 P2
+      expect(r1.state.pending.window.defender).toBe('P2');
+    }
+
+    // P2 出杀响应 → 免伤，进入 P3 的窗口
+    const killInP2 = findCardInHand(r1.state, 'P2', '杀')!;
+    const r2 = engine(r1.state, { type: 'respond', player: 'P2', cardId: killInP2 });
+    expect(r2.error).toBeUndefined();
+    // 杀进入弃牌
+    expect(r2.state.zones.discardPile.includes(killInP2)).toBe(true);
+    // 下一个 pending 是 P3 的 aoeResponse
+    expect(r2.state.pending?.type).toBe('responseWindow');
+    if (r2.state.pending?.type === 'responseWindow') {
+      expect(r2.state.pending.window.type).toBe('aoeResponse');
+      expect(r2.state.pending.window.defender).toBe('P3');
+    }
+
+    // P3 不出杀 → 受 1 点伤害
+    const r3 = engine(r2.state, { type: 'respond', player: 'P3' });
+    expect(r3.error).toBeUndefined();
+    expect(r3.state.players['P3'].health).toBe(3); // 满血4，受伤变3
+    expect(r3.state.pending?.type).toBe('responseWindow');
+    if (r3.state.pending?.type === 'responseWindow') {
+      expect(r3.state.pending.window.type).toBe('aoeResponse');
+      expect(r3.state.pending.window.defender).toBe('P4');
+    }
+
+    // P4（华佗 maxHealth=3）不出杀 → 受 1 点伤害 → 体力 2
+    const r4 = engine(r3.state, { type: 'respond', player: 'P4' });
+    expect(r4.error).toBeUndefined();
+    expect(r4.state.players['P4'].health).toBe(2);
+    // 所有响应结束，无 pending
+    expect(r4.state.pending).toBeNull();
   });
 
   it('决斗只走 default 分支（未实现决斗响应链）', () => {
@@ -265,6 +303,74 @@ describe('边界: AOE/决斗', () => {
     // ⚠️ BUG: 决斗应该触发 duelResponse 链
   });
 
+  it('顺手牵羊全流程：trickResponse → selectCard → 获得目标手牌', () => {
+    let state = setPlayPhase(createTestGame({ playerCount: 2 }));
+    // 给 P1 注入顺手牵羊
+    state = injectTrickCard(state, 'P1', '顺手牵羊');
+    // 给 P2 注入一张可见的牌（便于验证）
+    state = injectCard(state, 'P2', '闪');
+    const stealId = findCardInHand(state, 'P1', '顺手牵羊')!;
+
+    // 1. 使用顺手牵羊
+    const r1 = engine(state, {
+      type: 'playCard', player: 'P1', cardId: stealId, target: 'P2',
+    });
+    expect(r1.error).toBeUndefined();
+    // 源牌进弃牌堆
+    expect(r1.state.zones.discardPile.includes(stealId)).toBe(true);
+    // 创建 trickResponse 窗口
+    expect(r1.state.pending?.type).toBe('responseWindow');
+    if (r1.state.pending?.type === 'responseWindow') {
+      expect(r1.state.pending.window.type).toBe('trickResponse');
+    }
+
+    // 2. 不出无懈 → 弹出 selectCard
+    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    expect(r2.error).toBeUndefined();
+    expect(r2.state.pending?.type).toBe('selectCard');
+    if (r2.state.pending?.type === 'selectCard') {
+      expect(r2.state.pending.mode).toBe('steal');
+      expect(r2.state.pending.target).toBe('P2');
+      expect(r2.state.pending.player).toBe('P1');
+      expect(r2.state.pending.cardIds.length).toBeGreaterThan(0);
+    }
+
+    // 3. 选择一张牌
+    const targetCardId = (r2.state.pending as any).cardIds[0] as string;
+    const r3 = engine(r2.state, { type: 'respond', player: 'P1', cardIds: [targetCardId] });
+    expect(r3.error).toBeUndefined();
+    // 该牌从 P2 转移到 P1
+    expect(r3.state.players['P1'].hand.includes(targetCardId)).toBe(true);
+    expect(r3.state.players['P2'].hand.includes(targetCardId)).toBe(false);
+    // 无 pending
+    expect(r3.state.pending).toBeNull();
+  });
+
+  it('顺手牵羊被无懈可击取消', () => {
+    let state = setPlayPhase(createTestGame({ playerCount: 2 }));
+    state = injectTrickCard(state, 'P1', '顺手牵羊');
+    // P2 有一张无懈可击
+    state = injectCard(state, 'P2', '无懈可击');
+    const stealId = findCardInHand(state, 'P1', '顺手牵羊')!;
+    const wuxieId = findCardInHand(state, 'P2', '无懈可击')!;
+    const targetCard = state.players['P2'].hand.find(id => id !== wuxieId)!;
+
+    const r1 = engine(state, {
+      type: 'playCard', player: 'P1', cardId: stealId, target: 'P2',
+    });
+    expect(r1.error).toBeUndefined();
+
+    // P2 出无懈可击 → 取消顺手牵羊
+    const r2 = engine(r1.state, { type: 'respond', player: 'P2', cardId: wuxieId });
+    expect(r2.error).toBeUndefined();
+    // 无懈可击进弃牌堆
+    expect(r2.state.zones.discardPile.includes(wuxieId)).toBe(true);
+    // 顺手牵羊已被取消，无 pending
+    expect(r2.state.pending).toBeNull();
+    // P2 的牌没有被拿走
+    expect(r2.state.players['P2'].hand.includes(targetCard)).toBe(true);
+  });
+
   it('过河拆桥用完源牌也在弃牌堆中', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectTrickCard(state, 'P1', '过河拆桥');
@@ -275,15 +381,18 @@ describe('边界: AOE/决斗', () => {
     });
     expect(r1.error).toBeUndefined();
 
-    // 过河拆桥没有在 pushPending 前 moveCard 源牌
-    // 应该先弃掉源牌（过河拆桥），再让玩家选牌
-    // 但 current approach：先 pushPending，resolveSelectCard 时再弃源牌
-    // 这导致 pending 期间，过河拆桥还在手牌中
-    // 测试 pending 是否正确设置
-    expect(r1.state.pending?.type).toBe('selectCard');
-    if (r1.state.pending?.type === 'selectCard') {
-      expect(r1.state.pending.min).toBe(1);
-      expect(r1.state.pending.max).toBe(1);
+    // 过河拆桥立即进入弃牌堆
+    expect(r1.state.zones.discardPile.includes(trickId)).toBe(true);
+    // pending 是 trickResponse（无懈可击窗口）
+    expect(r1.state.pending?.type).toBe('responseWindow');
+
+    // 过 trickResponse → 弹出 selectCard
+    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    expect(r2.error).toBeUndefined();
+    expect(r2.state.pending?.type).toBe('selectCard');
+    if (r2.state.pending?.type === 'selectCard') {
+      expect(r2.state.pending.min).toBe(1);
+      expect(r2.state.pending.max).toBe(1);
     }
   });
 });
@@ -457,18 +566,27 @@ describe('边界: 状态不变量', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('卡牌边界', () => {
-  it('顺手牵羊 steal mode resolveSelectCard 正确放入偷牌者手牌', () => {
+  it('顺手牵羊 steal mode 经过 trickResponse → resolveSelectCard 正确放入偷牌者手牌', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectTrickCard(state, 'P1', '顺手牵羊');
     const cardId = findCardInHand(state, 'P1', '顺手牵羊')!;
     const p2HandBefore = [...state.players['P2'].hand];
+
+    // Step1: 出牌 → trickResponse 窗口
     const step1 = engine(state, { type: 'playCard', player: 'P1', cardId, target: 'P2' });
     expect(step1.error).toBeUndefined();
-    expect(step1.state.pending!.type).toBe('selectCard');
-    const selected = p2HandBefore[0];
-    const step2 = engine(step1.state, { type: 'respond', player: 'P1', cardIds: [selected] });
+    expect(step1.state.pending!.type).toBe('responseWindow');
+
+    // Step2: 过 trickResponse（无懈不出 → 放行）
+    const step2 = engine(step1.state, { type: 'respond', player: 'P2' });
     expect(step2.error).toBeUndefined();
-    expect(step2.state.players['P1'].hand.includes(selected)).toBe(true);
+    expect(step2.state.pending!.type).toBe('selectCard');
+
+    // Step3: 选择偷哪张
+    const selected = p2HandBefore[0];
+    const step3 = engine(step2.state, { type: 'respond', player: 'P1', cardIds: [selected] });
+    expect(step3.error).toBeUndefined();
+    expect(step3.state.players['P1'].hand.includes(selected)).toBe(true);
   });
 
   it('顺手牵羊距离检查装备-1马后距离0可用', () => {
@@ -477,12 +595,9 @@ describe('卡牌边界', () => {
     state = injectEquipCard(state, 'P1', '赤兔', '进攻马');
     const cardId = findCardInHand(state, 'P1', '顺手牵羊')!;
     const result = engine(state, { type: 'playCard', player: 'P1', cardId, target: 'P2' });
-    if (result.error?.includes('距离')) {
-      // 距离检查 bug 仍存在
-      expect(result.error).toBeTruthy();
-    } else {
-      expect(result.error).toBeUndefined();
-    }
+    // -1马使距离=0，顺手牵羊通过距离检查，弹出 trickResponse
+    expect(result.error).toBeUndefined();
+    expect(result.state.pending?.type).toBe('responseWindow');
   });
 
   it('装备新武器时旧武器进入弃牌堆', () => {
@@ -511,12 +626,14 @@ describe('卡牌边界', () => {
     expect(result.state.players['P1'].hand.length).toBeLessThanOrEqual(handBefore);
   });
 
-  it('过河拆桥出牌后 pending 期间 sourceCard 仍留在手牌', () => {
+  it('过河拆桥出牌后 pending 期间 sourceCard 已进入弃牌堆', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectTrickCard(state, 'P1', '过河拆桥');
     const cardId = findCardInHand(state, 'P1', '过河拆桥')!;
     const r1 = engine(state, { type: 'playCard', player: 'P1', cardId, target: 'P2' });
-    expect(r1.state.players['P1'].hand.includes(cardId)).toBe(true);
+    // 源牌立即进弃牌堆，不再留手牌中等 selectCard
+    expect(r1.state.players['P1'].hand.includes(cardId)).toBe(false);
+    expect(r1.state.zones.discardPile.includes(cardId)).toBe(true);
   });
 
   it('延时锦囊使用后直接进入弃牌堆而非判定区', () => {

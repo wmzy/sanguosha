@@ -8,6 +8,7 @@ import type {
   GameEvent,
   ServerEvent,
 } from '../types';
+import { TIMEOUT_DEFAULTS } from '../types';
 import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms, createDyingPending } from './engine-utils';
@@ -154,40 +155,77 @@ function resolveAoeResponse(
     return { state, events: [], error: 'AOE 响应窗口需要 respond 动作' };
   }
 
-  const { defender, attacker } = pending.window;
+  const { defender, attacker, remainingTargets, requiredCard, sourceCard } = pending.window;
+
+  // 处理当前玩家的响应
+  let currentState = state;
+  let currentEvents: ServerEvent[] = [];
 
   if (action.cardId) {
     // 出了正确的牌 → 免疫
     const atoms: Atom[] = [
-      {
-        type: 'moveCard',
-        cardId: action.cardId,
-        from: { zone: 'hand', player: defender },
-        to: { zone: 'discardPile' },
-      },
+      { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player: defender }, to: { zone: 'discardPile' } },
       { type: 'popPending' },
     ];
     const result = applyAtoms(state, atoms);
-    return { state: result.state, events: result.events };
+    currentState = result.state;
+    currentEvents = result.events;
+  } else {
+    // 没出 → 受伤
+    const damageAtoms: Atom[] = [
+      { type: 'damage', target: defender, amount: 1, source: attacker },
+      { type: 'popPending' },
+    ];
+    const result = applyAtoms(currentState, damageAtoms);
+    currentState = result.state;
+    currentEvents = result.events;
   }
 
-  // 没出 → 受伤
-  const damageAtoms: Atom[] = [
-    { type: 'damage', target: defender, amount: 1, source: attacker },
-    { type: 'popPending' },
-  ];
-  const { state: damagedState, events: damageEvents } = applyAtoms(state, damageAtoms);
-
-  const defenderState = getPlayer(damagedState, defender);
-  if (defenderState.health <= 0 && defenderState.info.alive) {
-    const dyingPending = createDyingPending(damagedState, defender, attacker);
-    const { state: dyingState, events: dyingEvents } = applyAtoms(damagedState, [
+  // 检查濒死
+  const defState = getPlayer(currentState, defender);
+  if (defState.health <= 0 && defState.info.alive) {
+    // 有濒死，等濒死解决完后再继续链
+    const dyingPending = createDyingPending(currentState, defender, attacker);
+    const { state: dyingState, events: dyingEvents } = applyAtoms(currentState, [
       { type: 'pushPending', action: dyingPending },
+      // 标记剩余响应链需要继续
     ]);
-    return { state: dyingState, events: [...damageEvents, ...dyingEvents] };
+    return { state: dyingState, events: [...currentEvents, ...dyingEvents] };
   }
 
-  return { state: damagedState, events: damageEvents };
+  // 还有剩余玩家需要响应 → 创建下一个 aoeResponse
+  if (remainingTargets && remainingTargets.length > 0) {
+    const nextTarget = remainingTargets[0];
+    const nextRemaining = remainingTargets.slice(1);
+    const targetPlayer = getPlayer(currentState, nextTarget);
+    const validCards = targetPlayer.hand.filter(
+      id => currentState.cardMap[id]?.name === requiredCard,
+    );
+    const timeout = TIMEOUT_DEFAULTS.aoeResponse;
+    const nextPending: PendingResponseWindow = {
+      type: 'responseWindow',
+      window: {
+        type: 'aoeResponse',
+        attacker: attacker!,
+        defender: nextTarget,
+        validCards,
+        sourceCard,
+        remainingTargets: nextRemaining,
+        requiredCard,
+        timeout,
+        deadline: Date.now() + timeout,
+      },
+      timeout,
+      deadline: Date.now() + timeout,
+      onTimeout: { type: 'respond', player: nextTarget },
+    };
+    const { state: pushState, events: pushEvents } = applyAtoms(currentState, [
+      { type: 'pushPending', action: nextPending },
+    ]);
+    return { state: pushState, events: [...currentEvents, ...pushEvents] };
+  }
+
+  return { state: currentState, events: currentEvents };
 }
 
 function resolveTrickResponse(
@@ -196,23 +234,159 @@ function resolveTrickResponse(
   pending: PendingResponseWindow,
 ): EngineResult {
   const cardId = action.type === 'respond' ? action.cardId : undefined;
+  const { attacker, defender, sourceCard, trickTarget, remainingPlayers, negated } = pending.window;
+  if (!sourceCard) return { state, events: [], error: 'trickResponse 缺少 sourceCard' };
+  const trickCard = state.cardMap[sourceCard];
+  if (!trickCard) return { state, events: [], error: 'trickResponse 源卡牌不存在' };
+  const trickName = trickCard.name;
+
+  let newNegated = negated ?? false;
+
   if (cardId) {
-    const atoms: Atom[] = [
+    // 出了无懈可击 → 翻转取消状态
+    const card = state.cardMap[cardId];
+    if (card?.name !== '无懈可击') {
+      return { state, events: [], error: '只能用无懈可击响应锦囊' };
+    }
+    const responder = getPlayer(state, defender);
+    if (!responder.hand.includes(cardId)) {
+      return { state, events: [], error: '手牌中没有该卡牌' };
+    }
+    state = applyAtoms(state, [
       {
         type: 'moveCard',
         cardId,
-        from: { zone: 'hand', player: pending.window.defender },
+        from: { zone: 'hand', player: defender },
         to: { zone: 'discardPile' },
       },
-      { type: 'popPending' },
-    ];
-    const result = applyAtoms(state, atoms);
-    return { state: result.state, events: result.events };
+    ]).state;
+    newNegated = !newNegated;
   }
 
-  const atoms: Atom[] = [{ type: 'popPending' }];
-  const result = applyAtoms(state, atoms);
-  return { state: result.state, events: result.events };
+  // Pop current pending
+  state = applyAtoms(state, [{ type: 'popPending' }]).state;
+
+  // 还有剩余玩家 → 链式询问下一个
+  if (remainingPlayers && remainingPlayers.length > 0) {
+    const nextTarget = remainingPlayers[0];
+    const nextRemaining = remainingPlayers.slice(1);
+    const nextPlayer = getPlayer(state, nextTarget);
+    const validWuxie = nextPlayer.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
+    const nextTimeout = TIMEOUT_DEFAULTS.trickResponse;
+
+    const nextWindow: PendingResponseWindow = {
+      type: 'responseWindow',
+      window: {
+        type: 'trickResponse',
+        attacker: attacker!,
+        defender: nextTarget,
+        validCards: validWuxie,
+        sourceCard,
+        trickTarget: trickTarget ?? defender,
+        remainingPlayers: nextRemaining,
+        negated: newNegated,
+        timeout: nextTimeout,
+        deadline: Date.now() + nextTimeout,
+      },
+      timeout: nextTimeout,
+      deadline: Date.now() + nextTimeout,
+      onTimeout: { type: 'respond', player: nextTarget },
+    };
+
+    return applyAtoms(state, [{ type: 'pushPending', action: nextWindow }]);
+  }
+
+  // 所有玩家都问完了
+  if (newNegated) {
+    // 被无懈取消，直接返回
+    return { state, events: [] };
+  }
+
+  // 无无懈 → 放行，执行锦囊效果
+  const target = trickTarget ?? defender;
+  switch (trickName) {
+    case '过河拆桥': {
+      const targetPlayer = getPlayer(state, target);
+      if (targetPlayer.hand.length === 0) {
+        return { state, events: [] };
+      }
+      const selectPending: PendingSelectCard = {
+        type: 'selectCard',
+        player: attacker!,
+        target,
+        cardIds: targetPlayer.hand,
+        min: 1,
+        max: 1,
+        sourceCard,
+        mode: 'discard',
+        timeout: TIMEOUT_DEFAULTS.selectCard,
+        deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
+        onTimeout: { type: 'respond', player: attacker!, cardIds: [targetPlayer.hand[0]] },
+      };
+      return applyAtoms(state, [{ type: 'pushPending', action: selectPending }]);
+    }
+
+    case '顺手牵羊': {
+      const targetPlayer = getPlayer(state, target);
+      if (targetPlayer.hand.length === 0) {
+        return { state, events: [] };
+      }
+      const selectPending: PendingSelectCard = {
+        type: 'selectCard',
+        player: attacker!,
+        target,
+        cardIds: targetPlayer.hand,
+        min: 1,
+        max: 1,
+        sourceCard,
+        mode: 'steal',
+        timeout: TIMEOUT_DEFAULTS.selectCard,
+        deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
+        onTimeout: { type: 'respond', player: attacker!, cardIds: [targetPlayer.hand[0]] },
+      };
+      return applyAtoms(state, [{ type: 'pushPending', action: selectPending }]);
+    }
+
+    case '决斗': {
+      const validKills = getPlayer(state, target).hand.filter(
+        id => state.cardMap[id]?.name === '杀',
+      );
+      const duelTimeout = TIMEOUT_DEFAULTS.killResponse;
+      const duelWindow: PendingResponseWindow = {
+        type: 'responseWindow',
+        window: {
+          type: 'duelResponse',
+          attacker: attacker!,
+          defender: target,
+          validCards: validKills,
+          sourceCard,
+          timeout: duelTimeout,
+          deadline: Date.now() + duelTimeout,
+        },
+        timeout: duelTimeout,
+        deadline: Date.now() + duelTimeout,
+        onTimeout: { type: 'respond', player: target },
+      };
+      return applyAtoms(state, [{ type: 'pushPending', action: duelWindow }]);
+    }
+
+    case '乐不思蜀': {
+      const trick = { name: '乐不思蜀', source: attacker!, card: trickCard };
+      return applyAtoms(state, [
+        { type: 'addPendingTrick', player: target, trick },
+      ]);
+    }
+
+    case '兵粮寸断': {
+      const trick = { name: '兵粮寸断', source: attacker!, card: trickCard };
+      return applyAtoms(state, [
+        { type: 'addPendingTrick', player: target, trick },
+      ]);
+    }
+
+    default:
+      return { state, events: [] };
+  }
 }
 
 function resolveDuelResponse(
@@ -220,11 +394,23 @@ function resolveDuelResponse(
   action: GameAction,
   pending: PendingResponseWindow,
 ): EngineResult {
-  const { defender, attacker } = pending.window;
+  const { defender, attacker, sourceCard } = pending.window;
+
   const cardId = action.type === 'respond' ? action.cardId : undefined;
 
   if (cardId) {
-    const atoms: Atom[] = [
+    // 当前防守方出了杀 → 换对方继续出杀
+    const card = state.cardMap[cardId];
+    if (card?.name !== '杀') {
+      return { state, events: [], error: '只能用杀响应决斗' };
+    }
+    const responder = getPlayer(state, defender);
+    if (!responder.hand.includes(cardId)) {
+      return { state, events: [], error: '手牌中没有该卡牌' };
+    }
+
+    // 弃杀，弹掉当前窗口
+    const moveResult = applyAtoms(state, [
       {
         type: 'moveCard',
         cardId,
@@ -232,18 +418,60 @@ function resolveDuelResponse(
         to: { zone: 'discardPile' },
       },
       { type: 'popPending' },
-    ];
-    const result = applyAtoms(state, atoms);
-    return { state: result.state, events: result.events };
+    ]);
+
+    // 轮到对方出杀：交换 attacker/defender
+    const nextDefender = attacker!;
+    const nextAttacker = defender;
+    const validKills = getPlayer(moveResult.state, nextDefender).hand.filter(
+      id => moveResult.state.cardMap[id]?.name === '杀',
+    );
+    const duelTimeout = TIMEOUT_DEFAULTS.killResponse;
+    const nextDuel: PendingResponseWindow = {
+      type: 'responseWindow',
+      window: {
+        type: 'duelResponse',
+        attacker: nextAttacker,
+        defender: nextDefender,
+        validCards: validKills,
+        sourceCard: sourceCard!,
+        timeout: duelTimeout,
+        deadline: Date.now() + duelTimeout,
+      },
+      timeout: duelTimeout,
+      deadline: Date.now() + duelTimeout,
+      onTimeout: { type: 'respond', player: nextDefender },
+    };
+    const pushResult = applyAtoms(moveResult.state, [
+      { type: 'pushPending', action: nextDuel },
+    ]);
+    return {
+      state: pushResult.state,
+      events: [...moveResult.events, ...pushResult.events],
+    };
   }
 
-  // 没出杀 → 受伤
-  const atoms: Atom[] = [
+  // 没出杀 → 当前防守方受 1 点伤害
+  const damageAtoms: Atom[] = [
     { type: 'damage', target: defender, amount: 1, source: attacker },
     { type: 'popPending' },
   ];
-  const result = applyAtoms(state, atoms);
-  return { state: result.state, events: result.events };
+  const result = applyAtoms(state, damageAtoms);
+
+  // 检查濒死
+  const defenderState = getPlayer(result.state, defender);
+  if (defenderState.health <= 0 && defenderState.info.alive) {
+    const dyingPending = createDyingPending(result.state, defender, attacker);
+    const { state: dyingState, events: dyingEvents } = applyAtoms(result.state, [
+      { type: 'pushPending', action: dyingPending },
+    ]);
+    return {
+      state: dyingState,
+      events: [...result.events, ...dyingEvents],
+    };
+  }
+
+  return result;
 }
 
 function resolveDyingResponse(
@@ -281,15 +509,9 @@ export function resolveSelectCard(
     }
   }
 
-  // 弃掉源牌
-  const atoms: Atom[] = [
-    {
-      type: 'moveCard',
-      cardId: pending.sourceCard,
-      from: { zone: 'hand', player: pending.player },
-      to: { zone: 'discardPile' },
-    },
-  ];
+  // 执行效果：steal 或 discard 目标的手牌
+  // 注：源牌（锦囊牌）已在 handleTrickCard 中移入弃牌堆，此处不再重复移动
+  const atoms: Atom[] = [];
 
   if (pending.mode === 'steal') {
     // 顺手牵羊：将目标牌移到出牌者手牌

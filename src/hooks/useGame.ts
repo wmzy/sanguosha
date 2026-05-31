@@ -30,6 +30,12 @@ interface PendingPrompt {
   validCards?: string[];
   dyingPlayer?: string;
   savers?: string[];
+  /** aoeResponse 需要的响应牌（杀/闪） */
+  requiredCard?: string;
+  /** selectCard 数据 */
+  targetPlayer?: string;
+  targetCardIds?: string[];
+  selectMode?: 'discard' | 'steal';
 }
 
 function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
@@ -50,9 +56,11 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
         case 'aoeResponse':
           return {
             type: 'aoeResponse',
-            text: '请响应',
+            text: pending.window.requiredCard === '杀' ? '南蛮入侵：请出杀响应' : '万箭齐发：请出闪响应',
             responder: pending.window.defender,
+            attacker: pending.window.attacker,
             validCards: pending.window.validCards,
+            requiredCard: pending.window.requiredCard,
           };
         case 'dyingResponse':
           return {
@@ -93,6 +101,14 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
       return {
         type: 'skillPrompt',
         text: pending.prompt.text,
+      };
+    case 'selectCard':
+      return {
+        type: 'selectCard',
+        text: pending.mode === 'steal' ? '顺手牵羊：选择要获得的牌' : '过河拆桥：选择要弃掉的牌',
+        targetPlayer: pending.target,
+        targetCardIds: pending.cardIds,
+        selectMode: pending.mode,
       };
   }
   return null;
@@ -301,6 +317,18 @@ export function useGame() {
     });
   }, [state, myName, me.hand, dispatch]);
 
+  /** 通用响应：响应杀/锦囊/决斗/AOE 等 responseWindow */
+  const respond = useCallback((cardId?: string) => {
+    if (state.pending?.type !== 'responseWindow') return;
+    dispatch({ type: 'respond', player: myName, cardId });
+  }, [state, myName, dispatch]);
+
+  /** 选牌响应：顺手牵羊/过河拆桥选择目标手牌 */
+  const selectTargetCard = useCallback((cardId: string) => {
+    if (state.pending?.type !== 'selectCard') return;
+    dispatch({ type: 'respond', player: myName, cardIds: [cardId] });
+  }, [state, myName, dispatch]);
+
   const respondToDying = useCallback((saverName: string | null) => {
     if (state.pending?.type !== 'dyingWindow') return;
 
@@ -439,8 +467,11 @@ export function useGame() {
     // 响应
     pendingPrompt,
     hasDodge,
+    respondAction,
     respondToKill,
+    respond,
     respondToDying,
+    selectTargetCard,
 
     // 技能
     availableSkills,

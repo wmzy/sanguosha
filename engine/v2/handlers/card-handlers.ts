@@ -169,7 +169,7 @@ function handleTrickCard(
 
   switch (card.name) {
     case '无中生有': {
-      const atoms: Atom[] = [
+      const result = applyAtoms(state, [
         {
           type: 'moveCard',
           cardId: action.cardId,
@@ -177,71 +177,140 @@ function handleTrickCard(
           to: { zone: 'discardPile' },
         },
         { type: 'draw', player, count: 2 },
-      ];
-      const result = applyAtoms(state, atoms);
+      ]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
-    case '过河拆桥': {
+    // ── 可被无懈可击的锦囊：先弃源牌，开 trickResponse ──
+    case '过河拆桥':
+    case '顺手牵羊':
+    case '决斗':
+    case '乐不思蜀':
+    case '兵粮寸断': {
       const target = action.target;
-      if (!target) return { state, events: [], error: '过河拆桥需要指定目标' };
+      if (!target) return { state, events: [], error: `${card.name}需要指定目标` };
+
+      // 校验目标存活
       const targetPlayer = getPlayer(state, target);
-      if (targetPlayer.hand.length === 0) {
-        return { state, events: [], error: '目标没有手牌' };
-      }
-      // 创建选牌 pending，让玩家选择一张目标的手牌弃掉
-      const pending: PendingSelectCard = {
-        type: 'selectCard',
-        player,
-        target,
-        cardIds: targetPlayer.hand,
-        min: 1,
-        max: 1,
-        sourceCard: action.cardId,
-        mode: 'discard',
-        timeout: TIMEOUT_DEFAULTS.selectCard,
-        deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
-        onTimeout: { type: 'respond', player, cardIds: [targetPlayer.hand[0]] },
-      };
-      const atoms: Atom[] = [
-        { type: 'pushPending', action: pending },
-      ];
-      const result = applyAtoms(state, atoms);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
-    }
+      if (!targetPlayer.info.alive) return { state, events: [], error: '目标已阵亡' };
 
-    case '顺手牵羊': {
-      const target = action.target;
-      if (!target) return { state, events: [], error: '顺手牵羊需要指定目标' };
-      if (getDistance(state, player, target) !== 1) {
+      // 顺手牵羊距离检查
+      if (card.name === '顺手牵羊' && getDistance(state, player, target) !== 1) {
         return { state, events: [], error: '顺手牵羊目标距离必须为 1' };
       }
-      const targetPlayer = getPlayer(state, target);
-      if (targetPlayer.hand.length === 0) {
+
+      // 过河拆桥/顺手牵羊需要目标有手牌
+      if ((card.name === '过河拆桥' || card.name === '顺手牵羊') && targetPlayer.hand.length === 0) {
         return { state, events: [], error: '目标没有手牌' };
       }
-      const pending: PendingSelectCard = {
-        type: 'selectCard',
-        player,
-        target,
-        cardIds: targetPlayer.hand,
-        min: 1,
-        max: 1,
-        sourceCard: action.cardId,
-        mode: 'steal',
-        timeout: TIMEOUT_DEFAULTS.selectCard,
-        deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
-        onTimeout: { type: 'respond', player, cardIds: [targetPlayer.hand[0]] },
+
+      // 1. 弃掉源牌
+      const moveAtom: Atom = {
+        type: 'moveCard',
+        cardId: action.cardId,
+        from: { zone: 'hand', player },
+        to: { zone: 'discardPile' },
       };
+
+      // 2. 开 trickResponse 窗口（所有存活玩家依次出无懈可击）
+      const attackerIndex = state.playerOrder.indexOf(player);
+      const afterAttacker = state.playerOrder.slice(attackerIndex + 1).filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const beforeAttacker = state.playerOrder.slice(0, attackerIndex).filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const allPlayers = [...afterAttacker, ...beforeAttacker];
+
+      if (allPlayers.length === 0) {
+        // 没有其他存活玩家，跳过无懈流程直接放行
+        const trickResult = applyAtoms(state, [moveAtom]);
+        return { state: trickResult.state, events: [...trickResult.events, cardPlayedEvent] };
+      }
+
+      const firstTarget = allPlayers[0];
+      const remaining = allPlayers.slice(1);
+      const firstPlayerState = getPlayer(state, firstTarget);
+      const validWuxie = firstPlayerState.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
+      const timeout = TIMEOUT_DEFAULTS.trickResponse;
+      const trickResponse: PendingResponseWindow = {
+        type: 'responseWindow',
+        window: {
+          type: 'trickResponse',
+          attacker: player,
+          defender: firstTarget,
+          validCards: validWuxie,
+          sourceCard: action.cardId,
+          trickTarget: target,
+          remainingPlayers: remaining,
+          negated: false,
+          timeout,
+          deadline: Date.now() + timeout,
+        },
+        timeout,
+        deadline: Date.now() + timeout,
+        onTimeout: { type: 'respond', player: firstTarget },
+      };
+
+      const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
+      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+    }
+
+    // ── AOE：每个其他玩家依次响应（南蛮入侵→出杀，万箭齐发→出闪） ──
+    case '南蛮入侵':
+    case '万箭齐发': {
+      const requiredCard = card.name === '南蛮入侵' ? '杀' : '闪';
+
+      // 按 playerOrder 依次响应
+      const affected = state.playerOrder.filter(
+        p => p !== player && getPlayer(state, p).info.alive,
+      );
+
+      // 只创建第一个 aoeResponse，后续通过 resolveAoeResponse 链式创建
+      const firstTarget = affected[0];
+      if (!firstTarget) {
+        // 没有其他存活玩家，只弃牌
+        const result = applyAtoms(state, [
+          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        ]);
+        return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      }
+
+      const remaining = affected.slice(1);
+      const firstPlayer = getPlayer(state, firstTarget);
+      const validCards = firstPlayer.hand.filter(
+        id => state.cardMap[id]?.name === requiredCard,
+      );
+      const timeout = TIMEOUT_DEFAULTS.aoeResponse;
+
+      const responseWindow = {
+        type: 'responseWindow' as const,
+        window: {
+          type: 'aoeResponse' as const,
+          attacker: player,
+          defender: firstTarget,
+          validCards,
+          sourceCard: action.cardId,
+          remainingTargets: remaining,
+          requiredCard,
+          timeout,
+          deadline: Date.now() + timeout,
+        },
+        timeout,
+        deadline: Date.now() + timeout,
+        onTimeout: { type: 'respond' as const, player: firstTarget },
+      };
+
       const atoms: Atom[] = [
-        { type: 'pushPending', action: pending },
+        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        { type: 'pushPending', action: responseWindow },
       ];
       const result = applyAtoms(state, atoms);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
+    // ── 其他锦囊（桃园结义、五谷丰登、无懈可击等） ──
     default: {
-      // 其他锦囊牌（简化处理：弃掉使用的牌）
       const atoms: Atom[] = [
         {
           type: 'moveCard',

@@ -106,6 +106,7 @@ function validatePlayCard(
   if (!card) return '未知卡牌';
 
   if (card.name === '闪') return '闪不能主动使用';
+  if (card.name === '无懈可击') return '无懈可击只能用于响应锦囊';
 
   if (card.name === '杀') {
     if (!canKillUnlimited(state, action.player) && state.turn.killsPlayed >= 1) {
@@ -425,7 +426,12 @@ function computeResponseWindowActions(
   const validCards: string[] = [];
 
   for (const cardId of responder.hand) {
-    if (isCardValidResponse(state, cardId, pending.window.type)) {
+    // aoeResponse 精确匹配窗口 validCards
+    if (pending.window.type === 'aoeResponse') {
+      if (pending.window.validCards.includes(cardId)) {
+        validCards.push(cardId);
+      }
+    } else if (isCardValidResponse(state, cardId, pending.window.type)) {
       validCards.push(cardId);
     }
   }
@@ -452,7 +458,7 @@ function isCardValidResponse(
     case 'aoeResponse': return card.name === '闪' || card.name === '杀'; // 简化
     case 'dyingResponse': return card.name === '桃';
     case 'duelResponse': return card.name === '杀';
-    case 'trickResponse': return true; // 锦囊响应简化
+    case 'trickResponse': return card.name === '无懈可击';
     default: return false;
   }
 }
@@ -634,6 +640,8 @@ export function isCardPlayable(state: GameState, player: string, cardId: string)
       return canKillUnlimited(state, player) || state.turn.killsPlayed < 1;
     case '闪':
       return false; // 闪只能被动使用
+    case '无懈可击':
+      return false; // 无懈可击只能用于响应锦囊
     case '桃':
       return playerState.health < playerState.maxHealth;
     default:

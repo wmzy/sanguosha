@@ -214,7 +214,7 @@ describe('V2 Engine - 卡牌效果', () => {
         (id) => state.cardMap[id].name === '过河拆桥',
       )!;
 
-      // 第 1 步：出牌 → 进入选牌 pending
+      // 第 1 步：出牌 → 进入 trickResponse 窗口
       const step1 = engine(state, {
         type: 'playCard',
         player: 'P1',
@@ -223,13 +223,21 @@ describe('V2 Engine - 卡牌效果', () => {
       });
       expect(step1.error).toBeUndefined();
       expect(step1.state.pending).not.toBeNull();
-      expect(step1.state.pending!.type).toBe('selectCard');
-      // 手牌尚未减少
+      expect(step1.state.pending!.type).toBe('responseWindow');
+      // 手牌尚未减少（过河拆桥已弃，但目标手牌未动）
       expect(step1.state.players['P2'].hand.length).toBe(targetHandBefore);
 
+      // 第 1.5 步：过 trickResponse（不出无懈）
+      const step15 = engine(step1.state, {
+        type: 'respond',
+        player: 'P2',
+      });
+      expect(step15.error).toBeUndefined();
+      expect(step15.state.pending?.type).toBe('selectCard');
+
       // 第 2 步：选择一张目标手牌 → 弃牌
-      const selectedCardId = step1.state.players['P2'].hand[0];
-      const step2 = engine(step1.state, {
+      const selectedCardId = step15.state.players['P2'].hand[0];
+      const step2 = engine(step15.state, {
         type: 'respond',
         player: 'P1',
         cardIds: [selectedCardId],
