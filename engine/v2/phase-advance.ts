@@ -8,23 +8,73 @@
  * 只有出牌阶段和弃牌阶段需要玩家交互，其余阶段自动推进。
  */
 
-import type { GameState, ServerEvent, EngineResult, GameEvent } from './types';
+import type { GameState, ServerEvent, EngineResult, GameEvent, Atom } from './types';
 import type { TurnPhase } from '../../shared/types';
 import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';
+import { getPlayer } from './state';
 
-/** 不需要玩家交互、应自动推进的阶段 */
+/**
+ * 处理判定阶段的延迟锦囊（乐不思蜀、兵粮寸断）
+ *
+ * 三国杀规则：
+ * - 乐不思蜀：判定牌不是红桃♥时生效（跳过出牌阶段）
+ * - 兵粮寸断：判定牌不是梅花♣时生效（跳过摸牌阶段）
+ */
+function processJudgmentPhase(state: GameState, player: string): EngineResult {
+  const playerState = getPlayer(state, player);
+  const tricks = [...playerState.pendingTricks];
+  if (tricks.length === 0) {
+    return { state, events: [] };
+  }
+
+  const atoms: Atom[] = [];
+  const phaseFlags: string[] = [];
+
+  for (let i = tricks.length - 1; i >= 0; i--) {
+    const trick = tricks[i];
+    const judgeVarKey = `judgeResult_${trick.name}_${i}`;
+    atoms.push({ type: 'judge', player, varKey: judgeVarKey });
+
+    const { suit } = peekJudgeCard(state);
+
+    if (trick.name === '乐不思蜀') {
+      if (suit !== '♥') {
+        phaseFlags.push('skipPlay');
+      }
+    } else if (trick.name === '兵粮寸断') {
+      if (suit !== '♣') {
+        phaseFlags.push('skipDraw');
+      }
+    }
+
+    atoms.push({ type: 'removePendingTrick', player, index: i });
+  }
+
+  atoms.push(...phaseFlags.map(flag => ({ type: 'addTag' as const, player, tag: flag })));
+
+  const actionResult = applyAtoms(state, atoms);
+  return { state: actionResult.state, events: actionResult.events };
+}
+
+function peekJudgeCard(state: GameState): { cardId: string | null; suit: string } {
+  if (state.zones.deck.length === 0) {
+    return { cardId: null, suit: '♣' };
+  }
+  const cardId = state.zones.deck[state.zones.deck.length - 1];
+  const card = state.cardMap[cardId];
+  return { cardId, suit: card?.suit ?? '♣' };
+}
+
 export function isAutoPhase(phase: string): boolean {
   return phase === '准备' || phase === '判定' || phase === '摸牌';
 }
 
-/** 处理单个阶段的推进：emit 事件 → 阶段行为 → 切换阶段 */
 function processPhaseStep(state: GameState): EngineResult {
   const phase = state.phase;
   const player = state.currentPlayer;
   const allEvents: ServerEvent[] = [];
 
-  // 1. emit phaseBegin 事件（可能触发监听此阶段的技能）
   const phaseBeginEvent: GameEvent = { type: 'phaseBegin', phase, player };
   const emitResult = emitEvent(state, phaseBeginEvent);
   allEvents.push(...emitResult.events);
@@ -35,19 +85,25 @@ function processPhaseStep(state: GameState): EngineResult {
 
   let s = emitResult.state;
 
-  // 2. 执行阶段特有行为
-  const phaseActions = getPhaseActions(phase, player);
-  if (phaseActions.length > 0) {
-    const actionResult = applyAtoms(s, phaseActions);
-    s = actionResult.state;
-    allEvents.push(...actionResult.events);
+  if (phase === '判定') {
+    const judgmentResult = processJudgmentPhase(s, player);
+    s = judgmentResult.state;
+    allEvents.push(...judgmentResult.events);
+    if (s.pending !== null) {
+      return { state: s, events: allEvents };
+    }
+  } else {
+    const phaseActions = getPhaseActions(s, phase, player);
+    if (phaseActions.length > 0) {
+      const actionResult = applyAtoms(s, phaseActions);
+      s = actionResult.state;
+      allEvents.push(...actionResult.events);
+    }
+    if (s.pending !== null) {
+      return { state: s, events: allEvents };
+    }
   }
 
-  if (s.pending !== null) {
-    return { state: s, events: allEvents };
-  }
-
-  // 3. 切换到下一阶段
   const nextPhase = getNextPhase(phase);
   if (!nextPhase || nextPhase === phase) {
     return { state: s, events: allEvents };
@@ -61,12 +117,15 @@ function processPhaseStep(state: GameState): EngineResult {
   return { state: phaseState, events: allEvents };
 }
 
-/** 获取当前阶段的自动行为（无需玩家交互的原子操作） */
-function getPhaseActions(phase: TurnPhase, player: string): import('./types').Atom[] {
+function getPhaseActions(state: GameState, phase: TurnPhase, player: string): import('./types').Atom[] {
+  const playerState = getPlayer(state, player);
   switch (phase) {
     case '准备':
       return [];
     case '摸牌':
+      if (playerState.tags.includes('skipDraw')) {
+        return [{ type: 'removeTag' as const, player, tag: 'skipDraw' }];
+      }
       return [{ type: 'draw' as const, player, count: 2 }];
     default:
       return [];
@@ -84,7 +143,14 @@ function isPreparationPhase(phase: string): boolean {
   return phase === '准备';
 }
 
-/** 从当前阶段推进到下一个需要玩家交互的阶段 */
+function shouldSkipPhase(state: GameState, phase: string, player: string): boolean {
+  const playerState = getPlayer(state, player);
+  if (phase === '出牌' && playerState.tags.includes('skipPlay')) {
+    return true;
+  }
+  return false;
+}
+
 export function advanceToInteractivePhase(state: GameState): EngineResult {
   let s = state;
   const allEvents: ServerEvent[] = [];
@@ -99,6 +165,17 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
 
     if (result.error) return { state: s, events: allEvents, error: result.error };
     if (s.pending !== null) return { state: s, events: allEvents };
+  }
+
+  // 出牌阶段被乐不思蜀跳过 → 直接设置到弃牌阶段
+  if (s.pending === null && s.phase === '出牌' && shouldSkipPhase(s, s.phase, s.currentPlayer)) {
+    const skipAtoms: Atom[] = [
+      { type: 'removeTag' as const, player: s.currentPlayer, tag: 'skipPlay' },
+      { type: 'setPhase' as const, phase: '弃牌' as TurnPhase },
+    ];
+    const skipResult = applyAtoms(s, skipAtoms);
+    s = skipResult.state;
+    allEvents.push(...skipResult.events);
   }
 
   return { state: s, events: allEvents };

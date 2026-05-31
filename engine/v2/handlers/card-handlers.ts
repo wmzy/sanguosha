@@ -186,9 +186,7 @@ function handleTrickCard(
     // ── 可被无懈可击的锦囊：先弃源牌，开 trickResponse ──
     case '过河拆桥':
     case '顺手牵羊':
-    case '决斗':
-    case '乐不思蜀':
-    case '兵粮寸断': {
+    case '决斗': {
       const target = action.target;
       if (!target) return { state, events: [], error: `${card.name}需要指定目标` };
 
@@ -255,6 +253,24 @@ function handleTrickCard(
       };
 
       const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
+      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+    }
+
+    // ── 延迟锦囊：出牌时不问无懈可击，直接放入判定区 ──
+    // 无懈可击在判定阶段执行判定前询问
+    case '乐不思蜀':
+    case '兵粮寸断': {
+      const target = action.target;
+      if (!target) return { state, events: [], error: `${card.name}需要指定目标` };
+
+      const targetPlayer = getPlayer(state, target);
+      if (!targetPlayer.info.alive) return { state, events: [], error: '目标已阵亡' };
+
+      const trick = { name: card.name, source: player, card };
+      const result = applyAtoms(state, [
+        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        { type: 'addPendingTrick', player: target, trick },
+      ]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
