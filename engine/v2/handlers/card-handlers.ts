@@ -16,7 +16,7 @@ import { getDistance, isInAttackRange } from '../distance';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
 import { emitEvent } from '../skill';
-import { createConcurrentTrickResponse } from './response-handlers';
+import { createConcurrentTrickResponse, executeTrickEffect } from './response-handlers';
 
 export function handlePlayCard(
   state: GameState,
@@ -171,20 +171,114 @@ function handleTrickCard(
   });
 
   switch (card.name) {
+    // ── 无目标可被无懈的锦囊：先弃源牌，开 trickResponse ──
     case '无中生有': {
+      const moveAtom: Atom = {
+        type: 'moveCard',
+        cardId: action.cardId,
+        from: { zone: 'hand', player },
+        to: { zone: 'discardPile' },
+      };
+
+      const attackerIndex = state.playerOrder.indexOf(player);
+      const afterAttacker = state.playerOrder.slice(attackerIndex + 1).filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const beforeAttacker = state.playerOrder.slice(0, attackerIndex).filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const allPlayers = [...afterAttacker, ...beforeAttacker];
+
+      if (allPlayers.length === 0) {
+        const trickResult = applyAtoms(state, [moveAtom]);
+        return { state: trickResult.state, events: [...trickResult.events, cardPlayedEvent] };
+      }
+
+      const hasWuxieHolder = allPlayers.some(p =>
+        getPlayer(state, p).hand.some(id => state.cardMap[id]?.name === '无懈可击'),
+      );
+      if (!hasWuxieHolder) {
+        const { state: movedState, events: moveEvents } = applyAtoms(state, [moveAtom]);
+        const effectResult = executeTrickEffect(movedState, { sourceCard: action.cardId, attacker: player });
+        return { state: effectResult.state, events: [...moveEvents, ...effectResult.events, cardPlayedEvent] };
+      }
+
+      const trickResponse = createConcurrentTrickResponse(state, {
+        sourceCard: action.cardId,
+        attacker: player,
+        responders: allPlayers,
+        depth: 0,
+      });
+
+      const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
+      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+    }
+
+    // ── 桃园结义：所有存活玩家各回 1 点体力 ──
+    case '桃园结义': {
+      const alivePlayers = state.playerOrder.filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const healAtoms: Atom[] = alivePlayers.flatMap(p => {
+        const ps = getPlayer(state, p);
+        if (ps.health >= ps.maxHealth) return [];
+        return [{ type: 'heal' as const, target: p, amount: 1, source: player }];
+      });
       const result = applyAtoms(state, [
-        {
-          type: 'moveCard',
-          cardId: action.cardId,
-          from: { zone: 'hand', player },
-          to: { zone: 'discardPile' },
-        },
-        { type: 'draw', player, count: 2 },
+        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        ...healAtoms,
       ]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
-    // ── 可被无懈可击的锦囊：先弃源牌，开 trickResponse ──
+    // ── 五谷丰登：翻出 N 张牌（N=存活玩家数），存活玩家逆时针依次选一张 ──
+    case '五谷丰登': {
+      const alivePlayerNames = state.playerOrder.filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const count = Math.min(alivePlayerNames.length, state.zones.deck.length);
+      if (count === 0) {
+        const result = applyAtoms(state, [
+          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        ]);
+        return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      }
+
+      const revealedCards = state.zones.deck.slice(0, count);
+      const remainingDeck = state.zones.deck.slice(count);
+      const startIdx = state.playerOrder.indexOf(state.currentPlayer);
+      const pickOrder: string[] = [];
+      for (let i = 0; i < state.playerOrder.length; i++) {
+        const p = state.playerOrder[(startIdx - i + state.playerOrder.length) % state.playerOrder.length];
+        if (getPlayer(state, p).info.alive) {
+          pickOrder.push(p);
+        }
+      }
+
+      const timeout = TIMEOUT_DEFAULTS.harvestSelection;
+      const harvestPending: PendingHarvestSelection = {
+        type: 'harvestSelection',
+        revealedCards,
+        currentPickerIndex: 0,
+        pickOrder,
+        player,
+        timeout,
+        deadline: Date.now() + timeout,
+        onTimeout: { type: 'respond', player: pickOrder[0], cardId: revealedCards[0] },
+      };
+
+      const result = applyAtoms(
+        { ...state, zones: { ...state.zones, deck: remainingDeck } },
+        [
+          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+          { type: 'pushPending', action: harvestPending },
+        ],
+      );
+      const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
+      return { state: result.state, events: [...result.events, cardPlayedEvent, harvestRevealEvent] };
+    }
+
+    // ── 可被无懈可击的锦囊（有目标）：先弃源牌，开 trickResponse ──
     case '过河拆桥':
     case '顺手牵羊':
     case '决斗': {
@@ -368,73 +462,6 @@ function handleTrickCard(
 
       const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
-    }
-
-    // ── 桃园结义：所有存活玩家各回 1 点体力 ──
-    case '桃园结义': {
-      const alivePlayers = state.playerOrder.filter(
-        p => getPlayer(state, p).info.alive,
-      );
-      const healAtoms: Atom[] = alivePlayers.flatMap(p => {
-        const ps = getPlayer(state, p);
-        if (ps.health >= ps.maxHealth) return [];
-        return [{ type: 'heal' as const, target: p, amount: 1, source: player }];
-      });
-      const result = applyAtoms(state, [
-        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
-        ...healAtoms,
-      ]);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
-    }
-
-    // ── 五谷丰登：翻出 N 张牌（N=存活玩家数），存活玩家逆时针依次选一张 ──
-    case '五谷丰登': {
-      const alivePlayerNames = state.playerOrder.filter(
-        p => getPlayer(state, p).info.alive,
-      );
-      const count = Math.min(alivePlayerNames.length, state.zones.deck.length);
-      if (count === 0) {
-        const result = applyAtoms(state, [
-          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
-        ]);
-        return { state: result.state, events: [...result.events, cardPlayedEvent] };
-      }
-
-      // 翻出 count 张牌
-      const revealedCards = state.zones.deck.slice(0, count);
-      const remainingDeck = state.zones.deck.slice(count);
-
-      // 生成逆时针选牌顺序（从当前回合玩家开始）
-      const startIdx = state.playerOrder.indexOf(state.currentPlayer);
-      const pickOrder: string[] = [];
-      for (let i = 0; i < state.playerOrder.length; i++) {
-        const p = state.playerOrder[(startIdx - i + state.playerOrder.length) % state.playerOrder.length];
-        if (getPlayer(state, p).info.alive) {
-          pickOrder.push(p);
-        }
-      }
-
-      const timeout = TIMEOUT_DEFAULTS.harvestSelection;
-      const harvestPending: PendingHarvestSelection = {
-        type: 'harvestSelection',
-        revealedCards,
-        currentPickerIndex: 0,
-        pickOrder,
-        player,
-        timeout,
-        deadline: Date.now() + timeout,
-        onTimeout: { type: 'respond', player: pickOrder[0], cardId: revealedCards[0] },
-      };
-
-      const result = applyAtoms(
-        { ...state, zones: { ...state.zones, deck: remainingDeck } },
-        [
-          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
-          { type: 'pushPending', action: harvestPending },
-        ],
-      );
-      const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
-      return { state: result.state, events: [...result.events, cardPlayedEvent, harvestRevealEvent] };
     }
 
     // ── 其他锦囊（无懈可击等） ──

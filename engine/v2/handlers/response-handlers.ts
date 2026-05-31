@@ -5,6 +5,7 @@ import type {
   Atom,
   PendingResponseWindow,
   PendingSelectCard,
+  PendingHarvestSelection,
   GameEvent,
   ServerEvent,
 } from '../types';
@@ -438,7 +439,7 @@ function resolveTrickResolution(
   });
 }
 
-function executeTrickEffect(
+export function executeTrickEffect(
   state: GameState,
   params: {
     sourceCard: string;
@@ -531,6 +532,56 @@ function executeTrickEffect(
       return applyAtoms(state, [
         { type: 'addPendingTrick', player: target, trick },
       ]);
+    }
+
+    case '无中生有': {
+      return applyAtoms(state, [{ type: 'draw', player: attacker, count: 2 }]);
+    }
+
+    case '桃园结义': {
+      const alivePlayers = state.playerOrder.filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const healAtoms: Atom[] = alivePlayers.flatMap(p => {
+        const ps = getPlayer(state, p);
+        if (ps.health >= ps.maxHealth) return [];
+        return [{ type: 'heal' as const, target: p, amount: 1, source: attacker }];
+      });
+      return applyAtoms(state, healAtoms);
+    }
+
+    case '五谷丰登': {
+      const alivePlayerNames = state.playerOrder.filter(
+        p => getPlayer(state, p).info.alive,
+      );
+      const count = Math.min(alivePlayerNames.length, state.zones.deck.length);
+      if (count === 0) return { state, events: [] };
+
+      const revealedCards = state.zones.deck.slice(0, count);
+      const remainingDeck = state.zones.deck.slice(count);
+      const startIdx = state.playerOrder.indexOf(state.currentPlayer);
+      const pickOrder: string[] = [];
+      for (let i = 0; i < state.playerOrder.length; i++) {
+        const p = state.playerOrder[(startIdx - i + state.playerOrder.length) % state.playerOrder.length];
+        if (getPlayer(state, p).info.alive) {
+          pickOrder.push(p);
+        }
+      }
+      const timeout = TIMEOUT_DEFAULTS.harvestSelection;
+      const harvestPending: PendingHarvestSelection = {
+        type: 'harvestSelection',
+        revealedCards,
+        currentPickerIndex: 0,
+        pickOrder,
+        player: attacker,
+        timeout,
+        deadline: Date.now() + timeout,
+        onTimeout: { type: 'respond', player: pickOrder[0], cardId: revealedCards[0] },
+      };
+      const s = { ...state, zones: { ...state.zones, deck: remainingDeck } };
+      const result = applyAtoms(s, [{ type: 'pushPending', action: harvestPending }]);
+      const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
+      return { state: result.state, events: [...result.events, harvestRevealEvent] };
     }
 
     default:
