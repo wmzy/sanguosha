@@ -169,3 +169,19 @@ describe('nextRngState', () => {
     expect(rng1.nextInt(1000)).toBe(rng2.nextInt(1000));
   });
 });
+
+// ════════════════════════════════════════════════════════════════
+// 状态完整性
+// ════════════════════════════════════════════════════════════════
+
+describe('状态字段完整性', () => {
+  it('eventCounter 未在 createInitialState 中初始化', () => {
+    const state = createTestGame({ playerCount: 2 });
+    expect((state as any).eventCounter).toBeUndefined();
+  });
+
+  it('deferredDyingCheck 未在 createInitialState 中初始化', () => {
+    const state = createTestGame({ playerCount: 2 });
+    expect('deferredDyingCheck' in state).toBe(false);
+  });
+});

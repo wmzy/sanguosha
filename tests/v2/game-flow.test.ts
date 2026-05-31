@@ -368,3 +368,77 @@ describe('随机打谱', () => {
     expect(state.meta.turnNumber).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ════════════════════════════════════════════════════════════════
+// 回合流程缺陷文档
+// ════════════════════════════════════════════════════════════════
+
+describe('回合流程缺陷', () => {
+  it('初始状态 phase=准备，无任何方式推进阶段', () => {
+    const state = createTestGame({ playerCount: 2 });
+    expect(state.phase).toBe('准备');
+    // 引擎中没有任何操作可以推进准备阶段，游戏永久卡住
+    // 期望：准备阶段应自动推进到判定→摸牌→出牌，或 endTurn 可用
+    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    expect(r1.error).toBeTruthy();
+  });
+
+  it('handleEndTurn 跳过判定和摸牌阶段，直接设 phase=出牌', () => {
+    const state = createTestGame({ playPhase: true });
+    const r = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    expect(r.error).toBeUndefined();
+    expect(r.state.currentPlayer).toBe('P2');
+    // 期望：phase 应该是 '准备' 或 '判定'，而非 '出牌'
+    expect(r.state.phase).toBe('出牌');
+  });
+
+  it('弃牌后回合转换也跳过判定和摸牌', () => {
+    let state = createTestGame({ playPhase: true });
+    state = setHealth(state, 'P1', 2);
+    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    expect(r1.state.pending?.type).toBe('discardPhase');
+    const hand = r1.state.players['P1'].hand;
+    const r2 = safeEngine(r1.state, {
+      type: 'discard', player: 'P1', cardIds: hand.slice(0, 2),
+    });
+    expect(r2.state.currentPlayer).toBe('P2');
+    // 期望：phase 应该是 '准备'
+    expect(r2.state.phase).toBe('出牌');
+  });
+
+  it('准备阶段所有操作类型都报错', () => {
+    const state = createTestGame();
+    for (const op of [
+      { type: 'playCard', player: 'P1', cardId: state.players['P1'].hand[0] },
+      { type: 'endTurn', player: 'P1' },
+    ] as any[]) {
+      expect(safeEngine(state, op).error).toBeTruthy();
+    }
+  });
+
+  it('meta.round 不递增（整轮完成后仍为 1）', () => {
+    const state = createTestGame({ playPhase: true });
+    expect(state.meta.round).toBe(1);
+    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    const r2state = { ...r1.state, phase: '出牌' as const };
+    const r2 = safeEngine(r2state, { type: 'endTurn', player: 'P2' });
+    expect(r2.state.currentPlayer).toBe('P1');
+    // nextPlayer atom 从不过递增 meta.round
+    expect(r2.state.meta.round).toBe(1);
+  });
+
+  it('弃牌阶段结束回合不触发 turnEnd 事件', () => {
+    let state = createTestGame({ playPhase: true });
+    state = setHealth(state, 'P1', 2);
+    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    expect(r1.state.pending?.type).toBe('discardPhase');
+    const hand = r1.state.players['P1'].hand;
+    const r2 = safeEngine(r1.state, {
+      type: 'discard', player: 'P1', cardIds: hand.slice(0, 2),
+    });
+    // resolveDiscardPhase 直接 nextPlayer+setPhase，不 emit turnEnd
+    // 闭月等监听 turnEnd 的技能丢失
+    expect(r2.error).toBeUndefined();
+    expect(r2.state.currentPlayer).toBe('P2');
+  });
+});

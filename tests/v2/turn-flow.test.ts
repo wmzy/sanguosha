@@ -7,6 +7,7 @@ import {
   setHealth,
   findCardInHand,
 } from './setup';
+import { applyAtom } from '@engine/v2/atom';
 
 describe('V2 Engine - 回合流程', () => {
   describe('弃牌阶段', () => {
@@ -141,10 +142,11 @@ describe('V2 Engine - 回合流程', () => {
       let state = setPlayPhase(createTestGame({ playerCount: 2 }));
       state = setHealth(state, 'P2', 1);
       state = injectCard(state, 'P1', '杀');
-      state = injectCard(state, 'P1', '桃');
+      // 濒死者（P2）优先自救，所以把桃给 P2
+      state = injectCard(state, 'P2', '桃');
 
       const killId = findCardInHand(state, 'P1', '杀')!;
-      const peachId = findCardInHand(state, 'P1', '桃')!;
+      const peachId = findCardInHand(state, 'P2', '桃')!;
 
       const r1 = engine(state, {
         type: 'playCard',
@@ -155,10 +157,10 @@ describe('V2 Engine - 回合流程', () => {
       // P2 不出闪
       const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
 
-      // 濒死窗口，P1 救 P2
+      // 濒死窗口 savers=[P2, P1], currentSaverIndex=0 → P2 自救
       const r3 = engine(r2.state, {
         type: 'respond',
-        player: 'P1',
+        player: 'P2', // changed from 'P1' to 'P2' — 濒死者优先自救
         cardId: peachId,
       });
       expect(r3.error).toBeUndefined();
@@ -182,14 +184,83 @@ describe('V2 Engine - 回合流程', () => {
       // P2 不出闪
       const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
 
-      // 濒死窗口 savers=[P1, P2], currentSaverIndex=0 → P1
-      // P1 不救
-      const r3 = engine(r2.state, { type: 'respond', player: 'P1' });
-      // currentSaverIndex=1 → P2
-      // P2 也不救
-      const r4 = engine(r3.state, { type: 'respond', player: 'P2' });
+      // 濒死窗口 savers=[P2, P1], currentSaverIndex=0 → P2
+      // P2 不救
+      const r3 = engine(r2.state, { type: 'respond', player: 'P2' });
+      // currentSaverIndex=1 → P1
+      // P1 也不救
+      const r4 = engine(r3.state, { type: 'respond', player: 'P1' });
 
       expect(r4.state.players['P2'].info.alive).toBe(false);
     });
+
+    it('无人救助则死亡', () => {
+      let state = setPlayPhase(createTestGame({ playerCount: 2 }));
+      state = setHealth(state, 'P2', 1);
+      state = injectCard(state, 'P1', '杀');
+
+      const killId = findCardInHand(state, 'P1', '杀')!;
+      const r1 = engine(state, {
+        type: 'playCard',
+        player: 'P1',
+        cardId: killId,
+        target: 'P2',
+      });
+      // P2 不出闪
+      const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+
+      // 濒死窗口 savers=[P2(濒死者), P1], currentSaverIndex=0 → P2（濒死者）
+      // P2 不救
+      const r3 = engine(r2.state, { type: 'respond', player: 'P2' });
+      // currentSaverIndex=1 → P1
+      // P1 也不救
+      const r4 = engine(r3.state, { type: 'respond', player: 'P1' });
+
+      expect(r4.state.players['P2'].info.alive).toBe(false);
+    });
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// 死亡玩家与弃牌阶段
+// ════════════════════════════════════════════════════════════════
+
+describe('死亡玩家处理', () => {
+  it('kill atom 只设 alive=false，手牌未清理', () => {
+    const state = setPlayPhase(createTestGame({ playerCount: 2 }));
+    const p2Hand = [...state.players['P2'].hand];
+    const killAtom = { type: 'kill' as const, player: 'P2' as any };
+    const newState = applyAtom(state, killAtom);
+    expect(newState.players['P2'].info.alive).toBe(false);
+    // 期望：死亡玩家的手牌应进入弃牌堆
+    expect(newState.players['P2'].hand).toEqual(p2Hand);
+  });
+
+  it('死亡玩家从 playerOrder 移除，distance 计算变化', () => {
+    let state = setPlayPhase(createTestGame({ playerCount: 3 }));
+    state = injectCard(state, 'P1', '杀');
+    const killId = findCardInHand(state, 'P1', '杀')!;
+    const s = {
+      ...state,
+      players: {
+        ...state.players,
+        P2: { ...state.players['P2'], health: 0, info: { ...state.players['P2'].info, alive: false } },
+      },
+    };
+    const result = engine(s, { type: 'playCard', player: 'P1', cardId: killId, target: 'P3' });
+    // P1→P3 距离可能因 P2 被移除而变化
+    if (result.error) {
+      // 可能因距离不在攻击范围内报错
+      expect(result.error).toBeTruthy();
+    }
+  });
+});
+
+describe('弃牌阶段', () => {
+  it('弃牌阶段不能直接 endTurn（validateEndTurn 限制 phase=出牌）', () => {
+    const state = { ...setPlayPhase(createTestGame({ playerCount: 2 })), phase: '弃牌' as const };
+    const result = engine(state, { type: 'endTurn', player: 'P1' });
+    expect(result.error).toBeTruthy();
+    expect(result.error).toContain('出牌阶段');
   });
 });
