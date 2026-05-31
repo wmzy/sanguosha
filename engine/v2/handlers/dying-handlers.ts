@@ -28,7 +28,7 @@ export function resolveDying(
       return { state, events: [], error: '只能出桃救人' };
     }
 
-    const atoms: Atom[] = [
+    const healAtoms: Atom[] = [
       {
         type: 'moveCard',
         cardId: action.cardId,
@@ -41,15 +41,37 @@ export function resolveDying(
         amount: 1,
         source: currentSaver,
       },
-      { type: 'popPending' },
     ];
-    const result = applyAtoms(state, atoms);
+    const healResult = applyAtoms(state, healAtoms);
     const healEvent = makeServerEvent('heal', {
       target: pending.dyingPlayer,
       amount: 1,
       source: currentSaver,
     });
-    return { state: result.state, events: [...result.events, healEvent] };
+
+    // 检查濒死者体力是否恢复到 > 0
+    const dyingState = getPlayer(healResult.state, pending.dyingPlayer);
+    if (dyingState.health > 0) {
+      const popResult = applyAtoms(healResult.state, [{ type: 'popPending' }]);
+      return { state: popResult.state, events: [...healResult.events, healEvent] };
+    }
+
+    // 还没救活 → 尝试下一个救助者
+    const nextIndex = pending.currentSaverIndex + 1;
+    if (nextIndex >= pending.savers.length) {
+      const deathAtoms: Atom[] = [
+        { type: 'kill', player: pending.dyingPlayer },
+        { type: 'popPending' },
+      ];
+      const deathResult = applyAtoms(healResult.state, deathAtoms);
+      const deathEvent = makeServerEvent('death', { player: pending.dyingPlayer });
+      return { state: deathResult.state, events: [...healResult.events, healEvent, deathEvent] };
+    }
+
+    return {
+      state: { ...healResult.state, pending: { ...pending, currentSaverIndex: nextIndex } },
+      events: [...healResult.events, healEvent],
+    };
   }
 
   // ── 不出桃 → 下一个救助者 ──

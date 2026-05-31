@@ -115,7 +115,12 @@ function resolveKillResponse(
     skillEvents = skillResult.events;
 
     // 如果技能产生了 pending（如刚烈的判定），先返回等待处理
+    // 同时设置延迟濒死检查，确保 pending 解决后不遗漏濒死判定
     if (s.pending !== null) {
+      const defenderState = getPlayer(s, defender);
+      if (defenderState.health <= 0 && defenderState.info.alive) {
+        s = { ...s, deferredDyingCheck: { player: defender, source: attacker } };
+      }
       return { state: s, events: [...damageEvents, hitEvent, ...skillEvents] };
     }
   }
@@ -246,10 +251,9 @@ function resolveDyingResponse(
   _action: GameAction,
   _pending: PendingResponseWindow,
 ): EngineResult {
-  // 濒死桃响应在 resolveDying 中处理，此处不应到达
   const atoms: Atom[] = [{ type: 'popPending' }];
   const result = applyAtoms(state, atoms);
-  return { state: result.state, events: result.events };
+  return { state: result.state, events: result.events, error: '濒死响应不应通过此路径处理' };
 }
 
 export function resolveSelectCard(
@@ -277,7 +281,7 @@ export function resolveSelectCard(
     }
   }
 
-  // 弃掉过河拆桥牌 + 所选目标牌
+  // 弃掉源牌
   const atoms: Atom[] = [
     {
       type: 'moveCard',
@@ -285,14 +289,27 @@ export function resolveSelectCard(
       from: { zone: 'hand', player: pending.player },
       to: { zone: 'discardPile' },
     },
-    ...selectedIds.map(cardId => ({
+  ];
+
+  if (pending.mode === 'steal') {
+    // 顺手牵羊：将目标牌移到出牌者手牌
+    atoms.push(...selectedIds.map(cardId => ({
+      type: 'moveCard' as const,
+      cardId,
+      from: { zone: 'hand' as const, player: pending.target },
+      to: { zone: 'hand' as const, player: pending.player },
+    })));
+  } else {
+    // 过河拆桥：将目标牌弃掉
+    atoms.push(...selectedIds.map(cardId => ({
       type: 'moveCard' as const,
       cardId,
       from: { zone: 'hand' as const, player: pending.target },
       to: { zone: 'discardPile' as const },
-    })),
-    { type: 'popPending' },
-  ];
+    })));
+  }
+
+  atoms.push({ type: 'popPending' });
   const result = applyAtoms(state, atoms);
   return { state: result.state, events: result.events };
 }

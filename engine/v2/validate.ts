@@ -213,7 +213,7 @@ function validatePendingAction(state: GameState, action: GameAction): string | n
     case 'dyingWindow':
       return validateDyingWindow(state, action, pending);
     case 'selectCard':
-      return null;
+      return validateSelectCard(state, action, pending);
   }
 }
 
@@ -330,6 +330,27 @@ function validateDyingWindow(
     if (!saverState.hand.includes(action.cardId)) return '手牌中没有该卡牌';
     const card = state.cardMap[action.cardId];
     if (card.name !== '桃') return '只能用桃救人';
+  }
+
+  return null;
+}
+
+function validateSelectCard(
+  state: GameState,
+  action: GameAction,
+  pending: PendingSelectCard,
+): string | null {
+  if (action.type !== 'respond') return '选牌需要 respond 动作';
+  if (action.player !== pending.player) return '只有出牌者可以选择';
+
+  const selectedIds = action.cardIds ?? (action.cardId ? [action.cardId] : []);
+  if (selectedIds.length < pending.min || selectedIds.length > pending.max) {
+    return '选择的卡牌数量不符';
+  }
+
+  const targetPlayer = getPlayer(state, pending.target);
+  for (const cardId of selectedIds) {
+    if (!targetPlayer.hand.includes(cardId)) return '所选卡牌不在目标手牌中';
   }
 
   return null;

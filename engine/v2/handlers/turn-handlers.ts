@@ -17,9 +17,6 @@ export function handleEndTurn(
   action: GameAction & { type: 'endTurn' },
 ): EngineResult {
   const player = action.player;
-  const playerState = getPlayer(state, player);
-  const handSize = playerState.hand.length;
-  const health = playerState.health;
 
   // 触发 turnEnd 事件，使依赖此事件的技能可以响应（如闭月）
   const turnEndEvent: GameEvent = { type: 'turnEnd', player };
@@ -28,7 +25,12 @@ export function handleEndTurn(
     return turnEndResult;
   }
 
+  // 使用 turnEnd 后的最新状态
+  const s = turnEndResult.state;
   const turnEndLogEvent = makeServerEvent('turnEnd', { player });
+  const playerState = getPlayer(s, player);
+  const handSize = playerState.hand.length;
+  const health = playerState.health;
 
   if (handSize > health) {
     // 需要弃牌
@@ -40,14 +42,14 @@ export function handleEndTurn(
       max: discardCount,
       timeout: TIMEOUT_DEFAULTS.discardPhase,
       deadline: Date.now() + TIMEOUT_DEFAULTS.discardPhase,
-      onTimeout: { type: 'discard', player, cardIds: [] },
+      onTimeout: { type: 'discard', player, cardIds: playerState.hand.slice(0, discardCount) },
     };
     const atoms: Atom[] = [
       { type: 'setPhase', phase: '弃牌' },
       { type: 'pushPending', action: pending },
     ];
-    const result = applyAtoms(state, atoms);
-    return { state: result.state, events: [...result.events, turnEndLogEvent] };
+    const result = applyAtoms(s, atoms);
+    return { state: result.state, events: [...turnEndResult.events, ...result.events, turnEndLogEvent] };
   }
 
   // 不需要弃牌 → 下一玩家
@@ -55,13 +57,13 @@ export function handleEndTurn(
     { type: 'nextPlayer' },
     { type: 'setPhase', phase: '出牌' },
   ];
-  const result = applyAtoms(state, atoms);
+  const result = applyAtoms(s, atoms);
   const turnStartEvent = makeServerEvent('turnStart', {
     player: result.state.currentPlayer,
   });
   return {
     state: result.state,
-    events: [...result.events, turnEndLogEvent, turnStartEvent],
+    events: [...turnEndResult.events, ...result.events, turnEndLogEvent, turnStartEvent],
   };
 }
 

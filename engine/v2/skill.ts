@@ -124,6 +124,7 @@ export function emitEvent(
     .sort((a, b) => b.priority - a.priority);
 
   let s = state;
+  const allEvents: import('./types').ServerEvent[] = [];
 
   for (const trigger of matched) {
     const def = registry.get(trigger.skillId);
@@ -142,13 +143,14 @@ export function emitEvent(
 
     const result = executePlan(s, phases, ctx);
     s = result.state;
+    allEvents.push(...result.events);
 
     if (s.pending !== null) {
-      return { state: s, events: result.events };
+      return { state: s, events: allEvents };
     }
   }
 
-  return { state: s, events: [] };
+  return { state: s, events: allEvents };
 }
 
 const CLEAR_TURN_PATTERN = '*/usedThisTurn';

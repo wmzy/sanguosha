@@ -12,11 +12,17 @@ export function applyAtoms(state: GameState, atoms: Atom[]): { state: GameState;
 
 export function createDyingPending(state: GameState, dyingPlayer: string, source?: string): PendingDyingWindow {
   const timeout = TIMEOUT_DEFAULTS.dyingResponse;
+  const alivePlayers = getAlivePlayerNames(state);
+  // 濒死者优先自救，再按顺序询问其他玩家
+  const savers = [
+    dyingPlayer,
+    ...alivePlayers.filter(p => p !== dyingPlayer),
+  ];
   return {
     type: 'dyingWindow',
     dyingPlayer,
     currentSaverIndex: 0,
-    savers: getAlivePlayerNames(state),
+    savers,
     timeout,
     deadline: Date.now() + timeout,
     onTimeout: { type: 'respond', player: dyingPlayer },

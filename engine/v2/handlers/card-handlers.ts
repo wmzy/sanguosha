@@ -114,24 +114,16 @@ function handleKillCard(
       to: { zone: 'discardPile' },
     },
     { type: 'pushPending', action: responseWindow },
+    { type: 'incrementKills' },
   ];
   const result = applyAtoms(state, atoms);
-
-  // 更新回合杀计数
-  const newState: GameState = {
-    ...result.state,
-    turn: {
-      ...result.state.turn,
-      killsPlayed: result.state.turn.killsPlayed + 1,
-    },
-  };
 
   const cardPlayedEvent = makeServerEvent('cardPlayed', {
     player,
     cardId: action.cardId,
     target,
   });
-  return { state: newState, events: [...result.events, cardPlayedEvent] };
+  return { state: result.state, events: [...result.events, cardPlayedEvent] };
 }
 
 function handlePeachCard(
@@ -206,6 +198,7 @@ function handleTrickCard(
         min: 1,
         max: 1,
         sourceCard: action.cardId,
+        mode: 'discard',
         timeout: TIMEOUT_DEFAULTS.selectCard,
         deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
         onTimeout: { type: 'respond', player, cardIds: [targetPlayer.hand[0]] },
@@ -227,20 +220,21 @@ function handleTrickCard(
       if (targetPlayer.hand.length === 0) {
         return { state, events: [], error: '目标没有手牌' };
       }
-      const stolenCardId = targetPlayer.hand[0];
+      const pending: PendingSelectCard = {
+        type: 'selectCard',
+        player,
+        target,
+        cardIds: targetPlayer.hand,
+        min: 1,
+        max: 1,
+        sourceCard: action.cardId,
+        mode: 'steal',
+        timeout: TIMEOUT_DEFAULTS.selectCard,
+        deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
+        onTimeout: { type: 'respond', player, cardIds: [targetPlayer.hand[0]] },
+      };
       const atoms: Atom[] = [
-        {
-          type: 'moveCard',
-          cardId: action.cardId,
-          from: { zone: 'hand', player },
-          to: { zone: 'discardPile' },
-        },
-        {
-          type: 'moveCard',
-          cardId: stolenCardId,
-          from: { zone: 'hand', player: target },
-          to: { zone: 'hand', player },
-        },
+        { type: 'pushPending', action: pending },
       ];
       const result = applyAtoms(state, atoms);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };

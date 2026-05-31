@@ -22,6 +22,9 @@ export interface GameState {
 
   /** 种子化随机数状态（可序列化的数值） */
   rngState: number;
+
+  /** 延迟濒死检查：技能 pending 解决后自动创建濒死窗口 */
+  deferredDyingCheck?: { player: string; source?: string };
 }
 
 export interface GameMeta {
@@ -130,6 +133,7 @@ export interface PendingSelectCard {
   min: number;
   max: number;
   sourceCard: string;
+  mode: 'discard' | 'steal';
   timeout: number;
   deadline: number;
   onTimeout: GameAction;
@@ -167,7 +171,8 @@ export type Atom =
   | { type: 'removeTag'; player: Expr<string>; tag: string }
   | { type: 'kill'; player: Expr<string>; source?: Expr<string> }
   | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
-  | { type: 'setCtxVar'; key: string; value: Json };
+  | { type: 'setCtxVar'; key: string; value: Json }
+  | { type: 'incrementKills' };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog

@@ -8,6 +8,7 @@ import type {
   PendingDyingWindow,
   PendingSelectCard,
   SkillDef,
+  Atom,
 } from './types';
 import { validateAction } from './validate';
 import './atoms/index';
@@ -19,6 +20,9 @@ import { resolveDiscardPhase, handleEndTurn } from './handlers/turn-handlers';
 import { resolveDying } from './handlers/dying-handlers';
 import { handlePlayCard } from './handlers/card-handlers';
 import { getSkillRegistry, registerSkill as registerSkillToGlobal } from './skill';
+import { getPlayer } from './state';
+import { applyAtoms, createDyingPending } from './handlers/engine-utils';
+import { makeServerEvent } from './event';
 
 /** @deprecated 直接使用 skill.ts 的 registerSkill */
 export function registerSkill(def: SkillDef): void {
@@ -51,16 +55,46 @@ export function engine(state: GameState, action: GameAction): EngineResult {
 
 function handlePending(state: GameState, action: GameAction): EngineResult {
   const pending = state.pending!;
+  let result: EngineResult;
   switch (pending.type) {
     case 'responseWindow':
-      return resolveResponse(state, action, pending);
+      result = resolveResponse(state, action, pending);
+      break;
     case 'skillPrompt':
-      return resumeSkill(state, action, pending, getSkillRegistry());
+      result = resumeSkill(state, action, pending, getSkillRegistry());
+      break;
     case 'discardPhase':
-      return resolveDiscardPhase(state, action, pending);
+      result = resolveDiscardPhase(state, action, pending);
+      break;
     case 'dyingWindow':
-      return resolveDying(state, action, pending);
+      result = resolveDying(state, action, pending);
+      break;
     case 'selectCard':
-      return resolveSelectCard(state, action, pending);
+      result = resolveSelectCard(state, action, pending);
+      break;
   }
+
+  if (result.error || result.state.pending) return result;
+
+  const check = result.state.deferredDyingCheck;
+  if (!check) return result;
+
+  const target = getPlayer(result.state, check.player);
+  if (target.health > 0 || !target.info.alive) {
+    return { state: { ...result.state, deferredDyingCheck: undefined }, events: result.events };
+  }
+
+  const dyingPending = createDyingPending(result.state, check.player, check.source);
+  const { state: dyingState, events: dyingEvents } = applyAtoms(
+    { ...result.state, deferredDyingCheck: undefined },
+    [{ type: 'pushPending' as const, action: dyingPending }],
+  );
+  const dyingEvent = makeServerEvent('dying', {
+    player: check.player,
+    ...(check.source ? { source: check.source } : {}),
+  });
+  return {
+    state: dyingState,
+    events: [...result.events, ...dyingEvents, dyingEvent],
+  };
 }
