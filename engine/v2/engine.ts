@@ -7,6 +7,7 @@ import type {
   PendingDiscardPhase,
   PendingDyingWindow,
   PendingSelectCard,
+  PendingHarvestSelection,
   SkillDef,
   Atom,
 } from './types';
@@ -18,9 +19,9 @@ import { resolveResponse, resolveSelectCard } from './handlers/response-handlers
 import { resumeSkill, handleUseSkill } from './handlers/skill-handlers';
 import { resolveDiscardPhase, handleEndTurn } from './handlers/turn-handlers';
 import { resolveDying } from './handlers/dying-handlers';
-import { handlePlayCard } from './handlers/card-handlers';
+import { handlePlayCard, resolveHarvestSelection } from './handlers/card-handlers';
 import { getSkillRegistry, registerSkill as registerSkillToGlobal } from './skill';
-import { getPlayer } from './state';
+import { getPlayer, checkWinCondition } from './state';
 import { applyAtoms, createDyingPending } from './handlers/engine-utils';
 import { makeServerEvent } from './event';
 import { advanceToInteractivePhase, isAutoPhase } from './phase-advance';
@@ -102,6 +103,25 @@ export function engine(state: GameState, action: GameAction): EngineResult {
     }
   }
 
+  // 胜利条件检查
+  if (!result.state.pending) {
+    const win = checkWinCondition(result.state);
+    if (win) {
+      const gameOverEvent = makeServerEvent('gameOver', {
+        winner: win.winner,
+        reason: win.reason,
+      });
+      return {
+        state: {
+          ...result.state,
+          meta: { ...result.state.meta, status: '已结束', winner: win.winner },
+          pending: null,
+        },
+        events: [...result.events, gameOverEvent],
+      };
+    }
+  }
+
   return result;
 }
 
@@ -124,6 +144,9 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
     case 'selectCard':
       result = resolveSelectCard(state, action, pending);
       break;
+    case 'harvestSelection':
+      result = resolveHarvestSelection(state, action, pending);
+      break;
     default:
       return { state, events: [], error: `未知 pending 类型: ${(pending as any).type}` };
   }
@@ -131,7 +154,24 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
   if (result.error || result.state.pending) return result;
 
   const check = result.state.deferredDyingCheck;
-  if (!check) return result;
+  if (!check) {
+    const win = checkWinCondition(result.state);
+    if (win) {
+      const gameOverEvent = makeServerEvent('gameOver', {
+        winner: win.winner,
+        reason: win.reason,
+      });
+      return {
+        state: {
+          ...result.state,
+          meta: { ...result.state.meta, status: '已结束', winner: win.winner },
+          pending: null,
+        },
+        events: [...result.events, gameOverEvent],
+      };
+    }
+    return result;
+  }
 
   const target = getPlayer(result.state, check.player);
   if (target.health > 0 || !target.info.alive) {

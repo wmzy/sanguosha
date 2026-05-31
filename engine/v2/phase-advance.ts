@@ -10,7 +10,7 @@
 
 import type { GameState, ServerEvent, EngineResult, GameEvent } from './types';
 import type { TurnPhase } from '../../shared/types';
-import { emitEvent } from './skill';
+import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';
 
 /** 不需要玩家交互、应自动推进的阶段 */
@@ -18,27 +18,9 @@ export function isAutoPhase(phase: string): boolean {
   return phase === '准备' || phase === '判定' || phase === '摸牌';
 }
 
-/** 从当前阶段推进到下一个需要玩家交互的阶段 */
-export function advanceToInteractivePhase(state: GameState): EngineResult {
-  let s = state;
-  const allEvents: ServerEvent[] = [];
-
-  while (s.pending === null && isAutoPhase(s.phase)) {
-    const result = processPhaseStep(s);
-    s = result.state;
-    allEvents.push(...result.events);
-
-    if (result.error) return { state: s, events: allEvents, error: result.error };
-    // pending 被创建（技能触发）→ 停止推进
-    if (s.pending !== null) return { state: s, events: allEvents };
-  }
-
-  return { state: s, events: allEvents };
-}
-
 /** 处理单个阶段的推进：emit 事件 → 阶段行为 → 切换阶段 */
 function processPhaseStep(state: GameState): EngineResult {
-  const phase = state.phase as TurnPhase;
+  const phase = state.phase;
   const player = state.currentPlayer;
   const allEvents: ServerEvent[] = [];
 
@@ -82,18 +64,42 @@ function processPhaseStep(state: GameState): EngineResult {
 /** 获取当前阶段的自动行为（无需玩家交互的原子操作） */
 function getPhaseActions(phase: TurnPhase, player: string): import('./types').Atom[] {
   switch (phase) {
+    case '准备':
+      return [];
     case '摸牌':
-      // 摸牌阶段自动抽 2 张牌
       return [{ type: 'draw' as const, player, count: 2 }];
     default:
       return [];
   }
 }
 
-/** 获取阶段序列中的下一个阶段 */
 function getNextPhase(phase: TurnPhase): TurnPhase | null {
   const sequence: TurnPhase[] = ['准备', '判定', '摸牌', '出牌'];
   const idx = sequence.indexOf(phase);
   if (idx === -1 || idx >= sequence.length - 1) return null;
   return sequence[idx + 1];
+}
+
+function isPreparationPhase(phase: string): boolean {
+  return phase === '准备';
+}
+
+/** 从当前阶段推进到下一个需要玩家交互的阶段 */
+export function advanceToInteractivePhase(state: GameState): EngineResult {
+  let s = state;
+  const allEvents: ServerEvent[] = [];
+
+  while (s.pending === null && isAutoPhase(s.phase)) {
+    if (isPreparationPhase(s.phase)) {
+      s = clearTurnVars(s);
+    }
+    const result = processPhaseStep(s);
+    s = result.state;
+    allEvents.push(...result.events);
+
+    if (result.error) return { state: s, events: allEvents, error: result.error };
+    if (s.pending !== null) return { state: s, events: allEvents };
+  }
+
+  return { state: s, events: allEvents };
 }
