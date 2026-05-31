@@ -110,7 +110,10 @@ export function useGame() {
       seed: Date.now(),
       characterMap,
     };
-    return createInitialState(config);
+    const initial = createInitialState(config);
+    // 通过 startGame 触发准备→判定→摸牌→出牌的自动推进
+    const result = engine(initial, { type: 'startGame' });
+    return result.state;
   });
 
   // ── UI 状态 ─────────────────────────────────────────────────

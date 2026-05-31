@@ -188,7 +188,7 @@ export class GameSession {
       return;
     }
 
-    const fullAction: GameAction = { ...action, player: playerName };
+    const fullAction: GameAction = { ...action, player: playerName } as GameAction;
 
     const result = engine(this.state, fullAction);
 
