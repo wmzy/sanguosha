@@ -636,7 +636,7 @@ describe('卡牌边界', () => {
     expect(r1.state.zones.discardPile.includes(cardId)).toBe(true);
   });
 
-  it('延时锦囊使用后直接进入弃牌堆而非判定区', () => {
+  it('延时锦囊使用后进入目标判定区', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectTrickCard(state, 'P1', '乐不思蜀');
     const cardId = findCardInHand(state, 'P1', '乐不思蜀')!;
@@ -645,7 +645,8 @@ describe('卡牌边界', () => {
     expect(result.error).toBeUndefined();
     expect(result.state.players['P1'].hand.length).toBe(handBefore - 1);
     expect(result.state.zones.discardPile.includes(cardId)).toBe(true);
-    expect(result.state.players['P2'].pendingTricks.length).toBe(0);
+    expect(result.state.players['P2'].pendingTricks.length).toBe(1);
+    expect(result.state.players['P2'].pendingTricks[0].name).toBe('乐不思蜀');
   });
 
   it('AOE 响应后伤害不触发 damageDealt 事件', () => {

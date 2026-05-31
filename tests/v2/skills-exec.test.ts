@@ -525,18 +525,17 @@ describe('真实路径验证: phaseBegin 技能无法通过引擎触发（系统
   });
 });
 
-describe('真实路径验证: 延时锦囊无判定区效果', () => {
-  it('使用乐不思蜀后，目标没有判定区效果', () => {
+describe('真实路径验证: 延时锦囊放入判定区', () => {
+  it('使用乐不思蜀后，目标判定区有 1 个 pendingTrick', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectTrickCard(state, 'P1', '乐不思蜀');
     const cardId = state.players['P1'].hand.find(id => state.cardMap[id].name === '乐不思蜀')!;
 
     const result = engine(state, { type: 'playCard', player: 'P1', cardId, target: 'P2' });
     expect(result.error).toBeUndefined();
-    // 应该放在 P2 判定区
-    expect(result.state.players['P2'].pendingTricks.length).toBe(0); // BUG: 应该为 1
-    // 进弃牌堆了
-    expect(result.state.zones.discardPile.includes(cardId)).toBe(true); // BUG
+    expect(result.state.players['P2'].pendingTricks.length).toBe(1);
+    expect(result.state.players['P2'].pendingTricks[0].name).toBe('乐不思蜀');
+    expect(result.state.zones.discardPile.includes(cardId)).toBe(true);
   });
 });
 
