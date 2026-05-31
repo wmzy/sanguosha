@@ -431,6 +431,11 @@ export interface ResponseWindowDef {
   remainingPlayers?: string[];
   /** trickResponse 链：当前是否已被无懈 */
   negated?: boolean;
+  /** 判定阶段无懈上下文：当前 trickResponse 是为判定阶段的延时锦囊开的窗口 */
+  judgmentContext?: {
+    player: string;
+    trickIndex: number;
+  };
 }
 
 export interface ResponseWindowData extends ResponseWindowDef {

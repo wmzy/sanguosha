@@ -8,11 +8,12 @@
  * 只有出牌阶段和弃牌阶段需要玩家交互，其余阶段自动推进。
  */
 
-import type { GameState, ServerEvent, EngineResult, GameEvent, Atom } from './types';
+import type { GameState, ServerEvent, EngineResult, GameEvent, Atom, PendingResponseWindow } from './types';
+import { TIMEOUT_DEFAULTS } from './types';
 import type { TurnPhase } from '../../shared/types';
 import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';
-import { getPlayer } from './state';
+import { getPlayer, getAlivePlayerNames } from './state';
 
 /**
  * 处理判定阶段的延迟锦囊（乐不思蜀、兵粮寸断）
@@ -23,47 +24,107 @@ import { getPlayer } from './state';
  */
 function processJudgmentPhase(state: GameState, player: string): EngineResult {
   const playerState = getPlayer(state, player);
-  const tricks = [...playerState.pendingTricks];
-  if (tricks.length === 0) {
+  const { pendingTricks } = playerState;
+  if (pendingTricks.length === 0) {
     return { state, events: [] };
   }
 
+  const aliveOthers = getAlivePlayerNames(state).filter(p => p !== player);
+  if (aliveOthers.length === 0) {
+    return batchProcessJudgments(state, player, pendingTricks);
+  }
+
+  const lastIndex = pendingTricks.length - 1;
+  const trick = pendingTricks[lastIndex];
+  const pending = createJudgmentTrickResponse(state, player, lastIndex, trick, aliveOthers);
+  const result = applyAtoms(state, [{ type: 'pushPending', action: pending }]);
+  return { state: result.state, events: result.events };
+}
+
+function batchProcessJudgments(
+  state: GameState,
+  player: string,
+  tricks: import('../../shared/types').PendingTrick[],
+): EngineResult {
   const atoms: Atom[] = [];
-  const phaseFlags: string[] = [];
+  const tags: string[] = [];
 
   for (let i = tricks.length - 1; i >= 0; i--) {
     const trick = tricks[i];
-    const judgeVarKey = `judgeResult_${trick.name}_${i}`;
-    atoms.push({ type: 'judge', player, varKey: judgeVarKey });
-
-    const { suit } = peekJudgeCard(state);
-
-    if (trick.name === '乐不思蜀') {
-      if (suit !== '♥') {
-        phaseFlags.push('skipPlay');
-      }
-    } else if (trick.name === '兵粮寸断') {
-      if (suit !== '♣') {
-        phaseFlags.push('skipDraw');
-      }
-    }
-
+    atoms.push({ type: 'judge', player, varKey: `judgeResult_${trick.name}_${i}` });
     atoms.push({ type: 'removePendingTrick', player, index: i });
   }
 
-  atoms.push(...phaseFlags.map(flag => ({ type: 'addTag' as const, player, tag: flag })));
-
   const actionResult = applyAtoms(state, atoms);
-  return { state: actionResult.state, events: actionResult.events };
+  let s = actionResult.state;
+
+  for (let i = tricks.length - 1; i >= 0; i--) {
+    const trick = tricks[i];
+    const discardPile = s.zones.discardPile;
+    const judgedCardId = discardPile[discardPile.length - 1 - i];
+    const suit = judgedCardId ? s.cardMap[judgedCardId]?.suit : '♣';
+
+    if (trick.name === '乐不思蜀' && suit !== '♥') {
+      tags.push('skipPlay');
+    } else if (trick.name === '兵粮寸断' && suit !== '♣') {
+      tags.push('skipDraw');
+    }
+  }
+
+  if (tags.length > 0) {
+    const tagAtoms = tags.map(tag => ({ type: 'addTag' as const, player, tag }));
+    const tagResult = applyAtoms(s, tagAtoms);
+    return { state: tagResult.state, events: [...actionResult.events, ...tagResult.events] };
+  }
+
+  return { state: s, events: actionResult.events };
 }
 
-function peekJudgeCard(state: GameState): { cardId: string | null; suit: string } {
-  if (state.zones.deck.length === 0) {
-    return { cardId: null, suit: '♣' };
+export function createJudgmentTrickResponse(
+  state: GameState,
+  player: string,
+  trickIndex: number,
+  trick: import('../../shared/types').PendingTrick,
+  aliveOthers: string[],
+): PendingResponseWindow {
+  const attackerIndex = state.playerOrder.indexOf(trick.source);
+  const afterAttacker = state.playerOrder.slice(attackerIndex + 1).filter(
+    p => getPlayer(state, p).info.alive && p !== player,
+  );
+  const beforeAttacker = state.playerOrder.slice(0, attackerIndex).filter(
+    p => getPlayer(state, p).info.alive && p !== player,
+  );
+  const allPlayers = [...afterAttacker, ...beforeAttacker];
+
+  if (allPlayers.length === 0) {
+    allPlayers.push(...aliveOthers);
   }
-  const cardId = state.zones.deck[state.zones.deck.length - 1];
-  const card = state.cardMap[cardId];
-  return { cardId, suit: card?.suit ?? '♣' };
+
+  const firstTarget = allPlayers[0];
+  const remaining = allPlayers.slice(1);
+  const firstPlayerState = getPlayer(state, firstTarget);
+  const validWuxie = firstPlayerState.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
+  const timeout = TIMEOUT_DEFAULTS.trickResponse;
+
+  return {
+    type: 'responseWindow',
+    window: {
+      type: 'trickResponse',
+      attacker: trick.source,
+      defender: firstTarget,
+      validCards: validWuxie,
+      sourceCard: trick.card.id,
+      trickTarget: player,
+      remainingPlayers: remaining,
+      negated: false,
+      judgmentContext: { player, trickIndex },
+      timeout,
+      deadline: Date.now() + timeout,
+    },
+    timeout,
+    deadline: Date.now() + timeout,
+    onTimeout: { type: 'respond', player: firstTarget },
+  };
 }
 
 export function isAutoPhase(phase: string): boolean {

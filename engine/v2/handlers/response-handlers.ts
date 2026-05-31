@@ -13,6 +13,8 @@ import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms, createDyingPending } from './engine-utils';
 import { emitEvent } from '../skill';
+import { createJudgmentTrickResponse } from '../phase-advance';
+import { getAlivePlayerNames } from '../state';
 
 export function resolveResponse(
   state: GameState,
@@ -300,6 +302,10 @@ function resolveTrickResponse(
   }
 
   // 所有玩家都问完了
+  if (pending.window.judgmentContext) {
+    return resolveJudgmentTrickResponse(state, newNegated, trickName, pending.window.judgmentContext);
+  }
+
   if (newNegated) {
     // 被无懈取消，直接返回
     return { state, events: [] };
@@ -390,6 +396,102 @@ function resolveTrickResponse(
     default:
       return { state, events: [] };
   }
+}
+
+function resolveJudgmentTrickResponse(
+  state: GameState,
+  negated: boolean,
+  trickName: string,
+  ctx: { player: string; trickIndex: number },
+): EngineResult {
+  const { player, trickIndex } = ctx;
+
+  const atoms: Atom[] = [{ type: 'removePendingTrick', player, index: trickIndex }];
+
+  if (!negated) {
+    atoms.push({ type: 'judge', player, varKey: `judgeResult_${trickName}_${trickIndex}` });
+  }
+
+  const result = applyAtoms(state, atoms);
+  let s = result.state;
+
+  if (!negated) {
+    const discardPile = s.zones.discardPile;
+    const judgedCardId = discardPile[discardPile.length - 1];
+    const suit = judgedCardId ? s.cardMap[judgedCardId]?.suit : '♣';
+
+    let tag: string | undefined;
+    if (trickName === '乐不思蜀' && suit !== '♥') {
+      tag = 'skipPlay';
+    } else if (trickName === '兵粮寸断' && suit !== '♣') {
+      tag = 'skipDraw';
+    }
+
+    if (tag) {
+      const tagResult = applyAtoms(s, [{ type: 'addTag', player, tag }]);
+      s = tagResult.state;
+      return { state: s, events: [...result.events, ...tagResult.events] };
+    }
+  }
+
+  const nextIndex = trickIndex - 1;
+  if (nextIndex < 0) {
+    return { state: s, events: result.events };
+  }
+
+  const playerState = getPlayer(s, player);
+  const nextTrick = playerState.pendingTricks[nextIndex];
+  if (!nextTrick) {
+    return { state: s, events: result.events };
+  }
+
+  const aliveOthers = getAlivePlayerNames(s).filter(p => p !== player);
+  if (aliveOthers.length === 0) {
+    return batchRemainJudgments(s, player, nextIndex);
+  }
+
+  const nextPending = createJudgmentTrickResponse(s, player, nextIndex, nextTrick, aliveOthers);
+  return applyAtoms(s, [{ type: 'pushPending', action: nextPending }]);
+}
+
+function batchRemainJudgments(
+  state: GameState,
+  player: string,
+  fromIndex: number,
+): EngineResult {
+  const playerState = getPlayer(state, player);
+  const tricks = playerState.pendingTricks;
+  const atoms: Atom[] = [];
+  const tags: string[] = [];
+
+  for (let i = fromIndex; i >= 0; i--) {
+    const trick = tricks[i];
+    atoms.push({ type: 'judge', player, varKey: `judgeResult_${trick.name}_${i}` });
+    atoms.push({ type: 'removePendingTrick', player, index: i });
+  }
+
+  const actionResult = applyAtoms(state, atoms);
+  let s = actionResult.state;
+
+  for (let i = fromIndex; i >= 0; i--) {
+    const trick = tricks[i];
+    const judgedCardId = s.zones.discardPile[s.zones.discardPile.length - 1 - i];
+    const suit = judgedCardId ? s.cardMap[judgedCardId]?.suit : '♣';
+
+    if (trick.name === '乐不思蜀' && suit !== '♥') {
+      tags.push('skipPlay');
+    } else if (trick.name === '兵粮寸断' && suit !== '♣') {
+      tags.push('skipDraw');
+    }
+  }
+
+  if (tags.length > 0) {
+    const tagAtoms = tags.map(tag => ({ type: 'addTag' as const, player, tag }));
+    const tagResult = applyAtoms(s, tagAtoms);
+    return { state: tagResult.state, events: [...actionResult.events, ...tagResult.events] };
+  }
+
+  return { state: s, events: actionResult.events };
 }
 
 function resolveDuelResponse(
