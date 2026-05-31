@@ -4,6 +4,9 @@ import { createNodeWebSocket } from '@hono/node-ws';
 import app, { handleWsOpen, handleWsClose, handleWsMessage } from './app';
 import { deserialize, serialize } from './protocol';
 import { generatePlayerId } from './utils';
+import { createLogger } from './logger';
+
+const log = createLogger('server');
 
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
@@ -50,5 +53,5 @@ const host = process.env.HOST ?? '0.0.0.0';
 const server = serve({ fetch: app.fetch, port, hostname: host });
 injectWebSocket(server);
 
-console.warn(`服务器运行在 http://${host}:${port}`);
-console.warn(`WebSocket端点: ws://${host}:${port}/ws`);
+log.info(`服务器运行在 http://${host}:${port}`);
+log.info(`WebSocket端点: ws://${host}:${port}/ws`);

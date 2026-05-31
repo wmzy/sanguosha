@@ -7,6 +7,9 @@ import app from './app';
 import { handleWsOpen, handleWsClose, handleWsMessage } from './app';
 import { deserialize } from './protocol';
 import { generatePlayerId } from './utils';
+import { createLogger } from './logger';
+
+const log = createLogger('vite-plugin');
 
 export function honoApiPlugin(): Plugin {
   return {
@@ -57,7 +60,7 @@ export function honoApiPlugin(): Plugin {
           const responseBody = await response.text();
           res.end(responseBody);
         } catch (error) {
-          console.error('API Error:', error);
+          log.error('API Error', { error });
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? '*');

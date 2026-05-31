@@ -223,10 +223,7 @@ export function useGame() {
   // ── dispatch helper ─────────────────────────────────────────
   const dispatch = useCallback((action: GameAction) => {
     const result = engine(state, action);
-    if (result.error) {
-      console.warn('Action error:', result.error);
-      return;
-    }
+    if (result.error) return;
     setState(result.state);
     resetTimer();
   }, [state, resetTimer]);

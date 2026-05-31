@@ -23,32 +23,28 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
     ws.onopen = () => {
       setConnected(true);
-      console.warn('WebSocket 已连接');
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data as string) as ServerMessage;
         setLastMessage(message);
-      } catch (e) {
-        console.error('解析消息失败:', e);
+      } catch {
+        // 忽略格式错误的消息
       }
     };
 
     ws.onclose = () => {
       setConnected(false);
       wsRef.current = null;
-      console.warn('WebSocket 已断开');
 
-      // 自动重连
       reconnectTimeoutRef.current = setTimeout(() => {
-        console.warn('尝试重新连接...');
         connect();
       }, 3000);
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket 错误:', error);
+    ws.onerror = () => {
+      // onclose 会随后触发，处理重连逻辑
     };
 
     wsRef.current = ws;

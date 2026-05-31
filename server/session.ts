@@ -252,6 +252,17 @@ export class GameSession {
     return this.playerNames.get(playerId);
   }
 
+  getPending(): import('../engine/v2/types').PendingAction | null {
+    return this.state?.pending ?? null;
+  }
+
+  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext): boolean {
+    if (!this.state || this.state.meta.status !== '进行中') return false;
+    this.room.players.set(playerId, ws);
+    this.broadcastGameView();
+    return true;
+  }
+
   serializeState(): string | null {
     if (!this.state) return null;
     return serializeState(this.state);

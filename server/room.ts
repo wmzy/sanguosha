@@ -1,6 +1,7 @@
 // server/room.ts
 import type { WSContext } from 'hono/ws';
 import type { RoomInfo } from './protocol';
+import { createRng } from '../shared/rng';
 
 export interface Room {
   id: string;
@@ -14,11 +15,13 @@ export interface Room {
 
 const roomList = new Map<string, Room>();
 
+const roomIdRng = createRng(Date.now());
+
 function generateRoomId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(roomIdRng.nextInt(chars.length));
   }
   return result;
 }

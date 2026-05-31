@@ -27,7 +27,8 @@ export type ClientMessage =
   | { type: 'create_room'; name: string; maxPlayers: number }
   | { type: 'start_game' }
   | { type: 'leave_room' }
-  | { type: 'list_rooms' };
+  | { type: 'list_rooms' }
+  | { type: 'reconnect'; playerId: string };
 
 export interface RoomInfo {
   id: string;
@@ -54,6 +55,8 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
       return true;
     case 'join_room':
       return typeof msg.roomId === 'string';
+    case 'reconnect':
+      return typeof msg.playerId === 'string';
     case 'create_room':
       return typeof msg.name === 'string' && typeof msg.maxPlayers === 'number';
     default:

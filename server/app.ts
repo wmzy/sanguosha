@@ -14,6 +14,9 @@ import {
   broadcastMessage,
 } from './room';
 import { GameSession } from './session';
+import { createLogger } from './logger';
+
+const log = createLogger('ws');
 
 const app = new Hono();
 
@@ -72,15 +75,18 @@ export function handleWsMessage(
     case 'leave_room':
       handleLeaveRoom(playerId);
       break;
+    case 'reconnect':
+      handleReconnect(playerId, message.playerId, ws);
+      break;
   }
 }
 
 export function handleWsOpen(playerId: string): void {
-  console.warn(`玩家 ${playerId} 已连接`);
+  log.info('玩家已连接', { playerId });
 }
 
 export function handleWsClose(playerId: string): void {
-  console.warn(`玩家 ${playerId} 已断开`);
+  log.info('玩家已断开', { playerId });
   handleDisconnect(playerId);
 }
 
@@ -177,8 +183,49 @@ function handleAction(playerId: string, action: import('../engine/v2/types').Gam
   session.handleAction(playerId, action);
 }
 
-function handleResponse(playerId: string, promptId: string, choice: unknown): void {
-  console.warn(`玩家 ${playerId} 响应 ${promptId}:`, choice);
+function handleResponse(playerId: string, _promptId: string, choice: unknown): void {
+  const roomId = playerRoomMap.get(playerId);
+  if (!roomId) return;
+
+  const session = gameSessions.get(roomId);
+  if (!session) return;
+
+  const playerName = session.getPlayerName(playerId);
+  if (!playerName) return;
+
+  const pending = session.getPending();
+  if (!pending) return;
+
+  let action: import('../engine/v2/types').GameAction;
+
+  switch (pending.type) {
+    case 'responseWindow':
+    case 'dyingWindow': {
+      const cardId = typeof choice === 'string' ? choice : undefined;
+      action = { type: 'respond', player: playerName, cardId };
+      break;
+    }
+    case 'discardPhase': {
+      const cardIds = Array.isArray(choice) ? choice as string[] : [];
+      action = { type: 'discard', player: playerName, cardIds };
+      break;
+    }
+    case 'skillPrompt': {
+      action = { type: 'skillChoice', player: playerName, choice: choice as import('../engine/v2/types').Json };
+      break;
+    }
+    case 'selectCard': {
+      const cardIds = Array.isArray(choice) ? choice as string[] :
+        typeof choice === 'string' ? [choice] : [];
+      action = { type: 'respond', player: playerName, cardIds };
+      break;
+    }
+    default:
+      log.warn('未知 pending 类型', { pendingType: (pending as { type: string }).type });
+      return;
+  }
+
+  session.handleAction(playerId, action);
 }
 
 function handleLeaveRoom(playerId: string): void {
@@ -210,6 +257,27 @@ function handleDisconnect(playerId: string): void {
 
   if (room) {
     broadcastMessage(room, serialize({ type: 'player_left', playerId }));
+  }
+}
+
+function handleReconnect(currentPlayerId: string, previousPlayerId: string, ws: WSContext): void {
+  const roomId = playerRoomMap.get(previousPlayerId);
+  if (!roomId) {
+    ws.send(serialize({ type: 'error', message: '没有找到可恢复的会话' }));
+    return;
+  }
+
+  const session = gameSessions.get(roomId);
+  if (!session) {
+    ws.send(serialize({ type: 'error', message: '游戏会话已结束' }));
+    return;
+  }
+
+  if (session.reconnectPlayer(previousPlayerId, ws)) {
+    playerRoomMap.set(currentPlayerId, roomId);
+    log.info('玩家重连成功', { previousPlayerId, currentPlayerId });
+  } else {
+    ws.send(serialize({ type: 'error', message: '重连失败' }));
   }
 }
 
