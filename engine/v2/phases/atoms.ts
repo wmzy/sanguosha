@@ -12,7 +12,7 @@ function resolveExprFields<A extends Atom>(atom: A, state: GameState, ctx: Skill
     if (key !== 'type') {
       const value = result[key];
       if (isExpr(value)) {
-        result[key] = resolve(value as Parameters<typeof resolve>[0], state, ctx);
+        result[key] = resolve(value, state, ctx);
       }
     }
   }
@@ -28,7 +28,7 @@ export function register() {
       for (const rawAtom of phase.ops) {
         const atom = resolveExprFields(rawAtom, s, ctx);
         if (atom.type === 'setCtxVar') {
-          const setCtx = atom as Atom & { type: 'setCtxVar'; key: string; value: Json };
+          const setCtx = atom;
           ctx.localVars[setCtx.key] = setCtx.value;
         }
         const [serverEvent] = atomToEvents(s, atom);
