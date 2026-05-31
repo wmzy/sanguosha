@@ -57,7 +57,6 @@ describe('技能完整性审计', () => {
       '激将', // 复杂主公技，需系统重构
       '离间', // 复杂决斗交互，需系统重构
       '流离', // 转移杀目标，validation 层处理
-      '观星', // TODO: 判定阶段技能，未实现
       'dualWeapon', // 装备技能：丈八蛇矛，需两张牌当杀
       '激将', // 主公技，角色配置中未列出但引擎已注册
     ]);
@@ -143,15 +142,13 @@ describe('技能完整性审计', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('技能实现状态', () => {
-  it('观星 handler 为 stub（不满足预期）', () => {
+  it('观星 handler 已实现（包含 orderCards + aliveCount）', () => {
     const registry = getSkillRegistry();
     const def = registry.get('观星');
     if (!def) return;
     const handlerStr = def.handler.toString();
-    const body = handlerStr.replace(/^[^{]*{/, '').replace(/}\s*$/, '').trim();
-    // 观星应该处理判定阶段，但当前是 stub
-    // 这是一个 FAILING 测试，反映真实状态
-    expect(body).not.toMatch(/return\s*\[\s*\]/);
+    expect(handlerStr).toContain('orderCards');
+    expect(handlerStr).toContain('aliveCount');
   });
 
   it('反馈 handler 调用 discardRandom 但缺少 gainCard', () => {

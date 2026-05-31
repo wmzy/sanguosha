@@ -21,7 +21,13 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     case 'ctx': {
       const path = e.path as string;
       if (!ctx) throw new Error('resolve ctx: no SkillContext provided');
-      return (ctx as unknown as Record<string, unknown>)[path] as T;
+      const parts = path.split('.');
+      let result: unknown = ctx;
+      for (const part of parts) {
+        if (result == null || typeof result !== 'object') return undefined as T;
+        result = (result as Record<string, unknown>)[part];
+      }
+      return result as T;
     }
 
     case 'event': {

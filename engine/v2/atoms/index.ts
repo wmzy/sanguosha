@@ -15,6 +15,7 @@ import * as kill from './kill';
 import * as gainCard from './gainCard';
 import * as ctxVar from './ctxVar';
 import * as turn from './turn';
+import * as rearrangeDeck from './rearrangeDeck';
 
 damage.register();
 draw.register();
@@ -33,3 +34,4 @@ kill.register();
 gainCard.register();
 ctxVar.register();
 turn.register();
+rearrangeDeck.register();

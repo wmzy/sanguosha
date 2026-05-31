@@ -172,7 +172,8 @@ export type Atom =
   | { type: 'kill'; player: Expr<string>; source?: Expr<string> }
   | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
   | { type: 'setCtxVar'; key: string; value: Json }
-  | { type: 'incrementKills' };
+  | { type: 'incrementKills' }
+  | { type: 'rearrangeDeck'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog
@@ -388,7 +389,8 @@ export type PromptOption =
   | { label: string; value: Json }
   | { type: 'selectPlayer'; filter?: Condition }
   | { type: 'selectCard'; from: string; min?: number; max?: number }
-  | { type: 'selectCards'; from: string; min: number; max: number };
+  | { type: 'selectCards'; from: string; min: number; max: number }
+  | { type: 'orderCards'; cardIds: string[]; topLabel: string; bottomLabel: string };
 
 export interface ResponseWindowDef {
   type: 'killResponse' | 'aoeResponse' | 'dyingResponse' | 'trickResponse' | 'duelResponse';

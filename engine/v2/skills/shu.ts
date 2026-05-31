@@ -1,4 +1,4 @@
-import type { SkillDef } from '../types';
+import type { SkillDef, GameState, SkillPhase } from '../types';
 import { registerSkill } from '../skill';
 
 // ==================== 刘备 ====================
@@ -42,10 +42,55 @@ registerSkill({
     optional: true,
   },
   handler(ctx, state) {
-    // TODO: 复杂多玩家交互，需要 duel 系统支持
-    return [];
+    const aliveCount = state.playerOrder.filter(n => state.players[n].info.alive).length;
+    const N = Math.min(aliveCount, 5);
+    const topCards = state.zones.deck.slice(0, N);
+    if (topCards.length === 0) return [];
+    return buildRearrangeTree(state, topCards, 0, [], [], ctx.self);
   },
 });
+
+/** 递归构建观星的 prompt + condition 决策树 */
+function buildRearrangeTree(
+  state: GameState,
+  cards: string[],
+  index: number,
+  topSoFar: string[],
+  bottomSoFar: string[],
+  player: string,
+): SkillPhase[] {
+  if (index >= cards.length) {
+    return [{
+      type: 'atoms',
+      ops: [{
+        type: 'rearrangeDeck' as const,
+        player,
+        topCardIds: topSoFar,
+        bottomCardIds: bottomSoFar,
+      }],
+    }];
+  }
+
+  const card = state.cardMap[cards[index]];
+  const label = `${card.suit}${card.rank} ${card.name}`;
+
+  return [
+    {
+      type: 'prompt',
+      text: `观星：${label}（第${index + 1}/${cards.length}张）放到`,
+      options: [
+        { label: '牌堆顶', value: 'top' },
+        { label: '牌堆底', value: 'bottom' },
+      ],
+    },
+    {
+      type: 'condition',
+      check: { equals: [{ $: 'ctx', path: 'choice' }, 'top'] },
+      then: buildRearrangeTree(state, cards, index + 1, [...topSoFar, cards[index]], bottomSoFar, player),
+      else: buildRearrangeTree(state, cards, index + 1, topSoFar, [...bottomSoFar, cards[index]], player),
+    },
+  ];
+}
 
 // ==================== 关羽 ====================
 
@@ -110,8 +155,30 @@ registerSkill({
     optional: true,
   },
   handler(ctx, state) {
-    // TODO: 需要查看牌堆顶 N 张牌并重新排列的 UI 交互
-    return [];
+    const aliveCount = state.playerOrder.filter(name => state.players[name].info.alive).length;
+    const N = Math.min(aliveCount, 5);
+    if (N === 0) return [];
+    const topCards = state.zones.deck.slice(0, N);
+    if (topCards.length === 0) return [];
+
+    return [
+      {
+        type: 'prompt',
+        text: `观星：查看牌堆顶 ${topCards.length} 张牌，排列到牌堆顶或牌堆底`,
+        options: [
+          { type: 'orderCards', cardIds: topCards, topLabel: '牌堆顶', bottomLabel: '牌堆底' },
+        ],
+      },
+      {
+        type: 'atoms',
+        ops: [{
+          type: 'rearrangeDeck',
+          player: ctx.self,
+          topCardIds: { $: 'ctx', path: 'choice.top' },
+          bottomCardIds: { $: 'ctx', path: 'choice.bottom' },
+        }],
+      },
+    ];
   },
 });
 

@@ -10,6 +10,7 @@ import { allCharacters } from '../shared/characters';
 import { serialize } from './protocol';
 import { setRoomStatus } from './room';
 import type { Role } from '../shared/types';
+import { createLogger } from './logger';
 
 const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
 
@@ -128,6 +129,8 @@ export class GameSession {
   private state: GameState | null = null;
   private room: Room;
   private playerNames = new Map<string, string>();
+  private timeoutTimer: ReturnType<typeof setInterval> | null = null;
+  private logger = createLogger('./logger');
 
   constructor(room: Room) {
     this.room = room;
@@ -165,6 +168,8 @@ export class GameSession {
     this.state = state;
 
     import('../engine/v2/skills/index');
+
+    this.timeoutTimer = setInterval(() => this.checkTimeout(), 1000);
 
     setRoomStatus(this.room.id, '进行中');
     this.broadcastGameView();
@@ -233,8 +238,34 @@ export class GameSession {
     if (!this.state) return;
 
     if (this.state.meta.status === '已结束') {
+      this.clearTimeoutTimer();
       setRoomStatus(this.room.id, '已结束');
       this.broadcast({ type: 'gameOver', winner: this.state.meta.winner ?? '未知' });
+    }
+  }
+
+  private checkTimeout(): void {
+    if (!this.state || !this.state.pending) return;
+    if (Date.now() < this.state.pending.deadline) return;
+
+    const onTimeout = this.state.pending.onTimeout;
+    const result = engine(this.state, onTimeout);
+
+    if (result.error) {
+      this.logger.warn(`[Timeout] engine error: ${result.error}`);
+      return;
+    }
+
+    this.state = result.state;
+    this.broadcastEvents(result.events);
+    this.checkGameEnd();
+    this.broadcastGameView();
+  }
+
+  private clearTimeoutTimer(): void {
+    if (this.timeoutTimer) {
+      clearInterval(this.timeoutTimer);
+      this.timeoutTimer = null;
     }
   }
 
@@ -243,6 +274,7 @@ export class GameSession {
 
     const playerName = this.playerNames.get(playerId) ?? '未知玩家';
     if (this.state.meta.status === '进行中') {
+      this.clearTimeoutTimer();
       setRoomStatus(this.room.id, '已结束');
       this.broadcast({ type: 'error', message: `${playerName} 断开连接，游戏结束` });
     }
