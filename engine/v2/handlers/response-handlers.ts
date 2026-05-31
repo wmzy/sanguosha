@@ -346,14 +346,6 @@ function resolveConcurrentTrickResponse(
       return resolveTrickResolution(state, currentDepth + 1, sourceCard!, attacker!, trickTarget, judgmentContext, aoeResume);
     }
 
-    // 检查是否有人手中有无懈可击，若无人有则直接解决
-    const hasWuxieHolder = aliveOthers.some(p =>
-      getPlayer(state, p).hand.some(id => state.cardMap[id]?.name === '无懈可击'),
-    );
-    if (!hasWuxieHolder) {
-      return resolveTrickResolution(state, currentDepth + 1, sourceCard!, attacker!, trickTarget, judgmentContext, aoeResume);
-    }
-
     const nestedPending = createConcurrentTrickResponse(state, {
       sourceCard: sourceCard!,
       attacker: action.player,
@@ -859,7 +851,7 @@ function batchRemainJudgments(
   }
 
   const actionResult = applyAtoms(state, atoms);
-  let s = actionResult.state;
+  const s = actionResult.state;
 
   for (let i = fromIndex; i >= 0; i--) {
     const trick = tricks[i];

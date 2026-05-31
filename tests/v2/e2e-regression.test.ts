@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { engine } from '@engine/v2/engine';
-import { createTestGame, findCardInHand, injectCard, injectTrickCard, setHealth, act, expectError, findAllCardsInHand } from './setup';
+import { createTestGame, findCardInHand, injectCard, injectTrickCard, setHealth, act, expectError, findAllCardsInHand, passAllTrickResponders } from './setup';
 import type { GameState, GameAction } from '@engine/v2/types';
 import { getPlayer } from '@engine/v2/state';
 
@@ -151,19 +151,26 @@ describe('AOE 濒死后响应链恢复', () => {
     expect(aoeId).toBeDefined();
 
     // P1 出南蛮入侵
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId: aoeId! });
-    expect(r1.error).toBeUndefined();
-    expect(r1.state.pending?.type).toBe('responseWindow');
+    const r1pre = engine(s, { type: 'playCard', player: 'P1', cardId: aoeId! });
+    expect(r1pre.error).toBeUndefined();
+    // 先进入 trickResponse 窗口（无懈可击窗口）
+    expect(r1pre.state.pending?.type).toBe('responseWindow');
+    if (r1pre.state.pending?.type === 'responseWindow') {
+      expect(r1pre.state.pending.window.type).toBe('trickResponse');
+    }
 
-    expect(r1.state.pending).not.toBeNull();
-    const pending = r1.state.pending!;
+    // 所有玩家 pass 过无懈可击窗口
+    const r1state = passAllTrickResponders(r1pre.state);
+
+    expect(r1state.pending).not.toBeNull();
+    const pending = r1state.pending!;
     expect(pending.type).toBe('responseWindow');
     if (pending.type !== 'responseWindow') return;
     expect(pending.window.type).toBe('aoeResponse');
     if (pending.window.type !== 'aoeResponse') return;
 
     // P2 不出杀 → 受伤 → 濒死
-    const r2 = engine(r1.state, { type: 'respond', player: pending.window.defender });
+    const r2 = engine(r1state, { type: 'respond', player: pending.window.defender });
     expect(r2.error).toBeUndefined();
 
     const defender = pending.window.defender;

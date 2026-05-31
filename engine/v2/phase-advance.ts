@@ -64,7 +64,7 @@ function batchProcessJudgments(
   }
 
   const actionResult = applyAtoms(state, atoms);
-  let s = actionResult.state;
+  const s = actionResult.state;
 
   for (let i = tricks.length - 1; i >= 0; i--) {
     const trick = tricks[i];

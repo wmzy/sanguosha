@@ -241,3 +241,22 @@ export function nextAlivePlayer(state: GameState, afterPlayer: string): string {
   const idx = alive.indexOf(afterPlayer);
   return alive[(idx + 1) % alive.length];
 }
+
+/**
+ * 让所有 responder 依次 pass 过 trickResponse 窗口。
+ * 返回所有 pass 完成后的 GameState。
+ */
+export function passAllTrickResponders(state: GameState): GameState {
+  let current = state;
+  while (current.pending?.type === 'responseWindow' && current.pending.window.type === 'trickResponse') {
+    const window_ = current.pending.window;
+    const passed = window_.passedResponders ?? [];
+    const active = (window_.responders ?? []).filter(p => !passed.includes(p));
+    if (active.length === 0) break;
+    const next = active[0];
+    const result = safeEngine(current, { type: 'respond', player: next });
+    if (result.error) break;
+    current = result.state;
+  }
+  return current;
+}

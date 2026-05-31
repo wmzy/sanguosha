@@ -1,5 +1,5 @@
 import type { PlayerState, EquipmentSlots } from '../../engine/v2/types';
-import type { Card } from '../../shared/types';
+import type { Card, AbilityConfig } from '../../shared/types';
 import { colors } from '../theme';
 
 interface PlayerPanelProps {
@@ -10,15 +10,25 @@ interface PlayerPanelProps {
   isSelf: boolean;
   seatNumber?: number;
   distance?: number;
+  /** 剩余秒数（仅等待操作的玩家有值） */
+  timerSeconds?: number;
+  /** 角色技能列表 */
+  abilities?: AbilityConfig[];
 }
 
-export function PlayerPanel({ playerName, player, cardMap, isCurrentPlayer, isSelf, seatNumber, distance }: PlayerPanelProps) {
+export function PlayerPanel({ playerName, player, cardMap, isCurrentPlayer, isSelf, seatNumber, distance, timerSeconds, abilities }: PlayerPanelProps) {
   const equipmentNames = getEquipmentNames(player.equipment, cardMap);
   const hasEquipment = Object.values(player.equipment).some(Boolean);
+
+  const timerLabel = timerSeconds !== undefined
+    ? `${Math.floor(timerSeconds / 60)}:${(timerSeconds % 60).toString().padStart(2, '0')}`
+    : null;
+  const timerColor = timerSeconds !== undefined && timerSeconds <= 10 ? colors.accent.red : colors.accent.green;
 
   return (
     <div
       style={{
+        position: 'relative',
         border: isCurrentPlayer ? `2px solid ${colors.accent.red}` : `2px solid ${colors.bg.input}`,
         borderRadius: 8,
         padding: 12,
@@ -28,6 +38,25 @@ export function PlayerPanel({ playerName, player, cardMap, isCurrentPlayer, isSe
         opacity: player.info.alive ? 1 : 0.5,
       }}
     >
+      {timerSeconds !== undefined && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -8,
+            right: -8,
+            backgroundColor: timerColor,
+            color: colors.white,
+            fontSize: 11,
+            fontWeight: 'bold',
+            fontFamily: 'monospace',
+            padding: '2px 6px',
+            borderRadius: 10,
+            lineHeight: '14px',
+          }}
+        >
+          {timerLabel}
+        </div>
+      )}
       <div style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>
         {seatNumber !== undefined && <span style={{ fontSize: 12, color: colors.text.dim, marginRight: 4 }}>#{seatNumber}</span>}
         {player.info.characterId}
@@ -73,6 +102,33 @@ export function PlayerPanel({ playerName, player, cardMap, isCurrentPlayer, isSe
               🐎- {equipmentNames.horseMinus}
             </div>
           )}
+        </div>
+      )}
+      {player.pendingTricks.length > 0 && (
+        <div style={{ marginTop: 6, borderTop: `1px solid ${colors.bg.input}`, paddingTop: 6 }}>
+          <div style={{ fontSize: 11, color: colors.text.dim, marginBottom: 2 }}>判定区:</div>
+          {player.pendingTricks.map((trick, i) => (
+            <div key={i} style={{ fontSize: 12, color: colors.accent.purple, marginBottom: 1 }}>
+              ⏳ {trick.name} ({trick.card.suit}{trick.card.rank})
+            </div>
+          ))}
+        </div>
+      )}
+      {abilities && abilities.length > 0 && (
+        <div style={{ marginTop: 6, borderTop: `1px solid ${colors.bg.input}`, paddingTop: 6 }}>
+          <div style={{ fontSize: 11, color: colors.text.dim, marginBottom: 2 }}>技能:</div>
+          {abilities.map((a) => (
+            <div key={a.name} style={{ marginBottom: 2 }}>
+              <span style={{ fontSize: 12, color: colors.accent.amber, fontWeight: 'bold' }}>
+                {a.name}
+                {a.passive && <span style={{ color: colors.text.dim, fontWeight: 'normal' }}> (被动)</span>}
+                {a.oncePerTurn && <span style={{ color: colors.text.dim, fontWeight: 'normal' }}> (限一次)</span>}
+              </span>
+              <div style={{ fontSize: 11, color: colors.text.muted, lineHeight: '14px' }}>
+                {a.description}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

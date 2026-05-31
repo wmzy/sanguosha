@@ -1,12 +1,15 @@
+import { useState, useEffect } from 'react';
 import { useGame } from '../hooks/useGame';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
 import { LogPanel } from './LogPanel';
-import { Timer } from './Timer';
+import { allCharacters } from '../../shared/characters';
 import type { PlayerState } from '../../engine/v2/types';
 import type { Operation } from '../../shared/log';
 import { colors, styles } from '../theme';
+
+const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
 
 export function GameBoard() {
   const {
@@ -26,9 +29,6 @@ export function GameBoard() {
     validTargetList,
     handlePlayCard,
     handleEndTurn,
-    timerSeconds,
-    timerPaused,
-    toggleTimer,
     switchPerspective,
     goToCurrentPlayer,
     availableSkills,
@@ -50,6 +50,8 @@ export function GameBoard() {
     myHand,
     orderedPlayers,
     getDistance,
+    toggleAutoSkipWuxie,
+    setPerspective,
   } = useGame();
 
   const ordered = orderedPlayers;
@@ -63,6 +65,49 @@ export function GameBoard() {
   const getSeatNumber = (playerName: string): number => {
     return state.playerOrder.indexOf(playerName) + 1;
   };
+
+  // ── 引擎驱动的倒计时 ────────────────────────────────────────
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(id);
+  }, []);
+
+  const deadline = state.pending?.deadline ?? null;
+  const remainingSeconds = deadline !== null ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
+
+  // 计算当前等待操作的玩家集合
+  const waitingPlayers = (() => {
+    const s = new Set<string>();
+    const p = state.pending;
+    if (!p) return s;
+    switch (p.type) {
+      case 'responseWindow':
+        if (p.window.type === 'trickResponse' && p.window.responders) {
+          const passed = p.window.passedResponders ?? [];
+          p.window.responders.filter((r: string) => !passed.includes(r)).forEach((r: string) => s.add(r));
+        } else {
+          s.add(p.window.defender);
+        }
+        break;
+      case 'discardPhase':
+        s.add(p.player);
+        break;
+      case 'dyingWindow':
+        s.add(p.savers[p.currentSaverIndex]);
+        break;
+      case 'selectCard':
+        s.add(p.player);
+        break;
+      case 'harvestSelection':
+        s.add(p.pickOrder[p.currentPickerIndex]);
+        break;
+      case 'skillPrompt':
+        s.add(p.player);
+        break;
+    }
+    return s;
+  })();
 
   const isKillResponse = pendingPrompt?.type === 'killResponse';
   const isAoeResponse = pendingPrompt?.type === 'aoeResponse';
@@ -87,6 +132,7 @@ export function GameBoard() {
             setSelectedTarget(name === selectedTarget ? null : name);
           }
         }}
+        onDoubleClick={() => setPerspective(name)}
         style={{
           cursor:
             needsTarget && name !== myName && player.info.alive && validTargetList.includes(name)
@@ -108,6 +154,8 @@ export function GameBoard() {
           distance={
             selectedCardId !== null && name !== myName ? getDistance(myName, name) : undefined
           }
+          timerSeconds={waitingPlayers.has(name) ? remainingSeconds ?? undefined : undefined}
+          abilities={characterMap[player.info.characterId]?.abilities}
         />
       </div>
     );
@@ -137,7 +185,6 @@ export function GameBoard() {
             </button>
           )}
         </div>
-        <Timer seconds={timerSeconds} paused={timerPaused} onToggle={toggleTimer} />
       </div>
 
       {/* 提示信息 */}
@@ -612,6 +659,16 @@ export function GameBoard() {
           <div style={{ fontSize: 12, color: colors.text.muted, marginBottom: 8 }}>
             牌堆: {state.zones.deck.length} 张 | 弃牌堆: {state.zones.discardPile.length} 张
           </div>
+          <button
+            onClick={toggleAutoSkipWuxie}
+            style={{
+              ...styles.btn(state.meta.autoSkipWuxie ? colors.accent.green : colors.accent.red),
+              fontSize: 12,
+              marginBottom: 12,
+            }}
+          >
+            自动跳过无懈可击: {state.meta.autoSkipWuxie ? '开' : '关'}
+          </button>
           {state.playerOrder.map((name) => {
             const player = state.players[name];
             return (

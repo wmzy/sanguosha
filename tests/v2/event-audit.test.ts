@@ -18,6 +18,7 @@ import {
   injectTrickCard,
   setHealth,
   findCardInHand,
+  passAllTrickResponders,
 } from './setup';
 import { emitEvent, getSkillRegistry, registerCharacterTriggers } from '@engine/v2/skill';
 import { getCharacterMap } from './setup';
@@ -162,11 +163,15 @@ describe('事件审计: cardPlayed', () => {
     const trickId = findCardInHand(state, 'P1', '无中生有')!;
 
     const beforeHand = state.players['P1'].hand.length;
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: trickId });
+    const step1 = engine(state, { type: 'playCard', player: 'P1', cardId: trickId });
 
-    expect(result.error).toBeUndefined();
-    expect(result.events.some(e => e.type === 'cardPlayed')).toBe(true);
-    expect(result.state.players['P1'].hand.length).toBe(beforeHand + 2);
+    expect(step1.error).toBeUndefined();
+    expect(step1.events.some(e => e.type === 'cardPlayed')).toBe(true);
+
+    // 所有玩家 pass 过无懈可击窗口
+    const result = passAllTrickResponders(step1.state);
+    // 黄月英集智触发(+1) + 无中生有效果(+2) - 使用无中生有(-1) = +2
+    expect(result.players['P1'].hand.length).toBe(beforeHand + 2);
   });
 });
 

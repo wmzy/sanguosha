@@ -9,6 +9,7 @@ import {
   injectEquipCard,
   act,
   setHealth,
+  passAllTrickResponders,
 } from './setup';
 
 describe('V2 Engine - 卡牌效果', () => {
@@ -194,13 +195,18 @@ describe('V2 Engine - 卡牌效果', () => {
         (id) => state.cardMap[id].name === '无中生有',
       )!;
 
-      const result = engine(state, {
+      const step1 = engine(state, {
         type: 'playCard',
         player: 'P1',
         cardId,
       });
-      expect(result.error).toBeUndefined();
-      expect(result.state.players['P1'].hand.length).toBe(handBefore + 1);
+      expect(step1.error).toBeUndefined();
+      // 现在总是进入 trickResponse 窗口
+      expect(step1.state.pending?.type).toBe('responseWindow');
+
+      // 所有玩家 pass 过无懈可击窗口
+      const result = passAllTrickResponders(step1.state);
+      expect(result.players['P1'].hand.length).toBe(handBefore + 1);
     });
   });
 

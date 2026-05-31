@@ -37,6 +37,12 @@ export function engine(state: GameState, action: GameAction): EngineResult {
   if (action.type === 'startGame') {
     // startGame 跳过验证，直接返回当前状态（auto-advance 会处理 phase 推进）
     result = { state, events: [], error: undefined };
+  } else if (action.type === 'toggleAutoSkipWuxie') {
+    // 元操作：切换自动跳过无懈可击设置，不影响游戏状态
+    result = {
+      state: { ...state, meta: { ...state.meta, autoSkipWuxie: !state.meta.autoSkipWuxie } },
+      events: [],
+    };
   } else if (state.pending) {
     result = handlePending(state, action);
   } else {

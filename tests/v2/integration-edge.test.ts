@@ -19,6 +19,7 @@ import {
   findCardInHand,
   setHealth,
   getCharacterMap,
+  passAllTrickResponders,
 } from './setup';
 import { registerCharacterTriggers } from '@engine/v2/skill';
 import { getDistance } from '@engine/v2/distance';
@@ -62,10 +63,15 @@ describe('边界: 牌堆抽空 + reshuffle', () => {
     // 无中生有会抽 2 张
     state = injectTrickCard(state, 'P1', '无中生有');
     const trickId = findCardInHand(state, 'P1', '无中生有')!;
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: trickId });
-    expect(result.error).toBeUndefined();
-    // 应该从弃牌堆洗回后抽到了牌
-    expect(result.state.players['P1'].hand.length).toBe(state.players['P1'].hand.length + 1); // 用掉了无中生有，抽了2张
+    const handBefore = state.players['P1'].hand.length;
+    const step1 = engine(state, { type: 'playCard', player: 'P1', cardId: trickId });
+    expect(step1.error).toBeUndefined();
+    // 现在总是进入 trickResponse 窗口
+    expect(step1.state.pending?.type).toBe('responseWindow');
+    // 所有玩家 pass 过无懈可击窗口
+    const result = passAllTrickResponders(step1.state);
+    // 应该从弃牌堆洗回后抽到了牌：用掉无中生有(-1) + 抽2张 = +1
+    expect(result.players['P1'].hand.length).toBe(handBefore + 1);
   });
 });
 
@@ -242,25 +248,34 @@ describe('边界: AOE/决斗', () => {
     state = injectTrickCard(state, 'P1', '南蛮入侵');
     const trickId = findCardInHand(state, 'P1', '南蛮入侵')!;
 
-    const r1 = engine(state, {
+    const r1pre = engine(state, {
       type: 'playCard', player: 'P1', cardId: trickId,
     });
-    expect(r1.error).toBeUndefined();
+    expect(r1pre.error).toBeUndefined();
     // 源牌进入弃牌堆
-    expect(r1.state.zones.discardPile.includes(trickId)).toBe(true);
+    expect(r1pre.state.zones.discardPile.includes(trickId)).toBe(true);
+
+    // 先进入 trickResponse 窗口（无懈可击窗口）
+    expect(r1pre.state.pending?.type).toBe('responseWindow');
+    if (r1pre.state.pending?.type === 'responseWindow') {
+      expect(r1pre.state.pending.window.type).toBe('trickResponse');
+    }
+
+    // 所有玩家 pass 过无懈可击窗口
+    const r1 = passAllTrickResponders(r1pre.state);
 
     // 创建了 aoeResponse 窗口（栈顶是 P2→P3→P4 中的第一个）
-    expect(r1.state.pending).not.toBeNull();
-    expect(r1.state.pending?.type).toBe('responseWindow');
-    if (r1.state.pending?.type === 'responseWindow') {
-      expect(r1.state.pending.window.type).toBe('aoeResponse');
+    expect(r1.pending).not.toBeNull();
+    expect(r1.pending?.type).toBe('responseWindow');
+    if (r1.pending?.type === 'responseWindow') {
+      expect(r1.pending.window.type).toBe('aoeResponse');
       // 按 playerOrder，第一个受影响的是 P2
-      expect(r1.state.pending.window.defender).toBe('P2');
+      expect(r1.pending.window.defender).toBe('P2');
     }
 
     // P2 出杀响应 → 免伤，进入 P3 的窗口
-    const killInP2 = findCardInHand(r1.state, 'P2', '杀')!;
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2', cardId: killInP2 });
+    const killInP2 = findCardInHand(r1, 'P2', '杀')!;
+    const r2 = engine(r1, { type: 'respond', player: 'P2', cardId: killInP2 });
     expect(r2.error).toBeUndefined();
     // 杀进入弃牌
     expect(r2.state.zones.discardPile.includes(killInP2)).toBe(true);
@@ -365,10 +380,14 @@ describe('边界: AOE/决斗', () => {
     expect(r2.error).toBeUndefined();
     // 无懈可击进弃牌堆
     expect(r2.state.zones.discardPile.includes(wuxieId)).toBe(true);
+    // 现在会创建嵌套 trickResponse 窗口（询问 P1 是否反制无懈可击）
+    expect(r2.state.pending?.type).toBe('responseWindow');
+    // P1 pass 过嵌套窗口
+    const r3 = passAllTrickResponders(r2.state);
     // 顺手牵羊已被取消，无 pending
-    expect(r2.state.pending).toBeNull();
+    expect(r3.pending).toBeNull();
     // P2 的牌没有被拿走
-    expect(r2.state.players['P2'].hand.includes(targetCard)).toBe(true);
+    expect(r3.players['P2'].hand.includes(targetCard)).toBe(true);
   });
 
   it('过河拆桥用完源牌也在弃牌堆中', () => {

@@ -36,6 +36,8 @@ export interface GameMeta {
   winner?: string;
   createdAt: number;
   playerCount: number;
+  /** 自动跳过无懈可击：当玩家手中无无懈可击时自动不出（调试用） */
+  autoSkipWuxie: boolean;
 }
 
 export type GameStatus = '等待中' | '进行中' | '已结束';
@@ -374,7 +376,8 @@ export type GameAction =
   | { type: 'discard'; player: string; cardIds: string[] }
   | { type: 'useSkill'; player: string; skillId: string; target?: string }
   | { type: 'skillChoice'; player: string; choice: Json }
-  | { type: 'startGame' };
+  | { type: 'startGame' }
+  | { type: 'toggleAutoSkipWuxie' };
 export type GameEvent =
   | { type: 'turnStart'; player: string }
   | { type: 'turnEnd'; player: string }

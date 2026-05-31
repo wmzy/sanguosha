@@ -194,15 +194,6 @@ function handleTrickCard(
         return { state: trickResult.state, events: [...trickResult.events, cardPlayedEvent] };
       }
 
-      const hasWuxieHolder = allPlayers.some(p =>
-        getPlayer(state, p).hand.some(id => state.cardMap[id]?.name === '无懈可击'),
-      );
-      if (!hasWuxieHolder) {
-        const { state: movedState, events: moveEvents } = applyAtoms(state, [moveAtom]);
-        const effectResult = executeTrickEffect(movedState, { sourceCard: action.cardId, attacker: player });
-        return { state: effectResult.state, events: [...moveEvents, ...effectResult.events, cardPlayedEvent] };
-      }
-
       const trickResponse = createConcurrentTrickResponse(state, {
         sourceCard: action.cardId,
         attacker: player,
@@ -386,39 +377,6 @@ function handleTrickCard(
 
       if (allPlayers.length === 0) {
         // 无其他人可出无懈，直接进入 AOE 响应链
-        const firstTarget = affected[0];
-        const remaining = affected.slice(1);
-        const firstPlayer = getPlayer(state, firstTarget);
-        const validCards = firstPlayer.hand.filter(
-          id => state.cardMap[id]?.name === requiredCard,
-        );
-        const timeout = TIMEOUT_DEFAULTS.aoeResponse;
-        const responseWindow: PendingResponseWindow = {
-          type: 'responseWindow',
-          window: {
-            type: 'aoeResponse',
-            attacker: player,
-            defender: firstTarget,
-            validCards,
-            sourceCard: action.cardId,
-            remainingTargets: remaining,
-            requiredCard,
-            timeout,
-            deadline: Date.now() + timeout,
-          },
-          timeout,
-          deadline: Date.now() + timeout,
-          onTimeout: { type: 'respond', player: firstTarget },
-        };
-        const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: responseWindow }]);
-        return { state: result.state, events: [...result.events, cardPlayedEvent] };
-      }
-
-      // 检查是否有人手中有无懈可击，若无人有则跳过 trickResponse 直接进入 AOE
-      const hasWuxieHolder = allPlayers.some(p =>
-        getPlayer(state, p).hand.some(id => state.cardMap[id]?.name === '无懈可击'),
-      );
-      if (!hasWuxieHolder) {
         const firstTarget = affected[0];
         const remaining = affected.slice(1);
         const firstPlayer = getPlayer(state, firstTarget);

@@ -137,6 +137,38 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
   return null;
 }
 
+/** 获取当前唯一需要行动的玩家，如果有多个则返回 null */
+function getSingleActivePlayer(state: V2GameState): string | null {
+  const pending = state.pending;
+  if (pending) {
+    switch (pending.type) {
+      case 'responseWindow': {
+        if (pending.window.type === 'trickResponse' && pending.window.responders) {
+          const passed = pending.window.passedResponders ?? [];
+          const active = pending.window.responders.filter((p: string) => !passed.includes(p));
+          return active.length === 1 ? active[0] : null;
+        }
+        return pending.window.defender;
+      }
+      case 'discardPhase':
+        return pending.player;
+      case 'dyingWindow':
+        return pending.savers[pending.currentSaverIndex];
+      case 'selectCard':
+        return pending.player;
+      case 'harvestSelection':
+        return pending.pickOrder[pending.currentPickerIndex];
+      case 'skillPrompt':
+        return pending.player;
+      default:
+        return null;
+    }
+  }
+  // 无 pending 时，出牌阶段的当前玩家
+  if (state.phase === '出牌') return state.currentPlayer;
+  return null;
+}
+
 export function useGame() {
   // ── V2 引擎状态 ─────────────────────────────────────────────
   const [state, setState] = useState<V2GameState>(() => {
@@ -162,10 +194,6 @@ export function useGame() {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
 
-  // 计时器
-  const [timerSeconds, setTimerSeconds] = useState(60);
-  const [timerPaused, setTimerPaused] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -212,50 +240,84 @@ export function useGame() {
   // ── pending 提示 ────────────────────────────────────────────
   const pendingPrompt = useMemo(() => extractPendingPrompt(state), [state]);
 
-  // ── 计时器逻辑 ──────────────────────────────────────────────
-  const resetTimer = useCallback(() => setTimerSeconds(60), []);
-
+  // ── 自动切换到唯一需要行动的玩家视角 ──────────────────────────
   useEffect(() => {
-    if (state.meta.status !== '进行中' || timerPaused || !isMyTurn) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
+    const active = getSingleActivePlayer(state);
+    if (active && active !== myName) {
+      setPerspective(active);
     }
-    setTimerSeconds(60);
-    timerRef.current = setInterval(() => {
-      setTimerSeconds(prev => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
+  }, [state.pending, state.phase, state.currentPlayer]);
+
+  // ── 超时自动执行（引擎 deadline 驱动，调试模式无服务端） ─────
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    const pending = state.pending;
+    if (!pending || state.meta.status !== '进行中') return;
+    const delay = Math.max(0, pending.deadline - Date.now());
+    timeoutRef.current = setTimeout(() => {
+      const current = stateRef.current;
+      if (!current.pending) return;
+      const result = engine(current, current.pending.onTimeout);
+      if (!result.error) {
+        setState(result.state);
+        setSelectedForDiscard(new Set());
+        setSelectedCardId(null);
+      }
+    }, delay);
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
-  }, [state.currentPlayer, state.meta.round, timerPaused, state.meta.status, isMyTurn]);
-
-  // 超时自动弃牌
-  useEffect(() => {
-    if (timerSeconds !== 0 || !isMyTurn) return;
-    const currentState = stateRef.current;
-    const currentPending = currentState.pending;
-    if (currentPending?.type !== 'discardPhase') return;
-
-    const currentPlayerState = getPlayer(currentState, myName);
-    const excess = currentPlayerState.hand.length - currentPlayerState.health;
-    if (excess <= 0) return;
-
-    const cardIds = currentPlayerState.hand.slice(-excess);
-    const result = engine(currentState, { type: 'discard', player: myName, cardIds });
-    if (!result.error) {
-      setState(result.state);
-      setSelectedForDiscard(new Set());
-      setSelectedCardId(null);
-    }
-  }, [timerSeconds, isMyTurn, myName]);
+  }, [state.pending?.deadline, state.pending?.type, state.meta.status]);
 
   // ── dispatch helper ─────────────────────────────────────────
   const dispatch = useCallback((action: GameAction) => {
     const result = engine(state, action);
     if (result.error) return;
     setState(result.state);
-    resetTimer();
-  }, [state, resetTimer]);
+  }, [state]);
+
+  // 自动跳过无懈可击：当玩家手中无无懈可击时自动不出
+  const autoSkipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (autoSkipTimerRef.current) {
+      clearTimeout(autoSkipTimerRef.current);
+      autoSkipTimerRef.current = null;
+    }
+    if (!state.meta.autoSkipWuxie) return;
+    const pending = state.pending;
+    if (pending?.type !== 'responseWindow' || pending.window.type !== 'trickResponse') return;
+    const window_ = pending.window;
+    const passed = window_.passedResponders ?? [];
+    const active = (window_.responders ?? []).filter(p => !passed.includes(p));
+    if (!active.includes(myName)) return;
+    const myPlayer = getPlayer(state, myName);
+    const hasWuxie = myPlayer.hand.some(id => state.cardMap[id]?.name === '无懈可击');
+    if (hasWuxie) return;
+    const delay = 500 + Math.random() * 1500; // 500-2000ms 随机延迟
+    autoSkipTimerRef.current = setTimeout(() => {
+      const current = stateRef.current;
+      if (current.pending?.type !== 'responseWindow') return;
+      const curWindow = current.pending.window;
+      if (curWindow.type !== 'trickResponse') return;
+      const curPassed = curWindow.passedResponders ?? [];
+      const curActive = (curWindow.responders ?? []).filter(p => !curPassed.includes(p));
+      if (!curActive.includes(myName)) return;
+      dispatch({ type: 'respond', player: myName });
+    }, delay);
+    return () => {
+      if (autoSkipTimerRef.current) {
+        clearTimeout(autoSkipTimerRef.current);
+        autoSkipTimerRef.current = null;
+      }
+    };
+  }, [state.pending, state.meta.autoSkipWuxie, myName, dispatch]);
 
   // ── 操作处理 ────────────────────────────────────────────────
 
@@ -277,27 +339,29 @@ export function useGame() {
     setState(result.state);
     setSelectedCardId(null);
     setSelectedTarget(null);
-    resetTimer();
-  }, [state, selectedCardId, selectedTarget, isMyTurn, myName, resetTimer]);
+  }, [state, selectedCardId, selectedTarget, isMyTurn, myName]);
 
   const handleEndTurn = useCallback(() => {
-    if (!isMyTurn || state.pending) return;
+    if (!isMyTurn) return;
 
     // 如果需要弃牌且已选够，先弃牌
-    if (needsDiscard && selectedForDiscard.size === discardMin) {
-      const result = engine(state, {
-        type: 'discard',
-        player: myName,
-        cardIds: [...selectedForDiscard],
-      });
-      if (!result.error) {
-        setState(result.state);
-        setSelectedForDiscard(new Set());
-        setSelectedCardId(null);
-        resetTimer();
+    if (needsDiscard) {
+      if (selectedForDiscard.size === discardMin) {
+        const result = engine(state, {
+          type: 'discard',
+          player: myName,
+          cardIds: [...selectedForDiscard],
+        });
+        if (!result.error) {
+          setState(result.state);
+          setSelectedForDiscard(new Set());
+          setSelectedCardId(null);
+        }
       }
       return;
     }
+
+    if (state.pending) return;
 
     const result = engine(state, { type: 'endTurn', player: myName });
     if (result.error) {
@@ -308,8 +372,7 @@ export function useGame() {
     setSelectedCardId(null);
     setSelectedTarget(null);
     setSelectedForDiscard(new Set());
-    resetTimer();
-  }, [state, isMyTurn, myName, needsDiscard, selectedForDiscard, discardMin, resetTimer]);
+  }, [state, isMyTurn, myName, needsDiscard, selectedForDiscard, discardMin]);
 
   const handleDiscard = useCallback(() => {
     if (!needsDiscard || selectedForDiscard.size !== discardMin) return;
@@ -326,8 +389,7 @@ export function useGame() {
     setState(result.state);
     setSelectedForDiscard(new Set());
     setSelectedCardId(null);
-    resetTimer();
-  }, [state, needsDiscard, selectedForDiscard, discardMin, myName, resetTimer]);
+  }, [state, needsDiscard, selectedForDiscard, discardMin, myName]);
 
   const respondToKill = useCallback((playDodge: boolean) => {
     if (state.pending?.type !== 'responseWindow') return;
@@ -411,8 +473,7 @@ export function useGame() {
       return;
     }
     setState(result.state);
-    resetTimer();
-  }, [state, isMyTurn, myName, resetTimer]);
+  }, [state, isMyTurn, myName]);
 
   // ── UI 操作 ─────────────────────────────────────────────────
 
@@ -425,14 +486,19 @@ export function useGame() {
     setSelectedTarget(null);
   }, [myName]);
 
+  const setPerspective = useCallback((playerName: string) => {
+    setMyName(playerName);
+    setPlayerOrder(rotatePlayers(PLAYER_NAMES, playerName));
+    setSelectedCardId(null);
+    setSelectedTarget(null);
+  }, []);
+
   const goToCurrentPlayer = useCallback(() => {
     setMyName(state.currentPlayer);
     setPlayerOrder(rotatePlayers(PLAYER_NAMES, state.currentPlayer));
     setSelectedCardId(null);
     setSelectedTarget(null);
   }, [state.currentPlayer]);
-
-  const toggleTimer = useCallback(() => setTimerPaused(prev => !prev), []);
 
   const handleSaveLog = useCallback(() => {
     saveState(state);
@@ -441,8 +507,7 @@ export function useGame() {
   const selectCard = useCallback((cardId: string | null) => {
     setSelectedCardId(cardId);
     setSelectedTarget(null);
-    resetTimer();
-  }, [resetTimer]);
+  }, []);
 
   const toggleDiscardSelection = useCallback((cardId: string) => {
     setSelectedForDiscard(prev => {
@@ -527,12 +592,13 @@ export function useGame() {
     // UI
     myHand,
     orderedPlayers,
-    timerSeconds,
-    timerPaused,
-    toggleTimer,
     switchPerspective,
+    setPerspective,
     goToCurrentPlayer,
     handleSaveLog,
+
+    // 调试
+    toggleAutoSkipWuxie: useCallback(() => dispatch({ type: 'toggleAutoSkipWuxie' }), [dispatch]),
 
     // 距离
     getDistance: (from: string, to: string) => getDistance(state, from, to),

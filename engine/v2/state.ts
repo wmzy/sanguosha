@@ -67,6 +67,7 @@ export function createInitialState(config: GameConfig): GameState {
     status: '进行中',
     createdAt: Date.now(),
     playerCount: config.players.length,
+    autoSkipWuxie: false,
   };
 
   return {
