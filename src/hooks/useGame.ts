@@ -3,8 +3,7 @@ import { engine } from '../../engine/v2/engine';
 import { createInitialState, getPlayer } from '../../engine/v2/state';
 import { computeValidActions } from '../../engine/v2/validate';
 import { getDistance } from '../../engine/v2/distance';
-import { serialize } from '../../engine/v2/serializer';
-import type { GameState as V2GameState, GameAction, ValidAction, PendingAction } from '../../engine/v2/types';
+import type { GameState as V2GameState, GameAction, ValidAction } from '../../engine/v2/types';
 import type { Card, Role } from '../../shared/types';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import { saveState } from '../utils/logFile';
@@ -138,7 +137,7 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
 }
 
 /** 获取当前唯一需要行动的玩家，如果有多个则返回 null */
-function getSingleActivePlayer(state: V2GameState): string | null {
+function _getSingleActivePlayer(state: V2GameState): string | null {
   const pending = state.pending;
   if (pending) {
     switch (pending.type) {
@@ -240,13 +239,12 @@ export function useGame() {
   // ── pending 提示 ────────────────────────────────────────────
   const pendingPrompt = useMemo(() => extractPendingPrompt(state), [state]);
 
-  // ── 自动切换到唯一需要行动的玩家视角 ──────────────────────────
-  useEffect(() => {
-    const active = getSingleActivePlayer(state);
-    if (active && active !== myName) {
-      setPerspective(active);
-    }
-  }, [state.pending, state.phase, state.currentPlayer]);
+  const setPerspective = useCallback((playerName: string) => {
+    setMyName(playerName);
+    setPlayerOrder(rotatePlayers(PLAYER_NAMES, playerName));
+    setSelectedCardId(null);
+    setSelectedTarget(null);
+  }, []);
 
   // ── 超时自动执行（引擎 deadline 驱动，调试模式无服务端） ─────
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -274,7 +272,7 @@ export function useGame() {
         timeoutRef.current = null;
       }
     };
-  }, [state.pending?.deadline, state.pending?.type, state.meta.status]);
+  }, [state.pending?.deadline, state.pending?.type, state.meta.status, state]);
 
   // ── dispatch helper ─────────────────────────────────────────
   const dispatch = useCallback((action: GameAction) => {
@@ -317,7 +315,7 @@ export function useGame() {
         autoSkipTimerRef.current = null;
       }
     };
-  }, [state.pending, state.meta.autoSkipWuxie, myName, dispatch]);
+  }, [state.pending, state.meta.autoSkipWuxie, myName, dispatch, state]);
 
   // ── 操作处理 ────────────────────────────────────────────────
 
@@ -395,16 +393,14 @@ export function useGame() {
     if (state.pending?.type !== 'responseWindow') return;
     if (state.pending.window.defender !== myName) return;
 
-    const cardId = playDodge
-      ? me.hand.find(id => state.cardMap[id]?.name === '闪')
-      : undefined;
+    const cardId = playDodge ? respondAction?.cards?.[0] : undefined;
 
     dispatch({
       type: 'respond',
       player: myName,
       cardId,
     });
-  }, [state, myName, me.hand, dispatch]);
+  }, [state, myName, respondAction, dispatch]);
 
   /** 通用响应：响应杀/锦囊/决斗/AOE 等 responseWindow */
   const respond = useCallback((cardId?: string) => {
@@ -486,13 +482,6 @@ export function useGame() {
     setSelectedTarget(null);
   }, [myName]);
 
-  const setPerspective = useCallback((playerName: string) => {
-    setMyName(playerName);
-    setPlayerOrder(rotatePlayers(PLAYER_NAMES, playerName));
-    setSelectedCardId(null);
-    setSelectedTarget(null);
-  }, []);
-
   const goToCurrentPlayer = useCallback(() => {
     setMyName(state.currentPlayer);
     setPlayerOrder(rotatePlayers(PLAYER_NAMES, state.currentPlayer));
@@ -532,7 +521,7 @@ export function useGame() {
   const playableCardIds = new Set(playableCards.map(pc => pc.cardId));
 
   // 响应相关
-  const hasDodge = me.hand.some(id => state.cardMap[id]?.name === '闪');
+  const hasDodge = (respondAction?.cards?.length ?? 0) > 0;
 
   // ── 玩家列表（兼容旧组件） ──────────────────────────────────
   // GameBoard 需要 orderedPlayers（V2 的 Record 转 array）

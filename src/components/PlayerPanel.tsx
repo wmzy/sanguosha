@@ -16,7 +16,7 @@ interface PlayerPanelProps {
   abilities?: AbilityConfig[];
 }
 
-export function PlayerPanel({ playerName, player, cardMap, isCurrentPlayer, isSelf, seatNumber, distance, timerSeconds, abilities }: PlayerPanelProps) {
+export function PlayerPanel({ playerName: _playerName, player, cardMap, isCurrentPlayer, isSelf, seatNumber, distance, timerSeconds, abilities }: PlayerPanelProps) {
   const equipmentNames = getEquipmentNames(player.equipment, cardMap);
   const hasEquipment = Object.values(player.equipment).some(Boolean);
 

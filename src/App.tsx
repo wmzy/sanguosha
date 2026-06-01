@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { GameBoard } from './components/GameBoard';
+import { DebugLobby } from './components/DebugLobby';
 import { RoomLobby } from './components/RoomLobby';
 import { ReplayBoard } from './components/ReplayBoard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useState, useCallback } from 'react';
 import { loadState } from './utils/logFile';
 import type { GameState } from '../engine/v2/types';
-import { colors, styles } from './theme';
+import { colors } from './theme';
 
 function HomePage() {
   const [replayState, setReplayState] = useState<GameState | null>(null);
@@ -48,7 +48,7 @@ function HomePage() {
       <p style={{ color: colors.text.muted, marginBottom: 40 }}>数字卡牌游戏</p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 280 }}>
-        <Link to="/game" style={linkBtnStyle(colors.accent.orange)}>
+        <Link to="/debug" style={linkBtnStyle(colors.accent.orange)}>
           调试游戏
         </Link>
         <Link to="/lobby" style={linkBtnStyle(colors.accent.blue)}>
@@ -60,6 +60,11 @@ function HomePage() {
       </div>
     </div>
   );
+}
+
+function DebugPage() {
+  const navigate = useNavigate();
+  return <DebugLobby onExit={() => navigate('/')} />;
 }
 
 function LobbyPage() {
@@ -97,25 +102,13 @@ function MultiplayerPage() {
   );
 }
 
-function DebugGamePage() {
-  return (
-    <div>
-      <nav style={navStyle}>
-        <Link to="/" style={navLinkStyle}>← 返回</Link>
-        <span style={{ color: colors.text.muted }}>调试游戏</span>
-      </nav>
-      <GameBoard />
-    </div>
-  );
-}
-
 export function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/game" element={<DebugGamePage />} />
+          <Route path="/debug" element={<DebugPage />} />
           <Route path="/lobby" element={<LobbyPage />} />
           <Route path="/game/:roomId" element={<MultiplayerPage />} />
         </Routes>

@@ -5,18 +5,79 @@ import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
 import { LogPanel } from './LogPanel';
 import { allCharacters } from '../../shared/characters';
-import type { PlayerState } from '../../engine/v2/types';
+import type { PlayerState, ValidAction } from '../../engine/v2/types';
+import type { Card } from '../../shared/types';
 import type { Operation } from '../../shared/log';
 import { colors, styles } from '../theme';
 
 const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
 
-export function GameBoard() {
+interface PendingPrompt {
+  type: string;
+  text: string;
+  responder?: string;
+  responders?: string[];
+  attacker?: string;
+  validCards?: string[];
+  dyingPlayer?: string;
+  savers?: string[];
+  currentSaver?: string;
+  requiredCard?: string;
+  targetPlayer?: string;
+  targetCardIds?: string[];
+  selectMode?: 'discard' | 'steal';
+}
+
+export interface GameBoardData {
+  state: import('../../engine/v2/types').GameState;
+  me: PlayerState;
+  myName: string;
+  playerOrder: string[];
+  isMyTurn: boolean;
+  selectedCardId: string | null;
+  selectedCardIndex: number | null;
+  selectCard: (cardId: string | null) => void;
+  selectedTarget: string | null;
+  setSelectedTarget: (target: string | null) => void;
+  canPlay: boolean;
+  validActions: ValidAction[];
+  playableCards: import('../../engine/v2/types').PlayableCard[];
+  playableCardIds: Set<string>;
+  needsTarget: boolean;
+  validTargetList: string[];
+  handlePlayCard: () => void;
+  handleEndTurn: () => void;
+  needsDiscard: boolean;
+  discardCount: number;
+  discardCards: string[];
+  selectedForDiscard: Set<string>;
+  toggleDiscardSelection: (cardId: string) => void;
+  handleDiscard: () => void;
+  pendingPrompt: PendingPrompt | null;
+  hasDodge: boolean;
+  respondAction: Extract<ValidAction, { type: 'respond' }> | undefined;
+  respondToKill: (playDodge: boolean) => void;
+  respond: (cardId?: string) => void;
+  respondToDying: (saverName: string | null) => void;
+  selectTargetCard: (cardId: string) => void;
+  selectHarvestCard: (cardId: string) => void;
+  availableSkills: import('../../engine/v2/types').AvailableSkill[];
+  handleActivateSkill: (skillId: string, target?: string) => void;
+  myHand: Card[];
+  orderedPlayers: Array<{ name: string; player: PlayerState }>;
+  switchPerspective: () => void;
+  setPerspective: (playerName: string) => void;
+  goToCurrentPlayer: () => void;
+  handleSaveLog: () => void;
+  toggleAutoSkipWuxie: () => void;
+  getDistance: (from: string, to: string) => number;
+}
+
+export function GameBoard({ data }: { data: GameBoardData }) {
   const {
     state,
     me,
     myName,
-    playerOrder,
     isMyTurn,
     selectedCardId,
     selectedCardIndex,
@@ -52,7 +113,7 @@ export function GameBoard() {
     getDistance,
     toggleAutoSkipWuxie,
     setPerspective,
-  } = useGame();
+  } = data;
 
   const ordered = orderedPlayers;
 
@@ -66,7 +127,6 @@ export function GameBoard() {
     return state.playerOrder.indexOf(playerName) + 1;
   };
 
-  // ── 引擎驱动的倒计时 ────────────────────────────────────────
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 200);
@@ -76,7 +136,6 @@ export function GameBoard() {
   const deadline = state.pending?.deadline ?? null;
   const remainingSeconds = deadline !== null ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
 
-  // 计算当前等待操作的玩家集合
   const waitingPlayers = (() => {
     const s = new Set<string>();
     const p = state.pending;
@@ -165,7 +224,6 @@ export function GameBoard() {
 
   return (
     <div style={{ ...styles.page(16), display: 'flex', flexDirection: 'column' }}>
-      {/* 顶部栏 */}
       <div
         style={{
           display: 'flex',
@@ -187,7 +245,6 @@ export function GameBoard() {
         </div>
       </div>
 
-      {/* 提示信息 */}
       {needsTarget && (
         <div
           style={{
@@ -201,7 +258,6 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 待响应提示 - 杀响应 */}
       {isKillResponse && pendingPrompt && (
         <div
           style={{
@@ -231,7 +287,6 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 待响应提示 - AOE（南蛮入侵/万箭齐发） */}
       {isAoeResponse && pendingPrompt && (
         <div
           style={{
@@ -248,7 +303,7 @@ export function GameBoard() {
             {(respondAction?.cards ?? []).length > 0 ? (
               respondAction!.cards.map((cardId) => {
                 const card = state.cardMap[cardId];
-                const required = pendingPrompt.requiredCard || '杀';
+                const required = pendingPrompt.requiredCard ?? '杀';
                 return (
                   <button
                     key={cardId}
@@ -256,13 +311,14 @@ export function GameBoard() {
                     style={styles.btn(colors.accent.green)}
                   >
                     出{required} ({card?.suit}
-                    {card?.rank})
+                    {card?.rank}
+                    )
                   </button>
                 );
               })
             ) : (
               <span style={{ color: colors.text.dim, fontSize: 14 }}>
-                （无{pendingPrompt.requiredCard || '杀'}）
+                （无{pendingPrompt.requiredCard ?? '杀'}）
               </span>
             )}
             <button onClick={() => respond()} style={styles.btn(colors.accent.red)}>
@@ -272,7 +328,6 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 濒死救援提示 */}
       {isDyingWindow &&
         pendingPrompt &&
         state.pending?.type === 'dyingWindow' &&
@@ -323,7 +378,6 @@ export function GameBoard() {
           );
         })()}
 
-      {/* 待响应提示 - 锦囊（无懈可击） */}
       {isTrickResponse && pendingPrompt && (
         <div
           style={{
@@ -349,7 +403,8 @@ export function GameBoard() {
                     style={styles.btn(colors.accent.green)}
                   >
                     出无懈可击 ({card?.suit}
-                    {card?.rank})
+                    {card?.rank}
+                    )
                   </button>
                 );
               })
@@ -363,7 +418,6 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 待响应提示 - 决斗 */}
       {isDuelResponse && pendingPrompt && (
         <div
           style={{
@@ -387,7 +441,8 @@ export function GameBoard() {
                     style={styles.btn(colors.accent.green)}
                   >
                     出杀 ({card?.suit}
-                    {card?.rank})
+                    {card?.rank}
+                    )
                   </button>
                 );
               })
@@ -401,7 +456,6 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 待响应提示 - 选牌（顺手牵羊/过河拆桥） */}
       {isSelectCard && pendingPrompt && (
         <div
           style={{
@@ -438,7 +492,6 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 五谷丰登选牌 */}
       {isHarvestSelection &&
         pendingPrompt &&
         state.pending?.type === 'harvestSelection' &&
@@ -487,7 +540,6 @@ export function GameBoard() {
           );
         })()}
 
-      {/* 弃牌提示 */}
       {needsDiscard && (
         <div
           style={{
@@ -518,13 +570,11 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 上方玩家（逆时针） */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
         {leftTopPlayer && renderPlayerPanel(leftTopPlayer)}
         {rightTopPlayer && renderPlayerPanel(rightTopPlayer)}
       </div>
 
-      {/* 中间: 左 + 信息 + 右 */}
       <div
         style={{
           display: 'flex',
@@ -558,12 +608,10 @@ export function GameBoard() {
         </div>
       </div>
 
-      {/* 下方: 自己的面板 */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
         {bottomPlayer && renderPlayerPanel(bottomPlayer)}
       </div>
 
-      {/* 手牌区 */}
       <div style={{ marginBottom: 12 }}>
         <HandCards
           hand={myHand}
@@ -601,7 +649,6 @@ export function GameBoard() {
         />
       </div>
 
-      {/* 操作按钮 */}
       <div style={{ marginBottom: 12 }}>
         <ActionPanel
           canPlay={canPlay}
@@ -616,7 +663,6 @@ export function GameBoard() {
         />
       </div>
 
-      {/* 技能发动 */}
       {availableSkills.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
           {availableSkills.map((skill) => (
@@ -631,17 +677,14 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* 工具栏 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
         <button onClick={handleSaveLog} style={styles.smallBtn(colors.accent.purpleLight)}>
           保存日志
         </button>
       </div>
 
-      {/* 日志 */}
       <LogPanel operations={playerOps} maxHeight={150} />
 
-      {/* 调试面板 */}
       <details
         style={{ marginTop: 16, backgroundColor: colors.bg.nav, borderRadius: 8, padding: 12 }}
       >
@@ -733,4 +776,9 @@ export function GameBoard() {
       </details>
     </div>
   );
+}
+
+export function LocalGameBoard() {
+  const data = useGame();
+  return <GameBoard data={data} />;
 }

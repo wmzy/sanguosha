@@ -14,67 +14,72 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  const cleanup = useCallback(() => {
+    if (reconnectRef.current) {
+      clearTimeout(reconnectRef.current);
+      reconnectRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, []);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
+    cleanup();
     const ws = new WebSocket(url);
 
     ws.onopen = () => {
-      setConnected(true);
+      if (mountedRef.current) setConnected(true);
     };
 
     ws.onmessage = (event) => {
+      if (!mountedRef.current) return;
       try {
         const message = JSON.parse(event.data as string) as ServerMessage;
         setLastMessage(message);
       } catch {
-        // 忽略格式错误的消息
+        // parse error
       }
     };
 
     ws.onclose = () => {
+      if (!mountedRef.current) return;
       setConnected(false);
       wsRef.current = null;
-
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
+      reconnectRef.current = setTimeout(() => {
+        if (mountedRef.current) connect();
       }, 3000);
     };
 
-    ws.onerror = () => {
-      // onclose 会随后触发，处理重连逻辑
-    };
+    ws.onerror = () => {};
 
     wsRef.current = ws;
-  }, [url]);
+  }, [url, cleanup]);
 
   const send = useCallback((msg: ClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msg));
-    } else {
-      console.error('WebSocket 未连接');
     }
   }, []);
 
   const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
+    cleanup();
     setConnected(false);
-  }, []);
+  }, [cleanup]);
 
-  // 清理
   useEffect(() => {
+    mountedRef.current = true;
+    connect();
     return () => {
+      mountedRef.current = false;
       disconnect();
     };
-  }, [disconnect]);
+  }, [connect, disconnect]);
 
   return { connected, lastMessage, send, connect, disconnect };
 }
