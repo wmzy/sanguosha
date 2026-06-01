@@ -14,7 +14,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'prompt',
@@ -41,7 +41,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -58,7 +58,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -74,7 +74,7 @@ registerSkill({
     source: 'character',
     phase: '出牌',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -91,7 +91,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -108,12 +108,12 @@ registerSkill({
     phase: '准备',
     optional: true,
   },
-  handler(ctx, state) {
-    const aliveCount = state.playerOrder.filter(n => state.players[n].info.alive).length;
+  handler(_ctx, _state) {
+    const aliveCount = _state.playerOrder.filter(n => _state.players[n].info.alive).length;
     const N = Math.min(aliveCount, 5);
-    const topCards = state.zones.deck.slice(0, N);
+    const topCards = _state.zones.deck.slice(0, N);
     if (topCards.length === 0) return [];
-    return buildRearrangeTree(state, topCards, 0, [], [], ctx.self);
+    return buildRearrangeTree(_state, topCards, 0, [], [], _ctx.self);
   },
 });
 
@@ -167,7 +167,7 @@ registerSkill({
     event: 'cardPlayed',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -182,7 +182,7 @@ registerSkill({
     event: 'turnStart',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -196,10 +196,10 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
-    if (!ctx.target) return [];
+  handler(_ctx, _state) {
+    if (!_ctx.target) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'judge', player: ctx.self }] },
+      { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
       // TODO: 检查判定结果是否为红色
       // 若红色 → setTag(target, 'cannotDodge')
     ];
@@ -217,9 +217,9 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: 1 }] },
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 1 }] },
     ];
   },
 });
@@ -232,7 +232,7 @@ registerSkill({
     event: 'turnStart',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 } satisfies SkillDef);

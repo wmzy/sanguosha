@@ -1,4 +1,4 @@
-import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, PendingDyingWindow } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, PendingDyingWindow } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
@@ -9,7 +9,7 @@ type CheckDyingPhase = Extract<SkillPhase, { type: 'checkDying' }>;
 export function register() {
   registerPhase<CheckDyingPhase>({
     type: 'checkDying',
-    execute(state: GameState, phase: CheckDyingPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
+    execute(state: GameState, phase: CheckDyingPhase, ctx: SkillContext, _plan: SkillPhase[], _index: number): EngineResult {
       const playerName = resolve<string>(phase.player, state, ctx);
       const player = getPlayer(state, playerName);
 

@@ -1,4 +1,4 @@
-import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, ServerEvent } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent } from '../types';
 import { registerPhase, executePlan } from '../phase';
 import { resolve } from '../expr';
 
@@ -7,7 +7,7 @@ type ForeachPhase = Extract<SkillPhase, { type: 'foreach' }>;
 export function register() {
   registerPhase<ForeachPhase>({
     type: 'foreach',
-    execute(state: GameState, phase: ForeachPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
+    execute(state: GameState, phase: ForeachPhase, ctx: SkillContext, _plan: SkillPhase[], _index: number): EngineResult {
       let s = state;
       const events: ServerEvent[] = [];
       const collection = resolve<string[]>(phase.collection, s, ctx);

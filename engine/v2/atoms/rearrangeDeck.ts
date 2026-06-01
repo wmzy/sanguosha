@@ -1,4 +1,4 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom, AtomEventResult } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 
@@ -6,7 +6,6 @@ export function register() {
   registerAtom({
     type: 'rearrangeDeck',
     apply(state: GameState, atom: Atom & { type: 'rearrangeDeck' }): GameState {
-      const player = atom.player as string;
       const topCardIds = atom.topCardIds as string[];
       const bottomCardIds = atom.bottomCardIds as string[];
 

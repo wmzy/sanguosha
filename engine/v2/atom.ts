@@ -1,4 +1,4 @@
-import type { GameState, Atom, AtomDefinition, AtomEventResult, ServerEvent } from './types';
+import type { GameState, Atom, AtomDefinition, AtomEventResult } from './types';
 
 const registry = new Map<string, AtomDefinition>();
 
@@ -40,7 +40,7 @@ export function broadcast(state: GameState, atoms: Atom[]): BroadcastResult {
     const [serverEvent, playerMap, defaultEvent] = atomToEvents(s, atom);
 
     const updatedPlayerLogs = { ...s.playerLogs };
-    const logEventId = serverEvent.id;
+    const _logEventId = serverEvent.id;
 
     for (const player of s.playerOrder) {
       const specific = playerMap.get(player);

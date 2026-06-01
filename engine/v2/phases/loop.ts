@@ -1,4 +1,4 @@
-import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, ServerEvent } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent } from '../types';
 import { registerPhase, executePlan } from '../phase';
 import { checkCondition } from '../expr';
 
@@ -7,7 +7,7 @@ type LoopPhase = Extract<SkillPhase, { type: 'loop' }>;
 export function register() {
   registerPhase<LoopPhase>({
     type: 'loop',
-    execute(state: GameState, phase: LoopPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
+    execute(state: GameState, phase: LoopPhase, ctx: SkillContext, _plan: SkillPhase[], _index: number): EngineResult {
       let s = state;
       const events: ServerEvent[] = [];
       let iterations = 0;

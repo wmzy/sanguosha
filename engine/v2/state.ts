@@ -1,7 +1,7 @@
-import type { Card, CharacterConfig, Role } from '../../shared/types';
+import type { Card } from '../../shared/types';
 import { createStandardDeck, shuffle } from '../../shared/deck';
 import { createRng } from '../../shared/rng';
-import type { GameState, PlayerState, GameZones, TurnState, GameMeta, EquipmentSlots } from './types';
+import type { GameState, PlayerState, GameZones, TurnState, GameMeta } from './types';
 
 export interface GameConfig {
   players: Array<{

@@ -14,6 +14,7 @@ import { getPlayer, getAlivePlayerNames } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms, createDyingPending } from './engine-utils';
 import { emitEvent } from '../skill';
+import { isCardValidResponse } from '../validate';
 
 /**
  * 创建抢占式（并发）无懈可击响应窗口。
@@ -101,9 +102,8 @@ function resolveKillResponse(
     if (!responder.hand.includes(action.cardId)) {
       return { state, events: [], error: '手牌中没有该卡牌' };
     }
-    const card = state.cardMap[action.cardId];
-    if (card.name !== '闪') {
-      return { state, events: [], error: '只能用闪响应杀' };
+    if (!isCardValidResponse(state, action.cardId, 'killResponse', defender)) {
+      return { state, events: [], error: '只能用闪（或可当闪使用的牌）响应杀' };
     }
 
     const atoms: Atom[] = [
@@ -207,10 +207,9 @@ function resolveAoeResponse(
 
   // 处理当前玩家的响应
   let currentState = state;
-  let currentEvents: ServerEvent[] = [];
+  let currentEvents: ServerEvent[];
 
   if (action.cardId) {
-    // 出了正确的牌 → 免疫
     const atoms: Atom[] = [
       { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player: defender }, to: { zone: 'discardPile' } },
       { type: 'popPending' },
@@ -219,7 +218,6 @@ function resolveAoeResponse(
     currentState = result.state;
     currentEvents = result.events;
   } else {
-    // 没出 → 受伤
     const damageAtoms: Atom[] = [
       { type: 'damage', target: defender, amount: 1, source: attacker },
       { type: 'popPending' },
@@ -888,9 +886,8 @@ function resolveDuelResponse(
 
   if (cardId) {
     // 当前防守方出了杀 → 换对方继续出杀
-    const card = state.cardMap[cardId];
-    if (card?.name !== '杀') {
-      return { state, events: [], error: '只能用杀响应决斗' };
+    if (!isCardValidResponse(state, cardId, 'duelResponse', defender)) {
+      return { state, events: [], error: '只能用杀（或可当杀使用的牌）响应决斗' };
     }
     const responder = getPlayer(state, defender);
     if (!responder.hand.includes(cardId)) {

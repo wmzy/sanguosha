@@ -11,21 +11,20 @@ import type {
   ValidAction,
   PlayableCard,
   AvailableSkill,
-  PendingAction,
   PendingResponseWindow,
   PendingSkillPrompt,
   PendingDiscardPhase,
   PendingDyingWindow,
   PendingSelectCard,
   PendingHarvestSelection,
-  PromptOption,
 } from './types';
 import { getPlayer, getAlivePlayerNames } from './state';
-import { getDistance, getAttackRange, isInAttackRange } from './distance';
+import { isInAttackRange } from './distance';
 import type { Card, CardDef } from '../../shared/types';
 import { 基本牌列表 } from '../../shared/cards/basic';
 import { 锦囊牌列表 } from '../../shared/cards/tricks';
 import { 装备牌列表 } from '../../shared/cards/equipment';
+import { getSkill } from './skill';
 
 // ─── 卡牌定义查找表 ───────────────────────────────────────────
 
@@ -56,6 +55,58 @@ function characterHasUnlimitedKills(state: GameState, playerName: string): boole
 /** 综合判断玩家是否可以无限出杀 */
 function canKillUnlimited(state: GameState, playerName: string): boolean {
   return hasUnlimitedKills(state, playerName) || characterHasUnlimitedKills(state, playerName);
+}
+
+// ─── 技能卡牌转换 ─────────────────────────────────────────────
+
+/** 返回玩家可通过技能转换为 targetType 的手牌 ID（倾国/龙胆/武圣等） */
+export function getSkillConvertedCards(
+  state: GameState,
+  player: string,
+  targetType: '闪' | '杀',
+): string[] {
+  const playerState = getPlayer(state, player);
+  const convertedCards: string[] = [];
+
+  for (const cardId of playerState.hand) {
+    if (canCardBeConvertedBySkill(state, player, cardId, targetType)) {
+      convertedCards.push(cardId);
+    }
+  }
+
+  return convertedCards;
+}
+
+function canCardBeConvertedBySkill(
+  state: GameState,
+  player: string,
+  cardId: string,
+  targetType: '闪' | '杀',
+): boolean {
+  const card = state.cardMap[cardId];
+  if (!card) return false;
+  const isBlack = card.suit === '♠' || card.suit === '♣';
+  const isRed = card.suit === '♥' || card.suit === '♦';
+
+  for (const trigger of state.triggers) {
+    if (trigger.player !== player || trigger.source !== 'character') continue;
+    let skillId: string;
+    try {
+      skillId = getSkill(trigger.skillId).id;
+    } catch {
+      continue;
+    }
+
+    if (targetType === '闪' && (trigger.event === 'killResponse' || trigger.event === 'aoeResponse')) {
+      if (skillId === '倾国' && isBlack) return true;
+      if (skillId === '龙胆' && card.name === '杀') return true;
+    }
+    if (targetType === '杀') {
+      if (skillId === '武圣' && isRed) return true;
+      if (skillId === '龙胆' && card.name === '闪') return true;
+    }
+  }
+  return false;
 }
 
 // ─── validateAction ───────────────────────────────────────────
@@ -274,7 +325,9 @@ function validateResponseWindow(
 
   switch (pending.window.type) {
     case 'killResponse':
-      if (card.name !== '闪') return '只能用闪响应杀';
+      if (!isCardValidResponse(state, action.cardId, 'killResponse', action.player)) {
+        return '只能用闪响应杀';
+      }
       break;
     case 'aoeResponse':
       if (pending.window.validCards.length > 0 && !pending.window.validCards.includes(action.cardId)) {
@@ -285,7 +338,9 @@ function validateResponseWindow(
       if (card.name !== '桃') return '只能用桃响应濒死';
       break;
     case 'duelResponse':
-      if (card.name !== '杀') return '只能用杀响应决斗';
+      if (!isCardValidResponse(state, action.cardId, 'duelResponse', action.player)) {
+        return '只能用杀响应决斗';
+      }
       break;
     case 'trickResponse':
       if (pending.window.validCards.length > 0 && !pending.window.validCards.includes(action.cardId)) {
@@ -467,10 +522,10 @@ function computeResponseWindowActions(
 
   for (const cardId of responder.hand) {
     if (pending.window.type === 'aoeResponse') {
-      if (pending.window.validCards.includes(cardId)) {
+      if (isCardValidResponse(state, cardId, 'aoeResponse', player)) {
         validCards.push(cardId);
       }
-    } else if (isCardValidResponse(state, cardId, pending.window.type)) {
+    } else if (isCardValidResponse(state, cardId, pending.window.type, player)) {
       validCards.push(cardId);
     }
   }
@@ -484,19 +539,34 @@ function computeResponseWindowActions(
   }];
 }
 
-function isCardValidResponse(
+export function isCardValidResponse(
   state: GameState,
   cardId: string,
   windowType: string,
+  player?: string,
 ): boolean {
   const card = state.cardMap[cardId];
   if (!card) return false;
 
   switch (windowType) {
-    case 'killResponse': return card.name === '闪';
-    case 'aoeResponse': return card.name === '闪' || card.name === '杀'; // 简化
+    case 'killResponse':
+      if (card.name === '闪') return true;
+      return player ? canCardBeConvertedBySkill(state, player, cardId, '闪') : false;
+    case 'aoeResponse': {
+      const pending = state.pending;
+      const required = pending?.type === 'responseWindow' && pending.window.type === 'aoeResponse'
+        ? pending.window.requiredCard as '杀' | '闪'
+        : undefined;
+      if (required) {
+        if (card.name === required) return true;
+        return player ? canCardBeConvertedBySkill(state, player, cardId, required) : false;
+      }
+      return card.name === '闪' || card.name === '杀';
+    }
     case 'dyingResponse': return card.name === '桃';
-    case 'duelResponse': return card.name === '杀';
+    case 'duelResponse':
+      if (card.name === '杀') return true;
+      return player ? canCardBeConvertedBySkill(state, player, cardId, '杀') : false;
     case 'trickResponse': return card.name === '无懈可击';
     default: return false;
   }

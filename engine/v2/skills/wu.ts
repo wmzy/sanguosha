@@ -14,7 +14,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'prompt',
@@ -37,7 +37,7 @@ registerSkill({
     event: 'heal',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     // TODO: 需要检查 heal 来源是否为吴势力角色且不是自己
     // 且使用的牌是否为桃
     return [];
@@ -57,7 +57,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -73,11 +73,11 @@ registerSkill({
     source: 'character',
     phase: '弃牌',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'condition',
-        check: { not: { hasVar: { player: ctx.self, key: '杀/usedThisTurn' } } },
+        check: { not: { hasVar: { player: _ctx.self, key: '杀/usedThisTurn' } } },
         then: [
           {
             type: 'atoms',
@@ -104,19 +104,19 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'atoms',
         ops: [
-          { type: 'damage', target: ctx.self, amount: 1 },
+          { type: 'damage', target: _ctx.self, amount: 1 },
         ],
       },
-      { type: 'checkDying', player: ctx.self },
+      { type: 'checkDying', player: _ctx.self },
       {
         type: 'atoms',
         ops: [
-          { type: 'draw', player: ctx.self, count: 2 },
+          { type: 'draw', player: _ctx.self, count: 2 },
         ],
       },
     ];
@@ -134,9 +134,9 @@ registerSkill({
     source: 'character',
     phase: '摸牌',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: 1 }] },
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 1 }] },
     ];
   },
 });
@@ -152,7 +152,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'prompt',
@@ -179,7 +179,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -193,7 +193,7 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     // TODO: 需要杀目标重定向机制
     return [];
   },
@@ -209,7 +209,7 @@ registerSkill({
     event: 'cardPlayed',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -224,9 +224,9 @@ registerSkill({
     optional: true,
     filter: { handEmpty: { $: 'ctx', path: 'self' } },
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: 1 }] },
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 1 }] },
     ];
   },
 });
@@ -244,7 +244,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'prompt',
@@ -268,9 +268,9 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: 1 }] },
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 1 }] },
     ];
   },
 } satisfies SkillDef);

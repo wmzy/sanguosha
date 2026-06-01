@@ -4,9 +4,7 @@ import type {
   EngineResult,
   Atom,
   PendingResponseWindow,
-  PendingSelectCard,
   PendingHarvestSelection,
-  ServerEvent,
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import type { Card } from '../../../shared/types';
@@ -16,7 +14,8 @@ import { getDistance, isInAttackRange } from '../distance';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
 import { emitEvent } from '../skill';
-import { createConcurrentTrickResponse, executeTrickEffect } from './response-handlers';
+import { createConcurrentTrickResponse } from './response-handlers';
+import { getSkillConvertedCards } from '../validate';
 
 export function handlePlayCard(
   state: GameState,
@@ -87,10 +86,11 @@ function handleKillCard(
   const targetPlayer = getPlayer(state, target);
   if (!targetPlayer.info.alive) return { state, events: [], error: '目标已阵亡' };
 
-  // 计算目标可用闪
-  const validCards = targetPlayer.hand.filter(
+  const literalDodge = targetPlayer.hand.filter(
     (id) => state.cardMap[id].name === '闪',
   );
+  const skillDodge = getSkillConvertedCards(state, target, '闪');
+  const validCards = [...new Set([...literalDodge, ...skillDodge])];
 
   const timeout = TIMEOUT_DEFAULTS.killResponse;
   const responseWindow: PendingResponseWindow = {

@@ -9,7 +9,7 @@ import type { CharacterConfig } from '../../shared/types';
 import { checkCondition } from './expr';
 import { executePlan } from './phase';
 import { buildSkillContext } from './context';
-import { getAlivePlayerNames, updatePlayer } from './state';
+import { getAlivePlayerNames } from './state';
 import { applyAtom } from './atom';
 
 const registry = new Map<string, SkillDef>();
@@ -45,6 +45,8 @@ export function registerCharacterTriggers(
   if (!character) return state;
 
   const newTriggers: TriggerRule[] = [];
+  let s = state;
+
   for (const ability of character.abilities) {
     const def = registry.get(ability.name);
     if (!def) continue;
@@ -55,9 +57,15 @@ export function registerCharacterTriggers(
       player,
       priority: ability.passive ? 0 : 5,
     });
+
+    if (ability.modifiers) {
+      for (const mod of ability.modifiers) {
+        s = applyAtom(s, { type: 'setVar', player, key: mod, value: true });
+      }
+    }
   }
 
-  return { ...state, triggers: [...state.triggers, ...newTriggers] };
+  return { ...s, triggers: [...s.triggers, ...newTriggers] };
 }
 
 const EQUIPMENT_SKILL_MAP: Record<string, string> = {

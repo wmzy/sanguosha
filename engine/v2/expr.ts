@@ -1,4 +1,4 @@
-import type { Expr, Condition, GameState, SkillContext, Json } from './types';
+import type { Expr, Condition, GameState, SkillContext } from './types';
 import { isExpr } from './types';
 import { getPlayer, getAlivePlayerNames, getCard } from './state';
 import { getDistance } from './distance';

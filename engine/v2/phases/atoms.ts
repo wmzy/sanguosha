@@ -1,4 +1,4 @@
-import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent, Atom, Json } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent, Atom } from '../types';
 import { applyAtom, atomToEvents } from '../atom';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';

@@ -1,4 +1,4 @@
-import type { SkillDef, SkillPhase } from '../types';
+import type { SkillDef } from '../types';
 import { registerSkill } from '../skill';
 
 // ==================== 曹操 ====================
@@ -12,17 +12,17 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     // ctx.sourceCard = 造成伤害的牌 ID
-    if (!ctx.sourceCard) return [];
+    if (!_ctx.sourceCard) return [];
     return [
       {
         type: 'atoms',
         ops: [
           {
             type: 'gainCard',
-            player: ctx.self,
-            cardId: ctx.sourceCard,
+            player: _ctx.self,
+            cardId: _ctx.sourceCard,
             from: { zone: 'discardPile' },
           },
         ],
@@ -42,15 +42,15 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
-    if (!ctx.source) return [];
+  handler(_ctx, _state) {
+    if (!_ctx.source) return [];
     return [
       {
         type: 'atoms',
         ops: [
           {
             type: 'discardRandom',
-            player: ctx.source,
+            player: _ctx.source,
             count: 1,
             from: 'hand',
           },
@@ -70,7 +70,7 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'prompt',
@@ -103,10 +103,10 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
-    if (!ctx.source) return [];
+  handler(_ctx, _state) {
+    if (!_ctx.source) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'judge', player: ctx.self }] },
+      { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
       // TODO: 判定后检查结果是否为♥，若不是则让 source 选择弃2牌或受1点伤害
       // 这需要条件判定 + prompt 组合，目前 stub
     ];
@@ -125,10 +125,10 @@ registerSkill({
     phase: '摸牌',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       // 跳过正常摸牌
-      { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: 'skipDraw', value: true }] },
+      { type: 'atoms', ops: [{ type: 'setVar', player: _ctx.self, key: 'skipDraw', value: true }] },
       // TODO: 选择最多2名其他角色，各抽1张手牌
       // 需要 foreach + prompt 组合
     ];
@@ -147,13 +147,13 @@ registerSkill({
     phase: '摸牌',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'atoms',
         ops: [
-          { type: 'setVar', player: ctx.self, key: '裸衣/active', value: true },
-          { type: 'setVar', player: ctx.self, key: '裸衣/usedThisTurn', value: true },
+          { type: 'setVar', player: _ctx.self, key: '裸衣/active', value: true },
+          { type: 'setVar', player: _ctx.self, key: '裸衣/usedThisTurn', value: true },
         ],
       },
     ];
@@ -171,17 +171,17 @@ registerSkill({
     source: 'character',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     // ctx.sourceCard = 判定牌 ID
-    if (!ctx.sourceCard) return [];
+    if (!_ctx.sourceCard) return [];
     return [
       {
         type: 'atoms',
         ops: [
           {
             type: 'gainCard',
-            player: ctx.self,
-            cardId: ctx.sourceCard,
+            player: _ctx.self,
+            cardId: _ctx.sourceCard,
             from: { zone: 'discardPile' },
           },
         ],
@@ -198,9 +198,9 @@ registerSkill({
     event: 'damageReceived',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: 2 }] },
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 2 }] },
       // TODO: 将最多2张牌分配给其他角色（可选）
       // 需要 prompt 选择分配目标
     ];
@@ -219,7 +219,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     // 被动转换技能 — 在 validation 层处理黑色手牌→闪的转换
     return [];
   },
@@ -234,17 +234,17 @@ registerSkill({
     source: 'character',
     phase: '准备',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       // 预置初始判定结果为黑色，确保首次进入循环
-      { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: '洛神/judgeResult', value: 'black' }] },
+      { type: 'atoms', ops: [{ type: 'setVar', player: _ctx.self, key: '洛神/judgeResult', value: 'black' }] },
       {
         type: 'loop',
         // 检查上次判定结果：红色则退出循环，黑色继续
         while: { notEquals: [{ $: 'var', player: { $: 'ctx', path: 'self' }, key: '洛神/judgeResult' }, 'red'] },
         body: [
           // 判定（varKey 自动将结果存储到玩家变量）
-          { type: 'atoms', ops: [{ type: 'judge', player: ctx.self, varKey: '洛神/judgeResult' }] },
+          { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self, varKey: '洛神/judgeResult' }] },
           // 黑色 → 获得此牌（TODO: 需动态引用判定牌 ID）
           {
             type: 'condition',

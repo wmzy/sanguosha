@@ -11,7 +11,7 @@ registerSkill({
     event: 'killHit',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -29,7 +29,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     // TODO: 复杂多玩家决斗交互，需要 duel 系统支持
     return [];
   },
@@ -43,9 +43,9 @@ registerSkill({
     event: 'turnEnd',
     source: 'character',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: 1 }] },
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 1 }] },
     ];
   },
 });
@@ -62,7 +62,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -78,11 +78,11 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'condition',
-        check: { not: { hasVar: { player: ctx.self, key: '青囊/usedThisTurn' } } },
+        check: { not: { hasVar: { player: _ctx.self, key: '青囊/usedThisTurn' } } },
         then: [
           {
             type: 'prompt',
@@ -96,7 +96,7 @@ registerSkill({
           {
             type: 'atoms',
             ops: [
-              { type: 'setVar', player: ctx.self, key: '青囊/usedThisTurn', value: true },
+              { type: 'setVar', player: _ctx.self, key: '青囊/usedThisTurn', value: true },
             ],
           },
         ],

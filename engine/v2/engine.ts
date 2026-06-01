@@ -2,14 +2,7 @@ import type {
   GameState,
   GameAction,
   EngineResult,
-  PendingResponseWindow,
-  PendingSkillPrompt,
-  PendingDiscardPhase,
-  PendingDyingWindow,
-  PendingSelectCard,
-  PendingHarvestSelection,
   SkillDef,
-  Atom,
 } from './types';
 import { validateAction } from './validate';
 import './atoms/index';
@@ -24,7 +17,7 @@ import { getSkillRegistry, registerSkill as registerSkillToGlobal } from './skil
 import { getPlayer, checkWinCondition } from './state';
 import { applyAtoms, createDyingPending } from './handlers/engine-utils';
 import { makeServerEvent } from './event';
-import { advanceToInteractivePhase, isAutoPhase } from './phase-advance';
+import { advanceToInteractivePhase } from './phase-advance';
 
 /** @deprecated 直接使用 skill.ts 的 registerSkill */
 export function registerSkill(def: SkillDef): void {
@@ -65,8 +58,10 @@ export function engine(state: GameState, action: GameAction): EngineResult {
         return { state, events: [], error: '响应动作仅在响应窗口中有效' };
       case 'skillChoice':
         return { state, events: [], error: '技能选择仅在技能提示中有效' };
-      default:
-        return { state, events: [], error: `未知操作: ${(action as any).type}` };
+      default: {
+        const t = (action as { type: string }).type;
+        return { state, events: [], error: `未知操作: ${t}` };
+      }
     }
   }
 
@@ -153,8 +148,10 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
     case 'harvestSelection':
       result = resolveHarvestSelection(state, action, pending);
       break;
-    default:
-      return { state, events: [], error: `未知 pending 类型: ${(pending as any).type}` };
+    default: {
+      const t = (pending as { type: string }).type;
+      return { state, events: [], error: `未知 pending 类型: ${t}` };
+    }
   }
 
   if (result.error || result.state.pending) return result;

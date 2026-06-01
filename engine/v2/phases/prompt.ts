@@ -1,4 +1,4 @@
-import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, PendingSkillPrompt } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, PendingSkillPrompt } from '../types';
 import { registerPhase } from '../phase';
 
 type PromptPhase = Extract<SkillPhase, { type: 'prompt' }>;

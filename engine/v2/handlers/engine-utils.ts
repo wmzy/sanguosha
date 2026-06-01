@@ -10,7 +10,7 @@ export function applyAtoms(state: GameState, atoms: Atom[]): { state: GameState;
   return { state: newState, events: newState.serverLog.slice(startLen) };
 }
 
-export function createDyingPending(state: GameState, dyingPlayer: string, source?: string): PendingDyingWindow {
+export function createDyingPending(state: GameState, dyingPlayer: string, _source?: string): PendingDyingWindow {
   const timeout = TIMEOUT_DEFAULTS.dyingResponse;
   const alivePlayers = getAlivePlayerNames(state);
   // 濒死者优先自救，再按顺序询问其他玩家

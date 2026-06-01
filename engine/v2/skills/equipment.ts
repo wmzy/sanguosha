@@ -9,7 +9,7 @@ registerSkill({
     event: 'killHit',
     source: 'equipment',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -22,7 +22,7 @@ registerSkill({
     event: 'killHit',
     source: 'equipment',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -36,7 +36,7 @@ registerSkill({
     source: 'equipment',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'prompt',
@@ -61,7 +61,7 @@ registerSkill({
     source: 'equipment',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
       {
         type: 'prompt',
@@ -85,7 +85,7 @@ registerSkill({
     event: 'killHit',
     source: 'equipment',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     // TODO: 检查目标性别是否不同，若不同则双方各弃置一张手牌
     return [];
   },
@@ -100,9 +100,9 @@ registerSkill({
     source: 'equipment',
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'judge', player: ctx.self }] },
+      { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
       // TODO: 检查判定结果颜色，若红色则视为出闪
     ];
   },
@@ -116,7 +116,7 @@ registerSkill({
     event: 'killResponse',
     source: 'equipment',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -129,7 +129,7 @@ registerSkill({
     event: 'killHit',
     source: 'equipment',
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 });
@@ -144,7 +144,7 @@ registerSkill({
     manual: true,
     optional: true,
   },
-  handler(ctx, state) {
+  handler(_ctx, _state) {
     return [];
   },
 } satisfies SkillDef);

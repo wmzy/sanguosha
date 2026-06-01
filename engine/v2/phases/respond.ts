@@ -1,4 +1,4 @@
-import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, PendingResponseWindow, ResponseWindowDef, TIMEOUT_DEFAULTS } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, PendingResponseWindow, ResponseWindowDef } from '../types';
 import { TIMEOUT_DEFAULTS as timeouts } from '../types';
 import { registerPhase } from '../phase';
 
@@ -15,7 +15,7 @@ const timeoutByType: Record<ResponseWindowDef['type'], number> = {
 export function register() {
   registerPhase<RespondPhase>({
     type: 'respond',
-    execute(state: GameState, phase: RespondPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
+    execute(state: GameState, phase: RespondPhase, _ctx: SkillContext, _plan: SkillPhase[], _index: number): EngineResult {
       const timeout = timeoutByType[phase.window.type];
       const deadline = Date.now() + timeout;
       const pending: PendingResponseWindow = {

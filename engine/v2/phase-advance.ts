@@ -8,8 +8,7 @@
  * 只有出牌阶段和弃牌阶段需要玩家交互，其余阶段自动推进。
  */
 
-import type { GameState, ServerEvent, EngineResult, GameEvent, Atom, PendingResponseWindow } from './types';
-import { TIMEOUT_DEFAULTS } from './types';
+import type { GameState, ServerEvent, EngineResult, GameEvent, Atom } from './types';
 import type { TurnPhase } from '../../shared/types';
 import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';

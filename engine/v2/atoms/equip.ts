@@ -2,7 +2,6 @@ import type { GameState, Atom, AtomEventResult, EquipSlot, Json } from '../types
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
-import type { Card } from '../../../shared/types';
 
 const subtypeToSlot: Record<string, EquipSlot> = {
   武器: 'weapon',

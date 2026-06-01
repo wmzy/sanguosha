@@ -1,4 +1,4 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom, AtomEventResult } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
