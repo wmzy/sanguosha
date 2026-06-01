@@ -273,34 +273,35 @@ describe('边界: AOE/决斗', () => {
       expect(r1.pending.window.defender).toBe('P2');
     }
 
-    // P2 出杀响应 → 免伤，进入 P3 的窗口
+    // P2 出杀响应 → 免伤，进入 P3 的无懈可击窗口
     const killInP2 = findCardInHand(r1, 'P2', '杀')!;
-    const r2 = engine(r1, { type: 'respond', player: 'P2', cardId: killInP2 });
-    expect(r2.error).toBeUndefined();
-    // 杀进入弃牌
-    expect(r2.state.zones.discardPile.includes(killInP2)).toBe(true);
-    // 下一个 pending 是 P3 的 aoeResponse
-    expect(r2.state.pending?.type).toBe('responseWindow');
-    if (r2.state.pending?.type === 'responseWindow') {
-      expect(r2.state.pending.window.type).toBe('aoeResponse');
-      expect(r2.state.pending.window.defender).toBe('P3');
+    const r2pre = engine(r1, { type: 'respond', player: 'P2', cardId: killInP2 });
+    expect(r2pre.error).toBeUndefined();
+    expect(r2pre.state.zones.discardPile.includes(killInP2)).toBe(true);
+    // 先进入 P3 的无懈可击窗口，pass 后才是 aoeResponse
+    const r2 = passAllTrickResponders(r2pre.state);
+    expect(r2.pending?.type).toBe('responseWindow');
+    if (r2.pending?.type === 'responseWindow') {
+      expect(r2.pending.window.type).toBe('aoeResponse');
+      expect(r2.pending.window.defender).toBe('P3');
     }
 
     // P3 不出杀 → 受 1 点伤害
-    const r3 = engine(r2.state, { type: 'respond', player: 'P3' });
-    expect(r3.error).toBeUndefined();
-    expect(r3.state.players['P3'].health).toBe(3); // 满血4，受伤变3
-    expect(r3.state.pending?.type).toBe('responseWindow');
-    if (r3.state.pending?.type === 'responseWindow') {
-      expect(r3.state.pending.window.type).toBe('aoeResponse');
-      expect(r3.state.pending.window.defender).toBe('P4');
+    const r3pre = engine(r2, { type: 'respond', player: 'P3' });
+    expect(r3pre.error).toBeUndefined();
+    expect(r3pre.state.players['P3'].health).toBe(3);
+    // 进入 P4 的无懈可击窗口，pass 后才是 aoeResponse
+    const r3 = passAllTrickResponders(r3pre.state);
+    expect(r3.pending?.type).toBe('responseWindow');
+    if (r3.pending?.type === 'responseWindow') {
+      expect(r3.pending.window.type).toBe('aoeResponse');
+      expect(r3.pending.window.defender).toBe('P4');
     }
 
     // P4（华佗 maxHealth=3）不出杀 → 受 1 点伤害 → 体力 2
-    const r4 = engine(r3.state, { type: 'respond', player: 'P4' });
+    const r4 = engine(r3, { type: 'respond', player: 'P4' });
     expect(r4.error).toBeUndefined();
     expect(r4.state.players['P4'].health).toBe(2);
-    // 所有响应结束，无 pending
     expect(r4.state.pending).toBeNull();
   });
 

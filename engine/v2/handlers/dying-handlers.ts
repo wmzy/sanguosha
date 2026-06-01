@@ -1,8 +1,8 @@
-import type { GameState, GameAction, EngineResult, Atom, PendingDyingWindow, PendingResponseWindow, ServerEvent } from '../types';
-import { TIMEOUT_DEFAULTS } from '../types';
+import type { GameState, GameAction, EngineResult, Atom, PendingDyingWindow, ServerEvent } from '../types';
 import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
+import { startAoeTargetWuxie } from './response-handlers';
 
 export function resolveDying(
   state: GameState,
@@ -120,30 +120,12 @@ function resumeAoeChain(
   );
   if (aliveTargets.length === 0) return { state, events: [] };
 
-  const nextTarget = aliveTargets[0];
-  const rest = aliveTargets.slice(1);
-  const targetPlayer = getPlayer(state, nextTarget);
-  const validCards = targetPlayer.hand.filter(
-    id => state.cardMap[id]?.name === aoe.requiredCard,
-  );
-  const timeout = TIMEOUT_DEFAULTS.aoeResponse;
-  const nextPending: PendingResponseWindow = {
-    type: 'responseWindow',
-    window: {
-      type: 'aoeResponse',
-      attacker: aoe.attacker,
-      defender: nextTarget,
-      validCards,
-      sourceCard: aoe.sourceCard,
-      remainingTargets: rest,
-      requiredCard: aoe.requiredCard,
-      timeout,
-      deadline: Date.now() + timeout,
-    },
-    timeout,
-    deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: nextTarget },
-  };
+  const result = startAoeTargetWuxie(state, {
+    attacker: aoe.attacker,
+    remainingTargets: aliveTargets,
+    requiredCard: aoe.requiredCard,
+    sourceCard: aoe.sourceCard,
+  });
 
-  return applyAtoms(state, [{ type: 'pushPending', action: nextPending }]);
+  return { state: result.state, events: result.events };
 }

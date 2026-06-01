@@ -137,6 +137,18 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
     }
   }, [lastMessage, perspective]);
 
+  // ── 自动切换到需要操作的玩家 ──────────────────────────────
+  useEffect(() => {
+    if (!state) return;
+    const active = _getSingleActivePlayer(state);
+    if (active && active !== perspective) {
+      setPerspective(active);
+      setPlayerOrder(rotatePlayers(state.playerOrder, active));
+    }
+    // 故意不包含 perspective：只在 state 变化时触发，手动切换视角不会触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
   const handleCreateDebugRoom = useCallback(() => {
     send({ type: 'create_debug_room', playerCount });
   }, [playerCount, send]);
@@ -311,8 +323,9 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
         setSelectedTarget(null);
       },
       goToCurrentPlayer: () => {
-        setPerspective(state.currentPlayer);
-        setPlayerOrder(rotatePlayers(state.playerOrder, state.currentPlayer));
+        const target = _getSingleActivePlayer(state) ?? state.currentPlayer;
+        setPerspective(target);
+        setPlayerOrder(rotatePlayers(state.playerOrder, target));
         setSelectedCardId(null);
         setSelectedTarget(null);
       },

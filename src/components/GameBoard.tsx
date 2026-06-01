@@ -237,9 +237,9 @@ export function GameBoard({ data }: { data: GameBoardData }) {
           <button onClick={switchPerspective} style={styles.smallBtn(colors.accent.blue)}>
             切换视角 ({myName})
           </button>
-          {myName !== state.currentPlayer && !isKillResponse && !isDyingWindow && (
+          {!isKillResponse && !isDyingWindow && (
             <button onClick={goToCurrentPlayer} style={styles.smallBtn(colors.accent.green)}>
-              查看当前玩家 ({state.currentPlayer})
+              查看活跃玩家
             </button>
           )}
         </div>

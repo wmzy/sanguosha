@@ -200,11 +200,17 @@ describe('AOE 濒死后响应链恢复', () => {
       dyingState = engine(dyingState, { type: 'respond', player: saver }).state;
     }
 
-    // 死亡后应该恢复 AOE 链（或游戏结束）
+    // 死亡后应该恢复 AOE 链（先进入下一个目标的无懈可击窗口）
     if (dyingState.pending) {
       expect(dyingState.pending.type).toBe('responseWindow');
       if (dyingState.pending.type === 'responseWindow') {
-        expect(dyingState.pending.window.type).toBe('aoeResponse');
+        // per-target 无懈可击：先进入 trickResponse，pass 后才是 aoeResponse
+        if (dyingState.pending.window.type === 'trickResponse') {
+          dyingState = passAllTrickResponders(dyingState);
+        }
+        if (dyingState.pending?.type === 'responseWindow') {
+          expect(dyingState.pending.window.type).toBe('aoeResponse');
+        }
       }
     }
   });

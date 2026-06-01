@@ -274,6 +274,19 @@ export function useGame() {
     };
   }, [state.pending?.deadline, state.pending?.type, state.meta.status, state]);
 
+  // ── 自动切换到需要操作的玩家 ──────────────────────────────
+  useEffect(() => {
+    const active = _getSingleActivePlayer(state);
+    if (active && active !== myName) {
+      setMyName(active);
+      setPlayerOrder(rotatePlayers(PLAYER_NAMES, active));
+      setSelectedCardId(null);
+      setSelectedTarget(null);
+    }
+    // 故意不包含 myName：只在 state 变化时触发，手动切换视角不会触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
   // ── dispatch helper ─────────────────────────────────────────
   const dispatch = useCallback((action: GameAction) => {
     const result = engine(state, action);
@@ -483,11 +496,12 @@ export function useGame() {
   }, [myName]);
 
   const goToCurrentPlayer = useCallback(() => {
-    setMyName(state.currentPlayer);
-    setPlayerOrder(rotatePlayers(PLAYER_NAMES, state.currentPlayer));
+    const target = _getSingleActivePlayer(state) ?? state.currentPlayer;
+    setMyName(target);
+    setPlayerOrder(rotatePlayers(PLAYER_NAMES, target));
     setSelectedCardId(null);
     setSelectedTarget(null);
-  }, [state.currentPlayer]);
+  }, [state]);
 
   const handleSaveLog = useCallback(() => {
     saveState(state);

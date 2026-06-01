@@ -14,7 +14,7 @@ import { getDistance, isInAttackRange } from '../distance';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
 import { emitEvent } from '../skill';
-import { createConcurrentTrickResponse } from './response-handlers';
+import { createConcurrentTrickResponse, startAoeTargetWuxie } from './response-handlers';
 import { getSkillConvertedCards } from '../validate';
 
 export function handlePlayCard(
@@ -352,7 +352,6 @@ function handleTrickCard(
         p => p !== player && getPlayer(state, p).info.alive,
       );
 
-      // 先弃源牌
       const moveAtom: Atom = {
         type: 'moveCard',
         cardId: action.cardId,
@@ -365,61 +364,18 @@ function handleTrickCard(
         return { state: result.state, events: [...result.events, cardPlayedEvent] };
       }
 
-      // 开无懈可击窗口，附带 aoeResume 上下文
-      const attackerIndex = state.playerOrder.indexOf(player);
-      const afterAttacker = state.playerOrder.slice(attackerIndex + 1).filter(
-        p => getPlayer(state, p).info.alive,
-      );
-      const beforeAttacker = state.playerOrder.slice(0, attackerIndex).filter(
-        p => getPlayer(state, p).info.alive,
-      );
-      const allPlayers = [...afterAttacker, ...beforeAttacker];
-
-      if (allPlayers.length === 0) {
-        // 无其他人可出无懈，直接进入 AOE 响应链
-        const firstTarget = affected[0];
-        const remaining = affected.slice(1);
-        const firstPlayer = getPlayer(state, firstTarget);
-        const validCards = firstPlayer.hand.filter(
-          id => state.cardMap[id]?.name === requiredCard,
-        );
-        const timeout = TIMEOUT_DEFAULTS.aoeResponse;
-        const responseWindow: PendingResponseWindow = {
-          type: 'responseWindow',
-          window: {
-            type: 'aoeResponse',
-            attacker: player,
-            defender: firstTarget,
-            validCards,
-            sourceCard: action.cardId,
-            remainingTargets: remaining,
-            requiredCard,
-            timeout,
-            deadline: Date.now() + timeout,
-          },
-          timeout,
-          deadline: Date.now() + timeout,
-          onTimeout: { type: 'respond', player: firstTarget },
-        };
-        const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: responseWindow }]);
-        return { state: result.state, events: [...result.events, cardPlayedEvent] };
-      }
-
-      const trickResponse = createConcurrentTrickResponse(state, {
-        sourceCard: action.cardId,
+      const { state: movedState, events: moveEvents } = applyAtoms(state, [moveAtom]);
+      const wuxieResult = startAoeTargetWuxie(movedState, {
         attacker: player,
-        responders: allPlayers,
-        depth: 0,
-        aoeResume: {
-          attacker: player,
-          remainingTargets: affected,
-          requiredCard,
-          sourceCard: action.cardId,
-        },
+        remainingTargets: affected,
+        requiredCard,
+        sourceCard: action.cardId,
       });
 
-      const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      return {
+        state: wuxieResult.state,
+        events: [...moveEvents, ...wuxieResult.events, cardPlayedEvent],
+      };
     }
 
     // ── 其他锦囊（无懈可击等） ──

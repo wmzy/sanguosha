@@ -243,34 +243,12 @@ function resolveAoeResponse(
 
   // 还有剩余玩家需要响应 → 创建下一个 aoeResponse
   if (remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard) {
-    const nextTarget = remainingTargets[0];
-    const nextRemaining = remainingTargets.slice(1);
-    const targetPlayer = getPlayer(currentState, nextTarget);
-    const validCards = targetPlayer.hand.filter(
-      id => currentState.cardMap[id]?.name === requiredCard,
-    );
-    const timeout = TIMEOUT_DEFAULTS.aoeResponse;
-    const nextPending: PendingResponseWindow = {
-      type: 'responseWindow',
-      window: {
-        type: 'aoeResponse',
-        attacker,
-        defender: nextTarget,
-        validCards,
-        sourceCard,
-        remainingTargets: nextRemaining,
-        requiredCard,
-        timeout,
-        deadline: Date.now() + timeout,
-      },
-      timeout,
-      deadline: Date.now() + timeout,
-      onTimeout: { type: 'respond', player: nextTarget },
-    };
-    const { state: pushState, events: pushEvents } = applyAtoms(currentState, [
-      { type: 'pushPending', action: nextPending },
-    ]);
-    return { state: pushState, events: [...currentEvents, ...pushEvents] };
+    return startAoeTargetWuxie(currentState, {
+      attacker,
+      remainingTargets,
+      requiredCard,
+      sourceCard,
+    });
   }
 
   return { state: currentState, events: currentEvents };
@@ -416,7 +394,16 @@ function resolveTrickResolution(
   }
 
   if (aoeResume) {
-    if (negated) return { state, events: [] };
+    if (negated) {
+      const nextTargets = aoeResume.remainingTargets.slice(1);
+      if (nextTargets.length === 0) return { state, events: [] };
+      return startAoeTargetWuxie(state, {
+        attacker: aoeResume.attacker,
+        remainingTargets: nextTargets,
+        requiredCard: aoeResume.requiredCard,
+        sourceCard: aoeResume.sourceCard,
+      });
+    }
     return executeAoeResume(state, aoeResume);
   }
 
@@ -613,6 +600,48 @@ function executeAoeResume(
   };
 
   return applyAtoms(state, [{ type: 'pushPending', action: nextPending }]);
+}
+
+/**
+ * 为 AOE 的下一个目标开启无懈可击询问窗口。
+ * remainingTargets[0] 是当前要处理的目标。
+ */
+export function startAoeTargetWuxie(
+  state: GameState,
+  params: {
+    attacker: string;
+    remainingTargets: string[];
+    requiredCard: string;
+    sourceCard: string;
+  },
+): EngineResult {
+  const { attacker, remainingTargets, requiredCard, sourceCard } = params;
+
+  // 过滤存活的目标
+  const aliveTargets = remainingTargets.filter(t => getPlayer(state, t).info.alive);
+  if (aliveTargets.length === 0) return { state, events: [] };
+
+  // 所有存活玩家都可以出无懈可击（包括出牌者）
+  const allAlive = getAlivePlayerNames(state);
+
+  if (allAlive.length === 0) {
+    // 无人可出无懈，直接创建 aoeResponse
+    return executeAoeResume(state, { attacker, remainingTargets: aliveTargets, requiredCard, sourceCard });
+  }
+
+  const currentTarget = aliveTargets[0];
+
+  // 创建无懈可击窗口，trickTarget 设为当前 AOE 目标
+  const trickResponse = createConcurrentTrickResponse(state, {
+    sourceCard,
+    attacker,
+    trickTarget: currentTarget,
+    responders: allAlive,
+    depth: 0,
+    aoeResume: { attacker, remainingTargets: aliveTargets, requiredCard, sourceCard },
+  });
+
+  return applyAtoms(state, [{ type: 'pushPending', action: trickResponse }]);
 }
 
 function resolveLegacyTrickResponse(
