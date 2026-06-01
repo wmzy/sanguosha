@@ -6,14 +6,11 @@ import type {
   PendingResponseWindow,
   PendingSelectCard,
   PendingHarvestSelection,
-  GameEvent,
-  ServerEvent,
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';
 import { makeServerEvent } from '../event';
-import { applyAtoms, createDyingPending } from './engine-utils';
-import { emitEvent } from '../skill';
+import { applyAtoms, applyDamage } from './engine-utils';
 import { isCardValidResponse } from '../validate';
 
 /**
@@ -123,7 +120,7 @@ function resolveKillResponse(
     return { state: result.state, events: [...result.events, dodgedEvent] };
   }
 
-  // ── 不出 → 受到伤害 ──
+  // ── 不出闪 → 受到伤害 ──
   let damageAmount = 1;
   if (attacker) {
     const attackerState = getPlayer(state, attacker);
@@ -132,66 +129,20 @@ function resolveKillResponse(
     }
   }
 
-  const damageAtoms: Atom[] = [
-    {
-      type: 'damage',
-      target: defender,
-      amount: damageAmount,
-      source: attacker,
-      cardId: pending.window.sourceCard,
-    },
-    { type: 'popPending' },
-  ];
-  const { state: damagedState, events: damageEvents } = applyAtoms(state, damageAtoms);
+  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: 'popPending' }]);
+  const damageResult = applyDamage(
+    popState, defender, damageAmount,
+    attacker ?? undefined, pending.window.sourceCard,
+  );
   const hitEvent = makeServerEvent('killHit', {
     attacker: attacker ?? '',
     defender,
   });
 
-  // 触发 damageDealt 事件，使依赖伤害的技能可以响应（反馈、遗计、刚烈等）
-  let s = damagedState;
-  let skillEvents: ServerEvent[] = [];
-  if (attacker) {
-    const damageEvent: GameEvent = {
-      type: 'damageDealt' as const,
-      source: attacker,
-      target: defender,
-      amount: damageAmount,
-      cardId: pending.window.sourceCard,
-    };
-    const skillResult = emitEvent(s, damageEvent);
-    s = skillResult.state;
-    skillEvents = skillResult.events;
-
-    // 如果技能产生了 pending（如刚烈的判定），先返回等待处理
-    // 同时设置延迟濒死检查，确保 pending 解决后不遗漏濒死判定
-    if (s.pending !== null) {
-      const defenderState = getPlayer(s, defender);
-      if (defenderState.health <= 0 && defenderState.info.alive) {
-        s = { ...s, deferredDyingCheck: { player: defender, source: attacker } };
-      }
-      return { state: s, events: [...damageEvents, hitEvent, ...skillEvents] };
-    }
-  }
-
-  // 检查濒死
-  const defenderState = getPlayer(s, defender);
-  if (defenderState.health <= 0 && defenderState.info.alive) {
-    const dyingPending = createDyingPending(s, defender, attacker);
-    const { state: dyingState, events: dyingEvents } = applyAtoms(s, [
-      { type: 'pushPending', action: dyingPending },
-    ]);
-    const dyingEvent = makeServerEvent('dying', {
-      player: defender,
-      ...(attacker ? { source: attacker } : {}),
-    });
-    return {
-      state: dyingState,
-      events: [...damageEvents, hitEvent, ...skillEvents, ...dyingEvents, dyingEvent],
-    };
-  }
-
-  return { state: s, events: [...damageEvents, hitEvent, ...skillEvents] };
+  return {
+    state: damageResult.state,
+    events: [...popEvents, ...damageResult.events, hitEvent],
+  };
 }
 
 function resolveAoeResponse(
@@ -206,52 +157,53 @@ function resolveAoeResponse(
   const { defender, attacker, remainingTargets, requiredCard, sourceCard } = pending.window;
 
   // 处理当前玩家的响应
-  let currentState = state;
-  let currentEvents: ServerEvent[];
-
   if (action.cardId) {
     const atoms: Atom[] = [
       { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player: defender }, to: { zone: 'discardPile' } },
       { type: 'popPending' },
     ];
     const result = applyAtoms(state, atoms);
-    currentState = result.state;
-    currentEvents = result.events;
-  } else {
-    const damageAtoms: Atom[] = [
-      { type: 'damage', target: defender, amount: 1, source: attacker },
-      { type: 'popPending' },
-    ];
-    const result = applyAtoms(currentState, damageAtoms);
-    currentState = result.state;
-    currentEvents = result.events;
+    const s = result.state;
+    const events = result.events;
+
+    // 还有剩余玩家需要响应 → 创建下一个 aoeResponse
+    if (remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard) {
+      return startAoeTargetWuxie(s, { attacker, remainingTargets, requiredCard, sourceCard });
+    }
+    return { state: s, events };
   }
 
-  // 检查濒死
-  const defState = getPlayer(currentState, defender);
-  if (defState.health <= 0 && defState.info.alive) {
-    const dyingPending = createDyingPending(currentState, defender, attacker);
-    const resumeAoe = remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard
-      ? { attacker, remainingTargets, requiredCard, sourceCard }
-      : undefined;
-    const dyingWithResume = { ...dyingPending, resumeAoe };
-    const { state: dyingState, events: dyingEvents } = applyAtoms(currentState, [
-      { type: 'pushPending', action: dyingWithResume },
-    ]);
-    return { state: dyingState, events: [...currentEvents, ...dyingEvents] };
+  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: 'popPending' }]);
+  const damageResult = applyDamage(
+    popState, defender, 1,
+    attacker ?? undefined, sourceCard,
+  );
+  const allEvents = [...popEvents, ...damageResult.events];
+
+  const hasRemainingTargets = !!(remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard);
+
+  if (damageResult.state.pending?.type === 'dyingWindow' && hasRemainingTargets) {
+    const resumeAoe = { attacker: attacker!, remainingTargets: remainingTargets!, requiredCard: requiredCard!, sourceCard: sourceCard! };
+    return {
+      state: { ...damageResult.state, pending: { ...damageResult.state.pending, resumeAoe } },
+      events: allEvents,
+    };
   }
 
-  // 还有剩余玩家需要响应 → 创建下一个 aoeResponse
-  if (remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard) {
-    return startAoeTargetWuxie(currentState, {
-      attacker,
-      remainingTargets,
-      requiredCard,
-      sourceCard,
+  if (damageResult.state.pending !== null) {
+    return { state: damageResult.state, events: allEvents };
+  }
+
+  if (hasRemainingTargets) {
+    return startAoeTargetWuxie(damageResult.state, {
+      attacker: attacker!,
+      remainingTargets: remainingTargets!,
+      requiredCard: requiredCard!,
+      sourceCard: sourceCard!,
     });
   }
 
-  return { state: currentState, events: currentEvents };
+  return { state: damageResult.state, events: allEvents };
 }
 
 function resolveTrickResponse(
@@ -966,26 +918,13 @@ function resolveDuelResponse(
   }
 
   // 没出杀 → 当前防守方受 1 点伤害
-  const damageAtoms: Atom[] = [
-    { type: 'damage', target: defender, amount: 1, source: attacker },
-    { type: 'popPending' },
-  ];
-  const result = applyAtoms(state, damageAtoms);
+  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: 'popPending' }]);
+  const damageResult = applyDamage(popState, defender, 1, attacker, sourceCard);
 
-  // 检查濒死
-  const defenderState = getPlayer(result.state, defender);
-  if (defenderState.health <= 0 && defenderState.info.alive) {
-    const dyingPending = createDyingPending(result.state, defender, attacker);
-    const { state: dyingState, events: dyingEvents } = applyAtoms(result.state, [
-      { type: 'pushPending', action: dyingPending },
-    ]);
-    return {
-      state: dyingState,
-      events: [...result.events, ...dyingEvents],
-    };
-  }
-
-  return result;
+  return {
+    state: damageResult.state,
+    events: [...popEvents, ...damageResult.events],
+  };
 }
 
 function resolveDyingResponse(

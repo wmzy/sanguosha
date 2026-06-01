@@ -177,6 +177,16 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   let s = state;
   const allEvents: ServerEvent[] = [];
 
+  if (s.phase === '准备' && s.pending === null && !s.turn.phaseFlags.includes('turnStarted')) {
+    const turnStartEvent: GameEvent = { type: 'turnStart', player: s.currentPlayer };
+    const skillResult = emitEvent(s, turnStartEvent);
+    s = { ...skillResult.state, turn: { ...skillResult.state.turn, phaseFlags: [...skillResult.state.turn.phaseFlags, 'turnStarted'] } };
+    allEvents.push(...skillResult.events);
+    if (s.pending !== null) {
+      return { state: s, events: allEvents };
+    }
+  }
+
   while (s.pending === null && isAutoPhase(s.phase)) {
     if (isPreparationPhase(s.phase)) {
       s = clearTurnVars(s);

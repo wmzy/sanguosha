@@ -372,23 +372,18 @@ describe('真实路径验证: 杀→伤害→技能触发链', () => {
     const _beforeP1Hand = state.players['P1'].hand.length;
     const _beforeP2Hand = state.players['P2'].hand.length;
 
-    // ⚠️ 真实游戏路径
-    // 1. 出杀
     const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killCard, target: 'P2' });
     expect(r1.error).toBeUndefined();
     expect(r1.state.pending?.type).toBe('responseWindow');
 
-    // 2. 不闪
     const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
-    // 3. 验证 killHit ServerEvent（确认杀命中路径正确）
     expect(r2.events?.some(e => e.type === 'killHit')).toBe(true);
 
-    // 验证：奸雄没有触发（因为它监听 damageReceived，引擎发射的是 damageDealt）
-    // 事件类型不匹配 → 技能不响应
-    expect(r2.state.players['P1'].hand.length).toBe(_beforeP1Hand - 1); // P1 用了一张杀，手牌少 1
-    expect(r2.state.players['P2'].health).toBeLessThan(state.players['P2'].health); // P2 受伤
+    // 修复：engine 路径发射 damageReceived，奸雄正确触发拿回杀
+    expect(r2.state.players['P1'].hand.length).toBe(_beforeP1Hand);
+    expect(r2.state.players['P2'].health).toBeLessThan(state.players['P2'].health);
   });
 
   it('endTurn→turnEnd 事件→闭月技能触发（通过真实引擎路径）', () => {
@@ -657,11 +652,7 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
     // ⚠️ GameEvent damageDealt 被 emit，但技能监听的是 damageReceived
   });
 
-  it('通过 engine() 路径使用杀 → 奸雄触发但卡牌获取逻辑有误', () => {
-    // 奸雄监听 damageReceived（同上问题）
-    // 但在 resolveKillResponse 中，damageDealt 事件的 payload 包含 cardId
-    // 而奸雄的 handler 检查 ctx.sourceCard
-    // 如果发射的是 damageDealt 而非 damageReceived，ctx.sourceCard 可能为空
+  it('通过 engine() 路径使用杀 → 奸雄正确触发获取源牌', () => {
     let state = setPlayPhase(createTestGame({ characters: ['曹操', '刘备'] }));
     state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
     state = injectCard(state, 'P1', '杀');
@@ -671,12 +662,9 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
     const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
     const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
 
-    // 奸雄监听 damageReceived，引擎发射 damageDealt
-    // 事件类型不匹配 → 奸雄不触发
-    // 验证: P1 使用了一张杀（手牌-1），奸雄未触发（不会再+1）
-    expect(r2.state.players['P1'].hand.length).toBe(beforeHand - 1);
-    // ⚠️ 通过直接 emitEvent(damageReceived) 可以触发奸雄
-    // 但 engine() 路径不发射 damageReceived
+    // 修复：engine 路径现在发射 damageReceived，奸雄正确触发 gainCard
+    // P1 用杀（手牌-1）→ 受伤 → 奸雄触发拿回杀（手牌+1）→ 手牌恢复
+    expect(r2.state.players['P1'].hand.length).toBe(beforeHand);
   });
 
   // ── phaseBegin 技能（核心系统性 bug） ──
