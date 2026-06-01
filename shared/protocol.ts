@@ -1,4 +1,4 @@
-import type { TurnPhase, Card, Role, Gender, Faction, PendingTrick } from './types';
+import type { TurnPhase, Card, Role, Gender, Faction } from './types';
 
 export interface ClientPlayer {
   name: string;

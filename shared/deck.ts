@@ -4,7 +4,7 @@ import type { Rng } from './rng';
 const suits: Suit[] = ['♠', '♥', '♣', '♦'];
 const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-function card(name: string, type: Card['type'], subtype: Card['subtype'], suit: Suit, rank: Rank): Card {
+function _card(name: string, type: Card['type'], subtype: Card['subtype'], suit: Suit, rank: Rank): Card {
   return { name, type, subtype, suit, rank, description: '', id: `${name}-${suit}-${rank}` };
 }
 

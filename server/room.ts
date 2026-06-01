@@ -11,6 +11,7 @@ export interface Room {
   status: '等待中' | '进行中' | '已结束';
   hostId: string;
   readyPlayers: Set<string>;
+  isDebug?: boolean;
 }
 
 const roomList = new Map<string, Room>();

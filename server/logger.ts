@@ -27,10 +27,12 @@ function formatMessage(level: LogLevel, context: string, message: string, data?:
 export function createLogger(context: string) {
   return {
     debug(message: string, data?: unknown) {
-      if (shouldLog('debug')) console.debug(formatMessage('debug', context, message, data));
+      // eslint-disable-next-line no-console
+      if (shouldLog('debug')) console.log(formatMessage('debug', context, message, data));
     },
     info(message: string, data?: unknown) {
-      if (shouldLog('info')) console.info(formatMessage('info', context, message, data));
+      // eslint-disable-next-line no-console
+      if (shouldLog('info')) console.log(formatMessage('info', context, message, data));
     },
     warn(message: string, data?: unknown) {
       if (shouldLog('warn')) console.warn(formatMessage('warn', context, message, data));

@@ -1,7 +1,7 @@
 import type { GameAction, GameState, ClientPlayer, GameView, ValidAction, PendingView } from '../engine/v2/types';
 import type { ServerMessage } from './protocol';
 import type { Room } from './room';
-import { createInitialState, getPlayer, getAlivePlayerNames } from '../engine/v2/state';
+import { createInitialState, getPlayer } from '../engine/v2/state';
 import { engine } from '../engine/v2/engine';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/v2/serializer';
 import { registerCharacterTriggers } from '../engine/v2/skill';
@@ -128,32 +128,44 @@ function getPendingPrompt(windowType: string): string {
 export class GameSession {
   private state: GameState | null = null;
   private room: Room;
+  private debug: boolean;
   private playerNames = new Map<string, string>();
   private timeoutTimer: ReturnType<typeof setInterval> | null = null;
-  private logger = createLogger('./logger');
+  private logger = createLogger('session');
 
-  constructor(room: Room) {
+  constructor(room: Room, debug = false) {
     this.room = room;
+    this.debug = debug;
   }
 
-  startGame(): boolean {
-    if (this.room.players.size < 2) return false;
+  startGame(playerCount?: number): boolean {
+    const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
+    if (!this.debug && count < 2) return false;
+    if (this.debug && count < 2) return false;
 
     const seed = Date.now();
     const shuffled = [...allCharacters].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, this.room.players.size);
-    const roles = assignRoles(this.room.players.size);
+    const selected = shuffled.slice(0, count);
+    const roles = assignRoles(count);
 
-    const playerIds = [...this.room.players.keys()];
-    const players = playerIds.map((id, i) => ({
-      name: selected[i].name,
-      characterId: selected[i].name,
+    if (this.debug) {
+      // 调试模式：只有 1 个 WS 连接，为所有虚拟玩家建立映射
+      const playerId = this.room.players.keys().next().value!;
+      for (let i = 0; i < count; i++) {
+        this.playerNames.set(`${playerId}:${selected[i].name}`, selected[i].name);
+      }
+    } else {
+      const playerIds = [...this.room.players.keys()];
+      for (let i = 0; i < playerIds.length; i++) {
+        this.playerNames.set(playerIds[i], selected[i].name);
+      }
+    }
+
+    const players = selected.map((char, i) => ({
+      name: char.name,
+      characterId: char.name,
       role: roles[i],
     }));
-
-    for (let i = 0; i < playerIds.length; i++) {
-      this.playerNames.set(playerIds[i], selected[i].name);
-    }
 
     let state = createInitialState({
       players,
@@ -164,6 +176,10 @@ export class GameSession {
     for (const playerName of state.playerOrder) {
       state = registerCharacterTriggers(state, playerName, { characterMap });
     }
+
+    // 触发 startGame 自动阶段推进（准备→判定→摸牌→出牌）
+    const startResult = engine(state, { type: 'startGame' });
+    state = startResult.state;
 
     this.state = state;
 
@@ -182,18 +198,22 @@ export class GameSession {
       return;
     }
 
-    const playerName = this.playerNames.get(playerId);
-    if (!playerName) {
-      this.sendToPlayer(playerId, { type: 'error', message: '玩家不在游戏中' });
-      return;
+    let fullAction: GameAction;
+    if (this.debug) {
+      fullAction = action;
+    } else {
+      const playerName = this.playerNames.get(playerId);
+      if (!playerName) {
+        this.sendToPlayer(playerId, { type: 'error', message: '玩家不在游戏中' });
+        return;
+      }
+      fullAction = { ...action, player: playerName } as GameAction;
     }
 
     if (this.state.meta.status === '已结束') {
       this.sendToPlayer(playerId, { type: 'error', message: '游戏已结束' });
       return;
     }
-
-    const fullAction: GameAction = { ...action, player: playerName } as GameAction;
 
     const result = engine(this.state, fullAction);
 
@@ -212,21 +232,39 @@ export class GameSession {
   private broadcastEvents(events: import('../engine/v2/types').ServerEvent[]): void {
     if (events.length === 0) return;
 
+    const eventMsg = {
+      type: 'events' as const,
+      events: events.map(ev => ({
+        id: ev.id,
+        type: ev.type,
+        timestamp: ev.timestamp,
+        payload: ev.payload,
+      })),
+    };
+
+    if (this.debug) {
+      const realPlayerId = this.room.players.keys().next().value;
+      if (realPlayerId) this.sendToPlayer(realPlayerId, eventMsg);
+      return;
+    }
+
     for (const [pid] of this.playerNames) {
-      this.sendToPlayer(pid, {
-        type: 'events',
-        events: events.map(ev => ({
-          id: ev.id,
-          type: ev.type,
-          timestamp: ev.timestamp,
-          payload: ev.payload,
-        })),
-      });
+      this.sendToPlayer(pid, eventMsg);
     }
   }
 
   private broadcastGameView(): void {
-    if (this.state?.meta.status !== '进行中') return;
+    if (!this.state) return;
+
+    if (this.debug) {
+      const playerId = this.room.players.keys().next().value;
+      if (playerId) {
+        this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state });
+      }
+      return;
+    }
+
+    if (this.state.meta.status !== '进行中') return;
 
     for (const [playerId, playerName] of this.playerNames) {
       const view = buildGameView(this.state, playerName);
@@ -269,7 +307,14 @@ export class GameSession {
     }
   }
 
+  destroy(): void {
+    this.clearTimeoutTimer();
+    this.state = null;
+  }
+
   handleDisconnect(playerId: string): void {
+    if (this.debug) return;
+
     if (!this.state) return;
 
     const playerName = this.playerNames.get(playerId) ?? '未知玩家';

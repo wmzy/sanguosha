@@ -1,5 +1,4 @@
-import type { GameAction, GameView, ServerEvent } from '../engine/v2/types';
-import type { Role } from '../shared/types';
+import type { GameAction, GameState, GameView } from '../engine/v2/types';
 
 export interface PlayerEvent {
   id: string;
@@ -10,6 +9,7 @@ export interface PlayerEvent {
 
 export type ServerMessage =
   | { type: 'gameView'; view: GameView }
+  | { type: 'debugGameState'; state: GameState }
   | { type: 'events'; events: PlayerEvent[] }
   | { type: 'error'; message: string }
   | { type: 'gameOver'; winner: string }
@@ -25,6 +25,8 @@ export type ClientMessage =
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
   | { type: 'create_room'; name: string; maxPlayers: number }
+  | { type: 'create_debug_room'; playerCount: number }
+  | { type: 'delete_room' }
   | { type: 'start_game' }
   | { type: 'leave_room' }
   | { type: 'list_rooms' }
@@ -59,6 +61,10 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
       return typeof msg.playerId === 'string';
     case 'create_room':
       return typeof msg.name === 'string' && typeof msg.maxPlayers === 'number';
+    case 'create_debug_room':
+      return typeof msg.playerCount === 'number' && msg.playerCount >= 2 && msg.playerCount <= 8;
+    case 'delete_room':
+      return true;
     default:
       return false;
   }

@@ -44,6 +44,26 @@ app.get('/api/rooms/:id', (c) => {
   });
 });
 
+app.delete('/api/rooms/:id', (c) => {
+  const id = c.req.param('id');
+  const room = getRoom(id);
+  if (!room) return c.json({ error: '房间不存在' }, 404);
+  if (!room.isDebug) return c.json({ error: '只能删除调试房间' }, 403);
+
+  const session = gameSessions.get(id);
+  if (session) {
+    session.destroy();
+    gameSessions.delete(id);
+  }
+  const playerIds = [...room.players.keys()];
+  for (const pid of playerIds) {
+    playerRoomMap.delete(pid);
+    leaveRoom(id, pid);
+  }
+
+  return c.json({ success: true });
+});
+
 // WebSocket 消息处理
 export function handleWsMessage(
   playerId: string,
@@ -77,6 +97,12 @@ export function handleWsMessage(
       break;
     case 'reconnect':
       handleReconnect(playerId, message.playerId, ws);
+      break;
+    case 'create_debug_room':
+      handleCreateDebugRoom(playerId, message.playerCount, ws);
+      break;
+    case 'delete_room':
+      handleDeleteRoom(playerId);
       break;
   }
 }
@@ -246,18 +272,65 @@ function handleDisconnect(playerId: string): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
+  const room = getRoom(roomId);
+  // 调试房间：仅清理映射，不销毁会话和房间（供重连或手动删除）
+  if (room?.isDebug) {
+    playerRoomMap.delete(playerId);
+    return;
+  }
+
   const session = gameSessions.get(roomId);
   if (session) {
     session.handleDisconnect(playerId);
     gameSessions.delete(roomId);
   }
 
-  const room = leaveRoom(roomId, playerId);
+  const leftRoom = leaveRoom(roomId, playerId);
   playerRoomMap.delete(playerId);
 
-  if (room) {
-    broadcastMessage(room, serialize({ type: 'player_left', playerId }));
+  if (leftRoom) {
+    broadcastMessage(leftRoom, serialize({ type: 'player_left', playerId }));
   }
+}
+
+function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSContext): void {
+  try {
+    const existing = findRoomByPlayerId(playerId);
+    if (existing) {
+      leaveRoom(existing.id, playerId);
+      playerRoomMap.delete(playerId);
+    }
+
+    const room = createRoom(`调试${playerCount}人`, 1, playerId, ws);
+    room.isDebug = true;
+    playerRoomMap.set(playerId, room.id);
+
+    const session = new GameSession(room, true);
+    gameSessions.set(room.id, session);
+    session.startGame(playerCount);
+
+    ws.send(serialize({ type: 'room_joined', roomId: room.id, playerId }));
+  } catch (err) {
+    log.error('创建调试房间失败', { error: String(err) });
+    ws.send(serialize({ type: 'error', message: `创建调试房间失败: ${String(err)}` }));
+  }
+}
+
+function handleDeleteRoom(playerId: string): void {
+  const roomId = playerRoomMap.get(playerId);
+  if (!roomId) return;
+
+  const room = getRoom(roomId);
+  if (!room?.isDebug) return;
+
+  const session = gameSessions.get(roomId);
+  if (session) {
+    session.destroy();
+    gameSessions.delete(roomId);
+  }
+
+  leaveRoom(roomId, playerId);
+  playerRoomMap.delete(playerId);
 }
 
 function handleReconnect(currentPlayerId: string, previousPlayerId: string, ws: WSContext): void {
