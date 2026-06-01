@@ -23,8 +23,18 @@ registerSkill({
           { type: 'selectCards', from: 'hand', min: 1, max: 99 },
         ],
       },
-      // TODO: 弃置选择的牌，摸等量的牌
-      // 需要 ctx.choice 获取选择的 cardIds，然后 discard + draw
+      {
+        type: 'atoms',
+        ops: [
+          { type: 'discard', player: _ctx.self, cardIds: { $: 'ctx', path: 'choice.cardIds' } },
+        ],
+      },
+      {
+        type: 'atoms',
+        ops: [
+          { type: 'draw', player: _ctx.self, count: { $: 'count', source: { $: 'ctx', path: 'choice.cardIds' } } },
+        ],
+      },
     ];
   },
 });

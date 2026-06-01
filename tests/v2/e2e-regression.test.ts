@@ -313,8 +313,8 @@ describe('五谷丰登', () => {
     expect(r4.error).toBeUndefined();
     expect(r4.state.players.P2.hand).toContain(pick3);
 
-    // 选完后没有 pending，剩余牌（没有）进弃牌堆
-    expect(r4.state.pending).toBeNull();
+    // 选完后回到出牌阶段
+    expect(r4.state.pending?.type).toBe('playPhase');
   });
 
   it('牌堆不足时只翻出可用数量的牌', () => {

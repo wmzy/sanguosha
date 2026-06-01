@@ -26,6 +26,7 @@ export type ClientMessage =
   | { type: 'join_room'; roomId: string }
   | { type: 'create_room'; name: string; maxPlayers: number }
   | { type: 'create_debug_room'; playerCount: number }
+  | { type: 'join_debug_room'; roomId: string }
   | { type: 'delete_room' }
   | { type: 'start_game' }
   | { type: 'leave_room' }
@@ -63,6 +64,8 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
       return typeof msg.name === 'string' && typeof msg.maxPlayers === 'number';
     case 'create_debug_room':
       return typeof msg.playerCount === 'number' && msg.playerCount >= 2 && msg.playerCount <= 8;
+    case 'join_debug_room':
+      return typeof msg.roomId === 'string';
     case 'delete_room':
       return true;
     default:

@@ -82,12 +82,21 @@ export interface TurnState {
   phaseFlags: string[]; // 'skipDraw', 'skipPlay', etc.
 }
 export type PendingAction =
+  | PendingPlayPhase
   | PendingResponseWindow
   | PendingSkillPrompt
   | PendingDiscardPhase
   | PendingDyingWindow
   | PendingSelectCard
   | PendingHarvestSelection;
+
+export interface PendingPlayPhase {
+  type: 'playPhase';
+  player: string;
+  timeout: number;
+  deadline: number;
+  onTimeout: GameAction;
+}
 
 export interface PendingResponseWindow {
   type: 'responseWindow';

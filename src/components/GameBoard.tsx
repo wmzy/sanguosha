@@ -5,7 +5,7 @@ import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
 import { LogPanel } from './LogPanel';
 import { allCharacters } from '../../shared/characters';
-import type { PlayerState, ValidAction } from '../../engine/v2/types';
+import type { PlayerState, ValidAction, PromptOption, Json } from '../../engine/v2/types';
 import type { Card } from '../../shared/types';
 import type { Operation } from '../../shared/log';
 import { colors, styles } from '../theme';
@@ -26,6 +26,7 @@ interface PendingPrompt {
   targetPlayer?: string;
   targetCardIds?: string[];
   selectMode?: 'discard' | 'steal';
+  options?: PromptOption[];
 }
 
 export interface GameBoardData {
@@ -63,6 +64,9 @@ export interface GameBoardData {
   selectHarvestCard: (cardId: string) => void;
   availableSkills: import('../../engine/v2/types').AvailableSkill[];
   handleActivateSkill: (skillId: string, target?: string) => void;
+  selectedSkillCards: Set<string>;
+  toggleSkillCardSelection: (cardId: string) => void;
+  handleSkillChoice: (choice: Json) => void;
   myHand: Card[];
   orderedPlayers: Array<{ name: string; player: PlayerState }>;
   switchPerspective: () => void;
@@ -94,6 +98,9 @@ export function GameBoard({ data }: { data: GameBoardData }) {
     goToCurrentPlayer,
     availableSkills,
     handleActivateSkill,
+    selectedSkillCards,
+    toggleSkillCardSelection,
+    handleSkillChoice,
     pendingPrompt,
     hasDodge,
     respondAction,
@@ -141,6 +148,9 @@ export function GameBoard({ data }: { data: GameBoardData }) {
     const p = state.pending;
     if (!p) return s;
     switch (p.type) {
+      case 'playPhase':
+        s.add(p.player);
+        break;
       case 'responseWindow':
         if (p.window.type === 'trickResponse' && p.window.responders) {
           const passed = p.window.passedResponders ?? [];
@@ -175,6 +185,7 @@ export function GameBoard({ data }: { data: GameBoardData }) {
   const isSelectCard = pendingPrompt?.type === 'selectCard';
   const isHarvestSelection = pendingPrompt?.type === 'harvestSelection';
   const isDyingWindow = pendingPrompt?.type === 'dyingWindow';
+  const isSkillPrompt = pendingPrompt?.type === 'skillPrompt';
 
   const renderPlayerPanel = (entry: { name: string; player: PlayerState }) => {
     const { name, player } = entry;
@@ -377,6 +388,60 @@ export function GameBoard({ data }: { data: GameBoardData }) {
             </div>
           );
         })()}
+
+      {isSkillPrompt && pendingPrompt && (() => {
+        const selectCardsOption = pendingPrompt.options?.find(o => 'type' in o && o.type === 'selectCards');
+        if (!selectCardsOption || !('type' in selectCardsOption)) return null;
+        const min = selectCardsOption.min ?? 1;
+        const max = selectCardsOption.max ?? 99;
+        const isCurrentPlayer = state.pending?.type === 'skillPrompt' && state.pending.player === myName;
+        return (
+          <div
+            style={{
+              textAlign: 'center',
+              marginBottom: 16,
+              padding: 12,
+              backgroundColor: colors.accent.blue,
+              borderRadius: 8,
+              fontSize: 16,
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: 8 }}>{pendingPrompt.text}</div>
+            {isCurrentPlayer ? (
+              <div>
+                <div style={{ fontSize: 13, color: colors.text.dim, marginBottom: 8 }}>
+                  点击手牌选择（已选 {selectedSkillCards.size}，最少 {min} 张）
+                </div>
+                <button
+                  onClick={() => {
+                    if (selectedSkillCards.size >= min && selectedSkillCards.size <= max) {
+                      handleSkillChoice({ cardIds: [...selectedSkillCards] });
+                    }
+                  }}
+                  disabled={selectedSkillCards.size < min || selectedSkillCards.size > max}
+                  style={styles.btn(
+                    selectedSkillCards.size >= min && selectedSkillCards.size <= max
+                      ? colors.accent.green
+                      : colors.disabled,
+                    {
+                      cursor:
+                        selectedSkillCards.size >= min && selectedSkillCards.size <= max
+                          ? 'pointer'
+                          : 'not-allowed',
+                    },
+                  )}
+                >
+                  确认（{selectedSkillCards.size} 张）
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 14, color: colors.text.dim }}>
+                等待技能发动者选择...
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {isTrickResponse && pendingPrompt && (
         <div
@@ -625,7 +690,7 @@ export function GameBoard({ data }: { data: GameBoardData }) {
             }
           }}
           playableIndices={
-            isMyTurn && !isKillResponse && !isDyingWindow && !needsDiscard
+            isMyTurn && !isKillResponse && !isDyingWindow && !needsDiscard && !isSkillPrompt
               ? me.hand.map((id, idx) => (playableCardIds.has(id) ? idx : -1)).filter((i) => i >= 0)
               : undefined
           }
@@ -636,7 +701,13 @@ export function GameBoard({ data }: { data: GameBoardData }) {
                     .map((id, idx) => (selectedForDiscard.has(id) ? idx : -1))
                     .filter((i) => i >= 0),
                 )
-              : undefined
+              : isSkillPrompt && state.pending?.type === 'skillPrompt' && state.pending.player === myName
+                ? new Set(
+                    me.hand
+                      .map((id, idx) => (selectedSkillCards.has(id) ? idx : -1))
+                      .filter((i) => i >= 0),
+                  )
+                : undefined
           }
           onToggleDiscard={
             needsDiscard
@@ -644,7 +715,12 @@ export function GameBoard({ data }: { data: GameBoardData }) {
                   const cardId = me.hand[index];
                   if (cardId) toggleDiscardSelection(cardId);
                 }
-              : undefined
+              : isSkillPrompt && state.pending?.type === 'skillPrompt' && state.pending.player === myName
+                ? (index) => {
+                    const cardId = me.hand[index];
+                    if (cardId) toggleSkillCardSelection(cardId);
+                  }
+                : undefined
           }
         />
       </div>

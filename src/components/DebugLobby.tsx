@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { GameBoard } from './GameBoard';
 import type { GameBoardData } from './GameBoard';
 import { computeValidActions } from '../../engine/v2/validate';
 import { getDistance } from '../../engine/v2/distance';
 import { getPlayer } from '../../engine/v2/state';
-import type { GameState, GameAction, ValidAction, PlayerState } from '../../engine/v2/types';
+import type { GameState, GameAction, ValidAction, PlayerState, PromptOption, Json } from '../../engine/v2/types';
 import type { Card } from '../../shared/types';
 import { saveState } from '../utils/logFile';
 import { colors, styles } from '../theme';
@@ -30,6 +31,7 @@ interface PendingPrompt {
   targetPlayer?: string;
   targetCardIds?: string[];
   selectMode?: 'discard' | 'steal';
+  options?: PromptOption[];
 }
 
 function extractPendingPrompt(state: GameState): PendingPrompt | null {
@@ -61,7 +63,7 @@ function extractPendingPrompt(state: GameState): PendingPrompt | null {
     case 'dyingWindow':
       return { type: 'dyingWindow', text: `${pending.dyingPlayer} 濒死！需要桃来救援`, dyingPlayer: pending.dyingPlayer, savers: pending.savers, currentSaver: pending.savers[pending.currentSaverIndex] };
     case 'skillPrompt':
-      return { type: 'skillPrompt', text: pending.prompt.text };
+      return { type: 'skillPrompt', text: pending.prompt.text, options: pending.prompt.options };
     case 'selectCard':
       return { type: 'selectCard', text: pending.mode === 'steal' ? '顺手牵羊：选择要获得的牌' : '过河拆桥：选择要弃掉的牌', targetPlayer: pending.target, targetCardIds: pending.cardIds, selectMode: pending.mode };
     case 'harvestSelection':
@@ -87,6 +89,7 @@ function _getSingleActivePlayer(state: GameState): string | null {
       case 'selectCard': return pending.player;
       case 'harvestSelection': return pending.pickOrder[pending.currentPickerIndex];
       case 'skillPrompt': return pending.player;
+      case 'playPhase': return pending.player;
       default: return null;
     }
   }
@@ -101,28 +104,63 @@ const defaultMe: PlayerState = {
 
 interface DebugLobbyProps {
   onExit: () => void;
+  initialRoomId?: string;
 }
 
-export function DebugLobby({ onExit }: DebugLobbyProps) {
+const STORAGE_KEY = 'debug_session';
+
+function storeSession(roomId: string, playerId: string) {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ roomId, playerId }));
+}
+
+function loadSession(): { roomId: string; playerId: string } | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearSession() {
+  sessionStorage.removeItem(STORAGE_KEY);
+}
+
+export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) {
+  const navigate = useNavigate();
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = useMemo(() => `${wsProtocol}//${window.location.host}/ws`, [wsProtocol]);
   const { connected, messages, drainMessages, send, connect } = useWebSocket(wsUrl);
 
   const [playerCount, setPlayerCount] = useState(5);
   const [error, setError] = useState<string | null>(null);
-
   const [state, setState] = useState<GameState | null>(null);
   const [perspective, setPerspective] = useState('');
   const [playerOrder, setPlayerOrder] = useState<string[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
+  const hasRequestedRef = useRef(false);
+  const [selectedSkillCards, setSelectedSkillCards] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     connect();
   }, [connect]);
 
-  // 处理所有收到的 WebSocket 消息（队列模式，避免 React 批量更新吞消息）
+  useEffect(() => {
+    if (!connected || hasRequestedRef.current) return;
+    if (!initialRoomId) return;
+    const session = loadSession();
+    if (session?.roomId === initialRoomId) {
+      hasRequestedRef.current = true;
+      send({ type: 'reconnect', playerId: session.playerId });
+    } else {
+      hasRequestedRef.current = true;
+      send({ type: 'join_debug_room', roomId: initialRoomId });
+    }
+  }, [connected, initialRoomId, send]);
+
   useEffect(() => {
     if (messages.length === 0) return;
     for (const msg of messages) {
@@ -133,13 +171,22 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
           setPlayerOrder(rotatePlayers(msg.state.playerOrder, msg.state.currentPlayer));
         }
       }
+      if (msg.type === 'room_joined') {
+        storeSession(msg.roomId, msg.playerId);
+        window.history.replaceState(null, '', `/debug/${msg.roomId}`);
+      }
       if (msg.type === 'error') {
-        setError(msg.message);
-        setTimeout(() => setError(null), 3000);
+        if (initialRoomId && !state) {
+          clearSession();
+          navigate('/debug', { replace: true });
+        } else {
+          setError(msg.message);
+          setTimeout(() => setError(null), 3000);
+        }
       }
     }
     drainMessages();
-  }, [messages, perspective, drainMessages]);
+  }, [messages, perspective, drainMessages, navigate, initialRoomId, state, playerCount, send]);
 
   // ── 自动切换到需要操作的玩家 ──────────────────────────────
   useEffect(() => {
@@ -153,12 +200,29 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const handleCreateDebugRoom = useCallback(() => {
-    send({ type: 'create_debug_room', playerCount });
-  }, [playerCount, send]);
+  const handleCreateDebugRoom = useCallback(async () => {
+    try {
+      const res = await fetch('/api/debug-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerCount }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? '创建失败');
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
+      navigate(`/debug/${data.roomId}`, { replace: true });
+    } catch {
+      setError('网络错误');
+      setTimeout(() => setError(null), 3000);
+    }
+  }, [playerCount, navigate]);
 
   const handleDeleteRoom = useCallback(() => {
     send({ type: 'delete_room' });
+    clearSession();
     setState(null);
     setPerspective('');
     setPlayerOrder([]);
@@ -169,8 +233,8 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
 
   const handleExit = useCallback(() => {
     handleDeleteRoom();
-    onExit();
-  }, [handleDeleteRoom, onExit]);
+    navigate('/');
+  }, [handleDeleteRoom, navigate]);
 
   if (state) {
     const myName = perspective;
@@ -188,7 +252,7 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
     const selectedCardEntry = selectedCardId !== null ? playableCards.find(pc => pc.cardId === selectedCardId) : undefined;
     const needsTarget = selectedCardId !== null && !!selectedCardEntry && selectedCardEntry.targets.length > 0;
     const validTargetList = selectedCardEntry?.targets ?? [];
-    const canPlay = selectedCardId !== null && isMyTurn && state.phase === '出牌' && !state.pending && !!selectedCardEntry;
+    const canPlay = selectedCardId !== null && isMyTurn && state.phase === '出牌' && (!state.pending || state.pending.type === 'playPhase') && !!selectedCardEntry;
     const needsDiscard = discardAction != null;
     const discardMin = discardAction?.min ?? 0;
     const discardMax = discardAction?.max ?? 0;
@@ -239,7 +303,7 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
           }
           return;
         }
-        if (state.pending) return;
+        if (state.pending && state.pending.type !== 'playPhase') return;
         dispatch({ type: 'endTurn', player: myName });
         setSelectedCardId(null);
         setSelectedTarget(null);
@@ -310,6 +374,20 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
         if (!isMyTurn) return;
         dispatch({ type: 'useSkill', player: myName, skillId, target });
       },
+      selectedSkillCards,
+      toggleSkillCardSelection: (cardId: string) => {
+        setSelectedSkillCards(prev => {
+          const next = new Set(prev);
+          if (next.has(cardId)) next.delete(cardId);
+          else next.add(cardId);
+          return next;
+        });
+      },
+      handleSkillChoice: (choice: Json) => {
+        if (state.pending?.type !== 'skillPrompt') return;
+        dispatch({ type: 'skillChoice', player: myName, choice });
+        setSelectedSkillCards(new Set());
+      },
       myHand,
       orderedPlayers,
       switchPerspective: () => {
@@ -357,7 +435,7 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
   return (
     <div style={styles.page(40)}>
       <nav style={navStyle}>
-        <button onClick={onExit} style={navLinkStyle}>← 返回</button>
+        <button onClick={() => navigate('/')} style={navLinkStyle}>← 返回</button>
         <span style={{ color: colors.text.muted }}>调试游戏</span>
       </nav>
       <div style={{ marginTop: 40 }}>

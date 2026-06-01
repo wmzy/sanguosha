@@ -3,7 +3,7 @@ import { engine } from '../../engine/v2/engine';
 import { createInitialState, getPlayer } from '../../engine/v2/state';
 import { computeValidActions } from '../../engine/v2/validate';
 import { getDistance } from '../../engine/v2/distance';
-import type { GameState as V2GameState, GameAction, ValidAction } from '../../engine/v2/types';
+import type { GameState as V2GameState, GameAction, ValidAction, PromptOption, Json } from '../../engine/v2/types';
 import type { Card, Role } from '../../shared/types';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import { saveState } from '../utils/logFile';
@@ -36,6 +36,7 @@ interface PendingPrompt {
   targetPlayer?: string;
   targetCardIds?: string[];
   selectMode?: 'discard' | 'steal';
+  options?: PromptOption[];
 }
 
 function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
@@ -115,6 +116,7 @@ function extractPendingPrompt(state: V2GameState): PendingPrompt | null {
       return {
         type: 'skillPrompt',
         text: pending.prompt.text,
+        options: pending.prompt.options,
       };
     case 'selectCard':
       return {
@@ -159,6 +161,8 @@ function _getSingleActivePlayer(state: V2GameState): string | null {
         return pending.pickOrder[pending.currentPickerIndex];
       case 'skillPrompt':
         return pending.player;
+      case 'playPhase':
+        return pending.player;
       default:
         return null;
     }
@@ -192,6 +196,7 @@ export function useGame() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
+  const [selectedSkillCards, setSelectedSkillCards] = useState<Set<string>>(new Set());
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -228,7 +233,7 @@ export function useGame() {
   const validTargetList = selectedCardEntry?.targets ?? [];
 
   const canPlay = selectedCardId !== null && isMyTurn && state.phase === '出牌'
-    && !state.pending && !!selectedCardEntry;
+    && (!state.pending || state.pending.type === 'playPhase') && !!selectedCardEntry;
 
   // 弃牌逻辑
   const needsDiscard = discardAction != null;
@@ -311,7 +316,7 @@ export function useGame() {
     const myPlayer = getPlayer(state, myName);
     const hasWuxie = myPlayer.hand.some(id => state.cardMap[id]?.name === '无懈可击');
     if (hasWuxie) return;
-    const delay = 500 + Math.random() * 1500; // 500-2000ms 随机延迟
+    const delay = 50 + Math.random() * 100; // 50-150ms 随机延迟
     autoSkipTimerRef.current = setTimeout(() => {
       const current = stateRef.current;
       if (current.pending?.type !== 'responseWindow') return;
@@ -372,7 +377,7 @@ export function useGame() {
       return;
     }
 
-    if (state.pending) return;
+    if (state.pending && state.pending.type !== 'playPhase') return;
 
     const result = engine(state, { type: 'endTurn', player: myName });
     if (result.error) {
@@ -484,6 +489,31 @@ export function useGame() {
     setState(result.state);
   }, [state, isMyTurn, myName]);
 
+  const handleSkillChoice = useCallback((choice: Json) => {
+    if (state.pending?.type !== 'skillPrompt') return;
+
+    const result = engine(state, {
+      type: 'skillChoice',
+      player: myName,
+      choice,
+    });
+    if (result.error) {
+      console.warn('Skill choice error:', result.error);
+      return;
+    }
+    setState(result.state);
+    setSelectedSkillCards(new Set());
+  }, [state, myName]);
+
+  const toggleSkillCardSelection = useCallback((cardId: string) => {
+    setSelectedSkillCards(prev => {
+      const next = new Set(prev);
+      if (next.has(cardId)) next.delete(cardId);
+      else next.add(cardId);
+      return next;
+    });
+  }, []);
+
   // ── UI 操作 ─────────────────────────────────────────────────
 
   const switchPerspective = useCallback(() => {
@@ -591,6 +621,9 @@ export function useGame() {
     // 技能
     availableSkills,
     handleActivateSkill,
+    selectedSkillCards,
+    toggleSkillCardSelection,
+    handleSkillChoice,
 
     // UI
     myHand,

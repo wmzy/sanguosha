@@ -257,7 +257,7 @@ describe('随机打谱', () => {
         if (!player?.info.alive) break;
 
         // 有 pending 时处理
-        if (state.pending) {
+        if (state.pending && state.pending.type !== 'playPhase') {
           const pending = state.pending;
 
           if (pending.type === 'responseWindow') {
@@ -357,7 +357,7 @@ describe('随机打谱', () => {
         const player = state.players[current];
         if (!player?.info.alive) break;
 
-        if (state.pending) {
+        if (state.pending && state.pending.type !== 'playPhase') {
           const p = state.pending;
           if (p.type === 'responseWindow') {
             const r = safeEngine(state, { type: 'respond', player: p.window.defender });

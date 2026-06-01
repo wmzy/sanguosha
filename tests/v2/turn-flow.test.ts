@@ -40,7 +40,7 @@ describe('V2 Engine - 回合流程', () => {
         cardIds: discardCards,
       });
       expect(r2.error).toBeUndefined();
-      expect(r2.state.pending).toBeNull();
+      expect(r2.state.pending?.type).toBe('playPhase');
       // 回合应切换到 P2
       expect(r2.state.currentPlayer).toBe('P2');
     });
@@ -52,7 +52,7 @@ describe('V2 Engine - 回合流程', () => {
 
       const result = engine(state, { type: 'endTurn', player: 'P1' });
       expect(result.error).toBeUndefined();
-      expect(result.state.pending).toBeNull();
+      expect(result.state.pending?.type).toBe('playPhase');
       expect(result.state.currentPlayer).toBe('P2');
     });
 
@@ -170,7 +170,7 @@ describe('V2 Engine - 回合流程', () => {
       expect(r3.error).toBeUndefined();
       expect(r3.state.players['P2'].health).toBe(1);
       expect(r3.state.players['P2'].info.alive).toBe(true);
-      expect(r3.state.pending).toBeNull();
+      expect(r3.state.pending?.type).toBe('playPhase');
     });
 
     it('无人救助则死亡', () => {

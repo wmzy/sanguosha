@@ -8,11 +8,10 @@ import { colors, styles } from '../theme';
 
 interface MultiplayerGameBoardProps {
   roomId: string;
-  playerId: string;
   onLeave: () => void;
 }
 
-export function MultiplayerGameBoard({ roomId, playerId: _playerId, onLeave }: MultiplayerGameBoardProps) {
+export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardProps) {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);

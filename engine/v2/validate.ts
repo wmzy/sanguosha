@@ -11,6 +11,7 @@ import type {
   ValidAction,
   PlayableCard,
   AvailableSkill,
+  PendingPlayPhase,
   PendingResponseWindow,
   PendingSkillPrompt,
   PendingDiscardPhase,
@@ -261,6 +262,8 @@ function validateUseSkill(
 function validatePendingAction(state: GameState, action: GameAction): string | null {
   const pending = state.pending!;
   switch (pending.type) {
+    case 'playPhase':
+      return validatePlayPhasePending(state, action, pending);
     case 'responseWindow':
       return validateResponseWindow(state, action, pending);
     case 'skillPrompt':
@@ -274,6 +277,21 @@ function validatePendingAction(state: GameState, action: GameAction): string | n
     case 'harvestSelection':
       return null;
   }
+  return null;
+}
+
+function validatePlayPhasePending(
+  state: GameState,
+  action: GameAction,
+  _pending: PendingPlayPhase,
+): string | null {
+  const allowed: GameAction['type'][] = ['playCard', 'useSkill', 'endTurn', 'toggleAutoSkipWuxie'];
+  if (!allowed.includes(action.type)) {
+    return '出牌阶段不允许此操作';
+  }
+  if (action.type === 'playCard') return validatePlayCard(state, action);
+  if (action.type === 'useSkill') return validateUseSkill(state, action);
+  if (action.type === 'endTurn') return validateEndTurn(state, action);
   return null;
 }
 
@@ -477,6 +495,8 @@ export function computeValidActions(state: GameState, player: string): ValidActi
 function computePendingActions(state: GameState, player: string): ValidAction[] {
   const pending = state.pending!;
   switch (pending.type) {
+    case 'playPhase':
+      return computePlayPhaseActions(state, player);
     case 'responseWindow':
       return computeResponseWindowActions(state, player, pending);
     case 'skillPrompt':

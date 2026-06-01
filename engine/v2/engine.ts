@@ -3,6 +3,7 @@ import type {
   GameAction,
   EngineResult,
   SkillDef,
+  PendingPlayPhase,
 } from './types';
 import { validateAction } from './validate';
 import './atoms/index';
@@ -24,45 +25,70 @@ export function registerSkill(def: SkillDef): void {
   registerSkillToGlobal(def);
 }
 
+function dispatchAction(state: GameState, action: GameAction): EngineResult {
+  const error = validateAction(state, action);
+  if (error) return { state, events: [], error };
+
+  switch (action.type) {
+    case 'playCard':
+      return handlePlayCard(state, action);
+    case 'endTurn':
+      return handleEndTurn(state, action);
+    case 'useSkill':
+      return handleUseSkill(state, action, getSkillRegistry());
+    case 'discard':
+      return { state, events: [], error: '弃牌操作仅在弃牌阶段有效' };
+    case 'respond':
+      return { state, events: [], error: '响应动作仅在响应窗口中有效' };
+    case 'skillChoice':
+      return { state, events: [], error: '技能选择仅在技能提示中有效' };
+    case 'toggleAutoSkipWuxie':
+      return {
+        state: { ...state, meta: { ...state.meta, autoSkipWuxie: !state.meta.autoSkipWuxie } },
+        events: [],
+      };
+    case 'startGame':
+      return { state, events: [], error: undefined };
+    default: {
+      const t = (action as { type: string }).type;
+      return { state, events: [], error: `未知操作: ${t}` };
+    }
+  }
+}
+
 export function engine(state: GameState, action: GameAction): EngineResult {
   let result: EngineResult;
 
   if (action.type === 'startGame') {
-    // startGame 跳过验证，直接返回当前状态（auto-advance 会处理 phase 推进）
     result = { state, events: [], error: undefined };
   } else if (action.type === 'toggleAutoSkipWuxie') {
-    // 元操作：切换自动跳过无懈可击设置，不影响游戏状态
     result = {
       state: { ...state, meta: { ...state.meta, autoSkipWuxie: !state.meta.autoSkipWuxie } },
       events: [],
     };
+  } else if (state.pending?.type === 'playPhase') {
+    const playPhaseActions: GameAction['type'][] = ['playCard', 'useSkill', 'endTurn', 'toggleAutoSkipWuxie'];
+    if (!playPhaseActions.includes(action.type)) {
+      return { state, events: [], error: '出牌阶段不允许此操作' };
+    }
+    const { state: popState } = applyAtoms(state, [{ type: 'popPending' }]);
+    const savedPending = state.pending;
+    result = dispatchAction(popState, action);
+    if (!result.error && !result.state.pending && result.state.meta.status !== '已结束' && result.state.phase === '出牌') {
+      const refreshedPending: PendingPlayPhase = {
+        type: 'playPhase',
+        player: savedPending.player,
+        timeout: savedPending.timeout,
+        deadline: Date.now() + savedPending.timeout,
+        onTimeout: savedPending.onTimeout,
+      };
+      const { state: pushState, events: pushEvents } = applyAtoms(result.state, [{ type: 'pushPending', action: refreshedPending }]);
+      result = { state: pushState, events: [...result.events, ...pushEvents] };
+    }
   } else if (state.pending) {
     result = handlePending(state, action);
   } else {
-    const error = validateAction(state, action);
-    if (error) return { state, events: [], error };
-
-    switch (action.type) {
-      case 'playCard':
-        result = handlePlayCard(state, action);
-        break;
-      case 'endTurn':
-        result = handleEndTurn(state, action);
-        break;
-      case 'useSkill':
-        result = handleUseSkill(state, action, getSkillRegistry());
-        break;
-      case 'discard':
-        return { state, events: [], error: '弃牌操作仅在弃牌阶段有效' };
-      case 'respond':
-        return { state, events: [], error: '响应动作仅在响应窗口中有效' };
-      case 'skillChoice':
-        return { state, events: [], error: '技能选择仅在技能提示中有效' };
-      default: {
-        const t = (action as { type: string }).type;
-        return { state, events: [], error: `未知操作: ${t}` };
-      }
-    }
+    result = dispatchAction(state, action);
   }
 
   if (result.error) return result;

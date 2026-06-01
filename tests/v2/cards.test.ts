@@ -247,7 +247,7 @@ describe('V2 Engine - 卡牌效果', () => {
         cardIds: [selectedCardId],
       });
       expect(step2.error).toBeUndefined();
-      expect(step2.state.pending).toBeNull();
+      expect(step2.state.pending?.type).toBe('playPhase');
       expect(step2.state.players['P2'].hand.length).toBe(targetHandBefore - 1);
     });
 

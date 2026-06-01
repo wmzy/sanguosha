@@ -73,16 +73,44 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
     }
   }, [lastMessage, currentRoom, playerId, onJoinRoom, rooms]);
 
-  const handleCreateRoom = useCallback(() => {
+  const handleCreateRoom = useCallback(async () => {
     if (!roomName.trim()) {
       setError('请输入房间名称');
       return;
     }
-    send({ type: 'create_room', name: roomName.trim(), maxPlayers });
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: roomName.trim(), maxPlayers }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? '创建失败');
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
+      send({ type: 'join_room', roomId: data.roomId });
+    } catch {
+      setError('网络错误');
+      setTimeout(() => setError(null), 3000);
+    }
   }, [roomName, maxPlayers, send]);
 
-  const handleJoinRoom = useCallback((roomId: string) => {
-    send({ type: 'join_room', roomId });
+  const handleJoinRoom = useCallback(async (roomId: string) => {
+    try {
+      const res = await fetch(`/api/rooms/${roomId}/join`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? '无法加入');
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
+      send({ type: 'join_room', roomId });
+    } catch {
+      setError('网络错误');
+      setTimeout(() => setError(null), 3000);
+    }
   }, [send]);
 
   const handleReady = useCallback(() => {

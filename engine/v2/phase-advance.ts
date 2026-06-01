@@ -8,7 +8,8 @@
  * 只有出牌阶段和弃牌阶段需要玩家交互，其余阶段自动推进。
  */
 
-import type { GameState, ServerEvent, EngineResult, GameEvent, Atom } from './types';
+import type { GameState, ServerEvent, EngineResult, GameEvent, Atom, PendingPlayPhase } from './types';
+import { TIMEOUT_DEFAULTS } from './types';
 import type { TurnPhase } from '../../shared/types';
 import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';
@@ -197,6 +198,21 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
     const skipResult = applyAtoms(s, skipAtoms);
     s = skipResult.state;
     allEvents.push(...skipResult.events);
+  }
+
+  // 出牌阶段 → 创建 playPhase pending（带 deadline）
+  if (s.pending === null && s.phase === '出牌' && !shouldSkipPhase(s, s.phase, s.currentPlayer)) {
+    const timeout = TIMEOUT_DEFAULTS.playPhase;
+    const playPending: PendingPlayPhase = {
+      type: 'playPhase',
+      player: s.currentPlayer,
+      timeout,
+      deadline: Date.now() + timeout,
+      onTimeout: { type: 'endTurn', player: s.currentPlayer },
+    };
+    const pushResult = applyAtoms(s, [{ type: 'pushPending', action: playPending }]);
+    s = pushResult.state;
+    allEvents.push(...pushResult.events);
   }
 
   return { state: s, events: allEvents };

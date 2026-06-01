@@ -302,7 +302,7 @@ describe('边界: AOE/决斗', () => {
     const r4 = engine(r3, { type: 'respond', player: 'P4' });
     expect(r4.error).toBeUndefined();
     expect(r4.state.players['P4'].health).toBe(2);
-    expect(r4.state.pending).toBeNull();
+    expect(r4.state.pending?.type).toBe('playPhase');
   });
 
   it('决斗只走 default 分支（未实现决斗响应链）', () => {
@@ -358,8 +358,7 @@ describe('边界: AOE/决斗', () => {
     // 该牌从 P2 转移到 P1
     expect(r3.state.players['P1'].hand.includes(targetCardId)).toBe(true);
     expect(r3.state.players['P2'].hand.includes(targetCardId)).toBe(false);
-    // 无 pending
-    expect(r3.state.pending).toBeNull();
+    expect(r3.state.pending?.type).toBe('playPhase');
   });
 
   it('顺手牵羊被无懈可击取消', () => {
@@ -385,8 +384,7 @@ describe('边界: AOE/决斗', () => {
     expect(r2.state.pending?.type).toBe('responseWindow');
     // P1 pass 过嵌套窗口
     const r3 = passAllTrickResponders(r2.state);
-    // 顺手牵羊已被取消，无 pending
-    expect(r3.pending).toBeNull();
+    expect(r3.pending?.type).toBe('playPhase');
     // P2 的牌没有被拿走
     expect(r3.players['P2'].hand.includes(targetCard)).toBe(true);
   });
