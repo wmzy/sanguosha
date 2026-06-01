@@ -4,6 +4,8 @@ import type { ServerMessage, ClientMessage } from '../../server/protocol';
 
 export interface UseWebSocketReturn {
   connected: boolean;
+  messages: ServerMessage[];
+  drainMessages: () => void;
   lastMessage: ServerMessage | null;
   send: (msg: ClientMessage) => void;
   connect: () => void;
@@ -12,7 +14,7 @@ export interface UseWebSocketReturn {
 
 export function useWebSocket(url: string): UseWebSocketReturn {
   const [connected, setConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null);
+  const [messages, setMessages] = useState<ServerMessage[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
@@ -29,6 +31,8 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     }
   }, []);
 
+  const drainMessages = useCallback(() => setMessages([]), []);
+
   const connect = useCallback(() => {
     cleanup();
     const ws = new WebSocket(url);
@@ -41,7 +45,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       if (!mountedRef.current) return;
       try {
         const message = JSON.parse(event.data as string) as ServerMessage;
-        setLastMessage(message);
+        setMessages(prev => [...prev, message]);
       } catch {
         // parse error
       }
@@ -81,5 +85,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     };
   }, [connect, disconnect]);
 
-  return { connected, lastMessage, send, connect, disconnect };
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+
+  return { connected, messages, drainMessages, lastMessage, send, connect, disconnect };
 }

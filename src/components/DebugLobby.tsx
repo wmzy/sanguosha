@@ -106,7 +106,7 @@ interface DebugLobbyProps {
 export function DebugLobby({ onExit }: DebugLobbyProps) {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = useMemo(() => `${wsProtocol}//${window.location.host}/ws`, [wsProtocol]);
-  const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);
+  const { connected, messages, drainMessages, send, connect } = useWebSocket(wsUrl);
 
   const [playerCount, setPlayerCount] = useState(5);
   const [error, setError] = useState<string | null>(null);
@@ -122,20 +122,24 @@ export function DebugLobby({ onExit }: DebugLobbyProps) {
     connect();
   }, [connect]);
 
+  // 处理所有收到的 WebSocket 消息（队列模式，避免 React 批量更新吞消息）
   useEffect(() => {
-    if (!lastMessage) return;
-    if (lastMessage.type === 'debugGameState') {
-      setState(lastMessage.state);
-      if (!perspective && lastMessage.state.currentPlayer) {
-        setPerspective(lastMessage.state.currentPlayer);
-        setPlayerOrder(rotatePlayers(lastMessage.state.playerOrder, lastMessage.state.currentPlayer));
+    if (messages.length === 0) return;
+    for (const msg of messages) {
+      if (msg.type === 'debugGameState') {
+        setState(msg.state);
+        if (!perspective && msg.state.currentPlayer) {
+          setPerspective(msg.state.currentPlayer);
+          setPlayerOrder(rotatePlayers(msg.state.playerOrder, msg.state.currentPlayer));
+        }
+      }
+      if (msg.type === 'error') {
+        setError(msg.message);
+        setTimeout(() => setError(null), 3000);
       }
     }
-    if (lastMessage.type === 'error') {
-      setError(lastMessage.message);
-      setTimeout(() => setError(null), 3000);
-    }
-  }, [lastMessage, perspective]);
+    drainMessages();
+  }, [messages, perspective, drainMessages]);
 
   // ── 自动切换到需要操作的玩家 ──────────────────────────────
   useEffect(() => {
