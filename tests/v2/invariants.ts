@@ -115,7 +115,7 @@ export function checkInvariants(state: GameState): void {
   // ─── 不变量 6: 装备区卡牌存在 ───
   for (const name of state.playerOrder) {
     const p = state.players[name];
-    for (const [slot, id] of Object.entries(p.equipment)) {
+    for (const [_slot, id] of Object.entries(p.equipment)) {
       if (id) {
         expect(state.cardMap[id]).toBeDefined();
       }

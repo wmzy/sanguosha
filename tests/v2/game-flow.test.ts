@@ -263,27 +263,40 @@ describe('随机打谱', () => {
           if (pending.type === 'responseWindow') {
             // 总是 pass（不出牌）
             const r = safeEngine(state, { type: 'respond', player: pending.window.defender });
-            if (!r.error) { state = r.state; continue; }
+            if (!r.error) {
+              state = r.state;
+              continue;
+            }
           }
 
           if (pending.type === 'discardPhase') {
             const toDiscard = player.hand.slice(0, pending.max);
             const r = safeEngine(state, { type: 'discard', player: current, cardIds: toDiscard });
-            if (!r.error) { state = r.state; continue; }
+            if (!r.error) {
+              state = r.state;
+              continue;
+            }
           }
 
           if (pending.type === 'dyingWindow') {
             // 尝试出桃
             const saver = pending.savers[pending.currentSaverIndex];
             const saverState = state.players[saver];
-            const peach = saverState?.hand.find(id => state.cardMap[id]?.name === '桃');
+            const cardMap = state.cardMap;
+            const peach = saverState?.hand.find(id => cardMap[id]?.name === '桃');
             if (peach) {
               const r = safeEngine(state, { type: 'respond', player: saver, cardId: peach });
-              if (!r.error) { state = r.state; continue; }
+              if (!r.error) {
+                state = r.state;
+                continue;
+              }
             }
             // 不出桃
             const r = safeEngine(state, { type: 'respond', player: saver });
-            if (!r.error) { state = r.state; continue; }
+            if (!r.error) {
+              state = r.state;
+              continue;
+            }
           }
 
           if (pending.type === 'skillPrompt') {
@@ -294,7 +307,10 @@ describe('随机打谱', () => {
               player: pending.player,
               choice: defaultChoice,
             });
-            if (!r.error) { state = r.state; continue; }
+            if (!r.error) {
+              state = r.state;
+              continue;
+            }
           }
 
           // 无法处理的 pending → 继续循环（防止死循环）
@@ -304,10 +320,16 @@ describe('随机打谱', () => {
         // 出牌阶段
         if (state.phase === '出牌' && current === state.currentPlayer) {
           const played = tryPlayCard(state, current);
-          if (played) { state = played; continue; }
+          if (played) {
+            state = played;
+            continue;
+          }
           // 没牌可出 → 结束回合
           const r = safeEngine(state, { type: 'endTurn', player: current });
-          if (!r.error) { state = r.state; continue; }
+          if (!r.error) {
+            state = r.state;
+            continue;
+          }
         }
 
         // 其他阶段（摸牌、准备等）— 没有需要玩家操作，可能是 engine 内部自动化
@@ -339,14 +361,23 @@ describe('随机打谱', () => {
           const p = state.pending;
           if (p.type === 'responseWindow') {
             const r = safeEngine(state, { type: 'respond', player: p.window.defender });
-            if (!r.error) { state = r.state; continue; }
+            if (!r.error) {
+              state = r.state;
+              continue;
+            }
           } else if (p.type === 'discardPhase') {
             const r = safeEngine(state, { type: 'discard', player: current, cardIds: player.hand.slice(0, p.max) });
-            if (!r.error) { state = r.state; continue; }
+            if (!r.error) {
+              state = r.state;
+              continue;
+            }
           } else if (p.type === 'dyingWindow') {
             const saver = p.savers[p.currentSaverIndex];
             const r = safeEngine(state, { type: 'respond', player: saver });
-            if (!r.error) { state = r.state; continue; }
+            if (!r.error) {
+              state = r.state;
+              continue;
+            }
           } else {
             break;
           }
@@ -354,10 +385,16 @@ describe('随机打谱', () => {
 
         if (state.phase === '出牌' && current === state.currentPlayer) {
           const played = tryPlayCard(state, current);
-          if (played) { state = played; continue; }
+          if (played) {
+            state = played;
+            continue;
+          }
 
           const r = safeEngine(state, { type: 'endTurn', player: current });
-          if (!r.error) { state = r.state; continue; }
+          if (!r.error) {
+            state = r.state;
+            continue;
+          }
         }
 
         break;

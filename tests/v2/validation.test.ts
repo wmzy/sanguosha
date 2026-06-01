@@ -166,8 +166,8 @@ describe('验证系统缺口', () => {
   it('selectCard pending validation 无条件通过', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectCard(state, 'P1', '过河拆桥');
-    const cardId = findCardInHand(state, 'P1', '过河拆桥')!;
-    const step1 = computeValidActions(state, 'P1').find(a => a.type === 'playCard');
+    const _cardId = findCardInHand(state, 'P1', '过河拆桥')!;
+    const _step1 = computeValidActions(state, 'P1').find(a => a.type === 'playCard');
     // validatePendingAction 对 selectCard 返回 null，不做任何检查
     // engine 的 handler 层（resolveSelectCard）会检查 action type
   });

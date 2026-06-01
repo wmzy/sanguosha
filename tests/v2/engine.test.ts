@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { safeEngine as engine } from './invariants';
 import { createInitialState } from '@engine/v2/state';
 import { serialize, deserialize } from '@engine/v2/serializer';
-import { getCharacterMap, createTestGame, setPlayPhase, setHealth, findCardInHand, injectCard, act } from './setup';
+import { getCharacterMap, createTestGame, setPlayPhase, setHealth } from './setup';
 
 describe('V2 Engine - 核心引擎', () => {
   const charMap = getCharacterMap();

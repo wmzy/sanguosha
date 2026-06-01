@@ -7,9 +7,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { engine } from '@engine/v2/engine';
-import { createTestGame, findCardInHand, injectCard, injectTrickCard, setHealth, act, expectError, findAllCardsInHand, passAllTrickResponders } from './setup';
-import type { GameState, GameAction } from '@engine/v2/types';
-import { getPlayer } from '@engine/v2/state';
+import { createTestGame, findCardInHand, injectCard, injectTrickCard, setHealth, passAllTrickResponders } from './setup';
+import type { GameState } from '@engine/v2/types';
 
 // ════════════════════════════════════════════════════════════════
 // BUG 1: 胜利条件检查
@@ -140,9 +139,16 @@ describe('AOE 濒死后响应链恢复', () => {
     s = setHealth(s, 'P3', 1);
 
     // 移除所有桃
+    const cardMap = s.cardMap;
     for (const p of ['P1', 'P2', 'P3']) {
-      const noPeach = s.players[p].hand.filter(id => s.cardMap[id]?.name !== '桃');
-      s = { ...s, players: { ...s.players, [p]: { ...s.players[p], hand: noPeach } } };
+      const noPeach = s.players[p].hand.filter(id => cardMap[id]?.name !== '桃');
+      s = {
+        ...s,
+        players: {
+          ...s.players,
+          [p]: { ...s.players[p], hand: noPeach },
+        },
+      };
     }
 
     // 给 P1 注入南蛮入侵

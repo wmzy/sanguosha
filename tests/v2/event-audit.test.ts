@@ -82,7 +82,7 @@ describe('事件审计: turnStart GameEvent 未被引擎发射', () => {
     // 马术已注册触发器
     expect(state.triggers.some(t => t.skillId === '马术')).toBe(true);
 
-    const result = engine(state, { type: 'endTurn', player: 'P1' });
+    const _result = engine(state, { type: 'endTurn', player: 'P1' });
 
     // ⚠️ BUG: turnStart GameEvent 从未被 emitEvent 调用
     // handleEndTurn 只调用了 makeServerEvent('turnStart')
@@ -115,7 +115,7 @@ describe('事件审计: phaseBegin', () => {
     // 执行 endTurn → 下一玩家（P2）的出牌阶段
     // 如果 phaseBegin 被正确 emit，当轮到 P1 时英姿应触发
     // 但 handleEndTurn 从不 emit phaseBegin
-    const r1 = engine(setPlayPhase(state), { type: 'endTurn', player: 'P1' });
+    const _r1 = engine(setPlayPhase(state), { type: 'endTurn', player: 'P1' });
 
     // endTurn 只产生 turnEnd → 下一玩家，没有 phaseBegin 任何阶段
     // 所以英姿不可能被触发
@@ -284,14 +284,6 @@ describe('事件审计: 伤害事件', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('事件审计: GameEvent 类型覆盖对比', () => {
-  const ALL_EVENTS = [
-    'turnStart', 'turnEnd', 'phaseBegin', 'phaseEnd',
-    'cardPlayed', 'damageDealt', 'damageReceived',
-    'heal', 'killHit', 'killDodged',
-    'cardDrawn', 'cardDiscarded', 'equipChanged', 'judgeResult',
-    'dying', 'death',
-  ] as const;
-
   it('引擎通过 emitEvent 发射的 GameEvent 类型', () => {
     // 通过代码审计确认的 emitEvent 调用位置：
     // - turnEnd:     handleEndTurn (turn-handlers.ts:22)

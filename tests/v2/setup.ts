@@ -2,13 +2,10 @@
  * tests/v2/setup.ts — V2 引擎集成测试共享工具
  */
 import { createInitialState } from '@engine/v2/state';
-import { engine as rawEngine } from '@engine/v2/engine';
-import { computeValidActions } from '@engine/v2/validate';
-import { serialize, deserialize } from '@engine/v2/serializer';
-import { allCharacters } from '@shared/characters';
-import { safeEngine } from './invariants';
 import type { GameState, GameAction } from '@engine/v2/types';
 import type { CharacterConfig } from '@shared/types';
+import { allCharacters } from '@shared/characters';
+import { safeEngine } from './invariants';
 
 // ─── 角色查找表 ─────────────────────────────────────────────────
 

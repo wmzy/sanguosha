@@ -7,7 +7,6 @@ import {
   injectCard,
   injectTrickCard,
   injectEquipCard,
-  act,
   setHealth,
   passAllTrickResponders,
 } from './setup';
@@ -72,7 +71,6 @@ describe('V2 Engine - 卡牌效果', () => {
       state = injectCard(state, 'P1', '杀');
       state = injectCard(state, 'P1', '杀');
 
-      const kills = [findCardInHand(state, 'P1', '杀')!];
       // 注入两张杀后获取第二张
       const allKills = state.players['P1'].hand.filter(
         (id) => state.cardMap[id].name === '杀',

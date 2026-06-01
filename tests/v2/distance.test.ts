@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getDistance, getAttackRange, isInAttackRange } from '@engine/v2/distance';
-import { createTestGame, injectEquipCard, setPlayPhase } from './setup';
+import { createTestGame } from './setup';
 
 describe('V2 Engine - 距离计算', () => {
   describe('基础距离', () => {

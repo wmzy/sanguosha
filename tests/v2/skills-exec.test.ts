@@ -16,7 +16,6 @@ import {
   injectCard,
   injectTrickCard,
   setHealth,
-  act,
   findCardInHand,
 } from './setup';
 import type { GameState } from '@engine/v2/types';
@@ -238,7 +237,7 @@ describe('吴势力技能执行', () => {
       let state = createTestGame({ characters: ['吕蒙', '刘备'] });
       state = withTriggers(state, 'P1');
 
-      const beforePhase = state.phase;
+      const _beforePhase = state.phase;
       const result = emitEvent(state, {
         type: 'phaseBegin',
         phase: '弃牌',
@@ -330,8 +329,8 @@ describe('吴势力技能执行', () => {
       // 让 P2 受伤
       state = setHealth(state, 'P2', 1);
 
-      const beforeHand = state.players.P1.hand.length;
-      const beforeTargetHealth = state.players.P2.health;
+      const _beforeHand = state.players.P1.hand.length;
+      const _beforeTargetHealth = state.players.P2.health;
 
       // 通过 phaseBegin(出牌) 触发结姻
       const result = emitEvent(state, {
@@ -366,12 +365,12 @@ describe('真实路径验证: 杀→伤害→技能触发链', () => {
     state = withTriggers(state, 'P1');
 
     // 给 P1 一手杀
-    const p1Hand = state.players['P1'].hand;
+    const _p1Hand = state.players['P1'].hand;
     const killCard = findCardInHand(state, 'P1', '杀');
     if (!killCard) return; // skip if no 杀 in hand
 
-    const beforeP1Hand = state.players['P1'].hand.length;
-    const beforeP2Hand = state.players['P2'].hand.length;
+    const _beforeP1Hand = state.players['P1'].hand.length;
+    const _beforeP2Hand = state.players['P2'].hand.length;
 
     // ⚠️ 真实游戏路径
     // 1. 出杀
@@ -388,7 +387,7 @@ describe('真实路径验证: 杀→伤害→技能触发链', () => {
 
     // 验证：奸雄没有触发（因为它监听 damageReceived，引擎发射的是 damageDealt）
     // 事件类型不匹配 → 技能不响应
-    expect(r2.state.players['P1'].hand.length).toBe(beforeP1Hand - 1); // P1 用了一张杀，手牌少 1
+    expect(r2.state.players['P1'].hand.length).toBe(_beforeP1Hand - 1); // P1 用了一张杀，手牌少 1
     expect(r2.state.players['P2'].health).toBeLessThan(state.players['P2'].health); // P2 受伤
   });
 
@@ -461,7 +460,7 @@ describe('真实路径验证: 弃牌阶段闭月缺失（BUG）', () => {
     // 闭月监听 turnEnd，但弃牌后没有 turnEnd 事件
     // 所以闭月不会触发
     // 验证：没有事件类型包含 turnEnd
-    const turnEndEvent = r2.events?.find(e => e.type === 'turnEnd');
+    const _turnEndEvent = r2.events?.find(e => e.type === 'turnEnd');
     // 如果闭月触发了，turnEnd 事件会出现
     // 但 resolveDiscardPhase 没有 emit turnEnd
     // ⚠️ 注意：handleEndTurn 已经 emit 过 turnEnd 了！
@@ -477,7 +476,7 @@ describe('真实路径验证: phaseBegin 技能无法通过引擎触发（系统
     state = withTriggers(state, 'P1');
     state = setPlayPhase(state);
 
-    const beforeHand = state.players['P1'].hand.length;
+    const _beforeHand = state.players['P1'].hand.length;
 
     // endTurn → 由于手牌不超上限，直接切换到 P2
     const r1 = engine(state, { type: 'endTurn', player: 'P1' });
@@ -554,7 +553,7 @@ describe('群势力技能执行', () => {
       // 让 P2 受伤
       state = setHealth(state, 'P2', 2);
 
-      const beforeTargetHealth = state.players.P2.health;
+      const _beforeTargetHealth = state.players.P2.health;
 
       // 触发 phaseBegin(出牌)
       const result = emitEvent(state, {
@@ -725,7 +724,7 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
     if (r1.state.pending?.type === 'discardPhase') {
       const hand = r1.state.players['P1'].hand;
       const discardCount = hand.length - r1.state.players['P1'].health;
-      const r2 = engine(r1.state, {
+      const _r2 = engine(r1.state, {
         type: 'discard', player: 'P1',
         cardIds: hand.slice(0, discardCount),
       });

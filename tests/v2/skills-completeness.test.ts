@@ -27,6 +27,7 @@ describe('技能完整性审计', () => {
    * 注意：有些技能（被动转换型如 武圣、倾国）的 handler 返回空数组是"设计如此"，
    * 因为转换逻辑在 validation 层处理。这些需要人工判断。
    */
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   function isStubHandler(handler: Function): boolean {
     const handlerStr = handler.toString();
     // handler 体只包含 "return []" 或 "return [];" 或空白
@@ -100,9 +101,9 @@ describe('技能完整性审计', () => {
       // 输出当前状态，但不作为硬性断言
       // 目的是让开发者看到技能实现的整体健康状况
       const total = registry.size;
-      const pctImplemented = ((implemented / total) * 100).toFixed(1);
-      const pctPartial = ((partial / total) * 100).toFixed(1);
-      const pctStub = ((stub / total) * 100).toFixed(1);
+      const _pctImplemented = ((implemented / total) * 100).toFixed(1);
+      const _pctPartial = ((partial / total) * 100).toFixed(1);
+      const _pctStub = ((stub / total) * 100).toFixed(1);
 
       // 用一条不会失败但会输出的断言
       expect(implemented + partial + stub).toBe(total);
