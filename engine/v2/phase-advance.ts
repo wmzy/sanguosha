@@ -15,6 +15,7 @@ import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';
 import { getPlayer, getAlivePlayerNames } from './state';
 import { createConcurrentTrickResponse } from './handlers/response-handlers';
+import { makeServerEvent } from './event';
 
 /**
  * 处理判定阶段的延迟锦囊（乐不思蜀、兵粮寸断）
@@ -131,6 +132,15 @@ function processPhaseStep(state: GameState): EngineResult {
     return { state: s, events: allEvents };
   }
 
+  // 发射 phaseEnd 事件（触发监听当前阶段结束的技能，如貂蝉闭月）
+  const phaseEndEvent: GameEvent = { type: 'phaseEnd', phase, player };
+  const phaseEndResult = emitEvent(s, phaseEndEvent);
+  allEvents.push(...phaseEndResult.events);
+  if (phaseEndResult.state.pending !== null) {
+    return { state: phaseEndResult.state, events: allEvents };
+  }
+  s = phaseEndResult.state;
+
   const { state: phaseState, events: phaseEvents } = applyAtoms(s, [
     { type: 'setPhase', phase: nextPhase },
   ]);
@@ -177,15 +187,12 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   let s = state;
   const allEvents: ServerEvent[] = [];
 
-  if (s.phase === '准备' && s.pending === null && !s.turn.phaseFlags.includes('turnStarted')) {
-    const turnStartEvent: GameEvent = { type: 'turnStart', player: s.currentPlayer };
-    const skillResult = emitEvent(s, turnStartEvent);
-    s = { ...skillResult.state, turn: { ...skillResult.state.turn, phaseFlags: [...skillResult.state.turn.phaseFlags, 'turnStarted'] } };
-    allEvents.push(...skillResult.events);
-    if (s.pending !== null) {
-      return { state: s, events: allEvents };
-    }
-  }
+  const turnStartGameEvent: GameEvent = { type: 'turnStart', player: s.currentPlayer };
+  const turnStartResult = emitEvent(s, turnStartGameEvent);
+  s = turnStartResult.state;
+  allEvents.push(...turnStartResult.events);
+  const turnStartLogEvent = makeServerEvent('turnStart', { player: s.currentPlayer });
+  allEvents.push(turnStartLogEvent);
 
   while (s.pending === null && isAutoPhase(s.phase)) {
     if (isPreparationPhase(s.phase)) {

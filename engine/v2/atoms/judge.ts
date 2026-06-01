@@ -1,4 +1,4 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom, AtomEventResult, Json } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
@@ -65,6 +65,15 @@ export function register() {
       const payload = { player, cardId, result, suit, rank };
       const server = makeServerEvent('judge', payload);
       return [server, new Map(), makePlayerEvent('judge', payload)];
+    },
+    getResult(state: GameState, _atom: Atom & { type: 'judge' }): Record<string, Json> {
+      const discardPile = state.zones.discardPile;
+      if (discardPile.length === 0) return {};
+      const cardId = discardPile[discardPile.length - 1];
+      const card = state.cardMap[cardId];
+      if (!card) return {};
+      const result: 'red' | 'black' = redSuits.includes(card.suit) ? 'red' : 'black';
+      return { judgeCardId: cardId, judgeSuit: card.suit, judgeColor: result };
     },
   });
 }

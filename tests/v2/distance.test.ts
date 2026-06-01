@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getDistance, getAttackRange, isInAttackRange } from '@engine/v2/distance';
-import { createTestGame } from './setup';
+import { isCardPlayable, isValidTarget } from '@engine/v2/validate';
+import { createTestGame, injectTrickCard } from './setup';
 
 describe('V2 Engine - 距离计算', () => {
   describe('基础距离', () => {
@@ -174,6 +175,122 @@ describe('V2 Engine - 距离计算', () => {
       expect(isInAttackRange(state, 'P1', 'P2')).toBe(true);
       // P1→P3 distance=2, range=1 → false
       expect(isInAttackRange(state, 'P1', 'P3')).toBe(false);
+    });
+  });
+
+  describe('马术技能距离修正', () => {
+    it('马术通过 vars.distanceBonus 减少距离 1', () => {
+      const state = createTestGame({ playerCount: 4 });
+      // P1→P3 基础距离 2
+      expect(getDistance(state, 'P1', 'P3')).toBe(2);
+
+      // 给 P1 设置马术的 distanceBonus
+      const p1 = state.players['P1'];
+      const withBonus = {
+        ...state,
+        players: {
+          ...state.players,
+          P1: {
+            ...p1,
+            vars: { ...p1.vars, distanceBonus: -1 },
+          },
+        },
+      };
+
+      // P1→P3 = max(1, 2 + (-1)) = 1
+      expect(getDistance(withBonus, 'P1', 'P3')).toBe(1);
+    });
+
+    it('马术不会使距离小于 1', () => {
+      const state = createTestGame({ playerCount: 4 });
+      const p1 = state.players['P1'];
+      const withBonus = {
+        ...state,
+        players: {
+          ...state.players,
+          P1: {
+            ...p1,
+            vars: { ...p1.vars, distanceBonus: -1 },
+          },
+        },
+      };
+
+      // P1→P2 基础距离 1，马术不能减到 0
+      expect(getDistance(withBonus, 'P1', 'P2')).toBe(1);
+    });
+
+    it('马术与进攻马叠加', () => {
+      const state = createTestGame({ playerCount: 6 });
+      // P1→P4 基础距离 3
+      expect(getDistance(state, 'P1', 'P4')).toBe(3);
+
+      const horseCard = {
+        id: 'test-horse-minus',
+        name: '赤兔',
+        type: '装备牌' as const,
+        subtype: '进攻马' as const,
+        suit: '♥' as const,
+        rank: 'A' as const,
+        description: '',
+      };
+      const p1 = state.players['P1'];
+      const withBoth = {
+        ...state,
+        cardMap: { ...state.cardMap, 'test-horse-minus': horseCard },
+        players: {
+          ...state.players,
+          P1: {
+            ...p1,
+            equipment: { ...p1.equipment, horseMinus: 'test-horse-minus' },
+            vars: { ...p1.vars, distanceBonus: -1 },
+          },
+        },
+      };
+
+      // 先减进攻马(-1)=2，再减马术(-1)=1
+      expect(getDistance(withBoth, 'P1', 'P4')).toBe(1);
+    });
+
+    it('无 distanceBonus 时不受影响', () => {
+      const state = createTestGame({ playerCount: 4 });
+      // P1 没有 vars.distanceBonus，距离正常
+      expect(getDistance(state, 'P1', 'P3')).toBe(2);
+      expect(getDistance(state, 'P1', 'P2')).toBe(1);
+    });
+  });
+
+  describe('奇才技能（锦囊无距离限制）', () => {
+    it('有 noTrickDistanceLimit tag 时顺手牵羊可对距离外目标使用', () => {
+      let state = createTestGame({ playerCount: 4 });
+      state = injectTrickCard(state, 'P1', '顺手牵羊');
+      const cardId = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '顺手牵羊')!;
+
+      // P1→P3 distance=2 > attackRange=1，正常不能对 P3 用顺手牵羊
+      expect(isValidTarget(state, 'P1', cardId, 'P3')).toBe(false);
+
+      // 给 P1 加上奇才 tag
+      const p1 = state.players['P1'];
+      const withTag = {
+        ...state,
+        players: {
+          ...state.players,
+          P1: { ...p1, tags: [...p1.tags, 'noTrickDistanceLimit'] },
+        },
+      };
+
+      // 有 tag 后 P3 变成合法目标
+      expect(isValidTarget(withTag, 'P1', cardId, 'P3')).toBe(true);
+    });
+
+    it('无 tag 时顺手牵羊受距离限制', () => {
+      let state = createTestGame({ playerCount: 4 });
+      state = injectTrickCard(state, 'P1', '顺手牵羊');
+      const cardId = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '顺手牵羊')!;
+
+      // P1→P3 distance=2 > range=1，不能对 P3 使用
+      expect(isValidTarget(state, 'P1', cardId, 'P3')).toBe(false);
+      // P1→P2 distance=1 <= range=1，可以对 P2 使用
+      expect(isValidTarget(state, 'P1', cardId, 'P2')).toBe(true);
     });
   });
 });

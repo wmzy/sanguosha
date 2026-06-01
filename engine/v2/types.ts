@@ -224,6 +224,8 @@ export interface AtomDefinition<A = unknown> {
   type: string;
   apply(state: GameState, atom: A): GameState;
   toEvents(state: GameState, atom: A): AtomEventResult;
+  /** 可选：atom apply 后从 state 提取结果，自动注入到 ctx.localVars */
+  getResult?(state: GameState, atom: A): Record<string, Json>;
 }
 /**
  * 动态值引用。字面量直接使用，对象形式通过 resolve() 求值。

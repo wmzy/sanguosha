@@ -1,5 +1,5 @@
 import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent, Atom } from '../types';
-import { applyAtom, atomToEvents } from '../atom';
+import { applyAtom, atomToEvents, getAtomDef } from '../atom';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
 import { isExpr } from '../types';
@@ -34,6 +34,12 @@ export function register() {
         const [serverEvent] = atomToEvents(s, atom);
         events.push(serverEvent);
         s = applyAtom(s, atom);
+
+        const def = getAtomDef(atom.type);
+        if (def.getResult) {
+          const result = def.getResult(s, atom);
+          Object.assign(ctx.localVars, result);
+        }
       }
       return { state: s, events };
     },

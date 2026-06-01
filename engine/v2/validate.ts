@@ -196,6 +196,8 @@ function validateTrickTarget(
   if (!def?.targetFilter) return null;
 
   const filter = def.targetFilter;
+  const playerState = getPlayer(state, action.player);
+  const noDistanceLimit = playerState.tags.includes('noTrickDistanceLimit');
 
   switch (filter.type) {
     case 'self':
@@ -209,7 +211,7 @@ function validateTrickTarget(
     case 'inRange':
       if (!action.target) return '需要指定目标';
       if (action.target === action.player) return '不能对自己使用';
-      if (!isInAttackRange(state, action.player, action.target)) return '目标不在攻击范围内';
+      if (!noDistanceLimit && !isInAttackRange(state, action.player, action.target)) return '目标不在攻击范围内';
       if (!getPlayer(state, action.target).info.alive) return '目标已阵亡';
       break;
     case 'none':
@@ -811,6 +813,8 @@ function hasValidTargetForTrick(state: GameState, player: string, card: Card): b
 
   const filter = def.targetFilter;
   const alivePlayers = getAlivePlayerNames(state);
+  const playerState = getPlayer(state, player);
+  const noDistanceLimit = playerState.tags.includes('noTrickDistanceLimit');
 
   switch (filter.type) {
     case 'self':
@@ -819,6 +823,9 @@ function hasValidTargetForTrick(state: GameState, player: string, card: Card): b
     case 'other':
       return alivePlayers.some((t) => t !== player && getPlayer(state, t).info.alive);
     case 'inRange':
+      if (noDistanceLimit) {
+        return alivePlayers.some((t) => t !== player && getPlayer(state, t).info.alive);
+      }
       return alivePlayers.some(
         (t) => t !== player && isInAttackRange(state, player, t),
       );
@@ -874,6 +881,8 @@ function isValidTrickTarget(state: GameState, player: string, card: Card, target
   if (!def?.targetFilter) return target !== player;
 
   const filter = def.targetFilter;
+  const playerState = getPlayer(state, player);
+  const noDistanceLimit = playerState.tags.includes('noTrickDistanceLimit');
 
   switch (filter.type) {
     case 'self':
@@ -881,11 +890,14 @@ function isValidTrickTarget(state: GameState, player: string, card: Card, target
     case 'other':
       return target !== player && getPlayer(state, target).info.alive;
     case 'inRange':
+      if (noDistanceLimit) {
+        return target !== player && getPlayer(state, target).info.alive;
+      }
       return target !== player && isInAttackRange(state, player, target);
     case 'none':
-      return false; // 无目标牌，任何目标都不合法
+      return false;
     case 'all':
-      return target !== player; // 全体目标，选具体人不合理
+      return target !== player;
     default:
       return false;
   }

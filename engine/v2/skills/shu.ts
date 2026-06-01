@@ -182,8 +182,10 @@ registerSkill({
     event: 'turnStart',
     source: 'character',
   },
-  handler(_ctx, _state) {
-    return [];
+  handler(ctx, _state) {
+    return [
+      { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: 'distanceBonus', value: -1 }] },
+    ];
   },
 });
 
@@ -232,7 +234,9 @@ registerSkill({
     event: 'turnStart',
     source: 'character',
   },
-  handler(_ctx, _state) {
-    return [];
+  handler(ctx, _state) {
+    return [
+      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'noTrickDistanceLimit' }] },
+    ];
   },
 } satisfies SkillDef);

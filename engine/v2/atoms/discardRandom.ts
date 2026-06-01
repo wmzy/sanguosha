@@ -1,4 +1,4 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom, AtomEventResult, Json } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent } from '../event';
 import { updatePlayer } from '../state';
@@ -37,6 +37,12 @@ export function register() {
       const from = atom.from;
       const server = makeServerEvent('discardRandom', { player, count, from });
       return [server, new Map(), server] as const;
+    },
+    getResult(state: GameState, atom: Atom & { type: 'discardRandom'; player: string; count: number; from: 'hand' | 'equipment' }): Record<string, Json> {
+      const discardPile = state.zones.discardPile;
+      if (discardPile.length === 0) return {};
+      const lastCardId = discardPile[discardPile.length - 1];
+      return { discardedCardId: lastCardId };
     },
   });
 }

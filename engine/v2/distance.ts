@@ -19,6 +19,12 @@ export function getDistance(state: GameState, from: string, to: string): number 
     dist = Math.max(1, dist - 1);
   }
 
+  // 技能距离修正（如马术：distanceBonus = -1）
+  const distanceBonus = fromPlayer.vars['distanceBonus'];
+  if (typeof distanceBonus === 'number') {
+    dist = Math.max(1, dist + distanceBonus);
+  }
+
   const toPlayer = getPlayer(state, to);
   if (toPlayer.equipment.horsePlus) {
     dist += 1;

@@ -53,12 +53,12 @@ export function handleEndTurn(
   }
 
   // 不需要弃牌 → 下一玩家，从准备阶段开始
-  // turnStart GameEvent 由 advanceToInteractivePhase 统一发射
   const atoms: Atom[] = [
     { type: 'nextPlayer' },
     { type: 'setPhase', phase: '准备' },
   ];
   const result = applyAtoms(s, atoms);
+
   const turnStartLogEvent = makeServerEvent('turnStart', {
     player: result.state.currentPlayer,
   });
@@ -107,6 +107,7 @@ export function resolveDiscardPhase(
     { type: 'setPhase', phase: '准备' },
   ];
   const result = applyAtoms(state, discardAtoms);
+
   const discardEvent = makeServerEvent('cardDiscarded', {
     player: action.player,
     cardIds: action.cardIds,
