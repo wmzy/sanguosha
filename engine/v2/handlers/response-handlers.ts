@@ -183,7 +183,7 @@ function resolveAoeResponse(
   const hasRemainingTargets = !!(remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard);
 
   if (damageResult.state.pending?.type === 'dyingWindow' && hasRemainingTargets) {
-    const resumeAoe = { attacker: attacker!, remainingTargets: remainingTargets!, requiredCard: requiredCard!, sourceCard: sourceCard! };
+    const resumeAoe = { attacker, remainingTargets, requiredCard, sourceCard };
     return {
       state: { ...damageResult.state, pending: { ...damageResult.state.pending, resumeAoe } },
       events: allEvents,
@@ -196,10 +196,10 @@ function resolveAoeResponse(
 
   if (hasRemainingTargets) {
     return startAoeTargetWuxie(damageResult.state, {
-      attacker: attacker!,
-      remainingTargets: remainingTargets!,
-      requiredCard: requiredCard!,
-      sourceCard: sourceCard!,
+      attacker,
+      remainingTargets,
+      requiredCard,
+      sourceCard,
     });
   }
 

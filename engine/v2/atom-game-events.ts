@@ -12,10 +12,8 @@ const damageEvents: GameEventGenerator = (_state, atom) => {
     target: d.target as string,
     source: (d.source as string) ?? '',
     amount: d.amount as number,
+    ...(d.cardId != null ? { cardId: d.cardId as string } : {}),
   };
-  if (d.cardId != null) {
-    (event as Record<string, unknown>).cardId = d.cardId;
-  }
   return [event];
 };
 

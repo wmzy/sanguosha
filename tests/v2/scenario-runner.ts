@@ -29,6 +29,7 @@ export interface StateDiff {
 export class ScenarioContext {
   state: GameState;
   private _snapshots: Map<string, GameSnapshot> = new Map();
+  private _cardCounter = 0;
 
   constructor(state: GameState) {
     this.state = state;
@@ -77,7 +78,7 @@ export class ScenarioContext {
 
   giveCard(to: string, cardName: string, count: number = 1): void {
     for (let i = 0; i < count; i++) {
-      const cardId = `test-${cardName}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const cardId = `test-${cardName}-${++this._cardCounter}`;
       const card = {
         id: cardId,
         name: cardName,

@@ -187,12 +187,24 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   let s = state;
   const allEvents: ServerEvent[] = [];
 
-  const turnStartGameEvent: GameEvent = { type: 'turnStart', player: s.currentPlayer };
-  const turnStartResult = emitEvent(s, turnStartGameEvent);
-  s = turnStartResult.state;
-  allEvents.push(...turnStartResult.events);
-  const turnStartLogEvent = makeServerEvent('turnStart', { player: s.currentPlayer });
-  allEvents.push(turnStartLogEvent);
+  // turnStart 每回合只发射一次，由 nextPlayer atom 重置 phaseFlags
+  if (!s.turn.phaseFlags.includes('turnStarted')) {
+    const turnStartGameEvent: GameEvent = { type: 'turnStart', player: s.currentPlayer };
+    const turnStartResult = emitEvent(s, turnStartGameEvent);
+    s = {
+      ...turnStartResult.state,
+      turn: {
+        ...turnStartResult.state.turn,
+        phaseFlags: [...turnStartResult.state.turn.phaseFlags, 'turnStarted'],
+      },
+    };
+    allEvents.push(...turnStartResult.events);
+    const turnStartLogEvent = makeServerEvent('turnStart', { player: s.currentPlayer });
+    allEvents.push(turnStartLogEvent);
+    if (s.pending !== null) {
+      return { state: s, events: allEvents };
+    }
+  }
 
   while (s.pending === null && isAutoPhase(s.phase)) {
     if (isPreparationPhase(s.phase)) {

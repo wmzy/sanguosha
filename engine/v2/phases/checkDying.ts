@@ -3,6 +3,7 @@ import { TIMEOUT_DEFAULTS } from '../types';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
 import { getPlayer, getAlivePlayerNames } from '../state';
+import { makeServerEvent } from '../event';
 
 type CheckDyingPhase = Extract<SkillPhase, { type: 'checkDying' }>;
 
@@ -24,7 +25,8 @@ export function register() {
           deadline: Date.now() + timeout,
           onTimeout: { type: 'respond', player: playerName },
         };
-        return { state: { ...state, pending }, events: [] };
+        const dyingEvent = makeServerEvent('dying', { player: playerName });
+        return { state: { ...state, pending }, events: [dyingEvent] };
       }
 
       return { state, events: [] };
