@@ -1,5 +1,5 @@
 /**
- * tests/v2/serializer.test.ts — 序列化和验证
+ * tests/serializer.test.ts — 序列化和验证
  */
 import { describe, it, expect } from 'vitest';
 import { serialize, deserialize, validateGameState } from '@engine/serializer';

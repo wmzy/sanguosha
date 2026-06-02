@@ -1,5 +1,5 @@
 /**
- * tests/v2/expr.test.ts — 表达式求值和条件检查
+ * tests/expr.test.ts — 表达式求值和条件检查
  */
 import { describe, it, expect } from 'vitest';
 import { resolve, checkCondition } from '@engine/expr';

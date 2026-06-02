@@ -1,5 +1,5 @@
 /**
- * tests/v2/atom-result-inject.test.ts — Atom getResult 自动注入 ctx.localVars 测试
+ * tests/atom-result-inject.test.ts — Atom getResult 自动注入 ctx.localVars 测试
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { executePlan } from '@engine/phase';

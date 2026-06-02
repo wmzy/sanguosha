@@ -1,5 +1,7 @@
 import type { TurnPhase, Gender, Faction, Role, Card, PendingTrick } from '../shared/types';
 
+export type { TurnPhase, Gender, Faction, Role, Card, PendingTrick };
+
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 export interface GameState {
   meta: GameMeta;

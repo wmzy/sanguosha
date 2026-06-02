@@ -1,5 +1,5 @@
 /**
- * tests/v2/invariants.ts — 游戏状态不变量检查
+ * tests/invariants.ts — 游戏状态不变量检查
  *
  * 每次 engine() 调用后自动检查关键不变量，防止状态损坏。
  * 用于 safeEngine 包装器，套到所有现用测试上。

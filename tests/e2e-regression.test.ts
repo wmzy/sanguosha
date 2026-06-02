@@ -1,5 +1,5 @@
 /**
- * tests/v2/e2e-regression.test.ts — 端到端回归测试
+ * tests/e2e-regression.test.ts — 端到端回归测试
  *
  * 覆盖所有已修复 bug 的集成测试，确保不会回归。
  * 测试从创建游戏到胜利/失败的完整链路。

@@ -1,5 +1,5 @@
 /**
- * tests/v2/event-audit.test.ts — 事件审计测试
+ * tests/event-audit.test.ts — 事件审计测试
  *
  * 验证每个引擎 handler 产生的 ServerEvent（游戏日志事件），
  * 以及 GameEvent（技能触发事件）的发射情况。

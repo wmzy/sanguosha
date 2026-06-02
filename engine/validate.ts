@@ -1,5 +1,5 @@
 /**
- * engine/v2/validate.ts — V2 三国杀引擎动作验证模块
+ * engine/validate.ts — 三国杀引擎动作验证模块
  *
  * 提供权威的合法性检查，从 engine.ts 中提取并增强。
  * 服务端验证入口，也用于 computeValidActions 计算可用操作。

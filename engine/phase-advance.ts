@@ -1,5 +1,5 @@
 /**
- * engine/v2/phase-advance.ts — 回合阶段自动推进
+ * engine/phase-advance.ts — 回合阶段自动推进
  *
  * 自动执行"准备→判定→摸牌→出牌"的阶段性推进。
  * 每个阶段 emit phaseBegin 事件（触发监听该阶段的技能），

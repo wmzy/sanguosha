@@ -1,5 +1,5 @@
 import type { CardType, CardSubType } from '@shared/types';
-import type { PendingAction } from '@engine/types';
+import type { PendingAction, Json } from '@engine/types';
 
 // ─── 前端视角视图 ─────────────────────────────────────────
 
@@ -34,6 +34,7 @@ export interface EquipmentView {
 
 /** 卡牌信息（前端可见字段） */
 export interface CardInfo {
+  [key: string]: Json;
   id: string;
   name: string;
   type: CardType;

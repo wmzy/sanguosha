@@ -1,5 +1,5 @@
 /**
- * tests/v2/skills-exec.test.ts — 技能执行行为测试
+ * tests/skills-exec.test.ts — 技能执行行为测试
  *
  * 测试技能实际执行效果，而非仅注册。
  * 自动技能通过 emitEvent 触发，手动技能通过 useSkill 触发。

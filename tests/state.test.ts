@@ -1,5 +1,5 @@
 /**
- * tests/v2/state.test.ts — 状态管理函数
+ * tests/state.test.ts — 状态管理函数
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -177,7 +177,7 @@ describe('nextRngState', () => {
 describe('状态字段完整性', () => {
   it('eventCounter 未在 createInitialState 中初始化', () => {
     const state = createTestGame({ playerCount: 2 });
-    expect((state as Record<string, unknown>).eventCounter).toBeUndefined();
+    expect((state as unknown as Record<string, unknown>).eventCounter).toBeUndefined();
   });
 
   it('deferredDyingCheck 未在 createInitialState 中初始化', () => {

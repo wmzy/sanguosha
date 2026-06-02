@@ -1,5 +1,5 @@
 /**
- * tests/v2/context.test.ts — 技能上下文构建
+ * tests/context.test.ts — 技能上下文构建
  */
 import { describe, it, expect } from 'vitest';
 import { buildSkillContext } from '@engine/context';

@@ -1,5 +1,5 @@
 /**
- * tests/v2/game-flow.test.ts — 完整游戏流程测试
+ * tests/game-flow.test.ts — 完整游戏流程测试
  *
  * 种子确定性 + 不变量检查覆盖整个游戏生命周期。
  * 脚本化流畅 + 随机打谱两种模式。

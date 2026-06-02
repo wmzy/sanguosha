@@ -1,5 +1,5 @@
 /**
- * tests/v2/game-event-emission.test.ts — GameEvent 发射验证测试
+ * tests/game-event-emission.test.ts — GameEvent 发射验证测试
  *
  * 验证 V2 引擎通过 engine() 真实路径发射 GameEvent，
  * 确保 damageReceived、killHit、killDodged、turnStart 等事件

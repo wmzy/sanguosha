@@ -1,5 +1,5 @@
 /**
- * tests/v2/skill-conversion.test.ts — 技能卡牌转换验证
+ * tests/skill-conversion.test.ts — 技能卡牌转换验证
  *
  * 验证 `validateResponseWindow`、`isCardValidResponse` 在 killResponse/duelResponse
  * 中正确处理技能转换（倾国/龙胆/武圣）。

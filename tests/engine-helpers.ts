@@ -1,6 +1,3 @@
-/**
- * tests/v2/setup.ts — V2 引擎集成测试共享工具
- */
 import { createInitialState } from '@engine/state';
 import type { GameState, GameAction } from '@engine/types';
 import type { CharacterConfig } from '@shared/types';

@@ -1,5 +1,5 @@
 /**
- * tests/v2/skills-completeness.test.ts — 技能完整性审计
+ * tests/skills-completeness.test.ts — 技能完整性审计
  *
  * 遍历所有注册的技能，检查 handler 是否为 stub/TODO。
  * 这确保新注册的技能不会被"忘记实现"。

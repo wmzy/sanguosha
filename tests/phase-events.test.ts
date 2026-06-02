@@ -1,5 +1,5 @@
 /**
- * tests/v2/phase-events.test.ts — 阶段事件测试
+ * tests/phase-events.test.ts — 阶段事件测试
  *
  * 验证 phaseBegin 和 phaseEnd GameEvent 在阶段推进时正确发射。
  * 测试策略：通过注册监听 phaseBegin/phaseEnd 的技能，检查其副作用来验证事件发射。

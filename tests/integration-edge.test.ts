@@ -1,5 +1,5 @@
 /**
- * tests/v2/integration-edge.test.ts — 边界条件集成测试
+ * tests/integration-edge.test.ts — 边界条件集成测试
  *
  * 覆盖 bug-coverage-analysis.md 中列出的边界条件：
  * 1. 牌堆抽空后的 reshuffle

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { PlayerPanel } from '../../src/components/PlayerPanel';
 import type { PlayerState } from '../../engine/types';
+import type { Card } from '../../shared/types';
 
 const mockPlayer: PlayerState = {
   info: {
@@ -21,7 +22,7 @@ const mockPlayer: PlayerState = {
   tags: [],
 };
 
-const emptyCardMap: Record<string, unknown> = {};
+const emptyCardMap: Record<string, Card> = {};
 
 describe('PlayerPanel', () => {
   it('显示角色名', () => {
