@@ -25,6 +25,8 @@ export interface EquipmentView {
 }
 
 export interface SelfView {
+  /** 角色 ID（如 "曹操"），用于渲染角色名/技能。 */
+  characterId: string;
   hand: CardInfo[];
   equipment: EquipmentView;
   health: number;
@@ -36,8 +38,10 @@ export interface SelfView {
 }
 
 export interface OtherPlayerView {
+  /** 角色 ID（如 "曹操"），用于渲染角色名/技能。 */
+  characterId: string;
   handCount: number;
-  equipment: { weapon: string | null; armor: string | null; mount: string | null };
+  equipment: EquipmentView;
   health: number;
   maxHealth: number;
   pendingTrickCount: number;
@@ -62,6 +66,8 @@ export interface TurnView {
 }
 
 export interface PlayerView {
+  /** 共享卡牌元数据：所有可见的 CardInfo（手牌/装备/弃牌堆等）。 */
+  cardMap: Record<string, CardInfo>;
   self: SelfView;
   others: Record<string, OtherPlayerView>;
   table: TableView;

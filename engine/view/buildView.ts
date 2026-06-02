@@ -21,6 +21,7 @@ export function buildPlayerView(state: GameState, myPlayerId: string): PlayerVie
   }
 
   const selfView: SelfView = {
+    characterId: self.info.characterId,
     hand: self.hand.map(id => toCardInfo(state, id)),
     equipment: {
       weapon: self.equipment.weapon ? toCardInfo(state, self.equipment.weapon) : null,
@@ -43,11 +44,14 @@ export function buildPlayerView(state: GameState, myPlayerId: string): PlayerVie
     const p = state.players[name];
     if (!p) continue;
     others[name] = {
+      characterId: p.info.characterId,
       handCount: p.hand.length,
       equipment: {
-        weapon: p.equipment.weapon ?? null,
-        armor: p.equipment.armor ?? null,
-        mount: p.equipment.horsePlus ?? p.equipment.horseMinus ?? null,
+        weapon: p.equipment.weapon ? toCardInfo(state, p.equipment.weapon) : null,
+        armor: p.equipment.armor ? toCardInfo(state, p.equipment.armor) : null,
+        mount: (p.equipment.horsePlus ?? p.equipment.horseMinus)
+          ? toCardInfo(state, (p.equipment.horsePlus ?? p.equipment.horseMinus)!)
+          : null,
       },
       health: p.health,
       maxHealth: p.maxHealth,
@@ -67,7 +71,13 @@ export function buildPlayerView(state: GameState, myPlayerId: string): PlayerVie
     killsPlayed: state.turn.killsPlayed,
   };
 
+  const cardMap: Record<string, CardInfo> = {};
+  for (const [id, c] of Object.entries(state.cardMap)) {
+    cardMap[id] = toCardInfoFromCard(c);
+  }
+
   return {
+    cardMap,
     self: selfView,
     others,
     table,
@@ -81,6 +91,10 @@ function toCardInfo(state: GameState, cardId: string): CardInfo {
   if (!c) {
     return { id: cardId, name: '', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' };
   }
+  return toCardInfoFromCard(c);
+}
+
+function toCardInfoFromCard(c: GameState['cardMap'][string]): CardInfo {
   return {
     id: c.id,
     name: c.name,
@@ -90,6 +104,14 @@ function toCardInfo(state: GameState, cardId: string): CardInfo {
     rank: c.rank,
     description: c.description,
   };
+}
+
+export function toCardInfoMap(cards: GameState['cardMap']): Record<string, CardInfo> {
+  const map: Record<string, CardInfo> = {};
+  for (const [id, c] of Object.entries(cards)) {
+    map[id] = toCardInfoFromCard(c);
+  }
+  return map;
 }
 
 /** 深拷贝 PlayerView（用于 reducer immutable 更新）。 */
