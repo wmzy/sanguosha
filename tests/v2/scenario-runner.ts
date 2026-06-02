@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import type { GameState, GameEvent, GameAction } from '@engine/v2/types';
+import type { GameState, GameEvent, GameAction, PlayerEvent } from '@engine/v2/types';
 import type { CharacterConfig, Card as SharedCard } from '@shared/types';
 import { allCharacters } from '@shared/characters';
 import { createInitialState, getPlayer } from '@engine/v2/state';
 import { engine } from '@engine/v2/engine';
 import { emitEvent as engineEmitEvent, registerCharacterTriggers } from '@engine/v2/skill';
 import { allTricks, weapons, armors, horses } from '@shared/cards';
+import type { PlayerView, Animation, AvailableAction, CardInfo } from './frontend/types';
+import { eventsToAnimations } from './frontend/eventsToAnimations';
+import { getAvailableActions } from './frontend/actions';
 
 const characterMap = Object.fromEntries(
   allCharacters.map(c => [c.name, c]),
@@ -27,10 +30,63 @@ export interface StateDiff {
   currentPlayerChanged: boolean;
 }
 
+function makeCardInfoFromId(cardId: string | undefined, cardMap: Record<string, SharedCard | undefined>): CardInfo | null {
+  if (!cardId) return null;
+  const card = cardMap[cardId];
+  if (!card) return null;
+  return { id: cardId, name: card.name ?? '', type: card.type ?? '基本牌', subtype: card.subtype ?? '杀', suit: card.suit ?? '♠', rank: card.rank ?? 'A', description: card.description ?? '' };
+}
+
+function buildPlayerView(state: GameState, playerId: string): PlayerView {
+  const players = Object.keys(state.players);
+  const self = getPlayer(state, playerId);
+  return {
+    self: {
+      hand: self.hand.map(id => makeCardInfoFromId(id, state.cardMap)!),
+      equipment: {
+        weapon: makeCardInfoFromId(self.equipment.weapon, state.cardMap),
+        armor: makeCardInfoFromId(self.equipment.armor, state.cardMap),
+        mount: makeCardInfoFromId(self.equipment.horsePlus ?? self.equipment.horseMinus, state.cardMap),
+      },
+      health: self.health,
+      maxHealth: self.maxHealth,
+      pendingTricks: (self.pendingTricks ?? []).map(t => ({ name: t.name, source: t.source, cardId: t.card.id })),
+      tags: [...(self.tags ?? [])],
+      vars: { ...(self.vars ?? {}) },
+      alive: self.info.alive,
+    },
+    others: Object.fromEntries(players.filter(p => p !== playerId).map(p => {
+      const other = getPlayer(state, p);
+      return [p, {
+        handCount: other.hand.length,
+        equipment: {
+          weapon: other.equipment.weapon ?? null,
+          armor: other.equipment.armor ?? null,
+          mount: (other.equipment.horsePlus ?? other.equipment.horseMinus) ?? null,
+        },
+        health: other.health,
+        maxHealth: other.maxHealth,
+        pendingTrickCount: (other.pendingTricks ?? []).length,
+        alive: other.info.alive,
+      }];
+    })),
+    table: {
+      discardPileCount: state.zones.discardPile.length,
+      deckCount: state.zones.deck.length,
+    },
+    turn: {
+      phase: state.phase,
+      currentPlayer: state.currentPlayer,
+      killsPlayed: state.turn.killsPlayed,
+    },
+  };
+}
+
 export class ScenarioContext {
   state: GameState;
   private _snapshots: Map<string, GameSnapshot> = new Map();
   private _cardCounter = 0;
+  lastEvents: PlayerEvent[] = [];
 
   constructor(state: GameState) {
     this.state = state;
@@ -143,36 +199,42 @@ export class ScenarioContext {
     const result = engine(this.state, { type: 'playCard', player, cardId, target });
     if (result.error) throw new Error(`playCard error: ${result.error}`);
     this.state = result.state;
+    this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   respond(player: string, cardId?: string): void {
     const result = engine(this.state, { type: 'respond', player, cardId });
     if (result.error) throw new Error(`respond error: ${result.error}`);
     this.state = result.state;
+    this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   useSkill(player: string, skillId: string): void {
     const result = engine(this.state, { type: 'useSkill', player, skillId });
     if (result.error) throw new Error(`useSkill error: ${result.error}`);
     this.state = result.state;
+    this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   discardCards(player: string, cardIds: string[]): void {
     const result = engine(this.state, { type: 'discard', player, cardIds });
     if (result.error) throw new Error(`discardCards error: ${result.error}`);
     this.state = result.state;
+    this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   endTurn(player: string): void {
     const result = engine(this.state, { type: 'endTurn', player });
     if (result.error) throw new Error(`endTurn error: ${result.error}`);
     this.state = result.state;
+    this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   /** 直接发射 GameEvent 触发技能（用于引擎路径尚未覆盖的事件场景） */
   emitEvent(event: GameEvent): void {
     const result = engineEmitEvent(this.state, event);
     this.state = result.state;
+    this.lastEvents = result.playerEvents?.get(event.type) ?? [];
   }
 
   /** 执行任意 engine action */
@@ -180,6 +242,7 @@ export class ScenarioContext {
     const result = engine(this.state, action);
     if (result.error) throw new Error(`action error (${action.type}): ${result.error}`);
     this.state = result.state;
+    this.lastEvents = result.playerEvents?.get('') ?? [];
   }
 
   player(name: string) {
@@ -238,10 +301,17 @@ export class ScenarioContext {
   }
 }
 
+type ViewCheck = (ctx: ScenarioContext, view: PlayerView) => void;
+type AnimCheck = (ctx: ScenarioContext, anims: Animation[]) => void;
+type ActionCheck = (ctx: ScenarioContext, actions: AvailableAction[]) => void;
+
 interface Step {
   label: string;
   act?: (ctx: ScenarioContext) => void;
   check?: (ctx: ScenarioContext) => void;
+  viewCheck?: { playerId: string; fn: ViewCheck };
+  animCheck?: { playerId?: string; fn: AnimCheck };
+  actionCheck?: { playerId: string; fn: ActionCheck };
 }
 
 export class ScenarioBuilder {
@@ -268,6 +338,29 @@ export class ScenarioBuilder {
     return this;
   }
 
+  checkView(playerId: string, fn: ViewCheck): this {
+    this._steps.push({ label: `checkView(${playerId})`, viewCheck: { playerId, fn } });
+    return this;
+  }
+
+  /** 验证指定玩家视角的动画序列 */
+  checkAnimations(label: string, playerId: string, fn: AnimCheck): this {
+    this._steps.push({ label, animCheck: { playerId, fn } });
+    return this;
+  }
+
+  /** 验证当前操作产生的动画（不限定玩家） */
+  checkAnimationsAll(label: string, fn: AnimCheck): this {
+    this._steps.push({ label, animCheck: { playerId: '', fn } });
+    return this;
+  }
+
+  /** 验证指定玩家视角的可用操作 */
+  checkAvailable(label: string, playerId: string, fn: ActionCheck): this {
+    this._steps.push({ label, actionCheck: { playerId, fn } });
+    return this;
+  }
+
   run(): void {
     it(this._description, () => {
       const ctx = new ScenarioContext({} as GameState);
@@ -280,6 +373,20 @@ export class ScenarioBuilder {
         }
         if (step.check) {
           step.check(ctx);
+        }
+        if (step.viewCheck) {
+          const view = buildPlayerView(ctx.state, step.viewCheck.playerId);
+          step.viewCheck.fn(ctx, view);
+        }
+        if (step.animCheck) {
+          const pid = step.animCheck.playerId || '';
+          const anims = eventsToAnimations(pid, ctx.lastEvents);
+          step.animCheck.fn(ctx, anims);
+        }
+        if (step.actionCheck) {
+          const view = buildPlayerView(ctx.state, step.actionCheck.playerId);
+          const actions = getAvailableActions(view, ctx.state.pending);
+          step.actionCheck.fn(ctx, actions);
         }
       }
     });
