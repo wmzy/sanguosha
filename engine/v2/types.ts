@@ -477,6 +477,7 @@ export type ZoneLoc =
 export interface EngineResult {
   state: GameState;
   events: ServerEvent[];
+  playerEvents?: Map<string, PlayerEvent[]>;
   error?: string;
 }
 export interface GameView {
