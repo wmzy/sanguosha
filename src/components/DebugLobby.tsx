@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { GameBoard } from './GameBoard';
-import type { GameBoardData } from './GameBoard';
+import type { GameBoardData, PlayerEntry } from './GameBoard';
 import { computeValidActions } from '../../engine/validate';
 import { getDistance } from '../../engine/distance';
 import { getPlayer } from '../../engine/state';
+import { buildPlayerView } from '../../engine/view/buildView';
+import type { SelfView } from '../../engine/view/types';
 import type { GameState, GameAction, ValidAction, PlayerState, PromptOption, Json } from '../../engine/types';
 import type { Card } from '../../shared/types';
 import { saveState } from '../utils/logFile';
@@ -261,7 +263,21 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
     const playableCardIds = new Set(playableCards.map(pc => pc.cardId));
     const myHand: Card[] = me.hand.map(id => state.cardMap[id]).filter(Boolean);
     const selectedCardIndex = selectedCardId !== null ? me.hand.indexOf(selectedCardId) : null;
-    const orderedPlayers = playerOrder.filter(name => state.players[name]).map(name => ({ name, player: state.players[name] }));
+
+    // 为每个玩家构建 PlayerView（debug 模式：所有玩家都看得到完整 SelfView）
+    const playerEntries: PlayerEntry[] = playerOrder
+      .filter(name => state.players[name])
+      .map((name): PlayerEntry => {
+        const player = state.players[name];
+        const selfView: SelfView = buildPlayerView(state, name).self;
+        return {
+          name,
+          panelData: { kind: 'self', data: selfView },
+          characterId: player.info.characterId,
+          role: player.info.role,
+          alive: player.info.alive,
+        };
+      });
 
     const dispatch = (action: GameAction) => {
       send({ type: 'action', action });
@@ -269,6 +285,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
 
     const gameData: GameBoardData = {
       state,
+      cardMap: state.cardMap,
       me,
       myName,
       playerOrder,
@@ -389,7 +406,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         setSelectedSkillCards(new Set());
       },
       myHand,
-      orderedPlayers,
+      orderedPlayers: playerEntries,
       switchPerspective: () => {
         const idx = state.playerOrder.indexOf(myName);
         const nextName = state.playerOrder[(idx + 1) % state.playerOrder.length];
@@ -418,6 +435,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         dispatch({ type: 'toggleAutoSkipWuxie' });
       },
       getDistance: (from: string, to: string) => getDistance(state, from, to),
+      pending: state.pending,
     };
 
     return (

@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
-import { PlayerPanel } from './PlayerPanel';
+import { useState, useEffect, useMemo } from 'react';
+import { PlayerPanel, type PlayerPanelData } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
 import { LogPanel } from './LogPanel';
 import { allCharacters } from '../../shared/characters';
-import type { PlayerState, ValidAction, PromptOption, Json } from '../../engine/types';
+import type { PlayerState, ValidAction, PromptOption, Json, PendingAction } from '../../engine/types';
 import type { Card } from '../../shared/types';
 import type { Operation } from '../../shared/log';
+import { toCardInfoMap } from '../../engine/view/buildView';
 import { colors, styles } from '../theme';
 
 const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
@@ -28,8 +29,19 @@ interface PendingPrompt {
   options?: PromptOption[];
 }
 
+/** 单个玩家在棋盘上展示所需的所有数据。 */
+export interface PlayerEntry {
+  name: string;
+  panelData: PlayerPanelData;
+  characterId: string;
+  role: string;
+  alive: boolean;
+}
+
 export interface GameBoardData {
+  // 来自 GameState（保留以便 HandCards 等组件用，但 PlayerPanel 不再直接用）
   state: import('../../engine/types').GameState;
+  cardMap: Record<string, Card>;
   me: PlayerState;
   myName: string;
   playerOrder: string[];
@@ -67,13 +79,15 @@ export interface GameBoardData {
   toggleSkillCardSelection: (cardId: string) => void;
   handleSkillChoice: (choice: Json) => void;
   myHand: Card[];
-  orderedPlayers: Array<{ name: string; player: PlayerState }>;
+  /** 玩家面板条目（按座位顺序），使用 PlayerView 派生数据 */
+  orderedPlayers: PlayerEntry[];
   switchPerspective: () => void;
   setPerspective: (playerName: string) => void;
   goToCurrentPlayer: () => void;
   handleSaveLog: () => void;
   toggleAutoSkipWuxie: () => void;
   getDistance: (from: string, to: string) => number;
+  pending: PendingAction | null;
 }
 
 export function GameBoard({ data }: { data: GameBoardData }) {
@@ -186,8 +200,10 @@ export function GameBoard({ data }: { data: GameBoardData }) {
   const isDyingWindow = pendingPrompt?.type === 'dyingWindow';
   const isSkillPrompt = pendingPrompt?.type === 'skillPrompt';
 
-  const renderPlayerPanel = (entry: { name: string; player: PlayerState }) => {
-    const { name, player } = entry;
+  const viewCardMap = useMemo(() => toCardInfoMap(state.cardMap), [state.cardMap]);
+
+  const renderPlayerPanel = (entry: PlayerEntry) => {
+    const { name, panelData, characterId, alive } = entry;
     return (
       <div
         key={name}
@@ -195,7 +211,7 @@ export function GameBoard({ data }: { data: GameBoardData }) {
           if (
             needsTarget &&
             name !== myName &&
-            player.info.alive &&
+            alive &&
             validTargetList.includes(name)
           ) {
             setSelectedTarget(name === selectedTarget ? null : name);
@@ -204,7 +220,7 @@ export function GameBoard({ data }: { data: GameBoardData }) {
         onDoubleClick={() => setPerspective(name)}
         style={{
           cursor:
-            needsTarget && name !== myName && player.info.alive && validTargetList.includes(name)
+            needsTarget && name !== myName && alive && validTargetList.includes(name)
               ? 'pointer'
               : 'default',
           outline: selectedTarget === name ? `3px solid ${colors.accent.red}` : 'none',
@@ -215,16 +231,17 @@ export function GameBoard({ data }: { data: GameBoardData }) {
       >
         <PlayerPanel
           playerName={name}
-          player={player}
-          cardMap={state.cardMap}
+          data={panelData}
+          cardMap={viewCardMap}
           isCurrentPlayer={name === state.currentPlayer}
           isSelf={name === myName}
+          role={panelData.kind === 'self' ? entry.role : undefined}
           seatNumber={getSeatNumber(name)}
           distance={
             selectedCardId !== null && name !== myName ? getDistance(myName, name) : undefined
           }
           timerSeconds={waitingPlayers.has(name) ? remainingSeconds ?? undefined : undefined}
-          abilities={characterMap[player.info.characterId]?.abilities}
+          abilities={characterMap[characterId]?.abilities}
         />
       </div>
     );

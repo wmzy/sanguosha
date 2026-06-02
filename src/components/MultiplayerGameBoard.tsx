@@ -1,13 +1,14 @@
 // src/components/MultiplayerGameBoard.tsx — 多人模式游戏棋盘
 //
 // 数据流：服务器发 initialView 初始化本地 FrontendState，events 通过 reducer 应用。
-// 此处使用简化渲染（不依赖 PlayerPanel 组件）以避免与 PlayerState 类型耦合。
-// 后续可重做 UI 适配 PlayerView。
+// 面板渲染走 PlayerPanel：self 玩家用完整 SelfView，others 用 OtherPlayerView 摘要。
+// （手牌 / 出牌 / 响应 / 弃牌 / 技能等交互通过 `useGameState` hook 暴露给本组件。）
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type { FrontendState, CardInfo } from '../../engine/view/types';
 import { reduceFrontend } from '../../engine/view/reducer';
+import { PlayerPanel, type PlayerPanelData } from './PlayerPanel';
 import { colors, styles } from '../theme';
 
 interface MultiplayerGameBoardProps {
@@ -76,16 +77,36 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
     onLeave();
   }, [send, onLeave]);
 
+  // 自/他 玩家面板数据：self 用 SelfView（完整手牌），others 用 OtherPlayerView（摘要）
+  const playerPanels = useMemo<{ name: string; data: PlayerPanelData }[]>(() => {
+    if (!feState) return [];
+    const view = feState.view;
+    const myId = feState.myPlayerId;
+    const result: { name: string; data: PlayerPanelData }[] = [];
+
+    result.push({
+      name: myId,
+      data: { kind: 'self', data: view.self },
+    });
+
+    for (const otherId of Object.keys(view.others)) {
+      const other = view.others[otherId];
+      if (!other) continue;
+      result.push({
+        name: otherId,
+        data: { kind: 'other', data: other },
+      });
+    }
+    return result;
+  }, [feState]);
+
   if (!feState) {
     return (
       <div style={styles.page()}>
         <div style={{ textAlign: 'center' }}>
           <h2>等待游戏开始...</h2>
           <p style={{ color: colors.text.muted }}>房间号: {roomId}</p>
-          <button
-            onClick={handleLeave}
-            style={styles.btn(colors.text.dim, { padding: '10px 24px' })}
-          >
+          <button onClick={handleLeave} style={styles.btn(colors.text.dim)}>
             离开房间
           </button>
         </div>
@@ -95,72 +116,71 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
 
   const view = feState.view;
   const myId = feState.myPlayerId;
-  const allPlayerNames = [myId, ...Object.keys(view.others)];
+  const isMyTurn = view.turn.currentPlayer === myId;
+
+  const playCard = (cardId: string) => {
+    send({ type: 'action', action: { type: 'playCard', player: myId, cardId } });
+  };
+  const endTurn = () => {
+    send({ type: 'action', action: { type: 'endTurn', player: myId } });
+  };
 
   return (
     <div style={styles.page()}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1>三国杀 - 房间 {roomId}</h1>
-        <button
-          onClick={handleLeave}
-          style={styles.btn(colors.text.dim, { padding: '8px 16px' })}
-        >
+        <button onClick={handleLeave} style={styles.btn(colors.text.dim, { padding: '8px 16px' })}>
           离开
         </button>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 30, flexWrap: 'wrap' }}>
-        {allPlayerNames.map((name) => {
-          const isSelf = name === myId;
-          const health = isSelf ? view.self.health : view.others[name]?.health ?? 0;
-          const maxHealth = isSelf ? view.self.maxHealth : view.others[name]?.maxHealth ?? 0;
-          const alive = isSelf ? view.self.alive : view.others[name]?.alive ?? true;
+      <div style={{ textAlign: 'center', marginBottom: 12, fontSize: 14 }}>
+        <span>阶段: {view.turn.phase} | 当前玩家: {view.turn.currentPlayer}</span>
+        {isMyTurn && <span style={{ color: colors.accent.green, marginLeft: 10 }}>- 你的回合！</span>}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
+        {playerPanels.map(({ name, data }) => {
+          const isSelfPanel = name === myId;
+          const isCurrent = name === view.turn.currentPlayer;
+          const role = isSelfPanel && data.kind === 'self'
+            ? (typeof data.data.vars['role'] === 'string' ? data.data.vars['role'] : undefined)
+            : undefined;
           return (
-            <div
+            <PlayerPanel
               key={name}
-              style={{
-                backgroundColor: isSelf ? colors.bg.playerSelf : colors.bg.playerOther,
-                borderRadius: 8,
-                padding: 12,
-                minWidth: 120,
-                textAlign: 'center',
-                border: name === view.turn.currentPlayer ? `2px solid ${colors.accent.gold}` : 'none',
-              }}
-            >
-              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
-                {name}{isSelf ? '（你）' : ''}
-              </div>
-              <div style={{ color: alive ? colors.text.primary : colors.accent.red }}>
-                {health}/{maxHealth} HP
-              </div>
-              {!alive && <div style={{ color: colors.accent.red, fontSize: 12 }}>阵亡</div>}
-            </div>
+              playerName={name}
+              data={data}
+              cardMap={view.cardMap}
+              isCurrentPlayer={isCurrent}
+              isSelf={isSelfPanel}
+              role={role}
+            />
           );
         })}
       </div>
 
-      <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span>阶段: {view.turn.phase} | 当前玩家: {view.turn.currentPlayer}</span>
-        {view.turn.currentPlayer === myId && (
-          <span style={{ color: colors.accent.green, marginLeft: 10 }}>- 你的回合！</span>
-        )}
-      </div>
-
-      <div style={{ marginBottom: 20 }}>
-        <h3>我的手牌</h3>
+      <div style={{ marginBottom: 16 }}>
+        <h3>我的手牌（{view.self.hand.length} 张）</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {view.self.hand.map((card: CardInfo) => (
-            <div
+            <button
               key={card.id}
+              onClick={() => isMyTurn && playCard(card.id)}
+              disabled={!isMyTurn}
               style={{
                 backgroundColor: colors.bg.panel,
-                padding: '6px 10px',
+                padding: '8px 12px',
                 borderRadius: 4,
                 fontSize: 13,
+                cursor: isMyTurn ? 'pointer' : 'not-allowed',
+                opacity: isMyTurn ? 1 : 0.5,
+                color: colors.text.input,
+                border: 'none',
               }}
             >
               {card.name} {card.suit}{card.rank}
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -177,6 +197,16 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
           <div style={{ fontWeight: 'bold' }}>等待操作：{view.pending.type}</div>
         </div>
       )}
+
+      <div style={{ marginBottom: 16, textAlign: 'center' }}>
+        <button
+          onClick={endTurn}
+          disabled={!isMyTurn}
+          style={styles.btn(isMyTurn ? colors.accent.blue : colors.disabled, { padding: '10px 24px' })}
+        >
+          结束回合
+        </button>
+      </div>
 
       <div style={styles.logContainer()}>
         {log.map((msg, i) => (
