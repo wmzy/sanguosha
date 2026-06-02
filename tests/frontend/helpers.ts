@@ -29,6 +29,7 @@ function defaultCardInfo(cardId: string): CardInfo {
 
 function makeSelfView(hand: string[]): SelfView {
   return {
+    characterId: '曹操',
     hand: hand.map(id => defaultCardInfo(id)),
     equipment: { weapon: null, armor: null, mount: null },
     health: 4,
@@ -42,6 +43,7 @@ function makeSelfView(hand: string[]): SelfView {
 
 function makeOtherView(handCount: number): OtherPlayerView {
   return {
+    characterId: '张飞',
     handCount,
     equipment: { weapon: null, armor: null, mount: null },
     health: 4,
@@ -79,6 +81,7 @@ export function createFrontend(
 
   return {
     view: {
+      cardMap: {},
       self,
       others,
       table: { discardPileCount: 0, deckCount: 80 },
@@ -97,6 +100,7 @@ export function makeView(overrides?: {
   turn?: Partial<TurnView>;
 }): PlayerView {
   const defaults: PlayerView = {
+    cardMap: {},
     self: makeSelfView([]),
     others: {},
     table: { discardPileCount: 0, deckCount: 80 },
@@ -105,8 +109,9 @@ export function makeView(overrides?: {
   };
   if (!overrides) return defaults;
   return {
+    cardMap: defaults.cardMap,
     self: overrides.self ? { ...defaults.self, ...overrides.self } : defaults.self,
-    others: { ...defaults.others, ...overrides.others },
+    others: { ...defaults.others, ...(overrides.others ?? {}) },
     table: overrides.table ? { ...defaults.table, ...overrides.table } : defaults.table,
     turn: overrides.turn ? { ...defaults.turn, ...overrides.turn } : defaults.turn,
     pending: null,

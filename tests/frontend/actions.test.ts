@@ -196,7 +196,7 @@ describe('getAvailableActions', () => {
         equipment: { weapon: null, armor: null, mount: null },
         health: 2, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
-      others: { P2: { handCount: 3, equipment: { weapon: null, armor: null, mount: null }, health: 4, maxHealth: 4, pendingTrickCount: 0, alive: true } },
+      others: { P2: { characterId: '张飞', handCount: 3, equipment: { weapon: null, armor: null, mount: null }, health: 4, maxHealth: 4, pendingTrickCount: 0, alive: true } },
       turn: { phase: '出牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
     const actions = getAvailableActions(view, null);
