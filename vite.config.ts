@@ -13,6 +13,9 @@ export default defineConfig({
       displayName: process.env.NODE_ENV !== 'production',
       exclude: ['node_modules/**'],
       evaluate: false,
+      babelOptions: {
+        presets: ['@babel/preset-typescript'],
+      },
     }),
     honoApiPlugin(),
   ],

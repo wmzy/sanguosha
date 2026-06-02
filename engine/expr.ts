@@ -1,9 +1,31 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Expr, Condition, GameState, SkillContext } from './types';
 import { isExpr } from './types';
 import { getPlayer, getAlivePlayerNames, getCard } from './state';
 import { getDistance } from './distance';
 
 const MAX_DEPTH = 20;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getByPath(root: unknown, path: string): unknown {
+  let result: unknown = root;
+  for (const part of path.split('.')) {
+    if (result == null) return undefined;
+    if (Array.isArray(result)) {
+      const idx = Number(part);
+      if (!Number.isInteger(idx)) return undefined;
+      result = result[idx];
+    } else if (typeof result === 'object') {
+      result = (result as Record<string, unknown>)[part];
+    } else {
+      return undefined;
+    }
+  }
+  return result;
+}
 
 export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, depth = 0): T {
   if (depth > MAX_DEPTH) {
@@ -14,37 +36,32 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     return expr as T;
   }
 
-  const e = expr as Record<string, unknown>;
-  const tag = e.$ as string;
+  if (!isRecord(expr)) return undefined as T;
+  const tag = expr['$'];
 
   switch (tag) {
     case 'ctx': {
-      const path = e.path as string;
+      const path = expr['path'];
+      if (typeof path !== 'string') throw new Error('resolve ctx: path must be string');
       if (!ctx) throw new Error('resolve ctx: no SkillContext provided');
-      const parts = path.split('.');
-      let result: unknown = ctx;
-      for (const part of parts) {
-        if (result == null || typeof result !== 'object') return undefined as T;
-        result = (result as Record<string, unknown>)[part];
-      }
-      return result as T;
+      return getByPath(ctx, path) as T;
     }
 
     case 'event': {
-      const path = e.path as string;
+      const path = expr['path'];
+      if (typeof path !== 'string') throw new Error('resolve event: path must be string');
       if (!ctx) throw new Error('resolve event: no SkillContext provided');
-      return (ctx.event as unknown as Record<string, unknown>)[path] as T;
+      return getByPath(ctx.event, path) as T;
     }
 
     case 'var': {
-      const playerName = resolve(e.player as Expr<string>, state, ctx, depth + 1);
+      const playerName = resolve(expr['player'] as Expr<string>, state, ctx, depth + 1);
       const player = getPlayer(state, playerName);
-      return player.vars[e.key as string] as T;
+      return player.vars[expr['key'] as string] as T;
     }
 
     case 'count': {
-      const source = resolve(e.source, state, ctx, depth + 1);
-      // source 可能是数组（从 ctx 获取），也可能是玩家名
+      const source = resolve(expr['source'], state, ctx, depth + 1);
       if (Array.isArray(source)) return source.length as T;
       const player = getPlayer(state, source as string);
       if (!player) return 0 as T;
@@ -54,39 +71,39 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     }
 
     case 'distance': {
-      const from = resolve(e.from as Expr<string>, state, ctx, depth + 1);
-      const to = resolve(e.to as Expr<string>, state, ctx, depth + 1);
+      const from = resolve(expr['from'] as Expr<string>, state, ctx, depth + 1);
+      const to = resolve(expr['to'] as Expr<string>, state, ctx, depth + 1);
       return getDistance(state, from, to) as T;
     }
 
     case 'cardProp': {
-      const cardId = resolve(e.card as Expr<string>, state, ctx, depth + 1);
+      const cardId = resolve(expr['card'] as Expr<string>, state, ctx, depth + 1);
       const card = getCard(state, cardId);
-      return card[e.prop as keyof typeof card] as T;
+      return card[expr['prop'] as keyof typeof card] as T;
     }
 
     case 'cond': {
-      const condResult = checkCondition(e.check as Condition, state, ctx, depth);
+      const condResult = checkCondition(expr['check'] as Condition, state, ctx, depth);
       if (condResult) {
-        return resolve(e.then as Expr<T>, state, ctx, depth + 1);
+        return resolve(expr['then'] as Expr<T>, state, ctx, depth + 1);
       }
-      return resolve(e.else as Expr<T>, state, ctx, depth + 1);
+      return resolve(expr['else'] as Expr<T>, state, ctx, depth + 1);
     }
 
     case 'add': {
-      const left = resolve(e.left as Expr<number>, state, ctx, depth + 1);
-      const right = resolve(e.right as Expr<number>, state, ctx, depth + 1);
+      const left = resolve(expr['left'] as Expr<number>, state, ctx, depth + 1);
+      const right = resolve(expr['right'] as Expr<number>, state, ctx, depth + 1);
       return (left + right) as T;
     }
 
     case 'sub': {
-      const left = resolve(e.left as Expr<number>, state, ctx, depth + 1);
-      const right = resolve(e.right as Expr<number>, state, ctx, depth + 1);
+      const left = resolve(expr['left'] as Expr<number>, state, ctx, depth + 1);
+      const right = resolve(expr['right'] as Expr<number>, state, ctx, depth + 1);
       return (left - right) as T;
     }
 
     case 'handSize': {
-      const playerName = resolve(e.player as Expr<string>, state, ctx, depth + 1);
+      const playerName = resolve(expr['player'] as Expr<string>, state, ctx, depth + 1);
       const player = getPlayer(state, playerName);
       return player.hand.length as T;
     }
@@ -96,25 +113,8 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     }
 
     default:
-      return expr as T;
+      return expr;
   }
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a == null || b == null) return a === b;
-  if (typeof a !== typeof b) return false;
-  if (typeof a !== 'object') return false;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    return a.every((v, i) => deepEqual(v, b[i]));
-  }
-  if (Array.isArray(a) || Array.isArray(b)) return false;
-  const aObj = a as Record<string, unknown>;
-  const bObj = b as Record<string, unknown>;
-  const keys = Object.keys(aObj);
-  if (keys.length !== Object.keys(bObj).length) return false;
-  return keys.every(k => deepEqual(aObj[k], bObj[k]));
 }
 
 export function checkCondition(condition: Condition, state: GameState, ctx?: SkillContext, depth = 0): boolean {
@@ -126,14 +126,14 @@ export function checkCondition(condition: Condition, state: GameState, ctx?: Ski
     const [a, b] = condition.equals;
     const ra = isExpr(a) ? resolve(a, state, ctx, depth + 1) : a;
     const rb = isExpr(b) ? resolve(b, state, ctx, depth + 1) : b;
-    return deepEqual(ra, rb);
+    return isDeepStrictEqual(ra, rb);
   }
 
   if ('notEquals' in condition) {
     const [a, b] = condition.notEquals;
     const ra = isExpr(a) ? resolve(a, state, ctx, depth + 1) : a;
     const rb = isExpr(b) ? resolve(b, state, ctx, depth + 1) : b;
-    return !deepEqual(ra, rb);
+    return !isDeepStrictEqual(ra, rb);
   }
 
   if ('gte' in condition) {

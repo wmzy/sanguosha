@@ -122,6 +122,26 @@ describe('resolve', () => {
     expect(resolve(expr, state)).toBe(8);
   });
 
+  describe('event 表达式', () => {
+    it('单键查找：event.player', () => {
+      const expr: Expr<string> = { $: 'event', path: 'player' };
+      const c = ctx({ event: { player: 'P1' } as unknown as typeof c.event });
+      expect(resolve(expr, state, c)).toBe('P1');
+    });
+
+    it('点路径查找：event.data.target', () => {
+      const expr: Expr<string> = { $: 'event', path: 'data.target' };
+      const c = ctx({ event: { data: { target: 'P2' } } as unknown as typeof c.event });
+      expect(resolve(expr, state, c)).toBe('P2');
+    });
+
+    it('点路径缺失段返回 undefined', () => {
+      const expr: Expr<unknown> = { $: 'event', path: 'a.b.c' };
+      const c = ctx({ event: { a: { b: null } } as unknown as typeof c.event });
+      expect(resolve(expr, state, c)).toBeUndefined();
+    });
+  });
+
   it('throws on max recursion depth', () => {
     // Build a deeply nested add chain
     let expr: Expr<number> = 1;

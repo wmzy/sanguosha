@@ -14,9 +14,12 @@ import {
   getRoomList,
   findRoomByPlayerId,
   broadcastMessage,
+  addRoom,
+  type Room,
 } from './room';
 import { GameSession } from './session';
 import { createLogger } from './logger';
+import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreToState } from './persistence';
 
 const log = createLogger('ws');
 
@@ -27,6 +30,70 @@ const gameSessions = new Map<string, GameSession>();
 
 // 玩家到房间的映射
 const playerRoomMap = new Map<string, string>();
+
+const IDLE_ROOM_TTL_MS = 60 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+function cleanupIdleRooms(): void {
+  const now = Date.now();
+  const stale: string[] = [];
+  for (const [roomId, session] of gameSessions) {
+    if (now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS) {
+      stale.push(roomId);
+    }
+  }
+  for (const roomId of stale) {
+    log.info(`清理闲置房间 ${roomId}`);
+    const session = gameSessions.get(roomId);
+    session?.destroy();
+    gameSessions.delete(roomId);
+    const room = getRoom(roomId);
+    if (room) {
+      const playerIds = [...room.players.keys()];
+      for (const pid of playerIds) {
+        leaveRoom(roomId, pid);
+        playerRoomMap.delete(pid);
+      }
+    }
+    for (const [pid, rid] of playerRoomMap) {
+      if (rid === roomId) playerRoomMap.delete(pid);
+    }
+  }
+}
+
+setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
+
+function restorePersistedRooms(): void {
+  const roomIds = listPersistedRooms();
+  log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
+  for (const roomId of roomIds) {
+    const persisted = loadRoom(roomId);
+    if (!persisted) continue;
+    const state = restoreToState(persisted);
+    if (state.meta.status === '已结束') {
+      log.info(`房间 ${roomId} 已结束，删除落盘文件`);
+      deletePersistedRoom(roomId);
+      continue;
+    }
+    const room: Room = {
+      id: roomId,
+      name: persisted.roomName || `恢复-${roomId}`,
+      players: new Map(),
+      maxPlayers: persisted.maxPlayers || state.playerOrder.length,
+      status: '进行中',
+      hostId: persisted.hostId,
+      readyPlayers: new Set(),
+      isDebug: persisted.debug,
+    };
+    addRoom(room);
+    const session = new GameSession(room, persisted.debug);
+    session.restoreState(state, persisted.actionLog);
+    gameSessions.set(roomId, session);
+    log.info(`恢复房间 ${roomId}（${state.playerOrder.length} 名玩家，${persisted.actionLog.length} 步操作）`);
+  }
+}
+
+restorePersistedRooms();
 
 // REST API
 app.get('/api/rooms', (c) => {
@@ -104,8 +171,8 @@ app.post('/api/debug-room', async (c) => {
     const room = createDebugRoom(`调试${playerCount}人`, playerCount);
 
     const session = new GameSession(room, true);
+    session.pendingPlayerCount = playerCount;
     gameSessions.set(room.id, session);
-    session.startGame(playerCount);
 
     return c.json({ roomId: room.id });
   } catch (err) {
@@ -407,7 +474,17 @@ function handleJoinDebugRoom(playerId: string, roomId: string, ws: WSContext): v
     return;
   }
   playerRoomMap.set(playerId, roomId);
-  session.reconnectPlayer(playerId, ws);
+
+  const pendingPlayerCount = session.pendingPlayerCount;
+  if (pendingPlayerCount != null) {
+    session.pendingPlayerCount = undefined;
+    session.startGame(pendingPlayerCount);
+    ws.send(serialize({ type: 'room_joined', roomId, playerId }));
+  } else {
+    session.reconnectPlayer(playerId, ws);
+    ws.send(serialize({ type: 'room_joined', roomId, playerId }));
+    session.sendDebugGameState(playerId);
+  }
 }
 
 function handleReconnect(currentPlayerId: string, previousPlayerId: string, ws: WSContext): void {

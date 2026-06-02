@@ -243,6 +243,7 @@ export interface AtomDefinition<A = unknown> {
 export type Expr<T> =
   | T
   | ExprCtx
+  | ExprEvent
   | ExprVar
   | ExprCount
   | ExprDistance
@@ -255,6 +256,11 @@ export type Expr<T> =
 
 export interface ExprCtx {
   $: 'ctx';
+  path: string;
+}
+
+export interface ExprEvent {
+  $: 'event';
   path: string;
 }
 

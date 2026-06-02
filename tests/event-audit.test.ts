@@ -96,29 +96,71 @@ describe('事件审计: turnStart GameEvent 未被引擎发射', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// 2. phaseBegin 事件审计（系统性 bug）
+// 2. phaseBegin 事件审计
 // ════════════════════════════════════════════════════════════════
 
 describe('事件审计: phaseBegin', () => {
-  it('phaseBegin 在整个引擎中从未通过 emitEvent 发射（系统性 bug，影响 14+ 技能）', () => {
-    // 验证思路：执行关键引擎操作后，检查是否有任何技能侧效应表明 phaseBegin 被触发
-    // 由于没有技能会在 phaseBegin 触发后产生可观察的副作用（因为没有 emitEvent），
-    // 我们无法通过 effects 验证 → 通过代码审计确认
+  function setup5() {
+    let state = createTestGame({ characters: ['曹操', '甄姬', '诸葛亮', '刘备', '吕蒙'] });
+    for (const name of state.playerOrder) {
+      state = registerCharacterTriggers(state, name, { characterMap: charMap });
+    }
+    return state;
+  }
 
-    // 但可以通过间接方式：注册一个监听 phaseBegin 的技能（如英姿 摸牌阶段）
-    let state = createTestGame({ characters: ['周瑜', '刘备'] });
-    state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
+  it('phaseBegin = 准备 for P1（曹操）→ 不应触发其他玩家的 准备 阶段技能', () => {
+    const state = setup5();
+    const result = emitEvent(state, { type: 'phaseBegin', phase: '准备', player: 'P1' });
 
-    // 英姿监听 phaseBegin + 摸牌
-    expect(state.triggers.some(t => t.skillId === '英姿')).toBe(true);
+    if (result.state.pending) {
+      expect(result.state.pending.type).not.toBe('skillPrompt');
+    }
+  });
 
-    // 执行 endTurn → 下一玩家（P2）的出牌阶段
-    // 如果 phaseBegin 被正确 emit，当轮到 P1 时英姿应触发
-    // 但 handleEndTurn 从不 emit phaseBegin
-    const _r1 = engine(setPlayPhase(state), { type: 'endTurn', player: 'P1' });
+  it('phaseBegin = 准备 for P3（诸葛亮）→ 观星触发，pending.player = P3', () => {
+    let state = setup5();
+    state = { ...state, currentPlayer: 'P3' };
 
-    // endTurn 只产生 turnEnd → 下一玩家，没有 phaseBegin 任何阶段
-    // 所以英姿不可能被触发
+    const result = emitEvent(state, { type: 'phaseBegin', phase: '准备', player: 'P3' });
+
+    expect(result.state.pending?.type).toBe('skillPrompt');
+    if (result.state.pending?.type === 'skillPrompt') {
+      expect(result.state.pending.player).toBe('P3');
+      expect(result.state.pending.skillId).toBe('观星');
+    }
+  });
+
+  it('phaseBegin = 准备 for P2（甄姬）→ 洛神 handler 跑完（同步，无 prompt）', () => {
+    let state = setup5();
+    state = { ...state, currentPlayer: 'P2' };
+
+    const before = state.players['P2'].vars['洛神/judgeResult'];
+    const result = emitEvent(state, { type: 'phaseBegin', phase: '准备', player: 'P2' });
+    const after = result.state.players['P2'].vars['洛神/judgeResult'];
+
+    expect(after).toBeDefined();
+    expect(after).not.toBe(before);
+    expect(['red', 'black']).toContain(after);
+  });
+
+  it('phaseBegin = 出牌 for P3（诸葛亮）→ 观星不触发（只听 准备 阶段）', () => {
+    let state = setup5();
+    state = { ...state, currentPlayer: 'P3' };
+    const result = emitEvent(state, { type: 'phaseBegin', phase: '出牌', player: 'P3' });
+
+    if (result.state.pending?.type === 'skillPrompt') {
+      expect(result.state.pending.skillId).not.toBe('观星');
+    }
+  });
+
+  it('5 人 debug 局 startGame 后无悬空 skillPrompt（复现 KZ3SXN 卡死）', () => {
+    const state = createTestGame({ characters: ['曹操', '甄姬', '诸葛亮', '刘备', '吕蒙'] });
+    const r = engine(state, { type: 'startGame' });
+
+    if (r.state.pending) {
+      expect(r.state.pending.type).not.toBe('skillPrompt');
+    }
+    expect(['准备', '判定', '摸牌', '出牌']).toContain(r.state.phase);
   });
 
   it('setPhase atom 只产生 ServerEvent，不通过 emitEvent 发射 phaseBegin GameEvent', () => {
@@ -127,8 +169,6 @@ describe('事件审计: phaseBegin', () => {
       { type: 'setPhase', phase: '弃牌' },
     ]);
 
-    // applyAtoms 产生的 events 是 atoms 的 toEvents ServerEvent
-    // 不包含 GameEvent（phaseBegin 需要通过 emitEvent 发射）
     expect(events.some(e => e.type === 'phaseBegin')).toBe(false);
   });
 });

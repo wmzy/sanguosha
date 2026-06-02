@@ -138,38 +138,69 @@ export function checkWinCondition(
   if (state.meta.status === '已结束') return null;
 
   const alive = getAlivePlayers(state);
-  if (alive.length === 0) return { winner: '无', reason: '平局：所有玩家阵亡' };
+  const aliveByRole = groupAliveByRole(alive);
 
-  const lord = alive.find(p => p.info.role === '主公');
-  const loyalists = alive.filter(p => p.info.role === '忠臣');
-  const spy = alive.find(p => p.info.role === '内奸');
-
-  const lordDead = lord == null;
-
-  if (lordDead) {
-    const aliveNonLord = alive.filter(p => p.info.role !== '主公');
-    if (aliveNonLord.length === 1 && aliveNonLord[0].info.role === '内奸') {
-      return { winner: aliveNonLord[0].info.name, reason: '内奸获胜：主公阵亡，内奸是唯一存活者' };
-    }
-    return { winner: '反贼', reason: '反贼获胜：主公阵亡' };
-  }
-
-  const allRebelsDead = state.playerOrder
-    .filter(n => state.players[n].info.role === '反贼')
-    .every(n => !state.players[n].info.alive);
-
-  if (allRebelsDead) {
-    if (spy && loyalists.length === 0 && alive.length === 2) {
-      // 反贼、忠臣均已阵亡，仅剩主公与内奸 → 内奸对决主公，游戏继续，
-      // 必须由内奸单独击败主公（或反过来）才能决出胜负
-      return null;
-    }
-    if (spy) {
-      // 内奸存在但忠臣仍存活 → 主公阵营胜
-      return { winner: '主公', reason: '主公阵营获胜：所有反贼阵亡' };
-    }
-    return { winner: '主公', reason: '主公阵营获胜：所有反贼阵亡' };
+  for (const rule of WIN_RULES) {
+    const result = rule(alive, aliveByRole);
+    if (result !== null) return result;
   }
 
   return null;
 }
+
+interface AliveByRole {
+  lord: PlayerState | undefined;
+  loyalists: PlayerState[];
+  rebels: PlayerState[];
+  spy: PlayerState | undefined;
+}
+
+function groupAliveByRole(alive: PlayerState[]): AliveByRole {
+  return {
+    lord: alive.find(p => p.info.role === '主公'),
+    loyalists: alive.filter(p => p.info.role === '忠臣'),
+    rebels: alive.filter(p => p.info.role === '反贼'),
+    spy: alive.find(p => p.info.role === '内奸'),
+  };
+}
+
+type WinResult = { winner: string; reason: string } | null;
+type WinRule = (
+  alive: PlayerState[],
+  roles: AliveByRole,
+) => WinResult;
+
+const WIN_RULES: WinRule[] = [
+  (alive) => {
+    if (alive.length === 0) {
+      return { winner: '无', reason: '平局：所有玩家阵亡' };
+    }
+    return null;
+  },
+
+  (_alive, roles) => {
+    if (roles.lord == null && roles.spy != null && roles.rebels.length === 0 && roles.loyalists.length === 0) {
+      return { winner: roles.spy.info.name, reason: '内奸获胜：主公阵亡，内奸是唯一存活者' };
+    }
+    return null;
+  },
+
+  (_alive, roles) => {
+    if (roles.lord == null) {
+      return { winner: '反贼', reason: '反贼获胜：主公阵亡' };
+    }
+    return null;
+  },
+
+  (alive, roles) => {
+    const isLordVsSpyShowdown =
+      roles.rebels.length === 0 &&
+      roles.spy != null &&
+      roles.loyalists.length === 0 &&
+      alive.length === 2;
+    if (roles.rebels.length === 0 && !isLordVsSpyShowdown) {
+      return { winner: '主公', reason: '主公阵营获胜：所有反贼阵亡' };
+    }
+    return null;
+  },
+];

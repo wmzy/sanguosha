@@ -76,6 +76,10 @@ export function joinRoom(roomId: string, playerId: string, ws: WSContext): Room 
   return room;
 }
 
+export function addRoom(room: Room): void {
+  roomList.set(room.id, room);
+}
+
 /** 调试玩家加入调试房间。 */
 export function joinDebugRoom(roomId: string, playerId: string, ws: WSContext): Room | null {
   const room = roomList.get(roomId);

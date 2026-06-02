@@ -36,8 +36,12 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Test
-        run: pnpm test
-
       - name: Build
         run: pnpm build
+
+      - name: Test with coverage
+        run: pnpm test:coverage
+
+      - name: Check coverage thresholds
+        run: |
+          node scripts/check-coverage.mjs coverage/coverage-summary.json

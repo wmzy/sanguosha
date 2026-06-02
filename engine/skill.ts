@@ -138,10 +138,10 @@ export function emitEvent(
     const def = registry.get(trigger.skillId);
     if (!def) continue;
 
-    // 检查技能定义的阶段过滤条件
-    if (def.trigger.phase && event.type === 'phaseBegin') {
+    if (event.type === 'phaseBegin') {
       const phaseEvent = event as { type: 'phaseBegin'; phase: string; player: string };
-      if (phaseEvent.phase !== def.trigger.phase) continue;
+      if (trigger.player !== phaseEvent.player) continue;
+      if (def.trigger.phase && phaseEvent.phase !== def.trigger.phase) continue;
     }
 
     const ctx = buildSkillContext(s, event, trigger);

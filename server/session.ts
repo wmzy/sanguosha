@@ -4,6 +4,7 @@ import type { Room } from './room';
 import { createInitialState } from '../engine/state';
 import { engine } from '../engine/engine';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
+import { saveRoom, deletePersistedRoom } from './persistence';
 import { registerCharacterTriggers } from '../engine/skill';
 import { allCharacters } from '../shared/characters';
 import { serialize } from './protocol';
@@ -39,6 +40,7 @@ const RECONNECT_GRACE_MS = 30_000;
 
 export class GameSession {
   private state: GameState | null = null;
+  private actionLog: GameAction[] = [];
   private room: Room;
   private debug: boolean;
   private playerNames = new Map<string, string>();
@@ -47,11 +49,25 @@ export class GameSession {
   private graceTimer: ReturnType<typeof setTimeout> | null = null;
   private logger = createLogger('session');
   private sessionSeed: number;
+  private lastActivityAt = Date.now();
+  private roomName: string;
+  private maxPlayers: number;
+  pendingPlayerCount?: number;
 
   constructor(room: Room, debug = false, sessionSeed?: number) {
     this.room = room;
+    this.roomName = room.name;
+    this.maxPlayers = room.maxPlayers;
     this.debug = debug;
     this.sessionSeed = sessionSeed ?? Date.now();
+  }
+
+  restoreState(state: GameState, actionLog?: GameAction[]): void {
+    this.state = state;
+    this.actionLog = actionLog ?? [];
+    this.playerNames.clear();
+    this.lastActivityAt = Date.now();
+    this.scheduleTimeout();
   }
 
   startGame(playerCount?: number): boolean {
@@ -100,11 +116,12 @@ export class GameSession {
       state = registerCharacterTriggers(state, playerName, { characterMap });
     }
 
-    // 触发 startGame 自动阶段推进（准备→判定→摸牌→出牌）
     const startResult = engine(state, { type: 'startGame' });
     state = startResult.state;
 
     this.state = state;
+    this.actionLog = [{ type: 'startGame' }];
+    this.touchAndPersist();
 
     this.scheduleTimeout();
 
@@ -143,7 +160,9 @@ export class GameSession {
       return;
     }
 
+    this.appendAction(fullAction);
     this.state = result.state;
+    this.touchAndPersist();
 
     this.broadcastEvents(result.events);
     this.checkGameEnd();
@@ -200,6 +219,11 @@ export class GameSession {
     this.sendToPlayer(playerId, { type: 'initialView', state: feState });
   }
 
+  sendDebugGameState(playerId: string): void {
+    if (!this.state) return;
+    this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state });
+  }
+
   private checkGameEnd(): void {
     if (!this.state) return;
 
@@ -222,7 +246,9 @@ export class GameSession {
       return;
     }
 
+    this.appendAction(onTimeout);
     this.state = result.state;
+    this.touchAndPersist();
     this.broadcastEvents(result.events);
     this.checkGameEnd();
     this.scheduleTimeout();
@@ -256,6 +282,32 @@ export class GameSession {
     this.clearTimeoutTimer();
     this.clearGraceTimer();
     this.state = null;
+    deletePersistedRoom(this.room.id);
+  }
+
+  getLastActivityAt(): number {
+    return this.lastActivityAt;
+  }
+
+  private touchAndPersist(): void {
+    this.lastActivityAt = Date.now();
+    if (this.state) {
+      saveRoom(
+        this.room.id,
+        {
+          roomName: this.roomName,
+          maxPlayers: this.maxPlayers,
+          hostId: this.room.hostId,
+          debug: this.debug,
+        },
+        this.state,
+        this.actionLog,
+      );
+    }
+  }
+
+  private appendAction(action: GameAction): void {
+    this.actionLog = [...this.actionLog, action];
   }
 
   handleDisconnect(playerId: string): void {
@@ -312,11 +364,21 @@ export class GameSession {
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext): boolean {
     if (this.state?.meta.status !== '进行中') return false;
     const wasDisconnected = this.disconnectedAt.delete(playerId);
-    // 任何玩家重新上线即取消结束计时：只要还有人在就不应结束游戏
     this.clearGraceTimer();
     this.room.players.set(playerId, ws);
-    const playerName = this.playerNames.get(playerId);
-    if (playerName) this.sendInitialViewTo(playerId, playerName);
+
+    if (this.playerNames.size === 0 && this.debug && this.state) {
+      for (const charName of this.state.playerOrder) {
+        this.playerNames.set(`${playerId}:${charName}`, charName);
+      }
+    }
+
+    if (this.debug) {
+      this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state });
+    } else {
+      const playerName = this.playerNames.get(playerId);
+      if (playerName) this.sendInitialViewTo(playerId, playerName);
+    }
     this.scheduleTimeout();
     if (wasDisconnected) {
       this.broadcast({ type: 'player_reconnected', playerId });

@@ -102,11 +102,11 @@ const roomInfo = css`
   min-width: 0;
 `;
 
-const roomBadge = (color: string) => css`
+const roomBadge = css`
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
-  background-color: ${color};
+  background-color: var(--badge-color);
   color: ${colors.white};
   font-weight: bold;
   white-space: nowrap;
@@ -268,7 +268,7 @@ function HomePage() {
               return (
                 <div key={room.id} className={roomRow}>
                   <div className={roomInfo}>
-                    <span className={roomBadge(st.color)}>{st.text}</span>
+                    <span className={roomBadge} style={{ '--badge-color': st.color } as React.CSSProperties}>{st.text}</span>
                     <span className={roomName}>{room.name}</span>
                     <span className={roomMeta}>{room.playerCount}/{room.maxPlayers}</span>
                     <span className={roomId}>{room.id}</span>

@@ -79,6 +79,6 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.min.js', '*.min.css', '.env*', 'eslint.config.mjs', 'prettier.config.mjs', 'vite.config.ts', 'vitest.config.ts'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.min.js', '*.min.css', '.env*', 'eslint.config.mjs', 'prettier.config.mjs', 'vite.config.ts', 'vitest.config.ts', 'scripts/**'],
   },
 ];
