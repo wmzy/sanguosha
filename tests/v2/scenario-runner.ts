@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import type { GameState } from '@engine/v2/types';
-import type { CharacterConfig } from '@shared/types';
+import type { GameState, GameEvent, GameAction } from '@engine/v2/types';
+import type { CharacterConfig, Card as SharedCard } from '@shared/types';
 import { allCharacters } from '@shared/characters';
 import { createInitialState, getPlayer } from '@engine/v2/state';
 import { engine } from '@engine/v2/engine';
-import { registerCharacterTriggers } from '@engine/v2/skill';
+import { emitEvent as engineEmitEvent, registerCharacterTriggers } from '@engine/v2/skill';
+import { allTricks, weapons, armors, horses } from '@shared/cards';
 
 const characterMap = Object.fromEntries(
   allCharacters.map(c => [c.name, c]),
@@ -72,21 +73,59 @@ export class ScenarioContext {
     this.state = { ...this.state, phase: '出牌', pending: null };
   }
 
+  /** 移除指定玩家手牌中的所有杀（用于决斗/南蛮入侵等测试中避免响应） */
+  ensureNoKill(player: string): void {
+    const p = getPlayer(this.state, player);
+    const nonKill = p.hand.filter(id => this.state.cardMap[id]?.name !== '杀');
+    const kills = p.hand.filter(id => this.state.cardMap[id]?.name === '杀');
+    if (kills.length > 0) {
+      this.state = {
+        ...this.state,
+        zones: { ...this.state.zones, deck: [...this.state.zones.deck, ...kills] },
+        players: {
+          ...this.state.players,
+          [player]: { ...p, hand: nonKill },
+        },
+      };
+    }
+  }
+
   registerTriggers(player: string): void {
     this.state = registerCharacterTriggers(this.state, player, { characterMap });
   }
 
+  private _getCardTemplate(name: string): SharedCard | undefined {
+    const trickCard = allTricks.find(c => c.name === name);
+    if (trickCard) return trickCard;
+    const weaponCard = weapons.find(c => c.name === name);
+    if (weaponCard) return weaponCard;
+    const armorCard = armors.find(c => c.name === name);
+    if (armorCard) return armorCard;
+    const horseCard = horses.find(c => c.name === name);
+    if (horseCard) return horseCard;
+    const basicTemplates: Record<string, SharedCard> = {
+      '杀': { id: '', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' },
+      '闪': { id: '', name: '闪', type: '基本牌', subtype: '闪', suit: '♠', rank: 'A', description: '' },
+      '桃': { id: '', name: '桃', type: '基本牌', subtype: '桃', suit: '♠', rank: 'A', description: '' },
+    };
+    return basicTemplates[name];
+  }
+
   giveCard(to: string, cardName: string, count: number = 1): void {
+    const template = this._getCardTemplate(cardName);
+    if (!template) throw new Error(`未知卡牌: ${cardName}`);
     for (let i = 0; i < count; i++) {
       const cardId = `test-${cardName}-${++this._cardCounter}`;
-      const card = {
+      const card: SharedCard = {
         id: cardId,
-        name: cardName,
-        type: '基本牌' as const,
-        subtype: cardName as '杀' | '闪' | '桃',
-        suit: '♠' as const,
-        rank: 'A' as const,
-        description: '',
+        name: template.name,
+        type: template.type,
+        subtype: template.subtype,
+        suit: template.suit,
+        rank: template.rank,
+        description: template.description,
+        ...(template.range !== undefined ? { range: template.range } : {}),
+        ...(template.trickSubtype !== undefined ? { trickSubtype: template.trickSubtype } : {}),
       };
       const player = getPlayer(this.state, to);
       this.state = {
@@ -127,6 +166,19 @@ export class ScenarioContext {
   endTurn(player: string): void {
     const result = engine(this.state, { type: 'endTurn', player });
     if (result.error) throw new Error(`endTurn error: ${result.error}`);
+    this.state = result.state;
+  }
+
+  /** 直接发射 GameEvent 触发技能（用于引擎路径尚未覆盖的事件场景） */
+  emitEvent(event: GameEvent): void {
+    const result = engineEmitEvent(this.state, event);
+    this.state = result.state;
+  }
+
+  /** 执行任意 engine action */
+  engineAction(action: GameAction): void {
+    const result = engine(this.state, action);
+    if (result.error) throw new Error(`action error (${action.type}): ${result.error}`);
     this.state = result.state;
   }
 
