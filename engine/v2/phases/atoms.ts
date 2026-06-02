@@ -3,6 +3,8 @@ import { applyAtom, atomToEvents, getAtomDef } from '../atom';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
 import { isExpr } from '../types';
+import { ATOM_GAME_EVENTS } from '../atom-game-events';
+import { emitEvent } from '../skill';
 
 type AtomsPhase = Extract<SkillPhase, { type: 'atoms' }>;
 
@@ -39,6 +41,19 @@ export function register() {
         if (def.getResult) {
           const result = def.getResult(s, atom);
           Object.assign(ctx.localVars, result);
+        }
+
+        const eventGen = ATOM_GAME_EVENTS[atom.type];
+        if (eventGen) {
+          const gameEvents = eventGen(s, atom);
+          for (const ge of gameEvents) {
+            const emitResult = emitEvent(s, ge);
+            s = emitResult.state;
+            events.push(...emitResult.events);
+            if (s.pending !== null) {
+              return { state: s, events };
+            }
+          }
         }
       }
       return { state: s, events };
