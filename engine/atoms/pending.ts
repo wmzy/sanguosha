@@ -1,4 +1,4 @@
-import type { GameState, Atom, AtomEventResult, PendingAction } from '../types';
+import type { GameState, Atom, AtomEventResult, PendingAction, Json } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent } from '../event';
 
@@ -13,8 +13,9 @@ export function register() {
       const action = atom.action.id ? atom.action : { ...atom.action, id: createPendingId() };
       return { ...state, pending: action };
     },
-    toEvents(_state: GameState, _atom: Atom & { type: 'pushPending' }): AtomEventResult {
-      const server = makeServerEvent('pushPending', { type: 'pushPending' });
+    toEvents(_state: GameState, atom: Atom & { type: 'pushPending'; action: PendingAction }): AtomEventResult {
+      const action = atom.action.id ? atom.action : { ...atom.action, id: createPendingId() };
+      const server = makeServerEvent('pushPending', action as unknown as Json);
       return [server, new Map(), null];
     },
   });
