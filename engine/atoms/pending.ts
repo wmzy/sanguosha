@@ -2,11 +2,16 @@ import type { GameState, Atom, AtomEventResult, PendingAction } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent } from '../event';
 
+export function createPendingId(): string {
+  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function register() {
   registerAtom({
     type: 'pushPending',
     apply(state: GameState, atom: Atom & { type: 'pushPending'; action: PendingAction }) {
-      return { ...state, pending: atom.action };
+      const action = atom.action.id ? atom.action : { ...atom.action, id: createPendingId() };
+      return { ...state, pending: action };
     },
     toEvents(_state: GameState, _atom: Atom & { type: 'pushPending' }): AtomEventResult {
       const server = makeServerEvent('pushPending', { type: 'pushPending' });

@@ -4,6 +4,7 @@ import { registerPhase } from '../phase';
 import { resolve } from '../expr';
 import { getPlayer, getAlivePlayerNames } from '../state';
 import { makeServerEvent } from '../event';
+import { createPendingId } from '../atoms/pending';
 
 type CheckDyingPhase = Extract<SkillPhase, { type: 'checkDying' }>;
 
@@ -17,6 +18,7 @@ export function register() {
       if (player.health <= 0 && player.info.alive) {
         const timeout = TIMEOUT_DEFAULTS.dyingResponse;
         const pending: PendingDyingWindow = {
+          id: createPendingId(),
           type: 'dyingWindow',
           dyingPlayer: playerName,
           currentSaverIndex: 0,

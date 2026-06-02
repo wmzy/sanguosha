@@ -94,6 +94,8 @@ export type PendingAction =
 
 export interface PendingPlayPhase {
   type: 'playPhase';
+  /** 唯一标识，用于客户端 promptId 校验 */
+  id: string;
   player: string;
   timeout: number;
   deadline: number;
@@ -102,6 +104,7 @@ export interface PendingPlayPhase {
 
 export interface PendingResponseWindow {
   type: 'responseWindow';
+  id: string;
   window: ResponseWindowData;
   timeout: number;
   deadline: number;
@@ -110,6 +113,7 @@ export interface PendingResponseWindow {
 
 export interface PendingSkillPrompt {
   type: 'skillPrompt';
+  id: string;
   skillId: string;
   player: string;
   execution: SkillExecution;
@@ -121,6 +125,7 @@ export interface PendingSkillPrompt {
 
 export interface PendingDiscardPhase {
   type: 'discardPhase';
+  id: string;
   player: string;
   min: number;
   max: number;
@@ -131,6 +136,7 @@ export interface PendingDiscardPhase {
 
 export interface PendingDyingWindow {
   type: 'dyingWindow';
+  id: string;
   dyingPlayer: string;
   currentSaverIndex: number;
   savers: string[];
@@ -148,6 +154,7 @@ export interface PendingDyingWindow {
 
 export interface PendingSelectCard {
   type: 'selectCard';
+  id: string;
   player: string;
   target: string;
   cardIds: string[];
@@ -162,6 +169,7 @@ export interface PendingSelectCard {
 
 export interface PendingHarvestSelection {
   type: 'harvestSelection';
+  id: string;
   /** 翻出的待选牌 ID 列表 */
   revealedCards: string[];
   /** 当前选牌者在 pickOrder 中的索引 */
@@ -537,6 +545,7 @@ export interface AvailableSkill {
 }
 
 export interface PendingView {
+  id: string;
   type: string;
   prompt: string;
   options?: PromptOption[];

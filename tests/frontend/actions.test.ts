@@ -214,6 +214,7 @@ describe('getAvailableActions', () => {
       },
     });
     const pending: PendingAction = {
+      id: 'test-pending',
       type: 'responseWindow',
       window: { type: 'killResponse', defender: 'P1', validCards: ['c1'], timeout: 15000, deadline: Date.now() + 15000 },
       timeout: 15000,
@@ -235,6 +236,7 @@ describe('getAvailableActions', () => {
       },
     });
     const pending: PendingAction = {
+      id: 'test-pending',
       type: 'discardPhase',
       player: 'P1',
       min: 2,
@@ -267,6 +269,7 @@ describe('getAvailableActions', () => {
       },
     });
     const pending: PendingAction = {
+      id: 'test-pending',
       type: 'dyingWindow',
       dyingPlayer: 'P2',
       currentSaverIndex: 0,
@@ -290,6 +293,7 @@ describe('getAvailableActions', () => {
       },
     });
     const pending: PendingAction = {
+      id: 'test-pending',
       type: 'dyingWindow',
       dyingPlayer: 'P2',
       currentSaverIndex: 0,
@@ -325,6 +329,7 @@ describe('getAvailableActions', () => {
       },
     });
     const pending: PendingAction = {
+      id: 'test-pending',
       type: 'responseWindow',
       window: { type: 'duelResponse', defender: 'P1', validCards: ['c1'], timeout: 15000, deadline: Date.now() + 15000 },
       timeout: 15000,

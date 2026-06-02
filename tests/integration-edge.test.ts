@@ -672,7 +672,7 @@ describe('卡牌边界', () => {
   it('AOE 响应后伤害不触发 damageDealt 事件', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2, characters: ['夏侯惇', '曹操'] }));
     state = registerCharacterTriggers(state, 'P1', { characterMap: getCharacterMap() });
-    const aoeState = { ...state, pending: { type: 'responseWindow' as const, window: { type: 'aoeResponse' as const, defender: 'P1' as string, attacker: 'P2' as string, validCards: [] as string[], sourceCard: 'test-arrow-1', timeout: 15000, deadline: Date.now() + 15000 }, timeout: 15000, deadline: Date.now() + 15000, onTimeout: { type: 'respond' as const, player: 'P1' as string } } };
+    const aoeState = { ...state, pending: { id: 'test-pending', type: 'responseWindow' as const, window: { type: 'aoeResponse' as const, defender: 'P1' as string, attacker: 'P2' as string, validCards: [] as string[], sourceCard: 'test-arrow-1', timeout: 15000, deadline: Date.now() + 15000 }, timeout: 15000, deadline: Date.now() + 15000, onTimeout: { type: 'respond' as const, player: 'P1' as string } } };
     const result = engine(aoeState, { type: 'respond', player: 'P1' });
     expect(result.error).toBeUndefined();
     expect(result.state.players['P1'].health).toBeLessThan(state.players['P1'].health);

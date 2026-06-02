@@ -10,7 +10,10 @@ import {
   updatePlayer,
   updatePlayers,
   nextRngState,
+  checkWinCondition,
 } from '@engine/state';
+import type { GameState } from '@engine/types';
+import { createRng } from '@shared/rng';
 import { createTestGame } from './engine-helpers';
 
 describe('getPlayer', () => {
@@ -140,10 +143,12 @@ describe('updatePlayers', () => {
 });
 
 describe('nextRngState', () => {
-  it('returns a new state with incremented rngState', () => {
+  it('returns a new state with rngState advanced by the RNG', () => {
     const state = createTestGame();
     const { state: newState } = nextRngState(state);
-    expect(newState.rngState).toBe(state.rngState + 1);
+    const expected = createRng(state.rngState);
+    expected.next();
+    expect(newState.rngState).toBe(expected.getState());
   });
 
   it('does not mutate original state', () => {
@@ -183,5 +188,56 @@ describe('状态字段完整性', () => {
   it('deferredDyingCheck 未在 createInitialState 中初始化', () => {
     const state = createTestGame({ playerCount: 2 });
     expect('deferredDyingCheck' in state).toBe(false);
+  });
+});
+
+describe('checkWinCondition（身份局胜利条件）', () => {
+  /** 把玩家标记为死亡并清空手牌/装备的辅助函数 */
+  function kill(state: GameState, playerName: string): GameState {
+    return updatePlayer(state, playerName, () => ({ info: { ...state.players[playerName].info, alive: false }, hand: [] }));
+  }
+
+  it('反贼全灭 + 忠臣存活 → 主公阵营胜', () => {
+    let state = createTestGame({ playerCount: 4 });
+    state = kill(state, 'P2'); // 反贼死
+    expect(checkWinCondition(state)).toEqual({ winner: '主公', reason: '主公阵营获胜：所有反贼阵亡' });
+  });
+
+  it('反贼全灭 + 仅剩主公+内奸（无忠臣）→ 游戏继续（内奸必须先击败主公）', () => {
+    let state = createTestGame({ playerCount: 4 });
+    state = kill(state, 'P2'); // 反贼死
+    state = kill(state, 'P3'); // 忠臣死
+    expect(checkWinCondition(state)).toBeNull();
+  });
+
+  it('主公阵亡 + 仅剩内奸 → 内奸胜', () => {
+    let state = createTestGame({ playerCount: 4 });
+    state = kill(state, 'P1'); // 主公死
+    state = kill(state, 'P2'); // 反贼死
+    state = kill(state, 'P3'); // 忠臣死
+    const result = checkWinCondition(state);
+    expect(result).not.toBeNull();
+    expect(result?.winner).toBe('P4');
+  });
+
+  it('主公阵亡 + 还有非内奸存活 → 反贼胜', () => {
+    let state = createTestGame({ playerCount: 4 });
+    state = kill(state, 'P1'); // 主公死
+    // 反贼 P2 还活着
+    expect(checkWinCondition(state)).toEqual({ winner: '反贼', reason: '反贼获胜：主公阵亡' });
+  });
+
+  it('所有玩家阵亡 → 平局', () => {
+    let state = createTestGame({ playerCount: 3 });
+    for (const name of ['P1', 'P2', 'P3']) {
+      state = kill(state, name);
+    }
+    expect(checkWinCondition(state)).toEqual({ winner: '无', reason: '平局：所有玩家阵亡' });
+  });
+
+  it('游戏已结束时 checkWinCondition 返回 null', () => {
+    const state = createTestGame({ playerCount: 2 });
+    const ended: GameState = { ...state, meta: { ...state.meta, status: '已结束' } };
+    expect(checkWinCondition(ended)).toBeNull();
   });
 });

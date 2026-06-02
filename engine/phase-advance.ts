@@ -13,6 +13,7 @@ import { TIMEOUT_DEFAULTS } from './types';
 import type { TurnPhase } from '../shared/types';
 import { emitEvent, clearTurnVars } from './skill';
 import { applyAtoms } from './handlers/engine-utils';
+import { createPendingId } from './atoms/pending';
 import { getPlayer, getAlivePlayerNames } from './state';
 import { createConcurrentTrickResponse } from './handlers/response-handlers';
 import { makeServerEvent } from './event';
@@ -233,6 +234,7 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   if (s.pending === null && s.phase === '出牌' && !shouldSkipPhase(s, s.phase, s.currentPlayer)) {
     const timeout = TIMEOUT_DEFAULTS.playPhase;
     const playPending: PendingPlayPhase = {
+      id: createPendingId(),
       type: 'playPhase',
       player: s.currentPlayer,
       timeout,

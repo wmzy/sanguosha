@@ -13,6 +13,7 @@ import { getPlayer } from '../state';
 import { getDistance, isInAttackRange } from '../distance';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
+import { createPendingId } from '../atoms/pending';
 import { emitEvent } from '../skill';
 import { createConcurrentTrickResponse, startAoeTargetWuxie } from './response-handlers';
 import { getSkillConvertedCards } from '../validate';
@@ -94,6 +95,7 @@ function handleKillCard(
 
   const timeout = TIMEOUT_DEFAULTS.killResponse;
   const responseWindow: PendingResponseWindow = {
+    id: createPendingId(),
     type: 'responseWindow',
     window: {
       type: 'killResponse',
@@ -248,6 +250,7 @@ function handleTrickCard(
 
       const timeout = TIMEOUT_DEFAULTS.harvestSelection;
       const harvestPending: PendingHarvestSelection = {
+        id: createPendingId(),
         type: 'harvestSelection',
         revealedCards,
         currentPickerIndex: 0,

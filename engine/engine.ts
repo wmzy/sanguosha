@@ -2,7 +2,6 @@ import type {
   GameState,
   GameAction,
   EngineResult,
-  SkillDef,
   PendingPlayPhase,
 } from './types';
 import { validateAction } from './validate';
@@ -14,16 +13,11 @@ import { resumeSkill, handleUseSkill } from './handlers/skill-handlers';
 import { resolveDiscardPhase, handleEndTurn } from './handlers/turn-handlers';
 import { resolveDying } from './handlers/dying-handlers';
 import { handlePlayCard, resolveHarvestSelection } from './handlers/card-handlers';
-import { getSkillRegistry, registerSkill as registerSkillToGlobal } from './skill';
+import { getSkillRegistry } from './skill';
 import { getPlayer, checkWinCondition } from './state';
 import { applyAtoms, createDyingPending } from './handlers/engine-utils';
 import { makeServerEvent } from './event';
 import { advanceToInteractivePhase } from './phase-advance';
-
-/** @deprecated 直接使用 skill.ts 的 registerSkill */
-export function registerSkill(def: SkillDef): void {
-  registerSkillToGlobal(def);
-}
 
 function dispatchAction(state: GameState, action: GameAction): EngineResult {
   const error = validateAction(state, action);
@@ -76,6 +70,7 @@ export function engine(state: GameState, action: GameAction): EngineResult {
     result = dispatchAction(popState, action);
     if (!result.error && !result.state.pending && result.state.meta.status !== '已结束' && result.state.phase === '出牌') {
       const refreshedPending: PendingPlayPhase = {
+        id: savedPending.id,
         type: 'playPhase',
         player: savedPending.player,
         timeout: savedPending.timeout,

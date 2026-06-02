@@ -1,11 +1,4 @@
-import type { GameAction, GameState, GameView } from '../engine/types';
-
-export interface PlayerEvent {
-  id: string;
-  type: string;
-  timestamp: number;
-  payload: unknown;
-}
+import type { GameAction, GameState, GameView, PlayerEvent } from '../engine/types';
 
 export type ServerMessage =
   | { type: 'gameView'; view: GameView }

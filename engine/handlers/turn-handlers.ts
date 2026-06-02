@@ -10,6 +10,7 @@ import { TIMEOUT_DEFAULTS } from '../types';
 import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
+import { createPendingId } from '../atoms/pending';
 import { emitEvent } from '../skill';
 
 export function handleEndTurn(
@@ -36,6 +37,7 @@ export function handleEndTurn(
     // 需要弃牌
     const discardCount = handSize - health;
     const pending: PendingDiscardPhase = {
+      id: createPendingId(),
       type: 'discardPhase',
       player,
       min: discardCount,

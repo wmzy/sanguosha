@@ -15,9 +15,8 @@ export interface GameConfig {
 
 export function createInitialState(config: GameConfig): GameState {
   const rng = createRng(config.seed);
-  const rngState = (config.seed + 0x6d2b79f5) | 0;
-
   const deckCards = shuffle(createStandardDeck(), rng);
+  const rngState = rng.getState();
   const cardMap: Record<string, Card> = {};
   const deckIds: string[] = [];
   for (const card of deckCards) {
@@ -129,7 +128,7 @@ export function updatePlayers(
 export function nextRngState(state: GameState): { state: GameState; rng: import('../shared/rng').Rng } {
   const rng = createRng(state.rngState);
   rng.next();
-  return { state: { ...state, rngState: state.rngState + 1 }, rng };
+  return { state: { ...state, rngState: rng.getState() }, rng };
 }
 
 /** 身份局胜利条件检查。返回 { winner, reason } 或 null。 */
@@ -145,8 +144,7 @@ export function checkWinCondition(
   const loyalists = alive.filter(p => p.info.role === '忠臣');
   const spy = alive.find(p => p.info.role === '内奸');
 
-  const lordPlayer = state.playerOrder.find(n => state.players[n].info.role === '主公');
-  const lordDead = lordPlayer != null && !state.players[lordPlayer].info.alive;
+  const lordDead = lord == null;
 
   if (lordDead) {
     const aliveNonLord = alive.filter(p => p.info.role !== '主公');
@@ -161,9 +159,15 @@ export function checkWinCondition(
     .every(n => !state.players[n].info.alive);
 
   if (allRebelsDead) {
-    if (spy && lord && alive.length === 2) return null;
-    if (spy && lord && loyalists.length > 0) return null;
-    if (spy && lord) return null;
+    if (spy && loyalists.length === 0 && alive.length === 2) {
+      // 反贼、忠臣均已阵亡，仅剩主公与内奸 → 内奸对决主公，游戏继续，
+      // 必须由内奸单独击败主公（或反过来）才能决出胜负
+      return null;
+    }
+    if (spy) {
+      // 内奸存在但忠臣仍存活 → 主公阵营胜
+      return { winner: '主公', reason: '主公阵营获胜：所有反贼阵亡' };
+    }
     return { winner: '主公', reason: '主公阵营获胜：所有反贼阵亡' };
   }
 

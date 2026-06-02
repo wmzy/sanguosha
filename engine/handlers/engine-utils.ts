@@ -4,6 +4,7 @@ import { broadcast } from '../atom';
 import { emitEvent } from '../skill';
 import { getPlayer, getAlivePlayerNames } from '../state';
 import { makeServerEvent } from '../event';
+import { createPendingId } from '../atoms/pending';
 
 export function mergePlayerEvents(...maps: (Map<string, PlayerEvent[]> | undefined)[]): Map<string, PlayerEvent[]> {
   const result = new Map<string, PlayerEvent[]>();
@@ -90,6 +91,7 @@ export function createDyingPending(state: GameState, dyingPlayer: string, _sourc
     ...alivePlayers.filter(p => p !== dyingPlayer),
   ];
   return {
+    id: createPendingId(),
     type: 'dyingWindow',
     dyingPlayer,
     currentSaverIndex: 0,

@@ -158,6 +158,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
   describe('技能链暂停', () => {
     it('damage 触发技能链后创建 pending 时执行暂停', () => {
       const pendingAction: PendingAction = {
+        id: 'test-pending',
         type: 'skillPrompt',
         skillId: 'test-pending-skill',
         player: 'P1',

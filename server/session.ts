@@ -11,6 +11,7 @@ import { serialize } from './protocol';
 import { setRoomStatus } from './room';
 import type { Role } from '../shared/types';
 import { createLogger } from './logger';
+import { createRng } from '../shared/rng';
 
 const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
 
@@ -60,6 +61,7 @@ function buildGameView(state: GameState, playerName: string): GameView {
     switch (p.type) {
       case 'responseWindow':
         pending = {
+          id: p.id,
           type: p.window.type,
           prompt: getPendingPrompt(p.window.type),
           validCards: p.window.validCards,
@@ -69,6 +71,7 @@ function buildGameView(state: GameState, playerName: string): GameView {
         break;
       case 'discardPhase':
         pending = {
+          id: p.id,
           type: 'discard',
           prompt: `请弃掉 ${p.min}~${p.max} 张牌`,
           timeout: p.timeout,
@@ -77,6 +80,7 @@ function buildGameView(state: GameState, playerName: string): GameView {
         break;
       case 'dyingWindow':
         pending = {
+          id: p.id,
           type: 'dying',
           prompt: `${p.dyingPlayer} 濒死，是否出桃？`,
           timeout: p.timeout,
@@ -85,9 +89,37 @@ function buildGameView(state: GameState, playerName: string): GameView {
         break;
       case 'skillPrompt':
         pending = {
+          id: p.id,
           type: 'skillChoice',
           prompt: p.prompt.text,
           options: p.prompt.options,
+          timeout: p.timeout,
+          deadline: p.deadline,
+        };
+        break;
+      case 'selectCard':
+        pending = {
+          id: p.id,
+          type: 'selectCard',
+          prompt: p.mode === 'steal' ? '顺手牵羊：选择要获得的牌' : '过河拆桥：选择要弃掉的牌',
+          timeout: p.timeout,
+          deadline: p.deadline,
+        };
+        break;
+      case 'harvestSelection':
+        pending = {
+          id: p.id,
+          type: 'harvestSelection',
+          prompt: `五谷丰登：${p.pickOrder[p.currentPickerIndex]} 选牌`,
+          timeout: p.timeout,
+          deadline: p.deadline,
+        };
+        break;
+      case 'playPhase':
+        pending = {
+          id: p.id,
+          type: 'playPhase',
+          prompt: '请出牌或结束回合',
           timeout: p.timeout,
           deadline: p.deadline,
         };
@@ -132,10 +164,12 @@ export class GameSession {
   private playerNames = new Map<string, string>();
   private timeoutTimer: ReturnType<typeof setInterval> | null = null;
   private logger = createLogger('session');
+  private sessionSeed: number;
 
-  constructor(room: Room, debug = false) {
+  constructor(room: Room, debug = false, sessionSeed?: number) {
     this.room = room;
     this.debug = debug;
+    this.sessionSeed = sessionSeed ?? Date.now();
   }
 
   startGame(playerCount?: number): boolean {
@@ -143,8 +177,15 @@ export class GameSession {
     if (!this.debug && count < 2) return false;
     if (this.debug && count < 2) return false;
 
-    const seed = Date.now();
-    const shuffled = [...allCharacters].sort(() => Math.random() - 0.5);
+    const seed = this.sessionSeed;
+    const rng = createRng(seed);
+    const shuffled = [...allCharacters];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = rng.nextInt(i + 1);
+      const tmp = shuffled[i];
+      shuffled[i] = shuffled[j];
+      shuffled[j] = tmp;
+    }
     const selected = shuffled.slice(0, count);
     const roles = assignRoles(count);
 
@@ -182,8 +223,6 @@ export class GameSession {
     state = startResult.state;
 
     this.state = state;
-
-    import('../engine/skills/index');
 
     this.timeoutTimer = setInterval(() => this.checkTimeout(), 1000);
 

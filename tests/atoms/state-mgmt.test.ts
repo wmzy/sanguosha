@@ -138,14 +138,14 @@ describe('rearrangeDeck', () => {
 describe('pending/pendingTrick', () => {
   it('pushPending: 设置 pending', () => {
     const state = createTestGame();
-    const action: PendingAction = { type: 'playPhase', player: 'P1', timeout: 0, deadline: 0, onTimeout: { type: 'endTurn' as const, player: 'P1' } };
+    const action: PendingAction = { id: 'test-pending', type: 'playPhase', player: 'P1', timeout: 0, deadline: 0, onTimeout: { type: 'endTurn' as const, player: 'P1' } };
     const result = applyAtom(state, { type: 'pushPending', action });
     expect(result.pending).toBeDefined();
   });
 
   it('popPending: 清除 pending', () => {
     const state = createTestGame();
-    const action: PendingAction = { type: 'playPhase', player: 'P1', timeout: 0, deadline: 0, onTimeout: { type: 'endTurn' as const, player: 'P1' } };
+    const action: PendingAction = { id: 'test-pending', type: 'playPhase', player: 'P1', timeout: 0, deadline: 0, onTimeout: { type: 'endTurn' as const, player: 'P1' } };
     const pushed = applyAtom(state, { type: 'pushPending', action });
     const result = applyAtom(pushed, { type: 'popPending' });
     expect(result.pending).toBeNull();

@@ -48,6 +48,7 @@ function injectCardWithSuit(
 
 function makeKillResponsePending(defender: string, validCards: string[] = []) {
   return {
+    id: 'test-pending',
     type: 'responseWindow' as const,
     window: {
       type: 'killResponse' as const,
@@ -66,6 +67,7 @@ function makeKillResponsePending(defender: string, validCards: string[] = []) {
 
 function makeDuelResponsePending(defender: string, validCards: string[] = []) {
   return {
+    id: 'test-pending',
     type: 'responseWindow' as const,
     window: {
       type: 'duelResponse' as const,

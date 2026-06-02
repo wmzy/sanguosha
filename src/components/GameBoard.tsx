@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useGame } from '../hooks/useGame';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
@@ -852,9 +851,4 @@ export function GameBoard({ data }: { data: GameBoardData }) {
       </details>
     </div>
   );
-}
-
-export function LocalGameBoard() {
-  const data = useGame();
-  return <GameBoard data={data} />;
 }

@@ -9,7 +9,8 @@ export interface Room {
   players: Map<string, WSContext>;
   maxPlayers: number;
   status: '等待中' | '进行中' | '已结束';
-  hostId: string;
+  /** 房主；调试房间无房主 */
+  hostId: string | null;
   readyPlayers: Set<string>;
   isDebug?: boolean;
 }
@@ -27,16 +28,38 @@ function generateRoomId(): string {
   return result;
 }
 
+function clampPlayers(n: number): number {
+  return Math.min(Math.max(n, 2), 8);
+}
+
+/** 创建普通房间：需要 host 玩家立刻加入。 */
 export function createRoom(name: string, maxPlayers: number, hostId: string, ws: WSContext): Room {
   const id = generateRoomId();
   const room: Room = {
     id,
     name,
     players: new Map([[hostId, ws]]),
-    maxPlayers: Math.min(Math.max(maxPlayers, 2), 8),
+    maxPlayers: clampPlayers(maxPlayers),
     status: '等待中',
     hostId,
     readyPlayers: new Set(),
+  };
+  roomList.set(id, room);
+  return room;
+}
+
+/** 创建调试房间：无人加入、无 host。后续由 host 玩家调用 joinDebugRoom 进入。 */
+export function createDebugRoom(name: string, maxPlayers: number): Room {
+  const id = generateRoomId();
+  const room: Room = {
+    id,
+    name,
+    players: new Map(),
+    maxPlayers: clampPlayers(maxPlayers),
+    status: '等待中',
+    hostId: null,
+    readyPlayers: new Set(),
+    isDebug: true,
   };
   roomList.set(id, room);
   return room;
@@ -46,6 +69,17 @@ export function joinRoom(roomId: string, playerId: string, ws: WSContext): Room 
   const room = roomList.get(roomId);
   if (!room) return null;
   if (room.status !== '等待中') return null;
+  if (room.players.size >= room.maxPlayers) return null;
+  if (room.players.has(playerId)) return null;
+
+  room.players.set(playerId, ws);
+  return room;
+}
+
+/** 调试玩家加入调试房间。 */
+export function joinDebugRoom(roomId: string, playerId: string, ws: WSContext): Room | null {
+  const room = roomList.get(roomId);
+  if (!room?.isDebug) return null;
   if (room.players.size >= room.maxPlayers) return null;
   if (room.players.has(playerId)) return null;
 
@@ -65,10 +99,9 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
     return null;
   }
 
-  // 如果房主离开，转移房主
   if (room.hostId === playerId) {
     const newHost = room.players.keys().next().value;
-    if (newHost) room.hostId = newHost;
+    room.hostId = newHost ?? null;
   }
 
   return room;

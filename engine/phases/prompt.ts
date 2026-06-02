@@ -1,5 +1,6 @@
 import type { SkillPhase, GameState, SkillContext, EngineResult, PendingSkillPrompt } from '../types';
 import { registerPhase } from '../phase';
+import { createPendingId } from '../atoms/pending';
 
 type PromptPhase = Extract<SkillPhase, { type: 'prompt' }>;
 
@@ -9,6 +10,7 @@ export function register() {
     execute(state: GameState, phase: PromptPhase, ctx: SkillContext, plan: SkillPhase[], index: number): EngineResult {
       const timeout = phase.timeout ?? 15000;
       const pending: PendingSkillPrompt = {
+        id: createPendingId(),
         type: 'skillPrompt',
         skillId: ctx.skillId,
         player: ctx.self,

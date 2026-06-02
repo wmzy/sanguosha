@@ -1,6 +1,7 @@
 import type { SkillPhase, GameState, SkillContext, EngineResult, PendingResponseWindow, ResponseWindowDef } from '../types';
 import { TIMEOUT_DEFAULTS as timeouts } from '../types';
 import { registerPhase } from '../phase';
+import { createPendingId } from '../atoms/pending';
 
 type RespondPhase = Extract<SkillPhase, { type: 'respond' }>;
 
@@ -19,6 +20,7 @@ export function register() {
       const timeout = timeoutByType[phase.window.type];
       const deadline = Date.now() + timeout;
       const pending: PendingResponseWindow = {
+        id: createPendingId(),
         type: 'responseWindow',
         window: { ...phase.window, timeout, deadline },
         timeout,

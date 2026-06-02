@@ -11,6 +11,7 @@ import { TIMEOUT_DEFAULTS } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms, applyDamage } from './engine-utils';
+import { createPendingId } from '../atoms/pending';
 import { isCardValidResponse } from '../validate';
 
 /**
@@ -38,6 +39,7 @@ export function createConcurrentTrickResponse(
   const validCards = defenderPlayer.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
 
   return {
+    id: createPendingId(),
     type: 'responseWindow',
     window: {
       type: 'trickResponse',
@@ -300,6 +302,7 @@ function resolveConcurrentTrickResponse(
     const timeout = TIMEOUT_DEFAULTS.trickResponse;
 
     const updatedPending: PendingResponseWindow = {
+      id: createPendingId(),
       type: 'responseWindow',
       window: {
         type: 'trickResponse',
@@ -388,6 +391,7 @@ export function executeTrickEffect(
       const targetPlayer = getPlayer(state, target);
       if (targetPlayer.hand.length === 0) return { state, events: [] };
       const selectPending: PendingSelectCard = {
+        id: createPendingId(),
         type: 'selectCard',
         player: attacker,
         target,
@@ -408,6 +412,7 @@ export function executeTrickEffect(
       const targetPlayer = getPlayer(state, target);
       if (targetPlayer.hand.length === 0) return { state, events: [] };
       const selectPending: PendingSelectCard = {
+        id: createPendingId(),
         type: 'selectCard',
         player: attacker,
         target,
@@ -430,6 +435,7 @@ export function executeTrickEffect(
       );
       const duelTimeout = TIMEOUT_DEFAULTS.killResponse;
       const duelWindow: PendingResponseWindow = {
+        id: createPendingId(),
         type: 'responseWindow',
         window: {
           type: 'duelResponse',
@@ -498,6 +504,7 @@ export function executeTrickEffect(
       }
       const timeout = TIMEOUT_DEFAULTS.harvestSelection;
       const harvestPending: PendingHarvestSelection = {
+        id: createPendingId(),
         type: 'harvestSelection',
         revealedCards,
         currentPickerIndex: 0,
@@ -534,6 +541,7 @@ function executeAoeResume(
   const timeout = TIMEOUT_DEFAULTS.aoeResponse;
 
   const nextPending: PendingResponseWindow = {
+    id: createPendingId(),
     type: 'responseWindow',
     window: {
       type: 'aoeResponse',
@@ -641,6 +649,7 @@ function resolveLegacyTrickResponse(
     const nextTimeout = TIMEOUT_DEFAULTS.trickResponse;
 
     const nextWindow: PendingResponseWindow = {
+      id: createPendingId(),
       type: 'responseWindow',
       window: {
         type: 'trickResponse',
@@ -674,6 +683,7 @@ function resolveLegacyTrickResponse(
       const targetPlayer = getPlayer(state, target);
       if (targetPlayer.hand.length === 0) return { state, events: [] };
       const selectPending: PendingSelectCard = {
+        id: createPendingId(),
         type: 'selectCard',
         player: attacker,
         target,
@@ -693,6 +703,7 @@ function resolveLegacyTrickResponse(
       const targetPlayer = getPlayer(state, target);
       if (targetPlayer.hand.length === 0) return { state, events: [] };
       const selectPending: PendingSelectCard = {
+        id: createPendingId(),
         type: 'selectCard',
         player: attacker,
         target,
@@ -714,6 +725,7 @@ function resolveLegacyTrickResponse(
       );
       const duelTimeout = TIMEOUT_DEFAULTS.killResponse;
       const duelWindow: PendingResponseWindow = {
+        id: createPendingId(),
         type: 'responseWindow',
         window: {
           type: 'duelResponse',
@@ -894,6 +906,7 @@ function resolveDuelResponse(
     );
     const duelTimeout = TIMEOUT_DEFAULTS.killResponse;
     const nextDuel: PendingResponseWindow = {
+      id: createPendingId(),
       type: 'responseWindow',
       window: {
         type: 'duelResponse',

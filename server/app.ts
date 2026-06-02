@@ -4,7 +4,9 @@ import type { WSContext } from 'hono/ws';
 import { serialize } from './protocol';
 import {
   createRoom,
+  createDebugRoom,
   joinRoom,
+  joinDebugRoom,
   leaveRoom,
   setReady,
   allReady,
@@ -99,8 +101,7 @@ app.post('/api/debug-room', async (c) => {
   }
 
   try {
-    const room = createRoom(`调试${playerCount}人`, 1, '', null as never);
-    room.isDebug = true;
+    const room = createDebugRoom(`调试${playerCount}人`, playerCount);
 
     const session = new GameSession(room, true);
     gameSessions.set(room.id, session);
@@ -261,7 +262,7 @@ function handleAction(playerId: string, action: import('../engine/types').GameAc
   session.handleAction(playerId, action);
 }
 
-function handleResponse(playerId: string, _promptId: string, choice: unknown): void {
+function handleResponse(playerId: string, promptId: string, choice: unknown): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
@@ -273,6 +274,12 @@ function handleResponse(playerId: string, _promptId: string, choice: unknown): v
 
   const pending = session.getPending();
   if (!pending) return;
+
+  if (pending.id !== promptId) {
+    const ws = getRoom(roomId)?.players.get(playerId);
+    ws?.send(serialize({ type: 'error', message: '响应已过期或 promptId 不匹配' }));
+    return;
+  }
 
   let action: import('../engine/types').GameAction;
 
@@ -352,8 +359,12 @@ function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSCont
       playerRoomMap.delete(playerId);
     }
 
-    const room = createRoom(`调试${playerCount}人`, 1, playerId, ws);
-    room.isDebug = true;
+    const room = createDebugRoom(`调试${playerCount}人`, playerCount);
+    const joined = joinDebugRoom(room.id, playerId, ws);
+    if (!joined) {
+      ws.send(serialize({ type: 'error', message: '加入调试房间失败' }));
+      return;
+    }
     playerRoomMap.set(playerId, room.id);
 
     const session = new GameSession(room, true);
@@ -397,8 +408,11 @@ function handleJoinDebugRoom(playerId: string, roomId: string, ws: WSContext): v
     return;
   }
 
-  room.players.delete('');
-  room.players.set(playerId, ws);
+  const joined = joinDebugRoom(roomId, playerId, ws);
+  if (!joined) {
+    ws.send(serialize({ type: 'error', message: '加入调试房间失败' }));
+    return;
+  }
   playerRoomMap.set(playerId, roomId);
   session.reconnectPlayer(playerId, ws);
 }
