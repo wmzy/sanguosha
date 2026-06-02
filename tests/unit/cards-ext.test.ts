@@ -6,7 +6,7 @@ import {
   createDeck,
   isWeapon, isArmor, isHorse, isEquipment, isTrick, isDelayedTrick,
   isBlackSuit, isRedSuit,
-} from '@shared/cards';
+} from '../fixtures/cards';
 
 describe('装备牌', () => {
   describe('武器牌', () => {

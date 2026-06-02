@@ -5,7 +5,7 @@ import { allCharacters } from '@shared/characters';
 import { createInitialState, getPlayer } from '@engine/state';
 import { engine } from '@engine/engine';
 import { emitEvent as engineEmitEvent, registerCharacterTriggers } from '@engine/skill';
-import { allTricks, weapons, armors, horses } from '@shared/cards';
+import { allTricks, weapons, armors, horses } from './fixtures/cards';
 import type { PlayerView, Animation, AvailableAction, CardInfo } from './frontend/types';
 import { eventsToAnimations } from './frontend/eventsToAnimations';
 import { getAvailableActions } from './frontend/actions';

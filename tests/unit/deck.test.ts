@@ -1,7 +1,7 @@
 // tests/unit/deck.test.ts
 import { describe, it, expect } from 'vitest';
 import { shuffle, drawCards, discardCards } from '@shared/deck';
-import { createDeck } from '@shared/cards';
+import { createDeck } from '../fixtures/cards';
 import { createRng } from '@shared/rng';
 
 describe('牌组管理', () => {

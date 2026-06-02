@@ -346,7 +346,15 @@ export class GameSession {
     this.broadcastGameView();
   }
 
-  /** 按当前 pending 的 deadline 调度单次 setTimeout。 */
+  /**
+   * 按当前 pending 的 deadline 调度单次 setTimeout。
+   *
+   * TODO: 当前需要在每个会改变 state.pending 的方法（startGame / handleAction /
+   * checkTimeout / reconnectPlayer）末尾显式调用本方法，否则新设置的 pending
+   * 永远不会触发超时。理想的"零遗漏"设计是引入一个统一的 state 写入 hook
+   * （例如 withPending 包装器），让所有 pushPending / popPending 都自动
+   * reschedule。重构前请确保新增的会修改 state.pending 的方法都调用本方法。
+   */
   private scheduleTimeout(): void {
     this.clearTimeoutTimer();
     const pending = this.state?.pending;
@@ -373,12 +381,21 @@ export class GameSession {
     if (this.state?.meta.status !== '进行中') return;
 
     this.disconnectedAt.set(playerId, Date.now());
-    this.graceTimer ??= setTimeout(() => this.endDueToDisconnect(), RECONNECT_GRACE_MS);
+    // 只有当所有玩家都离线时才启动结束游戏的计时器；
+    // 仍有玩家在线时保持无限等待。
+    if (this.graceTimer === null && this.allPlayersDisconnected()) {
+      this.graceTimer = setTimeout(() => this.endDueToDisconnect(), RECONNECT_GRACE_MS);
+    }
     this.broadcast({
       type: 'player_disconnected',
       playerId,
       graceMs: RECONNECT_GRACE_MS,
     });
+  }
+
+  private allPlayersDisconnected(): boolean {
+    if (this.room.players.size === 0) return false;
+    return this.disconnectedAt.size >= this.room.players.size;
   }
 
   /** 重连宽限期到时仍有玩家未恢复：结束游戏。 */
@@ -413,7 +430,8 @@ export class GameSession {
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext): boolean {
     if (this.state?.meta.status !== '进行中') return false;
     const wasDisconnected = this.disconnectedAt.delete(playerId);
-    if (this.disconnectedAt.size === 0) this.clearGraceTimer();
+    // 任何玩家重新上线即取消结束计时：只要还有人在就不应结束游戏
+    this.clearGraceTimer();
     this.room.players.set(playerId, ws);
     this.broadcastGameView();
     this.scheduleTimeout();

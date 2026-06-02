@@ -1,12 +1,16 @@
-// shared/cards.ts — v1 卡牌数据（带 suit/rank/description 的完整 Card 实例）
+// tests/fixtures/cards.ts — 测试专用卡牌 fixture
 //
-// 注意：这是 v1 引擎的卡牌数据，被测试工具（scenario-runner）和
-// tests/unit/cards-ext.test.ts 引用作为发牌模板。v2 引擎使用
-// `shared/cards/` 目录下的 CardDef 声明式定义，并通过
-// `shared/deck.ts` 的 createStandardDeck() 在运行时生成卡实例。
-// 两者服务不同目的，请勿删除此文件。
+// 此文件原先位于 shared/cards.ts，承载 v1 风格的卡牌数据（带 suit/rank/description
+// 的完整 Card 实例）和 createDeck 等辅助函数。v2 引擎实际使用的是
+// `shared/cards/` 目录下的 CardDef 声明式定义，通过 `shared/deck.ts` 的
+// createStandardDeck() 在运行时生成卡实例——这条路径不再需要此文件。
+//
+// 移至 tests/fixtures/ 是为了：
+//   1. 让 tests/ 自给自足（不依赖 shared/ 中的测试专用辅助）
+//   2. 避免误导：让读者误以为这些数据是生产代码
+//   3. 任何"测试和真实逻辑脱节"的风险都被显式化
 
-import type { Card, Suit, Rank } from './types';
+import type { Card, Suit, Rank } from '../../shared/types';
 
 // ============================================================
 // 武器牌定义
