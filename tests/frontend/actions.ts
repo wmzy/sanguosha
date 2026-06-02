@@ -1,5 +1,5 @@
 import type { GameAction, PendingAction } from '@engine/types';
-import type { PlayerView, AvailableAction, ValidationResult } from './types';
+import type { PlayerView, AvailableAction, ValidationResult } from '@engine/view/types';
 
 export function isValidAction(view: PlayerView, action: GameAction): ValidationResult {
   switch (action.type) {

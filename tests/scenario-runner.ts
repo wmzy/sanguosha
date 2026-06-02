@@ -6,9 +6,10 @@ import { createInitialState, getPlayer } from '@engine/state';
 import { engine } from '@engine/engine';
 import { emitEvent as engineEmitEvent, registerCharacterTriggers } from '@engine/skill';
 import { allTricks, weapons, armors, horses } from './fixtures/cards';
-import type { PlayerView, Animation, AvailableAction, CardInfo } from './frontend/types';
-import { eventsToAnimations } from './frontend/eventsToAnimations';
+import type { PlayerView, Animation, AvailableAction } from '@engine/view/types';
+import { eventsToAnimations } from '@engine/view/reducer';
 import { getAvailableActions } from './frontend/actions';
+import { buildPlayerView as importPlayerView } from '@engine/view/buildView';
 
 const characterMap = Object.fromEntries(
   allCharacters.map(c => [c.name, c]),
@@ -30,56 +31,9 @@ export interface StateDiff {
   currentPlayerChanged: boolean;
 }
 
-function makeCardInfoFromId(cardId: string | undefined, cardMap: Record<string, SharedCard | undefined>): CardInfo | null {
-  if (!cardId) return null;
-  const card = cardMap[cardId];
-  if (!card) return null;
-  return { id: cardId, name: card.name ?? '', type: card.type ?? '基本牌', subtype: card.subtype ?? '杀', suit: card.suit ?? '♠', rank: card.rank ?? 'A', description: card.description ?? '' };
-}
-
 function buildPlayerView(state: GameState, playerId: string): PlayerView {
-  const players = Object.keys(state.players);
-  const self = getPlayer(state, playerId);
-  return {
-    self: {
-      hand: self.hand.map(id => makeCardInfoFromId(id, state.cardMap)!),
-      equipment: {
-        weapon: makeCardInfoFromId(self.equipment.weapon, state.cardMap),
-        armor: makeCardInfoFromId(self.equipment.armor, state.cardMap),
-        mount: makeCardInfoFromId(self.equipment.horsePlus ?? self.equipment.horseMinus, state.cardMap),
-      },
-      health: self.health,
-      maxHealth: self.maxHealth,
-      pendingTricks: (self.pendingTricks ?? []).map(t => ({ name: t.name, source: t.source, cardId: t.card.id })),
-      tags: [...(self.tags ?? [])],
-      vars: { ...(self.vars ?? {}) },
-      alive: self.info.alive,
-    },
-    others: Object.fromEntries(players.filter(p => p !== playerId).map(p => {
-      const other = getPlayer(state, p);
-      return [p, {
-        handCount: other.hand.length,
-        equipment: {
-          weapon: other.equipment.weapon ?? null,
-          armor: other.equipment.armor ?? null,
-          mount: (other.equipment.horsePlus ?? other.equipment.horseMinus) ?? null,
-        },
-        health: other.health,
-        maxHealth: other.maxHealth,
-        pendingTrickCount: (other.pendingTricks ?? []).length,
-        alive: other.info.alive,
-      }];
-    })),
-    table: {
-      discardPileCount: state.zones.discardPile.length,
-      deckCount: state.zones.deck.length,
-    },
-    turn: {
-      phase: state.phase,
-      currentPlayer: state.currentPlayer,
-      killsPlayed: state.turn.killsPlayed,
-    },
-  };
+  // 使用 engine/view 的实现（scenario-runner 旧版重复实现已删除）
+  return importPlayerView(state, playerId);
 }
 
 export class ScenarioContext {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { eventsToAnimations } from './eventsToAnimations';
+import { eventsToAnimations } from '@engine/view/reducer';
 import { makePlayerEvent, resetEventCounter } from './helpers';
 
 describe('eventsToAnimations', () => {

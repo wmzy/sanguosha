@@ -1,38 +1,12 @@
-import type { CardType, CardSubType } from '@shared/types';
-import type { PendingAction, Json } from '@engine/types';
+// engine/view/types.ts — 前端视角视图类型
+//
+// 服务端在 initialView 消息中发送 PlayerView，客户端用 reducer 维护 FrontendState。
+// FrontendState 与服务器内部 GameState 是不同抽象层：GameState 包含所有隐藏信息
+// （其他玩家手牌等），PlayerView 是 GameState 在某玩家视角下的"过滤"投影。
 
-// ─── 前端视角视图 ─────────────────────────────────────────
+import type { CardType, CardSubType } from '../../shared/types';
+import type { PendingAction, Json } from '../types';
 
-/** 玩家视角看到的自己信息 */
-export interface SelfView {
-  hand: CardInfo[];
-  equipment: EquipmentView;
-  health: number;
-  maxHealth: number;
-  pendingTricks: PendingTrickInfo[];
-  tags: string[];
-  vars: Record<string, unknown>;
-  alive: boolean;
-}
-
-/** 玩家视角看到的其他人信息（信息受限） */
-export interface OtherPlayerView {
-  handCount: number;
-  equipment: { weapon: string | null; armor: string | null; mount: string | null };
-  health: number;
-  maxHealth: number;
-  pendingTrickCount: number;
-  alive: boolean;
-}
-
-/** 装备区视图 */
-export interface EquipmentView {
-  weapon: CardInfo | null;
-  armor: CardInfo | null;
-  mount: CardInfo | null;
-}
-
-/** 卡牌信息（前端可见字段） */
 export interface CardInfo {
   [key: string]: Json;
   id: string;
@@ -44,35 +18,56 @@ export interface CardInfo {
   description: string;
 }
 
-/** 延时锦囊信息 */
+export interface EquipmentView {
+  weapon: CardInfo | null;
+  armor: CardInfo | null;
+  mount: CardInfo | null;
+}
+
+export interface SelfView {
+  hand: CardInfo[];
+  equipment: EquipmentView;
+  health: number;
+  maxHealth: number;
+  pendingTricks: PendingTrickInfo[];
+  tags: string[];
+  vars: Record<string, unknown>;
+  alive: boolean;
+}
+
+export interface OtherPlayerView {
+  handCount: number;
+  equipment: { weapon: string | null; armor: string | null; mount: string | null };
+  health: number;
+  maxHealth: number;
+  pendingTrickCount: number;
+  alive: boolean;
+}
+
 interface PendingTrickInfo {
   name: string;
   source: string;
   cardId: string;
 }
 
-/** 桌面公共信息 */
 export interface TableView {
   discardPileCount: number;
   deckCount: number;
 }
 
-/** 回合信息 */
 export interface TurnView {
   phase: string;
   currentPlayer: string;
   killsPlayed: number;
 }
 
-/** 单个玩家的完整视角 */
 export interface PlayerView {
   self: SelfView;
   others: Record<string, OtherPlayerView>;
   table: TableView;
   turn: TurnView;
+  pending: PendingAction | null;
 }
-
-// ─── 动画指令 ─────────────────────────────────────────────
 
 export type Animation =
   | { type: 'cardMove'; cardId: string; from: { zone: string; player?: string }; to: { zone: string; player?: string }; duration: number }
@@ -89,7 +84,11 @@ export type Animation =
   | { type: 'trickReveal'; cardId: string; result: 'success' | 'fail' }
   | { type: 'nextPlayer'; player: string };
 
-// ─── 可用操作 ─────────────────────────────────────────────
+export interface FrontendState {
+  view: PlayerView;
+  myPlayerId: string;
+  animationQueue: Animation[];
+}
 
 export interface AvailableAction {
   type: 'playCard' | 'useSkill' | 'respond' | 'discard';
@@ -98,15 +97,8 @@ export interface AvailableAction {
   required: boolean;
 }
 
-// ─── 前端整体状态 ─────────────────────────────────────────
-
-export interface FrontendState {
-  views: Record<string, PlayerView>;
-  myPlayerId: string;
-  animationQueue: Animation[];
-  pending: PendingAction | null;
-}
-
 export type ValidationResult =
   | { valid: true }
   | { valid: false; reason: string };
+
+export type { PendingAction, Json };

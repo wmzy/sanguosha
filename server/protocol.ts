@@ -1,7 +1,8 @@
-import type { GameAction, GameState, GameView, PlayerEvent } from '../engine/types';
+import type { GameAction, GameState, PlayerEvent } from '../engine/types';
+import type { PlayerView, FrontendState } from '../engine/view/types';
 
 export type ServerMessage =
-  | { type: 'gameView'; view: GameView }
+  | { type: 'initialView'; state: FrontendState }
   | { type: 'debugGameState'; state: GameState }
   | { type: 'events'; events: PlayerEvent[] }
   | { type: 'error'; message: string }
@@ -13,6 +14,9 @@ export type ServerMessage =
   | { type: 'player_reconnected'; playerId: string }
   | { type: 'game_started' }
   | { type: 'room_list'; rooms: RoomInfo[] };
+
+// Re-export for downstream consumers
+export type { PlayerView, FrontendState };
 
 export type ClientMessage =
   | { type: 'action'; action: GameAction }

@@ -490,35 +490,6 @@ export interface EngineResult {
   playerEvents?: Map<string, PlayerEvent[]>;
   error?: string;
 }
-export interface GameView {
-  state: ClientGameState;
-  pending?: PendingView;
-  actions: ValidAction[];
-}
-
-export interface ClientGameState {
-  self: string;
-  players: Record<string, ClientPlayer>;
-  phase: TurnPhase;
-  currentPlayer: string;
-  turn: { killsPlayed: number };
-  zones: { discardPile: Card[]; deckCount: number };
-}
-
-export interface ClientPlayer {
-  name: string;
-  health: number;
-  maxHealth: number;
-  hand: Card[];
-  handCount: number;
-  equipment: Record<string, Card | undefined>;
-  characterId: string;
-  role: Role;
-  alive: boolean;
-  gender: Gender;
-  faction: Faction;
-  vars: Record<string, Json>;
-}
 
 export type ValidAction =
   | { type: 'playCard'; prompt: string; cards: PlayableCard[] }
@@ -544,15 +515,6 @@ export interface AvailableSkill {
   reason?: string;
 }
 
-export interface PendingView {
-  id: string;
-  type: string;
-  prompt: string;
-  options?: PromptOption[];
-  validCards?: string[];
-  timeout: number;
-  deadline: number;
-}
 export interface TimeoutConfig {
   killResponse: number;
   aoeResponse: number;

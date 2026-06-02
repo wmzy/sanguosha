@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { isValidAction, getAvailableActions } from './actions';
 import { makeView } from './helpers';
-import type { CardInfo } from './types';
+import type { CardInfo } from '@engine/view/types';
 import type { PendingAction } from '@engine/types';
 
 function card(id: string, name: string, type?: string): CardInfo {

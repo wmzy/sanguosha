@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { reduceFrontend } from './reduceFrontend';
+import { reduceFrontend } from '@engine/view/reducer';
 import {
   createFrontend,
   makePlayerEvent,
   resetEventCounter,
   cloneFrontend,
 } from './helpers';
-import type { CardInfo } from './types';
+import type { CardInfo } from '@engine/view/types';
 
 function cardInfo(id: string, name = '杀'): CardInfo {
   return {
@@ -43,7 +43,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('damage', { target: 'P1', amount: 2 }),
       ]);
-      expect(result.views.P1.self.health).toBe(2);
+      expect(result.view.self.health).toBe(2);
       expect(result.animationQueue).toEqual([
         { type: 'damagePopup', target: 'P1', amount: 2 },
       ]);
@@ -54,7 +54,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('damage', { target: 'P2', amount: 3 }),
       ]);
-      expect(result.views.P1.others.P2.health).toBe(1);
+      expect(result.view.others.P2.health).toBe(1);
       expect(result.animationQueue[0]).toEqual({
         type: 'damagePopup',
         target: 'P2',
@@ -71,7 +71,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('heal', { target: 'P1', amount: 1 }),
       ]);
-      expect(result.views.P1.self.health).toBe(3);
+      expect(result.view.self.health).toBe(3);
       expect(result.animationQueue).toEqual([
         { type: 'healGlow', target: 'P1', amount: 1 },
       ]);
@@ -82,7 +82,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('heal', { target: 'P1', amount: 5 }),
       ]);
-      expect(result.views.P1.self.health).toBe(4);
+      expect(result.view.self.health).toBe(4);
     });
 
     it('heals other player', () => {
@@ -90,7 +90,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('heal', { target: 'P2', amount: 1 }),
       ]);
-      expect(result.views.P1.others.P2.health).toBe(4);
+      expect(result.view.others.P2.health).toBe(4);
     });
   });
 
@@ -103,9 +103,9 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('draw', { player: 'P1', count: 2, cards }),
       ]);
-      expect(result.views.P1.self.hand).toHaveLength(5);
-      expect(result.views.P1.self.hand[3].id).toBe('c10');
-      expect(result.views.P1.self.hand[4].id).toBe('c11');
+      expect(result.view.self.hand).toHaveLength(5);
+      expect(result.view.self.hand[3].id).toBe('c10');
+      expect(result.view.self.hand[4].id).toBe('c11');
     });
 
     it('increments handCount for others', () => {
@@ -113,8 +113,8 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('draw', { player: 'P2', count: 3 }),
       ]);
-      expect(result.views.P1.others.P2.handCount).toBe(4);
-      expect(result.views.P1.self.hand).toHaveLength(3);
+      expect(result.view.others.P2.handCount).toBe(4);
+      expect(result.view.self.hand).toHaveLength(3);
     });
 
     it('animation does not expose card details', () => {
@@ -137,8 +137,8 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('discard', { player: 'P1', cardIds: ['c1', 'c3'] }),
       ]);
-      expect(result.views.P1.self.hand).toHaveLength(1);
-      expect(result.views.P1.self.hand[0].id).toBe('c2');
+      expect(result.view.self.hand).toHaveLength(1);
+      expect(result.view.self.hand[0].id).toBe('c2');
     });
 
     it('decrements handCount for others using count', () => {
@@ -146,7 +146,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('discard', { player: 'P2', count: 1 }),
       ]);
-      expect(result.views.P1.others.P2.handCount).toBe(0);
+      expect(result.view.others.P2.handCount).toBe(0);
     });
 
     it('decrements handCount for others using cardIds length', () => {
@@ -154,7 +154,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('discard', { player: 'P2', cardIds: ['x1', 'x2'] }),
       ]);
-      expect(result.views.P1.others.P2.handCount).toBe(-1);
+      expect(result.view.others.P2.handCount).toBe(-1);
     });
 
     it('adds discardCards animation', () => {
@@ -178,10 +178,10 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('equip', { player: 'P1', cardId: 'c1', slot: 'weapon' }),
       ]);
-      expect(result.views.P1.self.hand).toHaveLength(2);
-      expect(result.views.P1.self.hand.find(c => c.id === 'c1')).toBeUndefined();
-      expect(result.views.P1.self.equipment.weapon).toBeTruthy();
-      expect(result.views.P1.self.equipment.weapon!.id).toBe('c1');
+      expect(result.view.self.hand).toHaveLength(2);
+      expect(result.view.self.hand.find(c => c.id === 'c1')).toBeUndefined();
+      expect(result.view.self.equipment.weapon).toBeTruthy();
+      expect(result.view.self.equipment.weapon!.id).toBe('c1');
     });
 
     it('replaces old equipment and increments discardPileCount', () => {
@@ -189,12 +189,12 @@ describe('reduceFrontend', () => {
       let result = reduceFrontend(fe, [
         makePlayerEvent('equip', { player: 'P1', cardId: 'c1', slot: 'weapon' }),
       ]);
-      expect(result.views.P1.table.discardPileCount).toBe(0);
+      expect(result.view.table.discardPileCount).toBe(0);
       result = reduceFrontend(result, [
         makePlayerEvent('equip', { player: 'P1', cardId: 'c2', slot: 'weapon' }),
       ]);
-      expect(result.views.P1.table.discardPileCount).toBe(1);
-      expect(result.views.P1.self.equipment.weapon!.id).toBe('c2');
+      expect(result.view.table.discardPileCount).toBe(1);
+      expect(result.view.self.equipment.weapon!.id).toBe('c2');
     });
 
     it('adds equipItem animation', () => {
@@ -219,9 +219,9 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('kill', { player: 'P1' }),
       ]);
-      expect(result.views.P1.self.health).toBe(0);
-      expect(result.views.P1.self.alive).toBe(false);
-      expect(result.views.P1.self.equipment).toEqual({
+      expect(result.view.self.health).toBe(0);
+      expect(result.view.self.alive).toBe(false);
+      expect(result.view.self.equipment).toEqual({
         weapon: null,
         armor: null,
         mount: null,
@@ -233,13 +233,13 @@ describe('reduceFrontend', () => {
       let result = reduceFrontend(fe, [
         makePlayerEvent('equip', { player: 'P2', cardId: 'c4', slot: 'weapon' }),
       ]);
-      expect(result.views.P1.others.P2.equipment.weapon).toBe('c4');
+      expect(result.view.others.P2.equipment.weapon).toBe('c4');
       result = reduceFrontend(result, [
         makePlayerEvent('kill', { player: 'P2' }),
       ]);
-      expect(result.views.P1.others.P2.health).toBe(0);
-      expect(result.views.P1.others.P2.alive).toBe(false);
-      expect(result.views.P1.others.P2.equipment).toEqual({
+      expect(result.view.others.P2.health).toBe(0);
+      expect(result.view.others.P2.alive).toBe(false);
+      expect(result.view.others.P2.equipment).toEqual({
         weapon: null,
         armor: null,
         mount: null,
@@ -263,7 +263,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('setPhase', { phase: '摸牌' }),
       ]);
-      expect(result.views.P1.turn.phase).toBe('摸牌');
+      expect(result.view.turn.phase).toBe('摸牌');
     });
   });
 
@@ -275,8 +275,8 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('nextPlayer', { player: 'P2' }),
       ]);
-      expect(result.views.P1.turn.currentPlayer).toBe('P2');
-      expect(result.views.P1.turn.phase).toBe('准备');
+      expect(result.view.turn.currentPlayer).toBe('P2');
+      expect(result.view.turn.phase).toBe('准备');
     });
 
     it('supports "to" field from real atom', () => {
@@ -284,8 +284,8 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('nextPlayer', { to: 'P3', from: 'P1', turnNumber: 2 }),
       ]);
-      expect(result.views.P1.turn.currentPlayer).toBe('P3');
-      expect(result.views.P1.turn.phase).toBe('准备');
+      expect(result.view.turn.currentPlayer).toBe('P3');
+      expect(result.view.turn.phase).toBe('准备');
     });
 
     it('adds nextPlayer animation', () => {
@@ -300,11 +300,14 @@ describe('reduceFrontend', () => {
   // ─── pushPending / popPending ────────────────────────────
 
   describe('pushPending', () => {
-    it('sets fe.pending to the event', () => {
+    it('sets view.pending state via animation queue', () => {
       const fe = setup();
       const evt = makePlayerEvent('pushPending', { actionType: 'playPhase' });
       const result = reduceFrontend(fe, [evt]);
-      expect(result.pending).toBe(evt);
+      expect(result.animationQueue).toEqual([
+        { type: 'pendingPrompt', actionType: 'playPhase' },
+      ]);
+      // pushPending 在新设计里只触发动画（具体 pending 状态由 server 推送的 initialView / 单独消息维护）
     });
 
     it('adds pendingPrompt animation', () => {
@@ -319,16 +322,13 @@ describe('reduceFrontend', () => {
   });
 
   describe('popPending', () => {
-    it('clears fe.pending', () => {
+    it('clears view.pending to null', () => {
       const fe = setup();
-      const withPending = reduceFrontend(fe, [
-        makePlayerEvent('pushPending', {}),
-      ]);
-      expect(withPending.pending).not.toBeNull();
-      const result = reduceFrontend(withPending, [
+      fe.view.pending = null;
+      const result = reduceFrontend(fe, [
         makePlayerEvent('popPending', {}),
       ]);
-      expect(result.pending).toBeNull();
+      expect(result.view.pending).toBeNull();
     });
   });
 
@@ -340,7 +340,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('judge', { player: 'P1', cardId: 'j1', result: 'red' }),
       ]);
-      expect(result.views.P1.table.discardPileCount).toBe(1);
+      expect(result.view.table.discardPileCount).toBe(1);
       expect(result.animationQueue).toEqual([{ type: 'cardFlip', cardId: 'j1' }]);
     });
   });
@@ -357,7 +357,7 @@ describe('reduceFrontend', () => {
           to: { zone: 'discardPile' },
         }),
       ]);
-      expect(result.views.P1.table.discardPileCount).toBe(1);
+      expect(result.view.table.discardPileCount).toBe(1);
       expect(result.animationQueue[0].type).toBe('cardMove');
     });
 
@@ -370,7 +370,7 @@ describe('reduceFrontend', () => {
           to: { zone: 'discardPile' },
         }),
       ]);
-      expect(result.views.P1.table.discardPileCount).toBe(1);
+      expect(result.view.table.discardPileCount).toBe(1);
     });
   });
 
@@ -382,7 +382,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('addTag', { player: 'P1', tag: '醉酒' }),
       ]);
-      expect(result.views.P1.self.tags).toEqual(['醉酒']);
+      expect(result.view.self.tags).toEqual(['醉酒']);
     });
 
     it('removes tag from self', () => {
@@ -393,7 +393,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(withTag, [
         makePlayerEvent('removeTag', { player: 'P1', tag: '醉酒' }),
       ]);
-      expect(result.views.P1.self.tags).toEqual([]);
+      expect(result.view.self.tags).toEqual([]);
     });
 
     it('ignores tag events for other players', () => {
@@ -401,7 +401,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('addTag', { player: 'P2', tag: '醉酒' }),
       ]);
-      expect(result.views.P1.self.tags).toEqual([]);
+      expect(result.view.self.tags).toEqual([]);
     });
   });
 
@@ -413,7 +413,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('setVar', { player: 'P1', key: 'killsPlayed', value: 2 }),
       ]);
-      expect(result.views.P1.self.vars['killsPlayed']).toBe(2);
+      expect(result.view.self.vars['killsPlayed']).toBe(2);
     });
 
     it('ignores setVar for other players', () => {
@@ -421,7 +421,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('setVar', { player: 'P2', key: 'killsPlayed', value: 1 }),
       ]);
-      expect(result.views.P1.self.vars).toEqual({});
+      expect(result.view.self.vars).toEqual({});
     });
   });
 
@@ -434,8 +434,8 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('addPendingTrick', { player: 'P1', trick }),
       ]);
-      expect(result.views.P1.self.pendingTricks).toHaveLength(1);
-      expect(result.views.P1.self.pendingTricks[0].cardId).toBe('t1');
+      expect(result.view.self.pendingTricks).toHaveLength(1);
+      expect(result.view.self.pendingTricks[0].cardId).toBe('t1');
     });
 
     it('removes trick by index', () => {
@@ -446,7 +446,7 @@ describe('reduceFrontend', () => {
         makePlayerEvent('addPendingTrick', { player: 'P1', trick: trick1 }),
         makePlayerEvent('addPendingTrick', { player: 'P1', trick: trick2 }),
       ]);
-      expect(withTricks.views.P1.self.pendingTricks).toHaveLength(2);
+      expect(withTricks.view.self.pendingTricks).toHaveLength(2);
       const result = reduceFrontend(withTricks, [
         makePlayerEvent('removePendingTrick', {
           player: 'P1',
@@ -454,8 +454,8 @@ describe('reduceFrontend', () => {
           result: 'success',
         }),
       ]);
-      expect(result.views.P1.self.pendingTricks).toHaveLength(1);
-      expect(result.views.P1.self.pendingTricks[0].cardId).toBe('t2');
+      expect(result.view.self.pendingTricks).toHaveLength(1);
+      expect(result.view.self.pendingTricks[0].cardId).toBe('t2');
     });
 
     it('adds animations for addPendingTrick and removePendingTrick', () => {
@@ -492,7 +492,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('turnStart', { player: 'P3' }),
       ]);
-      expect(result.views.P1.turn.currentPlayer).toBe('P3');
+      expect(result.view.turn.currentPlayer).toBe('P3');
     });
   });
 
@@ -502,7 +502,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('rearrangeDeck', { player: 'P1', topCardIds: [], bottomCardIds: [] }),
       ]);
-      expect(result.views.P1).toEqual(fe.views.P1);
+      expect(result.view).toEqual(fe.view);
       expect(result.animationQueue).toEqual([]);
     });
   });
@@ -535,8 +535,8 @@ describe('reduceFrontend', () => {
           from: { zone: 'discardPile' },
         }),
       ]);
-      expect(result.views.P1.self.hand).toHaveLength(4);
-      expect(result.views.P1.self.hand[3].id).toBe('c99');
+      expect(result.view.self.hand).toHaveLength(4);
+      expect(result.view.self.hand[3].id).toBe('c99');
     });
 
     it('increments handCount for others', () => {
@@ -548,7 +548,7 @@ describe('reduceFrontend', () => {
           from: { zone: 'discardPile' },
         }),
       ]);
-      expect(result.views.P1.others.P2.handCount).toBe(2);
+      expect(result.view.others.P2.handCount).toBe(2);
     });
 
     it('adds cardMove animation', () => {
@@ -577,8 +577,8 @@ describe('reduceFrontend', () => {
         makePlayerEvent('damage', { target: 'P1', amount: 2 }),
         makePlayerEvent('setPhase', { phase: '弃牌' }),
       ]);
-      expect(result.views.P1.self.health).toBe(2);
-      expect(result.views.P1.turn.phase).toBe('弃牌');
+      expect(result.view.self.health).toBe(2);
+      expect(result.view.turn.phase).toBe('弃牌');
       expect(result.animationQueue).toHaveLength(3);
     });
   });
@@ -589,7 +589,7 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('someFutureEvent', { foo: 'bar' }),
       ]);
-      expect(result.views.P1).toEqual(fe.views.P1);
+      expect(result.view).toEqual(fe.view);
       expect(result.animationQueue).toEqual([]);
     });
   });
@@ -602,8 +602,8 @@ describe('reduceFrontend', () => {
         makePlayerEvent('damage', { target: 'P1', amount: 3 }),
         makePlayerEvent('setPhase', { phase: '摸牌' }),
       ]);
-      expect(fe.views.P1.self.health).toBe(original.views.P1.self.health);
-      expect(fe.views.P1.turn.phase).toBe(original.views.P1.turn.phase);
+      expect(fe.view.self.health).toBe(original.view.self.health);
+      expect(fe.view.turn.phase).toBe(original.view.turn.phase);
       expect(fe.animationQueue).toEqual([]);
     });
   });
@@ -614,8 +614,8 @@ describe('reduceFrontend', () => {
       const result = reduceFrontend(fe, [
         makePlayerEvent('cardsDiscarded', { player: 'P1', cardIds: ['c2'] }),
       ]);
-      expect(result.views.P1.self.hand).toHaveLength(2);
-      expect(result.views.P1.self.hand.find(c => c.id === 'c2')).toBeUndefined();
+      expect(result.view.self.hand).toHaveLength(2);
+      expect(result.view.self.hand.find(c => c.id === 'c2')).toBeUndefined();
     });
   });
 
@@ -631,7 +631,7 @@ describe('reduceFrontend', () => {
           from: { zone: 'hand', player: 'P2' },
         }),
       ]);
-      expect(result.views.P1.self.hand).toHaveLength(4);
+      expect(result.view.self.hand).toHaveLength(4);
     });
   });
 });

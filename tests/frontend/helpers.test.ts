@@ -14,26 +14,21 @@ describe('createFrontend', () => {
       'P1',
     );
 
-    const p1View = fe.views['P1'];
-    expect(p1View.self.hand).toHaveLength(2);
-    expect(p1View.self.hand[0].id).toBe('c1');
-    expect(p1View.self.hand[1].id).toBe('c2');
-    expect(p1View.self.health).toBe(4);
-    expect(p1View.self.maxHealth).toBe(4);
-    expect(p1View.self.alive).toBe(true);
-    expect(p1View.self.equipment).toEqual({ weapon: null, armor: null, mount: null });
-    expect(p1View.self.pendingTricks).toEqual([]);
-    expect(p1View.self.tags).toEqual([]);
-    expect(p1View.self.vars).toEqual({});
+    expect(fe.myPlayerId).toBe('P1');
+    expect(fe.view.self.hand).toHaveLength(2);
+    expect(fe.view.self.hand[0].id).toBe('c1');
+    expect(fe.view.self.hand[1].id).toBe('c2');
+    expect(fe.view.self.health).toBe(4);
+    expect(fe.view.self.maxHealth).toBe(4);
+    expect(fe.view.self.alive).toBe(true);
+    expect(fe.view.self.equipment).toEqual({ weapon: null, armor: null, mount: null });
+    expect(fe.view.self.pendingTricks).toEqual([]);
+    expect(fe.view.self.tags).toEqual([]);
+    expect(fe.view.self.vars).toEqual({});
 
-    expect(p1View.others['P2'].handCount).toBe(1);
-    expect(p1View.others['P3'].handCount).toBe(0);
-    expect(p1View.others['P2'].health).toBe(4);
-
-    const p2View = fe.views['P2'];
-    expect(p2View.self.hand).toHaveLength(1);
-    expect(p2View.others['P1'].handCount).toBe(2);
-    expect(p2View.others['P3'].handCount).toBe(0);
+    expect(fe.view.others['P2'].handCount).toBe(1);
+    expect(fe.view.others['P3'].handCount).toBe(0);
+    expect(fe.view.others['P2'].health).toBe(4);
   });
 
   it('sets myPlayerId correctly', () => {
@@ -46,22 +41,19 @@ describe('createFrontend', () => {
       { P1: { health: 2, maxHealth: 5 }, P2: {} },
       'P1',
     );
-    expect(fe.views['P1'].self.health).toBe(2);
-    expect(fe.views['P1'].self.maxHealth).toBe(5);
-    expect(fe.views['P1'].others['P2'].health).toBe(4);
-
-    const p2View = fe.views['P2'];
-    expect(p2View.others['P1'].health).toBe(2);
-    expect(p2View.others['P1'].maxHealth).toBe(5);
+    expect(fe.view.self.health).toBe(2);
+    expect(fe.view.self.maxHealth).toBe(5);
+    expect(fe.view.others['P2'].health).toBe(4);
+    expect(fe.view.others['P2'].maxHealth).toBe(4);
   });
 
   it('sets table and turn defaults', () => {
     const fe = createFrontend({ A: {}, B: {} }, 'A');
-    expect(fe.views['A'].table).toEqual({ discardPileCount: 0, deckCount: 80 });
-    expect(fe.views['A'].turn.currentPlayer).toBe('A');
-    expect(fe.views['A'].turn.phase).toBe('出牌');
+    expect(fe.view.table).toEqual({ discardPileCount: 0, deckCount: 80 });
+    expect(fe.view.turn.currentPlayer).toBe('A');
+    expect(fe.view.turn.phase).toBe('出牌');
     expect(fe.animationQueue).toEqual([]);
-    expect(fe.pending).toBeNull();
+    expect(fe.view.pending).toBeNull();
   });
 });
 
@@ -116,21 +108,20 @@ describe('cloneFrontend', () => {
 
     expect(cloned).toEqual(original);
     expect(cloned).not.toBe(original);
-    expect(cloned.views).not.toBe(original.views);
-    expect(cloned.views['P1']).not.toBe(original.views['P1']);
-    expect(cloned.views['P1'].self.hand[0]).not.toBe(original.views['P1'].self.hand[0]);
+    expect(cloned.view).not.toBe(original.view);
+    expect(cloned.view.self.hand[0]).not.toBe(original.view.self.hand[0]);
   });
 
   it('modifying clone does not affect original', () => {
     const original = createFrontend({ P1: { hand: ['c1'] }, P2: {} }, 'P1');
     const cloned = cloneFrontend(original);
 
-    cloned.views['P1'].self.health = 0;
-    cloned.views['P1'].self.hand[0].name = '闪';
+    cloned.view.self.health = 0;
+    cloned.view.self.hand[0].name = '闪';
     cloned.animationQueue.push({ type: 'death', player: 'P2' });
 
-    expect(original.views['P1'].self.health).toBe(4);
-    expect(original.views['P1'].self.hand[0].name).toBe('杀');
+    expect(original.view.self.health).toBe(4);
+    expect(original.view.self.hand[0].name).toBe('杀');
     expect(original.animationQueue).toHaveLength(0);
   });
 });

@@ -7,7 +7,7 @@ import type {
   CardInfo,
   TableView,
   TurnView,
-} from './types';
+} from '@engine/view/types';
 
 let eventCounter = 0;
 
@@ -57,45 +57,36 @@ export function createFrontend(
 ): FrontendState {
   const playerIds = Object.keys(playerConfigs);
   const firstPlayer = playerIds[0];
+  const myConfig = playerConfigs[myPlayerId];
+  if (!myConfig) throw new Error(`createFrontend: myPlayerId "${myPlayerId}" not in playerConfigs`);
 
-  const views: Record<string, PlayerView> = {};
-  for (const pid of playerIds) {
-    const config = playerConfigs[pid];
-    const hand = config.hand ?? [];
-    const health = config.health ?? 4;
-    const maxHealth = config.maxHealth ?? 4;
+  const self: SelfView = {
+    ...makeSelfView(myConfig.hand ?? []),
+    health: myConfig.health ?? 4,
+    maxHealth: myConfig.maxHealth ?? 4,
+  };
 
-    const self: SelfView = {
-      ...makeSelfView(hand),
-      health,
-      maxHealth,
-    };
-
-    const others: Record<string, OtherPlayerView> = {};
-    for (const otherPid of playerIds) {
-      if (otherPid === pid) continue;
-      const otherConfig = playerConfigs[otherPid];
-      const otherHand = otherConfig.hand ?? [];
-      others[otherPid] = {
-        ...makeOtherView(otherHand.length),
-        health: otherConfig.health ?? 4,
-        maxHealth: otherConfig.maxHealth ?? 4,
-      };
-    }
-
-    views[pid] = {
-      self,
-      others,
-      table: { discardPileCount: 0, deckCount: 80 },
-      turn: { phase: '出牌', currentPlayer: firstPlayer, killsPlayed: 0 },
+  const others: Record<string, OtherPlayerView> = {};
+  for (const otherPid of playerIds) {
+    if (otherPid === myPlayerId) continue;
+    const otherConfig = playerConfigs[otherPid];
+    others[otherPid] = {
+      ...makeOtherView(otherConfig?.hand?.length ?? 0),
+      health: otherConfig?.health ?? 4,
+      maxHealth: otherConfig?.maxHealth ?? 4,
     };
   }
 
   return {
-    views,
+    view: {
+      self,
+      others,
+      table: { discardPileCount: 0, deckCount: 80 },
+      turn: { phase: '出牌', currentPlayer: firstPlayer, killsPlayed: 0 },
+      pending: null,
+    },
     myPlayerId,
     animationQueue: [],
-    pending: null,
   };
 }
 
@@ -110,6 +101,7 @@ export function makeView(overrides?: {
     others: {},
     table: { discardPileCount: 0, deckCount: 80 },
     turn: { phase: '出牌', currentPlayer: 'P1', killsPlayed: 0 },
+    pending: null,
   };
   if (!overrides) return defaults;
   return {
@@ -117,6 +109,7 @@ export function makeView(overrides?: {
     others: { ...defaults.others, ...overrides.others },
     table: overrides.table ? { ...defaults.table, ...overrides.table } : defaults.table,
     turn: overrides.turn ? { ...defaults.turn, ...overrides.turn } : defaults.turn,
+    pending: null,
   };
 }
 

@@ -1,17 +1,18 @@
-import type { GameAction, GameState, ClientPlayer, GameView, ValidAction, PendingView } from '../engine/types';
+import type { GameAction, GameState } from '../engine/types';
 import type { ServerMessage } from './protocol';
 import type { Room } from './room';
-import { createInitialState, getPlayer } from '../engine/state';
+import { createInitialState } from '../engine/state';
 import { engine } from '../engine/engine';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
 import { registerCharacterTriggers } from '../engine/skill';
-import { computeValidActions } from '../engine/validate';
 import { allCharacters } from '../shared/characters';
 import { serialize } from './protocol';
 import { setRoomStatus } from './room';
 import type { Role } from '../shared/types';
 import { createLogger } from './logger';
 import { createRng } from '../shared/rng';
+import { buildPlayerView } from '../engine/view/buildView';
+import type { FrontendState } from '../engine/view/types';
 
 const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
 
@@ -24,137 +25,13 @@ function assignRoles(count: number): Role[] {
   return roles;
 }
 
-function buildGameView(state: GameState, playerName: string): GameView {
-  const clientPlayers: Record<string, ClientPlayer> = {};
-
-  for (const name of state.playerOrder) {
-    const p = getPlayer(state, name);
-    const isSelf = name === playerName;
-    const hand = isSelf
-      ? p.hand.map(id => state.cardMap[id])
-      : [];
-    const equipment: Record<string, import('../shared/types').Card | undefined> = {};
-    if (p.equipment.weapon) equipment.weapon = state.cardMap[p.equipment.weapon];
-    if (p.equipment.armor) equipment.armor = state.cardMap[p.equipment.armor];
-    if (p.equipment.horsePlus) equipment.horsePlus = state.cardMap[p.equipment.horsePlus];
-    if (p.equipment.horseMinus) equipment.horseMinus = state.cardMap[p.equipment.horseMinus];
-
-    clientPlayers[name] = {
-      name,
-      health: p.health,
-      maxHealth: p.maxHealth,
-      hand,
-      handCount: p.hand.length,
-      equipment,
-      characterId: p.info.characterId,
-      role: p.info.role,
-      alive: p.info.alive,
-      gender: p.info.gender,
-      faction: p.info.faction,
-      vars: p.vars,
-    };
-  }
-
-  let pending: PendingView | undefined;
-  if (state.pending) {
-    const p = state.pending;
-    switch (p.type) {
-      case 'responseWindow':
-        pending = {
-          id: p.id,
-          type: p.window.type,
-          prompt: getPendingPrompt(p.window.type),
-          validCards: p.window.validCards,
-          timeout: p.timeout,
-          deadline: p.deadline,
-        };
-        break;
-      case 'discardPhase':
-        pending = {
-          id: p.id,
-          type: 'discard',
-          prompt: `请弃掉 ${p.min}~${p.max} 张牌`,
-          timeout: p.timeout,
-          deadline: p.deadline,
-        };
-        break;
-      case 'dyingWindow':
-        pending = {
-          id: p.id,
-          type: 'dying',
-          prompt: `${p.dyingPlayer} 濒死，是否出桃？`,
-          timeout: p.timeout,
-          deadline: p.deadline,
-        };
-        break;
-      case 'skillPrompt':
-        pending = {
-          id: p.id,
-          type: 'skillChoice',
-          prompt: p.prompt.text,
-          options: p.prompt.options,
-          timeout: p.timeout,
-          deadline: p.deadline,
-        };
-        break;
-      case 'selectCard':
-        pending = {
-          id: p.id,
-          type: 'selectCard',
-          prompt: p.mode === 'steal' ? '顺手牵羊：选择要获得的牌' : '过河拆桥：选择要弃掉的牌',
-          timeout: p.timeout,
-          deadline: p.deadline,
-        };
-        break;
-      case 'harvestSelection':
-        pending = {
-          id: p.id,
-          type: 'harvestSelection',
-          prompt: `五谷丰登：${p.pickOrder[p.currentPickerIndex]} 选牌`,
-          timeout: p.timeout,
-          deadline: p.deadline,
-        };
-        break;
-      case 'playPhase':
-        pending = {
-          id: p.id,
-          type: 'playPhase',
-          prompt: '请出牌或结束回合',
-          timeout: p.timeout,
-          deadline: p.deadline,
-        };
-        break;
-    }
-  }
-
-  const actions: ValidAction[] = computeValidActions(state, playerName);
-
+/** 从 GameState 构造某玩家视角的初始 FrontendState。 */
+function buildInitialState(state: GameState, myPlayerId: string): FrontendState {
   return {
-    state: {
-      self: playerName,
-      players: clientPlayers,
-      phase: state.phase,
-      currentPlayer: state.currentPlayer,
-      turn: { killsPlayed: state.turn.killsPlayed },
-      zones: {
-        discardPile: state.zones.discardPile.map(id => state.cardMap[id]),
-        deckCount: state.zones.deck.length,
-      },
-    },
-    pending,
-    actions,
+    view: buildPlayerView(state, myPlayerId),
+    myPlayerId,
+    animationQueue: [],
   };
-}
-
-function getPendingPrompt(windowType: string): string {
-  switch (windowType) {
-    case 'killResponse': return '请选择是否出闪';
-    case 'aoeResponse': return '请选择是否响应';
-    case 'dyingResponse': return '请选择是否出桃';
-    case 'duelResponse': return '请选择是否出杀';
-    case 'trickResponse': return '请选择是否响应';
-    default: return '请响应';
-  }
 }
 
 /** 玩家断线后等待重连的宽限期（毫秒）。超时则结束游戏。 */
@@ -232,7 +109,7 @@ export class GameSession {
     this.scheduleTimeout();
 
     setRoomStatus(this.room.id, '进行中');
-    this.broadcastGameView();
+    this.sendInitialViewToAll();
     return true;
   }
 
@@ -271,7 +148,6 @@ export class GameSession {
     this.broadcastEvents(result.events);
     this.checkGameEnd();
     this.scheduleTimeout();
-    this.broadcastGameView();
   }
 
   private broadcastEvents(events: import('../engine/types').ServerEvent[]): void {
@@ -298,9 +174,12 @@ export class GameSession {
     }
   }
 
-  private broadcastGameView(): void {
+  /**
+   * 给所有玩家发送完整初始 FrontendState（一次性快照）。
+   * 之后的状态变化通过 events 消息发送，客户端用 reducer 维护本地 state。
+   */
+  private sendInitialViewToAll(): void {
     if (!this.state) return;
-
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (playerId) {
@@ -308,13 +187,17 @@ export class GameSession {
       }
       return;
     }
-
-    if (this.state.meta.status !== '进行中') return;
-
     for (const [playerId, playerName] of this.playerNames) {
-      const view = buildGameView(this.state, playerName);
-      this.sendToPlayer(playerId, { type: 'gameView', view });
+      const feState = buildInitialState(this.state, playerName);
+      this.sendToPlayer(playerId, { type: 'initialView', state: feState });
     }
+  }
+
+  /** 给单个玩家（重连时）发完整初始视图。 */
+  private sendInitialViewTo(playerId: string, playerName: string): void {
+    if (!this.state) return;
+    const feState = buildInitialState(this.state, playerName);
+    this.sendToPlayer(playerId, { type: 'initialView', state: feState });
   }
 
   private checkGameEnd(): void {
@@ -343,7 +226,6 @@ export class GameSession {
     this.broadcastEvents(result.events);
     this.checkGameEnd();
     this.scheduleTimeout();
-    this.broadcastGameView();
   }
 
   /**
@@ -433,7 +315,8 @@ export class GameSession {
     // 任何玩家重新上线即取消结束计时：只要还有人在就不应结束游戏
     this.clearGraceTimer();
     this.room.players.set(playerId, ws);
-    this.broadcastGameView();
+    const playerName = this.playerNames.get(playerId);
+    if (playerName) this.sendInitialViewTo(playerId, playerName);
     this.scheduleTimeout();
     if (wasDisconnected) {
       this.broadcast({ type: 'player_reconnected', playerId });
