@@ -157,12 +157,17 @@ function getPendingPrompt(windowType: string): string {
   }
 }
 
+/** 玩家断线后等待重连的宽限期（毫秒）。超时则结束游戏。 */
+const RECONNECT_GRACE_MS = 30_000;
+
 export class GameSession {
   private state: GameState | null = null;
   private room: Room;
   private debug: boolean;
   private playerNames = new Map<string, string>();
-  private timeoutTimer: ReturnType<typeof setInterval> | null = null;
+  private timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private disconnectedAt = new Map<string, number>();
+  private graceTimer: ReturnType<typeof setTimeout> | null = null;
   private logger = createLogger('session');
   private sessionSeed: number;
 
@@ -224,7 +229,7 @@ export class GameSession {
 
     this.state = state;
 
-    this.timeoutTimer = setInterval(() => this.checkTimeout(), 1000);
+    this.scheduleTimeout();
 
     setRoomStatus(this.room.id, '进行中');
     this.broadcastGameView();
@@ -265,6 +270,7 @@ export class GameSession {
 
     this.broadcastEvents(result.events);
     this.checkGameEnd();
+    this.scheduleTimeout();
     this.broadcastGameView();
   }
 
@@ -322,8 +328,8 @@ export class GameSession {
   }
 
   private checkTimeout(): void {
+    this.timeoutTimer = null;
     if (!this.state?.pending) return;
-    if (Date.now() < this.state.pending.deadline) return;
 
     const onTimeout = this.state.pending.onTimeout;
     const result = engine(this.state, onTimeout);
@@ -336,31 +342,63 @@ export class GameSession {
     this.state = result.state;
     this.broadcastEvents(result.events);
     this.checkGameEnd();
+    this.scheduleTimeout();
     this.broadcastGameView();
+  }
+
+  /** 按当前 pending 的 deadline 调度单次 setTimeout。 */
+  private scheduleTimeout(): void {
+    this.clearTimeoutTimer();
+    const pending = this.state?.pending;
+    if (!pending) return;
+    const delay = Math.max(0, pending.deadline - Date.now());
+    this.timeoutTimer = setTimeout(() => this.checkTimeout(), delay);
   }
 
   private clearTimeoutTimer(): void {
     if (this.timeoutTimer) {
-      clearInterval(this.timeoutTimer);
+      clearTimeout(this.timeoutTimer);
       this.timeoutTimer = null;
     }
   }
 
   destroy(): void {
     this.clearTimeoutTimer();
+    this.clearGraceTimer();
     this.state = null;
   }
 
   handleDisconnect(playerId: string): void {
     if (this.debug) return;
+    if (this.state?.meta.status !== '进行中') return;
 
-    if (!this.state) return;
+    this.disconnectedAt.set(playerId, Date.now());
+    this.graceTimer ??= setTimeout(() => this.endDueToDisconnect(), RECONNECT_GRACE_MS);
+    this.broadcast({
+      type: 'player_disconnected',
+      playerId,
+      graceMs: RECONNECT_GRACE_MS,
+    });
+  }
 
-    const playerName = this.playerNames.get(playerId) ?? '未知玩家';
-    if (this.state.meta.status === '进行中') {
-      this.clearTimeoutTimer();
-      setRoomStatus(this.room.id, '已结束');
-      this.broadcast({ type: 'error', message: `${playerName} 断开连接，游戏结束` });
+  /** 重连宽限期到时仍有玩家未恢复：结束游戏。 */
+  private endDueToDisconnect(): void {
+    this.graceTimer = null;
+    if (this.state?.meta.status !== '进行中') return;
+    const still = [...this.disconnectedAt.keys()];
+    if (still.length === 0) return;
+    const names = still.map(id => this.playerNames.get(id) ?? id).join('、');
+    this.clearTimeoutTimer();
+    setRoomStatus(this.room.id, '已结束');
+    this.state = { ...this.state, meta: { ...this.state.meta, status: '已结束' } };
+    this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复，游戏结束` });
+    this.broadcast({ type: 'gameOver', winner: '无人' });
+  }
+
+  private clearGraceTimer(): void {
+    if (this.graceTimer !== null) {
+      clearTimeout(this.graceTimer);
+      this.graceTimer = null;
     }
   }
 
@@ -374,8 +412,14 @@ export class GameSession {
 
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext): boolean {
     if (this.state?.meta.status !== '进行中') return false;
+    const wasDisconnected = this.disconnectedAt.delete(playerId);
+    if (this.disconnectedAt.size === 0) this.clearGraceTimer();
     this.room.players.set(playerId, ws);
     this.broadcastGameView();
+    this.scheduleTimeout();
+    if (wasDisconnected) {
+      this.broadcast({ type: 'player_reconnected', playerId });
+    }
     return true;
   }
 
@@ -395,12 +439,11 @@ export class GameSession {
 
   private sendToPlayer(playerId: string, message: ServerMessage): void {
     const ws = this.room.players.get(playerId);
-    if (ws) {
-      try {
-        ws.send(serialize(message));
-      } catch {
-        // 忽略发送失败
-      }
+    if (!ws) return;
+    try {
+      ws.send(serialize(message));
+    } catch (err) {
+      this.logger.warn(`sendToPlayer failed for ${playerId}`, { error: String(err) });
     }
   }
 
@@ -409,8 +452,8 @@ export class GameSession {
     for (const [, ws] of this.room.players) {
       try {
         ws.send(data);
-      } catch {
-        // 忽略发送失败
+      } catch (err) {
+        this.logger.warn('broadcast send failed', { error: String(err) });
       }
     }
   }

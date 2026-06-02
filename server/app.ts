@@ -337,17 +337,10 @@ function handleDisconnect(playerId: string): void {
     return;
   }
 
+  // 真人游戏：通知 session 进入重连宽限期，由 session 决定何时真正结束游戏
   const session = gameSessions.get(roomId);
   if (session) {
     session.handleDisconnect(playerId);
-    gameSessions.delete(roomId);
-  }
-
-  const leftRoom = leaveRoom(roomId, playerId);
-  playerRoomMap.delete(playerId);
-
-  if (leftRoom) {
-    broadcastMessage(leftRoom, serialize({ type: 'player_left', playerId }));
   }
 }
 

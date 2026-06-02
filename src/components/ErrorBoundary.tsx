@@ -1,5 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { colors, styles } from '../theme';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('ErrorBoundary');
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -22,7 +25,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('React Error Boundary caught:', error, errorInfo);
+    log.error('React Error Boundary caught', { error: String(error), componentStack: errorInfo.componentStack });
   }
 
   render(): ReactNode {

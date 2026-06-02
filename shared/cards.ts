@@ -1,3 +1,11 @@
+// shared/cards.ts — v1 卡牌数据（带 suit/rank/description 的完整 Card 实例）
+//
+// 注意：这是 v1 引擎的卡牌数据，被测试工具（scenario-runner）和
+// tests/unit/cards-ext.test.ts 引用作为发牌模板。v2 引擎使用
+// `shared/cards/` 目录下的 CardDef 声明式定义，并通过
+// `shared/deck.ts` 的 createStandardDeck() 在运行时生成卡实例。
+// 两者服务不同目的，请勿删除此文件。
+
 import type { Card, Suit, Rank } from './types';
 
 // ============================================================

@@ -157,8 +157,9 @@ export function broadcastMessage(room: Room, message: string, excludeId?: string
     if (id !== excludeId) {
       try {
         ws.send(message);
-      } catch {
-        // 忽略发送失败
+      } catch (err) {
+        // 单点失败不影响其他玩家
+        console.warn(`[room ${room.id}] ws.send failed for player ${id}: ${String(err)}`);
       }
     }
   }
