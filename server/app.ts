@@ -251,7 +251,7 @@ function handleStartGame(playerId: string): void {
   }
 }
 
-function handleAction(playerId: string, action: import('../engine/v2/types').GameAction): void {
+function handleAction(playerId: string, action: import('../engine/types').GameAction): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
@@ -274,7 +274,7 @@ function handleResponse(playerId: string, _promptId: string, choice: unknown): v
   const pending = session.getPending();
   if (!pending) return;
 
-  let action: import('../engine/v2/types').GameAction;
+  let action: import('../engine/types').GameAction;
 
   switch (pending.type) {
     case 'responseWindow':
@@ -289,7 +289,7 @@ function handleResponse(playerId: string, _promptId: string, choice: unknown): v
       break;
     }
     case 'skillPrompt': {
-      action = { type: 'skillChoice', player: playerName, choice: choice as import('../engine/v2/types').Json };
+      action = { type: 'skillChoice', player: playerName, choice: choice as import('../engine/types').Json };
       break;
     }
     case 'selectCard': {

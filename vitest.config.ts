@@ -10,9 +10,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     include: [
-      'tests/unit/**/*.test.{ts,tsx}',
-      'tests/integration/**/*.test.{ts,tsx}',
-      'tests/v2/**/*.test.ts',
+      'tests/**/*.test.{ts,tsx}',
     ],
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { engine } from '../../engine/v2/engine';
-import { createInitialState, getPlayer } from '../../engine/v2/state';
-import { computeValidActions } from '../../engine/v2/validate';
-import { getDistance } from '../../engine/v2/distance';
-import type { GameState as V2GameState, GameAction, ValidAction, PromptOption, Json } from '../../engine/v2/types';
+import { engine } from '../../engine/engine';
+import { createInitialState, getPlayer } from '../../engine/state';
+import { computeValidActions } from '../../engine/validate';
+import { getDistance } from '../../engine/distance';
+import type { GameState as V2GameState, GameAction, ValidAction, PromptOption, Json } from '../../engine/types';
 import type { Card, Role } from '../../shared/types';
 import { 曹操, 刘备, 孙权, 诸葛亮, 司马懿 } from '../../shared/characters';
 import { saveState } from '../utils/logFile';

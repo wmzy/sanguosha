@@ -5,7 +5,7 @@ import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
 import { LogPanel } from './LogPanel';
 import { allCharacters } from '../../shared/characters';
-import type { PlayerState, ValidAction, PromptOption, Json } from '../../engine/v2/types';
+import type { PlayerState, ValidAction, PromptOption, Json } from '../../engine/types';
 import type { Card } from '../../shared/types';
 import type { Operation } from '../../shared/log';
 import { colors, styles } from '../theme';
@@ -30,7 +30,7 @@ interface PendingPrompt {
 }
 
 export interface GameBoardData {
-  state: import('../../engine/v2/types').GameState;
+  state: import('../../engine/types').GameState;
   me: PlayerState;
   myName: string;
   playerOrder: string[];
@@ -42,7 +42,7 @@ export interface GameBoardData {
   setSelectedTarget: (target: string | null) => void;
   canPlay: boolean;
   validActions: ValidAction[];
-  playableCards: import('../../engine/v2/types').PlayableCard[];
+  playableCards: import('../../engine/types').PlayableCard[];
   playableCardIds: Set<string>;
   needsTarget: boolean;
   validTargetList: string[];
@@ -62,7 +62,7 @@ export interface GameBoardData {
   respondToDying: (saverName: string | null) => void;
   selectTargetCard: (cardId: string) => void;
   selectHarvestCard: (cardId: string) => void;
-  availableSkills: import('../../engine/v2/types').AvailableSkill[];
+  availableSkills: import('../../engine/types').AvailableSkill[];
   handleActivateSkill: (skillId: string, target?: string) => void;
   selectedSkillCards: Set<string>;
   toggleSkillCardSelection: (cardId: string) => void;

@@ -6,7 +6,7 @@ import { ReplayBoard } from './components/ReplayBoard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useState, useCallback, useEffect } from 'react';
 import { loadState } from './utils/logFile';
-import type { GameState } from '../engine/v2/types';
+import type { GameState } from '../engine/types';
 import { colors } from './theme';
 import type { RoomInfo } from '../server/protocol';
 

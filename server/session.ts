@@ -1,11 +1,11 @@
-import type { GameAction, GameState, ClientPlayer, GameView, ValidAction, PendingView } from '../engine/v2/types';
+import type { GameAction, GameState, ClientPlayer, GameView, ValidAction, PendingView } from '../engine/types';
 import type { ServerMessage } from './protocol';
 import type { Room } from './room';
-import { createInitialState, getPlayer } from '../engine/v2/state';
-import { engine } from '../engine/v2/engine';
-import { serialize as serializeState, deserialize as deserializeState } from '../engine/v2/serializer';
-import { registerCharacterTriggers } from '../engine/v2/skill';
-import { computeValidActions } from '../engine/v2/validate';
+import { createInitialState, getPlayer } from '../engine/state';
+import { engine } from '../engine/engine';
+import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
+import { registerCharacterTriggers } from '../engine/skill';
+import { computeValidActions } from '../engine/validate';
 import { allCharacters } from '../shared/characters';
 import { serialize } from './protocol';
 import { setRoomStatus } from './room';
@@ -183,7 +183,7 @@ export class GameSession {
 
     this.state = state;
 
-    import('../engine/v2/skills/index');
+    import('../engine/skills/index');
 
     this.timeoutTimer = setInterval(() => this.checkTimeout(), 1000);
 
@@ -229,7 +229,7 @@ export class GameSession {
     this.broadcastGameView();
   }
 
-  private broadcastEvents(events: import('../engine/v2/types').ServerEvent[]): void {
+  private broadcastEvents(events: import('../engine/types').ServerEvent[]): void {
     if (events.length === 0) return;
 
     const eventMsg = {
@@ -329,7 +329,7 @@ export class GameSession {
     return this.playerNames.get(playerId);
   }
 
-  getPending(): import('../engine/v2/types').PendingAction | null {
+  getPending(): import('../engine/types').PendingAction | null {
     return this.state?.pending ?? null;
   }
 

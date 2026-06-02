@@ -1,5 +1,5 @@
-import { serialize, deserialize } from '../../engine/v2/serializer';
-import type { GameState } from '../../engine/v2/types';
+import { serialize, deserialize } from '../../engine/serializer';
+import type { GameState } from '../../engine/types';
 
 export function saveState(state: GameState): void {
   const json = serialize(state);

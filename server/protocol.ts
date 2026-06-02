@@ -1,4 +1,4 @@
-import type { GameAction, GameState, GameView } from '../engine/v2/types';
+import type { GameAction, GameState, GameView } from '../engine/types';
 
 export interface PlayerEvent {
   id: string;

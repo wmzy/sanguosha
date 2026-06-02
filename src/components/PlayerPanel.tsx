@@ -1,4 +1,4 @@
-import type { PlayerState, EquipmentSlots } from '../../engine/v2/types';
+import type { PlayerState, EquipmentSlots } from '../../engine/types';
 import type { Card, AbilityConfig } from '../../shared/types';
 import { colors } from '../theme';
 

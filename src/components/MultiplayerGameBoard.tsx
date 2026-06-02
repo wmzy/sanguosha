@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import type { GameView, GameAction } from '../../engine/v2/types';
+import type { GameView, GameAction } from '../../engine/types';
 import { PlayerPanel } from './PlayerPanel';
 import { HandCards } from './HandCards';
 import { ActionPanel } from './ActionPanel';
