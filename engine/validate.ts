@@ -251,8 +251,7 @@ function validateUseSkill(
   );
   if (!trigger) return `你不拥有技能: ${action.skillId}`;
 
-  // 检查本回合是否已使用过（如果 trigger.optional 不为 true 则限制每回合一次）
-  if (state.turn.skillsUsed.includes(action.skillId)) {
+  if (!trigger.optional && state.turn.skillsUsed.includes(action.skillId)) {
     return '本回合已使用过该技能';
   }
 
@@ -758,7 +757,10 @@ function getValidTargetsForCard(state: GameState, player: string, cardId: string
 
 function computeAvailableSkills(state: GameState, player: string): AvailableSkill[] {
   const playerTriggers = state.triggers.filter(
-    (t) => t.player === player && t.source === 'character' && !state.turn.skillsUsed.includes(t.skillId),
+    (t) =>
+      t.player === player &&
+      t.source === 'character' &&
+      (t.optional || !state.turn.skillsUsed.includes(t.skillId)),
   );
 
   return playerTriggers.map((trigger) => ({

@@ -395,6 +395,7 @@ export interface TriggerRule {
   skillId: string;
   player: string;
   priority: number;
+  optional?: boolean;
 }
 export type GameAction =
   | { type: 'playCard'; player: string; cardId: string; target?: string }

@@ -93,7 +93,7 @@ describe('魏势力技能执行', () => {
   });
 
   describe('许褚 · 裸衣', () => {
-    it('摸牌阶段触发设置裸衣标记', () => {
+    it('摸牌阶段开始时弹出 prompt 询问是否发动', () => {
       let state = createTestGame({ characters: ['许褚', '刘备'] });
       state = withTriggers(state, 'P1');
 
@@ -104,7 +104,31 @@ describe('魏势力技能执行', () => {
       });
 
       expect(result.error).toBeUndefined();
-      expect(result.state.players.P1.vars['裸衣/active']).toBe(true);
+      expect(result.state.pending?.type).toBe('skillPrompt');
+      expect((result.state.pending as { skillId: string }).skillId).toBe('裸衣');
+      expect(result.state.players.P1.vars['裸衣/active']).toBeUndefined();
+    });
+
+    it('选择发动后设置裸衣标记', () => {
+      let state = createTestGame({ characters: ['许褚', '刘备'] });
+      state = withTriggers(state, 'P1');
+
+      const r1 = emitEvent(state, { type: 'phaseBegin', phase: '摸牌', player: 'P1' });
+      const r2 = engine(r1.state, { type: 'skillChoice', player: 'P1', choice: true });
+
+      expect(r2.error).toBeUndefined();
+      expect(r2.state.players.P1.vars['裸衣/active']).toBe(true);
+    });
+
+    it('选择不发动不设标记', () => {
+      let state = createTestGame({ characters: ['许褚', '刘备'] });
+      state = withTriggers(state, 'P1');
+
+      const r1 = emitEvent(state, { type: 'phaseBegin', phase: '摸牌', player: 'P1' });
+      const r2 = engine(r1.state, { type: 'skillChoice', player: 'P1', choice: false });
+
+      expect(r2.error).toBeUndefined();
+      expect(r2.state.players.P1.vars['裸衣/active']).toBeUndefined();
     });
 
     it('裸衣标记使杀伤害+1', () => {

@@ -150,10 +150,25 @@ registerSkill({
   handler(_ctx, _state) {
     return [
       {
-        type: 'atoms',
-        ops: [
-          { type: 'setVar', player: _ctx.self, key: '裸衣/active', value: true },
-          { type: 'setVar', player: _ctx.self, key: '裸衣/usedThisTurn', value: true },
+        type: 'prompt',
+        text: '裸衣：是否少摸一张牌，使本回合【杀】/【决斗】伤害+1？',
+        options: [
+          { label: '不发动', value: false },
+          { label: '发动', value: true },
+        ],
+        defaultChoice: false,
+      },
+      {
+        type: 'condition',
+        check: { equals: [{ $: 'ctx', path: 'choice' }, true] },
+        then: [
+          {
+            type: 'atoms',
+            ops: [
+              { type: 'setVar', player: _ctx.self, key: '裸衣/active', value: true },
+              { type: 'setVar', player: _ctx.self, key: '裸衣/usedThisTurn', value: true },
+            ],
+          },
         ],
       },
     ];
