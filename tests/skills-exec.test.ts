@@ -775,17 +775,17 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
 // ════════════════════════════════════════════════════════════════
 
 describe('技能执行缺陷', () => {
-  it('司马懿反馈只弃牌不获得', () => {
+  it('司马懿反馈弃牌并获得', () => {
     let state = createTestGame({ characters: ['司马懿', '曹操'] });
     state = registerCharacterTriggers(state, 'P1', { characterMap: getCharacterMap() });
     const p2HandBefore = state.players['P2'].hand.length;
+    const p1HandBefore = state.players['P1'].hand.length;
     const event = { type: 'damageReceived' as const, player: 'P2', target: 'P1', source: 'P2', amount: 1 };
     const result = emitEvent(state, event);
     if (result.state.players['P2'].hand.length < p2HandBefore) {
-      // 反馈的 discardRandom 已弃牌但 TODO 未完成 gainCard
-      expect(result.state.players['P1'].hand.length).toBe(
-        state.players['P1'].hand.length,
-      );
+      // 反馈触发：P2 被随机弃1牌，P1 获得该牌
+      expect(result.state.players['P1'].hand.length).toBe(p1HandBefore + 1);
+      expect(result.state.players['P2'].hand.length).toBe(p2HandBefore - 1);
     }
   });
 

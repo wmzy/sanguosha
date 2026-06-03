@@ -163,8 +163,8 @@ export class ScenarioContext {
     this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
-  useSkill(player: string, skillId: string): void {
-    const result = engine(this.state, { type: 'useSkill', player, skillId });
+  useSkill(player: string, skillId: string, target?: string): void {
+    const result = engine(this.state, { type: 'useSkill', player, skillId, target });
     if (result.error) throw new Error(`useSkill error: ${result.error}`);
     this.state = result.state;
     this.lastEvents = result.playerEvents?.get(player) ?? [];
