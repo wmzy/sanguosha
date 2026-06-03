@@ -44,19 +44,26 @@ registerSkill({
   },
   handler(_ctx, _state) {
     if (!_ctx.source) return [];
+    const sourcePlayer = _state.players[_ctx.source];
+    if (!sourcePlayer || sourcePlayer.hand.length === 0) return [];
     return [
       {
         type: 'atoms',
         ops: [
+          { type: 'discardRandom', player: _ctx.source, count: 1, from: 'hand' },
+        ],
+      },
+      {
+        type: 'atoms',
+        ops: [
           {
-            type: 'discardRandom',
-            player: _ctx.source,
-            count: 1,
-            from: 'hand',
+            type: 'gainCard',
+            player: _ctx.self,
+            cardId: { $: 'ctx', path: 'localVars.discardedCardId' },
+            from: { zone: 'discardPile' },
           },
         ],
       },
-      // TODO: 将弃置的牌移到 ctx.self 手牌（需要从上一步结果获取 cardId）
     ];
   },
 });
@@ -107,8 +114,14 @@ registerSkill({
     if (!_ctx.source) return [];
     return [
       { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
-      // TODO: 判定后检查结果是否为♥，若不是则让 source 选择弃2牌或受1点伤害
-      // 这需要条件判定 + prompt 组合，目前 stub
+      {
+        type: 'condition',
+        check: { notEquals: [{ $: 'ctx', path: 'localVars.judgeSuit' }, '♥'] },
+        then: [
+          { type: 'atoms', ops: [{ type: 'damage', target: _ctx.source, amount: 1 }] },
+          { type: 'checkDying', player: _ctx.source },
+        ],
+      },
     ];
   },
 });
@@ -126,12 +139,32 @@ registerSkill({
     optional: true,
   },
   handler(_ctx, _state) {
-    return [
-      // 跳过正常摸牌
+    const others = _state.playerOrder.filter(
+      n => n !== _ctx.self && _state.players[n].info.alive && _state.players[n].hand.length > 0,
+    );
+    const targets = others.slice(0, 2);
+    if (targets.length === 0) return [];
+
+    const phases: import('../types').SkillPhase[] = [
       { type: 'atoms', ops: [{ type: 'setVar', player: _ctx.self, key: 'skipDraw', value: true }] },
-      // TODO: 选择最多2名其他角色，各抽1张手牌
-      // 需要 foreach + prompt 组合
     ];
+
+    for (const target of targets) {
+      phases.push(
+        { type: 'atoms', ops: [{ type: 'discardRandom', player: target, count: 1, from: 'hand' }] },
+        {
+          type: 'atoms',
+          ops: [{
+            type: 'gainCard',
+            player: _ctx.self,
+            cardId: { $: 'ctx', path: 'localVars.discardedCardId' },
+            from: { zone: 'discardPile' },
+          }],
+        },
+      );
+    }
+
+    return phases;
   },
 });
 
@@ -274,3 +307,326 @@ registerSkill({
     ];
   },
 } satisfies SkillDef);
+
+// ==================== 夏侯渊 ====================
+
+registerSkill({
+  id: '神速',
+  name: '神速',
+  description: '你可以选择以下一至两项：1.跳过判定阶段和摸牌阶段；2.跳过出牌阶段并弃置一张装备牌。你每选择一项，视为对一名其他角色使用一张无距离限制的【杀】。',
+  trigger: {
+    event: 'phaseBegin',
+    source: 'character',
+    phase: '判定',
+    optional: true,
+    manual: true,
+  },
+  handler(_ctx, _state) {
+    return [
+      {
+        type: 'prompt',
+        text: '神速：选择发动方式',
+        options: [
+          { label: '不发动', value: false },
+          { label: '跳过判定和摸牌（视为使用杀）', value: 'option1' },
+          { label: '跳过出牌并弃装备（视为使用杀）', value: 'option2' },
+        ],
+        defaultChoice: false,
+      },
+    ];
+  },
+});
+
+// ==================== 曹仁 ====================
+
+registerSkill({
+  id: '据守',
+  name: '据守',
+  description: '结束阶段，你可以翻面并摸三张牌，然后跳过你的下一回合。',
+  trigger: {
+    event: 'phaseBegin',
+    source: 'character',
+    phase: '结束',
+    optional: true,
+  },
+  handler(_ctx, _state) {
+    return [
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 3 }] },
+      { type: 'atoms', ops: [{ type: 'setVar', player: _ctx.self, key: '据守/flipped', value: true }] },
+    ];
+  },
+});
+
+// ==================== 荀彧 ====================
+
+registerSkill({
+  id: '驱虎',
+  name: '驱虎',
+  description: '出牌阶段，你可以与一名角色拼点，若你赢，该角色对其攻击范围内另一名角色造成1点伤害；若你没赢，该角色对你造成1点伤害。',
+  trigger: {
+    event: 'phaseBegin',
+    source: 'character',
+    phase: '出牌',
+    optional: true,
+    manual: true,
+  },
+  handler(_ctx, _state) {
+    return [
+      {
+        type: 'prompt',
+        text: '驱虎：选择拼点目标',
+        options: [
+          { label: '不发动', value: false },
+          { type: 'selectPlayer', filter: { handEmpty: _ctx.self } },
+        ],
+        defaultChoice: false,
+      },
+    ];
+  },
+});
+
+registerSkill({
+  id: '节命',
+  name: '节命',
+  description: '当你受到1点伤害后，你可以令一名角色将手牌摸至X张（X为其体力上限且最多为5）。',
+  trigger: {
+    event: 'damageReceived',
+    source: 'character',
+    optional: true,
+  },
+  handler(_ctx, _state) {
+    const selfPlayer = _state.players[_ctx.self];
+    const drawCount = Math.min(selfPlayer.maxHealth, 5) - selfPlayer.hand.length;
+    if (drawCount <= 0) return [];
+    return [
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: Math.min(drawCount, 5) }] },
+    ];
+  },
+});
+
+// ==================== 典韦 ====================
+
+registerSkill({
+  id: '强袭',
+  name: '强袭',
+  description: '出牌阶段，你可以自减1点体力或弃一张武器牌，对攻击范围内的一名角色造成1点伤害。每回合限一次。',
+  trigger: {
+    event: 'phaseBegin',
+    source: 'character',
+    phase: '出牌',
+    optional: true,
+    manual: true,
+  },
+  handler(_ctx, _state) {
+    const selfPlayer = _state.players[_ctx.self];
+    if (!selfPlayer || selfPlayer.health <= 0) return [];
+
+    const target = _ctx.target;
+    if (!target) return [];
+
+    const ops: import('../types').Atom[] = [
+      { type: 'damage', target: _ctx.self, amount: 1 },
+      { type: 'damage', target, amount: 1 },
+    ];
+
+    return [
+      { type: 'atoms', ops },
+      { type: 'checkDying', player: _ctx.self },
+      { type: 'checkDying', player: target },
+    ];
+  },
+});
+
+// ==================== 曹丕 ====================
+
+registerSkill({
+  id: '行殇',
+  name: '行殇',
+  description: '你可以立即获得死亡角色的所有牌。',
+  trigger: {
+    event: 'death',
+    source: 'character',
+    optional: true,
+  },
+  handler(_ctx, _state) {
+    const e = _ctx.event as Record<string, unknown> | undefined;
+    const deadPlayer = (e?.['player'] as string) ?? _ctx.target;
+    if (!deadPlayer) return [];
+
+    const dead = _state.players[deadPlayer];
+    if (!dead) return [];
+
+    const phases: import('../types').SkillPhase[] = [];
+
+    for (const cardId of dead.hand) {
+      phases.push({
+        type: 'atoms',
+        ops: [{
+          type: 'gainCard',
+          player: _ctx.self,
+          cardId,
+          from: { zone: 'discardPile' },
+        }],
+      });
+    }
+
+    return phases;
+  },
+});
+
+registerSkill({
+  id: '放逐',
+  name: '放逐',
+  description: '每当你受到一次伤害后，可以令除你以外的任一角色补X张牌（X为你已损失体力值），然后该角色将其武将牌翻面。',
+  trigger: {
+    event: 'damageReceived',
+    source: 'character',
+    optional: true,
+  },
+  handler(_ctx, _state) {
+    const selfPlayer = _state.players[_ctx.self];
+    if (!selfPlayer) return [];
+    const lostHealth = selfPlayer.maxHealth - selfPlayer.health;
+    if (lostHealth <= 0) return [];
+
+    return [
+      {
+        type: 'prompt',
+        text: `放逐：令一名角色补${lostHealth}张牌并翻面`,
+        options: [
+          { label: '不发动', value: false },
+          { type: 'selectPlayer' },
+        ],
+        defaultChoice: false,
+      },
+    ];
+  },
+});
+
+registerSkill({
+  id: '颂威',
+  name: '颂威',
+  description: '其他魏势力角色的判定牌结果为黑色且生效后，可以让你摸一张牌。',
+  trigger: {
+    event: 'judgeResult',
+    source: 'character',
+    optional: true,
+  },
+  handler(_ctx, _state) {
+    const e = _ctx.event as Record<string, unknown> | undefined;
+    const result = e?.['result'] as string | undefined;
+    if (result !== 'black') return [];
+
+    const judgePlayer = e?.['player'] as string | undefined;
+    if (!judgePlayer || judgePlayer === _ctx.self) return [];
+
+    const judgePlayerState = _state.players[judgePlayer];
+    if (!judgePlayerState || judgePlayerState.info.faction !== '魏') return [];
+
+    return [
+      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 1 }] },
+    ];
+  },
+});
+
+// ==================== 徐晃 ====================
+
+registerSkill({
+  id: '断粮',
+  name: '断粮',
+  description: '你可以将一张黑色的基本牌或黑色装备牌当【兵粮寸断】使用；你对手牌数不小于你的角色使用【兵粮寸断】无距离限制。',
+  trigger: {
+    event: 'phaseBegin',
+    source: 'character',
+    phase: '出牌',
+    optional: true,
+    manual: true,
+  },
+  handler(_ctx, _state) {
+    return [
+      {
+        type: 'prompt',
+        text: '断粮：选择一张黑色基本牌/装备牌当兵粮寸断使用',
+        options: [
+          { label: '不发动', value: false },
+          { type: 'selectCard', from: 'hand', min: 1, max: 1 },
+        ],
+        defaultChoice: false,
+      },
+    ];
+  },
+});
+
+// ==================== 张郃 ====================
+
+registerSkill({
+  id: '巧变',
+  name: '巧变',
+  description: '你可以弃置一张手牌来跳过自己的一个阶段（回合开始和回合结束阶段除外）。若以此法跳过摸牌阶段，你从至多两名其他角色处各获得一张手牌；若以此法跳过出牌阶段，你可以将场上的一张牌移动到另一个合理的位置。',
+  trigger: {
+    event: 'phaseBegin',
+    source: 'character',
+    optional: true,
+  },
+  handler(_ctx, _state) {
+    const e = _ctx.event as Record<string, unknown> | undefined;
+    const phase = e?.['phase'] as string | undefined;
+    if (!phase || phase === '准备' || phase === '结束') return [];
+
+    return [
+      {
+        type: 'prompt',
+        text: `巧变：是否弃一张手牌跳过${phase}阶段？`,
+        options: [
+          { label: '不发动', value: false },
+          { type: 'selectCard', from: 'hand', min: 1, max: 1 },
+        ],
+        defaultChoice: false,
+      },
+    ];
+  },
+});
+
+// ==================== 邓艾 ====================
+
+registerSkill({
+  id: '屯田',
+  name: '屯田',
+  description: '每次当你于回合外失去牌时，可进行一次判定，将非红桃的判定牌置于你的武将牌上，称为"田"；每有一张田，你计算与其他角色的距离便减少1。',
+  trigger: {
+    event: 'cardDiscarded',
+    source: 'character',
+    optional: true,
+  },
+  handler(_ctx, _state) {
+    return [
+      { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self, varKey: '屯田/judgeResult' }] },
+      {
+        type: 'condition',
+        check: { notEquals: [{ $: 'var', player: _ctx.self, key: '屯田/judgeResult' }, '♥'] },
+        then: [
+          { type: 'atoms', ops: [{ type: 'incrementVar', player: _ctx.self, key: '屯田/count', delta: 1 }] },
+        ],
+      },
+    ];
+  },
+});
+
+registerSkill({
+  id: '凿险',
+  name: '凿险',
+  description: '准备阶段，若"田"的数量≥3，你须减1点体力上限，然后获得技能"急袭"（你可以将一张"田"当【顺手牵羊】使用）。',
+  trigger: {
+    event: 'phaseBegin',
+    source: 'character',
+    phase: '准备',
+  },
+  handler(_ctx, _state) {
+    const count = (_state.players[_ctx.self].vars['屯田/count'] as number) ?? 0;
+    if (count < 3) return [];
+
+    return [
+      { type: 'atoms', ops: [{ type: 'setVar', player: _ctx.self, key: '凿险/awakened', value: true }] },
+    ];
+  },
+});

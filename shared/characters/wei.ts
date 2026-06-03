@@ -146,4 +146,171 @@ export const 甄姬: CharacterConfig = {
   ],
 };
 
-export const weiCharacters: CharacterConfig[] = [曹操, 司马懿, 夏侯惇, 张辽, 许褚, 郭嘉, 甄姬];
+// ==================== 风扩展包 ====================
+
+export const 夏侯渊: CharacterConfig = {
+  name: '夏侯渊',
+  maxHealth: 4,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '神速',
+      description: '你可以选择以下一至两项：1.跳过判定阶段和摸牌阶段；2.跳过出牌阶段并弃置一张装备牌。你每选择一项，视为对一名其他角色使用一张无距离限制的【杀】。',
+      trigger: 'manual',
+      effect: { type: 'sequence', steps: [] },
+    },
+  ],
+};
+
+export const 曹仁: CharacterConfig = {
+  name: '曹仁',
+  maxHealth: 4,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '据守',
+      description: '结束阶段，你可以翻面并摸三张牌，然后跳过你的下一回合。',
+      trigger: 'onTurnStart',
+      condition: { phase: '结束' },
+      effect: { type: 'sequence', steps: [
+        { type: 'draw', count: 3 },
+      ] },
+    },
+  ],
+};
+
+// ==================== 火扩展包 ====================
+
+export const 荀彧: CharacterConfig = {
+  name: '荀彧',
+  maxHealth: 3,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '驱虎',
+      description: '出牌阶段，你可以与一名角色拼点，若你赢，该角色对其攻击范围内另一名角色造成1点伤害；若你没赢，该角色对你造成1点伤害。',
+      trigger: 'manual',
+      effect: { type: 'sequence', steps: [] },
+    },
+    {
+      name: '节命',
+      description: '当你受到1点伤害后，你可以令一名角色将手牌摸至X张（X为其体力上限且最多为5）。',
+      trigger: 'onDamageReceived',
+      effect: { type: 'draw', count: 'upToMaxHealth' },
+      passive: true,
+    },
+  ],
+};
+
+export const 典韦: CharacterConfig = {
+  name: '典韦',
+  maxHealth: 4,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '强袭',
+      description: '出牌阶段，你可以自减1点体力或弃一张武器牌，对攻击范围内的一名角色造成1点伤害。每回合限一次。',
+      trigger: 'manual',
+      effect: { type: 'sequence', steps: [] },
+    },
+  ],
+};
+
+// ==================== 林扩展包 ====================
+
+export const 曹丕: CharacterConfig = {
+  name: '曹丕',
+  maxHealth: 3,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '行殇',
+      description: '你可以立即获得死亡角色的所有牌。',
+      trigger: 'onDeath',
+      effect: { type: 'gainCard', source: 'selected', count: 99 },
+      passive: true,
+    },
+    {
+      name: '放逐',
+      description: '每当你受到一次伤害后，可以令除你以外的任一角色补X张牌（X为你已损失体力值），然后该角色将其武将牌翻面。',
+      trigger: 'onDamageReceived',
+      effect: { type: 'sequence', steps: [
+        { type: 'draw', count: 'lostHealth' },
+      ] },
+      passive: true,
+    },
+    {
+      name: '颂威',
+      description: '其他魏势力角色的判定牌结果为黑色且生效后，可以让你摸一张牌。',
+      trigger: 'onJudge',
+      effect: { type: 'draw', count: 1 },
+    },
+  ],
+};
+
+export const 徐晃: CharacterConfig = {
+  name: '徐晃',
+  maxHealth: 4,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '断粮',
+      description: '你可以将一张黑色的基本牌或黑色装备牌当【兵粮寸断】使用；你对手牌数不小于你的角色使用【兵粮寸断】无距离限制。',
+      trigger: 'manual',
+      effect: { type: 'convert', from: 'blackBasicOrEquip', to: '兵粮寸断' },
+    },
+  ],
+};
+
+// ==================== 山扩展包 ====================
+
+export const 张郃: CharacterConfig = {
+  name: '张郃',
+  maxHealth: 4,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '巧变',
+      description: '你可以弃置一张手牌来跳过自己的一个阶段（回合开始和回合结束阶段除外）。若以此法跳过摸牌阶段，你从至多两名其他角色处各获得一张手牌；若以此法跳过出牌阶段，你可以将场上的一张牌移动到另一个合理的位置。',
+      trigger: 'onTurnStart',
+      effect: { type: 'sequence', steps: [] },
+    },
+  ],
+};
+
+export const 邓艾: CharacterConfig = {
+  name: '邓艾',
+  maxHealth: 4,
+  gender: '男',
+  faction: '魏',
+  abilities: [
+    {
+      name: '屯田',
+      description: '每次当你于回合外失去牌时，可进行一次判定，将非红桃的判定牌置于你的武将牌上，称为"田"；每有一张田，你计算与其他角色的距离便减少1。',
+      trigger: 'onCardPlayed',
+      effect: { type: 'sequence', steps: [
+        { type: 'judge', condition: 'notHeart' },
+      ] },
+      passive: true,
+    },
+    {
+      name: '凿险',
+      description: '准备阶段，若"田"的数量≥3，你须减1点体力上限，然后获得技能"急袭"（你可以将一张"田"当【顺手牵羊】使用）。',
+      trigger: 'onTurnStart',
+      condition: { phase: '准备' },
+      effect: { type: 'sequence', steps: [] },
+    },
+  ],
+};
+
+export const weiCharacters: CharacterConfig[] = [
+  曹操, 司马懿, 夏侯惇, 张辽, 许褚, 郭嘉, 甄姬,
+  夏侯渊, 曹仁, 荀彧, 典韦, 曹丕, 徐晃, 张郃, 邓艾,
+];
