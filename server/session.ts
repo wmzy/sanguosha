@@ -180,6 +180,7 @@ export class GameSession {
         timestamp: ev.timestamp,
         payload: ev.payload,
       })),
+      actionLog: this.actionLog,
     };
 
     if (this.debug) {
@@ -202,7 +203,7 @@ export class GameSession {
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (playerId) {
-        this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state });
+        this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, actionLog: this.actionLog });
       }
       return;
     }
@@ -221,7 +222,7 @@ export class GameSession {
 
   sendDebugGameState(playerId: string): void {
     if (!this.state) return;
-    this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state });
+    this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, actionLog: this.actionLog });
   }
 
   private checkGameEnd(): void {
@@ -374,7 +375,7 @@ export class GameSession {
     }
 
     if (this.debug) {
-      this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state });
+      this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, actionLog: this.actionLog });
     } else {
       const playerName = this.playerNames.get(playerId);
       if (playerName) this.sendInitialViewTo(playerId, playerName);

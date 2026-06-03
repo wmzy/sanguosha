@@ -88,6 +88,7 @@ export interface GameBoardData {
   toggleAutoSkipWuxie: () => void;
   getDistance: (from: string, to: string) => number;
   pending: PendingAction | null;
+  playerOps: Operation[];
 }
 
 export function GameBoard({ data }: { data: GameBoardData }) {
@@ -247,7 +248,7 @@ export function GameBoard({ data }: { data: GameBoardData }) {
     );
   };
 
-  const playerOps: Operation[] = [];
+  const playerOps = data.playerOps;
 
   return (
     <div style={{ ...styles.page(16), display: 'flex', flexDirection: 'column' }}>

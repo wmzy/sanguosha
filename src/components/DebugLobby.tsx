@@ -12,6 +12,7 @@ import type { SelfView } from '../../engine/view/types';
 import type { GameState, GameAction, ValidAction, PlayerState, PromptOption, Json, ServerEvent } from '../../engine/types';
 import type { Card } from '../../shared/types';
 import { saveState } from '../utils/logFile';
+import { actionLogToOperations } from '../../engine/view/actionLog';
 import { colors, styles } from '../theme';
 import type { ServerMessage } from '../../server/protocol';
 
@@ -156,6 +157,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   const [playerCount, setPlayerCount] = useState(5);
   const [error, setError] = useState<string | null>(null);
   const [state, dispatch] = useReducer(debugReducer, null as GameState | null);
+  const [actionLog, setActionLog] = useState<GameAction[]>([]);
   const [perspective, setPerspective] = useState('');
   const [playerOrder, setPlayerOrder] = useState<string[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -190,12 +192,14 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
     const unsubscribe = onMessage((msg: ServerMessage) => {
       if (msg.type === 'debugGameState') {
         dispatch({ type: 'reset', state: msg.state });
+        setActionLog(msg.actionLog);
         if (!perspective && msg.state.currentPlayer) {
           setPerspective(msg.state.currentPlayer);
           setPlayerOrder(rotatePlayers(msg.state.playerOrder, msg.state.currentPlayer));
         }
       } else if (msg.type === 'events') {
         dispatch({ type: 'applyEvents', events: msg.events });
+        setActionLog(msg.actionLog);
       } else if (msg.type === 'room_joined') {
         storeSession(msg.roomId, msg.playerId);
         window.history.replaceState(null, '', `/debug/${msg.roomId}`);
@@ -456,6 +460,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
       },
       getDistance: (from: string, to: string) => getDistance(state, from, to),
       pending: state.pending,
+      playerOps: actionLogToOperations(actionLog, state),
     };
 
     return (

@@ -3,8 +3,8 @@ import type { PlayerView, FrontendState } from '../engine/view/types';
 
 export type ServerMessage =
   | { type: 'initialView'; state: FrontendState }
-  | { type: 'debugGameState'; state: GameState }
-  | { type: 'events'; events: PlayerEvent[] }
+  | { type: 'debugGameState'; state: GameState; actionLog: GameAction[] }
+  | { type: 'events'; events: PlayerEvent[]; actionLog: GameAction[] }
   | { type: 'error'; message: string }
   | { type: 'gameOver'; winner: string }
   | { type: 'room_joined'; roomId: string; playerId: string }
