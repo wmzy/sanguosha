@@ -3,7 +3,7 @@
 // 客户端把服务器推送的 events 序列应用到本地 FrontendState 上，得到最新视图。
 // 这是事件溯源风格：初始快照 + 事件流 = 当前状态。
 
-import type { PlayerEvent, PendingAction } from '../types';
+import type { GameState, PlayerEvent, ServerEvent, PendingAction, Json } from '../types';
 import type { FrontendState, PlayerView, Animation, CardInfo } from './types';
 import { clonePlayerView } from './buildView';
 
@@ -16,6 +16,14 @@ export function reduceFrontend(fe: FrontendState, events: PlayerEvent[]): Fronte
     applyEvent({ view, animationQueue, myPlayerId: fe.myPlayerId }, event);
   }
   return { view, myPlayerId: fe.myPlayerId, animationQueue };
+}
+
+export function reduceGameState(state: GameState, events: ServerEvent[]): GameState {
+  let next = state;
+  for (const event of events) {
+    next = applyGameStateEvent(next, event);
+  }
+  return next;
 }
 
 /** 把 events 序列转换为动画队列（不修改 FrontendState）。 */
@@ -336,4 +344,301 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     default:
       break;
   }
+}
+
+function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
+  const p = (event.payload ?? {}) as P;
+  switch (event.type) {
+    case 'damage': {
+      const target = p.target as string;
+      const amount = p.amount as number;
+      const player = state.players[target];
+      if (!player) return state;
+      return { ...state, players: { ...state.players, [target]: { ...player, health: player.health - amount } } };
+    }
+    case 'heal': {
+      const target = p.target as string;
+      const amount = p.amount as number;
+      const player = state.players[target];
+      if (!player) return state;
+      return { ...state, players: { ...state.players, [target]: { ...player, health: Math.min(player.health + amount, player.maxHealth) } } };
+    }
+    case 'draw': {
+      const player = p.player as string;
+      const count = p.count as number;
+      const cards = p.cards as string[] | undefined;
+      const pState = state.players[player];
+      if (!pState) return state;
+      const drawn = cards ?? state.zones.deck.slice(0, count);
+      const newDeck = cards
+        ? state.zones.deck.filter(id => !drawn.includes(id))
+        : state.zones.deck.slice(drawn.length);
+      return {
+        ...state,
+        zones: { ...state.zones, deck: newDeck },
+        players: { ...state.players, [player]: { ...pState, hand: [...pState.hand, ...drawn] } },
+      };
+    }
+    case 'discard':
+    case 'cardsDiscarded':
+    case 'cardDiscarded': {
+      const player = p.player as string;
+      const cardIds = p.cardIds as string[] | undefined;
+      const count = p.count as number | undefined;
+      const pState = state.players[player];
+      if (!pState) return state;
+      if (cardIds) {
+        const set = new Set(cardIds);
+        return { ...state, players: { ...state.players, [player]: { ...pState, hand: pState.hand.filter(id => !set.has(id)) } }, zones: { ...state.zones, discardPile: [...state.zones.discardPile, ...cardIds] } };
+      }
+      if (count != null) {
+        const removed = pState.hand.slice(0, count);
+        return { ...state, players: { ...state.players, [player]: { ...pState, hand: pState.hand.slice(count) } }, zones: { ...state.zones, discardPile: [...state.zones.discardPile, ...removed] } };
+      }
+      return state;
+    }
+    case 'moveCard':
+    case 'cardMoved': {
+      const cardId = p.cardId as string;
+      const from = p.from as P | undefined;
+      const to = p.to as P | undefined;
+      if (!from || !to) return state;
+      return moveCardInState(state, cardId, from, to);
+    }
+    case 'equip': {
+      const player = p.player as string;
+      const cardId = p.cardId as string;
+      const slot = (p.slot ?? inferEquipSlot(state, cardId)) as keyof GameState['players'][string]['equipment'] | undefined;
+      const pState = state.players[player];
+      if (!pState || !slot) return state;
+      const newHand = pState.hand.filter(id => id !== cardId);
+      return { ...state, players: { ...state.players, [player]: { ...pState, hand: newHand, equipment: { ...pState.equipment, [slot]: cardId } } } };
+    }
+    case 'unequip': {
+      const player = p.player as string;
+      const slot = p.slot as keyof GameState['players'][string]['equipment'];
+      const pState = state.players[player];
+      if (!pState) return state;
+      const cardId = pState.equipment[slot];
+      return {
+        ...state,
+        players: {
+          ...state.players,
+          [player]: {
+            ...pState,
+            equipment: { ...pState.equipment, [slot]: undefined },
+            hand: cardId ? [...pState.hand, cardId] : pState.hand,
+          },
+        },
+      };
+    }
+    case 'setVar': {
+      const player = p.player as string;
+      const key = p.key as string;
+      const value = p.value as Json;
+      const pState = state.players[player];
+      if (!pState) return state;
+      return { ...state, players: { ...state.players, [player]: { ...pState, vars: { ...pState.vars, [key]: value } } } };
+    }
+    case 'incrementVar': {
+      const player = p.player as string;
+      const key = p.key as string;
+      const delta = p.delta as number;
+      const pState = state.players[player];
+      if (!pState) return state;
+      const current = (pState.vars[key] as number) ?? 0;
+      return { ...state, players: { ...state.players, [player]: { ...pState, vars: { ...pState.vars, [key]: current + delta } } } };
+    }
+    case 'clearVarPattern': {
+      const player = p.player as string;
+      const pattern = p.pattern as string;
+      const pState = state.players[player];
+      if (!pState) return state;
+      try {
+        const re = new RegExp(pattern);
+        const newVars = Object.fromEntries(Object.entries(pState.vars).filter(([k]) => !re.test(k)));
+        return { ...state, players: { ...state.players, [player]: { ...pState, vars: newVars } } };
+      } catch {
+        return state;
+      }
+    }
+    case 'pushPending': {
+      return { ...state, pending: event.payload as unknown as PendingAction };
+    }
+    case 'popPending': {
+      return { ...state, pending: null };
+    }
+    case 'setPhase': {
+      const phase = p.phase as GameState['phase'];
+      return { ...state, phase };
+    }
+    case 'nextPlayer': {
+      const to = (p.to ?? p.player) as string;
+      const round = p.round as number | undefined;
+      return {
+        ...state,
+        currentPlayer: to,
+        turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], phaseFlags: [] },
+        meta: {
+          ...state.meta,
+          turnNumber: state.meta.turnNumber + 1,
+          ...(round != null ? { round } : {}),
+        },
+      };
+    }
+    case 'judge': {
+      if (state.zones.deck.length === 0) return state;
+      const cardId = state.zones.deck[state.zones.deck.length - 1];
+      return {
+        ...state,
+        zones: {
+          ...state.zones,
+          deck: state.zones.deck.slice(0, -1),
+          discardPile: [...state.zones.discardPile, cardId],
+        },
+      };
+    }
+    case 'addPendingTrick': {
+      const player = p.player as string;
+      const trick = p.trick as GameState['players'][string]['pendingTricks'][number];
+      const pState = state.players[player];
+      if (!pState) return state;
+      return { ...state, players: { ...state.players, [player]: { ...pState, pendingTricks: [...pState.pendingTricks, trick] } } };
+    }
+    case 'removePendingTrick': {
+      const player = p.player as string;
+      const index = p.index as number;
+      const pState = state.players[player];
+      if (!pState) return state;
+      if (index < 0 || index >= pState.pendingTricks.length) return state;
+      const removed = pState.pendingTricks[index];
+      return {
+        ...state,
+        players: { ...state.players, [player]: { ...pState, pendingTricks: pState.pendingTricks.filter((_, i) => i !== index) } },
+        zones: { ...state.zones, discardPile: removed ? [...state.zones.discardPile, removed.card.id] : state.zones.discardPile },
+      };
+    }
+    case 'addTag': {
+      const player = p.player as string;
+      const tag = p.tag as string;
+      const pState = state.players[player];
+      if (!pState || pState.tags.includes(tag)) return state;
+      return { ...state, players: { ...state.players, [player]: { ...pState, tags: [...pState.tags, tag] } } };
+    }
+    case 'removeTag': {
+      const player = p.player as string;
+      const tag = p.tag as string;
+      const pState = state.players[player];
+      if (!pState) return state;
+      return { ...state, players: { ...state.players, [player]: { ...pState, tags: pState.tags.filter(t => t !== tag) } } };
+    }
+    case 'kill': {
+      const player = p.player as string;
+      const pState = state.players[player];
+      if (!pState) return state;
+      return { ...state, players: { ...state.players, [player]: { ...pState, info: { ...pState.info, alive: false } } } };
+    }
+    case 'gainCard':
+    case 'cardGained': {
+      const player = p.player as string;
+      const cardId = (p.cardId ?? (p.card as P | undefined)?.id) as string | undefined;
+      const pState = state.players[player];
+      if (!pState || !cardId) return state;
+      return { ...state, players: { ...state.players, [player]: { ...pState, hand: [...pState.hand, cardId] } } };
+    }
+    case 'incrementKills': {
+      return { ...state, turn: { ...state.turn, killsPlayed: state.turn.killsPlayed + 1 } };
+    }
+    case 'rearrangeDeck': {
+      const topCardIds = p.topCardIds as string[] | undefined;
+      const bottomCardIds = p.bottomCardIds as string[] | undefined;
+      const newDeck = [...(topCardIds ?? state.zones.deck), ...(bottomCardIds ?? [])];
+      return { ...state, zones: { ...state.zones, deck: newDeck } };
+    }
+    case 'turnStart': {
+      const player = p.player as string;
+      return { ...state, currentPlayer: player, turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], phaseFlags: [] } };
+    }
+    default:
+      return state;
+  }
+}
+
+interface ZoneRef {
+  zone: 'hand' | 'deck' | 'discardPile' | 'equipment' | 'pendingTricks';
+  player?: string;
+  index?: number;
+  slot?: keyof GameState['players'][string]['equipment'];
+}
+
+function moveCardInState(state: GameState, cardId: string, from: P, to: P): GameState {
+  const fromRef = from as unknown as ZoneRef;
+  const toRef = to as unknown as ZoneRef;
+  let stateAfterRemove = removeFromZone(state, cardId, fromRef);
+  let stateAfterAdd = addToZone(stateAfterRemove, cardId, toRef);
+  return stateAfterAdd;
+}
+
+function removeFromZone(state: GameState, cardId: string, ref: ZoneRef): GameState {
+  if (ref.zone === 'hand' && ref.player) {
+    const p = state.players[ref.player];
+    if (!p) return state;
+    return { ...state, players: { ...state.players, [ref.player]: { ...p, hand: p.hand.filter(id => id !== cardId) } } };
+  }
+  if (ref.zone === 'equipment' && ref.player && ref.slot) {
+    const p = state.players[ref.player];
+    if (!p) return state;
+    return { ...state, players: { ...state.players, [ref.player]: { ...p, equipment: { ...p.equipment, [ref.slot]: undefined } } } };
+  }
+  if (ref.zone === 'deck') {
+    return { ...state, zones: { ...state.zones, deck: state.zones.deck.filter(id => id !== cardId) } };
+  }
+  if (ref.zone === 'discardPile') {
+    return { ...state, zones: { ...state.zones, discardPile: state.zones.discardPile.filter(id => id !== cardId) } };
+  }
+  if (ref.zone === 'pendingTricks' && ref.player && ref.index != null) {
+    const p = state.players[ref.player];
+    if (!p) return state;
+    return { ...state, players: { ...state.players, [ref.player]: { ...p, pendingTricks: p.pendingTricks.filter((_, i) => i !== ref.index) } } };
+  }
+  return state;
+}
+
+function addToZone(state: GameState, cardId: string, ref: ZoneRef): GameState {
+  if (ref.zone === 'hand' && ref.player) {
+    const p = state.players[ref.player];
+    if (!p) return state;
+    return { ...state, players: { ...state.players, [ref.player]: { ...p, hand: [...p.hand, cardId] } } };
+  }
+  if (ref.zone === 'equipment' && ref.player && ref.slot) {
+    const p = state.players[ref.player];
+    if (!p) return state;
+    return { ...state, players: { ...state.players, [ref.player]: { ...p, equipment: { ...p.equipment, [ref.slot]: cardId } } } };
+  }
+  if (ref.zone === 'deck') {
+    return { ...state, zones: { ...state.zones, deck: [...state.zones.deck, cardId] } };
+  }
+  if (ref.zone === 'discardPile') {
+    return { ...state, zones: { ...state.zones, discardPile: [...state.zones.discardPile, cardId] } };
+  }
+  if (ref.zone === 'pendingTricks' && ref.player) {
+    const p = state.players[ref.player];
+    if (!p) return state;
+    const card = state.cardMap[cardId];
+    if (!card) return state;
+    const trick = { name: card.name, source: '', card };
+    return { ...state, players: { ...state.players, [ref.player]: { ...p, pendingTricks: [...p.pendingTricks, trick] } } };
+  }
+  return state;
+}
+
+function inferEquipSlot(state: GameState, cardId: string): keyof GameState['players'][string]['equipment'] | undefined {
+  const card = state.cardMap[cardId];
+  if (!card) return undefined;
+  const name = card.name;
+  if (['诸葛连弩', '雌雄双股剑', '贯石斧', '青龙偃月刀', '丈八蛇矛', '古锭刀', '麒麟弓'].includes(name)) return 'weapon';
+  if (['八卦阵', '仁王盾', '藤甲', '白银狮子', '寒冰甲'].includes(name)) return 'armor';
+  if (name === '的卢' || name === '绝影') return 'horsePlus';
+  if (name === '爪黄飞电' || name === '大宛') return 'horseMinus';
+  return undefined;
 }

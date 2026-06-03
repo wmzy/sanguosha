@@ -61,7 +61,8 @@ export function register() {
     },
     toEvents(state: GameState, atom: Atom & { type: 'judge' }): AtomEventResult {
       const player = atom.player as string;
-      const { cardId, suit, rank, result } = drawJudgeCard(state);
+      const s = ensureDeckHasCards(state);
+      const { cardId, suit, rank, result } = drawJudgeCard(s);
       const payload = { player, cardId, result, suit, rank };
       const server = makeServerEvent('judge', payload);
       return [server, new Map(), makePlayerEvent('judge', payload)];

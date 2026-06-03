@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useReducer, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { GameBoard } from './GameBoard';
@@ -7,11 +7,13 @@ import { computeValidActions } from '../../engine/validate';
 import { getDistance } from '../../engine/distance';
 import { getPlayer } from '../../engine/state';
 import { buildPlayerView } from '../../engine/view/buildView';
+import { reduceGameState } from '../../engine/view/reducer';
 import type { SelfView } from '../../engine/view/types';
-import type { GameState, GameAction, ValidAction, PlayerState, PromptOption, Json } from '../../engine/types';
+import type { GameState, GameAction, ValidAction, PlayerState, PromptOption, Json, ServerEvent } from '../../engine/types';
 import type { Card } from '../../shared/types';
 import { saveState } from '../utils/logFile';
 import { colors, styles } from '../theme';
+import type { ServerMessage } from '../../server/protocol';
 
 function rotatePlayers(names: string[], startName: string): string[] {
   const idx = names.indexOf(startName);
@@ -129,21 +131,38 @@ function clearSession() {
   sessionStorage.removeItem(STORAGE_KEY);
 }
 
+type DebugAction =
+  | { type: 'reset'; state: GameState }
+  | { type: 'applyEvents'; events: ServerEvent[] };
+
+function debugReducer(state: GameState | null, action: DebugAction): GameState | null {
+  if (action.type === 'reset') {
+    return action.state;
+  }
+  if (action.type === 'applyEvents') {
+    if (!state) return state;
+    if (action.events.length === 0) return state;
+    return reduceGameState(state, action.events);
+  }
+  return state;
+}
+
 export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) {
   const navigate = useNavigate();
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = useMemo(() => `${wsProtocol}//${window.location.host}/ws`, [wsProtocol]);
-  const { connected, messages, drainMessages, send, connect } = useWebSocket(wsUrl);
+  const { connected, send, onMessage, connect } = useWebSocket(wsUrl);
 
   const [playerCount, setPlayerCount] = useState(5);
   const [error, setError] = useState<string | null>(null);
-  const [state, setState] = useState<GameState | null>(null);
+  const [state, dispatch] = useReducer(debugReducer, null as GameState | null);
   const [perspective, setPerspective] = useState('');
   const [playerOrder, setPlayerOrder] = useState<string[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
   const hasRequestedRef = useRef(false);
+  const stateRef = useRef<GameState | null>(null);
   const [selectedSkillCards, setSelectedSkillCards] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -164,21 +183,24 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   }, [connected, initialRoomId, send]);
 
   useEffect(() => {
-    if (messages.length === 0) return;
-    for (const msg of messages) {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    const unsubscribe = onMessage((msg: ServerMessage) => {
       if (msg.type === 'debugGameState') {
-        setState(msg.state);
+        dispatch({ type: 'reset', state: msg.state });
         if (!perspective && msg.state.currentPlayer) {
           setPerspective(msg.state.currentPlayer);
           setPlayerOrder(rotatePlayers(msg.state.playerOrder, msg.state.currentPlayer));
         }
-      }
-      if (msg.type === 'room_joined') {
+      } else if (msg.type === 'events') {
+        dispatch({ type: 'applyEvents', events: msg.events });
+      } else if (msg.type === 'room_joined') {
         storeSession(msg.roomId, msg.playerId);
         window.history.replaceState(null, '', `/debug/${msg.roomId}`);
-      }
-      if (msg.type === 'error') {
-        if (initialRoomId && !state) {
+      } else if (msg.type === 'error') {
+        if (initialRoomId && !stateRef.current) {
           clearSession();
           navigate('/debug', { replace: true });
         } else {
@@ -186,11 +208,10 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
           setTimeout(() => setError(null), 3000);
         }
       }
-    }
-    drainMessages();
-  }, [messages, perspective, drainMessages, navigate, initialRoomId, state, playerCount, send]);
+    });
+    return unsubscribe;
+  }, [onMessage, perspective, initialRoomId, navigate]);
 
-  // ── 自动切换到需要操作的玩家 ──────────────────────────────
   useEffect(() => {
     if (!state) return;
     const active = _getSingleActivePlayer(state);
@@ -198,7 +219,6 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
       setPerspective(active);
       setPlayerOrder(rotatePlayers(state.playerOrder, active));
     }
-    // 故意不包含 perspective：只在 state 变化时触发，手动切换视角不会触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
@@ -225,7 +245,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   const handleDeleteRoom = useCallback(() => {
     send({ type: 'delete_room' });
     clearSession();
-    setState(null);
+    navigate('/');
     setPerspective('');
     setPlayerOrder([]);
     setSelectedCardId(null);

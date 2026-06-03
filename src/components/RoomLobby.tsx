@@ -11,7 +11,7 @@ interface RoomLobbyProps {
 export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-  const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);
+  const { connected, onMessage, send, connect } = useWebSocket(wsUrl);
 
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [roomName, setRoomName] = useState('');
@@ -35,43 +35,41 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
     }
   }, [connected, send]);
 
-  // 处理消息
   useEffect(() => {
-    if (!lastMessage) return;
+    const unsubscribe = onMessage((message) => {
+      switch (message.type) {
+        case 'room_list':
+          setRooms(message.rooms);
+          break;
 
-    const message = lastMessage;
+        case 'room_joined':
+          setCurrentRoom(message.roomId);
+          setPlayerId(message.playerId);
+          setIsHost(rooms.length === 0 || rooms.find(r => r.id === message.roomId)?.playerCount === 1);
+          break;
 
-    switch (message.type) {
-      case 'room_list':
-        setRooms(message.rooms);
-        break;
+        case 'player_joined':
+          setPlayersInRoom(prev => [...prev, message.playerId]);
+          break;
 
-      case 'room_joined':
-        setCurrentRoom(message.roomId);
-        setPlayerId(message.playerId);
-        setIsHost(rooms.length === 0 || rooms.find(r => r.id === message.roomId)?.playerCount === 1);
-        break;
+        case 'player_left':
+          setPlayersInRoom(prev => prev.filter(id => id !== message.playerId));
+          break;
 
-      case 'player_joined':
-        setPlayersInRoom(prev => [...prev, message.playerId]);
-        break;
+        case 'game_started':
+          if (currentRoom && playerId) {
+            onJoinRoom(currentRoom, playerId);
+          }
+          break;
 
-      case 'player_left':
-        setPlayersInRoom(prev => prev.filter(id => id !== message.playerId));
-        break;
-
-      case 'game_started':
-        if (currentRoom && playerId) {
-          onJoinRoom(currentRoom, playerId);
-        }
-        break;
-
-      case 'error':
-        setError(message.message);
-        setTimeout(() => setError(null), 3000);
-        break;
-    }
-  }, [lastMessage, currentRoom, playerId, onJoinRoom, rooms]);
+        case 'error':
+          setError(message.message);
+          setTimeout(() => setError(null), 3000);
+          break;
+      }
+    });
+    return unsubscribe;
+  }, [onMessage, currentRoom, playerId, onJoinRoom, rooms]);
 
   const handleCreateRoom = useCallback(async () => {
     if (!roomName.trim()) {

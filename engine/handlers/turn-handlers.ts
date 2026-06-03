@@ -107,13 +107,8 @@ export function resolveDiscardPhase(
   ];
   const result = applyAtoms(state, discardAtoms);
 
-  const discardEvent = makeServerEvent('cardDiscarded', {
-    player: action.player,
-    cardIds: action.cardIds,
-  });
-  // turnStart GameEvent + ServerEvent 由 advanceToInteractivePhase 统一发射
   return {
     state: result.state,
-    events: [...result.events, discardEvent],
+    events: result.events,
   };
 }

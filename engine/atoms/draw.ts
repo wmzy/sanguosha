@@ -45,7 +45,8 @@ export function register() {
     toEvents(state: GameState, atom: Atom & { type: 'draw' }): AtomEventResult {
       const player = atom.player as string;
       const count = atom.count as number;
-      const drawn = state.zones.deck.slice(0, count);
+      const s = reshuffleIfNeeded(state, count);
+      const drawn = s.zones.deck.slice(0, count);
       const actualCount = drawn.length;
       const server = makeServerEvent('draw', { player, count: actualCount, cards: drawn });
       const ownerEvent = makePlayerEvent('draw', { player, count: actualCount, cards: drawn });

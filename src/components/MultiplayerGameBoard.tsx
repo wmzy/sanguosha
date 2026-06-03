@@ -19,7 +19,7 @@ interface MultiplayerGameBoardProps {
 export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardProps) {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-  const { connected, lastMessage, send, connect } = useWebSocket(wsUrl);
+  const { connected, send, onMessage, connect } = useWebSocket(wsUrl);
 
   const [feState, setFeState] = useState<FrontendState | null>(null);
   const [log, setLog] = useState<string[]>(['等待游戏开始...']);
@@ -37,40 +37,41 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
   }, [connected, roomId, send]);
 
   useEffect(() => {
-    if (!lastMessage) return;
-    const message = lastMessage;
-    switch (message.type) {
-      case 'initialView':
-        setFeState(message.state);
-        break;
-      case 'events':
-        setFeState(prev => (prev ? reduceFrontend(prev, message.events) : prev));
-        break;
-      case 'gameOver':
-        setGameOver({ winner: message.winner });
-        setLog(prev => [...prev, `游戏结束！${message.winner} 获胜！`]);
-        break;
-      case 'error':
-        setError(message.message);
-        setTimeout(() => setError(null), 3000);
-        break;
-      case 'player_joined':
-        setLog(prev => [...prev, `玩家 ${message.playerId} 加入`]);
-        break;
-      case 'player_left':
-        setLog(prev => [...prev, `玩家 ${message.playerId} 离开`]);
-        break;
-      case 'player_disconnected':
-        setLog(prev => [...prev, `玩家 ${message.playerId} 断线（${Math.round(message.graceMs / 1000)}s 宽限期）`]);
-        break;
-      case 'player_reconnected':
-        setLog(prev => [...prev, `玩家 ${message.playerId} 重连`]);
-        break;
-      case 'game_started':
-        setLog(prev => [...prev, '游戏开始！']);
-        break;
-    }
-  }, [lastMessage]);
+    const unsubscribe = onMessage((message) => {
+      switch (message.type) {
+        case 'initialView':
+          setFeState(message.state);
+          break;
+        case 'events':
+          setFeState(prev => (prev ? reduceFrontend(prev, message.events) : prev));
+          break;
+        case 'gameOver':
+          setGameOver({ winner: message.winner });
+          setLog(prev => [...prev, `游戏结束！${message.winner} 获胜！`]);
+          break;
+        case 'error':
+          setError(message.message);
+          setTimeout(() => setError(null), 3000);
+          break;
+        case 'player_joined':
+          setLog(prev => [...prev, `玩家 ${message.playerId} 加入`]);
+          break;
+        case 'player_left':
+          setLog(prev => [...prev, `玩家 ${message.playerId} 离开`]);
+          break;
+        case 'player_disconnected':
+          setLog(prev => [...prev, `玩家 ${message.playerId} 断线（${Math.round(message.graceMs / 1000)}s 宽限期）`]);
+          break;
+        case 'player_reconnected':
+          setLog(prev => [...prev, `玩家 ${message.playerId} 重连`]);
+          break;
+        case 'game_started':
+          setLog(prev => [...prev, '游戏开始！']);
+          break;
+      }
+    });
+    return unsubscribe;
+  }, [onMessage]);
 
   const handleLeave = useCallback(() => {
     send({ type: 'leave_room' });
