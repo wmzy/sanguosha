@@ -8,17 +8,18 @@ import { emitEvent } from '../skill';
 
 type AtomsPhase = Extract<SkillPhase, { type: 'atoms' }>;
 
-function resolveExprFields<A extends Atom>(atom: A, state: GameState, ctx: SkillContext): A {
-  const result = { ...atom } as Record<string, unknown>;
-  for (const key of Object.keys(result)) {
-    if (key !== 'type') {
-      const value = result[key];
-      if (isExpr(value)) {
-        result[key] = resolve(value, state, ctx);
-      }
+function resolveExprFields<A>(obj: A, state: GameState, ctx: SkillContext): A {
+  if (obj === null || obj === undefined) return obj;
+  if (isExpr(obj)) return resolve(obj as unknown as Parameters<typeof resolve>[0], state, ctx) as A;
+  if (Array.isArray(obj)) return obj.map(item => resolveExprFields(item, state, ctx)) as A;
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(obj as Record<string, unknown>)) {
+      result[key] = resolveExprFields((obj as Record<string, unknown>)[key], state, ctx);
     }
+    return result as A;
   }
-  return result as A;
+  return obj;
 }
 
 export function register() {

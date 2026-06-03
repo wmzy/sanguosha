@@ -25,6 +25,10 @@ export function resolveKillResponse(
 
   // ── 出闪 → 闪避 ──
   if (action.cardId) {
+    const defenderState = getPlayer(state, defender);
+    if (defenderState.tags.includes('cannotDodge')) {
+      return { state, events: [], error: '铁骑判定生效，不能使用闪' };
+    }
     const responder = getPlayer(state, defender);
     if (!responder.hand.includes(action.cardId)) {
       return { state, events: [], error: '手牌中没有该卡牌' };

@@ -58,6 +58,16 @@ function canKillUnlimited(state: GameState, playerName: string): boolean {
   return hasUnlimitedKills(state, playerName) || characterHasUnlimitedKills(state, playerName);
 }
 
+function targetHasSkill(state: GameState, target: string, skillId: string): boolean {
+  return state.triggers.some(t => t.player === target && t.skillId === skillId);
+}
+
+function hasEmptyCityShield(state: GameState, target: string): boolean {
+  const targetPlayer = getPlayer(state, target);
+  if (targetPlayer.hand.length > 0) return false;
+  return targetHasSkill(state, target, '空城');
+}
+
 // ─── 技能卡牌转换 ─────────────────────────────────────────────
 
 /** 返回玩家可通过技能转换为 targetType 的手牌 ID（倾国/龙胆/武圣等） */
@@ -106,6 +116,30 @@ function canCardBeConvertedBySkill(
       if (skillId === '武圣' && isRed) return true;
       if (skillId === '龙胆' && card.name === '闪') return true;
     }
+  }
+  return false;
+}
+
+function canCardBeConvertedToPeach(
+  state: GameState,
+  player: string,
+  cardId: string,
+): boolean {
+  const card = state.cardMap[cardId];
+  if (!card) return false;
+  if (card.name === '桃') return false;
+  const isRed = card.suit === '♥' || card.suit === '♦';
+  if (!isRed) return false;
+
+  for (const trigger of state.triggers) {
+    if (trigger.player !== player || trigger.source !== 'character') continue;
+    let skillId: string;
+    try {
+      skillId = getSkill(trigger.skillId).id;
+    } catch {
+      continue;
+    }
+    if (skillId === '急救') return true;
   }
   return false;
 }
@@ -172,6 +206,7 @@ function validatePlayCard(
     }
     const targetPlayer = getPlayer(state, action.target);
     if (!targetPlayer.info.alive) return '目标已阵亡';
+    if (hasEmptyCityShield(state, action.target)) return '目标空城，不能成为杀的目标';
   }
 
   if (card.name === '桃' && player.health >= player.maxHealth) {
@@ -207,6 +242,7 @@ function validateTrickTarget(
       if (!action.target) return '需要指定目标';
       if (action.target === action.player) return '不能对自己使用';
       if (!getPlayer(state, action.target).info.alive) return '目标已阵亡';
+      if (card.name === '决斗' && hasEmptyCityShield(state, action.target)) return '目标空城，不能成为决斗的目标';
       break;
     case 'inRange':
       if (!action.target) return '需要指定目标';
@@ -344,6 +380,9 @@ function validateResponseWindow(
 
   switch (pending.window.type) {
     case 'killResponse':
+      if (getPlayer(state, action.player).tags.includes('cannotDodge')) {
+        return '铁骑判定生效，不能使用闪';
+      }
       if (!isCardValidResponse(state, action.cardId, 'killResponse', action.player)) {
         return '只能用闪响应杀';
       }
@@ -427,8 +466,9 @@ function validateDyingWindow(
   if (action.cardId) {
     const saverState = getPlayer(state, currentSaver);
     if (!saverState.hand.includes(action.cardId)) return '手牌中没有该卡牌';
-    const card = state.cardMap[action.cardId];
-    if (card.name !== '桃') return '只能用桃救人';
+    if (!isCardValidResponse(state, action.cardId, 'dyingResponse', currentSaver)) {
+      return '只能用桃（或急救红色手牌）救人';
+    }
   }
 
   return null;
@@ -584,7 +624,9 @@ export function isCardValidResponse(
       }
       return card.name === '闪' || card.name === '杀';
     }
-    case 'dyingResponse': return card.name === '桃';
+    case 'dyingResponse':
+      if (card.name === '桃') return true;
+      return player ? canCardBeConvertedToPeach(state, player, cardId) : false;
     case 'duelResponse':
       if (card.name === '杀') return true;
       return player ? canCardBeConvertedBySkill(state, player, cardId, '杀') : false;
@@ -645,7 +687,7 @@ function computeDyingWindowActions(
 
   const saverState = getPlayer(state, player);
   const peachCards = saverState.hand.filter(
-    (id) => state.cardMap[id]?.name === '桃',
+    (id) => isCardValidResponse(state, id, 'dyingResponse', player),
   );
 
   return [{
@@ -853,8 +895,8 @@ export function isValidTarget(state: GameState, player: string, cardId: string, 
 
   switch (card.name) {
     case '杀':
-      // 杀：不能对自己，距离检查
       if (target === player) return false;
+      if (hasEmptyCityShield(state, target)) return false;
       return isInAttackRange(state, player, target);
 
     case '桃':
@@ -879,6 +921,10 @@ export function isValidTarget(state: GameState, player: string, cardId: string, 
 }
 
 function isValidTrickTarget(state: GameState, player: string, card: Card, target: string): boolean {
+  if ((card.name === '过河拆桥' || card.name === '顺手牵羊') && targetHasSkill(state, target, '谦逊')) {
+    return false;
+  }
+
   const def = cardDefMap.get(card.name);
   if (!def?.targetFilter) return target !== player;
 
@@ -890,7 +936,9 @@ function isValidTrickTarget(state: GameState, player: string, card: Card, target
     case 'self':
       return target === player;
     case 'other':
-      return target !== player && getPlayer(state, target).info.alive;
+      if (target === player || !getPlayer(state, target).info.alive) return false;
+      if (card.name === '决斗' && hasEmptyCityShield(state, target)) return false;
+      return true;
     case 'inRange':
       if (noDistanceLimit) {
         return target !== player && getPlayer(state, target).info.alive;

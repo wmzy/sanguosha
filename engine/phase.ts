@@ -23,6 +23,7 @@ export function executePlan(
 ): EngineResult {
   let s = state;
   const events: ServerEvent[] = [];
+  const hadPendingOnEntry = s.pending !== null;
 
   for (let i = resumeFrom ?? 0; i < phases.length; i++) {
     const phase = phases[i];
@@ -30,7 +31,8 @@ export function executePlan(
     const result = def.execute(s, phase, ctx, phases, i);
     s = result.state;
     events.push(...result.events);
-    if (s.pending !== null) {
+    // Only break if a NEW pending was created during execution
+    if (!hadPendingOnEntry && s.pending !== null) {
       return { state: s, events };
     }
   }

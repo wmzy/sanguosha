@@ -3,6 +3,7 @@ import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
 import { startAoeTargetWuxie } from './response-handlers';
+import { isCardValidResponse } from '../validate';
 
 export function resolveDying(
   state: GameState,
@@ -24,9 +25,8 @@ export function resolveDying(
     if (!saverState.hand.includes(action.cardId)) {
       return { state, events: [], error: '手牌中没有该卡牌' };
     }
-    const card = state.cardMap[action.cardId];
-    if (card.name !== '桃') {
-      return { state, events: [], error: '只能出桃救人' };
+    if (!isCardValidResponse(state, action.cardId, 'dyingResponse', currentSaver)) {
+      return { state, events: [], error: '只能用桃（或急救红色手牌）救人' };
     }
 
     const healAtoms: Atom[] = [
