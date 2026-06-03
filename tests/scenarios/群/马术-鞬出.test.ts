@@ -1,0 +1,44 @@
+import { describe, expect } from 'vitest';
+import { scenario } from '../../scenario-runner';
+import { getDistance } from '../../../engine/distance';
+
+describe('庞德 - 马术', () => {
+  scenario('马术锁定技使距离-1')
+    .setup(ctx => {
+      ctx.selectCharacters('庞德', '曹操', '刘备', '孙权');
+      ctx.registerTriggers('P1');
+    })
+    .act('触发 turnStart 设置 distanceBonus', ctx => {
+      ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+    })
+    .check('庞德的 distanceBonus 被设为 -1', ctx => {
+      expect(ctx.player('P1').vars['distanceBonus']).toBe(-1);
+    })
+    .check('庞德到 P2 的距离减 1', ctx => {
+      const dist = getDistance(ctx.state, 'P1', 'P2');
+      expect(dist).toBeLessThanOrEqual(1);
+    })
+    .run();
+});
+
+describe('庞德 - 鞬出', () => {
+  scenario('使用杀指定目标后可弃置目标一张牌')
+    .setup(ctx => {
+      ctx.selectCharacters('庞德', '曹操');
+      ctx.giveCard('P1', '杀');
+      ctx.giveCard('P2', '闪');
+      ctx.giveCard('P2', '桃');
+      ctx.setCurrentPlayer('P1');
+      ctx.enterPlayPhase();
+      ctx.snapshot('initial');
+    })
+    .act('P1 对 P2 使用杀', ctx => {
+      const killId = ctx.findCard('P1', '杀')!;
+      ctx.playCard('P1', killId, 'P2');
+    })
+    .check('杀触发鞬出的 skillPrompt', ctx => {
+      expect(ctx.state.pending).not.toBeNull();
+      expect(ctx.state.pending?.type).toBe('skillPrompt');
+    })
+    .run();
+});
