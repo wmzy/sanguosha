@@ -98,36 +98,36 @@ describe('角色配置', () => {
   });
 
   describe('按势力分类', () => {
-    it('魏国应有7个角色', () => {
-      expect(weiCharacters.length).toBe(7);
+    it('魏国应有15个角色', () => {
+      expect(weiCharacters.length).toBe(15);
       for (const character of weiCharacters) {
         expect(character.faction).toBe('魏');
       }
     });
 
-    it('蜀国应有7个角色', () => {
-      expect(shuCharacters.length).toBe(7);
+    it('蜀国应有15个角色', () => {
+      expect(shuCharacters.length).toBe(15);
       for (const character of shuCharacters) {
         expect(character.faction).toBe('蜀');
       }
     });
 
-    it('吴国应有8个角色', () => {
-      expect(wuCharacters.length).toBe(8);
+    it('吴国应有15个角色', () => {
+      expect(wuCharacters.length).toBe(15);
       for (const character of wuCharacters) {
         expect(character.faction).toBe('吴');
       }
     });
 
-    it('群雄应有3个角色', () => {
-      expect(qunCharacters.length).toBe(3);
+    it('群雄应有12个角色', () => {
+      expect(qunCharacters.length).toBe(12);
       for (const character of qunCharacters) {
         expect(character.faction).toBe('群');
       }
     });
 
-    it('总共应有25个角色', () => {
-      expect(allCharacters.length).toBe(25);
+    it('总共应有57个角色', () => {
+      expect(allCharacters.length).toBe(57);
     });
   });
 });
