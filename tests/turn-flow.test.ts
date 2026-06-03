@@ -71,6 +71,25 @@ describe('V2 Engine - 回合流程', () => {
       });
       expect(r2.error).toContain('需要弃');
     });
+
+    it('弃牌阶段 timeout 自动弃牌', () => {
+      let state = setPlayPhase(createTestGame());
+      state = setHealth(state, 'P1', 2);
+
+      const r1 = engine(state, { type: 'endTurn', player: 'P1' });
+      expect(r1.state.pending?.type).toBe('discardPhase');
+      const pending = r1.state.pending as { onTimeout: { type: string; cardIds: string[]; player: string } };
+      const onTimeout = pending.onTimeout;
+      expect(onTimeout.type).toBe('discard');
+      expect(onTimeout.cardIds).toHaveLength(2);
+
+      const r2 = engine(r1.state, { type: 'discard', player: onTimeout.player, cardIds: onTimeout.cardIds });
+      expect(r2.error).toBeUndefined();
+      expect(r2.state.pending?.type).toBe('playPhase');
+      expect(r2.state.currentPlayer).toBe('P2');
+      expect(r2.state.players['P1'].hand).toHaveLength(2);
+      expect(r2.state.zones.discardPile).toHaveLength(2);
+    });
   });
 
   describe('回合切换', () => {
