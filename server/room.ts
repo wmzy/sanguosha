@@ -135,15 +135,22 @@ export function getRoom(roomId: string): Room | null {
   return roomList.get(roomId) ?? null;
 }
 
-export function getRoomList(): RoomInfo[] {
+export function deleteRoom(roomId: string): boolean {
+  return roomList.delete(roomId);
+}
+
+export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
   const result: RoomInfo[] = [];
   for (const room of roomList.values()) {
+    if (type === 'debug' && !room.isDebug) continue;
+    if (type === 'multiplayer' && room.isDebug) continue;
     result.push({
       id: room.id,
       name: room.name,
       playerCount: room.players.size,
       maxPlayers: room.maxPlayers,
       status: room.status,
+      isDebug: room.isDebug === true,
     });
   }
   return result;

@@ -52,6 +52,7 @@ export class GameSession {
   private lastActivityAt = Date.now();
   private roomName: string;
   private maxPlayers: number;
+  private destroyed = false;
   pendingPlayerCount?: number;
 
   constructor(room: Room, debug = false, sessionSeed?: number) {
@@ -71,6 +72,7 @@ export class GameSession {
   }
 
   startGame(playerCount?: number): boolean {
+    if (this.destroyed) return false;
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (!this.debug && count < 2) return false;
     if (this.debug && count < 2) return false;
@@ -131,6 +133,7 @@ export class GameSession {
   }
 
   handleAction(playerId: string, action: GameAction): void {
+    if (this.destroyed) return;
     if (!this.state) {
       this.sendToPlayer(playerId, { type: 'error', message: '游戏未开始' });
       return;
@@ -236,6 +239,7 @@ export class GameSession {
   }
 
   private checkTimeout(): void {
+    if (this.destroyed) return;
     this.timeoutTimer = null;
     if (!this.state?.pending) return;
 
@@ -244,6 +248,7 @@ export class GameSession {
 
     if (result.error) {
       this.logger.warn(`[Timeout] engine error: ${result.error}`);
+      this.scheduleTimeout();
       return;
     }
 
@@ -280,6 +285,8 @@ export class GameSession {
   }
 
   destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
     this.clearTimeoutTimer();
     this.clearGraceTimer();
     this.state = null;
@@ -291,6 +298,7 @@ export class GameSession {
   }
 
   private touchAndPersist(): void {
+    if (this.destroyed) return;
     this.lastActivityAt = Date.now();
     if (this.state) {
       saveRoom(

@@ -9,7 +9,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { loadState } from './utils/logFile';
 import type { GameState } from '../engine/types';
 import { colors } from './theme';
-import type { RoomInfo } from '../server/protocol';
 
 const page = css`
   min-height: 100vh;
@@ -65,101 +64,6 @@ const buttonPurple = css`
   width: 100%;
 `;
 
-const roomSection = css`
-  margin-top: 48px;
-  width: 100%;
-  max-width: 600px;
-`;
-
-const roomSectionTitle = css`
-  font-size: 18px;
-  margin: 0 0 16px;
-  color: ${colors.text.secondary};
-  text-align: center;
-`;
-
-const roomList = css`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const roomRow = css`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: ${colors.bg.panel};
-  border-radius: 8px;
-  padding: 12px 16px;
-  gap: 12px;
-`;
-
-const roomInfo = css`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-`;
-
-const roomBadge = css`
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background-color: var(--badge-color);
-  color: ${colors.white};
-  font-weight: bold;
-  white-space: nowrap;
-`;
-
-const roomName = css`
-  font-weight: bold;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const roomMeta = css`
-  color: ${colors.text.dim};
-  font-size: 13px;
-  white-space: nowrap;
-`;
-
-const roomId = css`
-  color: ${colors.text.dim};
-  font-size: 12px;
-  font-family: monospace;
-`;
-
-const roomActions = css`
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-`;
-
-const enterLink = css`
-  padding: 6px 14px;
-  background-color: ${colors.accent.blue};
-  color: ${colors.white};
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: bold;
-  text-decoration: none;
-`;
-
-const deleteBtn = css`
-  padding: 6px 14px;
-  background-color: ${colors.accent.red};
-  color: ${colors.white};
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: bold;
-`;
-
 const navBar = css`
   display: flex;
   align-items: center;
@@ -189,30 +93,8 @@ const errorText = css`
   text-align: center;
 `;
 
-const statusLabel = (status: RoomInfo['status']): { text: string; color: string } => {
-  switch (status) {
-    case '等待中': return { text: '等待', color: colors.accent.amber };
-    case '进行中': return { text: '游戏中', color: colors.accent.green };
-    case '已结束': return { text: '已结束', color: colors.text.muted };
-  }
-};
-
 function HomePage() {
   const [replayState, setReplayState] = useState<GameState | null>(null);
-  const [rooms, setRooms] = useState<RoomInfo[]>([]);
-
-  const refreshRooms = useCallback(() => {
-    fetch('/api/rooms')
-      .then(res => res.json())
-      .then((data: RoomInfo[]) => setRooms(data))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    refreshRooms();
-    const id = setInterval(refreshRooms, 5000);
-    return () => clearInterval(id);
-  }, [refreshRooms]);
 
   const handleLoadLog = useCallback(() => {
     const input = document.createElement('input');
@@ -231,12 +113,6 @@ function HomePage() {
     };
     input.click();
   }, []);
-
-  const handleDeleteRoom = useCallback((roomId: string) => {
-    fetch(`/api/rooms/${roomId}`, { method: 'DELETE' })
-      .then(res => { if (res.ok) refreshRooms(); })
-      .catch(() => {});
-  }, [refreshRooms]);
 
   if (replayState) {
     return <ReplayBoard onExit={() => setReplayState(null)} />;
@@ -258,39 +134,6 @@ function HomePage() {
           回放
         </button>
       </div>
-
-      {rooms.length > 0 && (
-        <div className={roomSection}>
-          <h2 className={roomSectionTitle}>房间列表</h2>
-          <div className={roomList}>
-            {rooms.map(room => {
-              const st = statusLabel(room.status);
-              return (
-                <div key={room.id} className={roomRow}>
-                  <div className={roomInfo}>
-                    <span className={roomBadge} style={{ '--badge-color': st.color } as React.CSSProperties}>{st.text}</span>
-                    <span className={roomName}>{room.name}</span>
-                    <span className={roomMeta}>{room.playerCount}/{room.maxPlayers}</span>
-                    <span className={roomId}>{room.id}</span>
-                  </div>
-                  <div className={roomActions}>
-                    <Link to={`/debug/${room.id}`} className={enterLink}>
-                      进入
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRoom(room.id)}
-                      className={deleteBtn}
-                    >
-                      删除
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

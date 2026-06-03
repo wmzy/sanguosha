@@ -29,7 +29,7 @@ export type ClientMessage =
   | { type: 'delete_room' }
   | { type: 'start_game' }
   | { type: 'leave_room' }
-  | { type: 'list_rooms' }
+  | { type: 'list_rooms'; filter?: 'debug' | 'multiplayer' }
   | { type: 'reconnect'; playerId: string };
 
 export interface RoomInfo {
@@ -38,6 +38,7 @@ export interface RoomInfo {
   playerCount: number;
   maxPlayers: number;
   status: '等待中' | '进行中' | '已结束';
+  isDebug: boolean;
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {
@@ -51,10 +52,11 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
     case 'response':
       return typeof msg.promptId === 'string';
     case 'ready':
-    case 'list_rooms':
     case 'start_game':
     case 'leave_room':
       return true;
+    case 'list_rooms':
+      return msg.filter === undefined || msg.filter === 'debug' || msg.filter === 'multiplayer';
     case 'join_room':
       return typeof msg.roomId === 'string';
     case 'reconnect':

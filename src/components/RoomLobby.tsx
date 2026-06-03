@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type { RoomInfo } from '../../server/protocol';
 import { colors, styles } from '../theme';
+import { RoomListPanel } from './RoomListPanel';
 
 interface RoomLobbyProps {
   onJoinRoom: (roomId: string, playerId: string) => void;
@@ -28,10 +29,9 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
     connect();
   }, [connect]);
 
-  // 获取房间列表
   useEffect(() => {
     if (connected) {
-      send({ type: 'list_rooms' });
+      send({ type: 'list_rooms', filter: 'multiplayer' });
     }
   }, [connected, send]);
 
@@ -127,7 +127,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
     setPlayersInRoom([]);
     setIsReady(false);
     setIsHost(false);
-    send({ type: 'list_rooms' });
+    send({ type: 'list_rooms', filter: 'multiplayer' });
   }, [send]);
 
   // 房间内等待界面
@@ -274,66 +274,11 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
           </button>
         </div>
 
-        {/* 房间列表 */}
-        <div style={{
-          backgroundColor: colors.bg.panel,
-          borderRadius: 12,
-          padding: 30,
-          minWidth: 300,
-          maxWidth: 400,
-        }}
-        >
-          <h2 style={{ marginBottom: 20 }}>房间列表</h2>
-
-          <div style={{ marginBottom: 15 }}>
-            <button
-              onClick={() => send({ type: 'list_rooms' })}
-              style={styles.btn(colors.accent.blue, { padding: '8px 16px', fontSize: 13 })}
-            >
-              刷新列表
-            </button>
-          </div>
-
-          <div style={{ maxHeight: 300, overflow: 'auto' }}>
-            {rooms.length === 0 ? (
-              <div style={{ color: colors.text.dim, textAlign: 'center', padding: 20 }}>
-                暂无房间
-              </div>
-            ) : (
-              rooms.map(room => (
-                <div
-                  key={room.id}
-                  style={{
-                    backgroundColor: colors.bg.input,
-                    borderRadius: 8,
-                    padding: 15,
-                    marginBottom: 10,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{room.name}</div>
-                    <div style={{ fontSize: 12, color: colors.text.muted }}>
-                      {room.playerCount}/{room.maxPlayers} 玩家 | {room.status}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleJoinRoom(room.id)}
-                    disabled={room.status !== '等待中' || room.playerCount >= room.maxPlayers}
-                    style={styles.btn(
-                      room.status === '等待中' && room.playerCount < room.maxPlayers ? colors.accent.green : colors.text.dim,
-                      { padding: '8px 16px', fontSize: 13, cursor: room.status === '等待中' && room.playerCount < room.maxPlayers ? 'pointer' : 'not-allowed' },
-                    )}
-                  >
-                    加入
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <RoomListPanel
+          rooms={rooms}
+          onRefresh={() => send({ type: 'list_rooms', filter: 'multiplayer' })}
+          onJoin={handleJoinRoom}
+        />
       </div>
 
       {/* 连接状态 */}

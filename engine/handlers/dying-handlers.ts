@@ -78,7 +78,10 @@ export function resolveDying(
     }
 
     return {
-      state: { ...healResult.state, pending: { ...pending, currentSaverIndex: nextIndex } },
+      state: {
+        ...healResult.state,
+        pending: advanceToNextSaver(pending, nextIndex),
+      },
       events: [...healResult.events, healEvent],
     };
   }
@@ -102,9 +105,19 @@ export function resolveDying(
   return {
     state: {
       ...state,
-      pending: { ...pending, currentSaverIndex: nextIndex },
+      pending: advanceToNextSaver(pending, nextIndex),
     },
     events: [],
+  };
+}
+
+function advanceToNextSaver(pending: PendingDyingWindow, nextIndex: number): PendingDyingWindow {
+  const nextSaver = pending.savers[nextIndex];
+  return {
+    ...pending,
+    currentSaverIndex: nextIndex,
+    deadline: Date.now() + pending.timeout,
+    onTimeout: { type: 'respond', player: nextSaver },
   };
 }
 

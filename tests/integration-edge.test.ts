@@ -305,6 +305,37 @@ describe('边界: AOE/决斗', () => {
     expect(r4.state.pending?.type).toBe('playPhase');
   });
 
+  it('AOE 顺序：从使用者逆时针开始（座位非 0 的使用者）', () => {
+    let state = setPlayPhase(createTestGame({ playerCount: 4 }));
+    state = { ...state, currentPlayer: 'P3' };
+    state = injectCard(state, 'P2', '闪');
+    state = injectCard(state, 'P4', '闪');
+    state = injectTrickCard(state, 'P3', '万箭齐发');
+    const trickId = findCardInHand(state, 'P3', '万箭齐发')!;
+
+    const r0 = engine(state, { type: 'playCard', player: 'P3', cardId: trickId });
+    expect(r0.error).toBeUndefined();
+    const r1 = passAllTrickResponders(r0.state);
+    expect(r1.pending?.type).toBe('responseWindow');
+    if (r1.pending?.type === 'responseWindow') {
+      expect(r1.pending.window.type).toBe('aoeResponse');
+      expect(r1.pending.window.defender).toBe('P4');
+    }
+    const dodgeP4 = findCardInHand(r1, 'P4', '闪')!;
+    const r2pre = engine(r1, { type: 'respond', player: 'P4', cardId: dodgeP4 });
+    const r2 = passAllTrickResponders(r2pre.state);
+    if (r2.pending?.type === 'responseWindow') {
+      expect(r2.pending.window.type).toBe('aoeResponse');
+      expect(r2.pending.window.defender).toBe('P1');
+    }
+    const r3pre = engine(r2, { type: 'respond', player: 'P1' });
+    const r3 = passAllTrickResponders(r3pre.state);
+    if (r3.pending?.type === 'responseWindow') {
+      expect(r3.pending.window.type).toBe('aoeResponse');
+      expect(r3.pending.window.defender).toBe('P2');
+    }
+  });
+
   it('决斗只走 default 分支（未实现决斗响应链）', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectTrickCard(state, 'P1', '决斗');

@@ -1,8 +1,14 @@
 import type { Card, Suit, Rank } from './types';
 import type { Rng } from './rng';
+import { 装备牌列表 } from './cards/equipment';
 
 const suits: Suit[] = ['♠', '♥', '♣', '♦'];
 const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+const equipmentRangeMap = new Map<string, number>();
+for (const def of 装备牌列表) {
+  if (typeof def.range === 'number') equipmentRangeMap.set(def.name, def.range);
+}
 
 function _card(name: string, type: Card['type'], subtype: Card['subtype'], suit: Suit, rank: Rank): Card {
   return { name, type, subtype, suit, rank, description: '', id: `${name}-${suit}-${rank}` };
@@ -14,10 +20,13 @@ export function createStandardDeck(): Card[] {
 
   function add(name: string, type: Card['type'], subtype: Card['subtype'], count: number, suitList?: Suit[]) {
     const ss = suitList ?? suits;
+    const range = equipmentRangeMap.get(name);
     for (let i = 0; i < count; i++) {
       const s = ss[i % ss.length];
       const r = ranks[(id++) % ranks.length];
-      deck.push({ name, type, subtype, suit: s, rank: r, description: '', id: `${name}-${s}-${r}-${deck.length}` });
+      const card: Card = { name, type, subtype, suit: s, rank: r, description: '', id: `${name}-${s}-${r}-${deck.length}` };
+      if (range != null) card.range = range;
+      deck.push(card);
     }
   }
 

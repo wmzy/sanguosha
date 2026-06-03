@@ -23,11 +23,13 @@ export function createConcurrentTrickResponse(
     trickTarget?: string;
     responders: string[];
     depth?: number;
+    wuxieChain?: { attacker: string; cardId: string }[];
+    sourceUser?: string;
     judgmentContext?: { player: string; trickIndex: number };
     aoeResume?: { attacker: string; remainingTargets: string[]; requiredCard: string; sourceCard: string };
   },
 ): PendingResponseWindow {
-  const { sourceCard, attacker, trickTarget, responders, depth, judgmentContext, aoeResume } = params;
+  const { sourceCard, attacker, trickTarget, responders, depth, wuxieChain, sourceUser, judgmentContext, aoeResume } = params;
   const timeout = TIMEOUT_DEFAULTS.trickResponse;
   const defender = responders[0];
   const defenderPlayer = getPlayer(state, defender);
@@ -43,9 +45,11 @@ export function createConcurrentTrickResponse(
       validCards,
       sourceCard,
       trickTarget,
+      sourceUser: sourceUser ?? attacker,
       responders,
       passedResponders: [],
       depth: depth ?? 0,
+      wuxieChain: wuxieChain ?? [],
       judgmentContext,
       aoeResume,
       timeout,
@@ -78,8 +82,10 @@ function resolveConcurrentTrickResponse(
   action: GameAction & { type: 'respond' },
   pending: PendingResponseWindow,
 ): EngineResult {
-  const { responders, passedResponders, depth, sourceCard, attacker, trickTarget, judgmentContext, aoeResume } = pending.window;
+  const { responders, passedResponders, depth, sourceCard, attacker, trickTarget, wuxieChain, sourceUser, judgmentContext, aoeResume } = pending.window;
   const currentDepth = depth ?? 0;
+  const currentChain = wuxieChain ?? [];
+  const sourceUserName = sourceUser ?? attacker;
 
   if (!responders || responders.length === 0) {
     return { state, events: [], error: 'trickResponse 并发模式缺少 responders' };
@@ -117,6 +123,7 @@ function resolveConcurrentTrickResponse(
 
     // 嵌套 trickResponse：询问其他人是否对这张无懈可击再出无懈可击
     const aliveOthers = getAlivePlayerNames(state).filter(p => p !== action.player);
+    const nextChain = [...currentChain, { attacker: action.player, cardId: action.cardId }];
 
     if (aliveOthers.length === 0) {
       return resolveTrickResolution(state, currentDepth + 1, sourceCard!, attacker!, trickTarget, judgmentContext, aoeResume);
@@ -126,8 +133,10 @@ function resolveConcurrentTrickResponse(
       sourceCard: sourceCard!,
       attacker: action.player,
       trickTarget,
+      sourceUser: sourceUserName,
       responders: aliveOthers,
       depth: currentDepth + 1,
+      wuxieChain: nextChain,
       judgmentContext,
       aoeResume,
     });
@@ -156,9 +165,11 @@ function resolveConcurrentTrickResponse(
         validCards,
         sourceCard,
         trickTarget,
+        sourceUser: sourceUserName,
         responders,
         passedResponders: newPassed,
         depth: currentDepth,
+        wuxieChain: currentChain,
         judgmentContext,
         aoeResume,
         timeout,

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { GameBoard } from './GameBoard';
 import type { GameBoardData, PlayerEntry } from './GameBoard';
+import { RoomListPanel } from './RoomListPanel';
 import { computeValidActions } from '../../engine/validate';
 import { getDistance } from '../../engine/distance';
 import { getPlayer } from '../../engine/state';
@@ -14,6 +15,8 @@ import type { Card } from '../../shared/types';
 import { saveState } from '../utils/logFile';
 import { actionLogToOperations } from '../../engine/view/actionLog';
 import { colors, styles } from '../theme';
+import { getSingleActivePlayer } from '../utils/activePlayer';
+import type { RoomInfo } from '../../server/protocol';
 import type { ServerMessage } from '../../server/protocol';
 
 function rotatePlayers(names: string[], startName: string): string[] {
@@ -37,6 +40,10 @@ interface PendingPrompt {
   targetCardIds?: string[];
   selectMode?: 'discard' | 'steal';
   options?: PromptOption[];
+  wuxieChain?: { attacker: string; cardId: string }[];
+  sourceName?: string;
+  sourceUser?: string;
+  trickTarget?: string;
 }
 
 function extractPendingPrompt(state: GameState): PendingPrompt | null {
@@ -56,10 +63,29 @@ function extractPendingPrompt(state: GameState): PendingPrompt | null {
         case 'trickResponse': {
           const passedResponders = pending.window.passedResponders ?? [];
           const activeResponders = pending.window.responders?.filter(p => !passedResponders.includes(p));
+          const win = pending.window;
+          const chain = win.wuxieChain ?? [];
+          const sourceName = (win.sourceCard && state.cardMap[win.sourceCard]?.name) || '锦囊';
+          const sourceUser = win.sourceUser ?? win.attacker;
+          const trickTarget = win.trickTarget;
+          const nextStatus = chain.length % 2 === 0 ? '失效' : '生效';
+          const text = chain.length === 0
+            ? `${sourceUser} 对 ${trickTarget} 用了 ${sourceName}，是否出无懈可击让它${nextStatus}？`
+            : `是否出无懈可击？若出，锦囊将${nextStatus}。`;
+          const result: PendingPrompt = {
+            type: 'trickResponse',
+            text,
+            responder: win.defender,
+            validCards: win.validCards,
+            wuxieChain: chain,
+            sourceName,
+            sourceUser,
+            trickTarget,
+          };
           if (activeResponders && activeResponders.length > 0) {
-            return { type: 'trickResponse', text: '请响应锦囊', responders: activeResponders, responder: pending.window.defender, validCards: pending.window.validCards };
+            result.responders = activeResponders;
           }
-          return { type: 'trickResponse', text: '请响应锦囊', responder: pending.window.defender, validCards: pending.window.validCards };
+          return result;
         }
       }
       break;
@@ -78,28 +104,7 @@ function extractPendingPrompt(state: GameState): PendingPrompt | null {
 }
 
 function _getSingleActivePlayer(state: GameState): string | null {
-  const pending = state.pending;
-  if (pending) {
-    switch (pending.type) {
-      case 'responseWindow': {
-        if (pending.window.type === 'trickResponse' && pending.window.responders) {
-          const passed = pending.window.passedResponders ?? [];
-          const active = pending.window.responders.filter((p: string) => !passed.includes(p));
-          return active.length === 1 ? active[0] : null;
-        }
-        return pending.window.defender;
-      }
-      case 'discardPhase': return pending.player;
-      case 'dyingWindow': return pending.savers[pending.currentSaverIndex];
-      case 'selectCard': return pending.player;
-      case 'harvestSelection': return pending.pickOrder[pending.currentPickerIndex];
-      case 'skillPrompt': return pending.player;
-      case 'playPhase': return pending.player;
-      default: return null;
-    }
-  }
-  if (state.phase === '出牌') return state.currentPlayer;
-  return null;
+  return getSingleActivePlayer(state);
 }
 
 const defaultMe: PlayerState = {
@@ -156,6 +161,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
 
   const [playerCount, setPlayerCount] = useState(5);
   const [error, setError] = useState<string | null>(null);
+  const [debugRooms, setDebugRooms] = useState<RoomInfo[]>([]);
   const [state, dispatch] = useReducer(debugReducer, null as GameState | null);
   const [actionLog, setActionLog] = useState<GameAction[]>([]);
   const [perspective, setPerspective] = useState('');
@@ -170,6 +176,12 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   useEffect(() => {
     connect();
   }, [connect]);
+
+  useEffect(() => {
+    if (connected) {
+      send({ type: 'list_rooms', filter: 'debug' });
+    }
+  }, [connected, send]);
 
   useEffect(() => {
     if (!connected || hasRequestedRef.current) return;
@@ -200,6 +212,8 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
       } else if (msg.type === 'events') {
         dispatch({ type: 'applyEvents', events: msg.events });
         setActionLog(msg.actionLog);
+      } else if (msg.type === 'room_list') {
+        setDebugRooms(msg.rooms);
       } else if (msg.type === 'room_joined') {
         storeSession(msg.roomId, msg.playerId);
         window.history.replaceState(null, '', `/debug/${msg.roomId}`);
@@ -256,6 +270,23 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
     setSelectedTarget(null);
     setSelectedForDiscard(new Set());
   }, [send]);
+
+  const handleJoinDebugRoom = useCallback((roomId: string) => {
+    send({ type: 'join_debug_room', roomId });
+  }, [send]);
+
+  const handleDeleteDebugRoom = useCallback(
+    (roomId: string) => {
+      fetch(`/api/rooms/${roomId}`, { method: 'DELETE' })
+        .then(res => {
+          if (res.ok) {
+            send({ type: 'list_rooms', filter: 'debug' });
+          }
+        })
+        .catch(() => {});
+    },
+    [send],
+  );
 
   const handleExit = useCallback(() => {
     handleDeleteRoom();
@@ -481,40 +512,45 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         <button onClick={() => navigate('/')} style={navLinkStyle}>← 返回</button>
         <span style={{ color: colors.text.muted }}>调试游戏</span>
       </nav>
-      <div style={{ marginTop: 40 }}>
-        <h1 style={{ textAlign: 'center', marginBottom: 40 }}>创建调试房间</h1>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <div style={{ backgroundColor: colors.bg.panel, borderRadius: 12, padding: 30, minWidth: 320, maxWidth: 400 }}>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', marginBottom: 5, fontSize: 14 }}>玩家人数</label>
-              <select value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))} style={styles.input()}>
-                <option value={2}>2人</option>
-                <option value={3}>3人</option>
-                <option value={4}>4人</option>
-                <option value={5}>5人</option>
-                <option value={6}>6人</option>
-                <option value={7}>7人</option>
-                <option value={8}>8人</option>
-              </select>
-            </div>
-            <button
-              onClick={handleCreateDebugRoom}
-              disabled={!connected}
-              style={{
-                width: '100%', padding: '12px',
-                backgroundColor: connected ? colors.accent.orange : colors.disabled,
-                color: colors.white, border: 'none', borderRadius: 6,
-                cursor: connected ? 'pointer' : 'not-allowed',
-                fontSize: 16, fontWeight: 'bold',
-              }}
-            >
-              创建调试房间
-            </button>
+      <div style={{ marginTop: 40, display: 'flex', justifyContent: 'center', gap: 40, flexWrap: 'wrap' }}>
+        <div style={{ backgroundColor: colors.bg.panel, borderRadius: 12, padding: 30, minWidth: 320, maxWidth: 400 }}>
+          <h2 style={{ marginBottom: 20 }}>创建调试房间</h2>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', marginBottom: 5, fontSize: 14 }}>玩家人数</label>
+            <select value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))} style={styles.input()}>
+              <option value={2}>2人</option>
+              <option value={3}>3人</option>
+              <option value={4}>4人</option>
+              <option value={5}>5人</option>
+              <option value={6}>6人</option>
+              <option value={7}>7人</option>
+              <option value={8}>8人</option>
+            </select>
           </div>
+          <button
+            onClick={handleCreateDebugRoom}
+            disabled={!connected}
+            style={{
+              width: '100%', padding: '12px',
+              backgroundColor: connected ? colors.accent.orange : colors.disabled,
+              color: colors.white, border: 'none', borderRadius: 6,
+              cursor: connected ? 'pointer' : 'not-allowed',
+              fontSize: 16, fontWeight: 'bold',
+            }}
+          >
+            创建调试房间
+          </button>
         </div>
-        <div style={{ textAlign: 'center', marginTop: 30, color: connected ? colors.accent.green : colors.accent.red }}>
-          {connected ? '已连接到服务器' : '未连接，请检查服务器是否启动'}
-        </div>
+        <RoomListPanel
+          rooms={debugRooms}
+          onRefresh={() => send({ type: 'list_rooms', filter: 'debug' })}
+          onJoin={handleJoinDebugRoom}
+          onDelete={handleDeleteDebugRoom}
+          emptyText="暂无调试房间"
+        />
+      </div>
+      <div style={{ textAlign: 'center', marginTop: 30, color: connected ? colors.accent.green : colors.accent.red }}>
+        {connected ? '已连接到服务器' : '未连接，请检查服务器是否启动'}
       </div>
       {error && <div style={styles.errorToast()}>{error}</div>}
     </div>

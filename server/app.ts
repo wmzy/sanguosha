@@ -12,6 +12,7 @@ import {
   allReady,
   getRoom,
   getRoomList,
+  deleteRoom,
   findRoomByPlayerId,
   broadcastMessage,
   addRoom,
@@ -97,7 +98,9 @@ restorePersistedRooms();
 
 // REST API
 app.get('/api/rooms', (c) => {
-  return c.json(getRoomList());
+  const typeParam = c.req.query('type');
+  const type = typeParam === 'debug' || typeParam === 'multiplayer' ? typeParam : undefined;
+  return c.json(getRoomList(type));
 });
 
 app.get('/api/rooms/:id', (c) => {
@@ -129,6 +132,8 @@ app.delete('/api/rooms/:id', (c) => {
     playerRoomMap.delete(pid);
     leaveRoom(id, pid);
   }
+  deleteRoom(id);
+  deletePersistedRoom(id);
 
   return c.json({ success: true });
 });
@@ -195,7 +200,7 @@ export function handleWsMessage(
       handleJoinRoom(playerId, message.roomId, ws);
       break;
     case 'list_rooms':
-      ws.send(serialize({ type: 'room_list', rooms: getRoomList() }));
+      ws.send(serialize({ type: 'room_list', rooms: getRoomList(message.filter) }));
       break;
     case 'ready':
       handleReady(playerId);

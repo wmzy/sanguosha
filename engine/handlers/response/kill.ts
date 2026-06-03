@@ -7,6 +7,7 @@ import { getPlayer } from '../../state';
 import { makeServerEvent } from '../../event';
 import { applyAtoms, applyDamage } from '../engine-utils';
 import { isCardValidResponse } from '../../validate';
+import { emitEvent } from '../../skill';
 
 export function resolveKillResponse(
   state: GameState,
@@ -42,11 +43,19 @@ export function resolveKillResponse(
       { type: 'popPending' },
     ];
     const result = applyAtoms(state, atoms);
+    const emitResult = emitEvent(result.state, {
+      type: 'killDodged',
+      attacker: attacker ?? '',
+      defender,
+    });
     const dodgedEvent = makeServerEvent('killDodged', {
       attacker: attacker ?? '',
       defender,
     });
-    return { state: result.state, events: [...result.events, dodgedEvent] };
+    return {
+      state: emitResult.state,
+      events: [...result.events, dodgedEvent, ...emitResult.events],
+    };
   }
 
   // ── 不出闪 → 受到伤害 ──
@@ -63,13 +72,18 @@ export function resolveKillResponse(
     popState, defender, damageAmount,
     attacker ?? undefined, pending.window.sourceCard,
   );
+  const emitResult = emitEvent(damageResult.state, {
+    type: 'killHit',
+    attacker: attacker ?? '',
+    defender,
+  });
   const hitEvent = makeServerEvent('killHit', {
     attacker: attacker ?? '',
     defender,
   });
 
   return {
-    state: damageResult.state,
-    events: [...popEvents, ...damageResult.events, hitEvent],
+    state: emitResult.state,
+    events: [...popEvents, ...damageResult.events, hitEvent, ...emitResult.events],
   };
 }

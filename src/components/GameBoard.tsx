@@ -27,6 +27,10 @@ interface PendingPrompt {
   targetCardIds?: string[];
   selectMode?: 'discard' | 'steal';
   options?: PromptOption[];
+  wuxieChain?: { attacker: string; cardId: string }[];
+  sourceName?: string;
+  sourceUser?: string;
+  trickTarget?: string;
 }
 
 /** 单个玩家在棋盘上展示所需的所有数据。 */
@@ -471,9 +475,70 @@ export function GameBoard({ data }: { data: GameBoardData }) {
             fontSize: 16,
           }}
         >
-          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
-            对方对你使用了锦囊，是否出无懈可击？
-          </div>
+          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>{pendingPrompt.text}</div>
+          {pendingPrompt.wuxieChain !== undefined && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 12,
+                flexWrap: 'wrap',
+                fontSize: 14,
+              }}
+            >
+              {pendingPrompt.sourceName && (
+                <span
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 12,
+                    backgroundColor: colors.accent.purpleLight,
+                    color: colors.white,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {pendingPrompt.sourceName}（{pendingPrompt.sourceUser} → {pendingPrompt.trickTarget}）
+                </span>
+              )}
+              {pendingPrompt.wuxieChain.map((w, i) => {
+                const makesEffective = (i + 1) % 2 === 0;
+                const bg = makesEffective ? colors.accent.green : colors.accent.red;
+                const statusLabel = makesEffective ? '生效' : '失效';
+                return (
+                  <span
+                    key={`${w.cardId}-${i}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                  >
+                    <span style={{ color: colors.text.dim }}>→</span>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 12,
+                        backgroundColor: bg,
+                        color: colors.white,
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {w.attacker} 的无懈（{statusLabel}）
+                    </span>
+                  </span>
+                );
+              })}
+              <span style={{ color: colors.text.dim }}>→</span>
+              <span
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 12,
+                  backgroundColor: colors.accent.amber,
+                  color: colors.bg.page,
+                  fontWeight: 'bold',
+                }}
+              >
+                你出无懈可击？
+              </span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
             {(respondAction?.cards ?? []).length > 0 ? (
               respondAction!.cards.map((cardId) => {

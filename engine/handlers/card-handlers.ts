@@ -14,7 +14,7 @@ import { getDistance, isInAttackRange } from '../distance';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from './engine-utils';
 import { createPendingId } from '../atoms/pending';
-import { emitEvent } from '../skill';
+import { emitEvent, registerEquipmentTriggers, unregisterEquipmentTriggers } from '../skill';
 import { createConcurrentTrickResponse, startAoeTargetWuxie } from './response-handlers';
 import { getSkillConvertedCards } from '../validate';
 
@@ -351,9 +351,12 @@ function handleTrickCard(
     case '万箭齐发': {
       const requiredCard = card.name === '南蛮入侵' ? '杀' : '闪';
 
-      const affected = state.playerOrder.filter(
-        p => p !== player && getPlayer(state, p).info.alive,
-      );
+      const startIdx = state.playerOrder.indexOf(player);
+      const affected: string[] = [];
+      for (let i = 1; i < state.playerOrder.length; i++) {
+        const name = state.playerOrder[(startIdx + i) % state.playerOrder.length];
+        if (getPlayer(state, name).info.alive) affected.push(name);
+      }
 
       const moveAtom: Atom = {
         type: 'moveCard',
@@ -400,16 +403,32 @@ function handleTrickCard(
 function handleEquipCard(
   state: GameState,
   action: GameAction & { type: 'playCard' },
-  _card: Card,
+  card: Card,
 ): EngineResult {
   const player = action.player;
-  const atoms: Atom[] = [{ type: 'equip', player, cardId: action.cardId }];
-  const result = applyAtoms(state, atoms);
+  const subtypeToSlot: Record<string, 'weapon' | 'armor' | 'horseMinus' | 'horsePlus'> = {
+    武器: 'weapon',
+    防具: 'armor',
+    进攻马: 'horseMinus',
+    防御马: 'horsePlus',
+  };
+  const slot = subtypeToSlot[card.subtype];
+  const oldEquipId = slot ? state.players[player].equipment[slot] : undefined;
+
+  let s = state;
+  if (oldEquipId) {
+    s = unregisterEquipmentTriggers(s, player, oldEquipId);
+  }
+
+  const result = applyAtoms(s, [{ type: 'equip', player, cardId: action.cardId }]);
+  let after = result.state;
+  after = registerEquipmentTriggers(after, player, action.cardId);
+
   const cardPlayedEvent = makeServerEvent('cardPlayed', {
     player,
     cardId: action.cardId,
   });
-  return { state: result.state, events: [...result.events, cardPlayedEvent] };
+  return { state: after, events: [...result.events, cardPlayedEvent] };
 }
 
 // ── 五谷丰登选牌处理 ──────────────────────────────────────

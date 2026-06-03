@@ -458,6 +458,8 @@ export interface ResponseWindowDef {
   requiredCard?: string;
   /** trickResponse 链：原锦囊目标（区别于 defender 当前响应者） */
   trickTarget?: string;
+  /** trickResponse 链：原锦囊使用者（嵌套时保持不变；attacker 字段在嵌套时是上一张无懈者） */
+  sourceUser?: string;
   /** @deprecated 旧顺序链式字段，保留兼容 */
   remainingPlayers?: string[];
   /** @deprecated 旧顺序链式字段，保留兼容 */
@@ -473,6 +475,8 @@ export interface ResponseWindowDef {
   passedResponders?: string[];
   /** 嵌套深度：0=原锦囊被无懈, 1=无懈被无懈, ... */
   depth?: number;
+  /** 无懈可击链：按出牌顺序记录已打出的无懈（不含当前正在询问的那张） */
+  wuxieChain?: { attacker: string; cardId: string }[];
   /** AOE 无懈上下文：无懈通过后需要恢复 AOE 流程 */
   aoeResume?: {
     attacker: string;

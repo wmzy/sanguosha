@@ -217,7 +217,7 @@ describe('V2 Engine - 回合流程', () => {
       expect(r4.state.players['P2'].info.alive).toBe(false);
     });
 
-    it('无人救助则死亡', () => {
+    it('推进 saver 时重置 deadline 和 onTimeout.player', () => {
       let state = setPlayPhase(createTestGame({ playerCount: 2 }));
       state = setHealth(state, 'P2', 1);
       state = injectCard(state, 'P1', '杀');
@@ -229,17 +229,52 @@ describe('V2 Engine - 回合流程', () => {
         cardId: killId,
         target: 'P2',
       });
-      // P2 不出闪
       const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
 
-      // 濒死窗口 savers=[P2(濒死者), P1], currentSaverIndex=0 → P2（濒死者）
-      // P2 不救
-      const r3 = engine(r2.state, { type: 'respond', player: 'P2' });
-      // currentSaverIndex=1 → P1
-      // P1 也不救
-      const r4 = engine(r3.state, { type: 'respond', player: 'P1' });
+      const initialPending = r2.state.pending as {
+        deadline: number;
+        onTimeout: { player: string };
+        currentSaverIndex: number;
+      };
+      const initialDeadline = initialPending.deadline;
+      const initialSaver = initialPending.onTimeout.player;
+      const initialIndex = initialPending.currentSaverIndex;
 
-      expect(r4.state.players['P2'].info.alive).toBe(false);
+      const r3 = engine(r2.state, { type: 'respond', player: initialSaver });
+      const nextPending = r3.state.pending as {
+        deadline: number;
+        onTimeout: { player: string };
+        currentSaverIndex: number;
+      };
+
+      expect(nextPending).not.toBeNull();
+      expect(nextPending.currentSaverIndex).toBe(initialIndex + 1);
+      expect(nextPending.onTimeout.player).not.toBe(initialSaver);
+      expect(nextPending.deadline).toBeGreaterThanOrEqual(initialDeadline);
+    });
+
+    it('onTimeout 玩家切换为当前 saver 后能成功触发', () => {
+      let state = setPlayPhase(createTestGame({ playerCount: 2 }));
+      state = setHealth(state, 'P2', 1);
+      state = injectCard(state, 'P1', '杀');
+
+      const killId = findCardInHand(state, 'P1', '杀')!;
+      const r1 = engine(state, {
+        type: 'playCard',
+        player: 'P1',
+        cardId: killId,
+        target: 'P2',
+      });
+      const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+
+      const initialSaver = (r2.state.pending as { onTimeout: { player: string } }).onTimeout.player;
+      const r3 = engine(r2.state, { type: 'respond', player: initialSaver });
+      const nextSaver = (r3.state.pending as { onTimeout: { player: string } }).onTimeout.player;
+
+      expect(nextSaver).not.toBe(initialSaver);
+
+      const r4 = engine(r3.state, { type: 'respond', player: nextSaver });
+      expect(r4.error).toBeUndefined();
     });
   });
 });

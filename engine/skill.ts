@@ -90,12 +90,17 @@ export function registerEquipmentTriggers(
   const skillId = EQUIPMENT_SKILL_MAP[card.name];
   if (!skillId) return state;
 
+  const def = registry.get(skillId);
+  if (!def) return state;
+
   const newTrigger: TriggerRule = {
-    event: 'killResponse',
+    event: def.trigger.event,
     source: 'equipment',
     skillId,
     player,
     priority: 3,
+    ...(def.trigger.optional ? { optional: true } : {}),
+    ...(def.trigger.manual ? { manual: true } : {}),
   };
 
   return { ...state, triggers: [...state.triggers, newTrigger] };
