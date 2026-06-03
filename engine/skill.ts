@@ -56,6 +56,7 @@ export function registerCharacterTriggers(
       skillId: ability.name,
       player,
       priority: ability.passive ? 0 : 5,
+      ...(def.trigger.optional ? { optional: true } : {}),
     });
 
     if (ability.modifiers) {
@@ -142,6 +143,8 @@ export function emitEvent(
       const phaseEvent = event as { type: 'phaseBegin'; phase: string; player: string };
       if (trigger.player !== phaseEvent.player) continue;
       if (def.trigger.phase && phaseEvent.phase !== def.trigger.phase) continue;
+      const beginFlag = `phaseBegin/${phaseEvent.phase}`;
+      if (s.turn.phaseFlags.includes(beginFlag)) continue;
     }
 
     const ctx = buildSkillContext(s, event, trigger);

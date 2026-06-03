@@ -99,15 +99,18 @@ function processPhaseStep(state: GameState): EngineResult {
   const player = state.currentPlayer;
   const allEvents: ServerEvent[] = [];
 
-  const phaseBeginEvent: GameEvent = { type: 'phaseBegin', phase, player };
-  const emitResult = emitEvent(state, phaseBeginEvent);
-  allEvents.push(...emitResult.events);
+  const beginFlag = `phaseBegin/${phase}`;
+  let s = state;
+  if (!s.turn.phaseFlags.includes(beginFlag)) {
+    const phaseBeginEvent: GameEvent = { type: 'phaseBegin', phase, player };
+    const emitResult = emitEvent(s, phaseBeginEvent);
+    allEvents.push(...emitResult.events);
+    s = { ...emitResult.state, turn: { ...emitResult.state.turn, phaseFlags: [...emitResult.state.turn.phaseFlags, beginFlag] } };
 
-  if (emitResult.state.pending !== null) {
-    return { state: emitResult.state, events: allEvents };
+    if (s.pending !== null) {
+      return { state: s, events: allEvents };
+    }
   }
-
-  let s = emitResult.state;
 
   if (phase === '判定') {
     const judgmentResult = processJudgmentPhase(s, player);
@@ -159,7 +162,8 @@ function getPhaseActions(state: GameState, phase: TurnPhase, player: string): im
       if (playerState.tags.includes('skipDraw')) {
         return [{ type: 'removeTag' as const, player, tag: 'skipDraw' }];
       }
-      return [{ type: 'draw' as const, player, count: 2 }];
+      const drawCount = playerState.vars['裸衣/active'] === true ? 1 : 2;
+      return [{ type: 'draw' as const, player, count: drawCount }];
     default:
       return [];
   }
@@ -207,7 +211,7 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
     }
   }
 
-  while (s.pending === null && isAutoPhase(s.phase)) {
+  while (isAutoPhase(s.phase)) {
     if (isPreparationPhase(s.phase)) {
       s = clearTurnVars(s);
     }
