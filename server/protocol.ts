@@ -1,10 +1,23 @@
-import type { GameAction, GameState, PlayerEvent } from '../engine/types';
+import type { GameAction, GameState, PlayerEvent, ServerEvent } from '../engine/types';
 import type { PlayerView, FrontendState } from '../engine/view/types';
 
+/**
+ * 事件协议层序号：服务端 GameSession 维护的全局递增序号。
+ * 客户端用它做去重 + 断点续传（reconnect 时携带 lastAppliedSeq，
+ * 服务端从 lastAppliedSeq+1 开始回放）。
+ */
+export type EventSeq = number;
+
+/**
+ * 一条广播事件的传输形态：在 ServerEvent 之上附加 seq。
+ * seq 与 ServerEvent.id 不同：id 是 GameState 内部日志引用，seq 是协议层序号。
+ */
+export type SequencedEvent = ServerEvent & { seq: EventSeq };
+
 export type ServerMessage =
-  | { type: 'initialView'; state: FrontendState }
-  | { type: 'debugGameState'; state: GameState; actionLog: GameAction[] }
-  | { type: 'events'; events: PlayerEvent[]; actionLog: GameAction[] }
+  | { type: 'initialView'; state: FrontendState; lastSeq: EventSeq }
+  | { type: 'debugGameState'; state: GameState; lastSeq: EventSeq }
+  | { type: 'events'; fromSeq: EventSeq; events: SequencedEvent[] }
   | { type: 'error'; message: string }
   | { type: 'gameOver'; winner: string }
   | { type: 'room_joined'; roomId: string; playerId: string }
@@ -24,13 +37,11 @@ export type ClientMessage =
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
   | { type: 'create_room'; name: string; maxPlayers: number }
-  | { type: 'create_debug_room'; playerCount: number }
-  | { type: 'join_debug_room'; roomId: string }
-  | { type: 'delete_room' }
+  | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
   | { type: 'start_game' }
   | { type: 'leave_room' }
   | { type: 'list_rooms'; filter?: 'debug' | 'multiplayer' }
-  | { type: 'reconnect'; playerId: string };
+  | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq };
 
 export interface RoomInfo {
   id: string;
@@ -60,15 +71,11 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
     case 'join_room':
       return typeof msg.roomId === 'string';
     case 'reconnect':
-      return typeof msg.playerId === 'string';
+      return typeof msg.playerId === 'string' && (msg.lastSeq === undefined || typeof msg.lastSeq === 'number');
     case 'create_room':
       return typeof msg.name === 'string' && typeof msg.maxPlayers === 'number';
-    case 'create_debug_room':
-      return typeof msg.playerCount === 'number' && msg.playerCount >= 2 && msg.playerCount <= 8;
     case 'join_debug_room':
-      return typeof msg.roomId === 'string';
-    case 'delete_room':
-      return true;
+      return typeof msg.roomId === 'string' && (msg.lastSeq === undefined || typeof msg.lastSeq === 'number');
     default:
       return false;
   }

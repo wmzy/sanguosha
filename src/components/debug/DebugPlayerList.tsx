@@ -14,7 +14,8 @@ import { computeValidActions } from '../../../engine/validate';
 import { getDistance } from '../../../engine/distance';
 import { getPlayer } from '../../../engine/state';
 import { buildPlayerView } from '../../../engine/view/buildView';
-import { actionLogToOperations } from '../../../engine/view/actionLog';
+import { actionLogEntriesToOperations } from '../../../engine/view/actionLog';
+import type { ActionLogEntry } from '../../hooks/useDebugRoom';
 import { getSingleActivePlayer } from '../../utils/activePlayer';
 import { saveState } from '../../utils/logFile';
 import { rotatePlayers } from '../../utils/rotatePlayers';
@@ -175,7 +176,7 @@ export interface DebugPlayerListProps {
   state: GameState;
   ui: DebugPlayerListUI;
   actions: DebugPlayerListActions;
-  actionLog: GameAction[];
+  actionLog: ActionLogEntry[];
   /** 把玩家动作发送到服务端（已序列化的 ClientMessage） */
   sendGameAction: (action: GameAction) => void;
 }
@@ -400,7 +401,7 @@ export function DebugPlayerList({
       },
       getDistance: (from: string, to: string) => getDistance(state, from, to),
       pending: state.pending,
-      playerOps: actionLogToOperations(actionLog, state),
+      playerOps: actionLogEntriesToOperations(actionLog, state),
     };
   }, [
     state,

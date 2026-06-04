@@ -233,16 +233,10 @@ export function handleWsMessage(
       handleLeaveRoom(playerId);
       break;
     case 'reconnect':
-      handleReconnect(playerId, message.playerId, ws);
-      break;
-    case 'create_debug_room':
-      handleCreateDebugRoom(playerId, message.playerCount, ws);
+      handleReconnect(playerId, message.playerId, message.lastSeq ?? 0, ws);
       break;
     case 'join_debug_room':
-      handleJoinDebugRoom(playerId, message.roomId, ws);
-      break;
-    case 'delete_room':
-      handleDeleteRoom(playerId);
+      handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws);
       break;
   }
 }
@@ -408,51 +402,8 @@ function handleDisconnect(playerId: string): void {
   }
 }
 
-function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSContext): void {
-  try {
-    const existing = findRoomByPlayerId(playerId);
-    if (existing) {
-      leaveRoom(existing.id, playerId);
-      playerRoomMap.delete(playerId);
-    }
 
-    const room = createDebugRoom(`调试${playerCount}人`, playerCount);
-    const joined = joinDebugRoom(room.id, playerId, ws);
-    if (!joined) {
-      ws.send(serialize({ type: 'error', message: '加入调试房间失败' }));
-      return;
-    }
-    playerRoomMap.set(playerId, room.id);
-
-    const session = new GameSession(room, true);
-    gameSessions.set(room.id, session);
-    session.startGame(playerCount);
-
-    ws.send(serialize({ type: 'room_joined', roomId: room.id, playerId }));
-  } catch (err) {
-    log.error('创建调试房间失败', { error: String(err) });
-    ws.send(serialize({ type: 'error', message: `创建调试房间失败: ${String(err)}` }));
-  }
-}
-
-function handleDeleteRoom(playerId: string): void {
-  const roomId = playerRoomMap.get(playerId);
-  if (!roomId) return;
-
-  const room = getRoom(roomId);
-  if (!room?.isDebug) return;
-
-  const session = gameSessions.get(roomId);
-  if (session) {
-    session.destroy();
-    gameSessions.delete(roomId);
-  }
-
-  leaveRoom(roomId, playerId);
-  playerRoomMap.delete(playerId);
-}
-
-function handleJoinDebugRoom(playerId: string, roomId: string, ws: WSContext): void {
+function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: number, ws: WSContext): void {
   const room = getRoom(roomId);
   if (!room?.isDebug) {
     ws.send(serialize({ type: 'error', message: '房间不存在或不是调试房间' }));
@@ -478,13 +429,14 @@ function handleJoinDebugRoom(playerId: string, roomId: string, ws: WSContext): v
     session.startGame(pendingPlayerCount);
     ws.send(serialize({ type: 'room_joined', roomId, playerId }));
   } else {
-    session.reconnectPlayer(playerId, ws);
+    // reconnectPlayer 内部已经发送 debugGameState + 可选 events 续传，
+    // 这里不再额外发一次。
+    session.reconnectPlayer(playerId, ws, lastSeq);
     ws.send(serialize({ type: 'room_joined', roomId, playerId }));
-    session.sendDebugGameState(playerId);
   }
 }
 
-function handleReconnect(currentPlayerId: string, previousPlayerId: string, ws: WSContext): void {
+function handleReconnect(currentPlayerId: string, previousPlayerId: string, lastSeq: number, ws: WSContext): void {
   const roomId = playerRoomMap.get(previousPlayerId);
   if (!roomId) {
     ws.send(serialize({ type: 'error', message: '没有找到可恢复的会话' }));
@@ -497,9 +449,9 @@ function handleReconnect(currentPlayerId: string, previousPlayerId: string, ws: 
     return;
   }
 
-  if (session.reconnectPlayer(previousPlayerId, ws)) {
+  if (session.reconnectPlayer(previousPlayerId, ws, lastSeq)) {
     playerRoomMap.set(currentPlayerId, roomId);
-    log.info('玩家重连成功', { previousPlayerId, currentPlayerId });
+    log.info('玩家重连成功', { previousPlayerId, currentPlayerId, lastSeq });
   } else {
     ws.send(serialize({ type: 'error', message: '重连失败' }));
   }

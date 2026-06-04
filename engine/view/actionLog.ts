@@ -60,3 +60,23 @@ export function actionLogToOperations(actions: GameAction[], state: GameState): 
     };
   });
 }
+
+/**
+ * 接受带 seq 的 ActionLogEntry[]，生成的 Operation.seq 取自 entry.clientSeq。
+ * 用于右侧操作流水：序号由客户端在 sendGameAction 时分配，更稳定。
+ */
+export function actionLogEntriesToOperations(
+  entries: ReadonlyArray<{ action: GameAction; clientSeq: number }>,
+  state: GameState,
+): Operation[] {
+  return entries.map((entry) => {
+    const described = describeAction(entry.action, state);
+    return {
+      seq: entry.clientSeq,
+      timestamp: Date.now(),
+      type: described.type,
+      data: described.data,
+      description: described.description,
+    };
+  });
+}

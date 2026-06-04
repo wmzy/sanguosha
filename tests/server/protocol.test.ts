@@ -59,21 +59,11 @@ describe('isValidClientMessage — valid messages', () => {
     expect(isValidClientMessage({ type: 'create_room', name: 'room1', maxPlayers: 4 })).toBe(true);
   });
 
-  it('accepts create_debug_room message (boundary: 2)', () => {
-    expect(isValidClientMessage({ type: 'create_debug_room', playerCount: 2 })).toBe(true);
-  });
-
-  it('accepts create_debug_room message (boundary: 8)', () => {
-    expect(isValidClientMessage({ type: 'create_debug_room', playerCount: 8 })).toBe(true);
-  });
 
   it('accepts join_debug_room message', () => {
     expect(isValidClientMessage({ type: 'join_debug_room', roomId: 'dr1' })).toBe(true);
   });
 
-  it('accepts delete_room message', () => {
-    expect(isValidClientMessage({ type: 'delete_room' })).toBe(true);
-  });
 
   it('accepts start_game message', () => {
     expect(isValidClientMessage({ type: 'start_game' })).toBe(true);
@@ -269,20 +259,25 @@ describe('serialize', () => {
   });
 
   it('serializes initialView message with FrontendState', () => {
-    const msg: ServerMessage = { type: 'initialView', state: stubFrontendState };
+    const msg: ServerMessage = { type: 'initialView', state: stubFrontendState, lastSeq: 5 };
     const result = serialize(msg);
     const parsed = JSON.parse(result);
     expect(parsed.type).toBe('initialView');
     expect(parsed.state.myPlayerId).toBe('p1');
+    expect(parsed.lastSeq).toBe(5);
   });
 
-  it('serializes events message', () => {
-    const events = [{ id: 'e1', type: 'turnStart', timestamp: 1000, payload: { player: 'p1' } }];
-    const msg: ServerMessage = { type: 'events', events, actionLog: [stubGameAction] };
+  it('serializes events message with seq/timestamp and no actionLog', () => {
+    const events = [{ id: 'e1', type: 'turnStart', timestamp: 1000, payload: { player: 'p1' }, seq: 3 }];
+    const msg: ServerMessage = { type: 'events', fromSeq: 3, events };
     const result = serialize(msg);
     const parsed = JSON.parse(result);
+    expect(parsed.type).toBe('events');
+    expect(parsed.fromSeq).toBe(3);
     expect(parsed.events).toHaveLength(1);
-    expect(parsed.actionLog).toHaveLength(1);
+    expect(parsed.events[0].seq).toBe(3);
+    expect(parsed.events[0].timestamp).toBe(1000);
+    expect(parsed.actionLog).toBeUndefined();
   });
 
   it('serializes room_list message', () => {

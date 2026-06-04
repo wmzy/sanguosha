@@ -15,24 +15,25 @@
 import { useEffect, useReducer, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from './useWebSocket';
-import { useDebugRoom } from './useDebugRoom';
+import { useDebugRoom, type DebugUiState } from './useDebugRoom';
 import { rotatePlayers } from '../utils/rotatePlayers';
 import { getSingleActivePlayer } from '../utils/activePlayer';
 import { storeSession, loadSession, clearSession } from '../utils/debugSession';
 import { apiFetch, ApiError } from '../api/client';
 import { reduceGameState } from '../../engine/view/reducer';
 import type { GameAction, GameState, ServerEvent } from '../../engine/types';
-import type { ServerMessage } from '../../server/protocol';
+import type { SequencedEvent, ServerMessage } from '../../server/protocol';
 
 type DebugAction =
-  | { type: 'reset'; state: GameState }
-  | { type: 'applyEvents'; events: ServerEvent[] };
+  | { type: 'reset'; state: GameState; lastAppliedSeq: number }
+  | { type: 'applyEvents'; events: SequencedEvent[]; lastSeq: number };
 
 function debugReducer(state: GameState | null, action: DebugAction): GameState | null {
   if (action.type === 'reset') return action.state;
   if (action.type === 'applyEvents') {
     if (!state || action.events.length === 0) return state;
-    return reduceGameState(state, action.events);
+    const bare: ServerEvent[] = action.events.map(({ seq: _seq, ...rest }) => rest);
+    return reduceGameState(state, bare);
   }
   return state;
 }
@@ -40,16 +41,16 @@ function debugReducer(state: GameState | null, action: DebugAction): GameState |
 export interface DebugLobbyController {
   connected: boolean;
   state: GameState | null;
-  ui: ReturnType<typeof useDebugRoom>['ui'];
-  setPlayerCount: ReturnType<typeof useDebugRoom>['setPlayerCount'];
-  setPerspective: ReturnType<typeof useDebugRoom>['setPerspective'];
-  setPlayerOrder: ReturnType<typeof useDebugRoom>['setPlayerOrder'];
-  setSelectedCardId: ReturnType<typeof useDebugRoom>['setSelectedCardId'];
-  setSelectedTarget: ReturnType<typeof useDebugRoom>['setSelectedTarget'];
-  toggleSelectedForDiscard: ReturnType<typeof useDebugRoom>['toggleSelectedForDiscard'];
-  clearSelectedForDiscard: ReturnType<typeof useDebugRoom>['clearSelectedForDiscard'];
-  toggleSelectedSkillCard: ReturnType<typeof useDebugRoom>['toggleSelectedSkillCard'];
-  clearSelectedSkillCards: ReturnType<typeof useDebugRoom>['clearSelectedSkillCards'];
+  ui: DebugUiState;
+  setPlayerCount: (n: number) => void;
+  setPerspective: (p: string) => void;
+  setPlayerOrder: (order: string[]) => void;
+  setSelectedCardId: (id: string | null) => void;
+  setSelectedTarget: (t: string | null) => void;
+  toggleSelectedForDiscard: (id: string) => void;
+  clearSelectedForDiscard: () => void;
+  toggleSelectedSkillCard: (id: string) => void;
+  clearSelectedSkillCards: () => void;
   sendGameAction: (action: GameAction) => void;
   refreshRoomList: () => void;
   handleCreateDebugRoom: () => Promise<void>;
@@ -67,7 +68,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
 
   const [state, dispatch] = useReducer(debugReducer, null as GameState | null);
   const stateRef = useRef<GameState | null>(null);
-  const hasRequestedRef = useRef(false);
+  const lastAppliedSeqRef = useRef(0);
 
   const {
     ui,
@@ -75,6 +76,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     setError,
     setDebugRooms,
     setActionLog,
+    appendAction,
     setPerspective,
     setPlayerOrder,
     setSelectedCardId,
@@ -94,14 +96,17 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     if (connected) send({ type: 'list_rooms', filter: 'debug' });
   }, [connected, send]);
 
+  const lastConnectedRef = useRef(false);
   useEffect(() => {
-    if (!connected || hasRequestedRef.current || !initialRoomId) return;
+    const becameConnected = connected && !lastConnectedRef.current;
+    lastConnectedRef.current = connected;
+    if (!becameConnected || !initialRoomId) return;
+
     const session = loadSession();
-    hasRequestedRef.current = true;
     if (session?.roomId === initialRoomId) {
-      send({ type: 'reconnect', playerId: session.playerId });
+      send({ type: 'reconnect', playerId: session.playerId, lastSeq: lastAppliedSeqRef.current });
     } else {
-      send({ type: 'join_debug_room', roomId: initialRoomId });
+      send({ type: 'join_debug_room', roomId: initialRoomId, lastSeq: lastAppliedSeqRef.current });
     }
   }, [connected, initialRoomId, send]);
 
@@ -112,15 +117,19 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   useEffect(() => {
     const unsubscribe = onMessage((msg: ServerMessage) => {
       if (msg.type === 'debugGameState') {
-        dispatch({ type: 'reset', state: msg.state });
-        setActionLog(msg.actionLog);
+        lastAppliedSeqRef.current = msg.lastSeq;
+        dispatch({ type: 'reset', state: msg.state, lastAppliedSeq: msg.lastSeq });
+        setActionLog([{ action: { type: 'startGame' }, clientSeq: 1 }]);
         if (!ui.perspective && msg.state.currentPlayer) {
           setPerspective(msg.state.currentPlayer);
           setPlayerOrder(rotatePlayers(msg.state.playerOrder, msg.state.currentPlayer));
         }
       } else if (msg.type === 'events') {
-        dispatch({ type: 'applyEvents', events: msg.events });
-        setActionLog(msg.actionLog);
+        const fresh: SequencedEvent[] = msg.events.filter((e) => e.seq > lastAppliedSeqRef.current);
+        if (fresh.length === 0) return;
+        const maxSeq = fresh[fresh.length - 1].seq;
+        lastAppliedSeqRef.current = maxSeq;
+        dispatch({ type: 'applyEvents', events: fresh, lastSeq: maxSeq });
       } else if (msg.type === 'room_list') {
         setDebugRooms(msg.rooms);
       } else if (msg.type === 'room_joined') {
@@ -159,8 +168,11 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   }, [state, ui.perspective, setPerspective, setPlayerOrder]);
 
   const sendGameAction = useCallback(
-    (action: GameAction) => send({ type: 'action', action }),
-    [send],
+    (action: GameAction) => {
+      appendAction(action);
+      send({ type: 'action', action });
+    },
+    [appendAction, send],
   );
 
   const refreshRoomList = useCallback(() => send({ type: 'list_rooms', filter: 'debug' }), [send]);
@@ -184,14 +196,21 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   }, [ui.playerCount, navigate, setError]);
 
   const handleDeleteRoom = useCallback(() => {
-    send({ type: 'delete_room' });
+    const session = loadSession();
+    if (session?.roomId) {
+      apiFetch<void>(`/api/rooms/${session.roomId}`, { method: 'DELETE' }).catch(() => {});
+    }
     clearSession();
+    lastAppliedSeqRef.current = 0;
     reset();
     navigate('/');
-  }, [send, reset, navigate]);
+  }, [reset, navigate]);
 
   const handleJoinDebugRoom = useCallback(
-    (roomId: string) => send({ type: 'join_debug_room', roomId }),
+    (roomId: string) => {
+      lastAppliedSeqRef.current = 0;
+      send({ type: 'join_debug_room', roomId });
+    },
     [send],
   );
 

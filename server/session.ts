@@ -1,5 +1,5 @@
-import type { GameAction, GameState } from '../engine/types';
-import type { ServerMessage } from './protocol';
+import type { GameAction, GameState, ServerEvent } from '../engine/types';
+import type { SequencedEvent, ServerMessage } from './protocol';
 import type { Room } from './room';
 import { createInitialState } from '../engine/state';
 import { engine } from '../engine/engine';
@@ -53,6 +53,11 @@ export class GameSession {
   private roomName: string;
   private maxPlayers: number;
   private destroyed = false;
+  /**
+   * 协议层事件序号：与 state.serverLog 同步累加（初始 = serverLog.length）。
+   * 重启从持久化的 serverLog 恢复，保证新事件 seq 不会与已持久化事件冲突。
+   */
+  private nextSeq = 0;
   pendingPlayerCount?: number;
 
   constructor(room: Room, debug = false, sessionSeed?: number) {
@@ -68,6 +73,7 @@ export class GameSession {
     this.actionLog = actionLog ?? [];
     this.playerNames.clear();
     this.lastActivityAt = Date.now();
+    this.nextSeq = state.serverLog?.length ?? 0;
     this.scheduleTimeout();
   }
 
@@ -123,6 +129,7 @@ export class GameSession {
 
     this.state = state;
     this.actionLog = [{ type: 'startGame' }];
+    this.nextSeq = state.serverLog?.length ?? 0;
     this.touchAndPersist();
 
     setRoomStatus(this.room.id, '进行中');
@@ -169,18 +176,22 @@ export class GameSession {
     this.checkGameEnd();
   }
 
-  private broadcastEvents(events: import('../engine/types').ServerEvent[]): void {
+  private broadcastEvents(events: ServerEvent[]): void {
     if (events.length === 0) return;
 
-    const eventMsg = {
-      type: 'events' as const,
-      events: events.map(ev => ({
-        id: ev.id,
-        type: ev.type,
-        timestamp: ev.timestamp,
-        payload: ev.payload,
-      })),
-      actionLog: this.actionLog,
+    const sequenced: SequencedEvent[] = events.map((ev) => ({
+      id: ev.id,
+      type: ev.type,
+      timestamp: ev.timestamp,
+      payload: ev.payload,
+      seq: ++this.nextSeq,
+    }));
+    const fromSeq = sequenced[0].seq;
+
+    const eventMsg: ServerMessage = {
+      type: 'events',
+      fromSeq,
+      events: sequenced,
     };
 
     if (this.debug) {
@@ -203,26 +214,49 @@ export class GameSession {
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (playerId) {
-        this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, actionLog: this.actionLog });
+        this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, lastSeq: this.nextSeq });
       }
       return;
     }
     for (const [playerId, playerName] of this.playerNames) {
       const feState = buildInitialState(this.state, playerName);
-      this.sendToPlayer(playerId, { type: 'initialView', state: feState });
+      this.sendToPlayer(playerId, { type: 'initialView', state: feState, lastSeq: this.nextSeq });
     }
   }
 
-  /** 给单个玩家（重连时）发完整初始视图。 */
-  private sendInitialViewTo(playerId: string, playerName: string): void {
+  /**
+   * 断点续传：从 serverLog[lastSeq..] 取所有未应用事件，组装成 events 消息下发。
+   */
+  private sendEventsSince(playerId: string, lastSeq: number): void {
     if (!this.state) return;
-    const feState = buildInitialState(this.state, playerName);
-    this.sendToPlayer(playerId, { type: 'initialView', state: feState });
+    const log = this.state.serverLog;
+    const startIdx = Math.max(0, Math.min(lastSeq, log.length));
+    if (startIdx >= log.length) {
+      this.sendToPlayer(playerId, { type: 'events', fromSeq: lastSeq, events: [] });
+      return;
+    }
+    const missed = log.slice(startIdx);
+    if (missed.length === 0) return;
+    const sequenced: SequencedEvent[] = missed.map((ev, i) => ({
+      id: ev.id,
+      type: ev.type,
+      timestamp: ev.timestamp,
+      payload: ev.payload,
+      seq: startIdx + i + 1,
+    }));
+    this.sendToPlayer(playerId, { type: 'events', fromSeq: startIdx + 1, events: sequenced });
   }
 
-  sendDebugGameState(playerId: string): void {
+  /** 给单个玩家（重连时）发完整初始视图。 */
+  private sendInitialViewTo(playerId: string, playerName: string, lastSeq?: number): void {
     if (!this.state) return;
-    this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, actionLog: this.actionLog });
+    const feState = buildInitialState(this.state, playerName);
+    this.sendToPlayer(playerId, { type: 'initialView', state: feState, lastSeq: lastSeq ?? this.nextSeq });
+  }
+
+  sendDebugGameState(playerId: string, lastSeq?: number): void {
+    if (!this.state) return;
+    this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, lastSeq: lastSeq ?? this.nextSeq });
   }
 
   private checkGameEnd(): void {
@@ -362,7 +396,7 @@ export class GameSession {
     return this.state?.pending ?? null;
   }
 
-  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext): boolean {
+  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, lastSeq = 0): boolean {
     if (this.state?.meta.status !== '进行中') return false;
     const wasDisconnected = this.disconnectedAt.delete(playerId);
     this.clearGraceTimer();
@@ -375,10 +409,18 @@ export class GameSession {
     }
 
     if (this.debug) {
-      this.sendToPlayer(playerId, { type: 'debugGameState', state: this.state, actionLog: this.actionLog });
+      this.sendDebugGameState(playerId, this.nextSeq);
+      if (lastSeq < this.nextSeq) {
+        this.sendEventsSince(playerId, lastSeq);
+      }
     } else {
       const playerName = this.playerNames.get(playerId);
-      if (playerName) this.sendInitialViewTo(playerId, playerName);
+      if (playerName) {
+        this.sendInitialViewTo(playerId, playerName, this.nextSeq);
+        if (lastSeq < this.nextSeq) {
+          this.sendEventsSince(playerId, lastSeq);
+        }
+      }
     }
     this.scheduleTimeout();
     if (wasDisconnected) {

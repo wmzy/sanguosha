@@ -43,6 +43,28 @@ describe('useDebugRoom', () => {
     expect(result.current.ui.playerOrder).toEqual(['P1', 'P2', 'P3']);
   });
 
+  it('appendAction 自动分配 clientSeq（1, 2, 3, ...），与协议层 EventSeq 无关', () => {
+    const { result } = renderHook(() => useDebugRoom());
+    act(() => result.current.appendAction({ type: 'playCard' } as any));
+    act(() => result.current.appendAction({ type: 'endTurn' } as any));
+    act(() => result.current.appendAction({ type: 'useSkill' } as any));
+    expect(result.current.ui.actionLog.map((e) => e.clientSeq)).toEqual([1, 2, 3]);
+    // action 字段保留用于 actionLogEntriesToOperations 派生 Operation
+    expect(result.current.ui.actionLog[0].action).toEqual({ type: 'playCard' });
+  });
+
+  it('setActionLog 后 appendAction 继续在末尾累加 clientSeq', () => {
+    const { result } = renderHook(() => useDebugRoom());
+    act(() =>
+      result.current.setActionLog([
+        { action: { type: 'startGame' } as any, clientSeq: 1 },
+        { action: { type: 'endTurn', player: 'P1' } as any, clientSeq: 2 },
+      ]),
+    );
+    act(() => result.current.appendAction({ type: 'endTurn', player: 'P2' } as any));
+    expect(result.current.ui.actionLog.map((e) => e.clientSeq)).toEqual([1, 2, 3]);
+  });
+
   it('toggleSelectedForDiscard + clearSelectedForDiscard：增删 + 批量清空', () => {
     const { result } = renderHook(() => useDebugRoom());
     act(() => result.current.toggleSelectedForDiscard('c1'));
