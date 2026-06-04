@@ -3,11 +3,12 @@
 // 客户端把服务器推送的 events 序列应用到本地 FrontendState 上，得到最新视图。
 // 这是事件溯源风格：初始快照 + 事件流 = 当前状态。
 
-import type { GameState, PlayerEvent, ServerEvent, PendingAction, Json } from '../types';
+import type { GameState, PlayerEvent, ServerEvent, Json } from '../types';
 import type { FrontendState, PlayerView, Animation, CardInfo } from './types';
+import { isPendingAction } from '../../shared/typeGuards';
 import { clonePlayerView } from './buildView';
 
-type P = Record<string, unknown>;
+type P = Record<string, unknown> & { zone?: ZoneRef['zone'] };
 
 export function reduceFrontend(fe: FrontendState, events: PlayerEvent[]): FrontendState {
   const view = clonePlayerView(fe.view);
@@ -181,20 +182,21 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     }
 
     // ─── equip ────────────────────────────────────────────
+    // ─── equip ────────────────────────────────────────────
     case 'equip': {
       const player = p.player as string;
       const cardId = p.cardId as string;
-      const slot = p.slot as string;
+      const slot = (p.slot ?? '') as 'weapon' | 'armor' | 'mount';
       if (player === myId) {
         const cardIdx = self.hand.findIndex(c => c.id === cardId);
         if (cardIdx !== -1) {
           const [card] = self.hand.splice(cardIdx, 1);
-          const eq = self.equipment as unknown as Record<string, CardInfo | null>;
-          if (eq[slot]) view.table.discardPileCount++;
-          eq[slot] = card;
+          const previousCard = self.equipment[slot];
+          if (previousCard) view.table.discardPileCount++;
+          self.equipment = { ...self.equipment, [slot]: card };
         }
       } else if (others[player]) {
-        (others[player].equipment as unknown as Record<string, string | null>)[slot] = cardId;
+        others[player].equipment = { ...others[player].equipment, [slot]: cardId };
       }
       ctx.animationQueue.push({ type: 'equipItem', player, cardId, slot });
       break;
@@ -235,8 +237,6 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     case 'pushPending': {
       const actionType = (p.actionType ?? p.type ?? 'pushPending') as string;
       ctx.animationQueue.push({ type: 'pendingPrompt', actionType });
-      // 将完整的 PendingAction 同步到视图（服务端 pushPending atom 现在会在 payload 中携带完整 action）
-      view.pending = event.payload as unknown as PendingAction;
       break;
     }
 
@@ -463,7 +463,8 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       }
     }
     case 'pushPending': {
-      return { ...state, pending: event.payload as unknown as PendingAction };
+      if (!isPendingAction(event.payload)) return state;
+      return { ...state, pending: event.payload };
     }
     case 'popPending': {
       return { ...state, pending: null };
@@ -572,8 +573,8 @@ interface ZoneRef {
 }
 
 function moveCardInState(state: GameState, cardId: string, from: P, to: P): GameState {
-  const fromRef = from as unknown as ZoneRef;
-  const toRef = to as unknown as ZoneRef;
+  const fromRef = from as ZoneRef;
+  const toRef = to as ZoneRef;
   let stateAfterRemove = removeFromZone(state, cardId, fromRef);
   let stateAfterAdd = addToZone(stateAfterRemove, cardId, toRef);
   return stateAfterAdd;

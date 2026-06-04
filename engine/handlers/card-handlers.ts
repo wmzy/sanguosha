@@ -93,6 +93,11 @@ function handleKillCard(
   const skillDodge = getSkillConvertedCards(state, target, '闪');
   const validCards = [...new Set([...literalDodge, ...skillDodge])];
 
+  // 无双（吕布）：杀需 2 闪抵消
+  const hasWushuang = state.triggers.some(
+    t => t.player === player && t.skillId === '无双',
+  );
+
   const timeout = TIMEOUT_DEFAULTS.killResponse;
   const responseWindow: PendingResponseWindow = {
     id: createPendingId(),
@@ -103,6 +108,7 @@ function handleKillCard(
       defender: target,
       validCards,
       sourceCard: action.cardId,
+      requiredFlashCount: hasWushuang ? 2 : undefined,
       timeout,
       deadline: Date.now() + timeout,
     },

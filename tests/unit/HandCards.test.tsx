@@ -31,9 +31,10 @@ describe('HandCards', () => {
 
   it('选中的卡牌有高亮样式', () => {
     const { container } = render(<HandCards hand={mockCards} selectedIndex={0} onSelectCard={() => {}} />);
-    const cards = container.querySelectorAll('div[style]');
-    // cards[0] is the outer flex container; cards[1] is the first card div
-    const firstCard = cards[1] as HTMLElement;
-    expect(firstCard.style.border).toContain('rgb(231, 76, 60)');
+    // 容器是 firstChild（handContainer），其直接子 div 是手牌
+    const handContainer = container.firstChild as HTMLElement;
+    const firstCard = handContainer.querySelectorAll(':scope > div')[0] as HTMLElement;
+    // 选中卡牌应用 transform: translateY(-8px) 实现"上浮"高亮
+    expect(firstCard.style.transform).toBe('translateY(-8px)');
   });
 });

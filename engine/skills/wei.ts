@@ -1,5 +1,7 @@
 import type { SkillDef } from '../types';
 import { registerSkill } from '../skill';
+import { getPlayer } from '../state';
+import { getSkillConvertedCards } from '../validate';
 
 // ==================== 曹操 ====================
 
@@ -90,9 +92,28 @@ registerSkill({
       },
       {
         type: 'condition',
-        check: { hasValue: { $: 'ctx', path: 'choice' } },
+        check: { notEquals: [{ $: 'ctx', path: 'choice' }, false] },
         then: [
-          // TODO: 用选择的手牌替换判定牌（需要 moveCard atom 将手牌移到判定位置）
+          // 将原判定牌从弃牌堆移回牌堆
+          {
+            type: 'atoms',
+            ops: [{
+              type: 'moveCard',
+              cardId: _ctx.sourceCard!,
+              from: { zone: 'discardPile' },
+              to: { zone: 'deck' },
+            }],
+          },
+          // 将选择的手牌移到弃牌堆作为新的判定结果
+          {
+            type: 'atoms',
+            ops: [{
+              type: 'moveCard',
+              cardId: { $: 'ctx', path: 'choice' },
+              from: { zone: 'hand', player: _ctx.self },
+              to: { zone: 'discardPile' },
+            }],
+          },
         ],
       },
     ];
@@ -249,8 +270,46 @@ registerSkill({
   handler(_ctx, _state) {
     return [
       { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 2 }] },
-      // TODO: 将最多2张牌分配给其他角色（可选）
-      // 需要 prompt 选择分配目标
+      {
+        type: 'prompt',
+        text: '遗计：选择最多2张牌分配给其他角色（或不分配）',
+        options: [
+          { label: '不分配', value: false },
+          { type: 'selectCards', from: 'hand', min: 1, max: 2 },
+        ],
+        defaultChoice: false,
+      },
+      {
+        type: 'condition',
+        check: { notEquals: [{ $: 'ctx', path: 'choice' }, false] },
+        then: [
+          { type: 'atoms', ops: [{ type: 'setCtxVar', key: '遗计/cards', value: { $: 'ctx', path: 'choice' } as const }] },
+          { type: 'atoms', ops: [{ type: 'discard', player: _ctx.self, cardIds: { $: 'ctx', path: 'choice' } as const }] },
+          {
+            type: 'prompt',
+            text: '遗计：选择获得牌的目标角色',
+            options: [
+              { type: 'selectPlayer' },
+            ],
+          },
+          {
+            type: 'foreach',
+            collection: { $: 'ctx', path: 'localVars.遗计/cards' },
+            varName: 'currentCard',
+            body: [
+              {
+                type: 'atoms',
+                ops: [{
+                  type: 'gainCard',
+                  player: { $: 'ctx', path: 'choice' },
+                  cardId: { $: 'ctx', path: 'localVars.currentCard' },
+                  from: { zone: 'discardPile' },
+                }],
+              },
+            ],
+          },
+        ],
+      },
     ];
   },
 });
@@ -291,15 +350,20 @@ registerSkill({
         // 检查上次判定结果：红色则退出循环，黑色继续
         while: { notEquals: [{ $: 'var', player: { $: 'ctx', path: 'self' }, key: '洛神/judgeResult' }, 'red'] },
         body: [
-          // 判定（varKey 自动将结果存储到玩家变量）
           { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self, varKey: '洛神/judgeResult' }] },
-          // 黑色 → 获得此牌（TODO: 需动态引用判定牌 ID）
           {
             type: 'condition',
             check: { equals: [{ $: 'var', player: { $: 'ctx', path: 'self' }, key: '洛神/judgeResult' }, 'black'] },
             then: [
-              // TODO: gainCard 需已知 cardId，当前基础设施不支持动态引用
-              // 需要在 gainCard 增加 fromRecentJudge 等特殊处理
+              {
+                type: 'atoms',
+                ops: [{
+                  type: 'gainCard',
+                  player: { $: 'ctx', path: 'self' },
+                  cardId: { $: 'ctx', path: 'localVars.judgeCardId' },
+                  from: { zone: 'discardPile' },
+                }],
+              },
             ],
           },
         ],
@@ -322,16 +386,27 @@ registerSkill({
     manual: true,
   },
   handler(_ctx, _state) {
+    const target = _ctx.target;
+    if (!target) return [];
+
+    const targetPlayer = getPlayer(_state, target);
+    if (!targetPlayer.info.alive) return [];
+
+    const literalDodge = targetPlayer.hand.filter(
+      (id) => _state.cardMap[id]?.name === '闪',
+    );
+    const skillDodge = getSkillConvertedCards(_state, target, '闪');
+    const validCards = [...new Set([...literalDodge, ...skillDodge])];
+
     return [
       {
-        type: 'prompt',
-        text: '神速：选择发动方式',
-        options: [
-          { label: '不发动', value: false },
-          { label: '跳过判定和摸牌（视为使用杀）', value: 'option1' },
-          { label: '跳过出牌并弃装备（视为使用杀）', value: 'option2' },
-        ],
-        defaultChoice: false,
+        type: 'respond',
+        window: {
+          type: 'killResponse',
+          attacker: _ctx.self,
+          defender: target,
+          validCards,
+        },
       },
     ];
   },
@@ -599,6 +674,12 @@ registerSkill({
     optional: true,
   },
   handler(_ctx, _state) {
+    const e = _ctx.event as Record<string, unknown> | undefined;
+    // 只在自己失去牌时触发
+    if (!e || e['player'] !== _ctx.self) return [];
+    // 只在回合外触发
+    if (_state.currentPlayer === _ctx.self) return [];
+
     return [
       { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self, varKey: '屯田/judgeResult' }] },
       {
@@ -622,11 +703,14 @@ registerSkill({
     phase: '准备',
   },
   handler(_ctx, _state) {
-    const count = (_state.players[_ctx.self].vars['屯田/count'] as number) ?? 0;
+    const p = _state.players[_ctx.self];
+    if (p.vars['凿险/awakened']) return [];
+    const count = (p.vars['屯田/count'] as number) ?? 0;
     if (count < 3) return [];
 
     return [
       { type: 'atoms', ops: [{ type: 'setVar', player: _ctx.self, key: '凿险/awakened', value: true }] },
+      { type: 'atoms', ops: [{ type: 'modifyMaxHealth', player: _ctx.self, delta: -1 }] },
     ];
   },
 });

@@ -217,7 +217,9 @@ export type Atom =
   | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
   | { type: 'setCtxVar'; key: string; value: Json }
   | { type: 'incrementKills' }
-  | { type: 'rearrangeDeck'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> };
+  | { type: 'rearrangeDeck'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> }
+  | { type: 'modifyMaxHealth'; player: Expr<string>; delta: Expr<number> }
+  | { type: 'addSkill'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog
@@ -284,7 +286,7 @@ export interface ExprDistance {
 export interface ExprCardProp {
   $: 'cardProp';
   card: Expr<string>;
-  prop: 'suit' | 'color' | 'type' | 'name';
+  prop: 'suit' | 'color' | 'type' | 'name' | 'rankValue';
 }
 
 export interface ExprCond<T> {
@@ -316,7 +318,7 @@ export interface ExprAliveCount {
 }
 
 /** 判断是否是 Expr 对象（需要 resolve） */
-export function isExpr(value: unknown): boolean {
+export function isExpr(value: unknown): value is (ExprCtx | ExprEvent | ExprVar | ExprCount | ExprDistance | ExprCardProp | ExprCond<unknown> | ExprAdd | ExprSub | ExprHandSize | ExprAliveCount) {
   return typeof value === 'object' && value !== null && '$' in value;
 }
 export type Condition =
@@ -473,6 +475,10 @@ export interface ResponseWindowDef {
   responders?: string[];
   /** 抢占式无懈可击：已 pass 的玩家 */
   passedResponders?: string[];
+  /** 无双（吕布）：杀需要几张闪才能抵消 */
+  requiredFlashCount?: number;
+  /** 无双（吕布）：决斗中每次需要出几张杀 */
+  requiredKillCount?: number;
   /** 嵌套深度：0=原锦囊被无懈, 1=无懈被无懈, ... */
   depth?: number;
   /** 无懈可击链：按出牌顺序记录已打出的无懈（不含当前正在询问的那张） */
@@ -493,8 +499,8 @@ export interface ResponseWindowData extends ResponseWindowDef {
 export type ZoneLoc =
   | { zone: 'deck' }
   | { zone: 'discardPile' }
-  | { zone: 'hand'; player: string }
-  | { zone: 'equipment'; player: string; slot: EquipSlot };
+  | { zone: 'hand'; player: Expr<string> }
+  | { zone: 'equipment'; player: Expr<string>; slot: EquipSlot };
 export interface EngineResult {
   state: GameState;
   events: ServerEvent[];

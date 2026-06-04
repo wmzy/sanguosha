@@ -24,4 +24,26 @@ describe('甄姬 - 洛神', () => {
       expect(currentDeck).toBeLessThanOrEqual(initialDeck);
     })
     .run();
+
+  scenario('黑色判定牌被获得后从弃牌堆移除')
+    .setup(ctx => {
+      ctx.selectCharacters('甄姬', '刘备');
+      ctx.snapshot('initial');
+    })
+    .act('发射准备阶段事件触发洛神', ctx => {
+      ctx.emitEvent({
+        type: 'phaseBegin',
+        phase: '准备',
+        player: 'P1',
+      });
+    })
+    .check('手牌增加时判定牌不再在弃牌堆', ctx => {
+      const diff = ctx.diff('initial');
+      if (diff.handSizeChanges['P1'] > 0) {
+        const initialDiscard = ctx.snapshot('initial').discardPileSize;
+        const currentDiscard = ctx.state.zones.discardPile.length;
+        expect(currentDiscard).toBeLessThanOrEqual(initialDiscard);
+      }
+    })
+    .run();
 });

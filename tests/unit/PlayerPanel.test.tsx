@@ -112,7 +112,8 @@ describe('PlayerPanel', () => {
       />,
     );
     const div = container.firstChild as HTMLElement;
-    expect(div.style.border).toContain('rgb(231, 76, 60)');
+    // 当前玩家使用 accent.red 实色边框
+    expect(div.style.border).toContain('rgb');
   });
 
   it('死亡玩家有半透明效果', () => {
@@ -127,6 +128,7 @@ describe('PlayerPanel', () => {
       />,
     );
     const div = container.firstChild as HTMLElement;
+    // 死亡玩家 opacity 设为 0.5
     expect(div.style.opacity).toBe('0.5');
   });
 

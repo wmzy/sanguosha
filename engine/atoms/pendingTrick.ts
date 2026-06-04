@@ -3,6 +3,7 @@ import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 import type { PendingTrick } from '../../shared/types';
+import { asJson } from '../../shared/typeGuards';
 
 export function register() {
   registerAtom({
@@ -15,7 +16,7 @@ export function register() {
     },
     toEvents(state: GameState, atom: Atom & { type: 'addPendingTrick' }): AtomEventResult {
       const player = atom.player as string;
-      const payload: Json = { player, trick: atom.trick as unknown as Json };
+      const payload: Json = { player, trick: asJson(atom.trick) };
       const server = makeServerEvent('addPendingTrick', payload);
       return [server, new Map(), makePlayerEvent('addPendingTrick', payload)];
     },

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Card } from '../../shared/types';
 import { colors, styles } from '../theme';
 
@@ -10,7 +11,7 @@ interface HandCardsProps {
   onToggleDiscard?: (index: number) => void;
 }
 
-export function HandCards({
+function HandCardsInner({
   hand,
   selectedIndex,
   onSelectCard,
@@ -67,6 +68,8 @@ export function HandCards({
     </div>
   );
 }
+
+export const HandCards = memo(HandCardsInner);
 
 function cardColor(card: Card): string {
   switch (card.name) {

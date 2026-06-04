@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import type { Operation } from '../../shared/log';
 import { colors } from '../theme';
 
@@ -7,7 +7,7 @@ interface LogPanelProps {
   maxHeight?: number;
 }
 
-export function LogPanel({ operations, maxHeight = 200 }: LogPanelProps) {
+function LogPanelInner({ operations, maxHeight = 200 }: LogPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,3 +48,5 @@ export function LogPanel({ operations, maxHeight = 200 }: LogPanelProps) {
     </div>
   );
 }
+
+export const LogPanel = memo(LogPanelInner);

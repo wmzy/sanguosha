@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { css, cx } from '@linaria/core';
 import { colors } from '../theme';
 
 interface ReplayControlsProps {
@@ -12,7 +13,70 @@ interface ReplayControlsProps {
   onSelectPlayer: (name: string) => void;
 }
 
-export function ReplayControls({
+const root = css`
+  background-color: ${colors.bg.page};
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+`;
+
+const topRow = css`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+`;
+
+const bottomRow = css`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
+const btnBase = css`
+  padding: 6px 16px;
+  background-color: ${colors.bg.input};
+  color: ${colors.text.input};
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+`;
+
+const btnActive = css`
+  background-color: ${colors.accent.red};
+`;
+
+const slider = css`
+  flex: 1;
+`;
+
+const stepLabel = css`
+  color: ${colors.text.secondary};
+  font-size: 13px;
+  min-width: 80px;
+`;
+
+const speedLabel = css`
+  color: ${colors.text.muted};
+  font-size: 13px;
+`;
+
+const perspectiveLabel = css`
+  color: ${colors.text.muted};
+  font-size: 13px;
+  margin-left: 16px;
+`;
+
+const selectStyle = css`
+  background-color: ${colors.bg.input};
+  color: ${colors.text.input};
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+`;
+
+export const ReplayControls = memo(function ReplayControls({
   currentStep,
   totalSteps,
   onPrev,
@@ -54,21 +118,15 @@ export function ReplayControls({
   const speeds = [0.5, 1, 2, 4];
 
   return (
-    <div style={{
-      backgroundColor: colors.bg.page,
-      borderRadius: 8,
-      padding: 16,
-      marginBottom: 16,
-    }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <button onClick={onPrev} disabled={currentStep <= 0} style={btnStyle}>
+    <div className={root}>
+      <div className={topRow}>
+        <button onClick={onPrev} disabled={currentStep <= 0} className={btnBase}>
           上一步
         </button>
-        <button onClick={() => setPlaying(!playing)} style={btnStyle}>
+        <button onClick={() => setPlaying(!playing)} className={btnBase}>
           {playing ? '暂停' : '播放'}
         </button>
-        <button onClick={onNext} disabled={currentStep >= totalSteps - 1} style={btnStyle}>
+        <button onClick={onNext} disabled={currentStep >= totalSteps - 1} className={btnBase}>
           下一步
         </button>
 
@@ -78,40 +136,29 @@ export function ReplayControls({
           max={totalSteps - 1}
           value={currentStep}
           onChange={e => onGoTo(parseInt(e.target.value))}
-          style={{ flex: 1 }}
+          className={slider}
         />
 
-        <span style={{ color: colors.text.secondary, fontSize: 13, minWidth: 80 }}>
-          {currentStep + 1}/{totalSteps}
-        </span>
+        <span className={stepLabel}>{currentStep + 1}/{totalSteps}</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ color: colors.text.muted, fontSize: 13 }}>速度:</span>
+      <div className={bottomRow}>
+        <span className={speedLabel}>速度:</span>
         {speeds.map(s => (
           <button
             key={s}
             onClick={() => setSpeed(s)}
-            style={{
-              ...btnStyle,
-              backgroundColor: speed === s ? colors.accent.red : colors.bg.input,
-            }}
+            className={cx(btnBase, speed === s && btnActive)}
           >
             {s}x
           </button>
         ))}
 
-        <span style={{ color: colors.text.muted, fontSize: 13, marginLeft: 16 }}>视角:</span>
+        <span className={perspectiveLabel}>视角:</span>
         <select
           value={selectedPlayer}
           onChange={e => onSelectPlayer(e.target.value)}
-          style={{
-            backgroundColor: colors.bg.input,
-            color: colors.text.input,
-            border: 'none',
-            borderRadius: 4,
-            padding: '4px 8px',
-          }}
+          className={selectStyle}
         >
           {players.map(p => (
             <option key={p} value={p}>{p}</option>
@@ -120,14 +167,4 @@ export function ReplayControls({
       </div>
     </div>
   );
-}
-
-const btnStyle: React.CSSProperties = {
-  padding: '6px 16px',
-  backgroundColor: colors.bg.input,
-  color: colors.text.input,
-  border: 'none',
-  borderRadius: 4,
-  cursor: 'pointer',
-  fontSize: 13,
-};
+});

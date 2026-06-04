@@ -3,6 +3,7 @@
 // 接受 PlayerView 派生数据（SelfView 或 OtherPlayerView），不再依赖引擎内部 PlayerState。
 // 自/他 两种形态用判别联合表达，编译期保证正确处理。
 
+import { memo } from 'react';
 import type { AbilityConfig } from '../../shared/types';
 import type { SelfView, OtherPlayerView, CardInfo } from '../../engine/view/types';
 import { colors } from '../theme';
@@ -28,7 +29,7 @@ interface PlayerPanelProps {
   abilities?: AbilityConfig[];
 }
 
-export function PlayerPanel({
+function PlayerPanelInner({
   playerName: _playerName,
   data,
   cardMap,
@@ -186,3 +187,5 @@ export function PlayerPanel({
     </div>
   );
 }
+
+export const PlayerPanel = memo(PlayerPanelInner);

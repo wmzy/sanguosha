@@ -1,6 +1,8 @@
 // src/components/RoomLobby.tsx
 import { useState, useEffect, useCallback } from 'react';
+import { css } from '@linaria/core';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { apiFetch, ApiError } from '../api/client';
 import type { RoomInfo } from '../../server/protocol';
 import { colors, styles } from '../theme';
 import { RoomListPanel } from './RoomListPanel';
@@ -8,6 +10,124 @@ import { RoomListPanel } from './RoomListPanel';
 interface RoomLobbyProps {
   onJoinRoom: (roomId: string, playerId: string) => void;
 }
+
+const waitingPage = css`
+  padding: 40px;
+  background-color: ${colors.bg.page};
+  min-height: 100vh;
+  color: ${colors.text.primary};
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`;
+
+const waitingTitle = css`
+  margin-bottom: 30px;
+`;
+
+const roomInfoCard = css`
+  background-color: ${colors.bg.panel};
+  border-radius: 12px;
+  padding: 30px;
+  min-width: 300px;
+  margin-bottom: 20px;
+`;
+
+const roomInfoTitle = css`
+  margin-bottom: 20px;
+`;
+
+const roomInfoList = css`
+  margin-bottom: 20px;
+`;
+
+const roomPlayerItem = css`
+  padding: 8px 0;
+  border-bottom: 1px solid ${colors.bg.input};
+`;
+
+const waitingButtons = css`
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+`;
+
+const roomErrorBox = css`
+  background-color: ${colors.accent.red};
+  padding: 10px 20px;
+  border-radius: 6px;
+  margin-top: 10px;
+`;
+
+const lobbyTitle = css`
+  text-align: center;
+  margin-bottom: 40px;
+`;
+
+const lobbyTopRow = css`
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+`;
+
+const createCard = css`
+  background-color: ${colors.bg.panel};
+  border-radius: 12px;
+  padding: 30px;
+  min-width: 300px;
+`;
+
+const createTitle = css`
+  margin-bottom: 20px;
+`;
+
+const formGroup15 = css`
+  margin-bottom: 15px;
+`;
+
+const formGroup20 = css`
+  margin-bottom: 20px;
+`;
+
+const formLabel = css`
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+`;
+
+const createBtnConnected = css`
+  background-color: ${colors.accent.red};
+  cursor: pointer;
+`;
+
+const createBtnDisconnected = css`
+  background-color: ${colors.text.dim};
+  cursor: not-allowed;
+`;
+
+const createBtnBase = css`
+  width: 100%;
+  padding: 12px;
+  color: ${colors.white};
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+`;
+
+const connectionStatus = css`
+  text-align: center;
+  margin-top: 30px;
+`;
+
+const connectionOk = css`
+  color: ${colors.accent.green};
+`;
+
+const connectionErr = css`
+  color: ${colors.accent.red};
+`;
 
 export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -77,36 +197,32 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
       return;
     }
     try {
-      const res = await fetch('/api/rooms', {
+      const data = await apiFetch<{ roomId: string }>('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: roomName.trim(), maxPlayers }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? '创建失败');
-        setTimeout(() => setError(null), 3000);
-        return;
-      }
       send({ type: 'join_room', roomId: data.roomId });
-    } catch {
-      setError('网络错误');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError((err.body as { error?: string }).error ?? '创建失败');
+      } else {
+        setError('网络错误');
+      }
       setTimeout(() => setError(null), 3000);
     }
   }, [roomName, maxPlayers, send]);
 
   const handleJoinRoom = useCallback(async (roomId: string) => {
     try {
-      const res = await fetch(`/api/rooms/${roomId}/join`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? '无法加入');
-        setTimeout(() => setError(null), 3000);
-        return;
-      }
+      await apiFetch(`/api/rooms/${roomId}/join`, { method: 'POST' });
       send({ type: 'join_room', roomId });
-    } catch {
-      setError('网络错误');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError((err.body as { error?: string }).error ?? '无法加入');
+      } else {
+        setError('网络错误');
+      }
       setTimeout(() => setError(null), 3000);
     }
   }, [send]);
@@ -133,39 +249,23 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
   // 房间内等待界面
   if (currentRoom) {
     return (
-      <div style={{
-        padding: 40,
-        backgroundColor: colors.bg.page,
-        minHeight: '100vh',
-        color: colors.text.primary,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}
-      >
-        <h1 style={{ marginBottom: 30 }}>房间: {currentRoom}</h1>
+      <div className={waitingPage}>
+        <h1 className={waitingTitle}>房间: {currentRoom}</h1>
 
-        <div style={{
-          backgroundColor: colors.bg.panel,
-          borderRadius: 12,
-          padding: 30,
-          minWidth: 300,
-          marginBottom: 20,
-        }}
-        >
-          <h2 style={{ marginBottom: 20 }}>玩家列表</h2>
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ padding: '8px 0', borderBottom: `1px solid ${colors.bg.input}` }}>
+        <div className={roomInfoCard}>
+          <h2 className={roomInfoTitle}>玩家列表</h2>
+          <div className={roomInfoList}>
+            <div className={roomPlayerItem}>
               {playerId} (你) {isHost ? '- 房主' : ''} {isReady ? '- 已准备' : ''}
             </div>
             {playersInRoom.map(id => (
-              <div key={id} style={{ padding: '8px 0', borderBottom: `1px solid ${colors.bg.input}` }}>
+              <div key={id} className={roomPlayerItem}>
                 {id}
               </div>
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <div className={waitingButtons}>
             {!isReady && (
               <button
                 onClick={handleReady}
@@ -193,17 +293,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
           </div>
         </div>
 
-        {error && (
-          <div style={{
-            backgroundColor: colors.accent.red,
-            padding: '10px 20px',
-            borderRadius: 6,
-            marginTop: 10,
-          }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <div className={roomErrorBox}>{error}</div>}
       </div>
     );
   }
@@ -211,27 +301,15 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
   // 大厅界面
   return (
     <div style={styles.page(40)}>
-      <h1 style={{ textAlign: 'center', marginBottom: 40 }}>三国杀 - 多人对战</h1>
+      <h1 className={lobbyTitle}>三国杀 - 多人对战</h1>
 
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        gap: 40,
-        flexWrap: 'wrap',
-      }}
-      >
+      <div className={lobbyTopRow}>
         {/* 创建房间 */}
-        <div style={{
-          backgroundColor: colors.bg.panel,
-          borderRadius: 12,
-          padding: 30,
-          minWidth: 300,
-        }}
-        >
-          <h2 style={{ marginBottom: 20 }}>创建房间</h2>
+        <div className={createCard}>
+          <h2 className={createTitle}>创建房间</h2>
 
-          <div style={{ marginBottom: 15 }}>
-            <label style={{ display: 'block', marginBottom: 5, fontSize: 14 }}>房间名称</label>
+          <div className={formGroup15}>
+            <label className={formLabel}>房间名称</label>
             <input
               type="text"
               value={roomName}
@@ -241,8 +319,8 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
             />
           </div>
 
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', marginBottom: 5, fontSize: 14 }}>最大玩家数</label>
+          <div className={formGroup20}>
+            <label className={formLabel}>最大玩家数</label>
             <select
               value={maxPlayers}
               onChange={(e) => setMaxPlayers(Number(e.target.value))}
@@ -258,17 +336,7 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
           <button
             onClick={handleCreateRoom}
             disabled={!connected}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: connected ? colors.accent.red : colors.text.dim,
-              color: colors.white,
-              border: 'none',
-              borderRadius: 6,
-              cursor: connected ? 'pointer' : 'not-allowed',
-              fontSize: 16,
-              fontWeight: 'bold',
-            }}
+            className={`${createBtnBase} ${connected ? createBtnConnected : createBtnDisconnected}`}
           >
             创建房间
           </button>
@@ -282,20 +350,13 @@ export function RoomLobby({ onJoinRoom }: RoomLobbyProps) {
       </div>
 
       {/* 连接状态 */}
-      <div style={{
-        textAlign: 'center',
-        marginTop: 30,
-        color: connected ? colors.accent.green : colors.accent.red,
-      }}
+      <div
+        className={`${connectionStatus} ${connected ? connectionOk : connectionErr}`}
       >
         {connected ? '已连接到服务器' : '未连接，请检查服务器是否启动'}
       </div>
 
-      {error && (
-        <div style={styles.errorToast()}>
-          {error}
-        </div>
-      )}
+      {error && <div style={styles.errorToast()}>{error}</div>}
     </div>
   );
 }

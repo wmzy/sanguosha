@@ -2,6 +2,7 @@ import type { GameState, Atom, AtomEventResult, Json, ZoneLoc } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
+import { asJson } from '../../shared/typeGuards';
 
 function removeCardFromZone(state: GameState, cardId: string, from: ZoneLoc): GameState {
   switch (from.zone) {
@@ -10,11 +11,11 @@ function removeCardFromZone(state: GameState, cardId: string, from: ZoneLoc): Ga
     case 'discardPile':
       return { ...state, zones: { ...state.zones, discardPile: state.zones.discardPile.filter(id => id !== cardId) } };
     case 'hand':
-      return updatePlayer(state, from.player, p => ({
+      return updatePlayer(state, from.player as string, p => ({
         hand: p.hand.filter(id => id !== cardId),
       }));
     case 'equipment':
-      return updatePlayer(state, from.player, p => {
+      return updatePlayer(state, from.player as string, p => {
         const equipment = { ...p.equipment };
         if (equipment[from.slot] === cardId) {
           delete equipment[from.slot];
@@ -43,9 +44,9 @@ export function register() {
       const { from } = atom;
       const card = state.cardMap[cardId];
 
-      const server = makeServerEvent('cardGained', { player, cardId, card: card as unknown as Json, from: from as unknown as Json });
-      const ownerEvent = makePlayerEvent('cardGained', { player, cardId, card: card as unknown as Json, from: from as unknown as Json });
-      const otherEvent = makePlayerEvent('cardGained', { player, cardId, from: from as unknown as Json });
+      const server = makeServerEvent('cardGained', { player, cardId, card: asJson(card), from: asJson(from) });
+      const ownerEvent = makePlayerEvent('cardGained', { player, cardId, card: asJson(card), from: asJson(from) });
+      const otherEvent = makePlayerEvent('cardGained', { player, cardId, from: asJson(from) });
 
       return [server, new Map([[player, ownerEvent]]), otherEvent];
     },

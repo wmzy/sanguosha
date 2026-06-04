@@ -1,5 +1,5 @@
 // server/persistence.ts
-import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, readdirSync, statSync } from 'node:fs';
+import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GameState, GameAction, ServerEvent } from '../engine/types';
 import { createInitialState } from '../engine/state';
@@ -11,9 +11,25 @@ import type { Role } from '../shared/types';
 
 const DATA_DIR = join(process.cwd(), 'data', 'rooms');
 
+import { register as registerLifecycle } from './lifecycles';
+import { createLogger } from './logger';
+
+const log = createLogger('persistence');
+
 const DEBOUNCE_MS = 1000;
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingWrappers = new Map<string, PersistedWrapper>();
+
+registerLifecycle('pendingTimers', pendingTimers, () => {
+  for (const timer of pendingTimers.values()) {
+    clearTimeout(timer);
+  }
+  pendingTimers.clear();
+});
+
+registerLifecycle('pendingWrappers', pendingWrappers, () => {
+  pendingWrappers.clear();
+});
 
 const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
 
@@ -35,35 +51,43 @@ interface PersistedWrapper {
   savedAt: number;
 }
 
-function ensureDir(): void {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
+async function ensureDir(): Promise<void> {
+  await mkdir(DATA_DIR, { recursive: true });
 }
 
 function filePath(roomId: string): string {
   return join(DATA_DIR, `${roomId}.json`);
 }
 
-function writeNow(roomId: string, wrapper: PersistedWrapper): void {
+async function writeNow(roomId: string, wrapper: PersistedWrapper): Promise<void> {
   try {
-    writeFileSync(filePath(roomId), JSON.stringify(wrapper));
+    await writeFile(filePath(roomId), JSON.stringify(wrapper));
   } catch (err) {
-    console.warn(`[persistence] save failed for room ${roomId}: ${String(err)}`);
+    log.warn(`save failed for room ${roomId}: ${String(err)}`);
   }
 }
 
-function readWrapperFromDisk(roomId: string): PersistedWrapper | null {
+async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | null> {
   const path = filePath(roomId);
-  if (!existsSync(path)) return null;
   try {
-    const raw = readFileSync(path, 'utf-8');
+    const raw = await readFile(path, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
     if (!isPersistedWrapper(parsed)) return null;
     return parsed;
   } catch (err) {
-    console.warn(`[persistence] read failed for room ${roomId}: ${String(err)}`);
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    log.warn(`read failed for room ${roomId}: ${String(err)}`);
     return null;
+  }
+}
+
+async function deleteFile(roomId: string): Promise<void> {
+  const path = filePath(roomId);
+  try {
+    await unlink(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    log.warn(`delete failed for room ${roomId}: ${String(err)}`);
   }
 }
 
@@ -108,7 +132,7 @@ export interface PersistedRoom {
   lastActivityAt: number;
 }
 
-export function saveRoom(
+export async function saveRoom(
   roomId: string,
   meta: {
     roomName: string;
@@ -119,8 +143,8 @@ export function saveRoom(
   state: GameState,
   actionLog: GameAction[],
   immediate = false,
-): void {
-  ensureDir();
+): Promise<void> {
+  await ensureDir();
   const wrapper: PersistedWrapper = {
     roomName: meta.roomName,
     maxPlayers: meta.maxPlayers,
@@ -147,7 +171,7 @@ export function saveRoom(
       clearTimeout(existing);
       pendingTimers.delete(roomId);
     }
-    writeNow(roomId, wrapper);
+    await writeNow(roomId, wrapper);
     pendingWrappers.delete(roomId);
     return;
   }
@@ -156,21 +180,25 @@ export function saveRoom(
   if (existing) clearTimeout(existing);
   pendingTimers.set(
     roomId,
-    setTimeout(() => {
+    setTimeout(async () => {
       const w = pendingWrappers.get(roomId);
-      if (w) writeNow(roomId, w);
+      if (w) await writeNow(roomId, w);
       pendingTimers.delete(roomId);
       pendingWrappers.delete(roomId);
     }, DEBOUNCE_MS),
   );
 }
 
-export function loadRoom(roomId: string): PersistedRoom | null {
+export async function loadRoom(roomId: string): Promise<PersistedRoom | null> {
   const path = filePath(roomId);
-  if (!existsSync(path)) return null;
-  const wrapper = readWrapperFromDisk(roomId);
+  const wrapper = await readWrapperFromDisk(roomId);
   if (!wrapper) return null;
-  const lastActivityAt = statSync(path).mtimeMs;
+  let lastActivityAt: number;
+  try {
+    lastActivityAt = (await stat(path)).mtimeMs;
+  } catch {
+    return null;
+  }
   return {
     roomId,
     roomName: wrapper.roomName,
@@ -186,39 +214,33 @@ export function loadRoom(roomId: string): PersistedRoom | null {
   };
 }
 
-export function deletePersistedRoom(roomId: string): void {
+export async function deletePersistedRoom(roomId: string): Promise<void> {
   const pending = pendingTimers.get(roomId);
   if (pending) {
     clearTimeout(pending);
     pendingTimers.delete(roomId);
   }
   pendingWrappers.delete(roomId);
-  const path = filePath(roomId);
-  if (existsSync(path)) {
-    try {
-      unlinkSync(path);
-    } catch (err) {
-      console.warn(`[persistence] delete failed for room ${roomId}: ${String(err)}`);
-    }
-  }
+  await deleteFile(roomId);
 }
 
-export function listPersistedRooms(): string[] {
-  ensureDir();
-  return readdirSync(DATA_DIR)
-    .filter(f => f.endsWith('.json'))
-    .map(f => f.replace(/\.json$/, ''));
+export async function listPersistedRooms(): Promise<string[]> {
+  await ensureDir();
+  const entries = await readdir(DATA_DIR);
+  return entries.filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, ''));
 }
 
-export function flushPendingWrites(): void {
+export async function flushPendingWrites(): Promise<void> {
+  const writes: Promise<void>[] = [];
   for (const [roomId, wrapper] of pendingWrappers) {
-    writeNow(roomId, wrapper);
+    writes.push(writeNow(roomId, wrapper));
   }
   for (const timer of pendingTimers.values()) {
     clearTimeout(timer);
   }
   pendingTimers.clear();
   pendingWrappers.clear();
+  await Promise.all(writes);
 }
 
 export function _pendingWriteCount(): number {
@@ -239,7 +261,7 @@ export function restoreToState(persisted: PersistedRoom): GameState {
   for (const action of persisted.actionLog) {
     const result = engine(state, action);
     if (result.error) {
-      console.warn(`[persistence] replay error for room ${persisted.roomId}: ${result.error}`);
+      log.warn(`replay error for room ${persisted.roomId}: ${result.error}`);
       break;
     }
     state = result.state;

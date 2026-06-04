@@ -2,8 +2,7 @@
 //
 // 数据流：服务器发 initialView 初始化本地 FrontendState，events 通过 reducer 应用。
 // 面板渲染走 PlayerPanel：self 玩家用完整 SelfView，others 用 OtherPlayerView 摘要。
-// （手牌 / 出牌 / 响应 / 弃牌 / 技能等交互通过 `useGameState` hook 暴露给本组件。）
-
+// 状态由本地 useState 维护（log / error / gameOver），游戏状态由 FrontendState 派生。
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type { FrontendState, CardInfo } from '../../engine/view/types';

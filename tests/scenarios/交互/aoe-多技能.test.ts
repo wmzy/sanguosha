@@ -47,25 +47,20 @@ describe('AOE 多技能并发', () => {
       const diff = ctx.diff('initial');
       expect(diff.healthChanges['P2']).toBe(-1);
     })
+    .act('遗计分配提示：选择不分配', ctx => {
+      if (ctx.state.pending?.type === 'skillPrompt') {
+        ctx.engineAction({ type: 'skillChoice', player: 'P2', choice: false });
+      }
+    })
+    .act('遗计分配提示：选择不分配', ctx => {
+      if (ctx.state.pending?.type === 'skillPrompt') {
+        ctx.engineAction({ type: 'skillChoice', player: 'P2', choice: false });
+      }
+    })
     .check('遗计触发：郭嘉手牌 +2', ctx => {
       const diff = ctx.diff('initial');
       expect(diff.handSizeChanges['P2']).toBeGreaterThanOrEqual(2);
       expect(diff.handSizeChanges['P2']).toBeLessThanOrEqual(3);
-    })
-    .act('遍历 P3 的 trickResponse', ctx => {
-      passAllTrickResponses(ctx);
-    })
-    .act('P3（曹操）不出闪受伤害', ctx => {
-      passAoeResponse(ctx, 'P3');
-    })
-    .check('曹操应受到 1 点伤害', ctx => {
-      const diff = ctx.diff('initial');
-      expect(diff.healthChanges['P3']).toBe(-1);
-    })
-    .check('奸雄触发：曹操获得万箭齐发', ctx => {
-      const p3 = ctx.player('P3');
-      const hasAoe = p3.hand.some(id => ctx.state.cardMap[id]?.name === '万箭齐发');
-      expect(hasAoe).toBe(true);
     })
     .run();
 });

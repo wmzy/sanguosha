@@ -1,6 +1,7 @@
 import type { GameState, Atom, AtomEventResult, PendingAction, Json } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent } from '../event';
+import { asJson } from '../../shared/typeGuards';
 
 export function createPendingId(): string {
   return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -15,7 +16,7 @@ export function register() {
     },
     toEvents(_state: GameState, atom: Atom & { type: 'pushPending'; action: PendingAction }): AtomEventResult {
       const action = atom.action.id ? atom.action : { ...atom.action, id: createPendingId() };
-      const server = makeServerEvent('pushPending', action as unknown as Json);
+      const server = makeServerEvent('pushPending', asJson(action));
       return [server, new Map(), null];
     },
   });

@@ -21,16 +21,31 @@ import {
 import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreToState } from './persistence';
+import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
+import { pendingToAction } from './protocol-adapter';
 
 const log = createLogger('ws');
 
 const app = new Hono();
+app.use('*', cors);
+app.use('*', requestLogger);
+app.use('*', rateLimit);
+app.onError(errorHandler);
 
 // 游戏会话管理
 const gameSessions = new Map<string, GameSession>();
 
 // 玩家到房间的映射
 const playerRoomMap = new Map<string, string>();
+
+import { register as registerLifecycle } from './lifecycles';
+
+registerLifecycle('gameSessions', gameSessions, () => {
+  gameSessions.clear();
+});
+registerLifecycle('playerRoomMap', playerRoomMap, () => {
+  playerRoomMap.clear();
+});
 
 const IDLE_ROOM_TTL_MS = 60 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -64,16 +79,16 @@ function cleanupIdleRooms(): void {
 
 setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
 
-function restorePersistedRooms(): void {
-  const roomIds = listPersistedRooms();
+async function restorePersistedRooms(): Promise<void> {
+  const roomIds = await listPersistedRooms();
   log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
   for (const roomId of roomIds) {
-    const persisted = loadRoom(roomId);
+    const persisted = await loadRoom(roomId);
     if (!persisted) continue;
     const state = restoreToState(persisted);
     if (state.meta.status === '已结束') {
       log.info(`房间 ${roomId} 已结束，删除落盘文件`);
-      deletePersistedRoom(roomId);
+      await deletePersistedRoom(roomId);
       continue;
     }
     const room: Room = {
@@ -94,7 +109,7 @@ function restorePersistedRooms(): void {
   }
 }
 
-restorePersistedRooms();
+void restorePersistedRooms();
 
 // REST API
 app.get('/api/rooms', (c) => {
@@ -116,7 +131,7 @@ app.get('/api/rooms/:id', (c) => {
   });
 });
 
-app.delete('/api/rooms/:id', (c) => {
+app.delete('/api/rooms/:id', async (c) => {
   const id = c.req.param('id');
   const room = getRoom(id);
   if (!room) return c.json({ error: '房间不存在' }, 404);
@@ -124,7 +139,7 @@ app.delete('/api/rooms/:id', (c) => {
 
   const session = gameSessions.get(id);
   if (session) {
-    session.destroy();
+    await session.destroy();
     gameSessions.delete(id);
   }
   const playerIds = [...room.players.keys()];
@@ -133,7 +148,7 @@ app.delete('/api/rooms/:id', (c) => {
     leaveRoom(id, pid);
   }
   deleteRoom(id);
-  deletePersistedRoom(id);
+  await deletePersistedRoom(id);
 
   return c.json({ success: true });
 });
@@ -353,33 +368,10 @@ function handleResponse(playerId: string, promptId: string, choice: unknown): vo
     return;
   }
 
-  let action: import('../engine/types').GameAction;
-
-  switch (pending.type) {
-    case 'responseWindow':
-    case 'dyingWindow': {
-      const cardId = typeof choice === 'string' ? choice : undefined;
-      action = { type: 'respond', player: playerName, cardId };
-      break;
-    }
-    case 'discardPhase': {
-      const cardIds = Array.isArray(choice) ? choice as string[] : [];
-      action = { type: 'discard', player: playerName, cardIds };
-      break;
-    }
-    case 'skillPrompt': {
-      action = { type: 'skillChoice', player: playerName, choice: choice as import('../engine/types').Json };
-      break;
-    }
-    case 'selectCard': {
-      const cardIds = Array.isArray(choice) ? choice as string[] :
-        typeof choice === 'string' ? [choice] : [];
-      action = { type: 'respond', player: playerName, cardIds };
-      break;
-    }
-    default:
-      log.warn('未知 pending 类型', { pendingType: (pending as { type: string }).type });
-      return;
+  const action = pendingToAction(pending, playerName, choice);
+  if (!action) {
+    log.warn('未知 pending 类型', { pendingType: (pending as { type: string }).type });
+    return;
   }
 
   session.handleAction(playerId, action);

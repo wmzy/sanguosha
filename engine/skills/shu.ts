@@ -26,16 +26,16 @@ registerSkill({
       },
       {
         type: 'foreach',
-        collection: { $: 'ctx', path: 'choice.cardIds' } as unknown as string[],
+        collection: { $: 'ctx', path: 'choice.cardIds' },
         varName: 'giveCardId',
         body: [
           {
             type: 'atoms',
             ops: [{
               type: 'moveCard',
-              cardId: { $: 'ctx', path: 'localVars.giveCardId' } as unknown as string,
+              cardId: { $: 'ctx', path: 'localVars.giveCardId' },
               from: { zone: 'hand', player: _ctx.self },
-              to: { zone: 'hand', player: { $: 'ctx', path: 'choice.target' } as unknown as string },
+              to: { zone: 'hand', player: { $: 'ctx', path: 'choice.target' } },
             }],
           },
         ],

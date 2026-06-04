@@ -477,14 +477,14 @@ registerSkill({
         });
         phases.push({
           type: 'foreach',
-          collection: { $: 'ctx', path: 'choice.cardIds' } as unknown as string[],
+          collection: { $: 'ctx', path: 'choice.cardIds' },
           varName: 'giveCardId',
           body: [
             {
               type: 'atoms',
               ops: [{
                 type: 'moveCard',
-                cardId: { $: 'ctx', path: 'localVars.giveCardId' } as unknown as string,
+                cardId: { $: 'ctx', path: 'localVars.giveCardId' },
                 from: { zone: 'hand', player: _ctx.self },
                 to: { zone: 'hand', player: target },
               }],
@@ -632,7 +632,16 @@ registerSkill({
     phase: '准备',
   },
   handler(_ctx, _state) {
-    return [];
+    const p = _state.players[_ctx.self];
+    if (p.vars['魂姿/awakened']) return [];
+    if (p.health !== 1) return [];
+
+    return [
+      { type: 'atoms', ops: [{ type: 'setVar', player: _ctx.self, key: '魂姿/awakened', value: true }] },
+      { type: 'atoms', ops: [{ type: 'modifyMaxHealth', player: _ctx.self, delta: -1 }] },
+      { type: 'atoms', ops: [{ type: 'addSkill', player: _ctx.self, skillId: '英姿' }] },
+      { type: 'atoms', ops: [{ type: 'addSkill', player: _ctx.self, skillId: '英魂' }] },
+    ];
   },
 });
 

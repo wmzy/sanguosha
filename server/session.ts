@@ -125,8 +125,6 @@ export class GameSession {
     this.actionLog = [{ type: 'startGame' }];
     this.touchAndPersist();
 
-    this.scheduleTimeout();
-
     setRoomStatus(this.room.id, '进行中');
     this.sendInitialViewToAll();
     return true;
@@ -169,7 +167,6 @@ export class GameSession {
 
     this.broadcastEvents(result.events);
     this.checkGameEnd();
-    this.scheduleTimeout();
   }
 
   private broadcastEvents(events: import('../engine/types').ServerEvent[]): void {
@@ -257,17 +254,11 @@ export class GameSession {
     this.touchAndPersist();
     this.broadcastEvents(result.events);
     this.checkGameEnd();
-    this.scheduleTimeout();
   }
 
   /**
    * 按当前 pending 的 deadline 调度单次 setTimeout。
-   *
-   * TODO: 当前需要在每个会改变 state.pending 的方法（startGame / handleAction /
-   * checkTimeout / reconnectPlayer）末尾显式调用本方法，否则新设置的 pending
-   * 永远不会触发超时。理想的"零遗漏"设计是引入一个统一的 state 写入 hook
-   * （例如 withPending 包装器），让所有 pushPending / popPending 都自动
-   * reschedule。重构前请确保新增的会修改 state.pending 的方法都调用本方法。
+   * 在 touchAndPersist() 中自动调用，无需手动 reschedule。
    */
   private scheduleTimeout(): void {
     this.clearTimeoutTimer();
@@ -284,13 +275,13 @@ export class GameSession {
     }
   }
 
-  destroy(): void {
+  async destroy(): Promise<void> {
     if (this.destroyed) return;
     this.destroyed = true;
     this.clearTimeoutTimer();
     this.clearGraceTimer();
     this.state = null;
-    deletePersistedRoom(this.room.id);
+    await deletePersistedRoom(this.room.id);
   }
 
   getLastActivityAt(): number {
@@ -301,7 +292,7 @@ export class GameSession {
     if (this.destroyed) return;
     this.lastActivityAt = Date.now();
     if (this.state) {
-      saveRoom(
+      void saveRoom(
         this.room.id,
         {
           roomName: this.roomName,
@@ -313,10 +304,11 @@ export class GameSession {
         this.actionLog,
       );
     }
+    this.scheduleTimeout();
   }
 
   private appendAction(action: GameAction): void {
-    this.actionLog = [...this.actionLog, action];
+    this.actionLog.push(action);
   }
 
   handleDisconnect(playerId: string): void {

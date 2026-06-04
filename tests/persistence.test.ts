@@ -37,8 +37,8 @@ describe('persistence', () => {
   it('saveRoom + loadRoom 往返一致', async () => {
     const { saveRoom, loadRoom } = await loadModule();
     const state = await makeState();
-    saveRoom('room-1', META, state, [{ type: 'endTurn', player: 'P1' }], true);
-    const loaded = loadRoom('room-1');
+    await saveRoom('room-1', META, state, [{ type: 'endTurn', player: 'P1' }], true);
+    const loaded = await loadRoom('room-1');
     expect(loaded).not.toBeNull();
     expect(loaded?.seed).toBe(42);
     expect(loaded?.players).toHaveLength(3);
@@ -48,24 +48,24 @@ describe('persistence', () => {
 
   it('loadRoom 返回 null 当文件不存在', async () => {
     const { loadRoom } = await loadModule();
-    expect(loadRoom('nonexistent')).toBeNull();
+    expect(await loadRoom('nonexistent')).toBeNull();
   });
 
   it('deletePersistedRoom 移除文件', async () => {
     const { saveRoom, deletePersistedRoom, loadRoom } = await loadModule();
     const state = await makeState();
-    saveRoom('room-2', META, state, [], true);
-    expect(loadRoom('room-2')).not.toBeNull();
-    deletePersistedRoom('room-2');
-    expect(loadRoom('room-2')).toBeNull();
+    await saveRoom('room-2', META, state, [], true);
+    expect(await loadRoom('room-2')).not.toBeNull();
+    await deletePersistedRoom('room-2');
+    expect(await loadRoom('room-2')).toBeNull();
   });
 
   it('listPersistedRooms 返回所有已保存房间', async () => {
     const { saveRoom, listPersistedRooms } = await loadModule();
     const state = await makeState();
-    saveRoom('room-a', META, state, [], true);
-    saveRoom('room-b', META, state, [], true);
-    const ids = listPersistedRooms();
+    await saveRoom('room-a', META, state, [], true);
+    await saveRoom('room-b', META, state, [], true);
+    const ids = await listPersistedRooms();
     expect(ids).toContain('room-a');
     expect(ids).toContain('room-b');
   });
@@ -82,13 +82,13 @@ describe('persistence 防抖路径', () => {
     try {
       const { saveRoom, loadRoom, _pendingWriteCount } = await loadModule();
       const state = await makeState();
-      saveRoom('debounce-1', META, state, []);
+      await saveRoom('debounce-1', META, state, []);
       expect(_pendingWriteCount()).toBe(1);
-      expect(loadRoom('debounce-1')).toBeNull();
-      vi.advanceTimersByTime(999);
-      expect(loadRoom('debounce-1')).toBeNull();
-      vi.advanceTimersByTime(2);
-      expect(loadRoom('debounce-1')).not.toBeNull();
+      expect(await loadRoom('debounce-1')).toBeNull();
+      await vi.advanceTimersByTimeAsync(999);
+      expect(await loadRoom('debounce-1')).toBeNull();
+      await vi.advanceTimersByTimeAsync(2);
+      expect(await loadRoom('debounce-1')).not.toBeNull();
     } finally {
       vi.useRealTimers();
     }
@@ -100,41 +100,41 @@ describe('persistence 防抖路径', () => {
       const { saveRoom, loadRoom, _pendingWriteCount } = await loadModule();
       const state = await makeState();
 
-      saveRoom('debounce-2', META, state, [{ type: 'endTurn', player: 'P1' }]);
+      await saveRoom('debounce-2', META, state, [{ type: 'endTurn', player: 'P1' }]);
       expect(_pendingWriteCount()).toBe(1);
-      vi.advanceTimersByTime(500);
-      saveRoom('debounce-2', META, state, [
+      await vi.advanceTimersByTimeAsync(500);
+      await saveRoom('debounce-2', META, state, [
         { type: 'endTurn', player: 'P1' },
         { type: 'endTurn', player: 'P2' },
       ]);
       expect(_pendingWriteCount()).toBe(1);
-      vi.advanceTimersByTime(500);
-      saveRoom('debounce-2', META, state, [
+      await vi.advanceTimersByTimeAsync(500);
+      await saveRoom('debounce-2', META, state, [
         { type: 'endTurn', player: 'P1' },
         { type: 'endTurn', player: 'P2' },
         { type: 'endTurn', player: 'P3' },
       ]);
       expect(_pendingWriteCount()).toBe(1);
-      vi.advanceTimersByTime(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
-      const loaded = loadRoom('debounce-2');
+      const loaded = await loadRoom('debounce-2');
       expect(loaded?.actionLog).toHaveLength(3);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('flushPendingWrites 同步刷写（防止进程退出丢数据）', async () => {
+  it('flushPendingWrites 刷写（防止进程退出丢数据）', async () => {
     vi.useFakeTimers();
     try {
       const { saveRoom, loadRoom, flushPendingWrites, _pendingWriteCount } = await loadModule();
       const state = await makeState();
-      saveRoom('flush-1', META, state, []);
+      await saveRoom('flush-1', META, state, []);
       expect(_pendingWriteCount()).toBe(1);
-      expect(loadRoom('flush-1')).toBeNull();
-      flushPendingWrites();
+      expect(await loadRoom('flush-1')).toBeNull();
+      await flushPendingWrites();
       expect(_pendingWriteCount()).toBe(0);
-      expect(loadRoom('flush-1')).not.toBeNull();
+      expect(await loadRoom('flush-1')).not.toBeNull();
     } finally {
       vi.useRealTimers();
     }
@@ -145,8 +145,8 @@ describe('restoreToState 事件重放', () => {
   it('无 actionLog 时重建初始状态', async () => {
     const { saveRoom, loadRoom, restoreToState } = await loadModule();
     const state = await makeState();
-    saveRoom('replay-empty', META, state, [], true);
-    const persisted = loadRoom('replay-empty')!;
+    await saveRoom('replay-empty', META, state, [], true);
+    const persisted = (await loadRoom('replay-empty'))!;
     const restored = restoreToState(persisted);
     expect(restored.meta.seed).toBe(42);
     expect(restored.players.P1.health).toBe(state.players.P1.health);
@@ -178,8 +178,8 @@ describe('restoreToState 事件重放', () => {
     }
     const finalOriginal = lastState;
 
-    saveRoom('replay-determinism', META, finalOriginal, actions, true);
-    const persisted = loadRoom('replay-determinism')!;
+    await saveRoom('replay-determinism', META, finalOriginal, actions, true);
+    const persisted = (await loadRoom('replay-determinism'))!;
     const restored = restoreToState(persisted);
 
     expect(restored.meta.seed).toBe(finalOriginal.meta.seed);
@@ -207,8 +207,8 @@ describe('restoreToState 事件重放', () => {
       characterMap: Object.fromEntries(characters.map(c => [c.name, c])),
     });
 
-    saveRoom('replay-triggers', META, state, [], true);
-    const persisted = loadRoom('replay-triggers')!;
+    await saveRoom('replay-triggers', META, state, [], true);
+    const persisted = (await loadRoom('replay-triggers'))!;
     const restored = restoreToState(persisted);
 
     expect(restored.triggers.length).toBeGreaterThan(0);

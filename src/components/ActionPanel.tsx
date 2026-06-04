@@ -1,4 +1,5 @@
 // src/components/ActionPanel.tsx
+import { memo } from 'react';
 import { colors, styles } from '../theme';
 
 interface ActionPanelProps {
@@ -8,7 +9,7 @@ interface ActionPanelProps {
   onEndTurn: () => void;
 }
 
-export function ActionPanel({ canPlay, canEndTurn, onPlayCard, onEndTurn }: ActionPanelProps) {
+function ActionPanelInner({ canPlay, canEndTurn, onPlayCard, onEndTurn }: ActionPanelProps) {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
       <button
@@ -34,3 +35,5 @@ export function ActionPanel({ canPlay, canEndTurn, onPlayCard, onEndTurn }: Acti
     </div>
   );
 }
+
+export const ActionPanel = memo(ActionPanelInner);

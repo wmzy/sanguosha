@@ -2,6 +2,7 @@ import type { GameState, Atom, AtomEventResult, Json } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
+import { asJson } from '../../shared/typeGuards';
 
 export function register() {
   registerAtom({
@@ -13,7 +14,7 @@ export function register() {
       let s: GameState = { ...state };
 
       if (from.zone === 'hand') {
-        s = updatePlayer(s, from.player, p => ({
+        s = updatePlayer(s, from.player as string, p => ({
           hand: p.hand.filter(id => id !== cardId),
         }));
       } else if (from.zone === 'discardPile') {
@@ -21,7 +22,7 @@ export function register() {
       } else if (from.zone === 'deck') {
         s = { ...s, zones: { ...s.zones, deck: s.zones.deck.filter(id => id !== cardId) } };
       } else if (from.zone === 'equipment') {
-        s = updatePlayer(s, from.player, p => {
+        s = updatePlayer(s, from.player as string, p => {
           const eq = { ...p.equipment };
           delete eq[from.slot];
           return { equipment: eq };
@@ -29,13 +30,13 @@ export function register() {
       }
 
       if (to.zone === 'hand') {
-        s = updatePlayer(s, to.player, p => ({ hand: [...p.hand, cardId] }));
+        s = updatePlayer(s, to.player as string, p => ({ hand: [...p.hand, cardId] }));
       } else if (to.zone === 'discardPile') {
         s = { ...s, zones: { ...s.zones, discardPile: [...s.zones.discardPile, cardId] } };
       } else if (to.zone === 'deck') {
         s = { ...s, zones: { ...s.zones, deck: [...s.zones.deck, cardId] } };
       } else if (to.zone === 'equipment') {
-        s = updatePlayer(s, to.player, p => ({
+        s = updatePlayer(s, to.player as string, p => ({
           equipment: { ...p.equipment, [to.slot]: cardId },
         }));
       }
@@ -44,7 +45,7 @@ export function register() {
     },
     toEvents(_state: GameState, atom: Atom & { type: 'moveCard' }): AtomEventResult {
       const cardId = atom.cardId as string;
-      const payload: Json = { cardId, from: atom.from as unknown as Json, to: atom.to as unknown as Json };
+      const payload: Json = { cardId, from: asJson(atom.from), to: asJson(atom.to) };
       const server = makeServerEvent('cardMoved', payload);
       return [server, new Map(), makePlayerEvent('cardMoved', payload)];
     },

@@ -47,7 +47,20 @@ registerSkill({
         ],
         defaultChoice: false,
       },
-      // TODO: 若选择手牌，再对目标使用一张杀
+      {
+        type: 'condition',
+        check: { notEquals: [{ $: 'ctx', path: 'choice' }, false] },
+        then: [
+          {
+            type: 'atoms',
+            ops: [
+              { type: 'discard', player: _ctx.self, cardIds: { $: 'ctx', path: 'choice' } },
+              { type: 'damage', target: _ctx.target!, amount: 1, source: _ctx.self },
+            ],
+          },
+          { type: 'checkDying', player: _ctx.target! },
+        ],
+      },
     ];
   },
 });
@@ -72,7 +85,20 @@ registerSkill({
         ],
         defaultChoice: false,
       },
-      // TODO: 若选择弃牌，强制命中
+      {
+        type: 'condition',
+        check: { notEquals: [{ $: 'ctx', path: 'choice' }, false] },
+        then: [
+          {
+            type: 'atoms',
+            ops: [
+              { type: 'discard', player: _ctx.self, cardIds: { $: 'ctx', path: 'choice' } },
+              { type: 'damage', target: _ctx.target!, amount: 1, source: _ctx.self },
+            ],
+          },
+          { type: 'checkDying', player: _ctx.target! },
+        ],
+      },
     ];
   },
 });
@@ -86,8 +112,26 @@ registerSkill({
     source: 'equipment',
   },
   handler(_ctx, _state) {
-    // TODO: 检查目标性别是否不同，若不同则双方各弃置一张手牌
-    return [];
+    if (!_ctx.target) return [];
+    const selfGender = _state.players[_ctx.self]?.info.gender;
+    const targetGender = _state.players[_ctx.target]?.info.gender;
+    if (!selfGender || !targetGender || selfGender === targetGender) return [];
+
+    const targetHand = _state.players[_ctx.target].hand;
+    const selfHand = _state.players[_ctx.self].hand;
+    if (targetHand.length === 0 && selfHand.length === 0) return [];
+
+    const ops: import('../types').Atom[] = [];
+    if (selfHand.length > 0) {
+      ops.push({ type: 'discardRandom', player: _ctx.self, count: 1, from: 'hand' });
+    }
+    if (targetHand.length > 0) {
+      ops.push({ type: 'discardRandom', player: _ctx.target, count: 1, from: 'hand' });
+    }
+
+    return [
+      { type: 'atoms', ops },
+    ];
   },
 });
 
@@ -103,7 +147,16 @@ registerSkill({
   handler(_ctx, _state) {
     return [
       { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
-      // TODO: 检查判定结果颜色，若红色则视为出闪
+      {
+        type: 'condition',
+        check: { equals: [{ $: 'ctx', path: 'localVars.judgeColor' }, 'red'] },
+        then: [
+          {
+            type: 'atoms',
+            ops: [{ type: 'setVar', player: _ctx.self, key: '八卦阵/dodged', value: true }],
+          },
+        ],
+      },
     ];
   },
 });

@@ -17,16 +17,6 @@ export function honoApiPlugin(): Plugin {
     configureServer(server) {
       // 挂载 Hono REST API 到 /api
       server.middlewares.use('/api', async (req: IncomingMessage, res: ServerResponse) => {
-        if (req.method === 'OPTIONS') {
-          res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? '*');
-          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-          res.setHeader('Access-Control-Max-Age', '86400');
-          res.statusCode = 204;
-          res.end();
-          return;
-        }
-
         try {
           const fullPath = `/api${req.url ?? ''}`;
           const url = new URL(fullPath, `http://${req.headers.host}`);
@@ -53,7 +43,6 @@ export function honoApiPlugin(): Plugin {
 
           const response = await app.fetch(request);
           res.statusCode = response.status;
-          res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? '*');
           response.headers.forEach((value: string, key: string) => {
             res.setHeader(key, value);
           });
@@ -63,7 +52,6 @@ export function honoApiPlugin(): Plugin {
           log.error('API Error', { error });
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
-          res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? '*');
           res.end(JSON.stringify({ error: 'Internal Server Error' }));
         }
       });

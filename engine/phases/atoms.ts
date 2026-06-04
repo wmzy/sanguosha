@@ -10,7 +10,7 @@ type AtomsPhase = Extract<SkillPhase, { type: 'atoms' }>;
 
 function resolveExprFields<A>(obj: A, state: GameState, ctx: SkillContext): A {
   if (obj === null || obj === undefined) return obj;
-  if (isExpr(obj)) return resolve(obj as unknown as Parameters<typeof resolve>[0], state, ctx) as A;
+  if (isExpr(obj)) return resolve(obj as Parameters<typeof resolve>[0], state, ctx) as A;
   if (Array.isArray(obj)) return obj.map(item => resolveExprFields(item, state, ctx)) as A;
   if (typeof obj === 'object' && obj.constructor === Object) {
     const result: Record<string, unknown> = {};

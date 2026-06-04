@@ -1,6 +1,9 @@
 // src/hooks/useWebSocket.ts
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('useWebSocket');
 
 export interface UseWebSocketReturn {
   connected: boolean;
@@ -45,7 +48,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
           cb(message);
         }
       } catch (e) {
-        console.warn('[useWebSocket] failed to parse message:', e);
+        log.warn('failed to parse message:', e);
       }
     };
 

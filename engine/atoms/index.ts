@@ -16,6 +16,8 @@ import * as gainCard from './gainCard';
 import * as ctxVar from './ctxVar';
 import * as turn from './turn';
 import * as rearrangeDeck from './rearrangeDeck';
+import * as maxHealth from './maxHealth';
+import * as skill from './skill';
 
 damage.register();
 draw.register();
@@ -35,3 +37,5 @@ gainCard.register();
 ctxVar.register();
 turn.register();
 rearrangeDeck.register();
+maxHealth.register();
+skill.register();

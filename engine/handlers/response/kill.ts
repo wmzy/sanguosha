@@ -37,7 +37,8 @@ export function resolveKillResponse(
       return { state, events: [], error: '只能用闪（或可当闪使用的牌）响应杀' };
     }
 
-    const atoms: Atom[] = [
+    const requiredFlashCount = pending.window.requiredFlashCount ?? 1;
+    const moveResult = applyAtoms(state, [
       {
         type: 'moveCard',
         cardId: action.cardId,
@@ -45,9 +46,17 @@ export function resolveKillResponse(
         to: { zone: 'discardPile' },
       },
       { type: 'popPending' },
-    ];
-    const result = applyAtoms(state, atoms);
-    const emitResult = emitEvent(result.state, {
+    ]);
+
+    if (requiredFlashCount > 1) {
+      return {
+        state,
+        events: [],
+        error: '多闪响应（裸衣）暂未实现',
+      };
+    }
+
+    const emitResult = emitEvent(moveResult.state, {
       type: 'killDodged',
       attacker: attacker ?? '',
       defender,
@@ -58,7 +67,7 @@ export function resolveKillResponse(
     });
     return {
       state: emitResult.state,
-      events: [...result.events, dodgedEvent, ...emitResult.events],
+      events: [...moveResult.events, dodgedEvent, ...emitResult.events],
     };
   }
 

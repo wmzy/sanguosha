@@ -25,7 +25,7 @@ describe('GameSession destroy 阻止后续持久化（race condition 修复）',
   });
 
   it('destroy 是幂等的，deletePersistedRoom 只调用一次', () => {
-    const deleteSpy = vi.spyOn(persistence, 'deletePersistedRoom').mockImplementation(() => {});
+    const deleteSpy = vi.spyOn(persistence, 'deletePersistedRoom').mockImplementation(async () => {});
     const session = new GameSession(room, true);
     session.destroy();
     session.destroy();
@@ -34,7 +34,7 @@ describe('GameSession destroy 阻止后续持久化（race condition 修复）',
   });
 
   it('destroy 后 handleAction 不调用 saveRoom', () => {
-    const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(() => {});
+    const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});
     const session = new GameSession(room, true);
     session.destroy();
     session.handleAction('p1', { type: 'endTurn', player: 'p1' } as never);
@@ -42,7 +42,7 @@ describe('GameSession destroy 阻止后续持久化（race condition 修复）',
   });
 
   it('destroy 后 startGame 不调用 saveRoom', () => {
-    const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(() => {});
+    const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});
     const session = new GameSession(room, true);
     session.destroy();
     session.startGame(2);
@@ -50,8 +50,8 @@ describe('GameSession destroy 阻止后续持久化（race condition 修复）',
   });
 
   it('destroy 后即便外部强行触发 checkTimeout，也不调用 saveRoom', () => {
-    const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(() => {});
-    vi.spyOn(persistence, 'deletePersistedRoom').mockImplementation(() => {});
+    const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});
+    vi.spyOn(persistence, 'deletePersistedRoom').mockImplementation(async () => {});
     const session = new GameSession(room, true);
     session.restoreState(
       {

@@ -2,6 +2,10 @@
 import type { WSContext } from 'hono/ws';
 import type { RoomInfo } from './protocol';
 import { createRng } from '../shared/rng';
+import { register } from './lifecycles';
+import { createLogger } from './logger';
+
+const log = createLogger('room');
 
 export interface Room {
   id: string;
@@ -18,6 +22,12 @@ export interface Room {
 const roomList = new Map<string, Room>();
 
 const roomIdRng = createRng(Date.now());
+
+register('roomList', roomList, () => {
+  roomList.clear();
+});
+
+register('roomIdRng', roomIdRng, () => {});
 
 function generateRoomId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -170,7 +180,7 @@ export function broadcastMessage(room: Room, message: string, excludeId?: string
         ws.send(message);
       } catch (err) {
         // 单点失败不影响其他玩家
-        console.warn(`[room ${room.id}] ws.send failed for player ${id}: ${String(err)}`);
+        log.warn(`ws.send failed for player ${id}: ${String(err)}`);
       }
     }
   }
