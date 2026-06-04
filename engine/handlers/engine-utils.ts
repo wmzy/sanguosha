@@ -85,11 +85,14 @@ export function applyAtoms(state: GameState, atoms: Atom[]): { state: GameState;
 export function createDyingPending(state: GameState, dyingPlayer: string, _source?: string): PendingDyingWindow {
   const timeout = TIMEOUT_DEFAULTS.dyingResponse;
   const alivePlayers = getAlivePlayerNames(state);
-  // 濒死者优先自救，再按顺序询问其他玩家
-  const savers = [
-    dyingPlayer,
-    ...alivePlayers.filter(p => p !== dyingPlayer),
-  ];
+  // 标准三国杀求桃规则：从当前回合玩家开始，按座位（行动）顺序依次询问，
+  // 濒死者本人排在最后自救。
+  const currentIdx = alivePlayers.indexOf(state.currentPlayer);
+  const ordered = currentIdx >= 0
+    ? [...alivePlayers.slice(currentIdx), ...alivePlayers.slice(0, currentIdx)]
+    : alivePlayers;
+  const others = ordered.filter(p => p !== dyingPlayer);
+  const savers = [...others, dyingPlayer];
   return {
     id: createPendingId(),
     type: 'dyingWindow',
@@ -98,6 +101,6 @@ export function createDyingPending(state: GameState, dyingPlayer: string, _sourc
     savers,
     timeout,
     deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: dyingPlayer },
+    onTimeout: { type: 'respond', player: savers[0] },
   };
 }

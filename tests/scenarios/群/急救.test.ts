@@ -20,19 +20,15 @@ describe('华佗 - 急救', () => {
     .act('P2 不出闪', ctx => {
       ctx.respond('P2');
     })
-    .check('P2 进入濒死', ctx => {
+    .check('P2 进入濒死，求桃从 P1 开始', ctx => {
       expect(ctx.state.pending?.type).toBe('dyingWindow');
       if (ctx.state.pending?.type === 'dyingWindow') {
         expect(ctx.state.pending.dyingPlayer).toBe('P2');
-        // P2 先自救，然后轮到 P1
-        expect(ctx.state.pending.savers[0]).toBe('P2');
-        expect(ctx.state.pending.savers[1]).toBe('P1');
+        // 标准规则：从当前回合玩家 P1 开始，濒死者 P2 最后自救
+        expect(ctx.state.pending.savers).toEqual(['P1', 'P2']);
       }
     })
-    .act('P2 没有桃，跳过', ctx => {
-      ctx.respond('P2');
-    })
-    .act('华佗(P1) 用红色手牌(无中生有♥)当桃救 P2', ctx => {
+    .act('P1 用红色手牌(无中生有♥)当桃救 P2', ctx => {
       const redCard = ctx.findCard('P1', '无中生有')!;
       expect(redCard).toBeDefined();
       // 确认这张牌是红色
@@ -84,16 +80,19 @@ describe('华佗 - 急救', () => {
     .act('P2 不出闪', ctx => {
       ctx.respond('P2');
     })
-    .act('P2 没有桃跳过', ctx => {
-      ctx.respond('P2');
-    })
-    .check('轮到华佗救助', ctx => {
+    .check('P2 濒死，求桃从 P1 开始', ctx => {
       expect(ctx.state.pending?.type).toBe('dyingWindow');
+      if (ctx.state.pending?.type === 'dyingWindow') {
+        expect(ctx.state.pending.savers).toEqual(['P1', 'P2']);
+      }
     })
-    .act('华佗也没有桃跳过', ctx => {
+    .act('华佗(P1) 没有桃跳过', ctx => {
       ctx.respond('P1');
     })
-    .check('华佗黑色手牌不能用于急救——P2 死亡', ctx => {
+    .act('P2 也没有桃跳过', ctx => {
+      ctx.respond('P2');
+    })
+    .check('无人出桃——P2 死亡', ctx => {
       const p2 = ctx.player('P2');
       expect(p2.info.alive).toBe(false);
     })
@@ -116,8 +115,8 @@ describe('华佗 - 急救', () => {
     .act('P2 不出闪', ctx => {
       ctx.respond('P2');
     })
-    .act('P2 没有桃跳过', ctx => {
-      ctx.respond('P2');
+    .check('P2 濒死，求桃从 P1 开始', ctx => {
+      expect(ctx.state.pending?.type).toBe('dyingWindow');
     })
     .act('华佗(P1) 用真正的桃救 P2', ctx => {
       const peachId = ctx.findCard('P1', '桃')!;

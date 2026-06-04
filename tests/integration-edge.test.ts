@@ -167,9 +167,9 @@ describe('边界: 濒死/死亡流程', () => {
   it('桃可以将濒死角色救回', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = setHealth(state, 'P2', 1);
-    // createDyingPending 的 savers 顺序为 [濒死者, 其他玩家...]
-    // 2 人局濒死者是 P2，所以 P2（濒死者）优先自救
-    state = injectCard(state, 'P2', '桃');
+    // 标准规则：求桃从当前回合玩家开始，濒死者最后自救
+    // 2 人局当前回合是 P1（用杀者），所以 P1 先求桃，桃给 P1
+    state = injectCard(state, 'P1', '桃');
 
     const killId = findCardInHand(state, 'P1', '杀');
     if (!killId) return;
@@ -178,10 +178,10 @@ describe('边界: 濒死/死亡流程', () => {
     const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
 
     if (r2.state.pending?.type === 'dyingWindow') {
-      // 濒死窗口 → P2（濒死者）出桃自救
-      const peachId = r2.state.players['P2'].hand.find(id => r2.state.cardMap[id]?.name === '桃');
+      // 濒死窗口 → P1（当前回合）出桃救 P2
+      const peachId = r2.state.players['P1'].hand.find(id => r2.state.cardMap[id]?.name === '桃');
       if (peachId) {
-        const r3 = engine(r2.state, { type: 'respond', player: 'P2', cardId: peachId });
+        const r3 = engine(r2.state, { type: 'respond', player: 'P1', cardId: peachId });
         expect(r3.error).toBeUndefined();
         // P2 被救回，体力变为 1
         expect(r3.state.players['P2'].health).toBe(1);

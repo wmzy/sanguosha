@@ -165,11 +165,12 @@ describe('V2 Engine - 回合流程', () => {
       let state = setPlayPhase(createTestGame({ playerCount: 2 }));
       state = setHealth(state, 'P2', 1);
       state = injectCard(state, 'P1', '杀');
-      // 濒死者（P2）优先自救，所以把桃给 P2
-      state = injectCard(state, 'P2', '桃');
+      // 标准规则：从当前回合玩家 P1 开始求桃，濒死者 P2 最后自救
+      // 所以把桃给 P1
+      state = injectCard(state, 'P1', '桃');
 
       const killId = findCardInHand(state, 'P1', '杀')!;
-      const peachId = findCardInHand(state, 'P2', '桃')!;
+      const peachId = findCardInHand(state, 'P1', '桃')!;
 
       const r1 = engine(state, {
         type: 'playCard',
@@ -180,10 +181,10 @@ describe('V2 Engine - 回合流程', () => {
       // P2 不出闪
       const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
 
-      // 濒死窗口 savers=[P2, P1], currentSaverIndex=0 → P2 自救
+      // 濒死窗口 savers=[P1, P2]（从当前回合玩家开始，濒死者最后）
       const r3 = engine(r2.state, {
         type: 'respond',
-        player: 'P2', // changed from 'P1' to 'P2' — 濒死者优先自救
+        player: 'P1',
         cardId: peachId,
       });
       expect(r3.error).toBeUndefined();
@@ -207,12 +208,12 @@ describe('V2 Engine - 回合流程', () => {
       // P2 不出闪
       const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
 
-      // 濒死窗口 savers=[P2, P1], currentSaverIndex=0 → P2
-      // P2 不救
-      const r3 = engine(r2.state, { type: 'respond', player: 'P2' });
-      // currentSaverIndex=1 → P1
-      // P1 也不救
-      const r4 = engine(r3.state, { type: 'respond', player: 'P1' });
+      // 濒死窗口 savers=[P1, P2]（从当前回合玩家开始，濒死者最后）
+      // P1 不救
+      const r3 = engine(r2.state, { type: 'respond', player: 'P1' });
+      // currentSaverIndex=1 → P2
+      // P2 也不救
+      const r4 = engine(r3.state, { type: 'respond', player: 'P2' });
 
       expect(r4.state.players['P2'].info.alive).toBe(false);
     });

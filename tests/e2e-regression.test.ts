@@ -569,8 +569,9 @@ describe('濒死救援', () => {
     let s = createTestGame({ playerCount: 2, playPhase: true });
     s = setHealth(s, 'P2', 1);
 
-    // 给 P2 注入桃（自救）
-    s = injectCard(s, 'P2', '桃');
+    // 标准规则：求桃从当前回合玩家开始，濒死者最后自救
+    // 当前回合是 P1（用杀者），所以桃给 P1
+    s = injectCard(s, 'P1', '桃');
     // 给 P1 注入杀
     s = injectCard(s, 'P1', '杀');
 
@@ -591,12 +592,12 @@ describe('濒死救援', () => {
     if (r2.state.pending?.type !== 'dyingWindow') return;
     expect(r2.state.pending.dyingPlayer).toBe('P2');
 
-    // P2 有桃，自救
-    const peachId = findCardInHand(r2.state, 'P2', '桃');
+    // P1 有桃，先救
+    const peachId = findCardInHand(r2.state, 'P1', '桃');
     expect(peachId).toBeDefined();
     if (!peachId) return;
 
-    const r3 = engine(r2.state, { type: 'respond', player: 'P2', cardId: peachId });
+    const r3 = engine(r2.state, { type: 'respond', player: 'P1', cardId: peachId });
     expect(r3.error).toBeUndefined();
 
     // P2 应该被救回
