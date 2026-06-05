@@ -231,7 +231,8 @@ export type Atom =
   | { type: 'phaseEnd'; phase: Expr<string>; player: Expr<string> }
   | { type: 'specifyTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
   | { type: 'becomeTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
-  | { type: 'resolveCard'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> };
+  | { type: 'resolveCard'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> }
+  | { type: 'compareRank'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog
@@ -359,7 +360,8 @@ export type SkillPhase =
   | { type: 'loop'; body: SkillPhase[]; while: Condition }
   | { type: 'emit'; event: GameEvent }
   | { type: 'foreach'; collection: Expr<string[]>; body: SkillPhase[]; varName: string }
-  | { type: 'checkDying'; player: Expr<string> };
+  | { type: 'checkDying'; player: Expr<string> }
+  | { type: 'pindian'; a: Expr<string>; b: Expr<string>; aCardId?: Expr<string>; bCardId?: Expr<string>; then: SkillPhase[]; else?: SkillPhase[] };
 export interface PhaseDefinition<P = unknown> {
   type: string;
   execute(

@@ -6,6 +6,7 @@ import * as loop from './loop';
 import * as emit from './emit';
 import * as foreach from './foreach';
 import * as checkDying from './checkDying';
+import * as pindian from './pindian';
 
 atoms.register();
 condition.register();
@@ -15,3 +16,4 @@ loop.register();
 emit.register();
 foreach.register();
 checkDying.register();
+pindian.register();

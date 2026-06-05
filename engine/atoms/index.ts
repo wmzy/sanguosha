@@ -24,6 +24,8 @@ import * as takeCard from './takeCard';
 import * as specifyTarget from './specifyTarget';
 import * as becomeTarget from './becomeTarget';
 import * as resolveCard from './resolveCard';
+import * as compareRank from './compareRank';
+
 const modules = [
   damage,
   draw,
@@ -51,6 +53,7 @@ const modules = [
   specifyTarget,
   becomeTarget,
   resolveCard,
+  compareRank,
 ];
 
 export function registerAllAtoms(): void {

@@ -31,6 +31,9 @@ export function executePlan(
     const result = def.execute(s, phase, ctx, phases, i);
     s = result.state;
     events.push(...result.events);
+    if (result.error) {
+      return { state: s, events, error: result.error };
+    }
     // Only break if a NEW pending was created during execution
     if (!hadPendingOnEntry && s.pending !== null) {
       return { state: s, events };
