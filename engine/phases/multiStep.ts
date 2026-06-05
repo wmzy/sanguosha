@@ -1,8 +1,9 @@
 // engine/phases/multiStep.ts — 顺序多步 SkillPhase 处理器（§6 P0 Task 5 骨架）
 //
 // 骨架版本：依次执行 steps 中的每个子阶段。如果某一步产生 pending（prompt/respond
-// 等需要用户输入），立即返回，把状态交还给调度器；用户响应后 resumeFrom 会
-// 从恢复点继续执行剩余 steps。
+// 等需要用户输入），立即返回，把状态交还给调度器。
+// 注：当前为 v3 简化的 pending 边界，resumeFrom 跨多步恢复（P1 阶段处理）尚未实现；
+// 恢复时 executePlan 仍会从头重放所有 steps。
 //
 // 后续 Task 接管：把 4 个多步 prompt 技能（观星/火计/遗计/制衡/...）迁移到
 // multiStep 形态。
