@@ -425,7 +425,7 @@ export type GameEvent =
   | { type: 'turnEnd'; player: string }
   | { type: 'phaseBegin'; phase: TurnPhase; player: string }
   | { type: 'phaseEnd'; phase: TurnPhase; player: string }
-  /** @deprecated v3: 使用 atom specifyTarget/becomeTarget/resolveCard 替代。GameEvent 概念取消中（[T-13]）。 */
+  /** @deprecated v3+ 将由 useCard 3 原子 (specifyTarget/becomeTarget/resolveCard, [T-13]) 取代；v2 路径保留至 [T-22] 迁移完成。仅 cardPlayed 弃用，非全部 GameEvent。 */
   | { type: 'cardPlayed'; player: string; cardId: string; target?: string }
   | { type: 'damageDealt'; source: string; target: string; amount: number; cardId?: string }
   | { type: 'damageReceived'; target: string; source: string; amount: number; cardId?: string }
