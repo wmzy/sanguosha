@@ -413,23 +413,6 @@ registerSkill({
   },
 } satisfies SkillDef);
 
-// ==================== 贾诩 ====================
-
-registerSkill({
-  id: '完杀',
-  name: '完杀',
-  description: '锁定技，在你的回合，除你以外，只有处于濒死状态的角色才能使用【桃】。',
-  trigger: {
-    event: 'turnStart',
-    source: 'character',
-  },
-  handler(ctx, _state) {
-    return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'wansha' }] },
-    ];
-  },
-} satisfies SkillDef);
-
 registerSkill({
   id: '乱武',
   name: '乱武',
@@ -443,21 +426,6 @@ registerSkill({
   },
   handler(_ctx, _state) {
     return [];
-  },
-} satisfies SkillDef);
-
-registerSkill({
-  id: '帷幕',
-  name: '帷幕',
-  description: '锁定技，你不能成为黑色锦囊的目标。',
-  trigger: {
-    event: 'turnStart',
-    source: 'character',
-  },
-  handler(ctx, _state) {
-    return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'barrier' }] },
-    ];
   },
 } satisfies SkillDef);
 

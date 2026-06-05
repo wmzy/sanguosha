@@ -1,9 +1,10 @@
 import { it } from 'vitest';
-import type { GameState, GameEvent, GameAction, PlayerEvent } from '@engine/types';
+import type { GameState, GameEvent, GameAction, PlayerEvent, Atom } from '@engine/types';
 import type { Card as SharedCard } from '@shared/types';
 import { allCharacters } from '@shared/characters';
 import { createInitialState, getPlayer } from '@engine/state';
 import { engine } from '@engine/engine';
+import { applyAtoms as engineApplyAtoms } from '@engine/atom';
 import { emitEvent as engineEmitEvent, registerCharacterTriggers } from '@engine/skill';
 import { allTricks, weapons, armors, horses } from './fixtures/cards';
 import type { PlayerView, Animation, AvailableAction } from '@engine/view/types';
@@ -189,6 +190,13 @@ export class ScenarioContext {
     const result = engineEmitEvent(this.state, event);
     this.state = result.state;
     this.lastEvents = result.playerEvents?.get(event.type) ?? [];
+  }
+
+  /** 直接应用 atom 序列（用于 v3 钩子测试：becomeTarget/heal 等） */
+  applyAtoms(atoms: Atom[]): void {
+    const result = engineApplyAtoms(this.state, atoms);
+    this.state = result.state;
+    this.lastEvents = [];
   }
 
   /** 执行任意 engine action */

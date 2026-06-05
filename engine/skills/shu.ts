@@ -191,19 +191,6 @@ function buildRearrangeTree(
   ];
 }
 
-registerSkill({
-  id: '空城',
-  name: '空城',
-  description: '锁定技，当你没有手牌时，你不能成为【杀】或【决斗】的目标。',
-  trigger: {
-    event: 'cardPlayed',
-    source: 'character',
-  },
-  handler(_ctx, _state) {
-    return [];
-  },
-});
-
 // ==================== 马超 ====================
 
 registerSkill({

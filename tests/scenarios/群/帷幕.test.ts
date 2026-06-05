@@ -1,30 +1,90 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('贾诩 - 帷幕', () => {
-  scenario('不能成为黑色锦囊的目标')
+describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
+  scenario('黑桃过河拆桥指定贾诩为目标：becomeTarget 被 cancel')
     .setup(ctx => {
       ctx.selectCharacters('贾诩', '曹操');
+      // 给 P2 一张过河拆桥（默认花色 ♠，黑桃属黑色锦囊）
+      ctx.giveCard('P2', '过河拆桥');
     })
-    .act('触发 turnStart 让帷幕标记生效', ctx => {
-      ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+    .act('对贾诩应用黑桃过河拆桥的 becomeTarget atom', ctx => {
+      const cardId = ctx.findCard('P2', '过河拆桥')!;
+      const card = ctx.state.cardMap[cardId];
+      // 确保是黑桃（fixture 默认 ♠）
+      expect(card.suit).toBe('♠');
+      ctx.applyAtoms([
+        {
+          type: 'becomeTarget',
+          cardId,
+          source: 'P2',
+          target: 'P1',
+        },
+      ]);
     })
-    .check('贾诩拥有帷幕标记', ctx => {
-      const p1 = ctx.player('P1');
-      expect(p1.tags).toContain('barrier');
+    .check('serverLog 末尾不是 becomeTarget 事件（被 cancel）', ctx => {
+      const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
+      expect(last?.type).not.toBe('becomeTarget');
+    })
+    .run();
+
+  scenario('红桃五谷丰登指定贾诩为目标：becomeTarget 通过')
+    .setup(ctx => {
+      ctx.selectCharacters('贾诩', '曹操');
+      // 红桃五谷丰登：直接构造（fixture 默认 ♥）
+      ctx.giveCard('P2', '五谷丰登');
+      const wgfdId = ctx.findCard('P2', '五谷丰登')!;
+      // 改花色为红桃
+      ctx.state = {
+        ...ctx.state,
+        cardMap: {
+          ...ctx.state.cardMap,
+          [wgfdId]: { ...ctx.state.cardMap[wgfdId], suit: '♥' },
+        },
+      };
+    })
+    .act('对贾诩应用红桃五谷丰登的 becomeTarget atom', ctx => {
+      const wgfdId = ctx.findCard('P2', '五谷丰登')!;
+      ctx.applyAtoms([
+        {
+          type: 'becomeTarget',
+          cardId: wgfdId,
+          source: 'P2',
+          target: 'P1',
+        },
+      ]);
+    })
+    .check('serverLog 末尾是 becomeTarget 事件（红色锦囊不阻）', ctx => {
+      const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
+      expect(last?.type).toBe('becomeTarget');
+    })
+    .run();
+
+  scenario('黑桃过河拆桥指定非贾诩为目标：becomeTarget 通过')
+    .setup(ctx => {
+      ctx.selectCharacters('贾诩', '曹操');
+      ctx.giveCard('P1', '过河拆桥');
+    })
+    .act('对曹操应用黑桃过河拆桥的 becomeTarget atom', ctx => {
+      const cardId = ctx.findCard('P1', '过河拆桥')!;
+      ctx.applyAtoms([
+        {
+          type: 'becomeTarget',
+          cardId,
+          source: 'P1',
+          target: 'P2',
+        },
+      ]);
+    })
+    .check('serverLog 末尾是 becomeTarget 事件（目标非贾诩）', ctx => {
+      const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
+      expect(last?.type).toBe('becomeTarget');
     })
     .run();
 });
 
-describe('贾诩 - 完杀', () => {
-  it.skip('完杀：回合内只有濒死角色能用桃（需要濒死窗口的桃使用限制逻辑）', () => {
-    // 完杀需要修改濒死窗口的桃使用验证逻辑，涉及验证层扩展
-  });
-});
-
-describe('贾诩 - 乱武', () => {
-  it.skip('乱武：限定技，令所有其他角色对最近角色出杀（需要复杂的AOE式链式交互）', () => {
-    // 乱武需要遍历所有其他角色、计算距离最近、强制出杀或掉血
-    // 是限定技且涉及多玩家串行交互，暂时跳过
+describe('贾诩 - 乱武（暂跳过）', () => {
+  it.skip('乱武：限定技，复杂 AOE 链式交互', () => {
+    // P2+ 任务
   });
 });
