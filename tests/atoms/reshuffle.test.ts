@@ -56,5 +56,7 @@ describe('reshuffle atom', () => {
     const types = next.serverLog.map(e => e.type);
     expect(types).toContain('reshuffle');
     expect(types).toContain('draw');
+    // 顺序：reshuffle 必须先于 draw 出现（先洗回牌堆再抽牌）
+    expect(types.indexOf('reshuffle')).toBeLessThan(types.indexOf('draw'));
   });
 });

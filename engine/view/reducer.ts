@@ -560,6 +560,12 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       const player = p.player as string;
       return { ...state, currentPlayer: player, turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], turnStarted: false } };
     }
+    // reshuffle 是服务端副作用（牌堆→弃牌堆洗回牌堆），已被后续 draw 事件的
+    // payload 携带的 cards 隐式覆盖；前端不需要在此重放 rngState/deck 改动。
+    // 跳过而非 fallthrough 到 default，能让后续 state-changes（draw/等）继续生效。
+    case 'reshuffle': {
+      return state;
+    }
     default:
       return state;
   }

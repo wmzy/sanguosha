@@ -1,5 +1,6 @@
 import type { GameState, Atom, AtomEventResult } from '../types';
 import { registerAtom, applyAtoms } from '../atom';
+import { registerAtomHook } from '../skill-hook';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 
@@ -19,8 +20,23 @@ function maybeReshuffle(state: GameState, needed: number): GameState {
 }
 
 export function register() {
+  // onBefore 钩子：当牌堆不足时在 toEvents 之前先 reshuffle。
+  // 这样 serverLog 顺序为 [..., reshuffle, draw]（reshuffle 先于 draw）。
+  // 直接 applyAtom 调用不走 onBefore，所以 draw.apply 内部仍保留 maybeReshuffle
+  // 兜底（保持直接调用者也能正确洗牌）。
+  registerAtomHook({
+    atomType: 'draw',
+    onBefore: ({ state, atom }) => {
+      const count = (atom as Atom & { type: 'draw' }).count as number;
+      if (state.zones.deck.length >= count) return undefined;
+      if (state.zones.discardPile.length === 0) return undefined;
+      return { state: maybeReshuffle(state, count) };
+    },
+  });
+
   registerAtom({
     type: 'draw',
+    // 直接 applyAtom 调用者：apply 内仍做 reshuffle 兜底（不走 onBefore 钩子）。
     apply(state: GameState, atom: Atom & { type: 'draw' }): GameState {
       const player = atom.player as string;
       const count = atom.count as number;
@@ -33,11 +49,12 @@ export function register() {
         p => ({ hand: [...p.hand, ...drawn] }),
       );
     },
+    // toEvents 不再做 reshuffle：onBefore 钩子（或 apply 路径）已保证牌堆足够。
+    // 避免 applyAtoms 一次入口触发两次 reshuffle（double RNG 推进）。
     toEvents(state: GameState, atom: Atom & { type: 'draw' }): AtomEventResult {
       const player = atom.player as string;
       const count = atom.count as number;
-      const s = maybeReshuffle(state, count);
-      const drawn = s.zones.deck.slice(0, count);
+      const drawn = state.zones.deck.slice(0, count);
       const actualCount = drawn.length;
       const server = makeServerEvent('draw', { player, count: actualCount, cards: drawn });
       const ownerEvent = makePlayerEvent('draw', { player, count: actualCount, cards: drawn });
