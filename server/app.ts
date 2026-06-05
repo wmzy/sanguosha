@@ -131,6 +131,15 @@ app.get('/api/rooms/:id', (c) => {
   });
 });
 
+app.get('/api/rooms/:id/log', (c) => {
+  const id = c.req.param('id');
+  const session = gameSessions.get(id);
+  if (!session) return c.json({ error: '会话不存在' }, 404);
+  const gameLog = session.getGameLog();
+  if (!gameLog) return c.json({ error: '无游戏日志' }, 404);
+  return c.json(gameLog);
+});
+
 app.delete('/api/rooms/:id', async (c) => {
   const id = c.req.param('id');
   const room = getRoom(id);

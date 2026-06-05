@@ -4,7 +4,7 @@
 
 import type { GameState, GameAction, EngineResult, Atom, PendingSelectCard } from '../../types';
 import { getPlayer } from '../../state';
-import { applyAtoms } from '../engine-utils';
+import { applyAtoms } from '../../atom';
 
 export function resolveSelectCard(
   state: GameState,

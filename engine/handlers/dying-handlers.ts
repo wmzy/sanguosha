@@ -1,7 +1,7 @@
 import type { GameState, GameAction, EngineResult, Atom, PendingDyingWindow, ServerEvent } from '../types';
 import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
-import { applyAtoms } from './engine-utils';
+import { applyAtoms } from '../atom';
 import { startAoeTargetWuxie } from './response-handlers';
 import { isCardValidResponse } from '../validate';
 

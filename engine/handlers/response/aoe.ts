@@ -4,7 +4,8 @@
 
 import type { GameState, GameAction, EngineResult, Atom, PendingResponseWindow } from '../../types';
 import { getPlayer, getAlivePlayerNames } from '../../state';
-import { applyAtoms, applyDamage } from '../engine-utils';
+import { applyAtoms } from '../../atom';
+import { applyDamage } from '../engine-utils';
 import { createPendingId } from '../../atoms/pending';
 import { TIMEOUT_DEFAULTS } from '../../types';
 import { createConcurrentTrickResponse } from './trick';

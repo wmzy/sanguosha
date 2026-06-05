@@ -148,8 +148,8 @@ export function emitEvent(
       const phaseEvent = event as { type: 'phaseBegin'; phase: string; player: string };
       if (trigger.player !== phaseEvent.player) continue;
       if (def.trigger.phase && phaseEvent.phase !== def.trigger.phase) continue;
-      const beginFlag = `phaseBegin/${phaseEvent.phase}`;
-      if (s.turn.phaseFlags.includes(beginFlag)) continue;
+      // phaseFlags 防重逻辑已删除（Phase 13）：setPhase 拆分为显式 phaseBegin atom，
+      // 每个新阶段只派一次 phaseBegin server event。
     }
 
     const ctx = buildSkillContext(s, event, trigger);

@@ -75,8 +75,8 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     setPlayerCount,
     setError,
     setDebugRooms,
-    setActionLog,
-    appendAction,
+    appendOperations,
+    setOperations,
     setPerspective,
     setPlayerOrder,
     setSelectedCardId,
@@ -119,7 +119,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       if (msg.type === 'debugGameState') {
         lastAppliedSeqRef.current = msg.lastSeq;
         dispatch({ type: 'reset', state: msg.state, lastAppliedSeq: msg.lastSeq });
-        setActionLog([{ action: { type: 'startGame' }, clientSeq: 1 }]);
+        setOperations([]);
         if (!ui.perspective && msg.state.currentPlayer) {
           setPerspective(msg.state.currentPlayer);
           setPlayerOrder(rotatePlayers(msg.state.playerOrder, msg.state.currentPlayer));
@@ -130,6 +130,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
         const maxSeq = fresh[fresh.length - 1].seq;
         lastAppliedSeqRef.current = maxSeq;
         dispatch({ type: 'applyEvents', events: fresh, lastSeq: maxSeq });
+        if (msg.operations) appendOperations(msg.operations);
       } else if (msg.type === 'room_list') {
         setDebugRooms(msg.rooms);
       } else if (msg.type === 'room_joined') {
@@ -151,7 +152,8 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     ui.perspective,
     initialRoomId,
     navigate,
-    setActionLog,
+    setOperations,
+    appendOperations,
     setDebugRooms,
     setError,
     setPerspective,
@@ -169,11 +171,9 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
 
   const sendGameAction = useCallback(
     (action: GameAction) => {
-      // 本地立即追加到 actionLog（用于右侧操作流水），不依赖服务端回传。
-      appendAction(action);
       send({ type: 'action', action, baseSeq: lastAppliedSeqRef.current });
     },
-    [appendAction, send],
+    [send],
   );
 
   const refreshRoomList = useCallback(() => send({ type: 'list_rooms', filter: 'debug' }), [send]);

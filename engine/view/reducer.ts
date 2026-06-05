@@ -479,7 +479,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       return {
         ...state,
         currentPlayer: to,
-        turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], phaseFlags: [] },
+        turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], turnStarted: false },
         meta: {
           ...state.meta,
           turnNumber: state.meta.turnNumber + 1,
@@ -558,7 +558,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
     }
     case 'turnStart': {
       const player = p.player as string;
-      return { ...state, currentPlayer: player, turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], phaseFlags: [] } };
+      return { ...state, currentPlayer: player, turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], turnStarted: false } };
     }
     default:
       return state;

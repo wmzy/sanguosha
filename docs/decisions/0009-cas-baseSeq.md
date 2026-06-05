@@ -32,5 +32,6 @@
 - **负面**:
   - 前端操作到 UI 更新有数百毫秒延迟（要等服务端 events 回来），可能影响操作流畅感。需要的话后续加 UI 层的 "in-flight" 视觉反馈。
   - 断线重连期间（前端 lastAppliedSeq 还在旧值时）所有操作都会被服务端静默丢弃。连接恢复后会话重放会自动解决。
+**后续实现**: ADR 0010 解决了本 ADR 第 5 点提到的"actionLog 完全由服务端 events 派生"——通过在 events 消息中附加 `operations` 字段实现。客户端不再本地追加 actionLog，改为接收服务端生成的 operations。ADR 0011 进一步修复 turnStart 事件不进 serverLog 的设计漏洞——封装为 atom 后，ReplayEngine 重建状态完整。
 
 **参考**: `server/protocol.ts` (ClientMessage/ServerMessage)、`server/session.ts:handleAction` (CAS 校验)、`src/hooks/useDebugLobbyController.ts:sendGameAction` (携带 baseSeq)、`engine/atoms/pending.ts` (pending 创建/推进产生新事件 → seq 推进)。

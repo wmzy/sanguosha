@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { broadcast } from '@engine/atom';
+import { applyAtoms } from "@engine/atom";
 import { ATOM_GAME_EVENTS } from '@engine/atom-game-events';
 import { createTestGame, setHealth } from '../engine-helpers';
 import '@engine/atoms/index';
@@ -48,14 +48,14 @@ describe('broadcast 多原子序列', () => {
   it('单原子 broadcast 正确', () => {
     const state = createTestGame();
     const beforeHand = state.players.P1.hand.length;
-    const result = broadcast(state, [{ type: 'draw', player: 'P1', count: 2 }]);
+    const result = applyAtoms(state, [{ type: 'draw', player: 'P1', count: 2 }]);
     expect(result.state.players.P1.hand.length).toBe(beforeHand + 2);
     expect(result.playerEvents.get('P1')).toHaveLength(1);
   });
 
   it('多原子顺序执行：draw → damage', () => {
     let state = setHealth(createTestGame(), 'P1', 4);
-    state = broadcast(state, [
+    state = applyAtoms(state, [
       { type: 'draw', player: 'P1', count: 1 },
       { type: 'damage', target: 'P1', amount: 2, source: 'P2' },
     ]).state;
@@ -64,7 +64,7 @@ describe('broadcast 多原子序列', () => {
 
   it('多原子各自产生事件', () => {
     const state = createTestGame();
-    const result = broadcast(state, [
+    const result = applyAtoms(state, [
       { type: 'draw', player: 'P1', count: 1 },
       { type: 'damage', target: 'P2', amount: 1, source: 'P1', cardId: 'test' },
     ]);
@@ -75,7 +75,7 @@ describe('broadcast 多原子序列', () => {
   it('每个原子的事件在 apply 之前生成', () => {
     const state = createTestGame();
     const beforeP2Hand = state.players.P2.hand.length;
-    const result = broadcast(state, [
+    const result = applyAtoms(state, [
       { type: 'draw', player: 'P1', count: 2 },
       { type: 'moveCard', cardId: state.players.P1.hand[0], from: { zone: 'hand', player: 'P1' }, to: { zone: 'hand', player: 'P2' } },
     ]);
@@ -87,12 +87,12 @@ describe('broadcast 多原子序列', () => {
   it('moveCard + gainCard 序列模拟奸雄路径', () => {
     const state = createTestGame();
     const cardId = state.players.P1.hand[0];
-    const r1 = broadcast(state, [
+    const r1 = applyAtoms(state, [
       { type: 'moveCard', cardId, from: { zone: 'hand', player: 'P1' }, to: { zone: 'discardPile' } },
     ]);
     expect(r1.state.zones.discardPile).toContain(cardId);
 
-    const r2 = broadcast(r1.state, [
+    const r2 = applyAtoms(r1.state, [
       { type: 'gainCard', player: 'P2', cardId, from: { zone: 'discardPile' } },
     ]);
     expect(r2.state.players.P2.hand).toContain(cardId);
@@ -104,7 +104,7 @@ describe('broadcast 多原子序列', () => {
 
   it('draw 后 damage：验证事件顺序', () => {
     const state = createTestGame();
-    const result = broadcast(state, [
+    const result = applyAtoms(state, [
       { type: 'draw', player: 'P1', count: 1 },
       { type: 'damage', target: 'P1', amount: 1, source: 'P2' },
     ]);

@@ -10,6 +10,7 @@ const LobbyPage = lazy(() => import('./pages/LobbyPage').then((m) => ({ default:
 const MultiplayerPage = lazy(() =>
   import('./pages/MultiplayerPage').then((m) => ({ default: m.MultiplayerPage })),
 );
+const ReplayPage = lazy(() => import('./pages/ReplayPage').then((m) => ({ default: m.ReplayPage })));
 
 export function App() {
   return (
@@ -22,6 +23,7 @@ export function App() {
             <Route path="/debug/:roomId" element={<DebugPage />} />
             <Route path="/lobby" element={<LobbyPage />} />
             <Route path="/game/:roomId" element={<MultiplayerPage />} />
+            <Route path="/replay" element={<ReplayPage />} />
           </Routes>
         </Suspense>
       </BrowserRouter>

@@ -1,170 +1,189 @@
-import { memo, useState, useEffect, useRef, useCallback } from 'react';
-import { css, cx } from '@linaria/core';
 import { colors } from '../theme';
 
-interface ReplayControlsProps {
+export interface ReplayControlsProps {
   currentStep: number;
   totalSteps: number;
+  speed: number;
+  isPlaying: boolean;
+  perspectives: string[];
+  selectedPerspective: string;
   onPrev: () => void;
   onNext: () => void;
   onGoTo: (step: number) => void;
-  players: string[];
-  selectedPlayer: string;
-  onSelectPlayer: (name: string) => void;
+  onTogglePlay: () => void;
+  onSpeedChange: (speed: number) => void;
+  onPerspectiveChange: (player: string) => void;
+  onClose: () => void;
 }
 
-const root = css`
-  background-color: ${colors.bg.page};
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-`;
+const speeds = [0.5, 1, 2];
 
-const topRow = css`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-`;
-
-const bottomRow = css`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-`;
-
-const btnBase = css`
-  padding: 6px 16px;
-  background-color: ${colors.bg.input};
-  color: ${colors.text.input};
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-`;
-
-const btnActive = css`
-  background-color: ${colors.accent.red};
-`;
-
-const slider = css`
-  flex: 1;
-`;
-
-const stepLabel = css`
-  color: ${colors.text.secondary};
-  font-size: 13px;
-  min-width: 80px;
-`;
-
-const speedLabel = css`
-  color: ${colors.text.muted};
-  font-size: 13px;
-`;
-
-const perspectiveLabel = css`
-  color: ${colors.text.muted};
-  font-size: 13px;
-  margin-left: 16px;
-`;
-
-const selectStyle = css`
-  background-color: ${colors.bg.input};
-  color: ${colors.text.input};
-  border: none;
-  border-radius: 4px;
-  padding: 4px 8px;
-`;
-
-export const ReplayControls = memo(function ReplayControls({
+export function ReplayControls({
   currentStep,
   totalSteps,
+  speed,
+  isPlaying,
+  perspectives,
+  selectedPerspective,
   onPrev,
   onNext,
   onGoTo,
-  players,
-  selectedPlayer,
-  onSelectPlayer,
+  onTogglePlay,
+  onSpeedChange,
+  onPerspectiveChange,
+  onClose,
 }: ReplayControlsProps) {
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopPlaying = useCallback(() => {
-    setPlaying(false);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (playing) {
-      intervalRef.current = setInterval(() => {
-        onNext();
-      }, 1000 / speed);
-    } else {
-      stopPlaying();
-    }
-    return stopPlaying;
-  }, [playing, speed, onNext, stopPlaying]);
-
-  useEffect(() => {
-    if (currentStep >= totalSteps - 1) {
-      stopPlaying();
-    }
-  }, [currentStep, totalSteps, stopPlaying]);
-
-  const speeds = [0.5, 1, 2, 4];
+  const atStart = currentStep === 0;
+  const atEnd = currentStep >= totalSteps - 1;
 
   return (
-    <div className={root}>
-      <div className={topRow}>
-        <button onClick={onPrev} disabled={currentStep <= 0} className={btnBase}>
-          上一步
-        </button>
-        <button onClick={() => setPlaying(!playing)} className={btnBase}>
-          {playing ? '暂停' : '播放'}
-        </button>
-        <button onClick={onNext} disabled={currentStep >= totalSteps - 1} className={btnBase}>
-          下一步
+    <div style={containerStyle}>
+      <div style={rowStyle}>
+        <button
+          onClick={onPrev}
+          disabled={atStart}
+          style={btnStyle(atStart)}
+          aria-label="上一步"
+        >
+          ◀ 上一步
         </button>
 
+        <button
+          onClick={onTogglePlay}
+          style={playBtnStyle}
+          aria-label={isPlaying ? '暂停' : '播放'}
+        >
+          {isPlaying ? '⏸ 暂停' : '▶ 播放'}
+        </button>
+
+        <button
+          onClick={onNext}
+          disabled={atEnd}
+          style={btnStyle(atEnd)}
+          aria-label="下一步"
+        >
+          下一步 ▶
+        </button>
+
+        <select
+          value={speed}
+          onChange={(e) => onSpeedChange(Number(e.target.value))}
+          style={selectStyle}
+          aria-label="播放速度"
+        >
+          {speeds.map((s) => (
+            <option key={s} value={s}>
+              {s}x
+            </option>
+          ))}
+        </select>
+
+        {perspectives.length > 1 && (
+          <select
+            value={selectedPerspective}
+            onChange={(e) => onPerspectiveChange(e.target.value)}
+            style={selectStyle}
+            aria-label="切换视角"
+          >
+            {perspectives.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button onClick={onClose} style={closeBtnStyle} aria-label="关闭">
+          ✕ 关闭
+        </button>
+      </div>
+
+      <div style={sliderRowStyle}>
+        <span style={stepLabelStyle}>
+          {currentStep + 1} / {totalSteps}
+        </span>
         <input
           type="range"
           min={0}
-          max={totalSteps - 1}
+          max={Math.max(totalSteps - 1, 0)}
           value={currentStep}
-          onChange={e => onGoTo(parseInt(e.target.value))}
-          className={slider}
+          onChange={(e) => onGoTo(Number(e.target.value))}
+          style={sliderStyle}
+          aria-label="进度条"
         />
-
-        <span className={stepLabel}>{currentStep + 1}/{totalSteps}</span>
-      </div>
-
-      <div className={bottomRow}>
-        <span className={speedLabel}>速度:</span>
-        {speeds.map(s => (
-          <button
-            key={s}
-            onClick={() => setSpeed(s)}
-            className={cx(btnBase, speed === s && btnActive)}
-          >
-            {s}x
-          </button>
-        ))}
-
-        <span className={perspectiveLabel}>视角:</span>
-        <select
-          value={selectedPlayer}
-          onChange={e => onSelectPlayer(e.target.value)}
-          className={selectStyle}
-        >
-          {players.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
       </div>
     </div>
   );
-});
+}
+
+const containerStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  padding: '8px 12px',
+  backgroundColor: colors.bg.panel,
+  borderRadius: 8,
+};
+
+const rowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flexWrap: 'wrap',
+};
+
+const baseBtn: React.CSSProperties = {
+  padding: '6px 12px',
+  border: 'none',
+  borderRadius: 4,
+  fontSize: 13,
+  cursor: 'pointer',
+  color: colors.white,
+};
+
+function btnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    ...baseBtn,
+    backgroundColor: disabled ? colors.disabled : colors.accent.blue,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.6 : 1,
+  };
+}
+
+const playBtnStyle: React.CSSProperties = {
+  ...baseBtn,
+  backgroundColor: colors.accent.green,
+  minWidth: 80,
+};
+
+const selectStyle: React.CSSProperties = {
+  padding: '4px 8px',
+  borderRadius: 4,
+  backgroundColor: colors.bg.input,
+  color: colors.text.primary,
+  border: `1px solid ${colors.disabled}`,
+  fontSize: 13,
+};
+
+const closeBtnStyle: React.CSSProperties = {
+  ...baseBtn,
+  backgroundColor: colors.accent.red,
+  marginLeft: 'auto',
+};
+
+const sliderRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+};
+
+const sliderStyle: React.CSSProperties = {
+  flex: 1,
+  accentColor: colors.accent.blue,
+};
+
+const stepLabelStyle: React.CSSProperties = {
+  color: colors.text.secondary,
+  fontSize: 13,
+  minWidth: 60,
+};

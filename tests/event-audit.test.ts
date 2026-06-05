@@ -22,7 +22,7 @@ import {
 } from './engine-helpers';
 import { emitEvent, getSkillRegistry, registerCharacterTriggers } from '@engine/skill';
 import { getCharacterMap } from './engine-helpers';
-import { applyAtoms } from '@engine/handlers/engine-utils';
+import { applyAtoms } from '@engine/atom';
 
 const charMap = getCharacterMap();
 

@@ -15,7 +15,8 @@ import { resolveDying } from './handlers/dying-handlers';
 import { handlePlayCard, resolveHarvestSelection } from './handlers/card-handlers';
 import { getSkillRegistry } from './skill';
 import { getPlayer, checkWinCondition } from './state';
-import { applyAtoms, createDyingPending } from './handlers/engine-utils';
+import { applyAtoms } from './atom';
+import { createDyingPending } from './handlers/engine-utils';
 import { makeServerEvent } from './event';
 import { advanceToInteractivePhase } from './phase-advance';
 

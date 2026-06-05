@@ -14,8 +14,7 @@ import { computeValidActions } from '../../../engine/validate';
 import { getDistance } from '../../../engine/distance';
 import { getPlayer } from '../../../engine/state';
 import { buildPlayerView } from '../../../engine/view/buildView';
-import { actionLogEntriesToOperations } from '../../../engine/view/actionLog';
-import type { ActionLogEntry } from '../../hooks/useDebugRoom';
+import type { Operation } from '../../../shared/log';
 import { getSingleActivePlayer } from '../../utils/activePlayer';
 import { saveState } from '../../utils/logFile';
 import { rotatePlayers } from '../../utils/rotatePlayers';
@@ -176,8 +175,7 @@ export interface DebugPlayerListProps {
   state: GameState;
   ui: DebugPlayerListUI;
   actions: DebugPlayerListActions;
-  actionLog: ActionLogEntry[];
-  /** 把玩家动作发送到服务端（已序列化的 ClientMessage） */
+  operations: Operation[];
   sendGameAction: (action: GameAction) => void;
 }
 
@@ -185,7 +183,7 @@ export function DebugPlayerList({
   state,
   ui,
   actions,
-  actionLog,
+  operations,
   sendGameAction,
 }: DebugPlayerListProps) {
   const {
@@ -401,7 +399,7 @@ export function DebugPlayerList({
       },
       getDistance: (from: string, to: string) => getDistance(state, from, to),
       pending: state.pending,
-      playerOps: actionLogEntriesToOperations(actionLog, state),
+      playerOps: operations,
     };
   }, [
     state,
@@ -411,7 +409,7 @@ export function DebugPlayerList({
     selectedTarget,
     selectedForDiscard,
     selectedSkillCards,
-    actionLog,
+    operations,
     sendGameAction,
     setPerspective,
     setPlayerOrder,

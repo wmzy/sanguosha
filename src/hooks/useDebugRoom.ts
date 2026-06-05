@@ -1,33 +1,24 @@
 // src/hooks/useDebugRoom.ts — DebugLobby UI 状态聚合 hook
 //
 // 把 DebugLobby 中可独立管理的 UI 状态（playerCount / error /
-// debugRooms / actionLog / perspective / playerOrder / selectedCardId /
+// debugRooms / operations / perspective / playerOrder / selectedCardId /
 // selectedTarget / selectedForDiscard / selectedSkillCards）合并到
 // useReducer 中。
 //
-// actionLog 设计：
-//   - 由客户端在 sendGameAction 时本地追加（不再依赖服务端每帧下发完整副本）。
-//   - 重连后由 useDebugLobbyController 收到 initialView/debugGameState 时重新播种。
-//   - clientSeq 是 UI 层流水号，与协议层 EventSeq 无关。
+// operations 由服务端在 events 消息中下发（debug 模式 = serverOps）。
+// 客户端通过 appendOperations 累积、setOperations 全量替换。
 
 import { useReducer, useCallback, useMemo } from 'react';
-import type { GameAction, GameState } from '../../engine/types';
+import type { GameState } from '../../engine/types';
+import type { Operation } from '../../shared/log';
 import type { RoomInfo } from '../../server/protocol';
 
-export interface ActionLogEntry {
-  action: GameAction;
-  /**
-   * 客户端操作序号：从 1 开始本地累加，用于右侧操作流水的 seq 显示。
-   * 与 events 消息的协议层 EventSeq 不同——这是 UI 层流水号，重连后归零。
-   */
-  clientSeq: number;
-}
 
 export interface DebugUiState {
   playerCount: number;
   error: string | null;
   debugRooms: RoomInfo[];
-  actionLog: ActionLogEntry[];
+  operations: Operation[];
   perspective: string;
   playerOrder: string[];
   selectedCardId: string | null;
@@ -35,13 +26,12 @@ export interface DebugUiState {
   selectedForDiscard: Set<string>;
   selectedSkillCards: Set<string>;
 }
-
 export type DebugUiAction =
   | { type: 'setPlayerCount'; n: number }
   | { type: 'setError'; err: string | null }
   | { type: 'setDebugRooms'; rooms: RoomInfo[] }
-  | { type: 'setActionLog'; log: ActionLogEntry[] }
-  | { type: 'appendAction'; action: GameAction }
+  | { type: 'appendOperations'; ops: Operation[] }
+  | { type: 'setOperations'; ops: Operation[] }
   | { type: 'setPerspective'; p: string }
   | { type: 'setPlayerOrder'; order: string[] }
   | { type: 'setSelectedCardId'; id: string | null }
@@ -56,8 +46,8 @@ export type DebugUiSetter = {
   setPlayerCount: (n: number) => void;
   setError: (err: string | null) => void;
   setDebugRooms: (rooms: RoomInfo[]) => void;
-  setActionLog: (log: ActionLogEntry[]) => void;
-  appendAction: (action: GameAction) => void;
+  appendOperations: (ops: Operation[]) => void;
+  setOperations: (ops: Operation[]) => void;
   setPerspective: (p: string) => void;
   setPlayerOrder: (order: string[]) => void;
   setSelectedCardId: (id: string | null) => void;
@@ -77,7 +67,7 @@ const initialState: DebugUiState = {
   playerCount: 5,
   error: null,
   debugRooms: [],
-  actionLog: [],
+  operations: [],
   perspective: '',
   playerOrder: [],
   selectedCardId: null,
@@ -94,14 +84,10 @@ function reducer(state: DebugUiState, action: DebugUiAction): DebugUiState {
       return { ...state, error: action.err };
     case 'setDebugRooms':
       return { ...state, debugRooms: action.rooms };
-    case 'setActionLog':
-      return { ...state, actionLog: action.log };
-    case 'appendAction': {
-      const nextSeq = state.actionLog.length > 0
-        ? state.actionLog[state.actionLog.length - 1].clientSeq + 1
-        : 1;
-      return { ...state, actionLog: [...state.actionLog, { action: action.action, clientSeq: nextSeq }] };
-    }
+    case 'setOperations':
+      return { ...state, operations: action.ops };
+    case 'appendOperations':
+      return { ...state, operations: [...state.operations, ...action.ops] };
     case 'setPerspective':
       return { ...state, perspective: action.p };
     case 'setPlayerOrder':
@@ -137,8 +123,8 @@ export function useDebugRoom(): DebugUiController {
   const setPlayerCount = useCallback((n: number) => dispatch({ type: 'setPlayerCount', n }), []);
   const setError = useCallback((err: string | null) => dispatch({ type: 'setError', err }), []);
   const setDebugRooms = useCallback((rooms: RoomInfo[]) => dispatch({ type: 'setDebugRooms', rooms }), []);
-  const setActionLog = useCallback((log: ActionLogEntry[]) => dispatch({ type: 'setActionLog', log }), []);
-  const appendAction = useCallback((action: GameAction) => dispatch({ type: 'appendAction', action }), []);
+  const appendOperations = useCallback((ops: Operation[]) => dispatch({ type: 'appendOperations', ops }), []);
+  const setOperations = useCallback((ops: Operation[]) => dispatch({ type: 'setOperations', ops }), []);
   const setPerspective = useCallback((p: string) => dispatch({ type: 'setPerspective', p }), []);
   const setPlayerOrder = useCallback((order: string[]) => dispatch({ type: 'setPlayerOrder', order }), []);
   const setSelectedCardId = useCallback((id: string | null) => dispatch({ type: 'setSelectedCardId', id }), []);
@@ -155,8 +141,8 @@ export function useDebugRoom(): DebugUiController {
       setPlayerCount,
       setError,
       setDebugRooms,
-      setActionLog,
-      appendAction,
+      appendOperations,
+      setOperations,
       setPerspective,
       setPlayerOrder,
       setSelectedCardId,
@@ -167,7 +153,7 @@ export function useDebugRoom(): DebugUiController {
       clearSelectedSkillCards,
       reset,
     }),
-    [ui, setPlayerCount, setError, setDebugRooms, setActionLog, appendAction, setPerspective, setPlayerOrder, setSelectedCardId, setSelectedTarget, toggleSelectedForDiscard, clearSelectedForDiscard, toggleSelectedSkillCard, clearSelectedSkillCards, reset],
+    [ui, setPlayerCount, setError, setDebugRooms, appendOperations, setOperations, setPerspective, setPlayerOrder, setSelectedCardId, setSelectedTarget, toggleSelectedForDiscard, clearSelectedForDiscard, toggleSelectedSkillCard, clearSelectedSkillCards, reset],
   );
 }
 

@@ -6,13 +6,21 @@
  * 并在特定阶段执行自动行为（摸牌阶段抽 2 张牌）。
  *
  * 只有出牌阶段和弃牌阶段需要玩家交互，其余阶段自动推进。
+ *
+ * Phase 13（setPhase 拆分）：processPhaseStep 改为显式 phaseBegin + 阶段内
+ * actions + phaseEnd + setPhase 序列，避免"xx阶段开始"和"yy阶段结束"乱序
+ * （克己等强制跳阶段技能）。
+ *
+ * 注意：phaseBegin/phaseEnd atom 走 applyAtoms 写 serverLog 后，**必须**显式
+ * 调 emitEvent 派 GameEvent 给技能钩子（38+ 技能监听 phaseBegin）。Phase 10b
+ * 完成统一钩子后这里会简化。
  */
 
-import type { GameState, ServerEvent, EngineResult, GameEvent, Atom, PendingPlayPhase } from './types';
+import type { GameState, ServerEvent, EngineResult, GameEvent, Atom, PendingPlayPhase, PendingTrick } from './types';
 import { TIMEOUT_DEFAULTS } from './types';
 import type { TurnPhase } from '../shared/types';
 import { emitEvent, clearTurnVars } from './skill';
-import { applyAtoms } from './handlers/engine-utils';
+import { applyAtoms } from './atom';
 import { createPendingId } from './atoms/pending';
 import { getPlayer, getAlivePlayerNames } from './state';
 import { createConcurrentTrickResponse } from './handlers/response-handlers';
@@ -20,10 +28,6 @@ import { makeServerEvent } from './event';
 
 /**
  * 处理判定阶段的延迟锦囊（乐不思蜀、兵粮寸断）
- *
- * 三国杀规则：
- * - 乐不思蜀：判定牌不是红桃♥时生效（跳过出牌阶段）
- * - 兵粮寸断：判定牌不是梅花♣时生效（跳过摸牌阶段）
  */
 function processJudgmentPhase(state: GameState, player: string): EngineResult {
   const playerState = getPlayer(state, player);
@@ -32,7 +36,7 @@ function processJudgmentPhase(state: GameState, player: string): EngineResult {
     return { state, events: [] };
   }
 
-  const aliveOthers = getAlivePlayerNames(state).filter(p => p !== player);
+  const aliveOthers = getAlivePlayerNames(state).filter((p) => p !== player);
   if (aliveOthers.length === 0) {
     return batchProcessJudgments(state, player, pendingTricks);
   }
@@ -51,11 +55,7 @@ function processJudgmentPhase(state: GameState, player: string): EngineResult {
   return { state: result.state, events: result.events };
 }
 
-function batchProcessJudgments(
-  state: GameState,
-  player: string,
-  tricks: import('../shared/types').PendingTrick[],
-): EngineResult {
+function batchProcessJudgments(state: GameState, player: string, tricks: PendingTrick[]): EngineResult {
   const atoms: Atom[] = [];
   const tags: string[] = [];
 
@@ -82,7 +82,7 @@ function batchProcessJudgments(
   }
 
   if (tags.length > 0) {
-    const tagAtoms = tags.map(tag => ({ type: 'addTag' as const, player, tag }));
+    const tagAtoms = tags.map((tag) => ({ type: 'addTag' as const, player, tag }));
     const tagResult = applyAtoms(s, tagAtoms);
     return { state: tagResult.state, events: [...actionResult.events, ...tagResult.events] };
   }
@@ -98,27 +98,23 @@ function processPhaseStep(state: GameState): EngineResult {
   const phase = state.phase;
   const player = state.currentPlayer;
   const allEvents: ServerEvent[] = [];
+  let s: GameState = state;
 
-  const beginFlag = `phaseBegin/${phase}`;
-  let s = state;
-  if (!s.turn.phaseFlags.includes(beginFlag)) {
-    const phaseBeginEvent: GameEvent = { type: 'phaseBegin', phase, player };
-    const emitResult = emitEvent(s, phaseBeginEvent);
-    allEvents.push(...emitResult.events);
-    s = { ...emitResult.state, turn: { ...emitResult.state.turn, phaseFlags: [...emitResult.state.turn.phaseFlags, beginFlag] } };
+  // 1. phaseBegin atom（写 serverLog）+ 显式 emitEvent 派 GameEvent 给技能钩子
+  const beginResult = applyAtoms(s, [{ type: 'phaseBegin' as const, phase, player }]);
+  s = beginResult.state;
+  allEvents.push(...beginResult.events);
+  const beginEvent = emitEvent(s, { type: 'phaseBegin' as const, phase, player });
+  s = beginEvent.state;
+  allEvents.push(...beginEvent.events);
+  if (s.pending !== null) return { state: s, events: allEvents };
 
-    if (s.pending !== null) {
-      return { state: s, events: allEvents };
-    }
-  }
-
+  // 2. 阶段内 actions
   if (phase === '判定') {
     const judgmentResult = processJudgmentPhase(s, player);
     s = judgmentResult.state;
     allEvents.push(...judgmentResult.events);
-    if (s.pending !== null) {
-      return { state: s, events: allEvents };
-    }
+    if (s.pending !== null) return { state: s, events: allEvents };
   } else {
     const phaseActions = getPhaseActions(s, phase, player);
     if (phaseActions.length > 0) {
@@ -126,9 +122,7 @@ function processPhaseStep(state: GameState): EngineResult {
       s = actionResult.state;
       allEvents.push(...actionResult.events);
     }
-    if (s.pending !== null) {
-      return { state: s, events: allEvents };
-    }
+    if (s.pending !== null) return { state: s, events: allEvents };
   }
 
   const nextPhase = getNextPhase(phase);
@@ -136,24 +130,26 @@ function processPhaseStep(state: GameState): EngineResult {
     return { state: s, events: allEvents };
   }
 
-  // 发射 phaseEnd 事件（触发监听当前阶段结束的技能，如貂蝉闭月）
-  const phaseEndEvent: GameEvent = { type: 'phaseEnd', phase, player };
-  const phaseEndResult = emitEvent(s, phaseEndEvent);
-  allEvents.push(...phaseEndResult.events);
-  if (phaseEndResult.state.pending !== null) {
-    return { state: phaseEndResult.state, events: allEvents };
-  }
-  s = phaseEndResult.state;
+  // 3. phaseEnd atom（写 serverLog）+ 显式 emitEvent 派 GameEvent 给技能钩子
+  const endResult = applyAtoms(s, [{ type: 'phaseEnd' as const, phase, player }]);
+  s = endResult.state;
+  allEvents.push(...endResult.events);
+  const endEvent = emitEvent(s, { type: 'phaseEnd' as const, phase, player });
+  s = endEvent.state;
+  allEvents.push(...endEvent.events);
+  if (s.pending !== null) return { state: s, events: allEvents };
 
+  // 4. setPhase atom: 切 state.phase 字段（写在 phaseEnd 之后避免乱序）
   const { state: phaseState, events: phaseEvents } = applyAtoms(s, [
-    { type: 'setPhase', phase: nextPhase },
+    { type: 'setPhase' as const, phase: nextPhase },
   ]);
+  s = phaseState;
   allEvents.push(...phaseEvents);
 
-  return { state: phaseState, events: allEvents };
+  return { state: s, events: allEvents };
 }
 
-function getPhaseActions(state: GameState, phase: TurnPhase, player: string): import('./types').Atom[] {
+function getPhaseActions(state: GameState, phase: TurnPhase, player: string): Atom[] {
   const playerState = getPlayer(state, player);
   switch (phase) {
     case '准备':
@@ -192,20 +188,17 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   let s = state;
   const allEvents: ServerEvent[] = [];
 
-  // turnStart 每回合只发射一次，由 nextPlayer atom 重置 phaseFlags
-  if (!s.turn.phaseFlags.includes('turnStarted')) {
+  // turnStart 防重：依赖 state.turn.turnStarted: boolean（nextPlayer atom 重置为 false）
+  if (!s.turn.turnStarted) {
+    // turnStart GameEvent 派发（技能钩子）
     const turnStartGameEvent: GameEvent = { type: 'turnStart', player: s.currentPlayer };
     const turnStartResult = emitEvent(s, turnStartGameEvent);
-    s = {
-      ...turnStartResult.state,
-      turn: {
-        ...turnStartResult.state.turn,
-        phaseFlags: [...turnStartResult.state.turn.phaseFlags, 'turnStarted'],
-      },
-    };
+    s = turnStartResult.state;
     allEvents.push(...turnStartResult.events);
-    const turnStartLogEvent = makeServerEvent('turnStart', { player: s.currentPlayer });
-    allEvents.push(turnStartLogEvent);
+    // turnStart server event 走 atom 路径（写进 state.serverLog，详见 ADR 0011）
+    const turnStartAtomResult = applyAtoms(s, [{ type: 'turnStart', player: s.currentPlayer }]);
+    s = { ...turnStartAtomResult.state, turn: { ...turnStartAtomResult.state.turn, turnStarted: true } };
+    allEvents.push(...turnStartAtomResult.events);
     if (s.pending !== null) {
       return { state: s, events: allEvents };
     }

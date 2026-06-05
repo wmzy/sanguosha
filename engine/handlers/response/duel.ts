@@ -4,7 +4,8 @@
 
 import type { GameState, GameAction, EngineResult, PendingResponseWindow } from '../../types';
 import { getPlayer } from '../../state';
-import { applyAtoms, applyDamage } from '../engine-utils';
+import { applyAtoms } from '../../atom';
+import { applyDamage } from '../engine-utils';
 import { isCardValidResponse } from '../../validate';
 
 export function resolveDuelResponse(

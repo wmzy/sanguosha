@@ -57,7 +57,7 @@ export function createInitialState(config: GameConfig): GameState {
   }
 
   const zones: GameZones = { deck: deckIds.slice(deckIdx), discardPile: [] };
-  const turn: TurnState = { killsPlayed: 0, skillsUsed: [], phaseFlags: [] };
+  const turn: TurnState = { killsPlayed: 0, skillsUsed: [], turnStarted: false };
   const meta: GameMeta = {
     id: `game_${Date.now().toString(36)}_${config.seed.toString(36)}`,
     seed: config.seed,

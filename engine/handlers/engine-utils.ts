@@ -1,6 +1,6 @@
 import type { GameState, GameEvent, Atom, ServerEvent, PlayerEvent, PendingDyingWindow, EngineResult } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
-import { broadcast } from '../atom';
+import { applyAtoms } from '../atom';
 import { emitEvent } from '../skill';
 import { getPlayer, getAlivePlayerNames } from '../state';
 import { makeServerEvent } from '../event';
@@ -75,12 +75,6 @@ export function applyDamage(
   return { state: s, events: allEvents, playerEvents: allPE };
 }
 
-export function applyAtoms(state: GameState, atoms: Atom[]): { state: GameState; events: ServerEvent[]; playerEvents: Map<string, PlayerEvent[]> } {
-  if (atoms.length === 0) return { state, events: [], playerEvents: new Map() };
-  const startLen = state.serverLog.length;
-  const { state: newState, playerEvents } = broadcast(state, atoms);
-  return { state: newState, events: newState.serverLog.slice(startLen), playerEvents };
-}
 
 export function createDyingPending(state: GameState, dyingPlayer: string, _source?: string): PendingDyingWindow {
   const timeout = TIMEOUT_DEFAULTS.dyingResponse;

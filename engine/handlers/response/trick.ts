@@ -10,7 +10,7 @@ import type {
 import { TIMEOUT_DEFAULTS } from '../../types';
 import { getPlayer, getAlivePlayerNames } from '../../state';
 import { makeServerEvent } from '../../event';
-import { applyAtoms } from '../engine-utils';
+import { applyAtoms } from '../../atom';
 import { createPendingId } from '../../atoms/pending';
 import { startAoeTargetWuxie, executeAoeResume } from './aoe';
 

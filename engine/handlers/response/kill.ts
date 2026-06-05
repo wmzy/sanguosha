@@ -5,7 +5,8 @@
 import type { GameState, GameAction, EngineResult, Atom } from '../../types';
 import { getPlayer } from '../../state';
 import { makeServerEvent } from '../../event';
-import { applyAtoms, applyDamage } from '../engine-utils';
+import { applyAtoms } from '../../atom';
+import { applyDamage } from '../engine-utils';
 import { isCardValidResponse } from '../../validate';
 import { emitEvent } from '../../skill';
 

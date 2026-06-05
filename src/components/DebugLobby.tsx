@@ -49,7 +49,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
             toggleSelectedSkillCard: c.toggleSelectedSkillCard,
             clearSelectedSkillCards: c.clearSelectedSkillCards,
           }}
-          actionLog={c.ui.actionLog}
+          operations={c.ui.operations}
           sendGameAction={c.sendGameAction}
         />
       </div>

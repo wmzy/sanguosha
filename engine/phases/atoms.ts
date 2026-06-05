@@ -1,17 +1,26 @@
+// engine/phases/atoms.ts — SkillPhase 'atoms' 阶段处理器
+//
+// 技能内部应用 atom 序列的统一入口（Phase 10a）。使用 `applyAtoms` 并通过
+// `skipPlayerEvents: true` 避免派发 per-player 视角事件——技能触发的副作用
+// 仅对触发技能的玩家有意义，serverLog 仍正常写入（解决深层漏洞）。
+//
+// 设计依据：docs/decisions/0012-unified-apply-atoms.md
+
 import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent, Atom } from '../types';
-import { applyAtom, atomToEvents, getAtomDef } from '../atom';
+import { getAtomDef } from '../atom';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
 import { isExpr } from '../types';
 import { ATOM_GAME_EVENTS } from '../atom-game-events';
 import { emitEvent } from '../skill';
+import { applyAtoms } from '../atom';
 
 type AtomsPhase = Extract<SkillPhase, { type: 'atoms' }>;
 
 function resolveExprFields<A>(obj: A, state: GameState, ctx: SkillContext): A {
   if (obj === null || obj === undefined) return obj;
   if (isExpr(obj)) return resolve(obj as Parameters<typeof resolve>[0], state, ctx) as A;
-  if (Array.isArray(obj)) return obj.map(item => resolveExprFields(item, state, ctx)) as A;
+  if (Array.isArray(obj)) return obj.map((item) => resolveExprFields(item, state, ctx)) as A;
   if (typeof obj === 'object' && obj.constructor === Object) {
     const result: Record<string, unknown> = {};
     for (const key of Object.keys(obj as Record<string, unknown>)) {
@@ -28,22 +37,26 @@ export function register() {
     execute(state: GameState, phase: AtomsPhase, ctx: SkillContext, _plan: SkillPhase[], _index: number): EngineResult {
       let s = state;
       const events: ServerEvent[] = [];
+
       for (const rawAtom of phase.ops) {
         const atom = resolveExprFields(rawAtom, s, ctx);
         if (atom.type === 'setCtxVar') {
           const setCtx = atom;
           ctx.localVars[setCtx.key] = setCtx.value;
         }
-        const [serverEvent] = atomToEvents(s, atom);
-        events.push(serverEvent);
-        s = applyAtom(s, atom);
+
+        // 统一入口：写 serverLog，不派 playerEvents（per-player 视角由技能自己控制）
+        const result = applyAtoms(s, [atom], { skipPlayerEvents: true });
+        s = result.state;
+        events.push(...result.events);
 
         const def = getAtomDef(atom.type);
         if (def.getResult) {
-          const result = def.getResult(s, atom);
-          Object.assign(ctx.localVars, result);
+          const getResult = def.getResult(s, atom);
+          Object.assign(ctx.localVars, getResult);
         }
 
+        // 派 GameEvent 触发技能钩子
         const eventGen = ATOM_GAME_EVENTS[atom.type];
         if (eventGen) {
           const gameEvents = eventGen(s, atom);
@@ -57,6 +70,7 @@ export function register() {
           }
         }
       }
+
       return { state: s, events };
     },
   });

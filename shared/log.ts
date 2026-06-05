@@ -31,6 +31,8 @@ export interface GameLog {
   };
   serverOps: Operation[];
   playerOps: Record<string, Operation[]>;
+  /** 完整服务端事件流（用于 ReplayEngine 重建状态） */
+  serverLog?: Array<{ id: string; type: string; timestamp: number; payload: unknown }>;
 }
 
 export interface DrawData {

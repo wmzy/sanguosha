@@ -12,7 +12,7 @@ import type { GameEvent } from '../types';
 import { getPlayer } from '../state';
 import { getDistance, isInAttackRange } from '../distance';
 import { makeServerEvent } from '../event';
-import { applyAtoms } from './engine-utils';
+import { applyAtoms } from '../atom';
 import { createPendingId } from '../atoms/pending';
 import { emitEvent, registerEquipmentTriggers, unregisterEquipmentTriggers } from '../skill';
 import { createConcurrentTrickResponse, startAoeTargetWuxie } from './response-handlers';

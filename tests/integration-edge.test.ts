@@ -23,7 +23,7 @@ import {
 } from './engine-helpers';
 import { registerCharacterTriggers } from '@engine/skill';
 import { getDistance } from '@engine/distance';
-import { applyAtoms } from '@engine/handlers/engine-utils';
+import { applyAtoms } from '@engine/atom';
 
 // ════════════════════════════════════════════════════════════════
 // 1. 牌堆抽空 + reshuffle

@@ -81,7 +81,7 @@ export type EquipSlot = keyof EquipmentSlots;
 export interface TurnState {
   killsPlayed: number;
   skillsUsed: string[];
-  phaseFlags: string[]; // 'skipDraw', 'skipPlay', etc.
+  turnStarted: boolean; // turnStart atom 是否已派发（防重用）
 }
 export type PendingAction =
   | PendingPlayPhase
@@ -219,7 +219,10 @@ export type Atom =
   | { type: 'incrementKills' }
   | { type: 'rearrangeDeck'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> }
   | { type: 'modifyMaxHealth'; player: Expr<string>; delta: Expr<number> }
-  | { type: 'addSkill'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } };
+  | { type: 'addSkill'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } }
+  | { type: 'turnStart'; player: Expr<string> }
+  | { type: 'phaseBegin'; phase: Expr<string>; player: Expr<string> }
+  | { type: 'phaseEnd'; phase: Expr<string>; player: Expr<string> };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog

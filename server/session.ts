@@ -14,6 +14,8 @@ import { createLogger } from './logger';
 import { createRng } from '../shared/rng';
 import { buildPlayerView } from '../engine/view/buildView';
 import type { FrontendState } from '../engine/view/types';
+import { GameLogger } from '../engine/logger';
+import type { GameLog, Operation } from '../shared/log';
 
 const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
 
@@ -58,6 +60,7 @@ export class GameSession {
    * 重启从持久化的 serverLog 恢复，保证新事件 seq 不会与已持久化事件冲突。
    */
   private nextSeq = 0;
+  private gameLogger: GameLogger | null = null;
   pendingPlayerCount?: number;
 
   constructor(room: Room, debug = false, sessionSeed?: number) {
@@ -74,6 +77,13 @@ export class GameSession {
     this.playerNames.clear();
     this.lastActivityAt = Date.now();
     this.nextSeq = state.serverLog?.length ?? 0;
+    if (this.actionLog.length > 0 && state.serverLog?.length) {
+      this.gameLogger = new GameLogger(
+        { version: '1.0', createdAt: Date.now(), playerCount: state.playerOrder.length, characters: state.playerOrder, seed: 0 },
+        state.playerOrder,
+      );
+      this.gameLogger.rebuildFromLog(state, state.serverLog);
+    }
     this.scheduleTimeout();
   }
 
@@ -130,7 +140,18 @@ export class GameSession {
     this.state = state;
     this.actionLog = [{ type: 'startGame' }];
     this.nextSeq = state.serverLog?.length ?? 0;
+    this.gameLogger = new GameLogger(
+      {
+        version: '1.0',
+        createdAt: Date.now(),
+        playerCount: count,
+        characters: selected.map(c => c.name),
+        seed,
+      },
+      state.playerOrder,
+    );
     this.touchAndPersist();
+    this.gameLogger.recordBatch({ type: 'startGame' } as GameAction, [], this.state);
 
     setRoomStatus(this.room.id, '进行中');
     this.sendInitialViewToAll();
@@ -170,11 +191,11 @@ export class GameSession {
     this.state = result.state;
     this.touchAndPersist();
 
-    this.broadcastEvents(result.events);
+    this.broadcastEvents(result.events, fullAction);
     this.checkGameEnd();
   }
 
-  private broadcastEvents(events: ServerEvent[]): void {
+  private broadcastEvents(events: ServerEvent[], action?: GameAction | null): void {
     if (events.length === 0) return;
 
     const sequenced: SequencedEvent[] = events.map((ev) => ({
@@ -186,20 +207,28 @@ export class GameSession {
     }));
     const fromSeq = sequenced[0].seq;
 
-    const eventMsg: ServerMessage = {
-      type: 'events',
-      fromSeq,
-      events: sequenced,
-    };
+    const batchResult = this.gameLogger?.recordBatch(action ?? null, events, this.state!) ?? { serverOps: [] as Operation[], playerOps: {} as Record<string, Operation[]> };
 
     if (this.debug) {
+      const eventMsg: ServerMessage = {
+        type: 'events',
+        fromSeq,
+        events: sequenced,
+        operations: batchResult.serverOps,
+      };
       const realPlayerId = this.room.players.keys().next().value;
       if (realPlayerId) this.sendToPlayer(realPlayerId, eventMsg);
       return;
     }
 
-    for (const [pid] of this.playerNames) {
-      this.sendToPlayer(pid, eventMsg);
+    for (const [pid, playerName] of this.playerNames) {
+      const playerMsg: ServerMessage = {
+        type: 'events',
+        fromSeq,
+        events: sequenced,
+        operations: batchResult.playerOps[playerName] ?? [],
+      };
+      this.sendToPlayer(pid, playerMsg);
     }
   }
 
@@ -230,7 +259,7 @@ export class GameSession {
     const log = this.state.serverLog;
     const startIdx = Math.max(0, Math.min(lastSeq, log.length));
     if (startIdx >= log.length) {
-      this.sendToPlayer(playerId, { type: 'events', fromSeq: lastSeq, events: [] });
+      this.sendToPlayer(playerId, { type: 'events', fromSeq: lastSeq, events: [], operations: [] });
       return;
     }
     const missed = log.slice(startIdx);
@@ -242,7 +271,17 @@ export class GameSession {
       payload: ev.payload,
       seq: startIdx + i + 1,
     }));
-    this.sendToPlayer(playerId, { type: 'events', fromSeq: startIdx + 1, events: sequenced });
+    const playerName = this.playerNames.get(playerId);
+    const exported = this.gameLogger?.export();
+    let operations: Operation[];
+    if (this.debug && exported) {
+      operations = exported.serverOps.slice(startIdx);
+    } else if (playerName && exported) {
+      operations = (exported.playerOps[playerName] ?? []).slice(startIdx);
+    } else {
+      operations = [];
+    }
+    this.sendToPlayer(playerId, { type: 'events', fromSeq: startIdx + 1, events: sequenced, operations });
   }
 
   /** 给单个玩家（重连时）发完整初始视图。 */
@@ -284,7 +323,7 @@ export class GameSession {
     this.appendAction(onTimeout);
     this.state = result.state;
     this.touchAndPersist();
-    this.broadcastEvents(result.events);
+    this.broadcastEvents(result.events, onTimeout);
     this.checkGameEnd();
   }
 
@@ -392,6 +431,10 @@ export class GameSession {
 
   getPending(): import('../engine/types').PendingAction | null {
     return this.state?.pending ?? null;
+  }
+
+  getGameLog(): GameLog | null {
+    return this.gameLogger?.export() ?? null;
   }
 
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, lastSeq = 0): boolean {

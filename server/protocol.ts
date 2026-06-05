@@ -1,5 +1,6 @@
 import type { GameAction, GameState, PlayerEvent, ServerEvent } from '../engine/types';
 import type { PlayerView, FrontendState } from '../engine/view/types';
+import type { Operation } from '../shared/log';
 
 /**
  * 事件协议层序号：服务端 GameSession 维护的全局递增序号。
@@ -17,7 +18,7 @@ export type SequencedEvent = ServerEvent & { seq: EventSeq };
 export type ServerMessage =
   | { type: 'initialView'; state: FrontendState; lastSeq: EventSeq }
   | { type: 'debugGameState'; state: GameState; lastSeq: EventSeq }
-  | { type: 'events'; fromSeq: EventSeq; events: SequencedEvent[] }
+  | { type: 'events'; fromSeq: EventSeq; events: SequencedEvent[]; operations?: Operation[] }
   | { type: 'error'; message: string }
   | { type: 'gameOver'; winner: string }
   | { type: 'room_joined'; roomId: string; playerId: string }
