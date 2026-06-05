@@ -7,6 +7,7 @@ import * as emit from './emit';
 import * as foreach from './foreach';
 import * as checkDying from './checkDying';
 import * as pindian from './pindian';
+import * as multiStep from './multiStep';
 
 atoms.register();
 condition.register();
@@ -17,3 +18,4 @@ emit.register();
 foreach.register();
 checkDying.register();
 pindian.register();
+multiStep.register();

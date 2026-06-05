@@ -361,7 +361,8 @@ export type SkillPhase =
   | { type: 'emit'; event: GameEvent }
   | { type: 'foreach'; collection: Expr<string[]>; body: SkillPhase[]; varName: string }
   | { type: 'checkDying'; player: Expr<string> }
-  | { type: 'pindian'; a: Expr<string>; b: Expr<string>; aCardId?: Expr<string>; bCardId?: Expr<string>; then: SkillPhase[]; else?: SkillPhase[] };
+  | { type: 'pindian'; a: Expr<string>; b: Expr<string>; aCardId?: Expr<string>; bCardId?: Expr<string>; then: SkillPhase[]; else?: SkillPhase[] }
+  | { type: 'multiStep'; steps: SkillPhase[] };
 export interface PhaseDefinition<P = unknown> {
   type: string;
   execute(
