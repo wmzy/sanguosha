@@ -50,6 +50,9 @@ export function registerCharacterTriggers(
   for (const ability of character.abilities) {
     const def = registry.get(ability.name);
     if (!def) continue;
+    // v3-only skill（无 trigger 字段）不进入 v2 state.triggers，
+    // v2 emitEvent 不会调它。完整逻辑在 registerAtomHook 钩子中。
+    if (!def.trigger) continue;
     newTriggers.push({
       event: def.trigger.event,
       source: 'character' as const,
@@ -92,6 +95,8 @@ export function registerEquipmentTriggers(
 
   const def = registry.get(skillId);
   if (!def) return state;
+  // v3-only 装备技能不进入 v2 state.triggers。
+  if (!def.trigger) return state;
 
   const newTrigger: TriggerRule = {
     event: def.trigger.event,
@@ -143,6 +148,9 @@ export function emitEvent(
   for (const trigger of matched) {
     const def = registry.get(trigger.skillId);
     if (!def) continue;
+    // v3-only skill（无 trigger）不应出现在 state.triggers 中；
+    // 此处 continue 是防御性兜底。
+    if (!def.trigger) continue;
 
     if (event.type === 'phaseBegin') {
       const phaseEvent = event as { type: 'phaseBegin'; phase: string; player: string };

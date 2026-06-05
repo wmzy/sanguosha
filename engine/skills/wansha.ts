@@ -16,16 +16,21 @@ import { registerSkill } from '../skill';
 import { registerAtomHook } from '../atom';
 import type { Atom, GameState } from '../types';
 
+// v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
+// - v2 emitEvent 按 event.type 匹配 state.triggers，此 event 不在
+//   GameEvent union 中，永远不会被 emitEvent 触发（不会走 v2 handler）
+// - v2 targetHasSkill() 查 state.triggers 时仍能命中，支持 validate.ts
+//   的 hasEmptyCityShield 等 v2 验证路径
+// - 实际逻辑在下方 registerAtomHook 中
 registerSkill({
   id: '完杀',
   name: '完杀',
   description: '锁定技，在你的回合，除你以外，只有处于濒死状态的角色才能使用【桃】。',
-  trigger: { event: 'heal', source: 'character' },
+  trigger: { event: 'v3HookOnly', source: 'character' },
   handler() {
     return [];
   },
 });
-
 /** 目标是否处于濒死状态：濒死窗口中 / 等待进入濒死窗口 / 体力 <= 0 但存活 */
 function isTargetDying(state: GameState, target: string): boolean {
   if (state.deferredDyingCheck?.player === target) return true;
@@ -40,9 +45,10 @@ registerAtomHook({
     const a = atom as Atom & { type: 'heal' };
     // 救自己不阻
     if (a.target === a.source) return false;
-    const source = (a.source ?? a.target) as string;
+    const source = a.source as string;
     const target = a.target as string;
-    if (!state.triggers.some((t) => t.skillId === '完杀' && t.player === source)) return false;
+    // 源必须拥有完杀（贾诩）。v3-only skill 不进入 state.triggers，按角色判定。
+    if (state.players[source]?.info.characterId !== '贾诩') return false;
     // 完杀 只在贾诩的回合生效
     if (state.currentPlayer !== source) return false;
     // 濒死状态豁免：他人仍可救濒死的目标

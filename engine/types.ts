@@ -387,14 +387,18 @@ export interface SkillDef {
   id: string;
   name: string;
   description: string;
-  trigger: TriggerSpec;
+  /**
+   * v2 trigger 规格。当 skill 完全由 v3 `registerAtomHook` 驱动时可省略
+   * （v3 钩子不依赖此字段）。[T-25] 迁移完成后，所有 skill 可省略此字段。
+   */
+  trigger?: TriggerSpec;
   /**
    * TypeScript 函数，返回 SkillPhase[] 执行计划。
    * 函数本身不需要序列化，只有执行计划中的 prompt/respond 需要暂停。
+   * v3-only skill（无 trigger）可保留此函数供 v2 fallback / 调试；典型实现返回 []。
    */
   handler: (ctx: SkillContext, state: GameState) => SkillPhase[];
 }
-
 export interface TriggerSpec {
   event: string;
   filter?: Condition;
@@ -404,7 +408,6 @@ export interface TriggerSpec {
   phase?: TurnPhase;
   manual?: boolean;
 }
-
 export interface TriggerRule {
   event: string;
   filter?: Condition;
@@ -423,7 +426,7 @@ export type GameAction =
   | { type: 'skillChoice'; player: string; choice: Json }
   | { type: 'startGame' }
   | { type: 'toggleAutoSkipWuxie' };
-export type GameEvent =
+ export type GameEvent =
   | { type: 'turnStart'; player: string }
   | { type: 'turnEnd'; player: string }
   | { type: 'phaseBegin'; phase: TurnPhase; player: string }

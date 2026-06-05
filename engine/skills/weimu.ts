@@ -9,16 +9,17 @@ import { registerSkill } from '../skill';
 import { registerAtomHook } from '../atom';
 import type { Atom } from '../types';
 
+// v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
+// 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
 registerSkill({
   id: '帷幕',
   name: '帷幕',
   description: '锁定技，你不能成为黑色锦囊牌的目标。',
-  trigger: { event: 'becomeTarget', source: 'character' },
+  trigger: { event: 'v3HookOnly', source: 'character' },
   handler() {
     return [];
   },
 });
-
 registerAtomHook({
   atomType: 'becomeTarget',
   filter: (state, atom) => {

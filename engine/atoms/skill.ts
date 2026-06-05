@@ -16,6 +16,8 @@ export function register() {
         t => t.player === player && t.skillId === skillId && t.source === 'character',
       );
       if (alreadyHas) return state;
+      // v3-only skill（无 trigger）不进入 v2 state.triggers。
+      if (!def.trigger) return state;
 
       const newTrigger = {
         event: def.trigger.event,
