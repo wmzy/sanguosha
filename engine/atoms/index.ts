@@ -19,7 +19,8 @@ import * as rearrangeDeck from './rearrangeDeck';
 import * as maxHealth from './maxHealth';
 import * as skill from './skill';
 import * as reshuffle from './reshuffle';
-
+import * as giveCard from './giveCard';
+import * as takeCard from './takeCard';
 const modules = [
   damage,
   draw,
@@ -42,6 +43,8 @@ const modules = [
   maxHealth,
   skill,
   reshuffle,
+  giveCard,
+  takeCard,
 ];
 
 export function registerAllAtoms(): void {

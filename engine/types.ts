@@ -199,6 +199,8 @@ export type Atom =
   | { type: 'discard'; player: Expr<string>; cardIds: Expr<string[]> }
   | { type: 'discardRandom'; player: Expr<string>; count: Expr<number>; from: 'hand' | 'equipment' }
   | { type: 'moveCard'; cardId: Expr<string>; from: ZoneLoc; to: ZoneLoc }
+  | { type: 'giveCard'; cardId: Expr<string>; from: Expr<string>; to: Expr<string> }
+  | { type: 'takeCard'; cardId: Expr<string>; to: Expr<string> }
   | { type: 'equip'; player: Expr<string>; cardId: Expr<string> }
   | { type: 'unequip'; player: Expr<string>; slot: EquipSlot }
   | { type: 'setVar'; player: Expr<string>; key: string; value: Expr<Json> }

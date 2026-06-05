@@ -28,6 +28,10 @@ export interface TestGameOptions {
   seed?: number;
   /** 直接设置出牌阶段 */
   playPhase?: boolean;
+  /** 覆盖指定玩家的手牌（cardId 列表）。未列出的玩家保持默认 4 张。 */
+  hand?: Record<string, string[]>;
+  /** 覆盖牌堆内容（cardId 列表）。cardMap 中不存在的 ID 会自动以占位 Card 注入。 */
+  deck?: string[];
 }
 
 /**
@@ -57,6 +61,39 @@ export function createTestGame(opts: TestGameOptions = {}): GameState {
   // 如果需要出牌阶段
   if (opts.playPhase) {
     state = { ...state, phase: '出牌' };
+  }
+
+  // 覆盖手牌（如有指定玩家）：未列出的玩家手牌置空，便于断言精确手牌数
+  if (opts.hand) {
+    const players = { ...state.players };
+    for (const name of state.playerOrder) {
+      const hand = opts.hand[name];
+      players[name] = { ...players[name], hand: hand ? [...hand] : [] };
+    }
+    state = { ...state, players };
+  }
+
+  // 覆盖牌堆（如有指定）
+  if (opts.deck) {
+    const cardMap = { ...state.cardMap };
+    for (const id of opts.deck) {
+      if (!cardMap[id]) {
+        cardMap[id] = {
+          id,
+          name: id,
+          type: '基本牌',
+          subtype: '杀',
+          suit: '♠',
+          rank: 'A',
+          description: '',
+        };
+      }
+    }
+    state = {
+      ...state,
+      zones: { ...state.zones, deck: [...opts.deck] },
+      cardMap,
+    };
   }
 
   return state;
