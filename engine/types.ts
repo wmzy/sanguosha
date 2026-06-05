@@ -1,5 +1,8 @@
 import type { TurnPhase, Gender, Faction, Role, Card, PendingTrick } from '../shared/types';
 
+// useCard 拆分（§6 P0）：specifyTarget → becomeTarget → resolveCard
+// 旧的 useCard GameEvent 在 [T-13] 决策下被取消。新技能监听 3 原子
+// onBefore/onAfter；useCard 路径暂时保留兼容，但 6.0 起不再 emit。
 export type { TurnPhase, Gender, Faction, Role, Card, PendingTrick };
 
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
@@ -225,7 +228,10 @@ export type Atom =
   | { type: 'addSkill'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } }
   | { type: 'turnStart'; player: Expr<string> }
   | { type: 'phaseBegin'; phase: Expr<string>; player: Expr<string> }
-  | { type: 'phaseEnd'; phase: Expr<string>; player: Expr<string> };
+  | { type: 'phaseEnd'; phase: Expr<string>; player: Expr<string> }
+  | { type: 'specifyTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
+  | { type: 'becomeTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
+  | { type: 'resolveCard'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog
@@ -419,6 +425,7 @@ export type GameEvent =
   | { type: 'turnEnd'; player: string }
   | { type: 'phaseBegin'; phase: TurnPhase; player: string }
   | { type: 'phaseEnd'; phase: TurnPhase; player: string }
+  /** @deprecated v3: 使用 atom specifyTarget/becomeTarget/resolveCard 替代。GameEvent 概念取消中（[T-13]）。 */
   | { type: 'cardPlayed'; player: string; cardId: string; target?: string }
   | { type: 'damageDealt'; source: string; target: string; amount: number; cardId?: string }
   | { type: 'damageReceived'; target: string; source: string; amount: number; cardId?: string }

@@ -22,7 +22,7 @@ import type {
   PlayerEvent,
   ServerEvent,
 } from './types';
-import { getAtomHooks, filterHooksByPlayer } from './skill-hook';
+import { getAtomHooks, filterHooksByPlayer, registerAtomHook, clearAtomHooks } from './skill-hook';
 
 const registry = new Map<string, AtomDefinition>();
 
@@ -30,6 +30,8 @@ const registry = new Map<string, AtomDefinition>();
 export function clearAtomRegistry(): void {
   registry.clear();
 }
+// 重新导出 skill-hook API：测试与新技能都从 @engine/atom 单入口引入
+export { registerAtomHook, clearAtomHooks };
 
 export function registerAtom<A>(def: AtomDefinition<A>): void {
   if (registry.has(def.type)) {

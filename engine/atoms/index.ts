@@ -21,6 +21,9 @@ import * as skill from './skill';
 import * as reshuffle from './reshuffle';
 import * as giveCard from './giveCard';
 import * as takeCard from './takeCard';
+import * as specifyTarget from './specifyTarget';
+import * as becomeTarget from './becomeTarget';
+import * as resolveCard from './resolveCard';
 const modules = [
   damage,
   draw,
@@ -45,6 +48,9 @@ const modules = [
   reshuffle,
   giveCard,
   takeCard,
+  specifyTarget,
+  becomeTarget,
+  resolveCard,
 ];
 
 export function registerAllAtoms(): void {
