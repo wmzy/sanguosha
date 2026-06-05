@@ -42,6 +42,20 @@ describe('giveCard / takeCard / moveCard', () => {
     expect(state.players.P1.hand).toContain('c1');
   });
 
+  it('giveCard: 源玩家手牌没有该 cardId 时静默追加到目标手牌（不抛错）', () => {
+    const s0 = createTestGame({ hand: { P1: ['other'], P2: [] } });
+    const { state } = applyAtoms(s0, [{
+      type: 'giveCard',
+      cardId: 'c-missing',
+      from: 'P1',
+      to: 'P2',
+    }]);
+    // P1 的手牌保持不变（c-missing 本就不在）
+    expect(state.players.P1.hand).toEqual(['other']);
+    // P2 收到 c-missing（与 discard 等其它原子一致：不做源区存在性校验）
+    expect(state.players.P2.hand).toEqual(['c-missing']);
+  });
+
   it('giveCard 写入 serverLog 含 from/to 字段', () => {
     const s0 = createTestGame({ hand: { P1: ['c1'] } });
     const { events } = applyAtoms(s0, [{ type: 'giveCard', cardId: 'c1', from: 'P1', to: 'P2' }]);

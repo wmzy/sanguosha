@@ -28,7 +28,7 @@ export interface TestGameOptions {
   seed?: number;
   /** 直接设置出牌阶段 */
   playPhase?: boolean;
-  /** 覆盖指定玩家的手牌（cardId 列表）。未列出的玩家保持默认 4 张。 */
+  /** 覆盖指定玩家的手牌（cardId 列表）。未列出的玩家清空手牌。 */
   hand?: Record<string, string[]>;
   /** 覆盖牌堆内容（cardId 列表）。cardMap 中不存在的 ID 会自动以占位 Card 注入。 */
   deck?: string[];
