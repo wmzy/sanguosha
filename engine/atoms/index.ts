@@ -18,24 +18,35 @@ import * as turn from './turn';
 import * as rearrangeDeck from './rearrangeDeck';
 import * as maxHealth from './maxHealth';
 import * as skill from './skill';
+import * as reshuffle from './reshuffle';
 
-damage.register();
-draw.register();
-heal.register();
-discard.register();
-discardRandom.register();
-moveCard.register();
-equip.register();
-varModule.register();
-phase.register();
-tag.register();
-pending.register();
-judge.register();
-pendingTrick.register();
-kill.register();
-gainCard.register();
-ctxVar.register();
-turn.register();
-rearrangeDeck.register();
-maxHealth.register();
-skill.register();
+const modules = [
+  damage,
+  draw,
+  heal,
+  discard,
+  discardRandom,
+  moveCard,
+  equip,
+  varModule,
+  phase,
+  tag,
+  pending,
+  judge,
+  pendingTrick,
+  kill,
+  gainCard,
+  ctxVar,
+  turn,
+  rearrangeDeck,
+  maxHealth,
+  skill,
+  reshuffle,
+];
+
+export function registerAllAtoms(): void {
+  for (const m of modules) m.register();
+}
+
+// 保持向后兼容：模块加载时即注册（旧的 `@engine/atoms/index` 副作用行为）
+registerAllAtoms();

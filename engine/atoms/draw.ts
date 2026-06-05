@@ -1,30 +1,21 @@
 import type { GameState, Atom, AtomEventResult } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom, applyAtoms } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
-import { createRng } from '../../shared/rng';
 
-function reshuffleIfNeeded(state: GameState, needed: number): GameState {
+/**
+ * 牌堆不足时调用 reshuffle atom 自动洗回弃牌堆。
+ * 通过 applyAtoms 复用原子管线，确保 reshuffle 事件也会写入 serverLog（§4.7 修复）。
+ * skipHooks/skipPlayerEvents 避免 reshuffle 触发技能钩子导致无限递归。
+ */
+function maybeReshuffle(state: GameState, needed: number): GameState {
   if (state.zones.deck.length >= needed) return state;
-
-  const discardPile = state.zones.discardPile;
-  if (discardPile.length === 0) return state;
-
-  const rng = createRng(state.rngState);
-  const shuffled = [...discardPile];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = rng.nextInt(i + 1);
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  return {
-    ...state,
-    zones: {
-      deck: [...state.zones.deck, ...shuffled],
-      discardPile: [],
-    },
-    rngState: state.rngState + Math.max(0, discardPile.length - 1),
-  };
+  if (state.zones.discardPile.length === 0) return state;
+  return applyAtoms(
+    state,
+    [{ type: 'reshuffle' }],
+    { skipHooks: true, skipPlayerEvents: true },
+  ).state;
 }
 
 export function register() {
@@ -33,7 +24,7 @@ export function register() {
     apply(state: GameState, atom: Atom & { type: 'draw' }): GameState {
       const player = atom.player as string;
       const count = atom.count as number;
-      const s = reshuffleIfNeeded(state, count);
+      const s = maybeReshuffle(state, count);
       const drawn = s.zones.deck.slice(0, count);
       const remaining = s.zones.deck.slice(count);
       return updatePlayer(
@@ -45,7 +36,7 @@ export function register() {
     toEvents(state: GameState, atom: Atom & { type: 'draw' }): AtomEventResult {
       const player = atom.player as string;
       const count = atom.count as number;
-      const s = reshuffleIfNeeded(state, count);
+      const s = maybeReshuffle(state, count);
       const drawn = s.zones.deck.slice(0, count);
       const actualCount = drawn.length;
       const server = makeServerEvent('draw', { player, count: actualCount, cards: drawn });

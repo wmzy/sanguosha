@@ -213,6 +213,7 @@ export type Atom =
   | { type: 'removePendingTrick'; player: Expr<string>; index: number }
   | { type: 'addTag'; player: Expr<string>; tag: string }
   | { type: 'removeTag'; player: Expr<string>; tag: string }
+  | { type: 'reshuffle' }
   | { type: 'kill'; player: Expr<string>; source?: Expr<string> }
   | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
   | { type: 'setCtxVar'; key: string; value: Json }

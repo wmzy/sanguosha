@@ -26,6 +26,11 @@ import { getAtomHooks, filterHooksByPlayer } from './skill-hook';
 
 const registry = new Map<string, AtomDefinition>();
 
+/** 重置 atom 注册表（仅用于测试场景，确保 test 之间互相隔离） */
+export function clearAtomRegistry(): void {
+  registry.clear();
+}
+
 export function registerAtom<A>(def: AtomDefinition<A>): void {
   if (registry.has(def.type)) {
     throw new Error(`Atom type "${def.type}" already registered`);
