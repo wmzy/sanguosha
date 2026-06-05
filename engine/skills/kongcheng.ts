@@ -1,12 +1,12 @@
 // engine/skills/kongcheng.ts — 空城（诸葛亮）v3 registerAtomHook 演示
 //
-// 锁定技：若你没有手牌，【杀】和锦囊对你无效。
+// 锁定技：若你没有手牌，【杀】和【决斗】对你无效。
 //
-// v3 路径：监听 `becomeTarget` 原子。目标 = 诸葛亮 + 手牌为空 + 牌是基本牌/锦囊
+// v3 路径：监听 `becomeTarget` 原子。目标 = 诸葛亮 + 手牌为空 + 牌是【杀】/【决斗】
 // → 取消该 atom（不让目标正式确定）。
 //
-// 注：filter 用通用条件（手牌为空 + 牌类型）缩小范围，onBefore 再特化
-// 到 characterId === '诸葛亮'。完整 v3 应在 filter 直接走 characterId。
+// 注：filter 用通用条件（手牌为空 + 牌是【杀】/【决斗】）缩小范围，
+// onBefore 再特化到 characterId === '诸葛亮'。完整 v3 应在 filter 直接走 characterId。
 
 import { registerSkill } from '../skill';
 import { registerAtomHook } from '../atom';
@@ -15,7 +15,7 @@ import type { Atom } from '../types';
 registerSkill({
   id: '空城',
   name: '空城',
-  description: '锁定技，若你没有手牌，【杀】和锦囊对你无效。',
+  description: '锁定技，若你没有手牌，【杀】和【决斗】对你无效。',
   trigger: { event: 'becomeTarget', source: 'character' },
   handler() {
     return [];
@@ -31,7 +31,9 @@ registerAtomHook({
     if (!p) return false;
     if (p.hand.length > 0) return false;
     const card = state.cardMap[a.cardId as string];
-    return card?.type === '基本牌' || card?.type === '锦囊牌';
+    if (!card) return false;
+    // 【杀】（基本牌）或【决斗】（锦囊牌）
+    return card.name === '杀' || card.name === '决斗';
   },
   onBefore: (ctx) => {
     const atom = ctx.atom as Atom & { type: 'becomeTarget' };
