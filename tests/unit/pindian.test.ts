@@ -101,7 +101,10 @@ describe('compareRank atom（pindian 基础设施）', () => {
   });
 
   it('compareRank: 平局时 getResult() 与 apply 的 winner 一致（post-apply RNG 修正）', () => {
-    // 验证 resolveWinner 在 isPostApply=true 时也能正确还原胜者
+    // 验证 resolveWinner 在 isPostApply=true 时也能正确还原胜者：
+    // 平局时 RNG 被 apply 推进 (rngState + 1)，event payload 由 toEvents
+    // 携带 winner；如果 getResult 的 rewind 逻辑 (rngState - 1) 不生效，
+    // apply 和 toEvents 会因种子不同而选出不同的 winner。
     const cardMap: Record<string, CardFixture> = {
       'c-5a': { id: 'c-5a', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '5', description: '' },
       'c-5b': { id: 'c-5b', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '5', description: '' },
@@ -111,7 +114,7 @@ describe('compareRank atom（pindian 基础设施）', () => {
       cardMap,
     );
     const ctx: SkillContext = { skillId: 'test', self: 'P1', localVars: {} };
-    executePlan(
+    const { events } = executePlan(
       s0,
       [
         {
@@ -121,9 +124,15 @@ describe('compareRank atom（pindian 基础设施）', () => {
       ],
       ctx,
     );
-    // 平局时 winner 由 RNG 决胜，getResult 应当返回跟 apply 相同的 winner
-    const winner = ctx.localVars.pindianWinner;
-    expect(['P1', 'P2']).toContain(winner);
+    // apply 侧（event payload 携带的 winner，对应 toEvents 路径）
+    const applyWinner = (events[0].payload as { winner?: string }).winner;
+    // getResult 侧（ctx.localVars.pindianWinner，对应 isPostApply=true 路径）
+    const getResultWinner = ctx.localVars.pindianWinner as string | undefined;
+    // 双方都是合法玩家名（sanity）
+    expect(['P1', 'P2']).toContain(applyWinner);
+    expect(['P1', 'P2']).toContain(getResultWinner);
+    // 关键不变量：平局 RNG rewind 生效时，apply 和 getResult 必须选出同一个 winner
+    expect(getResultWinner).toBe(applyWinner);
   });
 });
 
