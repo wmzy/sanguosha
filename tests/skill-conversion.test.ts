@@ -18,15 +18,16 @@ import {
   getCharacterMap,
   setPlayPhase,
 } from './engine-helpers';
+import type { GameState } from '@engine/types';
 
 const charMap = getCharacterMap();
 
 function injectCardWithSuit(
-  state: ReturnType<typeof createTestGame>,
+  state: GameState,
   playerName: string,
   cardName: '杀' | '闪' | '桃',
   suit: '♠' | '♣' | '♥' | '♦',
-): { state: ReturnType<typeof createTestGame>; cardId: string } {
+): { state: GameState; cardId: string } {
   const cardId = `test-${cardName}-${suit}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const card = {
     id: cardId,

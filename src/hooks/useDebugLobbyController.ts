@@ -169,8 +169,9 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
 
   const sendGameAction = useCallback(
     (action: GameAction) => {
+      // 本地立即追加到 actionLog（用于右侧操作流水），不依赖服务端回传。
       appendAction(action);
-      send({ type: 'action', action });
+      send({ type: 'action', action, baseSeq: lastAppliedSeqRef.current });
     },
     [appendAction, send],
   );

@@ -224,10 +224,10 @@ export function handleWsMessage(
       handleStartGame(playerId);
       break;
     case 'action':
-      handleAction(playerId, message.action);
+      handleAction(playerId, message.action, message.baseSeq);
       break;
     case 'response':
-      handleResponse(playerId, message.promptId, message.choice);
+      handleResponse(playerId, message.baseSeq, message.choice);
       break;
     case 'leave_room':
       handleLeaveRoom(playerId);
@@ -235,8 +235,14 @@ export function handleWsMessage(
     case 'reconnect':
       handleReconnect(playerId, message.playerId, message.lastSeq ?? 0, ws);
       break;
+    case 'create_debug_room':
+      handleCreateDebugRoom(playerId, message.playerCount, ws);
+      break;
     case 'join_debug_room':
       handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws);
+      break;
+    case 'delete_room':
+      handleDeleteRoom(playerId);
       break;
   }
 }
@@ -333,17 +339,17 @@ function handleStartGame(playerId: string): void {
   }
 }
 
-function handleAction(playerId: string, action: import('../engine/types').GameAction): void {
+function handleAction(playerId: string, action: import('../engine/types').GameAction, baseSeq: number): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
   const session = gameSessions.get(roomId);
   if (!session) return;
 
-  session.handleAction(playerId, action);
+  session.handleAction(playerId, action, baseSeq);
 }
 
-function handleResponse(playerId: string, promptId: string, choice: unknown): void {
+function handleResponse(playerId: string, baseSeq: number, choice: unknown): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
@@ -356,19 +362,15 @@ function handleResponse(playerId: string, promptId: string, choice: unknown): vo
   const pending = session.getPending();
   if (!pending) return;
 
-  if (pending.id !== promptId) {
-    const ws = getRoom(roomId)?.players.get(playerId);
-    ws?.send(serialize({ type: 'error', message: '响应已过期或 promptId 不匹配' }));
-    return;
-  }
-
   const action = pendingToAction(pending, playerName, choice);
   if (!action) {
     log.warn('未知 pending 类型', { pendingType: (pending as { type: string }).type });
     return;
   }
 
-  session.handleAction(playerId, action);
+  // CAS 校验由 session.handleAction 完成；pending 已被服务端的 state 推进过
+  // 也会导致 baseSeq 不匹配，从而被静默丢弃。
+  session.handleAction(playerId, action, baseSeq);
 }
 
 function handleLeaveRoom(playerId: string): void {
@@ -402,6 +404,37 @@ function handleDisconnect(playerId: string): void {
   }
 }
 
+function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSContext): void {
+  if (playerCount < 2 || playerCount > 8) {
+    ws.send(serialize({ type: 'error', message: '玩家人数须在2-8之间' }));
+    return;
+  }
+  const room = createDebugRoom(`调试${playerCount}人`, playerCount);
+  const session = new GameSession(room, true);
+  session.pendingPlayerCount = playerCount;
+  gameSessions.set(room.id, session);
+  // host 自动 join：和 handleJoinDebugRoom 走相同流程
+  handleJoinDebugRoom(playerId, room.id, 0, ws);
+}
+
+function handleDeleteRoom(playerId: string): void {
+  const roomId = playerRoomMap.get(playerId);
+  if (!roomId) return;
+  const room = getRoom(roomId);
+  if (!room?.isDebug) return;
+  const session = gameSessions.get(roomId);
+  if (session) {
+    void session.destroy();
+    gameSessions.delete(roomId);
+  }
+  const playerIds = [...room.players.keys()];
+  for (const pid of playerIds) {
+    playerRoomMap.delete(pid);
+    leaveRoom(roomId, pid);
+  }
+  deleteRoom(roomId);
+  void deletePersistedRoom(roomId);
+}
 
 function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: number, ws: WSContext): void {
   const room = getRoom(roomId);

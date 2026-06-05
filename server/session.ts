@@ -1,5 +1,5 @@
 import type { GameAction, GameState, ServerEvent } from '../engine/types';
-import type { SequencedEvent, ServerMessage } from './protocol';
+import type { SequencedEvent, EventSeq, ServerMessage } from './protocol';
 import type { Room } from './room';
 import { createInitialState } from '../engine/state';
 import { engine } from '../engine/engine';
@@ -137,10 +137,15 @@ export class GameSession {
     return true;
   }
 
-  handleAction(playerId: string, action: GameAction): void {
+  handleAction(playerId: string, action: GameAction, baseSeq?: EventSeq): void {
     if (this.destroyed) return;
-    if (!this.state) {
-      this.sendToPlayer(playerId, { type: 'error', message: '游戏未开始' });
+    if (!this.state) return;
+
+    // CAS 校验：客户端操作的 baseSeq 必须等于服务端当前 nextSeq。
+    // 不匹配说明客户端基于过期快照操作，静默丢弃——前端会通过后续
+    // events 推送自动看到最新状态，旧操作自然"消失"。详见 ADR 0009。
+    if (baseSeq !== undefined && baseSeq !== this.nextSeq) {
+      this.logger.warn('CAS mismatch', { baseSeq, currentSeq: this.nextSeq });
       return;
     }
 
@@ -149,20 +154,13 @@ export class GameSession {
       fullAction = action;
     } else {
       const playerName = this.playerNames.get(playerId);
-      if (!playerName) {
-        this.sendToPlayer(playerId, { type: 'error', message: '玩家不在游戏中' });
-        return;
-      }
+      if (!playerName) return;
       fullAction = { ...action, player: playerName } as GameAction;
     }
 
-    if (this.state.meta.status === '已结束') {
-      this.sendToPlayer(playerId, { type: 'error', message: '游戏已结束' });
-      return;
-    }
+    if (this.state.meta.status === '已结束') return;
 
     const result = engine(this.state, fullAction);
-
     if (result.error) {
       this.sendToPlayer(playerId, { type: 'error', message: result.error });
       return;

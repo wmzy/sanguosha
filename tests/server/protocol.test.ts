@@ -40,11 +40,11 @@ const stubFrontendState = {
 
 describe('isValidClientMessage — valid messages', () => {
   it('accepts action message', () => {
-    expect(isValidClientMessage({ type: 'action', action: stubGameAction })).toBe(true);
+    expect(isValidClientMessage({ type: 'action', action: stubGameAction, baseSeq: 0 })).toBe(true);
   });
 
   it('accepts response message', () => {
-    expect(isValidClientMessage({ type: 'response', promptId: 'p1', choice: 'A' })).toBe(true);
+    expect(isValidClientMessage({ type: 'response', baseSeq: 0, choice: 'A' })).toBe(true);
   });
 
   it('accepts ready message', () => {
@@ -133,12 +133,12 @@ describe('isValidClientMessage — invalid messages', () => {
     expect(isValidClientMessage({ type: 'action', action: null })).toBe(false);
   });
 
-  it('rejects response with missing promptId', () => {
+  it('rejects response with missing baseSeq', () => {
     expect(isValidClientMessage({ type: 'response', choice: 'A' })).toBe(false);
   });
 
-  it('rejects response with non-string promptId', () => {
-    expect(isValidClientMessage({ type: 'response', promptId: 123, choice: 'A' })).toBe(false);
+  it('rejects response with non-number baseSeq', () => {
+    expect(isValidClientMessage({ type: 'response', baseSeq: '0', choice: 'A' })).toBe(false);
   });
 
   it('rejects join_room with missing roomId', () => {
@@ -306,7 +306,7 @@ describe('deserialize — valid messages', () => {
   });
 
   it('deserializes action message with nested object', () => {
-    const msg = { type: 'action', action: { type: 'playCard', player: 'p1', cardId: 'c1' } };
+    const msg = { type: 'action', action: { type: 'playCard', player: 'p1', cardId: 'c1' }, baseSeq: 0 };
     const result = deserialize(JSON.stringify(msg));
     expect(result).not.toBeNull();
     expect(result!.type).toBe('action');
@@ -314,7 +314,7 @@ describe('deserialize — valid messages', () => {
   });
 
   it('deserializes response message', () => {
-    const msg = { type: 'response', promptId: 'prompt-1', choice: { cardId: 'c1' } };
+    const msg = { type: 'response', baseSeq: 0, choice: { cardId: 'c1' } };
     const result = deserialize(JSON.stringify(msg));
     expect(result).not.toBeNull();
     expect(result!.type).toBe('response');
@@ -390,7 +390,7 @@ describe('serialize + deserialize round-trip', () => {
   });
 
   it('round-trips response message', () => {
-    const original: ClientMessage = { type: 'response', promptId: 'p-1', choice: ['card1', 'card2'] };
+    const original: ClientMessage = { type: 'response', baseSeq: 42, choice: ['card1', 'card2'] };
     const result = deserialize(JSON.stringify(original));
     expect(result).toEqual(original);
   });

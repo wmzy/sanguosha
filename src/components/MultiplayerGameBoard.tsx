@@ -3,7 +3,7 @@
 // 数据流：服务器发 initialView 初始化本地 FrontendState，events 通过 reducer 应用。
 // 面板渲染走 PlayerPanel：self 玩家用完整 SelfView，others 用 OtherPlayerView 摘要。
 // 状态由本地 useState 维护（log / error / gameOver），游戏状态由 FrontendState 派生。
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type { FrontendState, CardInfo } from '../../engine/view/types';
 import { reduceFrontend } from '../../engine/view/reducer';
@@ -21,10 +21,12 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
   const { connected, send, onMessage, connect } = useWebSocket(wsUrl);
 
   const [feState, setFeState] = useState<FrontendState | null>(null);
+  // 最近一次应用的事件序号。initialView 时由 lastSeq 重置；events 时由本批最大 seq 更新。
+  // 发 action 时作为 baseSeq 传给服务端做 CAS 校验（详见 ADR 0009）。
+  const lastAppliedSeqRef = useRef(0);
   const [log, setLog] = useState<string[]>(['等待游戏开始...']);
   const [error, setError] = useState<string | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
-
   useEffect(() => {
     connect();
   }, [connect]);
@@ -39,9 +41,13 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
     const unsubscribe = onMessage((message) => {
       switch (message.type) {
         case 'initialView':
+          lastAppliedSeqRef.current = message.lastSeq;
           setFeState(message.state);
           break;
         case 'events':
+          if (message.events.length > 0) {
+            lastAppliedSeqRef.current = message.events[message.events.length - 1].seq;
+          }
           setFeState(prev => (prev ? reduceFrontend(prev, message.events) : prev));
           break;
         case 'gameOver':
@@ -119,10 +125,10 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
   const isMyTurn = view.turn.currentPlayer === myId;
 
   const playCard = (cardId: string) => {
-    send({ type: 'action', action: { type: 'playCard', player: myId, cardId } });
+    send({ type: 'action', action: { type: 'playCard', player: myId, cardId }, baseSeq: lastAppliedSeqRef.current });
   };
   const endTurn = () => {
-    send({ type: 'action', action: { type: 'endTurn', player: myId } });
+    send({ type: 'action', action: { type: 'endTurn', player: myId }, baseSeq: lastAppliedSeqRef.current });
   };
 
   return (

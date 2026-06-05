@@ -7,7 +7,7 @@
 //   - reconnectPlayer(lastSeq) 决定是补发还是只发快照
 //   - 重启后 nextSeq 与持久化 serverLog.length 同步
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { GameSession } from '../../server/session';
 import * as persistence from '../../server/persistence';
 import type { Room } from '../../server/room';
@@ -29,7 +29,7 @@ interface SentMessage {
   payload: ServerMessage;
 }
 
-function setupMockWs(playerId: string): { ws: { send: ReturnType<typeof vi.fn> }; sent: SentMessage[] } {
+function setupMockWs(playerId: string): { ws: { send: Mock }; sent: SentMessage[] } {
   const sent: SentMessage[] = [];
   const ws = {
     send: vi.fn((data: string) => {

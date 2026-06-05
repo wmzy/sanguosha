@@ -32,12 +32,14 @@ export type ServerMessage =
 export type { PlayerView, FrontendState };
 
 export type ClientMessage =
-  | { type: 'action'; action: GameAction }
-  | { type: 'response'; promptId: string; choice: unknown }
+  | { type: 'action'; action: GameAction; baseSeq: EventSeq }
+  | { type: 'response'; baseSeq: EventSeq; choice: unknown }
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
   | { type: 'create_room'; name: string; maxPlayers: number }
+  | { type: 'create_debug_room'; playerCount: number }
   | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
+  | { type: 'delete_room' }
   | { type: 'start_game' }
   | { type: 'leave_room' }
   | { type: 'list_rooms'; filter?: 'debug' | 'multiplayer' }
@@ -55,16 +57,15 @@ export interface RoomInfo {
 export function isValidClientMessage(data: unknown): data is ClientMessage {
   if (typeof data !== 'object' || data === null) return false;
   const msg = data as Record<string, unknown>;
-  if (typeof msg.type !== 'string') return false;
-
   switch (msg.type) {
     case 'action':
-      return typeof msg.action === 'object' && msg.action !== null;
+      return typeof msg.action === 'object' && msg.action !== null && typeof msg.baseSeq === 'number';
     case 'response':
-      return typeof msg.promptId === 'string';
+      return typeof msg.baseSeq === 'number';
     case 'ready':
     case 'start_game':
     case 'leave_room':
+    case 'delete_room':
       return true;
     case 'list_rooms':
       return msg.filter === undefined || msg.filter === 'debug' || msg.filter === 'multiplayer';
@@ -74,6 +75,8 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
       return typeof msg.playerId === 'string' && (msg.lastSeq === undefined || typeof msg.lastSeq === 'number');
     case 'create_room':
       return typeof msg.name === 'string' && typeof msg.maxPlayers === 'number';
+    case 'create_debug_room':
+      return typeof msg.playerCount === 'number' && msg.playerCount >= 2 && msg.playerCount <= 8;
     case 'join_debug_room':
       return typeof msg.roomId === 'string' && (msg.lastSeq === undefined || typeof msg.lastSeq === 'number');
     default:

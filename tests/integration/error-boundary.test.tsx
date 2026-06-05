@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from 'react';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
 
@@ -18,7 +18,7 @@ class Bomb extends Component<BombProps> {
 }
 
 describe('ErrorBoundary — 局部错误隔离', () => {
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: MockInstance;
   beforeEach(() => {
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -55,7 +55,7 @@ describe('ErrorBoundary — 局部错误隔离', () => {
 });
 
 describe('ErrorBoundary — 重试按钮', () => {
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: MockInstance;
   beforeEach(() => {
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -110,7 +110,7 @@ describe('ErrorBoundary — 重试按钮', () => {
 });
 
 describe('ErrorBoundary — context 日志', () => {
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: MockInstance;
   beforeEach(() => {
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -143,7 +143,7 @@ describe('ErrorBoundary — context 日志', () => {
 });
 
 describe('ErrorBoundary — resetKey 自动重置', () => {
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: MockInstance;
   beforeEach(() => {
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -185,7 +185,7 @@ describe('ErrorBoundary — resetKey 自动重置', () => {
 });
 
 describe('ErrorBoundary — 自定义 fallback 与 onReset 回调', () => {
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: MockInstance;
   beforeEach(() => {
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
