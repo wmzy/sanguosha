@@ -7,7 +7,8 @@
 // - 取消（return { cancel: true }）：跳过该 atom（不调 applyAtom、不写 serverLog）
 // - 替换（return { atom: NewAtom }）：用新 atom 替代
 // - 修改 state（return { state: NewState }）：覆盖 state
-//
+// - 改写目标（return { redirect: newTarget }）：仅对 damage / becomeTarget 生效
+//   （天香/流离/借刀等"目标转移"技能的底层机制）
 // onAfter 用途：
 // - 追加副作用（return { additionalAtoms: [...] }）：递归 applyAtoms
 //   （用于"出牌阶段摸牌后追加一张牌"等场景）
@@ -21,6 +22,11 @@ export interface BeforeHookResult {
   cancel?: boolean;
   atom?: Atom;
   state?: GameState;
+  /**
+   * 改写 atom.target。仅对 damage / becomeTarget 生效（其他 atom type 忽略）。
+   * 用于"目标转移"类技能（天香/流离/借刀等）的底层机制。
+   */
+  redirect?: string;
 }
 
 export interface AfterHookResult {
