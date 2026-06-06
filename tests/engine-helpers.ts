@@ -306,6 +306,19 @@ export function withArmor(state: GameState, playerName: string, armorId: string)
   };
 }
 /**
+ * 给玩家装备指定 weapon（写入 equipment.weapon）。仅在测试 setup 中使用。
+ */
+export function withWeapon(state: GameState, playerName: string, weaponId: string): GameState {
+  const player = state.players[playerName];
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerName]: { ...player, equipment: { ...player.equipment, weapon: weaponId } },
+    },
+  };
+}
+/**
  * 给玩家设置手牌（写入 hand）。仅在测试 setup 中使用。
  */
 export function withHand(state: GameState, playerName: string, cardIds: string[]): GameState {

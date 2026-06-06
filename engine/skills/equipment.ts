@@ -18,12 +18,9 @@ registerSkill({
   id: 'ignoreArmor',
   name: '青釭剑',
   description: '武器技：你使用【杀】时无视目标防具。',
-  trigger: {
-    event: 'killHit',
-    source: 'equipment',
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 qinggang.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
 });
 

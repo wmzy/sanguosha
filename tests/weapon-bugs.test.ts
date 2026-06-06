@@ -128,18 +128,19 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     expect(trigger?.event).toBe('killDodged');
   });
 
-  it('装备青釭剑后注册 ignoreArmor trigger (killHit event)', () => {
+  it('装备青釭剑后注册 ignoreArmor trigger (v3HookOnly event — 1D-T3 青釭剑 v3 钩子迁移)', () => {
     let state = createTestGame();
     state = setPlayPhase(state);
     state = injectEquipCard(state, 'P1', '青釭剑', '武器', 2);
     const weaponId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
-
     const result = engine(state, { type: 'playCard', player: 'P1', cardId: weaponId });
     const trigger = result.state.triggers.find(
       t => t.source === 'equipment' && t.skillId === 'ignoreArmor',
     );
     expect(trigger).toBeDefined();
-    expect(trigger?.event).toBe('killHit');
+    // 1D-T3：青釭剑的 v3 实现走 engine/skills/qinggang.ts 的 registerAtomHook；
+    // registerSkill 的 trigger 占位为 v3HookOnly（v2 emitEvent 永不触发，state.triggers 仍命中）。
+    expect(trigger?.event).toBe('v3HookOnly');
   });
 
   it('装备八卦阵后注册 judgeDodge trigger (v3HookOnly event — 1D-T2 八卦阵 v3 钩子迁移)', () => {
