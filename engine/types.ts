@@ -200,6 +200,7 @@ export type DamageType = 'normal' | 'fire' | 'thunder';
 export type Atom =
   | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string>; damageType?: Expr<DamageType> }
   | { type: 'heal'; target: Expr<string>; amount: Expr<number>; source?: Expr<string> }
+  | { type: 'loseHealth'; target: Expr<string>; amount: Expr<number> }
   | { type: 'draw'; player: Expr<string>; count: Expr<number> }
   | { type: 'discard'; player: Expr<string>; cardIds: Expr<string[]> }
   | { type: 'discardRandom'; player: Expr<string>; count: Expr<number>; from: 'hand' | 'equipment' }

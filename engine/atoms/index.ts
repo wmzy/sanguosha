@@ -1,6 +1,7 @@
 import * as damage from './damage';
 import * as draw from './draw';
 import * as heal from './heal';
+import * as loseHealth from './loseHealth';
 import * as discard from './discard';
 import * as discardRandom from './discardRandom';
 import * as moveCard from './moveCard';
@@ -30,6 +31,7 @@ const modules = [
   damage,
   draw,
   heal,
+  loseHealth,
   discard,
   discardRandom,
   moveCard,
