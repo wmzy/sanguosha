@@ -191,12 +191,14 @@ export interface SkillExecution {
   ctx: SkillContext;
   plan: SkillPhase[];
 }
+/** damage 原子和事件的 type 字段值（见 docs/ENGINE.md §5 T-11） */
+export type DamageType = 'normal' | 'fire' | 'thunder';
 /**
  * Atom 是唯一修改 GameState 的通道。
  * 每个 Atom 类型通过 registerAtom() 注册，包含 apply 和 toEvents。
  */
 export type Atom =
-  | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string>; damageType?: Expr<'normal' | 'fire' | 'thunder'> }
+  | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string>; damageType?: Expr<DamageType> }
   | { type: 'heal'; target: Expr<string>; amount: Expr<number>; source?: Expr<string> }
   | { type: 'draw'; player: Expr<string>; count: Expr<number> }
   | { type: 'discard'; player: Expr<string>; cardIds: Expr<string[]> }

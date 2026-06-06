@@ -1,10 +1,10 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom, AtomEventResult, Json, DamageType } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 
 /** damage type 默认值：所有未显式指定的 damage 视为 normal */
-const DEFAULT_DAMAGE_TYPE = 'normal' as const;
+const DEFAULT_DAMAGE_TYPE: DamageType = 'normal';
 
 export function register() {
   registerAtom({
@@ -23,7 +23,7 @@ export function register() {
       const cardId = atom.cardId as string | undefined;
       // Atom 内字段用 damageType（避免和 Atom 联合判别字段 type 冲突），
       // 事件 payload 命名仍为 type（对外协议保持简洁）。
-      const damageType = (atom.damageType as 'normal' | 'fire' | 'thunder' | undefined) ?? DEFAULT_DAMAGE_TYPE;
+      const damageType = (atom.damageType as DamageType | undefined) ?? DEFAULT_DAMAGE_TYPE;
       const payload: Json = {
         target,
         amount,

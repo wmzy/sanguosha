@@ -21,25 +21,15 @@ describe('damage.type', () => {
     expect(events[0].payload).toMatchObject({ type: 'normal', amount: 1 });
   });
 
-  it('damageType=fire 写入 payload.type', () => {
+  it.each(['fire', 'thunder'] as const)('damageType=%s 写入 payload.type', (t) => {
     const s0 = setHealth(createTestGame(), 'P1', 3);
     const { events } = applyAtoms(s0, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
+      { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: t },
     ]);
-    expect(events[0].payload).toMatchObject({ type: 'fire' });
+    expect(events[0].payload).toMatchObject({ type: t });
   });
 
-  it('damageType=thunder 写入 payload.type', () => {
-    const s0 = setHealth(createTestGame(), 'P1', 3);
-    const { events } = applyAtoms(s0, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'thunder' },
-    ]);
-    expect(events[0].payload).toMatchObject({ type: 'thunder' });
-  });
-
-  it('replay 阶段 fromEvents 重建时 type 字段保留', () => {
-    // 验证 toEvents 写出的 server event payload 不丢 type 字段
-    // （完整 reducer round-trip 由 reduceGameState-consistency.test.ts 覆盖）
+  it('toEvents payload 保留 damageType=fire 字段', () => {
     const s0 = setHealth(createTestGame(), 'P1', 4);
     const { events } = applyAtoms(s0, [
       { type: 'damage', target: 'P1', amount: 2, source: 'P2', damageType: 'fire' },
