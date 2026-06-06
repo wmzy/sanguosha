@@ -196,7 +196,7 @@ export interface SkillExecution {
  * 每个 Atom 类型通过 registerAtom() 注册，包含 apply 和 toEvents。
  */
 export type Atom =
-  | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string> }
+  | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string>; damageType?: Expr<'normal' | 'fire' | 'thunder'> }
   | { type: 'heal'; target: Expr<string>; amount: Expr<number>; source?: Expr<string> }
   | { type: 'draw'; player: Expr<string>; count: Expr<number> }
   | { type: 'discard'; player: Expr<string>; cardIds: Expr<string[]> }
