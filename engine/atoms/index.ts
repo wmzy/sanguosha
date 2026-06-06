@@ -25,6 +25,7 @@ import * as reshuffle from './reshuffle';
 import * as shuffleDeck from './shuffleDeck';
 import * as giveCard from './giveCard';
 import * as takeCard from './takeCard';
+import * as useCard from './useCard';
 import * as specifyTarget from './specifyTarget';
 import * as becomeTarget from './becomeTarget';
 import * as resolveCard from './resolveCard';
@@ -60,6 +61,7 @@ const modules = [
   shuffleDeck,
   giveCard,
   takeCard,
+  useCard,
   specifyTarget,
   becomeTarget,
   resolveCard,
