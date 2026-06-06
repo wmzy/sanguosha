@@ -146,39 +146,26 @@ registerSkill({
   id: 'blockBlackKill',
   name: '仁王盾',
   description: '防具技：黑色【杀】对你无效。',
-  trigger: {
-    event: 'killResponse',
-    source: 'equipment',
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 renwang.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
 });
-
 registerSkill({
   id: 'multiTarget',
   name: '方天画戟',
   description: '武器技：若你的手牌数为0，你使用【杀】可以指定最多三名角色为目标。',
-  trigger: {
-    event: 'killHit',
-    source: 'equipment',
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 fangtian.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
 });
-
 registerSkill({
   id: 'twoCardsAsKill',
   name: '丈八蛇矛',
   description: '武器技：你可以将两张手牌当一张【杀】使用。',
-  trigger: {
-    event: 'killResponse',
-    source: 'equipment',
-    manual: true,
-    optional: true,
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 zhangba.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
-} satisfies SkillDef);
+});
