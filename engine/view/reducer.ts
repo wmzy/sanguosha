@@ -3,7 +3,7 @@
 // 客户端把服务器推送的 events 序列应用到本地 FrontendState 上，得到最新视图。
 // 这是事件溯源风格：初始快照 + 事件流 = 当前状态。
 
-import type { GameState, PlayerEvent, ServerEvent, Json } from '../types';
+import type { GameState, PlayerEvent, ServerEvent, Json, Mark } from '../types';
 import type { FrontendState, PlayerView, Animation, CardInfo } from './types';
 import { isPendingAction } from '../../shared/typeGuards';
 import { clonePlayerView } from './buildView';
@@ -564,6 +564,80 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
     // payload 携带的 cards 隐式覆盖；前端不需要在此重放 rngState/deck 改动。
     // 跳过而非 fallthrough 到 default，能让后续 state-changes（draw/等）继续生效。
     case 'reshuffle': {
+      return state;
+    }
+    case 'loseHealth': {
+      const target = p.target as string;
+      const amount = p.amount as number;
+      const pState = state.players[target];
+      if (!pState) return state;
+      return { ...state, players: { ...state.players, [target]: { ...pState, health: Math.max(0, pState.health - amount) } } };
+    }
+    case 'loseCard': {
+      // payload: { cardId, from: { zone, player, slot? } }
+      const cardId = p.cardId as string;
+      const from = p.from as { zone: 'hand' | 'equipment'; player: string; slot?: string };
+      const player = from.player;
+      const pState = state.players[player];
+      if (!pState) return state;
+      if (from.zone === 'hand') {
+        if (!pState.hand.includes(cardId)) return state;
+        const after = { ...state, players: { ...state.players, [player]: { ...pState, hand: pState.hand.filter(id => id !== cardId) } } };
+        return { ...after, zones: { ...after.zones, discardPile: [...after.zones.discardPile, cardId] } };
+      }
+      if (from.zone === 'equipment' && from.slot) {
+        if ((pState.equipment as Record<string, string | undefined>)[from.slot] !== cardId) return state;
+        const after = { ...state, players: { ...state.players, [player]: { ...pState, equipment: { ...pState.equipment, [from.slot]: undefined } } } };
+        return { ...after, zones: { ...after.zones, discardPile: [...after.zones.discardPile, cardId] } };
+      }
+      return state;
+    }
+    case 'removeSkill': {
+      // payload: { player, skillId }
+      const player = p.player as string;
+      const skillId = p.skillId as string;
+      return { ...state, triggers: state.triggers.filter(t => !(t.player === player && t.skillId === skillId)) };
+    }
+    case 'setChained': {
+      const target = p.target as string;
+      const chained = p.chained as boolean;
+      const pState = state.players[target];
+      if (!pState) return state;
+      return { ...state, players: { ...state.players, [target]: { ...pState, chained } } };
+    }
+    case 'addMark': {
+      const player = p.player as string;
+      const mark = p.mark as Mark;
+      const current = state.marks[player] ?? [];
+      const filtered = current.filter(m => m.id !== mark.id);
+      return { ...state, marks: { ...state.marks, [player]: [...filtered, mark] } };
+    }
+    case 'removeMark': {
+      const player = p.player as string;
+      const markId = p.markId as string;
+      const current = state.marks[player] ?? [];
+      return { ...state, marks: { ...state.marks, [player]: current.filter(m => m.id !== markId) } };
+    }
+    case 'clearExpiredMarks': {
+      const phase = p.phase as string;
+      const next: GameState['marks'] = {};
+      for (const [player, marks] of Object.entries(state.marks)) {
+        const kept = marks.filter(m => {
+          if (m.duration === 'permanent') return true;
+          if (m.duration === 'untilTurnEnd' && phase === 'turnEnd') return false;
+          if (m.duration === 'untilPhaseEnd' && m.scope === 'relation') {
+            return phase !== 'turnEnd';
+          }
+          return true;
+        });
+        next[player] = kept;
+      }
+      return { ...state, marks: next };
+    }
+    case 'shuffleDeck': {
+      // 服务端 rng 推进；前端仅刷新 deck 内容（保持 multiset 不变）。
+      // 实际 deck 内容由后续 draw/discard/loseCard 事件携带的 cardId 隐式重构。
+      // reducer 不维护 rngState，因此本 case 为 no-op。
       return state;
     }
     default:
