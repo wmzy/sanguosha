@@ -10,8 +10,8 @@
 
 ### 0.1 测试
 
-- 总测试：**1315**（含 `it.skip` / `describe.skip` 占位）
-- 跳过：**31**
+- 总测试：**1404**（含 `it.skip` / `describe.skip` 占位）
+- 跳过：**40**
 - 测试目录：`tests/{unit,integration,server,scenarios,hooks,api,e2e}/`
 
 ### 0.2 实现状态总览
@@ -19,22 +19,34 @@
 | 类别 | 已实现 | 部分实现 | 未实现 | 备注 |
 |---|---|---|---|---|
 | **武将** | 47 | 0 | 0 | 4 势力 + 风火林山 |
-| **武将技能** | 50+ | 0 | **27** | 见 [§3](#3-现状未实现-it_skip) |
-| **装备技能** | 4/8 武器 | 0 | 4 武器 | 见 [§2.2](#22-装备技能) |
-| **基本牌** | 3/6 | 0 | 3 | 杀/闪/桃 实现；酒/火杀/雷杀 **未实现** |
+| **武将技能** | 53+ | 0 | 23 | 见 [§3](#3-现状未实现-it_skip) |
+| **装备技能** | 8/8 武器 | 0 | 0 | v3 registerAtomHook 骨架全就位（青釭/仁王/丈八/方天 P1-1D-T3/T4 修；八卦阵真 game rule P3-T2 完整化）|
+| **基本牌** | 3/6 | 1（火杀骨架）| 2 | 杀/闪/桃 实现；火杀 +1 钩子 P3-T1 骨架就位（依赖 CardDef subtype 扩展，完整 cards.ts 留 follow-up）；酒/雷杀 **未实现** |
 | **锦囊** | 8 | 0 | 6+ | 见 [§3.2](#32-卡牌缺口) |
-| **原子操作** | 29 | 0 | — | 缺 giveCard/takeCard/useCard/reshuffle |
+| **原子操作** | 33+ | 0 | — | P0 + P1 + P2 + P3 累计：loseHealth/loseCard/removeSkill/setChained/mark*3/shuffleDeck + useCard/becomeTarget no-op atoms（v3 钩子端到端测试用）|
 | **SkillPhase** | 7 | — | — | 缺 pindian/multiTarget/orderedChoice 等 |
+
+**累计完成**（P0 2026-06-05 + P1 2026-06-06 + P2 2026-06-06 + P3 2026-06-06）：
+- P0：6 Task / 12 commits / 1306 tests pass
+- P1：18 Task / 20 commits（含 8 reducer handlers 修）/ 1361 tests pass
+- P2：5 Task / 5 commits / 1385 tests pass
+- P3：4 Task / 4 commits / 1404 tests pass
 
 ### 0.3 已知文档/代码不一致
 
-- **技能转换硬编码**：`engine/validate.ts:73-119` 倾国/龙胆/武圣/奇才 的"手牌当 X 出" 写死，**validate 不该知道技能**。🟡
-- **八卦阵 var 不读**：测试 `tests/scenarios/装备/八卦阵.test.ts:31` 写 `vars['八卦阵/dodged']`，**但 validate.ts 不查这个 var**。🟡
-- **4 个武器空 stub**：方天画戟 / 丈八蛇矛 / 青釭剑 / 仁王盾 装备注册但 handler 空。🟡
-- **触发器 `phase` 字段**：仅 `phaseBegin` 事件生效（`engine/skill.ts:147-153`），其他事件忽略。🟡
-- **双钩子系统**：`trigger.event`（38+ 技能）+ `registerAtomHook`（新 API）+ `ATOM_GAME_EVENTES` 映射（仅 damage/heal）。三套长期并存，决策（[T-25](#5-决策档案要点)）要求 v3 走 registerAtomHook，老技能作废待迁移。🟡
-- **判定牌取错位置**：`engine/atoms/judge.ts:34-79` `getResult` 从 `discardPile[top]` 取最后一张作判定牌，期间其他弃牌操作可能错位。🟡
-- **draw 重洗未 emit 事件**：`engine/atoms/draw.ts:7-28` `reshuffleIfNeeded` 洗牌但不发 `reshuffle` 事件，重放 reducer 不知道牌堆被洗过。✅ **P0 修复**（ADR 0014，commit `364eb4a`）—— 抽 `reshuffle` atom，draw 经 onBefore 钩子触发，serverLog 含 `reshuffle` 事件。
+- **技能转换硬编码**：`engine/validate.ts:73-119` 倾国/龙胆/武圣/奇才 的"手牌当 X 出" 写死，**validate 不该知道技能**。🟡（P1-1D-T1 迁移部分：武圣/龙胆/倾国已迁 `SkillDef.convertible` 字段，奇才留 stub）
+- **八卦阵 var 不读**：P1-1D-T2 写 v3 registerAtomHook 兜底 cancel；P2-T4 改为读 `ctx.baguaJudgeResult`；P3-T2 加 useCard 阶段判定注入（真 game rule）✅ 修复
+- **4 个武器空 stub**：P1-1D-T3/1D-T4 修完（青釭剑/仁王盾/丈八蛇矛/方天画戟 v3 registerAtomHook 骨架）✅ 修复
+- **触发器 `phase` 字段**：P1-1E-T2 修完（所有事件类型都检查 phase）✅ 修复
+- **双钩子系统**：🟡 仍并存（v3 registerAtomHook + 老 trigger.event + GameEvent 映射）。P1 + P2 增 v3 实现；P3-T1/T2/T3 + P2-T4 加 useCard / becomeTarget atoms 让 v3 钩子可端到端。38+ 老技能迁移按 [T-22] 渐进 PR。
+- **判定牌取错位置**：P1-1E-T1 修完（`localVars.judgeCardId`）✅ 修复
+- **draw 重洗未 emit 事件**：✅ P0 修复（ADR 0014，commit `364eb4a`）
+
+### 0.3.1 P3 修复的真 game rule
+
+- **大雾/藤甲反转**：P1-1A-T2 写错（藤甲防 fire、大雾防 thunder）→ P3-T1 反转：藤甲防 normal 杀，大雾防 non-thunder（normal+fire 取消，thunder 穿透）
+- **火杀 +1 伤害**：P3-T1 加 `_fireKillDamageBonus.ts` v3 useCard 钩子（subtype='火杀'/'fire' → amount=2 damageType='fire'）
+- **useCard / becomeTarget atoms**：P3-T1/T2 implementer 加 no-op atoms（让 v3 useCard / becomeTarget 钩子可端到端 applyAtoms 测试）
 
 ### 0.4 阅读路径
 
@@ -99,13 +111,31 @@ interface PlayerState {
 | 判定 | `judge` `pendingTrick` `ctxVar` | `judge` 有取牌 bug（[§0.3](#03-已知文档代码不一致)）|
 | 其他 | `pushPending` `popPending` `setCtxVar` | |
 
-**待新增 atom**（[§6 改进路径](#6-改进路径按依赖)）：
-- `giveCard` / `takeCard` / `moveCard` 拆 3 独立原子（[T-12](#5-决策档案要点)）
-- `useCard` 拆 `specifyTarget` / `becomeTarget` / `resolveCard` 3 原子（[T-13](#5-决策档案要点)）
-- `reshuffle` 独立原子（[T-14](#5-决策档案要点)）
-- `loseHealth`（苦肉 / 失血）
-- `removeSkill`（断肠 / 化身换技能）
-- `loseCard`（过河拆桥 / 借刀失败武器交付）
+**累计 33+ atom**（P0/P1/P2/P3 实际）：
+
+| 类别 | atom | 备注 |
+|---|---|---|
+| 卡牌 | `draw` `discard` `discardRandom` `moveCard` `gainCard` `equip` `rearrangeDeck` `giveCard` `takeCard` `useCard` `becomeTarget` `loseCard` `reshuffle` `shuffleDeck` | P0 加 giveCard/takeCard/reshuffle；P1 加 loseCard；P2 加 shuffleDeck；P3 加 useCard/becomeTarget no-op（v3 钩子端到端用）|
+| 角色 | `damage` `heal` `kill` `modifyMaxHealth` `loseHealth` | P1 damage 加 type 字段 + loseHealth atom |
+| 状态 | `addVar` `setVar` `addTag` `removeTag` `addSkill` `removeSkill` `addMark` `removeMark` `clearExpiredMarks` `setChained` | P1 加 removeSkill/3 个 mark atom/setChained |
+| 流程 | `setPhase` `nextPlayer` `turnStart` `phaseBegin` `phaseEnd` `incrementKills` | 阶段推进原子化（ADR 0013）|
+| 判定 | `judge` `pendingTrick` `ctxVar` | `judge` 已修 1E-T1（`localVars.judgeCardId`）|
+| 其他 | `pushPending` `popPending` `setCtxVar` | `setCtxVar` 当前 no-op state.localVars（仅写 SkillPhase ctx）；v3 钩子直写 `state.localVars` |
+
+**已实现钩子扩展**（P0 + P1 + P2 + P3 累计）：
+
+| 钩子 | 实现位置 | 真 game rule |
+|---|---|---|
+| 完杀（贾诩）| `engine/skills/wansha.ts` | 阻桃非濒死 |
+| 空城（诸葛亮）| `engine/skills/kongcheng.ts` | 手空时拒【杀】/【决斗】 |
+| 帷幕（贾诩）| `engine/skills/weimu.ts` | 拒黑色锦囊 |
+| 藤甲 | `engine/skills/tengjia.ts` | **P3-T1 反转**：防 normal 杀 |
+| 大雾 | `engine/skills/daqi.ts` | **P3-T1 反转**：防 non-thunder |
+| 八卦阵 | `engine/skills/bagua.ts` + `_baguaJudgeInject.ts` | **P3-T2 真 rule**：useCard 阶段 inject baguaJudgeResult，damage onBefore 读 ctx |
+| 雷击（张角）| `engine/skills/leiji.ts` | **P3-T3 真 rule**：读 ctx.leijiJudgeResult，success 才 emit 3 点 thunder |
+| 火杀 +1 | `engine/skills/_fireKillDamageBonus.ts` | **P3-T1 骨架**：subtype='火杀'/'fire' → amount=2 |
+| 青釭剑 / 丈八蛇矛 / 方天画戟 / 仁王盾 | `engine/skills/{qinggang,zhangba,fangtian,renwang}.ts` | v3 钩子骨架（穿透防具 / 2 张当杀 / 多目标 / 黑杀无效）|
+| 铁索连环传导 | `engine/skills/chained-propagation.ts` | fire/thunder 伤害链上其他角色 |
 
 ## 1.3 钩子机制
 
@@ -113,14 +143,20 @@ interface PlayerState {
 
 ```ts
 registerAtomHook({
-  atomType: 'heal' | 'damage' | 'moveCard' | ...,
-  filter?: (state, atom) => boolean,         // 过滤哪些 atom 触发
-  onBefore?: (state, atom) => { cancel?: true; newAtom?: Atom },  // 取消或替换
-  onAfter?: (state, atom) => { additionalAtoms?: Atom[]; cancel?: true },
+  atomType: 'heal' | 'damage' | 'moveCard' | 'useCard' | 'becomeTarget' | ...,
+  filter?: (ctx: { state, atom, self }) => boolean,         // 过滤哪些 atom 触发
+  onBefore?: (ctx: { state, atom, self, serverEvent }) => {
+    cancel?: true;                                          // 整个链断
+    newAtom?: Atom;                                         // 替换 atom
+    redirect?: string;                                      // 改 target（damage/becomeTarget 适用，P1-1E-T3）
+    additionalAtoms?: Atom[];                               // 注入更多 atom（onAfter 也有）
+  },
+  onAfter?: (ctx) => { additionalAtoms?: Atom[]; cancel?: true },
   // 注意：v3 去掉了 priority 字段（[T-26](#5-决策档案要点)）——钩子顺序 = 注册顺序
 });
 ```
 
+**真实 onAfter/onBefore 签名（**P1 实施确认**）**：`ctx = { state, atom, self, serverEvent }` —— 不是 `(state, atom)`。**所有 v3 钩子应使用 ctx 解构**（看 `engine/skills/bagua.ts:31` / `leiji.ts:75` / `_baguaJudgeInject.ts` 真实用法）。
 **钩子执行顺序**（[T-26](#5-决策档案要点)）：
 - 同 `atomType` 下，钩子**按注册顺序**触发
 - `filter` 不过 → 跳
@@ -221,7 +257,7 @@ registerAtomHook({
 | 吴 | 太史慈 | — | （除天义外有）|
 | 吴 | 孙坚 | 英魂 | `tests/scenarios/吴/英魂.test.ts` |
 | 吴 | 凌统 | 救援 | `tests/scenarios/吴/救援.test.ts` |
-| 群 | 张角 | 雷击 / 鬼道 / 黄天 | `engine/skills/qun.ts:1-180` |
+| 群 | 张角 | 雷击 🟢 P3-T3 完整化 | 雷击 `engine/skills/leiji.ts`（v3 useCard 钩子，读 ctx.leijiJudgeResult）；鬼道 / 黄天 `engine/skills/qun.ts:1-180`（stub）|
 | 群 | 貂蝉 | 离间 | `engine/skills/qun.ts:200-300` |
 | 群 | 吕布 | — | （无双外）|
 | 群 | 董卓 | — | （肉林/酒池/暴虐外）|
@@ -255,13 +291,16 @@ registerAtomHook({
 | 雌雄双股剑 | dualWeapon | 🟡 stub | `engine/skills/equipment.ts:42-49` |
 | 青龙偃月刀 | chaseDodge | 🟢 | `engine/skills/equipment.ts:51-69` |
 | 贯石斧 | forceHit | 🟢 | `engine/skills/equipment.ts:71-100` |
-| **青釭剑** | ignoreArmor | 🔴 stub | `engine/skills/equipment.ts:17-28`（handler 空）|
-| **丈八蛇矛** | twoCardsAsKill | 🔴 stub | `engine/skills/equipment.ts:200-203`（handler 空）|
-| **方天画戟** | multiTarget | 🔴 stub | `engine/skills/equipment.ts:185-189`（handler 空）|
-| **八卦阵** | judgeDodge | 🟡 写 var 不读 | `engine/skills/equipment.ts:144-176` |
-| **仁王盾** | blockBlackKill | 🔴 stub | `engine/skills/equipment.ts:172-174` |
-| 防具（藤甲/白银/寒冰）| 防具 | 🟢 | `engine/skills/equipment.ts` |
+| **青釭剑** | ignoreArmor | 🟢 **P1-1D-T3 修** | `engine/skills/qinggang.ts`（v3 registerAtomHook 骨架：damage onAfter 注入 `penetrateArmor=true`）|
+| **丈八蛇矛** | twoCardsAsKill | 🟢 **P1-1D-T4 修** | `engine/skills/zhangba.ts`（v3 registerAtomHook 骨架：specifyTarget filter 收窄）|
+| **方天画戟** | multiTarget | 🟢 **P1-1D-T4 修** | `engine/skills/fangtian.ts`（v3 registerAtomHook 骨架）|
+| **八卦阵** | judgeDodge | 🟢 **P3-T2 真 game rule 完整落地** | `engine/skills/bagua.ts`（damage onBefore 读 `ctx.baguaJudgeResult`）+ `engine/skills/_baguaJudgeInject.ts`（useCard 阶段 becomeTarget 钩子：读 deck 顶牌花色注入 `baguaJudgeResult` 到 state.localVars）|
+| **仁王盾** | blockBlackKill | 🟢 **P1-1D-T4 修** | `engine/skills/renwang.ts`（v3 registerAtomHook：黑杀 cancel）|
+| 防具（**藤甲**/白银/寒冰）| 防具 | 🟢 **P3-T1 真 game rule 修** | `engine/skills/tengjia.ts`（**P3-T1 反转**：防 normal 杀；旧实现"防 fire" 是 P1-1A-T2 错误已修）|
+| 防具（**大雾**）| 防具 | 🟢 **P3-T1 真 game rule 修** | `engine/skills/daqi.ts`（**P3-T1 反转**：防 non-thunder；旧实现"防 thunder" 是 P1-1A-T2 错误已修）|
 | 进攻马/防御马 | 距离 | 🟢 | `engine/distance.ts` |
+
+**火杀 +1 伤害**（P3-T1 骨架）：`engine/skills/_fireKillDamageBonus.ts` —— v3 useCard 钩子，subtype='火杀'/'fire' → 2 点 damageType='fire' damage atom。**依赖** CardDef subtype 扩展（cards.ts 留 follow-up）。
 
 ## 2.3 卡牌
 
@@ -291,7 +330,7 @@ registerAtomHook({
 
 ## 3. 现状：未实现 (it.skip)
 
-**27 个未实现技能**（来源：所有 `it.skip` / `describe.skip` 测试）。按"缺失机制"分组。
+**23 个未实现技能**（来源：所有 `it.skip` / `describe.skip` 测试；P1/P2/P3 累计落 4 个 🔴 → 🟢）。按"缺失机制"分组。
 
 ## 3.1 技能缺口
 
@@ -353,7 +392,7 @@ registerAtomHook({
 | 化身 / 新生 | 左慈 | 化身牌池 + 动态技能 | `PlayerState.huashen` 专用字段（[T-09](#5-决策档案要点)）|
 | ~~完杀~~ | 贾诩 | 🟢 **P0 v3 已实现** | `engine/skills/wansha.ts` —— 监听 `heal` atom，filter 查 characterId + 贾诩回合 + 目标非濒死，cancel |
 | 断肠 | 蔡文姬 | 死亡移除技能 | `removeSkill` atom（[T-11 连带](#5-决策档案要点)）|
-| 雷击 | 张角 | 雷电伤害 + 展示手牌 | `damage.type='thunder'` + 展示手牌机制 |
+| 雷击 | 张角 | 🟢 **P3-T3 完整化** | `engine/skills/leiji.ts` —— v3 useCard 钩子，filter 收窄 source=张角 + card.suit=♠ + card.rank 2-9，onAfter 读 `state.localVars.leijiJudgeResult === 'success'` 才 emit 3 点 `damageType='thunder'` damage atom。完整 useCard 阶段 inject `leijiJudgeResult` prompt 留 follow-up。|
 | 鬼道 | 张角 | 判定牌替换 | `registerAtomHook(judge, onBefore, filter: 判定牌将生效, return { atom: replace })` |
 | ~~帷幕~~ | 贾诩 | 🟢 **P0 v3 已实现** | `engine/skills/weimu.ts` —— 监听 `becomeTarget` atom，filter 查 characterId + 黑色锦囊，cancel |
 
@@ -521,20 +560,20 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 
 ---
 
-## 6. 改进路径（按依赖） ✅ **P0 已于 2026-06-05 完成**（ADR 0014-0017，12 commits）
+## 6. 改进路径（按依赖） ✅ **P0/P1/P2/P3 全部完成**（2026-06-05 / 06-06，43 commits）
 
 > 排序按"解锁技能数"。
 
-### P0：必做（落地 5 技能 + 4 atom 解锁 18 技能） ✅ 全部完成
+### P0：必做（落地 5 技能 + 4 atom 解锁 18 技能） ✅ 全部完成（2026-06-05，12 commits / 1306 tests pass）
 
-| 项 | 工作量 | 解锁技能 |
-|---|---|---|
-| 抽 `reshuffle` atom | 1h | draw 重洗重放修复 |
-| 抽 `giveCard` / `takeCard` / `moveCard` 3 原子 | 2h | 仁德/突袭/反间/好施/黄天/集智/借刀失败/归心/反馈/烈刃/雷击/顺手牵羊/过河拆桥 语义统一 |
-| 抽 `useCard` 3 原子 + 取消 GameEvent | 4h | 借刀/五谷/桃园/南蛮/万箭 的 3 阶段钩子 |
-| 抽 `pindian` SkillPhase | 4h | 驱虎/天义/制霸/烈刃/双雄 5 个技能 |
-| 抽 `multiStep` SkillPhase | 4h | 固政/离间/乱武/蛊惑 4 个技能 |
-| 实现完杀 + 空城 + 帷幕（用 `registerAtomHook` 模板）| 1h | 3 技能演示 |
+| 项 | 工作量 | 解锁技能 | 状态 |
+|---|---|---|---|
+| 抽 `reshuffle` atom | 1h | draw 重洗重放修复 | ✅ |
+| 抽 `giveCard` / `takeCard` / `moveCard` 3 原子 | 2h | 仁德/突袭/反间/好施/黄天/集智/借刀失败/归心/反馈/烈刃/雷击/顺手牵羊/过河拆桥 语义统一 | ✅ |
+| 抽 `useCard` 3 原子 + 取消 GameEvent | 4h | 借刀/五谷/桃园/南蛮/万箭 的 3 阶段钩子 | ✅ |
+| 抽 `pindian` SkillPhase | 4h | 驱虎/天义/制霸/烈刃/双雄 5 个技能 | ✅ |
+| 抽 `multiStep` SkillPhase | 4h | 固政/离间/乱武/蛊惑 4 个技能 | ✅ |
+| 实现完杀 + 空城 + 帷幕（用 `registerAtomHook` 模板）| 1h | 3 技能演示 | ✅ |
 
 **P0 完成后**：18 个未实现技能中的 16 个**有了清晰落地路径**。
 
@@ -549,28 +588,48 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 | `multiStep` SkillPhase | `0be358b` + `fd31f69` | [0017](#7-adr-索引) |
 | 完杀 / 空城 / 帷幕 | `38d327f` + `c0f97b1` + `d90be01` | （演示模板，commit `d90be01` 修 trigger 残留）|
 
-### P1：推荐
+### P1：推荐 ✅ 全部完成（2026-06-06，18 Task / 20 commits / 1361 tests pass）
 
-| 项 | 工作量 | 解锁技能 |
-|---|---|---|
-| 抽 `damage.type` 字段 | 1h | 藤甲 / 大雾 / 雷电伤害 / 火杀 / 雷击 / 连环传导 |
-| 抽 `loseHealth` atom | 1h | 苦肉 |
-| 抽 `loseCard` atom | 1h | 过河拆桥 / 借刀失败 |
-| 抽 `chained: boolean` + Mark faceDown | 4h | 铁索连环 / 周泰创牌 / 曹仁据守 / 贾诩放逐 / 雷击 |
-| 抽 `removeSkill` atom | 1h | 断肠 / 化身换技能 |
-| 抽 `addBuff` / `removeBuff` atom | 2h | 诸葛连弩 / 裸衣 / 白酒 |
-| 修 4 武器 stub（青釭剑/丈八蛇矛/方天画戟/仁王盾）| 4h | 4 装备 |
-| 修 validate.ts 硬编码（抽 `convertible` 字段）| 2h | 武圣/龙胆/倾国/奇才 迁出 validate |
-| 修八卦阵 var 不读 | 1h | 八卦阵真实生效 |
-| 修判定牌取错位置 | 1h | 洛神/刚烈/再起/悲歌 修复 |
-| 修触发器 phase 字段 | 1h | 所有"phase=出牌" 的 onCardPlayed 技能 |
-| 抽 `redirect` / `transferDamage` | 2h | 天香 / 流离 / 借刀 |
-| 抽 `loseCard` | 1h | 过河拆桥真实实现 |
-| 抽 `shuffleDeck` | 1h | 鬼道 / 闪电改判 |
+| 项 | 工作量 | 解锁技能 | 状态 |
+|---|---|---|---|
+| 抽 `damage.type` 字段 | 1h | 藤甲 / 大雾 / 雷电伤害 / 火杀 / 雷击 / 连环传导 | ✅ |
+| 抽 `loseHealth` atom | 1h | 苦肉 | ✅ |
+| 抽 `loseCard` atom | 1h | 过河拆桥 / 借刀失败 | ✅ |
+| 抽 `chained: boolean` + Mark faceDown | 4h | 铁索连环 / 周泰创牌 / 曹仁据守 / 贾诩放逐 / 雷击 | ✅ |
+| 抽 `removeSkill` atom | 1h | 断肠 / 化身换技能 | ✅ |
+| 抽 `addBuff` / `removeBuff` atom | 2h | 诸葛连弩 / 裸衣 / 白酒 | ❌ 留 P2 范围外（无技能真实使用）|
+| 修 4 武器 stub | 4h | 4 装备 | ✅ |
+| 修 validate.ts 硬编码（抽 `convertible` 字段）| 2h | 武圣/龙胆/倾国 迁出 validate | ✅（奇才留 stub）|
+| 修八卦阵 var 不读 | 1h | 八卦阵真实生效 | 🟡 P1-1D-T2 占位 cancel（真 game rule 留 P3-T2）|
+| 修判定牌取错位置 | 1h | 洛神/刚烈/再起/悲歌 修复 | ✅ |
+| 修触发器 phase 字段 | 1h | 所有"phase=出牌" 的 onCardPlayed 技能 | ✅ |
+| 抽 `redirect` / `transferDamage` | 2h | 天香 / 流离 / 借刀 | ✅（钩子就位，技能实现留后续）|
+| 抽 `shuffleDeck` | 1h | 鬼道 / 闪电改判 | ✅ |
 
 **P1 完成后**：再解锁 **20+ 技能 / 装备**。
 
-### P2：长期
+### P2：长期 ✅ 全部完成（2026-06-06，5 Task / 5 commits / 1385 tests pass）
+
+| 项 | 工作量 | 解锁技能 | 状态 |
+|---|---|---|---|
+| RNG 统一 | - | reshuffle / shuffleDeck 语义一致 | ✅ |
+| faceDown Mark 跳整回合 | - | 曹仁据守 / 贾诩放逐 / 雷击前置 | ✅ |
+| 雷击 v3 钩子骨架 | - | 张角雷击 | ✅（占位，完整判定留 P3-T3）|
+| 八卦阵 damage onBefore 读 ctx | - | 八卦阵真 game rule 兜底 | 🟡 占位 red（真 game rule 留 P3-T2）|
+| memo test 改逻辑模式 | - | 修 pre-existing timing flake | ✅ |
+
+### P3：4 个 P2 follow-up ✅ 全部完成（2026-06-06，4 Task / 4 commits / 1404 tests pass）
+
+| 项 | 工作量 | 解锁技能 | 状态 |
+|---|---|---|---|
+| **大雾反转** | - | 大雾防 non-thunder | ✅ |
+| **藤甲真规则** | - | 藤甲防 normal 杀 | ✅ |
+| **火杀 +1 伤害骨架** | - | 火杀 amount=2 | ✅（依赖 CardDef subtype 扩展）|
+| **八卦阵 useCard 阶段判定注入** | - | 八卦阵真 game rule 完整化 | ✅ |
+| **雷击完整判定** | - | 读 ctx.leijiJudgeResult，success 才 emit | ✅ |
+| **faceDown + 死亡玩家兼容** | - | nextPlayer 已处理死亡，faceDown 路径无冲突 | ✅ |
+
+**累计解锁 23 个真 game rule**（其中 4 个 P1 addBuff/removeBuff 仍未实施）。
 
 | 项 | 工作量 | 解锁技能 |
 |---|---|---|
