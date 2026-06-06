@@ -7,25 +7,16 @@
 // 注：神诸葛亮"大雾"是 Mark-style 技能（给一名角色"大雾"标记），
 // 不是装备。此 Task 走 fixture 模拟"目标拥有大雾标记 = 装备视为大雾防具"，
 // 抽象与藤甲对称。
+//
+// TODO(P1-B): complete rule — 真实规则是"非雷电伤害防止"（normal + fire 均免疫），
+// 下文 cases 2/3 显式记录"non-thunder 路径在 v3 钩子骨架下不生效"。
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { applyAtoms, clearAtomRegistry } from '@engine/atom';
 import { clearAtomHooks } from '@engine/skill-hook';
 import { registerAllAtoms } from '@engine/atoms';
-import { createTestGame, setHealth } from '../../engine-helpers';
-import { registerAll as registerFixtureHooks } from '../../fixtures/藤甲';
-
-/** 给 P1 装上大雾（写入 equipment.armor）。仅在测试 setup 中使用。 */
-function withDaqiArmor(state: ReturnType<typeof createTestGame>): ReturnType<typeof createTestGame> {
-  const p1 = state.players.P1;
-  return {
-    ...state,
-    players: {
-      ...state.players,
-      P1: { ...p1, equipment: { ...p1.equipment, armor: 'daqi' } },
-    },
-  };
-}
+import { createTestGame, setHealth, withArmor } from '../../engine-helpers';
+import { registerAll as registerFixtureHooks } from '../../fixtures/大雾';
 
 describe('大雾（thunder 免疫，本 Task 范围）', () => {
   beforeEach(() => {
@@ -36,7 +27,7 @@ describe('大雾（thunder 免疫，本 Task 范围）', () => {
   });
 
   it('装备大雾受 thunder 伤害时，cancel 整个链（无伤害、不写 server event）', () => {
-    const s0 = setHealth(withDaqiArmor(createTestGame()), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'daqi'), 'P1', 4);
     const { state, events } = applyAtoms(s0, [
       { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'thunder' },
     ]);
@@ -44,18 +35,19 @@ describe('大雾（thunder 免疫，本 Task 范围）', () => {
     expect(events).toHaveLength(0);
   });
 
+  // TODO(P1-B): complete rule — 完整大雾"非雷电全部防止"应使本用例 health 维持 4；
+  // 当前 v3 钩子骨架仅 cancel thunder，non-thunder 路径未拦截（见 daqi.ts 头部注释）。
   it('大雾对 normal 伤害不生效（本 Task 范围：thunder-only 实现）', () => {
-    // 说明：大雾完整规则是"非雷电伤害防止"，但本 Task 只先实现 thunder 免疫作为 v3 钩子骨架。
-    // 非雷电（normal / fire）伤害的 full 防具语义留 P1-B 配合 chained 状态一并实现。
-    const s0 = setHealth(withDaqiArmor(createTestGame()), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'daqi'), 'P1', 4);
     const { state } = applyAtoms(s0, [
       { type: 'damage', target: 'P1', amount: 1, source: 'P2' },
     ]);
     expect(state.players.P1.health).toBe(3);
   });
 
+  // TODO(P1-B): complete rule — 同上，完整大雾应使本用例 health 维持 4。
   it('大雾对 fire 伤害不生效（本 Task 范围：thunder-only 实现）', () => {
-    const s0 = setHealth(withDaqiArmor(createTestGame()), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'daqi'), 'P1', 4);
     const { state } = applyAtoms(s0, [
       { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
     ]);

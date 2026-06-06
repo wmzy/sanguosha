@@ -9,26 +9,14 @@
 // 涉及 chained 状态（[T-12] P1-B），留 P1-B 一并实现。
 // 大雾为 Mark-style 技能（不是装备），本 Task 走 fixture 模拟
 // "目标拥有大雾 = equipment.armor === 'daqi'"——与藤甲对称实现。
+//
+// TODO(P1-D): migrate to armorEffect — 当前 armorId 字面量 'daqi'
+// 应当由 cardId '大雾' 经 P1-D 装备 barrel 解析得到。
+// TODO(P1-B): complete rule — 真实规则是"非雷电伤害防止"（normal + fire 均免疫），
+// 当前实现仅 cancel thunder；non-thunder 路径依赖 chained 状态，留 P1-B 一并实现。
 
-import { registerAtomHook } from '../atom';
-import { getPlayer } from '../state';
-import type { Atom, GameState, DamageType } from '../types';
-
-const DAQI_ID = 'daqi';
+import { registerArmorDamageBlock } from './_armorDamageBlock';
 
 export function register(): void {
-  registerAtomHook({
-    atomType: 'damage',
-    filter(state: GameState, atom: Atom): boolean {
-      if (atom.type !== 'damage') return false;
-      const target = atom.target as string;
-      const targetPlayer = getPlayer(state, target);
-      if (targetPlayer.equipment.armor !== DAQI_ID) return false;
-      const damageType = (atom.damageType as DamageType | undefined) ?? 'normal';
-      return damageType === 'thunder';
-    },
-    onBefore() {
-      return { cancel: true };
-    },
-  });
+  registerArmorDamageBlock('daqi', 'thunder');
 }

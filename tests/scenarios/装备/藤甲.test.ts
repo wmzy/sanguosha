@@ -7,20 +7,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { applyAtoms, clearAtomRegistry } from '@engine/atom';
 import { clearAtomHooks } from '@engine/skill-hook';
 import { registerAllAtoms } from '@engine/atoms';
-import { createTestGame, setHealth } from '../../engine-helpers';
+import { createTestGame, setHealth, withArmor } from '../../engine-helpers';
 import { registerAll as registerFixtureHooks } from '../../fixtures/藤甲';
-
-/** 给 P1 装上藤甲（写入 equipment.armor）。仅在测试 setup 中使用。 */
-function withTengjiaArmor(state: ReturnType<typeof createTestGame>): ReturnType<typeof createTestGame> {
-  const p1 = state.players.P1;
-  return {
-    ...state,
-    players: {
-      ...state.players,
-      P1: { ...p1, equipment: { ...p1.equipment, armor: 'tengjia' } },
-    },
-  };
-}
 
 describe('藤甲（火伤免疫）', () => {
   beforeEach(() => {
@@ -31,7 +19,7 @@ describe('藤甲（火伤免疫）', () => {
   });
 
   it('装备藤甲受 fire 伤害时，cancel 整个链（无伤害、不写 server event）', () => {
-    const s0 = setHealth(withTengjiaArmor(createTestGame()), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'tengjia'), 'P1', 4);
     const { state, events } = applyAtoms(s0, [
       { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
     ]);
@@ -40,7 +28,7 @@ describe('藤甲（火伤免疫）', () => {
   });
 
   it('藤甲对 normal 伤害不生效', () => {
-    const s0 = setHealth(withTengjiaArmor(createTestGame()), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'tengjia'), 'P1', 4);
     const { state } = applyAtoms(s0, [
       { type: 'damage', target: 'P1', amount: 1, source: 'P2' },
     ]);
@@ -48,7 +36,7 @@ describe('藤甲（火伤免疫）', () => {
   });
 
   it('藤甲对 thunder 伤害不生效', () => {
-    const s0 = setHealth(withTengjiaArmor(createTestGame()), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'tengjia'), 'P1', 4);
     const { state } = applyAtoms(s0, [
       { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'thunder' },
     ]);

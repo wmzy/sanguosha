@@ -8,26 +8,11 @@
 // 注：本 Task 仅实现 v3 钩子骨架，装备注册（cardId 映射、装备区放置）由 P1-D 处理。
 // 旧 stub handler 空壳未注册（`engine/skills/equipment.ts` 暂不含 tengjia）。
 
-import { registerAtomHook } from '../atom';
-import { getPlayer } from '../state';
-import type { Atom, GameState, DamageType } from '../types';
+// TODO(P1-D): migrate to armorEffect — 当前 armorId 字面量 'tengjia'
+// 应当由 cardId '藤甲' 经 P1-D 装备 barrel 解析得到，不再是裸字符串。
 
-const TENGJIA_ID = 'tengjia';
+import { registerArmorDamageBlock } from './_armorDamageBlock';
 
 export function register(): void {
-  registerAtomHook({
-    atomType: 'damage',
-    filter(state: GameState, atom: Atom): boolean {
-      if (atom.type !== 'damage') return false;
-      const target = atom.target as string;
-      const targetPlayer = getPlayer(state, target);
-      if (targetPlayer.equipment.armor !== TENGJIA_ID) return false;
-      const damageType = (atom.damageType as DamageType | undefined) ?? 'normal';
-      return damageType === 'fire';
-    },
-    onBefore() {
-      // 藤甲：fire 伤害全防
-      return { cancel: true };
-    },
-  });
+  registerArmorDamageBlock('tengjia', 'fire');
 }

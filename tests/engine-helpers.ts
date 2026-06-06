@@ -291,3 +291,17 @@ export function passAllTrickResponders(state: GameState): GameState {
   }
   return current;
 }
+
+/**
+ * 给玩家装备指定 armor（写入 equipment.armor）。仅在测试 setup 中使用。
+ */
+export function withArmor(state: GameState, playerName: string, armorId: string): GameState {
+  const player = state.players[playerName];
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerName]: { ...player, equipment: { ...player.equipment, armor: armorId } },
+    },
+  };
+}
