@@ -139,25 +139,9 @@ registerSkill({
   id: 'judgeDodge',
   name: '八卦阵',
   description: '防具技：当你需要使用或打出【闪】时，你可以进行判定：若结果为红色，视为你使用或打出了一张【闪】。',
-  trigger: {
-    event: 'killResponse',
-    source: 'equipment',
-    optional: true,
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 bagua.ts
   handler(_ctx, _state) {
-    return [
-      { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
-      {
-        type: 'condition',
-        check: { equals: [{ $: 'ctx', path: 'localVars.judgeColor' }, 'red'] },
-        then: [
-          {
-            type: 'atoms',
-            ops: [{ type: 'setVar', player: _ctx.self, key: '八卦阵/dodged', value: true }],
-          },
-        ],
-      },
-    ];
+    return []; // v3 占位
   },
 });
 

@@ -142,7 +142,7 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     expect(trigger?.event).toBe('killHit');
   });
 
-  it('装备八卦阵后注册 judgeDodge trigger (killResponse event)', () => {
+  it('装备八卦阵后注册 judgeDodge trigger (v3HookOnly event — 1D-T2 八卦阵 v3 钩子迁移)', () => {
     let state = createTestGame();
     state = setPlayPhase(state);
     state = injectEquipCard(state, 'P1', '八卦阵', '防具');
@@ -153,7 +153,9 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
       t => t.source === 'equipment' && t.skillId === 'judgeDodge',
     );
     expect(trigger).toBeDefined();
-    expect(trigger?.event).toBe('killResponse');
+    // 1D-T2：八卦阵的 v3 实现走 engine/skills/bagua.ts 的 registerAtomHook；
+    // registerSkill 的 trigger 占位为 v3HookOnly（v2 emitEvent 永不触发，state.triggers 仍命中）。
+    expect(trigger?.event).toBe('v3HookOnly');
   });
 
   it('装备旧武器后换新武器，注销旧 trigger 并注册新 trigger', () => {
