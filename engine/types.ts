@@ -205,6 +205,7 @@ export type Atom =
   | { type: 'discard'; player: Expr<string>; cardIds: Expr<string[]> }
   | { type: 'discardRandom'; player: Expr<string>; count: Expr<number>; from: 'hand' | 'equipment' }
   | { type: 'moveCard'; cardId: Expr<string>; from: ZoneLoc; to: ZoneLoc }
+  | { type: 'loseCard'; cardId: Expr<string>; from: { zone: 'hand' | 'equipment'; player: Expr<string>; slot?: EquipSlot } }
   | { type: 'giveCard'; cardId: Expr<string>; from: Expr<string>; to: Expr<string> }
   | { type: 'takeCard'; cardId: Expr<string>; to: Expr<string> }
   | { type: 'equip'; player: Expr<string>; cardId: Expr<string> }

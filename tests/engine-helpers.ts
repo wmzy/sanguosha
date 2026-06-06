@@ -305,3 +305,36 @@ export function withArmor(state: GameState, playerName: string, armorId: string)
     },
   };
 }
+/**
+ * 给玩家设置手牌（写入 hand）。仅在测试 setup 中使用。
+ */
+export function withHand(state: GameState, playerName: string, cardIds: string[]): GameState {
+  const player = state.players[playerName];
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerName]: { ...player, hand: [...cardIds] },
+    },
+  };
+}
+
+/**
+ * 给玩家设置装备（写入 equipment）。仅在测试 setup 中使用。
+ * 接受 EquipSlot→cardId 映射，合并到现有 equipment。
+ */
+export function withEquipment(
+  state: GameState,
+  playerName: string,
+  equipment: { weapon?: string; armor?: string; horsePlus?: string; horseMinus?: string },
+): GameState {
+  const player = state.players[playerName];
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerName]: { ...player, equipment: { ...player.equipment, ...equipment } },
+    },
+  };
+}
+

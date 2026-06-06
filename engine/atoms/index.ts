@@ -5,6 +5,7 @@ import * as loseHealth from './loseHealth';
 import * as discard from './discard';
 import * as discardRandom from './discardRandom';
 import * as moveCard from './moveCard';
+import * as loseCard from './loseCard';
 import * as equip from './equip';
 import * as varModule from './var';
 import * as phase from './phase';
@@ -35,6 +36,7 @@ const modules = [
   discard,
   discardRandom,
   moveCard,
+  loseCard,
   equip,
   varModule,
   phase,
