@@ -21,6 +21,7 @@ import type { SkillDef, GameState, TurnPhase, TriggerRule } from '@engine/types'
 function stateWithProbe(
   currentPhase: TurnPhase,
   triggerEvent: string,
+  triggerPhase?: TurnPhase,
 ): GameState {
   const base = setPlayPhase(createTestGame({ playerCount: 2 }));
   const probe: TriggerRule = {
@@ -29,6 +30,7 @@ function stateWithProbe(
     skillId: '_phaseProbe',
     player: 'P1',
     priority: 5,
+    ...(triggerPhase ? { phase: triggerPhase } : {}),
   };
   return { ...base, phase: currentPhase, triggers: [...base.triggers, probe] };
 }
@@ -94,7 +96,12 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       description: 'test',
       trigger: { event: 'phaseEnd', source: 'character', phase: '出牌' },
       handler(_ctx, _state) {
-        return [];
+        return [
+          {
+            type: 'atoms',
+            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+          },
+        ];
       },
     };
     registerSkill(def);
@@ -104,11 +111,10 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       phase: '出牌',
       player: 'P1',
     });
-    expect(result.state).toBeDefined();
+    expect(result.state.players['P1'].vars['_phaseProbe/fired']).toBe(true);
   });
 
   it('trigger.phase=出牌 + event=phaseEnd(摸牌) → 跳过（修 §4.4）', () => {
-    // 关键回归：phaseEnd + 不匹配 phase → 跳过。
     const def: SkillDef = {
       id: '_phaseProbe',
       name: '相位探针',
@@ -134,14 +140,20 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
   });
 
   it('trigger.phase=出牌 + event=cardPlayed 且 state.phase=出牌 → 触发（修 §4.4）', () => {
-    // 关键场景：技能声明 event=cardPlayed + phase=出牌，state 在出牌阶段 → handler 触发。
+    // 关键回归：之前 cardPlayed 完全忽略 phase，handler 总被调。
+    // 修后：state.phase === '出牌' → 触发。
     const def: SkillDef = {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
       trigger: { event: 'cardPlayed', source: 'character', phase: '出牌' },
       handler(_ctx, _state) {
-        return [];
+        return [
+          {
+            type: 'atoms',
+            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+          },
+        ];
       },
     };
     registerSkill(def);
@@ -151,7 +163,7 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       player: 'P1',
       cardId: 'fake-card-1',
     });
-    expect(result.state).toBeDefined();
+    expect(result.state.players['P1'].vars['_phaseProbe/fired']).toBe(true);
   });
 
   it('trigger.phase=出牌 + event=cardPlayed 且 state.phase=摸牌 → 跳过（修 §4.4）', () => {

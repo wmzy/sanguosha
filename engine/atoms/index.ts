@@ -22,6 +22,7 @@ import * as maxHealth from './maxHealth';
 import * as skill from './skill';
 import * as removeSkill from './removeSkill';
 import * as reshuffle from './reshuffle';
+import * as shuffleDeck from './shuffleDeck';
 import * as giveCard from './giveCard';
 import * as takeCard from './takeCard';
 import * as specifyTarget from './specifyTarget';
@@ -56,6 +57,7 @@ const modules = [
   skill,
   removeSkill,
   reshuffle,
+  shuffleDeck,
   giveCard,
   takeCard,
   specifyTarget,

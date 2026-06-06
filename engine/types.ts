@@ -246,6 +246,7 @@ export type Atom =
   | { type: 'addTag'; player: Expr<string>; tag: string }
   | { type: 'removeTag'; player: Expr<string>; tag: string }
   | { type: 'reshuffle' }
+  | { type: 'shuffleDeck' }
   | { type: 'kill'; player: Expr<string>; source?: Expr<string> }
   | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
   | { type: 'setCtxVar'; key: string; value: Json }
