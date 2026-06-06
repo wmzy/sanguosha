@@ -1,14 +1,16 @@
 // engine/skills/leiji.ts — 雷击（张角）v3 registerAtomHook 实现
 //
-// 雷击真 game rule（占位骨架）：
+// 雷击真 game rule：
 // - 当你使用或打出【闪】时，可令任意一名角色判定
 // - 若结果为黑桃 2-9，对该角色造成 3 点雷电伤害
 //
-// 本 Task 范围（P2-T3）：v3 钩子骨架 + 判定简化版本。
+// 本文件实现：v3 钩子骨架 + 判定结果（ctx）驱动的 onAfter。
 // filter：source=张角 && card.suit=♠ && card.rank 在 2-9 之间
-// onAfter：直接 emit 3 点雷电伤害（判定已由 filter 隐式确认）
+// onAfter：读 state.localVars.leijiJudgeResult
+//   - 'success' → emit 3 点雷电伤害
+//   - 'fail' 或缺失 → 不 emit
 //
-// 完整判定流程（prompt + judge + condition）由 follow-up Task 处理。
+// 完整 useCard 阶段 inject leijiJudgeResult 留 follow-up。
 // 真实 `useCard` 原子 3 阶段（specifyTarget / becomeTarget / resolveCard）
 // 在 [T-13] 决策下替代旧的 useCard 路径——但 hook 仍按 `useCard` 注册，
 // 等 useCard atom 上线后此钩子自动接入。
@@ -72,7 +74,7 @@ export function register(): void {
       if (!Number.isFinite(rankNum) || rankNum < 2 || rankNum > 9) return false;
       return true;
     },
-    onAfter({ atom }) {
+    onAfter({ state, atom }) {
       const useCard = asUseCard(atom);
       if (!useCard) return {};
       const target = typeof useCard.target === 'string' ? useCard.target : undefined;
@@ -80,6 +82,10 @@ export function register(): void {
       const source = typeof useCard.source === 'string' ? useCard.source : undefined;
       const cardId = typeof useCard.cardId === 'string' ? useCard.cardId : undefined;
       if (!source || !cardId) return {};
+      // 真 game rule：读 state.localVars.leijiJudgeResult
+      // 'success' → emit 3 点 thunder damage；'fail' 或缺失 → 不 emit
+      const judge = state.localVars?.leijiJudgeResult;
+      if (judge !== 'success') return {};
       return {
         additionalAtoms: [
           {
