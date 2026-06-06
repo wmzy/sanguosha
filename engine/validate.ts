@@ -18,9 +18,12 @@ import type {
   PendingDyingWindow,
   PendingSelectCard,
   PendingHarvestSelection,
+  SkillDef,
+  SkillContext,
 } from './types';
 import { getPlayer, getAlivePlayerNames } from './state';
 import { isInAttackRange } from './distance';
+import { checkCondition } from './expr';
 import type { Card, CardDef } from '../shared/types';
 import { 基本牌列表 } from '../shared/cards/basic';
 import { 锦囊牌列表 } from '../shared/cards/tricks';
@@ -96,25 +99,31 @@ function canCardBeConvertedBySkill(
 ): boolean {
   const card = state.cardMap[cardId];
   if (!card) return false;
-  const isBlack = card.suit === '♠' || card.suit === '♣';
-  const isRed = card.suit === '♥' || card.suit === '♦';
+
+  // 临时 ctx：把当前卡 ID 注入 localVars，convertible.filter 内可通过
+  // `{ $: 'ctx', path: 'localVars.cardId' }` 引用。
+  const filterCtx: SkillContext = {
+    skillId: '',
+    self: player,
+    localVars: { cardId },
+  };
 
   for (const trigger of state.triggers) {
     if (trigger.player !== player || trigger.source !== 'character') continue;
-    let skillId: string;
+    let skill: SkillDef;
     try {
-      skillId = getSkill(trigger.skillId).id;
+      skill = getSkill(trigger.skillId);
     } catch {
       continue;
     }
-
-    if (targetType === '闪' && (trigger.event === 'killResponse' || trigger.event === 'aoeResponse')) {
-      if (skillId === '倾国' && isBlack) return true;
-      if (skillId === '龙胆' && card.name === '杀') return true;
-    }
-    if (targetType === '杀') {
-      if (skillId === '武圣' && isRed) return true;
-      if (skillId === '龙胆' && card.name === '闪') return true;
+    const convs = skill.convertible;
+    if (!convs || convs.length === 0) continue;
+    for (const conv of convs) {
+      if (conv.to !== targetType) continue;
+      // from: '*' 表示任意卡名（用于"任意黑色手牌当闪"等规则）
+      if (conv.from !== '*' && conv.from !== card.name) continue;
+      if (conv.filter && !checkCondition(conv.filter, state, filterCtx)) continue;
+      return true;
     }
   }
   return false;

@@ -421,6 +421,43 @@ export interface SkillDef {
    * v3-only skill（无 trigger）可保留此函数供 v2 fallback / 调试；典型实现返回 []。
    */
   handler: (ctx: SkillContext, state: GameState) => SkillPhase[];
+  /**
+   * 被动卡牌转换声明：`from` 源卡名 → `to` 目标卡名（如 '杀' → '闪'）。
+   * validate.getSkillConvertedCards 读此字段替代硬编码。
+   * 数组形式以支持双向转换（龙胆：杀↔闪）。
+   * filter 为可选条件；不填则无条件转换。
+   */
+  convertible?: SkillConvertible[];
+}
+/**
+ * 技能卡牌转换条目。
+ * - `from: '*'` 表示任意卡名（用于"任意黑色手牌当闪"等规则）。
+ * - `filter` 为可选 Condition；不填则无条件转换。
+ * - 表达式内可通过 `{ $: 'ctx', path: 'localVars.cardId' }` 引用当前校验卡 ID。
+ *   validate 层构造一个临时 SkillContext 把 `cardId` 注入 `localVars`。
+ *
+ * 例：武圣红色杀当杀
+ * ```
+ * filter: { or: [
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♥'] },
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♦'] },
+ * ] }
+ * ```
+ *
+ * 例：倾国任意黑色手牌当闪
+ * ```
+ * { from: '*', to: '闪', filter: { or: [
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♠'] },
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♣'] },
+ * ] } }
+ * ```
+ */
+export interface SkillConvertible {
+  /** 源卡名；'*' 表示任意卡。 */
+  from: string;
+  to: '杀' | '闪' | '桃';
+  /** 可选条件；不填则无条件转换。 */
+  filter?: Condition;
 }
 export interface TriggerSpec {
   event: string;

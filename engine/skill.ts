@@ -30,6 +30,10 @@ export function getSkill(id: string): SkillDef {
   if (!def) throw new Error(`Unknown skill: "${id}"`);
   return def;
 }
+/** 重置技能注册表（仅用于测试场景，确保 test 之间互相隔离） */
+export function clearSkillRegistry(): void {
+  registry.clear();
+}
 
 interface CharacterMapSource {
   characterMap: Record<string, CharacterConfig>;
