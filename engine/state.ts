@@ -53,6 +53,7 @@ export function createInitialState(config: GameConfig): GameState {
       pendingTricks: [],
       vars: {},
       tags: [],
+      chained: false,
     };
   }
 

@@ -27,6 +27,7 @@ import * as takeCard from './takeCard';
 import * as specifyTarget from './specifyTarget';
 import * as becomeTarget from './becomeTarget';
 import * as resolveCard from './resolveCard';
+import * as setChained from './setChained';
 import * as compareRank from './compareRank';
 
 const modules = [
@@ -59,6 +60,7 @@ const modules = [
   specifyTarget,
   becomeTarget,
   resolveCard,
+  setChained,
   compareRank,
 ];
 
