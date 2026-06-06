@@ -29,6 +29,7 @@ import * as becomeTarget from './becomeTarget';
 import * as resolveCard from './resolveCard';
 import * as setChained from './setChained';
 import * as compareRank from './compareRank';
+import * as mark from './mark';
 
 const modules = [
   damage,
@@ -62,6 +63,7 @@ const modules = [
   resolveCard,
   setChained,
   compareRank,
+  mark,
 ];
 
 export function registerAllAtoms(): void {

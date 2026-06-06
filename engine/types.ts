@@ -28,6 +28,9 @@ export interface GameState {
   /** 种子化随机数状态（可序列化的数值） */
   rngState: number;
 
+  /** 标记集合：按玩家分组的 Mark 列表（持续但有生命周期的状态） */
+  marks: Record<string, Mark[]>;
+
   /** 延迟濒死检查：技能 pending 解决后自动创建濒死窗口 */
   deferredDyingCheck?: { player: string; source?: string };
 }
@@ -47,6 +50,15 @@ export interface GameMeta {
 
 export type GameStatus = '等待中' | '进行中' | '已结束';
 
+export type MarkScope = 'player' | 'relation' | 'transient';
+export type MarkDuration = 'permanent' | 'untilTurnEnd' | 'untilPhaseEnd';
+
+export interface Mark {
+  id: string;
+  scope: MarkScope;
+  payload?: Record<string, Json>;
+  duration: MarkDuration;
+}
 export interface GameZones {
   deck: string[];
   discardPile: string[];
@@ -240,7 +252,10 @@ export type Atom =
   | { type: 'becomeTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
   | { type: 'resolveCard'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> }
   | { type: 'setChained'; target: Expr<string>; chained: Expr<boolean> }
-  | { type: 'compareRank'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> };
+  | { type: 'compareRank'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> }
+  | { type: 'addMark'; player: Expr<string>; mark: Mark }
+  | { type: 'removeMark'; player: Expr<string>; markId: string }
+  | { type: 'clearExpiredMarks'; phase: TurnPhase };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog

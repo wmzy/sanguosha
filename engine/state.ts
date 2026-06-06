@@ -81,6 +81,7 @@ export function createInitialState(config: GameConfig): GameState {
     turn,
     pending: null,
     triggers: [],
+    marks: {},
     serverLog: [],
     playerLogs: Object.fromEntries(playerOrder.map(name => [name, []])),
     rngState,
