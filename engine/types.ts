@@ -230,6 +230,7 @@ export type Atom =
   | { type: 'rearrangeDeck'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> }
   | { type: 'modifyMaxHealth'; player: Expr<string>; delta: Expr<number> }
   | { type: 'addSkill'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } }
+  | { type: 'removeSkill'; player: Expr<string>; skillId: string }
   | { type: 'turnStart'; player: Expr<string> }
   | { type: 'phaseBegin'; phase: Expr<string>; player: Expr<string> }
   | { type: 'phaseEnd'; phase: Expr<string>; player: Expr<string> }
