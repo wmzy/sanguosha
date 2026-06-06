@@ -28,8 +28,20 @@ export interface GameState {
   /** 种子化随机数状态（可序列化的数值） */
   rngState: number;
 
+  /** 标记集合：按玩家分组的 Mark 列表（持续但有生命周期的状态） */
+  marks: Record<string, Mark[]>;
+
   /** 延迟濒死检查：技能 pending 解决后自动创建濒死窗口 */
   deferredDyingCheck?: { player: string; source?: string };
+
+  /**
+   * 原子级共享上下文变量（§4.6 修复）。
+   * 例如 judge atom 在 apply 时把判定牌 cardId 写到这里，
+   * getResult 读此字段（避免从 discardPile[top] 误读）。
+   * 与 SkillContext.localVars 不同的是：本字段是 GameState 的一部分，
+   * 不随技能上下文销毁；按需重置。
+   */
+  localVars?: Record<string, Json>;
 }
 
 export interface GameMeta {
@@ -47,6 +59,15 @@ export interface GameMeta {
 
 export type GameStatus = '等待中' | '进行中' | '已结束';
 
+export type MarkScope = 'player' | 'relation' | 'transient';
+export type MarkDuration = 'permanent' | 'untilTurnEnd' | 'untilPhaseEnd';
+
+export interface Mark {
+  id: string;
+  scope: MarkScope;
+  payload?: Record<string, Json>;
+  duration: MarkDuration;
+}
 export interface GameZones {
   deck: string[];
   discardPile: string[];
@@ -62,6 +83,8 @@ export interface PlayerState {
   vars: Record<string, Json>;
   /** 标记（增益/减益） */
   tags: string[];
+  /** 铁索连环状态：true 时受 fire/thunder 伤害会传导给链上其他角色 */
+  chained: boolean;
 }
 
 export interface PlayerInfo {
@@ -191,17 +214,21 @@ export interface SkillExecution {
   ctx: SkillContext;
   plan: SkillPhase[];
 }
+/** damage 原子和事件的 type 字段值（见 docs/ENGINE.md §5 T-11） */
+export type DamageType = 'normal' | 'fire' | 'thunder';
 /**
  * Atom 是唯一修改 GameState 的通道。
  * 每个 Atom 类型通过 registerAtom() 注册，包含 apply 和 toEvents。
  */
 export type Atom =
-  | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string> }
+  | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string>; damageType?: Expr<DamageType> }
   | { type: 'heal'; target: Expr<string>; amount: Expr<number>; source?: Expr<string> }
+  | { type: 'loseHealth'; target: Expr<string>; amount: Expr<number> }
   | { type: 'draw'; player: Expr<string>; count: Expr<number> }
   | { type: 'discard'; player: Expr<string>; cardIds: Expr<string[]> }
   | { type: 'discardRandom'; player: Expr<string>; count: Expr<number>; from: 'hand' | 'equipment' }
   | { type: 'moveCard'; cardId: Expr<string>; from: ZoneLoc; to: ZoneLoc }
+  | { type: 'loseCard'; cardId: Expr<string>; from: { zone: 'hand' | 'equipment'; player: Expr<string>; slot?: EquipSlot } }
   | { type: 'giveCard'; cardId: Expr<string>; from: Expr<string>; to: Expr<string> }
   | { type: 'takeCard'; cardId: Expr<string>; to: Expr<string> }
   | { type: 'equip'; player: Expr<string>; cardId: Expr<string> }
@@ -219,6 +246,7 @@ export type Atom =
   | { type: 'addTag'; player: Expr<string>; tag: string }
   | { type: 'removeTag'; player: Expr<string>; tag: string }
   | { type: 'reshuffle' }
+  | { type: 'shuffleDeck' }
   | { type: 'kill'; player: Expr<string>; source?: Expr<string> }
   | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
   | { type: 'setCtxVar'; key: string; value: Json }
@@ -226,13 +254,18 @@ export type Atom =
   | { type: 'rearrangeDeck'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> }
   | { type: 'modifyMaxHealth'; player: Expr<string>; delta: Expr<number> }
   | { type: 'addSkill'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } }
+  | { type: 'removeSkill'; player: Expr<string>; skillId: string }
   | { type: 'turnStart'; player: Expr<string> }
   | { type: 'phaseBegin'; phase: Expr<string>; player: Expr<string> }
   | { type: 'phaseEnd'; phase: Expr<string>; player: Expr<string> }
   | { type: 'specifyTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
   | { type: 'becomeTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
   | { type: 'resolveCard'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> }
-  | { type: 'compareRank'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> };
+  | { type: 'setChained'; target: Expr<string>; chained: Expr<boolean> }
+  | { type: 'compareRank'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> }
+  | { type: 'addMark'; player: Expr<string>; mark: Mark }
+  | { type: 'removeMark'; player: Expr<string>; markId: string }
+  | { type: 'clearExpiredMarks'; phase: TurnPhase };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog
@@ -398,6 +431,43 @@ export interface SkillDef {
    * v3-only skill（无 trigger）可保留此函数供 v2 fallback / 调试；典型实现返回 []。
    */
   handler: (ctx: SkillContext, state: GameState) => SkillPhase[];
+  /**
+   * 被动卡牌转换声明：`from` 源卡名 → `to` 目标卡名（如 '杀' → '闪'）。
+   * validate.getSkillConvertedCards 读此字段替代硬编码。
+   * 数组形式以支持双向转换（龙胆：杀↔闪）。
+   * filter 为可选条件；不填则无条件转换。
+   */
+  convertible?: SkillConvertible[];
+}
+/**
+ * 技能卡牌转换条目。
+ * - `from: '*'` 表示任意卡名（用于"任意黑色手牌当闪"等规则）。
+ * - `filter` 为可选 Condition；不填则无条件转换。
+ * - 表达式内可通过 `{ $: 'ctx', path: 'localVars.cardId' }` 引用当前校验卡 ID。
+ *   validate 层构造一个临时 SkillContext 把 `cardId` 注入 `localVars`。
+ *
+ * 例：武圣红色杀当杀
+ * ```
+ * filter: { or: [
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♥'] },
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♦'] },
+ * ] }
+ * ```
+ *
+ * 例：倾国任意黑色手牌当闪
+ * ```
+ * { from: '*', to: '闪', filter: { or: [
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♠'] },
+ *   { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♣'] },
+ * ] } }
+ * ```
+ */
+export interface SkillConvertible {
+  /** 源卡名；'*' 表示任意卡。 */
+  from: string;
+  to: '杀' | '闪' | '桃';
+  /** 可选条件；不填则无条件转换。 */
+  filter?: Condition;
 }
 export interface TriggerSpec {
   event: string;

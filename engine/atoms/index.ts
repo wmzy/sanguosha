@@ -1,9 +1,11 @@
 import * as damage from './damage';
 import * as draw from './draw';
 import * as heal from './heal';
+import * as loseHealth from './loseHealth';
 import * as discard from './discard';
 import * as discardRandom from './discardRandom';
 import * as moveCard from './moveCard';
+import * as loseCard from './loseCard';
 import * as equip from './equip';
 import * as varModule from './var';
 import * as phase from './phase';
@@ -18,21 +20,27 @@ import * as turn from './turn';
 import * as rearrangeDeck from './rearrangeDeck';
 import * as maxHealth from './maxHealth';
 import * as skill from './skill';
+import * as removeSkill from './removeSkill';
 import * as reshuffle from './reshuffle';
+import * as shuffleDeck from './shuffleDeck';
 import * as giveCard from './giveCard';
 import * as takeCard from './takeCard';
 import * as specifyTarget from './specifyTarget';
 import * as becomeTarget from './becomeTarget';
 import * as resolveCard from './resolveCard';
+import * as setChained from './setChained';
 import * as compareRank from './compareRank';
+import * as mark from './mark';
 
 const modules = [
   damage,
   draw,
   heal,
+  loseHealth,
   discard,
   discardRandom,
   moveCard,
+  loseCard,
   equip,
   varModule,
   phase,
@@ -47,13 +55,17 @@ const modules = [
   rearrangeDeck,
   maxHealth,
   skill,
+  removeSkill,
   reshuffle,
+  shuffleDeck,
   giveCard,
   takeCard,
   specifyTarget,
   becomeTarget,
   resolveCard,
+  setChained,
   compareRank,
+  mark,
 ];
 
 export function registerAllAtoms(): void {

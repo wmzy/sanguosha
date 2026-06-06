@@ -90,6 +90,18 @@ registerSkill({
     manual: true,
     optional: true,
   },
+  // 被动转换 — validate 读此字段（替代 validate.ts:111-118 硬编码）。
+  // 武圣 = 任意红色手牌当杀。from: '*' 配合 suit filter 表达。
+  convertible: [{
+    from: '*',
+    to: '杀',
+    filter: {
+      or: [
+        { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♥'] },
+        { equals: [{ $: 'cardProp', card: { $: 'ctx', path: 'localVars.cardId' }, prop: 'suit' }, '♦'] },
+      ],
+    },
+  }],
   handler(_ctx, _state) {
     return [];
   },
@@ -112,7 +124,6 @@ registerSkill({
 });
 
 // ==================== 赵云 ====================
-
 registerSkill({
   id: '龙胆',
   name: '龙胆',
@@ -123,6 +134,11 @@ registerSkill({
     manual: true,
     optional: true,
   },
+  // 双向转换（数组形式）：杀→闪 + 闪→杀
+  convertible: [
+    { from: '杀', to: '闪' },
+    { from: '闪', to: '杀' },
+  ],
   handler(_ctx, _state) {
     return [];
   },

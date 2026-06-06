@@ -18,12 +18,9 @@ registerSkill({
   id: 'ignoreArmor',
   name: '青釭剑',
   description: '武器技：你使用【杀】时无视目标防具。',
-  trigger: {
-    event: 'killHit',
-    source: 'equipment',
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 qinggang.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
 });
 
@@ -139,25 +136,9 @@ registerSkill({
   id: 'judgeDodge',
   name: '八卦阵',
   description: '防具技：当你需要使用或打出【闪】时，你可以进行判定：若结果为红色，视为你使用或打出了一张【闪】。',
-  trigger: {
-    event: 'killResponse',
-    source: 'equipment',
-    optional: true,
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 bagua.ts
   handler(_ctx, _state) {
-    return [
-      { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
-      {
-        type: 'condition',
-        check: { equals: [{ $: 'ctx', path: 'localVars.judgeColor' }, 'red'] },
-        then: [
-          {
-            type: 'atoms',
-            ops: [{ type: 'setVar', player: _ctx.self, key: '八卦阵/dodged', value: true }],
-          },
-        ],
-      },
-    ];
+    return []; // v3 占位
   },
 });
 
@@ -165,39 +146,26 @@ registerSkill({
   id: 'blockBlackKill',
   name: '仁王盾',
   description: '防具技：黑色【杀】对你无效。',
-  trigger: {
-    event: 'killResponse',
-    source: 'equipment',
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 renwang.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
 });
-
 registerSkill({
   id: 'multiTarget',
   name: '方天画戟',
   description: '武器技：若你的手牌数为0，你使用【杀】可以指定最多三名角色为目标。',
-  trigger: {
-    event: 'killHit',
-    source: 'equipment',
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 fangtian.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
 });
-
 registerSkill({
   id: 'twoCardsAsKill',
   name: '丈八蛇矛',
   description: '武器技：你可以将两张手牌当一张【杀】使用。',
-  trigger: {
-    event: 'killResponse',
-    source: 'equipment',
-    manual: true,
-    optional: true,
-  },
+  trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 zhangba.ts
   handler(_ctx, _state) {
-    return [];
+    return []; // v3 占位
   },
-} satisfies SkillDef);
+});

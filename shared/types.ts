@@ -34,7 +34,7 @@ export type Faction = '魏' | '蜀' | '吴' | '群';
 
 export type Role = '主公' | '忠臣' | '反贼' | '内奸';
 
-export type TurnPhase = '准备' | '判定' | '摸牌' | '出牌' | '弃牌' | '结束';
+export type TurnPhase = '准备' | '判定' | '摸牌' | '出牌' | '弃牌' | '结束' | 'turnEnd';
 
 export type EffectPrimitive =
   | { type: 'draw'; count: number | string }

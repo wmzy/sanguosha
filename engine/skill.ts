@@ -30,6 +30,10 @@ export function getSkill(id: string): SkillDef {
   if (!def) throw new Error(`Unknown skill: "${id}"`);
   return def;
 }
+/** 重置技能注册表（仅用于测试场景，确保 test 之间互相隔离） */
+export function clearSkillRegistry(): void {
+  registry.clear();
+}
 
 interface CharacterMapSource {
   characterMap: Record<string, CharacterConfig>;
@@ -155,9 +159,17 @@ export function emitEvent(
     if (event.type === 'phaseBegin') {
       const phaseEvent = event as { type: 'phaseBegin'; phase: string; player: string };
       if (trigger.player !== phaseEvent.player) continue;
-      if (def.trigger.phase && phaseEvent.phase !== def.trigger.phase) continue;
-      // phaseFlags 防重逻辑已删除（Phase 13）：setPhase 拆分为显式 phaseBegin atom，
-      // 每个新阶段只派一次 phaseBegin server event。
+    }
+    // phase 字段对所有事件类型生效（修 §4.4）。
+    // - phaseBegin / phaseEnd: 读 event.phase
+    // - 其他事件（cardPlayed 等）: 读 state.phase（当前阶段）
+    if (def.trigger.phase) {
+      if (event.type === 'phaseBegin' || event.type === 'phaseEnd') {
+        const eventPhase = (event as { phase: string }).phase;
+        if (eventPhase !== def.trigger.phase) continue;
+      } else {
+        if (state.phase !== def.trigger.phase) continue;
+      }
     }
 
     const ctx = buildSkillContext(s, event, trigger);

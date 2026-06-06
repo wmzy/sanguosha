@@ -127,6 +127,10 @@ export function applyAtoms(
         }
         if (result.atom) atom = result.atom;
         if (result.state) s = result.state;
+        if (result.redirect && (atom.type === 'damage' || atom.type === 'becomeTarget')) {
+          // 改写目标（"目标转移"机制：天香/流离/借刀）。新建 atom 避免污染原对象。
+          atom = { ...atom, target: result.redirect };
+        }
       }
     }
 
