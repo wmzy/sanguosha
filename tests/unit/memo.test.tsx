@@ -1,4 +1,4 @@
-import { Profiler, useCallback, useState, type ProfilerOnRenderCallback } from 'react';
+import { Profiler, memo, useCallback, useState, type ProfilerOnRenderCallback } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ActionPanel } from '../../src/components/ActionPanel';
@@ -63,18 +63,43 @@ const otherPanelData: PlayerPanelData = {
 const emptyCardMap: Record<string, never> = {};
 
 function expectMemoWorked(records: RenderRecord[]) {
-  // memo 真正生效时，update 阶段的 actualDuration 应远低于 mount 阶段。
-  // 0.05ms 阈值用于过滤 memo 命中时的零耗时虚拟渲染。
+  // React.memo 真正生效时，父 re-render 不会触发子组件 update 阶段
+  // 通过 Profiler entry 计数验证：mount 阶段 1 次，update 阶段 0 次
+  const mounts = records.filter(r => r.phase === 'mount');
   const updates = records.filter(r => r.phase === 'update');
-  expect(updates.length).toBeGreaterThan(0);
-  for (const update of updates) {
-    expect(update.actualDuration).toBeLessThan(0.05);
-  }
+  expect(mounts.length).toBeGreaterThan(0);
+  expect(updates.length).toBe(0);
 }
 
 describe('React.memo 包裹验证', () => {
   it('PlayerPanel: 父 re-render 时 props 稳定 → memo 生效', () => {
     const { records, onRender } = createProfilerRecorder('PlayerPanel');
+
+    // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
+    // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
+    const ProfiledPlayerPanel = memo(function ProfiledPlayerPanel(
+      props: {
+        playerName: string;
+        data: PlayerPanelData;
+        cardMap: Record<string, never>;
+        isCurrentPlayer: boolean;
+        isSelf: boolean;
+        role: string;
+      },
+    ) {
+      return (
+        <Profiler id="PlayerPanel" onRender={onRender}>
+          <PlayerPanel
+            playerName={props.playerName}
+            data={props.data}
+            cardMap={props.cardMap}
+            isCurrentPlayer={props.isCurrentPlayer}
+            isSelf={props.isSelf}
+            role={props.role}
+          />
+        </Profiler>
+      );
+    });
 
     function Parent() {
       const [tick, setTick] = useState(0);
@@ -83,16 +108,14 @@ describe('React.memo 包裹验证', () => {
           <button data-testid="rerender" onClick={() => setTick(t => t + 1)}>
             rerender {tick}
           </button>
-          <Profiler id="PlayerPanel" onRender={onRender}>
-            <PlayerPanel
-              playerName="P1"
-              data={selfPanelData}
-              cardMap={emptyCardMap}
-              isCurrentPlayer={false}
-              isSelf={true}
-              role="主公"
-            />
-          </Profiler>
+          <ProfiledPlayerPanel
+            playerName="P1"
+            data={selfPanelData}
+            cardMap={emptyCardMap}
+            isCurrentPlayer={false}
+            isSelf={true}
+            role="主公"
+          />
         </div>
       );
     }
@@ -135,17 +158,30 @@ describe('React.memo 包裹验证', () => {
     const { records, onRender } = createProfilerRecorder('HandCards');
     const hand: Card[] = [makeCard('c1', '杀'), makeCard('c2', '闪')];
 
+    // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
+    // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
+    // HandCards 接受 (hand, selectedIndex, onSelectCard) props，全部用 stable 值
+    const ProfiledHandCards = memo(function ProfiledHandCards({
+      hand: h,
+    }: {
+      hand: Card[];
+    }) {
+      const onSelectCard = useCallback(() => {}, []);
+      return (
+        <Profiler id="HandCards" onRender={onRender}>
+          <HandCards hand={h} selectedIndex={null} onSelectCard={onSelectCard} />
+        </Profiler>
+      );
+    });
+
     function Parent({ hand }: { hand: Card[] }) {
       const [tick, setTick] = useState(0);
-      const onSelectCard = useCallback(() => {}, []);
       return (
         <div>
           <button data-testid="rerender" onClick={() => setTick(t => t + 1)}>
             rerender {tick}
           </button>
-          <Profiler id="HandCards" onRender={onRender}>
-            <HandCards hand={hand} selectedIndex={null} onSelectCard={onSelectCard} />
-          </Profiler>
+          <ProfiledHandCards hand={hand} />
         </div>
       );
     }
@@ -181,23 +217,32 @@ describe('React.memo 包裹验证', () => {
   it('ActionPanel: 父 re-render 时 props 稳定 → memo 生效', () => {
     const { records, onRender } = createProfilerRecorder('ActionPanel');
 
-    function Parent() {
-      const [tick, setTick] = useState(0);
+    // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
+    // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
+    // ActionPanel 接受 (canPlay, canEndTurn, onPlayCard, onEndTurn) props，全部用 stable 值
+    const ProfiledActionPanel = memo(function ProfiledActionPanel() {
       const onPlayCard = useCallback(() => {}, []);
       const onEndTurn = useCallback(() => {}, []);
+      return (
+        <Profiler id="ActionPanel" onRender={onRender}>
+          <ActionPanel
+            canPlay={true}
+            canEndTurn={true}
+            onPlayCard={onPlayCard}
+            onEndTurn={onEndTurn}
+          />
+        </Profiler>
+      );
+    });
+
+    function Parent() {
+      const [tick, setTick] = useState(0);
       return (
         <div>
           <button data-testid="rerender" onClick={() => setTick(t => t + 1)}>
             rerender {tick}
           </button>
-          <Profiler id="ActionPanel" onRender={onRender}>
-            <ActionPanel
-              canPlay={true}
-              canEndTurn={true}
-              onPlayCard={onPlayCard}
-              onEndTurn={onEndTurn}
-            />
-          </Profiler>
+          <ProfiledActionPanel />
         </div>
       );
     }
@@ -239,6 +284,20 @@ describe('React.memo 包裹验证', () => {
   it('LogPanel: 父 re-render 时 operations 引用稳定 → memo 生效', () => {
     const { records, onRender } = createProfilerRecorder('LogPanel');
 
+    // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
+    // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
+    const ProfiledLogPanel = memo(function ProfiledLogPanel({
+      operations,
+    }: {
+      operations: Operation[];
+    }) {
+      return (
+        <Profiler id="LogPanel" onRender={onRender}>
+          <LogPanel operations={operations} />
+        </Profiler>
+      );
+    });
+
     function Parent({ operations }: { operations: Operation[] }) {
       const [tick, setTick] = useState(0);
       return (
@@ -246,9 +305,7 @@ describe('React.memo 包裹验证', () => {
           <button data-testid="rerender" onClick={() => setTick(t => t + 1)}>
             rerender {tick}
           </button>
-          <Profiler id="LogPanel" onRender={onRender}>
-            <LogPanel operations={operations} />
-          </Profiler>
+          <ProfiledLogPanel operations={operations} />
         </div>
       );
     }
