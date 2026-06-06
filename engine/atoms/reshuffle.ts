@@ -18,7 +18,7 @@ export function register() {
       return {
         ...state,
         zones: { deck: [...state.zones.deck, ...shuffled], discardPile: [] },
-        rngState: state.rngState + Math.max(0, discardPile.length - 1),
+        rngState: rng.getState(),
       };
     },
     toEvents(state: GameState, _atom: Atom & { type: 'reshuffle' }): AtomEventResult {

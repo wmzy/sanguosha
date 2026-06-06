@@ -188,6 +188,27 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   let s = state;
   const allEvents: ServerEvent[] = [];
 
+  // faceDown Mark 检查：玩家被翻面则跳过整回合（T-07 真 game rule）。
+  // 与 shouldSkipPhase（skipPlay tag → 跳过出牌阶段）正交：faceDown 跳整回合。
+  // 跳过路径：nextPlayer + clearExpiredMarks(turnEnd) 清理 untilTurnEnd player-scope
+  // （untilPhaseEnd+player scope 不清，关系型 Mark 才在 turnEnd 清）。
+  const faceDownMarks = (s.marks[s.currentPlayer] ?? []).filter(
+    (m) =>
+      m.id.startsWith('faceDown:') &&
+      (m.duration === 'untilTurnEnd' || m.duration === 'untilPhaseEnd'),
+  );
+  if (faceDownMarks.length > 0) {
+    const skipResult = applyAtoms(s, [
+      { type: 'nextPlayer' },
+      { type: 'clearExpiredMarks', phase: 'turnEnd' },
+    ]);
+    // nextPlayer atom 已把 turnStarted 重置为 false（见 engine/atoms/phase.ts）；
+    // 显式再写一次以防御未来重构。
+    s = { ...skipResult.state, turn: { ...skipResult.state.turn, turnStarted: false } };
+    allEvents.push(...skipResult.events);
+    return { state: s, events: allEvents };
+  }
+
   // turnStart 防重：依赖 state.turn.turnStarted: boolean（nextPlayer atom 重置为 false）
   if (!s.turn.turnStarted) {
     // turnStart GameEvent 派发（技能钩子）
