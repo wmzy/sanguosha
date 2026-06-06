@@ -37,7 +37,7 @@ export function register() {
     apply(state: GameState, atom: Atom & { type: 'judge' }) {
       const player = atom.player as string;
       const s = ensureDeckHasCards(state);
-      const { cardId, result } = drawJudgeCard(s);
+      const { cardId, suit, result } = drawJudgeCard(s);
 
       let newState: GameState = s;
       if (cardId) {
@@ -57,6 +57,20 @@ export function register() {
         }));
       }
 
+      // §4.6 修复：把判定牌显式存到 state.localVars，避免 getResult 从
+      // discardPile[top] 误读（判定期间其他弃牌操作可能插错牌）。
+      // 字段覆盖：judgeCardId / judgeSuit / judgeColor（保持 getResult 既有
+      // 字段名，向后兼容所有读 localVars.judgeColor/judgeSuit 的技能）。
+      newState = {
+        ...newState,
+        localVars: {
+          ...(newState.localVars ?? {}),
+          ...(cardId !== null
+            ? { judgeCardId: cardId, judgeSuit: suit, judgeColor: result }
+            : {}),
+        },
+      };
+
       return newState;
     },
     toEvents(state: GameState, atom: Atom & { type: 'judge' }): AtomEventResult {
@@ -68,6 +82,15 @@ export function register() {
       return [server, new Map(), makePlayerEvent('judge', payload)];
     },
     getResult(state: GameState, _atom: Atom & { type: 'judge' }): Record<string, Json> {
+      // §4.6 修复：优先读 state.localVars（apply 写入的判定牌 ID），避免
+      // discardPile[top] 在多步骤技能中被其他弃牌覆盖。fallback 保留以兼容
+      // 旧调用站点直接调用 getResult 而未经过 apply 的极端情况。
+      const stored = state.localVars?.judgeCardId;
+      if (typeof stored === 'string' && state.cardMap[stored]) {
+        const card = state.cardMap[stored];
+        const result: 'red' | 'black' = redSuits.includes(card.suit) ? 'red' : 'black';
+        return { judgeCardId: stored, judgeSuit: card.suit, judgeColor: result };
+      }
       const discardPile = state.zones.discardPile;
       if (discardPile.length === 0) return {};
       const cardId = discardPile[discardPile.length - 1];

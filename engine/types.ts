@@ -33,6 +33,15 @@ export interface GameState {
 
   /** 延迟濒死检查：技能 pending 解决后自动创建濒死窗口 */
   deferredDyingCheck?: { player: string; source?: string };
+
+  /**
+   * 原子级共享上下文变量（§4.6 修复）。
+   * 例如 judge atom 在 apply 时把判定牌 cardId 写到这里，
+   * getResult 读此字段（避免从 discardPile[top] 误读）。
+   * 与 SkillContext.localVars 不同的是：本字段是 GameState 的一部分，
+   * 不随技能上下文销毁；按需重置。
+   */
+  localVars?: Record<string, Json>;
 }
 
 export interface GameMeta {
