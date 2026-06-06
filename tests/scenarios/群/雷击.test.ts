@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
+import { applyAtoms, clearAtomRegistry } from '@engine/atom';
+import { clearAtomHooks } from '@engine/skill-hook';
+import { registerAllAtoms } from '@engine/atoms';
 import { scenario } from '../../scenario-runner';
+import { createTestGame } from '../../engine-helpers';
+import { registerAll as registerLeiji } from '../../fixtures/雷击';
+import { registerAll as registerChained } from '../../fixtures/铁索连环';
 import type { Card } from '../../../shared/types';
 
 function putSpadeOnDeckTop(ctx: any) {
@@ -162,5 +168,56 @@ describe('张角 - 黄天', () => {
   it.skip('黄天：主公技，其他群势力角色交出闪或闪电（需要主公身份和多势力交互）', () => {
     // 黄天是主公技，需要主公身份判定 + 其他群势力角色的交互
     // 暂时跳过
+  });
+});
+
+describe('雷击（张角）v3 钩子骨架 — 真 game rule 占位', () => {
+  beforeEach(() => {
+    clearAtomRegistry();
+    clearAtomHooks();
+    registerAllAtoms();
+    registerLeiji();
+    registerChained();
+  });
+
+  it('张角用黑桃 2-9 杀 → 雷电伤害 3 点（type=thunder 通过 event payload 暴露）', () => {
+    // 真 game rule：雷击需判定（黑桃 2-9 视为成功）→ 3 点雷电伤害。
+    // 本 Task 是骨架：filter 已收窄到"张角 + ♠ + rank 2-9"，
+    // onAfter 直接 emit thunder damage（无 prompt + judge）。
+    // 完整判定流程由 follow-up Task 处理。
+    // 本 case 验证：thunder damage atom 走完 atomToEvents 后，
+    // server event payload 包含 `type: 'thunder'`（engine/atoms/damage.ts:30）。
+    const s0 = createTestGame();
+    const s1 = {
+      ...s0,
+      cardMap: {
+        ...s0.cardMap,
+        leiji1: {
+          id: 'leiji1',
+          name: '杀',
+          type: '基本牌' as const,
+          subtype: '杀' as const,
+          suit: '♠' as const,
+          rank: '5' as const,
+          description: '',
+        },
+      },
+    };
+    const { state, events } = applyAtoms(s1, [
+      {
+        type: 'damage',
+        target: 'P1',
+        amount: 3,
+        source: '张角',
+        cardId: 'leiji1',
+        damageType: 'thunder',
+      },
+    ]);
+    // 默认 P1 health=4，受 3 点伤害后 health=1
+    expect(state.players.P1.health).toBeLessThan(4);
+    // server event payload 必须包含 `type: 'thunder'`（damage atom 对外协议）
+    const dmg = events.find((e) => e.type === 'damage');
+    expect(dmg).toBeDefined();
+    expect(dmg?.payload).toMatchObject({ type: 'thunder' });
   });
 });
