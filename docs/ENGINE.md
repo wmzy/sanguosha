@@ -133,9 +133,11 @@ registerAtomHook({
 - 依赖场景（如"先判定再决定是否取消"）：把判定逻辑内联到自己的 filter，**自给自足**
 - 例：八卦阵 var 写 + 读 → 改为"filter: target has 八卦阵, inline 判定 + 取消"
 
-**已注册钩子**：0 技能使用（API 刚建）——所有现存技能仍走 `trigger.event`。
+**已注册钩子**（P0 后）：3 演示技能使用 —— 完杀/空城/帷幕（`engine/skills/{wansha,kongcheng,weimu}.ts`）。38+ 老技能仍走 `trigger.event`，按 [T-22] 渐进迁移。
 
 **🎯 v3 决策**（[T-25](#5-决策档案要点)）：**完全迁移到 `registerAtomHook`，老技能（trigger.event）作废**。v3 测试**只用** registerAtomHook 路径。38+ 技能迁移是渐进 PR。
+
+**v3-only skill 写法**（commit `d90be01`）：`SkillDef.trigger` 已改为 optional（`engine/types.ts:390`）。v3 钩子驱动的技能可不填 `trigger` 字段。完全迁移前的过渡做法是填占位 `trigger.event: 'v3HookOnly'` —— 不在 GameEvent union 中，v2 `emitEvent` 永不触发；但 `state.triggers` 仍命中以支持 v2 `targetHasSkill` 验证路径（`engine/validate.ts:61-63 hasEmptyCityShield` 等）。4 处 registerTriggers 路径加 `if (!def.trigger) return state/continue` 防御性保护。
 
 ## 1.4 SkillPhase 控制流
 
@@ -185,7 +187,7 @@ registerAtomHook({
 | 蜀 | 马超 | 铁骑 | `tests/scenarios/蜀/铁骑.test.ts` |
 | 蜀 | 黄忠 | — | `tests/scenarios/蜀/黄忠.test.ts` |
 | 蜀 | 魏延 | — | `tests/scenarios/蜀/魏延.test.ts` |
-| 蜀 | 诸葛亮 | 观星 / 空城 | `engine/skills/shu.ts:177-217` |
+| 蜀 | 诸葛亮 | 观星 / 空城 🟢 v3 钩子 | 观星 `engine/skills/shu.ts:177-217`；空城 v3 `engine/skills/kongcheng.ts` |
 | 蜀 | 卧龙诸葛 | 火计 / 看破 | `engine/skills/shu.ts:357-400` |
 | 蜀 | 庞统 | 涅槃 | `engine/skills/shu.ts:418-450` |
 | 蜀 | 姜维 | 挑衅 / 志继 | `tests/scenarios/蜀/姜维.test.ts` |
@@ -223,7 +225,7 @@ registerAtomHook({
 | 群 | 貂蝉 | 离间 | `engine/skills/qun.ts:200-300` |
 | 群 | 吕布 | — | （无双外）|
 | 群 | 董卓 | — | （肉林/酒池/暴虐外）|
-| 群 | 贾诩 | — | （完杀/乱武/帷幕外）|
+| 群 | 贾诩 | 完杀 🟢 v3 钩子 / 帷幕 🟢 v3 钩子 | 完杀 `engine/skills/wansha.ts`；帷幕 `engine/skills/weimu.ts`；（乱武外）|
 | 群 | 蔡文姬 | 悲歌 | `tests/scenarios/群/悲歌-断肠.test.ts`（悲歌实现，断肠未实现）|
 | 群 | 左慈 | 闭月 | `tests/scenarios/群/闭月.test.ts` |
 | 群 | 华佗 | 急救 / 马术-鞬出 | `tests/scenarios/群/急救.test.ts` |
@@ -239,7 +241,7 @@ registerAtomHook({
 - **火计**（卧龙诸葛）：stub
 - **咆哮**（张飞）：stub
 - **激将**（刘备）：stub
-- **空城**（诸葛亮）：stub
+- **空城**（诸葛亮）：🟢 **P0 v3 钩子实现**（`engine/skills/kongcheng.ts`）——监听 `becomeTarget` atom，filter 收窄到【杀】/【决斗】，手牌为空时取消
 
 ### 🔴 未实现（27 个 it.skip / describe.skip）
 
@@ -347,14 +349,13 @@ registerAtomHook({
 ### 状态系统：创牌 / 化身 / 翻面 / 主公技（7 个）
 
 | 技能 | 武将 | 原因 | 落地建议 |
-|---|---|---|---|
 | 不屈 | 周泰 | 创牌系统 | `PlayerState.toughCards: CardId[]` + 专属原子（[T-08](#5-决策档案要点)）|
 | 化身 / 新生 | 左慈 | 化身牌池 + 动态技能 | `PlayerState.huashen` 专用字段（[T-09](#5-决策档案要点)）|
-| 完杀 | 贾诩 | 桃使用限制 | `registerAtomHook(heal, onBefore, filter: sourceRole=贾诩 && !targetIsDying)` |
+| ~~完杀~~ | 贾诩 | 🟢 **P0 v3 已实现** | `engine/skills/wansha.ts` —— 监听 `heal` atom，filter 查 characterId + 贾诩回合 + 目标非濒死，cancel |
 | 断肠 | 蔡文姬 | 死亡移除技能 | `removeSkill` atom（[T-11 连带](#5-决策档案要点)）|
 | 雷击 | 张角 | 雷电伤害 + 展示手牌 | `damage.type='thunder'` + 展示手牌机制 |
 | 鬼道 | 张角 | 判定牌替换 | `registerAtomHook(judge, onBefore, filter: 判定牌将生效, return { atom: replace })` |
-| 帷幕 | 贾诩 | 不能成为黑色锦囊目标 | `registerAtomHook(becomeTarget, onBefore, filter: targetSelf has 帷幕)` |
+| ~~帷幕~~ | 贾诩 | 🟢 **P0 v3 已实现** | `engine/skills/weimu.ts` —— 监听 `becomeTarget` atom，filter 查 characterId + 黑色锦囊，cancel |
 
 **机制需求**（[T-05/T-07](#5-决策档案要点)）：**Mark 体系**（faceDown 等状态）。Mark 不带 hooks 字段（[T-05](#5-决策档案要点)），所有"读点"走 registerAtomHook。
 
@@ -546,7 +547,7 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 | `useCard` 3 原子 | `6901023` + `30f2d55` | [0016](#7-adr-索引) |
 | `pindian` SkillPhase + `compareRank` | `aa8bec6` + `f1e97dd` | [0017](#7-adr-索引) |
 | `multiStep` SkillPhase | `0be358b` + `fd31f69` | [0017](#7-adr-索引) |
-| 完杀 / 空城 / 帷幕 | `38d327f` + `c0f97b1` | （演示模板） |
+| 完杀 / 空城 / 帷幕 | `38d327f` + `c0f97b1` + `d90be01` | （演示模板，commit `d90be01` 修 trigger 残留）|
 
 ### P1：推荐
 
@@ -585,7 +586,7 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 | 抽化身牌池 系统 | 8h | 化身 / 新生 |
 | 抽断肠 unregister 系统 | 2h | 断肠 |
 | 抽救援 onHealFromAlly | 1h | 救援 |
-| 抽完杀桃使用限制 | 1h | 完杀（已 P0 完杀钩子）|
+| 抽完杀桃使用限制 | 1h | ~~完杀（已 P0 完杀钩子）~~ ✅ P0 已 v3 实现（commit `38d327f`/`c0f97b1`）|
 | 抽闪电视效 完整流程 | 4h | 闪电 |
 
 ### 性能 + 测试
