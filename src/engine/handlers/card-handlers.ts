@@ -12,6 +12,7 @@ import type { Card } from '../../shared/types';
 import type { GameEvent } from '../types';
 import { getPlayer } from '../state';
 import { getDistance, isInAttackRange } from '../distance';
+import { hasSkill } from '../mark';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from '../atom';
 import { createPendingId } from '../atoms/pending';
@@ -95,9 +96,7 @@ function handleKillCard(
   const validCards = [...new Set([...literalDodge, ...skillDodge])];
 
   // 无双（吕布）：杀需 2 闪抵消
-  const hasWushuang = state.triggers.some(
-    t => t.player === player && t.skillId === '无双',
-  );
+  const hasWushuang = hasSkill(state, player, '无双');
 
   const timeout = TIMEOUT_DEFAULTS.killResponse;
   const responseWindow: PendingResponseWindow = {
