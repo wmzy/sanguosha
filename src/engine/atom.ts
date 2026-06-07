@@ -26,7 +26,13 @@ import { getAtomHooks, filterHooksByPlayer, registerAtomHook, clearAtomHooks, Ho
 
 const registry = new Map<string, AtomDefinition>();
 
-/** 重置 atom 注册表（仅用于测试场景，确保 test 之间互相隔离） */
+/**
+ * 重置 atom 定义注册表。
+ *
+ * @deprecated 自 2026-06-06 改用 `createTestEngine().clearForTest()` 代替。
+ * `clearForTest()` 不重置 atom registry（atom 定义静态不变），
+ * 多数测试不需要重调 `registerAllAtoms()`。详见 ADR 0018。
+ */
 export function clearAtomRegistry(): void {
   registry.clear();
 }

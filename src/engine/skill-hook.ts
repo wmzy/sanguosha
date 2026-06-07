@@ -108,15 +108,33 @@ export class HookRegistry {
 // 实例化独立的 HookRegistry 后会移除这些便捷函数。
 const defaultRegistry = new HookRegistry();
 
-/** 暴露默认全局 HookRegistry，用于测试 fixture 等需要手动调用 `registerHooks(registry)` 的场景。 */
+/**
+ * 暴露默认全局 HookRegistry。
+ *
+ * @deprecated 自 2026-06-06 内部 API，仅 `create-engine.ts` 和 `atom.ts`
+ * 使用。测试请用 `engine.hooks`。详见 ADR 0018。
+ */
 export function getDefaultHookRegistry(): HookRegistry {
   return defaultRegistry;
 }
 
+/**
+ * 向全局 defaultRegistry 注册一个 atom 钩子。
+ *
+ * @deprecated 自 2026-06-06 改用 `engine.hooks.register(def)` 代替。
+ * 闭包 HookRegistry 是 instance 独立的，不会污染其他 engine。
+ * 详见 ADR 0018。
+ */
 export function registerAtomHook(def: AtomHookDef): void {
   defaultRegistry.register(def);
 }
 
+/**
+ * 清空全局 defaultRegistry 中所有钩子。
+ *
+ * @deprecated 自 2026-06-06 改用 `createTestEngine().clearForTest()` 代替。
+ * 详见 ADR 0018。
+ */
 export function clearAtomHooks(): void {
   defaultRegistry.clear();
 }
