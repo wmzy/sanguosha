@@ -16,7 +16,7 @@ import { resolveDiscardPhase, handleEndTurn } from './handlers/turn-handlers';
 import { resolveDying } from './handlers/dying-handlers';
 import { handlePlayCard, resolveHarvestSelection } from './handlers/card-handlers';
 import { getPlayer, checkWinCondition } from './state';
-import { applyAtoms } from './atom';
+import { applyAtoms, _setCurrentEngineHooks } from './atom';
 import { createDyingPending } from './handlers/engine-utils';
 import { makeServerEvent } from './event';
 import { advanceToInteractivePhase } from './phase-advance';
@@ -184,6 +184,17 @@ export function createEngine(config: EngineConfig): EngineInstance {
   }
 
   function dispatch(state: GameState, action: GameAction): EngineResult {
+    // Phase 5 P2-1：让 applyAtoms 不传 opts 也能命中本 instance 闭包 hooks
+    // try/finally 保证即使抛错也能清空
+    const previousHooks = _setCurrentEngineHooks(hookRegistry);
+    try {
+      return dispatchInner(state, action);
+    } finally {
+      _setCurrentEngineHooks(previousHooks);
+    }
+  }
+
+  function dispatchInner(state: GameState, action: GameAction): EngineResult {
     let result: EngineResult;
 
     if (action.type === '开始') {

@@ -49,3 +49,35 @@ describe('createEngine 多实例隔离', () => {
     expect(totalAfter).toBeGreaterThan(0);
   });
 });
+
+describe('多 engine 实例钩子互不干扰', () => {
+  it('engine1 注册的私有 hook 不会出现在 engine2 闭包', () => {
+    const engine1 = createTestEngine();
+    const engine2 = createTestEngine();
+
+    // 在 engine1 闭包注册一个独特 hook
+    engine1.hooks.register({
+      atomType: 'useCard',
+      onAfter: () => {},
+    });
+
+    // engine2 闭包不应有 engine1 的额外 hook
+    expect(engine2.hooks.getByAtomType('useCard').length).toBeLessThan(
+      engine1.hooks.getByAtomType('useCard').length
+    );
+  });
+
+  it('clearForTest 不影响其他 instance 的闭包 hooks', () => {
+    const engine1 = createTestEngine();
+    const engine2 = createTestEngine();
+
+    const before2 = engine2.hooks.getByAtomType('useCard').length;
+
+    engine1.clearForTest();
+
+    // engine1 重新注册后闭包 hooks 应恢复到原来
+    expect(engine1.hooks.getByAtomType('useCard').length).toBeGreaterThan(0);
+    // engine2 闭包不受影响
+    expect(engine2.hooks.getByAtomType('useCard').length).toBe(before2);
+  });
+});

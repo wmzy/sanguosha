@@ -92,14 +92,36 @@ const MAX_HOOK_RECURSION = 16;
  * - onBefore：可取消/替换 atom、改 state
  * - onAfter：可追加 atom 序列（additionalAtoms 递归应用）、改 state
  */
+/**
+ * 当前正在 dispatch 的 engine instance 闭包 hookRegistry。
+ * 由 `createEngine().dispatch()` 入口设置，退出时清空。
+ * 值为 `null` 表示无活跃 engine（fallback 到全局 defaultRegistry）。
+ *
+ * Phase 5 P2-1：让 `applyAtoms(state, atoms)` 不传 opts 也能命中
+ * engine 闭包的 hooks，无需改造 ~80 个 handler 调用点。
+ */
+let currentEngineHooks: HookRegistry | null = null;
+
+/**
+ * 由 createEngine() 在 dispatch 入口调用，注入闭包 hooks。
+ * 内部 API，仅 create-engine.ts 使用。
+ * @internal
+ */
+export function _setCurrentEngineHooks(hooks: HookRegistry | null): void {
+  currentEngineHooks = hooks;
+}
+
 export function applyAtoms(
   state: GameState,
   atoms: Atom[],
   opts: ApplyAtomsOptions = {},
   _recursionDepth = 0,
 ): ApplyAtomsResult {
-  // 选择 hooks 源：优先用实例级，fallback 全局
-  const hookReg = opts.hooks;
+  // 选择 hooks 源（优先级）：
+  // 1. opts.hooks（显式传）— 单元测试 / 特定路径
+  // 2. currentEngineHooks（活跃 engine 闭包）— createEngine() dispatch
+  // 3. 全局 defaultRegistry（fallback）— 单实例环境 / 老代码路径
+  const hookReg = opts.hooks ?? currentEngineHooks;
 
   function resolveHooks(atomType: string) {
     if (hookReg) return hookReg.filterByPlayer(hookReg.getByAtomType(atomType), s.currentPlayer);
