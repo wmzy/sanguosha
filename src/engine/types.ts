@@ -438,6 +438,12 @@ export interface SkillDef {
    * filter 为可选条件；不填则无条件转换。
    */
   convertible?: SkillConvertible[];
+  /**
+   * v3 atom 钩子注册函数。createEngine 时调用，将钩子注册到实例级 HookRegistry。
+   * 旧模式：模块顶层调用 registerAtomHook()（全局副作用）。
+   * 新模式：定义此字段，由 createEngine 统一调用。
+   */
+  registerHooks?: (registry: import('./skill-hook').HookRegistry) => void;
 }
 /**
  * 技能卡牌转换条目。
