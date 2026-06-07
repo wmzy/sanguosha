@@ -22,7 +22,7 @@ import type {
   PlayerEvent,
   ServerEvent,
 } from './types';
-import { getAtomHooks, filterHooksByPlayer, registerAtomHook, clearAtomHooks } from './skill-hook';
+import { getAtomHooks, filterHooksByPlayer, registerAtomHook, clearAtomHooks, HookRegistry } from './skill-hook';
 
 const registry = new Map<string, AtomDefinition>();
 
@@ -66,6 +66,11 @@ export interface ApplyAtomsOptions {
    * 避免钩子无限递归。
    */
   skipHooks?: boolean;
+  /**
+   * 实例级钩子注册表。传入时使用此实例替代全局 hookRegistry。
+   * createEngine() 闭包内传入，实现多游戏实例隔离。
+   */
+  hooks?: HookRegistry;
 }
 
 export interface ApplyAtomsResult {
@@ -93,6 +98,14 @@ export function applyAtoms(
   opts: ApplyAtomsOptions = {},
   _recursionDepth = 0,
 ): ApplyAtomsResult {
+  // 选择 hooks 源：优先用实例级，fallback 全局
+  const hookReg = opts.hooks;
+
+  function resolveHooks(atomType: string) {
+    if (hookReg) return hookReg.filterByPlayer(hookReg.getByAtomType(atomType), s.currentPlayer);
+    return filterHooksByPlayer(getAtomHooks(atomType), s.currentPlayer);
+  }
+
   if (atoms.length === 0) {
     return { state, events: [], playerEvents: new Map() };
   }
@@ -113,9 +126,8 @@ export function applyAtoms(
 
     // ── onBefore 钩子：可取消/替换/改 state ──
     if (!opts.skipHooks) {
-      const hooks = getAtomHooks(atom.type);
+      const playerHooks = resolveHooks(atom.type);
       const self = s.currentPlayer;
-      const playerHooks = filterHooksByPlayer(hooks, self);
       for (const hook of playerHooks) {
         if (hook.filter && !hook.filter(s, atom, self)) continue;
         const result = hook.onBefore?.({ state: s, atom, self });
@@ -165,9 +177,8 @@ export function applyAtoms(
 
     // ── onAfter 钩子：可追加 atom 序列/改 state ──
     if (!opts.skipHooks) {
-      const hooks = getAtomHooks(atom.type);
+      const playerHooks = resolveHooks(atom.type);
       const self = s.currentPlayer;
-      const playerHooks = filterHooksByPlayer(hooks, self);
       for (const hook of playerHooks) {
         if (hook.filter && !hook.filter(s, atom, self)) continue;
         const result = hook.onAfter?.({ state: s, atom, self, serverEvent });
@@ -178,7 +189,7 @@ export function applyAtoms(
           const sub = applyAtoms(
             s,
             result.additionalAtoms,
-            { skipHooks: true, skipPlayerEvents: opts.skipPlayerEvents },
+            { skipHooks: true, skipPlayerEvents: opts.skipPlayerEvents, hooks: opts.hooks },
             _recursionDepth + 1,
           );
           s = sub.state;
