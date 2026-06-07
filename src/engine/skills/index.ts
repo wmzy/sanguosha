@@ -72,21 +72,21 @@ import { skills as dongZhuo } from './董卓';
 import { skills as zuoCi } from './左慈';
 import { skills as caiWenJi } from './蔡文姬';
 
-// 装备
-import { skills as equipmentSkills } from './equipment';
+// 装备（v2 stub）
+import { skills as equipmentSkills } from '../equipment/stubs';
 
-// v3 钩子技能
-import { skills as baguaSkills } from './bagua';
-import { skills as daqiSkills } from './daqi';
-import { skills as fangtianSkills } from './fangtian';
-import { skills as kongchengSkills } from './kongcheng';
-import { skills as leijiSkills } from './leiji';
-import { skills as qinggangSkills } from './qinggang';
-import { skills as renwangSkills } from './renwang';
-import { skills as tengjiaSkills } from './tengjia';
-import { skills as wanshaSkills } from './wansha';
-import { skills as weimuSkills } from './weimu';
-import { skills as zhangbaSkills } from './zhangba';
+// 装备（v3 钩子技能）
+import { skills as baguaSkills } from '../equipment/bagua';
+import { skills as daqiSkills } from '../equipment/daqi';
+import { skills as fangtianSkills } from '../equipment/fangtian';
+import { skills as kongchengSkills } from '../equipment/kongcheng';
+import { skills as leijiSkills } from '../equipment/leiji';
+import { skills as qinggangSkills } from '../equipment/qinggang';
+import { skills as renwangSkills } from '../equipment/renwang';
+import { skills as tengjiaSkills } from '../equipment/tengjia';
+import { skills as wanshaSkills } from '../equipment/wansha';
+import { skills as weimuSkills } from '../equipment/weimu';
+import { skills as zhangbaSkills } from '../equipment/zhangba';
 
 /** 所有可用技能定义（纯数据，无副作用） */
 export const allSkills: SkillDef[] = [

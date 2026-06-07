@@ -6,7 +6,7 @@
 // 后 registerAll），避免模块级副作用被 beforeEach 清空后丢失。
 
 import { getDefaultHookRegistry } from '@engine/skill-hook';
-import { skills } from '@engine/skills/leiji';
+import { skills } from '@engine/equipment/leiji';
 
 export function registerAll(): void {
   const registry = getDefaultHookRegistry();

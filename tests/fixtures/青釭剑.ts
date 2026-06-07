@@ -7,7 +7,7 @@
 // 避免模块级副作用被 beforeEach 清空后丢失。
 
 import { getDefaultHookRegistry } from '@engine/skill-hook';
-import { skills } from '@engine/skills/qinggang';
+import { skills } from '@engine/equipment/qinggang';
 
 export function registerAll(): void {
   const registry = getDefaultHookRegistry();
