@@ -5,7 +5,7 @@ import { createInitialState } from '../engine/state';
 import { createEngine } from '../engine/create-engine';
 import type { EngineInstance } from '../engine/create-engine';
 import { createAsyncEngine, type AsyncEngineInstance } from '../engine/async-engine';
-import { AsyncHookRegistry } from '../engine/async-hook';
+import { AsyncHookRegistry, type ResumeData } from '../engine/async-hook';
 import { allSkills } from '../engine/skills';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
 import { saveRoom, deletePersistedRoom } from './persistence';
@@ -225,8 +225,9 @@ export class GameSession {
     }
     if (this.state.meta.status === '已结束') return;
 
-    // fire-and-forget：dispatchAsync 内部走恢复路径
-    void this.asyncEngine.dispatchAsync(this.state, fullAction).then((result) => {
+    // fire-and-forget：resolveAsyncHookResponse 内部走恢复路径
+    const resume = (fullAction as { resume: ResumeData }).resume;
+    void this.asyncEngine!.resolveAsyncHookResponse(this.state, (fullAction as { pendingId: string }).pendingId, resume).then((result) => {
       if (result.error) {
         this.sendToPlayer(playerId, { type: 'error', message: result.error });
         return;

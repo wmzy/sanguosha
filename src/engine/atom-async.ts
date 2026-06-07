@@ -28,6 +28,7 @@ const MAX_HOOK_RECURSION = 16;
 export interface ApplyAtomsAsyncOptions {
   skipPlayerEvents?: boolean;
   skipHooks?: boolean;
+  skipApply?: boolean;
   asyncHooks?: AsyncHookRegistry;
 }
 
@@ -90,25 +91,30 @@ export async function applyAtomsAsync(
 
     if (atom === (null as unknown as Atom)) continue;
 
-    const [serverEvent, playerMap, defaultEvent] = atomToEvents(s, atom);
-    events.push(serverEvent);
+    // 恢复路径（skipApply）：跳过 atom apply + events，直接进入 onAfter 钩子
+    let serverEvent: ServerEvent | undefined;
+    if (!opts.skipApply) {
+      const [se, playerMap, defaultEvent] = atomToEvents(s, atom);
+      serverEvent = se;
+      events.push(se);
 
-    if (!opts.skipPlayerEvents) {
-      const updatedPlayerLogs = { ...s.playerLogs };
-      for (const player of s.playerOrder) {
-        const specific = playerMap.get(player);
-        const evt = specific ?? defaultEvent;
-        if (evt) {
-          playerEvents.get(player)!.push(evt);
-          updatedPlayerLogs[player] = [...(updatedPlayerLogs[player] ?? []), evt.id];
+      if (!opts.skipPlayerEvents) {
+        const updatedPlayerLogs = { ...s.playerLogs };
+        for (const player of s.playerOrder) {
+          const specific = playerMap.get(player);
+          const evt = specific ?? defaultEvent;
+          if (evt) {
+            playerEvents.get(player)!.push(evt);
+            updatedPlayerLogs[player] = [...(updatedPlayerLogs[player] ?? []), evt.id];
+          }
         }
+        s = { ...s, serverLog: [...s.serverLog, se], playerLogs: updatedPlayerLogs };
+      } else {
+        s = { ...s, serverLog: [...s.serverLog, se] };
       }
-      s = { ...s, serverLog: [...s.serverLog, serverEvent], playerLogs: updatedPlayerLogs };
-    } else {
-      s = { ...s, serverLog: [...s.serverLog, serverEvent] };
-    }
 
-    s = applyAtom(s, atom);
+      s = applyAtom(s, atom);
+    }
 
     if (!opts.skipHooks && hookReg) {
       const hooks = filterAsyncHooks(hookReg, atom.type, s.currentPlayer, s, atom);
@@ -240,7 +246,25 @@ function injectHelpers(baseCtx: HookCtx): HookCtx {
   const redirect: HookCtx['redirect'] = (target) => ({ kind: 'redirect', target });
   const additionalAtoms: HookCtx['additionalAtoms'] = (atoms) =>
     atoms.length === 0 ? { kind: 'continue' } : { kind: 'additionalAtoms', atoms };
-  return { ...baseCtx, pending, modifyState, cancel, redirect, additionalAtoms };
+  // 同步判定 helper：跑一次判定 atom 并返回结果。
+  // 注意：直接调 applyAtom（不走钩子），且**写回** cctx.state 让后续 helper 看到。
+  const judge: HookCtx['judge'] = (varKey) => {
+    const cctx = getCurrentHookContext();
+    if (!cctx) {
+      throw new Error('ctx.judge() called outside AsyncHook context');
+    }
+    const judgeAtom = { type: '判定' as const, player: cctx.self, ...(varKey ? { varKey } : {}) };
+    const newState = applyAtom(cctx.state, judgeAtom);
+    // 把新 state 写回 cctx（同步覆盖）
+    setCurrentHookContext({ ...cctx, state: newState });
+    const local = newState.localVars ?? {};
+    const cardId = (local['judgeCardId'] as string | null) ?? null;
+    const suit = (local['judgeSuit'] as string) ?? '';
+    const rank = (local['judgeRank'] as string) ?? '';
+    const result = (suit === '♥' || suit === '♦') ? 'red' : 'black';
+    return { cardId, suit, rank, result };
+  };
+  return { ...baseCtx, pending, judge, modifyState, cancel, redirect, additionalAtoms };
 }
 
 function buildAsyncPending(

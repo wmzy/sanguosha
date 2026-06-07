@@ -30,6 +30,8 @@ export interface HookCtx {
   resume?: ResumeData;
   /** 挂起 helper：ctx.pending(def) 等玩家响应 */
   pending: <T = Json>(def: PendingDef, tag?: Json) => Promise<T | ResumeData>;
+  /** 判定 helper：ctx.judge() 同步 apply 判定 atom 并返回结果（不挂起） */
+  judge: (varKey?: string) => JudgeResult;
   /** 修改 state helper：ctx.modifyState(state) 覆盖 */
   modifyState: (state: GameState) => HookResult;
   /** 取消整个 atom helper */
@@ -38,6 +40,14 @@ export interface HookCtx {
   redirect: (target: string) => HookResult;
   /** 追加 atom 序列 helper */
   additionalAtoms: (atoms: Atom[]) => HookResult;
+}
+
+/** 判定 helper 返回值 */
+export interface JudgeResult {
+  cardId: string | null;
+  suit: string;
+  rank: string;
+  result: 'red' | 'black';
 }
 
 export type ResumeData =

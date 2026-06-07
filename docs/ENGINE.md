@@ -10,10 +10,11 @@
 
 ### 0.1 测试
 
-
-- 总测试：**1410**（含 `it.skip` / `describe.skip` 占位）
+- 总测试：**1453**（含 `it.skip` / `describe.skip` 占位）
+- 通过：**1413**
 - 跳过：**40**
-- 测试目录：`tests/{unit,integration,server,scenarios,hooks,api,e2e}/`
+- 失败：**0** ✅
+- 测试目录：`tests/{unit,integration,server,scenarios,hooks,api,e2e,engine,atoms}/`
 ### 0.2 实现状态总览
 
 | 类别 | 已实现 | 部分实现 | 未实现 | 备注 |
@@ -39,7 +40,7 @@
 - **八卦阵 var 不读**：P1-1D-T2 写 v3 registerAtomHook 兜底 cancel；P2-T4 改为读 `ctx.baguaJudgeResult`；P3-T2 加 useCard 阶段判定注入（真 game rule）✅ 修复
 - **4 个武器空 stub**：P1-1D-T3/1D-T4 修完（青釭剑/仁王盾/丈八蛇矛/方天画戟 v3 registerAtomHook 骨架）✅ 修复
 - **触发器 `phase` 字段**：P1-1E-T2 修完（所有事件类型都检查 phase）✅ 修复
-- **双钩子系统**：🟡 仍并存（v3 registerAtomHook + 老 trigger.event + GameEvent 映射）。P1 + P2 增 v3 实现；P3-T1/T2/T3 + P2-T4 加 useCard / becomeTarget atoms 让 v3 钩子可端到端。38+ 老技能迁移按 [T-22] 渐进 PR。
+- **三套钩子系统**：🟡 仍并存（v2 trigger.event + v3 同步 registerAtomHook + P5 异步 AsyncHook）。v3 已有 11+ 钩子；P5 `applyAtomsAsync` / `createAsyncEngine` 已合入但处于 PoC 骨架阶段（测试失败，未激活）。38+ 老 v2 技能迁移按 [T-22] 渐进 PR。详见 §4.5。
 - **判定牌取错位置**：P1-1E-T1 修完（`localVars.judgeCardId`）✅ 修复
 - **draw 重洗未 emit 事件**：✅ P0 修复（ADR 0014，commit `364eb4a`）
 
@@ -48,6 +49,36 @@
 - **大雾/藤甲反转**：P1-1A-T2 写错（藤甲防 fire、大雾防 thunder）→ P3-T1 反转：藤甲防 normal 杀，大雾防 non-thunder（normal+fire 取消，thunder 穿透）
 - **火杀 +1 伤害**：P3-T1 加 `_fireKillDamageBonus.ts` v3 useCard 钩子（subtype='火杀'/'fire' → amount=2 damageType='fire'）
 - **useCard / becomeTarget atoms**：P3-T1/T2 implementer 加 no-op atoms（让 v3 useCard / becomeTarget 钩子可端到端 applyAtoms 测试）
+
+### 0.3.2 P5 异步钩子 PoC（ADR 0025）— ✅ 测试已修复
+
+> 代码已合入主分支，测试全部通过。属架构预埋，未激活。
+
+**新增文件**（PoC 骨架）：
+- `src/engine/async-hook.ts`：AsyncHook / HookResult / PendingDef / AsyncPending / AsyncHookRegistry 核心类型
+- `src/engine/hook-helpers.ts`：`pending()` / `cancel()` / `redirect()` helper
+- `src/engine/atom-async.ts`：`applyAtomsAsync` 异步版骨架
+- `src/engine/async-engine.ts`：`createAsyncEngine` 工厂
+- `src/engine/types.ts`：新增 `PendingAsyncHook` 类型 + `GameAction` 新增 `'异步钩子响应'`
+
+**已修复问题**（2026-06-07）：
+
+| 文件 | 原失败数 | 根因 | 修复 |
+|---|---|---|---|
+| `tests/engine/async-engine-benghuai.test.ts` | 6/7 | 测试传 `阶段结束` atom 缺少 `phase` 字段；恢复用错 API（应用 `resolveAsyncHookResponse` 而非 `dispatchAsync`）| ✅ |
+| `tests/engine/async-engine-ganglie.test.ts` | 2/5 | 同上 + 钩子 `pending()` 返回值类型不匹配（裸 string vs `{ value }` 对象）| ✅ |
+| `tests/server/session-pending.test.ts` | 6/6 | `session.ts:137` 调 `registerCharacterTriggers()` 未 import | ✅ |
+| `tests/server/action-log.test.ts` | 3/3 | 同上 | ✅ |
+| `tests/server/game-logger-session.test.ts` | 1/6 | 同上 | ✅ |
+
+**修复涉及的代码变更**：
+- `src/server/session.ts`：添加 `import { registerCharacterTriggers } from '../engine/skill'`
+- `src/engine/atom-async.ts`：新增 `skipApply` 选项——恢复路径（`resumePoint === 'onAfter'`）跳过已 apply 的 atom，避免重复执行
+- `src/engine/async-engine.ts`：`resolveAsyncHookResponse` 传 `skipApply: pending.resumePoint === 'onAfter'`
+- `src/engine/skills/刚烈.async.ts`：修正 `pending()` 返回值处理（裸 string 而非 `{ value }` 对象）
+- `tests/engine/async-engine-*.test.ts`：所有 `阶段结束` atom 补全 `phase` 字段；恢复路径改用 `resolveAsyncHookResponse`
+
+**结论**：P5 PoC 测试全部通过。代码仅供 API 形状验证，**未激活**（`AsyncHookRegistry` 在 session 中为空）。激活前需完成 ADR 0025 第 2-6 周工程。
 
 ### 0.4 阅读路径
 
@@ -190,9 +221,11 @@ registerAtomHook({
 - 依赖场景（如"先判定再决定是否取消"）：把判定逻辑内联到自己的 filter，**自给自足**
 - 例：八卦阵 var 写 + 读 → 改为"filter: target has 八卦阵, inline 判定 + 取消"
 
-**已注册钩子**（P0 后）：3 演示技能使用 —— 完杀/空城/帷幕（`src/engine/equipment/wansha.ts` / `kongcheng.ts` / `weimu.ts`）。38+ 老技能仍走 `trigger.event`，按 [T-22] 渐进迁移。
+**已注册钩子**（P3 后）：11+ v3 钩子 —— 完杀/空城/帷幕/藤甲/大雾/八卦阵/雷击/火杀+1/青釭剑/丈八蛇矛/方天画戟/仁王盾/铁索连环传导（`src/engine/equipment/` 下各文件）。38+ 老技能仍走 `trigger.event`，按 [T-22] 渐进迁移。
 
 **🎯 v3 决策**（[T-25](#5-决策档案要点)）：**完全迁移到 `registerAtomHook`，老技能（trigger.event）作废**。v3 测试**只用** registerAtomHook 路径。38+ 技能迁移是渐进 PR。
+
+**🔮 P5 异步钩子**（ADR 0025）：`onBefore`/`onAfter` 改 `async function`，可 `await pending(...)` 挂起等玩家响应。PoC 骨架已合入（`src/engine/async-hook.ts` / `atom-async.ts` / `async-engine.ts`），但测试失败、未激活。详见 [§0.3.2](#032-p5-异步钩子-pocadr-0025-测试失败)。
 
 **v3-only skill 写法**（commit `d90be01`）：`SkillDef.trigger` 已改为 optional（`src/engine/types.ts:390`）。v3 钩子驱动的技能可不填 `trigger` 字段。完全迁移前的过渡做法是填占位 `trigger.event: 'v3HookOnly'` —— 不在 GameEvent union 中，v2 `emitEvent` 永不触发；但 `state.triggers` 仍命中以支持 v2 `targetHasSkill` 验证路径（`src/engine/validate.ts:61-63 hasEmptyCityShield` 等）。4 处 registerTriggers 路径加 `if (!def.trigger) return state/continue` 防御性保护。
 
@@ -444,34 +477,20 @@ registerAtomHook({
 
 ## 4.1 validate.ts 硬编码技能转换
 
-**位置**：`src/engine/validate.ts:73-119` `getSkillConvertedCards`
+**位置**：`src/engine/validate.ts:75-145`
 
-```ts
-// src/engine/validate.ts:111-118
-if (targetType === '闪' && (trigger.event === 'killResponse' || trigger.event === 'aoeResponse')) {
-  if (skillId === '倾国' && isBlack) return true;
-  if (skillId === '龙胆' && card.name === '杀') return true;
-}
-if (targetType === '杀') {
-  if (skillId === '武圣' && isRed) return true;
-  if (skillId === '龙胆' && card.name === '闪') return true;
-}
-```
+**当前状态**：🟡 **部分修复**
+- ✅ `getSkillConvertedCards`（validate.ts:78-93）已通过 `SkillDef.convertible` 字段解耦：武圣/龙胆/倾国 3 个技能不再硬编码，走 `canCardBeConvertedBySkill` → 遍历 `skill.convertible` 数组
+- 🟡 `canCardBeConvertedToPeach`（validate.ts:132-145）**仍硬编码** `'急救'` 技能名：`return hasSkill(state, player, '急救')`。新增"X 当桃"技能需要改 validate。
+- 🟡 奇才（黄月英）仍留 stub，未走 `convertible` 字段
 
-**问题**：validate 不该知道技能。新增"X 当 Y"技能要改 validate。
+**修复方向**：将 `canCardBeConvertedToPeach` 也改为读 `SkillDef.convertible`（新增 `to: '桃'` 条目），彻底移除 validate 对技能名的依赖。
 
-**修复方向**：抽 `SkillDef.convertible: { from: CardName, to: CardName, filter: Expr<boolean> }`，validate 读这个字段。
+## 4.2 八卦阵 var 写了不读 — ✅ 已修复
 
-## 4.2 八卦阵 var 写了不读
+**状态**：✅ P3-T2 已修（真 game rule 完整落地）
 
-**位置**：
-- 写：``src/engine/equipment/stubs.ts`:144-176` `八卦阵/dodged` var
-- 读：**无**
-- 测试 `tests/scenarios/装备/八卦阵.test.ts:31` 查这个 var
-
-**问题**：测试通过但**实际 八卦阵不生效**（validate 不查 var）。
-
-**修复方向**：把"是否生效"判断移到 `validate.ts` 或 `useKill` 钩子。
+**修复路径**：P1-1D-T2 占位 cancel → P2-T4 改为读 `ctx.baguaJudgeResult` → P3-T2 完整化：`src/engine/equipment/_baguaJudgeInject.ts`（useCard 阶段 becomeTarget 钩子：读 deck 顶牌花色注入 `baguaJudgeResult`）+ `src/engine/equipment/bagua.ts`（damage onBefore 读 `ctx.baguaJudgeResult`）。详见 §2.2 八卦阵装备条目。
 
 ## 4.3 4 个武器空 stub
 
@@ -505,7 +524,26 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 
 **修复方向**：每个事件类型的 phase 检查都加分支。
 
-## 4.5 双钩子系统长期并存
+## 4.5 三套钩子系统并存
+
+当前引擎同时存在 **3 套**技能机制：
+
+| 机制 | 位置 | 覆盖范围 | 状态 |
+|---|---|---|---|
+| v2 `trigger.event` + `emitEvent` | `src/engine/skill.ts` | 38+ 老技能 | 🟡 渐进迁移中 |
+| v3 同步 `registerAtomHook` | `src/engine/skill-hook.ts` | 11+ 新钩子（装备 + 空城/完杀/帷幕）| 🟢 活跃 |
+| P5 异步 `AsyncHook` + `pending()` | `src/engine/async-hook.ts` / `atom-async.ts` | 0（PoC 骨架）| 🔴 测试失败，未激活 |
+
+**共存规则**：
+- `applyAtoms` 优先查闭包 `currentEngineHooks`（v3），回退全局 `defaultRegistry`（v3 全局）
+- v2 `emitEvent` 路径独立运行（`src/engine/skill.ts:141-196`），与 v3 钩子不在同一条链上
+- P5 `applyAtomsAsync`（`src/engine/atom-async.ts`）是独立入口，不与 v2/v3 交叉
+- 同一 atom 同时被 v2 trigger 和 v3 hook 监听时，**两个都触发**——暂无冲突案例
+
+**风险**：
+- 新开发者不知道该用哪套 API
+- v3 钩子的 `onBefore cancel` 不会阻止 v2 trigger 对同一 atom 的响应
+- `validate.ts` 的 `targetHasSkill` 已迁 `PlayerState.skills`（P5-T2），不再读 `state.triggers`，但其他路径可能仍读 `state.triggers`
 
 详见 [§0.3](#03-已知文档代码不一致) + [T-25](#5-决策档案要点)。
 
@@ -542,6 +580,36 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 * faceDown：未实现（断肠/曹仁据守/贾诩放逐 仍 stub）
 * leijiPending：未实施（雷击占位真 game rule 完整判定需此 Mark）
 
+
+
+## 4.9 全局单例 vs 闭包隔离 — 混合模式
+
+`createEngine()` 设计上创建闭包内独立的 `hookRegistry` + `skillsMap`，但实际运行时存在两条路径交叉：
+
+- ✅ `applyAtoms` 内部：先查 `_setCurrentEngineHooks()` 注入的闭包 hooks，回退全局 `defaultRegistry`
+- 🟡 `validate.ts`：`getSkill()` 查全局 registry（`src/engine/skill.ts`），**不查 `skillsMap`**——验证逻辑始终走全局状态
+- 🟡 `skill.ts:emitEvent`：`getSkill()` 走全局；`skillsMap` 参数虽已透传但多数调用路径不传
+- 🟡 `registerCharacterTriggers` / `registerEquipmentTriggers`：同时写 `state.triggers`（v2）和 `PlayerState.skills`（v3），但注册来源是全局 `getSkillRegistry()`
+
+**风险**：多 `createEngine` 实例并发时，validate 和 emitEvent 会读到另一个实例注册的技能。当前只有测试场景会触发，生产环境单实例不受影响。
+
+**修复方向**：validate / emitEvent 接受 `skillsMap` 参数（或通过 `_setCurrentEngineHooks` 机制注入），彻底脱离全局 registry。
+
+## 4.10 双引擎并存（createEngine + createAsyncEngine）
+
+`session.ts:140-146` 同时创建两个引擎实例：
+
+```ts
+this.gameEngine = createEngine({ skills: allSkills });
+this.asyncEngine = createAsyncEngine({ asyncHooks: new AsyncHookRegistry() }); // 空注册表
+```
+
+**当前状态**：
+- `asyncEngine` 的 `AsyncHookRegistry` 始终为空——`dispatchAsync` 永远不会触发任何钩子
+- `session.handleAction` 中 `asyncEngine` 的路由逻辑已预埋但未激活
+- 两个引擎共享同一个 `state` 对象，若同时 dispatch 会产生竞态
+
+**结论**：`asyncEngine` 是 P5 预埋占位，生产路径完全走 `gameEngine`（同步）。未来 P5 激活时需决定：合并为单一引擎（async dispatch 接管 sync），或保持双引擎并严格路由。
 
 ---
 
@@ -705,7 +773,7 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 | [0017](./decisions/0017-skill-pindian-multistep.md) | pindian / multiStep SkillPhase | 拼点 + 多步 prompt 骨架 |
 | [0013](./decisions/0013-skill-character-decouple.md) | 技能/角色/装备解耦 | **架构**：engine/{characters,skills,equipment} 分层（56 单文件、equipment 独立目录）|
 | [0018](./decisions/0018-deprecated-test-apis.md) | 废弃全局测试 API | 测试从 `clearXxx()` 迁到 `engine.clearForTest()`；`currentEngineHooks` 实现多实例隔离 |
-| [0025](./decisions/0025-async-hooks.md) | 异步钩子（v3 引擎终态） | onBefore/onAfter 改 async function + `pending()` helper 挂起等玩家；替代 v2 SkillPhase DSL；51 技能 v3 化前置架构 |
+| [0025](./decisions/0025-async-hooks.md) | 异步钩子（v3 引擎终态）| 🔴 PoC 骨架已合入，测试失败；onBefore/onAfter 改 async + `pending()` 挂起；详见 [§0.3.2](#032-p5-异步钩子-pocadr-0025-测试失败) |
 **未来 ADR 候选**：
 - Mark 体系（[T-05/T-07](#5-决策档案要点)）
 - 钩子迁移 38+ 技能策略（[T-25](#5-决策档案要点)）
@@ -720,24 +788,28 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 |---|---|
 | 状态机入口 | `src/engine/create-engine.ts:createEngine` → `engine.dispatch(state, action)` |
 | 统一 atom 入口 | `src/engine/atom.ts:applyAtoms` |
-| Skill registry | `src/engine/skill.ts`（v2 全局，已 `@deprecated`）| 
+| 异步 atom 入口 | `src/engine/atom-async.ts:applyAtomsAsync`（🔴 P5 PoC，未激活）|
+| Skill registry | `src/engine/skill.ts`（v2 全局，已 `@deprecated`）|
 | 引擎实例 | `src/engine/create-engine.ts:createEngine` 返回 `EngineInstance` |
-| 钩子注册 | `src/engine/skill-hook.ts:HookRegistry` / `applyAtoms(_setCurrentEngineHooks)` 机制 |
+| 异步引擎实例 | `src/engine/async-engine.ts:createAsyncEngine` 返回 `AsyncEngineInstance`（🔴 P5 PoC）|
+| 钩子注册（v3 同步）| `src/engine/skill-hook.ts:HookRegistry` / `applyAtoms(_setCurrentEngineHooks)` 机制 |
+| 钩子注册（P5 异步）| `src/engine/async-hook.ts:AsyncHookRegistry`（🔴 PoC）|
+| 钩子 helpers | `src/engine/hook-helpers.ts:pending()` / `cancel()` / `redirect()`（🔴 PoC）|
 | 阶段推进 | `src/engine/phase-advance.ts` |
 | 触发器 | `src/engine/skill.ts:emitEvent`（🟡 老）|
 | 重放 | `src/engine/replay.ts` + `src/engine/view/reducer.ts` |
-| 服务端 | `src/server/session.ts:engineLoop` |
+| 服务端 | `src/server/session.ts`（同时持有 `gameEngine` + `asyncEngine`）|
 
 ## 8.2 关键测试位置
-
 | 类别 | 路径 |
 |---|---|
 | 单元 atom | `tests/atoms/` |
 | 单元 skill | `tests/unit/skill-hook.test.ts` |
 | 场景技能 | `tests/scenarios/{魏,蜀,吴,群,装备,交互}/` |
-| 端到端 | `tests/e2e-regression.test.ts` |
-| 重放 | `tests/serializer.test.ts` |
-
+| 异步引擎 e2e | `tests/engine/async-engine-{ganglie,benghuai}.test.ts`（🔴 18 失败）|
+| 服务端集成 | `tests/server/session-pending.test.ts`（🔴 mock 缺失）|
+| 端到端 | `tests/e2e/game.spec.ts` |
+| 重放 | `tests/integration/replay-round-trip.test.ts` |
 ## 8.3 文档
 
 - 设计文档（本文）：`docs/ENGINE.md`

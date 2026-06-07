@@ -3,14 +3,14 @@
 // 阶段 D-2 集成测试：createAsyncEngine 把 AsyncHook 接入 dispatchAsync 路径。
 // 验证：
 // 1. dispatchAsync 触发 AsyncHook 钩子挂起 → state.pending 写入 PendingAsyncHook
-// 2. dispatch 收到 '异步钩子响应' action → 调 applyAtomsAsync 恢复
+// 2. resolveAsyncHookResponse 恢复钩子执行
 // 3. 钩子返回 additionalAtoms 正确 apply（health / maxHealth 改变）
 // 4. 错位响应（pendingId 不匹配）拒绝
 // 5. 挂起期间其它 action 拒绝
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createAsyncEngine } from '@engine/async-engine';
-import { AsyncHookRegistry } from '@engine/async-hook';
+import { AsyncHookRegistry, type ResumeData } from '@engine/async-hook';
 import { bengHuaiAsyncHook } from '@engine/skills/崩坏.async';
 import { createTestGame, setHealth } from '../engine-helpers';
 import type { GameState, Atom } from '@engine/types';
@@ -34,6 +34,7 @@ describe('createAsyncEngine — 崩坏（董卓）端到端集成', () => {
     const engine = createAsyncEngine({ asyncHooks });
     const result = await engine.dispatchAsync(state, {
       type: '阶段结束',
+      phase: '结束',
       player: 'P1',
     });
     // state.pending 是 PendingAsyncHook
@@ -46,38 +47,38 @@ describe('createAsyncEngine — 崩坏（董卓）端到端集成', () => {
 
   it('挂起期间收到非 异步钩子响应 action → 拒绝', async () => {
     const engine = createAsyncEngine({ asyncHooks });
-    const first = await engine.dispatchAsync(state, { type: '阶段结束', player: 'P1' });
+    const first = await engine.dispatchAsync(state, { type: '阶段结束', phase: '结束', player: 'P1' });
     expect(first.state.pending).not.toBeNull();
     // 玩家误打 '结束回合' action
     const rejected = await engine.dispatchAsync(first.state, {
       type: '结束回合',
       player: 'P1',
     });
-    expect(rejected.error).toMatch(/异步钩子挂起期间只接受/);
+    expect(rejected.error).toMatch(/当前等待异步钩子响应/);
     // state 未变（仍挂起）
     expect(rejected.state.pending).not.toBeNull();
   });
 
   it('错位响应（pendingId 不匹配）拒绝', async () => {
     const engine = createAsyncEngine({ asyncHooks });
-    const first = await engine.dispatchAsync(state, { type: '阶段结束', player: 'P1' });
-    const wrongId = await engine.dispatchAsync(first.state, {
-      type: '异步钩子响应',
-      pendingId: 'wrong-id',
-      resume: { kind: 'response', value: 'health' },
-    });
+    const first = await engine.dispatchAsync(state, { type: '阶段结束', phase: '结束', player: 'P1' });
+    const wrongId = await engine.resolveAsyncHookResponse(
+      first.state,
+      'wrong-id',
+      { kind: 'response', value: 'health' } as ResumeData,
+    );
     expect(wrongId.error).toMatch(/pendingId 不匹配/);
   });
 
   it('玩家选 "health" → 完整恢复并 apply 失去体力 atom', async () => {
     const engine = createAsyncEngine({ asyncHooks });
-    const first = await engine.dispatchAsync(state, { type: '阶段结束', player: 'P1' });
+    const first = await engine.dispatchAsync(state, { type: '阶段结束', phase: '结束', player: 'P1' });
     const pendingId = (first.state.pending as { id: string }).id;
-    const second = await engine.dispatchAsync(first.state, {
-      type: '异步钩子响应',
+    const second = await engine.resolveAsyncHookResponse(
+      first.state,
       pendingId,
-      resume: { kind: 'response', value: 'health' },
-    });
+      { kind: 'response', value: 'health' } as ResumeData,
+    );
     expect(second.error).toBeUndefined();
     expect(second.state.players.P1.health).toBe(4);
     expect(second.state.pending).toBeNull();
@@ -85,13 +86,13 @@ describe('createAsyncEngine — 崩坏（董卓）端到端集成', () => {
 
   it('玩家选 "maxHealth" → 完整恢复并 apply 设上限 atom', async () => {
     const engine = createAsyncEngine({ asyncHooks });
-    const first = await engine.dispatchAsync(state, { type: '阶段结束', player: 'P1' });
+    const first = await engine.dispatchAsync(state, { type: '阶段结束', phase: '结束', player: 'P1' });
     const pendingId = (first.state.pending as { id: string }).id;
-    const second = await engine.dispatchAsync(first.state, {
-      type: '异步钩子响应',
+    const second = await engine.resolveAsyncHookResponse(
+      first.state,
       pendingId,
-      resume: { kind: 'response', value: 'maxHealth' },
-    });
+      { kind: 'response', value: 'maxHealth' } as ResumeData,
+    );
     expect(second.error).toBeUndefined();
     expect(second.state.players.P1.maxHealth).toBe(4);
     // 设上限副作用：health 也 cap 到 maxHealth
@@ -101,13 +102,13 @@ describe('createAsyncEngine — 崩坏（董卓）端到端集成', () => {
 
   it('玩家取消 → 钩子 return continue，无副作用', async () => {
     const engine = createAsyncEngine({ asyncHooks });
-    const first = await engine.dispatchAsync(state, { type: '阶段结束', player: 'P1' });
+    const first = await engine.dispatchAsync(state, { type: '阶段结束', phase: '结束', player: 'P1' });
     const pendingId = (first.state.pending as { id: string }).id;
-    const second = await engine.dispatchAsync(first.state, {
-      type: '异步钩子响应',
+    const second = await engine.resolveAsyncHookResponse(
+      first.state,
       pendingId,
-      resume: { kind: 'cancel' },
-    });
+      { kind: 'cancel' } as ResumeData,
+    );
     expect(second.error).toBeUndefined();
     expect(second.state.players.P1.health).toBe(5);
     expect(second.state.players.P1.maxHealth).toBe(5);
@@ -117,7 +118,7 @@ describe('createAsyncEngine — 崩坏（董卓）端到端集成', () => {
   it('体力最低时 filter 过滤 → 不挂 pending', async () => {
     const engine = createAsyncEngine({ asyncHooks });
     const lowState = setHealth(state, 'P1', 1);
-    const result = await engine.dispatchAsync(lowState, { type: '阶段结束', player: 'P1' });
+    const result = await engine.dispatchAsync(lowState, { type: '阶段结束', phase: '结束', player: 'P1' });
     expect(result.state.pending).toBeNull();
     expect(result.state.players.P1.health).toBe(1);
   });
