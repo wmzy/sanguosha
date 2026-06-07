@@ -2,7 +2,9 @@ import type { GameAction, GameState, ServerEvent } from '../engine/types';
 import type { SequencedEvent, EventSeq, ServerMessage } from './protocol';
 import type { Room } from './room';
 import { createInitialState } from '../engine/state';
-import { engine } from '../engine/engine';
+import { createEngine } from '../engine/create-engine';
+import type { EngineInstance } from '../engine/create-engine';
+import { allSkills } from '../engine/skills';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
 import { saveRoom, deletePersistedRoom } from './persistence';
 import { registerCharacterTriggers } from '../engine/skill';
@@ -42,6 +44,7 @@ const RECONNECT_GRACE_MS = 30_000;
 
 export class GameSession {
   private state: GameState | null = null;
+  private gameEngine: EngineInstance | null = null;
   private actionLog: GameAction[] = [];
   private room: Room;
   private debug: boolean;
@@ -129,12 +132,12 @@ export class GameSession {
       seed,
       characterMap,
     });
-
     for (const playerName of state.playerOrder) {
       state = registerCharacterTriggers(state, playerName, { characterMap });
     }
 
-    const startResult = engine(state, { type: '开始' });
+    this.gameEngine = createEngine({ skills: allSkills });
+    const startResult = this.gameEngine.dispatch(state, { type: '开始' });
     state = startResult.state;
 
     this.state = state;
@@ -181,7 +184,7 @@ export class GameSession {
 
     if (this.state.meta.status === '已结束') return;
 
-    const result = engine(this.state, fullAction);
+    const result = this.gameEngine!.dispatch(this.state, fullAction);
     if (result.error) {
       this.sendToPlayer(playerId, { type: 'error', message: result.error });
       return;
@@ -312,7 +315,7 @@ export class GameSession {
     if (!this.state?.pending) return;
 
     const onTimeout = this.state.pending.onTimeout;
-    const result = engine(this.state, onTimeout);
+    const result = this.gameEngine!.dispatch(this.state, onTimeout);
 
     if (result.error) {
       this.logger.warn(`[Timeout] engine error: ${result.error}`);

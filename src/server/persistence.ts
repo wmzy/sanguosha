@@ -3,7 +3,8 @@ import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'node:fs/promi
 import { join } from 'node:path';
 import type { GameState, GameAction, ServerEvent } from '../engine/types';
 import { createInitialState } from '../engine/state';
-import { engine } from '../engine/engine';
+import { createEngine } from '../engine/create-engine';
+import { allSkills } from '../engine/skills';
 import { registerCharacterTriggers } from '../engine/skill';
 import { restoreEventCounterFromLog } from '../engine/event';
 import { allCharacters } from '../shared/characters';
@@ -253,13 +254,13 @@ export function restoreToState(persisted: PersistedRoom): GameState {
     seed: persisted.seed,
     characterMap,
   });
-
   for (const playerName of state.playerOrder) {
     state = registerCharacterTriggers(state, playerName, { characterMap });
   }
 
+  const gameEngine = createEngine({ skills: allSkills });
   for (const action of persisted.actionLog) {
-    const result = engine(state, action);
+    const result = gameEngine.dispatch(state, action);
     if (result.error) {
       log.warn(`replay error for room ${persisted.roomId}: ${result.error}`);
       break;
