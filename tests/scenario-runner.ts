@@ -6,6 +6,7 @@ import { createInitialState, getPlayer } from '@engine/state';
 import { engine } from '@engine/engine';
 import { applyAtoms as engineApplyAtoms } from '@engine/atom';
 import { emitEvent as engineEmitEvent, registerCharacterTriggers } from '@engine/skill';
+import { registerAllSkills as registerAllEngineSkills } from '@engine/skills';
 import { allTricks, weapons, armors, horses } from './fixtures/cards';
 import type { PlayerView, Animation, AvailableAction } from '@engine/view/types';
 import { eventsToAnimations } from '@engine/view/reducer';
@@ -15,6 +16,10 @@ import { buildPlayerView as importPlayerView } from '@engine/view/buildView';
 const characterMap = Object.fromEntries(
   allCharacters.map(c => [c.name, c]),
 );
+
+// 在测试进程启动时一次性注册所有 v3 钩子到默认 HookRegistry，
+// 替代旧 module-level registerAtomHook() 副作用。
+registerAllEngineSkills();
 
 interface GameSnapshot {
   health: Record<string, number>;

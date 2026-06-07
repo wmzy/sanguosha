@@ -19,31 +19,45 @@
 // 应当由 cardId '仁王盾' 经 P1-D 装备 barrel 解析得到，不再是裸字符串。
 // TODO(P2): replace with useCard hook listening on becomeTarget / resolveCard.
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import { getPlayer } from '../state';
-import type { Atom, GameState } from '../types';
+import type { Atom, GameState, SkillDef } from '../types';
 
 const RENWANG_ID = '仁王盾';
 
-export function register(): void {
-  registerAtomHook({
-    atomType: '造成伤害',
-    filter(state: GameState, atom: Atom): boolean {
-      if (atom.type !== '造成伤害') return false;
-      const cardId = atom.cardId as string | undefined;
-      if (!cardId) return false;
-      const card = state.cardMap[cardId];
-      if (card?.name !== '杀') return false;
-      const isBlack = card.suit === '♠' || card.suit === '♣';
-      if (!isBlack) return false;
-      const target = atom.target as string;
-      const p = getPlayer(state, target);
-      if (!p) return false;
-      return p.equipment.防具 === RENWANG_ID;
+export const skills: SkillDef[] = [
+  {
+    id: RENWANG_ID,
+    name: RENWANG_ID,
+    description:
+      '防具技：装备仁王盾的角色受到黑色【杀】造成的伤害时，防止此伤害。',
+    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
+    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
+    trigger: { event: 'v3HookOnly', source: '装备' },
+    handler() {
+      return [];
     },
-    onBefore() {
-      // 仁王盾：黑色【杀】对该角色无效 → 取消该 damage
-      return { cancel: true };
+    registerHooks(registry: HookRegistry) {
+      registry.register({
+        atomType: '造成伤害',
+        filter(state: GameState, atom: Atom): boolean {
+          if (atom.type !== '造成伤害') return false;
+          const cardId = atom.cardId as string | undefined;
+          if (!cardId) return false;
+          const card = state.cardMap[cardId];
+          if (card?.name !== '杀') return false;
+          const isBlack = card.suit === '♠' || card.suit === '♣';
+          if (!isBlack) return false;
+          const target = atom.target as string;
+          const p = getPlayer(state, target);
+          if (!p) return false;
+          return p.equipment.防具 === RENWANG_ID;
+        },
+        onBefore() {
+          // 仁王盾：黑色【杀】对该角色无效 → 取消该 damage
+          return { cancel: true };
+        },
+      });
     },
-  });
-}
+  },
+];

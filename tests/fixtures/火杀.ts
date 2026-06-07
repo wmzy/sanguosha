@@ -6,8 +6,9 @@
 // 暴露 `registerAll` 函数供测试在 beforeEach 中调用（先 clearAtomHooks() 后 registerAll），
 // 避免模块级副作用被 beforeEach 清空后丢失。
 
+import { getDefaultHookRegistry } from '@engine/skill-hook';
 import { register } from '@engine/skills/_fireKillDamageBonus';
 
 export function registerAll(): void {
-  register();
+  register(getDefaultHookRegistry());
 }

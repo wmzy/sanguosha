@@ -6,12 +6,14 @@
 // 暴露 `registerAll` 函数供测试在 beforeEach 中调用（先 clearAtomHooks() 后 registerAll），
 // 避免模块级副作用被 beforeEach 清空后丢失。
 
-import { register as registerRenwang } from '@engine/skills/renwang';
-import { register as registerZhangba } from '@engine/skills/zhangba';
-import { register as registerFangtian } from '@engine/skills/fangtian';
+import { getDefaultHookRegistry } from '@engine/skill-hook';
+import { skills as renwang } from '@engine/skills/renwang';
+import { skills as zhangba } from '@engine/skills/zhangba';
+import { skills as fangtian } from '@engine/skills/fangtian';
 
 export function registerAll(): void {
-  registerRenwang();
-  registerZhangba();
-  registerFangtian();
+  const registry = getDefaultHookRegistry();
+  for (const skill of renwang) skill.registerHooks?.(registry);
+  for (const skill of zhangba) skill.registerHooks?.(registry);
+  for (const skill of fangtian) skill.registerHooks?.(registry);
 }

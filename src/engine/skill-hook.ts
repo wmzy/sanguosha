@@ -108,6 +108,11 @@ export class HookRegistry {
 // 实例化独立的 HookRegistry 后会移除这些便捷函数。
 const defaultRegistry = new HookRegistry();
 
+/** 暴露默认全局 HookRegistry，用于测试 fixture 等需要手动调用 `registerHooks(registry)` 的场景。 */
+export function getDefaultHookRegistry(): HookRegistry {
+  return defaultRegistry;
+}
+
 export function registerAtomHook(def: AtomHookDef): void {
   defaultRegistry.register(def);
 }

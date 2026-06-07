@@ -15,28 +15,42 @@
 // 应当由 cardId '方天画戟' 经 P1-D 装备 barrel 解析得到，不再是裸字符串。
 // TODO(P2): 接入 multiStep prompt 选 1-2 个追加目标。
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import { getPlayer } from '../state';
-import type { Atom, GameState } from '../types';
+import type { Atom, GameState, SkillDef } from '../types';
 
 const FANGTIAN_ID = '方天画戟';
 
-export function register(): void {
-  registerAtomHook({
-    atomType: '指定目标',
-    filter(state: GameState, atom: Atom): boolean {
-      if (atom.type !== '指定目标') return false;
-      const source = atom.source as string;
-      const p = getPlayer(state, source);
-      if (!p) return false;
-      if (p.equipment.武器 !== FANGTIAN_ID) return false;
-      if (p.hand.length !== 0) return false; // 方天画戟：手牌为 0 时多目标
-      return true;
+export const skills: SkillDef[] = [
+  {
+    id: FANGTIAN_ID,
+    name: FANGTIAN_ID,
+    description:
+      '武器技：装备方天画戟且手牌数为 0 的角色使用【杀】可以指定最多三名角色为目标。',
+    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
+    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
+    trigger: { event: 'v3HookOnly', source: '装备' },
+    handler() {
+      return [];
     },
-    onAfter() {
-      // 追加 1-2 个 specifyTarget（最多 3 个目标）
-      // 简化：暂只追加 0 个，留 P2 prompt 选目标
-      return {};
+    registerHooks(registry: HookRegistry) {
+      registry.register({
+        atomType: '指定目标',
+        filter(state: GameState, atom: Atom): boolean {
+          if (atom.type !== '指定目标') return false;
+          const source = atom.source as string;
+          const p = getPlayer(state, source);
+          if (!p) return false;
+          if (p.equipment.武器 !== FANGTIAN_ID) return false;
+          if (p.hand.length !== 0) return false; // 方天画戟：手牌为 0 时多目标
+          return true;
+        },
+        onAfter() {
+          // 追加 1-2 个 specifyTarget（最多 3 个目标）
+          // 简化：暂只追加 0 个，留 P2 prompt 选目标
+          return {};
+        },
+      });
     },
-  });
-}
+  },
+];

@@ -16,30 +16,43 @@
 // 应当由 cardId '丈八蛇矛' 经 P1-D 装备 barrel 解析得到，不再是裸字符串。
 // TODO(P2): 接入 multiStep prompt 选 2 张手牌当【杀】。
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import { getPlayer } from '../state';
-import type { Atom, GameState } from '../types';
+import type { Atom, GameState, SkillDef } from '../types';
 
 const ZHANGBA_ID = '丈八蛇矛';
 
-export function register(): void {
-  registerAtomHook({
-    atomType: '指定目标',
-    filter(state: GameState, atom: Atom): boolean {
-      if (atom.type !== '指定目标') return false;
-      const cardId = atom.cardId as string;
-      const card = state.cardMap[cardId];
-      if (card?.name !== '杀') return false;
-      const source = atom.source as string;
-      const p = getPlayer(state, source);
-      if (!p) return false;
-      if (p.equipment.武器 !== ZHANGBA_ID) return false;
-      return p.hand.length >= 2;
+export const skills: SkillDef[] = [
+  {
+    id: ZHANGBA_ID,
+    name: ZHANGBA_ID,
+    description: '武器技：装备丈八蛇矛的角色可以将两张手牌当【杀】使用。',
+    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
+    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
+    trigger: { event: 'v3HookOnly', source: '装备' },
+    handler() {
+      return [];
     },
-    onBefore() {
-      // TODO: 接入 multiStep prompt 选 2 张手牌
-      // 本 Task 留接口，由 P2 完整化
-      return {};
+    registerHooks(registry: HookRegistry) {
+      registry.register({
+        atomType: '指定目标',
+        filter(state: GameState, atom: Atom): boolean {
+          if (atom.type !== '指定目标') return false;
+          const cardId = atom.cardId as string;
+          const card = state.cardMap[cardId];
+          if (card?.name !== '杀') return false;
+          const source = atom.source as string;
+          const p = getPlayer(state, source);
+          if (!p) return false;
+          if (p.equipment.武器 !== ZHANGBA_ID) return false;
+          return p.hand.length >= 2;
+        },
+        onBefore() {
+          // TODO: 接入 multiStep prompt 选 2 张手牌
+          // 本 Task 留接口，由 P2 完整化
+          return {};
+        },
+      });
     },
-  });
-}
+  },
+];

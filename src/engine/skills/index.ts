@@ -1,19 +1,79 @@
 // engine/skills/index.ts — 技能模块聚合入口
 //
-// 模块顶层副作用：import 即触发 registerSkill()。
-// `registerAllSkills` 是显式语义出口，方便未来切换到"显式 register 调用"
-// 模式（先在 init 阶段调用一次）；当前实现下无需重复调用。
+// 旧模式：各模块顶层调用 registerSkill()（import 即副作用）。
+// 新模式：各模块导出 SkillDef[]，由本文件统一注册。
+// v3 registerAtomHook 钩子通过 SkillDef.registerHooks 字段注册到全局 HookRegistry。
 
-import './wei';
-import './shu';
-import './wu';
-import './qun';
-import './equipment';
-import './wansha';
-import './kongcheng';
-import './weimu';
+import { getDefaultHookRegistry } from '../skill-hook';
+import { registerSkill } from '../skill';
+import type { SkillDef } from '../types';
 
+// v2 武将技能
+import { skills as weiSkills } from './wei';
+import { skills as shuSkills } from './shu';
+import { skills as wuSkills } from './wu';
+import { skills as qunSkills } from './qun';
+import { skills as equipmentSkills } from './equipment';
+
+// v3 钩子技能
+import { skills as baguaSkills } from './bagua';
+import { skills as daqiSkills } from './daqi';
+import { skills as fangtianSkills } from './fangtian';
+import { skills as kongchengSkills } from './kongcheng';
+import { skills as leijiSkills } from './leiji';
+import { skills as qinggangSkills } from './qinggang';
+import { skills as renwangSkills } from './renwang';
+import { skills as tengjiaSkills } from './tengjia';
+import { skills as wanshaSkills } from './wansha';
+import { skills as weimuSkills } from './weimu';
+import { skills as zhangbaSkills } from './zhangba';
+
+/** 所有可用技能定义（纯数据，无副作用） */
+export const allSkills: SkillDef[] = [
+  ...weiSkills,
+  ...shuSkills,
+  ...wuSkills,
+  ...qunSkills,
+  ...equipmentSkills,
+  ...baguaSkills,
+  ...daqiSkills,
+  ...fangtianSkills,
+  ...kongchengSkills,
+  ...leijiSkills,
+  ...qinggangSkills,
+  ...renwangSkills,
+  ...tengjiaSkills,
+  ...wanshaSkills,
+  ...weimuSkills,
+  ...zhangbaSkills,
+];
+
+let _initialized = false;
+
+/**
+ * 注册所有技能到全局注册表（v2 skill registry + v3 hook registry）。
+ * 幂等：多次调用只注册一次。
+ * import './skills/index' 时自动调用，保持向后兼容。
+ */
 export function registerAllSkills(): void {
-  // 当前实现：模块顶层副作用已注入所有 skill；本函数为占位 + 显式语义出口。
-  // 调用者可在测试 setup 显式调用以表达意图，但无副作用。
+  if (_initialized) return;
+  _initialized = true;
+
+  const hookRegistry = getDefaultHookRegistry();
+  const best = new Map<string, SkillDef>();
+  for (const skill of allSkills) {
+    const existing = best.get(skill.id);
+    // 优先保留含 registerHooks 的版本（v3 钩子技能），
+    // 跳过同名占位版（equipment.ts 中的 v2 stub）
+    if (!existing || skill.registerHooks) {
+      best.set(skill.id, skill);
+    }
+  }
+  for (const skill of best.values()) {
+    registerSkill(skill);
+    skill.registerHooks?.(hookRegistry);
+  }
 }
+
+// 模块加载时自动注册——保持 import './skills/index' 的副作用语义
+registerAllSkills();

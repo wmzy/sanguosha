@@ -17,30 +17,43 @@
 // 应当由 cardId '青釭剑' 经 P1-D 装备 barrel 解析得到，不再是裸字符串。
 // TODO(P2): 完整化：藤甲/仁王盾钩子读取 penetrateArmor 后选择是否取消防具效果。
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import { getPlayer } from '../state';
-import type { Atom, GameState } from '../types';
+import type { Atom, GameState, SkillDef } from '../types';
 
 const QINGGANG_ID = '青釭剑';
 
-export function register(): void {
-  registerAtomHook({
-    atomType: '造成伤害',
-    filter(state: GameState, atom: Atom): boolean {
-      if (atom.type !== '造成伤害') return false;
-      const source = atom.source as string | undefined;
-      if (!source) return false;
-      const p = getPlayer(state, source);
-      if (!p) return false;
-      return p.equipment.武器 === QINGGANG_ID;
+export const skills: SkillDef[] = [
+  {
+    id: QINGGANG_ID,
+    name: QINGGANG_ID,
+    description: '武器技：装备青釭剑的角色造成【杀】伤害时，无视目标防具。',
+    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
+    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
+    trigger: { event: 'v3HookOnly', source: '装备' },
+    handler() {
+      return [];
     },
-    // 标记穿透：onAfter 注入 setCtxVar(penetrateArmor=true)
-    // (onBefore 不支持 additionalAtoms；onAfter 是 supported 路径)
-    // 由后续防具（藤甲/仁王盾）钩子读取并跳过防具效果。
-    onAfter() {
-      return {
-        additionalAtoms: [{ type: '设置上下文变量', key: 'penetrateArmor', value: true }],
-      };
+    registerHooks(registry: HookRegistry) {
+      registry.register({
+        atomType: '造成伤害',
+        filter(state: GameState, atom: Atom): boolean {
+          if (atom.type !== '造成伤害') return false;
+          const source = atom.source as string | undefined;
+          if (!source) return false;
+          const p = getPlayer(state, source);
+          if (!p) return false;
+          return p.equipment.武器 === QINGGANG_ID;
+        },
+        // 标记穿透：onAfter 注入 setCtxVar(penetrateArmor=true)
+        // (onBefore 不支持 additionalAtoms；onAfter 是 supported 路径)
+        // 由后续防具（藤甲/仁王盾）钩子读取并跳过防具效果。
+        onAfter() {
+          return {
+            additionalAtoms: [{ type: '设置上下文变量', key: 'penetrateArmor', value: true }],
+          };
+        },
+      });
     },
-  });
-}
+  },
+];
