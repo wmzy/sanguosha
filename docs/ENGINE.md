@@ -705,7 +705,7 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 | [0017](./decisions/0017-skill-pindian-multistep.md) | pindian / multiStep SkillPhase | 拼点 + 多步 prompt 骨架 |
 | [0013](./decisions/0013-skill-character-decouple.md) | 技能/角色/装备解耦 | **架构**：engine/{characters,skills,equipment} 分层（56 单文件、equipment 独立目录）|
 | [0018](./decisions/0018-deprecated-test-apis.md) | 废弃全局测试 API | 测试从 `clearXxx()` 迁到 `engine.clearForTest()`；`currentEngineHooks` 实现多实例隔离 |
-
+| [0025](./decisions/0025-async-hooks.md) | 异步钩子（v3 引擎终态） | onBefore/onAfter 改 async function + `pending()` helper 挂起等玩家；替代 v2 SkillPhase DSL；51 技能 v3 化前置架构 |
 **未来 ADR 候选**：
 - Mark 体系（[T-05/T-07](#5-决策档案要点)）
 - 钩子迁移 38+ 技能策略（[T-25](#5-决策档案要点)）

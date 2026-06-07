@@ -1,9 +1,7 @@
-// engine/skills/诸葛亮.ts — 诸葛亮
-import type { GameState, SkillDef, SkillPhase } from '../types';
+// engine/skills/观星.ts
+import type { SkillDef } from '../types';
 
-// ==================== 诸葛亮 ====================
-
-export const def: SkillDef = {
+export const def: SkillDef =   {
     id: '观星',
     name: '观星',
     description: '准备阶段，你可以观看牌堆顶的X张牌（X为存活角色数且至多为5），并将任意数量的牌以任意顺序置于牌堆顶，其余以任意顺序置于牌堆底。',
@@ -12,7 +10,15 @@ export const def: SkillDef = {
       source: '角色',
       phase: '准备',
       optional: true,
-};
+    },
+    handler(_ctx, _state) {
+      const aliveCount = _state.playerOrder.filter(n => _state.players[n].info.alive).length;
+      const N = Math.min(aliveCount, 5);
+      const topCards = _state.zones.deck.slice(0, N);
+      if (topCards.length === 0) return [];
+      return buildRearrangeTree(_state, topCards, 0, [], [], _ctx.self);
+    },
+  };
 
 /** 递归构建观星的 prompt + condition 决策树 */
 function buildRearrangeTree(
