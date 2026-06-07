@@ -16,7 +16,7 @@
 // ctx.localVars，不写 state）。bagua.ts 读 ctx.state.localVars，所以必须
 // 直接 return modified state。
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import { getPlayer } from '../state';
 import type { Atom, GameState, Json } from '../types';
 
@@ -46,8 +46,8 @@ function readTopDeckCard(state: GameState): { suit: string } | null {
   return { suit: topCard.suit };
 }
 
-export function register(): void {
-  registerAtomHook({
+export function register(registry: HookRegistry): void {
+  registry.register({
     atomType: '成为目标',
     filter(state: GameState, atom: Atom): boolean {
       const becomeTarget = asBecomeTarget(atom);

@@ -12,20 +12,20 @@
 // 设计：与 kongcheng.ts 一致—— filter 阶段做 null-guard + 范围窄化，
 // onBefore 仅做最终拦截（{ cancel: true }）。
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import { getPlayer } from '../state';
 import type { Atom, DamageType, GameState } from '../types';
 
 const ALL_DAMAGE_TYPES: readonly DamageType[] = ['normal', 'fire', 'thunder'];
 
 /** 单一伤害类型免疫（保留原 API） */
-export function registerArmorDamageBlock(armorId: string, blockedDamageType: DamageType): void {
-  registerArmorDamageBlockMulti(armorId, [blockedDamageType]);
+export function registerArmorDamageBlock(registry: HookRegistry, armorId: string, blockedDamageType: DamageType): void {
+  registerArmorDamageBlockMulti(registry, armorId, [blockedDamageType]);
 }
 
 /** 多伤害类型免疫 */
-export function registerArmorDamageBlockMulti(armorId: string, blockedDamageTypes: readonly DamageType[]): void {
-  registerAtomHook({
+export function registerArmorDamageBlockMulti(registry: HookRegistry, armorId: string, blockedDamageTypes: readonly DamageType[]): void {
+  registry.register({
     atomType: '造成伤害',
     filter(state: GameState, atom: Atom): boolean {
       if (atom.type !== '造成伤害') return false;
@@ -43,7 +43,7 @@ export function registerArmorDamageBlockMulti(armorId: string, blockedDamageType
 }
 
 /** 反向：只防"除 allowedDamageType 之外的所有类型"（大雾防 non-thunder） */
-export function registerArmorDamageBlockExcept(armorId: string, allowedDamageType: DamageType): void {
+export function registerArmorDamageBlockExcept(registry: HookRegistry, armorId: string, allowedDamageType: DamageType): void {
   const blockedTypes = ALL_DAMAGE_TYPES.filter((t) => t !== allowedDamageType);
-  registerArmorDamageBlockMulti(armorId, blockedTypes);
+  registerArmorDamageBlockMulti(registry, armorId, blockedTypes);
 }

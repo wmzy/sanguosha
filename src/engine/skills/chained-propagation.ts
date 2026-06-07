@@ -15,11 +15,11 @@
 //
 // 本文件不属于角色技能（铁索连环是装备/锦囊效果），不通过 engine/skills/index.ts 启动；
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import type { Atom, DamageType, GameState } from '../types';
 
-export function register(): void {
-  registerAtomHook({
+export function register(registry: HookRegistry): void {
+  registry.register({
     atomType: '造成伤害',
     filter(_state: GameState, atom: Atom): boolean {
       if (atom.type !== '造成伤害') return false;

@@ -12,7 +12,7 @@
 // hook 注册仍按 `useCard` 字面量走——等 useCard atom 上线后此钩子自动接入。
 // 用本文件局部 type guard 把 `atom: Atom` 在 hook 闭包内收窄到 UseCardAtom。
 
-import { registerAtomHook } from '../atom';
+import type { HookRegistry } from '../skill-hook';
 import type { Atom, GameState } from '../types';
 
 interface UseCardAtom {
@@ -39,8 +39,8 @@ function isFireKillSubtype(subtype: string): boolean {
   return subtype === '火杀' || subtype === 'fire';
 }
 
-export function register(): void {
-  registerAtomHook({
+export function register(registry: HookRegistry): void {
+  registry.register({
     atomType: 'useCard',
     filter(state: GameState, atom: Atom): boolean {
       const useCard = asUseCard(atom);
