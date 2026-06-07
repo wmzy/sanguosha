@@ -13,6 +13,9 @@
 //
 // 设计依据：docs/decisions/0012-unified-apply-atoms.md
 //           docs/decisions/0013-phase-begin-end-atoms.md
+// Phase 10c：在 applyAtoms 内部集成 ATOM_GAME_EVENTS 自动 emitEvent，
+// 消除手工 emitEvent 调用。atom 应用后检查映射表，自动派发 GameEvent 给 v2 技能。
+
 
 import type {
   GameState,
@@ -22,6 +25,8 @@ import type {
   PlayerEvent,
   ServerEvent,
 } from './types';
+import { ATOM_GAME_EVENTS } from './atom-game-events';
+import { emitEvent } from './skill';
 import { getAtomHooks, filterHooksByPlayer, registerAtomHook, clearAtomHooks, HookRegistry } from './skill-hook';
 
 const registry = new Map<string, AtomDefinition>();
@@ -148,8 +153,10 @@ export function applyAtoms(
 
   let s = state;
   const events: ServerEvent[] = [];
+  let aborted = false;
 
   for (const rawAtom of atoms) {
+    if (aborted) break;
     let atom = rawAtom;
 
     // ── onBefore 钩子：可取消/替换/改 state ──
@@ -228,6 +235,30 @@ export function applyAtoms(
               const existing = playerEvents.get(player);
               if (existing) existing.push(...evts);
             }
+          }
+        }
+      }
+    }
+    // ── ATOM_GAME_EVENTS：自动派发 GameEvent 给 v2 技能 ──
+    // 在 onAfter 钩子之后执行，保持 v3 钩子优先、v2 技能兼容。
+    if (!opts.skipHooks) {
+      const eventGen = ATOM_GAME_EVENTS[atom.type];
+      if (eventGen) {
+        const gameEvents = eventGen(s, atom);
+        for (const ge of gameEvents) {
+          const emitResult = emitEvent(s, ge);
+          s = emitResult.state;
+          events.push(...emitResult.events);
+          if (!opts.skipPlayerEvents && emitResult.playerEvents) {
+            for (const [player, evts] of emitResult.playerEvents) {
+              const existing = playerEvents.get(player);
+              if (existing) existing.push(...evts);
+            }
+          }
+          if (s.pending !== null) {
+            // emitEvent 产生了 pending（技能需要玩家输入），停止处理
+            aborted = true;
+            break;
           }
         }
       }

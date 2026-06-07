@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] — 2026-06-07
+### Engine v3 ATOM_GAME_EVENTS 自动派发 — emitEvent 调用点从 11 处降至 4 处
+
+将 `ATOM_GAME_EVENTS` 自动 emitEvent 管道集成到 `applyAtoms` 主入口，消除手工 `emitEvent` 调用。
+
+### Added
+
+- `engine/atom-game-events.ts` — 扩展映射：新增 `阶段开始`/`阶段结束`/`回合开始` 三种 atom→event 映射
+- `engine/atom.ts` — `applyAtoms` 在 onAfter 钩子之后自动检查 `ATOM_GAME_EVENTS`，匹配时调 `emitEvent`；新增 `aborted` 标志位处理 pending 中断
+- `engine/phases/atoms.ts` — 新增 `hadPending` 检查，避免在已有 pending 的技能执行中误中断
+
+### Removed
+
+- `engine/phase-advance.ts` — 删除 `processPhaseStep` 中 phaseBegin/phaseEnd 和 `advanceToInteractivePhase` 中 turnStart 的手工 `emitEvent` 调用（3 处）
+- `engine/handlers/engine-utils.ts` — 删除 `applyDamage` 中手工 `emitEvent(受到伤害)` 调用（1 处）
+- `engine/phases/atoms.ts` — 删除 ATOM_GAME_EVENTS 手工调用代码块（3 处）
+
 
 ### Engine v3 P5 T1 — chained 迁移 Mark 体系
 

@@ -33,14 +33,14 @@
 - P2：5 Task / 5 commits / 1385 tests pass
 - P3：4 Task / 4 commits / 1404 tests pass
 - P4（解耦重构）：4 commit / 1412 tests pass — 56 角色单文件、装备独立、createEngine 闭包 + clearForTest、currentEngineHooks fallback。详见 ADR 0013、0018
-
+- P5（ATOM_GAME_EVENTS 自动派发）：`applyAtoms` 内集成 ATOM_GAME_EVENTS 自动 emitEvent；删除 phase-advance/engine-utils/phases-atoms 中 7 处手工 emitEvent；扩展映射（阶段开始/阶段结束/回合开始）。1413 tests pass
 ### 0.3 已知文档/代码不一致
 
 - **技能转换硬编码**：`src/engine/validate.ts:73-119` 倾国/龙胆/武圣/奇才 的"手牌当 X 出" 写死，**validate 不该知道技能**。🟡（P1-1D-T1 迁移部分：武圣/龙胆/倾国已迁 `SkillDef.convertible` 字段，奇才留 stub）
 - **八卦阵 var 不读**：P1-1D-T2 写 v3 registerAtomHook 兜底 cancel；P2-T4 改为读 `ctx.baguaJudgeResult`；P3-T2 加 useCard 阶段判定注入（真 game rule）✅ 修复
 - **4 个武器空 stub**：P1-1D-T3/1D-T4 修完（青釭剑/仁王盾/丈八蛇矛/方天画戟 v3 registerAtomHook 骨架）✅ 修复
 - **触发器 `phase` 字段**：P1-1E-T2 修完（所有事件类型都检查 phase）✅ 修复
-- **三套钩子系统**：🟡 仍并存（v2 trigger.event + v3 同步 registerAtomHook + P5 异步 AsyncHook）。v3 已有 11+ 钩子；P5 `applyAtomsAsync` / `createAsyncEngine` 已合入但处于 PoC 骨架阶段（测试失败，未激活）。38+ 老 v2 技能迁移按 [T-22] 渐进 PR。详见 §4.5。
+- **三套钩子系统**：🟡 部分统一（v2 `emitEvent` 手工调用从 11 处降至 4 处）。`applyAtoms` 现在通过 `ATOM_GAME_EVENTS` 自动派发 `造成伤害`/`回复体力`/`阶段开始`/`阶段结束`/`回合开始` GameEvent 给 v2 技能。剩余 4 处手工 `emitEvent`（`出牌`/`杀命中`/`杀被闪避`/`回合结束`）待 38+ 技能迁移后统一删除。详见 §4.5。
 - **判定牌取错位置**：P1-1E-T1 修完（`localVars.judgeCardId`）✅ 修复
 - **draw 重洗未 emit 事件**：✅ P0 修复（ADR 0014，commit `364eb4a`）
 
@@ -524,7 +524,7 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 
 **修复方向**：每个事件类型的 phase 检查都加分支。
 
-## 4.5 三套钩子系统并存
+## 4.5 三套钩子系统并存 — 🟡 部分统一
 
 当前引擎同时存在 **3 套**技能机制：
 
@@ -532,18 +532,22 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 |---|---|---|---|
 | v2 `trigger.event` + `emitEvent` | `src/engine/skill.ts` | 38+ 老技能 | 🟡 渐进迁移中 |
 | v3 同步 `registerAtomHook` | `src/engine/skill-hook.ts` | 11+ 新钩子（装备 + 空城/完杀/帷幕）| 🟢 活跃 |
-| P5 异步 `AsyncHook` + `pending()` | `src/engine/async-hook.ts` / `atom-async.ts` | 0（PoC 骨架）| 🔴 测试失败，未激活 |
+| P5 异步 `AsyncHook` + `pending()` | `src/engine/async-hook.ts` / `atom-async.ts` | 0（PoC 骨架）| 🔴 测试已通过，未激活 |
+
+**ATOM_GAME_EVENTS 自动派发**（2026-06-07）：
+`applyAtoms`（`src/engine/atom.ts`）现在在每个 atom 应用后自动检查 `ATOM_GAME_EVENTS` 映射表，对匹配的 atom 类型（`造成伤害`/`回复体力`/`阶段开始`/`阶段结束`/`回合开始`）自动调用 `emitEvent` 派发 GameEvent 给 v2 技能。这消除了 7 处手工 `emitEvent` 调用（`phase-advance.ts` 3 处、`engine-utils.ts` 1 处、`phases/atoms.ts` ATOM_GAME_EVENTS 手工调用）。
 
 **共存规则**：
-- `applyAtoms` 优先查闭包 `currentEngineHooks`（v3），回退全局 `defaultRegistry`（v3 全局）
-- v2 `emitEvent` 路径独立运行（`src/engine/skill.ts:141-196`），与 v3 钩子不在同一条链上
+- `applyAtoms` 先执行 v3 `registerAtomHook` 钩子（onBefore/onAfter），再通过 `ATOM_GAME_EVENTS` 自动调 v2 `emitEvent`
+- 4 处手工 `emitEvent` 保留（`card-handlers.ts` 出牌、`kill.ts` 杀命中/杀被闪避、`turn-handlers.ts` 回合结束）——这些事件没有对应 atom
+- v3 钩子的 `onBefore cancel` 会阻止 atom 执行，但不阻止 v2 `emitEvent`（因为 cancel 跳过 atom，而 `ATOM_GAME_EVENTS` 检查在 atom 之后）
+- pending 检查：`applyAtoms` 内 `aborted` 标志在 `ATOM_GAME_EVENTS` 产生 pending 时阻止后续 atom；`phases/atoms.ts` 用 `hadPending` 检查避免在已有 pending 的技能执行中误中断
 - P5 `applyAtomsAsync`（`src/engine/atom-async.ts`）是独立入口，不与 v2/v3 交叉
-- 同一 atom 同时被 v2 trigger 和 v3 hook 监听时，**两个都触发**——暂无冲突案例
 
-**风险**：
-- 新开发者不知道该用哪套 API
-- v3 钩子的 `onBefore cancel` 不会阻止 v2 trigger 对同一 atom 的响应
-- `validate.ts` 的 `targetHasSkill` 已迁 `PlayerState.skills`（P5-T2），不再读 `state.triggers`，但其他路径可能仍读 `state.triggers`
+**剩余工作**（v2 完全移除前）：
+- 38+ 老技能迁移到 `registerAtomHook`（按 [T-22] 渐进 PR）
+- 迁移完成后：删 `state.triggers` + `emitEvent` + 全局 registry + `TriggerRule` 类型
+- 4 处手工 `emitEvent` 调用要么扩展 `ATOM_GAME_EVENTS`（创建新 atom），要么直接删除（如果已无 v2 技能需要这些事件）
 
 详见 [§0.3](#03-已知文档代码不一致) + [T-25](#5-决策档案要点)。
 

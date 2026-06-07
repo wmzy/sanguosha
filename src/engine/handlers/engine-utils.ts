@@ -1,7 +1,6 @@
-import type { GameState, GameEvent, Atom, ServerEvent, PlayerEvent, PendingDyingWindow, EngineResult } from '../types';
+import type { GameState, Atom, ServerEvent, PlayerEvent, PendingDyingWindow, EngineResult } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { applyAtoms } from '../atom';
-import { emitEvent } from '../skill';
 import { getPlayer, getAlivePlayerNames } from '../state';
 import { makeServerEvent } from '../event';
 import { createPendingId } from '../atoms/pending';
@@ -32,20 +31,8 @@ export function applyDamage(
     ...(source !== undefined ? { source } : {}),
     ...(cardId !== undefined ? { cardId } : {}),
   };
-  const { state: damagedState, events: damageEvents, playerEvents: damagePE } = applyAtoms(state, [damageAtom]);
-  let allPE = damagePE;
-
-  const gameEvent: GameEvent = {
-    type: '受到伤害',
-    target,
-    source: source ?? '',
-    amount,
-    ...(cardId !== undefined ? { cardId } : {}),
-  };
-  const skillResult = emitEvent(damagedState, gameEvent);
-  let s = skillResult.state;
-  const allEvents = [...damageEvents, ...skillResult.events];
-  allPE = mergePlayerEvents(allPE, skillResult.playerEvents);
+  const { state: s, events: damageEvents, playerEvents: allPE } = applyAtoms(state, [damageAtom]);
+  const allEvents = [...damageEvents];
 
   if (s.pending !== null) {
     const targetState = getPlayer(s, target);

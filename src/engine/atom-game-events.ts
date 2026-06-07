@@ -33,4 +33,17 @@ const healEvents: GameEventGenerator = (_state, atom) => {
 export const ATOM_GAME_EVENTS: Record<string, GameEventGenerator> = {
   造成伤害: damageEvents,
   回复体力: healEvents,
+  // Phase events
+  阶段开始: (_state, atom) => {
+    const a = atom as Extract<Atom, { type: '阶段开始' }>;
+    return [{ type: '阶段开始' as const, phase: a.phase as string, player: a.player as string }];
+  },
+  阶段结束: (_state, atom) => {
+    const a = atom as Extract<Atom, { type: '阶段结束' }>;
+    return [{ type: '阶段结束' as const, phase: a.phase as string, player: a.player as string }];
+  },
+  回合开始: (_state, atom) => {
+    const a = atom as Extract<Atom, { type: '回合开始' }>;
+    return [{ type: '回合开始' as const, player: a.player as string }];
+  },
 };

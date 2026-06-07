@@ -16,10 +16,10 @@
  * 完成统一钩子后这里会简化。
  */
 
-import type { GameState, ServerEvent, EngineResult, GameEvent, Atom, PendingPlayPhase, PendingTrick } from './types';
+import type { GameState, ServerEvent, EngineResult, Atom, PendingPlayPhase, PendingTrick } from './types';
 import { TIMEOUT_DEFAULTS } from './types';
 import type { TurnPhase } from '../shared/types';
-import { emitEvent, clearTurnVars } from './skill';
+import { clearTurnVars } from './skill';
 import { applyAtoms } from './atom';
 import { createPendingId } from './atoms/pending';
 import { getPlayer, getAlivePlayerNames } from './state';
@@ -100,13 +100,10 @@ function processPhaseStep(state: GameState): EngineResult {
   const allEvents: ServerEvent[] = [];
   let s: GameState = state;
 
-  // 1. phaseBegin atom（写 serverLog）+ 显式 emitEvent 派 GameEvent 给技能钩子
+  // 1. phaseBegin atom（写 serverLog）—— ATOM_GAME_EVENTS 自动派发 GameEvent
   const beginResult = applyAtoms(s, [{ type: '阶段开始' as const, phase, player }]);
   s = beginResult.state;
   allEvents.push(...beginResult.events);
-  const beginEvent = emitEvent(s, { type: '阶段开始' as const, phase, player });
-  s = beginEvent.state;
-  allEvents.push(...beginEvent.events);
   if (s.pending !== null) return { state: s, events: allEvents };
 
   // 2. 阶段内 actions
@@ -130,13 +127,10 @@ function processPhaseStep(state: GameState): EngineResult {
     return { state: s, events: allEvents };
   }
 
-  // 3. phaseEnd atom（写 serverLog）+ 显式 emitEvent 派 GameEvent 给技能钩子
+  // 3. phaseEnd atom（写 serverLog）—— ATOM_GAME_EVENTS 自动派发 GameEvent
   const endResult = applyAtoms(s, [{ type: '阶段结束' as const, phase, player }]);
   s = endResult.state;
   allEvents.push(...endResult.events);
-  const endEvent = emitEvent(s, { type: '阶段结束' as const, phase, player });
-  s = endEvent.state;
-  allEvents.push(...endEvent.events);
   if (s.pending !== null) return { state: s, events: allEvents };
 
   // 4. setPhase atom: 切 state.phase 字段（写在 phaseEnd 之后避免乱序）
@@ -210,13 +204,8 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   }
 
   // turnStart 防重：依赖 state.turn.turnStarted: boolean（nextPlayer atom 重置为 false）
+  // turnStart atom 同时写 serverLog + ATOM_GAME_EVENTS 自动派发 GameEvent
   if (!s.turn.turnStarted) {
-    // turnStart GameEvent 派发（技能钩子）
-    const turnStartGameEvent: GameEvent = { type: '回合开始', player: s.currentPlayer };
-    const turnStartResult = emitEvent(s, turnStartGameEvent);
-    s = turnStartResult.state;
-    allEvents.push(...turnStartResult.events);
-    // turnStart server event 走 atom 路径（写进 state.serverLog，详见 ADR 0011）
     const turnStartAtomResult = applyAtoms(s, [{ type: '回合开始', player: s.currentPlayer }]);
     s = { ...turnStartAtomResult.state, turn: { ...turnStartAtomResult.state.turn, turnStarted: true } };
     allEvents.push(...turnStartAtomResult.events);

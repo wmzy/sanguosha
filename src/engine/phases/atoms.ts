@@ -7,13 +7,10 @@
 // 设计依据：docs/decisions/0012-unified-apply-atoms.md
 
 import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent, Atom } from '../types';
-import { getAtomDef } from '../atom';
+import { getAtomDef, applyAtoms } from '../atom';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
 import { isExpr } from '../types';
-import { ATOM_GAME_EVENTS } from '../atom-game-events';
-import { emitEvent } from '../skill';
-import { applyAtoms } from '../atom';
 
 type AtomsPhase = Extract<SkillPhase, { type: 'atoms' }>;
 
@@ -46,9 +43,12 @@ export function register() {
         }
 
         // 统一入口：写 serverLog，不派 playerEvents（per-player 视角由技能自己控制）
+        const hadPending = s.pending !== null;
         const result = applyAtoms(s, [atom], { skipPlayerEvents: true });
         s = result.state;
         events.push(...result.events);
+        // 只有新产生的 pending 才中断（与 executePlan 的 hadPendingOnEntry 逻辑一致）
+        if (!hadPending && s.pending !== null) return { state: s, events };
 
         const def = getAtomDef(atom.type);
         if (def.getResult) {
@@ -56,19 +56,6 @@ export function register() {
           Object.assign(ctx.localVars, getResult);
         }
 
-        // 派 GameEvent 触发技能钩子
-        const eventGen = ATOM_GAME_EVENTS[atom.type];
-        if (eventGen) {
-          const gameEvents = eventGen(s, atom);
-          for (const ge of gameEvents) {
-            const emitResult = emitEvent(s, ge);
-            s = emitResult.state;
-            events.push(...emitResult.events);
-            if (s.pending !== null) {
-              return { state: s, events };
-            }
-          }
-        }
       }
 
       return { state: s, events };
