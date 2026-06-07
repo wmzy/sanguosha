@@ -9,6 +9,9 @@ import type { FrontendState, CardInfo } from '../../engine/view/types';
 import { reduceFrontend } from '../../engine/view/reducer';
 import { PlayerPanel, type PlayerPanelData } from './PlayerPanel';
 import { colors, styles } from '../theme';
+import type { ServerMessage } from '../../server/protocol';
+
+type AsyncHookPendingMsg = Extract<ServerMessage, { type: 'asyncHookPending' }>;
 
 interface MultiplayerGameBoardProps {
   roomId: string;
@@ -27,6 +30,7 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
   const [log, setLog] = useState<string[]>(['等待游戏开始...']);
   const [error, setError] = useState<string | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
+  const [asyncHookPending, setAsyncHookPending] = useState<AsyncHookPendingMsg | null>(null);
   useEffect(() => {
     connect();
   }, [connect]);
@@ -72,6 +76,9 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
           break;
         case 'game_started':
           setLog(prev => [...prev, '游戏开始！']);
+          break;
+        case 'asyncHookPending':
+          setAsyncHookPending(message);
           break;
       }
     });
@@ -129,6 +136,28 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
   };
   const endTurn = () => {
     send({ type: 'action', action: { type: '结束回合', player: myId }, baseSeq: lastAppliedSeqRef.current });
+  };
+
+  // P5-T2 / ADR 0025：响应 async hook 挂起
+  const respondAsyncHook = (value: unknown) => {
+    if (!asyncHookPending) return;
+    if (asyncHookPending.player !== myId) return; // 只本人响应
+    send({
+      type: 'action',
+      action: { type: '异步钩子响应', pendingId: asyncHookPending.pendingId, resume: { kind: 'response', value } },
+      baseSeq: lastAppliedSeqRef.current,
+    });
+    setAsyncHookPending(null);
+  };
+  const cancelAsyncHook = () => {
+    if (!asyncHookPending) return;
+    if (asyncHookPending.player !== myId) return;
+    send({
+      type: 'action',
+      action: { type: '异步钩子响应', pendingId: asyncHookPending.pendingId, resume: { kind: 'cancel' } },
+      baseSeq: lastAppliedSeqRef.current,
+    });
+    setAsyncHookPending(null);
   };
 
   return (
@@ -235,6 +264,50 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
         </div>
       )}
 
+      {/* P5-T2 / ADR 0025：async hook 挂起弹窗（等待玩家响应） */}
+      {asyncHookPending && asyncHookPending.player === myId && (() => {
+        const def = asyncHookPending.def as { ui?: { title?: string; description?: string; options?: Array<{ value: unknown; label: string }> } };
+        const ui = def.ui ?? {};
+        const options = ui.options ?? [];
+        return (
+          <div
+            data-testid="async-hook-modal"
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: colors.overlay,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000,
+            }}
+          >
+            <div style={{ backgroundColor: colors.bg.panel, borderRadius: 12, padding: 32, minWidth: 320, textAlign: 'center' }}>
+              <h2 style={{ marginBottom: 12 }}>{ui.title ?? '请选择'}</h2>
+              {ui.description && <p style={{ color: colors.text.muted, marginBottom: 20 }}>{ui.description}</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                {options.map((opt, i) => (
+                  <button
+                    key={i}
+                    data-testid={`async-hook-option-${i}`}
+                    onClick={() => respondAsyncHook(opt.value)}
+                    style={styles.btn(colors.accent.blue, { padding: '10px 20px', fontSize: 15 })}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                data-testid="async-hook-cancel"
+                onClick={cancelAsyncHook}
+                style={styles.btn(colors.text.dim, { padding: '6px 16px', fontSize: 13 })}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        );
+      })()}
       {error && (
         <div style={styles.errorToast()}>
           {error}
