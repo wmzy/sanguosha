@@ -12,11 +12,12 @@
 
 - **英文**：`src/engine/skill.ts`、`src/engine/atoms/damage.ts`、`src/server/room.ts`
 - **中文允许**（无法翻译的专有名词，或业务概念是中文本身）：
-  - 国家：`src/shared/characters/魏.ts`
+  - 国家（引擎目录用英文）：`src/engine/characters/wei.ts`
   - 人名/技能名/卡牌名：`src/engine/skills/雷击.ts`、`src/engine/skills/八卦阵.ts`、`tests/fixtures/诸葛连弩.ts`
   - 文件聚合：`tests/scenarios/装备/八卦阵.test.ts`
 
 **反例**：`src/engine/skills/leiji.ts`（拼音）、`src/engine/skills/bagua.ts`（拼音）、`src/server/protocol-adapter/pendingToAction.ts`（业务协议适配器用拼音）→ 应为 `雷击.ts` / `八卦阵.ts` / `等待转动作.ts`。
+另：`src/shared/characters/魏.ts` 也不应使用——`shared/characters/` 目录已迁到 `src/engine/characters/`，且目录按势力（wei/shu/wu/qun）组织而非汉字。
 
 ### 2. 函数名 / 变量名 / 常量名 → 英文
 
@@ -214,6 +215,7 @@ vars['unlimitedKills']  // 应改为 '诸葛连弩/active'
 - 使用 `pnpm lint --fix` 修复代码风格
 - 组件使用 named export（不用 default export）
 - 服务端状态管理使用 plain object + event emitter，不用状态管理库
+- **引擎分层**（2026-06-06 重构后）：`src/engine/{characters,skills,equipment,create-engine}/`——角色/武将技能/装备技能已物理隔离，`createEngine()` 返回带闭包的 `EngineInstance`（`clearForTest()` 可重置全局 hooks）。详细 ADR：`docs/decisions/0013-skill-character-decouple.md`。
 
 ## 关键架构决策
 
@@ -234,7 +236,11 @@ pnpm test:watch        # 监听模式
 
 - `src/client/` — 前端 React 应用
 - `src/engine/` — 游戏引擎（纯逻辑）
-- `src/shared/` — 前后端共享的类型和数据
+  - `characters/` — 角色声明（`CharacterConfig`）
+  - `skills/` — 武将技能实现（`SkillDef`），按角色单文件（汉字命名）
+  - `equipment/` — 装备技能实现（武器/防具/马）
+  - `create-engine.ts` — 引擎入口，提供 `createEngine()` 返回带闭包的 `EngineInstance`
+- `src/shared/` — 前后端共享的类型和数据（types/cards/deck/rng 等）
 - `src/server/` — 后端服务器
 - `tests/` — 测试
 - `docs/` — 设计文档和实现计划

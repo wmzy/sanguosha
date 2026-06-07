@@ -207,5 +207,50 @@ equipmentSkills: Map<string, SkillDef>   // 按装备名索引（'八卦阵'、'
 | Phase 1 | ~56 技能文件 | 低（只改导入） | ★★☆ |
 | Phase 2 | ~60 角色+引用文件 | 中（导入路径变化） | ★★★ |
 | Phase 3 | ~15 装备文件 | 中（注册表 API 变化） | ★★★ |
-| Phase 4 | ~10 类型+引用文件 | 低（纯删除） | ★☆☆ |
 | Phase 5 | ~30 测试+引擎文件 | 高（API 变化） | ★★★ |
+
+---
+
+## 实施状态（2026-06-06）
+
+### 已完成
+
+| Phase | 状态 | 改动量 | 提交数 |
+|---|---|---|---|
+| **Phase 1** | ✅ 完成 | 56 个角色单文件（汉字命名）+ index.ts 重写 | 1 commit |
+| **Phase 2** | ✅ 完成 | `shared/characters/` → `engine/characters/` + 7 个消费文件 import 调整 | 1 commit |
+| **Phase 3** | ✅ 完成 | 装备技能 → `engine/equipment/` 独立目录（17 文件） + 9 个测试 fixture 调整 | 1 commit |
+| **Phase 5** | ⚠️ 部分完成 | `createEngine` 暴露 `clearForTest()` + 多实例隔离测试（2 个新增），但全局 `registerSkill`/`clearAtomHooks` 仍保留向后兼容 | 1 commit |
+
+### 跳过
+
+| Phase | 原因 |
+|---|---|
+| **Phase 4** | `AbilityConfig.effect` 与 `CardDef.effect` 共享 `Effect`/`EffectPrimitive` 类型，删除会破坏卡牌定义。`effect` 字段从未被引擎运行时读取（仅文档性质），改为标记 `@deprecated` 即可。 |
+
+### 最终架构
+
+```
+src/engine/
+├── characters/         ← 角色声明 (CharacterConfig)
+│   ├── wei.ts, shu.ts, wu.ts, qun.ts
+│   └── index.ts
+├── skills/             ← 武将技能实现 (SkillDef)
+│   ├── 曹操.ts, 司马懿.ts, ... 56 个汉字单文件
+│   └── index.ts
+├── equipment/          ← 装备技能 (SkillDef + v3 hooks)
+│   ├── stubs.ts, bagua.ts, daqi.ts, leiji.ts ...
+│   └── _armorDamageBlock.ts 等辅助
+├── create-engine.ts    ← 闭包 + clearForTest()
+├── skill-hook.ts       ← HookRegistry 类 + 全局 defaultRegistry（向后兼容）
+└── skill.ts            ← registerSkill() / clearSkillRegistry()（向后兼容）
+```
+
+### Phase 5 后续工作（独立 PR）
+
+- 76 个 handler 中的 `applyAtoms(state, atoms)` 调用点未传 `hooks` 参数，仍依赖全局 defaultRegistry
+- 全部改造相当于重写引擎执行路径
+- 建议作为 P2 任务分步完成：
+   - P2-1：把 `applyAtoms` 默认从 thread-local `currentEngineHooks` 取（替代全局 defaultRegistry fallback）
+   - P2-2：handlers 接收 `EngineContext` 参数（含 `hooks` + `skillsMap`）
+   - P2-3：标记 `clearSkillRegistry()` / `clearAtomHooks()` 为 `@deprecated`，最终删除
