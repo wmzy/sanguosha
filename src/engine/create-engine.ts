@@ -6,7 +6,7 @@ import type {
   SkillDef,
 } from './types';
 import { HookRegistry, clearAtomHooks, getDefaultHookRegistry } from './skill-hook';
-import { clearSkillRegistry, registerSkill } from './skill';
+
 import { validateAction } from './validate';
 import './atoms/index';
 import './phases/index';
@@ -62,10 +62,12 @@ export function createEngine(config: EngineConfig): EngineInstance {
    * 调用方需自己重新注册 atom registry（用 `registerAllAtoms()`）。
    */
   function clearForTest(): void {
-    clearSkillRegistry();
+    // [P5-T2] v3 时代：registerSkill 调用已无副作用（registry 不再用于 v2 trigger 派发）。
+    // 闭包 hookRegistry + 全局 defaultHookRegistry 是 v3 钩子唯一通道——
+    // 清空 + 重新注册本 instance 的 registerHooks。
     clearAtomHooks();
     hookRegistry.clear();
-    // 重新注册本 instance 的所有技能
+    // 重新注册本 instance 的所有 v3 钩子到闭包 + 全局
     // 优先保留含 registerHooks 的版本（v3），跳过同名占位版（equipment.ts 中的 v2 stub）
     const best = new Map<string, SkillDef>();
     for (const skill of config.skills) {
@@ -74,8 +76,6 @@ export function createEngine(config: EngineConfig): EngineInstance {
       }
     }
     for (const skill of best.values()) {
-      registerSkill(skill);
-      // 同时注册到：闭包 + 全局
       skill.registerHooks?.(hookRegistry);
       skill.registerHooks?.(getDefaultHookRegistry());
     }

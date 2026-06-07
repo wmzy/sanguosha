@@ -33,17 +33,6 @@ export function getSkill(id: string, skillsMap?: Map<string, SkillDef>): SkillDe
   return def;
 }
 
-/**
- * 重置技能注册表。
- *
- * @deprecated 自 2026-06-06 改用 `createTestEngine().clearForTest()` 代替。
- * 新 API 自动重置 skill registry + atom hooks 并重新注册 instance 技能，
- * 不需调用方手动重装。详见 ADR 0018。
- */
-export function clearSkillRegistry(): void {
-  registry.clear();
-}
-
 interface CharacterMapSource {
   characterMap: Record<string, CharacterConfig>;
 }
