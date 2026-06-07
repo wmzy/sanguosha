@@ -27,7 +27,8 @@ export type ServerMessage =
   | { type: 'player_disconnected'; playerId: string; graceMs: number }
   | { type: 'player_reconnected'; playerId: string }
   | { type: 'game_started' }
-  | { type: 'room_list'; rooms: RoomInfo[] };
+  | { type: 'room_list'; rooms: RoomInfo[] }
+  | { type: 'asyncHookPending'; pendingId: string; hookId: string; player: string; def: unknown; timeout: number; deadline: number };
 
 // Re-export for downstream consumers
 export type { PlayerView, FrontendState };

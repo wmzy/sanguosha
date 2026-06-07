@@ -233,7 +233,11 @@ export function handleWsMessage(
       handleStartGame(playerId);
       break;
     case 'action':
-      handleAction(playerId, message.action, message.baseSeq);
+      if (message.action.type === '异步钩子响应') {
+        handleAsyncHookResponse(playerId, message.action, message.baseSeq);
+      } else {
+        handleAction(playerId, message.action, message.baseSeq);
+      }
       break;
     case 'response':
       handleResponse(playerId, message.baseSeq, message.choice);
@@ -356,6 +360,19 @@ function handleAction(playerId: string, action: import('../engine/types').GameAc
   if (!session) return;
 
   session.handleAction(playerId, action, baseSeq);
+  session.handleAction(playerId, action, baseSeq);
+}
+
+/**
+ * 处理 异步钩子响应 action（P5-T2 / ADR 0025）。
+ * 路由到 session.handleAsyncHookResponse，走 asyncEngine.dispatchAsync 恢复路径。
+ */
+function handleAsyncHookResponse(playerId: string, action: import('../engine/types').GameAction, baseSeq: number): void {
+  const roomId = playerRoomMap.get(playerId);
+  if (!roomId) return;
+  const session = gameSessions.get(roomId);
+  if (!session) return;
+  session.handleAsyncHookResponse(playerId, action, baseSeq);
 }
 
 function handleResponse(playerId: string, baseSeq: number, choice: unknown): void {

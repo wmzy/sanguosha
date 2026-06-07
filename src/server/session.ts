@@ -4,6 +4,8 @@ import type { Room } from './room';
 import { createInitialState } from '../engine/state';
 import { createEngine } from '../engine/create-engine';
 import type { EngineInstance } from '../engine/create-engine';
+import { createAsyncEngine, type AsyncEngineInstance } from '../engine/async-engine';
+import { AsyncHookRegistry } from '../engine/async-hook';
 import { allSkills } from '../engine/skills';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
 import { saveRoom, deletePersistedRoom } from './persistence';
@@ -43,8 +45,8 @@ function buildInitialState(state: GameState, myPlayerId: string): FrontendState 
 const RECONNECT_GRACE_MS = 30_000;
 
 export class GameSession {
-  private state: GameState | null = null;
   private gameEngine: EngineInstance | null = null;
+  private asyncEngine: AsyncEngineInstance | null = null;
   private actionLog: GameAction[] = [];
   private room: Room;
   private debug: boolean;
@@ -140,6 +142,9 @@ export class GameSession {
     const startResult = this.gameEngine.dispatch(state, { type: '开始' });
     state = startResult.state;
 
+    // P5-T2 / ADR 0025：创建 AsyncHook 引擎。当前 PoC 阶段 AsyncHookRegistry 留空，
+    // 由 future 迁移 / 配置注入。session.handleAction 会优先把 action 路由到 asyncEngine。
+    this.asyncEngine = createAsyncEngine({ asyncHooks: new AsyncHookRegistry() });
     this.state = state;
     this.actionLog = [{ type: '开始' }];
     this.nextSeq = state.serverLog?.length ?? 0;
@@ -198,6 +203,44 @@ export class GameSession {
     this.checkGameEnd();
   }
 
+  /**
+   * 处理 '异步钩子响应' action：路由到 asyncEngine.dispatchAsync。
+   * fire-and-forget 模式：返回 void 即可，结果通过 WS 推送。
+   */
+  handleAsyncHookResponse(playerId: string, action: GameAction, baseSeq?: EventSeq): void {
+    if (this.destroyed) return;
+    if (!this.state) return;
+    if (!this.asyncEngine) return;
+    if (baseSeq !== undefined && baseSeq !== this.nextSeq) {
+      this.logger.warn('CAS mismatch (async hook)', { baseSeq, currentSeq: this.nextSeq });
+      return;
+    }
+    let fullAction: GameAction;
+    if (this.debug) {
+      fullAction = action;
+    } else {
+      const playerName = this.playerNames.get(playerId);
+      if (!playerName) return;
+      fullAction = { ...action, player: playerName } as GameAction;
+    }
+    if (this.state.meta.status === '已结束') return;
+
+    // fire-and-forget：dispatchAsync 内部走恢复路径
+    void this.asyncEngine.dispatchAsync(this.state, fullAction).then((result) => {
+      if (result.error) {
+        this.sendToPlayer(playerId, { type: 'error', message: result.error });
+        return;
+      }
+      this.appendAction(fullAction);
+      this.state = result.state;
+      this.touchAndPersist();
+      this.broadcastEvents(result.events, fullAction);
+      this.checkGameEnd();
+    }).catch((err) => {
+      this.logger.error('async hook dispatch error', { err });
+    });
+  }
+
   private broadcastEvents(events: ServerEvent[], action?: GameAction | null): void {
     if (events.length === 0) return;
 
@@ -232,6 +275,37 @@ export class GameSession {
         operations: batchResult.playerOps[playerName] ?? [],
       };
       this.sendToPlayer(pid, playerMsg);
+    }
+
+    this.broadcastAsyncHookPendingIfAny();
+  }
+
+  /**
+   * 如果 state.pending 是 PendingAsyncHook，给对应玩家推送 asyncHookPending 消息。
+   */
+  private broadcastAsyncHookPendingIfAny(): void {
+    const pending = this.state?.pending;
+    if (!pending || pending.type !== '异步钩子挂起') return;
+    const msg: ServerMessage = {
+      type: 'asyncHookPending',
+      pendingId: pending.id,
+      hookId: pending.hookId,
+      player: pending.self,
+      def: pending.def,
+      timeout: pending.timeout,
+      deadline: pending.deadline,
+    };
+    // 找 self 玩家的 pid
+    if (this.debug) {
+      const realPlayerId = this.room.players.keys().next().value;
+      if (realPlayerId) this.sendToPlayer(realPlayerId, msg);
+      return;
+    }
+    for (const [pid, playerName] of this.playerNames) {
+      if (playerName === pending.self) {
+        this.sendToPlayer(pid, msg);
+        break;
+      }
     }
   }
 
