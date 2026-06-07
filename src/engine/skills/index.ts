@@ -48,6 +48,20 @@ export const allSkills: SkillDef[] = [
   ...zhangbaSkills,
 ];
 
+
+/**
+ * 根据房间配置过滤可用技能。
+ * 当前返回全部——后续实现按武将/禁用卡牌/化身池过滤。
+ */
+export function filterSkills(
+  _config: {
+    characterIds: string[];
+    disabledCardNames?: string[];
+    hasHuashen?: boolean;
+  },
+): SkillDef[] {
+  return allSkills;
+}
 let _initialized = false;
 
 /**

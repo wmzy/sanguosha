@@ -3,6 +3,14 @@ import type { GameState, GameAction } from '@engine/types';
 import type { CharacterConfig } from '@shared/types';
 import { allCharacters } from '@shared/characters';
 import { safeEngine } from './invariants';
+import { createEngine } from '@engine/create-engine';
+import type { EngineInstance } from '@engine/create-engine';
+import { allSkills } from '@engine/skills';
+
+/** 创建测试用引擎实例（加载所有技能） */
+export function createTestEngine(): EngineInstance {
+  return createEngine({ skills: allSkills });
+}
 
 // ─── 角色查找表 ─────────────────────────────────────────────────
 
