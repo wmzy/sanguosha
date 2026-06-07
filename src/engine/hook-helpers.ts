@@ -29,6 +29,8 @@ export interface AsyncHookContext {
   serverEvent?: ServerEvent;
   /** 当前是否在 await（如果 true，pending() 实际挂起） */
   awaiting: boolean;
+  /** 恢复时的玩家响应（仅 awaiting=true 时存在） */
+  resume?: ResumeData;
 }
 
 /** 当前正在执行的钩子上下文（applyAtoms 设置，钩子 helper 读取） */

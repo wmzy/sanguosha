@@ -121,7 +121,24 @@ export type PendingAction =
   | PendingDiscardPhase
   | PendingDyingWindow
   | PendingSelectCard
-  | PendingHarvestSelection;
+  | PendingHarvestSelection
+  | PendingAsyncHook;
+
+/** [P5-T2 / ADR 0025] 异步钩子挂起。
+ * 引擎遇到此 pending 时不进入下个 action——等玩家响应 (action.type='异步钩子响应')。
+ * 响应后 dispatch 重新调 applyAtomsAsync 走恢复路径。*/
+export interface PendingAsyncHook {
+  type: '异步钩子挂起';
+  id: string;
+  hookId: string;
+  resumePoint: 'onBefore' | 'onAfter' | 'onResume';
+  atomSnapshot: Atom;
+  self: string;
+  def: Json;
+  timeout: number;
+  deadline: number;
+  onTimeout: GameAction;
+}
 
 export interface PendingPlayPhase {
   type: '出牌阶段';
@@ -506,7 +523,8 @@ export type GameAction =
   | { type: '使用技能'; player: string; skillId: string; target?: string }
   | { type: '技能选择'; player: string; choice: Json }
   | { type: '开始' }
-  | { type: '切换自动跳过无懈可击' };
+  | { type: '切换自动跳过无懈可击' }
+  | { type: '异步钩子响应'; pendingId: string; resume: Json };
 export type GameEvent =
   | { type: '回合开始'; player: string }
   | { type: '回合结束'; player: string }

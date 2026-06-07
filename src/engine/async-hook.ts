@@ -28,6 +28,16 @@ export interface HookCtx {
   serverEvent?: ServerEvent;
   /** 仅 resume 时：玩家响应数据 */
   resume?: ResumeData;
+  /** 挂起 helper：ctx.pending(def) 等玩家响应 */
+  pending: <T = Json>(def: PendingDef, tag?: Json) => Promise<T | ResumeData>;
+  /** 修改 state helper：ctx.modifyState(state) 覆盖 */
+  modifyState: (state: GameState) => HookResult;
+  /** 取消整个 atom helper */
+  cancel: () => HookResult;
+  /** 改 atom 目标 helper */
+  redirect: (target: string) => HookResult;
+  /** 追加 atom 序列 helper */
+  additionalAtoms: (atoms: Atom[]) => HookResult;
 }
 
 export type ResumeData =

@@ -1,24 +1,9 @@
 // engine/atom-async.ts — 异步 applyAtoms（ADR 0025 第 2-3 周产物）
-//
-// 这是 applyAtoms 的 async 版本：钩子 onBefore / onAfter 改 async，可 await
-// pending(...) 挂起等玩家响应。引擎调度器在挂起时冻结 dispatch。
-//
-// 关键设计点：
-// 1. **逐 atom 调度**：每个 atom 跑完整的 onBefore → apply → onAfter 三段。
-//    钩子链中任意一个返回 { kind: 'cancel' } 短路该 atom（不 apply / 不写 serverLog）。
-// 2. **pending 挂起**：onBefore 或 onAfter 内 await pending(...) 时，pending 抛
-//    PendingRequestSignal，applyAtoms 捕获后返回 { state, pending, hookId, ... }。
-//    dispatch 不进入下个 action；玩家响应后 dispatch 重新进入本 atom 的钩子链。
-// 3. **钩子内 state 重新取**：await 之间 state 可能变化（其他钩子修改）。
-//    pending 解决后，下一行代码读 state.localVars 拿新值。
-// 4. **additionalAtoms 不重入钩子**：与同步版一致，跳过钩子递归（MAX_HOOK_RECURSION 保护）。
-// 5. **序列化恢复**：dispatch 看到 state.pending.type === '异步钩子挂起' 时，读取
-//    hookId + atomSnapshot 重新执行钩子，直到下一个 pending。
 
 import type {
   GameState,
   Atom,
-  AtomEventResult,
+  Json,
   PlayerEvent,
   ServerEvent,
 } from './types';
@@ -30,22 +15,19 @@ import type {
   HookResult,
   PendingDef,
   ResumeData,
-  SerializedPending,
 } from './async-hook';
-import { AsyncHookRegistry } from './async-hook';
 import {
   PendingRequestSignal,
   setCurrentHookContext,
-  AsyncHookContext,
+  getCurrentHookContext,
 } from './hook-helpers';
-import { applyAtom, atomToEvents, getAtomDef } from './atom';
+import { applyAtom, atomToEvents } from './atom';
 
 const MAX_HOOK_RECURSION = 16;
 
 export interface ApplyAtomsAsyncOptions {
   skipPlayerEvents?: boolean;
   skipHooks?: boolean;
-  /** 实例级异步钩子注册表（createEngine 闭包用） */
   asyncHooks?: AsyncHookRegistry;
 }
 
@@ -53,12 +35,10 @@ export interface ApplyAtomsAsyncResult {
   state: GameState;
   events: ServerEvent[];
   playerEvents: Map<string, PlayerEvent[]>;
-  /** 钩子挂起时填充。dispatch 收到非 null pending 时不进入下个 action */
   pending: AsyncPending | null;
 }
 
 export interface ApplyAtomsResume {
-  /** 玩家响应（来自 dispatch 解析） */
   resume: ResumeData;
 }
 
@@ -85,13 +65,11 @@ export async function applyAtomsAsync(
   for (const rawAtom of atoms) {
     let atom = rawAtom;
 
-    // ── onBefore 钩子链 ──
     if (!opts.skipHooks && hookReg) {
       const hooks = filterAsyncHooks(hookReg, atom.type, s.currentPlayer, s, atom);
       for (const hook of hooks) {
-        const result = await runHookOnBefore(hook, { state: s, atom, self: s.currentPlayer, resume: _resume?.resume });
+        const result = await runHookOnBefore(hook, { state: s, atom, self: s.currentPlayer }, _resume?.resume);
         if (result.kind === 'cancel') {
-          // 整个链断：跳过该 atom
           atom = null as unknown as Atom;
           break;
         }
@@ -107,21 +85,11 @@ export async function applyAtomsAsync(
             pending: buildAsyncPending(result.def, hook.id, 'onBefore', atom, s.currentPlayer, result.tag),
           };
         }
-        if (result.kind === 'pendingThen') {
-          // pendingThen：先挂 pending，玩家响应后调 then
-          return {
-            state: s,
-            events,
-            playerEvents,
-            pending: buildAsyncPending(result.def, hook.id, 'onResume', atom, s.currentPlayer, result.tag, result.then),
-          };
-        }
       }
     }
 
     if (atom === (null as unknown as Atom)) continue;
 
-    // ── apply atom ──
     const [serverEvent, playerMap, defaultEvent] = atomToEvents(s, atom);
     events.push(serverEvent);
 
@@ -142,14 +110,12 @@ export async function applyAtomsAsync(
 
     s = applyAtom(s, atom);
 
-    // ── onAfter 钩子链 ──
     if (!opts.skipHooks && hookReg) {
       const hooks = filterAsyncHooks(hookReg, atom.type, s.currentPlayer, s, atom);
       for (const hook of hooks) {
-        const result = await runHookOnAfter(hook, { state: s, atom, self: s.currentPlayer, serverEvent, resume: _resume?.resume });
+        const result = await runHookOnAfter(hook, { state: s, atom, self: s.currentPlayer, serverEvent }, _resume?.resume);
         if (result.kind === 'modifyState') s = result.state;
         if (result.kind === 'additionalAtoms' && result.atoms.length > 0) {
-          // 递归应用 additionalAtoms（不触发钩子，避免无限递归）
           const sub = await applyAtomsAsync(
             s, result.atoms,
             { skipHooks: true, skipPlayerEvents: opts.skipPlayerEvents, asyncHooks: opts.asyncHooks },
@@ -175,24 +141,12 @@ export async function applyAtomsAsync(
             pending: buildAsyncPending(result.def, hook.id, 'onAfter', atom, s.currentPlayer, result.tag),
           };
         }
-        if (result.kind === 'pendingThen') {
-          return {
-            state: s,
-            events,
-            playerEvents,
-            pending: buildAsyncPending(result.def, hook.id, 'onResume', atom, s.currentPlayer, result.tag, result.then),
-          };
-        }
       }
     }
   }
 
   return { state: s, events, playerEvents, pending: null };
 }
-
-// ════════════════════════════════════════════════════════════════════
-// 钩子辅助
-// ════════════════════════════════════════════════════════════════════
 
 function filterAsyncHooks(
   reg: AsyncHookRegistry,
@@ -209,10 +163,19 @@ function filterAsyncHooks(
 
 async function runHookOnBefore(
   hook: AsyncHook,
-  ctx: HookCtx,
+  baseCtx: HookCtx,
+  resumeData?: ResumeData,
 ): Promise<HookResult> {
   if (!hook.onBefore) return { kind: 'continue' };
-  setCurrentHookContext({ state: ctx.state, atom: ctx.atom, self: ctx.self, hookId: hook.id, awaiting: false });
+  const ctx = injectHelpers(baseCtx);
+  setCurrentHookContext({
+    state: ctx.state,
+    atom: ctx.atom,
+    self: ctx.self,
+    hookId: hook.id,
+    awaiting: resumeData !== undefined,
+    resume: resumeData,
+  });
   try {
     const result = await hook.onBefore(ctx);
     return result ?? { kind: 'continue' };
@@ -228,10 +191,20 @@ async function runHookOnBefore(
 
 async function runHookOnAfter(
   hook: AsyncHook,
-  ctx: HookCtx,
+  baseCtx: HookCtx,
+  resumeData?: ResumeData,
 ): Promise<HookResult> {
   if (!hook.onAfter) return { kind: 'continue' };
-  setCurrentHookContext({ state: ctx.state, atom: ctx.atom, self: ctx.self, hookId: hook.id, serverEvent: ctx.serverEvent, awaiting: false });
+  const ctx = injectHelpers(baseCtx);
+  setCurrentHookContext({
+    state: ctx.state,
+    atom: ctx.atom,
+    self: ctx.self,
+    hookId: hook.id,
+    serverEvent: ctx.serverEvent,
+    awaiting: resumeData !== undefined,
+    resume: resumeData,
+  });
   try {
     const result = await hook.onAfter(ctx);
     return result ?? { kind: 'continue' };
@@ -244,6 +217,31 @@ async function runHookOnAfter(
     setCurrentHookContext(null);
   }
 }
+function injectHelpers(baseCtx: HookCtx): HookCtx {
+  const pending: HookCtx['pending'] = async <T>(def: PendingDef, tag?: Json) => {
+    const cctx = getCurrentHookContext();
+    if (!cctx) {
+      throw new Error('ctx.pending() called outside AsyncHook context');
+    }
+    // eslint-disable-next-line no-console
+
+    if (cctx.awaiting && cctx.resume && cctx.resume.kind === 'response') {
+      // 恢复路径：unwrap response.value（pending<T> 的 T 就是 value 的类型）
+      return cctx.resume.value as T | ResumeData;
+    }
+    if (cctx.awaiting) {
+      // cancel / timeout
+      return { kind: 'cancel' as const };
+    }
+    throw new PendingRequestSignal(def, tag);
+  };
+  const modifyState: HookCtx['modifyState'] = (state) => ({ kind: 'modifyState', state });
+  const cancel: HookCtx['cancel'] = () => ({ kind: 'cancel' });
+  const redirect: HookCtx['redirect'] = (target) => ({ kind: 'redirect', target });
+  const additionalAtoms: HookCtx['additionalAtoms'] = (atoms) =>
+    atoms.length === 0 ? { kind: 'continue' } : { kind: 'additionalAtoms', atoms };
+  return { ...baseCtx, pending, modifyState, cancel, redirect, additionalAtoms };
+}
 
 function buildAsyncPending(
   def: PendingDef,
@@ -252,7 +250,6 @@ function buildAsyncPending(
   atom: Atom,
   self: string,
   tag?: Json,
-  onResumeFn?: (ctx: HookCtx) => Promise<HookResult | HookResult[]>,
 ): AsyncPending {
   const startedAt = Date.now();
   const deadline = def.timeout ? startedAt + def.timeout : 0;
@@ -267,8 +264,5 @@ function buildAsyncPending(
     startedAt,
     deadline,
     tag,
-    onResumeFn,
   };
 }
-
-import type { Json } from './types';
