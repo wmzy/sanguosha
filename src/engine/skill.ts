@@ -61,30 +61,17 @@ export function registerCharacterTriggers(
   const character = source.characterMap[characterId];
   if (!character) return state;
 
-  const newTriggers: TriggerRule[] = [];
+  // [P5-T3] 阶段 D：trigger 匹配已由 emitEvent 动态构建（从 PlayerState.skills），
+  // 本函数只保留 modifiers（setVar）设置。trigger 不再写入 state.triggers。
   let s = state;
-
   for (const ability of character.abilities) {
-    const def = map.get(ability.name);
-    if (!def) continue;
-    if (!def.trigger) continue;
-    newTriggers.push({
-      event: def.trigger.event,
-      source: '角色' as const,
-      skillId: ability.name,
-      player,
-      priority: ability.passive ? 0 : 5,
-      ...(def.trigger.optional ? { optional: true } : {}),
-    });
-
     if (ability.modifiers) {
       for (const mod of ability.modifiers) {
         s = applyAtom(s, { type: '设置变量', player, key: mod, value: true });
       }
     }
   }
-
-  return { ...s, triggers: [...s.triggers, ...newTriggers] };
+  return s;
 }
 
 /**
@@ -95,62 +82,81 @@ export function registerCharacterTriggers(
  *
  * 阶段 D 删 state.triggers 后本函数将删除。
  */
+// [P5-T3] 阶段 D：registerEquipmentTriggers / unregisterEquipmentTriggers
+// 不再需要——emitEvent 动态从装备槽扫描 trigger。保留空函数签名避免调用点编译错误。
 export function registerEquipmentTriggers(
-  state: GameState,
-  player: string,
-  cardId: string,
-  skillsMap?: Map<string, SkillDef>,
+  _state: GameState,
+  _player: string,
+  _cardId: string,
+  _skillsMap?: Map<string, SkillDef>,
 ): GameState {
-  const map = skillsMap ?? registry;
-  const card = state.cardMap[cardId];
-  if (!card) return state;
-
-  const def = map.get(card.name);
-  if (!def) return state;
-  if (!def.trigger) return state;
-
-  const newTrigger: TriggerRule = {
-    event: def.trigger.event,
-    source: '装备',
-    skillId: card.name,
-    player,
-    priority: 3,
-    ...(def.trigger.optional ? { optional: true } : {}),
-    ...(def.trigger.manual ? { manual: true } : {}),
-  };
-
-  return { ...state, triggers: [...state.triggers, newTrigger] };
+  return _state;
 }
 
 export function unregisterEquipmentTriggers(
   state: GameState,
-  player: string,
-  cardId: string,
+  _player: string,
+  _cardId: string,
 ): GameState {
-  const card = state.cardMap[cardId];
-  if (!card) return state;
-
-  return {
-    ...state,
-    triggers: state.triggers.filter(
-      (t) => !(t.player === player && t.source === '装备' && t.skillId === card.name),
-    ),
-  };
+  return state;
 }
 
+/**
+ * 派发 GameEvent 给所有匹配的 v2 trigger 技能。
+ *
+ * [P5-T3] 阶段 D 重写：不再读 state.triggers 字段，
+ * 改为运行时从 state.players[P].skills + 装备槽动态构建 trigger 列表。
+ * 消除了对 state.triggers / registerCharacterTriggers / registerEquipmentTriggers 的依赖。
+ */
 export function emitEvent(
   state: GameState,
   event: GameEvent,
   skillsMap?: Map<string, SkillDef>,
 ): EngineResult {
   const map = skillsMap ?? registry;
-  const matched = state.triggers
-    .filter((t) => t.event === event.type)
-    .filter((t) => {
-      if (!t.filter) return true;
-      return checkCondition(t.filter, state);
-    })
-    .sort((a, b) => b.priority - a.priority);
+
+  // 动态构建 trigger 列表：遍历所有玩家 → skills（角色）+ equipment（装备）
+  const matched: TriggerRule[] = [];
+  for (const playerId of state.playerOrder) {
+    const player = state.players[playerId];
+    if (!player) continue;
+
+    // 角色技能
+    for (const skillId of player.skills) {
+      const def = map.get(skillId);
+      if (!def?.trigger) continue;
+      if (def.trigger.event !== event.type) continue;
+      matched.push({
+        event: def.trigger.event,
+        source: '角色',
+        skillId,
+        player: playerId,
+        priority: 5,
+        ...(def.trigger.optional ? { optional: true } : {}),
+      });
+    }
+
+    // 装备技能
+    for (const slot of Object.values(player.equipment) as string[]) {
+      if (!slot) continue;
+      const card = state.cardMap[slot];
+      if (!card) continue;
+      const def = map.get(card.name);
+      if (!def?.trigger) continue;
+      if (def.trigger.event !== event.type) continue;
+      matched.push({
+        event: def.trigger.event,
+        source: '装备',
+        skillId: card.name,
+        player: playerId,
+        priority: 3,
+        ...(def.trigger.optional ? { optional: true } : {}),
+      });
+    }
+  }
+
+  // 按 priority 降序排序（高优先级先执行）
+  matched.sort((a, b) => b.priority - a.priority);
 
   let s = state;
   const allEvents: ServerEvent[] = [];
@@ -158,17 +164,12 @@ export function emitEvent(
   for (const trigger of matched) {
     const def = map.get(trigger.skillId);
     if (!def) continue;
-    // v3-only skill（无 trigger）不应出现在 state.triggers 中；
-    // 此处 continue 是防御性兜底。
     if (!def.trigger) continue;
 
     if (event.type === '阶段开始') {
       const phaseEvent = event as { type: '阶段开始'; phase: string; player: string };
       if (trigger.player !== phaseEvent.player) continue;
     }
-    // phase 字段对所有事件类型生效（修 §4.4）。
-    // - phaseBegin / phaseEnd: 读 event.phase
-    // - 其他事件（cardPlayed 等）: 读 state.phase（当前阶段）
     if (def.trigger.phase) {
       if (event.type === '阶段开始' || event.type === '阶段结束') {
         const eventPhase = (event as { phase: string }).phase;

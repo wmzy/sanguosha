@@ -8,9 +8,7 @@ describe('姜维', () => {
         ctx.selectCharacters('姜维', '刘备');
       })
       .check('姜维有挑衅技能触发器', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '挑衅',
-        );
+        const triggers = ctx.player('P1').skills.filter(s => s === '挑衅');
         expect(triggers.length).toBeGreaterThan(0);
       })
       .run();

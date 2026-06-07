@@ -52,9 +52,7 @@ describe('夏侯渊 - 神速', () => {
       ctx.registerTriggers('P1');
     })
     .check('P1 拥有神速触发器', ctx => {
-      const hasTrigger = ctx.state.triggers.some(
-        t => t.player === 'P1' && t.skillId === '神速',
-      );
+      const hasTrigger = ctx.player('P1').skills.includes('神速');
       expect(hasTrigger).toBe(true);
     })
     .run();

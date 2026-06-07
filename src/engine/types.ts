@@ -18,7 +18,6 @@ export interface GameState {
 
   turn: TurnState;
   pending: PendingAction | null;
-  triggers: TriggerRule[];
 
   /** 服务端完整事件日志（用于重播/审计） */
   serverLog: ServerEvent[];

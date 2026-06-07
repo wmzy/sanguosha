@@ -79,8 +79,8 @@ describe('事件审计: turnStart GameEvent 未被引擎发射', () => {
     let state = setPlayPhase(createTestGame({ characters: ['马超', '刘备'] }));
     state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
 
-    // 马术已注册触发器
-    expect(state.triggers.some(t => t.skillId === '马术')).toBe(true);
+    // [P5-T3] 阶段 D：trigger 由 emitEvent 从 PlayerState.skills 动态构建
+    expect(state.players.P1.skills).toContain('马术');
 
     const _result = engine(state, { type: '结束回合', player: 'P1' });
 

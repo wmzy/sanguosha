@@ -242,7 +242,7 @@ describe('边界: 卡牌目标验证', () => {
 
 describe('边界: AOE/决斗', () => {
   it('南蛮入侵触发 aoeResponse 窗口链', () => {
-    let state = setPlayPhase(createTestGame({ playerCount: 4 }));
+    let state = setPlayPhase(createTestGame({ playerCount: 4, characters: ['曹操', '刘备', '孙权', '华佗'] }));
     // 给 P2 注入一张杀，让 P2 可以出杀响应
     state = injectCard(state, 'P2', '杀');
     state = injectTrickCard(state, 'P1', '南蛮入侵');
@@ -701,13 +701,14 @@ describe('卡牌边界', () => {
   });
 
   it('AOE 响应后伤害不触发 damageDealt 事件', () => {
-    let state = setPlayPhase(createTestGame({ playerCount: 2, characters: ['夏侯惇', '曹操'] }));
+    let state = setPlayPhase(createTestGame({ playerCount: 2, characters: ['夏侯惇', '测试傀儡'] }));
     state = registerCharacterTriggers(state, 'P1', { characterMap: getCharacterMap() });
     const aoeState = { ...state, pending: { id: 'test-pending', type: '响应窗口' as const, window: { type: 'aoeResponse' as const, defender: 'P1' as string, attacker: 'P2' as string, validCards: [] as string[], sourceCard: 'test-arrow-1', timeout: 15000, deadline: Date.now() + 15000 }, timeout: 15000, deadline: Date.now() + 15000, onTimeout: { type: '打出' as const, player: 'P1' as string } } };
     const result = engine(aoeState, { type: '打出', player: 'P1' });
     expect(result.error).toBeUndefined();
     expect(result.state.players['P1'].health).toBeLessThan(state.players['P1'].health);
-    expect(result.state.triggers.length).toBeGreaterThan(0);
+    // [P5-T3] 阶段 D：P1 有夏侯惇刚烈技能，emitEvent 动态构建能匹配到
+    expect(result.state.players['P1'].skills.length).toBeGreaterThan(0);
   });
 
   it('顺手牵羊装备武器后 validate 允许但 handler 拒绝距离>1', () => {

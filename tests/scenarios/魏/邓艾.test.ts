@@ -41,9 +41,7 @@ describe('邓艾', () => {
         ctx.registerTriggers('P1');
       })
       .check('P1 拥有屯田触发器', ctx => {
-        const hasTrigger = ctx.state.triggers.some(
-          t => t.player === 'P1' && t.skillId === '屯田',
-        );
+        const hasTrigger = ctx.player('P1').skills.includes('屯田');
         expect(hasTrigger).toBe(true);
       })
       .run();
@@ -122,9 +120,7 @@ describe('邓艾', () => {
         ctx.registerTriggers('P1');
       })
       .check('P1 拥有凿险触发器', ctx => {
-        const hasTrigger = ctx.state.triggers.some(
-          t => t.player === 'P1' && t.skillId === '凿险',
-        );
+        const hasTrigger = ctx.player('P1').skills.includes('凿险');
         expect(hasTrigger).toBe(true);
       })
       .run();

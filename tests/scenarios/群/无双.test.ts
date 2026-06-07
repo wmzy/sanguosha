@@ -98,9 +98,7 @@ describe.skip('吕布 - 无双', () => {
       ctx.selectCharacters('吕布', '刘备');
       ctx.registerTriggers('P1');
       const p1 = ctx.player('P1');
-      const hasWushuang = ctx.state.triggers.some(
-        t => t.skillId === '无双' && t.player === 'P1',
-      );
+      const hasWushuang = ctx.player('P1').skills.includes('无双');
       expect(hasWushuang).toBe(true);
     })
     .run();

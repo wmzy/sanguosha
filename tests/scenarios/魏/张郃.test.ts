@@ -14,9 +14,7 @@ describe('张郃 - 巧变', () => {
       ctx.registerTriggers('P1');
     })
     .check('P1 拥有巧变触发器', ctx => {
-      const hasTrigger = ctx.state.triggers.some(
-        t => t.player === 'P1' && t.skillId === '巧变',
-      );
+      const hasTrigger = ctx.player('P1').skills.includes('巧变');
       expect(hasTrigger).toBe(true);
     })
     .run();

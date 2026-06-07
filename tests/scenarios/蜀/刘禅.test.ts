@@ -70,9 +70,7 @@ describe('刘禅', () => {
         ctx.selectCharacters('刘禅', '刘备');
       })
       .check('刘禅有放权技能触发器', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '放权',
-        );
+        const triggers = ctx.player('P1').skills.filter(s => s === '放权');
         expect(triggers.length).toBeGreaterThan(0);
       })
       .run();

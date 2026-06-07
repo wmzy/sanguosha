@@ -25,9 +25,7 @@ describe('祝融', () => {
         ctx.selectCharacters('祝融', '刘备');
       })
       .check('祝融有烈刃技能触发器', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '烈刃',
-        );
+        const triggers = ctx.player('P1').skills.filter(s => s === '烈刃');
         expect(triggers.length).toBeGreaterThan(0);
       })
       .run();
@@ -62,9 +60,7 @@ describe('祝融', () => {
         });
       })
       .check('烈刃不应触发（非自己造成伤害）', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '烈刃',
-        );
+        const triggers = ctx.player('P1').skills.filter(s => s === '烈刃');
         expect(triggers.length).toBeGreaterThan(0);
       })
       .run();

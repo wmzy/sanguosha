@@ -28,7 +28,6 @@ export function validateGameState(obj: unknown): obj is GameState {
   if (typeof o['zones'] !== 'object' || o['zones'] === null) return false;
   if (typeof o['cardMap'] !== 'object' || o['cardMap'] === null) return false;
   if (typeof o['turn'] !== 'object' || o['turn'] === null) return false;
-  if (!Array.isArray(o['triggers'])) return false;
   if (!Array.isArray(o['serverLog'])) return false;
   if (typeof o['playerLogs'] !== 'object' || o['playerLogs'] === null) return false;
   if (typeof o['rngState'] !== 'number') return false;

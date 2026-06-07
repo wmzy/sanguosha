@@ -211,8 +211,8 @@ describe('restoreToState 事件重放', () => {
     const persisted = (await loadRoom('replay-triggers'))!;
     const restored = restoreToState(persisted);
 
-    expect(restored.triggers.length).toBeGreaterThan(0);
-    const hasCharacterTrigger = restored.triggers.some(t => t.source === '角色');
-    expect(hasCharacterTrigger).toBe(true);
+    // [P5-T3] 阶段 D：不再验证 state.triggers（已删），改为验证 PlayerState.skills
+    const hasSkills = Object.values(restored.players).some(p => p.skills.length > 0);
+    expect(hasSkills).toBe(true);
   });
 });

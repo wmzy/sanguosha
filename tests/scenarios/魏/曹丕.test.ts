@@ -49,9 +49,7 @@ describe('曹丕', () => {
         expect(diff.healthChanges['P1']).toBe(-1);
       })
       .check('放逐触发：目标角色被翻面', ctx => {
-        const triggered = ctx.state.triggers.some(
-          t => t.player === 'P1' && t.skillId === '放逐',
-        );
+        const triggered = ctx.player('P1').skills.includes('放逐');
         expect(triggered).toBe(true);
       })
       .run();
@@ -64,9 +62,7 @@ describe('曹丕', () => {
         ctx.registerTriggers('P1');
       })
       .check('P1 拥有颂威触发器', ctx => {
-        const hasTrigger = ctx.state.triggers.some(
-          t => t.player === 'P1' && t.skillId === '颂威',
-        );
+        const hasTrigger = ctx.player('P1').skills.includes('颂威');
         expect(hasTrigger).toBe(true);
       })
       .run();

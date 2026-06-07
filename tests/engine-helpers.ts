@@ -18,6 +18,20 @@ const characterMap = Object.fromEntries(
   allCharacters.map((c) => [c.name, c]),
 );
 
+// [P5-T3] 阶段 D：emitEvent 不再读 state.triggers，改为从 PlayerState.skills 动态构建。
+// 默认曹操/刘备有 trigger 技能（奸雄/仁德），测试不期望触发 → 用空角色代替。
+const DUMMY_CHAR: CharacterConfig = {
+  name: '测试傀儡',
+  maxHealth: 4,
+  gender: '男',
+  faction: '群',
+  abilities: [],
+};
+characterMap[DUMMY_CHAR.name] = DUMMY_CHAR;
+
+/** 无 trigger 的测试角色 ID */
+export const DUMMY_CHARACTER = DUMMY_CHAR.name;
+
 export function getCharacterMap(): Record<string, CharacterConfig> {
   return characterMap;
 }
@@ -44,13 +58,15 @@ export interface TestGameOptions {
 
 /**
  * 创建测试用 GameState。
- * 默认 2 人游戏（曹操 vs 刘备），种子 42。
+ * 默认 2 人游戏（测试傀儡 vs 测试傀儡），种子 42。
+ * [P5-T3] 阶段 D：默认用无 trigger 的测试傀儡角色，避免 emitEvent 动态构建时
+ * 意外触发技能。需要特定角色的测试可传 `characters` 选项覆盖。
  */
 export function createTestGame(opts: TestGameOptions = {}): GameState {
   const playerCount = opts.playerCount ?? 2;
   const seed = opts.seed ?? 42;
-  const defaultChars = ['曹操', '刘备', '孙权', '华佗', '诸葛亮', '司马懿'];
-  const characters = opts.characters ?? defaultChars.slice(0, playerCount);
+  const defaultChars = Array(playerCount).fill(DUMMY_CHARACTER);
+  const characters = opts.characters ?? defaultChars;
 
   const roles = ['主公', '反贼', '忠臣', '内奸'] as const;
 

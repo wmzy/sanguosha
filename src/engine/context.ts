@@ -1,4 +1,4 @@
-import type { SkillContext, GameEvent, TriggerRule, GameState } from './types';
+import type { SkillContext, GameEvent, GameState } from './types';
 
 /**
  * 从事件和触发规则构建技能执行上下文。

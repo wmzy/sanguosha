@@ -30,9 +30,7 @@ describe('典韦 - 强袭', () => {
       ctx.registerTriggers('P1');
     })
     .check('P1 拥有强袭触发器', ctx => {
-      const hasTrigger = ctx.state.triggers.some(
-        t => t.player === 'P1' && t.skillId === '强袭',
-      );
+      const hasTrigger = ctx.player('P1').skills.includes('强袭');
       expect(hasTrigger).toBe(true);
     })
     .run();

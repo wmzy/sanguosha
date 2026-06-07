@@ -78,10 +78,6 @@ describe('validateGameState', () => {
     expect(validateGameState(rest)).toBe(false);
   });
 
-  it('returns false when triggers is not an array', () => {
-    const state = createTestGame();
-    expect(validateGameState({ ...state, triggers: 'not-array' })).toBe(false);
-  });
 
   it('returns false when serverLog is not an array', () => {
     const state = createTestGame();

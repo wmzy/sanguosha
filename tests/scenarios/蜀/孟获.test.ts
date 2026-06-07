@@ -26,9 +26,7 @@ describe('孟获', () => {
         ctx.setHealth('P1', 2);
       })
       .check('孟获有再起技能触发器', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '再起',
-        );
+        const triggers = ctx.player('P1').skills.filter(s => s === '再起');
         expect(triggers.length).toBeGreaterThan(0);
       })
       .run();

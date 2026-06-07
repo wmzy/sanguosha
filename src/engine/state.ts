@@ -91,7 +91,6 @@ export function createInitialState(config: GameConfig): GameState {
     cardMap,
     turn,
     pending: null,
-    triggers: [],
     marks: {},
     serverLog: [],
     playerLogs: Object.fromEntries(playerOrder.map(name => [name, []])),

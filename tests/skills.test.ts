@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { registerCharacterTriggers, emitEvent } from '@engine/skill';
+import { registerCharacterTriggers, emitEvent, getSkillRegistry } from '@engine/skill';
 import { safeEngine as engine } from './invariants';
 import { getCharacterMap, createTestGame, setPlayPhase } from './engine-helpers';
 
@@ -8,69 +8,43 @@ describe('V2 Engine - 技能注册与触发', () => {
 
   describe('角色触发器注册', () => {
     it('曹操 奸雄 技能注册', () => {
-      let state = createTestGame({ characters: ['曹操', '刘备'] });
-      state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
-
-      const trigger = state.triggers.find(
-        (t) => t.skillId === '奸雄' && t.player === 'P1',
-      );
-      expect(trigger).toBeDefined();
-      expect(trigger!.event).toBe('受到伤害');
-      expect(trigger!.source).toBe('角色');
+      const state = createTestGame({ characters: ['曹操', '刘备'] });
+      // [P5-T3] 阶段 D：trigger 匹配由 emitEvent 从 PlayerState.skills 动态构建，
+      // 不再依赖 state.triggers。验证技能存在于 skills 列表 + SkillDef.trigger 正确。
+      expect(state.players.P1.skills).toContain('奸雄');
+      const def = getSkillRegistry().get('奸雄');
+      expect(def).toBeDefined();
+      expect(def!.trigger?.event).toBe('受到伤害');
     });
 
     it('刘备 仁德 技能注册', () => {
-      let state = createTestGame({ characters: ['刘备', '曹操'] });
-      state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
-
-      const trigger = state.triggers.find(
-        (t) => t.skillId === '仁德' && t.player === 'P1',
-      );
-      expect(trigger).toBeDefined();
+      const state = createTestGame({ characters: ['刘备', '曹操'] });
+      expect(state.players.P1.skills).toContain('仁德');
     });
 
     it('司马懿 反馈 技能注册', () => {
-      let state = createTestGame({ characters: ['司马懿', '曹操'] });
-      state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
-
-      const trigger = state.triggers.find(
-        (t) => t.skillId === '反馈' && t.player === 'P1',
-      );
-      expect(trigger).toBeDefined();
-      expect(trigger!.event).toBe('受到伤害');
+      const state = createTestGame({ characters: ['司马懿', '曹操'] });
+      expect(state.players.P1.skills).toContain('反馈');
+      const def = getSkillRegistry().get('反馈');
+      expect(def).toBeDefined();
+      expect(def!.trigger?.event).toBe('受到伤害');
     });
 
     it('孙权 制衡 技能注册', () => {
-      let state = createTestGame({ characters: ['孙权', '曹操'] });
-      state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
-
-      const trigger = state.triggers.find(
-        (t) => t.skillId === '制衡' && t.player === 'P1',
-      );
-      expect(trigger).toBeDefined();
+      const state = createTestGame({ characters: ['孙权', '曹操'] });
+      expect(state.players.P1.skills).toContain('制衡');
     });
 
     it('诸葛亮 观星 技能注册（如果存在）', () => {
-      let state = createTestGame({ characters: ['诸葛亮', '曹操'] });
-      state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
-
-      const triggers = state.triggers.filter(
-        (t) => t.player === 'P1',
-      );
-      // 诸葛亮至少有技能触发器
-      expect(triggers.length).toBeGreaterThan(0);
+      const state = createTestGame({ characters: ['诸葛亮', '曹操'] });
+      // 诸葛亮至少有技能
+      expect(state.players.P1.skills.length).toBeGreaterThan(0);
     });
 
-    it('多个角色的触发器共存', () => {
-      let state = createTestGame({ characters: ['曹操', '刘备'] });
-      state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
-      state = registerCharacterTriggers(state, 'P2', { characterMap: charMap });
-
-      const p1Triggers = state.triggers.filter((t) => t.player === 'P1');
-      const p2Triggers = state.triggers.filter((t) => t.player === 'P2');
-
-      expect(p1Triggers.length).toBeGreaterThan(0);
-      expect(p2Triggers.length).toBeGreaterThan(0);
+    it('多个角色的技能共存', () => {
+      const state = createTestGame({ characters: ['曹操', '刘备'] });
+      expect(state.players.P1.skills.length).toBeGreaterThan(0);
+      expect(state.players.P2.skills.length).toBeGreaterThan(0);
     });
   });
 

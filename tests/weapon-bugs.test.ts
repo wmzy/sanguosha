@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createStandardDeck } from '../src/shared/deck';
 import { getAttackRange, isInAttackRange } from '../src/engine/distance';
 import { engine } from '../src/engine/engine';
+import { getSkillRegistry } from '../src/engine/skill';
 import { createTestGame, injectEquipCard, injectCard } from './engine-helpers';
 import { hasUnlimitedKills } from '../src/engine/validate';
 import type { GameState } from '../src/engine/types';
@@ -83,17 +84,18 @@ describe('武器 attackRange 与出杀 (BUG #1)', () => {
   });
 });
 
-describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
+describe('武器技能装备注册', () => {
   it('装备诸葛连弩后注册 unlimitedKills trigger', () => {
     let state = createTestGame();
     state = setPlayPhase(state);
     state = injectEquipCard(state, 'P1', '诸葛连弩', '武器');
     const weaponId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
 
-    const before = state.triggers.filter(t => t.source === '装备').length;
+    // [P5-T3] 阶段 D：trigger 动态从装备槽构建，不再写 state.triggers。
+    // 验证装备后装备槽有值 + unlimitedKills 生效。
     const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: weaponId });
-    const after = result.state.triggers.filter(t => t.source === '装备').length;
-    expect(after).toBe(before + 1);
+    expect(result.error).toBeUndefined();
+    expect(result.state.players['P1'].equipment.武器).toBe(weaponId);
     expect(hasUnlimitedKills(result.state, 'P1')).toBe(true);
   });
 
@@ -112,7 +114,7 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     expect(r1.error).toBeUndefined();
   });
 
-  it('装备贯石斧后注册 forceHit trigger (killDodged event)，不硬编码为 killResponse', () => {
+  it('装备贯石斧后可触发杀被闪避事件', () => {
     let state = createTestGame();
     state = setPlayPhase(state);
     state = injectEquipCard(state, 'P1', '贯石斧', '武器', 3);
@@ -121,15 +123,13 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: weaponId });
     expect(result.error).toBeUndefined();
 
-    const trigger = result.state.triggers.find(
-      t => t.source === '装备' && t.skillId === '贯石斧',
-    );
-    expect(trigger).toBeDefined();
-    expect(trigger?.event).toBe('杀被闪避');
+    // [P5-T3] 阶段 D：验证 SkillDef 存在 + trigger.event 正确
+    const def = getSkillRegistry().get('贯石斧');
+    expect(def).toBeDefined();
+    expect(def?.trigger?.event).toBe('杀被闪避');
   });
 
-
-  it('装备旧武器后换新武器，注销旧 trigger 并注册新 trigger', () => {
+  it('换装武器后装备槽只有新武器', () => {
     let state = createTestGame();
     state = setPlayPhase(state);
     state = injectEquipCard(state, 'P1', '诸葛连弩', '武器');
@@ -140,9 +140,8 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     let s = engine(state, { type: '打出一张牌', player: 'P1', cardId: zhuId }).state;
     s = engine(s, { type: '打出一张牌', player: 'P1', cardId: guanId }).state;
 
-    const triggers = s.triggers.filter(t => t.source === '装备' && t.player === 'P1');
-    expect(triggers.length).toBe(1);
-    expect(triggers[0]?.skillId).toBe('贯石斧');
+    // 装备槽只有贯石斧
+    expect(s.players['P1'].equipment.武器).toBe(guanId);
   });
 });
 

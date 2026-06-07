@@ -59,9 +59,7 @@ describe.skip('徐晃 - 断粮', () => {
       ctx.registerTriggers('P1');
     })
     .check('P1 拥有断粮触发器', ctx => {
-      const hasTrigger = ctx.state.triggers.some(
-        t => t.player === 'P1' && t.skillId === '断粮',
-      );
+      const hasTrigger = ctx.player('P1').skills.includes('断粮');
       expect(hasTrigger).toBe(true);
     })
     .run();

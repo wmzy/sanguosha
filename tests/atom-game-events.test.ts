@@ -188,10 +188,13 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
       }
 
       let state = createTestGame({ characters: ['曹操', '刘备'] });
-      state.triggers = [
-        ...state.triggers,
-        { event: '受到伤害', source: '角色', skillId, player: 'P1', priority: 5 },
-      ];
+      // [P5-T3] 阶段 D：emitEvent 不再读 state.triggers，改为从 PlayerState.skills 动态构建。
+      // 将测试技能 ID 注入 P1 的 skills 列表，让 emitEvent 能匹配到。
+      const p1 = state.players.P1;
+      state = {
+        ...state,
+        players: { ...state.players, P1: { ...p1, skills: [...p1.skills, skillId] } },
+      };
       state = setHealth(state, 'P1', 2);
 
       const ctx = makeCtx({ self: 'P2' });
