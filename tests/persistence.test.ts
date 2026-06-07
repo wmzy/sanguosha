@@ -22,7 +22,7 @@ async function loadModule() {
 
 async function makeState() {
   const { createInitialState } = await import('@engine/state');
-  const { allCharacters } = await import('@shared/characters');
+  const { allCharacters } = await import('@engine/characters');
   const characters = allCharacters.slice(0, 3);
   return createInitialState({
     players: characters.map((c, i) => ({ name: `P${i + 1}`, characterId: c.name, role: i === 0 ? '主公' : '反贼' })),
@@ -156,7 +156,7 @@ describe('restoreToState 事件重放', () => {
   it('同 seed + 同 actionLog 产生与原始状态完全一致的结果', async () => {
     const { saveRoom, loadRoom, restoreToState } = await loadModule();
     const { createInitialState } = await import('@engine/state');
-    const { allCharacters } = await import('@shared/characters');
+    const { allCharacters } = await import('@engine/characters');
     const { engine } = await import('@engine/engine');
     const characters = allCharacters.slice(0, 3);
 
@@ -199,7 +199,7 @@ describe('restoreToState 事件重放', () => {
   it('restoreToState 注册角色技能触发器（不依赖 startGame 流程）', async () => {
     const { saveRoom, loadRoom, restoreToState } = await loadModule();
     const { createInitialState } = await import('@engine/state');
-    const { allCharacters } = await import('@shared/characters');
+    const { allCharacters } = await import('@engine/characters');
     const characters = allCharacters.slice(0, 3);
     const state = createInitialState({
       players: characters.map((c, i) => ({ name: `P${i + 1}`, characterId: c.name, role: i === 0 ? '主公' : '反贼' })),

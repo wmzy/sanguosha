@@ -8,7 +8,7 @@ import { allSkills } from '../engine/skills';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
 import { saveRoom, deletePersistedRoom } from './persistence';
 import { registerCharacterTriggers } from '../engine/skill';
-import { allCharacters } from '../shared/characters';
+import { allCharacters } from '../engine/characters';
 import { serialize } from './protocol';
 import { setRoomStatus } from './room';
 import type { Role } from '../shared/types';

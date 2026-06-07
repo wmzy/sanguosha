@@ -7,7 +7,7 @@ import { createEngine } from '../engine/create-engine';
 import { allSkills } from '../engine/skills';
 import { registerCharacterTriggers } from '../engine/skill';
 import { restoreEventCounterFromLog } from '../engine/event';
-import { allCharacters } from '../shared/characters';
+import { allCharacters } from '../engine/characters';
 import type { Role } from '../shared/types';
 
 const DATA_DIR = join(process.cwd(), 'data', 'rooms');

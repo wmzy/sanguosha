@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { getSkillRegistry } from '@engine/skill';
 import '@engine/skills/index';
-import { allCharacters } from '@shared/characters';
+import { allCharacters } from '@engine/characters';
 
 describe('技能完整性审计', () => {
   const registry = getSkillRegistry();

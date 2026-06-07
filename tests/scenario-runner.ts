@@ -1,7 +1,7 @@
 import { it } from 'vitest';
 import type { GameState, GameEvent, GameAction, PlayerEvent, Atom } from '@engine/types';
 import type { Card as SharedCard } from '@shared/types';
-import { allCharacters } from '@shared/characters';
+import { allCharacters } from '@engine/characters';
 import { createInitialState, getPlayer } from '@engine/state';
 import { engine } from '@engine/engine';
 import { applyAtoms as engineApplyAtoms } from '@engine/atom';

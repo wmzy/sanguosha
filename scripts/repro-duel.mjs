@@ -2,7 +2,7 @@ process.chdir('/home/zlt/projects/sanguosha');
 const { engine } = await import('../engine/engine.ts');
 const { createInitialState, getPlayer } = await import('../engine/state.ts');
 const { registerCharacterTriggers } = await import('../engine/skill.ts');
-const { allCharacters } = await import('../shared/characters/index.ts');
+const { allCharacters } = await import('../engine/characters/index.ts');
 const fs = await import('fs');
 
 const data = JSON.parse(fs.readFileSync('./data/rooms/NVMHYO.json'));

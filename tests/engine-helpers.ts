@@ -1,7 +1,7 @@
 import { createInitialState } from '@engine/state';
 import type { GameState, GameAction } from '@engine/types';
 import type { CharacterConfig } from '@shared/types';
-import { allCharacters } from '@shared/characters';
+import { allCharacters } from '@engine/characters';
 import { safeEngine } from './invariants';
 import { createEngine } from '@engine/create-engine';
 import type { EngineInstance } from '@engine/create-engine';

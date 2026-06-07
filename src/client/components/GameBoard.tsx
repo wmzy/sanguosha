@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { css } from '@linaria/core';
 import { ActionPanel } from './ActionPanel';
-import { allCharacters } from '../../shared/characters';
+import { allCharacters } from '../../engine/characters';
 import type { PendingAction } from '../../engine/types';
 import { toCardInfoMap } from '../../engine/view/buildView';
 import { colors } from '../theme';

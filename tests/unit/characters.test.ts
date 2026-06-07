@@ -1,6 +1,6 @@
 // tests/unit/characters.test.ts
 import { describe, it, expect } from 'vitest';
-import { allCharacters, weiCharacters, shuCharacters, wuCharacters, qunCharacters } from '@shared/characters';
+import { allCharacters, weiCharacters, shuCharacters, wuCharacters, qunCharacters } from '@engine/characters';
 
 describe('角色配置', () => {
   describe('所有角色配置有效性', () => {
