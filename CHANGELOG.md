@@ -22,6 +22,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `engine/phases/atoms.ts` — 删除 ATOM_GAME_EVENTS 手工调用代码块（3 处）
 
 
+### Engine v3 阶段 D 准备 — 58 个 v2 stub 技能去 trigger + hasWushuang 改 v3 真相源
+
+为阶段 D（删 v2 基础设施：`state.triggers` / `emitEvent` / `registerSkill` / 全局 registry）做前置安全清理——所有空 handler 的占位 stub 技能去 v2 trigger 字段。
+
+### Changed
+
+* `engine/handlers/card-handlers.ts` — `handleKillCard` 中 `hasWushuang` 判定从 `state.triggers.some(...)` 改用 `hasSkill(state, player, '无双')`（[P5-T2] v3 真相源：`PlayerState.skills`）
+* `tests/scenarios/蜀/卧龙诸葛.test.ts` — 火计/看破 注册检查从 `state.triggers` 断言改 `ctx.player('P1').skills`（v3 真相源）
+* `tests/scenarios/蜀/庞统.test.ts` — 连环 注册检查同上
+
+### Removed
+
+* 58 个 v2 stub 技能（handler 是空 `[]`，v2 派发本就无效）删 `trigger` 字段：
+  * 5 个孤儿 stub 文件（无双/不屈/周泰/化身/新生）
+  * 22 个孤儿 stub 文件（乱武/倾国/制霸/双雄/咆哮/固政/天义/天香/急救/断肠/暴虐/武圣/流离/激将/缔盟/肉林/蛊惑/谦逊/酒池/鬼道/黄天/龙胆）
+  * 24 个多技能文件中的 stub 技能（华佗急救、董卓酒池肉林暴虐乱武、蔡文姬断肠、左慈化身新生、颜良文丑双雄、张角鬼道黄天、甄姬倾国、小乔天香、孙策制霸、陆逊谦逊、张飞咆哮、大乔流离、鲁肃缔盟、太史慈天义、张昭张纮固政、赵云龙胆、卧龙诸葛火计看破、庞统连环、吕布无双、火计/看破/连环/急救 4 个独立 stub 文件）
+  * 3 个孤儿 stub 文件（火计/看破/连环 完整清理）
+
+### Verified
+
+* `npx vitest run`: **1413 passed**, 40 skipped, 0 failed
+* v2 路径未破坏：剩余 109 个 v2 trigger 兜底技能继续工作（全是真实 handler）
+* `hasWushuang` 计算路径（吕布杀需 2 闪）行为不变
+
 ### Engine v3 P5 T1 — chained 迁移 Mark 体系
 
 将 `chained`（铁索连环）状态从 `PlayerState.chained` 字段迁移到 Mark 体系。
