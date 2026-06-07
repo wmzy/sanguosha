@@ -5,7 +5,8 @@ import type {
   PendingPlayPhase,
   SkillDef,
 } from './types';
-import { HookRegistry } from './skill-hook';
+import { HookRegistry, clearAtomHooks, getDefaultHookRegistry } from './skill-hook';
+import { clearSkillRegistry, registerSkill } from './skill';
 import { validateAction } from './validate';
 import './atoms/index';
 import './phases/index';
@@ -28,6 +29,16 @@ export interface EngineInstance {
   dispatch(state: GameState, action: GameAction): EngineResult;
   readonly skillsMap: ReadonlyMap<string, SkillDef>;
   readonly hooks: HookRegistry;
+  /**
+   * 重置全局 skill registry + atom hooks，重新注册本 instance 的 v3 hooks。
+   *
+   * 测试场景专用：在每个 test case 之前调用，确保隔离。
+   * 旧 API 三件套 (clearSkillRegistry + clearAtomHooks + registerAllSkills)
+   * 已被本方法替代。
+   *
+   * 注意：atom registry 的重置由各测试的 `registerAllAtoms()` 显式调用。
+   */
+  clearForTest(): void;
 }
 
 /**
@@ -44,6 +55,30 @@ export function createEngine(config: EngineConfig): EngineInstance {
   // 注册 v3 钩子
   for (const skill of config.skills) {
     skill.registerHooks?.(hookRegistry);
+  }
+
+  /**
+   * 测试隔离：清空全局 skill registry + atom hooks，重新注册本 instance 的 v3 hooks。
+   * 调用方需自己重新注册 atom registry（用 `registerAllAtoms()`）。
+   */
+  function clearForTest(): void {
+    clearSkillRegistry();
+    clearAtomHooks();
+    hookRegistry.clear();
+    // 重新注册本 instance 的所有技能
+    // 优先保留含 registerHooks 的版本（v3），跳过同名占位版（equipment.ts 中的 v2 stub）
+    const best = new Map<string, SkillDef>();
+    for (const skill of config.skills) {
+      if (!best.has(skill.id) || skill.registerHooks) {
+        best.set(skill.id, skill);
+      }
+    }
+    for (const skill of best.values()) {
+      registerSkill(skill);
+      // 同时注册到：闭包 + 全局
+      skill.registerHooks?.(hookRegistry);
+      skill.registerHooks?.(getDefaultHookRegistry());
+    }
   }
 
   function dispatchAction(state: GameState, action: GameAction): EngineResult {
@@ -250,5 +285,6 @@ export function createEngine(config: EngineConfig): EngineInstance {
     dispatch,
     get skillsMap() { return skillsMap; },
     get hooks() { return hookRegistry; },
+    clearForTest,
   };
 }
