@@ -12,7 +12,7 @@ describe('黄忠', () => {
       .act('黄忠使用杀指定刘备（两者体力都是4）', ctx => {
         const killId = ctx.findCard('P1', '杀')!;
         ctx.emitEvent({
-          type: 'cardPlayed',
+          type: '出牌',
           player: 'P1',
           cardId: killId,
           target: 'P2',
@@ -35,7 +35,7 @@ describe('黄忠', () => {
       .act('黄忠使用杀（P2体力少但手牌多）', ctx => {
         const killId = ctx.findCard('P1', '杀')!;
         ctx.emitEvent({
-          type: 'cardPlayed',
+          type: '出牌',
           player: 'P1',
           cardId: killId,
           target: 'P2',
@@ -56,7 +56,7 @@ describe('黄忠', () => {
       .act('黄忠使用杀（P2体力和手牌都少于P1）', ctx => {
         const killId = ctx.findCard('P1', '杀')!;
         ctx.emitEvent({
-          type: 'cardPlayed',
+          type: '出牌',
           player: 'P1',
           cardId: killId,
           target: 'P2',

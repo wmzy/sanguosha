@@ -14,7 +14,7 @@ describe('张昭张纮 - 直谏', () => {
     })
     .check('出现技能提示（选牌+选目标）', ctx => {
       expect(ctx.isPending()).toBe(true);
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .run();
 });

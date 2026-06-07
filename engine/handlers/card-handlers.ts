@@ -5,6 +5,7 @@ import type {
   Atom,
   PendingResponseWindow,
   PendingHarvestSelection,
+  EquipSlot,
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import type { Card } from '../../shared/types';
@@ -20,7 +21,7 @@ import { getSkillConvertedCards } from '../validate';
 
 export function handlePlayCard(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
 ): EngineResult {
   const card = state.cardMap[action.cardId];
   if (!card) return { state, events: [], error: '未知卡牌' };
@@ -41,7 +42,7 @@ export function handlePlayCard(
 
   // 触发 cardPlayed 事件，使依赖此事件的技能可以响应
   const gameEvent: GameEvent = {
-    type: 'cardPlayed',
+    type: '出牌',
     player: action.player,
     cardId: action.cardId,
     ...(action.target ? { target: action.target } : {}),
@@ -55,7 +56,7 @@ export function handlePlayCard(
 
 function handleBasicCard(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
   card: Card,
 ): EngineResult {
   switch (card.name) {
@@ -72,7 +73,7 @@ function handleBasicCard(
 
 function handleKillCard(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
   _card: Card,
 ): EngineResult {
   const player = action.player;
@@ -101,7 +102,7 @@ function handleKillCard(
   const timeout = TIMEOUT_DEFAULTS.killResponse;
   const responseWindow: PendingResponseWindow = {
     id: createPendingId(),
-    type: 'responseWindow',
+    type: '响应窗口',
     window: {
       type: 'killResponse',
       attacker: player,
@@ -114,22 +115,22 @@ function handleKillCard(
     },
     timeout,
     deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: target },
+    onTimeout: { type: '打出', player: target },
   };
 
   const atoms: Atom[] = [
     {
-      type: 'moveCard',
+      type: '移动牌',
       cardId: action.cardId,
-      from: { zone: 'hand', player },
-      to: { zone: 'discardPile' },
+      from: { zone: '手牌', player },
+      to: { zone: '弃牌堆' },
     },
-    { type: 'pushPending', action: responseWindow },
-    { type: 'incrementKills' },
+    { type: '推入待定', action: responseWindow },
+    { type: '累计出杀' },
   ];
   const result = applyAtoms(state, atoms);
 
-  const cardPlayedEvent = makeServerEvent('cardPlayed', {
+  const cardPlayedEvent = makeServerEvent('出牌', {
     player,
     cardId: action.cardId,
     target,
@@ -139,7 +140,7 @@ function handleKillCard(
 
 function handlePeachCard(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
   _card: Card,
 ): EngineResult {
   const player = action.player;
@@ -151,15 +152,15 @@ function handlePeachCard(
 
   const atoms: Atom[] = [
     {
-      type: 'moveCard',
+      type: '移动牌',
       cardId: action.cardId,
-      from: { zone: 'hand', player },
-      to: { zone: 'discardPile' },
+      from: { zone: '手牌', player },
+      to: { zone: '弃牌堆' },
     },
-    { type: 'heal', target: player, amount: 1, source: player },
+    { type: '回复体力', target: player, amount: 1, source: player },
   ];
   const result = applyAtoms(state, atoms);
-  const cardPlayedEvent = makeServerEvent('cardPlayed', {
+  const cardPlayedEvent = makeServerEvent('出牌', {
     player,
     cardId: action.cardId,
   });
@@ -168,11 +169,11 @@ function handlePeachCard(
 
 function handleTrickCard(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
   card: Card,
 ): EngineResult {
   const player = action.player;
-  const cardPlayedEvent = makeServerEvent('cardPlayed', {
+  const cardPlayedEvent = makeServerEvent('出牌', {
     player,
     cardId: action.cardId,
     ...(action.target ? { target: action.target } : {}),
@@ -182,10 +183,10 @@ function handleTrickCard(
     // ── 无目标可被无懈的锦囊：先弃源牌，开 trickResponse ──
     case '无中生有': {
       const moveAtom: Atom = {
-        type: 'moveCard',
+        type: '移动牌',
         cardId: action.cardId,
-        from: { zone: 'hand', player },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player },
+        to: { zone: '弃牌堆' },
       };
 
       const attackerIndex = state.playerOrder.indexOf(player);
@@ -209,7 +210,7 @@ function handleTrickCard(
         depth: 0,
       });
 
-      const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
+      const result = applyAtoms(state, [moveAtom, { type: '推入待定', action: trickResponse }]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
@@ -221,10 +222,10 @@ function handleTrickCard(
       const healAtoms: Atom[] = alivePlayers.flatMap(p => {
         const ps = getPlayer(state, p);
         if (ps.health >= ps.maxHealth) return [];
-        return [{ type: 'heal' as const, target: p, amount: 1, source: player }];
+        return [{ type: '回复体力' as const, target: p, amount: 1, source: player }];
       });
       const result = applyAtoms(state, [
-        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+        { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player }, to: { zone: '弃牌堆' } },
         ...healAtoms,
       ]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
@@ -238,7 +239,7 @@ function handleTrickCard(
       const count = Math.min(alivePlayerNames.length, state.zones.deck.length);
       if (count === 0) {
         const result = applyAtoms(state, [
-          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
+          { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player }, to: { zone: '弃牌堆' } },
         ]);
         return { state: result.state, events: [...result.events, cardPlayedEvent] };
       }
@@ -257,21 +258,21 @@ function handleTrickCard(
       const timeout = TIMEOUT_DEFAULTS.harvestSelection;
       const harvestPending: PendingHarvestSelection = {
         id: createPendingId(),
-        type: 'harvestSelection',
+        type: '收获选牌',
         revealedCards,
         currentPickerIndex: 0,
         pickOrder,
         player,
         timeout,
         deadline: Date.now() + timeout,
-        onTimeout: { type: 'respond', player: pickOrder[0], cardId: revealedCards[0] },
+        onTimeout: { type: '打出', player: pickOrder[0], cardId: revealedCards[0] },
       };
 
       const result = applyAtoms(
         { ...state, zones: { ...state.zones, deck: remainingDeck } },
         [
-          { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
-          { type: 'pushPending', action: harvestPending },
+          { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player }, to: { zone: '弃牌堆' } },
+          { type: '推入待定', action: harvestPending },
         ],
       );
       const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
@@ -301,10 +302,10 @@ function handleTrickCard(
 
       // 1. 弃掉源牌
       const moveAtom: Atom = {
-        type: 'moveCard',
+        type: '移动牌',
         cardId: action.cardId,
-        from: { zone: 'hand', player },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player },
+        to: { zone: '弃牌堆' },
       };
 
       // 2. 开 trickResponse 窗口（抢占式并发：所有存活玩家同时可出无懈可击）
@@ -330,7 +331,7 @@ function handleTrickCard(
         depth: 0,
       });
 
-      const result = applyAtoms(state, [moveAtom, { type: 'pushPending', action: trickResponse }]);
+      const result = applyAtoms(state, [moveAtom, { type: '推入待定', action: trickResponse }]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
 
@@ -346,8 +347,8 @@ function handleTrickCard(
 
       const trick = { name: card.name, source: player, card };
       const result = applyAtoms(state, [
-        { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player }, to: { zone: 'discardPile' } },
-        { type: 'addPendingTrick', player: target, trick },
+        { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player }, to: { zone: '弃牌堆' } },
+        { type: '添加延时锦囊', player: target, trick },
       ]);
       return { state: result.state, events: [...result.events, cardPlayedEvent] };
     }
@@ -365,10 +366,10 @@ function handleTrickCard(
       }
 
       const moveAtom: Atom = {
-        type: 'moveCard',
+        type: '移动牌',
         cardId: action.cardId,
-        from: { zone: 'hand', player },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player },
+        to: { zone: '弃牌堆' },
       };
 
       if (affected.length === 0) {
@@ -394,10 +395,10 @@ function handleTrickCard(
     default: {
       const atoms: Atom[] = [
         {
-          type: 'moveCard',
+          type: '移动牌',
           cardId: action.cardId,
-          from: { zone: 'hand', player },
-          to: { zone: 'discardPile' },
+          from: { zone: '手牌', player },
+          to: { zone: '弃牌堆' },
         },
       ];
       const result = applyAtoms(state, atoms);
@@ -408,15 +409,15 @@ function handleTrickCard(
 
 function handleEquipCard(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
   card: Card,
 ): EngineResult {
   const player = action.player;
-  const subtypeToSlot: Record<string, 'weapon' | 'armor' | 'horseMinus' | 'horsePlus'> = {
-    武器: 'weapon',
-    防具: 'armor',
-    进攻马: 'horseMinus',
-    防御马: 'horsePlus',
+  const subtypeToSlot: Record<string, EquipSlot> = {
+    武器: '武器',
+    防具: '防具',
+    进攻马: '进攻马',
+    防御马: '防御马',
   };
   const slot = subtypeToSlot[card.subtype];
   const oldEquipId = slot ? state.players[player].equipment[slot] : undefined;
@@ -426,11 +427,11 @@ function handleEquipCard(
     s = unregisterEquipmentTriggers(s, player, oldEquipId);
   }
 
-  const result = applyAtoms(s, [{ type: 'equip', player, cardId: action.cardId }]);
+  const result = applyAtoms(s, [{ type: '装备', player, cardId: action.cardId }]);
   let after = result.state;
   after = registerEquipmentTriggers(after, player, action.cardId);
 
-  const cardPlayedEvent = makeServerEvent('cardPlayed', {
+  const cardPlayedEvent = makeServerEvent('出牌', {
     player,
     cardId: action.cardId,
   });
@@ -444,7 +445,7 @@ export function resolveHarvestSelection(
   action: GameAction,
   pending: PendingHarvestSelection,
 ): EngineResult {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return { state, events: [], error: '选牌需要 respond 动作' };
   }
 
@@ -466,20 +467,20 @@ export function resolveHarvestSelection(
   if (nextIndex >= pending.pickOrder.length) {
     // 所有人都选完了，剩余牌进弃牌堆
     const atoms: Atom[] = [
-      { type: 'popPending' },
+      { type: '弹出待定' },
       ...newRevealed.map(id => ({
-        type: 'moveCard' as const,
+        type: '移动牌' as const,
         cardId: id,
-        from: { zone: 'deck' as const },
-        to: { zone: 'discardPile' as const },
+        from: { zone: '牌堆' as const },
+        to: { zone: '弃牌堆' as const },
       })),
     ];
     if (selectedId) {
       atoms.unshift({
-        type: 'moveCard',
+        type: '移动牌',
         cardId: selectedId,
-        from: { zone: 'deck' },
-        to: { zone: 'hand', player: action.player },
+        from: { zone: '牌堆' },
+        to: { zone: '手牌', player: action.player },
       });
     }
     const result = applyAtoms(state, atoms);
@@ -495,10 +496,10 @@ export function resolveHarvestSelection(
   const atoms: Atom[] = [];
   if (selectedId) {
     atoms.push({
-      type: 'moveCard',
+      type: '移动牌',
       cardId: selectedId,
-      from: { zone: 'deck' },
-      to: { zone: 'hand', player: action.player },
+      from: { zone: '牌堆' },
+      to: { zone: '手牌', player: action.player },
     });
   }
   const timeout = TIMEOUT_DEFAULTS.harvestSelection;
@@ -508,12 +509,12 @@ export function resolveHarvestSelection(
     currentPickerIndex: nextIndex,
     timeout,
     deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: nextPicker, cardId: newRevealed[0] },
+    onTimeout: { type: '打出', player: nextPicker, cardId: newRevealed[0] },
   };
-  atoms.push({ type: 'pushPending', action: nextPending });
+  atoms.push({ type: '推入待定', action: nextPending });
 
   // 如果在同一个调用中既有 moveCard 又有 pushPending，先 pop 再 push
-  const popThenPush = [{ type: 'popPending' as const }, ...atoms];
+  const popThenPush = [{ type: '弹出待定' as const }, ...atoms];
   const result = applyAtoms(state, popThenPush);
   return { state: result.state, events: result.events };
 }

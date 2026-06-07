@@ -44,7 +44,7 @@ describe('魏势力技能执行', () => {
 
       const beforeHand = state.players.P1.hand.length;
       const result = emitEvent(state, {
-        type: 'damageReceived',
+        type: '受到伤害',
         target: 'P1',
         source: 'P2',
         amount: 1,
@@ -62,7 +62,7 @@ describe('魏势力技能执行', () => {
 
       const beforeHand = state.players.P1.hand.length;
       const result = emitEvent(state, {
-        type: 'damageReceived',
+        type: '受到伤害',
         target: 'P1',
         source: 'P2',
         amount: 1,
@@ -79,7 +79,7 @@ describe('魏势力技能执行', () => {
       state = withTriggers(state, 'P1');
 
       const result = emitEvent(state, {
-        type: 'damageReceived',
+        type: '受到伤害',
         target: 'P1',
         source: 'P2',
         amount: 1,
@@ -98,13 +98,13 @@ describe('魏势力技能执行', () => {
       state = withTriggers(state, 'P1');
 
       const result = emitEvent(state, {
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '摸牌',
         player: 'P1',
       });
 
       expect(result.error).toBeUndefined();
-      expect(result.state.pending?.type).toBe('skillPrompt');
+      expect(result.state.pending?.type).toBe('技能选择');
       expect((result.state.pending as { skillId: string }).skillId).toBe('裸衣');
       expect(result.state.players.P1.vars['裸衣/active']).toBeUndefined();
     });
@@ -113,8 +113,8 @@ describe('魏势力技能执行', () => {
       let state = createTestGame({ characters: ['许褚', '刘备'] });
       state = withTriggers(state, 'P1');
 
-      const r1 = emitEvent(state, { type: 'phaseBegin', phase: '摸牌', player: 'P1' });
-      const r2 = engine(r1.state, { type: 'skillChoice', player: 'P1', choice: true });
+      const r1 = emitEvent(state, { type: '阶段开始', phase: '摸牌', player: 'P1' });
+      const r2 = engine(r1.state, { type: '技能选择', player: 'P1', choice: true });
 
       expect(r2.error).toBeUndefined();
       expect(r2.state.players.P1.vars['裸衣/active']).toBe(true);
@@ -124,8 +124,8 @@ describe('魏势力技能执行', () => {
       let state = createTestGame({ characters: ['许褚', '刘备'] });
       state = withTriggers(state, 'P1');
 
-      const r1 = emitEvent(state, { type: 'phaseBegin', phase: '摸牌', player: 'P1' });
-      const r2 = engine(r1.state, { type: 'skillChoice', player: 'P1', choice: false });
+      const r1 = emitEvent(state, { type: '阶段开始', phase: '摸牌', player: 'P1' });
+      const r2 = engine(r1.state, { type: '技能选择', player: 'P1', choice: false });
 
       expect(r2.error).toBeUndefined();
       expect(r2.state.players.P1.vars['裸衣/active']).toBeUndefined();
@@ -150,11 +150,11 @@ describe('魏势力技能执行', () => {
       const targetHealth = state.players.P2.health;
 
       // 出杀
-      const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+      const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
       expect(r1.error).toBeUndefined();
 
       // P2 不出闪 → 受伤害，裸衣使伤害为 2
-      const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+      const r2 = engine(r1.state, { type: '打出', player: 'P2' });
       expect(r2.error).toBeUndefined();
       expect(r2.state.players.P2.health).toBe(targetHealth - 2);
     });
@@ -167,7 +167,7 @@ describe('魏势力技能执行', () => {
 
       const beforeHand = state.players.P1.hand.length;
       const result = emitEvent(state, {
-        type: 'damageReceived',
+        type: '受到伤害',
         target: 'P1',
         source: 'P2',
         amount: 1,
@@ -186,10 +186,10 @@ describe('魏势力技能执行', () => {
       // 先将一张牌放入弃牌堆作为"判定牌"
       const judgeCard = state.cardMap[state.zones.deck[0]];
       const result = emitEvent(state, {
-        type: 'judgeResult',
+        type: '判定结果',
         player: 'P1',
         cardId: judgeCard.id,
-        result: 'red',
+        result: '红',
       });
 
       expect(result.error).toBeUndefined();
@@ -214,7 +214,7 @@ describe('蜀势力技能执行', () => {
       const beforeHand = state.players.P1.hand.length;
       // 模拟使用锦囊牌事件
       const result = emitEvent(state, {
-        type: 'cardPlayed',
+        type: '出牌',
         player: 'P1',
         cardId: trickId,
       });
@@ -244,7 +244,7 @@ describe('吴势力技能执行', () => {
       // 苦肉是 phaseBegin(出牌) 触发的 manual 技能
       // 通过 emitEvent 触发
       const result = emitEvent(state, {
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '出牌',
         player: 'P1',
       });
@@ -263,7 +263,7 @@ describe('吴势力技能执行', () => {
 
       const _beforePhase = state.phase;
       const result = emitEvent(state, {
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '弃牌',
         player: 'P1',
       });
@@ -283,7 +283,7 @@ describe('吴势力技能执行', () => {
 
       const beforeHand = state.players.P1.hand.length;
       const result = emitEvent(state, {
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '摸牌',
         player: 'P1',
       });
@@ -310,7 +310,7 @@ describe('吴势力技能执行', () => {
 
       const beforeHand = state.players.P1.hand.length;
       const result = emitEvent(state, {
-        type: 'cardDiscarded',
+        type: '弃置',
         player: 'P1',
         cardIds: [],
       });
@@ -333,9 +333,9 @@ describe('吴势力技能执行', () => {
 
       const beforeHand = state.players.P1.hand.length;
       const result = emitEvent(state, {
-        type: 'equipChanged',
+        type: '装备变动',
         player: 'P1',
-        slot: 'weapon',
+        slot: '武器',
       });
 
       expect(result.error).toBeUndefined();
@@ -358,7 +358,7 @@ describe('吴势力技能执行', () => {
 
       // 通过 phaseBegin(出牌) 触发结姻
       const result = emitEvent(state, {
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '出牌',
         player: 'P1',
       });
@@ -396,14 +396,14 @@ describe('真实路径验证: 杀→伤害→技能触发链', () => {
     const _beforeP1Hand = state.players['P1'].hand.length;
     const _beforeP2Hand = state.players['P2'].hand.length;
 
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killCard, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killCard, target: 'P2' });
     expect(r1.error).toBeUndefined();
-    expect(r1.state.pending?.type).toBe('responseWindow');
+    expect(r1.state.pending?.type).toBe('响应窗口');
 
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
-    expect(r2.events?.some(e => e.type === 'killHit')).toBe(true);
+    expect(r2.events?.some(e => e.type === '杀命中')).toBe(true);
 
     // 修复：engine 路径发射 damageReceived，奸雄正确触发拿回杀
     expect(r2.state.players['P1'].hand.length).toBe(_beforeP1Hand);
@@ -418,7 +418,7 @@ describe('真实路径验证: 杀→伤害→技能触发链', () => {
     const beforeHand = state.players['P1'].hand.length;
 
     // 真实路径：结束回合
-    const result = engine(state, { type: 'endTurn', player: 'P1' });
+    const result = engine(state, { type: '结束回合', player: 'P1' });
     expect(result.error).toBeUndefined();
 
     // handleEndTurn 第 23 行 emitEvent({ type: 'turnEnd' })
@@ -426,7 +426,7 @@ describe('真实路径验证: 杀→伤害→技能触发链', () => {
     // P1 手牌 4，体力 3（貂蝉默认 3 体力）
     // handSize(4) > health(3) → 走弃牌分支，setPhase('弃牌')，pushPending
     // 所以先验证闭月是否触发了
-    if (result.state.pending?.type === 'discardPhase') {
+    if (result.state.pending?.type === '弃牌阶段') {
       // 走了弃牌分支 — 闭月在 endTurn 阶段已经触发了
       // 闭月的 draw 1 在 turnEnd 事件处理中已执行
       // 检查是否摸了 1 张牌
@@ -434,12 +434,12 @@ describe('真实路径验证: 杀→伤害→技能触发链', () => {
       // 但 P1 的 health=3，需要弃到 3 张
       // 所以 pending 要求弃 2 张手牌
       const pending = result.state.pending;
-      if (pending.type === 'discardPhase') {
+      if (pending.type === '弃牌阶段') {
         expect(pending.min).toBe(2); // 5-3=2
         // 弃牌
         const hand = result.state.players['P1'].hand;
         const r2 = engine(result.state, {
-          type: 'discard', player: 'P1', cardIds: hand.slice(0, pending.min),
+          type: '弃置', player: 'P1', cardIds: hand.slice(0, pending.min),
         });
         expect(r2.error).toBeUndefined();
         // 转到 P2 回合
@@ -463,15 +463,15 @@ describe('真实路径验证: 弃牌阶段闭月缺失（BUG）', () => {
     // 让 P1 手牌 > 体力，强制弃牌
     state = setHealth(state, 'P1', 2); // 4手牌 > 2体力
 
-    const r1 = engine(state, { type: 'endTurn', player: 'P1' });
-    expect(r1.state.pending?.type).toBe('discardPhase');
+    const r1 = engine(state, { type: '结束回合', player: 'P1' });
+    expect(r1.state.pending?.type).toBe('弃牌阶段');
 
     // 弃牌 — 闭月在 endTurn 时已触发摸牌，手牌数变为 5，需弃 3 张
     const hand = r1.state.players['P1'].hand;
     const pending = r1.state.pending as { min: number; max: number } | null;
     const discardCount = pending ? pending.min : (hand.length - 2);
     const r2 = engine(r1.state, {
-      type: 'discard', player: 'P1', cardIds: hand.slice(0, discardCount),
+      type: '弃置', player: 'P1', cardIds: hand.slice(0, discardCount),
     });
     expect(r2.error).toBeUndefined();
 
@@ -479,7 +479,7 @@ describe('真实路径验证: 弃牌阶段闭月缺失（BUG）', () => {
     // 闭月监听 turnEnd，但弃牌后没有 turnEnd 事件
     // 所以闭月不会触发
     // 验证：没有事件类型包含 turnEnd
-    const _turnEndEvent = r2.events?.find(e => e.type === 'turnEnd');
+    const _turnEndEvent = r2.events?.find(e => e.type === '回合结束');
     // 如果闭月触发了，turnEnd 事件会出现
     // 但 resolveDiscardPhase 没有 emit turnEnd
     // ⚠️ 注意：handleEndTurn 已经 emit 过 turnEnd 了！
@@ -498,7 +498,7 @@ describe('真实路径验证: phaseBegin 技能无法通过引擎触发（系统
     const _beforeHand = state.players['P1'].hand.length;
 
     // endTurn → 由于手牌不超上限，直接切换到 P2
-    const r1 = engine(state, { type: 'endTurn', player: 'P1' });
+    const r1 = engine(state, { type: '结束回合', player: 'P1' });
     if (r1.state.currentPlayer === 'P2') {
       // P2 的回合开始了，但英姿是 P1 的（当前已不是 P1 回合）
       // 英姿必须在本人的摸牌阶段触发
@@ -515,7 +515,7 @@ describe('真实路径验证: phaseBegin 技能无法通过引擎触发（系统
     // 但周瑜(3体力,4手牌)会走弃牌分支
     if (r1.state.phase === '弃牌') {
       // 手牌 > 体力 → 弃牌阶段，phaseBegin 未发射
-      expect(r1.state.pending?.type).toBe('discardPhase');
+      expect(r1.state.pending?.type).toBe('弃牌阶段');
     } else {
       // 手牌不超上限时直接切换到下一玩家
       expect(r1.state.currentPlayer).toBe('P2');
@@ -532,7 +532,7 @@ describe('真实路径验证: phaseBegin 技能无法通过引擎触发（系统
 
     // 真实路径：useSkill
     const result = engine(state, {
-      type: 'useSkill', player: 'P1', skillId: '苦肉',
+      type: '使用技能', player: 'P1', skillId: '苦肉',
     });
     // 苦肉是手动技能，通过 useSkill 触发
     // useSkill 第 39 行通过 getSkillRegistry 获取定义并执行 executePlan
@@ -549,7 +549,7 @@ describe('真实路径验证: 延时锦囊放入判定区', () => {
     state = injectTrickCard(state, 'P1', '乐不思蜀');
     const cardId = state.players['P1'].hand.find(id => state.cardMap[id].name === '乐不思蜀')!;
 
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId, target: 'P2' });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId, target: 'P2' });
     expect(result.error).toBeUndefined();
     expect(result.state.players['P2'].pendingTricks.length).toBe(1);
     expect(result.state.players['P2'].pendingTricks[0].name).toBe('乐不思蜀');
@@ -576,7 +576,7 @@ describe('群势力技能执行', () => {
 
       // 触发 phaseBegin(出牌)
       const result = emitEvent(state, {
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '出牌',
         player: 'P1',
       });
@@ -587,7 +587,7 @@ describe('群势力技能执行', () => {
       expect(result.state).toBeDefined();
       // 由于有 pending，青囊的后续 atoms 尚未执行
       if (result.state.pending) {
-        expect(result.state.pending.type).toBe('skillPrompt');
+        expect(result.state.pending.type).toBe('技能选择');
       }
     });
 
@@ -610,7 +610,7 @@ describe('群势力技能执行', () => {
       };
 
       const result = emitEvent(state, {
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '出牌',
         player: 'P1',
       });
@@ -629,7 +629,7 @@ describe('群势力技能执行', () => {
 
       const beforeHand = state.players.P1.hand.length;
       const result = emitEvent(state, {
-        type: 'turnEnd',
+        type: '回合结束',
         player: 'P1',
       });
 
@@ -664,12 +664,12 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
     state = injectCard(state, 'P1', '杀');
     const killId = findCardInHand(state, 'P1', '杀')!;
 
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
 
     // resolveKillResponse 第 106 行：emitEvent({ type: 'damageDealt' })
     // 但 killHit ServerEvent 可以被确认
-    expect(r2.events.some(e => e.type === 'killHit')).toBe(true);
+    expect(r2.events.some(e => e.type === '杀命中')).toBe(true);
     // 刚烈监听 damageReceived — 不匹配，所以 P1 没有 pending 判定
     // verify: 伤害已应用
     expect(r2.state.players['P2'].health).toBeLessThan(r1.state.players['P2'].health);
@@ -683,8 +683,8 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
     const killId = findCardInHand(state, 'P1', '杀')!;
 
     const beforeHand = state.players['P1'].hand.length;
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
 
     // 修复：engine 路径现在发射 damageReceived，奸雄正确触发 gainCard
     // P1 用杀（手牌-1）→ 受伤 → 奸雄触发拿回杀（手牌+1）→ 手牌恢复
@@ -707,7 +707,7 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
 
     // 验证直接 emitEvent 能触发英姿
     const directResult = emitEvent(state, {
-      type: 'phaseBegin', phase: '摸牌', player: 'P1',
+      type: '阶段开始', phase: '摸牌', player: 'P1',
     });
     expect(directResult.state.players['P1'].hand.length).toBe(beforeHand + 1);
 
@@ -729,15 +729,15 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
     state = injectCard(state, 'P1', '杀');
     state = setPlayPhase(state);
 
-    const r1 = engine(state, { type: 'endTurn', player: 'P1' });
+    const r1 = engine(state, { type: '结束回合', player: 'P1' });
     // handleEndTurn 发射 turnEnd (skill触发)，手牌>体力 → 弃牌 pending
     // 弃牌阶段没有 phaseBegin 发射
     // 克己监听 phaseBegin+弃牌 → 不会触发
-    if (r1.state.pending?.type === 'discardPhase') {
+    if (r1.state.pending?.type === '弃牌阶段') {
       const hand = r1.state.players['P1'].hand;
       const discardCount = hand.length - r1.state.players['P1'].health;
       const _r2 = engine(r1.state, {
-        type: 'discard', player: 'P1',
+        type: '弃置', player: 'P1',
         cardIds: hand.slice(0, discardCount),
       });
       // 克己应该跳过弃牌阶段，但实际进入了弃牌
@@ -754,11 +754,11 @@ describe('⚠️ 真实引擎路径审计：以下技能在真实游戏中不会
     const registry = getSkillRegistry();
     const phaseSkills: { skill: string; phase: string }[] = [];
     registry.forEach((def, id) => {
-      if (def.trigger?.event === 'phaseBegin' && def.trigger?.phase) {
+      if (def.trigger?.event === '阶段开始' && def.trigger?.phase) {
         phaseSkills.push({ skill: id, phase: def.trigger.phase });
       }
-      if (def.trigger?.event === 'turnStart') {
-        phaseSkills.push({ skill: id, phase: 'turnStart' });
+      if (def.trigger?.event === '回合开始') {
+        phaseSkills.push({ skill: id, phase: '回合开始' });
       }
     });
 
@@ -780,7 +780,7 @@ describe('技能执行缺陷', () => {
     state = registerCharacterTriggers(state, 'P1', { characterMap: getCharacterMap() });
     const p2HandBefore = state.players['P2'].hand.length;
     const p1HandBefore = state.players['P1'].hand.length;
-    const event = { type: 'damageReceived' as const, player: 'P2', target: 'P1', source: 'P2', amount: 1 };
+    const event = { type: '受到伤害' as const, player: 'P2', target: 'P1', source: 'P2', amount: 1 };
     const result = emitEvent(state, event);
     if (result.state.players['P2'].hand.length < p2HandBefore) {
       // 反馈触发：P2 被随机弃1牌，P1 获得该牌
@@ -795,9 +795,9 @@ describe('技能执行缺陷', () => {
     state = registerCharacterTriggers(state, 'P2', { characterMap: getCharacterMap() });
     const killId = findCardInHand(state, 'P1', '杀')!;
     const p1HandBefore = state.players['P1'].hand.length;
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     if (r1.error) return;
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
     // engine 发出 damageDealt，但技能监听 damageReceived → 无技能触发
     // 如果反馈触发会弃 P1 牌，手牌会 < p1HandBefore - 1
@@ -813,10 +813,10 @@ describe('技能执行缺陷', () => {
     state = injectCard(state, 'P1', '杀');
     state = injectCard(state, 'P1', '杀');
     state = { ...state, phase: '出牌' as const };
-    const result = engine(state, { type: 'endTurn', player: 'P1' });
+    const result = engine(state, { type: '结束回合', player: 'P1' });
     // phaseBegin/弃牌 事件未被 emit，克己没有机会触发跳过弃牌
     expect(result.state.phase).toBe('弃牌');
-    expect(result.state.pending?.type).toBe('discardPhase');
+    expect(result.state.pending?.type).toBe('弃牌阶段');
   });
 
   it('苦肉体力=1时使用可能濒死，后续操作仍执行', () => {
@@ -824,8 +824,8 @@ describe('技能执行缺陷', () => {
     state = registerCharacterTriggers(state, 'P1', { characterMap: getCharacterMap() });
     state = setHealth(state, 'P1', 1);
     state = setPlayPhase(state);
-    const result = engine(state, { type: 'useSkill', player: 'P1', skillId: '苦肉' });
-    if (result.state.pending?.type === 'dyingWindow') {
+    const result = engine(state, { type: '使用技能', player: 'P1', skillId: '苦肉' });
+    if (result.state.pending?.type === '濒死窗口') {
       // 正确暂停在濒死窗口
       expect(result.state.pending.dyingPlayer).toBe('P1');
     }

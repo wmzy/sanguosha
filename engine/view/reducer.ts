@@ -40,31 +40,31 @@ export function eventsToAnimations(myPlayerId: string, events: PlayerEvent[]): A
 
 function mapEvent(type: string, p: Record<string, unknown>): Animation | null {
   switch (type) {
-    case 'damage':
+    case '造成伤害':
       return { type: 'damagePopup', target: (p.target ?? '') as string, amount: (p.amount ?? 0) as number };
-    case 'heal':
+    case '回复体力':
       return { type: 'healGlow', target: (p.target ?? '') as string, amount: (p.amount ?? 0) as number };
-    case 'draw':
+    case '摸牌':
       return { type: 'drawCards', player: (p.player ?? '') as string, count: (p.count ?? 0) as number };
-    case 'discard':
+    case '弃置':
       return { type: 'discardCards', player: (p.player ?? '') as string, cardIds: (p.cardIds ?? []) as string[] };
-    case 'gainCard':
+    case '获得':
       return {
         type: 'cardMove',
         cardId: ((p.cardId ?? (p.card as Record<string, unknown> | undefined)?.id) ?? '') as string,
-        from: (p.from ?? { zone: 'discardPile' }) as { zone: string; player?: string },
-        to: { zone: 'hand', player: (p.player ?? '') as string },
+        from: (p.from ?? { zone: '弃牌堆' }) as { zone: string; player?: string },
+        to: { zone: '手牌', player: (p.player ?? '') as string },
         duration: 300,
       };
-    case 'equip':
+    case '装备':
       return { type: 'equipItem', player: (p.player ?? '') as string, cardId: (p.cardId ?? '') as string, slot: (p.slot ?? '') as string };
-    case 'kill':
-      return { type: 'death', player: ((p.player ?? p.target) ?? '') as string };
-    case 'pushPending':
+    case '击杀':
+      return { type: '死亡', player: ((p.player ?? p.target) ?? '') as string };
+    case '推入待定':
       return { type: 'pendingPrompt', actionType: ((p.type ?? '') as string) };
-    case 'judge':
+    case '判定':
       return { type: 'cardFlip', cardId: ((p.cardId ?? '') as string) };
-    case 'moveCard':
+    case '移动牌':
       return {
         type: 'cardMove',
         cardId: (p.cardId ?? '') as string,
@@ -72,11 +72,11 @@ function mapEvent(type: string, p: Record<string, unknown>): Animation | null {
         to: p.to as { zone: string; player?: string },
         duration: 300,
       };
-    case 'nextPlayer':
-      return { type: 'nextPlayer', player: (p.player ?? '') as string };
-    case 'addPendingTrick':
-      return { type: 'pendingPrompt', actionType: 'addPendingTrick' };
-    case 'removePendingTrick':
+    case '下一玩家':
+      return { type: '下一玩家', player: (p.player ?? '') as string };
+    case '添加延时锦囊':
+      return { type: 'pendingPrompt', actionType: '添加延时锦囊' };
+    case '移除延时锦囊':
       return { type: 'trickReveal', cardId: ((p.cardId ?? '') as string), result: ((p.result ?? 'success') as 'success' | 'fail') };
     default:
       return null;
@@ -99,7 +99,7 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
 
   switch (type) {
     // ─── damage ───────────────────────────────────────────
-    case 'damage': {
+    case '造成伤害': {
       const target = p.target as string;
       const amount = p.amount as number;
       if (target === myId) {
@@ -112,7 +112,7 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     }
 
     // ─── heal ─────────────────────────────────────────────
-    case 'heal': {
+    case '回复体力': {
       const target = p.target as string;
       const amount = p.amount as number;
       if (target === myId) {
@@ -125,7 +125,7 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     }
 
     // ─── draw ─────────────────────────────────────────────
-    case 'draw': {
+    case '摸牌': {
       const player = p.player as string;
       const count = p.count as number;
       if (player === myId) {
@@ -139,8 +139,7 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     }
 
     // ─── discard ──────────────────────────────────────────
-    case 'discard':
-    case 'cardsDiscarded': {
+    case '弃置': {
       const player = p.player as string;
       const cardIds = p.cardIds as string[] | undefined;
       const count = p.count as number | undefined;
@@ -161,8 +160,7 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     }
 
     // ─── gainCard ─────────────────────────────────────────
-    case 'gainCard':
-    case 'cardGained': {
+    case '获得': {
       const player = p.player as string;
       const from = p.from as P | undefined;
       if (player === myId) {
@@ -175,35 +173,35 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
         type: 'cardMove',
         cardId: (p.cardId ?? '') as string,
         from: (from ?? { zone: 'unknown' }) as Animation extends { type: 'cardMove' } ? Animation['from'] : never,
-        to: { zone: 'hand', player },
+        to: { zone: '手牌', player },
         duration: 300,
       });
       break;
     }
 
-    // ─── equip ────────────────────────────────────────────
-    // ─── equip ────────────────────────────────────────────
-    case 'equip': {
+    // ─── equip ───────────────────────────────────────────
+    case '装备': {
       const player = p.player as string;
       const cardId = p.cardId as string;
-      const slot = (p.slot ?? '') as 'weapon' | 'armor' | 'mount';
+      // slot 是 EquipSlot（中文），映射到 view 字段名（weapon/armor/mount）。
+      const viewSlot = equipSlotToViewSlot(p.slot);
       if (player === myId) {
         const cardIdx = self.hand.findIndex(c => c.id === cardId);
         if (cardIdx !== -1) {
           const [card] = self.hand.splice(cardIdx, 1);
-          const previousCard = self.equipment[slot];
+          const previousCard = viewSlot ? self.equipment[viewSlot] : undefined;
           if (previousCard) view.table.discardPileCount++;
-          self.equipment = { ...self.equipment, [slot]: card };
+          if (viewSlot) self.equipment = { ...self.equipment, [viewSlot]: card };
         }
       } else if (others[player]) {
-        others[player].equipment = { ...others[player].equipment, [slot]: cardId };
+        if (viewSlot) others[player].equipment = { ...others[player].equipment, [viewSlot]: cardId };
       }
-      ctx.animationQueue.push({ type: 'equipItem', player, cardId, slot });
+      ctx.animationQueue.push({ type: 'equipItem', player, cardId, slot: (p.slot ?? '') as string });
       break;
     }
 
     // ─── kill ─────────────────────────────────────────────
-    case 'kill': {
+    case '击杀': {
       const player = p.player as string;
       if (player === myId) {
         self.health = 0;
@@ -214,52 +212,51 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
         others[player].alive = false;
         others[player].equipment = { weapon: null, armor: null, mount: null };
       }
-      ctx.animationQueue.push({ type: 'death', player });
+      ctx.animationQueue.push({ type: '死亡', player });
       break;
     }
 
     // ─── setPhase ─────────────────────────────────────────
-    case 'setPhase': {
+    case '设阶段': {
       view.turn.phase = p.phase as string;
       break;
     }
 
     // ─── nextPlayer ───────────────────────────────────────
-    case 'nextPlayer': {
+    case '下一玩家': {
       const player = (p.player ?? p.to) as string;
       view.turn.currentPlayer = player;
       view.turn.phase = '准备';
-      ctx.animationQueue.push({ type: 'nextPlayer', player });
+      ctx.animationQueue.push({ type: '下一玩家', player });
       break;
     }
 
     // ─── pushPending ──────────────────────────────────────
-    case 'pushPending': {
-      const actionType = (p.actionType ?? p.type ?? 'pushPending') as string;
+    case '推入待定': {
+      const actionType = (p.actionType ?? p.type ?? '推入待定') as string;
       ctx.animationQueue.push({ type: 'pendingPrompt', actionType });
       break;
     }
 
     // ─── popPending ───────────────────────────────────────
-    case 'popPending': {
+    case '弹出待定': {
       view.pending = null;
       break;
     }
 
     // ─── judge ────────────────────────────────────────────
-    case 'judge': {
+    case '判定': {
       view.table.discardPileCount++;
       ctx.animationQueue.push({ type: 'cardFlip', cardId: (p.cardId ?? '') as string });
       break;
     }
 
     // ─── moveCard / cardMoved ─────────────────────────────
-    case 'moveCard':
-    case 'cardMoved': {
+    case '移动牌': {
       const to = p.to as P | undefined;
       const from = p.from as P | undefined;
-      if (to?.zone === 'discardPile') view.table.discardPileCount++;
-      if (from?.zone === 'discardPile') {
+      if (to?.zone === '弃牌堆') view.table.discardPileCount++;
+      if (from?.zone === '弃牌堆') {
         view.table.discardPileCount = Math.max(0, view.table.discardPileCount - 1);
       }
       ctx.animationQueue.push({
@@ -273,38 +270,38 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     }
 
     // ─── addTag ───────────────────────────────────────────
-    case 'addTag': {
+    case '加标签': {
       const player = p.player as string;
       if (player === myId) self.tags.push(p.tag as string);
       break;
     }
 
     // ─── removeTag ────────────────────────────────────────
-    case 'removeTag': {
+    case '去标签': {
       const player = p.player as string;
       if (player === myId) self.tags = self.tags.filter(t => t !== (p.tag as string));
       break;
     }
 
     // ─── setVar ───────────────────────────────────────────
-    case 'setVar': {
+    case '设置变量': {
       const player = p.player as string;
       if (player === myId) self.vars[p.key as string] = p.value;
       break;
     }
 
     // ─── addPendingTrick ──────────────────────────────────
-    case 'addPendingTrick': {
+    case '添加延时锦囊': {
       const player = p.player as string;
       if (player === myId) {
         self.pendingTricks.push(p.trick as PlayerView['self']['pendingTricks'][number]);
       }
-      ctx.animationQueue.push({ type: 'pendingPrompt', actionType: 'addPendingTrick' });
+      ctx.animationQueue.push({ type: 'pendingPrompt', actionType: '添加延时锦囊' });
       break;
     }
 
     // ─── removePendingTrick ───────────────────────────────
-    case 'removePendingTrick': {
+    case '移除延时锦囊': {
       const player = p.player as string;
       const index = p.index as number;
       let removedCardId = p.cardId as string | undefined;
@@ -321,20 +318,20 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
     }
 
     // ─── rearrangeDeck ────────────────────────────────────
-    case 'rearrangeDeck': {
+    case '整理牌堆': {
       break;
     }
 
     // ─── turnStart ────────────────────────────────────────
-    case 'turnStart': {
+    case '回合开始': {
       view.turn.currentPlayer = p.player as string;
       break;
     }
 
     // ─── skillActivate ────────────────────────────────────
-    case 'skillActivate': {
+    case '技能发动': {
       ctx.animationQueue.push({
-        type: 'skillActivate',
+        type: '技能发动',
         player: p.player as string,
         skillId: p.skillId as string,
       });
@@ -349,21 +346,21 @@ function applyEvent(ctx: ReducerCtx, event: PlayerEvent): void {
 function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
   const p = (event.payload ?? {}) as P;
   switch (event.type) {
-    case 'damage': {
+    case '造成伤害': {
       const target = p.target as string;
       const amount = p.amount as number;
       const player = state.players[target];
       if (!player) return state;
       return { ...state, players: { ...state.players, [target]: { ...player, health: player.health - amount } } };
     }
-    case 'heal': {
+    case '回复体力': {
       const target = p.target as string;
       const amount = p.amount as number;
       const player = state.players[target];
       if (!player) return state;
       return { ...state, players: { ...state.players, [target]: { ...player, health: Math.min(player.health + amount, player.maxHealth) } } };
     }
-    case 'draw': {
+    case '摸牌': {
       const player = p.player as string;
       const count = p.count as number;
       const cards = p.cards as string[] | undefined;
@@ -379,9 +376,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
         players: { ...state.players, [player]: { ...pState, hand: [...pState.hand, ...drawn] } },
       };
     }
-    case 'discard':
-    case 'cardsDiscarded':
-    case 'cardDiscarded': {
+    case '弃置': {
       const player = p.player as string;
       const cardIds = p.cardIds as string[] | undefined;
       const count = p.count as number | undefined;
@@ -397,15 +392,14 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       }
       return state;
     }
-    case 'moveCard':
-    case 'cardMoved': {
+    case '移动牌': {
       const cardId = p.cardId as string;
       const from = p.from as P | undefined;
       const to = p.to as P | undefined;
       if (!from || !to) return state;
       return moveCardInState(state, cardId, from, to);
     }
-    case 'equip': {
+    case '装备': {
       const player = p.player as string;
       const cardId = p.cardId as string;
       const slot = (p.slot ?? inferEquipSlot(state, cardId)) as keyof GameState['players'][string]['equipment'] | undefined;
@@ -414,7 +408,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       const newHand = pState.hand.filter(id => id !== cardId);
       return { ...state, players: { ...state.players, [player]: { ...pState, hand: newHand, equipment: { ...pState.equipment, [slot]: cardId } } } };
     }
-    case 'unequip': {
+    case '卸下': {
       const player = p.player as string;
       const slot = p.slot as keyof GameState['players'][string]['equipment'];
       const pState = state.players[player];
@@ -432,7 +426,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
         },
       };
     }
-    case 'setVar': {
+    case '设置变量': {
       const player = p.player as string;
       const key = p.key as string;
       const value = p.value as Json;
@@ -440,7 +434,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       if (!pState) return state;
       return { ...state, players: { ...state.players, [player]: { ...pState, vars: { ...pState.vars, [key]: value } } } };
     }
-    case 'incrementVar': {
+    case '增加变量': {
       const player = p.player as string;
       const key = p.key as string;
       const delta = p.delta as number;
@@ -449,7 +443,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       const current = (pState.vars[key] as number) ?? 0;
       return { ...state, players: { ...state.players, [player]: { ...pState, vars: { ...pState.vars, [key]: current + delta } } } };
     }
-    case 'clearVarPattern': {
+    case '清空变量': {
       const player = p.player as string;
       const pattern = p.pattern as string;
       const pState = state.players[player];
@@ -462,18 +456,18 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
         return state;
       }
     }
-    case 'pushPending': {
+    case '推入待定': {
       if (!isPendingAction(event.payload)) return state;
       return { ...state, pending: event.payload };
     }
-    case 'popPending': {
+    case '弹出待定': {
       return { ...state, pending: null };
     }
-    case 'setPhase': {
+    case '设阶段': {
       const phase = p.phase as GameState['phase'];
       return { ...state, phase };
     }
-    case 'nextPlayer': {
+    case '下一玩家': {
       const to = (p.to ?? p.player) as string;
       const round = p.round as number | undefined;
       return {
@@ -487,7 +481,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
         },
       };
     }
-    case 'judge': {
+    case '判定': {
       if (state.zones.deck.length === 0) return state;
       const cardId = state.zones.deck[state.zones.deck.length - 1];
       return {
@@ -499,14 +493,14 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
         },
       };
     }
-    case 'addPendingTrick': {
+    case '添加延时锦囊': {
       const player = p.player as string;
       const trick = p.trick as GameState['players'][string]['pendingTricks'][number];
       const pState = state.players[player];
       if (!pState) return state;
       return { ...state, players: { ...state.players, [player]: { ...pState, pendingTricks: [...pState.pendingTricks, trick] } } };
     }
-    case 'removePendingTrick': {
+    case '移除延时锦囊': {
       const player = p.player as string;
       const index = p.index as number;
       const pState = state.players[player];
@@ -519,114 +513,113 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
         zones: { ...state.zones, discardPile: removed ? [...state.zones.discardPile, removed.card.id] : state.zones.discardPile },
       };
     }
-    case 'addTag': {
+    case '加标签': {
       const player = p.player as string;
       const tag = p.tag as string;
       const pState = state.players[player];
       if (!pState || pState.tags.includes(tag)) return state;
       return { ...state, players: { ...state.players, [player]: { ...pState, tags: [...pState.tags, tag] } } };
     }
-    case 'removeTag': {
+    case '去标签': {
       const player = p.player as string;
       const tag = p.tag as string;
       const pState = state.players[player];
       if (!pState) return state;
       return { ...state, players: { ...state.players, [player]: { ...pState, tags: pState.tags.filter(t => t !== tag) } } };
     }
-    case 'kill': {
+    case '击杀': {
       const player = p.player as string;
       const pState = state.players[player];
       if (!pState) return state;
       return { ...state, players: { ...state.players, [player]: { ...pState, info: { ...pState.info, alive: false } } } };
     }
-    case 'gainCard':
-    case 'cardGained': {
+    case '获得': {
       const player = p.player as string;
       const cardId = (p.cardId ?? (p.card as P | undefined)?.id) as string | undefined;
       const pState = state.players[player];
       if (!pState || !cardId) return state;
       return { ...state, players: { ...state.players, [player]: { ...pState, hand: [...pState.hand, cardId] } } };
     }
-    case 'incrementKills': {
+    case '累计出杀': {
       return { ...state, turn: { ...state.turn, killsPlayed: state.turn.killsPlayed + 1 } };
     }
-    case 'rearrangeDeck': {
+    case '整理牌堆': {
       const topCardIds = p.topCardIds as string[] | undefined;
       const bottomCardIds = p.bottomCardIds as string[] | undefined;
       const newDeck = [...(topCardIds ?? state.zones.deck), ...(bottomCardIds ?? [])];
       return { ...state, zones: { ...state.zones, deck: newDeck } };
     }
-    case 'turnStart': {
+    case '回合开始': {
       const player = p.player as string;
       return { ...state, currentPlayer: player, turn: { ...state.turn, killsPlayed: 0, skillsUsed: [], turnStarted: false } };
     }
     // reshuffle 是服务端副作用（牌堆→弃牌堆洗回牌堆），已被后续 draw 事件的
     // payload 携带的 cards 隐式覆盖；前端不需要在此重放 rngState/deck 改动。
     // 跳过而非 fallthrough 到 default，能让后续 state-changes（draw/等）继续生效。
-    case 'reshuffle': {
+    case '重洗': {
       return state;
     }
-    case 'loseHealth': {
+    case '失去体力': {
       const target = p.target as string;
       const amount = p.amount as number;
       const pState = state.players[target];
       if (!pState) return state;
       return { ...state, players: { ...state.players, [target]: { ...pState, health: Math.max(0, pState.health - amount) } } };
     }
-    case 'loseCard': {
+    case '失去牌': {
       // payload: { cardId, from: { zone, player, slot? } }
       const cardId = p.cardId as string;
-      const from = p.from as { zone: 'hand' | 'equipment'; player: string; slot?: string };
+      const from = p.from as { zone: '手牌' | '装备'; player: string; slot?: string };
       const player = from.player;
       const pState = state.players[player];
       if (!pState) return state;
-      if (from.zone === 'hand') {
+      if (from.zone === '手牌') {
         if (!pState.hand.includes(cardId)) return state;
         const after = { ...state, players: { ...state.players, [player]: { ...pState, hand: pState.hand.filter(id => id !== cardId) } } };
         return { ...after, zones: { ...after.zones, discardPile: [...after.zones.discardPile, cardId] } };
       }
-      if (from.zone === 'equipment' && from.slot) {
+      if (from.zone === '装备' && from.slot) {
         if ((pState.equipment as Record<string, string | undefined>)[from.slot] !== cardId) return state;
         const after = { ...state, players: { ...state.players, [player]: { ...pState, equipment: { ...pState.equipment, [from.slot]: undefined } } } };
         return { ...after, zones: { ...after.zones, discardPile: [...after.zones.discardPile, cardId] } };
       }
       return state;
     }
-    case 'removeSkill': {
+    case '去技能': {
       // payload: { player, skillId }
       const player = p.player as string;
       const skillId = p.skillId as string;
       return { ...state, triggers: state.triggers.filter(t => !(t.player === player && t.skillId === skillId)) };
     }
-    case 'setChained': {
+    case '设横置': {
       const target = p.target as string;
       const chained = p.chained as boolean;
       const pState = state.players[target];
       if (!pState) return state;
       return { ...state, players: { ...state.players, [target]: { ...pState, chained } } };
     }
-    case 'addMark': {
+    case '加标记': {
       const player = p.player as string;
       const mark = p.mark as Mark;
       const current = state.marks[player] ?? [];
       const filtered = current.filter(m => m.id !== mark.id);
       return { ...state, marks: { ...state.marks, [player]: [...filtered, mark] } };
     }
-    case 'removeMark': {
+    case '去标记': {
       const player = p.player as string;
       const markId = p.markId as string;
       const current = state.marks[player] ?? [];
       return { ...state, marks: { ...state.marks, [player]: current.filter(m => m.id !== markId) } };
     }
-    case 'clearExpiredMarks': {
+    case '清过期标记': {
       const phase = p.phase as string;
       const next: GameState['marks'] = {};
       for (const [player, marks] of Object.entries(state.marks)) {
         const kept = marks.filter(m => {
           if (m.duration === 'permanent') return true;
-          if (m.duration === 'untilTurnEnd' && phase === 'turnEnd') return false;
+          if (m.duration === 'untilTurnEnd' && phase === '回合结束') return false;
           if (m.duration === 'untilPhaseEnd' && m.scope === 'relation') {
-            return phase !== 'turnEnd';
+            return phase !== '回合结束';
           }
           return true;
         });
@@ -634,7 +627,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       }
       return { ...state, marks: next };
     }
-    case 'shuffleDeck': {
+    case '洗牌': {
       // 服务端 rng 推进；前端仅刷新 deck 内容（保持 multiset 不变）。
       // 实际 deck 内容由后续 draw/discard/loseCard 事件携带的 cardId 隐式重构。
       // reducer 不维护 rngState，因此本 case 为 no-op。
@@ -646,7 +639,7 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
 }
 
 interface ZoneRef {
-  zone: 'hand' | 'deck' | 'discardPile' | 'equipment' | 'pendingTricks';
+  zone: '手牌' | '牌堆' | '弃牌堆' | '装备' | '延时锦囊';
   player?: string;
   index?: number;
   slot?: keyof GameState['players'][string]['equipment'];
@@ -655,29 +648,29 @@ interface ZoneRef {
 function moveCardInState(state: GameState, cardId: string, from: P, to: P): GameState {
   const fromRef = from as ZoneRef;
   const toRef = to as ZoneRef;
-  let stateAfterRemove = removeFromZone(state, cardId, fromRef);
-  let stateAfterAdd = addToZone(stateAfterRemove, cardId, toRef);
+  const stateAfterRemove = removeFromZone(state, cardId, fromRef);
+  const stateAfterAdd = addToZone(stateAfterRemove, cardId, toRef);
   return stateAfterAdd;
 }
 
 function removeFromZone(state: GameState, cardId: string, ref: ZoneRef): GameState {
-  if (ref.zone === 'hand' && ref.player) {
+  if (ref.zone === '手牌' && ref.player) {
     const p = state.players[ref.player];
     if (!p) return state;
     return { ...state, players: { ...state.players, [ref.player]: { ...p, hand: p.hand.filter(id => id !== cardId) } } };
   }
-  if (ref.zone === 'equipment' && ref.player && ref.slot) {
+  if (ref.zone === '装备' && ref.player && ref.slot) {
     const p = state.players[ref.player];
     if (!p) return state;
     return { ...state, players: { ...state.players, [ref.player]: { ...p, equipment: { ...p.equipment, [ref.slot]: undefined } } } };
   }
-  if (ref.zone === 'deck') {
+  if (ref.zone === '牌堆') {
     return { ...state, zones: { ...state.zones, deck: state.zones.deck.filter(id => id !== cardId) } };
   }
-  if (ref.zone === 'discardPile') {
+  if (ref.zone === '弃牌堆') {
     return { ...state, zones: { ...state.zones, discardPile: state.zones.discardPile.filter(id => id !== cardId) } };
   }
-  if (ref.zone === 'pendingTricks' && ref.player && ref.index != null) {
+  if (ref.zone === '延时锦囊' && ref.player && ref.index != null) {
     const p = state.players[ref.player];
     if (!p) return state;
     return { ...state, players: { ...state.players, [ref.player]: { ...p, pendingTricks: p.pendingTricks.filter((_, i) => i !== ref.index) } } };
@@ -686,23 +679,23 @@ function removeFromZone(state: GameState, cardId: string, ref: ZoneRef): GameSta
 }
 
 function addToZone(state: GameState, cardId: string, ref: ZoneRef): GameState {
-  if (ref.zone === 'hand' && ref.player) {
+  if (ref.zone === '手牌' && ref.player) {
     const p = state.players[ref.player];
     if (!p) return state;
     return { ...state, players: { ...state.players, [ref.player]: { ...p, hand: [...p.hand, cardId] } } };
   }
-  if (ref.zone === 'equipment' && ref.player && ref.slot) {
+  if (ref.zone === '装备' && ref.player && ref.slot) {
     const p = state.players[ref.player];
     if (!p) return state;
     return { ...state, players: { ...state.players, [ref.player]: { ...p, equipment: { ...p.equipment, [ref.slot]: cardId } } } };
   }
-  if (ref.zone === 'deck') {
+  if (ref.zone === '牌堆') {
     return { ...state, zones: { ...state.zones, deck: [...state.zones.deck, cardId] } };
   }
-  if (ref.zone === 'discardPile') {
+  if (ref.zone === '弃牌堆') {
     return { ...state, zones: { ...state.zones, discardPile: [...state.zones.discardPile, cardId] } };
   }
-  if (ref.zone === 'pendingTricks' && ref.player) {
+  if (ref.zone === '延时锦囊' && ref.player) {
     const p = state.players[ref.player];
     if (!p) return state;
     const card = state.cardMap[cardId];
@@ -717,9 +710,17 @@ function inferEquipSlot(state: GameState, cardId: string): keyof GameState['play
   const card = state.cardMap[cardId];
   if (!card) return undefined;
   const name = card.name;
-  if (['诸葛连弩', '雌雄双股剑', '贯石斧', '青龙偃月刀', '丈八蛇矛', '古锭刀', '麒麟弓'].includes(name)) return 'weapon';
-  if (['八卦阵', '仁王盾', '藤甲', '白银狮子', '寒冰甲'].includes(name)) return 'armor';
-  if (name === '的卢' || name === '绝影') return 'horsePlus';
-  if (name === '爪黄飞电' || name === '大宛') return 'horseMinus';
+  if (['诸葛连弩', '雌雄双股剑', '贯石斧', '青龙偃月刀', '丈八蛇矛', '古锭刀', '麒麟弓'].includes(name)) return '武器';
+  if (['八卦阵', '仁王盾', '藤甲', '白银狮子', '寒冰甲'].includes(name)) return '防具';
+  if (name === '的卢' || name === '绝影') return '防御马';
+  if (name === '爪黄飞电' || name === '大宛') return '进攻马';
+  return undefined;
+}
+
+/** EquipSlot（中文：武器/防具/防御马/进攻马）→ view 字段名（weapon/armor/mount）。 */
+function equipSlotToViewSlot(slot: unknown): 'weapon' | 'armor' | 'mount' | undefined {
+  if (slot === '武器') return 'weapon';
+  if (slot === '防具') return 'armor';
+  if (slot === '防御马' || slot === '进攻马') return 'mount';
   return undefined;
 }

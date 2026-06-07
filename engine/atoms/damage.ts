@@ -8,15 +8,15 @@ const DEFAULT_DAMAGE_TYPE: DamageType = 'normal';
 
 export function register() {
   registerAtom({
-    type: 'damage',
-    apply(state: GameState, atom: Atom & { type: 'damage' }): GameState {
+    type: '造成伤害',
+    apply(state: GameState, atom: Atom & { type: '造成伤害' }): GameState {
       const target = atom.target as string;
       const amount = atom.amount as number;
       return updatePlayer(state, target, p => ({
         health: p.health - amount,
       }));
     },
-    toEvents(state: GameState, atom: Atom & { type: 'damage' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '造成伤害' }): AtomEventResult {
       const target = atom.target as string;
       const amount = atom.amount as number;
       const source = atom.source as string | undefined;
@@ -31,8 +31,8 @@ export function register() {
         ...(source ? { source } : {}),
         ...(cardId ? { cardId } : {}),
       };
-      const server = makeServerEvent('damage', payload);
-      return [server, new Map(), makePlayerEvent('damage', payload)];
+      const server = makeServerEvent('造成伤害', payload);
+      return [server, new Map(), makePlayerEvent('造成伤害', payload)];
     },
   });
 }

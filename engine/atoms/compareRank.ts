@@ -13,7 +13,7 @@ import { updatePlayer } from '../state';
 import { createRng } from '../../shared/rng';
 import { getRankValue } from '../pile-compare';
 
-type CompareRankAtom = Extract<Atom, { type: 'compareRank' }>;
+type CompareRankAtom = Extract<Atom, { type: '拼点' }>;
 
 interface CompareResult {
   winner: string;
@@ -54,7 +54,7 @@ function resolveWinner(
 
 export function register() {
   registerAtom<CompareRankAtom>({
-    type: 'compareRank',
+    type: '拼点',
     apply(state: GameState, atom: CompareRankAtom): GameState {
       const a = atom.a as string;
       const b = atom.b as string;
@@ -96,7 +96,7 @@ export function register() {
         winner: result.winner,
       };
       if (result.tied) payload.tied = true;
-      const server = makeServerEvent('compareRank', payload);
+      const server = makeServerEvent('拼点', payload);
       return [server, new Map(), null] as const;
     },
     getResult(state: GameState, atom: CompareRankAtom): Record<string, Json> {

@@ -12,11 +12,11 @@ describe('董卓 - 崩坏', () => {
       ctx.snapshot('initial');
     })
     .act('直接发射 turnEnd 事件触发崩坏', ctx => {
-      ctx.emitEvent({ type: 'turnEnd', player: 'P1' });
+      ctx.emitEvent({ type: '回合结束', player: 'P1' });
     })
     .check('崩坏触发：创建选择 prompt', ctx => {
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
     })
     .run();
 
@@ -30,7 +30,7 @@ describe('董卓 - 崩坏', () => {
       ctx.snapshot('initial');
     })
     .act('结束回合（体力已为最少）', ctx => {
-      ctx.emitEvent({ type: 'turnEnd', player: 'P1' });
+      ctx.emitEvent({ type: '回合结束', player: 'P1' });
     })
     .check('崩坏不触发：体力不变', ctx => {
       expect(ctx.player('P1').health).toBe(1);

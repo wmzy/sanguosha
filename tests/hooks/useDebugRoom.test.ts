@@ -34,10 +34,10 @@ describe('useDebugRoom', () => {
   it('appendOperations 累加 / setDebugRooms 替换 / setPlayerOrder 替换', () => {
     const { result } = renderHook(() => useDebugRoom());
     act(() => result.current.appendOperations([
-      { seq: 1, timestamp: Date.now(), type: 'play', data: {}, description: 'P1 使用了一张牌' },
+      { seq: 1, timestamp: Date.now(), type: '出牌', data: {}, description: 'P1 使用了一张牌' },
     ]));
     act(() => result.current.appendOperations([
-      { seq: 2, timestamp: Date.now(), type: 'turnChange', data: {}, description: 'P1 结束回合' },
+      { seq: 2, timestamp: Date.now(), type: '回合变更', data: {}, description: 'P1 结束回合' },
     ]));
     expect(result.current.ui.operations).toHaveLength(2);
     act(() => result.current.setDebugRooms([{ id: 'r1', name: 'room1' } as any]));
@@ -49,8 +49,8 @@ describe('useDebugRoom', () => {
   it('appendOperations 保留服务端下发的 seq', () => {
     const { result } = renderHook(() => useDebugRoom());
     const ops = [
-      { seq: 5, timestamp: Date.now(), type: 'play' as const, data: {}, description: 'P1 使用了一张牌' },
-      { seq: 6, timestamp: Date.now(), type: 'turnChange' as const, data: {}, description: 'P1 结束回合' },
+      { seq: 5, timestamp: Date.now(), type: '出牌' as const, data: {}, description: 'P1 使用了一张牌' },
+      { seq: 6, timestamp: Date.now(), type: '回合变更' as const, data: {}, description: 'P1 结束回合' },
     ];
     act(() => result.current.appendOperations(ops));
     expect(result.current.ui.operations.map((o) => o.seq)).toEqual([5, 6]);
@@ -59,10 +59,10 @@ describe('useDebugRoom', () => {
   it('setOperations 全量替换', () => {
     const { result } = renderHook(() => useDebugRoom());
     act(() => result.current.appendOperations([
-      { seq: 1, timestamp: Date.now(), type: 'play', data: {}, description: 'P1 使用了一张牌' },
+      { seq: 1, timestamp: Date.now(), type: '出牌', data: {}, description: 'P1 使用了一张牌' },
     ]));
     act(() => result.current.setOperations([
-      { seq: 10, timestamp: Date.now(), type: 'gameStart', data: {}, description: '游戏开始' },
+      { seq: 10, timestamp: Date.now(), type: '游戏开始', data: {}, description: '游戏开始' },
     ]));
     expect(result.current.ui.operations).toHaveLength(1);
     expect(result.current.ui.operations[0].seq).toBe(10);
@@ -95,7 +95,7 @@ describe('useDebugRoom', () => {
       result.current.setPlayerCount(8);
     });
     act(() => result.current.appendOperations([
-      { seq: 1, timestamp: Date.now(), type: 'play', data: {}, description: 'P1 使用了一张牌' },
+      { seq: 1, timestamp: Date.now(), type: '出牌', data: {}, description: 'P1 使用了一张牌' },
     ]));
     expect(result.current.ui.error).toBe('boom');
     expect(result.current.ui.playerCount).toBe(8);

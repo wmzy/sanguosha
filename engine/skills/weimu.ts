@@ -15,15 +15,15 @@ registerSkill({
   id: '帷幕',
   name: '帷幕',
   description: '锁定技，你不能成为黑色锦囊牌的目标。',
-  trigger: { event: 'v3HookOnly', source: 'character' },
+  trigger: { event: 'v3HookOnly', source: '角色' },
   handler() {
     return [];
   },
 });
 registerAtomHook({
-  atomType: 'becomeTarget',
+  atomType: '成为目标',
   filter: (state, atom) => {
-    const a = atom as Atom & { type: 'becomeTarget' };
+    const a = atom as Atom & { type: '成为目标' };
     const target = a.target as string;
     const char = state.players[target]?.info.characterId;
     if (char !== '贾诩') return false;

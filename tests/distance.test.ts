@@ -63,7 +63,7 @@ describe('V2 Engine - 距离计算', () => {
           ...state.players,
           P1: {
             ...p1,
-            equipment: { ...p1.equipment, horseMinus: 'test-horse-minus' },
+            equipment: { ...p1.equipment, 进攻马: 'test-horse-minus' },
           },
         },
       };
@@ -94,7 +94,7 @@ describe('V2 Engine - 距离计算', () => {
           ...state.players,
           P1: {
             ...p1,
-            equipment: { ...p1.equipment, horsePlus: 'test-horse-plus' },
+            equipment: { ...p1.equipment, 防御马: 'test-horse-plus' },
           },
         },
       };
@@ -161,7 +161,7 @@ describe('V2 Engine - 距离计算', () => {
           ...state.players,
           P1: {
             ...p1,
-            equipment: { ...p1.equipment, weapon: 'test-weapon' },
+            equipment: { ...p1.equipment, 武器: 'test-weapon' },
           },
         },
       };
@@ -179,12 +179,12 @@ describe('V2 Engine - 距离计算', () => {
   });
 
   describe('马术技能距离修正', () => {
-    it('马术通过 vars.distanceBonus 减少距离 1', () => {
+    it('马术通过 vars.马术/距离修正 减少距离 1', () => {
       const state = createTestGame({ playerCount: 4 });
       // P1→P3 基础距离 2
       expect(getDistance(state, 'P1', 'P3')).toBe(2);
 
-      // 给 P1 设置马术的 distanceBonus
+      // 给 P1 设置马术的距离修正
       const p1 = state.players['P1'];
       const withBonus = {
         ...state,
@@ -192,7 +192,7 @@ describe('V2 Engine - 距离计算', () => {
           ...state.players,
           P1: {
             ...p1,
-            vars: { ...p1.vars, distanceBonus: -1 },
+            vars: { ...p1.vars, '马术/距离修正': -1 },
           },
         },
       };
@@ -210,7 +210,7 @@ describe('V2 Engine - 距离计算', () => {
           ...state.players,
           P1: {
             ...p1,
-            vars: { ...p1.vars, distanceBonus: -1 },
+            vars: { ...p1.vars, '马术/距离修正': -1 },
           },
         },
       };
@@ -241,8 +241,8 @@ describe('V2 Engine - 距离计算', () => {
           ...state.players,
           P1: {
             ...p1,
-            equipment: { ...p1.equipment, horseMinus: 'test-horse-minus' },
-            vars: { ...p1.vars, distanceBonus: -1 },
+            equipment: { ...p1.equipment, 进攻马: 'test-horse-minus' },
+            vars: { ...p1.vars, '马术/距离修正': -1 },
           },
         },
       };
@@ -251,9 +251,9 @@ describe('V2 Engine - 距离计算', () => {
       expect(getDistance(withBoth, 'P1', 'P4')).toBe(1);
     });
 
-    it('无 distanceBonus 时不受影响', () => {
+    it('无马术距离修正时不受影响', () => {
       const state = createTestGame({ playerCount: 4 });
-      // P1 没有 vars.distanceBonus，距离正常
+      // P1 没有 vars.马术/距离修正，距离正常
       expect(getDistance(state, 'P1', 'P3')).toBe(2);
       expect(getDistance(state, 'P1', 'P2')).toBe(1);
     });

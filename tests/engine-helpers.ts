@@ -279,13 +279,13 @@ export function nextAlivePlayer(state: GameState, afterPlayer: string): string {
  */
 export function passAllTrickResponders(state: GameState): GameState {
   let current = state;
-  while (current.pending?.type === 'responseWindow' && current.pending.window.type === 'trickResponse') {
+  while (current.pending?.type === '响应窗口' && current.pending.window.type === 'trickResponse') {
     const window_ = current.pending.window;
     const passed = window_.passedResponders ?? [];
     const active = (window_.responders ?? []).filter(p => !passed.includes(p));
     if (active.length === 0) break;
     const next = active[0];
-    const result = safeEngine(current, { type: 'respond', player: next });
+    const result = safeEngine(current, { type: '打出', player: next });
     if (result.error) break;
     current = result.state;
   }
@@ -293,7 +293,7 @@ export function passAllTrickResponders(state: GameState): GameState {
 }
 
 /**
- * 给玩家装备指定 armor（写入 equipment.armor）。仅在测试 setup 中使用。
+ * 给玩家装备指定 防具（写入 equipment.防具）。仅在测试 setup 中使用。
  */
 export function withArmor(state: GameState, playerName: string, armorId: string): GameState {
   const player = state.players[playerName];
@@ -301,12 +301,13 @@ export function withArmor(state: GameState, playerName: string, armorId: string)
     ...state,
     players: {
       ...state.players,
-      [playerName]: { ...player, equipment: { ...player.equipment, armor: armorId } },
+      [playerName]: { ...player, equipment: { ...player.equipment, 防具: armorId } },
     },
   };
 }
 /**
- * 给玩家装备指定 weapon（写入 equipment.weapon）。仅在测试 setup 中使用。
+/**
+ * 给玩家装备指定 武器（写入 equipment.武器）。仅在测试 setup 中使用。
  */
 export function withWeapon(state: GameState, playerName: string, weaponId: string): GameState {
   const player = state.players[playerName];
@@ -314,7 +315,7 @@ export function withWeapon(state: GameState, playerName: string, weaponId: strin
     ...state,
     players: {
       ...state.players,
-      [playerName]: { ...player, equipment: { ...player.equipment, weapon: weaponId } },
+      [playerName]: { ...player, equipment: { ...player.equipment, 武器: weaponId } },
     },
   };
 }
@@ -339,7 +340,7 @@ export function withHand(state: GameState, playerName: string, cardIds: string[]
 export function withEquipment(
   state: GameState,
   playerName: string,
-  equipment: { weapon?: string; armor?: string; horsePlus?: string; horseMinus?: string },
+  equipment: { 武器?: string; 防具?: string; 防御马?: string; 进攻马?: string },
 ): GameState {
   const player = state.players[playerName];
   return {
@@ -350,4 +351,3 @@ export function withEquipment(
     },
   };
 }
-

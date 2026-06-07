@@ -4,8 +4,8 @@ import { makeServerEvent, makePlayerEvent } from '../event';
 
 export function register() {
   registerAtom({
-    type: 'rearrangeDeck',
-    apply(state: GameState, atom: Atom & { type: 'rearrangeDeck' }): GameState {
+    type: '整理牌堆',
+    apply(state: GameState, atom: Atom & { type: '整理牌堆' }): GameState {
       const topCardIds = atom.topCardIds as string[];
       const bottomCardIds = atom.bottomCardIds as string[];
 
@@ -20,7 +20,7 @@ export function register() {
 
       return { ...state, zones: { ...state.zones, deck: newDeck } };
     },
-    toEvents(state: GameState, atom: Atom & { type: 'rearrangeDeck' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '整理牌堆' }): AtomEventResult {
       const player = atom.player as string;
       const topCardIds = atom.topCardIds as string[];
       const bottomCardIds = atom.bottomCardIds as string[];

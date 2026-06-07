@@ -10,9 +10,9 @@ describe('孙尚香 - 枭姬', () => {
     })
     .act('发射 equipChanged 事件触发枭姬', ctx => {
       ctx.emitEvent({
-        type: 'equipChanged',
+        type: '装备变动',
         player: 'P1',
-        slot: 'weapon',
+        slot: '武器',
       });
     })
     .check('枭姬触发：手牌 +1', ctx => {

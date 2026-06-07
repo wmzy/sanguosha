@@ -68,7 +68,7 @@ describe('pending 自动调度（touchAndPersist 内 scheduleTimeout）', () => 
     const playerName = session.getPlayerName('debug-player');
     if (!playerName) return;
 
-    session.handleAction('debug-player', { type: 'endTurn', player: playerName });
+    session.handleAction('debug-player', { type: '结束回合', player: playerName });
 
     const pendingAfter = session.getPending();
     if (pendingAfter) {
@@ -91,7 +91,7 @@ describe('pending 自动调度（touchAndPersist 内 scheduleTimeout）', () => 
 
     // 模拟客户端基于过期快照操作：baseSeq=999 远小于 nextSeq
     const sentBefore = vi.mocked(mockWs.send).mock.calls.length;
-    session.handleAction('debug-player', { type: 'endTurn', player: playerName }, 999);
+    session.handleAction('debug-player', { type: '结束回合', player: playerName }, 999);
 
     // ws 不应收到任何 events 推送，也不会有 error 推送
     expect(vi.mocked(mockWs.send).mock.calls.length).toBe(sentBefore);
@@ -116,7 +116,7 @@ describe('pending 自动调度（touchAndPersist 内 scheduleTimeout）', () => 
 
     const beforeNextSeq = (session as unknown as { nextSeq: number }).nextSeq;
     const sentBefore = vi.mocked(mockWs.send).mock.calls.length;
-    session.handleAction('debug-player', { type: 'endTurn', player: playerName }, beforeNextSeq);
+    session.handleAction('debug-player', { type: '结束回合', player: playerName }, beforeNextSeq);
 
     // 应收到 events 推送
     expect(vi.mocked(mockWs.send).mock.calls.length).toBeGreaterThan(sentBefore);

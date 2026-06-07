@@ -34,7 +34,7 @@ interface PendingPrompt {
   requiredCard?: string;
   targetPlayer?: string;
   targetCardIds?: string[];
-  selectMode?: 'discard' | 'steal';
+  selectMode?: '弃置' | '获得';
   options?: PromptOption[];
   wuxieChain?: { attacker: string; cardId: string }[];
   sourceName?: string;
@@ -46,7 +46,7 @@ function extractPendingPrompt(state: GameState): PendingPrompt | null {
   const pending = state.pending;
   if (!pending) return null;
   switch (pending.type) {
-    case 'responseWindow':
+    case '响应窗口':
       switch (pending.window.type) {
         case 'killResponse':
           return {
@@ -108,29 +108,29 @@ function extractPendingPrompt(state: GameState): PendingPrompt | null {
         }
       }
       break;
-    case 'discardPhase':
-      return { type: 'discardPhase', text: `请弃掉 ${pending.min}~${pending.max} 张牌` };
-    case 'dyingWindow':
+    case '弃牌阶段':
+      return { type: '弃牌阶段', text: `请弃掉 ${pending.min}~${pending.max} 张牌` };
+    case '濒死窗口':
       return {
-        type: 'dyingWindow',
+        type: '濒死窗口',
         text: `${pending.dyingPlayer} 濒死！需要桃来救援`,
         dyingPlayer: pending.dyingPlayer,
         savers: pending.savers,
         currentSaver: pending.savers[pending.currentSaverIndex],
       };
-    case 'skillPrompt':
-      return { type: 'skillPrompt', text: pending.prompt.text, options: pending.prompt.options };
-    case 'selectCard':
+    case '技能选择':
+      return { type: '技能选择', text: pending.prompt.text, options: pending.prompt.options };
+    case '选择牌':
       return {
-        type: 'selectCard',
-        text: pending.mode === 'steal' ? '顺手牵羊：选择要获得的牌' : '过河拆桥：选择要弃掉的牌',
+        type: '选择牌',
+        text: pending.mode === '获得' ? '顺手牵羊：选择要获得的牌' : '过河拆桥：选择要弃掉的牌',
         targetPlayer: pending.target,
         targetCardIds: pending.cardIds,
         selectMode: pending.mode,
       };
-    case 'harvestSelection':
+    case '收获选牌':
       return {
-        type: 'harvestSelection',
+        type: '收获选牌',
         text: `五谷丰登：${pending.pickOrder[pending.currentPickerIndex]} 选牌`,
         responder: pending.pickOrder[pending.currentPickerIndex],
         targetCardIds: pending.revealedCards,
@@ -212,11 +212,11 @@ export function DebugPlayerList({
     const isMyTurn = state.currentPlayer === myName;
 
     const validActions: ValidAction[] = computeValidActions(state, myName);
-    const playCardAction = validActions.find(a => a.type === 'playCard');
+    const playCardAction = validActions.find(a => a.type === '打出一张牌');
     const playableCards = playCardAction?.cards ?? [];
-    const respondAction = validActions.find(a => a.type === 'respond');
-    const discardAction = validActions.find(a => a.type === 'discard');
-    const useSkillAction = validActions.find(a => a.type === 'useSkill');
+    const respondAction = validActions.find(a => a.type === '打出');
+    const discardAction = validActions.find(a => a.type === '弃置');
+    const useSkillAction = validActions.find(a => a.type === '使用技能');
     const availableSkills = useSkillAction?.skills ?? [];
 
     const selectedCardEntry = selectedCardId !== null
@@ -227,7 +227,7 @@ export function DebugPlayerList({
     const canPlay = selectedCardId !== null
       && isMyTurn
       && state.phase === '出牌'
-      && (!state.pending || state.pending.type === 'playPhase')
+      && (!state.pending || state.pending.type === '出牌阶段')
       && !!selectedCardEntry;
     const needsDiscard = discardAction != null;
     const discardMin = discardAction?.min ?? 0;
@@ -276,7 +276,7 @@ export function DebugPlayerList({
       validTargetList,
       handlePlayCard: () => {
         if (!selectedCardId || !isMyTurn) return;
-        sendGameAction({ type: 'playCard', player: myName, cardId: selectedCardId, target: selectedTarget ?? undefined });
+        sendGameAction({ type: '打出一张牌', player: myName, cardId: selectedCardId, target: selectedTarget ?? undefined });
         setSelectedCardId(null);
         setSelectedTarget(null);
       },
@@ -284,14 +284,14 @@ export function DebugPlayerList({
         if (!isMyTurn) return;
         if (needsDiscard) {
           if (selectedForDiscard.size === discardMin) {
-            sendGameAction({ type: 'discard', player: myName, cardIds: [...selectedForDiscard] });
+            sendGameAction({ type: '弃置', player: myName, cardIds: [...selectedForDiscard] });
             clearSelectedForDiscard();
             setSelectedCardId(null);
           }
           return;
         }
-        if (state.pending && state.pending.type !== 'playPhase') return;
-        sendGameAction({ type: 'endTurn', player: myName });
+        if (state.pending && state.pending.type !== '出牌阶段') return;
+        sendGameAction({ type: '结束回合', player: myName });
         setSelectedCardId(null);
         setSelectedTarget(null);
         clearSelectedForDiscard();
@@ -309,7 +309,7 @@ export function DebugPlayerList({
       },
       handleDiscard: () => {
         if (!needsDiscard || selectedForDiscard.size !== discardMin) return;
-        sendGameAction({ type: 'discard', player: myName, cardIds: [...selectedForDiscard] });
+        sendGameAction({ type: '弃置', player: myName, cardIds: [...selectedForDiscard] });
         clearSelectedForDiscard();
         setSelectedCardId(null);
       },
@@ -317,13 +317,13 @@ export function DebugPlayerList({
       hasDodge,
       respondAction,
       respondToKill: (playDodge: boolean) => {
-        if (state.pending?.type !== 'responseWindow' || state.pending.window.defender !== myName) return;
+        if (state.pending?.type !== '响应窗口' || state.pending.window.defender !== myName) return;
         const respondCards = respondAction?.cards ?? [];
         const cardId = playDodge ? respondCards[0] : undefined;
-        sendGameAction({ type: 'respond', player: myName, cardId });
+        sendGameAction({ type: '打出', player: myName, cardId });
       },
       respond: (cardId?: string) => {
-        if (state.pending?.type !== 'responseWindow') return;
+        if (state.pending?.type !== '响应窗口') return;
         if (state.pending.window.type === 'trickResponse' && state.pending.window.responders) {
           const passed = state.pending.window.passedResponders ?? [];
           const active = state.pending.window.responders.filter(p => !passed.includes(p));
@@ -331,42 +331,42 @@ export function DebugPlayerList({
         } else if (state.pending.window.defender !== myName) {
           return;
         }
-        sendGameAction({ type: 'respond', player: myName, cardId });
+        sendGameAction({ type: '打出', player: myName, cardId });
       },
       respondToDying: (saverName: string | null) => {
-        if (state.pending?.type !== 'dyingWindow') return;
+        if (state.pending?.type !== '濒死窗口') return;
         const currentSaver = state.pending.savers[state.pending.currentSaverIndex];
         if (!saverName) {
-          sendGameAction({ type: 'respond', player: currentSaver });
+          sendGameAction({ type: '打出', player: currentSaver });
           return;
         }
         if (saverName !== currentSaver) return;
         const saver = getPlayer(state, saverName);
         const peachId = saver.hand.find(id => state.cardMap[id]?.name === '桃');
-        sendGameAction({ type: 'respond', player: saverName, cardId: peachId });
+        sendGameAction({ type: '打出', player: saverName, cardId: peachId });
       },
       selectTargetCard: (cardId: string) => {
-        if (state.pending?.type !== 'selectCard') return;
-        sendGameAction({ type: 'respond', player: myName, cardIds: [cardId] });
+        if (state.pending?.type !== '选择牌') return;
+        sendGameAction({ type: '打出', player: myName, cardIds: [cardId] });
       },
       selectHarvestCard: (cardId: string) => {
-        if (state.pending?.type !== 'harvestSelection') return;
+        if (state.pending?.type !== '收获选牌') return;
         const currentPicker = state.pending.pickOrder[state.pending.currentPickerIndex];
         if (currentPicker !== myName) return;
-        sendGameAction({ type: 'respond', player: myName, cardId });
+        sendGameAction({ type: '打出', player: myName, cardId });
       },
       availableSkills,
       handleActivateSkill: (skillId: string, target?: string) => {
         if (!isMyTurn) return;
-        sendGameAction({ type: 'useSkill', player: myName, skillId, target });
+        sendGameAction({ type: '使用技能', player: myName, skillId, target });
       },
       selectedSkillCards,
       toggleSkillCardSelection: (cardId: string) => {
         toggleSelectedSkillCard(cardId);
       },
       handleSkillChoice: (choice: Json) => {
-        if (state.pending?.type !== 'skillPrompt') return;
-        sendGameAction({ type: 'skillChoice', player: myName, choice });
+        if (state.pending?.type !== '技能选择') return;
+        sendGameAction({ type: '技能选择', player: myName, choice });
         clearSelectedSkillCards();
       },
       myHand,
@@ -396,12 +396,12 @@ export function DebugPlayerList({
         saveState(state);
       },
       toggleAutoSkipWuxie: () => {
-        sendGameAction({ type: 'toggleAutoSkipWuxie' });
+        sendGameAction({ type: '切换自动跳过无懈可击' });
       },
       getDistance: (from: string, to: string) => getDistance(state, from, to),
       pending: state.pending,
       playerOps: operations,
-    };
+    } as unknown as GameBoardData;
   }, [
     state,
     perspective,

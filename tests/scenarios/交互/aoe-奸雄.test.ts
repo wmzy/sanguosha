@@ -2,7 +2,7 @@ import { describe, expect } from 'vitest';
 import { scenario, ScenarioContext } from '../../scenario-runner';
 
 function passAllTrickResponses(ctx: ScenarioContext): void {
-  while (ctx.state.pending?.type === 'responseWindow') {
+  while (ctx.state.pending?.type === '响应窗口') {
     const window = ctx.state.pending.window;
     if (window.type !== 'trickResponse') break;
     const responders = window.responders ?? [];
@@ -30,8 +30,8 @@ describe('AOE + 奸雄', () => {
       passAllTrickResponses(ctx);
     })
     .check('应进入 aoeResponse 阶段', ctx => {
-      expect(ctx.state.pending?.type).toBe('responseWindow');
-      if (ctx.state.pending?.type === 'responseWindow') {
+      expect(ctx.state.pending?.type).toBe('响应窗口');
+      if (ctx.state.pending?.type === '响应窗口') {
         if (ctx.state.pending.window.type === 'trickResponse') {
           passAllTrickResponses(ctx);
         }
@@ -39,8 +39,8 @@ describe('AOE + 奸雄', () => {
       }
     })
     .act('P2 不出闪受伤害', ctx => {
-      expect(ctx.state.pending?.type).toBe('responseWindow');
-      if (ctx.state.pending?.type === 'responseWindow') {
+      expect(ctx.state.pending?.type).toBe('响应窗口');
+      if (ctx.state.pending?.type === '响应窗口') {
         expect(ctx.state.pending.window.type).toBe('aoeResponse');
         const defender = ctx.state.pending.window.defender;
         expect(defender).toBe('P2');
@@ -74,8 +74,8 @@ describe('AOE + 奸雄', () => {
       passAllTrickResponses(ctx);
     })
     .check('应进入 aoeResponse 阶段', ctx => {
-      expect(ctx.state.pending?.type).toBe('responseWindow');
-      if (ctx.state.pending?.type === 'responseWindow') {
+      expect(ctx.state.pending?.type).toBe('响应窗口');
+      if (ctx.state.pending?.type === '响应窗口') {
         if (ctx.state.pending.window.type === 'trickResponse') {
           passAllTrickResponses(ctx);
         }
@@ -83,8 +83,8 @@ describe('AOE + 奸雄', () => {
       }
     })
     .act('P2 不出杀受伤害', ctx => {
-      expect(ctx.state.pending?.type).toBe('responseWindow');
-      if (ctx.state.pending?.type === 'responseWindow') {
+      expect(ctx.state.pending?.type).toBe('响应窗口');
+      if (ctx.state.pending?.type === '响应窗口') {
         expect(ctx.state.pending.window.type).toBe('aoeResponse');
         expect(ctx.state.pending.window.defender).toBe('P2');
         ctx.respond('P2');

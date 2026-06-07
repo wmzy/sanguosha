@@ -54,7 +54,7 @@ describe.skip('张角 - 雷击', () => {
     })
     .act('P1 打出闪触发雷击', ctx => {
       ctx.emitEvent({
-        type: 'cardPlayed',
+        type: '出牌',
         player: 'P1',
         cardId: ctx.findCard('P1', '闪')!,
       });
@@ -62,7 +62,7 @@ describe.skip('张角 - 雷击', () => {
     .check('雷击触发后创建 prompt 选择目标', ctx => {
       // 雷击需要选择目标角色
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
     })
     .run();
 
@@ -75,7 +75,7 @@ describe.skip('张角 - 雷击', () => {
     })
     .act('P1 打出闪触发雷击（红桃判定）', ctx => {
       ctx.emitEvent({
-        type: 'cardPlayed',
+        type: '出牌',
         player: 'P1',
         cardId: ctx.findCard('P1', '闪')!,
       });
@@ -95,15 +95,15 @@ describe.skip('张角 - 鬼道', () => {
     })
     .act('发射 judgeResult 事件触发鬼道', ctx => {
       ctx.emitEvent({
-        type: 'judgeResult',
+        type: '判定结果',
         player: 'P1',
         cardId: 'fake-judge-card',
-        result: 'red',
+        result: '红',
       });
     })
     .check('鬼道触发后创建技能选择提示', ctx => {
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
       const prompt = ctx.state.pending as any;
       expect(prompt.skillId).toBe('鬼道');
     })
@@ -119,17 +119,17 @@ describe.skip('张角 - 鬼道', () => {
     })
     .act('发射 judgeResult 事件触发鬼道', ctx => {
       ctx.emitEvent({
-        type: 'judgeResult',
+        type: '判定结果',
         player: 'P1',
         cardId: 'fake-judge-card',
-        result: 'red',
+        result: '红',
       });
     })
     .act('记录回答前手牌数', ctx => {
       ctx.snapshot('before-choice');
     })
     .act('选择不替换', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: false });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: false });
     })
     .check('手牌不变', ctx => {
       const diff = ctx.diff('before-choice');
@@ -147,15 +147,15 @@ describe.skip('张角 - 鬼道', () => {
     })
     .act('发射 judgeResult 事件触发鬼道', ctx => {
       ctx.emitEvent({
-        type: 'judgeResult',
+        type: '判定结果',
         player: 'P1',
         cardId: 'fake-judge-card',
-        result: 'red',
+        result: '红',
       });
     })
     .act('选择黑色手牌替换判定牌', ctx => {
       const cardId = ctx.findCard('P1', '杀')!;
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: cardId });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: cardId });
     })
     .check('选中的牌从手牌移出', ctx => {
       const diff = ctx.diff('initial');
@@ -205,7 +205,7 @@ describe('雷击（张角）v3 钩子骨架 — 真 game rule 占位', () => {
     };
     const { state, events } = applyAtoms(s1, [
       {
-        type: 'damage',
+        type: '造成伤害',
         target: 'P1',
         amount: 3,
         source: '张角',
@@ -216,7 +216,7 @@ describe('雷击（张角）v3 钩子骨架 — 真 game rule 占位', () => {
     // 默认 P1 health=4，受 3 点伤害后 health=1
     expect(state.players.P1.health).toBeLessThan(4);
     // server event payload 必须包含 `type: 'thunder'`（damage atom 对外协议）
-    const dmg = events.find((e) => e.type === 'damage');
+    const dmg = events.find((e) => e.type === '造成伤害');
     expect(dmg).toBeDefined();
     expect(dmg?.payload).toMatchObject({ type: 'thunder' });
   });

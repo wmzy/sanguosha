@@ -13,7 +13,7 @@ describe('V2 Engine - 动作验证', () => {
     it('非当前玩家不能出牌', () => {
       const state = setPlayPhase(createTestGame());
       const result = validateAction(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P2',
         cardId: state.players['P2'].hand[0],
       });
@@ -24,7 +24,7 @@ describe('V2 Engine - 动作验证', () => {
       const state = createTestGame();
       // phase = '准备'
       const result = validateAction(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: state.players['P1'].hand[0],
       });
@@ -34,7 +34,7 @@ describe('V2 Engine - 动作验证', () => {
     it('手牌中没有的牌不能出', () => {
       const state = setPlayPhase(createTestGame());
       const result = validateAction(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: 'fake-card-id',
       });
@@ -47,7 +47,7 @@ describe('V2 Engine - 动作验证', () => {
       const peachId = findCardInHand(state, 'P1', '桃')!;
 
       const result = validateAction(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: peachId,
       });
@@ -60,8 +60,8 @@ describe('V2 Engine - 动作验证', () => {
       const state = setPlayPhase(createTestGame());
       const actions = computeValidActions(state, 'P1');
       const types = actions.map((a) => a.type);
-      expect(types).toContain('playCard');
-      expect(types).toContain('endTurn');
+      expect(types).toContain('打出一张牌');
+      expect(types).toContain('结束回合');
     });
 
     it('非当前玩家没有可用操作', () => {
@@ -73,8 +73,8 @@ describe('V2 Engine - 动作验证', () => {
     it('杀只能出现在有合法目标时', () => {
       const state = setPlayPhase(createTestGame({ playerCount: 2 }));
       const actions = computeValidActions(state, 'P1');
-      const playAction = actions.find((a) => a.type === 'playCard');
-      if (playAction?.type !== 'playCard') return;
+      const playAction = actions.find((a) => a.type === '打出一张牌');
+      if (playAction?.type !== '打出一张牌') return;
 
       const killCard = playAction.cards.find((c) => {
         const card = state.cardMap[c.cardId];
@@ -167,7 +167,7 @@ describe('验证系统缺口', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectCard(state, 'P1', '过河拆桥');
     const _cardId = findCardInHand(state, 'P1', '过河拆桥')!;
-    const _step1 = computeValidActions(state, 'P1').find(a => a.type === 'playCard');
+    const _step1 = computeValidActions(state, 'P1').find(a => a.type === '打出一张牌');
     // validatePendingAction 对 selectCard 返回 null，不做任何检查
     // engine 的 handler 层（resolveSelectCard）会检查 action type
   });

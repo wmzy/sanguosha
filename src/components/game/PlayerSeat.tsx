@@ -50,7 +50,7 @@ const playerPanelWrapDim = css`
   opacity: 0.5;
 `;
 
-export const PlayerSeat = memo(function PlayerSeat({
+export const PlayerSeat = memo(({
   entry,
   cardMap,
   myName,
@@ -65,7 +65,7 @@ export const PlayerSeat = memo(function PlayerSeat({
   getDistance,
   setSelectedTarget,
   setPerspective,
-}: PlayerSeatProps) {
+}: PlayerSeatProps) => {
   const { name, panelData, role, alive, abilities } = entry;
 
   const clickable =

@@ -125,10 +125,10 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
   const isMyTurn = view.turn.currentPlayer === myId;
 
   const playCard = (cardId: string) => {
-    send({ type: 'action', action: { type: 'playCard', player: myId, cardId }, baseSeq: lastAppliedSeqRef.current });
+    send({ type: 'action', action: { type: '打出一张牌', player: myId, cardId }, baseSeq: lastAppliedSeqRef.current });
   };
   const endTurn = () => {
-    send({ type: 'action', action: { type: 'endTurn', player: myId }, baseSeq: lastAppliedSeqRef.current });
+    send({ type: 'action', action: { type: '结束回合', player: myId }, baseSeq: lastAppliedSeqRef.current });
   };
 
   return (

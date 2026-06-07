@@ -38,20 +38,20 @@ describe('胜利条件检查', () => {
     if (!killId) return;
 
     // P1 出杀 P2 → P2 不闪 → 受伤 → 濒死 → 不救 → 死亡
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
     if (r1.error) return;
 
     // P2 不闪 → 受伤
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
     // 遍历濒死窗口不救援 → P2 死亡
     let dyingState = r2.state;
-    while (dyingState.pending?.type === 'dyingWindow') {
+    while (dyingState.pending?.type === '濒死窗口') {
       const dp = dyingState.pending;
       const saver = dp.savers[dp.currentSaverIndex];
-      dyingState = engine(dyingState, { type: 'respond', player: saver }).state;
+      dyingState = engine(dyingState, { type: '打出', player: saver }).state;
     }
 
     // P2 是反贼，死亡后不应该触发主公胜利（因为反贼没全灭——P1 是主公不是反贼）
@@ -92,24 +92,24 @@ describe('胜利条件检查', () => {
     if (!killId) return;
 
     // P1 出杀 P2
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
     if (r1.error) return;
 
     // P2 不闪
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
     // 濒死窗口
-    expect(r2.state.pending?.type).toBe('dyingWindow');
-    if (r2.state.pending?.type !== 'dyingWindow') return;
+    expect(r2.state.pending?.type).toBe('濒死窗口');
+    if (r2.state.pending?.type !== '濒死窗口') return;
 
     // 遍历所有 savers 直到无人救 → 死亡
     let dyingState = r2.state;
-    while (dyingState.pending?.type === 'dyingWindow') {
+    while (dyingState.pending?.type === '濒死窗口') {
       const dp = dyingState.pending;
       const saver = dp.savers[dp.currentSaverIndex];
-      dyingState = engine(dyingState, { type: 'respond', player: saver }).state;
+      dyingState = engine(dyingState, { type: '打出', player: saver }).state;
     }
 
     // P2 应该已阵亡
@@ -157,11 +157,11 @@ describe('AOE 濒死后响应链恢复', () => {
     expect(aoeId).toBeDefined();
 
     // P1 出南蛮入侵
-    const r1pre = engine(s, { type: 'playCard', player: 'P1', cardId: aoeId! });
+    const r1pre = engine(s, { type: '打出一张牌', player: 'P1', cardId: aoeId! });
     expect(r1pre.error).toBeUndefined();
     // 先进入 trickResponse 窗口（无懈可击窗口）
-    expect(r1pre.state.pending?.type).toBe('responseWindow');
-    if (r1pre.state.pending?.type === 'responseWindow') {
+    expect(r1pre.state.pending?.type).toBe('响应窗口');
+    if (r1pre.state.pending?.type === '响应窗口') {
       expect(r1pre.state.pending.window.type).toBe('trickResponse');
     }
 
@@ -170,13 +170,13 @@ describe('AOE 濒死后响应链恢复', () => {
 
     expect(r1state.pending).not.toBeNull();
     const pending = r1state.pending!;
-    expect(pending.type).toBe('responseWindow');
-    if (pending.type !== 'responseWindow') return;
+    expect(pending.type).toBe('响应窗口');
+    if (pending.type !== '响应窗口') return;
     expect(pending.window.type).toBe('aoeResponse');
     if (pending.window.type !== 'aoeResponse') return;
 
     // P2 不出杀 → 受伤 → 濒死
-    const r2 = engine(r1state, { type: 'respond', player: pending.window.defender });
+    const r2 = engine(r1state, { type: '打出', player: pending.window.defender });
     expect(r2.error).toBeUndefined();
 
     const defender = pending.window.defender;
@@ -185,8 +185,8 @@ describe('AOE 濒死后响应链恢复', () => {
     if (defenderState.health > 0) return;
 
     // 濒死窗口
-    expect(r2.state.pending?.type).toBe('dyingWindow');
-    if (r2.state.pending?.type !== 'dyingWindow') return;
+    expect(r2.state.pending?.type).toBe('濒死窗口');
+    if (r2.state.pending?.type !== '濒死窗口') return;
 
     // 验证 resumeAoe 存在
     expect(r2.state.pending.resumeAoe).toBeDefined();
@@ -194,21 +194,21 @@ describe('AOE 濒死后响应链恢复', () => {
 
     // 遍历所有 saver 直到死亡或救活
     let dyingState = r2.state;
-    while (dyingState.pending?.type === 'dyingWindow') {
+    while (dyingState.pending?.type === '濒死窗口') {
       const dp = dyingState.pending;
       const saver = dp.savers[dp.currentSaverIndex];
-      dyingState = engine(dyingState, { type: 'respond', player: saver }).state;
+      dyingState = engine(dyingState, { type: '打出', player: saver }).state;
     }
 
     // 死亡后应该恢复 AOE 链（先进入下一个目标的无懈可击窗口）
     if (dyingState.pending) {
-      expect(dyingState.pending.type).toBe('responseWindow');
-      if (dyingState.pending.type === 'responseWindow') {
+      expect(dyingState.pending.type).toBe('响应窗口');
+      if (dyingState.pending.type === '响应窗口') {
         // per-target 无懈可击：先进入 trickResponse，pass 后才是 aoeResponse
         if (dyingState.pending.window.type === 'trickResponse') {
           dyingState = passAllTrickResponders(dyingState);
         }
-        if (dyingState.pending?.type === 'responseWindow') {
+        if (dyingState.pending?.type === '响应窗口') {
           expect(dyingState.pending.window.type).toBe('aoeResponse');
         }
       }
@@ -230,7 +230,7 @@ describe('桃园结义', () => {
     s = injectTrickCard(s, 'P1', '桃园结义');
     const cardId = findCardInHand(s, 'P1', '桃园结义');
 
-    const r = engine(s, { type: 'playCard', player: 'P1', cardId: cardId! });
+    const r = engine(s, { type: '打出一张牌', player: 'P1', cardId: cardId! });
     expect(r.error).toBeUndefined();
     expect(r.state.players.P1.health).toBe(p1max - 1);
     expect(r.state.players.P2.health).toBe(s.players.P2.maxHealth - 1);
@@ -244,7 +244,7 @@ describe('桃园结义', () => {
     s = injectTrickCard(s, 'P1', '桃园结义');
     const cardId = findCardInHand(s, 'P1', '桃园结义');
 
-    const r = engine(s, { type: 'playCard', player: 'P1', cardId: cardId! });
+    const r = engine(s, { type: '打出一张牌', player: 'P1', cardId: cardId! });
     expect(r.error).toBeUndefined();
     expect(r.state.players.P1.health).toBe(s.players.P1.maxHealth); // 不变
     expect(r.state.players.P2.health).toBe(s.players.P2.maxHealth); // +1
@@ -262,12 +262,12 @@ describe('五谷丰登', () => {
     expect(cardId).toBeDefined();
     if (!cardId) return;
 
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId, target: 'P1' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId, target: 'P1' });
     expect(r1.error).toBeUndefined();
 
     // 应该进入 harvestSelection pending
-    expect(r1.state.pending?.type).toBe('harvestSelection');
-    if (r1.state.pending?.type !== 'harvestSelection') return;
+    expect(r1.state.pending?.type).toBe('收获选牌');
+    if (r1.state.pending?.type !== '收获选牌') return;
     const harvest = r1.state.pending;
 
     // 翻出了 aliveCount 张牌
@@ -279,14 +279,14 @@ describe('五谷丰登', () => {
 
     // P1 选第 1 张
     const pick1 = harvest.revealedCards[0];
-    const r2 = engine(r1.state, { type: 'respond', player: 'P1', cardId: pick1 });
+    const r2 = engine(r1.state, { type: '打出', player: 'P1', cardId: pick1 });
     expect(r2.error).toBeUndefined();
     // P1 手牌应该多了这张
     expect(r2.state.players.P1.hand).toContain(pick1);
 
     // 轮到 P3 选牌
-    expect(r2.state.pending?.type).toBe('harvestSelection');
-    if (r2.state.pending?.type !== 'harvestSelection') return;
+    expect(r2.state.pending?.type).toBe('收获选牌');
+    if (r2.state.pending?.type !== '收获选牌') return;
     const h2 = r2.state.pending;
     expect(h2.currentPickerIndex).toBe(1);
     expect(h2.pickOrder[h2.currentPickerIndex]).toBe('P3');
@@ -295,13 +295,13 @@ describe('五谷丰登', () => {
 
     // P3 选第 2 张
     const pick2 = h2.revealedCards[0];
-    const r3 = engine(r2.state, { type: 'respond', player: 'P3', cardId: pick2 });
+    const r3 = engine(r2.state, { type: '打出', player: 'P3', cardId: pick2 });
     expect(r3.error).toBeUndefined();
     expect(r3.state.players.P3.hand).toContain(pick2);
 
     // 轮到 P2 选牌
-    expect(r3.state.pending?.type).toBe('harvestSelection');
-    if (r3.state.pending?.type !== 'harvestSelection') return;
+    expect(r3.state.pending?.type).toBe('收获选牌');
+    if (r3.state.pending?.type !== '收获选牌') return;
     const h3 = r3.state.pending;
     expect(h3.currentPickerIndex).toBe(2);
     expect(h3.pickOrder[h3.currentPickerIndex]).toBe('P2');
@@ -309,12 +309,12 @@ describe('五谷丰登', () => {
 
     // P2 选最后 1 张
     const pick3 = h3.revealedCards[0];
-    const r4 = engine(r3.state, { type: 'respond', player: 'P2', cardId: pick3 });
+    const r4 = engine(r3.state, { type: '打出', player: 'P2', cardId: pick3 });
     expect(r4.error).toBeUndefined();
     expect(r4.state.players.P2.hand).toContain(pick3);
 
     // 选完后回到出牌阶段
-    expect(r4.state.pending?.type).toBe('playPhase');
+    expect(r4.state.pending?.type).toBe('出牌阶段');
   });
 
   it('牌堆不足时只翻出可用数量的牌', () => {
@@ -327,12 +327,12 @@ describe('五谷丰登', () => {
     expect(cardId).toBeDefined();
     if (!cardId) return;
 
-    const r = engine(s, { type: 'playCard', player: 'P1', cardId, target: 'P1' });
+    const r = engine(s, { type: '打出一张牌', player: 'P1', cardId, target: 'P1' });
     expect(r.error).toBeUndefined();
 
     // 只翻了 2 张（牌堆只有 2 张，但 5 个存活玩家）
-    expect(r.state.pending?.type).toBe('harvestSelection');
-    if (r.state.pending?.type !== 'harvestSelection') return;
+    expect(r.state.pending?.type).toBe('收获选牌');
+    if (r.state.pending?.type !== '收获选牌') return;
     expect(r.state.pending.revealedCards.length).toBe(2);
   });
 
@@ -344,13 +344,13 @@ describe('五谷丰登', () => {
     expect(cardId).toBeDefined();
     if (!cardId) return;
 
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId, target: 'P1' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId, target: 'P1' });
     expect(r1.error).toBeUndefined();
-    expect(r1.state.pending?.type).toBe('harvestSelection');
-    if (r1.state.pending?.type !== 'harvestSelection') return;
+    expect(r1.state.pending?.type).toBe('收获选牌');
+    if (r1.state.pending?.type !== '收获选牌') return;
 
     // P2 尝试选牌（应该是 P1 的回合）
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2', cardId: r1.state.pending.revealedCards[0] });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2', cardId: r1.state.pending.revealedCards[0] });
     expect(r2.error).toBeDefined();
   });
 
@@ -362,12 +362,12 @@ describe('五谷丰登', () => {
     expect(cardId).toBeDefined();
     if (!cardId) return;
 
-    const r = engine(s, { type: 'playCard', player: 'P1', cardId, target: 'P1' });
+    const r = engine(s, { type: '打出一张牌', player: 'P1', cardId, target: 'P1' });
     expect(r.error).toBeUndefined();
 
     // 2 个存活玩家 → 翻 2 张
-    expect(r.state.pending?.type).toBe('harvestSelection');
-    if (r.state.pending?.type !== 'harvestSelection') return;
+    expect(r.state.pending?.type).toBe('收获选牌');
+    if (r.state.pending?.type !== '收获选牌') return;
     expect(r.state.pending.revealedCards.length).toBe(2);
     expect(r.state.pending.pickOrder.length).toBe(2);
   });
@@ -386,19 +386,19 @@ describe('回合重置', () => {
     if (!killId) return;
 
     // P1 出杀
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
     if (r1.error) return;
 
     // P2 不闪
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
     if (r2.error) return;
 
     expect(r2.state.turn.killsPlayed).toBe(1);
 
     // P1 结束回合
-    const r3 = engine(r2.state, { type: 'endTurn', player: 'P1' });
+    const r3 = engine(r2.state, { type: '结束回合', player: 'P1' });
     if (r3.error) return;
 
     // P2 回合 → P2 出牌阶段
@@ -449,20 +449,20 @@ describe('完整游戏流程', () => {
     expect(killId).toBeDefined();
 
     // P1 出杀 P2
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId: killId!, target: 'P2' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId: killId!, target: 'P2' });
     expect(r1.error).toBeUndefined();
-    expect(r1.state.pending?.type).toBe('responseWindow');
+    expect(r1.state.pending?.type).toBe('响应窗口');
 
     // P2 不闪
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
     // 遍历濒死窗口
     let currentState = r2.state;
-    while (currentState.pending?.type === 'dyingWindow') {
+    while (currentState.pending?.type === '濒死窗口') {
       const dp = currentState.pending;
       const saver = dp.savers[dp.currentSaverIndex];
-      currentState = engine(currentState, { type: 'respond', player: saver }).state;
+      currentState = engine(currentState, { type: '打出', player: saver }).state;
     }
 
     // P2 死亡 → 反贼全灭 → 主公胜
@@ -485,19 +485,19 @@ describe('完整游戏流程', () => {
     expect(discardCount).toBeGreaterThan(0);
 
     // P1 结束回合
-    const r1 = engine(s, { type: 'endTurn', player: 'P1' });
+    const r1 = engine(s, { type: '结束回合', player: 'P1' });
     expect(r1.error).toBeUndefined();
 
     // 应该进入弃牌阶段
-    expect(r1.state.pending?.type).toBe('discardPhase');
-    if (r1.state.pending?.type !== 'discardPhase') return;
+    expect(r1.state.pending?.type).toBe('弃牌阶段');
+    if (r1.state.pending?.type !== '弃牌阶段') return;
 
     expect(r1.state.pending.min).toBe(discardCount);
     expect(r1.state.pending.max).toBe(discardCount);
 
     // 弃牌
     const discardIds = p1hand.slice(0, discardCount);
-    const r2 = engine(r1.state, { type: 'discard', player: 'P1', cardIds: discardIds });
+    const r2 = engine(r1.state, { type: '弃置', player: 'P1', cardIds: discardIds });
     expect(r2.error).toBeUndefined();
 
     // 弃牌后应该自动切换到 P2 并推进到出牌阶段
@@ -524,19 +524,19 @@ describe('决斗完整流程', () => {
     if (!duelId) return;
 
     // P1 对 P2 用决斗
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId: duelId, target: 'P2' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId: duelId, target: 'P2' });
     expect(r1.error).toBeUndefined();
     if (r1.error) return;
 
     // 跳过无懈可击
     let currentState = r1.state;
-    while (currentState.pending?.type === 'responseWindow' && currentState.pending.window.type === 'trickResponse') {
-      currentState = engine(currentState, { type: 'respond', player: currentState.pending.window.defender }).state;
+    while (currentState.pending?.type === '响应窗口' && currentState.pending.window.type === 'trickResponse') {
+      currentState = engine(currentState, { type: '打出', player: currentState.pending.window.defender }).state;
     }
 
     // 应该是 duelResponse
-    expect(currentState.pending?.type).toBe('responseWindow');
-    if (currentState.pending?.type !== 'responseWindow') return;
+    expect(currentState.pending?.type).toBe('响应窗口');
+    if (currentState.pending?.type !== '响应窗口') return;
     expect(currentState.pending.window.type).toBe('duelResponse');
     if (currentState.pending.window.type !== 'duelResponse') return;
 
@@ -544,17 +544,17 @@ describe('决斗完整流程', () => {
     const p2kill = findCardInHand(currentState, 'P2', '杀');
     expect(p2kill).toBeDefined();
     if (!p2kill) return;
-    const r2 = engine(currentState, { type: 'respond', player: 'P2', cardId: p2kill });
+    const r2 = engine(currentState, { type: '打出', player: 'P2', cardId: p2kill });
     expect(r2.error).toBeUndefined();
 
     // 应该交换攻守，轮到 P1 出杀
-    expect(r2.state.pending?.type).toBe('responseWindow');
-    if (r2.state.pending?.type !== 'responseWindow') return;
+    expect(r2.state.pending?.type).toBe('响应窗口');
+    if (r2.state.pending?.type !== '响应窗口') return;
     expect(r2.state.pending.window.type).toBe('duelResponse');
     expect(r2.state.pending.window.defender).toBe('P1');
 
     // P1 不出 → 受伤
-    const r3 = engine(r2.state, { type: 'respond', player: 'P1' });
+    const r3 = engine(r2.state, { type: '打出', player: 'P1' });
     expect(r3.error).toBeUndefined();
     expect(r3.state.players.P1.health).toBeLessThan(s.players.P1.maxHealth);
   });
@@ -580,16 +580,16 @@ describe('濒死救援', () => {
     if (!killId) return;
 
     // P1 出杀 P2
-    const r1 = engine(s, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(s, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
     if (r1.error) return;
 
     // P2 不闪 → 受伤 → 濒死
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
-    expect(r2.state.pending?.type).toBe('dyingWindow');
-    if (r2.state.pending?.type !== 'dyingWindow') return;
+    expect(r2.state.pending?.type).toBe('濒死窗口');
+    if (r2.state.pending?.type !== '濒死窗口') return;
     expect(r2.state.pending.dyingPlayer).toBe('P2');
 
     // P1 有桃，先救
@@ -597,7 +597,7 @@ describe('濒死救援', () => {
     expect(peachId).toBeDefined();
     if (!peachId) return;
 
-    const r3 = engine(r2.state, { type: 'respond', player: 'P1', cardId: peachId });
+    const r3 = engine(r2.state, { type: '打出', player: 'P1', cardId: peachId });
     expect(r3.error).toBeUndefined();
 
     // P2 应该被救回

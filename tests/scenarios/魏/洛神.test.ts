@@ -9,7 +9,7 @@ describe('甄姬 - 洛神', () => {
     })
     .act('发射准备阶段事件触发洛神', ctx => {
       ctx.emitEvent({
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '准备',
         player: 'P1',
       });
@@ -32,7 +32,7 @@ describe('甄姬 - 洛神', () => {
     })
     .act('发射准备阶段事件触发洛神', ctx => {
       ctx.emitEvent({
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '准备',
         player: 'P1',
       });

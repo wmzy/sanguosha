@@ -45,7 +45,7 @@ describe('诸葛亮 - 空城（v2 validation 路径）', () => {
       ctx.playCard('P1', killId, 'P2');
     })
     .check('杀成功指定 P2（进入响应窗口）', ctx => {
-      expect(ctx.state.pending?.type).toBe('responseWindow');
+      expect(ctx.state.pending?.type).toBe('响应窗口');
     })
     .run();
 });
@@ -69,7 +69,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
       const killId = ctx.findCard('P1', '杀')!;
       ctx.applyAtoms([
         {
-          type: 'becomeTarget',
+          type: '成为目标',
           cardId: killId,
           source: 'P1',
           target: 'P2',
@@ -78,7 +78,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
     })
     .check('serverLog 末尾不是 becomeTarget 事件（被 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).not.toBe('becomeTarget');
+      expect(last?.type).not.toBe('成为目标');
     })
     .run();
 
@@ -92,7 +92,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
       const killId = ctx.findCard('P1', '杀')!;
       ctx.applyAtoms([
         {
-          type: 'becomeTarget',
+          type: '成为目标',
           cardId: killId,
           source: 'P1',
           target: 'P2',
@@ -101,7 +101,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（有手牌不阻）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('becomeTarget');
+      expect(last?.type).toBe('成为目标');
     })
     .run();
 
@@ -123,7 +123,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
       const killId = ctx.findCard('P1', '杀')!;
       ctx.applyAtoms([
         {
-          type: 'becomeTarget',
+          type: '成为目标',
           cardId: killId,
           source: 'P1',
           target: 'P2',
@@ -132,7 +132,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（无空城）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('becomeTarget');
+      expect(last?.type).toBe('成为目标');
     })
     .run();
 });

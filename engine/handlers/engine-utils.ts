@@ -26,7 +26,7 @@ export function applyDamage(
   cardId?: string,
 ): EngineResult {
   const damageAtom: Atom = {
-    type: 'damage',
+    type: '造成伤害',
     target,
     amount,
     ...(source !== undefined ? { source } : {}),
@@ -36,7 +36,7 @@ export function applyDamage(
   let allPE = damagePE;
 
   const gameEvent: GameEvent = {
-    type: 'damageReceived',
+    type: '受到伤害',
     target,
     source: source ?? '',
     amount,
@@ -59,9 +59,9 @@ export function applyDamage(
   if (targetState.health <= 0 && targetState.info.alive) {
     const dyingPending = createDyingPending(s, target, source);
     const { state: dyingState, events: dyingEvents, playerEvents: dyingPE } = applyAtoms(s, [
-      { type: 'pushPending', action: dyingPending },
+      { type: '推入待定', action: dyingPending },
     ]);
-    const dyingEvent = makeServerEvent('dying', {
+    const dyingEvent = makeServerEvent('濒死', {
       player: target,
       ...(source ? { source } : {}),
     });
@@ -74,7 +74,6 @@ export function applyDamage(
 
   return { state: s, events: allEvents, playerEvents: allPE };
 }
-
 
 export function createDyingPending(state: GameState, dyingPlayer: string, _source?: string): PendingDyingWindow {
   const timeout = TIMEOUT_DEFAULTS.dyingResponse;
@@ -89,12 +88,12 @@ export function createDyingPending(state: GameState, dyingPlayer: string, _sourc
   const savers = [...others, dyingPlayer];
   return {
     id: createPendingId(),
-    type: 'dyingWindow',
+    type: '濒死窗口',
     dyingPlayer,
     currentSaverIndex: 0,
     savers,
     timeout,
     deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: savers[0] },
+    onTimeout: { type: '打出', player: savers[0] },
   };
 }

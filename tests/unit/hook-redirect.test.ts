@@ -20,9 +20,9 @@ describe('registerAtomHook redirect', () => {
 
   it('onBefore 返回 redirect: newTarget 改写 damage.target', () => {
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       filter(_state, atom) {
-        return atom.type === 'damage' && (atom.target as string) === 'P1';
+        return atom.type === '造成伤害' && (atom.target as string) === 'P1';
       },
       onBefore() {
         return { redirect: 'P2' };
@@ -31,11 +31,11 @@ describe('registerAtomHook redirect', () => {
 
     const s0 = setHealth(setHealth(createTestGame(), 'P1', 4), 'P2', 4);
     const { state, events } = applyAtoms(s0, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P3' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P3' },
     ]);
     expect(state.players.P1.health).toBe(4);
     expect(state.players.P2.health).toBe(3);
-    const dmg = events.find(e => e.type === 'damage');
+    const dmg = events.find(e => e.type === '造成伤害');
     expect(dmg?.payload).toMatchObject({ target: 'P2' });
   });
 });

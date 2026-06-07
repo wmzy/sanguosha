@@ -59,7 +59,7 @@ export function registerCharacterTriggers(
     if (!def.trigger) continue;
     newTriggers.push({
       event: def.trigger.event,
-      source: 'character' as const,
+      source: '角色' as const,
       skillId: ability.name,
       player,
       priority: ability.passive ? 0 : 5,
@@ -68,23 +68,13 @@ export function registerCharacterTriggers(
 
     if (ability.modifiers) {
       for (const mod of ability.modifiers) {
-        s = applyAtom(s, { type: 'setVar', player, key: mod, value: true });
+        s = applyAtom(s, { type: '设置变量', player, key: mod, value: true });
       }
     }
   }
 
   return { ...s, triggers: [...s.triggers, ...newTriggers] };
 }
-
-const EQUIPMENT_SKILL_MAP: Record<string, string> = {
-  诸葛连弩: 'unlimitedKills',
-  八卦阵: 'judgeDodge',
-  仁王盾: 'blockBlackKill',
-  青龙偃月刀: 'chaseDodge',
-  丈八蛇矛: 'dualWeapon',
-  青釭剑: 'ignoreArmor',
-  贯石斧: 'forceHit',
-};
 
 export function registerEquipmentTriggers(
   state: GameState,
@@ -94,18 +84,16 @@ export function registerEquipmentTriggers(
   const card = state.cardMap[cardId];
   if (!card) return state;
 
-  const skillId = EQUIPMENT_SKILL_MAP[card.name];
-  if (!skillId) return state;
-
-  const def = registry.get(skillId);
+  // skill id === card.name（业务标识符中文化），直接用 card.name 查 registry。
+  const def = registry.get(card.name);
   if (!def) return state;
   // v3-only 装备技能不进入 v2 state.triggers。
   if (!def.trigger) return state;
 
   const newTrigger: TriggerRule = {
     event: def.trigger.event,
-    source: 'equipment',
-    skillId,
+    source: '装备',
+    skillId: card.name,
     player,
     priority: 3,
     ...(def.trigger.optional ? { optional: true } : {}),
@@ -123,13 +111,11 @@ export function unregisterEquipmentTriggers(
   const card = state.cardMap[cardId];
   if (!card) return state;
 
-  const skillId = EQUIPMENT_SKILL_MAP[card.name];
-  if (!skillId) return state;
-
+  // skill id === card.name（业务标识符中文化）。
   return {
     ...state,
     triggers: state.triggers.filter(
-      (t) => !(t.player === player && t.source === 'equipment' && t.skillId === skillId),
+      (t) => !(t.player === player && t.source === '装备' && t.skillId === card.name),
     ),
   };
 }
@@ -156,15 +142,15 @@ export function emitEvent(
     // 此处 continue 是防御性兜底。
     if (!def.trigger) continue;
 
-    if (event.type === 'phaseBegin') {
-      const phaseEvent = event as { type: 'phaseBegin'; phase: string; player: string };
+    if (event.type === '阶段开始') {
+      const phaseEvent = event as { type: '阶段开始'; phase: string; player: string };
       if (trigger.player !== phaseEvent.player) continue;
     }
     // phase 字段对所有事件类型生效（修 §4.4）。
     // - phaseBegin / phaseEnd: 读 event.phase
     // - 其他事件（cardPlayed 等）: 读 state.phase（当前阶段）
     if (def.trigger.phase) {
-      if (event.type === 'phaseBegin' || event.type === 'phaseEnd') {
+      if (event.type === '阶段开始' || event.type === '阶段结束') {
         const eventPhase = (event as { phase: string }).phase;
         if (eventPhase !== def.trigger.phase) continue;
       } else {
@@ -195,7 +181,7 @@ export function clearTurnVars(state: GameState): GameState {
   let s = state;
   for (const player of getAlivePlayerNames(s)) {
     s = applyAtom(s, {
-      type: 'clearVarPattern',
+      type: '清空变量',
       player,
       pattern: CLEAR_TURN_PATTERN,
     });

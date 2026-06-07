@@ -5,8 +5,8 @@ import { updatePlayer } from '../state';
 
 export function register() {
   registerAtom({
-    type: 'discard',
-    apply(state: GameState, atom: Atom & { type: 'discard' }): GameState {
+    type: '弃置',
+    apply(state: GameState, atom: Atom & { type: '弃置' }): GameState {
       const player = atom.player as string;
       const cardIds = atom.cardIds as string[];
       const cardIdSet = new Set(cardIds);
@@ -20,12 +20,12 @@ export function register() {
         },
       };
     },
-    toEvents(_state: GameState, atom: Atom & { type: 'discard' }): AtomEventResult {
+    toEvents(_state: GameState, atom: Atom & { type: '弃置' }): AtomEventResult {
       const player = atom.player as string;
       const cardIds = atom.cardIds as string[];
       const payload: Json = { player, cardIds };
-      const server = makeServerEvent('cardsDiscarded', payload);
-      return [server, new Map(), makePlayerEvent('cardsDiscarded', payload)];
+      const server = makeServerEvent('弃置', payload);
+      return [server, new Map(), makePlayerEvent('弃置', payload)];
     },
   });
 }

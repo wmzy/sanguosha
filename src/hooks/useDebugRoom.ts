@@ -13,7 +13,6 @@ import type { GameState } from '../../engine/types';
 import type { Operation } from '../../shared/log';
 import type { RoomInfo } from '../../server/protocol';
 
-
 export interface DebugUiState {
   playerCount: number;
   error: string | null;

@@ -42,7 +42,7 @@ describe('八卦阵 useCard 阶段完整判定（真 game rule）', () => {
 
   it('装备八卦阵，deck 顶牌为红桃 → baguaJudgeResult=red → damage cancel', () => {
     let s0 = createTestGame({ deck: ['ht5'] });
-    s0 = withArmor(s0, 'P1', 'bagua');
+    s0 = withArmor(s0, 'P1', '八卦阵');
     s0 = setHealth(s0, 'P1', 4);
     s0 = {
       ...s0,
@@ -54,14 +54,14 @@ describe('八卦阵 useCard 阶段完整判定（真 game rule）', () => {
     };
     // becomeTarget 钩子：自动读 deck 顶 ht5（红）→ 写入 state.localVars.baguaJudgeResult='red'
     const becomeAtom: Atom = {
-      type: 'becomeTarget',
+      type: '成为目标',
       cardId: 'kill1',
       source: 'P2',
       target: 'P1',
     };
     const s1 = applyAtoms(s0, [becomeAtom]).state;
     const { state } = applyAtoms(s1, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     // baguaJudgeResult='red' → damage cancel → P1 health=4
     expect(state.players.P1.health).toBe(4);
@@ -69,7 +69,7 @@ describe('八卦阵 useCard 阶段完整判定（真 game rule）', () => {
 
   it('装备八卦阵，deck 顶牌为黑桃 → baguaJudgeResult=black → damage 不 cancel', () => {
     let s0 = createTestGame({ deck: ['st5'] });
-    s0 = withArmor(s0, 'P1', 'bagua');
+    s0 = withArmor(s0, 'P1', '八卦阵');
     s0 = setHealth(s0, 'P1', 4);
     s0 = {
       ...s0,
@@ -80,14 +80,14 @@ describe('八卦阵 useCard 阶段完整判定（真 game rule）', () => {
       },
     };
     const becomeAtom: Atom = {
-      type: 'becomeTarget',
+      type: '成为目标',
       cardId: 'kill1',
       source: 'P2',
       target: 'P1',
     };
     const s1 = applyAtoms(s0, [becomeAtom]).state;
     const { state } = applyAtoms(s1, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     // baguaJudgeResult='black' → damage 不 cancel → P1 health=3
     expect(state.players.P1.health).toBe(3);
@@ -97,21 +97,21 @@ describe('八卦阵 useCard 阶段完整判定（真 game rule）', () => {
     // 兼容路径：deck 空（reshuffle 尚未触发）→ 钩子 no-op，bagua damage onBefore
     // 走默认 'red' 占位 cancel 行为。
     let s0: GameState = createTestGame({ deck: [] });
-    s0 = withArmor(s0, 'P1', 'bagua');
+    s0 = withArmor(s0, 'P1', '八卦阵');
     s0 = setHealth(s0, 'P1', 4);
     s0 = {
       ...s0,
       cardMap: { ...s0.cardMap, kill1: makeKill('kill1', '♠', 'A') },
     };
     const becomeAtom: Atom = {
-      type: 'becomeTarget',
+      type: '成为目标',
       cardId: 'kill1',
       source: 'P2',
       target: 'P1',
     };
     const s1 = applyAtoms(s0, [becomeAtom]).state;
     const { state } = applyAtoms(s1, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     expect(state.players.P1.health).toBe(4);
   });

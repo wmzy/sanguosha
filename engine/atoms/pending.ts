@@ -9,25 +9,25 @@ export function createPendingId(): string {
 
 export function register() {
   registerAtom({
-    type: 'pushPending',
-    apply(state: GameState, atom: Atom & { type: 'pushPending'; action: PendingAction }) {
+    type: '推入待定',
+    apply(state: GameState, atom: Atom & { type: '推入待定'; action: PendingAction }) {
       const action = atom.action.id ? atom.action : { ...atom.action, id: createPendingId() };
       return { ...state, pending: action };
     },
-    toEvents(_state: GameState, atom: Atom & { type: 'pushPending'; action: PendingAction }): AtomEventResult {
+    toEvents(_state: GameState, atom: Atom & { type: '推入待定'; action: PendingAction }): AtomEventResult {
       const action = atom.action.id ? atom.action : { ...atom.action, id: createPendingId() };
-      const server = makeServerEvent('pushPending', asJson(action));
+      const server = makeServerEvent('推入待定', asJson(action));
       return [server, new Map(), null];
     },
   });
 
   registerAtom({
-    type: 'popPending',
-    apply(state: GameState, _atom: Atom & { type: 'popPending' }) {
+    type: '弹出待定',
+    apply(state: GameState, _atom: Atom & { type: '弹出待定' }) {
       return { ...state, pending: null };
     },
-    toEvents(_state: GameState, _atom: Atom & { type: 'popPending' }): AtomEventResult {
-      const server = makeServerEvent('popPending', {});
+    toEvents(_state: GameState, _atom: Atom & { type: '弹出待定' }): AtomEventResult {
+      const server = makeServerEvent('弹出待定', {});
       return [server, new Map(), null];
     },
   });

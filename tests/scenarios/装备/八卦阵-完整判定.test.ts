@@ -25,7 +25,7 @@ describe('八卦阵完整判定（真 game rule）', () => {
 
   it('判定红桃（ctx.baguaJudgeResult=red）→ 视为已打出闪，damage cancel', () => {
     let s0 = createTestGame();
-    s0 = withArmor(s0, 'P1', 'bagua');
+    s0 = withArmor(s0, 'P1', '八卦阵');
     s0 = setHealth(s0, 'P1', 4);
     const s1: GameState = {
       ...s0,
@@ -45,17 +45,17 @@ describe('八卦阵完整判定（真 game rule）', () => {
     // 注入判定结果为红
     const s2: GameState = {
       ...s1,
-      localVars: { ...(s1.localVars ?? {}), baguaJudgeResult: 'red' },
+      localVars: { ...(s1.localVars ?? {}), baguaJudgeResult: '红' },
     };
     const { state } = applyAtoms(s2, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     expect(state.players.P1.health).toBe(4);
   });
 
   it('判定黑桃（ctx.baguaJudgeResult=black）→ 不视为闪，damage 仍生效', () => {
     let s0 = createTestGame();
-    s0 = withArmor(s0, 'P1', 'bagua');
+    s0 = withArmor(s0, 'P1', '八卦阵');
     s0 = setHealth(s0, 'P1', 4);
     const s1: GameState = {
       ...s0,
@@ -74,17 +74,17 @@ describe('八卦阵完整判定（真 game rule）', () => {
     };
     const s2: GameState = {
       ...s1,
-      localVars: { ...(s1.localVars ?? {}), baguaJudgeResult: 'black' },
+      localVars: { ...(s1.localVars ?? {}), baguaJudgeResult: '黑' },
     };
     const { state } = applyAtoms(s2, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     expect(state.players.P1.health).toBe(3);
   });
 
   it('ctx.baguaJudgeResult 缺失 → 占位视为红（damage cancel）', () => {
     let s0 = createTestGame();
-    s0 = withArmor(s0, 'P1', 'bagua');
+    s0 = withArmor(s0, 'P1', '八卦阵');
     s0 = setHealth(s0, 'P1', 4);
     const s1: GameState = {
       ...s0,
@@ -102,7 +102,7 @@ describe('八卦阵完整判定（真 game rule）', () => {
       },
     };
     const { state } = applyAtoms(s1, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     expect(state.players.P1.health).toBe(4);
   });

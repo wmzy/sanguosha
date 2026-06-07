@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyAtoms } from "@engine/atom";
+import { applyAtoms } from '@engine/atom';
 import { createTestGame } from '../engine-helpers';
 import '@engine/atoms/index';
 
@@ -15,8 +15,8 @@ describe('toEvents 与 apply 一致性', () => {
       cardMap: { ...state.cardMap, c1: cardC1, c2: cardC2, c3: cardC3 },
     };
     const before = state;
-    const result = applyAtoms(before, [{ type: 'judge', player: 'P1' }]);
-    const judgeEvent = result.state.serverLog.find(e => e.type === 'judge');
+    const result = applyAtoms(before, [{ type: '判定', player: 'P1' }]);
+    const judgeEvent = result.state.serverLog.find(e => e.type === '判定');
     expect(judgeEvent).toBeDefined();
     const payload = judgeEvent!.payload as { player: string; cardId: string | null; suit: string; rank: string; result: string };
     expect(payload.cardId).not.toBeNull();
@@ -40,8 +40,8 @@ describe('toEvents 与 apply 一致性', () => {
         c3: { id: 'c3', name: '桃', type: '基本牌', subtype: '桃', suit: '♣', rank: '5', description: '' },
       },
     };
-    const result = applyAtoms(state, [{ type: 'draw', player: 'P1', count: 2 }]);
-    const drawEvent = result.state.serverLog.find(e => e.type === 'draw');
+    const result = applyAtoms(state, [{ type: '摸牌', player: 'P1', count: 2 }]);
+    const drawEvent = result.state.serverLog.find(e => e.type === '摸牌');
     expect(drawEvent).toBeDefined();
     const payload = drawEvent!.payload as { player: string; count: number; cards: string[] };
     expect(payload.count).toBe(2);
@@ -55,8 +55,8 @@ describe('toEvents 与 apply 一致性', () => {
   it('draw: deck 充足时，toEvents payload 包含 deck 前几张的牌', () => {
     const state = createTestGame({ playerCount: 2, playPhase: true });
     const topThree = state.zones.deck.slice(0, 3);
-    const result = applyAtoms(state, [{ type: 'draw', player: 'P1', count: 3 }]);
-    const drawEvent = result.state.serverLog.find(e => e.type === 'draw');
+    const result = applyAtoms(state, [{ type: '摸牌', player: 'P1', count: 3 }]);
+    const drawEvent = result.state.serverLog.find(e => e.type === '摸牌');
     expect(drawEvent).toBeDefined();
     const payload = drawEvent!.payload as { count: number; cards: string[] };
     expect(payload.count).toBe(3);

@@ -11,7 +11,7 @@ export function resolveSelectCard(
   action: GameAction,
   pending: PendingSelectCard,
 ): EngineResult {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return { state, events: [], error: '选牌需要 respond 动作' };
   }
   if (action.player !== pending.player) {
@@ -34,23 +34,23 @@ export function resolveSelectCard(
   // 执行效果：注：源牌（锦囊牌）已在 handleTrickCard 中移入弃牌堆，此处不再重复移动
   const atoms: Atom[] = [];
 
-  if (pending.mode === 'steal') {
+  if (pending.mode === '获得') {
     atoms.push(...selectedIds.map(cardId => ({
-      type: 'moveCard' as const,
+      type: '移动牌' as const,
       cardId,
-      from: { zone: 'hand' as const, player: pending.target },
-      to: { zone: 'hand' as const, player: pending.player },
+      from: { zone: '手牌' as const, player: pending.target },
+      to: { zone: '手牌' as const, player: pending.player },
     })));
   } else {
     atoms.push(...selectedIds.map(cardId => ({
-      type: 'moveCard' as const,
+      type: '移动牌' as const,
       cardId,
-      from: { zone: 'hand' as const, player: pending.target },
-      to: { zone: 'discardPile' as const },
+      from: { zone: '手牌' as const, player: pending.target },
+      to: { zone: '弃牌堆' as const },
     })));
   }
 
-  atoms.push({ type: 'popPending' });
+  atoms.push({ type: '弹出待定' });
   const result = applyAtoms(state, atoms);
   return { state: result.state, events: result.events };
 }

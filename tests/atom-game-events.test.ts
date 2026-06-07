@@ -48,7 +48,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
           type: 'atoms',
           ops: [
             {
-              type: 'damage',
+              type: '造成伤害',
               target: 'P1',
               amount: 1,
               source: 'P2',
@@ -76,7 +76,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
           type: 'atoms',
           ops: [
             {
-              type: 'damage',
+              type: '造成伤害',
               target: 'P1',
               amount: 1,
               source: 'P2',
@@ -102,8 +102,8 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
         {
           type: 'atoms',
           ops: [
-            { type: 'damage', target: 'P1', amount: 1, source: 'P2' },
-            { type: 'damage', target: 'P2', amount: 1, source: 'P1' },
+            { type: '造成伤害', target: 'P1', amount: 1, source: 'P2' },
+            { type: '造成伤害', target: 'P2', amount: 1, source: 'P1' },
           ],
         },
       ];
@@ -125,7 +125,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
         {
           type: 'atoms',
           ops: [
-            { type: 'heal', target: 'P1', amount: 1 },
+            { type: '回复体力', target: 'P1', amount: 1 },
           ],
         },
       ];
@@ -144,7 +144,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
         {
           type: 'atoms',
           ops: [
-            { type: 'heal', target: 'P1', amount: 1, source: 'P2' },
+            { type: '回复体力', target: 'P1', amount: 1, source: 'P2' },
           ],
         },
       ];
@@ -159,14 +159,14 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
     it('damage 触发技能链后创建 pending 时执行暂停', () => {
       const pendingAction: PendingAction = {
         id: 'test-pending',
-        type: 'skillPrompt',
+        type: '技能选择',
         skillId: 'test-pending-skill',
         player: 'P1',
         execution: { phaseIndex: 0, ctx: makeCtx({ self: 'P1' }), plan: [] },
         prompt: { text: '选择', options: [{ label: '确定', value: true }] },
         timeout: 10000,
         deadline: Date.now() + 10000,
-        onTimeout: { type: 'endTurn', player: 'P1' },
+        onTimeout: { type: '结束回合', player: 'P1' },
       };
 
       const skillId = '__test_pending_on_damage__';
@@ -175,12 +175,12 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
           id: skillId,
           name: '测试-伤害暂停',
           description: '受到伤害后创建 pending',
-          trigger: { event: 'damageReceived', source: 'character' },
+          trigger: { event: '受到伤害', source: '角色' },
           handler(_ctx, _state) {
             return [
               {
                 type: 'atoms',
-                ops: [{ type: 'pushPending' as const, action: pendingAction }],
+                ops: [{ type: '推入待定' as const, action: pendingAction }],
               },
             ];
           },
@@ -190,7 +190,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
       let state = createTestGame({ characters: ['曹操', '刘备'] });
       state.triggers = [
         ...state.triggers,
-        { event: 'damageReceived', source: 'character', skillId, player: 'P1', priority: 5 },
+        { event: '受到伤害', source: '角色', skillId, player: 'P1', priority: 5 },
       ];
       state = setHealth(state, 'P1', 2);
 
@@ -199,8 +199,8 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
         {
           type: 'atoms',
           ops: [
-            { type: 'damage', target: 'P1', amount: 1, source: 'P2' },
-            { type: 'draw', player: 'P2', count: 1 },
+            { type: '造成伤害', target: 'P1', amount: 1, source: 'P2' },
+            { type: '摸牌', player: 'P2', count: 1 },
           ],
         },
       ];
@@ -210,7 +210,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
       expect(result.error).toBeUndefined();
       expect(result.state.players.P1.health).toBe(1);
       expect(result.state.pending).not.toBeNull();
-      expect(result.state.pending?.type).toBe('skillPrompt');
+      expect(result.state.pending?.type).toBe('技能选择');
       expect(result.state.players.P2.hand.length).toBe(beforeP2Hand);
     });
   });
@@ -226,7 +226,7 @@ describe('ATOM_GAME_EVENTS 自动事件发射', () => {
         {
           type: 'atoms',
           ops: [
-            { type: 'draw', player: 'P1', count: 2 },
+            { type: '摸牌', player: 'P1', count: 2 },
           ],
         },
       ];

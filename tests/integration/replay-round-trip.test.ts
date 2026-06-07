@@ -31,7 +31,7 @@ const characterMap = getCharacterMap();
 function runGameSequence(
   actions: Array<{ action: GameAction; state: GameState }>,
 ): { logger: GameLogger; finalState: GameState } {
-  const firstState = actions[0]!.state;
+  const firstState = actions[0].state;
   const players = firstState.playerOrder;
   const logger = new GameLogger(
     {
@@ -86,23 +86,23 @@ describe('Replay round-trip 集成测试', () => {
 
       // 执行 startGame + playCard
       const actions: Array<{ action: GameAction; state: GameState }> = [
-        { action: { type: 'startGame' }, state },
+        { action: { type: '开始' }, state },
       ];
 
       // startGame 不改变 state（engine 直接返回）
-      const startResult = engine(state, { type: 'startGame' });
+      const startResult = engine(state, { type: '开始' });
       // startGame 返回同一 state（无 events）
 
       // playCard
       const playResult = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: cp,
         cardId: cardId!,
         target,
       });
       expect(playResult.error).toBeUndefined();
       actions.push({
-        action: { type: 'playCard', player: cp, cardId: cardId!, target },
+        action: { type: '打出一张牌', player: cp, cardId: cardId!, target },
         state,
       });
 
@@ -113,8 +113,8 @@ describe('Replay round-trip 集成测试', () => {
       // 验证 serverOps 包含预期类型
       expect(serverOps.length).toBeGreaterThan(0);
       const types = serverOps.map((op) => op.type);
-      expect(types).toContain('gameStart');
-      expect(types).toContain('play');
+      expect(types).toContain('游戏开始');
+      expect(types).toContain('出牌');
 
       // ReplayEngine 能重建
       const replay = new ReplayEngine(log, { characterMap });
@@ -132,8 +132,8 @@ describe('Replay round-trip 集成测试', () => {
 
       // 先执行 startGame（空操作），然后 playCard
       const actions: Array<{ action: GameAction; state: GameState }> = [
-        { action: { type: 'startGame' }, state },
-        { action: { type: 'playCard', player: cp, cardId, target }, state },
+        { action: { type: '开始' }, state },
+        { action: { type: '打出一张牌', player: cp, cardId, target }, state },
       ];
 
       const { logger, finalState } = runGameSequence(actions);
@@ -160,8 +160,8 @@ describe('Replay round-trip 集成测试', () => {
       const target = state.playerOrder.find((p) => p !== cp)!;
 
       const actions: Array<{ action: GameAction; state: GameState }> = [
-        { action: { type: 'startGame' }, state },
-        { action: { type: 'playCard', player: cp, cardId, target }, state },
+        { action: { type: '开始' }, state },
+        { action: { type: '打出一张牌', player: cp, cardId, target }, state },
       ];
 
       const { logger, finalState } = runGameSequence(actions);
@@ -190,8 +190,8 @@ describe('Replay round-trip 集成测试', () => {
       const target = state.playerOrder.find((p) => p !== cp)!;
 
       const actions: Array<{ action: GameAction; state: GameState }> = [
-        { action: { type: 'startGame' }, state },
-        { action: { type: 'playCard', player: cp, cardId, target }, state },
+        { action: { type: '开始' }, state },
+        { action: { type: '打出一张牌', player: cp, cardId, target }, state },
       ];
 
       const { logger, finalState } = runGameSequence(actions);
@@ -219,12 +219,12 @@ describe('Replay round-trip 集成测试', () => {
 
       // 不设 playPhase，让 engine 从初始状态自动推进
       // 发 startGame 看看有没有 draw 事件（通常 startGame 不产生事件）
-      const startResult = engine(state, { type: 'startGame' });
+      const startResult = engine(state, { type: '开始' });
 
       // 手动构造一个 draw 事件来验证视角裁剪逻辑
       const players = state.playerOrder;
-      const drawer = players[0]!;
-      const other = players[1]!;
+      const drawer = players[0];
+      const other = players[1];
       const logger = new GameLogger(
         {
           version: '1.0',
@@ -250,7 +250,7 @@ describe('Replay round-trip 集成测试', () => {
 
       const drawEvent: ServerEvent = {
         id: 'evt-draw-1',
-        type: 'draw',
+        type: '摸牌',
         timestamp: Date.now(),
         payload: { player: drawer, count: 2, cards: cardIds },
       };
@@ -264,24 +264,24 @@ describe('Replay round-trip 集成测试', () => {
       expect(otherOps.length).toBe(1);
 
       // drawer 看到 cards 详情
-      const drawerOp = drawerOps[0]!;
-      expect(drawerOp.type).toBe('draw');
+      const drawerOp = drawerOps[0];
+      expect(drawerOp.type).toBe('摸牌');
       expect(drawerOp.description).toContain('杀');
       expect(drawerOp.description).toContain('闪');
 
       // 他人只看 count，看不到卡名
-      const otherOp = otherOps[0]!;
-      expect(otherOp.type).toBe('draw');
+      const otherOp = otherOps[0];
+      expect(otherOp.type).toBe('摸牌');
       expect(otherOp.description).not.toContain('杀');
       expect(otherOp.description).not.toContain('闪');
       expect(otherOp.description).toContain('2');
     });
 
     it('非 draw 事件：全员看到相同信息', () => {
-      let state = createTestGame({ characters: ['曹操', '刘备'], seed: 42 });
+      const state = createTestGame({ characters: ['曹操', '刘备'], seed: 42 });
       const players = state.playerOrder;
-      const target = players[1]!;
-      const source = players[0]!;
+      const target = players[1];
+      const source = players[0];
 
       const logger = new GameLogger(
         {
@@ -296,7 +296,7 @@ describe('Replay round-trip 集成测试', () => {
 
       const damageEvent: ServerEvent = {
         id: 'evt-dmg-1',
-        type: 'damage',
+        type: '造成伤害',
         timestamp: Date.now(),
         payload: { target, amount: 1, source },
       };
@@ -307,10 +307,10 @@ describe('Replay round-trip 集成测试', () => {
       for (const player of players) {
         const ops = logger.getPlayerOps(player);
         expect(ops.length).toBe(1);
-        expect(ops[0]!.type).toBe('damage');
-        expect(ops[0]!.description).toContain(source);
-        expect(ops[0]!.description).toContain(target);
-        expect(ops[0]!.description).toContain('1');
+        expect(ops[0].type).toBe('造成伤害');
+        expect(ops[0].description).toContain(source);
+        expect(ops[0].description).toContain(target);
+        expect(ops[0].description).toContain('1');
       }
     });
   });
@@ -327,8 +327,8 @@ describe('Replay round-trip 集成测试', () => {
       const cardId = findCardInHand(state, cp, '杀')!;
 
       const actions: Array<{ action: GameAction; state: GameState }> = [
-        { action: { type: 'startGame' }, state },
-        { action: { type: 'playCard', player: cp, cardId, target }, state },
+        { action: { type: '开始' }, state },
+        { action: { type: '打出一张牌', player: cp, cardId, target }, state },
       ];
 
       const { logger } = runGameSequence(actions);
@@ -336,7 +336,7 @@ describe('Replay round-trip 集成测试', () => {
 
       // seq 应该从 0 连续递增
       for (let i = 0; i < serverOps.length; i++) {
-        expect(serverOps[i]!.seq).toBe(i);
+        expect(serverOps[i].seq).toBe(i);
       }
     });
 
@@ -350,7 +350,7 @@ describe('Replay round-trip 集成测试', () => {
       const target = state.playerOrder.find((p) => p !== cp)!;
       const cardId = findCardInHand(state, cp, '杀')!;
 
-      const playResult = engine(state, { type: 'playCard', player: cp, cardId, target });
+      const playResult = engine(state, { type: '打出一张牌', player: cp, cardId, target });
       expect(playResult.error).toBeUndefined();
 
       const players = state.playerOrder;
@@ -367,7 +367,7 @@ describe('Replay round-trip 集成测试', () => {
 
       // 记录 playCard action + 产生的事件
       logger.recordBatch(
-        { type: 'playCard', player: cp, cardId, target },
+        { type: '打出一张牌', player: cp, cardId, target },
         playResult.events,
         playResult.state,
       );
@@ -393,10 +393,10 @@ describe('Replay round-trip 集成测试', () => {
     });
 
     it('playerOps 每个玩家的 seq 独立递增', () => {
-      let state = createTestGame({ characters: ['曹操', '刘备'], seed: 42 });
+      const state = createTestGame({ characters: ['曹操', '刘备'], seed: 42 });
       const players = state.playerOrder;
-      const target = players[1]!;
-      const source = players[0]!;
+      const target = players[1];
+      const source = players[0];
 
       const logger = new GameLogger(
         {
@@ -411,11 +411,11 @@ describe('Replay round-trip 集成测试', () => {
 
       // 记录两批事件
       const ev1: ServerEvent = {
-        id: 'e1', type: 'damage', timestamp: 1,
+        id: 'e1', type: '造成伤害', timestamp: 1,
         payload: { target, amount: 1, source },
       };
       const ev2: ServerEvent = {
-        id: 'e2', type: 'damage', timestamp: 2,
+        id: 'e2', type: '造成伤害', timestamp: 2,
         payload: { target, amount: 2, source },
       };
 
@@ -425,8 +425,8 @@ describe('Replay round-trip 集成测试', () => {
       for (const player of players) {
         const ops = logger.getPlayerOps(player);
         expect(ops.length).toBe(2);
-        expect(ops[0]!.seq).toBe(0);
-        expect(ops[1]!.seq).toBe(1);
+        expect(ops[0].seq).toBe(0);
+        expect(ops[1].seq).toBe(1);
       }
     });
   });

@@ -8,7 +8,7 @@ describe('卧龙诸葛', () => {
         ctx.selectCharacters('卧龙诸葛', '刘备');
       })
       .act('触发turnStart事件', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('卧龙诸葛获得virtualArmor标记', ctx => {
         expect(ctx.player('P1').tags).toContain('virtualArmor');
@@ -25,12 +25,12 @@ describe('卧龙诸葛', () => {
           ...ctx.state,
           players: {
             ...ctx.state.players,
-            P1: { ...p, equipment: { ...p.equipment, armor: cardId }, hand: p.hand.filter(id => id !== cardId) },
+            P1: { ...p, equipment: { ...p.equipment, 防具: cardId }, hand: p.hand.filter(id => id !== cardId) },
           },
         };
       })
       .act('触发turnStart事件', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('卧龙诸葛不获得virtualArmor标记（已有防具）', ctx => {
         expect(ctx.player('P1').tags).not.toContain('virtualArmor');

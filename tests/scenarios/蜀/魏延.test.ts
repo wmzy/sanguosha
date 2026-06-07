@@ -11,7 +11,7 @@ describe('魏延', () => {
       })
       .act('魏延对P2造成伤害（距离1）', ctx => {
         ctx.emitEvent({
-          type: 'damageDealt',
+          type: '造成伤害',
           source: 'P1',
           target: 'P2',
           amount: 1,
@@ -30,7 +30,7 @@ describe('魏延', () => {
       })
       .act('P2对P3造成伤害（不是魏延造成的）', ctx => {
         ctx.emitEvent({
-          type: 'damageDealt',
+          type: '造成伤害',
           source: 'P2',
           target: 'P1',
           amount: 1,

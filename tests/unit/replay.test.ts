@@ -32,9 +32,9 @@ describe('ReplayEngine', () => {
     it('步骤数 = serverLog.length + 1', () => {
       const log = baseLog();
       log.serverLog = [
-        { id: 'e1', type: 'setPhase', timestamp: 1, payload: { phase: '判定' } },
-        { id: 'e2', type: 'setPhase', timestamp: 2, payload: { phase: '摸牌' } },
-        { id: 'e3', type: 'setPhase', timestamp: 3, payload: { phase: '出牌' } },
+        { id: 'e1', type: '设阶段', timestamp: 1, payload: { phase: '判定' } },
+        { id: 'e2', type: '设阶段', timestamp: 2, payload: { phase: '摸牌' } },
+        { id: 'e3', type: '设阶段', timestamp: 3, payload: { phase: '出牌' } },
       ];
       const engine = new ReplayEngine(log, { characterMap });
       expect(engine.getTotalSteps()).toBe(4);
@@ -52,9 +52,9 @@ describe('ReplayEngine', () => {
     function threeStepEngine() {
       const log = baseLog();
       log.serverLog = [
-        { id: 'e1', type: 'setPhase', timestamp: 1, payload: { phase: '判定' } },
-        { id: 'e2', type: 'setPhase', timestamp: 2, payload: { phase: '摸牌' } },
-        { id: 'e3', type: 'setPhase', timestamp: 3, payload: { phase: '出牌' } },
+        { id: 'e1', type: '设阶段', timestamp: 1, payload: { phase: '判定' } },
+        { id: 'e2', type: '设阶段', timestamp: 2, payload: { phase: '摸牌' } },
+        { id: 'e3', type: '设阶段', timestamp: 3, payload: { phase: '出牌' } },
       ];
       return new ReplayEngine(log, { characterMap });
     }
@@ -127,7 +127,7 @@ describe('ReplayEngine', () => {
     it('setPhase 事件重建 phase 切换', () => {
       const log = baseLog();
       log.serverLog = [
-        { id: 'e1', type: 'setPhase', timestamp: 1, payload: { phase: '判定' } },
+        { id: 'e1', type: '设阶段', timestamp: 1, payload: { phase: '判定' } },
       ];
       const engine = new ReplayEngine(log, { characterMap });
       engine.next();
@@ -137,7 +137,7 @@ describe('ReplayEngine', () => {
     it('damage 事件重建：player.health 减少', () => {
       const log = baseLog();
       log.serverLog = [
-        { id: 'e1', type: 'damage', timestamp: 1, payload: { target: '曹操', amount: 1 } },
+        { id: 'e1', type: '造成伤害', timestamp: 1, payload: { target: '曹操', amount: 1 } },
       ];
       const engine = new ReplayEngine(log, { characterMap });
       const initHealth = engine.getCurrent().state.players['曹操'].health;
@@ -148,7 +148,7 @@ describe('ReplayEngine', () => {
     it('nextPlayer 事件重建：currentPlayer 切换', () => {
       const log = baseLog();
       log.serverLog = [
-        { id: 'e1', type: 'nextPlayer', timestamp: 1, payload: { to: '刘备' } },
+        { id: 'e1', type: '下一玩家', timestamp: 1, payload: { to: '刘备' } },
       ];
       const engine = new ReplayEngine(log, { characterMap });
       expect(engine.getCurrent().state.currentPlayer).toBe('曹操');
@@ -161,14 +161,14 @@ describe('ReplayEngine', () => {
     it('截止当前步返回 playerOps', () => {
       const log = baseLog();
       log.playerOps['曹操'] = [
-        makeOp(0, 'draw', '摸牌'),
-        makeOp(1, 'play', '出牌'),
-        makeOp(2, 'discard', '弃牌'),
+        makeOp(0, '摸牌', '摸牌'),
+        makeOp(1, '出牌', '出牌'),
+        makeOp(2, '弃置', '弃牌'),
       ];
       log.serverLog = [
-        { id: 'e1', type: 'setPhase', timestamp: 1, payload: { phase: '摸牌' } },
-        { id: 'e2', type: 'setPhase', timestamp: 2, payload: { phase: '出牌' } },
-        { id: 'e3', type: 'setPhase', timestamp: 3, payload: { phase: '弃牌' } },
+        { id: 'e1', type: '设阶段', timestamp: 1, payload: { phase: '摸牌' } },
+        { id: 'e2', type: '设阶段', timestamp: 2, payload: { phase: '出牌' } },
+        { id: 'e3', type: '设阶段', timestamp: 3, payload: { phase: '弃牌' } },
       ];
       const engine = new ReplayEngine(log, { characterMap });
 
@@ -183,7 +183,7 @@ describe('ReplayEngine', () => {
 
     it('显式 upto 参数', () => {
       const log = baseLog();
-      log.playerOps['刘备'] = [makeOp(0, 'draw', 'A'), makeOp(1, 'play', 'B')];
+      log.playerOps['刘备'] = [makeOp(0, '摸牌', 'A'), makeOp(1, '出牌', 'B')];
       const engine = new ReplayEngine(log, { characterMap });
       expect(engine.getPlayerOps('刘备', 1)).toHaveLength(1);
       expect(engine.getPlayerOps('刘备', 0)).toHaveLength(0);
@@ -199,9 +199,9 @@ describe('ReplayEngine', () => {
     it('next×N 状态 == goTo(N) 状态', () => {
       const log = baseLog();
       log.serverLog = [
-        { id: 'e1', type: 'setPhase', timestamp: 1, payload: { phase: '判定' } },
-        { id: 'e2', type: 'damage', timestamp: 2, payload: { target: '刘备', amount: 2 } },
-        { id: 'e3', type: 'setPhase', timestamp: 3, payload: { phase: '出牌' } },
+        { id: 'e1', type: '设阶段', timestamp: 1, payload: { phase: '判定' } },
+        { id: 'e2', type: '造成伤害', timestamp: 2, payload: { target: '刘备', amount: 2 } },
+        { id: 'e3', type: '设阶段', timestamp: 3, payload: { phase: '出牌' } },
       ];
 
       const engineA = new ReplayEngine(log, { characterMap });

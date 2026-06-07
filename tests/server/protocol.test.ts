@@ -11,7 +11,7 @@ import type { GameAction } from '../../engine/types';
 
 // ─── helpers ────────────────────────────────────────────────
 
-const stubGameAction: GameAction = { type: 'playCard', player: 'p1', cardId: 'c1' };
+const stubGameAction: GameAction = { type: '打出一张牌', player: 'p1', cardId: 'c1' };
 
 const stubFrontendState = {
   view: {
@@ -59,11 +59,9 @@ describe('isValidClientMessage — valid messages', () => {
     expect(isValidClientMessage({ type: 'create_room', name: 'room1', maxPlayers: 4 })).toBe(true);
   });
 
-
   it('accepts join_debug_room message', () => {
     expect(isValidClientMessage({ type: 'join_debug_room', roomId: 'dr1' })).toBe(true);
   });
-
 
   it('accepts start_game message', () => {
     expect(isValidClientMessage({ type: 'start_game' })).toBe(true);
@@ -268,7 +266,7 @@ describe('serialize', () => {
   });
 
   it('serializes events message with seq/timestamp and no actionLog', () => {
-    const events = [{ id: 'e1', type: 'turnStart', timestamp: 1000, payload: { player: 'p1' }, seq: 3 }];
+    const events = [{ id: 'e1', type: '回合开始', timestamp: 1000, payload: { player: 'p1' }, seq: 3 }];
     const msg: ServerMessage = { type: 'events', fromSeq: 3, events };
     const result = serialize(msg);
     const parsed = JSON.parse(result);
@@ -306,7 +304,7 @@ describe('deserialize — valid messages', () => {
   });
 
   it('deserializes action message with nested object', () => {
-    const msg = { type: 'action', action: { type: 'playCard', player: 'p1', cardId: 'c1' }, baseSeq: 0 };
+    const msg = { type: 'action', action: { type: '打出一张牌', player: 'p1', cardId: 'c1' }, baseSeq: 0 };
     const result = deserialize(JSON.stringify(msg));
     expect(result).not.toBeNull();
     expect(result!.type).toBe('action');

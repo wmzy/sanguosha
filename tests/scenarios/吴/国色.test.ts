@@ -22,12 +22,12 @@ describe('大乔 - 国色', () => {
     })
     .act('发动国色', ctx => {
       ctx.useSkill('P1', '国色');
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .act('选择♦手牌和目标P2', ctx => {
       const p1 = ctx.player('P1');
       const card = p1.hand[0];
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: { cardIds: [card], player: 'P2' } });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: { cardIds: [card], player: 'P2' } });
     })
     .check('P2 判定区有乐不思蜀', ctx => {
       const p2 = ctx.player('P2');

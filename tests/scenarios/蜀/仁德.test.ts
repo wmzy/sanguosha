@@ -15,13 +15,13 @@ describe('刘备 - 仁德', () => {
       ctx.useSkill('P1', '仁德');
     })
     .check('应进入仁德技能提示', ctx => {
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
     })
     .act('选择 2 张杀给 P2', ctx => {
       const p1 = ctx.player('P1');
       const killIds = p1.hand.filter(id => ctx.state.cardMap[id]?.name === '杀');
       ctx.engineAction({
-        type: 'skillChoice',
+        type: '技能选择',
         player: 'P1',
         choice: { cardIds: killIds.slice(0, 2), target: 'P2' },
       });
@@ -55,7 +55,7 @@ describe('刘备 - 仁德', () => {
     .act('选择 1 张杀给 P2', ctx => {
       const killId = ctx.findCard('P1', '杀')!;
       ctx.engineAction({
-        type: 'skillChoice',
+        type: '技能选择',
         player: 'P1',
         choice: { cardIds: [killId], target: 'P2' },
       });

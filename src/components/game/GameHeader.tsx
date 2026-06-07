@@ -27,12 +27,12 @@ const titleText = css`
   font-size: 20px;
 `;
 
-export const GameHeader = memo(function GameHeader({
+export const GameHeader = memo(({
   myName,
   onSwitchPerspective,
   onGoToCurrentPlayer,
   hideGoToCurrentPlayer,
-}: GameHeaderProps) {
+}: GameHeaderProps) => {
   return (
     <div className={headerRow}>
       <div className={headerLeft}>

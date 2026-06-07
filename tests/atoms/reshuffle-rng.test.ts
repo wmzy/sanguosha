@@ -14,8 +14,8 @@ describe('reshuffle atom — rng 语义与 shuffleDeck 一致', () => {
   it('reshuffle 后 rngState 由 rng.getState() 推进（不是合成 +length-1）', () => {
     const base = createTestGame({ deck: ['a'] });
     const s0 = { ...base, zones: { ...base.zones, discardPile: ['b', 'c', 'd', 'e'] } };
-    const { state, events } = applyAtoms(s0, [{ type: 'reshuffle' }]);
-    expect(events[0].type).toBe('reshuffle');
+    const { state, events } = applyAtoms(s0, [{ type: '重洗' }]);
+    expect(events[0].type).toBe('重洗');
     expect(state.zones.discardPile).toEqual([]);
     expect(state.zones.deck).toHaveLength(5);
     expect(state.rngState).not.toBe(s0.rngState + 3);
@@ -26,9 +26,9 @@ describe('reshuffle atom — rng 语义与 shuffleDeck 一致', () => {
     // nextInt，state 都向前推进。验证第二次操作后的 state 与第一次不同。
     const base = createTestGame({ deck: ['a'] });
     const s0 = { ...base, zones: { ...base.zones, discardPile: ['b', 'c', 'd'] } };
-    const r1 = applyAtoms(s0, [{ type: 'reshuffle' }]);
+    const r1 = applyAtoms(s0, [{ type: '重洗' }]);
     const s1 = r1.state;
-    const r2 = applyAtoms(s1, [{ type: 'shuffleDeck' }]);
+    const r2 = applyAtoms(s1, [{ type: '洗牌' }]);
     const s2 = r2.state;
     expect(s1.rngState).not.toBe(s0.rngState);
     expect(s2.rngState).not.toBe(s1.rngState);

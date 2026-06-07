@@ -37,7 +37,7 @@ describe('faceDown + 死亡玩家（真 game rule）', () => {
     s0.players.P1.info.alive = false;
     const faceDown: Mark = { id: 'faceDown:P1', scope: 'player', duration: 'untilTurnEnd' };
     const s1 = applyAtoms(s0, [
-      { type: 'addMark', player: 'P1', mark: faceDown },
+      { type: '加标记', player: 'P1', mark: faceDown },
     ]).state;
     s1.turn.turnStarted = false;
     const result = advanceToInteractivePhase(s1);
@@ -53,7 +53,7 @@ describe('faceDown + 死亡玩家（真 game rule）', () => {
     const s0 = createTestGame();
     const faceDown: Mark = { id: 'faceDown:P1', scope: 'player', duration: 'untilTurnEnd' };
     const s1 = applyAtoms(s0, [
-      { type: 'addMark', player: 'P1', mark: faceDown },
+      { type: '加标记', player: 'P1', mark: faceDown },
     ]).state;
     s1.turn.turnStarted = false;
     const result = advanceToInteractivePhase(s1);

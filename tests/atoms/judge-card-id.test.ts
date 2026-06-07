@@ -32,12 +32,12 @@ describe('judge atom §4.6 修：判定牌不读弃牌堆', () => {
       zones: { ...base.zones, discardPile: ['ghost1', 'ghost2'] },
     };
     const { state, events } = applyAtoms(s0, [
-      { type: 'judge', player: 'P1' },
+      { type: '判定', player: 'P1' },
     ]);
     // 验证：判定牌来自 deck 顶（c3），不读 discardPile
     expect(state.localVars?.judgeCardId).toBe('c3');
     // toEvents payload 同步带 cardId
-    const judgeEvent = events.find(e => e.type === 'judge');
+    const judgeEvent = events.find(e => e.type === '判定');
     expect(judgeEvent).toBeDefined();
     expect((judgeEvent!.payload as { cardId: string }).cardId).toBe('c3');
   });
@@ -51,8 +51,8 @@ describe('judge atom §4.6 修：判定牌不读弃牌堆', () => {
       hand: { P1: ['c3'] },
     });
     const { state } = applyAtoms(s0, [
-      { type: 'judge', player: 'P1' },
-      { type: 'discard', player: 'P1', cardIds: ['c3'] },
+      { type: '判定', player: 'P1' },
+      { type: '弃置', player: 'P1', cardIds: ['c3'] },
     ]);
     // 判定牌仍是 c2（不是被 discard 推上去的 c3）
     expect(state.localVars?.judgeCardId).toBe('c2');

@@ -20,7 +20,7 @@ describe('荀彧', () => {
       })
       .act('发射 damageReceived 事件', ctx => {
         ctx.emitEvent({
-          type: 'damageReceived',
+          type: '受到伤害',
           target: 'P1',
           source: 'P2',
           amount: 1,

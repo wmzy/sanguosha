@@ -20,7 +20,7 @@ import { registerAtomHook } from '../atom';
 import { getPlayer } from '../state';
 import type { Atom, GameState, Json } from '../types';
 
-const BAGUA_ID = 'bagua';
+const BAGUA_ID = '八卦阵';
 const JUDGE_KEY = 'baguaJudgeResult';
 const RED_SUITS: Record<string, true> = { '♥': true, '♦': true };
 
@@ -33,7 +33,7 @@ interface BecomeTargetLike {
 
 function asBecomeTarget(atom: Atom): BecomeTargetLike | null {
   if (atom === null || typeof atom !== 'object') return null;
-  if ((atom as { type?: unknown }).type !== 'becomeTarget') return null;
+  if ((atom as { type?: unknown }).type !== '成为目标') return null;
   return atom as unknown as BecomeTargetLike;
 }
 
@@ -48,7 +48,7 @@ function readTopDeckCard(state: GameState): { suit: string } | null {
 
 export function register(): void {
   registerAtomHook({
-    atomType: 'becomeTarget',
+    atomType: '成为目标',
     filter(state: GameState, atom: Atom): boolean {
       const becomeTarget = asBecomeTarget(atom);
       if (!becomeTarget) return false;
@@ -56,17 +56,17 @@ export function register(): void {
       if (!target) return false;
       const player = getPlayer(state, target);
       if (!player) return false;
-      if (player.equipment.armor !== BAGUA_ID) return false;
+      if (player.equipment.防具 !== BAGUA_ID) return false;
       const cardId = typeof becomeTarget.cardId === 'string' ? becomeTarget.cardId : undefined;
       if (!cardId) return false;
       const card = state.cardMap[cardId];
-      if (!card || card.name !== '杀') return false;
+      if (card?.name !== '杀') return false;
       return true;
     },
     onAfter({ state }) {
       const top = readTopDeckCard(state);
       if (!top) return {};
-      const value: Json = RED_SUITS[top.suit] === true ? 'red' : 'black';
+      const value: Json = RED_SUITS[top.suit] === true ? '红' : '黑';
       return {
         state: {
           ...state,

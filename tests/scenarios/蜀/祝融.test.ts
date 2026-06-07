@@ -8,7 +8,7 @@ describe('祝融', () => {
         ctx.selectCharacters('祝融', '刘备');
       })
       .act('触发turnStart', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('祝融获得immune南蛮入侵标记', ctx => {
         expect(ctx.player('P1').tags).toContain('immune南蛮入侵');
@@ -38,7 +38,7 @@ describe('祝融', () => {
       })
       .act('祝融对P2造成伤害', ctx => {
         ctx.emitEvent({
-          type: 'damageDealt',
+          type: '造成伤害',
           source: 'P1',
           target: 'P2',
           amount: 1,
@@ -55,7 +55,7 @@ describe('祝融', () => {
       })
       .act('P2对祝融造成伤害', ctx => {
         ctx.emitEvent({
-          type: 'damageDealt',
+          type: '造成伤害',
           source: 'P2',
           target: 'P1',
           amount: 1,

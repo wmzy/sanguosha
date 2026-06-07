@@ -151,35 +151,35 @@ export class ScenarioContext {
   }
 
   playCard(player: string, cardId: string, target?: string): void {
-    const result = engine(this.state, { type: 'playCard', player, cardId, target });
+    const result = engine(this.state, { type: '打出一张牌', player, cardId, target });
     if (result.error) throw new Error(`playCard error: ${result.error}`);
     this.state = result.state;
     this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   respond(player: string, cardId?: string): void {
-    const result = engine(this.state, { type: 'respond', player, cardId });
+    const result = engine(this.state, { type: '打出', player, cardId });
     if (result.error) throw new Error(`respond error: ${result.error}`);
     this.state = result.state;
     this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   useSkill(player: string, skillId: string, target?: string): void {
-    const result = engine(this.state, { type: 'useSkill', player, skillId, target });
+    const result = engine(this.state, { type: '使用技能', player, skillId, target });
     if (result.error) throw new Error(`useSkill error: ${result.error}`);
     this.state = result.state;
     this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   discardCards(player: string, cardIds: string[]): void {
-    const result = engine(this.state, { type: 'discard', player, cardIds });
+    const result = engine(this.state, { type: '弃置', player, cardIds });
     if (result.error) throw new Error(`discardCards error: ${result.error}`);
     this.state = result.state;
     this.lastEvents = result.playerEvents?.get(player) ?? [];
   }
 
   endTurn(player: string): void {
-    const result = engine(this.state, { type: 'endTurn', player });
+    const result = engine(this.state, { type: '结束回合', player });
     if (result.error) throw new Error(`endTurn error: ${result.error}`);
     this.state = result.state;
     this.lastEvents = result.playerEvents?.get(player) ?? [];

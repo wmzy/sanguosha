@@ -45,16 +45,16 @@ describe('GameEvent 发射: 杀响应', () => {
     const beforeP2Health = state.players['P2'].health;
 
     // P1 对 P2(曹操) 出杀
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
-    expect(r1.state.pending?.type).toBe('responseWindow');
+    expect(r1.state.pending?.type).toBe('响应窗口');
 
     // P2 不出闪
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
     // killHit ServerEvent 被发射
-    expect(r2.events.some(e => e.type === 'killHit')).toBe(true);
+    expect(r2.events.some(e => e.type === '杀命中')).toBe(true);
     // P2 受到 1 点伤害
     expect(r2.state.players['P2'].health).toBe(beforeP2Health - 1);
     // damageReceived GameEvent 触发了奸雄：P2(曹操)获得源牌（杀）
@@ -70,15 +70,15 @@ describe('GameEvent 发射: 杀响应', () => {
     const p2Health = state.players['P2'].health;
 
     // P1 对 P2 出杀
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
 
     // P2 出闪
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2', cardId: dodgeId });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2', cardId: dodgeId });
     expect(r2.error).toBeUndefined();
 
     // killDodged ServerEvent 被发射
-    expect(r2.events.some(e => e.type === 'killDodged')).toBe(true);
+    expect(r2.events.some(e => e.type === '杀被闪避')).toBe(true);
     // P2 未受伤
     expect(r2.state.players['P2'].health).toBe(p2Health);
   });
@@ -94,12 +94,12 @@ describe('GameEvent 发射: 回合事件', () => {
     state = withTriggers(state, 'P2');
 
     // P1 结束回合
-    const r1 = engine(state, { type: 'endTurn', player: 'P1' });
+    const r1 = engine(state, { type: '结束回合', player: 'P1' });
     expect(r1.error).toBeUndefined();
     expect(r1.state.currentPlayer).toBe('P2');
 
     // turnStart ServerEvent 被发射
-    expect(r1.events.some(e => e.type === 'turnStart')).toBe(true);
+    expect(r1.events.some(e => e.type === '回合开始')).toBe(true);
   });
 
   it('endTurn(弃牌后)→turnStart ServerEvent', () => {
@@ -109,21 +109,21 @@ describe('GameEvent 发射: 回合事件', () => {
     state = setHealth(state, 'P1', 1);
 
     // P1 结束回合 → 进入弃牌阶段
-    const r1 = engine(state, { type: 'endTurn', player: 'P1' });
+    const r1 = engine(state, { type: '结束回合', player: 'P1' });
     expect(r1.error).toBeUndefined();
-    expect(r1.state.pending?.type).toBe('discardPhase');
+    expect(r1.state.pending?.type).toBe('弃牌阶段');
 
     // P1 弃牌
     const hand = r1.state.players['P1'].hand;
     const discardCount = hand.length - r1.state.players['P1'].health;
     const r2 = engine(r1.state, {
-      type: 'discard', player: 'P1',
+      type: '弃置', player: 'P1',
       cardIds: hand.slice(0, discardCount),
     });
     expect(r2.error).toBeUndefined();
 
     // turnStart ServerEvent 被发射
-    expect(r2.events.some(e => e.type === 'turnStart')).toBe(true);
+    expect(r2.events.some(e => e.type === '回合开始')).toBe(true);
     expect(r2.state.currentPlayer).toBe('P2');
   });
 });
@@ -143,7 +143,7 @@ describe('GameEvent 发射: AOE 伤害', () => {
     const beforeP2Health = state.players['P2'].health;
 
     // P1 使用南蛮入侵
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: aoeCardId });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: aoeCardId });
     expect(r1.error).toBeUndefined();
 
     // 所有人 pass 过无懈可击窗口
@@ -151,13 +151,13 @@ describe('GameEvent 发射: AOE 伤害', () => {
 
     // 确认进入 aoeResponse 阶段
     const pending = afterWuxie.pending;
-    expect(pending?.type).toBe('responseWindow');
-    if (pending?.type === 'responseWindow') {
+    expect(pending?.type).toBe('响应窗口');
+    if (pending?.type === '响应窗口') {
       expect(pending.window.type).toBe('aoeResponse');
     }
 
     // P2 不出杀
-    const r2 = engine(afterWuxie, { type: 'respond', player: 'P2' });
+    const r2 = engine(afterWuxie, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
     // P2 受到 1 点伤害
@@ -182,7 +182,7 @@ describe('GameEvent 发射: 决斗伤害', () => {
     const beforeP2Health = state.players['P2'].health;
 
     // P1 对 P2 使用决斗
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: duelCardId, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: duelCardId, target: 'P2' });
     expect(r1.error).toBeUndefined();
 
     // 所有人 pass 过无懈可击窗口
@@ -190,13 +190,13 @@ describe('GameEvent 发射: 决斗伤害', () => {
 
     // 确认进入 duelResponse 阶段
     const pending = afterWuxie.pending;
-    expect(pending?.type).toBe('responseWindow');
-    if (pending?.type === 'responseWindow') {
+    expect(pending?.type).toBe('响应窗口');
+    if (pending?.type === '响应窗口') {
       expect(pending.window.type).toBe('duelResponse');
     }
 
     // P2 不出杀
-    const r2 = engine(afterWuxie, { type: 'respond', player: 'P2' });
+    const r2 = engine(afterWuxie, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
     // P2 受到 1 点伤害

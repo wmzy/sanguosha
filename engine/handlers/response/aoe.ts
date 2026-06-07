@@ -15,7 +15,7 @@ export function resolveAoeResponse(
   action: GameAction,
   pending: PendingResponseWindow,
 ): EngineResult {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return { state, events: [], error: 'AOE 响应窗口需要 respond 动作' };
   }
 
@@ -24,8 +24,8 @@ export function resolveAoeResponse(
   // 处理当前玩家的响应
   if (action.cardId) {
     const atoms: Atom[] = [
-      { type: 'moveCard', cardId: action.cardId, from: { zone: 'hand', player: defender }, to: { zone: 'discardPile' } },
-      { type: 'popPending' },
+      { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player: defender }, to: { zone: '弃牌堆' } },
+      { type: '弹出待定' },
     ];
     const result = applyAtoms(state, atoms);
     const s = result.state;
@@ -38,7 +38,7 @@ export function resolveAoeResponse(
     return { state: s, events };
   }
 
-  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: 'popPending' }]);
+  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: '弹出待定' }]);
   const damageResult = applyDamage(
     popState, defender, 1,
     attacker ?? undefined, sourceCard,
@@ -47,7 +47,7 @@ export function resolveAoeResponse(
 
   const hasRemainingTargets = !!(remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard);
 
-  if (damageResult.state.pending?.type === 'dyingWindow' && hasRemainingTargets) {
+  if (damageResult.state.pending?.type === '濒死窗口' && hasRemainingTargets) {
     const resumeAoe = { attacker, remainingTargets, requiredCard, sourceCard };
     return {
       state: { ...damageResult.state, pending: { ...damageResult.state.pending, resumeAoe } },
@@ -89,7 +89,7 @@ export function executeAoeResume(
 
   const nextPending: PendingResponseWindow = {
     id: createPendingId(),
-    type: 'responseWindow',
+    type: '响应窗口',
     window: {
       type: 'aoeResponse',
       attacker,
@@ -103,10 +103,10 @@ export function executeAoeResume(
     },
     timeout,
     deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: firstTarget },
+    onTimeout: { type: '打出', player: firstTarget },
   };
 
-  return applyAtoms(state, [{ type: 'pushPending', action: nextPending }]);
+  return applyAtoms(state, [{ type: '推入待定', action: nextPending }]);
 }
 
 /**
@@ -148,5 +148,5 @@ export function startAoeTargetWuxie(
     aoeResume: { attacker, remainingTargets: aliveTargets, requiredCard, sourceCard },
   });
 
-  return applyAtoms(state, [{ type: 'pushPending', action: trickResponse }]);
+  return applyAtoms(state, [{ type: '推入待定', action: trickResponse }]);
 }

@@ -287,15 +287,15 @@ registerAtomHook({
 
 | 装备 | 技能 | 状态 | 实现位置 |
 |---|---|---|---|
-| 诸葛连弩 | unlimitedKills | 🟡 stub | `engine/skills/equipment.ts:8-15` |
-| 雌雄双股剑 | dualWeapon | 🟡 stub | `engine/skills/equipment.ts:42-49` |
-| 青龙偃月刀 | chaseDodge | 🟢 | `engine/skills/equipment.ts:51-69` |
-| 贯石斧 | forceHit | 🟢 | `engine/skills/equipment.ts:71-100` |
-| **青釭剑** | ignoreArmor | 🟢 **P1-1D-T3 修** | `engine/skills/qinggang.ts`（v3 registerAtomHook 骨架：damage onAfter 注入 `penetrateArmor=true`）|
-| **丈八蛇矛** | twoCardsAsKill | 🟢 **P1-1D-T4 修** | `engine/skills/zhangba.ts`（v3 registerAtomHook 骨架：specifyTarget filter 收窄）|
-| **方天画戟** | multiTarget | 🟢 **P1-1D-T4 修** | `engine/skills/fangtian.ts`（v3 registerAtomHook 骨架）|
-| **八卦阵** | judgeDodge | 🟢 **P3-T2 真 game rule 完整落地** | `engine/skills/bagua.ts`（damage onBefore 读 `ctx.baguaJudgeResult`）+ `engine/skills/_baguaJudgeInject.ts`（useCard 阶段 becomeTarget 钩子：读 deck 顶牌花色注入 `baguaJudgeResult` 到 state.localVars）|
-| **仁王盾** | blockBlackKill | 🟢 **P1-1D-T4 修** | `engine/skills/renwang.ts`（v3 registerAtomHook：黑杀 cancel）|
+| 诸葛连弩 | 诸葛连弩 | 🟡 stub | `engine/skills/equipment.ts:8-15` |
+| 雌雄双股剑 | 雌雄双股剑 | 🟡 stub | `engine/skills/equipment.ts:42-49` |
+| 青龙偃月刀 | 青龙偃月刀 | 🟢 | `engine/skills/equipment.ts:51-69` |
+| 贯石斧 | 贯石斧 | 🟢 | `engine/skills/equipment.ts:71-100` |
+| **青釭剑** | 青釭剑 | 🟢 **P1-1D-T3 修** | `engine/skills/qinggang.ts`（v3 registerAtomHook 骨架：damage onAfter 注入 `penetrateArmor=true`）|
+| **丈八蛇矛** | 丈八蛇矛 | 🟢 **P1-1D-T4 修** | `engine/skills/zhangba.ts`（v3 registerAtomHook 骨架：specifyTarget filter 收窄）|
+| **方天画戟** | 方天画戟 | 🟢 **P1-1D-T4 修** | `engine/skills/fangtian.ts`（v3 registerAtomHook 骨架）|
+| **八卦阵** | 八卦阵 | 🟢 **P3-T2 真 game rule 完整落地** | `engine/skills/bagua.ts`（damage onBefore 读 `ctx.baguaJudgeResult`）+ `engine/skills/_baguaJudgeInject.ts`（useCard 阶段 becomeTarget 钩子：读 deck 顶牌花色注入 `baguaJudgeResult` 到 state.localVars）|
+| **仁王盾** | 仁王盾 | 🟢 **P1-1D-T4 修** | `engine/skills/renwang.ts`（v3 registerAtomHook：黑杀 cancel）|
 | 防具（**藤甲**/白银/寒冰）| 防具 | 🟢 **P3-T1 真 game rule 修** | `engine/skills/tengjia.ts`（**P3-T1 反转**：防 normal 杀；旧实现"防 fire" 是 P1-1A-T2 错误已修）|
 | 防具（**大雾**）| 防具 | 🟢 **P3-T1 真 game rule 修** | `engine/skills/daqi.ts`（**P3-T1 反转**：防 non-thunder；旧实现"防 thunder" 是 P1-1A-T2 错误已修）|
 | 进攻马/防御马 | 距离 | 🟢 | `engine/distance.ts` |

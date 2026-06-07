@@ -10,7 +10,7 @@ export const 曹操: CharacterConfig = {
       name: '奸雄',
       description: '当你受到伤害后，你可以获得对你造成伤害的牌。',
       trigger: 'onDamageReceived',
-      effect: { type: 'gainCard', source: 'damageSourceCard' },
+      effect: { type: '获得', source: 'damageSourceCard' },
       passive: true,
     },
   ],
@@ -26,7 +26,7 @@ export const 司马懿: CharacterConfig = {
       name: '反馈',
       description: '当你受到伤害后，你可以获得伤害来源的一张牌。',
       trigger: 'onDamageReceived',
-      effect: { type: 'gainCard', source: 'attacker', count: 1 },
+      effect: { type: '获得', source: 'attacker', count: 1 },
       passive: true,
     },
     {
@@ -52,7 +52,7 @@ export const 夏侯惇: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'judge', expectedSuit: '♥', onFail: { type: 'discard', count: 2, target: 'attacker' } },
+          { type: '判定', expectedSuit: '♥', onFail: { type: '弃置', count: 2, target: 'attacker' } },
         ],
       },
       passive: true,
@@ -73,7 +73,7 @@ export const 张辽: CharacterConfig = {
       condition: { phase: '摸牌' },
       effect: { type: 'sequence', steps: [
         { type: 'skipDraw' },
-        { type: 'gainCard', source: 'otherPlayers', count: 2 },
+        { type: '获得', source: 'otherPlayers', count: 2 },
       ] },
     },
   ],
@@ -108,14 +108,14 @@ export const 郭嘉: CharacterConfig = {
       name: '天妒',
       description: '当你的判定牌生效后，你可以获得此判定牌。',
       trigger: 'onJudge',
-      effect: { type: 'gainCard', source: 'judgeCard' },
+      effect: { type: '获得', source: 'judgeCard' },
       passive: true,
     },
     {
       name: '遗计',
       description: '当你受到1点伤害后，你可以摸两张牌。',
       trigger: 'onDamageReceived',
-      effect: { type: 'draw', count: 2 },
+      effect: { type: '摸牌', count: 2 },
       passive: true,
     },
   ],
@@ -139,8 +139,8 @@ export const 甄姬: CharacterConfig = {
       trigger: 'onTurnStart',
       condition: { phase: '准备' },
       effect: { type: 'sequence', steps: [
-        { type: 'judge', repeatOnBlack: true },
-        { type: 'gainCard', source: 'judgeCard' },
+        { type: '判定', repeatOnBlack: true },
+        { type: '获得', source: 'judgeCard' },
       ] },
     },
   ],
@@ -175,7 +175,7 @@ export const 曹仁: CharacterConfig = {
       trigger: 'onTurnStart',
       condition: { phase: '结束' },
       effect: { type: 'sequence', steps: [
-        { type: 'draw', count: 3 },
+        { type: '摸牌', count: 3 },
       ] },
     },
   ],
@@ -199,7 +199,7 @@ export const 荀彧: CharacterConfig = {
       name: '节命',
       description: '当你受到1点伤害后，你可以令一名角色将手牌摸至X张（X为其体力上限且最多为5）。',
       trigger: 'onDamageReceived',
-      effect: { type: 'draw', count: 'upToMaxHealth' },
+      effect: { type: '摸牌', count: 'upToMaxHealth' },
       passive: true,
     },
   ],
@@ -232,7 +232,7 @@ export const 曹丕: CharacterConfig = {
       name: '行殇',
       description: '你可以立即获得死亡角色的所有牌。',
       trigger: 'onDeath',
-      effect: { type: 'gainCard', source: 'selected', count: 99 },
+      effect: { type: '获得', source: 'selected', count: 99 },
       passive: true,
     },
     {
@@ -240,7 +240,7 @@ export const 曹丕: CharacterConfig = {
       description: '每当你受到一次伤害后，可以令除你以外的任一角色补X张牌（X为你已损失体力值），然后该角色将其武将牌翻面。',
       trigger: 'onDamageReceived',
       effect: { type: 'sequence', steps: [
-        { type: 'draw', count: 'lostHealth' },
+        { type: '摸牌', count: 'lostHealth' },
       ] },
       passive: true,
     },
@@ -248,7 +248,7 @@ export const 曹丕: CharacterConfig = {
       name: '颂威',
       description: '其他魏势力角色的判定牌结果为黑色且生效后，可以让你摸一张牌。',
       trigger: 'onJudge',
-      effect: { type: 'draw', count: 1 },
+      effect: { type: '摸牌', count: 1 },
     },
   ],
 };
@@ -296,7 +296,7 @@ export const 邓艾: CharacterConfig = {
       description: '每次当你于回合外失去牌时，可进行一次判定，将非红桃的判定牌置于你的武将牌上，称为"田"；每有一张田，你计算与其他角色的距离便减少1。',
       trigger: 'onCardPlayed',
       effect: { type: 'sequence', steps: [
-        { type: 'judge', condition: 'notHeart' },
+        { type: '判定', condition: 'notHeart' },
       ] },
       passive: true,
     },

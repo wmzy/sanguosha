@@ -2,7 +2,7 @@ import { describe, expect } from 'vitest';
 import { scenario, ScenarioContext } from '../../scenario-runner';
 
 function passAllTrickResponses(ctx: ScenarioContext): void {
-  while (ctx.state.pending?.type === 'responseWindow') {
+  while (ctx.state.pending?.type === '响应窗口') {
     const window = ctx.state.pending.window;
     if (window.type !== 'trickResponse') break;
     const responders = window.responders ?? [];
@@ -14,8 +14,8 @@ function passAllTrickResponses(ctx: ScenarioContext): void {
 }
 
 function passAoeResponse(ctx: ScenarioContext, expectedDefender: string): void {
-  expect(ctx.state.pending?.type).toBe('responseWindow');
-  if (ctx.state.pending?.type === 'responseWindow') {
+  expect(ctx.state.pending?.type).toBe('响应窗口');
+  if (ctx.state.pending?.type === '响应窗口') {
     expect(ctx.state.pending.window.type).toBe('aoeResponse');
     expect(ctx.state.pending.window.defender).toBe(expectedDefender);
     ctx.respond(expectedDefender);
@@ -48,13 +48,13 @@ describe('AOE 多技能并发', () => {
       expect(diff.healthChanges['P2']).toBe(-1);
     })
     .act('遗计分配提示：选择不分配', ctx => {
-      if (ctx.state.pending?.type === 'skillPrompt') {
-        ctx.engineAction({ type: 'skillChoice', player: 'P2', choice: false });
+      if (ctx.state.pending?.type === '技能选择') {
+        ctx.engineAction({ type: '技能选择', player: 'P2', choice: false });
       }
     })
     .act('遗计分配提示：选择不分配', ctx => {
-      if (ctx.state.pending?.type === 'skillPrompt') {
-        ctx.engineAction({ type: 'skillChoice', player: 'P2', choice: false });
+      if (ctx.state.pending?.type === '技能选择') {
+        ctx.engineAction({ type: '技能选择', player: 'P2', choice: false });
       }
     })
     .check('遗计触发：郭嘉手牌 +2', ctx => {

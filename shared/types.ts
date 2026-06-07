@@ -34,18 +34,18 @@ export type Faction = '魏' | '蜀' | '吴' | '群';
 
 export type Role = '主公' | '忠臣' | '反贼' | '内奸';
 
-export type TurnPhase = '准备' | '判定' | '摸牌' | '出牌' | '弃牌' | '结束' | 'turnEnd';
+export type TurnPhase = '准备' | '判定' | '摸牌' | '出牌' | '弃牌' | '结束' | '回合结束';
 
 export type EffectPrimitive =
-  | { type: 'draw'; count: number | string }
+  | { type: '摸牌'; count: number | string }
   | { type: 'damage'; amount: number; damageType?: '普通' | '雷电' | '火焰' }
-  | { type: 'heal'; amount: number; target?: string }
-  | { type: 'discard'; source?: string; count: number | 'any'; target?: string }
-  | { type: 'gainCard'; from?: string; source?: 'damageSourceCard' | 'attacker' | 'judgeCard' | 'otherPlayers' | 'selected' | 'deck'; count?: number }
+  | { type: '回复体力'; amount: number; target?: string }
+  | { type: '弃置'; source?: string; count: number | 'any'; target?: string }
+  | { type: '获得'; from?: string; source?: 'damageSourceCard' | 'attacker' | 'judgeCard' | 'otherPlayers' | 'selected' | 'deck'; count?: number }
   | { type: 'skipPhase'; phase?: TurnPhase; target?: string }
   | { type: 'skipDraw' }
-  | { type: 'judge'; condition?: string; expectedSuit?: string; repeatOnBlack?: boolean; redResult?: string; failEffect?: string; onSuccess?: Effect; onFail?: Effect }
-  | { type: 'addPendingTrick'; trickName: string; target: string }
+  | { type: '判定'; condition?: string; expectedSuit?: string; repeatOnBlack?: boolean; redResult?: string; failEffect?: string; onSuccess?: Effect; onFail?: Effect }
+  | { type: '添加延时锦囊'; trickName: string; target: string }
   | { type: 'convert'; from: string; to: string }
   | { type: 'redirect'; from: string; to: string }
   | { type: 'giveCards'; count: number | 'any'; target: string }
@@ -77,11 +77,11 @@ export interface TargetFilter {
 }
 
 export interface WeaponEffect {
-  type: 'unlimitedKills' | 'ignoreArmor' | 'chaseDodge' | 'forceHit' | 'dualWeapon';
+  type: '诸葛连弩' | '青釭剑' | '青龙偃月刀' | '贯石斧' | '雌雄双股剑';
 }
 
 export interface ArmorEffect {
-  type: 'judgeDodge' | 'blockBlackKill';
+  type: '八卦阵' | '仁王盾';
 }
 
 export interface Condition {

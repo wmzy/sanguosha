@@ -58,7 +58,7 @@ describe('技能完整性审计', () => {
       '激将', // 复杂主公技，需系统重构
       '离间', // 复杂决斗交互，需系统重构
       '流离', // 转移杀目标，validation 层处理
-      'dualWeapon', // 装备技能：丈八蛇矛，需两张牌当杀
+      '丈八蛇矛', // 装备技能：丈八蛇矛，需两张牌当杀
       '激将', // 主公技，角色配置中未列出但引擎已注册
     ]);
 
@@ -125,9 +125,9 @@ describe('技能完整性审计', () => {
     registry.forEach((def, skillId) => {
       it(`技能 "${skillId}" 在角色配置中有对应 abilities`, () => {
         // 装备技能不要求在角色 abilities 中
-        if (['unlimitedKills', 'judgeDodge', 'blockBlackKill', 'chaseDodge',
-          'dualWeapon', 'ignoreArmor', 'forceHit', 'multiTarget',
-          'twoCardsAsKill', '救援', '激将'].includes(skillId)) {
+        if (['诸葛连弩', '八卦阵', '仁王盾', '青龙偃月刀',
+          '雌雄双股剑', '青釭剑', '贯石斧', '方天画戟',
+          '丈八蛇矛', '救援', '激将'].includes(skillId)) {
           return;
         }
         // 技能可能通过 id 或 name 匹配
@@ -157,7 +157,7 @@ describe('技能实现状态', () => {
     const def = registry.get('反馈');
     if (!def) return;
     const handlerStr = def.handler.toString();
-    expect(handlerStr).toContain('discardRandom');
+    expect(handlerStr).toContain('随机弃置');
     // 缺少 gainCard 步骤，TODO 未完成
   });
 
@@ -167,6 +167,6 @@ describe('技能实现状态', () => {
     if (!def) return;
     const handlerStr = def.handler.toString();
     // 克己检查本回合是否使用过杀，未使用则将 phase 设为"结束"以跳过弃牌
-    expect(handlerStr).toContain('setPhase');
+    expect(handlerStr).toContain('设阶段');
   });
 });

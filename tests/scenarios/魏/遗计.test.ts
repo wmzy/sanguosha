@@ -44,8 +44,8 @@ describe('郭嘉 - 遗计', () => {
     })
     .act('跳过分配（选择不分配）', ctx => {
       // 遗计的分配是可选的，跳过后不应改变手牌
-      if (ctx.state.pending?.type === 'skillPrompt') {
-        ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: false });
+      if (ctx.state.pending?.type === '技能选择') {
+        ctx.engineAction({ type: '技能选择', player: 'P1', choice: false });
       }
     })
     .check('不分配时手牌保持摸牌后的数量', ctx => {
@@ -71,18 +71,18 @@ describe('郭嘉 - 遗计', () => {
       ctx.respond('P1');
     })
     .act('选择1张牌分配', ctx => {
-      if (ctx.state.pending?.type === 'skillPrompt') {
+      if (ctx.state.pending?.type === '技能选择') {
         const cardId = ctx.findCard('P1', '桃');
         if (cardId) {
-          ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: [cardId] });
+          ctx.engineAction({ type: '技能选择', player: 'P1', choice: [cardId] });
         } else {
-          ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: false });
+          ctx.engineAction({ type: '技能选择', player: 'P1', choice: false });
         }
       }
     })
     .act('选择 P2 作为目标', ctx => {
-      if (ctx.state.pending?.type === 'skillPrompt') {
-        ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: 'P2' });
+      if (ctx.state.pending?.type === '技能选择') {
+        ctx.engineAction({ type: '技能选择', player: 'P1', choice: 'P2' });
       }
     })
     .check('P2 获得分配的牌', ctx => {

@@ -4,8 +4,8 @@ import { makeServerEvent, makePlayerEvent } from '../event';
 
 export function register() {
   registerAtom({
-    type: 'kill',
-    apply(state: GameState, atom: Atom & { type: 'kill' }) {
+    type: '击杀',
+    apply(state: GameState, atom: Atom & { type: '击杀' }) {
       const player = atom.player as string;
       return {
         ...state,
@@ -18,12 +18,12 @@ export function register() {
         },
       };
     },
-    toEvents(state: GameState, atom: Atom & { type: 'kill' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '击杀' }): AtomEventResult {
       const player = atom.player as string;
       const source = atom.source as string | undefined;
       const payload: Json = { player, ...(source ? { source } : {}) };
-      const server = makeServerEvent('kill', payload);
-      return [server, new Map(), makePlayerEvent('kill', payload)];
+      const server = makeServerEvent('击杀', payload);
+      return [server, new Map(), makePlayerEvent('击杀', payload)];
     },
   });
 }

@@ -43,10 +43,10 @@ function computeWaitingPlayers(pending: PendingAction | null): Set<string> {
   const s = new Set<string>();
   if (!pending) return s;
   switch (pending.type) {
-    case 'playPhase':
+    case '出牌阶段':
       s.add(pending.player);
       break;
-    case 'responseWindow':
+    case '响应窗口':
       if (pending.window.type === 'trickResponse' && pending.window.responders) {
         const passed = pending.window.passedResponders ?? [];
         pending.window.responders
@@ -56,19 +56,19 @@ function computeWaitingPlayers(pending: PendingAction | null): Set<string> {
         s.add(pending.window.defender);
       }
       break;
-    case 'discardPhase':
+    case '弃牌阶段':
       s.add(pending.player);
       break;
-    case 'dyingWindow':
+    case '濒死窗口':
       s.add(pending.savers[pending.currentSaverIndex]);
       break;
-    case 'selectCard':
+    case '选择牌':
       s.add(pending.player);
       break;
-    case 'harvestSelection':
+    case '收获选牌':
       s.add(pending.pickOrder[pending.currentPickerIndex]);
       break;
-    case 'skillPrompt':
+    case '技能选择':
       s.add(pending.player);
       break;
   }
@@ -129,10 +129,10 @@ export function GameBoard({ data }: { data: GameBoardData }) {
 
   const isKillResponse = pendingPrompt?.type === 'killResponse';
   const isAoeResponse = pendingPrompt?.type === 'aoeResponse';
-  const isDyingWindow = pendingPrompt?.type === 'dyingWindow';
-  const isSkillPrompt = pendingPrompt?.type === 'skillPrompt';
+  const isDyingWindow = pendingPrompt?.type === '濒死窗口';
+  const isSkillPrompt = pendingPrompt?.type === '技能选择';
   const isCurrentPickerForSkill =
-    isSkillPrompt && pending?.type === 'skillPrompt' && pending.player === myName;
+    isSkillPrompt && pending?.type === '技能选择' && pending.player === myName;
 
   const viewCardMap = useMemo(() => toCardInfoMap(state.cardMap), [state.cardMap]);
   const seatsWithAbilities = useMemo(

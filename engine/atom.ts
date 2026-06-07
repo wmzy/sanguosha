@@ -108,7 +108,7 @@ export function applyAtoms(
   let s = state;
   const events: ServerEvent[] = [];
 
-  for (let rawAtom of atoms) {
+  for (const rawAtom of atoms) {
     let atom = rawAtom;
 
     // ── onBefore 钩子：可取消/替换/改 state ──
@@ -127,7 +127,7 @@ export function applyAtoms(
         }
         if (result.atom) atom = result.atom;
         if (result.state) s = result.state;
-        if (result.redirect && (atom.type === 'damage' || atom.type === 'becomeTarget')) {
+        if (result.redirect && (atom.type === '造成伤害' || atom.type === '成为目标')) {
           // 改写目标（"目标转移"机制：天香/流离/借刀）。新建 atom 避免污染原对象。
           atom = { ...atom, target: result.redirect };
         }

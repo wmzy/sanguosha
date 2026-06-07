@@ -6,22 +6,22 @@ import { asJson } from '../../shared/typeGuards';
 
 export function register() {
   registerAtom({
-    type: 'moveCard',
-    apply(state: GameState, atom: Atom & { type: 'moveCard' }): GameState {
+    type: '移动牌',
+    apply(state: GameState, atom: Atom & { type: '移动牌' }): GameState {
       const cardId = atom.cardId as string;
       const { from, to } = atom;
 
       let s: GameState = { ...state };
 
-      if (from.zone === 'hand') {
+      if (from.zone === '手牌') {
         s = updatePlayer(s, from.player as string, p => ({
           hand: p.hand.filter(id => id !== cardId),
         }));
-      } else if (from.zone === 'discardPile') {
+      } else if (from.zone === '弃牌堆') {
         s = { ...s, zones: { ...s.zones, discardPile: s.zones.discardPile.filter(id => id !== cardId) } };
-      } else if (from.zone === 'deck') {
+      } else if (from.zone === '牌堆') {
         s = { ...s, zones: { ...s.zones, deck: s.zones.deck.filter(id => id !== cardId) } };
-      } else if (from.zone === 'equipment') {
+      } else if (from.zone === '装备') {
         s = updatePlayer(s, from.player as string, p => {
           const eq = { ...p.equipment };
           delete eq[from.slot];
@@ -29,13 +29,13 @@ export function register() {
         });
       }
 
-      if (to.zone === 'hand') {
+      if (to.zone === '手牌') {
         s = updatePlayer(s, to.player as string, p => ({ hand: [...p.hand, cardId] }));
-      } else if (to.zone === 'discardPile') {
+      } else if (to.zone === '弃牌堆') {
         s = { ...s, zones: { ...s.zones, discardPile: [...s.zones.discardPile, cardId] } };
-      } else if (to.zone === 'deck') {
+      } else if (to.zone === '牌堆') {
         s = { ...s, zones: { ...s.zones, deck: [...s.zones.deck, cardId] } };
-      } else if (to.zone === 'equipment') {
+      } else if (to.zone === '装备') {
         s = updatePlayer(s, to.player as string, p => ({
           equipment: { ...p.equipment, [to.slot]: cardId },
         }));
@@ -43,11 +43,11 @@ export function register() {
 
       return s;
     },
-    toEvents(_state: GameState, atom: Atom & { type: 'moveCard' }): AtomEventResult {
+    toEvents(_state: GameState, atom: Atom & { type: '移动牌' }): AtomEventResult {
       const cardId = atom.cardId as string;
       const payload: Json = { cardId, from: asJson(atom.from), to: asJson(atom.to) };
-      const server = makeServerEvent('cardMoved', payload);
-      return [server, new Map(), makePlayerEvent('cardMoved', payload)];
+      const server = makeServerEvent('移动牌', payload);
+      return [server, new Map(), makePlayerEvent('移动牌', payload)];
     },
   });
 }

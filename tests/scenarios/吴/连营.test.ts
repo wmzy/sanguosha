@@ -30,7 +30,7 @@ describe('陆逊 - 连营', () => {
       };
     })
     .act('发射 cardDiscarded 事件触发连营', ctx => {
-      ctx.emitEvent({ type: 'cardDiscarded', player: 'P1', cardIds: [] });
+      ctx.emitEvent({ type: '弃置', player: 'P1', cardIds: [] });
     })
     .check('连营触发：手牌 +1（原 0 → 连营摸 1）', ctx => {
       expect(ctx.handSize('P1')).toBe(1);

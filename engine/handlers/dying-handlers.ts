@@ -10,7 +10,7 @@ export function resolveDying(
   action: GameAction,
   pending: PendingDyingWindow,
 ): EngineResult {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return { state, events: [], error: '濒死窗口需要 respond 动作' };
   }
 
@@ -31,20 +31,20 @@ export function resolveDying(
 
     const healAtoms: Atom[] = [
       {
-        type: 'moveCard',
+        type: '移动牌',
         cardId: action.cardId,
-        from: { zone: 'hand', player: currentSaver },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player: currentSaver },
+        to: { zone: '弃牌堆' },
       },
       {
-        type: 'heal',
+        type: '回复体力',
         target: pending.dyingPlayer,
         amount: 1,
         source: currentSaver,
       },
     ];
     const healResult = applyAtoms(state, healAtoms);
-    const healEvent = makeServerEvent('heal', {
+    const healEvent = makeServerEvent('回复体力', {
       target: pending.dyingPlayer,
       amount: 1,
       source: currentSaver,
@@ -53,7 +53,7 @@ export function resolveDying(
     // 检查濒死者体力是否恢复到 > 0
     const dyingState = getPlayer(healResult.state, pending.dyingPlayer);
     if (dyingState.health > 0) {
-      const popResult = applyAtoms(healResult.state, [{ type: 'popPending' }]);
+      const popResult = applyAtoms(healResult.state, [{ type: '弹出待定' }]);
       const resumed = resumeAoeChain(popResult.state, pending);
       return {
         state: resumed.state,
@@ -65,11 +65,11 @@ export function resolveDying(
     const nextIndex = pending.currentSaverIndex + 1;
     if (nextIndex >= pending.savers.length) {
       const deathAtoms: Atom[] = [
-        { type: 'kill', player: pending.dyingPlayer },
-        { type: 'popPending' },
+        { type: '击杀', player: pending.dyingPlayer },
+        { type: '弹出待定' },
       ];
       const deathResult = applyAtoms(healResult.state, deathAtoms);
-      const deathEvent = makeServerEvent('death', { player: pending.dyingPlayer });
+      const deathEvent = makeServerEvent('死亡', { player: pending.dyingPlayer });
       const resumed = resumeAoeChain(deathResult.state, pending);
       return {
         state: resumed.state,
@@ -92,11 +92,11 @@ export function resolveDying(
   if (nextIndex >= pending.savers.length) {
     // 无人救助 → 死亡
     const atoms: Atom[] = [
-      { type: 'kill', player: pending.dyingPlayer },
-      { type: 'popPending' },
+      { type: '击杀', player: pending.dyingPlayer },
+      { type: '弹出待定' },
     ];
     const result = applyAtoms(state, atoms);
-    const deathEvent = makeServerEvent('death', { player: pending.dyingPlayer });
+    const deathEvent = makeServerEvent('死亡', { player: pending.dyingPlayer });
     const resumed = resumeAoeChain(result.state, pending);
     return { state: resumed.state, events: [...result.events, deathEvent, ...resumed.events] };
   }
@@ -117,7 +117,7 @@ function advanceToNextSaver(pending: PendingDyingWindow, nextIndex: number): Pen
     ...pending,
     currentSaverIndex: nextIndex,
     deadline: Date.now() + pending.timeout,
-    onTimeout: { type: 'respond', player: nextSaver },
+    onTimeout: { type: '打出', player: nextSaver },
   };
 }
 

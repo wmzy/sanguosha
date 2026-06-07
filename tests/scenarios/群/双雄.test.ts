@@ -41,14 +41,14 @@ describe.skip('颜良文丑 - 双雄', () => {
     })
     .act('发射摸牌阶段开始事件触发双雄', ctx => {
       ctx.emitEvent({
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '摸牌',
         player: 'P1',
       });
     })
     .check('双雄触发后创建技能选择提示', ctx => {
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
       const prompt = ctx.state.pending as any;
       expect(prompt.skillId).toBe('双雄');
     })
@@ -63,13 +63,13 @@ describe.skip('颜良文丑 - 双雄', () => {
     })
     .act('发射摸牌阶段开始事件触发双雄', ctx => {
       ctx.emitEvent({
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '摸牌',
         player: 'P1',
       });
     })
     .act('选择牌堆顶第二张牌（♠杀）', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: 'deck-top-2' });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: 'deck-top-2' });
     })
     .check('获得花色标记', ctx => {
       const p1 = ctx.player('P1');

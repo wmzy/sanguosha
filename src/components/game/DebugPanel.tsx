@@ -88,11 +88,11 @@ const debugAutoSkipPadding = css`
   margin-bottom: 12px;
 `;
 
-export const DebugPanel = memo(function DebugPanel({
+export const DebugPanel = memo(({
   state,
   myName,
   onToggleAutoSkipWuxie,
-}: DebugPanelProps) {
+}: DebugPanelProps) => {
   return (
     <details className={debugDetails}>
       <summary className={debugSummary}>调试信息（点击展开）</summary>
@@ -138,11 +138,11 @@ export const DebugPanel = memo(function DebugPanel({
               </div>
               {Object.values(player.equipment).some(Boolean) && (
                 <div className={debugEquipLine}>
-                  装备: {player.equipment.weapon && state.cardMap[player.equipment.weapon]?.name}{' '}
-                  {player.equipment.armor && state.cardMap[player.equipment.armor]?.name}{' '}
-                  {player.equipment.horsePlus && state.cardMap[player.equipment.horsePlus]?.name}{' '}
-                  {player.equipment.horseMinus &&
-                    state.cardMap[player.equipment.horseMinus]?.name}
+                  装备: {player.equipment.武器 && state.cardMap[player.equipment.武器]?.name}{' '}
+                  {player.equipment.防具 && state.cardMap[player.equipment.防具]?.name}{' '}
+                  {player.equipment.防御马 && state.cardMap[player.equipment.防御马]?.name}{' '}
+                  {player.equipment.进攻马 &&
+                    state.cardMap[player.equipment.进攻马]?.name}
                 </div>
               )}
             </div>

@@ -20,7 +20,7 @@ describe('isValidAction', () => {
       },
       turn: { phase: '出牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
-    const result = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c1', target: 'P2' });
+    const result = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c1', target: 'P2' });
     expect(result).toEqual({ valid: true });
   });
 
@@ -33,7 +33,7 @@ describe('isValidAction', () => {
       },
       turn: { phase: '出牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
-    const result = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c99', target: 'P2' });
+    const result = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c99', target: 'P2' });
     expect(result).toEqual({ valid: false, reason: '手牌中没有此牌' });
   });
 
@@ -46,7 +46,7 @@ describe('isValidAction', () => {
       },
       turn: { phase: '弃牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
-    const result = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c1', target: 'P2' });
+    const result = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c1', target: 'P2' });
     expect(result).toEqual({ valid: false, reason: '当前不是出牌阶段' });
   });
 
@@ -58,7 +58,7 @@ describe('isValidAction', () => {
         health: 4, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
     });
-    const result = isValidAction(view, { type: 'respond', player: 'P1', cardId: 'c1' });
+    const result = isValidAction(view, { type: '打出', player: 'P1', cardId: 'c1' });
     expect(result).toEqual({ valid: true });
   });
 
@@ -70,7 +70,7 @@ describe('isValidAction', () => {
         health: 4, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
     });
-    const result = isValidAction(view, { type: 'respond', player: 'P1', cardId: 'c1' });
+    const result = isValidAction(view, { type: '打出', player: 'P1', cardId: 'c1' });
     expect(result).toEqual({ valid: false, reason: '手牌中没有此牌' });
   });
 
@@ -82,7 +82,7 @@ describe('isValidAction', () => {
         health: 4, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
     });
-    const result = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c1', target: 'P1' });
+    const result = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c1', target: 'P1' });
     expect(result).toEqual({ valid: false, reason: '体力已满' });
   });
 
@@ -94,7 +94,7 @@ describe('isValidAction', () => {
         health: 2, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
     });
-    const result = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c1', target: 'P1' });
+    const result = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c1', target: 'P1' });
     expect(result).toEqual({ valid: true });
   });
 
@@ -102,7 +102,7 @@ describe('isValidAction', () => {
     const view = makeView({
       turn: { phase: '出牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
-    const result = isValidAction(view, { type: 'endTurn', player: 'P1' });
+    const result = isValidAction(view, { type: '结束回合', player: 'P1' });
     expect(result).toEqual({ valid: true });
   });
 
@@ -110,7 +110,7 @@ describe('isValidAction', () => {
     const view = makeView({
       turn: { phase: '弃牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
-    const result = isValidAction(view, { type: 'endTurn', player: 'P1' });
+    const result = isValidAction(view, { type: '结束回合', player: 'P1' });
     expect(result).toEqual({ valid: false, reason: '当前不是出牌阶段' });
   });
 
@@ -122,13 +122,13 @@ describe('isValidAction', () => {
         health: 4, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
     });
-    const result = isValidAction(view, { type: 'respond', player: 'P1', cardId: 'c1' });
+    const result = isValidAction(view, { type: '打出', player: 'P1', cardId: 'c1' });
     expect(result).toEqual({ valid: true });
   });
 
   it('使用技能始终有效（服务端决定）', () => {
     const view = makeView();
-    const result = isValidAction(view, { type: 'useSkill', player: 'P1', skillId: '青囊', target: 'P1' });
+    const result = isValidAction(view, { type: '使用技能', player: 'P1', skillId: '青囊', target: 'P1' });
     expect(result).toEqual({ valid: true });
   });
 
@@ -140,7 +140,7 @@ describe('isValidAction', () => {
         health: 4, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
     });
-    const result = isValidAction(view, { type: 'discard', player: 'P1', cardIds: ['c1', 'c99'] });
+    const result = isValidAction(view, { type: '弃置', player: 'P1', cardIds: ['c1', 'c99'] });
     expect(result).toEqual({ valid: false, reason: '弃牌中包含不在手牌的卡牌' });
   });
 
@@ -152,7 +152,7 @@ describe('isValidAction', () => {
         health: 4, maxHealth: 4, pendingTricks: [], tags: [], vars: {}, alive: true,
       },
     });
-    const result = isValidAction(view, { type: 'discard', player: 'P1', cardIds: ['c1', 'c2'] });
+    const result = isValidAction(view, { type: '弃置', player: 'P1', cardIds: ['c1', 'c2'] });
     expect(result).toEqual({ valid: true });
   });
 
@@ -165,10 +165,10 @@ describe('isValidAction', () => {
       },
       turn: { phase: '出牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
-    const noTarget = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c1' });
+    const noTarget = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c1' });
     expect(noTarget).toEqual({ valid: false, reason: '需要指定目标' });
 
-    const withTarget = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c1', target: 'P2' });
+    const withTarget = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c1', target: 'P2' });
     expect(withTarget).toEqual({ valid: true });
   });
 
@@ -181,7 +181,7 @@ describe('isValidAction', () => {
       },
       turn: { phase: '出牌', currentPlayer: 'P1', killsPlayed: 0 },
     });
-    const result = isValidAction(view, { type: 'playCard', player: 'P1', cardId: 'c1', target: 'P2' });
+    const result = isValidAction(view, { type: '打出一张牌', player: 'P1', cardId: 'c1', target: 'P2' });
     expect(result).toEqual({ valid: false, reason: '闪不能主动使用' });
   });
 });
@@ -215,15 +215,15 @@ describe('getAvailableActions', () => {
     });
     const pending: PendingAction = {
       id: 'test-pending',
-      type: 'responseWindow',
+      type: '响应窗口',
       window: { type: 'killResponse', defender: 'P1', validCards: ['c1'], timeout: 15000, deadline: Date.now() + 15000 },
       timeout: 15000,
       deadline: Date.now() + 15000,
-      onTimeout: { type: 'respond', player: 'P1' },
+      onTimeout: { type: '打出', player: 'P1' },
     };
     const actions = getAvailableActions(view, pending);
     expect(actions).toHaveLength(1);
-    expect(actions[0].type).toBe('respond');
+    expect(actions[0].type).toBe('打出');
     expect(actions[0].validTargets).toEqual(['c1']);
   });
 
@@ -237,17 +237,17 @@ describe('getAvailableActions', () => {
     });
     const pending: PendingAction = {
       id: 'test-pending',
-      type: 'discardPhase',
+      type: '弃牌阶段',
       player: 'P1',
       min: 2,
       max: 2,
       timeout: 30000,
       deadline: Date.now() + 30000,
-      onTimeout: { type: 'discard', player: 'P1', cardIds: ['c1', 'c2'] },
+      onTimeout: { type: '弃置', player: 'P1', cardIds: ['c1', 'c2'] },
     };
     const actions = getAvailableActions(view, pending);
     expect(actions).toHaveLength(1);
-    expect(actions[0].type).toBe('discard');
+    expect(actions[0].type).toBe('弃置');
     expect(actions[0].validTargets).toEqual(['c1', 'c2', 'c3']);
     expect(actions[0].required).toBe(true);
   });
@@ -270,17 +270,17 @@ describe('getAvailableActions', () => {
     });
     const pending: PendingAction = {
       id: 'test-pending',
-      type: 'dyingWindow',
+      type: '濒死窗口',
       dyingPlayer: 'P2',
       currentSaverIndex: 0,
       savers: ['P1'],
       timeout: 20000,
       deadline: Date.now() + 20000,
-      onTimeout: { type: 'respond', player: 'P1' },
+      onTimeout: { type: '打出', player: 'P1' },
     };
     const actions = getAvailableActions(view, pending);
     expect(actions).toHaveLength(1);
-    expect(actions[0].type).toBe('respond');
+    expect(actions[0].type).toBe('打出');
     expect(actions[0].validTargets).toEqual(['c1']);
   });
 
@@ -294,13 +294,13 @@ describe('getAvailableActions', () => {
     });
     const pending: PendingAction = {
       id: 'test-pending',
-      type: 'dyingWindow',
+      type: '濒死窗口',
       dyingPlayer: 'P2',
       currentSaverIndex: 0,
       savers: ['P1'],
       timeout: 20000,
       deadline: Date.now() + 20000,
-      onTimeout: { type: 'respond', player: 'P1' },
+      onTimeout: { type: '打出', player: 'P1' },
     };
     const actions = getAvailableActions(view, pending);
     expect(actions).toEqual([]);
@@ -330,11 +330,11 @@ describe('getAvailableActions', () => {
     });
     const pending: PendingAction = {
       id: 'test-pending',
-      type: 'responseWindow',
+      type: '响应窗口',
       window: { type: 'duelResponse', defender: 'P1', validCards: ['c1'], timeout: 15000, deadline: Date.now() + 15000 },
       timeout: 15000,
       deadline: Date.now() + 15000,
-      onTimeout: { type: 'respond', player: 'P1' },
+      onTimeout: { type: '打出', player: 'P1' },
     };
     const actions = getAvailableActions(view, pending);
     expect(actions).toHaveLength(1);

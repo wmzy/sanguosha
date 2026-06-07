@@ -5,8 +5,8 @@ import { updatePlayer } from '../state';
 
 export function register() {
   registerAtom({
-    type: 'modifyMaxHealth',
-    apply(state: GameState, atom: Atom & { type: 'modifyMaxHealth' }): GameState {
+    type: '设上限',
+    apply(state: GameState, atom: Atom & { type: '设上限' }): GameState {
       const player = atom.player as string;
       const delta = atom.delta as number;
       return updatePlayer(state, player, p => {
@@ -18,12 +18,12 @@ export function register() {
         return { maxHealth: clampedMax, health: newHealth };
       });
     },
-    toEvents(state: GameState, atom: Atom & { type: 'modifyMaxHealth' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '设上限' }): AtomEventResult {
       const player = atom.player as string;
       const delta = atom.delta as number;
       const payload: Json = { player, delta };
-      const server = makeServerEvent('modifyMaxHealth', payload);
-      const ownerEvent = makePlayerEvent('modifyMaxHealth', payload);
+      const server = makeServerEvent('设上限', payload);
+      const ownerEvent = makePlayerEvent('设上限', payload);
       return [server, new Map([[player, ownerEvent]]), null];
     },
   });

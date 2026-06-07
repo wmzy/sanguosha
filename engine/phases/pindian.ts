@@ -50,7 +50,7 @@ export function register() {
       // 1) 调 compareRank 原子（已注册到 @engine/atoms）
       const r = applyAtoms(
         s,
-        [{ type: 'compareRank', a, b, aCardId, bCardId }],
+        [{ type: '拼点', a, b, aCardId, bCardId }],
         { skipPlayerEvents: true },
       );
       s = r.state;

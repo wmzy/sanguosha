@@ -13,49 +13,49 @@ import { makeServerEvent, makePlayerEvent } from '../event';
 export function register() {
   // setPhase: 单纯修改 state.phase 字段
   registerAtom({
-    type: 'setPhase',
-    apply(state: GameState, atom: Atom & { type: 'setPhase' }) {
+    type: '设阶段',
+    apply(state: GameState, atom: Atom & { type: '设阶段' }) {
       return { ...state, phase: atom.phase };
     },
-    toEvents(state: GameState, atom: Atom & { type: 'setPhase' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '设阶段' }): AtomEventResult {
       const payload: Json = { phase: atom.phase, player: state.currentPlayer };
-      const server = makeServerEvent('setPhase', payload);
-      return [server, new Map(), makePlayerEvent('setPhase', payload)];
+      const server = makeServerEvent('设阶段', payload);
+      return [server, new Map(), makePlayerEvent('设阶段', payload)];
     },
   });
 
   // phaseBegin atom: 阶段开始通知（写 serverLog，给技能钩子）
   registerAtom({
-    type: 'phaseBegin',
-    apply(state: GameState, _atom: Atom & { type: 'phaseBegin' }) {
+    type: '阶段开始',
+    apply(state: GameState, _atom: Atom & { type: '阶段开始' }) {
       return state;
     },
-    toEvents(state: GameState, atom: Atom & { type: 'phaseBegin' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '阶段开始' }): AtomEventResult {
       const phase = atom.phase as string;
       const player = atom.player as string;
       const payload: Json = { phase, player };
-      return [makeServerEvent('phaseBegin', payload), new Map(), makePlayerEvent('phaseBegin', payload)];
+      return [makeServerEvent('阶段开始', payload), new Map(), makePlayerEvent('阶段开始', payload)];
     },
   });
 
   // phaseEnd atom: 阶段结束通知
   registerAtom({
-    type: 'phaseEnd',
-    apply(state: GameState, _atom: Atom & { type: 'phaseEnd' }) {
+    type: '阶段结束',
+    apply(state: GameState, _atom: Atom & { type: '阶段结束' }) {
       return state;
     },
-    toEvents(state: GameState, atom: Atom & { type: 'phaseEnd' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '阶段结束' }): AtomEventResult {
       const phase = atom.phase as string;
       const player = atom.player as string;
       const payload: Json = { phase, player };
-      return [makeServerEvent('phaseEnd', payload), new Map(), makePlayerEvent('phaseEnd', payload)];
+      return [makeServerEvent('阶段结束', payload), new Map(), makePlayerEvent('阶段结束', payload)];
     },
   });
 
   // nextPlayer: 切换到下一玩家，turn state 重置（turnStarted: false 让下一回合重新派 turnStart）
   registerAtom({
-    type: 'nextPlayer',
-    apply(state: GameState, _atom: Atom & { type: 'nextPlayer' }) {
+    type: '下一玩家',
+    apply(state: GameState, _atom: Atom & { type: '下一玩家' }) {
       const alive = state.playerOrder.filter((name) => state.players[name].info.alive);
       if (alive.length === 0) return state;
       const currentIdx = alive.indexOf(state.currentPlayer);
@@ -73,15 +73,15 @@ export function register() {
         turn: { killsPlayed: 0, skillsUsed: [], turnStarted: false },
       };
     },
-    toEvents(state: GameState, _atom: Atom & { type: 'nextPlayer' }): AtomEventResult {
+    toEvents(state: GameState, _atom: Atom & { type: '下一玩家' }): AtomEventResult {
       const alive = state.playerOrder.filter((name) => state.players[name].info.alive);
       if (alive.length === 0) {
-        const server = makeServerEvent('nextPlayer', {
+        const server = makeServerEvent('下一玩家', {
           from: state.currentPlayer,
           to: state.currentPlayer,
           turnNumber: state.meta.turnNumber + 1,
         });
-        return [server, new Map(), makePlayerEvent('nextPlayer', server.payload)];
+        return [server, new Map(), makePlayerEvent('下一玩家', server.payload)];
       }
       const currentIdx = alive.indexOf(state.currentPlayer);
       const nextIdx = (Math.max(0, currentIdx) + 1) % alive.length;
@@ -92,8 +92,8 @@ export function register() {
         turnNumber: state.meta.turnNumber + 1,
         round: currentIdx === -1 || nextIdx <= currentIdx ? state.meta.round + 1 : state.meta.round,
       };
-      const server = makeServerEvent('nextPlayer', payload);
-      return [server, new Map(), makePlayerEvent('nextPlayer', payload)];
+      const server = makeServerEvent('下一玩家', payload);
+      return [server, new Map(), makePlayerEvent('下一玩家', payload)];
     },
   });
 }

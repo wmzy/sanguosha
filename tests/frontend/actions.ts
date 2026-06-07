@@ -3,21 +3,21 @@ import type { PlayerView, AvailableAction, ValidationResult } from '@engine/view
 
 export function isValidAction(view: PlayerView, action: GameAction): ValidationResult {
   switch (action.type) {
-    case 'playCard':
+    case '打出一张牌':
       return validatePlayCard(view, action);
-    case 'respond':
+    case '打出':
       return validateRespond(view, action);
-    case 'endTurn':
+    case '结束回合':
       return validateEndTurn(view, action);
-    case 'discard':
+    case '弃置':
       return validateDiscard(view, action);
-    case 'useSkill':
+    case '使用技能':
       return { valid: true };
-    case 'skillChoice':
+    case '技能选择':
       return { valid: true };
-    case 'startGame':
+    case '开始':
       return { valid: true };
-    case 'toggleAutoSkipWuxie':
+    case '切换自动跳过无懈可击':
       return { valid: true };
   }
 }
@@ -28,7 +28,7 @@ function findCardInHand(view: PlayerView, cardId: string) {
 
 function validatePlayCard(
   view: PlayerView,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
 ): ValidationResult {
   const card = findCardInHand(view, action.cardId);
   if (!card) return { valid: false, reason: '手牌中没有此牌' };
@@ -63,7 +63,7 @@ function validatePlayCard(
 
 function validateRespond(
   view: PlayerView,
-  action: GameAction & { type: 'respond' },
+  action: GameAction & { type: '打出' },
 ): ValidationResult {
   if (!action.cardId) return { valid: true };
 
@@ -75,7 +75,7 @@ function validateRespond(
 
 function validateEndTurn(
   view: PlayerView,
-  _action: GameAction & { type: 'endTurn' },
+  _action: GameAction & { type: '结束回合' },
 ): ValidationResult {
   if (view.turn.phase !== '出牌') {
     return { valid: false, reason: '当前不是出牌阶段' };
@@ -85,7 +85,7 @@ function validateEndTurn(
 
 function validateDiscard(
   view: PlayerView,
-  action: GameAction & { type: 'discard' },
+  action: GameAction & { type: '弃置' },
 ): ValidationResult {
   for (const id of action.cardIds) {
     if (!findCardInHand(view, id)) {
@@ -116,24 +116,24 @@ export function getAvailableActions(
 
 function getPendingActions(view: PlayerView, pending: PendingAction): AvailableAction[] {
   switch (pending.type) {
-    case 'responseWindow': {
+    case '响应窗口': {
       const cards = getResponseCards(view, pending.window.type);
       if (cards.length === 0) return [];
-      return [{ type: 'respond', validTargets: cards.map(c => c.id), required: false }];
+      return [{ type: '打出', validTargets: cards.map(c => c.id), required: false }];
     }
-    case 'discardPhase': {
+    case '弃牌阶段': {
       const handIds = view.self.hand.map(c => c.id);
       return [{
-        type: 'discard',
+        type: '弃置',
         validTargets: handIds,
         required: true,
         sourceId: `discard-${pending.min}-${pending.max}`,
       }];
     }
-    case 'dyingWindow': {
+    case '濒死窗口': {
       const peaches = view.self.hand.filter(c => c.name === '桃');
       if (peaches.length === 0) return [];
-      return [{ type: 'respond', validTargets: peaches.map(c => c.id), required: false }];
+      return [{ type: '打出', validTargets: peaches.map(c => c.id), required: false }];
     }
     default:
       return [];
@@ -162,7 +162,7 @@ function getPlayPhaseActions(view: PlayerView): AvailableAction[] {
   for (const card of view.self.hand) {
     const targets = getTargetsForCard(view, card, others);
     if (targets === null) continue;
-    actions.push({ type: 'playCard', sourceId: card.id, validTargets: targets, required: false });
+    actions.push({ type: '打出一张牌', sourceId: card.id, validTargets: targets, required: false });
   }
 
   return actions;

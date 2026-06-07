@@ -97,10 +97,10 @@ export interface PlayerInfo {
 }
 
 export interface EquipmentSlots {
-  weapon?: string;
-  armor?: string;
-  horsePlus?: string;
-  horseMinus?: string;
+  武器?: string;
+  防具?: string;
+  防御马?: string;
+  进攻马?: string;
 }
 
 export type EquipSlot = keyof EquipmentSlots;
@@ -119,7 +119,7 @@ export type PendingAction =
   | PendingHarvestSelection;
 
 export interface PendingPlayPhase {
-  type: 'playPhase';
+  type: '出牌阶段';
   /** 唯一标识，用于客户端 promptId 校验 */
   id: string;
   player: string;
@@ -129,7 +129,7 @@ export interface PendingPlayPhase {
 }
 
 export interface PendingResponseWindow {
-  type: 'responseWindow';
+  type: '响应窗口';
   id: string;
   window: ResponseWindowData;
   timeout: number;
@@ -138,7 +138,7 @@ export interface PendingResponseWindow {
 }
 
 export interface PendingSkillPrompt {
-  type: 'skillPrompt';
+  type: '技能选择';
   id: string;
   skillId: string;
   player: string;
@@ -150,7 +150,7 @@ export interface PendingSkillPrompt {
 }
 
 export interface PendingDiscardPhase {
-  type: 'discardPhase';
+  type: '弃牌阶段';
   id: string;
   player: string;
   min: number;
@@ -161,7 +161,7 @@ export interface PendingDiscardPhase {
 }
 
 export interface PendingDyingWindow {
-  type: 'dyingWindow';
+  type: '濒死窗口';
   id: string;
   dyingPlayer: string;
   currentSaverIndex: number;
@@ -179,7 +179,7 @@ export interface PendingDyingWindow {
 }
 
 export interface PendingSelectCard {
-  type: 'selectCard';
+  type: '选择牌';
   id: string;
   player: string;
   target: string;
@@ -187,14 +187,14 @@ export interface PendingSelectCard {
   min: number;
   max: number;
   sourceCard: string;
-  mode: 'discard' | 'steal';
+  mode: '弃置' | '获得';
   timeout: number;
   deadline: number;
   onTimeout: GameAction;
 }
 
 export interface PendingHarvestSelection {
-  type: 'harvestSelection';
+  type: '收获选牌';
   id: string;
   /** 翻出的待选牌 ID 列表 */
   revealedCards: string[];
@@ -221,51 +221,51 @@ export type DamageType = 'normal' | 'fire' | 'thunder';
  * 每个 Atom 类型通过 registerAtom() 注册，包含 apply 和 toEvents。
  */
 export type Atom =
-  | { type: 'damage'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string>; damageType?: Expr<DamageType> }
-  | { type: 'heal'; target: Expr<string>; amount: Expr<number>; source?: Expr<string> }
-  | { type: 'loseHealth'; target: Expr<string>; amount: Expr<number> }
-  | { type: 'draw'; player: Expr<string>; count: Expr<number> }
-  | { type: 'discard'; player: Expr<string>; cardIds: Expr<string[]> }
-  | { type: 'discardRandom'; player: Expr<string>; count: Expr<number>; from: 'hand' | 'equipment' }
-  | { type: 'moveCard'; cardId: Expr<string>; from: ZoneLoc; to: ZoneLoc }
-  | { type: 'loseCard'; cardId: Expr<string>; from: { zone: 'hand' | 'equipment'; player: Expr<string>; slot?: EquipSlot } }
-  | { type: 'giveCard'; cardId: Expr<string>; from: Expr<string>; to: Expr<string> }
-  | { type: 'takeCard'; cardId: Expr<string>; to: Expr<string> }
-  | { type: 'equip'; player: Expr<string>; cardId: Expr<string> }
-  | { type: 'unequip'; player: Expr<string>; slot: EquipSlot }
-  | { type: 'setVar'; player: Expr<string>; key: string; value: Expr<Json> }
-  | { type: 'incrementVar'; player: Expr<string>; key: string; delta: Expr<number> }
-  | { type: 'clearVarPattern'; player: Expr<string>; pattern: string }
-  | { type: 'pushPending'; action: PendingAction }
-  | { type: 'popPending' }
-  | { type: 'setPhase'; phase: TurnPhase }
-  | { type: 'nextPlayer' }
-  | { type: 'judge'; player: Expr<string>; varKey?: string }
-  | { type: 'addPendingTrick'; player: Expr<string>; trick: PendingTrick }
-  | { type: 'removePendingTrick'; player: Expr<string>; index: number }
-  | { type: 'addTag'; player: Expr<string>; tag: string }
-  | { type: 'removeTag'; player: Expr<string>; tag: string }
-  | { type: 'reshuffle' }
-  | { type: 'shuffleDeck' }
-  | { type: 'kill'; player: Expr<string>; source?: Expr<string> }
-  | { type: 'gainCard'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
-  | { type: 'setCtxVar'; key: string; value: Json }
-  | { type: 'incrementKills' }
-  | { type: 'rearrangeDeck'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> }
-  | { type: 'modifyMaxHealth'; player: Expr<string>; delta: Expr<number> }
-  | { type: 'addSkill'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } }
-  | { type: 'removeSkill'; player: Expr<string>; skillId: string }
-  | { type: 'turnStart'; player: Expr<string> }
-  | { type: 'phaseBegin'; phase: Expr<string>; player: Expr<string> }
-  | { type: 'phaseEnd'; phase: Expr<string>; player: Expr<string> }
-  | { type: 'specifyTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
-  | { type: 'becomeTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
-  | { type: 'resolveCard'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> }
-  | { type: 'setChained'; target: Expr<string>; chained: Expr<boolean> }
-  | { type: 'compareRank'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> }
-  | { type: 'addMark'; player: Expr<string>; mark: Mark }
-  | { type: 'removeMark'; player: Expr<string>; markId: string }
-  | { type: 'clearExpiredMarks'; phase: TurnPhase };
+  | { type: '造成伤害'; target: Expr<string>; amount: Expr<number>; source?: Expr<string>; cardId?: Expr<string>; damageType?: Expr<DamageType> }
+  | { type: '回复体力'; target: Expr<string>; amount: Expr<number>; source?: Expr<string> }
+  | { type: '失去体力'; target: Expr<string>; amount: Expr<number> }
+  | { type: '摸牌'; player: Expr<string>; count: Expr<number> }
+  | { type: '弃置'; player: Expr<string>; cardIds: Expr<string[]> }
+  | { type: '随机弃置'; player: Expr<string>; count: Expr<number>; from: '手牌' | '装备' }
+  | { type: '移动牌'; cardId: Expr<string>; from: ZoneLoc; to: ZoneLoc }
+  | { type: '失去牌'; cardId: Expr<string>; from: { zone: '手牌' | '装备'; player: Expr<string>; slot?: EquipSlot } }
+  | { type: '给予'; cardId: Expr<string>; from: Expr<string>; to: Expr<string> }
+  | { type: '抽牌'; cardId: Expr<string>; to: Expr<string> }
+  | { type: '装备'; player: Expr<string>; cardId: Expr<string> }
+  | { type: '卸下'; player: Expr<string>; slot: EquipSlot }
+  | { type: '设置变量'; player: Expr<string>; key: string; value: Expr<Json> }
+  | { type: '增加变量'; player: Expr<string>; key: string; delta: Expr<number> }
+  | { type: '清空变量'; player: Expr<string>; pattern: string }
+  | { type: '推入待定'; action: PendingAction }
+  | { type: '弹出待定' }
+  | { type: '设阶段'; phase: TurnPhase }
+  | { type: '下一玩家' }
+  | { type: '判定'; player: Expr<string>; varKey?: string }
+  | { type: '添加延时锦囊'; player: Expr<string>; trick: PendingTrick }
+  | { type: '移除延时锦囊'; player: Expr<string>; index: number }
+  | { type: '加标签'; player: Expr<string>; tag: string }
+  | { type: '去标签'; player: Expr<string>; tag: string }
+  | { type: '重洗' }
+  | { type: '洗牌' }
+  | { type: '击杀'; player: Expr<string>; source?: Expr<string> }
+  | { type: '获得'; player: Expr<string>; cardId: Expr<string>; from: ZoneLoc }
+  | { type: '设置上下文变量'; key: string; value: Json }
+  | { type: '累计出杀' }
+  | { type: '整理牌堆'; player: Expr<string>; topCardIds: Expr<string[]>; bottomCardIds: Expr<string[]> }
+  | { type: '设上限'; player: Expr<string>; delta: Expr<number> }
+  | { type: '加技能'; player: Expr<string>; skillId: string; source?: { characterMap: Record<string, import('../shared/types').CharacterConfig> } }
+  | { type: '去技能'; player: Expr<string>; skillId: string }
+  | { type: '回合开始'; player: Expr<string> }
+  | { type: '阶段开始'; phase: Expr<string>; player: Expr<string> }
+  | { type: '阶段结束'; phase: Expr<string>; player: Expr<string> }
+  | { type: '指定目标'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
+  | { type: '成为目标'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
+  | { type: '解决'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> }
+  | { type: '设横置'; target: Expr<string>; chained: Expr<boolean> }
+  | { type: '拼点'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> }
+  | { type: '加标记'; player: Expr<string>; mark: Mark }
+  | { type: '去标记'; player: Expr<string>; markId: string }
+  | { type: '清过期标记'; phase: TurnPhase };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog
@@ -389,7 +389,7 @@ export type SkillPhase =
   | { type: 'atoms'; ops: Atom[] }
   | { type: 'condition'; check: Condition; then: SkillPhase[]; else?: SkillPhase[] }
   | { type: 'prompt'; text: string; options: PromptOption[]; defaultChoice?: Json; timeout?: number }
-  | { type: 'respond'; window: ResponseWindowDef }
+  | { type: '打出'; window: ResponseWindowDef }
   | { type: 'loop'; body: SkillPhase[]; while: Condition }
   | { type: 'emit'; event: GameEvent }
   | { type: 'foreach'; collection: Expr<string[]>; body: SkillPhase[]; varName: string }
@@ -472,7 +472,7 @@ export interface SkillConvertible {
 export interface TriggerSpec {
   event: string;
   filter?: Condition;
-  source: 'character' | 'equipment';
+  source: '角色' | '装备';
   priority?: number;
   optional?: boolean;
   phase?: TurnPhase;
@@ -481,40 +481,40 @@ export interface TriggerSpec {
 export interface TriggerRule {
   event: string;
   filter?: Condition;
-  source: 'character' | 'equipment';
+  source: '角色' | '装备';
   skillId: string;
   player: string;
   priority: number;
   optional?: boolean;
 }
 export type GameAction =
-  | { type: 'playCard'; player: string; cardId: string; target?: string }
-  | { type: 'respond'; player: string; cardId?: string; cardIds?: string[] }
-  | { type: 'endTurn'; player: string }
-  | { type: 'discard'; player: string; cardIds: string[] }
-  | { type: 'useSkill'; player: string; skillId: string; target?: string }
-  | { type: 'skillChoice'; player: string; choice: Json }
-  | { type: 'startGame' }
-  | { type: 'toggleAutoSkipWuxie' };
- export type GameEvent =
-  | { type: 'turnStart'; player: string }
-  | { type: 'turnEnd'; player: string }
-  | { type: 'phaseBegin'; phase: TurnPhase; player: string }
-  | { type: 'phaseEnd'; phase: TurnPhase; player: string }
-  /** @deprecated v3+ 将由 useCard 3 原子 (specifyTarget/becomeTarget/resolveCard, [T-13]) 取代；v2 路径保留至 [T-22] 迁移完成。仅 cardPlayed 弃用，非全部 GameEvent。 */
-  | { type: 'cardPlayed'; player: string; cardId: string; target?: string }
-  | { type: 'damageDealt'; source: string; target: string; amount: number; cardId?: string }
-  | { type: 'damageReceived'; target: string; source: string; amount: number; cardId?: string }
-  | { type: 'heal'; target: string; amount: number; source?: string }
-  | { type: 'killDodged'; attacker: string; defender: string }
-  | { type: 'killHit'; attacker: string; defender: string }
-  | { type: 'cardDrawn'; player: string; count: number }
-  | { type: 'cardDiscarded'; player: string; cardIds: string[] }
-  | { type: 'equipChanged'; player: string; slot: EquipSlot; oldCardId?: string; newCardId?: string }
-  | { type: 'judgeResult'; player: string; cardId: string; result: 'red' | 'black' }
-  | { type: 'dying'; player: string; source?: string }
-  | { type: 'death'; player: string; source?: string }
-  | { type: 'skillActivated'; player: string; skillId: string };
+  | { type: '打出一张牌'; player: string; cardId: string; target?: string }
+  | { type: '打出'; player: string; cardId?: string; cardIds?: string[] }
+  | { type: '结束回合'; player: string }
+  | { type: '弃置'; player: string; cardIds: string[] }
+  | { type: '使用技能'; player: string; skillId: string; target?: string }
+  | { type: '技能选择'; player: string; choice: Json }
+  | { type: '开始' }
+  | { type: '切换自动跳过无懈可击' };
+export type GameEvent =
+  | { type: '回合开始'; player: string }
+  | { type: '回合结束'; player: string }
+  | { type: '阶段开始'; phase: TurnPhase; player: string }
+  | { type: '阶段结束'; phase: TurnPhase; player: string }
+  /** @deprecated v3+ 将由 useCard 3 原子 (指定目标/成为目标/解决, [T-13]) 取代；v2 路径保留至 [T-22] 迁移完成。仅 出牌 弃用，非全部 GameEvent。 */
+  | { type: '出牌'; player: string; cardId: string; target?: string }
+  | { type: '造成伤害'; source: string; target: string; amount: number; cardId?: string }
+  | { type: '受到伤害'; target: string; source: string; amount: number; cardId?: string }
+  | { type: '回复体力'; target: string; amount: number; source?: string }
+  | { type: '杀被闪避'; attacker: string; defender: string }
+  | { type: '杀命中'; attacker: string; defender: string }
+  | { type: '摸牌'; player: string; count: number }
+  | { type: '弃置'; player: string; cardIds: string[] }
+  | { type: '装备变动'; player: string; slot: EquipSlot; oldCardId?: string; newCardId?: string }
+  | { type: '判定结果'; player: string; cardId: string; result: '红' | '黑' }
+  | { type: '濒死'; player: string; source?: string }
+  | { type: '死亡'; player: string; source?: string }
+  | { type: '技能发动'; player: string; skillId: string };
 export interface ServerEvent {
   id: string;
   type: string;
@@ -533,7 +533,7 @@ export interface PromptDef {
 export type PromptOption =
   | { label: string; value: Json }
   | { type: 'selectPlayer'; filter?: Condition }
-  | { type: 'selectCard'; from: string; min?: number; max?: number }
+  | { type: '选择牌'; from: string; min?: number; max?: number }
   | { type: 'selectCards'; from: string; min: number; max: number }
   | { type: 'orderCards'; cardIds: string[]; topLabel: string; bottomLabel: string };
 
@@ -586,10 +586,10 @@ export interface ResponseWindowData extends ResponseWindowDef {
   deadline: number;
 }
 export type ZoneLoc =
-  | { zone: 'deck' }
-  | { zone: 'discardPile' }
-  | { zone: 'hand'; player: Expr<string> }
-  | { zone: 'equipment'; player: Expr<string>; slot: EquipSlot };
+  | { zone: '牌堆' }
+  | { zone: '弃牌堆' }
+  | { zone: '手牌'; player: Expr<string> }
+  | { zone: '装备'; player: Expr<string>; slot: EquipSlot };
 export interface EngineResult {
   state: GameState;
   events: ServerEvent[];
@@ -598,12 +598,12 @@ export interface EngineResult {
 }
 
 export type ValidAction =
-  | { type: 'playCard'; prompt: string; cards: PlayableCard[] }
-  | { type: 'respond'; prompt: string; required: boolean; cards: string[]; canPass: boolean }
-  | { type: 'useSkill'; prompt: string; skills: AvailableSkill[] }
-  | { type: 'discard'; prompt: string; min: number; max: number; cards: string[] }
-  | { type: 'skillChoice'; prompt: string; options: PromptOption[] }
-  | { type: 'endTurn'; prompt: string };
+  | { type: '打出一张牌'; prompt: string; cards: PlayableCard[] }
+  | { type: '打出'; prompt: string; required: boolean; cards: string[]; canPass: boolean }
+  | { type: '使用技能'; prompt: string; skills: AvailableSkill[] }
+  | { type: '弃置'; prompt: string; min: number; max: number; cards: string[] }
+  | { type: '技能选择'; prompt: string; options: PromptOption[] }
+  | { type: '结束回合'; prompt: string };
 
 export interface PlayableCard {
   cardId: string;

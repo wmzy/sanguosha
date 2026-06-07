@@ -19,7 +19,7 @@ describe('PlayerState.chained', () => {
   it('setVar 写到 vars.chained 不影响 .chained 字段', () => {
     const s0 = createTestGame();
     const { state } = applyAtoms(s0, [
-      { type: 'setVar', player: 'P1', key: 'chained', value: true },
+      { type: '设置变量', player: 'P1', key: 'chained', value: true },
     ]);
     expect(state.players.P1.chained).toBe(false);
     expect(state.players.P1.vars.chained).toBe(true);

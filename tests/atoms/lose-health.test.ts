@@ -15,10 +15,10 @@ describe('loseHealth atom', () => {
     let s0 = createTestGame();
     s0 = setHealth(s0, 'P1', 4);
     const { state, events } = applyAtoms(s0, [
-      { type: 'loseHealth', target: 'P1', amount: 2 },
+      { type: '失去体力', target: 'P1', amount: 2 },
     ]);
     expect(state.players.P1.health).toBe(2);
-    expect(events[0].type).toBe('loseHealth');
+    expect(events[0].type).toBe('失去体力');
     expect(events[0].payload).toMatchObject({ target: 'P1', amount: 2 });
     expect(events[0].payload).not.toHaveProperty('source');
   });
@@ -27,7 +27,7 @@ describe('loseHealth atom', () => {
     let s0 = createTestGame();
     s0 = setHealth(s0, 'P1', 4);
     const { state } = applyAtoms(s0, [
-      { type: 'loseHealth', target: 'P1', amount: 1 },
+      { type: '失去体力', target: 'P1', amount: 1 },
     ]);
     expect(state.players.P1.health).toBe(3);
   });
@@ -36,7 +36,7 @@ describe('loseHealth atom', () => {
     let s0 = createTestGame();
     s0 = setHealth(s0, 'P1', 4);
     const { state } = applyAtoms(s0, [
-      { type: 'loseHealth', target: 'P1', amount: 0 },
+      { type: '失去体力', target: 'P1', amount: 0 },
     ]);
     expect(state.players.P1.health).toBe(4);
   });

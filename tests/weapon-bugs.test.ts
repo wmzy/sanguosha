@@ -45,7 +45,7 @@ describe('武器 attackRange 与出杀 (BUG #1)', () => {
     const weaponId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
 
     const result = engine(state, {
-      type: 'playCard',
+      type: '打出一张牌',
       player: 'P1',
       cardId: weaponId,
     });
@@ -59,7 +59,7 @@ describe('武器 attackRange 与出杀 (BUG #1)', () => {
     const weaponId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
 
     const result = engine(state, {
-      type: 'playCard',
+      type: '打出一张牌',
       player: 'P1',
       cardId: weaponId,
     });
@@ -74,7 +74,7 @@ describe('武器 attackRange 与出杀 (BUG #1)', () => {
 
     expect(isInAttackRange(state, 'P1', 'P3')).toBe(false);
     const result = engine(state, {
-      type: 'playCard',
+      type: '打出一张牌',
       player: 'P1',
       cardId: killId,
       target: 'P3',
@@ -90,9 +90,9 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     state = injectEquipCard(state, 'P1', '诸葛连弩', '武器');
     const weaponId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
 
-    const before = state.triggers.filter(t => t.source === 'equipment').length;
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: weaponId });
-    const after = result.state.triggers.filter(t => t.source === 'equipment').length;
+    const before = state.triggers.filter(t => t.source === '装备').length;
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: weaponId });
+    const after = result.state.triggers.filter(t => t.source === '装备').length;
     expect(after).toBe(before + 1);
     expect(hasUnlimitedKills(result.state, 'P1')).toBe(true);
   });
@@ -105,10 +105,10 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     const kill1 = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '杀')!;
     const weaponId = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '诸葛连弩')!;
 
-    const equipResult = engine(state, { type: 'playCard', player: 'P1', cardId: weaponId });
+    const equipResult = engine(state, { type: '打出一张牌', player: 'P1', cardId: weaponId });
     expect(equipResult.error).toBeUndefined();
 
-    const r1 = engine(equipResult.state, { type: 'playCard', player: 'P1', cardId: kill1, target: 'P2' });
+    const r1 = engine(equipResult.state, { type: '打出一张牌', player: 'P1', cardId: kill1, target: 'P2' });
     expect(r1.error).toBeUndefined();
   });
 
@@ -118,14 +118,14 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     state = injectEquipCard(state, 'P1', '贯石斧', '武器', 3);
     const weaponId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
 
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: weaponId });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: weaponId });
     expect(result.error).toBeUndefined();
 
     const trigger = result.state.triggers.find(
-      t => t.source === 'equipment' && t.skillId === 'forceHit',
+      t => t.source === '装备' && t.skillId === '贯石斧',
     );
     expect(trigger).toBeDefined();
-    expect(trigger?.event).toBe('killDodged');
+    expect(trigger?.event).toBe('杀被闪避');
   });
 
   it('装备青釭剑后注册 ignoreArmor trigger (v3HookOnly event — 1D-T3 青釭剑 v3 钩子迁移)', () => {
@@ -133,9 +133,9 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     state = setPlayPhase(state);
     state = injectEquipCard(state, 'P1', '青釭剑', '武器', 2);
     const weaponId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: weaponId });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: weaponId });
     const trigger = result.state.triggers.find(
-      t => t.source === 'equipment' && t.skillId === 'ignoreArmor',
+      t => t.source === '装备' && t.skillId === '青釭剑',
     );
     expect(trigger).toBeDefined();
     // 1D-T3：青釭剑的 v3 实现走 engine/skills/qinggang.ts 的 registerAtomHook；
@@ -149,9 +149,9 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     state = injectEquipCard(state, 'P1', '八卦阵', '防具');
     const armorId = state.players['P1'].hand[state.players['P1'].hand.length - 1];
 
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: armorId });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: armorId });
     const trigger = result.state.triggers.find(
-      t => t.source === 'equipment' && t.skillId === 'judgeDodge',
+      t => t.source === '装备' && t.skillId === '八卦阵',
     );
     expect(trigger).toBeDefined();
     // 1D-T2：八卦阵的 v3 实现走 engine/skills/bagua.ts 的 registerAtomHook；
@@ -167,12 +167,12 @@ describe('武器技能 trigger 注册 (BUG #2 + #3)', () => {
     const zhuId = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '诸葛连弩')!;
     const guanId = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '贯石斧')!;
 
-    let s = engine(state, { type: 'playCard', player: 'P1', cardId: zhuId }).state;
-    s = engine(s, { type: 'playCard', player: 'P1', cardId: guanId }).state;
+    let s = engine(state, { type: '打出一张牌', player: 'P1', cardId: zhuId }).state;
+    s = engine(s, { type: '打出一张牌', player: 'P1', cardId: guanId }).state;
 
-    const triggers = s.triggers.filter(t => t.source === 'equipment' && t.player === 'P1');
+    const triggers = s.triggers.filter(t => t.source === '装备' && t.player === 'P1');
     expect(triggers.length).toBe(1);
-    expect(triggers[0]?.skillId).toBe('forceHit');
+    expect(triggers[0]?.skillId).toBe('贯石斧');
   });
 });
 
@@ -184,14 +184,14 @@ describe('杀事件触发 (BUG #4)', () => {
     state = injectCard(state, 'P2', '闪');
     const killId = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '杀')!;
 
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
 
     const dodgeId = r1.state.players['P2'].hand.find(id => state.cardMap[id]?.name === '闪')!;
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2', cardId: dodgeId });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2', cardId: dodgeId });
     expect(r2.error).toBeUndefined();
     const types = r2.events.map(e => e.type);
-    expect(types).toContain('killDodged');
+    expect(types).toContain('杀被闪避');
   });
 
   it('杀命中时生成 killHit ServerEvent', () => {
@@ -200,12 +200,12 @@ describe('杀事件触发 (BUG #4)', () => {
     state = injectCard(state, 'P1', '杀');
     const killId = state.players['P1'].hand.find(id => state.cardMap[id]?.name === '杀')!;
 
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
 
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
     const types = r2.events.map(e => e.type);
-    expect(types).toContain('killHit');
+    expect(types).toContain('杀命中');
   });
 });

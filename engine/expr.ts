@@ -61,7 +61,7 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
   }
 
   if (!isExpr(expr)) {
-    return expr as T;
+    return expr;
   }
 
   if (!isRecord(expr)) return undefined as T;
@@ -83,15 +83,15 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     }
 
     case 'var': {
-      const playerName = resolve(expr['player'] as Expr<string>, state, ctx, depth + 1);
+      const playerName = resolve(expr['player'], state, ctx, depth + 1);
       const player = getPlayer(state, playerName);
-      return player.vars[expr['key'] as string] as T;
+      return player.vars[expr['key']] as T;
     }
 
     case 'count': {
       const source = resolve(expr['source'], state, ctx, depth + 1);
       if (Array.isArray(source)) return source.length as T;
-      const player = getPlayer(state, source as string);
+      const player = getPlayer(state, source);
       if (!player) return 0 as T;
       const zone = player[source as keyof typeof player];
       if (Array.isArray(zone)) return zone.length as T;
@@ -99,39 +99,39 @@ export function resolve<T>(expr: Expr<T>, state: GameState, ctx?: SkillContext, 
     }
 
     case 'distance': {
-      const from = resolve(expr['from'] as Expr<string>, state, ctx, depth + 1);
-      const to = resolve(expr['to'] as Expr<string>, state, ctx, depth + 1);
+      const from = resolve(expr['from'], state, ctx, depth + 1);
+      const to = resolve(expr['to'], state, ctx, depth + 1);
       return getDistance(state, from, to) as T;
     }
 
     case 'cardProp': {
-      const cardId = resolve(expr['card'] as Expr<string>, state, ctx, depth + 1);
+      const cardId = resolve(expr['card'], state, ctx, depth + 1);
       const card = getCard(state, cardId);
       return card[expr['prop'] as keyof typeof card] as T;
     }
 
     case 'cond': {
-      const condResult = checkCondition(expr['check'] as Condition, state, ctx, depth);
+      const condResult = checkCondition(expr['check'], state, ctx, depth);
       if (condResult) {
-        return resolve(expr['then'] as Expr<T>, state, ctx, depth + 1);
+        return resolve(expr['then'], state, ctx, depth + 1);
       }
-      return resolve(expr['else'] as Expr<T>, state, ctx, depth + 1);
+      return resolve(expr['else'], state, ctx, depth + 1);
     }
 
     case 'add': {
-      const left = resolve(expr['left'] as Expr<number>, state, ctx, depth + 1);
-      const right = resolve(expr['right'] as Expr<number>, state, ctx, depth + 1);
+      const left = resolve(expr['left'], state, ctx, depth + 1);
+      const right = resolve(expr['right'], state, ctx, depth + 1);
       return (left + right) as T;
     }
 
     case 'sub': {
-      const left = resolve(expr['left'] as Expr<number>, state, ctx, depth + 1);
-      const right = resolve(expr['right'] as Expr<number>, state, ctx, depth + 1);
+      const left = resolve(expr['left'], state, ctx, depth + 1);
+      const right = resolve(expr['right'], state, ctx, depth + 1);
       return (left - right) as T;
     }
 
     case 'handSize': {
-      const playerName = resolve(expr['player'] as Expr<string>, state, ctx, depth + 1);
+      const playerName = resolve(expr['player'], state, ctx, depth + 1);
       const player = getPlayer(state, playerName);
       return player.hand.length as T;
     }

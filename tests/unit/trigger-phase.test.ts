@@ -26,7 +26,7 @@ function stateWithProbe(
   const base = setPlayPhase(createTestGame({ playerCount: 2 }));
   const probe: TriggerRule = {
     event: triggerEvent,
-    source: 'character',
+    source: '角色',
     skillId: '_phaseProbe',
     player: 'P1',
     priority: 5,
@@ -48,15 +48,15 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
-      trigger: { event: 'phaseBegin', source: 'character', phase: '出牌' },
+      trigger: { event: '阶段开始', source: '角色', phase: '出牌' },
       handler(_ctx, _state) {
         return [];
       },
     };
     registerSkill(def);
-    const state = stateWithProbe('出牌', 'phaseBegin', '出牌');
+    const state = stateWithProbe('出牌', '阶段开始', '出牌');
     const result = emitEvent(state, {
-      type: 'phaseBegin',
+      type: '阶段开始',
       phase: '出牌',
       player: 'P1',
     });
@@ -68,20 +68,20 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
-      trigger: { event: 'phaseBegin', source: 'character', phase: '出牌' },
+      trigger: { event: '阶段开始', source: '角色', phase: '出牌' },
       handler(_ctx, _state) {
         return [
           {
             type: 'atoms',
-            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+            ops: [{ type: '设置变量', player: 'P1', key: '_phaseProbe/fired', value: true }],
           },
         ];
       },
     };
     registerSkill(def);
-    const state = stateWithProbe('摸牌', 'phaseBegin', '出牌');
+    const state = stateWithProbe('摸牌', '阶段开始', '出牌');
     const result = emitEvent(state, {
-      type: 'phaseBegin',
+      type: '阶段开始',
       phase: '摸牌',
       player: 'P1',
     });
@@ -94,20 +94,20 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
-      trigger: { event: 'phaseEnd', source: 'character', phase: '出牌' },
+      trigger: { event: '阶段结束', source: '角色', phase: '出牌' },
       handler(_ctx, _state) {
         return [
           {
             type: 'atoms',
-            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+            ops: [{ type: '设置变量', player: 'P1', key: '_phaseProbe/fired', value: true }],
           },
         ];
       },
     };
     registerSkill(def);
-    const state = stateWithProbe('出牌', 'phaseEnd', '出牌');
+    const state = stateWithProbe('出牌', '阶段结束', '出牌');
     const result = emitEvent(state, {
-      type: 'phaseEnd',
+      type: '阶段结束',
       phase: '出牌',
       player: 'P1',
     });
@@ -119,20 +119,20 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
-      trigger: { event: 'phaseEnd', source: 'character', phase: '出牌' },
+      trigger: { event: '阶段结束', source: '角色', phase: '出牌' },
       handler(_ctx, _state) {
         return [
           {
             type: 'atoms',
-            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+            ops: [{ type: '设置变量', player: 'P1', key: '_phaseProbe/fired', value: true }],
           },
         ];
       },
     };
     registerSkill(def);
-    const state = stateWithProbe('摸牌', 'phaseEnd', '出牌');
+    const state = stateWithProbe('摸牌', '阶段结束', '出牌');
     const result = emitEvent(state, {
-      type: 'phaseEnd',
+      type: '阶段结束',
       phase: '摸牌',
       player: 'P1',
     });
@@ -146,20 +146,20 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
-      trigger: { event: 'cardPlayed', source: 'character', phase: '出牌' },
+      trigger: { event: '出牌', source: '角色', phase: '出牌' },
       handler(_ctx, _state) {
         return [
           {
             type: 'atoms',
-            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+            ops: [{ type: '设置变量', player: 'P1', key: '_phaseProbe/fired', value: true }],
           },
         ];
       },
     };
     registerSkill(def);
-    const state = stateWithProbe('出牌', 'cardPlayed', '出牌');
+    const state = stateWithProbe('出牌', '出牌', '出牌');
     const result = emitEvent(state, {
-      type: 'cardPlayed',
+      type: '出牌',
       player: 'P1',
       cardId: 'fake-card-1',
     });
@@ -173,20 +173,20 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
-      trigger: { event: 'cardPlayed', source: 'character', phase: '出牌' },
+      trigger: { event: '出牌', source: '角色', phase: '出牌' },
       handler(_ctx, _state) {
         return [
           {
             type: 'atoms',
-            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+            ops: [{ type: '设置变量', player: 'P1', key: '_phaseProbe/fired', value: true }],
           },
         ];
       },
     };
     registerSkill(def);
-    const state = stateWithProbe('摸牌', 'cardPlayed', '出牌');
+    const state = stateWithProbe('摸牌', '出牌', '出牌');
     const result = emitEvent(state, {
-      type: 'cardPlayed',
+      type: '出牌',
       player: 'P1',
       cardId: 'fake-card-1',
     });
@@ -199,20 +199,20 @@ describe('§4.4 触发器 phase 字段对所有事件类型生效', () => {
       id: '_phaseProbe',
       name: '相位探针',
       description: 'test',
-      trigger: { event: 'cardPlayed', source: 'character' },
+      trigger: { event: '出牌', source: '角色' },
       handler(_ctx, _state) {
         return [
           {
             type: 'atoms',
-            ops: [{ type: 'setVar', player: 'P1', key: '_phaseProbe/fired', value: true }],
+            ops: [{ type: '设置变量', player: 'P1', key: '_phaseProbe/fired', value: true }],
           },
         ];
       },
     };
     registerSkill(def);
-    const state = stateWithProbe('摸牌', 'cardPlayed');
+    const state = stateWithProbe('摸牌', '出牌');
     const result = emitEvent(state, {
-      type: 'cardPlayed',
+      type: '出牌',
       player: 'P1',
       cardId: 'fake-card-1',
     });

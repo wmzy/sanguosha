@@ -5,8 +5,8 @@ describe('makeServerEvent', () => {
   beforeEach(() => resetEventCounter(0));
 
   it('has correct type and payload', () => {
-    const evt = makeServerEvent('damage', { target: 'P1', amount: 2 });
-    expect(evt.type).toBe('damage');
+    const evt = makeServerEvent('造成伤害', { target: 'P1', amount: 2 });
+    expect(evt.type).toBe('造成伤害');
     expect(evt.payload).toEqual({ target: 'P1', amount: 2 });
   });
 
@@ -35,8 +35,8 @@ describe('makePlayerEvent', () => {
   beforeEach(() => resetEventCounter(0));
 
   it('has correct type and payload', () => {
-    const evt = makePlayerEvent('draw', { player: 'P1', count: 2 });
-    expect(evt.type).toBe('draw');
+    const evt = makePlayerEvent('摸牌', { player: 'P1', count: 2 });
+    expect(evt.type).toBe('摸牌');
     expect(evt.payload).toEqual({ player: 'P1', count: 2 });
   });
 

@@ -30,8 +30,8 @@ describe('貂蝉 - 离间', () => {
       expect(diff.handSizeChanges['P1']).toBeLessThan(0);
     })
     .check('创建决斗响应窗口', ctx => {
-      expect(ctx.state.pending?.type).toBe('responseWindow');
-      if (ctx.state.pending?.type === 'responseWindow') {
+      expect(ctx.state.pending?.type).toBe('响应窗口');
+      if (ctx.state.pending?.type === '响应窗口') {
         expect(ctx.state.pending.window.type).toBe('duelResponse');
       }
     })

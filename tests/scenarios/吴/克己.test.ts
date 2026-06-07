@@ -11,7 +11,7 @@ describe('吕蒙 - 克己', () => {
     .act('触发 phaseBegin(弃牌)', ctx => {
       // 克己监听 phaseBegin(弃牌)，引擎路径当前未发射此事件
       // 通过 emitEvent 直接触发
-      ctx.emitEvent({ type: 'phaseBegin', phase: '弃牌', player: 'P1' });
+      ctx.emitEvent({ type: '阶段开始', phase: '弃牌', player: 'P1' });
     })
     .check('克己触发：阶段跳过弃牌直接设为结束', ctx => {
       // 克己 handler 检查未出杀 → setPhase('结束')
@@ -36,7 +36,7 @@ describe('吕蒙 - 克己', () => {
       ctx.snapshot('initial');
     })
     .act('触发 phaseBegin(弃牌)', ctx => {
-      ctx.emitEvent({ type: 'phaseBegin', phase: '弃牌', player: 'P1' });
+      ctx.emitEvent({ type: '阶段开始', phase: '弃牌', player: 'P1' });
     })
     .check('克己不触发：阶段不变（仍为出牌阶段，因为未 setPhase）', ctx => {
       expect(ctx.state.phase).toBe('出牌');

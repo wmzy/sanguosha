@@ -20,15 +20,15 @@ import type { Atom, DamageType, GameState } from '../types';
 
 export function register(): void {
   registerAtomHook({
-    atomType: 'damage',
+    atomType: '造成伤害',
     filter(_state: GameState, atom: Atom): boolean {
-      if (atom.type !== 'damage') return false;
+      if (atom.type !== '造成伤害') return false;
       const damageType = (atom.damageType as DamageType | undefined) ?? 'normal';
       // 仅 fire/thunder 传导（v2 规则）
       return damageType === 'fire' || damageType === 'thunder';
     },
     onAfter({ state, atom }: { state: GameState; atom: Atom }) {
-      if (atom.type !== 'damage') return {};
+      if (atom.type !== '造成伤害') return {};
       const target = atom.target as string;
       const targetPlayer = state.players[target];
       if (!targetPlayer?.chained) return {};
@@ -40,7 +40,7 @@ export function register(): void {
       const additionalAtoms: Atom[] = Object.entries(state.players)
         .filter(([name, p]) => p.chained && name !== target)
         .map(([name]) => ({
-          type: 'damage' as const,
+          type: '造成伤害' as const,
           target: name,
           amount,
           ...(source !== undefined ? { source } : {}),

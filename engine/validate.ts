@@ -42,18 +42,18 @@ for (const def of [...基本牌列表, ...锦囊牌列表, ...装备牌列表]) 
 /** 武器是否允许无限出杀（诸葛连弩等） */
 export function hasUnlimitedKills(state: GameState, playerName: string): boolean {
   const player = getPlayer(state, playerName);
-  if (!player.equipment.weapon) return false;
-  const weaponCard = state.cardMap[player.equipment.weapon];
+  if (!player.equipment.武器) return false;
+  const weaponCard = state.cardMap[player.equipment.武器];
   if (!weaponCard) return false;
   const def = cardDefMap.get(weaponCard.name);
-  return def?.weaponEffect?.type === 'unlimitedKills';
+  return def?.weaponEffect?.type === '诸葛连弩';
 }
 
 /** 检查角色 modifiers 是否包含 unlimitedKills */
 function characterHasUnlimitedKills(state: GameState, playerName: string): boolean {
   const player = getPlayer(state, playerName);
   // 检查 vars 中是否有标记允许无限出杀
-  return player.vars['unlimitedKills'] === true;
+  return player.vars['诸葛连弩/active'] === true;
 }
 
 /** 综合判断玩家是否可以无限出杀 */
@@ -109,7 +109,7 @@ function canCardBeConvertedBySkill(
   };
 
   for (const trigger of state.triggers) {
-    if (trigger.player !== player || trigger.source !== 'character') continue;
+    if (trigger.player !== player || trigger.source !== '角色') continue;
     let skill: SkillDef;
     try {
       skill = getSkill(trigger.skillId);
@@ -141,7 +141,7 @@ function canCardBeConvertedToPeach(
   if (!isRed) return false;
 
   for (const trigger of state.triggers) {
-    if (trigger.player !== player || trigger.source !== 'character') continue;
+    if (trigger.player !== player || trigger.source !== '角色') continue;
     let skillId: string;
     try {
       skillId = getSkill(trigger.skillId).id;
@@ -166,19 +166,19 @@ export function validateAction(state: GameState, action: GameAction): string | n
   }
 
   switch (action.type) {
-    case 'playCard':
+    case '打出一张牌':
       return validatePlayCard(state, action);
-    case 'respond':
+    case '打出':
       return '响应动作仅在响应窗口中有效';
-    case 'endTurn':
+    case '结束回合':
       return validateEndTurn(state, action);
-    case 'discard':
+    case '弃置':
       return '弃牌操作仅在弃牌阶段有效';
-    case 'useSkill':
+    case '使用技能':
       return validateUseSkill(state, action);
-    case 'skillChoice':
+    case '技能选择':
       return '技能选择仅在技能提示中有效';
-    case 'startGame':
+    case '开始':
       return null; // startGame 不需要验证
   }
 
@@ -189,7 +189,7 @@ export function validateAction(state: GameState, action: GameAction): string | n
 
 function validatePlayCard(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
 ): string | null {
   if (action.player !== state.currentPlayer) return '不是你的回合';
   if (state.phase !== '出牌') return '当前不是出牌阶段';
@@ -233,7 +233,7 @@ function validatePlayCard(
 /** 锦囊牌目标合法性检查 */
 function validateTrickTarget(
   state: GameState,
-  action: GameAction & { type: 'playCard' },
+  action: GameAction & { type: '打出一张牌' },
   card: Card,
 ): string | null {
   const def = cardDefMap.get(card.name);
@@ -271,7 +271,7 @@ function validateTrickTarget(
 
 function validateEndTurn(
   state: GameState,
-  action: GameAction & { type: 'endTurn' },
+  action: GameAction & { type: '结束回合' },
 ): string | null {
   if (action.player !== state.currentPlayer) return '不是你的回合';
   if (state.phase !== '出牌') return '当前不是出牌阶段';
@@ -282,7 +282,7 @@ function validateEndTurn(
 
 function validateUseSkill(
   state: GameState,
-  action: GameAction & { type: 'useSkill' },
+  action: GameAction & { type: '使用技能' },
 ): string | null {
   if (action.player !== state.currentPlayer) return '不是你的回合';
   if (state.phase !== '出牌') return '当前不是出牌阶段';
@@ -308,19 +308,19 @@ function validateUseSkill(
 function validatePendingAction(state: GameState, action: GameAction): string | null {
   const pending = state.pending!;
   switch (pending.type) {
-    case 'playPhase':
+    case '出牌阶段':
       return validatePlayPhasePending(state, action, pending);
-    case 'responseWindow':
+    case '响应窗口':
       return validateResponseWindow(state, action, pending);
-    case 'skillPrompt':
+    case '技能选择':
       return validateSkillPrompt(state, action, pending);
-    case 'discardPhase':
+    case '弃牌阶段':
       return validateDiscardPhase(state, action, pending);
-    case 'dyingWindow':
+    case '濒死窗口':
       return validateDyingWindow(state, action, pending);
-    case 'selectCard':
+    case '选择牌':
       return validateSelectCard(state, action, pending);
-    case 'harvestSelection':
+    case '收获选牌':
       return null;
   }
   return null;
@@ -331,13 +331,13 @@ function validatePlayPhasePending(
   action: GameAction,
   _pending: PendingPlayPhase,
 ): string | null {
-  const allowed: GameAction['type'][] = ['playCard', 'useSkill', 'endTurn', 'toggleAutoSkipWuxie'];
+  const allowed: GameAction['type'][] = ['打出一张牌', '使用技能', '结束回合', '切换自动跳过无懈可击'];
   if (!allowed.includes(action.type)) {
     return '出牌阶段不允许此操作';
   }
-  if (action.type === 'playCard') return validatePlayCard(state, action);
-  if (action.type === 'useSkill') return validateUseSkill(state, action);
-  if (action.type === 'endTurn') return validateEndTurn(state, action);
+  if (action.type === '打出一张牌') return validatePlayCard(state, action);
+  if (action.type === '使用技能') return validateUseSkill(state, action);
+  if (action.type === '结束回合') return validateEndTurn(state, action);
   return null;
 }
 
@@ -346,7 +346,7 @@ function validateResponseWindow(
   action: GameAction,
   pending: PendingResponseWindow,
 ): string | null {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return '当前需要响应动作';
   }
 
@@ -424,7 +424,7 @@ function validateSkillPrompt(
   action: GameAction,
   pending: PendingSkillPrompt,
 ): string | null {
-  if (action.type !== 'skillChoice') {
+  if (action.type !== '技能选择') {
     return '当前需要技能选择动作';
   }
   if (action.player !== pending.player) {
@@ -438,7 +438,7 @@ function validateDiscardPhase(
   action: GameAction,
   pending: PendingDiscardPhase,
 ): string | null {
-  if (action.type !== 'discard') {
+  if (action.type !== '弃置') {
     return '当前需要弃牌动作';
   }
   if (action.player !== pending.player) {
@@ -463,7 +463,7 @@ function validateDyingWindow(
   action: GameAction,
   pending: PendingDyingWindow,
 ): string | null {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return '濒死窗口需要响应动作';
   }
 
@@ -488,7 +488,7 @@ function validateSelectCard(
   action: GameAction,
   pending: PendingSelectCard,
 ): string | null {
-  if (action.type !== 'respond') return '选牌需要 respond 动作';
+  if (action.type !== '打出') return '选牌需要 respond 动作';
   if (action.player !== pending.player) return '只有出牌者可以选择';
 
   const selectedIds = action.cardIds ?? (action.cardId ? [action.cardId] : []);
@@ -530,7 +530,7 @@ export function computeValidActions(state: GameState, player: string): ValidActi
     const discardCount = Math.max(0, playerState.hand.length - playerState.health);
     if (discardCount > 0) {
       return [{
-        type: 'discard',
+        type: '弃置',
         prompt: `请弃掉 ${discardCount} 张牌`,
         min: discardCount,
         max: discardCount,
@@ -545,19 +545,19 @@ export function computeValidActions(state: GameState, player: string): ValidActi
 function computePendingActions(state: GameState, player: string): ValidAction[] {
   const pending = state.pending!;
   switch (pending.type) {
-    case 'playPhase':
+    case '出牌阶段':
       return computePlayPhaseActions(state, player);
-    case 'responseWindow':
+    case '响应窗口':
       return computeResponseWindowActions(state, player, pending);
-    case 'skillPrompt':
+    case '技能选择':
       return computeSkillPromptActions(state, player, pending);
-    case 'discardPhase':
+    case '弃牌阶段':
       return computeDiscardPhaseActions(state, player, pending);
-    case 'dyingWindow':
+    case '濒死窗口':
       return computeDyingWindowActions(state, player, pending);
-    case 'selectCard':
+    case '选择牌':
       return computeSelectCardActions(state, player, pending);
-    case 'harvestSelection':
+    case '收获选牌':
       return computeHarvestSelectionActions(state, player, pending);
   }
   return [];
@@ -577,7 +577,7 @@ function computeResponseWindowActions(
     const responder = getPlayer(state, player);
     const validCards = responder.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
     return [{
-      type: 'respond',
+      type: '打出',
       prompt: '请选择是否响应',
       required: false,
       cards: validCards,
@@ -601,7 +601,7 @@ function computeResponseWindowActions(
   }
 
   return [{
-    type: 'respond',
+    type: '打出',
     prompt: getResponsePrompt(pending.window.type),
     required: false,
     cards: validCards,
@@ -624,7 +624,7 @@ export function isCardValidResponse(
       return player ? canCardBeConvertedBySkill(state, player, cardId, '闪') : false;
     case 'aoeResponse': {
       const pending = state.pending;
-      const required = pending?.type === 'responseWindow' && pending.window.type === 'aoeResponse'
+      const required = pending?.type === '响应窗口' && pending.window.type === 'aoeResponse'
         ? pending.window.requiredCard as '杀' | '闪'
         : undefined;
       if (required) {
@@ -663,7 +663,7 @@ function computeSkillPromptActions(
   if (player !== pending.player) return [];
 
   return [{
-    type: 'skillChoice',
+    type: '技能选择',
     prompt: pending.prompt.text,
     options: pending.prompt.options,
   }];
@@ -678,7 +678,7 @@ function computeDiscardPhaseActions(
 
   const playerState = getPlayer(state, player);
   return [{
-    type: 'discard',
+    type: '弃置',
     prompt: `请弃掉 ${pending.min}~${pending.max} 张牌`,
     min: pending.min,
     max: pending.max,
@@ -700,7 +700,7 @@ function computeDyingWindowActions(
   );
 
   return [{
-    type: 'respond',
+    type: '打出',
     prompt: `${pending.dyingPlayer} 濒死，是否出桃？`,
     required: false,
     cards: peachCards,
@@ -715,7 +715,7 @@ function computeSelectCardActions(
 ): ValidAction[] {
   if (player !== pending.player) return [];
   return [{
-    type: 'respond',
+    type: '打出',
     prompt: `请选择 ${pending.target} 的一张手牌`,
     required: true,
     cards: pending.cardIds,
@@ -731,7 +731,7 @@ function computeHarvestSelectionActions(
   const currentPicker = pending.pickOrder[pending.currentPickerIndex];
   if (player !== currentPicker) return [];
   return [{
-    type: 'respond',
+    type: '打出',
     prompt: `五谷丰登选牌：从 ${pending.revealedCards.length} 张牌中选择一张`,
     required: true,
     cards: pending.revealedCards,
@@ -744,14 +744,14 @@ function computePlayPhaseActions(state: GameState, player: string): ValidAction[
   const playerState = getPlayer(state, player);
 
   if (!playerState.info.alive) {
-    return [{ type: 'endTurn', prompt: '结束回合' }];
+    return [{ type: '结束回合', prompt: '结束回合' }];
   }
 
   // 可出的牌
   const playableCards = computePlayableCards(state, player);
   if (playableCards.length > 0) {
     actions.push({
-      type: 'playCard',
+      type: '打出一张牌',
       prompt: '请出牌',
       cards: playableCards,
     });
@@ -761,14 +761,14 @@ function computePlayPhaseActions(state: GameState, player: string): ValidAction[
   const availableSkills = computeAvailableSkills(state, player);
   if (availableSkills.length > 0) {
     actions.push({
-      type: 'useSkill',
+      type: '使用技能',
       prompt: '使用技能',
       skills: availableSkills,
     });
   }
 
   // 结束回合
-  actions.push({ type: 'endTurn', prompt: '结束回合' });
+  actions.push({ type: '结束回合', prompt: '结束回合' });
 
   return actions;
 }
@@ -810,7 +810,7 @@ function computeAvailableSkills(state: GameState, player: string): AvailableSkil
   const playerTriggers = state.triggers.filter(
     (t) =>
       t.player === player &&
-      t.source === 'character' &&
+      t.source === '角色' &&
       (t.optional || !state.turn.skillsUsed.includes(t.skillId)),
   );
 

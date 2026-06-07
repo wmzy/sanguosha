@@ -32,7 +32,7 @@ describe('姜维', () => {
         ctx.snapshot('initial');
       })
       .act('触发turnStart', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('志继已觉醒标记', ctx => {
         expect(ctx.player('P1').vars['志继/awakened']).toBe(true);
@@ -46,7 +46,7 @@ describe('姜维', () => {
         ctx.giveCard('P1', '杀');
       })
       .act('触发turnStart', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('志继不触发（有手牌）', ctx => {
         expect(ctx.player('P1').vars['志继/awakened']).toBeUndefined();
@@ -67,7 +67,7 @@ describe('姜维', () => {
         };
       })
       .act('触发turnStart', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('志继不再重复触发', ctx => {
         expect(ctx.player('P1').vars['志继/awakened']).toBe(true);

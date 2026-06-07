@@ -10,7 +10,7 @@ describe('鲁肃 - 好施', () => {
       ctx.snapshot('initial');
     })
     .act('触发摸牌阶段', ctx => {
-      ctx.emitEvent({ type: 'phaseBegin', phase: '摸牌', player: 'P1' });
+      ctx.emitEvent({ type: '阶段开始', phase: '摸牌', player: 'P1' });
     })
     .check('P1 摸了2张额外牌', ctx => {
       const diff = ctx.diff('initial');

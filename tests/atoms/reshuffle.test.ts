@@ -13,10 +13,10 @@ describe('reshuffle atom', () => {
     const state = createTestGame();
     const emptied = { ...state, zones: { deck: [], discardPile: ['c1', 'c2', 'c3'] } };
     const { state: next, events } = applyAtoms(emptied, [
-      { type: 'reshuffle' },
+      { type: '重洗' },
     ]);
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('reshuffle');
+    expect(events[0].type).toBe('重洗');
     expect(next.zones.discardPile).toEqual([]);
     expect(next.zones.deck).toHaveLength(3);
     expect([...next.zones.deck].sort()).toEqual(['c1', 'c2', 'c3']);
@@ -26,10 +26,10 @@ describe('reshuffle atom', () => {
   it('reshuffle 弃牌堆为空时无操作', () => {
     const state = createTestGame();
     const { state: next, events } = applyAtoms(state, [
-      { type: 'reshuffle' },
+      { type: '重洗' },
     ]);
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('reshuffle');
+    expect(events[0].type).toBe('重洗');
     expect(next.zones.deck).toEqual(state.zones.deck);
     expect(next.zones.discardPile).toEqual(state.zones.discardPile);
     expect(next.rngState).toBe(state.rngState);
@@ -39,9 +39,9 @@ describe('reshuffle atom', () => {
     // 防回归：连续多次 reshuffle 不应死循环
     expect(() => {
       applyAtoms(createTestGame(), [
-        { type: 'reshuffle' },
-        { type: 'reshuffle' },
-        { type: 'reshuffle' },
+        { type: '重洗' },
+        { type: '重洗' },
+        { type: '重洗' },
       ]);
     }).not.toThrow();
   });
@@ -51,12 +51,12 @@ describe('reshuffle atom', () => {
     const state = createTestGame();
     const emptied = { ...state, zones: { deck: [], discardPile: ['c1', 'c2'] } };
     const { state: next } = applyAtoms(emptied, [
-      { type: 'draw', player: 'P1', count: 1 },
+      { type: '摸牌', player: 'P1', count: 1 },
     ]);
     const types = next.serverLog.map(e => e.type);
-    expect(types).toContain('reshuffle');
-    expect(types).toContain('draw');
+    expect(types).toContain('重洗');
+    expect(types).toContain('摸牌');
     // 顺序：reshuffle 必须先于 draw 出现（先洗回牌堆再抽牌）
-    expect(types.indexOf('reshuffle')).toBeLessThan(types.indexOf('draw'));
+    expect(types.indexOf('重洗')).toBeLessThan(types.indexOf('摸牌'));
   });
 });

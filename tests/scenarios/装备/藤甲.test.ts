@@ -21,29 +21,29 @@ describe('藤甲（防 normal 杀）', () => {
   });
 
   it('装备藤甲受 normal 伤害时，cancel 整个链（无伤害、不写 server event）', () => {
-    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'tengjia'), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', '藤甲'), 'P1', 4);
     const { state, events } = applyAtoms(s0, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'normal' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'normal' },
     ]);
     expect(state.players.P1.health).toBe(4);
     expect(events).toHaveLength(0);
   });
 
   it('藤甲对 fire 伤害不生效（火杀照样造成伤害）', () => {
-    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'tengjia'), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', '藤甲'), 'P1', 4);
     const { state, events } = applyAtoms(s0, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
     ]);
     expect(state.players.P1.health).toBe(3);
-    expect(events.some((e) => e.type === 'damage')).toBe(true);
+    expect(events.some((e) => e.type === '造成伤害')).toBe(true);
   });
 
   it('藤甲对 thunder 伤害不生效', () => {
-    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'tengjia'), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', '藤甲'), 'P1', 4);
     const { state, events } = applyAtoms(s0, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', damageType: 'thunder' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'thunder' },
     ]);
     expect(state.players.P1.health).toBe(3);
-    expect(events.some((e) => e.type === 'damage')).toBe(true);
+    expect(events.some((e) => e.type === '造成伤害')).toBe(true);
   });
 });

@@ -26,7 +26,7 @@ registerSkill({
   id: '完杀',
   name: '完杀',
   description: '锁定技，在你的回合，除你以外，只有处于濒死状态的角色才能使用【桃】。',
-  trigger: { event: 'v3HookOnly', source: 'character' },
+  trigger: { event: 'v3HookOnly', source: '角色' },
   handler() {
     return [];
   },
@@ -34,15 +34,15 @@ registerSkill({
 /** 目标是否处于濒死状态：濒死窗口中 / 等待进入濒死窗口 / 体力 <= 0 但存活 */
 function isTargetDying(state: GameState, target: string): boolean {
   if (state.deferredDyingCheck?.player === target) return true;
-  if (state.pending?.type === 'dyingWindow' && state.pending.dyingPlayer === target) return true;
+  if (state.pending?.type === '濒死窗口' && state.pending.dyingPlayer === target) return true;
   const p = state.players[target];
   return !!p && p.health <= 0 && p.info.alive;
 }
 
 registerAtomHook({
-  atomType: 'heal',
+  atomType: '回复体力',
   filter: (state, atom) => {
-    const a = atom as Atom & { type: 'heal' };
+    const a = atom as Atom & { type: '回复体力' };
     // 救自己不阻
     if (a.target === a.source) return false;
     const source = a.source as string;

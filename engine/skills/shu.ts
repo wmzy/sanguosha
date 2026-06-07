@@ -8,8 +8,8 @@ registerSkill({
   name: '仁德',
   description: '出牌阶段，你可以将任意数量的手牌交给其他角色。每阶段以此法给出两张或更多后，你回复1点体力。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '出牌',
     manual: true,
     optional: true,
@@ -20,7 +20,7 @@ registerSkill({
         type: 'prompt',
         text: '仁德：选择要送出的手牌和目标角色',
         options: [
-          { type: 'selectCards', from: 'hand', min: 1, max: 99 },
+          { type: 'selectCards', from: '手牌', min: 1, max: 99 },
           { type: 'selectPlayer' },
         ],
       },
@@ -32,10 +32,10 @@ registerSkill({
           {
             type: 'atoms',
             ops: [{
-              type: 'moveCard',
+              type: '移动牌',
               cardId: { $: 'ctx', path: 'localVars.giveCardId' },
-              from: { zone: 'hand', player: _ctx.self },
-              to: { zone: 'hand', player: { $: 'ctx', path: 'choice.target' } },
+              from: { zone: '手牌', player: _ctx.self },
+              to: { zone: '手牌', player: { $: 'ctx', path: 'choice.target' } },
             }],
           },
         ],
@@ -52,8 +52,8 @@ registerSkill({
           {
             type: 'atoms',
             ops: [
-              { type: 'heal', target: _ctx.self, amount: 1 },
-              { type: 'setVar', player: _ctx.self, key: '仁德/healedThisPhase', value: true },
+              { type: '回复体力', target: _ctx.self, amount: 1 },
+              { type: '设置变量', player: _ctx.self, key: '仁德/healedThisPhase', value: true },
             ],
           },
         ],
@@ -67,8 +67,8 @@ registerSkill({
   name: '激将',
   description: '主公技，出牌阶段，你可以令一名蜀势力角色替你使用【杀】。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '出牌',
     manual: true,
     optional: true,
@@ -86,7 +86,7 @@ registerSkill({
   description: '你可以将一张红色手牌当【杀】使用或打出。',
   trigger: {
     event: 'killResponse',
-    source: 'character',
+    source: '角色',
     manual: true,
     optional: true,
   },
@@ -114,8 +114,8 @@ registerSkill({
   name: '咆哮',
   description: '锁定技，出牌阶段，你使用【杀】无次数限制。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '出牌',
   },
   handler(_ctx, _state) {
@@ -130,7 +130,7 @@ registerSkill({
   description: '你可以将【杀】当【闪】、【闪】当【杀】使用或打出。',
   trigger: {
     event: 'killResponse',
-    source: 'character',
+    source: '角色',
     manual: true,
     optional: true,
   },
@@ -151,8 +151,8 @@ registerSkill({
   name: '观星',
   description: '准备阶段，你可以观看牌堆顶的X张牌（X为存活角色数且至多为5），并将任意数量的牌以任意顺序置于牌堆顶，其余以任意顺序置于牌堆底。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '准备',
     optional: true,
   },
@@ -178,7 +178,7 @@ function buildRearrangeTree(
     return [{
       type: 'atoms',
       ops: [{
-        type: 'rearrangeDeck' as const,
+        type: '整理牌堆' as const,
         player,
         topCardIds: topSoFar,
         bottomCardIds: bottomSoFar,
@@ -214,12 +214,12 @@ registerSkill({
   name: '马术',
   description: '锁定技，你计算与其他角色的距离时，始终-1。',
   trigger: {
-    event: 'turnStart',
-    source: 'character',
+    event: '回合开始',
+    source: '角色',
   },
   handler(ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: 'distanceBonus', value: -1 }] },
+      { type: 'atoms', ops: [{ type: '设置变量', player: ctx.self, key: '马术/距离修正', value: -1 }] },
     ];
   },
 });
@@ -229,22 +229,22 @@ registerSkill({
   name: '铁骑',
   description: '当你使用【杀】指定一名角色为目标后，你可以进行判定：若结果为红色，该角色不能使用【闪】。',
   trigger: {
-    event: 'cardPlayed',
-    source: 'character',
+    event: '出牌',
+    source: '角色',
     optional: true,
   },
   handler(_ctx, _state) {
     if (!_ctx.sourceCard) return [];
     const card = _state.cardMap[_ctx.sourceCard];
-    if (!card || card.name !== '杀') return [];
+    if (card?.name !== '杀') return [];
     if (!_ctx.target) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'judge', player: _ctx.self }] },
+      { type: 'atoms', ops: [{ type: '判定', player: _ctx.self }] },
       {
         type: 'condition',
         check: { equals: [{ $: 'ctx', path: 'localVars.judgeColor' }, 'red'] },
         then: [
-          { type: 'atoms', ops: [{ type: 'addTag', player: _ctx.target!, tag: 'cannotDodge' }] },
+          { type: 'atoms', ops: [{ type: '加标签', player: _ctx.target, tag: 'cannotDodge' }] },
         ],
       },
     ];
@@ -258,13 +258,13 @@ registerSkill({
   name: '集智',
   description: '当你使用一张非延时锦囊牌时，你可以摸一张牌。',
   trigger: {
-    event: 'cardPlayed',
-    source: 'character',
+    event: '出牌',
+    source: '角色',
     optional: true,
   },
   handler(_ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'draw', player: _ctx.self, count: 1 }] },
+      { type: 'atoms', ops: [{ type: '摸牌', player: _ctx.self, count: 1 }] },
     ];
   },
 });
@@ -274,12 +274,12 @@ registerSkill({
   name: '奇才',
   description: '锁定技，你使用锦囊牌无距离限制。',
   trigger: {
-    event: 'turnStart',
-    source: 'character',
+    event: '回合开始',
+    source: '角色',
   },
   handler(ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'noTrickDistanceLimit' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: ctx.self, tag: 'noTrickDistanceLimit' }] },
     ];
   },
 } satisfies SkillDef);
@@ -291,13 +291,13 @@ registerSkill({
   name: '烈弓',
   description: '当你使用【杀】指定目标后，若其手牌数≥你或体力值≥你，其不能使用【闪】。',
   trigger: {
-    event: 'cardPlayed',
-    source: 'character',
+    event: '出牌',
+    source: '角色',
   },
   handler(_ctx, _state) {
     if (!_ctx.target || !_ctx.sourceCard) return [];
     const card = _state.cardMap[_ctx.sourceCard];
-    if (!card || card.name !== '杀') return [];
+    if (card?.name !== '杀') return [];
     if (_ctx.target === _ctx.self) return [];
 
     const me = _state.players[_ctx.self];
@@ -310,7 +310,7 @@ registerSkill({
     if (!targetHandGte && !targetHpGte) return [];
 
     return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: _ctx.target, tag: 'cannotDodge' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: _ctx.target, tag: 'cannotDodge' }] },
     ];
   },
 });
@@ -322,14 +322,14 @@ registerSkill({
   name: '狂骨',
   description: '锁定技，当你对距离1以内的角色造成伤害后，你回复1点体力。',
   trigger: {
-    event: 'damageDealt',
-    source: 'character',
+    event: '造成伤害',
+    source: '角色',
   },
   handler(_ctx, _state) {
     if (_ctx.source !== _ctx.self) return [];
     if (!_ctx.target) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'heal', target: _ctx.self, amount: 1 }] },
+      { type: 'atoms', ops: [{ type: '回复体力', target: _ctx.self, amount: 1 }] },
     ];
   },
 });
@@ -341,14 +341,14 @@ registerSkill({
   name: '八阵',
   description: '锁定技，当你没有装备防具时，始终视为你装备着【八卦阵】。',
   trigger: {
-    event: 'turnStart',
-    source: 'character',
+    event: '回合开始',
+    source: '角色',
   },
   handler(ctx, state) {
     const p = state.players[ctx.self];
-    if (p.equipment.armor) return [];
+    if (p.equipment.防具) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'virtualArmor' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: ctx.self, tag: 'virtualArmor' }] },
     ];
   },
 });
@@ -358,8 +358,8 @@ registerSkill({
   name: '火计',
   description: '你可以将一张红色手牌当【火攻】使用。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '出牌',
     manual: true,
     optional: true,
@@ -375,7 +375,7 @@ registerSkill({
   description: '你可以将一张黑色手牌当【无懈可击】使用。',
   trigger: {
     event: 'trickResponse',
-    source: 'character',
+    source: '角色',
     manual: true,
     optional: true,
   },
@@ -391,8 +391,8 @@ registerSkill({
   name: '连环',
   description: '你可以将一张梅花手牌当【铁索连环】使用或重铸。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '出牌',
     manual: true,
     optional: true,
@@ -407,8 +407,8 @@ registerSkill({
   name: '涅槃',
   description: '限定技，当你处于濒死状态时，你可以弃置所有牌和判定区的牌，重置武将牌，摸三张牌并回复至3点体力。',
   trigger: {
-    event: 'dying',
-    source: 'character',
+    event: '濒死',
+    source: '角色',
     optional: true,
   },
   handler(ctx, state) {
@@ -419,16 +419,16 @@ registerSkill({
       {
         type: 'atoms',
         ops: [
-          { type: 'discard', player: ctx.self, cardIds: allHandCards },
-          { type: 'draw', player: ctx.self, count: 3 },
-          { type: 'setVar', player: ctx.self, key: '涅槃/used', value: true },
+          { type: '弃置', player: ctx.self, cardIds: allHandCards },
+          { type: '摸牌', player: ctx.self, count: 3 },
+          { type: '设置变量', player: ctx.self, key: '涅槃/used', value: true },
         ],
       },
       {
         type: 'condition',
         check: { lt: [{ $: 'var', player: ctx.self, key: 'health' }, 3] },
         then: [
-          { type: 'atoms', ops: [{ type: 'heal', target: ctx.self, amount: 3 }] },
+          { type: 'atoms', ops: [{ type: '回复体力', target: ctx.self, amount: 3 }] },
         ],
       },
     ];
@@ -442,13 +442,13 @@ registerSkill({
   name: '祸首',
   description: '锁定技，【南蛮入侵】对你无效；你是任何【南蛮入侵】造成伤害的来源。',
   trigger: {
-    event: 'turnStart',
-    source: 'character',
+    event: '回合开始',
+    source: '角色',
   },
   handler(ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'immune南蛮入侵' }] },
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: '南蛮入侵来源' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: ctx.self, tag: 'immune南蛮入侵' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: ctx.self, tag: '南蛮入侵来源' }] },
     ];
   },
 });
@@ -458,8 +458,8 @@ registerSkill({
   name: '再起',
   description: '摸牌阶段，若你已受伤，你可以放弃摸牌并展示牌堆顶X张牌（X为你已损失体力值），每有一张红桃回复1点体力，然后弃掉这些红桃牌，将其余的牌收入手牌。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '摸牌',
     optional: true,
   },
@@ -481,8 +481,8 @@ registerSkill({
         type: 'condition',
         check: { equals: [{ $: 'ctx', path: 'choice' }, true] },
         then: [
-          { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: lost }] },
-          { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: '再起/skipNormalDraw', value: true }] },
+          { type: 'atoms', ops: [{ type: '摸牌', player: ctx.self, count: lost }] },
+          { type: 'atoms', ops: [{ type: '设置变量', player: ctx.self, key: '再起/skipNormalDraw', value: true }] },
         ],
       },
     ];
@@ -496,13 +496,13 @@ registerSkill({
   name: '巨象',
   description: '锁定技，【南蛮入侵】对你无效；若其他角色使用的【南蛮入侵】在结算完时进入弃牌堆，你立即获得它。',
   trigger: {
-    event: 'turnStart',
-    source: 'character',
+    event: '回合开始',
+    source: '角色',
   },
   handler(ctx, _state) {
     return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'immune南蛮入侵' }] },
-      { type: 'atoms', ops: [{ type: 'addTag', player: ctx.self, tag: 'collect南蛮入侵' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: ctx.self, tag: 'immune南蛮入侵' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: ctx.self, tag: 'collect南蛮入侵' }] },
     ];
   },
 });
@@ -512,8 +512,8 @@ registerSkill({
   name: '烈刃',
   description: '每当你使用【杀】造成伤害后，可与受伤害的角色拼点：若你赢，你获得对方的一张牌。',
   trigger: {
-    event: 'damageDealt',
-    source: 'character',
+    event: '造成伤害',
+    source: '角色',
     optional: true,
   },
   handler(_ctx, _state) {
@@ -531,8 +531,8 @@ registerSkill({
   name: '挑衅',
   description: '出牌阶段，你可以指定一名使用【杀】能攻击到你的角色，该角色需对你使用一张【杀】，否则你弃其一张牌。每回合限一次。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '出牌',
     manual: true,
     optional: true,
@@ -555,32 +555,32 @@ registerSkill({
   name: '志继',
   description: '觉醒技，回合开始阶段，若你没有手牌，你须回复1点体力或摸两张牌，然后减1点体力上限，并永久获得技能"观星"。',
   trigger: {
-    event: 'turnStart',
-    source: 'character',
+    event: '回合开始',
+    source: '角色',
   },
   handler(ctx, state) {
     if (state.players[ctx.self].vars['志继/awakened']) return [];
     const p = state.players[ctx.self];
     if (p.hand.length > 0) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: '志继/awakened', value: true }] },
+      { type: 'atoms', ops: [{ type: '设置变量', player: ctx.self, key: '志继/awakened', value: true }] },
       {
         type: 'prompt',
         text: '志继觉醒：选择回复1点体力或摸两张牌',
         options: [
-          { label: '回复1点体力', value: 'heal' },
-          { label: '摸两张牌', value: 'draw' },
+          { label: '回复1点体力', value: '回复体力' },
+          { label: '摸两张牌', value: '摸牌' },
         ],
-        defaultChoice: 'heal',
+        defaultChoice: '回复体力',
       },
       {
         type: 'condition',
-        check: { equals: [{ $: 'ctx', path: 'choice' }, 'heal'] },
+        check: { equals: [{ $: 'ctx', path: 'choice' }, '回复体力'] },
         then: [
-          { type: 'atoms', ops: [{ type: 'heal', target: ctx.self, amount: 1 }] },
+          { type: 'atoms', ops: [{ type: '回复体力', target: ctx.self, amount: 1 }] },
         ],
         else: [
-          { type: 'atoms', ops: [{ type: 'draw', player: ctx.self, count: 2 }] },
+          { type: 'atoms', ops: [{ type: '摸牌', player: ctx.self, count: 2 }] },
         ],
       },
     ];
@@ -594,18 +594,18 @@ registerSkill({
   name: '享乐',
   description: '锁定技，当其他角色使用【杀】指定你为目标时，需额外弃置一张基本牌，否则该【杀】对你无效。',
   trigger: {
-    event: 'cardPlayed',
-    source: 'character',
+    event: '出牌',
+    source: '角色',
   },
   handler(_ctx, _state) {
     if (!_ctx.sourceCard) return [];
     const card = _state.cardMap[_ctx.sourceCard];
-    if (!card || card.name !== '杀') return [];
+    if (card?.name !== '杀') return [];
     if (!_ctx.target || _ctx.target !== _ctx.self) return [];
     const attacker = (_ctx.event as Record<string, unknown>)['player'] as string;
     if (!attacker || attacker === _ctx.self) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'addTag', player: attacker, tag: '享乐/discardBasic' }] },
+      { type: 'atoms', ops: [{ type: '加标签', player: attacker, tag: '享乐/discardBasic' }] },
     ];
   },
 });
@@ -615,8 +615,8 @@ registerSkill({
   name: '放权',
   description: '你可以跳过出牌阶段，然后在回合结束时弃置一张手牌，令一名其他角色进行一个额外回合。',
   trigger: {
-    event: 'phaseBegin',
-    source: 'character',
+    event: '阶段开始',
+    source: '角色',
     phase: '出牌',
     manual: true,
     optional: true,
@@ -641,8 +641,8 @@ registerSkill({
   name: '若愚',
   description: '主公技，觉醒技，回合开始阶段，若你的体力是全场最少的（或之一），你须增加1点体力上限并回复1点体力，然后永久获得技能"激将"。',
   trigger: {
-    event: 'turnStart',
-    source: 'character',
+    event: '回合开始',
+    source: '角色',
   },
   handler(ctx, state) {
     if (state.players[ctx.self].vars['若愚/awakened']) return [];
@@ -653,7 +653,7 @@ registerSkill({
     const minHealth = Math.min(...allHealths);
     if (myHealth > minHealth) return [];
     return [
-      { type: 'atoms', ops: [{ type: 'setVar', player: ctx.self, key: '若愚/awakened', value: true }] },
+      { type: 'atoms', ops: [{ type: '设置变量', player: ctx.self, key: '若愚/awakened', value: true }] },
     ];
   },
 });

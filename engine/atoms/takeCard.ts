@@ -9,8 +9,8 @@ import { updatePlayer } from '../state';
  */
 export function register() {
   registerAtom({
-    type: 'takeCard',
-    apply(state: GameState, atom: Atom & { type: 'takeCard' }): GameState {
+    type: '抽牌',
+    apply(state: GameState, atom: Atom & { type: '抽牌' }): GameState {
       const cardId = atom.cardId as string;
       const to = atom.to as string;
       const remaining = state.zones.deck.filter(id => id !== cardId);
@@ -23,7 +23,7 @@ export function register() {
     toEvents(_state, atom): AtomEventResult {
       const cardId = atom.cardId as string;
       const to = atom.to as string;
-      const server = makeServerEvent('takeCard', { cardId, to });
+      const server = makeServerEvent('抽牌', { cardId, to });
       return [server, new Map(), null];
     },
   });

@@ -15,22 +15,22 @@ function createTestLog() {
       seed: 12345,
     },
     serverOps: [
-      { seq: 0, timestamp: Date.now(), type: 'gameStart', data: { players: [{ name: '曹操', character: '曹操', role: '主公' }, { name: '刘备', character: '刘备', role: '反贼' }] }, description: '游戏开始' },
-      { seq: 1, timestamp: Date.now(), type: 'phaseChange', data: { phase: '判定', player: '曹操' }, description: '进入判定阶段' },
-      { seq: 2, timestamp: Date.now(), type: 'phaseChange', data: { phase: '摸牌', player: '曹操' }, description: '进入摸牌阶段' },
-      { seq: 3, timestamp: Date.now(), type: 'draw', data: { player: '曹操', cards: [{ name: '杀', suit: '♠', rank: '3' }, { name: '闪', suit: '♥', rank: '5' }] }, description: '曹操摸了2张牌' },
-      { seq: 4, timestamp: Date.now(), type: 'phaseChange', data: { phase: '出牌', player: '曹操' }, description: '进入出牌阶段' },
-      { seq: 5, timestamp: Date.now(), type: 'damage', data: { source: '曹操', target: '刘备', amount: 1, cardName: '杀' }, description: '曹操对刘备使用杀，造成1点伤害' },
+      { seq: 0, timestamp: Date.now(), type: '游戏开始', data: { players: [{ name: '曹操', character: '曹操', role: '主公' }, { name: '刘备', character: '刘备', role: '反贼' }] }, description: '游戏开始' },
+      { seq: 1, timestamp: Date.now(), type: '阶段变更', data: { phase: '判定', player: '曹操' }, description: '进入判定阶段' },
+      { seq: 2, timestamp: Date.now(), type: '阶段变更', data: { phase: '摸牌', player: '曹操' }, description: '进入摸牌阶段' },
+      { seq: 3, timestamp: Date.now(), type: '摸牌', data: { player: '曹操', cards: [{ name: '杀', suit: '♠', rank: '3' }, { name: '闪', suit: '♥', rank: '5' }] }, description: '曹操摸了2张牌' },
+      { seq: 4, timestamp: Date.now(), type: '阶段变更', data: { phase: '出牌', player: '曹操' }, description: '进入出牌阶段' },
+      { seq: 5, timestamp: Date.now(), type: '造成伤害', data: { source: '曹操', target: '刘备', amount: 1, cardName: '杀' }, description: '曹操对刘备使用杀，造成1点伤害' },
     ],
     playerOps: {
       曹操: [
-        { seq: 0, timestamp: Date.now(), type: 'gameStart', data: {}, description: '游戏开始，你是 曹操（主公）' },
-        { seq: 1, timestamp: Date.now(), type: 'draw', data: {}, description: '你摸了 杀、闪' },
-        { seq: 2, timestamp: Date.now(), type: 'damage', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
+        { seq: 0, timestamp: Date.now(), type: '游戏开始', data: {}, description: '游戏开始，你是 曹操（主公）' },
+        { seq: 1, timestamp: Date.now(), type: '摸牌', data: {}, description: '你摸了 杀、闪' },
+        { seq: 2, timestamp: Date.now(), type: '造成伤害', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
       ],
       刘备: [
-        { seq: 0, timestamp: Date.now(), type: 'gameStart', data: {}, description: '游戏开始，你是 刘备（反贼）' },
-        { seq: 1, timestamp: Date.now(), type: 'damage', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
+        { seq: 0, timestamp: Date.now(), type: '游戏开始', data: {}, description: '游戏开始，你是 刘备（反贼）' },
+        { seq: 1, timestamp: Date.now(), type: '造成伤害', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
       ],
     },
   };

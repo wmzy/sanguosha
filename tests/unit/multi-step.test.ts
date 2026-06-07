@@ -25,10 +25,10 @@ describe('multiStep SkillPhase', () => {
 
   it('multiStep: 顺序执行多个 prompt，第二个 prompt 能拿到第一个的 choice', () => {
     const state: GameState = createTestGame();
-    const event = { type: 'skillActivated' as const, player: 'P1', skillId: 'test' };
+    const event = { type: '技能发动' as const, player: 'P1', skillId: 'test' };
     const trigger = {
-      event: 'skillActivated',
-      source: 'character' as const,
+      event: '技能发动',
+      source: '角色' as const,
       skillId: 'test',
       player: 'P1',
       priority: 0,
@@ -40,7 +40,7 @@ describe('multiStep SkillPhase', () => {
         steps: [
           {
             type: 'atoms',
-            ops: [{ type: 'setCtxVar', key: 'firstChoice', value: 'A' }],
+            ops: [{ type: '设置上下文变量', key: 'firstChoice', value: 'A' }],
           },
           {
             type: 'prompt',
@@ -61,7 +61,7 @@ describe('multiStep SkillPhase', () => {
     // 暂停，r.state.pending 应该是 skillPrompt（第二个 prompt 等待响应）。
     expect(r.state).toBeDefined();
     expect(r.state.pending).not.toBeNull();
-    expect(r.state.pending?.type).toBe('skillPrompt');
+    expect(r.state.pending?.type).toBe('技能选择');
     // 第一个 step 的 setCtxVar 已被执行
     expect(ctx.localVars.firstChoice).toBe('A');
   });

@@ -18,7 +18,7 @@ export interface PendingPromptData {
   trickTarget?: string;
   requiredCard?: string;
   targetCardIds?: string[];
-  selectMode?: 'discard' | 'steal';
+  selectMode?: '弃置' | 'steal';
   options?: PromptOption[];
 }
 
@@ -26,7 +26,7 @@ interface GamePromptsProps {
   state: GameState;
   pendingPrompt: PendingPromptData | null;
   pending: PendingAction | null;
-  respondAction: Extract<ValidAction, { type: 'respond' }> | undefined;
+  respondAction: Extract<ValidAction, { type: '打出' }> | undefined;
   selectedSkillCards: Set<string>;
   needsDiscard: boolean;
   discardCount: number;
@@ -202,7 +202,7 @@ function DiscardPrompt({
   );
 }
 
-export const GamePrompts = memo(function GamePrompts({
+export const GamePrompts = memo(({
   state,
   pendingPrompt,
   pending,
@@ -220,7 +220,7 @@ export const GamePrompts = memo(function GamePrompts({
   selectHarvestCard,
   handleSkillChoice,
   handleDiscard,
-}: GamePromptsProps) {
+}: GamePromptsProps) => {
   const respondCards = respondAction?.cards ?? [];
   const promptNode = (() => {
     if (!pendingPrompt) return null;
@@ -366,7 +366,7 @@ export const GamePrompts = memo(function GamePrompts({
       );
     }
 
-    if (pendingPrompt.type === 'dyingWindow' && pending?.type === 'dyingWindow') {
+    if (pendingPrompt.type === '濒死窗口' && pending?.type === '濒死窗口') {
       const currentSaver = pending.savers[pending.currentSaverIndex];
       const isSaver = currentSaver === myName;
       const saverPlayer = state.players[currentSaver];
@@ -402,14 +402,14 @@ export const GamePrompts = memo(function GamePrompts({
       );
     }
 
-    if (pendingPrompt.type === 'skillPrompt') {
+    if (pendingPrompt.type === '技能选择') {
       const selectCardsOption = pendingPrompt.options?.find(
         (o) => 'type' in o && o.type === 'selectCards',
       );
       if (selectCardsOption && 'type' in selectCardsOption) {
         const min = selectCardsOption.min ?? 1;
         const max = selectCardsOption.max ?? 99;
-        const isCurrentPlayer = pending?.type === 'skillPrompt' && pending.player === myName;
+        const isCurrentPlayer = pending?.type === '技能选择' && pending.player === myName;
         return (
           <div className={cx(promptBase, promptBgBlue)}>
             <div className={promptTitle}>{pendingPrompt.text}</div>
@@ -449,14 +449,14 @@ export const GamePrompts = memo(function GamePrompts({
       return null;
     }
 
-    if (pendingPrompt.type === 'selectCard') {
+    if (pendingPrompt.type === '选择牌') {
       return (
         <div className={cx(promptBase, promptBgPurple)}>
           <div className={promptTitle}>{pendingPrompt.text}</div>
           <div className={promptButtonsRowGap8}>
             {(pendingPrompt.targetCardIds ?? []).map((cardId, idx) => {
               const showFaceDown =
-                pendingPrompt.selectMode === 'steal' || pendingPrompt.selectMode === 'discard';
+                pendingPrompt.selectMode === 'steal' || pendingPrompt.selectMode === '弃置';
               const card = state.cardMap[cardId];
               return (
                 <button
@@ -476,7 +476,7 @@ export const GamePrompts = memo(function GamePrompts({
       );
     }
 
-    if (pendingPrompt.type === 'harvestSelection' && pending?.type === 'harvestSelection') {
+    if (pendingPrompt.type === '收获选牌' && pending?.type === '收获选牌') {
       const currentPicker = pending.pickOrder[pending.currentPickerIndex];
       const isCurrentPicker = currentPicker === myName;
       return (

@@ -10,15 +10,15 @@ describe('司马懿 - 鬼才', () => {
     })
     .act('发射 judgeResult 事件触发鬼才', ctx => {
       ctx.emitEvent({
-        type: 'judgeResult',
+        type: '判定结果',
         player: 'P1',
         cardId: 'fake-judge-card',
-        result: 'red',
+        result: '红',
       });
     })
     .check('鬼才触发后创建技能选择提示', ctx => {
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
     })
     .run();
 
@@ -32,17 +32,17 @@ describe('司马懿 - 鬼才', () => {
     })
     .act('发射 judgeResult 事件触发鬼才', ctx => {
       ctx.emitEvent({
-        type: 'judgeResult',
+        type: '判定结果',
         player: 'P1',
         cardId: 'fake-judge-card',
-        result: 'red',
+        result: '红',
       });
     })
     .act('记录回答前手牌数', ctx => {
       ctx.snapshot('before-choice');
     })
     .act('选择不替换', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: false });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: false });
     })
     .check('手牌不变', ctx => {
       const diff = ctx.diff('before-choice');
@@ -60,15 +60,15 @@ describe('司马懿 - 鬼才', () => {
     })
     .act('发射 judgeResult 事件触发鬼才', ctx => {
       ctx.emitEvent({
-        type: 'judgeResult',
+        type: '判定结果',
         player: 'P1',
         cardId: 'fake-judge-card',
-        result: 'red',
+        result: '红',
       });
     })
     .act('选择手牌替换判定牌', ctx => {
       const cardId = ctx.findCard('P1', '桃')!;
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: cardId });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: cardId });
     })
     .check('选中的牌从手牌移出', ctx => {
       const diff = ctx.diff('initial');

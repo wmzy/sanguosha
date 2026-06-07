@@ -8,7 +8,7 @@ describe('孟获', () => {
         ctx.selectCharacters('孟获', '刘备');
       })
       .act('触发turnStart', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('孟获获得immune南蛮入侵标记', ctx => {
         expect(ctx.player('P1').tags).toContain('immune南蛮入侵');
@@ -38,7 +38,7 @@ describe('孟获', () => {
         ctx.selectCharacters('孟获', '刘备');
       })
       .act('触发摸牌阶段事件', ctx => {
-        ctx.emitEvent({ type: 'phaseBegin', phase: '摸牌', player: 'P1' });
+        ctx.emitEvent({ type: '阶段开始', phase: '摸牌', player: 'P1' });
       })
       .check('孟获没有再起/skipNormalDraw变量（满血不触发）', ctx => {
         expect(ctx.player('P1').vars['再起/skipNormalDraw']).toBeUndefined();

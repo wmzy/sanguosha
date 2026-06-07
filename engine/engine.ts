@@ -25,24 +25,24 @@ function dispatchAction(state: GameState, action: GameAction): EngineResult {
   if (error) return { state, events: [], error };
 
   switch (action.type) {
-    case 'playCard':
+    case '打出一张牌':
       return handlePlayCard(state, action);
-    case 'endTurn':
+    case '结束回合':
       return handleEndTurn(state, action);
-    case 'useSkill':
+    case '使用技能':
       return handleUseSkill(state, action, getSkillRegistry());
-    case 'discard':
+    case '弃置':
       return { state, events: [], error: '弃牌操作仅在弃牌阶段有效' };
-    case 'respond':
+    case '打出':
       return { state, events: [], error: '响应动作仅在响应窗口中有效' };
-    case 'skillChoice':
+    case '技能选择':
       return { state, events: [], error: '技能选择仅在技能提示中有效' };
-    case 'toggleAutoSkipWuxie':
+    case '切换自动跳过无懈可击':
       return {
         state: { ...state, meta: { ...state.meta, autoSkipWuxie: !state.meta.autoSkipWuxie } },
         events: [],
       };
-    case 'startGame':
+    case '开始':
       return { state, events: [], error: undefined };
     default: {
       const t = (action as { type: string }).type;
@@ -54,31 +54,31 @@ function dispatchAction(state: GameState, action: GameAction): EngineResult {
 export function engine(state: GameState, action: GameAction): EngineResult {
   let result: EngineResult;
 
-  if (action.type === 'startGame') {
+  if (action.type === '开始') {
     result = { state, events: [], error: undefined };
-  } else if (action.type === 'toggleAutoSkipWuxie') {
+  } else if (action.type === '切换自动跳过无懈可击') {
     result = {
       state: { ...state, meta: { ...state.meta, autoSkipWuxie: !state.meta.autoSkipWuxie } },
       events: [],
     };
-  } else if (state.pending?.type === 'playPhase') {
-    const playPhaseActions: GameAction['type'][] = ['playCard', 'useSkill', 'endTurn', 'toggleAutoSkipWuxie'];
+  } else if (state.pending?.type === '出牌阶段') {
+    const playPhaseActions: GameAction['type'][] = ['打出一张牌', '使用技能', '结束回合', '切换自动跳过无懈可击'];
     if (!playPhaseActions.includes(action.type)) {
       return { state, events: [], error: '出牌阶段不允许此操作' };
     }
-    const { state: popState } = applyAtoms(state, [{ type: 'popPending' }]);
+    const { state: popState } = applyAtoms(state, [{ type: '弹出待定' }]);
     const savedPending = state.pending;
     result = dispatchAction(popState, action);
     if (!result.error && !result.state.pending && result.state.meta.status !== '已结束' && result.state.phase === '出牌') {
       const refreshedPending: PendingPlayPhase = {
         id: savedPending.id,
-        type: 'playPhase',
+        type: '出牌阶段',
         player: savedPending.player,
         timeout: savedPending.timeout,
         deadline: Date.now() + savedPending.timeout,
         onTimeout: savedPending.onTimeout,
       };
-      const { state: pushState, events: pushEvents } = applyAtoms(result.state, [{ type: 'pushPending', action: refreshedPending }]);
+      const { state: pushState, events: pushEvents } = applyAtoms(result.state, [{ type: '推入待定', action: refreshedPending }]);
       result = { state: pushState, events: [...result.events, ...pushEvents] };
     }
   } else if (state.pending) {
@@ -107,9 +107,9 @@ export function engine(state: GameState, action: GameAction): EngineResult {
         const dyingPending = createDyingPending(result.state, check.player, check.source);
         const { state: dyingState, events: dyingEvents } = applyAtoms(
           { ...result.state, deferredDyingCheck: undefined },
-          [{ type: 'pushPending' as const, action: dyingPending }],
+          [{ type: '推入待定' as const, action: dyingPending }],
         );
-        const dyingEvent = makeServerEvent('dying', {
+        const dyingEvent = makeServerEvent('濒死', {
           player: check.player,
           ...(check.source ? { source: check.source } : {}),
         });
@@ -152,22 +152,22 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
   const pending = state.pending!;
   let result: EngineResult;
   switch (pending.type) {
-    case 'responseWindow':
+    case '响应窗口':
       result = resolveResponse(state, action, pending);
       break;
-    case 'skillPrompt':
+    case '技能选择':
       result = resumeSkill(state, action, pending, getSkillRegistry());
       break;
-    case 'discardPhase':
+    case '弃牌阶段':
       result = resolveDiscardPhase(state, action, pending);
       break;
-    case 'dyingWindow':
+    case '濒死窗口':
       result = resolveDying(state, action, pending);
       break;
-    case 'selectCard':
+    case '选择牌':
       result = resolveSelectCard(state, action, pending);
       break;
-    case 'harvestSelection':
+    case '收获选牌':
       result = resolveHarvestSelection(state, action, pending);
       break;
     default: {
@@ -206,9 +206,9 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
   const dyingPending = createDyingPending(result.state, check.player, check.source);
   const { state: dyingState, events: dyingEvents } = applyAtoms(
     { ...result.state, deferredDyingCheck: undefined },
-    [{ type: 'pushPending' as const, action: dyingPending }],
+    [{ type: '推入待定' as const, action: dyingPending }],
   );
-  const dyingEvent = makeServerEvent('dying', {
+  const dyingEvent = makeServerEvent('濒死', {
     player: check.player,
     ...(check.source ? { source: check.source } : {}),
   });

@@ -67,7 +67,7 @@ describe('V2 Engine - 核心引擎', () => {
   describe('engine 纯函数性质', () => {
     it('相同输入总是产生相同输出', () => {
       const state = setPlayPhase(createTestGame());
-      const action = { type: 'endTurn' as const, player: state.currentPlayer };
+      const action = { type: '结束回合' as const, player: state.currentPlayer };
       const r1 = engine(state, action);
       const r2 = engine(state, action);
       expect(r1.state.currentPlayer).toBe(r2.state.currentPlayer);
@@ -78,7 +78,7 @@ describe('V2 Engine - 核心引擎', () => {
       const state = setPlayPhase(createTestGame());
       const originalPlayer = state.currentPlayer;
       const originalPhase = state.phase;
-      engine(state, { type: 'endTurn', player: state.currentPlayer });
+      engine(state, { type: '结束回合', player: state.currentPlayer });
       expect(state.currentPlayer).toBe(originalPlayer);
       expect(state.phase).toBe(originalPhase);
     });
@@ -88,20 +88,20 @@ describe('V2 Engine - 核心引擎', () => {
     it('结束回合后切换到下一个玩家', () => {
       const state = setPlayPhase(createTestGame({ playerCount: 2 }));
       expect(state.currentPlayer).toBe('P1');
-      const next = engine(state, { type: 'endTurn', player: 'P1' });
+      const next = engine(state, { type: '结束回合', player: 'P1' });
       expect(next.error).toBeUndefined();
       expect(next.state.currentPlayer).toBe('P2');
     });
 
     it('轮次循环：最后一个玩家后回到第一个', () => {
       const state = setPlayPhase(createTestGame({ playerCount: 2 }));
-      const r1 = engine(state, { type: 'endTurn', player: 'P1' });
+      const r1 = engine(state, { type: '结束回合', player: 'P1' });
       expect(r1.state.currentPlayer).toBe('P2');
       // P2 摸牌阶段抽了 2 张，设高体力避免弃牌
       const p2HighHealth = setHealth(r1.state, 'P2', 10);
       const r2 = engine(
         { ...p2HighHealth, phase: '出牌' },
-        { type: 'endTurn', player: 'P2' },
+        { type: '结束回合', player: 'P2' },
       );
       // 整轮完成，回到 P1
       expect(r2.state.currentPlayer).toBe('P1');
@@ -109,7 +109,7 @@ describe('V2 Engine - 核心引擎', () => {
 
     it('非当前玩家不能结束回合', () => {
       const state = setPlayPhase(createTestGame({ playerCount: 2 }));
-      const result = engine(state, { type: 'endTurn', player: 'P2' });
+      const result = engine(state, { type: '结束回合', player: 'P2' });
       expect(result.error).toBeTruthy();
       expect(result.state).toBe(state);
     });
@@ -145,7 +145,7 @@ describe('V2 Engine - 核心引擎', () => {
       // phase = '准备', not '出牌'
       const cardId = state.players['P1'].hand[0];
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId,
       });
@@ -155,7 +155,7 @@ describe('V2 Engine - 核心引擎', () => {
     it('不能出不在手牌中的牌', () => {
       const state = setPlayPhase(createTestGame());
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: 'nonexistent-card',
       });
@@ -165,7 +165,7 @@ describe('V2 Engine - 核心引擎', () => {
     it('弃牌操作在非弃牌阶段无效', () => {
       const state = setPlayPhase(createTestGame());
       const result = engine(state, {
-        type: 'discard',
+        type: '弃置',
         player: 'P1',
         cardIds: [state.players['P1'].hand[0]],
       });
@@ -175,7 +175,7 @@ describe('V2 Engine - 核心引擎', () => {
     it('响应动作在非响应窗口无效', () => {
       const state = setPlayPhase(createTestGame());
       const result = engine(state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
       });
       expect(result.error).toBeTruthy();

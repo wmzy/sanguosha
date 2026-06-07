@@ -15,7 +15,7 @@ export function resumeSkill(
   pending: PendingSkillPrompt,
   _skillRegistry: Map<string, SkillDef>,
 ): EngineResult {
-  if (action.type !== 'skillChoice') {
+  if (action.type !== '技能选择') {
     return { state, events: [], error: '技能提示需要 skillChoice 动作' };
   }
   if (action.player !== pending.player) {
@@ -38,7 +38,7 @@ export function resumeSkill(
 
 export function handleUseSkill(
   state: GameState,
-  action: GameAction & { type: 'useSkill' },
+  action: GameAction & { type: '使用技能' },
   skillRegistry: Map<string, SkillDef>,
 ): EngineResult {
   const skill = skillRegistry.get(action.skillId);
@@ -53,7 +53,7 @@ export function handleUseSkill(
 
   const phases = skill.handler(ctx, state);
   const planResult = executePlan(state, phases, ctx);
-  const activatedEvent = makeServerEvent('skillActivated', {
+  const activatedEvent = makeServerEvent('技能发动', {
     player: action.player,
     skillId: action.skillId,
   });

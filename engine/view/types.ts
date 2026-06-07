@@ -84,11 +84,11 @@ export type Animation =
   | { type: 'discardCards'; player: string; cardIds: string[] }
   | { type: 'equipItem'; player: string; cardId: string; slot: string }
   | { type: 'unequipItem'; player: string; slot: string }
-  | { type: 'death'; player: string }
-  | { type: 'skillActivate'; player: string; skillId: string }
+  | { type: '死亡'; player: string }
+  | { type: '技能发动'; player: string; skillId: string }
   | { type: 'pendingPrompt'; actionType: string }
   | { type: 'trickReveal'; cardId: string; result: 'success' | 'fail' }
-  | { type: 'nextPlayer'; player: string };
+  | { type: '下一玩家'; player: string };
 
 export interface FrontendState {
   view: PlayerView;
@@ -97,7 +97,7 @@ export interface FrontendState {
 }
 
 export interface AvailableAction {
-  type: 'playCard' | 'useSkill' | 'respond' | 'discard';
+  type: '打出一张牌' | '使用技能' | '打出' | '弃置';
   sourceId?: string;
   validTargets: string[];
   required: boolean;

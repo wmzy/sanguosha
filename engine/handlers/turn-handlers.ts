@@ -15,12 +15,12 @@ import { emitEvent } from '../skill';
 
 export function handleEndTurn(
   state: GameState,
-  action: GameAction & { type: 'endTurn' },
+  action: GameAction & { type: '结束回合' },
 ): EngineResult {
   const player = action.player;
 
   // 触发 turnEnd 事件，使依赖此事件的技能可以响应（如闭月）
-  const turnEndEvent: GameEvent = { type: 'turnEnd', player };
+  const turnEndEvent: GameEvent = { type: '回合结束', player };
   const turnEndResult = emitEvent(state, turnEndEvent);
   if (turnEndResult.state.pending !== null) {
     return turnEndResult;
@@ -28,7 +28,7 @@ export function handleEndTurn(
 
   // 使用 turnEnd 后的最新状态
   const s = turnEndResult.state;
-  const turnEndLogEvent = makeServerEvent('turnEnd', { player });
+  const turnEndLogEvent = makeServerEvent('回合结束', { player });
   const playerState = getPlayer(s, player);
   const handSize = playerState.hand.length;
   const health = playerState.health;
@@ -38,17 +38,17 @@ export function handleEndTurn(
     const discardCount = handSize - health;
     const pending: PendingDiscardPhase = {
       id: createPendingId(),
-      type: 'discardPhase',
+      type: '弃牌阶段',
       player,
       min: discardCount,
       max: discardCount,
       timeout: TIMEOUT_DEFAULTS.discardPhase,
       deadline: Date.now() + TIMEOUT_DEFAULTS.discardPhase,
-      onTimeout: { type: 'discard', player, cardIds: playerState.hand.slice(0, discardCount) },
+      onTimeout: { type: '弃置', player, cardIds: playerState.hand.slice(0, discardCount) },
     };
     const atoms: Atom[] = [
-      { type: 'setPhase', phase: '弃牌' },
-      { type: 'pushPending', action: pending },
+      { type: '设阶段', phase: '弃牌' },
+      { type: '推入待定', action: pending },
     ];
     const result = applyAtoms(s, atoms);
     return { state: result.state, events: [...turnEndResult.events, ...result.events, turnEndLogEvent] };
@@ -57,8 +57,8 @@ export function handleEndTurn(
   // 不需要弃牌 → 下一玩家，从准备阶段开始
   // turnStart GameEvent + ServerEvent 由 advanceToInteractivePhase 统一发射
   const atoms: Atom[] = [
-    { type: 'nextPlayer' },
-    { type: 'setPhase', phase: '准备' },
+    { type: '下一玩家' },
+    { type: '设阶段', phase: '准备' },
   ];
   const result = applyAtoms(s, atoms);
   return {
@@ -72,7 +72,7 @@ export function resolveDiscardPhase(
   action: GameAction,
   pending: PendingDiscardPhase,
 ): EngineResult {
-  if (action.type !== 'discard') {
+  if (action.type !== '弃置') {
     return { state, events: [], error: '弃牌阶段需要 discard 动作' };
   }
   if (action.player !== pending.player) {
@@ -95,15 +95,15 @@ export function resolveDiscardPhase(
     ...action.cardIds.map(
       (cardId) =>
         ({
-          type: 'moveCard',
+          type: '移动牌',
           cardId,
-          from: { zone: 'hand', player: action.player },
-          to: { zone: 'discardPile' },
+          from: { zone: '手牌', player: action.player },
+          to: { zone: '弃牌堆' },
         }) satisfies Atom,
     ),
-    { type: 'popPending' },
-    { type: 'nextPlayer' },
-    { type: 'setPhase', phase: '准备' },
+    { type: '弹出待定' },
+    { type: '下一玩家' },
+    { type: '设阶段', phase: '准备' },
   ];
   const result = applyAtoms(state, discardAtoms);
 

@@ -75,7 +75,7 @@ const metaDim12 = css`
   color: ${colors.text.dim};
 `;
 
-export const SeatingLayout = memo(function SeatingLayout({
+export const SeatingLayout = memo(({
   ordered,
   cardMap,
   myName,
@@ -99,7 +99,7 @@ export const SeatingLayout = memo(function SeatingLayout({
   getDistance,
   setSelectedTarget,
   setPerspective,
-}: SeatingLayoutProps) {
+}: SeatingLayoutProps) => {
   const bottomPlayer = ordered[0];
   const rightBottomPlayer = ordered[1];
   const rightTopPlayer = ordered[2];

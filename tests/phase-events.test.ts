@@ -19,7 +19,7 @@ describe('phaseBegin GameEvent', () => {
     const state = createTestGame({ playerCount: 2, seed: 42 });
 
     const result = emitEvent(state, {
-      type: 'phaseBegin',
+      type: '阶段开始',
       phase: '准备',
       player: 'P1',
     });
@@ -32,10 +32,10 @@ describe('phaseBegin GameEvent', () => {
     const state = createTestGame({ playerCount: 2, seed: 42 });
     expect(state.phase).toBe('准备');
 
-    const r = engine(state, { type: 'toggleAutoSkipWuxie' });
+    const r = engine(state, { type: '切换自动跳过无懈可击' });
 
     expect(r.state.phase).toBe('出牌');
-    expect(r.state.pending?.type).toBe('playPhase');
+    expect(r.state.pending?.type).toBe('出牌阶段');
   });
 });
 
@@ -44,7 +44,7 @@ describe('phaseEnd GameEvent', () => {
     const state = createTestGame({ playerCount: 2, seed: 42 });
 
     const result = emitEvent(state, {
-      type: 'phaseEnd',
+      type: '阶段结束',
       phase: '准备',
       player: 'P1',
     });
@@ -55,7 +55,7 @@ describe('phaseEnd GameEvent', () => {
 
   it('phaseEnd 发射后阶段推进不阻断', () => {
     const state = createTestGame({ playerCount: 2, seed: 42 });
-    const r = engine(state, { type: 'toggleAutoSkipWuxie' });
+    const r = engine(state, { type: '切换自动跳过无懈可击' });
 
     expect(r.state.phase).toBe('出牌');
   });
@@ -66,7 +66,7 @@ describe('阶段推进完整流程', () => {
     const state = createTestGame({ playerCount: 2, seed: 42 });
     const stateAtPlay = { ...state, phase: '出牌' as const };
 
-    const r = engine(stateAtPlay, { type: 'endTurn', player: 'P1' });
+    const r = engine(stateAtPlay, { type: '结束回合', player: 'P1' });
 
     expect(r.error).toBeUndefined();
     expect(r.state.currentPlayer).toBe('P2');

@@ -24,7 +24,7 @@ describe('决斗 → 小乔濒死', () => {
         hp: xq.health,
         alive: xq.info.alive,
         pending: ctx.pendingType(),
-      }).toEqual({ hp: 0, alive: true, pending: 'dyingWindow' });
+      }).toEqual({ hp: 0, alive: true, pending: '濒死窗口' });
     })
     .run();
 });

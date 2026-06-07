@@ -5,8 +5,8 @@ import { createRng } from '../../shared/rng';
 
 export function register() {
   registerAtom({
-    type: 'reshuffle',
-    apply(state: GameState, _atom: Atom & { type: 'reshuffle' }): GameState {
+    type: '重洗',
+    apply(state: GameState, _atom: Atom & { type: '重洗' }): GameState {
       const discardPile = state.zones.discardPile;
       if (discardPile.length === 0) return state;
       const rng = createRng(state.rngState);
@@ -21,10 +21,10 @@ export function register() {
         rngState: rng.getState(),
       };
     },
-    toEvents(state: GameState, _atom: Atom & { type: 'reshuffle' }): AtomEventResult {
+    toEvents(state: GameState, _atom: Atom & { type: '重洗' }): AtomEventResult {
       const moved = state.zones.discardPile.length;
-      const server = makeServerEvent('reshuffle', { count: moved });
-      const owner = makePlayerEvent('reshuffle', { count: moved });
+      const server = makeServerEvent('重洗', { count: moved });
+      const owner = makePlayerEvent('重洗', { count: moved });
       return [server, new Map(), owner];
     },
   });

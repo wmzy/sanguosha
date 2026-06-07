@@ -18,12 +18,12 @@ describe('孙尚香 - 结姻', () => {
     })
     .act('发动结姻', ctx => {
       ctx.useSkill('P1', '结姻');
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .act('选择2张手牌和目标P2', ctx => {
       const p1 = ctx.player('P1');
       const cardIds = p1.hand.slice(0, 2);
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: { cardIds, player: 'P2' } });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: { cardIds, player: 'P2' } });
     })
     .check('P2 回复1体力', ctx => {
       const diff = ctx.diff('initial');

@@ -33,10 +33,10 @@ const charMap = getCharacterMap();
 describe('事件审计: endTurn', () => {
   it('handleEndTurn 产生 turnEnd ServerEvent', () => {
     const state = setPlayPhase(createTestGame({ playerCount: 2 }));
-    const result = engine(state, { type: 'endTurn', player: 'P1' });
+    const result = engine(state, { type: '结束回合', player: 'P1' });
 
     // handleEndTurn 第30行 makeServerEvent('turnEnd', { player })
-    const found = result.events.some(e => e.type === 'turnEnd');
+    const found = result.events.some(e => e.type === '回合结束');
     expect(found).toBe(true);
   });
 
@@ -44,31 +44,31 @@ describe('事件审计: endTurn', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = setHealth(state, 'P1', 1); // 手牌 > 体力，触发弃牌
 
-    const r1 = engine(state, { type: 'endTurn', player: 'P1' });
-    expect(r1.state.pending?.type).toBe('discardPhase');
+    const r1 = engine(state, { type: '结束回合', player: 'P1' });
+    expect(r1.state.pending?.type).toBe('弃牌阶段');
     // handleEndTurn 中已经产生了 turnEnd ServerEvent
-    expect(r1.events.some(e => e.type === 'turnEnd')).toBe(true);
+    expect(r1.events.some(e => e.type === '回合结束')).toBe(true);
 
     // 弃牌
     const hand = r1.state.players['P1'].hand;
     const r2 = engine(r1.state, {
-      type: 'discard', player: 'P1', cardIds: hand.slice(0, hand.length - 1),
+      type: '弃置', player: 'P1', cardIds: hand.slice(0, hand.length - 1),
     });
     expect(r2.error).toBeUndefined();
 
     // resolveDiscardPhase 不产生 turnEnd ServerEvent（仅产生 cardDiscarded + turnStart）
     // 但这是合理的：turnEnd 在上层 handleEndTurn 中已经发射了
-    expect(r2.events.some(e => e.type === 'turnEnd')).toBe(false);
+    expect(r2.events.some(e => e.type === '回合结束')).toBe(false);
     // 弃牌后应该产生 turnStart ServerEvent（切换到下一玩家）
-    expect(r2.events.some(e => e.type === 'turnStart')).toBe(true);
+    expect(r2.events.some(e => e.type === '回合开始')).toBe(true);
   });
 
   it('handleEndTurn 产生 turnStart ServerEvent（无需弃牌时切换到下一玩家）', () => {
     const state = setPlayPhase(createTestGame({ playerCount: 2 }));
-    const result = engine(state, { type: 'endTurn', player: 'P1' });
+    const result = engine(state, { type: '结束回合', player: 'P1' });
 
     // handleEndTurn 第61行 makeServerEvent('turnStart', ...)
-    const found = result.events.some(e => e.type === 'turnStart');
+    const found = result.events.some(e => e.type === '回合开始');
     expect(found).toBe(true);
     expect(result.state.currentPlayer).toBe('P2');
   });
@@ -82,7 +82,7 @@ describe('事件审计: turnStart GameEvent 未被引擎发射', () => {
     // 马术已注册触发器
     expect(state.triggers.some(t => t.skillId === '马术')).toBe(true);
 
-    const _result = engine(state, { type: 'endTurn', player: 'P1' });
+    const _result = engine(state, { type: '结束回合', player: 'P1' });
 
     // ⚠️ BUG: turnStart GameEvent 从未被 emitEvent 调用
     // handleEndTurn 只调用了 makeServerEvent('turnStart')
@@ -110,10 +110,10 @@ describe('事件审计: phaseBegin', () => {
 
   it('phaseBegin = 准备 for P1（曹操）→ 不应触发其他玩家的 准备 阶段技能', () => {
     const state = setup5();
-    const result = emitEvent(state, { type: 'phaseBegin', phase: '准备', player: 'P1' });
+    const result = emitEvent(state, { type: '阶段开始', phase: '准备', player: 'P1' });
 
     if (result.state.pending) {
-      expect(result.state.pending.type).not.toBe('skillPrompt');
+      expect(result.state.pending.type).not.toBe('技能选择');
     }
   });
 
@@ -121,10 +121,10 @@ describe('事件审计: phaseBegin', () => {
     let state = setup5();
     state = { ...state, currentPlayer: 'P3' };
 
-    const result = emitEvent(state, { type: 'phaseBegin', phase: '准备', player: 'P3' });
+    const result = emitEvent(state, { type: '阶段开始', phase: '准备', player: 'P3' });
 
-    expect(result.state.pending?.type).toBe('skillPrompt');
-    if (result.state.pending?.type === 'skillPrompt') {
+    expect(result.state.pending?.type).toBe('技能选择');
+    if (result.state.pending?.type === '技能选择') {
       expect(result.state.pending.player).toBe('P3');
       expect(result.state.pending.skillId).toBe('观星');
     }
@@ -135,7 +135,7 @@ describe('事件审计: phaseBegin', () => {
     state = { ...state, currentPlayer: 'P2' };
 
     const before = state.players['P2'].vars['洛神/judgeResult'];
-    const result = emitEvent(state, { type: 'phaseBegin', phase: '准备', player: 'P2' });
+    const result = emitEvent(state, { type: '阶段开始', phase: '准备', player: 'P2' });
     const after = result.state.players['P2'].vars['洛神/judgeResult'];
 
     expect(after).toBeDefined();
@@ -146,19 +146,19 @@ describe('事件审计: phaseBegin', () => {
   it('phaseBegin = 出牌 for P3（诸葛亮）→ 观星不触发（只听 准备 阶段）', () => {
     let state = setup5();
     state = { ...state, currentPlayer: 'P3' };
-    const result = emitEvent(state, { type: 'phaseBegin', phase: '出牌', player: 'P3' });
+    const result = emitEvent(state, { type: '阶段开始', phase: '出牌', player: 'P3' });
 
-    if (result.state.pending?.type === 'skillPrompt') {
+    if (result.state.pending?.type === '技能选择') {
       expect(result.state.pending.skillId).not.toBe('观星');
     }
   });
 
   it('5 人 debug 局 startGame 后无悬空 skillPrompt（复现 KZ3SXN 卡死）', () => {
     const state = createTestGame({ characters: ['曹操', '甄姬', '诸葛亮', '刘备', '吕蒙'] });
-    const r = engine(state, { type: 'startGame' });
+    const r = engine(state, { type: '开始' });
 
     if (r.state.pending) {
-      expect(r.state.pending.type).not.toBe('skillPrompt');
+      expect(r.state.pending.type).not.toBe('技能选择');
     }
     expect(['准备', '判定', '摸牌', '出牌']).toContain(r.state.phase);
   });
@@ -166,10 +166,10 @@ describe('事件审计: phaseBegin', () => {
   it('setPhase atom 只产生 ServerEvent，不通过 emitEvent 发射 phaseBegin GameEvent', () => {
     const state = setPlayPhase(createTestGame());
     const { events } = applyAtoms(state, [
-      { type: 'setPhase', phase: '弃牌' },
+      { type: '设阶段', phase: '弃牌' },
     ]);
 
-    expect(events.some(e => e.type === 'phaseBegin')).toBe(false);
+    expect(events.some(e => e.type === '阶段开始')).toBe(false);
   });
 });
 
@@ -181,19 +181,19 @@ describe('事件审计: cardPlayed', () => {
   it('playCard(杀) 产生 cardPlayed ServerEvent', () => {
     const state = setPlayPhase(createTestGame({ characters: ['曹操', '刘备'] }));
     const killId = findCardInHand(state, 'P1', '杀')!;
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
 
     // handlePlayCard 内部产生 cardPlayed ServerEvent
-    expect(result.events.some(e => e.type === 'cardPlayed')).toBe(true);
+    expect(result.events.some(e => e.type === '出牌')).toBe(true);
   });
 
   it('playCard(锦囊) 产生 cardPlayed ServerEvent', () => {
     let state = setPlayPhase(createTestGame({ characters: ['曹操', '刘备'] }));
     state = injectTrickCard(state, 'P1', '无中生有');
     const trickId = findCardInHand(state, 'P1', '无中生有')!;
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: trickId });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: trickId });
 
-    expect(result.events.some(e => e.type === 'cardPlayed')).toBe(true);
+    expect(result.events.some(e => e.type === '出牌')).toBe(true);
   });
 
   it('playCard(无中生有) 产生 cardPlayed ServerEvent，集智监听并触发', () => {
@@ -203,10 +203,10 @@ describe('事件审计: cardPlayed', () => {
     const trickId = findCardInHand(state, 'P1', '无中生有')!;
 
     const beforeHand = state.players['P1'].hand.length;
-    const step1 = engine(state, { type: 'playCard', player: 'P1', cardId: trickId });
+    const step1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: trickId });
 
     expect(step1.error).toBeUndefined();
-    expect(step1.events.some(e => e.type === 'cardPlayed')).toBe(true);
+    expect(step1.events.some(e => e.type === '出牌')).toBe(true);
 
     // 所有玩家 pass 过无懈可击窗口
     const result = passAllTrickResponders(step1.state);
@@ -224,15 +224,15 @@ describe('事件审计: 伤害事件', () => {
     let state = setPlayPhase(createTestGame({ characters: ['曹操', '刘备'] }));
     state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
     const killId = findCardInHand(state, 'P1', '杀')!;
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     expect(r1.error).toBeUndefined();
 
     const beforeHealth = r1.state.players['P2'].health;
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
 
     // ServerEvent: killHit 被产生
-    expect(r2.events.some(e => e.type === 'killHit')).toBe(true);
+    expect(r2.events.some(e => e.type === '杀命中')).toBe(true);
     // 伤害已应用
     expect(r2.state.players['P2'].health).toBe(beforeHealth - 1);
   });
@@ -252,8 +252,8 @@ describe('事件审计: 伤害事件', () => {
     state = injectCard(state, 'P1', '杀');
     const killId = findCardInHand(state, 'P1', '杀')!;
 
-    const r1 = engine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
-    const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+    const r1 = engine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
+    const r2 = engine(r1.state, { type: '打出', player: 'P2' });
 
     // 刚烈因事件类型不匹配未触发
     // P1（夏侯惇）没有任何状态变化（如 pending 刚烈判定）
@@ -303,7 +303,7 @@ describe('事件审计: 伤害事件', () => {
     const killId = state.players.P2.hand.find(id => state.cardMap[id].name === '杀')!;
 
     const result = emitEvent(state, {
-      type: 'damageReceived',
+      type: '受到伤害',
       target: 'P1',
       source: 'P2',
       amount: 1,
@@ -329,8 +329,8 @@ describe('事件审计: GameEvent 类型覆盖对比', () => {
     // - turnEnd:     handleEndTurn (turn-handlers.ts:22)
     // - cardPlayed:  handlePlayCard (card-handlers.ts:46)
     // - damageDealt: resolveKillResponse (response-handlers.ts:106)
-    const engineEmits = ['turnEnd', 'cardPlayed', 'damageDealt'];
-    expect(engineEmits).toEqual(['turnEnd', 'cardPlayed', 'damageDealt']);
+    const engineEmits = ['回合结束', '出牌', '造成伤害'];
+    expect(engineEmits).toEqual(['回合结束', '出牌', '造成伤害']);
   });
 
   it('技能注册表中所有技能依赖的 GameEvent 类型', () => {
@@ -358,7 +358,7 @@ describe('事件审计: GameEvent 类型覆盖对比', () => {
       }
     });
 
-    const engineEmits = new Set(['turnEnd', 'cardPlayed', 'damageDealt']);
+    const engineEmits = new Set(['回合结束', '出牌', '造成伤害']);
     const missing = [...requiredEvents].filter(e => !engineEmits.has(e));
 
     // ⚠️ 这些事件从未被发射 = 对应技能永久静默

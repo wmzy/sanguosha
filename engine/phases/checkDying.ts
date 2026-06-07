@@ -19,15 +19,15 @@ export function register() {
         const timeout = TIMEOUT_DEFAULTS.dyingResponse;
         const pending: PendingDyingWindow = {
           id: createPendingId(),
-          type: 'dyingWindow',
+          type: '濒死窗口',
           dyingPlayer: playerName,
           currentSaverIndex: 0,
           savers: getAlivePlayerNames(state),
           timeout,
           deadline: Date.now() + timeout,
-          onTimeout: { type: 'respond', player: playerName },
+          onTimeout: { type: '打出', player: playerName },
         };
-        const dyingEvent = makeServerEvent('dying', { player: playerName });
+        const dyingEvent = makeServerEvent('濒死', { player: playerName });
         return { state: { ...state, pending }, events: [dyingEvent] };
       }
 

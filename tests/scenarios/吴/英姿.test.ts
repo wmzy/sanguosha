@@ -9,7 +9,7 @@ describe('周瑜 - 英姿', () => {
     })
     .act('触发阶段自动推进', ctx => {
       // 起始 phase='准备', 通过一个无副作用 action 触发 advanceToInteractivePhase
-      ctx.engineAction({ type: 'toggleAutoSkipWuxie' });
+      ctx.engineAction({ type: '切换自动跳过无懈可击' });
     })
     .check('推进到出牌阶段', ctx => {
       expect(ctx.state.phase).toBe('出牌');
@@ -28,7 +28,7 @@ describe('周瑜 - 英姿', () => {
       ctx.snapshot('initial');
     })
     .act('触发阶段自动推进', ctx => {
-      ctx.engineAction({ type: 'toggleAutoSkipWuxie' });
+      ctx.engineAction({ type: '切换自动跳过无懈可击' });
     })
     .check('刘备没有英姿，只摸 2 张', ctx => {
       // 初始手牌 4 + 2 = 6

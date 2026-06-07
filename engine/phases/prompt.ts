@@ -11,7 +11,7 @@ export function register() {
       const timeout = phase.timeout ?? 15000;
       const pending: PendingSkillPrompt = {
         id: createPendingId(),
-        type: 'skillPrompt',
+        type: '技能选择',
         skillId: ctx.skillId,
         player: ctx.self,
         execution: { phaseIndex: index + 1, ctx, plan },
@@ -23,7 +23,7 @@ export function register() {
         },
         timeout,
         deadline: Date.now() + timeout,
-        onTimeout: { type: 'skillChoice', player: ctx.self, choice: phase.defaultChoice ?? null },
+        onTimeout: { type: '技能选择', player: ctx.self, choice: phase.defaultChoice ?? null },
       };
       return { state: { ...state, pending }, events: [] };
     },

@@ -40,8 +40,8 @@ export function clearExpiredMarksByPhase(state: GameState, phase: TurnPhase): Ga
   for (const [player, marks] of Object.entries(state.marks)) {
     const kept = marks.filter((m) => {
       if (m.duration === 'permanent') return true;
-      if (m.duration === 'untilTurnEnd' && phase === 'turnEnd') return false;
-      if (m.duration === 'untilPhaseEnd' && m.scope === 'relation' && phase === 'turnEnd') {
+      if (m.duration === 'untilTurnEnd' && phase === '回合结束') return false;
+      if (m.duration === 'untilPhaseEnd' && m.scope === 'relation' && phase === '回合结束') {
         return false;
       }
       return true;

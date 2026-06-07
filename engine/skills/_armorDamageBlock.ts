@@ -26,13 +26,13 @@ export function registerArmorDamageBlock(armorId: string, blockedDamageType: Dam
 /** 多伤害类型免疫 */
 export function registerArmorDamageBlockMulti(armorId: string, blockedDamageTypes: readonly DamageType[]): void {
   registerAtomHook({
-    atomType: 'damage',
+    atomType: '造成伤害',
     filter(state: GameState, atom: Atom): boolean {
-      if (atom.type !== 'damage') return false;
+      if (atom.type !== '造成伤害') return false;
       const target = atom.target as string;
       const p = getPlayer(state, target);
       if (!p) return false;
-      if (p.equipment.armor !== armorId) return false;
+      if (p.equipment.防具 !== armorId) return false;
       const damageType = (atom.damageType as DamageType | undefined) ?? 'normal';
       return blockedDamageTypes.includes(damageType);
     },

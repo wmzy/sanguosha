@@ -24,10 +24,10 @@ export function buildPlayerView(state: GameState, myPlayerId: string): PlayerVie
     characterId: self.info.characterId,
     hand: self.hand.map(id => toCardInfo(state, id)),
     equipment: {
-      weapon: self.equipment.weapon ? toCardInfo(state, self.equipment.weapon) : null,
-      armor: self.equipment.armor ? toCardInfo(state, self.equipment.armor) : null,
-      mount: (self.equipment.horsePlus ?? self.equipment.horseMinus)
-        ? toCardInfo(state, (self.equipment.horsePlus ?? self.equipment.horseMinus)!)
+      weapon: self.equipment.武器 ? toCardInfo(state, self.equipment.武器) : null,
+      armor: self.equipment.防具 ? toCardInfo(state, self.equipment.防具) : null,
+      mount: (self.equipment.防御马 ?? self.equipment.进攻马)
+        ? toCardInfo(state, (self.equipment.防御马 ?? self.equipment.进攻马)!)
         : null,
     },
     health: self.health,
@@ -47,10 +47,10 @@ export function buildPlayerView(state: GameState, myPlayerId: string): PlayerVie
       characterId: p.info.characterId,
       handCount: p.hand.length,
       equipment: {
-        weapon: p.equipment.weapon ? toCardInfo(state, p.equipment.weapon) : null,
-        armor: p.equipment.armor ? toCardInfo(state, p.equipment.armor) : null,
-        mount: (p.equipment.horsePlus ?? p.equipment.horseMinus)
-          ? toCardInfo(state, (p.equipment.horsePlus ?? p.equipment.horseMinus)!)
+        weapon: p.equipment.武器 ? toCardInfo(state, p.equipment.武器) : null,
+        armor: p.equipment.防具 ? toCardInfo(state, p.equipment.防具) : null,
+        mount: (p.equipment.防御马 ?? p.equipment.进攻马)
+          ? toCardInfo(state, (p.equipment.防御马 ?? p.equipment.进攻马)!)
           : null,
       },
       health: p.health,

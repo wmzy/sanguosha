@@ -23,7 +23,7 @@ export const 桃: CardDef = {
   type: '基本牌',
   subtype: '桃',
   targetFilter: { type: 'self' },
-  effect: { type: 'heal', amount: 1 },
+  effect: { type: '回复体力', amount: 1 },
 };
 
 export const 基本牌列表: CardDef[] = [杀, 闪, 桃];

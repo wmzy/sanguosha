@@ -15,32 +15,32 @@ describe('skill-hook API', () => {
   });
 
   it('registerAtomHook 注册后 getAtomHooks 返回按优先级降序', () => {
-    registerAtomHook({ atomType: 'damage', priority: 1, onBefore: () => {} });
-    registerAtomHook({ atomType: 'damage', priority: 5, onBefore: () => {} });
-    registerAtomHook({ atomType: 'damage', priority: 3, onBefore: () => {} });
-    registerAtomHook({ atomType: 'heal', priority: 1, onBefore: () => {} });
+    registerAtomHook({ atomType: '造成伤害', priority: 1, onBefore: () => {} });
+    registerAtomHook({ atomType: '造成伤害', priority: 5, onBefore: () => {} });
+    registerAtomHook({ atomType: '造成伤害', priority: 3, onBefore: () => {} });
+    registerAtomHook({ atomType: '回复体力', priority: 1, onBefore: () => {} });
 
-    const damageHooks = getAtomHooks('damage');
+    const damageHooks = getAtomHooks('造成伤害');
     expect(damageHooks.map((h) => h.priority)).toEqual([5, 3, 1]);
 
-    const healHooks = getAtomHooks('heal');
+    const healHooks = getAtomHooks('回复体力');
     expect(healHooks).toHaveLength(1);
   });
 
   it('clearAtomHooks 清空所有钩子', () => {
-    registerAtomHook({ atomType: 'damage', onBefore: () => {} });
-    expect(getAtomHooks('damage')).toHaveLength(1);
+    registerAtomHook({ atomType: '造成伤害', onBefore: () => {} });
+    expect(getAtomHooks('造成伤害')).toHaveLength(1);
     clearAtomHooks();
-    expect(getAtomHooks('damage')).toHaveLength(0);
+    expect(getAtomHooks('造成伤害')).toHaveLength(0);
   });
 
   it('player 过滤：player 匹配的钩子优先返回', () => {
-    registerAtomHook({ atomType: 'damage', player: 'P1', onBefore: () => {} });
-    registerAtomHook({ atomType: 'damage', player: 'P2', onBefore: () => {} });
-    registerAtomHook({ atomType: 'damage', onBefore: () => {} });
+    registerAtomHook({ atomType: '造成伤害', player: 'P1', onBefore: () => {} });
+    registerAtomHook({ atomType: '造成伤害', player: 'P2', onBefore: () => {} });
+    registerAtomHook({ atomType: '造成伤害', onBefore: () => {} });
 
     // 全员钩子总是返回
-    expect(getAtomHooks('damage')).toHaveLength(3);
+    expect(getAtomHooks('造成伤害')).toHaveLength(3);
   });
 });
 
@@ -52,7 +52,7 @@ describe('onBefore 钩子行为', () => {
   it('cancel 跳过 atom：serverLog 不增长', () => {
     let cancelCalled = false;
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       onBefore: () => {
         cancelCalled = true;
         return { cancel: true };
@@ -62,7 +62,7 @@ describe('onBefore 钩子行为', () => {
     const state = createTestGame({ characters: ['曹操', '刘备'] });
     const startLen = state.serverLog.length;
     const result = applyAtoms(state, [
-      { type: 'damage' as const, target: 'P1' as never, amount: 1 },
+      { type: '造成伤害' as const, target: 'P1' as never, amount: 1 },
     ]);
 
     expect(cancelCalled).toBe(true);
@@ -74,11 +74,11 @@ describe('onBefore 钩子行为', () => {
   it('replace 用新 atom 替代：原 atom 的 toEvents 不调', () => {
     // 假设我们注册一个"免疫伤害"技能：把所有 damage 转成 heal
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       onBefore: ({ atom }) => {
-        const dmg = atom as Atom & { type: 'damage' };
+        const dmg = atom as Atom & { type: '造成伤害' };
         return {
-          atom: { type: 'heal' as const, target: dmg.target as never, amount: dmg.amount as never },
+          atom: { type: '回复体力' as const, target: dmg.target as never, amount: dmg.amount as never },
         };
       },
     });
@@ -86,7 +86,7 @@ describe('onBefore 钩子行为', () => {
     const state = createTestGame({ characters: ['曹操', '刘备'] });
     state.players['P1'].health = 2;
     const result = applyAtoms(state, [
-      { type: 'damage' as const, target: 'P1' as never, amount: 1 },
+      { type: '造成伤害' as const, target: 'P1' as never, amount: 1 },
     ]);
 
     // 原始 damage 被替换为 heal：P1 health 应该是 3（2+1）
@@ -96,7 +96,7 @@ describe('onBefore 钩子行为', () => {
   it('modifyState：钩子修改 state 后再 apply atom', () => {
     // "出牌时手牌上限+1" 风格：先加手牌上限
     registerAtomHook({
-      atomType: 'draw',
+      atomType: '摸牌',
       onBefore: ({ state }) => ({
         state: {
           ...state,
@@ -111,7 +111,7 @@ describe('onBefore 钩子行为', () => {
     const state = createTestGame({ characters: ['曹操', '刘备'] });
     state.players['P1'].health = 3;
     const result = applyAtoms(state, [
-      { type: 'draw' as const, player: 'P1' as never, count: 2 },
+      { type: '摸牌' as const, player: 'P1' as never, count: 2 },
     ]);
 
     // 钩子已经把 P1 health 改为 5，draw 不影响 health
@@ -121,14 +121,14 @@ describe('onBefore 钩子行为', () => {
   it('priority 高的先执行', () => {
     const order: string[] = [];
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       priority: 1,
       onBefore: () => {
         order.push('low');
       },
     });
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       priority: 10,
       onBefore: () => {
         order.push('high');
@@ -136,14 +136,14 @@ describe('onBefore 钩子行为', () => {
     });
 
     const state = createTestGame({ characters: ['曹操', '刘备'] });
-    applyAtoms(state, [{ type: 'damage' as const, target: 'P1' as never, amount: 1 }]);
+    applyAtoms(state, [{ type: '造成伤害' as const, target: 'P1' as never, amount: 1 }]);
     expect(order).toEqual(['high', 'low']);
   });
 
   it('第一个 cancel 的钩子立即终止后续钩子', () => {
     const order: string[] = [];
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       priority: 10,
       onBefore: () => {
         order.push('first');
@@ -151,7 +151,7 @@ describe('onBefore 钩子行为', () => {
       },
     });
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       priority: 1,
       onBefore: () => {
         order.push('second');
@@ -159,7 +159,7 @@ describe('onBefore 钩子行为', () => {
     });
 
     const state = createTestGame({ characters: ['曹操', '刘备'] });
-    applyAtoms(state, [{ type: 'damage' as const, target: 'P1' as never, amount: 1 }]);
+    applyAtoms(state, [{ type: '造成伤害' as const, target: 'P1' as never, amount: 1 }]);
     expect(order).toEqual(['first']); // second 不执行
   });
 });
@@ -172,9 +172,9 @@ describe('onAfter 钩子行为', () => {
   it('additionalAtoms 递归应用：伤害后追加摸牌', () => {
     // "造成伤害后摸 1 张牌" 风格技能
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       onAfter: () => ({
-        additionalAtoms: [{ type: 'draw' as const, player: 'P2' as never, count: 1 }],
+        additionalAtoms: [{ type: '摸牌' as const, player: 'P2' as never, count: 1 }],
       }),
     });
 
@@ -183,7 +183,7 @@ describe('onAfter 钩子行为', () => {
     state.zones.deck = ['new-card-1', 'new-card-2', 'new-card-3'];
 
     const result = applyAtoms(state, [
-      { type: 'damage' as const, target: 'P1' as never, amount: 1, source: 'P2' as never },
+      { type: '造成伤害' as const, target: 'P1' as never, amount: 1, source: 'P2' as never },
     ]);
 
     // damage 派了 1 个 + draw 派了 1 个 = 2 events
@@ -195,11 +195,11 @@ describe('onAfter 钩子行为', () => {
   it('additionalAtoms 递归但不触发 onAfter 钩子（防无限递归）', () => {
     let callCount = 0;
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       onAfter: () => {
         callCount++;
         return {
-          additionalAtoms: [{ type: 'draw' as const, player: 'P2' as never, count: 1 }],
+          additionalAtoms: [{ type: '摸牌' as const, player: 'P2' as never, count: 1 }],
         };
       },
     });
@@ -208,7 +208,7 @@ describe('onAfter 钩子行为', () => {
     state.zones.deck = ['c1', 'c2', 'c3'];
 
     // 应该不会因为 additionalAtoms 的 draw 再次触发 damage 钩子（draw 不是 damage）
-    applyAtoms(state, [{ type: 'damage' as const, target: 'P1' as never, amount: 1, source: 'P2' as never }]);
+    applyAtoms(state, [{ type: '造成伤害' as const, target: 'P1' as never, amount: 1, source: 'P2' as never }]);
 
     // damage 钩子只调 1 次
     expect(callCount).toBe(1);
@@ -216,23 +216,23 @@ describe('onAfter 钩子行为', () => {
 
   it('多个钩子 onAfter 追加多组 additionalAtoms', () => {
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       priority: 10,
       onAfter: () => ({
-        additionalAtoms: [{ type: 'setVar' as const, player: 'P1' as never, key: 'first', value: true }],
+        additionalAtoms: [{ type: '设置变量' as const, player: 'P1' as never, key: 'first', value: true }],
       }),
     });
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       priority: 1,
       onAfter: () => ({
-        additionalAtoms: [{ type: 'setVar' as const, player: 'P1' as never, key: 'second', value: true }],
+        additionalAtoms: [{ type: '设置变量' as const, player: 'P1' as never, key: 'second', value: true }],
       }),
     });
 
     const state = createTestGame({ characters: ['曹操', '刘备'] });
     const result = applyAtoms(state, [
-      { type: 'damage' as const, target: 'P1' as never, amount: 1 },
+      { type: '造成伤害' as const, target: 'P1' as never, amount: 1 },
     ]);
 
     expect(result.state.players['P1'].vars['first']).toBe(true);
@@ -241,7 +241,7 @@ describe('onAfter 钩子行为', () => {
 
   it('modifyState：钩子修改 state', () => {
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       onAfter: ({ state }) => ({
         state: {
           ...state,
@@ -252,7 +252,7 @@ describe('onAfter 钩子行为', () => {
 
     const state = createTestGame({ characters: ['曹操', '刘备'] });
     const result = applyAtoms(state, [
-      { type: 'damage' as const, target: 'P1' as never, amount: 1 },
+      { type: '造成伤害' as const, target: 'P1' as never, amount: 1 },
     ]);
 
     // meta 字段被钩子修改
@@ -269,14 +269,14 @@ describe('钩子集成：player 过滤', () => {
     let p1Called = 0;
     let p2Called = 0;
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       player: 'P1',
       onBefore: () => {
         p1Called++;
       },
     });
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       player: 'P2',
       onBefore: () => {
         p2Called++;
@@ -285,7 +285,7 @@ describe('钩子集成：player 过滤', () => {
 
     const state = createTestGame({ characters: ['曹操', '刘备'] });
     state.currentPlayer = 'P1';
-    applyAtoms(state, [{ type: 'damage' as const, target: 'P1' as never, amount: 1 }]);
+    applyAtoms(state, [{ type: '造成伤害' as const, target: 'P1' as never, amount: 1 }]);
 
     // P1 是 currentPlayer → P1 钩子触发
     expect(p1Called).toBe(1);
@@ -301,7 +301,7 @@ describe('钩子集成：skipHooks 选项', () => {
   it('opts.skipHooks=true 时钩子不触发', () => {
     let called = false;
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       onBefore: () => {
         called = true;
         return { cancel: true };
@@ -311,7 +311,7 @@ describe('钩子集成：skipHooks 选项', () => {
     const state = createTestGame({ characters: ['曹操', '刘备'] });
     const result = applyAtoms(
       state,
-      [{ type: 'damage' as const, target: 'P1' as never, amount: 1 }],
+      [{ type: '造成伤害' as const, target: 'P1' as never, amount: 1 }],
       { skipHooks: true },
     );
 
@@ -323,12 +323,12 @@ describe('钩子集成：skipHooks 选项', () => {
   it('additionalAtoms 递归应用时 skipHooks=true（防无限递归）', () => {
     let callCount = 0;
     registerAtomHook({
-      atomType: 'damage',
+      atomType: '造成伤害',
       onAfter: () => {
         callCount++;
         return {
           // 故意让 additionalAtoms 包含 damage——验证递归不会无限循环
-          additionalAtoms: [{ type: 'damage' as const, target: 'P1' as never, amount: 1 }],
+          additionalAtoms: [{ type: '造成伤害' as const, target: 'P1' as never, amount: 1 }],
         };
       },
     });
@@ -336,7 +336,7 @@ describe('钩子集成：skipHooks 选项', () => {
     const state = createTestGame({ characters: ['曹操', '刘备'] });
 
     expect(() => {
-      applyAtoms(state, [{ type: 'damage' as const, target: 'P1' as never, amount: 1, source: 'P2' as never }]);
+      applyAtoms(state, [{ type: '造成伤害' as const, target: 'P1' as never, amount: 1, source: 'P2' as never }]);
     }).not.toThrow();
 
     // damage 钩子调 1 次（additionalAtoms 里的 damage 不触发 damage 钩子）

@@ -9,14 +9,14 @@ import { makeServerEvent } from '../event';
  */
 export function register() {
   registerAtom({
-    type: 'specifyTarget',
+    type: '指定目标',
     apply(s: GameState) { return s; },
     toEvents(_s, atom): AtomEventResult {
-      const a = atom as Atom & { type: 'specifyTarget' };
+      const a = atom as Atom & { type: '指定目标' };
       const cardId = a.cardId as string;
       const source = a.source as string;
       const target = a.target as string;
-      return [makeServerEvent('specifyTarget', { cardId, source, target }), new Map(), null];
+      return [makeServerEvent('指定目标', { cardId, source, target }), new Map(), null];
     },
   });
 }

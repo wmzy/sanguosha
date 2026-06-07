@@ -9,10 +9,10 @@ import type { GameAction, GameState, ServerEvent, EquipSlot } from './types';
 import type { Operation, GameLog } from '../shared/log';
 
 const SLOT_LABELS: Record<EquipSlot, string> = {
-  weapon: '武器',
-  armor: '防具',
-  horsePlus: '防御马',
-  horseMinus: '进攻马',
+  武器: '武器',
+  防具: '防具',
+  防御马: '防御马',
+  进攻马: '进攻马',
 };
 
 const UNKNOWN_CARD = '未知牌';
@@ -31,7 +31,7 @@ export function eventToServerOp(
   const ts = event.timestamp;
 
   switch (event.type) {
-    case 'damage': {
+    case '造成伤害': {
       const target = String(p.target ?? '');
       const amount = Number(p.amount ?? 0);
       const source = typeof p.source === 'string' ? p.source : '';
@@ -41,38 +41,38 @@ export function eventToServerOp(
       return {
         seq: 0,
         timestamp: ts,
-        type: 'damage',
+        type: '造成伤害',
         data: { source, target, amount, cardId },
         description: `${sourceLabel}造成了${amount}点伤害${cardLabel}`,
       };
     }
-    case 'heal': {
+    case '回复体力': {
       const target = String(p.target ?? '');
       const amount = Number(p.amount ?? 0);
       const newHealth = state.players[target]?.health ?? 0;
       return {
         seq: 0,
         timestamp: ts,
-        type: 'heal',
+        type: '回复体力',
         data: { player: target, amount, newHealth },
         description: `${target}回复了${amount}点体力（当前${newHealth}）`,
       };
     }
-    case 'cardsDiscarded': {
+    case '弃置': {
       const player = String(p.player ?? '');
       const cardIds = Array.isArray(p.cardIds) ? (p.cardIds as string[]) : [];
       const names = cardIds.map((id) => lookupCardName(state, id)).join('、');
       return {
         seq: 0,
         timestamp: ts,
-        type: 'discard',
+        type: '弃置',
         data: { player, cards: cardIds },
         description: names
           ? `${player}弃了${cardIds.length}张牌（${names}）`
           : `${player}弃了${cardIds.length}张牌`,
       };
     }
-    case 'equip': {
+    case '装备': {
       const player = String(p.player ?? '');
       const cardId = String(p.cardId ?? '');
       const slot = String(p.slot ?? '') as EquipSlot;
@@ -80,35 +80,35 @@ export function eventToServerOp(
       return {
         seq: 0,
         timestamp: ts,
-        type: 'equip',
+        type: '装备',
         data: { player, cardId, slot },
         description: `${player}装备了${lookupCardName(state, cardId)}（${slotLabel}）`,
       };
     }
-    case 'unequip': {
+    case '卸下': {
       const player = String(p.player ?? '');
       const slot = String(p.slot ?? '') as EquipSlot;
       const slotLabel = SLOT_LABELS[slot] ?? slot;
       return {
         seq: 0,
         timestamp: ts,
-        type: 'equip',
+        type: '装备',
         data: { player, slot },
         description: `${player}卸下了${slotLabel}`,
       };
     }
-    case 'setPhase': {
+    case '设阶段': {
       const phase = String(p.phase ?? '');
       const player = String(p.player ?? '');
       return {
         seq: 0,
         timestamp: ts,
-        type: 'phaseChange',
+        type: '阶段变更',
         data: { phase, player },
         description: `进入${phase}阶段（${player}）`,
       };
     }
-    case 'nextPlayer': {
+    case '下一玩家': {
       const from = String(p.from ?? '');
       const to = String(p.to ?? '');
       const turnNumber = Number(p.turnNumber ?? 0);
@@ -116,42 +116,42 @@ export function eventToServerOp(
       return {
         seq: 0,
         timestamp: ts,
-        type: 'turnChange',
+        type: '回合变更',
         data: { from, to, turnNumber, round },
         description: `${to}的回合开始（第${round}轮·第${turnNumber}回合）`,
       };
     }
-    case 'turnStart': {
+    case '回合开始': {
       return null;
     }
-    case 'kill': {
+    case '击杀': {
       const player = String(p.player ?? '');
       const source = typeof p.source === 'string' ? p.source : undefined;
       return {
         seq: 0,
         timestamp: ts,
-        type: 'damage',
+        type: '造成伤害',
         data: { kill: true, player, source },
         description: source ? `${player}阵亡（来源：${source}）` : `${player}阵亡`,
       };
     }
-    case 'dying': {
+    case '濒死': {
       const player = String(p.player ?? '');
       return {
         seq: 0,
         timestamp: ts,
-        type: 'damage',
+        type: '造成伤害',
         data: { dying: true, player },
         description: `${player}濒死`,
       };
     }
-    case 'addSkill': {
+    case '加技能': {
       const player = String(p.player ?? '');
       const skillId = String(p.skillId ?? '');
       return {
         seq: 0,
         timestamp: ts,
-        type: 'skillActivate',
+        type: '技能发动',
         data: { player, skillId },
         description: `${player}获得了技能【${skillId}】`,
       };
@@ -168,7 +168,7 @@ export function eventToPlayerOp(
   state: GameState,
   playerName: string,
 ): Operation | null {
-  if (event.type === 'draw') {
+  if (event.type === '摸牌') {
     const p = event.payload as Record<string, unknown>;
     const drawer = String(p.player ?? '');
     const count = Number(p.count ?? 0);
@@ -178,7 +178,7 @@ export function eventToPlayerOp(
       return {
         seq: 0,
         timestamp: event.timestamp,
-        type: 'draw',
+        type: '摸牌',
         data: { player: drawer, count, cards: cardIds },
         description: names
           ? `${drawer}摸了${count}张牌（${names}）`
@@ -188,7 +188,7 @@ export function eventToPlayerOp(
     return {
       seq: 0,
       timestamp: event.timestamp,
-      type: 'draw',
+      type: '摸牌',
       data: { player: drawer, count },
       description: `${drawer}摸了${count}张牌`,
     };
@@ -202,58 +202,58 @@ export function eventToPlayerOp(
 export function actionToOp(action: GameAction, state: GameState): Operation | null {
   const ts = Date.now();
   switch (action.type) {
-    case 'startGame':
+    case '开始':
       return {
         seq: 0,
         timestamp: ts,
-        type: 'gameStart',
+        type: '游戏开始',
         data: {},
         description: '游戏开始',
       };
-    case 'playCard': {
+    case '打出一张牌': {
       const cardId = String(action.cardId ?? '');
       const target = action.target;
       return {
         seq: 0,
         timestamp: ts,
-        type: 'play',
+        type: '出牌',
         data: { player: action.player, cardId, target },
         description: target
           ? `${action.player}使用了${lookupCardName(state, cardId)}（目标：${target}）`
           : `${action.player}使用了${lookupCardName(state, cardId)}`,
       };
     }
-    case 'respond': {
+    case '打出': {
       const cardId = action.cardId ?? action.cardIds?.[0];
       return {
         seq: 0,
         timestamp: ts,
-        type: 'play',
+        type: '出牌',
         data: { player: action.player, cardId },
         description: `${action.player}打出了${lookupCardName(state, cardId)}响应`,
       };
     }
-    case 'useSkill': {
+    case '使用技能': {
       const skillId = String(action.skillId ?? '');
       return {
         seq: 0,
         timestamp: ts,
-        type: 'skillActivate',
+        type: '技能发动',
         data: { player: action.player, skillId },
         description: `${action.player}发动了技能【${skillId}】`,
       };
     }
-    case 'skillChoice':
+    case '技能选择':
       return {
         seq: 0,
         timestamp: ts,
-        type: 'skillActivate',
+        type: '技能发动',
         data: { player: action.player },
         description: `${action.player}选择技能选项`,
       };
-    case 'endTurn':
-    case 'discard':
-    case 'toggleAutoSkipWuxie':
+    case '结束回合':
+    case '弃置':
+    case '切换自动跳过无懈可击':
       return null;
     default:
       return null;

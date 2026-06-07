@@ -9,8 +9,8 @@ import { updatePlayer } from '../state';
  */
 export function register() {
   registerAtom({
-    type: 'giveCard',
-    apply(state: GameState, atom: Atom & { type: 'giveCard' }): GameState {
+    type: '给予',
+    apply(state: GameState, atom: Atom & { type: '给予' }): GameState {
       const cardId = atom.cardId as string;
       const from = atom.from as string;
       const to = atom.to as string;
@@ -24,7 +24,7 @@ export function register() {
       const cardId = atom.cardId as string;
       const from = atom.from as string;
       const to = atom.to as string;
-      const server = makeServerEvent('giveCard', { cardId, from, to });
+      const server = makeServerEvent('给予', { cardId, from, to });
       return [server, new Map(), null];
     },
   });

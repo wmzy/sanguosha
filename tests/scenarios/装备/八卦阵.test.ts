@@ -56,7 +56,7 @@ describe('八卦阵 v3', () => {
     // 完整判定走 useCard 钩子留 P2
     // 现阶段：v3 钩子一旦检测到 cardId.name === '杀' + 目标.armor === 'bagua'
     // → damage atom cancel
-    const s0 = setHealth(withArmor(createTestGame(), 'P1', 'bagua'), 'P1', 4);
+    const s0 = setHealth(withArmor(createTestGame(), 'P1', '八卦阵'), 'P1', 4);
     // 注入 kill1 卡片到 cardMap 以便 v3 钩子能查到 name === '杀'
     const s1: GameState = {
       ...s0,
@@ -74,7 +74,7 @@ describe('八卦阵 v3', () => {
       },
     };
     const { state, events } = applyAtoms(s1, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     expect(state.players.P1.health).toBe(4);
     expect(events).toHaveLength(0);
@@ -98,7 +98,7 @@ describe('八卦阵 v3', () => {
       },
     };
     const { state } = applyAtoms(s1, [
-      { type: 'damage', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
+      { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     expect(state.players.P1.health).toBe(3);
   });

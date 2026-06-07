@@ -31,7 +31,7 @@ describe('Atom getResult 自动注入 ctx.localVars', () => {
       {
         type: 'atoms',
         ops: [
-          { type: 'judge', player: 'P1' },
+          { type: '判定', player: 'P1' },
         ],
       },
     ];
@@ -56,7 +56,7 @@ describe('Atom getResult 自动注入 ctx.localVars', () => {
       {
         type: 'atoms',
         ops: [
-          { type: 'discardRandom', player: 'P1', count: 1, from: 'hand' },
+          { type: '随机弃置', player: 'P1', count: 1, from: '手牌' },
         ],
       },
     ];
@@ -81,7 +81,7 @@ describe('Atom getResult 自动注入 ctx.localVars', () => {
       {
         type: 'atoms',
         ops: [
-          { type: 'judge', player: 'P1' },
+          { type: '判定', player: 'P1' },
         ],
       },
       {
@@ -91,7 +91,7 @@ describe('Atom getResult 自动注入 ctx.localVars', () => {
           {
             type: 'atoms',
             ops: [
-              { type: 'draw', player: 'P1', count: 1 },
+              { type: '摸牌', player: 'P1', count: 1 },
             ],
           },
         ],
@@ -99,7 +99,7 @@ describe('Atom getResult 自动注入 ctx.localVars', () => {
           {
             type: 'atoms',
             ops: [
-              { type: 'draw', player: 'P1', count: 2 },
+              { type: '摸牌', player: 'P1', count: 2 },
             ],
           },
         ],
@@ -119,8 +119,8 @@ describe('Atom getResult 自动注入 ctx.localVars', () => {
       {
         type: 'atoms',
         ops: [
-          { type: 'judge', player: 'P1' },
-          { type: 'discardRandom', player: 'P2', count: 1, from: 'hand' },
+          { type: '判定', player: 'P1' },
+          { type: '随机弃置', player: 'P2', count: 1, from: '手牌' },
         ],
       },
     ];

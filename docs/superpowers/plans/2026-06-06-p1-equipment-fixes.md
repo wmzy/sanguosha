@@ -267,11 +267,11 @@ export function register() {
 
 ### 2.4 删 `engine/skills/equipment.ts:138-162` judgeDodge 旧 stub
 
-保留 `registerSkill({ id: 'judgeDodge', ... })` 注册（trigger.event='killResponse'）但 `trigger` 改为 `event: 'v3HookOnly'`（按 v3 兼容模式）：
+保留 `registerSkill({ id: '八卦阵', ... })` 注册（trigger.event='v3HookOnly'）：
 
 ```ts
 registerSkill({
-  id: 'judgeDodge',
+  id: '八卦阵',
   name: '八卦阵',
   description: '...',
   trigger: { event: 'v3HookOnly', source: 'equipment' }, // v3 实现走 bagua.ts

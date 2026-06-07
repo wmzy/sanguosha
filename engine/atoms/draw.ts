@@ -14,7 +14,7 @@ function maybeReshuffle(state: GameState, needed: number): GameState {
   if (state.zones.discardPile.length === 0) return state;
   return applyAtoms(
     state,
-    [{ type: 'reshuffle' }],
+    [{ type: '重洗' }],
     { skipHooks: true, skipPlayerEvents: true },
   ).state;
 }
@@ -25,9 +25,9 @@ export function register() {
   // 直接 applyAtom 调用不走 onBefore，所以 draw.apply 内部仍保留 maybeReshuffle
   // 兜底（保持直接调用者也能正确洗牌）。
   registerAtomHook({
-    atomType: 'draw',
+    atomType: '摸牌',
     onBefore: ({ state, atom }) => {
-      const count = (atom as Atom & { type: 'draw' }).count as number;
+      const count = (atom as Atom & { type: '摸牌' }).count as number;
       if (state.zones.deck.length >= count) return undefined;
       if (state.zones.discardPile.length === 0) return undefined;
       return { state: maybeReshuffle(state, count) };
@@ -35,9 +35,9 @@ export function register() {
   });
 
   registerAtom({
-    type: 'draw',
+    type: '摸牌',
     // 直接 applyAtom 调用者：apply 内仍做 reshuffle 兜底（不走 onBefore 钩子）。
-    apply(state: GameState, atom: Atom & { type: 'draw' }): GameState {
+    apply(state: GameState, atom: Atom & { type: '摸牌' }): GameState {
       const player = atom.player as string;
       const count = atom.count as number;
       const s = maybeReshuffle(state, count);
@@ -51,14 +51,14 @@ export function register() {
     },
     // toEvents 不再做 reshuffle：onBefore 钩子（或 apply 路径）已保证牌堆足够。
     // 避免 applyAtoms 一次入口触发两次 reshuffle（double RNG 推进）。
-    toEvents(state: GameState, atom: Atom & { type: 'draw' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '摸牌' }): AtomEventResult {
       const player = atom.player as string;
       const count = atom.count as number;
       const drawn = state.zones.deck.slice(0, count);
       const actualCount = drawn.length;
-      const server = makeServerEvent('draw', { player, count: actualCount, cards: drawn });
-      const ownerEvent = makePlayerEvent('draw', { player, count: actualCount, cards: drawn });
-      const defaultEvent = makePlayerEvent('draw', { player, count: actualCount });
+      const server = makeServerEvent('摸牌', { player, count: actualCount, cards: drawn });
+      const ownerEvent = makePlayerEvent('摸牌', { player, count: actualCount, cards: drawn });
+      const defaultEvent = makePlayerEvent('摸牌', { player, count: actualCount });
       return [server, new Map([[player, ownerEvent]]), defaultEvent];
     },
   });

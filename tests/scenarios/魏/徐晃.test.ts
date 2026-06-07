@@ -36,11 +36,11 @@ describe.skip('徐晃 - 断粮', () => {
     })
     .check('创建技能提示选择牌和目标', ctx => {
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
     })
     .act('选择黑色杀和目标P2', ctx => {
       const cardId = ctx.findCard('P1', '杀')!;
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: { cardIds: [cardId], player: 'P2' } });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: { cardIds: [cardId], player: 'P2' } });
     })
     .check('P2获得兵粮寸断延时锦囊', ctx => {
       const p2 = ctx.player('P2');

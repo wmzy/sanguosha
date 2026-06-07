@@ -16,10 +16,10 @@ const bottomButtonsRow = css`
   margin-bottom: 12px;
 `;
 
-export const LogSection = memo(function LogSection({
+export const LogSection = memo(({
   operations,
   onSaveLog,
-}: LogSectionProps) {
+}: LogSectionProps) => {
   return (
     <>
       <div className={bottomButtonsRow}>

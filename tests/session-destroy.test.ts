@@ -37,7 +37,7 @@ describe('GameSession destroy 阻止后续持久化（race condition 修复）',
     const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});
     const session = new GameSession(room, true);
     session.destroy();
-    session.handleAction('p1', { type: 'endTurn', player: 'p1' } as never);
+    session.handleAction('p1', { type: '结束回合', player: 'p1' } as never);
     expect(saveSpy).not.toHaveBeenCalled();
   });
 
@@ -57,11 +57,11 @@ describe('GameSession destroy 阻止后续持久化（race condition 修复）',
       {
         pending: {
           id: 'p',
-          type: 'playPhase',
+          type: '出牌阶段',
           player: 'p1',
           timeout: 1000,
           deadline: Date.now() - 1,
-          onTimeout: { type: 'endTurn', player: 'p1' },
+          onTimeout: { type: '结束回合', player: 'p1' },
         },
       } as never,
       [],

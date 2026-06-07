@@ -73,7 +73,7 @@ function getBroadcastEvents(session: GameSession) {
 function getOperations(sent: SentMessage[], fromSeq?: number): Operation[] {
   for (const m of sent) {
     if (m.payload.type === 'events') {
-      const msg = m.payload as Extract<ServerMessage, { type: 'events' }>;
+      const msg = m.payload;
       if (fromSeq === undefined || msg.fromSeq === fromSeq) {
         return msg.operations ?? [];
       }
@@ -112,15 +112,15 @@ describe('GameLogger session 集成', () => {
 
     // 使用 logger 识别的事件类型：setPhase → phaseChange, damage → damage
     getBroadcastEvents(session).call(session, [
-      makeEvent('e1', 'setPhase', { player: 'A', phase: '摸牌' }),
-      makeEvent('e2', 'damage', { source: 'A', target: 'B', amount: 1 }),
+      makeEvent('e1', '设阶段', { player: 'A', phase: '摸牌' }),
+      makeEvent('e2', '造成伤害', { source: 'A', target: 'B', amount: 1 }),
     ]);
 
     const ops = getOperations(sent, 1);
     expect(ops.length).toBeGreaterThan(0);
     const types = ops.map((op) => op.type);
-    expect(types).toContain('phaseChange');
-    expect(types).toContain('damage');
+    expect(types).toContain('阶段变更');
+    expect(types).toContain('造成伤害');
   });
 
   it('多人模式：每个玩家收到独立的 playerOps', () => {
@@ -171,8 +171,8 @@ describe('GameLogger session 集成', () => {
       );
 
     getBroadcastEvents(session).call(session, [
-      makeEvent('e1', 'setPhase', { player: 'Alice', phase: '摸牌' }),
-      makeEvent('e2', 'damage', { source: 'Alice', target: 'Bob', amount: 1 }),
+      makeEvent('e1', '设阶段', { player: 'Alice', phase: '摸牌' }),
+      makeEvent('e2', '造成伤害', { source: 'Alice', target: 'Bob', amount: 1 }),
     ]);
 
     // 每人应该收到各自的 operations
@@ -204,7 +204,7 @@ describe('GameLogger session 集成', () => {
     expect(gameLog).not.toBeNull();
 
     const serverOps = gameLog!.serverOps;
-    const gameStartOps = serverOps.filter((op) => op.type === 'gameStart');
+    const gameStartOps = serverOps.filter((op) => op.type === '游戏开始');
     expect(gameStartOps.length).toBeGreaterThanOrEqual(1);
 
     // gameStart Operation 的 data 应该存在（当前实现为 {}）
@@ -216,7 +216,7 @@ describe('GameLogger session 集成', () => {
     expect(playerNames.length).toBe(2);
     for (const pname of playerNames) {
       const pOps = gameLog!.playerOps[pname];
-      const pGameStart = pOps.filter((op) => op.type === 'gameStart');
+      const pGameStart = pOps.filter((op) => op.type === '游戏开始');
       expect(pGameStart.length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -228,15 +228,15 @@ describe('GameLogger session 集成', () => {
 
     // 使用 logger 识别的事件类型：setPhase → phaseChange, damage → damage
     const fakeLog: ServerEvent[] = [
-      makeEvent('e0', 'setPhase', { player: 'A', phase: '摸牌' }),
-      makeEvent('e1', 'damage', { source: 'A', target: 'B', amount: 1 }),
-      makeEvent('e2', 'kill', { player: 'B', source: 'A' }),
+      makeEvent('e0', '设阶段', { player: 'A', phase: '摸牌' }),
+      makeEvent('e1', '造成伤害', { source: 'A', target: 'B', amount: 1 }),
+      makeEvent('e2', '击杀', { player: 'B', source: 'A' }),
     ];
     const fakeState = fakeGameState(fakeLog);
     // rebuildFromLog 需要 playerOrder
     (fakeState as { playerOrder: string[] }).playerOrder = ['A', 'B'];
 
-    session.restoreState(fakeState, [{ type: 'startGame' }]);
+    session.restoreState(fakeState, [{ type: '开始' }]);
 
     const gameLog = session.getGameLog();
     expect(gameLog).not.toBeNull();
@@ -255,7 +255,7 @@ describe('GameLogger session 集成', () => {
     // 后续 broadcastEvents 应该继续累加 operations
     const serverOpsCountBefore = serverOps.length;
     getBroadcastEvents(session).call(session, [
-      makeEvent('e3', 'setPhase', { player: 'B', phase: '出牌' }),
+      makeEvent('e3', '设阶段', { player: 'B', phase: '出牌' }),
     ]);
 
     const updatedLog = session.getGameLog();
@@ -270,7 +270,7 @@ describe('GameLogger session 集成', () => {
     setState(session, []);
 
     // 不注入 gameLogger（gameLogger = null）
-    getBroadcastEvents(session).call(session, [makeEvent('x', 'setPhase', { player: 'p1', phase: '出牌' })]);
+    getBroadcastEvents(session).call(session, [makeEvent('x', '设阶段', { player: 'p1', phase: '出牌' })]);
 
     const eventsMsgs = sent.filter((m) => m.payload.type === 'events');
     expect(eventsMsgs.length).toBe(1);

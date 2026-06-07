@@ -76,7 +76,7 @@ const roomActions = css`
   flex-shrink: 0;
 `;
 
-export const RoomListPanel = memo(function RoomListPanel({ rooms, onRefresh, onJoin, onDelete, emptyText }: RoomListPanelProps) {
+export const RoomListPanel = memo(({ rooms, onRefresh, onJoin, onDelete, emptyText }: RoomListPanelProps) => {
   return (
     <div className={panelRoot}>
       <h2 className={panelTitle}>房间列表</h2>

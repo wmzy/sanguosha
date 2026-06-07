@@ -22,7 +22,7 @@ describe('V2 Engine - 卡牌效果', () => {
 
       // 出杀
       const r1 = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: killId,
         target: 'P2',
@@ -31,10 +31,10 @@ describe('V2 Engine - 卡牌效果', () => {
 
       // 杀触发响应窗口
       expect(r1.state.pending).not.toBeNull();
-      expect(r1.state.pending!.type).toBe('responseWindow');
+      expect(r1.state.pending!.type).toBe('响应窗口');
 
       // P2 不出闪
-      const r2 = engine(r1.state, { type: 'respond', player: 'P2' });
+      const r2 = engine(r1.state, { type: '打出', player: 'P2' });
       expect(r2.error).toBeUndefined();
       expect(r2.state.players['P2'].health).toBe(targetHealth - 1);
     });
@@ -49,7 +49,7 @@ describe('V2 Engine - 卡牌效果', () => {
       const dodgeId = findCardInHand(state, 'P2', '闪')!;
 
       const r1 = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: killId,
         target: 'P2',
@@ -58,7 +58,7 @@ describe('V2 Engine - 卡牌效果', () => {
 
       // P2 出闪
       const r2 = engine(r1.state, {
-        type: 'respond',
+        type: '打出',
         player: 'P2',
         cardId: dodgeId,
       });
@@ -78,7 +78,7 @@ describe('V2 Engine - 卡牌效果', () => {
 
       // 出第一张杀
       const r1 = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: allKills[0],
         target: 'P2',
@@ -86,11 +86,11 @@ describe('V2 Engine - 卡牌效果', () => {
       expect(r1.error).toBeUndefined();
 
       // 响应 P2
-      const afterKill = engine(r1.state, { type: 'respond', player: 'P2' });
+      const afterKill = engine(r1.state, { type: '打出', player: 'P2' });
 
       // 尝试出第二张杀
       const r3 = engine(afterKill.state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: allKills[1],
         target: 'P2',
@@ -104,7 +104,7 @@ describe('V2 Engine - 卡牌效果', () => {
       const killId = findCardInHand(state, 'P1', '杀')!;
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: killId,
         target: 'P1',
@@ -127,7 +127,7 @@ describe('V2 Engine - 卡牌效果', () => {
       const killId = findCardInHand(state, 'P1', '杀')!;
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: killId,
         target: 'P3',
@@ -144,7 +144,7 @@ describe('V2 Engine - 卡牌效果', () => {
 
       const peachId = findCardInHand(state, 'P1', '桃')!;
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: peachId,
       });
@@ -160,7 +160,7 @@ describe('V2 Engine - 卡牌效果', () => {
       const peachId = findCardInHand(state, 'P1', '桃')!;
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: peachId,
       });
@@ -175,7 +175,7 @@ describe('V2 Engine - 卡牌效果', () => {
       const dodgeId = findCardInHand(state, 'P1', '闪')!;
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId: dodgeId,
       });
@@ -194,13 +194,13 @@ describe('V2 Engine - 卡牌效果', () => {
       )!;
 
       const step1 = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId,
       });
       expect(step1.error).toBeUndefined();
       // 现在总是进入 trickResponse 窗口
-      expect(step1.state.pending?.type).toBe('responseWindow');
+      expect(step1.state.pending?.type).toBe('响应窗口');
 
       // 所有玩家 pass 过无懈可击窗口
       const result = passAllTrickResponders(step1.state);
@@ -220,34 +220,34 @@ describe('V2 Engine - 卡牌效果', () => {
 
       // 第 1 步：出牌 → 进入 trickResponse 窗口
       const step1 = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId,
         target: 'P2',
       });
       expect(step1.error).toBeUndefined();
       expect(step1.state.pending).not.toBeNull();
-      expect(step1.state.pending!.type).toBe('responseWindow');
+      expect(step1.state.pending!.type).toBe('响应窗口');
       // 手牌尚未减少（过河拆桥已弃，但目标手牌未动）
       expect(step1.state.players['P2'].hand.length).toBe(targetHandBefore);
 
       // 第 1.5 步：过 trickResponse（不出无懈）
       const step15 = engine(step1.state, {
-        type: 'respond',
+        type: '打出',
         player: 'P2',
       });
       expect(step15.error).toBeUndefined();
-      expect(step15.state.pending?.type).toBe('selectCard');
+      expect(step15.state.pending?.type).toBe('选择牌');
 
       // 第 2 步：选择一张目标手牌 → 弃牌
       const selectedCardId = step15.state.players['P2'].hand[0];
       const step2 = engine(step15.state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
         cardIds: [selectedCardId],
       });
       expect(step2.error).toBeUndefined();
-      expect(step2.state.pending?.type).toBe('playPhase');
+      expect(step2.state.pending?.type).toBe('出牌阶段');
       expect(step2.state.players['P2'].hand.length).toBe(targetHandBefore - 1);
     });
 
@@ -267,7 +267,7 @@ describe('V2 Engine - 卡牌效果', () => {
       )!;
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId,
         target: 'P2',
@@ -285,15 +285,15 @@ describe('V2 Engine - 卡牌效果', () => {
         (id) => state.cardMap[id].name === '麒麟弓',
       )!;
 
-      expect(state.players['P1'].equipment.weapon).toBeUndefined();
+      expect(state.players['P1'].equipment.武器).toBeUndefined();
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId,
       });
       expect(result.error).toBeUndefined();
-      expect(result.state.players['P1'].equipment.weapon).toBe(cardId);
+      expect(result.state.players['P1'].equipment.武器).toBe(cardId);
       expect(result.state.cardMap[cardId].range).toBe(5);
     });
 
@@ -306,12 +306,12 @@ describe('V2 Engine - 卡牌效果', () => {
       )!;
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId,
       });
       expect(result.error).toBeUndefined();
-      expect(result.state.players['P1'].equipment.horseMinus).toBe(cardId);
+      expect(result.state.players['P1'].equipment.进攻马).toBe(cardId);
     });
 
     it('装备防御马（+1马）', () => {
@@ -323,12 +323,12 @@ describe('V2 Engine - 卡牌效果', () => {
       )!;
 
       const result = engine(state, {
-        type: 'playCard',
+        type: '打出一张牌',
         player: 'P1',
         cardId,
       });
       expect(result.error).toBeUndefined();
-      expect(result.state.players['P1'].equipment.horsePlus).toBe(cardId);
+      expect(result.state.players['P1'].equipment.防御马).toBe(cardId);
     });
   });
 });
@@ -342,7 +342,7 @@ describe('桃', () => {
     let state = setPlayPhase(createTestGame({ playerCount: 2 }));
     state = injectCard(state, 'P1', '桃');
     const peachId = findCardInHand(state, 'P1', '桃')!;
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: peachId });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: peachId });
     expect(result.error).toBeTruthy();
   });
 
@@ -352,7 +352,7 @@ describe('桃', () => {
     state = setHealth(state, 'P2', 1);
     state = injectCard(state, 'P1', '桃');
     const peachId = findCardInHand(state, 'P1', '桃')!;
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: peachId, target: 'P2' });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: peachId, target: 'P2' });
     if (!result.error) {
       expect(result.state.players['P1'].health).toBe(3);
       expect(result.state.players['P2'].health).toBe(1);
@@ -364,7 +364,7 @@ describe('桃', () => {
     state = injectCard(state, 'P1', '桃');
     const peachId = findCardInHand(state, 'P1', '桃')!;
     state = setHealth(state, 'P1', 0);
-    const result = engine(state, { type: 'playCard', player: 'P1', cardId: peachId });
+    const result = engine(state, { type: '打出一张牌', player: 'P1', cardId: peachId });
     // 体力0时非濒死窗口中不能直接使用桃
     // 结果可能通过 validate 或失败
     if (!result.error) {

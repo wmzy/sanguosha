@@ -24,7 +24,7 @@ describe('青龙偃月刀 - chaseDodge', () => {
     })
     .check('触发青龙偃月刀追杀 prompt', ctx => {
       expect(ctx.isPending()).toBe(true);
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .run();
 
@@ -49,8 +49,8 @@ describe('青龙偃月刀 - chaseDodge', () => {
       ctx.respond('P2', dodgeId);
     })
     .check('选择不追杀', ctx => {
-      expect(ctx.pendingType()).toBe('skillPrompt');
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: false });
+      expect(ctx.pendingType()).toBe('技能选择');
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: false });
     })
     .check('无额外伤害', ctx => {
       const diff = ctx.diff('equipped');

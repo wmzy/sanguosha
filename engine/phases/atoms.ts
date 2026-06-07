@@ -23,7 +23,7 @@ function resolveExprFields<A>(obj: A, state: GameState, ctx: SkillContext): A {
   if (Array.isArray(obj)) return obj.map((item) => resolveExprFields(item, state, ctx)) as A;
   if (typeof obj === 'object' && obj.constructor === Object) {
     const result: Record<string, unknown> = {};
-    for (const key of Object.keys(obj as Record<string, unknown>)) {
+    for (const key of Object.keys(obj)) {
       result[key] = resolveExprFields((obj as Record<string, unknown>)[key], state, ctx);
     }
     return result as A;
@@ -40,7 +40,7 @@ export function register() {
 
       for (const rawAtom of phase.ops) {
         const atom = resolveExprFields(rawAtom, s, ctx);
-        if (atom.type === 'setCtxVar') {
+        if (atom.type === '设置上下文变量') {
           const setCtx = atom;
           ctx.localVars[setCtx.key] = setCtx.value;
         }

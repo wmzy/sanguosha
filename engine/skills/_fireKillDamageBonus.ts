@@ -48,7 +48,7 @@ export function register(): void {
       const cardId = typeof useCard.cardId === 'string' ? useCard.cardId : undefined;
       if (!cardId) return false;
       const card = state.cardMap[cardId];
-      if (!card || card.name !== '杀') return false;
+      if (card?.name !== '杀') return false;
       return isFireKillSubtype(card.subtype);
     },
     onAfter({ atom, state }) {
@@ -65,7 +65,7 @@ export function register(): void {
       return {
         additionalAtoms: [
           {
-            type: 'damage' as const,
+            type: '造成伤害' as const,
             target,
             amount: 2,
             source,

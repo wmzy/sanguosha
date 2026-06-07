@@ -12,7 +12,7 @@ describe('夏侯惇 - 刚烈', () => {
     })
     .act('P2 对 P1 使用杀', ctx => {
       const killId = ctx.findCard('P2', '杀')!;
-      ctx.playCard('P2', killId!, 'P1');
+      ctx.playCard('P2', killId, 'P1');
     })
     .act('P1 不出闪', ctx => {
       ctx.respond('P1');

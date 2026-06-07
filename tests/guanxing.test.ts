@@ -18,7 +18,7 @@ function withTriggers(state: GameState, ...players: string[]): GameState {
 }
 
 function triggerPhaseBegin(state: GameState, player: string, phase: string) {
-  return emitEvent(state, { type: 'phaseBegin', phase: phase as TurnPhase, player });
+  return emitEvent(state, { type: '阶段开始', phase: phase as TurnPhase, player });
 }
 
 describe('观星技能', () => {
@@ -31,7 +31,7 @@ describe('观星技能', () => {
 
     expect(result.error).toBeUndefined();
     expect(result.state.pending).not.toBeNull();
-    expect(result.state.pending!.type).toBe('skillPrompt');
+    expect(result.state.pending!.type).toBe('技能选择');
     const prompt = result.state.pending as PendingAction & { prompt: { text: string; options: unknown[] } };
     expect(prompt.prompt.text).toContain('观星');
     expect(prompt.prompt.options).toHaveLength(2);
@@ -47,20 +47,20 @@ describe('观星技能', () => {
 
     let result = triggerPhaseBegin(state, 'P1', '准备');
     expect(result.error).toBeUndefined();
-    expect(result.state.pending!.type).toBe('skillPrompt');
+    expect(result.state.pending!.type).toBe('技能选择');
 
     // 第 1 张 → 牌堆底
     result = engine(result.state, {
-      type: 'skillChoice',
+      type: '技能选择',
       player: 'P1',
       choice: 'bottom',
     });
     expect(result.error).toBeUndefined();
 
     // 2 人游戏 N=2 → 还有第 2 张 prompt
-    if (result.state.pending?.type === 'skillPrompt') {
+    if (result.state.pending?.type === '技能选择') {
       result = engine(result.state, {
-        type: 'skillChoice',
+        type: '技能选择',
         player: 'P1',
         choice: 'top',
       });
@@ -84,14 +84,14 @@ describe('观星技能', () => {
     let result = triggerPhaseBegin(state, 'P1', '准备');
 
     result = engine(result.state, {
-      type: 'skillChoice',
+      type: '技能选择',
       player: 'P1',
       choice: 'top',
     });
 
-    if (result.state.pending?.type === 'skillPrompt') {
+    if (result.state.pending?.type === '技能选择') {
       result = engine(result.state, {
-        type: 'skillChoice',
+        type: '技能选择',
         player: 'P1',
         choice: 'top',
       });
@@ -111,14 +111,14 @@ describe('观星技能', () => {
     let result = triggerPhaseBegin(state, 'P1', '准备');
 
     result = engine(result.state, {
-      type: 'skillChoice',
+      type: '技能选择',
       player: 'P1',
       choice: 'bottom',
     });
 
-    if (result.state.pending?.type === 'skillPrompt') {
+    if (result.state.pending?.type === '技能选择') {
       result = engine(result.state, {
-        type: 'skillChoice',
+        type: '技能选择',
         player: 'P1',
         choice: 'bottom',
       });
@@ -145,9 +145,9 @@ describe('观星技能', () => {
 
     const choices = ['top', 'bottom', 'top', 'top', 'bottom'];
     for (const choice of choices) {
-      expect(result.state.pending?.type).toBe('skillPrompt');
+      expect(result.state.pending?.type).toBe('技能选择');
       result = engine(result.state, {
-        type: 'skillChoice',
+        type: '技能选择',
         player: 'P1',
         choice,
       });

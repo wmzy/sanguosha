@@ -21,21 +21,21 @@ describe('Mark 体系', () => {
     const s0 = createTestGame();
     const mark: Mark = { id: 'faceDown:P1', scope: 'player', payload: { faceDown: true }, duration: 'untilTurnEnd' };
     const { state, events } = applyAtoms(s0, [
-      { type: 'addMark', player: 'P1', mark },
+      { type: '加标记', player: 'P1', mark },
     ]);
     expect(state.marks.P1).toHaveLength(1);
     expect(state.marks.P1[0]).toEqual(mark);
-    expect(events[0].type).toBe('addMark');
+    expect(events[0].type).toBe('加标记');
   });
 
   it('removeMark 按 id 移除', () => {
     const s0 = createTestGame();
     const mark: Mark = { id: 'faceDown:P1', scope: 'player', duration: 'untilTurnEnd' };
     const s1 = applyAtoms(s0, [
-      { type: 'addMark', player: 'P1', mark },
+      { type: '加标记', player: 'P1', mark },
     ]).state;
     const { state } = applyAtoms(s1, [
-      { type: 'removeMark', player: 'P1', markId: 'faceDown:P1' },
+      { type: '去标记', player: 'P1', markId: 'faceDown:P1' },
     ]);
     expect(state.marks.P1).toEqual([]);
   });
@@ -49,7 +49,7 @@ describe('Mark 体系', () => {
       },
     };
     const { state } = applyAtoms(s0, [
-      { type: 'clearExpiredMarks', phase: 'turnEnd' },
+      { type: '清过期标记', phase: '回合结束' },
     ]);
     expect(state.marks.P1).toEqual([]);
     expect(state.marks.P2).toHaveLength(1);

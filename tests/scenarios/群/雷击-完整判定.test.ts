@@ -67,9 +67,9 @@ describe('雷击完整判定（真 game rule）', () => {
     // leiji 钩子 onAfter 读 ctx=success → emit damage(3, thunder)
     // P1 health: 4 - 3 = 1
     expect(state.players.P1.health).toBe(1);
-    expect(events.filter((e) => e.type === 'damage')).toHaveLength(1);
-    const dmg = events.find((e) => e.type === 'damage');
-    if (dmg?.type === 'damage') {
+    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(1);
+    const dmg = events.find((e) => e.type === '造成伤害');
+    if (dmg?.type === '造成伤害') {
       expect(dmg.payload).toMatchObject({ amount: 3, type: 'thunder' });
     }
   });
@@ -90,6 +90,6 @@ describe('雷击完整判定（真 game rule）', () => {
     // leiji 钩子 onAfter 读 ctx=fail → 不 emit damage
     // P1 health 不变（4）
     expect(state.players.P1.health).toBe(4);
-    expect(events.filter((e) => e.type === 'damage')).toHaveLength(0);
+    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(0);
   });
 });

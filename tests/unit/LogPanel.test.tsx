@@ -4,9 +4,9 @@ import { LogPanel } from '../../src/components/LogPanel';
 import type { Operation } from '../../shared/log';
 
 const mockOps: Operation[] = [
-  { seq: 0, timestamp: Date.now(), type: 'gameStart', data: {}, description: '游戏开始' },
-  { seq: 1, timestamp: Date.now(), type: 'draw', data: {}, description: '曹操摸了2张牌' },
-  { seq: 2, timestamp: Date.now(), type: 'damage', data: {}, description: '曹操对刘备使用杀' },
+  { seq: 0, timestamp: Date.now(), type: '游戏开始', data: {}, description: '游戏开始' },
+  { seq: 1, timestamp: Date.now(), type: '摸牌', data: {}, description: '曹操摸了2张牌' },
+  { seq: 2, timestamp: Date.now(), type: '造成伤害', data: {}, description: '曹操对刘备使用杀' },
 ];
 
 describe('LogPanel', () => {

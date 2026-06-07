@@ -2,9 +2,9 @@ import type { SkillPhase, SkillContext, GameState, Condition } from './types';
 
 /** 三国杀卡牌点数：K=13 > Q=12 > ... > 2=2 > A=1 */
 const RANK_VALUES: Record<string, number> = {
-  'A': 1, '2': 2, '3': 3, '4': 4, '5': 5,
-  '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-  'J': 11, 'Q': 12, 'K': 13,
+  A: 1, 2: 2, 3: 3, 4: 4, 5: 5,
+  6: 6, 7: 7, 8: 8, 9: 9, 10: 10,
+  J: 11, Q: 12, K: 13,
 };
 
 export function getRankValue(rank: string): number {
@@ -41,25 +41,25 @@ export function createPileComparePhases(
     {
       type: 'prompt',
       text: `拼点：请选择一张手牌`,
-      options: [{ type: 'selectCards', from: 'hand', min: 1, max: 1 }],
+      options: [{ type: 'selectCards', from: '手牌', min: 1, max: 1 }],
     },
     {
       type: 'atoms',
       ops: [
-        { type: 'setCtxVar', key: `${prefix}InitiatorCard`, value: { $: 'ctx', path: 'choice.cardIds.0' } as const },
-        { type: 'discard', player: initiator, cardIds: { $: 'ctx', path: 'choice.cardIds' } as const },
+        { type: '设置上下文变量', key: `${prefix}InitiatorCard`, value: { $: 'ctx', path: 'choice.cardIds.0' } as const },
+        { type: '弃置', player: initiator, cardIds: { $: 'ctx', path: 'choice.cardIds' } as const },
       ],
     },
     {
       type: 'prompt',
       text: `拼点：请选择一张手牌`,
-      options: [{ type: 'selectCards', from: 'hand', min: 1, max: 1 }],
+      options: [{ type: 'selectCards', from: '手牌', min: 1, max: 1 }],
     },
     {
       type: 'atoms',
       ops: [
-        { type: 'setCtxVar', key: `${prefix}TargetCard`, value: { $: 'ctx', path: 'choice.cardIds.0' } as const },
-        { type: 'discard', player: target, cardIds: { $: 'ctx', path: 'choice.cardIds' } as const },
+        { type: '设置上下文变量', key: `${prefix}TargetCard`, value: { $: 'ctx', path: 'choice.cardIds.0' } as const },
+        { type: '弃置', player: target, cardIds: { $: 'ctx', path: 'choice.cardIds' } as const },
       ],
     },
     {
@@ -71,10 +71,10 @@ export function createPileComparePhases(
         ],
       } as Condition,
       then: [
-        { type: 'atoms', ops: [{ type: 'setCtxVar', key: `${prefix}Result`, value: 'win' }] },
+        { type: 'atoms', ops: [{ type: '设置上下文变量', key: `${prefix}Result`, value: 'win' }] },
       ],
       else: [
-        { type: 'atoms', ops: [{ type: 'setCtxVar', key: `${prefix}Result`, value: 'lose' }] },
+        { type: 'atoms', ops: [{ type: '设置上下文变量', key: `${prefix}Result`, value: 'lose' }] },
       ],
     },
   ];

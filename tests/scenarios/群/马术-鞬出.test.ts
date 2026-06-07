@@ -8,11 +8,11 @@ describe('庞德 - 马术', () => {
       ctx.selectCharacters('庞德', '曹操', '刘备', '孙权');
       ctx.registerTriggers('P1');
     })
-    .act('触发 turnStart 设置 distanceBonus', ctx => {
-      ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+    .act('触发 turnStart 设置马术/距离修正', ctx => {
+      ctx.emitEvent({ type: '回合开始', player: 'P1' });
     })
-    .check('庞德的 distanceBonus 被设为 -1', ctx => {
-      expect(ctx.player('P1').vars['distanceBonus']).toBe(-1);
+    .check('庞德的 马术/距离修正 被设为 -1', ctx => {
+      expect(ctx.player('P1').vars['马术/距离修正']).toBe(-1);
     })
     .check('庞德到 P2 的距离减 1', ctx => {
       const dist = getDistance(ctx.state, 'P1', 'P2');
@@ -38,7 +38,7 @@ describe('庞德 - 鞬出', () => {
     })
     .check('杀触发鞬出的 skillPrompt', ctx => {
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
     })
     .run();
 });

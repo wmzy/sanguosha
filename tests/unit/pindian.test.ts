@@ -41,7 +41,7 @@ describe('compareRank atom（pindian 基础设施）', () => {
       'c-K': { id: 'c-K', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: 'K', description: '' },
     });
     const { state: next, events } = applyAtoms(state, [
-      { type: 'compareRank', a: 'P1', b: 'P2', aCardId: 'c-A', bCardId: 'c-K' },
+      { type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-A', bCardId: 'c-K' },
     ]);
     // P1 出 A(1)，P2 出 K(13) → P2 赢
     expect(events[0].payload).toMatchObject({ winner: 'P2', aRank: 1, bRank: 13 });
@@ -62,10 +62,10 @@ describe('compareRank atom（pindian 基础设施）', () => {
       cardMap,
     );
     const { events: e1 } = applyAtoms(s0, [
-      { type: 'compareRank', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' },
+      { type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' },
     ]);
     const { events: e2 } = applyAtoms(s0, [
-      { type: 'compareRank', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' },
+      { type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' },
     ]);
     const w1 = (e1[0].payload as { winner: string }).winner;
     const w2 = (e2[0].payload as { winner: string }).winner;
@@ -91,7 +91,7 @@ describe('compareRank atom（pindian 基础设施）', () => {
       [
         {
           type: 'atoms',
-          ops: [{ type: 'compareRank', a: 'P1', b: 'P2', aCardId: 'c-A', bCardId: 'c-K' }],
+          ops: [{ type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-A', bCardId: 'c-K' }],
         },
       ],
       ctx,
@@ -119,7 +119,7 @@ describe('compareRank atom（pindian 基础设施）', () => {
       [
         {
           type: 'atoms',
-          ops: [{ type: 'compareRank', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' }],
+          ops: [{ type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' }],
         },
       ],
       ctx,
@@ -162,10 +162,10 @@ describe('pindian SkillPhase 骨架', () => {
           aCardId: 'c-K',
           bCardId: 'c-A',
           then: [
-            { type: 'atoms', ops: [{ type: 'setCtxVar', key: 'pindianResult', value: 'win' }] },
+            { type: 'atoms', ops: [{ type: '设置上下文变量', key: 'pindianResult', value: 'win' }] },
           ],
           else: [
-            { type: 'atoms', ops: [{ type: 'setCtxVar', key: 'pindianResult', value: 'lose' }] },
+            { type: 'atoms', ops: [{ type: '设置上下文变量', key: 'pindianResult', value: 'lose' }] },
           ],
         },
       ],
@@ -173,7 +173,7 @@ describe('pindian SkillPhase 骨架', () => {
     );
     expect(ctx.localVars.pindianWinner).toBe('P1');
     expect(ctx.localVars.pindianResult).toBe('win');
-    expect(events.some((e) => e.type === 'compareRank')).toBe(true);
+    expect(events.some((e) => e.type === '拼点')).toBe(true);
     expect(state.zones.discardPile).toContain('c-A');
     expect(state.zones.discardPile).toContain('c-K');
   });
@@ -198,10 +198,10 @@ describe('pindian SkillPhase 骨架', () => {
           aCardId: 'c-A',
           bCardId: 'c-K',
           then: [
-            { type: 'atoms', ops: [{ type: 'setCtxVar', key: 'pindianResult', value: 'win' }] },
+            { type: 'atoms', ops: [{ type: '设置上下文变量', key: 'pindianResult', value: 'win' }] },
           ],
           else: [
-            { type: 'atoms', ops: [{ type: 'setCtxVar', key: 'pindianResult', value: 'lose' }] },
+            { type: 'atoms', ops: [{ type: '设置上下文变量', key: 'pindianResult', value: 'lose' }] },
           ],
         },
       ],
@@ -209,7 +209,7 @@ describe('pindian SkillPhase 骨架', () => {
     );
     expect(ctx.localVars.pindianWinner).toBe('P2');
     expect(ctx.localVars.pindianResult).toBe('lose');
-    expect(events.some((e) => e.type === 'compareRank')).toBe(true);
+    expect(events.some((e) => e.type === '拼点')).toBe(true);
     expect(state.zones.discardPile).toContain('c-A');
     expect(state.zones.discardPile).toContain('c-K');
   });

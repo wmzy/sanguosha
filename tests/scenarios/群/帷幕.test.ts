@@ -15,7 +15,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
       expect(card.suit).toBe('♠');
       ctx.applyAtoms([
         {
-          type: 'becomeTarget',
+          type: '成为目标',
           cardId,
           source: 'P2',
           target: 'P1',
@@ -24,7 +24,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾不是 becomeTarget 事件（被 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).not.toBe('becomeTarget');
+      expect(last?.type).not.toBe('成为目标');
     })
     .run();
 
@@ -47,7 +47,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
       const wgfdId = ctx.findCard('P2', '五谷丰登')!;
       ctx.applyAtoms([
         {
-          type: 'becomeTarget',
+          type: '成为目标',
           cardId: wgfdId,
           source: 'P2',
           target: 'P1',
@@ -56,7 +56,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（红色锦囊不阻）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('becomeTarget');
+      expect(last?.type).toBe('成为目标');
     })
     .run();
 
@@ -69,7 +69,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
       const cardId = ctx.findCard('P1', '过河拆桥')!;
       ctx.applyAtoms([
         {
-          type: 'becomeTarget',
+          type: '成为目标',
           cardId,
           source: 'P1',
           target: 'P2',
@@ -78,7 +78,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（目标非贾诩）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('becomeTarget');
+      expect(last?.type).toBe('成为目标');
     })
     .run();
 });

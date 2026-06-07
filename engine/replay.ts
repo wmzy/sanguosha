@@ -34,7 +34,7 @@ export class ReplayEngine {
     const initial = createInitialState({
       players,
       seed: meta.seed,
-      characterMap: (characterMap ?? {}) as Record<string, CharacterConfig>,
+      characterMap: (characterMap ?? {}),
     });
 
     const steps: ReplayStep[] = [

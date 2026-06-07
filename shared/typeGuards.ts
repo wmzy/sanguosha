@@ -28,7 +28,7 @@ export function isPendingAction(value: unknown): value is PendingAction {
   const type = value.type;
   return (
     typeof type === 'string' &&
-    ['playPhase', 'responseWindow', 'skillPrompt', 'discardPhase', 'dyingWindow', 'selectCard', 'harvestSelection'].includes(type)
+    ['出牌阶段', '响应窗口', '技能选择', '弃牌阶段', '濒死窗口', 'selectCard', '收获选牌'].includes(type)
   );
 }
 

@@ -39,7 +39,7 @@ function collectVisibleCardIds(state: GameState): Set<string> {
   // pending 中的相关卡牌
   if (state.pending) {
     const pending = state.pending as unknown as Record<string, unknown>;
-    if (pending.type === 'responseWindow') {
+    if (pending.type === '响应窗口') {
       const window = pending.window as Record<string, unknown>;
       const sourceCard = window.sourceCard as string | undefined;
       if (sourceCard) ids.add(sourceCard);
@@ -94,7 +94,7 @@ export function checkInvariants(state: GameState): void {
   }
 
   // ─── 不变量 4: 生存玩家 health > 0 —— 濒死窗口期间允许 health ≤ 0 ───
-  const dyingPlayer = state.pending?.type === 'dyingWindow'
+  const dyingPlayer = state.pending?.type === '濒死窗口'
     ? state.pending.dyingPlayer
     : undefined;
   for (const name of state.playerOrder) {

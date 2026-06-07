@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyAtoms } from "@engine/atom";
+import { applyAtoms } from '@engine/atom';
 import { reduceGameState } from '@engine/view/reducer';
 import { createTestGame } from '../engine-helpers';
 import '@engine/atoms/index';
@@ -36,7 +36,7 @@ describe('reduceGameState 与 broadcast 一致性', () => {
     // 保证 deck 充足，避免 reshuffle 导致 rngState 差异
     expect(state.zones.deck.length).toBeGreaterThan(5);
 
-    const result = applyAtoms(state, [{ type: 'draw', player: 'P1', count: 2 }]);
+    const result = applyAtoms(state, [{ type: '摸牌', player: 'P1', count: 2 }]);
     const serverEvents = result.state.serverLog;
     const frontendState = reduceGameState(state, serverEvents);
 
@@ -47,7 +47,7 @@ describe('reduceGameState 与 broadcast 一致性', () => {
     const state = createTestGame({ playerCount: 2, playPhase: true });
     expect(state.zones.deck.length).toBeGreaterThan(5);
 
-    const result = applyAtoms(state, [{ type: 'judge', player: 'P1' }]);
+    const result = applyAtoms(state, [{ type: '判定', player: 'P1' }]);
     const serverEvents = result.state.serverLog;
     const frontendState = reduceGameState(state, serverEvents);
 
@@ -57,7 +57,7 @@ describe('reduceGameState 与 broadcast 一致性', () => {
   it('damage: 前后端 apply 结果一致', () => {
     const state = createTestGame({ playerCount: 2, playPhase: true });
 
-    const result = applyAtoms(state, [{ type: 'damage', target: 'P2', amount: 1 }]);
+    const result = applyAtoms(state, [{ type: '造成伤害', target: 'P2', amount: 1 }]);
     const serverEvents = result.state.serverLog;
     const frontendState = reduceGameState(state, serverEvents);
 
@@ -69,9 +69,9 @@ describe('reduceGameState 与 broadcast 一致性', () => {
     expect(state.zones.deck.length).toBeGreaterThan(10);
 
     const atoms = [
-      { type: 'draw' as const, player: 'P1', count: 3 },
-      { type: 'judge' as const, player: 'P2' },
-      { type: 'damage' as const, target: 'P2', amount: 1 },
+      { type: '摸牌' as const, player: 'P1', count: 3 },
+      { type: '判定' as const, player: 'P2' },
+      { type: '造成伤害' as const, target: 'P2', amount: 1 },
     ];
 
     const result = applyAtoms(state, atoms);
@@ -91,7 +91,7 @@ describe('reduceGameState 与 broadcast 一致性', () => {
       cardMap: { ...state.cardMap, c1: cardC1, c2: cardC2 },
     };
 
-    const result = applyAtoms(state, [{ type: 'draw', player: 'P1', count: 1 }]);
+    const result = applyAtoms(state, [{ type: '摸牌', player: 'P1', count: 1 }]);
     const serverEvents = result.state.serverLog;
     const frontendState = reduceGameState(state, serverEvents);
 

@@ -1,14 +1,14 @@
 import type { GameState, Atom, GameEvent } from './types';
 
-type DamageAtom = Extract<Atom, { type: 'damage' }>;
-type HealAtom = Extract<Atom, { type: 'heal' }>;
+type DamageAtom = Extract<Atom, { type: '造成伤害' }>;
+type HealAtom = Extract<Atom, { type: '回复体力' }>;
 
 type GameEventGenerator = (state: GameState, atom: Atom) => GameEvent[];
 
 const damageEvents: GameEventGenerator = (_state, atom) => {
   const d = atom as DamageAtom;
   const event: GameEvent = {
-    type: 'damageReceived',
+    type: '受到伤害',
     target: d.target as string,
     source: (d.source as string) ?? '',
     amount: d.amount as number,
@@ -20,7 +20,7 @@ const damageEvents: GameEventGenerator = (_state, atom) => {
 const healEvents: GameEventGenerator = (_state, atom) => {
   const h = atom as HealAtom;
   const event: GameEvent = {
-    type: 'heal',
+    type: '回复体力',
     target: h.target as string,
     amount: h.amount as number,
   };
@@ -31,6 +31,6 @@ const healEvents: GameEventGenerator = (_state, atom) => {
 };
 
 export const ATOM_GAME_EVENTS: Record<string, GameEventGenerator> = {
-  damage: damageEvents,
-  heal: healEvents,
+  造成伤害: damageEvents,
+  回复体力: healEvents,
 };

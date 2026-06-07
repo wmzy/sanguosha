@@ -15,7 +15,7 @@ export function resolveKillResponse(
   action: GameAction,
   pending: import('../../types').PendingResponseWindow,
 ): EngineResult {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return { state, events: [], error: '杀响应窗口需要 respond 动作' };
   }
 
@@ -41,12 +41,12 @@ export function resolveKillResponse(
     const requiredFlashCount = pending.window.requiredFlashCount ?? 1;
     const moveResult = applyAtoms(state, [
       {
-        type: 'moveCard',
+        type: '移动牌',
         cardId: action.cardId,
-        from: { zone: 'hand', player: defender },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player: defender },
+        to: { zone: '弃牌堆' },
       },
-      { type: 'popPending' },
+      { type: '弹出待定' },
     ]);
 
     if (requiredFlashCount > 1) {
@@ -58,11 +58,11 @@ export function resolveKillResponse(
     }
 
     const emitResult = emitEvent(moveResult.state, {
-      type: 'killDodged',
+      type: '杀被闪避',
       attacker: attacker ?? '',
       defender,
     });
-    const dodgedEvent = makeServerEvent('killDodged', {
+    const dodgedEvent = makeServerEvent('杀被闪避', {
       attacker: attacker ?? '',
       defender,
     });
@@ -81,17 +81,17 @@ export function resolveKillResponse(
     }
   }
 
-  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: 'popPending' }]);
+  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: '弹出待定' }]);
   const damageResult = applyDamage(
     popState, defender, damageAmount,
     attacker ?? undefined, pending.window.sourceCard,
   );
   const emitResult = emitEvent(damageResult.state, {
-    type: 'killHit',
+    type: '杀命中',
     attacker: attacker ?? '',
     defender,
   });
-  const hitEvent = makeServerEvent('killHit', {
+  const hitEvent = makeServerEvent('杀命中', {
     attacker: attacker ?? '',
     defender,
   });

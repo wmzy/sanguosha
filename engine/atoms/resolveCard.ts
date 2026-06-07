@@ -9,16 +9,16 @@ import { makeServerEvent } from '../event';
  */
 export function register() {
   registerAtom({
-    type: 'resolveCard',
+    type: '解决',
     apply(s: GameState) { return s; },
     toEvents(_s, atom): AtomEventResult {
-      const a = atom as Atom & { type: 'resolveCard' };
+      const a = atom as Atom & { type: '解决' };
       const cardId = a.cardId as string;
       const source = a.source as string;
       const target = a.target as string | undefined;
       const payload: Record<string, string> = { cardId, source };
       if (target !== undefined) payload.target = target;
-      return [makeServerEvent('resolveCard', payload), new Map(), null];
+      return [makeServerEvent('解决', payload), new Map(), null];
     },
   });
 }

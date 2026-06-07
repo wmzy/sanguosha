@@ -12,7 +12,7 @@ describe('刘禅', () => {
       .act('刘备对刘禅使用杀', ctx => {
         const killId = ctx.findCard('P1', '杀')!;
         ctx.emitEvent({
-          type: 'cardPlayed',
+          type: '出牌',
           player: 'P1',
           cardId: killId,
           target: 'P2',
@@ -32,7 +32,7 @@ describe('刘禅', () => {
       .act('刘备使用桃（不是杀）', ctx => {
         const peachId = ctx.findCard('P1', '桃')!;
         ctx.emitEvent({
-          type: 'cardPlayed',
+          type: '出牌',
           player: 'P1',
           cardId: peachId,
           target: 'P2',
@@ -52,7 +52,7 @@ describe('刘禅', () => {
       .act('刘备对自己使用杀', ctx => {
         const killId = ctx.findCard('P1', '杀')!;
         ctx.emitEvent({
-          type: 'cardPlayed',
+          type: '出牌',
           player: 'P1',
           cardId: killId,
           target: 'P1',
@@ -85,7 +85,7 @@ describe('刘禅', () => {
         ctx.setHealth('P1', 1);
       })
       .act('触发turnStart', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('若愚已觉醒标记', ctx => {
         expect(ctx.player('P1').vars['若愚/awakened']).toBe(true);
@@ -98,7 +98,7 @@ describe('刘禅', () => {
         ctx.setHealth('P2', 2);
       })
       .act('触发turnStart（P1体力3，P2体力2）', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('若愚不触发（体力不是最少）', ctx => {
         expect(ctx.player('P1').vars['若愚/awakened']).toBeUndefined();
@@ -109,10 +109,10 @@ describe('刘禅', () => {
       .setup(ctx => {
         ctx.selectCharacters('刘禅', '刘备');
         ctx.setHealth('P1', 1);
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .act('再次触发turnStart', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('若愚不重复触发', ctx => {
         expect(ctx.player('P1').vars['若愚/awakened']).toBe(true);
@@ -126,7 +126,7 @@ describe('刘禅', () => {
         ctx.setHealth('P2', 3);
       })
       .act('触发turnStart（P1和P2体力相同）', ctx => {
-        ctx.emitEvent({ type: 'turnStart', player: 'P1' });
+        ctx.emitEvent({ type: '回合开始', player: 'P1' });
       })
       .check('若愚觉醒（体力并列最少）', ctx => {
         expect(ctx.player('P1').vars['若愚/awakened']).toBe(true);

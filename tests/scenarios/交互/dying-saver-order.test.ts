@@ -20,8 +20,8 @@ describe('求桃 savers 顺序', () => {
       for (const p of ['P5', 'P1', 'P2', 'P3']) ctx.respond(p);
       ctx.respond('P2'); // P2 不出杀
       const pending = ctx.state.pending;
-      expect(pending?.type).toBe('dyingWindow');
-      if (pending?.type === 'dyingWindow') {
+      expect(pending?.type).toBe('濒死窗口');
+      if (pending?.type === '濒死窗口') {
         // 规则：从当前回合 P4 开始，依次 P4, P5, P1, P3，濒死者 P2 最后自救
         expect(pending.savers).toEqual(['P4', 'P5', 'P1', 'P3', 'P2']);
       }

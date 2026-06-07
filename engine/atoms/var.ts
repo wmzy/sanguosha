@@ -5,8 +5,8 @@ import { updatePlayer } from '../state';
 
 export function register() {
   registerAtom({
-    type: 'setVar',
-    apply(state: GameState, atom: Atom & { type: 'setVar' }) {
+    type: '设置变量',
+    apply(state: GameState, atom: Atom & { type: '设置变量' }) {
       const player = atom.player as string;
       const { key } = atom;
       const value = atom.value as Json;
@@ -14,20 +14,20 @@ export function register() {
         vars: { ...p.vars, [key]: value },
       }));
     },
-    toEvents(state: GameState, atom: Atom & { type: 'setVar' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '设置变量' }): AtomEventResult {
       const player = atom.player as string;
       const { key } = atom;
       const value = atom.value as Json;
       const payload = { player, key, value };
-      const server = makeServerEvent('setVar', payload);
-      const ownerEvent = makePlayerEvent('setVar', payload);
+      const server = makeServerEvent('设置变量', payload);
+      const ownerEvent = makePlayerEvent('设置变量', payload);
       return [server, new Map([[player, ownerEvent]]), null];
     },
   });
 
   registerAtom({
-    type: 'incrementVar',
-    apply(state: GameState, atom: Atom & { type: 'incrementVar' }) {
+    type: '增加变量',
+    apply(state: GameState, atom: Atom & { type: '增加变量' }) {
       const player = atom.player as string;
       const { key } = atom;
       const delta = atom.delta as number;
@@ -35,20 +35,20 @@ export function register() {
         vars: { ...p.vars, [key]: ((p.vars[key] as number | undefined) ?? 0) + delta },
       }));
     },
-    toEvents(state: GameState, atom: Atom & { type: 'incrementVar' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '增加变量' }): AtomEventResult {
       const player = atom.player as string;
       const { key } = atom;
       const delta = atom.delta as number;
       const payload = { player, key, delta };
-      const server = makeServerEvent('incrementVar', payload);
-      const ownerEvent = makePlayerEvent('incrementVar', payload);
+      const server = makeServerEvent('增加变量', payload);
+      const ownerEvent = makePlayerEvent('增加变量', payload);
       return [server, new Map([[player, ownerEvent]]), null];
     },
   });
 
   registerAtom({
-    type: 'clearVarPattern',
-    apply(state: GameState, atom: Atom & { type: 'clearVarPattern' }) {
+    type: '清空变量',
+    apply(state: GameState, atom: Atom & { type: '清空变量' }) {
       const player = atom.player as string;
       const { pattern } = atom;
       const regex = globToRegex(pattern);
@@ -60,10 +60,10 @@ export function register() {
         return { vars };
       });
     },
-    toEvents(state: GameState, atom: Atom & { type: 'clearVarPattern' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '清空变量' }): AtomEventResult {
       const player = atom.player as string;
       const payload = { player, pattern: atom.pattern };
-      const server = makeServerEvent('clearVarPattern', payload);
+      const server = makeServerEvent('清空变量', payload);
       return [server, new Map(), null];
     },
   });

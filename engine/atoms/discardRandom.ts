@@ -6,15 +6,15 @@ import { createRng } from '../../shared/rng';
 
 export function register() {
   registerAtom({
-    type: 'discardRandom',
-    apply(state: GameState, atom: Atom & { type: 'discardRandom'; player: string; count: number; from: 'hand' | 'equipment' }) {
+    type: '随机弃置',
+    apply(state: GameState, atom: Atom & { type: '随机弃置'; player: string; count: number; from: '手牌' | '装备' }) {
       const player = atom.player;
       const count = atom.count;
       const from = atom.from;
       const p = state.players[player];
       if (!p) return state;
 
-      if (from === 'hand') {
+      if (from === '手牌') {
         const rng = createRng(state.rngState);
         const hand = [...p.hand];
         const discarded: string[] = [];
@@ -31,14 +31,14 @@ export function register() {
 
       return state;
     },
-    toEvents(state: GameState, atom: Atom & { type: 'discardRandom'; player: string; count: number; from: 'hand' | 'equipment' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '随机弃置'; player: string; count: number; from: '手牌' | '装备' }): AtomEventResult {
       const player = atom.player;
       const count = atom.count;
       const from = atom.from;
-      const server = makeServerEvent('discardRandom', { player, count, from });
+      const server = makeServerEvent('随机弃置', { player, count, from });
       return [server, new Map(), server] as const;
     },
-    getResult(state: GameState, _atom: Atom & { type: 'discardRandom'; player: string; count: number; from: 'hand' | 'equipment' }): Record<string, Json> {
+    getResult(state: GameState, _atom: Atom & { type: '随机弃置'; player: string; count: number; from: '手牌' | '装备' }): Record<string, Json> {
       const discardPile = state.zones.discardPile;
       if (discardPile.length === 0) return {};
       const lastCardId = discardPile[discardPile.length - 1];

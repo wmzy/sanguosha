@@ -46,7 +46,7 @@ export interface GameBoardData {
   handleDiscard: () => void;
   pendingPrompt: import('./Prompts').PendingPromptData | null;
   hasDodge: boolean;
-  respondAction: Extract<ValidAction, { type: 'respond' }> | undefined;
+  respondAction: Extract<ValidAction, { type: '打出' }> | undefined;
   respondToKill: (playDodge: boolean) => void;
   respond: (cardId?: string) => void;
   respondToDying: (saverName: string | null) => void;

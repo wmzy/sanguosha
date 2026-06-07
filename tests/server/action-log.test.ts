@@ -31,16 +31,16 @@ describe('actionLog 增量追加', () => {
 
     const sessionAny = session as unknown as { appendAction: (action: unknown) => void };
     for (let i = 0; i < 1000; i++) {
-      sessionAny.appendAction({ type: 'endTurn', player: `P${i}` });
+      sessionAny.appendAction({ type: '结束回合', player: `P${i}` });
     }
 
     (session as unknown as { touchAndPersist: () => void }).touchAndPersist();
     const lastLog = vi.mocked(persistence.saveRoom).mock.calls.at(-1)![3] as unknown[];
 
     expect(lastLog).toHaveLength(1001);
-    expect(lastLog[0]).toEqual({ type: 'startGame' });
-    expect(lastLog[500]).toEqual({ type: 'endTurn', player: 'P499' });
-    expect(lastLog[1000]).toEqual({ type: 'endTurn', player: 'P999' });
+    expect(lastLog[0]).toEqual({ type: '开始' });
+    expect(lastLog[500]).toEqual({ type: '结束回合', player: 'P499' });
+    expect(lastLog[1000]).toEqual({ type: '结束回合', player: 'P999' });
   });
 
   it('push 保持同一数组引用（O(1) 而非 O(n) 重建）', () => {
@@ -54,7 +54,7 @@ describe('actionLog 增量追加', () => {
     };
 
     const refBefore = sessionAny.actionLog;
-    sessionAny.appendAction({ type: 'endTurn', player: 'P1' });
+    sessionAny.appendAction({ type: '结束回合', player: 'P1' });
     const refAfter = sessionAny.actionLog;
 
     expect(refBefore).toBe(refAfter);
@@ -71,7 +71,7 @@ describe('actionLog 增量追加', () => {
 
     const start = performance.now();
     for (let i = 0; i < 1000; i++) {
-      sessionAny.appendAction({ type: 'endTurn', player: `P${i}` });
+      sessionAny.appendAction({ type: '结束回合', player: `P${i}` });
     }
     const elapsed = performance.now() - start;
 

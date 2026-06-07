@@ -5,7 +5,7 @@ export const 过河拆桥: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'other', condition: (p) => p.hand.length > 0 },
-  effect: { type: 'discard', source: 'hand', count: 1, target: 'selected' },
+  effect: { type: '弃置', source: 'hand', count: 1, target: 'selected' },
   responseWindow: 'trick_response',
 };
 
@@ -14,7 +14,7 @@ export const 顺手牵羊: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'inRange' },
-  effect: { type: 'gainCard', from: 'player', source: 'selected' },
+  effect: { type: '获得', from: 'player', source: 'selected' },
   responseWindow: 'trick_response',
 };
 
@@ -23,7 +23,7 @@ export const 无中生有: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'self' },
-  effect: { type: 'draw', count: 2 },
+  effect: { type: '摸牌', count: 2 },
   responseWindow: 'trick_response',
 };
 
@@ -59,7 +59,7 @@ export const 桃园结义: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'none' },
-  effect: { type: 'heal', amount: 1 },
+  effect: { type: '回复体力', amount: 1 },
 };
 
 export const 五谷丰登: CardDef = {
@@ -67,7 +67,7 @@ export const 五谷丰登: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'none' },
-  effect: { type: 'draw', count: 1 },
+  effect: { type: '摸牌', count: 1 },
 };
 
 export const 乐不思蜀: CardDef = {
@@ -75,7 +75,7 @@ export const 乐不思蜀: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'other' },
-  effect: { type: 'addPendingTrick', trickName: '乐不思蜀', target: 'selected' },
+  effect: { type: '添加延时锦囊', trickName: '乐不思蜀', target: 'selected' },
   responseWindow: 'trick_response',
 };
 
@@ -84,7 +84,7 @@ export const 兵粮寸断: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'other' },
-  effect: { type: 'addPendingTrick', trickName: '兵粮寸断', target: 'selected' },
+  effect: { type: '添加延时锦囊', trickName: '兵粮寸断', target: 'selected' },
   responseWindow: 'trick_response',
 };
 
@@ -93,7 +93,7 @@ export const 闪电: CardDef = {
   type: '锦囊牌',
   subtype: '锦囊',
   targetFilter: { type: 'self' },
-  effect: { type: 'addPendingTrick', trickName: '闪电', target: 'self' },
+  effect: { type: '添加延时锦囊', trickName: '闪电', target: 'self' },
 };
 
 export const 无懈可击: CardDef = {

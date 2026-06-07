@@ -3,7 +3,7 @@ import { TIMEOUT_DEFAULTS as timeouts } from '../types';
 import { registerPhase } from '../phase';
 import { createPendingId } from '../atoms/pending';
 
-type RespondPhase = Extract<SkillPhase, { type: 'respond' }>;
+type RespondPhase = Extract<SkillPhase, { type: '打出' }>;
 
 const timeoutByType: Record<ResponseWindowDef['type'], number> = {
   killResponse: timeouts.killResponse,
@@ -15,17 +15,17 @@ const timeoutByType: Record<ResponseWindowDef['type'], number> = {
 
 export function register() {
   registerPhase<RespondPhase>({
-    type: 'respond',
+    type: '打出',
     execute(state: GameState, phase: RespondPhase, _ctx: SkillContext, _plan: SkillPhase[], _index: number): EngineResult {
       const timeout = timeoutByType[phase.window.type];
       const deadline = Date.now() + timeout;
       const pending: PendingResponseWindow = {
         id: createPendingId(),
-        type: 'responseWindow',
+        type: '响应窗口',
         window: { ...phase.window, timeout, deadline },
         timeout,
         deadline,
-        onTimeout: { type: 'respond', player: phase.window.defender },
+        onTimeout: { type: '打出', player: phase.window.defender },
       };
       return { state: { ...state, pending }, events: [] };
     },

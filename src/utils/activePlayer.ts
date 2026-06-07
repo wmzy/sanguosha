@@ -5,15 +5,15 @@ export function getSingleActivePlayer(state: GameState): string | null {
   const pending = state.pending;
   if (pending) {
     switch (pending.type) {
-      case 'responseWindow': {
+      case '响应窗口': {
         return pending.window.defender;
       }
-      case 'discardPhase': return pending.player;
-      case 'dyingWindow': return pending.savers[pending.currentSaverIndex];
-      case 'selectCard': return pending.player;
-      case 'harvestSelection': return pending.pickOrder[pending.currentPickerIndex];
-      case 'skillPrompt': return pending.player;
-      case 'playPhase': return pending.player;
+      case '弃牌阶段': return pending.player;
+      case '濒死窗口': return pending.savers[pending.currentSaverIndex];
+      case '选择牌': return pending.player;
+      case '收获选牌': return pending.pickOrder[pending.currentPickerIndex];
+      case '技能选择': return pending.player;
+      case '出牌阶段': return pending.player;
       default: return null;
     }
   }

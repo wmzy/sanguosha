@@ -37,7 +37,7 @@ export function createConcurrentTrickResponse(
 
   return {
     id: createPendingId(),
-    type: 'responseWindow',
+    type: '响应窗口',
     window: {
       type: 'trickResponse',
       attacker,
@@ -57,7 +57,7 @@ export function createConcurrentTrickResponse(
     },
     timeout,
     deadline: Date.now() + timeout,
-    onTimeout: { type: 'respond', player: defender },
+    onTimeout: { type: '打出', player: defender },
   };
 }
 
@@ -66,7 +66,7 @@ export function resolveTrickResponse(
   action: GameAction,
   pending: PendingResponseWindow,
 ): EngineResult {
-  if (action.type !== 'respond') {
+  if (action.type !== '打出') {
     return { state, events: [], error: '锦囊响应窗口需要 respond 动作' };
   }
 
@@ -79,7 +79,7 @@ export function resolveTrickResponse(
 
 function resolveConcurrentTrickResponse(
   state: GameState,
-  action: GameAction & { type: 'respond' },
+  action: GameAction & { type: '打出' },
   pending: PendingResponseWindow,
 ): EngineResult {
   const { responders, passedResponders, depth, sourceCard, attacker, trickTarget, wuxieChain, sourceUser, judgmentContext, aoeResume } = pending.window;
@@ -113,12 +113,12 @@ function resolveConcurrentTrickResponse(
 
     state = applyAtoms(state, [
       {
-        type: 'moveCard',
+        type: '移动牌',
         cardId: action.cardId,
-        from: { zone: 'hand', player: action.player },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player: action.player },
+        to: { zone: '弃牌堆' },
       },
-      { type: 'popPending' },
+      { type: '弹出待定' },
     ]).state;
 
     // 嵌套 trickResponse：询问其他人是否对这张无懈可击再出无懈可击
@@ -141,7 +141,7 @@ function resolveConcurrentTrickResponse(
       aoeResume,
     });
 
-    return applyAtoms(state, [{ type: 'pushPending', action: nestedPending }]);
+    return applyAtoms(state, [{ type: '推入待定', action: nestedPending }]);
   }
 
   // Pass
@@ -149,7 +149,7 @@ function resolveConcurrentTrickResponse(
   const remaining = responders.filter(p => !newPassed.includes(p));
 
   if (remaining.length > 0) {
-    state = applyAtoms(state, [{ type: 'popPending' }]).state;
+    state = applyAtoms(state, [{ type: '弹出待定' }]).state;
     const nextDefender = remaining[0];
     const nextDefenderPlayer = getPlayer(state, nextDefender);
     const validCards = nextDefenderPlayer.hand.filter(id => state.cardMap[id]?.name === '无懈可击');
@@ -157,7 +157,7 @@ function resolveConcurrentTrickResponse(
 
     const updatedPending: PendingResponseWindow = {
       id: createPendingId(),
-      type: 'responseWindow',
+      type: '响应窗口',
       window: {
         type: 'trickResponse',
         attacker,
@@ -177,13 +177,13 @@ function resolveConcurrentTrickResponse(
       },
       timeout,
       deadline: Date.now() + timeout,
-      onTimeout: { type: 'respond', player: nextDefender },
+      onTimeout: { type: '打出', player: nextDefender },
     };
 
-    return applyAtoms(state, [{ type: 'pushPending', action: updatedPending }]);
+    return applyAtoms(state, [{ type: '推入待定', action: updatedPending }]);
   }
 
-  state = applyAtoms(state, [{ type: 'popPending' }]).state;
+  state = applyAtoms(state, [{ type: '弹出待定' }]).state;
   return resolveTrickResolution(state, currentDepth, sourceCard!, attacker!, trickTarget, judgmentContext, aoeResume);
 }
 
@@ -239,19 +239,19 @@ export function executeTrickEffect(
       if (targetPlayer.hand.length === 0) return { state, events: [] };
       const selectPending: PendingSelectCard = {
         id: createPendingId(),
-        type: 'selectCard',
+        type: '选择牌',
         player: attacker,
         target,
         cardIds: targetPlayer.hand,
         min: 1,
         max: 1,
         sourceCard,
-        mode: 'discard',
+        mode: '弃置',
         timeout: TIMEOUT_DEFAULTS.selectCard,
         deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
-        onTimeout: { type: 'respond', player: attacker, cardIds: [targetPlayer.hand[0]] },
+        onTimeout: { type: '打出', player: attacker, cardIds: [targetPlayer.hand[0]] },
       };
-      return applyAtoms(state, [{ type: 'pushPending', action: selectPending }]);
+      return applyAtoms(state, [{ type: '推入待定', action: selectPending }]);
     }
 
     case '顺手牵羊': {
@@ -260,19 +260,19 @@ export function executeTrickEffect(
       if (targetPlayer.hand.length === 0) return { state, events: [] };
       const selectPending: PendingSelectCard = {
         id: createPendingId(),
-        type: 'selectCard',
+        type: '选择牌',
         player: attacker,
         target,
         cardIds: targetPlayer.hand,
         min: 1,
         max: 1,
         sourceCard,
-        mode: 'steal',
+        mode: '获得',
         timeout: TIMEOUT_DEFAULTS.selectCard,
         deadline: Date.now() + TIMEOUT_DEFAULTS.selectCard,
-        onTimeout: { type: 'respond', player: attacker, cardIds: [targetPlayer.hand[0]] },
+        onTimeout: { type: '打出', player: attacker, cardIds: [targetPlayer.hand[0]] },
       };
-      return applyAtoms(state, [{ type: 'pushPending', action: selectPending }]);
+      return applyAtoms(state, [{ type: '推入待定', action: selectPending }]);
     }
 
     case '决斗': {
@@ -281,7 +281,7 @@ export function executeTrickEffect(
       const duelTimeout = TIMEOUT_DEFAULTS.killResponse;
       const duelWindow: PendingResponseWindow = {
         id: createPendingId(),
-        type: 'responseWindow',
+        type: '响应窗口',
         window: {
           type: 'duelResponse',
           attacker,
@@ -293,25 +293,25 @@ export function executeTrickEffect(
         },
         timeout: duelTimeout,
         deadline: Date.now() + duelTimeout,
-        onTimeout: { type: 'respond', player: target },
+        onTimeout: { type: '打出', player: target },
       };
-      return applyAtoms(state, [{ type: 'pushPending', action: duelWindow }]);
+      return applyAtoms(state, [{ type: '推入待定', action: duelWindow }]);
     }
 
     case '乐不思蜀': {
       if (!target) return { state, events: [] };
       const trick = { name: '乐不思蜀', source: attacker, card: trickCard };
-      return applyAtoms(state, [{ type: 'addPendingTrick', player: target, trick }]);
+      return applyAtoms(state, [{ type: '添加延时锦囊', player: target, trick }]);
     }
 
     case '兵粮寸断': {
       if (!target) return { state, events: [] };
       const trick = { name: '兵粮寸断', source: attacker, card: trickCard };
-      return applyAtoms(state, [{ type: 'addPendingTrick', player: target, trick }]);
+      return applyAtoms(state, [{ type: '添加延时锦囊', player: target, trick }]);
     }
 
     case '无中生有': {
-      return applyAtoms(state, [{ type: 'draw', player: attacker, count: 2 }]);
+      return applyAtoms(state, [{ type: '摸牌', player: attacker, count: 2 }]);
     }
 
     case '桃园结义': {
@@ -319,7 +319,7 @@ export function executeTrickEffect(
       const healAtoms: Atom[] = alivePlayers.flatMap(p => {
         const ps = getPlayer(state, p);
         if (ps.health >= ps.maxHealth) return [];
-        return [{ type: 'heal' as const, target: p, amount: 1, source: attacker }];
+        return [{ type: '回复体力' as const, target: p, amount: 1, source: attacker }];
       });
       return applyAtoms(state, healAtoms);
     }
@@ -340,17 +340,17 @@ export function executeTrickEffect(
       const timeout = TIMEOUT_DEFAULTS.harvestSelection;
       const harvestPending: PendingHarvestSelection = {
         id: createPendingId(),
-        type: 'harvestSelection',
+        type: '收获选牌',
         revealedCards,
         currentPickerIndex: 0,
         pickOrder,
         player: attacker,
         timeout,
         deadline: Date.now() + timeout,
-        onTimeout: { type: 'respond', player: pickOrder[0], cardId: revealedCards[0] },
+        onTimeout: { type: '打出', player: pickOrder[0], cardId: revealedCards[0] },
       };
       const s = { ...state, zones: { ...state.zones, deck: remainingDeck } };
-      const result = applyAtoms(s, [{ type: 'pushPending', action: harvestPending }]);
+      const result = applyAtoms(s, [{ type: '推入待定', action: harvestPending }]);
       const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
       return { state: result.state, events: [...result.events, harvestRevealEvent] };
     }
@@ -365,7 +365,7 @@ function resolveLegacyTrickResponse(
   action: GameAction,
   pending: PendingResponseWindow,
 ): EngineResult {
-  const cardId = action.type === 'respond' ? action.cardId : undefined;
+  const cardId = action.type === '打出' ? action.cardId : undefined;
   const { attacker, defender, sourceCard, trickTarget, remainingPlayers, negated } = pending.window;
   if (!sourceCard) return { state, events: [], error: 'trickResponse 缺少 sourceCard' };
   if (!attacker) return { state, events: [], error: 'trickResponse 缺少 attacker' };
@@ -386,16 +386,16 @@ function resolveLegacyTrickResponse(
     }
     state = applyAtoms(state, [
       {
-        type: 'moveCard',
+        type: '移动牌',
         cardId,
-        from: { zone: 'hand', player: defender },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player: defender },
+        to: { zone: '弃牌堆' },
       },
     ]).state;
     newNegated = !newNegated;
   }
 
-  state = applyAtoms(state, [{ type: 'popPending' }]).state;
+  state = applyAtoms(state, [{ type: '弹出待定' }]).state;
 
   if (remainingPlayers && remainingPlayers.length > 0) {
     const nextTarget = remainingPlayers[0];
@@ -406,7 +406,7 @@ function resolveLegacyTrickResponse(
 
     const nextWindow: PendingResponseWindow = {
       id: createPendingId(),
-      type: 'responseWindow',
+      type: '响应窗口',
       window: {
         type: 'trickResponse',
         attacker,
@@ -421,10 +421,10 @@ function resolveLegacyTrickResponse(
       },
       timeout: nextTimeout,
       deadline: Date.now() + nextTimeout,
-      onTimeout: { type: 'respond', player: nextTarget },
+      onTimeout: { type: '打出', player: nextTarget },
     };
 
-    return applyAtoms(state, [{ type: 'pushPending', action: nextWindow }]);
+    return applyAtoms(state, [{ type: '推入待定', action: nextWindow }]);
   }
 
   if (pending.window.judgmentContext) {
@@ -445,10 +445,10 @@ function resolveJudgmentTrickResponse(
 ): EngineResult {
   const { player, trickIndex } = ctx;
 
-  const atoms: Atom[] = [{ type: 'removePendingTrick', player, index: trickIndex }];
+  const atoms: Atom[] = [{ type: '移除延时锦囊', player, index: trickIndex }];
 
   if (!negated) {
-    atoms.push({ type: 'judge', player, varKey: `judgeResult_${trickName}_${trickIndex}` });
+    atoms.push({ type: '判定', player, varKey: `judgeResult_${trickName}_${trickIndex}` });
   }
 
   const result = applyAtoms(state, atoms);
@@ -467,7 +467,7 @@ function resolveJudgmentTrickResponse(
     }
 
     if (tag) {
-      const tagResult = applyAtoms(s, [{ type: 'addTag', player, tag }]);
+      const tagResult = applyAtoms(s, [{ type: '加标签', player, tag }]);
       s = tagResult.state;
       return { state: s, events: [...result.events, ...tagResult.events] };
     }
@@ -497,7 +497,7 @@ function resolveJudgmentTrickResponse(
     depth: 0,
     judgmentContext: { player, trickIndex: nextIndex },
   });
-  return applyAtoms(s, [{ type: 'pushPending', action: nextPending }]);
+  return applyAtoms(s, [{ type: '推入待定', action: nextPending }]);
 }
 
 function batchRemainJudgments(
@@ -512,8 +512,8 @@ function batchRemainJudgments(
 
   for (let i = fromIndex; i >= 0; i--) {
     const trick = tricks[i];
-    atoms.push({ type: 'judge', player, varKey: `judgeResult_${trick.name}_${i}` });
-    atoms.push({ type: 'removePendingTrick', player, index: i });
+    atoms.push({ type: '判定', player, varKey: `judgeResult_${trick.name}_${i}` });
+    atoms.push({ type: '移除延时锦囊', player, index: i });
   }
 
   const actionResult = applyAtoms(state, atoms);
@@ -532,7 +532,7 @@ function batchRemainJudgments(
   }
 
   if (tags.length > 0) {
-    const tagAtoms = tags.map(tag => ({ type: 'addTag' as const, player, tag }));
+    const tagAtoms = tags.map(tag => ({ type: '加标签' as const, player, tag }));
     const tagResult = applyAtoms(s, tagAtoms);
     return { state: tagResult.state, events: [...actionResult.events, ...tagResult.events] };
   }

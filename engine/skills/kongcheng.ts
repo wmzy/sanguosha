@@ -18,15 +18,15 @@ registerSkill({
   id: '空城',
   name: '空城',
   description: '锁定技，若你没有手牌，【杀】和【决斗】对你无效。',
-  trigger: { event: 'v3HookOnly', source: 'character' },
+  trigger: { event: 'v3HookOnly', source: '角色' },
   handler() {
     return [];
   },
 });
 registerAtomHook({
-  atomType: 'becomeTarget',
+  atomType: '成为目标',
   filter: (state, atom) => {
-    const a = atom as Atom & { type: 'becomeTarget' };
+    const a = atom as Atom & { type: '成为目标' };
     const target = a.target as string;
     const p = state.players[target];
     if (!p) return false;
@@ -37,7 +37,7 @@ registerAtomHook({
     return card.name === '杀' || card.name === '决斗';
   },
   onBefore: (ctx) => {
-    const atom = ctx.atom as Atom & { type: 'becomeTarget' };
+    const atom = ctx.atom as Atom & { type: '成为目标' };
     const target = atom.target as string;
     const char = ctx.state.players[target]?.info.characterId;
     if (char !== '诸葛亮') return {};

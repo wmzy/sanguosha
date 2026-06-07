@@ -5,8 +5,8 @@ import { createRng } from '../../shared/rng';
 
 export function register() {
   registerAtom({
-    type: 'shuffleDeck',
-    apply(state: GameState, _atom: Atom & { type: 'shuffleDeck' }): GameState {
+    type: '洗牌',
+    apply(state: GameState, _atom: Atom & { type: '洗牌' }): GameState {
       const deck = state.zones.deck;
       if (deck.length <= 1) return state;
       const rng = createRng(state.rngState);
@@ -18,8 +18,8 @@ export function register() {
       return { ...state, zones: { ...state.zones, deck: shuffled }, rngState: rng.getState() };
     },
     toEvents(_state, _atom) {
-      const server = makeServerEvent('shuffleDeck', {});
-      return [server, new Map(), makePlayerEvent('shuffleDeck', {})];
+      const server = makeServerEvent('洗牌', {});
+      return [server, new Map(), makePlayerEvent('洗牌', {})];
     },
   });
 }

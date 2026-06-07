@@ -5,8 +5,8 @@ import { updatePlayer } from '../state';
 
 export function register() {
   registerAtom({
-    type: 'loseHealth',
-    apply(state: GameState, atom: Atom & { type: 'loseHealth' }): GameState {
+    type: '失去体力',
+    apply(state: GameState, atom: Atom & { type: '失去体力' }): GameState {
       const target = atom.target as string;
       const amount = atom.amount as number;
       if (amount <= 0) return state;
@@ -14,12 +14,12 @@ export function register() {
         health: Math.max(0, p.health - amount),
       }));
     },
-    toEvents(_state: GameState, atom: Atom & { type: 'loseHealth' }): AtomEventResult {
+    toEvents(_state: GameState, atom: Atom & { type: '失去体力' }): AtomEventResult {
       const target = atom.target as string;
       const amount = atom.amount as number;
       const payload: Json = { target, amount };
-      const server = makeServerEvent('loseHealth', payload);
-      return [server, new Map(), makePlayerEvent('loseHealth', payload)];
+      const server = makeServerEvent('失去体力', payload);
+      return [server, new Map(), makePlayerEvent('失去体力', payload)];
     },
   });
 }

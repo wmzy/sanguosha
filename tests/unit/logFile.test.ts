@@ -28,9 +28,9 @@ function makeGameLog(overrides?: Partial<GameLog>): GameLog {
       characters: ['刘备', '曹操'],
       seed: 42,
     },
-    serverOps: [{ seq: 1, timestamp: Date.now(), type: 'gameStart', data: {}, description: 'test' }],
+    serverOps: [{ seq: 1, timestamp: Date.now(), type: '游戏开始', data: {}, description: 'test' }],
     playerOps: {
-      刘备: [{ seq: 1, timestamp: Date.now(), type: 'draw', data: {}, description: 'draw' }],
+      刘备: [{ seq: 1, timestamp: Date.now(), type: '摸牌', data: {}, description: '摸牌' }],
     },
     ...overrides,
   };
@@ -97,7 +97,7 @@ describe('loadLog', () => {
 
   it('serverLog 存在时正确解析', async () => {
     const log = makeGameLog({
-      serverLog: [{ id: 'evt-1', type: 'draw', timestamp: Date.now(), payload: {} }],
+      serverLog: [{ id: 'evt-1', type: '摸牌', timestamp: Date.now(), payload: {} }],
     });
     const file = makeFile(JSON.stringify(log));
     const result = await loadLog(file);
@@ -114,7 +114,7 @@ describe('loadLog', () => {
 describe('saveLog/loadLog round-trip', () => {
   it('数据一致', async () => {
     const log = makeGameLog({
-      serverLog: [{ id: 'evt-1', type: 'gameStart', timestamp: 1000, payload: { a: 1 } }],
+      serverLog: [{ id: 'evt-1', type: '游戏开始', timestamp: 1000, payload: { a: 1 } }],
     });
     const json = JSON.stringify(log, null, 2);
     const file = makeFile(json);

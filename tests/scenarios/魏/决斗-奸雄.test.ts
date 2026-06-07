@@ -19,8 +19,8 @@ describe('决斗 + 奸雄', () => {
       ctx.respond('P2');
     })
     .check('应进入决斗响应阶段', ctx => {
-      expect(ctx.state.pending?.type).toBe('responseWindow');
-      if (ctx.state.pending?.type === 'responseWindow') {
+      expect(ctx.state.pending?.type).toBe('响应窗口');
+      if (ctx.state.pending?.type === '响应窗口') {
         expect(ctx.state.pending.window.type).toBe('duelResponse');
         expect(ctx.state.pending.window.defender).toBe('P2');
       }

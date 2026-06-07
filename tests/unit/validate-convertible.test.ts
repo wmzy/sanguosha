@@ -55,7 +55,7 @@ function buildState(
   const trig: TriggerRule = {
     player: trigger.player,
     skillId: trigger.skillId,
-    source: 'character',
+    source: '角色',
     event: 'killResponse',
     priority: 5,
   };

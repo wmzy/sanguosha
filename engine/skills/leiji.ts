@@ -89,7 +89,7 @@ export function register(): void {
       return {
         additionalAtoms: [
           {
-            type: 'damage' as const,
+            type: '造成伤害' as const,
             target,
             amount: 3,
             source,

@@ -10,11 +10,11 @@ describe('孙坚 - 英魂', () => {
       ctx.snapshot('initial');
     })
     .act('触发准备阶段事件', ctx => {
-      ctx.emitEvent({ type: 'phaseBegin', phase: '准备', player: 'P1' });
+      ctx.emitEvent({ type: '阶段开始', phase: '准备', player: 'P1' });
     })
     .check('英魂触发了技能提示（pending）', ctx => {
       expect(ctx.isPending()).toBe(true);
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .run();
 });

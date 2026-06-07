@@ -15,18 +15,18 @@ export function getDistance(state: GameState, from: string, to: string): number 
   let dist = Math.min(clockwise, counterClockwise);
 
   const fromPlayer = getPlayer(state, from);
-  if (fromPlayer.equipment.horseMinus) {
+  if (fromPlayer.equipment.进攻马) {
     dist = Math.max(1, dist - 1);
   }
 
-  // 技能距离修正（如马术：distanceBonus = -1）
-  const distanceBonus = fromPlayer.vars['distanceBonus'];
-  if (typeof distanceBonus === 'number') {
-    dist = Math.max(1, dist + distanceBonus);
+  // 技能距离修正（如马术：马术/距离修正 = -1）
+  const 马术距离修正 = fromPlayer.vars['马术/距离修正'];
+  if (typeof 马术距离修正 === 'number') {
+    dist = Math.max(1, dist + 马术距离修正);
   }
 
   const toPlayer = getPlayer(state, to);
-  if (toPlayer.equipment.horsePlus) {
+  if (toPlayer.equipment.防御马) {
     dist += 1;
   }
 
@@ -35,8 +35,8 @@ export function getDistance(state: GameState, from: string, to: string): number 
 
 export function getAttackRange(state: GameState, player: string): number {
   const p = getPlayer(state, player);
-  if (p.equipment.weapon) {
-    const card = state.cardMap[p.equipment.weapon];
+  if (p.equipment.武器) {
+    const card = state.cardMap[p.equipment.武器];
     if (card?.range != null) return card.range;
   }
   return 1;

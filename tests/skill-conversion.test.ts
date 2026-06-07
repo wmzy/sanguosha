@@ -50,7 +50,7 @@ function injectCardWithSuit(
 function makeKillResponsePending(defender: string, validCards: string[] = []) {
   return {
     id: 'test-pending',
-    type: 'responseWindow' as const,
+    type: '响应窗口' as const,
     window: {
       type: 'killResponse' as const,
       attacker: 'P1',
@@ -62,14 +62,14 @@ function makeKillResponsePending(defender: string, validCards: string[] = []) {
     },
     timeout: 15000,
     deadline: Date.now() + 15000,
-    onTimeout: { type: 'respond' as const, player: defender },
+    onTimeout: { type: '打出' as const, player: defender },
   };
 }
 
 function makeDuelResponsePending(defender: string, validCards: string[] = []) {
   return {
     id: 'test-pending',
-    type: 'responseWindow' as const,
+    type: '响应窗口' as const,
     window: {
       type: 'duelResponse' as const,
       attacker: 'P1',
@@ -81,7 +81,7 @@ function makeDuelResponsePending(defender: string, validCards: string[] = []) {
     },
     timeout: 15000,
     deadline: Date.now() + 15000,
-    onTimeout: { type: 'respond' as const, player: defender },
+    onTimeout: { type: '打出' as const, player: defender },
   };
 }
 
@@ -148,7 +148,7 @@ describe('技能卡牌转换', () => {
       state = { ...state, pending: makeKillResponsePending('P1') };
 
       const result = validateAction(state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
         cardId: killAsDodge,
       });
@@ -164,7 +164,7 @@ describe('技能卡牌转换', () => {
       state = { ...state, pending: makeKillResponsePending('P1') };
 
       const result = validateAction(state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
         cardId: blackKill,
       });
@@ -180,7 +180,7 @@ describe('技能卡牌转换', () => {
       state = { ...state, pending: makeKillResponsePending('P1') };
 
       const result = validateAction(state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
         cardId: redKill,
       });
@@ -196,7 +196,7 @@ describe('技能卡牌转换', () => {
       state = { ...state, pending: makeDuelResponsePending('P1') };
 
       const result = validateAction(state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
         cardId: redDodge,
       });
@@ -212,7 +212,7 @@ describe('技能卡牌转换', () => {
       state = { ...state, pending: makeDuelResponsePending('P1') };
 
       const result = validateAction(state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
         cardId: dodge,
       });
@@ -228,7 +228,7 @@ describe('技能卡牌转换', () => {
       state = { ...state, pending: makeDuelResponsePending('P1') };
 
       const result = validateAction(state, {
-        type: 'respond',
+        type: '打出',
         player: 'P1',
         cardId: peach,
       });

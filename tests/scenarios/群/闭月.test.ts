@@ -50,7 +50,7 @@ describe('貂蝉 - 闭月', () => {
     })
     .check('因手牌数超过体力，进入弃牌阶段', ctx => {
       expect(ctx.isPending()).toBe(true);
-      expect(ctx.pendingType()).toBe('discardPhase');
+      expect(ctx.pendingType()).toBe('弃牌阶段');
     })
     .run();
 });

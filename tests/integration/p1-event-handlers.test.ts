@@ -17,35 +17,35 @@ function makeEvent(type: string, payload: Record<string, unknown>): ServerEvent 
 }
 
 describe('P1 reducer handlers (8 个新 server event 类型)', () => {
-  describe('loseHealth', () => {
+  describe('失去体力', () => {
     it('减血并夹到 0', () => {
       const state = createTestGame({ playerCount: 2 });
       const start = state.players.P1.health;
-      const next = reduceGameState(state, [makeEvent('loseHealth', { target: 'P1', amount: 2 })]);
+      const next = reduceGameState(state, [makeEvent('失去体力', { target: 'P1', amount: 2 })]);
       expect(next.players.P1.health).toBe(start - 2);
     });
 
     it('扣到 0 不会变负数', () => {
       const state = createTestGame({ playerCount: 2 });
-      const next = reduceGameState(state, [makeEvent('loseHealth', { target: 'P1', amount: 999 })]);
+      const next = reduceGameState(state, [makeEvent('失去体力', { target: 'P1', amount: 999 })]);
       expect(next.players.P1.health).toBe(0);
     });
 
     it('未知 target 时返回原 state', () => {
       const state = createTestGame({ playerCount: 2 });
-      const next = reduceGameState(state, [makeEvent('loseHealth', { target: 'NOPE', amount: 1 })]);
+      const next = reduceGameState(state, [makeEvent('失去体力', { target: 'NOPE', amount: 1 })]);
       expect(next).toBe(state);
     });
   });
 
-  describe('loseCard', () => {
+  describe('失去牌', () => {
     it('从手牌失去：移出手牌并进入弃牌堆', () => {
       let state = createTestGame({ playerCount: 2 });
       state = { ...state, players: { ...state.players, P1: { ...state.players.P1, hand: ['c1', 'c2'] } } };
       state = { ...state, cardMap: { ...state.cardMap, c1: { id: 'c1', name: '杀', type: '基本牌', subtype: '杀', suit: '♥', rank: 'A', description: '' } } };
 
       const next = reduceGameState(state, [
-        makeEvent('loseCard', { cardId: 'c1', from: { zone: 'hand', player: 'P1' } }),
+        makeEvent('失去牌', { cardId: 'c1', from: { zone: '手牌', player: 'P1' } }),
       ]);
       expect(next.players.P1.hand).toEqual(['c2']);
       expect(next.zones.discardPile).toContain('c1');
@@ -57,33 +57,33 @@ describe('P1 reducer handlers (8 个新 server event 类型)', () => {
         ...state,
         players: {
           ...state.players,
-          P1: { ...state.players.P1, equipment: { ...state.players.P1.equipment, weapon: 'w1' } },
+          P1: { ...state.players.P1, equipment: { ...state.players.P1.equipment, 武器: 'w1' } },
         },
         cardMap: { ...state.cardMap, w1: { id: 'w1', name: '诸葛连弩', type: '装备牌', subtype: '武器', suit: '♠', rank: 'A', description: '' } },
       };
 
       const next = reduceGameState(state, [
-        makeEvent('loseCard', { cardId: 'w1', from: { zone: 'equipment', player: 'P1', slot: 'weapon' } }),
+        makeEvent('失去牌', { cardId: 'w1', from: { zone: '装备', player: 'P1', slot: '武器' } }),
       ]);
-      expect(next.players.P1.equipment.weapon).toBeUndefined();
+      expect(next.players.P1.equipment.武器).toBeUndefined();
       expect(next.zones.discardPile).toContain('w1');
     });
 
     it('手牌中无此 cardId：no-op', () => {
       const state = createTestGame({ playerCount: 2 });
       const next = reduceGameState(state, [
-        makeEvent('loseCard', { cardId: 'nonexistent', from: { zone: 'hand', player: 'P1' } }),
+        makeEvent('失去牌', { cardId: 'nonexistent', from: { zone: '手牌', player: 'P1' } }),
       ]);
       expect(next).toBe(state);
     });
   });
 
-  describe('removeSkill', () => {
+  describe('去技能', () => {
     it('移除该玩家的指定 skillId triggers', () => {
       let state = createTestGame({ playerCount: 2 });
       const trigger: TriggerRule = {
-        event: 'damage',
-        source: 'character',
+        event: '造成伤害',
+        source: '角色',
         skillId: 'jianxiong',
         player: 'P1',
         priority: 0,
@@ -92,25 +92,25 @@ describe('P1 reducer handlers (8 个新 server event 类型)', () => {
       state = { ...state, triggers: [trigger, other] };
 
       const next = reduceGameState(state, [
-        makeEvent('removeSkill', { player: 'P1', skillId: 'jianxiong' }),
+        makeEvent('去技能', { player: 'P1', skillId: 'jianxiong' }),
       ]);
       expect(next.triggers).toHaveLength(1);
       expect(next.triggers[0]?.skillId).toBe('rende');
     });
   });
 
-  describe('setChained', () => {
+  describe('设横置', () => {
     it('设置 chained=true', () => {
       const state = createTestGame({ playerCount: 2 });
       expect(state.players.P1.chained).toBe(false);
-      const next = reduceGameState(state, [makeEvent('setChained', { target: 'P1', chained: true })]);
+      const next = reduceGameState(state, [makeEvent('设横置', { target: 'P1', chained: true })]);
       expect(next.players.P1.chained).toBe(true);
     });
 
     it('设置 chained=false（取消连环）', () => {
       let state = createTestGame({ playerCount: 2 });
       state = { ...state, players: { ...state.players, P1: { ...state.players.P1, chained: true } } };
-      const next = reduceGameState(state, [makeEvent('setChained', { target: 'P1', chained: false })]);
+      const next = reduceGameState(state, [makeEvent('设横置', { target: 'P1', chained: false })]);
       expect(next.players.P1.chained).toBe(false);
     });
   });
@@ -121,10 +121,10 @@ describe('P1 reducer handlers (8 个新 server event 类型)', () => {
       const m1: Mark = { id: 'k1', scope: 'player', duration: 'permanent' };
       const m1b: Mark = { id: 'k1', scope: 'player', duration: 'untilTurnEnd' };
 
-      const s1 = reduceGameState(state, [makeEvent('addMark', { player: 'P1', mark: m1 })]);
+      const s1 = reduceGameState(state, [makeEvent('加标记', { player: 'P1', mark: m1 })]);
       expect(s1.marks.P1).toEqual([m1]);
 
-      const s2 = reduceGameState(s1, [makeEvent('addMark', { player: 'P1', mark: m1b })]);
+      const s2 = reduceGameState(s1, [makeEvent('加标记', { player: 'P1', mark: m1b })]);
       expect(s2.marks.P1).toEqual([m1b]);
     });
 
@@ -134,7 +134,7 @@ describe('P1 reducer handlers (8 个新 server event 类型)', () => {
       state = { ...state, marks: { ...state.marks, P1: [m] } };
 
       const next = reduceGameState(state, [
-        makeEvent('removeMark', { player: 'P1', markId: 'k1' }),
+        makeEvent('去标记', { player: 'P1', markId: 'k1' }),
       ]);
       expect(next.marks.P1).toEqual([]);
     });
@@ -146,17 +146,17 @@ describe('P1 reducer handlers (8 个新 server event 类型)', () => {
       state = { ...state, marks: { ...state.marks, P1: [trans], P2: [perm] } };
 
       const next = reduceGameState(state, [
-        makeEvent('clearExpiredMarks', { phase: 'turnEnd' }),
+        makeEvent('清过期标记', { phase: '回合结束' }),
       ]);
       expect(next.marks.P1).toEqual([]);
       expect(next.marks.P2).toEqual([perm]);
     });
   });
 
-  describe('shuffleDeck', () => {
+  describe('洗牌', () => {
     it('shuffleDeck 为 no-op（不修改状态字段）', () => {
       const state = createTestGame({ playerCount: 2 });
-      const next = reduceGameState(state, [makeEvent('shuffleDeck', {})]);
+      const next = reduceGameState(state, [makeEvent('洗牌', {})]);
       expect(next).toBe(state);
     });
   });

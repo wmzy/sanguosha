@@ -8,7 +8,7 @@ describe('孙策 - 魂姿', () => {
       ctx.setHealth('P1', 1);
     })
     .act('触发准备阶段', ctx => {
-      ctx.emitEvent({ type: 'phaseBegin', phase: '准备', player: 'P1' });
+      ctx.emitEvent({ type: '阶段开始', phase: '准备', player: 'P1' });
     })
     .check('魂姿已觉醒标记', ctx => {
       expect(ctx.player('P1').vars['魂姿/awakened']).toBe(true);
@@ -36,7 +36,7 @@ describe('孙策 - 魂姿', () => {
       ctx.setHealth('P1', 2);
     })
     .act('触发准备阶段', ctx => {
-      ctx.emitEvent({ type: 'phaseBegin', phase: '准备', player: 'P1' });
+      ctx.emitEvent({ type: '阶段开始', phase: '准备', player: 'P1' });
     })
     .check('魂姿未触发', ctx => {
       expect(ctx.player('P1').vars['魂姿/awakened']).toBeUndefined();
@@ -60,7 +60,7 @@ describe('孙策 - 魂姿', () => {
       };
     })
     .act('再次触发准备阶段', ctx => {
-      ctx.emitEvent({ type: 'phaseBegin', phase: '准备', player: 'P1' });
+      ctx.emitEvent({ type: '阶段开始', phase: '准备', player: 'P1' });
     })
     .check('体力上限不再减少', ctx => {
       expect(ctx.player('P1').maxHealth).toBe(4);

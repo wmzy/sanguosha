@@ -14,8 +14,8 @@ export const 孙权: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'discard', count: 'any' },
-          { type: 'draw', count: 'sameAsDiscarded' },
+          { type: '弃置', count: 'any' },
+          { type: '摸牌', count: 'sameAsDiscarded' },
         ],
       },
     },
@@ -23,7 +23,7 @@ export const 孙权: CharacterConfig = {
       name: '救援',
       description: '锁定技，其他吴势力角色对你使用【桃】时，你额外回复1点体力。',
       trigger: 'onHealReceived',
-      effect: { type: 'heal', target: 'self', amount: 1 },
+      effect: { type: '回复体力', target: 'self', amount: 1 },
       passive: true,
     },
   ],
@@ -76,7 +76,7 @@ export const 黄盖: CharacterConfig = {
         type: 'sequence',
         steps: [
           { type: 'dealDamage', target: 'self', amount: 1 },
-          { type: 'draw', count: 2 },
+          { type: '摸牌', count: 2 },
         ],
       },
     },
@@ -101,7 +101,7 @@ export const 周瑜: CharacterConfig = {
       description: '锁定技，摸牌阶段，你额外摸一张牌。',
       trigger: 'onTurnStart',
       condition: { phase: '摸牌' },
-      effect: { type: 'draw', count: 1 },
+      effect: { type: '摸牌', count: 1 },
       passive: true,
     },
   ],
@@ -147,7 +147,7 @@ export const 陆逊: CharacterConfig = {
       name: '连营',
       description: '当你失去最后的手牌时，你可以摸一张牌。',
       trigger: 'onHandEmpty',
-      effect: { type: 'draw', count: 1 },
+      effect: { type: '摸牌', count: 1 },
     },
   ],
 };
@@ -164,15 +164,15 @@ export const 孙尚香: CharacterConfig = {
       trigger: 'manual',
       condition: { phase: '出牌', hasHandCards: true },
       effect: { type: 'sequence', steps: [
-        { type: 'discard', count: 2 },
-        { type: 'heal', target: 'injuredMaleAlly', amount: 1 },
+        { type: '弃置', count: 2 },
+        { type: '回复体力', target: 'injuredMaleAlly', amount: 1 },
       ] },
     },
     {
       name: '枭姬',
       description: '当你失去一张装备区里的牌时，你可以摸一张牌。',
       trigger: 'onEquipChange',
-      effect: { type: 'draw', count: 1 },
+      effect: { type: '摸牌', count: 1 },
     },
   ],
 };
@@ -193,9 +193,9 @@ export const 小乔: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'discard', count: 1 },
+          { type: '弃置', count: 1 },
           { type: 'dealDamage', target: 'otherPlayer', amount: 1 },
-          { type: 'draw', count: 1 },
+          { type: '摸牌', count: 1 },
         ],
       },
     },
@@ -203,7 +203,7 @@ export const 小乔: CharacterConfig = {
       name: '红颜',
       description: '锁定技，你的黑桃牌均视为红桃牌。',
       trigger: 'onTurnStart',
-      effect: { type: 'draw', count: 0 },
+      effect: { type: '摸牌', count: 0 },
       passive: true,
     },
   ],
@@ -242,7 +242,7 @@ export const 太史慈: CharacterConfig = {
         type: 'sequence',
         steps: [
           { type: 'dealDamage', target: 'otherPlayer', amount: 0 },
-          { type: 'draw', count: 0 },
+          { type: '摸牌', count: 0 },
         ],
       },
       oncePerTurn: true,
@@ -266,7 +266,7 @@ export const 鲁肃: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'draw', count: 2 },
+          { type: '摸牌', count: 2 },
         ],
       },
       oncePerTurn: true,
@@ -279,8 +279,8 @@ export const 鲁肃: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'discard', count: 'any' },
-          { type: 'draw', count: 0 },
+          { type: '弃置', count: 'any' },
+          { type: '摸牌', count: 0 },
         ],
       },
       oncePerTurn: true,
@@ -302,8 +302,8 @@ export const 孙坚: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'draw', count: 1 },
-          { type: 'discard', count: 1 },
+          { type: '摸牌', count: 1 },
+          { type: '弃置', count: 1 },
         ],
       },
       oncePerTurn: true,
@@ -323,7 +323,7 @@ export const 孙策: CharacterConfig = {
       name: '激昂',
       description: '每当你使用（指定目标后）或被使用（成为目标后）一张【决斗】或红色的【杀】时，你可以摸一张牌。',
       trigger: 'onCardPlayed',
-      effect: { type: 'draw', count: 1 },
+      effect: { type: '摸牌', count: 1 },
     },
     {
       name: '魂姿',
@@ -356,8 +356,8 @@ export const 张昭张纮: CharacterConfig = {
       effect: {
         type: 'sequence',
         steps: [
-          { type: 'discard', count: 1 },
-          { type: 'draw', count: 1 },
+          { type: '弃置', count: 1 },
+          { type: '摸牌', count: 1 },
         ],
       },
     },
@@ -365,7 +365,7 @@ export const 张昭张纮: CharacterConfig = {
       name: '固政',
       description: '其他角色的弃牌阶段结束时，你可以将弃牌堆中一张该角色弃置的牌返回其手牌，然后获得其余弃牌。',
       trigger: 'onTurnEnd',
-      effect: { type: 'draw', count: 1 },
+      effect: { type: '摸牌', count: 1 },
       passive: true,
     },
   ],

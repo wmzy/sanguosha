@@ -37,13 +37,13 @@ describe('persistence', () => {
   it('saveRoom + loadRoom 往返一致', async () => {
     const { saveRoom, loadRoom } = await loadModule();
     const state = await makeState();
-    await saveRoom('room-1', META, state, [{ type: 'endTurn', player: 'P1' }], true);
+    await saveRoom('room-1', META, state, [{ type: '结束回合', player: 'P1' }], true);
     const loaded = await loadRoom('room-1');
     expect(loaded).not.toBeNull();
     expect(loaded?.seed).toBe(42);
     expect(loaded?.players).toHaveLength(3);
     expect(loaded?.actionLog).toHaveLength(1);
-    expect(loaded?.actionLog[0]).toEqual({ type: 'endTurn', player: 'P1' });
+    expect(loaded?.actionLog[0]).toEqual({ type: '结束回合', player: 'P1' });
   });
 
   it('loadRoom 返回 null 当文件不存在', async () => {
@@ -100,19 +100,19 @@ describe('persistence 防抖路径', () => {
       const { saveRoom, loadRoom, _pendingWriteCount } = await loadModule();
       const state = await makeState();
 
-      await saveRoom('debounce-2', META, state, [{ type: 'endTurn', player: 'P1' }]);
+      await saveRoom('debounce-2', META, state, [{ type: '结束回合', player: 'P1' }]);
       expect(_pendingWriteCount()).toBe(1);
       await vi.advanceTimersByTimeAsync(500);
       await saveRoom('debounce-2', META, state, [
-        { type: 'endTurn', player: 'P1' },
-        { type: 'endTurn', player: 'P2' },
+        { type: '结束回合', player: 'P1' },
+        { type: '结束回合', player: 'P2' },
       ]);
       expect(_pendingWriteCount()).toBe(1);
       await vi.advanceTimersByTimeAsync(500);
       await saveRoom('debounce-2', META, state, [
-        { type: 'endTurn', player: 'P1' },
-        { type: 'endTurn', player: 'P2' },
-        { type: 'endTurn', player: 'P3' },
+        { type: '结束回合', player: 'P1' },
+        { type: '结束回合', player: 'P2' },
+        { type: '结束回合', player: 'P3' },
       ]);
       expect(_pendingWriteCount()).toBe(1);
       await vi.advanceTimersByTimeAsync(1000);
@@ -168,9 +168,9 @@ describe('restoreToState 事件重放', () => {
 
     const original = createInitialState(initConfig);
 
-    const actions: Array<{ type: 'endTurn'; player: string }> = [
-      { type: 'endTurn', player: 'P1' },
-      { type: 'endTurn', player: 'P2' },
+    const actions: Array<{ type: '结束回合'; player: string }> = [
+      { type: '结束回合', player: 'P1' },
+      { type: '结束回合', player: 'P2' },
     ];
     let lastState = original;
     for (const a of actions) {
@@ -212,7 +212,7 @@ describe('restoreToState 事件重放', () => {
     const restored = restoreToState(persisted);
 
     expect(restored.triggers.length).toBeGreaterThan(0);
-    const hasCharacterTrigger = restored.triggers.some(t => t.source === 'character');
+    const hasCharacterTrigger = restored.triggers.some(t => t.source === '角色');
     expect(hasCharacterTrigger).toBe(true);
   });
 });

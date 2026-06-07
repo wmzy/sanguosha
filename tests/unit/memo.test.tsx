@@ -29,7 +29,7 @@ function makeCard(id: string, name: string): Card {
 }
 
 function makeOp(seq: number, description: string): Operation {
-  return { seq, timestamp: 0, type: 'play', data: {}, description };
+  return { seq, timestamp: 0, type: '出牌', data: {}, description };
 }
 
 const selfPanelData: PlayerPanelData = {
@@ -77,7 +77,7 @@ describe('React.memo 包裹验证', () => {
 
     // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
     // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
-    const ProfiledPlayerPanel = memo(function ProfiledPlayerPanel(
+    const ProfiledPlayerPanel = memo((
       props: {
         playerName: string;
         data: PlayerPanelData;
@@ -86,7 +86,7 @@ describe('React.memo 包裹验证', () => {
         isSelf: boolean;
         role: string;
       },
-    ) {
+    ) => {
       return (
         <Profiler id="PlayerPanel" onRender={onRender}>
           <PlayerPanel
@@ -161,11 +161,11 @@ describe('React.memo 包裹验证', () => {
     // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
     // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
     // HandCards 接受 (hand, selectedIndex, onSelectCard) props，全部用 stable 值
-    const ProfiledHandCards = memo(function ProfiledHandCards({
+    const ProfiledHandCards = memo(({
       hand: h,
     }: {
       hand: Card[];
-    }) {
+    }) => {
       const onSelectCard = useCallback(() => {}, []);
       return (
         <Profiler id="HandCards" onRender={onRender}>
@@ -220,7 +220,7 @@ describe('React.memo 包裹验证', () => {
     // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
     // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
     // ActionPanel 接受 (canPlay, canEndTurn, onPlayCard, onEndTurn) props，全部用 stable 值
-    const ProfiledActionPanel = memo(function ProfiledActionPanel() {
+    const ProfiledActionPanel = memo(() => {
       const onPlayCard = useCallback(() => {}, []);
       const onEndTurn = useCallback(() => {}, []);
       return (
@@ -286,11 +286,11 @@ describe('React.memo 包裹验证', () => {
 
     // memo'd wrapper 把 Profiler 放在 React.memo 边界内，
     // 这样父 re-render 时整个子树（含 Profiler 自身）bail-out，update 阶段 0 次
-    const ProfiledLogPanel = memo(function ProfiledLogPanel({
+    const ProfiledLogPanel = memo(({
       operations,
     }: {
       operations: Operation[];
-    }) {
+    }) => {
       return (
         <Profiler id="LogPanel" onRender={onRender}>
           <LogPanel operations={operations} />

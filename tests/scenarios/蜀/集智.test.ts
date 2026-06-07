@@ -13,7 +13,7 @@ describe('黄月英 - 集智', () => {
       const trickId = ctx.findCard('P1', '无中生有')!;
       // cardPlayed GameEvent 当前引擎路径未发射，直接 emitEvent
       ctx.emitEvent({
-        type: 'cardPlayed',
+        type: '出牌',
         player: 'P1',
         cardId: trickId,
       });

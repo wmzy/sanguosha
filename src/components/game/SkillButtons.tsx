@@ -20,10 +20,10 @@ const skillBtnPadding = css`
   font-size: 13px;
 `;
 
-export const SkillButtons = memo(function SkillButtons({
+export const SkillButtons = memo(({
   availableSkills,
   onActivate,
-}: SkillButtonsProps) {
+}: SkillButtonsProps) => {
   if (availableSkills.length === 0) return null;
   return (
     <div className={bottomButtonsRow}>

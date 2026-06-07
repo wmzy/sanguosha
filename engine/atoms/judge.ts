@@ -33,8 +33,8 @@ function drawJudgeCard(state: GameState): { cardId: string | null; suit: Suit; r
 
 export function register() {
   registerAtom({
-    type: 'judge',
-    apply(state: GameState, atom: Atom & { type: 'judge' }) {
+    type: '判定',
+    apply(state: GameState, atom: Atom & { type: '判定' }) {
       const player = atom.player as string;
       const s = ensureDeckHasCards(state);
       const { cardId, suit, result } = drawJudgeCard(s);
@@ -73,15 +73,15 @@ export function register() {
 
       return newState;
     },
-    toEvents(state: GameState, atom: Atom & { type: 'judge' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '判定' }): AtomEventResult {
       const player = atom.player as string;
       const s = ensureDeckHasCards(state);
       const { cardId, suit, rank, result } = drawJudgeCard(s);
       const payload = { player, cardId, result, suit, rank };
-      const server = makeServerEvent('judge', payload);
-      return [server, new Map(), makePlayerEvent('judge', payload)];
+      const server = makeServerEvent('判定', payload);
+      return [server, new Map(), makePlayerEvent('判定', payload)];
     },
-    getResult(state: GameState, _atom: Atom & { type: 'judge' }): Record<string, Json> {
+    getResult(state: GameState, _atom: Atom & { type: '判定' }): Record<string, Json> {
       // §4.6 修复：优先读 state.localVars（apply 写入的判定牌 ID），避免
       // discardPile[top] 在多步骤技能中被其他弃牌覆盖。fallback 保留以兼容
       // 旧调用站点直接调用 getResult 而未经过 apply 的极端情况。

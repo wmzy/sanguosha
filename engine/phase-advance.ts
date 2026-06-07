@@ -51,7 +51,7 @@ function processJudgmentPhase(state: GameState, player: string): EngineResult {
     depth: 0,
     judgmentContext: { player, trickIndex: lastIndex },
   });
-  const result = applyAtoms(state, [{ type: 'pushPending', action: pending }]);
+  const result = applyAtoms(state, [{ type: '推入待定', action: pending }]);
   return { state: result.state, events: result.events };
 }
 
@@ -61,8 +61,8 @@ function batchProcessJudgments(state: GameState, player: string, tricks: Pending
 
   for (let i = tricks.length - 1; i >= 0; i--) {
     const trick = tricks[i];
-    atoms.push({ type: 'judge', player, varKey: `judgeResult_${trick.name}_${i}` });
-    atoms.push({ type: 'removePendingTrick', player, index: i });
+    atoms.push({ type: '判定', player, varKey: `judgeResult_${trick.name}_${i}` });
+    atoms.push({ type: '移除延时锦囊', player, index: i });
   }
 
   const actionResult = applyAtoms(state, atoms);
@@ -82,7 +82,7 @@ function batchProcessJudgments(state: GameState, player: string, tricks: Pending
   }
 
   if (tags.length > 0) {
-    const tagAtoms = tags.map((tag) => ({ type: 'addTag' as const, player, tag }));
+    const tagAtoms = tags.map((tag) => ({ type: '加标签' as const, player, tag }));
     const tagResult = applyAtoms(s, tagAtoms);
     return { state: tagResult.state, events: [...actionResult.events, ...tagResult.events] };
   }
@@ -101,10 +101,10 @@ function processPhaseStep(state: GameState): EngineResult {
   let s: GameState = state;
 
   // 1. phaseBegin atom（写 serverLog）+ 显式 emitEvent 派 GameEvent 给技能钩子
-  const beginResult = applyAtoms(s, [{ type: 'phaseBegin' as const, phase, player }]);
+  const beginResult = applyAtoms(s, [{ type: '阶段开始' as const, phase, player }]);
   s = beginResult.state;
   allEvents.push(...beginResult.events);
-  const beginEvent = emitEvent(s, { type: 'phaseBegin' as const, phase, player });
+  const beginEvent = emitEvent(s, { type: '阶段开始' as const, phase, player });
   s = beginEvent.state;
   allEvents.push(...beginEvent.events);
   if (s.pending !== null) return { state: s, events: allEvents };
@@ -131,17 +131,17 @@ function processPhaseStep(state: GameState): EngineResult {
   }
 
   // 3. phaseEnd atom（写 serverLog）+ 显式 emitEvent 派 GameEvent 给技能钩子
-  const endResult = applyAtoms(s, [{ type: 'phaseEnd' as const, phase, player }]);
+  const endResult = applyAtoms(s, [{ type: '阶段结束' as const, phase, player }]);
   s = endResult.state;
   allEvents.push(...endResult.events);
-  const endEvent = emitEvent(s, { type: 'phaseEnd' as const, phase, player });
+  const endEvent = emitEvent(s, { type: '阶段结束' as const, phase, player });
   s = endEvent.state;
   allEvents.push(...endEvent.events);
   if (s.pending !== null) return { state: s, events: allEvents };
 
   // 4. setPhase atom: 切 state.phase 字段（写在 phaseEnd 之后避免乱序）
   const { state: phaseState, events: phaseEvents } = applyAtoms(s, [
-    { type: 'setPhase' as const, phase: nextPhase },
+    { type: '设阶段' as const, phase: nextPhase },
   ]);
   s = phaseState;
   allEvents.push(...phaseEvents);
@@ -156,10 +156,10 @@ function getPhaseActions(state: GameState, phase: TurnPhase, player: string): At
       return [];
     case '摸牌':
       if (playerState.tags.includes('skipDraw')) {
-        return [{ type: 'removeTag' as const, player, tag: 'skipDraw' }];
+        return [{ type: '去标签' as const, player, tag: 'skipDraw' }];
       }
       const drawCount = playerState.vars['裸衣/active'] === true ? 1 : 2;
-      return [{ type: 'draw' as const, player, count: drawCount }];
+      return [{ type: '摸牌' as const, player, count: drawCount }];
     default:
       return [];
   }
@@ -199,8 +199,8 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   );
   if (faceDownMarks.length > 0) {
     const skipResult = applyAtoms(s, [
-      { type: 'nextPlayer' },
-      { type: 'clearExpiredMarks', phase: 'turnEnd' },
+      { type: '下一玩家' },
+      { type: '清过期标记', phase: '回合结束' },
     ]);
     // nextPlayer atom 已把 turnStarted 重置为 false（见 engine/atoms/phase.ts）；
     // 显式再写一次以防御未来重构。
@@ -212,12 +212,12 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   // turnStart 防重：依赖 state.turn.turnStarted: boolean（nextPlayer atom 重置为 false）
   if (!s.turn.turnStarted) {
     // turnStart GameEvent 派发（技能钩子）
-    const turnStartGameEvent: GameEvent = { type: 'turnStart', player: s.currentPlayer };
+    const turnStartGameEvent: GameEvent = { type: '回合开始', player: s.currentPlayer };
     const turnStartResult = emitEvent(s, turnStartGameEvent);
     s = turnStartResult.state;
     allEvents.push(...turnStartResult.events);
     // turnStart server event 走 atom 路径（写进 state.serverLog，详见 ADR 0011）
-    const turnStartAtomResult = applyAtoms(s, [{ type: 'turnStart', player: s.currentPlayer }]);
+    const turnStartAtomResult = applyAtoms(s, [{ type: '回合开始', player: s.currentPlayer }]);
     s = { ...turnStartAtomResult.state, turn: { ...turnStartAtomResult.state.turn, turnStarted: true } };
     allEvents.push(...turnStartAtomResult.events);
     if (s.pending !== null) {
@@ -240,8 +240,8 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   // 出牌阶段被乐不思蜀跳过 → 直接设置到弃牌阶段
   if (s.pending === null && s.phase === '出牌' && shouldSkipPhase(s, s.phase, s.currentPlayer)) {
     const skipAtoms: Atom[] = [
-      { type: 'removeTag' as const, player: s.currentPlayer, tag: 'skipPlay' },
-      { type: 'setPhase' as const, phase: '弃牌' as TurnPhase },
+      { type: '去标签' as const, player: s.currentPlayer, tag: 'skipPlay' },
+      { type: '设阶段' as const, phase: '弃牌' as TurnPhase },
     ];
     const skipResult = applyAtoms(s, skipAtoms);
     s = skipResult.state;
@@ -253,13 +253,13 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
     const timeout = TIMEOUT_DEFAULTS.playPhase;
     const playPending: PendingPlayPhase = {
       id: createPendingId(),
-      type: 'playPhase',
+      type: '出牌阶段',
       player: s.currentPlayer,
       timeout,
       deadline: Date.now() + timeout,
-      onTimeout: { type: 'endTurn', player: s.currentPlayer },
+      onTimeout: { type: '结束回合', player: s.currentPlayer },
     };
-    const pushResult = applyAtoms(s, [{ type: 'pushPending', action: playPending }]);
+    const pushResult = applyAtoms(s, [{ type: '推入待定', action: playPending }]);
     s = pushResult.state;
     allEvents.push(...pushResult.events);
   }

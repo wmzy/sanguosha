@@ -25,7 +25,7 @@ describe('贯石斧 - forceHit', () => {
     })
     .check('触发贯石斧强制命中 prompt', ctx => {
       expect(ctx.isPending()).toBe(true);
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .run();
 
@@ -51,8 +51,8 @@ describe('贯石斧 - forceHit', () => {
       ctx.respond('P2', dodgeId);
     })
     .check('选择不弃牌', ctx => {
-      expect(ctx.pendingType()).toBe('skillPrompt');
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: false });
+      expect(ctx.pendingType()).toBe('技能选择');
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: false });
     })
     .check('P2 无伤害', ctx => {
       const diff = ctx.diff('equipped');

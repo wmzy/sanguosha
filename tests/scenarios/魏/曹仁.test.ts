@@ -10,7 +10,7 @@ describe('曹仁 - 据守', () => {
     })
     .act('发射结束阶段事件', ctx => {
       ctx.emitEvent({
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '结束',
         player: 'P1',
       });

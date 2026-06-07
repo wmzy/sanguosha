@@ -102,9 +102,9 @@ describe('事件序号 + 断点续传', () => {
     setState(session, []);
 
     getBroadcastEvents(session).call(session, [
-      makeEvent('e1', 'turnStart'),
-      makeEvent('e2', 'phaseBegin'),
-      makeEvent('e3', 'draw'),
+      makeEvent('e1', '回合开始'),
+      makeEvent('e2', '阶段开始'),
+      makeEvent('e3', '摸牌'),
     ]);
 
     const eventsMsg = sent.find((s) => s.payload.type === 'events')?.payload as
@@ -122,9 +122,9 @@ describe('事件序号 + 断点续传', () => {
     const session = new GameSession(room, true);
     setState(session, []);
 
-    getBroadcastEvents(session).call(session, [makeEvent('a', 'turnStart'), makeEvent('b', 'phaseBegin')]);
-    getBroadcastEvents(session).call(session, [makeEvent('c', 'draw')]);
-    getBroadcastEvents(session).call(session, [makeEvent('d', 'damage'), makeEvent('e', 'kill')]);
+    getBroadcastEvents(session).call(session, [makeEvent('a', '回合开始'), makeEvent('b', '阶段开始')]);
+    getBroadcastEvents(session).call(session, [makeEvent('c', '摸牌')]);
+    getBroadcastEvents(session).call(session, [makeEvent('d', '造成伤害'), makeEvent('e', '击杀')]);
 
     const allSeqs: number[] = [];
     for (const m of sent) {
@@ -157,7 +157,7 @@ describe('事件序号 + 断点续传', () => {
     const session = new GameSession(room, true);
     setState(session, []);
 
-    getBroadcastEvents(session).call(session, [makeEvent('x', 'turnStart')]);
+    getBroadcastEvents(session).call(session, [makeEvent('x', '回合开始')]);
 
     const eventsMsg = sent.find((s) => s.payload.type === 'events')?.payload as
       | { actionLog?: unknown }
@@ -171,11 +171,11 @@ describe('事件序号 + 断点续传', () => {
     const { sent } = setupMockWs(playerId);
     const session = new GameSession(room, true);
     const fakeLog: ServerEvent[] = [
-      makeEvent('e0', 'turnStart'),
-      makeEvent('e1', 'phaseBegin'),
-      makeEvent('e2', 'draw'),
-      makeEvent('e3', 'damage'),
-      makeEvent('e4', 'kill'),
+      makeEvent('e0', '回合开始'),
+      makeEvent('e1', '阶段开始'),
+      makeEvent('e2', '摸牌'),
+      makeEvent('e3', '造成伤害'),
+      makeEvent('e4', '击杀'),
     ];
     setState(session, fakeLog);
 
@@ -311,7 +311,7 @@ describe('事件序号 + 断点续传', () => {
     // 第三阶段：新事件再 broadcast，seq 应从 3 开始
     const playerId = 'debug-player';
     const { sent } = setupMockWs(playerId);
-    getBroadcastEvents(session2).call(session2, [makeEvent('new', 'turnStart')]);
+    getBroadcastEvents(session2).call(session2, [makeEvent('new', '回合开始')]);
 
     const eventsMsg = sent.find((s) => s.payload.type === 'events')?.payload as
       | Extract<ServerMessage, { type: 'events' }>

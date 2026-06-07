@@ -18,7 +18,7 @@ export function resolveDuelResponse(
     return { state, events: [], error: '决斗响应窗口缺少必要参数' };
   }
 
-  const cardId = action.type === 'respond' ? action.cardId : undefined;
+  const cardId = action.type === '打出' ? action.cardId : undefined;
 
   if (cardId) {
     // 当前防守方出了杀 → 换对方继续出杀
@@ -33,12 +33,12 @@ export function resolveDuelResponse(
     // 弃杀，弹掉当前窗口
     const moveResult = applyAtoms(state, [
       {
-        type: 'moveCard',
+        type: '移动牌',
         cardId,
-        from: { zone: 'hand', player: defender },
-        to: { zone: 'discardPile' },
+        from: { zone: '手牌', player: defender },
+        to: { zone: '弃牌堆' },
       },
-      { type: 'popPending' },
+      { type: '弹出待定' },
     ]);
 
     // 轮到对方出杀：交换 attacker/defender
@@ -50,7 +50,7 @@ export function resolveDuelResponse(
     const duelTimeout = 15000;
     const nextDuel: PendingResponseWindow = {
       id: 'duel-next',
-      type: 'responseWindow',
+      type: '响应窗口',
       window: {
         type: 'duelResponse',
         attacker: nextAttacker,
@@ -62,10 +62,10 @@ export function resolveDuelResponse(
       },
       timeout: duelTimeout,
       deadline: Date.now() + duelTimeout,
-      onTimeout: { type: 'respond', player: nextDefender },
+      onTimeout: { type: '打出', player: nextDefender },
     };
     const pushResult = applyAtoms(moveResult.state, [
-      { type: 'pushPending', action: nextDuel },
+      { type: '推入待定', action: nextDuel },
     ]);
     return {
       state: pushResult.state,
@@ -74,7 +74,7 @@ export function resolveDuelResponse(
   }
 
   // 没出杀 → 当前防守方受 1 点伤害
-  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: 'popPending' }]);
+  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: '弹出待定' }]);
   const damageResult = applyDamage(popState, defender, 1, attacker, sourceCard);
 
   return {

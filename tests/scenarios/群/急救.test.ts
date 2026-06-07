@@ -21,8 +21,8 @@ describe('华佗 - 急救', () => {
       ctx.respond('P2');
     })
     .check('P2 进入濒死，求桃从 P1 开始', ctx => {
-      expect(ctx.state.pending?.type).toBe('dyingWindow');
-      if (ctx.state.pending?.type === 'dyingWindow') {
+      expect(ctx.state.pending?.type).toBe('濒死窗口');
+      if (ctx.state.pending?.type === '濒死窗口') {
         expect(ctx.state.pending.dyingPlayer).toBe('P2');
         // 标准规则：从当前回合玩家 P1 开始，濒死者 P2 最后自救
         expect(ctx.state.pending.savers).toEqual(['P1', 'P2']);
@@ -81,8 +81,8 @@ describe('华佗 - 急救', () => {
       ctx.respond('P2');
     })
     .check('P2 濒死，求桃从 P1 开始', ctx => {
-      expect(ctx.state.pending?.type).toBe('dyingWindow');
-      if (ctx.state.pending?.type === 'dyingWindow') {
+      expect(ctx.state.pending?.type).toBe('濒死窗口');
+      if (ctx.state.pending?.type === '濒死窗口') {
         expect(ctx.state.pending.savers).toEqual(['P1', 'P2']);
       }
     })
@@ -116,7 +116,7 @@ describe('华佗 - 急救', () => {
       ctx.respond('P2');
     })
     .check('P2 濒死，求桃从 P1 开始', ctx => {
-      expect(ctx.state.pending?.type).toBe('dyingWindow');
+      expect(ctx.state.pending?.type).toBe('濒死窗口');
     })
     .act('华佗(P1) 用真正的桃救 P2', ctx => {
       const peachId = ctx.findCard('P1', '桃')!;

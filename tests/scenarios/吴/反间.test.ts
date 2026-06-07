@@ -17,14 +17,14 @@ describe('周瑜 - 反间', () => {
     })
     .act('发动反间', ctx => {
       ctx.useSkill('P1', '反间');
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .act('选择目标 P2', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: { player: 'P2' } });
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: { player: 'P2' } });
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .act('选择花色 ♥（P1手牌为♠，不同）', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: '♥' });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: '♥' });
     })
     .check('P2 受到1点伤害', ctx => {
       const diff = ctx.diff('initial');
@@ -49,10 +49,10 @@ describe('周瑜 - 反间', () => {
       ctx.useSkill('P1', '反间');
     })
     .act('选择目标 P2', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: { player: 'P2' } });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: { player: 'P2' } });
     })
     .act('选择花色 ♠（与手牌相同）', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: '♠' });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: '♠' });
     })
     .check('P2 不受伤', ctx => {
       const diff = ctx.diff('initial');

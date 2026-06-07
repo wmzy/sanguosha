@@ -5,13 +5,13 @@ import { updatePlayer, getPlayer } from '../state';
 
 export function register() {
   registerAtom({
-    type: 'loseCard',
-    apply(state: GameState, atom: Atom & { type: 'loseCard' }): GameState {
+    type: '失去牌',
+    apply(state: GameState, atom: Atom & { type: '失去牌' }): GameState {
       const cardId = atom.cardId as string;
       const from = atom.from;
       const playerName = from.player as string;
 
-      if (from.zone === 'hand') {
+      if (from.zone === '手牌') {
         const player = getPlayer(state, playerName);
         if (!player.hand.includes(cardId)) return state;
         return {
@@ -27,7 +27,7 @@ export function register() {
         };
       }
 
-      if (from.zone === 'equipment') {
+      if (from.zone === '装备') {
         const player = getPlayer(state, playerName);
         const slot = from.slot;
         if (!slot || player.equipment[slot] !== cardId) return state;
@@ -36,7 +36,7 @@ export function register() {
           playerName,
           p => {
             const next = { ...p.equipment };
-            delete next[slot!];
+            delete next[slot];
             return { equipment: next };
           },
         );
@@ -44,12 +44,12 @@ export function register() {
 
       return state;
     },
-    toEvents(_state: GameState, atom: Atom & { type: 'loseCard' }): AtomEventResult {
+    toEvents(_state: GameState, atom: Atom & { type: '失去牌' }): AtomEventResult {
       const cardId = atom.cardId as string;
       const from = atom.from;
       const payload: Json = { cardId, from: { zone: from.zone, player: from.player as string } };
-      const server = makeServerEvent('loseCard', payload);
-      return [server, new Map(), makePlayerEvent('loseCard', payload)];
+      const server = makeServerEvent('失去牌', payload);
+      return [server, new Map(), makePlayerEvent('失去牌', payload)];
     },
   });
 }

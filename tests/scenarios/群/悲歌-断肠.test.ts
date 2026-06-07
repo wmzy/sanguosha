@@ -32,7 +32,7 @@ describe('蔡文姬 - 悲歌', () => {
     })
     .act('P1 受到杀伤害触发悲歌', ctx => {
       ctx.emitEvent({
-        type: 'damageReceived',
+        type: '受到伤害',
         target: 'P1',
         source: 'P2',
         amount: 1,
@@ -40,7 +40,7 @@ describe('蔡文姬 - 悲歌', () => {
     })
     .check('悲歌触发创建技能选择', ctx => {
       expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('skillPrompt');
+      expect(ctx.state.pending?.type).toBe('技能选择');
     })
     .run();
 });

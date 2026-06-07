@@ -20,7 +20,7 @@ interface HandCardsSectionProps {
   onToggleSkillCard: (cardId: string) => void;
 }
 
-export const HandCardsSection = memo(function HandCardsSection({
+export const HandCardsSection = memo(({
   hand,
   me,
   selectedIndex,
@@ -36,7 +36,7 @@ export const HandCardsSection = memo(function HandCardsSection({
   onSelectCard,
   onToggleDiscard,
   onToggleSkillCard,
-}: HandCardsSectionProps) {
+}: HandCardsSectionProps) => {
   const showPlayable =
     isMyTurn && !isKillResponse && !isDyingWindow && !needsDiscard && !isSkillPrompt;
 

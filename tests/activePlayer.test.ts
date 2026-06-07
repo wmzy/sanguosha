@@ -23,7 +23,7 @@ function makeState(pending: PendingAction | null, phase: TurnPhase = '出牌', c
 describe('getSingleActivePlayer', () => {
   it('trickResponse 多 responder 时返回 defender（不是 null）', () => {
     const pending: PendingAction = {
-      type: 'responseWindow',
+      type: '响应窗口',
       window: {
         type: 'trickResponse',
         attacker: 'P1',
@@ -38,7 +38,7 @@ describe('getSingleActivePlayer', () => {
         deadline: Date.now() + 1000,
       },
       id: 'p1',
-      onTimeout: { type: 'respond', player: 'P2' },
+      onTimeout: { type: '打出', player: 'P2' },
       timeout: 1000,
       deadline: Date.now() + 1000,
     };
@@ -48,7 +48,7 @@ describe('getSingleActivePlayer', () => {
 
   it('trickResponse 嵌套时 defender 是新焦点', () => {
     const pending: PendingAction = {
-      type: 'responseWindow',
+      type: '响应窗口',
       window: {
         type: 'trickResponse',
         attacker: 'P1',
@@ -63,7 +63,7 @@ describe('getSingleActivePlayer', () => {
         deadline: Date.now() + 1000,
       },
       id: 'p2',
-      onTimeout: { type: 'respond', player: 'P3' },
+      onTimeout: { type: '打出', player: 'P3' },
       timeout: 1000,
       deadline: Date.now() + 1000,
     };
@@ -73,7 +73,7 @@ describe('getSingleActivePlayer', () => {
 
   it('aoeResponse 单 defender 正常返回', () => {
     const pending: PendingAction = {
-      type: 'responseWindow',
+      type: '响应窗口',
       window: {
         type: 'aoeResponse',
         attacker: 'P1',
@@ -86,7 +86,7 @@ describe('getSingleActivePlayer', () => {
         deadline: Date.now() + 1000,
       },
       id: 'p3',
-      onTimeout: { type: 'respond', player: 'P2' },
+      onTimeout: { type: '打出', player: 'P2' },
       timeout: 1000,
       deadline: Date.now() + 1000,
     };
@@ -96,12 +96,12 @@ describe('getSingleActivePlayer', () => {
 
   it('dyingWindow 返回 currentSaver', () => {
     const pending: PendingAction = {
-      type: 'dyingWindow',
+      type: '濒死窗口',
       dyingPlayer: 'P1',
       savers: ['P1', 'P2', 'P3'],
       currentSaverIndex: 1,
       id: 'p4',
-      onTimeout: { type: 'respond', player: 'P2' },
+      onTimeout: { type: '打出', player: 'P2' },
       timeout: 1000,
       deadline: Date.now() + 1000,
     };

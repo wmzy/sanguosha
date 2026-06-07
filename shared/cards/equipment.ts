@@ -3,31 +3,31 @@ import type { CardDef } from '../types';
 export const 诸葛连弩: CardDef = {
   name: '诸葛连弩', type: '装备牌', subtype: '武器',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
-  range: 1, weaponEffect: { type: 'unlimitedKills' },
+  range: 1, weaponEffect: { type: '诸葛连弩' },
 };
 
 export const 青釭剑: CardDef = {
   name: '青釭剑', type: '装备牌', subtype: '武器',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
-  range: 2, weaponEffect: { type: 'ignoreArmor' },
+  range: 2, weaponEffect: { type: '青釭剑' },
 };
 
 export const 雌雄双股剑: CardDef = {
   name: '雌雄双股剑', type: '装备牌', subtype: '武器',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
-  range: 2, weaponEffect: { type: 'dualWeapon' },
+  range: 2, weaponEffect: { type: '雌雄双股剑' },
 };
 
 export const 贯石斧: CardDef = {
   name: '贯石斧', type: '装备牌', subtype: '武器',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
-  range: 3, weaponEffect: { type: 'forceHit' },
+  range: 3, weaponEffect: { type: '贯石斧' },
 };
 
 export const 青龙偃月刀: CardDef = {
   name: '青龙偃月刀', type: '装备牌', subtype: '武器',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
-  range: 3, weaponEffect: { type: 'chaseDodge' },
+  range: 3, weaponEffect: { type: '青龙偃月刀' },
 };
 
 export const 丈八蛇矛: CardDef = {
@@ -51,13 +51,13 @@ export const 麒麟弓: CardDef = {
 export const 八卦阵: CardDef = {
   name: '八卦阵', type: '装备牌', subtype: '防具',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
-  armorEffect: { type: 'judgeDodge' },
+  armorEffect: { type: '八卦阵' },
 };
 
 export const 仁王盾: CardDef = {
   name: '仁王盾', type: '装备牌', subtype: '防具',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
-  armorEffect: { type: 'blockBlackKill' },
+  armorEffect: { type: '仁王盾' },
 };
 
 export const 赤兔: CardDef = { name: '赤兔', type: '装备牌', subtype: '进攻马', targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] } };

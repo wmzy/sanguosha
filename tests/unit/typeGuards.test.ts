@@ -50,7 +50,7 @@ describe('isCardInfo', () => {
 
 describe('isPendingAction', () => {
   it('should return true for valid pending types', () => {
-    expect(isPendingAction({ type: 'playPhase', id: '1', player: 'a', timeout: 0, deadline: 0, onTimeout: { type: 'pass' } })).toBe(true);
+    expect(isPendingAction({ type: '出牌阶段', id: '1', player: 'a', timeout: 0, deadline: 0, onTimeout: { type: 'pass' } })).toBe(true);
   });
   it('should return false for invalid type', () => {
     expect(isPendingAction({ type: 'invalid' })).toBe(false);

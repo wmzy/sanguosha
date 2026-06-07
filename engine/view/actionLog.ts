@@ -8,42 +8,42 @@ function describeAction(action: GameAction, state: GameState): { type: Operation
   const target = (action as { target?: string }).target;
 
   switch (action.type) {
-    case 'startGame':
-      return { type: 'gameStart', description: '游戏开始', data: {} };
-    case 'endTurn':
-      return { type: 'turnChange', description: `${p} 结束回合`, data: { player: p } };
-    case 'playCard':
+    case '开始':
+      return { type: '游戏开始', description: '游戏开始', data: {} };
+    case '结束回合':
+      return { type: '回合变更', description: `${p} 结束回合`, data: { player: p } };
+    case '打出一张牌':
       return {
-        type: 'play',
+        type: '出牌',
         description: `${p} 使用了${cardName ?? '一张牌'}${target ? `（目标：${target}）` : ''}`,
         data: { player: p, cardId, target },
       };
-    case 'discard': {
+    case '弃置': {
       const cardIds = (action as { cardIds: string[] }).cardIds;
       const names = cardIds.map(id => state.cardMap[id]?.name ?? '?').join('、');
       return {
-        type: 'discard',
+        type: '弃置',
         description: `${p} 弃了 ${cardIds.length} 张牌（${names}）`,
         data: { player: p, cardIds },
       };
     }
-    case 'useSkill': {
+    case '使用技能': {
       const skillId = (action as { skillId: string }).skillId;
-      return { type: 'skillActivate', description: `${p} 发动技能【${skillId}】`, data: { player: p, skillId } };
+      return { type: '技能发动', description: `${p} 发动技能【${skillId}】`, data: { player: p, skillId } };
     }
-    case 'respond': {
+    case '打出': {
       const cardIds = (action as { cardIds?: string[] }).cardIds;
       const rCard = cardId ?? cardIds?.[0];
       const rName = rCard ? state.cardMap[rCard]?.name : undefined;
-      return { type: 'play', description: `${p} 打出${rName ?? '一张牌'}响应`, data: { player: p, cardId: rCard } };
+      return { type: '出牌', description: `${p} 打出${rName ?? '一张牌'}响应`, data: { player: p, cardId: rCard } };
     }
-    case 'skillChoice':
-      return { type: 'skillActivate', description: `${p} 选择技能选项`, data: { player: p } };
-    case 'toggleAutoSkipWuxie':
-      return { type: 'gameStart', description: '切换自动跳过无懈可击', data: {} };
+    case '技能选择':
+      return { type: '技能发动', description: `${p} 选择技能选项`, data: { player: p } };
+    case '切换自动跳过无懈可击':
+      return { type: '游戏开始', description: '切换自动跳过无懈可击', data: {} };
     default: {
       const t = (action as { type: string }).type;
-      return { type: 'phaseChange', description: `${p ?? '系统'} 执行 ${t}`, data: { player: p } };
+      return { type: '阶段变更', description: `${p ?? '系统'} 执行 ${t}`, data: { player: p } };
     }
   }
 }

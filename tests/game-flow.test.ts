@@ -29,16 +29,16 @@ describe('脚本化游戏流程', () => {
     const p1handBefore = state.players.P1.hand.length;
 
     // P1 出杀
-    const r1 = safeEngine(state, { type: 'playCard', player: 'P1', cardId: killId, target: 'P2' });
+    const r1 = safeEngine(state, { type: '打出一张牌', player: 'P1', cardId: killId, target: 'P2' });
     // 可能失败（距离不够、已有pending等）或成功
     // 成功的话产生响应窗口
     if (r1.error) return; // 不能出杀，跳过
 
     expect(r1.state.pending).not.toBeNull();
-    expect(r1.state.pending!.type).toBe('responseWindow');
+    expect(r1.state.pending!.type).toBe('响应窗口');
 
     // P2 不出闪 → 受伤
-    const r2 = safeEngine(r1.state, { type: 'respond', player: 'P2' });
+    const r2 = safeEngine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
     expect(r2.state.players.P2.health).toBe(p2health - 1);
 
@@ -47,18 +47,18 @@ describe('脚本化游戏流程', () => {
     expect(r2.state.players.P1.hand.length).toBe(p1handBefore - 1);
 
     // 结束回合
-    const r3 = safeEngine(r2.state, { type: 'endTurn', player: 'P1' });
+    const r3 = safeEngine(r2.state, { type: '结束回合', player: 'P1' });
     expect(r3.error).toBeUndefined();
 
     // P2 成为当前玩家（P1 手牌可能>体力触发弃牌，但弃牌后应轮到 P2）
     const afterEndTurn = () => {
       let s = r3.state;
       // 如果有弃牌 pending，全部弃完
-      while (s.pending?.type === 'discardPhase') {
+      while (s.pending?.type === '弃牌阶段') {
         const discardP = s.pending;
         const hand = s.players[discardP.player].hand;
         const toDiscard = hand.slice(0, discardP.max);
-        const r = safeEngine(s, { type: 'discard', player: discardP.player, cardIds: toDiscard });
+        const r = safeEngine(s, { type: '弃置', player: discardP.player, cardIds: toDiscard });
         if (r.error) break;
         s = r.state;
       }
@@ -103,7 +103,7 @@ describe('脚本化游戏流程', () => {
 
     const beforeHealth = state.players.P1.health;
     const r = safeEngine(state, {
-      type: 'playCard',
+      type: '打出一张牌',
       player: 'P1',
       cardId: 'test-peach-1',
     });
@@ -136,10 +136,10 @@ describe('脚本化游戏流程', () => {
       },
     };
 
-    const r = safeEngine(state, { type: 'playCard', player: 'P1', cardId: 'test-weapon-1' });
+    const r = safeEngine(state, { type: '打出一张牌', player: 'P1', cardId: 'test-weapon-1' });
     expect(r.error).toBeUndefined();
     // 应装备到武器槽
-    expect(r.state.players.P1.equipment.weapon).toBe('test-weapon-1');
+    expect(r.state.players.P1.equipment.武器).toBe('test-weapon-1');
     expect(r.state.players.P1.hand).not.toContain('test-weapon-1');
   });
 });
@@ -157,24 +157,24 @@ describe('种子确定性', () => {
       const p1kill = state.players.P1.hand.find(id => state.cardMap[id].name === '杀');
       if (!p1kill) return state;
 
-      const r1 = safeEngine(state, { type: 'playCard', player: 'P1', cardId: p1kill, target: 'P2' });
+      const r1 = safeEngine(state, { type: '打出一张牌', player: 'P1', cardId: p1kill, target: 'P2' });
       if (r1.error) return state;
       state = r1.state;
 
-      if (state.pending?.type === 'responseWindow') {
-        const r2 = safeEngine(state, { type: 'respond', player: 'P2' });
+      if (state.pending?.type === '响应窗口') {
+        const r2 = safeEngine(state, { type: '打出', player: 'P2' });
         if (!r2.error) state = r2.state;
       }
 
-      const r3 = safeEngine(state, { type: 'endTurn', player: state.currentPlayer });
+      const r3 = safeEngine(state, { type: '结束回合', player: state.currentPlayer });
       if (r3.error) return state;
       state = r3.state;
 
       // 处理可能的弃牌 pending
-      while (state.pending?.type === 'discardPhase') {
+      while (state.pending?.type === '弃牌阶段') {
         const dp = state.pending;
         const hand = state.players[dp.player].hand;
-        const r = safeEngine(state, { type: 'discard', player: dp.player, cardIds: hand.slice(0, dp.max) });
+        const r = safeEngine(state, { type: '弃置', player: dp.player, cardIds: hand.slice(0, dp.max) });
         if (r.error) break;
         state = r.state;
       }
@@ -222,7 +222,7 @@ describe('随机打谱', () => {
         n => n !== player && state.players[n].info.alive,
       );
       if (targets.length > 0) {
-        const r = safeEngine(state, { type: 'playCard', player, cardId: kill, target: targets[0] });
+        const r = safeEngine(state, { type: '打出一张牌', player, cardId: kill, target: targets[0] });
         if (!r.error) return r.state;
       }
     }
@@ -231,7 +231,7 @@ describe('随机打谱', () => {
     if (p.health < p.maxHealth) {
       const peach = p.hand.find(id => state.cardMap[id]?.name === '桃');
       if (peach) {
-        const r = safeEngine(state, { type: 'playCard', player, cardId: peach });
+        const r = safeEngine(state, { type: '打出一张牌', player, cardId: peach });
         if (!r.error) return r.state;
       }
     }
@@ -257,53 +257,53 @@ describe('随机打谱', () => {
         if (!player?.info.alive) break;
 
         // 有 pending 时处理
-        if (state.pending && state.pending.type !== 'playPhase') {
+        if (state.pending && state.pending.type !== '出牌阶段') {
           const pending = state.pending;
 
-          if (pending.type === 'responseWindow') {
+          if (pending.type === '响应窗口') {
             // 总是 pass（不出牌）
-            const r = safeEngine(state, { type: 'respond', player: pending.window.defender });
+            const r = safeEngine(state, { type: '打出', player: pending.window.defender });
             if (!r.error) {
               state = r.state;
               continue;
             }
           }
 
-          if (pending.type === 'discardPhase') {
+          if (pending.type === '弃牌阶段') {
             const toDiscard = player.hand.slice(0, pending.max);
-            const r = safeEngine(state, { type: 'discard', player: current, cardIds: toDiscard });
+            const r = safeEngine(state, { type: '弃置', player: current, cardIds: toDiscard });
             if (!r.error) {
               state = r.state;
               continue;
             }
           }
 
-          if (pending.type === 'dyingWindow') {
+          if (pending.type === '濒死窗口') {
             // 尝试出桃
             const saver = pending.savers[pending.currentSaverIndex];
             const saverState = state.players[saver];
             const cardMap = state.cardMap;
             const peach = saverState?.hand.find(id => cardMap[id]?.name === '桃');
             if (peach) {
-              const r = safeEngine(state, { type: 'respond', player: saver, cardId: peach });
+              const r = safeEngine(state, { type: '打出', player: saver, cardId: peach });
               if (!r.error) {
                 state = r.state;
                 continue;
               }
             }
             // 不出桃
-            const r = safeEngine(state, { type: 'respond', player: saver });
+            const r = safeEngine(state, { type: '打出', player: saver });
             if (!r.error) {
               state = r.state;
               continue;
             }
           }
 
-          if (pending.type === 'skillPrompt') {
+          if (pending.type === '技能选择') {
             // 跳过技能提示（使用 prompt 中的默认选项）
             const defaultChoice = pending.prompt.defaultChoice ?? false;
             const r = safeEngine(state, {
-              type: 'skillChoice',
+              type: '技能选择',
               player: pending.player,
               choice: defaultChoice,
             });
@@ -325,7 +325,7 @@ describe('随机打谱', () => {
             continue;
           }
           // 没牌可出 → 结束回合
-          const r = safeEngine(state, { type: 'endTurn', player: current });
+          const r = safeEngine(state, { type: '结束回合', player: current });
           if (!r.error) {
             state = r.state;
             continue;
@@ -357,23 +357,23 @@ describe('随机打谱', () => {
         const player = state.players[current];
         if (!player?.info.alive) break;
 
-        if (state.pending && state.pending.type !== 'playPhase') {
+        if (state.pending && state.pending.type !== '出牌阶段') {
           const p = state.pending;
-          if (p.type === 'responseWindow') {
-            const r = safeEngine(state, { type: 'respond', player: p.window.defender });
+          if (p.type === '响应窗口') {
+            const r = safeEngine(state, { type: '打出', player: p.window.defender });
             if (!r.error) {
               state = r.state;
               continue;
             }
-          } else if (p.type === 'discardPhase') {
-            const r = safeEngine(state, { type: 'discard', player: current, cardIds: player.hand.slice(0, p.max) });
+          } else if (p.type === '弃牌阶段') {
+            const r = safeEngine(state, { type: '弃置', player: current, cardIds: player.hand.slice(0, p.max) });
             if (!r.error) {
               state = r.state;
               continue;
             }
-          } else if (p.type === 'dyingWindow') {
+          } else if (p.type === '濒死窗口') {
             const saver = p.savers[p.currentSaverIndex];
-            const r = safeEngine(state, { type: 'respond', player: saver });
+            const r = safeEngine(state, { type: '打出', player: saver });
             if (!r.error) {
               state = r.state;
               continue;
@@ -390,7 +390,7 @@ describe('随机打谱', () => {
             continue;
           }
 
-          const r = safeEngine(state, { type: 'endTurn', player: current });
+          const r = safeEngine(state, { type: '结束回合', player: current });
           if (!r.error) {
             state = r.state;
             continue;
@@ -416,13 +416,13 @@ describe('回合流程缺陷', () => {
     expect(state.phase).toBe('准备');
     // 引擎中没有任何操作可以推进准备阶段，游戏永久卡住
     // 期望：准备阶段应自动推进到判定→摸牌→出牌，或 endTurn 可用
-    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    const r1 = safeEngine(state, { type: '结束回合', player: 'P1' });
     expect(r1.error).toBeTruthy();
   });
 
   it('handleEndTurn 跳过判定和摸牌阶段，直接设 phase=出牌', () => {
     const state = createTestGame({ playPhase: true });
-    const r = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    const r = safeEngine(state, { type: '结束回合', player: 'P1' });
     expect(r.error).toBeUndefined();
     expect(r.state.currentPlayer).toBe('P2');
     // 期望：phase 应该是 '准备' 或 '判定'，而非 '出牌'
@@ -432,11 +432,11 @@ describe('回合流程缺陷', () => {
   it('弃牌后回合转换也跳过判定和摸牌', () => {
     let state = createTestGame({ playPhase: true });
     state = setHealth(state, 'P1', 2);
-    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
-    expect(r1.state.pending?.type).toBe('discardPhase');
+    const r1 = safeEngine(state, { type: '结束回合', player: 'P1' });
+    expect(r1.state.pending?.type).toBe('弃牌阶段');
     const hand = r1.state.players['P1'].hand;
     const r2 = safeEngine(r1.state, {
-      type: 'discard', player: 'P1', cardIds: hand.slice(0, 2),
+      type: '弃置', player: 'P1', cardIds: hand.slice(0, 2),
     });
     expect(r2.state.currentPlayer).toBe('P2');
     // 期望：phase 应该是 '准备'
@@ -446,8 +446,8 @@ describe('回合流程缺陷', () => {
   it('准备阶段所有操作类型都报错', () => {
     const state = createTestGame();
     for (const op of [
-      { type: 'playCard', player: 'P1', cardId: state.players['P1'].hand[0] },
-      { type: 'endTurn', player: 'P1' },
+      { type: '打出一张牌', player: 'P1', cardId: state.players['P1'].hand[0] },
+      { type: '结束回合', player: 'P1' },
     ] as GameAction[]) {
       expect(safeEngine(state, op).error).toBeTruthy();
     }
@@ -456,11 +456,11 @@ describe('回合流程缺陷', () => {
   it('meta.round 在整轮完成后递增', () => {
     const state = createTestGame({ playPhase: true });
     expect(state.meta.round).toBe(1);
-    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
+    const r1 = safeEngine(state, { type: '结束回合', player: 'P1' });
     // P2 摸牌阶段抽了 2 张，设高体力避免弃牌
     const p2high = setHealth(r1.state, 'P2', 10);
     const r2state = { ...p2high, phase: '出牌' as const };
-    const r2 = safeEngine(r2state, { type: 'endTurn', player: 'P2' });
+    const r2 = safeEngine(r2state, { type: '结束回合', player: 'P2' });
     expect(r2.state.currentPlayer).toBe('P1');
     // nextPlayer atom 在整轮完成后递增 meta.round
     expect(r2.state.meta.round).toBe(2);
@@ -469,11 +469,11 @@ describe('回合流程缺陷', () => {
   it('弃牌阶段结束回合不触发 turnEnd 事件', () => {
     let state = createTestGame({ playPhase: true });
     state = setHealth(state, 'P1', 2);
-    const r1 = safeEngine(state, { type: 'endTurn', player: 'P1' });
-    expect(r1.state.pending?.type).toBe('discardPhase');
+    const r1 = safeEngine(state, { type: '结束回合', player: 'P1' });
+    expect(r1.state.pending?.type).toBe('弃牌阶段');
     const hand = r1.state.players['P1'].hand;
     const r2 = safeEngine(r1.state, {
-      type: 'discard', player: 'P1', cardIds: hand.slice(0, 2),
+      type: '弃置', player: 'P1', cardIds: hand.slice(0, 2),
     });
     // resolveDiscardPhase 直接 nextPlayer+setPhase，不 emit turnEnd
     // 闭月等监听 turnEnd 的技能丢失

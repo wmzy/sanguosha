@@ -18,12 +18,12 @@ describe('甘宁 - 奇袭', () => {
     })
     .act('发动奇袭', ctx => {
       ctx.useSkill('P1', '奇袭');
-      expect(ctx.pendingType()).toBe('skillPrompt');
+      expect(ctx.pendingType()).toBe('技能选择');
     })
     .act('选择黑色手牌和目标P2', ctx => {
       const p1 = ctx.player('P1');
       const blackCard = p1.hand[0];
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: { cardIds: [blackCard], player: 'P2' } });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: { cardIds: [blackCard], player: 'P2' } });
     })
     .check('P2 手牌减少', ctx => {
       const diff = ctx.diff('initial');

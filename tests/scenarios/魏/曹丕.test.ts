@@ -15,7 +15,7 @@ describe('曹丕', () => {
       })
       .act('发射死亡事件', ctx => {
         ctx.emitEvent({
-          type: 'death',
+          type: '死亡',
           player: 'P2',
           source: 'P1',
         });

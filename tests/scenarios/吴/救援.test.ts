@@ -9,7 +9,7 @@ describe('孙权 - 救援', () => {
       ctx.snapshot('initial');
     })
     .act('模拟吴势力甘宁对孙权heal事件', ctx => {
-      ctx.emitEvent({ type: 'heal', target: 'P1', amount: 1, source: 'P2' });
+      ctx.emitEvent({ type: '回复体力', target: 'P1', amount: 1, source: 'P2' });
     })
     .check('孙权额外回复1体力', ctx => {
       const diff = ctx.diff('initial');
@@ -24,7 +24,7 @@ describe('孙权 - 救援', () => {
       ctx.snapshot('initial');
     })
     .act('模拟蜀势力刘备对孙权heal事件', ctx => {
-      ctx.emitEvent({ type: 'heal', target: 'P1', amount: 1, source: 'P3' });
+      ctx.emitEvent({ type: '回复体力', target: 'P1', amount: 1, source: 'P3' });
     })
     .check('孙权不额外回复', ctx => {
       const diff = ctx.diff('initial');
@@ -39,7 +39,7 @@ describe('孙权 - 救援', () => {
       ctx.snapshot('initial');
     })
     .act('模拟孙权对自己heal事件', ctx => {
-      ctx.emitEvent({ type: 'heal', target: 'P1', amount: 1, source: 'P1' });
+      ctx.emitEvent({ type: '回复体力', target: 'P1', amount: 1, source: 'P1' });
     })
     .check('孙权不额外回复', ctx => {
       const diff = ctx.diff('initial');

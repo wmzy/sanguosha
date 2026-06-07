@@ -4,16 +4,16 @@ import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 
 const subtypeToSlot: Record<string, EquipSlot> = {
-  武器: 'weapon',
-  防具: 'armor',
-  进攻马: 'horseMinus',
-  防御马: 'horsePlus',
+  武器: '武器',
+  防具: '防具',
+  进攻马: '进攻马',
+  防御马: '防御马',
 };
 
 export function register() {
   registerAtom({
-    type: 'equip',
-    apply(state: GameState, atom: Atom & { type: 'equip' }) {
+    type: '装备',
+    apply(state: GameState, atom: Atom & { type: '装备' }) {
       const player = atom.player as string;
       const cardId = atom.cardId as string;
       const card = state.cardMap[cardId];
@@ -38,20 +38,20 @@ export function register() {
 
       return s;
     },
-    toEvents(state: GameState, atom: Atom & { type: 'equip' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '装备' }): AtomEventResult {
       const player = atom.player as string;
       const cardId = atom.cardId as string;
       const card = state.cardMap[cardId];
       const slot = subtypeToSlot[card.subtype];
       const payload: Json = { player, cardId, slot };
-      const server = makeServerEvent('equip', payload);
-      return [server, new Map(), makePlayerEvent('equip', payload)];
+      const server = makeServerEvent('装备', payload);
+      return [server, new Map(), makePlayerEvent('装备', payload)];
     },
   });
 
   registerAtom({
-    type: 'unequip',
-    apply(state: GameState, atom: Atom & { type: 'unequip' }) {
+    type: '卸下',
+    apply(state: GameState, atom: Atom & { type: '卸下' }) {
       const player = atom.player as string;
       const slot = atom.slot;
       return updatePlayer(state, player, p => {
@@ -60,12 +60,12 @@ export function register() {
         return { equipment: eq };
       });
     },
-    toEvents(state: GameState, atom: Atom & { type: 'unequip' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '卸下' }): AtomEventResult {
       const player = atom.player as string;
       const slot = atom.slot;
       const payload: Json = { player, slot };
-      const server = makeServerEvent('unequip', payload);
-      return [server, new Map(), makePlayerEvent('unequip', payload)];
+      const server = makeServerEvent('卸下', payload);
+      return [server, new Map(), makePlayerEvent('卸下', payload)];
     },
   });
 }

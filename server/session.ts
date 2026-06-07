@@ -134,11 +134,11 @@ export class GameSession {
       state = registerCharacterTriggers(state, playerName, { characterMap });
     }
 
-    const startResult = engine(state, { type: 'startGame' });
+    const startResult = engine(state, { type: '开始' });
     state = startResult.state;
 
     this.state = state;
-    this.actionLog = [{ type: 'startGame' }];
+    this.actionLog = [{ type: '开始' }];
     this.nextSeq = state.serverLog?.length ?? 0;
     this.gameLogger = new GameLogger(
       {
@@ -151,7 +151,7 @@ export class GameSession {
       state.playerOrder,
     );
     this.touchAndPersist();
-    this.gameLogger.recordBatch({ type: 'startGame' } as GameAction, [], this.state);
+    this.gameLogger.recordBatch({ type: '开始' }, [], this.state);
 
     setRoomStatus(this.room.id, '进行中');
     this.sendInitialViewToAll();
@@ -207,7 +207,7 @@ export class GameSession {
     }));
     const fromSeq = sequenced[0].seq;
 
-    const batchResult = this.gameLogger?.recordBatch(action ?? null, events, this.state!) ?? { serverOps: [] as Operation[], playerOps: {} as Record<string, Operation[]> };
+    const batchResult = this.gameLogger?.recordBatch(action ?? null, events, this.state!) ?? { serverOps: [] as Operation[], playerOps: {} };
 
     if (this.debug) {
       const eventMsg: ServerMessage = {

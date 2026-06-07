@@ -18,8 +18,8 @@ export const 华佗: CharacterConfig = {
       trigger: 'manual',
       condition: { phase: '出牌', hasHandCards: true },
       effect: { type: 'sequence', steps: [
-        { type: 'discard', count: 1 },
-        { type: 'heal', target: 'anyPlayer', amount: 1 },
+        { type: '弃置', count: 1 },
+        { type: '回复体力', target: 'anyPlayer', amount: 1 },
       ] },
       oncePerTurn: true,
     },
@@ -36,7 +36,7 @@ export const 吕布: CharacterConfig = {
       name: '无双',
       description: '锁定技，你使用的【杀】需两张【闪】才能抵消；与你进行【决斗】的角色每次需打出两张【杀】。',
       trigger: 'manual',
-      effect: { type: 'draw', count: 0 },
+      effect: { type: '摸牌', count: 0 },
       passive: true,
     },
   ],
@@ -54,7 +54,7 @@ export const 貂蝉: CharacterConfig = {
       trigger: 'manual',
       condition: { phase: '出牌', hasHandCards: true },
       effect: { type: 'sequence', steps: [
-        { type: 'discard', count: 1 },
+        { type: '弃置', count: 1 },
         { type: 'dealDamage', condition: '决斗', target: 'malePlayer' },
       ] },
       oncePerTurn: true,
@@ -63,7 +63,7 @@ export const 貂蝉: CharacterConfig = {
       name: '闭月',
       description: '结束阶段，你可以摸一张牌。',
       trigger: 'onTurnEnd',
-      effect: { type: 'draw', count: 1 },
+      effect: { type: '摸牌', count: 1 },
     },
   ],
 };
@@ -81,7 +81,7 @@ export const 张角: CharacterConfig = {
       description: '当你使用或打出【闪】时，可令任意一名角色判定，若结果为黑桃，你对该角色造成2点雷电伤害。',
       trigger: 'onCardPlayed',
       effect: { type: 'sequence', steps: [
-        { type: 'judge', condition: 'spade', onFail: { type: 'damage', amount: 2, damageType: '雷电' } },
+        { type: '判定', condition: 'spade', onFail: { type: 'damage', amount: 2, damageType: '雷电' } },
       ] },
     },
     {

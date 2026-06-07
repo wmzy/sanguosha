@@ -2,18 +2,18 @@
 //
 // 神诸葛亮"大雾"标记：防止受到的所有非雷电伤害（normal + fire cancel，thunder 穿透）。
 //
-// v3 路径：监听 `damage` 原子。目标 = 装备.armor === 'daqi' + damageType ∈ {normal, fire}
+// v3 路径：监听 `damage` 原子。目标 = 装备.防具 === '大雾' + damageType ∈ {normal, fire}
 // → 取消该 atom（不 apply、不写 serverLog）；thunder 穿透。
 //
 // 大雾为 Mark-style 技能（不是装备），本 Task 走 fixture 模拟
-// "目标拥有大雾 = equipment.armor === 'daqi'"——与藤甲对称实现。
+// "目标拥有大雾 = equipment.防具 === '大雾'"——与藤甲对称实现。
 //
-// TODO(P1-D): migrate to armorEffect — 当前 armorId 字面量 'daqi'
+// TODO(P1-D): migrate to armorEffect — 当前 armorId 字面量 '大雾'
 // 应当由 cardId '大雾' 经 P1-D 装备 barrel 解析得到。
 
 import { registerArmorDamageBlockExcept } from './_armorDamageBlock';
 
 export function register(): void {
   // 大雾防 normal + fire（thunder 穿透）
-  registerArmorDamageBlockExcept('daqi', 'thunder');
+  registerArmorDamageBlockExcept('大雾', 'thunder');
 }

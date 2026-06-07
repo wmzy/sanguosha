@@ -30,7 +30,7 @@ describe('faceDown Mark 跳过整个回合（真 game rule）', () => {
     const s0 = createTestGame();
     const faceDown: Mark = { id: 'faceDown:P1', scope: 'player', duration: 'untilTurnEnd' };
     const addResult = applyAtoms(s0, [
-      { type: 'addMark', player: 'P1', mark: faceDown },
+      { type: '加标记', player: 'P1', mark: faceDown },
     ]);
     const result = advanceToInteractivePhase(addResult.state);
     // 期望：P2 变成 currentPlayer（已跳到 P2 准备阶段）
@@ -52,7 +52,7 @@ describe('faceDown Mark 跳过整个回合（真 game rule）', () => {
     const s0 = createTestGame();
     const faceDown: Mark = { id: 'faceDown:P1', scope: 'player', duration: 'untilPhaseEnd' };
     const addResult = applyAtoms(s0, [
-      { type: 'addMark', player: 'P1', mark: faceDown },
+      { type: '加标记', player: 'P1', mark: faceDown },
     ]);
     // untilPhaseEnd + player scope → 仍 skip 整回合（faceDown 永久直到 phase 结束）
     // 但不清理 mark（player scope + untilPhaseEnd 不在 turnEnd clear）

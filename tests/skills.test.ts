@@ -15,8 +15,8 @@ describe('V2 Engine - 技能注册与触发', () => {
         (t) => t.skillId === '奸雄' && t.player === 'P1',
       );
       expect(trigger).toBeDefined();
-      expect(trigger!.event).toBe('damageReceived');
-      expect(trigger!.source).toBe('character');
+      expect(trigger!.event).toBe('受到伤害');
+      expect(trigger!.source).toBe('角色');
     });
 
     it('刘备 仁德 技能注册', () => {
@@ -37,7 +37,7 @@ describe('V2 Engine - 技能注册与触发', () => {
         (t) => t.skillId === '反馈' && t.player === 'P1',
       );
       expect(trigger).toBeDefined();
-      expect(trigger!.event).toBe('damageReceived');
+      expect(trigger!.event).toBe('受到伤害');
     });
 
     it('孙权 制衡 技能注册', () => {
@@ -80,7 +80,7 @@ describe('V2 Engine - 技能注册与触发', () => {
       state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
 
       const event = {
-        type: 'damageReceived' as const,
+        type: '受到伤害' as const,
         player: 'P2',
         target: 'P1',
         source: 'P2',
@@ -99,7 +99,7 @@ describe('V2 Engine - 技能注册与触发', () => {
     it('useSkill 在非出牌阶段报错', () => {
       const state = createTestGame({ characters: ['曹操', '刘备'] });
       const result = engine(state, {
-        type: 'useSkill',
+        type: '使用技能',
         player: 'P1',
         skillId: '奸雄',
       });
@@ -109,7 +109,7 @@ describe('V2 Engine - 技能注册与触发', () => {
     it('useSkill 对未知技能报错', () => {
       const state = setPlayPhase(createTestGame());
       const result = engine(state, {
-        type: 'useSkill',
+        type: '使用技能',
         player: 'P1',
         skillId: '不存在的技能',
       });

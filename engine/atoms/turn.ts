@@ -17,8 +17,8 @@ import { makeServerEvent } from '../event';
 
 export function register() {
   registerAtom({
-    type: 'incrementKills',
-    apply(state: GameState, _atom: Atom & { type: 'incrementKills' }) {
+    type: '累计出杀',
+    apply(state: GameState, _atom: Atom & { type: '累计出杀' }) {
       return {
         ...state,
         turn: {
@@ -27,8 +27,8 @@ export function register() {
         },
       };
     },
-    toEvents(state: GameState, _atom: Atom & { type: 'incrementKills' }): AtomEventResult {
-      const server = makeServerEvent('incrementKills', {
+    toEvents(state: GameState, _atom: Atom & { type: '累计出杀' }): AtomEventResult {
+      const server = makeServerEvent('累计出杀', {
         killsPlayed: state.turn.killsPlayed + 1,
       });
       return [server, new Map(), null];
@@ -36,16 +36,16 @@ export function register() {
   });
 
   registerAtom({
-    type: 'turnStart',
-    apply(state: GameState, _atom: Atom & { type: 'turnStart' }) {
+    type: '回合开始',
+    apply(state: GameState, _atom: Atom & { type: '回合开始' }) {
       // 状态修改由 nextPlayer atom 负责（已有）；这里不重复改 state。
       // phase-advance.ts 在 emitEvent(turnStart) 之后手工加 'turnStarted' phaseFlag，
       // 这部分也保留不动。
       return state;
     },
-    toEvents(_state: GameState, atom: Atom & { type: 'turnStart' }): AtomEventResult {
+    toEvents(_state: GameState, atom: Atom & { type: '回合开始' }): AtomEventResult {
       const payload: Json = { player: atom.player as string };
-      return [makeServerEvent('turnStart', payload), new Map(), null];
+      return [makeServerEvent('回合开始', payload), new Map(), null];
     },
   });
 }

@@ -43,7 +43,7 @@ describe('雷电伤害 + 铁索连环传导（真 game rule）', () => {
     };
     const { state, events } = applyAtoms(s0, [
       {
-        type: 'damage',
+        type: '造成伤害',
         target: 'P1',
         amount: 3,
         source: '张角',
@@ -58,7 +58,7 @@ describe('雷电伤害 + 铁索连环传导（真 game rule）', () => {
     // P2 不在链上，未受伤
     expect(state.players.P2.health).toBe(4);
     // server log 含 2 个 damage 事件（P1 + P3）
-    const damageEvents = events.filter((e) => e.type === 'damage');
+    const damageEvents = events.filter((e) => e.type === '造成伤害');
     expect(damageEvents).toHaveLength(2);
   });
 });

@@ -11,19 +11,19 @@ describe('许褚 - 裸衣', () => {
     })
     .act('发射摸牌阶段事件触发裸衣prompt', ctx => {
       ctx.emitEvent({
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '摸牌',
         player: 'P1',
       });
     })
     .act('P1选择发动裸衣', ctx => {
-      ctx.engineAction({ type: 'skillChoice', player: 'P1', choice: true });
+      ctx.engineAction({ type: '技能选择', player: 'P1', choice: true });
     })
     .act('P1对P2使用杀', ctx => {
       ctx.enterPlayPhase();
       ctx.setCurrentPlayer('P1');
       const killId = ctx.findCard('P1', '杀')!;
-      ctx.playCard('P1', killId!, 'P2');
+      ctx.playCard('P1', killId, 'P2');
     })
     .act('P2不出闪', ctx => {
       ctx.respond('P2');

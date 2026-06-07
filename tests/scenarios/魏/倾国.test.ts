@@ -12,11 +12,11 @@ describe('甄姬 - 倾国', () => {
     })
     .act('P2 对 P1 使用杀', ctx => {
       const killId = ctx.findCard('P2', '杀')!;
-      ctx.playCard('P2', killId!, 'P1');
+      ctx.playCard('P2', killId, 'P1');
     })
     .check('进入杀响应窗口', ctx => {
       expect(ctx.isPending()).toBe(true);
-      expect(ctx.pendingType()).toBe('responseWindow');
+      expect(ctx.pendingType()).toBe('响应窗口');
     })
     .act('P1 查找黑色手牌当闪', ctx => {
       const p1 = ctx.player('P1');

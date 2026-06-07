@@ -5,15 +5,15 @@ import { getSkill } from '../skill';
 
 export function register() {
   registerAtom({
-    type: 'addSkill',
-    apply(state: GameState, atom: Atom & { type: 'addSkill' }): GameState {
+    type: '加技能',
+    apply(state: GameState, atom: Atom & { type: '加技能' }): GameState {
       const player = atom.player as string;
-      const skillId = atom.skillId as string;
+      const skillId = atom.skillId;
       const source = atom.source as { characterMap: Record<string, import('../../shared/types').CharacterConfig> };
 
       const def = getSkill(skillId);
       const alreadyHas = state.triggers.some(
-        t => t.player === player && t.skillId === skillId && t.source === 'character',
+        t => t.player === player && t.skillId === skillId && t.source === '角色',
       );
       if (alreadyHas) return state;
       // v3-only skill（无 trigger）不进入 v2 state.triggers。
@@ -21,7 +21,7 @@ export function register() {
 
       const newTrigger = {
         event: def.trigger.event,
-        source: 'character' as const,
+        source: '角色' as const,
         skillId,
         player,
         priority: 5,
@@ -30,12 +30,12 @@ export function register() {
 
       return { ...state, triggers: [...state.triggers, newTrigger] };
     },
-    toEvents(state: GameState, atom: Atom & { type: 'addSkill' }): AtomEventResult {
+    toEvents(state: GameState, atom: Atom & { type: '加技能' }): AtomEventResult {
       const player = atom.player as string;
-      const skillId = atom.skillId as string;
+      const skillId = atom.skillId;
       const payload: Json = { player, skillId };
-      const server = makeServerEvent('addSkill', payload);
-      const ownerEvent = makePlayerEvent('addSkill', payload);
+      const server = makeServerEvent('加技能', payload);
+      const ownerEvent = makePlayerEvent('加技能', payload);
       return [server, new Map([[player, ownerEvent]]), null];
     },
   });

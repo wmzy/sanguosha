@@ -84,12 +84,12 @@ describe('makePlayerEvent', () => {
   });
 
   it('creates events with incrementing ids', () => {
-    const e1 = makePlayerEvent('draw', { player: 'P1' });
-    const e2 = makePlayerEvent('damage', { player: 'P2' });
+    const e1 = makePlayerEvent('摸牌', { player: 'P1' });
+    const e2 = makePlayerEvent('造成伤害', { player: 'P2' });
     expect(e1.id).toBe('evt-1');
     expect(e2.id).toBe('evt-2');
-    expect(e1.type).toBe('draw');
-    expect(e2.type).toBe('damage');
+    expect(e1.type).toBe('摸牌');
+    expect(e2.type).toBe('造成伤害');
     expect(e1.payload).toEqual({ player: 'P1' });
     expect(e2.payload).toEqual({ player: 'P2' });
   });
@@ -118,7 +118,7 @@ describe('cloneFrontend', () => {
 
     cloned.view.self.health = 0;
     cloned.view.self.hand[0].name = '闪';
-    cloned.animationQueue.push({ type: 'death', player: 'P2' });
+    cloned.animationQueue.push({ type: '死亡', player: 'P2' });
 
     expect(original.view.self.health).toBe(4);
     expect(original.view.self.hand[0].name).toBe('杀');

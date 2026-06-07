@@ -13,7 +13,7 @@ describe('张辽 - 突袭', () => {
     })
     .act('发射摸牌阶段事件触发突袭', ctx => {
       ctx.emitEvent({
-        type: 'phaseBegin',
+        type: '阶段开始',
         phase: '摸牌',
         player: 'P1',
       });
