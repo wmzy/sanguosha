@@ -8,7 +8,6 @@ import { makeServerEvent } from '../../event';
 import { applyAtoms } from '../../atom';
 import { applyDamage } from '../engine-utils';
 import { isCardValidResponse } from '../../validate';
-import { emitEvent } from '../../skill';
 
 export function resolveKillResponse(
   state: GameState,
@@ -57,11 +56,9 @@ export function resolveKillResponse(
       };
     }
 
-    const emitResult = emitEvent(moveResult.state, {
-      type: '杀被闪避',
-      attacker: attacker ?? '',
-      defender,
-    });
+    const emitResult = applyAtoms(moveResult.state, [
+      { type: '杀被闪避', attacker: attacker ?? '', defender },
+    ]);
     const dodgedEvent = makeServerEvent('杀被闪避', {
       attacker: attacker ?? '',
       defender,
@@ -86,11 +83,9 @@ export function resolveKillResponse(
     popState, defender, damageAmount,
     attacker ?? undefined, pending.window.sourceCard,
   );
-  const emitResult = emitEvent(damageResult.state, {
-    type: '杀命中',
-    attacker: attacker ?? '',
-    defender,
-  });
+  const emitResult = applyAtoms(damageResult.state, [
+    { type: '杀命中', attacker: attacker ?? '', defender },
+  ]);
   const hitEvent = makeServerEvent('杀命中', {
     attacker: attacker ?? '',
     defender,

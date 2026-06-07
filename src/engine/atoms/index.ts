@@ -32,6 +32,11 @@ import * as resolveCard from './resolveCard';
 import * as setChained from './setChained';
 import * as compareRank from './compareRank';
 import * as mark from './mark';
+// [P5-T3] 阶段 D 准备：v2 兼容占位 atom（出牌/杀命中/杀被闪避/回合结束）
+import * as playCard from './playCard';
+import * as killHit from './killHit';
+import * as killDodged from './killDodged';
+import * as turnEnd from './turnEnd';
 
 const modules = [
   damage,
@@ -68,6 +73,11 @@ const modules = [
   setChained,
   compareRank,
   mark,
+  // [P5-T3] 阶段 D 准备：v2 兼容占位 atom
+  playCard,
+  killHit,
+  killDodged,
+  turnEnd,
 ];
 
 export function registerAllAtoms(): void {

@@ -4,14 +4,12 @@ import type {
   EngineResult,
   Atom,
   PendingDiscardPhase,
-  GameEvent,
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { getPlayer } from '../state';
 import { makeServerEvent } from '../event';
 import { applyAtoms } from '../atom';
 import { createPendingId } from '../atoms/pending';
-import { emitEvent } from '../skill';
 
 export function handleEndTurn(
   state: GameState,
@@ -19,11 +17,10 @@ export function handleEndTurn(
 ): EngineResult {
   const player = action.player;
 
-  // 触发 turnEnd 事件，使依赖此事件的技能可以响应（如闭月）
-  const turnEndEvent: GameEvent = { type: '回合结束', player };
-  const turnEndResult = emitEvent(state, turnEndEvent);
+  // [P5-T3] 阶段 D 准备：'回合结束' 事件改用 applyAtoms 派发
+  const turnEndResult = applyAtoms(state, [{ type: '回合结束', player }]);
   if (turnEndResult.state.pending !== null) {
-    return turnEndResult;
+    return { state: turnEndResult.state, events: [...turnEndResult.events] };
   }
 
   // 使用 turnEnd 后的最新状态

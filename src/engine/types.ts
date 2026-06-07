@@ -287,7 +287,12 @@ export type Atom =
   | { type: '拼点'; a: Expr<string>; b: Expr<string>; aCardId: Expr<string>; bCardId: Expr<string> }
   | { type: '加标记'; player: Expr<string>; mark: Mark }
   | { type: '去标记'; player: Expr<string>; markId: string }
-  | { type: '清过期标记'; phase: TurnPhase };
+  | { type: '清过期标记'; phase: TurnPhase }
+  // [P5-T3] 阶段 D 准备：v2 兼容占位 atom（apply 不改 state，ATOM_GAME_EVENTS 派发）
+  | { type: '出牌'; player: Expr<string>; cardId: Expr<string>; target?: Expr<string> }
+  | { type: '杀命中'; attacker: Expr<string>; defender: Expr<string> }
+  | { type: '杀被闪避'; attacker: Expr<string>; defender: Expr<string> }
+  | { type: '回合结束'; player: Expr<string> };
 /**
  * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
  * - [0] 服务端完整事件 → 写入 serverLog

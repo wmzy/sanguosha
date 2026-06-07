@@ -46,4 +46,29 @@ export const ATOM_GAME_EVENTS: Record<string, GameEventGenerator> = {
     const a = atom as Extract<Atom, { type: '回合开始' }>;
     return [{ type: '回合开始' as const, player: a.player as string }];
   },
+  // [P5-T3] 阶段 D 准备：4 个 v2 兼容占位 atom 的 GameEvent 映射
+  出牌: (_state, atom) => {
+    const a = atom as Extract<Atom, { type: '出牌' }>;
+    const event: GameEvent = {
+      type: '出牌' as const,
+      player: a.player as string,
+      cardId: a.cardId as string,
+    };
+    if (a.target != null) {
+      (event as Record<string, unknown>).target = a.target;
+    }
+    return [event];
+  },
+  杀命中: (_state, atom) => {
+    const a = atom as Extract<Atom, { type: '杀命中' }>;
+    return [{ type: '杀命中' as const, attacker: a.attacker as string, defender: a.defender as string }];
+  },
+  杀被闪避: (_state, atom) => {
+    const a = atom as Extract<Atom, { type: '杀被闪避' }>;
+    return [{ type: '杀被闪避' as const, attacker: a.attacker as string, defender: a.defender as string }];
+  },
+  回合结束: (_state, atom) => {
+    const a = atom as Extract<Atom, { type: '回合结束' }>;
+    return [{ type: '回合结束' as const, player: a.player as string }];
+  },
 };

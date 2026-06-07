@@ -9,7 +9,6 @@ import type {
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import type { Card } from '../../shared/types';
-import type { GameEvent } from '../types';
 import { getPlayer } from '../state';
 import { getDistance, isInAttackRange } from '../distance';
 import { hasSkill } from '../mark';
@@ -41,17 +40,19 @@ export function handlePlayCard(
   }
   if (!result || result.error) return result;
 
-  // 触发 cardPlayed 事件，使依赖此事件的技能可以响应
-  const gameEvent: GameEvent = {
-    type: '出牌',
-    player: action.player,
-    cardId: action.cardId,
-    ...(action.target ? { target: action.target } : {}),
-  };
-  const skillResult = emitEvent(result.state, gameEvent);
+  // [P5-T3] 阶段 D 准备：'出牌' 事件改用 applyAtoms 派发，ATOM_GAME_EVENTS 在
+  // applyAtoms 内部自动 emitEvent 触发 v2 派发管道，消除手工 emitEvent。
+  const emitResult = applyAtoms(result.state, [
+    {
+      type: '出牌',
+      player: action.player,
+      cardId: action.cardId,
+      ...(action.target ? { target: action.target } : {}),
+    },
+  ]);
   return {
-    state: skillResult.state,
-    events: [...result.events, ...skillResult.events],
+    state: emitResult.state,
+    events: [...result.events, ...emitResult.events],
   };
 }
 
