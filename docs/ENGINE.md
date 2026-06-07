@@ -10,7 +10,6 @@
 
 ### 0.1 测试
 
-### 0.1 测试
 
 - 总测试：**1410**（含 `it.skip` / `describe.skip` 占位）
 - 跳过：**40**
@@ -32,6 +31,7 @@
 - P1：18 Task / 20 commits（含 8 reducer handlers 修）/ 1361 tests pass
 - P2：5 Task / 5 commits / 1385 tests pass
 - P3：4 Task / 4 commits / 1404 tests pass
+- P4（解耦重构）：4 commit / 1412 tests pass — 56 角色单文件、装备独立、createEngine 闭包 + clearForTest、currentEngineHooks fallback。详见 ADR 0013、0018
 
 ### 0.3 已知文档/代码不一致
 
@@ -56,6 +56,23 @@
 - 想看"什么没做" → [§3 现状：未实现](#3-现状未实现-it_skip)
 - 想看"什么不对" → [§0.3 已知不一致](#03-已知文档代码不一致)
 - 想看"下一步做什么" → [§6 改进路径](#6-改进路径按依赖)
+
+### 0.5 引擎分层（2026-06-06 重构后）
+
+`src/engine/` 按业务概念物理隔离：
+
+| 子目录 | 内容 | 文件组织 |
+|---|---|---|
+| `characters/` | 角色声明（`CharacterConfig`）| 按势力：`wei.ts` `shu.ts` `wu.ts` `qun.ts` |
+| `skills/` | 武将技能实现（`SkillDef`）| **按角色单文件，汉字命名**：`曹操.ts` `刘备.ts` `孙悟空.ts` ... 共 56 个 |
+| `equipment/` | 装备技能实现（`SkillDef` + v3 hooks）| `stubs.ts` + `bagua.ts` `daqi.ts` `leiji.ts` ... + 辅助文件（`chained-propagation` `_fireKillDamageBonus` 等）|
+| `create-engine.ts` | 引擎入口 | `createEngine(config)` 返回带闭包的 `EngineInstance`（含 `skillsMap` / `hooks` / `clearForTest()`）|
+| `skill.ts` / `skill-hook.ts` | 全局注册表（v2，向后兼容）| 已 `@deprecated`，迁移指南见 ADR 0018 |
+
+**关键不变量**：
+- `createEngine()` 的 `hookRegistry` 是闭包独立的，dispatch 期间 `applyAtoms` 优先用闭包 hooks
+- `engine.clearForTest()` 重置全局 skill registry + atom hooks，重新注册本 instance 技能
+- 测试隔离：`createTestEngine()` 替代旧的 `clearXxx()` 三件套（详见 ADR 0018）
 
 ---
 
@@ -127,16 +144,16 @@ interface PlayerState {
 
 | 钩子 | 实现位置 | 真 game rule |
 |---|---|---|
-| 完杀（贾诩）| `src/engine/skills/wansha.ts` | 阻桃非濒死 |
-| 空城（诸葛亮）| `src/engine/skills/kongcheng.ts` | 手空时拒【杀】/【决斗】 |
-| 帷幕（贾诩）| `src/engine/skills/weimu.ts` | 拒黑色锦囊 |
-| 藤甲 | `src/engine/skills/tengjia.ts` | **P3-T1 反转**：防 normal 杀 |
-| 大雾 | `src/engine/skills/daqi.ts` | **P3-T1 反转**：防 non-thunder |
-| 八卦阵 | `src/engine/skills/bagua.ts` + `_baguaJudgeInject.ts` | **P3-T2 真 rule**：useCard 阶段 inject baguaJudgeResult，damage onBefore 读 ctx |
-| 雷击（张角）| `src/engine/skills/leiji.ts` | **P3-T3 真 rule**：读 ctx.leijiJudgeResult，success 才 emit 3 点 thunder |
-| 火杀 +1 | `src/engine/skills/_fireKillDamageBonus.ts` | **P3-T1 骨架**：subtype='火杀'/'fire' → amount=2 |
-| 青釭剑 / 丈八蛇矛 / 方天画戟 / 仁王盾 | `src/engine/skills/{qinggang,zhangba,fangtian,renwang}.ts` | v3 钩子骨架（穿透防具 / 2 张当杀 / 多目标 / 黑杀无效）|
-| 铁索连环传导 | `src/engine/skills/chained-propagation.ts` | fire/thunder 伤害链上其他角色 |
+| 完杀（贾诩）| `src/engine/equipment/wansha.ts` | 阻桃非濒死 |
+| 空城（诸葛亮）| `src/engine/equipment/kongcheng.ts` | 手空时拒【杀】/【决斗】 |
+| 帷幕（贾诩）| `src/engine/equipment/weimu.ts` | 拒黑色锦囊 |
+| 藤甲 | `src/engine/equipment/tengjia.ts` | **P3-T1 反转**：防 normal 杀 |
+| 大雾 | `src/engine/equipment/daqi.ts` | **P3-T1 反转**：防 non-thunder |
+| 八卦阵 | `src/engine/equipment/bagua.ts` + `_baguaJudgeInject.ts` | **P3-T2 真 rule**：useCard 阶段 inject baguaJudgeResult，damage onBefore 读 ctx |
+| 雷击（张角）| `src/engine/equipment/leiji.ts` | **P3-T3 真 rule**：读 ctx.leijiJudgeResult，success 才 emit 3 点 thunder |
+| 火杀 +1 | `src/engine/equipment/_fireKillDamageBonus.ts` | **P3-T1 骨架**：subtype='火杀'/'fire' → amount=2 |
+| 青釭剑 / 丈八蛇矛 / 方天画戟 / 仁王盾 | `src/engine/equipment/qinggang.ts` / `zhangba.ts` / `fangtian.ts` / `renwang.ts` | v3 钩子骨架（穿透防具 / 2 张当杀 / 多目标 / 黑杀无效）|
+| 铁索连环传导 | `src/engine/equipment/chained-propagation.ts` | fire/thunder 伤害链上其他角色 |
 
 ## 1.3 钩子机制
 
@@ -157,7 +174,7 @@ registerAtomHook({
 });
 ```
 
-**真实 onAfter/onBefore 签名（**P1 实施确认**）**：`ctx = { state, atom, self, serverEvent }` —— 不是 `(state, atom)`。**所有 v3 钩子应使用 ctx 解构**（看 `src/engine/skills/bagua.ts:31` / `leiji.ts:75` / `_baguaJudgeInject.ts` 真实用法）。
+**真实 onAfter/onBefore 签名（**P1 实施确认**）**：`ctx = { state, atom, self, serverEvent }` —— 不是 `(state, atom)`。**所有 v3 钩子应使用 ctx 解构**（看 `src/engine/equipment/bagua.ts:31` / `leiji.ts:75` / `_baguaJudgeInject.ts` 真实用法）。
 **钩子执行顺序**（[T-26](#5-决策档案要点)）：
 - 同 `atomType` 下，钩子**按注册顺序**触发
 - `filter` 不过 → 跳
@@ -170,7 +187,7 @@ registerAtomHook({
 - 依赖场景（如"先判定再决定是否取消"）：把判定逻辑内联到自己的 filter，**自给自足**
 - 例：八卦阵 var 写 + 读 → 改为"filter: target has 八卦阵, inline 判定 + 取消"
 
-**已注册钩子**（P0 后）：3 演示技能使用 —— 完杀/空城/帷幕（`src/engine/skills/{wansha,kongcheng,weimu}.ts`）。38+ 老技能仍走 `trigger.event`，按 [T-22] 渐进迁移。
+**已注册钩子**（P0 后）：3 演示技能使用 —— 完杀/空城/帷幕（`src/engine/equipment/wansha.ts` / `kongcheng.ts` / `weimu.ts`）。38+ 老技能仍走 `trigger.event`，按 [T-22] 渐进迁移。
 
 **🎯 v3 决策**（[T-25](#5-决策档案要点)）：**完全迁移到 `registerAtomHook`，老技能（trigger.event）作废**。v3 测试**只用** registerAtomHook 路径。38+ 技能迁移是渐进 PR。
 
@@ -217,28 +234,28 @@ registerAtomHook({
 
 | 势力 | 武将 | 技能 | 实现位置 |
 |---|---|---|---|
-| 蜀 | 刘备 | 仁德 | ``src/engine/skills/蜀.ts` 群:1-50` |
-| 蜀 | 关羽 | 武圣 🟡 | ``src/engine/skills/蜀.ts` 群:83` stub，逻辑在 `src/engine/validate.ts:116` |
-| 蜀 | 张飞 | 咆哮 | ``src/engine/skills/蜀.ts` 群:100-112` |
-| 蜀 | 赵云 | 龙胆 🟡 | ``src/engine/skills/蜀.ts` 群:127` stub，逻辑在 `src/engine/validate.ts:113/117` |
+| 蜀 | 刘备 | 仁德 | `src/engine/skills/仁德.ts` |
+| 蜀 | 关羽 | 武圣 🟡 | `src/engine/skills/武圣.ts` stub，逻辑在 `src/engine/validate.ts:116` |
+| 蜀 | 张飞 | 咆哮 | `src/engine/skills/咆哮.ts` |
+| 蜀 | 赵云 | 龙胆 🟡 | `src/engine/skills/龙胆.ts` stub，逻辑在 `src/engine/validate.ts:113/117` |
 | 蜀 | 马超 | 铁骑 | `tests/scenarios/蜀/铁骑.test.ts` |
 | 蜀 | 黄忠 | — | `tests/scenarios/蜀/黄忠.test.ts` |
 | 蜀 | 魏延 | — | `tests/scenarios/蜀/魏延.test.ts` |
-| 蜀 | 诸葛亮 | 观星 / 空城 🟢 v3 钩子 | 观星 ``src/engine/skills/蜀.ts` 群:177-217`；空城 v3 `src/engine/skills/kongcheng.ts` |
-| 蜀 | 卧龙诸葛 | 火计 / 看破 | ``src/engine/skills/蜀.ts` 群:357-400` |
-| 蜀 | 庞统 | 涅槃 | ``src/engine/skills/蜀.ts` 群:418-450` |
+| 蜀 | 诸葛亮 | 观星 / 空城 🟢 v3 钩子 | 观星 `src/engine/skills/观星.ts`；空城 v3 `src/engine/equipment/kongcheng.ts` |
+| 蜀 | 卧龙诸葛 | 火计 / 看破 | `src/engine/skills/火计.ts` |
+| 蜀 | 庞统 | 涅槃 | `src/engine/skills/涅槃.ts` |
 | 蜀 | 姜维 | 挑衅 / 志继 | `tests/scenarios/蜀/姜维.test.ts` |
 | 蜀 | 刘禅 | 享乐 / 放权 / 若愚 | `tests/scenarios/蜀/刘禅.test.ts` |
 | 蜀 | 孟获 | 祸首 / 再起 | `tests/scenarios/蜀/孟获.test.ts` |
 | 蜀 | 祝融 | 烈刃（拼点赢拿牌）| `tests/scenarios/蜀/祝融.test.ts` |
-| 蜀 | 黄月英 | 集智 / 奇才 🟡 | ``src/engine/skills/蜀.ts` 群:325-355` stub，奇才逻辑在 `validate.ts` |
-| 魏 | 曹操 | 奸雄 | ``src/engine/skills/魏.ts` 群:8-34` |
-| 魏 | 司马懿 | 反馈 / 鬼才 | ``src/engine/skills/魏.ts` 群:60-150` |
+| 蜀 | 黄月英 | 集智 / 奇才 🟡 | `src/engine/skills/集智.ts` stub，奇才逻辑在 `validate.ts` |
+| 魏 | 曹操 | 奸雄 | `src/engine/skills/奸雄.ts` |
+| 魏 | 司马懿 | 反馈 / 鬼才 | `src/engine/skills/反馈.ts` |
 | 魏 | 夏侯惇 | 刚烈 | `tests/scenarios/魏/刚烈.test.ts` |
-| 魏 | 张辽 | 突袭（偷 2 人各 1 张）| ``src/engine/skills/魏.ts` 群:200-260` |
+| 魏 | 张辽 | 突袭（偷 2 人各 1 张）| `src/engine/skills/突袭.ts` |
 | 魏 | 许褚 | 裸衣 | `tests/scenarios/魏/裸衣.test.ts` |
 | 魏 | 郭嘉 | 遗计 | `tests/scenarios/魏/遗计.test.ts` |
-| 魏 | 甄姬 | 倾国 🟡 / 洛神 | ``src/engine/skills/魏.ts` 群:280-360` stub，倾国在 `validate.ts:112` |
+| 魏 | 甄姬 | 倾国 🟡 / 洛神 | `src/engine/skills/倾国.ts` stub，倾国在 `validate.ts:112` |
 | 魏 | 典韦 | 强袭 | `tests/scenarios/魏/典韦.test.ts` |
 | 魏 | 荀彧 | 节命 | `tests/scenarios/魏/荀彧.test.ts` |
 | 魏 | 曹仁 | 据守 | `tests/scenarios/魏/曹仁.test.ts` |
@@ -247,38 +264,38 @@ registerAtomHook({
 | 魏 | 徐晃 | — | `tests/scenarios/魏/徐晃.test.ts` |
 | 魏 | 张郃 | 巧变 | `tests/scenarios/魏/张郃.test.ts`（逻辑实现，阶段拦截待验证）|
 | 魏 | 夏侯渊 | 神速 | `tests/scenarios/魏/夏侯渊.test.ts` |
-| 吴 | 孙权 | 制衡 | ``src/engine/skills/吴.ts` 群:1-50` |
+| 吴 | 孙权 | 制衡 | `src/engine/skills/制衡.ts` |
 | 吴 | 甘宁 | 奇袭 | `tests/scenarios/吴/奇袭.test.ts` |
 | 吴 | 吕蒙 | 克己 | `tests/scenarios/吴/克己.test.ts` |
 | 吴 | 黄盖 | 苦肉 | `tests/scenarios/吴/苦肉.test.ts` |
 | 吴 | 大乔 | 国色 | `tests/scenarios/吴/国色.test.ts` |
-| 吴 | 周瑜 | 英姿 / 反间 | ``src/engine/skills/吴.ts` 群:60-160` |
+| 吴 | 周瑜 | 英姿 / 反间 | `src/engine/skills/英姿.ts` |
 | 吴 | 陆逊 | 谦逊 / 连营 | `tests/scenarios/吴/谦逊.test.ts` |
 | 吴 | 孙尚香 | 结姻 / 枭姬 | `tests/scenarios/吴/结姻.test.ts` |
 | 吴 | 太史慈 | — | （除天义外有）|
 | 吴 | 孙坚 | 英魂 | `tests/scenarios/吴/英魂.test.ts` |
 | 吴 | 凌统 | 救援 | `tests/scenarios/吴/救援.test.ts` |
-| 群 | 张角 | 雷击 🟢 P3-T3 完整化 | 雷击 `src/engine/skills/leiji.ts`（v3 useCard 钩子，读 ctx.leijiJudgeResult）；鬼道 / 黄天 ``src/engine/skills/群.ts` 群:1-180`（stub）|
-| 群 | 貂蝉 | 离间 | ``src/engine/skills/群.ts` 群:200-300` |
+| 群 | 张角 | 雷击 🟢 P3-T3 完整化 | 雷击 `src/engine/equipment/leiji.ts`（v3 useCard 钩子，读 ctx.leijiJudgeResult）；鬼道 / 黄天 `src/engine/skills/鬼道.ts` / `src/engine/skills/黄天.ts`（stub）|
+| 群 | 貂蝉 | 离间 | `src/engine/skills/离间.ts` |
 | 群 | 吕布 | — | （无双外）|
 | 群 | 董卓 | — | （肉林/酒池/暴虐外）|
-| 群 | 贾诩 | 完杀 🟢 v3 钩子 / 帷幕 🟢 v3 钩子 | 完杀 `src/engine/skills/wansha.ts`；帷幕 `src/engine/skills/weimu.ts`；（乱武外）|
+| 群 | 贾诩 | 完杀 🟢 v3 钩子 / 帷幕 🟢 v3 钩子 | 完杀 `src/engine/equipment/wansha.ts`；帷幕 `src/engine/equipment/weimu.ts`；（乱武外）|
 | 群 | 蔡文姬 | 悲歌 | `tests/scenarios/群/悲歌-断肠.test.ts`（悲歌实现，断肠未实现）|
 | 群 | 左慈 | 闭月 | `tests/scenarios/群/闭月.test.ts` |
 | 群 | 华佗 | 急救 / 马术-鞬出 | `tests/scenarios/群/急救.test.ts` |
 
 ### 🟡 实现是 v2 stub + validate.ts 硬编码
 
-- **武圣**（关羽）：``src/engine/skills/蜀.ts` 群:83` stub，逻辑在 `src/engine/validate.ts:116`
+- **武圣**（关羽）：`src/engine/skills/武圣.ts` stub，逻辑在 `src/engine/validate.ts:116`
 - **龙胆**（赵云）：同上 `validate.ts:113/117`
 - **倾国**（甄姬）：同上 `validate.ts:112`
 - **奇才**（黄月英）：同上 stub
-- **急救**（华佗）：🟡 部分，``src/engine/skills/群.ts` 群:102-115` 实际是 stub，靠 red 牌当桃（**待核查**）
-- **看破**（卧龙诸葛）：``src/engine/skills/蜀.ts` 群:380` stub，逻辑靠 "锦囊可被无懈可击"
+- **急救**（华佗）：🟡 部分，`src/engine/skills/急救.ts` 实际是 stub，靠 red 牌当桃（**待核查**）
+- **看破**（卧龙诸葛）：`src/engine/skills/看破.ts` stub，逻辑靠 "锦囊可被无懈可击"
 - **火计**（卧龙诸葛）：stub
 - **咆哮**（张飞）：stub
 - **激将**（刘备）：stub
-- **空城**（诸葛亮）：🟢 **P0 v3 钩子实现**（`src/engine/skills/kongcheng.ts`）——监听 `becomeTarget` atom，filter 收窄到【杀】/【决斗】，手牌为空时取消
+- **空城**（诸葛亮）：🟢 **P0 v3 钩子实现**（`src/engine/equipment/kongcheng.ts`）——监听 `becomeTarget` atom，filter 收窄到【杀】/【决斗】，手牌为空时取消
 
 ### 🔴 未实现（27 个 it.skip / describe.skip）
 
@@ -292,16 +309,16 @@ registerAtomHook({
 | 雌雄双股剑 | 雌雄双股剑 | 🟡 stub | ``src/engine/equipment/stubs.ts`:42-49` |
 | 青龙偃月刀 | 青龙偃月刀 | 🟢 | ``src/engine/equipment/stubs.ts`:51-69` |
 | 贯石斧 | 贯石斧 | 🟢 | ``src/engine/equipment/stubs.ts`:71-100` |
-| **青釭剑** | 青釭剑 | 🟢 **P1-1D-T3 修** | `src/engine/skills/qinggang.ts`（v3 registerAtomHook 骨架：damage onAfter 注入 `penetrateArmor=true`）|
-| **丈八蛇矛** | 丈八蛇矛 | 🟢 **P1-1D-T4 修** | `src/engine/skills/zhangba.ts`（v3 registerAtomHook 骨架：specifyTarget filter 收窄）|
-| **方天画戟** | 方天画戟 | 🟢 **P1-1D-T4 修** | `src/engine/skills/fangtian.ts`（v3 registerAtomHook 骨架）|
-| **八卦阵** | 八卦阵 | 🟢 **P3-T2 真 game rule 完整落地** | `src/engine/skills/bagua.ts`（damage onBefore 读 `ctx.baguaJudgeResult`）+ `src/engine/skills/_baguaJudgeInject.ts`（useCard 阶段 becomeTarget 钩子：读 deck 顶牌花色注入 `baguaJudgeResult` 到 state.localVars）|
-| **仁王盾** | 仁王盾 | 🟢 **P1-1D-T4 修** | `src/engine/skills/renwang.ts`（v3 registerAtomHook：黑杀 cancel）|
-| 防具（**藤甲**/白银/寒冰）| 防具 | 🟢 **P3-T1 真 game rule 修** | `src/engine/skills/tengjia.ts`（**P3-T1 反转**：防 normal 杀；旧实现"防 fire" 是 P1-1A-T2 错误已修）|
-| 防具（**大雾**）| 防具 | 🟢 **P3-T1 真 game rule 修** | `src/engine/skills/daqi.ts`（**P3-T1 反转**：防 non-thunder；旧实现"防 thunder" 是 P1-1A-T2 错误已修）|
-| 进攻马/防御马 | 距离 | 🟢 | `src/src/engine/distance.ts` |
+| **青釭剑** | 青釭剑 | 🟢 **P1-1D-T3 修** | `src/engine/equipment/qinggang.ts`（v3 registerAtomHook 骨架：damage onAfter 注入 `penetrateArmor=true`）|
+| **丈八蛇矛** | 丈八蛇矛 | 🟢 **P1-1D-T4 修** | `src/engine/equipment/zhangba.ts`（v3 registerAtomHook 骨架：specifyTarget filter 收窄）|
+| **方天画戟** | 方天画戟 | 🟢 **P1-1D-T4 修** | `src/engine/equipment/fangtian.ts`（v3 registerAtomHook 骨架）|
+| **八卦阵** | 八卦阵 | 🟢 **P3-T2 真 game rule 完整落地** | `src/engine/equipment/bagua.ts`（damage onBefore 读 `ctx.baguaJudgeResult`）+ `src/engine/equipment/_baguaJudgeInject.ts`（useCard 阶段 becomeTarget 钩子：读 deck 顶牌花色注入 `baguaJudgeResult` 到 state.localVars）|
+| **仁王盾** | 仁王盾 | 🟢 **P1-1D-T4 修** | `src/engine/equipment/renwang.ts`（v3 registerAtomHook：黑杀 cancel）|
+| 防具（**藤甲**/白银/寒冰）| 防具 | 🟢 **P3-T1 真 game rule 修** | `src/engine/equipment/tengjia.ts`（**P3-T1 反转**：防 normal 杀；旧实现"防 fire" 是 P1-1A-T2 错误已修）|
+| 防具（**大雾**）| 防具 | 🟢 **P3-T1 真 game rule 修** | `src/engine/equipment/daqi.ts`（**P3-T1 反转**：防 non-thunder；旧实现"防 thunder" 是 P1-1A-T2 错误已修）|
+| 进攻马/防御马 | 距离 | 🟢 | `src/engine/distance.ts` |
 
-**火杀 +1 伤害**（P3-T1 骨架）：`src/engine/skills/_fireKillDamageBonus.ts` —— v3 useCard 钩子，subtype='火杀'/'fire' → 2 点 damageType='fire' damage atom。**依赖** CardDef subtype 扩展（cards.ts 留 follow-up）。
+**火杀 +1 伤害**（P3-T1 骨架）：`src/engine/equipment/_fireKillDamageBonus.ts` —— v3 useCard 钩子，subtype='火杀'/'fire' → 2 点 damageType='fire' damage atom。**依赖** CardDef subtype 扩展（cards.ts 留 follow-up）。
 
 ## 2.3 卡牌
 
@@ -391,11 +408,11 @@ registerAtomHook({
 | 技能 | 武将 | 原因 | 落地建议 |
 | 不屈 | 周泰 | 创牌系统 | `PlayerState.toughCards: CardId[]` + 专属原子（[T-08](#5-决策档案要点)）|
 | 化身 / 新生 | 左慈 | 化身牌池 + 动态技能 | `PlayerState.huashen` 专用字段（[T-09](#5-决策档案要点)）|
-| ~~完杀~~ | 贾诩 | 🟢 **P0 v3 已实现** | `src/engine/skills/wansha.ts` —— 监听 `heal` atom，filter 查 characterId + 贾诩回合 + 目标非濒死，cancel |
+| ~~完杀~~ | 贾诩 | 🟢 **P0 v3 已实现** | `src/engine/equipment/wansha.ts` —— 监听 `heal` atom，filter 查 characterId + 贾诩回合 + 目标非濒死，cancel |
 | 断肠 | 蔡文姬 | 死亡移除技能 | `removeSkill` atom（[T-11 连带](#5-决策档案要点)）|
-| 雷击 | 张角 | 🟢 **P3-T3 完整化** | `src/engine/skills/leiji.ts` —— v3 useCard 钩子，filter 收窄 source=张角 + card.suit=♠ + card.rank 2-9，onAfter 读 `state.localVars.leijiJudgeResult === 'success'` 才 emit 3 点 `damageType='thunder'` damage atom。完整 useCard 阶段 inject `leijiJudgeResult` prompt 留 follow-up。|
+| 雷击 | 张角 | 🟢 **P3-T3 完整化** | `src/engine/equipment/leiji.ts` —— v3 useCard 钩子，filter 收窄 source=张角 + card.suit=♠ + card.rank 2-9，onAfter 读 `state.localVars.leijiJudgeResult === 'success'` 才 emit 3 点 `damageType='thunder'` damage atom。完整 useCard 阶段 inject `leijiJudgeResult` prompt 留 follow-up。|
 | 鬼道 | 张角 | 判定牌替换 | `registerAtomHook(judge, onBefore, filter: 判定牌将生效, return { atom: replace })` |
-| ~~帷幕~~ | 贾诩 | 🟢 **P0 v3 已实现** | `src/engine/skills/weimu.ts` —— 监听 `becomeTarget` atom，filter 查 characterId + 黑色锦囊，cancel |
+| ~~帷幕~~ | 贾诩 | 🟢 **P0 v3 已实现** | `src/engine/equipment/weimu.ts` —— 监听 `becomeTarget` atom，filter 查 characterId + 黑色锦囊，cancel |
 
 **机制需求**（[T-05/T-07](#5-决策档案要点)）：**Mark 体系**（faceDown 等状态）。Mark 不带 hooks 字段（[T-05](#5-决策档案要点)），所有"读点"走 registerAtomHook。
 
@@ -676,6 +693,8 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 | [0015](./decisions/0015-give-take-move-3-atoms.md) | giveCard/takeCard 3 原子 | 13+ 技能语义统一 |
 | [0016](./decisions/0016-use-card-3-atoms.md) | useCard 3 原子 | specifyTarget / becomeTarget / resolveCard |
 | [0017](./decisions/0017-skill-pindian-multistep.md) | pindian / multiStep SkillPhase | 拼点 + 多步 prompt 骨架 |
+| [0013](./decisions/0013-skill-character-decouple.md) | 技能/角色/装备解耦 | **架构**：engine/{characters,skills,equipment} 分层（56 单文件、equipment 独立目录）|
+| [0018](./decisions/0018-deprecated-test-apis.md) | 废弃全局测试 API | 测试从 `clearXxx()` 迁到 `engine.clearForTest()`；`currentEngineHooks` 实现多实例隔离 |
 
 **未来 ADR 候选**：
 - Mark 体系（[T-05/T-07](#5-决策档案要点)）
@@ -689,10 +708,11 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 
 | 模块 | 路径 |
 |---|---|
-| 状态机入口 | `src/engine/engine.ts:54` `engine(state, action)` |
+| 状态机入口 | `src/engine/create-engine.ts:createEngine` → `engine.dispatch(state, action)` |
 | 统一 atom 入口 | `src/engine/atom.ts:applyAtoms` |
-| Skill registry | `src/engine/skill.ts` |
-| 钩子注册 | `src/engine/skill-hook.ts:registerAtomHook` |
+| Skill registry | `src/engine/skill.ts`（v2 全局，已 `@deprecated`）| 
+| 引擎实例 | `src/engine/create-engine.ts:createEngine` 返回 `EngineInstance` |
+| 钩子注册 | `src/engine/skill-hook.ts:HookRegistry` / `applyAtoms(_setCurrentEngineHooks)` 机制 |
 | 阶段推进 | `src/engine/phase-advance.ts` |
 | 触发器 | `src/engine/skill.ts:emitEvent`（🟡 老）|
 | 重放 | `src/engine/replay.ts` + `src/engine/view/reducer.ts` |
