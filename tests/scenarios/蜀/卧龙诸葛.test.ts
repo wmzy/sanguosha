@@ -50,11 +50,10 @@ describe('卧龙诸葛', () => {
         // 在当前引擎中，convert 类型技能通过 playCard 路径处理
         // 此测试确认技能注册无误
       })
-      .check('卧龙诸葛有火计技能触发器', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '火计',
-        );
-        expect(triggers.length).toBeGreaterThan(0);
+      .check('卧龙诸葛有火计技能', ctx => {
+        // 阶段 D：[P5-T2] v3 真相源是 PlayerState.skills，
+        // 不再读 state.triggers（v2 字段即将删除）。
+        expect(ctx.player('P1').skills).toContain('火计');
       })
       .run();
   });
@@ -64,14 +63,10 @@ describe('卧龙诸葛', () => {
       .setup(ctx => {
         ctx.selectCharacters('卧龙诸葛', '刘备');
       })
-      .act('确认技能已注册', ctx => {
-        // 看破是主动技，在 trickResponse 窗口中使用
-      })
-      .check('卧龙诸葛有看破技能触发器', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '看破',
-        );
-        expect(triggers.length).toBeGreaterThan(0);
+      .check('卧龙诸葛有看破技能', ctx => {
+        // 阶段 D：[P5-T2] v3 真相源是 PlayerState.skills，
+        // 不再读 state.triggers（v2 字段即将删除）。
+        expect(ctx.player('P1').skills).toContain('看破');
       })
       .run();
   });

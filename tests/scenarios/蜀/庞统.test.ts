@@ -7,11 +7,10 @@ describe('庞统', () => {
       .setup(ctx => {
         ctx.selectCharacters('庞统', '刘备');
       })
-      .check('庞统有连环技能触发器', ctx => {
-        const triggers = ctx.state.triggers.filter(
-          t => t.player === 'P1' && t.skillId === '连环',
-        );
-        expect(triggers.length).toBeGreaterThan(0);
+      .check('庞统有连环技能', ctx => {
+        // 阶段 D：[P5-T2] v3 真相源是 PlayerState.skills，
+        // 不再读 state.triggers（v2 字段即将删除）。
+        expect(ctx.player('P1').skills).toContain('连环');
       })
       .run();
   });

@@ -25,13 +25,6 @@ export const skills: SkillDef[] = [
     id: '火计',
     name: '火计',
     description: '你可以将一张红色手牌当【火攻】使用。',
-    trigger: {
-      event: '阶段开始',
-      source: '角色',
-      phase: '出牌',
-      manual: true,
-      optional: true,
-    },
     handler(_ctx, _state) {
       return [];
     },
@@ -41,12 +34,6 @@ export const skills: SkillDef[] = [
     id: '看破',
     name: '看破',
     description: '你可以将一张黑色手牌当【无懈可击】使用。',
-    trigger: {
-      event: 'trickResponse',
-      source: '角色',
-      manual: true,
-      optional: true,
-    },
     handler(_ctx, _state) {
       return [];
     },
