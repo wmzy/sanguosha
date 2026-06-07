@@ -594,9 +594,15 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
     case '设横置': {
       const target = p.target as string;
       const chained = p.chained as boolean;
-      const pState = state.players[target];
-      if (!pState) return state;
-      return { ...state, players: { ...state.players, [target]: { ...pState, chained } } };
+      // P5-T1：chained 走 Mark 体系，不再写 PlayerState.chained 字段。
+      if (chained) {
+        const current = state.marks[target] ?? [];
+        if (current.some((m) => m.id === 'chained')) return state;
+        const nextMark: Mark = { id: 'chained', scope: 'player', duration: 'permanent' };
+        return { ...state, marks: { ...state.marks, [target]: [...current, nextMark] } };
+      }
+      const cur = state.marks[target] ?? [];
+      return { ...state, marks: { ...state.marks, [target]: cur.filter((m) => m.id !== 'chained') } };
     }
     case '加标记': {
       const player = p.player as string;

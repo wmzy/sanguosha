@@ -83,8 +83,7 @@ export interface PlayerState {
   vars: Record<string, Json>;
   /** 标记（增益/减益） */
   tags: string[];
-  /** 铁索连环状态：true 时受 fire/thunder 伤害会传导给链上其他角色 */
-  chained: boolean;
+
 }
 
 export interface PlayerInfo {

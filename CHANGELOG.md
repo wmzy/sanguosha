@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-07
+
+### Engine v3 P5 T1 — chained 迁移 Mark 体系
+
+将 `chained`（铁索连环）状态从 `PlayerState.chained` 字段迁移到 Mark 体系。
+
+### Changed
+
+- `engine/mark.ts` — 新增 `hasMark` / `hasChained` / `CHAINED_MARK` 导出；`clearExpiredMarksByPhase` 中文 phase 名
+- `engine/atoms/setChained.ts` — `设横置` atom 改写为 `addMark` / `removeMark` 入口
+- `engine/equipment/chained-propagation.ts` — 伤害传导读取 `hasChained` 替代 `PlayerState.chained`
+- `engine/view/reducer.ts` — `设横置` server event 处理走 Mark
+- `engine/types.ts` — 移除 `PlayerState.chained` 字段
+- `engine/state.ts` — 移除 `chained: false` 初始值
+- `client/components/debug/DebugPlayerList.tsx` — 移除 `chained: false` 默认值
+
+### Tests
+
+- `tests/atoms/player-chained.test.ts` — 适配 Mark 体系断言
+- `tests/atoms/set-chained.test.ts` — 新增幂等性测试 + Mark 断言适配
+- `tests/integration/p1-event-handlers.test.ts` — 设横置走 Mark 断言
+- `tests/scenarios/设备/大雾-真规则.test.ts` — 用 `addMarkToPlayer` 替代手动构造 chained
+- `tests/scenarios/设备/铁索连环.test.ts` — 用 `addMarkToPlayer` 替代手动构造 chained
+- `tests/scenarios/设备/雷电-连环.test.ts` — 用 `addMarkToPlayer` 替代手动构造 chained
+
+### Documentation
+
+- `docs/ENGINE.md` — §4.8 更新为"持续状态走 Mark 体系"；§6 P5 表格 chained 行标 ✅
+
+---
+
 ## [Unreleased] — 2026-06-05
 
 ### Engine v3 P0 — 引擎核心扩展

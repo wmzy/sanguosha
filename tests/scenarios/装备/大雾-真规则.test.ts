@@ -14,6 +14,7 @@ import { applyAtoms, clearAtomRegistry } from '@engine/atom';
 import { clearAtomHooks } from '@engine/skill-hook';
 import { registerAllAtoms } from '@engine/atoms';
 import { createTestGame, setHealth, withArmor } from '../../engine-helpers';
+import { addMarkToPlayer, CHAINED_MARK } from '@engine/mark';
 import { registerAll as registerDaqi } from '../../fixtures/大雾';
 import { registerAll as registerChained } from '../../fixtures/铁索连环';
 
@@ -68,18 +69,14 @@ describe('大雾真 game rule（防 non-thunder）', () => {
     expect(state.players.P1.health).toBe(4);
     expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(0);
   });
-
   it('装备大雾 + thunder + chained → 链上其他角色也受 thunder 伤害（穿透大雾 + 链传导）', () => {
     const base = createTestGame({ playerCount: 3 });
-    const s0 = {
-      ...base,
-      players: {
-        ...base.players,
-        P1: { ...base.players.P1, chained: true, health: 4, maxHealth: 4 },
-        P2: { ...base.players.P2, chained: false, health: 4, maxHealth: 4 },
-        P3: { ...base.players.P3, chained: true, health: 4, maxHealth: 4 },
-      },
-    };
+    // P1 / P3 设横置（走 Mark 体系，P5-T1）：用 addMarkToPlayer + 设血量
+    let s0 = addMarkToPlayer(base, 'P1', CHAINED_MARK);
+    s0 = addMarkToPlayer(s0, 'P3', CHAINED_MARK);
+    s0 = setHealth(s0, 'P1', 4);
+    s0 = setHealth(s0, 'P2', 4);
+    s0 = setHealth(s0, 'P3', 4);
     s0.players.P1.equipment = { ...s0.players.P1.equipment, 防具: '大雾' };
     const { state, events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 3, source: '张角', damageType: 'thunder' },

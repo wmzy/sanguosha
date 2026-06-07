@@ -13,6 +13,7 @@ import { applyAtoms, clearAtomRegistry } from '@engine/atom';
 import { clearAtomHooks } from '@engine/skill-hook';
 import { registerAllAtoms } from '@engine/atoms';
 import { createTestGame, setHealth } from '../../engine-helpers';
+import { addMarkToPlayer, CHAINED_MARK } from '@engine/mark';
 import { registerAll as registerFixtureHooks } from '../../fixtures/铁索连环';
 
 describe('铁索连环（chained 传导）', () => {
@@ -22,20 +23,15 @@ describe('铁索连环（chained 传导）', () => {
     registerAllAtoms();
     registerFixtureHooks();
   });
-
   it('P1、P3 都 chained，P1 受 fire 伤害 → P3 也受同伤害', () => {
     // 3 人局：P1, P2, P3
     const base = createTestGame({ playerCount: 3 });
-    // 显式 setHealth（避免默认 maxHealth=4 假设）
-    const s0 = {
-      ...base,
-      players: {
-        ...base.players,
-        P1: { ...base.players.P1, chained: true, health: 4, maxHealth: 4 },
-        P2: { ...base.players.P2, chained: false, health: 4, maxHealth: 4 },
-        P3: { ...base.players.P3, chained: true, health: 4, maxHealth: 4 },
-      },
-    };
+    // P5-T1：chained 走 Mark 体系，P1 / P3 加 chained Mark
+    let s0 = addMarkToPlayer(base, 'P1', CHAINED_MARK);
+    s0 = addMarkToPlayer(s0, 'P3', CHAINED_MARK);
+    s0 = setHealth(s0, 'P1', 4);
+    s0 = setHealth(s0, 'P2', 4);
+    s0 = setHealth(s0, 'P3', 4);
     const { state, events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
     ]);
@@ -50,15 +46,12 @@ describe('铁索连环（chained 传导）', () => {
 
   it('chained=false 的角色不参与传导', () => {
     const base = createTestGame({ playerCount: 3 });
-    const s0 = {
-      ...base,
-      players: {
-        ...base.players,
-        P1: { ...base.players.P1, chained: true, health: 4, maxHealth: 4 },
-        P2: { ...base.players.P2, chained: false, health: 4, maxHealth: 4 },
-        P3: { ...base.players.P3, chained: true, health: 4, maxHealth: 4 },
-      },
-    };
+    // 仅 P1、P3 设横置（P5-T1：走 Mark），P2 不加 Mark（默认非连环）
+    let s0 = addMarkToPlayer(base, 'P1', CHAINED_MARK);
+    s0 = addMarkToPlayer(s0, 'P3', CHAINED_MARK);
+    s0 = setHealth(s0, 'P1', 4);
+    s0 = setHealth(s0, 'P2', 4);
+    s0 = setHealth(s0, 'P3', 4);
     const { state } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2' }, // normal
     ]);

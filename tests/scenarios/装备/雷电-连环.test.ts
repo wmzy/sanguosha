@@ -17,7 +17,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { applyAtoms, clearAtomRegistry } from '@engine/atom';
 import { clearAtomHooks } from '@engine/skill-hook';
 import { registerAllAtoms } from '@engine/atoms';
-import { createTestGame } from '../../engine-helpers';
+import { createTestGame, setHealth } from '../../engine-helpers';
+import { addMarkToPlayer, CHAINED_MARK } from '@engine/mark';
 import { registerAll as registerChained } from '../../fixtures/铁索连环';
 
 describe('雷电伤害 + 铁索连环传导（真 game rule）', () => {
@@ -27,30 +28,24 @@ describe('雷电伤害 + 铁索连环传导（真 game rule）', () => {
     registerAllAtoms();
     registerChained();
   });
-
   it('thunder dmg + P1/P3 都 chained → P1 受伤 P3 也受同 thunder 伤害', () => {
     // 3 人局：P1 受雷击 thunder 伤害 → chained-propagation onAfter
     // 给 P3 追加同源同型同量 thunder damage（P2 不在链上）
+    // P5-T1：chained 走 Mark 体系
     const base = createTestGame({ playerCount: 3 });
-    const s0 = {
-      ...base,
-      players: {
-        ...base.players,
-        P1: { ...base.players.P1, chained: true, health: 4, maxHealth: 4 },
-        P2: { ...base.players.P2, chained: false, health: 4, maxHealth: 4 },
-        P3: { ...base.players.P3, chained: true, health: 4, maxHealth: 4 },
-      },
+    const s0WithMarks = addMarkToPlayer(addMarkToPlayer(base, 'P1', CHAINED_MARK), 'P3', CHAINED_MARK);
+    const s0 = setHealth(setHealth(setHealth(s0WithMarks, 'P1', 4), 'P2', 4), 'P3', 4);
+    const damageAtom = {
+      type: '造成伤害',
+      target: 'P1',
+      amount: 3,
+      source: '张角',
+      cardId: 'leiji1',
+      damageType: 'thunder',
     };
-    const { state, events } = applyAtoms(s0, [
-      {
-        type: '造成伤害',
-        target: 'P1',
-        amount: 3,
-        source: '张角',
-        cardId: 'leiji1',
-        damageType: 'thunder',
-      },
-    ]);
+    const result = applyAtoms(s0, [damageAtom]);
+    const state = result.state;
+    const events = result.events;
     // P1 受 3 点伤害：4 → 1
     expect(state.players.P1.health).toBe(1);
     // P3 也受同 thunder 伤害（chain 传导）：4 → 1

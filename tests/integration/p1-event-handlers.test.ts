@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { reduceGameState } from '@engine/view/reducer';
 import { createTestGame } from '../engine-helpers';
 import type { GameState, Json, Mark, ServerEvent, TriggerRule } from '@engine/types';
+import { addMarkToPlayer, hasChained, CHAINED_MARK } from '@engine/mark';
 let evId = 0;
 
 function makeEvent(type: string, payload: Record<string, unknown>): ServerEvent {
@@ -99,19 +100,19 @@ describe('P1 reducer handlers (8 个新 server event 类型)', () => {
     });
   });
 
-  describe('设横置', () => {
-    it('设置 chained=true', () => {
+  describe('设横置（走 Mark 体系）', () => {
+    it('设置 chained=true → marks[P1] 含 id=chained', () => {
       const state = createTestGame({ playerCount: 2 });
-      expect(state.players.P1.chained).toBe(false);
+      expect(hasChained(state, 'P1')).toBe(false);
       const next = reduceGameState(state, [makeEvent('设横置', { target: 'P1', chained: true })]);
-      expect(next.players.P1.chained).toBe(true);
+      expect(hasChained(next, 'P1')).toBe(true);
     });
 
-    it('设置 chained=false（取消连环）', () => {
+    it('设置 chained=false 取消连环', () => {
       let state = createTestGame({ playerCount: 2 });
-      state = { ...state, players: { ...state.players, P1: { ...state.players.P1, chained: true } } };
+      state = addMarkToPlayer(state, 'P1', CHAINED_MARK);
       const next = reduceGameState(state, [makeEvent('设横置', { target: 'P1', chained: false })]);
-      expect(next.players.P1.chained).toBe(false);
+      expect(hasChained(next, 'P1')).toBe(false);
     });
   });
 

@@ -23,7 +23,7 @@
 | **装备技能** | 8/8 武器 | 0 | 0 | v3 registerAtomHook 骨架全就位（青釭/仁王/丈八/方天 P1-1D-T3/T4 修；八卦阵真 game rule P3-T2 完整化）|
 | **基本牌** | 3/6 | 1（火杀骨架）| 2 | 杀/闪/桃 实现；火杀 +1 钩子 P3-T1 骨架就位（依赖 CardDef subtype 扩展，完整 cards.ts 留 follow-up）；酒/雷杀 **未实现** |
 | **锦囊** | 8 | 0 | 6+ | 见 [§3.2](#32-卡牌缺口) |
-| **原子操作** | 33+ | 0 | — | P0 + P1 + P2 + P3 累计：loseHealth/loseCard/removeSkill/setChained/mark*3/shuffleDeck + useCard/becomeTarget no-op atoms（v3 钩子端到端测试用）|
+| **原子操作** | 33+ | 0 | — | P0 + P1 + P2 + P3 累计：loseHealth/loseCard/removeSkill/mark*3/shuffleDeck + useCard/becomeTarget no-op atoms（v3 钩子端到端测试用）；`设横置` 改写为加/去 Mark 'chained'，不再写 PlayerState.chained 字段 |
 | **SkillPhase** | 7 | — | — | 缺 pindian/multiTarget/orderedChoice 等 |
 
 **累计完成**（P0 2026-06-05 + P1 2026-06-06 + P2 2026-06-06 + P3 2026-06-06）：
@@ -111,6 +111,9 @@ interface PlayerState {
   equipment: { weapon; armor; mount; plus; minus };
   judgmentZone: PendingTrick[];
   vars: Record<string, Json>;     // 🟡 类型不安全，v3 不再用
+  // chained（铁索连环）已迁出：作为 Mark 存在 GameState.marks[playerId]，id='chained'。
+  // 读取走 hasMark(state, player, 'chained')，不再用 PlayerState.chained 字段。
+  // 其他持续状态（faceDown、leijiPending 等）同理。
 }
 ```
 
@@ -430,7 +433,7 @@ registerAtomHook({
 | 火杀 / 雷杀 | 🔴 | 加 CardDef，type='basic', subtype='火杀' / '雷杀' |
 | 借刀杀人 | 🔴 | 抽 useCard 拆 3 原子（[T-13](#5-决策档案要点)）|
 | 火攻 | 🔴 | 展示手牌 + 火判定 + 弃红桃 |
-| 铁索连环 | 🔴 卡牌定义在 | 加 `chained: boolean` PlayerState 字段 + damage 链 |
+| 铁索连环 | 🔴 卡牌定义在 | chained 已迁 Mark（id='chained'），本任务仅需卡牌 handler 调用 `设横置` atom |
 | 闪电 | 🟡 `pendingTrick.name === '闪电'` phase-advance 未处理 | `src/engine/phase-advance.ts:77-81` 加分支 |
 
 ---
@@ -522,16 +525,23 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 
 **修复方向**：抽 `reshuffle` atom，draw atom 在 `reshuffleIfNeeded` 后 `applyAtoms(reshuffle)`（[T-14](#5-决策档案要点)）。
 
-## 4.8 PlayerState 缺字段
+## 4.8 持续状态走 Mark 体系
 
-`src/engine/types.ts:51-62` 现状：
+`src/engine/mark.ts` + `src/engine/atoms/mark.ts` 是**所有持续状态**的唯一通道。
 
-- 没有 `chained: boolean`（连环状态）
-- 没有 `faceUp: boolean`（翻面：曹仁据守、贾诩放逐）
-- 没有 `marks: MarkMap`（统一铁索/翻面/创牌等状态）
-- 没有 `dying: boolean`（濒死过渡）
+**当前 PlayerState（`src/engine/types.ts:75-88`）**：
+* 不含 `chained: boolean` —— **chained 已迁 Mark**：id='chained', scope='player', duration='permanent'。由 `设横置` atom 在 chained=true 时 `加标记({id:'chained',...})`，chained=false 时 `去标记('chained')`。钩子读 `hasMark(state, player, 'chained')`。
+* 不含 `faceUp: boolean` —— 翻面（曹仁据守、贾诩放逐）用 Mark `faceDown`，duration='untilTurnEnd'，由 phase-advance 在 `回合结束` 时清。
+* `state.marks: Record<PlayerId, Mark[]>`（顶层字段，**不**进 PlayerState）：所有按玩家分组的 Mark 列表。
+* 不含 `dying: boolean` —— 濒死走 PendingDyingWindow，不是状态。
 
-**修复方向**（[T-07](#5-决策档案要点)）：**Mark 体系**。`Mark<T> = { id, scope: 'player' | 'relation' | 'transient', payload?, duration }`。所有"持续状态"都是 Mark。
+**决策**（[T-05/T-07](#5-决策档案要点)）：`Mark = { id, scope, payload?, duration }`。**所有"持续状态"都是 Mark**（含 chained、faceDown、leijiPending 等），不走独立字段。例外：`toughCards`（创牌，[T-08]）是牌区，`huashen`（化身，[T-09]）是动态技能注册子系统——这两类不归 Mark。
+
+**迁移记录**：
+* chained：✅ 本次迁移完成（Mark id='chained'，原子 `设横置` 改写）
+* faceDown：未实现（断肠/曹仁据守/贾诩放逐 仍 stub）
+* leijiPending：未实施（雷击占位真 game rule 完整判定需此 Mark）
+
 
 ---
 
@@ -613,7 +623,7 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 | 抽 `damage.type` 字段 | 1h | 藤甲 / 大雾 / 雷电伤害 / 火杀 / 雷击 / 连环传导 | ✅ |
 | 抽 `loseHealth` atom | 1h | 苦肉 | ✅ |
 | 抽 `loseCard` atom | 1h | 过河拆桥 / 借刀失败 | ✅ |
-| 抽 `chained: boolean` + Mark faceDown | 4h | 铁索连环 / 周泰创牌 / 曹仁据守 / 贾诩放逐 / 雷击 | ✅ |
+| 抽 chained Mark + Mark faceDown | 4h | 铁索连环 / 周泰创牌 / 曹仁据守 / 贾诩放逐 / 雷击 | ✅（chained 本次迁 Mark）|
 | 抽 `removeSkill` atom | 1h | 断肠 / 化身换技能 | ✅ |
 | 抽 `addBuff` / `removeBuff` atom | 2h | 诸葛连弩 / 裸衣 / 白酒 | ❌ 留 P2 范围外（无技能真实使用）|
 | 修 4 武器 stub | 4h | 4 装备 | ✅ |
