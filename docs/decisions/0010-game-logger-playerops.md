@@ -16,7 +16,7 @@
 
 4. **GameLog 文件包含 serverLog 用于 ReplayEngine 状态重建**。复用 `reduceGameState` 从原始 ServerEvent 序列逐步重建状态，避免重新实现 `applyOperation`。替代方案——从 serverOps 重建——需要实现 Operation→state 转换逻辑，与引擎逻辑重复。
 
-5. **保留 engine/view/actionLog.ts 不删除**。纯函数无副作用，现有单元测试保持通过，作为 GameAction→Operation 的参考实现保留。
+5. **保留 src/engine/view/actionLog.ts 不删除**。纯函数无副作用，现有单元测试保持通过，作为 GameAction→Operation 的参考实现保留。
 
 6. **description 中文手写模板**。13 种 OperationType + 4 种 GameAction 级别共约 17 个描述模板，总计 ~80 行 switch-case，集中在一个文件，可维护。替代方案 i18n 框架——过重，无多语言需求。
 
@@ -33,4 +33,4 @@
   - GameLog 文件包含 serverLog 会增大文件体积（相比仅存 serverOps）。
   - `actionLog.ts` 保留但不再被主流程调用，有死代码嫌疑。
 
-**参考**: `engine/logger.ts` (GameLogger)、`engine/replay.ts` (ReplayEngine)、`shared/log.ts` (GameLog 类型)、`server/protocol.ts` (events 消息 operations 字段)、`server/session.ts` (broadcastEvents 分发 playerOps)。
+**参考**: `src/src/engine/logger.ts` (GameLogger)、`src/src/engine/replay.ts` (ReplayEngine)、`src/src/shared/log.ts` (GameLog 类型)、`src/src/server/protocol.ts` (events 消息 operations 字段)、`src/src/server/session.ts` (broadcastEvents 分发 playerOps)。

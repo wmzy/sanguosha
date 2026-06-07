@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { PlayerPanel, type PlayerPanelData } from '../../src/components/PlayerPanel';
-import type { SelfView, OtherPlayerView, CardInfo } from '../../engine/view/types';
+import { PlayerPanel, type PlayerPanelData } from '../../src/client/components/PlayerPanel';
+import type { SelfView, OtherPlayerView, CardInfo } from '../../src/engine/view/types';
 
 function makeCardInfo(id: string, name: string, subtype: '武器' | '防具' | '马'): CardInfo {
   return {

@@ -10,7 +10,7 @@ import {
   narrowArray,
   isStringArray,
   isRecordOf,
-} from '../../shared/typeGuards';
+} from '../../src/shared/typeGuards';
 
 describe('isRecord', () => {
   it('should return true for plain objects', () => {

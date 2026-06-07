@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { register, unregister, shutdownAll, getResourceCount, _resetForTests } from '../../server/lifecycles';
+import { register, unregister, shutdownAll, getResourceCount, _resetForTests } from '../../src/server/lifecycles';
 
 describe('server/lifecycles', () => {
   beforeEach(() => {

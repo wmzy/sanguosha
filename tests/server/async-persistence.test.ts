@@ -3,7 +3,7 @@ import {
   loadRoom,
   deletePersistedRoom,
   flushPendingWrites,
-} from '../../server/persistence';
+} from '../../src/server/persistence';
 
 describe('server/persistence async API (T16)', () => {
   it('loadRoom returns a Promise and resolves to null for missing rooms', async () => {
@@ -28,7 +28,7 @@ describe('server/persistence async API (T16)', () => {
   it('persistence uses node:fs/promises internally (no *Sync in main path)', async () => {
     const fs = await import('node:fs');
     expect(fs).toBeDefined();
-    const persistence = await import('../../server/persistence');
+    const persistence = await import('../../src/server/persistence');
     expect(typeof persistence.saveRoom).toBe('function');
     expect(typeof persistence.loadRoom).toBe('function');
     expect(typeof persistence.deletePersistedRoom).toBe('function');

@@ -1,6 +1,6 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
-import type { Card } from '../../../shared/types';
+import type { Card } from '../../../src/shared/types';
 
 function putHeartOnDeckTop(ctx: any) {
   const cardId = 'test-heart-judge';

@@ -147,4 +147,4 @@ type ServerMessage =
 
 ## 类型来源
 
-`shared/types.ts`、`engine/types.ts`、`engine/view/types.ts`、`server/protocol.ts` 均为单一类型来源（TS 编译期校验）。
+`src/src/shared/types.ts`、`src/src/engine/types.ts`、`src/src/engine/view/types.ts`、`src/src/server/protocol.ts` 均为单一类型来源（TS 编译期校验）。

@@ -6,8 +6,8 @@ import {
   deserialize,
   type ClientMessage,
   type ServerMessage,
-} from '../../server/protocol';
-import type { GameAction } from '../../engine/types';
+} from '../../src/server/protocol';
+import type { GameAction } from '../../src/engine/types';
 
 // ─── helpers ────────────────────────────────────────────────
 

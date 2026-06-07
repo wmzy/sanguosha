@@ -17,7 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "server": "tsx server/index.ts",
+    "server": "tsx src/server/index.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

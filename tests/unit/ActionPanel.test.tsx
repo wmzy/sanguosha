@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ActionPanel } from '../../src/components/ActionPanel';
+import { ActionPanel } from '../../src/client/components/ActionPanel';
 
 describe('ActionPanel', () => {
   it('显示出牌和结束回合按钮', () => {

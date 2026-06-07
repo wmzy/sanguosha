@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, render } from '@testing-library/react';
-import { Countdown, useCountdownSeconds } from '../../src/components/game/Countdown';
+import { Countdown, useCountdownSeconds } from '../../src/client/components/game/Countdown';
 
 describe('useCountdownSeconds', () => {
   beforeEach(() => {

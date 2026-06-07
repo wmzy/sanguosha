@@ -10,7 +10,7 @@
 //   2. 避免误导：让读者误以为这些数据是生产代码
 //   3. 任何"测试和真实逻辑脱节"的风险都被显式化
 
-import type { Card, Suit, Rank } from '../../shared/types';
+import type { Card, Suit, Rank } from '../../src/shared/types';
 
 // ============================================================
 // 武器牌定义

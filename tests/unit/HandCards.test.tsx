@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { HandCards } from '../../src/components/HandCards';
-import type { Card } from '../../shared/types';
+import { HandCards } from '../../src/client/components/HandCards';
+import type { Card } from '../../src/shared/types';
 
 const mockCards: Card[] = [
   { id: '杀-♠-3', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: '3', description: '' },

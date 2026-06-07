@@ -34,7 +34,7 @@
 
 ### 决策 1：统一 `applyAtoms` 入口（单路径）
 
-`engine/atom.ts` 顶层 `applyAtoms(state, atoms, opts?)` 是**所有** atom 序列应用的唯一入口：
+`src/src/engine/atom.ts` 顶层 `applyAtoms(state, atoms, opts?)` 是**所有** atom 序列应用的唯一入口：
 
 - 内部走 `broadcast` 写 `state.serverLog` / 派 `playerEvents`
 - `opts.skipPlayerEvents: true` 让技能层（`phases/atoms`）复用同一路径，serverLog 仍正常写入
@@ -43,7 +43,7 @@
 
 ### 决策 2：onBefore / onAfter 钩子 API
 
-`engine/skill-hook.ts` 新增 `registerAtomHook(def)` API：
+`src/src/engine/skill-hook.ts` 新增 `registerAtomHook(def)` API：
 
 ```ts
 interface AtomHookDef {
@@ -76,7 +76,7 @@ interface AtomHookDef {
 
 ### 决策 4：不立即迁移 38+ 技能到 onAfterAtom
 
-38+ 现有技能继续用 `trigger.event` 注册系统（`engine/skill.ts:emitEvent`）。新功能用 `registerAtomHook` API。**不**一次性迁移——避免大规模重写。
+38+ 现有技能继续用 `trigger.event` 注册系统（`src/src/engine/skill.ts:emitEvent`）。新功能用 `registerAtomHook` API。**不**一次性迁移——避免大规模重写。
 
 未来某个技能"用 onAfterAtom 比 trigger.event 更合适"时，再单独迁移。
 
@@ -104,15 +104,15 @@ interface AtomHookDef {
 ## 改动文件
 
 **新增**:
-- `engine/skill-hook.ts` (62 行)
+- `src/src/engine/skill-hook.ts` (62 行)
 - `tests/unit/skill-hook.test.ts` (15 测试)
 
 **修改**:
-- `engine/atom.ts`: 顶层 `applyAtoms`（含 `skipHooks` 选项、`_recursionDepth` 内部参数）；`broadcast` 函数**删除**
-- `engine/handlers/engine-utils.ts`: 删 `applyAtoms` 函数；保留 `mergePlayerEvents` / `applyDamage` / `createDyingPending`
-- `engine/phases/atoms.ts`: 改用 `applyAtoms(s, [atom], { skipPlayerEvents: true })`
-- 9 个 handler 文件 + 2 引擎核心文件 + 3 测试文件：import 全部迁移到 `engine/atom.ts:applyAtoms`
-- `engine/skill.ts:152`: 删 `phaseFlags` 防重死代码
+- `src/src/engine/atom.ts`: 顶层 `applyAtoms`（含 `skipHooks` 选项、`_recursionDepth` 内部参数）；`broadcast` 函数**删除**
+- `src/src/engine/handlers/engine-utils.ts`: 删 `applyAtoms` 函数；保留 `mergePlayerEvents` / `applyDamage` / `createDyingPending`
+- `src/src/engine/phases/atoms.ts`: 改用 `applyAtoms(s, [atom], { skipPlayerEvents: true })`
+- 9 个 handler 文件 + 2 引擎核心文件 + 3 测试文件：import 全部迁移到 `src/src/engine/atom.ts:applyAtoms`
+- `src/src/engine/skill.ts:152`: 删 `phaseFlags` 防重死代码
 
 ## ADR 关系
 

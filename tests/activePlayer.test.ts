@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { GameState, PendingAction, TurnPhase } from '../engine/types';
-import { getSingleActivePlayer } from '../src/utils/activePlayer';
+import type { GameState, PendingAction, TurnPhase } from '../src/engine/types';
+import { getSingleActivePlayer } from '../src/client/utils/activePlayer';
 
 function makeState(pending: PendingAction | null, phase: TurnPhase = '出牌', currentPlayer = 'P1'): GameState {
   return {

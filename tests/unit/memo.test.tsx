@@ -1,12 +1,12 @@
 import { Profiler, memo, useCallback, useState, type ProfilerOnRenderCallback } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ActionPanel } from '../../src/components/ActionPanel';
-import { HandCards } from '../../src/components/HandCards';
-import { LogPanel } from '../../src/components/LogPanel';
-import { PlayerPanel, type PlayerPanelData } from '../../src/components/PlayerPanel';
-import type { Card } from '../../shared/types';
-import type { Operation } from '../../shared/log';
+import { ActionPanel } from '../../src/client/components/ActionPanel';
+import { HandCards } from '../../src/client/components/HandCards';
+import { LogPanel } from '../../src/client/components/LogPanel';
+import { PlayerPanel, type PlayerPanelData } from '../../src/client/components/PlayerPanel';
+import type { Card } from '../../src/shared/types';
+import type { Operation } from '../../src/shared/log';
 
 interface RenderRecord {
   phase: string;

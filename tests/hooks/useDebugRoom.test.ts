@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useDebugRoom } from '../../src/hooks/useDebugRoom';
+import { useDebugRoom } from '../../src/client/hooks/useDebugRoom';
 
 describe('useDebugRoom', () => {
   it('初始 UI state：playerCount=5 / error=null / debugRooms=[] / operations=[] / selectedCardId=null / selectedForDiscard=空 / selectedSkillCards=空', () => {

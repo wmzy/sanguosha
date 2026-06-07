@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiFetch, ApiError } from '../../src/api/client';
+import { apiFetch, ApiError } from '../../src/client/api/client';
 
 function mockFetch(response: { ok: boolean; status: number; json: () => Promise<unknown> }) {
   return vi.fn().mockResolvedValue(response);

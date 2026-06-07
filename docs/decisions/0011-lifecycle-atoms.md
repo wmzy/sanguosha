@@ -8,9 +8,9 @@
 
 引擎层有**三个**事件概念，长期混淆：
 
-- **Atom**（`engine/types.ts:195-222`）：唯一修改 `GameState` 的原语。handler 层 `applyAtoms` 调 `broadcast` 写 `state.serverLog` / 派 `playerEvents`。
-- **GameEvent**（`engine/types.ts:411-428`）：技能钩子信号，扫 `state.triggers` 匹配后调 skill handler。**不**进 serverLog，**不**改 state。
-- **ServerEvent**（`engine/types.ts:429-434`）：流水/广播/重放事件。**不**触发技能，**不**改 state。
+- **Atom**（`src/src/engine/types.ts:195-222`）：唯一修改 `GameState` 的原语。handler 层 `applyAtoms` 调 `broadcast` 写 `state.serverLog` / 派 `playerEvents`。
+- **GameEvent**（`src/src/engine/types.ts:411-428`）：技能钩子信号，扫 `state.triggers` 匹配后调 skill handler。**不**进 serverLog，**不**改 state。
+- **ServerEvent**（`src/src/engine/types.ts:429-434`）：流水/广播/重放事件。**不**触发技能，**不**改 state。
 
 不变量："**每个** atom 应用后派 1 个 server event 进 serverLog + 派对应 GameEvent 给技能"。
 
@@ -18,17 +18,17 @@
 
 **问题 1：turnStart 绕开 atom**
 
-`engine/phase-advance.ts:197-208` 处理回合开始时手工 `makeServerEvent('turnStart', ...)` 派 server event（不写 `state.serverLog`）+ 手工 `emitEvent({ type: 'turnStart' })` 派 GameEvent。两条派发路径都不走 atom 体系。ReplayEngine 重建状态时**看不到** `turnStart`。
+`src/src/engine/phase-advance.ts:197-208` 处理回合开始时手工 `makeServerEvent('turnStart', ...)` 派 server event（不写 `state.serverLog`）+ 手工 `emitEvent({ type: 'turnStart' })` 派 GameEvent。两条派发路径都不走 atom 体系。ReplayEngine 重建状态时**看不到** `turnStart`。
 
 **问题 2：phaseBegin / phaseEnd 同样绕开 atom**
 
-`engine/phase-advance.ts:106, 140` 手工 `emitEvent({ type: 'phaseBegin' })` / `{ type: 'phaseEnd' }` 派 GameEvent。**没有** server event 派发（不写 serverLog），"进入X阶段"由 `setPhase` atom 派生表达。
+`src/src/engine/phase-advance.ts:106, 140` 手工 `emitEvent({ type: 'phaseBegin' })` / `{ type: 'phaseEnd' }` 派 GameEvent。**没有** server event 派发（不写 serverLog），"进入X阶段"由 `setPhase` atom 派生表达。
 
 但 `setPhase` atom 应用后**没有**自动派 `phaseBegin` GameEvent——38+ 技能监听 `phaseBegin` 完全依赖手工 `emitEvent`。`setPhase` atom 应用 → 写 serverLog → **跳过** `ATOM_GAME_EVENTS` 钩子。
 
 **问题 3：phases/atoms.ts 不写 serverLog**
 
-`engine/phases/atoms.ts:37-39` 手工 `atomToEvents` + `applyAtom` 应用技能触发的 atom，**不**调 `broadcast`——`state.serverLog` 不增长。
+`src/src/engine/phases/atoms.ts:37-39` 手工 `atomToEvents` + `applyAtom` 应用技能触发的 atom，**不**调 `broadcast`——`state.serverLog` 不增长。
 
 `engine-utils.applyAtoms` = `broadcast` 封装（写 serverLog）——`phases/atoms` 走的是**另一条**路径。
 
@@ -38,13 +38,13 @@
 - ReplayEngine 重建 state 缺技能副作用
 - GameLogger 流水不完整（虽然目前 logger 还没处理 `cardDrawn` 这类死代码 GameEvent）
 
-**根因**：`ATOM_GAME_EVENTS` 钩子**只在 `phases/atoms` 路径**（技能内部）调用，**不在 `engine/atom.ts:broadcast`**（handler 层）调用——`broadcast` 是所有 atom 必经之路，应该挂这个钩子。
+**根因**：`ATOM_GAME_EVENTS` 钩子**只在 `phases/atoms` 路径**（技能内部）调用，**不在 `src/src/engine/atom.ts:broadcast`**（handler 层）调用——`broadcast` 是所有 atom 必经之路，应该挂这个钩子。
 
 ## 决策
 
 **本期已落地**：
 
-1. **`turnStart` 封装为 atom**。新 atom 注册在 `engine/atoms/turn.ts`，`toEvents` 派 `makeServerEvent('turnStart', { player })`，`apply` no-op。`Atom` 联合类型扩展 `{ type: 'turnStart'; player: Expr<string> }`。
+1. **`turnStart` 封装为 atom**。新 atom 注册在 `src/src/engine/atoms/turn.ts`，`toEvents` 派 `makeServerEvent('turnStart', { player })`，`apply` no-op。`Atom` 联合类型扩展 `{ type: 'turnStart'; player: Expr<string> }`。
 
 2. **`phase-advance.ts:207-208` 手工 `makeServerEvent('turnStart')` 替换为 `applyAtoms(s, [{ type: 'turnStart', player }])`**。自动写 `state.serverLog`。
 
@@ -52,7 +52,7 @@
 
 **Future work（统一管道方案）**：
 
-4. **`engine/atom.ts:broadcast` 增加 `ATOM_GAME_EVENTS` 钩子**。每个 atom 应用后查 `ATOM_GAME_EVENTS[atom.type]`，如有则调 `emitEvent(state, gameEvent)`，emitEvent 返回的 state 用于下一轮。**这让 `setPhase` atom → `phaseBegin` GameEvent、`nextPlayer` atom → `turnStart` GameEvent 等自动派生**。
+4. **`src/src/engine/atom.ts:broadcast` 增加 `ATOM_GAME_EVENTS` 钩子**。每个 atom 应用后查 `ATOM_GAME_EVENTS[atom.type]`，如有则调 `emitEvent(state, gameEvent)`，emitEvent 返回的 state 用于下一轮。**这让 `setPhase` atom → `phaseBegin` GameEvent、`nextPlayer` atom → `turnStart` GameEvent 等自动派生**。
 
 5. **扩展 `ATOM_GAME_EVENTS` 映射**：补 `setPhase` → `phaseBegin`、`nextPlayer` → `turnStart`、`draw` → `cardDrawn`、`discard` → `cardDiscarded`、`equip` / `unequip` → `equipChanged`、`judge` → `judgeResult` 等。统一为"每个 atom 应用后自动派对应 GameEvent"。
 
@@ -70,7 +70,7 @@
 ## 后果
 
 **正面**:
-- `turnStart` server event 进 `state.serverLog`，ReplayEngine 用 `reduceGameState`（`engine/view/reducer.ts:559-562`）能正确 replay。
+- `turnStart` server event 进 `state.serverLog`，ReplayEngine 用 `reduceGameState`（`src/src/engine/view/reducer.ts:559-562`）能正确 replay。
 - 消除 `phase-advance.ts` 绕过 atom 的特殊路径，引擎不变量更严格。
 - GameLogger 流水中 `turnStart` 仍走 `eventToServerOp` 的 `case 'turnStart': return null`（与 `nextPlayer` 流水不重复），serverLog 完整但流水清晰。
 
@@ -93,18 +93,18 @@
 ## 改动文件
 
 **本期**:
-- `engine/atoms/turn.ts`: 新增 `turnStart` atom
-- `engine/types.ts`: `Atom` 联合扩展 `turnStart` 变体
-- `engine/phase-advance.ts`: 行 207-208 手工 `makeServerEvent` 替换为 `applyAtoms([{ type: 'turnStart', player }])`
+- `src/src/engine/atoms/turn.ts`: 新增 `turnStart` atom
+- `src/src/engine/types.ts`: `Atom` 联合扩展 `turnStart` 变体
+- `src/src/engine/phase-advance.ts`: 行 207-208 手工 `makeServerEvent` 替换为 `applyAtoms([{ type: 'turnStart', player }])`
 - `docs/decisions/0010-game-logger-playerops.md`: 决策 1 "理由" 段更新（指向本 ADR）
 
 **Future work**（不在本 PR）:
-- `engine/atom.ts:broadcast`: 增加 `ATOM_GAME_EVENTS` 钩子
-- `engine/atom-game-events.ts`: 扩展映射（`setPhase` → `phaseBegin` 等）
-- `engine/phases/atoms.ts`: 改用 `applyAtoms`（含 playerEvents 跳过选项）
+- `src/src/engine/atom.ts:broadcast`: 增加 `ATOM_GAME_EVENTS` 钩子
+- `src/src/engine/atom-game-events.ts`: 扩展映射（`setPhase` → `phaseBegin` 等）
+- `src/src/engine/phases/atoms.ts`: 改用 `applyAtoms`（含 playerEvents 跳过选项）
 - `engine-utils.applyDamage` 等: 删除手工 `emitEvent` 调用
-- `engine/phase-advance.ts:106, 140, 198`: 删除手工 `emitEvent`（如果未来钩子补全）
-- `engine/types.ts`: 移除死代码 GameEvent 类型（`cardDrawn` / `cardDiscarded` / `equipChanged` / `judgeResult` / `skillActivated` 等如果仍无人监听）
+- `src/src/engine/phase-advance.ts:106, 140, 198`: 删除手工 `emitEvent`（如果未来钩子补全）
+- `src/src/engine/types.ts`: 移除死代码 GameEvent 类型（`cardDrawn` / `cardDiscarded` / `equipChanged` / `judgeResult` / `skillActivated` 等如果仍无人监听）
 
 ## 关键概念再澄清
 

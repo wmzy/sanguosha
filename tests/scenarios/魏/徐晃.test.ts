@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
-import type { Card } from '../../../shared/types';
+import type { Card } from '../../../src/shared/types';
 
 function giveBlackBasic(ctx: any, player: string) {
   const cardId = 'test-black-杀-1';

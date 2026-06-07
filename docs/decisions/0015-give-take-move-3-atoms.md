@@ -8,8 +8,8 @@
 
 `docs/ENGINE.md` §6 P0 指出：13+ 技能（仁德/突袭/反间/好施/黄天/集智/借刀失败/归心/反馈/烈刃/雷击/顺手牵羊/过河拆桥）都涉及"卡牌从 A 到 B"的语义，但代码里用多种方式实现：
 
-- 直接改 `state.players[from].hand` 数组（仁德 `engine/skills/shu.ts:1-50`）
-- 用 `discard` + `gainCard` 组合（突袭 `engine/skills/wei.ts:200-260`）
+- 直接改 `state.players[from].hand` 数组（仁德 `src/src/engine/skills/shu.ts:1-50`）
+- 用 `discard` + `gainCard` 组合（突袭 `src/src/engine/skills/wei.ts:200-260`）
 - 用 `moveCard` atom
 
 这些方式缺乏统一语义，导致：
@@ -22,7 +22,7 @@
 ### 抽 3 个独立 atom
 
 ```ts
-// engine/types.ts Atom 联合新增
+// src/src/engine/types.ts Atom 联合新增
 | { type: 'giveCard'; cardId: Expr<string>; from: Expr<string>; to: Expr<string> }
 | { type: 'takeCard'; cardId: Expr<string>; to: Expr<string> }
 ```
@@ -64,18 +64,18 @@
 ## 改动文件
 
 **新增**:
-- `engine/atoms/giveCard.ts` (40 行)
-- `engine/atoms/takeCard.ts` (35 行)
+- `src/src/engine/atoms/giveCard.ts` (40 行)
+- `src/src/engine/atoms/takeCard.ts` (35 行)
 - `tests/atoms/give-take-move.test.ts` (5 测试)
 
 **修改**:
-- `engine/atoms/index.ts`: 注册 giveCard + takeCard
-- `engine/types.ts`: Atom 联合 + 2 个变体
+- `src/src/engine/atoms/index.ts`: 注册 giveCard + takeCard
+- `src/src/engine/types.ts`: Atom 联合 + 2 个变体
 - `tests/engine-helpers.ts`: `TestGameOptions` 加 `hand` / `deck` 选项
 
 ## 跟进项（P1）
 
-- `engine/view/reducer.ts:applyGameStateEvent` 加 `case 'giveCard'` / `case 'takeCard'`，mutate `state.players[from/to].hand`
+- `src/src/engine/view/reducer.ts:applyGameStateEvent` 加 `case 'giveCard'` / `case 'takeCard'`，mutate `state.players[from/to].hand`
 - 13+ 技能 v3 迁移时使用新 atom（`trigger.event` → `registerAtomHook`）
 
 ## ADR 关系

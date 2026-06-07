@@ -1,7 +1,7 @@
 // tests/server/middleware.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
-import { cors, requestLogger, rateLimit, errorHandler } from '../../server/middleware';
+import { cors, requestLogger, rateLimit, errorHandler } from '../../src/server/middleware';
 
 describe('CORS middleware', () => {
   it('should set Access-Control-Allow-Origin header on normal requests', async () => {

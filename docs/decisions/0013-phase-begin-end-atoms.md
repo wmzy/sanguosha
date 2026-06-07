@@ -6,11 +6,11 @@
 
 ## 背景
 
-`engine/atoms/phase.ts` 的 `setPhase` atom 应用 = `state.phase = atom.phase`，**单字段切换**。但**没有**显式的"阶段开始 / 阶段结束"通知。
+`src/src/engine/atoms/phase.ts` 的 `setPhase` atom 应用 = `state.phase = atom.phase`，**单字段切换**。但**没有**显式的"阶段开始 / 阶段结束"通知。
 
 ### 现状
 
-`engine/phase-advance.ts:processPhaseStep` 内部：
+`src/src/engine/phase-advance.ts:processPhaseStep` 内部：
 
 1. 派 `phaseBegin` GameEvent（手工 `emitEvent`）
 2. 执行阶段内 actions
@@ -40,15 +40,15 @@
 
 ### state.turn.phaseFlags 字段问题
 
-`engine/types.ts:84` 字段 `phaseFlags: string[]` 注释说"skipDraw, skipPlay, etc."——但实际**这些是 `state.players[].tags[]`，不是 `phaseFlags`**。
+`src/src/engine/types.ts:84` 字段 `phaseFlags: string[]` 注释说"skipDraw, skipPlay, etc."——但实际**这些是 `state.players[].tags[]`，不是 `phaseFlags`**。
 
-`phaseFlags` 字段实际**只有** `'turnStarted'` 字符串在用（`engine/phase-advance.ts:197`）——**形式是 `string[]`，类型不安全**。
+`phaseFlags` 字段实际**只有** `'turnStarted'` 字符串在用（`src/src/engine/phase-advance.ts:197`）——**形式是 `string[]`，类型不安全**。
 
 ## 决策
 
 ### 决策 1：setPhase 拆分为显式 phaseBegin/phaseEnd atom
 
-`engine/atoms/phase.ts` 新增 2 个 atom：
+`src/src/engine/atoms/phase.ts` 新增 2 个 atom：
 
 - `phaseBegin(phase, player)` atom: 写 serverLog `phaseBegin` server event
 - `phaseEnd(phase, player)` atom: 写 serverLog `phaseEnd` server event
@@ -72,7 +72,7 @@
 
 ### 决策 3：state.turn.phaseFlags: string[] 改为 turnStarted: boolean
 
-`engine/types.ts:84` `TurnState`：
+`src/src/engine/types.ts:84` `TurnState`：
 
 ```ts
 // 之前：
@@ -86,7 +86,7 @@ turnStarted: boolean; // turnStart atom 是否已派发（防重用）
 
 ### 决策 4：保留 38+ 现有技能的 trigger.event 注册
 
-`engine/skill.ts:emitEvent` 仍按 `trigger.event` 匹配——`phaseBegin` / `phaseEnd` GameEvent 派发后扫 `state.triggers` 找匹配技能，触发 skill handler。**不**迁移到 `onAfterAtom` 钩子。
+`src/src/engine/skill.ts:emitEvent` 仍按 `trigger.event` 匹配——`phaseBegin` / `phaseEnd` GameEvent 派发后扫 `state.triggers` 找匹配技能，触发 skill handler。**不**迁移到 `onAfterAtom` 钩子。
 
 ## 后果
 
@@ -110,13 +110,13 @@ turnStarted: boolean; // turnStart atom 是否已派发（防重用）
 ## 改动文件
 
 **修改**:
-- `engine/atoms/phase.ts`: 新增 `phaseBegin` / `phaseEnd` atom（apply no-op，toEvents 派 server event + player event）
-- `engine/types.ts`: `Atom` 联合扩展 `phaseBegin` / `phaseEnd` 变体；`TurnState.phaseFlags: string[]` → `turnStarted: boolean`
-- `engine/phase-advance.ts`: `processPhaseStep` 重构为 4 步显式序列；`advanceToInteractivePhase` turnStart 防重改用 `state.turn.turnStarted`
-- `engine/atoms/phase.ts` `nextPlayer` atom: 重置 `turnStarted: false`
-- `engine/state.ts`: 初始 `turnStarted: false`
-- `engine/view/reducer.ts`: turnStart 重建 turn 时 `turnStarted: false`
-- `engine/skill.ts`: 删 `phaseFlags` 防重死代码
+- `src/src/engine/atoms/phase.ts`: 新增 `phaseBegin` / `phaseEnd` atom（apply no-op，toEvents 派 server event + player event）
+- `src/src/engine/types.ts`: `Atom` 联合扩展 `phaseBegin` / `phaseEnd` 变体；`TurnState.phaseFlags: string[]` → `turnStarted: boolean`
+- `src/src/engine/phase-advance.ts`: `processPhaseStep` 重构为 4 步显式序列；`advanceToInteractivePhase` turnStart 防重改用 `state.turn.turnStarted`
+- `src/src/engine/atoms/phase.ts` `nextPlayer` atom: 重置 `turnStarted: false`
+- `src/src/engine/state.ts`: 初始 `turnStarted: false`
+- `src/src/engine/view/reducer.ts`: turnStart 重建 turn 时 `turnStarted: false`
+- `src/src/engine/skill.ts`: 删 `phaseFlags` 防重死代码
 
 ## ADR 关系
 

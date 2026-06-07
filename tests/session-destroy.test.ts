@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GameSession } from '../server/session';
-import * as persistence from '../server/persistence';
-import type { Room } from '../server/room';
+import { GameSession } from '../src/server/session';
+import * as persistence from '../src/server/persistence';
+import type { Room } from '../src/server/room';
 
 const room: Room = {
   id: 'test-room',

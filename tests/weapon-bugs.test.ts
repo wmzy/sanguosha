@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { createStandardDeck } from '../shared/deck';
-import { getAttackRange, isInAttackRange } from '../engine/distance';
-import { engine } from '../engine/engine';
+import { createStandardDeck } from '../src/shared/deck';
+import { getAttackRange, isInAttackRange } from '../src/engine/distance';
+import { engine } from '../src/engine/engine';
 import { createTestGame, injectEquipCard, injectCard } from './engine-helpers';
-import { hasUnlimitedKills } from '../engine/validate';
-import type { GameState } from '../engine/types';
+import { hasUnlimitedKills } from '../src/engine/validate';
+import type { GameState } from '../src/engine/types';
 
 function setPlayPhase(state: GameState): GameState {
   return { ...state, phase: '出牌', pending: null };

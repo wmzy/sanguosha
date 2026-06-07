@@ -6,12 +6,12 @@
 
 **Architecture:**
 - **P3-T1 大雾反转修 + 藤甲真规则 + 火杀 +1**：
-  - 大雾：当前 `engine/skills/daqi.ts` 调 `registerArmorDamageBlock('daqi', 'thunder')` 是错的。改成防 non-thunder（normal+fire）。
-  - 藤甲：当前 `engine/skills/tengjia.ts` 调 `registerArmorDamageBlock('tengjia', 'fire')` 是错的（真 rule：防 normal 杀）。改成防 normal。
+  - 大雾：当前 `src/src/engine/skills/daqi.ts` 调 `registerArmorDamageBlock('daqi', 'thunder')` 是错的。改成防 non-thunder（normal+fire）。
+  - 藤甲：当前 `src/src/engine/skills/tengjia.ts` 调 `registerArmorDamageBlock('tengjia', 'fire')` 是错的（真 rule：防 normal 杀）。改成防 normal。
   - 火杀 +1：火属性 `damage.amount` 默认为 1；扩展为 fire 默认 amount=2（1A-T1 默认 normal=1，保持兼容；fire 在 damage atom apply 阶段改 amount=2，或在 useCard 钩子注入 amount=2 的 damage atom）。
   - 现有 P2-T3 雷电-连环 test 不装备大雾——本 Task 补全真 game rule 断言（thunder 穿透大雾，normal/fire 被大雾防）。
 - **P3-T2 八卦阵 useCard prompt**：在 `becomeTarget` 阶段用 v3 hook 注入 `setCtxVar` 写入 `baguaJudgeResult` 到 `state.localVars`。判定走 deck 顶牌花色（红→red，黑→black）。
-- **P3-T3 雷击完整判定**：升级 `engine/skills/leiji.ts` 从"占位直接 dmg"为"读 ctx.leijiJudgeResult（useCard 阶段 hook 注入），success 才 emit 3 点 dmg"。
+- **P3-T3 雷击完整判定**：升级 `src/src/engine/skills/leiji.ts` 从"占位直接 dmg"为"读 ctx.leijiJudgeResult（useCard 阶段 hook 注入），success 才 emit 3 点 dmg"。
 - **P3-T4 faceDown + 死亡玩家**：P2-T2 跳过死亡场景。验证 `nextPlayer` atom 死亡跳过与 faceDown 路径互斥。
 
 **Tech Stack:** TypeScript 5.9 + vitest 4.1 + pnpm。
@@ -35,12 +35,12 @@
 - **火杀**：伤害 +1（normal 杀 amount=1，火杀 amount=2）
 
 **Files:**
-- Modify: `engine/skills/daqi.ts`（反转：防 non-thunder）
-- Modify: `engine/skills/tengjia.ts`（反转：防 normal）
-- Modify: `engine/skills/_armorDamageBlock.ts`（保留单类型，daqi 用新注册模式）
-- Create: `engine/skills/_fireKillDamageBonus.ts`（v3 useCard 钩子：card.name=杀 + card.suit=♥/♦/♠? → 注入 +1 amount）
+- Modify: `src/src/engine/skills/daqi.ts`（反转：防 non-thunder）
+- Modify: `src/src/engine/skills/tengjia.ts`（反转：防 normal）
+- Modify: `src/src/engine/skills/_armorDamageBlock.ts`（保留单类型，daqi 用新注册模式）
+- Create: `src/src/engine/skills/_fireKillDamageBonus.ts`（v3 useCard 钩子：card.name=杀 + card.suit=♥/♦/♠? → 注入 +1 amount）
   - **真 game rule**：火杀指【火属性的杀】—— CardDef subtype='fire'（红桃是花色，不是火属性）。本 Task 简化：火杀 = 普通【杀】且 source 手牌是火属性卡（subtype='fire'）。如 cards 表里 subtype 区分火杀/雷杀，filter 收窄 subtype='fire'。
-- Modify: `engine/atoms/damage.ts:apply`（不改——amount 已在 atom 入参决定）
+- Modify: `src/src/engine/atoms/damage.ts:apply`（不改——amount 已在 atom 入参决定）
 - Modify: `tests/scenarios/装备/大雾.test.ts`（P1-1A-T2 写错了，更新断言对齐真 game rule）
 - Modify: `tests/scenarios/装备/藤甲.test.ts`（P1-1A-T2 写错了，更新断言对齐真 game rule）
 - New: `tests/scenarios/装备/大雾-真规则.test.ts`
@@ -257,14 +257,14 @@ describe('火杀 +1 伤害（真 game rule）', () => {
 
 **重要**：火杀 +1 实施方式有 2 种：
 - **方案 A（推荐）**：useCard 钩子 onAfter 注入 `{ type: 'damage', amount: 2, damageType: 'fire', cardId }`（**不**改 damage atom 本身）
-- **方案 B**：在 `engine/atoms/damage.ts:apply` 中 `if (damageType === 'fire' && atom.amount === 1) amount = 2` —— 不推荐（魔法数字 + 隐式 + 跟 amount 默认 1 冲突）
+- **方案 B**：在 `src/src/engine/atoms/damage.ts:apply` 中 `if (damageType === 'fire' && atom.amount === 1) amount = 2` —— 不推荐（魔法数字 + 隐式 + 跟 amount 默认 1 冲突）
 
 P3-T1 采用**方案 A**。
 
 ### 1.4 跑测试确认失败
 3 个新测试文件 + 2 个旧测试文件应 FAIL（当前实现是大雾防 thunder + 藤甲防 fire + 无火杀 bonus）。
 
-### 1.5 改 `engine/skills/_armorDamageBlock.ts`
+### 1.5 改 `src/src/engine/skills/_armorDamageBlock.ts`
 
 **先 read** 全文 30 行。
 
@@ -308,7 +308,7 @@ export function registerArmorDamageBlockExcept(armorId: string, allowedDamageTyp
 }
 ```
 
-### 1.6 改 `engine/skills/daqi.ts`
+### 1.6 改 `src/src/engine/skills/daqi.ts`
 
 ```ts
 import { registerArmorDamageBlockExcept } from './_armorDamageBlock';
@@ -317,7 +317,7 @@ export function register(): void {
 }
 ```
 
-### 1.7 改 `engine/skills/tengjia.ts`
+### 1.7 改 `src/src/engine/skills/tengjia.ts`
 
 ```ts
 import { registerArmorDamageBlock } from './_armorDamageBlock';
@@ -326,10 +326,10 @@ export function register(): void {
 }
 ```
 
-### 1.8 改 `engine/skills/_fireKillDamageBonus.ts` (新)
+### 1.8 改 `src/src/engine/skills/_fireKillDamageBonus.ts` (新)
 
 ```ts
-// engine/skills/_fireKillDamageBonus.ts — 火杀 +1 伤害 v3 useCard 钩子
+// src/src/engine/skills/_fireKillDamageBonus.ts — 火杀 +1 伤害 v3 useCard 钩子
 //
 // 真 game rule：使用火【杀】（subtype='火杀'）造成 2 点伤害，普通【杀】1 点。
 //
@@ -373,7 +373,7 @@ export function register(): void {
 }
 ```
 
-**注意**：火杀 +1 实现依赖 `CardDef.subtype` 区分火杀/普通杀。当前 `shared/cards/basic.ts` 中 `杀` 卡的 subtype 是 '杀'，没有 '火杀' 区分。**完整实现需先扩 cards 集合**——本 Task **仅做骨架** + 1 个真 game rule 端到端测试（用 stub Card subtype='火杀'）。
+**注意**：火杀 +1 实现依赖 `CardDef.subtype` 区分火杀/普通杀。当前 `src/src/shared/cards/basic.ts` 中 `杀` 卡的 subtype 是 '杀'，没有 '火杀' 区分。**完整实现需先扩 cards 集合**——本 Task **仅做骨架** + 1 个真 game rule 端到端测试（用 stub Card subtype='火杀'）。
 
 ### 1.9 改 `tests/scenarios/装备/大雾.test.ts`（P1-1A-T2 旧测试）
 
@@ -391,7 +391,7 @@ export function register(): void {
 
 ### 1.13 提交
 ```bash
-git add engine/skills/daqi.ts engine/skills/tengjia.ts engine/skills/_armorDamageBlock.ts engine/skills/_fireKillDamageBonus.ts tests/fixtures/火杀.ts tests/scenarios/装备/大雾.test.ts tests/scenarios/装备/藤甲.test.ts tests/scenarios/装备/大雾-真规则.test.ts tests/scenarios/装备/藤甲-真规则.test.ts tests/scenarios/装备/火杀.test.ts
+git add src/src/engine/skills/daqi.ts src/engine/skills/tengjia.ts src/engine/skills/_armorDamageBlock.ts src/engine/skills/_fireKillDamageBonus.ts tests/fixtures/火杀.ts tests/scenarios/装备/大雾.test.ts tests/scenarios/装备/藤甲.test.ts tests/scenarios/装备/大雾-真规则.test.ts tests/scenarios/装备/藤甲-真规则.test.ts tests/scenarios/装备/火杀.test.ts
 git commit -m "fix(skill): 真 game rule — 藤甲防 normal / 大雾防 non-thunder / 火杀 +1 伤害骨架"
 ```
 
@@ -400,8 +400,8 @@ git commit -m "fix(skill): 真 game rule — 藤甲防 normal / 大雾防 non-th
 ## Task 2: 八卦阵 useCard 阶段 inject 判定 prompt
 
 **Files:**
-- Create: `engine/skills/_baguaJudgeInject.ts`（监听 becomeTarget 阶段，写 baguaJudgeResult 到 localVars）
-- Modify: `engine/skills/bagua.ts`（保留现状，P2-T4 已正确）
+- Create: `src/src/engine/skills/_baguaJudgeInject.ts`（监听 becomeTarget 阶段，写 baguaJudgeResult 到 localVars）
+- Modify: `src/src/engine/skills/bagua.ts`（保留现状，P2-T4 已正确）
 - Test: `tests/scenarios/装备/八卦阵-useCard判定.test.ts`（新）
 
 ### 2.1 写失败测试
@@ -485,10 +485,10 @@ describe('八卦阵 useCard 阶段完整判定（真 game rule）', () => {
 ### 2.2 跑测试确认失败
 `pnpm test tests/scenarios/装备/八卦阵-useCard判定.test.ts` 应 FAIL（fixture 不存在）。
 
-### 2.3 写 `engine/skills/_baguaJudgeInject.ts`
+### 2.3 写 `src/src/engine/skills/_baguaJudgeInject.ts`
 
 ```ts
-// engine/skills/_baguaJudgeInject.ts — 八卦阵 useCard 阶段判定注入钩子
+// src/src/engine/skills/_baguaJudgeInject.ts — 八卦阵 useCard 阶段判定注入钩子
 //
 // 真 game rule：装备八卦阵的角色被【杀】指定时，触发判定；
 // 红桃/方块（红）视为成功打出【闪】；黑桃/梅花（黑）需继续出闪。
@@ -568,7 +568,7 @@ export function register(): void {
 `tests/fixtures/八卦阵判定.ts`:
 
 ```ts
-import { register as registerBaguaJudge } from '@engine/skills/_baguaJudgeInject';
+import { register as registerBaguaJudge } from '@src/engine/skills/_baguaJudgeInject';
 export function registerAll() {
   registerBaguaJudge();
 }
@@ -582,7 +582,7 @@ export function registerAll() {
 
 ### 2.7 提交
 ```bash
-git add engine/skills/_baguaJudgeInject.ts tests/scenarios/装备/八卦阵-useCard判定.test.ts tests/fixtures/八卦阵判定.ts
+git add src/src/engine/skills/_baguaJudgeInject.ts tests/scenarios/装备/八卦阵-useCard判定.test.ts tests/fixtures/八卦阵判定.ts
 git commit -m "feat(skill): 八卦阵 useCard 阶段判定注入（真 game rule — 读 deck 顶牌 setCtxVar baguaJudgeResult）"
 ```
 
@@ -591,7 +591,7 @@ git commit -m "feat(skill): 八卦阵 useCard 阶段判定注入（真 game rule
 ## Task 3: 雷击完整判定（黑桃 2-9 + judge success/fail）
 
 **Files:**
-- Modify: `engine/skills/leiji.ts`（升级 onAfter 走判定）
+- Modify: `src/src/engine/skills/leiji.ts`（升级 onAfter 走判定）
 - Test: `tests/scenarios/群/雷击-完整判定.test.ts`（新）
 
 ### 3.1 写失败测试
@@ -648,7 +648,7 @@ describe('雷击完整判定（真 game rule）', () => {
 ### 3.2 跑测试确认失败
 `pnpm test tests/scenarios/群/雷击-完整判定.test.ts` 应 FAIL（leiji.ts 当前 onAfter 总是 emit damage，不读 ctx）。
 
-### 3.3 改 `engine/skills/leiji.ts`
+### 3.3 改 `src/src/engine/skills/leiji.ts`
 
 把 onAfter 从"总是 emit 3 dmg"改为"读 ctx.leijiJudgeResult，success 才 emit"：
 
@@ -694,7 +694,7 @@ onAfter({ state, atom }) {
 
 ### 3.6 提交
 ```bash
-git add engine/skills/leiji.ts tests/scenarios/群/雷击-完整判定.test.ts
+git add src/src/engine/skills/leiji.ts tests/scenarios/群/雷击-完整判定.test.ts
 git commit -m "feat(skill): 雷击完整判定（读 ctx.leijiJudgeResult，success 才 emit 3 点 thunder）"
 ```
 
@@ -703,7 +703,7 @@ git commit -m "feat(skill): 雷击完整判定（读 ctx.leijiJudgeResult，succ
 ## Task 4: faceDown + 死亡玩家处理
 
 **Files:**
-- Modify: `engine/phase-advance.ts:advanceToInteractivePhase` faceDown 路径
+- Modify: `src/src/engine/phase-advance.ts:advanceToInteractivePhase` faceDown 路径
 - Test: `tests/integration/facedown-dead-player.test.ts`（新）
 
 ### 4.1 写失败测试
@@ -767,15 +767,15 @@ describe('faceDown + 死亡玩家（真 game rule）', () => {
 ### 4.2 跑测试确认失败
 `pnpm test tests/integration/facedown-dead-player.test.ts` 应 FAIL（P2-T2 跳 P1 路径在 P1 死亡时也跳——已有 nextPlayer 跳过死亡，但 P2-T2 没复用 P1 死亡处理）。
 
-**重要**：实际上 `nextPlayer` atom 应已处理死亡玩家。P2-T2 路径调 `nextPlayer` 切到 P2 即可。看 `engine/atoms/nextPlayer.ts` 实现。
+**重要**：实际上 `nextPlayer` atom 应已处理死亡玩家。P2-T2 路径调 `nextPlayer` 切到 P2 即可。看 `src/src/engine/atoms/nextPlayer.ts` 实现。
 
 ### 4.3 看 `nextPlayer` 是否跳过死亡玩家
 
-**先 read** `engine/atoms/nextPlayer.ts`（或 `engine/atoms/phase.ts`）。如已处理死亡跳过 → P2-T2 路径自动 OK，无需改 phase-advance。
+**先 read** `src/src/engine/atoms/nextPlayer.ts`（或 `src/src/engine/atoms/phase.ts`）。如已处理死亡跳过 → P2-T2 路径自动 OK，无需改 phase-advance。
 
 如未处理 → 改 nextPlayer atom 跳过死亡。
 
-### 4.4 改 `engine/phase-advance.ts` faceDown 路径（如必要）
+### 4.4 改 `src/src/engine/phase-advance.ts` faceDown 路径（如必要）
 
 如果 nextPlayer 已跳过死亡，**faceDown 路径不需要改 phase-advance**。验证方式：跑测试 #1 + #2 是否过。
 
@@ -810,7 +810,7 @@ P3-T4 测试应 PASS（nextPlayer 死亡跳过自动生效）。
 
 ### 4.6 提交
 ```bash
-git add engine/phase-advance.ts tests/integration/facedown-dead-player.test.ts
+git add src/src/engine/phase-advance.ts tests/integration/facedown-dead-player.test.ts
 git commit -m "feat(phase): faceDown + 死亡玩家兼容（nextPlayer 跳过死亡时 faceDown 也清理）"
 ```
 

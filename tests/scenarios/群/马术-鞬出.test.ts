@@ -1,6 +1,6 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
-import { getDistance } from '../../../engine/distance';
+import { getDistance } from '../../../src/engine/distance';
 
 describe('庞德 - 马术', () => {
   scenario('马术锁定技使距离-1')

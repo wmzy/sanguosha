@@ -10,8 +10,8 @@ import {
   findCardInHand,
 } from './engine-helpers';
 
-import '../engine/atoms/index';
-import '../engine/phases/index';
+import '../src/engine/atoms/index';
+import '../src/engine/phases/index';
 
 const charMap = getCharacterMap();
 

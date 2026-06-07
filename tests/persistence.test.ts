@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 async function loadModule() {
-  return import('../server/persistence');
+  return import('../src/server/persistence');
 }
 
 async function makeState() {

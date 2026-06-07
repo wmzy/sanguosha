@@ -8,11 +8,11 @@
 //   - 重启后 nextSeq 与持久化 serverLog.length 同步
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { GameSession } from '../../server/session';
-import * as persistence from '../../server/persistence';
-import type { Room } from '../../server/room';
-import type { GameState, Json, ServerEvent } from '../../engine/types';
-import type { ServerMessage } from '../../server/protocol';
+import { GameSession } from '../../src/server/session';
+import * as persistence from '../../src/server/persistence';
+import type { Room } from '../../src/server/room';
+import type { GameState, Json, ServerEvent } from '../../src/engine/types';
+import type { ServerMessage } from '../../src/server/protocol';
 
 const room: Room = {
   id: 'test-room',

@@ -10,7 +10,7 @@ import {
   getRoom,
   getRoomList,
   findRoomByPlayerId,
-} from '../../server/room';
+} from '../../src/server/room';
 
 // Mock WebSocket context
 function createMockWS(): WSContext {

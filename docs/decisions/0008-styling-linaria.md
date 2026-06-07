@@ -10,4 +10,4 @@
 - **正面**: 零运行时 CSS 提取、静态分析、样式与组件同文件、通过模板插值支持主题
 - **负面**: 构建时依赖、测试环境中 CSS 被 mock（`mocked-css-${idx++}`）、测试中 className 顺序脆弱
 
-**参考**: `src/components/Loading.tsx`（静态样式示例）、`src/theme.ts`（主题常量定义）
+**参考**: `src/client/components/Loading.tsx`（静态样式示例）、`src/client/theme.ts`（主题常量定义）

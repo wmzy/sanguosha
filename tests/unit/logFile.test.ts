@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GameLog } from '../../shared/log';
-import { saveLog, loadLog } from '../../src/utils/logFile';
+import type { GameLog } from '../../src/shared/log';
+import { saveLog, loadLog } from '../../src/client/utils/logFile';
 
 // Mock URL and document for saveLog
 const mockClick = vi.fn();

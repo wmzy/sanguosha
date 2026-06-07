@@ -15,7 +15,7 @@ import { createTestGame } from '../engine-helpers';
 import { executePlan } from '@engine/phase';
 import type { SkillPhase, GameState, TriggerRule } from '@engine/types';
 import { buildSkillContext } from '@engine/context';
-import '../../engine/phases/index';
+import '../../src/engine/phases/index';
 
 describe('multiStep SkillPhase', () => {
   beforeEach(() => {

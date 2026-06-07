@@ -6,8 +6,8 @@ import { executePlan } from '@engine/phase';
 import type { SkillContext, GameState, SkillPhase } from '@engine/types';
 import { createTestGame } from './engine-helpers';
 
-import '../engine/atoms/index';
-import '../engine/phases/index';
+import '../src/engine/atoms/index';
+import '../src/engine/phases/index';
 
 function makeCtx(overrides?: Partial<SkillContext>): SkillContext {
   return {

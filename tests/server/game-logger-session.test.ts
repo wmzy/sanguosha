@@ -7,13 +7,13 @@
 //   - restoreState 从 serverLog 重建 gameLogger（rebuildFromLog）
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { GameSession } from '../../server/session';
-import { GameLogger } from '../../engine/logger';
-import * as persistence from '../../server/persistence';
-import type { Room } from '../../server/room';
-import type { GameAction, GameState, Json, ServerEvent } from '../../engine/types';
-import type { ServerMessage } from '../../server/protocol';
-import type { Operation } from '../../shared/log';
+import { GameSession } from '../../src/server/session';
+import { GameLogger } from '../../src/engine/logger';
+import * as persistence from '../../src/server/persistence';
+import type { Room } from '../../src/server/room';
+import type { GameAction, GameState, Json, ServerEvent } from '../../src/engine/types';
+import type { ServerMessage } from '../../src/server/protocol';
+import type { Operation } from '../../src/shared/log';
 
 // ─── helpers ────────────────────────────────────────────────
 

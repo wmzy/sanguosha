@@ -5,8 +5,8 @@ import {
   pendingToDiscardAction,
   pendingToSkillChoiceAction,
   pendingToSelectCardAction,
-} from '../../server/protocol-adapter';
-import type { PendingAction } from '../../engine/types';
+} from '../../src/server/protocol-adapter';
+import type { PendingAction } from '../../src/engine/types';
 
 const makePending = (type: PendingAction['type'], extra: Record<string, unknown> = {}): PendingAction => {
   const base = { id: 'p1', timeout: 10000, deadline: Date.now() + 10000, onTimeout: { type: '结束回合', player: '刘备' } };

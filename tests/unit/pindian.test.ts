@@ -12,7 +12,7 @@ import { createTestGame } from '../engine-helpers';
 import type { GameState, SkillContext } from '@engine/types';
 import type { Suit, Rank } from '@shared/types';
 import { executePlan } from '@engine/phase';
-import '../../engine/phases/index';
+import '../../src/engine/phases/index';
 
 type CardFixture = {
   id: string;

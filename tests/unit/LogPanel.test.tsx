@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { LogPanel } from '../../src/components/LogPanel';
-import type { Operation } from '../../shared/log';
+import { LogPanel } from '../../src/client/components/LogPanel';
+import type { Operation } from '../../src/shared/log';
 
 const mockOps: Operation[] = [
   { seq: 0, timestamp: Date.now(), type: '游戏开始', data: {}, description: '游戏开始' },

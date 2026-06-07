@@ -8,11 +8,11 @@
 //   - ReplayEngine + GameLog 互相兼容
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { engine } from '../../engine/engine';
-import type { GameState, GameAction, ServerEvent } from '../../engine/types';
-import { GameLogger } from '../../engine/logger';
-import { ReplayEngine } from '../../engine/replay';
-import type { GameLog, Operation } from '../../shared/log';
+import { engine } from '../../src/engine/engine';
+import type { GameState, GameAction, ServerEvent } from '../../src/engine/types';
+import { GameLogger } from '../../src/engine/logger';
+import { ReplayEngine } from '../../src/engine/replay';
+import type { GameLog, Operation } from '../../src/shared/log';
 import {
   createTestGame,
   injectCard,

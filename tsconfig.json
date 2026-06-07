@@ -21,9 +21,9 @@
     "rootDir": "./",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@shared/*": ["./shared/*"],
-      "@engine/*": ["./engine/*"]
+      "@/*": ["./src/client/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@engine/*": ["./src/engine/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

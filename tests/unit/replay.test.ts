@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { GameLog, Operation } from '../../shared/log';
-import type { CharacterConfig } from '../../shared/types';
-import { ReplayEngine } from '../../engine/replay';
+import type { GameLog, Operation } from '../../src/shared/log';
+import type { CharacterConfig } from '../../src/shared/types';
+import { ReplayEngine } from '../../src/engine/replay';
 
 const characterMap: Record<string, CharacterConfig> = {
   曹操: { name: '曹操', maxHealth: 4, gender: '男', faction: '魏', abilities: [] },

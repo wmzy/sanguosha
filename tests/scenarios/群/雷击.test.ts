@@ -6,7 +6,7 @@ import { scenario } from '../../scenario-runner';
 import { createTestGame } from '../../engine-helpers';
 import { registerAll as registerLeiji } from '../../fixtures/雷击';
 import { registerAll as registerChained } from '../../fixtures/铁索连环';
-import type { Card } from '../../../shared/types';
+import type { Card } from '../../../src/shared/types';
 
 function putSpadeOnDeckTop(ctx: any) {
   const cardId = 'test-spade-judge';

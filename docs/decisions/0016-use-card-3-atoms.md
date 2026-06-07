@@ -22,7 +22,7 @@
 ### 抽 3 个独立 atom
 
 ```ts
-// engine/types.ts Atom 联合新增
+// src/src/engine/types.ts Atom 联合新增
 | { type: 'specifyTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
 | { type: 'becomeTarget'; cardId: Expr<string>; source: Expr<string>; target: Expr<string> }
 | { type: 'resolveCard'; cardId: Expr<string>; source: Expr<string>; target?: Expr<string> }
@@ -40,7 +40,7 @@
 
 ### 引擎 entry 暂不 emit 3 atom
 
-**当前状态**：`engine/handlers/card-handlers.ts` 等仍 emit `cardPlayed` GameEvent，**不** emit 3 atom。Task 6 演示技能（完杀/空城/帷幕）的测试用 `applyAtoms` 直接调 `becomeTarget` 跳过引擎 entry。
+**当前状态**：`src/src/engine/handlers/card-handlers.ts` 等仍 emit `cardPlayed` GameEvent，**不** emit 3 atom。Task 6 演示技能（完杀/空城/帷幕）的测试用 `applyAtoms` 直接调 `becomeTarget` 跳过引擎 entry。
 
 **P1 跟进**：在 card handler 关键点（出牌、响应、AOE）插入 `applyAtoms` 调用 emit 3 atom，逐步替换 `cardPlayed` GameEvent 发射点。
 
@@ -70,15 +70,15 @@
 ## 改动文件
 
 **新增**:
-- `engine/atoms/specifyTarget.ts` (22 行)
-- `engine/atoms/becomeTarget.ts` (22 行)
-- `engine/atoms/resolveCard.ts` (24 行)
+- `src/src/engine/atoms/specifyTarget.ts` (22 行)
+- `src/src/engine/atoms/becomeTarget.ts` (22 行)
+- `src/src/engine/atoms/resolveCard.ts` (24 行)
 - `tests/atoms/use-card-lifecycle.test.ts` (4 测试)
 
 **修改**:
-- `engine/atoms/index.ts`: 注册 3 个
-- `engine/atom.ts`: re-export `registerAtomHook` / `clearAtomHooks`
-- `engine/types.ts`: Atom 联合 + 3 变体；`cardPlayed` GameEvent 加 `@deprecated`
+- `src/src/engine/atoms/index.ts`: 注册 3 个
+- `src/src/engine/atom.ts`: re-export `registerAtomHook` / `clearAtomHooks`
+- `src/src/engine/types.ts`: Atom 联合 + 3 变体；`cardPlayed` GameEvent 加 `@deprecated`
 
 ## 跟进项（P1）
 

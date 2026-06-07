@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ReplayControls } from '../../src/components/ReplayControls';
+import { ReplayControls } from '../../src/client/components/ReplayControls';
 
 const defaultProps = {
   currentStep: 2,

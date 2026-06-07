@@ -10,13 +10,13 @@
 
 ### 1. 文件名
 
-- **英文**：`engine/skill.ts`、`engine/atoms/damage.ts`、`server/room.ts`
+- **英文**：`src/engine/skill.ts`、`src/engine/atoms/damage.ts`、`src/server/room.ts`
 - **中文允许**（无法翻译的专有名词，或业务概念是中文本身）：
-  - 国家：`shared/characters/魏.ts`
-  - 人名/技能名/卡牌名：`engine/skills/雷击.ts`、`engine/skills/八卦阵.ts`、`tests/fixtures/诸葛连弩.ts`
+  - 国家：`src/shared/characters/魏.ts`
+  - 人名/技能名/卡牌名：`src/engine/skills/雷击.ts`、`src/engine/skills/八卦阵.ts`、`tests/fixtures/诸葛连弩.ts`
   - 文件聚合：`tests/scenarios/装备/八卦阵.test.ts`
 
-**反例**：`engine/skills/leiji.ts`（拼音）、`engine/skills/bagua.ts`（拼音）、`server/protocol-adapter/pendingToAction.ts`（业务协议适配器用拼音）→ 应为 `雷击.ts` / `八卦阵.ts` / `等待转动作.ts`。
+**反例**：`src/engine/skills/leiji.ts`（拼音）、`src/engine/skills/bagua.ts`（拼音）、`src/server/protocol-adapter/pendingToAction.ts`（业务协议适配器用拼音）→ 应为 `雷击.ts` / `八卦阵.ts` / `等待转动作.ts`。
 
 ### 2. 函数名 / 变量名 / 常量名 → 英文
 
@@ -193,8 +193,8 @@ vars['unlimitedKills']  // 应改为 '诸葛连弩/active'
 
 | 类别 | 命名 | 示例 |
 |---|---|---|
-| 文件名（具体技能/卡牌）| 中文 | `engine/skills/雷击.ts`、`tests/fixtures/诸葛连弩.ts` |
-| 文件名（聚合/工具/协议）| 英文 | `engine/skill.ts`、`server/room.ts`、`_armorDamageBlock.ts` |
+| 文件名（具体技能/卡牌）| 中文 | `src/engine/skills/雷击.ts`、`tests/fixtures/诸葛连弩.ts` |
+| 文件名（聚合/工具/协议）| 英文 | `src/engine/skill.ts`、`src/server/room.ts`、`_armorDamageBlock.ts` |
 | 函数名 / 变量名 / 常量名 | 英文 | `drawCards`、`initialHandSize`、`count` |
 | 业务标识符（角色/技能/卡牌/装备/装备效果）| **中文** | `'奸雄'`、`'诸葛连弩'`、`'八卦阵'` |
 | 业务操作字面量（Atom.type / GameAction.type / ServerEvent.type / TriggerRule.source / TargetFilter.type / PendingAction.type）| **中文** | `'摸牌'`、`'重铸'`、`'造成伤害'`、`'角色'`、`'射程内'`、`'responseWindow'` |
@@ -204,7 +204,7 @@ vars['unlimitedKills']  // 应改为 '诸葛连弩/active'
 | 类型名（承载业务字段的容器）| 英文 | `EquipmentSlots`、`PlayerState` |
 | wire 协议 message type | 英文 | `ServerMessage.type: 'join_room'`、`ClientMessage.type: 'action'` |
 | 前端 UI 动画 type（CSS 钩子）| 英文 | `Animation.type: 'damagePopup'` |
-| 抽象工具 / 通用 hook 文件名 | 英文 | `_armorDamageBlock.ts`、`engine/skill.ts` |
+| 抽象工具 / 通用 hook 文件名 | 英文 | `_armorDamageBlock.ts`、`src/engine/skill.ts` |
 | 结构化数据字段 key（如 `zone`）| 英文（值按 §4 改中文）| `ZoneRef.zone: '手牌'` |
 
 ## 开发规范
@@ -232,10 +232,10 @@ pnpm test:watch        # 监听模式
 
 ## 文件结构
 
-- `shared/` — 前后端共享的类型和数据
-- `engine/` — 游戏引擎（纯逻辑）
-- `src/` — 前端 React 应用
-- `server/` — 后端服务器
+- `src/client/` — 前端 React 应用
+- `src/engine/` — 游戏引擎（纯逻辑）
+- `src/shared/` — 前后端共享的类型和数据
+- `src/server/` — 后端服务器
 - `tests/` — 测试
 - `docs/` — 设计文档和实现计划
 

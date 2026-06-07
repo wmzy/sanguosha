@@ -6,7 +6,7 @@
 
 ## 背景
 
-`engine/atoms/draw.ts:7-28` 的 `reshuffleIfNeeded` 内部把弃牌堆洗回牌堆，但**不**发 server event。问题：
+`src/src/engine/atoms/draw.ts:7-28` 的 `reshuffleIfNeeded` 内部把弃牌堆洗回牌堆，但**不**发 server event。问题：
 
 1. `state.serverLog` 不知道牌堆被洗过 → `reduceGameState` 重建 state 时 deck 顺序错误
 2. Replay / 审计日志不完整
@@ -16,11 +16,11 @@
 
 ### 抽 `reshuffle` atom
 
-`engine/atoms/reshuffle.ts` 注册独立 atom，emit `{ type: 'reshuffle' }` server event，payload `{ count: moved }`。
+`src/src/engine/atoms/reshuffle.ts` 注册独立 atom，emit `{ type: 'reshuffle' }` server event，payload `{ count: moved }`。
 
 ### draw 改用 onBefore 钩子触发 reshuffle
 
-`engine/atoms/draw.ts` 注册 `registerAtomHook({ atomType: 'draw', onBefore: ... })`。当 deck 不足且 discardPile 非空时：
+`src/src/engine/atoms/draw.ts` 注册 `registerAtomHook({ atomType: 'draw', onBefore: ... })`。当 deck 不足且 discardPile 非空时：
 
 ```ts
 const sub = applyAtoms(state, [{ type: 'reshuffle' }], { skipHooks: true, skipPlayerEvents: true });
@@ -33,7 +33,7 @@ return { state: sub.state };
 
 ### view reducer 加 no-op case
 
-`engine/view/reducer.ts:applyGameStateEvent` 加 `case 'reshuffle': return state;`——前端无状态变化（reshuffle 已经在 server 端 apply 完成），仅防止事件被静默丢弃。
+`src/src/engine/view/reducer.ts:applyGameStateEvent` 加 `case 'reshuffle': return state;`——前端无状态变化（reshuffle 已经在 server 端 apply 完成），仅防止事件被静默丢弃。
 
 ## 后果
 
@@ -59,15 +59,15 @@ return { state: sub.state };
 ## 改动文件
 
 **新增**:
-- `engine/atoms/reshuffle.ts` (40 行)
+- `src/src/engine/atoms/reshuffle.ts` (40 行)
 - `tests/atoms/reshuffle.test.ts` (4 测试)
 
 **修改**:
-- `engine/atoms/draw.ts`: `reshuffleIfNeeded` 替换为 onBefore 钩子调用
-- `engine/atoms/index.ts`: 注册 reshuffle
-- `engine/atom.ts`: 导出 `clearAtomRegistry`
-- `engine/types.ts`: Atom 联合加 `{ type: 'reshuffle' }`
-- `engine/view/reducer.ts`: `applyGameStateEvent` 加 `case 'reshuffle'` no-op
+- `src/src/engine/atoms/draw.ts`: `reshuffleIfNeeded` 替换为 onBefore 钩子调用
+- `src/src/engine/atoms/index.ts`: 注册 reshuffle
+- `src/src/engine/atom.ts`: 导出 `clearAtomRegistry`
+- `src/src/engine/types.ts`: Atom 联合加 `{ type: 'reshuffle' }`
+- `src/src/engine/view/reducer.ts`: `applyGameStateEvent` 加 `case 'reshuffle'` no-op
 
 ## ADR 关系
 
