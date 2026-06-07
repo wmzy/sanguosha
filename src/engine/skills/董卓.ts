@@ -9,13 +9,6 @@ export const skills: SkillDef[] = [
     id: '酒池',
     name: '酒池',
     description: '你可以将一张黑桃手牌当【酒】使用。',
-    trigger: {
-      event: '阶段开始',
-      source: '角色',
-      phase: '出牌',
-      manual: true,
-      optional: true,
-    },
     handler(_ctx, _state) {
       return [];
     },
@@ -24,10 +17,6 @@ export const skills: SkillDef[] = [
     id: '肉林',
     name: '肉林',
     description: '锁定技，你对女性角色/女性角色对你使用【杀】时，需连续使用两张【闪】才能抵消。',
-    trigger: {
-      event: '杀命中',
-      source: '角色',
-    },
     handler(_ctx, _state) {
       return [];
     },
@@ -63,11 +52,6 @@ export const skills: SkillDef[] = [
     id: '暴虐',
     name: '暴虐',
     description: '主公技，其他群雄角色每造成一次伤害，可进行一次判定，若结果为黑桃，你回复1点体力。',
-    trigger: {
-      event: '造成伤害',
-      source: '角色',
-      optional: true,
-    },
     handler(_ctx, _state) {
       return [];
     },
@@ -76,13 +60,6 @@ export const skills: SkillDef[] = [
     id: '乱武',
     name: '乱武',
     description: '限定技，出牌阶段，你可以令所有其他角色依次对与其距离最近的另一名角色使用一张【杀】，无法如此做者失去1点体力。',
-    trigger: {
-      event: '阶段开始',
-      source: '角色',
-      phase: '出牌',
-      manual: true,
-      optional: true,
-    },
     handler(_ctx, _state) {
       return [];
     },
