@@ -4,6 +4,7 @@ import type {
   GameState,
   GameEvent,
   EngineResult,
+  ServerEvent,
 } from './types';
 import type { CharacterConfig } from '../shared/types';
 import { checkCondition } from './expr';
@@ -25,11 +26,13 @@ export function getSkillRegistry(): Map<string, SkillDef> {
   return registry;
 }
 
-export function getSkill(id: string): SkillDef {
-  const def = registry.get(id);
+export function getSkill(id: string, skillsMap?: Map<string, SkillDef>): SkillDef {
+  const map = skillsMap ?? registry;
+  const def = map.get(id);
   if (!def) throw new Error(`Unknown skill: "${id}"`);
   return def;
 }
+
 /** 重置技能注册表（仅用于测试场景，确保 test 之间互相隔离） */
 export function clearSkillRegistry(): void {
   registry.clear();
@@ -43,7 +46,9 @@ export function registerCharacterTriggers(
   state: GameState,
   player: string,
   source: CharacterMapSource,
+  skillsMap?: Map<string, SkillDef>,
 ): GameState {
+  const map = skillsMap ?? registry;
   const characterId = state.players[player].info.characterId;
   const character = source.characterMap[characterId];
   if (!character) return state;
@@ -52,7 +57,7 @@ export function registerCharacterTriggers(
   let s = state;
 
   for (const ability of character.abilities) {
-    const def = registry.get(ability.name);
+    const def = map.get(ability.name);
     if (!def) continue;
     // v3-only skill（无 trigger 字段）不进入 v2 state.triggers，
     // v2 emitEvent 不会调它。完整逻辑在 registerAtomHook 钩子中。
@@ -80,12 +85,13 @@ export function registerEquipmentTriggers(
   state: GameState,
   player: string,
   cardId: string,
+  skillsMap?: Map<string, SkillDef>,
 ): GameState {
+  const map = skillsMap ?? registry;
   const card = state.cardMap[cardId];
   if (!card) return state;
 
-  // skill id === card.name（业务标识符中文化），直接用 card.name 查 registry。
-  const def = registry.get(card.name);
+  const def = map.get(card.name);
   if (!def) return state;
   // v3-only 装备技能不进入 v2 state.triggers。
   if (!def.trigger) return state;
@@ -111,7 +117,6 @@ export function unregisterEquipmentTriggers(
   const card = state.cardMap[cardId];
   if (!card) return state;
 
-  // skill id === card.name（业务标识符中文化）。
   return {
     ...state,
     triggers: state.triggers.filter(
@@ -123,7 +128,9 @@ export function unregisterEquipmentTriggers(
 export function emitEvent(
   state: GameState,
   event: GameEvent,
+  skillsMap?: Map<string, SkillDef>,
 ): EngineResult {
+  const map = skillsMap ?? registry;
   const matched = state.triggers
     .filter((t) => t.event === event.type)
     .filter((t) => {
@@ -133,10 +140,10 @@ export function emitEvent(
     .sort((a, b) => b.priority - a.priority);
 
   let s = state;
-  const allEvents: import('./types').ServerEvent[] = [];
+  const allEvents: ServerEvent[] = [];
 
   for (const trigger of matched) {
-    const def = registry.get(trigger.skillId);
+    const def = map.get(trigger.skillId);
     if (!def) continue;
     // v3-only skill（无 trigger）不应出现在 state.triggers 中；
     // 此处 continue 是防御性兜底。
