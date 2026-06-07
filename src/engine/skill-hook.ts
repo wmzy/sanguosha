@@ -60,24 +60,68 @@ export interface AtomHookDef {
   onAfter?: AfterHookFn;
 }
 
-const hookRegistry: AtomHookDef[] = [];
+/**
+ * 钩子注册表。把"全局数组 + 4 个便捷函数"封装成一个类，让外部可持有
+ * 自己的实例（后续 `createEngine` 闭包用），同时保持向后兼容——全局便捷
+ * 函数代理到 `defaultRegistry` 单例。
+ *
+ * 设计依据：docs/decisions/0012-unified-apply-atoms.md
+ */
+export class HookRegistry {
+  private readonly hooks: AtomHookDef[] = [];
+
+  /** 注册一个钩子。 */
+  register(def: AtomHookDef): void {
+    this.hooks.push(def);
+  }
+
+  /** 清空所有已注册钩子。 */
+  clear(): void {
+    this.hooks.length = 0;
+  }
+
+  /** 只读快照：返回所有已注册钩子的浅拷贝。 */
+  getAll(): readonly AtomHookDef[] {
+    return this.hooks.slice();
+  }
+
+  /**
+   * 获取某 atom type 的所有钩子（按优先级降序）。返回新数组——调用方修改
+   * 不会污染内部状态。
+   */
+  getByAtomType(atomType: string): AtomHookDef[] {
+    return this.hooks
+      .filter((h) => h.atomType === atomType)
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  }
+
+  /**
+   * 按 player 过滤钩子。`h.player === undefined` 视为"全员钩子"——始终
+   * 通过过滤。
+   */
+  filterByPlayer(hooks: AtomHookDef[], player: string): AtomHookDef[] {
+    return hooks.filter((h) => h.player === undefined || h.player === player);
+  }
+}
+
+// 全局单例：保留旧的模块级语义。后续 Phase 5 在 `createEngine` 闭包里
+// 实例化独立的 HookRegistry 后会移除这些便捷函数。
+const defaultRegistry = new HookRegistry();
 
 export function registerAtomHook(def: AtomHookDef): void {
-  hookRegistry.push(def);
+  defaultRegistry.register(def);
 }
 
 export function clearAtomHooks(): void {
-  hookRegistry.length = 0;
+  defaultRegistry.clear();
 }
 
 /** 获取某 atom type 的所有钩子（按优先级降序） */
 export function getAtomHooks(atomType: string): AtomHookDef[] {
-  return hookRegistry
-    .filter((h) => h.atomType === atomType)
-    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  return defaultRegistry.getByAtomType(atomType);
 }
 
 /** 按 player 过滤钩子 */
 export function filterHooksByPlayer(hooks: AtomHookDef[], player: string): AtomHookDef[] {
-  return hooks.filter((h) => h.player === undefined || h.player === player);
+  return defaultRegistry.filterByPlayer(hooks, player);
 }
