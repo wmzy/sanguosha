@@ -65,6 +65,10 @@ describe('技能完整性审计', () => {
     registry.forEach((def, skillId) => {
       // 跳过已知被动 stub
       if (knownPassiveStubs.has(skillId)) return;
+      // [P5-T2] 跳过 v3 实装技能——它们用 registerHooks 钩子，handler 是占位空实现
+      // 不走 isStubHandler 判定（否则误报为 stub）
+      if (def.registerHooks) return;
+      if (!def.handler) return; // handler 字段 optional（v3 skill 不需要）
 
       const handlerStr = def.handler.toString();
       const isStub = isStubHandler(def.handler);
@@ -81,13 +85,20 @@ describe('技能完整性审计', () => {
   });
 
   describe('技能 handler 质量检查', () => {
-    it('所有技能 handler 都应调用至少一个 atom 或产生至少一个提示', () => {
+    it('所有技能都被计入（v3 钩子 + v2 handler）', () => {
       // 统计技能质量分布
       let implemented = 0;
       let partial = 0;
       let stub = 0;
+      let v3Implemented = 0;
 
       registry.forEach((def) => {
+        // [P5-T2] v3 实装技能：registerHooks 钩子已实现，handler 可缺
+        if (def.registerHooks) {
+          v3Implemented++;
+          return;
+        }
+        if (!def.handler) return;
         const handlerStr = def.handler.toString();
         if (handlerStr.includes('TODO')) {
           partial++;
@@ -98,15 +109,16 @@ describe('技能完整性审计', () => {
         }
       });
 
-      // 输出当前状态，但不作为硬性断言
-      // 目的是让开发者看到技能实现的整体健康状况
       const total = registry.size;
+      // 输出当前状态
       const _pctImplemented = ((implemented / total) * 100).toFixed(1);
       const _pctPartial = ((partial / total) * 100).toFixed(1);
       const _pctStub = ((stub / total) * 100).toFixed(1);
+      const _pctV3 = ((v3Implemented / total) * 100).toFixed(1);
+      void _pctImplemented; void _pctPartial; void _pctStub; void _pctV3;
 
-      // 用一条不会失败但会输出的断言
-      expect(implemented + partial + stub).toBe(total);
+      // v3 钩子技能 + v2 handler 三类合计 = total
+      expect(implemented + partial + stub + v3Implemented).toBe(total);
     });
   });
 

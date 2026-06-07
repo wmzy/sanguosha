@@ -48,6 +48,19 @@ interface CharacterMapSource {
   characterMap: Record<string, CharacterConfig>;
 }
 
+/**
+ * 注册角色触发器。
+ *
+ * 双源时期（[P5-T2] 过渡）：v2 老技能（trigger.event 走 GameEvent）仍需
+ * state.triggers 推入才能被 emitEvent 触发，所以本函数保留 v2 push 行为。
+ * v3 实装技能（registerHooks）走 createEngine 实例级 hookRegistry，
+ * 不依赖本函数。
+ *
+ * 注意：PlayerState.skills 已在 createInitialState 从 characterMap 填好，
+ * 本函数不重复设置 skills。但 modifiers 走 applyAtom setVar 会**重复
+ * emit setVar serverLog 事件**——这是已知冗余，阶段 D 删 state.triggers
+ * 字段后本函数将整个删除。
+ */
 export function registerCharacterTriggers(
   state: GameState,
   player: string,
@@ -65,8 +78,6 @@ export function registerCharacterTriggers(
   for (const ability of character.abilities) {
     const def = map.get(ability.name);
     if (!def) continue;
-    // v3-only skill（无 trigger 字段）不进入 v2 state.triggers，
-    // v2 emitEvent 不会调它。完整逻辑在 registerAtomHook 钩子中。
     if (!def.trigger) continue;
     newTriggers.push({
       event: def.trigger.event,
@@ -87,6 +98,14 @@ export function registerCharacterTriggers(
   return { ...s, triggers: [...s.triggers, ...newTriggers] };
 }
 
+/**
+ * 装备技能触发器注册。
+ *
+ * [P5-T2] 双源时期：v2 装备技能（trigger.event）仍需 state.triggers 推入。
+ * v3 实装装备技能（registerHooks）走 createEngine 实例级 hookRegistry。
+ *
+ * 阶段 D 删 state.triggers 后本函数将删除。
+ */
 export function registerEquipmentTriggers(
   state: GameState,
   player: string,
@@ -99,7 +118,6 @@ export function registerEquipmentTriggers(
 
   const def = map.get(card.name);
   if (!def) return state;
-  // v3-only 装备技能不进入 v2 state.triggers。
   if (!def.trigger) return state;
 
   const newTrigger: TriggerRule = {

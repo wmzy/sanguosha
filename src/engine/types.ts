@@ -83,7 +83,13 @@ export interface PlayerState {
   vars: Record<string, Json>;
   /** 标记（增益/减益） */
   tags: string[];
-
+  /**
+   * v3 技能所有权（[P5-T2] 替代 v2 state.triggers 字段）。
+   * 初始化时由 createInitialState 从 characterMap[characterId].abilities[].name 填充；
+   * addSkill / removeSkill atom 维护此列表。validate.ts / 钩子 filter 都走
+   * `hasSkill(state, player, skillId)` 查此字段。
+   */
+  skills: string[];
 }
 
 export interface PlayerInfo {

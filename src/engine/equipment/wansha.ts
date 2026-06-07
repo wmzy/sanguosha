@@ -20,16 +20,6 @@ export const skills: SkillDef[] = [
     id: '完杀',
     name: '完杀',
     description: '锁定技，在你的回合，除你以外，只有处于濒死状态的角色才能使用【桃】。',
-    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
-    // - v2 emitEvent 按 event.type 匹配 state.triggers，此 event 不在
-    //   GameEvent union 中，永远不会被 emitEvent 触发（不会走 v2 handler）
-    // - v2 targetHasSkill() 查 state.triggers 时仍能命中，支持 validate.ts
-    //   的 hasEmptyCityShield 等 v2 验证路径
-    // - 实际逻辑在下方 registerAtomHook 中
-    trigger: { event: 'v3HookOnly', source: '角色' },
-    handler() {
-      return [];
-    },
     registerHooks(registry: HookRegistry) {
       registry.register({
         atomType: '回复体力',

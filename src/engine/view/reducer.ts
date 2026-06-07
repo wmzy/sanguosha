@@ -586,10 +586,21 @@ function applyGameStateEvent(state: GameState, event: ServerEvent): GameState {
       return state;
     }
     case '去技能': {
-      // payload: { player, skillId }
+      // P5-T2：去技能走 PlayerState.skills.skillId filter。
       const player = p.player as string;
       const skillId = p.skillId as string;
-      return { ...state, triggers: state.triggers.filter(t => !(t.player === player && t.skillId === skillId)) };
+      const current = state.players[player]?.skills ?? [];
+      if (!current.includes(skillId)) return state;
+      return {
+        ...state,
+        players: {
+          ...state.players,
+          [player]: {
+            ...state.players[player],
+            skills: current.filter((s) => s !== skillId),
+          },
+        },
+      };
     }
     case '设横置': {
       const target = p.target as string;

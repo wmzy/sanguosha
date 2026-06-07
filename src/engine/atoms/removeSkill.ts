@@ -1,6 +1,10 @@
+// engine/atoms/removeSkill.ts — `去技能` atom
+// [P5-T2] 改写：技能所有权走 PlayerState.skills，不再过滤 state.triggers。
+
 import type { GameState, Atom, AtomEventResult, Json } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
+import { removeSkillFromPlayer } from '../mark';
 
 export function register() {
   registerAtom({
@@ -8,10 +12,7 @@ export function register() {
     apply(state: GameState, atom: Atom & { type: '去技能' }): GameState {
       const player = atom.player as string;
       const skillId = atom.skillId;
-      return {
-        ...state,
-        triggers: state.triggers.filter(t => !(t.player === player && t.skillId === skillId)),
-      };
+      return removeSkillFromPlayer(state, player, skillId);
     },
     toEvents(_state: GameState, atom: Atom & { type: '去技能' }): AtomEventResult {
       const player = atom.player as string;

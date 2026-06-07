@@ -28,12 +28,6 @@ export const skills: SkillDef[] = [
     id: QINGGANG_ID,
     name: QINGGANG_ID,
     description: '武器技：装备青釭剑的角色造成【杀】伤害时，无视目标防具。',
-    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
-    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
-    trigger: { event: 'v3HookOnly', source: '装备' },
-    handler() {
-      return [];
-    },
     registerHooks(registry: HookRegistry) {
       registry.register({
         atomType: '造成伤害',

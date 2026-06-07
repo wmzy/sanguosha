@@ -1,3 +1,5 @@
+// tests/scenarios/吴/魂姿.test.ts — [P5-T2] 技能拥有判定改读 PlayerState.skills
+
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
@@ -16,17 +18,11 @@ describe('孙策 - 魂姿', () => {
     .check('体力上限减少1', ctx => {
       expect(ctx.player('P1').maxHealth).toBe(3);
     })
-    .check('获得英姿触发器', ctx => {
-      const has英姿 = ctx.state.triggers.some(
-        t => t.player === 'P1' && t.skillId === '英姿',
-      );
-      expect(has英姿).toBe(true);
+    .check('获得英姿技能', ctx => {
+      expect(ctx.player('P1').skills).toContain('英姿');
     })
-    .check('获得英魂触发器', ctx => {
-      const has英魂 = ctx.state.triggers.some(
-        t => t.player === 'P1' && t.skillId === '英魂',
-      );
-      expect(has英魂).toBe(true);
+    .check('获得英魂技能', ctx => {
+      expect(ctx.player('P1').skills).toContain('英魂');
     })
     .run();
 
@@ -65,10 +61,8 @@ describe('孙策 - 魂姿', () => {
     .check('体力上限不再减少', ctx => {
       expect(ctx.player('P1').maxHealth).toBe(4);
     })
-    .check('不重复添加技能触发器', ctx => {
-      const yingziCount = ctx.state.triggers.filter(
-        t => t.player === 'P1' && t.skillId === '英姿',
-      ).length;
+    .check('不重复添加英姿技能', ctx => {
+      const yingziCount = ctx.player('P1').skills.filter(s => s === '英姿').length;
       expect(yingziCount).toBe(0);
     })
     .run();
@@ -78,11 +72,8 @@ describe('孙策 - 魂姿', () => {
       ctx.selectCharacters('孙策', '刘备');
       ctx.registerTriggers('P1');
     })
-    .check('P1 拥有魂姿触发器', ctx => {
-      const hasTrigger = ctx.state.triggers.some(
-        t => t.player === 'P1' && t.skillId === '魂姿',
-      );
-      expect(hasTrigger).toBe(true);
+    .check('P1 拥有魂姿技能', ctx => {
+      expect(ctx.player('P1').skills).toContain('魂姿');
     })
     .run();
 });

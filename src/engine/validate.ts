@@ -21,6 +21,7 @@ import type {
   SkillDef,
   SkillContext,
 } from './types';
+import { hasSkill, getPlayerSkills } from './mark';
 import { getPlayer, getAlivePlayerNames } from './state';
 import { isInAttackRange } from './distance';
 import { checkCondition } from './expr';
@@ -60,15 +61,15 @@ function characterHasUnlimitedKills(state: GameState, playerName: string): boole
 function canKillUnlimited(state: GameState, playerName: string): boolean {
   return hasUnlimitedKills(state, playerName) || characterHasUnlimitedKills(state, playerName);
 }
-
+// [P5-T2] 技能拥有判定走 PlayerState.skills（v3 真相源），不再读 state.triggers。
 function targetHasSkill(state: GameState, target: string, skillId: string): boolean {
-  return state.triggers.some(t => t.player === target && t.skillId === skillId);
+  return hasSkill(state, target, skillId);
 }
 
 function hasEmptyCityShield(state: GameState, target: string): boolean {
   const targetPlayer = getPlayer(state, target);
   if (targetPlayer.hand.length > 0) return false;
-  return targetHasSkill(state, target, '空城');
+  return hasSkill(state, target, '空城');
 }
 
 // ─── 技能卡牌转换 ─────────────────────────────────────────────
@@ -108,11 +109,10 @@ function canCardBeConvertedBySkill(
     localVars: { cardId },
   };
 
-  for (const trigger of state.triggers) {
-    if (trigger.player !== player || trigger.source !== '角色') continue;
+  for (const skillId of getPlayerSkills(state, player)) {
     let skill: SkillDef;
     try {
-      skill = getSkill(trigger.skillId);
+      skill = getSkill(skillId);
     } catch {
       continue;
     }
@@ -140,17 +140,8 @@ function canCardBeConvertedToPeach(
   const isRed = card.suit === '♥' || card.suit === '♦';
   if (!isRed) return false;
 
-  for (const trigger of state.triggers) {
-    if (trigger.player !== player || trigger.source !== '角色') continue;
-    let skillId: string;
-    try {
-      skillId = getSkill(trigger.skillId).id;
-    } catch {
-      continue;
-    }
-    if (skillId === '急救') return true;
-  }
-  return false;
+  // [P5-T2] 走 PlayerState.skills，替代 v2 state.triggers
+  return hasSkill(state, player, '急救');
 }
 
 // ─── validateAction ───────────────────────────────────────────
@@ -286,17 +277,20 @@ function validateUseSkill(
 ): string | null {
   if (action.player !== state.currentPlayer) return '不是你的回合';
   if (state.phase !== '出牌') return '当前不是出牌阶段';
-
   const player = getPlayer(state, action.player);
   if (!player.info.alive) return '你已阵亡';
 
-  // 检查技能是否属于该玩家的角色
-  const trigger = state.triggers.find(
-    (t) => t.skillId === action.skillId && t.player === action.player,
-  );
-  if (!trigger) return `你不拥有技能: ${action.skillId}`;
+  // [P5-T2] 技能拥有判定走 PlayerState.skills，替代 v2 state.triggers
+  if (!hasSkill(state, action.player, action.skillId)) {
+    return `你不拥有技能: ${action.skillId}`;
+  }
 
-  if (!trigger.optional && state.turn.skillsUsed.includes(action.skillId)) {
+  // optional 标志从 SkillDef 读（v2 老技能保留 trigger.optional 字段）
+  const skillDef = (() => {
+    try { return getSkill(action.skillId); } catch { return null; }
+  })();
+  const isOptional = skillDef?.trigger?.optional === true;
+  if (!isOptional && state.turn.skillsUsed.includes(action.skillId)) {
     return '本回合已使用过该技能';
   }
 
@@ -807,19 +801,26 @@ function getValidTargetsForCard(state: GameState, player: string, cardId: string
 }
 
 function computeAvailableSkills(state: GameState, player: string): AvailableSkill[] {
-  const playerTriggers = state.triggers.filter(
-    (t) =>
-      t.player === player &&
-      t.source === '角色' &&
-      (t.optional || !state.turn.skillsUsed.includes(t.skillId)),
-  );
-
-  return playerTriggers.map((trigger) => ({
-    skillId: trigger.skillId,
-    name: trigger.skillId,
-    description: '',
-    canActivate: true,
-  }));
+  // [P5-T2] 技能拥有判定走 PlayerState.skills，替代 v2 state.triggers
+  // optional 标志从 SkillDef.trigger.optional 读
+  const result: AvailableSkill[] = [];
+  for (const skillId of getPlayerSkills(state, player)) {
+    let isOptional = false;
+    try {
+      isOptional = getSkill(skillId).trigger?.optional === true;
+    } catch {
+      // skill id 找不到对应 SkillDef（不应发生，但兜底）
+      continue;
+    }
+    if (!isOptional && state.turn.skillsUsed.includes(skillId)) continue;
+    result.push({
+      skillId,
+      name: skillId,
+      description: '',
+      canActivate: true,
+    });
+  }
+  return result;
 }
 
 // ─── isCardPlayable ───────────────────────────────────────────

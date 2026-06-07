@@ -13,12 +13,6 @@ export const skills: SkillDef[] = [
     id: '帷幕',
     name: '帷幕',
     description: '锁定技，你不能成为黑色锦囊牌的目标。',
-    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
-    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
-    trigger: { event: 'v3HookOnly', source: '角色' },
-    handler() {
-      return [];
-    },
     registerHooks(registry: HookRegistry) {
       registry.register({
         atomType: '成为目标',

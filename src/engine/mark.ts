@@ -81,3 +81,44 @@ export function getChainedOthers(state: GameState, player: string): string[] {
     .filter(([name, _p]) => name !== player && hasChained(state, name))
     .map(([name]) => name);
 }
+
+
+// --- 技能所有权工具（[P5-T2] 替代 v2 state.triggers 字段）---
+// PlayerState.skills 是 v3 技能拥有的真源；addSkill / removeSkill atom 维护。
+// validate.ts / 钩子 filter 都走 hasSkill()，不再读 state.triggers。
+
+/** 玩家是否拥有指定技能（v3 真相源：PlayerState.skills）*/
+export function hasSkill(state: GameState, player: string, skillId: string): boolean {
+  return state.players[player]?.skills.includes(skillId) ?? false;
+}
+
+/** 玩家拥有的全部技能 id 列表 */
+export function getPlayerSkills(state: GameState, player: string): string[] {
+  return [...(state.players[player]?.skills ?? [])];
+}
+
+/** 给玩家加技能（id 重复检查 + 幂等） */
+export function addSkillToPlayer(state: GameState, player: string, skillId: string): GameState {
+  const current = state.players[player]?.skills ?? [];
+  if (current.includes(skillId)) return state;
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [player]: { ...state.players[player], skills: [...current, skillId] },
+    },
+  };
+}
+
+/** 从玩家移除技能（缺失时无操作） */
+export function removeSkillFromPlayer(state: GameState, player: string, skillId: string): GameState {
+  const current = state.players[player]?.skills ?? [];
+  if (!current.includes(skillId)) return state;
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [player]: { ...state.players[player], skills: current.filter((s) => s !== skillId) },
+    },
+  };
+}

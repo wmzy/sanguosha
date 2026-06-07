@@ -27,12 +27,6 @@ export const skills: SkillDef[] = [
     id: ZHANGBA_ID,
     name: ZHANGBA_ID,
     description: '武器技：装备丈八蛇矛的角色可以将两张手牌当【杀】使用。',
-    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
-    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
-    trigger: { event: 'v3HookOnly', source: '装备' },
-    handler() {
-      return [];
-    },
     registerHooks(registry: HookRegistry) {
       registry.register({
         atomType: '指定目标',

@@ -37,6 +37,17 @@ export function createInitialState(config: GameConfig): GameState {
     const hand = deckIds.slice(deckIdx, deckIdx + handSize);
     deckIdx += handSize;
 
+    // P5-T2：替代 v2 state.triggers 字段——技能所有权直接存在 PlayerState。
+    // modifiers（distanceMinus1 / 咆哮/active / 裸衣Bonus 等）也直接进 vars，
+    // 避免 init 阶段调 applyAtoms.emit serverLog 重复事件。
+    const skills: string[] = char.abilities.map((a) => a.name);
+    const vars: Record<string, import('./types').Json> = {};
+    for (const ability of char.abilities) {
+      for (const mod of ability.modifiers ?? []) {
+        vars[mod] = true;
+      }
+    }
+
     players[p.name] = {
       info: {
         name: p.name,
@@ -51,8 +62,9 @@ export function createInitialState(config: GameConfig): GameState {
       hand,
       equipment: {},
       pendingTricks: [],
-      vars: {},
+      vars,
       tags: [],
+      skills,
     };
   }
 

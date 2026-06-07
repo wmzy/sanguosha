@@ -149,6 +149,7 @@ const defaultMe: PlayerState = {
   pendingTricks: [],
   vars: {},
   tags: [],
+  skills: [],
 };
 
 export interface DebugPlayerListUI {

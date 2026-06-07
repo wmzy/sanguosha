@@ -24,7 +24,8 @@ import { createTestGame } from '../engine-helpers';
 import { registerAllAtoms } from '@engine/atoms';
 import { registerAllSkills } from '@engine/skills';
 import { registerSkill, getSkill } from '@engine/skill';
-import type { TriggerRule, SkillDef, GameState, Card } from '@engine/types';
+import type { SkillDef, GameState, Card } from '@engine/types';
+import { addSkillToPlayer } from '@engine/mark';
 
 type CardName = '杀' | '闪' | '桃';
 type SuitT = '♠' | '♣' | '♥' | '♦';
@@ -52,14 +53,9 @@ function buildState(
     ...newPlayers[trigger.player],
     hand: hand.map((h) => h.cardId),
   };
-  const trig: TriggerRule = {
-    player: trigger.player,
-    skillId: trigger.skillId,
-    source: '角色',
-    event: 'killResponse',
-    priority: 5,
-  };
-  s0 = { ...s0, cardMap, players: newPlayers, triggers: [...s0.triggers, trig] };
+  // [P5-T2] 技能拥有判定走 PlayerState.skills，替代 v2 state.triggers
+  s0 = { ...s0, cardMap, players: newPlayers };
+  s0 = addSkillToPlayer(s0, trigger.player, trigger.skillId);
   return s0;
 }
 

@@ -22,12 +22,6 @@ export const skills: SkillDef[] = [
     name: '藤甲',
     description:
       '锁定技：装备藤甲的角色受到【杀】造成的伤害（normal 类型）时，防止此伤害。',
-    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
-    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
-    trigger: { event: 'v3HookOnly', source: '装备' },
-    handler() {
-      return [];
-    },
     registerHooks(registry: HookRegistry) {
       // 藤甲只防 normal 杀（不防 fire / thunder）
       registerArmorDamageBlock(registry, '藤甲', 'normal');

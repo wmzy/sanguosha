@@ -57,12 +57,6 @@ export const skills: SkillDef[] = [
     name: '雷击',
     description:
       '当你使用或打出【闪】时，可令任意一名角色判定，若结果为黑桃 2-9，对该角色造成 3 点雷电伤害。',
-    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
-    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
-    trigger: { event: 'v3HookOnly', source: '角色' },
-    handler() {
-      return [];
-    },
     registerHooks(registry: HookRegistry) {
       registry.register({
         atomType: 'useCard',

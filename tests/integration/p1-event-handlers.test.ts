@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { reduceGameState } from '@engine/view/reducer';
 import { createTestGame } from '../engine-helpers';
 import type { GameState, Json, Mark, ServerEvent, TriggerRule } from '@engine/types';
-import { addMarkToPlayer, hasChained, CHAINED_MARK } from '@engine/mark';
+import { addMarkToPlayer, hasChained, CHAINED_MARK, addSkillToPlayer } from '@engine/mark';
 let evId = 0;
 
 function makeEvent(type: string, payload: Record<string, unknown>): ServerEvent {
@@ -79,24 +79,17 @@ describe('P1 reducer handlers (8 个新 server event 类型)', () => {
     });
   });
 
-  describe('去技能', () => {
-    it('移除该玩家的指定 skillId triggers', () => {
+  describe('去技能（走 PlayerState.skills）', () => {
+    it('移除该玩家的指定 skillId', () => {
       let state = createTestGame({ playerCount: 2 });
-      const trigger: TriggerRule = {
-        event: '造成伤害',
-        source: '角色',
-        skillId: 'jianxiong',
-        player: 'P1',
-        priority: 0,
-      };
-      const other: TriggerRule = { ...trigger, player: 'P2', skillId: 'rende' };
-      state = { ...state, triggers: [trigger, other] };
+      state = addSkillToPlayer(state, 'P1', 'jianxiong');
+      state = addSkillToPlayer(state, 'P2', 'rende');
 
       const next = reduceGameState(state, [
         makeEvent('去技能', { player: 'P1', skillId: 'jianxiong' }),
       ]);
-      expect(next.triggers).toHaveLength(1);
-      expect(next.triggers[0]?.skillId).toBe('rende');
+      expect(next.players.P1.skills).not.toContain('jianxiong');
+      expect(next.players.P2.skills).toContain('rende');
     });
   });
 

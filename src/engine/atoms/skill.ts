@@ -1,7 +1,12 @@
+// engine/atoms/skill.ts — `加技能` atom
+// [P5-T2] 改写：技能所有权走 PlayerState.skills（v3 真相源），不再写 state.triggers。
+// 外部 source 参数保留兼容（外部未传时不再走 CharacterMapSource 路径）。
+// 调用方 0 破坏：原子形参 { type, player, skillId, source? } 不变。
+
 import type { GameState, Atom, AtomEventResult, Json } from '../types';
 import { registerAtom } from '../atom';
 import { makeServerEvent, makePlayerEvent } from '../event';
-import { getSkill } from '../skill';
+import { addSkillToPlayer } from '../mark';
 
 export function register() {
   registerAtom({
@@ -9,26 +14,9 @@ export function register() {
     apply(state: GameState, atom: Atom & { type: '加技能' }): GameState {
       const player = atom.player as string;
       const skillId = atom.skillId;
-      const source = atom.source as { characterMap: Record<string, import('../../shared/types').CharacterConfig> };
-
-      const def = getSkill(skillId);
-      const alreadyHas = state.triggers.some(
-        t => t.player === player && t.skillId === skillId && t.source === '角色',
-      );
-      if (alreadyHas) return state;
-      // v3-only skill（无 trigger）不进入 v2 state.triggers。
-      if (!def.trigger) return state;
-
-      const newTrigger = {
-        event: def.trigger.event,
-        source: '角色' as const,
-        skillId,
-        player,
-        priority: 5,
-        ...(def.trigger.optional ? { optional: true } : {}),
-      };
-
-      return { ...state, triggers: [...state.triggers, newTrigger] };
+      // 幂等：玩家已有此技能则 no-op
+      if (state.players[player]?.skills.includes(skillId)) return state;
+      return addSkillToPlayer(state, player, skillId);
     },
     toEvents(state: GameState, atom: Atom & { type: '加技能' }): AtomEventResult {
       const player = atom.player as string;

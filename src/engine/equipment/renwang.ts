@@ -31,12 +31,6 @@ export const skills: SkillDef[] = [
     name: RENWANG_ID,
     description:
       '防具技：装备仁王盾的角色受到黑色【杀】造成的伤害时，防止此伤害。',
-    // v3-only skill：使用占位 trigger event 字符串 'v3HookOnly'。
-    // 详见 wansha.ts 头部注释（保持 state.triggers 命中，v2 emitEvent 永不触发）
-    trigger: { event: 'v3HookOnly', source: '装备' },
-    handler() {
-      return [];
-    },
     registerHooks(registry: HookRegistry) {
       registry.register({
         atomType: '造成伤害',
