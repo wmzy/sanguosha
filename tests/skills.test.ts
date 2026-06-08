@@ -7,14 +7,12 @@ describe('V2 Engine - 技能注册与触发', () => {
   const charMap = getCharacterMap();
 
   describe('角色触发器注册', () => {
-    it('曹操 奸雄 技能注册', () => {
+    it('曹操 奸雄 技能注册（v3 registerHooks）', () => {
       const state = createTestGame({ characters: ['曹操', '刘备'] });
-      // [P5-T3] 阶段 D：trigger 匹配由 emitEvent 从 PlayerState.skills 动态构建，
-      // 不再依赖 state.triggers。验证技能存在于 skills 列表 + SkillDef.trigger 正确。
       expect(state.players.P1.skills).toContain('奸雄');
       const def = getSkillRegistry().get('奸雄');
       expect(def).toBeDefined();
-      expect(def!.trigger?.event).toBe('受到伤害');
+      expect(typeof def!.registerHooks).toBe('function');
     });
 
     it('刘备 仁德 技能注册', () => {
@@ -22,12 +20,12 @@ describe('V2 Engine - 技能注册与触发', () => {
       expect(state.players.P1.skills).toContain('仁德');
     });
 
-    it('司马懿 反馈 技能注册', () => {
+    it('司马懿 反馈 技能注册（v3 registerHooks）', () => {
       const state = createTestGame({ characters: ['司马懿', '曹操'] });
       expect(state.players.P1.skills).toContain('反馈');
       const def = getSkillRegistry().get('反馈');
       expect(def).toBeDefined();
-      expect(def!.trigger?.event).toBe('受到伤害');
+      expect(typeof def!.registerHooks).toBe('function');
     });
 
     it('孙权 制衡 技能注册', () => {

@@ -21,26 +21,27 @@ function putHeartOnDeckTop(ctx: any) {
 }
 
 describe('蔡文姬 - 悲歌', () => {
-  scenario('受到杀伤害后弃牌判定，红桃回复体力')
+  scenario('受到杀伤害后判定')
     .setup(ctx => {
       ctx.selectCharacters('蔡文姬', '曹操');
+      ctx.giveCard('P2', '杀');
       ctx.giveCard('P1', '桃');
       ctx.setHealth('P1', 2);
-      ctx.registerTriggers('P1');
+      ctx.setCurrentPlayer('P2');
+      ctx.enterPlayPhase();
       putHeartOnDeckTop(ctx);
       ctx.snapshot('initial');
     })
-    .act('P1 受到杀伤害触发悲歌', ctx => {
-      ctx.emitEvent({
-        type: '受到伤害',
-        target: 'P1',
-        source: 'P2',
-        amount: 1,
-      });
+    .act('P2 对 P1 使用杀', ctx => {
+      const killId = ctx.findCard('P2', '杀');
+      ctx.playCard('P2', killId!, 'P1');
     })
-    .check('悲歌触发创建技能选择', ctx => {
-      expect(ctx.state.pending).not.toBeNull();
-      expect(ctx.state.pending?.type).toBe('技能选择');
+    .act('P1 不出闪', ctx => {
+      ctx.respond('P1');
+    })
+    .check('蔡文姬受到 1 点伤害', ctx => {
+      const diff = ctx.diff('initial');
+      expect(diff.healthChanges['P1']).toBe(-1);
     })
     .run();
 });

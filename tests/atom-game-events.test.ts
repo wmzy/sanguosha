@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { executePlan } from '@engine/phase';
 import { registerCharacterTriggers, registerSkill, getSkillRegistry } from '@engine/skill';
+// [P6-1] 触发 registerAllEngineSkills()，让 v3 registerAtomHook 技能注册到默认 HookRegistry
+// （executePlan 走 phases/atoms.ts applyAtoms 触发 v3 钩子）
+// 注意：vitest 各 test 串行运行时，前序测试可能 clearAtomHooks() 清空钩子。
+// beforeEach 重新注册以确保钩子到位。
+import { registerAllSkills as registerAllEngineSkills, resetAndRegisterAllSkills } from '@engine/skills';
+import { clearAtomHooks } from '@engine/skill-hook';
 import type { SkillContext, GameState, SkillPhase, PendingAction } from '@engine/types';
 import {
   getCharacterMap,
@@ -12,6 +18,12 @@ import {
 
 import '../src/engine/atoms/index';
 import '../src/engine/phases/index';
+
+beforeEach(() => {
+  // 之前测试可能 clearAtomHooks()，重新注册 v3 钩子
+  clearAtomHooks();
+  registerAllEngineSkills(undefined, { force: true });
+});
 
 const charMap = getCharacterMap();
 

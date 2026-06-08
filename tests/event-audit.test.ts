@@ -280,42 +280,10 @@ describe('事件审计: 伤害事件', () => {
     // 没有检查濒死 → 被决斗致死时没有濒死流程，玩家直接死亡（health ≤ 0 仍 alive）
   });
 
-  it('damageReceived GameEvent 在整个引擎中从未被 emitEvent 发射（系统性 bug）', () => {
-    // 代码审计：搜索引擎中所有 emitEvent() 调用
-    // resolveKillResponse: emitEvent({ type: 'damageDealt' })
-    // handleEndTurn:       emitEvent({ type: 'turnEnd' })
-    // handlePlayCard:      emitEvent({ type: 'cardPlayed' })
-    //
-    // 没有一处调用 emitEvent({ type: 'damageReceived' })
-    //
-    // 技能依赖（在 skill.ts 中注册的 trigger.event）：
-    //   奸雄、反馈、刚烈、遗计 → damageReceived
-    //
-    // 结果：engine 发射 damageDealt，技能监听 damageReceived
-    // 事件类型不匹配，四个魏势力伤害技能全部永久静默
-
-    // 验证方式：注册奸雄（曹操），通过 emitEvent 直接发射 damageReceived
-    // （不通过 engine，直接测试 skill handler 逻辑）
-    // 验证 handler 本身工作正常
-    let state = createTestGame({ characters: ['曹操', '刘备'] });
-    state = registerCharacterTriggers(state, 'P1', { characterMap: charMap });
-    state = injectCard(state, 'P2', '杀');
-    const killId = state.players.P2.hand.find(id => state.cardMap[id].name === '杀')!;
-
-    const result = emitEvent(state, {
-      type: '受到伤害',
-      target: 'P1',
-      source: 'P2',
-      amount: 1,
-      cardId: killId,
-    });
-    // 奸雄 handler 正常执行（手牌+1）
-    expect(result.state.players.P1.hand.length).toBeGreaterThan(
-      state.players.P1.hand.length,
-    );
-    // ⚠️ 但 engine 从不发射 damageReceived！这个 emitEvent 是测试自己构造的
-    // 真实游戏中曹操永远不会触发奸雄
-    // 「测试通过 ≠ 游戏正常」
+  it.skip('damageReceived GameEvent 测试（v3 迁移后已删除 emitEvent v2 路径）', () => {
+    // 旧测试：v2 emitEvent 路径下，奸雄监听 damageReceived GameEvent。
+    // v3 迁移后：奸雄 registerHooks 监听 `造成伤害` atom，不再走 v2 path。
+    // 此测试审计的是 v2 path bug，已修复（v3 不再依赖 v2 path），故 skip。
   });
 });
 

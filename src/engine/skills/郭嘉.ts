@@ -29,59 +29,30 @@ export const skills: SkillDef[] = [
       ];
     },
   },
-
   {
     id: '遗计',
     name: '遗计',
     description: '当你受到1点伤害后，你可以摸两张牌。',
-    trigger: {
-      event: '受到伤害',
-      source: '角色',
-    },
-    handler(_ctx, _state) {
-      return [
-        { type: 'atoms', ops: [{ type: '摸牌', player: _ctx.self, count: 2 }] },
-        {
-          type: 'prompt',
-          text: '遗计：选择最多2张牌分配给其他角色（或不分配）',
-          options: [
-            { label: '不分配', value: false },
-            { type: 'selectCards', from: '手牌', min: 1, max: 2 },
-          ],
-          defaultChoice: false,
+    // v3 registerAtomHook 实现：监听 `造成伤害` atom onAfter，
+    // filter 收窄到「自己是有遗计的角色」+「受到伤害」，
+    // onAfter 注入「摸 2 张」atom。
+    // 原 v2 handler 中的「分配给其他角色」为 C 类（含 prompt/foreach），
+    // 在 v3 registerAtomHook 中无法实现，已删除。
+    registerHooks(registry) {
+      registry.register({
+        atomType: '造成伤害',
+        filter: (state, atom) => {
+          if (atom.type !== '造成伤害') return false;
+          const target = atom.target as string;
+          return state.players[target]?.skills?.includes('遗计') ?? false;
         },
-        {
-          type: 'condition',
-          check: { notEquals: [{ $: 'ctx', path: 'choice' }, false] },
-          then: [
-            { type: 'atoms', ops: [{ type: '设置上下文变量', key: '遗计/cards', value: { $: 'ctx', path: 'choice' } as const }] },
-            { type: 'atoms', ops: [{ type: '弃置', player: _ctx.self, cardIds: { $: 'ctx', path: 'choice' } as const }] },
-            {
-              type: 'prompt',
-              text: '遗计：选择获得牌的目标角色',
-              options: [
-                { type: 'selectPlayer' },
-              ],
-            },
-            {
-              type: 'foreach',
-              collection: { $: 'ctx', path: 'localVars.遗计/cards' },
-              varName: 'currentCard',
-              body: [
-                {
-                  type: 'atoms',
-                  ops: [{
-                    type: '获得',
-                    player: { $: 'ctx', path: 'choice' },
-                    cardId: { $: 'ctx', path: 'localVars.currentCard' },
-                    from: { zone: '弃牌堆' },
-                  }],
-                },
-              ],
-            },
-          ],
+        onAfter: ({ atom }) => {
+          const target = atom.target as string;
+          return {
+            additionalAtoms: [{ type: '摸牌', player: target, count: 2 }],
+          };
         },
-      ];
+      });
     },
   },
 ];

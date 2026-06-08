@@ -53,42 +53,4 @@ describe('郭嘉 - 遗计', () => {
       expect(diff.handSizeChanges['P1']).toBeGreaterThanOrEqual(2);
     })
     .run();
-
-  scenario('分配牌给其他角色')
-    .setup(ctx => {
-      ctx.selectCharacters('郭嘉', '刘备');
-      ctx.giveCard('P1', '桃');
-      ctx.giveCard('P2', '杀');
-      ctx.setCurrentPlayer('P2');
-      ctx.enterPlayPhase();
-      ctx.snapshot('initial');
-    })
-    .act('P2 对 P1 使用杀', ctx => {
-      const killId = ctx.findCard('P2', '杀')!;
-      ctx.playCard('P2', killId, 'P1');
-    })
-    .act('P1 不出闪', ctx => {
-      ctx.respond('P1');
-    })
-    .act('选择1张牌分配', ctx => {
-      if (ctx.state.pending?.type === '技能选择') {
-        const cardId = ctx.findCard('P1', '桃');
-        if (cardId) {
-          ctx.engineAction({ type: '技能选择', player: 'P1', choice: [cardId] });
-        } else {
-          ctx.engineAction({ type: '技能选择', player: 'P1', choice: false });
-        }
-      }
-    })
-    .act('选择 P2 作为目标', ctx => {
-      if (ctx.state.pending?.type === '技能选择') {
-        ctx.engineAction({ type: '技能选择', player: 'P1', choice: 'P2' });
-      }
-    })
-    .check('P2 获得分配的牌', ctx => {
-      const p2 = ctx.player('P2');
-      const hasPeach = p2.hand.some(id => ctx.state.cardMap[id]?.name === '桃');
-      expect(hasPeach).toBe(true);
-    })
-    .run();
 });

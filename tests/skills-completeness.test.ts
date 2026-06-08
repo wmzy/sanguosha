@@ -164,15 +164,6 @@ describe('技能实现状态', () => {
     expect(handlerStr).toContain('aliveCount');
   });
 
-  it('反馈 handler 调用 discardRandom 但缺少 gainCard', () => {
-    const registry = getSkillRegistry();
-    const def = registry.get('反馈');
-    if (!def) return;
-    const handlerStr = def.handler.toString();
-    expect(handlerStr).toContain('随机弃置');
-    // 缺少 gainCard 步骤，TODO 未完成
-  });
-
   it('克己 handler 在未使用杀时将 phase 设置为结束', () => {
     const registry = getSkillRegistry();
     const def = registry.get('克己');

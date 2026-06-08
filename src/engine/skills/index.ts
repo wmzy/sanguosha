@@ -5,7 +5,7 @@
 // v3 registerAtomHook 钩子通过 SkillDef.registerHooks 字段注册到全局 HookRegistry。
 
 import { getDefaultHookRegistry, type HookRegistry } from '../skill-hook';
-import { registerSkill } from '../skill';
+import { registerSkill, getSkillRegistry } from '../skill';
 import type { SkillDef } from '../types';
 // 魏
 import { skills as caocao } from './曹操';
@@ -191,8 +191,8 @@ let _initialized = false;
  * Phase 5 演进：createEngine() 显式调用 registerAllSkills(hookRegistry)，
  * 把同一组 v3 hooks 复制到自己的闭包 HookRegistry。
  */
-export function registerAllSkills(hookRegistry?: HookRegistry): void {
-  if (_initialized) return;
+export function registerAllSkills(hookRegistry?: HookRegistry, options?: { force?: boolean }): void {
+  if (_initialized && !options?.force) return;
   _initialized = true;
 
   const globalHookRegistry = hookRegistry ?? getDefaultHookRegistry();
@@ -206,6 +206,12 @@ export function registerAllSkills(hookRegistry?: HookRegistry): void {
     }
   }
   for (const skill of best.values()) {
+    // 重新注册 skill：若已注册则跳过（避免 "already registered"）
+    if (getSkillRegistry().has(skill.id)) {
+      // 已注册 skill 不重写，但若含 registerHooks 仍可重新调（覆盖 hookRegistry）
+      skill.registerHooks?.(globalHookRegistry);
+      continue;
+    }
     registerSkill(skill);
     skill.registerHooks?.(globalHookRegistry);
   }
