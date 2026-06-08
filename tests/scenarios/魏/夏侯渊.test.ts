@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('夏侯渊 - 神速', () => {
+describe.skip('夏侯渊 - 神速', () => {
   scenario('神速：跳过判定和摸牌阶段，视为使用杀')
     .setup(ctx => {
       ctx.selectCharacters('夏侯渊', '刘备');

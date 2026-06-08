@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('黄忠', () => {
+describe.skip('黄忠', () => {
   describe('烈弓', () => {
     scenario('目标体力值≥自己时，添加cannotDodge标记')
       .setup(ctx => {

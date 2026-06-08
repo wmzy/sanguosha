@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent } from '../event';
 import { updatePlayer } from '../state';
 
 /**
@@ -19,12 +18,6 @@ export function register() {
         to,
         p => ({ hand: [...p.hand, cardId] }),
       );
-    },
-    toEvents(_state, atom): AtomEventResult {
-      const cardId = atom.cardId as string;
-      const to = atom.to as string;
-      const server = makeServerEvent('抽牌', { cardId, to });
-      return [server, new Map(), null];
     },
   });
 }

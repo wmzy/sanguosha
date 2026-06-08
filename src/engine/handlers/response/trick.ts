@@ -9,7 +9,7 @@ import type {
 } from '../../types';
 import { TIMEOUT_DEFAULTS } from '../../types';
 import { getPlayer, getAlivePlayerNames } from '../../state';
-import { makeServerEvent } from '../../event';
+import { makeLogEntry } from '../../event';
 import { applyAtoms } from '../../atom';
 import { createPendingId } from '../../atoms/pending';
 import { startAoeTargetWuxie, executeAoeResume } from './aoe';
@@ -67,7 +67,7 @@ export function resolveTrickResponse(
   pending: PendingResponseWindow,
 ): EngineResult {
   if (action.type !== '打出') {
-    return { state, events: [], error: '锦囊响应窗口需要 respond 动作' };
+    return { state, logEntries: [], error: '锦囊响应窗口需要 respond 动作' };
   }
 
   const responders = pending.window.responders;
@@ -88,27 +88,27 @@ function resolveConcurrentTrickResponse(
   const sourceUserName = sourceUser ?? attacker;
 
   if (!responders || responders.length === 0) {
-    return { state, events: [], error: 'trickResponse 并发模式缺少 responders' };
+    return { state, logEntries: [], error: 'trickResponse 并发模式缺少 responders' };
   }
 
   const currentPassed = passedResponders ?? [];
 
   if (!responders.includes(action.player)) {
-    return { state, events: [], error: '你不是可响应的玩家' };
+    return { state, logEntries: [], error: '你不是可响应的玩家' };
   }
   if (currentPassed.includes(action.player)) {
-    return { state, events: [], error: '你已经 pass 了' };
+    return { state, logEntries: [], error: '你已经 pass 了' };
   }
 
   // 出了无懈可击
   if (action.cardId) {
     const card = state.cardMap[action.cardId];
     if (card?.name !== '无懈可击') {
-      return { state, events: [], error: '只能用无懈可击响应锦囊' };
+      return { state, logEntries: [], error: '只能用无懈可击响应锦囊' };
     }
     const responder = getPlayer(state, action.player);
     if (!responder.hand.includes(action.cardId)) {
-      return { state, events: [], error: '手牌中没有该卡牌' };
+      return { state, logEntries: [], error: '手牌中没有该卡牌' };
     }
 
     state = applyAtoms(state, [
@@ -206,7 +206,7 @@ function resolveTrickResolution(
   if (aoeResume) {
     if (negated) {
       const nextTargets = aoeResume.remainingTargets.slice(1);
-      if (nextTargets.length === 0) return { state, events: [] };
+      if (nextTargets.length === 0) return { state, logEntries: [] };
       return startAoeTargetWuxie(state, {
         attacker: aoeResume.attacker,
         remainingTargets: nextTargets,
@@ -217,7 +217,7 @@ function resolveTrickResolution(
     return executeAoeResume(state, aoeResume);
   }
 
-  if (negated) return { state, events: [] };
+  if (negated) return { state, logEntries: [] };
 
   return executeTrickEffect(state, { sourceCard, attacker, trickTarget });
 }
@@ -228,15 +228,15 @@ export function executeTrickEffect(
 ): EngineResult {
   const { sourceCard, attacker, trickTarget } = params;
   const trickCard = state.cardMap[sourceCard];
-  if (!trickCard) return { state, events: [], error: '源卡牌不存在' };
+  if (!trickCard) return { state, logEntries: [], error: '源卡牌不存在' };
   const trickName = trickCard.name;
   const target = trickTarget;
 
   switch (trickName) {
     case '过河拆桥': {
-      if (!target) return { state, events: [] };
+      if (!target) return { state, logEntries: [] };
       const targetPlayer = getPlayer(state, target);
-      if (targetPlayer.hand.length === 0) return { state, events: [] };
+      if (targetPlayer.hand.length === 0) return { state, logEntries: [] };
       const selectPending: PendingSelectCard = {
         id: createPendingId(),
         type: '选择牌',
@@ -255,9 +255,9 @@ export function executeTrickEffect(
     }
 
     case '顺手牵羊': {
-      if (!target) return { state, events: [] };
+      if (!target) return { state, logEntries: [] };
       const targetPlayer = getPlayer(state, target);
-      if (targetPlayer.hand.length === 0) return { state, events: [] };
+      if (targetPlayer.hand.length === 0) return { state, logEntries: [] };
       const selectPending: PendingSelectCard = {
         id: createPendingId(),
         type: '选择牌',
@@ -276,7 +276,7 @@ export function executeTrickEffect(
     }
 
     case '决斗': {
-      if (!target) return { state, events: [] };
+      if (!target) return { state, logEntries: [] };
       const validKills = getPlayer(state, target).hand.filter(id => state.cardMap[id]?.name === '杀');
       const duelTimeout = TIMEOUT_DEFAULTS.killResponse;
       const duelWindow: PendingResponseWindow = {
@@ -299,13 +299,13 @@ export function executeTrickEffect(
     }
 
     case '乐不思蜀': {
-      if (!target) return { state, events: [] };
+      if (!target) return { state, logEntries: [] };
       const trick = { name: '乐不思蜀', source: attacker, card: trickCard };
       return applyAtoms(state, [{ type: '添加延时锦囊', player: target, trick }]);
     }
 
     case '兵粮寸断': {
-      if (!target) return { state, events: [] };
+      if (!target) return { state, logEntries: [] };
       const trick = { name: '兵粮寸断', source: attacker, card: trickCard };
       return applyAtoms(state, [{ type: '添加延时锦囊', player: target, trick }]);
     }
@@ -327,7 +327,7 @@ export function executeTrickEffect(
     case '五谷丰登': {
       const alivePlayerNames = state.playerOrder.filter(p => getPlayer(state, p).info.alive);
       const count = Math.min(alivePlayerNames.length, state.zones.deck.length);
-      if (count === 0) return { state, events: [] };
+      if (count === 0) return { state, logEntries: [] };
 
       const revealedCards = state.zones.deck.slice(0, count);
       const remainingDeck = state.zones.deck.slice(count);
@@ -351,12 +351,12 @@ export function executeTrickEffect(
       };
       const s = { ...state, zones: { ...state.zones, deck: remainingDeck } };
       const result = applyAtoms(s, [{ type: '推入待定', action: harvestPending }]);
-      const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
-      return { state: result.state, events: [...result.events, harvestRevealEvent] };
+      const harvestRevealLogEntry = makeLogEntry({ type: 'harvestReveal', cards: revealedCards } as unknown as Atom);
+      return { state: result.state, logEntries: [...result.logEntries, harvestRevealLogEntry] };
     }
 
     default:
-      return { state, events: [] };
+      return { state, logEntries: [] };
   }
 }
 
@@ -367,10 +367,10 @@ function resolveLegacyTrickResponse(
 ): EngineResult {
   const cardId = action.type === '打出' ? action.cardId : undefined;
   const { attacker, defender, sourceCard, trickTarget, remainingPlayers, negated } = pending.window;
-  if (!sourceCard) return { state, events: [], error: 'trickResponse 缺少 sourceCard' };
-  if (!attacker) return { state, events: [], error: 'trickResponse 缺少 attacker' };
+  if (!sourceCard) return { state, logEntries: [], error: 'trickResponse 缺少 sourceCard' };
+  if (!attacker) return { state, logEntries: [], error: 'trickResponse 缺少 attacker' };
   const trickCard = state.cardMap[sourceCard];
-  if (!trickCard) return { state, events: [], error: 'trickResponse 源卡牌不存在' };
+  if (!trickCard) return { state, logEntries: [], error: 'trickResponse 源卡牌不存在' };
   const trickName = trickCard.name;
 
   let newNegated = negated ?? false;
@@ -378,11 +378,11 @@ function resolveLegacyTrickResponse(
   if (cardId) {
     const card = state.cardMap[cardId];
     if (card?.name !== '无懈可击') {
-      return { state, events: [], error: '只能用无懈可击响应锦囊' };
+      return { state, logEntries: [], error: '只能用无懈可击响应锦囊' };
     }
     const responder = getPlayer(state, defender);
     if (!responder.hand.includes(cardId)) {
-      return { state, events: [], error: '手牌中没有该卡牌' };
+      return { state, logEntries: [], error: '手牌中没有该卡牌' };
     }
     state = applyAtoms(state, [
       {
@@ -431,7 +431,7 @@ function resolveLegacyTrickResponse(
     return resolveJudgmentTrickResponse(state, newNegated, trickName, pending.window.judgmentContext);
   }
 
-  if (newNegated) return { state, events: [] };
+  if (newNegated) return { state, logEntries: [] };
 
   // Legacy 路径：直接 dispatch 到与 executeTrickEffect 相同的 switch
   return executeTrickEffect(state, { sourceCard, attacker, trickTarget });
@@ -469,19 +469,19 @@ function resolveJudgmentTrickResponse(
     if (tag) {
       const tagResult = applyAtoms(s, [{ type: '加标签', player, tag }]);
       s = tagResult.state;
-      return { state: s, events: [...result.events, ...tagResult.events] };
+      return { state: s, logEntries: [...result.logEntries, ...tagResult.logEntries] };
     }
   }
 
   const nextIndex = trickIndex - 1;
   if (nextIndex < 0) {
-    return { state: s, events: result.events };
+    return { state: s, logEntries: result.logEntries };
   }
 
   const playerState = getPlayer(s, player);
   const nextTrick = playerState.pendingTricks[nextIndex];
   if (!nextTrick) {
-    return { state: s, events: result.events };
+    return { state: s, logEntries: result.logEntries };
   }
 
   const aliveOthers = getAlivePlayerNames(s).filter(p => p !== player);
@@ -534,8 +534,8 @@ function batchRemainJudgments(
   if (tags.length > 0) {
     const tagAtoms = tags.map(tag => ({ type: '加标签' as const, player, tag }));
     const tagResult = applyAtoms(s, tagAtoms);
-    return { state: tagResult.state, events: [...actionResult.events, ...tagResult.events] };
+    return { state: tagResult.state, logEntries: [...actionResult.logEntries, ...tagResult.logEntries] };
   }
 
-  return { state: s, events: actionResult.events };
+  return { state: s, logEntries: actionResult.logEntries };
 }

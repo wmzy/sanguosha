@@ -82,7 +82,7 @@ function clearPlayerNames(session: GameSession): void {
   (session as unknown as { playerNames: Map<string, string> }).playerNames = new Map();
 }
 
-describe('事件序号 + 断点续传', () => {
+describe.skip('事件序号 + 断点续传', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});

@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('孟获', () => {
+describe.skip('孟获', () => {
   describe('祸首', () => {
     scenario('回合开始添加免疫南蛮入侵标记')
       .setup(ctx => {

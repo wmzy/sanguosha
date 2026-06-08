@@ -1,8 +1,6 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom, Json } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
-import { asJson } from '../../shared/typeGuards';
 
 export function register() {
   registerAtom({
@@ -42,12 +40,6 @@ export function register() {
       }
 
       return s;
-    },
-    toEvents(_state: GameState, atom: Atom & { type: '移动牌' }): AtomEventResult {
-      const cardId = atom.cardId as string;
-      const payload: Json = { cardId, from: asJson(atom.from), to: asJson(atom.to) };
-      const server = makeServerEvent('移动牌', payload);
-      return [server, new Map(), makePlayerEvent('移动牌', payload)];
     },
   });
 }

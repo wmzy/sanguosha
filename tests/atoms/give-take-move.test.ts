@@ -11,7 +11,7 @@ describe('giveCard / takeCard / moveCard', () => {
 
   it('moveCard: hand → discardPile', () => {
     const s0 = createTestGame({ hand: { P1: ['c1'] } });
-    const { state, events } = applyAtoms(s0, [{
+    const { state, logEntries: events } = applyAtoms(s0, [{
       type: '移动牌',
       cardId: 'c1',
       from: { zone: '手牌', player: 'P1' },
@@ -20,7 +20,7 @@ describe('giveCard / takeCard / moveCard', () => {
     expect(state.players.P1.hand).toEqual([]);
     expect(state.zones.discardPile).toEqual(['c1']);
     // moveCard 原子 emit 的服务端事件类型沿用 'cardMoved'（与 view/reducer 兼容）
-    expect(events[0].type).toBe('移动牌');
+    expect(events[0].atom.type).toBe('移动牌');
   });
 
   it('giveCard: P1 → P2', () => {
@@ -58,7 +58,7 @@ describe('giveCard / takeCard / moveCard', () => {
 
   it('giveCard 写入 serverLog 含 from/to 字段', () => {
     const s0 = createTestGame({ hand: { P1: ['c1'] } });
-    const { events } = applyAtoms(s0, [{ type: '给予', cardId: 'c1', from: 'P1', to: 'P2' }]);
-    expect(events[0].payload).toMatchObject({ from: 'P1', to: 'P2', cardId: 'c1' });
+    const { logEntries: events } = applyAtoms(s0, [{ type: '给予', cardId: 'c1', from: 'P1', to: 'P2' }]);
+    expect(events[0].atom).toMatchObject({ from: 'P1', to: 'P2', cardId: 'c1' });
   });
 });

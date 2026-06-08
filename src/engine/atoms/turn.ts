@@ -11,9 +11,8 @@
 // 概念，**不**进 serverLog 也不进流水；"进入X阶段"语义由 setPhase
 // server event 表达。
 
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent } from '../event';
 
 export function register() {
   registerAtom({
@@ -27,12 +26,6 @@ export function register() {
         },
       };
     },
-    toEvents(state: GameState, _atom: Atom & { type: '累计出杀' }): AtomEventResult {
-      const server = makeServerEvent('累计出杀', {
-        killsPlayed: state.turn.killsPlayed + 1,
-      });
-      return [server, new Map(), null];
-    },
   });
 
   registerAtom({
@@ -42,10 +35,6 @@ export function register() {
       // phase-advance.ts 在 emitEvent(turnStart) 之后手工加 'turnStarted' phaseFlag，
       // 这部分也保留不动。
       return state;
-    },
-    toEvents(_state: GameState, atom: Atom & { type: '回合开始' }): AtomEventResult {
-      const payload: Json = { player: atom.player as string };
-      return [makeServerEvent('回合开始', payload), new Map(), null];
     },
   });
 }

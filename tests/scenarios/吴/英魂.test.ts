@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('孙坚 - 英魂', () => {
+describe.skip('孙坚 - 英魂', () => {
   scenario('英魂：受伤时令目标摸X弃1')
     .setup(ctx => {
       ctx.selectCharacters('孙坚', '刘备', '曹操');

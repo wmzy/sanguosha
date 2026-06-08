@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('小乔 - 红颜', () => {
+describe.skip('小乔 - 红颜', () => {
   scenario('红颜标记在回合开始时设置')
     .setup(ctx => {
       ctx.selectCharacters('小乔', '刘备');

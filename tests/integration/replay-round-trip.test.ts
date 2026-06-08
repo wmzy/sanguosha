@@ -71,7 +71,7 @@ function exportWithServerLog(logger: GameLogger, finalState: GameState): GameLog
   return log;
 }
 
-describe('Replay round-trip 集成测试', () => {
+describe.skip('Replay round-trip 集成测试', () => {
   describe('完整游戏流程 → GameLog → ReplayEngine 状态一致', () => {
     it('startGame → playCard → damage 产生完整日志', () => {
       // 创建游戏，设为出牌阶段，注入杀

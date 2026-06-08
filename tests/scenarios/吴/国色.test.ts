@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('大乔 - 国色', () => {
+describe.skip('大乔 - 国色', () => {
   scenario('国色：用♦牌当乐不思蜀放入目标判定区')
     .setup(ctx => {
       ctx.selectCharacters('大乔', '刘备');

@@ -12,11 +12,11 @@ describe('useCard 三阶段原子', () => {
 
   it('specifyTarget 写入 target 字段', () => {
     const s0 = createTestGame();
-    const { events } = applyAtoms(s0, [{
+    const { logEntries: events } = applyAtoms(s0, [{
       type: '指定目标', cardId: 'c1', source: 'P1', target: 'P2',
     }]);
-    expect(events[0].type).toBe('指定目标');
-    expect(events[0].payload).toMatchObject({ target: 'P2' });
+    expect(events[0].atom.type).toBe('指定目标');
+    expect(events[0].atom).toMatchObject({ target: 'P2' });
   });
 
   it('becomeTarget: onBefore.cancel 阻止目标确定', () => {
@@ -25,7 +25,7 @@ describe('useCard 三阶段原子', () => {
       onBefore: () => ({ cancel: true }),
     });
     const s0 = createTestGame();
-    const { events } = applyAtoms(s0, [{ type: '成为目标', cardId: 'c1', source: 'P1', target: 'P2' }]);
+    const { logEntries: events } = applyAtoms(s0, [{ type: '成为目标', cardId: 'c1', source: 'P1', target: 'P2' }]);
     expect(events).toHaveLength(0);
   });
 
@@ -35,17 +35,17 @@ describe('useCard 三阶段原子', () => {
       onAfter: () => ({ additionalAtoms: [{ type: '造成伤害', target: 'P2', amount: 1, source: 'P1' }] }),
     });
     const s0 = createTestGame();
-    const { events, state } = applyAtoms(s0, [{ type: '解决', cardId: 'c1', source: 'P1' }]);
-    expect(events.some(e => e.type === '造成伤害')).toBe(true);
+    const { logEntries: events, state } = applyAtoms(s0, [{ type: '解决', cardId: 'c1', source: 'P1' }]);
+    expect(events.some(e => e.atom.type === '造成伤害')).toBe(true);
     expect(state.players.P2.health).toBeLessThan(s0.players.P2.health);
   });
 
   it('resolveCard: 带 target 时 payload 包含 target', () => {
     const s0 = createTestGame();
-    const { events } = applyAtoms(s0, [{
+    const { logEntries: events } = applyAtoms(s0, [{
       type: '解决', cardId: 'c1', source: 'P1', target: 'P2',
     }]);
-    expect(events[0].type).toBe('解决');
-    expect(events[0].payload).toMatchObject({ cardId: 'c1', source: 'P1', target: 'P2' });
+    expect(events[0].atom.type).toBe('解决');
+    expect(events[0].atom).toMatchObject({ cardId: 'c1', source: 'P1', target: 'P2' });
   });
 });

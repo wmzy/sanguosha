@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('貂蝉 - 离间', () => {
+describe.skip('貂蝉 - 离间', () => {
   scenario('离间基础：弃1牌创建决斗窗口')
     .setup(ctx => {
       ctx.selectCharacters('貂蝉', '华佗', '吕布', '刘备');

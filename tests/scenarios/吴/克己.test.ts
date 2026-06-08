@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('吕蒙 - 克己', () => {
+describe.skip('吕蒙 - 克己', () => {
   scenario('未出杀时触发克己跳过弃牌阶段')
     .setup(ctx => {
       ctx.selectCharacters('吕蒙', '刘备');

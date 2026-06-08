@@ -9,7 +9,7 @@
 // - pending() 抛 PendingRequestError（内部信号），applyAtoms 捕获后挂起
 // - cancel() / redirect() / additionalAtoms() 返回 HookResult
 
-import type { GameState, Atom, ServerEvent, Json } from './types';
+import type { GameState, Atom, AtomLogEntry, Json } from './types';
 import type { HookResult, PendingDef, ResumeData } from './async-hook';
 
 // ════════════════════════════════════════════════════════════════════
@@ -25,8 +25,8 @@ export interface AsyncHookContext {
   self: string;
   /** 钩子 id（用于 localVars namespace） */
   hookId: string;
-  /** apply 后的 server event（仅 onAfter 阶段） */
-  serverEvent?: ServerEvent;
+  /** 仅 onAfter：apply 产生的 log entry */
+  logEntry?: AtomLogEntry;
   /** 当前是否在 await（如果 true，pending() 实际挂起） */
   awaiting: boolean;
   /** 恢复时的玩家响应（仅 awaiting=true 时存在） */

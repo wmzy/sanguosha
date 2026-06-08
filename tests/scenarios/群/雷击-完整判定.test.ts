@@ -63,14 +63,14 @@ describe('雷击完整判定（真 game rule）', () => {
       localVars: { ...(s0.localVars ?? {}), leijiJudgeResult: 'success' },
       cardMap: { ...s0.cardMap, leijiCard: makeSpadeKill('leijiCard') },
     };
-    const { state, events } = applyAtoms(s1, [useCard('P2', 'P1', 'leijiCard')]);
+    const { state, logEntries: events } = applyAtoms(s1, [useCard('P2', 'P1', 'leijiCard')]);
     // leiji 钩子 onAfter 读 ctx=success → emit damage(3, thunder)
     // P1 health: 4 - 3 = 1
     expect(state.players.P1.health).toBe(1);
-    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(1);
-    const dmg = events.find((e) => e.type === '造成伤害');
-    if (dmg?.type === '造成伤害') {
-      expect(dmg.payload).toMatchObject({ amount: 3, type: 'thunder' });
+    expect(events.filter((e) => e.atom.type === '造成伤害')).toHaveLength(1);
+    const dmg = events.find((e) => e.atom.type === '造成伤害');
+    if (dmg?.atom.type === '造成伤害') {
+      expect(dmg.atom).toMatchObject({ amount: 3, damageType: 'thunder' });
     }
   });
 
@@ -86,10 +86,10 @@ describe('雷击完整判定（真 game rule）', () => {
       localVars: { ...(s0.localVars ?? {}), leijiJudgeResult: 'fail' },
       cardMap: { ...s0.cardMap, leijiCard: makeSpadeKill('leijiCard') },
     };
-    const { state, events } = applyAtoms(s1, [useCard('P2', 'P1', 'leijiCard')]);
+    const { state, logEntries: events } = applyAtoms(s1, [useCard('P2', 'P1', 'leijiCard')]);
     // leiji 钩子 onAfter 读 ctx=fail → 不 emit damage
     // P1 health 不变（4）
     expect(state.players.P1.health).toBe(4);
-    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(0);
+    expect(events.filter((e) => e.atom.type === '造成伤害')).toHaveLength(0);
   });
 });

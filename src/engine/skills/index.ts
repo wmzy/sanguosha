@@ -4,7 +4,7 @@
 // 新模式：各模块导出 SkillDef[]，由本文件统一注册。
 // v3 registerAtomHook 钩子通过 SkillDef.registerHooks 字段注册到全局 HookRegistry。
 
-import { getDefaultHookRegistry, type HookRegistry } from '../skill-hook';
+import { getDefaultHookRegistry, clearAtomHooks, type HookRegistry } from '../skill-hook';
 import { registerSkill, getSkillRegistry } from '../skill';
 import type { SkillDef } from '../types';
 // 魏
@@ -179,53 +179,36 @@ export function filterSkills(
   return allSkills;
 }
 let _initialized = false;
-
 /**
-/**
- * 注册所有技能到指定的 hookRegistry（v3 钩子技能）。
- * 同时也写入全局 skill registry（v2 trigger.event 路径）。
- *
- * 幂等：首次调用才真正注册。后续调用无操作——避免重复注册覆盖之前的。
- * import './skills/index' 时自动调用（用全局 default registry）。
- *
- * Phase 5 演进：createEngine() 显式调用 registerAllSkills(hookRegistry)，
- * 把同一组 v3 hooks 复制到自己的闭包 HookRegistry。
+ * 注册所有技能到全局 registry + 指定的 hookRegistry。
  */
 export function registerAllSkills(hookRegistry?: HookRegistry, options?: { force?: boolean }): void {
   if (_initialized && !options?.force) return;
   _initialized = true;
 
-  const globalHookRegistry = hookRegistry ?? getDefaultHookRegistry();
+  const reg = hookRegistry ?? getDefaultHookRegistry();
   const best = new Map<string, SkillDef>();
   for (const skill of allSkills) {
     const existing = best.get(skill.id);
-    // 优先保留含 registerHooks 的版本（v3 钩子技能），
-    // 跳过同名占位版（equipment.ts 中的 v2 stub）
     if (!existing || skill.registerHooks) {
       best.set(skill.id, skill);
     }
   }
   for (const skill of best.values()) {
-    // 重新注册 skill：若已注册则跳过（避免 "already registered"）
-    if (getSkillRegistry().has(skill.id)) {
-      // 已注册 skill 不重写，但若含 registerHooks 仍可重新调（覆盖 hookRegistry）
-      skill.registerHooks?.(globalHookRegistry);
-      continue;
+    if (!getSkillRegistry().has(skill.id)) {
+      registerSkill(skill);
     }
-    registerSkill(skill);
-    skill.registerHooks?.(globalHookRegistry);
+    skill.registerHooks?.(reg);
   }
 }
 
 /**
  * 强制重置 _initialized 标志并重新注册所有技能。
- * 测试场景专用：在每个 test case 之前调用，确保隔离。
- * 对应旧的 `clearSkillRegistry()` + `clearAtomHooks()` + `registerAllSkills()` 三件套。
  */
 export function resetAndRegisterAllSkills(hookRegistry?: HookRegistry): void {
   _initialized = false;
   registerAllSkills(hookRegistry);
 }
 
-// 模块加载时自动注册到全局 default registry——保持向后兼容语义
+// 模块加载时自动注册到全局 default registry
 registerAllSkills();

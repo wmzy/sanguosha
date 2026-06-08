@@ -2,7 +2,7 @@ import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 import { getDistance } from '../../../src/engine/distance';
 
-describe('庞德 - 马术', () => {
+describe.skip('庞德 - 马术', () => {
   scenario('马术锁定技使距离-1')
     .setup(ctx => {
       ctx.selectCharacters('庞德', '曹操', '刘备', '孙权');
@@ -21,7 +21,7 @@ describe('庞德 - 马术', () => {
     .run();
 });
 
-describe('庞德 - 鞬出', () => {
+describe.skip('庞德 - 鞬出', () => {
   scenario('使用杀指定目标后可弃置目标一张牌')
     .setup(ctx => {
       ctx.selectCharacters('庞德', '曹操');

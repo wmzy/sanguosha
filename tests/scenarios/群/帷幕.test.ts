@@ -24,7 +24,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾不是 becomeTarget 事件（被 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).not.toBe('成为目标');
+      expect(last?.atom.type).not.toBe('成为目标');
     })
     .run();
 
@@ -56,7 +56,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（红色锦囊不阻）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('成为目标');
+      expect(last?.atom.type).toBe('成为目标');
     })
     .run();
 
@@ -78,7 +78,7 @@ describe('贾诩 - 帷幕（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（目标非贾诩）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('成为目标');
+      expect(last?.atom.type).toBe('成为目标');
     })
     .run();
 });

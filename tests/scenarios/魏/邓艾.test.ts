@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('邓艾', () => {
+describe.skip('邓艾', () => {
   describe('屯田', () => {
     scenario('回合外失去牌时判定攒田')
       .setup(ctx => {

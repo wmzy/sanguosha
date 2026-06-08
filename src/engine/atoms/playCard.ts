@@ -7,24 +7,14 @@
 //
 // 本占位原子：apply 不改 state，toEvents 输出 server event '出牌' 供 log/审计。
 // 真实业务仍由 handlePlayCard 主流程（移动牌/累计出杀/推入待定）原子承载。
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent } from '../event';
 
 export function register() {
   registerAtom({
     type: '出牌',
     apply(s: GameState) {
       return s;
-    },
-    toEvents(_s, atom): AtomEventResult {
-      const a = atom as Atom & { type: '出牌' };
-      const player = (a as { player?: unknown }).player as string;
-      const cardId = (a as { cardId?: unknown }).cardId as string;
-      const target = (a as { target?: unknown }).target as string | undefined;
-      const payload: Record<string, string> = { player, cardId };
-      if (target !== undefined) payload.target = target;
-      return [makeServerEvent('出牌', payload), new Map(), null];
     },
   });
 }

@@ -26,11 +26,11 @@ describe('藤甲真 game rule（防 normal 杀）', () => {
 
   it('装备藤甲 + normal 伤害 → cancel（藤甲生效）', () => {
     const s0 = setHealth(withArmor(createTestGame(), 'P1', '藤甲'), 'P1', 4);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'normal' },
     ]);
     expect(state.players.P1.health).toBe(4);
-    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(0);
+    expect(events.filter((e) => e.atom.type === '造成伤害')).toHaveLength(0);
   });
 
   it('装备藤甲 + fire 伤害 → 不 cancel（藤甲不防 fire）', () => {
@@ -50,7 +50,7 @@ describe('藤甲真 game rule（防 normal 杀）', () => {
         } as unknown as Card,
       },
     };
-    const { state, events } = applyAtoms(s1, [
+    const { state, logEntries: events } = applyAtoms(s1, [
       {
         type: '造成伤害',
         target: 'P1',
@@ -61,15 +61,15 @@ describe('藤甲真 game rule（防 normal 杀）', () => {
       },
     ]);
     expect(state.players.P1.health).toBe(2);
-    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(1);
+    expect(events.filter((e) => e.atom.type === '造成伤害')).toHaveLength(1);
   });
 
   it('装备藤甲 + thunder 伤害 → 不 cancel（藤甲不防 thunder）', () => {
     const s0 = setHealth(withArmor(createTestGame(), 'P1', '藤甲'), 'P1', 4);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 3, source: '张角', damageType: 'thunder' },
     ]);
     expect(state.players.P1.health).toBe(1);
-    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(1);
+    expect(events.filter((e) => e.atom.type === '造成伤害')).toHaveLength(1);
   });
 });

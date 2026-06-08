@@ -1,4 +1,4 @@
-import type { ServerEvent, PlayerEvent, Json } from './types';
+import type { Atom, AtomLogEntry, Json } from './types';
 
 let eventCounter = 0;
 
@@ -10,18 +10,14 @@ export function getEventCounter(): number {
   return eventCounter;
 }
 
-export function makeServerEvent(type: string, payload: Json): ServerEvent {
-  return { id: `evt-${++eventCounter}`, type, timestamp: Date.now(), payload };
+export function makeLogEntry(atom: Atom): AtomLogEntry {
+  return { id: `evt-${++eventCounter}`, timestamp: Date.now(), atom };
 }
 
-export function makePlayerEvent(type: string, payload: Json): PlayerEvent {
-  return { id: `evt-${++eventCounter}`, type, timestamp: Date.now(), payload };
-}
-
-export function restoreEventCounterFromLog(serverLog: ServerEvent[]): void {
+export function restoreEventCounterFromLog(serverLog: AtomLogEntry[]): void {
   let maxId = 0;
-  for (const evt of serverLog) {
-    const match = evt.id.match(/^evt-(\d+)$/);
+  for (const entry of serverLog) {
+    const match = entry.id.match(/^evt-(\d+)$/);
     if (match) {
       const num = parseInt(match[1], 10);
       if (num > maxId) maxId = num;

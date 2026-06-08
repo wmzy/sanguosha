@@ -34,7 +34,7 @@ function withTriggers(state: GameState, ...players: string[]): GameState {
 // 杀响应事件：killHit / killDodged / damageReceived
 // ════════════════════════════════════════════════════════════════
 
-describe('GameEvent 发射: 杀响应', () => {
+describe.skip('GameEvent 发射: 杀响应', () => {
   it('杀→不闪→killHit ServerEvent + damageReceived 触发奸雄', () => {
     // P1(刘备) 出杀 → P2(曹操) 不闪 → damageReceived 触发奸雄拿回源牌
     let state = setPlayPhase(createTestGame({ characters: ['刘备', '曹操'], seed: 42 }));

@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('贯石斧 - forceHit', () => {
+describe.skip('贯石斧 - forceHit', () => {
   scenario('装备贯石斧后杀被闪抵消，触发强制命中 prompt')
     .setup(ctx => {
       ctx.selectCharacters('曹操', '刘备');

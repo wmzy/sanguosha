@@ -40,11 +40,11 @@ describe('compareRank atom（pindian 基础设施）', () => {
       'c-A': { id: 'c-A', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' },
       'c-K': { id: 'c-K', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: 'K', description: '' },
     });
-    const { state: next, events } = applyAtoms(state, [
+    const { state: next, logEntries: events } = applyAtoms(state, [
       { type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-A', bCardId: 'c-K' },
     ]);
     // P1 出 A(1)，P2 出 K(13) → P2 赢
-    expect(events[0].payload).toMatchObject({ winner: 'P2', aRank: 1, bRank: 13 });
+    expect(events[0].atom).toMatchObject({ winner: 'P2', aRank: 1, bRank: 13 });
     // 双方手牌已弃
     expect(next.players.P1.hand).toEqual([]);
     expect(next.players.P2.hand).toEqual([]);
@@ -61,19 +61,19 @@ describe('compareRank atom（pindian 基础设施）', () => {
       createTestGame({ hand: { P1: ['c-5a'], P2: ['c-5b'] } }),
       cardMap,
     );
-    const { events: e1 } = applyAtoms(s0, [
+    const { logEntries: e1 } = applyAtoms(s0, [
       { type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' },
     ]);
-    const { events: e2 } = applyAtoms(s0, [
+    const { logEntries: e2 } = applyAtoms(s0, [
       { type: '拼点', a: 'P1', b: 'P2', aCardId: 'c-5a', bCardId: 'c-5b' },
     ]);
-    const w1 = (e1[0].payload as { winner: string }).winner;
-    const w2 = (e2[0].payload as { winner: string }).winner;
+    const w1 = (e1[0].atom as { winner: string }).winner;
+    const w2 = (e2[0].atom as { winner: string }).winner;
     expect(w1).toBe(w2);
     // 决胜由 seed 决定（不是 A 必赢）
     expect(['P1', 'P2']).toContain(w1);
     // 标记为 tied
-    expect(e1[0].payload).toMatchObject({ tied: true });
+    expect(e1[0].atom).toMatchObject({ tied: true });
   });
 
   it('compareRank: getResult() 通过 atoms phase 注入到 ctx.localVars', () => {
@@ -114,7 +114,7 @@ describe('compareRank atom（pindian 基础设施）', () => {
       cardMap,
     );
     const ctx: SkillContext = { skillId: 'test', self: 'P1', localVars: {} };
-    const { events } = executePlan(
+    const { logEntries: events } = executePlan(
       s0,
       [
         {
@@ -125,7 +125,7 @@ describe('compareRank atom（pindian 基础设施）', () => {
       ctx,
     );
     // apply 侧（event payload 携带的 winner，对应 toEvents 路径）
-    const applyWinner = (events[0].payload as { winner?: string }).winner;
+    const applyWinner = (events[0].atom as { winner?: string }).winner;
     // getResult 侧（ctx.localVars.pindianWinner，对应 isPostApply=true 路径）
     const getResultWinner = ctx.localVars.pindianWinner as string | undefined;
     // 双方都是合法玩家名（sanity）
@@ -152,7 +152,7 @@ describe('pindian SkillPhase 骨架', () => {
       },
     );
     const ctx: SkillContext = { skillId: 'test', self: 'P1', localVars: {} };
-    const { state, events } = executePlan(
+    const { state, logEntries: events } = executePlan(
       s0,
       [
         {
@@ -173,7 +173,7 @@ describe('pindian SkillPhase 骨架', () => {
     );
     expect(ctx.localVars.pindianWinner).toBe('P1');
     expect(ctx.localVars.pindianResult).toBe('win');
-    expect(events.some((e) => e.type === '拼点')).toBe(true);
+    expect(events.some((e) => e.atom.type === '拼点')).toBe(true);
     expect(state.zones.discardPile).toContain('c-A');
     expect(state.zones.discardPile).toContain('c-K');
   });
@@ -188,7 +188,7 @@ describe('pindian SkillPhase 骨架', () => {
       },
     );
     const ctx: SkillContext = { skillId: 'test', self: 'P1', localVars: {} };
-    const { state, events } = executePlan(
+    const { state, logEntries: events } = executePlan(
       s0,
       [
         {
@@ -209,7 +209,7 @@ describe('pindian SkillPhase 骨架', () => {
     );
     expect(ctx.localVars.pindianWinner).toBe('P2');
     expect(ctx.localVars.pindianResult).toBe('lose');
-    expect(events.some((e) => e.type === '拼点')).toBe(true);
+    expect(events.some((e) => e.atom.type === '拼点')).toBe(true);
     expect(state.zones.discardPile).toContain('c-A');
     expect(state.zones.discardPile).toContain('c-K');
   });

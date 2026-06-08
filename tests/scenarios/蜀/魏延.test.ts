@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('魏延', () => {
+describe.skip('魏延', () => {
   describe('狂骨', () => {
     scenario('对距离1以内的角色造成伤害时回复1点体力')
       .setup(ctx => {

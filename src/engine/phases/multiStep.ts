@@ -10,7 +10,7 @@
 //
 // 设计依据：docs/design/v3/0001-v3-redesign.md §4.5
 
-import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, AtomLogEntry } from '../types';
 import { registerPhase, executePlan } from '../phase';
 
 type MultiStepPhase = Extract<SkillPhase, { type: 'multiStep' }>;
@@ -26,20 +26,20 @@ export function register() {
       _index: number,
     ): EngineResult {
       let s = state;
-      const events: ServerEvent[] = [];
+      const logEntries: AtomLogEntry[] = [];
 
       for (const step of phase.steps) {
         const sub = executePlan(s, [step], ctx);
         s = sub.state;
-        events.push(...sub.events);
+        logEntries.push(...sub.logEntries);
         // 任何子步骤产生 pending（prompt/respond 等）→ 立即返回，
         // resumeFrom 由 PendingSkillPrompt.execution 保留，恢复时继续。
         if (s.pending !== null) {
-          return { state: s, events };
+          return { state: s, logEntries };
         }
       }
 
-      return { state: s, events };
+      return { state: s, logEntries };
     },
   });
 }

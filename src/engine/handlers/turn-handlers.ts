@@ -7,7 +7,7 @@ import type {
 } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { getPlayer } from '../state';
-import { makeServerEvent } from '../event';
+import { makeLogEntry } from '../event';
 import { applyAtoms } from '../atom';
 import { createPendingId } from '../atoms/pending';
 
@@ -20,12 +20,12 @@ export function handleEndTurn(
   // [P5-T3] 阶段 D 准备：'回合结束' 事件改用 applyAtoms 派发
   const turnEndResult = applyAtoms(state, [{ type: '回合结束', player }]);
   if (turnEndResult.state.pending !== null) {
-    return { state: turnEndResult.state, events: [...turnEndResult.events] };
+    return { state: turnEndResult.state, logEntries: [...turnEndResult.logEntries] };
   }
 
   // 使用 turnEnd 后的最新状态
   const s = turnEndResult.state;
-  const turnEndLogEvent = makeServerEvent('回合结束', { player });
+  const turnEndLogEntry = makeLogEntry({ type: '回合结束', player } as unknown as Atom);
   const playerState = getPlayer(s, player);
   const handSize = playerState.hand.length;
   const health = playerState.health;
@@ -48,7 +48,7 @@ export function handleEndTurn(
       { type: '推入待定', action: pending },
     ];
     const result = applyAtoms(s, atoms);
-    return { state: result.state, events: [...turnEndResult.events, ...result.events, turnEndLogEvent] };
+    return { state: result.state, logEntries: [...turnEndResult.logEntries, ...result.logEntries, turnEndLogEntry] };
   }
 
   // 不需要弃牌 → 下一玩家，从准备阶段开始
@@ -60,7 +60,7 @@ export function handleEndTurn(
   const result = applyAtoms(s, atoms);
   return {
     state: result.state,
-    events: [...turnEndResult.events, ...result.events, turnEndLogEvent],
+    logEntries: [...turnEndResult.logEntries, ...result.logEntries, turnEndLogEntry],
   };
 }
 
@@ -70,20 +70,20 @@ export function resolveDiscardPhase(
   pending: PendingDiscardPhase,
 ): EngineResult {
   if (action.type !== '弃置') {
-    return { state, events: [], error: '弃牌阶段需要 discard 动作' };
+    return { state, logEntries: [], error: '弃牌阶段需要 discard 动作' };
   }
   if (action.player !== pending.player) {
-    return { state, events: [], error: '只有当前玩家可以弃牌' };
+    return { state, logEntries: [], error: '只有当前玩家可以弃牌' };
   }
   if (action.cardIds.length < pending.min || action.cardIds.length > pending.max) {
-    return { state, events: [], error: `需要弃 ${pending.min}~${pending.max} 张牌` };
+    return { state, logEntries: [], error: `需要弃 ${pending.min}~${pending.max} 张牌` };
   }
 
   // 验证卡牌在手牌中
   const playerState = getPlayer(state, action.player);
   for (const id of action.cardIds) {
     if (!playerState.hand.includes(id)) {
-      return { state, events: [], error: `卡牌 ${id} 不在手牌中` };
+      return { state, logEntries: [], error: `卡牌 ${id} 不在手牌中` };
     }
   }
 
@@ -106,6 +106,6 @@ export function resolveDiscardPhase(
 
   return {
     state: result.state,
-    events: result.events,
+    logEntries: result.logEntries,
   };
 }

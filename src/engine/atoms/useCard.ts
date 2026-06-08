@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent } from '../event';
 
 /**
  * useCard: 旧 v2 路径"使用一张牌"的钩子点。
@@ -17,17 +16,6 @@ export function register() {
     type: 'useCard',
     apply(s: GameState) {
       return s;
-    },
-    toEvents(_s, atom): AtomEventResult {
-      const a = atom as Atom & { type: 'useCard' };
-      const source = (a as { source?: unknown }).source as string | undefined;
-      const target = (a as { target?: unknown }).target as string | undefined;
-      const cardId = (a as { cardId?: unknown }).cardId as string | undefined;
-      const payload: Record<string, string> = {};
-      if (source !== undefined) payload.source = source;
-      if (target !== undefined) payload.target = target;
-      if (cardId !== undefined) payload.cardId = cardId;
-      return [makeServerEvent('useCard', payload), new Map(), null];
     },
   });
 }

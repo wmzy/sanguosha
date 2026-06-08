@@ -12,10 +12,10 @@ import type { Card } from '../../shared/types';
 import { getPlayer } from '../state';
 import { getDistance, isInAttackRange } from '../distance';
 import { hasSkill } from '../mark';
-import { makeServerEvent } from '../event';
+import { makeLogEntry } from '../event';
 import { applyAtoms } from '../atom';
 import { createPendingId } from '../atoms/pending';
-import { emitEvent, registerEquipmentTriggers, unregisterEquipmentTriggers } from '../skill';
+import { getSkill } from '../skill';
 import { createConcurrentTrickResponse, startAoeTargetWuxie } from './response-handlers';
 import { getSkillConvertedCards } from '../validate';
 
@@ -24,7 +24,7 @@ export function handlePlayCard(
   action: GameAction & { type: '打出一张牌' },
 ): EngineResult {
   const card = state.cardMap[action.cardId];
-  if (!card) return { state, events: [], error: '未知卡牌' };
+  if (!card) return { state, logEntries: [], error: '未知卡牌' };
 
   let result: EngineResult;
   switch (card.type) {
@@ -52,7 +52,7 @@ export function handlePlayCard(
   ]);
   return {
     state: emitResult.state,
-    events: [...result.events, ...emitResult.events],
+    logEntries: [...result.logEntries, ...emitResult.logEntries],
   };
 }
 
@@ -67,9 +67,9 @@ function handleBasicCard(
     case '桃':
       return handlePeachCard(state, action, card);
     case '闪':
-      return { state, events: [], error: '闪不能主动使用' };
+      return { state, logEntries: [], error: '闪不能主动使用' };
     default:
-      return { state, events: [], error: `不能主动使用 ${card.name}` };
+      return { state, logEntries: [], error: `不能主动使用 ${card.name}` };
   }
 }
 
@@ -81,14 +81,14 @@ function handleKillCard(
   const player = action.player;
   const target = action.target;
 
-  if (!target) return { state, events: [], error: '杀需要指定目标' };
-  if (target === player) return { state, events: [], error: '不能对自己使用杀' };
+  if (!target) return { state, logEntries: [], error: '杀需要指定目标' };
+  if (target === player) return { state, logEntries: [], error: '不能对自己使用杀' };
   if (!isInAttackRange(state, player, target)) {
-    return { state, events: [], error: '目标不在攻击范围内' };
+    return { state, logEntries: [], error: '目标不在攻击范围内' };
   }
 
   const targetPlayer = getPlayer(state, target);
-  if (!targetPlayer.info.alive) return { state, events: [], error: '目标已阵亡' };
+  if (!targetPlayer.info.alive) return { state, logEntries: [], error: '目标已阵亡' };
 
   const literalDodge = targetPlayer.hand.filter(
     (id) => state.cardMap[id].name === '闪',
@@ -130,12 +130,8 @@ function handleKillCard(
   ];
   const result = applyAtoms(state, atoms);
 
-  const cardPlayedEvent = makeServerEvent('出牌', {
-    player,
-    cardId: action.cardId,
-    target,
-  });
-  return { state: result.state, events: [...result.events, cardPlayedEvent] };
+  const cardPlayedLogEntry = makeLogEntry({ type: '出牌', player, cardId: action.cardId, target } as unknown as Atom);
+  return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
 }
 
 function handlePeachCard(
@@ -147,7 +143,7 @@ function handlePeachCard(
   const playerState = getPlayer(state, player);
 
   if (playerState.health >= playerState.maxHealth) {
-    return { state, events: [], error: '体力已满，不能使用桃' };
+    return { state, logEntries: [], error: '体力已满，不能使用桃' };
   }
 
   const atoms: Atom[] = [
@@ -160,11 +156,8 @@ function handlePeachCard(
     { type: '回复体力', target: player, amount: 1, source: player },
   ];
   const result = applyAtoms(state, atoms);
-  const cardPlayedEvent = makeServerEvent('出牌', {
-    player,
-    cardId: action.cardId,
-  });
-  return { state: result.state, events: [...result.events, cardPlayedEvent] };
+  const cardPlayedLogEntry = makeLogEntry({ type: '出牌', player, cardId: action.cardId } as unknown as Atom);
+  return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
 }
 
 function handleTrickCard(
@@ -173,11 +166,7 @@ function handleTrickCard(
   card: Card,
 ): EngineResult {
   const player = action.player;
-  const cardPlayedEvent = makeServerEvent('出牌', {
-    player,
-    cardId: action.cardId,
-    ...(action.target ? { target: action.target } : {}),
-  });
+  const cardPlayedLogEntry = makeLogEntry({ type: '出牌', player, cardId: action.cardId, ...(action.target ? { target: action.target } : {}) } as unknown as Atom);
 
   switch (card.name) {
     // ── 无目标可被无懈的锦囊：先弃源牌，开 trickResponse ──
@@ -200,7 +189,7 @@ function handleTrickCard(
 
       if (allPlayers.length === 0) {
         const trickResult = applyAtoms(state, [moveAtom]);
-        return { state: trickResult.state, events: [...trickResult.events, cardPlayedEvent] };
+        return { state: trickResult.state, logEntries: [...trickResult.logEntries, cardPlayedLogEntry] };
       }
 
       const trickResponse = createConcurrentTrickResponse(state, {
@@ -211,7 +200,7 @@ function handleTrickCard(
       });
 
       const result = applyAtoms(state, [moveAtom, { type: '推入待定', action: trickResponse }]);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
     }
 
     // ── 桃园结义：所有存活玩家各回 1 点体力 ──
@@ -228,7 +217,7 @@ function handleTrickCard(
         { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player }, to: { zone: '弃牌堆' } },
         ...healAtoms,
       ]);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
     }
 
     // ── 五谷丰登：翻出 N 张牌（N=存活玩家数），存活玩家逆时针依次选一张 ──
@@ -241,7 +230,7 @@ function handleTrickCard(
         const result = applyAtoms(state, [
           { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player }, to: { zone: '弃牌堆' } },
         ]);
-        return { state: result.state, events: [...result.events, cardPlayedEvent] };
+        return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
       }
 
       const revealedCards = state.zones.deck.slice(0, count);
@@ -275,8 +264,8 @@ function handleTrickCard(
           { type: '推入待定', action: harvestPending },
         ],
       );
-      const harvestRevealEvent = makeServerEvent('harvestReveal', { cards: revealedCards });
-      return { state: result.state, events: [...result.events, cardPlayedEvent, harvestRevealEvent] };
+      const harvestRevealLogEntry = makeLogEntry({ type: 'harvestReveal', cards: revealedCards } as unknown as Atom);
+      return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry, harvestRevealLogEntry] };
     }
 
     // ── 可被无懈可击的锦囊（有目标）：先弃源牌，开 trickResponse ──
@@ -284,20 +273,20 @@ function handleTrickCard(
     case '顺手牵羊':
     case '决斗': {
       const target = action.target;
-      if (!target) return { state, events: [], error: `${card.name}需要指定目标` };
+      if (!target) return { state, logEntries: [], error: `${card.name}需要指定目标` };
 
       // 校验目标存活
       const targetPlayer = getPlayer(state, target);
-      if (!targetPlayer.info.alive) return { state, events: [], error: '目标已阵亡' };
+      if (!targetPlayer.info.alive) return { state, logEntries: [], error: '目标已阵亡' };
 
       // 顺手牵羊距离检查
       if (card.name === '顺手牵羊' && getDistance(state, player, target) !== 1) {
-        return { state, events: [], error: '顺手牵羊目标距离必须为 1' };
+        return { state, logEntries: [], error: '顺手牵羊目标距离必须为 1' };
       }
 
       // 过河拆桥/顺手牵羊需要目标有手牌
       if ((card.name === '过河拆桥' || card.name === '顺手牵羊') && targetPlayer.hand.length === 0) {
-        return { state, events: [], error: '目标没有手牌' };
+        return { state, logEntries: [], error: '目标没有手牌' };
       }
 
       // 1. 弃掉源牌
@@ -320,7 +309,7 @@ function handleTrickCard(
 
       if (allPlayers.length === 0) {
         const trickResult = applyAtoms(state, [moveAtom]);
-        return { state: trickResult.state, events: [...trickResult.events, cardPlayedEvent] };
+        return { state: trickResult.state, logEntries: [...trickResult.logEntries, cardPlayedLogEntry] };
       }
 
       const trickResponse = createConcurrentTrickResponse(state, {
@@ -332,7 +321,7 @@ function handleTrickCard(
       });
 
       const result = applyAtoms(state, [moveAtom, { type: '推入待定', action: trickResponse }]);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
     }
 
     // ── 延迟锦囊：出牌时不问无懈可击，直接放入判定区 ──
@@ -340,17 +329,17 @@ function handleTrickCard(
     case '乐不思蜀':
     case '兵粮寸断': {
       const target = action.target;
-      if (!target) return { state, events: [], error: `${card.name}需要指定目标` };
+      if (!target) return { state, logEntries: [], error: `${card.name}需要指定目标` };
 
       const targetPlayer = getPlayer(state, target);
-      if (!targetPlayer.info.alive) return { state, events: [], error: '目标已阵亡' };
+      if (!targetPlayer.info.alive) return { state, logEntries: [], error: '目标已阵亡' };
 
       const trick = { name: card.name, source: player, card };
       const result = applyAtoms(state, [
         { type: '移动牌', cardId: action.cardId, from: { zone: '手牌', player }, to: { zone: '弃牌堆' } },
         { type: '添加延时锦囊', player: target, trick },
       ]);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
     }
 
     // ── AOE：先问无懈可击，再每个其他玩家依次响应（南蛮入侵→出杀，万箭齐发→出闪） ──
@@ -374,10 +363,10 @@ function handleTrickCard(
 
       if (affected.length === 0) {
         const result = applyAtoms(state, [moveAtom]);
-        return { state: result.state, events: [...result.events, cardPlayedEvent] };
+        return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
       }
 
-      const { state: movedState, events: moveEvents } = applyAtoms(state, [moveAtom]);
+      const { state: movedState, logEntries: moveLogEntries } = applyAtoms(state, [moveAtom]);
       const wuxieResult = startAoeTargetWuxie(movedState, {
         attacker: player,
         remainingTargets: affected,
@@ -387,7 +376,7 @@ function handleTrickCard(
 
       return {
         state: wuxieResult.state,
-        events: [...moveEvents, ...wuxieResult.events, cardPlayedEvent],
+        logEntries: [...moveLogEntries, ...wuxieResult.logEntries, cardPlayedLogEntry],
       };
     }
 
@@ -402,7 +391,7 @@ function handleTrickCard(
         },
       ];
       const result = applyAtoms(state, atoms);
-      return { state: result.state, events: [...result.events, cardPlayedEvent] };
+      return { state: result.state, logEntries: [...result.logEntries, cardPlayedLogEntry] };
     }
   }
 }
@@ -421,21 +410,16 @@ function handleEquipCard(
   };
   const slot = subtypeToSlot[card.subtype];
   const oldEquipId = slot ? state.players[player].equipment[slot] : undefined;
-
-  let s = state;
+  // 装备替换：卸旧装新
   if (oldEquipId) {
-    s = unregisterEquipmentTriggers(s, player, oldEquipId);
+    // v2 trigger 已删除，无需 unregisterEquipmentTriggers
   }
 
-  const result = applyAtoms(s, [{ type: '装备', player, cardId: action.cardId }]);
-  let after = result.state;
-  after = registerEquipmentTriggers(after, player, action.cardId);
+  const result = applyAtoms(state, [{ type: '装备', player, cardId: action.cardId }]);
+  const after = result.state;
 
-  const cardPlayedEvent = makeServerEvent('出牌', {
-    player,
-    cardId: action.cardId,
-  });
-  return { state: after, events: [...result.events, cardPlayedEvent] };
+  const cardPlayedLogEntry = makeLogEntry({ type: '出牌', player, cardId: action.cardId } as unknown as Atom);
+  return { state: after, logEntries: [...result.logEntries, cardPlayedLogEntry] };
 }
 
 // ── 五谷丰登选牌处理 ──────────────────────────────────────
@@ -446,19 +430,19 @@ export function resolveHarvestSelection(
   pending: PendingHarvestSelection,
 ): EngineResult {
   if (action.type !== '打出') {
-    return { state, events: [], error: '选牌需要 respond 动作' };
+    return { state, logEntries: [], error: '选牌需要 respond 动作' };
   }
 
   const currentPicker = pending.pickOrder[pending.currentPickerIndex];
   if (action.player !== currentPicker) {
-    return { state, events: [], error: '还没轮到你选牌' };
+    return { state, logEntries: [], error: '还没轮到你选牌' };
   }
 
   const selectedId = action.cardId ?? pending.revealedCards[0];
   let newRevealed = pending.revealedCards;
 
   if (!newRevealed.includes(selectedId)) {
-    return { state, events: [], error: '选择的卡牌不在翻出的牌中' };
+    return { state, logEntries: [], error: '选择的卡牌不在翻出的牌中' };
   }
   newRevealed = newRevealed.filter(id => id !== selectedId);
 
@@ -484,11 +468,8 @@ export function resolveHarvestSelection(
       });
     }
     const result = applyAtoms(state, atoms);
-    const harvestDoneEvent = makeServerEvent('harvestDone', {
-      player: action.player,
-      cardId: selectedId ?? null,
-    });
-    return { state: result.state, events: [...result.events, harvestDoneEvent] };
+    const harvestDoneLogEntry = makeLogEntry({ type: 'harvestDone', player: action.player, cardId: selectedId ?? null } as unknown as Atom);
+    return { state: result.state, logEntries: [...result.logEntries, harvestDoneLogEntry] };
   }
 
   // 还有下一位选牌者
@@ -516,5 +497,5 @@ export function resolveHarvestSelection(
   // 如果在同一个调用中既有 moveCard 又有 pushPending，先 pop 再 push
   const popThenPush = [{ type: '弹出待定' as const }, ...atoms];
   const result = applyAtoms(state, popThenPush);
-  return { state: result.state, events: result.events };
+  return { state: result.state, logEntries: result.logEntries };
 }

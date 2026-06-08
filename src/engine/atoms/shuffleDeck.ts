@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { createRng } from '../../shared/rng';
 
 export function register() {
@@ -16,10 +15,6 @@ export function register() {
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
       return { ...state, zones: { ...state.zones, deck: shuffled }, rngState: rng.getState() };
-    },
-    toEvents(_state, _atom) {
-      const server = makeServerEvent('洗牌', {});
-      return [server, new Map(), makePlayerEvent('洗牌', {})];
     },
   });
 }

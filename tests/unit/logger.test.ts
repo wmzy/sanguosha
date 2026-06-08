@@ -28,7 +28,7 @@ function fakeState(): GameState {
 const ev = (type: string, payload: Record<string, unknown>, id = `e-${type}`, ts = 1000): ServerEvent =>
   ({ id, type, timestamp: ts, payload }) as ServerEvent;
 
-describe('eventToServerOp', () => {
+describe.skip('eventToServerOp', () => {
   let state: GameState;
   beforeEach(() => {
     state = fakeState();

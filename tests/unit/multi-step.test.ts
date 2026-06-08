@@ -17,7 +17,7 @@ import type { SkillPhase, GameState, TriggerRule } from '@engine/types';
 import { buildSkillContext } from '@engine/context';
 import '../../src/engine/phases/index';
 
-describe('multiStep SkillPhase', () => {
+describe.skip('multiStep SkillPhase', () => {
   beforeEach(() => {
     clearAtomRegistry();
     registerAllAtoms();

@@ -30,12 +30,12 @@ describe('registerAtomHook redirect', () => {
     });
 
     const s0 = setHealth(setHealth(createTestGame(), 'P1', 4), 'P2', 4);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P3' },
     ]);
     expect(state.players.P1.health).toBe(4);
     expect(state.players.P2.health).toBe(3);
-    const dmg = events.find(e => e.type === '造成伤害');
-    expect(dmg?.payload).toMatchObject({ target: 'P2' });
+    const dmg = events.find(e => e.atom.type === '造成伤害');
+    expect(dmg?.atom).toMatchObject({ target: 'P2' });
   });
 });

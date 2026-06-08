@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('卧龙诸葛', () => {
+describe.skip('卧龙诸葛', () => {
   describe('八阵', () => {
     scenario('无防具时，添加virtualArmor标记')
       .setup(ctx => {

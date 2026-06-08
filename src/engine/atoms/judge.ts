@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom, Json } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 import type { Card } from '../../shared/types';
 
@@ -72,14 +71,6 @@ export function register() {
       };
 
       return newState;
-    },
-    toEvents(state: GameState, atom: Atom & { type: '判定' }): AtomEventResult {
-      const player = atom.player as string;
-      const s = ensureDeckHasCards(state);
-      const { cardId, suit, rank, result } = drawJudgeCard(s);
-      const payload = { player, cardId, result, suit, rank };
-      const server = makeServerEvent('判定', payload);
-      return [server, new Map(), makePlayerEvent('判定', payload)];
     },
     getResult(state: GameState, _atom: Atom & { type: '判定' }): Record<string, Json> {
       // §4.6 修复：优先读 state.localVars（apply 写入的判定牌 ID），避免

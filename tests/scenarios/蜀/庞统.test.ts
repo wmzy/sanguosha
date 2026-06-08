@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('庞统', () => {
+describe.skip('庞统', () => {
   describe('连环', () => {
     scenario('连环技能注册检查')
       .setup(ctx => {

@@ -1,4 +1,4 @@
-import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, ServerEvent } from './types';
+import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, AtomLogEntry } from './types';
 
 const registry = new Map<string, PhaseDefinition>();
 
@@ -22,7 +22,7 @@ export function executePlan(
   resumeFrom?: number,
 ): EngineResult {
   let s = state;
-  const events: ServerEvent[] = [];
+  const logEntries: AtomLogEntry[] = [];
   const hadPendingOnEntry = s.pending !== null;
 
   for (let i = resumeFrom ?? 0; i < phases.length; i++) {
@@ -30,15 +30,15 @@ export function executePlan(
     const def = getPhaseDef(phase.type);
     const result = def.execute(s, phase, ctx, phases, i);
     s = result.state;
-    events.push(...result.events);
+    logEntries.push(...result.logEntries);
     if (result.error) {
-      return { state: s, events, error: result.error };
+      return { state: s, logEntries, error: result.error };
     }
     // Only break if a NEW pending was created during execution
     if (!hadPendingOnEntry && s.pending !== null) {
-      return { state: s, events };
+      return { state: s, logEntries };
     }
   }
 
-  return { state: s, events };
+  return { state: s, logEntries };
 }

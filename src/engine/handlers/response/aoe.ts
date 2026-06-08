@@ -16,7 +16,7 @@ export function resolveAoeResponse(
   pending: PendingResponseWindow,
 ): EngineResult {
   if (action.type !== '打出') {
-    return { state, events: [], error: 'AOE 响应窗口需要 respond 动作' };
+    return { state, logEntries: [], error: 'AOE 响应窗口需要 respond 动作' };
   }
 
   const { defender, attacker, remainingTargets, requiredCard, sourceCard } = pending.window;
@@ -29,21 +29,21 @@ export function resolveAoeResponse(
     ];
     const result = applyAtoms(state, atoms);
     const s = result.state;
-    const events = result.events;
+    const logEntries = result.logEntries;
 
     // 还有剩余玩家需要响应 → 创建下一个 aoeResponse
     if (remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard) {
       return startAoeTargetWuxie(s, { attacker, remainingTargets, requiredCard, sourceCard });
     }
-    return { state: s, events };
+    return { state: s, logEntries };
   }
 
-  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: '弹出待定' }]);
+  const { state: popState, logEntries: popLogEntries } = applyAtoms(state, [{ type: '弹出待定' }]);
   const damageResult = applyDamage(
     popState, defender, 1,
     attacker ?? undefined, sourceCard,
   );
-  const allEvents = [...popEvents, ...damageResult.events];
+  const allLogEntries = [...popLogEntries, ...damageResult.logEntries];
 
   const hasRemainingTargets = !!(remainingTargets && remainingTargets.length > 0 && attacker && requiredCard && sourceCard);
 
@@ -51,12 +51,12 @@ export function resolveAoeResponse(
     const resumeAoe = { attacker, remainingTargets, requiredCard, sourceCard };
     return {
       state: { ...damageResult.state, pending: { ...damageResult.state.pending, resumeAoe } },
-      events: allEvents,
+      logEntries: allLogEntries,
     };
   }
 
   if (damageResult.state.pending !== null) {
-    return { state: damageResult.state, events: allEvents };
+    return { state: damageResult.state, logEntries: allLogEntries };
   }
 
   if (hasRemainingTargets) {
@@ -68,7 +68,7 @@ export function resolveAoeResponse(
     });
   }
 
-  return { state: damageResult.state, events: allEvents };
+  return { state: damageResult.state, logEntries: allLogEntries };
 }
 
 /** 把 AOE 链恢复成针对下一个目标的响应窗口。 */
@@ -77,7 +77,7 @@ export function executeAoeResume(
   aoeResume: { attacker: string; remainingTargets: string[]; requiredCard: string; sourceCard: string },
 ): EngineResult {
   const { attacker, remainingTargets, requiredCard, sourceCard } = aoeResume;
-  if (remainingTargets.length === 0) return { state, events: [] };
+  if (remainingTargets.length === 0) return { state, logEntries: [] };
 
   const firstTarget = remainingTargets[0];
   const nextRemaining = remainingTargets.slice(1);
@@ -126,7 +126,7 @@ export function startAoeTargetWuxie(
 
   // 过滤存活的目标
   const aliveTargets = remainingTargets.filter(t => getPlayer(state, t).info.alive);
-  if (aliveTargets.length === 0) return { state, events: [] };
+  if (aliveTargets.length === 0) return { state, logEntries: [] };
 
   // 所有存活玩家都可以出无懈可击（包括出牌者）
   const allAlive = getAlivePlayerNames(state);

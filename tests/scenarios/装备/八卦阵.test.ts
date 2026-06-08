@@ -73,7 +73,7 @@ describe('八卦阵 v3', () => {
         },
       },
     };
-    const { state, events } = applyAtoms(s1, [
+    const { state, logEntries: events } = applyAtoms(s1, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', cardId: 'kill1' },
     ]);
     expect(state.players.P1.health).toBe(4);

@@ -32,7 +32,7 @@ describe('铁索连环（chained 传导）', () => {
     s0 = setHealth(s0, 'P1', 4);
     s0 = setHealth(s0, 'P2', 4);
     s0 = setHealth(s0, 'P3', 4);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
     ]);
     // P1 受伤害
@@ -40,7 +40,7 @@ describe('铁索连环（chained 传导）', () => {
     // P3 也受同伤害（chain 传导）
     expect(state.players.P3.health).toBe(3);
     // server log 含 2 个 damage 事件（P1 + P3）
-    const damageEvents = events.filter(e => e.type === '造成伤害');
+    const damageEvents = events.filter(e => e.atom.type === '造成伤害');
     expect(damageEvents).toHaveLength(2);
   });
 

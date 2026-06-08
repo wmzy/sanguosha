@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 
 export function register() {
@@ -17,14 +16,6 @@ export function register() {
         const newHealth = Math.min(p.health, clampedMax);
         return { maxHealth: clampedMax, health: newHealth };
       });
-    },
-    toEvents(state: GameState, atom: Atom & { type: '设上限' }): AtomEventResult {
-      const player = atom.player as string;
-      const delta = atom.delta as number;
-      const payload: Json = { player, delta };
-      const server = makeServerEvent('设上限', payload);
-      const ownerEvent = makePlayerEvent('设上限', payload);
-      return [server, new Map([[player, ownerEvent]]), null];
     },
   });
 }

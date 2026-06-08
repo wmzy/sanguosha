@@ -7,7 +7,7 @@
 //
 // 设计依据：docs/design/v3/0001-v3-redesign.md §4.5
 
-import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, AtomLogEntry } from '../types';
 import { registerPhase, executePlan } from '../phase';
 import { resolve } from '../expr';
 import { applyAtoms } from '../atom';
@@ -39,12 +39,12 @@ export function register() {
       if (!aCardId || !bCardId) {
         return {
           state,
-          events: [],
+          logEntries: [],
           error: 'pindian phase requires aCardId and bCardId (literal or ctx.localVars.pindianACard/BCard)',
         };
       }
 
-      const events: ServerEvent[] = [];
+      const logEntries: AtomLogEntry[] = [];
       let s = state;
 
       // 1) 调 compareRank 原子（已注册到 @engine/atoms）
@@ -54,23 +54,23 @@ export function register() {
         { skipPlayerEvents: true },
       );
       s = r.state;
-      events.push(...r.events);
+      logEntries.push(...r.logEntries);
 
       // 2) 注入结果到 ctx.localVars，便于后续 ExprCardProp/condition 引用
       //    winner 从 applyAtoms 派发的 serverEvent payload 中读取
-      const winnerFromEvent = r.events[0]?.payload as { winner?: string } | undefined;
-      ctx.localVars.pindianWinner = winnerFromEvent?.winner ?? a;
+      const winnerFromEvent = r.logEntries[0]?.atom as Record<string, unknown> | undefined;
+      ctx.localVars.pindianWinner = winnerFromEvent?.winner as string | undefined ?? a;
       ctx.localVars.pindianACard = aCardId;
       ctx.localVars.pindianBCard = bCardId;
 
       // 3) 分支：winner 是 a 走 then，否则走 else
       const branch = ctx.localVars.pindianWinner === a ? phase.then : (phase.else ?? []);
-      if (branch.length === 0) return { state: s, events };
+      if (branch.length === 0) return { state: s, logEntries };
 
       const sub = executePlan(s, branch, ctx);
       s = sub.state;
-      events.push(...sub.events);
-      return { state: s, events };
+      logEntries.push(...sub.logEntries);
+      return { state: s, logEntries };
     },
   });
 }

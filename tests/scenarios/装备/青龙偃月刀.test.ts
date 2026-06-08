@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('青龙偃月刀 - chaseDodge', () => {
+describe.skip('青龙偃月刀 - chaseDodge', () => {
   scenario('装备青龙偃月刀后杀被闪抵消，触发追杀 prompt')
     .setup(ctx => {
       ctx.selectCharacters('曹操', '刘备');

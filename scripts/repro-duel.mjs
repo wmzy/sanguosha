@@ -15,7 +15,6 @@ const config = {
   characterMap,
 };
 let state = createInitialState(config);
-for (const p of data.players) state = registerCharacterTriggers(state, p.name, { characterMap });
 
 console.log('init 小乔 hp =', getPlayer(state, '小乔').health, 'max =', getPlayer(state, '小乔').maxHealth);
 

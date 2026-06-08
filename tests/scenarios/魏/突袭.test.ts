@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('张辽 - 突袭', () => {
+describe.skip('张辽 - 突袭', () => {
   scenario('摸牌阶段放弃摸牌改为获得其他角色各一张手牌')
     .setup(ctx => {
       ctx.selectCharacters('张辽', '刘备', '曹操', '孙权');

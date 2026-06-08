@@ -6,24 +6,14 @@
 //
 // 本占位原子：apply 不改 state，toEvents 输出 server event '回合结束' 供 log/审计。
 // 真实业务（弃牌阶段推入待定等）由 handleEndTurn 主流程 atom 序列承载。
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent } from '../event';
 
 export function register() {
   registerAtom({
     type: '回合结束',
     apply(s: GameState) {
       return s;
-    },
-    toEvents(_s, atom): AtomEventResult {
-      const a = atom as Atom & { type: '回合结束' };
-      const player = (a as { player?: unknown }).player as string;
-      return [
-        makeServerEvent('回合结束', { player }),
-        new Map(),
-        null,
-      ];
     },
   });
 }

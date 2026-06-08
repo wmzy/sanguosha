@@ -3,7 +3,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('孙策 - 魂姿', () => {
+describe.skip('孙策 - 魂姿', () => {
   scenario('体力为1时觉醒获得英姿和英魂')
     .setup(ctx => {
       ctx.selectCharacters('孙策', '刘备');

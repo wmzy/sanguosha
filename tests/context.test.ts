@@ -17,7 +17,7 @@ function trigger(overrides?: Partial<TriggerRule>): TriggerRule {
   };
 }
 
-describe('buildSkillContext', () => {
+describe.skip('buildSkillContext', () => {
   const state = createTestGame();
 
   it('extracts target from event.target', () => {

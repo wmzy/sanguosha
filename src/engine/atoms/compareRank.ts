@@ -6,9 +6,8 @@
 //
 // 设计依据：docs/design/v3/0001-v3-redesign.md §4（拼点技能落地路径）
 
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom, Json } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent } from '../event';
 import { updatePlayer } from '../state';
 import { createRng } from '../../shared/rng';
 import { getRankValue } from '../pile-compare';
@@ -79,25 +78,6 @@ export function register() {
         },
         rngState: result.tied ? state.rngState + 1 : state.rngState,
       };
-    },
-    toEvents(state: GameState, atom: CompareRankAtom): AtomEventResult {
-      const a = atom.a as string;
-      const b = atom.b as string;
-      const aCardId = atom.aCardId as string;
-      const bCardId = atom.bCardId as string;
-      const result = resolveWinner(state, a, b, aCardId, bCardId);
-      const payload: Record<string, Json> = {
-        a,
-        b,
-        aCardId,
-        bCardId,
-        aRank: result.aRank,
-        bRank: result.bRank,
-        winner: result.winner,
-      };
-      if (result.tied) payload.tied = true;
-      const server = makeServerEvent('拼点', payload);
-      return [server, new Map(), null] as const;
     },
     getResult(state: GameState, atom: CompareRankAtom): Record<string, Json> {
       const a = atom.a as string;

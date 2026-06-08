@@ -4,8 +4,7 @@ import type {
   GameState,
   Atom,
   Json,
-  PlayerEvent,
-  ServerEvent,
+  AtomLogEntry,
 } from './types';
 import type {
   AsyncHook,
@@ -21,7 +20,8 @@ import {
   setCurrentHookContext,
   getCurrentHookContext,
 } from './hook-helpers';
-import { applyAtom, atomToEvents } from './atom';
+import { applyAtom } from './atom';
+import { makeLogEntry } from './event';
 
 const MAX_HOOK_RECURSION = 16;
 
@@ -34,8 +34,8 @@ export interface ApplyAtomsAsyncOptions {
 
 export interface ApplyAtomsAsyncResult {
   state: GameState;
-  events: ServerEvent[];
-  playerEvents: Map<string, PlayerEvent[]>;
+  logEntries: AtomLogEntry[];
+  playerViews: Map<string, Atom[]>;
   pending: AsyncPending | null;
 }
 
@@ -55,13 +55,13 @@ export async function applyAtomsAsync(
   }
 
   const hookReg = opts.asyncHooks;
-  const playerEvents = new Map<string, PlayerEvent[]>();
+  const playerViews = new Map<string, Atom[]>();
   for (const player of state.playerOrder) {
-    playerEvents.set(player, []);
+    playerViews.set(player, []);
   }
 
   let s = state;
-  const events: ServerEvent[] = [];
+  const logEntries: AtomLogEntry[] = [];
 
   for (const rawAtom of atoms) {
     let atom = rawAtom;
@@ -81,8 +81,8 @@ export async function applyAtomsAsync(
         if (result.kind === 'pending') {
           return {
             state: s,
-            events,
-            playerEvents,
+            logEntries,
+            playerViews,
             pending: buildAsyncPending(result.def, hook.id, 'onBefore', atom, s.currentPlayer, result.tag),
           };
         }
@@ -91,26 +91,20 @@ export async function applyAtomsAsync(
 
     if (atom === (null as unknown as Atom)) continue;
 
-    // 恢复路径（skipApply）：跳过 atom apply + events，直接进入 onAfter 钩子
-    let serverEvent: ServerEvent | undefined;
+    let logEntry: AtomLogEntry | undefined;
     if (!opts.skipApply) {
-      const [se, playerMap, defaultEvent] = atomToEvents(s, atom);
-      serverEvent = se;
-      events.push(se);
+      logEntry = makeLogEntry(atom);
+      logEntries.push(logEntry);
 
       if (!opts.skipPlayerEvents) {
         const updatedPlayerLogs = { ...s.playerLogs };
         for (const player of s.playerOrder) {
-          const specific = playerMap.get(player);
-          const evt = specific ?? defaultEvent;
-          if (evt) {
-            playerEvents.get(player)!.push(evt);
-            updatedPlayerLogs[player] = [...(updatedPlayerLogs[player] ?? []), evt.id];
-          }
+          playerViews.get(player)!.push(atom);
+          updatedPlayerLogs[player] = [...(updatedPlayerLogs[player] ?? []), logEntry.id];
         }
-        s = { ...s, serverLog: [...s.serverLog, se], playerLogs: updatedPlayerLogs };
+        s = { ...s, serverLog: [...s.serverLog, logEntry], playerLogs: updatedPlayerLogs };
       } else {
-        s = { ...s, serverLog: [...s.serverLog, se] };
+        s = { ...s, serverLog: [...s.serverLog, logEntry] };
       }
 
       s = applyAtom(s, atom);
@@ -119,7 +113,7 @@ export async function applyAtomsAsync(
     if (!opts.skipHooks && hookReg) {
       const hooks = filterAsyncHooks(hookReg, atom.type, s.currentPlayer, s, atom);
       for (const hook of hooks) {
-        const result = await runHookOnAfter(hook, { state: s, atom, self: s.currentPlayer, serverEvent }, _resume?.resume);
+        const result = await runHookOnAfter(hook, { state: s, atom, self: s.currentPlayer, logEntry }, _resume?.resume);
         if (result.kind === 'modifyState') s = result.state;
         if (result.kind === 'additionalAtoms' && result.atoms.length > 0) {
           const sub = await applyAtomsAsync(
@@ -128,22 +122,22 @@ export async function applyAtomsAsync(
             _recursionDepth + 1,
           );
           s = sub.state;
-          events.push(...sub.events);
+          logEntries.push(...sub.logEntries);
           if (sub.pending) {
-            return { state: s, events, playerEvents, pending: sub.pending };
+            return { state: s, logEntries, playerViews, pending: sub.pending };
           }
           if (!opts.skipPlayerEvents) {
-            for (const [player, evts] of sub.playerEvents) {
-              const existing = playerEvents.get(player);
-              if (existing) existing.push(...evts);
+            for (const [player, views] of sub.playerViews) {
+              const existing = playerViews.get(player);
+              if (existing) existing.push(...views);
             }
           }
         }
         if (result.kind === 'pending') {
           return {
             state: s,
-            events,
-            playerEvents,
+            logEntries,
+            playerViews,
             pending: buildAsyncPending(result.def, hook.id, 'onAfter', atom, s.currentPlayer, result.tag),
           };
         }
@@ -151,7 +145,7 @@ export async function applyAtomsAsync(
     }
   }
 
-  return { state: s, events, playerEvents, pending: null };
+  return { state: s, logEntries, playerViews, pending: null };
 }
 
 function filterAsyncHooks(
@@ -207,7 +201,7 @@ async function runHookOnAfter(
     atom: ctx.atom,
     self: ctx.self,
     hookId: hook.id,
-    serverEvent: ctx.serverEvent,
+    logEntry: ctx.logEntry,
     awaiting: resumeData !== undefined,
     resume: resumeData,
   });

@@ -35,11 +35,11 @@ describe('setChained atom（走 Mark）', () => {
 
   it('setChained 写入 server event payload（target + chained 保留）', () => {
     const s0 = createTestGame();
-    const { events } = applyAtoms(s0, [
+    const { logEntries: events } = applyAtoms(s0, [
       { type: '设横置', target: 'P1', chained: true },
     ]);
-    expect(events[0].type).toBe('设横置');
-    expect(events[0].payload).toMatchObject({ target: 'P1', chained: true });
+    expect(events[0].atom.type).toBe('设横置');
+    expect(events[0].atom).toMatchObject({ target: 'P1', chained: true });
   });
 
   it('setChained 幂等：连续两次 true 不会重复加 Mark', () => {

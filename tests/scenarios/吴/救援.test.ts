@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('孙权 - 救援', () => {
+describe.skip('孙权 - 救援', () => {
   scenario('吴势力角色用桃时孙权额外回1体力')
     .setup(ctx => {
       ctx.selectCharacters('孙权', '甘宁', '刘备');

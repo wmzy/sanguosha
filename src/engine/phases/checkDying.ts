@@ -1,9 +1,9 @@
-import type { SkillPhase, GameState, SkillContext, EngineResult, PendingDyingWindow } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, PendingDyingWindow, Atom } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
 import { getPlayer, getAlivePlayerNames } from '../state';
-import { makeServerEvent } from '../event';
+import { makeLogEntry } from '../event';
 import { createPendingId } from '../atoms/pending';
 
 type CheckDyingPhase = Extract<SkillPhase, { type: 'checkDying' }>;
@@ -27,11 +27,11 @@ export function register() {
           deadline: Date.now() + timeout,
           onTimeout: { type: '打出', player: playerName },
         };
-        const dyingEvent = makeServerEvent('濒死', { player: playerName });
-        return { state: { ...state, pending }, events: [dyingEvent] };
+        const dyingEvent = makeLogEntry({ type: '濒死', player: playerName } as unknown as Atom);
+        return { state: { ...state, pending }, logEntries: [dyingEvent] };
       }
 
-      return { state, events: [] };
+      return { state, logEntries: [] };
     },
   });
 }

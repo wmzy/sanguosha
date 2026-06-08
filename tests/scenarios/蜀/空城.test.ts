@@ -78,7 +78,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
     })
     .check('serverLog 末尾不是 becomeTarget 事件（被 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).not.toBe('成为目标');
+      expect(last?.atom.type).not.toBe('成为目标');
     })
     .run();
 
@@ -101,7 +101,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（有手牌不阻）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('成为目标');
+      expect(last?.atom.type).toBe('成为目标');
     })
     .run();
 
@@ -132,7 +132,7 @@ describe('诸葛亮 - 空城（v3 registerAtomHook 路径）', () => {
     })
     .check('serverLog 末尾是 becomeTarget 事件（无空城）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('成为目标');
+      expect(last?.atom.type).toBe('成为目标');
     })
     .run();
 });

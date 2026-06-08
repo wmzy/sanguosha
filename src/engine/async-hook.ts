@@ -11,7 +11,7 @@
 // 4. 钩子必须 id 稳定——跨序列化 / 跨重启保持唯一
 // 5. 钩子内读 state 必须在 await 之间重新取
 
-import type { GameState, Atom, ServerEvent, Json, PendingAction } from './types';
+import type { GameState, Atom, AtomLogEntry, Json, PendingAction } from './types';
 
 // ════════════════════════════════════════════════════════════════════
 // Hook 上下文
@@ -24,8 +24,8 @@ export interface HookCtx {
   atom: Atom;
   /** 钩子的 self 引用（player 过滤后的当前玩家） */
   self: string;
-  /** 仅 onAfter：apply 产生的 server event */
-  serverEvent?: ServerEvent;
+  /** 仅 onAfter：apply 产生的 log entry */
+  logEntry?: AtomLogEntry;
   /** 仅 resume 时：玩家响应数据 */
   resume?: ResumeData;
   /** 挂起 helper：ctx.pending(def) 等玩家响应 */

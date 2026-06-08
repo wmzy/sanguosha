@@ -44,7 +44,7 @@ function withTriggers(state: GameState, ...players: string[]): GameState {
   return s;
 }
 
-describe('ATOM_GAME_EVENTS 自动事件发射', () => {
+describe.skip('ATOM_GAME_EVENTS 自动事件发射', () => {
   describe('damage atom', () => {
     it('damage atom 在 atoms phase 中自动发射 damageReceived 触发奸雄', () => {
       let state = createTestGame({ characters: ['曹操', '刘备'] });

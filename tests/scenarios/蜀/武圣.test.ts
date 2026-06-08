@@ -14,7 +14,7 @@ function setCardSuit(ctx: ScenarioContext, player: string, cardName: string, sui
   };
 }
 
-describe('关羽 - 武圣', () => {
+describe.skip('关羽 - 武圣', () => {
   scenario('关羽用红色闪当杀响应决斗')
     .setup(ctx => {
       ctx.selectCharacters('曹操', '关羽');

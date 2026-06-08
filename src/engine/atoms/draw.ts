@@ -1,7 +1,6 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom, applyAtoms } from '../atom';
 import { registerAtomHook } from '../skill-hook';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 
 /**
@@ -48,18 +47,6 @@ export function register() {
         player,
         p => ({ hand: [...p.hand, ...drawn] }),
       );
-    },
-    // toEvents 不再做 reshuffle：onBefore 钩子（或 apply 路径）已保证牌堆足够。
-    // 避免 applyAtoms 一次入口触发两次 reshuffle（double RNG 推进）。
-    toEvents(state: GameState, atom: Atom & { type: '摸牌' }): AtomEventResult {
-      const player = atom.player as string;
-      const count = atom.count as number;
-      const drawn = state.zones.deck.slice(0, count);
-      const actualCount = drawn.length;
-      const server = makeServerEvent('摸牌', { player, count: actualCount, cards: drawn });
-      const ownerEvent = makePlayerEvent('摸牌', { player, count: actualCount, cards: drawn });
-      const defaultEvent = makePlayerEvent('摸牌', { player, count: actualCount });
-      return [server, new Map([[player, ownerEvent]]), defaultEvent];
     },
   });
 }

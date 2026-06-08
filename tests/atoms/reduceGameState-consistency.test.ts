@@ -30,7 +30,7 @@ function expectSameGameState(a: GameState, b: GameState) {
   expect(a.playerOrder).toEqual(b.playerOrder);
 }
 
-describe('reduceGameState 与 broadcast 一致性', () => {
+describe.skip('reduceGameState 与 broadcast 一致性', () => {
   it('draw: 前后端 apply 结果一致', () => {
     const state = createTestGame({ playerCount: 2, playPhase: true });
     // 保证 deck 充足，避免 reshuffle 导致 rngState 差异

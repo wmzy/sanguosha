@@ -17,6 +17,7 @@ import type {
   PendingAsyncHook,
   Json,
   Atom,
+  AtomLogEntry,
 } from './types';
 import type { AsyncHookRegistry, AsyncPending, ResumeData } from './async-hook';
 import { applyAtomsAsync } from './atom-async';
@@ -111,8 +112,8 @@ export function createAsyncEngine(config: AsyncEngineConfig): AsyncEngineInstanc
 
 function finalizeAsyncResult(result: {
   state: GameState;
-  events: import('./types').ServerEvent[];
-  playerEvents: Map<string, import('./types').PlayerEvent[]>;
+  logEntries: AtomLogEntry[];
+  playerViews: Map<string, Atom[]>;
   pending: AsyncPending | null;
 }): EngineResult {
   let nextState = result.state;
@@ -139,8 +140,8 @@ function finalizeAsyncResult(result: {
   }
   return {
     state: nextState,
-    events: result.events,
-    playerEvents: result.playerEvents,
+    logEntries: result.logEntries,
+    playerViews: result.playerViews,
     error: undefined,
   };
 }

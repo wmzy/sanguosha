@@ -159,7 +159,7 @@ describe('杀事件触发 (BUG #4)', () => {
     const dodgeId = r1.state.players['P2'].hand.find(id => state.cardMap[id]?.name === '闪')!;
     const r2 = engine(r1.state, { type: '打出', player: 'P2', cardId: dodgeId });
     expect(r2.error).toBeUndefined();
-    const types = r2.events.map(e => e.type);
+    const types = r2.logEntries.map(e => e.atom.type);
     expect(types).toContain('杀被闪避');
   });
 
@@ -174,7 +174,7 @@ describe('杀事件触发 (BUG #4)', () => {
 
     const r2 = engine(r1.state, { type: '打出', player: 'P2' });
     expect(r2.error).toBeUndefined();
-    const types = r2.events.map(e => e.type);
+    const types = r2.logEntries.map(e => e.atom.type);
     expect(types).toContain('杀命中');
   });
 });

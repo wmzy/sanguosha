@@ -5,7 +5,6 @@ import type { GameState, GameAction, ServerEvent } from '../engine/types';
 import { createInitialState } from '../engine/state';
 import { createEngine } from '../engine/create-engine';
 import { allSkills } from '../engine/skills';
-import { registerCharacterTriggers } from '../engine/skill';
 import { restoreEventCounterFromLog } from '../engine/event';
 import { allCharacters } from '../engine/characters';
 import type { Role } from '../shared/types';
@@ -254,9 +253,7 @@ export function restoreToState(persisted: PersistedRoom): GameState {
     seed: persisted.seed,
     characterMap,
   });
-  for (const playerName of state.playerOrder) {
-    state = registerCharacterTriggers(state, playerName, { characterMap });
-  }
+  // v2 registerCharacterTriggers 已删除
 
   const gameEngine = createEngine({ skills: allSkills });
   for (const action of persisted.actionLog) {

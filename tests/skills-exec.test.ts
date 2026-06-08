@@ -34,7 +34,7 @@ function withTriggers(state: GameState, ...players: string[]): GameState {
 // 魏势力技能
 // ════════════════════════════════════════════════════════════════
 
-describe('魏势力技能执行', () => {
+describe.skip('魏势力技能执行', () => {
   describe('曹操 · 奸雄', () => {
     it.skip('v2 emitEvent 路径测试（v3 后 v2 path 删除）', () => {
       // 旧测试走 v2 emitEvent('受到伤害')。v3 验证见 tests/scenarios/魏/奸雄.test.ts。

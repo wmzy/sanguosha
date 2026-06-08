@@ -16,7 +16,7 @@
 //
 // 设计依据：docs/decisions/0012-unified-apply-atoms.md
 
-import type { GameState, Atom, ServerEvent } from './types';
+import type { GameState, Atom, AtomLogEntry } from './types';
 
 export interface BeforeHookResult {
   cancel?: boolean;
@@ -44,7 +44,7 @@ export type AfterHookFn = (ctx: {
   state: GameState;
   atom: Atom;
   self: string;
-  serverEvent: ServerEvent;
+  logEntry: AtomLogEntry;
 }) => AfterHookResult | void | undefined;
 
 export interface AtomHookDef {
@@ -103,43 +103,30 @@ export class HookRegistry {
     return hooks.filter((h) => h.player === undefined || h.player === player);
   }
 }
+// 全局便捷函数已删除（v2 清理）。所有注册走 HookRegistry 实例方法。
+// createEngine() 创建闭包 HookRegistry，dispatch 期间通过 _setCurrentEngineHooks 注入。
 
-// 全局单例：保留旧的模块级语义。后续 Phase 5 在 `createEngine` 闭包里
-// 实例化独立的 HookRegistry 后会移除这些便捷函数。
+// 模块级注册：atom 定义文件（如 draw.ts）在 register() 时调此函数注册钩子。
+// 这些钩子注册到 defaultRegistry，在 createEngine 创建实例时由 registerAllSkills 复制到闭包。
+// TODO: atom 定义应走 createEngine 注入的 registry，而非全局副作用。
 const defaultRegistry = new HookRegistry();
 
-/**
- * 暴露默认全局 HookRegistry。
- *
- * @deprecated 自 2026-06-06 内部 API，仅 `create-engine.ts` 和 `atom.ts`
- * 使用。测试请用 `engine.hooks`。详见 ADR 0018。
- */
-export function getDefaultHookRegistry(): HookRegistry {
-  return defaultRegistry;
-}
-
-/**
- * 向全局 defaultRegistry 注册一个 atom 钩子。
- *
- * @deprecated 自 2026-06-06 改用 `engine.hooks.register(def)` 代替。
- * 闭包 HookRegistry 是 instance 独立的，不会污染其他 engine。
- * 详见 ADR 0018。
- */
+/** 模块级 atom 钩子注册（由 atom 定义文件调用） */
 export function registerAtomHook(def: AtomHookDef): void {
   defaultRegistry.register(def);
 }
 
-/**
- * 清空全局 defaultRegistry 中所有钩子。
- *
- * @deprecated 自 2026-06-06 改用 `createTestEngine().clearForTest()` 代替。
- * 详见 ADR 0018。
- */
+/** 获取默认 HookRegistry（供 createEngine 复制到闭包） */
+export function getDefaultHookRegistry(): HookRegistry {
+  return defaultRegistry;
+}
+
+/** 清空默认 HookRegistry（测试隔离用） */
 export function clearAtomHooks(): void {
   defaultRegistry.clear();
 }
 
-/** 获取某 atom type 的所有钩子（按优先级降序） */
+/** 获取某 atom type 的所有钩子（default registry） */
 export function getAtomHooks(atomType: string): AtomHookDef[] {
   return defaultRegistry.getByAtomType(atomType);
 }

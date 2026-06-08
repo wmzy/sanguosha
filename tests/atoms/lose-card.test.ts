@@ -13,12 +13,12 @@ describe('loseCard atom', () => {
 
   it('loseCard: hand → discardPile', () => {
     const s0 = withHand(createTestGame(), 'P1', ['c1', 'c2']);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '失去牌', cardId: 'c1', from: { zone: '手牌', player: 'P1' } },
     ]);
     expect(state.players.P1.hand).toEqual(['c2']);
     expect(state.zones.discardPile).toContain('c1');
-    expect(events[0].type).toBe('失去牌');
+    expect(events[0].atom.type).toBe('失去牌');
   });
 
   it('loseCard: equipment → discardPile（带装备 slot 清理）', () => {

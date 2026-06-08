@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult, EquipSlot, Json } from '../types';
+import type { GameState, Atom, EquipSlot } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer } from '../state';
 
 const subtypeToSlot: Record<string, EquipSlot> = {
@@ -38,15 +37,6 @@ export function register() {
 
       return s;
     },
-    toEvents(state: GameState, atom: Atom & { type: '装备' }): AtomEventResult {
-      const player = atom.player as string;
-      const cardId = atom.cardId as string;
-      const card = state.cardMap[cardId];
-      const slot = subtypeToSlot[card.subtype];
-      const payload: Json = { player, cardId, slot };
-      const server = makeServerEvent('装备', payload);
-      return [server, new Map(), makePlayerEvent('装备', payload)];
-    },
   });
 
   registerAtom({
@@ -59,13 +49,6 @@ export function register() {
         delete eq[slot];
         return { equipment: eq };
       });
-    },
-    toEvents(state: GameState, atom: Atom & { type: '卸下' }): AtomEventResult {
-      const player = atom.player as string;
-      const slot = atom.slot;
-      const payload: Json = { player, slot };
-      const server = makeServerEvent('卸下', payload);
-      return [server, new Map(), makePlayerEvent('卸下', payload)];
     },
   });
 }

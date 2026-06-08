@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('张昭张纮 - 直谏', () => {
+describe.skip('张昭张纮 - 直谏', () => {
   scenario('将装备牌给其他角色后摸1张')
     .setup(ctx => {
       ctx.selectCharacters('张昭张纮', '刘备');

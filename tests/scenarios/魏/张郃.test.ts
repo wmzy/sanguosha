@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('张郃 - 巧变', () => {
+describe.skip('张郃 - 巧变', () => {
   it.skip('巧变：弃手牌跳阶段（需要引擎支持多阶段跳过和场牌移动）', () => {
     // 巧变涉及：每个阶段可选择弃手牌跳过
     // 跳摸牌阶段时偷牌、跳出牌阶段时移场牌

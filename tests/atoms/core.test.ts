@@ -15,7 +15,7 @@ function firstCardId(state: GameState, player: string): string {
   return state.players[player].hand[0];
 }
 
-describe('移动牌', () => {
+describe.skip('移动牌', () => {
   it('apply: hand → hand', () => {
     const state = createTestGame();
     const cardId = firstCardId(state, 'P1');

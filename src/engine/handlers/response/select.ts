@@ -12,22 +12,22 @@ export function resolveSelectCard(
   pending: PendingSelectCard,
 ): EngineResult {
   if (action.type !== '打出') {
-    return { state, events: [], error: '选牌需要 respond 动作' };
+    return { state, logEntries: [], error: '选牌需要 respond 动作' };
   }
   if (action.player !== pending.player) {
-    return { state, events: [], error: '只有出牌者可以选择' };
+    return { state, logEntries: [], error: '只有出牌者可以选择' };
   }
 
   const selectedIds = action.cardIds ?? (action.cardId ? [action.cardId] : []);
   if (selectedIds.length < pending.min || selectedIds.length > pending.max) {
-    return { state, events: [], error: '选择的卡牌数量不符' };
+    return { state, logEntries: [], error: '选择的卡牌数量不符' };
   }
 
   // 校验所选卡牌确实在目标手中
   const targetPlayer = getPlayer(state, pending.target);
   for (const cardId of selectedIds) {
     if (!targetPlayer.hand.includes(cardId)) {
-      return { state, events: [], error: '所选卡牌不在目标手牌中' };
+      return { state, logEntries: [], error: '所选卡牌不在目标手牌中' };
     }
   }
 
@@ -52,5 +52,5 @@ export function resolveSelectCard(
 
   atoms.push({ type: '弹出待定' });
   const result = applyAtoms(state, atoms);
-  return { state: result.state, events: result.events };
+  return { state: result.state, logEntries: result.logEntries };
 }

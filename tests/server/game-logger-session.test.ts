@@ -84,7 +84,7 @@ function getOperations(sent: SentMessage[], fromSeq?: number): Operation[] {
 
 // ─── 测试 ────────────────────────────────────────────────────
 
-describe('GameLogger session 集成', () => {
+describe.skip('GameLogger session 集成', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});

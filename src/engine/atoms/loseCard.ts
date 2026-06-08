@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { updatePlayer, getPlayer } from '../state';
 
 export function register() {
@@ -43,13 +42,6 @@ export function register() {
       }
 
       return state;
-    },
-    toEvents(_state: GameState, atom: Atom & { type: '失去牌' }): AtomEventResult {
-      const cardId = atom.cardId as string;
-      const from = atom.from;
-      const payload: Json = { cardId, from: { zone: from.zone, player: from.player as string } };
-      const server = makeServerEvent('失去牌', payload);
-      return [server, new Map(), makePlayerEvent('失去牌', payload)];
     },
   });
 }

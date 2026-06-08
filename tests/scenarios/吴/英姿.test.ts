@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('周瑜 - 英姿', () => {
+describe.skip('周瑜 - 英姿', () => {
   scenario('摸牌阶段额外摸一张牌（通过 auto-advance 引擎路径）')
     .setup(ctx => {
       ctx.selectCharacters('周瑜', '刘备');

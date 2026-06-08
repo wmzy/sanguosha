@@ -19,8 +19,8 @@ export interface GameState {
   turn: TurnState;
   pending: PendingAction | null;
 
-  /** 服务端完整事件日志（用于重播/审计） */
-  serverLog: ServerEvent[];
+  /** 服务端完整 atom 日志（用于重播/审计） */
+  serverLog: AtomLogEntry[];
   /** 每个玩家可见的事件 ID 列表 */
   playerLogs: Record<string, string[]>;
 
@@ -293,21 +293,50 @@ export type Atom =
   | { type: '杀被闪避'; attacker: Expr<string>; defender: Expr<string> }
   | { type: '回合结束'; player: Expr<string> };
 /**
- * 事件元组：[服务端事件, 特殊视角 Map, 默认玩家事件]
- * - [0] 服务端完整事件 → 写入 serverLog
- * - [1] 特殊视角 Map → Map 中的玩家看到特定内容
- * - [2] 默认事件 → 不在 Map 中的玩家看到此事件（null = 不可见）
+ * Atom 写入 serverLog 的日志条目。
+ * resolved atom + 元数据，替代原 ServerEvent 成为重放的唯一数据源。
+ *
+ * 设计决策：atom 是事实的唯一来源。
+ * - apply() 和 applyGameStateEvent() 曾是同一逻辑的两个实现（bug 温床），
+ *   合并后重放直接循环 applyAtom，消除重复。
+ * - toEvents() 降级为 toPlayerViews()：只负责 per-player 可见性分叉。
+ * - 默认不分叉（所有人看到相同 atom）。
+ *
+ * 迁移路径见 docs/superpowers/plans/2026-06-08-atom-as-event.md。
  */
-export type AtomEventResult = readonly [
-  ServerEvent,
-  ReadonlyMap<string, PlayerEvent>,
-  PlayerEvent | null,
+export interface AtomLogEntry {
+  /** 全局单调递增 ID（与原 ServerEvent.id 格式兼容：evt-N） */
+  id: string;
+  /** 时间戳（毫秒） */
+  timestamp: number;
+  /** resolved 后的 atom（Expr 已求值为具体值，重放无需再次 resolve） */
+  atom: Atom;
+}
+
+/**
+ * Atom 的 per-player 可见性分叉（元组）。
+ * - [0] ownerViews：特定玩家看到的额外/不同数据（如摸牌时牌面详情）。
+ * - [1] defaultView：不在 ownerViews 中的玩家看到的数据（null = 不可见）。
+ *
+ * 不分叉的 atom 可以不实现 toPlayerViews——applyAtoms 内部有默认行为
+ * （所有人看到同一个 AtomLogEntry）。
+ */
+export type AtomPlayerViews = readonly [
+  /** 特定玩家 → 他们看到的（可能含额外字段的）atom 视图 */
+  ownerViews: ReadonlyMap<string, Atom>,
+  /** 其他玩家看到的 atom 视角；null = 不可见 */
+  defaultView: Atom | null,
 ];
 
 export interface AtomDefinition<A = unknown> {
   type: string;
   apply(state: GameState, atom: A): GameState;
-  toEvents(state: GameState, atom: A): AtomEventResult;
+  /**
+   * per-player 可见性分叉（可选）。
+   * 不实现或返回 undefined → 所有人看到同一个 atom（无分叉）。
+   * 实现 → applyAtoms 用返回值派发 playerEvents。
+   */
+  toPlayerViews?(state: GameState, atom: A): AtomPlayerViews | undefined;
   /** 可选：atom apply 后从 state 提取结果，自动注入到 ctx.localVars */
   getResult?(state: GameState, atom: A): Record<string, Json>;
 }
@@ -417,7 +446,6 @@ export type SkillPhase =
   | { type: 'prompt'; text: string; options: PromptOption[]; defaultChoice?: Json; timeout?: number }
   | { type: '打出'; window: ResponseWindowDef }
   | { type: 'loop'; body: SkillPhase[]; while: Condition }
-  | { type: 'emit'; event: GameEvent }
   | { type: 'foreach'; collection: Expr<string[]>; body: SkillPhase[]; varName: string }
   | { type: 'checkDying'; player: Expr<string> }
   | { type: 'pindian'; a: Expr<string>; b: Expr<string>; aCardId?: Expr<string>; bCardId?: Expr<string>; then: SkillPhase[]; else?: SkillPhase[] }
@@ -439,7 +467,6 @@ export interface SkillContext {
   choice?: Json;
   source?: string;
   sourceCard?: string;
-  event?: GameEvent;
   localVars: Record<string, Json>;
 }
 export interface SkillDef {
@@ -447,27 +474,11 @@ export interface SkillDef {
   name: string;
   description: string;
   /**
-   * v2 trigger 规格。当 skill 完全由 v3 `registerAtomHook` 驱动时可省略
-   * （v3 钩子不依赖此字段）。[T-25] 迁移完成后，所有 skill 可省略此字段。
-   */
-  trigger?: TriggerSpec;
-  /**
-   * TypeScript 函数，返回 SkillPhase[] 执行计划。
-   * 函数本身不需要序列化，只有执行计划中的 prompt/respond 需要暂停。
-   * v3-only skill（无 trigger）可保留此函数供 v2 fallback / 调试；典型实现返回 []。
-   */
-  handler: (ctx: SkillContext, state: GameState) => SkillPhase[];
-  /**
    * 被动卡牌转换声明：`from` 源卡名 → `to` 目标卡名（如 '杀' → '闪'）。
-   * validate.getSkillConvertedCards 读此字段替代硬编码。
-   * 数组形式以支持双向转换（龙胆：杀↔闪）。
-   * filter 为可选条件；不填则无条件转换。
    */
   convertible?: SkillConvertible[];
   /**
    * v3 atom 钩子注册函数。createEngine 时调用，将钩子注册到实例级 HookRegistry。
-   * 旧模式：模块顶层调用 registerAtomHook()（全局副作用）。
-   * 新模式：定义此字段，由 createEngine 统一调用。
    */
   registerHooks?: (registry: import('./skill-hook').HookRegistry) => void;
 }
@@ -501,24 +512,7 @@ export interface SkillConvertible {
   /** 可选条件；不填则无条件转换。 */
   filter?: Condition;
 }
-export interface TriggerSpec {
-  event: string;
-  filter?: Condition;
-  source: '角色' | '装备';
-  priority?: number;
-  optional?: boolean;
-  phase?: TurnPhase;
-  manual?: boolean;
-}
-export interface TriggerRule {
-  event: string;
-  filter?: Condition;
-  source: '角色' | '装备';
-  skillId: string;
-  player: string;
-  priority: number;
-  optional?: boolean;
-}
+
 export type GameAction =
   | { type: '打出一张牌'; player: string; cardId: string; target?: string }
   | { type: '打出'; player: string; cardId?: string; cardIds?: string[] }
@@ -529,33 +523,7 @@ export type GameAction =
   | { type: '开始' }
   | { type: '切换自动跳过无懈可击' }
   | { type: '异步钩子响应'; pendingId: string; resume: Json };
-export type GameEvent =
-  | { type: '回合开始'; player: string }
-  | { type: '回合结束'; player: string }
-  | { type: '阶段开始'; phase: TurnPhase; player: string }
-  | { type: '阶段结束'; phase: TurnPhase; player: string }
-  /** @deprecated v3+ 将由 useCard 3 原子 (指定目标/成为目标/解决, [T-13]) 取代；v2 路径保留至 [T-22] 迁移完成。仅 出牌 弃用，非全部 GameEvent。 */
-  | { type: '出牌'; player: string; cardId: string; target?: string }
-  | { type: '造成伤害'; source: string; target: string; amount: number; cardId?: string }
-  | { type: '受到伤害'; target: string; source: string; amount: number; cardId?: string }
-  | { type: '回复体力'; target: string; amount: number; source?: string }
-  | { type: '杀被闪避'; attacker: string; defender: string }
-  | { type: '杀命中'; attacker: string; defender: string }
-  | { type: '摸牌'; player: string; count: number }
-  | { type: '弃置'; player: string; cardIds: string[] }
-  | { type: '装备变动'; player: string; slot: EquipSlot; oldCardId?: string; newCardId?: string }
-  | { type: '判定结果'; player: string; cardId: string; result: '红' | '黑' }
-  | { type: '濒死'; player: string; source?: string }
-  | { type: '死亡'; player: string; source?: string }
-  | { type: '技能发动'; player: string; skillId: string };
-export interface ServerEvent {
-  id: string;
-  type: string;
-  timestamp: number;
-  payload: Json;
-}
 
-export type PlayerEvent = ServerEvent; // 结构相同，但 payload 内容可能被裁剪
 export interface PromptDef {
   text: string;
   options: PromptOption[];
@@ -625,8 +593,8 @@ export type ZoneLoc =
   | { zone: '装备'; player: Expr<string>; slot: EquipSlot };
 export interface EngineResult {
   state: GameState;
-  events: ServerEvent[];
-  playerEvents?: Map<string, PlayerEvent[]>;
+  logEntries: AtomLogEntry[];
+  playerViews?: Map<string, Atom[]>;
   error?: string;
 }
 

@@ -3,6 +3,7 @@ import type {
   GameAction,
   EngineResult,
   PendingPlayPhase,
+  Atom,
 } from './types';
 import { validateAction } from './validate';
 import './atoms/index';
@@ -17,12 +18,12 @@ import { getSkillRegistry } from './skill';
 import { getPlayer, checkWinCondition } from './state';
 import { applyAtoms } from './atom';
 import { createDyingPending } from './handlers/engine-utils';
-import { makeServerEvent } from './event';
+import { makeLogEntry } from './event';
 import { advanceToInteractivePhase } from './phase-advance';
 
 function dispatchAction(state: GameState, action: GameAction): EngineResult {
   const error = validateAction(state, action);
-  if (error) return { state, events: [], error };
+  if (error) return { state, logEntries: [], error };
 
   switch (action.type) {
     case '打出一张牌':
@@ -32,39 +33,40 @@ function dispatchAction(state: GameState, action: GameAction): EngineResult {
     case '使用技能':
       return handleUseSkill(state, action, getSkillRegistry());
     case '弃置':
-      return { state, events: [], error: '弃牌操作仅在弃牌阶段有效' };
+      return { state, logEntries: [], error: '弃牌操作仅在弃牌阶段有效' };
     case '打出':
-      return { state, events: [], error: '响应动作仅在响应窗口中有效' };
+      return { state, logEntries: [], error: '响应动作仅在响应窗口中有效' };
     case '技能选择':
-      return { state, events: [], error: '技能选择仅在技能提示中有效' };
+      return { state, logEntries: [], error: '技能选择仅在技能提示中有效' };
     case '切换自动跳过无懈可击':
       return {
         state: { ...state, meta: { ...state.meta, autoSkipWuxie: !state.meta.autoSkipWuxie } },
-        events: [],
+        logEntries: [],
       };
     case '开始':
-      return { state, events: [], error: undefined };
+      return { state, logEntries: [], error: undefined };
     default: {
       const t = (action as { type: string }).type;
-      return { state, events: [], error: `未知操作: ${t}` };
+      return { state, logEntries: [], error: `未知操作: ${t}` };
     }
   }
 }
+
 
 export function engine(state: GameState, action: GameAction): EngineResult {
   let result: EngineResult;
 
   if (action.type === '开始') {
-    result = { state, events: [], error: undefined };
+    result = { state, logEntries: [], error: undefined };
   } else if (action.type === '切换自动跳过无懈可击') {
     result = {
       state: { ...state, meta: { ...state.meta, autoSkipWuxie: !state.meta.autoSkipWuxie } },
-      events: [],
+      logEntries: [],
     };
   } else if (state.pending?.type === '出牌阶段') {
     const playPhaseActions: GameAction['type'][] = ['打出一张牌', '使用技能', '结束回合', '切换自动跳过无懈可击'];
     if (!playPhaseActions.includes(action.type)) {
-      return { state, events: [], error: '出牌阶段不允许此操作' };
+      return { state, logEntries: [], error: '出牌阶段不允许此操作' };
     }
     const { state: popState } = applyAtoms(state, [{ type: '弹出待定' }]);
     const savedPending = state.pending;
@@ -78,8 +80,8 @@ export function engine(state: GameState, action: GameAction): EngineResult {
         deadline: Date.now() + savedPending.timeout,
         onTimeout: savedPending.onTimeout,
       };
-      const { state: pushState, events: pushEvents } = applyAtoms(result.state, [{ type: '推入待定', action: refreshedPending }]);
-      result = { state: pushState, events: [...result.events, ...pushEvents] };
+      const { state: pushState, logEntries: pushLogEntries } = applyAtoms(result.state, [{ type: '推入待定', action: refreshedPending }]);
+      result = { state: pushState, logEntries: [...result.logEntries, ...pushLogEntries] };
     }
   } else if (state.pending) {
     result = handlePending(state, action);
@@ -94,7 +96,7 @@ export function engine(state: GameState, action: GameAction): EngineResult {
     const autoResult = advanceToInteractivePhase(result.state);
     result = {
       state: autoResult.state,
-      events: [...result.events, ...autoResult.events],
+      logEntries: [...result.logEntries, ...autoResult.logEntries],
     };
   }
 
@@ -105,22 +107,19 @@ export function engine(state: GameState, action: GameAction): EngineResult {
       const target = getPlayer(result.state, check.player);
       if (target.health <= 0 && target.info.alive) {
         const dyingPending = createDyingPending(result.state, check.player, check.source);
-        const { state: dyingState, events: dyingEvents } = applyAtoms(
+        const { state: dyingState, logEntries: dyingLogEntries } = applyAtoms(
           { ...result.state, deferredDyingCheck: undefined },
           [{ type: '推入待定' as const, action: dyingPending }],
         );
-        const dyingEvent = makeServerEvent('濒死', {
-          player: check.player,
-          ...(check.source ? { source: check.source } : {}),
-        });
+        const dyingEvent = makeLogEntry({ type: '濒死', player: check.player, ...(check.source ? { source: check.source } : {}) } as unknown as Atom);
         result = {
           state: dyingState,
-          events: [...result.events, ...dyingEvents, dyingEvent],
+          logEntries: [...result.logEntries, ...dyingLogEntries, dyingEvent],
         };
       } else {
         result = {
           state: { ...result.state, deferredDyingCheck: undefined },
-          events: result.events,
+          logEntries: result.logEntries,
         };
       }
     }
@@ -130,17 +129,14 @@ export function engine(state: GameState, action: GameAction): EngineResult {
   if (!result.state.pending) {
     const win = checkWinCondition(result.state);
     if (win) {
-      const gameOverEvent = makeServerEvent('gameOver', {
-        winner: win.winner,
-        reason: win.reason,
-      });
+      const gameOverEvent = makeLogEntry({ type: 'gameOver', winner: win.winner, reason: win.reason } as unknown as Atom);
       return {
         state: {
           ...result.state,
           meta: { ...result.state.meta, status: '已结束', winner: win.winner },
           pending: null,
         },
-        events: [...result.events, gameOverEvent],
+        logEntries: [...result.logEntries, gameOverEvent],
       };
     }
   }
@@ -172,7 +168,7 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
       break;
     default: {
       const t = (pending as { type: string }).type;
-      return { state, events: [], error: `未知 pending 类型: ${t}` };
+      return { state, logEntries: [], error: `未知 pending 类型: ${t}` };
     }
   }
 
@@ -182,17 +178,14 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
   if (!check) {
     const win = checkWinCondition(result.state);
     if (win) {
-      const gameOverEvent = makeServerEvent('gameOver', {
-        winner: win.winner,
-        reason: win.reason,
-      });
+      const gameOverEvent = makeLogEntry({ type: 'gameOver', winner: win.winner, reason: win.reason } as unknown as Atom);
       return {
         state: {
           ...result.state,
           meta: { ...result.state.meta, status: '已结束', winner: win.winner },
           pending: null,
         },
-        events: [...result.events, gameOverEvent],
+        logEntries: [...result.logEntries, gameOverEvent],
       };
     }
     return result;
@@ -200,20 +193,17 @@ function handlePending(state: GameState, action: GameAction): EngineResult {
 
   const target = getPlayer(result.state, check.player);
   if (target.health > 0 || !target.info.alive) {
-    return { state: { ...result.state, deferredDyingCheck: undefined }, events: result.events };
+    return { state: { ...result.state, deferredDyingCheck: undefined }, logEntries: result.logEntries };
   }
 
   const dyingPending = createDyingPending(result.state, check.player, check.source);
-  const { state: dyingState, events: dyingEvents } = applyAtoms(
+  const { state: dyingState, logEntries: dyingLogEntries } = applyAtoms(
     { ...result.state, deferredDyingCheck: undefined },
     [{ type: '推入待定' as const, action: dyingPending }],
   );
-  const dyingEvent = makeServerEvent('濒死', {
-    player: check.player,
-    ...(check.source ? { source: check.source } : {}),
-  });
+  const dyingEvent = makeLogEntry({ type: '濒死', player: check.player, ...(check.source ? { source: check.source } : {}) } as unknown as Atom);
   return {
     state: dyingState,
-    events: [...result.events, ...dyingEvents, dyingEvent],
+    logEntries: [...result.logEntries, ...dyingLogEntries, dyingEvent],
   };
 }

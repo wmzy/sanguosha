@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom, Json } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent } from '../event';
 import { updatePlayer } from '../state';
 import { createRng } from '../../shared/rng';
 
@@ -30,13 +29,6 @@ export function register() {
       }
 
       return state;
-    },
-    toEvents(state: GameState, atom: Atom & { type: '随机弃置'; player: string; count: number; from: '手牌' | '装备' }): AtomEventResult {
-      const player = atom.player;
-      const count = atom.count;
-      const from = atom.from;
-      const server = makeServerEvent('随机弃置', { player, count, from });
-      return [server, new Map(), server] as const;
     },
     getResult(state: GameState, _atom: Atom & { type: '随机弃置'; player: string; count: number; from: '手牌' | '装备' }): Record<string, Json> {
       const discardPile = state.zones.discardPile;

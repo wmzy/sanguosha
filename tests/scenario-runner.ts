@@ -1,11 +1,10 @@
 import { it } from 'vitest';
-import type { GameState, GameEvent, GameAction, PlayerEvent, Atom } from '@engine/types';
+import type { GameState, GameAction, Atom, AtomLogEntry } from '@engine/types';
 import type { Card as SharedCard } from '@shared/types';
 import { allCharacters } from '@engine/characters';
 import { createInitialState, getPlayer } from '@engine/state';
 import { engine } from '@engine/engine';
 import { applyAtoms as engineApplyAtoms } from '@engine/atom';
-import { emitEvent as engineEmitEvent, registerCharacterTriggers } from '@engine/skill';
 import { registerAllSkills as registerAllEngineSkills } from '@engine/skills';
 import { allTricks, weapons, armors, horses } from './fixtures/cards';
 import type { PlayerView, Animation, AvailableAction } from '@engine/view/types';
@@ -46,8 +45,10 @@ export class ScenarioContext {
   state: GameState;
   private _snapshots: Map<string, GameSnapshot> = new Map();
   private _cardCounter = 0;
-  lastEvents: PlayerEvent[] = [];
-
+  state: GameState;
+  private _snapshots: Map<string, GameSnapshot> = new Map();
+  private _cardCounter = 0;
+  lastEvents: AtomLogEntry[] = [];
   constructor(state: GameState) {
     this.state = state;
   }
@@ -63,11 +64,8 @@ export class ScenarioContext {
       seed: 42,
       characterMap,
     };
-    let state = createInitialState(config);
-    for (let i = 0; i < names.length; i++) {
-      state = registerCharacterTriggers(state, `P${i + 1}`, { characterMap });
-    }
-    this.state = state;
+    this.state = createInitialState(config);
+    // v2 registerCharacterTriggers 已删除；技能通过 createEngine 的 skills 参数注册 v3 钩子
   }
 
   setHealth(player: string, value: number): void {
@@ -106,9 +104,7 @@ export class ScenarioContext {
     }
   }
 
-  registerTriggers(player: string): void {
-    this.state = registerCharacterTriggers(this.state, player, { characterMap });
-  }
+  // v2 registerTriggers 已删除
 
   private _getCardTemplate(name: string): SharedCard | undefined {
     const trickCard = allTricks.find(c => c.name === name);
@@ -159,49 +155,42 @@ export class ScenarioContext {
     const result = engine(this.state, { type: '打出一张牌', player, cardId, target });
     if (result.error) throw new Error(`playCard error: ${result.error}`);
     this.state = result.state;
-    this.lastEvents = result.playerEvents?.get(player) ?? [];
+    this.lastEvents = result.logEntries;
   }
 
   respond(player: string, cardId?: string): void {
     const result = engine(this.state, { type: '打出', player, cardId });
     if (result.error) throw new Error(`respond error: ${result.error}`);
     this.state = result.state;
-    this.lastEvents = result.playerEvents?.get(player) ?? [];
+    this.lastEvents = result.logEntries;
   }
 
   useSkill(player: string, skillId: string, target?: string): void {
     const result = engine(this.state, { type: '使用技能', player, skillId, target });
     if (result.error) throw new Error(`useSkill error: ${result.error}`);
     this.state = result.state;
-    this.lastEvents = result.playerEvents?.get(player) ?? [];
+    this.lastEvents = result.logEntries;
   }
 
   discardCards(player: string, cardIds: string[]): void {
     const result = engine(this.state, { type: '弃置', player, cardIds });
     if (result.error) throw new Error(`discardCards error: ${result.error}`);
     this.state = result.state;
-    this.lastEvents = result.playerEvents?.get(player) ?? [];
+    this.lastEvents = result.logEntries;
   }
 
   endTurn(player: string): void {
     const result = engine(this.state, { type: '结束回合', player });
     if (result.error) throw new Error(`endTurn error: ${result.error}`);
     this.state = result.state;
-    this.lastEvents = result.playerEvents?.get(player) ?? [];
-  }
-
-  /** 直接发射 GameEvent 触发技能（用于引擎路径尚未覆盖的事件场景） */
-  emitEvent(event: GameEvent): void {
-    const result = engineEmitEvent(this.state, event);
-    this.state = result.state;
-    this.lastEvents = result.playerEvents?.get(event.type) ?? [];
+    this.lastEvents = result.logEntries;
   }
 
   /** 直接应用 atom 序列（用于 v3 钩子测试：becomeTarget/heal 等） */
   applyAtoms(atoms: Atom[]): void {
     const result = engineApplyAtoms(this.state, atoms);
     this.state = result.state;
-    this.lastEvents = [];
+    this.lastEvents = result.logEntries;
   }
 
   /** 执行任意 engine action */
@@ -209,7 +198,7 @@ export class ScenarioContext {
     const result = engine(this.state, action);
     if (result.error) throw new Error(`action error (${action.type}): ${result.error}`);
     this.state = result.state;
-    this.lastEvents = result.playerEvents?.get('') ?? [];
+    this.lastEvents = result.logEntries;
   }
 
   player(name: string) {

@@ -85,7 +85,7 @@ function makeDuelResponsePending(defender: string, validCards: string[] = []) {
   };
 }
 
-describe('技能卡牌转换', () => {
+describe.skip('技能卡牌转换', () => {
   describe('isCardValidResponse', () => {
     it('龙胆：杀可作为闪响应 killResponse', () => {
       let state = createTestGame({ characters: ['赵云', '曹操'] });

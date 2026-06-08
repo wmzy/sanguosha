@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { createRng } from '../../shared/rng';
 
 export function register() {
@@ -20,12 +19,6 @@ export function register() {
         zones: { deck: [...state.zones.deck, ...shuffled], discardPile: [] },
         rngState: rng.getState(),
       };
-    },
-    toEvents(state: GameState, _atom: Atom & { type: '重洗' }): AtomEventResult {
-      const moved = state.zones.discardPile.length;
-      const server = makeServerEvent('重洗', { count: moved });
-      const owner = makePlayerEvent('重洗', { count: moved });
-      return [server, new Map(), owner];
     },
   });
 }

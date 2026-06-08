@@ -1,21 +1,9 @@
-import type { GameState, Atom, ServerEvent, PlayerEvent, PendingDyingWindow, EngineResult } from '../types';
+import type { GameState, Atom, PendingDyingWindow, EngineResult } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { applyAtoms } from '../atom';
 import { getPlayer, getAlivePlayerNames } from '../state';
-import { makeServerEvent } from '../event';
+import { makeLogEntry } from '../event';
 import { createPendingId } from '../atoms/pending';
-
-export function mergePlayerEvents(...maps: (Map<string, PlayerEvent[]> | undefined)[]): Map<string, PlayerEvent[]> {
-  const result = new Map<string, PlayerEvent[]>();
-  for (const map of maps) {
-    if (!map) continue;
-    for (const [player, events] of map) {
-      const existing = result.get(player) ?? [];
-      result.set(player, [...existing, ...events]);
-    }
-  }
-  return result;
-}
 
 export function applyDamage(
   state: GameState,
@@ -31,35 +19,31 @@ export function applyDamage(
     ...(source !== undefined ? { source } : {}),
     ...(cardId !== undefined ? { cardId } : {}),
   };
-  const { state: s, events: damageEvents, playerEvents: allPE } = applyAtoms(state, [damageAtom]);
-  const allEvents = [...damageEvents];
+  const { state: s, logEntries: damageLogEntries } = applyAtoms(state, [damageAtom]);
+  const allLogEntries = [...damageLogEntries];
 
   if (s.pending !== null) {
     const targetState = getPlayer(s, target);
     if (targetState.health <= 0 && targetState.info.alive) {
       s = { ...s, deferredDyingCheck: { player: target, source } };
     }
-    return { state: s, events: allEvents, playerEvents: allPE };
+    return { state: s, logEntries: allLogEntries };
   }
 
   const targetState = getPlayer(s, target);
   if (targetState.health <= 0 && targetState.info.alive) {
     const dyingPending = createDyingPending(s, target, source);
-    const { state: dyingState, events: dyingEvents, playerEvents: dyingPE } = applyAtoms(s, [
+    const { state: dyingState, logEntries: dyingLogEntries } = applyAtoms(s, [
       { type: '推入待定', action: dyingPending },
     ]);
-    const dyingEvent = makeServerEvent('濒死', {
-      player: target,
-      ...(source ? { source } : {}),
-    });
+    const dyingLogEntry = makeLogEntry({ type: '濒死', player: target, ...(source ? { source } : {}) } as unknown as Atom);
     return {
       state: dyingState,
-      events: [...allEvents, ...dyingEvents, dyingEvent],
-      playerEvents: mergePlayerEvents(allPE, dyingPE),
+      logEntries: [...allLogEntries, ...dyingLogEntries, dyingLogEntry],
     };
   }
 
-  return { state: s, events: allEvents, playerEvents: allPE };
+  return { state: s, logEntries: allLogEntries };
 }
 
 export function createDyingPending(state: GameState, dyingPlayer: string, _source?: string): PendingDyingWindow {
@@ -70,7 +54,7 @@ export function createDyingPending(state: GameState, dyingPlayer: string, _sourc
   const currentIdx = alivePlayers.indexOf(state.currentPlayer);
   const ordered = currentIdx >= 0
     ? [...alivePlayers.slice(currentIdx), ...alivePlayers.slice(0, currentIdx)]
-    : alivePlayers;
+    : [...alivePlayers];
   const others = ordered.filter(p => p !== dyingPlayer);
   const savers = [...others, dyingPlayer];
   return {

@@ -2,9 +2,9 @@
 //
 // 出闪则抵消，不出则受 1 点伤害。武将"裸衣"技能可造成 2 点伤害。
 
-import type { GameState, GameAction, EngineResult, Atom } from '../../types';
+import type { GameState, GameAction, EngineResult, Atom, PendingResponseWindow } from '../../types';
 import { getPlayer } from '../../state';
-import { makeServerEvent } from '../../event';
+import { makeLogEntry } from '../../event';
 import { applyAtoms } from '../../atom';
 import { applyDamage } from '../engine-utils';
 import { isCardValidResponse } from '../../validate';
@@ -12,29 +12,29 @@ import { isCardValidResponse } from '../../validate';
 export function resolveKillResponse(
   state: GameState,
   action: GameAction,
-  pending: import('../../types').PendingResponseWindow,
+  pending: PendingResponseWindow,
 ): EngineResult {
   if (action.type !== '打出') {
-    return { state, events: [], error: '杀响应窗口需要 respond 动作' };
+    return { state, logEntries: [], error: '杀响应窗口需要 respond 动作' };
   }
 
   const { attacker, defender } = pending.window;
   if (action.player !== defender) {
-    return { state, events: [], error: '只有被杀者可以响应' };
+    return { state, logEntries: [], error: '只有被杀者可以响应' };
   }
 
   // ── 出闪 → 闪避 ──
   if (action.cardId) {
     const defenderState = getPlayer(state, defender);
     if (defenderState.tags.includes('cannotDodge')) {
-      return { state, events: [], error: '铁骑判定生效，不能使用闪' };
+      return { state, logEntries: [], error: '铁骑判定生效，不能使用闪' };
     }
     const responder = getPlayer(state, defender);
     if (!responder.hand.includes(action.cardId)) {
-      return { state, events: [], error: '手牌中没有该卡牌' };
+      return { state, logEntries: [], error: '手牌中没有该卡牌' };
     }
     if (!isCardValidResponse(state, action.cardId, 'killResponse', defender)) {
-      return { state, events: [], error: '只能用闪（或可当闪使用的牌）响应杀' };
+      return { state, logEntries: [], error: '只能用闪（或可当闪使用的牌）响应杀' };
     }
 
     const requiredFlashCount = pending.window.requiredFlashCount ?? 1;
@@ -51,7 +51,7 @@ export function resolveKillResponse(
     if (requiredFlashCount > 1) {
       return {
         state,
-        events: [],
+        logEntries: [],
         error: '多闪响应（裸衣）暂未实现',
       };
     }
@@ -59,13 +59,10 @@ export function resolveKillResponse(
     const emitResult = applyAtoms(moveResult.state, [
       { type: '杀被闪避', attacker: attacker ?? '', defender },
     ]);
-    const dodgedEvent = makeServerEvent('杀被闪避', {
-      attacker: attacker ?? '',
-      defender,
-    });
+    const dodgedLogEntry = makeLogEntry({ type: '杀被闪避', attacker: attacker ?? '', defender } as unknown as Atom);
     return {
       state: emitResult.state,
-      events: [...moveResult.events, dodgedEvent, ...emitResult.events],
+      logEntries: [...moveResult.logEntries, dodgedLogEntry, ...emitResult.logEntries],
     };
   }
 
@@ -78,7 +75,7 @@ export function resolveKillResponse(
     }
   }
 
-  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: '弹出待定' }]);
+  const { state: popState, logEntries: popLogEntries } = applyAtoms(state, [{ type: '弹出待定' }]);
   const damageResult = applyDamage(
     popState, defender, damageAmount,
     attacker ?? undefined, pending.window.sourceCard,
@@ -86,13 +83,10 @@ export function resolveKillResponse(
   const emitResult = applyAtoms(damageResult.state, [
     { type: '杀命中', attacker: attacker ?? '', defender },
   ]);
-  const hitEvent = makeServerEvent('杀命中', {
-    attacker: attacker ?? '',
-    defender,
-  });
+  const hitLogEntry = makeLogEntry({ type: '杀命中', attacker: attacker ?? '', defender } as unknown as Atom);
 
   return {
     state: emitResult.state,
-    events: [...popEvents, ...damageResult.events, hitEvent, ...emitResult.events],
+    logEntries: [...popLogEntries, ...damageResult.logEntries, hitLogEntry, ...emitResult.logEntries],
   };
 }

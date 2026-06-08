@@ -14,7 +14,7 @@ export function register() {
       if (phase.else) {
         return executePlan(state, phase.else, ctx);
       }
-      return { state, events: [] };
+      return { state, logEntries: [] };
     },
   });
 }

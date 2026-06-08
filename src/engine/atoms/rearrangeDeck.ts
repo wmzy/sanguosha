@@ -1,6 +1,5 @@
-import type { GameState, Atom, AtomEventResult } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 
 export function register() {
   registerAtom({
@@ -19,34 +18,6 @@ export function register() {
       const newDeck = [...topCardIds, ...remainingDeck, ...bottomCardIds];
 
       return { ...state, zones: { ...state.zones, deck: newDeck } };
-    },
-    toEvents(state: GameState, atom: Atom & { type: '整理牌堆' }): AtomEventResult {
-      const player = atom.player as string;
-      const topCardIds = atom.topCardIds as string[];
-      const bottomCardIds = atom.bottomCardIds as string[];
-
-      // 服务端完整事件（包含牌的具体信息）
-      const server = makeServerEvent('deckRearranged', {
-        player,
-        topCardIds,
-        bottomCardIds,
-      });
-
-      // 发动者可以看到牌堆顶和牌堆底分别是什么牌
-      const ownerEvent = makePlayerEvent('deckRearranged', {
-        player,
-        topCardIds,
-        bottomCardIds,
-      });
-
-      // 其他玩家只知道牌堆被重排了，看不到具体牌
-      const defaultEvent = makePlayerEvent('deckRearranged', {
-        player,
-        topCount: topCardIds.length,
-        bottomCount: bottomCardIds.length,
-      });
-
-      return [server, new Map([[player, ownerEvent]]), defaultEvent];
     },
   });
 }

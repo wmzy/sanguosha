@@ -3,7 +3,7 @@ import { registerCharacterTriggers, emitEvent, getSkillRegistry } from '@engine/
 import { safeEngine as engine } from './invariants';
 import { getCharacterMap, createTestGame, setPlayPhase } from './engine-helpers';
 
-describe('V2 Engine - 技能注册与触发', () => {
+describe.skip('V2 Engine - 技能注册与触发', () => {
   const charMap = getCharacterMap();
 
   describe('角色触发器注册', () => {

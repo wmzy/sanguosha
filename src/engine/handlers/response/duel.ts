@@ -15,7 +15,7 @@ export function resolveDuelResponse(
 ): EngineResult {
   const { defender, attacker, sourceCard } = pending.window;
   if (!attacker || !sourceCard) {
-    return { state, events: [], error: '决斗响应窗口缺少必要参数' };
+    return { state, logEntries: [], error: '决斗响应窗口缺少必要参数' };
   }
 
   const cardId = action.type === '打出' ? action.cardId : undefined;
@@ -23,11 +23,11 @@ export function resolveDuelResponse(
   if (cardId) {
     // 当前防守方出了杀 → 换对方继续出杀
     if (!isCardValidResponse(state, cardId, 'duelResponse', defender)) {
-      return { state, events: [], error: '只能用杀（或可当杀使用的牌）响应决斗' };
+      return { state, logEntries: [], error: '只能用杀（或可当杀使用的牌）响应决斗' };
     }
     const responder = getPlayer(state, defender);
     if (!responder.hand.includes(cardId)) {
-      return { state, events: [], error: '手牌中没有该卡牌' };
+      return { state, logEntries: [], error: '手牌中没有该卡牌' };
     }
 
     // 弃杀，弹掉当前窗口
@@ -69,16 +69,16 @@ export function resolveDuelResponse(
     ]);
     return {
       state: pushResult.state,
-      events: [...moveResult.events, ...pushResult.events],
+      logEntries: [...moveResult.logEntries, ...pushResult.logEntries],
     };
   }
 
   // 没出杀 → 当前防守方受 1 点伤害
-  const { state: popState, events: popEvents } = applyAtoms(state, [{ type: '弹出待定' }]);
+  const { state: popState, logEntries: popLogEntries } = applyAtoms(state, [{ type: '弹出待定' }]);
   const damageResult = applyDamage(popState, defender, 1, attacker, sourceCard);
 
   return {
     state: damageResult.state,
-    events: [...popEvents, ...damageResult.events],
+    logEntries: [...popLogEntries, ...damageResult.logEntries],
   };
 }

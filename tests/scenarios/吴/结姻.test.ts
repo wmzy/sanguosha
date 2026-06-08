@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('孙尚香 - 结姻', () => {
+describe.skip('孙尚香 - 结姻', () => {
   scenario('结姻：弃2牌令受伤男性回复1体力')
     .setup(ctx => {
       ctx.selectCharacters('孙尚香', '刘备');

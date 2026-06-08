@@ -6,7 +6,7 @@
 //
 // 设计依据：docs/decisions/0012-unified-apply-atoms.md
 
-import type { SkillPhase, GameState, SkillContext, EngineResult, ServerEvent, Atom } from '../types';
+import type { SkillPhase, GameState, SkillContext, EngineResult, AtomLogEntry, Atom } from '../types';
 import { getAtomDef, applyAtoms } from '../atom';
 import { registerPhase } from '../phase';
 import { resolve } from '../expr';
@@ -33,7 +33,7 @@ export function register() {
     type: 'atoms',
     execute(state: GameState, phase: AtomsPhase, ctx: SkillContext, _plan: SkillPhase[], _index: number): EngineResult {
       let s = state;
-      const events: ServerEvent[] = [];
+      const logEntries: AtomLogEntry[] = [];
 
       for (const rawAtom of phase.ops) {
         const atom = resolveExprFields(rawAtom, s, ctx);
@@ -46,9 +46,9 @@ export function register() {
         const hadPending = s.pending !== null;
         const result = applyAtoms(s, [atom], { skipPlayerEvents: true });
         s = result.state;
-        events.push(...result.events);
+        logEntries.push(...result.logEntries);
         // 只有新产生的 pending 才中断（与 executePlan 的 hadPendingOnEntry 逻辑一致）
-        if (!hadPending && s.pending !== null) return { state: s, events };
+        if (!hadPending && s.pending !== null) return { state: s, logEntries };
 
         const def = getAtomDef(atom.type);
         if (def.getResult) {
@@ -58,7 +58,7 @@ export function register() {
 
       }
 
-      return { state: s, events };
+      return { state: s, logEntries };
     },
   });
 }

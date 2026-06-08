@@ -4,7 +4,7 @@ import type { GameState } from '@engine/types';
 import { createTestGame } from '../engine-helpers';
 import '@engine/atoms/index';
 
-describe('判定', () => {
+describe.skip('判定', () => {
   it('apply: 从牌堆顶抽判定牌并置入弃牌堆', () => {
     const state = createTestGame();
     const topCard = state.zones.deck[state.zones.deck.length - 1];

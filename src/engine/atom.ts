@@ -2,46 +2,26 @@
 //
 // 唯一修改 GameState 的通道。`applyAtoms` 是**所有** atom 序列应用的
 // 单入口（Phase 10a）：handler 层和技能层（phases/atoms）都走这个函数。
-// serverLog 写入、playerEvents 派生、playerLogs 增长 全部由 `applyAtoms`
-// 内部完成，调用方不再手工 `atomToEvents` + `applyAtom`。
 //
-// 不变量：每个 atom 应用后必产生 1 个 server event 进 state.serverLog。
-//
-// Phase 10b：在 applyAtoms 内部集成 onBefore/onAfter 钩子（engine/skill-hook）。
-// - onBefore 支持 cancel（跳过 atom）/ replace（用新 atom 替代）/ modifyState
-// - onAfter 支持 additionalAtoms（递归 applyAtoms）/ modifyState
-//
-// 设计依据：docs/decisions/0012-unified-apply-atoms.md
-//           docs/decisions/0013-phase-begin-end-atoms.md
-// Phase 10c：在 applyAtoms 内部集成 ATOM_GAME_EVENTS 自动 emitEvent，
-// 消除手工 emitEvent 调用。atom 应用后检查映射表，自动派发 GameEvent 给 v2 技能。
-
+// atom-as-event：serverLog 存 AtomLogEntry（resolved atom + id/timestamp），
+// 不再经过 ServerEvent 中间层。重放直接循环 applyAtom。
 
 import type {
   GameState,
   Atom,
   AtomDefinition,
-  AtomEventResult,
-  PlayerEvent,
-  ServerEvent,
+  AtomLogEntry,
+  AtomPlayerViews,
 } from './types';
-import { ATOM_GAME_EVENTS } from './atom-game-events';
-import { emitEvent } from './skill';
-import { getAtomHooks, filterHooksByPlayer, registerAtomHook, clearAtomHooks, HookRegistry } from './skill-hook';
+import { HookRegistry, registerAtomHook, clearAtomHooks, getAtomHooks, filterHooksByPlayer } from './skill-hook';
+import { makeLogEntry } from './event';
 
 const registry = new Map<string, AtomDefinition>();
 
-/**
- * 重置 atom 定义注册表。
- *
- * @deprecated 自 2026-06-06 改用 `createTestEngine().clearForTest()` 代替。
- * `clearForTest()` 不重置 atom registry（atom 定义静态不变），
- * 多数测试不需要重调 `registerAllAtoms()`。详见 ADR 0018。
- */
 export function clearAtomRegistry(): void {
   registry.clear();
 }
-// 重新导出 skill-hook API：测试与新技能都从 @engine/atom 单入口引入
+// 重新导出：atom 定义文件和测试从 @engine/atom 单入口引入
 export { registerAtomHook, clearAtomHooks };
 
 export function registerAtom<A>(def: AtomDefinition<A>): void {
@@ -59,10 +39,6 @@ export function getAtomDef(type: string): AtomDefinition {
 
 export function applyAtom(state: GameState, atom: Atom): GameState {
   return getAtomDef(atom.type).apply(state, atom);
-}
-
-export function atomToEvents(state: GameState, atom: Atom): AtomEventResult {
-  return getAtomDef(atom.type).toEvents(state, atom);
 }
 
 export interface ApplyAtomsOptions {
@@ -86,15 +62,15 @@ export interface ApplyAtomsOptions {
 
 export interface ApplyAtomsResult {
   state: GameState;
-  events: ServerEvent[];
-  playerEvents: Map<string, PlayerEvent[]>;
+  logEntries: AtomLogEntry[];
+  playerViews: Map<string, Atom[]>;
 }
 
 /** 防止 onAfter.additionalAtoms 递归钩子无限循环 */
 const MAX_HOOK_RECURSION = 16;
 
 /**
- * 统一入口：应用 atom 序列，写 serverLog / 派 playerEvents（如未跳过）。
+ * 统一入口：应用 atom 序列，写 serverLog（AtomLogEntry）/ 派 playerViews（如未跳过）。
  *
  * 这是**所有** atom 应用的唯一通道。`phases/atoms`（技能内部）通过
  * `opts.skipPlayerEvents: true` 复用同一路径，serverLog 仍正常写入。
@@ -107,19 +83,23 @@ const MAX_HOOK_RECURSION = 16;
  * 当前正在 dispatch 的 engine instance 闭包 hookRegistry。
  * 由 `createEngine().dispatch()` 入口设置，退出时清空。
  * 值为 `null` 表示无活跃 engine（fallback 到全局 defaultRegistry）。
- *
- * Phase 5 P2-1：让 `applyAtoms(state, atoms)` 不传 opts 也能命中
- * engine 闭包的 hooks，无需改造 ~80 个 handler 调用点。
  */
 let currentEngineHooks: HookRegistry | null = null;
 
 /**
  * 由 createEngine() 在 dispatch 入口调用，注入闭包 hooks。
- * 内部 API，仅 create-engine.ts 使用。
  * @internal
  */
 export function _setCurrentEngineHooks(hooks: HookRegistry | null): void {
   currentEngineHooks = hooks;
+}
+
+/**
+ * 获取 atom 的 per-player 可见性分叉。
+ * 无 toPlayerViews 或返回 undefined → 无分叉（所有人看到同一个 atom）。
+ */
+function resolvePlayerViews(state: GameState, atom: Atom): AtomPlayerViews | undefined {
+  return getAtomDef(atom.type).toPlayerViews?.(state, atom);
 }
 
 export function applyAtoms(
@@ -128,10 +108,6 @@ export function applyAtoms(
   opts: ApplyAtomsOptions = {},
   _recursionDepth = 0,
 ): ApplyAtomsResult {
-  // 选择 hooks 源（优先级）：
-  // 1. opts.hooks（显式传）— 单元测试 / 特定路径
-  // 2. currentEngineHooks（活跃 engine 闭包）— createEngine() dispatch
-  // 3. 全局 defaultRegistry（fallback）— 单实例环境 / 老代码路径
   const hookReg = opts.hooks ?? currentEngineHooks;
 
   function resolveHooks(atomType: string) {
@@ -140,19 +116,19 @@ export function applyAtoms(
   }
 
   if (atoms.length === 0) {
-    return { state, events: [], playerEvents: new Map() };
+    return { state, logEntries: [], playerViews: new Map() };
   }
   if (_recursionDepth > MAX_HOOK_RECURSION) {
     throw new Error('applyAtoms: hook recursion depth exceeded');
   }
 
-  const playerEvents = new Map<string, PlayerEvent[]>();
+  const playerViews = new Map<string, Atom[]>();
   for (const player of state.playerOrder) {
-    playerEvents.set(player, []);
+    playerViews.set(player, []);
   }
 
   let s = state;
-  const events: ServerEvent[] = [];
+  const logEntries: AtomLogEntry[] = [];
   let aborted = false;
 
   for (const rawAtom of atoms) {
@@ -168,14 +144,12 @@ export function applyAtoms(
         const result = hook.onBefore?.({ state: s, atom, self });
         if (!result) continue;
         if (result.cancel) {
-          // 跳过该 atom：不派 server event、不 apply、playerEvents 也不动
           atom = null as unknown as Atom;
           break;
         }
         if (result.atom) atom = result.atom;
         if (result.state) s = result.state;
         if (result.redirect && (atom.type === '造成伤害' || atom.type === '成为目标')) {
-          // 改写目标（"目标转移"机制：天香/流离/借刀）。新建 atom 避免污染原对象。
           atom = { ...atom, target: result.redirect };
         }
       }
@@ -183,28 +157,36 @@ export function applyAtoms(
 
     if (atom === (null as unknown as Atom)) continue;
 
-    const [serverEvent, playerMap, defaultEvent] = atomToEvents(s, atom);
-    events.push(serverEvent);
+    // ── 生成 AtomLogEntry 写入 serverLog ──
+    const logEntry = makeLogEntry(atom);
+    logEntries.push(logEntry);
 
     if (!opts.skipPlayerEvents) {
+      const views = resolvePlayerViews(s, atom);
       const updatedPlayerLogs = { ...s.playerLogs };
       for (const player of s.playerOrder) {
-        const specific = playerMap.get(player);
-        const evt = specific ?? defaultEvent;
-        if (evt) {
-          playerEvents.get(player)!.push(evt);
-          updatedPlayerLogs[player] = [...(updatedPlayerLogs[player] ?? []), evt.id];
+        let playerAtom: Atom | null;
+        if (views) {
+          const [ownerViews, defaultView] = views;
+          playerAtom = ownerViews.get(player) ?? defaultView;
+        } else {
+          // 无分叉：所有人看到同一个 atom
+          playerAtom = atom;
+        }
+        if (playerAtom) {
+          playerViews.get(player)!.push(playerAtom);
+          updatedPlayerLogs[player] = [...(updatedPlayerLogs[player] ?? []), logEntry.id];
         }
       }
       s = {
         ...s,
-        serverLog: [...s.serverLog, serverEvent],
+        serverLog: [...s.serverLog, logEntry],
         playerLogs: updatedPlayerLogs,
       };
     } else {
       s = {
         ...s,
-        serverLog: [...s.serverLog, serverEvent],
+        serverLog: [...s.serverLog, logEntry],
       };
     }
 
@@ -216,11 +198,10 @@ export function applyAtoms(
       const self = s.currentPlayer;
       for (const hook of playerHooks) {
         if (hook.filter && !hook.filter(s, atom, self)) continue;
-        const result = hook.onAfter?.({ state: s, atom, self, serverEvent });
+        const result = hook.onAfter?.({ state: s, atom, self, logEntry });
         if (!result) continue;
         if (result.state) s = result.state;
         if (result.additionalAtoms && result.additionalAtoms.length > 0) {
-          // 递归应用 additionalAtoms（不再次触发 onAfter，避免无限递归）
           const sub = applyAtoms(
             s,
             result.additionalAtoms,
@@ -228,42 +209,17 @@ export function applyAtoms(
             _recursionDepth + 1,
           );
           s = sub.state;
-          events.push(...sub.events);
+          logEntries.push(...sub.logEntries);
           if (!opts.skipPlayerEvents) {
-            // 合并 playerEvents
-            for (const [player, evts] of sub.playerEvents) {
-              const existing = playerEvents.get(player);
-              if (existing) existing.push(...evts);
+            for (const [player, views] of sub.playerViews) {
+              const existing = playerViews.get(player);
+              if (existing) existing.push(...views);
             }
-          }
-        }
-      }
-    }
-    // ── ATOM_GAME_EVENTS：自动派发 GameEvent 给 v2 技能 ──
-    // 在 onAfter 钩子之后执行，保持 v3 钩子优先、v2 技能兼容。
-    if (!opts.skipHooks) {
-      const eventGen = ATOM_GAME_EVENTS[atom.type];
-      if (eventGen) {
-        const gameEvents = eventGen(s, atom);
-        for (const ge of gameEvents) {
-          const emitResult = emitEvent(s, ge);
-          s = emitResult.state;
-          events.push(...emitResult.events);
-          if (!opts.skipPlayerEvents && emitResult.playerEvents) {
-            for (const [player, evts] of emitResult.playerEvents) {
-              const existing = playerEvents.get(player);
-              if (existing) existing.push(...evts);
-            }
-          }
-          if (s.pending !== null) {
-            // emitEvent 产生了 pending（技能需要玩家输入），停止处理
-            aborted = true;
-            break;
           }
         }
       }
     }
   }
 
-  return { state: s, events, playerEvents };
+  return { state: s, logEntries, playerViews };
 }

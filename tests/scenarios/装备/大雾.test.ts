@@ -22,7 +22,7 @@ describe('大雾（防 non-thunder 真 game rule）', () => {
 
   it('装备大雾受 normal 伤害时，cancel 整个链（无伤害、不写 server event）', () => {
     const s0 = setHealth(withArmor(createTestGame(), 'P1', '大雾'), 'P1', 4);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'normal' },
     ]);
     expect(state.players.P1.health).toBe(4);
@@ -31,7 +31,7 @@ describe('大雾（防 non-thunder 真 game rule）', () => {
 
   it('装备大雾受 fire 伤害时，cancel 整个链（无伤害、不写 server event）', () => {
     const s0 = setHealth(withArmor(createTestGame(), 'P1', '大雾'), 'P1', 4);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'fire' },
     ]);
     expect(state.players.P1.health).toBe(4);
@@ -40,10 +40,10 @@ describe('大雾（防 non-thunder 真 game rule）', () => {
 
   it('大雾对 thunder 伤害不生效（thunder 穿透大雾）', () => {
     const s0 = setHealth(withArmor(createTestGame(), 'P1', '大雾'), 'P1', 4);
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '造成伤害', target: 'P1', amount: 1, source: 'P2', damageType: 'thunder' },
     ]);
     expect(state.players.P1.health).toBe(3);
-    expect(events.some((e) => e.type === '造成伤害')).toBe(true);
+    expect(events.some((e) => e.atom.type === '造成伤害')).toBe(true);
   });
 });

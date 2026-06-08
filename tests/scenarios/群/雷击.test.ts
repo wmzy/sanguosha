@@ -203,7 +203,7 @@ describe('雷击（张角）v3 钩子骨架 — 真 game rule 占位', () => {
         },
       },
     };
-    const { state, events } = applyAtoms(s1, [
+    const { state, logEntries: events } = applyAtoms(s1, [
       {
         type: '造成伤害',
         target: 'P1',
@@ -216,8 +216,8 @@ describe('雷击（张角）v3 钩子骨架 — 真 game rule 占位', () => {
     // 默认 P1 health=4，受 3 点伤害后 health=1
     expect(state.players.P1.health).toBeLessThan(4);
     // server event payload 必须包含 `type: 'thunder'`（damage atom 对外协议）
-    const dmg = events.find((e) => e.type === '造成伤害');
+    const dmg = events.find((e) => e.atom.type === '造成伤害');
     expect(dmg).toBeDefined();
-    expect(dmg?.payload).toMatchObject({ type: 'thunder' });
+    expect(dmg?.atom).toMatchObject({ damageType: 'thunder' });
   });
 });

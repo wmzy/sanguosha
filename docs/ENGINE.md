@@ -10,10 +10,10 @@
 
 ### 0.1 测试
 
-- 总测试：**1453**（含 `it.skip` / `describe.skip` 占位）
-- 通过：**1413**
-- 跳过：**40**
-- 失败：**0** ✅
+- 总测试：**1460**（含 `it.skip` / `describe.skip` 占位）
+- 通过：**90**（v2 引擎清理后 scenario 测试需迁移，预期失败 83）
+- 跳过：**16**
+- 失败：**83** 🟡（v2 API 已删除，测试引用 `registerCharacterTriggers`/`emitEvent` 待迁移）
 - 测试目录：`tests/{unit,integration,server,scenarios,hooks,api,e2e,engine,atoms}/`
 ### 0.2 实现状态总览
 
@@ -33,14 +33,14 @@
 - P2：5 Task / 5 commits / 1385 tests pass
 - P3：4 Task / 4 commits / 1404 tests pass
 - P4（解耦重构）：4 commit / 1412 tests pass — 56 角色单文件、装备独立、createEngine 闭包 + clearForTest、currentEngineHooks fallback。详见 ADR 0013、0018
-- P5（ATOM_GAME_EVENTS 自动派发）：`applyAtoms` 内集成 ATOM_GAME_EVENTS 自动 emitEvent；删除 phase-advance/engine-utils/phases-atoms 中 7 处手工 emitEvent；扩展映射（阶段开始/阶段结束/回合开始）。1413 tests pass
+- P5（v2 引擎清理）：删除 `atom-game-events.ts`/`context.ts`/`phases/emit.ts`；清理 `skill.ts`/`skill-hook.ts`/`atom.ts`/`create-engine.ts`/`card-handlers.ts`/`session.ts`/`persistence.ts` 中 v2 引用；`SkillDef.trigger`/`handler`/`TriggerRule`/`TriggerSpec`/`GameEvent` 类型已删除。83 scenario 测试失败（引用已删除 API，待迁移）。148 编译错误限于孤立技能文件
 ### 0.3 已知文档/代码不一致
 
 - **技能转换硬编码**：`src/engine/validate.ts:73-119` 倾国/龙胆/武圣/奇才 的"手牌当 X 出" 写死，**validate 不该知道技能**。🟡（P1-1D-T1 迁移部分：武圣/龙胆/倾国已迁 `SkillDef.convertible` 字段，奇才留 stub）
 - **八卦阵 var 不读**：P1-1D-T2 写 v3 registerAtomHook 兜底 cancel；P2-T4 改为读 `ctx.baguaJudgeResult`；P3-T2 加 useCard 阶段判定注入（真 game rule）✅ 修复
 - **4 个武器空 stub**：P1-1D-T3/1D-T4 修完（青釭剑/仁王盾/丈八蛇矛/方天画戟 v3 registerAtomHook 骨架）✅ 修复
 - **触发器 `phase` 字段**：P1-1E-T2 修完（所有事件类型都检查 phase）✅ 修复
-- **三套钩子系统**：🟡 部分统一（v2 `emitEvent` 手工调用从 11 处降至 4 处）。`applyAtoms` 现在通过 `ATOM_GAME_EVENTS` 自动派发 `造成伤害`/`回复体力`/`阶段开始`/`阶段结束`/`回合开始` GameEvent 给 v2 技能。剩余 4 处手工 `emitEvent`（`出牌`/`杀命中`/`杀被闪避`/`回合结束`）待 38+ 技能迁移后统一删除。详见 §4.5。
+- **v2 钩子系统已删除**：✅ `emitEvent`/`registerCharacterTriggers`/`registerEquipmentTriggers`/`ATOM_GAME_EVENTS`/`TriggerRule`/`TriggerSpec`/`GameEvent` 全部移除。v3 `registerAtomHook` 是唯一钩子机制。83 scenario 测试引用已删除 API，待测试迁移后修复。详见 §4.5。
 - **判定牌取错位置**：P1-1E-T1 修完（`localVars.judgeCardId`）✅ 修复
 - **draw 重洗未 emit 事件**：✅ P0 修复（ADR 0014，commit `364eb4a`）
 
@@ -227,8 +227,7 @@ registerAtomHook({
 
 **🔮 P5 异步钩子**（ADR 0025）：`onBefore`/`onAfter` 改 `async function`，可 `await pending(...)` 挂起等玩家响应。PoC 骨架已合入（`src/engine/async-hook.ts` / `atom-async.ts` / `async-engine.ts`），但测试失败、未激活。详见 [§0.3.2](#032-p5-异步钩子-pocadr-0025-测试失败)。
 
-**v3-only skill 写法**（commit `d90be01`）：`SkillDef.trigger` 已改为 optional（`src/engine/types.ts:390`）。v3 钩子驱动的技能可不填 `trigger` 字段。完全迁移前的过渡做法是填占位 `trigger.event: 'v3HookOnly'` —— 不在 GameEvent union 中，v2 `emitEvent` 永不触发；但 `state.triggers` 仍命中以支持 v2 `targetHasSkill` 验证路径（`src/engine/validate.ts:61-63 hasEmptyCityShield` 等）。4 处 registerTriggers 路径加 `if (!def.trigger) return state/continue` 防御性保护。
-
+**v3-only skill 写法**：`SkillDef.trigger` 和 `SkillDef.handler` 已删除。所有技能通过 `SkillDef.registerHooks` 注册 v3 钩子。未迁移的孤立技能文件（`src/engine/skills/英魂.ts` 等 15 个）因引用已删除字段而有编译错误，需迁移或删除。
 ## 1.4 SkillPhase 控制流
 
 7 种（`src/engine/types.ts:342-350`）：
@@ -524,32 +523,63 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 
 **修复方向**：每个事件类型的 phase 检查都加分支。
 
-## 4.5 三套钩子系统并存 — 🟡 部分统一
+## 4.5 钩子系统 — v2 已移除，v3 唯一活跃
 
-当前引擎同时存在 **3 套**技能机制：
+当前引擎存在 **2 套**技能机制（v2 已移除）：
 
 | 机制 | 位置 | 覆盖范围 | 状态 |
 |---|---|---|---|
-| v2 `trigger.event` + `emitEvent` | `src/engine/skill.ts` | 38+ 老技能 | 🟡 渐进迁移中 |
-| v3 同步 `registerAtomHook` | `src/engine/skill-hook.ts` | 11+ 新钩子（装备 + 空城/完杀/帷幕）| 🟢 活跃 |
+| v3 同步 `registerAtomHook` | `src/engine/skill-hook.ts` | 所有已迁移技能 + 装备 | 🟢 唯一活跃机制 |
 | P5 异步 `AsyncHook` + `pending()` | `src/engine/async-hook.ts` / `atom-async.ts` | 0（PoC 骨架）| 🔴 测试已通过，未激活 |
 
-**ATOM_GAME_EVENTS 自动派发**（2026-06-07）：
-`applyAtoms`（`src/engine/atom.ts`）现在在每个 atom 应用后自动检查 `ATOM_GAME_EVENTS` 映射表，对匹配的 atom 类型（`造成伤害`/`回复体力`/`阶段开始`/`阶段结束`/`回合开始`）自动调用 `emitEvent` 派发 GameEvent 给 v2 技能。这消除了 7 处手工 `emitEvent` 调用（`phase-advance.ts` 3 处、`engine-utils.ts` 1 处、`phases/atoms.ts` ATOM_GAME_EVENTS 手工调用）。
+**v2 已移除**（P5 清理，2026-06-08）：
+- `emitEvent`、`registerCharacterTriggers`、`registerEquipmentTriggers`、`unregisterEquipmentTriggers` 已从 `skill.ts` 删除
+- `ATOM_GAME_EVENTS` 桥接（`atom-game-events.ts`）已删除
+- `TriggerRule`、`TriggerSpec`、`GameEvent` 类型已从 `types.ts` 删除
+- `context.ts`（`buildSkillContext`）已删除
+- `phases/emit.ts` 已删除
+- `SkillDef.trigger` 和 `SkillDef.handler` 字段已删除
+- 引擎核心编译零错误；148 编译错误限于孤立技能文件（`src/engine/skills/` 中未迁移的 v2 技能定义）
 
-**共存规则**：
-- `applyAtoms` 先执行 v3 `registerAtomHook` 钩子（onBefore/onAfter），再通过 `ATOM_GAME_EVENTS` 自动调 v2 `emitEvent`
-- 4 处手工 `emitEvent` 保留（`card-handlers.ts` 出牌、`kill.ts` 杀命中/杀被闪避、`turn-handlers.ts` 回合结束）——这些事件没有对应 atom
-- v3 钩子的 `onBefore cancel` 会阻止 atom 执行，但不阻止 v2 `emitEvent`（因为 cancel 跳过 atom，而 `ATOM_GAME_EVENTS` 检查在 atom 之后）
-- pending 检查：`applyAtoms` 内 `aborted` 标志在 `ATOM_GAME_EVENTS` 产生 pending 时阻止后续 atom；`phases/atoms.ts` 用 `hadPending` 检查避免在已有 pending 的技能执行中误中断
-- P5 `applyAtomsAsync`（`src/engine/atom-async.ts`）是独立入口，不与 v2/v3 交叉
+**共存规则**（v2 删除后简化）：
+- `applyAtoms` 执行 v3 `registerAtomHook` 钩子（onBefore/onAfter），无 v2 回退
+- P5 `applyAtomsAsync`（`src/engine/atom-async.ts`）是独立入口，不与 v3 交叉
 
-**剩余工作**（v2 完全移除前）：
-- 38+ 老技能迁移到 `registerAtomHook`（按 [T-22] 渐进 PR）
-- 迁移完成后：删 `state.triggers` + `emitEvent` + 全局 registry + `TriggerRule` 类型
-- 4 处手工 `emitEvent` 调用要么扩展 `ATOM_GAME_EVENTS`（创建新 atom），要么直接删除（如果已无 v2 技能需要这些事件）
+**剩余工作**：
+- 孤立技能文件（`src/engine/skills/英魂.ts` 等 15 个）需迁移到 v3 `registerHooks` 模式或删除
+- 测试迁移：`scenario-runner.ts` 引用已删除的 `registerCharacterTriggers`/`emitEvent`，83 个 scenario 测试失败
 
 详见 [§0.3](#03-已知文档代码不一致) + [T-25](#5-决策档案要点)。
+
+### 4.5.1 atom-as-event：atom 替代 ServerEvent（规划中）
+
+> 类型定义已合入（`AtomLogEntry`、`AtomPlayerViews`、`AtomDefinition.toPlayerViews`），
+> 运行时迁移见 `docs/superpowers/plans/2026-06-08-atom-as-event.md`。
+
+**问题**：每个 atom 定义了 `toEvents()` + `apply()` 两个函数。`toEvents` 从 atom 参数生成 `ServerEvent`（写入 serverLog），`apply` 修改 state。重放时 `applyGameStateEvent()` 把 `ServerEvent` 反向解析为状态变更——与 `apply()` 是**同一逻辑的第二个实现**。
+
+**方案**：serverLog 存 resolved atom + 元数据（`AtomLogEntry`），重放直接循环 `applyAtom`。
+
+```
+旧：atom → toEvents() → ServerEvent → serverLog → applyGameStateEvent() → state（重复逻辑）
+新：atom → AtomLogEntry{ id, timestamp, atom } → serverLog → applyAtom() → state（复用唯一实现）
+```
+
+**可见性分叉**保留：`toPlayerViews()` 替代 `toEvents()` 的三元组，只管"谁看到什么"：
+- 摸牌：P1 看到牌面详情，其他人只看到 count
+- 获得：P1 看到卡牌详情，其他人只看到来源
+- 大部分 atom：无分叉，所有人看到同一个 atom（`toPlayerViews` 可不实现）
+
+**消除的重复**：
+- `view/reducer.ts` 的 `applyGameStateEvent`（~300 行）→ 删除，重放走 `applyAtom`
+- 每个 atom 的 `toEvents` → 简化为 `toPlayerViews`（默认实现可省略）
+- `makeServerEvent` / `makePlayerEvent` → 改为 `makeLogEntry`
+
+**不改的**：
+- `applyAtom` 内部逻辑不变
+- Expr resolve 时机不变（apply 前已 resolve，存入 AtomLogEntry 的已是具体值）
+- 客户端渲染 switch-case 从 `event.type + payload` 改为 atom 字段匹配（机械重构）
+
 
 ## 4.6 判定牌取错位置
 
@@ -585,19 +615,16 @@ if (def.trigger.phase && event.type === 'phaseBegin' && event.phase !== def.trig
 * leijiPending：未实施（雷击占位真 game rule 完整判定需此 Mark）
 
 
+## 4.9 全局单例 vs 闭包隔离 — v2 已清理
 
-## 4.9 全局单例 vs 闭包隔离 — 混合模式
-
-`createEngine()` 设计上创建闭包内独立的 `hookRegistry` + `skillsMap`，但实际运行时存在两条路径交叉：
+`createEngine()` 创建闭包内独立的 `hookRegistry` + `skillsMap`。v2 清理后：
 
 - ✅ `applyAtoms` 内部：先查 `_setCurrentEngineHooks()` 注入的闭包 hooks，回退全局 `defaultRegistry`
-- 🟡 `validate.ts`：`getSkill()` 查全局 registry（`src/engine/skill.ts`），**不查 `skillsMap`**——验证逻辑始终走全局状态
-- 🟡 `skill.ts:emitEvent`：`getSkill()` 走全局；`skillsMap` 参数虽已透传但多数调用路径不传
-- 🟡 `registerCharacterTriggers` / `registerEquipmentTriggers`：同时写 `state.triggers`（v2）和 `PlayerState.skills`（v3），但注册来源是全局 `getSkillRegistry()`
+- ✅ `validate.ts`：`getSkill()` 走全局 registry（`src/engine/skill.ts`）
+- ~~`skill.ts:emitEvent`~~：已删除
+- ~~`registerCharacterTriggers` / `registerEquipmentTriggers`~~：已删除
 
-**风险**：多 `createEngine` 实例并发时，validate 和 emitEvent 会读到另一个实例注册的技能。当前只有测试场景会触发，生产环境单实例不受影响。
-
-**修复方向**：validate / emitEvent 接受 `skillsMap` 参数（或通过 `_setCurrentEngineHooks` 机制注入），彻底脱离全局 registry。
+**剩余风险**：多 `createEngine` 实例并发时，validate 会读到另一个实例注册的技能。生产环境单实例不受影响。
 
 ## 4.10 双引擎并存（createEngine + createAsyncEngine）
 
@@ -778,6 +805,7 @@ this.asyncEngine = createAsyncEngine({ asyncHooks: new AsyncHookRegistry() }); /
 | [0013](./decisions/0013-skill-character-decouple.md) | 技能/角色/装备解耦 | **架构**：engine/{characters,skills,equipment} 分层（56 单文件、equipment 独立目录）|
 | [0018](./decisions/0018-deprecated-test-apis.md) | 废弃全局测试 API | 测试从 `clearXxx()` 迁到 `engine.clearForTest()`；`currentEngineHooks` 实现多实例隔离 |
 | [0025](./decisions/0025-async-hooks.md) | 异步钩子（v3 引擎终态）| 🔴 PoC 骨架已合入，测试失败；onBefore/onAfter 改 async + `pending()` 挂起；详见 [§0.3.2](#032-p5-异步钩子-pocadr-0025-测试失败) |
+| [0026](./decisions/0026-unified-engine-architecture.md) | 统一引擎架构：技能编排 + Atom 执行 + 栈驱动 | **提案**：消除 GameAction/card-handlers，牌=令牌，使用牌=技能，validate 下放，栈驱动执行 |
 **未来 ADR 候选**：
 - Mark 体系（[T-05/T-07](#5-决策档案要点)）
 - 钩子迁移 38+ 技能策略（[T-25](#5-决策档案要点)）
@@ -793,17 +821,15 @@ this.asyncEngine = createAsyncEngine({ asyncHooks: new AsyncHookRegistry() }); /
 | 状态机入口 | `src/engine/create-engine.ts:createEngine` → `engine.dispatch(state, action)` |
 | 统一 atom 入口 | `src/engine/atom.ts:applyAtoms` |
 | 异步 atom 入口 | `src/engine/atom-async.ts:applyAtomsAsync`（🔴 P5 PoC，未激活）|
-| Skill registry | `src/engine/skill.ts`（v2 全局，已 `@deprecated`）|
+| Skill registry | `src/engine/skill.ts`（`registerSkill` + `getSkill` + `clearTurnVars`）|
 | 引擎实例 | `src/engine/create-engine.ts:createEngine` 返回 `EngineInstance` |
 | 异步引擎实例 | `src/engine/async-engine.ts:createAsyncEngine` 返回 `AsyncEngineInstance`（🔴 P5 PoC）|
 | 钩子注册（v3 同步）| `src/engine/skill-hook.ts:HookRegistry` / `applyAtoms(_setCurrentEngineHooks)` 机制 |
 | 钩子注册（P5 异步）| `src/engine/async-hook.ts:AsyncHookRegistry`（🔴 PoC）|
 | 钩子 helpers | `src/engine/hook-helpers.ts:pending()` / `cancel()` / `redirect()`（🔴 PoC）|
 | 阶段推进 | `src/engine/phase-advance.ts` |
-| 触发器 | `src/engine/skill.ts:emitEvent`（🟡 老）|
 | 重放 | `src/engine/replay.ts` + `src/engine/view/reducer.ts` |
 | 服务端 | `src/server/session.ts`（同时持有 `gameEngine` + `asyncEngine`）|
-
 ## 8.2 关键测试位置
 | 类别 | 路径 |
 |---|---|

@@ -17,7 +17,7 @@ describe('贾诩 - 完杀（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾不是 heal 事件（被 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).not.toBe('回复体力');
+      expect(last?.atom.type).not.toBe('回复体力');
     })
     .run();
 
@@ -36,7 +36,7 @@ describe('贾诩 - 完杀（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾是 heal 事件', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('回复体力');
+      expect(last?.atom.type).toBe('回复体力');
     })
     .run();
 
@@ -71,7 +71,7 @@ describe('贾诩 - 完杀（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾是 heal 事件（未被 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('回复体力');
+      expect(last?.atom.type).toBe('回复体力');
     })
     .run();
 
@@ -90,7 +90,7 @@ describe('贾诩 - 完杀（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾不是 heal 事件（被 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).not.toBe('回复体力');
+      expect(last?.atom.type).not.toBe('回复体力');
     })
     .run();
 
@@ -112,7 +112,7 @@ describe('贾诩 - 完杀（v3 registerAtomHook）', () => {
     })
     .check('serverLog 末尾是 heal 事件（未 cancel）', ctx => {
       const last = ctx.state.serverLog[ctx.state.serverLog.length - 1];
-      expect(last?.type).toBe('回复体力');
+      expect(last?.atom.type).toBe('回复体力');
     })
     .run();
 });

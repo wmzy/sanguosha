@@ -11,12 +11,11 @@
  * actions + phaseEnd + setPhase 序列，避免"xx阶段开始"和"yy阶段结束"乱序
  * （克己等强制跳阶段技能）。
  *
- * 注意：phaseBegin/phaseEnd atom 走 applyAtoms 写 serverLog 后，**必须**显式
- * 调 emitEvent 派 GameEvent 给技能钩子（38+ 技能监听 phaseBegin）。Phase 10b
- * 完成统一钩子后这里会简化。
+ * 注意：phaseBegin/phaseEnd atom 走 applyAtoms 写 serverLog 后，技能钩子
+ * 通过 registerAtomHook 监听对应 atom type 触发。
  */
 
-import type { GameState, ServerEvent, EngineResult, Atom, PendingPlayPhase, PendingTrick } from './types';
+import type { GameState, AtomLogEntry, EngineResult, Atom, PendingPlayPhase, PendingTrick } from './types';
 import { TIMEOUT_DEFAULTS } from './types';
 import type { TurnPhase } from '../shared/types';
 import { clearTurnVars } from './skill';
@@ -24,7 +23,7 @@ import { applyAtoms } from './atom';
 import { createPendingId } from './atoms/pending';
 import { getPlayer, getAlivePlayerNames } from './state';
 import { createConcurrentTrickResponse } from './handlers/response-handlers';
-import { makeServerEvent } from './event';
+import { makeAtomLogEntry } from './event';
 
 /**
  * 处理判定阶段的延迟锦囊（乐不思蜀、兵粮寸断）
@@ -33,7 +32,7 @@ function processJudgmentPhase(state: GameState, player: string): EngineResult {
   const playerState = getPlayer(state, player);
   const { pendingTricks } = playerState;
   if (pendingTricks.length === 0) {
-    return { state, events: [] };
+    return { state, logEntries: [] };
   }
 
   const aliveOthers = getAlivePlayerNames(state).filter((p) => p !== player);
@@ -52,7 +51,7 @@ function processJudgmentPhase(state: GameState, player: string): EngineResult {
     judgmentContext: { player, trickIndex: lastIndex },
   });
   const result = applyAtoms(state, [{ type: '推入待定', action: pending }]);
-  return { state: result.state, events: result.events };
+  return { state: result.state, logEntries: result.logEntries };
 }
 
 function batchProcessJudgments(state: GameState, player: string, tricks: PendingTrick[]): EngineResult {
@@ -84,10 +83,10 @@ function batchProcessJudgments(state: GameState, player: string, tricks: Pending
   if (tags.length > 0) {
     const tagAtoms = tags.map((tag) => ({ type: '加标签' as const, player, tag }));
     const tagResult = applyAtoms(s, tagAtoms);
-    return { state: tagResult.state, events: [...actionResult.events, ...tagResult.events] };
+    return { state: tagResult.state, logEntries: [...actionResult.logEntries, ...tagResult.logEntries] };
   }
 
-  return { state: s, events: actionResult.events };
+  return { state: s, logEntries: actionResult.logEntries };
 }
 
 export function isAutoPhase(phase: string): boolean {
@@ -97,50 +96,50 @@ export function isAutoPhase(phase: string): boolean {
 function processPhaseStep(state: GameState): EngineResult {
   const phase = state.phase;
   const player = state.currentPlayer;
-  const allEvents: ServerEvent[] = [];
+  const allEvents: AtomLogEntry[] = [];
   let s: GameState = state;
 
   // 1. phaseBegin atom（写 serverLog）—— ATOM_GAME_EVENTS 自动派发 GameEvent
   const beginResult = applyAtoms(s, [{ type: '阶段开始' as const, phase, player }]);
   s = beginResult.state;
-  allEvents.push(...beginResult.events);
-  if (s.pending !== null) return { state: s, events: allEvents };
+  allEvents.push(...beginResult.logEntries);
+  if (s.pending !== null) return { state: s, logEntries: allEvents };
 
   // 2. 阶段内 actions
   if (phase === '判定') {
     const judgmentResult = processJudgmentPhase(s, player);
     s = judgmentResult.state;
-    allEvents.push(...judgmentResult.events);
-    if (s.pending !== null) return { state: s, events: allEvents };
+    allEvents.push(...judgmentResult.logEntries);
+    if (s.pending !== null) return { state: s, logEntries: allEvents };
   } else {
     const phaseActions = getPhaseActions(s, phase, player);
     if (phaseActions.length > 0) {
       const actionResult = applyAtoms(s, phaseActions);
       s = actionResult.state;
-      allEvents.push(...actionResult.events);
+      allEvents.push(...actionResult.logEntries);
     }
-    if (s.pending !== null) return { state: s, events: allEvents };
+    if (s.pending !== null) return { state: s, logEntries: allEvents };
   }
 
   const nextPhase = getNextPhase(phase);
   if (!nextPhase || nextPhase === phase) {
-    return { state: s, events: allEvents };
+    return { state: s, logEntries: allEvents };
   }
 
   // 3. phaseEnd atom（写 serverLog）—— ATOM_GAME_EVENTS 自动派发 GameEvent
   const endResult = applyAtoms(s, [{ type: '阶段结束' as const, phase, player }]);
   s = endResult.state;
-  allEvents.push(...endResult.events);
-  if (s.pending !== null) return { state: s, events: allEvents };
+  allEvents.push(...endResult.logEntries);
+  if (s.pending !== null) return { state: s, logEntries: allEvents };
 
   // 4. setPhase atom: 切 state.phase 字段（写在 phaseEnd 之后避免乱序）
-  const { state: phaseState, events: phaseEvents } = applyAtoms(s, [
+  const { state: phaseState, logEntries: phaseLogEntries } = applyAtoms(s, [
     { type: '设阶段' as const, phase: nextPhase },
   ]);
   s = phaseState;
-  allEvents.push(...phaseEvents);
+  allEvents.push(...phaseLogEntries);
 
-  return { state: s, events: allEvents };
+  return { state: s, logEntries: allEvents };
 }
 
 function getPhaseActions(state: GameState, phase: TurnPhase, player: string): Atom[] {
@@ -180,7 +179,7 @@ function shouldSkipPhase(state: GameState, phase: string, player: string): boole
 
 export function advanceToInteractivePhase(state: GameState): EngineResult {
   let s = state;
-  const allEvents: ServerEvent[] = [];
+  const allEvents: AtomLogEntry[] = [];
 
   // faceDown Mark 检查：玩家被翻面则跳过整回合（T-07 真 game rule）。
   // 与 shouldSkipPhase（skipPlay tag → 跳过出牌阶段）正交：faceDown 跳整回合。
@@ -199,8 +198,8 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
     // nextPlayer atom 已把 turnStarted 重置为 false（见 engine/atoms/phase.ts）；
     // 显式再写一次以防御未来重构。
     s = { ...skipResult.state, turn: { ...skipResult.state.turn, turnStarted: false } };
-    allEvents.push(...skipResult.events);
-    return { state: s, events: allEvents };
+    allEvents.push(...skipResult.logEntries);
+    return { state: s, logEntries: allEvents };
   }
 
   // turnStart 防重：依赖 state.turn.turnStarted: boolean（nextPlayer atom 重置为 false）
@@ -208,9 +207,9 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
   if (!s.turn.turnStarted) {
     const turnStartAtomResult = applyAtoms(s, [{ type: '回合开始', player: s.currentPlayer }]);
     s = { ...turnStartAtomResult.state, turn: { ...turnStartAtomResult.state.turn, turnStarted: true } };
-    allEvents.push(...turnStartAtomResult.events);
+    allEvents.push(...turnStartAtomResult.logEntries);
     if (s.pending !== null) {
-      return { state: s, events: allEvents };
+      return { state: s, logEntries: allEvents };
     }
   }
 
@@ -220,10 +219,10 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
     }
     const result = processPhaseStep(s);
     s = result.state;
-    allEvents.push(...result.events);
+    allEvents.push(...result.logEntries);
 
-    if (result.error) return { state: s, events: allEvents, error: result.error };
-    if (s.pending !== null) return { state: s, events: allEvents };
+    if (result.error) return { state: s, logEntries: allEvents, error: result.error };
+    if (s.pending !== null) return { state: s, logEntries: allEvents };
   }
 
   // 出牌阶段被乐不思蜀跳过 → 直接设置到弃牌阶段
@@ -234,7 +233,7 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
     ];
     const skipResult = applyAtoms(s, skipAtoms);
     s = skipResult.state;
-    allEvents.push(...skipResult.events);
+    allEvents.push(...skipResult.logEntries);
   }
 
   // 出牌阶段 → 创建 playPhase pending（带 deadline）
@@ -250,8 +249,8 @@ export function advanceToInteractivePhase(state: GameState): EngineResult {
     };
     const pushResult = applyAtoms(s, [{ type: '推入待定', action: playPending }]);
     s = pushResult.state;
-    allEvents.push(...pushResult.events);
+    allEvents.push(...pushResult.logEntries);
   }
 
-  return { state: s, events: allEvents };
+  return { state: s, logEntries: allEvents };
 }

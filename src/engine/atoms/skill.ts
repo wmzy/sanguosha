@@ -3,9 +3,8 @@
 // 外部 source 参数保留兼容（外部未传时不再走 CharacterMapSource 路径）。
 // 调用方 0 破坏：原子形参 { type, player, skillId, source? } 不变。
 
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 import { addSkillToPlayer } from '../mark';
 
 export function register() {
@@ -17,14 +16,6 @@ export function register() {
       // 幂等：玩家已有此技能则 no-op
       if (state.players[player]?.skills.includes(skillId)) return state;
       return addSkillToPlayer(state, player, skillId);
-    },
-    toEvents(state: GameState, atom: Atom & { type: '加技能' }): AtomEventResult {
-      const player = atom.player as string;
-      const skillId = atom.skillId;
-      const payload: Json = { player, skillId };
-      const server = makeServerEvent('加技能', payload);
-      const ownerEvent = makePlayerEvent('加技能', payload);
-      return [server, new Map([[player, ownerEvent]]), null];
     },
   });
 }

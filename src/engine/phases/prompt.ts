@@ -25,7 +25,7 @@ export function register() {
         deadline: Date.now() + timeout,
         onTimeout: { type: '技能选择', player: ctx.self, choice: phase.defaultChoice ?? null },
       };
-      return { state: { ...state, pending }, events: [] };
+      return { state: { ...state, pending }, logEntries: [] };
     },
   });
 }

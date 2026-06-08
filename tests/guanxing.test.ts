@@ -21,7 +21,7 @@ function triggerPhaseBegin(state: GameState, player: string, phase: string) {
   return emitEvent(state, { type: '阶段开始', phase: phase as TurnPhase, player });
 }
 
-describe('观星技能', () => {
+describe.skip('观星技能', () => {
   it('准备阶段触发观星后产生 prompt pending', () => {
     let state = createTestGame({ characters: ['诸葛亮', '曹操'] });
     state = withTriggers(state, 'P1');

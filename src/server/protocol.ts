@@ -1,4 +1,4 @@
-import type { GameAction, GameState, PlayerEvent, ServerEvent } from '../engine/types';
+import type { GameAction, GameState } from '../engine/types';
 import type { PlayerView, FrontendState } from '../engine/view/types';
 import type { Operation } from '../shared/log';
 
@@ -10,10 +10,17 @@ import type { Operation } from '../shared/log';
 export type EventSeq = number;
 
 /**
- * 一条广播事件的传输形态：在 ServerEvent 之上附加 seq。
- * seq 与 ServerEvent.id 不同：id 是 GameState 内部日志引用，seq 是协议层序号。
+ * 一条广播事件的传输形态：基于 AtomLogEntry 展平为 {id, type, timestamp, payload}，
+ * 附加 seq 协议层序号。type 从 entry.atom.type 提取，payload 直接持 atom 本身，
+ * 客户端拿到即可走 reducer（与原 ServerEvent 形态保持兼容）。
  */
-export type SequencedEvent = ServerEvent & { seq: EventSeq };
+export interface SequencedEvent {
+  id: string;
+  type: string;
+  timestamp: number;
+  payload: unknown;
+  seq: EventSeq;
+}
 
 export type ServerMessage =
   | { type: 'initialView'; state: FrontendState; lastSeq: EventSeq }

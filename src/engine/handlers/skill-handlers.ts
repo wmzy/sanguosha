@@ -5,9 +5,10 @@ import type {
   SkillContext,
   PendingSkillPrompt,
   SkillDef,
+  Atom,
 } from '../types';
 import { executePlan } from '../phase';
-import { makeServerEvent } from '../event';
+import { makeLogEntry } from '../event';
 
 export function resumeSkill(
   state: GameState,
@@ -16,10 +17,10 @@ export function resumeSkill(
   _skillRegistry: Map<string, SkillDef>,
 ): EngineResult {
   if (action.type !== '技能选择') {
-    return { state, events: [], error: '技能提示需要 skillChoice 动作' };
+    return { state, logEntries: [], error: '技能提示需要 skillChoice 动作' };
   }
   if (action.player !== pending.player) {
-    return { state, events: [], error: '只有技能发动者可以做选择' };
+    return { state, logEntries: [], error: '只有技能发动者可以做选择' };
   }
 
   const ctx: SkillContext = {
@@ -42,7 +43,7 @@ export function handleUseSkill(
   skillRegistry: Map<string, SkillDef>,
 ): EngineResult {
   const skill = skillRegistry.get(action.skillId);
-  if (!skill) return { state, events: [], error: `未知技能: ${action.skillId}` };
+  if (!skill) return { state, logEntries: [], error: `未知技能: ${action.skillId}` };
 
   const ctx: SkillContext = {
     skillId: action.skillId,
@@ -53,10 +54,7 @@ export function handleUseSkill(
 
   const phases = skill.handler(ctx, state);
   const planResult = executePlan(state, phases, ctx);
-  const activatedEvent = makeServerEvent('技能发动', {
-    player: action.player,
-    skillId: action.skillId,
-  });
+  const activatedLogEntry = makeLogEntry({ type: '技能发动', player: action.player, skillId: action.skillId } as unknown as Atom);
 
   // 记录技能使用
   const newState: GameState = {
@@ -67,5 +65,5 @@ export function handleUseSkill(
     },
   };
 
-  return { state: newState, events: [...planResult.events, activatedEvent] };
+  return { state: newState, logEntries: [...planResult.logEntries, activatedLogEntry] };
 }

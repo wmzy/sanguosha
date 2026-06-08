@@ -31,15 +31,15 @@ describe('judge atom §4.6 修：判定牌不读弃牌堆', () => {
       ...base,
       zones: { ...base.zones, discardPile: ['ghost1', 'ghost2'] },
     };
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '判定', player: 'P1' },
     ]);
     // 验证：判定牌来自 deck 顶（c3），不读 discardPile
     expect(state.localVars?.judgeCardId).toBe('c3');
     // toEvents payload 同步带 cardId
-    const judgeEvent = events.find(e => e.type === '判定');
+    const judgeEvent = events.find(e => e.atom.type === '判定');
     expect(judgeEvent).toBeDefined();
-    expect((judgeEvent!.payload as { cardId: string }).cardId).toBe('c3');
+    expect((judgeEvent!.atom as { cardId: string }).cardId).toBe('c3');
   });
 
   it('期间有其他 discard 操作，判定牌不被覆盖', () => {

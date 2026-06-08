@@ -50,13 +50,13 @@ describe('火杀 +1 伤害（真 game rule）', () => {
       ...s0,
       cardMap: { ...s0.cardMap, fireKill1: makeKill('fireKill1', '火杀') },
     };
-    const { state, events } = applyAtoms(s1, [useCard('P2', 'P1', 'fireKill1')]);
+    const { state, logEntries: events } = applyAtoms(s1, [useCard('P2', 'P1', 'fireKill1')]);
     // 期望：P1 受 2 点伤害（4 → 2）
     expect(state.players.P1.health).toBe(2);
-    const dmg = events.filter((e) => e.type === '造成伤害');
+    const dmg = events.filter((e) => e.atom.type === '造成伤害');
     expect(dmg).toHaveLength(1);
-    if (dmg[0]?.type === '造成伤害') {
-      expect(dmg[0].payload).toMatchObject({ amount: 2, type: 'fire' });
+    if (dmg[0]?.atom.type === '造成伤害') {
+      expect(dmg[0].atom).toMatchObject({ amount: 2, damageType: 'fire' });
     }
   });
 
@@ -66,10 +66,10 @@ describe('火杀 +1 伤害（真 game rule）', () => {
       ...s0,
       cardMap: { ...s0.cardMap, normalKill1: makeKill('normalKill1', '杀') },
     };
-    const { state, events } = applyAtoms(s1, [useCard('P2', 'P1', 'normalKill1')]);
+    const { state, logEntries: events } = applyAtoms(s1, [useCard('P2', 'P1', 'normalKill1')]);
     // 普通杀不触发 +1 钩子，无 damage atom 注入 → P1 health 不变
     expect(state.players.P1.health).toBe(4);
-    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(0);
+    expect(events.filter((e) => e.atom.type === '造成伤害')).toHaveLength(0);
   });
 
   it('source 用 subtype=fire（英文别名）→ 钩子也触发 → 目标受 2 点伤害', () => {
@@ -80,8 +80,8 @@ describe('火杀 +1 伤害（真 game rule）', () => {
       ...s0,
       cardMap: { ...s0.cardMap, fireKill2: makeKill('fireKill2', 'fire') },
     };
-    const { state, events } = applyAtoms(s1, [useCard('P2', 'P1', 'fireKill2')]);
+    const { state, logEntries: events } = applyAtoms(s1, [useCard('P2', 'P1', 'fireKill2')]);
     expect(state.players.P1.health).toBe(2);
-    expect(events.filter((e) => e.type === '造成伤害')).toHaveLength(1);
+    expect(events.filter((e) => e.atom.type === '造成伤害')).toHaveLength(1);
   });
 });

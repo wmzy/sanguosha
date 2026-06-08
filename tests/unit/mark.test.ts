@@ -20,12 +20,12 @@ describe('Mark 体系', () => {
   it('addMark 写入玩家 marks 列表', () => {
     const s0 = createTestGame();
     const mark: Mark = { id: 'faceDown:P1', scope: 'player', payload: { faceDown: true }, duration: 'untilTurnEnd' };
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '加标记', player: 'P1', mark },
     ]);
     expect(state.marks.P1).toHaveLength(1);
     expect(state.marks.P1[0]).toEqual(mark);
-    expect(events[0].type).toBe('加标记');
+    expect(events[0].atom.type).toBe('加标记');
   });
 
   it('removeMark 按 id 移除', () => {

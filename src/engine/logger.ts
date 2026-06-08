@@ -5,7 +5,7 @@
 //
 // 设计依据：docs/design/日志与重播设计.md
 
-import type { GameAction, GameState, ServerEvent, EquipSlot } from './types';
+import type { GameAction, GameState, Atom, AtomLogEntry, EquipSlot } from './types';
 import type { Operation, GameLog } from '../shared/log';
 
 const SLOT_LABELS: Record<EquipSlot, string> = {
@@ -24,13 +24,13 @@ function lookupCardName(state: GameState, cardId: string | undefined): string {
 // ── 单事件 → Operation（server 视角，含完整信息） ─────────────────────
 
 export function eventToServerOp(
-  event: ServerEvent,
+  event: AtomLogEntry,
   state: GameState,
 ): Operation | null {
-  const p = event.payload as Record<string, unknown>;
+  const p = event.atom as unknown as Record<string, unknown>;
   const ts = event.timestamp;
-
-  switch (event.type) {
+  const type = event.atom.type;
+  switch (type) {
     case '造成伤害': {
       const target = String(p.target ?? '');
       const amount = Number(p.amount ?? 0);
@@ -164,12 +164,13 @@ export function eventToServerOp(
 // ── 视角裁剪：单事件 → Operation（player 视角） ──────────────────────
 
 export function eventToPlayerOp(
-  event: ServerEvent,
+  event: AtomLogEntry,
   state: GameState,
   playerName: string,
 ): Operation | null {
-  if (event.type === '摸牌') {
-    const p = event.payload as Record<string, unknown>;
+  const type = event.atom.type;
+  if (type === '摸牌') {
+    const p = event.atom as unknown as Record<string, unknown>;
     const drawer = String(p.player ?? '');
     const count = Number(p.count ?? 0);
     const cardIds = Array.isArray(p.cards) ? (p.cards as string[]) : [];
@@ -291,7 +292,7 @@ export class GameLogger {
 
   recordBatch(
     action: GameAction | null,
-    serverEvents: ServerEvent[],
+    serverEntries: AtomLogEntry[],
     state: GameState,
   ): RecordBatchResult {
     const serverOps: Operation[] = [];
@@ -315,18 +316,18 @@ export class GameLogger {
       }
     }
 
-    for (const event of serverEvents) {
-      const serverOp = eventToServerOp(event, state);
+    for (const entry of serverEntries) {
+      const serverOp = eventToServerOp(entry, state);
       if (serverOp) {
         serverOp.seq = this.nextServerSeq();
         this._serverOps.push(serverOp);
         serverOps.push(serverOp);
       }
       for (const player of Object.keys(this._playerOps)) {
-        const playerOp = eventToPlayerOp(event, state, player);
+        const playerOp = eventToPlayerOp(entry, state, player);
         if (playerOp) {
           playerOp.seq = this.nextPlayerSeq(player);
-          playerOp.timestamp = playerOp.timestamp || event.timestamp;
+          playerOp.timestamp = playerOp.timestamp || entry.timestamp;
           this._playerOps[player].push(playerOp);
           playerOps[player].push(playerOp);
         }
@@ -354,7 +355,7 @@ export class GameLogger {
     return [...(this._playerOps[playerName] ?? [])];
   }
 
-  rebuildFromLog(state: GameState, serverLog: ServerEvent[]): void {
+  rebuildFromLog(state: GameState, serverLog: AtomLogEntry[]): void {
     this._serverOps = [];
     this._playerOps = {};
     for (const p of state.playerOrder) this._playerOps[p] = [];

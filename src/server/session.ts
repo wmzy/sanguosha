@@ -1,4 +1,4 @@
-import type { GameAction, GameState, ServerEvent } from '../engine/types';
+import type { GameAction, GameState, AtomLogEntry, Atom } from '../engine/types';
 import type { SequencedEvent, EventSeq, ServerMessage } from './protocol';
 import type { Room } from './room';
 import { createInitialState } from '../engine/state';
@@ -9,7 +9,6 @@ import { AsyncHookRegistry, type ResumeData } from '../engine/async-hook';
 import { allSkills } from '../engine/skills';
 import { serialize as serializeState, deserialize as deserializeState } from '../engine/serializer';
 import { saveRoom, deletePersistedRoom } from './persistence';
-import { registerCharacterTriggers } from '../engine/skill';
 import { allCharacters } from '../engine/characters';
 import { serialize } from './protocol';
 import { setRoomStatus } from './room';
@@ -134,9 +133,8 @@ export class GameSession {
       seed,
       characterMap,
     });
-    for (const playerName of state.playerOrder) {
-      state = registerCharacterTriggers(state, playerName, { characterMap });
-    }
+    // v2 registerCharacterTriggers 已删除
+    // v3 钩子由 createEngine({ skills: allSkills }) 注册
 
     this.gameEngine = createEngine({ skills: allSkills });
     const startResult = this.gameEngine.dispatch(state, { type: '开始' });
@@ -199,7 +197,7 @@ export class GameSession {
     this.state = result.state;
     this.touchAndPersist();
 
-    this.broadcastEvents(result.events, fullAction);
+    this.broadcastEvents(result.logEntries, fullAction);
     this.checkGameEnd();
   }
 
@@ -235,21 +233,21 @@ export class GameSession {
       this.appendAction(fullAction);
       this.state = result.state;
       this.touchAndPersist();
-      this.broadcastEvents(result.events, fullAction);
+      this.broadcastEvents(result.logEntries, fullAction);
       this.checkGameEnd();
     }).catch((err) => {
       this.logger.error('async hook dispatch error', { err });
     });
   }
 
-  private broadcastEvents(events: ServerEvent[], action?: GameAction | null): void {
+  private broadcastEvents(events: AtomLogEntry[], action?: GameAction | null): void {
     if (events.length === 0) return;
 
-    const sequenced: SequencedEvent[] = events.map((ev) => ({
-      id: ev.id,
-      type: ev.type,
-      timestamp: ev.timestamp,
-      payload: ev.payload,
+    const sequenced: SequencedEvent[] = events.map((entry) => ({
+      id: entry.id,
+      timestamp: entry.timestamp,
+      type: (entry.atom as { type?: string }).type ?? 'unknown',
+      payload: entry.atom as unknown,
       seq: ++this.nextSeq,
     }));
     const fromSeq = sequenced[0].seq;
@@ -342,11 +340,11 @@ export class GameSession {
     }
     const missed = log.slice(startIdx);
     if (missed.length === 0) return;
-    const sequenced: SequencedEvent[] = missed.map((ev, i) => ({
-      id: ev.id,
-      type: ev.type,
-      timestamp: ev.timestamp,
-      payload: ev.payload,
+    const sequenced: SequencedEvent[] = missed.map((entry, i) => ({
+      id: entry.id,
+      timestamp: entry.timestamp,
+      type: (entry.atom as { type?: string }).type ?? 'unknown',
+      payload: entry.atom as unknown,
       seq: startIdx + i + 1,
     }));
     const playerName = this.playerNames.get(playerId);
@@ -401,7 +399,7 @@ export class GameSession {
     this.appendAction(onTimeout);
     this.state = result.state;
     this.touchAndPersist();
-    this.broadcastEvents(result.events, onTimeout);
+    this.broadcastEvents(result.logEntries, onTimeout);
     this.checkGameEnd();
   }
 

@@ -12,11 +12,11 @@ describe('reshuffle atom', () => {
   it('reshuffle 后 serverLog 末尾出现 reshuffle 事件，弃牌堆洗回牌堆', () => {
     const state = createTestGame();
     const emptied = { ...state, zones: { deck: [], discardPile: ['c1', 'c2', 'c3'] } };
-    const { state: next, events } = applyAtoms(emptied, [
+    const { state: next, logEntries: events } = applyAtoms(emptied, [
       { type: '重洗' },
     ]);
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('重洗');
+    expect(events[0].atom.type).toBe('重洗');
     expect(next.zones.discardPile).toEqual([]);
     expect(next.zones.deck).toHaveLength(3);
     expect([...next.zones.deck].sort()).toEqual(['c1', 'c2', 'c3']);
@@ -25,11 +25,11 @@ describe('reshuffle atom', () => {
 
   it('reshuffle 弃牌堆为空时无操作', () => {
     const state = createTestGame();
-    const { state: next, events } = applyAtoms(state, [
+    const { state: next, logEntries: events } = applyAtoms(state, [
       { type: '重洗' },
     ]);
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('重洗');
+    expect(events[0].atom.type).toBe('重洗');
     expect(next.zones.deck).toEqual(state.zones.deck);
     expect(next.zones.discardPile).toEqual(state.zones.discardPile);
     expect(next.rngState).toBe(state.rngState);
@@ -53,7 +53,7 @@ describe('reshuffle atom', () => {
     const { state: next } = applyAtoms(emptied, [
       { type: '摸牌', player: 'P1', count: 1 },
     ]);
-    const types = next.serverLog.map(e => e.type);
+    const types = next.serverLog.map(e => e.atom.type);
     expect(types).toContain('重洗');
     expect(types).toContain('摸牌');
     // 顺序：reshuffle 必须先于 draw 出现（先洗回牌堆再抽牌）

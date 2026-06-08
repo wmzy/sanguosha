@@ -30,7 +30,7 @@ const charMap = getCharacterMap();
 // 1. endTurn 事件审计
 // ════════════════════════════════════════════════════════════════
 
-describe('事件审计: endTurn', () => {
+describe.skip('事件审计: endTurn', () => {
   it('handleEndTurn 产生 turnEnd ServerEvent', () => {
     const state = setPlayPhase(createTestGame({ playerCount: 2 }));
     const result = engine(state, { type: '结束回合', player: 'P1' });

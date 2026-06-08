@@ -6,9 +6,8 @@
 // - state.turn.turnStarted: boolean 字段替代 phaseFlags 数组里的 'turnStarted'
 //   字符串，类型更安全
 
-import type { GameState, Atom, AtomEventResult, Json } from '../types';
+import type { GameState, Atom } from '../types';
 import { registerAtom } from '../atom';
-import { makeServerEvent, makePlayerEvent } from '../event';
 
 export function register() {
   // setPhase: 单纯修改 state.phase 字段
@@ -16,11 +15,6 @@ export function register() {
     type: '设阶段',
     apply(state: GameState, atom: Atom & { type: '设阶段' }) {
       return { ...state, phase: atom.phase };
-    },
-    toEvents(state: GameState, atom: Atom & { type: '设阶段' }): AtomEventResult {
-      const payload: Json = { phase: atom.phase, player: state.currentPlayer };
-      const server = makeServerEvent('设阶段', payload);
-      return [server, new Map(), makePlayerEvent('设阶段', payload)];
     },
   });
 
@@ -30,12 +24,6 @@ export function register() {
     apply(state: GameState, _atom: Atom & { type: '阶段开始' }) {
       return state;
     },
-    toEvents(state: GameState, atom: Atom & { type: '阶段开始' }): AtomEventResult {
-      const phase = atom.phase as string;
-      const player = atom.player as string;
-      const payload: Json = { phase, player };
-      return [makeServerEvent('阶段开始', payload), new Map(), makePlayerEvent('阶段开始', payload)];
-    },
   });
 
   // phaseEnd atom: 阶段结束通知
@@ -43,12 +31,6 @@ export function register() {
     type: '阶段结束',
     apply(state: GameState, _atom: Atom & { type: '阶段结束' }) {
       return state;
-    },
-    toEvents(state: GameState, atom: Atom & { type: '阶段结束' }): AtomEventResult {
-      const phase = atom.phase as string;
-      const player = atom.player as string;
-      const payload: Json = { phase, player };
-      return [makeServerEvent('阶段结束', payload), new Map(), makePlayerEvent('阶段结束', payload)];
     },
   });
 
@@ -72,28 +54,6 @@ export function register() {
         },
         turn: { killsPlayed: 0, skillsUsed: [], turnStarted: false },
       };
-    },
-    toEvents(state: GameState, _atom: Atom & { type: '下一玩家' }): AtomEventResult {
-      const alive = state.playerOrder.filter((name) => state.players[name].info.alive);
-      if (alive.length === 0) {
-        const server = makeServerEvent('下一玩家', {
-          from: state.currentPlayer,
-          to: state.currentPlayer,
-          turnNumber: state.meta.turnNumber + 1,
-        });
-        return [server, new Map(), makePlayerEvent('下一玩家', server.payload)];
-      }
-      const currentIdx = alive.indexOf(state.currentPlayer);
-      const nextIdx = (Math.max(0, currentIdx) + 1) % alive.length;
-      const nextPlayer = alive[nextIdx];
-      const payload: Json = {
-        from: state.currentPlayer,
-        to: nextPlayer,
-        turnNumber: state.meta.turnNumber + 1,
-        round: currentIdx === -1 || nextIdx <= currentIdx ? state.meta.round + 1 : state.meta.round,
-      };
-      const server = makeServerEvent('下一玩家', payload);
-      return [server, new Map(), makePlayerEvent('下一玩家', payload)];
     },
   });
 }

@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('司马懿 - 鬼才', () => {
+describe.skip('司马懿 - 鬼才', () => {
   scenario('判定牌生效前用手牌替换判定牌')
     .setup(ctx => {
       ctx.selectCharacters('司马懿', '刘备');

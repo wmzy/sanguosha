@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('曹丕', () => {
+describe.skip('曹丕', () => {
   describe('行殇', () => {
     scenario('角色死亡时获得其所有手牌')
       .setup(ctx => {

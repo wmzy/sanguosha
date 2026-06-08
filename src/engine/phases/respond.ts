@@ -27,7 +27,7 @@ export function register() {
         deadline,
         onTimeout: { type: '打出', player: phase.window.defender },
       };
-      return { state: { ...state, pending }, events: [] };
+      return { state: { ...state, pending }, logEntries: [] };
     },
   });
 }

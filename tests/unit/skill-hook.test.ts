@@ -67,7 +67,7 @@ describe('onBefore 钩子行为', () => {
 
     expect(cancelCalled).toBe(true);
     // cancel 跳过该 atom——serverLog 不增长
-    expect(result.events).toHaveLength(0);
+    expect(result.logEntries).toHaveLength(0);
     expect(result.state.serverLog).toHaveLength(startLen);
   });
 
@@ -187,7 +187,7 @@ describe('onAfter 钩子行为', () => {
     ]);
 
     // damage 派了 1 个 + draw 派了 1 个 = 2 events
-    expect(result.events).toHaveLength(2);
+    expect(result.logEntries).toHaveLength(2);
     // P2 手牌从 1 张变 2 张（摸 1 张）
     expect(result.state.players['P2'].hand).toHaveLength(2);
   });
@@ -317,7 +317,7 @@ describe('钩子集成：skipHooks 选项', () => {
 
     expect(called).toBe(false);
     // 没 cancel：serverLog 增长
-    expect(result.events).toHaveLength(1);
+    expect(result.logEntries).toHaveLength(1);
   });
 
   it('additionalAtoms 递归应用时 skipHooks=true（防无限递归）', () => {

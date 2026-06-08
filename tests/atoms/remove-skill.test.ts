@@ -18,11 +18,11 @@ describe('removeSkill atom（走 PlayerState.skills）', () => {
 
   it('removeSkill 从 PlayerState.skills 移除指定 skillId', () => {
     const s0 = addSkillToPlayer(createTestGame(), 'P1', '断肠');
-    const { state, events } = applyAtoms(s0, [
+    const { state, logEntries: events } = applyAtoms(s0, [
       { type: '去技能', player: 'P1', skillId: '断肠' },
     ]);
     expect(state.players.P1.skills).not.toContain('断肠');
-    expect(events[0].type).toBe('去技能');
+    expect(events[0].atom.type).toBe('去技能');
   });
 
   it('removeSkill 不影响其他玩家的同名技能', () => {

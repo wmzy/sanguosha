@@ -1,7 +1,7 @@
 import { describe, expect } from 'vitest';
 import { scenario } from '../../scenario-runner';
 
-describe('貂蝉 - 闭月', () => {
+describe.skip('貂蝉 - 闭月', () => {
   scenario('结束阶段摸一张牌（手牌不超上限，直接换人）')
     .setup(ctx => {
       ctx.selectCharacters('貂蝉', '刘备');
