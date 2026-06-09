@@ -1,0 +1,19 @@
+// src/engine/atoms/击杀.ts
+import type { AtomDefinition, GameState } from '../types';
+import { registerAtom } from '../atom';
+
+export const 击杀: AtomDefinition<{ player: string }> = {
+  type: '击杀',
+  validate(state, atom) {
+    const p = state.players.find(x => x.name === atom.player);
+    if (!p) return `player ${atom.player} not found`;
+    if (p.alive) return 'player still alive';
+    return null;
+  },
+  apply(state, atom) {
+    return { ...state };  // 击杀本身不修改 state,只是事件标记
+  },
+  effect: { sound: 'death', animation: 'fade', duration: 1000 },
+};
+
+registerAtom(击杀);
