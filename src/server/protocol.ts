@@ -1,5 +1,5 @@
-import type { GameAction, GameState } from '../engine/types';
-import type { PlayerView, FrontendState } from '../engine/view/types';
+import type { ClientMessage as EngineClientMessage, GameState } from '../engine/types';
+import type { GameView } from '../engine/types';
 import type { Operation } from '../shared/log';
 
 /**
@@ -23,7 +23,7 @@ export interface SequencedEvent {
 }
 
 export type ServerMessage =
-  | { type: 'initialView'; state: FrontendState; lastSeq: EventSeq }
+  | { type: 'initialView'; state: GameView; lastSeq: EventSeq }
   | { type: 'debugGameState'; state: GameState; lastSeq: EventSeq }
   | { type: 'events'; fromSeq: EventSeq; events: SequencedEvent[]; operations?: Operation[] }
   | { type: 'error'; message: string }
@@ -38,10 +38,10 @@ export type ServerMessage =
   | { type: 'asyncHookPending'; pendingId: string; hookId: string; player: string; def: unknown; timeout: number; deadline: number };
 
 // Re-export for downstream consumers
-export type { PlayerView, FrontendState };
+export type { GameView };
 
 export type ClientMessage =
-  | { type: 'action'; action: GameAction; baseSeq: EventSeq }
+  | { type: 'action'; action: EngineClientMessage; baseSeq: EventSeq }
   | { type: 'response'; baseSeq: EventSeq; choice: unknown }
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
