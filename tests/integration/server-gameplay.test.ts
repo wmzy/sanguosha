@@ -2,9 +2,10 @@
 // 集成测试: GameSession 用新 ENGINE-DESIGN createEngine().dispatch() 跑真实玩法
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameSession } from '../../src/server/session';
+import { createEngine } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import type { GameState } from '../../engine/types';
+import type { GameState } from '../../src/engine/types';
 
 interface MockRoom {
   id: string;
@@ -112,5 +113,58 @@ describe('新 ENGINE-DESIGN GameSession — 玩法集成', () => {
     const p2After = after.players.find(p => p.name === p2.name)!;
     expect(p2After.health).toBe(beforeHealth);
     expect(after.zones.discardPile).not.toContain('c1');
+  });
+
+  it('回合管理 start → P1 摸 2 张,手牌 = 4(初始) + 2(摸牌) = 6', async () => {
+    // 构建有足够牌堆的状态
+    const deckCards: string[] = [];
+    const cardMap: GameState['cardMap'] = {};
+    for (let i = 0; i < 20; i++) {
+      const id = `d${i}`;
+      deckCards.push(id);
+      cardMap[id] = { id, name: '杀', suit: '♠', rank: i + 1, type: '基本牌' };
+    }
+    // 每人初始 4 张手牌
+    const p1Hand = deckCards.splice(0, 4);
+    const p2Hand = deckCards.splice(0, 4);
+
+    const state: GameState = {
+      players: [
+        { index: 0, name: 'P1', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: p1Hand, equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [] },
+        { index: 1, name: 'P2', character: '刘备', health: 4, maxHealth: 4, alive: true, hand: p2Hand, equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [] },
+      ],
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+      zones: { deck: deckCards, discardPile: [], processing: [] },
+      settlementStack: [],
+      cardMap,
+      rngSeed: 1,
+      marks: [],
+      localVars: {},
+      meta: { gameId: 'g1', createdAt: 0 },
+      seq: 0,
+      startedAt: 0,
+      actionLog: [],
+    };
+
+    const engine = createEngine();
+    engine.resetForTest();
+    const bootState = engine.bootstrap(state);
+
+    // 触发 start action
+    const after = await engine.dispatch(bootState, {
+      skillId: '回合管理', actionType: 'start', ownerId: 'P1',
+      params: {}, baseSeq: 0,
+    });
+
+    const p1 = after.players.find(p => p.name === 'P1')!;
+    const p2 = after.players.find(p => p.name === 'P2')!;
+    // P1: 4(初始) + 2(摸牌阶段) = 6
+    expect(p1.hand.length).toBe(6);
+    // P2: 未摸牌,仍为 4
+    expect(p2.hand.length).toBe(4);
+    // 当前玩家应为 P1,阶段应为出牌
+    expect(after.phase).toBe('出牌');
   });
 });

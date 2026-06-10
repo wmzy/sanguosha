@@ -56,6 +56,7 @@ function makeFrame(
       const beforeHooks = getBeforeHooks(atom.type);
       try {
         for (const h of beforeHooks) {
+          ctx.self = h.ownerId;
           await h.handler(ctx);
         }
       } catch (e) {
@@ -89,6 +90,7 @@ function makeFrame(
       };
       const afterHooks = getAfterHooks(atom.type);
       for (const h of afterHooks) {
+        afterCtx.self = h.ownerId;
         await h.handler(afterCtx);
       }
     },
