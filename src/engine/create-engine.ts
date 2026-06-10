@@ -1,14 +1,6 @@
 // src/engine/create-engine.ts
 // 完整实装 ENGINE-DESIGN §4 + §6:createEngine 工厂 + dispatch 路由
-import type {
-  ActionEntry,
-  Atom,
-  ClientMessage,
-  GameState,
-  GameView,
-  SettlementFrame,
-  Skill,
-} from './types';
+import type { ClientMessage, GameState, GameView, Skill } from './types';
 import { buildView } from './view/buildView';
 import {
   clearAllSkillInstances,
@@ -17,7 +9,7 @@ import {
   makeBackendAPI,
   setSkillInstanceUnload,
 } from './skill';
-import { makeFrame, popFrame, pushFrame, topFrame } from './settlement';
+import { makeFrame, popFrame, pushFrame } from './settlement';
 
 export interface EngineInstance {
   /**
@@ -42,7 +34,6 @@ export function createEngine(): EngineInstance {
 
   function bootstrap(state: GameState): GameState {
     currentState = state;
-    // 遍历所有玩家的所有 skill,实例化并注册
     for (const player of state.players) {
       for (const skillId of player.skills) {
         instantiateSkill(skillId, player.name);
@@ -70,14 +61,14 @@ export function createEngine(): EngineInstance {
       // 没找到 — 静默忽略
       return state;
     }
-    // 2. 校验(GameView)
+
     const view = buildView(state, getViewerIndex(state, message.ownerId));
     const validationError = entry.validate(view, message.params);
     if (validationError !== null) {
       // 静默丢弃(不记入 action log)
       return state;
     }
-    console.error('[dispatch]', message.skillId, message.actionType, 'validation OK, executing');
+
     const executor: { state: GameState } = { state };
     const frame = makeFrame(undefined, {
       skillId: message.skillId,
@@ -87,16 +78,14 @@ export function createEngine(): EngineInstance {
     }, executor);
     let nextState = pushFrame(state, frame);
 
-    // 4. execute
     try {
       await entry.execute(frame);
-    } catch (e) {
+    } catch {
       // execute 失败 — 弹栈,返回原 state
       nextState = popFrame(executor.state);
       return nextState;
     }
 
-    // 5. 弹栈
     nextState = popFrame(executor.state);
     currentState = nextState;
     return nextState;
