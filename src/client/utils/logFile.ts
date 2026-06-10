@@ -1,9 +1,9 @@
-import { serialize, deserialize } from '../../engine/serializer';
+
 import type { GameState } from '../../engine/types';
 import type { GameLog } from '../../shared/log';
 
 export function saveState(state: GameState): void {
-  const json = serialize(state);
+  const json = JSON.stringify(state);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -14,19 +14,19 @@ export function saveState(state: GameState): void {
 }
 
 export function loadState(file: File): Promise<GameState> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = deserialize(reader.result as string);
-        resolve(data);
-      } catch (e) {
-        reject(e);
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsText(file);
-  });
+  const { promise, resolve, reject } = Promise.withResolvers<GameState>();
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result as string) as GameState;
+      resolve(data);
+    } catch (e) {
+      reject(e);
+    }
+  };
+  reader.onerror = reject;
+  reader.readAsText(file);
+  return promise;
 }
 
 function validateGameLog(obj: unknown): obj is GameLog {
