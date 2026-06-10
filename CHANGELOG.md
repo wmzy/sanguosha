@@ -29,6 +29,10 @@ All notable changes to this project will be documented in this file.
 - `src/server/app.ts` — 删老 pendingToAction/handleAsyncHookResponse/handleResponse,所有 action 走新 ClientMessage
 - `src/client/components/NewEngineDemo.tsx` — client-side 直接调新 `createEngine().dispatch()` 试用
 - `tests/integration/server-gameplay.test.ts` — 服务端玩法集成测试(P1出杀→P2扣血 + CAS 校验)
+- `src/client/components/GameView.tsx` — 新 ENGINE-DESIGN 游戏视图(渲染 GameView + 发 ClientMessage)
+- `src/client/hooks/useDebugLobbyController.ts` — 重写,存 GameView,发 ClientMessage(删老 SequencedEvent/reduceGameState)
+- `src/client/components/DebugLobby.tsx` — 用 GameViewComponent 替代 DebugPlayerList
+- `src/engine/types.ts` — 删除重复 GameView 接口(缺 marks 字段)
 
 ### Changed
 
