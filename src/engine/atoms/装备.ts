@@ -17,24 +17,25 @@ function inferSlot(cardType: string | undefined): EquipSlot | null {
 export const 装备: AtomDefinition<{ player: string; cardId: string }> = {
   type: '装备',
   validate(state, atom) {
-    if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
     const p = state.players.find(x => x.name === atom.player);
     if (!p) return `player ${atom.player} not found`;
     if (!p.hand.includes(atom.cardId)) return `card not in player's hand`;
+    const card = state.cardMap[atom.cardId];
+    if (!card) return `card ${atom.cardId} not found`;
+    const slot = inferSlot(card.subtype);
+    if (!slot) return `card is not equipment`;
     return null;
   },
   apply(state, atom) {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
     const card = state.cardMap[atom.cardId];
-    const slot = inferSlot(card.subtype);
+    const slot = inferSlot(card.subtype)!;
     return {
       ...state,
       players: state.players.map((p, i) => {
         if (i !== pIdx) return p;
         const hand = p.hand.filter(id => id !== atom.cardId);
-        return slot
-          ? { ...p, hand, equipment: { ...p.equipment, [slot]: atom.cardId } }
-          : { ...p, hand };
+        return { ...p, hand, equipment: { ...p.equipment, [slot]: atom.cardId } };
       }),
     };
   },

@@ -214,8 +214,7 @@ export type Atom =
   // 目标
   | { type: '指定目标'; source: string; cardId?: string; target: string }
   // 判定
-  | { type: '判定'; player: string; judgeType: string }
-  | { type: '添加延时锦囊'; player: string; trickName: string; source: string }
+  | { type: '添加延时锦囊'; player: string; trick: PendingTrick }
   | { type: '移除延时锦囊'; player: string; trickName: string }
   // 拼点
   | { type: '拼点'; initiator: string; target: string; initiatorCard: string; targetCard: string }
