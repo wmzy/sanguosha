@@ -1,5 +1,6 @@
 // src/engine/skills/护甲.ts
 // 护甲(曹操·锁定技):当你受到【杀】造成的伤害时,若此牌为黑色,伤害 -1
+// 实现:onAtomBefore + guard mark 防 re-entry
 import type { AtomBeforeContext, BackendAPI, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
@@ -15,20 +16,29 @@ export function createSkill(id: string, ownerId: string): Skill {
 export function onInit(skill: Skill, api: BackendAPI): () => void {
   api.onAtomBefore('造成伤害', async (ctx: AtomBeforeContext) => {
     if (ctx.atom.target !== api.self) return;
-    if (typeof ctx.atom.cardId !== 'string') return;  // 非卡牌伤害(失去体力等)不触发
+    if (typeof ctx.atom.cardId !== 'string') return;
     const card = ctx.state.cardMap[ctx.atom.cardId];
     if (!card) return;
-    if (card.name !== '杀' && !card.name.includes('杀')) return;
+    if (!card.name.includes('杀')) return;  // 非杀牌不触发
     if (card.suit !== '♠' && card.suit !== '♣') return;  // 仅黑色
-    ctx.modifyParams({});
-    // 通过 atomStack 顶端 0 索引获取正在结算的 atom
-    // 简化实现:drop + 重新 apply(amount-1)
-    // 真正的实现应通过 settlement frame modifyParams
-    if (ctx.atom.amount > 1) {
+    // 防 re-entry:在 damage 被 drop + 重新 apply 时,使用 guard mark 标记
+    const self = ctx.state.players.find(p => p.name === api.self);
+    if (!self) return;
+    if (self.marks.some(m => m.id === '护甲/applied')) return;
+    // 应用护甲:drop 重新 apply 减 1,加 guard mark 防止 re-entry
+    if (ctx.atom.amount > 0) {
       ctx.drop();
-      await ctx.apply({ ...ctx.atom, amount: ctx.atom.amount - 1 });
-    } else {
-      ctx.drop();
+      // 先加 guard(在 re-apply 之前)
+      await ctx.apply({
+        type: '加标记',
+        player: api.self,
+        mark: { id: '护甲/applied', scope: -1 },
+      });
+      // 重新 apply
+      if (ctx.atom.amount > 1) {
+        await ctx.apply({ ...ctx.atom, amount: ctx.atom.amount - 1 });
+      }
+      // 否则 amount=1 时不 apply(直接 drop,无伤害)
     }
   });
   return () => {};

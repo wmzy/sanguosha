@@ -1,6 +1,7 @@
 // src/engine/skills/酒.ts
 // 酒:出牌阶段对自己使用,本回合下一张杀的伤害+1
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+// 实现:加 mark '酒/nextKillDamageBonus',通过 onAtomBefore('造成伤害') 钩子消费
+import type { AtomBeforeContext, BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -12,7 +13,8 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     'use',
     (view: GameView, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
-      if (apiSelf(view, params) === false) return '酒只能对自己使用';
+      // 酒只能对自己用;但 params 不传 target(默认 from)
+      // 由 action 路由层保证 from === ownerId
       return null;
     },
     async (frame: SettlementFrame) => {
@@ -37,15 +39,26 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       });
     },
   );
-  return () => {};
-}
 
-function apiSelf(view: GameView, params: Record<string, Json>): boolean {
-  // 简化:酒只能自己用(target === ownerId)
-  const ownerId = params.__ownerId as string | undefined;
-  if (ownerId === undefined) return true;  // 由 spec 调用方传 ownerId
-  const target = params.target as string | undefined;
-  return target === ownerId;
+  // 消费 mark:在造成伤害时,如果是 self 造成的 且 有 酒/nextKillDamageBonus mark,amount + 1
+  api.onAtomBefore('造成伤害', async (ctx: AtomBeforeContext) => {
+    if (ctx.atom.source !== api.self) return;
+    if (ctx.atom.amount <= 0) return;
+    const self = ctx.state.players.find(p => p.name === api.self);
+    if (!self) return;
+    const hasMark = self.marks.some(m => m.id === '酒/nextKillDamageBonus');
+    if (!hasMark) return;
+    // drop + 重新 apply(增加 1) — 简化处理;不会 re-entry 因为 mark 用完即去
+    ctx.drop();
+    await ctx.apply({ ...ctx.atom, amount: ctx.atom.amount + 1 });
+    await ctx.apply({
+      type: '去标记',
+      player: api.self,
+      markId: '酒/nextKillDamageBonus',
+    });
+  });
+
+  return () => {};
 }
 
 export const module_酒: SkillModule = { createSkill, onInit };
