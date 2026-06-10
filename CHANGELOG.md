@@ -2,7 +2,70 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+## [Unreleased] — 2026-06-10
+### Engine v3 P0 重构启动 — 按 ENGINE-DESIGN.md 在 `src/engine/` 重写核心
+
+将 `src/engine/*` 整体迁至 `src/engine/_legacy/`(参考保留),在 `src/engine/` 重新实现新引擎核心(types/atom/settlement/skill/skill-loader/event-stream/create-engine)。首批交付 38 atom + 10 skill(4 基本牌 + 5 武将 6 技能)。
+
+### Added
+
+- `docs/superpowers/specs/2026-06-09-engine-rewrite-design.md` — 引擎重写 spec
+- `docs/superpowers/plans/2026-06-09-engine-rewrite.md` — 17 Task 实现计划
+- `src/engine/types.ts` — `GameState` / `Atom` 联合(spec §5 全集) / `ActionPrompt` / `Skill` / `SettlementFrame` / `ClientMessage` / `BackendAPI` / `FrontendAPI`
+- `src/engine/atom.ts` — atom 注册表 + 同步 apply
+- `src/engine/settlement.ts` — 结算区栈骨架(push/pop/top)
+- `src/engine/skill.ts` — 技能模块注册表
+- `src/engine/skill-loader.ts` — 玩家技能查询骨架
+- `src/engine/event-stream.ts` — per-player 事件流骨架
+- `src/engine/create-engine.ts` — `createEngine()` 工厂
+- `src/engine/view/buildView.ts` — `GameState → GameView` 派生(viewer 隔离手牌)
+- `src/engine/atoms/*.ts` — 38 atom(摸牌/弃置/移动牌/获得/给予/抽牌/装备/卸下/洗牌/重洗/整理牌堆/造成伤害/回复体力/失去体力/击杀/设上限/加去标记/清过期标记/设横置/加去标签/添加移除技能/回合开始结束/阶段开始结束/设阶段/下一玩家/指定目标/判定/添加移除延时锦囊/拼点/询问闪杀/请求回应)
+- `src/engine/skills/杀.ts` `闪.ts` `桃.ts` `酒.ts` — 4 基本牌(registerAction)
+- `src/engine/skills/仁德.ts` `激将.ts` `护甲.ts` `制衡.ts` `武圣.ts` `遗计.ts` — 5 武将 6 技能(刘备/曹操/孙权/关羽/郭嘉)
+- `tests/engine-smoke.test.ts` — 4 烟雾测试
+
+### Changed
+
+- `src/engine/atoms/摸牌.ts` — `slice(-count).reverse()`(牌堆顶→入手首位,Sanguosha 惯例)
+- `src/engine/atoms/弃置.ts` — `cardIds: string[]`(spec 用 `cardId` 单数,本实现用复数更贴合多张弃牌场景)
+- `src/engine/atoms/造成伤害.ts` — `cardId?: string` 字段(spec 用 `damageType`,本实现附加 cardId 便于技能如护甲判断)
+- `src/engine/atoms/添加延时锦囊.ts` — `trick: PendingTrick`(匹配 spec `PendingTrick` 接口)
+- `src/engine/skills/杀.ts` — `killsPlayed` 持久化到 `player.marks`(每 turn 自动清理),而非 `frame.params`(settlement 局部)
+- `src/engine/skills/酒.ts` — 加 `onAtomBefore('造成伤害')` 钩子消费 `酒/nextKillDamageBonus` mark,实现酒+杀=2 伤害
+- `src/engine/skills/护甲.ts` — 加 `护甲/applied` guard mark 防 onAtomBefore 递归 re-entry
+
+### Removed
+
+- `src/engine/*` 全部内容 → `src/engine/_legacy/*`(`src/engine/` 仅含新代码 + `_legacy/` 参考目录)
+
+### Verified
+
+- `pnpm vitest run tests/engine-smoke.test.ts`: 4/4 passed
+- `pnpm tsc --noEmit`: 0 新引擎错误(`_legacy/` 148 个错误为预期,旧代码未动)
+- 0 新代码 import `_legacy/`
+- 0 内联 `import("...")`(全部顶级 `import type`)
+
+### Spec Deltas (待 spec 更新)
+
+- `弃置` 复数 `cardIds`(spec 单数 `cardId`)— 实用主义
+- `造成伤害` 字段 `cardId`(spec 用 `damageType`)— 同时保留 spec 的 DamageType 概念可在后续 PR 补
+- `回复体力` `source` 可选(spec 必填)— 自然恢复场景不应强制 source
+- `添加延时锦囊` 用 `trick: PendingTrick` 对象(spec 写 flat `trickName + source`)— 修复 PR 3 review 发现的 critical 不匹配
+- `询问闪` / `询问杀` 加 `source` 字段(spec 无)— 前端需展示攻击来源
+
+### Pending Follow-ups
+
+- PR 5: 服务端接通(`src/server/protocol.ts` + `session.ts` 切到新 ClientMessage)
+- PR 6: DebugLobby 复刻
+- PR 7-10: 17 锦囊 + 8 装备
+- settlement frame awaits 完整实装(目前简化:杀/闪同步模拟,武圣/遗计/激将为骨架)
+- 武圣牌包装/还原机制(`CardWrapper` 完整实装)
+- 洗牌 RNG 接入(目前 no-op)
+- 30+ skill e2e 测试(plan §6.2 列出)
+
+### Documentation
+
+- 2 条新 ADR 待写(`src/engine/_legacy/` 清理时机 + v2 删除)
 
 ## [Unreleased] — 2026-06-07
 ### Engine v3 ATOM_GAME_EVENTS 自动派发 — emitEvent 调用点从 11 处降至 4 处
