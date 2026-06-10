@@ -1,18 +1,11 @@
-// server/persistence.ts
+// src/server/persistence.ts
+// 切到新 ENGINE-DESIGN:序列化 GameState + ActionLogEntry[] 到磁盘
 import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { GameState, GameAction, ServerEvent } from '../engine/types';
-import { createInitialState } from '../engine/state';
-import { createEngine } from '../engine/create-engine';
-import { allSkills } from '../engine/skills';
-import { restoreEventCounterFromLog } from '../engine/event';
-import { allCharacters } from '../engine/characters';
-import type { Role } from '../shared/types';
-
-const DATA_DIR = join(process.cwd(), 'data', 'rooms');
-
+import type { ActionLogEntry, GameState } from '../engine/types';
 import { register as registerLifecycle } from './lifecycles';
 import { createLogger } from './logger';
+
+const DATA_DIR = join(process.cwd(), 'data', 'rooms');
 
 const log = createLogger('persistence');
 
@@ -31,12 +24,10 @@ registerLifecycle('pendingWrappers', pendingWrappers, () => {
   pendingWrappers.clear();
 });
 
-const characterMap = Object.fromEntries(allCharacters.map(c => [c.name, c]));
-
 export interface PlayerConfig {
   name: string;
   characterId: string;
-  role: Role;
+  role: string;
 }
 
 interface PersistedWrapper {
@@ -46,8 +37,8 @@ interface PersistedWrapper {
   debug: boolean;
   players: PlayerConfig[];
   seed: number;
-  actionLog: GameAction[];
-  serverLog: ServerEvent[];
+  actionLog: ActionLogEntry[];
+  state: GameState;
   savedAt: number;
 }
 
@@ -75,7 +66,7 @@ async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | n
     if (!isPersistedWrapper(parsed)) return null;
     return parsed;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+  if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
     log.warn(`read failed for room ${roomId}: ${String(err)}`);
     return null;
   }
@@ -101,20 +92,8 @@ function isPersistedWrapper(value: unknown): value is PersistedWrapper {
   if (!Array.isArray(v['players'])) return false;
   if (typeof v['seed'] !== 'number') return false;
   if (!Array.isArray(v['actionLog'])) return false;
-  if (!Array.isArray(v['serverLog'])) return false;
+  if (typeof v['state'] !== 'object' || v['state'] === null) return false;
   if (typeof v['savedAt'] !== 'number') return false;
-  for (const p of v['players']) {
-    if (typeof p !== 'object' || p === null) return false;
-    const pp = p as Record<string, unknown>;
-    if (typeof pp['name'] !== 'string') return false;
-    if (typeof pp['characterId'] !== 'string') return false;
-    if (typeof pp['role'] !== 'string') return false;
-  }
-  for (const a of v['actionLog']) {
-    if (typeof a !== 'object' || a === null) return false;
-    const aa = a as Record<string, unknown>;
-    if (typeof aa['type'] !== 'string') return false;
-  }
   return true;
 }
 
@@ -126,8 +105,8 @@ export interface PersistedRoom {
   debug: boolean;
   players: PlayerConfig[];
   seed: number;
-  actionLog: GameAction[];
-  serverLog: ServerEvent[];
+  actionLog: ActionLogEntry[];
+  state: GameState;
   savedAt: number;
   lastActivityAt: number;
 }
@@ -141,7 +120,7 @@ export async function saveRoom(
     debug: boolean;
   },
   state: GameState,
-  actionLog: GameAction[],
+  actionLog: ActionLogEntry[],
   immediate = false,
 ): Promise<void> {
   await ensureDir();
@@ -150,17 +129,14 @@ export async function saveRoom(
     maxPlayers: meta.maxPlayers,
     hostId: meta.hostId,
     debug: meta.debug,
-    players: state.playerOrder.map(name => {
-      const p = state.players[name];
-      return {
-        name: p.info.name,
-        characterId: p.info.characterId,
-        role: p.info.role,
-      };
-    }),
-    seed: state.meta.seed,
+    players: state.players.map(p => ({
+      name: p.name,
+      characterId: p.character,
+      role: '主公',
+    })),
+    seed: state.rngSeed,
     actionLog: [...actionLog],
-    serverLog: state.serverLog,
+    state,
     savedAt: Date.now(),
   };
   pendingWrappers.set(roomId, wrapper);
@@ -177,7 +153,7 @@ export async function saveRoom(
   }
 
   const existing = pendingTimers.get(roomId);
-  if (existing) clearTimeout(existing);
+  clearTimeout(existing);
   pendingTimers.set(
     roomId,
     setTimeout(async () => {
@@ -208,7 +184,7 @@ export async function loadRoom(roomId: string): Promise<PersistedRoom | null> {
     players: wrapper.players,
     seed: wrapper.seed,
     actionLog: wrapper.actionLog,
-    serverLog: wrapper.serverLog,
+    state: wrapper.state,
     savedAt: wrapper.savedAt,
     lastActivityAt,
   };
@@ -248,23 +224,6 @@ export function _pendingWriteCount(): number {
 }
 
 export function restoreToState(persisted: PersistedRoom): GameState {
-  let state = createInitialState({
-    players: persisted.players,
-    seed: persisted.seed,
-    characterMap,
-  });
-  // v2 registerCharacterTriggers 已删除
-
-  const gameEngine = createEngine({ skills: allSkills });
-  for (const action of persisted.actionLog) {
-    const result = gameEngine.dispatch(state, action);
-    if (result.error) {
-      log.warn(`replay error for room ${persisted.roomId}: ${result.error}`);
-      break;
-    }
-    state = result.state;
-  }
-
-  restoreEventCounterFromLog(state.serverLog);
-  return state;
+  // 直接返回持久化的 state,真正的重放由 GameSession 调新 createEngine().dispatch() 完成
+  return persisted.state;
 }
