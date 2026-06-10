@@ -1,0 +1,32 @@
+// src/engine/atoms/弃置.ts
+// 弃置:从玩家手牌/装备区将 cardIds 移至弃牌堆
+import type { AtomDefinition, GameState } from '../types';
+import { registerAtom } from '../atom';
+
+export const 弃置: AtomDefinition<{ player: string; cardIds: string[] }> = {
+  type: '弃置',
+  validate(state, atom) {
+    if (atom.cardIds.length === 0) return 'no cards to discard';
+    const p = state.players.find(x => x.name === atom.player);
+    if (!p) return `player ${atom.player} not found`;
+    return null;
+  },
+  apply(state, atom) {
+    const pIdx = state.players.findIndex(p => p.name === atom.player);
+    const player = state.players[pIdx];
+    const discardSet = new Set(atom.cardIds);
+    const hand = player.hand.filter(id => !discardSet.has(id));
+    const equipment: Record<string, string> = {};
+    for (const [slot, id] of Object.entries(player.equipment)) {
+      if (id && !discardSet.has(id)) equipment[slot] = id;
+    }
+    return {
+      ...state,
+      zones: { ...state.zones, discardPile: [...state.zones.discardPile, ...atom.cardIds] },
+      players: state.players.map((p, i) => i === pIdx ? { ...p, hand, equipment } : p),
+    };
+  },
+  effect: { sound: 'discard', animation: 'flip', duration: 200 },
+};
+
+registerAtom(弃置);

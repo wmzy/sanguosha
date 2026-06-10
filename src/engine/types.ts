@@ -37,6 +37,13 @@ export interface Mark {
   duration?: 'turn' | 'round' | number;
 }
 
+
+export interface PendingTrick {
+  name: string;
+  source: string;
+  card: Card;
+}
+
 export interface PlayerState {
   index: number;
   name: string;
@@ -46,6 +53,7 @@ export interface PlayerState {
   alive: boolean;
   hand: string[];
   equipment: Partial<Record<EquipSlot, string>>;
+  pendingTricks: PendingTrick[];
   skills: string[];
   vars: Record<string, Json>;
   marks: Mark[];
@@ -168,12 +176,53 @@ export type ZoneLoc =
   | { zone: '处理区' };
 
 export type Atom =
+  // 卡牌/资源
   | { type: '摸牌'; player: string; count: number }
   | { type: '弃置'; player: string; cardIds: string[] }
   | { type: '移动牌'; cardId: string; from: ZoneLoc; to: ZoneLoc }
+  | { type: '获得'; player: string; cardId: string; from?: string }
+  | { type: '给予'; cardId: string; from: string; to: string }
+  | { type: '抽牌'; player: string; cardId: string }
+  | { type: '装备'; player: string; cardId: string }
+  | { type: '卸下'; player: string; slot: EquipSlot }
+  | { type: '洗牌' }
+  | { type: '重洗' }
+  | { type: '整理牌堆'; cards: string[] }
+  // 角色状态
   | { type: '造成伤害'; target: string; amount: number; source: string; cardId?: string }
   | { type: '回复体力'; target: string; amount: number; source?: string }
-  | { type: '击杀'; player: string };
+  | { type: '失去体力'; target: string; amount: number }
+  | { type: '击杀'; player: string }
+  | { type: '设上限'; player: string; amount: number }
+  // 标记/状态
+  | { type: '加标记'; player: string; mark: Mark }
+  | { type: '去标记'; player: string; markId: string }
+  | { type: '清过期标记'; player: string }
+  | { type: '设横置'; player: string; chained: boolean }
+  | { type: '加标签'; player: string; tag: string }
+  | { type: '去标签'; player: string; tag: string }
+  // 技能管理
+  | { type: '添加技能'; player: string; skillId: string }
+  | { type: '移除技能'; player: string; skillId: string }
+  // 流程
+  | { type: '回合开始'; player: string }
+  | { type: '回合结束'; player: string }
+  | { type: '阶段开始'; player: string; phase: string }
+  | { type: '阶段结束'; player: string; phase: string }
+  | { type: '设阶段'; phase: TurnPhase }
+  | { type: '下一玩家' }
+  // 目标
+  | { type: '指定目标'; source: string; cardId?: string; target: string }
+  // 判定
+  | { type: '判定'; player: string; judgeType: string }
+  | { type: '添加延时锦囊'; player: string; trickName: string; source: string }
+  | { type: '移除延时锦囊'; player: string; trickName: string }
+  // 拼点
+  | { type: '拼点'; initiator: string; target: string; initiatorCard: string; targetCard: string }
+  // 等待回应
+  | { type: '询问闪'; target: string; source: string }
+  | { type: '询问杀'; target: string; source: string }
+  | { type: '请求回应'; requestType: string; target: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number };
 
 export interface AtomDefinition<A = unknown> {
   type: string;
