@@ -1,6 +1,14 @@
 // src/engine/skill.ts
 // 技能模块注册 + action/hook 实例注册 + 实例管理
-import type { ActionEntry, AtomHookEntry, BackendAPI, FrontendAPI, GameState, Json, SettlementFrame, Skill } from './types';
+import type {
+  ActionEntry,
+  AtomHookEntry,
+  BackendAPI,
+  FrontendAPI,
+  Json,
+  SettlementFrame,
+  Skill,
+} from './types';
 
 export interface SkillModule {
   createSkill(id: string, ownerId: string): Skill;
@@ -28,16 +36,12 @@ export function clearSkillModules(): void {
 
 // ─── 实例级注册表(action + hook) ──────────────────────────────
 
-const actions = new Map<string, ActionEntry>();                // key = skillId + ':' + ownerId + ':' + actionType
-const beforeHooks = new Map<string, AtomHookEntry[]>();        // key = atomType
+const actions = new Map<string, ActionEntry>();
+const beforeHooks = new Map<string, AtomHookEntry[]>();
 const afterHooks = new Map<string, AtomHookEntry[]>();
 
 function actionKey(skillId: string, ownerId: string, actionType: string): string {
   return `${skillId}:${ownerId}:${actionType}`;
-}
-
-function hookKey(atomType: string): string {
-  return atomType;
 }
 
 export function registerActionEntry(entry: ActionEntry): void {
@@ -50,41 +54,49 @@ export function findActionEntry(skillId: string, ownerId: string, actionType: st
   return actions.get(actionKey(skillId, ownerId, actionType));
 }
 
-export function unregisterActionsForInstance(skillId: string, ownerId: string): void {
+function unregisterActionsForInstance(skillId: string, ownerId: string): void {
+  const prefix = `${skillId}:${ownerId}:`;
   for (const k of Array.from(actions.keys())) {
-    if (k.startsWith(`${skillId}:${ownerId}:`)) actions.delete(k);
+    if (k.startsWith(prefix)) actions.delete(k);
   }
-  // 同步清理 hooks
-  for (const list of [beforeHooks, afterHooks]) {
-    for (const arr of list.values()) {
-      const filtered = arr.filter(h => !(h.skillId === skillId && h.ownerId === ownerId));
-      if (filtered.length === 0) continue;
-      // 注意:不可变替换
-      arr.length = 0;
-      arr.push(...filtered);
+  for (const map of [beforeHooks, afterHooks]) {
+    for (const [k, list] of Array.from(map.entries())) {
+      const filtered = list.filter(h => !(h.skillId === skillId && h.ownerId === ownerId));
+      if (filtered.length === 0) {
+        map.delete(k);
+      } else {
+        map.set(k, filtered);
+      }
     }
   }
 }
 
-export function registerHookEntry(phase: 'before' | 'after', entry: AtomHookEntry): void {
-  const map = phase === 'before' ? beforeHooks : afterHooks;
-  const k = hookKey(entry.atomType);
-  const list = map.get(k) ?? [];
-  list.push(entry);
-  map.set(k, list);
-}
-
 export function getBeforeHooks(atomType: string): AtomHookEntry[] {
-  return beforeHooks.get(hookKey(atomType)) ?? [];
+  return beforeHooks.get(atomType) ?? [];
 }
 
 export function getAfterHooks(atomType: string): AtomHookEntry[] {
-  return afterHooks.get(hookKey(atomType)) ?? [];
+  return afterHooks.get(atomType) ?? [];
 }
 
-// ─── 实例管理(per player skill) ───────────────────────────────
+function registerHook(phase: 'before' | 'after', entry: AtomHookEntry): void {
+  const map = phase === 'before' ? beforeHooks : afterHooks;
+  const list = map.get(entry.atomType) ?? [];
+  list.push(entry);
+  map.set(entry.atomType, list);
+}
 
-const instances = new Map<string, () => void>();  // key = skillId + ':' + ownerId, value = 卸载函数
+function removeHook(phase: 'before' | 'after', entry: AtomHookEntry): void {
+  const map = phase === 'before' ? beforeHooks : afterHooks;
+  const list = map.get(entry.atomType);
+  if (!list) return;
+  const idx = list.indexOf(entry);
+  if (idx >= 0) list.splice(idx, 1);
+}
+
+// ─── 实例管理 ──────────────────────────────────────────────
+
+const instanceUnloads = new Map<string, () => void>();
 
 function instanceKey(skillId: string, ownerId: string): string {
   return `${skillId}:${ownerId}`;
@@ -92,9 +104,8 @@ function instanceKey(skillId: string, ownerId: string): string {
 
 export function setSkillInstanceUnload(skillId: string, ownerId: string, unload: () => void): void {
   const k = instanceKey(skillId, ownerId);
-  // 合并卸载
-  const prev = instances.get(k);
-  instances.set(k, () => {
+  const prev = instanceUnloads.get(k);
+  instanceUnloads.set(k, () => {
     prev?.();
     unload();
   });
@@ -102,28 +113,30 @@ export function setSkillInstanceUnload(skillId: string, ownerId: string, unload:
 
 export function unloadSkillInstance(skillId: string, ownerId: string): void {
   const k = instanceKey(skillId, ownerId);
-  const unload = instances.get(k);
+  const unload = instanceUnloads.get(k);
   if (unload) {
     unload();
-    instances.delete(k);
+    instanceUnloads.delete(k);
   }
   unregisterActionsForInstance(skillId, ownerId);
 }
 
 export function clearAllSkillInstances(): void {
-  for (const unload of instances.values()) unload();
-  instances.clear();
+  for (const unload of instanceUnloads.values()) unload();
+  instanceUnloads.clear();
   actions.clear();
   beforeHooks.clear();
   afterHooks.clear();
 }
 
-// ─── 给 skill 的 BackendAPI(供 skill.onInit 调用) ─────────────
+// ─── 给 skill 的 BackendAPI ────────────────────────────────
 
 export function makeBackendAPI(skill: Skill): BackendAPI {
   return {
+    self: skill.ownerId,
     registerAction(actionType, validate, execute) {
-      registerActionEntry({ skillId: skill.id, ownerId: skill.ownerId, actionType, validate, execute });
+      const entry: ActionEntry = { skillId: skill.id, ownerId: skill.ownerId, actionType, validate, execute };
+      registerActionEntry(entry);
       return () => {
         const k = actionKey(skill.id, skill.ownerId, actionType);
         actions.delete(k);
@@ -131,29 +144,19 @@ export function makeBackendAPI(skill: Skill): BackendAPI {
     },
     onAtomBefore(atomType, handler) {
       const entry: AtomHookEntry = { skillId: skill.id, ownerId: skill.ownerId, atomType, phase: 'before', handler: handler as AtomHookEntry['handler'] };
-      registerHookEntry('before', entry);
-      return () => {
-        const list = beforeHooks.get(hookKey(atomType)) ?? [];
-        const idx = list.indexOf(entry);
-        if (idx >= 0) list.splice(idx, 1);
-      };
+      registerHook('before', entry);
+      return () => removeHook('before', entry);
     },
     onAtomAfter(atomType, handler) {
       const entry: AtomHookEntry = { skillId: skill.id, ownerId: skill.ownerId, atomType, phase: 'after', handler: handler as AtomHookEntry['handler'] };
-      registerHookEntry('after', entry);
-      return () => {
-        const list = afterHooks.get(hookKey(atomType)) ?? [];
-        const idx = list.indexOf(entry);
-        if (idx >= 0) list.splice(idx, 1);
-      };
+      registerHook('after', entry);
+      return () => removeHook('after', entry);
     },
-    apply(atom) {
-      // 实际 apply 由 dispatch 流程处理,这里返回 Promise.resolve()
-      // 真正接入 settlement pipeline 后,这里会调用 settlement.apply(atom)
+    apply(_atom) {
       return Promise.resolve();
     },
     notify() {
-      // notify 占位
+      // 简化:noop
     },
   };
 }

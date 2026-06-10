@@ -352,6 +352,8 @@ export interface AtomHookEntry {
 // ==================== SkillDef ====================
 
 export interface BackendAPI {
+  /** ownerId(per player instance) */
+  readonly self: string;
   registerAction(
     actionType: string,
     validate: (view: GameView, params: Record<string, Json>) => string | null,
