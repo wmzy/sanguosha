@@ -1,31 +1,20 @@
-import type { GameAction, GameState } from '../engine/types';
-import type { PlayerView, FrontendState } from '../engine/view/types';
+// src/server/protocol.ts
+// 服务端协议层 — 切到新 ENGINE-DESIGN ClientMessage + GameView
+// 新 ENGINE-DESIGN 没有独立的事件流序号(SequencedEvent 取消),
+// 客户端轮询/订阅 state.seq 即可,断线重连直接拉最新 GameView。
+import type { ClientMessage as EngineClientMessage, GameView, Json } from '../engine/types';
 import type { Operation } from '../shared/log';
 
-/**
- * 事件协议层序号：服务端 GameSession 维护的全局递增序号。
- * 客户端用它做去重 + 断点续传（reconnect 时携带 lastAppliedSeq，
- * 服务端从 lastAppliedSeq+1 开始回放）。
- */
 export type EventSeq = number;
 
 /**
- * 一条广播事件的传输形态：基于 AtomLogEntry 展平为 {id, type, timestamp, payload}，
- * 附加 seq 协议层序号。type 从 entry.atom.type 提取，payload 直接持 atom 本身，
- * 客户端拿到即可走 reducer（与原 ServerEvent 形态保持兼容）。
+ * 服务端发往客户端的消息。
+ * initialView / debugGameState 用新 ENGINE-DESIGN 的 GameView(viewer 隔离)。
  */
-export interface SequencedEvent {
-  id: string;
-  type: string;
-  timestamp: number;
-  payload: unknown;
-  seq: EventSeq;
-}
-
 export type ServerMessage =
-  | { type: 'initialView'; state: FrontendState; lastSeq: EventSeq }
-  | { type: 'debugGameState'; state: GameState; lastSeq: EventSeq }
-  | { type: 'events'; fromSeq: EventSeq; events: SequencedEvent[]; operations?: Operation[] }
+  | { type: 'initialView'; state: GameView; lastSeq: EventSeq }
+  | { type: 'debugGameState'; state: GameView; lastSeq: EventSeq }
+  | { type: 'events'; fromSeq: EventSeq; events: GameEventEnvelope[]; operations?: Operation[] }
   | { type: 'error'; message: string }
   | { type: 'gameOver'; winner: string }
   | { type: 'room_joined'; roomId: string; playerId: string }
@@ -34,15 +23,29 @@ export type ServerMessage =
   | { type: 'player_disconnected'; playerId: string; graceMs: number }
   | { type: 'player_reconnected'; playerId: string }
   | { type: 'game_started' }
-  | { type: 'room_list'; rooms: RoomInfo[] }
-  | { type: 'asyncHookPending'; pendingId: string; hookId: string; player: string; def: unknown; timeout: number; deadline: number };
+  | { type: 'room_list'; rooms: RoomInfo[] };
 
-// Re-export for downstream consumers
-export type { PlayerView, FrontendState };
+/**
+ * 推送给客户端的事件 envelope(per-player 视图)。
+ * 新 ENGINE-DESIGN 的事件流由 atom + notify 组成(见 types.ts GameEvent)。
+ */
+export interface GameEventEnvelope {
+  seq: EventSeq;
+  /** 事件 timestamp,相对 game startedAt */
+  timestamp: number;
+  /** atom 事件 */
+  atom?: import('../engine/types').Atom;
+  /** 通知事件 */
+  notify?: { skillId: string; eventType: string; data: Json };
+}
 
+/**
+ * 客户端发往服务端的消息。
+ * 'action' 类型携带新 ENGINE-DESIGN 的 ClientMessage { skillId, actionType, ownerId, params, baseSeq }。
+ * 主动 / 回应 action 都走这个形状。
+ */
 export type ClientMessage =
-  | { type: 'action'; action: GameAction; baseSeq: EventSeq }
-  | { type: 'response'; baseSeq: EventSeq; choice: unknown }
+  | { type: 'action'; action: EngineClientMessage; baseSeq: EventSeq }
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
   | { type: 'create_room'; name: string; maxPlayers: number }
@@ -55,42 +58,51 @@ export type ClientMessage =
   | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq };
 
 export interface RoomInfo {
-  id: string;
-  name: string;
-  playerCount: number;
+  roomId: string;
+  roomName: string;
   maxPlayers: number;
-  status: '等待中' | '进行中' | '已结束';
-  isDebug: boolean;
+  currentPlayers: number;
+  hasPassword: boolean;
+  gameStarted: boolean;
+  debug: boolean;
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {
   if (typeof data !== 'object' || data === null) return false;
-  const msg = data as Record<string, unknown>;
-  switch (msg.type) {
+  const d = data as Record<string, unknown>;
+  const t = d['type'];
+  switch (t) {
     case 'action':
-      return typeof msg.action === 'object' && msg.action !== null && typeof msg.baseSeq === 'number';
-    case 'response':
-      return typeof msg.baseSeq === 'number';
+      return typeof d['baseSeq'] === 'number' && isValidEngineClientMessage(d['action']);
     case 'ready':
+    case 'delete_room':
     case 'start_game':
     case 'leave_room':
-    case 'delete_room':
       return true;
-    case 'list_rooms':
-      return msg.filter === undefined || msg.filter === 'debug' || msg.filter === 'multiplayer';
     case 'join_room':
-      return typeof msg.roomId === 'string';
-    case 'reconnect':
-      return typeof msg.playerId === 'string' && (msg.lastSeq === undefined || typeof msg.lastSeq === 'number');
-    case 'create_room':
-      return typeof msg.name === 'string' && typeof msg.maxPlayers === 'number';
-    case 'create_debug_room':
-      return typeof msg.playerCount === 'number' && msg.playerCount >= 2 && msg.playerCount <= 8;
     case 'join_debug_room':
-      return typeof msg.roomId === 'string' && (msg.lastSeq === undefined || typeof msg.lastSeq === 'number');
+      return typeof d['roomId'] === 'string';
+    case 'reconnect':
+      return typeof d['playerId'] === 'string';
+    case 'create_room':
+      return typeof d['name'] === 'string' && typeof d['maxPlayers'] === 'number';
+    case 'create_debug_room':
+      return typeof d['playerCount'] === 'number';
+    case 'list_rooms':
+      return d['filter'] === undefined || d['filter'] === 'debug' || d['filter'] === 'multiplayer';
     default:
       return false;
   }
+}
+
+function isValidEngineClientMessage(data: unknown): data is EngineClientMessage {
+  if (typeof data !== 'object' || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return typeof d['skillId'] === 'string'
+    && typeof d['actionType'] === 'string'
+    && typeof d['ownerId'] === 'string'
+    && typeof d['params'] === 'object' && d['params'] !== null
+    && typeof d['baseSeq'] === 'number';
 }
 
 export function serialize(msg: ServerMessage): string {
@@ -100,8 +112,7 @@ export function serialize(msg: ServerMessage): string {
 export function deserialize(data: string): ClientMessage | null {
   try {
     const parsed: unknown = JSON.parse(data);
-    if (isValidClientMessage(parsed)) return parsed;
-    return null;
+    return isValidClientMessage(parsed) ? parsed : null;
   } catch {
     return null;
   }
