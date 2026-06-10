@@ -230,7 +230,7 @@ export function handleWsMessage(
       handleReady(playerId);
       break;
     case 'start_game':
-      handleStartGame(playerId);
+      void handleStartGame(playerId);
       break;
     case 'action':
       handleAction(playerId, message.action, message.baseSeq);
@@ -242,10 +242,10 @@ export function handleWsMessage(
       handleReconnect(playerId, message.playerId, message.lastSeq ?? 0, ws);
       break;
     case 'create_debug_room':
-      handleCreateDebugRoom(playerId, message.playerCount, ws);
+      void handleCreateDebugRoom(playerId, message.playerCount, ws);
       break;
     case 'join_debug_room':
-      handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws);
+      void handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws);
       break;
     case 'delete_room':
       handleDeleteRoom(playerId);
@@ -318,7 +318,7 @@ function handleReady(playerId: string): void {
   setReady(roomId, playerId);
 }
 
-function handleStartGame(playerId: string): void {
+async function handleStartGame(playerId: string): Promise<void> {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
@@ -340,7 +340,7 @@ function handleStartGame(playerId: string): void {
   const session = new GameSession(room);
   gameSessions.set(roomId, session);
 
-  if (session.startGame()) {
+  if (await session.startGame()) {
     broadcastMessage(room, serialize({ type: 'game_started' }));
   }
 }
@@ -390,7 +390,7 @@ function handleDisconnect(playerId: string): void {
   }
 }
 
-function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSContext): void {
+async function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSContext): Promise<void> {
   if (playerCount < 2 || playerCount > 8) {
     ws.send(serialize({ type: 'error', message: '玩家人数须在2-8之间' }));
     return;
@@ -400,7 +400,7 @@ function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSCont
   session.pendingPlayerCount = playerCount;
   gameSessions.set(room.id, session);
   // host 自动 join：和 handleJoinDebugRoom 走相同流程
-  handleJoinDebugRoom(playerId, room.id, 0, ws);
+  await handleJoinDebugRoom(playerId, room.id, 0, ws);
 }
 
 function handleDeleteRoom(playerId: string): void {
@@ -422,7 +422,7 @@ function handleDeleteRoom(playerId: string): void {
   void deletePersistedRoom(roomId);
 }
 
-function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: number, ws: WSContext): void {
+async function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: number, ws: WSContext): Promise<void> {
   const room = getRoom(roomId);
   if (!room?.isDebug) {
     ws.send(serialize({ type: 'error', message: '房间不存在或不是调试房间' }));
@@ -445,7 +445,7 @@ function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: number, 
   const pendingPlayerCount = session.pendingPlayerCount;
   if (pendingPlayerCount != null) {
     session.pendingPlayerCount = undefined;
-    session.startGame(pendingPlayerCount);
+    await session.startGame(pendingPlayerCount);
     ws.send(serialize({ type: 'room_joined', roomId, playerId }));
   } else {
     // reconnectPlayer 内部已经发送 debugGameState + 可选 events 续传，

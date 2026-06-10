@@ -17,6 +17,7 @@ import type { Room } from './room';
 import type { Role } from '../shared/types';
 import { createLogger } from './logger';
 import { createRng } from '../shared/rng';
+import { createStandardDeck, shuffle } from '../shared/deck';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
 
@@ -77,7 +78,7 @@ export class GameSession {
     this.engine.bootstrap(state);
   }
 
-  startGame(playerCount?: number): boolean {
+  async startGame(playerCount?: number): Promise<boolean> {
     if (this.destroyed) return false;
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
@@ -107,27 +108,45 @@ export class GameSession {
       }
     }
 
-    const state: GameState = {
-      players: selected.map((char, i) => ({
+    // 创建并洗牌
+    const allCards = shuffle(createStandardDeck(), rng);
+    const cardMap: GameState['cardMap'] = {};
+    const deckIds: string[] = [];
+    for (const card of allCards) {
+      cardMap[card.id] = card;
+      deckIds.push(card.id);
+    }
+
+    // 发初始手牌(每人4张)
+    const handSize = 4;
+    let cursor = 0;
+    const players = selected.map((char, i) => {
+      const hand = deckIds.slice(cursor, cursor + handSize);
+      cursor += handSize;
+      return {
         index: i,
         name: char.name,
         character: char.name,
         health: 4,
         maxHealth: 4,
         alive: true,
-        hand: [],
+        hand,
         equipment: {},
-        skills: char.skills,
+        skills: [...char.skills, '回合管理'],
         vars: {},
         marks: [],
         pendingTricks: [],
-      })),
+      };
+    });
+
+    const state: GameState = {
+      players,
       currentPlayerIndex: 0,
       phase: '准备',
       turn: { round: 1, phase: '准备', vars: {} },
-      zones: { deck: [], discardPile: [], processing: [] },
+      zones: { deck: deckIds.slice(cursor), discardPile: [], processing: [] },
       settlementStack: [],
-      cardMap: {},
+      cardMap,
       rngSeed: seed,
       marks: [],
       localVars: {},
@@ -139,7 +158,23 @@ export class GameSession {
     this.engine = createEngine();
     this.engine.resetForTest();
     this.engine.bootstrap(state);
-    this.state = state;
+
+    // 触发第一次回合开始 → 阶段开始(准备)
+    // 直接 dispatch 一个内部 action 来启动游戏
+    const firstPlayer = state.players[0];
+    if (firstPlayer) {
+      const startMsg: EngineClientMessage = {
+        skillId: '回合管理',
+        actionType: 'start',
+        ownerId: firstPlayer.name,
+        params: {},
+        baseSeq: 0,
+      };
+      this.state = await this.engine.dispatch(state, startMsg);
+    } else {
+      this.state = state;
+    }
+
     this.actionLog = [];
     this.lastActivityAt = Date.now();
 
