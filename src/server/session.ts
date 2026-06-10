@@ -71,9 +71,7 @@ export class GameSession {
   restoreState(state: GameState, actionLog: ActionLogEntry[] = []): void {
     this.state = state;
     this.actionLog = actionLog;
-    this.playerNames.clear();
     this.lastActivityAt = Date.now();
-    // 重启后,新 engine 重新实例化所有 skill
     this.engine = createEngine();
     this.engine.resetForTest();
     this.engine.bootstrap(state);
@@ -150,27 +148,18 @@ export class GameSession {
     return true;
   }
 
-  /**
-   * 处理客户端 action(主动/回应都走这个接口)
-   * 主动 action 压栈(由 engine 内部处理),回应 action 不压栈(由 engine settlement 内部处理)
-   * CAS 校验:baseSeq 不匹配时静默丢弃
-   */
   async handleAction(playerId: string, action: EngineClientMessage, baseSeq?: number): Promise<void> {
     if (this.destroyed) return;
     if (!this.state || !this.engine) return;
-
     if (baseSeq !== undefined && baseSeq !== this.state.seq) {
-      this.logger.warn('CAS mismatch', { baseSeq, currentSeq: this.state.seq });
       return;
     }
-
     const expectedName = this.playerNames.get(playerId);
     if (!expectedName) return;
     if (action.ownerId !== expectedName) {
       this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedName });
       return;
     }
-
     try {
       const next = await this.engine.dispatch(this.state, action);
       this.state = next;

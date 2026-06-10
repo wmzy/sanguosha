@@ -1,6 +1,6 @@
 // src/server/persistence.ts
-// 切到新 ENGINE-DESIGN:序列化 GameState + ActionLogEntry[] 到磁盘
 import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { ActionLogEntry, GameState } from '../engine/types';
 import { register as registerLifecycle } from './lifecycles';
 import { createLogger } from './logger';
