@@ -22,7 +22,7 @@ import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreToState } from './persistence';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
-import { pendingToAction } from './protocol-adapter';
+// 新 ENGINE-DESIGN 不再需要 protocol-adapter(回应 action 走 ClientMessage 直接 dispatch)
 
 const log = createLogger('ws');
 
@@ -233,14 +233,7 @@ export function handleWsMessage(
       handleStartGame(playerId);
       break;
     case 'action':
-      if (message.action.type === '异步钩子响应') {
-        handleAsyncHookResponse(playerId, message.action, message.baseSeq);
-      } else {
-        handleAction(playerId, message.action, message.baseSeq);
-      }
-      break;
-    case 'response':
-      handleResponse(playerId, message.baseSeq, message.choice);
+      handleAction(playerId, message.action, message.baseSeq);
       break;
     case 'leave_room':
       handleLeaveRoom(playerId);
@@ -352,52 +345,19 @@ function handleStartGame(playerId: string): void {
   }
 }
 
-function handleAction(playerId: string, action: import('../engine/types').GameAction, baseSeq: number): void {
+function handleAction(playerId: string, action: import('../engine/types').ClientMessage, baseSeq: number): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
   const session = gameSessions.get(roomId);
   if (!session) return;
 
-  session.handleAction(playerId, action, baseSeq);
-  session.handleAction(playerId, action, baseSeq);
+  void session.handleAction(playerId, action, baseSeq);
 }
 
-/**
- * 处理 异步钩子响应 action（P5-T2 / ADR 0025）。
- * 路由到 session.handleAsyncHookResponse，走 asyncEngine.dispatchAsync 恢复路径。
- */
-function handleAsyncHookResponse(playerId: string, action: import('../engine/types').GameAction, baseSeq: number): void {
-  const roomId = playerRoomMap.get(playerId);
-  if (!roomId) return;
-  const session = gameSessions.get(roomId);
-  if (!session) return;
-  session.handleAsyncHookResponse(playerId, action, baseSeq);
-}
+// 新 ENGINE-DESIGN 不再需要 handleAsyncHookResponse
 
-function handleResponse(playerId: string, baseSeq: number, choice: unknown): void {
-  const roomId = playerRoomMap.get(playerId);
-  if (!roomId) return;
-
-  const session = gameSessions.get(roomId);
-  if (!session) return;
-
-  const playerName = session.getPlayerName(playerId);
-  if (!playerName) return;
-
-  const pending = session.getPending();
-  if (!pending) return;
-
-  const action = pendingToAction(pending, playerName, choice);
-  if (!action) {
-    log.warn('未知 pending 类型', { pendingType: (pending as { type: string }).type });
-    return;
-  }
-
-  // CAS 校验由 session.handleAction 完成；pending 已被服务端的 state 推进过
-  // 也会导致 baseSeq 不匹配，从而被静默丢弃。
-  session.handleAction(playerId, action, baseSeq);
-}
+// 新 ENGINE-DESIGN 不再需要 handleResponse(回应走 action 消息)
 
 function handleLeaveRoom(playerId: string): void {
   const roomId = playerRoomMap.get(playerId);

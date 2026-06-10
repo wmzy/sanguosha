@@ -1263,6 +1263,15 @@ src/engine/
     摸牌.ts
     ...
 
+  cards/               # 卡牌定义（每个文件一类卡牌）
+    characters/        # 武将卡牌定义（每个文件一个卡牌）
+      刘备.ts
+      ...
+
+    基础.ts
+    锦囊.ts
+    ...
+
   skills/              # 技能定义（每个文件一个技能）
     杀.ts              # 主动技能（registerAction）
     桃.ts
