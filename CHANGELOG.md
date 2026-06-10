@@ -23,6 +23,12 @@ All notable changes to this project will be documented in this file.
 - `src/engine/skills/杀.ts` `闪.ts` `桃.ts` `酒.ts` — 4 基本牌(registerAction)
 - `src/engine/skills/仁德.ts` `激将.ts` `护甲.ts` `制衡.ts` `武圣.ts` `遗计.ts` — 5 武将 6 技能(刘备/曹操/孙权/关羽/郭嘉)
 - `tests/engine-smoke.test.ts` — 4 烟雾测试
+- `src/server/protocol.ts` — 新 `EngineClientMessage` 协议(删老 SequencedEvent/EventSeq)
+- `src/server/session.ts` — 切到 `createEngine().dispatch()`(删老 createAsyncEngine/GameAction/AsyncHookRegistry)
+- `src/server/persistence.ts` — 序列化 `GameState` + `ActionLogEntry[]`(删老 action replay)
+- `src/server/app.ts` — 删老 pendingToAction/handleAsyncHookResponse/handleResponse,所有 action 走新 ClientMessage
+- `src/client/components/NewEngineDemo.tsx` — client-side 直接调新 `createEngine().dispatch()` 试用
+- `tests/integration/server-gameplay.test.ts` — 服务端玩法集成测试(P1出杀→P2扣血 + CAS 校验)
 
 ### Changed
 
@@ -39,8 +45,9 @@ All notable changes to this project will be documented in this file.
 - `src/engine/*` 全部内容 → `src/engine/_legacy/*`(`src/engine/` 仅含新代码 + `_legacy/` 参考目录)
 
 ### Verified
-
 - `pnpm vitest run tests/engine-smoke.test.ts`: 4/4 passed
+- `pnpm vitest run tests/integration/new-engine-*.test.ts`: 9/9 passed
+- `pnpm vitest run tests/integration/server-gameplay.test.ts`: 2/2 passed
 - `pnpm tsc --noEmit`: 0 新引擎错误(`_legacy/` 148 个错误为预期,旧代码未动)
 - 0 新代码 import `_legacy/`
 - 0 内联 `import("...")`(全部顶级 `import type`)
