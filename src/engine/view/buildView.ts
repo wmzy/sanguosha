@@ -8,6 +8,8 @@ export function buildView(state: GameState, viewer: number): GameView {
     phase: state.phase,
     turn: state.turn,
     players: state.players.map((p, i) => ({
+      name: p.name,
+      character: p.character,
       health: p.health,
       maxHealth: p.maxHealth,
       alive: p.alive,

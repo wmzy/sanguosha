@@ -25,7 +25,6 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
       <div>
         <GameViewComponent
           view={c.view}
-          playerNames={c.playerNames}
           onAction={c.sendAction}
           onDeleteRoom={c.handleDeleteRoom}
         />

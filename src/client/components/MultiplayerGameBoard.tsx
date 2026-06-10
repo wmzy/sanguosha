@@ -1,13 +1,19 @@
 // src/components/MultiplayerGameBoard.tsx — 多人模式游戏棋盘
 //
 // 新 ENGINE-DESIGN: 服务器发 GameView(initialView),客户端发 ClientMessage。
-// 不再用 FrontendState / reduceFrontend / SequencedEvent / GameAction。
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { GameViewComponent } from './GameView';
 import { styles } from '../theme';
-import type { GameView, ClientMessage as EngineClientMessage } from '../../engine/types';
+import type { GameView, Json } from '../../engine/types';
 import type { ServerMessage } from '../../server/protocol';
+
+interface ActionMsg {
+  skillId: string;
+  actionType: string;
+  ownerId: string;
+  params: Record<string, Json>;
+}
 
 interface MultiplayerGameBoardProps {
   roomId: string;
@@ -17,15 +23,12 @@ interface MultiplayerGameBoardProps {
 export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardProps) {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-  const { connected, send, onMessage, connect } = useWebSocket(wsUrl);
+  const { connected, send, onMessage } = useWebSocket(wsUrl);
 
   const [view, setView] = useState<GameView | null>(null);
-  const [playerNames, setPlayerNames] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const lastSeqRef = useRef(0);
-
-  useEffect(() => { connect(); }, [connect]);
 
   useEffect(() => {
     if (connected) send({ type: 'join_room', roomId });
@@ -36,12 +39,6 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
       if (msg.type === 'initialView') {
         lastSeqRef.current = msg.lastSeq;
         setView(msg.state);
-      } else if (msg.type === 'game_started') {
-        // 游戏开始,等待 initialView
-      } else if (msg.type === 'player_joined') {
-        // 可以更新玩家列表
-      } else if (msg.type === 'player_left') {
-        // 可以更新玩家列表
       } else if (msg.type === 'gameOver') {
         setGameOver({ winner: msg.winner });
       } else if (msg.type === 'error') {
@@ -53,8 +50,8 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
   }, [onMessage]);
 
   const sendAction = useCallback(
-    (action: EngineClientMessage) => {
-      send({ type: 'action', action, baseSeq: lastSeqRef.current });
+    (action: ActionMsg) => {
+      send({ type: 'action', action: { ...action, baseSeq: lastSeqRef.current }, baseSeq: lastSeqRef.current });
     },
     [send],
   );
@@ -95,7 +92,6 @@ export function MultiplayerGameBoard({ roomId, onLeave }: MultiplayerGameBoardPr
     <div>
       <GameViewComponent
         view={view}
-        playerNames={playerNames}
         onAction={sendAction}
         onDeleteRoom={handleLeave}
       />

@@ -237,6 +237,8 @@ export interface GameView {
   phase: TurnPhase;
   turn: { round: number; phase: TurnPhase; vars: Record<string, Json> };
   players: {
+    name: string;
+    character: string;
     health: number;
     maxHealth: number;
     alive: boolean;

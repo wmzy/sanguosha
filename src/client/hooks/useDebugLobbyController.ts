@@ -8,8 +8,16 @@ import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from './useWebSocket';
 import { storeSession, loadSession, clearSession } from '../utils/debugSession';
 import { apiFetch, ApiError } from '../api/client';
-import type { GameView, ClientMessage as EngineClientMessage } from '../../engine/types';
+import type { GameView, Json } from '../../engine/types';
 import type { ServerMessage, RoomInfo } from '../../server/protocol';
+
+/** 客户端发的 action(不含 baseSeq) */
+interface ActionMsg {
+  skillId: string;
+  actionType: string;
+  ownerId: string;
+  params: Record<string, Json>;
+}
 
 export interface DebugLobbyController {
   connected: boolean;
@@ -19,7 +27,7 @@ export interface DebugLobbyController {
   error: string | null;
   playerCount: number;
   setPlayerCount: (n: number) => void;
-  sendAction: (action: EngineClientMessage) => void;
+  sendAction: (action: ActionMsg) => void;
   refreshRoomList: () => void;
   handleCreateDebugRoom: () => Promise<void>;
   handleDeleteRoom: () => void;
@@ -47,12 +55,12 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     if (connected) send({ type: 'list_rooms', filter: 'debug' });
   }, [connected, send]);
 
-  // 自动重连
-  const lastConnectedRef = useRef(false);
+  // 加入房间: connected 时 initialRoomId 变化也触发
+  const prevRoomRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    const becameConnected = connected && !lastConnectedRef.current;
-    lastConnectedRef.current = connected;
-    if (!becameConnected || !initialRoomId) return;
+    if (!connected || !initialRoomId) return;
+    if (prevRoomRef.current === initialRoomId) return;
+    prevRoomRef.current = initialRoomId;
 
     const session = loadSession();
     if (session?.roomId === initialRoomId) {
@@ -96,10 +104,10 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     return unsubscribe;
   }, [onMessage, initialRoomId, navigate, playerNames.length]);
 
-  // 发送 action
+  // 发送 action(自动加 baseSeq)
   const sendAction = useCallback(
-    (action: EngineClientMessage) => {
-      send({ type: 'action', action, baseSeq: lastSeqRef.current });
+    (action: ActionMsg) => {
+      send({ type: 'action', action: { ...action, baseSeq: lastSeqRef.current }, baseSeq: lastSeqRef.current });
     },
     [send],
   );
