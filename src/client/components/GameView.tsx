@@ -33,6 +33,13 @@ const SUIT_COLOR: Record<string, string> = {
   '♠': '#ccc', '♣': '#ccc', '♥': '#e74c3c', '♦': '#e74c3c',
 };
 
+// ─── 时间格式化 ───
+function formatTime(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+}
+
 // ─── 倒计时 hook ───
 function useCountdownSeconds(deadline: number | null): number | null {
   const [sec, setSec] = useState<number | null>(null);
@@ -60,6 +67,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const perspective = view.players[perspectiveIdx];
   const perspectiveName = perspective?.name ?? `P${perspectiveIdx}`;
   const isMyTurn = view.currentPlayerIndex === view.viewer;
+  const isPerspectiveTurn = view.currentPlayerIndex === perspectiveIdx;
   const currentPlayer = view.players[view.currentPlayerIndex];
   const currentPlayerName = currentPlayer?.name ?? '';
 
@@ -67,13 +75,29 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const perspectiveHand: Card[] = perspective?.hand ?? [];
   const viewerHand: Card[] = view.players[view.viewer]?.hand ?? [];
 
-  // 待回应
+  // 待回应:基于视角玩家
   const pending = view.pending;
-  const isAwaitingResponse = pending !== null && pending.target === view.players[view.viewer]?.name;
+  const isPerspectiveAwaiting = pending !== null && pending.target === perspectiveName;
+  // 只有当视角=自己时才能操作
+  const canOperate = perspectiveIdx === view.viewer;
+  const isMyAwaiting = isPerspectiveAwaiting && canOperate;
 
-  // 倒计时
-  const deadline = pending?.deadline ?? null;
+  // 倒计时:pending 回应优先,否则用 turnDeadline
+  const deadline = pending?.deadline ?? view.turnDeadline;
   const remainingSeconds = useCountdownSeconds(deadline);
+
+  // 倒计时到 0 自动跳过
+  useEffect(() => {
+    if (remainingSeconds !== null && remainingSeconds <= 0) {
+      if (isMyAwaiting) {
+        // 有 pending 回应 → 自动不出
+        handleRespond();
+      } else if (isMyTurn && canOperate) {
+        // 自己回合 → 自动结束
+        handleEndTurn();
+      }
+    }
+  }, [remainingSeconds]);
 
   // 切换视角
   const switchPerspective = useCallback(() => {
@@ -96,16 +120,25 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setSelectedTarget(null);
   }, [onAction, view]);
 
+  // 需要选目标的牌
+  const TARGET_REQUIRED_CARDS = new Set(['杀', '过河拆桥', '顺手牵羊', '借刀杀人', '决斗', '乐不思蜀']);
+  // 自动以自己为目标的牌
+  const SELF_TARGET_CARDS = new Set(['桃', '酒']);
+  // 只能作为回应打出的牌(不能主动出)
+  const RESPOND_ONLY = new Set(['闪', '无懈可击']);
   // 出牌
   function handlePlayCard() {
     if (!selectedCardId || !isMyTurn) return;
     const card = viewerHand.find(c => c.id === selectedCardId);
     if (!card) return;
-    if (selectedTarget) {
-      send(card.name, 'use', { cardId: card.id, targets: [selectedTarget] });
-    } else {
-      send(card.name, 'use', { cardId: card.id });
-    }
+    if (RESPOND_ONLY.has(card.name)) return; // 不能主动出
+    const selfName = view.players[view.viewer].name;
+    const needsTarget = TARGET_REQUIRED_CARDS.has(card.name);
+    if (needsTarget && !selectedTarget) return; // 需要目标但没选
+    const target = selectedTarget ?? (SELF_TARGET_CARDS.has(card.name) ? selfName : undefined);
+    const params: Record<string, Json> = { cardId: card.id };
+    if (target) params.targets = [target];
+    send(card.name, 'use', params);
   }
 
   // 回应
@@ -130,15 +163,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   // 选牌
   function handleCardClick(card: Card) {
-    // 回应模式
-    if (isAwaitingResponse) {
+    // 回应模式(只有自己视角才能操作)
+    if (isMyAwaiting) {
       if (card.name === '闪' || card.name === '杀') {
         handleRespond(card.id);
       }
       return;
     }
-    // 出牌模式
-    if (!isMyTurn) return;
+    // 出牌模式(只有自己回合才能操作)
+    if (!isMyTurn || !canOperate) return;
     if (selectedCardId === card.id) {
       setSelectedCardId(null);
       setSelectedTarget(null);
@@ -183,6 +216,9 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           <span className={currentPlayerText}>
             当前: {currentPlayerName} {currentPlayer?.character ? `(${currentPlayer.character})` : ''}
           </span>
+          {remainingSeconds !== null && (
+            <span className={headerCountdown}>⏱ {remainingSeconds}s</span>
+          )}
         </div>
         <div className={headerRight}>
           <button className={perspectiveBtn} onClick={switchPerspective}>
@@ -193,26 +229,49 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       </div>
 
       {/* ─── 操作提示 ─── */}
-      {isAwaitingResponse && pending && (
+      {isPerspectiveAwaiting && pending && (
         <div className={promptBox}>
-          <div className={promptTitle}>⚡ 需要回应</div>
+          <div className={promptTitle}>⚡ 需要回应 — {perspectiveName}</div>
           <div className={promptDesc}>
             {pending.prompt.title}
             {pending.prompt.description && <span> — {pending.prompt.description}</span>}
           </div>
-          <div className={promptActions}>
-            <button className={promptBtn} onClick={() => handleRespond()}>不出</button>
-            {viewerHand.filter(c => c.name === '闪' || c.name === '杀').map(c => (
-              <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
-                {c.name} {c.suit}{c.rank}
-              </button>
-            ))}
-          </div>
+          {canOperate && (
+            <div className={promptActions}>
+              <button className={promptBtn} onClick={() => handleRespond()}>不出</button>
+              {viewerHand.filter(c => c.name === '闪' || c.name === '杀').map(c => (
+                <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
+                  {c.name} {c.suit}{c.rank}
+                </button>
+              ))}
+            </div>
+          )}
+          {!canOperate && <div className={waitingHint}>等待 {perspectiveName} 回应...</div>}
         </div>
       )}
 
-      {!isMyTurn && !isAwaitingResponse && (
+      {!isPerspectiveTurn && !isPerspectiveAwaiting && (
         <div className={waitingHint}>等待 {currentPlayerName} 操作...</div>
+      )}
+      {isPerspectiveTurn && view.phase === '出牌' && !isPerspectiveAwaiting && (
+        <div className={promptBox}>
+          <div className={promptTitle}>🃏 {perspectiveName}的回合 — 出牌阶段</div>
+          <div className={promptDesc}>
+            {canOperate && selectedCardId
+              ? selectedTarget
+                ? `已选择目标: ${selectedTarget}，点击「出牌」确认`
+                : '已选牌，可选择目标或直接出牌'
+              : canOperate
+                ? '选择一张手牌出牌，或点击「结束回合」'
+                : `${perspectiveName} 正在思考...`}
+          </div>
+        </div>
+      )}
+      {isPerspectiveTurn && view.phase === '弃牌' && !isPerspectiveAwaiting && (
+        <div className={promptBox}>
+          <div className={promptTitle}>🗑️ {perspectiveName} — 弃牌阶段</div>
+          <div className={promptDesc}>{canOperate ? '请弃置多余的手牌' : `${perspectiveName} 正在弃牌...`}</div>
+        </div>
       )}
 
       {/* ─── 座位布局 ─── */}
@@ -322,8 +381,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         <div className={handList}>
           {perspectiveHand.map((card, i) => {
             const isSelected = selectedCardId === card.id;
-            const canPlay = isMyTurn && perspectiveIdx === view.viewer;
-            const isAwaiting = isAwaitingResponse && (card.name === '闪' || card.name === '杀');
+            const canPlay = isMyTurn && canOperate;
+            const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀');
             const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
             return (
               <div
@@ -342,21 +401,25 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
       {/* ─── 操作面板 ─── */}
       <div className={actionBar}>
-        {isMyTurn && view.phase === '出牌' && selectedCardId && (
-          <button className={playBtn} onClick={handlePlayCard}>
-            出牌{selectedTarget ? ` → ${selectedTarget}` : ''}
-          </button>
-        )}
-        {isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
+        {canOperate && isMyTurn && view.phase === '出牌' && selectedCardId && (() => {
+          const card = viewerHand.find(c => c.id === selectedCardId);
+          const needsTarget = card ? TARGET_REQUIRED_CARDS.has(card.name) : false;
+          const canPlay = !needsTarget || !!selectedTarget;
+          return <button className={playBtn} onClick={handlePlayCard} disabled={!canPlay}
+            style={canPlay ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
+            出牌{selectedTarget ? ` → ${selectedTarget}` : needsTarget ? ' (请选目标)' : ''}
+          </button>;
+        })()}
+        {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
           <button className={endTurnBtn} onClick={handleEndTurn}>结束回合</button>
         )}
-        {selectedCardId && selectedTarget && isMyTurn && (
+        {selectedCardId && selectedTarget && canOperate && isMyTurn && (
           <div className={targetHint}>已选择目标: {selectedTarget}</div>
         )}
       </div>
 
       {/* ─── 目标选择 ─── */}
-      {selectedCardId && isMyTurn && !isAwaitingResponse && (
+      {selectedCardId && canOperate && isMyTurn && !isMyAwaiting && (
         <div className={targetSection}>
           <div className={targetTitle}>选择目标:</div>
           <div className={targetList}>
@@ -376,6 +439,20 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         </div>
       )}
 
+      {/* ─── 游戏日志 ─── */}
+      <details className={logPanel}>
+        <summary className={logSummary}>📜 游戏日志 ({view.log.length})</summary>
+        <div className={logContent}>
+          {view.log.length === 0 && <div className={logEmpty}>暂无记录</div>}
+          {view.log.slice().reverse().map((entry, i) => (
+            <div key={i} className={logEntry}>
+              <span className={logTime}>{formatTime(entry.time)}</span>
+              <span className={logPlayer}>{entry.player}</span>
+              <span className={logText}>{entry.text}</span>
+            </div>
+          ))}
+        </div>
+      </details>
       {/* ─── 调试面板 ─── */}
       <details className={debugPanel}>
         <summary className={debugSummary}>调试信息</summary>
@@ -523,6 +600,11 @@ const goToBtn = css`
   border: 1px solid #555; border-radius: 4px; padding: 4px 10px;
   cursor: pointer; background: transparent; color: #aaa; font-size: 12px;
 `;
+const headerCountdown = css`
+  color: #e67e22; font-weight: bold; font-size: 16px;
+  background: rgba(230,126,34,0.15); border-radius: 4px; padding: 2px 8px;
+  animation: pulse 1s ease-in-out infinite;
+`;
 
 // Prompt
 const promptBox = css`
@@ -660,3 +742,24 @@ const debugContent = css`padding: 8px 12px; font-size: 12px; color: #aaa; font-f
 const debugHr = css`border: none; border-top: 1px solid #333; margin: 8px 0;`;
 const debugPlayer = css`margin-bottom: 4px;`;
 const debugDead = css`text-decoration: line-through; opacity: 0.5;`;
+
+// Log panel
+const logPanel = css`
+  margin-top: 12px; border: 1px solid #333; border-radius: 8px;
+  background: rgba(0,0,0,0.2);
+`;
+const logSummary = css`
+  padding: 8px 12px; cursor: pointer; color: #888; font-size: 12px;
+`;
+const logContent = css`
+  padding: 8px 12px; font-size: 12px; color: #aaa;
+  max-height: 200px; overflow-y: auto;
+`;
+const logEmpty = css`color: #555; font-style: italic;`;
+const logEntry = css`
+  display: flex; gap: 8px; padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+`;
+const logTime = css`color: #666; min-width: 40px; flex-shrink: 0;`;
+const logPlayer = css`color: #3498db; font-weight: bold; min-width: 40px; flex-shrink: 0;`;
+const logText = css`color: #ccc;`;

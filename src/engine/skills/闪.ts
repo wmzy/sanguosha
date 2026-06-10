@@ -10,30 +10,30 @@ export function createSkill(id: string, ownerId: string): Skill {
 export function onInit(skill: Skill, api: BackendAPI): () => void {
   api.registerAction(
     'respond',
-    (view: GameView, params: Record<string, Json>) => {
-      if (typeof params.cardId !== 'string') return 'cardId required';
+    (view: GameView, _params: Record<string, Json>) => {
+      // cardId 为空表示不出闪 — 始终允许
       return null;
     },
     async (frame: SettlementFrame) => {
       const { from, params } = frame;
-      const cardId = params.cardId as string;
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return; // 不出闪,什么都不做
+      // 移动闪到弃牌堆
       await frame.apply({
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
-      if (settlement) {
-        const item = settlement.find(s => s.target === from);
-        if (item) item.dodged = true;
-      }
-      await frame.apply({
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
         to: { zone: '弃牌堆' },
       });
+      // 在 parent frame(kill frame) 的 settlement 中标记 dodged
+      const parent = frame.parent;
+      if (parent) {
+        const settlement = parent.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
+        if (settlement) {
+          const item = settlement.find(s => s.target === from);
+          if (item) item.dodged = true;
+        }
+      }
     },
   );
   return () => {};

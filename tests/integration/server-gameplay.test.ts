@@ -79,11 +79,20 @@ describe('新 ENGINE-DESIGN GameSession — 玩法集成', () => {
     const p2 = state.players[1];
     const originalHealth = p2.health;
 
+    // 第一步:出杀 → 产生 pending
     await session.handleAction('P1_WS', {
       skillId: '杀',
       actionType: 'use',
       ownerId: p1.name,
       params: { cardId: 'c1', targets: [p2.name] },
+    });
+
+    // 第二步:P2 不出闪 → 结算
+    await session.handleAction('P2_WS', {
+      skillId: '闪',
+      actionType: 'respond',
+      ownerId: p2.name,
+      params: {},
     });
 
     const after = session.getState()!;

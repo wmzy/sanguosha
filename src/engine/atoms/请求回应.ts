@@ -16,6 +16,13 @@ export const 请求回应: AtomDefinition<{
     return null;
   },
   apply(state) { return { ...state }; },
+  // 等待回应:目标来自 atom.target 字段(避免硬编码为 '');
+  // 兜底 timeout 30s;各调用方在 atom 自身传 timeout 字段,
+  // settlement.ts:88 优先读 def.awaits.timeout,这里给 30s 默认值。
+  awaits: {
+    getTarget: (atom) => (atom as { target: string }).target,
+    timeout: 30,
+  },
   effect: { blockUntilDone: true, duration: 200 },
 };
 

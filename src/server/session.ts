@@ -55,6 +55,7 @@ export class GameSession {
   private disconnectedAt = new Map<string, number>();
   private graceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastActivityAt = Date.now();
+  private pendingTimeout: ReturnType<typeof setTimeout> | null = null;
   private roomName: string;
   private maxPlayers: number;
   private destroyed = false;
@@ -85,14 +86,14 @@ export class GameSession {
 
     const seed = this.sessionSeed;
     const rng = createRng(seed);
-    const shuffled = [...CHARACTERS];
-    for (let i = shuffled.length - 1; i > 0; i--) {
+    // 主公固定在 0 号位,其余角色随机
+    const lord = CHARACTERS.find(c => c.name === '主公')!;
+    const others = CHARACTERS.filter(c => c.name !== '主公');
+    for (let i = others.length - 1; i > 0; i--) {
       const j = rng.nextInt(i + 1);
-      const tmp = shuffled[i];
-      shuffled[i] = shuffled[j];
-      shuffled[j] = tmp;
+      const tmp = others[i]; others[i] = others[j]; others[j] = tmp;
     }
-    const selected = shuffled.slice(0, count);
+    const selected = [lord, ...others.slice(0, count - 1)];
     const roles = assignRoles(count);
 
     if (this.debug) {
@@ -132,7 +133,7 @@ export class GameSession {
         alive: true,
         hand,
         equipment: {},
-        skills: [...char.skills, '回合管理'],
+        skills: [...char.skills, '回合管理', '装备通用'],
         vars: {},
         marks: [],
         pendingTricks: [],
@@ -202,16 +203,77 @@ export class GameSession {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         timestamp: Date.now() - this.state.startedAt,
         message: action,
-        baseSeq: this.state.seq,
+        // 用客户端送来的 baseSeq(未传则为 -1 表示未参与 CAS),
+        // 而不是 dispatch 推进后的 this.state.seq——后者会让重放时 CAS 错位。
+        baseSeq: baseSeq ?? -1,
       });
       this.lastActivityAt = Date.now();
       this.persistAsync();
       this.broadcastNewState();
       this.checkGameEnd();
+      this.schedulePendingTimeout();
     } catch (err) {
       this.logger.error('dispatch error', { err: String(err) });
       this.sendToPlayer(playerId, { type: 'error', message: '引擎内部错误' });
     }
+  }
+
+  /**
+   * 检查 state.settlementStack 栈顶是否有等待回应;
+   * 如有,按 pendingRequest.deadline 设置 setTimeout,到期后自动注入
+   * 请求回应 atom 的 defaultChoice 作为玩家回应(防止掉线/不响应时
+   * 整局卡死)。
+   */
+  private schedulePendingTimeout(): void {
+    this.clearPendingTimeout();
+    if (!this.state) return;
+    const top = this.state.settlementStack[this.state.settlementStack.length - 1];
+    if (!top || !top.pendingRequest || top.pendingRequest.status !== 'waiting') return;
+    const pr = top.pendingRequest;
+    const atom = pr.atom;
+    if (atom.type !== '请求回应' && atom.type !== '询问闪' && atom.type !== '询问杀') return;
+    const remaining = pr.deadline ? pr.deadline - Date.now() : 30_000;
+    if (remaining <= 0) {
+      // 立即超时
+      void this.injectTimeoutResponse(atom);
+      return;
+    }
+    this.pendingTimeout = setTimeout(() => {
+      this.pendingTimeout = null;
+      void this.injectTimeoutResponse(atom);
+    }, remaining);
+  }
+
+  private clearPendingTimeout(): void {
+    if (this.pendingTimeout !== null) {
+      clearTimeout(this.pendingTimeout);
+      this.pendingTimeout = null;
+    }
+  }
+
+  /**
+   * 把 atom 的 defaultChoice 作为目标玩家的"超时回应",走正常 handleAction。
+   *
+   * 实现策略:在 engine dispatch 走 'responded' 路径时(栈顶有 pendingRequest),
+   * findActionEntry 找不到时 dispatch 会静默丢弃;为此我们直接走 settlement 内部:
+   * 1. 标记栈顶 pendingRequest.status = 'resolved'
+   * 2. 把 defaultChoice + requestType 注入 pending.params(供 frame.execute 后续读)
+   * 3. 重新调一次 'no-op' 内部 dispatch(用 '__timeout__' skillId)
+   */
+  private async injectTimeoutResponse(atom: { type: '请求回应'; requestType?: string; defaultChoice?: unknown }): Promise<void> {
+    if (!this.state || !this.engine) return;
+    const top = this.state.settlementStack[this.state.settlementStack.length - 1];
+    if (!top || !top.pendingRequest || top.pendingRequest.status !== 'waiting') return;
+    const target = top.pendingRequest.target;
+    if (!target) return;
+    // 调 engine.dispatchTimeout:走和玩家回应等价的路径,
+    // entry 不存在时仍然走"杀结算"代执行。
+    this.state = await this.engine.dispatchTimeout(this.state);
+    this.lastActivityAt = Date.now();
+    this.persistAsync();
+    this.broadcastNewState();
+    this.checkGameEnd();
+    this.schedulePendingTimeout();
   }
 
   private broadcastNewState(): void {

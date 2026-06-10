@@ -11,15 +11,14 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
   api.registerAction(
     'use',
     (view: GameView, params: Record<string, Json>) => {
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      const target = params.target as string | undefined;
+      const target = (params.target ?? (params.targets as string[] | undefined)?.[0]) as string | undefined;
       if (!target) return 'target required';
       return null;
     },
     async (frame: SettlementFrame) => {
       const { from, params } = frame;
       const cardId = params.cardId as string;
-      const target = params.target as string;
+      const target = (params.target ?? (params.targets as string[] | undefined)?.[0]) as string;
       await frame.apply({
         type: '移动牌',
         cardId,

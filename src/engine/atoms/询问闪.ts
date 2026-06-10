@@ -10,6 +10,7 @@ export const 询问闪: AtomDefinition<{ target: string; source: string }> = {
     return null;
   },
   apply(state) { return { ...state }; },
+  awaits: { getTarget: (atom) => (atom as { target: string }).target },
   effect: { sound: 'dodge_request', blockUntilDone: true, duration: 200 },
 };
 

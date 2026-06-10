@@ -148,8 +148,9 @@ export interface ChoosePlayerPrompt {
 // ==================== Atom ====================
 
 export interface AtomAwaits {
-  target: string;
-  prompt: ActionPrompt;
+  target?: string;
+  getTarget?: (atom: unknown) => string;
+  prompt?: ActionPrompt;
   defaultChoice?: Json;
   timeout?: number;
 }
@@ -250,12 +251,31 @@ export interface GameView {
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;
+  /** 出牌/弃牌阶段的操作截止时间(独立于 pending) */
+  turnDeadline: number | null;
+  log: { time: number; player: string; text: string }[];
+}
+
+/** before 钩子上下文:atom 执行前调用 */
+export interface AtomBeforeContext {
+  state: GameState;
+  atom: Atom;
+  self: string;
+  /** 当前结算帧的参数(可读)。 */
+  readonly params: Record<string, Json>;
+  modifyParams(patch: Record<string, Json>): void;
+  /** 阻止该 atom 执行,before 钩子专用 */
+  drop(): void;
+  apply(atom: Atom): Promise<void>;
+  notify(event: NotifyEvent): void;
 }
 
 export interface AtomAfterContext {
   state: GameState;
   atom: Atom;
   self: string;
+  /** 当前结算帧的参数(可读)。dispatch 把回应的 params 注入此处。 */
+  readonly params: Record<string, Json>;
   modifyParams(patch: Record<string, Json>): void;
   apply(atom: Atom): Promise<void>;
   notify(event: NotifyEvent): void;
@@ -289,10 +309,32 @@ export interface SettlementFrame {
   parent?: SettlementFrame;
   /** 在 dispatch 流程中由 settlement 注入(不是 user 写的) */
   apply(atom: Atom): Promise<void>;
+  /**
+   * applyOrAwait:apply 流程不抛 PendingInterrupt,改用 await promise。
+   * 返回 boolean:有 awaits 已收到回应,或无 awaits 已 apply 完成。
+   * 用于技能代码在 execute 内同步等待回应(例如杀.execute 末尾在询问闪回应后
+   * 继续跑'造成伤害'+'弃牌',让 onAtomAfter('造成伤害') 钩子真正触发)。
+   */
+  applyOrAwait(atom: Atom): Promise<boolean>;
+  /**
+   * 取消当前帧的等待回应(把 pendingRequest 标 resolved)。
+   * 用于回应 action 在自己的 settlement 帧上执行时(如闪的 execute 把自己
+   * 标记为"已响应"),让外层 dispatch 不再等待此回应。
+   */
+  drop(): void;
   modifyParams(patch: Record<string, Json>): void;
   notify(event: NotifyEvent): void;
+  /** 内部:applyOrAwait 等待回应时保存的 resume 闭包,外部 dispatch 调用 */
+  _resume?: () => void;
+  /** 内部:保存 FrameExecutor 引用,供 respFrame 复用同一个 executor */
+  _executor?: { state: GameState };
+  /** 内部:applyOrAwait 等待期间,dispatch await 此 Promise 等待 execute 完成 */
+  _executePromise?: Promise<void>;
+  /** 内部:技能 execute 在 PendingInterrupt 前注册的续跑函数,
+   *  dispatch 收到回应后调此函数完成后续 atom(造成伤害/弃牌等)。
+   *  使用 frame.apply 让 atom 走完整 pipeline(触发 before/after 钩子)。 */
+  _continueFn?: () => Promise<void>;
 }
-
 // ==================== 协议 ====================
 
 export interface ClientMessage {
