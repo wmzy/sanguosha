@@ -68,24 +68,24 @@ describe('新 ENGINE-DESIGN createEngine — 出杀全流程', () => {
   it('出杀:无回应 → 目标扣 1 血', async () => {
     const engine = createEngine();
     // 第一步:出杀 → 产生 pending 等待闪
-    const pending = await engine.dispatch(state, {
+    const { state: pending } = await engine.dispatch(state, {
       skillId: '杀',
       actionType: 'use',
       ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] },
       baseSeq: 0,
-    });
+    })
     const p2Mid = pending.players.find(p => p.name === 'P2')!;
     expect(p2Mid.health).toBe(4); // 还没扣血
 
     // 第二步:P2 不出闪 → 结算伤害
-    const next = await engine.dispatch(pending, {
+    const { state: next } = await engine.dispatch(pending, {
       skillId: '闪',
       actionType: 'respond',
       ownerId: 'P2',
       params: {},
       baseSeq: 0,
-    });
+    })
     const p2 = next.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
     expect(p2.alive).toBe(true);
@@ -95,15 +95,15 @@ describe('新 ENGINE-DESIGN createEngine — 出杀全流程', () => {
   it('出杀:limit 验证 — 同回合第二次出杀应被拒绝', async () => {
     const engine = createEngine();
     // 第一步:出杀
-    state = await engine.dispatch(state, {
+    state = (await engine.dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
-    });
+    })).state;
     // 第二步:P2 不出闪 → 结算
-    state = await engine.dispatch(state, {
+    state = (await engine.dispatch(state, {
       skillId: '闪', actionType: 'respond', ownerId: 'P2',
       params: {}, baseSeq: 0,
-    });
+    })).state;
     // 准备第二张杀
     const c2: Card = { id: 'c2', name: '杀', suit: '♠', rank: 2, type: '基本牌' };
     state = {
@@ -111,20 +111,20 @@ describe('新 ENGINE-DESIGN createEngine — 出杀全流程', () => {
       players: state.players.map(p => p.name === 'P1' ? { ...p, hand: ['c2'] } : p),
       cardMap: { ...state.cardMap, c2 },
     };
-    const next = await engine.dispatch(state, {
+    const { state: next } = await engine.dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c2', targets: ['P2'] }, baseSeq: 0,
-    });
+    })
     const p2 = next.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
   });
 
   it('未注册的 action:静默丢弃', async () => {
     const engine = createEngine();
-    const next = await engine.dispatch(state, {
+    const { state: next } = await engine.dispatch(state, {
       skillId: '不存在的 skill', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
-    });
+    })
     expect(next).toBe(state);
   });
 });

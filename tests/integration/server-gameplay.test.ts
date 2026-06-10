@@ -162,10 +162,10 @@ describe('新 ENGINE-DESIGN GameSession — 玩法集成', () => {
     const bootState = engine.bootstrap(state);
 
     // 触发 start action
-    const after = await engine.dispatch(bootState, {
+    const { state: after } = await engine.dispatch(bootState, {
       skillId: '回合管理', actionType: 'start', ownerId: 'P1',
       params: {}, baseSeq: 0,
-    });
+    })
 
     const p1 = after.players.find(p => p.name === 'P1')!;
     const p2 = after.players.find(p => p.name === 'P2')!;

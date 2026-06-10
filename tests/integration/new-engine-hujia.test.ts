@@ -41,10 +41,10 @@ describe('新 ENGINE-DESIGN createEngine — 护甲(曹操·锁定被动)', () =
 
   it('受到黑色【杀】 → 扣 0 血(护甲吸收)', async () => {
     const engine = createEngine();
-    const next = await engine.dispatch(state, {
+    const { state: next } = await engine.dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
-    });
+    })
     const p2 = next.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(4);
     expect(p2.alive).toBe(true);

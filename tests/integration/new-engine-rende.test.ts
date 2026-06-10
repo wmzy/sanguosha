@@ -42,7 +42,7 @@ describe('新 ENGINE-DESIGN createEngine — 仁德(刘备)', () => {
 
   it('给 1 人 2 张牌(单帧) → 刘备回复 1 血', async () => {
     const engine = createEngine();
-    const next = await engine.dispatch(state, {
+    const { state: next } = await engine.dispatch(state, {
       skillId: '仁德', actionType: 'use', ownerId: 'P1',
       params: {
         targets: [
@@ -50,7 +50,7 @@ describe('新 ENGINE-DESIGN createEngine — 仁德(刘备)', () => {
         ],
       },
       baseSeq: 0,
-    });
+    })
     const p1 = next.players.find(p => p.name === 'P1')!;
     expect(p1.health).toBe(4);
     const p2 = next.players.find(p => p.name === 'P2')!;

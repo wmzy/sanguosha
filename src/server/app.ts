@@ -83,29 +83,35 @@ async function restorePersistedRooms(): Promise<void> {
   const roomIds = await listPersistedRooms();
   log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
   for (const roomId of roomIds) {
-    const persisted = await loadRoom(roomId);
-    if (!persisted) continue;
-    const state = restoreToState(persisted);
-    if (state.meta.status === '已结束') {
-      log.info(`房间 ${roomId} 已结束，删除落盘文件`);
+    try {
+      const persisted = await loadRoom(roomId);
+      if (!persisted) continue;
+      const state = restoreToState(persisted);
+      // 兼容新旧 GameState 格式
+      if (!state.players || !Array.isArray(state.players)) {
+        log.info(`房间 ${roomId} 数据格式不兼容,跳过`);
+        await deletePersistedRoom(roomId);
+        continue;
+      }
+      const room: Room = {
+        id: roomId,
+        name: persisted.roomName || `恢复-${roomId}`,
+        players: new Map(),
+        maxPlayers: persisted.maxPlayers || state.players.length,
+        status: '进行中',
+        hostId: persisted.hostId,
+        readyPlayers: new Set(),
+        isDebug: persisted.debug,
+      };
+      addRoom(room);
+      const session = new GameSession(room, persisted.debug);
+      session.restoreState(state, persisted.actionLog);
+      gameSessions.set(roomId, session);
+      log.info(`恢复房间 ${roomId}（${state.players.length} 名玩家，${persisted.actionLog.length} 步操作）`);
+    } catch (err) {
+      log.info(`房间 ${roomId} 恢复失败: ${err},删除`);
       await deletePersistedRoom(roomId);
-      continue;
     }
-    const room: Room = {
-      id: roomId,
-      name: persisted.roomName || `恢复-${roomId}`,
-      players: new Map(),
-      maxPlayers: persisted.maxPlayers || state.playerOrder.length,
-      status: '进行中',
-      hostId: persisted.hostId,
-      readyPlayers: new Set(),
-      isDebug: persisted.debug,
-    };
-    addRoom(room);
-    const session = new GameSession(room, persisted.debug);
-    session.restoreState(state, persisted.actionLog);
-    gameSessions.set(roomId, session);
-    log.info(`恢复房间 ${roomId}（${state.playerOrder.length} 名玩家，${persisted.actionLog.length} 步操作）`);
   }
 }
 

@@ -19,7 +19,7 @@ function formatLogEntry(msg: ClientMessage): string {
   return `${ownerId} ${skillId}:${actionType}`;
 }
 
-export function buildView(state: GameState, viewer: number): GameView {
+export function buildView(state: GameState, viewer: number, debug = false): GameView {
   // 构建日志(最近50条)
   const log: GameView['log'] = state.actionLog.slice(-50).map((e: ActionLogEntry) => ({
     time: e.timestamp,
@@ -68,7 +68,7 @@ export function buildView(state: GameState, viewer: number): GameView {
       equipment: p.equipment,
       skills: p.skills,
       handCount: p.hand.length,
-      hand: i === viewer ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
+      hand: (i === viewer || debug) ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
       marks: p.marks,
     })),
     cardMap: state.cardMap,

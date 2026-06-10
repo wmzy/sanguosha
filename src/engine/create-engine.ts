@@ -17,7 +17,7 @@ export interface EngineInstance {
    * 主动 action 压栈 → 路由 → execute → 弹栈。
    * CAS(baseSeq) 由调用方在 dispatch 之外做(本接口不感知 baseSeq)。
    */
-  dispatch(state: GameState, message: ClientMessage): Promise<GameState>;
+  dispatch(state: GameState, message: ClientMessage): Promise<{ state: GameState; error?: string }>;
   /**
    * 服务端超时注入:把栈顶 pendingRequest 的 defaultChoice 作为玩家回应,
    * 走和正常回应相同的'entry.execute + 杀结算代执行'路径。
@@ -64,24 +64,17 @@ export function createEngine(): EngineInstance {
     return skill;
   }
 
-  async function dispatch(state: GameState, message: ClientMessage): Promise<GameState> {
+  async function dispatch(state: GameState, message: ClientMessage): Promise<{ state: GameState; error?: string }> {
     if (!currentState) currentState = state;
 
     // ── 检查是否有 pending 回应 ──
     const pending = topFrame(state);
     if (pending?.pendingRequest?.status === 'waiting') {
       const pr = pending.pendingRequest;
-      // 只允许目标玩家回应
-      if (message.ownerId !== pr.target) return state;
+      if (message.ownerId !== pr.target) return { state };
 
-      // 标记回应已收到
       pr.status = 'resolved';
-
-      // 找到回应 action 并执行(在 pending frame 上下文中)
-      // 找到回应 action(允许不存在 — "不出" 等情况)
       const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-
-      // 把回应参数注入 pending frame
       pending.params = { ...pending.params, ...message.params, __responder: message.ownerId };
 
       let nextState: GameState = state;
@@ -91,8 +84,6 @@ export function createEngine(): EngineInstance {
         if (err !== null) {
           // 验证失败 — 不出有效回应,直接结算
         } else {
-          // 复用 pending frame 的 executor,让 respFrame 的 state 变更
-          // 反映在 pending frame 可见的 executor.state 上
           const sharedExecutor = pending._executor ?? { state };
           const respFrame = makeFrame(pending, {
             skillId: message.skillId,
@@ -106,34 +97,33 @@ export function createEngine(): EngineInstance {
             await entry.execute(respFrame);
           } catch (e) {
             if (e instanceof PendingInterrupt) {
-              return sharedExecutor.state;
+              return { state: sharedExecutor.state };
             }
             nextState = popFrame(sharedExecutor.state);
             currentState = nextState;
-            return nextState;
+            return { state: nextState };
           }
           nextState = popFrame(sharedExecutor.state);
         }
       }
 
-      // 续跑:调技能注册的 _continueFn(如杀的"造成伤害+弃牌")
-      // _continueFn 内用 frame.apply,走完整 pipeline(触发 before/after 钩子)
       if (pending._continueFn) {
-        await pending._continueFn();
-        // _continueFn 通过 frame.apply 修改了 executor.state
+        try {
+          await pending._continueFn();
+        } catch (e) {
+          console.error('[engine] _continueFn error:', e);
+        }
         nextState = pending._executor?.state ?? nextState;
       }
 
-      // 弹掉 pending frame
       nextState = popFrame(nextState);
       pending.pendingRequest = undefined;
       currentState = nextState;
-      return nextState;
+      return { state: nextState };
     }
 
     // ── 正常 dispatch(无 pending) ──
     let entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-    // fallback:装备牌用 card.name 查不到 action 时,路由到装备通用
     if (!entry && message.actionType === 'use') {
       const cardId = message.params?.cardId as string | undefined;
       if (cardId) {
@@ -144,13 +134,13 @@ export function createEngine(): EngineInstance {
       }
     }
     if (!entry) {
-      return state;
+      return { state };
     }
 
     const view = buildView(state, getViewerIndex(state, message.ownerId));
     const validationError = entry.validate(view, message.params);
     if (validationError !== null) {
-      return state;
+      return { state, error: validationError };
     }
 
     const executor: { state: GameState } = { state };
@@ -161,26 +151,23 @@ export function createEngine(): EngineInstance {
       cards: [],
     }, executor);
     let nextState = pushFrame(state, frame);
-    executor.state = nextState; // 确保 frame 在 executor 的 settlementStack 上
+    executor.state = nextState;
 
     try {
       await entry.execute(frame);
     } catch (e) {
       if (e instanceof PendingInterrupt) {
-        // 杀等技能需要等待回应,保持 frame 在栈上
         currentState = executor.state;
-        return executor.state;
+        return { state: executor.state };
       }
-
-      // execute 失败 — 弹栈,返回原 state
       nextState = popFrame(executor.state);
       currentState = nextState;
-      return nextState;
+      return { state: nextState };
     }
 
     nextState = popFrame(executor.state);
     currentState = nextState;
-    return nextState;
+    return { state: nextState };
   }
   /**
    * 服务端超时注入:把栈顶 pendingRequest 的 defaultChoice 作为玩家回应。
@@ -188,19 +175,15 @@ export function createEngine(): EngineInstance {
    * entry 不存在时仍然走"杀结算"代执行。
    * 没有 pendingRequest 时返回 state 不变。
    */
-  async function dispatchTimeout(state: GameState): Promise<GameState> {
+  async function dispatchTimeout(state: GameState): Promise<{ state: GameState; error?: string }> {
     if (!currentState) currentState = state;
     const pending = topFrame(state);
-    if (!pending?.pendingRequest || pending.pendingRequest.status !== 'waiting') return state;
+    if (!pending?.pendingRequest || pending.pendingRequest.status !== 'waiting') return { state };
     const pr = pending.pendingRequest;
     const atom = pr.atom;
-    // 提取 defaultChoice:优先 atom.defaultChoice,fallback 到 prompt.defaultChoice
     const a = atom as { type: '请求回应'; defaultChoice?: unknown; prompt?: { defaultChoice?: unknown } };
     const defaultChoice = a.defaultChoice ?? a.prompt?.defaultChoice;
     const requestType = (atom as { requestType?: string }).requestType;
-    // 走 dispatch 内部'回应'分支(用 __internal/timeout skillId;entry 找不到时静默丢弃,
-    // 但 create-engine.ts:106-141 的"杀结算"代执行会跑;defaultChoice 注入到
-    // pending.params 后,任何想读 frame.params.__timeoutChoice 的技能代码可用)。
     return dispatch(state, {
       skillId: '__internal/timeout',
       actionType: '__timeout__',

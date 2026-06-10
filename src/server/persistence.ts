@@ -111,6 +111,17 @@ export interface PersistedRoom {
   lastActivityAt: number;
 }
 
+/** 清理 GameState 中的循环引用(_executor, _continueFn 等) */
+function sanitizeState(state: GameState): GameState {
+  return {
+    ...state,
+    settlementStack: state.settlementStack.map(f => {
+      const { _executor, _executePromise, _continueFn, ...rest } = f as Record<string, unknown>;
+      return rest as typeof f;
+    }),
+  };
+}
+
 export async function saveRoom(
   roomId: string,
   meta: {
@@ -136,7 +147,7 @@ export async function saveRoom(
     })),
     seed: state.rngSeed,
     actionLog: [...actionLog],
-    state,
+    state: sanitizeState(state),
     savedAt: Date.now(),
   };
   pendingWrappers.set(roomId, wrapper);

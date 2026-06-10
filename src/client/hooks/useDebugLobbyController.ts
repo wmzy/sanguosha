@@ -56,9 +56,11 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   }, [connected, send]);
 
   // 加入房间: connected 时 initialRoomId 变化也触发
+  // disconnect 时重置 prevRoomRef,确保重连后重新 join
   const prevRoomRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!connected || !initialRoomId) return;
+    if (!connected) { prevRoomRef.current = undefined; return; }
+    if (!initialRoomId) return;
     if (prevRoomRef.current === initialRoomId) return;
     prevRoomRef.current = initialRoomId;
 

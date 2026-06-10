@@ -99,9 +99,13 @@ export class GameSession {
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (!playerId) return false;
+      // debug 模式:单玩家控制所有角色
+      // playerNames 用 playerId:character 格式(重连时需要),同时设置 playerId→主公
       for (let i = 0; i < count; i++) {
         this.playerNames.set(`${playerId}:${selected[i].name}`, selected[i].name);
       }
+      // 直接映射 playerId→主公,让 handleAction 能通过 expectedName 检查
+      this.playerNames.set(playerId, selected[0].name);
     } else {
       const playerIds = [...this.room.players.keys()];
       for (let i = 0; i < playerIds.length; i++) {
@@ -133,7 +137,7 @@ export class GameSession {
         alive: true,
         hand,
         equipment: {},
-        skills: [...char.skills, '回合管理', '装备通用'],
+        skills: [...char.skills, '回合管理', '装备通用', '杀', '闪', '桃', '酒', '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '借刀杀人', '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击', '反馈'],
         vars: {},
         marks: [],
         pendingTricks: [],
@@ -171,7 +175,8 @@ export class GameSession {
         params: {},
         baseSeq: 0,
       };
-      this.state = await this.engine.dispatch(state, startMsg);
+      const result = await this.engine.dispatch(state, startMsg);
+      this.state = result.state;
     } else {
       this.state = state;
     }
@@ -186,27 +191,29 @@ export class GameSession {
 
   async handleAction(playerId: string, action: EngineClientMessage, baseSeq?: number): Promise<void> {
     if (this.destroyed) return;
-    if (!this.state || !this.engine) return;
-    if (baseSeq !== undefined && baseSeq !== this.state.seq) {
-      return;
-    }
+    // debug 模式:允许以任意角色名发 action
+    // 非 debug 模式:校验 ownerId 必须匹配预期玩家
     const expectedName = this.playerNames.get(playerId);
-    if (!expectedName) return;
-    if (action.ownerId !== expectedName) {
+    if (!expectedName && !this.debug) return;
+    if (!this.debug && action.ownerId !== expectedName) {
       this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedName });
       return;
     }
     try {
-      const next = await this.engine.dispatch(this.state, action);
-      this.state = next;
-      this.actionLog.push({
+      const result = await this.engine.dispatch(this.state, action);
+      if (result.error) {
+        this.sendToPlayer(playerId, { type: 'error', message: result.error });
+        return;
+      }
+      this.state = result.state;
+      const entry = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         timestamp: Date.now() - this.state.startedAt,
         message: action,
-        // 用客户端送来的 baseSeq(未传则为 -1 表示未参与 CAS),
-        // 而不是 dispatch 推进后的 this.state.seq——后者会让重放时 CAS 错位。
         baseSeq: baseSeq ?? -1,
-      });
+      };
+      this.actionLog.push(entry);
+      this.state.actionLog.push(entry);
       this.lastActivityAt = Date.now();
       this.persistAsync();
       this.broadcastNewState();
@@ -268,7 +275,13 @@ export class GameSession {
     if (!target) return;
     // 调 engine.dispatchTimeout:走和玩家回应等价的路径,
     // entry 不存在时仍然走"杀结算"代执行。
-    this.state = await this.engine.dispatchTimeout(this.state);
+    try {
+      const result = await this.engine.dispatchTimeout(this.state);
+      this.state = result.state;
+    } catch (e) {
+      this.logger.error('injectTimeoutResponse error', { err: String(e) });
+      return;
+    }
     this.lastActivityAt = Date.now();
     this.persistAsync();
     this.broadcastNewState();
@@ -279,10 +292,10 @@ export class GameSession {
   private broadcastNewState(): void {
     if (!this.state) return;
     if (this.debug) {
-      const playerId = this.room.players.keys().next().value;
-      if (playerId) {
-        const view = buildView(this.state, 0);
-        this.sendToPlayer(playerId, { type: 'debugGameState', state: view, lastSeq: this.state.seq });
+      // debug 模式:发给房间内所有连接的玩家(支持重连后新 playerId)
+      const view = buildView(this.state, 0, true);
+      for (const [pid] of this.room.players) {
+        this.sendToPlayer(pid, { type: 'debugGameState', state: view, lastSeq: this.state.seq });
       }
       return;
     }
@@ -311,7 +324,7 @@ export class GameSession {
 
   private sendDebugGameState(playerId: string, lastSeq?: number): void {
     if (!this.state) return;
-    const view = buildView(this.state, 0);
+    const view = buildView(this.state, 0, true);
     this.sendToPlayer(playerId, { type: 'debugGameState', state: view, lastSeq: lastSeq ?? this.state.seq });
   }
 
@@ -388,7 +401,7 @@ export class GameSession {
 
   getDebugView(): GameView | null {
     if (!this.state) return null;
-    return buildView(this.state, 0);
+    return buildView(this.state, 0, true);
   }
 
   private clearGraceTimer(): void {

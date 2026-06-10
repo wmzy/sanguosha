@@ -33,6 +33,13 @@ const SUIT_COLOR: Record<string, string> = {
   '♠': '#ccc', '♣': '#ccc', '♥': '#e74c3c', '♦': '#e74c3c',
 };
 
+// ─── 基本技能(不在 UI 上显示) ───
+const BASIC_SKILLS = new Set([
+  '回合管理', '装备通用', '杀', '闪', '桃', '酒',
+  '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '借刀杀人',
+  '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击', '反馈',
+]);
+
 // ─── 时间格式化 ───
 function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -62,6 +69,16 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
 
   // 同步 viewer(服务器可能重连后变化)
+  // 有待回应请求时,自动切换视角到目标玩家
+  useEffect(() => {
+    if (view.pending) {
+      const targetIdx = view.players.findIndex(p => p.name === view.pending!.target);
+      if (targetIdx >= 0) setPerspectiveIdx(targetIdx);
+    } else {
+      // 无 pending 时回到当前玩家视角
+      setPerspectiveIdx(view.currentPlayerIndex);
+    }
+  }, [view.pending?.target, view.currentPlayerIndex]);
   useEffect(() => { setPerspectiveIdx(view.viewer); }, [view.viewer]);
 
   const perspective = view.players[perspectiveIdx];
@@ -471,8 +488,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               {Object.entries(p.equipment).map(([slot, cardId]) => (
                 <span key={slot}> [{slot}:{equipName(slot as EquipSlot, cardId as string)}]</span>
               ))}
-              {p.skills.filter(s => s !== '回合管理').length > 0 && (
-                <span> 技能:{p.skills.filter(s => s !== '回合管理').join(',')}</span>
+              {p.skills.filter(s => !BASIC_SKILLS.has(s)).length > 0 && (
+                <span> 技能:{p.skills.filter(s => !BASIC_SKILLS.has(s)).join(',')}</span>
               )}
             </div>
           ))}
@@ -530,7 +547,7 @@ function PlayerSeatView({
         </div>
       </div>
       <div className={skillRow}>
-        {player.skills.filter(s => s !== '回合管理').map(s => (
+        {player.skills.filter(s => !BASIC_SKILLS.has(s)).map(s => (
           <span key={s} className={skillTag}>{s}</span>
         ))}
       </div>
