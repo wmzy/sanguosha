@@ -65,15 +65,11 @@ export function createEngine(): EngineInstance {
   async function dispatch(state: GameState, message: ClientMessage): Promise<GameState> {
     if (!currentState) currentState = state;
 
-    // 1. 主动 action 压栈(回应 action 由 settlement.apply 内部处理)
-    // 当前实现: 假设 message 总是主动 action(回应通过 frame.apply 内部走)
-    // 路由查找
     const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
     if (!entry) {
       // 没找到 — 静默忽略
       return state;
     }
-
     // 2. 校验(GameView)
     const view = buildView(state, getViewerIndex(state, message.ownerId));
     const validationError = entry.validate(view, message.params);
@@ -81,8 +77,7 @@ export function createEngine(): EngineInstance {
       // 静默丢弃(不记入 action log)
       return state;
     }
-
-    // 3. 构造 frame 并压栈
+    console.error('[dispatch]', message.skillId, message.actionType, 'validation OK, executing');
     const executor: { state: GameState } = { state };
     const frame = makeFrame(undefined, {
       skillId: message.skillId,

@@ -231,17 +231,23 @@ export interface AtomDefinition<A = unknown> {
   toPlayerViews?(state: GameState, atom: A): AtomPlayerViews | undefined;
   effect?: AtomEffect;
 }
-
-// ==================== 钩子 ====================
-
-export interface AtomBeforeContext {
-  state: GameState;
-  atom: Atom;
-  self: string;
-  drop(): void;
-  modifyParams(patch: Record<string, Json>): void;
-  apply(atom: Atom): Promise<void>;
-  notify(event: NotifyEvent): void;
+export interface GameView {
+  viewer: number;
+  currentPlayerIndex: number;
+  phase: TurnPhase;
+  turn: { round: number; phase: TurnPhase; vars: Record<string, Json> };
+  players: {
+    health: number;
+    maxHealth: number;
+    alive: boolean;
+    equipment: Partial<Record<EquipSlot, string>>;
+    skills: string[];
+    handCount: number;
+    hand?: Card[];
+    marks: Mark[];
+  }[];
+  cardMap: Record<string, Card>;
+  pending: PendingView | null;
 }
 
 export interface AtomAfterContext {

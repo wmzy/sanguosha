@@ -15,6 +15,7 @@ export function buildView(state: GameState, viewer: number): GameView {
       skills: p.skills,
       handCount: p.hand.length,
       hand: i === viewer ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
+      marks: p.marks,
     })),
     cardMap: state.cardMap,
     pending: null,
