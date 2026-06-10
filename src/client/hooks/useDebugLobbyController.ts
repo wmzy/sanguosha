@@ -1,57 +1,25 @@
 // src/hooks/useDebugLobbyController.ts — 调试大厅控制器 hook
 //
-// T10 拆分：把 DebugLobby 中的所有"非视图"逻辑（WebSocket 生命周期 +
-// 消息分发 + 事件 handler + perspective 跟随 + 业务 state reducer）
-// 收拢到一个 hook 中。父组件只负责调用 hook + 路由到子组件视图。
-//
-// 返回值：
-//   - connected       : WebSocket 连接状态
-//   - state           : 业务游戏状态（GameState | null）
-//   - ui              : UI 状态聚合（见 useDebugRoom）
-//   - setters         : UI 状态 setter 集合
-//   - sendGameAction  : 把 GameAction 包装成 ws 消息发出
-//   - handlers        : 各种点击 handler 集合
+// 新 ENGINE-DESIGN: 服务器发 GameView,客户端发 ClientMessage。
+// 不再用 SequencedEvent / reduceGameState / GameAction。
 
-import { useEffect, useReducer, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from './useWebSocket';
-import { useDebugRoom, type DebugUiState } from './useDebugRoom';
-import { rotatePlayers } from '../utils/rotatePlayers';
-import { getSingleActivePlayer } from '../utils/activePlayer';
 import { storeSession, loadSession, clearSession } from '../utils/debugSession';
 import { apiFetch, ApiError } from '../api/client';
-import { reduceGameState } from '../../engine/view/reducer';
-import type { GameAction, GameState, ServerEvent } from '../../engine/types';
-import type { SequencedEvent, ServerMessage } from '../../server/protocol';
-
-type DebugAction =
-  | { type: 'reset'; state: GameState; lastAppliedSeq: number }
-  | { type: 'applyEvents'; events: SequencedEvent[]; lastSeq: number };
-
-function debugReducer(state: GameState | null, action: DebugAction): GameState | null {
-  if (action.type === 'reset') return action.state;
-  if (action.type === 'applyEvents') {
-    if (!state || action.events.length === 0) return state;
-    const bare: ServerEvent[] = action.events.map(({ seq: _seq, ...rest }) => rest);
-    return reduceGameState(state, bare);
-  }
-  return state;
-}
+import type { GameView, ClientMessage as EngineClientMessage } from '../../engine/types';
+import type { ServerMessage, RoomInfo } from '../../server/protocol';
 
 export interface DebugLobbyController {
   connected: boolean;
-  state: GameState | null;
-  ui: DebugUiState;
+  view: GameView | null;
+  playerNames: string[];
+  debugRooms: RoomInfo[];
+  error: string | null;
+  playerCount: number;
   setPlayerCount: (n: number) => void;
-  setPerspective: (p: string) => void;
-  setPlayerOrder: (order: string[]) => void;
-  setSelectedCardId: (id: string | null) => void;
-  setSelectedTarget: (t: string | null) => void;
-  toggleSelectedForDiscard: (id: string) => void;
-  clearSelectedForDiscard: () => void;
-  toggleSelectedSkillCard: (id: string) => void;
-  clearSelectedSkillCards: () => void;
-  sendGameAction: (action: GameAction) => void;
+  sendAction: (action: EngineClientMessage) => void;
   refreshRoomList: () => void;
   handleCreateDebugRoom: () => Promise<void>;
   handleDeleteRoom: () => void;
@@ -63,39 +31,24 @@ export interface DebugLobbyController {
 export function useDebugLobbyController(initialRoomId?: string): DebugLobbyController {
   const navigate = useNavigate();
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = useMemo(() => `${wsProtocol}//${window.location.host}/ws`, [wsProtocol]);
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   const { connected, send, onMessage, connect } = useWebSocket(wsUrl);
 
-  const [state, dispatch] = useReducer(debugReducer, null as GameState | null);
-  const stateRef = useRef<GameState | null>(null);
-  const lastAppliedSeqRef = useRef(0);
+  const [view, setView] = useState<GameView | null>(null);
+  const [playerNames, setPlayerNames] = useState<string[]>([]);
+  const [debugRooms, setDebugRooms] = useState<RoomInfo[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [playerCount, setPlayerCount] = useState(5);
+  const lastSeqRef = useRef(0);
+  const viewRef = useRef<GameView | null>(null);
 
-  const {
-    ui,
-    setPlayerCount,
-    setError,
-    setDebugRooms,
-    appendOperations,
-    setOperations,
-    setPerspective,
-    setPlayerOrder,
-    setSelectedCardId,
-    setSelectedTarget,
-    toggleSelectedForDiscard,
-    clearSelectedForDiscard,
-    toggleSelectedSkillCard,
-    clearSelectedSkillCards,
-    reset,
-  } = useDebugRoom();
-
-  useEffect(() => {
-    connect();
-  }, [connect]);
+  useEffect(() => { connect(); }, [connect]);
 
   useEffect(() => {
     if (connected) send({ type: 'list_rooms', filter: 'debug' });
   }, [connected, send]);
 
+  // 自动重连
   const lastConnectedRef = useRef(false);
   useEffect(() => {
     const becameConnected = connected && !lastConnectedRef.current;
@@ -104,40 +57,35 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
 
     const session = loadSession();
     if (session?.roomId === initialRoomId) {
-      send({ type: 'reconnect', playerId: session.playerId, lastSeq: lastAppliedSeqRef.current });
+      send({ type: 'reconnect', playerId: session.playerId, lastSeq: lastSeqRef.current });
     } else {
-      send({ type: 'join_debug_room', roomId: initialRoomId, lastSeq: lastAppliedSeqRef.current });
+      send({ type: 'join_debug_room', roomId: initialRoomId, lastSeq: lastSeqRef.current });
     }
   }, [connected, initialRoomId, send]);
 
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+  useEffect(() => { viewRef.current = view; }, [view]);
 
+  // 消息处理
   useEffect(() => {
     const unsubscribe = onMessage((msg: ServerMessage) => {
       if (msg.type === 'debugGameState') {
-        lastAppliedSeqRef.current = msg.lastSeq;
-        dispatch({ type: 'reset', state: msg.state, lastAppliedSeq: msg.lastSeq });
-        setOperations([]);
-        if (!ui.perspective && msg.state.currentPlayer) {
-          setPerspective(msg.state.currentPlayer);
-          setPlayerOrder(rotatePlayers(msg.state.playerOrder, msg.state.currentPlayer));
+        lastSeqRef.current = msg.lastSeq;
+        setView(msg.state);
+        // 从 GameView 推导 playerNames(调试模式 server 不单独下发)
+        // GameView 没有 name 字段,用 index 编号
+        if (playerNames.length === 0 && msg.state.players.length > 0) {
+          setPlayerNames(msg.state.players.map((_, i) => `P${i + 1}`));
         }
-      } else if (msg.type === 'events') {
-        const fresh: SequencedEvent[] = msg.events.filter((e) => e.seq > lastAppliedSeqRef.current);
-        if (fresh.length === 0) return;
-        const maxSeq = fresh[fresh.length - 1].seq;
-        lastAppliedSeqRef.current = maxSeq;
-        dispatch({ type: 'applyEvents', events: fresh, lastSeq: maxSeq });
-        if (msg.operations) appendOperations(msg.operations);
+      } else if (msg.type === 'initialView') {
+        lastSeqRef.current = msg.lastSeq;
+        setView(msg.state);
       } else if (msg.type === 'room_list') {
         setDebugRooms(msg.rooms);
       } else if (msg.type === 'room_joined') {
         storeSession(msg.roomId, msg.playerId);
         window.history.replaceState(null, '', `/debug/${msg.roomId}`);
       } else if (msg.type === 'error') {
-        if (initialRoomId && !stateRef.current) {
+        if (initialRoomId && !viewRef.current) {
           clearSession();
           navigate('/debug', { replace: true });
         } else {
@@ -147,31 +95,12 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       }
     });
     return unsubscribe;
-  }, [
-    onMessage,
-    ui.perspective,
-    initialRoomId,
-    navigate,
-    setOperations,
-    appendOperations,
-    setDebugRooms,
-    setError,
-    setPerspective,
-    setPlayerOrder,
-  ]);
+  }, [onMessage, initialRoomId, navigate, playerNames.length]);
 
-  useEffect(() => {
-    if (!state) return;
-    const active = getSingleActivePlayer(state);
-    if (active && active !== ui.perspective) {
-      setPerspective(active);
-      setPlayerOrder(rotatePlayers(state.playerOrder, active));
-    }
-  }, [state, ui.perspective, setPerspective, setPlayerOrder]);
-
-  const sendGameAction = useCallback(
-    (action: GameAction) => {
-      send({ type: 'action', action, baseSeq: lastAppliedSeqRef.current });
+  // 发送 action
+  const sendAction = useCallback(
+    (action: EngineClientMessage) => {
+      send({ type: 'action', action, baseSeq: lastSeqRef.current });
     },
     [send],
   );
@@ -183,7 +112,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       const data = await apiFetch<{ roomId: string }>('/api/debug-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerCount: ui.playerCount }),
+        body: JSON.stringify({ playerCount }),
       });
       navigate(`/debug/${data.roomId}`, { replace: true });
     } catch (err) {
@@ -194,7 +123,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       }
       setTimeout(() => setError(null), 3000);
     }
-  }, [ui.playerCount, navigate, setError]);
+  }, [playerCount, navigate]);
 
   const handleDeleteRoom = useCallback(() => {
     const session = loadSession();
@@ -202,14 +131,16 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       apiFetch<void>(`/api/rooms/${session.roomId}`, { method: 'DELETE' }).catch(() => {});
     }
     clearSession();
-    lastAppliedSeqRef.current = 0;
-    reset();
+    lastSeqRef.current = 0;
+    setView(null);
+    setPlayerNames([]);
     navigate('/');
-  }, [reset, navigate]);
+  }, [navigate]);
 
   const handleJoinDebugRoom = useCallback(
     (roomId: string) => {
-      lastAppliedSeqRef.current = 0;
+      lastSeqRef.current = 0;
+      setPlayerNames([]);
       send({ type: 'join_debug_room', roomId });
     },
     [send],
@@ -231,18 +162,13 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
 
   return {
     connected,
-    state,
-    ui,
+    view,
+    playerNames,
+    debugRooms,
+    error,
+    playerCount,
     setPlayerCount,
-    setPerspective,
-    setPlayerOrder,
-    setSelectedCardId,
-    setSelectedTarget,
-    toggleSelectedForDiscard,
-    clearSelectedForDiscard,
-    toggleSelectedSkillCard,
-    clearSelectedSkillCards,
-    sendGameAction,
+    sendAction,
     refreshRoomList,
     handleCreateDebugRoom,
     handleDeleteRoom,
