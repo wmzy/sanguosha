@@ -296,6 +296,10 @@ export interface SettlementFrame {
   atomStack: Atom[];
   pendingRequest?: { atom: Atom; target: string; status: 'waiting' | 'resolved'; deadline?: number };
   parent?: SettlementFrame;
+  /** 在 dispatch 流程中由 settlement 注入(不是 user 写的) */
+  apply(atom: Atom): Promise<void>;
+  modifyParams(patch: Record<string, Json>): void;
+  notify(event: NotifyEvent): void;
 }
 
 // ==================== 协议 ====================
@@ -320,6 +324,23 @@ export interface ActionLogEntry {
   timestamp: number;
   message: ClientMessage;
   baseSeq: number;
+}
+// ==================== 内部 Registry 类型 ====================
+
+export interface ActionEntry {
+  skillId: string;
+  ownerId: string;
+  actionType: string;
+  validate: (view: GameView, params: Record<string, Json>) => string | null;
+  execute: (frame: SettlementFrame) => Promise<void>;
+}
+
+export interface AtomHookEntry {
+  skillId: string;
+  ownerId: string;
+  atomType: string;
+  phase: 'before' | 'after';
+  handler: (ctx: AtomBeforeContext | AtomAfterContext) => Promise<void>;
 }
 
 // ==================== SkillDef ====================
