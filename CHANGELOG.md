@@ -64,10 +64,40 @@ All notable changes to this project will be documented in this file.
 - 30+ skill e2e 测试(plan §6.2 列出)
 
 ### Documentation
-
 - 2 条新 ADR 待写(`src/engine/_legacy/` 清理时机 + v2 删除)
 
-## [Unreleased] — 2026-06-07
+### Engine v3 P0 PR 5 — createEngine().dispatch() 完整实装
+
+新引擎核心完整跑通:`createEngine().bootstrap(state)` 启动时按 per-player 实例化所有 skill,`dispatch(state, ClientMessage)` 走"主动 action 压栈 → 路由 → validate → execute → 弹栈"全流程,`frame.apply(atom)` 触发 before/after 钩子 + atom apply pipeline。
+
+### Added
+
+- `src/engine/settlement.ts` — makeFrame/pushFrame/popFrame + DropAtom sentinel + 完整 apply pipeline(before 钩子可 drop + modifyParams,after 钩子可 modifyParams + apply 新 atom,awaits 同步 resolve)
+- `src/engine/skill.ts` — 完整实装:`registerActionEntry` / `findActionEntry` / `registerHookEntry` / `getBeforeHooks` / `getAfterHooks` / `instanceUnloads` 管理 / `makeBackendAPI` 返回带 `self` 字段
+- `src/engine/create-engine.ts` — `createEngine()` 工厂,返回 `EngineInstance` 含 `dispatch` / `buildView` / `bootstrap` / `resetForTest`
+- `tests/integration/new-engine-kill.test.ts` — 出杀全流程(3 测试):无回应扣血、limit 验证、未注册 action 静默丢弃
+- `tests/integration/new-engine-hujia.test.ts` — 曹操护甲(锁定被动):黑色杀吸收
+- `tests/integration/new-engine-rende.test.ts` — 刘备仁德:给 2 张牌后回复 1 血
+
+### Changed
+
+- `src/engine/types.ts` — `SettlementFrame` 加 `apply/modifyParams/notify` 方法;`BackendAPI` 加 `readonly self: string` 字段;`GameView.players` 加 `marks: Mark[]`;新增 `ActionEntry` / `AtomHookEntry` 内部 registry 类型
+- `src/engine/view/buildView.ts` — 传递 `marks` 到 GameView
+
+### Verified
+
+- `pnpm vitest run tests/engine-smoke.test.ts tests/integration/new-engine-*.test.ts`: **9/9 PASS**(4 文件)
+- `pnpm tsc --noEmit`: 0 新引擎错误
+- 新引擎独立可运行:`createEngine().bootstrap(state).dispatch(state, msg)` 跑出杀全流程、护甲减伤、仁德给牌回复血
+
+### Pending Follow-ups
+
+- PR 6: DebugLobby 复刻(改 3 个 client 文件用新 engine dispatch)
+- PR 7-10: 17 锦囊 + 8 装备(按 plan §4.1)
+- server 切到新 engine:目前 server 仍 import `_legacy/create-engine` 路径,需要按新 ClientMessage 重写 session.ts dispatch
+- `frame.apply(atom)` awaits 异步等待实装(目前是同步 resolve 占位)
+- settlement frame 超时/断线机制
+- 30+ skill e2e 测试覆盖
 ### Engine v3 ATOM_GAME_EVENTS 自动派发 — emitEvent 调用点从 11 处降至 4 处
 
 将 `ATOM_GAME_EVENTS` 自动 emitEvent 管道集成到 `applyAtoms` 主入口，消除手工 `emitEvent` 调用。
