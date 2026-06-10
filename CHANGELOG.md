@@ -33,6 +33,9 @@ All notable changes to this project will be documented in this file.
 - `src/client/hooks/useDebugLobbyController.ts` — 重写,存 GameView,发 ClientMessage(删老 SequencedEvent/reduceGameState)
 - `src/client/components/DebugLobby.tsx` — 用 GameViewComponent 替代 DebugPlayerList
 - `src/engine/types.ts` — 删除重复 GameView 接口(缺 marks 字段)
+- `src/client/components/MultiplayerGameBoard.tsx` — 重写,用 GameView + ClientMessage 替代 FrontendState/reduceFrontend
+- `src/client/components/ReplayBoard.tsx` — stub(老 ReplayEngine 依赖 SequencedEvent,待重写)
+- `src/client/utils/logFile.ts` — serialize/deserialize 替换为 JSON.stringify/JSON.parse
 
 ### Changed
 
