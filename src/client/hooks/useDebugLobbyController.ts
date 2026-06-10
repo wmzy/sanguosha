@@ -32,7 +32,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   const navigate = useNavigate();
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-  const { connected, send, onMessage, connect } = useWebSocket(wsUrl);
+  const { connected, send, onMessage } = useWebSocket(wsUrl);
 
   const [view, setView] = useState<GameView | null>(null);
   const [playerNames, setPlayerNames] = useState<string[]>([]);
@@ -42,7 +42,6 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   const lastSeqRef = useRef(0);
   const viewRef = useRef<GameView | null>(null);
 
-  useEffect(() => { connect(); }, [connect]);
 
   useEffect(() => {
     if (connected) send({ type: 'list_rooms', filter: 'debug' });
