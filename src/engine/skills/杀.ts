@@ -87,6 +87,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
         player: from,
         mark: { id: '杀/killsPlayed', scope: -1, payload: 1, duration: 'turn' },
       });
+      api.popFrame();
     },
   );
   // respond action:南蛮入侵/决斗/万箭齐发/激将等场景,目标"出杀抵消"

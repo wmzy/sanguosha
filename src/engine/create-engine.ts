@@ -43,12 +43,13 @@ export interface DispatchResult {
   winner?: string;
 }
 
-/** 空闲超时信息 */
 export interface EngineInstance {
   dispatch(message: ClientMessage): Promise<DispatchResult>;
   buildView(viewer: number): GameView;
   resetForTest(): void;
   bootstrap(initialState: GameState): GameState;
+  /** 重新注册当前 state 中所有玩家的技能(用于初始化游戏后) */
+  rebootstrap(): void;
   /** 获取当前 state(只读) */
   getState(): GameState;
 }
@@ -152,12 +153,7 @@ export function createEngine(): EngineInstance {
           // 构造 api,执行回应 action
           const { api, ctx } = makeApi(currentState, message.ownerId, { ...message.params }, () => {});
           setRuntimeApi(api);
-          const depthBefore = currentState.settlementStack.length;
           await entry.execute(api);
-          // 弹栈:execute 内部 push 的帧
-          while (currentState.settlementStack.length > depthBefore) {
-            currentState = { ...currentState, settlementStack: currentState.settlementStack.slice(0, -1) };
-          }
           // 恢复原始 execute 的 runtimeApi(让原始 execute 从 pending 恢复后能继续调用 api.apply)
           if (activeExecuteApi) {
             setRuntimeApi(activeExecuteApi);
@@ -233,19 +229,12 @@ export function createEngine(): EngineInstance {
     currentState = ctx.state;
     activeExecuteCtx = ctx;
     activeExecuteApi = api;
-    // 记录 execute 前的帧栈深度(技能 pushFrame 后引擎自动弹栈)
-    const depthBefore = currentState.settlementStack.length;
-
     setRuntimeApi(api);
     const executeP = entry.execute(api)
       .finally(() => {
         setRuntimeApi(null);
         // 从 engine api 读取最新 state
         currentState = ctx.state;
-        // 弹栈:execute 内部 push 的帧
-        while (currentState.settlementStack.length > depthBefore) {
-          currentState = { ...currentState, settlementStack: currentState.settlementStack.slice(0, -1) };
-        }
         // 触发 dispatchReady(如果 execute 在没有 pending 的情况下完成)
         fireDispatchReady();
       });
@@ -274,7 +263,15 @@ export function createEngine(): EngineInstance {
     currentState = createGameState({ players: [], cardMap: {} });
   }
 
-  return { dispatch, buildView: (viewer) => buildView(currentState, viewer), resetForTest, bootstrap, getState };
+  function rebootstrap(): void {
+    for (const player of currentState.players) {
+      for (const skillId of player.skills) {
+        instantiateSkill(skillId, player.name);
+      }
+    }
+  }
+
+  return { dispatch, buildView: (viewer) => buildView(currentState, viewer), resetForTest, bootstrap, rebootstrap, getState };
 }
 
 function getViewerIndex(state: GameState, ownerName: string): number {

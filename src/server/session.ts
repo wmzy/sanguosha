@@ -6,8 +6,9 @@ import type {
   GameState,
   GameView,
 } from '../engine/types';
+import { createGameState } from '../engine/types';
 import { createEngine, type EngineInstance } from '../engine/create-engine';
-import { createInitialState, type GameSetupConfig } from '../engine/game-setup';
+
 import '../engine/atoms';
 import '../engine/skills';
 import type { ServerMessage } from './protocol';
@@ -17,8 +18,8 @@ import { createLogger } from './logger';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
 
-/** 默认角色列表 */
-const CHARACTERS: GameSetupConfig['characters'] = [
+/** 默认武将列表 */
+const CHARACTERS: Array<{ name: string; skills: string[] }> = [
   { name: '刘备', skills: ['仁德'] },
   { name: '曹操', skills: ['护甲'] },
   { name: '孙权', skills: ['制衡'] },
@@ -66,15 +67,32 @@ export class GameSession {
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
 
-    // 引擎创建初始状态(抽角色、洗牌、发牌)
-    const state = createInitialState({
-      characters: CHARACTERS,
-      playerCount: count,
-      seed: this.sessionSeed,
-      gameId: this.room.id,
+    // bootstrap 引擎(最小状态,只需要能运行 开局 技能)
+    this.engine = createEngine();
+    this.engine.bootstrap(createGameState({
+      players: [{ index: 0, name: '主公', character: '主公', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['开局'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] }],
+      cardMap: {},
+    }));
+
+    // dispatch 开局.start → 引擎内部 apply 初始化游戏 atom(抽角色、洗牌、发牌)
+    const result = await this.engine.dispatch({
+      skillId: '开局',
+      actionType: 'start',
+      ownerId: '主公',
+      params: {
+        characters: CHARACTERS,
+        playerCount: count,
+        seed: this.sessionSeed,
+        gameId: this.room.id,
+      },
+      baseSeq: 0,
     });
 
+    // 初始化游戏后重新注册技能(新 players 需要注册自己的技能实例)
+    this.engine.rebootstrap();
+
     // 建立 playerId → playerName 映射
+    const state = this.engine.getState();
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (!playerId) return false;
@@ -89,24 +107,8 @@ export class GameSession {
       }
     }
 
-    // bootstrap 引擎
-    this.engine = createEngine();
-    this.engine.resetForTest();
-    this.engine.bootstrap(state);
-
-    // 启动第一回合
-    const firstPlayer = state.players[0];
-    if (firstPlayer) {
-      const result = await this.engine.dispatch({
-        skillId: '回合管理',
-        actionType: 'start',
-        ownerId: firstPlayer.name,
-        params: {},
-        baseSeq: 0,
-      });
-      if (result.gameOver) {
-        this.handleGameOver(result.winner);
-      }
+    if (result.gameOver) {
+      this.handleGameOver(result.winner);
     }
 
     this.actionLog = [];

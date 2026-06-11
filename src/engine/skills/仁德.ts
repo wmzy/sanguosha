@@ -40,6 +40,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
           frame.params['仁德/healedThisTurn'] = true;
         }
       }
+      api.popFrame();
     },
   );
   return () => {};

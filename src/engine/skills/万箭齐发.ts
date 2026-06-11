@@ -54,6 +54,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         from: { zone: '处理区' },
         to: { zone: '弃牌堆' },
       });
+      api.popFrame();
     },
   );
   return () => {};

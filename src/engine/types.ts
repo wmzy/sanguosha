@@ -251,7 +251,11 @@ export type Atom =
   | { type: '移除延时锦囊'; player: string; trickName: string }
   // 拼点
   | { type: '拼点'; initiator: string; target: string; initiatorCard: string; targetCard: string }
-  // 判定
+  // 初始化
+  | { type: '抽身份'; playerCount: number; seed: number }
+  | { type: '选将'; characters: Array<{ name: string; skills: string[] }>; seed: number }
+  | { type: '洗牌'; seed: number }
+  | { type: '发牌'; handSize: number; lordBonus?: number }
   | { type: '判定'; player: string; judgeType: string }
   // 等待回应
   | { type: '询问闪'; target: string; source: string }
@@ -302,8 +306,10 @@ export interface EngineApi {
   readonly self: string;
   /** 当前消息 params(由 dispatch 注入;回应路径的 params 在消费 pending 后更新) */
   readonly params: Record<string, Json>;
-  /** 创建帧并压入 settlementStack,返回帧引用。execute 结束后引擎自动弹栈 */
+  /** 创建帧并压入 settlementStack,返回帧引用 */
   pushFrame(skillId: string, from: string, params?: Record<string, Json>): SettlementFrame;
+  /** 弹出栈顶帧 */
+  popFrame(): void;
   /** 取栈顶帧 */
   topFrame(): SettlementFrame | undefined;
   /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到回应/超时 */

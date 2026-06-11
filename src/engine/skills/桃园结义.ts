@@ -26,6 +26,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         await api.apply({ type: '回复体力', target: p.name, amount: 1 });
       }
       await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      api.popFrame();
     },
   );
   return () => {};

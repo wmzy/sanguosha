@@ -64,6 +64,9 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
       ctx.state = pushFrame(ctx.state, frame);
       return frame;
     },
+    popFrame(): void {
+      ctx.state = popFrame(ctx.state);
+    },
     topFrame(): SettlementFrame | undefined {
       return topFrame(ctx.state);
     },
@@ -184,6 +187,11 @@ function topFrame(state: GameState): SettlementFrame | undefined {
 
 function pushFrame(state: GameState, frame: SettlementFrame): GameState {
   return { ...state, settlementStack: [...state.settlementStack, frame] };
+}
+
+function popFrame(state: GameState): GameState {
+  if (state.settlementStack.length === 0) return state;
+  return { ...state, settlementStack: state.settlementStack.slice(0, -1) };
 }
 
 /** 判定 atom:apply 后从牌堆顶翻一张到目标玩家 judgeZone */

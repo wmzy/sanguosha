@@ -31,6 +31,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       }
       // 装备
       await api.apply({ type: '装备', player: from, cardId });
+      api.popFrame();
     },
   );
   return () => {};

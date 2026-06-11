@@ -46,6 +46,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       }
       // 移牌到弃牌堆
       await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      api.popFrame();
     },
   );
   return () => {};

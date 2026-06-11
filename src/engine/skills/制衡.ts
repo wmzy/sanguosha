@@ -26,6 +26,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const cardId = params.cardId as string;
       await api.apply({ type: '弃置', player: from, cardIds: [cardId] });
       await api.apply({ type: '摸牌', player: from, count: 2 });
+      api.popFrame();
     },
   );
   return () => {};
