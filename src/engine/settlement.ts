@@ -1,14 +1,11 @@
 // src/engine/settlement.ts
-// 结算区栈(ENGINE-DESIGN §6.2)。帧是纯数据——所有 apply/drop/notify 通过 EngineApi。
-//
-// 帧生命周期:
-//   - action dispatch 创建帧,pushFrame 入栈
-//   - 帧上的 execute 通过 EngineApi.apply 推 atom;等待型 atom 抵达后由 dispatch 消费
-//   - execute 全部完成后,create-engine.ts 调用 popFrame 退栈
+// 结算区栈(ENGINE-DESIGN §6.2)。
+// 帧是纯数据,由技能通过 api.pushFrame 创建并压栈;execute 结束后引擎自动弹栈。
+// atomStack 和 pendingSlot 是 GameState 属性(游戏状态),不是 frame 属性。
 
 import type { GameState, SettlementFrame } from './types';
 
-/** 把帧入栈,返回新 state(不修改原 state) */
+/** 把帧入栈,返回新 state */
 export function pushFrame(state: GameState, frame: SettlementFrame): GameState {
   return { ...state, settlementStack: [...state.settlementStack, frame] };
 }

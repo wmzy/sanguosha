@@ -1,6 +1,6 @@
 // src/engine/skills/闪.ts
 // 闪:需要使用或打出闪时,打出一张闪
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -14,8 +14,9 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       // cardId 为空表示不出闪 — 始终允许
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const cardId = params.cardId as string | undefined;
       if (!cardId) return; // 不出闪,什么都不做
       // 移动闪到弃牌堆
@@ -26,10 +27,13 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
         to: { zone: '弃牌堆' },
       });
       // 在当前帧(即杀帧)的 settlement 中标记 dodged
-      const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
-      if (settlement) {
-        const item = settlement.find(s => s.target === from);
-        if (item) item.dodged = true;
+      const frame = api.topFrame();
+      if (frame) {
+        const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
+        if (settlement) {
+          const item = settlement.find(s => s.target === from);
+          if (item) item.dodged = true;
+        }
       }
     },
   );

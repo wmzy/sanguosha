@@ -1,6 +1,6 @@
 // src/engine/skills/桃.ts
 // 桃:出牌阶段对自己使用(回复 1 体力);或濒死时对濒死角色使用
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -15,8 +15,10 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       if (!target) return 'target required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
+      const frame = api.pushFrame('桃', from, { ...params });
       const cardId = params.cardId as string;
       const target = (params.target ?? (params.targets as string[] | undefined)?.[0]) as string;
       await api.apply({

@@ -1,6 +1,6 @@
 // src/engine/skills/借刀杀人.ts
 // 借刀杀人(锦囊):获得目标武器,或令目标对指定角色出杀
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -15,10 +15,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       if (typeof params.target !== 'string') return 'target required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const cardId = params.cardId as string;
       const target = params.target as string;
+      const frame = api.pushFrame('借刀杀人', from, { ...params });
       // 移锦囊到处理区
       await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // ─── Promise-based 续跑 ───
@@ -35,7 +37,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const killed = frame.params.__借刀杀回应 as boolean | undefined;
       if (!killed) {
         // 不出杀:获得目标的武器
-        const targetPlayer = frame._executor?.state.players.find(p => p.name === target);
+        const targetPlayer = api.state.players.find(p => p.name === target);
         const weaponId = targetPlayer?.equipment?.['武器'];
         if (weaponId) {
           await api.apply({ type: '卸下', player: target, slot: '武器' });

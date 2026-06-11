@@ -1,6 +1,6 @@
 // src/engine/skills/南蛮入侵.ts
 // 南蛮入侵(锦囊):出牌阶段对所有其他角色使用,每名目标需出一张杀,否则受 1 点伤害
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -14,14 +14,14 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const cardId = params.cardId as string;
+      const frame = api.pushFrame('南蛮入侵', from, { ...params });
 
       // 初始化 settlement:所有其他存活角色
-      const targets = frame._executor
-        ? api.state.players.filter(p => p.name !== from && p.alive).map(p => p.name)
-        : [];
+      const targets = api.state.players.filter(p => p.name !== from && p.alive).map(p => p.name);
       const settlement = targets.map(t => ({ target: t, dodged: false }));
       frame.params.settlement = settlement;
 

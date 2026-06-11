@@ -1,6 +1,6 @@
 // src/engine/skills/乐不思蜀.ts
 // 乐不思蜀(延时锦囊):对一名角色使用,判定结果为红桃则跳过出牌阶段
-import type { AtomAfterContext, BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { AtomAfterContext, BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -15,14 +15,16 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       if (typeof params.target !== 'string') return 'target required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const cardId = params.cardId as string;
       const target = params.target as string;
+      api.pushFrame('乐不思蜀', from, { ...params });
       // 移牌到处理区
       await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 添加延时锦囊到目标
-      const trickCard = frame._executor ? api.state.cardMap[cardId] : undefined;
+      const trickCard = api.state.cardMap[cardId];
       await api.apply({ type: '添加延时锦囊', player: target, trick: { name: '乐不思蜀', source: from, card: trickCard ?? { id: cardId, name: '乐不思蜀', suit: '', type: '锦囊牌' } } });
       // 移牌到弃牌堆
       await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });

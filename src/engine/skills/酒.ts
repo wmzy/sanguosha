@@ -1,7 +1,7 @@
 // src/engine/skills/酒.ts
 // 酒:出牌阶段对自己使用,本回合下一张杀的伤害+1
 // 实现:加 mark '酒/nextKillDamageBonus',通过 onAtomBefore('造成伤害') 钩子消费
-import type { AtomBeforeContext, BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { Atom, AtomBeforeContext, BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -17,8 +17,10 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       // 由 action 路由层保证 from === ownerId
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
+      const frame = api.pushFrame('酒', from, { ...params });
       const cardId = params.cardId as string;
       await api.apply({
         type: '移动牌',
@@ -42,15 +44,16 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
 
   // 消费 mark:在造成伤害时,如果是 self 造成的 且 有 酒/nextKillDamageBonus mark,amount + 1
   api.onAtomBefore('造成伤害', async (ctx: AtomBeforeContext) => {
-    if (ctx.atom.source !== api.self) return;
-    if (ctx.atom.amount <= 0) return;
+    const atom = ctx.atom as { source?: string; amount?: number; type: string };
+    if (atom.source !== api.self) return;
+    if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players.find(p => p.name === api.self);
     if (!self) return;
     const hasMark = self.marks.some(m => m.id === '酒/nextKillDamageBonus');
     if (!hasMark) return;
     // drop + 重新 apply(增加 1) — 简化处理;不会 re-entry 因为 mark 用完即去
     ctx.api.drop();
-    await ctx.api.apply({ ...ctx.atom, amount: ctx.atom.amount + 1 });
+    await ctx.api.apply({ ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as Atom);
     await ctx.api.apply({
       type: '去标记',
       player: api.self,

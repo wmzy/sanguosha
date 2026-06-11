@@ -1,7 +1,7 @@
 // src/engine/skills/回合管理.ts
 // 回合控制:每玩家一个实例,监听上家"回合结束"→启动自己回合
 // 设计:见 docs/ENGINE-DESIGN.md §4.14
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 const PHASE_ORDER = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'] as const;
@@ -75,8 +75,8 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
   api.registerAction(
     'end',
     (_view: GameView, _params: Record<string, Json>) => null,
-    async (frame: SettlementFrame) => {
-      const player = frame.from;
+    async (api: EngineApi) => {
+      const player = api.self;
 
       await api.apply({ type: '阶段结束', player, phase: '出牌' });
       await api.apply({ type: '阶段结束', player, phase: '弃牌' });
@@ -96,8 +96,8 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       if (view.currentPlayerIndex !== 0) return '只有主公位可以开局';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const player = frame.from;
+    async (api: EngineApi) => {
+      const player = api.self;
       await api.apply({ type: '回合开始', player });
       await api.apply({ type: '阶段开始', player, phase: '准备' });
       // 触发阶段结束,让阶段推进钩子跑(准备→判定→摸牌→出牌)

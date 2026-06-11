@@ -1,7 +1,7 @@
 // src/engine/skills/激将.ts
 // 激将(刘备·主公技):主公被南蛮入侵/万箭齐发等波及时,可请求其他蜀势力出杀/闪
 // 简化实现:主动技 — 出牌阶段限一次,主公可请求一张杀
-import type { BackendAPI, FrontendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, FrontendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -20,9 +20,11 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       if (typeof params.target !== 'string') return 'target required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const target = params.target as string;
+      const frame = api.pushFrame('激将', from, { ...params });
       // ─── Promise-based 续跑 ───
       await api.apply({
         type: '请求回应',

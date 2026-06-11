@@ -1,6 +1,6 @@
 // src/engine/skills/仁德.ts
 // 仁德(刘备):出牌阶段,可以将任意数量手牌给其他角色;给出 ≥2 张后回复 1 体力
-import type { BackendAPI, FrontendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, FrontendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -22,8 +22,10 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       if (total === 0) return 'no cards to give';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
+      const frame = api.pushFrame('仁德', from, { ...params });
       const targets = params.targets as Array<{ target: string; cardIds: string[] }>;
       for (const t of targets) {
         for (const cardId of t.cardIds) {

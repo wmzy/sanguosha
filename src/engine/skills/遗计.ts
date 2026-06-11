@@ -16,7 +16,7 @@ export function createSkill(id: string, ownerId: string): Skill {
 export function onInit(skill: Skill, api: BackendAPI): () => void {
   api.onAtomAfter('造成伤害', async (ctx: AtomAfterContext) => {
     if ((ctx.atom as { target?: string }).target !== api.self) return;
-    if ((ctx.atom as { amount?: number }).amount <= 0) return;
+    if (((ctx.atom as { amount?: number }).amount ?? 0) <= 0) return;
     // 1. 询问是否发动
     await ctx.api.apply({
       type: '请求回应',

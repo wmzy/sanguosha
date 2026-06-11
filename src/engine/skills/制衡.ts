@@ -1,6 +1,6 @@
 // src/engine/skills/制衡.ts
 // 制衡(孙权):出牌阶段限一次,可以弃一张手牌并摸两张牌
-import type { BackendAPI, FrontendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, FrontendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -19,8 +19,10 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
+      const frame = api.pushFrame('制衡', from, { ...params });
       const cardId = params.cardId as string;
       await api.apply({ type: '弃置', player: from, cardIds: [cardId] });
       await api.apply({ type: '摸牌', player: from, count: 2 });

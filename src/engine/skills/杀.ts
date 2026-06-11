@@ -1,7 +1,7 @@
 // src/engine/skills/杀.ts
 // 杀:出牌阶段对攻击范围内一名角色使用,目标可出闪
 // 计数:持久化到 player.marks(每回合 turn 结束自动清理)
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -47,10 +47,12 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       }
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const cardId = params.cardId as string;
       const targets = params.targets as string[];
+      const frame = api.pushFrame('杀', from, { ...params });
       frame.params.settlement = targets.map(t => ({ target: t, dodged: false }));
       frame.params.cardId = cardId;
       // 移动杀到处理区
@@ -60,9 +62,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
         from: { zone: '手牌', player: from },
         to: { zone: '处理区' },
       });
-      // ─── Promise-based 续跑 ───
       // 询问闪挂起 → 玩家回应后 Promise resolve → 自然续跑
-      // 闪技能(若有)的 respond action 通过 frame.parent.params.settlement 标记 dodged
       for (const target of targets) {
         await api.apply({ type: '指定目标', source: from, target });
         await api.apply({ type: '询问闪', target, source: from });
@@ -71,7 +71,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }>;
       for (const item of settlement) {
         if (!item.dodged) {
-          await api.apply({ type: '造成伤害', target: item.target, amount: 1, source: frame.from });
+          await api.apply({ type: '造成伤害', target: item.target, amount: 1, source: from });
         }
       }
       // 移动杀到弃牌堆
@@ -97,22 +97,26 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const cardId = params.cardId as string;
       // 移动杀到弃牌堆
       await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '弃牌堆' } });
       // 在当前帧(南蛮入侵/决斗帧)的 settlement 中标记 responded
-      const settlement = frame.params.settlement as Array<{ target: string; responded?: boolean; dodged?: boolean }> | undefined;
-      if (settlement) {
-        const item = settlement.find(s => s.target === from);
-        if (item) {
-          item.responded = true;
-          item.dodged = true;
+      const frame = api.topFrame();
+      if (frame) {
+        const settlement = frame.params.settlement as Array<{ target: string; responded?: boolean; dodged?: boolean }> | undefined;
+        if (settlement) {
+          const item = settlement.find(s => s.target === from);
+          if (item) {
+            item.responded = true;
+            item.dodged = true;
+          }
         }
+        frame.params.__杀响应 = true;
+        frame.params.__responded = from;
       }
-      frame.params.__杀响应 = true;
-      frame.params.__responded = from;
     },
   );
   return () => {};

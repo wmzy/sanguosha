@@ -1,12 +1,12 @@
 // src/engine/engine-api.ts
 // 引擎 API 实现 + atom apply pipeline(ENGINE-DESIGN §6.1)。
 //
-// 单一 apply 路径:所有 atom(普通/等待)走同一段 8 步流程,唯一区别在步骤 8 是否进 pending 区。
-//
 // 关键不变量:
+//   - atomStack / pendingSlot 是 GameState 属性,不是 frame 属性
+//   - 帧由技能通过 api.pushFrame 创建;execute 结束后引擎自动弹栈
 //   - 钩子不允许修改 atom 参数(§4.5 原子性保证)
 //   - 钩子改 state 只能通过 api.apply(嵌套) 或 api.drop(取消)
-//   - SettlementFrame 是纯数据,execute 自己读写 frame.params(本地状态,跨 atom 共享)
+//   - 引擎内部不 try/catch——除 bug 外不应抛错;DropAtomSignal 是控制流信号
 
 import type {
   Atom,
@@ -14,7 +14,6 @@ import type {
   AtomBeforeContext,
   EngineApi,
   GameState,
-  NotifyEvent,
   PendingSlot,
   SettlementFrame,
 } from './types';
@@ -22,8 +21,8 @@ import { applyAtom, getAtomDef, resolvePlayerViews } from './atom';
 import { getAfterHooks, getBeforeHooks } from './skill';
 import { pushEvent } from './event-stream';
 
-/** before 钩子用 throw 取消当前 atom(在 api 内部被 try/catch 吞掉) */
-class DropAtomSignal extends Error {
+/** before 钩子用 throw 取消当前 atom(控制流信号,不是错误) */
+export class DropAtomSignal extends Error {
   constructor() {
     super('Atom dropped');
     this.name = 'DropAtomSignal';
@@ -32,24 +31,45 @@ class DropAtomSignal extends Error {
 
 /** apply 管线单次执行的内部上下文(由 createEngine 创建,传给 createEngineApi) */
 export interface EngineContext {
+  /** 当前 GameState(可写,所有修改通过新 state 替换实现) */
   state: GameState;
-  /** 当前 apply 栈所在的帧(由 execute 创建,push 入栈) */
-  frame: SettlementFrame;
+  /** 当前消息 params(由 dispatch 注入) */
+  messageParams: Record<string, import('./types').Json>;
+  /** 技能 ownerId */
+  self: string;
   /** 触发 _dispatchReady 的内部函数(在挂起/完成时调用) */
   fireDispatchReady: () => void;
 }
 
 export function createEngineApi(ctx: EngineContext): EngineApi {
-  // 标记:在当前 before-hook 链完成后是否要丢栈顶
   let droppedCurrent = false;
 
   const api: EngineApi = {
     get state() {
       return ctx.state;
     },
+    get self() {
+      return ctx.self;
+    },
+    get params() {
+      return ctx.messageParams as Record<string, import('./types').Json>;
+    },
+    pushFrame(skillId: string, from: string, params?: Record<string, import('./types').Json>): SettlementFrame {
+      const frame: SettlementFrame = {
+        skillId,
+        from,
+        params: params ? { ...params } : {},
+        cards: [],
+      };
+      ctx.state = pushFrame(ctx.state, frame);
+      return frame;
+    },
+    topFrame(): SettlementFrame | undefined {
+      return topFrame(ctx.state);
+    },
     async apply(atom: Atom): Promise<void> {
       droppedCurrent = false;
-      ctx.frame.atomStack.push(atom);
+      ctx.state = { ...ctx.state, atomStack: [...ctx.state.atomStack, atom] };
 
       // before hooks
       const beforeHooks = getBeforeHooks(atom.type);
@@ -58,25 +78,16 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
         atom,
         self: '',
         api,
-        params: ctx.frame.params,
+        params: (topFrame(ctx.state)?.params ?? {}) as Record<string, import('./types').Json>,
       };
-      try {
-        for (const h of beforeHooks) {
-          beforeCtx.self = h.ownerId;
-          await h.handler(beforeCtx);
-          if (droppedCurrent) break;
-        }
-      } catch (e) {
-        if (e instanceof DropAtomSignal) {
-          droppedCurrent = true;
-        } else {
-          ctx.frame.atomStack.pop();
-          throw e;
-        }
+      for (const h of beforeHooks) {
+        if (droppedCurrent) break;
+        beforeCtx.self = h.ownerId;
+        await h.handler(beforeCtx);
       }
 
       if (droppedCurrent) {
-        ctx.frame.atomStack.pop();
+        ctx.state = { ...ctx.state, atomStack: ctx.state.atomStack.slice(0, -1) };
         droppedCurrent = false;
         return;
       }
@@ -85,7 +96,7 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
       const def = getAtomDef(atom.type);
       const error = def.validate(ctx.state, atom);
       if (error !== null) {
-        ctx.frame.atomStack.pop();
+        ctx.state = { ...ctx.state, atomStack: ctx.state.atomStack.slice(0, -1) };
         return;
       }
 
@@ -108,14 +119,15 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
         atom,
         self: '',
         api,
-        params: ctx.frame.params,
+        params: (topFrame(ctx.state)?.params ?? {}) as Record<string, import('./types').Json>,
       };
       for (const h of afterHooks) {
         afterCtx.self = h.ownerId;
         await h.handler(afterCtx);
       }
 
-      ctx.frame.atomStack.pop();
+      // 弹栈
+      ctx.state = { ...ctx.state, atomStack: ctx.state.atomStack.slice(0, -1) };
 
       // 判定 atom 收尾:把目标 judgeZone 顶部牌移入弃牌堆
       if (atom.type === '判定') {
@@ -132,11 +144,11 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
             startTime: Date.now(),
             deadline: Date.now() + timeoutMs * 1000,
             resolve: () => {
-              ctx.frame.pendingSlot = undefined;
+              ctx.state = { ...ctx.state, pendingSlot: undefined };
               resolve();
             },
           };
-          ctx.frame.pendingSlot = slot;
+          ctx.state = { ...ctx.state, pendingSlot: slot };
           // 通知 dispatch:帧已抵达挂起点,可以返回当前 state
           ctx.fireDispatchReady();
         });
@@ -145,11 +157,20 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
     drop() {
       droppedCurrent = true;
     },
-    notify(event: NotifyEvent) {
+    notify(event) {
       pushEvent({ kind: 'notify', ...event });
     },
   };
   return api;
+}
+
+/** 取栈顶帧(从 state.settlementStack) */
+function topFrame(state: GameState): SettlementFrame | undefined {
+  return state.settlementStack[state.settlementStack.length - 1];
+}
+
+function pushFrame(state: GameState, frame: SettlementFrame): GameState {
+  return { ...state, settlementStack: [...state.settlementStack, frame] };
 }
 
 /** 判定 atom:apply 后从牌堆顶翻一张到目标玩家 judgeZone */
@@ -158,10 +179,7 @@ function moveJudgeCardToZone(state: GameState, atom: { player: string; judgeType
   const topCardId = state.zones.deck[0];
   return {
     ...state,
-    zones: {
-      ...state.zones,
-      deck: state.zones.deck.slice(1),
-    },
+    zones: { ...state.zones, deck: state.zones.deck.slice(1) },
     players: state.players.map((p) =>
       p.name === atom.player ? { ...p, judgeZone: [...p.judgeZone, topCardId] } : p,
     ),

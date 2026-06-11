@@ -1,6 +1,6 @@
 // src/engine/skills/决斗.ts
 // 决斗(锦囊):出牌阶段对一名角色使用,双方轮流出杀,先不出者受 1 点伤害
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -15,10 +15,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       if (typeof params.target !== 'string') return 'target required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
       const cardId = params.cardId as string;
       const target = params.target as string;
+      const frame = api.pushFrame('决斗', from, { ...params });
 
       // 移牌到处理区
       await api.apply({

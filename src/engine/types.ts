@@ -72,11 +72,11 @@ export interface GameState {
     processing: string[];
   };
   settlementStack: SettlementFrame[];
+  /** 当前正在 apply 栈上的 atom 列表(栈顶=最新)。游戏状态属性,不是 frame 属性 */
+  atomStack: Atom[];
+  /** 当前等待中的 pending slot(同时只有一个等待) */
+  pendingSlot?: PendingSlot;
   cardMap: Record<string, Card>;
-  /**
-   * 牌包装字典:不修改 cardMap 本身;cardWrappers[cardId] 表示该牌被某技能包装后的"虚拟"属性。
-   * 牌移入弃牌堆时引擎自动清理包装。
-   */
   cardWrappers: Record<string, CardWrapper>;
   rngSeed: number;
   marks: Mark[];
@@ -85,6 +85,27 @@ export interface GameState {
   seq: number;
   startedAt: number;
   actionLog: ActionLogEntry[];
+}
+
+/** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
+export function createGameState(partial: Partial<GameState> & { players: PlayerState[]; cardMap: Record<string, Card> }): GameState {
+  return {
+    currentPlayerIndex: 0,
+    phase: '准备',
+    turn: { round: 1, phase: '准备', vars: {} },
+    zones: { deck: [], discardPile: [], processing: [] },
+    settlementStack: [],
+    atomStack: [],
+    cardWrappers: {},
+    rngSeed: 0,
+    marks: [],
+    localVars: {},
+    meta: { gameId: '', createdAt: 0 },
+    seq: 0,
+    startedAt: 0,
+    actionLog: [],
+    ...partial,
+  };
 }
 
 // ==================== ActionPrompt ====================
@@ -272,11 +293,19 @@ export interface GameView {
 
 /**
  * 引擎 API:由 createEngine 内部生成,挂在 hook 上下文中供技能调用。
- * 不挂在 frame 上——所有"全局"操作(apply/drop/notify)都通过它。
+ * 技能通过 pushFrame 创建帧;apply 变更状态;drop 取消当前 atom;notify 推送事件。
  */
 export interface EngineApi {
   /** 当前 GameState(只读快照) */
   readonly state: GameState;
+  /** 技能 ownerId(per player instance) */
+  readonly self: string;
+  /** 当前消息 params(由 dispatch 注入;回应路径的 params 在消费 pending 后更新) */
+  readonly params: Record<string, Json>;
+  /** 创建帧并压入 settlementStack,返回帧引用。execute 结束后引擎自动弹栈 */
+  pushFrame(skillId: string, from: string, params?: Record<string, Json>): SettlementFrame;
+  /** 取栈顶帧 */
+  topFrame(): SettlementFrame | undefined;
   /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到回应/超时 */
   apply(atom: Atom): Promise<void>;
   /** 取消当前正在 apply 栈上的 atom(在 before 钩子中调用),随后 apply 流程跳过该 atom */
@@ -324,8 +353,8 @@ export interface PendingView {
 
 /**
  * 结算帧:execute 本地状态。
- * 帧没有方法——所有"操作"通过 EngineApi(apply/drop/notify)进行。
- * params 是 execute 自己的本地状态(跨 atom 共享 settlement 数据);dispatch 收到回应时合并 message.params 到 topFrame.params。
+ * 帧是纯数据——所有"操作"通过 EngineApi(apply/drop/notify)进行。
+ * 技能通过 api.pushFrame 创建并压入 settlementStack;execute 结束后引擎自动弹栈。
  */
 export interface SettlementFrame {
   skillId: string;
@@ -334,11 +363,6 @@ export interface SettlementFrame {
   params: Record<string, Json>;
   /** 处理区(此帧涉及的牌 ID 列表) */
   cards: string[];
-  /** 当前正在 apply 栈上的 atom 列表(栈顶=最新) */
-  atomStack: Atom[];
-  /** 当前等待中的 pending slot(同时只有一个等待) */
-  pendingSlot?: PendingSlot;
-  parent?: SettlementFrame;
 }
 
 /** Pending 区——等待玩家操作的 slot */
@@ -379,7 +403,8 @@ export interface ActionEntry {
   ownerId: string;
   actionType: string;
   validate: (view: GameView, params: Record<string, Json>) => string | null;
-  execute: (frame: SettlementFrame) => Promise<void>;
+  /** 技能 execute:接收 api,内部通过 api.pushFrame 创建帧 */
+  execute: (api: EngineApi) => Promise<void>;
 }
 
 export interface AtomHookEntry {
@@ -402,7 +427,8 @@ export interface BackendAPI {
   registerAction(
     actionType: string,
     validate: (view: GameView, params: Record<string, Json>) => string | null,
-    execute: (frame: SettlementFrame) => Promise<void>,
+    /** 技能 execute:接收 api,内部通过 api.pushFrame 创建帧 */
+    execute: (api: EngineApi) => Promise<void>,
   ): () => void;
   onAtomBefore(
     atomType: string,

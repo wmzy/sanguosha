@@ -1,6 +1,6 @@
 // src/engine/skills/无中生有.ts
 // 无中生有(锦囊):摸两张牌
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -14,8 +14,10 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
     },
-    async (frame: SettlementFrame) => {
-      const { from, params } = frame;
+    async (api: EngineApi) => {
+      const from = api.self;
+      const params = api.params;
+      api.pushFrame('无中生有', from, { ...params });
       const cardId = params.cardId as string;
       await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       await api.apply({ type: '摸牌', player: from, count: 2 });
