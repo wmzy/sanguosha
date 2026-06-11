@@ -27,16 +27,16 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     if (self.marks.some(m => m.id === '护甲/applied')) return;
     // 应用护甲:drop 重新 apply 减 1,加 guard mark 防止 re-entry
     if (ctx.atom.amount > 0) {
-      ctx.drop();
+      ctx.api.drop();
       // 先加 guard(在 re-apply 之前)
-      await ctx.apply({
+      await ctx.api.apply({
         type: '加标记',
         player: api.self,
         mark: { id: '护甲/applied', scope: -1 },
       });
       // 重新 apply
       if (ctx.atom.amount > 1) {
-        await ctx.apply({ ...ctx.atom, amount: ctx.atom.amount - 1 });
+        await ctx.api.apply({ ...ctx.atom, amount: ctx.atom.amount - 1 });
       }
       // 否则 amount=1 时不 apply(直接 drop,无伤害)
     }

@@ -24,7 +24,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const { from, params } = frame;
       const target = params.target as string;
       // ─── Promise-based 续跑 ───
-      await frame.apply({
+      await api.apply({
         type: '请求回应',
         requestType: '激将/respondKill',
         target,
@@ -36,12 +36,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         // 目标出杀:把目标的杀效果委托到杀技能
         const killTarget = frame.params.__激将杀目标 as string | undefined;
         if (killTarget) {
-          await frame.apply({ type: '指定目标', source: target, target: killTarget });
-          await frame.apply({ type: '询问闪', target: killTarget, source: target });
+          await api.apply({ type: '指定目标', source: target, target: killTarget });
+          await api.apply({ type: '询问闪', target: killTarget, source: target });
         }
       } else {
         // 目标不出:主公摸 1 张
-        await frame.apply({ type: '摸牌', player: from, count: 1 });
+        await api.apply({ type: '摸牌', player: from, count: 1 });
       }
     },
   );

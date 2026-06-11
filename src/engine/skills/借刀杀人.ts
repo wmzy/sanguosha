@@ -20,10 +20,10 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const cardId = params.cardId as string;
       const target = params.target as string;
       // 移锦囊到处理区
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // ─── Promise-based 续跑 ───
       // 请求回应挂起,等目标出杀或超时
-      await frame.apply({
+      await api.apply({
         type: '请求回应',
         requestType: '借刀杀人/forceKill',
         target,
@@ -38,12 +38,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         const targetPlayer = frame._executor?.state.players.find(p => p.name === target);
         const weaponId = targetPlayer?.equipment?.['武器'];
         if (weaponId) {
-          await frame.apply({ type: '卸下', player: target, slot: '武器' });
-          await frame.apply({ type: '获得', player: from, cardId: weaponId, from: target });
+          await api.apply({ type: '卸下', player: target, slot: '武器' });
+          await api.apply({ type: '获得', player: from, cardId: weaponId, from: target });
         }
       }
       // 移牌到弃牌堆
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
     },
   );
   return () => {};

@@ -20,18 +20,18 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     async (frame: SettlementFrame) => {
       const { from, params } = frame;
       const cardId = params.cardId as string;
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
         to: { zone: '处理区' },
       });
-      await frame.apply({
+      await api.apply({
         type: '加标记',
         player: from,
         mark: { id: '酒/nextKillDamageBonus', scope: -1, payload: 1, duration: 'turn' },
       });
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '处理区' },
@@ -49,9 +49,9 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const hasMark = self.marks.some(m => m.id === '酒/nextKillDamageBonus');
     if (!hasMark) return;
     // drop + 重新 apply(增加 1) — 简化处理;不会 re-entry 因为 mark 用完即去
-    ctx.drop();
-    await ctx.apply({ ...ctx.atom, amount: ctx.atom.amount + 1 });
-    await ctx.apply({
+    ctx.api.drop();
+    await ctx.api.apply({ ...ctx.atom, amount: ctx.atom.amount + 1 });
+    await ctx.api.apply({
       type: '去标记',
       player: api.self,
       markId: '酒/nextKillDamageBonus',

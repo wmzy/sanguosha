@@ -21,7 +21,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const target = params.target as string;
 
       // 移牌到处理区
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
@@ -34,7 +34,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       let loser: string | null = null;
       while (loser === null) {
         const current = turn === 0 ? target : from;
-        await frame.apply({ type: '询问杀', target: current, source: turn === 0 ? from : target });
+        await api.apply({ type: '询问杀', target: current, source: turn === 0 ? from : target });
         // 询问杀挂起 → resolve 后读取回应
         const responded = frame.params.__决斗回应 as boolean | undefined;
         if (!responded) {
@@ -44,9 +44,9 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         }
       }
       const winner = loser === target ? from : target;
-      await frame.apply({ type: '造成伤害', target: loser, amount: 1, source: winner });
+      await api.apply({ type: '造成伤害', target: loser, amount: 1, source: winner });
       // 移牌到弃牌堆
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '处理区' },

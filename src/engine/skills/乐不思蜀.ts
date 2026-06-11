@@ -20,12 +20,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const cardId = params.cardId as string;
       const target = params.target as string;
       // 移牌到处理区
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 添加延时锦囊到目标
-      const trickCard = frame._executor ? frame._executor.state.cardMap[cardId] : undefined;
-      await frame.apply({ type: '添加延时锦囊', player: target, trick: { name: '乐不思蜀', source: from, card: trickCard ?? { id: cardId, name: '乐不思蜀', suit: '', type: '锦囊牌' } } });
+      const trickCard = frame._executor ? api.state.cardMap[cardId] : undefined;
+      await api.apply({ type: '添加延时锦囊', player: target, trick: { name: '乐不思蜀', source: from, card: trickCard ?? { id: cardId, name: '乐不思蜀', suit: '', type: '锦囊牌' } } });
       // 移牌到弃牌堆
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
     },
   );
   // 判定后检查结果:红桃则标记跳过出牌

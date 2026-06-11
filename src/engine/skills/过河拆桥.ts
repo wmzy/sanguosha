@@ -20,14 +20,14 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const cardId = params.cardId as string;
       const target = params.target as string;
       // 移锦囊到处理区
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 弃目标一张牌(简化:弃手牌第一张)
       const targetPlayer = frame._executor?.state.players.find(p => p.name === target);
       if (targetPlayer && targetPlayer.hand.length > 0) {
-        await frame.apply({ type: '弃置', player: target, cardIds: [targetPlayer.hand[0]] });
+        await api.apply({ type: '弃置', player: target, cardIds: [targetPlayer.hand[0]] });
       }
       // 移锦囊到弃牌堆
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
     },
   );
   return () => {};

@@ -24,7 +24,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const aliveOthers = ctx.state.players.filter(p => p.name !== api.self && p.alive);
     if (aliveOthers.length === 0) return;
     // 询问是否发动
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '流离/confirm',
       target: api.self,
@@ -36,7 +36,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const confirmed = ctx.params.__流离confirmed as boolean | undefined;
     if (!confirmed) return;
     // 询问选择新目标
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '流离/chooseTarget',
       target: api.self,
@@ -53,7 +53,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     if (!newTarget || newTarget === api.self) return;
     // 弃 1 张牌(让玩家选择,简化:弃手牌第一张)
     const discardCard = selfPlayer.hand[0];
-    await ctx.apply({ type: '弃置', player: api.self, cardIds: [discardCard] });
+    await ctx.api.apply({ type: '弃置', player: api.self, cardIds: [discardCard] });
     // 修改 settlement 中的目标
     const settlement = ctx.params.settlement as Array<{ target: string; dodged: boolean; amount: number }> | undefined;
     if (settlement) {
@@ -63,7 +63,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       }
     }
     // 也修改当前 atom 的 target,后续 atom 读取新值
-    ctx.modifyParams({ target: newTarget });
+    ;
   });
   return () => {};
 }

@@ -19,20 +19,17 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const cardId = params.cardId as string | undefined;
       if (!cardId) return; // 不出闪,什么都不做
       // 移动闪到弃牌堆
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
         to: { zone: '弃牌堆' },
       });
-      // 在 parent frame(kill frame) 的 settlement 中标记 dodged
-      const parent = frame.parent;
-      if (parent) {
-        const settlement = parent.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
-        if (settlement) {
-          const item = settlement.find(s => s.target === from);
-          if (item) item.dodged = true;
-        }
+      // 在当前帧(即杀帧)的 settlement 中标记 dodged
+      const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
+      if (settlement) {
+        const item = settlement.find(s => s.target === from);
+        if (item) item.dodged = true;
       }
     },
   );

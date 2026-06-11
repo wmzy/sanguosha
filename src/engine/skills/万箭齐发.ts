@@ -20,13 +20,13 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
 
       // 初始化 settlement:所有其他存活角色
       const targets = frame._executor
-        ? frame._executor.state.players.filter(p => p.name !== from && p.alive).map(p => p.name)
+        ? api.state.players.filter(p => p.name !== from && p.alive).map(p => p.name)
         : [];
       const settlement = targets.map(t => ({ target: t, dodged: false }));
       frame.params.settlement = settlement;
 
       // 移牌到处理区
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
@@ -36,19 +36,19 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       // ─── Promise-based 续跑 ───
       // 逐个询问闪,每个 respond action(闪技能)通过 frame.parent.params.settlement 标记 dodged
       for (const target of targets) {
-        await frame.apply({ type: '询问闪', target, source: from });
+        await api.apply({ type: '询问闪', target, source: from });
       }
 
       // 对未闪避者造成伤害
       const settled = frame.params.settlement as Array<{ target: string; dodged: boolean }>;
       for (const item of settled) {
         if (!item.dodged) {
-          await frame.apply({ type: '造成伤害', target: item.target, amount: 1, source: from });
+          await api.apply({ type: '造成伤害', target: item.target, amount: 1, source: from });
         }
       }
 
       // 移牌到弃牌堆
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '处理区' },

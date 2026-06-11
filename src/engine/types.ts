@@ -57,6 +57,8 @@ export interface PlayerState {
   skills: string[];
   vars: Record<string, Json>;
   marks: Mark[];
+  /** 判定区:当前正在被判定中的牌 ID 列表(顶端最新) */
+  judgeZone: string[];
 }
 
 export interface GameState {
@@ -71,6 +73,11 @@ export interface GameState {
   };
   settlementStack: SettlementFrame[];
   cardMap: Record<string, Card>;
+  /**
+   * 牌包装字典:不修改 cardMap 本身;cardWrappers[cardId] 表示该牌被某技能包装后的"虚拟"属性。
+   * 牌移入弃牌堆时引擎自动清理包装。
+   */
+  cardWrappers: Record<string, CardWrapper>;
   rngSeed: number;
   marks: Mark[];
   localVars: Record<string, Json>;
@@ -223,6 +230,8 @@ export type Atom =
   | { type: '移除延时锦囊'; player: string; trickName: string }
   // 拼点
   | { type: '拼点'; initiator: string; target: string; initiatorCard: string; targetCard: string }
+  // 判定
+  | { type: '判定'; player: string; judgeType: string }
   // 等待回应
   | { type: '询问闪'; target: string; source: string }
   | { type: '询问杀'; target: string; source: string }
@@ -261,28 +270,38 @@ export interface GameView {
   log: { time: number; player: string; text: string }[];
 }
 
+/**
+ * 引擎 API:由 createEngine 内部生成,挂在 hook 上下文中供技能调用。
+ * 不挂在 frame 上——所有"全局"操作(apply/drop/notify)都通过它。
+ */
+export interface EngineApi {
+  /** 当前 GameState(只读快照) */
+  readonly state: GameState;
+  /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到回应/超时 */
+  apply(atom: Atom): Promise<void>;
+  /** 取消当前正在 apply 栈上的 atom(在 before 钩子中调用),随后 apply 流程跳过该 atom */
+  drop(): void;
+  /** 推送 notify 事件(不改变 state) */
+  notify(event: NotifyEvent): void;
+}
+
 /** before 钩子上下文:atom 执行前调用 */
 export interface AtomBeforeContext {
   state: GameState;
   atom: Atom;
   self: string;
-  /** 当前结算帧的参数(可读)。 */
+  api: EngineApi;
+  /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
   readonly params: Record<string, Json>;
-  modifyParams(patch: Record<string, Json>): void;
-  /** 阻止该 atom 执行,before 钩子专用 */
-  drop(): void;
-  apply(atom: Atom): Promise<void>;
 }
 
 export interface AtomAfterContext {
   state: GameState;
   atom: Atom;
   self: string;
-  /** 当前结算帧的参数(可读)。dispatch 把回应的 params 注入此处。 */
+  api: EngineApi;
+  /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
   readonly params: Record<string, Json>;
-  modifyParams(patch: Record<string, Json>): void;
-  apply(atom: Atom): Promise<void>;
-  notify(event: NotifyEvent): void;
 }
 
 // ==================== Skill ====================
@@ -303,25 +322,23 @@ export interface PendingView {
   deadline: number;
 }
 
+/**
+ * 结算帧:execute 本地状态。
+ * 帧没有方法——所有"操作"通过 EngineApi(apply/drop/notify)进行。
+ * params 是 execute 自己的本地状态(跨 atom 共享 settlement 数据);dispatch 收到回应时合并 message.params 到 topFrame.params。
+ */
 export interface SettlementFrame {
   skillId: string;
   from: string;
+  /** execute 本地状态,跨 atom 共享(settlement 标记、跨帧中间结果) */
   params: Record<string, Json>;
+  /** 处理区(此帧涉及的牌 ID 列表) */
   cards: string[];
+  /** 当前正在 apply 栈上的 atom 列表(栈顶=最新) */
   atomStack: Atom[];
-  /** 当前等待中的 pending slot（同时只有一个等待） */
+  /** 当前等待中的 pending slot(同时只有一个等待) */
   pendingSlot?: PendingSlot;
   parent?: SettlementFrame;
-  /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到 consumePending */
-  apply(atom: Atom): Promise<void>;
-  /** 消费当前 pending slot（resolve Promise），让 await frame.apply 恢复 */
-  consumePending(): void;
-  /** 取消当前帧的等待回应 */
-  drop(): void;
-  modifyParams(patch: Record<string, Json>): void;
-  notify(event: NotifyEvent): void;
-  /** 内部:保存 FrameExecutor 引用,供嵌套帧或 dispatch 写入 state */
-  _executor?: { state: GameState };
 }
 
 /** Pending 区——等待玩家操作的 slot */
@@ -375,6 +392,10 @@ export interface AtomHookEntry {
 
 // ==================== SkillDef ====================
 
+/**
+ * BackendAPI:onInit 时传给技能模块的句柄。提供 registerAction/onAtomBefore/onAtomAfter。
+ * apply/notify 是转发到当前引擎的 EngineApi(避免 onInit 阶段调用——见 skill.ts)。
+ */
 export interface BackendAPI {
   /** ownerId(per player instance) */
   readonly self: string;

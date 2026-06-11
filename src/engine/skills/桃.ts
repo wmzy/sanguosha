@@ -19,14 +19,14 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const { from, params } = frame;
       const cardId = params.cardId as string;
       const target = (params.target ?? (params.targets as string[] | undefined)?.[0]) as string;
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
         to: { zone: '处理区' },
       });
-      await frame.apply({ type: '回复体力', target, amount: 1, source: from });
-      await frame.apply({
+      await api.apply({ type: '回复体力', target, amount: 1, source: from });
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '处理区' },

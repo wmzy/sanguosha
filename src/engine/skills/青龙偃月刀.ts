@@ -15,7 +15,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     const dodged = ctx.params.__闪避 as boolean | undefined;
     if (!dodged) return;
     // 询问是否追杀
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '青龙偃月刀/confirm',
       target: api.self,
@@ -26,7 +26,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     const confirmed = ctx.params.__青龙confirmed as boolean | undefined;
     if (!confirmed) return;
     // 再询问一次闪
-    await ctx.apply({ type: '询问闪', target: atom.target!, source: api.self });
+    await ctx.api.apply({ type: '询问闪', target: atom.target!, source: api.self });
   });
   return () => {};
 }

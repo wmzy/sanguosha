@@ -16,8 +16,8 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     const card = ctx.state.cardMap[atom.cardId];
     if (!card) return;
     if (card.suit === '♠' || card.suit === '♣') {
-      ctx.modifyParams({ __仁王盾生效: true });
-      ctx.drop(); // 阻止伤害
+      ;
+      ctx.api.drop(); // 阻止伤害
     }
   });
   return () => {};

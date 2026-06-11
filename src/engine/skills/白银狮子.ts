@@ -13,14 +13,14 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     const atom = ctx.atom as { target?: string; amount?: number };
     if (atom.target !== api.self) return;
     if ((atom.amount ?? 0) > 1) {
-      ctx.modifyParams({ amount: 1 });
+      ;
     }
   });
   // 受伤后回复1点(白银狮子特效)
   api.onAtomAfter('造成伤害', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { target?: string };
     if (atom.target !== api.self) return;
-    await ctx.apply({ type: '回复体力', target: api.self, amount: 1 });
+    await ctx.api.apply({ type: '回复体力', target: api.self, amount: 1 });
   });
   return () => {};
 }

@@ -16,7 +16,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     if (!self || self.hand.length !== 1) return; // 不是最后一张
     const lastCard = ctx.state.cardMap[self.hand[0]];
     if (!lastCard || lastCard.name !== '杀') return; // 最后一张不是杀
-    ctx.modifyParams({ __方天多目标: true });
+    ;
   });
   return () => {};
 }

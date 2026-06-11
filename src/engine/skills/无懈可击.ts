@@ -19,12 +19,9 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const { from, params } = frame;
       const cardId = params.cardId as string;
       // 移无懈可击到弃牌堆
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '弃牌堆' } });
-      // 在 parent frame 标记无懈可击生效
-      const parent = frame.parent;
-      if (parent) {
-        parent.params.__无懈可击生效 = true;
-      }
+      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '弃牌堆' } });
+      // 在当前帧标记无懈可击生效
+      frame.params.__无懈可击生效 = true;
     },
   );
   return () => {};

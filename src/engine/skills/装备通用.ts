@@ -23,12 +23,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         const slot = card.subtype as '武器' | '防具' | '进攻马' | '防御马' | '宝物';
         const currentEquip = frame._executor?.state.players.find(p => p.name === from)?.equipment?.[slot];
         if (currentEquip) {
-          await frame.apply({ type: '卸下', player: from, slot });
-          await frame.apply({ type: '移动牌', cardId: currentEquip, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+          await api.apply({ type: '卸下', player: from, slot });
+          await api.apply({ type: '移动牌', cardId: currentEquip, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
       }
       // 装备
-      await frame.apply({ type: '装备', player: from, cardId });
+      await api.apply({ type: '装备', player: from, cardId });
     },
   );
   return () => {};

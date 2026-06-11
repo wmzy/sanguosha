@@ -19,7 +19,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     const self = ctx.state.players.find(p => p.name === api.self);
     if (!self || self.hand.length < 2) return;
     // 询问是否弃2牌强命
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '贯石斧/confirm',
       target: api.self,
@@ -31,15 +31,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     if (!confirmed) return;
     // 弃2张牌(简化:弃手牌前2张)
     const discardCards = self.hand.slice(0, 2);
-    await ctx.apply({ type: '弃置', player: api.self, cardIds: discardCards });
-    // 在 parent frame 标记 dodged=false(强命)
-    const parent = (ctx as unknown as { _frameRef?: { parent?: { params: Record<string, unknown> } } })._frameRef?.parent;
-    if (parent) {
-      const settlement = parent.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
-      if (settlement) {
-        const item = settlement.find(s => s.target === atom.target);
-        if (item) item.dodged = false;
-      }
+    await ctx.api.apply({ type: '弃置', player: api.self, cardIds: discardCards });
+    // 在当前帧标记 dodged=false(强命)
+    const settlement = ctx.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
+    if (settlement) {
+      const item = settlement.find(s => s.target === atom.target);
+      if (item) item.dodged = false;
     }
   });
   return () => {};

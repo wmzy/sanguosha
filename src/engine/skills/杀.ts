@@ -54,7 +54,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       frame.params.settlement = targets.map(t => ({ target: t, dodged: false }));
       frame.params.cardId = cardId;
       // 移动杀到处理区
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
@@ -64,22 +64,28 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       // 询问闪挂起 → 玩家回应后 Promise resolve → 自然续跑
       // 闪技能(若有)的 respond action 通过 frame.parent.params.settlement 标记 dodged
       for (const target of targets) {
-        await frame.apply({ type: '指定目标', source: from, target });
-        await frame.apply({ type: '询问闪', target, source: from });
+        await api.apply({ type: '指定目标', source: from, target });
+        await api.apply({ type: '询问闪', target, source: from });
       }
       // 对未闪避的目标造成伤害
       const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }>;
       for (const item of settlement) {
         if (!item.dodged) {
-          await frame.apply({ type: '造成伤害', target: item.target, amount: 1, source: frame.from });
+          await api.apply({ type: '造成伤害', target: item.target, amount: 1, source: frame.from });
         }
       }
       // 移动杀到弃牌堆
-      await frame.apply({
+      await api.apply({
         type: '移动牌',
         cardId,
         from: { zone: '处理区' },
         to: { zone: '弃牌堆' },
+      });
+      // 记录出杀次数(duration='turn' 在回合结束时自动清理)
+      await api.apply({
+        type: '加标记',
+        player: from,
+        mark: { id: '杀/killsPlayed', scope: -1, payload: 1, duration: 'turn' },
       });
     },
   );
@@ -95,22 +101,18 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const { from, params } = frame;
       const cardId = params.cardId as string;
       // 移动杀到弃牌堆
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '弃牌堆' } });
-      // 在 parent frame 的 settlement 中标记 responded
-      const parent = frame.parent;
-      if (parent) {
-        const settlement = parent.params.settlement as Array<{ target: string; responded?: boolean; dodged?: boolean }> | undefined;
-        if (settlement) {
-          const item = settlement.find(s => s.target === from);
-          if (item) {
-            item.responded = true;
-            item.dodged = true; // 也兼容旧字段(对杀来说 dodged = 不需造成伤害)
-          }
+      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '弃牌堆' } });
+      // 在当前帧(南蛮入侵/决斗帧)的 settlement 中标记 responded
+      const settlement = frame.params.settlement as Array<{ target: string; responded?: boolean; dodged?: boolean }> | undefined;
+      if (settlement) {
+        const item = settlement.find(s => s.target === from);
+        if (item) {
+          item.responded = true;
+          item.dodged = true;
         }
-        // 兼容老字段名
-        parent.params.__杀响应 = true;
-        parent.params.__responded = from;
       }
+      frame.params.__杀响应 = true;
+      frame.params.__responded = from;
     },
   );
   return () => {};

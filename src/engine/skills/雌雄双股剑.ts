@@ -15,12 +15,12 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     const target = ctx.state.players.find(p => p.name === atom.target);
     if (!target || target.hand.length === 0) {
       // 目标无牌可弃,只摸牌
-      await ctx.apply({ type: '摸牌', player: api.self, count: 1 });
+      await ctx.api.apply({ type: '摸牌', player: api.self, count: 1 });
       return;
     }
     // 目标弃1张,自己摸1张
-    await ctx.apply({ type: '弃置', player: atom.target!, cardIds: [target.hand[0]] });
-    await ctx.apply({ type: '摸牌', player: api.self, count: 1 });
+    await ctx.api.apply({ type: '弃置', player: atom.target!, cardIds: [target.hand[0]] });
+    await ctx.api.apply({ type: '摸牌', player: api.self, count: 1 });
   });
   return () => {};
 }

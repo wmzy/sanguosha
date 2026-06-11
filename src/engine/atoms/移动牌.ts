@@ -37,6 +37,11 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       next.zones = { ...next.zones, deck: [...next.zones.deck, atom.cardId] };
     } else if (atom.to.zone === '弃牌堆') {
       next.zones = { ...next.zones, discardPile: [...next.zones.discardPile, atom.cardId] };
+      // 牌移入弃牌堆时清理包装(武圣等转化技的还原)
+      if (next.cardWrappers?.[atom.cardId]) {
+        const { [atom.cardId]: _, ...rest } = next.cardWrappers;
+        next = { ...next, cardWrappers: rest };
+      }
     } else if (atom.to.zone === '处理区') {
       next.zones = { ...next.zones, processing: [...next.zones.processing, atom.cardId] };
     }
@@ -44,5 +49,4 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     return next;
   },
 };
-
 registerAtom(移动牌);

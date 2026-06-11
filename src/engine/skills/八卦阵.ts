@@ -16,19 +16,21 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
   api.onAtomBefore('询问闪', async (ctx: AtomBeforeContext) => {
     // 只对自己生效
     if ((ctx.atom as { target?: string }).target !== api.self) return;
-    // 判定:翻牌堆顶一张牌
-    const state = ctx.state;
-    if (state.zones.deck.length === 0) return; // 牌堆空,无法判定
-    const judgeCardId = state.zones.deck[0];
-    // 翻牌 → 判定 → 弃牌堆
-    await ctx.apply({ type: '移动牌', cardId: judgeCardId, from: { zone: '牌堆' }, to: { zone: '弃牌堆' } });
-    const judgeCard = state.cardMap[judgeCardId];
+    if (ctx.state.zones.deck.length === 0) return; // 牌堆空,无法判定
+
+    // 使用判定 atom:deck[0] → judgeZone → after 链后自动入弃牌堆
+    await ctx.api.apply({ type: '判定', player: api.self, judgeType: '八卦阵' });
+
+    // 判定牌现在在 judgeZone 顶部
+    const self = ctx.state.players.find((p) => p.name === api.self);
+    if (!self || self.judgeZone.length === 0) return;
+    const judgeCardId = self.judgeZone[self.judgeZone.length - 1];
+    const judgeCard = ctx.state.cardMap[judgeCardId];
     if (judgeCard && (judgeCard.suit === '♥' || judgeCard.suit === '♦')) {
-      // 红色:等效出闪 — 阻止询问闪执行,并标记已闪避
-      ctx.modifyParams({ __八卦阵生效: true });
-      ctx.drop();
+      // 红色:等效出闪 — 阻止询问闪执行
+      ctx.api.drop();
     }
-    // 黑色:不生效,继续正常询问闪
+    // 黑色:不生效,继续正常询问闪(等用户出闪)
   });
   return () => {};
 }

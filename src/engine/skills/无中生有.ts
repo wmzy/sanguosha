@@ -17,9 +17,9 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     async (frame: SettlementFrame) => {
       const { from, params } = frame;
       const cardId = params.cardId as string;
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      await frame.apply({ type: '摸牌', player: from, count: 2 });
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await api.apply({ type: '摸牌', player: from, count: 2 });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
     },
   );
   return () => {};

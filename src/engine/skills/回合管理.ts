@@ -39,16 +39,16 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const next = nextPhase(phase);
     if (!next) return;
 
-    await ctx.apply({ type: '阶段开始', player, phase: next });
+    await ctx.api.apply({ type: '阶段开始', player, phase: next });
 
     // 摸牌阶段自动摸 2 张
     if (next === '摸牌') {
-      await ctx.apply({ type: '摸牌', player, count: 2 });
+      await ctx.api.apply({ type: '摸牌', player, count: 2 });
     }
 
     // 自动阶段(准备/判定/摸牌)立即结束,推进到下一阶段
     if (next === '准备' || next === '判定' || next === '摸牌') {
-      await ctx.apply({ type: '阶段结束', player, phase: next });
+      await ctx.api.apply({ type: '阶段结束', player, phase: next });
     }
   });
 
@@ -65,10 +65,10 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     // 不是我就跳过——只有轮到的玩家启动自己的回合
     if (nextName !== me) return;
 
-    await ctx.apply({ type: '回合开始', player: me });
-    await ctx.apply({ type: '阶段开始', player: me, phase: '准备' });
+    await ctx.api.apply({ type: '回合开始', player: me });
+    await ctx.api.apply({ type: '阶段开始', player: me, phase: '准备' });
     // 触发阶段结束,让本实例的阶段推进钩子接着跑(准备→判定→摸牌→出牌)
-    await ctx.apply({ type: '阶段结束', player: me, phase: '准备' });
+    await ctx.api.apply({ type: '阶段结束', player: me, phase: '准备' });
   });
 
   // ─── 主动结束回合 ───
@@ -78,12 +78,14 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     async (frame: SettlementFrame) => {
       const player = frame.from;
 
-      await frame.apply({ type: '阶段结束', player, phase: '出牌' });
-      await frame.apply({ type: '阶段结束', player, phase: '弃牌' });
+      await api.apply({ type: '阶段结束', player, phase: '出牌' });
+      await api.apply({ type: '阶段结束', player, phase: '弃牌' });
+      // 清理回合级标记(如 杀/killsPlayed)
+      await api.apply({ type: '清过期标记', player });
       // 触发所有 onAtomAfter('回合结束') 钩子——下家实例发现自己接手,启动回合
-      await frame.apply({ type: '回合结束', player });
+      await api.apply({ type: '回合结束', player });
       // 推进 currentPlayerIndex 到下一家
-      await frame.apply({ type: '下一玩家' });
+      await api.apply({ type: '下一玩家' });
     },
   );
 
@@ -96,10 +98,10 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     },
     async (frame: SettlementFrame) => {
       const player = frame.from;
-      await frame.apply({ type: '回合开始', player });
-      await frame.apply({ type: '阶段开始', player, phase: '准备' });
+      await api.apply({ type: '回合开始', player });
+      await api.apply({ type: '阶段开始', player, phase: '准备' });
       // 触发阶段结束,让阶段推进钩子跑(准备→判定→摸牌→出牌)
-      await frame.apply({ type: '阶段结束', player, phase: '准备' });
+      await api.apply({ type: '阶段结束', player, phase: '准备' });
     },
   );
 

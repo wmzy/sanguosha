@@ -17,13 +17,13 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     async (frame: SettlementFrame) => {
       const { from, params } = frame;
       const cardId = params.cardId as string;
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 所有存活角色回复1点
       const players = frame._executor?.state.players.filter(p => p.alive) ?? [];
       for (const p of players) {
-        await frame.apply({ type: '回复体力', target: p.name, amount: 1 });
+        await api.apply({ type: '回复体力', target: p.name, amount: 1 });
       }
-      await frame.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
     },
   );
   return () => {};

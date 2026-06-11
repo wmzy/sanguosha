@@ -22,8 +22,8 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     async (frame: SettlementFrame) => {
       const { from, params } = frame;
       const cardId = params.cardId as string;
-      await frame.apply({ type: '弃置', player: from, cardIds: [cardId] });
-      await frame.apply({ type: '摸牌', player: from, count: 2 });
+      await api.apply({ type: '弃置', player: from, cardIds: [cardId] });
+      await api.apply({ type: '摸牌', player: from, count: 2 });
     },
   );
   return () => {};

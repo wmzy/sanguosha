@@ -11,7 +11,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
   api.onAtomBefore('造成伤害', async (ctx: AtomBeforeContext) => {
     const atom = ctx.atom as { source?: string; target?: string };
     if (atom.source !== api.self) return;
-    ctx.modifyParams({ penetrateArmor: true });
+    ;
   });
   return () => {};
 }

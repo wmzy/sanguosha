@@ -27,14 +27,14 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const targets = params.targets as Array<{ target: string; cardIds: string[] }>;
       for (const t of targets) {
         for (const cardId of t.cardIds) {
-          await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '手牌', player: t.target } });
+          await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '手牌', player: t.target } });
         }
       }
       const total = targets.reduce((n, t) => n + t.cardIds.length, 0);
       if (total >= 2) {
         const healed = frame.params['仁德/healedThisTurn'] as boolean | undefined;
         if (!healed) {
-          await frame.apply({ type: '回复体力', target: from, amount: 1 });
+          await api.apply({ type: '回复体力', target: from, amount: 1 });
           frame.params['仁德/healedThisTurn'] = true;
         }
       }

@@ -24,7 +24,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const hasCards = sourcePlayer.hand.length > 0 || Object.keys(sourcePlayer.equipment).length > 0;
     if (!hasCards) return;
     // 询问是否发动
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '反馈/confirm',
       target: api.self,
@@ -40,13 +40,13 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     let cardId: string | undefined;
     if (source.hand.length > 0) {
       cardId = source.hand[0];
-      await ctx.apply({ type: '获得', player: api.self, cardId, from: atom.source });
+      await ctx.api.apply({ type: '获得', player: api.self, cardId, from: atom.source });
     } else {
       const equipSlot = Object.keys(source.equipment)[0] as keyof typeof source.equipment;
       if (equipSlot) {
         cardId = source.equipment[equipSlot];
         if (cardId) {
-          await ctx.apply({ type: '获得', player: api.self, cardId, from: atom.source });
+          await ctx.api.apply({ type: '获得', player: api.self, cardId, from: atom.source });
         }
       }
     }

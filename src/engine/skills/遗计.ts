@@ -18,7 +18,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     if ((ctx.atom as { target?: string }).target !== api.self) return;
     if ((ctx.atom as { amount?: number }).amount <= 0) return;
     // 1. 询问是否发动
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '遗计/confirm',
       target: api.self,
@@ -28,12 +28,12 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     });
     // 2. 摸两张牌
     const handBefore = ctx.state.players.find(p => p.name === api.self)?.hand.length ?? 0;
-    await ctx.apply({ type: '摸牌', player: api.self, count: 2 });
+    await ctx.api.apply({ type: '摸牌', player: api.self, count: 2 });
     // 取摸到的牌:手牌末尾 2 张
     const selfPlayer = ctx.state.players.find(p => p.name === api.self);
     const drawnCards = selfPlayer ? selfPlayer.hand.slice(-2) : [];
     // 3. 询问分配
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '遗计/distribute',
       target: api.self,
@@ -47,7 +47,7 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     if (Array.isArray(distribution)) {
       for (const entry of distribution) {
         for (const cardId of entry.cardIds) {
-          await ctx.apply({ type: '给予', cardId, from: api.self, to: entry.target });
+          await ctx.api.apply({ type: '给予', cardId, from: api.self, to: entry.target });
         }
       }
     }

@@ -15,7 +15,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     const target = ctx.state.players.find(p => p.name === atom.target);
     if (!target || target.hand.length === 0) return;
     // 询问是否发动
-    await ctx.apply({
+    await ctx.api.apply({
       type: '请求回应',
       requestType: '寒冰剑/confirm',
       target: api.self,
@@ -27,9 +27,9 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
     if (!confirmed) return;
     // 弃目标最多2张牌
     const cards = target.hand.slice(0, 2);
-    await ctx.apply({ type: '弃置', player: atom.target!, cardIds: cards });
+    await ctx.api.apply({ type: '弃置', player: atom.target!, cardIds: cards });
     // 阻止伤害
-    ctx.drop();
+    ctx.api.drop();
   });
   return () => {};
 }
