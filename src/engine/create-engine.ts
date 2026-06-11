@@ -43,42 +43,17 @@ export interface DispatchResult {
   winner?: string;
 }
 
-/** pending 超时信息 */
-export interface PendingTimeoutInfo {
-  /** 剩余毫秒 */
-  remaining: number;
-  /** 超时截止时间戳 */
-  deadline: number;
-  /** 等待中的 atom 类型 */
-  atomType: string;
-}
-
 /** 空闲超时信息 */
-export interface IdleTimeoutInfo {
-  /** 当前阶段 */
-  phase: string;
-  /** 当前玩家名字 */
-  currentPlayer: string;
-  /** 空闲超时毫秒 */
-  idleMs: number;
-}
-
 export interface EngineInstance {
   dispatch(message: ClientMessage): Promise<DispatchResult>;
-  dispatchTimeout(): Promise<DispatchResult>;
   buildView(viewer: number): GameView;
   resetForTest(): void;
   bootstrap(initialState: GameState): GameState;
-  /** 获取 pending 超时信息(如果有) */
-  getPendingTimeoutInfo(): PendingTimeoutInfo | null;
-  /** 获取空闲超时信息(如果当前是出牌/弃牌阶段且无 pending) */
-  getIdleTimeoutInfo(): IdleTimeoutInfo | null;
   /** 获取当前 state(只读) */
   getState(): GameState;
 }
 
-/** 空闲超时毫秒 */
-const IDLE_TIMEOUT_MS = 50_000;
+
 
 export function createEngine(): EngineInstance {
   let currentState: GameState;
@@ -289,68 +264,6 @@ export function createEngine(): EngineInstance {
     return { state: currentState, gameOver, winner };
   }
 
-  async function dispatchTimeout(): Promise<DispatchResult> {
-    const frame = topFrame(currentState);
-    if (!currentState.pendingSlot) return { state: currentState };
-
-    const def = currentState.pendingSlot.definition;
-    if (def.pending?.onTimeout) {
-      // 构造 api,执行 onTimeout atom
-      const { api, ctx } = makeApi(currentState, frame?.from ?? '', {}, () => {});
-      setRuntimeApi(api);
-      await api.apply(def.pending.onTimeout);
-      setRuntimeApi(null);
-      currentState = ctx.state;
-    }
-
-    // 消费 pending
-    const slot = currentState.pendingSlot;
-    if (slot) {
-      const resolve = slot.resolve;
-      slot.resolve = () => {};
-      resolve();
-    }
-
-    // 等 execute 继续
-    if (frame) {
-      const execP = (frame as { _executePromise?: Promise<void> })._executePromise;
-      if (execP) {
-        await new Promise<void>((r) => setTimeout(r, 0));
-        if (!currentState.pendingSlot) {
-          await execP;
-        }
-      }
-    }
-
-    // 检查游戏结束
-    const { gameOver, winner } = checkGameOver();
-    return { state: currentState, gameOver, winner };
-  }
-
-  function getPendingTimeoutInfo(): PendingTimeoutInfo | null {
-    if (!currentState.pendingSlot) return null;
-    const slot = currentState.pendingSlot;
-    const remaining = slot.deadline ? slot.deadline - Date.now() : 30_000;
-    return {
-      remaining: Math.max(0, remaining),
-      deadline: slot.deadline,
-      atomType: slot.atom.type,
-    };
-  }
-
-  function getIdleTimeoutInfo(): IdleTimeoutInfo | null {
-    if (currentState.pendingSlot) return null;
-    const phase = currentState.phase;
-    if (phase !== '出牌' && phase !== '弃牌') return null;
-    const currentPlayer = currentState.players[currentState.currentPlayerIndex];
-    if (!currentPlayer || !currentPlayer.alive) return null;
-    return {
-      phase,
-      currentPlayer: currentPlayer.name,
-      idleMs: IDLE_TIMEOUT_MS,
-    };
-  }
-
   function getState(): GameState {
     return currentState;
   }
@@ -361,7 +274,7 @@ export function createEngine(): EngineInstance {
     currentState = createGameState({ players: [], cardMap: {} });
   }
 
-  return { dispatch, dispatchTimeout, buildView: (viewer) => buildView(currentState, viewer), resetForTest, bootstrap, getPendingTimeoutInfo, getIdleTimeoutInfo, getState };
+  return { dispatch, buildView: (viewer) => buildView(currentState, viewer), resetForTest, bootstrap, getState };
 }
 
 function getViewerIndex(state: GameState, ownerName: string): number {

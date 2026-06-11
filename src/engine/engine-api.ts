@@ -137,18 +137,31 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
       // pending?
       if (def.pending) {
         await new Promise<void>((resolve) => {
-          const timeoutMs = def.pending!.timeout ?? 30;
+          const timeoutSec = def.pending!.timeout ?? 30;
           const slot: PendingSlot = {
             atom,
             definition: def,
             startTime: Date.now(),
-            deadline: Date.now() + timeoutMs * 1000,
+            deadline: Date.now() + timeoutSec * 1000,
             resolve: () => {
               ctx.state = { ...ctx.state, pendingSlot: undefined };
+              clearTimeout(timer!);
               resolve();
             },
           };
           ctx.state = { ...ctx.state, pendingSlot: slot };
+
+          // 引擎内部管理超时定时器
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          if (def.pending!.onTimeout) {
+            timer = setTimeout(async () => {
+              ctx.state = { ...ctx.state, pendingSlot: undefined };
+              // 执行 onTimeout atom
+              await api.apply(def.pending!.onTimeout!);
+              resolve();
+            }, timeoutSec * 1000);
+          }
+
           // 通知 dispatch:帧已抵达挂起点,可以返回当前 state
           ctx.fireDispatchReady();
         });

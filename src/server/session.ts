@@ -54,7 +54,7 @@ export class GameSession {
   private disconnectedAt = new Map<string, number>();
   private graceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastActivityAt = Date.now();
-  private pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+
   private roomName: string;
   private maxPlayers: number;
   private destroyed = false;
@@ -214,91 +214,9 @@ export class GameSession {
     this.lastActivityAt = Date.now();
     this.persistAsync();
     this.broadcastNewState();
-    this.schedulePendingTimeout();
+
 
     // 检查游戏结束
-    if (result.gameOver) {
-      this.handleGameOver(result.winner);
-    }
-  }
-
-  /**
-   * 设置空闲超时定时器。引擎暴露 getPendingTimeoutInfo/getIdleTimeoutInfo,
-   * session 只负责调度定时器,不读引擎内部结构。
-   */
-  private schedulePendingTimeout(): void {
-    this.clearPendingTimeout();
-    if (!this.engine) return;
-
-    // 场景 1:有 pendingSlot,等回应超时
-    const pendingInfo = this.engine.getPendingTimeoutInfo();
-    if (pendingInfo) {
-      if (pendingInfo.remaining <= 0) {
-        void this.injectTimeoutResponse();
-        return;
-      }
-      this.pendingTimeout = setTimeout(() => {
-        this.pendingTimeout = null;
-        void this.injectTimeoutResponse();
-      }, pendingInfo.remaining);
-      return;
-    }
-
-    // 场景 2:出牌/弃牌阶段无 pendingSlot,空闲超时自动 end
-    const idleInfo = this.engine.getIdleTimeoutInfo();
-    if (idleInfo) {
-      this.pendingTimeout = setTimeout(() => {
-        this.pendingTimeout = null;
-        void this.autoEndTurn(idleInfo.currentPlayer);
-      }, idleInfo.idleMs);
-    }
-  }
-
-  /**
-   * 自动结束当前玩家的回合(空闲超时)。
-   * 等价于该玩家主动点击"结束回合"。
-   */
-  private async autoEndTurn(ownerName: string): Promise<void> {
-    if (!this.engine) return;
-    const result = await this.engine.dispatch({
-      skillId: '回合管理',
-      actionType: 'end',
-      ownerId: ownerName,
-      params: {},
-      baseSeq: 0,
-    });
-
-    this.actionLog = this.engine.getState().actionLog;
-    this.lastActivityAt = Date.now();
-    this.persistAsync();
-    this.broadcastNewState();
-    this.schedulePendingTimeout();
-
-    if (result.gameOver) {
-      this.handleGameOver(result.winner);
-    }
-  }
-
-  private clearPendingTimeout(): void {
-    if (this.pendingTimeout !== null) {
-      clearTimeout(this.pendingTimeout);
-      this.pendingTimeout = null;
-    }
-  }
-
-  /**
-   * 超时注入：调用 engine.dispatchTimeout 执行 onTimeout 并消费 pending。
-   */
-  private async injectTimeoutResponse(): Promise<void> {
-    if (!this.engine) return;
-    const result = await this.engine.dispatchTimeout();
-
-    this.actionLog = this.engine.getState().actionLog;
-    this.lastActivityAt = Date.now();
-    this.persistAsync();
-    this.broadcastNewState();
-    this.schedulePendingTimeout();
-
     if (result.gameOver) {
       this.handleGameOver(result.winner);
     }
@@ -308,6 +226,7 @@ export class GameSession {
     setRoomStatus(this.room.id, '已结束');
     this.broadcast({ type: 'gameOver', winner: winner ?? '无人' });
   }
+
 
   private broadcastNewState(): void {
     if (!this.engine) return;
