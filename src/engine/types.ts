@@ -312,25 +312,16 @@ export interface SettlementFrame {
   /** 当前等待中的 pending slot（同时只有一个等待） */
   pendingSlot?: PendingSlot;
   parent?: SettlementFrame;
-  /** 应用一个 atom（统一路径，等待型 atom 会挂起 Promise） */
+  /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到 consumePending */
   apply(atom: Atom): Promise<void>;
-  /**
-   * applyOrAwait:和 apply 相同流程，但不抛 PendingInterrupt。
-   * 用于技能代码在 execute 内同步等待回应后继续执行后续 atom。
-   */
-  applyOrAwait(atom: Atom): Promise<boolean>;
-  /** 消费当前 pending slot（resolve Promise），让技能的 await frame.apply 恢复 */
+  /** 消费当前 pending slot（resolve Promise），让 await frame.apply 恢复 */
   consumePending(): void;
   /** 取消当前帧的等待回应 */
   drop(): void;
   modifyParams(patch: Record<string, Json>): void;
   notify(event: NotifyEvent): void;
-  /** 内部:保存 FrameExecutor 引用 */
+  /** 内部:保存 FrameExecutor 引用,供嵌套帧或 dispatch 写入 state */
   _executor?: { state: GameState };
-  /** 内部:技能 execute 在 PendingInterrupt 前注册的续跑函数 */
-  _continueFn?: () => Promise<void>;
-  /** 内部:applyOrAwait 恢复闭包 */
-  _resume?: () => void;
 }
 
 /** Pending 区——等待玩家操作的 slot */

@@ -21,23 +21,8 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       const target = params.target as string;
       // 移锦囊到处理区
       await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 注册续跑
-      frame._continueFn = async () => {
-        const killed = frame.params.__借刀杀回应 as boolean | undefined;
-        if (killed) {
-          // 目标选择出杀(简化:不处理出杀目标选择)
-        } else {
-          // 不出杀:获得目标的武器
-          const targetPlayer = frame._executor?.state.players.find(p => p.name === target);
-          const weaponId = targetPlayer?.equipment?.['武器'];
-          if (weaponId) {
-            await frame.apply({ type: '卸下', player: target, slot: '武器' });
-            await frame.apply({ type: '获得', player: from, cardId: weaponId, from: target });
-          }
-        }
-        await frame.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      };
-      // 请求目标出杀
+      // ─── Promise-based 续跑 ───
+      // 请求回应挂起,等目标出杀或超时
       await frame.apply({
         type: '请求回应',
         requestType: '借刀杀人/forceKill',
@@ -46,6 +31,19 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         defaultChoice: false,
         timeout: 15000,
       });
+      // 回应到达后读结果
+      const killed = frame.params.__借刀杀回应 as boolean | undefined;
+      if (!killed) {
+        // 不出杀:获得目标的武器
+        const targetPlayer = frame._executor?.state.players.find(p => p.name === target);
+        const weaponId = targetPlayer?.equipment?.['武器'];
+        if (weaponId) {
+          await frame.apply({ type: '卸下', player: target, slot: '武器' });
+          await frame.apply({ type: '获得', player: from, cardId: weaponId, from: target });
+        }
+      }
+      // 移牌到弃牌堆
+      await frame.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
     },
   );
   return () => {};

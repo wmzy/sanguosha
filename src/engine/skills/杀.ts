@@ -53,21 +53,6 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const targets = params.targets as string[];
       frame.params.settlement = targets.map(t => ({ target: t, dodged: false }));
       frame.params.cardId = cardId;
-      // 注册续跑函数:dispatch 收到闪回应后调此函数跑"造成伤害+弃牌"
-      frame._continueFn = async () => {
-        const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }>;
-        for (const item of settlement) {
-          if (!item.dodged) {
-            await frame.apply({ type: '造成伤害', target: item.target, amount: 1, source: frame.from });
-          }
-        }
-        await frame.apply({
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      };
       // 移动杀到处理区
       await frame.apply({
         type: '移动牌',
@@ -75,9 +60,56 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
         from: { zone: '手牌', player: from },
         to: { zone: '处理区' },
       });
+      // ─── Promise-based 续跑 ───
+      // 询问闪挂起 → 玩家回应后 Promise resolve → 自然续跑
+      // 闪技能(若有)的 respond action 通过 frame.parent.params.settlement 标记 dodged
       for (const target of targets) {
         await frame.apply({ type: '指定目标', source: from, target });
         await frame.apply({ type: '询问闪', target, source: from });
+      }
+      // 对未闪避的目标造成伤害
+      const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }>;
+      for (const item of settlement) {
+        if (!item.dodged) {
+          await frame.apply({ type: '造成伤害', target: item.target, amount: 1, source: frame.from });
+        }
+      }
+      // 移动杀到弃牌堆
+      await frame.apply({
+        type: '移动牌',
+        cardId,
+        from: { zone: '处理区' },
+        to: { zone: '弃牌堆' },
+      });
+    },
+  );
+  // respond action:南蛮入侵/决斗/万箭齐发/激将等场景,目标"出杀抵消"
+  // 通过 parent frame 的 params.settlement 标记 responded = true
+  api.registerAction(
+    'respond',
+    (_view: GameView, params: Record<string, Json>) => {
+      if (typeof params.cardId !== 'string') return 'cardId required';
+      return null;
+    },
+    async (frame: SettlementFrame) => {
+      const { from, params } = frame;
+      const cardId = params.cardId as string;
+      // 移动杀到弃牌堆
+      await frame.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '弃牌堆' } });
+      // 在 parent frame 的 settlement 中标记 responded
+      const parent = frame.parent;
+      if (parent) {
+        const settlement = parent.params.settlement as Array<{ target: string; responded?: boolean; dodged?: boolean }> | undefined;
+        if (settlement) {
+          const item = settlement.find(s => s.target === from);
+          if (item) {
+            item.responded = true;
+            item.dodged = true; // 也兼容旧字段(对杀来说 dodged = 不需造成伤害)
+          }
+        }
+        // 兼容老字段名
+        parent.params.__杀响应 = true;
+        parent.params.__responded = from;
       }
     },
   );
