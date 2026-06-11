@@ -226,29 +226,78 @@ export class GameSession {
   }
 
   /**
-   * 检查 state.settlementStack 栈顶是否有等待回应;
-   * 如有,按 pendingRequest.deadline 设置 setTimeout,到期后自动注入
-   * 请求回应 atom 的 defaultChoice 作为玩家回应(防止掉线/不响应时
-   * 整局卡死)。
+   * 设置空闲超时定时器。两类场景:
+   * 1. 栈顶有 pendingRequest:按其 deadline 自动注入 defaultChoice
+   * 2. 玩家处于"出牌"或"弃牌"阶段且无 pendingRequest:N 秒内无操作
+   *    自动 dispatch 回合管理 end 动作,避免回合卡死
    */
   private schedulePendingTimeout(): void {
     this.clearPendingTimeout();
     if (!this.state) return;
     const top = this.state.settlementStack[this.state.settlementStack.length - 1];
-    if (!top || !top.pendingRequest || top.pendingRequest.status !== 'waiting') return;
-    const pr = top.pendingRequest;
-    const atom = pr.atom;
-    if (atom.type !== '请求回应' && atom.type !== '询问闪' && atom.type !== '询问杀') return;
-    const remaining = pr.deadline ? pr.deadline - Date.now() : 30_000;
-    if (remaining <= 0) {
-      // 立即超时
-      void this.injectTimeoutResponse(atom);
+    // 场景 1:有 pendingSlot,等回应超时
+    if (top && top.pendingSlot) {
+      const slot = top.pendingSlot;
+      const atom = slot.atom;
+      if (atom.type !== '请求回应' && atom.type !== '询问闪' && atom.type !== '询问杀') return;
+      const remaining = slot.deadline ? slot.deadline - Date.now() : 30_000;
+      if (remaining <= 0) {
+        void this.injectTimeoutResponse(atom);
+        return;
+      }
+      this.pendingTimeout = setTimeout(() => {
+        this.pendingTimeout = null;
+        void this.injectTimeoutResponse(atom);
+      }, remaining);
       return;
     }
+    // 场景 2:出牌/弃牌阶段无 pendingSlot,空闲超时自动 end
+    const phase = this.state.phase;
+    if (phase !== '出牌' && phase !== '弃牌') return;
+    const currentPlayer = this.state.players[this.state.currentPlayerIndex];
+    if (!currentPlayer || !currentPlayer.alive) return;
+    const IDLE_MS = 50_000;
     this.pendingTimeout = setTimeout(() => {
       this.pendingTimeout = null;
-      void this.injectTimeoutResponse(atom);
-    }, remaining);
+      void this.autoEndTurn(currentPlayer.name);
+    }, IDLE_MS);
+  }
+
+  /**
+   * 自动结束当前玩家的回合(空闲超时)。
+   * 等价于该玩家主动点击"结束回合"。
+   */
+  private async autoEndTurn(ownerName: string): Promise<void> {
+    if (!this.state || !this.engine) return;
+    // 仅在"出牌"或"弃牌"阶段且当前玩家匹配时触发
+    const cur = this.state.players[this.state.currentPlayerIndex];
+    if (!cur || cur.name !== ownerName) return;
+    if (this.state.phase !== '出牌' && this.state.phase !== '弃牌') return;
+    const top = this.state.settlementStack[this.state.settlementStack.length - 1];
+    if (top && top.pendingSlot) return;
+    try {
+      const result = await this.engine.dispatch(this.state, {
+        skillId: '回合管理',
+        actionType: 'end',
+        ownerId: ownerName,
+        params: {},
+        baseSeq: this.state.seq,
+      });
+      this.state = result.state;
+      this.actionLog.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: Date.now() - this.state.startedAt,
+        message: { skillId: '回合管理', actionType: 'end', ownerId: ownerName, params: {}, baseSeq: -1 },
+        baseSeq: -1,
+      });
+      this.lastActivityAt = Date.now();
+      this.persistAsync();
+      this.broadcastNewState();
+      this.checkGameEnd();
+      this.schedulePendingTimeout();
+    } catch (e) {
+      this.logger.error('autoEndTurn error', { err: String(e) });
+    }
   }
 
   private clearPendingTimeout(): void {
@@ -259,25 +308,15 @@ export class GameSession {
   }
 
   /**
-   * 把 atom 的 defaultChoice 作为目标玩家的"超时回应",走正常 handleAction。
-   *
-   * 实现策略:在 engine dispatch 走 'responded' 路径时(栈顶有 pendingRequest),
-   * findActionEntry 找不到时 dispatch 会静默丢弃;为此我们直接走 settlement 内部:
-   * 1. 标记栈顶 pendingRequest.status = 'resolved'
-   * 2. 把 defaultChoice + requestType 注入 pending.params(供 frame.execute 后续读)
-   * 3. 重新调一次 'no-op' 内部 dispatch(用 '__timeout__' skillId)
+   * 超时注入：调用 engine.dispatchTimeout 执行 onTimeout 并消费 pending。
    */
-  private async injectTimeoutResponse(atom: { type: '请求回应'; requestType?: string; defaultChoice?: unknown }): Promise<void> {
+  private async injectTimeoutResponse(_atom: { type: string }): Promise<void> {
     if (!this.state || !this.engine) return;
     const top = this.state.settlementStack[this.state.settlementStack.length - 1];
-    if (!top || !top.pendingRequest || top.pendingRequest.status !== 'waiting') return;
-    const target = top.pendingRequest.target;
-    if (!target) return;
-    // 调 engine.dispatchTimeout:走和玩家回应等价的路径,
-    // entry 不存在时仍然走"杀结算"代执行。
+    if (!top || !top.pendingSlot) return;
     try {
       const result = await this.engine.dispatchTimeout(this.state);
-      this.state = result.state;
+      this.state = result;
     } catch (e) {
       this.logger.error('injectTimeoutResponse error', { err: String(e) });
       return;

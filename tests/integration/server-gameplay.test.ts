@@ -176,4 +176,59 @@ describe('新 ENGINE-DESIGN GameSession — 玩法集成', () => {
     // 当前玩家应为 P1,阶段应为出牌
     expect(after.phase).toBe('出牌');
   });
+
+  it('回合管理 end → P1 结束 → P2 接手进入出牌阶段(每玩家实例化)', async () => {
+    // 验证 §4.14 设计:每个玩家一份 回合管理 实例,
+    // 监听 上家回合结束 → 启动自己的回合
+    const deckCards: string[] = [];
+    const cardMap: GameState['cardMap'] = {};
+    for (let i = 0; i < 20; i++) {
+      const id = `d${i}`;
+      deckCards.push(id);
+      cardMap[id] = { id, name: '杀', suit: '♠', rank: i + 1, type: '基本牌' };
+    }
+    const p1Hand = deckCards.splice(0, 4);
+    const p2Hand = deckCards.splice(0, 4);
+
+    const state: GameState = {
+      players: [
+        { index: 0, name: 'P1', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: p1Hand, equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [] },
+        { index: 1, name: 'P2', character: '刘备', health: 4, maxHealth: 4, alive: true, hand: p2Hand, equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [] },
+      ],
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+      zones: { deck: deckCards, discardPile: [], processing: [] },
+      settlementStack: [],
+      cardMap,
+      rngSeed: 1,
+      marks: [],
+      localVars: {},
+      meta: { gameId: 'g1', createdAt: 0 },
+      seq: 0,
+      startedAt: 0,
+      actionLog: [],
+    };
+
+    const engine = createEngine();
+    engine.resetForTest();
+    const bootState = engine.bootstrap(state);
+
+    // P1 开局
+    const r1 = await engine.dispatch(bootState, {
+      skillId: '回合管理', actionType: 'start', ownerId: 'P1', params: {}, baseSeq: 0,
+    });
+    expect(r1.state.phase).toBe('出牌');
+    expect(r1.state.currentPlayerIndex).toBe(0);
+    expect(r1.state.players.find(p => p.name === 'P1')!.hand.length).toBe(6);
+
+    // P1 结束回合
+    const r2 = await engine.dispatch(r1.state, {
+      skillId: '回合管理', actionType: 'end', ownerId: 'P1', params: {}, baseSeq: 0,
+    });
+    // 下一家 P2 应接手,且 P2 在摸牌阶段摸了 2 张
+    expect(r2.state.currentPlayerIndex).toBe(1);
+    expect(r2.state.phase).toBe('出牌');
+    expect(r2.state.players.find(p => p.name === 'P2')!.hand.length).toBe(6);
+  });
 });

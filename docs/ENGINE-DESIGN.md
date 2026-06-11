@@ -178,7 +178,7 @@ interface BackendAPI {
 
 ### 4.3 结算帧与结算区栈
 
-引擎维护一个**结算区栈**（settlement stack），管理当前正在结算的牌及其状态。
+引擎维护一个**结算区栈**（settlement stack）。**帧由技能在 execute 中显式创建**，引擎不自动创建或管理帧的生命周期——技能决定何时创建、何时销毁。
 
 ```ts
 interface SettlementFrame {
@@ -197,49 +197,94 @@ interface SettlementFrame {
 }
 ```
 
-**主动 action 压栈**——杀、南蛮入侵等主动技能的 execute 开始时，引擎压入新的结算帧。执行完毕弹栈。
+**技能显式管理帧**：
 
-**回应 action 共享栈顶**——闪、杀（回应）等回应触发的 action 不压新帧，直接在当前栈顶帧操作。回应 action 可以修改栈顶帧的 `params`（如闪设置 `dodged: true`），主动 action 据此决定后续流程。
+```ts
+// 杀技能的 execute——技能自己创建帧、结算、销毁
+async (frame: SettlementFrame) => {
+  const { from } = frame;
+  frame.params.settlement = [{ target: 'P2', dodged: false }];
 
-**嵌套自然隔离**——南蛮入侵内部触发杀，杀有独立的结算帧：
+  await frame.apply({ type: '移动牌', ... }); // 杀牌 → 处理区
+  await frame.apply({ type: '询问闪', ... });  // 等待回应（可能暂停）
+
+  if (!frame.params.settlement[0].dodged)
+    await frame.apply({ type: '造成伤害', ... });
+
+  await frame.apply({ type: '移动牌', ... }); // 处理区 → 弃牌堆
+  // execute 结束 → 帧销毁
+}
+```
+
+引擎只为 action execute 提供 `SettlementFrame` 实例。帧的创建和销毁是 action 的责任，不是引擎的。
+
+**嵌套自然隔离**——南蛮入侵 execute 中触发杀，杀创建自己的帧：
 
 ```
 结算区栈:
-  [南蛮入侵(P1)]              ← 栈底
-    [杀(P1→P2)]               ← 嵌套帧
-      闪(P2回应) → 不压栈，在杀的帧上操作
+  [南蛮入侵(P1)]              ← 栈底（南蛮入侵创建）
+    [杀(P1→P2)]               ← 杀在 execute 中创建
+      询问闪 → 进入 pending 区（见 §4.4）
 ```
 
 **action 不支持钩子**。它只是技能的入口路由，`skillId + actionType` 唯一确定一个回调。
 + validate 不通过 → 静默丢弃，不记入 action 日志
 + 技能间协作通过 atom 钩子和结算帧 params，不通过 action 链
 
-**两种 action 调用路径**：
-1. **主动 action**：客户端发 `ClientMessage { skillId, actionType, params, baseSeq }` → CAS 校验 → 压入结算帧 → validate → execute → 弹栈
-2. **回应 action**：等待回应的 atom 超时或收到回应 → 查找匹配的 action → 不压栈 → 在当前帧上 execute
+**action 调用路径**（统一，不区分主动/回应）：
 
-### 4.4 等待回应的 Atom
+客户端发 `ClientMessage` → CAS 校验 → 路由到 action → validate → execute(frame)。execute 内部通过 `frame.apply` 驱动所有状态变更和等待——包括嵌套等待（询问闪、请求回应）和嵌套帧创建（杀、南蛮入侵）。
 
-某些 atom 需要等待玩家回应（如"询问闪"——等目标出闪）。这通过 `AtomDefinition.awaits` 声明。
+### 4.4 等待型 Atom 与 Pending 区
 
-```ts
-/** Atom 等待配置。有此字段 = apply 后会等待回应 */
-interface AtomAwaits {
-  /** 等谁的回应 */
-  target: string;
-  /** 前端显示的提示 */
-  prompt: ActionPrompt;
-  /** 超时默认值 */
-  defaultChoice?: Json;
-  /** 超时毫秒 */
-  timeout?: number;
-}
+游戏等待玩家输入是一个**原子操作**——游戏同时只有一个等待。等待型 atom 和普通 atom 走**同一条 `frame.apply` 路径**（§6.1），唯一区别是 apply 流程结束后进入 pending 区而非立即 resolve Promise。
+
+**核心机制**：
+
++ 等待型 atom 的 `AtomDefinition` 声明 `pending` 字段（§5）
++ `frame.apply(等待型atom)` 执行完 before hooks → validate → apply → after hooks → 弹栈后，进入 **pending 区**，`frame.apply` 返回的 Promise 挂起
++ pending 区只有一个位置——**同时只有一个等待**
++ 等待在超时前可被消费（玩家回应）或被清掉（钩子 drop）
++ 超时后，引擎执行 `pending.onTimeout` 声明的 atom（和普通 apply 一样压栈执行），然后 Promise resolve
+
+**before hooks 可以插入等待**：当前 atom 还在 apply 栈上没弹出时，钩子可以 `ctx.apply(另一个等待型atom)` 嵌套执行。比如八卦阵在 `询问闪` 的 before hook 中插入 `请求回应`：
+
+```
+frame.apply(询问闪):
+  压栈：[询问闪]
+  before hooks:
+    八卦阵-P2:
+      ctx.apply(请求回应, {是否发动八卦阵})     ← 嵌套
+        压栈：[询问闪, 请求回应]
+        before → validate → apply → after → 弹栈
+        检测到 pending → 进入 pending 区
+        apply 栈：[询问闪]     ← 请求回应已出栈，在 pending 等用户
+        Promise 挂起
+      // 用户选择发动 → 八卦 action → 判定
+      if (判定成功):
+        ctx.modifyParams({ dodged: true })
+        ctx.drop()            ← 丢弃询问闪，从 apply 栈移除
+        return                ← 询问闪 Promise 立即 resolve
+      // 判定失败 → return（不 drop）
+    闪-P2: 无事发生
+  // 所有 before hooks 结束
+  validate → apply → after → 弹栈
+  检测到 pending → 进入 pending 区 → Promise 挂起
+  // 等用户出闪或超时
 ```
 
-- 不带 `awaits` 的 atom：`apply()` 不等待，直接完成状态变更
-- 带 `awaits` 的 atom：`apply()` 在 before 钩子执行后等待玩家回应。回应 action 在当前结算帧上执行（不压新帧），可以修改帧的 `params`
+**超时行为**：`pending.onTimeout` 声明一个 atom，引擎用 `frame.apply(onTimeout)` 执行——和普通 apply 一样压栈、走钩子、弹栈。不设 `onTimeout` = 什么都不做（Promise 直接 resolve）。
 
-`apply()` 不返回值。技能代码通过结算帧的 `params` 判断后续流程。
+**前端感知**：等待型 atom 进入 pending 区时下发 atom 事件，事件带时间戳：
+
+```ts
+{ kind: 'atom', atom: { type: '询问闪', target: 'P2' },
+  pending: { startTime: 4500, deadline: 34500 } }
+```
+
+前端根据 `pending` 字段显示倒计时/进度条，根据 `prompt` 渲染回应 UI，根据等待型 atom 的 `AtomDefinition.pending.prompt` 启用对应的 action 按钮。
+
+**`frame.apply` 返回 `Promise<void>`**。等待型 atom 的 Promise 在被消费（用户回应 / 超时）时 resolve。技能代码用 `await frame.apply(...)` 自然暂停/恢复，不需要回调或续跑机制。
 
 ### 4.5 Atom 钩子
 
@@ -478,11 +523,11 @@ export function onInit(杀, api: BackendAPI) {
         // 指定目标（流离在 after 钩子中 modifyParams 改 target）
         await frame.apply({ type: '指定目标', source: from, target: item.target });
 
-        // 询问闪——八卦阵/闪在 before 钩子中 modifyParams + drop
-        await frame.apply({
-          type: '询问闪', target: item.target, source: from,
-          awaits: { target: item.target, prompt: { type: 'useCard', title: '是否出闪', cardFilter: { filter: c => c.name === '闪', min: 1, max: 1 } } }
-        });
+        // 询问闪：等待型 atom，进入 pending 区
+        // 八卦阵在 before 钩子中可能插入请求回应并 drop 此 atom
+        // 用户出闪 → 闪 action execute → 标记 dodged → 消费 pending
+        // 超时 → 什么都不做 → Promise resolve
+        await frame.apply({ type: '询问闪', target: item.target });
       }
 
       // 最终结算——根据 settlement 状态决定伤害
@@ -526,17 +571,18 @@ export function createSkill(id, ownerId) {
 export function onInit(闪, api: BackendAPI) {
   api.registerAction('respond',
     (view, params) => {
-      if (!view.pending?.requestType?.startsWith('需要闪')) return '当前不需要出闪';
+      // 只有询问闪等待中时才能出闪
+      if (view.pending?.atom?.type !== '询问闪') return '当前不需要出闪';
       return null;
     },
     async (frame) => {
-      const { params, from } = frame;
+      const { from, params } = frame;
       // 闪牌放入处理区
       await frame.apply({ type: '移动牌', cardId: params.cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 标记闪避成功，cancel 询问闪 atom
-      const item = frame.params.settlement.find(s => s.target === from);
-      item.dodged = true;
-      frame.drop();  // 丢栈顶——询问闪 atom 不会真正 apply
+      // 标记闪避成功（修改杀帧的 settlement）
+      frame.modifyParams({ dodged: true });
+      // 消费 pending（询问闪的 Promise resolve，杀的 execute 从暂停点恢复）
+      frame.consumePending();
       // 闪牌从处理区移到弃牌堆
       await frame.apply({ type: '移动牌', cardId: params.cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
     },
@@ -569,25 +615,24 @@ export function onInit(八卦阵, api: BackendAPI) {
     if (ctx.atom.target !== api.self) return;
     if (!hasEquipped(ctx.state, api.self, '八卦阵')) return;
 
-    // 询问是否发动
-    await api.apply({
+    // 询问闪还在 apply 栈上没弹出
+    // 插入一个请求回应——也是等待型 atom，先进 pending 区
+    await ctx.apply({
       type: '请求回应',
       requestType: '是否发动八卦阵',
       target: api.self,
-      prompt: { type: 'confirm', title: '是否发动八卦阵？', confirmLabel: '发动', cancelLabel: '不发动' },
-      defaultChoice: false,
-      timeout: 15000,
     });
+    // ↑ 用户选择发动 → 八卦 action → 继续；选择不发动 → 超时 → 继续
+
     // 判定
-    await api.apply({ type: '判定', player: api.self, judgeType: '八卦阵' });
+    await ctx.apply({ type: '判定', player: api.self, judgeType: '八卦阵' });
     const judgeResult = ctx.state.localVars['八卦阵:判定结果'];
     if (judgeResult === 'red') {
-      // 标记已闪避 + drop 询问闪
-      const item = ctx.modifyParams({});
-      // 八卦阵在 before 钩子中，需要找到当前结算帧的 settlement 并修改
-      // settlement 在帧的 params 上，before 钩子的 modifyParams 修改帧 params
-      ctx.drop();  // 询问闪不会真正 apply
+      // 判定成功：标记已闪避，直接丢弃询问闪（不进 pending）
+      ctx.modifyParams({ dodged: true });
+      ctx.drop();
     }
+    // 判定失败：不 drop → 询问闪继续执行 → 进 pending 区（等用户出闪）
   });
 }
 
@@ -613,33 +658,59 @@ export function onInit(遗计, api: BackendAPI) {
   api.onAtomAfter('造成伤害', async (ctx) => {
     if (ctx.atom.target !== api.self) return;
 
-    // "你可以" = 选择性发动
-    await api.apply({
+    // "你可以" = 选择性发动（请求回应，超时不发动）
+    await ctx.apply({
       type: '请求回应',
       requestType: '是否发动遗计',
       target: api.self,
-      prompt: { type: 'confirm', title: '是否发动遗计？', confirmLabel: '发动', cancelLabel: '不发动' },
-      defaultChoice: false,
-      timeout: 10000,
     });
-    // 请求回应的结果通过结算帧 params 传递
+    // 检查用户是否选择发动（通过结算帧 params）
+    if (!ctx.params.__responded) return;
 
-    await api.apply({ type: '摸牌', player: api.self, count: 2 });
+    await ctx.apply({ type: '摸牌', player: api.self, count: 2 });
 
-    await api.apply({
+    // 分配牌——请求回应等待用户操作
+    await ctx.apply({
       type: '请求回应',
-      requestType: '分配',
+      requestType: '遗计分配',
       target: api.self,
-      prompt: { type: 'distribute', title: '遗计：分配牌', cardIds: getRecentlyDrawn(ctx.state, api.self, 2), minPerTarget: 1, maxPerTarget: 2 },
-      timeout: 30000,
     });
     // 分配结果通过结算帧 params 传递
-    for (const { target, cardIds } of frame.params.遗计分配) {
+    for (const { target, cardIds } of ctx.params.遗计分配) {
       for (const cardId of cardIds) {
-        await api.apply({ type: '给予', cardId, from: api.self, to: target });
+        await ctx.apply({ type: '给予', cardId, from: api.self, to: target });
       }
     }
   });
+}
+```
+
+```ts
+// ── 回合管理.ts（出牌阶段等待示例） ──
+export function onInit(回合管理, api: BackendAPI) {
+  // ... onAtomAfter('回合结束') 启动下一家回合 ...
+
+  api.registerAction('end', null, async (frame) => {
+    const player = frame.from;
+    await frame.apply({ type: '阶段结束', player, phase: '出牌' });
+    // consumePending → 等待出牌的 Promise resolve → execute 继续
+    frame.consumePending();
+    await frame.apply({ type: '阶段结束', player, phase: '弃牌' });
+    await frame.apply({ type: '回合结束', player });
+    await frame.apply({ type: '下一玩家' });
+  });
+}
+
+// 出牌阶段启动（在阶段开始的 after 钩子中）:
+async function startPlayPhase(ctx) {
+  const player = ctx.self;
+  await ctx.apply({ type: '阶段开始', player, phase: '出牌' });
+  // 等待出牌：超时后自动 apply(阶段结束, 出牌)
+  await ctx.apply({ type: '等待出牌', player });
+  // ↑ 用户发 杀.use / 桃.use / ... → 等待出牌 还在 pending（用户可多次出牌）
+  // ↑ 用户发 回合管理.end → consumePending → Promise resolve → 继续
+  // ↑ 超时 → frame.apply(阶段结束, 出牌) → Promise resolve → 继续
+  await ctx.apply({ type: '阶段结束', player, phase: '出牌' });
 }
 ```
 
@@ -794,6 +865,97 @@ for each player:
 
 `ClientMessage { skillId: '杀', actionType: 'use', params, baseSeq }` 中的 `skillId` 是技能 ID（不含 ownerId）。引擎收到后查找 `skillId === '杀' && ownerId === from` 的已注册 action 实例。
 
+### 4.14 回合控制技能
+
+回合控制本身是一个**按玩家实例化**的技能（`回合管理`），不是引擎内建机制。每个玩家启动时挂一份自己的实例，监听 `回合结束` atom，**上家回合结束**则自动开始自己的回合。
+
+**为什么是技能而不是引擎内建流程**：
+- 回合控制本质上就是一段业务逻辑（准备→判定→摸牌→出牌→弃牌→回合结束→下一家），与"出杀/出闪"是同构的"按玩家状态推进"
+- 实例化后，"谁在什么阶段做什么"由 ownerId 自然决定，引擎不需要存全局的"回合机状态机"
+- 技能钩子链（`onAtomAfter('回合结束')`）就是回合传递机制——上家触发 atom，监听者被唤起，无需中心协调
+- 可被其他技能干预（觉醒、托管、跳过阶段……）与一般技能无异
+
+**三个组成部分**：
+
+| 组件 | 机制 | 触发 |
+|---|---|---|
+| **轮到我开始** | `onAtomAfter('回合结束')`：当 `self` 等于"上家下一家"时，自动 `apply(回合开始)` + `apply(阶段开始, 准备)` | 上家玩家 apply 了 `回合结束` atom |
+| **主动结束回合** | `registerAction('end')`：玩家点"结束回合"时触发自己回合的结束流程 | 客户端 `ClientMessage { skillId: '回合管理', actionType: 'end' }` |
+| **首次开局** | `registerAction('start')`：开局时由主公（`currentPlayerIndex === 0`）触发，唤起第一个回合 | 客户端 `ClientMessage { skillId: '回合管理', actionType: 'start' }` |
+
+**如何确定"上家下一家"**：
+
+```ts
+function findNextAlive(state: GameState, fromIndex: number): number {
+  const n = state.players.length;
+  for (let i = 1; i <= n; i++) {
+    const idx = (fromIndex + i) % n;
+    if (state.players[idx].alive) return idx;
+  }
+  return fromIndex; // 全死亡,游戏结束
+}
+```
+
+**典型事件流**（4 人局,P1 → P2 → P3 → P4 → 循环）：
+
+```
+开局:P1 触发 start → 回合管理-P1 跑 "回合开始 + 阶段开始(准备)"
+
+P1 点"结束回合":
+  回合管理-P1.execute(end):
+    apply(阶段结束, P1, 出牌)
+    apply(阶段结束, P1, 弃牌)
+    apply(回合结束, P1)  ← 触发 after 钩子链
+      ↓ onAtomAfter('回合结束'):
+        回合管理-P1:  atom.player === self(P1),但此时 ctx.state.currentPlayerIndex
+                      还没推进(下一玩家是 P1 自己主动 apply 的)——
+                      实际上由 P1.execute 内 apply(下一玩家) 来推进
+        回合管理-P2:  自己 = P2,findNextAlive(P1)=P2,匹配 → 启动 P2 回合
+        回合管理-P3:  findNextAlive(P1)=P2 ≠ P3,跳过
+        回合管理-P4:  findNextAlive(P1)=P2 ≠ P4,跳过
+    apply(下一玩家)  ← currentPlayerIndex: P1 → P2
+```
+
+**职责切分**：钩子只负责"启动下一家回合"，`apply(下一玩家)` 由**上家 end action execute** 自己推进（`currentPlayerIndex` 的推进是发起者责任），两个角色各管一段——
+
+```ts
+// 回合管理-P1.execute('end') — 上家自己推进
+async (frame) => {
+  const player = frame.from;
+  await frame.apply({ type: '阶段结束', player, phase: '出牌' });
+  await frame.apply({ type: '阶段结束', player, phase: '弃牌' });
+  await frame.apply({ type: '回合结束', player });     // ← 触发所有 after 钩子
+  // 钩子链中:回合管理-P2.onAtomAfter 发现自己该接手 → 启动回合
+  await frame.apply({ type: '下一玩家' });              // ← currentPlayerIndex 推进
+}
+
+// 回合管理-P2.onAtomAfter('回合结束') — 被叫到时启动
+async (ctx) => {
+  const { state, atom } = ctx;
+  const finishedIndex = state.players.findIndex(p => p.name === atom.player);
+  if (finishedIndex < 0) return;
+  // 跳过死亡玩家,找到下一个活着的
+  let nextIdx = finishedIndex;
+  for (let i = 1; i <= state.players.length; i++) {
+    nextIdx = (finishedIndex + i) % state.players.length;
+    if (state.players[nextIdx].alive) break;
+  }
+  if (state.players[nextIdx].name !== ctx.self) return; // 不是我
+  await ctx.apply({ type: '回合开始', player: ctx.self });
+  await ctx.apply({ type: '阶段开始', player: ctx.self, phase: '准备' });
+}
+```
+
+**前端 UI**：每个玩家一份 `回合管理` 实例，调用 `defineAction('end', ...)` 和 `defineAction('start', ...)`；前端只对 viewer 自己的实例生效，所以只有"当前行动玩家"会看到"结束回合"按钮（详见 §4.13 前后端加载对比）。
+
+**集成步骤**：
+
+1. 每个玩家在初始 `state.players[i].skills` 中预置 `'回合管理'`（或由开局 `添加技能` atom 触发）
+2. `createEngine().bootstrap()` 遍历所有玩家的 skills，调用 `createSkill('回合管理', player.name) → onInit(...)`，为每个玩家实例化
+3. 玩家 `end` 走 action dispatch；自动轮转走 `onAtomAfter('回合结束')` 钩子链
+
+**为什么不需要全局的"回合机"**：所有"我现在该做什么"的状态都已经在 atom 流中。`currentPlayerIndex` 指向当前行动玩家；阶段在 `state.phase` 上；`turn.vars` 是当前回合的临时状态。回合管理技能只是把 atom 流串成"一段连续的回合"——纯事件驱动，无中心状态。
+
 ## 5. Atom
 
 Atom 是游戏事件——最小的状态变更单元。每个 atom 做两件事：
@@ -847,10 +1009,12 @@ type Atom =
   | { type: '移除延时锦囊'; player: string; trickName: string }
   // 拼点
   | { type: '拼点'; initiator: string; target: string; initiatorCard: string; targetCard: string }
-  // 等待回应（状态变为"等待玩家回应"）
+  // 等待型（进入 pending 区，等待玩家操作或超时）
   | { type: '询问闪'; target: string }
   | { type: '询问杀'; target: string }
-  | { type: '请求回应'; requestType: string; target: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
+  | { type: '请求回应'; requestType: string; target: string }
+  | { type: '等待出牌'; player: string }
+  | { type: '等待弃牌'; player: string; count: number }
 
 interface AtomDefinition<A = unknown> {
   type: string;
@@ -864,10 +1028,18 @@ interface AtomDefinition<A = unknown> {
   apply(state: GameState, atom: A): GameState;
 
   /**
-   * 可选：等待配置。有此字段 = apply 后等待玩家回应。
-   * onBefore hooks 可以 drop + modifyParams 直接满足，不等玩家。
+   * 可选：等待配置。有此字段 = 等待型 atom。
+   * apply 流程走完后进入 pending 区，Promise 挂起，等用户操作或超时。
+   * before hooks 可以 drop（直接取消，不进 pending）。
    */
-  awaits?: AtomAwaits;
+  pending?: {
+    /** 超时后的行为：一个 atom，和普通 apply 一样压栈执行。不设 = 什么都不做 */
+    onTimeout?: Atom;
+    /** 前端提示（告诉前端渲染什么 UI） */
+    prompt: ActionPrompt;
+    /** 超时毫秒。不设 = 引擎默认值（30 秒） */
+    timeout?: number;
+  };
 
   // ── 前后端共用 ──
 
@@ -939,27 +1111,32 @@ type AtomPlayerViews = readonly [
 
 ### 6.1 apply(atom) 执行流程
 
-当技能代码调用 `await apply(atom)` 时：
+当技能代码调用 `await frame.apply(atom)` 时，**所有 atom 走同一条路径**——无论是否等待型：
 
-1. **压栈**：atom 压入结算区栈的栈顶帧的 atom 栈
+1. **压栈**：atom 压入当前帧的 atom 栈
 2. **onBefore hooks**：所有注册了该 `atomType` 的 `onAtomBefore` 钩子按优先级串行执行（async）
    - 钩子可以 `drop()`（丢栈顶）或 `modifyParams()`（改结算帧参数）
-   - 任一钩子调用 `drop()` → 后续钩子不再执行，atom 从栈中移除，validate 和 apply 跳过
-   - 钩子中可以 `await apply(新atom)` 形成嵌套
-3. **等待回应**（仅当 `awaits` 存在且未被 drop）：
-   - 标记栈顶 atom 为等待中，等目标玩家发 `ClientMessage` 回应或超时
-   - 回应 action 在当前结算帧上执行（不压新帧），可以 `modifyParams` 或 `drop`
-4. **弹栈**：atom 从栈中弹出
-5. **validate**：`AtomDefinition.validate(state, atom)` → 不合法则忽略（静默跳过）
-6. **apply**：`AtomDefinition.apply(state, atom)` → 产生新 state（纯函数，原子操作）
-7. **生成事件**：构造 `GameEvent { kind: 'atom', atom }` + per-player 视图分叉 → 推入前端事件流
-8. **onAfter hooks**：所有注册了该 `atomType` 的 `onAtomAfter` 钩子按优先级串行执行（async）
-   - 钩子可以 `modifyParams()`（修改结算帧参数）或 `await apply(新atom)`
+   - 任一钩子调用 `drop()` → 后续钩子不再执行，atom 从栈中移除，后续步骤全部跳过，Promise resolve
+   - 钩子中可以 `await ctx.apply(新atom)` 形成嵌套（包括嵌套等待型 atom）
+3. **validate**：`AtomDefinition.validate(state, atom)` → 不合法则跳过，Promise resolve
+4. **apply**：`AtomDefinition.apply(state, atom)` → 产生新 state（纯函数）
+5. **弹栈**：atom 从 atom 栈弹出
+6. **生成事件**：构造 `GameEvent { kind: 'atom', atom }` + per-player 视图分叉 → 推入前端事件流
+7. **onAfter hooks**：所有注册了该 `atomType` 的 `onAtomAfter` 钩子按优先级串行执行（async）
+   - 钩子可以 `modifyParams()` 或 `await ctx.apply(新atom)`
+8. **检查 pending**（仅当 `AtomDefinition.pending` 存在时）：
+   - atom 进入 **pending 区**，`frame.apply` 返回的 Promise **挂起**
+   - 前端收到带 `pending: { startTime, deadline }` 的 atom 事件
+   - 等待被消费（用户发 action）或超时：
+     - **用户回应**：action execute 执行完后，pending 被消费 → Promise resolve
+     - **超时**：如果有 `pending.onTimeout` → `frame.apply(onTimeout)`（和普通 apply 一样压栈执行）；如果无 → 什么都不做 → Promise resolve
 
 **原子性保证**：before 钩子只能丢栈顶（cancel），不能修改 atom 参数。validate 在钩子之后执行，基于最新状态检查。
 
+**普通 atom vs 等待型 atom 的唯一区别**：步骤 8。没有 `pending` 声明的 atom 在步骤 7 后 Promise 直接 resolve；有 `pending` 声明的 atom 进入 pending 区等待。
+
 ```
-// 杀的 execute 流程（settlement frame 上下文）
+// 杀的 execute 流程（技能显式创建的帧）
 frame.params.settlement = [{ target: 'P2', dodged: false, amount: 1 }]
 
 // 移牌到处理区
@@ -968,12 +1145,17 @@ await frame.apply({ type: '移动牌', cardId, from: 手牌, to: 处理区 })
 await frame.apply({ type: '指定目标', source: P1, target: 'P2' })
 // ↑ 流离在 after 钩子中 modifyParams({ target: 'P3' })
 
-await frame.apply({ type: '询问闪', target: frame.params.target, ... })
-// ↑ 八卦阵 before 钩子：判定成功 → modifyParams({ dodged: true }) + drop()
-// ↑ 或 闪 action execute：移牌 → modifyParams({ dodged: true }) + drop()
-// ↑ 或 超时：不 drop → 询问闪正常 apply
+// 询问闪：等待型 atom → 进入 pending 区 → Promise 挂起
+await frame.apply({ type: '询问闪', target: frame.params.target })
+// ↑ 八卦阵 before 钩子：
+//    插入 请求回应(是否发动八卦阵) → 用户选择 → 判定
+//    判定成功 → modifyParams({ dodged: true }) + drop(询问闪) → Promise resolve
+//    判定失败 → 不 drop → 询问闪进 pending 区
+// ↑ 询问闪进 pending 区后：
+//    用户出闪 → 闪 action execute（移牌+标记 dodged） → pending 消费 → Promise resolve
+//    或超时 → 什么都不做 → Promise resolve
 
-// 最终结算
+// Promise resolve 后继续
 if (!frame.params.settlement[0].dodged) {
   await frame.apply({ type: '造成伤害', ... })
 }
@@ -981,39 +1163,36 @@ if (!frame.params.settlement[0].dodged) {
 await frame.apply({ type: '移动牌', cardId, from: 处理区, to: 弃牌堆 })
 ```
 
-### 6.2 结算区栈
+### 6.2 Pending 区
+
+Pending 区存放当前正在等待玩家操作的 atom。**同时只有一个等待**——新等待进入前，旧等待必须先被消费或清除。
 
 ```ts
-interface SettlementFrame {
-  skillId: string;
-  from: string;
-  params: Record<string, Json>;
-  /** 处理区中的牌 ID */
-  cards: string[];
-  /** 当前帧内的 atom 栈（嵌套 apply 时压入） */
-  atomStack: Atom[];
-  /** 等待回应的请求 */
-  pendingRequest?: {
-    atom: Atom;
-    target: string;
-    status: 'waiting' | 'resolved';
-    deadline?: number;
-  };
-  parent?: SettlementFrame;
+interface PendingSlot {
+  /** 等待中的 atom */
+  atom: Atom;
+  /** 该 atom 的 AtomDefinition（含 pending 配置） */
+  definition: AtomDefinition;
+  /** 等待开始的相对时间 */
+  startTime: number;
+  /** 超时截止的相对时间 */
+  deadline: number;
+  /** Promise 的 resolve 函数——消费/超时时调用 */
+  resolve: () => void;
 }
 ```
 
-+ **主动 action 压栈**：杀、南蛮入侵等主动技能 execute 开始时压入新帧
-+ **回应 action 不压栈**：闪、杀（回应）在当前帧上执行
-+ **atom 栈**：每次 `apply(atom)` 先压入 atom 栈，before 钩子可以 drop 栈顶
-+ **嵌套隔离**：南蛮入侵内部触发杀 → 杀有独立帧，闪在杀的帧上操作
-+ **处理区**：帧的 `cards` 存放当前结算中的牌，结算完成后移到弃牌堆
-+ **可序列化**：断线重连时恢复整个结算区栈状态
++ **入队**：等待型 atom 的 apply 流程走完后，从 atom 栈弹出，进入 pending 区
++ **消费**：用户发 action → action execute → pending 被消费 → `resolve()` → 技能的 `await frame.apply(...)` 从暂停点恢复
++ **超时**：定时器触发 → 执行 `pending.onTimeout`（如果声明了） → `resolve()` → 技能恢复
++ **清除**：before hook 的 `drop()` 直接丢弃 atom，不进 pending 区，Promise 立即 resolve
+
+**嵌套等待**：before hook 中可以 `ctx.apply(等待型atom)` 插入新的等待。此时外层 atom 还在 apply 栈上没弹出，内层等待型 atom 先执行完其 apply 流程，先进入 pending 区。内层被消费后，外层 atom 的 before hooks 继续——如果外层被 drop，就不进 pending；如果没被 drop，外层 atom 继续执行其 apply 流程，也进入 pending 区。
 
 ### 6.3 超时配置
 
 超时值按优先级链选取：
-1. `AtomAwaits.timeout` 参数
+1. `AtomDefinition.pending.timeout` 参数
 2. 游戏实例级配置
 3. 玩家级配置（可运行时变更，如生手加思考时间）
 4. 引擎默认值（30 秒）

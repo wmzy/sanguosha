@@ -123,7 +123,9 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerCount }),
       });
-      navigate(`/debug/${data.roomId}`, { replace: true });
+      // navigate 在同 path 下可能不触发路由切换。
+      // 用 window.location.href 强制刷新，确保新组件挂载 + useEffect join 触发。
+      window.location.href = `/debug/${data.roomId}`;
     } catch (err) {
       if (err instanceof ApiError) {
         setError((err.body as { error?: string }).error ?? '创建失败');
@@ -132,7 +134,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       }
       setTimeout(() => setError(null), 3000);
     }
-  }, [playerCount, navigate]);
+  }, [playerCount, navigate, send]);
 
   const handleDeleteRoom = useCallback(() => {
     const session = loadSession();

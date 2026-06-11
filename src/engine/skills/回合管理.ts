@@ -1,6 +1,6 @@
 // src/engine/skills/回合管理.ts
-// 回合阶段自动推进:准备→判定→摸牌(摸2张)→出牌
-// 玩家在出牌阶段可主动"结束回合",推进到弃牌→回合结束→下一玩家
+// 回合控制:每玩家一个实例,监听上家"回合结束"→启动自己回合
+// 设计:见 docs/ENGINE-DESIGN.md §4.14
 import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
@@ -12,24 +12,33 @@ function nextPhase(current: string): string | null {
   return PHASE_ORDER[idx + 1];
 }
 
+/** 从 fromIndex 之后找第一个存活玩家的索引;全死亡时返回 fromIndex */
+function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: number): number {
+  const n = state.players.length;
+  for (let i = 1; i <= n; i++) {
+    const idx = (fromIndex + i) % n;
+    if (state.players[idx].alive) return idx;
+  }
+  return fromIndex;
+}
+
 export function createSkill(id: string, ownerId: string): Skill {
-  return { id, ownerId, name: '回合管理', description: '自动推进回合阶段' };
+  return { id, ownerId, name: '回合管理', description: '监听上家回合结束,自动开始自己的回合' };
 }
 
 export function onInit(skill: Skill, api: BackendAPI): () => void {
-  void skill; // 回合管理是全局技能,不依赖 ownerId
+  const me = skill.ownerId;
 
-  // ─── 阶段结束 → 自动推进到下一阶段 ───
+  // ─── 阶段结束 → 自动推进到下一阶段(自己回合内) ───
   api.onAtomAfter('阶段结束', async (ctx) => {
     if (ctx.atom.type !== '阶段结束') return;
     const { player, phase } = ctx.atom;
-    // 只让阶段所属玩家的实例处理(避免重复调用)
-    if (ctx.self !== player) return;
+    // 只让本回合所属玩家实例处理,避免和其他玩家的实例重复
+    if (player !== me) return;
 
     const next = nextPhase(phase);
     if (!next) return;
 
-    // 推进到下一阶段
     await ctx.apply({ type: '阶段开始', player, phase: next });
 
     // 摸牌阶段自动摸 2 张
@@ -37,58 +46,62 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       await ctx.apply({ type: '摸牌', player, count: 2 });
     }
 
-    // 自动阶段(准备/判定/摸牌)立即触发阶段结束,推进到下一阶段
-    // 出牌/弃牌需要玩家操作,不自动结束
+    // 自动阶段(准备/判定/摸牌)立即结束,推进到下一阶段
     if (next === '准备' || next === '判定' || next === '摸牌') {
       await ctx.apply({ type: '阶段结束', player, phase: next });
     }
   });
 
-  // ─── 游戏开始 → 触发第一次回合 ───
+  // ─── 上家回合结束 → 如果我是下一家,启动自己的回合 ───
+  api.onAtomAfter('回合结束', async (ctx) => {
+    if (ctx.atom.type !== '回合结束') return;
+    const finishedName = ctx.atom.player;
+    const state = ctx.state;
+    const finishedIndex = state.players.findIndex(p => p.name === finishedName);
+    if (finishedIndex < 0) return;
+
+    const nextIndex = findNextAlive(state, finishedIndex);
+    const nextName = state.players[nextIndex].name;
+    // 不是我就跳过——只有轮到的玩家启动自己的回合
+    if (nextName !== me) return;
+
+    await ctx.apply({ type: '回合开始', player: me });
+    await ctx.apply({ type: '阶段开始', player: me, phase: '准备' });
+    // 触发阶段结束,让本实例的阶段推进钩子接着跑(准备→判定→摸牌→出牌)
+    await ctx.apply({ type: '阶段结束', player: me, phase: '准备' });
+  });
+
+  // ─── 主动结束回合 ───
+  api.registerAction(
+    'end',
+    (_view: GameView, _params: Record<string, Json>) => null,
+    async (frame: SettlementFrame) => {
+      const player = frame.from;
+
+      await frame.apply({ type: '阶段结束', player, phase: '出牌' });
+      await frame.apply({ type: '阶段结束', player, phase: '弃牌' });
+      // 触发所有 onAtomAfter('回合结束') 钩子——下家实例发现自己接手,启动回合
+      await frame.apply({ type: '回合结束', player });
+      // 推进 currentPlayerIndex 到下一家
+      await frame.apply({ type: '下一玩家' });
+    },
+  );
+
+  // ─── 首次开局(由主公位玩家触发)───
   api.registerAction(
     'start',
-    () => null,
+    (view: GameView) => {
+      if (view.currentPlayerIndex !== 0) return '只有主公位可以开局';
+      return null;
+    },
     async (frame: SettlementFrame) => {
       const player = frame.from;
       await frame.apply({ type: '回合开始', player });
       await frame.apply({ type: '阶段开始', player, phase: '准备' });
-      // 触发阶段结束,让 afterHook 自动推进到下一阶段
+      // 触发阶段结束,让阶段推进钩子跑(准备→判定→摸牌→出牌)
       await frame.apply({ type: '阶段结束', player, phase: '准备' });
     },
   );
-
-  // ─── 玩家主动结束回合 ───
-  api.registerAction(
-    'end',
-    (_view: GameView, _params: Record<string, Json>) => {
-      return null; // 始终允许
-    },
-    async (frame: SettlementFrame) => {
-      const player = frame.from;
-
-      // 出牌阶段结束 → 弃牌
-      await frame.apply({ type: '阶段结束', player, phase: '出牌' });
-      // 弃牌阶段(暂跳过弃牌逻辑)
-      await frame.apply({ type: '阶段结束', player, phase: '弃牌' });
-      // 回合结束
-      await frame.apply({ type: '回合结束', player });
-      // 下一玩家
-      await frame.apply({ type: '下一玩家' });
-      // 回合结束 hook 会自动处理回合开始 + 准备阶段
-    },
-  );
-
-  // ─── 回合结束 → 自动开始下一玩家的回合 ───
-  api.onAtomAfter('回合结束', async (ctx) => {
-    // 回合结束后,下一玩家 atom 已经在 action 里 apply 了
-    // 这里处理回合开始 + 准备阶段
-    const state = ctx.state;
-    const currentPlayer = state.players[state.currentPlayerIndex];
-    if (currentPlayer) {
-      await ctx.apply({ type: '回合开始', player: currentPlayer.name });
-      await ctx.apply({ type: '阶段开始', player: currentPlayer.name, phase: '准备' });
-    }
-  });
 
   return () => {};
 }

@@ -147,11 +147,15 @@ export interface ChoosePlayerPrompt {
 
 // ==================== Atom ====================
 
-export interface AtomAwaits {
-  target?: string;
+/** Atom 等待配置(pending)。有此字段 = 等待型 atom。apply 流程走完后进 pending 区。 */
+export interface AtomPending {
+  /** 获取等待目标玩家 */
   getTarget?: (atom: unknown) => string;
+  /** 超时后的行为：一个 atom，和普通 apply 一样压栈执行。不设 = 什么都不做 */
+  onTimeout?: Atom;
+  /** 前端提示（告诉前端渲染什么 UI） */
   prompt?: ActionPrompt;
-  defaultChoice?: Json;
+  /** 超时毫秒。不设 = 引擎默认值（30 秒） */
   timeout?: number;
 }
 
@@ -224,11 +228,12 @@ export type Atom =
   | { type: '询问杀'; target: string; source: string }
   | { type: '请求回应'; requestType: string; target: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number };
 
+
 export interface AtomDefinition<A = unknown> {
   type: string;
   validate(state: GameState, atom: A): string | null;
   apply(state: GameState, atom: A): GameState;
-  awaits?: AtomAwaits;
+  pending?: AtomPending;
   toPlayerViews?(state: GameState, atom: A): AtomPlayerViews | undefined;
   effect?: AtomEffect;
 }
@@ -267,7 +272,6 @@ export interface AtomBeforeContext {
   /** 阻止该 atom 执行,before 钩子专用 */
   drop(): void;
   apply(atom: Atom): Promise<void>;
-  notify(event: NotifyEvent): void;
 }
 
 export interface AtomAfterContext {
@@ -305,35 +309,37 @@ export interface SettlementFrame {
   params: Record<string, Json>;
   cards: string[];
   atomStack: Atom[];
-  pendingRequest?: { atom: Atom; target: string; status: 'waiting' | 'resolved'; deadline?: number };
+  /** 当前等待中的 pending slot（同时只有一个等待） */
+  pendingSlot?: PendingSlot;
   parent?: SettlementFrame;
-  /** 在 dispatch 流程中由 settlement 注入(不是 user 写的) */
+  /** 应用一个 atom（统一路径，等待型 atom 会挂起 Promise） */
   apply(atom: Atom): Promise<void>;
   /**
-   * applyOrAwait:apply 流程不抛 PendingInterrupt,改用 await promise。
-   * 返回 boolean:有 awaits 已收到回应,或无 awaits 已 apply 完成。
-   * 用于技能代码在 execute 内同步等待回应(例如杀.execute 末尾在询问闪回应后
-   * 继续跑'造成伤害'+'弃牌',让 onAtomAfter('造成伤害') 钩子真正触发)。
+   * applyOrAwait:和 apply 相同流程，但不抛 PendingInterrupt。
+   * 用于技能代码在 execute 内同步等待回应后继续执行后续 atom。
    */
   applyOrAwait(atom: Atom): Promise<boolean>;
-  /**
-   * 取消当前帧的等待回应(把 pendingRequest 标 resolved)。
-   * 用于回应 action 在自己的 settlement 帧上执行时(如闪的 execute 把自己
-   * 标记为"已响应"),让外层 dispatch 不再等待此回应。
-   */
+  /** 消费当前 pending slot（resolve Promise），让技能的 await frame.apply 恢复 */
+  consumePending(): void;
+  /** 取消当前帧的等待回应 */
   drop(): void;
   modifyParams(patch: Record<string, Json>): void;
   notify(event: NotifyEvent): void;
-  /** 内部:applyOrAwait 等待回应时保存的 resume 闭包,外部 dispatch 调用 */
-  _resume?: () => void;
-  /** 内部:保存 FrameExecutor 引用,供 respFrame 复用同一个 executor */
+  /** 内部:保存 FrameExecutor 引用 */
   _executor?: { state: GameState };
-  /** 内部:applyOrAwait 等待期间,dispatch await 此 Promise 等待 execute 完成 */
-  _executePromise?: Promise<void>;
-  /** 内部:技能 execute 在 PendingInterrupt 前注册的续跑函数,
-   *  dispatch 收到回应后调此函数完成后续 atom(造成伤害/弃牌等)。
-   *  使用 frame.apply 让 atom 走完整 pipeline(触发 before/after 钩子)。 */
+  /** 内部:技能 execute 在 PendingInterrupt 前注册的续跑函数 */
   _continueFn?: () => Promise<void>;
+  /** 内部:applyOrAwait 恢复闭包 */
+  _resume?: () => void;
+}
+
+/** Pending 区——等待玩家操作的 slot */
+export interface PendingSlot {
+  atom: Atom;
+  definition: AtomDefinition;
+  startTime: number;
+  deadline: number;
+  resolve: () => void;
 }
 // ==================== 协议 ====================
 

@@ -67,57 +67,53 @@ export function createEngine(): EngineInstance {
   async function dispatch(state: GameState, message: ClientMessage): Promise<{ state: GameState; error?: string }> {
     if (!currentState) currentState = state;
 
-    // ── 检查是否有 pending 回应 ──
-    const pending = topFrame(state);
-    if (pending?.pendingRequest?.status === 'waiting') {
-      const pr = pending.pendingRequest;
-      if (message.ownerId !== pr.target) return { state };
+    // ── 检查是否有 pending 等待 ──
+    const frame = topFrame(state);
+    if (frame?.pendingSlot) {
+      const slot = frame.pendingSlot;
+      // 检查 target 匹配
+      const target = slot.definition.pending?.getTarget
+        ? slot.definition.pending.getTarget(slot.atom)
+        : '';
+      if (message.ownerId !== target) return { state };
 
-      pr.status = 'resolved';
+      // 找到匹配的 action
       const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-      pending.params = { ...pending.params, ...message.params, __responder: message.ownerId };
+      frame.params = { ...frame.params, ...message.params, __responder: message.ownerId };
 
       let nextState: GameState = state;
       if (entry) {
         const view = buildView(state, getViewerIndex(state, message.ownerId));
         const err = entry.validate(view, message.params);
-        if (err !== null) {
-          // 验证失败 — 不出有效回应,直接结算
-        } else {
-          const sharedExecutor = pending._executor ?? { state };
-          const respFrame = makeFrame(pending, {
-            skillId: message.skillId,
-            from: message.ownerId,
-            params: { ...message.params, __ownerId: message.ownerId },
-            cards: [],
-          }, sharedExecutor);
-          nextState = pushFrame(state, respFrame);
-          sharedExecutor.state = nextState;
+        if (err === null) {
+          // action execute 在当前帧上（不压新帧）
+          const executor = frame._executor ?? { state };
           try {
-            await entry.execute(respFrame);
+            await entry.execute(frame);
           } catch (e) {
             if (e instanceof PendingInterrupt) {
-              return { state: sharedExecutor.state };
+              currentState = executor.state;
+              return { state: executor.state };
             }
-            nextState = popFrame(sharedExecutor.state);
-            currentState = nextState;
-            return { state: nextState };
+            currentState = frame._executor?.state ?? state;
+            return { state: currentState };
           }
-          nextState = popFrame(sharedExecutor.state);
+          nextState = frame._executor?.state ?? state;
         }
       }
 
-      if (pending._continueFn) {
+      // 如果杀的 execute 注册了续跑函数，执行它
+      if (frame._continueFn) {
         try {
-          await pending._continueFn();
+          await frame._continueFn();
         } catch (e) {
-          console.error('[engine] _continueFn error:', e);
+          // ignore
         }
-        nextState = pending._executor?.state ?? nextState;
       }
 
-      nextState = popFrame(nextState);
-      pending.pendingRequest = undefined;
+      // 消费 pending
+      frame.consumePending();
+      nextState = frame._executor?.state ?? nextState;
       currentState = nextState;
       return { state: nextState };
     }
@@ -144,17 +140,17 @@ export function createEngine(): EngineInstance {
     }
 
     const executor: { state: GameState } = { state };
-    const frame = makeFrame(undefined, {
+    const actionFrame = makeFrame(undefined, {
       skillId: message.skillId,
       from: message.ownerId,
       params: { ...message.params, __ownerId: message.ownerId },
       cards: [],
     }, executor);
-    let nextState = pushFrame(state, frame);
+    let nextState = pushFrame(state, actionFrame);
     executor.state = nextState;
 
     try {
-      await entry.execute(frame);
+      await entry.execute(actionFrame);
     } catch (e) {
       if (e instanceof PendingInterrupt) {
         currentState = executor.state;
@@ -170,27 +166,31 @@ export function createEngine(): EngineInstance {
     return { state: nextState };
   }
   /**
-   * 服务端超时注入:把栈顶 pendingRequest 的 defaultChoice 作为玩家回应。
-   * 走和'回应 action'等价的代码路径(create-engine.ts:60-148 的'top pending'分支),
-   * entry 不存在时仍然走"杀结算"代执行。
-   * 没有 pendingRequest 时返回 state 不变。
+   * 服务端超时注入:执行 pending.onTimeout（如果有），然后 resolve Promise。
+   * 没有 pendingSlot 时返回 state 不变。
    */
-  async function dispatchTimeout(state: GameState): Promise<{ state: GameState; error?: string }> {
+  async function dispatchTimeout(state: GameState): Promise<GameState> {
     if (!currentState) currentState = state;
-    const pending = topFrame(state);
-    if (!pending?.pendingRequest || pending.pendingRequest.status !== 'waiting') return { state };
-    const pr = pending.pendingRequest;
-    const atom = pr.atom;
-    const a = atom as { type: '请求回应'; defaultChoice?: unknown; prompt?: { defaultChoice?: unknown } };
-    const defaultChoice = a.defaultChoice ?? a.prompt?.defaultChoice;
-    const requestType = (atom as { requestType?: string }).requestType;
-    return dispatch(state, {
-      skillId: '__internal/timeout',
-      actionType: '__timeout__',
-      ownerId: pr.target,
-      params: { __timeoutChoice: defaultChoice, __timeoutRequestType: requestType },
-      baseSeq: state.seq,
-    });
+    const frame = topFrame(state);
+    if (!frame?.pendingSlot) return state;
+
+    const slot = frame.pendingSlot;
+    const def = slot.definition;
+
+    // 执行 onTimeout atom（如果有）
+    if (def.pending?.onTimeout) {
+      const executor = frame._executor ?? { state };
+      try {
+        await frame.apply(def.pending.onTimeout);
+      } catch (e) {
+        // ignore
+      }
+      currentState = executor.state;
+    }
+
+    // 消费 pending：resolve Promise
+    frame.consumePending();
+    return currentState;
   }
 
 

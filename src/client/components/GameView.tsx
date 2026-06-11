@@ -5,7 +5,8 @@
 // 特性: 视角切换、倒计时、装备区、座位布局、操作提示、弃牌选择
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { css, cx } from '@linaria/core';
-import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot } from '../../engine/types';
+import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt } from '../../engine/types';
+import { getActionsForPlayer, registerSkillActions, clearRegistry, type SkillActionDef } from '../skillActionRegistry';
 
 
 // ─── ActionMsg: 发给 controller(不含 baseSeq) ───
@@ -83,10 +84,24 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   const perspective = view.players[perspectiveIdx];
   const perspectiveName = perspective?.name ?? `P${perspectiveIdx}`;
-  const isMyTurn = view.currentPlayerIndex === view.viewer;
   const isPerspectiveTurn = view.currentPlayerIndex === perspectiveIdx;
+  // debug 模式:viewer 可以代打任何玩家,所以"是不是我的回合"以"正在看的玩家"为准
+  const isMyTurn = isPerspectiveTurn;
+  const isMyViewerTurn = view.currentPlayerIndex === view.viewer;
   const currentPlayer = view.players[view.currentPlayerIndex];
   const currentPlayerName = currentPlayer?.name ?? '';
+
+  // ─── 技能 action 注册表 ───
+  // view 变化时,重新注册所有玩家的技能前端 actions(defineAction)
+  const skillActionsKey = view.players.map(p => `${p.name}:${p.skills.join(',')}`).join('|');
+  const skillActions = useMemo(() => {
+    clearRegistry();
+    for (const p of view.players) {
+      registerSkillActions(p.name, p.skills);
+    }
+    // 返回当前视角玩家的 action 定义
+    return getActionsForPlayer(perspectiveName);
+  }, [skillActionsKey, perspectiveName]);
 
   // 视角玩家的手牌(debug 模式所有人可见)
   const perspectiveHand: Card[] = perspective?.hand ?? [];
@@ -95,8 +110,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 待回应:基于视角玩家
   const pending = view.pending;
   const isPerspectiveAwaiting = pending !== null && pending.target === perspectiveName;
-  // 只有当视角=自己时才能操作
-  const canOperate = perspectiveIdx === view.viewer;
+  // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
+  const canOperate = true; // debug 模式永远允许操作
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
 
   // 倒计时:pending 回应优先,否则用 turnDeadline
@@ -131,14 +146,73 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   }, [view.currentPlayerIndex]);
 
   // 发送 action
+  // debug 模式:以"正在看的玩家"作为 ownerId(代打)
+  // 正式模式:必须以自己(viewer)为 ownerId
   const send = useCallback((skillId: string, actionType: string, params: Record<string, Json>) => {
-    onAction({ skillId, actionType, ownerId: view.players[view.viewer].name, params });
+    const ownerId = perspectiveName;
+    onAction({ skillId, actionType, ownerId, params });
     setSelectedCardId(null);
     setSelectedTarget(null);
-  }, [onAction, view]);
+  }, [onAction, perspectiveName]);
+
+  // ─── 距离和攻击范围计算(纯函数，基于 GameView) ───
+  const WEAPON_RANGE: Record<string, number> = {
+    '诸葛连弩': 1, '青釭剑': 2, '雌雄双股剑': 2, '贯石斧': 3,
+    '青龙偃月刀': 3, '丈八蛇矛': 3, '方天画戟': 4, '麒麟弓': 5, '寒冰剑': 2,
+  };
+  /** 需要攻击范围内才能选目标的牌 */
+  const RANGE_REQUIRED_CARDS = new Set(['杀', '顺手牵羊']);
+
+  /** 计算 from 到 to 的座位距离(只算存活玩家) */
+  function seatDistance(fromIdx: number, toIdx: number): number {
+    const alive = view.players.filter(p => p.alive);
+    const n = alive.length;
+    if (n <= 1) return 0;
+    const aliveFromIdx = alive.findIndex(p => p.name === view.players[fromIdx]?.name);
+    const aliveToIdx = alive.findIndex(p => p.name === view.players[toIdx]?.name);
+    if (aliveFromIdx < 0 || aliveToIdx < 0) return Infinity;
+    const d = Math.abs(aliveFromIdx - aliveToIdx);
+    return Math.min(d, n - d);
+  }
+
+  /** 计算 from 到 to 的实际距离(含马修正) */
+  function effectiveDist(fromIdx: number, toIdx: number): number {
+    let dist = seatDistance(fromIdx, toIdx);
+    const fromP = view.players[fromIdx];
+    const toP = view.players[toIdx];
+    if (fromP?.equipment?.['进攻马']) dist -= 1;
+    if (toP?.equipment?.['防御马']) dist += 1;
+    return Math.max(1, dist);
+  }
+
+  /** from 是否能攻击到 to */
+  function canAttack(fromIdx: number, toIdx: number): boolean {
+    const fromP = view.players[fromIdx];
+    let range = 1;
+    if (fromP?.equipment?.['武器']) {
+      const weapon = view.cardMap[fromP.equipment['武器']];
+      if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
+    }
+    return effectiveDist(fromIdx, toIdx) <= range;
+  }
+
+  /** 选中的牌是否需要攻击范围才能选目标 */
+  const selectedCard = selectedCardId ? (perspectiveHand.find(c => c.id === selectedCardId) ?? viewerHand.find(c => c.id === selectedCardId)) : null;
+  const selectedNeedsRange = selectedCard ? RANGE_REQUIRED_CARDS.has(selectedCard.name) : false;
+
+  /** 判断目标 i 是否可被选中(距离/范围检查) */
+  function isTargetable(i: number): boolean {
+    if (!selectedNeedsRange) return true;
+    return canAttack(perspectiveIdx, i);
+  }
 
   // 需要选目标的牌
   const TARGET_REQUIRED_CARDS = new Set(['杀', '过河拆桥', '顺手牵羊', '借刀杀人', '决斗', '乐不思蜀']);
+
+  // 当前是否需要选目标(出牌或使用技能时)
+  const selectedNeedsTarget = selectedCard
+    ? TARGET_REQUIRED_CARDS.has(selectedCard.name)
+    : false;
   // 自动以自己为目标的牌
   const SELF_TARGET_CARDS = new Set(['桃', '酒']);
   // 只能作为回应打出的牌(不能主动出)
@@ -158,6 +232,55 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     send(card.name, 'use', params);
   }
 
+  // 选目标(含距离检查)
+  function handleTargetClick(name: string) {
+    const idx = view.players.findIndex(p => p.name === name);
+    if (idx >= 0 && !isTargetable(idx)) return; // 距离外,禁止选中
+    setSelectedTarget(selectedTarget === name ? null : name);
+  }
+
+  // ─── 武将技能使用(基于 ActionPrompt 类型驱动) ───
+  function handleSkillAction(action: SkillActionDef) {
+    const { skillId, actionType, prompt } = action;
+    const params: Record<string, Json> = {};
+
+    switch (prompt.type) {
+      case 'useCard':
+        // 选牌型:需要 selectedCardId
+        if (!selectedCardId) { alert(prompt.title); return; }
+        params.cardId = selectedCardId;
+        break;
+      case 'selectTarget':
+        // 选目标型:需要 selectedTarget
+        if (!selectedTarget) { alert(prompt.title); return; }
+        params.target = selectedTarget;
+        break;
+      case 'useCardAndTarget':
+        // 选牌+选目标型
+        if (!selectedCardId) { alert(prompt.title + ' — 请先选中手牌'); return; }
+        if (!selectedTarget) { alert(prompt.title + ' — 请选择目标'); return; }
+        params.targets = [{ target: selectedTarget, cardIds: [selectedCardId] }];
+        break;
+      case 'confirm':
+        // 确认型:直接发送
+        break;
+      case 'choosePlayer':
+        // 选玩家型:需要 selectedTarget
+        if (!selectedTarget) { alert(prompt.title); return; }
+        params.target = selectedTarget;
+        break;
+      case 'distribute':
+        // 分配型:暂不支持,提示
+        alert('分配型技能暂未实现'); return;
+      default:
+        break;
+    }
+
+    send(skillId, actionType, params);
+    setSelectedCardId(null);
+    setSelectedTarget(null);
+  }
+
   // 回应
   function handleRespond(cardId?: string) {
     if (!pending) return;
@@ -165,7 +288,11 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       const card = viewerHand.find(c => c.id === cardId);
       if (card) send(card.name, 'respond', { cardId });
     } else {
-      send('不出', 'respond', {});
+      // 不出闪/杀:用对应 skill respond 但不带 cardId(后端 skill 收到空 cardId → 不做操作)
+      // 根据当前 pending 的 atom type 决定用哪个 skill
+      const atomType = pending?.atom?.type;
+      const skillId = atomType === '询问杀' ? '杀' : '闪';
+      send(skillId, 'respond', {});
     }
   }
 
@@ -196,11 +323,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       setSelectedCardId(card.id);
       setSelectedTarget(null);
     }
-  }
-
-  // 选目标
-  function handleTargetClick(name: string) {
-    setSelectedTarget(selectedTarget === name ? null : name);
   }
 
   // 选弃牌(暂未实现UI)
@@ -301,7 +423,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             view={view}
             isCurrentPlayer={orderedPlayers[3].name === currentPlayerName}
             isPerspective={orderedPlayers[3].name === perspectiveName}
-            needsTarget={selectedCardId !== null && isMyTurn}
+            needsTarget={selectedNeedsTarget}
+            isTargetable={isTargetable((perspectiveIdx + 3) % view.players.length)}
             selectedTarget={selectedTarget}
             remainingSeconds={orderedPlayers[3].name === currentPlayerName ? remainingSeconds : null}
             onTargetClick={handleTargetClick}
@@ -313,7 +436,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             view={view}
             isCurrentPlayer={orderedPlayers[2].name === currentPlayerName}
             isPerspective={orderedPlayers[2].name === perspectiveName}
-            needsTarget={selectedCardId !== null && isMyTurn}
+            needsTarget={selectedNeedsTarget}
+            isTargetable={isTargetable((perspectiveIdx + 2) % view.players.length)}
             selectedTarget={selectedTarget}
             remainingSeconds={orderedPlayers[2].name === currentPlayerName ? remainingSeconds : null}
             onTargetClick={handleTargetClick}
@@ -330,7 +454,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               view={view}
               isCurrentPlayer={orderedPlayers[4].name === currentPlayerName}
               isPerspective={orderedPlayers[4].name === perspectiveName}
-              needsTarget={selectedCardId !== null && isMyTurn}
+              needsTarget={selectedNeedsTarget}
+              isTargetable={isTargetable((perspectiveIdx + 4) % view.players.length)}
               selectedTarget={selectedTarget}
               remainingSeconds={orderedPlayers[4].name === currentPlayerName ? remainingSeconds : null}
               onTargetClick={handleTargetClick}
@@ -356,7 +481,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               view={view}
               isCurrentPlayer={orderedPlayers[1].name === currentPlayerName}
               isPerspective={orderedPlayers[1].name === perspectiveName}
-              needsTarget={selectedCardId !== null && isMyTurn}
+              needsTarget={selectedNeedsTarget}
+              isTargetable={isTargetable((perspectiveIdx + 1) % view.players.length)}
               selectedTarget={selectedTarget}
               remainingSeconds={orderedPlayers[1].name === currentPlayerName ? remainingSeconds : null}
               onTargetClick={handleTargetClick}
@@ -374,6 +500,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             isCurrentPlayer={orderedPlayers[0].name === currentPlayerName}
             isPerspective={true}
             needsTarget={false}
+            isTargetable={true}
             selectedTarget={null}
             remainingSeconds={orderedPlayers[0].name === currentPlayerName ? remainingSeconds : null}
             onTargetClick={handleTargetClick}
@@ -415,6 +542,24 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           {perspectiveHand.length === 0 && <div className={emptyHand}>无手牌</div>}
         </div>
       </div>
+      {/* ─── 武将技能区(基于 defineAction 注册表) ─── */}
+      {isMyTurn && canOperate && view.phase === '出牌' && skillActions.length > 0 && (
+        <div className={skillSection}>
+          <div className={skillTitle}>武将技能:</div>
+          <div className={skillList}>
+            {skillActions.map(action => (
+              <button key={`${action.skillId}:${action.actionType}`}
+                className={skillBtn}
+                onClick={() => handleSkillAction(action)}
+                title={action.prompt.title}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {/* ─── 操作面板 ─── */}
       <div className={actionBar}>
@@ -441,14 +586,17 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           <div className={targetTitle}>选择目标:</div>
           <div className={targetList}>
             {view.players.map((p, i) => {
-              if (!p.alive || i === view.viewer) return null;
+              if (!p.alive || i === perspectiveIdx) return null;
+              const targetable = isTargetable(i);
               return (
                 <button
                   key={i}
-                  className={cx(targetBtn, selectedTarget === p.name && targetBtnActive)}
+                  className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
+                  disabled={!targetable}
                   onClick={() => handleTargetClick(p.name)}
                 >
                   {p.name} ({p.character}) ♥{p.health}
+                  {!targetable && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
                 </button>
               );
             })}
@@ -507,6 +655,7 @@ interface PlayerSeatProps {
   isCurrentPlayer: boolean;
   isPerspective: boolean;
   needsTarget: boolean;
+  isTargetable: boolean;
   selectedTarget: string | null;
   remainingSeconds: number | null;
   onTargetClick: (name: string) => void;
@@ -515,11 +664,11 @@ interface PlayerSeatProps {
 
 function PlayerSeatView({
   player, index, view, isCurrentPlayer, isPerspective,
-  needsTarget, selectedTarget, remainingSeconds,
+  needsTarget, isTargetable, selectedTarget, remainingSeconds,
   onTargetClick, onPerspectiveChange,
 }: PlayerSeatProps) {
   const isDead = !player.alive;
-  const isClickable = needsTarget && !isDead && player.name !== view.players[view.viewer]?.name;
+  const isClickable = needsTarget && !isDead && isTargetable;
 
   return (
     <div
@@ -746,6 +895,16 @@ const targetBtn = css`
   cursor: pointer; background: rgba(22,33,62,0.8); color: #e0e0e0; font-size: 13px;
 `;
 const targetBtnActive = css`border: 2px solid #e74c3c; background: rgba(231,76,60,0.2);`;
+const targetBtnDisabled = css`opacity: 0.35; cursor: not-allowed; border-style: dashed;`;
+// Skill buttons
+const skillSection = css`margin-bottom: 8px;`;
+const skillTitle = css`font-size: 13px; color: #aaa; margin-bottom: 6px; font-weight: bold;`;
+const skillList = css`display: flex; gap: 8px; flex-wrap: wrap;`;
+const skillBtn = css`
+  border: 1px solid #9b59b6; border-radius: 6px; padding: 6px 14px;
+  cursor: pointer; background: rgba(155,89,182,0.15); color: #bb8fce; font-size: 13px; font-weight: bold;
+  &:hover { background: rgba(155,89,182,0.3); }
+`;
 
 // Debug panel
 const debugPanel = css`

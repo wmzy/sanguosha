@@ -1,5 +1,5 @@
 // src/engine/atoms/询问杀.ts
-// 询问杀:等待 target 出杀
+// 询问杀:等待型 atom — 等待 target 出杀
 import type { AtomDefinition, GameState } from '../types';
 import { registerAtom } from '../atom';
 
@@ -10,7 +10,7 @@ export const 询问杀: AtomDefinition<{ target: string; source: string }> = {
     return null;
   },
   apply(state) { return { ...state }; },
-  awaits: { getTarget: (atom) => (atom as { target: string }).target },
+  pending: { getTarget: (atom) => (atom as { target: string }).target },
   effect: { sound: 'slash_request', blockUntilDone: true, duration: 200 },
 };
 

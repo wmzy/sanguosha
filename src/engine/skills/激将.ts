@@ -1,7 +1,7 @@
 // src/engine/skills/激将.ts
 // 激将(刘备·主公技):主公被南蛮入侵/万箭齐发等波及时,可请求其他蜀势力出杀/闪
 // 简化实现:主动技 — 出牌阶段限一次,主公可请求一张杀
-import type { BackendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
+import type { BackendAPI, FrontendAPI, GameView, Json, SettlementFrame, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
@@ -56,5 +56,19 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
   return () => {};
 }
 
-export const module_激将: SkillModule = { createSkill, onInit };
+export function onMount(skill: Skill, api: FrontendAPI): () => void {
+  api.defineAction('use', {
+    label: '激将',
+    style: 'primary',
+    prompt: {
+      type: 'choosePlayer',
+      title: '激将：选择一名蜀势力角色出杀',
+      min: 1,
+      max: 1,
+    },
+  });
+  return () => {};
+}
+
+export const module_激将: SkillModule = { createSkill, onInit, onMount };
 registerSkillModule('激将', module_激将);

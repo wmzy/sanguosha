@@ -82,10 +82,19 @@ setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
 async function restorePersistedRooms(): Promise<void> {
   const roomIds = await listPersistedRooms();
   log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
+  // 清理超过 1 小时没活动的房间(debug 房间不需要跨重启保留)
+  const ONE_HOUR = 60 * 60 * 1000;
+  const now = Date.now();
   for (const roomId of roomIds) {
     try {
       const persisted = await loadRoom(roomId);
       if (!persisted) continue;
+      // 跳过超时的 debug 房间
+      if (persisted.debug && persisted.state?.startedAt && (now - persisted.state.startedAt > ONE_HOUR)) {
+        log.info(`跳过过期 debug 房间 ${roomId}`);
+        await deletePersistedRoom(roomId);
+        continue;
+      }
       const state = restoreToState(persisted);
       // 兼容新旧 GameState 格式
       if (!state.players || !Array.isArray(state.players)) {

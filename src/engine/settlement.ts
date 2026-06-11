@@ -74,8 +74,8 @@ function makeFrame(
         }
         throw e;
       }
-      if (frame.pendingRequest) {
-        frame.pendingRequest.status = 'resolved';
+      if (frame.pendingSlot) {
+        frame.pendingSlot.resolve();
       }
       frame.atomStack.pop();
       const def = getAtomDef(atom.type);
@@ -84,18 +84,20 @@ function makeFrame(
       const after = applyAtom(executor.state, atom);
       executor.state = after;
       resolvePlayerViews(after, atom);
-      // 检查 awaits:如果有,设置 pendingRequest 并暂停执行
-      if (def.awaits) {
-        const target = def.awaits.getTarget
-          ? def.awaits.getTarget(atom)
-          : def.awaits.target ?? '';
-        frame.pendingRequest = {
+      // 检查 pending:如果有,设置 pendingSlot 并 throw PendingInterrupt
+      // 暂时保持 throw-based:dispatch 在 catch 中返回 state。
+      // 后续重构时改为 Promise-based (需要 dispatch 不 await execute 完成)。
+      if (def.pending) {
+        const target = def.pending.getTarget
+          ? def.pending.getTarget(atom)
+          : '';
+        const timeoutMs = def.pending.timeout ? def.pending.timeout * 1000 : 30_000;
+        frame.pendingSlot = {
           atom,
-          target,
-          status: 'waiting',
-          deadline: def.awaits.timeout
-            ? Date.now() + def.awaits.timeout * 1000
-            : Date.now() + 30_000,
+          definition: def,
+          startTime: Date.now(),
+          deadline: Date.now() + timeoutMs,
+          resolve: () => {},
         };
         throw new PendingInterrupt();
       }
@@ -155,8 +157,8 @@ function makeFrame(
         }
         throw e;
       }
-      if (frame.pendingRequest) {
-        frame.pendingRequest.status = 'resolved';
+      if (frame.pendingSlot) {
+        frame.pendingSlot.resolve();
       }
       frame.atomStack.pop();
       const def = getAtomDef(atom.type);
@@ -165,17 +167,17 @@ function makeFrame(
       const after = applyAtom(executor.state, atom);
       executor.state = after;
       resolvePlayerViews(after, atom);
-      if (def.awaits) {
-        const target = def.awaits.getTarget
-          ? def.awaits.getTarget(atom)
-          : def.awaits.target ?? '';
-        frame.pendingRequest = {
+      if (def.pending) {
+        const target = def.pending.getTarget
+          ? def.pending.getTarget(atom)
+          : '';
+        const timeoutMs = def.pending.timeout ? def.pending.timeout * 1000 : 30_000;
+        frame.pendingSlot = {
           atom,
-          target,
-          status: 'waiting',
-          deadline: def.awaits.timeout
-            ? Date.now() + def.awaits.timeout * 1000
-            : Date.now() + 30_000,
+          definition: def,
+          startTime: Date.now(),
+          deadline: Date.now() + timeoutMs,
+          resolve: () => {},
         };
         await new Promise<void>((resolve) => {
           frame._resume = () => {
@@ -183,7 +185,7 @@ function makeFrame(
             resolve();
           };
         });
-        frame.pendingRequest = undefined;
+        frame.pendingSlot = undefined;
       }
       const afterCtx: AtomAfterContext = {
         state: executor.state,
@@ -213,10 +215,17 @@ function makeFrame(
     /** 内部:保存 executor 引用,供 dispatch 创建 respFrame 时复用 */
     _executor: executor,
     drop() {
-      // 取消当前帧的等待回应。提醒:此方法只清 pendingRequest,不影响 frame.params;
-      // 闪.execute 仍需 modifyParams({ settlement: [{...dodged: true}] }) 把结果传父帧。
-      if (frame.pendingRequest) {
-        frame.pendingRequest.status = 'resolved';
+      // 取消当前帧的等待回应
+      if (frame.pendingSlot) {
+        frame.pendingSlot.resolve();
+        frame.pendingSlot = undefined;
+      }
+    },
+    consumePending() {
+      // 消费 pending slot：resolve Promise，让技能的 await frame.apply 恢复
+      if (frame.pendingSlot) {
+        frame.pendingSlot.resolve();
+        frame.pendingSlot = undefined;
       }
     },
     modifyParams(patch) {
