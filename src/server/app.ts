@@ -248,7 +248,7 @@ export function handleWsMessage(
       void handleStartGame(playerId);
       break;
     case 'action':
-      handleAction(playerId, message.action, message.baseSeq);
+      handleAction(playerId, message.action);
       break;
     case 'leave_room':
       handleLeaveRoom(playerId);
@@ -360,14 +360,14 @@ async function handleStartGame(playerId: string): Promise<void> {
   }
 }
 
-function handleAction(playerId: string, action: import('../engine/types').ClientMessage, baseSeq: number): void {
+function handleAction(playerId: string, action: import('../engine/types').ClientMessage): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
 
   const session = gameSessions.get(roomId);
   if (!session) return;
 
-  void session.handleAction(playerId, action, baseSeq);
+  void session.handleAction(playerId, action);
 }
 
 // 新 ENGINE-DESIGN 不再需要 handleAsyncHookResponse

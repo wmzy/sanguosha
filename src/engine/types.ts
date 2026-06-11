@@ -13,7 +13,7 @@ export type Card = {
   id: string;
   name: string;
   suit: '♠' | '♥' | '♣' | '♦';
-  rank: number;
+  rank: string;
   type: '基本牌' | '锦囊牌' | '装备牌';
   subtype?: string;
 };

@@ -11,6 +11,7 @@
 // 帧由技能在 execute 中显式创建(api.pushFrame);execute 结束后引擎自动弹栈。
 // atomStack / pendingSlot 是 GameState 属性,不是 frame 属性。
 // 引擎内部不 try/catch——除 bug 外不应抛错。
+// actionLog 由引擎自动记录,session 不直接 mutate state。
 
 import type {
   ClientMessage,
@@ -36,21 +37,58 @@ import { topFrame } from './settlement';
 export interface DispatchResult {
   state: GameState;
   error?: string;
+  /** 游戏是否结束 */
+  gameOver?: boolean;
+  /** 获胜者名字(游戏结束时) */
+  winner?: string;
+}
+
+/** pending 超时信息 */
+export interface PendingTimeoutInfo {
+  /** 剩余毫秒 */
+  remaining: number;
+  /** 超时截止时间戳 */
+  deadline: number;
+  /** 等待中的 atom 类型 */
+  atomType: string;
+}
+
+/** 空闲超时信息 */
+export interface IdleTimeoutInfo {
+  /** 当前阶段 */
+  phase: string;
+  /** 当前玩家名字 */
+  currentPlayer: string;
+  /** 空闲超时毫秒 */
+  idleMs: number;
 }
 
 export interface EngineInstance {
-  dispatch(state: GameState, message: ClientMessage): Promise<DispatchResult>;
-  dispatchTimeout(state: GameState): Promise<GameState>;
-  buildView(state: GameState, viewer: number): GameView;
+  dispatch(message: ClientMessage): Promise<DispatchResult>;
+  dispatchTimeout(): Promise<DispatchResult>;
+  buildView(viewer: number): GameView;
   resetForTest(): void;
   bootstrap(initialState: GameState): GameState;
+  /** 获取 pending 超时信息(如果有) */
+  getPendingTimeoutInfo(): PendingTimeoutInfo | null;
+  /** 获取空闲超时信息(如果当前是出牌/弃牌阶段且无 pending) */
+  getIdleTimeoutInfo(): IdleTimeoutInfo | null;
+  /** 获取当前 state(只读) */
+  getState(): GameState;
 }
+
+/** 空闲超时毫秒 */
+const IDLE_TIMEOUT_MS = 50_000;
 
 export function createEngine(): EngineInstance {
   let currentState: GameState;
 
   function bootstrap(state: GameState): GameState {
     state = ensureStateShape(state);
+    // 设置 startedAt
+    if (!state.startedAt) {
+      state = { ...state, startedAt: Date.now() };
+    }
     currentState = state;
     for (const player of state.players) {
       for (const skillId of player.skills) {
@@ -88,15 +126,36 @@ export function createEngine(): EngineInstance {
   let activeExecuteApi: EngineApi | undefined;
   let activeExecuteP: Promise<void> | undefined;
 
-  async function dispatch(state: GameState, message: ClientMessage): Promise<DispatchResult> {
-    state = ensureStateShape(state);
-    currentState = state;
+  /** 检查游戏是否结束 */
+  function checkGameOver(): { gameOver: boolean; winner?: string } {
+    const aliveCount = currentState.players.filter(p => p.alive).length;
+    if (aliveCount <= 1) {
+      const winner = currentState.players.find(p => p.alive);
+      return { gameOver: true, winner: winner?.name ?? '无人' };
+    }
+    return { gameOver: false };
+  }
 
-    const frame = topFrame(state);
+  /** 记录 action 到 actionLog */
+  function logAction(message: ClientMessage): void {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now() - currentState.startedAt,
+      message,
+      baseSeq: message.baseSeq ?? -1,
+    };
+    currentState = {
+      ...currentState,
+      actionLog: [...currentState.actionLog, entry],
+    };
+  }
+
+  async function dispatch(message: ClientMessage): Promise<DispatchResult> {
+    const frame = topFrame(currentState);
 
     // === 回应路径(已有 pending slot) ===
-    if (state.pendingSlot) {
-      const slot = state.pendingSlot;
+    if (currentState.pendingSlot) {
+      const slot = currentState.pendingSlot;
       const target = slot.definition.pending?.getTarget
         ? slot.definition.pending.getTarget(slot.atom)
         : '';
@@ -112,7 +171,7 @@ export function createEngine(): EngineInstance {
       // 尝试找到对应的 action entry
       const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
       if (entry) {
-        const view = buildView(state, getViewerIndex(state, message.ownerId));
+        const view = buildView(currentState, getViewerIndex(currentState, message.ownerId));
         const err = entry.validate(view, message.params);
         if (err === null) {
           // 构造 api,执行回应 action
@@ -153,7 +212,13 @@ export function createEngine(): EngineInstance {
       }
       activeExecuteCtx = undefined;
       activeExecuteP = undefined;
-      return { state: currentState };
+
+      // 记录 action
+      logAction(message);
+
+      // 检查游戏结束
+      const { gameOver, winner } = checkGameOver();
+      return { state: currentState, gameOver, winner };
     }
 
     // === 主动 action 路径 ===
@@ -216,14 +281,17 @@ export function createEngine(): EngineInstance {
     // 读取最新 state(可能已被 engine-api 修改,如添加 pendingSlot)
     currentState = ctx.state;
 
-    return { state: currentState };
+    // 记录 action
+    logAction(message);
+
+    // 检查游戏结束
+    const { gameOver, winner } = checkGameOver();
+    return { state: currentState, gameOver, winner };
   }
 
-  async function dispatchTimeout(state: GameState): Promise<GameState> {
-    state = ensureStateShape(state);
-    currentState = state;
+  async function dispatchTimeout(): Promise<DispatchResult> {
     const frame = topFrame(currentState);
-    if (!currentState.pendingSlot) return currentState;
+    if (!currentState.pendingSlot) return { state: currentState };
 
     const def = currentState.pendingSlot.definition;
     if (def.pending?.onTimeout) {
@@ -253,6 +321,37 @@ export function createEngine(): EngineInstance {
         }
       }
     }
+
+    // 检查游戏结束
+    const { gameOver, winner } = checkGameOver();
+    return { state: currentState, gameOver, winner };
+  }
+
+  function getPendingTimeoutInfo(): PendingTimeoutInfo | null {
+    if (!currentState.pendingSlot) return null;
+    const slot = currentState.pendingSlot;
+    const remaining = slot.deadline ? slot.deadline - Date.now() : 30_000;
+    return {
+      remaining: Math.max(0, remaining),
+      deadline: slot.deadline,
+      atomType: slot.atom.type,
+    };
+  }
+
+  function getIdleTimeoutInfo(): IdleTimeoutInfo | null {
+    if (currentState.pendingSlot) return null;
+    const phase = currentState.phase;
+    if (phase !== '出牌' && phase !== '弃牌') return null;
+    const currentPlayer = currentState.players[currentState.currentPlayerIndex];
+    if (!currentPlayer || !currentPlayer.alive) return null;
+    return {
+      phase,
+      currentPlayer: currentPlayer.name,
+      idleMs: IDLE_TIMEOUT_MS,
+    };
+  }
+
+  function getState(): GameState {
     return currentState;
   }
 
@@ -262,7 +361,7 @@ export function createEngine(): EngineInstance {
     currentState = createGameState({ players: [], cardMap: {} });
   }
 
-  return { dispatch, dispatchTimeout, buildView, resetForTest, bootstrap };
+  return { dispatch, dispatchTimeout, buildView: (viewer) => buildView(currentState, viewer), resetForTest, bootstrap, getPendingTimeoutInfo, getIdleTimeoutInfo, getState };
 }
 
 function getViewerIndex(state: GameState, ownerName: string): number {
