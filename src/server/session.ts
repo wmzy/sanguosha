@@ -1,31 +1,24 @@
 // src/server/session.ts
-// 切到新 ENGINE-DESIGN:使用 createEngine() + ClientMessage 协议
-// 不再用 createAsyncEngine / AsyncHookRegistry / 老 GameAction / 老 serverLog
+// Session 只负责网络/持久化,游戏逻辑由引擎管理
 import type {
   ActionLogEntry,
   ClientMessage as EngineClientMessage,
   GameState,
   GameView,
 } from '../engine/types';
-
 import { createEngine, type EngineInstance } from '../engine/create-engine';
+import { createInitialState, type GameSetupConfig } from '../engine/game-setup';
 import '../engine/atoms';
 import '../engine/skills';
 import type { ServerMessage } from './protocol';
 import { serialize } from './protocol';
 import type { Room } from './room';
-import type { Role } from '../shared/types';
 import { createLogger } from './logger';
-import { createRng } from '../shared/rng';
-import { createStandardDeck, shuffle } from '../shared/deck';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
 
-/**
- * 武将定义(简化版:名字 + 初始技能列表)
- * 新 ENGINE-DESIGN 技能由 src/engine/skills/<name>.ts 编译进模块。
- */
-const CHARACTERS: Array<{ name: string; skills: string[] }> = [
+/** 默认角色列表 */
+const CHARACTERS: GameSetupConfig['characters'] = [
   { name: '刘备', skills: ['仁德'] },
   { name: '曹操', skills: ['护甲'] },
   { name: '孙权', skills: ['制衡'] },
@@ -33,15 +26,6 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = [
   { name: '郭嘉', skills: ['遗计'] },
   { name: '主公', skills: [] },
 ];
-
-function assignRoles(count: number): Role[] {
-  if (count === 2) return ['主公', '反贼'];
-  if (count === 3) return ['主公', '反贼', '内奸'];
-  if (count === 4) return ['主公', '忠臣', '反贼', '反贼'];
-  const roles: Role[] = ['主公', '忠臣', '内奸'];
-  for (let i = 3; i < count; i++) roles.push('反贼');
-  return roles;
-}
 
 const RECONNECT_GRACE_MS = 30_000;
 
@@ -82,102 +66,44 @@ export class GameSession {
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
 
-    const seed = this.sessionSeed;
-    const rng = createRng(seed);
-    // 主公固定在 0 号位,其余角色随机
-    const lord = CHARACTERS.find(c => c.name === '主公')!;
-    const others = CHARACTERS.filter(c => c.name !== '主公');
-    for (let i = others.length - 1; i > 0; i--) {
-      const j = rng.nextInt(i + 1);
-      const tmp = others[i]; others[i] = others[j]; others[j] = tmp;
-    }
-    const selected = [lord, ...others.slice(0, count - 1)];
+    // 引擎创建初始状态(抽角色、洗牌、发牌)
+    const state = createInitialState({
+      characters: CHARACTERS,
+      playerCount: count,
+      seed: this.sessionSeed,
+      gameId: this.room.id,
+    });
 
-
+    // 建立 playerId → playerName 映射
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (!playerId) return false;
-      // debug 模式:单玩家控制所有角色
-      // playerNames 用 playerId:character 格式(重连时需要),同时设置 playerId→主公
-      for (let i = 0; i < count; i++) {
-        this.playerNames.set(`${playerId}:${selected[i].name}`, selected[i].name);
+      for (const player of state.players) {
+        this.playerNames.set(`${playerId}:${player.name}`, player.name);
       }
-      // 直接映射 playerId→主公,让 handleAction 能通过 expectedName 检查
-      this.playerNames.set(playerId, selected[0].name);
+      this.playerNames.set(playerId, state.players[0].name);
     } else {
       const playerIds = [...this.room.players.keys()];
-      for (let i = 0; i < playerIds.length; i++) {
-        this.playerNames.set(playerIds[i], selected[i].name);
+      for (let i = 0; i < playerIds.length && i < state.players.length; i++) {
+        this.playerNames.set(playerIds[i], state.players[i].name);
       }
     }
 
-    // 创建并洗牌
-    const allCards = shuffle(createStandardDeck(), rng);
-    const cardMap: GameState['cardMap'] = {};
-    const deckIds: string[] = [];
-    for (const card of allCards) {
-      cardMap[card.id] = card;
-      deckIds.push(card.id);
-    }
-
-    // 发初始手牌(每人4张)
-    const handSize = 4;
-    let cursor = 0;
-    const players = selected.map((char, i) => {
-      const hand = deckIds.slice(cursor, cursor + handSize);
-      cursor += handSize;
-      return {
-        index: i,
-        name: char.name,
-        character: char.name,
-        health: 4,
-        maxHealth: 4,
-        alive: true,
-        hand,
-        equipment: {},
-        skills: [...char.skills, '回合管理', '装备通用', '杀', '闪', '桃', '酒', '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '借刀杀人', '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击', '反馈'],
-        vars: {},
-        marks: [],
-        pendingTricks: [],
-        judgeZone: [],
-      };
-    });
-
-    const state: GameState = {
-      players,
-      currentPlayerIndex: 0,
-      phase: '准备',
-      turn: { round: 1, phase: '准备', vars: {} },
-      zones: { deck: deckIds.slice(cursor), discardPile: [], processing: [] },
-      settlementStack: [],
-      atomStack: [],
-      cardMap,
-      cardWrappers: {},
-      rngSeed: seed,
-      marks: [],
-      localVars: {},
-      meta: { gameId: this.room.id, createdAt: Date.now() },
-      seq: 0,
-      startedAt: 0,
-      actionLog: [],
-    };
+    // bootstrap 引擎
     this.engine = createEngine();
     this.engine.resetForTest();
     this.engine.bootstrap(state);
 
-    // 触发第一次回合开始 → 阶段开始(准备)
-    // 直接 dispatch 一个内部 action 来启动游戏
+    // 启动第一回合
     const firstPlayer = state.players[0];
     if (firstPlayer) {
-      const startMsg: EngineClientMessage = {
+      const result = await this.engine.dispatch({
         skillId: '回合管理',
         actionType: 'start',
         ownerId: firstPlayer.name,
         params: {},
         baseSeq: 0,
-      };
-      const result = await this.engine.dispatch(startMsg);
-      // 检查游戏结束
+      });
       if (result.gameOver) {
         this.handleGameOver(result.winner);
       }
