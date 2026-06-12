@@ -1,6 +1,6 @@
 // src/engine/atoms/指定目标.ts
 // 指定目标:事件标记(目标关系在事件流中记录)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 指定目标: AtomDefinition<{ source: string; cardId?: string; target: string }> = {
@@ -10,7 +10,9 @@ export const 指定目标: AtomDefinition<{ source: string; cardId?: string; tar
     if (!state.players.find(p => p.name === atom.target)) return `target ${atom.target} not found`;
     return null;
   },
-  apply(state) { return { ...state }; },
+  apply(_state) {
+    // 事件标记——目标关系在事件流中记录
+  },
   effect: { sound: 'target', animation: 'highlight', duration: 200 },
 };
 

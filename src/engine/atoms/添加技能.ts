@@ -1,6 +1,6 @@
 // src/engine/atoms/添加技能.ts
 // 添加技能:为玩家添加 skillId(实际 registerAction/onInit 由 skill-loader 监听此 atom 触发)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 添加技能: AtomDefinition<{ player: string; skillId: string }> = {
@@ -11,14 +11,9 @@ export const 添加技能: AtomDefinition<{ player: string; skillId: string }> =
   },
   apply(state, atom) {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== pIdx) return p;
-        if (p.skills.includes(atom.skillId)) return p;
-        return { ...p, skills: [...p.skills, atom.skillId] };
-      }),
-    };
+    const player = state.players[pIdx];
+    if (player.skills.includes(atom.skillId)) return;
+    player.skills.push(atom.skillId);
   },
 };
 

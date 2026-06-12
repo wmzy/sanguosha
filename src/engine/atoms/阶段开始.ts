@@ -1,6 +1,6 @@
 // src/engine/atoms/阶段开始.ts
 // 阶段开始:更新 state.phase
-import type { AtomDefinition, GameState, TurnPhase } from '../types';
+import type { AtomDefinition, TurnPhase } from '../types';
 import { registerAtom } from '../atom';
 
 const VALID_PHASES: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'];
@@ -13,11 +13,9 @@ export const 阶段开始: AtomDefinition<{ player: string; phase: string }> = {
     return null;
   },
   apply(state, atom) {
-    return {
-      ...state,
-      phase: atom.phase as TurnPhase,
-      turn: { ...state.turn, phase: atom.phase as TurnPhase },
-    };
+    const phase = atom.phase as TurnPhase;
+    state.phase = phase;
+    state.turn.phase = phase;
   },
   effect: { sound: 'phase_start', duration: 150 },
 };

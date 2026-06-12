@@ -1,6 +1,6 @@
 // src/engine/atoms/卸下.ts
 // 卸下:玩家卸下指定槽位的装备,返回手牌
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 卸下: AtomDefinition<{ player: string; slot: '武器' | '防具' | '进攻马' | '防御马' | '宝物' }> = {
@@ -13,16 +13,10 @@ export const 卸下: AtomDefinition<{ player: string; slot: '武器' | '防具' 
   },
   apply(state, atom) {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== pIdx) return p;
-        const cardId = p.equipment[atom.slot]!;
-        const equipment = { ...p.equipment };
-        delete equipment[atom.slot];
-        return { ...p, equipment, hand: [...p.hand, cardId] };
-      }),
-    };
+    const player = state.players[pIdx];
+    const cardId = player.equipment[atom.slot]!;
+    delete player.equipment[atom.slot];
+    player.hand.push(cardId);
   },
 };
 

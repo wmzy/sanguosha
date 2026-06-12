@@ -1,6 +1,6 @@
 // src/engine/atoms/弃置.ts
 // 弃置:从玩家手牌/装备区将 cardIds 移至弃牌堆
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 弃置: AtomDefinition<{ player: string; cardIds: string[] }> = {
@@ -15,16 +15,13 @@ export const 弃置: AtomDefinition<{ player: string; cardIds: string[] }> = {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
     const player = state.players[pIdx];
     const discardSet = new Set(atom.cardIds);
-    const hand = player.hand.filter(id => !discardSet.has(id));
+    player.hand = player.hand.filter(id => !discardSet.has(id));
     const equipment: Record<string, string> = {};
     for (const [slot, id] of Object.entries(player.equipment)) {
       if (id && !discardSet.has(id)) equipment[slot] = id;
     }
-    return {
-      ...state,
-      zones: { ...state.zones, discardPile: [...state.zones.discardPile, ...atom.cardIds] },
-      players: state.players.map((p, i) => i === pIdx ? { ...p, hand, equipment } : p),
-    };
+    player.equipment = equipment;
+    state.zones.discardPile.push(...atom.cardIds);
   },
   effect: { sound: 'discard', animation: 'flip', duration: 200 },
 };

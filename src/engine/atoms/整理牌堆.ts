@@ -1,6 +1,6 @@
 // src/engine/atoms/整理牌堆.ts
 // 整理牌堆:用给定顺序替换牌堆(用于观星等技能)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 整理牌堆: AtomDefinition<{ cards: string[] }> = {
@@ -14,7 +14,7 @@ export const 整理牌堆: AtomDefinition<{ cards: string[] }> = {
     return null;
   },
   apply(state, atom) {
-    return { ...state, zones: { ...state.zones, deck: [...atom.cards] } };
+    state.zones.deck = [...atom.cards];
   },
 };
 

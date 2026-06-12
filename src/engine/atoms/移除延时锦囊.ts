@@ -1,6 +1,6 @@
 // src/engine/atoms/移除延时锦囊.ts
 // 移除延时锦囊:从玩家判定区移除指定延时锦囊
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 移除延时锦囊: AtomDefinition<{ player: string; trickName: string }> = {
@@ -11,13 +11,7 @@ export const 移除延时锦囊: AtomDefinition<{ player: string; trickName: str
   },
   apply(state, atom) {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== pIdx) return p;
-        return { ...p, pendingTricks: p.pendingTricks.filter(t => t.name !== atom.trickName) };
-      }),
-    };
+    state.players[pIdx].pendingTricks = state.players[pIdx].pendingTricks.filter(t => t.name !== atom.trickName);
   },
 };
 

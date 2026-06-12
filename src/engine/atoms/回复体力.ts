@@ -1,6 +1,6 @@
 // src/engine/atoms/回复体力.ts
 // 回复体力:target 玩家回复 amount 体力(不超过 maxHealth)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 回复体力: AtomDefinition<{ target: string; amount: number; source?: string }> = {
@@ -14,14 +14,8 @@ export const 回复体力: AtomDefinition<{ target: string; amount: number; sour
   },
   apply(state, atom) {
     const tIdx = state.players.findIndex(p => p.name === atom.target);
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== tIdx) return p;
-        const newHealth = Math.min(p.maxHealth, p.health + atom.amount);
-        return { ...p, health: newHealth };
-      }),
-    };
+    const target = state.players[tIdx];
+    target.health = Math.min(target.maxHealth, target.health + atom.amount);
   },
   effect: { sound: 'heal', particles: 'ice', duration: 300 },
 };

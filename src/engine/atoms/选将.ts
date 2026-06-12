@@ -1,7 +1,7 @@
 // src/engine/atoms/选将.ts
 // 游戏初始化 atoms:抽身份、选将、发牌
 // 每个 atom 做一件事,符合三国杀身份局规则
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
 import { registerAtom } from '../atom';
@@ -42,7 +42,7 @@ export const 抽身份: AtomDefinition<{
     const { playerCount, seed } = atom;
     const rng = createRng(seed);
     const counts = IDENTITY_COUNTS[playerCount];
-    if (!counts) return state;
+    if (!counts) return;
 
     // 构建身份牌堆
     const identities: string[] = [];
@@ -55,7 +55,9 @@ export const 抽身份: AtomDefinition<{
     // 洗混身份牌
     for (let i = identities.length - 1; i > 0; i--) {
       const j = rng.nextInt(i + 1);
-      const tmp = identities[i]; identities[i] = identities[j]; identities[j] = tmp;
+      const tmp = identities[i];
+      identities[i] = identities[j];
+      identities[j] = tmp;
     }
 
     // 分配身份,主公固定 0 号位
@@ -66,12 +68,9 @@ export const 抽身份: AtomDefinition<{
     }
 
     // 更新玩家身份(存入 vars)
-    const players = state.players.map((p, i) => ({
-      ...p,
-      vars: { ...p.vars, 身份: identities[i] || '未知' },
-    }));
-
-    return { ...state, players };
+    for (let i = 0; i < state.players.length; i++) {
+      state.players[i].vars['身份'] = identities[i] || '未知';
+    }
   },
 };
 
@@ -98,7 +97,9 @@ export const 选将: AtomDefinition<{
     const pool = [...characters];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = rng.nextInt(i + 1);
-      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
     }
 
     // 主公从池中选(取第一个),其他人依次分配
@@ -107,17 +108,13 @@ export const 选将: AtomDefinition<{
     const selected = lord ? [lord, ...others.slice(0, playerCount - 1)] : others.slice(0, playerCount);
 
     // 更新玩家武将和技能
-    const players = state.players.map((p, i) => {
+    for (let i = 0; i < state.players.length; i++) {
       const char = selected[i];
-      if (!char) return p;
-      return {
-        ...p,
-        character: char.name,
-        skills: [...char.skills, ...DEFAULT_SKILLS],
-      };
-    });
-
-    return { ...state, players };
+      if (!char) continue;
+      const p = state.players[i];
+      p.character = char.name;
+      p.skills = [...char.skills, ...DEFAULT_SKILLS];
+    }
   },
 };
 
@@ -134,19 +131,13 @@ export const 初始化洗牌: AtomDefinition<{
     const rng = createRng(atom.seed);
     const allCards = shuffle(createStandardDeck(), rng);
 
-    const cardMap: GameState['cardMap'] = {};
-    const deckIds: string[] = [];
+    state.cardMap = {};
+    state.zones.deck.length = 0;
     for (const card of allCards) {
-      cardMap[card.id] = card;
-      deckIds.push(card.id);
+      state.cardMap[card.id] = card;
+      state.zones.deck.push(card.id);
     }
-
-    return {
-      ...state,
-      cardMap,
-      zones: { ...state.zones, deck: deckIds },
-      rngSeed: atom.seed,
-    };
+    state.rngSeed = atom.seed;
   },
 };
 
@@ -168,20 +159,15 @@ export const 发牌: AtomDefinition<{
   apply(state, atom) {
     const { handSize, lordBonus = 1 } = atom;
     let cursor = 0;
-    const players = state.players.map(p => {
-      const isLord = p.vars.身份 === '主公';
+    for (const p of state.players) {
+      const isLord = p.vars['身份'] === '主公';
       const bonus = isLord ? lordBonus : 0;
       const drawCount = handSize + bonus;
-      const hand = [...p.hand, ...state.zones.deck.slice(cursor, cursor + drawCount)];
+      const drawn = state.zones.deck.slice(cursor, cursor + drawCount);
+      p.hand.push(...drawn);
       cursor += drawCount;
-      return { ...p, hand };
-    });
-
-    return {
-      ...state,
-      players,
-      zones: { ...state.zones, deck: state.zones.deck.slice(cursor) },
-    };
+    }
+    state.zones.deck = state.zones.deck.slice(cursor);
   },
 };
 

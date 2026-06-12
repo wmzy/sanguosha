@@ -1,6 +1,6 @@
 // src/engine/atoms/回合开始.ts
 // 回合开始:事件标记(具体状态变更由前置 apply 处理)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 回合开始: AtomDefinition<{ player: string }> = {
@@ -9,7 +9,9 @@ export const 回合开始: AtomDefinition<{ player: string }> = {
     if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
     return null;
   },
-  apply(state) { return { ...state }; },
+  apply(_state) {
+    // 事件标记——具体状态变更由前置 apply 处理
+  },
   effect: { sound: 'turn_start', duration: 200 },
 };
 

@@ -1,6 +1,6 @@
 // src/engine/atoms/设横置.ts
 // 设横置:设置玩家横置状态(简化为加/去 'chained' mark)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 设横置: AtomDefinition<{ player: string; chained: boolean }> = {
@@ -11,16 +11,11 @@ export const 设横置: AtomDefinition<{ player: string; chained: boolean }> = {
   },
   apply(state, atom) {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== pIdx) return p;
-        const without = p.marks.filter(m => m.id !== 'chained');
-        return atom.chained
-          ? { ...p, marks: [...without, { id: 'chained', scope: p.index }] }
-          : { ...p, marks: without };
-      }),
-    };
+    const player = state.players[pIdx];
+    player.marks = player.marks.filter(m => m.id !== 'chained');
+    if (atom.chained) {
+      player.marks.push({ id: 'chained', scope: player.index });
+    }
   },
 };
 

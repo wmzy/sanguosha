@@ -1,6 +1,6 @@
 // src/engine/atoms/失去体力.ts
 // 失去体力:target 玩家失去 amount 体力(不进入濒死流程——纯事件)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 失去体力: AtomDefinition<{ target: string; amount: number }> = {
@@ -14,14 +14,10 @@ export const 失去体力: AtomDefinition<{ target: string; amount: number }> = 
   },
   apply(state, atom) {
     const tIdx = state.players.findIndex(p => p.name === atom.target);
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== tIdx) return p;
-        const newHealth = Math.max(0, p.health - atom.amount);
-        return { ...p, health: newHealth, alive: newHealth > 0 };
-      }),
-    };
+    const target = state.players[tIdx];
+    const newHealth = Math.max(0, target.health - atom.amount);
+    target.health = newHealth;
+    target.alive = newHealth > 0;
   },
   effect: { sound: 'lose_health', animation: 'shake', duration: 300 },
 };

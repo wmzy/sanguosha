@@ -1,5 +1,5 @@
 // src/engine/atoms/摸牌.ts
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 摸牌: AtomDefinition<{ player: string; count: number }> = {
@@ -14,15 +14,8 @@ export const 摸牌: AtomDefinition<{ player: string; count: number }> = {
   apply(state, atom) {
     const idx = state.players.findIndex(p => p.name === atom.player);
     const drawn = state.zones.deck.slice(-atom.count).reverse();
-    const newDeck = state.zones.deck.slice(0, -atom.count);
-    const newHand = [...state.players[idx].hand, ...drawn];
-    return {
-      ...state,
-      zones: { ...state.zones, deck: newDeck },
-      players: state.players.map((p, i) =>
-        i === idx ? { ...p, hand: newHand } : p,
-      ),
-    };
+    state.zones.deck = state.zones.deck.slice(0, -atom.count);
+    state.players[idx].hand.push(...drawn);
   },
   effect: { sound: 'draw', animation: 'slide', duration: 200 },
 };

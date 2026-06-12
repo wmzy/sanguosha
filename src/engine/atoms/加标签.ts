@@ -1,6 +1,6 @@
 // src/engine/atoms/加标签.ts
 // 加标签:为玩家加 tag(实现为 mark id='tag:<name>')
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 加标签: AtomDefinition<{ player: string; tag: string }> = {
@@ -11,14 +11,9 @@ export const 加标签: AtomDefinition<{ player: string; tag: string }> = {
   },
   apply(state, atom) {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== pIdx) return p;
-        if (p.marks.some(m => m.id === `tag:${atom.tag}`)) return p;
-        return { ...p, marks: [...p.marks, { id: `tag:${atom.tag}`, scope: p.index }] };
-      }),
-    };
+    const player = state.players[pIdx];
+    if (player.marks.some(m => m.id === `tag:${atom.tag}`)) return;
+    player.marks.push({ id: `tag:${atom.tag}`, scope: player.index });
   },
 };
 

@@ -1,5 +1,5 @@
 // src/engine/atoms/击杀.ts
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 击杀: AtomDefinition<{ player: string }> = {
@@ -10,8 +10,8 @@ export const 击杀: AtomDefinition<{ player: string }> = {
     if (p.alive) return 'player still alive';
     return null;
   },
-  apply(state, atom) {
-    return { ...state };  // 击杀本身不修改 state,只是事件标记
+  apply(_state, _atom) {
+    // 击杀本身不修改 state,只是事件标记
   },
   effect: { sound: 'death', animation: 'fade', duration: 1000 },
 };

@@ -1,6 +1,6 @@
 // src/engine/atoms/判定.ts
 // 判定:事件标记(具体判定结果由后端随机 + 钩子处理)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 判定: AtomDefinition<{ player: string; judgeType: string }> = {
@@ -9,7 +9,9 @@ export const 判定: AtomDefinition<{ player: string; judgeType: string }> = {
     if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
     return null;
   },
-  apply(state) { return { ...state }; },
+  apply(_state) {
+    // 事件标记——具体判定结果由后端随机 + 钩子处理
+  },
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 600 },
 };
 

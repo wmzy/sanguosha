@@ -1,6 +1,6 @@
 // src/engine/atoms/拼点.ts
 // 拼点:事件标记(拼点结果由后端 + 钩子处理)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 拼点: AtomDefinition<{
@@ -12,7 +12,9 @@ export const 拼点: AtomDefinition<{
     if (!state.players.find(p => p.name === atom.target)) return `target not found`;
     return null;
   },
-  apply(state) { return { ...state }; },
+  apply(_state) {
+    // 事件标记——拼点结果由后端 + 钩子处理
+  },
   effect: { sound: 'pindian', animation: 'flip', duration: 800 },
 };
 

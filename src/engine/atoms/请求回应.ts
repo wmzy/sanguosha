@@ -14,7 +14,9 @@ export const 请求回应: AtomDefinition<{
     if (!state.players.find(p => p.name === atom.target)) return `target not found`;
     return null;
   },
-  apply(state) { return { ...state }; },
+  apply(_state) {
+    // 等待型 atom——apply 不修改 state
+  },
   pending: {
     onTimeout: { type: '无操作' },
     prompt: { type: 'confirm', title: '请回应' },

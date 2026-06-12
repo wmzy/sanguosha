@@ -1,6 +1,6 @@
 // src/engine/atoms/装备.ts
 // 装备:玩家装备 cardId(从手牌移除,放入 equipment 槽位)
-import type { AtomDefinition, EquipSlot, GameState } from '../types';
+import type { AtomDefinition, EquipSlot } from '../types';
 import { registerAtom } from '../atom';
 
 function inferSlot(cardType: string | undefined): EquipSlot | null {
@@ -30,14 +30,9 @@ export const 装备: AtomDefinition<{ player: string; cardId: string }> = {
     const pIdx = state.players.findIndex(p => p.name === atom.player);
     const card = state.cardMap[atom.cardId];
     const slot = inferSlot(card.subtype)!;
-    return {
-      ...state,
-      players: state.players.map((p, i) => {
-        if (i !== pIdx) return p;
-        const hand = p.hand.filter(id => id !== atom.cardId);
-        return { ...p, hand, equipment: { ...p.equipment, [slot]: atom.cardId } };
-      }),
-    };
+    const player = state.players[pIdx];
+    player.hand = player.hand.filter(id => id !== atom.cardId);
+    player.equipment[slot] = atom.cardId;
   },
 };
 

@@ -1,6 +1,6 @@
 // src/engine/atoms/阶段结束.ts
 // 阶段结束:事件标记
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 阶段结束: AtomDefinition<{ player: string; phase: string }> = {
@@ -9,7 +9,9 @@ export const 阶段结束: AtomDefinition<{ player: string; phase: string }> = {
     if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
     return null;
   },
-  apply(state) { return { ...state }; },
+  apply(_state) {
+    // 事件标记
+  },
   effect: { sound: 'phase_end', duration: 150 },
 };
 

@@ -1,6 +1,6 @@
 // src/engine/atoms/设阶段.ts
 // 设阶段:直接覆盖 state.phase
-import type { AtomDefinition, GameState, TurnPhase } from '../types';
+import type { AtomDefinition, TurnPhase } from '../types';
 import { registerAtom } from '../atom';
 
 export const 设阶段: AtomDefinition<{ phase: TurnPhase }> = {
@@ -11,7 +11,8 @@ export const 设阶段: AtomDefinition<{ phase: TurnPhase }> = {
     return null;
   },
   apply(state, atom) {
-    return { ...state, phase: atom.phase, turn: { ...state.turn, phase: atom.phase } };
+    state.phase = atom.phase;
+    state.turn.phase = atom.phase;
   },
 };
 

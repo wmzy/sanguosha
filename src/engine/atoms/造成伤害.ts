@@ -1,5 +1,5 @@
 // src/engine/atoms/造成伤害.ts
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 造成伤害: AtomDefinition<{
@@ -17,12 +17,8 @@ export const 造成伤害: AtomDefinition<{
     const targetIdx = state.players.findIndex(p => p.name === atom.target);
     const target = state.players[targetIdx];
     const newHealth = Math.max(0, target.health - atom.amount);
-    return {
-      ...state,
-      players: state.players.map((p, i) =>
-        i === targetIdx ? { ...p, health: newHealth, alive: newHealth > 0 } : p,
-      ),
-    };
+    target.health = newHealth;
+    target.alive = newHealth > 0;
   },
   effect: { sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 400 },
 };

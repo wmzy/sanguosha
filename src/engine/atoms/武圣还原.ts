@@ -1,7 +1,7 @@
 // src/engine/atoms/武圣还原.ts
 // 武圣还原:把 _wrapper 中的原始属性恢复(name/suit),删除 _wrapper
 // (in-place mutation,保持与既有实现兼容)
-import type { AtomDefinition, GameState } from '../types';
+import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 武圣还原: AtomDefinition<{ cardId: string }> = {
@@ -23,7 +23,6 @@ export const 武圣还原: AtomDefinition<{ cardId: string }> = {
       card.suit = card._wrapper.origSuit as typeof card.suit;
       delete card._wrapper;
     }
-    return state;
   },
 };
 
