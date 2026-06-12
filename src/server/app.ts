@@ -20,7 +20,7 @@ import {
 } from './room';
 import { GameSession } from './session';
 import { createLogger } from './logger';
-import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreToState } from './persistence';
+import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
 // 新 ENGINE-DESIGN 不再需要 protocol-adapter(回应 action 走 ClientMessage 直接 dispatch)
 
@@ -95,7 +95,7 @@ async function restorePersistedRooms(): Promise<void> {
         await deletePersistedRoom(roomId);
         continue;
       }
-      const state = restoreToState(persisted);
+      const state = restoreFromLog(persisted);
       // 兼容新旧 GameState 格式
       if (!state.players || !Array.isArray(state.players)) {
         log.info(`房间 ${roomId} 数据格式不兼容,跳过`);

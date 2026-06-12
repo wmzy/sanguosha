@@ -234,7 +234,10 @@ export function _pendingWriteCount(): number {
   return pendingTimers.size;
 }
 
-export function restoreToState(persisted: PersistedRoom): GameState {
-  // 直接返回持久化的 state,真正的重放由 GameSession 调新 createEngine().dispatch() 完成
+/** 从持久化日志恢复 state:返回最新一份 state 快照。
+ * 持久化文件里 actionLog 与 state 都被保存 —— state 是 actionLog replay 出来的最终结果。
+ * 这里返回 state 即可,GameSession 会用 state.seed / state.players 等直接接管。
+ * (未来若需要"从头 replay 验证"再扩展:用 create + bootstrap + 逐条 dispatch。) */
+export function restoreFromLog(persisted: PersistedRoom): GameState {
   return persisted.state;
 }
