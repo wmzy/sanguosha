@@ -20,9 +20,10 @@ describe('create(gameConfig) — 端到端开局', () => {
     };
     const state = await create(config);
 
-    // state 有 3 个玩家(对应 3 个角色)
+    // state 有 3 个玩家(对应 3 个角色;顺序由选将 atom 决定,不可假设)
     expect(state.players).toHaveLength(3);
-    expect(state.players.map(p => p.character).sort()).toEqual(['刘备', '曹操', '孙权']);
+    const assignedCharacters = new Set(state.players.map(p => p.character));
+    expect(assignedCharacters).toEqual(new Set(['刘备', '曹操', '孙权']));
 
     // 主公已确定(由 抽身份 atom 决定)
     const lord = state.players.find(p => p.vars['身份'] === '主公');
@@ -35,8 +36,8 @@ describe('create(gameConfig) — 端到端开局', () => {
       expect(p.hand.length).toBe(expected);
     }
 
-    // 牌堆有牌(被摸了 13 张,108 - 13 = 95)
-    expect(state.zones.deck.length).toBe(108 - (4 * 3 + 1));  // 4 张 × 3 人 + 1 张主公奖励
+    // 牌堆有牌(被摸了 13 张,103 - 13 = 90)
+    expect(state.zones.deck.length).toBe(103 - (4 * 3 + 1));  // 4 张 × 3 人 + 1 张主公奖励
 
     // 状态进入第一个回合(主公 回合开始 / 阶段开始 已 apply)
     expect(state.currentPlayerIndex).toBe(0);

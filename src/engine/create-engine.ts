@@ -38,7 +38,7 @@ import {
 } from './skill';
 import { createEngineApi, type EngineContext } from './engine-api';
 import { clearEvents } from './event-stream';
-import { module_开局 } from './skills/开局';
+import * as module_开局 from './skills/开局';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
 // 必须 import 来注册所有 skill 模块(武将技能/装备技能) —— 否则 rebootstrap 在
@@ -118,7 +118,7 @@ export async function create(gameConfig: GameConfig): Promise<GameState> {
   // action,不依赖任何 state.players[i].skills 列表 —— 否则 dispatch 找不到入口。
   const syntheticSkill = { id: '开局', ownerId: '主公', name: '开局', description: 'system skill' };
   const systemApi = makeBackendAPI(syntheticSkill);
-  if (!module_开局.onInit) throw new Error('开局 skill 缺少 onInit 实现');
+
   module_开局.onInit(syntheticSkill, systemApi);
 
   // 预创建 playerCount 个空玩家槽位。开局 skill 的 抽身份/选将/发牌 atom 依赖
