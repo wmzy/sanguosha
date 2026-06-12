@@ -33,12 +33,17 @@ import { buildView as buildViewImpl } from './view/buildView';
 import {
   clearAllSkillInstances,
   findActionEntry,
+  makeBackendAPI,
   rebootstrap as skillRebootstrap,
 } from './skill';
 import { createEngineApi, type EngineContext } from './engine-api';
 import { clearEvents } from './event-stream';
+import { module_开局 } from './skills/开局';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
+// 必须 import 来注册所有 skill 模块(武将技能/装备技能) —— 否则 rebootstrap 在
+// 遍历 state.players[i].skills 时会抛 "Skill module X not registered"。
+import './skills';
 
 export interface DispatchResult {
   error?: string;
@@ -109,7 +114,36 @@ function getViewerIndex(state: GameState, ownerName: string): number {
  * 创建一个新游戏:建 state → dispatch 开局 start → rebootstrap → 返回 state。
  */
 export async function create(gameConfig: GameConfig): Promise<GameState> {
-  const state = createGameState({ players: [], cardMap: {} });
+  // 系统技能(如 开局)在 rebootstrap 之前手动实例化:它们的 onInit 注册全局可用的
+  // action,不依赖任何 state.players[i].skills 列表 —— 否则 dispatch 找不到入口。
+  const syntheticSkill = { id: '开局', ownerId: '主公', name: '开局', description: 'system skill' };
+  const systemApi = makeBackendAPI(syntheticSkill);
+  if (!module_开局.onInit) throw new Error('开局 skill 缺少 onInit 实现');
+  module_开局.onInit(syntheticSkill, systemApi);
+
+  // 预创建 playerCount 个空玩家槽位。开局 skill 的 抽身份/选将/发牌 atom 依赖
+  // state.players 非空来分配身份/武将/手牌 —— 但这些 atom 自己不创建 slots,
+  // 而 rebootstrap 又是 dispatch 完才跑(那时才真正有玩家名 / 技能)。
+  // 用临时名 'player-0' / 'player-1' ... 占位,开局 skill 跑完后这些名会被实际
+  // 选将流程替换为角色名(state.players[i].character),但 name 字段保持不变。
+  const playerCount = Math.max(2, Math.min(8, gameConfig.playerCount));
+  const stubPlayers = Array.from({ length: playerCount }, (_, i) => ({
+    index: i,
+    name: `player-${i}`,
+    character: '',
+    health: 4,
+    maxHealth: 4,
+    alive: true,
+    hand: [] as string[],
+    equipment: {},
+    skills: [] as string[],
+    vars: {} as Record<string, Json>,
+    marks: [],
+    pendingTricks: [],
+    judgeZone: [] as string[],
+  }));
+
+  const state = createGameState({ players: stubPlayers, cardMap: {} });
   ensureStateShape(state);
   state.startedAt = Date.now();
   const params = { ...gameConfig } as Record<string, Json>;
