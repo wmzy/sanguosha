@@ -412,6 +412,9 @@ export interface PendingSlot {
   startTime: number;
   deadline: number;
   resolve: () => void;
+  /** 内部:由 engine-api 在创建 pending 时挂上,供 engine.fireTimeout 立即触发 onTimeout。
+   *  属于引擎内部钩子,不属于 PendingSlot 对外契约(下划线前缀 + 可选)。 */
+  _fireTimeoutNow?: () => Promise<void>;
 }
 // ==================== 协议 ====================
 

@@ -57,6 +57,8 @@ export interface EngineInstance {
   rebootstrap(): void;
   /** 获取当前 state(只读) */
   getState(): GameState;
+  /** 测试用:立即触发当前 pending 的 onTimeout(模拟超时,绕过真实 setTimeout) */
+  fireTimeout(): Promise<DispatchResult>;
 }
 
 
@@ -270,7 +272,22 @@ export function createEngine(): EngineInstance {
     }
   }
 
-  return { dispatch, buildView: (viewer) => buildView(currentState, viewer), resetForTest, bootstrap, rebootstrap, getState };
+  async function fireTimeout(): Promise<DispatchResult> {
+    const slot = currentState.pendingSlot;
+    if (!slot) return { state: currentState };
+
+    await slot._fireTimeoutNow?.();
+    if (activeExecuteP) await activeExecuteP;
+    if (activeExecuteCtx) currentState = activeExecuteCtx.state;
+    activeExecuteCtx = undefined;
+    activeExecuteP = undefined;
+
+    // seq 不递增(不是 ClientMessage)
+    const { gameOver, winner } = checkGameOver();
+    return { state: currentState, gameOver, winner };
+  }
+
+  return { dispatch, buildView: (viewer) => buildView(currentState, viewer), resetForTest, bootstrap, rebootstrap, getState, fireTimeout };
 }
 
 function getViewerIndex(state: GameState, ownerName: string): number {

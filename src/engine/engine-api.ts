@@ -165,16 +165,20 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
           }
           ctx.state = { ...ctx.state, pendingSlot: slot };
 
-          // 引擎内部管理超时定时器(必填——onTimeout 必填)
-          const timer = setTimeout(async () => {
+          // 提取 timer 回调为可复用函数,挂到 slot._fireTimeoutNow 供测试立即触发
+          const fireTimeoutNow = async (): Promise<void> => {
             // 仅当此 slot 仍是当前 slot 时才 fire(避免旧 slot 残留触发)
-            if (ctx.state.pendingSlot === slot) {
-              ctx.state = { ...ctx.state, pendingSlot: undefined };
-              // 执行 onTimeout atom
-              await api.apply(pending.onTimeout);
-            }
+            if (ctx.state.pendingSlot !== slot) return;
+            clearTimeout(timer);
+            ctx.state = { ...ctx.state, pendingSlot: undefined };
+            // 执行 onTimeout atom
+            await api.apply(pending.onTimeout);
             safeResolve();
-          }, timeoutMs);
+          };
+          slot._fireTimeoutNow = fireTimeoutNow;
+
+          // 引擎内部管理超时定时器(必填——onTimeout 必填)
+          const timer = setTimeout(fireTimeoutNow, timeoutMs);
 
           // 通知 dispatch:帧已抵达挂起点,可以返回当前 state
           ctx.fireDispatchReady();
