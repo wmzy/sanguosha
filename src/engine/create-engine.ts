@@ -18,26 +18,17 @@ import type {
   EngineApi,
   GameState,
   GameView,
-  Skill,
+  Json,
 } from './types';
 import { createGameState } from './types';
 import { buildView } from './view/buildView';
 import {
   clearAllSkillInstances,
   findActionEntry,
-  getSkillModule,
-  makeBackendAPI,
-  setRuntimeApi,
-  setSkillInstanceUnload,
+  rebootstrap as skillRebootstrap,
 } from './skill';
 import { createEngineApi, type EngineContext } from './engine-api';
 import { clearEvents } from './event-stream';
-
-/** 从 pending atom 中提取等待目标玩家。所有内置等待型 atom 都有 target 字段 */
-function extractPendingTarget(atom: import('./types').Atom): string {
-  if ('target' in atom && typeof atom.target === 'string') return atom.target;
-  return '';
-}
 
 export interface DispatchResult {
   state: GameState;
@@ -61,42 +52,30 @@ export interface EngineInstance {
   fireTimeout(): Promise<DispatchResult>;
 }
 
-
+/** 从 pending atom 中提取等待目标玩家 */
+function extractPendingTarget(atom: { type: string } & Record<string, unknown>): string {
+  if ('target' in atom && typeof atom.target === 'string') return atom.target;
+  return '';
+}
 
 export function createEngine(): EngineInstance {
   let currentState: GameState;
 
   function bootstrap(state: GameState): GameState {
     state = ensureStateShape(state);
-    // 设置 startedAt
     if (!state.startedAt) {
       state = { ...state, startedAt: Date.now() };
     }
     currentState = state;
-    for (const player of state.players) {
-      for (const skillId of player.skills) {
-        instantiateSkill(skillId, player.name);
-      }
-    }
+    skillRebootstrap(state);
     return state;
-  }
-
-  function instantiateSkill(skillId: string, ownerId: string): Skill {
-    const module = getSkillModule(skillId);
-    const skill = module.createSkill(skillId, ownerId);
-    if (module.onInit) {
-      const api = makeBackendAPI(skill);
-      const unload = module.onInit(skill, api);
-      setSkillInstanceUnload(skillId, ownerId, typeof unload === 'function' ? unload : () => {});
-    }
-    return skill;
   }
 
   /** 构造 EngineApi(每次 dispatch 调用创建一个新的) */
   function makeApi(
     state: GameState,
     self: string,
-    messageParams: Record<string, import('./types').Json>,
+    messageParams: Record<string, Json>,
     fireDispatchReady: () => void,
   ): { api: EngineApi; ctx: EngineContext } {
     const ctx: EngineContext = { state, self, messageParams, fireDispatchReady };
@@ -104,9 +83,8 @@ export function createEngine(): EngineInstance {
     return { api, ctx };
   }
 
-  // 当前活跃的 execute 上下文、api 和 Promise(供回应路径读取原始 execute 的 state)
+  // 当前活跃的 execute 上下文和 Promise(供回应路径读取原始 execute 的 state)
   let activeExecuteCtx: EngineContext | undefined;
-  let activeExecuteApi: EngineApi | undefined;
   let activeExecuteP: Promise<void> | undefined;
 
   /** 检查游戏是否结束 */
@@ -137,8 +115,7 @@ export function createEngine(): EngineInstance {
     // === 回应路径(已有 pending slot) ===
     if (currentState.pendingSlot) {
       const slot = currentState.pendingSlot;
-      // 提取 pending atom 的 target 字段(没有 getTarget 了——每个 waiting atom 都自带 target)
-      const target = extractPendingTarget(slot.atom);
+      const target = extractPendingTarget(slot.atom as { type: string } & Record<string, unknown>);
       if (message.ownerId !== target) {
         return { state: currentState };
       }
@@ -151,18 +128,18 @@ export function createEngine(): EngineInstance {
         if (err === null) {
           // 构造 api,执行回应 action
           const { api, ctx } = makeApi(currentState, message.ownerId, { ...message.params }, () => {});
-          setRuntimeApi(api);
           await entry.execute(api);
-          // 恢复原始 execute 的 runtimeApi(让原始 execute 从 pending 恢复后能继续调用 api.apply)
-          if (activeExecuteApi) {
-            setRuntimeApi(activeExecuteApi);
-          } else {
-            setRuntimeApi(null);
-          }
           // 回应 action 也可能修改 state,同步到主 ctx
           if (activeExecuteCtx) {
             activeExecuteCtx.state = ctx.state;
           }
+        }
+      } else {
+        // 无匹配 entry(如 confirm/distribute):merge message.params 到 topFrame,
+        // 让原始 execute 恢复后能通过 ctx.params 读到回应数据
+        const frame = currentState.settlementStack[currentState.settlementStack.length - 1];
+        if (frame) {
+          Object.assign(frame.params, message.params);
         }
       }
       // 消费 pending slot — 这会让原始 execute 从 await 恢复
@@ -228,11 +205,8 @@ export function createEngine(): EngineInstance {
     );
     currentState = ctx.state;
     activeExecuteCtx = ctx;
-    activeExecuteApi = api;
-    setRuntimeApi(api);
     const executeP = entry.execute(api)
       .finally(() => {
-        setRuntimeApi(null);
         // 从 engine api 读取最新 state
         currentState = ctx.state;
         // 触发 dispatchReady(如果 execute 在没有 pending 的情况下完成)
@@ -265,11 +239,7 @@ export function createEngine(): EngineInstance {
   }
 
   function rebootstrap(): void {
-    for (const player of currentState.players) {
-      for (const skillId of player.skills) {
-        instantiateSkill(skillId, player.name);
-      }
-    }
+    skillRebootstrap(currentState);
   }
 
   async function fireTimeout(): Promise<DispatchResult> {
@@ -277,10 +247,31 @@ export function createEngine(): EngineInstance {
     if (!slot) return { state: currentState };
 
     await slot._fireTimeoutNow?.();
-    if (activeExecuteP) await activeExecuteP;
+    // _fireTimeoutNow resolve pending → execute 恢复。execute 可能:
+    //   (a) 直接完成 → activeExecuteP resolve
+    //   (b) 进入新 pending → activeExecuteCtx.state.pendingSlot 被设置
+    // Promise.race:先到先得。setInterval(0) 轮询检测新 pending(execute 恢复是异步的)。
+    if (activeExecuteP && activeExecuteCtx) {
+      await Promise.race([
+        activeExecuteP,
+        new Promise<void>((resolve) => {
+          const timer = setInterval(() => {
+            if ((activeExecuteCtx!.state as GameState).pendingSlot) {
+              clearInterval(timer);
+              resolve();
+            }
+          }, 0);
+          // execute 先完成时清理 timer
+          activeExecuteP!.then(() => clearInterval(timer));
+        }),
+      ]);
+    }
     if (activeExecuteCtx) currentState = activeExecuteCtx.state;
-    activeExecuteCtx = undefined;
-    activeExecuteP = undefined;
+    // 仅当 execute 完全结束时才清理上下文
+    if (!currentState.pendingSlot) {
+      activeExecuteCtx = undefined;
+      activeExecuteP = undefined;
+    }
 
     // seq 不递增(不是 ClientMessage)
     const { gameOver, winner } = checkGameOver();

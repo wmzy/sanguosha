@@ -462,7 +462,6 @@ export interface AtomHookEntry {
 
 /**
  * BackendAPI:onInit 时传给技能模块的句柄。提供 registerAction/onAtomBefore/onAtomAfter。
- * apply/notify 是转发到当前引擎的 EngineApi(避免 onInit 阶段调用——见 skill.ts)。
  */
 export interface BackendAPI {
   /** ownerId(per player instance) */
@@ -481,8 +480,6 @@ export interface BackendAPI {
     atomType: string,
     handler: (ctx: AtomAfterContext) => Promise<void>,
   ): () => void;
-  apply(atom: Atom): Promise<void>;
-  notify(event: NotifyEvent): void;
 }
 
 export interface FrontendAPI {

@@ -4,8 +4,8 @@ import type {
   ActionEntry,
   AtomHookEntry,
   BackendAPI,
-  EngineApi,
   FrontendAPI,
+  GameState,
   Skill,
 } from './types';
 
@@ -117,16 +117,6 @@ export function clearAllSkillInstances(): void {
 
 // ─── 给 skill 的 BackendAPI ────────────────────────────────
 
-/**
- * 运行时引擎 API 槽位。create-engine.ts 在调用 execute/hooks 前设置,调用后清除。
- * BackendAPI.apply/notify 从这里转发到真实 EngineApi。
- */
-let _runtimeApi: EngineApi | null = null;
-
-export function setRuntimeApi(api: EngineApi | null): void {
-  _runtimeApi = api;
-}
-
 export function makeBackendAPI(skill: Skill): BackendAPI {
   return {
     self: skill.ownerId,
@@ -148,13 +138,28 @@ export function makeBackendAPI(skill: Skill): BackendAPI {
       registerHook('after', entry);
       return () => removeHook('after', entry);
     },
-    apply(atom) {
-      if (!_runtimeApi) throw new Error('api.apply 只能在 execute 或钩子中调用');
-      return _runtimeApi.apply(atom);
-    },
-    notify(event) {
-      if (!_runtimeApi) throw new Error('api.notify 只能在 execute 或钩子中调用');
-      _runtimeApi.notify(event);
-    },
   };
+}
+
+// ─── bootstrap / rebootstrap ────────────────────────────────
+
+/** 遍历 state.players,给每个 skill 调 onInit 注册实例(并保存 unload) */
+export function rebootstrap(state: GameState): void {
+  for (const player of state.players) {
+    for (const skillId of player.skills) {
+      instantiateSkill(skillId, player.name);
+    }
+  }
+}
+
+/** 内部 helper:实例化单个 skill(从 create-engine bootstrap / rebootstrap 提取) */
+function instantiateSkill(skillId: string, ownerId: string): Skill {
+  const module = getSkillModule(skillId);
+  const skill = module.createSkill(skillId, ownerId);
+  if (module.onInit) {
+    const api = makeBackendAPI(skill);
+    const unload = module.onInit(skill, api);
+    setSkillInstanceUnload(skillId, ownerId, typeof unload === 'function' ? unload : () => {});
+  }
+  return skill;
 }
