@@ -57,18 +57,18 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
         params: params ? { ...params } : {},
         cards: [],
       };
-      ctx.state = pushFrame(ctx.state, frame);
+      ctx.state.settlementStack.push(frame);
       return frame;
     },
     popFrame(): void {
-      ctx.state = popFrame(ctx.state);
+      if (ctx.state.settlementStack.length > 0) ctx.state.settlementStack.pop();
     },
     topFrame(): SettlementFrame | undefined {
       return topFrame(ctx.state);
     },
     async apply(atom: Atom): Promise<void> {
       droppedCurrent = false;
-      ctx.state = { ...ctx.state, atomStack: [...ctx.state.atomStack, atom] };
+      ctx.state.atomStack.push(atom);
 
       // before hooks
       const beforeHooks = getBeforeHooks(atom.type);
@@ -89,7 +89,7 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
       }
 
       if (droppedCurrent) {
-        ctx.state = { ...ctx.state, atomStack: ctx.state.atomStack.slice(0, -1) };
+        ctx.state.atomStack.pop();
         droppedCurrent = false;
         return;
       }
@@ -98,12 +98,12 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
       const def = getAtomDef(atom.type);
       const error = def.validate(ctx.state, atom);
       if (error !== null) {
-        ctx.state = { ...ctx.state, atomStack: ctx.state.atomStack.slice(0, -1) };
+        ctx.state.atomStack.pop();
         return;
       }
 
       // apply(纯函数,新 state)
-      ctx.state = applyAtom(ctx.state, atom);
+      applyAtom(ctx.state, atom);
 
       // emit atom event
       const views = resolvePlayerViews(ctx.state, atom);
@@ -111,7 +111,7 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
 
       // 判定 atom 特殊:apply 阶段把牌堆顶牌移入目标玩家 judgeZone
       if (atom.type === '判定') {
-        ctx.state = moveJudgeCardToZone(ctx.state, atom);
+        moveJudgeCardToZone(ctx.state, atom);
       }
 
       // after hooks
@@ -132,11 +132,11 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
       }
 
       // 弹栈
-      ctx.state = { ...ctx.state, atomStack: ctx.state.atomStack.slice(0, -1) };
+      ctx.state.atomStack.pop();
 
       // 判定 atom 收尾:把目标 judgeZone 顶部牌移入弃牌堆
       if (atom.type === '判定') {
-        ctx.state = cleanupJudgeZone(ctx.state, atom);
+        cleanupJudgeZone(ctx.state, atom);
       }
 
       // pending?
@@ -161,16 +161,16 @@ export function createEngineApi(ctx: EngineContext): EngineApi {
           // 等待替换语义:新 wait 入 slot 前,旧 slot 直接 resolve(不 fire onTimeout)
           if (ctx.state.pendingSlot) {
             ctx.state.pendingSlot.resolve();
-            ctx.state = { ...ctx.state, pendingSlot: undefined };
+            ctx.state.pendingSlot = undefined;
           }
-          ctx.state = { ...ctx.state, pendingSlot: slot };
+          ctx.state.pendingSlot = slot;
 
           // 提取 timer 回调为可复用函数,挂到 slot._fireTimeoutNow 供测试立即触发
           const fireTimeoutNow = async (): Promise<void> => {
             // 仅当此 slot 仍是当前 slot 时才 fire(避免旧 slot 残留触发)
             if (ctx.state.pendingSlot !== slot) return;
             clearTimeout(timer);
-            ctx.state = { ...ctx.state, pendingSlot: undefined };
+            ctx.state.pendingSlot = undefined;
             // 执行 onTimeout atom
             await api.apply(pending.onTimeout);
             safeResolve();
@@ -200,43 +200,23 @@ function topFrame(state: GameState): SettlementFrame | undefined {
   return state.settlementStack[state.settlementStack.length - 1];
 }
 
-function pushFrame(state: GameState, frame: SettlementFrame): GameState {
-  return { ...state, settlementStack: [...state.settlementStack, frame] };
-}
-
-function popFrame(state: GameState): GameState {
-  if (state.settlementStack.length === 0) return state;
-  return { ...state, settlementStack: state.settlementStack.slice(0, -1) };
-}
-
 /** 兜底空帧(atom apply 时无帧场景——启动器/无 action execute 直接 apply 的情况) */
 function emptyFrame(): SettlementFrame {
   return { skillId: '', from: '', params: Object.freeze({}), cards: [] };
 }
 
-/** 判定 atom:apply 后从牌堆顶翻一张到目标玩家 judgeZone */
-function moveJudgeCardToZone(state: GameState, atom: { player: string; judgeType: string }): GameState {
-  if (state.zones.deck.length === 0) return state;
-  const topCardId = state.zones.deck[0];
-  return {
-    ...state,
-    zones: { ...state.zones, deck: state.zones.deck.slice(1) },
-    players: state.players.map((p) =>
-      p.name === atom.player ? { ...p, judgeZone: [...p.judgeZone, topCardId] } : p,
-    ),
-  };
+/** 判定 atom:apply 后从牌堆顶翻一张到目标玩家 judgeZone(原地变更) */
+function moveJudgeCardToZone(state: GameState, atom: { player: string; judgeType: string }): void {
+  if (state.zones.deck.length === 0) return;
+  const topCardId = state.zones.deck.shift()!;
+  const target = state.players.find((p) => p.name === atom.player);
+  if (target) target.judgeZone.push(topCardId);
 }
 
-/** 判定 atom 收尾:after 链跑完后,把目标 judgeZone 顶部牌移入弃牌堆 */
-function cleanupJudgeZone(state: GameState, atom: { player: string; judgeType: string }): GameState {
+/** 判定 atom 收尾:after 链跑完后,把目标 judgeZone 顶部牌移入弃牌堆(原地变更) */
+function cleanupJudgeZone(state: GameState, atom: { player: string; judgeType: string }): void {
   const target = state.players.find((p) => p.name === atom.player);
-  if (!target || target.judgeZone.length === 0) return state;
-  const topId = target.judgeZone[target.judgeZone.length - 1];
-  return {
-    ...state,
-    zones: { ...state.zones, discardPile: [...state.zones.discardPile, topId] },
-    players: state.players.map((p) =>
-      p.name === atom.player ? { ...p, judgeZone: p.judgeZone.slice(0, -1) } : p,
-    ),
-  };
+  if (!target || target.judgeZone.length === 0) return;
+  const topId = target.judgeZone.pop()!;
+  state.zones.discardPile.push(topId);
 }
