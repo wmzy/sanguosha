@@ -1,6 +1,6 @@
 # create-engine 重构设计
 
-> 把 `createEngine()` 从"闭包工厂 + 不可变 state + 实例方法"重构为"句柄(state)+ 顶层函数 + 原地变更 state",贴近 skill 模块的"create 工厂 + 顶层注册"模式。
+> 把 `createEngine()` 从"闭包工厂 + 不可变 state + 实例方法"重构为"`create(gameConfig) → GameState` + 顶层函数 + 原地变更 state",贴近 skill 模块的"create 工厂 + 顶层注册"模式。`create` 返回的对象本身就是 state(纯数据),不包 wrapper。
 
 **日期**: 2026-06-12
 **状态**: 设计完成,待用户 review
@@ -58,8 +58,8 @@ import { createGameState } from './types';
 import { rebootstrap, clearAllSkillInstances } from './skill';
 import { clearEvents } from './event-stream';
 
+/** Dispatch 纯元数据结果(不含 state——调用方已持引用,直接读 state 即可) */
 export interface DispatchResult {
-  state: GameState;
   error?: string;
   gameOver?: boolean;
   winner?: string;
@@ -73,10 +73,11 @@ export interface GameConfig {
   handSize?: number;
 }
 
-/** 创建新游戏:空 state → dispatch 开局 start → rebootstrap → 返回 */
-export async function create(gameConfig: GameConfig): Promise<{ state: GameState; result: DispatchResult }>;
+/** 创建新游戏:空 state → dispatch 开局 start → rebootstrap → 返回 state 本身
+ *  内部若 dispatch 出错则 throw(开局是必经流程,失败即抛) */
+export async function create(gameConfig: GameConfig): Promise<GameState>;
 
-/** 主 / 回应 dispatch */
+/** 主 / 回应 dispatch(state 原地变更;返回元数据) */
 export async function dispatch(state: GameState, msg: ClientMessage): Promise<DispatchResult>;
 
 /** 构造玩家视图 */
@@ -85,11 +86,11 @@ export function buildView(state: GameState, viewer: number): GameView;
 /** 立即触发 pending 的 onTimeout(测试用) */
 export async function fireTimeout(state: GameState): Promise<DispatchResult>;
 
-/** 重置 skill 实例表 + event stream + 创建新 state */
-export function resetForTest(state: GameState): void;
+/** 重置 skill 实例表 + event stream */
+export function resetForTest(): void;
 ```
 
-`state` 是常规可变 `GameState` 对象。函数不持有任何闭包状态(除模块级 `activeExecuteP`)。
+`state` 是常规可变 `GameState` 对象。`create` 返回的就是 state 本身——没有 `EngineInstance` 包装,没有 `{ state, result }` 包装。函数不持有任何闭包状态(除模块级 `activeExecuteP`)。
 
 ### 2.2 `rebootstrap` 在 `skill.ts`
 
@@ -140,35 +141,34 @@ notify(event) { _runtimeApi.notify(event); }     // 删
 
 ```ts
 // session.startGame
-const { state, result } = await create(gameConfig);
-this.state = state;
+this.state = await create(gameConfig);
 this.sendInitialViewToAll();
 ```
 
 `create` 内部:
 1. `state = createGameState({ players: [], cardMap: {} })` — 工厂建空 state
 2. `ensureStateShape(state)`(原地补缺失字段);`state.startedAt = Date.now()`
-3. `result = await dispatch(state, { skillId: '开局', actionType: 'start', ownerId: '主公', params: gameConfig, baseSeq: 0 })` —— 开局 start 跑 atom 流程(抽身份/选将/洗牌/发牌/回合开始),期间产生新 players
+3. `await dispatch(state, { skillId: '开局', actionType: 'start', ownerId: '主公', params: gameConfig, baseSeq: 0 })` —— 开局 start 跑 atom 流程(抽身份/选将/洗牌/发牌/回合开始),期间产生新 players
 4. `rebootstrap(state)` —— 给所有 players(包括选将生成的新 players)注册 skill 实例
-5. 返回 `{ state, result }`
+5. `return state`
 
 ### 3.2 单次 dispatch(主动 action)
 
 ```ts
 const result = await dispatch(state, msg);
+// result 只含 error / gameOver / winner
+// state 已被原地变更,直接读 state.players 即可
 ```
 
 内部:
 1. 找 action entry(`findActionEntry`);若 `actionType === 'use'` 且 card 为装备牌,fallback 到 `装备通用`
-2. `entry.validate(view, msg.params)` 校验
+2. `entry.validate(view, msg.params)` 校验(失败返回 `{ error }`)
 3. 创建 `EngineApi`(新 `EngineContext { state, self: msg.ownerId, messageParams, fireDispatchReady }`)
 4. 启动 `entry.execute(api)` 作为 promise,赋值给模块级 `activeExecuteP`
 5. 等待 `dispatchReady` promise(挂起 / 完成都触发)
-6. 同步 `activeExecuteP` 完成
-7. 同步 `state.seq += 1`;记 actionLog;检查 gameOver
-8. 返回 `{ state, gameOver, winner }`
-
-注意:`state.seq += 1` 现在是**原地变更**(以前是 `{ ...state, seq: state.seq + 1 }`)。
+6. `await activeExecuteP` 等原始 execute 完成
+7. 原地 `state.seq += 1`;记 actionLog;检查 gameOver
+8. 返回 `{ gameOver, winner }`(若有)
 
 ### 3.3 回应 action 路径
 
@@ -178,14 +178,14 @@ const result = await dispatch(state, responseMsg);
 ```
 
 内部:
-1. 检查 `state.pendingSlot` 存在
+1. 检查 `state.pendingSlot` 存在;若不在,等同主动 action 路径
 2. 检查 `responseMsg.ownerId === pending.atom.target`
 3. 找回应 action entry,`entry.validate`
 4. 创新 `EngineApi` 跑 `entry.execute(api)`(可能 nested apply)
 5. 由于 `state` 是引用,所有变更**自动**反映到原始 execute 看到的 `ctx.state`
 6. `state.pendingSlot.resolve()` 解除挂起
 7. `await activeExecuteP` 等原始 execute 完成
-8. 同步 seq / logAction / checkGameOver,返回
+8. 原地 `state.seq += 1`;记 actionLog;检查 gameOver;返回
 
 **关键简化**:以前要 `activeExecuteCtx.state = ctx.state` 同步 state;现在原地变更,不需要。
 
@@ -193,8 +193,7 @@ const result = await dispatch(state, responseMsg);
 
 ```ts
 // session.restoreFromLog(gameConfig, actionLog)
-const { state } = await create(gameConfig);
-this.state = state;
+this.state = await create(gameConfig);
 for (const log of actionLog) {
   // actionLog[0] 是开局的 start(create 已执行),跳过
   if (log.message.skillId === '开局' && log.message.actionType === 'start') continue;
@@ -218,13 +217,13 @@ await session.restoreFromLog(
 
 | 旧 API | 新 API |
 |---|---|
-| `createEngine(): EngineInstance` | `create(gameConfig): Promise<{ state, result }>` |
+| `createEngine(): EngineInstance` | `create(gameConfig): Promise<GameState>` |
 | `engine.dispatch(msg)` | `dispatch(state, msg)` |
 | `engine.buildView(viewer)` | `buildView(state, viewer)` |
-| `engine.getState()` | `state`(直接读)或 `readState(state)`(为对称) |
+| `engine.getState()` | `state`(调用方直接读) |
 | `engine.bootstrap(s)` | 删除(并入 `create`) |
 | `engine.rebootstrap()` | `rebootstrap(state)`(`skill.ts` 顶层) |
-| `engine.resetForTest()` | `resetForTest(state)` |
+| `engine.resetForTest()` | `resetForTest()`(模块级单例清空,无 state 参数) |
 | `engine.fireTimeout()` | `fireTimeout(state)` |
 | `session.engine: EngineInstance` | `session.state: GameState` |
 | `session.restoreState(state, log)` | `session.restoreFromLog(gameConfig, log)` |
@@ -232,7 +231,7 @@ await session.restoreFromLog(
 | `harness.engine.buildView(idx)` | `buildView(harness.state, idx)` |
 | `harness.engine.getState()` | `harness.state` |
 | `harness.engine.fireTimeout()` | `fireTimeout(harness.state)` |
-| `harness.engine.resetForTest()` | `resetForTest(harness.state)` |
+| `harness.engine.resetForTest()` | `resetForTest()`(不接 state) |
 
 ---
 
@@ -308,7 +307,8 @@ export interface EngineContext {
 
 旧 `engine.getState(): GameState` 单纯返回闭包 `currentState`。新设计中 `state` 是调用方持有的变量,直接用即可。
 
-为保持对称可暴露一个 `readState(state): GameState`(`return state`),但不必要。
+`session.ts:135` 处的 `const curState = this.engine.getState();` 直接改为读 `this.state`。
+`session.ts:147, 172, 178, 195, 234, 239, 274, 290, 298, 319` 等多处同理。
 
 ### 5.6 `ensureStateShape` 改为原地
 
@@ -383,18 +383,35 @@ export function createTestEngine(): EngineInstance {
   return createEngine({ skills: allSkills });
 }
 
-// 改后
-export async function createTestGame(): Promise<{ state: GameState; result: DispatchResult }> {
-  return create({ characters: allCharacters, playerCount: 2, seed: 42, gameId: 'test' });
+// 改后(同步 helper,用于不要开局的场景——单纯 bootstrap state + 注册 skills)
+export function setupTestState(state: GameState): void {
+  resetForTest();
+  rebootstrap(state);
+}
+
+// 异步 helper,用于要完整开局流程的场景
+export async function createTestGame(opts: { characters: string[]; seed?: number } = {}): Promise<GameState> {
+  const characters = opts.characters.map(name => allCharacterMap[name]).filter(Boolean);
+  return create({ characters, playerCount: characters.length, seed: opts.seed ?? 42, gameId: 'test' });
 }
 ```
 
-(详细函数体可保留原 `createTestGame(opts)` 形态,内部改为 `await create(...)`。)
+注意:`createTestEngine` 旧签名 `createEngine({ skills: allSkills })` 传 `skills` 字段(把 skills 当 config 传)其实是 broken——新 `createEngine()` 不接 config;旧 `engine-isolation.test.ts` 因此 0 通过。本 spec 不修复 `engine-isolation.test.ts`(见 6.5)。
 
 ### 6.4 新增审计(可选,本 spec 不强制)
 
 - 审计所有 atom 是否只用 `mulberry32(state.rngSeed)`,不出现 `Math.random()` / `Date.now()`(除 `startedAt` / `actionLog.timestamp`)
 - 审计所有 skill 的 `onInit` / `onAtomBefore` / `onAtomAfter` 中是否有 `api.apply` 之外的 state 修改路径(应该没有)
+
+### 6.5 `tests/integration/engine-isolation.test.ts` 特殊处理
+
+该文件测试的是**旧** `createEngine` 的 per-instance hook 隔离特性(`.hooks` / `.clearForTest()`),新设计是单 engine、模块级 hook,该特性**不存在了**。
+
+处理方式:
+- **删除** 该测试文件(本 spec 范围外再加对应的新隔离测试)
+- 或**改写**为测试新设计的"单 engine 串行"假设下的 hook 行为(全局注册 / 全部可见;`resetForTest` 清空全局)
+
+本 spec 采用**删除**。理由:旧 per-instance 隔离本身在多 engine 假设不成立时已无意义,且代码库当前已有大量测试在 `_legacy/` 跑(已知 broken 状态),不在这堆里再加新 broken。
 
 ---
 
@@ -405,13 +422,15 @@ export async function createTestGame(): Promise<{ state: GameState; result: Disp
 | **43 个 atom 改 mutation 工作量大** | 机械工作,逐文件改;保留 validate 不动;每改一个跑全量测试 |
 | **state 引用稳定性变化**:React 端可能有 `useMemo([state])` 缓存 | 客户端不做本次范围,留 issue 跟进;契约层 `state` 引用创建时不变,后续 mutate |
 | **replay 失败**:某个 atom 用 `Date.now()` 等非种子源,replay 出不同 state | spec 6.4 审计;若发现,改为读 `state.rngSeed` 派生 |
-| **`session.restoreFromLog` 跳过开局 start**:依赖 actionLog 顺序 | 显式 `if` 判断,加注释 + 测试覆盖 |
+| **`session.restoreFromLog` 跳过开局 start**:依赖 actionLog 顺序 | 显式 `if` 判断,加注释 + 测试覆盖(验收 9 列入) |
 | **`create` 是 async**:调用方 `await` 必要 | `session.startGame` 本来就 async,无回归 |
 | **`activeExecuteP` 模块级导致多 engine 串行** | 当前 usage 单 engine,接受;真要并行单独开 ADR |
-| **`skill.ts` / `event-stream` 仍是模块级**:vitest 单线程 OK,但跨测试文件仍共享 | `resetForTest` 清两端;新测试用 `beforeEach` 调 |
+| **`skill.ts` / `event-stream` 仍是模块级**:vitest 单线程 OK,但跨测试文件仍共享 | `resetForTest()` 不接参数,清两端;新测试用 `beforeEach` 调 |
 | **`app.ts:117` 改 `restoreFromLog` 时装配 gameConfig** | 需要从 `PersistedRoom.players` 重新组装 `characters` 数组(从 `CharacterConfig` 查 skills);现有 `restoreToState` 旁路即可删除 |
 | **client 端 stale closure** | 本次不动;后续 React 组件按需 `useEffect` 监听 state 引用 |
 | **破坏性 `EngineInstance` 删**:外部调用全部要改 | `git mv` 旧 `create-engine.ts` → `create-engine.legacy.ts`,新文件 `create-engine.ts` 直接替换;一次性 commit 后 build / test 全绿 |
+| **`engine-isolation.test.ts` 删除** | 该文件本来就是 broken(测试旧 per-instance API,新 create-engine.ts 无 `.hooks`/`.clearForTest`),不影响 154 个已失败的 test 集合;按 6.5 删 |
+| **`createTestEngine`/`createTestGame` helper 改名** | 仅 `engine-isolation.test.ts` 调用,后者已删;helper 改 `setupTestState` / `createTestGame` 无外部冲突 |
 
 ---
 
@@ -420,24 +439,30 @@ export async function createTestGame(): Promise<{ state: GameState; result: Disp
 1. **底层先动**:`atom.ts` 改 `applyAtom → void`、`AtomDefinition.apply → void` 类型签名(全 43 个 atom 同步改 mutation)
 2. **`engine-api.ts` 改**:接收 state、原地变更、`activeExecuteP` 模块级
 3. **`skill.ts` 改**:删 runtimeApi、新增 `rebootstrap(state)`、缩 `BackendAPI`
-4. **`create-engine.ts` 重写**:顶层函数 + `create(gameConfig)` + `dispatch(state, msg)` + 其他
-5. **`session.ts` 改**:删 `engine`,改 `state`;`startGame` 走 `create`;`restoreState` 改 `restoreFromLog`
-6. **`app.ts` 改**:装配 `gameConfig` 给 `restoreFromLog`
-7. **`tests/engine-harness.ts` + `tests/engine-helpers.ts` 改**
-8. **6 个 integration test 改**
-9. **全量测试 + typecheck + lint**
-10. **写 ADR 记录这次重构**
+4. **`create-engine.ts` 重写**:顶层函数 + `create(gameConfig): Promise<GameState>` + `dispatch(state, msg)` + 其他
+5. **`session.ts` 改**:删 `engine`,改 `state`;`startGame` 走 `await create(gameConfig)`;`restoreState` 改 `restoreFromLog`
+6. **`app.ts` 改**:装配 `gameConfig` 给 `restoreFromLog`,删 `restoreToState` 旁路
+7. **删 `tests/integration/engine-isolation.test.ts`**
+8. **`tests/engine-harness.ts` + `tests/engine-helpers.ts` 改**
+9. **6 个 integration test 改**
+10. **全量测试 + typecheck + lint**
+11. **写 ADR `0027-create-engine-refactor.md` 并 commit**
 
 ---
 
 ## 9. 验收标准
 
 - [ ] `pnpm typecheck` 通过(0 错误)
-- [ ] `pnpm test` 全量通过(所有 unit + integration + skill-tests)
+- [ ] `pnpm test` 全量通过(所有 unit + integration + skill-tests,排除本 spec 6.5 明确删除的 `engine-isolation.test.ts`)
 - [ ] `pnpm lint` 通过
-- [ ] `createEngine` / `EngineInstance` / `setRuntimeApi` / `_runtimeApi` / `Bootstrap` 函数 0 引用(`grep` 验证)
-- [ ] `create(gameConfig)` 一次调用产生完整可玩 state(主公选将完成 + 4 张起始手牌)
-- [ ] `restoreFromLog(gameConfig, actionLog)` 产生与原始 session 等价的 state
+- [ ] 旧 API 0 引用:
+  - `grep -rn "createEngine\b" src tests --include="*.ts"` 仅命中 `docs/` / `tests/_legacy/` 引用与本 spec 后续要做的替换
+  - `grep -rn "EngineInstance\b" src tests --include="*.ts"` 0 命中
+  - `grep -rn "setRuntimeApi\|_runtimeApi" src --include="*.ts"` 0 命中
+  - `grep -rn "BackendAPI" src --include="*.ts"` 仅命中 `skill.ts` 的接口定义(不命中 `apply/notify`)
+- [ ] `create(gameConfig)` 一次调用产生完整可玩 state(主公选将完成 + 4 张起始手牌),写 1 个 e2e 测试覆盖
+- [ ] `restoreFromLog(gameConfig, actionLog)` 产生与原始 session 等价的 state,写 1 个 integration test 覆盖
 - [ ] 所有 43 个 atom 的 `apply` 返回 `void`(`tsc` 强制)
-- [ ] 至少 1 个 integration test 覆盖 `restoreFromLog` 路径(避免 skip 开局 start 的回归)
-- [ ] ADR 写好并 commit
+- [ ] 至少 1 个 integration test 覆盖 `restoreFromLog` 跳过开局 start 的回归(显式 `if` 判断)
+- [ ] ADR 写好并 commit 到 `docs/decisions/0027-create-engine-refactor.md`
+- [ ] `engine-isolation.test.ts` 已删除(per 6.5)
