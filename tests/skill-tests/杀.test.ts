@@ -31,7 +31,9 @@ function makePlayer(opts: { index: number; name: string; hand: string[]; skills:
 
 describe('杀', () => {
   let harness: SkillTestHarness;
-  beforeEach(() => { harness = new SkillTestHarness(); });
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
 
   it('P1 对 P2 出杀,P2 不出闪 → P2 扣 1 血', async () => {
     harness.setup(buildState());
