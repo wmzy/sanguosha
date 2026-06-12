@@ -10,7 +10,11 @@ export const 询问杀: AtomDefinition<{ target: string; source: string }> = {
     return null;
   },
   apply(state) { return { ...state }; },
-  pending: { getTarget: (atom) => (atom as { target: string }).target },
+  pending: {
+    onTimeout: { type: '无操作' },
+    prompt: { type: 'useCard', title: '是否出杀', cardFilter: { filter: c => c.name === '杀', min: 1, max: 1 } },
+    timeout: 15,
+  },
   effect: { sound: 'slash_request', blockUntilDone: true, duration: 200 },
 };
 

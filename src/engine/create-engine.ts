@@ -32,7 +32,12 @@ import {
 } from './skill';
 import { createEngineApi, type EngineContext } from './engine-api';
 import { clearEvents } from './event-stream';
-import { topFrame } from './settlement';
+
+/** 从 pending atom 中提取等待目标玩家。所有内置等待型 atom 都有 target 字段 */
+function extractPendingTarget(atom: import('./types').Atom): string {
+  if ('target' in atom && typeof atom.target === 'string') return atom.target;
+  return '';
+}
 
 export interface DispatchResult {
   state: GameState;
@@ -127,21 +132,13 @@ export function createEngine(): EngineInstance {
   }
 
   async function dispatch(message: ClientMessage): Promise<DispatchResult> {
-    const frame = topFrame(currentState);
-
     // === 回应路径(已有 pending slot) ===
     if (currentState.pendingSlot) {
       const slot = currentState.pendingSlot;
-      const target = slot.definition.pending?.getTarget
-        ? slot.definition.pending.getTarget(slot.atom)
-        : '';
+      // 提取 pending atom 的 target 字段(没有 getTarget 了——每个 waiting atom 都自带 target)
+      const target = extractPendingTarget(slot.atom);
       if (message.ownerId !== target) {
         return { state: currentState };
-      }
-
-      // 合并回应 params 到 topFrame.params
-      if (frame) {
-        frame.params = { ...frame.params, ...message.params, __responder: message.ownerId };
       }
 
       // 尝试找到对应的 action entry
@@ -159,6 +156,10 @@ export function createEngine(): EngineInstance {
             setRuntimeApi(activeExecuteApi);
           } else {
             setRuntimeApi(null);
+          }
+          // 回应 action 也可能修改 state,同步到主 ctx
+          if (activeExecuteCtx) {
+            activeExecuteCtx.state = ctx.state;
           }
         }
       }

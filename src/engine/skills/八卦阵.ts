@@ -1,5 +1,6 @@
 // src/engine/skills/八卦阵.ts
 // 八卦阵(防具技):当你需要出闪时,判定:若为红色则等效于出闪
+// 新设计:不加标签 + 不调 drop——八卦阵只 set 标记,父 action 询问闪后观察 state 决定扣血
 import type { AtomBeforeContext, BackendAPI, Skill } from '../types';
 import { registerSkillModule, type SkillModule } from '../skill';
 
@@ -27,10 +28,12 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const judgeCardId = self.judgeZone[self.judgeZone.length - 1];
     const judgeCard = ctx.state.cardMap[judgeCardId];
     if (judgeCard && (judgeCard.suit === '♥' || judgeCard.suit === '♦')) {
-      // 红色:等效出闪 — 阻止询问闪执行
-      ctx.api.drop();
+      // 红色:加 autoDodge 标签(实际存为 mark:tag:八卦阵/autoDodge)
+      // 杀.execute 在观察弃牌堆无闪时检查此标记
+      // (询问闪继续走完 validate/apply,进入 pending;若用户最终未出闪则 autoDodge 生效)
+      await ctx.api.apply({ type: '加标签', player: api.self, tag: '八卦阵/autoDodge' });
     }
-    // 黑色:不生效,继续正常询问闪(等用户出闪)
+    // 黑色:不做事,继续等用户出闪
   });
   return () => {};
 }

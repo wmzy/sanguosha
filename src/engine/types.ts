@@ -57,6 +57,9 @@ export interface PlayerState {
   skills: string[];
   vars: Record<string, Json>;
   marks: Mark[];
+  /** 标签集合——轻量无 payload 标记(如 '八卦阵/autoDodge'),通过 加标签/去标签 atom 维护。
+   *  可选:未设置时引擎视同空数组(由 createGameState 兜底) */
+  tags?: string[];
   /** 判定区:当前正在被判定中的牌 ID 列表(顶端最新) */
   judgeZone: string[];
 }
@@ -89,6 +92,13 @@ export interface GameState {
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
 export function createGameState(partial: Partial<GameState> & { players: PlayerState[]; cardMap: Record<string, Card> }): GameState {
+  // 兜底:为缺失 tags 字段的 players 补默认值
+  const players = partial.players.map((p): PlayerState => {
+    if (p.tags) return p;
+    const { tags: _ignored, ...rest } = p as PlayerState & { tags?: string[] };
+    void _ignored;
+    return { ...rest, tags: [] };
+  });
   return {
     currentPlayerIndex: 0,
     phase: '准备',
@@ -105,6 +115,7 @@ export function createGameState(partial: Partial<GameState> & { players: PlayerS
     startedAt: 0,
     actionLog: [],
     ...partial,
+    players,
   };
 }
 
@@ -175,16 +186,16 @@ export interface ChoosePlayerPrompt {
 
 // ==================== Atom ====================
 
-/** Atom 等待配置(pending)。有此字段 = 等待型 atom。apply 流程走完后进 pending 区。 */
+/** Atom 等待配置(pending)。有此字段 = 等待型 atom。apply 流程走完后进 pending 区。
+ * 等待型 atom 不可被取消——必走完(响应/超时)之一(没有 drop 机制)。
+ * `timeout` 与 `onTimeout` 都是必填,无合理默认值。*/
 export interface AtomPending {
-  /** 获取等待目标玩家 */
-  getTarget?: (atom: unknown) => string;
-  /** 超时后的行为：一个 atom，和普通 apply 一样压栈执行。不设 = 什么都不做 */
-  onTimeout?: Atom;
-  /** 前端提示（告诉前端渲染什么 UI） */
-  prompt?: ActionPrompt;
-  /** 超时毫秒。不设 = 引擎默认值（30 秒） */
-  timeout?: number;
+  /** 超时后的行为:一个 atom,和普通 apply 一样压栈执行。**必填**——典型 `{ type: '无操作' }` */
+  onTimeout: Atom;
+  /** 前端提示(告诉前端渲染什么 UI) */
+  prompt: ActionPrompt;
+  /** 超时毫秒。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s */
+  timeout: number;
 }
 
 export interface AtomEffect {
@@ -258,9 +269,13 @@ export type Atom =
   | { type: '发牌'; handSize: number; lordBonus?: number }
   | { type: '判定'; player: string; judgeType: string }
   // 等待回应
+  | { type: '无操作' }
   | { type: '询问闪'; target: string; source: string }
   | { type: '询问杀'; target: string; source: string }
-  | { type: '请求回应'; requestType: string; target: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number };
+  | { type: '请求回应'; requestType: string; target: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
+  // 牌包装(武圣转化)
+  | { type: '武圣包装'; cardId: string }
+  | { type: '武圣还原'; cardId: string };
 
 
 export interface AtomDefinition<A = unknown> {
@@ -297,7 +312,11 @@ export interface GameView {
 
 /**
  * 引擎 API:由 createEngine 内部生成,挂在 hook 上下文中供技能调用。
- * 技能通过 pushFrame 创建帧;apply 变更状态;drop 取消当前 atom;notify 推送事件。
+ * 技能通过 pushFrame 创建帧;apply 变更状态;notify 推送事件。
+ *
+ * **临时过渡**:`drop()` 仍存在,仅供 6 个防具/武器 skill(仁王盾/寒冰剑/护甲/白银狮子/藤甲/酒)
+ * 在 before 钩子中调整伤害量(damage 调整是组合问题,需要更深的重构)。
+ * 新代码不要再调用 `drop()`——等待型 atom 不可被取消,必走完(响应/超时)之一(见 §4.4)。
  */
 export interface EngineApi {
   /** 当前 GameState(只读快照) */
@@ -314,7 +333,10 @@ export interface EngineApi {
   topFrame(): SettlementFrame | undefined;
   /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到回应/超时 */
   apply(atom: Atom): Promise<void>;
-  /** 取消当前正在 apply 栈上的 atom(在 before 钩子中调用),随后 apply 流程跳过该 atom */
+  /**
+   * 取消当前正在 apply 栈上的 atom(在 before 钩子中调用),随后 apply 流程跳过该 atom。
+   * @deprecated 临时过渡,见接口 JSDoc。新代码不应使用。
+   */
   drop(): void;
   /** 推送 notify 事件(不改变 state) */
   notify(event: NotifyEvent): void;
@@ -326,6 +348,8 @@ export interface AtomBeforeContext {
   atom: Atom;
   self: string;
   api: EngineApi;
+  /** 当前结算帧(只读) */
+  readonly frame: SettlementFrame;
   /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
   readonly params: Record<string, Json>;
 }
@@ -335,6 +359,8 @@ export interface AtomAfterContext {
   atom: Atom;
   self: string;
   api: EngineApi;
+  /** 当前结算帧(只读) */
+  readonly frame: SettlementFrame;
   /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
   readonly params: Record<string, Json>;
 }
@@ -359,13 +385,21 @@ export interface PendingView {
 
 /**
  * 结算帧:execute 本地状态。
- * 帧是纯数据——所有"操作"通过 EngineApi(apply/drop/notify)进行。
+ * 帧是纯数据——所有"操作"通过 EngineApi(apply/notify)进行。
  * 技能通过 api.pushFrame 创建并压入 settlementStack;技能负责 api.popFrame 配对弹出。
+ *
+ * `params` 原则上只读(在 pushFrame 时初始化一次,后续不允许修改)。
+ * 跨 atom 通信(尤其是父 action 读 respond 结果)走 state 观察(zones/tags/marks/localVars),
+ * 不通过此字段。
+ *
+ * **临时过渡**:目前 TS 未强制 readonly——旧 skill 仍通过 mutation 写 __Xxx 字段。
+ * 新 skill 应通过 state 观察(stage B 后续统一改造时再改 readonly)。
  */
 export interface SettlementFrame {
   skillId: string;
   from: string;
-  /** execute 本地状态,跨 atom 共享(settlement 标记、跨帧中间结果) */
+  /** execute 本地初始参数(跨 atom 共享的配置,如 cardId/targets 列表)。
+   *  pushFrame 时初始化一次。**原则上只读**——新代码不要 mutate。 */
   params: Record<string, Json>;
   /** 处理区(此帧涉及的牌 ID 列表) */
   cards: string[];

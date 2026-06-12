@@ -1,6 +1,6 @@
 // src/engine/atoms/请求回应.ts
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
-import type { ActionPrompt, AtomDefinition, GameState, Json } from '../types';
+import type { ActionPrompt, AtomDefinition, Json } from '../types';
 import { registerAtom } from '../atom';
 
 export const 请求回应: AtomDefinition<{
@@ -8,7 +8,6 @@ export const 请求回应: AtomDefinition<{
   target: string;
   prompt: ActionPrompt;
   defaultChoice?: Json;
-  timeout?: number;
 }> = {
   type: '请求回应',
   validate(state, atom) {
@@ -17,7 +16,8 @@ export const 请求回应: AtomDefinition<{
   },
   apply(state) { return { ...state }; },
   pending: {
-    getTarget: (atom) => (atom as { target: string }).target,
+    onTimeout: { type: '无操作' },
+    prompt: { type: 'confirm', title: '请回应' },
     timeout: 30,
   },
   effect: { blockUntilDone: true, duration: 200 },

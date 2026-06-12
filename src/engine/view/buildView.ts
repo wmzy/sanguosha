@@ -39,8 +39,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         : slot.atom.type === '询问杀'
         ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
         : { type: 'confirm' as const, title: '请回应' });
-    const target = def.pending?.getTarget
-      ? def.pending.getTarget(slot.atom)
+    const target = 'target' in slot.atom && typeof slot.atom.target === 'string'
+      ? slot.atom.target
       : '';
     pending = {
       type: 'awaits',
