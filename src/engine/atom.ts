@@ -23,8 +23,8 @@ export function getAtomDef(type: string): AtomDefinition {
   return def;
 }
 
-export function applyAtom(state: GameState, atom: Atom): GameState {
-  return getAtomDef(atom.type).apply(state, atom);
+export function applyAtom(state: GameState, atom: Atom): void {
+  getAtomDef(atom.type).apply(state, atom);
 }
 
 export function resolvePlayerViews(

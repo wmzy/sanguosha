@@ -281,7 +281,7 @@ export type Atom =
 export interface AtomDefinition<A = unknown> {
   type: string;
   validate(state: GameState, atom: A): string | null;
-  apply(state: GameState, atom: A): GameState;
+  apply(state: GameState, atom: A): void;
   pending?: AtomPending;
   toPlayerViews?(state: GameState, atom: A): AtomPlayerViews | undefined;
   effect?: AtomEffect;
