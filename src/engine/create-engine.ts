@@ -2,11 +2,16 @@
 // 引擎主入口(顶层函数,无闭包)。
 //
 // 主要导出:
-//   - create(gameConfig): 建 state → dispatch 开局 start → rebootstrap → 返回 state
+//   - create(gameConfig): 同步建 state(预创建 playerCount 个空玩家槽位),返回骨架 state
+//   - bootstrap(state, gameConfig): 异步 —— 加载 开局 skill → onInit → dispatch 开局 start → rebootstrap
 //   - dispatch(state, msg): 接受 state,执行 client message
 //   - buildView(state, viewer): 接受 state,返回 view
 //   - fireTimeout(state): 触发 pending slot 的 onTimeout
 //   - resetForTest(): 模块级清空(skill instances + events + activeExecuteP)
+//
+// create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
+// 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
+// 完成了开局,不需要再 dispatch 开局 start。
 //
 // 两种 dispatch 路径:
 //   1) 主动 action(无 pending slot):→ 调用 entry.execute(api) → 技能内部 pushFrame →
@@ -33,12 +38,10 @@ import { buildView as buildViewImpl } from './view/buildView';
 import {
   clearAllSkillInstances,
   findActionEntry,
-  makeBackendAPI,
   rebootstrap as skillRebootstrap,
 } from './skill';
 import { createEngineApi, type EngineContext } from './engine-api';
 import { clearEvents } from './event-stream';
-import * as module_开局 from './skills/开局';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
 // 必须 import 来注册所有 skill 模块(武将技能/装备技能) —— 否则 rebootstrap 在
@@ -111,21 +114,16 @@ function getViewerIndex(state: GameState, ownerName: string): number {
 // ==================== 公开 API ====================
 
 /**
- * 创建一个新游戏:建 state → dispatch 开局 start → rebootstrap → 返回 state。
+ * 同步创建一个新游戏的骨架 state:建 playerCount 个空玩家槽位 + 初始 state shape。
+ * 不会触发任何 dispatch / 初始化流程 —— 那是 bootstrap 的事。
+ *
+ * 调用模式:
+ *   const state = create(config);
+ *   await bootstrap(state, config);  // 触发 开局 start action
+ *
+ * 这样解耦的好处:restore 路径可以从 actionLog replay 出来一个 state,直接使用,不需要 bootstrap。
  */
-export async function create(gameConfig: GameConfig): Promise<GameState> {
-  // 系统技能(如 开局)在 rebootstrap 之前手动实例化:它们的 onInit 注册全局可用的
-  // action,不依赖任何 state.players[i].skills 列表 —— 否则 dispatch 找不到入口。
-  const syntheticSkill = { id: '开局', ownerId: '主公', name: '开局', description: 'system skill' };
-  const systemApi = makeBackendAPI(syntheticSkill);
-
-  module_开局.onInit(syntheticSkill, systemApi);
-
-  // 预创建 playerCount 个空玩家槽位。开局 skill 的 抽身份/选将/发牌 atom 依赖
-  // state.players 非空来分配身份/武将/手牌 —— 但这些 atom 自己不创建 slots,
-  // 而 rebootstrap 又是 dispatch 完才跑(那时才真正有玩家名 / 技能)。
-  // 用临时名 'player-0' / 'player-1' ... 占位,开局 skill 跑完后这些名会被实际
-  // 选将流程替换为角色名(state.players[i].character),但 name 字段保持不变。
+export function create(gameConfig: GameConfig): GameState {
   const playerCount = Math.max(2, Math.min(8, gameConfig.playerCount));
   const stubPlayers = Array.from({ length: playerCount }, (_, i) => ({
     index: i,
@@ -146,6 +144,28 @@ export async function create(gameConfig: GameConfig): Promise<GameState> {
   const state = createGameState({ players: stubPlayers, cardMap: {} });
   ensureStateShape(state);
   state.startedAt = Date.now();
+  // 存 gameConfig 进 state(bootstrap 阶段需要,例如 开局 skill 可能直接读它)
+  // 实际 bootstrap 不需要 —— 它从 gameConfig 参数里读 —— 但存进 state 方便调试和 restore
+  (state as GameState & { _gameConfig?: GameConfig })._gameConfig = gameConfig;
+  return state;
+}
+
+/**
+ * 异步 bootstrap:在 state 上跑完开局流程。
+ *   1. 动态 import 开局 skill 模块
+ *   2. 调 开局.onInit(skill, state) 注册 start action
+ *   3. dispatch 开局 start → 跑完抽身份/选将/洗牌/发牌/启动第一回合
+ *   4. rebootstrap(state) 给每个 player 的 skills 注册实例
+ *
+ * restore 路径不调 bootstrap —— 直接用 replay 出来的 state 即可。
+ */
+export async function bootstrap(state: GameState, gameConfig: GameConfig): Promise<void> {
+  // 1. 动态 import 开局 skill 模块(其它 skill 在 ./skills 里,这里只需要开局)
+  const 开局 = await import('./skills/开局');
+  const syntheticSkill = 开局.createSkill('开局', '主公');
+  开局.onInit(syntheticSkill, state);
+
+  // 2. dispatch 开局 start
   const params = { ...gameConfig } as Record<string, Json>;
   const result = await dispatch(state, {
     skillId: '开局',
@@ -155,8 +175,9 @@ export async function create(gameConfig: GameConfig): Promise<GameState> {
     baseSeq: 0,
   });
   if (result.error) throw new Error(`开局失败: ${result.error}`);
-  rebootstrap(state);
-  return state;
+
+  // 3. 给每个 player 的 skills 注册实例(开局时玩家技能已通过 选将 atom 注入)
+  skillRebootstrap(state);
 }
 
 /**
@@ -168,7 +189,7 @@ export function rebootstrap(state: GameState): void {
 }
 
 /**
- * 执行一条 client message。state 必须由 create() 或外部构造好后传入。
+ * 执行一条 client message。state 必须由 create() + bootstrap() 或外部构造好后传入。
  */
 export async function dispatch(state: GameState, message: ClientMessage): Promise<DispatchResult> {
   // === 回应路径(已有 pending slot) ===

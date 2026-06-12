@@ -1,8 +1,17 @@
 // src/engine/skills/开局.ts
-// 开局技能:按三国杀身份局规则初始化游戏
+// 开局系统技能:按三国杀身份局规则初始化游戏
 // 1. 抽身份 → 2. 选将 → 3. 洗牌 → 4. 发牌 → 5. 启动第一回合
-import type { BackendAPI, EngineApi, Skill } from '../types';
-import { registerSkillModule, type SkillModule } from '../skill';
+//
+// 这是 system skill(非玩家技能),由 create-engine.bootstrap() 手动调用 onInit,
+// onInit 接受 (skill, gameState) 而非 BackendAPI,registerActionEntry / unregisterActionEntry
+// 直接从 skill.ts 模块导入。
+import type { ActionEntry, EngineApi, GameState, Skill } from '../types';
+import {
+  registerActionEntry,
+  unregisterActionEntry,
+  type SkillModule,
+} from '../skill';
+import { registerSkillModule } from '../skill';
 
 /** 开局配置 */
 interface GameConfig {
@@ -25,11 +34,13 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(_skill: Skill, api: BackendAPI): () => void {
-  api.registerAction(
-    'start',
-    () => null,
-    async (api: EngineApi) => {
+export function onInit(_skill: Skill, _state: GameState): () => void {
+  const entry: ActionEntry = {
+    skillId: '开局',
+    ownerId: '主公',
+    actionType: 'start',
+    validate: () => null,
+    execute: async (api: EngineApi) => {
       const config = api.params as unknown as GameConfig;
       const { characters, playerCount, seed, handSize = 4 } = config;
 
@@ -53,9 +64,13 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         await api.apply({ type: '阶段开始', player: lord.name, phase: '准备' });
       }
     },
-  );
-  return () => {};
+  };
+  registerActionEntry(entry);
+  return () => unregisterActionEntry('开局', '主公', 'start');
 }
 
-export const module_开局: SkillModule = { createSkill, onInit };
+// module_开局 不再走 SkillModule.onInit 路径 —— bootstrap() 直接调顶层 onInit。
+// 这里只暴露 createSkill 让 SkillModule 注册表能找到这个模块(其他代码可能仍按
+// SkillModule 接口查询),并保留 registerSkillModule 副作用以维持向后兼容。
+export const module_开局: SkillModule = { createSkill };
 registerSkillModule('开局', module_开局);

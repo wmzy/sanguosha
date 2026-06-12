@@ -1,13 +1,12 @@
 // src/server/session.ts
-// Session 只负责网络/持久化,游戏逻辑由引擎管理
+// Session 只负责网络/持久化,游戏逻辑由引擎管理(顶层函数 + state: GameState)
 import type {
   ActionLogEntry,
   ClientMessage as EngineClientMessage,
   GameState,
   GameView,
 } from '../engine/types';
-import { createGameState } from '../engine/types';
-import { createEngine, type EngineInstance } from '../engine/create-engine';
+import { create, bootstrap, dispatch, buildView, resetForTest, type GameConfig } from '../engine/create-engine';
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -32,7 +31,7 @@ const RECONNECT_GRACE_MS = 30_000;
 const IDLE_TIMEOUT_MS = 50_000;
 
 export class GameSession {
-  private engine: EngineInstance | null = null;
+  private state: GameState | null = null;
   private actionLog: ActionLogEntry[] = [];
   private room: Room;
   private debug: boolean;
@@ -46,6 +45,7 @@ export class GameSession {
   private destroyed = false;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private sessionSeed: number;
+  private logger = createLogger('session');
 
   constructor(room: Room, debug = false, sessionSeed?: number) {
     this.room = room;
@@ -55,12 +55,11 @@ export class GameSession {
     this.sessionSeed = sessionSeed ?? Date.now();
   }
 
+  /** 用持久化恢复的 state 接管(由 app.ts 从 actionLog replay 出来后传入) */
   restoreState(state: GameState, actionLog: ActionLogEntry[] = []): void {
     this.actionLog = actionLog;
     this.lastActivityAt = Date.now();
-    this.engine = createEngine();
-    this.engine.resetForTest();
-    this.engine.bootstrap(state);
+    this.state = state;
   }
 
   async startGame(playerCount?: number): Promise<boolean> {
@@ -68,32 +67,21 @@ export class GameSession {
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
 
-    // bootstrap 引擎(最小状态,只需要能运行 开局 技能)
-    this.engine = createEngine();
-    this.engine.bootstrap(createGameState({
-      players: [{ index: 0, name: '主公', character: '主公', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['开局'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] }],
-      cardMap: {},
-    }));
+    // 清空模块级状态(技能实例 + 事件流)以避免历史注册污染
+    resetForTest();
 
-    // dispatch 开局.start → 引擎内部 apply 初始化游戏 atom(抽角色、洗牌、发牌)
-    const result = await this.engine.dispatch({
-      skillId: '开局',
-      actionType: 'start',
-      ownerId: '主公',
-      params: {
-        characters: CHARACTERS,
-        playerCount: count,
-        seed: this.sessionSeed,
-        gameId: this.room.id,
-      },
-      baseSeq: 0,
-    });
-
-    // 初始化游戏后重新注册技能(新 players 需要注册自己的技能实例)
-    this.engine.rebootstrap();
+    // 调用 create + bootstrap 建好完整可玩 state:抽身份 + 选将 + 洗牌 + 发牌 + 启动第一回合
+    const config: GameConfig = {
+      characters: CHARACTERS,
+      playerCount: count,
+      seed: this.sessionSeed,
+      gameId: this.room.id,
+    };
+    this.state = create(config);
+    await bootstrap(this.state, config);
 
     // 建立 playerId → playerName 映射
-    const state = this.engine.getState();
+    const state = this.state;
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (!playerId) return false;
@@ -108,11 +96,12 @@ export class GameSession {
       }
     }
 
-    if (result.gameOver) {
-      this.handleGameOver(result.winner);
+    // 检查游戏是否开局时已结束(3 人场开不了,直接结束)
+    if (state.players.filter(p => p.alive).length <= 1) {
+      this.handleGameOver(undefined);
     }
 
-    this.actionLog = [];
+    this.actionLog = state.actionLog;
     this.lastActivityAt = Date.now();
 
     setRoomStatus(this.room.id, '进行中');
@@ -122,7 +111,7 @@ export class GameSession {
   }
 
   async handleAction(playerId: string, action: EngineClientMessage): Promise<void> {
-    if (this.destroyed || !this.engine) return;
+    if (this.destroyed || !this.state) return;
     // debug 模式:允许以任意角色名发 action
     // 非 debug 模式:校验 ownerId 必须匹配预期玩家
     const expectedName = this.playerNames.get(playerId);
@@ -132,20 +121,19 @@ export class GameSession {
       return;
     }
     // CAS 校验:baseSeq 不匹配则静默丢弃
-    const curState = this.engine.getState();
+    const curState = this.state;
     if (action.baseSeq !== undefined && action.baseSeq !== curState.seq) {
       return;
     }
 
-    const result = await this.engine.dispatch(action);
+    const result = await dispatch(this.state, action);
     if (result.error) {
       this.sendToPlayer(playerId, { type: 'error', message: result.error });
       return;
     }
 
     // 记录 actionLog(从引擎获取)
-    const state = this.engine.getState();
-    this.actionLog = state.actionLog;
+    this.actionLog = this.state.actionLog;
     this.lastActivityAt = Date.now();
     this.persistAsync();
     this.broadcastNewState();
@@ -165,34 +153,34 @@ export class GameSession {
 
 
   private broadcastNewState(): void {
-    if (!this.engine) return;
+    if (!this.state) return;
     if (this.debug) {
       // debug 模式:发给房间内所有连接的玩家(支持重连后新 playerId)
-      const view = this.engine.buildView(0);
-      const state = this.engine.getState();
+      const view = buildView(this.state, 0);
+      const state = this.state;
       for (const [pid] of this.room.players) {
         this.sendToPlayer(pid, { type: 'debugGameState', state: view, lastSeq: state.seq });
       }
       return;
     }
-    const state = this.engine.getState();
+    const state = this.state;
     for (const [playerId, playerName] of this.playerNames) {
       const playerIdx = state.players.findIndex(p => p.name === playerName);
       if (playerIdx < 0) continue;
-      const view = this.engine.buildView(playerIdx);
+      const view = buildView(state, playerIdx);
       this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
     }
   }
 
   private sendInitialViewToAll(): void {
-    if (!this.engine) return;
+    if (!this.state) return;
     this.broadcastNewState();
   }
 
   private sendDebugGameState(playerId: string, lastSeq?: number): void {
-    if (!this.engine) return;
-    const view = this.engine.buildView(0);
-    const state = this.engine.getState();
+    if (!this.state) return;
+    const view = buildView(this.state, 0);
+    const state = this.state;
     this.sendToPlayer(playerId, { type: 'debugGameState', state: view, lastSeq: lastSeq ?? state.seq });
   }
 
@@ -225,21 +213,21 @@ export class GameSession {
   }
 
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, _lastSeq = 0): boolean {
-    if (!this.engine) return false;
+    if (!this.state) return false;
     this.disconnectedAt.delete(playerId);
     this.clearGraceTimer();
     this.room.players.set(playerId, ws);
 
     if (this.debug) {
-      const state = this.engine.getState();
+      const state = this.state;
       this.sendDebugGameState(playerId, state.seq);
     } else {
       const playerName = this.playerNames.get(playerId);
       if (playerName) {
-        const state = this.engine.getState();
+        const state = this.state;
         const playerIdx = state.players.findIndex(p => p.name === playerName);
         if (playerIdx >= 0) {
-          const view = this.engine.buildView(playerIdx);
+          const view = buildView(state, playerIdx);
           this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
         }
       }
@@ -253,7 +241,7 @@ export class GameSession {
     this.destroyed = true;
     this.clearIdleTimer();
     this.clearGraceTimer();
-    this.engine = null;
+    this.state = null;
     await deletePersistedRoom(this.room.id);
   }
 
@@ -266,12 +254,12 @@ export class GameSession {
   }
 
   getState(): GameState | null {
-    return this.engine?.getState() ?? null;
+    return this.state;
   }
 
   getDebugView(): GameView | null {
-    if (!this.engine) return null;
-    return this.engine.buildView(0);
+    if (!this.state) return null;
+    return buildView(this.state, 0);
   }
 
   private clearGraceTimer(): void {
@@ -286,17 +274,17 @@ export class GameSession {
     if (this.idleTimer !== null) {
       clearTimeout(this.idleTimer);
     }
-    if (!this.engine) return;
-    const state = this.engine.getState();
+    if (!this.state) return;
+    const state = this.state;
     // 只在游戏进行中且有当前玩家时启动定时器
     if (state.players.some(p => !p.alive) || state.pendingSlot) return;
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.alive) return;
     this.idleTimer = setTimeout(async () => {
-      if (this.destroyed || !this.engine) return;
+      if (this.destroyed || !this.state) return;
       this.logger.info('idle timeout, auto-ending turn', { player: currentPlayer.name });
-      const seq = this.engine.getState().seq;
-      await this.engine.dispatch({
+      const seq = this.state.seq;
+      await dispatch(this.state, {
         skillId: '回合管理',
         actionType: 'end',
         ownerId: currentPlayer.name,
@@ -315,8 +303,8 @@ export class GameSession {
     }
   }
   private persistAsync(): void {
-    if (!this.engine) return;
-    const state = this.engine.getState();
+    if (!this.state) return;
+    const state = this.state;
     void saveRoom(
       this.room.id,
       {

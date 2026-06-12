@@ -53,6 +53,10 @@ export function findActionEntry(skillId: string, ownerId: string, actionType: st
   return actions.get(actionKey(skillId, ownerId, actionType));
 }
 
+export function unregisterActionEntry(skillId: string, ownerId: string, actionType: string): void {
+  actions.delete(actionKey(skillId, ownerId, actionType));
+}
+
 function unregisterActionsForInstance(skillId: string, ownerId: string): void {
   const prefix = `${skillId}:${ownerId}:`;
   for (const key of [...actions.keys()]) {

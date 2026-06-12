@@ -1,12 +1,12 @@
 // tests/integration/create-game.test.ts
-// e2e 覆盖:create(gameConfig) 一次性返回完整可玩 state(主公选将 + 起始手牌 + 牌堆 + 第一回合)
+// e2e 覆盖:create(gameConfig) + bootstrap() 一次性产生完整可玩 state
+// (主公选将 + 起始手牌 + 牌堆 + 第一回合)
 import { describe, it, expect } from 'vitest';
-import { create } from '../../src/engine/create-engine';
-import { resetForTest } from '../../src/engine/create-engine';
+import { create, bootstrap, resetForTest } from '../../src/engine/create-engine';
 import type { GameConfig } from '../../src/engine/create-engine';
 
-describe('create(gameConfig) — 端到端开局', () => {
-  it('一次调用产生完整可玩 state:主公选将完成 + 4 张起始手牌', async () => {
+describe('create + bootstrap — 端到端开局', () => {
+  it('create 同步返回骨架 state,bootstrap 异步跑完开局流程', async () => {
     resetForTest();
     const config: GameConfig = {
       characters: [
@@ -18,10 +18,15 @@ describe('create(gameConfig) — 端到端开局', () => {
       seed: 42,
       gameId: 'test-create',
     };
-    const state = await create(config);
+    // create 是同步的(返回骨架 state)
+    const state = create(config);
+    expect(state.players).toHaveLength(3);
+    expect(state.zones.deck.length).toBe(0);  // 骨架没洗牌
+
+    // bootstrap 异步跑完开局流程
+    await bootstrap(state, config);
 
     // state 有 3 个玩家(对应 3 个角色;顺序由选将 atom 决定,不可假设)
-    expect(state.players).toHaveLength(3);
     const assignedCharacters = new Set(state.players.map(p => p.character));
     expect(assignedCharacters).toEqual(new Set(['刘备', '曹操', '孙权']));
 
