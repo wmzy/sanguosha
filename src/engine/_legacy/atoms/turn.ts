@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atoms/turn.ts — turnStart / nextPlayer / incrementKills
 //
 // turnStart 原子化（Phase 8 / ADR 0011）：

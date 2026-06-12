@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/庞德.ts — 庞德
 import type { SkillDef } from '../types';
 import { getPlayer } from '../state';

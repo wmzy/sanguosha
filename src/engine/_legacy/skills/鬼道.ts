@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/鬼道.ts — 鬼道
 import type { SkillDef, SkillPhase } from '../types';
 

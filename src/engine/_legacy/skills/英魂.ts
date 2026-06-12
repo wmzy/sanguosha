@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/孙坚.ts — 孙坚
 import type { SkillDef } from '../types';
 import { getPlayer } from '../state';

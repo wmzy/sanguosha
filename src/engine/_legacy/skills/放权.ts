@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/放权.ts — 放权
 import type { SkillDef } from '../types';
 

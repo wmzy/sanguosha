@@ -254,7 +254,7 @@ export type Atom =
   // 初始化
   | { type: '抽身份'; playerCount: number; seed: number }
   | { type: '选将'; characters: Array<{ name: string; skills: string[] }>; seed: number }
-  | { type: '洗牌'; seed: number }
+  | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number; lordBonus?: number }
   | { type: '判定'; player: string; judgeType: string }
   // 等待回应
@@ -360,7 +360,7 @@ export interface PendingView {
 /**
  * 结算帧:execute 本地状态。
  * 帧是纯数据——所有"操作"通过 EngineApi(apply/drop/notify)进行。
- * 技能通过 api.pushFrame 创建并压入 settlementStack;execute 结束后引擎自动弹栈。
+ * 技能通过 api.pushFrame 创建并压入 settlementStack;技能负责 api.popFrame 配对弹出。
  */
 export interface SettlementFrame {
   skillId: string;

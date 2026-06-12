@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/phases/pindian.ts — 拼点 SkillPhase 处理器（§6 P0 Task 4 骨架）
 //
 // 骨架版本：直接以 SkillPhase 携带的 aCardId/bCardId（或 ctx.localVars 中的

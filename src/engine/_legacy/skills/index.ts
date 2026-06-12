@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/index.ts — 技能模块聚合入口
 //
 // 旧模式：各模块顶层调用 registerSkill()（import 即副作用）。

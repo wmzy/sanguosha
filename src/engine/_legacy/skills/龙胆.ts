@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/龙胆.ts
 import type { SkillDef } from '../types';
 

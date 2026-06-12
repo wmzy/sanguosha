@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/典韦.ts — 典韦
 import type { Atom, SkillDef } from '../types';
 

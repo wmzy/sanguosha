@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/屯田.ts
 import type { SkillDef } from '../types';
 

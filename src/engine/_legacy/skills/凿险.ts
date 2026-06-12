@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/凿险.ts
 import type { SkillDef } from '../types';
 

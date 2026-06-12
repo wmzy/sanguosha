@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/吕布.ts — 吕布
 //
 // 无双 v2 stub：handler 空 []，v2 派发本就无效。

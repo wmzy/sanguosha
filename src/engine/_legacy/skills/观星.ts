@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/观星.ts
 import type { SkillDef } from '../types';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/武圣.ts
 import type { SkillDef } from '../types';
 

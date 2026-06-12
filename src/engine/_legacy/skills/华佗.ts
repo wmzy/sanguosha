@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/华佗.ts — 华佗
 import type { SkillDef } from '../types';
 

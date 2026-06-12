@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/志继.ts — 志继
 import type { SkillDef } from '../types';
 

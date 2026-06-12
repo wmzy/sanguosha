@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/邓艾.ts — 邓艾
 import type { SkillDef } from '../types';
 

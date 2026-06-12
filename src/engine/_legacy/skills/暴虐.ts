@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/暴虐.ts — 暴虐
 import type { SkillDef } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';

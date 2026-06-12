@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/颂威.ts
 import type { SkillDef } from '../types';
 

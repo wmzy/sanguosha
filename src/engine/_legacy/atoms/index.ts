@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as damage from './damage';
 import * as draw from './draw';
 import * as heal from './heal';

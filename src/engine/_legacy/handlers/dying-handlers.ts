@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState, GameAction, EngineResult, Atom, PendingDyingWindow, AtomLogEntry } from '../types';
 import { getPlayer } from '../state';
 import { makeLogEntry } from '../event';

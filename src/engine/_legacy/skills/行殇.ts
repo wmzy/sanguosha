@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/行殇.ts
 import type { SkillDef, SkillPhase } from '../types';
 

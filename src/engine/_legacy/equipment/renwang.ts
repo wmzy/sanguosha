@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/renwang.ts — 仁王盾（防具）v3 registerAtomHook 实现
 //
 // 防具技（占位实现）：装备仁王盾的角色受到黑色【杀】造成的伤害时，防止此伤害。

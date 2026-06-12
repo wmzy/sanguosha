@@ -29,6 +29,7 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = [
 ];
 
 const RECONNECT_GRACE_MS = 30_000;
+const IDLE_TIMEOUT_MS = 50_000;
 
 export class GameSession {
   private engine: EngineInstance | null = null;
@@ -43,7 +44,7 @@ export class GameSession {
   private roomName: string;
   private maxPlayers: number;
   private destroyed = false;
-  private logger = createLogger('session');
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private sessionSeed: number;
 
   constructor(room: Room, debug = false, sessionSeed?: number) {
@@ -116,6 +117,7 @@ export class GameSession {
 
     setRoomStatus(this.room.id, '进行中');
     this.sendInitialViewToAll();
+    this.resetIdleTimer();
     return true;
   }
 
@@ -127,6 +129,11 @@ export class GameSession {
     if (!expectedName && !this.debug) return;
     if (!this.debug && action.ownerId !== expectedName) {
       this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedName });
+      return;
+    }
+    // CAS 校验:baseSeq 不匹配则静默丢弃
+    const curState = this.engine.getState();
+    if (action.baseSeq !== undefined && action.baseSeq !== curState.seq) {
       return;
     }
 
@@ -148,6 +155,7 @@ export class GameSession {
     if (result.gameOver) {
       this.handleGameOver(result.winner);
     }
+    this.resetIdleTimer();
   }
 
   private handleGameOver(winner?: string): void {
@@ -243,6 +251,7 @@ export class GameSession {
   async destroy(): Promise<void> {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.clearIdleTimer();
     this.clearGraceTimer();
     this.engine = null;
     await deletePersistedRoom(this.room.id);
@@ -272,6 +281,39 @@ export class GameSession {
     }
   }
 
+  /** 重置空闲超时定时器(在每次 action 和 startGame 后调用) */
+  private resetIdleTimer(): void {
+    if (this.idleTimer !== null) {
+      clearTimeout(this.idleTimer);
+    }
+    if (!this.engine) return;
+    const state = this.engine.getState();
+    // 只在游戏进行中且有当前玩家时启动定时器
+    if (state.players.some(p => !p.alive) || state.pendingSlot) return;
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer?.alive) return;
+    this.idleTimer = setTimeout(async () => {
+      if (this.destroyed || !this.engine) return;
+      this.logger.info('idle timeout, auto-ending turn', { player: currentPlayer.name });
+      const seq = this.engine.getState().seq;
+      await this.engine.dispatch({
+        skillId: '回合管理',
+        actionType: 'end',
+        ownerId: currentPlayer.name,
+        params: {},
+        baseSeq: seq,
+      });
+      this.broadcastNewState();
+      this.persistAsync();
+    }, IDLE_TIMEOUT_MS);
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer !== null) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+  }
   private persistAsync(): void {
     if (!this.engine) return;
     const state = this.engine.getState();

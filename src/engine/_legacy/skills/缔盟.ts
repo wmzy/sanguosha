@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/缔盟.ts — 缔盟
 import type { SkillDef, SkillPhase } from '../types';
 import { getPlayer } from '../state';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/张郃.ts — 张郃
 import type { SkillDef } from '../types';
 

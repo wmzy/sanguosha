@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/洛神.ts
 import type { SkillDef } from '../types';
 

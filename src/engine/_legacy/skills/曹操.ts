@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/曹操.ts — 曹操
 import type { SkillDef } from '../types';
 import type { HookRegistry } from '../skill-hook';

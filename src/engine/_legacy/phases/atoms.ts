@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/phases/atoms.ts — SkillPhase 'atoms' 阶段处理器
 //
 // 技能内部应用 atom 序列的统一入口（Phase 10a）。使用 `applyAtoms` 并通过

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Atom, AtomLogEntry, Json } from './types';
 
 let eventCounter = 0;

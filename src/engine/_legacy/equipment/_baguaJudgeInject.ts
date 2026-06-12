@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/_baguaJudgeInject.ts — 八卦阵 useCard 阶段判定注入钩子
 //
 // 真 game rule：装备八卦阵的角色被【杀】指定为目标的瞬间，触发判定；

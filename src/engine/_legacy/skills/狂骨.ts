@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/魏延.ts — 魏延
 import type { SkillDef } from '../types';
 

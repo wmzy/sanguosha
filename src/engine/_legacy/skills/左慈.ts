@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/左慈.ts — 左慈
 import type { SkillDef } from '../types';
 

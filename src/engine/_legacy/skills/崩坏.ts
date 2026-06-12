@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/崩坏.ts — 崩坏
 import type { SkillDef } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';

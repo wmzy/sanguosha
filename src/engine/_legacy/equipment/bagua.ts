@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/bagua.ts — 八卦阵（防具）v3 registerAtomHook 实现
 //
 // 锁定技：装备八卦阵的角色受到【杀】造成的伤害时，若 ctx.localVars.baguaJudgeResult

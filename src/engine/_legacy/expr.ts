@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Expr, Condition, GameState, SkillContext } from './types';
 import { isExpr } from './types';
 import { getPlayer, getAlivePlayerNames, getCard } from './state';

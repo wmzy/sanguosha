@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atoms/setChained.ts — `设横置` atom 改写为 Mark 体系入口
 //
 // 旧实现：直接写 PlayerState.chained: boolean。

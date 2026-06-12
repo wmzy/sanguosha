@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/英姿.ts — 英姿
 import type { SkillDef } from '../types';
 import { getPlayer } from '../state';

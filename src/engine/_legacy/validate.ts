@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * engine/validate.ts — 三国杀引擎动作验证模块
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 export { 曹操, 司马懿, 夏侯惇, 张辽, 许褚, 郭嘉, 甄姬, 夏侯渊, 曹仁, 荀彧, 典韦, 曹丕, 徐晃, 张郃, 邓艾, weiCharacters } from './wei';
 export { 刘备, 关羽, 张飞, 赵云, 诸葛亮, 黄月英, 马超, 黄忠, 魏延, 卧龙诸葛, 庞统, 孟获, 祝融, 姜维, 刘禅, shuCharacters } from './shu';
 export { 孙权, 甘宁, 吕蒙, 黄盖, 周瑜, 大乔, 陆逊, 孙尚香, 小乔, 周泰, 太史慈, 鲁肃, 孙坚, 孙策, 张昭张纮, wuCharacters } from './wu';

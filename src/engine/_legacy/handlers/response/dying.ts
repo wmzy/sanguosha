@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/handlers/response/dying.ts — 濒死窗口的 respond 路径
 
 import type { GameState, GameAction, EngineResult, PendingResponseWindow } from '../../types';

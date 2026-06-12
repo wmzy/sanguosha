@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/蛊惑.ts
 import type { SkillDef } from '../types';
 

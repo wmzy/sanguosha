@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/天妒.ts
 import type { SkillDef } from '../types';
 

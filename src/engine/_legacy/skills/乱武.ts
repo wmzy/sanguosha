@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/乱武.ts — 乱武
 import type { SkillDef } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';

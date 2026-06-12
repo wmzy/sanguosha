@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/equipment/chained-propagation.ts — 铁索连环（chained 伤害传导）v3 registerAtomHook 实现
 //
 // 锁定技：受 fire/thunder 伤害时，若目标处于连环状态（state.marks 含 id='chained'），

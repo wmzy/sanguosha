@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atom-async.ts — 异步 applyAtoms（ADR 0025 第 2-3 周产物）
 
 import type {

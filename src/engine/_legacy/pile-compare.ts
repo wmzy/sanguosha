@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SkillPhase, SkillContext, GameState, Condition } from './types';
 
 /** 三国杀卡牌点数：K=13 > Q=12 > ... > 2=2 > A=1 */

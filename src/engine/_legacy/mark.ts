@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/mark.ts — Mark 体系状态操作
 //
 // Mark 是「持续但有生命周期」的状态载体（[T-05/T-07] 决策）：

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SkillPhase, GameState, SkillContext, EngineResult, AtomLogEntry } from '../types';
 import { registerPhase, executePlan } from '../phase';
 import { checkCondition } from '../expr';

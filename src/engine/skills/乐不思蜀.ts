@@ -28,6 +28,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       await api.apply({ type: '添加延时锦囊', player: target, trick: { name: '乐不思蜀', source: from, card: trickCard ?? { id: cardId, name: '乐不思蜀', suit: '', type: '锦囊牌' } } });
       // 移牌到弃牌堆
       await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      api.popFrame();
     },
   );
   // 判定后检查结果:红桃则标记跳过出牌

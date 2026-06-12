@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState, Atom } from '../types';
 import { registerAtom, applyAtoms } from '../atom';
 import { registerAtomHook } from '../skill-hook';

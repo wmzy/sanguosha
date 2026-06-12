@@ -79,13 +79,14 @@ describe('新 ENGINE-DESIGN GameSession — 玩法集成', () => {
       baseSeq: 0,
     });
 
-    // 第二步:P2 不出闪 → 结算
+    // 第二步:P2 不出闪 → 结算(seq 已递增为 1)
+    const seq1 = session.getState()!.seq;
     await session.handleAction('P2_WS', {
       skillId: '闪',
       actionType: 'respond',
       ownerId: p2.name,
       params: {},
-      baseSeq: 0,
+      baseSeq: seq1,
     });
 
     const after = session.getState()!;

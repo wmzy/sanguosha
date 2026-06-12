@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/wansha.ts — 完杀（贾诩）v3 registerAtomHook 演示
 //
 // 锁定技：在你的回合，除你以外，只有处于濒死状态的角色才能使用【桃】。

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/天香.ts — 天香
 import type { SkillDef } from '../types';
 

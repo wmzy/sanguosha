@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/卧龙诸葛.ts — 卧龙诸葛
 import type { SkillDef } from '../types';
 

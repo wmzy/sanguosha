@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/火计.ts
 import type { SkillDef } from '../types';
 

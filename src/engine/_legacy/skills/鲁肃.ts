@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/鲁肃.ts — 鲁肃
 import type { SkillDef, SkillPhase } from '../types';
 import { getPlayer } from '../state';

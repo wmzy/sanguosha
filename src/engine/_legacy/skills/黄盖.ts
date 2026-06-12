@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/黄盖.ts — 黄盖
 import type { SkillDef } from '../types';
 

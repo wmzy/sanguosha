@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/救援.ts — 救援
 import type { SkillDef } from '../types';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/荀彧.ts — 荀彧
 import type { SkillDef } from '../types';
 import type { HookRegistry } from '../skill-hook';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/祝融.ts — 祝融
 import type { SkillDef } from '../types';
 

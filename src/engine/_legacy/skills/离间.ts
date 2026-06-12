@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/离间.ts — 离间
 import type { SkillDef } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';

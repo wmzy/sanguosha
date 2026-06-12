@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atom.ts — Atom 注册表 + 统一 applyAtoms 入口 + 钩子集成
 //
 // 唯一修改 GameState 的通道。`applyAtoms` 是**所有** atom 序列应用的

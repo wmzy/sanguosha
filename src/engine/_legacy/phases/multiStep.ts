@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/phases/multiStep.ts — 顺序多步 SkillPhase 处理器（§6 P0 Task 5 骨架）
 //
 // 骨架版本：依次执行 steps 中的每个子阶段。如果某一步产生 pending（prompt/respond

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/handlers/response/select.ts — selectCard 窗口（过河拆桥/顺手牵羊选牌）
 //
 // 出牌者从目标手牌选 1 张牌：steal 模式移到出牌者手牌，discard 模式移入弃牌堆。

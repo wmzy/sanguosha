@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * engine/phase-advance.ts — 回合阶段自动推进
  *

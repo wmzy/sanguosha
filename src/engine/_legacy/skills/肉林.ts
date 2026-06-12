@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/肉林.ts
 import type { SkillDef } from '../types';
 

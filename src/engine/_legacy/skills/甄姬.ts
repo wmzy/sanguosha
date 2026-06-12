@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/甄姬.ts — 甄姬
 import type { SkillDef } from '../types';
 

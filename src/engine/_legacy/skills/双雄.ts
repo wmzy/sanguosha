@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/双雄.ts
 import type { SkillDef } from '../types';
 

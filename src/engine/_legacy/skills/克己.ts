@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/吕蒙.ts — 吕蒙
 import type { SkillDef } from '../types';
 

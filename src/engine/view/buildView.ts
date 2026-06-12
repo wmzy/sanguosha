@@ -28,32 +28,27 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     text: formatLogEntry(e.message),
   }));
 
-  // 从 settlementStack 构建 pending view
+  // 从 GameState.pendingSlot 构建 pending view
   let pending: GameView['pending'] = null;
-  for (let i = state.settlementStack.length - 1; i >= 0; i--) {
-    const frame = state.settlementStack[i];
-    if (frame.pendingSlot) {
-      const slot = frame.pendingSlot;
-      // 从 atom 的 AtomDefinition.pending.prompt 取 prompt，fallback 到硬编码
-      const def = slot.definition;
-      const prompt = def.pending?.prompt
-        ?? (slot.atom.type === '询问闪'
-          ? { type: 'useCard' as const, title: '请出闪', cardFilter: { min: 1, max: 1 } }
-          : slot.atom.type === '询问杀'
-          ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
-          : { type: 'confirm' as const, title: '请回应' });
-      const target = def.pending?.getTarget
-        ? def.pending.getTarget(slot.atom)
-        : '';
-      pending = {
-        type: 'awaits',
-        atom: slot.atom,
-        prompt,
-        target,
-        deadline: slot.deadline,
-      };
-      break;
-    }
+  if (state.pendingSlot) {
+    const slot = state.pendingSlot;
+    const def = slot.definition;
+    const prompt = def.pending?.prompt
+      ?? (slot.atom.type === '询问闪'
+        ? { type: 'useCard' as const, title: '请出闪', cardFilter: { min: 1, max: 1 } }
+        : slot.atom.type === '询问杀'
+        ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
+        : { type: 'confirm' as const, title: '请回应' });
+    const target = def.pending?.getTarget
+      ? def.pending.getTarget(slot.atom)
+      : '';
+    pending = {
+      type: 'awaits',
+      atom: slot.atom,
+      prompt,
+      target,
+      deadline: slot.deadline,
+    };
   }
 
   // 出牌/弃牌阶段:独立的 turnDeadline(不创建 fake pending)

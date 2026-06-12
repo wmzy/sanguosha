@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/郭嘉.ts — 郭嘉
 import type { SkillDef } from '../types';
 

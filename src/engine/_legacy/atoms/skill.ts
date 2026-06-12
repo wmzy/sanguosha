@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atoms/skill.ts — `加技能` atom
 // [P5-T2] 改写：技能所有权走 PlayerState.skills（v3 真相源），不再写 state.triggers。
 // 外部 source 参数保留兼容（外部未传时不再走 CharacterMapSource 路径）。

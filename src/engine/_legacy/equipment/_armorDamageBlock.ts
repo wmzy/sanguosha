@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/_armorDamageBlock.ts — 装备防具：单一/多/反向伤害类型免疫钩子
 //
 // 藤甲/大雾这类"装备防具 + 防特定伤害类型"的对称实现。

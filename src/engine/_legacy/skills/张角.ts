@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/张角.ts — 张角
 import type { SkillDef, SkillPhase } from '../types';
 

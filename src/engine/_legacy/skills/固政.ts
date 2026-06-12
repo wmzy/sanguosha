@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/固政.ts — 固政
 import type { SkillDef } from '../types';
 

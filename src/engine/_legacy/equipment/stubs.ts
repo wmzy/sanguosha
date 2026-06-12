@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Atom, SkillDef } from '../types';
 
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/刚烈.async.ts — 刚烈（夏侯惇）AsyncHook 版本
 //
 // [P5-T2 / ADR 0025] 阶段 D-3 第 1 个示范：把 v2 老技能 trigger.event + SkillPhase

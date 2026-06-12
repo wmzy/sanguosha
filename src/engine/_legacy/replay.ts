@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState, ServerEvent } from './types';
 import type { Operation, GameLog } from '../shared/log';
 import type { CharacterConfig, Role } from '../shared/types';

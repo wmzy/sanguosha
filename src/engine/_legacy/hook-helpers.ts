@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/hook-helpers.ts — 异步钩子内 helper 实现
 //
 // 这些函数是 AsyncHook.onBefore / onAfter 内部的"领域概念命名"。

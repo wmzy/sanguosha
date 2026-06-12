@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/诸葛亮.ts — 诸葛亮
 import type { GameState, SkillDef, SkillPhase } from '../types';
 

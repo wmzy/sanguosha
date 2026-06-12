@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/董卓.ts — 董卓
 import type { SkillDef } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';

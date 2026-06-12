@@ -121,14 +121,14 @@ export const 选将: AtomDefinition<{
   },
 };
 
-// ── 洗牌 ──────────────────────────────────────────────
-// 创建标准牌堆并用 seed 洗牌
+// ── 初始化洗牌 ──────────────────────────────────────────
+// 创建标准牌堆并用 seed 洗牌(仅在开局时使用)
 
-export const 洗牌: AtomDefinition<{
-  type: '洗牌';
+export const 初始化洗牌: AtomDefinition<{
+  type: '初始化洗牌';
   seed: number;
 }> = {
-  type: '洗牌',
+  type: '初始化洗牌',
   validate: () => null,
   apply(state, atom) {
     const rng = createRng(atom.seed);
@@ -187,5 +187,5 @@ export const 发牌: AtomDefinition<{
 
 registerAtom(抽身份);
 registerAtom(选将);
-registerAtom(洗牌);
+registerAtom(初始化洗牌);
 registerAtom(发牌);

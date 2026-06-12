@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/青囊.ts — 青囊
 import type { SkillDef } from '../types';
 

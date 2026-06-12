@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/马超.ts — 马超
 import type { SkillDef } from '../types';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState, Atom, PendingAction } from '../types';
 import { registerAtom } from '../atom';
 

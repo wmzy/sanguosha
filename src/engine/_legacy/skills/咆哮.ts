@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/咆哮.ts
 import type { SkillDef } from '../types';
 

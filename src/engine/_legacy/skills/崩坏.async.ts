@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/崩坏.async.ts — 崩坏（董卓）AsyncHook PoC
 //
 // 验证 [P5-T2 ADR 0025] async hook 设计端到端可用：

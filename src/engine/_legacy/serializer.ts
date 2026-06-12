@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState } from './types';
 import { restoreEventCounterFromLog } from './event';
 

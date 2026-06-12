@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/view/types.ts — 前端视角视图类型
 //
 // 服务端在 initialView 消息中发送 PlayerView，客户端用 reducer 维护 FrontendState。

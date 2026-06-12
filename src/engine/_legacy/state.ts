@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Card } from '../shared/types';
 import { createStandardDeck, shuffle } from '../shared/deck';
 import { createRng } from '../shared/rng';

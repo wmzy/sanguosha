@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/黄月英.ts — 黄月英
 import type { SkillDef } from '../types';
 

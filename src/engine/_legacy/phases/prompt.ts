@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SkillPhase, GameState, SkillContext, EngineResult, PendingSkillPrompt } from '../types';
 import { registerPhase } from '../phase';
 import { createPendingId } from '../atoms/pending';

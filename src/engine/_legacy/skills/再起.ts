@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/再起.ts — 再起
 import type { SkillDef } from '../types';
 

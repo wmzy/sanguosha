@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/徐晃.ts — 徐晃
 import type { SkillDef } from '../types';
 

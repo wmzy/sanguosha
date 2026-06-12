@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/好施.ts — 好施
 import type { SkillDef, SkillPhase } from '../types';
 import { getPlayer } from '../state';

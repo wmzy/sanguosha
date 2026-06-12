@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skill-hook.ts — Atom 钩子 API
 //
 // 钩子在 applyAtoms 应用每个 atom 前后触发。新技能用此 API 替代 trigger.event

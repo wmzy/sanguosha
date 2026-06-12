@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/雷击.ts — 雷击
 import type { SkillDef, SkillPhase } from '../types';
 

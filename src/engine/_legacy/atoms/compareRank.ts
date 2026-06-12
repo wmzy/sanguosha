@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atoms/compareRank.ts — 拼点比较原子（§6 P0 Task 4）
 //
 // compareRank 是 5 个拼点技能（驱虎/天义/制霸/烈刃/双雄）共用的基础原子。

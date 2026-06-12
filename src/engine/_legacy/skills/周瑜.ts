@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/周瑜.ts — 周瑜
 import type { SkillDef } from '../types';
 import { getPlayer } from '../state';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/涅槃.ts — 涅槃
 import type { SkillDef } from '../types';
 

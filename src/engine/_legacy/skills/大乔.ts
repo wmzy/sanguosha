@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/大乔.ts — 大乔
 import type { SkillDef } from '../types';
 

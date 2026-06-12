@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/曹丕.ts — 曹丕
 import type { SkillDef, SkillPhase } from '../types';
 

@@ -3,7 +3,7 @@
 //
 // 关键不变量:
 //   - atomStack / pendingSlot 是 GameState 属性,不是 frame 属性
-//   - 帧由技能通过 api.pushFrame 创建;execute 结束后引擎自动弹栈
+//   - 帧由技能通过 api.pushFrame/api.popFrame 自行管理;dispatch 不管理帧
 //   - 钩子不允许修改 atom 参数(§4.5 原子性保证)
 //   - 钩子改 state 只能通过 api.apply(嵌套) 或 api.drop(取消)
 //   - 引擎内部不 try/catch——除 bug 外不应抛错;DropAtomSignal 是控制流信号

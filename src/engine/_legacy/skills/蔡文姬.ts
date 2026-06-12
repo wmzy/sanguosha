@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/蔡文姬.ts — 蔡文姬
 import type { SkillDef } from '../types';
 import type { HookRegistry } from '../skill-hook';

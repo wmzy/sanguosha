@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/酒池.ts
 import type { SkillDef } from '../types';
 

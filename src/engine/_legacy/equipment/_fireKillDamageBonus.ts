@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/_fireKillDamageBonus.ts — 火杀 +1 伤害 v3 useCard 钩子
 //
 // 真 game rule：使用火【杀】（card.name='杀' + card.subtype ∈ {'火杀', 'fire'}）造成 2 点伤害，

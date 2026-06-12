@@ -19,7 +19,8 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       const killsPlayed = self.marks
         .filter(m => m.id === '杀/killsPlayed')
         .reduce((n, m) => n + (typeof m.payload === 'number' ? m.payload : 0), 0);
-      if (killsPlayed >= 1) return '出杀次数已用尽';
+      const hasUnlimitedKills = self.marks.some(m => m.id === '诸葛连弩/无限出杀');
+      if (killsPlayed >= 1 && !hasUnlimitedKills) return '出杀次数已用尽';
       // 距离检查:目标必须在攻击范围内
       const WEAPON_RANGE: Record<string, number> = {
         '诸葛连弩': 1, '青釭剑': 2, '雌雄双股剑': 2, '贯石斧': 3,

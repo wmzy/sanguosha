@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/黄天.ts — 黄天
 import type { SkillDef, SkillPhase } from '../types';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/挑衅.ts — 挑衅
 import type { SkillDef } from '../types';
 

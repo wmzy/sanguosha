@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/leiji.ts — 雷击（张角）v3 registerAtomHook 实现
 //
 // 雷击真 game rule：

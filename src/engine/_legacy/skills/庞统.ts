@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/庞统.ts — 庞统
 import type { SkillDef } from '../types';
 

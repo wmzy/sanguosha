@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/国色.ts — 国色
 import type { SkillDef } from '../types';
 

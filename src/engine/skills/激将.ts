@@ -45,6 +45,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         // 目标不出:主公摸 1 张
         await api.apply({ type: '摸牌', player: from, count: 1 });
       }
+      api.popFrame();
     },
   );
   return () => {};

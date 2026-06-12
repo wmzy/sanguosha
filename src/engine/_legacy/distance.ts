@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState } from './types';
 import { getPlayer } from './state';
 

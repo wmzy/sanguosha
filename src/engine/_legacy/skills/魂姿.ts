@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/魂姿.ts — 魂姿
 import type { SkillDef } from '../types';
 

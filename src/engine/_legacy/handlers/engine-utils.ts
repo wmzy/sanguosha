@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState, Atom, PendingDyingWindow, EngineResult } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { applyAtoms } from '../atom';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atoms/removeSkill.ts — `去技能` atom
 // [P5-T2] 改写：技能所有权走 PlayerState.skills，不再过滤 state.triggers。
 

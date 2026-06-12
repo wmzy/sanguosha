@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SkillPhase, PhaseDefinition, GameState, SkillContext, EngineResult, AtomLogEntry } from './types';
 
 const registry = new Map<string, PhaseDefinition>();

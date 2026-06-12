@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/制霸.ts — 制霸
 import type { SkillDef } from '../types';
 

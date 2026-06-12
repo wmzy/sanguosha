@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { TurnPhase, Gender, Faction, Role, Card, PendingTrick } from '../shared/types';
 
 // useCard 拆分（§6 P0）：specifyTarget → becomeTarget → resolveCard

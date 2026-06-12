@@ -38,3 +38,4 @@ import './拼点';
 import './询问闪';
 import './询问杀';
 import './请求回应';
+import './选将';

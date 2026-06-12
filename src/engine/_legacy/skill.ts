@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skill.ts — 技能注册表 + 辅助函数
 //
 // v2 清理后保留：

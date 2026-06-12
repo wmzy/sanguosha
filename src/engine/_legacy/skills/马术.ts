@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/马术.ts
 import type { SkillDef } from '../types';
 

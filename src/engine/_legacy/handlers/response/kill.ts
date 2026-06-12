@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/handlers/response/kill.ts — 杀响应窗口处理
 //
 // 出闪则抵消，不出则受 1 点伤害。武将"裸衣"技能可造成 2 点伤害。

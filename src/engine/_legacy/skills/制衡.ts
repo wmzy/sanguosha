@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/制衡.ts — 制衡
 import type { SkillDef } from '../types';
 

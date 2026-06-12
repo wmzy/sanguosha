@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/貂蝉.ts — 貂蝉
 import type { SkillDef } from '../types';
 import { getPlayer, getAlivePlayerNames } from '../state';

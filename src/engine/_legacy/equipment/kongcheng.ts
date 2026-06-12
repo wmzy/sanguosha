@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/kongcheng.ts — 空城（诸葛亮）v3 registerAtomHook 演示
 //
 // 锁定技：若你没有手牌，【杀】和【决斗】对你无效。

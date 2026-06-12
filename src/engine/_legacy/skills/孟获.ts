@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/孟获.ts — 孟获
 import type { SkillDef } from '../types';
 

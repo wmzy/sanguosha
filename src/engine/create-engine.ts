@@ -8,7 +8,7 @@
 //    调用 entry.execute(api)(回应技能内部也 pushFrame) → consume pending →
 //    等原始 execute 恢复 → 返回最新 state。
 //
-// 帧由技能在 execute 中显式创建(api.pushFrame);execute 结束后引擎自动弹栈。
+// 帧由技能在 execute 中显式创建(api.pushFrame)和弹出(api.popFrame);dispatch 不管理帧。
 // atomStack / pendingSlot 是 GameState 属性,不是 frame 属性。
 // 引擎内部不 try/catch——除 bug 外不应抛错。
 // actionLog 由引擎自动记录,session 不直接 mutate state。
@@ -177,15 +177,12 @@ export function createEngine(): EngineInstance {
         currentState = activeExecuteCtx.state;
       }
 
-      // 弹栈:如果原始 frame 还在栈顶
-      if (frame && frame === topFrame(currentState)) {
-        currentState = { ...currentState, settlementStack: currentState.settlementStack.slice(0, -1) };
-      }
       activeExecuteCtx = undefined;
       activeExecuteP = undefined;
 
-      // 记录 action
+      // 记录 action + 递增 seq
       logAction(message);
+      currentState = { ...currentState, seq: currentState.seq + 1 };
 
       // 检查游戏结束
       const { gameOver, winner } = checkGameOver();
@@ -245,8 +242,9 @@ export function createEngine(): EngineInstance {
     // 读取最新 state(可能已被 engine-api 修改,如添加 pendingSlot)
     currentState = ctx.state;
 
-    // 记录 action
+    // 记录 action + 递增 seq
     logAction(message);
+    currentState = { ...currentState, seq: currentState.seq + 1 };
 
     // 检查游戏结束
     const { gameOver, winner } = checkGameOver();

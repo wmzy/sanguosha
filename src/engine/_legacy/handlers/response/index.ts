@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/handlers/response/index.ts — 响应窗口处理入口
 //
 // 统一 re-export 各种 response handlers，并提供 resolveResponse 派发器。

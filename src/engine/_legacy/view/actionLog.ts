@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameAction, GameState } from '../types';
 import type { Operation, OperationType } from '../../shared/log';
 

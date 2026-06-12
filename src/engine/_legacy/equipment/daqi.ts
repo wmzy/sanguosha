@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/daqi.ts — 大雾（神诸葛亮技能）v3 registerAtomHook 实现
 //
 // 神诸葛亮"大雾"标记：防止受到的所有非雷电伤害（normal + fire cancel，thunder 穿透）。

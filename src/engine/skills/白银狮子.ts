@@ -8,19 +8,21 @@ export function createSkill(id: string, ownerId: string): Skill {
 }
 
 export function onInit(_skill: Skill, api: BackendAPI): () => void {
-  // 伤害上限1
+  // 受到伤害时:如果 amount > 1,替换为 amount = 1
+  // 实现:通过标记让造成伤害后判断(简化:用 before 钩子 drop 原始伤害并 apply 修正后的)
   api.onAtomBefore('造成伤害', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { target?: string; amount?: number };
+    const atom = ctx.atom as { target?: string; amount?: number; source?: string; cardId?: string };
     if (atom.target !== api.self) return;
-    if ((atom.amount ?? 0) > 1) {
-      ;
-    }
-  });
-  // 受伤后回复1点(白银狮子特效)
-  api.onAtomAfter('造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: string };
-    if (atom.target !== api.self) return;
-    await ctx.api.apply({ type: '回复体力', target: api.self, amount: 1 });
+    if ((atom.amount ?? 0) <= 1) return;
+    // 检查是否装备了白银狮子
+    const me = ctx.state.players.find(p => p.name === api.self);
+    const armorId = me?.equipment?.['防具'];
+    if (!armorId) return;
+    const card = ctx.state.cardMap[armorId];
+    if (card?.name !== '白银狮子') return;
+    // drop 原始伤害,apply 修正后的(最多1点)
+    ctx.api.drop();
+    await ctx.api.apply({ type: '造成伤害', target: atom.target!, amount: 1, source: atom.source ?? '', cardId: atom.cardId });
   });
   return () => {};
 }

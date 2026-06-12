@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/刘禅.ts — 刘禅
 import type { SkillDef } from '../types';
 

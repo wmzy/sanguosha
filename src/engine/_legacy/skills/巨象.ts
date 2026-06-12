@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/巨象.ts — 巨象
 import type { SkillDef } from '../types';
 

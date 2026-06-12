@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/反间.ts — 反间
 import type { SkillDef } from '../types';
 import { getPlayer } from '../state';

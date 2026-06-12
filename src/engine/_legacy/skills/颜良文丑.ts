@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/颜良文丑.ts — 颜良文丑
 import type { SkillDef } from '../types';
 

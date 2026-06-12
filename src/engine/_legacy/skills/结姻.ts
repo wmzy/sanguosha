@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/结姻.ts — 结姻
 import type { SkillDef } from '../types';
 

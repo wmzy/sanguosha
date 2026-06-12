@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/直谏.ts — 直谏
 import type { SkillDef } from '../types';
 

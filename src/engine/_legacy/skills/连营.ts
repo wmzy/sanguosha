@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/连营.ts — 连营
 import type { SkillDef } from '../types';
 

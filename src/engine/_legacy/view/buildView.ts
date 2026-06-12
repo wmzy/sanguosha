@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/view/buildView.ts — 从 GameState 构造 PlayerView
 //
 // 服务端在玩家加入/重连时调用此函数生成 initialView。客户端不需要此函数

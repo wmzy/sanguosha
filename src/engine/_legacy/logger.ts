@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/logger.ts — GameLogger + Operation 派生
 //
 // 把引擎广播的 ServerEvent[] 和玩家发送的 GameAction 转译为人类可读的

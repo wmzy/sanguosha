@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atoms/playCard.ts — 出牌 v2 兼容占位 atom
 //
 // 现状：[P5-T3] 阶段 D 删 v2 基础设施前，提供 atom 化占位，

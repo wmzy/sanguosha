@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/姜维.ts — 姜维
 import type { SkillDef } from '../types';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/新生.ts — 新生（左慈）v2 stub
 //
 // 阶段 D 删 state.triggers 后 v2 trigger 兜底自然失效——已显式删除。

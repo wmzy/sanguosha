@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as atoms from './atoms';
 import * as condition from './condition';
 import * as prompt from './prompt';

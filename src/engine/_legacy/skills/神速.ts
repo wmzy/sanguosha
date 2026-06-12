@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/夏侯渊.ts — 夏侯渊
 import type { SkillDef } from '../types';
 import { getPlayer } from '../state';

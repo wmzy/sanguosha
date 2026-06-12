@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/红颜.ts — 红颜
 import type { SkillDef } from '../types';
 

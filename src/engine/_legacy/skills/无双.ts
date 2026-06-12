@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/无双.ts — 无双（吕布）v2 stub
 //
 // 真实判定走 hasSkill(state, player, '无双')（card-handlers handleKillCard

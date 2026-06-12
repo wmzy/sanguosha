@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/handlers/response/trick.ts — 锦囊牌响应 + 效果执行
 //
 // 处理过河拆桥/顺手牵羊/决斗/乐不思蜀/兵粮寸断/无中生有/桃园结义/五谷丰登等。

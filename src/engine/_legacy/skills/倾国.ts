@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/倾国.ts
 import type { SkillDef } from '../types';
 

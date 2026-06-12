@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/async-hook.ts — 异步钩子核心类型（ADR 0025）
 //
 // v3 registerAtomHook 的异步版：onBefore / onAfter 改 async function，

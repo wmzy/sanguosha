@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SkillPhase, GameState, SkillContext, EngineResult, PendingDyingWindow, Atom } from '../types';
 import { TIMEOUT_DEFAULTS } from '../types';
 import { registerPhase } from '../phase';

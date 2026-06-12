@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/atoms/phase.ts — 阶段切换相关 atom
 //
 // 设计依据：

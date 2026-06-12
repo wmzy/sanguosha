@@ -8,17 +8,22 @@ export function createSkill(id: string, ownerId: string): Skill {
 }
 
 export function onInit(_skill: Skill, api: BackendAPI): () => void {
-  // 出牌阶段开始时设杀次数上限为 Infinity
+  // 出牌阶段开始时:添加"诸葛连弩=无限出杀"标记
   api.onAtomAfter('设阶段', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { phase?: string };
     if (atom.phase !== '出牌') return;
-    const self = ctx.state.players.find(p => p.name === api.self);
-    if (self) self.vars.__杀次数上限 = Infinity;
-  });
-  // 回合结束时清除
-  api.onAtomAfter('回合结束', async (ctx: AtomAfterContext) => {
-    const self = ctx.state.players.find(p => p.name === api.self);
-    if (self) delete self.vars.__杀次数上限;
+    const me = ctx.state.players.find(p => p.name === api.self);
+    if (!me) return;
+    // 检查是否装备了诸葛连弩
+    const weaponId = me.equipment?.['武器'];
+    if (!weaponId) return;
+    const card = ctx.state.cardMap[weaponId];
+    if (card?.name !== '诸葛连弩') return;
+    await ctx.api.apply({
+      type: '加标记',
+      player: api.self,
+      mark: { id: '诸葛连弩/无限出杀', scope: -1, payload: 1, duration: 'turn' },
+    });
   });
   return () => {};
 }

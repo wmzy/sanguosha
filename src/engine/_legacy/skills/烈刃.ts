@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/烈刃.ts — 烈刃
 import type { SkillDef } from '../types';
 

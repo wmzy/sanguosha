@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/夏侯惇.ts — 夏侯惇
 import type { SkillDef } from '../types';
 import type { HookRegistry } from '../skill-hook';

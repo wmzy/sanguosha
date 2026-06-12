@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/zhangba.ts — 丈八蛇矛（武器）v3 registerAtomHook 实现
 //
 // 武器技（占位实现）：装备丈八蛇矛的角色可以将两张手牌当【杀】使用。

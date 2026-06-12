@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/关羽.ts — 关羽
 import type { SkillDef } from '../types';
 

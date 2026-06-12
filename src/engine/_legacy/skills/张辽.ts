@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/张辽.ts — 张辽
 import type { SkillDef, SkillPhase } from '../types';
 

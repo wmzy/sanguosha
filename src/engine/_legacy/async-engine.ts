@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/async-engine.ts — AsyncHook 引擎工厂（ADR 0025）
 //
 // createAsyncEngine(config) 返回支持 AsyncHook 的引擎实例。

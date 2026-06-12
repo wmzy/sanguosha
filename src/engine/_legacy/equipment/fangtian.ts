@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/fangtian.ts — 方天画戟（武器）v3 registerAtomHook 实现
 //
 // 武器技（占位实现）：装备方天画戟且手牌数为 0 的角色使用【杀】可以指定最多三名角色为目标。

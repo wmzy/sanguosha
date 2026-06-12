@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/weimu.ts — 帷幕（贾诩）v3 registerAtomHook 演示
 //
 // 锁定技：你不能成为黑色锦囊牌的目标。

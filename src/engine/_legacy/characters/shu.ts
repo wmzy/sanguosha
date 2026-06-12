@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { CharacterConfig } from '../types';
 
 export const 刘备: CharacterConfig = {

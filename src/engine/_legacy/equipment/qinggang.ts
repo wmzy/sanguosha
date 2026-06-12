@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/qinggang.ts — 青釭剑（武器）v3 registerAtomHook 实现
 //
 // 武器技（占位实现）：装备青釭剑的角色造成【杀】伤害时，无视目标防具。

@@ -39,8 +39,8 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       // 2. 选将(从武将池分配)
       await api.apply({ type: '选将', characters, seed });
 
-      // 3. 洗牌
-      await api.apply({ type: '洗牌', seed });
+      // 3. 初始化洗牌(创建标准牌堆并洗混)
+      await api.apply({ type: '初始化洗牌', seed });
 
       // 4. 发牌(主公多摸 1 张)
       await api.apply({ type: '发牌', handSize, lordBonus: 1 });

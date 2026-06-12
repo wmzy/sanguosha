@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/流离.ts — 流离
 import type { SkillDef } from '../types';
 

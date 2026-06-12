@@ -13,7 +13,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
 
     // from
     if (atom.from.zone === '手牌') {
-      const pIdx = next.players.findIndex(p => p.name === atom.from.player);
+      const pIdx = next.players.findIndex(p => p.name === (atom.from as { zone: '手牌'; player: string }).player);
       if (pIdx >= 0) {
         const hand = next.players[pIdx].hand.filter(id => id !== atom.cardId);
         next.players = next.players.map((p, i) => i === pIdx ? { ...p, hand } : p);
@@ -28,7 +28,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
 
     // to
     if (atom.to.zone === '手牌') {
-      const pIdx = next.players.findIndex(p => p.name === atom.to.player);
+      const pIdx = next.players.findIndex(p => p.name === (atom.to as { zone: '手牌'; player: string }).player);
       if (pIdx >= 0) {
         const hand = [...next.players[pIdx].hand, atom.cardId];
         next.players = next.players.map((p, i) => i === pIdx ? { ...p, hand } : p);

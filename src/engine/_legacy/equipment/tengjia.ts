@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/tengjia.ts — 藤甲（防具）v3 registerAtomHook 实现
 //
 // 锁定技：装备藤甲的角色受到【杀】造成的伤害（normal 类型）时，防止此伤害。

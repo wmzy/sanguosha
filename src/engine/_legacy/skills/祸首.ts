@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/祸首.ts — 祸首
 import type { SkillDef } from '../types';
 

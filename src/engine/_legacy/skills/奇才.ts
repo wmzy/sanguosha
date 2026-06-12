@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/奇才.ts — 奇才（黄月英）
 //
 // 锁定技，你使用锦囊牌无距离限制。

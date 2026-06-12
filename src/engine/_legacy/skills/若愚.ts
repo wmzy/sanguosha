@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/若愚.ts — 若愚
 import type { SkillDef } from '../types';
 

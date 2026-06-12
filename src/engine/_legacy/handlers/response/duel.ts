@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/handlers/response/duel.ts — 决斗响应窗口
 //
 // 决斗：双方轮流交出杀，先不出杀者受 1 点伤害。

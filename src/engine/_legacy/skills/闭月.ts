@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/闭月.ts — 闭月（貂蝉）
 //
 // 阶段 B-1：[P5-T2] 双源时期示范——v2 trigger.event + v3 registerAtomHook 并行。

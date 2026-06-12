@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/handlers/response/aoe.ts — AOE 锦囊响应窗口
 //
 // 处理南蛮入侵、万箭齐发：每个目标依次出对应类型的牌响应。

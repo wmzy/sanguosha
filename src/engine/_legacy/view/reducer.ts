@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/view/reducer.ts — FrontendState reducer
 //
 // 客户端把服务器推送的 events 序列应用到本地 FrontendState 上，得到最新视图。

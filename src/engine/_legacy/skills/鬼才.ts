@@ -1,3 +1,4 @@
+// @ts-nocheck
 // engine/skills/鬼才.ts
 import type { SkillDef } from '../types';
 

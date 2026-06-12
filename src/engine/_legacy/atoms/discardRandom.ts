@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { GameState, Atom, Json } from '../types';
 import { registerAtom } from '../atom';
 import { updatePlayer } from '../state';
