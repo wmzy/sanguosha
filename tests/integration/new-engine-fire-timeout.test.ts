@@ -1,7 +1,7 @@
 // tests/integration/new-engine-fire-timeout.test.ts
-// 引擎 fireTimeout() 单元测试(归 core 项目)
+// 引擎 fireTimeout(state) 单元测试(归 core 项目)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createEngine, type EngineInstance } from '../../src/engine/create-engine';
+import { dispatch, fireTimeout, rebootstrap, resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -23,31 +23,31 @@ function buildInitialState(): GameState {
   });
 }
 
-describe('engine.fireTimeout', () => {
-  let engine: EngineInstance;
+describe('fireTimeout(state)', () => {
+  let state: GameState;
   beforeEach(() => {
-    engine = createEngine();
-    engine.resetForTest();
-    engine.bootstrap(buildInitialState());
+    resetForTest();
+    state = buildInitialState();
+    rebootstrap(state);
   });
 
-  it('无 pending 时调用:返回当前 state,不抛错', async () => {
-    const before = engine.getState();
-    const result = await engine.fireTimeout();
-    expect(result.state).toBe(before);
+  it('无 pending 时调用:返回空 result,state 不变', async () => {
+    const beforeSeq = state.seq;
+    const result = await fireTimeout(state);
     expect(result.gameOver).toBeFalsy();
+    expect(state.seq).toBe(beforeSeq);
   });
 
   it('有 pending(询问闪)时调用:触发 onTimeout → pending 清空 → P2 扣 1 血', async () => {
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
     });
-    expect(engine.getState().pendingSlot).toBeDefined();
+    expect(state.pendingSlot).toBeDefined();
 
-    await engine.fireTimeout();
-    expect(engine.getState().pendingSlot).toBeUndefined();
-    const p2 = engine.getState().players.find(p => p.name === 'P2')!;
+    await fireTimeout(state);
+    expect(state.pendingSlot).toBeUndefined();
+    const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
   });
 });

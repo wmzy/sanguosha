@@ -1,7 +1,7 @@
 // tests/integration/new-engine-kill.test.ts
-// 集成测试 1: 新 ENGINE-DESIGN createEngine + 出杀全流程(不含回应,含扣血)
+// 集成测试 1: 新顶层 API(dispatch / rebootstrap) + 出杀全流程(不含回应,含扣血)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createEngine, type EngineInstance } from '../../src/engine/create-engine';
+import { dispatch, rebootstrap, resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -49,82 +49,76 @@ function buildInitialState(): GameState {
   });
 }
 
-describe('新 ENGINE-DESIGN createEngine — 出杀全流程', () => {
-  let engine: EngineInstance;
+describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
+  let state: GameState;
 
   beforeEach(() => {
-    engine = createEngine();
-    engine.resetForTest();
-    engine.bootstrap(buildInitialState());
+    resetForTest();
+    state = buildInitialState();
+    rebootstrap(state);
   });
 
   it('出杀:无回应 → 目标扣 1 血', async () => {
     // 第一步:出杀 → 产生 pending 等待闪
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '杀',
       actionType: 'use',
       ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] },
       baseSeq: 0,
     });
-    const mid = engine.getState();
+    const mid = state;
     const p2Mid = mid.players.find(p => p.name === 'P2')!;
     expect(p2Mid.health).toBe(4); // 还没扣血
 
     // 第二步:P2 不出闪 → 结算伤害
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '闪',
       actionType: 'respond',
       ownerId: 'P2',
       params: {},
-      baseSeq: 0,
+      baseSeq: 1,
     });
-    const next = engine.getState();
-    const p2 = next.players.find(p => p.name === 'P2')!;
+    const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
     expect(p2.alive).toBe(true);
-    expect(next.zones.discardPile).toContain('c1');
+    expect(state.zones.discardPile).toContain('c1');
   });
 
   it('出杀:limit 验证 — 同回合第二次出杀应被拒绝', async () => {
     // 第一步:出杀
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
     });
     // 第二步:P2 不出闪 → 结算
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '闪', actionType: 'respond', ownerId: 'P2',
-      params: {}, baseSeq: 0,
+      params: {}, baseSeq: 1,
     });
     // 准备第二张杀
     const c2: Card = { id: 'c2', name: '杀', suit: '♠', rank: '2', type: '基本牌' };
-    const state = engine.getState();
     // 注:这里直接修改 state 是测试 hack,实际应该通过引擎
-    const updatedState = {
-      ...state,
-      players: state.players.map(p => p.name === 'P1' ? { ...p, hand: ['c2'] } : p),
-      cardMap: { ...state.cardMap, c2 },
-    };
-    engine.resetForTest();
-    engine.bootstrap(updatedState);
+    state.players = state.players.map(p => p.name === 'P1' ? { ...p, hand: ['c2'] } : p);
+    state.cardMap = { ...state.cardMap, c2 };
+    resetForTest();
+    rebootstrap(state);
 
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',
-      params: { cardId: 'c2', targets: ['P2'] }, baseSeq: 0,
+      params: { cardId: 'c2', targets: ['P2'] }, baseSeq: 2,
     });
-    const next = engine.getState();
-    const p2 = next.players.find(p => p.name === 'P2')!;
+    const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
   });
 
   it('未注册的 action:静默丢弃', async () => {
-    const before = engine.getState();
-    await engine.dispatch({
+    const beforeSeq = state.seq;
+    await dispatch(state, {
       skillId: '不存在的 skill', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
     });
-    const after = engine.getState();
-    expect(after).toBe(before);
+    // 未注册的 action:dispatch 返回 {}(静默丢弃),state 不变
+    expect(state.seq).toBe(beforeSeq);
   });
 });

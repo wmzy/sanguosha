@@ -1,7 +1,7 @@
 // tests/integration/new-engine-rende.test.ts
-// 集成测试 3: 新 ENGINE-DESIGN createEngine + 武将技能 仁德(刘备)
+// 集成测试 3: 新顶层 API(dispatch / rebootstrap) + 武将技能 仁德(刘备)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createEngine, type EngineInstance } from '../../src/engine/create-engine';
+import { dispatch, rebootstrap, resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -22,17 +22,17 @@ function buildInitialState(): GameState {
   });
 }
 
-describe('新 ENGINE-DESIGN createEngine — 仁德(刘备)', () => {
-  let engine: EngineInstance;
+describe('新 ENGINE-DESIGN 顶层 API — 仁德(刘备)', () => {
+  let state: GameState;
 
   beforeEach(() => {
-    engine = createEngine();
-    engine.resetForTest();
-    engine.bootstrap(buildInitialState());
+    resetForTest();
+    state = buildInitialState();
+    rebootstrap(state);
   });
 
   it('给 1 人 2 张牌(单帧) → 刘备回复 1 血', async () => {
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '仁德', actionType: 'use', ownerId: 'P1',
       params: {
         targets: [
@@ -41,10 +41,9 @@ describe('新 ENGINE-DESIGN createEngine — 仁德(刘备)', () => {
       },
       baseSeq: 0,
     });
-    const next = engine.getState();
-    const p1 = next.players.find(p => p.name === 'P1')!;
+    const p1 = state.players.find(p => p.name === 'P1')!;
     expect(p1.health).toBe(4);
-    const p2 = next.players.find(p => p.name === 'P2')!;
+    const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.hand).toContain('c1');
     expect(p2.hand).toContain('c2');
   });

@@ -1,7 +1,7 @@
 // tests/integration/new-engine-hujia.test.ts
-// 集成测试 2: 新 ENGINE-DESIGN createEngine + 武将技能 护甲(锁定被动)
+// 集成测试 2: 新顶层 API(dispatch / rebootstrap) + 武将技能 护甲(锁定被动)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createEngine, type EngineInstance } from '../../src/engine/create-engine';
+import { dispatch, rebootstrap, resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -21,22 +21,21 @@ function buildInitialState(): GameState {
   });
 }
 
-describe('新 ENGINE-DESIGN createEngine — 护甲(曹操·锁定被动)', () => {
-  let engine: EngineInstance;
+describe('新 ENGINE-DESIGN 顶层 API — 护甲(曹操·锁定被动)', () => {
+  let state: GameState;
 
   beforeEach(() => {
-    engine = createEngine();
-    engine.resetForTest();
-    engine.bootstrap(buildInitialState());
+    resetForTest();
+    state = buildInitialState();
+    rebootstrap(state);
   });
 
   it('受到黑色【杀】 → 扣 0 血(护甲吸收)', async () => {
-    await engine.dispatch({
+    await dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',
       params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
     });
-    const next = engine.getState();
-    const p2 = next.players.find(p => p.name === 'P2')!;
+    const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(4);
     expect(p2.alive).toBe(true);
   });

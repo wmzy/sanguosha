@@ -266,9 +266,10 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   const executeP = entry.execute(api).finally(fireDispatchReady);
   activeExecuteP = executeP;
 
+  // 等到 execute 抵达 pending 挂起点(fireDispatchReady 触发)就返回当前 state。
+  // 不 await executeP 本身 —— execute 可能挂在 pending slot 上,要等回应或
+  // fireTimeout 推进,主动 action 的调用方不需要阻塞等待。
   await dispatchReady;
-  await activeExecuteP;
-  activeExecuteP = undefined;
 
   logAction(state, message);
   state.seq += 1;
