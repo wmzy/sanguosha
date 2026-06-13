@@ -13,6 +13,13 @@ import {
   type SkillModule,
 } from '../skill';
 
+/**
+ * system 命名空间占位 ownerId。
+ * 客户端永远不发这个值(WS handler 注入的 ownerId 是绑定玩家名),
+ * engine 内部 dispatch 只在 bootstrap 路径用到它。
+ */
+const SYSTEM_OWNER = '系统';
+
 /** 开局配置 */
 interface GameConfig {
   /** 可用武将列表 */
@@ -37,7 +44,7 @@ export function createSkill(id: string, ownerId: string): Skill {
 export function onInit(_skill: Skill, _state: GameState): () => void {
   const entry: ActionEntry = {
     skillId: '开局',
-    ownerId: '主公',
+    ownerId: SYSTEM_OWNER,
     actionType: 'start',
     validate: (_state: GameState, _params: Record<string, Json>) => null,
     execute: async (state: GameState, params: Record<string, Json>) => {
@@ -65,7 +72,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
     },
   };
   registerActionEntry(entry);
-  return () => unregisterActionEntry('开局', '主公', 'start');
+  return () => unregisterActionEntry('开局', SYSTEM_OWNER, 'start');
 }
 
 // module_开局 不再走 SkillModule.onInit 路径 —— bootstrap() 直接调顶层 onInit。
