@@ -215,10 +215,31 @@ export interface AtomEffect {
   blockUntilDone?: boolean;
 }
 
-export type AtomPlayerViews = readonly [
-  ownerViews: ReadonlyMap<string, Atom>,
-  defaultView: Atom | null,
-];
+/** 前端视图事件——后端 atom 的前端投影。纯数据，可序列化。 */
+export interface ViewEvent {
+  /** 事件类型（与后端 atom type 一致，可按需别名，如 移动牌→弃牌） */
+  type: string;
+  /**
+   * 原始 atom 类型。当 ViewEvent.type 与 atom.type 不同时设置，
+   * 前端据此查找 AtomDefinition.applyView。
+   * 相同时省略（前端 fallback 到 type）。
+   */
+  atomType?: string;
+  /** 事件数据（已脱敏，只含前端需要的字段） */
+  [key: string]: Json;
+  /** 内联动画/音效 */
+  effect?: AtomEffect;
+  /** 等待信息（仅等待型 atom） */
+  pending?: { startTime: number; deadline: number; prompt: ActionPrompt };
+}
+
+/** Per-player 视图分叉——toViewEvents 的返回值 */
+export interface ViewEventSplit {
+  /** 指定玩家看到的专属视图事件。值为 null = 该玩家看不到此事件 */
+  ownerViews: ReadonlyMap<string, ViewEvent | null>;
+  /** 其余玩家看到的通用视图事件。null = 其他人不感知此 atom */
+  othersView: ViewEvent | null;
+}
 
 export type ZoneLoc =
   | { zone: '牌堆' }
@@ -290,7 +311,25 @@ export interface AtomDefinition<A = unknown> {
   validate(state: GameState, atom: A): string | null;
   apply(state: GameState, atom: A): void;
   pending?: AtomPending;
-  toPlayerViews?(state: GameState, atom: A): AtomPlayerViews | undefined;
+  /**
+   * 将后端 atom 转换为前端可消费的视图事件。
+   *
+   * ⚠️ 在 apply 之前调用——此时 state 尚未变更，可以读取即将被消费的数据
+   * （如摸牌前读取牌堆顶的牌面信息）。
+   *
+   * 返回 ViewEventSplit 实现 per-player 信息分级和参数脱敏。
+   * ViewEvent 是纯数据（可序列化），不含函数。
+   * 未实现 = fallback 到带 effect 的原始 atom（前端回退到全量 buildView）。 */
+  toViewEvents?(state: GameState, atom: A): ViewEventSplit | undefined;
+  /**
+   * 前端视图状态更新。与后端 apply 对称——apply 修改 GameState，applyView 修改 GameView。
+   *
+   * 前端收到 ViewEvent 后，按 `event.atomType ?? event.type` 查找 AtomDefinition，
+   * 调用此函数增量更新 GameView。
+   * 未实现 = 前端回退到全量 buildView。
+   */
+  applyView?(view: GameView, event: ViewEvent): void;
+  /** effect 作为 toViewEvents 未实现时的 fallback。 */
   effect?: AtomEffect;
 }
 export interface GameView {
@@ -503,5 +542,5 @@ export interface FrontendAPI {
 }
 
 export type GameEvent =
-  | { kind: 'atom'; atom: Atom; views?: AtomPlayerViews }
+  | { kind: 'atom'; atom: Atom; viewEvents?: ViewEventSplit }
   | { kind: 'notify'; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };

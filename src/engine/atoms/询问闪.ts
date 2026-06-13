@@ -1,6 +1,6 @@
 // src/engine/atoms/询问闪.ts
 // 询问闪:等待型 atom — 等待 target 出闪
-import type { AtomDefinition } from '../types';
+import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 询问闪: AtomDefinition<{ target: string; source: string }> = {
@@ -18,6 +18,26 @@ export const 询问闪: AtomDefinition<{ target: string; source: string }> = {
     timeout: 15,
   },
   effect: { sound: 'dodge_request', blockUntilDone: true, duration: 200 },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const effect = { sound: 'dodge_request' as const, blockUntilDone: true as const, duration: 200 };
+    // target 看到带 prompt 的询问，其他人只看到"某人被要求出闪"
+    const targetView: ViewEvent = {
+      type: '询问闪',
+      target: atom.target,
+      source: atom.source,
+      effect,
+    };
+    const othersView: ViewEvent = {
+      type: '询问闪',
+      target: atom.target,
+      source: atom.source,
+      effect: { duration: 200 },
+    };
+    return {
+      ownerViews: new Map([[atom.target, targetView]]),
+      othersView,
+    };
+  },
 };
 
 registerAtom(询问闪);

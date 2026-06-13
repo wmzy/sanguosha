@@ -1,6 +1,6 @@
 // src/engine/atoms/询问杀.ts
 // 询问杀:等待型 atom — 等待 target 出杀
-import type { AtomDefinition } from '../types';
+import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 询问杀: AtomDefinition<{ target: string; source: string }> = {
@@ -18,6 +18,25 @@ export const 询问杀: AtomDefinition<{ target: string; source: string }> = {
     timeout: 15,
   },
   effect: { sound: 'slash_request', blockUntilDone: true, duration: 200 },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const effect = { sound: 'slash_request' as const, blockUntilDone: true as const, duration: 200 };
+    const targetView: ViewEvent = {
+      type: '询问杀',
+      target: atom.target,
+      source: atom.source,
+      effect,
+    };
+    const othersView: ViewEvent = {
+      type: '询问杀',
+      target: atom.target,
+      source: atom.source,
+      effect: { duration: 200 },
+    };
+    return {
+      ownerViews: new Map([[atom.target, targetView]]),
+      othersView,
+    };
+  },
 };
 
 registerAtom(询问杀);

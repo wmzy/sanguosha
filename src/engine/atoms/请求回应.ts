@@ -1,6 +1,6 @@
 // src/engine/atoms/请求回应.ts
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
-import type { ActionPrompt, AtomDefinition, Json } from '../types';
+import type { ActionPrompt, AtomDefinition, Json, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 请求回应: AtomDefinition<{
@@ -23,6 +23,28 @@ export const 请求回应: AtomDefinition<{
     timeout: 30,
   },
   effect: { blockUntilDone: true, duration: 200 },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const effect = { blockUntilDone: true as const, duration: 200 };
+    // target 看到带 prompt 的请求
+    const targetView: ViewEvent = {
+      type: '请求回应',
+      requestType: atom.requestType,
+      target: atom.target,
+      prompt: atom.prompt,
+      effect,
+    };
+    // 其他人只看到"某人被请求回应"
+    const othersView: ViewEvent = {
+      type: '请求回应',
+      requestType: atom.requestType,
+      target: atom.target,
+      effect: { duration: 200 },
+    };
+    return {
+      ownerViews: new Map([[atom.target, targetView]]),
+      othersView,
+    };
+  },
 };
 
 registerAtom(请求回应);

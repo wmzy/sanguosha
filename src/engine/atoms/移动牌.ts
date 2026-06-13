@@ -1,5 +1,5 @@
 // src/engine/atoms/移动牌.ts
-import type { AtomDefinition, ZoneLoc } from '../types';
+import type { AtomDefinition, ZoneLoc, ViewEventSplit, ViewEvent, Card } from '../types';
 import { registerAtom } from '../atom';
 
 export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: ZoneLoc }> = {
@@ -33,12 +33,68 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       state.zones.deck.push(atom.cardId);
     } else if (atom.to.zone === '弃牌堆') {
       state.zones.discardPile.push(atom.cardId);
-      // 牌移入弃牌堆时清理包装(武圣等转化技的还原)
       if (state.cardWrappers?.[atom.cardId]) {
         delete state.cardWrappers[atom.cardId];
       }
     } else if (atom.to.zone === '处理区') {
       state.zones.processing.push(atom.cardId);
+    }
+  },
+  toViewEvents(state, atom): ViewEventSplit {
+    const card: Card | undefined = state.cardMap[atom.cardId];
+    const cardInfo = card ? { name: card.name, suit: card.suit, rank: card.rank } : null;
+    const fromPlayer = atom.from.zone === '手牌' ? (atom.from as { zone: '手牌'; player: string }).player : undefined;
+    const toPlayer = atom.to.zone === '手牌' ? (atom.to as { zone: '手牌'; player: string }).player : undefined;
+
+    // 弃牌堆目标 → 弃牌事件
+    if (atom.to.zone === '弃牌堆' && fromPlayer && cardInfo) {
+      const effect = { sound: 'discard' as const, duration: 200 };
+      const view: ViewEvent = { type: '弃牌', player: fromPlayer, card: cardInfo, effect };
+      return { ownerViews: new Map(), othersView: view };
+    }
+
+    // 手牌→处理区 = 打出
+    if (atom.to.zone === '处理区' && fromPlayer && cardInfo) {
+      const effect = { sound: 'play_card' as const, duration: 200 };
+      const view: ViewEvent = { type: '打出', player: fromPlayer, card: cardInfo, effect };
+      return { ownerViews: new Map(), othersView: view };
+    }
+
+    // 牌堆→手牌 = 摸牌（信息分级）
+    if (atom.from.zone === '牌堆' && toPlayer && cardInfo) {
+      const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 200 };
+      const ownerView: ViewEvent = { type: '摸牌', player: toPlayer, count: 1, cards: [cardInfo], effect };
+      const othersView: ViewEvent = { type: '摸牌', player: toPlayer, count: 1, effect };
+      return { ownerViews: new Map([[toPlayer, ownerView]]), othersView };
+    }
+
+    // 通用 fallback
+    const view: ViewEvent = { type: '移动牌', cardId: atom.cardId, from: atom.from, to: atom.to };
+    return { ownerViews: new Map(), othersView: view };
+  },
+  applyView(view, event) {
+    const pi = view.players.findIndex(p => p.name === (event.player as string));
+    if (pi < 0) return;
+    switch (event.type) {
+      case '弃牌':
+      case '打出': {
+        view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
+        if (view.players[pi].hand) {
+          const card = event.card as any;
+          view.players[pi].hand = view.players[pi].hand!.filter(
+            (c: any) => !(c.name === card?.name && c.suit === card?.suit && c.rank === card?.rank)
+          );
+        }
+        break;
+      }
+      case '摸牌': {
+        const count = (event.count as number) ?? 1;
+        view.players[pi].handCount += count;
+        if (event.cards && view.players[pi].hand) {
+          view.players[pi].hand!.push(...(event.cards as any[]));
+        }
+        break;
+      }
     }
   },
 };

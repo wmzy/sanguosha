@@ -384,7 +384,7 @@ interface AtomAfterContext {
 
 ```ts
 type GameEvent =
-  | { kind: 'atom'; atom: Atom; views?: AtomPlayerViews }
+  | { kind: 'atom'; atom: Atom; viewEvents?: ViewEventSplit }
   | { kind: 'notify'; skillId: string; eventType: string; data: Json; views?: NotifyPlayerViews }
 
 /** 通知事件的 per-player 视图分叉 */
@@ -1035,8 +1035,8 @@ interface AtomDefinition<A = unknown> {
   /** 验证：这个 atom 在当前 state 下合法吗？返回 null = 合法 */
   validate(state: GameState, atom: A): string | null;
 
-  /** 执行：修改 state，返回新 state（纯函数） */
-  apply(state: GameState, atom: A): GameState;
+  /** 执行：修改 state（原地突变） */
+  apply(state: GameState, atom: A): void;
 
   /**
    * 可选:等待配置。有此字段 = 等待型 atom。
@@ -1055,14 +1055,32 @@ interface AtomDefinition<A = unknown> {
     timeout: number;
   };
 
-  // ── 前后端共用 ──
+  // ── 前端视图 ──
 
-  /** 可选：per-player 可见性分叉。不实现 = 所有人看到同一个 atom */
-  toPlayerViews?(state: GameState, atom: A): AtomPlayerViews | undefined;
+  /**
+   * ⚠️ **在 apply 之前调用**——此时 state 尚未变更，可以读取即将被消费的数据
+   * （如摸牌前读取牌堆顶的牌面信息）。
+   *
+   * 后端 atom 含完整信息（牌 ID、zone 引用等），不适合直接推前端：
+   * 1. 信息泄漏——摸牌对本人显示牌面，对其他人只显示数量
+   * 2. 语义不匹配——后端 `{ type: '移动牌', from: 手牌, to: 弃牌堆 }`，
+   *    前端需要的是 `{ type: '弃牌', card: { name: '杀', suit: '♠', rank: 7 } }`
+   *
+   * 返回 ViewEventSplit，ViewEvent 是纯数据（可序列化）。
+   * 不实现 = fallback 到带 effect 的原始 atom（前端回退到全量 buildView）。
+   */
+  toViewEvents?(state: GameState, atom: A): ViewEventSplit | undefined;
 
-  // ── 前端 ──
+  /**
+   * 前端视图状态更新。与后端 apply 对称——apply 修改 GameState，applyView 修改 GameView。
+   *
+   * 前端收到 ViewEvent 后，按 `event.atomType ?? event.type` 查找此 AtomDefinition，
+   * 调用 applyView 增量更新 GameView。
+   * 未实现 = 前端回退到全量 buildView。
+   */
+  applyView?(view: GameView, event: ViewEvent): void;
 
-  /** 可选：视觉/音效反馈声明。前端按 atom type 查表播放 */
+  /** 可选：视觉/音效反馈声明。仅在 toViewEvents 未实现时作为 fallback 使用。 */
   effect?: AtomEffect;
 }
 ```
@@ -1098,28 +1116,101 @@ interface AtomEffect {
 ```
 
 前端工作流：
-1. 收到新的 `GameEvent { kind: 'atom' }`，按 `atom.type` 查 `AtomDefinition.effect`
-2. 按 effect 声明播放动画/音效
+1. 收到新的 `ViewEvent`，前端 reducer 增量更新 `GameView`
+2. 按 `effect` 声明播放动画/音效
 3. 如果 `blockUntilDone` = true，等待动画结束再更新 UI 状态
 
 示例：
-- **造成伤害**：`{ sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 400 }`
-- **造成伤害（火）**：`{ sound: 'damage_fire', animation: 'shake', particles: 'fire', duration: 500 }`
-- **摸牌**：`{ sound: 'draw', animation: 'slide', duration: 200 }`
-- **指定目标**：`{ sound: 'target', animation: 'highlight', duration: 200 }`
-- **询问闪**：`{ sound: 'dodge_request', blockUntilDone: true }`
-- **判定**：`{ sound: 'judge', animation: 'flip', blockUntilDone: true }`
-- **回复体力**：`{ sound: 'heal', particles: 'ice', duration: 300 }`
+- **造成伤害**：`toViewEvents` → 本人看到 `{ type: '造成伤害', target: 'P2', amount: 1, source: 'P1', effect: { ... } }`
+- **摸牌**：`toViewEvents` → 本人看到 `{ type: '摸牌', player: 'P1', cards: [{ name: '杀', suit: '♠', rank: 7 }] }`，其他人看到 `{ type: '摸牌', player: 'P1', count: 2 }`
+- **移动牌**（手牌→弃牌堆）：`toViewEvents` → `{ type: '弃牌', player: 'P1', card: { name: '闪', suit: '♥', rank: 3 } }`
+- **指定目标**：`toViewEvents` → `{ type: '指定目标', source: 'P1', target: 'P2' }`
+- **询问闪**：`toViewEvents` → `{ type: '询问闪', target: 'P2', pending: { ... }, effect: { blockUntilDone: true } }`
 
-Atom 不知道为什么被调用、谁在调用。`validate` 做数据级检查（"target 存不存在"），`apply` 做状态变更（"扣血"），`effect` 声明前端反馈（"扣血动画"）。三者同文件定义，修改 atom 时不会忘改效果。
+Atom 不知道为什么被调用、谁在调用。`validate` 做数据级检查（"target 存不存在"），`apply` 做状态变更（"扣血"），`toViewEvents` 做前端展示（"扣血动画 + 脱敏参数"）。三者同文件定义，修改 atom 时不会忘改效果。
+
+### 5.2 ViewEvent——前端视图事件
+
+`ViewEvent` 是前端实际消费的事件，由 `AtomDefinition.toViewEvents` 从后端 atom 转换而来。
+**ViewEvent 是纯数据——可序列化，跨网络传输，不含函数。**
+```ts
+/**
+ * 前端视图事件——后端 atom 的前端投影。纯数据，可序列化。
+ *
+ * 与后端 Atom 的区别：
+ * 1. 参数脱敏：不含 cardId 引用（前端用 cardMap 查），不含 zone 内部引用
+ * 2. 信息分级：摸牌对本人暴露牌面，对他人只给数量
+ * 3. 语义对齐：后端 `移动牌` 对应前端 `弃牌`/`出牌`/`摸牌` 等语义化事件
+ * 4. 自带 effect：动画/音效声明内联，前端不需要按 type 查表
+ * 5. atomType：当 ViewEvent.type 与 atom.type 不同时，携带原始 atom 类型
+ */
+interface ViewEvent {
+  /** 事件类型（可能与 atom type 不同，如 移动牌→弃牌） */
+  type: string;
+  /**
+   * 原始 atom 类型。当 ViewEvent.type 与 atom.type 不同时自动设置，
+   * 前端据此查找 AtomDefinition.applyView。
+   * 相同时省略（前端 fallback 到 type）。
+   */
+  atomType?: string;
+  /** 事件数据（已脱敏，只含前端需要的字段） */
+  [key: string]: Json;
+  /** 内联动画/音效声明（可选） */
+  effect?: AtomEffect;
+  /** 等待信息（仅等待型 atom） */
+  pending?: { startTime: number; deadline: number; prompt: ActionPrompt };
+}
+
+/**
+ * Per-player 视图分叉——替代旧的 AtomPlayerViews 元组。
+ *
+ * ownerViews: 指定玩家看到专属的视图事件（如摸牌看到具体牌面）
+ * othersView: 其余玩家看到的通用视图事件（如摸牌只看到数量）
+ *
+ * null = 该角色看不到此事件（如对方的加标签）
+ */
+interface ViewEventSplit {
+  /** 指定玩家看到的专属视图事件 */
+  ownerViews: ReadonlyMap<string, ViewEvent | null>;
+  /** 其余玩家看到的通用视图事件。null = 其他人不感知此 atom */
+  othersView: ViewEvent | null;
+}
+```
+
+**`applyView` 不在 ViewEvent 上——它在 AtomDefinition 上**。ViewEvent 是后端生成的纯数据，通过网络序列化传给前端；`applyView` 是前端逻辑，在前端按 `event.atomType ?? event.type` 查找 AtomDefinition 后调用。
+
+**旧 `toPlayerViews` / `AtomPlayerViews` 已删除**。替代方案：
+
+| 旧 | 新 | 变化 |
+|---|---|---|
+| `toPlayerViews(state, atom): [Map<string, Atom>, Atom \| null]` | `toViewEvents(state, atom): ViewEventSplit` | 返回前端语义化的 ViewEvent，不是原始 Atom |
+| `AtomPlayerViews` 元组 | `ViewEventSplit` | `ownerViews` 值可为 null（隐藏），`othersView` 也可为 null |
+| `AtomDefinition.effect` | `ViewEvent.effect` 内联 | effect 成为 ViewEvent 的字段，不再按 type 查表 |
+| 前端按 atom.type 查 effect 表 | 前端直接读 ViewEvent.effect | 消除前端查表逻辑 |
+| `view/reducer.ts` 300+ 行 switch-case | `AtomDefinition.applyView` | 前端 reducer 按 `atomType` 查找 def，调用 `def.applyView(view, event)` |
+
+#### 前端消费管线
 
 ```ts
-/** 可见性分叉（元组） */
-type AtomPlayerViews = readonly [
-  ownerViews: ReadonlyMap<string, Atom>,
-  defaultView: Atom | null,
-];
+// 前端 reducer —— 不再需要巨型 switch-case
+function viewReducer(view: GameView, event: ViewEvent): GameView {
+  // 1. 按 atomType 查找 AtomDefinition，调用其 applyView
+  const def = getAtomDef(event.atomType ?? event.type);
+  def.applyView?.(view, event);
+  // 2. 播放动画/音效
+  if (event.effect) {
+    playEffect(event.effect);
+  }
+  return view;
+}
+
+// 前端收到事件流后
+for (const event of viewEvents) {
+  gameView = viewReducer(gameView, event);
+}
 ```
+
+若 AtomDefinition 没有 `applyView`（如 fallback 路径），前端回退到全量 `buildView()`。
 
 ## 6. 执行模型
 
@@ -1132,9 +1223,12 @@ type AtomPlayerViews = readonly [
    - 钩子可以 `await applyAtom(ctx.state, 新atom)` 形成嵌套(包括嵌套等待型 atom)
    - **钩子不能取消当前 atom**——`drop()` 机制已移除,所有 before hooks 跑完后必然进入 validate/apply
 3. **validate**：`AtomDefinition.validate(state, atom)` → 不合法则跳过，Promise resolve
-4. **apply**：`AtomDefinition.apply(state, atom)` → 产生新 state（纯函数）
-5. **弹栈**：atom 从 atom 栈弹出
-6. **生成事件**：构造 `GameEvent { kind: 'atom', atom }` + per-player 视图分叉 → 推入前端事件流
+4. **生成视图事件**：调用 `AtomDefinition.toViewEvents(state, atom)` 生成分叉视图事件 → 推入前端事件流。
+   - ⚠️ **在 apply 之前**——此时 state 尚未变更，可以读取即将被消费的数据（如牌堆顶的牌面信息）
+   - 每个 ViewEvent 可附带 `applyView` 函数，前端 reducer 据此增量更新 GameView
+   - 若 `toViewEvents` 未实现，fallback 为带 `AtomDefinition.effect` 的原始 atom（无 applyView）
+5. **apply**：`AtomDefinition.apply(state, atom)` → 产生新 state（纯函数）
+6. **弹栈**：atom 从 atom 栈弹出
 7. **onAfter hooks**：所有注册了该 `atomType` 的 `onAtomAfter` 钩子按优先级串行执行（async）
    - 钩子可以 `await applyAtom(ctx.state, 新atom)`
    - 钩子通过 `ctx.state` 读 state(只读)
@@ -1433,10 +1527,85 @@ interface ActionLogEntry {
 
 ### 8.2 前端事件流
 
-前端收到的是 `GameEvent[]` 流，包含 atom 事件和通知事件。per-player 视图分叉（`toPlayerViews` / `NotifyPlayerViews`）。
+前端收到的是 **视图事件流**（`ViewEvent[]`），由 `AtomDefinition.toViewEvents` 从后端 atom 转换而来。每个 action 执行后，引擎收集所有生成的 ViewEvent，session 层按 player 做 per-player 分叉广播。
+
+### 8.2.1 事件生成管线
+
+```
+后端 atom                     ViewEvent（per-player 分叉）
+─────────────────────────     ──────────────────────────────────
+{ type: '摸牌',              owner(P1): { type: '摸牌', player: 'P1',
+  player: 'P1', count: 2 }       cards: [{ name: '杀', ... }, { name: '闪', ... }],
+                                  effect: { sound: 'draw' } }
+                              others:   { type: '摸牌', player: 'P1', count: 2,
+                                  effect: { sound: 'draw' } }
+
+{ type: '造成伤害',           all: { type: '造成伤害', target: 'P2', amount: 1,
+  target: 'P2', amount: 1,       source: 'P1',
+  source: 'P1' }                 effect: { sound: 'damage_physical', animation: 'shake' } }
+
+{ type: '移动牌',             owner(P1): { type: '弃牌', player: 'P1',
+  from: 手牌(P1),                 card: { name: '闪', suit: '♥', rank: 3 },
+  to: 弃牌堆 }                    effect: { sound: 'discard' } }
+                              others:   { type: '弃牌', player: 'P1',
+                                  card: { name: '闪', suit: '♥', rank: 3 },
+                                  effect: { sound: 'discard' } }
+```
+
+### 8.2.2 传输协议
+
+```ts
+/** 服务端推给单个客户端的消息 */
+type ServerEventMessage = {
+  type: 'events';
+  fromSeq: number;
+  /** 该玩家可见的视图事件列表 */
+  events: ViewEvent[];
+};
+```
+
+Session 层在 `broadcastNewState()` 中：
+1. 从引擎事件流获取本批次所有 `ViewEventSplit`
+2. 遍历每个玩家，收集其可见的 ViewEvent（`ownerViews.get(name) ?? othersView`）
+3. 发送 `{ type: 'events', fromSeq, events }` 给该玩家
+
+### 8.2.3 前端消费
+
+前端维护一个 `GameView` 状态机，收到 `ViewEvent[]` 后增量更新。
+前端按 `event.atomType ?? event.type` 查找 AtomDefinition，调用其 `applyView`：
+
+```ts
+// 前端 reducer —— 不需要巨型 switch-case
+function viewReducer(view: GameView, event: ViewEvent): GameView {
+  // 1. 按 atomType 查找 AtomDefinition，调用其 applyView
+  const def = getAtomDef(event.atomType ?? event.type);
+  def.applyView?.(view, event);
+  // 2. 播放动画/音效
+  if (event.effect) {
+    playEffect(event.effect);
+  }
+  return view;
+}
+
+// 前端收到事件流后
+for (const event of viewEvents) {
+  gameView = viewReducer(gameView, event);
+}
+```
+
+**设计决策**：`applyView` 在 AtomDefinition 上而非 ViewEvent 上。
+ViewEvent 是后端生成的纯数据，通过网络序列化传给前端——函数不能序列化。
+`applyView` 是前端逻辑，前端共享 atom 定义代码（tree-shake 后端的 validate/apply），
+按 `atomType` 查找 AtomDefinition 后调用 `applyView(view, event)`。
+
+`atomType` 由 `resolveViewEvents` 在后端自动设置——当 ViewEvent.type 与 atom.type 不同时
+（如 `移动牌` → `弃牌`），确保前端能找到原始 AtomDefinition。
+
+若 AtomDefinition 没有 `applyView`（如 fallback 路径），前端回退到全量 `buildView()`。
+
+### 8.2.4 断线重连与回放
 
 服务端按玩家存事件流（用于断线重连推差量），客户端 ack 序号。
-
 事件流不持久化到 action 日志——它是 action 执行的副产物，可以从 action 日志重新生成。
 
 ## 9. 文件结构
@@ -1519,6 +1688,7 @@ src/server/
 | `getCurrentState()` / `getCurrentOwnerId()` | 已删除——validate/execute 签名直接接收 state 参数 |
 | `engine-api.ts` | 已合并到 `create-engine.ts`——所有函数从 create-engine 导出 |
 | `registerSkillModule` | 已删除——技能模块通过 `skills/index.ts` 的 skillLoaders map 注册 |
+| `toPlayerViews` / `AtomPlayerViews` | 已删除——被 `toViewEvents` / `ViewEventSplit` 替代。旧设计返回原始 Atom 的不同版本；新设计返回前端语义化的 ViewEvent，内联 effect |
 
 ## 11. 场景推演
 

@@ -46,7 +46,7 @@ import {
   getBeforeHooks,
   rebootstrap as skillRebootstrap,
 } from './skill';
-import { applyAtom as applyAtomImpl, getAtomDef, resolvePlayerViews } from './atom';
+import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
 import { clearEvents, pushEvent } from './event-stream';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
@@ -443,10 +443,12 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
     return;
   }
 
+  // toViewEvents 必须在 apply 之前调用——此时 state 尚未变更
+  const viewEvents = resolveViewEvents(state, atom);
+
   applyAtomImpl(state, atom);
 
-  const views = resolvePlayerViews(state, atom);
-  pushEvent({ kind: 'atom', atom, views });
+  pushEvent({ kind: 'atom', atom, viewEvents });
 
   if (atom.type === '判定') {
     moveJudgeCardToZone(state, atom);
