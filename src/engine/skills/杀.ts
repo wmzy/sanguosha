@@ -1,6 +1,31 @@
 // src/engine/skills/杀.ts
-// 杀:出牌阶段对攻击范围内一名角色使用,目标可出闪
-// 计数:持久化到 player.marks(每回合 turn 结束自动清理)
+// ============================================================
+// 技能描述(三国杀官方规则):
+//   出牌阶段,对你攻击范围内的一名其他角色使用,对其造成 1 点伤害。
+//   每回合限用一张(除非有特殊效果,如诸葛连弩 → 无限出杀)。
+//   目标可以打出【闪】抵消此杀的效果。
+//
+// 关键原子操作:
+//   use 路径:
+//     移动牌(手牌→处理区) → 指定目标 → 询问闪 → 造成伤害 → 移动牌(处理区→弃牌堆) → 加标记(killsPlayed)
+//   respond 路径(决斗/南蛮入侵/万箭齐发/激将等场景):
+//     移动牌(手牌→弃牌堆) → mutate parent frame.settlement.responded/dodged
+//
+// 关键时机:
+//   - validate:出杀次数(killsPlayed mark)、攻击范围(距离 + 武器)
+//   - 询问闪 是等待型 atom,挂起 execute 直到目标回应或超时(15s)
+//
+// 已知问题/不完整实现:
+//   1. validate 未限制"其他角色"(理论上当前可对自己出杀,虽 UI 不显示)
+//   2. WEAPON_RANGE 表与 src/engine/distance.ts 完全重复——应直接调用
+//      inAttackRange(state, from, to) 复用,而非内联硬编码武器列表。
+//   3. 距离计算硬编码进攻马/防御马,未走"距离技能" hook,无法被新技能(如马术)修正。
+//   4. 未考虑杀属性(普通/火杀/雷杀)——红色 → 火,黑色 → 雷,无属性区分对应防具(藤甲等)。
+//   5. "诸葛连弩"判定通过 marks 名 '诸葛连弩/无限出杀' 硬耦合;新增类似无限出杀效果需复制此分支。
+//   6. respond 用 frame.params.__杀响应 / __responded 等私有标签 mutate parent frame,
+//      属于"通过 params 传递跨 atom 状态"的反模式(类型注释明确说明应通过 state 观察)。
+//   7. settlement.dodged 既表示"出闪了"也表示"出杀响应了决斗"——语义模糊,应拆分字段。
+// ============================================================
 import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame, topFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';

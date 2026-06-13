@@ -1,5 +1,28 @@
 // src/engine/skills/桃.ts
-// 桃:出牌阶段对自己使用(回复 1 体力);或濒死时对濒死角色使用
+// ============================================================
+// 技能描述(三国杀官方规则):
+//   1. 出牌阶段,对自己使用,回复 1 点体力(不能超过体力上限)。
+//   2. 一名角色处于濒死状态时,该角色或其他角色对其使用,回复 1 点体力(救命)。
+//
+// 关键原子操作:
+//   use 路径:
+//     pushFrame → 移动牌(手牌→处理区) → 回复体力 → 移动牌(处理区→弃牌堆) → popFrame
+//
+// 关键时机:
+//   - 出牌阶段:target 必须是自己,且自己体力 < 上限
+//   - 濒死求桃:在 dyingWindow pending 期间,任何角色都可对濒死角色使用桃
+//
+// 已知问题/不完整实现:
+//   1. validate 只检查 target 存在,未限制"出牌阶段时只能对自己使用",
+//      也未检查"濒死阶段才允许对其他玩家使用"——
+//      理论上当前允许出牌阶段对任意人使用桃(违反规则)。
+//   2. validate 未检查目标体力是否 < 上限——空回血(满血时)可能被错误允许,
+//      会浪费一张桃且产生噪音事件(虽然 回复体力 atom 内可能限制)。
+//   3. 缺少濒死场景的特殊处理:当前实现走的是普通 use 流程,
+//      与 dyingWindow pending 的交互(中断 wait、注入回应)未在本文件体现,需检查 dispatch 路径。
+//   4. 没有 onMount 注册 UI prompt——前端如何区分"出牌阶段桃"与"濒死求桃"二者的目标选择,
+//      需依赖外部 prompt 配置(如 dyingWindow PendingAction 自带 target 列表)。
+// ============================================================
 import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
