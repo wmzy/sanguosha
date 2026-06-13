@@ -1,5 +1,25 @@
 // src/engine/skills/无中生有.ts
-// 无中生有(锦囊):摸两张牌
+// ============================================================
+// 技能描述(三国杀官方规则):
+//   无中生有(普通锦囊):出牌阶段,对自己使用,你摸两张牌。
+//   可被【无懈可击】取消。
+//
+// 关键原子操作:
+//   use 路径:
+//     pushFrame → 移动牌(手牌→处理区) → 摸牌(from, 2) →
+//     移动牌(处理区→弃牌堆) → popFrame
+//
+// 关键时机:
+//   - 仅出牌阶段,目标必须是自己
+//
+// 已知问题/不完整实现:
+//   1. **无懈可击未支持**:虽然可对自己用,但无懈仍可被其他玩家打出取消——
+//      当前 use 流程无询问无懈环节。
+//   2. **未约束目标为 self**:validate 无 target 参数,默认是 self,
+//      但若 params 误传了 target 给非 self,代码没拒绝(目前没有 target 使用,影响小)。
+//   3. validate 未检查 cardId 是否在手牌中、是否是真的"无中生有"卡名。
+//   4. 摸牌前后未触发"使用锦囊"事件,某些技能(如某些武将的"反制锦囊")无 hook。
+// ============================================================
 import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
