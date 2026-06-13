@@ -273,31 +273,20 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   const validationError = entry.validate(state, message.params);
   if (validationError !== null) return { error: validationError };
 
-  // execute 到达 pending 时 fireDispatchReady → dispatch 返回。
-  // 不等 activeExecuteP:execute 在 pending 处挂起,等回应/超时后才完成。
-  // fireDispatchReady 走模块级 currentDispatchReady。
-  let dispatchReadyResolve: () => void = () => {};
-  const dispatchReady = new Promise<void>((r) => {
-    dispatchReadyResolve = r;
-  });
-  let fired = false;
-  const fireDispatchReady = (): void => {
-    if (!fired) {
-      fired = true;
-      dispatchReadyResolve();
-    }
-  };
-  setDispatchReady(fireDispatchReady);
+  // 主动 action 路径:启动 execute,await per-state stable wait。
+  // 通知触发点:execute 完成(.finally) / 新 pending 创建(applyAtom via resolveStable)。
+  let resolveStableLocal: () => void = () => {};
+  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+  state._resolveStable = resolveStableLocal;
+
   const executeP = entry.execute(state, message.params).finally(() => {
-    clearDispatchReady();
-    fireDispatchReady();
+    resolveStable(state);    // execute 完成 → 稳定点
   });
   state._activeExecuteP = executeP;
 
-  // 等到 execute 抵达 pending 挂起点(fireDispatchReady 触发)就返回当前 state。
-  // 不 await executeP 本身 —— execute 可能挂在 pending slot 上,要等回应或
-  // fireTimeout 推进,主动 action 的调用方不需要阻塞等待。
-  await dispatchReady;
+  // 等到稳定点(execute 完成 OR 新 pending 创建)就返回当前 state。
+  // 不 await executeP 本身 —— execute 可能挂在 pending slot 上。
+  await state._waitForStable;
   // activeExecuteP 挂在 pending 处,不等它;回应路径 dispatch 会 await 它
 
   logAction(state, message);
