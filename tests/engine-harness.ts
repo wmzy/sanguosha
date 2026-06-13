@@ -1,14 +1,14 @@
 // tests/engine-harness.ts
-// 技能集成测试 harness:
-//   SkillTestHarness  → 引擎生命周期 + 玩家索引
+// 技能集成测试 harness(用新顶层 API):
+//   SkillTestHarness  → state 生命周期 + 玩家索引
 //   PlayerSession     → 玩家操作/查询/断言
 //   FakeFrontendAPI   → 收集 defineAction 声明
 //
 // 设计原则:
 //   - 用玩家术语(pass / respond / useCard),不暴露 timer/pending/atom 机制
 //   - 断言可观察游戏状态(health / hand / zone),不断言内部 atom 序列
-//   - 不 mock 任何引擎组件:复用真实 createEngine / dispatch / apply pipeline
-//   - 走 engine.fireTimeout() 触发 onTimeout(语义最准,不需 fake timers)
+//   - 不 mock 任何引擎组件:复用真实 dispatch / buildView / apply pipeline
+//   - 走 fireTimeout(state) 触发 onTimeout(语义最准,不需 fake timers)
 
 import type {
   ActionPrompt,
@@ -24,7 +24,7 @@ import type {
   Json,
   TargetFilter,
 } from '../src/engine/types';
-import { createEngine, type EngineInstance } from '../src/engine/create-engine';
+import { dispatch, buildView, fireTimeout, resetForTest } from '../src/engine/create-engine';
 import { getEventCount, getEvents } from '../src/engine/event-stream';
 import { getSkillModule } from '../src/engine/skill';
 
@@ -102,7 +102,7 @@ export class PlayerSession {
 
   get view(): GameView {
     const idx = this.harness.state.players.findIndex((p) => p.name === this.playerName);
-    return this.harness.engine.buildView(idx);
+    return buildView(this.harness.state, idx);
   }
 
   get newEvents(): GameEvent[] {
@@ -175,7 +175,7 @@ export class PlayerSession {
 
   /** 放弃响应当前等待(不出闪、不发动技能、不确认)。走 onTimeout 路径。 */
   async pass(): Promise<void> {
-    await this.harness.engine.fireTimeout();
+    await fireTimeout(this.harness.state);
   }
 
   async triggerAction(
@@ -218,10 +218,10 @@ export class PlayerSession {
   private async dispatch(
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
   ): Promise<void> {
-    const result = await this.harness.engine.dispatch({
+    const result = await dispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerName,
-      baseSeq: this.harness.engine.getState().seq,
+      baseSeq: this.harness.state.seq,
     });
     if (result.error) throw new Error(`dispatch error: ${result.error}`);
   }
@@ -230,17 +230,13 @@ export class PlayerSession {
 // ─── SkillTestHarness ──────────────────────────────────────────
 
 export class SkillTestHarness {
-  readonly engine: EngineInstance;
+  private _state: GameState | null = null;
   private sessions = new Map<string, PlayerSession>();
 
-  constructor() {
-    this.engine = createEngine();
-  }
-
-  /** 初始化:重置引擎 → bootstrap state → 为每个玩家创建 session 并加载 onMount */
+  /** 初始化:重置引擎 → 接管传入的 state → 为每个玩家创建 session 并加载 onMount */
   setup(state: GameState): void {
-    this.engine.resetForTest();
-    this.engine.bootstrap(state);
+    resetForTest();
+    this._state = state;
     this.sessions.clear();
     for (const player of state.players) {
       const session = new PlayerSession(player.name, this);
@@ -256,7 +252,8 @@ export class SkillTestHarness {
   }
 
   get state(): GameState {
-    return this.engine.getState();
+    if (!this._state) throw new Error('SkillTestHarness.state: setup() 未调用');
+    return this._state;
   }
 
   get events(): GameEvent[] {
