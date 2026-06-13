@@ -84,17 +84,23 @@ function extractPendingTarget(atom: Atom): string {
 
 /** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。 */
 function resolveStable(state: GameState): void {
-  // 任务 1 中间态:在 _waitForStable 尚未被任何路径 await 的情况下,
-  // 也转发到旧的模块级 notifier,保持 dispatch() 的行为不变。
-  // Task 2-4 把 dispatch/response/fireTimeout 改用 state._waitForStable 后,
-  // 这条 fallback 路径变成死代码,Task 5 会和模块级 notifier 一起删除。
-  notifyDispatchReady();
   const r = state._resolveStable;
   if (r) {
     r();
     state._waitForStable = undefined;
     state._resolveStable = undefined;
   }
+}
+
+/**
+ * 建立 per-execute stable wait:创建新 _waitForStable Promise + _resolveStable resolver。
+ * 每个 execute lifecycle 调用一次。续跑路径(回应/fireTimeout)必须重新调用,
+ * 因为上一轮 wait 已被 applyAtom 触发 resolveStable 清掉。
+ */
+function setupStableWait(state: GameState): void {
+  let resolveStableLocal: () => void = () => {};
+  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+  state._resolveStable = resolveStableLocal;
 }
 
 /** 兜底:补全老 state 缺失的字段(原地变更) */
@@ -240,9 +246,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
 
     // 等稳定点:重新建立 per-state stable wait,捕捉原 execute 续跑后的
     // .finally(完成)或 applyAtom 创建新 pending 事件。
-    let resolveStableLocal: () => void = () => {};
-    state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
-    state._resolveStable = resolveStableLocal;
+    setupStableWait(state);
     await state._waitForStable;
     if (!state.pendingSlot) state._activeExecuteP = undefined
     logAction(state, message);
@@ -269,9 +273,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
 
   // 主动 action 路径:启动 execute,await per-state stable wait。
   // 通知触发点:execute 完成(.finally) / 新 pending 创建(applyAtom via resolveStable)。
-  let resolveStableLocal: () => void = () => {};
-  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
-  state._resolveStable = resolveStableLocal;
+  setupStableWait(state);
 
   const executeP = entry.execute(state, message.params).finally(() => {
     resolveStable(state);    // execute 完成 → 稳定点
@@ -306,9 +308,7 @@ export async function fireTimeout(state: GameState): Promise<DispatchResult> {
   // 不等 activeExecuteP:execute 恢复后可能产生新 pending 或完成,
   // 下一次 dispatch/fireTimeout 会处理。仅当 execute 已完成时清理。
   // 续跑路径:重新建立 stable wait 捕捉原 execute 续跑后的事件(同 Task 3 回应路径)
-  let resolveStableLocal: () => void = () => {};
-  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
-  state._resolveStable = resolveStableLocal;
+  setupStableWait(state);
   await state._waitForStable;
   if (!state.pendingSlot) state._activeExecuteP = undefined
   const { gameOver, winner } = checkGameOver(state);
@@ -326,22 +326,6 @@ export function resetForTest(): void {
 
 // ==================== 从 engine-api.ts 合并的导出 ====================
 // 以下函数原属 engine-api.ts,现已合并到本文件。skill 文件通过 import from '../create-engine' 使用。
-
-// ─── 模块级 dispatch ready 通知器 ──────────────────────────────
-
-let currentDispatchReady: () => void = () => {};
-
-export function setDispatchReady(fn: () => void): void {
-  currentDispatchReady = fn;
-}
-
-export function clearDispatchReady(): void {
-  currentDispatchReady = () => {};
-}
-
-function notifyDispatchReady(): void {
-  currentDispatchReady();
-}
 
 // ─── 帧管理 ──────────────────────────────────────────────────
 
