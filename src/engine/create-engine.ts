@@ -238,18 +238,12 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     slot.resolve = () => {};
     resolve();
 
-    // 等原始 execute 完成 或 产生新 pending
-    if (state._activeExecuteP) {
-          await Promise.race([
-            state._activeExecuteP,
-            new Promise<void>((resolve) => {
-              const timer = setInterval(() => {
-                if (state.pendingSlot) { clearInterval(timer); resolve(); }
-              }, 0);
-              state._activeExecuteP!.then(() => clearInterval(timer));
-            }),
-          ]);
-        }
+    // 等稳定点:重新建立 per-state stable wait,捕捉原 execute 续跑后的
+    // .finally(完成)或 applyAtom 创建新 pending 事件。
+    let resolveStableLocal: () => void = () => {};
+    state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+    state._resolveStable = resolveStableLocal;
+    await state._waitForStable;
     if (!state.pendingSlot) state._activeExecuteP = undefined
     logAction(state, message);
     state.seq += 1;
