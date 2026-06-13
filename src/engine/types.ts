@@ -95,6 +95,14 @@ export interface GameState {
   _dropNext?: boolean;
   /** 内部:当前活跃的 execute Promise,回应路径上用于等待原始 execute 完成。 */
   _activeExecuteP?: Promise<void>;
+  /**
+   * 当前 dispatch/fireTimeout 在等的"稳定点" Promise。
+   * 每个 execute lifecycle 创建一个新 Promise,execute 完成或新 pending 创建时 resolve。
+   * 等价于"下一个 pending 出现 OR 当前 execute 真的结束"二者择一。
+   */
+  _waitForStable?: Promise<void>;
+  /** 配套的 resolve 函数,供通知触发点使用 */
+  _resolveStable?: () => void;
 }
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */

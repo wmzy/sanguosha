@@ -82,6 +82,21 @@ function extractPendingTarget(atom: Atom): string {
   return '';
 }
 
+/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。 */
+function resolveStable(state: GameState): void {
+  // 任务 1 中间态:在 _waitForStable 尚未被任何路径 await 的情况下,
+  // 也转发到旧的模块级 notifier,保持 dispatch() 的行为不变。
+  // Task 2-4 把 dispatch/response/fireTimeout 改用 state._waitForStable 后,
+  // 这条 fallback 路径变成死代码,Task 5 会和模块级 notifier 一起删除。
+  notifyDispatchReady();
+  const r = state._resolveStable;
+  if (r) {
+    r();
+    state._waitForStable = undefined;
+    state._resolveStable = undefined;
+  }
+}
+
 /** 兜底:补全老 state 缺失的字段(原地变更) */
 function ensureStateShape(state: GameState): void {
   if (!state.cardWrappers) state.cardWrappers = {};
@@ -513,7 +528,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
       slot._fireTimeoutNow = fireTimeoutNow;
 
       const timer = setTimeout(fireTimeoutNow, timeoutMs);
-      notifyDispatchReady();
+      resolveStable(state);
     });
   }
 }
