@@ -1,7 +1,8 @@
 // src/engine/skills/反馈.ts
 // 反馈(司马懿·锁定技):当你受到伤害后,你可以获得伤害来源的一张牌
-import type { AtomAfterContext, BackendAPI, Skill } from '../types';
-import { registerSkillModule, type SkillModule } from '../skill';
+import type { AtomAfterContext, Skill } from '../types';
+import { applyAtom } from '../create-engine';
+import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
   return {
@@ -12,10 +13,10 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(skill: Skill, api: BackendAPI): () => void {
-  api.onAtomAfter('造成伤害', async (ctx: AtomAfterContext) => {
+export function onInit(skill: Skill, ownerId: string): () => void {
+  registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { target?: string; source?: string; amount?: number };
-    if (atom.target !== api.self) return;
+    if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (!atom.source) return;
     // 检查来源是否有牌
@@ -24,10 +25,10 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const hasCards = sourcePlayer.hand.length > 0 || Object.keys(sourcePlayer.equipment).length > 0;
     if (!hasCards) return;
     // 询问是否发动
-    await ctx.api.apply({
+    await applyAtom(ctx.state, {
       type: '请求回应',
       requestType: '反馈/confirm',
-      target: api.self,
+      target: ownerId,
       prompt: { type: 'confirm', title: '是否发动反馈?', confirmLabel: '发动', cancelLabel: '不发动' },
       defaultChoice: false,
       timeout: 10000,
@@ -40,13 +41,13 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     let cardId: string | undefined;
     if (source.hand.length > 0) {
       cardId = source.hand[0];
-      await ctx.api.apply({ type: '获得', player: api.self, cardId, from: atom.source });
+      await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: atom.source });
     } else {
       const equipSlot = Object.keys(source.equipment)[0] as keyof typeof source.equipment;
       if (equipSlot) {
         cardId = source.equipment[equipSlot];
         if (cardId) {
-          await ctx.api.apply({ type: '获得', player: api.self, cardId, from: atom.source });
+          await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: atom.source });
         }
       }
     }
@@ -54,5 +55,4 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
   return () => {};
 }
 
-export const module_反馈: SkillModule = { createSkill, onInit };
-registerSkillModule('反馈', module_反馈);
+export default { createSkill, onInit };

@@ -52,10 +52,10 @@ function buildInitialState(): GameState {
 describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
   let state: GameState;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetForTest();
     state = buildInitialState();
-    rebootstrap(state);
+    await rebootstrap(state);
   });
 
   it('出杀:无回应 → 目标扣 1 血', async () => {
@@ -102,7 +102,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     state.players = state.players.map(p => p.name === 'P1' ? { ...p, hand: ['c2'] } : p);
     state.cardMap = { ...state.cardMap, c2 };
     resetForTest();
-    rebootstrap(state);
+    await rebootstrap(state);
 
     await dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 'P1',

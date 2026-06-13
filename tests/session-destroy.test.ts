@@ -53,7 +53,7 @@ describe('GameSession destroy 阻止后续持久化（race condition 修复）',
     const saveSpy = vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});
     vi.spyOn(persistence, 'deletePersistedRoom').mockImplementation(async () => {});
     const session = new GameSession(room, true);
-    session.restoreState(
+    await session.restoreState(
       {
         pending: {
           id: 'p',

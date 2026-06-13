@@ -25,10 +25,10 @@ function buildInitialState(): GameState {
 describe('新 ENGINE-DESIGN 顶层 API — 仁德(刘备)', () => {
   let state: GameState;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetForTest();
     state = buildInitialState();
-    rebootstrap(state);
+    await rebootstrap(state);
   });
 
   it('给 1 人 2 张牌(单帧) → 刘备回复 1 血', async () => {

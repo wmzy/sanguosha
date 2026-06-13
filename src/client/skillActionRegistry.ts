@@ -1,9 +1,7 @@
 // src/client/skillActionRegistry.ts
 // 前端技能 action 注册表：收集技能 onMount 调用 defineAction 注册的 UI 配置
-// 按设计文档 §4.7 / §4.13
+// 通过 import() 动态加载技能包
 import type { ActionPrompt, Card, CardWrapper, Skill, FrontendAPI } from '../engine/types';
-// 确保所有 skill modules 已注册(side-effect import)
-import '../engine/skills/index';
 import { getSkillModule } from '../engine/skill';
 
 export interface SkillActionDef {
@@ -45,18 +43,17 @@ function makeFrontendAPI(skillId: string, ownerId: string): FrontendAPI {
 
 /**
  * 为一个玩家初始化所有技能的前端 action 注册。
- * 遍历 player.skills，调用每个技能 module 的 onMount。
+ * 通过 import() 动态加载技能模块，调用每个技能 module 的 onMount。
  */
-export function registerSkillActions(playerName: string, skillIds: string[]): void {
+export async function registerSkillActions(playerName: string, skillIds: string[]): Promise<void> {
   for (const skillId of skillIds) {
     try {
-      const mod = getSkillModule(skillId);
+      const mod = await getSkillModule(skillId);
       if (!mod.onMount) continue;
       const skill: Skill = mod.createSkill(skillId, playerName);
       const api = makeFrontendAPI(skillId, playerName);
       mod.onMount(skill, api);
     } catch (e) {
-      // skill not registered, skip
       console.warn(`[skillActionRegistry] 注册 ${skillId} 失败:`, e);
     }
   }

@@ -24,10 +24,10 @@ function buildInitialState(): GameState {
 describe('新 ENGINE-DESIGN 顶层 API — 护甲(曹操·锁定被动)', () => {
   let state: GameState;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetForTest();
     state = buildInitialState();
-    rebootstrap(state);
+    await rebootstrap(state);
   });
 
   it('受到黑色【杀】 → 扣 0 血(护甲吸收)', async () => {

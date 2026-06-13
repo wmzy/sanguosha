@@ -6,7 +6,7 @@ import type {
   GameState,
   GameView,
 } from '../engine/types';
-import { create, bootstrap, dispatch, buildView, resetForTest, type GameConfig } from '../engine/create-engine';
+import { create, bootstrap, dispatch, buildView, resetForTest, rebootstrap, type GameConfig } from '../engine/create-engine';
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -56,10 +56,12 @@ export class GameSession {
   }
 
   /** 用持久化恢复的 state 接管(由 app.ts 从 actionLog replay 出来后传入) */
-  restoreState(state: GameState, actionLog: ActionLogEntry[] = []): void {
+  async restoreState(state: GameState, actionLog: ActionLogEntry[] = []): Promise<void> {
     this.actionLog = actionLog;
     this.lastActivityAt = Date.now();
     this.state = state;
+    // 通过 skillLoaders 动态加载并注册所有 skill 实例
+    await rebootstrap(state);
   }
 
   async startGame(playerCount?: number): Promise<boolean> {
@@ -78,7 +80,7 @@ export class GameSession {
       gameId: this.room.id,
     };
     this.state = create(config);
-    await bootstrap(this.state, config);
+    await bootstrap(this.state);
 
     // 建立 playerId → playerName 映射
     const state = this.state;

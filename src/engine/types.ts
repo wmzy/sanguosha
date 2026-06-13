@@ -88,6 +88,13 @@ export interface GameState {
   seq: number;
   startedAt: number;
   actionLog: ActionLogEntry[];
+  /**
+   * 内部 drop 标志(由 engine-api 内部使用):applyAtom 进入时重置为 false,
+   * 仅供 6 个防具/武器 skill 调整伤害用,新代码不应使用。
+   */
+  _dropNext?: boolean;
+  /** 内部:当前活跃的 execute Promise,回应路径上用于等待原始 execute 完成。 */
+  _activeExecuteP?: Promise<void>;
 }
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
@@ -311,15 +318,44 @@ export interface GameView {
 }
 
 /**
- * 引擎 API:由 dispatch 通过 createEngineApi 内部生成,作为 action.execute 的参数传入。
- * 技能通过 pushFrame 创建帧;apply 变更状态;notify 推送事件。
+ * 引擎原子操作管线说明:详见 src/engine/engine-api.ts。
  *
- * **临时过渡**:`drop()` 仍存在,仅供 6 个防具/武器 skill(仁王盾/寒冰剑/护甲/白银狮子/藤甲/酒)
- * 在 before 钩子中调整伤害量(damage 调整是组合问题,需要更深的重构)。
- * 新代码不要再调用 `drop()`——等待型 atom 不可被取消,必走完(响应/超时)之一(见 §4.4)。
+ * 新版"操作 gameState 的函数"全部为顶层 export,skill 通过 import 直接调用,
+ * 参数显式传 state + 调用参数。例如:`applyAtom(state, atom)` / `pushFrame(state, ...)`。
+ *
+ * **EngineApi(旧闭包接口)保留** —— 仅为兼容少数 system skill(如 开局)使用。
+ * 新代码请直接 import 顶层函数,不要创建 EngineApi 实例。
+ */
+
+/** before 钩子上下文:atom 执行前调用 */
+export interface AtomBeforeContext {
+  state: GameState;
+  atom: Atom;
+  /** 钩子注册时的 ownerId(skill 实例的所属玩家) */
+  ownerId: string;
+  /** 当前结算帧(只读) */
+  readonly frame: SettlementFrame;
+  /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
+  readonly params: Record<string, Json>;
+}
+
+export interface AtomAfterContext {
+  state: GameState;
+  atom: Atom;
+  /** 钩子注册时的 ownerId(skill 实例的所属玩家) */
+  ownerId: string;
+  /** 当前结算帧(只读) */
+  readonly frame: SettlementFrame;
+  /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
+  readonly params: Record<string, Json>;
+}
+
+/**
+ * 旧版 EngineApi 对象(给 skill 传闭包,内部用 state 闭包变量)。仅供兼容 system skill 使用。
+ * 新代码请直接 import 顶层函数:参见 src/engine/engine-api.ts。
  */
 export interface EngineApi {
-  /** 当前 GameState(只读快照) */
+  /** 当前 GameState(只读引用) */
   readonly state: GameState;
   /** 技能 ownerId(per player instance) */
   readonly self: string;
@@ -333,36 +369,8 @@ export interface EngineApi {
   topFrame(): SettlementFrame | undefined;
   /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到回应/超时 */
   apply(atom: Atom): Promise<void>;
-  /**
-   * 取消当前正在 apply 栈上的 atom(在 before 钩子中调用),随后 apply 流程跳过该 atom。
-   * @deprecated 临时过渡,见接口 JSDoc。新代码不应使用。
-   */
-  drop(): void;
   /** 推送 notify 事件(不改变 state) */
   notify(event: NotifyEvent): void;
-}
-
-/** before 钩子上下文:atom 执行前调用 */
-export interface AtomBeforeContext {
-  state: GameState;
-  atom: Atom;
-  self: string;
-  api: EngineApi;
-  /** 当前结算帧(只读) */
-  readonly frame: SettlementFrame;
-  /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
-  readonly params: Record<string, Json>;
-}
-
-export interface AtomAfterContext {
-  state: GameState;
-  atom: Atom;
-  self: string;
-  api: EngineApi;
-  /** 当前结算帧(只读) */
-  readonly frame: SettlementFrame;
-  /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
-  readonly params: Record<string, Json>;
 }
 
 // ==================== Skill ====================
@@ -445,9 +453,16 @@ export interface ActionEntry {
   skillId: string;
   ownerId: string;
   actionType: string;
-  validate: (view: GameView, params: Record<string, Json>) => string | null;
-  /** 技能 execute:接收 api,内部通过 api.pushFrame 创建帧 */
-  execute: (api: EngineApi) => Promise<void>;
+  /**
+   * 验证消息合法性:返回 null 表示通过,返回字符串为错误信息。
+   * ownerId 已在 entry.ownerId 上,无需重复传入。
+   */
+  validate: (state: GameState, params: Record<string, Json>) => string | null;
+  /**
+   * 技能 execute:顶层函数式 API。
+   * ownerId 已在 entry.ownerId 上,无需重复传入。
+   */
+  execute: (state: GameState, params: Record<string, Json>) => Promise<void>;
 }
 
 export interface AtomHookEntry {
@@ -461,25 +476,15 @@ export interface AtomHookEntry {
 // ==================== SkillDef ====================
 
 /**
- * BackendAPI:onInit 时传给技能模块的句柄。提供 registerAction/onAtomBefore/onAtomAfter。
+ * 旧 BackendAPI(给 onInit 传闭包)已删除。
+ * 新版 onInit 签名:`(skill: Skill, ownerId: string) => (() => void) | void`。
+ * skill 内部直接 import { registerAction, registerBeforeHook, registerAfterHook } from '../skill'
+ * 并调用,ownerId 由 onInit 第二参数注入。
  */
-export interface BackendAPI {
-  /** ownerId(per player instance) */
-  readonly self: string;
-  registerAction(
-    actionType: string,
-    validate: (view: GameView, params: Record<string, Json>) => string | null,
-    /** 技能 execute:接收 api,内部通过 api.pushFrame 创建帧 */
-    execute: (api: EngineApi) => Promise<void>,
-  ): () => void;
-  onAtomBefore(
-    atomType: string,
-    handler: (ctx: AtomBeforeContext) => Promise<void>,
-  ): () => void;
-  onAtomAfter(
-    atomType: string,
-    handler: (ctx: AtomAfterContext) => Promise<void>,
-  ): () => void;
+export interface SkillModule {
+  createSkill: (id: string, ownerId: string) => Skill;
+  onInit?: (skill: Skill, ownerId: string) => (() => void) | void;
+  onMount?: (skill: Skill, api: FrontendAPI) => (() => void) | void;
 }
 
 export interface FrontendAPI {

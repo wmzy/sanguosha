@@ -288,7 +288,7 @@ describe.skip('事件序号 + 断点续传', () => {
       makeEvent('e1', 'b'),
       makeEvent('e2', 'c'),
     ];
-    session.restoreState(fakeGameState(fakeLog), []);
+    await session.restoreState(fakeGameState(fakeLog), []);
 
     const stateAny = session as unknown as { nextSeq: number };
     expect(stateAny.nextSeq).toBe(3);
@@ -301,12 +301,12 @@ describe.skip('事件序号 + 断点续传', () => {
       makeEvent('e0', 'a'),
       makeEvent('e1', 'b'),
     ];
-    session1.restoreState(fakeGameState(fakeLog), []);
+    await session1.restoreState(fakeGameState(fakeLog), []);
     expect((session1 as unknown as { nextSeq: number }).nextSeq).toBe(2);
 
     // 第二阶段：模拟"重启后"——新 session 重新 restore 同样的 serverLog
     const session2 = new GameSession(room, true);
-    session2.restoreState(fakeGameState(fakeLog), []);
+    await session2.restoreState(fakeGameState(fakeLog), []);
 
     // 第三阶段：新事件再 broadcast，seq 应从 3 开始
     const playerId = 'debug-player';

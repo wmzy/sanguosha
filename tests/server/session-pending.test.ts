@@ -126,7 +126,7 @@ describe('pending 自动调度（touchAndPersist 内 scheduleTimeout）', () => 
     room.players.delete('debug-player');
   });
 
-  it('restoreState 后 scheduleTimeout 正常工作', () => {
+  it('restoreState 后 scheduleTimeout 正常工作', async () => {
     vi.spyOn(persistence, 'saveRoom').mockImplementation(async () => {});
     const session1 = new GameSession(room, true);
     session1.startGame(2);
@@ -137,7 +137,7 @@ describe('pending 自动调度（touchAndPersist 内 scheduleTimeout）', () => 
     const ok = session2.deserializeAndRestore(json!);
     expect(ok).toBe(true);
 
-    session2.restoreState(JSON.parse(json!));
+    await session2.restoreState(JSON.parse(json!));
 
     const s = session2 as unknown as { timeoutTimer: ReturnType<typeof setTimeout> | null };
     expect(s.timeoutTimer).not.toBeNull();

@@ -1,29 +1,27 @@
 // src/engine/skills/决斗.ts
 // 决斗(锦囊):出牌阶段对一名角色使用,双方轮流出杀,先不出者受 1 点伤害
-import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
-import { registerSkillModule, type SkillModule } from '../skill';
+import type { GameState, GameView, Json, Skill  } from '../types';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { registerAction, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
   return { id, ownerId, name: '决斗', description: '对一名角色使用,双方轮流出杀,先不出者受 1 点伤害' };
 }
 
-export function onInit(_skill: Skill, api: BackendAPI): () => void {
-  api.registerAction(
-    'use',
-    (_view: GameView, params: Record<string, Json>) => {
+export function onInit(_skill: Skill, ownerId: string): () => void {
+  registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (typeof params.target !== 'string') return 'target required';
       return null;
-    },
-    async (api: EngineApi) => {
-      const from = api.self;
-      const params = api.params;
+    }, async (state: GameState, params: Record<string, Json>) => {
+      
+      const from = ownerId;
       const cardId = params.cardId as string;
       const target = params.target as string;
-      const frame = api.pushFrame('决斗', from, { ...params });
+      const frame = pushFrame(state, '决斗', from, { ...params });
 
       // 移牌到处理区
-      await api.apply({
+      await applyAtom(state, {
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: from },
@@ -36,7 +34,7 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
       let loser: string | null = null;
       while (loser === null) {
         const current = turn === 0 ? target : from;
-        await api.apply({ type: '询问杀', target: current, source: turn === 0 ? from : target });
+        await applyAtom(state, { type: '询问杀', target: current, source: turn === 0 ? from : target });
         // 询问杀挂起 → resolve 后读取回应
         const responded = frame.params.__决斗回应 as boolean | undefined;
         if (!responded) {
@@ -46,19 +44,17 @@ export function onInit(_skill: Skill, api: BackendAPI): () => void {
         }
       }
       const winner = loser === target ? from : target;
-      await api.apply({ type: '造成伤害', target: loser, amount: 1, source: winner });
+      await applyAtom(state, { type: '造成伤害', target: loser, amount: 1, source: winner });
       // 移牌到弃牌堆
-      await api.apply({
+      await applyAtom(state, {
         type: '移动牌',
         cardId,
         from: { zone: '处理区' },
         to: { zone: '弃牌堆' },
       });
-      api.popFrame();
-    },
-  );
+      popFrame(state);
+    }, );
   return () => {};
 }
 
-export const module_决斗: SkillModule = { createSkill, onInit };
-registerSkillModule('决斗', module_决斗);
+export default { createSkill, onInit };

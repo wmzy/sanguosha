@@ -1,7 +1,7 @@
 // src/engine/skills/武圣.ts
 // 武圣(关羽·转化技):你可以将一张红色牌当【杀】使用或打出
-import type { AtomAfterContext, BackendAPI, FrontendAPI, Skill } from '../types';
-import { registerSkillModule, type SkillModule } from '../skill';
+import type { AtomAfterContext, FrontendAPI, Skill } from '../types';
+import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
   return {
@@ -29,10 +29,10 @@ function unwrap(state: { cardMap: Record<string, { name: string; suit: string; _
   delete card._wrapper;
 }
 
-export function onInit(skill: Skill, api: BackendAPI): () => void {
+export function onInit(skill: Skill, ownerId: string): () => void {
   // 杀的 action 路由自动处理 fromSkill='武圣' 的牌包装(后端校验)
   // 武圣自身不注册 action,只注册 after 钩子:牌离开处理区时还原
-  api.onAtomAfter('移动牌', async (ctx: AtomAfterContext) => {
+  registerAfterHook(skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { from?: { zone?: string }; to?: { zone?: string }; cardId?: string };
     if (atom.from?.zone === '处理区' && atom.cardId) {
       unwrap(ctx.state, atom.cardId);
@@ -58,5 +58,4 @@ export function isRedSuit(suit: string): boolean {
   return suit === '♥' || suit === '♦';
 }
 
-export const module_武圣: SkillModule = { createSkill, onInit, onMount };
-registerSkillModule('武圣', module_武圣);
+export default { createSkill, onInit, onMount };

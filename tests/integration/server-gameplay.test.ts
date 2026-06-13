@@ -62,7 +62,7 @@ describe('新 ENGINE-DESIGN GameSession — 玩法集成', () => {
   it('P1 出杀 → P2 不闪 → P2 扣 1 血 + 杀牌入弃牌堆', async () => {
     const state = buildCombatReadyState(false);
     const session = new GameSession(room as unknown as import('../../src/server/room').Room, true);
-    session.restoreState(state, []);
+    await session.restoreState(state, []);
     (session as unknown as { playerNames: Map<string, string> }).playerNames.set('P1_WS', 'P1');
     (session as unknown as { playerNames: Map<string, string> }).playerNames.set('P2_WS', 'P2');
 

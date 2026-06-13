@@ -25,10 +25,10 @@ function buildInitialState(): GameState {
 
 describe('fireTimeout(state)', () => {
   let state: GameState;
-  beforeEach(() => {
+  beforeEach(async () => {
     resetForTest();
     state = buildInitialState();
-    rebootstrap(state);
+    await rebootstrap(state);
   });
 
   it('无 pending 时调用:返回空 result,state 不变', async () => {

@@ -1,8 +1,9 @@
 // src/engine/skills/回合管理.ts
 // 回合控制:每玩家一个实例,监听上家"回合结束"→启动自己回合
 // 设计:见 docs/ENGINE-DESIGN.md §4.14
-import type { BackendAPI, GameView, Json, EngineApi, Skill } from '../types';
-import { registerSkillModule, type SkillModule } from '../skill';
+import type { GameState, GameView, Json, Skill  } from '../types';
+import { applyAtom } from '../create-engine';
+import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const PHASE_ORDER = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'] as const;
 
@@ -26,11 +27,11 @@ export function createSkill(id: string, ownerId: string): Skill {
   return { id, ownerId, name: '回合管理', description: '监听上家回合结束,自动开始自己的回合' };
 }
 
-export function onInit(skill: Skill, api: BackendAPI): () => void {
+export function onInit(skill: Skill, ownerId: string): () => void {
   const me = skill.ownerId;
 
   // ─── 阶段结束 → 自动推进到下一阶段(自己回合内) ───
-  api.onAtomAfter('阶段结束', async (ctx) => {
+  registerAfterHook(skill.id, ownerId, '阶段结束', async (ctx) => {
     if (ctx.atom.type !== '阶段结束') return;
     const { player, phase } = ctx.atom;
     // 只让本回合所属玩家实例处理,避免和其他玩家的实例重复
@@ -39,21 +40,21 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     const next = nextPhase(phase);
     if (!next) return;
 
-    await ctx.api.apply({ type: '阶段开始', player, phase: next });
+    await applyAtom(ctx.state, { type: '阶段开始', player, phase: next });
 
     // 摸牌阶段自动摸 2 张
     if (next === '摸牌') {
-      await ctx.api.apply({ type: '摸牌', player, count: 2 });
+      await applyAtom(ctx.state, { type: '摸牌', player, count: 2 });
     }
 
     // 自动阶段(准备/判定/摸牌)立即结束,推进到下一阶段
     if (next === '准备' || next === '判定' || next === '摸牌') {
-      await ctx.api.apply({ type: '阶段结束', player, phase: next });
+      await applyAtom(ctx.state, { type: '阶段结束', player, phase: next });
     }
   });
 
   // ─── 上家回合结束 → 如果我是下一家,启动自己的回合 ───
-  api.onAtomAfter('回合结束', async (ctx) => {
+  registerAfterHook(skill.id, ownerId, '回合结束', async (ctx) => {
     if (ctx.atom.type !== '回合结束') return;
     const finishedName = ctx.atom.player;
     const state = ctx.state;
@@ -65,48 +66,41 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
     // 不是我就跳过——只有轮到的玩家启动自己的回合
     if (nextName !== me) return;
 
-    await ctx.api.apply({ type: '回合开始', player: me });
-    await ctx.api.apply({ type: '阶段开始', player: me, phase: '准备' });
+    await applyAtom(ctx.state, { type: '回合开始', player: me });
+    await applyAtom(ctx.state, { type: '阶段开始', player: me, phase: '准备' });
     // 触发阶段结束,让本实例的阶段推进钩子接着跑(准备→判定→摸牌→出牌)
-    await ctx.api.apply({ type: '阶段结束', player: me, phase: '准备' });
+    await applyAtom(ctx.state, { type: '阶段结束', player: me, phase: '准备' });
   });
 
   // ─── 主动结束回合 ───
-  api.registerAction(
-    'end',
-    (_view: GameView, _params: Record<string, Json>) => null,
-    async (api: EngineApi) => {
-      const player = api.self;
+  registerAction(skill.id, ownerId, 'end', (state: GameState, params: Record<string, Json>) => null, async (state: GameState, params: Record<string, Json>) => {
+      
+      const player = ownerId;
 
-      await api.apply({ type: '阶段结束', player, phase: '出牌' });
-      await api.apply({ type: '阶段结束', player, phase: '弃牌' });
+      await applyAtom(state, { type: '阶段结束', player, phase: '出牌' });
+      await applyAtom(state, { type: '阶段结束', player, phase: '弃牌' });
       // 清理回合级标记(如 杀/killsPlayed)
-      await api.apply({ type: '清过期标记', player });
+      await applyAtom(state, { type: '清过期标记', player });
       // 触发所有 onAtomAfter('回合结束') 钩子——下家实例发现自己接手,启动回合
-      await api.apply({ type: '回合结束', player });
+      await applyAtom(state, { type: '回合结束', player });
       // 推进 currentPlayerIndex 到下一家
-      await api.apply({ type: '下一玩家' });
-    },
-  );
+      await applyAtom(state, { type: '下一玩家' });
+    }, );
 
   // ─── 首次开局(由主公位玩家触发)───
-  api.registerAction(
-    'start',
-    (view: GameView) => {
-      if (view.currentPlayerIndex !== 0) return '只有主公位可以开局';
+  registerAction(skill.id, ownerId, 'start', (state: GameState, params: Record<string, Json>) => {
+      if (state.currentPlayerIndex !== 0) return '只有主公位可以开局';
       return null;
-    },
-    async (api: EngineApi) => {
-      const player = api.self;
-      await api.apply({ type: '回合开始', player });
-      await api.apply({ type: '阶段开始', player, phase: '准备' });
+    }, async (state: GameState, params: Record<string, Json>) => {
+      
+      const player = ownerId;
+      await applyAtom(state, { type: '回合开始', player });
+      await applyAtom(state, { type: '阶段开始', player, phase: '准备' });
       // 触发阶段结束,让阶段推进钩子跑(准备→判定→摸牌→出牌)
-      await api.apply({ type: '阶段结束', player, phase: '准备' });
-    },
-  );
+      await applyAtom(state, { type: '阶段结束', player, phase: '准备' });
+    }, );
 
   return () => {};
 }
 
-export const module_回合管理: SkillModule = { createSkill, onInit };
-registerSkillModule('回合管理', module_回合管理);
+export default { createSkill, onInit };

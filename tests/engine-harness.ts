@@ -216,12 +216,12 @@ export class PlayerSession {
 
   // ─── 前端技能加载 ─────────────────────────────
 
-  loadFrontend(): void {
+  async loadFrontend(): Promise<void> {
     const player = this.harness.state.players.find(p => p.name === this.playerName);
     if (!player) return;
     this.frontend.clearActions();
     for (const skillId of player.skills) {
-      const module = getSkillModule(skillId);
+      const module = await getSkillModule(skillId);
       this.frontend.setCurrentSkill(skillId);
       if (module.onMount) {
         module.onMount({ id: skillId, ownerId: this.playerName, name: skillId, description: '' }, this.frontend);
@@ -248,7 +248,7 @@ export class SkillTestHarness {
   private sessions = new Map<string, PlayerSession>();
 
   /** 初始化:重置引擎 → bootstrap state → 为每个玩家创建 session 并加载 onMount */
-  setup(state: GameState): void {
+  async setup(state: GameState): Promise<void> {
     resetForTest();
     // 补全 state 缺失字段
     if (!state.cardWrappers) state.cardWrappers = {};
@@ -260,11 +260,11 @@ export class SkillTestHarness {
       if (!p.tags) p.tags = [];
     }
     this._state = state;
-    rebootstrap(state);
+    await rebootstrap(state);
     this.sessions.clear();
     for (const player of state.players) {
       const session = new PlayerSession(player.name, this);
-      session.loadFrontend();
+      await session.loadFrontend();
       this.sessions.set(player.name, session);
     }
   }

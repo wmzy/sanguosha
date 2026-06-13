@@ -36,7 +36,7 @@ async function makeGame(seed = 42): Promise<{ state: import('../../src/engine/ty
   resetForTest();
   const config = { characters: CHARACTERS, playerCount: 3, seed, gameId: 'test' };
   const state = create(config);
-  await bootstrap(state, config);
+  await bootstrap(state);
   return { state, characters: CHARACTERS };
 }
 

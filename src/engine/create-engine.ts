@@ -7,7 +7,7 @@
 //   - dispatch(state, msg): 接受 state,执行 client message
 //   - buildView(state, viewer): 接受 state,返回 view
 //   - fireTimeout(state): 触发 pending slot 的 onTimeout
-//   - resetForTest(): 模块级清空(skill instances + events + activeExecuteP)
+//   - resetForTest(): 模块级清空(skill instances + events)
 //
 // create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
 // 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
@@ -27,26 +27,29 @@
 
 import type {
   Atom,
+  AtomAfterContext,
+  AtomBeforeContext,
   ClientMessage,
-  EngineApi,
   GameState,
   GameView,
   Json,
+  NotifyEvent,
+  PendingSlot,
+  SettlementFrame,
 } from './types';
 import { createGameState } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
 import {
   clearAllSkillInstances,
   findActionEntry,
+  getAfterHooks,
+  getBeforeHooks,
   rebootstrap as skillRebootstrap,
 } from './skill';
-import { createEngineApi, type EngineContext } from './engine-api';
-import { clearEvents } from './event-stream';
+import { applyAtom as applyAtomImpl, getAtomDef, resolvePlayerViews } from './atom';
+import { clearEvents, pushEvent } from './event-stream';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
-// 必须 import 来注册所有 skill 模块(武将技能/装备技能) —— 否则 rebootstrap 在
-// 遍历 state.players[i].skills 时会抛 "Skill module X not registered"。
-import './skills';
 
 export interface DispatchResult {
   error?: string;
@@ -64,11 +67,6 @@ export interface GameConfig {
   handSize?: number;
 }
 
-// ==================== 模块级状态(用于回应路径跟踪) ====================
-
-/** 当前活跃的 execute Promise(回应路径上,内嵌 execute 完成后 resolve)。
- *  模块级而非闭包,以便响应内嵌 execute(action 在 apply 期间触发嵌套 action)。 */
-let activeExecuteP: Promise<void> | undefined;
 
 // ==================== 模块级 helpers ====================
 
@@ -105,10 +103,6 @@ function checkGameOver(state: GameState): { gameOver: boolean; winner?: string }
     return { gameOver: true, winner: winner?.name ?? '无人' };
   }
   return { gameOver: false };
-}
-
-function getViewerIndex(state: GameState, ownerName: string): number {
-  return state.players.findIndex((p) => p.name === ownerName);
 }
 
 // ==================== 公开 API ====================
@@ -153,17 +147,25 @@ export function create(gameConfig: GameConfig): GameState {
 /**
  * 异步 bootstrap:在 state 上跑完开局流程。
  *   1. 动态 import 开局 skill 模块
- *   2. 调 开局.onInit(skill, state) 注册 start action
+ *   2. 调 开局.onInit(skill, ownerId) 注册 start action(从 state._gameConfig 读配置)
  *   3. dispatch 开局 start → 跑完抽身份/选将/洗牌/发牌/启动第一回合
  *   4. rebootstrap(state) 给每个 player 的 skills 注册实例
  *
  * restore 路径不调 bootstrap —— 直接用 replay 出来的 state 即可。
+ *
+ * config 不通过参数传 —— 由 create(config) 时已 stash 到 state._gameConfig,这里读 state。
  */
-export async function bootstrap(state: GameState, gameConfig: GameConfig): Promise<void> {
-  // 1. 动态 import 开局 skill 模块(其它 skill 在 ./skills 里,这里只需要开局)
-  const 开局 = await import('./skills/开局');
-  const syntheticSkill = 开局.createSkill('开局', '主公');
-  开局.onInit(syntheticSkill, state);
+export async function bootstrap(state: GameState): Promise<void> {
+  const gameConfig = (state as GameState & { _gameConfig?: GameConfig })._gameConfig;
+  if (!gameConfig) {
+    throw new Error('bootstrap: state._gameConfig 缺失(请用 create(config) 创建 state)');
+  }
+
+  const 开局mod = await import('./skills/开局');
+  const syntheticSkill = 开局mod.default.createSkill('开局', '主公');
+  // 开局.onInit(skill, state) 是 system skill 的特殊接口
+  // @ts-ignore 开局的 onInit 签名是 (skill, state),不是 SkillModule 标准 (skill, ownerId)
+  开局mod.onInit(syntheticSkill, state);
 
   // 2. dispatch 开局 start
   const result = await dispatch(state, {
@@ -176,15 +178,15 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   if (result.error) throw new Error(`开局失败: ${result.error}`);
 
   // 3. 给每个 player 的 skills 注册实例(开局时玩家技能已通过 选将 atom 注入)
-  skillRebootstrap(state);
+  await skillRebootstrap(state);
 }
 
 /**
  * 重新注册 state 中所有玩家的技能实例(用于初始化游戏后)。
- * 直接走 skill.rebootstrap。
+ * 通过 skillLoaders 动态 import 加载技能模块。
  */
-export function rebootstrap(state: GameState): void {
-  skillRebootstrap(state);
+export async function rebootstrap(state: GameState): Promise<void> {
+  await skillRebootstrap(state);
 }
 
 /**
@@ -199,17 +201,9 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
 
     const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
     if (entry) {
-      const view = buildView(state, getViewerIndex(state, message.ownerId));
-      const err = entry.validate(view, message.params);
+      const err = entry.validate(state, message.params);
       if (err === null) {
-        const ctx: EngineContext = {
-          state,
-          self: message.ownerId,
-          messageParams: { ...message.params },
-          fireDispatchReady: () => {},
-        };
-        const api = createEngineApi(ctx);
-        await entry.execute(api);
+        await entry.execute(state, message.params);
       }
     } else {
       // 无匹配 entry(如 confirm/distribute):merge message.params 到 topFrame,
@@ -224,18 +218,18 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     resolve();
 
     // 等原始 execute 完成 或 产生新 pending
-    if (activeExecuteP) {
-      await Promise.race([
-        activeExecuteP,
-        new Promise<void>((resolve) => {
-          const timer = setInterval(() => {
-            if (state.pendingSlot) { clearInterval(timer); resolve(); }
-          }, 0);
-          activeExecuteP!.then(() => clearInterval(timer));
-        }),
-      ]);
-    }
-    if (!state.pendingSlot) activeExecuteP = undefined;
+    if (state._activeExecuteP) {
+          await Promise.race([
+            state._activeExecuteP,
+            new Promise<void>((resolve) => {
+              const timer = setInterval(() => {
+                if (state.pendingSlot) { clearInterval(timer); resolve(); }
+              }, 0);
+              state._activeExecuteP!.then(() => clearInterval(timer));
+            }),
+          ]);
+        }
+    if (!state.pendingSlot) state._activeExecuteP = undefined
     logAction(state, message);
     state.seq += 1;
     const { gameOver, winner } = checkGameOver(state);
@@ -255,12 +249,12 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   }
   if (!entry) return {};
 
-  const view = buildView(state, getViewerIndex(state, message.ownerId));
-  const validationError = entry.validate(view, message.params);
+  const validationError = entry.validate(state, message.params);
   if (validationError !== null) return { error: validationError };
 
   // execute 到达 pending 时 fireDispatchReady → dispatch 返回。
   // 不等 activeExecuteP:execute 在 pending 处挂起,等回应/超时后才完成。
+  // fireDispatchReady 走模块级 currentDispatchReady。
   let dispatchReadyResolve: () => void = () => {};
   const dispatchReady = new Promise<void>((r) => {
     dispatchReadyResolve = r;
@@ -272,15 +266,12 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       dispatchReadyResolve();
     }
   };
-  const ctx: EngineContext = {
-    state,
-    self: message.ownerId,
-    messageParams: { ...message.params, __ownerId: message.ownerId },
-    fireDispatchReady,
-  };
-  const api: EngineApi = createEngineApi(ctx);
-  const executeP = entry.execute(api).finally(fireDispatchReady);
-  activeExecuteP = executeP;
+  setDispatchReady(fireDispatchReady);
+  const executeP = entry.execute(state, message.params).finally(() => {
+    clearDispatchReady();
+    fireDispatchReady();
+  });
+  state._activeExecuteP = executeP;
 
   // 等到 execute 抵达 pending 挂起点(fireDispatchReady 触发)就返回当前 state。
   // 不 await executeP 本身 —— execute 可能挂在 pending slot 上,要等回应或
@@ -310,26 +301,211 @@ export async function fireTimeout(state: GameState): Promise<DispatchResult> {
   await slot._fireTimeoutNow?.();
   // 不等 activeExecuteP:execute 恢复后可能产生新 pending 或完成,
   // 下一次 dispatch/fireTimeout 会处理。仅当 execute 已完成时清理。
-  if (activeExecuteP) {
-    // 用 microtask 给 execute 一轮执行机会
-    await new Promise<void>((resolve) => {
-      const timer = setInterval(() => {
-        if (state.pendingSlot) { clearInterval(timer); resolve(); }
-      }, 0);
-      activeExecuteP!.then(() => { clearInterval(timer); resolve(); });
-    });
-  }
-  if (!state.pendingSlot) activeExecuteP = undefined;
+  if (state._activeExecuteP) {
+        await new Promise<void>((resolve) => {
+          const timer = setInterval(() => {
+            if (state.pendingSlot) { clearInterval(timer); resolve(); }
+          }, 0);
+          state._activeExecuteP!.then(() => { clearInterval(timer); resolve(); });
+        });
+      }
+  if (!state.pendingSlot) state._activeExecuteP = undefined
   const { gameOver, winner } = checkGameOver(state);
   return { gameOver, winner };
 }
 
 /**
- * 测试用:模块级清空(skill instances + events + activeExecuteP)。
- * 不接 state —— 引擎状态是模块级的。
+ * 测试用:模块级清空(skill instances + events)。
+ * state 上的字段（pendingSlot、_activeExecuteP 等）随 state 生死，不需要在这里清理。
  */
 export function resetForTest(): void {
   clearAllSkillInstances();
   clearEvents();
-  activeExecuteP = undefined;
+}
+
+// ==================== 从 engine-api.ts 合并的导出 ====================
+// 以下函数原属 engine-api.ts,现已合并到本文件。skill 文件通过 import from '../create-engine' 使用。
+
+// ─── 模块级 dispatch ready 通知器 ──────────────────────────────
+
+let currentDispatchReady: () => void = () => {};
+
+export function setDispatchReady(fn: () => void): void {
+  currentDispatchReady = fn;
+}
+
+export function clearDispatchReady(): void {
+  currentDispatchReady = () => {};
+}
+
+function notifyDispatchReady(): void {
+  currentDispatchReady();
+}
+
+// ─── 帧管理 ──────────────────────────────────────────────────
+
+/** 创建帧并压入 state.settlementStack,返回帧引用 */
+export function pushFrame(
+  state: GameState,
+  skillId: string,
+  from: string,
+  params?: Record<string, Json>,
+): SettlementFrame {
+  const frame: SettlementFrame = {
+    skillId,
+    from,
+    params: params ? { ...params } : {},
+    cards: [],
+  };
+  state.settlementStack.push(frame);
+  return frame;
+}
+
+/** 弹出栈顶帧 */
+export function popFrame(state: GameState): void {
+  if (state.settlementStack.length > 0) state.settlementStack.pop();
+}
+
+/** 取栈顶帧(只读引用) */
+export function topFrame(state: GameState): SettlementFrame | undefined {
+  return state.settlementStack[state.settlementStack.length - 1];
+}
+
+/** 兜底空帧 */
+function emptyFrame(): SettlementFrame {
+  return { skillId: '', from: '', params: Object.freeze({}), cards: [] };
+}
+
+// ─── Drop 标志 ───────────────────────────────────────────────
+
+/** 在 before 钩子中调 dropAtom(state) 会让当前 atom 的 validate/apply 跳过。 */
+export function dropAtom(state: GameState): void {
+  state._dropNext = true;
+}
+
+// ─── Notify 事件 ────────────────────────────────────────────
+
+/** 推送 notify 事件(不改变 state) */
+export function pushNotify(_state: GameState, event: NotifyEvent): void {
+  pushEvent({ kind: 'notify', ...event });
+}
+
+// ─── Atom apply 管线 ────────────────────────────────────────
+
+/** 判定 atom:apply 后从牌堆顶翻一张到目标玩家 judgeZone */
+function moveJudgeCardToZone(state: GameState, atom: { player: string; judgeType: string }): void {
+  if (state.zones.deck.length === 0) return;
+  const topCardId = state.zones.deck.shift()!;
+  const target = state.players.find((p) => p.name === atom.player);
+  if (target) target.judgeZone.push(topCardId);
+}
+
+/** 判定 atom 收尾:把目标 judgeZone 顶部牌移入弃牌堆 */
+function cleanupJudgeZone(state: GameState, atom: { player: string; judgeType: string }): void {
+  const target = state.players.find((p) => p.name === atom.player);
+  if (!target || target.judgeZone.length === 0) return;
+  const topId = target.judgeZone.pop()!;
+  state.zones.discardPile.push(topId);
+}
+
+/**
+ * 应用一个 atom:走完整 pipeline(before hooks → validate → apply → emit event → after hooks → pending)。
+ * 等待型 atom 的 Promise 会挂起直到回应/超时。
+ */
+export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
+  state._dropNext = false;
+  state.atomStack.push(atom);
+
+  const beforeHooks = getBeforeHooks(atom.type);
+  for (const h of beforeHooks) {
+    if (state._dropNext) break;
+    const frame = topFrame(state) ?? emptyFrame();
+    const beforeCtx: AtomBeforeContext = {
+      state,
+      atom,
+      ownerId: h.ownerId,
+      frame,
+      params: (frame.params ?? {}) as Record<string, Json>,
+    };
+    await h.handler(beforeCtx);
+  }
+
+  if (state._dropNext) {
+    state.atomStack.pop();
+    state._dropNext = false;
+    return;
+  }
+
+  const def = getAtomDef(atom.type);
+  const error = def.validate(state, atom);
+  if (error !== null) {
+    state.atomStack.pop();
+    return;
+  }
+
+  applyAtomImpl(state, atom);
+
+  const views = resolvePlayerViews(state, atom);
+  pushEvent({ kind: 'atom', atom, views });
+
+  if (atom.type === '判定') {
+    moveJudgeCardToZone(state, atom);
+  }
+
+  const afterHooks = getAfterHooks(atom.type);
+  for (const h of afterHooks) {
+    const curFrame = topFrame(state) ?? emptyFrame();
+    const afterCtx: AtomAfterContext = {
+      state,
+      atom,
+      ownerId: h.ownerId,
+      frame: curFrame,
+      params: (curFrame.params ?? {}) as Record<string, Json>,
+    };
+    await h.handler(afterCtx);
+  }
+
+  state.atomStack.pop();
+
+  if (atom.type === '判定') {
+    cleanupJudgeZone(state, atom);
+  }
+
+  if (def.pending) {
+    await new Promise<void>((resolve) => {
+      const pending = def.pending!;
+      const timeoutMs = pending.timeout * 1000;
+      let resolveCalled = false;
+      const safeResolve = () => {
+        if (resolveCalled) return;
+        resolveCalled = true;
+        clearTimeout(timer);
+        resolve();
+      };
+      const slot: PendingSlot = {
+        atom,
+        definition: def,
+        startTime: Date.now(),
+        deadline: Date.now() + timeoutMs,
+        resolve: safeResolve,
+      };
+      if (state.pendingSlot) {
+        state.pendingSlot.resolve();
+        state.pendingSlot = undefined;
+      }
+      state.pendingSlot = slot;
+
+      const fireTimeoutNow = async (): Promise<void> => {
+        if (state.pendingSlot !== slot) return;
+        clearTimeout(timer);
+        state.pendingSlot = undefined;
+        await applyAtom(state, pending.onTimeout);
+        safeResolve();
+      };
+      slot._fireTimeoutNow = fireTimeoutNow;
+
+      const timer = setTimeout(fireTimeoutNow, timeoutMs);
+      notifyDispatchReady();
+    });
+  }
 }

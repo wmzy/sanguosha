@@ -114,7 +114,7 @@ async function restorePersistedRooms(): Promise<void> {
       };
       addRoom(room);
       const session = new GameSession(room, persisted.debug);
-      session.restoreState(state, persisted.actionLog);
+      await session.restoreState(state, persisted.actionLog);
       gameSessions.set(roomId, session);
       log.info(`恢复房间 ${roomId}（${state.players.length} 名玩家，${persisted.actionLog.length} 步操作）`);
     } catch (err) {

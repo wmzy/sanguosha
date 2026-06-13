@@ -1,7 +1,8 @@
 // src/engine/skills/制衡.ts
 // 制衡(孙权):出牌阶段限一次,可以弃一张手牌并摸两张牌
-import type { BackendAPI, FrontendAPI, GameView, Json, EngineApi, Skill } from '../types';
-import { registerSkillModule, type SkillModule } from '../skill';
+import type { GameState, FrontendAPI, GameView, Json, Skill  } from '../types';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { registerAction, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: string): Skill {
   return {
@@ -12,23 +13,19 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(skill: Skill, api: BackendAPI): () => void {
-  api.registerAction(
-    'use',
-    (view: GameView, params: Record<string, Json>) => {
+export function onInit(skill: Skill, ownerId: string): () => void {
+  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
-    },
-    async (api: EngineApi) => {
-      const from = api.self;
-      const params = api.params;
-      const frame = api.pushFrame('制衡', from, { ...params });
+    }, async (state: GameState, params: Record<string, Json>) => {
+      
+      const from = ownerId;
+      const frame = pushFrame(state, '制衡', from, { ...params });
       const cardId = params.cardId as string;
-      await api.apply({ type: '弃置', player: from, cardIds: [cardId] });
-      await api.apply({ type: '摸牌', player: from, count: 2 });
-      api.popFrame();
-    },
-  );
+      await applyAtom(state, { type: '弃置', player: from, cardIds: [cardId] });
+      await applyAtom(state, { type: '摸牌', player: from, count: 2 });
+      popFrame(state);
+    }, );
   return () => {};
 }
 
@@ -45,5 +42,4 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
   return () => {};
 }
 
-export const module_制衡: SkillModule = { createSkill, onInit, onMount };
-registerSkillModule('制衡', module_制衡);
+export default { createSkill, onInit, onMount };

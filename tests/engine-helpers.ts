@@ -41,7 +41,7 @@ export class TestEngine {
 
   /** 异步 bootstrap(只用于 create() 出来的骨架 state) */
   async bootstrapWith(config: GameConfig): Promise<void> {
-    await bootstrap(this.state, config);
+    await bootstrap(this.state);
   }
 
   async dispatch(msg: ClientMessage): Promise<{ error?: string; gameOver?: boolean; winner?: string }> {

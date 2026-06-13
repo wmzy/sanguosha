@@ -221,7 +221,7 @@ describe.skip('GameLogger session 集成', () => {
     }
   });
 
-  it('restoreState 从 serverLog 重建 gameLogger（rebuildFromLog）', () => {
+  it('restoreState 从 serverLog 重建 gameLogger（rebuildFromLog）', async () => {
     const playerId = 'debug-player';
     setupMockWs(playerId);
     const session = new GameSession(room, true);
@@ -236,7 +236,7 @@ describe.skip('GameLogger session 集成', () => {
     // rebuildFromLog 需要 playerOrder
     (fakeState as { playerOrder: string[] }).playerOrder = ['A', 'B'];
 
-    session.restoreState(fakeState, [{ type: '开始' }]);
+    await session.restoreState(fakeState, [{ type: '开始' }]);
 
     const gameLog = session.getGameLog();
     expect(gameLog).not.toBeNull();

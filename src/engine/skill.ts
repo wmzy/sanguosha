@@ -1,36 +1,38 @@
 // src/engine/skill.ts
-// 技能模块注册 + action/hook 实例注册 + 实例管理
+// action/hook 实例注册 + 实例管理(全部顶层函数式 API)。
+//
+// skill 直接 import 以下函数使用:
+//   - registerAction(skillId, ownerId, actionType, validate, execute)
+//   - registerBeforeHook(skillId, ownerId, atomType, handler)
+//   - registerAfterHook(skillId, ownerId, atomType, handler)
+//   - 对应的 unregisterXxx 配套
+
 import type {
   ActionEntry,
+  AtomAfterContext,
+  AtomBeforeContext,
   AtomHookEntry,
-  BackendAPI,
   FrontendAPI,
   GameState,
+  Json,
   Skill,
 } from './types';
 
 export interface SkillModule {
   createSkill: (id: string, ownerId: string) => Skill;
-  onInit?: (skill: Skill, api: BackendAPI) => (() => void) | void;
+  /** 注册时拿到 skill + ownerId(per player instance);内部直接 import 注册函数 */
+  onInit?: (skill: Skill, ownerId: string) => (() => void) | void;
   onMount?: (skill: Skill, api: FrontendAPI) => (() => void) | void;
 }
 
-// ─── module 注册表 ───────────────────────────────────────────
+// ─── module 查询 ───────────────────────────────────────────
 
-const modules = new Map<string, SkillModule>();
-
-export function registerSkillModule(id: string, m: SkillModule): void {
-  modules.set(id, m);
-}
-
-export function getSkillModule(id: string): SkillModule {
-  const m = modules.get(id);
-  if (!m) throw new Error(`Skill module "${id}" not registered`);
-  return m;
-}
-
-export function clearSkillModules(): void {
-  modules.clear();
+/** 通过 skillLoaders 动态 import 获取技能模块 */
+export async function getSkillModule(id: string): Promise<SkillModule> {
+  const { skillLoaders } = await import('./skills/index');
+  const loader = skillLoaders[id];
+  if (!loader) throw new Error(`Skill module "${id}" not found in skillLoaders`);
+  return loader();
 }
 
 // ─── 实例级注册表(action + hook) ──────────────────────────────
@@ -72,19 +74,64 @@ export function getAfterHooks(atomType: string): AtomHookEntry[] {
   return afterHooks.get(atomType) ?? [];
 }
 
-function registerHook(phase: 'before' | 'after', entry: AtomHookEntry): void {
-  const map = phase === 'before' ? beforeHooks : afterHooks;
-  const list = map.get(entry.atomType) ?? [];
-  list.push(entry);
-  map.set(entry.atomType, list);
+// ─── 顶层注册 helper(skill 在 onInit 内直接调用) ─────────────
+
+/**
+ * 注册一个 action(主动出牌/使用技能/回应/开始等)。
+ * 内部封装 registerActionEntry;返回 unloader。
+ */
+export function registerAction(
+  skillId: string,
+  ownerId: string,
+  actionType: string,
+  validate: (state: GameState, params: Record<string, Json>) => string | null,
+  execute: (state: GameState, params: Record<string, Json>) => Promise<void>,
+): () => void {
+  const entry: ActionEntry = { skillId, ownerId, actionType, validate, execute };
+  registerActionEntry(entry);
+  return () => unregisterActionEntry(skillId, ownerId, actionType);
 }
 
-function removeHook(phase: 'before' | 'after', entry: AtomHookEntry): void {
-  const map = phase === 'before' ? beforeHooks : afterHooks;
-  const list = map.get(entry.atomType);
-  if (!list) return;
-  const idx = list.indexOf(entry);
-  if (idx >= 0) list.splice(idx, 1);
+/**
+ * 注册一个 before atom 钩子。ownerId 在注册时绑定,handler 通过 ctx.ownerId 拿(无需闭包)。
+ */
+export function registerBeforeHook(
+  skillId: string,
+  ownerId: string,
+  atomType: string,
+  handler: (ctx: AtomBeforeContext) => Promise<void>,
+): () => void {
+  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'before', handler: handler as AtomHookEntry['handler'] };
+  const list = beforeHooks.get(atomType) ?? [];
+  list.push(entry);
+  beforeHooks.set(atomType, list);
+  return () => {
+    const arr = beforeHooks.get(atomType);
+    if (!arr) return;
+    const idx = arr.indexOf(entry);
+    if (idx >= 0) arr.splice(idx, 1);
+  };
+}
+
+/**
+ * 注册一个 after atom 钩子。ownerId 在注册时绑定。
+ */
+export function registerAfterHook(
+  skillId: string,
+  ownerId: string,
+  atomType: string,
+  handler: (ctx: AtomAfterContext) => Promise<void>,
+): () => void {
+  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'after', handler: handler as AtomHookEntry['handler'] };
+  const list = afterHooks.get(atomType) ?? [];
+  list.push(entry);
+  afterHooks.set(atomType, list);
+  return () => {
+    const arr = afterHooks.get(atomType);
+    if (!arr) return;
+    const idx = arr.indexOf(entry);
+    if (idx >= 0) arr.splice(idx, 1);
+  };
 }
 
 // ─── 实例管理 ──────────────────────────────────────────────
@@ -119,50 +166,23 @@ export function clearAllSkillInstances(): void {
   afterHooks.clear();
 }
 
-// ─── 给 skill 的 BackendAPI ────────────────────────────────
-
-export function makeBackendAPI(skill: Skill): BackendAPI {
-  return {
-    self: skill.ownerId,
-    registerAction(actionType, validate, execute) {
-      const entry: ActionEntry = { skillId: skill.id, ownerId: skill.ownerId, actionType, validate, execute };
-      registerActionEntry(entry);
-      return () => {
-        const k = actionKey(skill.id, skill.ownerId, actionType);
-        actions.delete(k);
-      };
-    },
-    onAtomBefore(atomType, handler) {
-      const entry: AtomHookEntry = { skillId: skill.id, ownerId: skill.ownerId, atomType, phase: 'before', handler: handler as AtomHookEntry['handler'] };
-      registerHook('before', entry);
-      return () => removeHook('before', entry);
-    },
-    onAtomAfter(atomType, handler) {
-      const entry: AtomHookEntry = { skillId: skill.id, ownerId: skill.ownerId, atomType, phase: 'after', handler: handler as AtomHookEntry['handler'] };
-      registerHook('after', entry);
-      return () => removeHook('after', entry);
-    },
-  };
-}
-
 // ─── bootstrap / rebootstrap ────────────────────────────────
 
 /** 遍历 state.players,给每个 skill 调 onInit 注册实例(并保存 unload) */
-export function rebootstrap(state: GameState): void {
+export async function rebootstrap(state: GameState): Promise<void> {
   for (const player of state.players) {
     for (const skillId of player.skills) {
-      instantiateSkill(skillId, player.name);
+      await instantiateSkill(skillId, player.name);
     }
   }
 }
 
 /** 内部 helper:实例化单个 skill(从 create-engine bootstrap / rebootstrap 提取) */
-function instantiateSkill(skillId: string, ownerId: string): Skill {
-  const module = getSkillModule(skillId);
+async function instantiateSkill(skillId: string, ownerId: string): Promise<Skill> {
+  const module = await getSkillModule(skillId);
   const skill = module.createSkill(skillId, ownerId);
   if (module.onInit) {
-    const api = makeBackendAPI(skill);
-    const unload = module.onInit(skill, api);
+    const unload = module.onInit(skill, ownerId);
     setSkillInstanceUnload(skillId, ownerId, typeof unload === 'function' ? unload : () => {});
   }
   return skill;
