@@ -85,41 +85,27 @@ function extractPendingTarget(atom: Atom): string {
   return '';
 }
 
-/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。
- *  同时清除超时定时器(正常到达稳定点,无需兜底)。 */
+/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。 */
 function resolveStable(state: GameState): void {
   const r = state._resolveStable;
   if (r) {
-    if (state._stableTimer) { clearTimeout(state._stableTimer); state._stableTimer = undefined; }
     r();
     state._waitForStable = undefined;
     state._resolveStable = undefined;
-    state._rejectStable = undefined;
   }
 }
 
 /**
- * 建立 per-execute stable wait:创建新 _waitForStable Promise + resolve/reject resolver,
- * 并注册 30s 超时定时器(execute 卡死兜底)。续跑路径(回应/fireTimeout)必须重新调用,
+ * 建立 per-execute stable wait:创建新 _waitForStable Promise + _resolveStable resolver。
+ * 每个 execute lifecycle 调用一次。续跑路径(回应/fireTimeout)必须重新调用,
  * 因为上一轮 wait 已被 applyAtom 触发 resolveStable 清掉。
- *
- * 调用方直接 `await state._waitForStable`——无需 async 包装,避免引入额外微任务 tick
- * (杀.execute 的 pending 创建与 dispatch 恢复时序对微任务顺序敏感)。
  */
-const STABLE_WAIT_TIMEOUT_MS = 30_000;
 function setupStableWait(state: GameState): void {
   let resolveStableLocal: () => void = () => {};
-  let rejectStableLocal: (e: Error) => void = () => {};
-  state._waitForStable = new Promise<void>((resolve, reject) => {
-    resolveStableLocal = resolve;
-    rejectStableLocal = reject;
-  });
+  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
   state._resolveStable = resolveStableLocal;
-  state._rejectStable = rejectStableLocal;
-  state._stableTimer = setTimeout(() => {
-    rejectStableLocal(new Error('dispatch 超时:execute 未在 30s 内到达稳定点(pending 或完成)——疑似引擎 bug'));
-  }, STABLE_WAIT_TIMEOUT_MS);
 }
+
 /** 兜底:补全老 state 缺失的字段(原地变更) */
 function ensureStateShape(state: GameState): void {
   if (!state.cardWrappers) state.cardWrappers = {};
@@ -248,17 +234,13 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     if (message.ownerId !== target) return {};
 
     const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
+    // 回应路径:找到 entry 且校验通过 → 执行回应;否则视为"未有效回应"。
+    // 关键:无论是否有效回应都必须 resolve slot——pending 目标若不出牌/无法回应,
+    // 父 execute(如 杀)需继续结算。slot 保持挂起 = 死锁。
     if (entry) {
       const err = entry.validate(state, message.params);
       if (err === null) {
         await entry.execute(state, message.params);
-      }
-    } else {
-      // 无匹配 entry(如 confirm/distribute):merge message.params 到 topFrame,
-      // 让原始 execute 恢复后能通过 ctx.params 读到回应数据
-      const frame = state.settlementStack[state.settlementStack.length - 1];
-      if (frame) {
-        Object.assign(frame.params, message.params);
       }
     }
     const resolve = slot.resolve;
@@ -277,16 +259,8 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   }
 
   // === 主动 action 路径 ===
-  let entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-  if (!entry && message.actionType === 'use') {
-    const cardId = message.params?.cardId as string | undefined;
-    if (cardId) {
-      const card = state.cardMap[cardId];
-      if (card?.type === '装备牌') {
-        entry = findActionEntry('装备通用', message.ownerId, message.actionType);
-      }
-    }
-  }
+  // 纯路由:匹配不到 → 丢弃;校验失败 → 丢弃。dispatch 不认识"装备牌"等业务概念。
+  const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
   if (!entry) return {};
 
   const validationError = entry.validate(state, message.params);

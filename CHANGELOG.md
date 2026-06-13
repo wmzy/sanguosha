@@ -16,12 +16,16 @@ All notable changes to this project will be documented in this file.
 - **双重注册 P0**:`instantiateSkill` 改幂等(先 `unloadSkillInstance` 再注册),`bootstrap` 的 `开局:系统:start` 注册前先卸载。
   修复并发 rebootstrap / bootstrap 重入时的 `Action "X:Y:Z" already registered` 抛错(原 review 问题 7)。
   (`src/engine/skill.ts` instantiateSkill 导出+幂等;`src/engine/create-engine.ts` bootstrap)
-- **stable-wait 超时兜底**:`_waitForStable` 加 30s 超时 reject(execute 卡死保护,原 review 问题 5 加固 N1)。
-  实现嵌在 `setupStableWait`(注册定时器)+`resolveStable`(清除定时器),调用方仍直接 `await state._waitForStable`(不引入额外微任务 tick——async 包装 + Promise.race 会破坏 杀.execute pending 创建与 dispatch 恢复的时序)。
-  (`src/engine/types.ts` 加 `_rejectStable`/`_stableTimer`;`src/engine/create-engine.ts` setupStableWait/resolveStable)
+- **stable-wait 时序契约**(review 问题 5):dispatch/回应路径必须直接 `await state._waitForStable`,
+  不能用 async 包装 + Promise.race——额外微任务 tick 会破坏 杀.execute 的 pending 创建与 dispatch 恢复时序(pendingSlot 在 resolveStable 前被清空)。
+  未加超时兜底:引擎是确定性状态转移,execute 卡死属契约违反,应由 session 层 pending timeout 处理,引擎层不用墙钟时间容错。
 - **技能测试缺失 await**:`tests/skill-tests/{杀,遗计,contract}.test.ts` 的 `harness.setup()` 是 async 但调用处漏 `await`,
   导致并发 setup 在模块级注册表上竞争 → unhandled rejection。补齐 `await`。
-- **`_activeExecuteP` 文档化**:stable-wait 重构后该字段无消费者,注释改为"仅调试/诊断用"。
+- **dispatch 瘦身(纯路由+校验)**:删除两处 dispatch 违规逻辑,回归"匹配不到/校验失败即丢弃"。
+  1. 删 `装备通用` 特殊路由(dispatch 原本检查 `card.type === '装备牌'` 改路由到 `装备通用`——dispatch 不该认识业务概念;该路径无测试覆盖,装备应通过 `skillId: '装备通用'` 路由)。
+  2. 删回应路径无匹配 entry 时的 `Object.assign(frame.params, message.params)`(违反 §4.3 frame.params 只读)。
+  回应路径语义:pending 目标的回应无论是否有效(校验失败/无 entry)都必须 resolve slot——
+  目标不出牌即"未有效回应",父 execute(杀)继续结算;slot 保持挂起会死锁。
 
 ### Verified
 - `pnpm vitest run tests/integration/{new-engine-*,create-game,restore-from-log,dynamic-skill}.test.ts tests/skill-tests/`:24 passed | 4 skipped
