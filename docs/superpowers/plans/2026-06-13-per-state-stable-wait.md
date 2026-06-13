@@ -227,7 +227,9 @@ git commit -m "refactor(engine): 回应路径删除 setInterval(0),改用 _waitF
 **Files:**
 - Modify: `src/engine/create-engine.ts:310-318` (fireTimeout 内部)
 
-- [ ] **Step 1: 删 setInterval 块**
+- [ ] **Step 1: 删 setInterval 块,重新建立 per-state stable wait**
+
+> **设计澄清**:fireTimeout 也是"续跑路径"——和回应路径一样,原 execute 在 pending slot 处挂起,主路径的 `_waitForStable` 已经被清成 `undefined`。需要自己建立新的 `_waitForStable` 来等待原 execute 续跑后的 `.finally` 或新 `applyAtom` 事件。**同 Task 3 回应路径的模式**。
 
 定位 fireTimeout 内的 setInterval 块:
 
@@ -246,10 +248,11 @@ git commit -m "refactor(engine): 回应路径删除 setInterval(0),改用 _waitF
 替换为:
 
 ```ts
-  // 触发 onTimeout 后,原 execute 继续 → 稳定点由主路径的 _waitForStable 接收
-  if (state._waitForStable) {
-    await state._waitForStable;
-  }
+  // 续跑路径:重新建立 stable wait 捕捉原 execute 续跑后的事件(同 Task 3 回应路径)
+  let resolveStableLocal: () => void = () => {};
+  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+  state._resolveStable = resolveStableLocal;
+  await state._waitForStable;
   if (!state.pendingSlot) state._activeExecuteP = undefined
 ```
 

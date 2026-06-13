@@ -121,7 +121,9 @@ await state._waitForStable;
 
 ### 2.5 回应路径(dispatch line 222-237)
 
-删除 setInterval(0) 块,改为 await `_waitForStable`:
+删除 setInterval(0) 块,**重新建立** `_waitForStable` Promise 捕捉原 execute 续跑后的事件:
+
+> **设计澄清**:回应路径是"续跑路径"——原 execute 在 pending slot 处挂起,主路径的 `_waitForStable` 已经被 `applyAtom` 创建 pending 时 resolve 掉并清成 `undefined` 了。回应路径需要**自己建立**新的 `_waitForStable` 来等待原 execute 续跑后的 `.finally`(完成)或新 `applyAtom`(新 pending)事件。同样的模式适用于 `fireTimeout`(§2.6)。
 
 ```ts
 // 回应路径(修改前)
@@ -148,16 +150,18 @@ const resolve = slot.resolve;
 slot.resolve = () => {};
 resolve();
 
-// 等原始 execute 完成(主路径的 stable wait 会被 .finally 或新 pending 触发)
-if (state._waitForStable) {
-  await state._waitForStable;
-}
+// 等稳定点:重新建立 per-state stable wait,捕捉原 execute 续跑后的
+// .finally(完成)或 applyAtom 创建新 pending 事件。
+let resolveStableLocal: () => void = () => {};
+state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+state._resolveStable = resolveStableLocal;
+await state._waitForStable;
 if (!state.pendingSlot) state._activeExecuteP = undefined
 ```
 
 ### 2.6 fireTimeout(create-engine.ts:304-321)
 
-同样删除 setInterval(0) 块:
+同样删除 setInterval(0) 块,同样**重新建立** `_waitForStable`:
 
 ```ts
 // fireTimeout(修改前)
@@ -183,10 +187,11 @@ export async function fireTimeout(state: GameState): Promise<DispatchResult> {
   const slot = state.pendingSlot;
   if (!slot) return {};
   await slot._fireTimeoutNow?.();
-  // 触发 onTimeout 时,原 execute 继续 → 稳定点由原 waitForStable 接收
-  if (state._waitForStable) {
-    await state._waitForStable;
-  }
+  // 续跑路径:重新建立 stable wait 捕捉原 execute 续跑后的事件(同 §2.5)
+  let resolveStableLocal: () => void = () => {};
+  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+  state._resolveStable = resolveStableLocal;
+  await state._waitForStable;
   if (!state.pendingSlot) state._activeExecuteP = undefined
   const { gameOver, winner } = checkGameOver(state);
   return { gameOver, winner };
