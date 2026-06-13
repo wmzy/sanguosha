@@ -305,14 +305,11 @@ export async function fireTimeout(state: GameState): Promise<DispatchResult> {
   await slot._fireTimeoutNow?.();
   // 不等 activeExecuteP:execute 恢复后可能产生新 pending 或完成,
   // 下一次 dispatch/fireTimeout 会处理。仅当 execute 已完成时清理。
-  if (state._activeExecuteP) {
-        await new Promise<void>((resolve) => {
-          const timer = setInterval(() => {
-            if (state.pendingSlot) { clearInterval(timer); resolve(); }
-          }, 0);
-          state._activeExecuteP!.then(() => { clearInterval(timer); resolve(); });
-        });
-      }
+  // 续跑路径:重新建立 stable wait 捕捉原 execute 续跑后的事件(同 Task 3 回应路径)
+  let resolveStableLocal: () => void = () => {};
+  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+  state._resolveStable = resolveStableLocal;
+  await state._waitForStable;
   if (!state.pendingSlot) state._activeExecuteP = undefined
   const { gameOver, winner } = checkGameOver(state);
   return { gameOver, winner };
