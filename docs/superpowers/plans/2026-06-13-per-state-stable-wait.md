@@ -173,7 +173,9 @@ git commit -m "refactor(engine): 主动 action 路径改用 per-state _waitForSt
 **Files:**
 - Modify: `src/engine/create-engine.ts:222-238` (回应路径)
 
-- [ ] **Step 1: 删 setInterval 块,改用 `_waitForStable`**
+- [ ] **Step 1: 删 setInterval 块,重新建立 per-state stable wait**
+
+> **设计澄清**:回应路径是"续跑路径"——和主路径不同,主路径的 `_waitForStable` 已经在 `applyAtom` 创建 pending 时被 resolve 掉并清成 `undefined` 了。需要**自己建立**新的 `_waitForStable` 来等待原 execute 续跑后的 `.finally` 或新 `applyAtom` 事件。**不要用 `if (state._waitForStable)` 检查**——那时它已经是 `undefined` 了。**同 Task 4 fireTimeout 的模式**。
 
 定位 `// 等原始 execute 完成 或 产生新 pending` 注释后的 setInterval 块:
 
@@ -196,10 +198,12 @@ git commit -m "refactor(engine): 主动 action 路径改用 per-state _waitForSt
 替换为:
 
 ```ts
-    // 等稳定点(主路径的 _waitForStable 会被 .finally 或新 pending 触发)
-    if (state._waitForStable) {
-      await state._waitForStable;
-    }
+    // 等稳定点:重新建立 per-state stable wait,捕捉原 execute 续跑后的
+    // .finally(完成)或 applyAtom 创建新 pending 事件。
+    let resolveStableLocal: () => void = () => {};
+    state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+    state._resolveStable = resolveStableLocal;
+    await state._waitForStable;
     if (!state.pendingSlot) state._activeExecuteP = undefined
 ```
 
