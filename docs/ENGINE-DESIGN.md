@@ -107,21 +107,24 @@ interface CardWrapper {
 ### 4.1 API 概览
 
 ```ts
-// 技能模块，一个技能一个模块文件，导出三个函数由引擎 import 并调用
-// ── 创建 ──
+// 技能模块，一个技能一个模块文件，通过 skills/index.ts 的 skillLoaders map 懒加载
+// 导出 SkillModule 对象（default export）
+import type { SkillModule } from '../skill';
+
 export function createSkill(id: string, ownerId: string): Skill;
 
-// ── 后端初始化。api 上有 registerAction / onAtomBefore / onAtomAfter ──
 export function onInit(
   skill: Skill,
-  api: BackendAPI
+  ownerId: string,
 ): () => void;
 
-// ── 前端挂载 ──
+// 可选：前端挂载
 export function onMount(
   skill: Skill,
-  api: FrontendAPI
+  api: FrontendAPI,
 ): () => void;
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 ```
 
 ```ts
@@ -133,59 +136,70 @@ interface Skill {
 }
 ```
 
+技能不通过闭包对象（BackendAPI/EngineApi）操作状态，而是直接 import 顶层函数：
++ `registerAction`、`registerBeforeHook`、`registerAfterHook` ← `'../skill'`
++ `applyAtom`、`pushFrame`、`popFrame`、`topFrame`、`dropAtom`、`pushNotify` ← `'../create-engine'`
++ `state` 和 `ownerId` 通过 validate/execute 参数或 onInit 闭包传入，不需要全局单例
+
 **tree-shaking**：
-+ 前端构建：不引用 `onInit`，`BackendAPI` 及所有后端逻辑被 tree-shake
-+ 后端构建：不引用 `onMount`，`FrontendAPI` 及所有前端逻辑被 tree-shake
++ 前端构建：不引用 `onInit` / `registerAction` / `applyAtom` 等，后端逻辑被 tree-shake
++ 后端构建：不引用 `onMount` / `FrontendAPI`，前端逻辑被 tree-shake
 + `createSkill` 前后端都保留
 
-### 4.2 BackendAPI
+### 4.2 顶层函数式 API（无闭包对象）
 
-`onInit(skill, api)` 的 `api` 参数提供 `BackendAPI`，用于注册 action 和钩子：
+技能 `onInit(skill, ownerId)` 中直接 import 并调用顶层函数注册 action 和钩子。没有 `BackendAPI` / `EngineApi` 闭包对象——`state` 和 `ownerId` 通过参数和闭包传递：
 
 ```ts
-interface BackendAPI {
-  /**
-   * 注册 action。当客户端触发匹配 skillId 和 actionType 时，execute 被调用。
-   * validate 不通过 → 静默丢弃，不记入 action 日志。
-   * 返回卸载函数。
-   */
-  registerAction(
-    actionType: string,
-      /** 校验参数合法性。返回 null = 合法 */
-      validate(view: GameView, params: Record<string, Json>): string | null;
-      /**
-       * 执行。async 函数。形参是 EngineApi,不是 SettlementFrame。
-       * 帧是纯数据,所有"操作"通过 api.apply/notify 进行。
-       * api.pushFrame/popFrame 创建和销毁帧。
-       */
-      execute(api: EngineApi): Promise<void>;
-  ): () => void;
+// 从 skill.ts import
+import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
+// 从 create-engine.ts import
+import { applyAtom, pushFrame, popFrame, topFrame, dropAtom, pushNotify } from '../create-engine';
 
-  /**
-   * 注册 atom apply 前钩子。在 atom 压栈后、validate 前调用。
-   * 可以 await api.apply(其他 atom) 嵌套副作用(如 八卦阵 在 询问闪 前 判定)。
-   * 钩子中**不能**取消当前 atom——没有 drop 机制,atom 总会走完。
-   */
-  onAtomBefore(
-    atomType: string,
-    handler: (ctx: AtomBeforeContext) => Promise<void>,
-  ): () => void;
+// 注册 action。当客户端触发匹配 skillId 和 actionType 时，execute 被调用。
+// validate 不通过 → 静默丢弃，不记入 action 日志。返回卸载函数。
+registerAction(
+  skillId: string,
+  ownerId: string,
+  actionType: string,
+  /** 校验参数合法性。返回 null = 合法。state 由 dispatch 传入 */
+  validate: (state: GameState, params: Record<string, Json>) => string | null,
+  /** 执行。async 函数。state 由 dispatch 传入 */
+  execute: (state: GameState, params: Record<string, Json>) => Promise<void>,
+): () => void;
 
-  /**
-   * 注册 atom apply 后钩子。可以 await api.apply(其他 atom) 嵌套副作用。
-   * 钩子中**不能**修改刚应用的 atom 参数,也不能取消它。
-   * 钩子间通过 state 观察(zones/tags/marks/localVars)通信,不通过 frame.params。
-   */
-  onAtomAfter(
-    atomType: string,
-    handler: (ctx: AtomAfterContext) => Promise<void>,
-  ): () => void;
+// 注册 atom apply 前钩子。在 atom 压栈后、validate 前调用。
+// 可以 await applyAtom(state, 其他 atom) 嵌套副作用。
+// 钩子中可调 dropAtom(state) 跳过当前 atom 的 validate/apply（仅限 before 钩子）。
+registerBeforeHook(
+  skillId: string,
+  ownerId: string,
+  atomType: string,
+  handler: (ctx: AtomBeforeContext) => Promise<void>,
+): () => void;
 
-  /** 应用一个 atom,触发钩子,如果 atom 定义了 pending 则等待回应 */
-  apply(atom: Atom): Promise<void>;
-  /** 往前端事件流插入通知事件(不改变状态) */
-  notify(event: NotifyEvent): void;
-}
+// 注册 atom apply 后钩子。可以 await applyAtom(state, 其他 atom) 嵌套副作用。
+// 钩子间通过 state 观察(zones/tags/marks/localVars)通信。
+registerAfterHook(
+  skillId: string,
+  ownerId: string,
+  atomType: string,
+  handler: (ctx: AtomAfterContext) => Promise<void>,
+): () => void;
+
+// 应用一个 atom，走完整 pipeline(before hooks → validate → apply → after hooks → pending)
+applyAtom(state: GameState, atom: Atom): Promise<void>;
+
+// 帧管理
+pushFrame(state: GameState, skillId: string, from: string, params?: Record<string, Json>): SettlementFrame;
+popFrame(state: GameState): void;
+topFrame(state: GameState): SettlementFrame | undefined;
+
+// before 钩子中跳过当前 atom 的 validate/apply
+dropAtom(state: GameState): void;
+
+// 往前端事件流插入通知事件(不改变状态)
+pushNotify(state: GameState, event: NotifyEvent): void;
 ```
 
 ### 4.3 结算帧与结算区栈
@@ -208,34 +222,33 @@ interface SettlementFrame {
 }
 ```
 
-帧是纯数据——**没有 `apply`/`notify` 方法**。所有操作通过 `EngineApi`(见 §4.7)。
+帧是纯数据——**没有 `apply`/`notify` 方法**。所有操作通过顶层函数 `applyAtom`/`pushNotify` 等。
 
 **技能显式管理帧**：
 
 ```ts
 // 杀技能的 execute——技能自己创建帧、结算、销毁
-async (api: EngineApi) => {
-  const from = api.self;
+async (state: GameState, params: Record<string, Json>) => {
+  const from = ownerId;  // onInit 闭包
+  const cardId = params.cardId as string;
+  const targets = params.targets as string[];
   // 帧在创建时初始化结算数据(只读,后续不可改)
-  const frame = api.pushFrame('杀', from, {
-    cardId,
-    targets: ['P2'],
-  });
+  const frame = pushFrame(state, '杀', from, { cardId, targets });
 
-  await api.apply({ type: '移动牌', cardId, from: 手牌(P1), to: 处理区 });
-  await api.apply({ type: '指定目标', source: from, target: 'P2' });
+  await applyAtom(state, { type: '移动牌', cardId, from: 手牌(P1), to: 处理区 });
+  await applyAtom(state, { type: '指定目标', source: from, target: 'P2' });
 
   // 等待型 atom:进入 pending,Promise 挂起
-  await api.apply({ type: '询问闪', target: 'P2', source: from });
+  await applyAtom(state, { type: '询问闪', target: 'P2', source: from });
   // ↑ 闪 respond 后(或超时 onTimeout=无操作)Promise resolve
   // 父 action 通过观察 state.zones.discardPile 判断是否闪避(见 §4.10)
 
   // 结算后:清理 + 牌入弃牌堆
-  api.popFrame();
+  popFrame(state);
 }
 ```
 
-引擎只为 action execute 提供 `EngineApi` 实例。帧的创建和销毁是 action 的责任,不是引擎的。
+帧的创建和销毁是 action 的责任,不是引擎的。action execute 的 validate/execute 签名接收 state 和 params 参数。
 
 **嵌套自然隔离**——南蛮入侵 execute 中触发杀，杀创建自己的帧：
 
@@ -252,29 +265,29 @@ async (api: EngineApi) => {
 
 **action 调用路径**(统一,不区分主动/回应)：
 
-客户端发 `ClientMessage` → CAS 校验 → 路由到 action → validate → execute(api)。execute 内部通过 `api.apply` 驱动所有状态变更和等待——包括嵌套等待(询问闪、请求回应)和嵌套帧创建(杀、南蛮入侵)。
+客户端发 `ClientMessage` → CAS 校验 → 路由到 action → validate → execute(api)。execute 内部通过 `applyAtom` 驱动所有状态变更和等待——包括嵌套等待(询问闪、请求回应)和嵌套帧创建(杀、南蛮入侵)。
 
 ### 4.4 等待型 Atom 与 Pending 区
 
-游戏等待玩家输入是一个**原子操作**——游戏同时只有一个等待。等待型 atom 和普通 atom 走**同一条 `api.apply` 路径**（§6.1），唯一区别是 apply 流程结束后进入 pending 区而非立即 resolve Promise。
+游戏等待玩家输入是一个**原子操作**——游戏同时只有一个等待。等待型 atom 和普通 atom 走**同一条 `applyAtom` 路径**（§6.1），唯一区别是 apply 流程结束后进入 pending 区而非立即 resolve Promise。
 
 **核心机制**：
 
 + 等待型 atom 的 `AtomDefinition` 声明 `pending` 字段（§5）
-+ `api.apply(等待型atom)` 执行完 before hooks → validate → apply → after hooks → 弹栈后，进入 **pending 区**，`api.apply` 返回的 Promise 挂起
++ `applyAtom(state, 等待型atom)` 执行完 before hooks → validate → apply → after hooks → 弹栈后，进入 **pending 区**，`applyAtom` 返回的 Promise 挂起
 + pending 区只有一个位置——**同时只有一个等待**
 + 等待结束方式: **响应到达**(target 的 respond action execute 完,slot 被消费) 或 **超时**(`pending.onTimeout` 声明的 atom 走普通 apply 路径)
 + **等待型 atom 不可被丢弃/取消**——必走完上述两条路径之一(没有 `drop()` 机制)
 + `pending.timeout` 与 `pending.onTimeout` **都是必填**——没有合理默认值
 
-**before hooks 可以插入等待**：当前 atom 还在 apply 栈上没弹出时，钩子可以 `ctx.api.apply(另一个等待型atom)` 嵌套执行。比如八卦阵在 `询问闪` 的 before hook 中插入 `请求回应`：
+**before hooks 可以插入等待**：当前 atom 还在 apply 栈上没弹出时，钩子可以 `await applyAtom(ctx.state, 另一个等待型atom)` 嵌套执行。比如八卦阵在 `询问闪` 的 before hook 中插入 `请求回应`：
 
 ```
-api.apply(询问闪):
+applyAtom(state, 询问闪):
   压栈：[询问闪]
   before hooks:
     八卦阵-P2:
-      ctx.api.apply(请求回应, {是否发动八卦阵})     ← 嵌套
+      applyAtom(ctx.state, 请求回应, {是否发动八卦阵})     ← 嵌套
         压栈：[询问闪, 请求回应]
         before → validate → apply → after → 弹栈
         检测到 pending → 进入 pending 区
@@ -297,7 +310,7 @@ api.apply(询问闪):
 + 新 atom 走完整 apply 流程后入 slot
 + 典型场景: 闪响应后用户在 5s 内又发动某技能,新生成的等待顶替
 
-**超时行为**：`pending.onTimeout` 声明一个 atom,引擎用 `api.apply(onTimeout)` 执行——和普通 apply 一样压栈、走钩子、弹栈。**onTimeout 必填**——典型场景是 `{ type: '无操作' }` 占位 atom(空 apply),表示"超时不做事,继续结算"。
+**超时行为**：`pending.onTimeout` 声明一个 atom,引擎用 `applyAtom(state, onTimeout)` 执行——和普通 apply 一样压栈、走钩子、弹栈。**onTimeout 必填**——典型场景是 `{ type: '无操作' }` 占位 atom(空 apply),表示"超时不做事,继续结算"。
 
 **前端感知**：等待型 atom 进入 pending 区时下发 atom 事件,事件带时间戳：
 
@@ -308,58 +321,61 @@ api.apply(询问闪):
 
 前端根据 `pending` 字段显示倒计时/进度条,根据 `prompt` 渲染回应 UI,根据等待型 atom 的 `AtomDefinition.pending.prompt` 启用对应的 action 按钮。
 
-**`api.apply` 返回 `Promise<void>`**。等待型 atom 的 Promise 在被消费(用户回应 / 超时)时 resolve。技能代码用 `await api.apply(...)` 自然暂停/恢复,不需要回调或续跑机制。
+**`applyAtom(state, atom)` 返回 `Promise<void>`**。等待型 atom 的 Promise 在被消费(用户回应 / 超时)时 resolve。技能代码用 `await applyAtom(state, ...)` 自然暂停/恢复,不需要回调或续跑机制。
 
 ### 4.5 Atom 钩子
 
-Atom 钩子挂载在 atom 类型上,在 `api.apply(atom)` 流程中触发(§6.1)。所有匹配的钩子都执行。
+Atom 钩子挂载在 atom 类型上,在 `applyAtom(state, atom)` 流程中触发(§6.1)。所有匹配的钩子都执行。
 
 **before 钩子**——在 atom 压栈后、真正应用前执行。可以:
-- **应用新 atom**: 通过 `ctx.api.apply(...)` 插入新的状态变更(等待型也行,见 §4.4 嵌套例)
-- **不能取消当前 atom**——`drop()` 机制已移除,所有 before hooks 跑完后必然进入 validate/apply
+- **应用新 atom**: 通过 `await applyAtom(ctx.state, ...)` 插入新的状态变更(等待型也行,见 §4.4 嵌套例)
+- **跳过当前 atom**: 通过 `dropAtom(ctx.state)` 跳过 validate/apply(仅限 6 个防具/武器技能)
 
 ```ts
 interface AtomBeforeContext {
   state: GameState;
   atom: Atom;
-  self: string;
+  /** 钩子注册时绑定的 ownerId */
+  ownerId: string;
   /** 当前结算帧(只读) */
   frame: SettlementFrame;
-  /** 调用 api.apply 触发新的 atom(等待型也行) */
-  api: EngineApi;
+  /** frame.params */
+  params: Record<string, Json>;
 }
+```
 ```
 
 **after 钩子**——在 atom 真正应用后执行。可以:
-- **应用新 atom**: 如遗计在"受到伤害"后摸牌、分牌
+- **应用新 atom**: 如遗计在"受到伤害"后摸牌、分牌，通过 `await applyAtom(ctx.state, ...)`
 - **读取 state** 决定副作用(通过 `ctx.state`)
 
 ```ts
 interface AtomAfterContext {
   state: GameState;
   atom: Atom;
-  self: string;
+  /** 钩子注册时绑定的 ownerId */
+  ownerId: string;
   /** 当前结算帧(只读) */
   frame: SettlementFrame;
-  /** 调用 api.apply 触发新的 atom */
-  api: EngineApi;
+  /** frame.params */
+  params: Record<string, Json>;
 }
 ```
 
-钩子通过 `ctx.api.apply` 操作状态(见 §4.2 BackendAPI)。**没有 `drop()` / `modifyParams()`**——状态变化都通过 `apply` 走,跨 atom 通信通过 state 观察(弃牌堆增量、tags、marks、localVars)。
+钩子通过 `await applyAtom(ctx.state, ...)` 操作状态（见 §4.2）。跨 atom 通信通过 state 观察(弃牌堆增量、tags、marks、localVars)，不通过 frame.params 突变。before 钩子中可调 `dropAtom(ctx.state)` 跳过当前 atom。
 
 **`询问闪` 的 before 钩子示例**:
-- 八卦阵: 判定成功 → `ctx.api.apply({ type: '加标签', player: target, tag: '八卦阵/autoDodge' })` → 杀.execute 后续观察此标签决定是否扣血
-- 不调 `drop()`,询问闪继续走完 validate/apply 并进入 pending(等用户出闪);若用户最终未出闪,onTimeout=`无操作` 触发,杀.execute 检查 `tags.includes('八卦阵/autoDodge')` 决定是否扣血
+- 八卦阵: 判定成功 → `await applyAtom(ctx.state, { type: '加标签', player: target, tag: '八卦阵/autoDodge' })` → 杀.execute 后续观察此标签决定是否扣血
+- 不调 `dropAtom()`,询问闪继续走完 validate/apply 并进入 pending(等用户出闪);若用户最终未出闪,onTimeout=`无操作` 触发,杀.execute 检查 `tags.includes('八卦阵/autoDodge')` 决定是否扣血
 
 **闪的回应 action execute**: 移牌到弃牌堆。**不修改 frame.params**。父 action 通过观察弃牌堆(`state.zones.discardPile` 增量)判断是否闪避。
 
 **`指定目标` 的 after 钩子示例**:
-- 流离(大乔): `atom.target === api.self` → 推入新的"流离"选择 UI(通过 `ctx.api.apply(请求回应)` 让用户选新目标),后续 atom 读 `state.localVars['流离/newTarget']`
+- 流离(大乔): `atom.target === ctx.ownerId` → 推入新的"流离"选择 UI(通过 `await applyAtom(ctx.state, 请求回应)` 让用户选新目标),后续 atom 读 `state.localVars['流离/newTarget']`
 
 **`造成伤害` 的 after 钩子示例**:
-- 遗计(郭嘉): `target === self` → `await ctx.api.apply(摸牌)` + `await ctx.api.apply(请求回应)` 分配牌
-- 反馈(司马懿): `target === self` → `await ctx.api.apply(获得牌)` 从伤害来源获得一张牌
+- 遗计(郭嘉): `target === ctx.ownerId` → `await applyAtom(ctx.state, 摸牌)` + `await applyAtom(ctx.state, 请求回应)` 分配牌
+- 反馈(司马懿): `target === ctx.ownerId` → `await applyAtom(ctx.state, 获得牌)` 从伤害来源获得一张牌
 - 两个钩子都执行(副作用语义),遗计先执行完,反馈再执行
 
 ### 4.6 通知事件
@@ -519,89 +535,65 @@ interface TargetFilter {
 
 ### 4.10 示例
 
-下面的示例使用本节定义的 `EngineApi`/`BackendAPI` 新接口(无 `frame.apply`、`drop`、`modifyParams`、`consumePending`)。**结算数据通过 state 观察**(弃牌堆增量、tags、marks、localVars)而非 `frame.params` 突变。
+下面的示例使用顶层函数式 API（无闭包对象）。**结算数据通过 state 观察**(弃牌堆增量、tags、marks、localVars)而非 `frame.params` 突变。
 
 ```ts
 // ── 杀.ts ──
-export function createSkill(id, ownerId) {
-  return {
-    id,
-    ownerId,
-    name: '杀',
-    description: '出牌阶段，你可以对攻击范围内的一名角色使用杀',
-  };
+import type { GameState, Json, Skill } from '../types';
+import { applyAtom, pushFrame, popFrame, topFrame } from '../create-engine';
+import { registerAction, type SkillModule } from '../skill';
+
+export function createSkill(id: string, ownerId: string): Skill {
+  return { id, ownerId, name: '杀', description: '出牌阶段，你可以对攻击范围内的一名角色使用杀' };
 }
 
-export function onInit(杀, api: BackendAPI) {
-  api.registerAction('use',
-    (view, params) => {
-      if ((view.turn.vars['杀/killsPlayed'] ?? 0) >= getKillLimit(view)) {
+export function onInit(skill: Skill, ownerId: string): () => void {
+  registerAction(skill.id, ownerId, 'use',
+    (state: GameState, params: Record<string, Json>) => {
+      if ((state.turn?.vars?.['杀/killsPlayed'] ?? 0) >= getKillLimit(state)) {
         return '出杀次数已用尽';
       }
       return null;
     },
-    async (api: EngineApi) => {
-      const { from, params } = api;
+    async (state: GameState, params: Record<string, Json>) => {
+      const from = ownerId;  // onInit 闭包
       const cardId = params.cardId as string;
       const targets = params.targets as string[];
 
-      // 帧在 pushFrame 时初始化,params 只读——target 列表作为初始结算信息
-      api.pushFrame('杀', from, { cardId, targets });
+      pushFrame(state, '杀', from, { cardId, targets });
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
 
-      // 杀牌放入处理区
-      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-
-      // 对每个 target:观察弃牌堆增量判断是否闪避
       for (const target of targets) {
-        await api.apply({ type: '指定目标', source: from, target });
-
-        // 八卦阵在 询问闪 的 before 钩子中可能 apply(判定 + 加标签) 而非 drop
-        // 询问闪 继续走完 validate/apply 并进入 pending,等用户出闪或超时
-        const beforeCount = api.state.zones.discardPile.length;
-        await api.apply({ type: '询问闪', target, source: from });
-        // ↑ 闪 respond → 闪牌入弃牌堆;或 超时 onTimeout=无操作 → 不入弃牌堆
-        // 父 action 不读 frame.params,直接读 state
-        const dodged = api.state.zones.discardPile.length > beforeCount &&
-          api.state.zones.discardPile.slice(beforeCount).some(id => {
-            const c = api.state.cardMap[id];
-            return c?.name === '闪';
-          });
+        await applyAtom(state, { type: '指定目标', source: from, target });
+        const beforeCount = state.zones.discardPile.length;
+        await applyAtom(state, { type: '询问闪', target, source: from });
+        const dodged = state.zones.discardPile.length > beforeCount &&
+          state.zones.discardPile.slice(beforeCount).some(id => state.cardMap[id]?.name === '闪');
 
         if (!dodged) {
-          // 检查八卦阵 autoDodge 标签(若用户在闪 respond 前发动八卦阵并判定成功)
-          const autoDodge = api.state.players
-            .find(p => p.name === target)
-            ?.tags?.includes('八卦阵/autoDodge');
+          const autoDodge = state.players.find(p => p.name === target)?.tags?.includes('八卦阵/autoDodge');
           if (!autoDodge) {
-            // 酒:检查 source 是否有 nextKillDamageBonus 标记
-            const killBonus = api.state.players
-              .find(p => p.name === from)
+            const killBonus = state.players.find(p => p.name === from)
               ?.marks?.find(m => m.id === '酒/nextKillDamageBonus')?.payload === 1 ? 1 : 0;
-            const amount = 1 + killBonus;
-            await api.apply({ type: '造成伤害', target, amount, source: from });
-            // 消费酒 buff
+            await applyAtom(state, { type: '造成伤害', target, amount: 1 + killBonus, source: from });
             if (killBonus > 0) {
-              await api.apply({ type: '去标记', player: from, mark: { id: '酒/nextKillDamageBonus' } });
+              await applyAtom(state, { type: '去标记', player: from, mark: { id: '酒/nextKillDamageBonus' } });
             }
           } else {
-            // 清理 autoDodge 标签
-            await api.apply({ type: '去标签', player: target, tag: '八卦阵/autoDodge' });
+            await applyAtom(state, { type: '去标签', player: target, tag: '八卦阵/autoDodge' });
           }
         }
       }
 
-      // 处理区 → 弃牌堆
-      await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-
-      // 更新出杀次数(走 apply 而非 frame.params 突变)
-      await api.apply({ type: '增量变量', key: '杀/killsPlayed', scope: 'turn', delta: 1 });
-
-      api.popFrame();
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await applyAtom(state, { type: '增量变量', key: '杀/killsPlayed', scope: 'turn', delta: 1 });
+      popFrame(state);
     },
   );
+  return () => {};
 }
 
-export function onMount(杀, api: FrontendAPI) {
+export function onMount(杀: Skill, api: FrontendAPI) {
   api.defineAction('use', {
     label: '杀', style: 'primary',
     prompt: {
@@ -613,227 +605,154 @@ export function onMount(杀, api: FrontendAPI) {
   });
 }
 
-// ── 闪.ts ──
-export function createSkill(id, ownerId) {
-  return {
-    id,
-    ownerId,
-    name: '闪',
-    description: '需要使用或打出闪时,你可以打出一张闪',
-  };
-}
+export default { createSkill, onInit, onMount } satisfies SkillModule;
+```
 
-export function onInit(闪, api: BackendAPI) {
-  api.registerAction('respond',
-    (view, params) => {
-      // 只有询问闪等待中时才能出闪
-      if (view.pending?.atom?.type !== '询问闪') return '当前不需要出闪';
+```ts
+// ── 闪.ts ──
+export function onInit(skill: Skill, ownerId: string): () => void {
+  registerAction(skill.id, ownerId, 'respond',
+    (state: GameState, params: Record<string, Json>) => {
+      if (state.pendingSlot?.atom?.type !== '询问闪') return '当前不需要出闪';
       return null;
     },
-    async (api: EngineApi) => {
-      const { from, params } = api;
+    async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
-      // 闪牌直接入弃牌堆。**不修改 frame.params**——父 action 通过 state 观察。
-      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '弃牌堆' } });
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: ownerId }, to: { zone: '弃牌堆' } });
     },
   );
+  return () => {};
 }
+```
 
-export function onMount(闪, api: FrontendAPI) {
-  api.defineAction('respond', {
-    label: '出闪', style: 'primary',
-    prompt: {
-      type: 'useCard',
-      title: '是否出闪',
-      cardFilter: { filter: (c) => c.name === '闪', min: 1, max: 1 },
-    },
-  });
-}
-
+```ts
 // ── 八卦阵.ts（装备·防具） ──
-export function createSkill(id, ownerId) {
-  return {
-    id,
-    ownerId,
-    name: '八卦阵',
-    description: '当你需要使用或打出一张闪时，你可以进行一次判定：若判定结果为红色，则视为你使用或打出了一张闪',
-  };
-}
+import { registerBeforeHook } from '../skill';
 
-export function onInit(八卦阵, api: BackendAPI) {
-  // 询问闪之前:询问是否发动八卦阵 + 判定
-  api.onAtomBefore('询问闪', async (ctx) => {
-    if (ctx.atom.target !== api.self) return;
-    if (!hasEquipped(ctx.state, api.self, '八卦阵')) return;
+export function onInit(skill: Skill, ownerId: string): () => void {
+  registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx) => {
+    if (ctx.atom.target !== ctx.ownerId) return;
+    if (!hasEquipped(ctx.state, ctx.ownerId, '八卦阵')) return;
 
-    // 插入一个请求回应——也是等待型 atom，先进 pending 区
-    await ctx.api.apply({
-      type: '请求回应',
-      requestType: '是否发动八卦阵',
-      target: api.self,
-      prompt: { type: 'confirm', title: '是否发动八卦阵?' },
+    await applyAtom(ctx.state, {
+      type: '请求回应', requestType: '是否发动八卦阵', target: ctx.ownerId,
     });
-    // ↑ 用户选择发动 → 八卦 action → 继续;选择不发动 → 超时 → 继续
 
-    // 判定
-    await ctx.api.apply({ type: '判定', player: api.self, judgeType: '八卦阵' });
+    await applyAtom(ctx.state, { type: '判定', player: ctx.ownerId, judgeType: '八卦阵' });
     const judgeResult = ctx.state.localVars['八卦阵:判定结果'];
     if (judgeResult === 'red') {
-      // 判定成功:加标签,杀.execute 后续观察此标签决定是否扣血
-      // **不调 drop()**——询问闪继续走完 validate/apply 并进入 pending 等用户出闪
-      // 若用户最终未出闪,onTimeout=无操作,杀检查 autoDodge 标签决定是否扣血
-      await ctx.api.apply({ type: '加标签', player: api.self, tag: '八卦阵/autoDodge' });
-    }
-    // 判定失败:不做事 → 询问闪继续等用户出闪
-  });
-}
-
-export function onMount(八卦阵, api: FrontendAPI) {
-  api.onEvent((event) => {
-    if (event.kind === 'atom' && event.atom.type === '判定' && event.atom.judgeType === '八卦阵') {
-      api.playEffect({ sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 600 });
+      await applyAtom(ctx.state, { type: '加标签', player: ctx.ownerId, tag: '八卦阵/autoDodge' });
     }
   });
+  return () => {};
 }
+```
 
+```ts
 // ── 遗计.ts（郭嘉） ──
-export function createSkill(id, ownerId) {
-  return {
-    id,
-    ownerId,
-    name: '遗计',
-    description: '当你受到1点伤害后，你可以摸两张牌，然后将两张牌交给任意角色（可以是自己）',
-  };
-}
+import { registerAfterHook } from '../skill';
 
-export function onInit(遗计, api: BackendAPI) {
-  api.onAtomAfter('造成伤害', async (ctx) => {
-    if (ctx.atom.target !== api.self) return;
+export function onInit(skill: Skill, ownerId: string): () => void {
+  registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx) => {
+    if (ctx.atom.target !== ctx.ownerId) return;
 
-    // "你可以" = 选择性发动
-    await ctx.api.apply({
-      type: '请求回应',
-      requestType: '是否发动遗计',
-      target: api.self,
-      prompt: { type: 'confirm', title: '是否发动遗计?' },
+    await applyAtom(ctx.state, {
+      type: '请求回应', requestType: '是否发动遗计', target: ctx.ownerId,
     });
-    // 检查用户是否选择发动(弃牌堆无对应卡,或通过 state.localVars)
-    // 此处用 addTag/onTag 检查:发动后打上 遗计/active 标签
-    const active = ctx.state.players
-      .find(p => p.name === api.self)
-      ?.tags?.includes('遗计/active');
+    const active = ctx.state.players.find(p => p.name === ctx.ownerId)?.tags?.includes('遗计/active');
     if (!active) return;
 
-    await ctx.api.apply({ type: '摸牌', player: api.self, count: 2 });
-
-    // 分配牌——请求回应等待用户操作
-    await ctx.api.apply({
-      type: '请求回应',
-      requestType: '遗计分配',
-      target: api.self,
-      prompt: { type: 'distribute', cardIds: ctx.state.localVars['遗计:摸到的牌'] ?? [], minPerTarget: 0, maxPerTarget: 2 },
+    await applyAtom(ctx.state, { type: '摸牌', player: ctx.ownerId, count: 2 });
+    await applyAtom(ctx.state, {
+      type: '请求回应', requestType: '遗计分配', target: ctx.ownerId,
     });
-    // 分配结果由遗计/respond action 写 state.localVars,此处遍历应用
     const distribution = ctx.state.localVars['遗计:分配结果'] as Array<{ target: string; cardIds: string[] }> | undefined;
     if (distribution) {
       for (const { target, cardIds } of distribution) {
         for (const cardId of cardIds) {
-          await ctx.api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: api.self }, to: { zone: '手牌', player: target } });
+          await applyAtom(ctx.state, { type: '移动牌', cardId, from: { zone: '手牌', player: ctx.ownerId }, to: { zone: '手牌', player: target } });
         }
       }
     }
   });
+  return () => {};
 }
 ```
 
 ```ts
 // ── 回合管理.ts（出牌阶段等待示例） ──
-export function onInit(回合管理, api: BackendAPI) {
-  // ... onAtomAfter('回合结束') 启动下一家回合 ...
+export function onInit(skill: Skill, ownerId: string): () => void {
+  // ... registerAfterHook(skill.id, ownerId, '回合结束', ...) 启动下一家回合 ...
 
-  api.registerAction('end', null, async (api: EngineApi) => {
-    const player = api.self;
-    await api.apply({ type: '阶段结束', player, phase: '出牌' });
-    await api.apply({ type: '阶段结束', player, phase: '弃牌' });
-    await api.apply({ type: '回合结束', player });
-    await api.apply({ type: '下一玩家' });
-  });
+  registerAction(skill.id, ownerId, 'end',
+    (state: GameState, params: Record<string, Json>) => null,
+    async (state: GameState, params: Record<string, Json>) => {
+      const player = ownerId;
+      await applyAtom(state, { type: '阶段结束', player, phase: '出牌' });
+      await applyAtom(state, { type: '阶段结束', player, phase: '弃牌' });
+      await applyAtom(state, { type: '回合结束', player });
+      await applyAtom(state, { type: '下一玩家' });
+    },
+  );
+  return () => {};
 }
 
 // 出牌阶段启动（在阶段开始的 after 钩子中）:
 async function startPlayPhase(ctx: AtomAfterContext) {
-  const player = ctx.self;
-  await ctx.api.apply({ type: '阶段开始', player, phase: '出牌' });
-  // 等待出牌:超时后自动 apply(阶段结束, 出牌)
-  // (本 PR 暂不实现 等待出牌 atom,留待后续——见 §10)
-  await ctx.api.apply({ type: '阶段结束', player, phase: '出牌' });
+  const player = ctx.ownerId;
+  await applyAtom(ctx.state, { type: '阶段开始', player, phase: '出牌' });
+  await applyAtom(ctx.state, { type: '阶段结束', player, phase: '出牌' });
 }
 ```
 
 ```ts
 // ── 武圣.ts（关羽） ──
-// "你可以将一张红色牌当杀使用或打出"
-export function createSkill(id, ownerId) {
-  return {
-    id,
-    ownerId,
-    name: '武圣',
-    description: '你可以将一张红色牌当杀使用或打出',
-  };
-}
-
-export function onInit(武圣, api: BackendAPI) {
-  // 后端 use action:前端选完牌后,后端校验花色并 apply 武圣包装 + 走标准杀流程
-  api.registerAction('use',
-    (view, params) => {
+export function onInit(skill: Skill, ownerId: string): () => void {
+  registerAction(skill.id, ownerId, 'use',
+    (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
-      const card = view.cardMap[params.cardId as string];
+      const card = state.cardMap[params.cardId as string];
       if (!card) return 'card not found';
       if (card.suit !== '♥' && card.suit !== '♦') return '只能将红色牌当杀使用';
-      // 校验目标在攻击范围内
       const targets = params.targets as string[] | undefined;
       if (!targets?.length) return 'targets required';
-      // ...距离校验略
       return null;
     },
-    async (api: EngineApi) => {
-      const from = api.self;
-      const cardId = api.params.cardId as string;
-      const targets = api.params.targets as string[];
+    async (state: GameState, params: Record<string, Json>) => {
+      const from = ownerId;
+      const cardId = params.cardId as string;
+      const targets = params.targets as string[];
 
-      // 包装:把原牌 info 暂存到 card._wrapper,name 改为 '杀'
-      await api.apply({ type: '武圣包装', cardId });
-      // 走标准杀流程
-      api.pushFrame('武圣', from, { cardId, targets });
-      await api.apply({ type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await applyAtom(state, { type: '武圣包装', cardId });
+      pushFrame(state, '武圣', from, { cardId, targets });
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       for (const target of targets) {
-        await api.apply({ type: '指定目标', source: from, target });
-        const beforeCount = api.state.zones.discardPile.length;
-        await api.apply({ type: '询问闪', target, source: from });
-        const dodged = api.state.zones.discardPile.length > beforeCount &&
-          api.state.zones.discardPile.slice(beforeCount).some(id => api.state.cardMap[id]?.name === '闪');
+        await applyAtom(state, { type: '指定目标', source: from, target });
+        const beforeCount = state.zones.discardPile.length;
+        await applyAtom(state, { type: '询问闪', target, source: from });
+        const dodged = state.zones.discardPile.length > beforeCount &&
+          state.zones.discardPile.slice(beforeCount).some(id => state.cardMap[id]?.name === '闪');
         if (!dodged) {
-          await api.apply({ type: '造成伤害', target, amount: 1, source: from });
+          await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from });
         }
       }
-      await api.apply({ type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      api.popFrame();
-      // 武圣包装还原:在 onAtomAfter('移动牌', from: 处理区) 钩子中自动执行
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      popFrame(state);
     },
   );
 
-  // 还原:牌离开处理区时还原为原始牌
-  api.onAtomAfter('移动牌', async (ctx) => {
-    if (ctx.atom.from?.zone === '处理区' && ctx.atom.to?.zone === '弃牌堆') {
-      const card = ctx.state.cardMap[ctx.atom.cardId];
-      if (card._wrapper?.fromSkill === '武圣') {
-        await ctx.api.apply({ type: '武圣还原', cardId: ctx.atom.cardId });
+  registerAfterHook(skill.id, ownerId, '移动牌', async (ctx) => {
+    if ((ctx.atom as any).from?.zone === '处理区' && (ctx.atom as any).to?.zone === '弃牌堆') {
+      const card = ctx.state.cardMap[(ctx.atom as any).cardId];
+      if ((card as any)?._wrapper?.fromSkill === '武圣') {
+        await applyAtom(ctx.state, { type: '武圣还原', cardId: (ctx.atom as any).cardId });
       }
     }
   });
+  return () => {};
 }
 
-export function onMount(武圣, api: FrontendAPI) {
+export function onMount(武圣: Skill, api: FrontendAPI) {
   api.defineAction('use', {
     label: '武圣', style: 'secondary',
     prompt: {
@@ -875,7 +794,7 @@ export function onMount(武圣, api: FrontendAPI) {
 
 **为什么卡牌技能也按玩家实例化**：
 - `validate` 需要知道"谁的牌"、"谁的出杀次数"——`ownerId` 提供上下文
-- `api.self` 就是 `ownerId`，钩子中直接判断 `ctx.atom.target !== api.self`
+- `ctx.ownerId` 就是 `ownerId`，钩子中直接判断 `ctx.atom.target !== ctx.ownerId`
 - 前端 `defineAction` 的 filter 也需要 `api.viewer`
 
 #### 后端加载流程
@@ -885,13 +804,14 @@ export function onMount(武圣, api: FrontendAPI) {
   ↓
 for each player:
   for each skillId in player.技能列表:
-    1. import 技能模块 (skills/${skillId}.ts)
-    2. skill = module.createSkill(skillId, player.id)   // 创建实例
-    3. module.onInit(skill, backendAPI)                  // 注册 action/钩子
+    1. 通过 skillLoaders[skillId] 动态 import() 技能模块 (skills/${skillId}.ts)
+    2. skill = module.createSkill(skillId, player.name)   // 创建实例
+    3. module.onInit(skill, player.name)                  // 注册 action/钩子
 ```
+- 技能模块通过 `skills/index.ts` 导出的 `skillLoaders: Record<string, () => Promise<SkillModule>>` 懒加载
 - `createSkill` 由引擎调用，传入 `id` 和 `ownerId`，模块返回 Skill 对象
-- `onInit` 由引擎紧接着调用，传入 Skill 对象和 BackendAPI，返回卸载函数
-- 模块本身是**无状态**的工厂，所有状态通过 `Skill`/`BackendAPI` 参数传递
+- `onInit` 由引擎紧接着调用，传入 Skill 对象和 ownerId 字符串（非 BackendAPI），返回卸载函数
+- 模块本身是**无状态**的工厂，所有状态通过参数和闭包传递
 - `onInit` 返回的卸载函数会取消该技能实例的所有 action 注册和 atom 钩子
 
 #### 前端加载流程
@@ -903,8 +823,8 @@ for each player:
   ↓
 for each player:
   for each skillId in player.skills:
-    1. import 技能模块 (skills/${skillId}.ts)
-    2. skill = module.createSkill(skillId, player.id)
+    1. 通过 skillLoaders[skillId] 动态 import() 技能模块
+    2. skill = module.createSkill(skillId, player.name)
     3. offMount = module.onMount(skill, frontendAPI)       // 注册 UI，返回卸载函数
 ```
 
@@ -1013,11 +933,11 @@ P1 点"结束回合":
 // 回合管理-P1.execute('end') — 上家自己推进
 async (frame) => {
   const player = frame.from;
-  await frame.apply({ type: '阶段结束', player, phase: '出牌' });
-  await frame.apply({ type: '阶段结束', player, phase: '弃牌' });
-  await frame.apply({ type: '回合结束', player });     // ← 触发所有 after 钩子
+  await applyAtom(state, { type: '阶段结束', player, phase: '出牌' });
+  await applyAtom(state, { type: '阶段结束', player, phase: '弃牌' });
+  await applyAtom(state, { type: '回合结束', player });     // ← 触发所有 after 钩子
   // 钩子链中:回合管理-P2.onAtomAfter 发现自己该接手 → 启动回合
-  await frame.apply({ type: '下一玩家' });              // ← currentPlayerIndex 推进
+  await applyAtom(state, { type: '下一玩家' });              // ← currentPlayerIndex 推进
 }
 
 // 回合管理-P2.onAtomAfter('回合结束') — 被叫到时启动
@@ -1205,22 +1125,22 @@ type AtomPlayerViews = readonly [
 
 ### 6.1 apply(atom) 执行流程
 
-当技能代码调用 `await api.apply(atom)` 时，**所有 atom 走同一条路径**——无论是否等待型：
+当技能代码调用 `await applyAtom(state, atom)` 时，**所有 atom 走同一条路径**——无论是否等待型：
 
 1. **压栈**：atom 压入当前帧的 atom 栈
 2. **onBefore hooks**：所有注册了该 `atomType` 的 `onAtomBefore` 钩子按优先级串行执行（async）
-   - 钩子可以 `await ctx.api.apply(新atom)` 形成嵌套(包括嵌套等待型 atom)
+   - 钩子可以 `await applyAtom(ctx.state, 新atom)` 形成嵌套(包括嵌套等待型 atom)
    - **钩子不能取消当前 atom**——`drop()` 机制已移除,所有 before hooks 跑完后必然进入 validate/apply
 3. **validate**：`AtomDefinition.validate(state, atom)` → 不合法则跳过，Promise resolve
 4. **apply**：`AtomDefinition.apply(state, atom)` → 产生新 state（纯函数）
 5. **弹栈**：atom 从 atom 栈弹出
 6. **生成事件**：构造 `GameEvent { kind: 'atom', atom }` + per-player 视图分叉 → 推入前端事件流
 7. **onAfter hooks**：所有注册了该 `atomType` 的 `onAtomAfter` 钩子按优先级串行执行（async）
-   - 钩子可以 `await ctx.api.apply(新atom)`
+   - 钩子可以 `await applyAtom(ctx.state, 新atom)`
    - 钩子通过 `ctx.state` 读 state(只读)
 8. **检查 pending**（仅当 `AtomDefinition.pending` 存在时）：
    - **若当前已有 pending slot**:旧 slot 的 Promise **直接 resolve**(不 fire onTimeout,旧 atom 已被新 wait 取代),旧 atom 已应用的 state 变更保留
-   - 新 atom 进入 **pending 区**，`api.apply` 返回的 Promise **挂起**
+   - 新 atom 进入 **pending 区**，`applyAtom` 返回的 Promise **挂起**
    - 前端收到带 `pending: { startTime, deadline }` 的 atom 事件
    - 等待结束: 响应到达(target 的 respond action execute 完,slot 被消费)或 超时(`pending.onTimeout` 声明的 atom 走普通 apply 路径,必填)
 
@@ -1230,15 +1150,15 @@ type AtomPlayerViews = readonly [
 
 ```
 // 杀的 execute 流程(技能显式创建的帧,params 只读)
-api.pushFrame('杀', from, { cardId, targets })
+pushFrame(state, '杀', from, { cardId, targets })
 
 // 移牌到处理区
-await api.apply({ type: '移动牌', cardId, from: 手牌, to: 处理区 })
+await applyAtom(state, { type: '移动牌', cardId, from: 手牌, to: 处理区 })
 
-await api.apply({ type: '指定目标', source: P1, target: 'P2' })
+await applyAtom(state, { type: '指定目标', source: P1, target: 'P2' })
 
 // 询问闪:等待型 atom → 进入 pending 区 → Promise 挂起
-await api.apply({ type: '询问闪', target, source: P1 })
+await applyAtom(state, { type: '询问闪', target, source: P1 })
 // ↑ 八卦阵 before 钩子:
 //    插入 请求回应(是否发动八卦阵) → 用户选择 → 判定
 //    判定成功 → apply(加标签, autoDodge) → 询问闪继续(不 drop)
@@ -1250,13 +1170,13 @@ await api.apply({ type: '询问闪', target, source: P1 })
 // Promise resolve 后,父 action 观察 state.zones.discardPile 增量判断闪避
 const beforeCount = ...; // 等待前快照
 // ↑ 询问闪后
-const dodged = api.state.zones.discardPile.slice(beforeCount)
-  .some(id => api.state.cardMap[id]?.name === '闪');
+const dodged = state.zones.discardPile.slice(beforeCount)
+  .some(id => state.cardMap[id]?.name === '闪');
 if (!dodged && !hasTag('八卦阵/autoDodge')) {
-  await api.apply({ type: '造成伤害', target, amount: 1, source: P1 });
+  await applyAtom(state, { type: '造成伤害', target, amount: 1, source: P1 });
 }
 // 移牌到弃牌堆
-await api.apply({ type: '移动牌', cardId, from: 处理区, to: 弃牌堆 })
+await applyAtom(state, { type: '移动牌', cardId, from: 处理区, to: 弃牌堆 })
 ```
 
 ### 6.2 Pending 区
@@ -1281,11 +1201,11 @@ interface PendingSlot {
 ```
 
 + **入队**: 等待型 atom 的 apply 流程走完后,从 atom 栈弹出,进入 pending 区(若已有旧 slot,旧 slot 立即被替换,见 §6.1)
-+ **消费**: 用户发 action → action execute → pending 被消费 → `resolve()` → 技能的 `await api.apply(...)` 从暂停点恢复
++ **消费**: 用户发 action → action execute → pending 被消费 → `resolve()` → 技能的 `await applyAtom(state, ...)` 从暂停点恢复
 + **超时**: 定时器触发 → `clearTimeout(timer)` → 执行 `pending.onTimeout`(必填)走普通 apply 路径 → `resolve()` → 技能恢复
 + **没有 `drop()` 清除机制**——等待型 atom 必走完(消费/超时)之一
 
-**嵌套等待**: before hook 中可以 `ctx.api.apply(等待型atom)` 插入新的等待。此时外层 atom 还在 apply 栈上没弹出,内层等待型 atom 先执行完其 apply 流程,先进入 pending 区。内层被消费后,外层 atom 的 before hooks 继续——外层 atom 继续执行其 apply 流程,也进入 pending 区(若内层是替换进来的,旧 slot 也已 resolve)。
+**嵌套等待**: before hook 中可以 `await applyAtom(ctx.state, 等待型atom)` 插入新的等待。此时外层 atom 还在 apply 栈上没弹出,内层等待型 atom 先执行完其 apply 流程,先进入 pending 区。内层被消费后,外层 atom 的 before hooks 继续——外层 atom 继续执行其 apply 流程,也进入 pending 区(若内层是替换进来的,旧 slot 也已 resolve)。
 
 ### 6.3 超时配置
 
@@ -1299,20 +1219,19 @@ interface PendingSlot {
 
 ```ts
 interface AtomHookEntry {
-  id: string;
   skillId: string;
+  ownerId: string;
   atomType: string;
-  priority?: number;
-  /** before 钩子用 AtomBeforeContext，after 钩子用 AtomAfterContext */
+  phase: 'before' | 'after';
   handler: (ctx: AtomBeforeContext | AtomAfterContext) => Promise<void>;
 }
 
 interface ActionEntry {
-  id: string;
   skillId: string;
+  ownerId: string;
   actionType: string;
-  validate: (view: GameView, params: Record<string, Json>) => string | null;
-  execute: (ctx: SettlementFrame) => Promise<void>;
+  validate: (state: GameState, params: Record<string, Json>) => string | null;
+  execute: (state: GameState, params: Record<string, Json>) => Promise<void>;
 }
 ```
 
@@ -1525,13 +1444,11 @@ interface ActionLogEntry {
 ```
 src/engine/
   atom.ts              # atom 定义注册 + apply 实现
-  skill.ts             # 技能注册表 + BackendAPI
+  skill.ts             # 技能注册表 + skillLoaders + registerAction/registerBeforeHook/registerAfterHook
   atom-registry.ts     # atom 注册表
-  settlement.ts        # 结算区栈管理
   event-stream.ts      # 前端事件流管理（per-player）
   types.ts             # 所有类型定义
-  create-engine.ts     # createEngine 工厂
-
+  create-engine.ts     # 引擎主入口(create/bootstrap/dispatch/buildView/fireTimeout/resetForTest) + 原属 engine-api.ts 的导出(applyAtom/pushFrame/popFrame/dropAtom/pushNotify 等)
   atoms/               # atom 定义（每个文件一个 atom）
     受伤.ts
     摸牌.ts
@@ -1546,13 +1463,14 @@ src/engine/
     锦囊.ts
     ...
 
-  skills/              # 技能定义（每个文件一个技能）
+  skills/              # 技能定义（每个文件一个技能，通过 index.ts 的 skillLoaders 懒加载）
+    index.ts           # skillLoaders: Record<string, () => Promise<SkillModule>>
     杀.ts              # 主动技能（registerAction）
     桃.ts
     无中生有.ts
-    遗计.ts            # 锁定技（onAtomAfter）
+    遗计.ts            # 锁定技（registerAfterHook）
     反馈.ts
-    八卦阵.ts          # 被动技（onAtomBefore）
+    八卦阵.ts          # 被动技（registerBeforeHook）
     ...
 
   view/
@@ -1584,18 +1502,23 @@ src/server/
 | `解决`/`出牌` atom | 技能内部流程步骤，不是独立游戏事件 |
 | `杀命中`/`杀被闪避` atom | 杀技能内部结果分支，通过结算帧 params 判断 |
 | `AtomResult` 类型 | `apply` 不返回值，结算通过帧 params |
-| `AtomHookContext` | 拆分为 `AtomBeforeContext`（可 drop/modifyParams）和 `AtomAfterContext`（可 modifyParams） |
+| `AtomHookContext` | 拆分为 `AtomBeforeContext`（可 dropAtom）和 `AtomAfterContext` |
 | `ActionContext` | 改为 `SettlementFrame`（结算帧），含处理区 cards |
 | `requestStack` | 合并进 `SettlementFrame.pendingRequest` |
 | `actionStack` | 改为 `settlementStack` |
 | `setResult` / `cancel` | 统一为 `drop()` + `modifyParams()` |
 | `atom.result` 字段 | atom 不携带结果，结算全看帧 params |
 | `modifyParams` API | 已删除——frame.params 只读,跨 atom 通信走 state 观察(zones/tags/marks/localVars) |
-| `ctx.drop()` | 已删除——等待型 atom 不可被取消,必走完(响应/超时) |
+| `ctx.drop()` | 改为 `dropAtom(state)`——仅在 before 钩子中可用,跳过当前 atom 的 validate/apply |
 | `GameState.activeContexts` | 已删除——Promise 链自管理,运行时不需要额外跟踪 |
-| `EngineApi.drop()` | 已删除(原是 `ctx.drop` 的方法化形态) |
+| `EngineApi.drop()` | 改为 `dropAtom(state)` |
 | `frame.consumePending()` | 已删除——pending 消费由引擎自动驱动(target respond action execute 完自动 resolve) |
-| `frame.apply` / `frame.notify` | 已删除——SettlementFrame 是纯数据,所有操作走 `api.apply` / `api.notify` |
+| `frame.apply` / `frame.notify` | 已删除——SettlementFrame 是纯数据,所有操作走顶层函数 `applyAtom` / `pushNotify` |
+| `BackendAPI` / `EngineApi` | 已删除——技能直接 import 顶层函数,不需要闭包对象 |
+| `createEngineApi` | 已删除——从未使用 |
+| `getCurrentState()` / `getCurrentOwnerId()` | 已删除——validate/execute 签名直接接收 state 参数 |
+| `engine-api.ts` | 已合并到 `create-engine.ts`——所有函数从 create-engine 导出 |
+| `registerSkillModule` | 已删除——技能模块通过 `skills/index.ts` 的 skillLoaders map 注册 |
 
 ## 11. 场景推演
 
@@ -1607,26 +1530,26 @@ src/server/
     params: { cardId: 'c1', settlement: [{ target: 'P2', dodged: false, amount: 1 }] }
     cards: ['c1']
 
-  frame.apply({ type: '移动牌', c1, 手牌(P1) → 处理区 })
+  applyAtom(state, { type: '移动牌', c1, 手牌(P1) → 处理区 })
 
-  frame.apply({ type: '指定目标', source: P1, target: P2 })
+  applyAtom(state, { type: '指定目标', source: P1, target: P2 })
   ↓ onAfter hooks:
     流离.onAtomAfter('指定目标'):
-      atom.target === api.self (P2) → 手牌有方块 → 发动
+      atom.target === ownerId (P2) → 手牌有方块 → 发动
       modifyParams({ settlement: [{ target: 'P3', dodged: false, amount: 1 }] })
 
-  frame.apply({ type: '询问闪', target: P3, awaits: { target: P3, prompt: '需要闪' } })
+  applyAtom(state, { type: '询问闪', target: P3, awaits: { target: P3, prompt: '需要闪' } })
   ↓ onBefore hooks: (无八卦阵在 P3)
   ↓ 等待 P3 回应
   ↓ P3 出闪 → 闪 action 在当前帧上 execute:
-    frame.apply({ type: '移动牌', 闪牌, 手牌(P3) → 处理区 })
+    applyAtom(state, { type: '移动牌', 闪牌, 手牌(P3) → 处理区 })
     frame.params.settlement[0].dodged = true
-    frame.drop()  // 丢栈顶——询问闪不会真正 apply
-    frame.apply({ type: '移动牌', 闪牌, 处理区 → 弃牌堆 })
+    dropAtom(state)  // 丢栈顶——询问闪不会真正 apply
+    applyAtom(state, { type: '移动牌', 闪牌, 处理区 → 弃牌堆 })
 
   // 最终结算
   settlement[0].dodged === true → 不执行造成伤害
-  frame.apply({ type: '移动牌', c1, 处理区 → 弃牌堆 })
+  applyAtom(state, { type: '移动牌', c1, 处理区 → 弃牌堆 })
 ```
 
 ### 场景 B：杀 → 八卦阵判定成功 → 视为闪
@@ -1636,16 +1559,16 @@ src/server/
   [杀(P1, cardId:'c1')]
     params: { settlement: [{ target: 'P2', dodged: false, amount: 1 }] }
 
-  frame.apply({ type: '移动牌', c1, 手牌(P1) → 处理区 })
-  frame.apply({ type: '指定目标', source: P1, target: P2 })  // 无钩子
+  applyAtom(state, { type: '移动牌', c1, 手牌(P1) → 处理区 })
+  applyAtom(state, { type: '指定目标', source: P1, target: P2 })  // 无钩子
 
-  frame.apply({ type: '询问闪', target: P2, awaits: { target: P2, prompt: '需要闪' } })
+  applyAtom(state, { type: '询问闪', target: P2, awaits: { target: P2, prompt: '需要闪' } })
   ↓ onBefore hooks:
     八卦阵.onAtomBefore('询问闪'):
-      atom.target === api.self (P2) → hasEquipped(P2, '八卦阵') → 是
-      api.apply({ type: '请求回应', requestType: '是否发动八卦阵', target: P2 })
+      atom.target === ownerId (P2) → hasEquipped(P2, '八卦阵') → 是
+      applyAtom(state, { type: '请求回应', requestType: '是否发动八卦阵', target: P2 })
       → P2 选择"发动"
-      api.apply({ type: '判定', player: P2, judgeType: '八卦阵' })
+      applyAtom(state, { type: '判定', player: P2, judgeType: '八卦阵' })
       → 翻牌 → 红色
       frame.params.settlement[0].dodged = true
       ctx.drop()  // 询问闪不会真正 apply
@@ -1665,37 +1588,37 @@ src/server/
       { target: 'P4', responded: false },
     ]}
 
-  frame.apply({ type: '移动牌', 南蛮牌, 手牌(P1) → 处理区 })
+  applyAtom(state, { type: '移动牌', 南蛮牌, 手牌(P1) → 处理区 })
 
   for item of settlement:
-    frame.apply({ type: '询问杀', target: item.target, awaits: { target, prompt: '需要杀' } })
+    applyAtom(state, { type: '询问杀', target: item.target, awaits: { target, prompt: '需要杀' } })
     // 响应 action 在当前帧上 execute，item.responded = true + drop
 
   for item of settlement:
     if !item.responded:
-      frame.apply({ type: '造成伤害', target: item.target, amount: 1, source: P1 })
+      applyAtom(state, { type: '造成伤害', target: item.target, amount: 1, source: P1 })
 
-  frame.apply({ type: '移动牌', 南蛮牌, 处理区 → 弃牌堆 })
+  applyAtom(state, { type: '移动牌', 南蛮牌, 处理区 → 弃牌堆 })
 ```
 
 ### 场景 D：伤害 → 遗计（郭嘉） → 反馈（司马懿）
 
 ```
-frame.apply({ type: '造成伤害', target: 郭嘉, amount: 1, source: 司马懿 }):
+applyAtom(state, { type: '造成伤害', target: 郭嘉, amount: 1, source: 司马懿 }):
   onBefore hooks: (无)
   apply → state 更新（郭嘉体力 -1）
   onAfter hooks (全部执行):
     遗计.onAtomAfter('造成伤害'):              // 郭嘉
-      atom.target === api.self → 继续
-      api.apply({ type: '请求回应', requestType: '是否发动遗计', ... })
+      atom.target === ownerId → 继续
+      applyAtom(state, { type: '请求回应', requestType: '是否发动遗计', ... })
       → 郭嘉 选择"发动"
-      api.apply({ type: '摸牌', player: 郭嘉, count: 2 })
-      api.apply({ type: '请求回应', requestType: '分配', target: 郭嘉, ... })
+      applyAtom(state, { type: '摸牌', player: 郭嘉, count: 2 })
+      applyAtom(state, { type: '请求回应', requestType: '分配', target: 郭嘉, ... })
       for { target, cardIds } of frame.params.遗计分配:
-        api.apply({ type: '给予', cardId, from: 郭嘉, to: target })
+        applyAtom(state, { type: '给予', cardId, from: 郭嘉, to: target })
 
     反馈.onAtomAfter('造成伤害'):              // 司马懿
-      atom.target === api.self → 不是，跳过
+      atom.target === ownerId → 不是，跳过
 ```
 
 两个 atom hook 都执行（副作用语义）。遗计先执行完，反馈再执行。
