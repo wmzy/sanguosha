@@ -22,9 +22,9 @@ import { applyAtom, getAtomDef, resolvePlayerViews } from './atom';
 import { getAfterHooks, getBeforeHooks } from './skill';
 import { pushEvent } from './event-stream';
 
-/** apply 管线单次执行的内部上下文(由 createEngine 创建,传给 createEngineApi) */
+/** apply 管线单次执行的内部上下文(由 dispatch / engine-api 调用,传给 createEngineApi) */
 export interface EngineContext {
-  /** 当前 GameState(可写,所有修改通过新 state 替换实现) */
+  /** 当前 GameState(可写,atom apply 原地变更) */
   state: GameState;
   /** 当前消息 params(由 dispatch 注入) */
   messageParams: Record<string, Json>;

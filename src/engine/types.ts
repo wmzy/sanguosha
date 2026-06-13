@@ -311,7 +311,7 @@ export interface GameView {
 }
 
 /**
- * 引擎 API:由 createEngine 内部生成,挂在 hook 上下文中供技能调用。
+ * 引擎 API:由 dispatch 通过 createEngineApi 内部生成,作为 action.execute 的参数传入。
  * 技能通过 pushFrame 创建帧;apply 变更状态;notify 推送事件。
  *
  * **临时过渡**:`drop()` 仍存在,仅供 6 个防具/武器 skill(仁王盾/寒冰剑/护甲/白银狮子/藤甲/酒)
