@@ -1,5 +1,36 @@
 // src/engine/skills/武圣.ts
-// 武圣(关羽·转化技):你可以将一张红色牌当【杀】使用或打出
+// ============================================================
+// 技能描述(三国杀官方规则):
+//   武圣(关羽·转化技):你可以将一张红色牌当【杀】使用或打出。
+//
+// 关键原子操作:
+//   transform 路径(由 杀.ts 的 use/respond action 路由处理 wrapper):
+//     杀使用前:wrapAsKill(cardId)——mutate cardMap[cardId].name='杀',保留原 name/suit 到 _wrapper
+//   after 钩子(移动牌):
+//     当 atom.from.zone==='处理区' 时调用 unwrap → 恢复原 name/suit,删除 _wrapper
+//
+// 关键时机:
+//   - 适用范围:杀的使用(出牌阶段)与打出(响应决斗/南蛮入侵等)
+//   - 还原时机:牌离开处理区时(进弃牌堆/装备区/其他玩家手牌)
+//
+// 已知问题/不完整实现:
+//   1. **cardMap 全局 mutate 严重问题**:cardMap 是所有玩家共享的引用,
+//      mutate card.name 会让"任何正在读这张牌的代码"看到错误的 name/suit
+//      (例如:判定 / 拼点 / 洛神在同帧内读此牌时会读到 '杀' + 原 suit,
+//      或被 _wrapper 标记影响)。应通过 CardWrapper 机制(types.ts 已定义)走 fromSkill 协议,
+//      而非直接 mutate cardMap。
+//   2. **还原时机不稳健**:仅依赖 "from.zone === '处理区'" 触发还原,
+//      若杀被无懈可击/中断而未进入处理区→其他区的常规移动,wrapper 残留;
+//      下一次该卡使用时会被认为"已包装",可能导致状态泄漏。
+//   3. **类型擅自扩展**:在 wrapAsKill/unwrap 内强制写入 card._wrapper,
+//      但 Card 类型(types.ts)没有 _wrapper 字段——TypeScript 通过 cast 绕过,
+//      运行时正确但破坏了类型契约。
+//   4. **isRedSuit 未与 useAndRespond 路径协同**:onMount 端的 cardFilter 限制了红色,
+//      但 onInit 服务端验证不存在(由杀.ts 的 use/respond 接管)——
+//      若客户端绕过 UI 直接构造 use 消息,服务端不会拦截非红色牌的武圣转化。
+//   5. **没有适配响应路径的"打出"语义**:transform action 名字暗示 use,
+//      respond 场景的转化由 杀.ts 接管,但 fromSkill 协议未充分文档化。
+// ============================================================
 import type { AtomAfterContext, FrontendAPI, Skill } from '../types';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 

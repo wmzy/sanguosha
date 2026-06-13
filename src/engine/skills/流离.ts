@@ -1,5 +1,35 @@
 // src/engine/skills/流离.ts
-// 流离(大乔·主动技):当你成为【杀】的目标时,可弃一张牌,将此【杀】转移给攻击范围内一名其他角色
+// ============================================================
+// 技能描述(三国杀官方规则):
+//   流离(大乔):当你成为【杀】的目标时,你可以弃置一张牌并选择你攻击范围内的一名其他角色,
+//   将此【杀】的目标转移给该角色。
+//
+// 关键原子操作:
+//   after 钩子(指定目标):
+//     请求回应(confirm) → 请求回应(choosePlayer) → 弃置(self.hand[0]) →
+//     mutate parent frame.params.settlement[].target = newTarget
+//
+// 关键时机:
+//   - "成为【杀】的目标时"——after hook of 指定目标
+//   - 必须在询问闪之前介入,否则"闪"将由错误目标决定
+//
+// 已知问题/不完整实现:
+//   1. **"攻击范围内"未验证**:描述里说"攻击范围内一名其他角色",
+//      但代码 filter 只排除自己,任何存活角色都能被选中(违反规则)。
+//      应使用 distance.ts 的 inAttackRange 验证。
+//   2. **触发时机错误**:after hook 在【指定目标】atom 执行后触发,
+//      但 杀.ts 的 use 流程是 "指定目标 → 询问闪",当 hook 修改 settlement.target 时,
+//      下一个迭代的 询问闪 已经按旧 target 排队(若同步),但代码靠 mutate settlement 来"间接"修改后续迭代的 target——
+//      检查 杀.ts 第 65-68 行:`for (target of targets) { 指定目标; 询问闪 }`——
+//      这里 targets 数组是循环变量,**不会读 settlement**,因此 settlement.target 修改对询问闪无效。
+//      流离实际上**不工作**(询问闪还是问旧目标)。
+//   3. **弃牌强制第一张**:直接弃 selfPlayer.hand[0],未询问玩家选哪张(违反规则)。
+//      应通过 prompt(useCard, min:1, max:1) 让玩家选弃哪张。
+//   4. **"非【杀】"未过滤**:after hook 不检查 atom.cardId 是否真是【杀】——
+//      理论上对决斗等"指定目标"的非杀牌也会触发(违反"成为【杀】的目标时")。
+//   5. 用 frame.params.__流离confirmed 等 __ 私有字段(同其他文件反模式)。
+//   6. 第 67 行的空 `;` 是死代码,注释"也修改当前 atom 的 target"未真实实现。
+// ============================================================
 import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';

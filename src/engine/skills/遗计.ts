@@ -1,6 +1,35 @@
 // src/engine/skills/遗计.ts
-// 遗计(郭嘉·锁定技):当你受到 1 点伤害后,可以摸两张牌,然后将两张牌交给任意角色
-// 简化实现:每次受到伤害时,给 self 发请求回应("是否发动遗计?")
+// ============================================================
+// 技能描述(三国杀官方规则):
+//   遗计(郭嘉):当你受到 1 点伤害后,你可以摸两张牌,然后将这两张牌交给一至两名其他角色。
+//   注:每 1 点伤害触发一次——若一次受到 2 点伤害,则触发两次。
+//   注:**非锁定技**(标准武将技为"可发动"),当前文件描述写"锁定技"是错的。
+//
+// 关键原子操作:
+//   after 钩子(造成伤害):
+//     请求回应(confirm) → 摸牌(count=2) → 请求回应(distribute, drawnCards) → for each: 给予
+//
+// 关键时机:
+//   - 受到伤害后触发(after hook of 造成伤害)
+//   - 每 1 点伤害触发一次(标准规则) — 当前实现忽略 amount,只触发一次
+//
+// 已知问题/不完整实现:
+//   1. **描述错误**:文件 description 写"锁定技",但标准遗计是非锁定技(可选),
+//      当前实现确实询问 confirm,功能上是非锁定技——文件描述需修正。
+//   2. **amount > 1 触发次数错误**:标准规则是每 1 点伤害触发一次,
+//      当前 hook 只触发一次,无论 amount 是几——3 点伤害也只摸/分一次牌。
+//      应改为 for (let i=0; i<amount; i++) { ... }。
+//   3. **"任意角色" 包含自己** vs 规则"其他角色":
+//      ctx.params.allocation 未做 target!==ownerId 校验,可能把牌分给自己(违反规则)。
+//   4. **摸两张牌的检索方式脆弱**:`selfPlayer.hand.slice(-2)` 假定刚摸的牌
+//      就是手牌末尾两张——目前 摸牌 atom 实现确实 append 到末尾,但耦合实现细节,
+//      若改成"插入随机位置"等会立刻失效。应在摸牌前后 diff 来取得真实 drawn 列表。
+//   5. **distribution 必填校验缺失**:若超时(distribute prompt 30s),
+//      `ctx.params.allocation` 可能为 undefined,代码 fallback 是"什么都不做" —
+//      但此时 2 张牌已摸进手牌,规则上若不分配应丢弃或保留?当前默认保留(可能违反规则)。
+//   6. allocation 不验证 cardIds 是否在 drawnCards 内——理论上玩家可"指定其他手牌交出"
+//      (但 dispatch 层应已校验,需 cross-check)。
+// ============================================================
 import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
