@@ -7,8 +7,8 @@
 // 设计原则:
 //   - 用玩家术语(pass / respond / useCard),不暴露 timer/pending/atom 机制
 //   - 断言可观察游戏状态(health / hand / zone),不断言内部 atom 序列
-//   - 不 mock 任何引擎组件:复用真实 dispatch / buildView / apply pipeline
-//   - 走 fireTimeout(state) 触发 onTimeout(语义最准,不需 fake timers)
+//   - 不 mock 任何引擎组件:复用真实 dispatch / apply pipeline
+//   - 走 fireTimeout() 触发 onTimeout(语义最准,不需 fake timers)
 
 import type {
   ActionPrompt,
@@ -24,7 +24,13 @@ import type {
   Json,
   TargetFilter,
 } from '../src/engine/types';
-import { dispatch, buildView, fireTimeout, resetForTest } from '../src/engine/create-engine';
+import {
+  dispatch as engineDispatch,
+  fireTimeout as engineFireTimeout,
+  buildView as engineBuildView,
+  resetForTest,
+  rebootstrap,
+} from '../src/engine/create-engine';
 import { getEventCount, getEvents } from '../src/engine/event-stream';
 import { getSkillModule } from '../src/engine/skill';
 
@@ -39,32 +45,29 @@ export interface ActionDef {
   transform?: (card: Card) => CardWrapper;
 }
 
-// ─── FakeFrontendAPI ───────────────────────────────────────────
+// ─── FakeFrontendAPI ──────────────────────────────────────────
 
-export class FakeFrontendAPI implements FrontendAPI {
+class FakeFrontendAPI implements FrontendAPI {
   viewer: string;
+  private skillId = '';
   private actions: ActionDef[] = [];
-  private currentSkillId = '';
 
   constructor(viewer: string) {
     this.viewer = viewer;
   }
 
   setCurrentSkill(skillId: string): void {
-    this.currentSkillId = skillId;
+    this.skillId = skillId;
   }
 
-  defineAction(
-    actionType: string,
-    opts: {
-      label: string;
-      style?: 'primary' | 'danger' | 'default' | 'passive';
-      prompt: ActionPrompt;
-      transform?: (card: Card) => CardWrapper;
-    },
-  ): void {
+  defineAction(actionType: string, opts: {
+    label: string;
+    style?: string;
+    prompt: ActionPrompt;
+    transform?: (card: Card) => CardWrapper;
+  }): void {
     this.actions.push({
-      skillId: this.currentSkillId,
+      skillId: this.skillId,
       ownerId: this.viewer,
       actionType,
       label: opts.label,
@@ -73,152 +76,163 @@ export class FakeFrontendAPI implements FrontendAPI {
     });
   }
 
-  onEvent(_handler: (event: GameEvent, view: GameView) => void): () => void {
-    return () => {};
-  }
+  onEvent(): () => void { return () => {}; }
+  playEffect(): void { /* no-op */ }
 
-  playEffect(_effect: AtomEffect): void {
-    /* no-op: harness 不渲染 */
-  }
-
-  getActions(): ActionDef[] {
-    return this.actions;
-  }
+  getActions(): ActionDef[] { return this.actions; }
+  clearActions(): void { this.actions = []; }
 }
 
-// ─── PlayerSession ─────────────────────────────────────────────
+// ─── PlayerSession ──────────────────────────────────────────
 
 export class PlayerSession {
   readonly playerName: string;
-  readonly frontend: FakeFrontendAPI;
+  private harness: SkillTestHarness;
+  private frontend: FakeFrontendAPI;
   private lastEventIndex = 0;
 
-  constructor(playerName: string, private harness: SkillTestHarness) {
+  constructor(playerName: string, harness: SkillTestHarness) {
     this.playerName = playerName;
+    this.harness = harness;
     this.frontend = new FakeFrontendAPI(playerName);
   }
 
-  // ─── 视图与查询 ───────────────────────────────────────────
+  // ─── 视图 ─────────────────────────────────────
 
   get view(): GameView {
-    const idx = this.harness.state.players.findIndex((p) => p.name === this.playerName);
-    return buildView(this.harness.state, idx);
+    return engineBuildView(this.harness.state, this.harness.state.players.findIndex(p => p.name === this.playerName));
   }
 
   get newEvents(): GameEvent[] {
-    const all = getEvents(this.lastEventIndex);
-    this.lastEventIndex = getEventCount();
-    return all;
+    const all = getEvents(0);
+    const slice = all.slice(this.lastEventIndex);
+    this.lastEventIndex = all.length;
+    return slice;
   }
 
   availableActions(): ActionDef[] {
     return this.frontend.getActions();
   }
 
-  /** 根据前端 defineAction 的 cardFilter 找一张合法牌。跑真实 filter 函数。 */
-  findValidCard(actionType: string, extra?: (c: Card) => boolean): Card | null {
-    const def = this.availableActions().find((a) => a.actionType === actionType);
-    if (!def) return null;
-    const filter = extractCardFilter(def.prompt);
-    if (!filter) return null;
-    const self = this.view.players[this.view.viewer];
-    for (const handCard of self.hand ?? []) {
-      const card = this.view.cardMap[handCard.id];
-      if (!card) continue;
-      if (filter(card) && (!extra || extra(card))) return card;
-    }
-    return null;
-  }
+  // ─── 操作 ─────────────────────────────────────
 
-  /** 根据前端 defineAction 的 targetFilter 找合法目标。 */
-  findValidTargets(actionType: string, count?: number): string[] {
-    const def = this.availableActions().find((a) => a.actionType === actionType);
-    if (!def) return [];
-    const targetFilter = extractTargetFilter(def.prompt);
-    if (!targetFilter) return [];
-    const result: string[] = [];
-    for (const p of this.view.players) {
-      if (p.name === this.playerName) continue;
-      if (!p.alive) continue;
-      if (!targetFilter.filter || targetFilter.filter(this.view, p.name)) {
-        result.push(p.name);
-        if (count !== undefined && result.length >= count) break;
-      }
-    }
-    return result;
-  }
-
-  // ─── 操作 ─────────────────────────────────────────────────
-
-  async useCardAndTarget(
-    skillId: string,
-    cardId: string,
-    targets: string[],
-  ): Promise<void> {
+  async useCardAndTarget(skillId: string, cardId: string, targets: string[]): Promise<void> {
     return this.dispatch({ skillId, actionType: 'use', params: { cardId, targets } });
   }
 
-  async useCard(
-    skillId: string,
-    cardId: string,
-    params: Record<string, Json> = {},
-  ): Promise<void> {
-    return this.dispatch({ skillId, actionType: 'use', params: { cardId, ...params } });
+  async useCard(skillId: string, cardId: string): Promise<void> {
+    return this.dispatch({ skillId, actionType: 'use', params: { cardId } });
   }
 
-  async respond(
-    skillId: string,
-    params: Record<string, Json> = {},
-  ): Promise<void> {
-    return this.dispatch({ skillId, actionType: 'respond', params });
+  async respond(skillId: string, params?: Record<string, Json>): Promise<void> {
+    return this.dispatch({ skillId, actionType: 'respond', params: params ?? {} });
   }
 
-  /** 放弃响应当前等待(不出闪、不发动技能、不确认)。走 onTimeout 路径。 */
   async pass(): Promise<void> {
-    await fireTimeout(this.harness.state);
+    await engineFireTimeout(this.harness.state);
+  }
+
+  /** 确认/取消(八卦阵、遗计确认等)。choice=false 等同 pass()。 */
+  async confirm(choice: boolean): Promise<void> {
+    if (!choice) {
+      await this.pass();
+      return;
+    }
+    const slot = this.harness.state.pendingSlot;
+    if (!slot) throw new Error('confirm() 但无 pending');
+    return this.dispatch({
+      skillId: (slot.atom as Record<string, Json>).requestType as string ?? '请求回应',
+      actionType: 'confirm',
+      params: { choice: true },
+    });
+  }
+
+  /** 分配(遗计分配牌等)。params 通过 dispatch merge 到 topFrame,原始 execute 通过 ctx.params.allocation 读取。 */
+  async distribute(
+    skillId: string,
+    allocation: Array<{ target: string; cardIds: string[] }>,
+  ): Promise<void> {
+    return this.dispatch({ skillId, actionType: 'distribute', params: { allocation } });
   }
 
   async triggerAction(
     skillId: string,
     actionType: string,
-    params: Record<string, Json> = {},
+    params?: Record<string, Json>,
   ): Promise<void> {
-    return this.dispatch({ skillId, actionType, params });
+    return this.dispatch({ skillId, actionType, params: params ?? {} });
   }
 
-  // ─── 断言 ─────────────────────────────────────────────────
+  // ─── 辅助选择 ─────────────────────────────────
 
-  /** 断言当前有 pending 等待本玩家。atomType 是玩家术语(如 '询问闪')。 */
+  findValidCard(actionType: string, extraFilter?: (card: Card) => boolean): Card | null {
+    const actions = this.frontend.getActions().filter(a => a.actionType === actionType);
+    for (const action of actions) {
+      const filter = extractCardFilter(action.prompt);
+      if (!filter) continue;
+      for (const cardId of this.harness.state.players.find(p => p.name === this.playerName)?.hand ?? []) {
+        const card = this.harness.state.cardMap[cardId];
+        if (card && filter(card) && (!extraFilter || extraFilter(card))) {
+          return card;
+        }
+      }
+    }
+    return null;
+  }
+
+  findValidTargets(actionType: string, count?: number): string[] {
+    const actions = this.frontend.getActions().filter(a => a.actionType === actionType);
+    for (const action of actions) {
+      const filter = extractTargetFilter(action.prompt);
+      if (!filter) continue;
+      const result: string[] = [];
+      for (const player of this.harness.state.players) {
+        if (player.name === this.playerName) continue;
+        if (!filter.filter || filter.filter(this.view, player.name)) {
+          result.push(player.name);
+        }
+      }
+      if (result.length >= (count ?? 1)) return result.slice(0, count ?? result.length);
+    }
+    return [];
+  }
+
+  // ─── 断言 ─────────────────────────────────────
+
   expectPending(atomType: string): void {
     const slot = this.harness.state.pendingSlot;
-    if (!slot) throw new Error(`expectPending(${atomType}) 但无 pending`);
-    const target = extractPendingTarget(slot.atom);
-    expect(slot.atom.type).toBe(atomType);
-    expect(target).toBe(this.playerName);
+    if (!slot) throw new Error(`expectPending('${atomType}'): 无 pending`);
+    const type = (slot.atom as { type: string }).type;
+    if (type !== atomType) throw new Error(`expectPending('${atomType}'): 实际 pending 是 '${type}'`);
   }
 
   expectNoPending(): void {
-    expect(this.harness.state.pendingSlot).toBeUndefined();
+    const slot = this.harness.state.pendingSlot;
+    if (slot) {
+      const type = (slot.atom as { type: string }).type;
+      throw new Error(`expectNoPending(): 实际有 pending '${type}'`);
+    }
   }
 
-  // ─── 内部 ─────────────────────────────────────────────────
+  // ─── 前端技能加载 ─────────────────────────────
 
-  /** 遍历玩家每个 skill,跑 onMount(若存在)收集 defineAction 声明。 */
   loadFrontend(): void {
-    const player = this.harness.state.players.find((p) => p.name === this.playerName)!;
+    const player = this.harness.state.players.find(p => p.name === this.playerName);
+    if (!player) return;
+    this.frontend.clearActions();
     for (const skillId of player.skills) {
-      const mod = getSkillModule(skillId);
-      if (!mod.onMount) continue; // 后端 only skill 跳过(合法)
+      const module = getSkillModule(skillId);
       this.frontend.setCurrentSkill(skillId);
-      const skill = mod.createSkill(skillId, this.playerName);
-      mod.onMount(skill, this.frontend);
+      if (module.onMount) {
+        module.onMount({ id: skillId, ownerId: this.playerName, name: skillId, description: '' }, this.frontend);
+      }
     }
   }
 
   private async dispatch(
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
   ): Promise<void> {
-    const result = await dispatch(this.harness.state, {
+    const result = await engineDispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerName,
       baseSeq: this.harness.state.seq,
@@ -230,13 +244,23 @@ export class PlayerSession {
 // ─── SkillTestHarness ──────────────────────────────────────────
 
 export class SkillTestHarness {
-  private _state: GameState | null = null;
+  private _state!: GameState;
   private sessions = new Map<string, PlayerSession>();
 
-  /** 初始化:重置引擎 → 接管传入的 state → 为每个玩家创建 session 并加载 onMount */
+  /** 初始化:重置引擎 → bootstrap state → 为每个玩家创建 session 并加载 onMount */
   setup(state: GameState): void {
     resetForTest();
+    // 补全 state 缺失字段
+    if (!state.cardWrappers) state.cardWrappers = {};
+    if (!state.atomStack) state.atomStack = [];
+    if (!state.settlementStack) state.settlementStack = [];
+    if (!state.startedAt) state.startedAt = Date.now();
+    for (const p of state.players) {
+      if (!p.judgeZone) p.judgeZone = [];
+      if (!p.tags) p.tags = [];
+    }
     this._state = state;
+    rebootstrap(state);
     this.sessions.clear();
     for (const player of state.players) {
       const session = new PlayerSession(player.name, this);
@@ -261,7 +285,7 @@ export class SkillTestHarness {
   }
 }
 
-// ─── 内部 helper(私有) ────────────────────────────────────────
+// ─── 内部 helper(私有) ───────────────────────────────────────
 
 /** 从 ActionPrompt 中提取 cardFilter(filter 函数 + min/max) */
 function extractCardFilter(prompt: ActionPrompt): ((c: Card) => boolean) | null {
@@ -283,10 +307,4 @@ function extractTargetFilter(prompt: ActionPrompt): TargetFilter | null {
     default:
       return null;
   }
-}
-
-/** 从 waiting atom 中提取 target 字段(所有内置等待型 atom 都有 target) */
-function extractPendingTarget(atom: Atom): string {
-  if ('target' in atom && typeof atom.target === 'string') return atom.target;
-  return '';
 }

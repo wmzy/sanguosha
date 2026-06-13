@@ -41,9 +41,9 @@ export function onInit(skill: Skill, api: BackendAPI): () => void {
       timeout: 30000,
     });
     // 4. 读取分配结果并逐张给予
-    // dispatch 把回应 params 注入到 settlement frame 的 params 中
-    // 客户端回应格式: { __遗计分配: [{ target: 'P1', cardIds: ['c1'] }, ...] }
-    const distribution = ctx.params.__遗计分配 as Array<{ target: string; cardIds: string[] }> | undefined;
+    // dispatch 回应路径把 distribute 的 params merge 到 topFrame
+    // 客户端回应格式: { allocation: [{ target: 'P1', cardIds: ['c1'] }, ...] }
+    const distribution = ctx.params.allocation as Array<{ target: string; cardIds: string[] }> | undefined;
     if (Array.isArray(distribution)) {
       for (const entry of distribution) {
         for (const cardId of entry.cardIds) {

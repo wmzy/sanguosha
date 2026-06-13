@@ -29,4 +29,4 @@ export {
   wuCharacters,
   qunCharacters,
   allCharacters,
-} from '../engine/characters/index';
+} from '../engine/cards/characters/index';

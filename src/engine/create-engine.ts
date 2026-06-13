@@ -166,12 +166,11 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   开局.onInit(syntheticSkill, state);
 
   // 2. dispatch 开局 start
-  const params = { ...gameConfig } as Record<string, Json>;
   const result = await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
     ownerId: '主公',
-    params,
+    params: { ...gameConfig } as Record<string, Json>,
     baseSeq: 0,
   });
   if (result.error) throw new Error(`开局失败: ${result.error}`);
@@ -212,14 +211,31 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
         const api = createEngineApi(ctx);
         await entry.execute(api);
       }
+    } else {
+      // 无匹配 entry(如 confirm/distribute):merge message.params 到 topFrame,
+      // 让原始 execute 恢复后能通过 ctx.params 读到回应数据
+      const frame = state.settlementStack[state.settlementStack.length - 1];
+      if (frame) {
+        Object.assign(frame.params, message.params);
+      }
     }
     const resolve = slot.resolve;
     slot.resolve = () => {};
     resolve();
 
-    if (activeExecuteP) await activeExecuteP;
-    activeExecuteP = undefined;
-
+    // 等原始 execute 完成 或 产生新 pending
+    if (activeExecuteP) {
+      await Promise.race([
+        activeExecuteP,
+        new Promise<void>((resolve) => {
+          const timer = setInterval(() => {
+            if (state.pendingSlot) { clearInterval(timer); resolve(); }
+          }, 0);
+          activeExecuteP!.then(() => clearInterval(timer));
+        }),
+      ]);
+    }
+    if (!state.pendingSlot) activeExecuteP = undefined;
     logAction(state, message);
     state.seq += 1;
     const { gameOver, winner } = checkGameOver(state);
@@ -243,8 +259,8 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   const validationError = entry.validate(view, message.params);
   if (validationError !== null) return { error: validationError };
 
-  // execute 返回前先等 fireDispatchReady(apply 抵达 pending 时触发),
-  // 再等整条 executeP 结束(响应/超时后 resolve 收尾)
+  // execute 到达 pending 时 fireDispatchReady → dispatch 返回。
+  // 不等 activeExecuteP:execute 在 pending 处挂起,等回应/超时后才完成。
   let dispatchReadyResolve: () => void = () => {};
   const dispatchReady = new Promise<void>((r) => {
     dispatchReadyResolve = r;
@@ -270,6 +286,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // 不 await executeP 本身 —— execute 可能挂在 pending slot 上,要等回应或
   // fireTimeout 推进,主动 action 的调用方不需要阻塞等待。
   await dispatchReady;
+  // activeExecuteP 挂在 pending 处,不等它;回应路径 dispatch 会 await 它
 
   logAction(state, message);
   state.seq += 1;
@@ -291,8 +308,18 @@ export async function fireTimeout(state: GameState): Promise<DispatchResult> {
   const slot = state.pendingSlot;
   if (!slot) return {};
   await slot._fireTimeoutNow?.();
-  if (activeExecuteP) await activeExecuteP;
-  activeExecuteP = undefined;
+  // 不等 activeExecuteP:execute 恢复后可能产生新 pending 或完成,
+  // 下一次 dispatch/fireTimeout 会处理。仅当 execute 已完成时清理。
+  if (activeExecuteP) {
+    // 用 microtask 给 execute 一轮执行机会
+    await new Promise<void>((resolve) => {
+      const timer = setInterval(() => {
+        if (state.pendingSlot) { clearInterval(timer); resolve(); }
+      }, 0);
+      activeExecuteP!.then(() => { clearInterval(timer); resolve(); });
+    });
+  }
+  if (!state.pendingSlot) activeExecuteP = undefined;
   const { gameOver, winner } = checkGameOver(state);
   return { gameOver, winner };
 }
