@@ -44,7 +44,10 @@ import {
   findActionEntry,
   getAfterHooks,
   getBeforeHooks,
+  instantiateSkill,
   rebootstrap as skillRebootstrap,
+  setSkillInstanceUnload,
+  unloadSkillInstance,
 } from './skill';
 import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
 import { clearEvents, pushEvent } from './event-stream';
@@ -82,27 +85,41 @@ function extractPendingTarget(atom: Atom): string {
   return '';
 }
 
-/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。 */
+/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。
+ *  同时清除超时定时器(正常到达稳定点,无需兜底)。 */
 function resolveStable(state: GameState): void {
   const r = state._resolveStable;
   if (r) {
+    if (state._stableTimer) { clearTimeout(state._stableTimer); state._stableTimer = undefined; }
     r();
     state._waitForStable = undefined;
     state._resolveStable = undefined;
+    state._rejectStable = undefined;
   }
 }
 
 /**
- * 建立 per-execute stable wait:创建新 _waitForStable Promise + _resolveStable resolver。
- * 每个 execute lifecycle 调用一次。续跑路径(回应/fireTimeout)必须重新调用,
+ * 建立 per-execute stable wait:创建新 _waitForStable Promise + resolve/reject resolver,
+ * 并注册 30s 超时定时器(execute 卡死兜底)。续跑路径(回应/fireTimeout)必须重新调用,
  * 因为上一轮 wait 已被 applyAtom 触发 resolveStable 清掉。
+ *
+ * 调用方直接 `await state._waitForStable`——无需 async 包装,避免引入额外微任务 tick
+ * (杀.execute 的 pending 创建与 dispatch 恢复时序对微任务顺序敏感)。
  */
+const STABLE_WAIT_TIMEOUT_MS = 30_000;
 function setupStableWait(state: GameState): void {
   let resolveStableLocal: () => void = () => {};
-  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
+  let rejectStableLocal: (e: Error) => void = () => {};
+  state._waitForStable = new Promise<void>((resolve, reject) => {
+    resolveStableLocal = resolve;
+    rejectStableLocal = reject;
+  });
   state._resolveStable = resolveStableLocal;
+  state._rejectStable = rejectStableLocal;
+  state._stableTimer = setTimeout(() => {
+    rejectStableLocal(new Error('dispatch 超时:execute 未在 30s 内到达稳定点(pending 或完成)——疑似引擎 bug'));
+  }, STABLE_WAIT_TIMEOUT_MS);
 }
-
 /** 兜底:补全老 state 缺失的字段(原地变更) */
 function ensureStateShape(state: GameState): void {
   if (!state.cardWrappers) state.cardWrappers = {};
@@ -188,11 +205,15 @@ export async function bootstrap(state: GameState): Promise<void> {
     throw new Error('bootstrap: state._gameConfig 缺失(请用 create(config) 创建 state)');
   }
 
+  // 幂等:若 bootstrap 重入(如 restore 路径误调),先卸载旧的 开局:系统 实例,避免重复注册抛错
+  unloadSkillInstance('开局', SYSTEM_OWNER);
   const 开局mod = await import('./skills/开局');
   const syntheticSkill = 开局mod.default.createSkill('开局', SYSTEM_OWNER);
   // 开局.onInit(skill, state) 是 system skill 的特殊接口
   // @ts-ignore 开局的 onInit 签名是 (skill, state),不是 SkillModule 标准 (skill, ownerId)
-  开局mod.onInit(syntheticSkill, state);
+  const off开局 = 开局mod.onInit(syntheticSkill, state);
+  // 登记实例 unload,使 unloadSkillInstance/clearAllSkillInstances 能正确清理 开局:系统
+  setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
   // 2. dispatch 开局 start
   const result = await dispatch(state, {
@@ -279,11 +300,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     resolveStable(state);    // execute 完成 → 稳定点
   });
   state._activeExecuteP = executeP;
-
-  // 等到稳定点(execute 完成 OR 新 pending 创建)就返回当前 state。
-  // 不 await executeP 本身 —— execute 可能挂在 pending slot 上。
   await state._waitForStable;
-  // activeExecuteP 挂在 pending 处,不等它;回应路径 dispatch 会 await 它
 
   logAction(state, message);
   state.seq += 1;
@@ -437,6 +454,15 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   if (atom.type === '判定') {
     moveJudgeCardToZone(state, atom);
+  }
+
+  // 技能生命周期:添加技能/移除技能 atom apply 后,同步注册/卸载 skill 实例。
+  // 与 判定 同属"引擎管理的 atom 特殊处理"(技能生命周期是引擎职责,不是 atom 自身职责)。
+  // apply 是同步的(只改 player.skills 列表),实例化涉及动态 import 故在此异步补注册。
+  if (atom.type === '添加技能') {
+    await instantiateSkill(atom.skillId, atom.player);
+  } else if (atom.type === '移除技能') {
+    unloadSkillInstance(atom.skillId, atom.player);
   }
 
   const afterHooks = getAfterHooks(atom.type);

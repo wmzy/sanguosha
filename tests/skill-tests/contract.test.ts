@@ -38,8 +38,8 @@ describe('前端 → 后端契约', () => {
   const SKILLS_WITH_OWN_REGISTER = ['仁德', '制衡', '激将'];
   const SKILLS_WITH_CROSS_SKILL_ROUTING = ['武圣', '丈八蛇矛'];
 
-  function checkSkillDeclaredActions(skillId: string, h: SkillTestHarness) {
-    h.setup(buildStateWithSkills([skillId]));
+  async function checkSkillDeclaredActions(skillId: string, h: SkillTestHarness) {
+    await h.setup(buildStateWithSkills([skillId]));
 
     const P1 = h.player('P1');
     const declared = P1.availableActions();
@@ -49,15 +49,15 @@ describe('前端 → 后端契约', () => {
       const found = findActionEntry(def.skillId, def.ownerId, def.actionType);
       expect(
         found,
-        `${skillId}.${def.actionType} declared in onMount but not registered in onInit`,
+        `defineAction 声明了 ${def.skillId}:${def.actionType},但后端无对应 registerAction`,
       ).toBeDefined();
     }
   }
 
   it.each(SKILLS_WITH_OWN_REGISTER)(
     '%s: defineAction 声明的 actionType 都有对应 registerAction',
-    (skillId) => {
-      checkSkillDeclaredActions(skillId, harness);
+    async (skillId) => {
+      await checkSkillDeclaredActions(skillId, harness);
     },
   );
 

@@ -177,8 +177,16 @@ export async function rebootstrap(state: GameState): Promise<void> {
   }
 }
 
-/** 内部 helper:实例化单个 skill(从 create-engine bootstrap / rebootstrap 提取) */
-async function instantiateSkill(skillId: string, ownerId: string): Promise<Skill> {
+/**
+ * 实例化单个 skill(从 create-engine bootstrap / rebootstrap / 添加技能 atom 调用)。
+ *
+ * 幂等:若 (skillId, ownerId) 已有实例,先卸载旧实例(调其 unload 函数 + 清 action/hook 注册),
+ * 再重新注册。保证 rebootstrap 重入、并发 dispatch、动态 添加技能 等场景不会因
+ * `registerActionEntry` 的 "already registered" 抛错。
+ */
+export async function instantiateSkill(skillId: string, ownerId: string): Promise<Skill> {
+  // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册抛错
+  unloadSkillInstance(skillId, ownerId);
   const module = await getSkillModule(skillId);
   const skill = module.createSkill(skillId, ownerId);
   if (module.onInit) {

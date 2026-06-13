@@ -36,7 +36,7 @@ describe('杀', () => {
   });
 
   it('P1 对 P2 出杀,P2 不出闪 → P2 扣 1 血', async () => {
-    harness.setup(buildState());
+    await harness.setup(buildState());
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
@@ -48,7 +48,7 @@ describe('杀', () => {
   });
 
   it('P1 对 P2 出杀,P2 出闪 → 双方不扣血,杀和闪结算完毕进入弃牌堆', async () => {
-    harness.setup(buildState({ p2Hand: ['c3'] }));
+    await harness.setup(buildState({ p2Hand: ['c3'] }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
@@ -68,7 +68,7 @@ describe('杀', () => {
 
   it('同回合不能出第二张杀', async () => {
     const c2: Card = { id: 'c2', name: '杀', suit: '♠', rank: '2', type: '基本牌' };
-    harness.setup(buildState({ extraCardMap: { c2 } }));
+    await harness.setup(buildState({ extraCardMap: { c2 } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 

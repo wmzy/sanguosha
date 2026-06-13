@@ -7,6 +7,26 @@ All notable changes to this project will be documented in this file.
 
 将 `src/engine/*` 整体迁至 `src/engine/_legacy/`(参考保留),在 `src/engine/` 重新实现新引擎核心(types/atom/settlement/skill/skill-loader/event-stream/create-engine)。首批交付 38 atom + 10 skill(4 基本牌 + 5 武将 6 技能)。
 
+### Fixed — 引擎 review P0 修复(2026-06-13)
+
+- **动态技能生命周期(§4.13)**:`添加技能`/`移除技能` atom 现在真正触发实例化/卸载。
+  之前 `apply` 只改 `player.skills` 列表,后端 action/hook 从未注册——动态获得的技能(装备、觉醒、化身)全坏。
+  修复:`applyAtom` 在 apply 后为这两个 atom 补 `instantiateSkill`/`unloadSkillInstance`(引擎管理,与 `判定` 特殊处理同构)。
+  (`src/engine/create-engine.ts` applyAtom;新增 `tests/integration/dynamic-skill.test.ts` 4 测试)
+- **双重注册 P0**:`instantiateSkill` 改幂等(先 `unloadSkillInstance` 再注册),`bootstrap` 的 `开局:系统:start` 注册前先卸载。
+  修复并发 rebootstrap / bootstrap 重入时的 `Action "X:Y:Z" already registered` 抛错(原 review 问题 7)。
+  (`src/engine/skill.ts` instantiateSkill 导出+幂等;`src/engine/create-engine.ts` bootstrap)
+- **stable-wait 超时兜底**:`_waitForStable` 加 30s 超时 reject(execute 卡死保护,原 review 问题 5 加固 N1)。
+  实现嵌在 `setupStableWait`(注册定时器)+`resolveStable`(清除定时器),调用方仍直接 `await state._waitForStable`(不引入额外微任务 tick——async 包装 + Promise.race 会破坏 杀.execute pending 创建与 dispatch 恢复的时序)。
+  (`src/engine/types.ts` 加 `_rejectStable`/`_stableTimer`;`src/engine/create-engine.ts` setupStableWait/resolveStable)
+- **技能测试缺失 await**:`tests/skill-tests/{杀,遗计,contract}.test.ts` 的 `harness.setup()` 是 async 但调用处漏 `await`,
+  导致并发 setup 在模块级注册表上竞争 → unhandled rejection。补齐 `await`。
+- **`_activeExecuteP` 文档化**:stable-wait 重构后该字段无消费者,注释改为"仅调试/诊断用"。
+
+### Verified
+- `pnpm vitest run tests/integration/{new-engine-*,create-game,restore-from-log,dynamic-skill}.test.ts tests/skill-tests/`:24 passed | 4 skipped
+- 全量基线:HEAD 30 passed → 修复后 34 passed(+4,无新增失败;其余失败为 v2 legacy 测试引用已删模块)
+
 ### Added
 
 - `docs/superpowers/specs/2026-06-09-engine-rewrite-design.md` — 引擎重写 spec

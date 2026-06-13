@@ -43,7 +43,7 @@ describe('遗计', () => {
   });
 
   it('P1 出杀,P2(有遗计)不出闪 → P2 扣血(遗计 after hook 触发后进入新 pending)', async () => {
-    harness.setup(buildState());
+    await harness.setup(buildState());
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
@@ -100,7 +100,7 @@ describe('confirm / distribute API', () => {
 
   it('confirm(false) 等同 pass()', async () => {
     const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
-    harness.setup(createGameState({
+    await harness.setup(createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
