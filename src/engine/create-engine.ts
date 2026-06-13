@@ -70,6 +70,12 @@ export interface GameConfig {
 
 // ==================== 模块级 helpers ====================
 
+/**
+ * system 命名空间占位 ownerId。客户端不会用此值(WS handler 注入真实玩家名),
+ * engine 内部 dispatch 只在 system skill 触发路径(如 bootstrap)用到。
+ */
+const SYSTEM_OWNER = '系统';
+
 /** 从 pending atom 中提取等待目标玩家。所有内置等待型 atom 都有 target 字段 */
 function extractPendingTarget(atom: Atom): string {
   if ('target' in atom && typeof atom.target === 'string') return atom.target;
@@ -162,7 +168,7 @@ export async function bootstrap(state: GameState): Promise<void> {
   }
 
   const 开局mod = await import('./skills/开局');
-  const syntheticSkill = 开局mod.default.createSkill('开局', '主公');
+  const syntheticSkill = 开局mod.default.createSkill('开局', SYSTEM_OWNER);
   // 开局.onInit(skill, state) 是 system skill 的特殊接口
   // @ts-ignore 开局的 onInit 签名是 (skill, state),不是 SkillModule 标准 (skill, ownerId)
   开局mod.onInit(syntheticSkill, state);
@@ -171,7 +177,7 @@ export async function bootstrap(state: GameState): Promise<void> {
   const result = await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
-    ownerId: '主公',
+    ownerId: SYSTEM_OWNER,
     params: { ...gameConfig } as Record<string, Json>,
     baseSeq: 0,
   });
