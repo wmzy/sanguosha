@@ -3,17 +3,16 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 设上限: AtomDefinition<{ player: string; amount: number }> = {
+export const 设上限: AtomDefinition<{ player: number; amount: number }> = {
   type: '设上限',
   validate(state, atom) {
     if (atom.amount <= 0) return 'amount must be > 0';
-    const p = state.players.find(x => x.name === atom.player);
+    const p = state.players[atom.player];
     if (!p) return `player ${atom.player} not found`;
     return null;
   },
   apply(state, atom) {
-    const pIdx = state.players.findIndex(p => p.name === atom.player);
-    const player = state.players[pIdx];
+    const player = state.players[atom.player];
     player.maxHealth = atom.amount;
     player.health = Math.min(player.health, atom.amount);
   },

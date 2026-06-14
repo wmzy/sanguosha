@@ -3,15 +3,14 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 设横置: AtomDefinition<{ player: string; chained: boolean }> = {
+export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
   type: '设横置',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
   apply(state, atom) {
-    const pIdx = state.players.findIndex(p => p.name === atom.player);
-    const player = state.players[pIdx];
+    const player = state.players[atom.player];
     player.marks = player.marks.filter(m => m.id !== 'chained');
     if (atom.chained) {
       player.marks.push({ id: 'chained', scope: player.index });

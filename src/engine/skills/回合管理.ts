@@ -64,11 +64,11 @@ function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: numb
   return fromIndex;
 }
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '回合管理', description: '监听上家回合结束,自动开始自己的回合' };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   const me = skill.ownerId;
 
   // ─── 阶段结束 → 自动推进到下一阶段(自己回合内) ───
@@ -97,15 +97,12 @@ export function onInit(skill: Skill, ownerId: string): () => void {
   // ─── 上家回合结束 → 如果我是下一家,启动自己的回合 ───
   registerAfterHook(skill.id, ownerId, '回合结束', async (ctx) => {
     if (ctx.atom.type !== '回合结束') return;
-    const finishedName = ctx.atom.player;
+    const finishedIndex = ctx.atom.player;
     const state = ctx.state;
-    const finishedIndex = state.players.findIndex(p => p.name === finishedName);
-    if (finishedIndex < 0) return;
 
     const nextIndex = findNextAlive(state, finishedIndex);
-    const nextName = state.players[nextIndex].name;
     // 不是我就跳过——只有轮到的玩家启动自己的回合
-    if (nextName !== me) return;
+    if (nextIndex !== me) return;
 
     await applyAtom(ctx.state, { type: '回合开始', player: me });
     await applyAtom(ctx.state, { type: '阶段开始', player: me, phase: '准备' });

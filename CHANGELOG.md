@@ -7,6 +7,27 @@ All notable changes to this project will be documented in this file.
 
 将 `src/engine/*` 整体迁至 `src/engine/_legacy/`(参考保留),在 `src/engine/` 重新实现新引擎核心(types/atom/settlement/skill/skill-loader/event-stream/create-engine)。首批交付 38 atom + 10 skill(4 基本牌 + 5 武将 6 技能)。
 
+
+### Refactor — 引擎优雅度重构(2026-06-14)
+
+- **HookResult 取代 dropAtom**(review B1):before 钩子返回 `HookResult`(`pass`/`modify`/`cancel`)取代隐式 `dropAtom` flag。
+  - `modify`:修改 atom 参数,管线用新值继续(藤甲 -1 → 白银狮子看到减过的伤害,叠加生效,座次序)。消除了 6 个防具/武器技能的 drop+reapply+guard-mark 反模式。
+  - `cancel`:取消当前 atom,推 notify 事件(非静默),仁王盾/寒冰剑用此。
+  - 折叠(folding)语义:before hooks 按注册顺序串行折叠,而非第一个 drop 就 break。
+  - 修复 guard mark 永久残留 bug(藤甲/护甲 `scope:-1` 从不清理 → 只触发一次)。
+  (`types.ts` HookResult;`create-engine.ts` applyAtom 折叠循环;6 skill 迁移;`ENGINE-DESIGN.md` §4.2/4.5/6.1 更新)
+- **座次解耦**:引擎层所有 player/target/source/ownerId 从 string(玩家名)改为 number(座次下标)。
+  引擎只认座次,玩家真实 ID ↔ 座次映射在 session 层(`playerNames: Map<WS, number>`)。
+  `SYSTEM_OWNER = '系统'` 改为 `-1`(消除玩家名冲突风险)。`PlayerState.name` 保留为展示名。
+  (`types.ts` Atom 联合 + 全部接口;`create-engine.ts`/`skill.ts`/`atoms/*`/`skills/*`/`session.ts`/`protocol.ts`/`distance.ts`/`buildView.ts`;测试全量迁移)
+- **gameConfig 显式传参**:`bootstrap(state, gameConfig)` 显式接收配置,删除 `state._gameConfig` 隐式 stash(避免序列化污染)。
+- **低风险清理**:
+  - 删 `settlement.ts` 死模块(create-engine.ts 有同名实现,幽灵代码 + 双实现语义冲突)
+  - 删 `SettlementFrame.cards` 死字段 + `EngineApi` 死类型
+  - `logAction.id` 改 `seq`(确定性,支持重放)替代 `Date.now()-random`
+  - pending `startTime/deadline` 改相对时间(`Date.now() - state.startedAt`),符合 §7.5
+  - `GameView.players[]` 加 `index` 字段;`ViewEventSplit.ownerViews` key 改 number
+
 ### Fixed — 引擎 review P0 修复(2026-06-13)
 
 - **动态技能生命周期(§4.13)**:`添加技能`/`移除技能` atom 现在真正触发实例化/卸载。
@@ -28,8 +49,10 @@ All notable changes to this project will be documented in this file.
   目标不出牌即"未有效回应",父 execute(杀)继续结算;slot 保持挂起会死锁。
 
 ### Verified
-- `pnpm vitest run tests/integration/{new-engine-*,create-game,restore-from-log,dynamic-skill}.test.ts tests/skill-tests/`:24 passed | 4 skipped
-- 全量基线:HEAD 30 passed → 修复后 34 passed(+4,无新增失败;其余失败为 v2 legacy 测试引用已删模块)
+- 目标测试:`tests/integration/{new-engine-*,create-game,restore-from-log,dynamic-skill,system-owner-id}.test.ts tests/skill-tests/` 全绿(26+ passed | 4 skipped)
+- 全量基线:34 passed(新引擎),155 failed(v2 legacy 引用已删模块,预存)
+- `pnpm tsc --noEmit`:0 新引擎错误(types.ts 的 3 个 ViewEvent 索引签名错误为预存)
+
 
 ### Added
 

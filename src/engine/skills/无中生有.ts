@@ -24,16 +24,16 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '无中生有', description: '锦囊:摸两张牌' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       pushFrame(state, '无中生有', from, { ...params });
       const cardId = params.cardId as string;

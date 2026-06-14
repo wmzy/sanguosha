@@ -47,7 +47,7 @@ describe('遗计', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCardAndTarget('杀', 'c1', ['P2']);
+    await P1.useCardAndTarget('杀', 'c1', [1]);
     // P2 处于询问闪 pending
     P2.expectPending('询问闪');
 
@@ -69,7 +69,7 @@ describe('遗计', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCardAndTarget('杀', 'c1', ['P2']);
+    await P1.useCardAndTarget('杀', 'c1', [1]);
     await P2.pass();
 
     // 遗计 confirm
@@ -114,7 +114,7 @@ describe('confirm / distribute API', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCardAndTarget('杀', 'c1', ['P2']);
+    await P1.useCardAndTarget('杀', 'c1', [1]);
     P2.expectPending('询问闪');
     await P2.confirm(false);
 

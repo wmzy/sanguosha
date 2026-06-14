@@ -33,10 +33,10 @@ describe('新 ENGINE-DESIGN 顶层 API — 仁德(刘备)', () => {
 
   it('给 1 人 2 张牌(单帧) → 刘备回复 1 血', async () => {
     await dispatch(state, {
-      skillId: '仁德', actionType: 'use', ownerId: 'P1',
+      skillId: '仁德', actionType: 'use', ownerId: 0,
       params: {
         targets: [
-          { target: 'P2', cardIds: ['c1', 'c2'] },
+          { target: 1, cardIds: ['c1', 'c2'] },
         ],
       },
       baseSeq: 0,

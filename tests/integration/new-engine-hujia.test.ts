@@ -32,8 +32,8 @@ describe('新 ENGINE-DESIGN 顶层 API — 护甲(曹操·锁定被动)', () => 
 
   it('受到黑色【杀】 → 扣 0 血(护甲吸收)', async () => {
     await dispatch(state, {
-      skillId: '杀', actionType: 'use', ownerId: 'P1',
-      params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
+      skillId: '杀', actionType: 'use', ownerId: 0,
+      params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
     const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(4);

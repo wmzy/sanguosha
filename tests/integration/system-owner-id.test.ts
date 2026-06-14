@@ -19,12 +19,12 @@ describe('system ownerId 约定', () => {
       gameId: 'test-system-owner',
     };
     const state = create(config);
-    await bootstrap(state);
-    const entry = findActionEntry('开局', '系统', 'start');
+  await bootstrap(state, config);
+    const entry = findActionEntry('开局', -1, 'start');
     expect(entry).toBeDefined();
   });
 
-  it('旧占位 ownerId "主公" 不应再被使用', async () => {
+  it('开局 skill 不应注册到真实玩家座次', async () => {
     resetForTest();
     const config: GameConfig = {
       characters: [
@@ -37,8 +37,9 @@ describe('system ownerId 约定', () => {
       gameId: 'test-system-owner-old',
     };
     const state = create(config);
-    await bootstrap(state);
-    const oldEntry = findActionEntry('开局', '主公', 'start');
-    expect(oldEntry).toBeUndefined();
+    await bootstrap(state, config);
+    // 开局 只注册到 SYSTEM_OWNER(-1),不注册到任何真实座次(0/1/2)
+    expect(findActionEntry('开局', 0, 'start')).toBeUndefined();
+    expect(findActionEntry('开局', 1, 'start')).toBeUndefined();
   });
 });

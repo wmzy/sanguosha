@@ -40,8 +40,8 @@ describe('fireTimeout(state)', () => {
 
   it('有 pending(询问闪)时调用:触发 onTimeout → pending 清空 → P2 扣 1 血', async () => {
     await dispatch(state, {
-      skillId: '杀', actionType: 'use', ownerId: 'P1',
-      params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
+      skillId: '杀', actionType: 'use', ownerId: 0,
+      params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
     expect(state.pendingSlot).toBeDefined();
 

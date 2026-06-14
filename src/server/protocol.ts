@@ -100,7 +100,7 @@ function isValidEngineClientMessage(data: unknown): data is EngineClientMessage 
   const d = data as Record<string, unknown>;
   return typeof d['skillId'] === 'string'
     && typeof d['actionType'] === 'string'
-    && typeof d['ownerId'] === 'string'
+    && typeof d['ownerId'] === 'number'
     && typeof d['params'] === 'object' && d['params'] !== null
     && typeof d['baseSeq'] === 'number';
 }

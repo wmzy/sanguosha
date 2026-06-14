@@ -35,11 +35,11 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '装备', description: '装备到对应栏位' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
@@ -52,7 +52,7 @@ export function onInit(_skill: Skill, ownerId: string): () => void {
       const card = state.cardMap[cardId];
       if (card?.subtype) {
         const slot = card.subtype as '武器' | '防具' | '进攻马' | '防御马' | '宝物';
-        const currentEquip = state.players.find(p => p.name === from)?.equipment?.[slot];
+        const currentEquip = state.players[from]?.equipment?.[slot];
         if (currentEquip) {
           await applyAtom(state, { type: '卸下', player: from, slot });
           await applyAtom(state, { type: '移动牌', cardId: currentEquip, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });

@@ -19,9 +19,9 @@ import type {
 } from './types';
 
 export interface SkillModule {
-  createSkill: (id: string, ownerId: string) => Skill;
+  createSkill: (id: string, ownerId: number) => Skill;
   /** 注册时拿到 skill + ownerId(per player instance);内部直接 import 注册函数 */
-  onInit?: (skill: Skill, ownerId: string) => (() => void) | void;
+  onInit?: (skill: Skill, ownerId: number) => (() => void) | void;
   onMount?: (skill: Skill, api: FrontendAPI) => (() => void) | void;
 }
 
@@ -41,7 +41,7 @@ const actions = new Map<string, ActionEntry>();
 const beforeHooks = new Map<string, AtomHookEntry[]>();
 const afterHooks = new Map<string, AtomHookEntry[]>();
 
-function actionKey(skillId: string, ownerId: string, actionType: string): string {
+function actionKey(skillId: string, ownerId: number, actionType: string): string {
   return `${skillId}:${ownerId}:${actionType}`;
 }
 
@@ -51,15 +51,15 @@ export function registerActionEntry(entry: ActionEntry): void {
   actions.set(k, entry);
 }
 
-export function findActionEntry(skillId: string, ownerId: string, actionType: string): ActionEntry | undefined {
+export function findActionEntry(skillId: string, ownerId: number, actionType: string): ActionEntry | undefined {
   return actions.get(actionKey(skillId, ownerId, actionType));
 }
 
-export function unregisterActionEntry(skillId: string, ownerId: string, actionType: string): void {
+export function unregisterActionEntry(skillId: string, ownerId: number, actionType: string): void {
   actions.delete(actionKey(skillId, ownerId, actionType));
 }
 
-function unregisterActionsForInstance(skillId: string, ownerId: string): void {
+function unregisterActionsForInstance(skillId: string, ownerId: number): void {
   const prefix = `${skillId}:${ownerId}:`;
   for (const key of [...actions.keys()]) {
     if (key.startsWith(prefix)) actions.delete(key);
@@ -82,7 +82,7 @@ export function getAfterHooks(atomType: string): AtomHookEntry[] {
  */
 export function registerAction(
   skillId: string,
-  ownerId: string,
+  ownerId: number,
   actionType: string,
   validate: (state: GameState, params: Record<string, Json>) => string | null,
   execute: (state: GameState, params: Record<string, Json>) => Promise<void>,
@@ -97,7 +97,7 @@ export function registerAction(
  */
 export function registerBeforeHook(
   skillId: string,
-  ownerId: string,
+  ownerId: number,
   atomType: string,
   handler: (ctx: AtomBeforeContext) => Promise<void>,
 ): () => void {
@@ -118,7 +118,7 @@ export function registerBeforeHook(
  */
 export function registerAfterHook(
   skillId: string,
-  ownerId: string,
+  ownerId: number,
   atomType: string,
   handler: (ctx: AtomAfterContext) => Promise<void>,
 ): () => void {
@@ -138,15 +138,15 @@ export function registerAfterHook(
 
 const instanceUnloads = new Map<string, () => void>();
 
-function instanceKey(skillId: string, ownerId: string): string {
+function instanceKey(skillId: string, ownerId: number): string {
   return `${skillId}:${ownerId}`;
 }
 
-export function setSkillInstanceUnload(skillId: string, ownerId: string, unload: () => void): void {
+export function setSkillInstanceUnload(skillId: string, ownerId: number, unload: () => void): void {
   instanceUnloads.set(instanceKey(skillId, ownerId), unload);
 }
 
-export function unloadSkillInstance(skillId: string, ownerId: string): void {
+export function unloadSkillInstance(skillId: string, ownerId: number): void {
   const key = instanceKey(skillId, ownerId);
   const unload = instanceUnloads.get(key);
   if (unload) {
@@ -172,7 +172,7 @@ export function clearAllSkillInstances(): void {
 export async function rebootstrap(state: GameState): Promise<void> {
   for (const player of state.players) {
     for (const skillId of player.skills) {
-      await instantiateSkill(skillId, player.name);
+      await instantiateSkill(skillId, player.index);
     }
   }
 }
@@ -184,7 +184,7 @@ export async function rebootstrap(state: GameState): Promise<void> {
  * 再重新注册。保证 rebootstrap 重入、并发 dispatch、动态 添加技能 等场景不会因
  * `registerActionEntry` 的 "already registered" 抛错。
  */
-export async function instantiateSkill(skillId: string, ownerId: string): Promise<Skill> {
+export async function instantiateSkill(skillId: string, ownerId: number): Promise<Skill> {
   // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册抛错
   unloadSkillInstance(skillId, ownerId);
   const module = await getSkillModule(skillId);

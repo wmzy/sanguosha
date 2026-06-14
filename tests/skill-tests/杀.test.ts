@@ -40,7 +40,7 @@ describe('杀', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCardAndTarget('杀', 'c1', ['P2']);
+    await P1.useCardAndTarget('杀', 'c1', [1]);
     await P2.pass();
 
     expect(P2.view.players[1].health).toBe(3);
@@ -52,7 +52,7 @@ describe('杀', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCardAndTarget('杀', 'c1', ['P2']);
+    await P1.useCardAndTarget('杀', 'c1', [1]);
     // 中间状态:杀已离开 P1 手牌,正在处理区,等待 P2 出闪
     expect(harness.state.zones.processing).toContain('c1');
     expect(P1.view.players[0].hand).not.toContain('c1');
@@ -72,11 +72,11 @@ describe('杀', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCardAndTarget('杀', 'c1', ['P2']);
+    await P1.useCardAndTarget('杀', 'c1', [1]);
     await P2.pass();
 
     await expect(
-      P1.useCardAndTarget('杀', 'c2', ['P2']),
+      P1.useCardAndTarget('杀', 'c2', [1]),
     ).rejects.toThrow(/出杀次数已用尽/);
   });
 });

@@ -5,10 +5,10 @@ import { registerAtom } from '../atom';
 
 const VALID_PHASES: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'];
 
-export const 阶段开始: AtomDefinition<{ player: string; phase: string }> = {
+export const 阶段开始: AtomDefinition<{ player: number; phase: string }> = {
   type: '阶段开始',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     if (!VALID_PHASES.includes(atom.phase as TurnPhase)) return `invalid phase ${atom.phase}`;
     return null;
   },

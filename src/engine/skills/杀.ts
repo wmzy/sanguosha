@@ -33,16 +33,16 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame, topFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
-      const targets = params.targets as string[] | undefined;
+      const targets = params.targets as number[] | undefined;
       if (!Array.isArray(targets) || targets.length === 0) return 'targets required';
-      const self = state.players.find(p => p.name === ownerId)!;
+      const self = state.players[ownerId];
       const killsPlayed = self.marks
         .filter(m => m.id === '杀/killsPlayed')
         .reduce((n, m) => n + (typeof m.payload === 'number' ? m.payload : 0), 0);
@@ -60,25 +60,25 @@ export function onInit(skill: Skill, ownerId: string): () => void {
         if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
       }
       const alive = state.players.filter(p => p.alive);
-      const aliveSelfIdx = alive.findIndex(p => p.name === self.name);
-      for (const targetName of targets) {
-        const aliveToIdx = alive.findIndex(p => p.name === targetName);
-        if (aliveToIdx < 0) return `target ${targetName} not found`;
+      const aliveSelfIdx = alive.findIndex(p => p.index === ownerId);
+      for (const targetIdx of targets) {
+        const aliveToIdx = alive.findIndex(p => p.index === targetIdx);
+        if (aliveToIdx < 0) return `target ${targetIdx} not found`;
         const n = alive.length;
         const d = Math.abs(aliveSelfIdx - aliveToIdx);
         let dist = Math.min(d, n - d);
         if (self.equipment?.['进攻马']) dist -= 1;
-        const targetPlayer = state.players.find(p => p.name === targetName);
+        const targetPlayer = state.players[targetIdx];
         if (targetPlayer?.equipment?.['防御马']) dist += 1;
         dist = Math.max(1, dist);
-        if (dist > range) return `目标 ${targetName} 不在攻击范围内(距离${dist},范围${range})`;
+        if (dist > range) return `目标 ${targetIdx} 不在攻击范围内(距离${dist},范围${range})`;
       }
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const cardId = params.cardId as string;
-      const targets = params.targets as string[];
+      const targets = params.targets as number[];
       const frame = pushFrame(state, '杀', from, { ...params });
       frame.params.settlement = targets.map(t => ({ target: t, dodged: false }));
       frame.params.cardId = cardId;
@@ -95,7 +95,7 @@ export function onInit(skill: Skill, ownerId: string): () => void {
         await applyAtom(state, { type: '询问闪', target, source: from });
       }
       // 对未闪避的目标造成伤害
-      const settlement = frame.params.settlement as Array<{ target: string; dodged: boolean }>;
+      const settlement = frame.params.settlement as Array<{ target: number; dodged: boolean }>;
       for (const item of settlement) {
         if (!item.dodged) {
           await applyAtom(state, { type: '造成伤害', target: item.target, amount: 1, source: from });
@@ -122,7 +122,7 @@ export function onInit(skill: Skill, ownerId: string): () => void {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const cardId = params.cardId as string;
       // 移动杀到弃牌堆
@@ -130,7 +130,7 @@ export function onInit(skill: Skill, ownerId: string): () => void {
       // 在当前帧(南蛮入侵/决斗帧)的 settlement 中标记 responded
       const frame = topFrame(state);
       if (frame) {
-        const settlement = frame.params.settlement as Array<{ target: string; responded?: boolean; dodged?: boolean }> | undefined;
+        const settlement = frame.params.settlement as Array<{ target: number; responded?: boolean; dodged?: boolean }> | undefined;
         if (settlement) {
           const item = settlement.find(s => s.target === from);
           if (item) {

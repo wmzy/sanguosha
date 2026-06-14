@@ -38,7 +38,7 @@ import type { GameState, FrontendAPI, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -47,18 +47,18 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      const targets = params.targets as Array<{ target: string; cardIds: string[] }> | undefined;
+      const targets = params.targets as Array<{ target: number; cardIds: string[] }> | undefined;
       if (!Array.isArray(targets) || targets.length === 0) return 'targets required';
       const total = targets.reduce((n, t) => n + (Array.isArray(t.cardIds) ? t.cardIds.length : 0), 0);
       if (total === 0) return 'no cards to give';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const frame = pushFrame(state, '仁德', from, { ...params });
-      const targets = params.targets as Array<{ target: string; cardIds: string[] }>;
+      const targets = params.targets as Array<{ target: number; cardIds: string[] }>;
       for (const t of targets) {
         for (const cardId of t.cardIds) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '手牌', player: t.target } });

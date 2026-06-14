@@ -3,15 +3,14 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 添加技能: AtomDefinition<{ player: string; skillId: string }> = {
+export const 添加技能: AtomDefinition<{ player: number; skillId: string }> = {
   type: '添加技能',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
   apply(state, atom) {
-    const pIdx = state.players.findIndex(p => p.name === atom.player);
-    const player = state.players[pIdx];
+    const player = state.players[atom.player];
     if (player.skills.includes(atom.skillId)) return;
     player.skills.push(atom.skillId);
   },

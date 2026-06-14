@@ -33,25 +33,25 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '过河拆桥', description: '锦囊:弃置目标一张牌' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'string') return 'target required';
+      if (typeof params.target !== 'number') return 'target required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       pushFrame(state, '过河拆桥', from, { ...params });
       const cardId = params.cardId as string;
-      const target = params.target as string;
+      const target = params.target as number;
       // 移锦囊到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 弃目标一张牌(简化:弃手牌第一张)
-      const targetPlayer = state.players.find(p => p.name === target);
+      const targetPlayer = state.players[target];
       if (targetPlayer && targetPlayer.hand.length > 0) {
         await applyAtom(state, { type: '弃置', player: target, cardIds: [targetPlayer.hand[0]] });
       }

@@ -51,20 +51,20 @@ import type { GameState, AtomAfterContext, GameView, Json, Skill  } from '../typ
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '乐不思蜀', description: '延时锦囊:判定红桃则跳过出牌阶段' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'string') return 'target required';
+      if (typeof params.target !== 'number') return 'target required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const cardId = params.cardId as string;
-      const target = params.target as string;
+      const target = params.target as number;
       pushFrame(state, '乐不思蜀', from, { ...params });
       // 移牌到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });

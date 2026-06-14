@@ -3,10 +3,10 @@
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
-export const 询问闪: AtomDefinition<{ target: string; source: string }> = {
+export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
   type: '询问闪',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.target)) return `target not found`;
+    if (!state.players[atom.target]) return `target not found`;
     return null;
   },
   apply(_state) {

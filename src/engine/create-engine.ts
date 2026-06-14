@@ -58,8 +58,8 @@ export interface DispatchResult {
   error?: string;
   /** 游戏是否结束 */
   gameOver?: boolean;
-  /** 获胜者名字(游戏结束时) */
-  winner?: string;
+  /** 获胜者座次下标(游戏结束时) */
+  winner?: number;
 }
 
 export interface GameConfig {
@@ -74,15 +74,15 @@ export interface GameConfig {
 // ==================== 模块级 helpers ====================
 
 /**
- * system 命名空间占位 ownerId。客户端不会用此值(WS handler 注入真实玩家名),
- * engine 内部 dispatch 只在 system skill 触发路径(如 bootstrap)用到。
+ * system 命名空间占位座次。引擎只认座次下标,玩家真实 ID 由 session 层映射。
+ * -1 = 系统(开局 action),不对应任何真实玩家槽位。
  */
-const SYSTEM_OWNER = '系统';
+const SYSTEM_OWNER = -1;
 
-/** 从 pending atom 中提取等待目标玩家。所有内置等待型 atom 都有 target 字段 */
-function extractPendingTarget(atom: Atom): string {
-  if ('target' in atom && typeof atom.target === 'string') return atom.target;
-  return '';
+/** 从 pending atom 中提取等待目标玩家(座次下标)。所有内置等待型 atom 都有 target 字段 */
+function extractPendingTarget(atom: Atom): number {
+  if ('target' in atom && typeof atom.target === 'number') return atom.target;
+  return -1;
 }
 
 /** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。 */
@@ -119,18 +119,18 @@ function ensureStateShape(state: GameState): void {
 
 function logAction(state: GameState, message: ClientMessage): void {
   state.actionLog.push({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: String(state.seq),
     timestamp: Date.now() - state.startedAt,
     message,
     baseSeq: message.baseSeq ?? -1,
   });
 }
 
-function checkGameOver(state: GameState): { gameOver: boolean; winner?: string } {
+function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
   const aliveCount = state.players.filter((p) => p.alive).length;
   if (aliveCount <= 1) {
     const winner = state.players.find((p) => p.alive);
-    return { gameOver: true, winner: winner?.name ?? '无人' };
+    return { gameOver: true, winner: winner?.index };
   }
   return { gameOver: false };
 }
@@ -168,36 +168,26 @@ export function create(gameConfig: GameConfig): GameState {
   const state = createGameState({ players: stubPlayers, cardMap: {} });
   ensureStateShape(state);
   state.startedAt = Date.now();
-  // 存 gameConfig 进 state(bootstrap 阶段需要,例如 开局 skill 可能直接读它)
-  // 实际 bootstrap 不需要 —— 它从 gameConfig 参数里读 —— 但存进 state 方便调试和 restore
-  (state as GameState & { _gameConfig?: GameConfig })._gameConfig = gameConfig;
   return state;
 }
 
 /**
  * 异步 bootstrap:在 state 上跑完开局流程。
  *   1. 动态 import 开局 skill 模块
- *   2. 调 开局.onInit(skill, ownerId) 注册 start action(从 state._gameConfig 读配置)
+ *   2. 调 开局.onInit(skill, gameConfig) 注册 start action
  *   3. dispatch 开局 start → 跑完抽身份/选将/洗牌/发牌/启动第一回合
  *   4. rebootstrap(state) 给每个 player 的 skills 注册实例
  *
  * restore 路径不调 bootstrap —— 直接用 replay 出来的 state 即可。
- *
- * config 不通过参数传 —— 由 create(config) 时已 stash 到 state._gameConfig,这里读 state。
  */
-export async function bootstrap(state: GameState): Promise<void> {
-  const gameConfig = (state as GameState & { _gameConfig?: GameConfig })._gameConfig;
-  if (!gameConfig) {
-    throw new Error('bootstrap: state._gameConfig 缺失(请用 create(config) 创建 state)');
-  }
-
+export async function bootstrap(state: GameState, gameConfig: GameConfig): Promise<void> {
   // 幂等:若 bootstrap 重入(如 restore 路径误调),先卸载旧的 开局:系统 实例,避免重复注册抛错
   unloadSkillInstance('开局', SYSTEM_OWNER);
   const 开局mod = await import('./skills/开局');
   const syntheticSkill = 开局mod.default.createSkill('开局', SYSTEM_OWNER);
-  // 开局.onInit(skill, state) 是 system skill 的特殊接口
-  // @ts-ignore 开局的 onInit 签名是 (skill, state),不是 SkillModule 标准 (skill, ownerId)
-  const off开局 = 开局mod.onInit(syntheticSkill, state);
+  // 开局.onInit(skill, gameConfig) 是 system skill 的特殊接口
+  // @ts-ignore 开局的 onInit 签名是 (skill, gameConfig),不是 SkillModule 标准 (skill, ownerId)
+  const off开局 = 开局mod.onInit(syntheticSkill, gameConfig);
   // 登记实例 unload,使 unloadSkillInstance/clearAllSkillInstances 能正确清理 开局:系统
   setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
@@ -324,14 +314,13 @@ export function resetForTest(): void {
 export function pushFrame(
   state: GameState,
   skillId: string,
-  from: string,
+  from: number,
   params?: Record<string, Json>,
 ): SettlementFrame {
   const frame: SettlementFrame = {
     skillId,
     from,
     params: params ? { ...params } : {},
-    cards: [],
   };
   state.settlementStack.push(frame);
   return frame;
@@ -349,15 +338,9 @@ export function topFrame(state: GameState): SettlementFrame | undefined {
 
 /** 兜底空帧 */
 function emptyFrame(): SettlementFrame {
-  return { skillId: '', from: '', params: Object.freeze({}), cards: [] };
+  return { skillId: '', from: -1, params: Object.freeze({}) };
 }
 
-// ─── Drop 标志 ───────────────────────────────────────────────
-
-/** 在 before 钩子中调 dropAtom(state) 会让当前 atom 的 validate/apply 跳过。 */
-export function dropAtom(state: GameState): void {
-  state._dropNext = true;
-}
 
 // ─── Notify 事件 ────────────────────────────────────────────
 
@@ -369,16 +352,16 @@ export function pushNotify(_state: GameState, event: NotifyEvent): void {
 // ─── Atom apply 管线 ────────────────────────────────────────
 
 /** 判定 atom:apply 后从牌堆顶翻一张到目标玩家 judgeZone */
-function moveJudgeCardToZone(state: GameState, atom: { player: string; judgeType: string }): void {
+function moveJudgeCardToZone(state: GameState, atom: { player: number; judgeType: string }): void {
   if (state.zones.deck.length === 0) return;
   const topCardId = state.zones.deck.shift()!;
-  const target = state.players.find((p) => p.name === atom.player);
+  const target = state.players[atom.player];
   if (target) target.judgeZone.push(topCardId);
 }
 
 /** 判定 atom 收尾:把目标 judgeZone 顶部牌移入弃牌堆 */
-function cleanupJudgeZone(state: GameState, atom: { player: string; judgeType: string }): void {
-  const target = state.players.find((p) => p.name === atom.player);
+function cleanupJudgeZone(state: GameState, atom: { player: number; judgeType: string }): void {
+  const target = state.players[atom.player];
   if (!target || target.judgeZone.length === 0) return;
   const topId = target.judgeZone.pop()!;
   state.zones.discardPile.push(topId);
@@ -389,62 +372,69 @@ function cleanupJudgeZone(state: GameState, atom: { player: string; judgeType: s
  * 等待型 atom 的 Promise 会挂起直到回应/超时。
  */
 export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
-  state._dropNext = false;
   state.atomStack.push(atom);
 
-  const beforeHooks = getBeforeHooks(atom.type);
-  for (const h of beforeHooks) {
-    if (state._dropNext) break;
+  // before 阶段:折叠(folding)语义。hooks 按注册顺序(座次序)依次跑,
+  // 每个 hook 可 pass/modify/cancel。modify 叠加(藤甲-1 后白银狮子看到减过的值);
+  // cancel 终止(仁王盾取消后后续 hook 不跑,atom 不进入 validate/apply/after)。
+  let current = atom;
+  let cancelled = false;
+  for (const h of getBeforeHooks(atom.type)) {
     const frame = topFrame(state) ?? emptyFrame();
     const beforeCtx: AtomBeforeContext = {
       state,
-      atom,
+      atom: current,
       ownerId: h.ownerId,
       frame,
       params: (frame.params ?? {}) as Record<string, Json>,
     };
-    await h.handler(beforeCtx);
+    const result = await h.handler(beforeCtx);
+    if (result === undefined) continue;             // void = pass(向后兼容)
+    if (result.kind === 'cancel') { cancelled = true; break; }
+    if (result.kind === 'modify') { current = result.atom; }  // 后续 hook + validate + apply 用新值
   }
 
-  if (state._dropNext) {
+  if (cancelled) {
     state.atomStack.pop();
-    state._dropNext = false;
+    // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消")
+    pushNotify(state, { skillId: '', eventType: 'atomCancelled', data: { atomType: atom.type } });
     return;
   }
 
-  const def = getAtomDef(atom.type);
-  const error = def.validate(state, atom);
+  const def = getAtomDef(current.type);
+  const error = def.validate(state, current);
   if (error !== null) {
     state.atomStack.pop();
     return;
   }
 
   // toViewEvents 必须在 apply 之前调用——此时 state 尚未变更
-  const viewEvents = resolveViewEvents(state, atom);
+  const viewEvents = resolveViewEvents(state, current);
 
-  applyAtomImpl(state, atom);
+  applyAtomImpl(state, current);
 
-  pushEvent({ kind: 'atom', atom, viewEvents });
+  pushEvent({ kind: 'atom', atom: current, viewEvents });
 
-  if (atom.type === '判定') {
-    moveJudgeCardToZone(state, atom);
+  if (current.type === '判定') {
+    moveJudgeCardToZone(state, current);
   }
+
 
   // 技能生命周期:添加技能/移除技能 atom apply 后,同步注册/卸载 skill 实例。
   // 与 判定 同属"引擎管理的 atom 特殊处理"(技能生命周期是引擎职责,不是 atom 自身职责)。
   // apply 是同步的(只改 player.skills 列表),实例化涉及动态 import 故在此异步补注册。
-  if (atom.type === '添加技能') {
-    await instantiateSkill(atom.skillId, atom.player);
-  } else if (atom.type === '移除技能') {
-    unloadSkillInstance(atom.skillId, atom.player);
+  if (current.type === '添加技能') {
+    await instantiateSkill(current.skillId, current.player);
+  } else if (current.type === '移除技能') {
+    unloadSkillInstance(current.skillId, current.player);
   }
 
-  const afterHooks = getAfterHooks(atom.type);
+  const afterHooks = getAfterHooks(current.type);
   for (const h of afterHooks) {
     const curFrame = topFrame(state) ?? emptyFrame();
     const afterCtx: AtomAfterContext = {
       state,
-      atom,
+      atom: current,
       ownerId: h.ownerId,
       frame: curFrame,
       params: (curFrame.params ?? {}) as Record<string, Json>,
@@ -454,8 +444,8 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   state.atomStack.pop();
 
-  if (atom.type === '判定') {
-    cleanupJudgeZone(state, atom);
+  if (current.type === '判定') {
+    cleanupJudgeZone(state, current);
   }
 
   if (def.pending) {
@@ -470,10 +460,10 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
         resolve();
       };
       const slot: PendingSlot = {
-        atom,
+        atom: current,
         definition: def,
-        startTime: Date.now(),
-        deadline: Date.now() + timeoutMs,
+        startTime: Date.now() - state.startedAt,
+        deadline: Date.now() - state.startedAt + timeoutMs,
         resolve: safeResolve,
       };
       if (state.pendingSlot) {

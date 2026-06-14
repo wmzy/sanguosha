@@ -150,56 +150,60 @@ interface Skill {
 
 技能 `onInit(skill, ownerId)` 中直接 import 并调用顶层函数注册 action 和钩子。没有 `BackendAPI` / `EngineApi` 闭包对象——`state` 和 `ownerId` 通过参数和闭包传递：
 
+
 ```ts
 // 从 skill.ts import
 import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
 // 从 create-engine.ts import
-import { applyAtom, pushFrame, popFrame, topFrame, dropAtom, pushNotify } from '../create-engine';
+import { applyAtom, pushFrame, popFrame, topFrame, pushNotify } from '../create-engine';
 
-// 注册 action。当客户端触发匹配 skillId 和 actionType 时，execute 被调用。
-// validate 不通过 → 静默丢弃，不记入 action 日志。返回卸载函数。
+// 注册 action。当客户端触发匹配 skillId 和 actionType 时,execute 被调用。
+// validate 不通过 → 静默丢弃,不记入 action 日志。返回卸载函数。
 registerAction(
   skillId: string,
-  ownerId: string,
+  ownerId: number,   // 座次下标
   actionType: string,
-  /** 校验参数合法性。返回 null = 合法。state 由 dispatch 传入 */
   validate: (state: GameState, params: Record<string, Json>) => string | null,
-  /** 执行。async 函数。state 由 dispatch 传入 */
   execute: (state: GameState, params: Record<string, Json>) => Promise<void>,
 ): () => void;
 
 // 注册 atom apply 前钩子。在 atom 压栈后、validate 前调用。
 // 可以 await applyAtom(state, 其他 atom) 嵌套副作用。
-// 钩子中可调 dropAtom(state) 跳过当前 atom 的 validate/apply（仅限 before 钩子）。
+// before 钩子返回 HookResult 干预当前 atom(pass/modify/cancel),见 §4.5。
 registerBeforeHook(
   skillId: string,
-  ownerId: string,
+  ownerId: number,
   atomType: string,
-  handler: (ctx: AtomBeforeContext) => Promise<void>,
+  handler: (ctx: AtomBeforeContext) => Promise<HookResult | void>,  // void = pass
 ): () => void;
 
 // 注册 atom apply 后钩子。可以 await applyAtom(state, 其他 atom) 嵌套副作用。
-// 钩子间通过 state 观察(zones/tags/marks/localVars)通信。
+// after 钩子是纯副作用,不能 modify/cancel(事件已发生)。
 registerAfterHook(
   skillId: string,
-  ownerId: string,
+  ownerId: number,
   atomType: string,
   handler: (ctx: AtomAfterContext) => Promise<void>,
 ): () => void;
 
-// 应用一个 atom，走完整 pipeline(before hooks → validate → apply → after hooks → pending)
+// 应用一个 atom,走完整 pipeline(before hooks 折叠 → validate → apply → after hooks → pending)
 applyAtom(state: GameState, atom: Atom): Promise<void>;
 
 // 帧管理
-pushFrame(state: GameState, skillId: string, from: string, params?: Record<string, Json>): SettlementFrame;
+pushFrame(state: GameState, skillId: string, from: number, params?: Record<string, Json>): SettlementFrame;
 popFrame(state: GameState): void;
 topFrame(state: GameState): SettlementFrame | undefined;
 
-// before 钩子中跳过当前 atom 的 validate/apply
-dropAtom(state: GameState): void;
-
 // 往前端事件流插入通知事件(不改变状态)
 pushNotify(state: GameState, event: NotifyEvent): void;
+```
+
+**HookResult**(before 钩子返回值,干预当前 atom):
+```ts
+type HookResult =
+  | { kind: 'pass' }                              // 不干预(默认;返回 void 也视为 pass)
+  | { kind: 'modify'; atom: Atom }                // 修改参数,管线用新 atom 继续(叠加生效,座次序)
+  | { kind: 'cancel' };                           // 取消当前 atom(不进入 validate/apply/after;推 notify 事件)
 ```
 
 ### 4.3 结算帧与结算区栈
@@ -325,11 +329,13 @@ applyAtom(state, 询问闪):
 
 ### 4.5 Atom 钩子
 
-Atom 钩子挂载在 atom 类型上,在 `applyAtom(state, atom)` 流程中触发(§6.1)。所有匹配的钩子都执行。
+Atom 钩子挂载在 atom 类型上,在 `applyAtom(state, atom)` 流程中触发(§6.1)。before 钩子按注册顺序(座次序)依次跑,可叠加 modify。
 
 **before 钩子**——在 atom 压栈后、真正应用前执行。可以:
 - **应用新 atom**: 通过 `await applyAtom(ctx.state, ...)` 插入新的状态变更(等待型也行,见 §4.4 嵌套例)
-- **跳过当前 atom**: 通过 `dropAtom(ctx.state)` 跳过 validate/apply(仅限 6 个防具/武器技能)
+- **修改当前 atom**: 返回 `{ kind: 'modify', atom: 修改后的atom }`,管线用新 atom 继续;后续 before 钩子收到修改后的值(藤甲 -1 后白银狮子看到减过的伤害,叠加生效)
+- **取消当前 atom**: 返回 `{ kind: 'cancel' }`,atom 不进入 validate/apply/after;管线推一个 notify 事件让前端感知(仁王盾黑杀无效、寒冰剑改为弃牌)。cancel 后后续 before 钩子不再跑
+- **不干预**: 返回 `{ kind: 'pass' }` 或 `void`(默认)
 
 ```ts
 interface AtomBeforeContext {
@@ -1219,9 +1225,10 @@ for (const event of viewEvents) {
 当技能代码调用 `await applyAtom(state, atom)` 时，**所有 atom 走同一条路径**——无论是否等待型：
 
 1. **压栈**：atom 压入当前帧的 atom 栈
-2. **onBefore hooks**：所有注册了该 `atomType` 的 `onAtomBefore` 钩子按优先级串行执行（async）
+2. **onBefore hooks**(折叠语义):所有注册了该 `atomType` 的 before 钩子按注册顺序(座次序)串行执行(async)
    - 钩子可以 `await applyAtom(ctx.state, 新atom)` 形成嵌套(包括嵌套等待型 atom)
-   - **钩子不能取消当前 atom**——`drop()` 机制已移除,所有 before hooks 跑完后必然进入 validate/apply
+   - 钩子返回 `HookResult`:`pass`(默认)/`modify`(修改参数,后续钩子看到新值,叠加)/`cancel`(终止,atom 不进入 validate/apply/after,推 notify)
+   - `cancel` 后后续 before 钩子不再跑;`modify` 叠加(藤甲 -1 → 白银狮子看到减过的伤害)
 3. **validate**：`AtomDefinition.validate(state, atom)` → 不合法则跳过，Promise resolve
 4. **生成视图事件**：调用 `AtomDefinition.toViewEvents(state, atom)` 生成分叉视图事件 → 推入前端事件流。
    - ⚠️ **在 apply 之前**——此时 state 尚未变更，可以读取即将被消费的数据（如牌堆顶的牌面信息）
@@ -1670,12 +1677,12 @@ src/server/
 | `成为目标` atom | 被统一为 `指定目标` atom（视角通过钩子条件区分） |
 | `解决`/`出牌` atom | 技能内部流程步骤，不是独立游戏事件 |
 | `杀命中`/`杀被闪避` atom | 杀技能内部结果分支，通过结算帧 params 判断 |
-| `AtomResult` 类型 | `apply` 不返回值，结算通过帧 params |
-| `AtomHookContext` | 拆分为 `AtomBeforeContext`（可 dropAtom）和 `AtomAfterContext` |
-| `ActionContext` | 改为 `SettlementFrame`（结算帧），含处理区 cards |
+| `AtomHookContext` | 拆分为 `AtomBeforeContext`(可返回 HookResult)和 `AtomAfterContext`(纯副作用) |
+| `ActionContext` | 改为 `SettlementFrame`(结算帧) |
 | `requestStack` | 合并进 `SettlementFrame.pendingRequest` |
 | `actionStack` | 改为 `settlementStack` |
-| `setResult` / `cancel` | 统一为 `drop()` + `modifyParams()` |
+| `setResult` / `cancel` / `dropAtom` / `ctx.drop()` | 统一为 `HookResult`(`pass`/`modify`/`cancel`),before 钩子返回值 |
+
 | `atom.result` 字段 | atom 不携带结果，结算全看帧 params |
 | `modifyParams` API | 已删除——frame.params 只读,跨 atom 通信走 state 观察(zones/tags/marks/localVars) |
 | `ctx.drop()` | 改为 `dropAtom(state)`——仅在 before 钩子中可用,跳过当前 atom 的 validate/apply |

@@ -42,7 +42,7 @@ import type { GameState, FrontendAPI, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -51,14 +51,14 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      if (typeof params.target !== 'string') return 'target required';
+      if (typeof params.target !== 'number') return 'target required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
-      const target = params.target as string;
+      const target = params.target as number;
       const frame = pushFrame(state, '激将', from, { ...params });
       // ─── Promise-based 续跑 ───
       await applyAtom(state, {
@@ -71,8 +71,8 @@ export function onInit(_skill: Skill, ownerId: string): () => void {
       const responded = frame.params.__激将回应 as boolean | undefined;
       if (responded) {
         // 目标出杀:把目标的杀效果委托到杀技能
-        const killTarget = frame.params.__激将杀目标 as string | undefined;
-        if (killTarget) {
+        const killTarget = frame.params.__激将杀目标 as number | undefined;
+        if (killTarget !== undefined) {
           await applyAtom(state, { type: '指定目标', source: target, target: killTarget });
           await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
         }

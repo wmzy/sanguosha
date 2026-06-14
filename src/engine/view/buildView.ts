@@ -39,9 +39,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         : slot.atom.type === '询问杀'
         ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
         : { type: 'confirm' as const, title: '请回应' });
-    const target = 'target' in slot.atom && typeof slot.atom.target === 'string'
+    const target = 'target' in slot.atom && typeof slot.atom.target === 'number'
       ? slot.atom.target
-      : '';
+      : -1;
     pending = {
       type: 'awaits',
       atom: slot.atom,
@@ -63,6 +63,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     phase: state.phase,
     turn: state.turn,
     players: state.players.map((p, i) => ({
+      index: i,
       name: p.name,
       character: p.character,
       health: p.health,

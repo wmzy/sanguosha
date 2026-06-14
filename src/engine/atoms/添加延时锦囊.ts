@@ -3,15 +3,14 @@
 import type { AtomDefinition, PendingTrick } from '../types';
 import { registerAtom } from '../atom';
 
-export const 添加延时锦囊: AtomDefinition<{ player: string; trick: PendingTrick }> = {
+export const 添加延时锦囊: AtomDefinition<{ player: number; trick: PendingTrick }> = {
   type: '添加延时锦囊',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
   apply(state, atom) {
-    const pIdx = state.players.findIndex(p => p.name === atom.player);
-    const player = state.players[pIdx];
+    const player = state.players[atom.player];
     if (player.pendingTricks.some(t => t.name === atom.trick.name)) return;
     player.pendingTricks.push(atom.trick);
   },

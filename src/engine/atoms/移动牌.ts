@@ -11,10 +11,8 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
   apply(state, atom) {
     // from
     if (atom.from.zone === '手牌') {
-      const pIdx = state.players.findIndex(p => p.name === (atom.from as { zone: '手牌'; player: string }).player);
-      if (pIdx >= 0) {
-        state.players[pIdx].hand = state.players[pIdx].hand.filter(id => id !== atom.cardId);
-      }
+      const fromP = atom.from as { zone: '手牌'; player: number };
+      state.players[fromP.player].hand = state.players[fromP.player].hand.filter(id => id !== atom.cardId);
     } else if (atom.from.zone === '牌堆') {
       state.zones.deck = state.zones.deck.filter(id => id !== atom.cardId);
     } else if (atom.from.zone === '弃牌堆') {
@@ -25,10 +23,8 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
 
     // to
     if (atom.to.zone === '手牌') {
-      const pIdx = state.players.findIndex(p => p.name === (atom.to as { zone: '手牌'; player: string }).player);
-      if (pIdx >= 0) {
-        state.players[pIdx].hand.push(atom.cardId);
-      }
+      const toP = atom.to as { zone: '手牌'; player: number };
+      state.players[toP.player].hand.push(atom.cardId);
     } else if (atom.to.zone === '牌堆') {
       state.zones.deck.push(atom.cardId);
     } else if (atom.to.zone === '弃牌堆') {
@@ -43,8 +39,8 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
   toViewEvents(state, atom): ViewEventSplit {
     const card: Card | undefined = state.cardMap[atom.cardId];
     const cardInfo = card ? { name: card.name, suit: card.suit, rank: card.rank } : null;
-    const fromPlayer = atom.from.zone === '手牌' ? (atom.from as { zone: '手牌'; player: string }).player : undefined;
-    const toPlayer = atom.to.zone === '手牌' ? (atom.to as { zone: '手牌'; player: string }).player : undefined;
+    const fromPlayer = atom.from.zone === '手牌' ? (atom.from as { zone: '手牌'; player: number }).player : undefined;
+    const toPlayer = atom.to.zone === '手牌' ? (atom.to as { zone: '手牌'; player: number }).player : undefined;
 
     // 弃牌堆目标 → 弃牌事件
     if (atom.to.zone === '弃牌堆' && fromPlayer && cardInfo) {
@@ -73,7 +69,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.name === (event.player as string));
+    const pi = view.players.findIndex(p => p.index === (event.player as number));
     if (pi < 0) return;
     switch (event.type) {
       case '弃牌':

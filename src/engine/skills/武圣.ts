@@ -44,7 +44,7 @@
 import type { AtomAfterContext, FrontendAPI, Skill } from '../types';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -70,7 +70,7 @@ function unwrap(state: { cardMap: Record<string, { name: string; suit: string; _
   delete card._wrapper;
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   // 杀的 action 路由自动处理 fromSkill='武圣' 的牌包装(后端校验)
   // 武圣自身不注册 action,只注册 after 钩子:牌离开处理区时还原
   registerAfterHook(skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {

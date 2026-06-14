@@ -32,30 +32,26 @@
 //      hook 自身依赖"装备换走后 hook 还在,只是 early return"的隐式正确。
 //      更稳健做法:依赖装备通用.ts 的 unloadSkillInstance 正确 unregisterHook。
 // ============================================================
-import type { AtomAfterContext, AtomBeforeContext, Skill } from '../types';
-import { applyAtom, dropAtom } from '../create-engine';
-import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
+import type { AtomBeforeContext, Skill } from '../types';
+import { registerBeforeHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '白银狮子', description: '防具:每次受伤最多1点' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
-  // 受到伤害时:如果 amount > 1,替换为 amount = 1
-  // 实现:通过标记让造成伤害后判断(简化:用 before 钩子 drop 原始伤害并 apply 修正后的)
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { target?: string; amount?: number; source?: string; cardId?: string };
+export function onInit(_skill: Skill, ownerId: number): () => void {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+    const atom = ctx.atom as { target?: number; amount?: number; source?: number; cardId?: string };
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 1) return;
     // 检查是否装备了白银狮子
-    const me = ctx.state.players.find(p => p.name === ownerId);
+    const me = ctx.state.players[ownerId];
     const armorId = me?.equipment?.['防具'];
     if (!armorId) return;
     const card = ctx.state.cardMap[armorId];
     if (card?.name !== '白银狮子') return;
-    // drop 原始伤害,apply 修正后的(最多1点)
-    dropAtom(ctx.state);
-    await applyAtom(ctx.state, { type: '造成伤害', target: atom.target!, amount: 1, source: atom.source ?? '', cardId: atom.cardId });
+    // 伤害上限 1
+    return { kind: 'modify', atom: { ...ctx.atom, amount: 1 } as typeof ctx.atom };
   });
   return () => {};
 }

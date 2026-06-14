@@ -47,7 +47,7 @@ import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -56,16 +56,16 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerAfterHook(skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: string; target?: string; cardId?: string };
+    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
     // 只在被指定为杀的目标时触发
     if (atom.target !== ownerId) return;
     // 检查是否有手牌可以弃
-    const selfPlayer = ctx.state.players.find(p => p.name === ownerId);
+    const selfPlayer = ctx.state.players[ownerId];
     if (!selfPlayer || selfPlayer.hand.length === 0) return;
     // 检查攻击范围内是否有其他角色(简化:排除自己和已死亡)
-    const aliveOthers = ctx.state.players.filter(p => p.name !== ownerId && p.alive);
+    const aliveOthers = ctx.state.players.filter(p => p.index !== ownerId && p.alive);
     if (aliveOthers.length === 0) return;
     // 询问是否发动
     await applyAtom(ctx.state, {
@@ -93,13 +93,13 @@ export function onInit(skill: Skill, ownerId: string): () => void {
       },
       timeout: 15000,
     });
-    const newTarget = ctx.params.__流离目标 as string | undefined;
-    if (!newTarget || newTarget === ownerId) return;
+    const newTarget = ctx.params.__流离目标 as number | undefined;
+    if (newTarget === undefined || newTarget === ownerId) return;
     // 弃 1 张牌(让玩家选择,简化:弃手牌第一张)
     const discardCard = selfPlayer.hand[0];
     await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCard] });
     // 修改 settlement 中的目标
-    const settlement = ctx.params.settlement as Array<{ target: string; dodged: boolean; amount: number }> | undefined;
+    const settlement = ctx.params.settlement as Array<{ target: number; dodged: boolean; amount: number }> | undefined;
     if (settlement) {
       const item = settlement.find(s => s.target === ownerId);
       if (item) {

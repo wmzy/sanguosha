@@ -3,15 +3,14 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 去标签: AtomDefinition<{ player: string; tag: string }> = {
+export const 去标签: AtomDefinition<{ player: number; tag: string }> = {
   type: '去标签',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
   apply(state, atom) {
-    const pIdx = state.players.findIndex(p => p.name === atom.player);
-    state.players[pIdx].marks = state.players[pIdx].marks.filter(m => m.id !== `tag:${atom.tag}`);
+    state.players[atom.player].marks = state.players[atom.player].marks.filter(m => m.id !== `tag:${atom.tag}`);
   },
 };
 

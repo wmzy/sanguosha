@@ -33,22 +33,22 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '万箭齐发', description: '对所有其他角色使用,每名目标需出闪,否则受 1 点伤害' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const cardId = params.cardId as string;
       const frame = pushFrame(state, '万箭齐发', from, { ...params });
 
       // 初始化 settlement:所有其他存活角色
-      const targets = state.players.filter(p => p.name !== from && p.alive).map(p => p.name);
+      const targets = state.players.filter(p => p.index !== from && p.alive).map(p => p.index);
       const settlement = targets.map(t => ({ target: t, dodged: false }));
       frame.params.settlement = settlement;
 
@@ -67,7 +67,7 @@ export function onInit(_skill: Skill, ownerId: string): () => void {
       }
 
       // 对未闪避者造成伤害
-      const settled = frame.params.settlement as Array<{ target: string; dodged: boolean }>;
+      const settled = frame.params.settlement as Array<{ target: number; dodged: boolean }>;
       for (const item of settled) {
         if (!item.dodged) {
           await applyAtom(state, { type: '造成伤害', target: item.target, amount: 1, source: from });

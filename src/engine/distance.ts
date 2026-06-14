@@ -17,24 +17,24 @@ function seatDist(aliveCount: number, fromIdx: number, toIdx: number): number {
 }
 
 /** 两人之间的实际距离 */
-export function effectiveDistance(state: GameState, from: string, to: string): number {
+export function effectiveDistance(state: GameState, from: number, to: number): number {
   const alive = state.players.filter(p => p.alive);
-  const aliveFrom = alive.findIndex(p => p.name === from);
-  const aliveTo = alive.findIndex(p => p.name === to);
+  const aliveFrom = alive.findIndex(p => p.index === from);
+  const aliveTo = alive.findIndex(p => p.index === to);
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   let dist = seatDist(alive.length, aliveFrom, aliveTo);
   // 进攻马:缩短距离
-  const fromPlayer = state.players.find(p => p.name === from);
+  const fromPlayer = state.players[from];
   if (fromPlayer?.equipment?.['进攻马']) dist -= 1;
   // 防御马:增加距离
-  const toPlayer = state.players.find(p => p.name === to);
+  const toPlayer = state.players[to];
   if (toPlayer?.equipment?.['防御马']) dist += 1;
   return Math.max(1, dist);
 }
 
 /** 是否在攻击范围内 */
-export function inAttackRange(state: GameState, from: string, to: string): boolean {
-  const fromPlayer = state.players.find(p => p.name === from);
+export function inAttackRange(state: GameState, from: number, to: number): boolean {
+  const fromPlayer = state.players[from];
   let range = 1;
   if (fromPlayer?.equipment?.['武器']) {
     const weapon = state.cardMap[fromPlayer.equipment['武器']];

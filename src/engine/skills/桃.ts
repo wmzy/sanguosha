@@ -34,21 +34,21 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '桃', description: '出牌阶段对自己使用,回复 1 体力(濒死时可对任何濒死角色使用)' };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      const target = (params.target ?? (params.targets as string[] | undefined)?.[0]) as string | undefined;
-      if (!target) return 'target required';
+      const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined;
+      if (typeof target !== 'number') return 'target required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const frame = pushFrame(state, '桃', from, { ...params });
       const cardId = params.cardId as string;
-      const target = (params.target ?? (params.targets as string[] | undefined)?.[0]) as string;
+      const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number;
       await applyAtom(state, {
         type: '移动牌',
         cardId,

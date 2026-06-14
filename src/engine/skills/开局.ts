@@ -2,7 +2,6 @@
 // ============================================================
 // 技能描述(系统级):
 //   开局流程,由 create-engine.bootstrap() 在游戏开始时调用 onInit 注册。
-//   非玩家技能,owner='系统'(占位符)。
 //
 // 关键原子操作(start action):
 //   抽身份 → 选将 → 初始化洗牌 → 发牌(lordBonus=1) → 回合开始(主公) → 阶段开始(主公,准备)
@@ -12,11 +11,9 @@
 //   - 唯一由"系统"ownerId 触发的 action,客户端永远不发此消息
 //
 // 已知问题/不完整实现:
-//   1. **system ownerId 占位符易冲突**:`SYSTEM_OWNER = '系统'`,
-//      若有玩家昵称叫"系统"会与 dispatch 路由冲突——应使用不可冲突的保留前缀(如 '__system__')。
+//   1. **system ownerId 占位符已改为 -1**(座次下标,不对应任何玩家槽位)。
 //   2. **主公定位脆弱**:第 67 行通过 `vars.身份 === '主公'` 找主公,
 //      若"抽身份" atom 实现没写入 vars.身份(项目可能改名为 '主公标志' 或别的 key),
-//      lord 为 undefined → 首回合根本不会启动(无错误提示,游戏卡住)。
 //   3. **选将不交互**:`选将` atom 直接传入 characters 配置,
 //      标准三国杀身份局是"主公先选,反贼/忠臣再选"的多轮交互;
 //      当前是一次性分配,缺玩家选择 UI。
@@ -37,11 +34,11 @@ import {
 } from '../skill';
 
 /**
- * system 命名空间占位 ownerId。
+ * system 命名空间占位 ownerId(座次下标 -1,不对应任何玩家槽位)。
  * 客户端永远不发这个值(WS handler 注入的 ownerId 是绑定玩家名),
  * engine 内部 dispatch 只在 bootstrap 路径用到它。
  */
-const SYSTEM_OWNER = '系统';
+const SYSTEM_OWNER = -1;
 
 /** 开局配置 */
 interface GameConfig {
@@ -55,7 +52,7 @@ interface GameConfig {
   handSize?: number;
 }
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -89,8 +86,8 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       // 5. 启动第一回合(从主公开始)
       const lord = state.players.find(p => p.vars.身份 === '主公');
       if (lord) {
-        await applyAtom(state, { type: '回合开始', player: lord.name });
-        await applyAtom(state, { type: '阶段开始', player: lord.name, phase: '准备' });
+        await applyAtom(state, { type: '回合开始', player: lord.index });
+        await applyAtom(state, { type: '阶段开始', player: lord.index, phase: '准备' });
       }
     },
   };

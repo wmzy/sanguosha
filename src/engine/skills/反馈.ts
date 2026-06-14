@@ -41,7 +41,7 @@ import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -50,14 +50,14 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: string; source?: string; amount?: number };
+    const atom = ctx.atom as { target?: number; source?: number; amount?: number };
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
-    if (!atom.source) return;
+    if (atom.source === undefined) return;
     // 检查来源是否有牌
-    const sourcePlayer = ctx.state.players.find(p => p.name === atom.source);
+    const sourcePlayer = ctx.state.players[atom.source];
     if (!sourcePlayer) return;
     const hasCards = sourcePlayer.hand.length > 0 || Object.keys(sourcePlayer.equipment).length > 0;
     if (!hasCards) return;
@@ -73,7 +73,7 @@ export function onInit(skill: Skill, ownerId: string): () => void {
     const confirmed = ctx.params.__反馈confirmed as boolean | undefined;
     if (!confirmed) return;
     // 获得来源的一张牌(简化:取手牌第一张,优先手牌)
-    const source = ctx.state.players.find(p => p.name === atom.source);
+    const source = ctx.state.players[atom.source];
     if (!source) return;
     let cardId: string | undefined;
     if (source.hand.length > 0) {

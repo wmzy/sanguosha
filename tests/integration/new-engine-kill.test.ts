@@ -63,8 +63,8 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     await dispatch(state, {
       skillId: '杀',
       actionType: 'use',
-      ownerId: 'P1',
-      params: { cardId: 'c1', targets: ['P2'] },
+      ownerId: 0,
+      params: { cardId: 'c1', targets: [1] },
       baseSeq: 0,
     });
     const mid = state;
@@ -75,9 +75,8 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     await dispatch(state, {
       skillId: '闪',
       actionType: 'respond',
-      ownerId: 'P2',
+      ownerId: 1,
       params: {},
-      baseSeq: 1,
     });
     const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
@@ -88,13 +87,12 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
   it('出杀:limit 验证 — 同回合第二次出杀应被拒绝', async () => {
     // 第一步:出杀
     await dispatch(state, {
-      skillId: '杀', actionType: 'use', ownerId: 'P1',
-      params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
+      skillId: '杀', actionType: 'use', ownerId: 0,
+      params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
     // 第二步:P2 不出闪 → 结算
     await dispatch(state, {
-      skillId: '闪', actionType: 'respond', ownerId: 'P2',
-      params: {}, baseSeq: 1,
+      skillId: '闪', actionType: 'respond', ownerId: 1, params: {},
     });
     // 准备第二张杀
     const c2: Card = { id: 'c2', name: '杀', suit: '♠', rank: '2', type: '基本牌' };
@@ -105,8 +103,8 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     await rebootstrap(state);
 
     await dispatch(state, {
-      skillId: '杀', actionType: 'use', ownerId: 'P1',
-      params: { cardId: 'c2', targets: ['P2'] }, baseSeq: 2,
+      skillId: '杀', actionType: 'use', ownerId: 0,
+      params: { cardId: 'c2', targets: [1] }, baseSeq: 2,
     });
     const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
@@ -115,8 +113,8 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
   it('未注册的 action:静默丢弃', async () => {
     const beforeSeq = state.seq;
     await dispatch(state, {
-      skillId: '不存在的 skill', actionType: 'use', ownerId: 'P1',
-      params: { cardId: 'c1', targets: ['P2'] }, baseSeq: 0,
+      skillId: '不存在的 skill', actionType: 'use', ownerId: 0,
+      params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
     // 未注册的 action:dispatch 返回 {}(静默丢弃),state 不变
     expect(state.seq).toBe(beforeSeq);

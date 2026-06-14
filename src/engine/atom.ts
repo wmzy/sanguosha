@@ -44,7 +44,7 @@ export function resolveViewEvents(
     event.type === atom.type ? event : { ...event, atomType: atom.type };
 
   if (explicit) {
-    const ownerViews = new Map<string, ViewEvent | null>();
+    const ownerViews = new Map<number, ViewEvent | null>();
     for (const [player, evt] of explicit.ownerViews) {
       ownerViews.set(player, evt ? ensureAtomType(evt) : null);
     }
@@ -56,7 +56,7 @@ export function resolveViewEvents(
 
   // Fallback：构造一个带 effect 的视图事件，所有人看到相同内容
   const effect: AtomEffect | undefined = def.effect;
-  const viewEvent: ViewEvent = { ...atom, ...(effect ? { effect } : {}) };
+  const viewEvent = { ...atom, ...(effect ? { effect } : {}) } as ViewEvent;
   return {
     ownerViews: new Map(),
     othersView: viewEvent,

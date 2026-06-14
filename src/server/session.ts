@@ -35,7 +35,7 @@ export class GameSession {
   private actionLog: ActionLogEntry[] = [];
   private room: Room;
   private debug: boolean;
-  private playerNames = new Map<string, string>();
+  private playerNames = new Map<string, number>();
   private disconnectedAt = new Map<string, number>();
   private graceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastActivityAt = Date.now();
@@ -80,21 +80,21 @@ export class GameSession {
       gameId: this.room.id,
     };
     this.state = create(config);
-    await bootstrap(this.state);
+    await bootstrap(this.state, config);
 
-    // 建立 playerId → playerName 映射
+    // 建立 playerId → 座次下标 映射
     const state = this.state;
     if (this.debug) {
       const playerId = this.room.players.keys().next().value;
       if (!playerId) return false;
-      for (const player of state.players) {
-        this.playerNames.set(`${playerId}:${player.name}`, player.name);
+      for (let i = 0; i < state.players.length; i++) {
+        this.playerNames.set(`${playerId}:${state.players[i].name}`, state.players[i].index);
       }
-      this.playerNames.set(playerId, state.players[0].name);
+      this.playerNames.set(playerId, state.players[0].index);
     } else {
       const playerIds = [...this.room.players.keys()];
       for (let i = 0; i < playerIds.length && i < state.players.length; i++) {
-        this.playerNames.set(playerIds[i], state.players[i].name);
+        this.playerNames.set(playerIds[i], state.players[i].index);
       }
     }
 
@@ -116,10 +116,10 @@ export class GameSession {
     if (this.destroyed || !this.state) return;
     // debug 模式:允许以任意角色名发 action
     // 非 debug 模式:校验 ownerId 必须匹配预期玩家
-    const expectedName = this.playerNames.get(playerId);
-    if (!expectedName && !this.debug) return;
-    if (!this.debug && action.ownerId !== expectedName) {
-      this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedName });
+    const expectedIndex = this.playerNames.get(playerId);
+    if (expectedIndex === undefined && !this.debug) return;
+    if (!this.debug && action.ownerId !== expectedIndex) {
+      this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedIndex });
       return;
     }
     // CAS 校验:baseSeq 不匹配则静默丢弃
@@ -148,9 +148,9 @@ export class GameSession {
     this.resetIdleTimer();
   }
 
-  private handleGameOver(winner?: string): void {
+  private handleGameOver(winner?: number): void {
     setRoomStatus(this.room.id, '已结束');
-    this.broadcast({ type: 'gameOver', winner: winner ?? '无人' });
+    this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
   }
 
 
@@ -166,10 +166,9 @@ export class GameSession {
       return;
     }
     const state = this.state;
-    for (const [playerId, playerName] of this.playerNames) {
-      const playerIdx = state.players.findIndex(p => p.name === playerName);
-      if (playerIdx < 0) continue;
-      const view = buildView(state, playerIdx);
+    for (const [playerId, playerIndex] of this.playerNames) {
+      if (playerIndex < 0 || playerIndex >= state.players.length) continue;
+      const view = buildView(state, playerIndex);
       this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
     }
   }
@@ -208,7 +207,11 @@ export class GameSession {
     this.graceTimer = null;
     const still = [...this.disconnectedAt.keys()];
     if (still.length === 0) return;
-    const names = still.map(id => this.playerNames.get(id) ?? id).join('、');
+    const state = this.state;
+    const names = still.map(id => {
+      const idx = this.playerNames.get(id);
+      return idx !== undefined ? (state?.players[idx]?.name ?? id) : id;
+    }).join('、');
     setRoomStatus(this.room.id, '已结束');
     this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
     this.broadcast({ type: 'gameOver', winner: '无人' });
@@ -224,12 +227,11 @@ export class GameSession {
       const state = this.state;
       this.sendDebugGameState(playerId, state.seq);
     } else {
-      const playerName = this.playerNames.get(playerId);
-      if (playerName) {
+      const playerIndex = this.playerNames.get(playerId);
+      if (playerIndex !== undefined && playerIndex >= 0) {
         const state = this.state;
-        const playerIdx = state.players.findIndex(p => p.name === playerName);
-        if (playerIdx >= 0) {
-          const view = buildView(state, playerIdx);
+        if (playerIndex < state.players.length) {
+          const view = buildView(state, playerIndex);
           this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
         }
       }
@@ -251,7 +253,7 @@ export class GameSession {
     return this.lastActivityAt;
   }
 
-  getPlayerName(playerId: string): string | undefined {
+  getPlayerName(playerId: string): number | undefined {
     return this.playerNames.get(playerId);
   }
 
@@ -289,7 +291,7 @@ export class GameSession {
       await dispatch(this.state, {
         skillId: '回合管理',
         actionType: 'end',
-        ownerId: currentPlayer.name,
+        ownerId: currentPlayer.index,
         params: {},
         baseSeq: seq,
       });

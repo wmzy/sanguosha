@@ -40,7 +40,7 @@ export interface Mark {
 
 export interface PendingTrick {
   name: string;
-  source: string;
+  source: number;
   card: Card;
 }
 
@@ -88,11 +88,7 @@ export interface GameState {
   seq: number;
   startedAt: number;
   actionLog: ActionLogEntry[];
-  /**
-   * 内部 drop 标志(由 engine-api 内部使用):applyAtom 进入时重置为 false,
-   * 仅供 6 个防具/武器 skill 调整伤害用,新代码不应使用。
-   */
-  _dropNext?: boolean;
+
   /** 内部:当前活跃的 execute Promise(仅调试/诊断用,引擎核心逻辑不读取)。
    *  stable-wait 重构前回应路径曾 await 它;现已被 _waitForStable 取代,保留供调试器检视。 */
   _activeExecuteP?: Promise<void>;
@@ -154,7 +150,7 @@ export interface CardFilter {
 export interface TargetFilter {
   min: number;
   max: number;
-  filter?: (view: GameView, target: string) => boolean;
+  filter?: (view: GameView, target: number) => boolean;
 }
 
 export interface UseCardPrompt {
@@ -197,7 +193,7 @@ export interface ChoosePlayerPrompt {
   description?: string;
   min: number;
   max: number;
-  filter?: (view: GameView, target: string) => boolean;
+  filter?: (view: GameView, target: number) => boolean;
 }
 
 // ==================== Atom ====================
@@ -242,10 +238,10 @@ export interface ViewEvent {
   pending?: { startTime: number; deadline: number; prompt: ActionPrompt };
 }
 
-/** Per-player 视图分叉——toViewEvents 的返回值 */
+/** Per-player 视图分叉——toViewEvents 的返回值。key 是座次下标(引擎只认座次) */
 export interface ViewEventSplit {
   /** 指定玩家看到的专属视图事件。值为 null = 该玩家看不到此事件 */
-  ownerViews: ReadonlyMap<string, ViewEvent | null>;
+  ownerViews: ReadonlyMap<number, ViewEvent | null>;
   /** 其余玩家看到的通用视图事件。null = 其他人不感知此 atom */
   othersView: ViewEvent | null;
 }
@@ -253,63 +249,63 @@ export interface ViewEventSplit {
 export type ZoneLoc =
   | { zone: '牌堆' }
   | { zone: '弃牌堆' }
-  | { zone: '手牌'; player: string }
+  | { zone: '手牌'; player: number }
   | { zone: '处理区' };
 
 export type Atom =
   // 卡牌/资源
-  | { type: '摸牌'; player: string; count: number }
-  | { type: '弃置'; player: string; cardIds: string[] }
+  | { type: '摸牌'; player: number; count: number }
+  | { type: '弃置'; player: number; cardIds: string[] }
   | { type: '移动牌'; cardId: string; from: ZoneLoc; to: ZoneLoc }
-  | { type: '获得'; player: string; cardId: string; from?: string }
-  | { type: '给予'; cardId: string; from: string; to: string }
-  | { type: '抽牌'; player: string; cardId: string }
-  | { type: '装备'; player: string; cardId: string }
-  | { type: '卸下'; player: string; slot: EquipSlot }
+  | { type: '获得'; player: number; cardId: string; from?: number }
+  | { type: '给予'; cardId: string; from: number; to: number }
+  | { type: '抽牌'; player: number; cardId: string }
+  | { type: '装备'; player: number; cardId: string }
+  | { type: '卸下'; player: number; slot: EquipSlot }
   | { type: '洗牌' }
   | { type: '重洗' }
   | { type: '整理牌堆'; cards: string[] }
   // 角色状态
-  | { type: '造成伤害'; target: string; amount: number; source: string; cardId?: string }
-  | { type: '回复体力'; target: string; amount: number; source?: string }
-  | { type: '失去体力'; target: string; amount: number }
-  | { type: '击杀'; player: string }
-  | { type: '设上限'; player: string; amount: number }
+  | { type: '造成伤害'; target: number; amount: number; source: number; cardId?: string }
+  | { type: '回复体力'; target: number; amount: number; source?: number }
+  | { type: '失去体力'; target: number; amount: number }
+  | { type: '击杀'; player: number }
+  | { type: '设上限'; player: number; amount: number }
   // 标记/状态
-  | { type: '加标记'; player: string; mark: Mark }
-  | { type: '去标记'; player: string; markId: string }
-  | { type: '清过期标记'; player: string }
-  | { type: '设横置'; player: string; chained: boolean }
-  | { type: '加标签'; player: string; tag: string }
-  | { type: '去标签'; player: string; tag: string }
+  | { type: '加标记'; player: number; mark: Mark }
+  | { type: '去标记'; player: number; markId: string }
+  | { type: '清过期标记'; player: number }
+  | { type: '设横置'; player: number; chained: boolean }
+  | { type: '加标签'; player: number; tag: string }
+  | { type: '去标签'; player: number; tag: string }
   // 技能管理
-  | { type: '添加技能'; player: string; skillId: string }
-  | { type: '移除技能'; player: string; skillId: string }
+  | { type: '添加技能'; player: number; skillId: string }
+  | { type: '移除技能'; player: number; skillId: string }
   // 流程
-  | { type: '回合开始'; player: string }
-  | { type: '回合结束'; player: string }
-  | { type: '阶段开始'; player: string; phase: string }
-  | { type: '阶段结束'; player: string; phase: string }
+  | { type: '回合开始'; player: number }
+  | { type: '回合结束'; player: number }
+  | { type: '阶段开始'; player: number; phase: string }
+  | { type: '阶段结束'; player: number; phase: string }
   | { type: '设阶段'; phase: TurnPhase }
   | { type: '下一玩家' }
   // 目标
-  | { type: '指定目标'; source: string; cardId?: string; target: string }
+  | { type: '指定目标'; source: number; cardId?: string; target: number }
   // 判定
-  | { type: '添加延时锦囊'; player: string; trick: PendingTrick }
-  | { type: '移除延时锦囊'; player: string; trickName: string }
+  | { type: '添加延时锦囊'; player: number; trick: PendingTrick }
+  | { type: '移除延时锦囊'; player: number; trickName: string }
   // 拼点
-  | { type: '拼点'; initiator: string; target: string; initiatorCard: string; targetCard: string }
+  | { type: '拼点'; initiator: number; target: number; initiatorCard: string; targetCard: string }
   // 初始化
   | { type: '抽身份'; playerCount: number; seed: number }
   | { type: '选将'; characters: Array<{ name: string; skills: string[] }>; seed: number }
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number; lordBonus?: number }
-  | { type: '判定'; player: string; judgeType: string }
+  | { type: '判定'; player: number; judgeType: string }
   // 等待回应
   | { type: '无操作' }
-  | { type: '询问闪'; target: string; source: string }
-  | { type: '询问杀'; target: string; source: string }
-  | { type: '请求回应'; requestType: string; target: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
+  | { type: '询问闪'; target: number; source: number }
+  | { type: '询问杀'; target: number; source: number }
+  | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
   // 牌包装(武圣转化)
   | { type: '武圣包装'; cardId: string }
   | { type: '武圣还原'; cardId: string };
@@ -347,6 +343,7 @@ export interface GameView {
   phase: TurnPhase;
   turn: { round: number; phase: TurnPhase; vars: Record<string, Json> };
   players: {
+    index: number;
     name: string;
     character: string;
     health: number;
@@ -362,25 +359,36 @@ export interface GameView {
   pending: PendingView | null;
   /** 出牌/弃牌阶段的操作截止时间(独立于 pending) */
   turnDeadline: number | null;
-  log: { time: number; player: string; text: string }[];
+  log: { time: number; player: number; text: string }[];
 }
 
 /**
- * 引擎原子操作管线说明:详见 src/engine/engine-api.ts。
+ * 引擎原子操作管线说明:
  *
- * 新版"操作 gameState 的函数"全部为顶层 export,skill 通过 import 直接调用,
+ * "操作 gameState 的函数"全部为顶层 export,skill 通过 import 直接调用,
  * 参数显式传 state + 调用参数。例如:`applyAtom(state, atom)` / `pushFrame(state, ...)`。
- *
- * **EngineApi(旧闭包接口)保留** —— 仅为兼容少数 system skill(如 开局)使用。
- * 新代码请直接 import 顶层函数,不要创建 EngineApi 实例。
  */
+
+/**
+ * before 钩子对当前 atom 的干预结果。
+ * - pass:不干预,管线继续(默认;返回 void 也视为 pass)
+ * - modify:修改 atom 参数,管线用新 atom 继续 validate/apply。后续 before 钩子收到修改后的 atom。
+ *   典型:藤甲减伤、护甲减伤、酒加伤——叠加生效(座次序)。
+ * - cancel:取消当前 atom,不进入 validate/apply/after hooks。
+ *   典型:仁王盾黑杀无效、寒冰剑改为弃牌。后续 before 钩子不再跑。
+ *   cancel 是确定性事件:管线推一个 notify 事件让前端感知(非静默)。
+ */
+export type HookResult =
+  | { kind: 'pass' }
+  | { kind: 'modify'; atom: Atom }
+  | { kind: 'cancel' };
 
 /** before 钩子上下文:atom 执行前调用 */
 export interface AtomBeforeContext {
   state: GameState;
   atom: Atom;
-  /** 钩子注册时的 ownerId(skill 实例的所属玩家) */
-  ownerId: string;
+  /** 钩子注册时的 ownerId(skill 实例的所属玩家,座次下标) */
+  ownerId: number;
   /** 当前结算帧(只读) */
   readonly frame: SettlementFrame;
   /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
@@ -390,42 +398,21 @@ export interface AtomBeforeContext {
 export interface AtomAfterContext {
   state: GameState;
   atom: Atom;
-  /** 钩子注册时的 ownerId(skill 实例的所属玩家) */
-  ownerId: string;
+  /** 钩子注册时的 ownerId(skill 实例的所属玩家,座次下标) */
+  ownerId: number;
   /** 当前结算帧(只读) */
   readonly frame: SettlementFrame;
   /** 当前结算帧 params 的只读快照(回应数据通过 dispatch 注入) */
   readonly params: Record<string, Json>;
 }
 
-/**
- * 旧版 EngineApi 对象(给 skill 传闭包,内部用 state 闭包变量)。仅供兼容 system skill 使用。
- * 新代码请直接 import 顶层函数:参见 src/engine/engine-api.ts。
- */
-export interface EngineApi {
-  /** 当前 GameState(只读引用) */
-  readonly state: GameState;
-  /** 技能 ownerId(per player instance) */
-  readonly self: string;
-  /** 当前消息 params(由 dispatch 注入;回应路径的 params 在消费 pending 后更新) */
-  readonly params: Record<string, Json>;
-  /** 创建帧并压入 settlementStack,返回帧引用 */
-  pushFrame(skillId: string, from: string, params?: Record<string, Json>): SettlementFrame;
-  /** 弹出栈顶帧 */
-  popFrame(): void;
-  /** 取栈顶帧 */
-  topFrame(): SettlementFrame | undefined;
-  /** 应用一个 atom。等待型 atom 的 Promise 会挂起直到回应/超时 */
-  apply(atom: Atom): Promise<void>;
-  /** 推送 notify 事件(不改变 state) */
-  notify(event: NotifyEvent): void;
-}
+
 
 // ==================== Skill ====================
 
 export interface Skill {
   id: string;
-  ownerId: string;
+  ownerId: number;
   name: string;
   description: string;
 }
@@ -435,7 +422,7 @@ export interface PendingView {
   type: 'awaits';
   atom: Atom;
   prompt: ActionPrompt;
-  target: string;
+  target: number;
   deadline: number;
 }
 
@@ -453,12 +440,10 @@ export interface PendingView {
  */
 export interface SettlementFrame {
   skillId: string;
-  from: string;
+  from: number;
   /** execute 本地初始参数(跨 atom 共享的配置,如 cardId/targets 列表)。
    *  pushFrame 时初始化一次。**原则上只读**——新代码不要 mutate。 */
   params: Record<string, Json>;
-  /** 处理区(此帧涉及的牌 ID 列表) */
-  cards: string[];
 }
 
 /** Pending 区——等待玩家操作的 slot */
@@ -477,7 +462,7 @@ export interface PendingSlot {
 export interface ClientMessage {
   skillId: string;
   actionType: string;
-  ownerId: string;
+  ownerId: number;
   params: Record<string, Json>;
   baseSeq: number;
 }
@@ -499,7 +484,7 @@ export interface ActionLogEntry {
 
 export interface ActionEntry {
   skillId: string;
-  ownerId: string;
+  ownerId: number;
   actionType: string;
   /**
    * 验证消息合法性:返回 null 表示通过,返回字符串为错误信息。
@@ -512,13 +497,13 @@ export interface ActionEntry {
    */
   execute: (state: GameState, params: Record<string, Json>) => Promise<void>;
 }
-
 export interface AtomHookEntry {
   skillId: string;
-  ownerId: string;
+  ownerId: number;
   atomType: string;
   phase: 'before' | 'after';
-  handler: (ctx: AtomBeforeContext | AtomAfterContext) => Promise<void>;
+  /** before 钩子可返回 HookResult(pass/modify/cancel);after 钩子返回 void */
+  handler: (ctx: AtomBeforeContext | AtomAfterContext) => Promise<HookResult | void>;
 }
 
 // ==================== SkillDef ====================
@@ -530,13 +515,13 @@ export interface AtomHookEntry {
  * 并调用,ownerId 由 onInit 第二参数注入。
  */
 export interface SkillModule {
-  createSkill: (id: string, ownerId: string) => Skill;
-  onInit?: (skill: Skill, ownerId: string) => (() => void) | void;
+  createSkill: (id: string, ownerId: number) => Skill;
+  onInit?: (skill: Skill, ownerId: number) => (() => void) | void;
   onMount?: (skill: Skill, api: FrontendAPI) => (() => void) | void;
 }
 
 export interface FrontendAPI {
-  viewer: string;
+  viewer: number;
   onEvent(handler: (event: GameEvent, view: GameView) => void): () => void;
   defineAction(
     actionType: string,

@@ -36,7 +36,7 @@ async function makeGame(seed = 42): Promise<{ state: import('../../src/engine/ty
   resetForTest();
   const config = { characters: CHARACTERS, playerCount: 3, seed, gameId: 'test' };
   const state = create(config);
-  await bootstrap(state);
+  await bootstrap(state, config);
   return { state, characters: CHARACTERS };
 }
 
@@ -71,7 +71,7 @@ describe('restoreFromLog — 持久化 + 恢复 e2e', () => {
     await dispatch(state, {
       skillId: '回合管理',
       actionType: 'end',
-      ownerId: state.players[0].name,
+      ownerId: state.players[0].index,
       params: {},
       baseSeq: 0,
     });

@@ -34,47 +34,47 @@ describe('动态技能生命周期(添加技能/移除技能 atom)', () => {
 
   it('添加技能 atom → 实例化,后端 action 已注册', async () => {
     // 初始:P1 无 杀 skill → 无 registerAction
-    expect(findActionEntry('杀', 'P1', 'use')).toBeUndefined();
+    expect(findActionEntry('杀', 0, 'use')).toBeUndefined();
 
-    await applyAtom(state, { type: '添加技能', player: 'P1', skillId: '杀' });
+    await applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' });
 
     // player.skills 列表更新
     expect(state.players[0].skills).toContain('杀');
     // 引擎已实例化:杀:use action 已注册
-    expect(findActionEntry('杀', 'P1', 'use')).toBeDefined();
+    expect(findActionEntry('杀', 0, 'use')).toBeDefined();
   });
 
   it('移除技能 atom → 卸载,后端 action 已注销', async () => {
     // 先添加
-    await applyAtom(state, { type: '添加技能', player: 'P1', skillId: '杀' });
-    expect(findActionEntry('杀', 'P1', 'use')).toBeDefined();
+    await applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' });
+    expect(findActionEntry('杀', 0, 'use')).toBeDefined();
 
     // 再移除
-    await applyAtom(state, { type: '移除技能', player: 'P1', skillId: '杀' });
+    await applyAtom(state, { type: '移除技能', player: 0, skillId: '杀' });
 
     expect(state.players[0].skills).not.toContain('杀');
-    expect(findActionEntry('杀', 'P1', 'use')).toBeUndefined();
+    expect(findActionEntry('杀', 0, 'use')).toBeUndefined();
   });
 
   it('添加技能 幂等:重复添加同一 skill 不抛错', async () => {
-    await applyAtom(state, { type: '添加技能', player: 'P1', skillId: '杀' });
+    await applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' });
     // 再次添加(已存在)→ 不抛错,action 仍注册
-    await expect(applyAtom(state, { type: '添加技能', player: 'P1', skillId: '杀' })).resolves.toBeUndefined();
-    expect(findActionEntry('杀', 'P1', 'use')).toBeDefined();
+    await expect(applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' })).resolves.toBeUndefined();
+    expect(findActionEntry('杀', 0, 'use')).toBeDefined();
   });
 
   it('钩子型技能(八卦阵)动态加载后,before hook 生效', async () => {
     // 八卦阵是 before-hook 型技能(挂 询问闪)
-    expect(findActionEntry('八卦阵', 'P2', 'use')).toBeUndefined();
+    expect(findActionEntry('八卦阵', 1, 'use')).toBeUndefined();
 
-    await applyAtom(state, { type: '添加技能', player: 'P2', skillId: '八卦阵' });
+    await applyAtom(state, { type: '添加技能', player: 1, skillId: '八卦阵' });
 
     // 八卦阵 注册的 action(若有)+ before hook 应生效
     // 这里验证实例化本身不抛错,且 player.skills 更新
     expect(state.players[1].skills).toContain('八卦阵');
 
     // 卸载干净
-    await applyAtom(state, { type: '移除技能', player: 'P2', skillId: '八卦阵' });
+    await applyAtom(state, { type: '移除技能', player: 1, skillId: '八卦阵' });
     expect(state.players[1].skills).not.toContain('八卦阵');
   });
 });

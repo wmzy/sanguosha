@@ -27,16 +27,16 @@ import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '雌雄双股剑', description: '武器:对异性角色出杀后,你摸1张牌,目标弃1张牌' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAfterHook(_skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: string; target?: string };
+    const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     // 简化:不对性别做判断(需要角色性别数据),总是触发效果
-    const target = ctx.state.players.find(p => p.name === atom.target);
+    const target = ctx.state.players[atom.target!];
     if (!target || target.hand.length === 0) {
       // 目标无牌可弃,只摸牌
       await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });

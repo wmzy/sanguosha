@@ -3,11 +3,11 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 指定目标: AtomDefinition<{ source: string; cardId?: string; target: string }> = {
+export const 指定目标: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '指定目标',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.source)) return `source ${atom.source} not found`;
-    if (!state.players.find(p => p.name === atom.target)) return `target ${atom.target} not found`;
+    if (!state.players[atom.source]) return `source ${atom.source} not found`;
+    if (!state.players[atom.target]) return `target ${atom.target} not found`;
     return null;
   },
   apply(_state) {

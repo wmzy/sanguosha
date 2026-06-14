@@ -38,20 +38,20 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '决斗', description: '对一名角色使用,双方轮流出杀,先不出者受 1 点伤害' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'string') return 'target required';
+      if (typeof params.target !== 'number') return 'target required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const cardId = params.cardId as string;
-      const target = params.target as string;
+      const target = params.target as number;
       const frame = pushFrame(state, '决斗', from, { ...params });
 
       // 移牌到处理区
@@ -65,7 +65,7 @@ export function onInit(_skill: Skill, ownerId: string): () => void {
       // ─── Promise-based 续跑 ───
       // 决斗循环:目标先出杀,之后发起者出杀,轮流
       let turn = 0; // 0=目标, 1=发起者
-      let loser: string | null = null;
+      let loser: number | null = null;
       while (loser === null) {
         const current = turn === 0 ? target : from;
         await applyAtom(state, { type: '询问杀', target: current, source: turn === 0 ? from : target });

@@ -3,15 +3,14 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 加标签: AtomDefinition<{ player: string; tag: string }> = {
+export const 加标签: AtomDefinition<{ player: number; tag: string }> = {
   type: '加标签',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
   apply(state, atom) {
-    const pIdx = state.players.findIndex(p => p.name === atom.player);
-    const player = state.players[pIdx];
+    const player = state.players[atom.player];
     if (player.marks.some(m => m.id === `tag:${atom.tag}`)) return;
     player.marks.push({ id: `tag:${atom.tag}`, scope: player.index });
   },

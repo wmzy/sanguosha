@@ -3,10 +3,10 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 判定: AtomDefinition<{ player: string; judgeType: string }> = {
+export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   type: '判定',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
   apply(_state) {

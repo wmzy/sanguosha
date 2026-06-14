@@ -2,10 +2,10 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 击杀: AtomDefinition<{ player: string }> = {
+export const 击杀: AtomDefinition<{ player: number }> = {
   type: '击杀',
   validate(state, atom) {
-    const p = state.players.find(x => x.name === atom.player);
+    const p = state.players[atom.player];
     if (!p) return `player ${atom.player} not found`;
     if (p.alive) return 'player still alive';
     return null;

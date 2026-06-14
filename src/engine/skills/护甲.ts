@@ -29,10 +29,9 @@
 //      应通过共享 hook 工具或 atom 修正管道避免重复。
 // ============================================================
 import type { Atom, AtomBeforeContext, Skill } from '../types';
-import { applyAtom, dropAtom } from '../create-engine';
-import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
+import { registerBeforeHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -41,34 +40,19 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { target?: string; cardId?: string; amount?: number; type: string };
+export function onInit(_skill: Skill, ownerId: number): () => void {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+    const atom = ctx.atom as { target?: number; cardId?: string; amount?: number; type: string };
     if (atom.target !== ownerId) return;
     if (typeof atom.cardId !== 'string') return;
     const card = ctx.state.cardMap[atom.cardId];
     if (!card) return;
     if (!card.name.includes('杀')) return;  // 非杀牌不触发
     if (card.suit !== '♠' && card.suit !== '♣') return;  // 仅黑色
-    // 防 re-entry:在 damage 被 drop + 重新 apply 时,使用 guard mark 标记
-    const self = ctx.state.players.find(p => p.name === ownerId);
-    if (!self) return;
-    if (self.marks.some(m => m.id === '护甲/applied')) return;
-    // 应用护甲:drop 重新 apply 减 1,加 guard mark 防止 re-entry
-    if ((atom.amount ?? 0) > 0) {
-      dropAtom(ctx.state);
-      // 先加 guard(在 re-apply 之前)
-      await applyAtom(ctx.state, {
-        type: '加标记',
-        player: ownerId,
-        mark: { id: '护甲/applied', scope: -1 },
-      });
-      // 重新 apply
-      if ((atom.amount ?? 0) > 1) {
-        await applyAtom(ctx.state, { ...ctx.atom, amount: (atom.amount ?? 1) - 1 } as Atom);
-      }
-      // 否则 amount=1 时不 apply(直接 drop,无伤害)
-    }
+    const baseAmount = atom.amount ?? 0;
+    if (baseAmount <= 0) return;
+    // 黑色杀伤害 -1
+    return { kind: 'modify', atom: { ...ctx.atom, amount: baseAmount - 1 } as typeof ctx.atom };
   });
   return () => {};
 }

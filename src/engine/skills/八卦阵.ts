@@ -42,7 +42,7 @@ import type { AtomBeforeContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -51,17 +51,17 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext) => {
     // 只对自己生效
-    if ((ctx.atom as { target?: string }).target !== ownerId) return;
+    if ((ctx.atom as { target?: number }).target !== ownerId) return;
     if (ctx.state.zones.deck.length === 0) return; // 牌堆空,无法判定
 
     // 使用判定 atom:deck[0] → judgeZone → after 链后自动入弃牌堆
     await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '八卦阵' });
 
     // 判定牌现在在 judgeZone 顶部
-    const self = ctx.state.players.find((p) => p.name === ownerId);
+    const self = ctx.state.players[ownerId];
     if (!self || self.judgeZone.length === 0) return;
     const judgeCardId = self.judgeZone[self.judgeZone.length - 1];
     const judgeCard = ctx.state.cardMap[judgeCardId];

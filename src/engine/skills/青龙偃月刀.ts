@@ -34,13 +34,13 @@ import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '青龙偃月刀', description: '武器:目标出闪后可追杀' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAfterHook(_skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: string; target?: string };
+    const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     // 目标出了闪才能追杀
     const dodged = ctx.params.__闪避 as boolean | undefined;

@@ -25,13 +25,13 @@
 import type { AtomBeforeContext, Skill } from '../types';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '青釭剑', description: '武器:杀无视目标防具' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { source?: string; target?: string };
+    const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     ;
   });

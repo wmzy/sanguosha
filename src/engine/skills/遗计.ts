@@ -43,7 +43,7 @@ import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
@@ -52,9 +52,9 @@ export function createSkill(id: string, ownerId: string): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    if ((ctx.atom as { target?: string }).target !== ownerId) return;
+    if ((ctx.atom as { target?: number }).target !== ownerId) return;
     if (((ctx.atom as { amount?: number }).amount ?? 0) <= 0) return;
     // 1. 询问是否发动
     await applyAtom(ctx.state, {
@@ -66,10 +66,10 @@ export function onInit(skill: Skill, ownerId: string): () => void {
       timeout: 10000,
     });
     // 2. 摸两张牌
-    const handBefore = ctx.state.players.find(p => p.name === ownerId)?.hand.length ?? 0;
+    const handBefore = ctx.state.players[ownerId]?.hand.length ?? 0;
     await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 2 });
     // 取摸到的牌:手牌末尾 2 张
-    const selfPlayer = ctx.state.players.find(p => p.name === ownerId);
+    const selfPlayer = ctx.state.players[ownerId];
     const drawnCards = selfPlayer ? selfPlayer.hand.slice(-2) : [];
     // 3. 询问分配
     await applyAtom(ctx.state, {
@@ -81,8 +81,8 @@ export function onInit(skill: Skill, ownerId: string): () => void {
     });
     // 4. 读取分配结果并逐张给予
     // dispatch 回应路径把 distribute 的 params merge 到 topFrame
-    // 客户端回应格式: { allocation: [{ target: 'P1', cardIds: ['c1'] }, ...] }
-    const distribution = ctx.params.allocation as Array<{ target: string; cardIds: string[] }> | undefined;
+    // 客户端回应格式: { allocation: [{ target: 0, cardIds: ['c1'] }, ...] }  (target = 座次)
+    const distribution = ctx.params.allocation as Array<{ target: number; cardIds: string[] }> | undefined;
     if (Array.isArray(distribution)) {
       for (const entry of distribution) {
         for (const cardId of entry.cardIds) {

@@ -2,27 +2,24 @@
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
-export const 摸牌: AtomDefinition<{ player: string; count: number }> = {
+export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
   type: '摸牌',
   validate(state, atom) {
-    const p = state.players.find(x => x.index === state.players.findIndex(y => y.name === atom.player));
-    if (!p) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     if (atom.count <= 0) return 'count must be > 0';
     if (state.zones.deck.length < atom.count) return 'deck empty';
     return null;
   },
   apply(state, atom) {
-    const idx = state.players.findIndex(p => p.name === atom.player);
     const drawn = state.zones.deck.slice(-atom.count).reverse();
     state.zones.deck = state.zones.deck.slice(0, -atom.count);
-    state.players[idx].hand.push(...drawn);
+    state.players[atom.player].hand.push(...drawn);
   },
   effect: { sound: 'draw', animation: 'slide', duration: 200 },
   toViewEvents(state, atom): ViewEventSplit {
     const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 200 };
     // 本人看到具体牌面
-    const idx = state.players.findIndex(p => p.name === atom.player);
-    const drawn = idx >= 0 ? state.zones.deck.slice(-atom.count).reverse() : [];
+    const drawn = state.zones.deck.slice(-atom.count).reverse();
     const cards = drawn.map(id => state.cardMap[id]).filter(Boolean);
     const ownerView: ViewEvent = {
       type: '摸牌',
@@ -44,7 +41,7 @@ export const 摸牌: AtomDefinition<{ player: string; count: number }> = {
     };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.name === event.player as string);
+    const pi = view.players.findIndex(p => p.index === (event.player as number));
     if (pi < 0) return;
     const count = (event.count as number) ?? 0;
     view.players[pi].handCount += count;

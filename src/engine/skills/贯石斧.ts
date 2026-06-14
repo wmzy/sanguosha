@@ -31,20 +31,20 @@ import type { AtomAfterContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '贯石斧', description: '武器:杀被闪后可弃2张牌强命' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAfterHook(_skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: string; target?: string };
+    const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     // 检查是否出了闪(通过 params 标记或 parent frame 的 settlement)
     // 简化: 如果有 __闪避 标记说明目标出了闪
     const dodged = ctx.params.__闪避 as boolean | undefined;
     if (!dodged) return; // 没出闪,不需要强命
     // 检查手牌是否>=2
-    const self = ctx.state.players.find(p => p.name === ownerId);
+    const self = ctx.state.players[ownerId];
     if (!self || self.hand.length < 2) return;
     // 询问是否弃2牌强命
     await applyAtom(ctx.state, {
@@ -61,7 +61,7 @@ export function onInit(_skill: Skill, ownerId: string): () => void {
     const discardCards = self.hand.slice(0, 2);
     await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: discardCards });
     // 在当前帧标记 dodged=false(强命)
-    const settlement = ctx.params.settlement as Array<{ target: string; dodged: boolean }> | undefined;
+    const settlement = ctx.params.settlement as Array<{ target: number; dodged: boolean }> | undefined;
     if (settlement) {
       const item = settlement.find(s => s.target === atom.target);
       if (item) item.dodged = false;

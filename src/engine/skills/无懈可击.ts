@@ -43,11 +43,11 @@ import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, topFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '无懈可击', description: '锦囊:取消一张锦囊牌的效果' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   // 注册 respond action:玩家打出无懈可击
   registerAction(_skill.id, ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';

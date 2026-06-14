@@ -3,19 +3,19 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 给予: AtomDefinition<{ cardId: string; from: string; to: string }> = {
+export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }> = {
   type: '给予',
   validate(state, atom) {
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
-    const fromP = state.players.find(p => p.name === atom.from);
+    const fromP = state.players[atom.from];
     if (!fromP) return `from ${atom.from} not found`;
     if (!fromP.hand.includes(atom.cardId)) return `card not in from's hand`;
-    if (!state.players.find(p => p.name === atom.to)) return `to ${atom.to} not found`;
+    if (!state.players[atom.to]) return `to ${atom.to} not found`;
     return null;
   },
   apply(state, atom) {
-    const fromIdx = state.players.findIndex(p => p.name === atom.from);
-    const toIdx = state.players.findIndex(p => p.name === atom.to);
+    const fromIdx = atom.from;
+    const toIdx = atom.to;
     state.players[fromIdx].hand = state.players[fromIdx].hand.filter(id => id !== atom.cardId);
     state.players[toIdx].hand.push(atom.cardId);
   },

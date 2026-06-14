@@ -5,13 +5,13 @@ import { registerAtom } from '../atom';
 
 export const 请求回应: AtomDefinition<{
   requestType: string;
-  target: string;
+  target: number;
   prompt: ActionPrompt;
   defaultChoice?: Json;
 }> = {
   type: '请求回应',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.target)) return `target not found`;
+    if (!state.players[atom.target]) return `target not found`;
     return null;
   },
   apply(_state) {

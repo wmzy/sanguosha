@@ -3,18 +3,16 @@
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
-export const 抽牌: AtomDefinition<{ player: string; cardId: string }> = {
+export const 抽牌: AtomDefinition<{ player: number; cardId: string }> = {
   type: '抽牌',
   validate(state, atom) {
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
     if (!state.zones.deck.includes(atom.cardId)) return `card not in deck`;
-    if (!state.players.find(p => p.name === atom.player)) return `player ${atom.player} not found`;
+    if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
   apply(state, atom) {
-    const pIdx = state.players.findIndex(p => p.name === atom.player);
-    state.zones.deck = state.zones.deck.filter(id => id !== atom.cardId);
-    state.players[pIdx].hand.push(atom.cardId);
+    state.players[atom.player].hand.push(atom.cardId);
   },
 };
 

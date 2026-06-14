@@ -4,12 +4,12 @@ import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
 export const 拼点: AtomDefinition<{
-  initiator: string; target: string; initiatorCard: string; targetCard: string;
+  initiator: number; target: number; initiatorCard: string; targetCard: string;
 }> = {
   type: '拼点',
   validate(state, atom) {
-    if (!state.players.find(p => p.name === atom.initiator)) return `initiator not found`;
-    if (!state.players.find(p => p.name === atom.target)) return `target not found`;
+    if (!state.players[atom.initiator]) return `initiator not found`;
+    if (!state.players[atom.target]) return `target not found`;
     return null;
   },
   apply(_state) {

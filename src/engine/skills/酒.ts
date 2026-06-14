@@ -34,21 +34,21 @@
 //   6. 未在 onMount 注册 UI prompt——前端按钮如何触发未定义。
 // ============================================================
 import type { GameState, Atom, AtomBeforeContext, GameView, Json, Skill  } from '../types';
-import { applyAtom, dropAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '酒', description: '出牌阶段对自己使用,本回合下一张杀的伤害+1' };
 }
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       // 酒只能对自己用;但 params 不传 target(默认 from)
       // 由 action 路由层保证 from === ownerId
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-      
+
       const from = ownerId;
       const frame = pushFrame(state, '酒', from, { ...params });
       const cardId = params.cardId as string;
@@ -73,22 +73,17 @@ export function onInit(skill: Skill, ownerId: string): () => void {
     }, );
 
   // 消费 mark:在造成伤害时,如果是 self 造成的 且 有 酒/nextKillDamageBonus mark,amount + 1
-  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { source?: string; amount?: number; type: string };
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+    const atom = ctx.atom as { source?: number; amount?: number; type: string };
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
-    const self = ctx.state.players.find(p => p.name === ownerId);
+    const self = ctx.state.players[ownerId];
     if (!self) return;
     const hasMark = self.marks.some(m => m.id === '酒/nextKillDamageBonus');
     if (!hasMark) return;
-    // drop + 重新 apply(增加 1) — 简化处理;不会 re-entry 因为 mark 用完即去
-    dropAtom(ctx.state);
-    await applyAtom(ctx.state, { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as Atom);
-    await applyAtom(ctx.state, {
-      type: '去标记',
-      player: ownerId,
-      markId: '酒/nextKillDamageBonus',
-    });
+    // 先消费 mark(副作用),再 modify 伤害 +1
+    await applyAtom(ctx.state, { type: '去标记', player: ownerId, markId: '酒/nextKillDamageBonus' });
+    return { kind: 'modify', atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom };
   });
 
   return () => {};

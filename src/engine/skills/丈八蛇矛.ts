@@ -27,11 +27,11 @@
 import type { FrontendAPI, Skill } from '../types';
 import { registerAction, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '丈八蛇矛', description: '武器:可将2张手牌当杀使用' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
+export function onInit(_skill: Skill, ownerId: number): () => void {
   // 后端不需要 registerAction,杀的 execute 处理 fromSkill='丈八蛇矛'
   return () => {};
 }

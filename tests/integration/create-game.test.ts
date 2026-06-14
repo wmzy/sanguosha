@@ -24,7 +24,7 @@ describe('create + bootstrap — 端到端开局', () => {
     expect(state.zones.deck.length).toBe(0);  // 骨架没洗牌
 
     // bootstrap 异步跑完开局流程
-    await bootstrap(state);
+    await bootstrap(state, config);
 
     // state 有 3 个玩家(对应 3 个角色;顺序由选将 atom 决定,不可假设)
     const assignedCharacters = new Set(state.players.map(p => p.character));

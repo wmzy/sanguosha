@@ -38,7 +38,7 @@ import { getSkillModule } from '../src/engine/skill';
 
 export interface ActionDef {
   skillId: string;
-  ownerId: string;
+  ownerId: number;
   actionType: string;
   label: string;
   prompt: ActionPrompt;
@@ -48,11 +48,11 @@ export interface ActionDef {
 // ─── FakeFrontendAPI ──────────────────────────────────────────
 
 class FakeFrontendAPI implements FrontendAPI {
-  viewer: string;
+  viewer: number;
   private skillId = '';
   private actions: ActionDef[] = [];
 
-  constructor(viewer: string) {
+  constructor(viewer: number) {
     this.viewer = viewer;
   }
 
@@ -86,21 +86,21 @@ class FakeFrontendAPI implements FrontendAPI {
 // ─── PlayerSession ──────────────────────────────────────────
 
 export class PlayerSession {
-  readonly playerName: string;
+  readonly playerIndex: number;
   private harness: SkillTestHarness;
   private frontend: FakeFrontendAPI;
   private lastEventIndex = 0;
 
-  constructor(playerName: string, harness: SkillTestHarness) {
-    this.playerName = playerName;
+  constructor(playerIndex: number, harness: SkillTestHarness) {
+    this.playerIndex = playerIndex;
     this.harness = harness;
-    this.frontend = new FakeFrontendAPI(playerName);
+    this.frontend = new FakeFrontendAPI(playerIndex);
   }
 
   // ─── 视图 ─────────────────────────────────────
 
   get view(): GameView {
-    return engineBuildView(this.harness.state, this.harness.state.players.findIndex(p => p.name === this.playerName));
+    return engineBuildView(this.harness.state, this.playerIndex);
   }
 
   get newEvents(): GameEvent[] {
@@ -116,7 +116,7 @@ export class PlayerSession {
 
   // ─── 操作 ─────────────────────────────────────
 
-  async useCardAndTarget(skillId: string, cardId: string, targets: string[]): Promise<void> {
+  async useCardAndTarget(skillId: string, cardId: string, targets: number[]): Promise<void> {
     return this.dispatch({ skillId, actionType: 'use', params: { cardId, targets } });
   }
 
@@ -217,14 +217,14 @@ export class PlayerSession {
   // ─── 前端技能加载 ─────────────────────────────
 
   async loadFrontend(): Promise<void> {
-    const player = this.harness.state.players.find(p => p.name === this.playerName);
+    const player = this.harness.state.players[this.playerIndex];
     if (!player) return;
     this.frontend.clearActions();
     for (const skillId of player.skills) {
       const module = await getSkillModule(skillId);
       this.frontend.setCurrentSkill(skillId);
       if (module.onMount) {
-        module.onMount({ id: skillId, ownerId: this.playerName, name: skillId, description: '' }, this.frontend);
+        module.onMount({ id: skillId, ownerId: this.playerIndex, name: skillId, description: '' }, this.frontend);
       }
     }
   }
@@ -234,7 +234,7 @@ export class PlayerSession {
   ): Promise<void> {
     const result = await engineDispatch(this.harness.state, {
       ...msg,
-      ownerId: this.playerName,
+      ownerId: this.playerIndex,
       baseSeq: this.harness.state.seq,
     });
     if (result.error) throw new Error(`dispatch error: ${result.error}`);
@@ -245,7 +245,7 @@ export class PlayerSession {
 
 export class SkillTestHarness {
   private _state!: GameState;
-  private sessions = new Map<string, PlayerSession>();
+  private sessions = new Map<number, PlayerSession>();
 
   /** 初始化:重置引擎 → bootstrap state → 为每个玩家创建 session 并加载 onMount */
   async setup(state: GameState): Promise<void> {
@@ -263,15 +263,19 @@ export class SkillTestHarness {
     await rebootstrap(state);
     this.sessions.clear();
     for (const player of state.players) {
-      const session = new PlayerSession(player.name, this);
+      const session = new PlayerSession(player.index, this);
       await session.loadFrontend();
-      this.sessions.set(player.name, session);
+      this.sessions.set(player.index, session);
     }
   }
 
-  player(name: string): PlayerSession {
-    const session = this.sessions.get(name);
-    if (!session) throw new Error(`Player ${name} not found in harness`);
+  /** 按名字或座次取玩家 session(测试可传 'P1' 或 0) */
+  player(nameOrIndex: string | number): PlayerSession {
+    const index = typeof nameOrIndex === 'number'
+      ? nameOrIndex
+      : this._state.players.findIndex(p => p.name === nameOrIndex);
+    const session = this.sessions.get(index);
+    if (!session) throw new Error(`Player ${nameOrIndex} not found in harness`);
     return session;
   }
 

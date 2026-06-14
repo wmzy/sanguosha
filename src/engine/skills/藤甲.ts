@@ -45,42 +45,28 @@
 //      hook 顺序未约束,需明确实现规则(目前依赖注册顺序,易错)。
 // ============================================================
 import type { AtomBeforeContext, Skill } from '../types';
-import { applyAtom, dropAtom } from '../create-engine';
-import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
+import { registerBeforeHook, type SkillModule } from '../skill';
 
-export function createSkill(id: string, ownerId: string): Skill {
+export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '藤甲', description: '防具:普通杀伤害-1,火焰伤害+1' };
 }
 
-export function onInit(_skill: Skill, ownerId: string): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { target?: string; amount?: number; damageType?: string };
+export function onInit(_skill: Skill, ownerId: number): () => void {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+    const atom = ctx.atom as { target?: number; amount?: number; damageType?: string };
     if (atom.target !== ownerId) return;
-    // 防 re-entry:drop 后重新 apply 时不再处理
-    const self = ctx.state.players.find((p) => p.name === ownerId);
-    if (!self) return;
-    if (self.marks.some((m) => m.id === '藤甲/applied')) return;
 
     const baseAmount = atom.amount ?? 1;
     let newAmount: number;
     if (atom.damageType === 'fire') {
-      newAmount = baseAmount + 1;
+      newAmount = baseAmount + 1;       // 火焰伤害 +1
     } else {
-      newAmount = Math.max(0, baseAmount - 1);
+      newAmount = Math.max(0, baseAmount - 1);  // 普通伤害 -1
     }
     if (newAmount === baseAmount) return; // 无变化
-
-    dropAtom(ctx.state);
-    // 加 guard mark 防止 re-entry
-    await applyAtom(ctx.state, {
-      type: '加标记',
-      player: ownerId,
-      mark: { id: '藤甲/applied', scope: -1 },
-    });
-    // 重新 apply 调整后的伤害
-    if (newAmount > 0) {
-      await applyAtom(ctx.state, { ...ctx.atom, amount: newAmount } as typeof ctx.atom);
-    }
+    // modify:管线用调整后的 atom 继续,后续 hook(如白银狮子)看到减过的值。
+    // 无需 guard mark——modify 不重新进入 before 阶段,无 re-entry。
+    return { kind: 'modify', atom: { ...ctx.atom, amount: newAmount } as typeof ctx.atom };
   });
   return () => {};
 }
