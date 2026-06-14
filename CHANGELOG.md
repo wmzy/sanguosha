@@ -47,6 +47,14 @@ All notable changes to this project will be documented in this file.
 将 `src/engine/*` 整体迁至 `src/engine/_legacy/`(参考保留),在 `src/engine/` 重新实现新引擎核心(types/atom/settlement/skill/skill-loader/event-stream/create-engine)。首批交付 38 atom + 10 skill(4 基本牌 + 5 武将 6 技能)。
 
 
+### Infrastructure — 集成收尾 + 测试框架 + 技能/atom 指南(2026-06-14)
+
+- **前后端集成收尾**:`skillActionRegistry`/`GameView`/`MultiplayerGameBoard` 的 ownerId/viewer 从 string 改 number(座次下标),对齐座次解耦。
+  GameView 加 `preceding` 支持(组合 action 透传,武圣两步 UI)。dispatch 全链路类型对齐。
+- **测试框架修复**:`findValidCard`/`findValidTargets` 修座次对齐;加 `expectAtoms`/`expectExactAtoms` 断言;加 `transformThenUse` helper(转化技);`distribute` target 改 number。
+- **docs/guides/添加技能.md**:技能实现生产手册。含引擎模型、4 类技能模板(锁定/主动/转化/防具武器 HookResult)、SkillTestHarness 测试方法、实现 Checklist、3 步式 AI 提示词(分析→实现→测试,每步强调文档为事实依据防幻觉,缺 atom 先建)。
+- **`.claude/skills/`**:`/add-skill`(添加武将技能,三步式:分析→实现→测试,带防幻觉约束+缺失 atom 检查)、`/add-atom`(添加引擎原子操作)。SKILL.md 精简(核心流程+硬约束),详细模板留在 `docs/guides/` 作为 supporting file 引用。
+
 ### Docs — 引擎能力边界分析(2026-06-14)
 
 - **ENGINE-DESIGN.md §4.4**:新增"多人响应"说明——验证了无懈可击(抢占式)、濒死求桃(逐个询问)、于吉蛊惑(扣牌+揭示)都能用"单槽 pending + for 循环 + 状态观察"表达,**不需要打破"同时只一个 pending"不变量**。
