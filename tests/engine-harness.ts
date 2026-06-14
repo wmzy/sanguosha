@@ -147,10 +147,10 @@ export class PlayerSession {
     });
   }
 
-  /** 分配(遗计分配牌等)。params 通过 dispatch merge 到 topFrame,原始 execute 通过 ctx.params.allocation 读取。 */
+  /** 分配(遗计分配牌等)。通过 ClientMessage 的 preceding merge 到 localVars。 */
   async distribute(
     skillId: string,
-    allocation: Array<{ target: string; cardIds: string[] }>,
+    allocation: Array<{ target: number; cardIds: string[] }>,
   ): Promise<void> {
     return this.dispatch({ skillId, actionType: 'distribute', params: { allocation } });
   }
@@ -170,7 +170,8 @@ export class PlayerSession {
     for (const action of actions) {
       const filter = extractCardFilter(action.prompt);
       if (!filter) continue;
-      for (const cardId of this.harness.state.players.find(p => p.name === this.playerName)?.hand ?? []) {
+      const player = this.harness.state.players[this.playerIndex];
+      for (const cardId of player?.hand ?? []) {
         const card = this.harness.state.cardMap[cardId];
         if (card && filter(card) && (!extraFilter || extraFilter(card))) {
           return card;
@@ -180,16 +181,16 @@ export class PlayerSession {
     return null;
   }
 
-  findValidTargets(actionType: string, count?: number): string[] {
+  findValidTargets(actionType: string, count?: number): number[] {
     const actions = this.frontend.getActions().filter(a => a.actionType === actionType);
     for (const action of actions) {
       const filter = extractTargetFilter(action.prompt);
       if (!filter) continue;
-      const result: string[] = [];
+      const result: number[] = [];
       for (const player of this.harness.state.players) {
-        if (player.name === this.playerName) continue;
-        if (!filter.filter || filter.filter(this.view, player.name)) {
-          result.push(player.name);
+        if (player.index === this.playerIndex) continue;
+        if (!filter.filter || filter.filter(this.view, player.index)) {
+          result.push(player.index);
         }
       }
       if (result.length >= (count ?? 1)) return result.slice(0, count ?? result.length);
@@ -212,6 +213,54 @@ export class PlayerSession {
       const type = (slot.atom as { type: string }).type;
       throw new Error(`expectNoPending(): 实际有 pending '${type}'`);
     }
+  }
+
+  /** 断言事件流中包含指定 atom 类型(子序列匹配,忽略 notify 事件) */
+  expectAtoms(...types: string[]): void {
+    const atoms = getEvents(0)
+      .filter((e): e is { kind: 'atom'; atom: { type: string } } => e.kind === 'atom')
+      .map(e => e.atom.type);
+    let searchFrom = 0;
+    for (const t of types) {
+      const idx = atoms.indexOf(t, searchFrom);
+      if (idx < 0) throw new Error(`expectAtoms: 事件流中未找到 '${t}'(按序)。已有: ${atoms.join(', ')}`);
+      searchFrom = idx + 1;
+    }
+  }
+
+  /** 断言事件流的 atom 类型严格匹配(忽略 notify 事件) */
+  expectExactAtoms(...types: string[]): void {
+    const atoms = getEvents(0)
+      .filter((e): e is { kind: 'atom'; atom: { type: string } } => e.kind === 'atom')
+      .map(e => e.atom.type);
+    const expected = types.join(', ');
+    const actual = atoms.join(', ');
+    if (expected !== actual) {
+      throw new Error(`expectExactAtoms: 期望 [${expected}],实际 [${actual}]`);
+    }
+  }
+
+  // ─── 组合 action(转化技) ─────────────────────
+
+  /**
+   * 转化后使用(武圣红牌当杀):preceding=[转化] + 主 action(使用)。
+   * @param transformSkill 转化技能 id(如 '武圣')
+   * @param transformParams 转化参数(如 { cardId })
+   * @param useSkill 使用技能 id(如 '杀')
+   * @param useParams 使用参数(如 { cardId: 'c1#武圣', targets: [1] })
+   */
+  async transformThenUse(
+    transformSkill: string,
+    transformParams: Record<string, Json>,
+    useSkill: string,
+    useParams: Record<string, Json>,
+  ): Promise<void> {
+    return this.dispatch({
+      skillId: useSkill,
+      actionType: 'use',
+      params: useParams,
+      preceding: [{ skillId: transformSkill, actionType: 'transform', params: transformParams }],
+    });
   }
 
   // ─── 前端技能加载 ─────────────────────────────

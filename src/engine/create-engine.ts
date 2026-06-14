@@ -26,8 +26,8 @@
 // actionLog 由引擎自动记录,session 不直接 mutate state。
 
 import type {
+  ActionEntry,
   ActionLogEntry,
-  Atom,
   AtomAfterContext,
   AtomBeforeContext,
   ClientMessage,
@@ -254,11 +254,36 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   }
 
   // === 主动 action 路径 ===
-  const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-  if (!entry) return;
-  const validationError = entry.validate(state, message.params);
-  if (validationError !== null) return;
+  // 1. 执行 preceding(转化类):逐个 validate+execute。
+  //    全部成功后,主 action validate 能看到 preceding 改变后的状态(如武圣转化后杀.validate 看到"杀")。
+  //    主 action validate 失败 → 对已执行的 preceding 按逆序 rollback 恢复 state。
+  const executedPreceding: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
+  if (message.preceding) {
+    for (const p of message.preceding) {
+      const pEntry = findActionEntry(p.skillId, message.ownerId, p.actionType);
+      if (!pEntry) return;
+      const pErr = pEntry.validate(state, p.params);
+      if (pErr !== null) return;
+      await pEntry.execute(state, p.params);
+      executedPreceding.push({ entry: pEntry, params: p.params });
+    }
+  }
 
+  // 2. 主 action:validate
+  const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
+  if (!entry) {
+    // 主 action 不存在 → 回滚 preceding
+    rollbackPreceding(state, executedPreceding);
+    return;
+  }
+  const validationError = entry.validate(state, message.params);
+  if (validationError !== null) {
+    // 主 action validate 失败 → 回滚 preceding
+    rollbackPreceding(state, executedPreceding);
+    return;
+  }
+
+  // 3. 主 action:execute
   setupStableWait(state);
   const executeP = entry.execute(state, message.params).finally(() => {
     resolveStable(state);
@@ -267,6 +292,14 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   await state._waitForStable;
   logAction(state, message);
   state.seq += 1;
+}
+
+/** 对已执行的 preceding 按逆序调用 rollback(若有)。 */
+function rollbackPreceding(state: GameState, executed: Array<{ entry: ActionEntry; params: Record<string, Json> }>): void {
+  for (let i = executed.length - 1; i >= 0; i--) {
+    const { entry, params } = executed[i];
+    if (entry.rollback) entry.rollback(state, params);
+  }
 }
 
 /**

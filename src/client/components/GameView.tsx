@@ -13,8 +13,10 @@ import { getActionsForPlayer, registerSkillActions, clearRegistry, type SkillAct
 interface ActionMsg {
   skillId: string;
   actionType: string;
-  ownerId: string;
+  ownerId: number;
   params: Record<string, Json>;
+  /** 组合 action:在主 action 前顺序执行的前置 action(转化类,如武圣) */
+  preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>;
 }
 
 interface Props {
@@ -73,8 +75,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 有待回应请求时,自动切换视角到目标玩家
   useEffect(() => {
     if (view.pending) {
-      const targetIdx = view.players.findIndex(p => p.name === view.pending!.target);
-      if (targetIdx >= 0) setPerspectiveIdx(targetIdx);
+      const targetIdx = view.pending.target;
+      if (targetIdx >= 0 && targetIdx < view.players.length) setPerspectiveIdx(targetIdx);
     } else {
       // 无 pending 时回到当前玩家视角
       setPerspectiveIdx(view.currentPlayerIndex);
@@ -97,11 +99,11 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const skillActions = useMemo(() => {
     clearRegistry();
     for (const p of view.players) {
-      registerSkillActions(p.name, p.skills);
+      registerSkillActions(p.index, p.skills);
     }
     // 返回当前视角玩家的 action 定义
-    return getActionsForPlayer(perspectiveName);
-  }, [skillActionsKey, perspectiveName]);
+    return getActionsForPlayer(perspectiveIdx);
+  }, [skillActionsKey, perspectiveIdx]);
 
   // 视角玩家的手牌(debug 模式所有人可见)
   const perspectiveHand: Card[] = perspective?.hand ?? [];
@@ -109,7 +111,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   // 待回应:基于视角玩家
   const pending = view.pending;
-  const isPerspectiveAwaiting = pending !== null && pending.target === perspectiveName;
+  const isPerspectiveAwaiting = pending !== null && pending.target === perspectiveIdx;
   // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
   const canOperate = true; // debug 模式永远允许操作
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
@@ -148,12 +150,16 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 发送 action
   // debug 模式:以"正在看的玩家"作为 ownerId(代打)
   // 正式模式:必须以自己(viewer)为 ownerId
-  const send = useCallback((skillId: string, actionType: string, params: Record<string, Json>) => {
-    const ownerId = perspectiveName;
-    onAction({ skillId, actionType, ownerId, params });
-    setSelectedCardId(null);
-    setSelectedTarget(null);
-  }, [onAction, perspectiveName]);
+  /** 发送 action。preceding 用于组合 action(转化技:武圣红牌当杀) */
+  const send = useCallback(
+    (skillId: string, actionType: string, params: Record<string, Json>, preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>) => {
+      const ownerId = perspectiveIdx;
+      onAction({ skillId, actionType, ownerId, params, preceding });
+      setSelectedCardId(null);
+      setSelectedTarget(null);
+    },
+    [onAction, perspectiveIdx],
+  );
 
   // ─── 距离和攻击范围计算(纯函数，基于 GameView) ───
   const WEAPON_RANGE: Record<string, number> = {
@@ -218,17 +224,25 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 只能作为回应打出的牌(不能主动出)
   const RESPOND_ONLY = new Set(['闪', '无懈可击']);
   // 出牌
+  /** 玩家名 → 座次下标(UI 层用 name,dispatch 时转 index) */
+  function nameToIndex(name: string): number {
+    return view.players.findIndex(p => p.name === name);
+  }
+
   function handlePlayCard() {
-    if (!selectedCardId || !isMyTurn) return;
+    if (!selectedCardId) return;
     const card = viewerHand.find(c => c.id === selectedCardId);
     if (!card) return;
     if (RESPOND_ONLY.has(card.name)) return; // 不能主动出
     const selfName = view.players[view.viewer].name;
     const needsTarget = TARGET_REQUIRED_CARDS.has(card.name);
     if (needsTarget && !selectedTarget) return; // 需要目标但没选
-    const target = selectedTarget ?? (SELF_TARGET_CARDS.has(card.name) ? selfName : undefined);
+    const targetName = selectedTarget ?? (SELF_TARGET_CARDS.has(card.name) ? selfName : undefined);
     const params: Record<string, Json> = { cardId: card.id };
-    if (target) params.targets = [target];
+    if (targetName) {
+      const idx = nameToIndex(targetName);
+      if (idx >= 0) params.targets = [idx];
+    }
     send(card.name, 'use', params);
   }
 
@@ -253,13 +267,13 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       case 'selectTarget':
         // 选目标型:需要 selectedTarget
         if (!selectedTarget) { alert(prompt.title); return; }
-        params.target = selectedTarget;
+        params.target = nameToIndex(selectedTarget);
         break;
       case 'useCardAndTarget':
         // 选牌+选目标型
         if (!selectedCardId) { alert(prompt.title + ' — 请先选中手牌'); return; }
         if (!selectedTarget) { alert(prompt.title + ' — 请选择目标'); return; }
-        params.targets = [{ target: selectedTarget, cardIds: [selectedCardId] }];
+        params.targets = [nameToIndex(selectedTarget)];
         break;
       case 'confirm':
         // 确认型:直接发送
@@ -267,7 +281,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       case 'choosePlayer':
         // 选玩家型:需要 selectedTarget
         if (!selectedTarget) { alert(prompt.title); return; }
-        params.target = selectedTarget;
+        params.target = nameToIndex(selectedTarget);
         break;
       case 'distribute':
         // 分配型:暂不支持,提示

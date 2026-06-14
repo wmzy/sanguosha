@@ -1,12 +1,13 @@
 // src/client/skillActionRegistry.ts
 // 前端技能 action 注册表：收集技能 onMount 调用 defineAction 注册的 UI 配置
 // 通过 import() 动态加载技能包
-import type { ActionPrompt, Card, CardWrapper, Skill, FrontendAPI } from '../engine/types';
+import type { ActionPrompt, Card, CardWrapper, FrontendAPI, Skill } from '../engine/types';
 import { getSkillModule } from '../engine/skill';
 
 export interface SkillActionDef {
   skillId: string;
-  ownerId: string;
+  /** 玩家座次下标 */
+  ownerId: number;
   actionType: string;
   label: string;
   style?: 'primary' | 'danger' | 'default' | 'passive';
@@ -17,12 +18,12 @@ export interface SkillActionDef {
 // 全局注册表：key = "skillId:ownerId:actionType"
 const registry = new Map<string, SkillActionDef>();
 
-function actionKey(skillId: string, ownerId: string, actionType: string): string {
+function actionKey(skillId: string, ownerId: number, actionType: string): string {
   return `${skillId}:${ownerId}:${actionType}`;
 }
 
 /** 创建一个 FrontendAPI 实例，defineAction 调用会注册到全局注册表 */
-function makeFrontendAPI(skillId: string, ownerId: string): FrontendAPI {
+function makeFrontendAPI(skillId: string, ownerId: number): FrontendAPI {
   return {
     viewer: ownerId,
     onEvent() { return () => {}; },
@@ -44,14 +45,15 @@ function makeFrontendAPI(skillId: string, ownerId: string): FrontendAPI {
 /**
  * 为一个玩家初始化所有技能的前端 action 注册。
  * 通过 import() 动态加载技能模块，调用每个技能 module 的 onMount。
+ * @param playerIndex 玩家座次下标
  */
-export async function registerSkillActions(playerName: string, skillIds: string[]): Promise<void> {
+export async function registerSkillActions(playerIndex: number, skillIds: string[]): Promise<void> {
   for (const skillId of skillIds) {
     try {
       const mod = await getSkillModule(skillId);
       if (!mod.onMount) continue;
-      const skill: Skill = mod.createSkill(skillId, playerName);
-      const api = makeFrontendAPI(skillId, playerName);
+      const skill: Skill = mod.createSkill(skillId, playerIndex);
+      const api = makeFrontendAPI(skillId, playerIndex);
       mod.onMount(skill, api);
     } catch (e) {
       console.warn(`[skillActionRegistry] 注册 ${skillId} 失败:`, e);
@@ -62,11 +64,12 @@ export async function registerSkillActions(playerName: string, skillIds: string[
 /**
  * 获取某个玩家已注册的所有 action 定义。
  * 用于前端渲染技能按钮区。
+ * @param playerIndex 玩家座次下标
  */
-export function getActionsForPlayer(playerName: string): SkillActionDef[] {
+export function getActionsForPlayer(playerIndex: number): SkillActionDef[] {
   const result: SkillActionDef[] = [];
   for (const [, def] of registry) {
-    if (def.ownerId === playerName) {
+    if (def.ownerId === playerIndex) {
       result.push(def);
     }
   }

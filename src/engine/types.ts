@@ -16,6 +16,11 @@ export type Card = {
   rank: string;
   type: '基本牌' | '锦囊牌' | '装备牌';
   subtype?: string;
+  /**
+   * 影子卡牌:若设置,本 Card 是由 shadowOf 指向的原卡"转化"而来(如武圣红牌当杀)。
+   * name/suit/rank 是转化后的视图;原卡仍在 cardMap[shadowOf]。
+   * 影子离开结算(入弃牌堆)时,引擎用 shadowOf 还原为原卡。 */
+  shadowOf?: string;
 };
 
 export type CardWrapper = {
@@ -454,17 +459,18 @@ export interface PendingSlot {
   deadline: number;
   resolve: () => void;
   /** 内部:由 engine-api 在创建 pending 时挂上,供 engine.fireTimeout 立即触发 onTimeout。
-   *  属于引擎内部钩子,不属于 PendingSlot 对外契约(下划线前缀 + 可选)。 */
-  _fireTimeoutNow?: () => Promise<void>;
-}
-// ==================== 协议 ====================
-
 export interface ClientMessage {
   skillId: string;
   actionType: string;
   ownerId: number;
   params: Record<string, Json>;
   baseSeq: number;
+  /**
+   * 可选:在主 action 前顺序执行的前置 action 序列(转化类)。
+   * dispatch 逐个 validate+execute;主 action validate 失败时,对已执行的 preceding
+   * 按逆序调用 rollback 恢复 state。典型:武圣转化(红牌→杀) 在 杀.use 之前。
+   */
+  preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>;
 }
 
 export interface NotifyEvent {
@@ -496,6 +502,13 @@ export interface ActionEntry {
    * ownerId 已在 entry.ownerId 上,无需重复传入。
    */
   execute: (state: GameState, params: Record<string, Json>) => Promise<void>;
+  /**
+   * 可选:回滚 execute 的副作用。仅"可组合 action"(用于 preceding)需要实现。
+   * dispatch 执行 preceding 序列时,若主 action 或后续 preceding 的 validate 失败,
+   * 对已执行的 preceding 按逆序调用 rollback,恢复 state。
+   * 普通非组合 action 不实现(undefined)。
+   */
+  rollback?: (state: GameState, params: Record<string, Json>) => void;
 }
 export interface AtomHookEntry {
   skillId: string;

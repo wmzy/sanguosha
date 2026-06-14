@@ -87,8 +87,9 @@ export function registerAction(
   actionType: string,
   validate: (state: GameState, params: Record<string, Json>) => string | null,
   execute: (state: GameState, params: Record<string, Json>) => Promise<void>,
+  rollback?: (state: GameState, params: Record<string, Json>) => void,
 ): () => void {
-  const entry: ActionEntry = { skillId, ownerId, actionType, validate, execute };
+  const entry: ActionEntry = { skillId, ownerId, actionType, validate, execute, rollback };
   registerActionEntry(entry);
   return () => unregisterActionEntry(skillId, ownerId, actionType);
 }

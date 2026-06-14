@@ -11,8 +11,10 @@ import type { ServerMessage } from '../../server/protocol';
 interface ActionMsg {
   skillId: string;
   actionType: string;
-  ownerId: string;
+  ownerId: number;
   params: Record<string, Json>;
+  /** 组合 action:前置 action 序列(转化类,如武圣) */
+  preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>;
 }
 
 interface MultiplayerGameBoardProps {

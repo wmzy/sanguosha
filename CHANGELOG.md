@@ -47,6 +47,26 @@ All notable changes to this project will be documented in this file.
 将 `src/engine/*` 整体迁至 `src/engine/_legacy/`(参考保留),在 `src/engine/` 重新实现新引擎核心(types/atom/settlement/skill/skill-loader/event-stream/create-engine)。首批交付 38 atom + 10 skill(4 基本牌 + 5 武将 6 技能)。
 
 
+### Docs — 引擎能力边界分析(2026-06-14)
+
+- **ENGINE-DESIGN.md §4.4**:新增"多人响应"说明——验证了无懈可击(抢占式)、濒死求桃(逐个询问)、于吉蛊惑(扣牌+揭示)都能用"单槽 pending + for 循环 + 状态观察"表达,**不需要打破"同时只一个 pending"不变量**。
+  三国杀所有多人交互都是依次串行(非并发),抢占式无懈是数据层约定(请求回应声明合法回应者集合)。
+- **ENGINE-DESIGN.md §6.1**:修正"原子性保证"——before 钩子现通过 HookResult(modify/cancel)干预,非"不能修改/取消"。杀示例座次改 number。
+- **docs/design/引擎缺失能力.md**:重写。核心结论:**引擎执行模型能表达全部技能**,所有缺口均为数据层(atom/字段)或机制已就绪(HookResult),无执行模型改动。逐项标注性质(数据层/已就绪)和优先级。
+
+### Added — 组合 action + 影子卡牌(转化技重构)(2026-06-14)
+
+- **组合 action(preceding)**:`ClientMessage` 加可选 `preceding` 字段——在主 action 前顺序执行的前置 action 序列(转化类)。
+  dispatch 逐个 validate+execute;主 action validate 失败时,对已执行的 preceding 按逆序调用 `rollback` 恢复 state(不用快照,action 自带回滚)。
+  `ActionEntry` 加可选 `rollback`;`registerAction` 加第 6 参数。
+- **影子卡牌(转化模型)**:转化技(武圣)不再 mutate cardMap,而是新建影子 Card(`${id}#${skill}`,`shadowOf` 指向原卡)。
+  原卡属性全程不变;影子入弃牌堆时 `移动牌` atom 用 `shadowOf` 还原为原卡。
+  杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
+- **武圣迁移**:武圣.transform 作为 preceding action(创建影子 + 手牌替换 + rollback 删除影子)。
+  删除旧 `wrapAsKill`/`unwrap`(cardMap 全局 mutate)和死代码 `武圣包装`/`武圣还原` atom。
+- 新增 `tests/integration/composite-action.test.ts`(3 测试:转化+使用成功 / preceding validate 失败丢弃 / 主 action validate 失败 rollback)。
+  (`types.ts` Card.shadowOf/ClientMessage.preceding/ActionEntry.rollback;`create-engine.ts` dispatch preceding 循环 + rollback;`skills/武圣.ts` 重写;`ENGINE-DESIGN.md` §3.1 重写)
+
 ### Refactor — 引擎优雅度重构(2026-06-14)
 
 - **HookResult 取代 dropAtom**(review B1):before 钩子返回 `HookResult`(`pass`/`modify`/`cancel`)取代隐式 `dropAtom` flag。

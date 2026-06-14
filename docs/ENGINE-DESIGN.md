@@ -70,35 +70,60 @@ interface Card {
 
 牌不携带行为。"使用杀的效果是什么"属于技能定义，不属于牌。
 
-### 3.1 技能转化（牌包装）
+### 3.1 技能转化（影子卡牌 + 组合 action）
 
-某些技能可以把一张牌当另一种牌使用（武圣：红牌当杀，倾国：黑牌当闪，龙胆：杀当闪/闪当杀）。这通过**牌包装**实现：
+某些技能可以把一张牌当另一种牌使用（武圣：红牌当杀，倾国：黑牌当闪，龙胆：杀当闪/闪当杀）。
+
+#### 影子卡牌
+
+转化时**不 mutate 原卡**，而是新建一个 **影子 Card 实体**，name/suit/rank 是转化后的视图，`shadowOf` 指向原卡：
 
 ```ts
-interface CardWrapper {
-  /** 包装后的牌属性 */
+type Card = {
+  id: string;
   name: string;
-  /** 原始牌 ID */
-  sourceCardId: string;
-  /** 转化此牌的技能 */
-  fromSkill: string;
+  suit: ...; rank: string; type: ...; subtype?: string;
+  /** 影子卡:若设置,本卡是由 shadowOf 指向的原卡转化而来。原卡仍在 cardMap。 */
+  shadowOf?: string;
+};
+```
+
+影子卡 id 形如 `${原id}#${skillId}`(如 `c1#武圣`)。玩家手牌引用影子 id(原卡被替换出 hand)。
+影子离开结算(入弃牌堆)时，`移动牌` atom 用 `shadowOf` 还原——弃牌堆收原卡 id，删除影子 cardMap 条目。原卡属性全程不变。
+
+#### 组合 action(转化 + 使用)
+
+转化是**前置 action**(`preceding`)，与主 action(杀.use)在**一个 ClientMessage** 中提交：
+
+```ts
+interface ClientMessage {
+  skillId: string; actionType: string; ownerId: number; params; baseSeq;
+  /** 在主 action 前顺序执行的前置 action(转化类)。dispatch 逐个 validate+execute。 */
+  preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>;
 }
 ```
 
-**前端流程**：
-1. 玩家点击武圣按钮 → 给手牌中的红牌加包装（`{ name: '杀', sourceCardId: 原牌.id, fromSkill: '武圣' }`）
-2. 包装后的牌在 UI 上显示为"杀"，可以按杀的方式选目标
-3. 提交时 `ClientMessage.params.cardId` 传的是包装信息
+**前端流程**(两步 UI、一次提交)：
+1. 玩家点击武圣 → 前端给手牌中的红牌加"杀"显示(纯前端,不提交)
+2. 玩家按杀的方式选目标、点出牌
+3. 提交:一个 ClientMessage,`preceding=[武圣.transform]` + 主 action `杀.use`
 
-**后端校验**：
-1. 收到 `ClientMessage` → 发现 `cardId` 包含 `fromSkill` 字段
-2. 取出原始牌，找到对应技能实例，调用技能的转化逻辑重新转换
-3. 比对前端提交的包装和后端重新转换的结果是否一致
-4. 一致 → 通过，把包装后的牌属性写入处理区
+**后端执行**(dispatch)：
+1. 先执行 preceding:武圣.transform validate(红牌校验) + execute(创建影子卡 c1#武圣,手牌引用替换)
+2. 主 action 杀.use validate → 读 `cardMap[c1#武圣]` 看到"杀" → 通过(**杀零感知武圣**)
+3. 杀.use execute → 正常出杀流程(移动牌/询问闪/造成伤害/入弃牌堆)
 
-**还原**：技能注册钩子在牌离开处理区时还原为原始牌属性。例如武圣注册 `移动牌` atom 的 after 钩子，检查是否是处理区→弃牌堆的移动且牌有武圣包装 → 还原。
+**回滚**：preceding 的 action 可选实现 `rollback`。主 action validate 失败时，dispatch 对已执行的 preceding 按逆序调用 rollback，恢复 state。武圣.transform 的 rollback：删除影子卡、手牌还原为原卡 id。
 
-杀的 filter/validate 完全不用改——它看到的就是一张"杀"。包装和还原都是武圣自己的事。
+```ts
+interface ActionEntry {
+  validate; execute;
+  /** 可选:回滚 execute 的副作用。仅"可组合 action"(用于 preceding)需要实现。 */
+  rollback?: (state, params) => void;
+}
+```
+
+杀的 filter/validate/execute 完全不用改——它看到的就是一张"杀"。转化(影子创建)、回滚、还原都是武圣自己的事。
 
 ## 4. 技能
 
@@ -326,6 +351,22 @@ applyAtom(state, 询问闪):
 前端根据 `pending` 字段显示倒计时/进度条,根据 `prompt` 渲染回应 UI,根据等待型 atom 的 `AtomDefinition.pending.prompt` 启用对应的 action 按钮。
 
 **`applyAtom(state, atom)` 返回 `Promise<void>`**。等待型 atom 的 Promise 在被消费(用户回应 / 超时)时 resolve。技能代码用 `await applyAtom(state, ...)` 自然暂停/恢复,不需要回调或续跑机制。
+
+**多人响应(无懈可击/濒死求桃/于吉蛊惑)**：三国杀里所有"多人交互"都是**依次串行**的,不是并发——求桃是从当前玩家开始轮询、无懈是抢占式(一轮收一个)、质疑是依次问每个玩家。因此**同时只一个 pending 的不变量足够表达全部**,无需并发等待。
+
+- **逐个询问(濒死/决斗/蛊惑)**:`for (player of 轮转序列) { await applyAtom(请求回应, { target: player }) }`——每人一个 pending,串行。回应结果通过 `state.localVars` 观察。
+- **抢占式(无懈可击)**:每轮一个 pending,允许**任一活着的玩家**回应(非单 target);第一个有效 respond 占用并 resolve,下一轮无懈是新的 pending。父 execute 用循环收集无懈数量,奇偶决定原锦囊是否生效:
+```ts
+// 锦囊 execute 内
+let wuxieCount = 0;
+while (true) {
+  await applyAtom(state, { type: '请求回应', requestType: '无懈', target: 广播, onTimeout: 无操作 });
+  if (!state.localVars['无懈/本轮已打']) break;  // 超时=本轮无人打无懈
+  wuxieCount++;
+}
+const 生效 = wuxieCount % 2 === 0;  // 偶数=原锦囊生效,奇数=被抵消
+```
+抢占式 pending 的"任一玩家可回应"是数据层约定(`请求回应` 声明合法回应者集合),不打破单槽不变量——仍是同时只一个 pending,只是回应者不限于单一 target。
 
 ### 4.5 Atom 钩子
 
@@ -1243,9 +1284,9 @@ for (const event of viewEvents) {
    - **若当前已有 pending slot**:旧 slot 的 Promise **直接 resolve**(不 fire onTimeout,旧 atom 已被新 wait 取代),旧 atom 已应用的 state 变更保留
    - 新 atom 进入 **pending 区**，`applyAtom` 返回的 Promise **挂起**
    - 前端收到带 `pending: { startTime, deadline }` 的 atom 事件
+**原子性保证**：before 钩子通过返回 `HookResult`(§4.5)干预当前 atom:`modify` 改参数(叠加生效)、`cancel` 取消。validate 在钩子折叠之后执行,基于(可能被 modify 过的)最新参数检查。
    - 等待结束: 响应到达(target 的 respond action execute 完,slot 被消费)或 超时(`pending.onTimeout` 声明的 atom 走普通 apply 路径,必填)
 
-**原子性保证**：before 钩子**不能修改 atom 参数**、**不能取消 atom**。validate 在钩子之后执行，基于最新状态检查。
 
 **普通 atom vs 等待型 atom 的唯一区别**：步骤 8。没有 `pending` 声明的 atom 在步骤 7 后 Promise 直接 resolve；有 `pending` 声明的 atom 进入 pending 区等待。
 
@@ -1256,13 +1297,13 @@ pushFrame(state, '杀', from, { cardId, targets })
 // 移牌到处理区
 await applyAtom(state, { type: '移动牌', cardId, from: 手牌, to: 处理区 })
 
-await applyAtom(state, { type: '指定目标', source: P1, target: 'P2' })
+await applyAtom(state, { type: '指定目标', source: 0, target: 1 })
 
 // 询问闪:等待型 atom → 进入 pending 区 → Promise 挂起
-await applyAtom(state, { type: '询问闪', target, source: P1 })
+await applyAtom(state, { type: '询问闪', target, source: 0 })
 // ↑ 八卦阵 before 钩子:
 //    插入 请求回应(是否发动八卦阵) → 用户选择 → 判定
-//    判定成功 → apply(加标签, autoDodge) → 询问闪继续(不 drop)
+//    判定成功 → apply(加标签, autoDodge) → 询问闪继续
 //    判定失败 → 不做事 → 询问闪继续
 // ↑ 询问闪进 pending 区后:
 //    用户出闪 → 闪 action execute(移牌到弃牌堆) → pending 消费 → Promise resolve
@@ -1274,7 +1315,7 @@ const beforeCount = ...; // 等待前快照
 const dodged = state.zones.discardPile.slice(beforeCount)
   .some(id => state.cardMap[id]?.name === '闪');
 if (!dodged && !hasTag('八卦阵/autoDodge')) {
-  await applyAtom(state, { type: '造成伤害', target, amount: 1, source: P1 });
+  await applyAtom(state, { type: '造成伤害', target, amount: 1, source: 0 });
 }
 // 移牌到弃牌堆
 await applyAtom(state, { type: '移动牌', cardId, from: 处理区, to: 弃牌堆 })
