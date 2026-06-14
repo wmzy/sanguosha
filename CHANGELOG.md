@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-10
+
+## [Unreleased] — 2026-06-14
+### Research — 武将技能研究文档补全(吴/群/蜀/魏 4 国)
+
+按 docs/research/武将技能.md 框架,补全 70+ 武将技能描述和规则注释:
+
+### Added
+
+- `docs/research/武将技能/吴国/*.md` — 20 名吴国武将(丁奉/凌统/吴国太/大乔小乔/孙鲁班/徐盛/朱桓/朱然/步练师/潘璋马忠/祖茂/程普/蒋钦/虞翻/诸葛瑾/陈武董袭/韩当/顾雍)
+- `docs/research/武将技能/群雄/*.md` — 24 名群雄武将(伏完/伏皇后/何太后/何进/刘协/刘表/吉本/孔融/张任/张宝/李儒/汉献帝/沮授/灵雎/田丰/穆顺/纪灵/蔡夫人/邹氏/陈宫/韩遂/马腾/高顺)
+- `docs/research/武将技能/蜀国/*.md` — 18 名蜀国武将(关兴张苞/关平/关银屏/刘封/吴懿/周仓/夏侯氏/夏侯霸/廖化/张松/徐庶/星彩/法正/甘夫人/简雍/糜夫人/蒋琬费祎/马岱/马良/马谡)
+- `docs/research/武将技能/魏国/*.md` — 18 名魏国武将(乐进/于禁/张春华/文聘/曹冲/曹彰/曹昂/曹植/曹洪/曹真/李典/杨修/满宠/牛金/王异/臧霸/荀攸/诸葛诞/郭淮/钟会/陈琳/陈群/韩浩史涣)
+
+### Changed
+
+- `docs/research/基础规则.md` — 补充牌堆构成、装备区规则、判定流程等
+- `docs/research/卡牌信息.md` — 补全锦囊/装备牌完整信息,修正官方规则引用
+- `docs/research/武将技能.md` — 补全 70+ 武将技能框架
+- `docs/research/武将技能/蜀国/刘备.md` — 修正仁德规则描述
+- `docs/research/武将技能/蜀国/界赵云.md` — 修正描述
+- `docs/research/武将技能/蜀国/诸葛亮.md` — 修正观星空城规则
+- `docs/research/武将技能/魏国/曹操.md` — 修正奸雄规则
+- `docs/research/武将技能/魏国/界曹操.md` — 修正界奸雄规则
+- `src/engine/skills/反馈.ts` — 注释修正:删除已完成的"描述错误"条,重新编号
+- `src/engine/skills/寒冰剑.ts` — 添加完整官方规则注释(技能描述/触发/FAQ)
+- `src/engine/skills/杀.ts` — 注释修正:目标限制改为"其他角色",标注 validate 未约束
+- `src/engine/skills/桃.ts` — 补充完整规则描述:各模式变体、FAQ
+- `src/engine/skills/酒.ts` — 补充完整规则描述:两种使用方法、FAQ
+
+### Removed
+
+- `scripts/check-coverage.mjs` — 无用覆盖检查脚本
+- `scripts/repro-duel.mjs` — 无用重放脚本(依赖 v2 遗留路径)
+
+### Verified
+
+- 9 新引擎测试文件全绿(21 passed, 4 skipped)
+- 类型检查:0 新错误(遗留 1000+ v2 预存错误)
+
 ### Engine v3 P0 重构启动 — 按 ENGINE-DESIGN.md 在 `src/engine/` 重写核心
 
 将 `src/engine/*` 整体迁至 `src/engine/_legacy/`(参考保留),在 `src/engine/` 重新实现新引擎核心(types/atom/settlement/skill/skill-loader/event-stream/create-engine)。首批交付 38 atom + 10 skill(4 基本牌 + 5 武将 6 技能)。
