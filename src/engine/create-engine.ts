@@ -172,7 +172,10 @@ export function create(gameConfig: GameConfig): GameState {
 }
 
 /**
- * 异步 bootstrap:在 state 上跑完开局流程。
+ * 异步 bootstrap:在 state 上跑完开局流程。**不可重入**——开局一旦执行,
+ * 抽身份/选将/洗牌/发牌的状态变更就开始了,无法回滚。对已开局的 state 再调
+ * bootstrap 是调用方 bug,直接抛错暴露,而非"幂等"重跑。
+ *
  *   1. 动态 import 开局 skill 模块
  *   2. 调 开局.onInit(skill, gameConfig) 注册 start action
  *   3. dispatch 开局 start → 跑完抽身份/选将/洗牌/发牌/启动第一回合
@@ -181,10 +184,15 @@ export function create(gameConfig: GameConfig): GameState {
  * restore 路径不调 bootstrap —— 直接用 replay 出来的 state 即可。
  */
 export async function bootstrap(state: GameState, gameConfig: GameConfig): Promise<void> {
-  // 幂等:若 bootstrap 重入(如 restore 路径误调),先卸载旧的 开局:系统 实例,避免重复注册抛错
-  unloadSkillInstance('开局', SYSTEM_OWNER);
+  // 防重入:开局已执行过(玩家已发牌)→ 抛错。不是"幂等"——状态变更不可回滚。
+  if (state.players.some(p => p.hand.length > 0)) {
+    throw new Error('bootstrap: state 已开局(玩家已有手牌),不可重复 bootstrap');
+  }
   const 开局mod = await import('./skills/开局');
   const syntheticSkill = 开局mod.default.createSkill('开局', SYSTEM_OWNER);
+  // 全局注册表幂等:先卸载旧实例(await import 之后、onInit 之前),避免
+  // 跨 session/跨 test 时因微任务交织导致 "already registered" 抛错。
+  unloadSkillInstance('开局', SYSTEM_OWNER);
   // 开局.onInit(skill, gameConfig) 是 system skill 的特殊接口
   // @ts-ignore 开局的 onInit 签名是 (skill, gameConfig),不是 SkillModule 标准 (skill, ownerId)
   const off开局 = 开局mod.onInit(syntheticSkill, gameConfig);

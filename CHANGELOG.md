@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
   - 折叠(folding)语义:before hooks 按注册顺序串行折叠,而非第一个 drop 就 break。
   - 修复 guard mark 永久残留 bug(藤甲/护甲 `scope:-1` 从不清理 → 只触发一次)。
   (`types.ts` HookResult;`create-engine.ts` applyAtom 折叠循环;6 skill 迁移;`ENGINE-DESIGN.md` §4.2/4.5/6.1 更新)
+- **双重注册 P0**:`instantiateSkill` 改幂等(先 `unloadSkillInstance` 再注册),修复 rebootstrap 重入时的 `already registered` 抛错(原 review 问题 7)。
+  注:`bootstrap` 双重防护——(a) `unloadSkillInstance` 前置卸载,保证全局 action 注册表在跨 session 复用时不抛错;(b) 玩家已有手牌 → 抛错,防止已开局 state 重入(状态变更不可回滚)。
 - **座次解耦**:引擎层所有 player/target/source/ownerId 从 string(玩家名)改为 number(座次下标)。
   引擎只认座次,玩家真实 ID ↔ 座次映射在 session 层(`playerNames: Map<WS, number>`)。
   `SYSTEM_OWNER = '系统'` 改为 `-1`(消除玩家名冲突风险)。`PlayerState.name` 保留为展示名。
