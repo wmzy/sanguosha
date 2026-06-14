@@ -72,11 +72,13 @@ describe('杀', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
+    // 第一刀:P1 出杀,P2 不闪 → P2 扣血
     await P1.useCardAndTarget('杀', 'c1', [1]);
     await P2.pass();
+    const healthAfterFirst = harness.state.players[1].health;
 
-    await expect(
-      P1.useCardAndTarget('杀', 'c2', [1]),
-    ).rejects.toThrow(/出杀次数已用尽/);
+    // 第二刀:validate 失败(出杀次数已用尽)→ 静默丢弃,无副作用(P2 血量未再扣)
+    await P1.useCardAndTarget('杀', 'c2', [1]);
+    expect(harness.state.players[1].health).toBe(healthAfterFirst);
   });
 });

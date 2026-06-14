@@ -29,7 +29,7 @@ import {
   fireTimeout as engineFireTimeout,
   buildView as engineBuildView,
   resetForTest,
-  rebootstrap,
+  registerSkillsFromState,
 } from '../src/engine/create-engine';
 import { getEventCount, getEvents } from '../src/engine/event-stream';
 import { getSkillModule } from '../src/engine/skill';
@@ -232,12 +232,11 @@ export class PlayerSession {
   private async dispatch(
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
   ): Promise<void> {
-    const result = await engineDispatch(this.harness.state, {
+    await engineDispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerIndex,
       baseSeq: this.harness.state.seq,
     });
-    if (result.error) throw new Error(`dispatch error: ${result.error}`);
   }
 }
 
@@ -260,7 +259,7 @@ export class SkillTestHarness {
       if (!p.tags) p.tags = [];
     }
     this._state = state;
-    await rebootstrap(state);
+    await registerSkillsFromState(state);
     this.sessions.clear();
     for (const player of state.players) {
       const session = new PlayerSession(player.index, this);

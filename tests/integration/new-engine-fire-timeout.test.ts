@@ -1,7 +1,7 @@
 // tests/integration/new-engine-fire-timeout.test.ts
 // 引擎 fireTimeout(state) 单元测试(归 core 项目)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { dispatch, fireTimeout, rebootstrap, resetForTest } from '../../src/engine/create-engine';
+import { dispatch, fireTimeout, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -28,13 +28,12 @@ describe('fireTimeout(state)', () => {
   beforeEach(async () => {
     resetForTest();
     state = buildInitialState();
-    await rebootstrap(state);
+    await registerSkillsFromState(state);
   });
 
-  it('无 pending 时调用:返回空 result,state 不变', async () => {
+  it('无 pending 时调用:无副作用,state 不变', async () => {
     const beforeSeq = state.seq;
-    const result = await fireTimeout(state);
-    expect(result.gameOver).toBeFalsy();
+    await fireTimeout(state);
     expect(state.seq).toBe(beforeSeq);
   });
 

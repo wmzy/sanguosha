@@ -1,7 +1,7 @@
 // tests/integration/new-engine-kill.test.ts
-// 集成测试 1: 新顶层 API(dispatch / rebootstrap) + 出杀全流程(不含回应,含扣血)
+// 集成测试 1: 新顶层 API(dispatch / registerSkillsFromState) + 出杀全流程(不含回应,含扣血)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { dispatch, rebootstrap, resetForTest } from '../../src/engine/create-engine';
+import { dispatch, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -55,7 +55,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
   beforeEach(async () => {
     resetForTest();
     state = buildInitialState();
-    await rebootstrap(state);
+    await registerSkillsFromState(state);
   });
 
   it('出杀:无回应 → 目标扣 1 血', async () => {
@@ -100,7 +100,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     state.players = state.players.map(p => p.name === 'P1' ? { ...p, hand: ['c2'] } : p);
     state.cardMap = { ...state.cardMap, c2 };
     resetForTest();
-    await rebootstrap(state);
+    await registerSkillsFromState(state);
 
     await dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 0,

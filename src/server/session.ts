@@ -6,7 +6,7 @@ import type {
   GameState,
   GameView,
 } from '../engine/types';
-import { create, bootstrap, dispatch, buildView, resetForTest, rebootstrap, type GameConfig } from '../engine/create-engine';
+import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -55,13 +55,22 @@ export class GameSession {
     this.sessionSeed = sessionSeed ?? Date.now();
   }
 
-  /** 用持久化恢复的 state 接管(由 app.ts 从 actionLog replay 出来后传入) */
+  /** 用持久化数据恢复:create(config) → bootstrap → 重放 actionLog,确定性重建完整 state。
+   *  config 从 state(rngSeed/playerCount)+ 全局 CHARACTERS 重构。 */
   async restoreState(state: GameState, actionLog: ActionLogEntry[] = []): Promise<void> {
-    this.actionLog = actionLog;
     this.lastActivityAt = Date.now();
-    this.state = state;
-    // 通过 skillLoaders 动态加载并注册所有 skill 实例
-    await rebootstrap(state);
+    // config 重构:seed 来自 state,playerCount 从 state.players,characters 用全局表
+    const config: GameConfig = {
+      characters: CHARACTERS,
+      playerCount: state.players.length,
+      seed: state.rngSeed,
+      gameId: this.room.id,
+    };
+    const fresh = create(config);
+    await bootstrap(fresh, config);
+    await restore(fresh, config, actionLog);
+    this.state = fresh;
+    this.actionLog = fresh.actionLog;
   }
 
   async startGame(playerCount?: number): Promise<boolean> {
@@ -128,11 +137,7 @@ export class GameSession {
       return;
     }
 
-    const result = await dispatch(this.state, action);
-    if (result.error) {
-      this.sendToPlayer(playerId, { type: 'error', message: result.error });
-      return;
-    }
+    await dispatch(this.state, action);
 
     // 记录 actionLog(从引擎获取)
     this.actionLog = this.state.actionLog;
@@ -140,10 +145,10 @@ export class GameSession {
     this.persistAsync();
     this.broadcastNewState();
 
-
-    // 检查游戏结束
-    if (result.gameOver) {
-      this.handleGameOver(result.winner);
+    // 检查游戏结束(从 state 计算,不依赖 dispatch 返回值)
+    const { gameOver, winner } = checkGameOver(this.state);
+    if (gameOver) {
+      this.handleGameOver(winner);
     }
     this.resetIdleTimer();
   }

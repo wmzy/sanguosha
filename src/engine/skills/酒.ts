@@ -33,7 +33,7 @@
 //   5. validate 未限制 target 必须是自己——任何 target 都能传入(虽 UI 不暴露)。
 //   6. 未在 onMount 注册 UI prompt——前端按钮如何触发未定义。
 // ============================================================
-import type { GameState, Atom, AtomBeforeContext, GameView, Json, Skill  } from '../types';
+import type { GameState, Atom, AtomBeforeContext, GameView, HookResult, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -73,7 +73,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     }, );
 
   // 消费 mark:在造成伤害时,如果是 self 造成的 且 有 酒/nextKillDamageBonus mark,amount + 1
-  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { source?: number; amount?: number; type: string };
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

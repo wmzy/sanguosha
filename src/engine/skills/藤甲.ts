@@ -44,7 +44,7 @@
 //      应按"八卦阵 → 仁王盾 → 白银狮子/藤甲"顺序?还是其他顺序?
 //      hook 顺序未约束,需明确实现规则(目前依赖注册顺序,易错)。
 // ============================================================
-import type { AtomBeforeContext, Skill } from '../types';
+import type { AtomBeforeContext, HookResult, Skill } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -52,10 +52,10 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; amount?: number; damageType?: string };
     if (atom.target !== ownerId) return;
-
+  
     const baseAmount = atom.amount ?? 1;
     let newAmount: number;
     if (atom.damageType === 'fire') {

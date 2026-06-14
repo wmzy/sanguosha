@@ -14,6 +14,7 @@ import type {
   AtomHookEntry,
   FrontendAPI,
   GameState,
+  HookResult,
   Json,
   Skill,
 } from './types';
@@ -94,14 +95,15 @@ export function registerAction(
 
 /**
  * 注册一个 before atom 钩子。ownerId 在注册时绑定,handler 通过 ctx.ownerId 拿(无需闭包)。
+ * before 钩子可返回 HookResult(pass/modify/cancel),after 钩子返回 void。
  */
 export function registerBeforeHook(
   skillId: string,
   ownerId: number,
   atomType: string,
-  handler: (ctx: AtomBeforeContext) => Promise<void>,
+  handler: (ctx: AtomBeforeContext) => Promise<HookResult | void>,
 ): () => void {
-  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'before', handler: handler as AtomHookEntry['handler'] };
+  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'before', handler };
   const list = beforeHooks.get(atomType) ?? [];
   list.push(entry);
   beforeHooks.set(atomType, list);
@@ -122,7 +124,7 @@ export function registerAfterHook(
   atomType: string,
   handler: (ctx: AtomAfterContext) => Promise<void>,
 ): () => void {
-  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'after', handler: handler as AtomHookEntry['handler'] };
+  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'after', handler };
   const list = afterHooks.get(atomType) ?? [];
   list.push(entry);
   afterHooks.set(atomType, list);
@@ -166,10 +168,11 @@ export function clearAllSkillInstances(): void {
   afterHooks.clear();
 }
 
-// ─── bootstrap / rebootstrap ────────────────────────────────
+// ─── skill 注册 ─────────────────────────────────────────────
 
-/** 遍历 state.players,给每个 skill 调 onInit 注册实例(并保存 unload) */
-export async function rebootstrap(state: GameState): Promise<void> {
+/** 遍历 state.players,给每个 skill 调 onInit 注册实例(并保存 unload)。
+ *  bootstrap 用此在 开局 流程注入 player.skills 后注册;测试用此给预构造 state 注册技能。 */
+export async function registerSkillsFromState(state: GameState): Promise<void> {
   for (const player of state.players) {
     for (const skillId of player.skills) {
       await instantiateSkill(skillId, player.index);
@@ -178,10 +181,10 @@ export async function rebootstrap(state: GameState): Promise<void> {
 }
 
 /**
- * 实例化单个 skill(从 create-engine bootstrap / rebootstrap / 添加技能 atom 调用)。
+ * 实例化单个 skill(从 create-engine bootstrap / registerSkillsFromState / 添加技能 atom 调用)。
  *
  * 幂等:若 (skillId, ownerId) 已有实例,先卸载旧实例(调其 unload 函数 + 清 action/hook 注册),
- * 再重新注册。保证 rebootstrap 重入、并发 dispatch、动态 添加技能 等场景不会因
+ * 再重新注册。保证 registerSkillsFromState 重入、并发 dispatch、动态 添加技能 等场景不会因
  * `registerActionEntry` 的 "already registered" 抛错。
  */
 export async function instantiateSkill(skillId: string, ownerId: number): Promise<Skill> {

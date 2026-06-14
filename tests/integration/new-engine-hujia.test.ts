@@ -1,7 +1,7 @@
 // tests/integration/new-engine-hujia.test.ts
-// 集成测试 2: 新顶层 API(dispatch / rebootstrap) + 武将技能 护甲(锁定被动)
+// 集成测试 2: 新顶层 API(dispatch / registerSkillsFromState) + 武将技能 护甲(锁定被动)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { dispatch, rebootstrap, resetForTest } from '../../src/engine/create-engine';
+import { dispatch, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -27,7 +27,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 护甲(曹操·锁定被动)', () => 
   beforeEach(async () => {
     resetForTest();
     state = buildInitialState();
-    await rebootstrap(state);
+    await registerSkillsFromState(state);
   });
 
   it('受到黑色【杀】 → 扣 0 血(护甲吸收)', async () => {

@@ -32,7 +32,7 @@
 //      hook 自身依赖"装备换走后 hook 还在,只是 early return"的隐式正确。
 //      更稳健做法:依赖装备通用.ts 的 unloadSkillInstance 正确 unregisterHook。
 // ============================================================
-import type { AtomBeforeContext, Skill } from '../types';
+import type { AtomBeforeContext, HookResult, Skill } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -40,7 +40,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; amount?: number; source?: number; cardId?: string };
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 1) return;

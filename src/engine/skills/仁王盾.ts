@@ -26,7 +26,7 @@
 //   5. **与青釭剑/藤甲叠加时优先级未定义**:青釭剑"无视防具"尚未实现,
 //      一旦实现,应在 hook 顺序中排在仁王盾/藤甲之前——目前未约束。
 // ============================================================
-import type { AtomBeforeContext, Skill } from '../types';
+import type { AtomBeforeContext, HookResult, Skill } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -34,7 +34,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'cancel' } | void> => {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; source?: number; cardId?: string };
     if (atom.target !== ownerId) return;
     // 检查杀的颜色

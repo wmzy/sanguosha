@@ -3,7 +3,7 @@
 //
 // 主要导出:
 //   - create(gameConfig): 同步建 state(预创建 playerCount 个空玩家槽位),返回骨架 state
-//   - bootstrap(state, gameConfig): 异步 —— 加载 开局 skill → onInit → dispatch 开局 start → rebootstrap
+//   - bootstrap(state, gameConfig): 异步 —— 加载 开局 skill → onInit → dispatch 开局 start → registerSkillsFromState
 //   - dispatch(state, msg): 接受 state,执行 client message
 //   - buildView(state, viewer): 接受 state,返回 view
 //   - fireTimeout(state): 触发 pending slot 的 onTimeout
@@ -26,6 +26,7 @@
 // actionLog 由引擎自动记录,session 不直接 mutate state。
 
 import type {
+  ActionLogEntry,
   Atom,
   AtomAfterContext,
   AtomBeforeContext,
@@ -45,7 +46,7 @@ import {
   getAfterHooks,
   getBeforeHooks,
   instantiateSkill,
-  rebootstrap as skillRebootstrap,
+  registerSkillsFromState as skillRebootstrap,
   setSkillInstanceUnload,
   unloadSkillInstance,
 } from './skill';
@@ -54,13 +55,7 @@ import { clearEvents, pushEvent } from './event-stream';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
 
-export interface DispatchResult {
-  error?: string;
-  /** 游戏是否结束 */
-  gameOver?: boolean;
-  /** 获胜者座次下标(游戏结束时) */
-  winner?: number;
-}
+
 
 export interface GameConfig {
   characters: Array<{ name: string; skills: string[] }>;
@@ -126,7 +121,8 @@ function logAction(state: GameState, message: ClientMessage): void {
   });
 }
 
-function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
+/** 检查游戏是否结束(存活玩家 ≤ 1)。纯函数,基于 state 计算。 */
+export function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
   const aliveCount = state.players.filter((p) => p.alive).length;
   if (aliveCount <= 1) {
     const winner = state.players.find((p) => p.alive);
@@ -179,7 +175,7 @@ export function create(gameConfig: GameConfig): GameState {
  *   1. 动态 import 开局 skill 模块
  *   2. 调 开局.onInit(skill, gameConfig) 注册 start action
  *   3. dispatch 开局 start → 跑完抽身份/选将/洗牌/发牌/启动第一回合
- *   4. rebootstrap(state) 给每个 player 的 skills 注册实例
+ *   4. registerSkillsFromState(state) 给每个 player 的 skills 注册实例
  *
  * restore 路径不调 bootstrap —— 直接用 replay 出来的 state 即可。
  */
@@ -199,85 +195,78 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   // 登记实例 unload,使 unloadSkillInstance/clearAllSkillInstances 能正确清理 开局:系统
   setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
-  // 2. dispatch 开局 start
-  const result = await dispatch(state, {
+  // 2. dispatch 开局 start(dispatch void:非法 action 静默丢弃,开局失败通过后续 state 检查暴露)
+  await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
     ownerId: SYSTEM_OWNER,
     params: { ...gameConfig } as Record<string, Json>,
     baseSeq: 0,
   });
-  if (result.error) throw new Error(`开局失败: ${result.error}`);
 
   // 3. 给每个 player 的 skills 注册实例(开局时玩家技能已通过 选将 atom 注入)
   await skillRebootstrap(state);
 }
 
 /**
- * 重新注册 state 中所有玩家的技能实例(用于初始化游戏后)。
- * 通过 skillLoaders 动态 import 加载技能模块。
+ * 从持久化数据恢复游戏:create(config) → bootstrap → 重放 actionLog(跳过开局条目,
+ * bootstrap 会重新生成)。确定性地重建完整 state + skill 注册。
+ *
+ * actionLog[0] 是 开局 start(bootstrap 重新生成),从 [1] 开始重放。
  */
-export async function rebootstrap(state: GameState): Promise<void> {
-  await skillRebootstrap(state);
+export async function restore(state: GameState, gameConfig: GameConfig, actionLog: ActionLogEntry[]): Promise<GameState> {
+  for (const entry of actionLog.slice(1)) {
+    await dispatch(state, entry.message);
+  }
+  return state;
 }
 
+/** 测试/工具用:给预构造 state(未走 bootstrap)注册所有 player.skills 实例 */
+export { registerSkillsFromState } from './skill';
+
 /**
- * 执行一条 client message。state 必须由 create() + bootstrap() 或外部构造好后传入。
+ * 执行一条 client message:查找合法 action 并调用。
+ * - 主动 action:validate 通过 → 执行;否则静默丢弃
+ * - 回应 action(pending 存在):先 resolve pending,再执行回应 execute
+ * 无返回值——游戏结束等状态由调用方从 state 自行读取(checkGameOver)。
  */
-export async function dispatch(state: GameState, message: ClientMessage): Promise<DispatchResult> {
+export async function dispatch(state: GameState, message: ClientMessage): Promise<void> {
   // === 回应路径(已有 pending slot) ===
   if (state.pendingSlot) {
     const slot = state.pendingSlot;
-    const target = extractPendingTarget(slot.atom);
-    if (message.ownerId !== target) return {};
+    if (message.ownerId !== extractPendingTarget(slot.atom)) return;
 
     const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-    // 回应路径:找到 entry 且校验通过 → 执行回应;否则视为"未有效回应"。
-    // 关键:无论是否有效回应都必须 resolve slot——pending 目标若不出牌/无法回应,
-    // 父 execute(如 杀)需继续结算。slot 保持挂起 = 死锁。
-    if (entry) {
-      const err = entry.validate(state, message.params);
-      if (err === null) {
-        await entry.execute(state, message.params);
-      }
+    // 回应:先执行 respond execute(打出闪等),再 resolve slot 让父 execute 续跑。
+    // validate 失败 = 未有效回应,仅 resolve(父 execute 继续,目标未出牌)。
+    if (entry && entry.validate(state, message.params) === null) {
+      await entry.execute(state, message.params);
     }
     const resolve = slot.resolve;
     slot.resolve = () => {};
     resolve();
-
-    // 等稳定点:重新建立 per-state stable wait,捕捉原 execute 续跑后的
-    // .finally(完成)或 applyAtom 创建新 pending 事件。
     setupStableWait(state);
     await state._waitForStable;
-    if (!state.pendingSlot) state._activeExecuteP = undefined
+    if (!state.pendingSlot) state._activeExecuteP = undefined;
     logAction(state, message);
     state.seq += 1;
-    const { gameOver, winner } = checkGameOver(state);
-    return { gameOver, winner };
+    return;
   }
 
   // === 主动 action 路径 ===
-  // 纯路由:匹配不到 → 丢弃;校验失败 → 丢弃。dispatch 不认识"装备牌"等业务概念。
   const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-  if (!entry) return {};
-
+  if (!entry) return;
   const validationError = entry.validate(state, message.params);
-  if (validationError !== null) return { error: validationError };
+  if (validationError !== null) return;
 
-  // 主动 action 路径:启动 execute,await per-state stable wait。
-  // 通知触发点:execute 完成(.finally) / 新 pending 创建(applyAtom via resolveStable)。
   setupStableWait(state);
-
   const executeP = entry.execute(state, message.params).finally(() => {
-    resolveStable(state);    // execute 完成 → 稳定点
+    resolveStable(state);
   });
   state._activeExecuteP = executeP;
   await state._waitForStable;
-
   logAction(state, message);
   state.seq += 1;
-  const { gameOver, winner } = checkGameOver(state);
-  return { gameOver, winner };
 }
 
 /**
@@ -290,19 +279,16 @@ export function buildView(state: GameState, viewer: number): GameView {
 /**
  * 立即触发当前 pending slot 的 onTimeout(模拟超时,绕过真实 setTimeout)。
  */
-export async function fireTimeout(state: GameState): Promise<DispatchResult> {
+export async function fireTimeout(state: GameState): Promise<void> {
   const slot = state.pendingSlot;
-  if (!slot) return {};
+  if (!slot) return;
   await slot._fireTimeoutNow?.();
-  // 不等 activeExecuteP:execute 恢复后可能产生新 pending 或完成,
-  // 下一次 dispatch/fireTimeout 会处理。仅当 execute 已完成时清理。
-  // 续跑路径:重新建立 stable wait 捕捉原 execute 续跑后的事件(同 dispatch 回应路径)
   setupStableWait(state);
   await state._waitForStable;
-  if (!state.pendingSlot) state._activeExecuteP = undefined
-  const { gameOver, winner } = checkGameOver(state);
-  return { gameOver, winner };
+  if (!state.pendingSlot) state._activeExecuteP = undefined;
 }
+
+
 
 /**
  * 测试用:模块级清空(skill instances + events)。

@@ -28,7 +28,7 @@
 //   5. **重复实现**:仁王盾(防具)有完全相同的逻辑,二者无复用关系——
 //      应通过共享 hook 工具或 atom 修正管道避免重复。
 // ============================================================
-import type { Atom, AtomBeforeContext, Skill } from '../types';
+import type { Atom, AtomBeforeContext, HookResult, Skill } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -41,7 +41,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'modify' } | void> => {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; cardId?: string; amount?: number; type: string };
     if (atom.target !== ownerId) return;
     if (typeof atom.cardId !== 'string') return;

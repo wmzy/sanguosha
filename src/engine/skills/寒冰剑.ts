@@ -1,6 +1,6 @@
 // src/engine/skills/寒冰剑.ts
 // 寒冰剑(武器):杀造成伤害时可改为弃目标2张牌(取消原伤害)
-import type { AtomBeforeContext, Skill } from '../types';
+import type { AtomBeforeContext, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
@@ -9,7 +9,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<{ kind: 'cancel' } | void> => {
+  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     // 检查目标是否有牌可弃

@@ -16,8 +16,16 @@ All notable changes to this project will be documented in this file.
   - 折叠(folding)语义:before hooks 按注册顺序串行折叠,而非第一个 drop 就 break。
   - 修复 guard mark 永久残留 bug(藤甲/护甲 `scope:-1` 从不清理 → 只触发一次)。
   (`types.ts` HookResult;`create-engine.ts` applyAtom 折叠循环;6 skill 迁移;`ENGINE-DESIGN.md` §4.2/4.5/6.1 更新)
-- **双重注册 P0**:`instantiateSkill` 改幂等(先 `unloadSkillInstance` 再注册),修复 rebootstrap 重入时的 `already registered` 抛错(原 review 问题 7)。
-  注:`bootstrap` 双重防护——(a) `unloadSkillInstance` 前置卸载,保证全局 action 注册表在跨 session 复用时不抛错;(b) 玩家已有手牌 → 抛错,防止已开局 state 重入(状态变更不可回滚)。
+- **双重注册**:`instantiateSkill` 改幂等(先 `unloadSkillInstance` 再注册),修复 skill 实例重注册的 `already registered` 抛错。
+  `bootstrap` 非幂等——已开局 state(玩家已发牌)重入直接抛错(状态变更不可回滚)。
+- **restore 取代 rebootstrap**:旧的 `rebootstrap`(遍历 player.skills 注册实例)逻辑错误。
+  改为 `restore(state, config, actionLog)`:跳过开局条目,逐条 `dispatch` 重放 actionLog,确定性重建完整 state + skill 注册。
+  `session.restoreState` 改用 create+bootstrap+restore 全量重放(config 从 state.rngSeed+全局 CHARACTERS 重构)。
+  原遍历式注册保留为 `registerSkillsFromState`(bootstrap 内部 + 测试用,语义清晰)。
+- **dispatch 瘦身为纯路由**:`dispatch` 返回 `void`(删 `DispatchResult` 类型),不再返回 `error`/`gameOver`。
+  - validate 失败/无匹配 → 静默丢弃(无返回值暴露)
+  - 回应路径:先执行 respond execute,再 resolve slot,父 execute 续跑
+  - 游戏结束不再由 dispatch 返回——`checkGameOver(state)` 导出为纯函数,session 在 dispatch 后自行调用(游戏结束从 state/atom 日志可读,不绑定单个 action)
 - **座次解耦**:引擎层所有 player/target/source/ownerId 从 string(玩家名)改为 number(座次下标)。
   引擎只认座次,玩家真实 ID ↔ 座次映射在 session 层(`playerNames: Map<WS, number>`)。
   `SYSTEM_OWNER = '系统'` 改为 `-1`(消除玩家名冲突风险)。`PlayerState.name` 保留为展示名。
