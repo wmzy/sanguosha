@@ -352,6 +352,23 @@ applyAtom(state, 询问闪):
 
 **`applyAtom(state, atom)` 返回 `Promise<void>`**。等待型 atom 的 Promise 在被消费(用户回应 / 超时)时 resolve。技能代码用 `await applyAtom(state, ...)` 自然暂停/恢复,不需要回调或续跑机制。
 
+**多询问合并(同时机多询问)**：当多个 hook 在同一时机各自 `applyAtom(请求回应)` 时，引擎的"同时只一个 pending"不变量通过 **choiceQueue** 保持——对用户永远只看到一个等待。
+
+机制：
+- `state.pendingSlot` = 当前正在处理的单一询问(用户看到的)。不变。
+- `state.choiceQueue` = 等待队列(通常空)。当新询问发现 pendingSlot 已被占时,两个询问都入队,pendingSlot 替换为一个"选择"询问。
+
+```
+hook A:applyAtom(请求回应-A) → pendingSlot = A
+hook B:applyAtom(请求回应-B) → 发现 pendingSlot 已占
+  → choiceQueue = [A, B],pendingSlot = "选择先响应哪个"
+  → 用户选 A → pendingSlot = A,choiceQueue = [B]
+  → A resolve → promoteChoiceQueue → pendingSlot = B,choiceQueue = []
+  → B resolve → promoteChoiceQueue → pendingSlot = undefined
+```
+
+对用户始终只看到一个 pending(要么是原始询问,要么是"先选哪个")。choiceQueue 是引擎内部的冲突解决缓冲,不是并行询问。
+
 **多人响应(无懈可击/濒死求桃/于吉蛊惑)**：三国杀里所有"多人交互"都是**依次串行**的,不是并发——求桃是从当前玩家开始轮询、无懈是抢占式(一轮收一个)、质疑是依次问每个玩家。因此**同时只一个 pending 的不变量足够表达全部**,无需并发等待。
 
 - **逐个询问(濒死/决斗/蛊惑)**:`for (player of 轮转序列) { await applyAtom(请求回应, { target: player }) }`——每人一个 pending,串行。回应结果通过 `state.localVars` 观察。

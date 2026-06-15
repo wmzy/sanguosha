@@ -31,6 +31,7 @@ import type {
   Atom,
   AtomAfterContext,
   AtomBeforeContext,
+  AtomDefinition,
   ClientMessage,
   GameState,
   GameView,
@@ -231,21 +232,34 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // === 回应路径(已有 pending slot) ===
   if (state.pendingSlot) {
     const slot = state.pendingSlot;
-    // 广播 pending(无懈可击等):任何存活玩家可回应。单目标 pending:只 target 可回应。
     const requestType = (slot.atom as { requestType?: string }).requestType;
+
+    // 特殊:选择询问 pending(多个询问竞争时让用户选先响应哪个)
+    if (requestType === '__选择询问') {
+      const choiceIdx = (message.params.choice as number) ?? 0;
+      promoteChoice(state, choiceIdx);
+      setupStableWait(state);
+      await state._waitForStable;
+      if (!state.pendingSlot) state._activeExecuteP = undefined;
+      logAction(state, message);
+      state.seq += 1;
+      return;
+    }
+
+    // 广播 pending(无懈可击等):任何存活玩家可回应。单目标 pending:只 target 可回应。
     const isBroadcast = requestType === '无懈可击';
     if (!isBroadcast && message.ownerId !== extractPendingTarget(slot.atom)) return;
     if (isBroadcast && !state.players[message.ownerId]?.alive) return;
 
     const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-    // 回应:先执行 respond execute(打出闪等),再 resolve slot 让父 execute 续跑。
-    // validate 失败 = 未有效回应,仅 resolve(父 execute 继续,目标未出牌)。
     if (entry && entry.validate(state, message.params) === null) {
       await entry.execute(state, message.params);
     }
     const resolve = slot.resolve;
     slot.resolve = () => {};
     resolve();
+    // 当前 slot 消费后,检查 choiceQueue 是否有下一个待处理询问
+    promoteChoiceQueue(state);
     setupStableWait(state);
     await state._waitForStable;
     if (!state.pendingSlot) state._activeExecuteP = undefined;
@@ -317,17 +331,16 @@ export async function fireTimeout(state: GameState): Promise<void> {
   const slot = state.pendingSlot;
   if (!slot) return;
   await slot._fireTimeoutNow?.();
+  // 选择 slot 的 _fireTimeoutNow 内部会 promoteChoice;普通 slot 超时后检查队列
+  if (!state.pendingSlot || state.pendingSlot === slot) {
+    promoteChoiceQueue(state);
+  }
   setupStableWait(state);
   await state._waitForStable;
   if (!state.pendingSlot) state._activeExecuteP = undefined;
 }
 
-
-
-/**
- * 测试用:模块级清空(skill instances + events)。
- * state 上的字段（pendingSlot、_activeExecuteP 等）随 state 生死，不需要在这里清理。
- */
+/** 测试用:模块级清空(skill instances + events)。 */
 export function resetForTest(): void {
   clearAllSkillInstances();
   clearEvents();
@@ -411,6 +424,59 @@ async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> 
   // 一圈无人救(或救了还是 0 血)→ 击杀
   if (state.players[targetIdx].health <= 0) {
     await applyAtom(state, { type: '击杀', player: targetIdx });
+  }
+}
+
+/**
+ * 多询问:choiceQueue 中有 2+ 个 slot 时,创建"选择先响应哪个"的 pending slot。
+ * 用户通过 respond {choice: index} 选择。选完后被选中的 slot 晋升为 pendingSlot。
+ */
+function makeChoiceSlot(state: GameState): PendingSlot {
+  const queue = state.choiceQueue ?? [];
+  const choices = queue.map((s, i) => {
+    const atom = s.atom as Record<string, unknown>;
+    return { index: i, type: s.atom.type, requestType: atom.requestType, target: extractPendingTarget(s.atom) };
+  });
+  const slot: PendingSlot = {
+    atom: { type: '请求回应', requestType: '__选择询问', target: choices[0]?.target ?? 0, prompt: { type: 'choosePlayer' as const, title: '请选择先响应哪个询问', min: 1, max: 1 }, defaultChoice: 0, timeout: 30 } as unknown as Atom,
+    definition: { type: '请求回应', validate: () => null, apply: () => {} } as unknown as AtomDefinition,
+    startTime: Date.now() - state.startedAt,
+    deadline: Date.now() - state.startedAt + 30000,
+    resolve: () => {},
+    _fireTimeoutNow: async () => {
+      // 选择超时:默认选第一个
+      promoteFirstChoice(state);
+    },
+  };
+  state.localVars['__choiceOptions'] = JSON.parse(JSON.stringify(choices)) as Json;
+  return slot;
+}
+
+/** 从 choiceQueue 中选出第 index 个 slot 晋升为 pendingSlot,其余留在队列 */
+function promoteChoice(state: GameState, index: number): void {
+  const queue = state.choiceQueue ?? [];
+  if (index < 0 || index >= queue.length) return;
+  const chosen = queue.splice(index, 1)[0];
+  state.pendingSlot = chosen;
+}
+
+/** 选择超时:默认选第一个 */
+function promoteFirstChoice(state: GameState): void {
+  promoteChoice(state, 0);
+}
+
+/**
+ * 当前 pendingSlot resolve 后,检查 choiceQueue 是否还有待处理 slot。
+ * 有 1 个 → 直接晋升;有 2+ 个 → 创建新的"选择"pending。
+ */
+function promoteChoiceQueue(state: GameState): void {
+  const queue = state.choiceQueue ?? [];
+  state.pendingSlot = undefined;
+  if (queue.length === 0) return;
+  if (queue.length === 1) {
+    state.pendingSlot = queue.shift();
+  } else {
+    state.pendingSlot = makeChoiceSlot(state);
   }
 }
 
@@ -549,22 +615,25 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
         deadline: Date.now() - state.startedAt + timeoutMs,
         resolve: safeResolve,
       };
-      if (state.pendingSlot) {
-        state.pendingSlot.resolve();
-        state.pendingSlot = undefined;
-      }
-      state.pendingSlot = slot;
-
       const fireTimeoutNow = async (): Promise<void> => {
         if (state.pendingSlot !== slot) return;
         clearTimeout(timer);
-        state.pendingSlot = undefined;
         await applyAtom(state, pending.onTimeout);
+        promoteChoiceQueue(state);
         safeResolve();
       };
       slot._fireTimeoutNow = fireTimeoutNow;
-
       const timer = setTimeout(fireTimeoutNow, timeoutMs);
+
+      // 多询问处理:pendingSlot 已被占 → 新 slot 入 choiceQueue,创建"选择"pending
+      if (state.pendingSlot) {
+        if (!state.choiceQueue) state.choiceQueue = [];
+        state.choiceQueue.push(state.pendingSlot);
+        state.choiceQueue.push(slot);
+        state.pendingSlot = makeChoiceSlot(state);
+      } else {
+        state.pendingSlot = slot;
+      }
       resolveStable(state);
     });
   }

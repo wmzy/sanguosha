@@ -91,6 +91,13 @@ export interface GameState {
   atomStack: Atom[];
   /** 当前等待中的 pending slot(同时只有一个等待) */
   pendingSlot?: PendingSlot;
+  /**
+   * 等待队列:当多个询问同时竞争 pending 时,除当前 slot 外的其余存入 choiceQueue。
+   * 用户当前看到的是 pendingSlot(要么是原始询问,要么是"先响应哪个"的选择)。
+   * 当前 slot resolve 后,choiceQueue 中的下一个晋升为 pendingSlot。
+   * 通常为空——只有同时机多询问时才有内容。
+   */
+  choiceQueue?: PendingSlot[];
   cardMap: Record<string, Card>;
   cardWrappers: Record<string, CardWrapper>;
   rngSeed: number;
