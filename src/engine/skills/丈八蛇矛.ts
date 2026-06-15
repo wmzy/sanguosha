@@ -1,52 +1,124 @@
 // src/engine/skills/丈八蛇矛.ts
-// ============================================================
-// 技能描述(三国杀官方规则,见 docs/research/卡牌信息.md):
-//   丈八蛇矛(武器,攻击范围 3,♠Q):
-//     - 你可以将 2 张手牌当【杀】使用或打出
-//     - 手牌不足时仍可出杀(只要有 2 张手牌)
+// 丈八蛇矛(武器,攻击范围 3):你可以将 2 张手牌当【杀】使用或打出(转化技)。
 //
-// 关键原子操作(标准设计):
-//   transform 路径:UI 端选 2 张手牌 → 服务端验证 → 走杀.ts use/respond,
-//   附加 fromSkill='丈八蛇矛' 标记,杀.ts 据此把 2 张牌全部弃置(代替单张杀)。
+// 模型(组合 action,与武圣同形):前端两步 UI(点丈八蛇矛给手牌加"杀"显示
+// → 点出杀选目标),提交时一个 ClientMessage:preceding=[丈八蛇矛.transform]
+// + 主 action=杀.use。
+// 后端 dispatch 先执行 丈八蛇矛.transform(用两张手牌创建一张影子杀),
+// 再 杀.use validate 看到"杀"通过。杀技能零感知丈八蛇矛——
+// 它看到的永远是 cardMap 里的一张"杀"。
 //
-// 已知问题/不完整实现:
-//   1. **onInit 完全空**:第 10-13 行只 return ()=>{},
-//      后端没有任何 registerAction、registerBeforeHook 等注册逻辑——
-//      丈八蛇矛装备后**完全无效**,玩家点 transform 按钮服务端会找不到 action handler。
-//   2. **杀.ts 不识别 fromSkill='丈八蛇矛'**:杀.ts 的 use/respond execute 中没有任何
-//      "若 fromSkill==='丈八蛇矛' 则取 cardIds 2 张并弃置"的处理逻辑,
-//      "依赖杀.ts 处理 fromSkill"的注释完全是 wishful thinking。
-//   3. **cardFilter 缺约束**:onMount 的 cardFilter `filter:()=>true` 允许任意 2 张牌,
-//      包括装备/判定区——规则限定只能"手牌",需 filter 来源 zone。
-//   4. **缺"使用/打出杀"语义区分**:丈八蛇矛 transform 应同时支持 use(出牌阶段)
-//      和 respond(决斗/南蛮等);当前只注册 transform 一个 action,
-//      执行链需要根据 context 分发——但 onInit 又是空的,根本走不下去。
-//   5. **响应限制缺失**:丈八蛇矛需要保留 2 张手牌才能用,若只有 1 张手牌不应触发——
-//      validate 缺失。
-// ============================================================
-import type { FrontendAPI, Skill } from '../types';
+// 与武圣的关键差异:武圣是 1 张原卡 → 1 张 shadow(原卡仍在 cardMap,
+// shadowOf 指向原卡,影子离开结算区时引擎按 shadowOf 还原)。丈八蛇矛是
+// 2 张原卡 → 1 张 shadow(原卡从 cardMap **移除**,从手牌移除;
+// shadowOf 置空,因为不存在一一对应的"原卡")。因此 rollback 路径
+// 必须在 execute 前后保留原卡 id,自己完成"删影子/还原卡"配对,引擎
+// shadowOf 还原机制不适用。
+import type { Card, GameState, Json, Skill } from '../types';
 import { registerAction, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '丈八蛇矛', description: '武器:可将2张手牌当杀使用' };
+  return {
+    id,
+    ownerId,
+    name: '丈八蛇矛',
+    description: '可将两张手牌当杀使用',
+  };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  // 后端不需要 registerAction,杀的 execute 处理 fromSkill='丈八蛇矛'
+/** 影子卡 id:${id1}#${id2}#丈八蛇矛 —— 拼接两张原卡 id 避免与单卡 shadow 冲突 */
+function shadowIdOf(id1: string, id2: string): string {
+  return `${id1}#${id2}#丈八蛇矛`;
+}
+
+/** localVars 键:供 rollback 找回本次合并的两张原卡 id */
+const LOCAL_VARS_KEY = '丈八蛇矛/原卡';
+
+export function onInit(skill: Skill, ownerId: number): () => void {
+  // transform action:把 2 张手牌转化为影子"杀"(新建 Card 实体,shadowOf 留空)。
+  // 作为 preceding 在 杀.use 之前执行。杀.validate 读 cardMap[影子id] 看到"杀"。
+  registerAction(
+    skill.id,
+    ownerId,
+    'transform',
+    (state: GameState, params: Record<string, Json>) => {
+      const cardIds = params.cardIds;
+      if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张手牌';
+      const [id1, id2] = cardIds as string[];
+      if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
+      if (id1 === id2) return '不能选择同一张牌';
+      const self = state.players[ownerId];
+      if (!self) return '玩家不存在';
+      if (!self.hand.includes(id1) || !self.hand.includes(id2)) return '牌不在你的手牌中';
+      const c1 = state.cardMap[id1];
+      const c2 = state.cardMap[id2];
+      if (!c1 || !c2) return '牌不存在';
+      // 武器校核:必须装备丈八蛇矛(动态检查,允许同帧内换下后不再触发)
+      const weaponId = self.equipment?.['武器'];
+      const weaponCard = weaponId ? state.cardMap[weaponId] : undefined;
+      if (weaponCard?.name !== '丈八蛇矛') return '未装备丈八蛇矛';
+      return null;
+    },
+    async (state: GameState, params: Record<string, Json>) => {
+      const [id1, id2] = params.cardIds as string[];
+      const c1 = state.cardMap[id1];
+      const sId = shadowIdOf(id1, id2);
+      // 新建影子卡:name='杀',suit/rank 取第一张原卡;shadowOf 留空(2 张合一,无单一原卡)
+      const shadow: Card = {
+        id: sId,
+        name: '杀',
+        suit: c1.suit,
+        rank: c1.rank,
+        type: '基本牌',
+      };
+      state.cardMap[sId] = shadow;
+      // 手牌:移除两张原卡,影子卡追加到末尾。validate 阶段已确认两张牌在手中,
+      // 此处用 filter+push(2 合一位置不固定,validate/UI 都不依赖手牌顺序)。
+      const self = state.players[ownerId];
+      self.hand = self.hand.filter(c => c !== id1 && c !== id2);
+      self.hand.push(sId);
+      // 记录原卡 id,供 rollback 恢复
+      state.localVars[LOCAL_VARS_KEY] = [id1, id2];
+    },
+    // rollback:主 action validate 失败时,撤销转化(删影子 + 还原卡 + 清 localVars)
+    (state: GameState, params: Record<string, Json>) => {
+      const cardIds = params.cardIds;
+      const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
+      const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
+      if (sId) {
+        delete state.cardMap[sId];
+        const self = state.players[ownerId];
+        const idx = self.hand.indexOf(sId);
+        if (idx >= 0) self.hand.splice(idx, 1);
+        // 把两张原卡按 localVars 记录的顺序放回手牌;若 localVars 缺失(异常路径),
+        // 退化为直接 push(避免卡牌丢失)。
+        const stored = state.localVars[LOCAL_VARS_KEY] as string[] | undefined;
+        if (stored && stored.length === 2) {
+          self.hand.push(stored[0], stored[1]);
+        } else if (id1 && id2) {
+          self.hand.push(id1, id2);
+        }
+      }
+      delete state.localVars[LOCAL_VARS_KEY];
+    },
+  );
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): () => void {
+export function onMount(skill: Skill, api: { defineAction: Function }): void {
+  // 前端:丈八蛇矛是转化技,defineAction 声明可选两张手牌。
+  // 前端 UI 流程:点丈八蛇矛 → 选 2 张手牌(加"杀"显示) → 点杀选目标
+  //   → 提交 preceding+主 action。
   api.defineAction('transform', {
     label: '丈八蛇矛',
     style: 'passive',
     prompt: {
       type: 'useCard',
-      title: '选择2张手牌当杀使用',
+      title: '选择 2 张手牌当杀使用',
       cardFilter: { filter: () => true, min: 2, max: 2 },
     },
   });
-  return () => {};
+  return;
 }
 
-export default { createSkill, onInit, onMount };
+export default { createSkill, onInit, onMount } satisfies SkillModule;

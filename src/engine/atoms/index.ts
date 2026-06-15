@@ -11,6 +11,7 @@ import './卸下';
 import './洗牌';
 import './重洗';
 import './整理牌堆';
+import './陷入濒死';
 import './造成伤害';
 import './回复体力';
 import './失去体力';

@@ -1,7 +1,7 @@
 // src/engine/atoms/选将.ts
 // 游戏初始化 atoms:抽身份、选将、发牌
 // 每个 atom 做一件事,符合三国杀身份局规则
-import type { AtomDefinition } from '../types';
+import type { AtomDefinition, PlayerState } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
 import { registerAtom } from '../atom';
@@ -67,9 +67,11 @@ export const 抽身份: AtomDefinition<{
       identities[0] = '主公';
     }
 
-    // 更新玩家身份(存入 vars)
+    // 更新玩家身份(存入 vars + identity 字段)
     for (let i = 0; i < state.players.length; i++) {
-      state.players[i].vars['身份'] = identities[i] || '未知';
+      const id = identities[i] || '未知';
+      state.players[i].vars['身份'] = id;
+      state.players[i].identity = id as PlayerState['identity'];
     }
   },
 };

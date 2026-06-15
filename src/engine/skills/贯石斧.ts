@@ -7,66 +7,101 @@
 //
 // 关键原子操作:
 //   after 钩子(询问闪):
-//     若 source===ownerId ∧ dodged ∧ self.hand.length>=2 → 请求回应(confirm) →
-//     若回应 → 弃置(self.hand[0..2]) → mutate settlement[i].dodged=false
+//     若 source===ownerId ∧ 装备贯石斧 ∧ discardPile 顶为闪 ∧ 手牌 ≥ 2
+//       → 加标签('贯石斧/可强命')
+//   confirm action(贯石斧/可强命):
+//     validate: 参数 choice 为 boolean 且玩家带 '贯石斧/可强命' 标签
+//     execute: 去标签 + 若 choice=true 则弃 2 张手牌 + mutate parent frame
+//       settlement[i].dodged=false(使杀仍造成伤害)
 //
 // 关键时机:
-//   - 询问闪 完成后,在杀的"造成伤害"环节之前(mutate settlement[].dodged 让后续 for-loop 重读)
-//
-// 已知问题/不完整实现:
-//   1. **__闪避 标记时机错**(同青龙偃月刀):ctx.params.__闪避 在 询问闪 after hook 执行时
-//      通常未设——闪.ts 是通过 mutate frame.params.settlement[].dodged 来标记,
-//      不写 __闪避 字段。本文件应读 settlement.find(s=>s.target===atom.target).dodged。
-//      实际:贯石斧永远不触发(没人写 __闪避)。
-//   2. **弃牌固定 hand[0..2]**:玩家无法选弃哪 2 张,影响策略;
-//      规则允许从装备区弃牌,当前完全不支持。
-//   3. **wpc的 attack target 仅一个**:贯石斧基于"被闪了"触发,
-//      若杀有多个目标(连弩+方天画戟+雌雄等),需逐个目标判断"是否被闪",
-//      当前实现只看 atom.target 单个目标。
-//   4. **未限于"杀"**:任何"询问闪"都触发,但目前只有杀.ts 派发 询问闪 atom,实际差别不大。
-//   5. self.hand.length < 2 时 silent skip,不报错——但应给玩家"强命不可用"的反馈。
-//   6. __贯石斧confirmed 用 __ 私有字段。
-// ============================================================
-import type { AtomAfterContext, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+//   - 询问闪 atom after 触发 → 检测是否被闪抵消
+//   - 通过 state.zones.discardPile 顶端读最近一张被弃的牌判断是否为闪
+//   - settlement.dodged 是 杀 帧的 params,确认强命时直接 mutate 父帧
+import type { AtomAfterContext, Json, Skill } from '../types';
+import { applyAtom, topFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
+const TAG = '贯石斧/可强命';
+
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '贯石斧', description: '武器:杀被闪后可弃2张牌强命' };
+  return {
+    id,
+    ownerId,
+    name: '贯石斧',
+    description: '武器技:杀被闪抵消后,可弃两张手牌令此杀依然造成伤害',
+  };
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
+  // ── after hook:检测自己的杀被闪抵消,加标签标记「可强命」──
   registerAfterHook(_skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { source?: number; target?: number };
+    // 只对自己使用的杀做出反应
     if (atom.source !== ownerId) return;
-    // 检查是否出了闪(通过 params 标记或 parent frame 的 settlement)
-    // 简化: 如果有 __闪避 标记说明目标出了闪
-    const dodged = ctx.params.__闪避 as boolean | undefined;
-    if (!dodged) return; // 没出闪,不需要强命
-    // 检查手牌是否>=2
+    // 检查自己装备的是贯石斧
     const self = ctx.state.players[ownerId];
-    if (!self || self.hand.length < 2) return;
-    // 询问是否弃2牌强命
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '贯石斧/confirm',
-      target: ownerId,
-      prompt: { type: 'confirm', title: '贯石斧:是否弃2张牌强命?', confirmLabel: '强命', cancelLabel: '放弃' },
-      defaultChoice: false,
-      timeout: 10000,
-    });
-    const confirmed = ctx.params.__贯石斧confirmed as boolean | undefined;
-    if (!confirmed) return;
-    // 弃2张牌(简化:弃手牌前2张)
-    const discardCards = self.hand.slice(0, 2);
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: discardCards });
-    // 在当前帧标记 dodged=false(强命)
-    const settlement = ctx.params.settlement as Array<{ target: number; dodged: boolean }> | undefined;
-    if (settlement) {
-      const item = settlement.find(s => s.target === atom.target);
-      if (item) item.dodged = false;
-    }
+    if (!self) return;
+    const weaponId = self.equipment?.['武器'];
+    if (!weaponId) return;
+    const weapon = ctx.state.cardMap[weaponId];
+    if (!weapon || weapon.name !== '贯石斧') return;
+    // 检查最近一张弃牌是否为闪
+    const discardPile = ctx.state.zones.discardPile;
+    if (discardPile.length === 0) return;
+    const topCardId = discardPile[discardPile.length - 1];
+    const topCard = ctx.state.cardMap[topCardId];
+    if (!topCard || topCard.name !== '闪') return;
+    // 强命需弃 2 张手牌;手牌不足则不开机会(标准规则要求「可以」,
+    // 玩家无可弃时不提示即可,符合「不强制要求」的体验)
+    if (self.hand.length < 2) return;
+    // 加标签标记可强命
+    await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: TAG });
   });
+
+  // ── confirm action:玩家选择是否弃 2 张牌强命 ──
+  registerAction(
+    '贯石斧/可强命',
+    ownerId,
+    'confirm',
+    (state, params: Record<string, Json>): string | null => {
+      if (typeof params.choice !== 'boolean') return 'choice required';
+      if (params.choice === true) {
+        // 选择强命时要求手牌仍 ≥ 2(强命机会期间可能手牌有变)
+        if (state.players[ownerId].hand.length < 2) return '手牌不足两张,无法强命';
+      }
+      return null;
+    },
+    async (state, params: Record<string, Json>) => {
+      const choice = params.choice as boolean;
+      // 先摘掉标签
+      await applyAtom(state, { type: '去标签', player: ownerId, tag: TAG });
+      if (!choice) return;
+      const self = state.players[ownerId];
+      if (!self || self.hand.length < 2) return;
+      // 弃 2 张手牌(简化:弃手牌前两张)
+      const discardCards = self.hand.slice(0, 2);
+      await applyAtom(state, { type: '弃置', player: ownerId, cardIds: discardCards });
+      // mutate 父帧(杀帧)的 settlement:把对应目标的 dodged 置为 false,
+      // 使 杀.ts 后续结算时仍按命中处理 → 造成伤害
+      const frame = topFrame(state);
+      if (frame) {
+        const settlement = frame.params.settlement as
+          | Array<{ target: number; dodged: boolean }>
+          | undefined;
+        if (settlement) {
+          // 取最后一个 dodged=true 的目标(就是当前被闪抵消的那个)
+          for (let i = settlement.length - 1; i >= 0; i--) {
+            if (settlement[i].dodged) {
+              settlement[i].dodged = false;
+              break;
+            }
+          }
+        }
+      }
+    },
+  );
+
   return () => {};
 }
 

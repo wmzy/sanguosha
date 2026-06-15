@@ -44,6 +44,8 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; cardId?: string; amount?: number; type: string };
     if (atom.target !== ownerId) return;
+    // 青釭剑:杀无视防具
+    if (ctx.state.players[ownerId].marks.some(m => m.id === 'tag:青釭剑/无视防具')) return;
     if (typeof atom.cardId !== 'string') return;
     const card = ctx.state.cardMap[atom.cardId];
     if (!card) return;

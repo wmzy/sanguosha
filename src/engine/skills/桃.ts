@@ -1,71 +1,60 @@
 // src/engine/skills/桃.ts
-// ============================================================
-// 技能描述(三国杀官方规则,见 docs/research/卡牌信息.md):
-//   【桃】(基本牌)——两种使用方法:
-//     方法 Ⅰ(出牌阶段):
-//       - 目标:包括你在内的 1 名**已受伤**的角色(可对自己,也可对其他已受伤角色)
-//       - 效果:目标角色回复 1 点体力
-//       - 限制:体力已满 / 未受伤的角色不能成为目标
-//     方法 Ⅱ(濒死时):
-//       - 目标:1 名处于濒死状态的角色
-//       - 效果:目标角色回复 1 点体力
-//       - 备注:每次濒死时可以有多名角色依次使用【桃】直到脱离濒死
-//   回复 1 点体力(不能超过体力上限);出牌阶段与濒死时属于不同使用时机。
-//
-// 关键原子操作:
-//   use 路径:
-//     pushFrame → 移动牌(手牌→处理区) → 回复体力 → 移动牌(处理区→弃牌堆) → popFrame
-//
-// 关键时机:
-//   - 出牌阶段(方法 Ⅰ):target 为自己或任一已受伤角色,目标体力 < 上限
-//   - 濒死求桃(方法 Ⅱ):在 dyingWindow pending 期间,任何角色都可对濒死角色使用桃
-//
-// 已知问题/不完整实现:
-//   1. validate 只检查 target 存在,未限制"出牌阶段时 target 必须是已受伤角色",
-//      也未检查"濒死阶段才允许对其他玩家使用"——
-//      理论上当前允许出牌阶段对满血角色使用桃(违反规则)。
-//   2. validate 未检查目标体力是否 < 上限——空回血(满血时)可能被错误允许,
-//      会浪费一张桃且产生噪音事件(虽然 回复体力 atom 内可能限制)。
-//   3. 缺少濒死场景的特殊处理:当前实现走的是普通 use 流程,
-//      与 dyingWindow pending 的交互(中断 wait、注入回应)未在本文件体现,需检查 dispatch 路径。
-//   4. 没有 onMount 注册 UI prompt——前端如何区分"出牌阶段桃"与"濒死求桃"二者的目标选择,
-//      需依赖外部 prompt 配置(如 dyingWindow PendingAction 自带 target 列表)。
-// ============================================================
-import type { GameState, GameView, Json, Skill  } from '../types';
+// 桃(基本牌):
+//   出牌阶段:对包括自己在内的 1 名已受伤角色使用,回复 1 体力。
+//   濒死阶段:对任何濒死角色使用(通过 respond action,见 runDyingFlow)。
+import type { GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '桃', description: '出牌阶段对自己使用,回复 1 体力(濒死时可对任何濒死角色使用)' };
+  return { id, ownerId, name: '桃', description: '出牌阶段对已受伤角色使用,回复 1 体力(濒死时可对濒死角色使用)' };
 }
 
 export function onInit(skill: Skill, ownerId: number): () => void {
-  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  // use:出牌阶段对自己/受伤角色用桃
+  registerAction(skill.id, ownerId, 'use',
+    (state: GameState, params: Record<string, Json>) => {
       const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined;
       if (typeof target !== 'number') return 'target required';
+      const player = state.players[target];
+      if (!player) return 'target 不存在';
+      if (player.health >= player.maxHealth) return '目标未受伤,无法使用桃';
       return null;
-    }, async (state: GameState, params: Record<string, Json>) => {
-
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
-      const frame = pushFrame(state, '桃', from, { ...params });
       const cardId = params.cardId as string;
       const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number;
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
+      pushFrame(state, '桃', from, { ...params });
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       await applyAtom(state, { type: '回复体力', target, amount: 1, source: from });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       popFrame(state);
-    }, );
+    },
+  );
+
+  // respond:濒死求桃时出桃救援
+  registerAction(skill.id, ownerId, 'respond',
+    (state: GameState, params: Record<string, Json>) => {
+      if (state.pendingSlot?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (requestType !== '求桃') return '当前不是求桃';
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return 'cardId required';
+      const self = state.players[ownerId];
+      if (!self.hand.includes(cardId)) return '牌不在手牌中';
+      const card = state.cardMap[cardId];
+      if (card.name !== '桃') return '只能用桃救援';
+      return null;
+    },
+    async (state: GameState, params: Record<string, Json>) => {
+      const cardId = params.cardId as string;
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: ownerId }, to: { zone: '弃牌堆' } });
+      state.localVars['求桃/已救'] = true;
+    },
+  );
+
   return () => {};
 }
 
-export default { createSkill, onInit };
+export default { createSkill, onInit } satisfies SkillModule;

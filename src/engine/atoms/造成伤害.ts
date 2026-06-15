@@ -17,7 +17,8 @@ export const 造成伤害: AtomDefinition<{
     const target = state.players[atom.target];
     const newHealth = Math.max(0, target.health - atom.amount);
     target.health = newHealth;
-    target.alive = newHealth > 0;
+    // 注意:扣到 0 不直接设 alive=false——进入濒死流程(求桃),无人救才 击杀
+    // alive 的清理由 击杀 atom 负责
   },
   effect: { sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 400 },
   toViewEvents(_state, atom): ViewEventSplit {
@@ -39,7 +40,7 @@ export const 造成伤害: AtomDefinition<{
     if (pi >= 0) {
       const p = view.players[pi];
       p.health = Math.max(0, p.health - (event.amount as number));
-      p.alive = p.health > 0;
+      // alive 由 击杀 atom 的 applyView 更新,这里不提前设
     }
   },
 };

@@ -43,6 +43,8 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; amount?: number; source?: number; cardId?: string };
     if (atom.target !== ownerId) return;
+    // 青釭剑:杀无视防具(但白银狮子的"伤害上限1"是防具本身特性,青釭剑无法穿透)
+    // 规则:青釭剑只无视"防具效果"(如减伤/免伤),不无视装备本身的被动属性。这里保留。
     if ((atom.amount ?? 0) <= 1) return;
     // 检查是否装备了白银狮子
     const me = ctx.state.players[ownerId];

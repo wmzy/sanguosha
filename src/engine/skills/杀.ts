@@ -32,6 +32,7 @@
 import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame, topFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
+import { inAttackRange } from '../distance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
@@ -46,32 +47,13 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       const killsPlayed = self.marks
         .filter(m => m.id === '杀/killsPlayed')
         .reduce((n, m) => n + (typeof m.payload === 'number' ? m.payload : 0), 0);
-      const hasUnlimitedKills = self.marks.some(m => m.id === '诸葛连弩/无限出杀');
+      const hasUnlimitedKills = self.marks.some(m => m.id === 'tag:诸葛连弩/无限出杀');
       if (killsPlayed >= 1 && !hasUnlimitedKills) return '出杀次数已用尽';
-      // 距离检查:目标必须在攻击范围内
-      const WEAPON_RANGE: Record<string, number> = {
-        '诸葛连弩': 1, '青釭剑': 2, '雌雄双股剑': 2, '贯石斧': 3,
-        '青龙偃月刀': 3, '丈八蛇矛': 3, '方天画戟': 4, '麒麟弓': 5, '寒冰剑': 2,
-      };
-      let range = 1;
-      const weaponId = self.equipment?.['武器'];
-      if (weaponId) {
-        const weapon = state.cardMap[weaponId];
-        if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
-      }
-      const alive = state.players.filter(p => p.alive);
-      const aliveSelfIdx = alive.findIndex(p => p.index === ownerId);
+      // 距离检查:目标必须在攻击范围内(委托给 distance.ts 统一计算)
       for (const targetIdx of targets) {
-        const aliveToIdx = alive.findIndex(p => p.index === targetIdx);
-        if (aliveToIdx < 0) return `target ${targetIdx} not found`;
-        const n = alive.length;
-        const d = Math.abs(aliveSelfIdx - aliveToIdx);
-        let dist = Math.min(d, n - d);
-        if (self.equipment?.['进攻马']) dist -= 1;
-        const targetPlayer = state.players[targetIdx];
-        if (targetPlayer?.equipment?.['防御马']) dist += 1;
-        dist = Math.max(1, dist);
-        if (dist > range) return `目标 ${targetIdx} 不在攻击范围内(距离${dist},范围${range})`;
+        if (!inAttackRange(state, ownerId, targetIdx)) {
+          return `目标 ${targetIdx} 不在攻击范围内`;
+        }
       }
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
@@ -97,8 +79,17 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       // 对未闪避的目标造成伤害
       const settlement = frame.params.settlement as Array<{ target: number; dodged: boolean }>;
       for (const item of settlement) {
-        if (!item.dodged) {
-          await applyAtom(state, { type: '造成伤害', target: item.target, amount: 1, source: from });
+        // 八卦阵:判定红视为已出闪
+        const autoDodged = state.players[item.target].marks.some(m => m.id === 'tag:八卦阵/autoDodge');
+        if (!item.dodged && !autoDodged) {
+          await applyAtom(state, { type: '造成伤害', target: item.target, amount: 1, source: from, cardId });
+        }
+      }
+      // 清除八卦阵 autoDodge 标签(本轮杀结算完毕)
+      for (const item of settlement) {
+        const target = state.players[item.target];
+        if (target.marks.some(m => m.id === 'tag:八卦阵/autoDodge')) {
+          await applyAtom(state, { type: '去标签', player: item.target, tag: '八卦阵/autoDodge' });
         }
       }
       // 移动杀到弃牌堆

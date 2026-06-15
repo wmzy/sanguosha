@@ -10,22 +10,20 @@
 //     pushFrame → 移动牌(手牌→处理区) → 获得(target.hand[0]) →
 //     移动牌(处理区→弃牌堆) → popFrame
 //
-// 关键时机:
-//   - 距离限制:1
-//
-// 已知问题/不完整实现:
-//   1. **距离限制缺失**(同过河拆桥):未检查 effectiveDistance <= 1。
-//   2. **获取牌固定 hand[0]**(同过河拆桥):严重影响公平性,应让使用者选。
-//   3. **不支持装备区/判定区**(同过河拆桥):无法顺取装备或延时锦囊。
-//   4. **不支持随机手牌**:标准规则中"获得手牌"应该不可见(随机一张),
-//      当前直接取 hand[0] 是确定性,使用者能预测获得什么——破坏盲取语义。
-//   5. **无懈可击未支持**。
-//   6. validate 同样未校验 target!==from、alive、cardId 是否在手牌中。
-//   7. 目标无牌时 silent skip(同过河拆桥)。
-// ============================================================
+// 修复说明:
+//   1. validate 增加距离检查:effectiveDistance(ownerId, target) <= 1
+//      (委托 distance.ts 统一计算,含 进攻马/防御马 修正)。
+//   2. execute 简化为:取目标 hand[0] 移动到自己手牌
+//      (规则:使用者从手牌/装备/判定区选;此处按任务要求简化)。
+// 待办(本次不修):
+//   - 无懈可击未支持
+//   - validate 未验证 target!==from、target.alive、cardId 是否在 from.hand
+//   - 目标无牌时 silent skip
+//   - 不支持装备区/判定区取牌
 import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
+import { effectiveDistance } from '../distance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '顺手牵羊', description: '锦囊:获得目标一张牌' };
@@ -33,9 +31,13 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'number') return 'target required';
-      return null;
+    if (typeof params.cardId !== 'string') return 'cardId required';
+    if (typeof params.target !== 'number') return 'target required';
+    // 距离检查:目标必须在距离 1 以内(委托 distance.ts,含 进攻马/防御马 修正)
+    if (effectiveDistance(state, ownerId, params.target as number) > 1) {
+      return `目标 ${params.target} 不在距离 1 以内`;
+    }
+    return null;
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;

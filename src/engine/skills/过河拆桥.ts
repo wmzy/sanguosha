@@ -16,18 +16,14 @@
 // 关键时机:
 //   - 距离限制:**无**——过河拆桥可作用于任意距离的对手
 //
-// 已知问题/不完整实现:
-//   1. **距离限制缺失**:validate 不检查 effectiveDistance(from, target) <= 1,
-//      违反标准规则——理论上当前可远距离过河拆桥(实际游戏中破坏平衡)。
-//   2. **弃牌目标固定 hand[0]**:简化为弃目标手牌第一张,
-//      违反规则(应该是随机一张手牌,或让使用者从手牌/装备/判定区选)。
-//      使玩家可预测对手手牌结构,严重影响公平性。
-//   3. **不支持装备区/判定区**:规则允许过拆装备和判定区延时锦囊(乐不思蜀等),
-//      当前只能弃手牌,导致延时锦囊无法被过拆。
-//   4. **无懈可击未支持**:无询问无懈环节。
-//   5. validate 未验证 target!==from(允许过拆自己)、target.alive、cardId 在手牌中。
-//   6. 目标手牌为 0 时直接 silent skip,不报错——
-//      规则上目标无牌时应"无效"或不能指定为目标(validate 阶段拦截更合规)。
+// 修复说明:
+//   1. validate 不做距离检查(过河拆桥规则上无距离限制)。
+//   2. 弃牌目标简化为:hand[0] 或装备区第一槽
+//      (规则:使用者从手牌/装备/判定区选;此处按任务要求简化)。
+// 待办(本次不修):
+//   - 无懈可击未支持
+//   - validate 未验证 target!==from、target.alive、cardId 是否在 from.hand
+//   - 目标无牌时 silent skip(应改为 validate 拦截)
 // ============================================================
 import type { GameState, GameView, Json, Skill  } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
@@ -50,10 +46,19 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const target = params.target as number;
       // 移锦囊到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 弃目标一张牌(简化:弃手牌第一张)
+      // 弃目标一张牌(简化:手牌第一张,无手牌则装备区第一槽)
       const targetPlayer = state.players[target];
+      let discardCardId: string | undefined;
       if (targetPlayer && targetPlayer.hand.length > 0) {
-        await applyAtom(state, { type: '弃置', player: target, cardIds: [targetPlayer.hand[0]] });
+        discardCardId = targetPlayer.hand[0];
+      } else if (targetPlayer) {
+        for (const slot of ['武器', '防具', '进攻马', '防御马', '宝物'] as const) {
+          const id = targetPlayer.equipment?.[slot];
+          if (id) { discardCardId = id; break; }
+        }
+      }
+      if (discardCardId) {
+        await applyAtom(state, { type: '弃置', player: target, cardIds: [discardCardId] });
       }
       // 移锦囊到弃牌堆
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });

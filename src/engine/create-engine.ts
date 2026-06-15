@@ -28,6 +28,7 @@
 import type {
   ActionEntry,
   ActionLogEntry,
+  Atom,
   AtomAfterContext,
   AtomBeforeContext,
   ClientMessage,
@@ -121,8 +122,17 @@ function logAction(state: GameState, message: ClientMessage): void {
   });
 }
 
-/** 检查游戏是否结束(存活玩家 ≤ 1)。纯函数,基于 state 计算。 */
+
+// ==================== 公开 API ====================
+
+/** 检查游戏是否结束。纯函数,基于 state 计算。
+ *  结束条件:存活 ≤ 1 人,或主公死亡。 */
 export function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
+  // 主公死亡 → 游戏立即结束
+  const lord = state.players.find(p => p.identity === '主公' || p.vars['身份'] === '主公');
+  if (lord && !lord.alive) {
+    return { gameOver: true, winner: undefined };
+  }
   const aliveCount = state.players.filter((p) => p.alive).length;
   if (aliveCount <= 1) {
     const winner = state.players.find((p) => p.alive);
@@ -130,19 +140,6 @@ export function checkGameOver(state: GameState): { gameOver: boolean; winner?: n
   }
   return { gameOver: false };
 }
-
-// ==================== 公开 API ====================
-
-/**
- * 同步创建一个新游戏的骨架 state:建 playerCount 个空玩家槽位 + 初始 state shape。
- * 不会触发任何 dispatch / 初始化流程 —— 那是 bootstrap 的事。
- *
- * 调用模式:
- *   const state = create(config);
- *   await bootstrap(state, config);  // 触发 开局 start action
- *
- * 这样解耦的好处:restore 路径可以从 actionLog replay 出来一个 state,直接使用,不需要 bootstrap。
- */
 export function create(gameConfig: GameConfig): GameState {
   const playerCount = Math.max(2, Math.min(8, gameConfig.playerCount));
   const stubPlayers = Array.from({ length: playerCount }, (_, i) => ({
@@ -234,7 +231,11 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // === 回应路径(已有 pending slot) ===
   if (state.pendingSlot) {
     const slot = state.pendingSlot;
-    if (message.ownerId !== extractPendingTarget(slot.atom)) return;
+    // 广播 pending(无懈可击等):任何存活玩家可回应。单目标 pending:只 target 可回应。
+    const requestType = (slot.atom as { requestType?: string }).requestType;
+    const isBroadcast = requestType === '无懈可击';
+    if (!isBroadcast && message.ownerId !== extractPendingTarget(slot.atom)) return;
+    if (isBroadcast && !state.players[message.ownerId]?.alive) return;
 
     const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
     // 回应:先执行 respond execute(打出闪等),再 resolve slot 让父 execute 续跑。
@@ -368,6 +369,51 @@ function emptyFrame(): SettlementFrame {
   return { skillId: '', from: -1, params: Object.freeze({}) };
 }
 
+/**
+ * 濒死求桃流程:从濒死玩家开始,按座次依次询问每个存活玩家是否使用桃救援。
+ * 有人出桃 → 回复体力 1 → 脱离濒死,返回。无人出桃 → 击杀。
+ * 三国杀规则:濒死不是并发——同时只一个 pending(当前被问的玩家)。
+ */
+async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> {
+  // 标记进入濒死(纯事件,让前端显示濒死动画)
+  await applyAtom(state, { type: '陷入濒死', target: targetIdx });
+
+  const n = state.players.length;
+  // 从濒死玩家自己开始(自己可以先救自己),按座次轮转一圈
+  for (let i = 0; i < n; i++) {
+    const playerIdx = (targetIdx + i) % n;
+    const player = state.players[playerIdx];
+    if (!player.alive) continue;
+
+    // 检查目标是否已脱离濒死(前一个玩家已经救了)
+    if (state.players[targetIdx].health > 0) return;
+
+    // 询问该玩家是否出桃
+    await applyAtom(state, {
+      type: '请求回应',
+      requestType: '求桃',
+      target: playerIdx,
+      prompt: { type: 'confirm', title: `${state.players[targetIdx].name} 濒死,是否使用桃救援?`, confirmLabel: '出桃', cancelLabel: '不救' },
+      timeout: 15,
+    });
+
+    // 读取该玩家是否出了桃(桃技能 respond 时设 localVars)
+    const rescuedByPeach = state.localVars['求桃/已救'] as boolean | undefined;
+    if (rescuedByPeach) {
+      // 有人出桃:回复 1 体力
+      await applyAtom(state, { type: '回复体力', target: targetIdx, amount: 1, source: playerIdx });
+      delete state.localVars['求桃/已救'];
+      // 回复后体力 > 0 → 脱离濒死
+      if (state.players[targetIdx].health > 0) return;
+    }
+  }
+
+  // 一圈无人救(或救了还是 0 血)→ 击杀
+  if (state.players[targetIdx].health <= 0) {
+    await applyAtom(state, { type: '击杀', player: targetIdx });
+  }
+}
+
 
 // ─── Notify 事件 ────────────────────────────────────────────
 
@@ -467,6 +513,16 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
       params: (curFrame.params ?? {}) as Record<string, Json>,
     };
     await h.handler(afterCtx);
+  }
+
+  // 濒死检查:造成伤害/失去体力 后,如果目标体力 ≤ 0,进入濒死流程。
+  // 引擎管理(同 判定/添加技能):濒死是全局规则,不是单个技能职责。
+  if ((current.type === '造成伤害' || current.type === '失去体力') && 'target' in current) {
+    const targetIdx = (current as { target: number }).target;
+    const target = state.players[targetIdx];
+    if (target && target.alive && target.health <= 0) {
+      await runDyingFlow(state, targetIdx);
+    }
   }
 
   state.atomStack.pop();

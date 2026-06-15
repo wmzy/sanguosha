@@ -68,6 +68,8 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       let loser: number | null = null;
       while (loser === null) {
         const current = turn === 0 ? target : from;
+        // 重置回应标志(避免上一轮残留)
+        delete frame.params.__决斗回应;
         await applyAtom(state, { type: '询问杀', target: current, source: turn === 0 ? from : target });
         // 询问杀挂起 → resolve 后读取回应
         const responded = frame.params.__决斗回应 as boolean | undefined;

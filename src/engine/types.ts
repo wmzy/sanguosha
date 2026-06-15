@@ -49,6 +49,9 @@ export interface PendingTrick {
   card: Card;
 }
 
+export type Identity = '主公' | '忠臣' | '反贼' | '内奸';
+export type Faction = '魏' | '蜀' | '吴' | '群';
+
 export interface PlayerState {
   index: number;
   name: string;
@@ -67,6 +70,10 @@ export interface PlayerState {
   tags?: string[];
   /** 判定区:当前正在被判定中的牌 ID 列表(顶端最新) */
   judgeZone: string[];
+  /** 身份局角色身份。主公开局亮明,其他角色死亡时翻开 */
+  identity?: Identity;
+  /** 武将势力(魏蜀吴群),影响部分技能(如激将、无懈可击·国) */
+  faction?: Faction;
 }
 
 export interface GameState {
@@ -274,8 +281,8 @@ export type Atom =
   | { type: '造成伤害'; target: number; amount: number; source: number; cardId?: string }
   | { type: '回复体力'; target: number; amount: number; source?: number }
   | { type: '失去体力'; target: number; amount: number }
+  | { type: '陷入濒死'; target: number }
   | { type: '击杀'; player: number }
-  | { type: '设上限'; player: number; amount: number }
   // 标记/状态
   | { type: '加标记'; player: number; mark: Mark }
   | { type: '去标记'; player: number; markId: string }
@@ -458,7 +465,10 @@ export interface PendingSlot {
   startTime: number;
   deadline: number;
   resolve: () => void;
-  /** 内部:由 engine-api 在创建 pending 时挂上,供 engine.fireTimeout 立即触发 onTimeout。
+  /** 内部:由引擎创建 pending 时挂上,供 fireTimeout 立即触发 onTimeout(绕过真实 setTimeout) */
+  _fireTimeoutNow?: () => void;
+}
+
 export interface ClientMessage {
   skillId: string;
   actionType: string;

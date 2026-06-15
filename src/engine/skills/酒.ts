@@ -72,8 +72,30 @@ export function onInit(skill: Skill, ownerId: number): () => void {
         from: { zone: '处理区' },
         to: { zone: '弃牌堆' },
       });
-      popFrame(state);
-    }, );
+    popFrame(state);
+  }, );
+
+  // respond:濒死求桃时,酒也可以当桃用(方法 Ⅱ)
+  // 桃救援流程读 state.localVars['求桃/已救'] 来判断是否有人救援(见 runDyingFlow)。
+  registerAction(skill.id, ownerId, 'respond',
+    (state: GameState, params: Record<string, Json>) => {
+      if (state.pendingSlot?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (requestType !== '求桃') return '当前不是求桃';
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return 'cardId required';
+      const self = state.players[ownerId];
+      if (!self.hand.includes(cardId)) return '牌不在手牌中';
+      const card = state.cardMap[cardId];
+      if (card.name !== '酒') return '只能用酒救援';
+      return null;
+    },
+    async (state: GameState, params: Record<string, Json>) => {
+      const cardId = params.cardId as string;
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: ownerId }, to: { zone: '弃牌堆' } });
+      state.localVars['求桃/已救'] = true;
+    },
+  );
 
   // 消费 mark:在造成伤害时,如果是 self 造成的 且 有 酒/nextKillDamageBonus mark,amount + 1
   registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {

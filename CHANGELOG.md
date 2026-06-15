@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-10
 
+## [Unreleased] — 2026-06-15
+### Identity Game — 身份局实现推进
+
+- **P0 核心**:
+  - `PlayerState` 加 `identity`/`faction` 字段(身份局基础)
+  - 濒死/求桃流程:`造成伤害` 不再直接死亡,进入 `runDyingFlow` 按座次轮询求桃,无人救才 `击杀`(手牌装备入弃牌堆)。新增 `陷入濒死` atom。
+  - 桃/酒 加 `respond` 路径(濒死时出桃/酒救援)
+- **P1 装备**:诸葛连弩/青釭剑/丈八蛇矛 从空壳实现;八卦阵接通(杀读 autoDodge 标签);仁王盾加 cardId 杀检查;青龙偃月刀/贯石斧 时序修复;防具全加青釭剑无视检查;装备通用修旧装备替换+技能实例化
+- **P1 锦囊**:无懈可击(dispatch 广播 pending + `settleWithWuxie` helper + respond);决斗修 respond 标志重置
+- **P1 基本牌**:桃完善(validate 受伤检查 + 濒死 respond);酒完善(濒死 respond)
+- **sensenova 批量评估**:适合单文件规范明确的技能实现;技能间通信协议(标签/标记命名)需人工统一
+
 ## [Unreleased] — 2026-06-14
 ### Research — 武将技能研究文档补全(吴/群/蜀/魏 4 国)
 

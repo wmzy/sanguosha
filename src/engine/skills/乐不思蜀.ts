@@ -18,69 +18,143 @@
 //   use 路径:
 //     pushFrame → 移动牌(手牌→处理区) → 添加延时锦囊(target, trick='乐不思蜀') →
 //     移动牌(处理区→弃牌堆) → popFrame
-//   判定阶段(标准流程,本文件未实现):
-//     在判定阶段判定 → 若非红桃则 设阶段(跳过出牌) → 移到弃牌堆
+//   判定阶段:
+//     before '阶段开始' phase='判定':若自己有 pendingTricks='乐不思蜀' →
+//       触发 判定 atom(judgeType='乐不思蜀')。after 钩子读 judgeZone 顶牌花色。
+//       ♥  → 仅移除延时锦囊(无效);
+//       其它 → 移除延时锦囊 + 加标签 '乐不思蜀/跳过出牌'。
+//   出牌阶段:
+//     before '阶段开始' phase='出牌':若自己有 '乐不思蜀/跳过出牌' 标签 →
+//       返回 cancel + 触发 阶段结束 出牌(让回合管理推进到 弃牌)+ 去标签。
 //
 // 关键时机:
 //   - 添加延时锦囊到目标的 pendingTricks 数组
-//   - 判定时机:目标的判定阶段(由回合管理阶段链触发)
+//   - 判定时机:目标的判定阶段开始(由回合管理阶段链触发 阶段开始 判定)
+//   - 跳过时机:目标的出牌阶段开始(由回合管理阶段链触发 阶段开始 出牌)
 //
-// 已知问题/不完整实现:
-//   1. **判定 hook 是空占位实现**:第 32-36 行 registerAfterHook 注册了空函数,
-//      只写了注释"实际需要检查判定牌花色,此处用占位逻辑"——
-//      **乐不思蜀完全不工作**:目标永远不会被跳过出牌阶段!
-//      需实现:在判定 atom after 时,匹配 judgeType==='乐不思蜀',
-//      读判定牌(从 state.localVars 或 player.judgeZone)的 suit,
-//      若非 '♥' → 触发 '设阶段(回合结束)' 或加 'skipPlayPhase' 标记。
-//   2. **判定本身未触发**:回合管理.ts 中"判定阶段自动 skip"(回合管理已知问题 #2),
-//      意味着判定阶段被跳过,从未生成判定 atom——
-//      即使 hook 实现了,也不会被触发(双重 bug 叠加)。
-//   3. **延时锦囊未在判定后移到弃牌堆**:规则要求判定后将此牌置入弃牌堆,
-//      本实现的 use 路径直接弃了原牌,但 pendingTrick 持有 card 副本,
-//      target.pendingTricks 中的项永久残留——下回合还会再判定一次!
-//   4. **添加延时锦囊去重逻辑**:atom 中 "已有同名则不添加"——
-//      但规则允许多张同名延时锦囊(如两张乐不思蜀,需两次判定),
-//      去重违反规则,且可能导致多张乐被忽略。
-//   5. **无懈可击未支持**:同所有锦囊。
-//   6. **trickCard fallback 构造不规范**:第 26 行 trickCard ?? { suit: '', type: '锦囊牌' },
-//      suit:'' 是非法 suit(必须是 '♠'|'♥'|'♣'|'♦'),会导致判定花色判断时类型错。
-//   7. validate 未检查 target.pendingTricks 是否已有乐不思蜀(虽然 atom 内会去重)。
-//   8. validate 未检查 target!==from(规则允许对自己用,但需明确)。
+// 引擎机制说明(参考 src/engine/create-engine.ts):
+//   判定 atom 是事件标记:apply 是 no-op。
+//   引擎在 applyAtom pipeline 中:
+//     applyAtomImpl → pushEvent → moveJudgeCardToZone(push card to judgeZone) →
+//     after hooks(can read judgeZone top) → atomStack.pop → cleanupJudgeZone(pop card to discard)
+//   因此判定牌花色必须在 判定 atom 的 after hook 中读取;过后 judgeZone 已被清空。
 // ============================================================
-import type { GameState, AtomAfterContext, GameView, Json, Skill  } from '../types';
+import type {
+  AtomAfterContext,
+  AtomBeforeContext,
+  Card,
+  GameState,
+  Json,
+  Skill,
+} from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+
+/** 跳过出牌阶段的 tag 名(实现为 mark id='tag:乐不思蜀/跳过出牌') */
+const SKIP_TAG = '乐不思蜀/跳过出牌';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '乐不思蜀', description: '延时锦囊:判定红桃则跳过出牌阶段' };
+  return { id, ownerId, name: '乐不思蜀', description: '延时锦囊:判定非红桃则跳过出牌阶段' };
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
+  // ─── use action:对目标放置延时锦囊 ────────────────────────
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (typeof params.target !== 'number') return 'target required';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
-
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = params.target as number;
       pushFrame(state, '乐不思蜀', from, { ...params });
       // 移牌到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 添加延时锦囊到目标
+      // 添加延时锦囊到目标(用 cardMap 里的真卡;suit/rank 保留)
       const trickCard = state.cardMap[cardId];
-      await applyAtom(state, { type: '添加延时锦囊', player: target, trick: { name: '乐不思蜀', source: from, card: trickCard ?? { id: cardId, name: '乐不思蜀', suit: '', type: '锦囊牌' } } });
-      // 移牌到弃牌堆
+      const pendingCard: Card = trickCard ?? {
+        id: cardId,
+        name: '乐不思蜀',
+        suit: '♠',
+        rank: 'A',
+        type: '锦囊牌',
+      };
+      await applyAtom(state, {
+        type: '添加延时锦囊',
+        player: target,
+        trick: { name: '乐不思蜀', source: from, card: pendingCard },
+      });
+      // 移牌到弃牌堆(原使用卡)
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       popFrame(state);
-    }, );
-  // 判定后检查结果:红桃则标记跳过出牌
-  registerAfterHook(_skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    // 简化:通过 ctx.params.__乐不思蜀判定 标记
-    // 判定 atom 的结果存在 state.localVars 或 frame.params 中
-    // 实际需要检查判定牌花色,此处用占位逻辑
+    });
+
+  // ─── 判定阶段:有 乐不思蜀 → 触发判定 ────────────────────────
+  registerBeforeHook(_skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段开始') return;
+    if (atom.player !== ownerId) return;
+    if (atom.phase !== '判定') return;
+    const self = ctx.state.players[ownerId];
+    if (!self) return;
+    // 判定区是否有 乐不思蜀
+    if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
+    // 牌堆空:无法判定,跳过(规则允许直接弃置,但避免引擎崩;这里 no-op)
+    if (ctx.state.zones.deck.length === 0) return;
+    // 触发判定:判定 atom 是事件标记,引擎会自动从牌堆翻一张到 judgeZone,
+    // 然后在 after hook 中读顶牌花色决定效果。
+    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '乐不思蜀' });
   });
+
+  // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────
+  registerAfterHook(_skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom;
+    if (atom.type !== '判定') return;
+    if (atom.judgeType !== '乐不思蜀') return;
+    if (atom.player !== ownerId) return;
+
+    const self = ctx.state.players[ownerId];
+    if (!self) return;
+    // 没有 pendingTrick → 不处理(可能已被 过河拆桥 拆掉)
+    if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
+
+    // 读判定牌:此时 moveJudgeCardToZone 已 push、cleanupJudgeZone 尚未执行。
+    // judgeZone 顶端就是本次判定的牌。
+    if (self.judgeZone.length === 0) return;
+    const judgeCardId = self.judgeZone[self.judgeZone.length - 1];
+    const judgeCard = ctx.state.cardMap[judgeCardId];
+    if (!judgeCard) return;
+
+    if (judgeCard.suit === '♥') {
+      // 红桃:无效,只移除延时锦囊(规则:♥ 时乐不思蜀无效果并弃置)
+      await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '乐不思蜀' });
+    } else {
+      // 其它花色:加跳过出牌标签,移除延时锦囊
+      await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_TAG });
+      await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '乐不思蜀' });
+    }
+  });
+
+  // ─── 出牌阶段:有跳过标签 → 跳过出牌阶段 ────────────────────
+  registerBeforeHook(_skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段开始') return;
+    if (atom.player !== ownerId) return;
+    if (atom.phase !== '出牌') return;
+    const self = ctx.state.players[ownerId];
+    if (!self) return;
+    // 检查跳过标签(存在 mark id='tag:乐不思蜀/跳过出牌')
+    if (!self.marks.some(m => m.id === `tag:${SKIP_TAG}`)) return;
+
+    // 顺序很重要:
+    //   1) 先去标签(否则 阶段结束 出牌 之后回合管理阶段链会再次命中本 hook)
+    //   2) 再触发 阶段结束 出牌(让回合管理的 after hook 把阶段推进到 弃牌)
+    //   3) 返回 cancel → 当前 阶段开始 出牌 atom 不 apply,state.phase 已是 弃牌
+    await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: SKIP_TAG });
+    await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '出牌' });
+    return { kind: 'cancel' };
+  });
+
   return () => {};
 }
 
