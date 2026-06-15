@@ -55,8 +55,6 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; amount?: number; damageType?: string };
     if (atom.target !== ownerId) return;
-    // 青釭剑:杀无视防具(但火焰伤害仍 +1,因为那是甲的特性不是防具效果)
-    if (!atom.damageType && ctx.state.players[ownerId].marks.some(m => m.id === 'tag:青釭剑/无视防具') && atom.amount) return;
 
     const baseAmount = atom.amount ?? 1;
     let newAmount: number;

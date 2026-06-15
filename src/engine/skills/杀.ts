@@ -43,12 +43,10 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       if (typeof params.cardId !== 'string') return 'cardId required';
       const targets = params.targets as number[] | undefined;
       if (!Array.isArray(targets) || targets.length === 0) return 'targets required';
-      const self = state.players[ownerId];
-      const killsPlayed = self.marks
-        .filter(m => m.id === '杀/killsPlayed')
-        .reduce((n, m) => n + (typeof m.payload === 'number' ? m.payload : 0), 0);
-      const hasUnlimitedKills = self.marks.some(m => m.id === 'tag:诸葛连弩/无限出杀');
-      if (killsPlayed >= 1 && !hasUnlimitedKills) return '出杀次数已用尽';
+      // 出杀次数检查:用 turn.vars['杀/quota'](默认1,诸葛连弩/咆哮设为 Infinity)
+      const quota = state.turn.vars['杀/quota'] as number | undefined;
+      const remaining = typeof quota === 'number' ? quota : 1;
+      if (remaining <= 0) return '出杀次数已用尽';
       // 距离检查:目标必须在攻击范围内(委托给 distance.ts 统一计算)
       for (const targetIdx of targets) {
         if (!inAttackRange(state, ownerId, targetIdx)) {
@@ -100,11 +98,10 @@ export function onInit(skill: Skill, ownerId: number): () => void {
         to: { zone: '弃牌堆' },
       });
       // 记录出杀次数(duration='turn' 在回合结束时自动清理)
-      await applyAtom(state, {
-        type: '加标记',
-        player: from,
-        mark: { id: '杀/killsPlayed', scope: -1, payload: 1, duration: 'turn' },
-      });
+      // 扣减出杀次数(Infinity 时不变)
+      const q = state.turn.vars['杀/quota'] as number | undefined;
+      const cur = typeof q === 'number' ? q : 1;
+      state.turn.vars['杀/quota'] = cur === Infinity ? Infinity : cur - 1;
       popFrame(state);
     }, );
   // respond action:南蛮入侵/决斗/万箭齐发/激将等场景,目标"出杀抵消"

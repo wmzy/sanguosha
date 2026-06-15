@@ -452,7 +452,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   // cancel 终止(仁王盾取消后后续 hook 不跑,atom 不进入 validate/apply/after)。
   let current = atom;
   let cancelled = false;
-  for (const h of getBeforeHooks(atom.type)) {
+  for (const h of [...getBeforeHooks(atom.type)]) {
     const frame = topFrame(state) ?? emptyFrame();
     const beforeCtx: AtomBeforeContext = {
       state,

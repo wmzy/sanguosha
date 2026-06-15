@@ -34,11 +34,8 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     if (!weaponId) return;
     const card = ctx.state.cardMap[weaponId];
     if (card?.name !== '诸葛连弩') return;
-    await applyAtom(ctx.state, {
-      type: '加标签',
-      player: ownerId,
-      tag: '诸葛连弩/无限出杀',
-    });
+    // 设出杀次数为无限(通用机制,见 添加技能.md §1.6.1)
+    ctx.state.turn.vars['杀/quota'] = Infinity;
   });
   return () => {};
 }
