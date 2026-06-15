@@ -1,48 +1,10 @@
-// src/engine/skills/回合管理.ts
-// ============================================================
-// 技能描述(系统级):
+// 回合管理(系统级):
 //   每玩家一个实例,负责回合/阶段的自动推进:
-//   1) 监听上家 回合结束 → 若我是下家则启动我的回合(回合开始+阶段开始 准备)
+//   1) 监听上家 回合结束 → 若我是下家则启动我的回合
 //   2) 监听 阶段结束 → 推进到下一阶段;自动阶段(准备/判定/摸牌)直接结束
 //   3) 主动 end action:玩家在出牌阶段点"结束回合"
-//   4) 主动 start action:仅主公位首次开局触发(currentPlayerIndex===0)
-//
-// 关键原子操作:
-//   end 路径:阶段结束(出牌) → 阶段结束(弃牌) → 清过期标记 → 回合结束 → 下一玩家
-//   start 路径:回合开始 → 阶段开始(准备) → 阶段结束(准备)
-//   阶段结束 hook:阶段开始(next) → 若 next==='摸牌' 则摸牌(2) → 若自动阶段则阶段结束
-//   回合结束 hook:若 next alive 是我 → 回合开始 + 阶段开始(准备) + 阶段结束(准备)
-//
-// 关键时机:
-//   - 阶段推进:阶段结束 after hook(同玩家实例处理)
-//   - 回合移交:回合结束 after hook,所有玩家实例同时收到,只有"是下家"的实例响应
-//
-// 已知问题/不完整实现:
-//   1. **PHASE_ORDER 写死**:扩展包/特殊技能(如某些武将的"额外阶段")无法插入。
-//      应通过 atom/hook 让技能可动态修改阶段链。
-//   2. **判定阶段自动 skip**:第 51 行 `next==='判定'` 直接结束 →
-//      跳过判定区延时锦囊(乐不思蜀/兵粮寸断/闪电)的判定处理!
-//      回合管理直接跳过判定阶段是严重 bug。
-//   3. **摸牌阶段固定 2 张**:第 47 行硬编码 count=2,
-//      "屯田"/"再起"等修改摸牌数的技能无法 hook 介入。
-//      应改为发"摸牌阶段开始"事件让技能修改,或开放 before hook。
-//   4. **弃牌阶段无交互**:end action 直接 阶段结束(弃牌),
-//      未让玩家选弃哪些牌(超过手牌上限时违反规则)。
-//      正确应该是询问 prompt(useCard, min=超出张数)。
-//   5. **清过期标记 ordering 问题**:end 路径中清过期标记在 回合结束 之前调用,
-//      但很多 mark 的 duration='turn' 语义是"本回合结束时清理"——
-//      技能 hook 监听 回合结束 时可能预期 mark 仍在,顺序应该是 回合结束 → 清过期标记。
-//   6. **start action 主公判断脆弱**:`currentPlayerIndex === 0` 假设主公在 0 位,
-//      与 开局.ts 一样,若初始 currentPlayerIndex 设到非 0(如选将时主公位变化),会 fail。
-//      应通过 player.vars.身份==='主公' 判断。
-//   7. **回合开始/下一玩家 顺序混乱**:end 中先 回合结束(触发下家 hook 开启回合),
-//      然后再 下一玩家(推进 currentPlayerIndex)——这意味着下家"回合开始"时
-//      currentPlayerIndex 还是上家,各种依赖 currentPlayerIndex 的技能会读到错误值。
-//   8. **死亡玩家未跳过自动 trigger**:hook 回合结束 检查 me 是否是 nextAlive,
-//      但若 me 已死亡,findNextAlive 不会返回 me,所以理论上不触发——
-//      不过 unloadSkillInstance 时会清 hook,死亡玩家若没及时清,可能短暂触发。
-// ============================================================
-import type { GameState, GameView, Json, Skill  } from '../types';
+//   4) 主动 start action:仅主公位首次开局触发
+import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -141,4 +103,3 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit };

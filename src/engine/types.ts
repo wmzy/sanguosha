@@ -16,6 +16,8 @@ export type Card = {
   rank: string;
   type: '基本牌' | '锦囊牌' | '装备牌';
   subtype?: string;
+  /** 武器攻击范围(仅武器装备牌)。徒手默认 1,由 distance.ts 兜底 */
+  range?: number;
   /**
    * 影子卡牌:若设置,本 Card 是由 shadowOf 指向的原卡"转化"而来(如武圣红牌当杀)。
    * name/suit/rank 是转化后的视图;原卡仍在 cardMap[shadowOf]。
@@ -68,8 +70,6 @@ export interface PlayerState {
   /** 标签集合——轻量无 payload 标记(如 '八卦阵/autoDodge'),通过 加标签/去标签 atom 维护。
    *  可选:未设置时引擎视同空数组(由 createGameState 兜底) */
   tags?: string[];
-  /** 判定区:当前正在被判定中的牌 ID 列表(顶端最新) */
-  judgeZone: string[];
   /** 身份局角色身份。主公开局亮明,其他角色死亡时翻开 */
   identity?: Identity;
   /** 武将势力(魏蜀吴群),影响部分技能(如激将、无懈可击·国) */
@@ -309,6 +309,7 @@ export type Atom =
   | { type: '下一玩家' }
   // 目标
   | { type: '指定目标'; source: number; cardId?: string; target: number }
+  | { type: '成为目标'; source: number; cardId?: string; target: number }
   // 判定
   | { type: '添加延时锦囊'; player: number; trick: PendingTrick }
   | { type: '移除延时锦囊'; player: number; trickName: string }
@@ -334,6 +335,12 @@ export interface AtomDefinition<A = unknown> {
   type: string;
   validate(state: GameState, atom: A): string | null;
   apply(state: GameState, atom: A): void;
+  /**
+   * atom 自身的后处理——在所有技能 after hooks 执行完毕后调用。
+   * 用于清理 atom 创建的临时状态(如判定牌从处理区移入弃牌堆)。
+   * 与技能 after hooks 区分:这是 atom 定义自身的职责,不是技能 hook。
+   */
+  afterHooks?(state: GameState, atom: A): void;
   pending?: AtomPending;
   /**
    * 将后端 atom 转换为前端可消费的视图事件。
@@ -460,8 +467,9 @@ export interface PendingView {
 export interface SettlementFrame {
   skillId: string;
   from: number;
-  /** execute 本地初始参数(跨 atom 共享的配置,如 cardId/targets 列表)。
-   *  pushFrame 时初始化一次。**原则上只读**——新代码不要 mutate。 */
+  /** execute 本地参数(跨 atom 共享的配置,如 cardId/targets 列表)。
+   *  pushFrame 时初始化一次。被动技能(如流离)可 mutate 数组元素修改结算目标(引用语义)。
+   *  新代码不要替换 params 对象本身,只改内部字段。 */
   params: Record<string, Json>;
 }
 
@@ -473,7 +481,7 @@ export interface PendingSlot {
   deadline: number;
   resolve: () => void;
   /** 内部:由引擎创建 pending 时挂上,供 fireTimeout 立即触发 onTimeout(绕过真实 setTimeout) */
-  _fireTimeoutNow?: () => void;
+  _fireTimeoutNow?: () => Promise<void>;
 }
 
 export interface ClientMessage {
@@ -527,6 +535,7 @@ export interface ActionEntry {
    */
   rollback?: (state: GameState, params: Record<string, Json>) => void;
 }
+
 export interface AtomHookEntry {
   skillId: string;
   ownerId: number;

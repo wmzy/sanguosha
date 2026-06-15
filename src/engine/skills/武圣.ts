@@ -86,4 +86,3 @@ export function onMount(skill: Skill, api: { defineAction: Function }): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies SkillModule;

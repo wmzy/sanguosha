@@ -1,5 +1,6 @@
-// src/engine/atoms/判定.ts
-// 判定:事件标记(具体判定结果由后端随机 + 钩子处理)
+// 判定:从牌堆顶翻一张到处理区(亮出判定牌)。
+// 技能 after hooks(八卦阵/乐不思蜀等)从处理区读判定牌花色。
+// atom.afterHooks 结束后把判定牌从处理区移入弃牌堆。
 import type { AtomDefinition } from '../types';
 import { registerAtom } from '../atom';
 
@@ -9,8 +10,18 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
-  apply(_state) {
-    // 事件标记——具体判定结果由后端随机 + 钩子处理
+  apply(state) {
+    // 牌堆顶翻一张到处理区(亮出判定牌)
+    if (state.zones.deck.length === 0) return;
+    const topCardId = state.zones.deck.shift()!;
+    state.zones.processing.push(topCardId);
+  },
+  afterHooks(state) {
+    // 所有技能 after hooks 读完判定牌后,把处理区顶部的判定牌移入弃牌堆
+    const idx = state.zones.processing.length - 1;
+    if (idx < 0) return;
+    const cardId = state.zones.processing.splice(idx, 1)[0];
+    state.zones.discardPile.push(cardId);
   },
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 600 },
 };

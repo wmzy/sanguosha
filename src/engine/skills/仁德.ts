@@ -1,40 +1,6 @@
-// src/engine/skills/仁德.ts
-// ============================================================
-// 技能描述(三国杀官方规则,见 docs/research/武将技能/蜀国/刘备.md):
-//   仁德(刘备):
-//     - 触发时机:出牌阶段
-//     - 发动条件:有手牌
-//     - 效果:
-//       1) 将任意数量的手牌交给其他角色
-//       2) 若本回合给出的牌累计不少于两张,回复 1 点体力
-//     - 限制:每回合限一次
-//     - 备注:可以给同一名角色多张牌 / 可以给不同角色牌 / 不能超过体力上限
-//
-// 关键原子操作:
-//   use 路径:
-//     pushFrame → for each target/cardId: 移动牌(手牌→目标手牌) → 若 total≥2 且本回合未回血: 回复体力
-//     popFrame
-//
-// 关键时机:
-//   - 出牌阶段使用,**每回合限一次**(官方规则)
-//   - "累计两张"是回合内累计,标准规则是首次累计达到 2 张时回血
-//
-// 已知问题/不完整实现:
-//   1. **描述/实现偏离规则**:标准规则是"每次给一张"(动作粒度=一张),回合内累计;
-//      当前实现允许"一次批量给多张到多个目标",虽达到同样累计,但 UI 交互与事件粒度不符标准。
-//   2. **回血累计错误作用域**:`healed` 标志存在 `frame.params['仁德/healedThisTurn']`——
-//      frame 是 execute 局部,每次 use 重新 push,所以同回合内多次 use 会重复回血!
-//      应该写入 `player.vars['仁德/healedThisTurn']`(回合结束清理)。
-//   3. **每回合限一次未实现**:规则上"每回合限一次"是 use 整个技能 1 次;
-//      当前实现允许多次 use,违反规则。需要在 use 入口检查 vars['仁德/usedThisTurn']。
-//   4. **不能给装备区的牌**:FAQ 明确"仁德只能给出手牌"——
-//      validate 当前没检查 cardId 的来源(手牌 vs 装备区 vs 判定区),
-//      可能从装备区"给"出,违反规则。
-//   5. validate 未检查 target 必须是"其他角色"(理论上可给自己 → 自抽,违反规则)。
-//   6. validate 未检查 cardIds 是否真在 from 手牌中(防御缺失)。
-//   7. validate 未检查 target 是否存活。
-// ============================================================
-import type { GameState, FrontendAPI, GameView, Json, Skill  } from '../types';
+// 仁德(刘备):
+//   出牌阶段,可以将任意数量手牌给其他角色;给出 ≥2 张后回复 1 体力。每回合限一次。
+import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -43,21 +9,33 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '仁德',
-    description: '出牌阶段,可以将任意数量手牌给其他角色;给出 ≥2 张后回复 1 体力',
+    description: '出牌阶段限一次:将手牌给其他角色;给出 ≥2 张后回复 1 体力',
   };
 }
 
 export function onInit(skill: Skill, ownerId: number): () => void {
-  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(skill.id, ownerId, 'use',
+    (state: GameState, params: Record<string, Json>) => {
       const targets = params.targets as Array<{ target: number; cardIds: string[] }> | undefined;
       if (!Array.isArray(targets) || targets.length === 0) return 'targets required';
       const total = targets.reduce((n, t) => n + (Array.isArray(t.cardIds) ? t.cardIds.length : 0), 0);
       if (total === 0) return 'no cards to give';
+      // 每回合限一次
+      if (state.players[ownerId]?.vars['仁德/usedThisTurn']) return '本回合已使用过仁德';
+      // 检查所有 cardId 在手牌中,target 不是自己
+      const self = state.players[ownerId];
+      for (const t of targets) {
+        if (t.target === ownerId) return '不能给自己';
+        if (!state.players[t.target]?.alive) return '目标不存在或已死亡';
+        for (const cardId of t.cardIds) {
+          if (!self.hand.includes(cardId)) return '牌不在手牌中';
+        }
+      }
       return null;
-    }, async (state: GameState, params: Record<string, Json>) => {
-
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
-      const frame = pushFrame(state, '仁德', from, { ...params });
+      pushFrame(state, '仁德', from, { ...params });
       const targets = params.targets as Array<{ target: number; cardIds: string[] }>;
       for (const t of targets) {
         for (const cardId of t.cardIds) {
@@ -65,15 +43,14 @@ export function onInit(skill: Skill, ownerId: number): () => void {
         }
       }
       const total = targets.reduce((n, t) => n + t.cardIds.length, 0);
-      if (total >= 2) {
-        const healed = frame.params['仁德/healedThisTurn'] as boolean | undefined;
-        if (!healed) {
-          await applyAtom(state, { type: '回复体力', target: from, amount: 1 });
-          frame.params['仁德/healedThisTurn'] = true;
-        }
+      if (total >= 2 && !state.players[from].vars['仁德/healedThisTurn']) {
+        await applyAtom(state, { type: '回复体力', target: from, amount: 1 });
+        state.players[from].vars['仁德/healedThisTurn'] = true;
       }
+      state.players[from].vars['仁德/usedThisTurn'] = true;
       popFrame(state);
-    }, );
+    },
+  );
   return () => {};
 }
 
@@ -91,4 +68,3 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit, onMount };

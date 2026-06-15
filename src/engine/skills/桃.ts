@@ -1,7 +1,7 @@
-// src/engine/skills/桃.ts
 // 桃(基本牌):
-//   出牌阶段:对包括自己在内的 1 名已受伤角色使用,回复 1 体力。
-//   濒死阶段:对任何濒死角色使用(通过 respond action,见 runDyingFlow)。
+//   use:出牌阶段对已受伤角色使用,回复 1 体力。
+//   respond:濒死求桃时出桃救援——设 state.localVars['求桃/已救'] = true,
+//   runDyingFlow 检查此标志判断是否有人救援。
 import type { GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
@@ -11,7 +11,6 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 export function onInit(skill: Skill, ownerId: number): () => void {
-  // use:出牌阶段对自己/受伤角色用桃
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined;
@@ -57,4 +56,3 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit } satisfies SkillModule;

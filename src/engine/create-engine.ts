@@ -47,7 +47,6 @@ import {
   findActionEntry,
   getAfterHooks,
   getBeforeHooks,
-  instantiateSkill,
   registerSkillsFromState as skillRebootstrap,
   setSkillInstanceUnload,
   unloadSkillInstance,
@@ -56,6 +55,9 @@ import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './ato
 import { clearEvents, pushEvent } from './event-stream';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
+// 必须 import skills/index 来设置 skillModuleResolver + 注册系统规则全局 hooks
+import './skills';
+import { onInit as init系统规则 } from './skills/系统规则';
 
 
 
@@ -109,7 +111,6 @@ function ensureStateShape(state: GameState): void {
   if (!state.atomStack) state.atomStack = [];
   if (!state.settlementStack) state.settlementStack = [];
   for (const p of state.players) {
-    if (!p.judgeZone) p.judgeZone = [];
     if (!p.tags) p.tags = [];
   }
 }
@@ -156,7 +157,6 @@ export function create(gameConfig: GameConfig): GameState {
     vars: {} as Record<string, Json>,
     marks: [],
     pendingTricks: [],
-    judgeZone: [] as string[],
   }));
 
   const state = createGameState({ players: stubPlayers, cardMap: {} });
@@ -183,7 +183,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
     throw new Error('bootstrap: state 已开局(玩家已有手牌),不可重复 bootstrap');
   }
   const 开局mod = await import('./skills/开局');
-  const syntheticSkill = 开局mod.default.createSkill('开局', SYSTEM_OWNER);
+  const syntheticSkill = 开局mod.createSkill('开局', SYSTEM_OWNER);
   // 全局注册表幂等:先卸载旧实例(await import 之后、onInit 之前),避免
   // 跨 session/跨 test 时因微任务交织导致 "already registered" 抛错。
   unloadSkillInstance('开局', SYSTEM_OWNER);
@@ -344,6 +344,8 @@ export async function fireTimeout(state: GameState): Promise<void> {
 export function resetForTest(): void {
   clearAllSkillInstances();
   clearEvents();
+  // 重新注册系统规则全局 hooks(被 clearAllSkillInstances 清掉了)
+  init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, -1);
 }
 
 // ==================== 从 engine-api.ts 合并的导出 ====================
@@ -380,51 +382,6 @@ export function topFrame(state: GameState): SettlementFrame | undefined {
 /** 兜底空帧 */
 function emptyFrame(): SettlementFrame {
   return { skillId: '', from: -1, params: Object.freeze({}) };
-}
-
-/**
- * 濒死求桃流程:从濒死玩家开始,按座次依次询问每个存活玩家是否使用桃救援。
- * 有人出桃 → 回复体力 1 → 脱离濒死,返回。无人出桃 → 击杀。
- * 三国杀规则:濒死不是并发——同时只一个 pending(当前被问的玩家)。
- */
-async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> {
-  // 标记进入濒死(纯事件,让前端显示濒死动画)
-  await applyAtom(state, { type: '陷入濒死', target: targetIdx });
-
-  const n = state.players.length;
-  // 从濒死玩家自己开始(自己可以先救自己),按座次轮转一圈
-  for (let i = 0; i < n; i++) {
-    const playerIdx = (targetIdx + i) % n;
-    const player = state.players[playerIdx];
-    if (!player.alive) continue;
-
-    // 检查目标是否已脱离濒死(前一个玩家已经救了)
-    if (state.players[targetIdx].health > 0) return;
-
-    // 询问该玩家是否出桃
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: '求桃',
-      target: playerIdx,
-      prompt: { type: 'confirm', title: `${state.players[targetIdx].name} 濒死,是否使用桃救援?`, confirmLabel: '出桃', cancelLabel: '不救' },
-      timeout: 15,
-    });
-
-    // 读取该玩家是否出了桃(桃技能 respond 时设 localVars)
-    const rescuedByPeach = state.localVars['求桃/已救'] as boolean | undefined;
-    if (rescuedByPeach) {
-      // 有人出桃:回复 1 体力
-      await applyAtom(state, { type: '回复体力', target: targetIdx, amount: 1, source: playerIdx });
-      delete state.localVars['求桃/已救'];
-      // 回复后体力 > 0 → 脱离濒死
-      if (state.players[targetIdx].health > 0) return;
-    }
-  }
-
-  // 一圈无人救(或救了还是 0 血)→ 击杀
-  if (state.players[targetIdx].health <= 0) {
-    await applyAtom(state, { type: '击杀', player: targetIdx });
-  }
 }
 
 /**
@@ -490,22 +447,6 @@ export function pushNotify(_state: GameState, event: NotifyEvent): void {
 
 // ─── Atom apply 管线 ────────────────────────────────────────
 
-/** 判定 atom:apply 后从牌堆顶翻一张到目标玩家 judgeZone */
-function moveJudgeCardToZone(state: GameState, atom: { player: number; judgeType: string }): void {
-  if (state.zones.deck.length === 0) return;
-  const topCardId = state.zones.deck.shift()!;
-  const target = state.players[atom.player];
-  if (target) target.judgeZone.push(topCardId);
-}
-
-/** 判定 atom 收尾:把目标 judgeZone 顶部牌移入弃牌堆 */
-function cleanupJudgeZone(state: GameState, atom: { player: number; judgeType: string }): void {
-  const target = state.players[atom.player];
-  if (!target || target.judgeZone.length === 0) return;
-  const topId = target.judgeZone.pop()!;
-  state.zones.discardPile.push(topId);
-}
-
 /**
  * 应用一个 atom:走完整 pipeline(before hooks → validate → apply → emit event → after hooks → pending)。
  * 等待型 atom 的 Promise 会挂起直到回应/超时。
@@ -554,22 +495,14 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   pushEvent({ kind: 'atom', atom: current, viewEvents });
 
-  if (current.type === '判定') {
-    moveJudgeCardToZone(state, current);
-  }
-
-
-  // 技能生命周期:添加技能/移除技能 atom apply 后,同步注册/卸载 skill 实例。
-  // 与 判定 同属"引擎管理的 atom 特殊处理"(技能生命周期是引擎职责,不是 atom 自身职责)。
-  // apply 是同步的(只改 player.skills 列表),实例化涉及动态 import 故在此异步补注册。
-  if (current.type === '添加技能') {
-    await instantiateSkill(current.skillId, current.player);
-  } else if (current.type === '移除技能') {
-    unloadSkillInstance(current.skillId, current.player);
-  }
-
   const afterHooks = getAfterHooks(current.type);
-  for (const h of afterHooks) {
+  // 系统级 hooks(ownerId=-1)最后执行——确保遗计/反馈等"受伤害后"技能先触发
+  const sortedHooks = [...afterHooks].sort((a, b) => {
+    if (a.ownerId === -1 && b.ownerId !== -1) return 1;
+    if (a.ownerId !== -1 && b.ownerId === -1) return -1;
+    return 0;
+  });
+  for (const h of sortedHooks) {
     const curFrame = topFrame(state) ?? emptyFrame();
     const afterCtx: AtomAfterContext = {
       state,
@@ -581,21 +514,12 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
     await h.handler(afterCtx);
   }
 
-  // 濒死检查:造成伤害/失去体力 后,如果目标体力 ≤ 0,进入濒死流程。
-  // 引擎管理(同 判定/添加技能):濒死是全局规则,不是单个技能职责。
-  if ((current.type === '造成伤害' || current.type === '失去体力') && 'target' in current) {
-    const targetIdx = (current as { target: number }).target;
-    const target = state.players[targetIdx];
-    if (target && target.alive && target.health <= 0) {
-      await runDyingFlow(state, targetIdx);
-    }
+  // atom 自身的后处理(在技能 after hooks 之后):如判定牌从处理区移入弃牌堆
+  if (def.afterHooks) {
+    def.afterHooks(state, current);
   }
 
   state.atomStack.pop();
-
-  if (current.type === '判定') {
-    cleanupJudgeZone(state, current);
-  }
 
   if (def.pending) {
     await new Promise<void>((resolve) => {

@@ -1,44 +1,6 @@
-// src/engine/skills/乐不思蜀.ts
-// ============================================================
-// 技能描述(三国杀官方规则,见 docs/research/卡牌信息.md):
-//   乐不思蜀(延时锦囊):
-//     - 使用条件:出牌阶段使用
-//     - 距离限制:**目标必须在你距离 1 以内**
-//     - 目标限制:距离 1 以内的 1 名其他角色
-//     - 判定条件:目标角色判定阶段进行判定
-//       - 若判定结果**不为♥(红桃)**,则跳过该角色的出牌阶段
-//       - 若判定结果为♥(红桃),则无效果,乐不思蜀弃置
-//     - 特殊规则:
-//       - 延时锦囊放置在目标角色的判定区
-//       - 在目标角色的判定阶段开始时进行判定
-//       - 可以被【无懈可击】抵消(判定前抵消或判定后抵消效果)
-//       - 可以被【过河拆桥】拆掉
-//
-// 关键原子操作:
-//   use 路径:
-//     pushFrame → 移动牌(手牌→处理区) → 添加延时锦囊(target, trick='乐不思蜀') →
-//     移动牌(处理区→弃牌堆) → popFrame
-//   判定阶段:
-//     before '阶段开始' phase='判定':若自己有 pendingTricks='乐不思蜀' →
-//       触发 判定 atom(judgeType='乐不思蜀')。after 钩子读 judgeZone 顶牌花色。
-//       ♥  → 仅移除延时锦囊(无效);
-//       其它 → 移除延时锦囊 + 加标签 '乐不思蜀/跳过出牌'。
-//   出牌阶段:
-//     before '阶段开始' phase='出牌':若自己有 '乐不思蜀/跳过出牌' 标签 →
-//       返回 cancel + 触发 阶段结束 出牌(让回合管理推进到 弃牌)+ 去标签。
-//
-// 关键时机:
-//   - 添加延时锦囊到目标的 pendingTricks 数组
-//   - 判定时机:目标的判定阶段开始(由回合管理阶段链触发 阶段开始 判定)
-//   - 跳过时机:目标的出牌阶段开始(由回合管理阶段链触发 阶段开始 出牌)
-//
-// 引擎机制说明(参考 src/engine/create-engine.ts):
-//   判定 atom 是事件标记:apply 是 no-op。
-//   引擎在 applyAtom pipeline 中:
-//     applyAtomImpl → pushEvent → moveJudgeCardToZone(push card to judgeZone) →
-//     after hooks(can read judgeZone top) → atomStack.pop → cleanupJudgeZone(pop card to discard)
-//   因此判定牌花色必须在 判定 atom 的 after hook 中读取;过后 judgeZone 已被清空。
-// ============================================================
+// 乐不思蜀(延时锦囊):出牌阶段对距离 1 以内的一名角色使用。
+//   判定阶段:判定不为♥ → 跳过出牌阶段;♥ → 无效弃置。
+//   判定牌走处理区,after hook 从处理区读花色,判定后进弃牌堆。
 import type {
   AtomAfterContext,
   AtomBeforeContext,
@@ -118,10 +80,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     // 没有 pendingTrick → 不处理(可能已被 过河拆桥 拆掉)
     if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
 
-    // 读判定牌:此时 moveJudgeCardToZone 已 push、cleanupJudgeZone 尚未执行。
-    // judgeZone 顶端就是本次判定的牌。
-    if (self.judgeZone.length === 0) return;
-    const judgeCardId = self.judgeZone[self.judgeZone.length - 1];
+    // 读判定牌:判定牌在处理区(afterHooks 才移到弃牌堆)
+    const processing = ctx.state.zones.processing;
+    if (processing.length === 0) return;
+    const judgeCardId = processing[processing.length - 1];
     const judgeCard = ctx.state.cardMap[judgeCardId];
     if (!judgeCard) return;
 
@@ -157,5 +119,3 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
 
   return () => {};
 }
-
-export default { createSkill, onInit };

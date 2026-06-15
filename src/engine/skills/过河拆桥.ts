@@ -1,31 +1,7 @@
-// src/engine/skills/过河拆桥.ts
-// ============================================================
-// 技能描述(三国杀官方规则,见 docs/research/卡牌信息.md):
-//   过河拆桥(普通锦囊):
-//     - 使用条件:出牌阶段使用
-//     - 目标限制:**1 名其他角色(不能对自己使用)**
-//     - 距离限制:**无需距离限制,可对任意距离的其他角色使用**
-//     - 效果:你选择该角色区域内(手牌、装备区、判定区)的 1 张牌并弃置之
-//     - 备注:可以被【无懈可击】抵消
-//
-// 关键原子操作:
-//   use 路径:
-//     pushFrame → 移动牌(手牌→处理区) → 弃置(target.hand[0]) →
-//     移动牌(处理区→弃牌堆) → popFrame
-//
-// 关键时机:
-//   - 距离限制:**无**——过河拆桥可作用于任意距离的对手
-//
-// 修复说明:
-//   1. validate 不做距离检查(过河拆桥规则上无距离限制)。
-//   2. 弃牌目标简化为:hand[0] 或装备区第一槽
-//      (规则:使用者从手牌/装备/判定区选;此处按任务要求简化)。
-// 待办(本次不修):
-//   - 无懈可击未支持
-//   - validate 未验证 target!==from、target.alive、cardId 是否在 from.hand
-//   - 目标无牌时 silent skip(应改为 validate 拦截)
-// ============================================================
-import type { GameState, GameView, Json, Skill  } from '../types';
+// 过河拆桥(普通锦囊):
+//   出牌阶段,对 1 名其他角色使用(无距离限制)。
+//   弃置该角色区域内(手牌、装备区、判定区)的 1 张牌。
+import type { GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -37,6 +13,11 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (typeof params.target !== 'number') return 'target required';
+      if (params.target === ownerId) return '不能对自己使用';
+      const target = state.players[params.target];
+      if (!target?.alive) return '目标不存在或已死亡';
+      const hasCards = target.hand.length > 0 || Object.keys(target.equipment).length > 0;
+      if (!hasCards) return '目标没有牌';
       return null;
     }, async (state: GameState, params: Record<string, Json>) => {
 
@@ -46,6 +27,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const target = params.target as number;
       // 移锦囊到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      // 询问无懈可击
+      delete state.localVars['无懈/被抵消'];
+      await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+      if (!state.localVars['无懈/被抵消']) {
       // 弃目标一张牌(简化:手牌第一张,无手牌则装备区第一槽)
       const targetPlayer = state.players[target];
       let discardCardId: string | undefined;
@@ -60,11 +45,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       if (discardCardId) {
         await applyAtom(state, { type: '弃置', player: target, cardIds: [discardCardId] });
       }
+      }
       // 移锦囊到弃牌堆
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       popFrame(state);
     }, );
   return () => {};
 }
-
-export default { createSkill, onInit };

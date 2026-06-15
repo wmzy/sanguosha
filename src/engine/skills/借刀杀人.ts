@@ -1,78 +1,89 @@
-// src/engine/skills/借刀杀人.ts
-// ============================================================
-// 技能描述(三国杀官方规则,见 docs/research/卡牌信息.md):
-//   借刀杀人(普通锦囊):
-//     - 使用条件:出牌阶段使用
-//     - 目标限制:装备区有武器牌的 1 名其他角色(A)
-//     - 效果/流程:
-//       1) 你指定目标角色 A(需有武器)
-//       2) 你指定 A 使用【杀】攻击其攻击范围内的另一名角色 B(你指定 B)
-//       3) A 必须选择一项:
-//          - 对 B 使用 1 张【杀】(**无视距离限制**)
-//          - 不执行杀则**武器归你所有**
-//     - 备注:可以被【无懈可击】抵消
-//
-// 关键原子操作:
-//   use 路径:
-//     pushFrame → 移动牌(手牌→处理区) →
-//     请求回应(target 是否出杀, 15s) →
-//     若未回应: 卸下(target 武器) + 获得(weaponId from target) →
-//     移动牌(处理区→弃牌堆) → popFrame
-//
-// 关键时机:
-//   - 目标必须装备了武器
-//
-// 已知问题/不完整实现:
-//   1. **未限制目标必须装武器**:validate 不检查 target.equipment.武器,
-//      理论上对无武器角色使用,目标不出杀时"获得武器" silent skip,效果空——
-//      违反规则的"目标必须装备武器才能使用"限定。
-//   2. **杀目标未传入"借刀杀人"的 killTarget 参数**:规则中借刀有两个目标——
-//      被借者(本 target)和被杀者(killTarget),但本文件没传 killTarget,
-//      `请求回应`prompt 只是 confirm 是否出杀,没让玩家选杀谁——
-//      若目标真出杀,杀的目标是谁完全没定义!
-//   3. **不验证 killTarget 在 target 攻击范围内**:借刀的核心约束之一,完全缺失。
-//   4. **__借刀杀回应 标记反模式**:同其他文件 __ 私有字段反模式。
-//   5. **目标"出杀"未联动 杀.ts**:即使 target 同意出杀,本文件没调用任何
-//      "代为出杀"的逻辑(如指定目标 + 询问闪 + 造成伤害),实际是空 act,严重 bug。
-//   6. **无懈可击未支持**。
-//   7. validate 未检查 target!==from(允许借自己,违反规则)、cardId 在手牌中。
-//   8. 卸下武器后,武器在 target.hand 中(根据 卸下 atom 实际行为),
-//      然后"获得"应从 target 处取——但此时已不是装备,from 字段语义可能错。
-// ============================================================
-import type { GameState, GameView, Json, Skill  } from '../types';
+// 借刀杀人(普通锦囊):
+//   出牌阶段,对装备区有武器牌的 1 名其他角色(A)使用。
+//   A 须选择:对使用者指定的另一名角色 B 使用 1 张杀,或交出武器。
+//   请求回应 后检查处理区:有杀 = 出了杀;没有 = 不出(获得武器)。
+import type { GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '借刀杀人', description: '锦囊:获得目标武器,或令目标出杀' };
+  return { id, ownerId, name: '借刀杀人', description: '锦囊:令目标出杀或获得其武器' };
 }
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(_skill.id, ownerId, 'use',
+    (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (typeof params.target !== 'number') return 'target required';
+      if (typeof params.killTarget !== 'number') return 'killTarget required';
+      const self = state.players[ownerId];
+      if (!self?.hand.includes(params.cardId)) return '牌不在手牌中';
+      const target = state.players[params.target];
+      if (!target?.equipment?.['武器']) return '目标没有武器';
+      if (params.target === ownerId) return '不能对自己使用';
       return null;
-    }, async (state: GameState, params: Record<string, Json>) => {
-
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = params.target as number;
-      const frame = pushFrame(state, '借刀杀人', from, { ...params });
-      // 移锦囊到处理区
+      const killTarget = params.killTarget as number;
+      pushFrame(state, '借刀杀人', from, { ...params });
+
+      // 锦囊进处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // ─── Promise-based 续跑 ───
-      // 请求回应挂起,等目标出杀或超时
+
+      // 被无懈抵消则跳过效果
+      delete state.localVars['无懈/被抵消'];
+      await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+      if (state.localVars['无懈/被抵消']) {
+        await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+        popFrame(state);
+        return;
+      }
+
+      // 请求回应:目标选择出杀或交出武器
       await applyAtom(state, {
         type: '请求回应',
         requestType: '借刀杀人/forceKill',
         target,
-        prompt: { type: 'confirm', title: '借刀杀人:是否对指定角色出杀?', confirmLabel: '出杀', cancelLabel: '不出(失武器)' },
+        prompt: { type: 'confirm', title: '借刀杀人:是否出杀?', confirmLabel: '出杀', cancelLabel: '不出(失武器)' },
         defaultChoice: false,
-        timeout: 15000,
+        timeout: 15,
       });
-      // 回应到达后读结果
-      const killed = frame.params.__借刀杀回应 as boolean | undefined;
-      if (!killed) {
+
+      // 检查处理区:有杀 = 出了杀
+      const killCardId = state.zones.processing.find(id => {
+        const c = state.cardMap[id];
+        return c && c.name === '杀';
+      });
+
+      if (killCardId) {
+        // 目标出了杀:移到弃牌堆,执行杀的效果(对 killTarget 询问闪)
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId: killCardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
+        await applyAtom(state, { type: '指定目标', source: target, target: killTarget, cardId: killCardId });
+        await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
+        // 检查处理区:有闪 = 出了闪,没闪 = 伤害
+        const dodgeCardId = state.zones.processing.find(id => {
+          const c = state.cardMap[id];
+          return c && c.name === '闪';
+        });
+        if (dodgeCardId) {
+          await applyAtom(state, {
+            type: '移动牌',
+            cardId: dodgeCardId,
+            from: { zone: '处理区' },
+            to: { zone: '弃牌堆' },
+          });
+        } else {
+          await applyAtom(state, { type: '造成伤害', target: killTarget, amount: 1, source: target, cardId: killCardId });
+        }
+      } else {
         // 不出杀:获得目标的武器
         const targetPlayer = state.players[target];
         const weaponId = targetPlayer?.equipment?.['武器'];
@@ -81,11 +92,12 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
           await applyAtom(state, { type: '获得', player: from, cardId: weaponId, from: target });
         }
       }
-      // 移牌到弃牌堆
+
+      // 锦囊移出处理区→弃牌堆
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       popFrame(state);
-    }, );
+    },
+  );
   return () => {};
 }
 
-export default { createSkill, onInit };

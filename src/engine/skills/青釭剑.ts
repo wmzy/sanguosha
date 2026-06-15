@@ -1,4 +1,3 @@
-// src/engine/skills/青釭剑.ts
 // 青釭剑(武器,范围2):杀无视目标防具。
 //
 // 实现:临时卸载目标的防具技能实例(移除技能),杀结算后恢复(添加技能)。
@@ -7,7 +6,7 @@
 // 时机:
 //   - 指定目标(杀 execute 内,造成伤害 之前):检测目标防具,移除技能
 //   - 造成伤害(杀 execute 内):正常结算(防具 hook 已不在)
-//   - 杀结算完毕后(指定目标的 after hook 无法捕获"结算完毕",改用 造成伤害 after hook 恢复)
+//   - 杀结算完毕后(造成伤害 after hook 恢复)
 //
 // 注意:移除技能 只卸载 hook 实例,不触发 卸下(装备仍在装备区)。
 // 白银狮子的"失去装备回血"监听 卸下 atom,不会被 移除技能 触发——正确。
@@ -17,6 +16,13 @@ import { registerAfterHook, unloadSkillInstance, instantiateSkill, type SkillMod
 
 /** 已知防具技能 id 列表——青釭剑临时卸载时遍历检查 */
 const ARMOR_SKILLS = ['仁王盾', '护甲', '藤甲', '白银狮子', '八卦阵'];
+
+/**
+ * 模块级:记录当前被青釭剑临时卸载的防具,供 造成伤害 after hook 恢复。
+ * key = 来源玩家(青釭剑使用者)座次下标,确保多玩家同时装备青釭剑时互不干扰。
+ * 这取代了旧的 state.localVars['青釭剑/临时卸载'] 跨 atom 通信。
+ */
+const tempUnloadMap = new Map<number, Array<{ target: number; skillId: string }>>();
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '青釭剑', description: '武器:杀无视目标防具' };
@@ -45,29 +51,29 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     if (!armorCard) return;
 
     // 找到目标当前已加载的防具技能,临时卸载
+    const unloaded: Array<{ target: number; skillId: string }> = [];
     for (const skillId of ARMOR_SKILLS) {
       if (targetPlayer.skills.includes(skillId)) {
-        // 记录被临时卸载的防具技能(供 造成伤害 after hook 恢复)
-        const list = (ctx.state.localVars['青釭剑/临时卸载'] as Array<{ target: number; skillId: string }> | undefined) ?? [];
-        list.push({ target, skillId });
-        ctx.state.localVars['青釭剑/临时卸载'] = list;
+        unloaded.push({ target, skillId });
         unloadSkillInstance(skillId, target);
       }
+    }
+    if (unloaded.length > 0) {
+      tempUnloadMap.set(ownerId, unloaded);
     }
   });
 
   // 造成伤害 after hook:杀结算完毕后,恢复被临时卸载的防具技能
   registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
     if ((ctx.atom as { source?: number }).source !== ownerId) return;
-    const unloaded = ctx.state.localVars['青釭剑/临时卸载'] as Array<{ target: number; skillId: string }> | undefined;
+    const unloaded = tempUnloadMap.get(ownerId);
     if (!unloaded || unloaded.length === 0) return;
     for (const { target, skillId } of unloaded) {
       await instantiateSkill(skillId, target);
     }
-    delete ctx.state.localVars['青釭剑/临时卸载'];
+    tempUnloadMap.delete(ownerId);
   });
 
   return () => {};
 }
 
-export default { createSkill, onInit } satisfies SkillModule;

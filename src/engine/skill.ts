@@ -28,12 +28,20 @@ export interface SkillModule {
 
 // ─── module 查询 ───────────────────────────────────────────
 
-/** 通过 skillLoaders 动态 import 获取技能模块 */
+/**
+ * 技能模块解析器。由 skills/index.ts 设置,打破循环依赖
+ * (技能文件 import skill.ts → skill.ts 不能反向 import skills/index.ts)。
+ */
+let skillModuleResolver: ((id: string) => Promise<SkillModule>) | null = null;
+
+export function setSkillModuleResolver(fn: (id: string) => Promise<SkillModule>): void {
+  skillModuleResolver = fn;
+}
+
+/** 通过解析器查找技能模块(动态 import,按需加载) */
 export async function getSkillModule(id: string): Promise<SkillModule> {
-  const { skillLoaders } = await import('./skills/index');
-  const loader = skillLoaders[id];
-  if (!loader) throw new Error(`Skill module "${id}" not found in skillLoaders`);
-  return loader();
+  if (!skillModuleResolver) throw new Error('skillModuleResolver not set (forgot to import skills/index?)');
+  return skillModuleResolver(id);
 }
 
 // ─── 实例级注册表(action + hook) ──────────────────────────────

@@ -1,19 +1,5 @@
-// src/engine/skills/诸葛连弩.ts
-// ============================================================
-// 技能描述(三国杀官方规则,见 docs/research/卡牌信息.md):
-//   诸葛连弩(武器,攻击范围 1,♠A):
-//     - 出牌阶段,你可以使用任意数量的【杀】
-//     - 移除了每回合只能使用 1 张【杀】的限制
-//
-// 关键原子操作:
-//   before 钩子(阶段开始):
-//     若 atom.player===ownerId ∧ atom.phase==='出牌' ∧ ownerId 装备的武器 name==='诸葛连弩'
-//     → 加标签 '诸葛连弩/无限出杀'
-//   消费:杀技能的 validate 检查此标签来突破每回合限杀
-//
-// 关键时机:
-//   - 标签的添加时机:出牌阶段开始(每回合重置)
-//   - 标签的清理:回合结束('清过期标记' 会清 duration='turn' 的标签)
+// 诸葛连弩(武器,攻击范围 1):出牌阶段使用【杀】无次数限制。
+//   出牌阶段开始时设 turn.vars['杀/quota'] = Infinity(杀.ts 的 validate 读此变量)。
 import type { AtomBeforeContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerBeforeHook, type SkillModule } from '../skill';
@@ -40,4 +26,3 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit };

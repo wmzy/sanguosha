@@ -32,6 +32,7 @@ import './阶段结束';
 import './设阶段';
 import './下一玩家';
 import './指定目标';
+import './成为目标';
 import './判定';
 import './添加延时锦囊';
 import './移除延时锦囊';

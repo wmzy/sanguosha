@@ -426,16 +426,18 @@ interface AtomAfterContext {
 }
 ```
 
-钩子通过 `await applyAtom(ctx.state, ...)` 操作状态（见 §4.2）。跨 atom 通信通过 state 观察(弃牌堆增量、tags、marks、localVars)，不通过 frame.params 突变。before 钩子中可调 `dropAtom(ctx.state)` 跳过当前 atom。
+钩子通过 `await applyAtom(ctx.state, ...)` 操作状态（见 §4.2）。跨 atom 通信通过两种方式:
+1. **处理区(牌列表)**:响应技能(闪/杀 respond)把牌移入处理区,父 action(杀/决斗)结算时检查处理区有没有对应牌——这是响应类结算的核心模式。
+2. **state.localVars**:被动 hook 用 localVars 与 respond action 通信(hook 设 localVars 后 await 请求回应,respond action 写入 localVars,hook 恢复后读取)。before 钩子可返回 `HookResult`(pass/modify/cancel)。
 
 **`询问闪` 的 before 钩子示例**:
-- 八卦阵: 判定成功 → `await applyAtom(ctx.state, { type: '加标签', player: target, tag: '八卦阵/autoDodge' })` → 杀.execute 后续观察此标签决定是否扣血
+- 八卦阵: 判定 → 红色 → 往处理区插入一张虚拟的闪牌。杀不需要知道八卦阵——只检查处理区有没有闪牌。
 - 不调 `dropAtom()`,询问闪继续走完 validate/apply 并进入 pending(等用户出闪);若用户最终未出闪,onTimeout=`无操作` 触发,杀.execute 检查 `tags.includes('八卦阵/autoDodge')` 决定是否扣血
 
-**闪的回应 action execute**: 移牌到弃牌堆。**不修改 frame.params**。父 action 通过观察弃牌堆(`state.zones.discardPile` 增量)判断是否闪避。
+**闪的回应 action execute**: 移牌到手牌→**处理区**(不是直接进弃牌堆)。父 action(杀/万箭齐发)结算时检查处理区有没有闪牌,有则移入弃牌堆(闪避成功),没有则造成伤害。
 
 **`指定目标` 的 after 钩子示例**:
-- 流离(大乔): `atom.target === ctx.ownerId` → 推入新的"流离"选择 UI(通过 `await applyAtom(ctx.state, 请求回应)` 让用户选新目标),后续 atom 读 `state.localVars['流离/newTarget']`
+- 流离(大乔): `atom.target === ctx.ownerId` → 推入新的"流离"选择 UI(通过 `await applyAtom(ctx.state, 请求回应)` 让用户选新目标),respond action 设 `state.localVars['流离/target']`,hook 恢复后读取并修改杀帧 settlement
 
 **`造成伤害` 的 after 钩子示例**:
 - 遗计(郭嘉): `target === ctx.ownerId` → `await applyAtom(ctx.state, 摸牌)` + `await applyAtom(ctx.state, 请求回应)` 分配牌
@@ -691,21 +693,27 @@ export function onInit(skill: Skill, ownerId: string): () => void {
 
 ```ts
 // ── 八卦阵.ts（装备·防具） ──
+// 八卦阵:判定红色 → 往处理区插入一张虚拟的闪牌。
+// 杀不需要知道八卦阵——只检查处理区有没有闪牌。
 import { registerBeforeHook } from '../skill';
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
   registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx) => {
-    if (ctx.atom.target !== ctx.ownerId) return;
-    if (!hasEquipped(ctx.state, ctx.ownerId, '八卦阵')) return;
+    if ((ctx.atom as { target?: number }).target !== ownerId) return;
+    if (ctx.state.zones.deck.length === 0) return;
 
-    await applyAtom(ctx.state, {
-      type: '请求回应', requestType: '是否发动八卦阵', target: ctx.ownerId,
-    });
+    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '八卦阵' });
 
-    await applyAtom(ctx.state, { type: '判定', player: ctx.ownerId, judgeType: '八卦阵' });
-    const judgeResult = ctx.state.localVars['八卦阵:判定结果'];
-    if (judgeResult === 'red') {
-      await applyAtom(ctx.state, { type: '加标签', player: ctx.ownerId, tag: '八卦阵/autoDodge' });
+    // 判定后,判定牌已入弃牌堆(引擎 cleanupJudgeZone)。读弃牌堆顶花色。
+    const discardPile = ctx.state.zones.discardPile;
+    const judgeCard = ctx.state.cardMap[discardPile[discardPile.length - 1]];
+    if (!judgeCard) return;
+
+    // 红色:往处理区放入一张虚拟的闪牌,杀检查处理区会看到闪
+    if (judgeCard.suit === '♥' || judgeCard.suit === '♦') {
+      const dodgeId = `八卦阵:${ownerId}:${judgeCard.id}`;
+      ctx.state.cardMap[dodgeId] = { id: dodgeId, name: '闪', suit: judgeCard.suit, rank: judgeCard.rank, type: '基本牌' };
+      ctx.state.zones.processing.push(dodgeId);
     }
   });
   return () => {};
@@ -714,27 +722,39 @@ export function onInit(skill: Skill, ownerId: string): () => void {
 
 ```ts
 // ── 遗计.ts（郭嘉） ──
+// 被动技 after hook 用 localVars 与 respond action 通信。
 import { registerAfterHook } from '../skill';
 
-export function onInit(skill: Skill, ownerId: string): () => void {
+export function onInit(skill: Skill, ownerId: number): () => void {
+  // respond action:遗计分配牌,设 localVars 记录结果
+  registerAction(skill.id, ownerId, 'respond', (state, params) => {
+    // validate...
+  }, async (state, params) => {
+    state.localVars['遗计/allocation'] = params.allocation ?? null;
+  });
+
   registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx) => {
-    if (ctx.atom.target !== ctx.ownerId) return;
+    if ((ctx.atom as { target?: number }).target !== ownerId) return;
+    const amount = (ctx.atom as { amount?: number }).amount ?? 0;
 
-    await applyAtom(ctx.state, {
-      type: '请求回应', requestType: '是否发动遗计', target: ctx.ownerId,
-    });
-    const active = ctx.state.players.find(p => p.name === ctx.ownerId)?.tags?.includes('遗计/active');
-    if (!active) return;
+    for (let i = 0; i < amount; i++) {
+      const handBefore = ctx.state.players[ownerId]?.hand.length ?? 0;
+      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 2 });
+      const drawnCards = ctx.state.players[ownerId].hand.slice(handBefore);
 
-    await applyAtom(ctx.state, { type: '摸牌', player: ctx.ownerId, count: 2 });
-    await applyAtom(ctx.state, {
-      type: '请求回应', requestType: '遗计分配', target: ctx.ownerId,
-    });
-    const distribution = ctx.state.localVars['遗计:分配结果'] as Array<{ target: string; cardIds: string[] }> | undefined;
-    if (distribution) {
-      for (const { target, cardIds } of distribution) {
-        for (const cardId of cardIds) {
-          await applyAtom(ctx.state, { type: '移动牌', cardId, from: { zone: '手牌', player: ctx.ownerId }, to: { zone: '手牌', player: target } });
+      delete ctx.state.localVars['遗计/allocation'];
+      await applyAtom(ctx.state, {
+        type: '请求回应', requestType: '遗计/distribute', target: ownerId,
+        prompt: { type: 'distribute', title: '遗计:分配两张牌', cardIds: drawnCards, minPerTarget: 1, maxPerTarget: 2 },
+        timeout: 30,
+      });
+
+      const distribution = ctx.state.localVars['遗计/allocation'] as Array<{ target: number; cardIds: string[] }> | null;
+      if (Array.isArray(distribution)) {
+        for (const entry of distribution) {
+          for (const cardId of entry.cardIds) {
+            await applyAtom(ctx.state, { type: '给予', cardId, from: ownerId, to: entry.target });
+          }
         }
       }
     }
@@ -1760,103 +1780,89 @@ src/server/
 ### 场景 A：杀 → 流离改目标 → 出闪
 
 ```
-结算区栈:
-  [杀(P1, cardId:'c1')]
-    params: { cardId: 'c1', settlement: [{ target: 'P2', dodged: false, amount: 1 }] }
-    cards: ['c1']
+杀.execute:
+  pushFrame('杀', P1, { cardId: 'c1', settlement: [{ target: P2, dodged: false }] })
+  移动牌 c1: 手牌(P1) → 处理区
 
-  applyAtom(state, { type: '移动牌', c1, 手牌(P1) → 处理区 })
+  // 第一阶段:逐个指定所有目标
+  applyAtom(state, { type: '指定目标', source: P1, target: P2, cardId: 'c1' })
+  ↓ after hooks:
+    流离(P2)收到指定目标 → 发动
+      await applyAtom(state, 请求回应 confirm) → respond 设 localVars['流离/confirmed']
+      await applyAtom(state, 请求回应 chooseTarget) → respond 设 localVars['流离/target']=P3
+      弃 P2 手牌一张
+      修改 settlement[0].target = P3
 
-  applyAtom(state, { type: '指定目标', source: P1, target: P2 })
-  ↓ onAfter hooks:
-    流离.onAtomAfter('指定目标'):
-      atom.target === ownerId (P2) → 手牌有方块 → 发动
-      modifyParams({ settlement: [{ target: 'P3', dodged: false, amount: 1 }] })
-
-  applyAtom(state, { type: '询问闪', target: P3, awaits: { target: P3, prompt: '需要闪' } })
-  ↓ onBefore hooks: (无八卦阵在 P3)
+  // 第二阶段:逐个结算
+  applyAtom(state, { type: '询问闪', target: P3, source: P1 })
   ↓ 等待 P3 回应
-  ↓ P3 出闪 → 闪 action 在当前帧上 execute:
-    applyAtom(state, { type: '移动牌', 闪牌, 手牌(P3) → 处理区 })
-    frame.params.settlement[0].dodged = true
-    dropAtom(state)  // 丢栈顶——询问闪不会真正 apply
-    applyAtom(state, { type: '移动牌', 闪牌, 处理区 → 弃牌堆 })
+  ↓ P3 出闪 → 闪.respond:
+    移动牌 闪牌: 手牌(P3) → 处理区
+  ↓ applyAtom 返回(挂起结束)
+  // 检查处理区:有闪牌 → 移入弃牌堆,标记闪避
+  移动牌 闪牌: 处理区 → 弃牌堆
 
-  // 最终结算
   settlement[0].dodged === true → 不执行造成伤害
-  applyAtom(state, { type: '移动牌', c1, 处理区 → 弃牌堆 })
+  移动牌 c1: 处理区 → 弃牌堆
+  popFrame
 ```
 
 ### 场景 B：杀 → 八卦阵判定成功 → 视为闪
 
 ```
-结算区栈:
-  [杀(P1, cardId:'c1')]
-    params: { settlement: [{ target: 'P2', dodged: false, amount: 1 }] }
+杀.execute:
+  pushFrame → 移动牌 c1 到处理区 → 指定目标 P2
 
-  applyAtom(state, { type: '移动牌', c1, 手牌(P1) → 处理区 })
-  applyAtom(state, { type: '指定目标', source: P1, target: P2 })  // 无钩子
+  applyAtom(state, { type: '询问闪', target: P2, source: P1 })
+  ↓ before hooks:
+    八卦阵(P2).beforeHook('询问闪'):
+      target === P2 → applyAtom(判定, judgeType='八卦阵')
+      读弃牌堆顶判定牌花色 → 红色
+      往处理区插入虚拟闪牌: cardMap['八卦阵:P2:...'] = { name:'闪', ... }
+      zones.processing.push(virtualDodgeId)
+  ↓ applyAtom 返回(询问闪 pending 挂起,但八卦阵已放闪牌到处理区)
+  // 检查处理区:有闪牌(八卦阵的虚拟闪) → 移入弃牌堆,标记闪避
+  移动牌 virtualDodgeId: 处理区 → 弃牌堆(虚拟牌从 cardMap 删除)
 
-  applyAtom(state, { type: '询问闪', target: P2, awaits: { target: P2, prompt: '需要闪' } })
-  ↓ onBefore hooks:
-    八卦阵.onAtomBefore('询问闪'):
-      atom.target === ownerId (P2) → hasEquipped(P2, '八卦阵') → 是
-      applyAtom(state, { type: '请求回应', requestType: '是否发动八卦阵', target: P2 })
-      → P2 选择"发动"
-      applyAtom(state, { type: '判定', player: P2, judgeType: '八卦阵' })
-      → 翻牌 → 红色
-      frame.params.settlement[0].dodged = true
-      ctx.drop()  // 询问闪不会真正 apply
-
-  // 最终结算
   settlement[0].dodged === true → 不执行造成伤害
 ```
 
 ### 场景 C：南蛮入侵 → 逐个响应
 
 ```
-结算区栈:
-  [南蛮入侵(P1)]
-    params: { settlement: [
-      { target: 'P2', responded: false },
-      { target: 'P3', responded: false },
-      { target: 'P4', responded: false },
-    ]}
+南蛮入侵.execute:
+  pushFrame → 移动牌 南蛮牌 到处理区
 
-  applyAtom(state, { type: '移动牌', 南蛮牌, 手牌(P1) → 处理区 })
+  for target of [P2, P3, P4]:
+    applyAtom(state, { type: '询问杀', target, source: P1 })
+    // 检查处理区:有杀牌? → 移到弃牌堆(出了杀);没有 → 收集到 notResponded
 
-  for item of settlement:
-    applyAtom(state, { type: '询问杀', target: item.target, awaits: { target, prompt: '需要杀' } })
-    // 响应 action 在当前帧上 execute，item.responded = true + drop
+  for target of notResponded:
+    applyAtom(state, { type: '造成伤害', target, amount: 1, source: P1, cardId })
 
-  for item of settlement:
-    if !item.responded:
-      applyAtom(state, { type: '造成伤害', target: item.target, amount: 1, source: P1 })
-
-  applyAtom(state, { type: '移动牌', 南蛮牌, 处理区 → 弃牌堆 })
+  移动牌 南蛮牌: 处理区 → 弃牌堆
+  popFrame
 ```
 
 ### 场景 D：伤害 → 遗计（郭嘉） → 反馈（司马懿）
 
 ```
-applyAtom(state, { type: '造成伤害', target: 郭嘉, amount: 1, source: 司马懿 }):
-  onBefore hooks: (无)
+applyAtom(state, { type: '造成伤害', target: 郭嘉, amount: 1, source: 司马郭 }):
+  before hooks: (无)
   apply → state 更新（郭嘉体力 -1）
-  onAfter hooks (全部执行):
-    遗计.onAtomAfter('造成伤害'):              // 郭嘉
-      atom.target === ownerId → 继续
-      applyAtom(state, { type: '请求回应', requestType: '是否发动遗计', ... })
-      → 郭嘉 选择"发动"
-      applyAtom(state, { type: '摸牌', player: 郭嘉, count: 2 })
-      applyAtom(state, { type: '请求回应', requestType: '分配', target: 郭嘉, ... })
-      for { target, cardIds } of frame.params.遗计分配:
-        applyAtom(state, { type: '给予', cardId, from: 郭嘉, to: target })
+  after hooks (全部执行):
+    遗计(郭嘉).afterHook('造成伤害'):
+      target === 郭嘉 → 继续
+      摸牌 2 → 请求回应(分配) → respond 设 localVars['遗计/allocation']
+      for { target, cardIds } of localVars['遗计/allocation']:
+        applyAtom(给予)
 
-    反馈.onAtomAfter('造成伤害'):              // 司马懿
-      atom.target === ownerId → 不是，跳过
+    反馈(司马懿).afterHook('造成伤害'):
+      target === 司马懿? 不是 → 跳过
 ```
 
-两个 atom hook 都执行（副作用语义）。遗计先执行完，反馈再执行。
+两个 after hook 都执行。遗计先执行完,反馈再执行。
+hook 与 respond action 通过 localVars 通信(非 frame.params)。
 
 ### 场景 E：玩家级超时配置
 
