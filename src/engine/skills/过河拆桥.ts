@@ -1,7 +1,7 @@
 // 过河拆桥(普通锦囊):
 //   出牌阶段,对 1 名其他角色使用(无距离限制)。
 //   弃置该角色区域内(手牌、装备区、判定区)的 1 张牌。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -51,4 +51,17 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       popFrame(state);
     }, );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '过河拆桥',
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '过河拆桥',
+      cardFilter: { filter: (c) => c.name === '过河拆桥', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 1 },
+    },
+  });
 }

@@ -3,7 +3,7 @@
 //   方法Ⅱ(respond):濒死时使用,回复 1 点体力(等同桃)。
 //
 // 方法Ⅱ的增伤效果通过 before hook(造成伤害)消费 mark 实现。
-import type { GameState, AtomBeforeContext, HookResult, Json, Skill } from '../types';
+import type { AtomBeforeContext, FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -71,5 +71,26 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   });
 
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '酒',
+    style: 'default',
+    prompt: {
+      type: 'useCard',
+      title: '使用酒',
+      cardFilter: { filter: (c) => c.name === '酒', min: 1, max: 1 },
+    },
+  });
+  api.defineAction('respond', {
+    label: '出酒',
+    style: 'default',
+    prompt: {
+      type: 'useCard',
+      title: '出酒救援',
+      cardFilter: { filter: (c) => c.name === '酒', min: 1, max: 1 },
+    },
+  });
 }
 

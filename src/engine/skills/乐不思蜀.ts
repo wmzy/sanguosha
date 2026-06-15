@@ -5,6 +5,7 @@ import type {
   AtomAfterContext,
   AtomBeforeContext,
   Card,
+  FrontendAPI,
   GameState,
   Json,
   Skill,
@@ -118,4 +119,17 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   });
 
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '乐不思蜀',
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '乐不思蜀',
+      cardFilter: { filter: (c) => c.name === '乐不思蜀', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 1 },
+    },
+  });
 }

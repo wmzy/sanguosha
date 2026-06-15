@@ -1,7 +1,7 @@
 // 青龙偃月刀(武器,攻击范围 3):
 //   你使用的【杀】被【闪】抵消后,你可以对相同目标再使用 1 张杀。
 //   可以连续追击直到命中或无杀可用。
-import type { AtomAfterContext, Json, Skill } from '../types';
+import type { AtomAfterContext, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -86,5 +86,13 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   });
 
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('respond', {
+    label: '青龙偃月刀',
+    style: 'danger',
+    prompt: { type: 'confirm', title: '青龙偃月刀：是否追杀？', confirmLabel: '追杀', cancelLabel: '不追杀' },
+  });
 }
 

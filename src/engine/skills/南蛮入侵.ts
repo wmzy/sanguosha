@@ -2,7 +2,7 @@
 // 每名目标依次判定:若不打出【杀】,则受到使用者造成的 1 点伤害。
 //
 // 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 受伤害。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -86,5 +86,17 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     },
   );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '南蛮入侵',
+    style: 'danger',
+    prompt: {
+      type: 'useCard',
+      title: '南蛮入侵',
+      cardFilter: { filter: (c) => c.name === '南蛮入侵', min: 1, max: 1 },
+    },
+  });
 }
 

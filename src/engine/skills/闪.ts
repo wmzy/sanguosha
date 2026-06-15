@@ -1,7 +1,7 @@
 // 闪(基本牌):当你成为【杀】的目标时,可以打出【闪】抵消伤害。
 // 闪只有 respond action(没有 use),因为闪不能主动使用。
 // respond:把闪牌从手牌移到处理区(不是直接进弃牌堆),供杀的结算流程检查。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -34,5 +34,17 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     },
   );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('respond', {
+    label: '出闪',
+    style: 'default',
+    prompt: {
+      type: 'useCard',
+      title: '打出闪',
+      cardFilter: { filter: (c) => c.name === '闪', min: 1, max: 1 },
+    },
+  });
 }
 

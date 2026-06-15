@@ -2,7 +2,7 @@
 //   use:出牌阶段对已受伤角色使用,回复 1 体力。
 //   respond:濒死求桃时出桃救援——设 state.localVars['求桃/已救'] = true,
 //   runDyingFlow 检查此标志判断是否有人救援。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -54,5 +54,26 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   );
 
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '桃',
+    style: 'primary',
+    prompt: {
+      type: 'useCard',
+      title: '使用桃',
+      cardFilter: { filter: (c) => c.name === '桃', min: 1, max: 1 },
+    },
+  });
+  api.defineAction('respond', {
+    label: '出桃',
+    style: 'primary',
+    prompt: {
+      type: 'useCard',
+      title: '出桃救援',
+      cardFilter: { filter: (c) => c.name === '桃', min: 1, max: 1 },
+    },
+  });
 }
 

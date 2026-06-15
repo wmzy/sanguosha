@@ -1,6 +1,6 @@
 // 寒冰剑(武器,攻击范围 2):
 //   每当你使用【杀】对目标造成伤害时,你可以防止此伤害,改为弃置其两张牌。
-import type { AtomBeforeContext, HookResult, Json, Skill } from '../types';
+import type { AtomBeforeContext, FrontendAPI, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -52,5 +52,13 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     return { kind: 'cancel' };
   });
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('respond', {
+    label: '寒冰剑',
+    style: 'default',
+    prompt: { type: 'confirm', title: '寒冰剑：是否改为弃目标2张？', confirmLabel: '弃牌', cancelLabel: '正常伤害' },
+  });
 }
 

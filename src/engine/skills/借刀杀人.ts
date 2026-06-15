@@ -2,7 +2,7 @@
 //   出牌阶段,对装备区有武器牌的 1 名其他角色(A)使用。
 //   A 须选择:对使用者指定的另一名角色 B 使用 1 张杀,或交出武器。
 //   请求回应 后检查处理区:有杀 = 出了杀;没有 = 不出(获得武器)。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -99,5 +99,18 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     },
   );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '借刀杀人',
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '借刀杀人',
+      cardFilter: { filter: (c) => c.name === '借刀杀人', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 1 },
+    },
+  });
 }
 

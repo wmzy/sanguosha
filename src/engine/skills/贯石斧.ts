@@ -1,6 +1,6 @@
 // 贯石斧(武器,攻击范围 3):
 //   目标角色使用【闪】后,你可以弃置 2 张牌,令此【杀】依然造成伤害。
-import type { AtomAfterContext, Json, Skill } from '../types';
+import type { AtomAfterContext, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -72,5 +72,13 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   });
 
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('respond', {
+    label: '贯石斧',
+    style: 'danger',
+    prompt: { type: 'confirm', title: '贯石斧：是否弃2张牌强命？', confirmLabel: '强命', cancelLabel: '不发动' },
+  });
 }
 

@@ -1,7 +1,7 @@
 // 装备通用(系统级):所有装备牌共用的 use action。
 //   把装备牌装到对应栏位(根据 card.subtype),旧装备卸下进弃牌堆。
 //   若装备牌自带技能(以 card.name 作 skillId),动态挂载技能实例。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 import { skillLoaders } from './index';
@@ -47,5 +47,17 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       popFrame(state);
     }, );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '装备',
+    style: 'default',
+    prompt: {
+      type: 'useCard',
+      title: '装备',
+      cardFilter: { filter: (c) => c.type === '装备牌', min: 1, max: 1 },
+    },
+  });
 }
 

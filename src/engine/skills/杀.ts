@@ -11,7 +11,7 @@
 //
 // 流离/转移类技能:在 成为目标 after hook 修改帧 params.currentTarget,
 // 杀在下轮结算时读帧上的 currentTarget 而非原始 targets[i]。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
@@ -129,5 +129,27 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   );
 
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '杀',
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '出杀',
+      cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 3 },
+    },
+  });
+  api.defineAction('respond', {
+    label: '出杀',
+    style: 'default',
+    prompt: {
+      type: 'useCard',
+      title: '打出杀',
+      cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+    },
+  });
 }
 

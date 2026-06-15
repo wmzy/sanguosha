@@ -8,7 +8,7 @@
 //       dispatch 的 respond 路径是 await execute → resolve,
 //       所以 respond 内部的反无懈询问会阻塞到反无懈完成,时序正确。
 //       奇数次无懈 = 被抵消, 偶数次 = 恢复生效。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -65,4 +65,16 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     },
   );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('respond', {
+    label: '无懈可击',
+    style: 'danger',
+    prompt: {
+      type: 'useCard',
+      title: '打出无懈可击',
+      cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 },
+    },
+  });
 }

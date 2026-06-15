@@ -1,6 +1,6 @@
 // 遗计(郭嘉·被动技):当你受到 1 点伤害后,你可以摸两张牌,
 // 然后将两张牌交给任意角色(每 1 点伤害触发一次)。
-import type { AtomAfterContext, Json, Skill } from '../types';
+import type { AtomAfterContext, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -61,5 +61,13 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     }
   });
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('respond', {
+    label: '遗计',
+    style: 'primary',
+    prompt: { type: 'confirm', title: '是否发动遗计？', confirmLabel: '发动', cancelLabel: '不发动' },
+  });
 }
 

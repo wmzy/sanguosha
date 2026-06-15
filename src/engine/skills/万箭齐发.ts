@@ -2,7 +2,7 @@
 // 每名目标依次判定:若不打出【闪】,则受到使用者造成的 1 点伤害。
 //
 // 询问闪 后检查处理区:有闪牌 = 出了闪;没有 = 受伤害。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -85,5 +85,17 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     },
   );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '万箭齐发',
+    style: 'danger',
+    prompt: {
+      type: 'useCard',
+      title: '万箭齐发',
+      cardFilter: { filter: (c) => c.name === '万箭齐发', min: 1, max: 1 },
+    },
+  });
 }
 

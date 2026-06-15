@@ -2,7 +2,7 @@
 // 目标先开始,与使用者轮流出杀,首先不出杀的一方受到对方造成的 1 点伤害。
 //
 // 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 没出(输)。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -86,5 +86,18 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     },
   );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '决斗',
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '决斗',
+      cardFilter: { filter: (c) => c.name === '决斗', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 1 },
+    },
+  });
 }
 

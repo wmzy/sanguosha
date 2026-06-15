@@ -1,5 +1,5 @@
 // 无中生有(普通锦囊):出牌阶段对自己使用,摸两张牌。
-import type { GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 
@@ -27,4 +27,16 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       popFrame(state);
     }, );
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('use', {
+    label: '无中生有',
+    style: 'primary',
+    prompt: {
+      type: 'useCard',
+      title: '无中生有',
+      cardFilter: { filter: (c) => c.name === '无中生有', min: 1, max: 1 },
+    },
+  });
 }
