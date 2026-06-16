@@ -2,6 +2,7 @@
 // 集成测试 2: 新顶层 API(dispatch / registerSkillsFromState) + 武将技能 护甲(锁定被动)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatch, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
+import { dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -31,7 +32,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 护甲(曹操·锁定被动)', () => 
   });
 
   it('受到黑色【杀】 → 扣 0 血(护甲吸收)', async () => {
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '杀', actionType: 'use', ownerId: 0,
       params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });

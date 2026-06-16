@@ -130,6 +130,7 @@ export class PlayerSession {
 
   async pass(): Promise<void> {
     await engineFireTimeout(this.harness.state);
+    await this.harness.waitForStable();
   }
 
   /** 确认/取消(八卦阵、遗计确认等)。choice=false 等同 pass()。 */
@@ -281,11 +282,13 @@ export class PlayerSession {
   private async dispatch(
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
   ): Promise<void> {
-    await engineDispatch(this.harness.state, {
+    // fire-and-forget 启动 dispatch,然后等到 state 稳定(pending 创建或 execute 跑完)
+    void engineDispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerIndex,
       baseSeq: this.harness.state.seq,
-    });
+    }).catch(() => { /* dispatch 内部不抛错;吞掉防御性 */ });
+    await this.harness.waitForStable();
   }
 }
 
@@ -315,6 +318,14 @@ export class SkillTestHarness {
       await session.loadFrontend();
       this.sessions.set(player.index, session);
     }
+  }
+
+  /**
+   * 等到 state 稳定:有 pendingSlot(等玩家输入)或 execute 跑完(无 pending 且 atomStack 空)。
+   * 委托给模块级 waitForStable。
+   */
+  async waitForStable(): Promise<void> {
+    await waitForStable(this._state);
   }
 
   /** 按名字或座次取玩家 session(测试可传 'P1' 或 0) */
@@ -358,5 +369,53 @@ function extractTargetFilter(prompt: ActionPrompt): TargetFilter | null {
       return prompt.targetFilter;
     default:
       return null;
+  }
+}
+
+/**
+ * dispatch 的 fire-and-forget 包装:启动 dispatch 后等到 state 稳定。
+ * 手写集成测试(直接用 dispatch、不经 SkillTestHarness)用此函数替代 `await dispatch(...)`。
+ * 等价于 `void dispatch(state, msg); await waitForStable(state);`,但会 rethrow dispatch 的 rejection。
+ */
+export async function dispatchAndWait(state: GameState, message: ClientMessage): Promise<void> {
+  // fire-and-forget:不 await dispatch 的 promise(主动 action 的 execute 会挂在 pending 上永不 resolve)。
+  // waitForStable 负责等到下一个稳定点(pending 创建或 execute 跑完)。
+  void engineDispatch(state, message);
+  await waitForStable(state);
+}
+
+/**
+ * fireTimeout 包装:触发超时后等到 state 稳定(父 execute resume 跑到下一个 pending 或结束)。
+ * 手写集成测试用此替代 `await fireTimeout(state)`。
+ */
+export async function fireTimeoutAndWait(state: GameState): Promise<void> {
+  await engineFireTimeout(state);
+  await waitForStable(state);
+}
+
+/**
+ * 等到 state 稳定:有 pendingSlot(等玩家输入)或 execute 跑完(无 pending 且 atomStack 空)。
+ * dispatch fire-and-forget 后用它拿到下一个稳定点。
+ * 用轮询 + 短超时:fire-and-forget 的 execute 在微任务队列里推进,
+ * 轮询能捕获到它建 pending 或跑完;连续 20ms 无变化且 atomStack 空则认为稳定。
+ *
+ * 手写集成测试(直接用 dispatch、不经 SkillTestHarness)可 import 此函数。
+ */
+export async function waitForStable(state: GameState): Promise<void> {
+  const deadline = Date.now() + 2000;
+  let lastChange = Date.now();
+  let lastSnapshot = '';
+  // 让出整个微任务队列(用 setTimeout 0 而非 Promise.resolve),
+  // 使 fire-and-forget 的 execute 能跨多层 await applyAtom 推进到 pending 或结束。
+  const yieldToMicrotasks = () => new Promise<void>((r) => setTimeout(r, 0));
+  while (Date.now() < deadline) {
+    await yieldToMicrotasks();
+    const snapshot = `${state.pendingSlot ? 1 : 0}|${state.atomStack.length}|${state.seq}`;
+    if (snapshot !== lastSnapshot) {
+      lastSnapshot = snapshot;
+      lastChange = Date.now();
+    }
+    if (state.pendingSlot) return;
+    if (state.atomStack.length === 0 && Date.now() - lastChange > 20) return;
   }
 }

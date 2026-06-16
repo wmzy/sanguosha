@@ -12,6 +12,7 @@ import {
   registerSkillsFromState,
   type GameConfig,
 } from '../../src/engine/create-engine';
+import { fireTimeoutAndWait,  dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { GameState, ClientMessage, Json, Card } from '../../src/engine/types';
@@ -69,13 +70,13 @@ describe('身份局端到端', () => {
     state.players[1].maxHealth = 1;
 
     // P0 对 P1 出杀
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '杀', actionType: 'use', ownerId: 0,
       params: { cardId: 'kill-1', targets: [1] }, baseSeq: 0,
     });
     // 进入 询问闪 pending → P1 不闪(超时)
     expect(state.pendingSlot).toBeDefined();
-    await fireTimeout(state);
+    await fireTimeoutAndWait(state);
 
     // 询问闪 resolve 后,杀.execute 造成伤害(1点)→ P1 血量 0 → 濒死
     // 濒死流程 runDyingFlow:从 P1 开始依次问求桃,每人一个 pending
@@ -84,7 +85,7 @@ describe('身份局端到端', () => {
     while (state.pendingSlot && safety-- > 0) {
       const atom = state.pendingSlot.atom as Record<string, unknown>;
       if (atom.requestType === '求桃' || atom.type === '请求回应') {
-        await fireTimeout(state);
+        await fireTimeoutAndWait(state);
       } else {
         break;
       }

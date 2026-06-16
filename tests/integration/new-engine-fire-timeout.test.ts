@@ -2,6 +2,7 @@
 // 引擎 fireTimeout(state) 单元测试(归 core 项目)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatch, fireTimeout, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
+import { fireTimeoutAndWait,  dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -33,18 +34,18 @@ describe('fireTimeout(state)', () => {
 
   it('无 pending 时调用:无副作用,state 不变', async () => {
     const beforeSeq = state.seq;
-    await fireTimeout(state);
+    await fireTimeoutAndWait(state);
     expect(state.seq).toBe(beforeSeq);
   });
 
   it('有 pending(询问闪)时调用:触发 onTimeout → pending 清空 → P2 扣 1 血', async () => {
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '杀', actionType: 'use', ownerId: 0,
       params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
     expect(state.pendingSlot).toBeDefined();
 
-    await fireTimeout(state);
+    await fireTimeoutAndWait(state);
     expect(state.pendingSlot).toBeUndefined();
     const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);

@@ -66,15 +66,17 @@ describe('restoreFromLog — 持久化 + 恢复 e2e', () => {
     const { saveRoom, loadRoom } = await loadPersistence();
     const { state } = await makeGame();
 
-    // 制造一点 action:回合管理 end
+    // 制造一点 action:回合管理 end(fire-and-forget,waitForStable 拿稳定点)
     const { dispatch } = await import('../../src/engine/create-engine');
-    await dispatch(state, {
+    const { waitForStable } = await import('../engine-harness');
+    void dispatch(state, {
       skillId: '回合管理',
       actionType: 'end',
       ownerId: state.players[0].index,
       params: {},
       baseSeq: 0,
     });
+    await waitForStable(state);
 
     await saveRoom('room-log', META, state, state.actionLog, true);
     const persisted = (await loadRoom('room-log'))!;

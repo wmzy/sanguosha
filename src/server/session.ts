@@ -71,6 +71,7 @@ export class GameSession {
     await restore(fresh, config, actionLog);
     this.state = fresh;
     this.actionLog = fresh.actionLog;
+    this.attachStateListener();
   }
 
   async startGame(playerCount?: number): Promise<boolean> {
@@ -115,6 +116,10 @@ export class GameSession {
     this.actionLog = state.actionLog;
     this.lastActivityAt = Date.now();
 
+    // 挂载 state 变更回调:每次 applyAtom 结束后广播+持久化+检查结束。
+    // dispatch 是 fire-and-forget,所有 session 副作用由此回调驱动。
+    this.attachStateListener();
+
     setRoomStatus(this.room.id, '进行中');
     this.sendInitialViewToAll();
     this.resetIdleTimer();
@@ -137,25 +142,38 @@ export class GameSession {
       return;
     }
 
-    await dispatch(this.state, action);
-
-    // 记录 actionLog(从引擎获取)
-    this.actionLog = this.state.actionLog;
-    this.lastActivityAt = Date.now();
-    this.persistAsync();
-    this.broadcastNewState();
-
-    // 检查游戏结束(从 state 计算,不依赖 dispatch 返回值)
-    const { gameOver, winner } = checkGameOver(this.state);
-    if (gameOver) {
-      this.handleGameOver(winner);
-    }
-    this.resetIdleTimer();
+    // dispatch 是 fire-and-forget:启动 execute 后立即返回。
+    // state 变更的广播/持久化/结束检查由 onStateChange 回调驱动(见 attachStateListener)。
+    // dispatch 同步部分(preceding/validate)不应抛错;用 void 吞掉潜在的 async rejection。
+    void dispatch(this.state, action).catch((err) => {
+      this.logger.error('dispatch error', { error: String(err) });
+    });
   }
 
   private handleGameOver(winner?: number): void {
     setRoomStatus(this.room.id, '已结束');
     this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
+  }
+
+  /**
+   * 挂载 state.onStateChange 回调:每次 applyAtom 结束后同步 broadcastNewState +
+   * persistAsync + checkGameOver。dispatch fire-and-forget 模型下,所有 session
+   * 副作用由本回调驱动。幂等:重复挂载会覆盖旧回调。
+   */
+  private attachStateListener(): void {
+    if (!this.state) return;
+    this.state.onStateChange = () => {
+      if (this.destroyed || !this.state) return;
+      this.actionLog = this.state.actionLog;
+      this.lastActivityAt = Date.now();
+      this.broadcastNewState();
+      this.persistAsync();
+      const { gameOver, winner } = checkGameOver(this.state);
+      if (gameOver) {
+        this.handleGameOver(winner);
+      }
+      this.resetIdleTimer();
+    };
   }
 
 
@@ -185,7 +203,7 @@ export class GameSession {
 
   private sendDebugGameState(playerId: string, lastSeq?: number): void {
     if (!this.state) return;
-    const view = buildView(this.state, 0);
+    const view = buildView(this.state, 0, this.debug);
     const state = this.state;
     this.sendToPlayer(playerId, { type: 'debugGameState', state: view, lastSeq: lastSeq ?? state.seq });
   }
@@ -250,6 +268,8 @@ export class GameSession {
     this.destroyed = true;
     this.clearIdleTimer();
     this.clearGraceTimer();
+    // 先断开 state 变更回调:防止挂起的 execute resume 后触发已销毁 session 的广播
+    if (this.state) this.state.onStateChange = undefined;
     this.state = null;
     await deletePersistedRoom(this.room.id);
   }
@@ -268,7 +288,7 @@ export class GameSession {
 
   getDebugView(): GameView | null {
     if (!this.state) return null;
-    return buildView(this.state, 0);
+    return buildView(this.state, 0, this.debug);
   }
 
   private clearGraceTimer(): void {
@@ -289,19 +309,20 @@ export class GameSession {
     if (state.players.some(p => !p.alive) || state.pendingSlot) return;
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.alive) return;
-    this.idleTimer = setTimeout(async () => {
+    this.idleTimer = setTimeout(() => {
       if (this.destroyed || !this.state) return;
       this.logger.info('idle timeout, auto-ending turn', { player: currentPlayer.name });
       const seq = this.state.seq;
-      await dispatch(this.state, {
+      // fire-and-forget:广播/持久化由 onStateChange 回调驱动
+      void dispatch(this.state, {
         skillId: '回合管理',
         actionType: 'end',
         ownerId: currentPlayer.index,
         params: {},
         baseSeq: seq,
+      }).catch((err) => {
+        this.logger.error('idle dispatch error', { error: String(err) });
       });
-      this.broadcastNewState();
-      this.persistAsync();
     }, IDLE_TIMEOUT_MS);
   }
 

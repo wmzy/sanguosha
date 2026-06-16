@@ -106,8 +106,8 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     if (atom.phase !== '出牌') return;
     const self = ctx.state.players[ownerId];
     if (!self) return;
-    // 检查跳过标签(存在 mark id='tag:乐不思蜀/跳过出牌')
-    if (!self.marks.some(m => m.id === `tag:${SKIP_TAG}`)) return;
+    // 检查跳过标签(tags 数组)
+    if (!self.tags?.includes(SKIP_TAG)) return;
 
     // 顺序很重要:
     //   1) 先去标签(否则 阶段结束 出牌 之后回合管理阶段链会再次命中本 hook)

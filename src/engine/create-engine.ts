@@ -13,12 +13,16 @@
 // 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
 // 完成了开局,不需要再 dispatch 开局 start。
 //
-// 两种 dispatch 路径:
-//   1) 主动 action(无 pending slot):→ 调用 entry.execute(api) → 技能内部 pushFrame →
-//      apply atom → 等稳定点(execute 完成 OR 新 pending 创建,通过 resolveStable(state) 通知)。
-//   2) 回应 action(有 pending slot):merge message.params →
-//      调用 entry.execute(api)(回应技能内部也 pushFrame) → consume pending →
-//      等原始 execute 恢复。
+// dispatch 路径(fire-and-forget):
+//   启动 execute 后立即返回,不等 pending 创建。preceding/validate 同步跑完,
+//   通过 entry.execute(...).then(resolve) 启动后即返回。
+//   1) 主动 action(无 pending slot):execute 跑到 applyAtom 建 pending 时自然挂起。
+//   2) 回应 action(有 pending slot):slot.pause() 取消定时器 → respond execute 跑完
+//      → .then(resolve) 恢复父 execute。递归 pending(如无纶递归)下 respond execute
+//      会挂在新 pending 上,旧 slot 待整条链 resolve 后才恢复。
+//
+// session 不 await dispatch;state 变化通过 applyAtom 末尾的 onStateChange 回调驱动广播。
+// 旧 _pendingSignal / _waitForStable / Promise.race 机制已全部移除。
 //
 // 帧由技能在 execute 中显式创建(api.pushFrame)和弹出(api.popFrame);dispatch 不管理帧。
 // atomStack / pendingSlot 是 GameState 属性,不是 frame 属性。
@@ -84,29 +88,9 @@ function extractPendingTarget(atom: Atom): number {
   return -1;
 }
 
-/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。
- *  resolve 后清除状态,确保不会重复 resolve。
- *  问题根源:executeP.then(() => resolveStable(state)) 的微任务可能在
- *  applyAtom 内部创建 pending 之前被调度,导致 _resolveStable 被提前清除。
- *  解决:dispatch 用 Promise.race(executeP, _waitForStable),不用 executeP.then。 */
-function resolveStable(state: GameState): void {
-  const r = state._resolveStable;
-  if (r) {
-    state._waitForStable = undefined;
-    state._resolveStable = undefined;
-    r();
-  }
-}
-
-/**
- * 建立 per-execute stable wait:创建新 _waitForStable Promise + _resolveStable resolver。
- * 每个 execute lifecycle 调用一次。续跑路径(回应/fireTimeout)必须重新调用,
- * 因为上一轮 wait 已被 applyAtom 触发 resolveStable 清掉。
- */
-function setupStableWait(state: GameState): void {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  state._waitForStable = promise;
-  state._resolveStable = resolve;
+/** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
+function notifyStateChange(state: GameState): void {
+  state.onStateChange?.();
 }
 
 /** 兜底:补全老 state 缺失的字段(原地变更) */
@@ -224,128 +208,72 @@ export async function restore(state: GameState, gameConfig: GameConfig, actionLo
 export { registerSkillsFromState } from './skill';
 
 /**
- * 执行一条 client message:查找合法 action 并调用。
- * - 主动 action:validate 通过 → 执行;否则静默丢弃
- * - 回应 action(pending 存在):先 resolve pending,再执行回应 execute
- * 无返回值——游戏结束等状态由调用方从 state 自行读取(checkGameOver)。
+ * 执行一条 client message。dispatch 是 fire-and-forget 的输入分发器:
+ * 同步跑 preceding/validate,启动 execute 后立即返回,不等 pending 创建。
+ * session 不 await dispatch——state 变更通过 applyAtom 末尾的 onStateChange 回调驱动广播。
+ *
+ * 回应路径(有 pendingSlot):slot.pause() 取消其超时定时器,让 respond execute 独占推进;
+ * respond execute 完成后 .then(resolve) 恢复父 execute。若 slot.isTimeout(超时已在处理中),
+ * 丢弃该 action,避免超时与用户回应竞态。
  */
 export async function dispatch(state: GameState, message: ClientMessage): Promise<void> {
-  // === 回应路径(已有 pending slot) ===
-  if (state.pendingSlot) {
-    const slot = state.pendingSlot;
-    const requestType = (slot.atom as { requestType?: string }).requestType;
-
-    // 特殊:选择询问 pending(多个询问竞争时让用户选先响应哪个)
-    if (requestType === '__选择询问') {
-      const choiceIdx = (message.params.choice as number) ?? 0;
-      promoteChoice(state, choiceIdx);
-      setupStableWait(state);
-      await state._waitForStable;
-      if (!state.pendingSlot) state._activeExecuteP = undefined;
-      logAction(state, message);
-      state.seq += 1;
-      return;
-    }
-
-    // 广播 pending(无懈可击等):任何存活玩家可回应。单目标 pending:只 target 可回应。
-    const isBroadcast = requestType === '无懈可击';
-    if (!isBroadcast && message.ownerId !== extractPendingTarget(slot.atom)) return;
-    if (isBroadcast && !state.players[message.ownerId]?.alive) return;
-
-    const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-    if (entry && entry.validate(state, message.params) === null) {
-      await entry.execute(state, message.params);
-    }
-    const resolve = slot.resolve;
-    slot.resolve = () => {};
-    resolve();
-    // 当前 slot 消费后,检查 choiceQueue 是否有下一个待处理询问
-    promoteChoiceQueue(state);
-    setupStableWait(state);
-    await state._waitForStable;
-    if (!state.pendingSlot) state._activeExecuteP = undefined;
-    logAction(state, message);
-    state.seq += 1;
-    return;
-  }
-
-  // === 主动 action 路径 ===
-  // 1. 执行 preceding(转化类):逐个 validate+execute。
-  //    全部成功后,主 action validate 能看到 preceding 改变后的状态(如武圣转化后杀.validate 看到"杀")。
-  //    主 action validate 失败 → 对已执行的 preceding 按逆序 rollback 恢复 state。
-  const executedPreceding: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
+  const rollbacks: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
   if (message.preceding) {
     for (const p of message.preceding) {
       const pEntry = findActionEntry(p.skillId, message.ownerId, p.actionType);
-      if (!pEntry) return;
-      const pErr = pEntry.validate(state, p.params);
-      if (pErr !== null) return;
+      if (!pEntry || pEntry.validate(state, p.params) !== null){
+        rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
+        return;
+      }
       await pEntry.execute(state, p.params);
-      executedPreceding.push({ entry: pEntry, params: p.params });
+      rollbacks.push({ entry: pEntry, params: p.params });
     }
   }
-
-  // 2. 主 action:validate
   const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-  if (!entry) {
-    // 主 action 不存在 → 回滚 preceding
-    rollbackPreceding(state, executedPreceding);
+  if (!entry || entry.validate(state, message.params) !== null){
+    rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
     return;
   }
-  const validationError = entry.validate(state, message.params);
-  if (validationError !== null) {
-    // 主 action validate 失败 → 回滚 preceding
-    rollbackPreceding(state, executedPreceding);
-    return;
+  // 回应路径:若 pending slot 的超时已在处理中(isTimeout),丢弃该 action;否则 pause 取消定时器
+  if (state.pendingSlot) {
+    if (state.pendingSlot.isTimeout) {
+      rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
+      return;
+    }
+    state.pendingSlot.pause();
   }
 
-  // 3. 主 action:execute
-  // stable wait:等待 execute 完成 OR 新 pending 创建(两个条件之一)。
-  // 不用 executeP.then(() => resolveStable)——微任务调度竞态会提前清 _resolveStable。
-  // 改为 Promise.race:executeP 完成 → resolveStable;pending 创建 → resolveStable。
-  // resolveStable 是幂等的(清除后不再调用)。race 先到先得。
-  setupStableWait(state);
-  const executeP = entry.execute(state, message.params);
-  state._activeExecuteP = executeP;
-  // executeP 完成时(无 pending 场景)resolve stable
-  void executeP.then(
-    () => resolveStable(state),
-    (err) => { console.error('[dispatch] execute error:', err); resolveStable(state); },
-  );
-  await state._waitForStable;
+  const resolve = state.pendingSlot?.resolve ?? (() => {});
+  state.pendingSlot = undefined;
   logAction(state, message);
   state.seq += 1;
-}
-
-/** 对已执行的 preceding 按逆序调用 rollback(若有)。 */
-function rollbackPreceding(state: GameState, executed: Array<{ entry: ActionEntry; params: Record<string, Json> }>): void {
-  for (let i = executed.length - 1; i >= 0; i--) {
-    const { entry, params } = executed[i];
-    if (entry.rollback) entry.rollback(state, params);
-  }
+  // fire-and-forget 启动 execute,完成后 resolve 旧 slot(父 execute 恢复)。
+  // 返回 execute promise:session 不 await(继续 fire-and-forget),
+  // 测试可 await 它等到 respond execute 跑完;父 execute resume 跑到下一个 pending
+  // 需调用方再让出一个微任务(见 harness 的 flush)。
+  return entry.execute(state, message.params).then(resolve);
 }
 
 /**
  * 构造指定 viewer 视角的 GameView。
  */
-export function buildView(state: GameState, viewer: number): GameView {
-  return buildViewImpl(state, viewer);
+export function buildView(state: GameState, viewer: number, debug = false): GameView {
+  return buildViewImpl(state, viewer, debug);
 }
 
 /**
  * 立即触发当前 pending slot 的 onTimeout(模拟超时,绕过真实 setTimeout)。
+ * 触发后 slot resolve → 父 execute 恢复。广播由 applyAtom 内部的 onStateChange 驱动。
  */
 export async function fireTimeout(state: GameState): Promise<void> {
   const slot = state.pendingSlot;
   if (!slot) return;
   await slot._fireTimeoutNow?.();
-  // 选择 slot 的 _fireTimeoutNow 内部会 promoteChoice;普通 slot 超时后检查队列
+  // 只在旧 slot 仍活跃时 promote choiceQueue。
+  // 如果 execute 恢复后创建了新 pending(state.pendingSlot 已变为新 slot),不 promote。
   if (!state.pendingSlot || state.pendingSlot === slot) {
     promoteChoiceQueue(state);
   }
-  setupStableWait(state);
-  await state._waitForStable;
-  if (!state.pendingSlot) state._activeExecuteP = undefined;
 }
 
 /** 测试用:模块级清空(skill instances + events)。 */
@@ -408,6 +336,8 @@ function makeChoiceSlot(state: GameState): PendingSlot {
     startTime: Date.now() - state.startedAt,
     deadline: Date.now() - state.startedAt + 30000,
     resolve: () => {},
+    isTimeout: false,
+    pause: () => {},
     _fireTimeoutNow: async () => {
       // 选择超时:默认选第一个
       promoteFirstChoice(state);
@@ -486,6 +416,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
     state.atomStack.pop();
     // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消")
     pushNotify(state, { skillId: '', eventType: 'atomCancelled', data: { atomType: atom.type } });
+    notifyStateChange(state);
     return;
   }
 
@@ -502,6 +433,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   applyAtomImpl(state, current);
 
   pushEvent({ kind: 'atom', atom: current, viewEvents });
+  notifyStateChange(state);
 
   const afterHooks = getAfterHooks(current.type);
   // 系统级 hooks(ownerId=-1)最后执行——确保遗计/反馈等"受伤害后"技能先触发
@@ -532,8 +464,13 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   if (def.pending) {
     await new Promise<void>((resolve) => {
       const pending = def.pending!;
-      const timeoutMs = pending.timeout * 1000;
+      // 优先读 atom 上的 timeout 字段(如 请求回应 的 timeout),fallback 到 def.pending.timeout
+      const atomTimeout = (current as Record<string, unknown>).timeout;
+      const timeoutSec = typeof atomTimeout === 'number' ? atomTimeout : pending.timeout;
+      const timeoutMs = timeoutSec * 1000;
       let resolveCalled = false;
+      let timedOut = false;
+      let paused = false;
       const safeResolve = () => {
         if (resolveCalled) return;
         resolveCalled = true;
@@ -546,11 +483,29 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
         startTime: Date.now() - state.startedAt,
         deadline: Date.now() - state.startedAt + timeoutMs,
         resolve: safeResolve,
+        get isTimeout() { return timedOut; },
+        pause() {
+          if (timedOut) return;
+          paused = true;
+          clearTimeout(timer);
+        },
       };
       const fireTimeoutNow = async (): Promise<void> => {
         if (state.pendingSlot !== slot) return;
+        if (paused) return;
+        timedOut = true;
         clearTimeout(timer);
         await applyAtom(state, pending.onTimeout);
+        // 弃牌 pending 超时:自动弃超出手牌
+        const slotAtom = slot.atom as { requestType?: string; target?: number };
+        if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
+          const p = state.players[slotAtom.target];
+          if (p && p.hand.length > p.maxHealth) {
+            const excess = p.hand.length - p.maxHealth;
+            const toDiscard = p.hand.slice(-excess);
+            await applyAtom(state, { type: '弃置', player: slotAtom.target, cardIds: toDiscard });
+          }
+        }
         promoteChoiceQueue(state);
         safeResolve();
       };
@@ -566,7 +521,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
       } else {
         state.pendingSlot = slot;
       }
-      resolveStable(state);
+      notifyStateChange(state);
     });
   }
 }

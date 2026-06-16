@@ -395,7 +395,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
       {/* ─── 操作提示 ─── */}
       {isPerspectiveAwaiting && pending && (
-        <div className={promptBox}>
+        <div className={promptBoxAwaiting}>
           <div className={promptTitle}>⚡ 需要回应 — {perspectiveName}</div>
           <div className={promptDesc}>
             {pending.prompt.title}
@@ -412,6 +412,16 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             </div>
           )}
           {!canOperate && <div className={waitingHint}>等待 {perspectiveName} 回应...</div>}
+          {/* 倒计时进度条:remainingSeconds 是秒数,15s 总长(询问闪/杀约定 timeout) */}
+          {remainingSeconds !== null && (() => {
+            const total = 15;
+            const ratio = Math.max(0, Math.min(1, remainingSeconds / total));
+            return (
+              <div className={promptCountdownBar}>
+                <div className={promptCountdownFill} style={{ width: `${ratio * 100}%` }} />
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -557,7 +567,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             return (
               <div
                 key={card.id}
-                className={cx(handCard, isSelected && handCardSelected, (!canPlay && !isAwaiting) && handCardDisabled)}
+                className={cx(handCard, isSelected && handCardSelected, (!canPlay && !isAwaiting) && handCardDisabled, isAwaiting && handCardRespondable)}
                 onClick={() => (canPlay || isAwaiting) && handleCardClick(card)}
               >
                 <div className={cardName} style={{ color: suitColor }}>{card.name}</div>
@@ -711,13 +721,14 @@ function PlayerSeatView({
     >
       <div className={seatHeader}>
         <div>
+          <span className={seatIndexBadge}>[{index + 1}号]</span>
           <span className={seatName}>{player.name}</span>
           {player.character && <span className={seatChar}>({player.character})</span>}
           {isPerspective && <span className={youBadge}>视角</span>}
           {isCurrentPlayer && <span className={turnBadge}>回合</span>}
           {isDead && <span> 💀</span>}
         </div>
-        <div className={player.health >= player.maxHealth ? hpFull : hpLow}>
+        <div className={player.health === 1 ? hpLow : player.health <= player.maxHealth / 2 ? hpMid : hpFull}>
           ♥ {player.health}/{player.maxHealth}
         </div>
       </div>
@@ -728,11 +739,21 @@ function PlayerSeatView({
       </div>
       <div className={infoRow}>
         <span>手牌: {player.handCount}</span>
-        {Object.entries(player.equipment).map(([slot, cardId]) => {
-          const card = view.cardMap[cardId as string];
-          return <span key={slot} className={equipTag}>[{slot}:{card?.name ?? cardId}]</span>;
-        })}
       </div>
+      {Object.keys(player.equipment).length > 0 && (
+        <div className={equipRow}>
+          {Object.entries(player.equipment).map(([slot, cardId]) => {
+            const card = view.cardMap[cardId as string];
+            const icon =
+              slot === '武器' ? '⚔' :
+              slot === '防具' ? '🛡' :
+              slot === '进攻马' ? '🐎+' :
+              slot === '防御马' ? '🐎-' :
+              '💎';
+            return <span key={slot}>{icon}{card?.name ?? cardId}</span>;
+          })}
+        </div>
+      )}
       {player.marks.length > 0 && (
         <div className={markRow}>
           {player.marks.map(m => (
@@ -803,6 +824,25 @@ const promptBox = css`
   border: 2px solid #e67e22; border-radius: 8px; padding: 12px 16px;
   background: rgba(230,126,34,0.15); margin-bottom: 12px;
 `;
+const promptBoxAwaiting = css`
+  border: 2px solid #e74c3c; border-left: 4px solid #e74c3c;
+  border-radius: 8px; padding: 12px 16px;
+  background: rgba(231,76,60,0.1); margin-bottom: 12px;
+`;
+const promptCountdownBar = css`
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(231,76,60,0.2);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+`;
+const promptCountdownFill = css`
+  height: 100%;
+  background: #e74c3c;
+  transition: width 0.2s linear;
+`;
 const promptTitle = css`color: #e67e22; font-weight: bold; font-size: 15px; margin-bottom: 4px;`;
 const promptDesc = css`font-size: 14px; margin-bottom: 8px;`;
 const promptActions = css`display: flex; gap: 8px; flex-wrap: wrap;`;
@@ -848,6 +888,17 @@ const seatHeader = css`
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
 `;
 const seatName = css`font-weight: bold; font-size: 14px;`;
+const seatIndexBadge = css`
+  display: inline-block;
+  background: rgba(136,153,170,0.25);
+  color: #8899aa;
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-right: 6px;
+  font-size: 10px;
+  font-weight: normal;
+  vertical-align: middle;
+`;
 const seatChar = css`color: #8899aa; font-size: 12px; margin-left: 4px;`;
 const youBadge = css`
   background: #3498db; border-radius: 3px; padding: 1px 5px;
@@ -858,7 +909,16 @@ const turnBadge = css`
   font-size: 10px; color: #000; margin-left: 4px; font-weight: bold;
 `;
 const hpFull = css`color: #2ecc71; font-weight: bold; font-size: 13px;`;
+const hpMid = css`color: #e67e22; font-weight: bold; font-size: 13px;`;
 const hpLow = css`color: #e74c3c; font-weight: bold; font-size: 13px;`;
+const equipRow = css`
+  font-size: 12px;
+  color: #f39c12;
+  margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;
 const skillRow = css`margin-bottom: 4px;`;
 const skillTag = css`
   display: inline-block; background: #0f3460; border-radius: 4px;
@@ -867,7 +927,6 @@ const skillTag = css`
 const infoRow = css`
   font-size: 12px; color: #888; display: flex; flex-wrap: wrap; gap: 8px;
 `;
-const equipTag = css`color: #f39c12;`;
 const markRow = css`font-size: 11px; color: #666; margin-top: 2px;`;
 const markTag = css`margin-right: 6px;`;
 const timerText = css`font-size: 12px; color: #e67e22; margin-top: 4px; font-weight: bold;`;
@@ -894,6 +953,11 @@ const handCardSelected = css`
   transform: translateY(-4px); box-shadow: 0 4px 12px rgba(52,152,219,0.3);
 `;
 const handCardDisabled = css`opacity: 0.4; cursor: default;`;
+const handCardRespondable = css`
+  border: 2px solid #ffd700;
+  box-shadow: 0 0 10px rgba(255,215,0,0.4);
+  background: rgba(255,215,0,0.08);
+`;
 const cardName = css`font-weight: bold; font-size: 15px; margin-bottom: 2px;`;
 const cardSuit = css`font-size: 12px;`;
 const emptyHand = css`color: #555; font-size: 13px; padding: 12px;`;

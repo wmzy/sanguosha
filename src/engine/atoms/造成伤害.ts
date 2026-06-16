@@ -7,7 +7,7 @@ export const 造成伤害: AtomDefinition<{
 }> = {
   type: '造成伤害',
   validate(state, atom) {
-    if (atom.amount <= 0) return 'amount must be > 0';
+    if (atom.amount < 0) return 'amount must be >= 0';
     const target = state.players[atom.target];
     if (!target) return `target ${atom.target} not found`;
     if (!target.alive) return `target ${atom.target} is dead`;

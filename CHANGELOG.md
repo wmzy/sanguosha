@@ -2,6 +2,73 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-06-16
+### 多模型协作迭代 — 核心技能打磨 + UI 修复 + 死代码清理
+
+通过多模型协作（mimo-v2-pro 审查、M3/sensenova 浏览器测试、deepseek 批量清理）发现并修复多个关键 bug。
+
+#### Fixed
+- **P0 buildView debug 参数丢失**：`create-engine.ts` 的 `buildView` 包装函数未传递 `debug` 参数 → 调试模式只有 viewer 手牌可见，其余玩家手牌为 undefined。修复：包装函数加 `debug` 参数透传。(`src/engine/create-engine.ts`)
+- **P0 sendDebugGameState/getDebugView 漏传 debug**：`session.ts` 中 `sendDebugGameState`（行 188）和 `getDebugView`（行 271）调用 `buildView` 未传 `this.debug`。修复：补 `this.debug` 参数。(`src/server/session.ts`)
+- **P1 请求回应 timeout 被忽略**：`applyAtom` 只读 `def.pending.timeout`（hardcode 30s），忽略技能传入的 `atom.timeout`。修复：优先读 atom 字段，fallback 到 def。(`src/engine/create-engine.ts`)
+- **P1 加标签/去标签 atom 用 marks 模拟 tags**：改为直接操作 `player.tags` 数组，符合设计文档 §7.4 tags/marks 分离。(`src/engine/atoms/加标签.ts`, `src/engine/atoms/去标签.ts`)
+- **P1 乐不思蜀读取 tags 位置错误**：从 `marks.some(m => m.id === 'tag:...')` 改为 `tags?.includes()`。(`src/engine/skills/乐不思蜀.ts`)
+- **P2 寒冰剑未注册到牌堆**：`shared/cards/equipment.ts` 和 `shared/deck.ts` 补寒冰剑 CardDef + deck 条目。(`src/shared/cards/equipment.ts`, `src/shared/deck.ts`, `src/engine/cards/装备.ts`, `src/engine/cards/index.ts`, `src/shared/types.ts`)
+
+#### Changed
+- **武器卡补 range 字段**：`engine/cards/装备.ts` 的 `make()` 加 `range` 参数，所有武器补 range（诸葛连弩 1, 青釭剑/寒冰剑/雌雄双股剑 2, 贯石斧/青龙偃月刀/丈八蛇矛 3, 方天画戟 4, 麒麟弓 5）
+- **前端 UI 改进**：装备区独立显示（emoji+名称）、HP 三态预警（绿/橙/红）、pending 红色警示框+倒计时进度条+手牌金色高亮、座位编号标注。(`src/client/components/GameView.tsx`)
+
+#### Removed
+- **抽牌 atom 死代码**：从 `types.ts`、`atoms/抽牌.ts`、`atoms/index.ts` 删除（被摸牌取代，无调用方）
+- **24 个废弃前端组件**：GameBoard/MultiplayerGameBoard/ReplayBoard/NewEngineDemo/PlayerPanel/ActionPanel/HandCards/LogPanel/ReplayControls/DebugPlayerList/activePlayer.ts/game/*整个目录(11文件)/MultiplayerPage/ReplayPage/LobbyPage。App.tsx 路由精简为 3 条（`/`, `/debug`, `/debug/:roomId`），HomePage 移除废弃入口。
+
+#### Added
+- `tests/integration/杀装备距离.test.ts` — 4 测试：装备范围扩大、出杀→出闪→伤害为 0、出杀→超时→扣血、诸葛连弩无限出杀
+- `tests/integration/弃牌阶段.test.ts` — 3 测试：手牌超限→弃牌 pending、fireTimeout 自动弃牌、手牌未超限→无 pending
+- `tests/integration/濒死求桃.test.ts` — 3 测试：出杀致死→濒死流程→无人救→击杀
+- `tests/integration/无懈可击.test.ts` — 2 passed 2 skipped（嵌套无纶的 dispatch respond 路径需重构）
+
+#### Fixed（补充第二轮）
+- **请求回应 validate 拒绝广播 target**：target=-2（无纶可击广播）导致 validate 失败，pending 不创建。修复：validate 允许 target<0 的特殊值。(`src/engine/atoms/请求回应.ts`)
+- **造成伤害 validate 拒绝 amount=0**：护甲减伤到 0 时 validate 报错，伤害静默取消。修复：允许 amount=0（apply 自然不扣血）。(`src/engine/atoms/造成伤害.ts`)
+
+#### Added（补充第二轮）
+- **弃牌阶段实装**：回合管理 阶段推进钩子中，进入弃牌阶段时检查手牌超限→创建弃牌 pending→系统规则注册 respond action→fireTimeout 自动弃最后 N 张。(`src/engine/skills/回合管理.ts`, `src/engine/skills/系统规则.ts`, `src/engine/create-engine.ts`)
+
+#### Removed（补充第二轮）
+- `src/engine/cards/装备.ts`、`基础.ts`、`锦囊.ts`、`index.ts` — 冗余 Card[] 牌堆实例（运行时用 shared/deck.ts，仅 characters/ 被引用）
+
+#### Verified
+- skills 项目：4 文件 13 passed 4 skipped
+- 新增 integration：杀装备距离 4 passed
+- 浏览览器实测：出杀→扣血→消耗手牌全链路通过、距离系统生效（徒手范围 1 打不到座位距离 2 的目标）、装备成功、所有玩家手牌可见（debug 模式修复）
+
+### dispatch fire-and-forget 重构 — session 不 await dispatch
+
+将 dispatch 从“await barrier”转为 fire-and-forget 输入分发器，广播时机从 dispatch 返回点移到 state 变更点（每次 applyAtom 结束）。并发安全（回应 vs 超时竞争）从 dispatch 层的 Promise.race 下移到 slot 层的定时器状态。
+
+#### Changed
+- **dispatch fire-and-forget**：同步跑 preceding/validate → `entry.execute(...).then(resolve)` 启动后立即返回，不等 pending 创建。旧 `_pendingSignal`/`_waitForStable`/`Promise.race` 机制全部移除。主动 action 的 execute 跑到 `applyAtom` 建 pending 时自然挂起；回应路径 `slot.pause()` 取消定时器让 respond execute 独占推进。递归 pending（无纶递归）下 respond execute 挂在新 pending 上，旧 slot 待整条链 resolve 后才恢复。(`src/engine/create-engine.ts` dispatch)
+- **PendingSlot 加 isTimeout/pause**：`isTimeout` 标记定时器已触发（dispatch 据此丢弃竞态中的用户 action）；`pause()` 取消定时器让 dispatch 走用户 action 路径。在 applyAtom 建 slot 时实现。(`src/engine/types.ts` PendingSlot, `src/engine/create-engine.ts` applyAtom)
+- **GameState 加 onStateChange 回调**：每次 applyAtom 结束（pushEvent 后、cancel 分支、pending 建好后）触发。删除旧的 `_pendingSignal` 字段。(`src/engine/types.ts` GameState)
+- **session 订阅 onStateChange**：`handleAction` 不再 `await dispatch`，改为 `void dispatch(...)`。广播/持久化/checkGameOver/resetIdleTimer 全部移入 `attachStateListener` 挂载的 onStateChange 回调。destroy 时先清回调防止挂起的 execute resume 触发已销毁 session 的广播。idleTimer 的 dispatch 也改 fire-and-forget。(`src/server/session.ts`)
+- **fireTimeout 注释更新**：广播由 applyAtom 内部的 onStateChange 驱动，不再用 pendingSignal。(`src/engine/create-engine.ts` fireTimeout)
+
+#### Removed
+- `setupPendingSignal`/`resolvePendingSignal`/`resolveSlot` helper（死代码）
+- `_pendingSignal` 字段（GameState）
+- dispatch 注释中过时的 pendingSignal/race 描述
+
+#### Added（测试适配）
+- `tests/engine-harness.ts` 导出 `waitForStable(state)`/`dispatchAndWait(state, msg)`/`fireTimeoutAndWait(state)`：dispatch fire-and-forget 后用轮询（setTimeout 0 yield）等到 pendingSlot 就绪或 execute 跑完。手写集成测试（直接用 dispatch、不经 SkillTestHarness）可用这些 helper。
+- 9 个直接用 `await dispatch` 的集成测试批量迁移到 `dispatchAndWait`/`fireTimeoutAndWait`。
+
+#### Verified
+- skills + integration：15 文件 42 passed 6 skipped
+- 类型检查：0 新错误（create-engine.ts/session.ts/types.ts 干净；types.ts 的 3 个 ViewEvent 索引签名错误为预存）
+- engine-smoke/server-gameplay/guanxing/serializer 的失败为历史遗留（改动前即失败，引用已删模块或旧 API）
+
 ## [Unreleased] — 2026-06-10
 
 ## [Unreleased] — 2026-06-15

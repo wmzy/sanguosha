@@ -89,7 +89,7 @@ describe('乐不思蜀', () => {
 
     // 红桃 → 仅移除延时锦囊,不加跳过出牌标签
     expect(harness.state.players[1].pendingTricks.length).toBe(0);
-    const hasSkipTag = harness.state.players[1].marks.some(m => m.id === 'tag:乐不思蜀/跳过出牌');
+    const hasSkipTag = harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌');
     expect(hasSkipTag).toBe(false);
   });
 
@@ -119,7 +119,7 @@ describe('乐不思蜀', () => {
 
     // 黑桃 → 移除延时锦囊 + 加跳过出牌标签
     expect(harness.state.players[1].pendingTricks.length).toBe(0);
-    const hasSkipTag = harness.state.players[1].marks.some(m => m.id === 'tag:乐不思蜀/跳过出牌');
+    const hasSkipTag = harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌');
     expect(hasSkipTag).toBe(true);
   });
 
@@ -146,7 +146,7 @@ describe('乐不思蜀', () => {
 
     // 阶段开始 判定 → 触发 判定 → 加跳过标签
     await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
-    const hasSkipTagBefore = harness.state.players[1].marks.some(m => m.id === 'tag:乐不思蜀/跳过出牌');
+    const hasSkipTagBefore = harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌');
     expect(hasSkipTagBefore).toBe(true);
 
     // 模拟进入出牌阶段(跳过摸牌/弃牌流程,直接发 阶段开始 出牌)
@@ -155,7 +155,7 @@ describe('乐不思蜀', () => {
     // 出牌阶段被 cancel:state.phase 应已推进到 弃牌(因内部触发了 阶段结束 出牌)
     expect(harness.state.phase).toBe('弃牌');
     // 标签应已清除
-    const hasSkipTagAfter = harness.state.players[1].marks.some(m => m.id === 'tag:乐不思蜀/跳过出牌');
+    const hasSkipTagAfter = harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌');
     expect(hasSkipTagAfter).toBe(false);
   });
 });

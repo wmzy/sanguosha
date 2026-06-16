@@ -2,6 +2,7 @@
 // 集成测试 1: 新顶层 API(dispatch / registerSkillsFromState) + 出杀全流程(不含回应,含扣血)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatch, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
+import { dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -60,7 +61,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
 
   it('出杀:无回应 → 目标扣 1 血', async () => {
     // 第一步:出杀 → 产生 pending 等待闪
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '杀',
       actionType: 'use',
       ownerId: 0,
@@ -72,7 +73,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     expect(p2Mid.health).toBe(4); // 还没扣血
 
     // 第二步:P2 不出闪 → 结算伤害
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '闪',
       actionType: 'respond',
       ownerId: 1,
@@ -86,12 +87,12 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
 
   it('出杀:limit 验证 — 同回合第二次出杀应被拒绝', async () => {
     // 第一步:出杀
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '杀', actionType: 'use', ownerId: 0,
       params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
     // 第二步:P2 不出闪 → 结算
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '闪', actionType: 'respond', ownerId: 1, params: {},
     });
     // 准备第二张杀
@@ -102,7 +103,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     resetForTest();
     await registerSkillsFromState(state);
 
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '杀', actionType: 'use', ownerId: 0,
       params: { cardId: 'c2', targets: [1] }, baseSeq: 2,
     });
@@ -112,7 +113,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
 
   it('未注册的 action:静默丢弃', async () => {
     const beforeSeq = state.seq;
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '不存在的 skill', actionType: 'use', ownerId: 0,
       params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });

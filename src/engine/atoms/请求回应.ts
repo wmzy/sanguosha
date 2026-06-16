@@ -11,6 +11,8 @@ export const 请求回应: AtomDefinition<{
 }> = {
   type: '请求回应',
   validate(state, atom) {
+    // target=-1(系统)和 target=-2(广播)是合法的特殊值
+    if (atom.target < 0) return null;
     if (!state.players[atom.target]) return `target not found`;
     return null;
   },

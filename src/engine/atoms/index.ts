@@ -5,7 +5,6 @@ import './弃置';
 import './移动牌';
 import './获得';
 import './给予';
-import './抽牌';
 import './装备';
 import './卸下';
 import './洗牌';

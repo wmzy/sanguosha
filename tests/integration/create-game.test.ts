@@ -41,8 +41,8 @@ describe('create + bootstrap — 端到端开局', () => {
       expect(p.hand.length).toBe(expected);
     }
 
-    // 牌堆有牌(被摸了 13 + 2 张主公摸牌)
-    expect(state.zones.deck.length).toBe(103 - (4 * 3 + 1) - 2);
+    // 牌堆有牌(标准牌堆 104 张含寒冰剑,被摸了 13 + 2 张主公摸牌)
+    expect(state.zones.deck.length).toBe(104 - (4 * 3 + 1) - 2);
 
     // 状态进入出牌阶段
     expect(state.currentPlayerIndex).toBe(0);

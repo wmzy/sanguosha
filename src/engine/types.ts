@@ -108,17 +108,10 @@ export interface GameState {
   startedAt: number;
   actionLog: ActionLogEntry[];
 
-  /** 内部:当前活跃的 execute Promise(仅调试/诊断用,引擎核心逻辑不读取)。
-   *  stable-wait 重构前回应路径曾 await 它;现已被 _waitForStable 取代,保留供调试器检视。 */
-  _activeExecuteP?: Promise<void>;
-  /**
-   * 当前 dispatch/fireTimeout 在等的"稳定点" Promise。
-   * 每个 execute lifecycle 创建一个新 Promise,execute 完成或新 pending 创建时 resolve。
-   * 等价于"下一个 pending 出现 OR 当前 execute 真的结束"二者择一。
-   */
-  _waitForStable?: Promise<void>;
-  /** 配套的 resolve 函数,供通知触发点使用 */
-  _resolveStable?: () => void;
+  /** state 变更回调:每次 applyAtom 完成(pushEvent 后)触发。
+   *  session 订阅后据此广播 view,不再 await dispatch。fire-and-forget 模型下
+   *  dispatch 返回时 execute 可能还在跑,广播时机由本回调驱动。 */
+  onStateChange?: () => void;
 }
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
@@ -278,7 +271,6 @@ export type Atom =
   | { type: '移动牌'; cardId: string; from: ZoneLoc; to: ZoneLoc }
   | { type: '获得'; player: number; cardId: string; from?: number }
   | { type: '给予'; cardId: string; from: number; to: number }
-  | { type: '抽牌'; player: number; cardId: string }
   | { type: '装备'; player: number; cardId: string }
   | { type: '卸下'; player: number; slot: EquipSlot }
   | { type: '洗牌' }
@@ -480,6 +472,10 @@ export interface PendingSlot {
   startTime: number;
   deadline: number;
   resolve: () => void;
+  /** 超时定时器是否已触发(已被 fireTimeout 接管)。dispatch 据 this 丢弃竞态中的用户 action */
+  isTimeout: boolean;
+  /** 取消超时定时器(不触发)。dispatch 走用户 action 路径前调用,让 respond execute 独占推进 */
+  pause: () => void;
   /** 内部:由引擎创建 pending 时挂上,供 fireTimeout 立即触发 onTimeout(绕过真实 setTimeout) */
   _fireTimeoutNow?: () => Promise<void>;
 }

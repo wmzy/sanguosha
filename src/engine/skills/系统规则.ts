@@ -3,7 +3,7 @@
 // applyAtom 只管通用管线(before → validate → apply → emit → after hooks → pending)。
 import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAfterHook, instantiateSkill, unloadSkillInstance, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '系统规则', description: '引擎级规则(判定清理/技能生命周期/濒死)' };
@@ -40,6 +40,28 @@ export function onInit(_skill: Skill, _ownerId: number): () => void {
     if (target && target.alive && target.health <= 0) {
       await runDyingFlow(ctx.state, atom.target);
     }
+  });
+
+  // ── 弃牌阶段 respond action:玩家选择弃哪些牌 ──
+  registerAction('系统规则', -1, 'respond', (state: GameState, params: Record<string, Json>) => {
+    const slot = state.pendingSlot;
+    if (!slot) return '当前不需要回应';
+    const atom = slot.atom as { requestType?: string };
+    if (atom.requestType !== '__弃牌') return '当前不是弃牌窗口';
+    const cardIds = params.cardIds;
+    if (!Array.isArray(cardIds)) return 'cardIds required';
+    const target = (slot.atom as { target: number }).target;
+    const player = state.players[target];
+    if (!player) return 'target not found';
+    for (const id of cardIds) {
+      if (typeof id !== 'string' || !player.hand.includes(id)) return `card ${id} not in hand`;
+    }
+    return null;
+  }, async (state: GameState, params: Record<string, Json>) => {
+    const slot = state.pendingSlot!;
+    const target = (slot.atom as { target: number }).target;
+    const cardIds = params.cardIds as string[];
+    await applyAtom(state, { type: '弃置', player: target, cardIds });
   });
 
   return () => {};

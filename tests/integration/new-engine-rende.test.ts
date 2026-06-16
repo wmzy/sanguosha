@@ -2,6 +2,7 @@
 // 集成测试 3: 新顶层 API(dispatch / registerSkillsFromState) + 武将技能 仁德(刘备)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatch, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
+import { dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -32,7 +33,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 仁德(刘备)', () => {
   });
 
   it('给 1 人 2 张牌(单帧) → 刘备回复 1 血', async () => {
-    await dispatch(state, {
+    await dispatchAndWait(state, {
       skillId: '仁德', actionType: 'use', ownerId: 0,
       params: {
         targets: [

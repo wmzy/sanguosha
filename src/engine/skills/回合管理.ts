@@ -50,6 +50,28 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       await applyAtom(ctx.state, { type: '摸牌', player, count: 2 });
     }
 
+    // 弃牌阶段:检查手牌是否超过体力上限
+    if (next === '弃牌') {
+      const playerState = ctx.state.players[player];
+      const handCount = playerState.hand.length;
+      const maxHealth = playerState.maxHealth;
+      if (handCount > maxHealth) {
+        const excess = handCount - maxHealth;
+        // 创建弃牌 pending,等玩家选择弃哪些牌
+        await applyAtom(ctx.state, {
+          type: '请求回应',
+          requestType: '__弃牌',
+          target: player,
+          prompt: {
+            type: 'useCard',
+            title: `弃牌阶段:需弃 ${excess} 张牌`,
+            cardFilter: { filter: () => true, min: excess, max: excess },
+          },
+          timeout: 30,
+        });
+      }
+    }
+
     // 自动阶段(准备/判定/摸牌)立即结束,推进到下一阶段
     if (next === '准备' || next === '判定' || next === '摸牌') {
       await applyAtom(ctx.state, { type: '阶段结束', player, phase: next });

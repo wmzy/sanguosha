@@ -77,7 +77,7 @@ export interface TargetFilter {
 }
 
 export interface WeaponEffect {
-  type: '诸葛连弩' | '青釭剑' | '青龙偃月刀' | '贯石斧' | '雌雄双股剑';
+  type: '诸葛连弩' | '青釭剑' | '寒冰剑' | '青龙偃月刀' | '贯石斧' | '雌雄双股剑';
 }
 
 export interface ArmorEffect {

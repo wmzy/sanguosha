@@ -12,6 +12,12 @@ export const 青釭剑: CardDef = {
   range: 2, weaponEffect: { type: '青釭剑' },
 };
 
+export const 寒冰剑: CardDef = {
+  name: '寒冰剑', type: '装备牌', subtype: '武器',
+  targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
+  range: 2, weaponEffect: { type: '寒冰剑' },
+};
+
 export const 雌雄双股剑: CardDef = {
   name: '雌雄双股剑', type: '装备牌', subtype: '武器',
   targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] },
@@ -67,7 +73,7 @@ export const 的卢: CardDef = { name: '的卢', type: '装备牌', subtype: '�
 export const 绝影: CardDef = { name: '绝影', type: '装备牌', subtype: '防御马', targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] } };
 export const 爪黄飞电: CardDef = { name: '爪黄飞电', type: '装备牌', subtype: '防御马', targetFilter: { type: 'none' }, effect: { type: 'sequence', steps: [] } };
 
-export const 武器列表 = [诸葛连弩, 青釭剑, 雌雄双股剑, 贯石斧, 青龙偃月刀, 丈八蛇矛, 方天画戟, 麒麟弓];
+export const 武器列表 = [诸葛连弩, 青釭剑, 寒冰剑, 雌雄双股剑, 贯石斧, 青龙偃月刀, 丈八蛇矛, 方天画戟, 麒麟弓];
 export const 防具列表 = [八卦阵, 仁王盾];
 export const 马列表 = [赤兔, 紫骍, 大宛, 的卢, 绝影, 爪黄飞电];
 export const 装备牌列表 = [...武器列表, ...防具列表, ...马列表];

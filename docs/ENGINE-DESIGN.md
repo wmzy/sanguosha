@@ -309,23 +309,21 @@ async (state: GameState, params: Record<string, Json>) => {
 + **等待型 atom 不可被丢弃/取消**——必走完上述两条路径之一(没有 `drop()` 机制)
 + `pending.timeout` 与 `pending.onTimeout` **都是必填**——没有合理默认值
 
-**before hooks 可以插入等待**：当前 atom 还在 apply 栈上没弹出时，钩子可以 `await applyAtom(ctx.state, 另一个等待型atom)` 嵌套执行。比如八卦阵在 `询问闪` 的 before hook 中插入 `请求回应`：
+**before hooks 可以插入等待**：当前 atom 还在 apply 栈上没弹出时，钩子可以 `await applyAtom(ctx.state, 另一个等待型atom)` 嵌套执行。比如八卦阵在 `询问闪` 的 before hook 中**直接调用 `判定` atom**（三国杀标准规则：八卦阵判定自动触发，无确认步骤）：
 
 ```
 applyAtom(state, 询问闪):
   压栈：[询问闪]
   before hooks:
     八卦阵-P2:
-      applyAtom(ctx.state, 请求回应, {是否发动八卦阵})     ← 嵌套
-        压栈：[询问闪, 请求回应]
+      applyAtom(ctx.state, 判定, { player: P2, judgeType: '八卦阵' })
+        压栈：[询问闪, 判定]
         before → validate → apply → after → 弹栈
-        检测到 pending → 进入 pending 区
-        apply 栈：[询问闪]     ← 请求回应已出栈，在 pending 等用户
-        Promise 挂起
-      // 用户选择发动 → 八卦 action → 判定
-      // 判定成功 → apply({ type: '加标签', player: target, tag: '八卦阵/autoDodge' })
-      //          ← 杀.execute 后续观察此标签决定是否扣血
-      // 判定失败 → 继续等用户出闪
+        判定牌进弃牌堆（引擎清理）
+        apply 栈：[询问闪]
+      // 钩子读弃牌堆顶 → 红色 → 往处理区放一张虚拟闪牌(cardMap + zones.processing)
+      //          ← 杀.execute 后续检查处理区发现闪，视为闪避
+      // 判定失败 → 不放虚拟闪 → 杀.execute 检查处理区无闪，造成伤害
     闪-P2: 无事发生
   // 所有 before hooks 结束
   validate → apply → after → 弹栈
@@ -333,7 +331,7 @@ applyAtom(state, 询问闪):
   // 等用户出闪或超时(onTimeout={ type: '无操作' })
 ```
 
-**等待替换语义**：新 wait 进入 pending 时，若已有 pending slot：
+> **实现注**：实际八卦阵实现不走「请求回应（是否发动八卦阵）」的确认步骤——三国杀标准规则下判定自动触发。上面流程图只展示 hook 嵌套调用的一般能力（hook 中可以 `await applyAtom` 任何 atom，包括等待型），实际八卦阵的简洁实现见 §4.10 八卦阵示例。
 + 旧 slot 的 Promise **直接 resolve**(不 fire onTimeout,因为旧 atom 已被新 wait 取代)
 + 旧 atom 已应用的 state 变更**保留**,不回滚
 + 新 atom 走完整 apply 流程后入 slot
@@ -631,23 +629,17 @@ export function onInit(skill: Skill, ownerId: string): () => void {
 
       for (const target of targets) {
         await applyAtom(state, { type: '指定目标', source: from, target });
-        const beforeCount = state.zones.discardPile.length;
+        await applyAtom(state, { type: '成为目标', source: from, target });  // 触发"成为目标后"hook（如流离），可被 cancel（空城等）
         await applyAtom(state, { type: '询问闪', target, source: from });
-        const dodged = state.zones.discardPile.length > beforeCount &&
-          state.zones.discardPile.slice(beforeCount).some(id => state.cardMap[id]?.name === '闪');
 
-        if (!dodged) {
-          const autoDodge = state.players.find(p => p.name === target)?.tags?.includes('八卦阵/autoDodge');
-          if (!autoDodge) {
-            const killBonus = state.players.find(p => p.name === from)
-              ?.marks?.find(m => m.id === '酒/nextKillDamageBonus')?.payload === 1 ? 1 : 0;
-            await applyAtom(state, { type: '造成伤害', target, amount: 1 + killBonus, source: from });
-            if (killBonus > 0) {
-              await applyAtom(state, { type: '去标记', player: from, mark: { id: '酒/nextKillDamageBonus' } });
-            }
-          } else {
-            await applyAtom(state, { type: '去标签', player: target, tag: '八卦阵/autoDodge' });
-          }
+        // 检查处理区:有没有闪牌(目标出闪 / 防具放入的虚拟闪)
+        const dodgeCardId = state.zones.processing.find(id => state.cardMap[id]?.name === '闪');
+        if (dodgeCardId) {
+          // 有闪:把闪牌移出处理区→弃牌堆
+          await applyAtom(state, { type: '移动牌', cardId: dodgeCardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+        } else {
+          // 没闪:造成伤害。酒增伤由酒.ts 的 造成伤害 before hook 负责(消费 '酒/nextKillDamageBonus' mark)。
+          await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from });
         }
       }
 
@@ -715,6 +707,31 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       ctx.state.cardMap[dodgeId] = { id: dodgeId, name: '闪', suit: judgeCard.suit, rank: judgeCard.rank, type: '基本牌' };
       ctx.state.zones.processing.push(dodgeId);
     }
+  });
+  return () => {};
+}
+```
+
+```ts
+// ── 酒.ts（增伤走 造成伤害 before hook） ──
+// use action:为下一张杀加 mark（'酒/nextKillDamageBonus', duration='turn'）。
+// 增伤效果通过 造成伤害 before hook 实现——杀不需要知道酒的存在。
+import type { AtomBeforeContext, HookResult } from '../types';
+import { registerBeforeHook } from '../skill';
+
+export function onInit(skill: Skill, ownerId: number): () => void {
+  // ... use action 推 '酒/nextKillDamageBonus' mark ...
+
+  // 造成伤害 before hook:自己是伤害来源 且 持有 mark → 消费 mark 并 modify atom.amount += 1
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+    const atom = ctx.atom as { source?: number; amount?: number };
+    if (atom.source !== ownerId) return;
+    if ((atom.amount ?? 0) <= 0) return;
+    const self = ctx.state.players[ownerId];
+    const hasMark = self?.marks.some(m => m.id === '酒/nextKillDamageBonus');
+    if (!hasMark) return;
+    await applyAtom(ctx.state, { type: '去标记', player: ownerId, markId: '酒/nextKillDamageBonus' });
+    return { kind: 'modify', atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom };
   });
   return () => {};
 }
@@ -1070,6 +1087,7 @@ type Atom =
   | { type: '抽牌'; player: string; cardId: string }
   | { type: '装备'; player: string; cardId: string }
   | { type: '卸下'; player: string; slot: EquipSlot }
+  | { type: '弃置'; player: string; cardIds: string[] }  // 批量弃牌(制衡/涅槃/弃牌阶段超时等)
   | { type: '洗牌' }
   | { type: '重洗' }
   | { type: '整理牌堆'; cards: string[] }
@@ -1077,7 +1095,8 @@ type Atom =
   | { type: '造成伤害'; target: string; amount: number; source: string; damageType?: DamageType }
   | { type: '回复体力'; target: string; amount: number; source: string }
   | { type: '失去体力'; target: string; amount: number }
-  | { type: '击杀'; player: string }
+  | { type: '陷入濒死'; target: string }  // 纯事件标记——体力已扣,等待求桃
+  | { type: '击杀'; player: string }  // 玩家死亡(手牌/装备→弃牌堆, alive=false)
   | { type: '设上限'; player: string; amount: number }
   // 标记/状态
   | { type: '加标记'; player: string; mark: Mark }
@@ -1096,8 +1115,9 @@ type Atom =
   | { type: '阶段结束'; player: string; phase: string }
   | { type: '设阶段'; phase: string }
   | { type: '下一玩家' }
-  // 目标（每个目标的选定是独立事件）
-  | { type: '指定目标'; source: string; cardId?: string; target: string }
+  // 目标（三阶段流程：指定目标 → 成为目标 → 结算）
+  | { type: '指定目标'; source: string; cardId?: string; target: string }    // 声明阶段：使用者宣告所有目标，触发"指定目标时"hook
+  | { type: '成为目标'; source: string; cardId?: string; target: string }    // 结算阶段：目标正式进入结算，触发"成为目标后"hook（流离/激昂等），before hook 可被 cancel（空城/帷幕/谦逊）
   // 判定
   | { type: '判定'; player: string; judgeType: string }
   | { type: '添加延时锦囊'; player: string; trick: PendingTrick }
@@ -1135,7 +1155,10 @@ interface AtomDefinition<A = unknown> {
     onTimeout: Atom;
     /** 前端提示(告诉前端渲染什么 UI) */
     prompt: ActionPrompt;
-    /** 超时毫秒。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s */
+    /** 超时毫秒。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s
+     * 运行时:优先读 atom 字段 `timeout`(如 `请求回应` 的 `timeout` 参数),fallback 到 def.pending.timeout。
+     * 这样可以在创建等待型 atom 时动态指定超时,不被 def 的默认值锁定。
+     */
     timeout: number;
   };
 
@@ -1175,7 +1198,6 @@ interface AtomDefinition<A = unknown> {
 + **每个 atom 是一次状态变更**——`apply` 确实修改 GameState
 + **不需要的 atom 已删除**：
   - `累计出杀`、`设置变量`、`增加变量`、`清空变量`、`设置上下文变量`：技能内部通过结算帧 params 管理状态，不需要全局 atom
-  - `成为目标`：被 `指定目标` 覆盖（见 §4.5）
   - `解决`、`出牌`：技能内部流程，不是独立游戏事件
   - `杀命中`、`杀被闪避`：杀技能的内部结果分支，通过结算帧 params 判断
 
@@ -1752,7 +1774,7 @@ src/server/
 | `AtomLogEntry` / `serverLog` | 改为 `ActionLogEntry` + `actionLog` |
 | `累计出杀` atom | 技能内部通过结算帧 params 管理 |
 | `设置变量`/`增加变量`/`清空变量`/`设置上下文变量` atom | 技能内部通过结算帧 params 管理 |
-| `成为目标` atom | 被统一为 `指定目标` atom（视角通过钩子条件区分） |
+| `成为目标`（旧设计为单一时机事件）| 保留并拆分为 `指定目标`（声明阶段）+ `成为目标`（结算阶段）两个独立 atom——视角通过原子类型而非钩子条件区分，且支持 cancel（空城等拦截） |
 | `解决`/`出牌` atom | 技能内部流程步骤，不是独立游戏事件 |
 | `杀命中`/`杀被闪避` atom | 杀技能内部结果分支，通过结算帧 params 判断 |
 | `AtomHookContext` | 拆分为 `AtomBeforeContext`(可返回 HookResult)和 `AtomAfterContext`(纯副作用) |

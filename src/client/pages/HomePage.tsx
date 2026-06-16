@@ -47,15 +47,6 @@ const linkOrange = css`
   background-color: ${colors.accent.orange};
 `;
 
-const linkBlue = css`
-  background-color: ${colors.accent.blue};
-`;
-
-const buttonPurple = css`
-  background-color: ${colors.accent.purpleLight};
-  width: 100%;
-`;
-
 export function HomePage() {
   return (
     <div className={page}>
@@ -64,12 +55,6 @@ export function HomePage() {
       <div className={actionList}>
         <Link to="/debug" className={`${linkButtonBase} ${linkOrange}`}>
           调试游戏
-        </Link>
-        <Link to="/lobby" className={`${linkButtonBase} ${linkBlue}`}>
-          多人对战
-        </Link>
-        <Link to="/replay" className={`${linkButtonBase} ${buttonPurple}`}>
-          回放
         </Link>
       </div>
     </div>
