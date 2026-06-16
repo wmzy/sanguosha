@@ -1,4 +1,6 @@
 // server/vite-plugin.ts
+// Vite dev server 插件:把 Hono REST API + WebSocket 挂载到 Vite 的 HTTP server 上。
+// 单端口模式:前端和后端共享 3930 端口。
 import type { Plugin } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
 import type { Duplex } from 'stream';
@@ -56,8 +58,8 @@ export function honoApiPlugin(): Plugin {
         }
       });
 
-      // 返回 post-hook:在 Vite 内部 middleware 之后注册 WS upgrade handler
-      // 避免 Vite HMR 拦截 /ws upgrade
+      // 返回 post-hook:在 Vite 内部 middleware 之后注册 WS upgrade handler。
+      // 避免 Vite HMR 拦截 /ws upgrade。
       return () => {
         const wss = new WebSocketServer({ noServer: true });
         const wsClients = new Map<WebSocket, string>();

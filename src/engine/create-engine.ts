@@ -84,13 +84,17 @@ function extractPendingTarget(atom: Atom): number {
   return -1;
 }
 
-/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。 */
+/** 解析当前 _waitForStable Promise(若存在)。通知 stable point 事件已发生。
+ *  resolve 后清除状态,确保不会重复 resolve。
+ *  问题根源:executeP.then(() => resolveStable(state)) 的微任务可能在
+ *  applyAtom 内部创建 pending 之前被调度,导致 _resolveStable 被提前清除。
+ *  解决:dispatch 用 Promise.race(executeP, _waitForStable),不用 executeP.then。 */
 function resolveStable(state: GameState): void {
   const r = state._resolveStable;
   if (r) {
-    r();
     state._waitForStable = undefined;
     state._resolveStable = undefined;
+    r();
   }
 }
 
@@ -100,9 +104,9 @@ function resolveStable(state: GameState): void {
  * 因为上一轮 wait 已被 applyAtom 触发 resolveStable 清掉。
  */
 function setupStableWait(state: GameState): void {
-  let resolveStableLocal: () => void = () => {};
-  state._waitForStable = new Promise<void>((r) => { resolveStableLocal = r; });
-  state._resolveStable = resolveStableLocal;
+  const { promise, resolve } = Promise.withResolvers<void>();
+  state._waitForStable = promise;
+  state._resolveStable = resolve;
 }
 
 /** 兜底:补全老 state 缺失的字段(原地变更) */
@@ -296,11 +300,18 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   }
 
   // 3. 主 action:execute
+  // stable wait:等待 execute 完成 OR 新 pending 创建(两个条件之一)。
+  // 不用 executeP.then(() => resolveStable)——微任务调度竞态会提前清 _resolveStable。
+  // 改为 Promise.race:executeP 完成 → resolveStable;pending 创建 → resolveStable。
+  // resolveStable 是幂等的(清除后不再调用)。race 先到先得。
   setupStableWait(state);
-  const executeP = entry.execute(state, message.params).finally(() => {
-    resolveStable(state);
-  });
+  const executeP = entry.execute(state, message.params);
   state._activeExecuteP = executeP;
+  // executeP 完成时(无 pending 场景)resolve stable
+  void executeP.then(
+    () => resolveStable(state),
+    (err) => { console.error('[dispatch] execute error:', err); resolveStable(state); },
+  );
   await state._waitForStable;
   logAction(state, message);
   state.seq += 1;

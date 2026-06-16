@@ -64,6 +64,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
         const target = resolved[i];
 
         // 成为目标:触发"成为目标后"hook(如流离转移),可被 cancel(空城等)
+        // 成为目标:触发"成为目标后"hook(如流离转移),可被 cancel(空城等)
         await applyAtom(state, { type: '成为目标', source: from, target, cardId });
 
         // 询问闪(等待目标回应,防具如仁王盾/八卦阵在此 cancel 或放虚拟闪)
