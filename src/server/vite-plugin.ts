@@ -56,35 +56,38 @@ export function honoApiPlugin(): Plugin {
         }
       });
 
-      // 处理 WebSocket 升级
-      const wss = new WebSocketServer({ noServer: true });
-      const wsClients = new Map<WebSocket, string>();
+      // 返回 post-hook:在 Vite 内部 middleware 之后注册 WS upgrade handler
+      // 避免 Vite HMR 拦截 /ws upgrade
+      return () => {
+        const wss = new WebSocketServer({ noServer: true });
+        const wsClients = new Map<WebSocket, string>();
 
-      server.httpServer?.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-        const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
-        if (url.pathname !== '/ws') return;
+        server.httpServer?.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+          const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+          if (url.pathname !== '/ws') return;
 
-        wss.handleUpgrade(req, socket, head, (ws) => {
-          const playerId = generatePlayerId();
-          wsClients.set(ws, playerId);
-          handleWsOpen(playerId);
+          wss.handleUpgrade(req, socket, head, (ws) => {
+            const playerId = generatePlayerId();
+            wsClients.set(ws, playerId);
+            handleWsOpen(playerId);
 
-          ws.on('message', (data: Buffer) => {
-            const message = deserialize(data.toString());
-            if (message) {
-              handleWsMessage(playerId, message, {
-                send: (msg: string) => ws.send(msg),
-                close: () => ws.close(),
-              } as never);
-            }
-          });
+            ws.on('message', (data: Buffer) => {
+              const message = deserialize(data.toString());
+              if (message) {
+                handleWsMessage(playerId, message, {
+                  send: (msg: string) => ws.send(msg),
+                  close: () => ws.close(),
+                } as never);
+              }
+            });
 
-          ws.on('close', () => {
-            handleWsClose(playerId);
-            wsClients.delete(ws);
+            ws.on('close', () => {
+              handleWsClose(playerId);
+              wsClients.delete(ws);
+            });
           });
         });
-      });
+      };
     },
   };
 }

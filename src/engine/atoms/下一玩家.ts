@@ -8,11 +8,16 @@ export const 下一玩家: AtomDefinition<Record<string, never>> = {
   validate() { return null; },
   apply(state) {
     if (state.players.length === 0) return;
-    let nextIdx = (state.currentPlayerIndex + 1) % state.players.length;
+    const prev = state.currentPlayerIndex;
+    let nextIdx = (prev + 1) % state.players.length;
     let safety = state.players.length;
     while (!state.players[nextIdx].alive && safety > 0) {
       nextIdx = (nextIdx + 1) % state.players.length;
       safety--;
+    }
+    // 绕回起点 → 回合数 +1
+    if (nextIdx <= prev) {
+      state.turn.round += 1;
     }
     state.currentPlayerIndex = nextIdx;
   },

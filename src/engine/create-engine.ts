@@ -193,7 +193,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   // 登记实例 unload,使 unloadSkillInstance/clearAllSkillInstances 能正确清理 开局:系统
   setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
-  // 2. dispatch 开局 start(dispatch void:非法 action 静默丢弃,开局失败通过后续 state 检查暴露)
+  // 3. dispatch 开局 start(dispatch void:非法 action 静默丢弃,开局失败通过后续 state 检查暴露)
   await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
@@ -201,9 +201,6 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
     params: { ...gameConfig } as Record<string, Json>,
     baseSeq: 0,
   });
-
-  // 3. 给每个 player 的 skills 注册实例(开局时玩家技能已通过 选将 atom 注入)
-  await skillRebootstrap(state);
 }
 
 /**

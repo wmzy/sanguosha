@@ -35,17 +35,18 @@ describe('create + bootstrap — 端到端开局', () => {
     expect(lord).toBeDefined();
     expect(lord).toBe(state.players[0]);  // 主公是第一个玩家
 
-    // 每个玩家有 4 张起始手牌(主公 5 张 lordBonus)
+    // 主公:发牌 5 + 摸牌阶段 2 = 7;其他玩家:发牌 4(还没到他们回合)
     for (const p of state.players) {
-      const expected = p === lord ? 5 : 4;
+      const expected = p === lord ? 5 + 2 : 4;
       expect(p.hand.length).toBe(expected);
     }
 
-    // 牌堆有牌(被摸了 13 张,103 - 13 = 90)
-    expect(state.zones.deck.length).toBe(103 - (4 * 3 + 1));  // 4 张 × 3 人 + 1 张主公奖励
+    // 牌堆有牌(被摸了 13 + 2 张主公摸牌)
+    expect(state.zones.deck.length).toBe(103 - (4 * 3 + 1) - 2);
 
-    // 状态进入第一个回合(主公 回合开始 / 阶段开始 已 apply)
+    // 状态进入出牌阶段
     expect(state.currentPlayerIndex).toBe(0);
     expect(state.turn.round).toBe(1);
+    expect(state.phase).toBe('出牌');
   });
 });

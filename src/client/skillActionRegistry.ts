@@ -1,6 +1,7 @@
 // src/client/skillActionRegistry.ts
 // 前端技能 action 注册表：收集技能 onMount 调用 defineAction 注册的 UI 配置
-// 通过 import() 动态加载技能包
+// import skills/index 触发 setSkillModuleResolver(动态 import 按需加载)
+import '../engine/skills';
 import type { ActionPrompt, Card, CardWrapper, FrontendAPI, Skill } from '../engine/types';
 import { getSkillModule } from '../engine/skill';
 

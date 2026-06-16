@@ -5,6 +5,7 @@ import { applyAtom } from '../create-engine';
 import {
   registerActionEntry,
   unregisterActionEntry,
+  instantiateSkill,
   type SkillModule,
 } from '../skill';
 
@@ -52,6 +53,14 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       // 2. 选将(从武将池分配)
       await applyAtom(state, { type: '选将', characters, seed });
 
+      // 2.5 注册技能实例(回合管理等默认技能)——必须在阶段推进前注册
+      //     选将 已设置 player.skills,但技能实例需要 registerSkillsFromState 实例化
+      for (const player of state.players) {
+        for (const skillId of player.skills) {
+          await instantiateSkill(skillId, player.index);
+        }
+      }
+
       // 3. 初始化洗牌(创建标准牌堆并洗混)
       await applyAtom(state, { type: '初始化洗牌', seed });
 
@@ -63,6 +72,8 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       if (lord) {
         await applyAtom(state, { type: '回合开始', player: lord.index });
         await applyAtom(state, { type: '阶段开始', player: lord.index, phase: '准备' });
+        // 触发阶段结束,让回合管理的阶段推进钩子接着跑(准备→判定→摸牌→出牌)
+        await applyAtom(state, { type: '阶段结束', player: lord.index, phase: '准备' });
       }
     },
   };
