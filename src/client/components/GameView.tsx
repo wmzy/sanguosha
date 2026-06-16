@@ -109,12 +109,22 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const perspectiveHand: Card[] = perspective?.hand ?? [];
   const viewerHand: Card[] = view.players[view.viewer]?.hand ?? [];
 
-  // 待回应:基于视角玩家
+  // 待回应:调试模式下自动跟到 pending target 的视角
   const pending = view.pending;
-  const isPerspectiveAwaiting = pending !== null && pending.target === perspectiveIdx;
+  const pendingTargetIdx = pending?.target ?? -1;
+  const isPerspectiveAwaiting = pending !== null && pendingTargetIdx === perspectiveIdx;
   // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
   const canOperate = true; // debug 模式永远允许操作
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
+
+  // 调试模式:pending 出现时自动切换视角到 target 玩家
+  useEffect(() => {
+    if (pending && pendingTargetIdx >= 0 && pendingTargetIdx !== perspectiveIdx) {
+      setPerspectiveIdx(pendingTargetIdx);
+      setSelectedCardId(null);
+      setSelectedTarget(null);
+    }
+  }, [pendingTargetIdx, pending]);
 
   // 倒计时:pending 回应优先,否则用 turnDeadline
   const deadline = pending?.deadline ?? view.turnDeadline;
@@ -231,7 +241,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   function handlePlayCard() {
     if (!selectedCardId) return;
-    const card = viewerHand.find(c => c.id === selectedCardId);
+    const card = perspectiveHand.find(c => c.id === selectedCardId);
     if (!card) return;
     if (RESPOND_ONLY.has(card.name)) return; // 不能主动出
     const selfName = view.players[view.viewer].name;
@@ -243,7 +253,9 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       const idx = nameToIndex(targetName);
       if (idx >= 0) params.targets = [idx];
     }
-    send(card.name, 'use', params);
+    // 装备牌统一走"装备通用" skillId,其他牌走 card.name
+    const skillId = card.type === '装备牌' ? '装备通用' : card.name;
+    send(skillId, 'use', params);
   }
 
   // 选目标(含距离检查)
@@ -299,7 +311,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   function handleRespond(cardId?: string) {
     if (!pending) return;
     if (cardId) {
-      const card = viewerHand.find(c => c.id === cardId);
+      const card = perspectiveHand.find(c => c.id === cardId);
       if (card) send(card.name, 'respond', { cardId });
     } else {
       // 不出闪/杀:用对应 skill respond 但不带 cardId(后端 skill 收到空 cardId → 不做操作)
@@ -392,7 +404,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           {canOperate && (
             <div className={promptActions}>
               <button className={promptBtn} onClick={() => handleRespond()}>不出</button>
-              {viewerHand.filter(c => c.name === '闪' || c.name === '杀').map(c => (
+              {perspectiveHand.filter(c => c.name === '闪' || c.name === '杀').map(c => (
                 <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
                   {c.name} {c.suit}{c.rank}
                 </button>
@@ -578,7 +590,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       {/* ─── 操作面板 ─── */}
       <div className={actionBar}>
         {canOperate && isMyTurn && view.phase === '出牌' && selectedCardId && (() => {
-          const card = viewerHand.find(c => c.id === selectedCardId);
+          const card = perspectiveHand.find(c => c.id === selectedCardId);
           const needsTarget = card ? TARGET_REQUIRED_CARDS.has(card.name) : false;
           const canPlay = !needsTarget || !!selectedTarget;
           return <button className={playBtn} onClick={handlePlayCard} disabled={!canPlay}

@@ -163,7 +163,7 @@ export class GameSession {
     if (!this.state) return;
     if (this.debug) {
       // debug 模式:发给房间内所有连接的玩家(支持重连后新 playerId)
-      const view = buildView(this.state, 0);
+      const view = buildView(this.state, 0, this.debug);
       const state = this.state;
       for (const [pid] of this.room.players) {
         this.sendToPlayer(pid, { type: 'debugGameState', state: view, lastSeq: state.seq });
