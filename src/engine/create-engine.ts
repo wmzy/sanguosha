@@ -182,6 +182,11 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
   // 3. dispatch 开局 start(dispatch void:非法 action 静默丢弃,开局失败通过后续 state 检查暴露)
+  // 先为每个玩家注册选将/弃牌 respond action(注册到具体座次,开局流程内会等待这些 respond)
+  const 系统规则mod = await import('./skills/系统规则');
+  for (const player of state.players) {
+    系统规则mod.registerSystemRespondActions(player.index);
+  }
   await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
@@ -204,8 +209,16 @@ export async function restore(state: GameState, gameConfig: GameConfig, actionLo
   return state;
 }
 
-/** 测试/工具用:给预构造 state(未走 bootstrap)注册所有 player.skills 实例 */
-export { registerSkillsFromState } from './skill';
+/** 测试/工具用:给预构造 state(未走 bootstrap)注册所有 player.skills 实例 + 选将/弃牌 respond action */
+export async function registerSkillsFromState(state: GameState): Promise<void> {
+  const { registerSkillsFromState: registerSkills } = await import('./skill');
+  await registerSkills(state);
+  // 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)
+  const 系统规则mod = await import('./skills/系统规则');
+  for (const player of state.players) {
+    系统规则mod.registerSystemRespondActions(player.index);
+  }
+}
 
 /**
  * 执行一条 client message。dispatch 是 fire-and-forget 的输入分发器:
@@ -230,17 +243,17 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     }
   }
   let entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
-  // 系统级 respond 回退:玩家 ownerId 找不到时,尝试系统级(-1)注册
-  // 仅在有 pendingSlot 时(即 respond 路径)启用,use() 路径不受影响
-  if (!entry && (message.actionType === 'respond' || message.actionType === '选将') && state.pendingSlot) {
-    entry = findActionEntry(message.skillId, -1, message.actionType);
-  }
   if (!entry || entry.validate(state, message.params) !== null){
     rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
     return;
   }
-  // 回应路径:若 pending slot 的超时已在处理中(isTimeout),丢弃该 action;否则 pause 取消定时器
-  const oldSlot = state.pendingSlot;
+  // 回应路径:按 ownerId 从 pendingSlots 定位该玩家的 slot。
+  // 单 target 询问(询问闪/杀/弃牌):Map 只有该 target 一个 slot。
+  // 并行询问(拼点/选将):Map 有多个 slot,各自独立 resolve。
+  // 无雕竞态(target=-2):任何玩家 respond 都命中同一 slot(先到先得)。
+  const targetKey = message.ownerId;
+  const oldSlot = state.pendingSlots.get(targetKey)
+    ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
   if (oldSlot) {
     if (oldSlot.isTimeout) {
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
@@ -250,20 +263,21 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   }
 
   const resolve = oldSlot?.resolve ?? (() => {});
-  // 注意:不在 execute 前清除 pendingSlot——respond execute 需要读 slot 信息
-  // (如系统规则弃牌 execute 读 slot.atom.target)。execute 完成后才清除旧 slot
-  // (仅当 execute 未创建新 pending 时)。
+  // 注意:不在 execute 前清除 slot——respond execute 需要读 slot 信息
+  // (如系统规则弃牌 execute 读 slot.atom.target)。execute 完成后才清除该玩家的 slot。
   logAction(state, message);
   state.seq += 1;
-  // fire-and-forget 启动 execute,完成后 resolve 旧 slot(父 execute 恢复)。
-  // 返回 execute promise:session 不 await(继续 fire-and-forget),
-  // 测试可 await 它等到 respond execute 跑完;父 execute resume 跑到下一个 pending
-  // 需调用方再让出一个微任务(见 harness 的 flush)。
+  // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot。
   return entry.execute(state, message.params).then(() => {
-    // execute 完成后:如果 pendingSlot 未被替换(execute 未创建新 pending),清除旧 slot
-    if (state.pendingSlot === oldSlot) state.pendingSlot = undefined;
-    // respond 完成后:如果有 choiceQueue 剩余,推进下一个 slot 为 pending
-    if (!state.pendingSlot) promoteChoiceQueue(state);
+    // execute 完成后:如果该 slot 仍未被替换(execute 未创建新 pending),清除它
+    if (oldSlot) {
+      const key = extractPendingTarget(oldSlot.atom);
+      if (state.pendingSlots.get(key) === oldSlot) state.pendingSlots.delete(key);
+      // 无雕等 target<0 的广播 slot:dispatch 用 ownerId 找不到精确 key,需按 slot 引用清除
+      if (key < 0) {
+        for (const [k, v] of state.pendingSlots) if (v === oldSlot) { state.pendingSlots.delete(k); break; }
+      }
+    }
     resolve();
   });
 }
@@ -280,14 +294,10 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
  * 触发后 slot resolve → 父 execute 恢复。广播由 applyAtom 内部的 onStateChange 驱动。
  */
 export async function fireTimeout(state: GameState): Promise<void> {
-  const slot = state.pendingSlot;
-  if (!slot) return;
-  await slot._fireTimeoutNow?.();
-  // 只在旧 slot 仍活跃时 promote choiceQueue。
-  // 如果 execute 恢复后创建了新 pending(state.pendingSlot 已变为新 slot),不 promote。
-  if (!state.pendingSlot || state.pendingSlot === slot) {
-    promoteChoiceQueue(state);
-  }
+  // 触发所有活跃 slot 的 onTimeout(并行场景下多个 slot 可能同时超时)
+  const slots = [...state.pendingSlots.values()];
+  if (slots.length === 0) return;
+  await Promise.all(slots.map(s => s._fireTimeoutNow?.()));
 }
 
 /** 测试用:模块级清空(skill instances + events)。 */
@@ -329,64 +339,9 @@ export function topFrame(state: GameState): SettlementFrame | undefined {
   return state.settlementStack[state.settlementStack.length - 1];
 }
 
-/** 兜底空帧 */
+/** 兑底空帧 */
 function emptyFrame(): SettlementFrame {
   return { skillId: '', from: -1, params: Object.freeze({}) };
-}
-
-/**
- * 多询问:choiceQueue 中有 2+ 个 slot 时,创建"选择先响应哪个"的 pending slot。
- * 用户通过 respond {choice: index} 选择。选完后被选中的 slot 晋升为 pendingSlot。
- */
-function makeChoiceSlot(state: GameState): PendingSlot {
-  const queue = state.choiceQueue ?? [];
-  const choices = queue.map((s, i) => {
-    const atom = s.atom as Record<string, unknown>;
-    return { index: i, type: s.atom.type, requestType: atom.requestType, target: extractPendingTarget(s.atom) };
-  });
-  const slot: PendingSlot = {
-    atom: { type: '请求回应', requestType: '__选择询问', target: choices[0]?.target ?? 0, prompt: { type: 'choosePlayer' as const, title: '请选择先响应哪个询问', min: 1, max: 1 }, defaultChoice: 0, timeout: 30 } as unknown as Atom,
-    definition: { type: '请求回应', validate: () => null, apply: () => {} } as unknown as AtomDefinition,
-    startTime: Date.now() - state.startedAt,
-    deadline: Date.now() - state.startedAt + 30000,
-    resolve: () => {},
-    isTimeout: false,
-    pause: () => {},
-    _fireTimeoutNow: async () => {
-      // 选择超时:默认选第一个
-      promoteFirstChoice(state);
-    },
-  };
-  state.localVars['__choiceOptions'] = JSON.parse(JSON.stringify(choices)) as Json;
-  return slot;
-}
-
-/** 从 choiceQueue 中选出第 index 个 slot 晋升为 pendingSlot,其余留在队列 */
-function promoteChoice(state: GameState, index: number): void {
-  const queue = state.choiceQueue ?? [];
-  if (index < 0 || index >= queue.length) return;
-  const chosen = queue.splice(index, 1)[0];
-  state.pendingSlot = chosen;
-}
-
-/** 选择超时:默认选第一个 */
-function promoteFirstChoice(state: GameState): void {
-  promoteChoice(state, 0);
-}
-
-/**
- * 当前 pendingSlot resolve 后,检查 choiceQueue 是否还有待处理 slot。
- * 有 1 个 → 直接晋升;有 2+ 个 → 创建新的"选择"pending。
- */
-function promoteChoiceQueue(state: GameState): void {
-  const queue = state.choiceQueue ?? [];
-  state.pendingSlot = undefined;
-  if (queue.length === 0) return;
-  if (queue.length === 1) {
-    state.pendingSlot = queue.shift();
-  } else {
-    state.pendingSlot = makeChoiceSlot(state);
-  }
 }
 
 
@@ -476,67 +431,92 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   state.atomStack.pop();
 
   if (def.pending) {
-    await new Promise<void>((resolve) => {
-      const pending = def.pending!;
-      // 优先读 atom 上的 timeout 字段(如 请求回应 的 timeout),fallback 到 def.pending.timeout
-      const atomTimeout = (current as Record<string, unknown>).timeout;
-      const timeoutSec = typeof atomTimeout === 'number' ? atomTimeout : pending.timeout;
-      const timeoutMs = timeoutSec * 1000;
-      let resolveCalled = false;
-      let timedOut = false;
-      let paused = false;
-      const safeResolve = () => {
-        if (resolveCalled) return;
-        resolveCalled = true;
-        clearTimeout(timer);
-        resolve();
-      };
-      const slot: PendingSlot = {
-        atom: current,
-        definition: def,
-        startTime: Date.now() - state.startedAt,
-        deadline: Date.now() - state.startedAt + timeoutMs,
-        resolve: safeResolve,
-        get isTimeout() { return timedOut; },
-        pause() {
-          if (timedOut) return;
-          paused = true;
-          clearTimeout(timer);
-        },
-      };
-      const fireTimeoutNow = async (): Promise<void> => {
-        if (state.pendingSlot !== slot) return;
-        if (paused) return;
-        timedOut = true;
-        clearTimeout(timer);
-        await applyAtom(state, pending.onTimeout);
-        // 弃牌 pending 超时:自动弃超出手牌
-        const slotAtom = slot.atom as { requestType?: string; target?: number };
-        if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
-          const p = state.players[slotAtom.target];
-          if (p && p.hand.length > p.maxHealth) {
-            const excess = p.hand.length - p.maxHealth;
-            const toDiscard = p.hand.slice(-excess);
-            await applyAtom(state, { type: '弃置', player: slotAtom.target, cardIds: toDiscard });
-          }
-        }
-        promoteChoiceQueue(state);
-        notifyStateChange(state);
-        safeResolve();
-      };
-      slot._fireTimeoutNow = fireTimeoutNow;
-      const timer = setTimeout(fireTimeoutNow, timeoutMs);
+    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应多 target)。
+    // 并行回应 为每个 target 创建独立 slot,Promise.all 等全部 resolve(语义同 Promise.all)。
+    const isParallel = current.type === '并行回应';
+    const targets: number[] = isParallel
+      ? (current as unknown as { targets: number[] }).targets
+      : [extractPendingTarget(current)];
 
-      // 多询问处理:pendingSlot 已被占 → 新 slot 入 choiceQueue,创建"选择"pending
-      if (state.pendingSlot) {
-        if (!state.choiceQueue) state.choiceQueue = [];
-        state.choiceQueue.push(state.pendingSlot);
-        state.choiceQueue.push(slot);
-        state.pendingSlot = makeChoiceSlot(state);
-      } else {
-        state.pendingSlot = slot;
+    // 为每个 target 构造一个单 target 的虚拟 atom(并行回应拆分;单 target 原样)
+    const slotAtoms: Atom[] = isParallel
+      ? targets.map(t => ({
+          ...current,
+          type: '请求回应' as const,
+          target: t,
+        } as unknown as Atom))
+      : [current];
+
+    const slotPromises: Promise<void>[] = [];
+    for (let i = 0; i < slotAtoms.length; i++) {
+      const slotAtom = slotAtoms[i];
+      const slotTarget = targets[i];
+      slotPromises.push(createAndAwaitSlot(state, slotAtom, def, slotTarget));
+    }
+    await Promise.all(slotPromises);
+  }
+}
+
+/** 为单个 target 创建 PendingSlot 并 await 到它 resolve。 */
+function createAndAwaitSlot(
+  state: GameState,
+  atom: Atom,
+  def: AtomDefinition,
+  target: number,
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const pending = def.pending!;
+    const atomTimeout = (atom as Record<string, unknown>).timeout;
+    const timeoutSec = typeof atomTimeout === 'number' ? atomTimeout : pending.timeout;
+    const timeoutMs = timeoutSec * 1000;
+    let resolveCalled = false;
+    let timedOut = false;
+    let paused = false;
+    const safeResolve = () => {
+      if (resolveCalled) return;
+      resolveCalled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const slot: PendingSlot = {
+      atom,
+      definition: def,
+      startTime: Date.now() - state.startedAt,
+      deadline: Date.now() - state.startedAt + timeoutMs,
+      resolve: safeResolve,
+      get isTimeout() { return timedOut; },
+      pause() {
+        if (timedOut) return;
+        paused = true;
+        clearTimeout(timer);
+      },
+    };
+    const fireTimeoutNow = async (): Promise<void> => {
+      if (state.pendingSlots.get(target) !== slot) return;
+      if (paused) return;
+      timedOut = true;
+      clearTimeout(timer);
+      await applyAtom(state, pending.onTimeout);
+      // 弃牌 pending 超时:自动弃超出手牌
+      const slotAtom = atom as { requestType?: string; target?: number };
+      if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
+        const p = state.players[slotAtom.target];
+        if (p && p.hand.length > p.maxHealth) {
+          const excess = p.hand.length - p.maxHealth;
+          const toDiscard = p.hand.slice(-excess);
+          await applyAtom(state, { type: '弃置', player: slotAtom.target, cardIds: toDiscard });
+        }
       }
       notifyStateChange(state);
-    });
-  }
+      // 从 Map 清除已 resolve 的 slot
+      if (state.pendingSlots.get(target) === slot) state.pendingSlots.delete(target);
+      safeResolve();
+    };
+    slot._fireTimeoutNow = fireTimeoutNow;
+    const timer = setTimeout(fireTimeoutNow, timeoutMs);
+
+    // 存入 pendingSlots Map(按 target 索引)。不同 target 的 slot 共存,各自独立 resolve。
+    state.pendingSlots.set(target, slot);
+    notifyStateChange(state);
+  });
 }

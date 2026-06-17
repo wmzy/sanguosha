@@ -17,12 +17,26 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      if (typeof params.target !== 'number') return 'target required';
-      const target = state.players[params.target];
-      if (!target?.alive) return '目标不存在或已死亡';
-      if (params.target === ownerId) return '不能激将自己';
-      if (target.faction !== '蜀') return '只能激将蜀势力角色';
-      return null;
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 主公身份 + 目标合法
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
+      // 激将是主公技:仅主公位可用(以 character.isLord 或主公位身份判断,这里以主公位 ownerId===0 为依据)
+      const isLord = ownerId === 0;
+      // 目标合法:不是自己 + 存活 + 蜀势力
+      const targetIdx = params.target as number | undefined;
+      const targetExists = typeof targetIdx === 'number' && !!state.players[targetIdx];
+      const target = targetExists ? state.players[targetIdx as number] : null;
+      const targetNotSelf = targetIdx !== ownerId;
+      const targetAlive = target?.alive === true;
+      const targetShu = target?.faction === '蜀';
+      // killTarget 校验:可选,若提供则需存活
+      const killTargetIdx = params.killTarget as number | undefined;
+      const killTargetValid = killTargetIdx === undefined || (state.players[killTargetIdx]?.alive === true && killTargetIdx !== targetIdx);
+      const ok = myTurn && inActPhase && free && selfAlive && isLord && targetExists && targetNotSelf && targetAlive && targetShu && killTargetValid;
+      return ok ? null : '现在不能使用激将';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

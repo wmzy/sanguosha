@@ -17,8 +17,8 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   // respond:遗计分配牌,设 localVars 记录分配结果
   registerAction(skill.id, ownerId, 'respond',
     (state, params) => {
-      if (state.pendingSlot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType !== '遗计/distribute') return '当前不是遗计分配';
       return null;
     },

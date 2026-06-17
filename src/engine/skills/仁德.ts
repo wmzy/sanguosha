@@ -16,22 +16,36 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      const targets = params.targets as Array<{ target: number; cardIds: string[] }> | undefined;
-      if (!Array.isArray(targets) || targets.length === 0) return 'targets required';
-      const total = targets.reduce((n, t) => n + (Array.isArray(t.cardIds) ? t.cardIds.length : 0), 0);
-      if (total === 0) return 'no cards to give';
-      // 每回合限一次
-      if (state.players[ownerId]?.vars['仁德/usedThisTurn']) return '本回合已使用过仁德';
-      // 检查所有 cardId 在手牌中,target 不是自己
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
       const self = state.players[ownerId];
-      for (const t of targets) {
-        if (t.target === ownerId) return '不能给自己';
-        if (!state.players[t.target]?.alive) return '目标不存在或已死亡';
-        for (const cardId of t.cardIds) {
-          if (!self.hand.includes(cardId)) return '牌不在手牌中';
+      const selfAlive = self?.alive === true;
+      // 每回合限一次
+      const notUsed = !self?.vars['仁德/usedThisTurn'];
+      const targets = params.targets as Array<{ target: number; cardIds: string[] }> | undefined;
+      const hasTargets = Array.isArray(targets) && targets.length > 0;
+      const total = hasTargets ? targets!.reduce((n, t) => n + (Array.isArray(t.cardIds) ? t.cardIds.length : 0), 0) : 0;
+      const hasCards = total > 0;
+      // 收集所有 cardId 检查重复 + 都在手牌
+      const allCardIds: string[] = [];
+      let noDuplicates = true;
+      let allInHand = true;
+      if (hasTargets) {
+        for (const t of targets!) {
+          if (!Array.isArray(t.cardIds)) { allInHand = false; continue; }
+          for (const cardId of t.cardIds) {
+            if (allCardIds.includes(cardId)) { noDuplicates = false; }
+            allCardIds.push(cardId);
+            if (!self?.hand.includes(cardId)) { allInHand = false; }
+          }
         }
       }
-      return null;
+      // 目标合法:不是自己 + 存活
+      const targetsLegal = hasTargets && targets!.every(t => t.target !== ownerId && state.players[t.target]?.alive === true);
+      const ok = myTurn && inActPhase && free && selfAlive && notUsed && hasTargets && hasCards && noDuplicates && allInHand && targetsLegal;
+      return ok ? null : '现在不能使用仁德';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

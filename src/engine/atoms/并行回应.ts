@@ -1,0 +1,58 @@
+// src/engine/atoms/并行回应.ts
+// 并行回应:多目标并行盲选等待型 atom。
+// 与 请求回应 的区别:targets 是复数,为每个 target 创建独立 PendingSlot,
+// 各 target 独立 respond、独立 resolve,互不阻塞。
+// 全部 resolve 后父 applyAtom 的 Promise 才 resolve(语义等同 Promise.all)。
+//
+// 典型场景:拼点(双方暗盖一张牌)、选将(多人同时选)。
+import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { registerAtom } from '../atom';
+
+export const 并行回应: AtomDefinition<{
+  requestType: string;
+  targets: number[];
+  prompt: ActionPrompt;
+  defaultChoice?: import('../types').Json;
+}> = {
+  type: '并行回应',
+  validate(state, atom) {
+    if (!Array.isArray(atom.targets) || atom.targets.length === 0) return 'targets required';
+    for (const t of atom.targets) {
+      if (!state.players[t]) return `target ${t} not found`;
+    }
+    return null;
+  },
+  apply(_state) {
+    // 等待型 atom——apply 不修改 state
+  },
+  pending: {
+    onTimeout: { type: '无操作' },
+    prompt: { type: 'confirm', title: '请回应' },
+    timeout: 30,
+  },
+  effect: { blockUntilDone: true, duration: 200 },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const effect = { blockUntilDone: true as const, duration: 200 };
+    // 每个 target 看到带 prompt 的请求
+    const ownerViews = new Map<number, ViewEvent>();
+    for (const target of atom.targets) {
+      ownerViews.set(target, {
+        type: '请求回应',
+        requestType: atom.requestType,
+        target,
+        prompt: atom.prompt,
+        effect,
+      });
+    }
+    // 其他人只看到"有玩家被请求回应"
+    const othersView: ViewEvent = {
+      type: '请求回应',
+      requestType: atom.requestType,
+      target: atom.targets[0],
+      effect: { duration: 200 },
+    };
+    return { ownerViews, othersView };
+  },
+};
+
+registerAtom(并行回应);

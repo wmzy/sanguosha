@@ -337,7 +337,7 @@ export class GameSession {
     if (!this.state) return;
     const state = this.state;
     // 只在游戏进行中且有当前玩家时启动定时器
-    if (state.players.some(p => !p.alive) || state.pendingSlot) return;
+    if (state.players.some(p => !p.alive) || state.pendingSlots.size > 0) return;
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.alive) return;
     this.idleTimer = setTimeout(() => {

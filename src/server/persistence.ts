@@ -111,10 +111,14 @@ export interface PersistedRoom {
   lastActivityAt: number;
 }
 
-/** 清理 GameState 中的循环引用(_executor 等) */
+/** 清理 GameState 中的循环引用(函数、定时器等,不可 JSON 序列化) */
 function sanitizeState(state: GameState): GameState {
   return {
     ...state,
+    // pendingSlots 含 resolve/pause/定时器等函数引用,持久化时清空。
+    // restore 路径走 bootstrap 重放 actionLog,会重建 pending。
+    pendingSlots: new Map(),
+    atomStack: [],
     settlementStack: state.settlementStack.map(f => {
       const { _executor, ...rest } = f as Record<string, unknown>;
       return rest as typeof f;
@@ -239,5 +243,17 @@ export function _pendingWriteCount(): number {
  * 这里返回 state 即可,GameSession 会用 state.seed / state.players 等直接接管。
  * (未来若需要"从头 replay 验证"再扩展:用 create + bootstrap + 逐条 dispatch。) */
 export function restoreFromLog(persisted: PersistedRoom): GameState {
-  return persisted.state;
+  const state = persisted.state;
+  // JSON 反序列化后 pendingSlots 可能是普通对象,转回 Map
+  if (!(state.pendingSlots instanceof Map)) {
+    const entries = state.pendingSlots as unknown as Array<[number, unknown]> | Record<string, unknown>;
+    const map = new Map<number, unknown>();
+    if (Array.isArray(entries)) {
+      for (const [k, v] of entries) map.set(Number(k), v);
+    } else if (entries && typeof entries === 'object') {
+      for (const [k, v] of Object.entries(entries)) map.set(Number(k), v);
+    }
+    state.pendingSlots = map as GameState['pendingSlots'];
+  }
+  return state;
 }

@@ -43,10 +43,10 @@ describe('fireTimeout(state)', () => {
       skillId: '杀', actionType: 'use', ownerId: 0,
       params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
 
     await fireTimeoutAndWait(state);
-    expect(state.pendingSlot).toBeUndefined();
+    expect(state.pendingSlots.size).toBe(0);
     const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
   });

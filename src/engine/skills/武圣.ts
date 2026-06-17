@@ -30,14 +30,18 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     ownerId,
     'transform',
     (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      if (typeof cardId !== 'string') return 'cardId required';
-      const card = state.cardMap[cardId];
-      if (!card) return 'card not found';
-      if (card.suit !== '♥' && card.suit !== '♦') return '只能将红色牌当杀使用';
+      // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 红牌
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const free = state.pendingSlots.size === 0
       const self = state.players[ownerId];
-      if (!self.hand.includes(cardId)) return '牌不在你的手牌中';
-      return null;
+      const selfAlive = self?.alive === true;
+      const cardId = params.cardId as string;
+      const cardIdOk = typeof cardId === 'string';
+      const card = cardIdOk ? state.cardMap[cardId] : undefined;
+      const cardInHand = cardIdOk && self?.hand.includes(cardId);
+      const isRed = !!card && (card.suit === '♥' || card.suit === '♦');
+      const ok = myTurn && free && selfAlive && cardInHand && isRed;
+      return ok ? null : '现在不能使用武圣';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;

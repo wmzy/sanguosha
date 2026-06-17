@@ -25,7 +25,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(
     skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
-      const slot = state.pendingSlot;
+      const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { requestType?: string };
       if (atom.requestType !== '无懈可击') return '当前不是无懈可击窗口';

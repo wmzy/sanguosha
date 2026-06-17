@@ -16,8 +16,8 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   // respond:被询问"是否发动反馈"时回应,设 localVars 标记结果
   registerAction(skill.id, ownerId, 'respond',
     (state, params) => {
-      if (state.pendingSlot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType !== '反馈/confirm') return '当前不是反馈确认';
       return null;
     },

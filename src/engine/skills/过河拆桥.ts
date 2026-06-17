@@ -11,15 +11,22 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (!Array.isArray(params.targets) || typeof params.targets[0] !== 'number') return 'target required';
       const targetIdx = params.targets[0];
-      if (targetIdx === ownerId) return '不能对自己使用';
-      const target = state.players[targetIdx];
-      if (!target?.alive) return '目标不存在或已死亡';
-      const hasCards = target.hand.length > 0 || Object.keys(target.equipment).length > 0;
-      if (!hasCards) return '目标没有牌';
-      return null;
+      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardNameOk = state.cardMap[params.cardId]?.name === '过河拆桥';
+      const targetPlayer = state.players[targetIdx];
+      const notSelf = targetIdx !== ownerId;
+      const targetAlive = targetPlayer?.alive === true;
+      const targetHasCards = !!targetPlayer && (targetPlayer.hand.length > 0 || Object.keys(targetPlayer.equipment).length > 0);
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notSelf && targetAlive && targetHasCards;
+      return ok ? null : '过河拆桥使用条件不满足';
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;

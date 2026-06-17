@@ -13,12 +13,22 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'number') return 'target required';
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
       const self = state.players[ownerId];
-      if (!self?.hand.includes(params.cardId)) return '牌不在手牌中';
-      if (params.target === ownerId) return '不能对自己使用';
-      return null;
+      const selfAlive = self?.alive === true;
+      const cardId = params.cardId as string;
+      const cardIdOk = typeof cardId === 'string';
+      const cardInHand = cardIdOk && self?.hand.includes(cardId);
+      const cardNameOk = cardIdOk && state.cardMap[cardId]?.name === '决斗';
+      const targetIdx = params.target as number | undefined;
+      const targetExists = typeof targetIdx === 'number' && !!state.players[targetIdx];
+      const targetAlive = targetExists && state.players[targetIdx as number]?.alive === true;
+      const targetNotSelf = targetIdx !== ownerId;
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetExists && targetAlive && targetNotSelf;
+      return ok ? null : '现在不能使用决斗';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

@@ -19,13 +19,13 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   // respond:流离 confirm 和 chooseTarget
   registerAction(skill.id, ownerId, 'respond',
     (state, params) => {
-      if (state.pendingSlot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType !== '流离/confirm' && requestType !== '流离/chooseTarget') return '当前不是流离回应';
       return null;
     },
     async (state, params) => {
-      const requestType = (state.pendingSlot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const requestType = (state.pendingSlots.get(ownerId)?.atom as unknown as Record<string, unknown>)?.requestType as string;
       if (requestType === '流离/confirm') {
         state.localVars['流离/confirmed'] = params.choice === true || params.confirmed === true;
       } else {

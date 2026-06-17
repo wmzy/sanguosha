@@ -13,15 +13,28 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (typeof params.target !== 'number') return 'target required';
       if (typeof params.killTarget !== 'number') return 'killTarget required';
-      const self = state.players[ownerId];
-      if (!self?.hand.includes(params.cardId)) return '牌不在手牌中';
+      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardNameOk = state.cardMap[params.cardId]?.name === '借刀杀人';
       const target = state.players[params.target];
-      if (!target?.equipment?.['武器']) return '目标没有武器';
-      if (params.target === ownerId) return '不能对自己使用';
-      return null;
+      const targetAlive = target?.alive === true;
+      const targetHasWeapon = !!target?.equipment?.['武器'];
+      const notSelf = params.target !== ownerId;
+      const killTargetPlayer = state.players[params.killTarget];
+      const killTargetAlive = killTargetPlayer?.alive === true;
+      const killTargetNotOwner = params.killTarget !== ownerId;
+      const killTargetNotTarget = params.killTarget !== params.target;
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk
+        && targetAlive && targetHasWeapon && notSelf
+        && killTargetAlive && killTargetNotOwner && killTargetNotTarget;
+      return ok ? null : '借刀杀人使用条件不满足';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

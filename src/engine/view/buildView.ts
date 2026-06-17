@@ -28,10 +28,10 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     text: formatLogEntry(e.message),
   }));
 
-  // 从 GameState.pendingSlot 构建 pending view
+  // 从 GameState.pendingSlots 构建 pending view(Map 中取活跃 slot)
   let pending: GameView['pending'] = null;
-  if (state.pendingSlot) {
-    const slot = state.pendingSlot;
+  const slot = state.pendingSlots.size > 0 ? [...state.pendingSlots.values()][0] : undefined;
+  if (slot) {
     const def = slot.definition;
     const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
       ?? def.pending?.prompt

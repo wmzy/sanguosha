@@ -13,10 +13,18 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      if (typeof params.cardId !== 'string') return 'cardId required';
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
       const self = state.players[ownerId];
-      if (!self?.hand.includes(params.cardId)) return '牌不在手牌中';
-      return null;
+      const selfAlive = self?.alive === true;
+      const cardId = params.cardId as string;
+      const cardIdOk = typeof cardId === 'string';
+      const cardInHand = cardIdOk && self?.hand.includes(cardId);
+      const cardNameOk = cardIdOk && state.cardMap[cardId]?.name === '南蛮入侵';
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk;
+      return ok ? null : '现在不能使用南蛮入侵';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

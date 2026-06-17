@@ -95,7 +95,14 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   });
 
   // ─── 主动结束回合 ───
-  registerAction(skill.id, ownerId, 'end', (state: GameState, params: Record<string, Json>) => null, async (state: GameState, params: Record<string, Json>) => {
+  // 合法条件:自己的出牌或弃牌阶段,且无 pending 挂起(须先回应询问)
+  registerAction(skill.id, ownerId, 'end', (state: GameState, _params: Record<string, Json>) => {
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌' || state.phase === '弃牌';
+      const free = state.pendingSlots.size === 0
+      if (myTurn && inActPhase && free) return null;
+      return '现在不能结束回合';
+    }, async (state: GameState, params: Record<string, Json>) => {
       
       const player = ownerId;
 
@@ -110,9 +117,12 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     }, );
 
   // ─── 首次开局(由主公位玩家触发)───
-  registerAction(skill.id, ownerId, 'start', (state: GameState, params: Record<string, Json>) => {
-      if (state.currentPlayerIndex !== 0) return '只有主公位可以开局';
-      return null;
+  // 合法条件:主公位(ownerId===0 且 currentPlayerIndex===0),处于初始准备阶段,且无 pending
+  registerAction(skill.id, ownerId, 'start', (state: GameState, _params: Record<string, Json>) => {
+      const isLordSeat = ownerId === 0 && state.currentPlayerIndex === 0;
+      const atInitial = state.phase === '准备' && state.pendingSlots.size === 0;
+      if (isLordSeat && atInitial) return null;
+      return '现在不能开局';
     }, async (state: GameState, params: Record<string, Json>) => {
       
       const player = ownerId;

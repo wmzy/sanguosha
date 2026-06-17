@@ -11,17 +11,23 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = state.pendingSlots.size === 0
+    const self = state.players[ownerId];
+    const selfAlive = self?.alive === true;
     if (typeof params.cardId !== 'string') return 'cardId required';
     if (typeof params.target !== 'number') return 'target required';
+    const cardInHand = !!self?.hand.includes(params.cardId);
+    const cardNameOk = state.cardMap[params.cardId]?.name === '顺手牵羊';
+    const notSelf = params.target !== ownerId;
     // 距离检查:目标必须在距离 1 以内(委托 distance.ts,含 进攻马/防御马 修正)
-    if (effectiveDistance(state, ownerId, params.target as number) > 1) {
-      return `目标 ${params.target} 不在距离 1 以内`;
-    }
-    if (params.target === ownerId) return '不能对自己使用';
+    const inRange = effectiveDistance(state, ownerId, params.target as number) <= 1;
     const target = state.players[params.target];
-    if (!target?.alive) return '目标不存在或已死亡';
-    if (target.hand.length === 0) return '目标没有手牌';
-    return null;
+    const targetAlive = target?.alive === true;
+    const targetHasHand = !!target && target.hand.length > 0;
+    const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notSelf && inRange && targetAlive && targetHasHand;
+    return ok ? null : '顺手牵羊使用条件不满足';
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;

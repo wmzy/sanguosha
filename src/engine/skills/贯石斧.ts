@@ -16,8 +16,8 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'respond',
     (state, params) => {
-      if (state.pendingSlot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType !== '贯石斧/confirm') return '当前不是贯石斧确认';
       return null;
     },

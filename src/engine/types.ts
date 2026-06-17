@@ -89,15 +89,14 @@ export interface GameState {
   settlementStack: SettlementFrame[];
   /** 当前正在 apply 栈上的 atom 列表(栈顶=最新)。游戏状态属性,不是 frame 属性 */
   atomStack: Atom[];
-  /** 当前等待中的 pending slot(同时只有一个等待) */
-  pendingSlot?: PendingSlot;
-  /**
-   * 等待队列:当多个询问同时竞争 pending 时,除当前 slot 外的其余存入 choiceQueue。
-   * 用户当前看到的是 pendingSlot(要么是原始询问,要么是"先响应哪个"的选择)。
-   * 当前 slot resolve 后,choiceQueue 中的下一个晋升为 pendingSlot。
-   * 通常为空——只有同时机多询问时才有内容。
-   */
-  choiceQueue?: PendingSlot[];
+  /** 当前等待中的 pending slots,按被问询玩家 target 索引。
+   *
+   * 单 target 询问(出牌期间询问闪/杀/弃牌等):Map size=1。
+   * 多 target 并行询问(拼点/选将):Map size=2+,各 target 独立 respond、独立 resolve,
+   * 互不阻塞,全部 resolve 后父 execute 继续(`await Promise.all`)。
+   *
+   * target 为特殊值时:key 用负数(-1=系统, -2=广播竞态如无懈可击)。 */
+  pendingSlots: Map<number, PendingSlot>;
   cardMap: Record<string, Card>;
   cardWrappers: Record<string, CardWrapper>;
   rngSeed: number;
@@ -130,6 +129,7 @@ export function createGameState(partial: Partial<GameState> & { players: PlayerS
     zones: { deck: [], discardPile: [], processing: [] },
     settlementStack: [],
     atomStack: [],
+    pendingSlots: new Map(),
     cardWrappers: {},
     rngSeed: 0,
     marks: [],
@@ -329,6 +329,8 @@ export type Atom =
   | { type: '询问闪'; target: number; source: number }
   | { type: '询问杀'; target: number; source: number }
   | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
+  // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
+  | { type: '并行回应'; requestType: string; targets: number[]; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
   // 牌包装(武圣转化)
   | { type: '武圣包装'; cardId: string }
   | { type: '武圣还原'; cardId: string };

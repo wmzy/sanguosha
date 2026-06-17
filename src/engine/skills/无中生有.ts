@@ -9,8 +9,16 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
-      return null;
+      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardNameOk = state.cardMap[params.cardId]?.name === '无中生有';
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk;
+      return ok ? null : '无中生有使用条件不满足';
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;

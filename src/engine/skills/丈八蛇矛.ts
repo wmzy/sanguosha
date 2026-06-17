@@ -42,22 +42,26 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     ownerId,
     'transform',
     (state: GameState, params: Record<string, Json>) => {
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
       const cardIds = params.cardIds;
       if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张手牌';
       const [id1, id2] = cardIds as string[];
       if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
       if (id1 === id2) return '不能选择同一张牌';
-      const self = state.players[ownerId];
-      if (!self) return '玩家不存在';
-      if (!self.hand.includes(id1) || !self.hand.includes(id2)) return '牌不在你的手牌中';
+      const cardInHand = !!self && self.hand.includes(id1) && self.hand.includes(id2);
       const c1 = state.cardMap[id1];
       const c2 = state.cardMap[id2];
-      if (!c1 || !c2) return '牌不存在';
+      const cardsExist = !!c1 && !!c2;
       // 武器校核:必须装备丈八蛇矛(动态检查,允许同帧内换下后不再触发)
-      const weaponId = self.equipment?.['武器'];
+      const weaponId = self?.equipment?.['武器'];
       const weaponCard = weaponId ? state.cardMap[weaponId] : undefined;
-      if (weaponCard?.name !== '丈八蛇矛') return '未装备丈八蛇矛';
-      return null;
+      const hasZhangba = weaponCard?.name === '丈八蛇矛';
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardsExist && hasZhangba;
+      return ok ? null : '丈八蛇矛转化条件不满足';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const [id1, id2] = params.cardIds as string[];

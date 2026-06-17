@@ -14,12 +14,20 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      const card = state.cardMap[params.cardId];
-      if (!card || card.name !== '酒') return '只能使用酒';
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
       const self = state.players[ownerId];
-      if (!self?.hand.includes(params.cardId)) return '牌不在手牌中';
-      return null;
+      const selfAlive = self?.alive === true;
+      const cardIdOk = typeof params.cardId === 'string';
+      const cardInHand = cardIdOk && self?.hand.includes(params.cardId as string);
+      const cardNameOk = cardIdOk && state.cardMap[params.cardId as string]?.name === '酒';
+      // 酒对自己使用:无 target/targets 时默认给自己
+      const rawTarget = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined;
+      const targetSelf = rawTarget === undefined || rawTarget === ownerId;
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetSelf;
+      return ok ? null : '现在不能使用酒';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
@@ -39,8 +47,8 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   // respond:濒死时酒当桃用
   registerAction(skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
-      if (state.pendingSlot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType !== '求桃') return '当前不是求桃';
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';

@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { effectiveDistance } from '../distance';
 
 /** 跳过出牌阶段的 tag 名(实现为 mark id='tag:乐不思蜀/跳过出牌') */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
@@ -23,9 +24,22 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(_skill: Skill, ownerId: number): () => void {
   // ─── use action:对目标放置延时锦囊 ────────────────────────
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (typeof params.target !== 'number') return 'target required';
-      return null;
+      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardNameOk = state.cardMap[params.cardId]?.name === '乐不思蜀';
+      const target = state.players[params.target];
+      const targetAlive = target?.alive === true;
+      const notSelf = params.target !== ownerId;
+      // 乐不思蜀对距离 1 以内一名角色使用
+      const inRange = effectiveDistance(state, ownerId, params.target as number) <= 1;
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetAlive && notSelf && inRange;
+      return ok ? null : '乐不思蜀使用条件不满足';
     }, async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;

@@ -24,18 +24,24 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   // ── use:主动出杀 ──
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      if (typeof params.cardId !== 'string') return 'cardId required';
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = state.pendingSlots.size === 0
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
+      const cardIdOk = typeof params.cardId === 'string';
+      const cardInHand = cardIdOk && self?.hand.includes(params.cardId as string);
+      const cardNameOk = cardIdOk && state.cardMap[params.cardId as string]?.name === '杀';
       const targets = params.targets as number[] | undefined;
-      if (!Array.isArray(targets) || targets.length === 0) return 'targets required';
+      const targetsExist = Array.isArray(targets) && targets.length > 0;
+      const targetsAlive = targetsExist && targets!.every(t => state.players[t]?.alive === true);
+      const inRange = targetsExist && targets!.every(t => inAttackRange(state, ownerId, t));
       const quota = state.turn.vars['杀/quota'] as number | undefined;
       const remaining = typeof quota === 'number' ? quota : 1;
-      if (remaining <= 0) return '出杀次数已用尽';
-      for (const targetIdx of targets) {
-        if (!inAttackRange(state, ownerId, targetIdx)) {
-          return `目标 ${targetIdx} 不在攻击范围内`;
-        }
-      }
-      return null;
+      const hasQuota = remaining > 0;
+      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetsAlive && inRange && hasQuota;
+      return ok ? null : '现在不能出杀';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
