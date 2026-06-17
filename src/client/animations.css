@@ -1,0 +1,121 @@
+/* ═══════════════════════════════════════════════════════════
+   三国杀动画 — 全局 CSS keyframes
+   轻量级,纯 CSS,零依赖
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── 摸牌:从上方滑入 + 淡入 ─── */
+@keyframes drawCardIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── 出牌飞行动画:浮动卡片从手牌位置飞向中央 ─── */
+@keyframes flyToCenter {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(var(--fly-dx, 0), calc(var(--fly-dy, 0) - 30px)) scale(1.1) rotate(-3deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--fly-dx, 0), var(--fly-dy, 0)) scale(0.6) rotate(5deg);
+  }
+}
+
+/* ─── 伤害闪烁:HP 数字红色脉冲 ─── */
+@keyframes damageFlash {
+  0% {
+    color: inherit;
+    transform: scale(1);
+    text-shadow: none;
+  }
+  15% {
+    color: #ff2222;
+    transform: scale(1.5);
+    text-shadow: 0 0 12px rgba(255, 34, 34, 0.8);
+  }
+  40% {
+    color: #ff4444;
+    transform: scale(1.25);
+    text-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
+  }
+  100% {
+    color: inherit;
+    transform: scale(1);
+    text-shadow: none;
+  }
+}
+
+/* ─── 伤害震动:座位卡片水平抖动 ─── */
+@keyframes damageShake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-6px); }
+  20% { transform: translateX(6px); }
+  30% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  50% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  70% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  90% { transform: translateX(-1px); }
+}
+
+/* ─── 伤害红光覆盖层 ─── */
+@keyframes damageOverlay {
+  0% {
+    opacity: 0;
+    background: rgba(255, 0, 0, 0);
+  }
+  20% {
+    opacity: 1;
+    background: rgba(255, 0, 0, 0.15);
+  }
+  100% {
+    opacity: 0;
+    background: rgba(255, 0, 0, 0);
+  }
+}
+
+/* ─── 回合切换:阶段标签淡入上滑 ─── */
+@keyframes phaseIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── 新回合光环 ─── */
+@keyframes newTurnGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+  }
+  30% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+  }
+}
+
+/* ─── 淡入(通用) ─── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

@@ -74,6 +74,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       handCount: p.hand.length,
       hand: (i === viewer || debug) ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
       marks: p.marks,
+      identity: p.vars['身份'] as string | undefined,
     })),
     cardMap: state.cardMap,
     pending,

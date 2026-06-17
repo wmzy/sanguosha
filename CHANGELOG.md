@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-06-17
+### 前端游戏流程修复 — 技能按钮/身份显示/延时锦囊/弃牌 UI/动画
+
+通过多模型协作(sensenova 浏览器视觉验证 + mimo-v2-pro/v2.5 代码审查与设计 + deepseek/M3 实现)定位并修复 5 个 P0 bug。
+
+#### Fixed
+- **P0 手牌点击无操作面板**: `GameView.tsx` 的 `useMemo` 中调用 async `registerSkillActions()` 未 await,Promise 被忽略,onMount→defineAction 从未执行,registry 永远为空。修复:改为 `useState`+`useEffect` 异步注册,await 完成后 setSkillActions 触发重渲染。(`src/client/components/GameView.tsx`)
+- **P0 身份不显示**: `buildView.ts` 的 players 映射未输出 identity 字段,前端永远拿不到身份信息。修复:buildView 加 `identity: p.vars['身份']`,GameView 类型加 `identity?: string`,座位卡片渲染彩色身份徽章(主公=金/忠臣=蓝/反贼=红/内奸=紫)。(`src/engine/view/buildView.ts`, `src/engine/types.ts`, `src/client/components/GameView.tsx`)
+- **P0 延时锦囊无法使用**: 前端发 `params.targets: number[]`(数组),后端乐不思蜀 validate 要 `params.target: number`(单数),契约错配导致 validate 拒绝。修复:新增 `DELAYED_TRICKS` set,延时锦囊发 `params.target`(单数),其他牌仍用 `targets`(数组)。(`src/client/components/GameView.tsx`)
+- **P0 弃牌阶段无弃牌**: 双层缺陷——(1)引擎:弃牌 respond 注册在 ownerId=-1,客户端用 perspectiveIdx 查找永远找不到;(2)前端:弃牌 UI 完全没实现(selectedForDiscard 死代码+handleDiscard 注释掉)。修复:dispatch 加系统级 respond fallback(ownerId 不匹配时回退查 -1),前端实现弃牌交互(手牌多选+确认弃牌按钮+倒计时)。(`src/engine/create-engine.ts`, `src/client/components/GameView.tsx`)
+
+#### Added
+- **前端动画系统**: 纯 CSS animation 实现(零额外依赖),包含摸牌滑入动画、出牌飞行动画、伤害闪烁+震动+红光覆盖、阶段过渡淡入、回合开始金色光环脉冲。通过 `useAnimationState` hook + ref diff 检测状态变化触发。(`src/client/animations.css`, `src/client/components/GameView.tsx`)
+
+#### Verified(浏览器完整游戏测试)
+- 技能按钮渲染:18 个操作按钮(杀/闪/桃/酒/装备/锦囊等)全部出现
+- 身份徽章:4 种身份(主公/忠臣/反贼/内奸)彩色显示
+- 出杀流程:选牌→选目标→出牌→询问闪→视角切换
+- 弃牌流程:结束回合→弃牌 pending→手牌多选→确认弃牌→回合切换
+- 延时锦囊:乐不思蜀 target 参数对齐后端契约
+- 多轮游戏稳定性:第 2 轮状态正常无崩溃
+
 ## [Unreleased] — 2026-06-16
 ### 引擎核心修复 — dispatch pending slot 时序 + 多选择机制修复
 

@@ -229,7 +229,12 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       rollbacks.push({ entry: pEntry, params: p.params });
     }
   }
-  const entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
+  let entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
+  // 系统级 respond 回退:玩家 ownerId 找不到时,尝试系统级(-1)注册
+  // 仅在有 pendingSlot 时(即 respond 路径)启用,use() 路径不受影响
+  if (!entry && message.actionType === 'respond' && state.pendingSlot) {
+    entry = findActionEntry(message.skillId, -1, message.actionType);
+  }
   if (!entry || entry.validate(state, message.params) !== null){
     rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
     return;

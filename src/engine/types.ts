@@ -372,6 +372,7 @@ export interface GameView {
     handCount: number;
     hand?: Card[];
     marks: Mark[];
+    identity?: string;
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;

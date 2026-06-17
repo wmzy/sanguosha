@@ -3,7 +3,7 @@
 //
 // 布局: GameHeader → 提示区 → 座位布局(5人) → 手牌区 → 操作面板 → 调试面板
 // 特性: 视角切换、倒计时、装备区、座位布局、操作提示、弃牌选择
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { css, cx } from '@linaria/core';
 import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt } from '../../engine/types';
 import { getActionsForPlayer, registerSkillActions, clearRegistry, type SkillActionDef } from '../skillActionRegistry';
@@ -43,6 +43,9 @@ const BASIC_SKILLS = new Set([
   '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击', '反馈',
 ]);
 
+// ─── 延时锦囊:validate 用 `params.target`(单数),非 targets(数组) ───
+const DELAYED_TRICKS = new Set(['乐不思蜀', '闪电', '兵粮寸断']);
+
 // ─── 时间格式化 ───
 function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -63,6 +66,104 @@ function useCountdownSeconds(deadline: number | null): number | null {
   return sec;
 }
 
+// ─── 动画状态追踪 hook ───
+interface AnimationState {
+  /** 当前需要播放摸牌动画的卡牌 ID 集合 */
+  newCardIds: Set<string>;
+  /** 受到伤害的玩家 index → 动画版本号(每次伤害递增,触发 re-render) */
+  damageFlashIndices: Map<number, number>;
+  /** 阶段变化的版本号(触发阶段标签动画) */
+  phaseVersion: number;
+  /** 新回合的版本号(触发回合光环) */
+  turnVersion: number;
+  /** 是否触发弃牌阶段动画 */
+  discardPhase: boolean;
+}
+
+function useAnimationState(view: EngineGameView, perspectiveIdx: number): AnimationState {
+  const [state, setState] = useState<AnimationState>({
+    newCardIds: new Set(),
+    damageFlashIndices: new Map(),
+    phaseVersion: 0,
+    turnVersion: 0,
+    discardPhase: false,
+  });
+
+  // 上一次的快照
+  const prevHandRef = useRef<string[]>([]);
+  const prevHpRef = useRef<Map<number, number>>(new Map());
+  const prevPhaseRef = useRef(view.phase);
+  const prevRoundRef = useRef(view.turn.round);
+
+  // 摸牌检测:当前视角手牌 ID 相对上一次新增的
+  useEffect(() => {
+    const hand = view.players[perspectiveIdx]?.hand ?? [];
+    const handIds = hand.map(c => c.id);
+    const prevIds = prevHandRef.current;
+    const newIds = handIds.filter(id => !prevIds.includes(id));
+    if (newIds.length > 0) {
+      setState(s => ({ ...s, newCardIds: new Set([...s.newCardIds, ...newIds]) }));
+      // 动画结束后清除标记(0.5s 留余量)
+      setTimeout(() => {
+        setState(s => {
+          const next = new Set(s.newCardIds);
+          for (const id of newIds) next.delete(id);
+          return { ...s, newCardIds: next };
+        });
+      }, 550);
+    }
+    prevHandRef.current = handIds;
+  }, [view.players[perspectiveIdx]?.hand]);
+
+  // 伤害检测:任意玩家 HP 下降
+  useEffect(() => {
+    const hpMap = new Map(view.players.map((p, i) => [i, p.health]));
+    const prevHp = prevHpRef.current;
+    const newFlash = new Map<number, number>();
+    let changed = false;
+    for (const [i, hp] of hpMap) {
+      const prev = prevHp.get(i);
+      if (prev !== undefined && hp < prev) {
+        newFlash.set(i, (state.damageFlashIndices.get(i) ?? 0) + 1);
+        changed = true;
+      }
+    }
+    if (changed) {
+      setState(s => ({ ...s, damageFlashIndices: new Map([...s.damageFlashIndices, ...newFlash]) }));
+      // 动画结束后清除(0.6s)
+      setTimeout(() => {
+        setState(s => {
+          const next = new Map(s.damageFlashIndices);
+          for (const [i] of newFlash) next.delete(i);
+          return { ...s, damageFlashIndices: next };
+        });
+      }, 650);
+    }
+    prevHpRef.current = hpMap;
+  }, [view.players]);
+
+  // 阶段变化检测
+  useEffect(() => {
+    if (view.phase !== prevPhaseRef.current) {
+      setState(s => ({ ...s, phaseVersion: s.phaseVersion + 1, discardPhase: view.phase === '弃牌' }));
+      prevPhaseRef.current = view.phase;
+      if (view.phase !== '弃牌') {
+        setTimeout(() => setState(s => ({ ...s, discardPhase: false })), 400);
+      }
+    }
+  }, [view.phase]);
+
+  // 新回合检测
+  useEffect(() => {
+    if (view.turn.round !== prevRoundRef.current) {
+      setState(s => ({ ...s, turnVersion: s.turnVersion + 1 }));
+      prevRoundRef.current = view.turn.round;
+    }
+  }, [view.turn.round]);
+
+  return state;
+}
+
 // ─── 主组件 ───
 export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 视角: 默认看自己,可切换
@@ -70,6 +171,11 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
+
+  // ─── 动画状态 ───
+  const anim = useAnimationState(view, perspectiveIdx);
+  const handListRef = useRef<HTMLDivElement>(null);
+  const prevPhaseForGlow = useRef(view.phase);
 
   // 同步 viewer(服务器可能重连后变化)
   // 有待回应请求时,自动切换视角到目标玩家
@@ -94,15 +200,24 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const currentPlayerName = currentPlayer?.name ?? '';
 
   // ─── 技能 action 注册表 ───
-  // view 变化时,重新注册所有玩家的技能前端 actions(defineAction)
+  // view 变化时,异步重新注册所有玩家的技能前端 actions(defineAction)
+  // registerSkillActions 是 async:内部会动态 import 技能模块并调用 onMount → defineAction,
+  // 必须 await 才能让 defineAction 完成,registry 才有内容。
   const skillActionsKey = view.players.map(p => `${p.name}:${p.skills.join(',')}`).join('|');
-  const skillActions = useMemo(() => {
+  const [skillActions, setSkillActions] = useState<SkillActionDef[]>([]);
+  useEffect(() => {
+    let cancelled = false;
     clearRegistry();
-    for (const p of view.players) {
-      registerSkillActions(p.index, p.skills);
-    }
-    // 返回当前视角玩家的 action 定义
-    return getActionsForPlayer(perspectiveIdx);
+    // 先为所有玩家注册
+    (async () => {
+      for (const p of view.players) {
+        await registerSkillActions(p.index, p.skills);
+      }
+      if (!cancelled) {
+        setSkillActions(getActionsForPlayer(perspectiveIdx));
+      }
+    })();
+    return () => { cancelled = true; };
   }, [skillActionsKey, perspectiveIdx]);
 
   // 视角玩家的手牌(debug 模式所有人可见)
@@ -113,6 +228,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const pending = view.pending;
   const pendingTargetIdx = pending?.target ?? -1;
   const isPerspectiveAwaiting = pending !== null && pendingTargetIdx === perspectiveIdx;
+  // 弃牌窗口:engine 在 弃牌阶段 创建 requestType='__弃牌' 的 pending
+  const isDiscardPhase = pending !== null && (pending.atom as { requestType?: string }).requestType === '__弃牌';
+  const discardMin = isDiscardPhase ? ((pending.atom as { prompt: { cardFilter?: { min?: number } } }).prompt.cardFilter?.min ?? 0) : 0;
+  const discardMax = isDiscardPhase ? ((pending.atom as { prompt: { cardFilter?: { max?: number } } }).prompt.cardFilter?.max ?? discardMin) : 0;
+  // 弃牌窗口出现/切换时清空已选
+  useEffect(() => { setSelectedForDiscard(new Set()); }, [pending]);
   // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
   const canOperate = true; // debug 模式永远允许操作
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
@@ -251,7 +372,44 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     const params: Record<string, Json> = { cardId: card.id };
     if (targetName) {
       const idx = nameToIndex(targetName);
-      if (idx >= 0) params.targets = [idx];
+      if (idx >= 0) {
+        // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
+        if (DELAYED_TRICKS.has(card.name)) {
+          params.target = idx;
+        } else {
+          params.targets = [idx];
+        }
+      }
+    }
+    // ─── 出牌飞行动画:在 card 消失前捕获位置,生成浮动元素 ───
+    const cardEl = handListRef.current?.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement | null;
+    if (cardEl) {
+      const rect = cardEl.getBoundingClientRect();
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2 - 40;
+      const flyDx = cx - rect.left - rect.width / 2;
+      const flyDy = cy - rect.top - rect.height / 2;
+      const floating = document.createElement('div');
+      floating.style.cssText = `
+        position: fixed; left: ${rect.left}px; top: ${rect.top}px;
+        width: ${rect.width}px; height: ${rect.height}px;
+        border: 2px solid #3498db; border-radius: 8px; padding: 10px 14px;
+        background: rgba(22,33,62,0.95); color: #e0e0e0;
+        text-align: center; pointer-events: none; z-index: 9999;
+        --fly-dx: ${flyDx}px; --fly-dy: ${flyDy}px;
+        animation: flyToCenter 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        box-shadow: 0 0 16px rgba(52,152,219,0.6);
+      `;
+      const nameDiv = document.createElement('div');
+      nameDiv.style.cssText = `font-weight: bold; font-size: 15px; margin-bottom: 2px; color: ${SUIT_COLOR[card.suit] ?? '#ccc'};`;
+      nameDiv.textContent = card.name;
+      const suitDiv = document.createElement('div');
+      suitDiv.style.cssText = `font-size: 12px; color: ${SUIT_COLOR[card.suit] ?? '#ccc'};`;
+      suitDiv.textContent = `${card.suit}${card.rank}`;
+      floating.appendChild(nameDiv);
+      floating.appendChild(suitDiv);
+      document.body.appendChild(floating);
+      floating.addEventListener('animationend', () => floating.remove());
     }
     // 装备牌统一走"装备通用" skillId,其他牌走 card.name
     const skillId = card.type === '装备牌' ? '装备通用' : card.name;
@@ -285,7 +443,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         // 选牌+选目标型
         if (!selectedCardId) { alert(prompt.title + ' — 请先选中手牌'); return; }
         if (!selectedTarget) { alert(prompt.title + ' — 请选择目标'); return; }
-        params.targets = [nameToIndex(selectedTarget)];
+        {
+          const idx = nameToIndex(selectedTarget);
+          if (idx < 0) { alert(prompt.title + ' — 目标无效'); return; }
+          // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
+          const trickCard = perspectiveHand.find(c => c.id === selectedCardId)
+            ?? viewerHand.find(c => c.id === selectedCardId);
+          if (trickCard && DELAYED_TRICKS.has(trickCard.name)) {
+            params.target = idx;
+          } else {
+            params.targets = [idx];
+          }
+        }
         break;
       case 'confirm':
         // 确认型:直接发送
@@ -310,6 +479,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 回应
   function handleRespond(cardId?: string) {
     if (!pending) return;
+    // 弃牌窗口超时:按顺序弃超出的牌（与 engine 超时回退一致：取最后 discardMin 张）
+    if (isDiscardPhase) {
+      if (selectedForDiscard.size >= discardMin) {
+        handleConfirmDiscard();
+      } else {
+        const hand = perspectiveHand;
+        const fallback = hand.slice(-discardMin).map(c => c.id);
+        send('系统规则', 'respond', { cardIds: fallback });
+        setSelectedForDiscard(new Set());
+      }
+      return;
+    }
     if (cardId) {
       const card = perspectiveHand.find(c => c.id === cardId);
       if (card) send(card.name, 'respond', { cardId });
@@ -333,6 +514,20 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   // 选牌
   function handleCardClick(card: Card) {
+    // 弃牌窗口:切换弃牌选中状态
+    if (isDiscardPhase && isPerspectiveAwaiting && canOperate) {
+      setSelectedForDiscard(prev => {
+        const next = new Set(prev);
+        if (next.has(card.id)) {
+          next.delete(card.id);
+          return next;
+        }
+        if (next.size >= discardMax) return prev; // 已达上限,不增加
+        next.add(card.id);
+        return next;
+      });
+      return;
+    }
     // 回应模式(只有自己视角才能操作)
     if (isMyAwaiting) {
       if (card.name === '闪' || card.name === '杀') {
@@ -349,6 +544,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       setSelectedCardId(card.id);
       setSelectedTarget(null);
     }
+  }
+
+  // 确认弃牌
+  function handleConfirmDiscard() {
+    if (!pending || !isDiscardPhase) return;
+    if (selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax) return;
+    const cardIds = Array.from(selectedForDiscard);
+    send('系统规则', 'respond', { cardIds });
+    setSelectedForDiscard(new Set());
   }
 
   // 选弃牌(暂未实现UI)
@@ -376,8 +580,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       <div className={headerBar}>
         <button className={backBtn} onClick={onDeleteRoom}>← 退出</button>
         <div className={headerCenter}>
-          <span className={roundBadge}>第 {view.turn.round} 轮</span>
-          <span className={phaseBadge}>{PHASE_LABELS[view.phase] ?? view.phase}</span>
+          <span className={cx(roundBadge, anim.turnVersion > 0 && turnGlowing)} key={`turn-${anim.turnVersion}`}>第 {view.turn.round} 轮</span>
+          <span className={cx(phaseBadge, anim.phaseVersion > 0 && phaseAnimating)} key={`phase-${anim.phaseVersion}`}>{PHASE_LABELS[view.phase] ?? view.phase}</span>
           <span className={currentPlayerText}>
             当前: {currentPlayerName} {currentPlayer?.character ? `(${currentPlayer.character})` : ''}
           </span>
@@ -448,6 +652,43 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           <div className={promptDesc}>{canOperate ? '请弃置多余的手牌' : `${perspectiveName} 正在弃牌...`}</div>
         </div>
       )}
+      {isDiscardPhase && isPerspectiveAwaiting && (
+        <div className={promptBoxAwaiting}>
+          <div className={promptTitle}>🗑️ 弃牌阶段:需弃 {discardMin} 张牌（已选 {selectedForDiscard.size}/{discardMin}）</div>
+          <div className={promptDesc}>
+            {canOperate
+              ? discardMin === discardMax
+                ? `请选择 ${discardMin} 张手牌弃置`
+                : `请选择 ${discardMin}–${discardMax} 张手牌弃置`
+              : `等待 ${perspectiveName} 弃牌...`}
+          </div>
+          {canOperate && (
+            <div className={promptActions}>
+              <button
+                className={promptBtnPrimary}
+                disabled={selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax}
+                onClick={handleConfirmDiscard}
+              >
+                确认弃牌 ({selectedForDiscard.size}/{discardMin})
+              </button>
+              {selectedForDiscard.size > 0 && (
+                <button className={promptBtn} onClick={() => setSelectedForDiscard(new Set())}>
+                  清空选择
+                </button>
+              )}
+            </div>
+          )}
+          {remainingSeconds !== null && (() => {
+            const total = 30;
+            const ratio = Math.max(0, Math.min(1, remainingSeconds / total));
+            return (
+              <div className={promptCountdownBar}>
+                <div className={promptCountdownFill} style={{ width: `${ratio * 100}%` }} />
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* ─── 座位布局 ─── */}
       <div className={seatingArea}>
@@ -465,6 +706,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             remainingSeconds={orderedPlayers[3].name === currentPlayerName ? remainingSeconds : null}
             onTargetClick={handleTargetClick}
             onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
+            isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 3) % view.players.length)}
+            damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 3) % view.players.length) ?? 0}
+            isTurnGlow={orderedPlayers[3].name === currentPlayerName && anim.turnVersion > 0}
+            turnGlowVersion={anim.turnVersion}
           />}
           {orderedPlayers[2] && <PlayerSeatView
             player={orderedPlayers[2]}
@@ -478,6 +723,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             remainingSeconds={orderedPlayers[2].name === currentPlayerName ? remainingSeconds : null}
             onTargetClick={handleTargetClick}
             onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
+            isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 2) % view.players.length)}
+            damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 2) % view.players.length) ?? 0}
+            isTurnGlow={orderedPlayers[2].name === currentPlayerName && anim.turnVersion > 0}
+            turnGlowVersion={anim.turnVersion}
           />}
         </div>
 
@@ -496,6 +745,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               remainingSeconds={orderedPlayers[4].name === currentPlayerName ? remainingSeconds : null}
               onTargetClick={handleTargetClick}
               onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
+              isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 4) % view.players.length)}
+              damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 4) % view.players.length) ?? 0}
+              isTurnGlow={orderedPlayers[4].name === currentPlayerName && anim.turnVersion > 0}
+              turnGlowVersion={anim.turnVersion}
             />}
           </div>
 
@@ -523,6 +776,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               remainingSeconds={orderedPlayers[1].name === currentPlayerName ? remainingSeconds : null}
               onTargetClick={handleTargetClick}
               onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
+              isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 1) % view.players.length)}
+              damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 1) % view.players.length) ?? 0}
+              isTurnGlow={orderedPlayers[1].name === currentPlayerName && anim.turnVersion > 0}
+              turnGlowVersion={anim.turnVersion}
             />}
           </div>
         </div>
@@ -541,6 +798,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             remainingSeconds={orderedPlayers[0].name === currentPlayerName ? remainingSeconds : null}
             onTargetClick={handleTargetClick}
             onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
+            isDamaged={anim.damageFlashIndices.has(perspectiveIdx)}
+            damageVersion={anim.damageFlashIndices.get(perspectiveIdx) ?? 0}
+            isTurnGlow={orderedPlayers[0].name === currentPlayerName && anim.turnVersion > 0}
+            turnGlowVersion={anim.turnVersion}
           />}
         </div>
       </div>
@@ -558,17 +819,22 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             </button>
           )}
         </div>
-        <div className={handList}>
+        <div className={handList} ref={handListRef}>
           {perspectiveHand.map((card, i) => {
             const isSelected = selectedCardId === card.id;
+            const isDiscardSelected = selectedForDiscard.has(card.id);
             const canPlay = isMyTurn && canOperate;
             const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀');
+            const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
+            const canClick = canPlay || isAwaiting || canDiscardClick;
             const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
+            const isNew = anim.newCardIds.has(card.id);
             return (
               <div
                 key={card.id}
-                className={cx(handCard, isSelected && handCardSelected, (!canPlay && !isAwaiting) && handCardDisabled, isAwaiting && handCardRespondable)}
-                onClick={() => (canPlay || isAwaiting) && handleCardClick(card)}
+                data-card-id={card.id}
+                className={cx(handCard, isSelected && handCardSelected, (!canPlay && !isAwaiting && !canDiscardClick) && handCardDisabled, isAwaiting && handCardRespondable, isDiscardSelected && discardCardSelected, isNew && handCardNew)}
+                onClick={() => canClick && handleCardClick(card)}
               >
                 <div className={cardName} style={{ color: suitColor }}>{card.name}</div>
                 <div className={cardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
@@ -696,12 +962,20 @@ interface PlayerSeatProps {
   remainingSeconds: number | null;
   onTargetClick: (name: string) => void;
   onPerspectiveChange: (index: number) => void;
+  /** 该玩家是否刚受到伤害 */
+  isDamaged?: boolean;
+  /** 伤害动画版本号(每次伤害递增,触发 key 变化重放动画) */
+  damageVersion?: number;
+  /** 是否触发新回合光环 */
+  isTurnGlow?: boolean;
+  turnGlowVersion?: number;
 }
 
 function PlayerSeatView({
   player, index, view, isCurrentPlayer, isPerspective,
   needsTarget, isTargetable, selectedTarget, remainingSeconds,
   onTargetClick, onPerspectiveChange,
+  isDamaged = false, damageVersion = 0, isTurnGlow = false, turnGlowVersion = 0,
 }: PlayerSeatProps) {
   const isDead = !player.alive;
   const isClickable = needsTarget && !isDead && isTargetable;
@@ -715,7 +989,11 @@ function PlayerSeatView({
         isDead && seatCardDead,
         isClickable && seatCardClickable,
         selectedTarget === player.name && seatCardTargeted,
+        isDamaged && seatShaking,
+        isDamaged && seatDamageOverlay,
+        isTurnGlow && turnGlowing,
       )}
+      key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onPerspectiveChange(index)}
     >
@@ -724,11 +1002,26 @@ function PlayerSeatView({
           <span className={seatIndexBadge}>[{index + 1}号]</span>
           <span className={seatName}>{player.name}</span>
           {player.character && <span className={seatChar}>({player.character})</span>}
+          {player.identity && (
+            <span
+              className={
+                player.identity === '主公' ? lordBadge :
+                player.identity === '忠臣' ? loyalistBadge :
+                player.identity === '反贼' ? rebelBadge :
+                renegadeBadge
+              }
+            >
+              {player.identity}
+            </span>
+          )}
           {isPerspective && <span className={youBadge}>视角</span>}
           {isCurrentPlayer && <span className={turnBadge}>回合</span>}
           {isDead && <span> 💀</span>}
         </div>
-        <div className={player.health === 1 ? hpLow : player.health <= player.maxHealth / 2 ? hpMid : hpFull}>
+        <div className={cx(
+          player.health === 1 ? hpLow : player.health <= player.maxHealth / 2 ? hpMid : hpFull,
+          isDamaged && hpFlash,
+        )} key={`hp-${damageVersion}`}>
           ♥ {player.health}/{player.maxHealth}
         </div>
       </div>
@@ -909,6 +1202,22 @@ const turnBadge = css`
   background: #ffd700; border-radius: 3px; padding: 1px 5px;
   font-size: 10px; color: #000; margin-left: 4px; font-weight: bold;
 `;
+const lordBadge = css`
+  background: #ffd700; border-radius: 3px; padding: 1px 5px;
+  font-size: 10px; color: #4a2800; margin-left: 4px; font-weight: bold;
+`;
+const loyalistBadge = css`
+  background: #4a90e2; border-radius: 3px; padding: 1px 5px;
+  font-size: 10px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
+const rebelBadge = css`
+  background: #e74c3c; border-radius: 3px; padding: 1px 5px;
+  font-size: 10px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
+const renegadeBadge = css`
+  background: #8e44ad; border-radius: 3px; padding: 1px 5px;
+  font-size: 10px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
 const hpFull = css`color: #2ecc71; font-weight: bold; font-size: 13px;`;
 const hpMid = css`color: #e67e22; font-weight: bold; font-size: 13px;`;
 const hpLow = css`color: #e74c3c; font-weight: bold; font-size: 13px;`;
@@ -959,9 +1268,43 @@ const handCardRespondable = css`
   box-shadow: 0 0 10px rgba(255,215,0,0.4);
   background: rgba(255,215,0,0.08);
 `;
+const discardCardSelected = css`
+  opacity: 0.5;
+  border: 2px solid #e74c3c;
+  border-radius: 6px;
+  background: rgba(231,76,60,0.18);
+`;
 const cardName = css`font-weight: bold; font-size: 15px; margin-bottom: 2px;`;
 const cardSuit = css`font-size: 12px;`;
 const emptyHand = css`color: #555; font-size: 13px; padding: 12px;`;
+
+// ─── 动画状态样式 ───
+const handCardNew = css`
+  animation: drawCardIn 0.45s cubic-bezier(0.23, 1, 0.32, 1) both;
+`;
+const hpFlash = css`
+  animation: damageFlash 0.6s ease-out both;
+`;
+const seatShaking = css`
+  animation: damageShake 0.5s ease-out both;
+`;
+const seatDamageOverlay = css`
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    pointer-events: none;
+    animation: damageOverlay 0.6s ease-out both;
+  }
+  position: relative;
+`;
+const phaseAnimating = css`
+  animation: phaseIn 0.35s ease-out both;
+`;
+const turnGlowing = css`
+  animation: newTurnGlow 0.8s ease-out both;
+`;
 
 // Action bar
 const actionBar = css`
