@@ -128,6 +128,12 @@ export class PlayerSession {
     return this.dispatch({ skillId, actionType: 'respond', params: params ?? {} });
   }
 
+  /**
+   * 不出牌 / 不发动(放弃当前 pending)。
+   * 用 fireTimeout 触发 onTimeout(resolve 当前 pending,不依赖具体技能注册)。
+   * 这是通用路径——不要求玩家拥有被询问的技能(如不出闪不要求有闪技能)。
+   * 弃牌阶段超时会自动弃(与真实游戏一致),其他询问 onTimeout 无副作用。
+   */
   async pass(): Promise<void> {
     await engineFireTimeout(this.harness.state);
     await this.harness.waitForStable();
@@ -139,7 +145,7 @@ export class PlayerSession {
       await this.pass();
       return;
     }
-    const slot = this.harness.state.pendingSlot;
+    const slot = [...this.harness.state.pendingSlots.values()][0];
     if (!slot) throw new Error('confirm() 但无 pending');
     return this.dispatch({
       skillId: (slot.atom as Record<string, Json>).requestType as string ?? '请求回应',
@@ -202,17 +208,43 @@ export class PlayerSession {
   // ─── 断言 ─────────────────────────────────────
 
   expectPending(atomType: string): void {
-    const slot = this.harness.state.pendingSlot;
-    if (!slot) throw new Error(`expectPending('${atomType}'): 无 pending`);
+    const slots = this.harness.state.pendingSlots;
+    if (slots.size === 0) throw new Error(`expectPending('${atomType}'): 无 pending`);
+    const slot = [...slots.values()][0];
     const type = (slot.atom as { type: string }).type;
     if (type !== atomType) throw new Error(`expectPending('${atomType}'): 实际 pending 是 '${type}'`);
   }
 
   expectNoPending(): void {
-    const slot = this.harness.state.pendingSlot;
-    if (slot) {
+    if (this.harness.state.pendingSlots.size > 0) {
+      const slot = [...this.harness.state.pendingSlots.values()][0];
       const type = (slot.atom as { type: string }).type;
       throw new Error(`expectNoPending(): 实际有 pending '${type}'`);
+    }
+  }
+
+  // ─── 断言:validate 拒绝 ─────────────────────
+
+  /**
+   * 发出一个 action,断言它被 validate 拒绝(dispatch 静默 return,state.seq 不增加)。
+   * 用于负面测试:不自己回合出牌 / pending 期间出牌 / 死人出牌 / 无牌出牌等。
+   */
+  async expectRejected(
+    msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
+  ): Promise<void> {
+    const accepted = await this.tryDispatch(msg);
+    if (accepted) {
+      throw new Error(`期望 action 被拒绝,但被接受了: ${msg.skillId}/${msg.actionType} ${JSON.stringify(msg.params)}`);
+    }
+  }
+
+  /** 发出一个 action,断言它被接受(state.seq 增加) */
+  async expectAccepted(
+    msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
+  ): Promise<void> {
+    const accepted = await this.tryDispatch(msg);
+    if (!accepted) {
+      throw new Error(`期望 action 被接受,但被拒绝了: ${msg.skillId}/${msg.actionType} ${JSON.stringify(msg.params)}`);
     }
   }
 
@@ -279,16 +311,28 @@ export class PlayerSession {
     }
   }
 
-  private async dispatch(
+  /**
+   * 发出 action 并返回是否被接受(dispatch 改变了 state.seq)。
+   * validate 拒绝时 dispatch 静默 rollback,state.seq 不增加 → 返回 false。
+   * dispatch 是 fire-and-forget(void),harness 不依赖返回值——通过观察 state 变化判断。
+   */
+  async tryDispatch(
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
-  ): Promise<void> {
-    // fire-and-forget 启动 dispatch,然后等到 state 稳定(pending 创建或 execute 跑完)
+  ): Promise<boolean> {
+    const seqBefore = this.harness.state.seq;
     void engineDispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerIndex,
       baseSeq: this.harness.state.seq,
     }).catch(() => { /* dispatch 内部不抛错;吞掉防御性 */ });
     await this.harness.waitForStable();
+    return this.harness.state.seq > seqBefore;
+  }
+
+  private async dispatch(
+    msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
+  ): Promise<void> {
+    await this.tryDispatch(msg);
   }
 }
 
@@ -410,12 +454,12 @@ export async function waitForStable(state: GameState): Promise<void> {
   const yieldToMicrotasks = () => new Promise<void>((r) => setTimeout(r, 0));
   while (Date.now() < deadline) {
     await yieldToMicrotasks();
-    const snapshot = `${state.pendingSlot ? 1 : 0}|${state.atomStack.length}|${state.seq}`;
+    const snapshot = `${state.pendingSlots.size}|${state.atomStack.length}|${state.seq}`;
     if (snapshot !== lastSnapshot) {
       lastSnapshot = snapshot;
       lastChange = Date.now();
     }
-    if (state.pendingSlot) return;
+    if (state.pendingSlots.size > 0) return;
     if (state.atomStack.length === 0 && Date.now() - lastChange > 20) return;
   }
 }
