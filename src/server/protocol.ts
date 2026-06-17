@@ -17,7 +17,7 @@ export type ServerMessage =
   | { type: 'events'; fromSeq: EventSeq; events: GameEventEnvelope[]; operations?: Operation[] }
   | { type: 'error'; message: string }
   | { type: 'gameOver'; winner: string }
-  | { type: 'room_joined'; roomId: string; playerId: string }
+  | { type: 'room_joined'; roomId: string; playerId: string; seatIndex?: number }
   | { type: 'player_joined'; playerId: string }
   | { type: 'player_left'; playerId: string }
   | { type: 'player_disconnected'; playerId: string; graceMs: number }

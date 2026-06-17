@@ -461,12 +461,13 @@ async function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: nu
   if (pendingPlayerCount != null) {
     session.pendingPlayerCount = undefined;
     await session.startGame(pendingPlayerCount);
-    ws.send(serialize({ type: 'room_joined', roomId, playerId }));
+    const seatIndex = session.assignDebugSeat(playerId);
+    ws.send(serialize({ type: 'room_joined', roomId, playerId, seatIndex }));
   } else {
-    // reconnectPlayer 内部已经发送 debugGameState + 可选 events 续传，
-    // 这里不再额外发一次。
+    // 后续连接的玩家分配座次
+    const seatIndex = session.assignDebugSeat(playerId);
     session.reconnectPlayer(playerId, ws, lastSeq);
-    ws.send(serialize({ type: 'room_joined', roomId, playerId }));
+    ws.send(serialize({ type: 'room_joined', roomId, playerId, seatIndex }));
   }
 }
 

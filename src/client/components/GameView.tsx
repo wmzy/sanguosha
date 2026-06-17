@@ -206,7 +206,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
   const [showIdentityReveal, setShowIdentityReveal] = useState(true);
-  const [showCharSelect, setShowCharSelect] = useState(true);
+  const [showCharSelect, setShowCharSelect] = useState(false);
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
 
   // 选将:随机抽 5 张(仅组件挂载时生成一次)
@@ -220,17 +220,20 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const handListRef = useRef<HTMLDivElement>(null);
   const prevPhaseForGlow = useRef(view.phase);
 
-  // 同步 viewer(服务器可能重连后变化)
-  // 有待回应请求时,自动切换视角到目标玩家
+  // 自动视角切换开关(默认开,多 agent 协作时可关)
+  const [autoSwitch, setAutoSwitch] = useState(true);
+
+  // 有待回应请求时,自动切换视角到被问询玩家;无 pending 时回到当前回合玩家
   useEffect(() => {
+    if (!autoSwitch) return;
     if (view.pending) {
       const targetIdx = view.pending.target;
       if (targetIdx >= 0 && targetIdx < view.players.length) setPerspectiveIdx(targetIdx);
     } else {
-      // 无 pending 时回到当前玩家视角
       setPerspectiveIdx(view.currentPlayerIndex);
     }
-  }, [view.pending?.target, view.currentPlayerIndex]);
+  }, [view.pending?.target, view.currentPlayerIndex, autoSwitch]);
+  // 初次加载:默认看自己的座次
   useEffect(() => { setPerspectiveIdx(view.viewer); }, [view.viewer]);
 
   const perspective = view.players[perspectiveIdx];
@@ -280,15 +283,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
   const canOperate = true; // debug 模式永远允许操作
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
-
-  // 调试模式:pending 出现时自动切换视角到 target 玩家
-  useEffect(() => {
-    if (pending && pendingTargetIdx >= 0 && pendingTargetIdx !== perspectiveIdx) {
-      setPerspectiveIdx(pendingTargetIdx);
-      setSelectedCardId(null);
-      setSelectedTarget(null);
-    }
-  }, [pendingTargetIdx, pending]);
 
   // 倒计时:pending 回应优先,否则用 turnDeadline
   const deadline = pending?.deadline ?? view.turnDeadline;
@@ -640,12 +634,67 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   return (
     <div className={pageRoot}>
+          {/* ─── 身份揭示遮罩 ─── */}
+      {showIdentityReveal && perspective?.identity && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10000,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.85)',
+          animation: 'overlayFadeIn 0.5s ease-out both',
+        }}>
+          <div style={{
+            width: 200,
+            height: 280,
+            borderRadius: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 16,
+            background: IDENTITY_COLORS[perspective.identity] || '#888',
+            color: '#fff',
+            boxShadow: '0 0 40px rgba(0,0,0,0.5)',
+            animation: 'identityCardFlip 1s cubic-bezier(0.23, 1, 0.32, 1) both',
+            transformStyle: 'preserve-3d',
+          }}>
+            <div style={{ fontSize: 14, opacity: 0.8, letterSpacing: 2 }}>你的身份</div>
+            <div style={{ fontSize: 36, fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{perspective.identity}</div>
+          </div>
+          <button
+            onClick={() => {
+              setShowIdentityReveal(false);
+              setShowCharSelect(true);
+            }}
+            style={{
+              marginTop: 32,
+              padding: '10px 48px',
+              fontSize: 16,
+              fontWeight: 'bold',
+              color: '#fff',
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 8,
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+          >
+            确认
+          </button>
+        </div>
+      )}
       {/* ─── 选将遮罩 ─── */}
       {showCharSelect && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          zIndex: 10000,
+          zIndex: 9999,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -770,58 +819,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           </button>
         </div>
       )}
-      {/* ─── 身份揭示遮罩 ─── */}
-      {showIdentityReveal && perspective?.identity && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.85)',
-          animation: 'overlayFadeIn 0.5s ease-out both',
-        }}>
-          <div style={{
-            width: 200,
-            height: 280,
-            borderRadius: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 16,
-            background: IDENTITY_COLORS[perspective.identity] || '#888',
-            color: '#fff',
-            boxShadow: '0 0 40px rgba(0,0,0,0.5)',
-            animation: 'identityCardFlip 1s cubic-bezier(0.23, 1, 0.32, 1) both',
-            transformStyle: 'preserve-3d',
-          }}>
-            <div style={{ fontSize: 14, opacity: 0.8, letterSpacing: 2 }}>你的身份</div>
-            <div style={{ fontSize: 36, fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{perspective.identity}</div>
-          </div>
-          <button
-            onClick={() => setShowIdentityReveal(false)}
-            style={{
-              marginTop: 32,
-              padding: '10px 48px',
-              fontSize: 16,
-              fontWeight: 'bold',
-              color: '#fff',
-              background: 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: 8,
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
-          >
-            确认
-          </button>
-        </div>
-      )}
+
       {/* ─── 头部 ─── */}
       <div className={headerBar}>
         <button className={backBtn} onClick={onDeleteRoom}>← 退出</button>
@@ -840,11 +838,19 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             视角: {perspectiveName}
           </button>
           <button className={goToBtn} onClick={goToCurrentPlayer}>查看当前玩家</button>
+          <button
+            className={goToBtn}
+            style={autoSwitch ? { background: '#27ae60', color: '#fff' } : undefined}
+            onClick={() => setAutoSwitch(!autoSwitch)}
+          >
+            自动切换{autoSwitch ? '✓' : '✗'}
+          </button>
         </div>
       </div>
 
       {/* ─── 操作提示 ─── */}
-      {isPerspectiveAwaiting && pending && (
+      {/* 优先级: 弃牌 pending > 回应 pending > 出牌/弃牌阶段提示 */}
+      {isPerspectiveAwaiting && pending && !isDiscardPhase && (
         <div className={promptBoxAwaiting}>
           <div className={promptTitle}>⚡ 需要回应 — {perspectiveName}</div>
           <div className={promptDesc}>
@@ -895,10 +901,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         </div>
       )}
 
-      {!isPerspectiveTurn && !isPerspectiveAwaiting && (
+      {!isPerspectiveTurn && !isPerspectiveAwaiting && !isDiscardPhase && (
         <div className={waitingHint}>等待 {currentPlayerName} 操作...</div>
       )}
-      {isPerspectiveTurn && view.phase === '出牌' && !isPerspectiveAwaiting && (
+      {isPerspectiveTurn && view.phase === '出牌' && !isPerspectiveAwaiting && !isDiscardPhase && (
         <div className={promptBox}>
           <div className={promptTitle}>🃏 {perspectiveName}的回合 — 出牌阶段</div>
           <div className={promptDesc}>
@@ -912,7 +918,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           </div>
         </div>
       )}
-      {isPerspectiveTurn && view.phase === '弃牌' && !isPerspectiveAwaiting && (
+      {isPerspectiveTurn && view.phase === '弃牌' && !isPerspectiveAwaiting && !isDiscardPhase && (
         <div className={promptBox}>
           <div className={promptTitle}>🗑️ {perspectiveName} — 弃牌阶段</div>
           <div className={promptDesc}>{canOperate ? '请弃置多余的手牌' : `${perspectiveName} 正在弃牌...`}</div>
@@ -1250,6 +1256,8 @@ interface PlayerSeatProps {
   /** 是否触发新回合光环 */
   isTurnGlow?: boolean;
   turnGlowVersion?: number;
+  /** debug 模式:是否在前端隐藏身份(非视角/非主公/非死亡) */
+  hideIdentity?: boolean;
 }
 
 function PlayerSeatView({
@@ -1257,6 +1265,7 @@ function PlayerSeatView({
   needsTarget, isTargetable, selectedTarget, remainingSeconds,
   onTargetClick, onPerspectiveChange,
   isDamaged = false, damageVersion = 0, isTurnGlow = false, turnGlowVersion = 0,
+  hideIdentity = true,
 }: PlayerSeatProps) {
   const isDead = !player.alive;
   const isClickable = needsTarget && !isDead && isTargetable;
@@ -1283,21 +1292,32 @@ function PlayerSeatView({
           <span className={seatIndexBadge}>[{index + 1}号]</span>
           <span className={seatName}>{player.name}</span>
           {player.character && <span className={seatChar}>({player.character})</span>}
-          {player.identity && (
-            <span
-              className={
-                player.identity === '主公' ? lordBadge :
-                player.identity === '忠臣' ? loyalistBadge :
-                player.identity === '反贼' ? rebelBadge :
-                renegadeBadge
-              }
-            >
-              {player.identity}
-            </span>
-          )}
-          {!player.identity && player.identityHidden && (
-            <span className={hiddenBadge}>暗</span>
-          )}
+          {/* 身份显示:hideIdentity=true 时隐藏非自己/非主公/非死亡的身份 */}
+          {(() => {
+            // debug 模式下前端自己计算身份可见性
+            // 服务端 debug=true 暴露所有 identity,前端按规则只显示自己/主公/死亡
+            const identity = player.identity;
+            if (!identity) {
+              if (player.identityHidden) return <span className={hiddenBadge}>暗</span>;
+              return null;
+            }
+            // hideIdentity 模式(debug 多人):只显示自己/主公/死亡
+            if (hideIdentity && !isPerspective && identity !== '主公' && player.alive) {
+              return <span className={hiddenBadge}>暗</span>;
+            }
+            return (
+              <span
+                className={
+                  identity === '主公' ? lordBadge :
+                  identity === '忠臣' ? loyalistBadge :
+                  identity === '反贼' ? rebelBadge :
+                  renegadeBadge
+                }
+              >
+                {identity}
+              </span>
+            );
+          })()}
           {isPerspective && <span className={youBadge}>视角</span>}
           {isCurrentPlayer && <span className={turnBadge}>回合</span>}
           {isDead && <span> 💀</span>}

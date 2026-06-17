@@ -80,7 +80,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       ...(() => {
         const rawIdentity = p.vars['身份'] as string | undefined;
         if (!rawIdentity) return { identity: undefined, identityHidden: false };
-        // 自己:可见(debug 模式全部可见)
+        // 自己:可见(debug 模式全部暴露,前端按 perspectiveIdx 隐藏)
         if (i === viewer || debug) return { identity: rawIdentity, identityHidden: false };
         // 主公:公开
         if (rawIdentity === '主公') return { identity: rawIdentity, identityHidden: false };

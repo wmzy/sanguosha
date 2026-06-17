@@ -95,12 +95,11 @@ export class GameSession {
     // 建立 playerId → 座次下标 映射
     const state = this.state;
     if (this.debug) {
+      // debug 模式:单连接控制所有角色。第一个连接者映射到 player[0]
+      // (前端通过 perspectiveIdx 切换视角,可操作任意角色)
       const playerId = this.room.players.keys().next().value;
       if (!playerId) return false;
-      for (let i = 0; i < state.players.length; i++) {
-        this.playerNames.set(`${playerId}:${state.players[i].name}`, state.players[i].index);
-      }
-      this.playerNames.set(playerId, state.players[0].index);
+      this.playerNames.set(playerId, 0);
     } else {
       const playerIds = [...this.room.players.keys()];
       for (let i = 0; i < playerIds.length && i < state.players.length; i++) {
@@ -126,12 +125,37 @@ export class GameSession {
     return true;
   }
 
+  /**
+   * debug 模式:为新连接的玩家分配座次。
+   * 按连接顺序分配 player[0], player[1], ...
+   * 返回分配的座次下标,超出玩家数时返回 0(观察者)。
+   */
+  assignDebugSeat(playerId: string): number {
+    if (!this.debug || !this.state) return 0;
+    // 已分配过则直接返回
+    const existing = this.playerNames.get(playerId);
+    if (existing !== undefined) return existing;
+    // 找到下一个未占用的座次
+    const used = new Set([...this.playerNames.values()]);
+    for (let i = 0; i < this.state.players.length; i++) {
+      if (!used.has(i)) {
+        this.playerNames.set(playerId, i);
+        return i;
+      }
+    }
+    // 全部占用 → 观察者
+    this.playerNames.set(playerId, 0);
+    return 0;
+  }
+
   async handleAction(playerId: string, action: EngineClientMessage): Promise<void> {
     if (this.destroyed || !this.state) return;
     // debug 模式:允许以任意角色名发 action
     // 非 debug 模式:校验 ownerId 必须匹配预期玩家
     const expectedIndex = this.playerNames.get(playerId);
     if (expectedIndex === undefined && !this.debug) return;
+    // debug 模式不校验 ownerId——单人控制所有角色
+    // 非 debug 模式:校验 ownerId
     if (!this.debug && action.ownerId !== expectedIndex) {
       this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedIndex });
       return;
@@ -180,9 +204,9 @@ export class GameSession {
   private broadcastNewState(): void {
     if (!this.state) return;
     if (this.debug) {
-      // debug 模式:发给房间内所有连接的玩家(支持重连后新 playerId)
-      const view = buildView(this.state, 0, this.debug);
+      // debug 模式:发全量 view(debug=true 暴露所有信息),前端按 perspectiveIdx 计算身份可见性
       const state = this.state;
+      const view = buildView(state, 0, this.debug);
       for (const [pid] of this.room.players) {
         this.sendToPlayer(pid, { type: 'debugGameState', state: view, lastSeq: state.seq });
       }
