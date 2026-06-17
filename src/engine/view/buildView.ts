@@ -1,5 +1,5 @@
 // src/engine/view/buildView.ts
-import type { GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
+import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
 
 
 /** 从 ClientMessage 生成可读日志文本 */
@@ -33,7 +33,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   if (state.pendingSlot) {
     const slot = state.pendingSlot;
     const def = slot.definition;
-    const prompt = def.pending?.prompt
+    const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
+      ?? def.pending?.prompt
       ?? (slot.atom.type === '询问闪'
         ? { type: 'useCard' as const, title: '请出闪', cardFilter: { min: 1, max: 1 } }
         : slot.atom.type === '询问杀'
@@ -47,7 +48,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       atom: slot.atom,
       prompt,
       target,
-      deadline: slot.deadline,
+      // slot.deadline 是相对开局时间 (Date.now() - state.startedAt + timeoutMs),
+      // 前端用 (deadline - Date.now()) / 1000 算剩余秒数,需要绝对时间戳。
+      deadline: state.startedAt + slot.deadline,
     };
   }
 
@@ -74,7 +77,18 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       handCount: p.hand.length,
       hand: (i === viewer || debug) ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
       marks: p.marks,
-      identity: p.vars['身份'] as string | undefined,
+      ...(() => {
+        const rawIdentity = p.vars['身份'] as string | undefined;
+        if (!rawIdentity) return { identity: undefined, identityHidden: false };
+        // 自己:可见(debug 模式全部可见)
+        if (i === viewer || debug) return { identity: rawIdentity, identityHidden: false };
+        // 主公:公开
+        if (rawIdentity === '主公') return { identity: rawIdentity, identityHidden: false };
+        // 死亡:揭示
+        if (!p.alive) return { identity: rawIdentity, identityHidden: false };
+        // 其他玩家:隐藏
+        return { identity: undefined, identityHidden: true };
+      })(),
     })),
     cardMap: state.cardMap,
     pending,

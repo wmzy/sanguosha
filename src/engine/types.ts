@@ -373,6 +373,9 @@ export interface GameView {
     hand?: Card[];
     marks: Mark[];
     identity?: string;
+    /** 该玩家的身份已分配但当前视角不可见。identity 为 undefined 时,
+     *  若 identityHidden=true 则显示「暗」,否则不渲染身份徽章(尚未分配)。 */
+    identityHidden?: boolean;
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;

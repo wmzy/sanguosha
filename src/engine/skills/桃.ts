@@ -39,15 +39,17 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       const requestType = (state.pendingSlot.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType !== '求桃') return '当前不是求桃';
       const cardId = params.cardId as string | undefined;
-      if (!cardId) return 'cardId required';
-      const self = state.players[ownerId];
-      if (!self.hand.includes(cardId)) return '牌不在手牌中';
-      const card = state.cardMap[cardId];
-      if (card.name !== '桃') return '只能用桃救援';
+      if (cardId) {
+        const self = state.players[ownerId];
+        if (!self.hand.includes(cardId)) return '牌不在手牌中';
+        const card = state.cardMap[cardId];
+        if (card.name !== '桃') return '只能用桃救援';
+      }
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return;
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: ownerId }, to: { zone: '弃牌堆' } });
       state.localVars['求桃/已救'] = true;
     },

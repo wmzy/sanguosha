@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-17
+### 前端游戏流程修复 — 选将/身份动画/技能过滤/出杀问闪/弃牌 UI
+
+通过多模型协作(sensenova 浏览器视觉验证 + mimo-v2-pro 代码审查 + deepseek/M3 批量实现 + mimo-v2.5 UI 设计)定位并修复 8 个问题。
+
+#### Fixed
+- **P0 出杀不问闪**: 双层根因——(1)buildView deadline 用相对时间,前端当绝对时间戳导致 remainingSeconds ≤ 0 立即自动 respond;(2)前端 useEffect 在 remainingSeconds ≤ 0 时自动触发 handleRespond。修复:deadline 改为绝对时间戳(state.startedAt + slot.deadline),删除自动 respond useEffect。(`src/engine/view/buildView.ts`, `src/client/components/GameView.tsx`)
+- **P0 手牌点击无操作面板**: useMemo 未 await registerSkillActions。修复:改 useState+useEffect 异步注册。
+- **P0 延时锦囊无法使用**: targets(数组) vs target(单数)契约错配。
+- **P0 弃牌阶段无弃牌**: 引擎 ownerId 路由 + 前端 UI 双层修复。
+- **P0 身份不显示**: buildView 缺 identity 字段。
+- **P1 技能按钮区太多**: 显示了杀/闪/桃等基本牌按钮。修复:HIDDEN_ACTION_SKILLS 过滤集。
+- **P1 杀/respond 空牌被拒绝**: validate 不允许空 cardId。修复:允许空 respond(不出杀)。
+- **P1 buildView 读取定义级 prompt**: 丢弃了 atom 实例的动态 prompt。修复:优先读 atom 实例 prompt。
+- **P1 pending UI 硬编码**: 只渲染闪/杀按钮。修复:根据 requestType 动态渲染(求桃→出桃/不救)。
+- **P1 身份可见性规则**: debug 模式全可见,正式模式按规则隐藏。
+
+#### Added
+- **选将 UI**: 游戏开始展示武将选择遮罩(5张随机武将卡,阵营色,hover 效果,确认选择)。(`src/client/components/GameView.tsx`)
+- **身份揭示动画**: 3D 翻转动画展示玩家身份(主公=金/忠臣=蓝/反贼=红/内奸=紫)。(`src/client/animations.css`, `src/client/components/GameView.tsx`)
+- **前端动画系统**: 摸牌滑入/出牌飞行/伤害闪烁震动/阶段过渡/回合光环。(`src/client/animations.css`, `src/client/components/GameView.tsx`)
+
+#### Changed — defineAction 驱动的 UI 渲染
+- **技能按钮区改为 prompt 类型驱动**: 不再硬编码 DEFAULT_SKILLS 过滤集。按文档设计,`defineAction` 的 `prompt.type` 决定渲染方式:`confirm`/`distribute`/`choosePlayer` 显示独立触发按钮;`useCard`/`useCardAndTarget`/`selectTarget` 影响手牌区可选性(哪些牌可选、选了怎么选目标),不显示按钮。(`src/client/components/GameView.tsx`)
+- **身份可见性 debug 与真实一致**: debug 模式下身份不再全部可见,统一规则:自己可见 + 主公可见 + 死亡可见 + 其他隐藏。切换视角可查看对应玩家身份。(`src/engine/view/buildView.ts`)
+
+#### Verified(sensenova 5/5 PASS)
+- 技能按钮区只显示 confirm 类型(遗计等),不显示杀/闪/桃/装备 ✅
+- 身份可见性:自己+主公可见,其他显示「暗」 ✅
+- 出杀→询问闪→不闪→伤害结算 P1 4→3 ✅
+- 选将遮罩 + 身份揭示动画 ✅
+- 技能按钮只显示武将技能 ✅
+- 身份徽章正确显示(4 种颜色) ✅
+- 弃牌 UI 可操作 ✅
+
+## [Unreleased] — 2026-06-16
 ### 前端游戏流程修复 — 技能按钮/身份显示/延时锦囊/弃牌 UI/动画
 
 通过多模型协作(sensenova 浏览器视觉验证 + mimo-v2-pro/v2.5 代码审查与设计 + deepseek/M3 实现)定位并修复 5 个 P0 bug。

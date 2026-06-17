@@ -110,15 +110,17 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string | undefined;
-      if (!cardId) return 'cardId required';
-      const self = state.players[ownerId];
-      if (!self?.hand.includes(cardId)) return '牌不在手牌中';
-      const card = state.cardMap[cardId];
-      if (!card || card.name !== '杀') return '只能打出杀';
+      if (cardId) {
+        const self = state.players[ownerId];
+        if (!self?.hand.includes(cardId)) return '牌不在手牌中';
+        const card = state.cardMap[cardId];
+        if (!card || card.name !== '杀') return '只能打出杀';
+      }
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return;
       // 杀牌进处理区,供调用方(决斗/南蛮入侵)检查处理区判断是否出了杀
       await applyAtom(state, {
         type: '移动牌',

@@ -36,15 +36,49 @@ const SUIT_COLOR: Record<string, string> = {
   '♠': '#ccc', '♣': '#ccc', '♥': '#e74c3c', '♦': '#e74c3c',
 };
 
-// ─── 基本技能(不在 UI 上显示) ───
-const BASIC_SKILLS = new Set([
+// ─── 引擎声明的默认通用技能(技能按钮区/座位卡均过滤这些) ───
+// 对应 src/engine/atoms/选将.ts:DEFAULT_SKILLS
+const DEFAULT_SKILLS = new Set([
   '回合管理', '装备通用', '杀', '闪', '桃', '酒',
-  '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '借刀杀人',
-  '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击', '反馈',
+  '过河拆桥', '顺手牵羊', '无中生有', '桃园结义',
+  '借刀杀人', '决斗', '南蛮入侵', '万箭齐发',
+  '乐不思蜀', '无懈可击',
 ]);
 
 // ─── 延时锦囊:validate 用 `params.target`(单数),非 targets(数组) ───
 const DELAYED_TRICKS = new Set(['乐不思蜀', '闪电', '兵粮寸断']);
+
+// ─── 选将:武将池 ───
+interface CharPoolItem {
+  name: string;
+  faction: string;
+  skills: string[];
+  maxHealth: number;
+}
+const CHAR_POOL: CharPoolItem[] = [
+  { name: '刘备', faction: '蜀', skills: ['仁德'], maxHealth: 4 },
+  { name: '曹操', faction: '魏', skills: ['奸雄'], maxHealth: 4 },
+  { name: '孙权', faction: '吴', skills: ['制衡'], maxHealth: 4 },
+  { name: '关羽', faction: '蜀', skills: ['武圣'], maxHealth: 4 },
+  { name: '郭嘉', faction: '魏', skills: ['天妒', '遗计'], maxHealth: 3 },
+  { name: '张飞', faction: '蜀', skills: ['咆哮'], maxHealth: 4 },
+  { name: '诸葛亮', faction: '蜀', skills: ['观星', '空城'], maxHealth: 3 },
+  { name: '司马懿', faction: '魏', skills: ['反馈'], maxHealth: 3 },
+  { name: '夏侯惇', faction: '魏', skills: ['刚烈'], maxHealth: 4 },
+  { name: '甄姬', faction: '魏', skills: ['倾国'], maxHealth: 3 },
+  { name: '赵云', faction: '蜀', skills: ['龙胆'], maxHealth: 4 },
+  { name: '周瑜', faction: '吴', skills: ['英姿', '反间'], maxHealth: 3 },
+  { name: '吕布', faction: '群', skills: ['无双'], maxHealth: 4 },
+  { name: '华佗', faction: '群', skills: ['急救', '青囊'], maxHealth: 3 },
+  { name: '貂蝉', faction: '群', skills: ['离间', '闭月'], maxHealth: 3 },
+  { name: '张角', faction: '群', skills: ['雷击', '鬼道', '黄天'], maxHealth: 3 },
+];
+const FACTION_BG: Record<string, string> = {
+  '魏': '#2c3e50',
+  '蜀': '#27ae60',
+  '吴': '#c0392b',
+  '群': '#8e44ad',
+};
 
 // ─── 时间格式化 ───
 function formatTime(ms: number): string {
@@ -171,6 +205,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
+  const [showIdentityReveal, setShowIdentityReveal] = useState(true);
+  const [showCharSelect, setShowCharSelect] = useState(true);
+  const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
+
+  // 选将:随机抽 5 张(仅组件挂载时生成一次)
+  const charOptions = useMemo(() => {
+    const shuffled = [...CHAR_POOL].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 5);
+  }, []);
 
   // ─── 动画状态 ───
   const anim = useAnimationState(view, perspectiveIdx);
@@ -250,19 +293,9 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 倒计时:pending 回应优先,否则用 turnDeadline
   const deadline = pending?.deadline ?? view.turnDeadline;
   const remainingSeconds = useCountdownSeconds(deadline);
-
-  // 倒计时到 0 自动跳过
-  useEffect(() => {
-    if (remainingSeconds !== null && remainingSeconds <= 0) {
-      if (isMyAwaiting) {
-        // 有 pending 回应 → 自动不出
-        handleRespond();
-      } else if (isMyTurn && canOperate) {
-        // 自己回合 → 自动结束
-        handleEndTurn();
-      }
-    }
-  }, [remainingSeconds]);
+  // 注意:不再在客户端 remainingSeconds<=0 时自动 respond/endTurn。
+  // 旧逻辑是 debug 模式自动操作,但会导致「出杀时跳过问闪」——pending 刚渲染就被自动 handleRespond() 当作「不出」处理。
+  // 现在依赖服务端真实超时(默认 15s):服务端 advance → view.pending 清空 → UI 自然恢复。
 
   // 切换视角
   const switchPerspective = useCallback(() => {
@@ -340,7 +373,17 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   /** 判断目标 i 是否可被选中(距离/范围检查) */
   function isTargetable(i: number): boolean {
     if (!selectedNeedsRange) return true;
-    return canAttack(perspectiveIdx, i);
+    const result = canAttack(perspectiveIdx, i);
+    if (!result) {
+      const fromP = view.players[perspectiveIdx];
+      let range = 1;
+      if (fromP?.equipment?.['武器']) {
+        const weapon = view.cardMap[fromP.equipment['武器']];
+        if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
+      }
+      console.log('[isTargetable] 无法选中', i, 'dist=', effectiveDist(perspectiveIdx, i), 'range=', range);
+    }
+    return result;
   }
 
   // 需要选目标的牌
@@ -495,10 +538,20 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       const card = perspectiveHand.find(c => c.id === cardId);
       if (card) send(card.name, 'respond', { cardId });
     } else {
-      // 不出闪/杀:用对应 skill respond 但不带 cardId(后端 skill 收到空 cardId → 不做操作)
-      // 根据当前 pending 的 atom type 决定用哪个 skill
+      // 不出闪/杀/桃:用对应 skill respond 但不带 cardId(后端 skill 收到空 cardId → 不做操作)
+      // 根据当前 pending 的 atom type 和 requestType 决定用哪个 skill
       const atomType = pending?.atom?.type;
-      const skillId = atomType === '询问杀' ? '杀' : '闪';
+      const reqType = (pending?.atom as Record<string, unknown>)?.requestType;
+      let skillId: string;
+      if (atomType === '询问杀') {
+        skillId = '杀';
+      } else if (atomType === '询问闪') {
+        skillId = '闪';
+      } else if (atomType === '请求回应' && reqType === '求桃') {
+        skillId = '桃';
+      } else {
+        skillId = '闪';
+      }
       send(skillId, 'respond', {});
     }
   }
@@ -530,7 +583,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     }
     // 回应模式(只有自己视角才能操作)
     if (isMyAwaiting) {
-      if (card.name === '闪' || card.name === '杀') {
+      const atomType = pending?.atom?.type;
+      const reqType = (pending?.atom as Record<string, unknown>)?.requestType;
+      const isPeachPending = atomType === '请求回应' && reqType === '求桃';
+      if (card.name === '闪' || card.name === '杀' || (isPeachPending && card.name === '桃')) {
         handleRespond(card.id);
       }
       return;
@@ -574,8 +630,198 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   }, [view.players, perspectiveIdx]);
 
 
+  // ─── 身份牌颜色映射 ───
+  const IDENTITY_COLORS: Record<string, string> = {
+    '主公': '#FFD700',
+    '忠臣': '#4A90E2',
+    '反贼': '#E74C3C',
+    '内奸': '#9B59B6',
+  };
+
   return (
     <div className={pageRoot}>
+      {/* ─── 选将遮罩 ─── */}
+      {showCharSelect && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10000,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.9)',
+        }}>
+          <div style={{
+            fontSize: 28,
+            fontWeight: 'bold',
+            color: '#ffd700',
+            marginBottom: 32,
+            letterSpacing: 4,
+            textShadow: '0 2px 12px rgba(255,215,0,0.3)',
+          }}>
+            选择你的武将
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 16,
+            maxWidth: 800,
+            width: '90%',
+          }}>
+            {charOptions.map((ch, i) => {
+              const isSelected = selectedCharIdx === i;
+              return (
+                <div
+                  key={ch.name}
+                  onClick={() => setSelectedCharIdx(i)}
+                  style={{
+                    background: FACTION_BG[ch.faction] || '#333',
+                    borderRadius: 12,
+                    padding: '24px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: 'pointer',
+                    border: isSelected ? '3px solid #ffd700' : '3px solid transparent',
+                    boxShadow: isSelected
+                      ? '0 0 20px rgba(255,215,0,0.4), 0 4px 16px rgba(0,0,0,0.3)'
+                      : '0 4px 16px rgba(0,0,0,0.3)',
+                    transform: isSelected ? 'translateY(-8px) scale(1.03)' : 'translateY(0)',
+                    transition: 'all 0.25s cubic-bezier(0.23, 1, 0.32, 1)',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isSelected) {
+                      e.currentTarget.style.transform = 'translateY(-6px)';
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isSelected) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)';
+                    }
+                  }}
+                >
+                  <div style={{
+                    fontSize: 22,
+                    fontWeight: 'bold',
+                    color: '#fff',
+                    textShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                  }}>
+                    {ch.name}
+                  </div>
+                  <div style={{
+                    fontSize: 12,
+                    color: 'rgba(255,255,255,0.7)',
+                    background: 'rgba(0,0,0,0.2)',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                  }}>
+                    {ch.faction} · {ch.skills.join(' / ')}
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    gap: 3,
+                    marginTop: 4,
+                  }}>
+                    {Array.from({ length: ch.maxHealth }, (_, j) => (
+                      <div key={j} style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: '#e74c3c',
+                        boxShadow: '0 0 4px rgba(231,76,60,0.5)',
+                      }} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            disabled={selectedCharIdx === null}
+            onClick={() => {
+              if (selectedCharIdx !== null) {
+                setShowCharSelect(false);
+              }
+            }}
+            style={{
+              marginTop: 32,
+              padding: '12px 56px',
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: selectedCharIdx !== null ? '#000' : '#666',
+              background: selectedCharIdx !== null
+                ? 'linear-gradient(135deg, #ffd700, #f0c000)'
+                : '#333',
+              border: 'none',
+              borderRadius: 8,
+              cursor: selectedCharIdx !== null ? 'pointer' : 'not-allowed',
+              boxShadow: selectedCharIdx !== null
+                ? '0 4px 16px rgba(255,215,0,0.3)'
+                : 'none',
+              transition: 'all 0.2s',
+              letterSpacing: 2,
+            }}
+          >
+            确认选择
+          </button>
+        </div>
+      )}
+      {/* ─── 身份揭示遮罩 ─── */}
+      {showIdentityReveal && perspective?.identity && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.85)',
+          animation: 'overlayFadeIn 0.5s ease-out both',
+        }}>
+          <div style={{
+            width: 200,
+            height: 280,
+            borderRadius: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 16,
+            background: IDENTITY_COLORS[perspective.identity] || '#888',
+            color: '#fff',
+            boxShadow: '0 0 40px rgba(0,0,0,0.5)',
+            animation: 'identityCardFlip 1s cubic-bezier(0.23, 1, 0.32, 1) both',
+            transformStyle: 'preserve-3d',
+          }}>
+            <div style={{ fontSize: 14, opacity: 0.8, letterSpacing: 2 }}>你的身份</div>
+            <div style={{ fontSize: 36, fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{perspective.identity}</div>
+          </div>
+          <button
+            onClick={() => setShowIdentityReveal(false)}
+            style={{
+              marginTop: 32,
+              padding: '10px 48px',
+              fontSize: 16,
+              fontWeight: 'bold',
+              color: '#fff',
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 8,
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+          >
+            确认
+          </button>
+        </div>
+      )}
       {/* ─── 头部 ─── */}
       <div className={headerBar}>
         <button className={backBtn} onClick={onDeleteRoom}>← 退出</button>
@@ -605,16 +851,36 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             {pending.prompt.title}
             {pending.prompt.description && <span> — {pending.prompt.description}</span>}
           </div>
-          {canOperate && (
-            <div className={promptActions}>
-              <button className={promptBtn} onClick={() => handleRespond()}>不出</button>
-              {perspectiveHand.filter(c => c.name === '闪' || c.name === '杀').map(c => (
-                <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
-                  {c.name} {c.suit}{c.rank}
-                </button>
-              ))}
-            </div>
-          )}
+          {canOperate && (() => {
+            const atomType = pending?.atom?.type;
+            const reqType = (pending?.atom as Record<string, unknown>)?.requestType;
+            // 根据 pending 类型决定按钮文案和展示的牌
+            let declineLabel: string;
+            let cardFilter: string[];
+            if (atomType === '询问闪') {
+              declineLabel = '不闪';
+              cardFilter = ['闪'];
+            } else if (atomType === '询问杀') {
+              declineLabel = '不出杀';
+              cardFilter = ['杀'];
+            } else if (atomType === '请求回应' && reqType === '求桃') {
+              declineLabel = '不救';
+              cardFilter = ['桃'];
+            } else {
+              declineLabel = '不回应';
+              cardFilter = [];
+            }
+            return (
+              <div className={promptActions}>
+                <button className={promptBtn} onClick={() => handleRespond()}>{declineLabel}</button>
+                {cardFilter.length > 0 && perspectiveHand.filter(c => cardFilter.includes(c.name)).map(c => (
+                  <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
+                    {c.name} {c.suit}{c.rank}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
           {!canOperate && <div className={waitingHint}>等待 {perspectiveName} 回应...</div>}
           {/* 倒计时进度条:remainingSeconds 是秒数,15s 总长(询问闪/杀约定 timeout) */}
           {remainingSeconds !== null && (() => {
@@ -824,7 +1090,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             const isSelected = selectedCardId === card.id;
             const isDiscardSelected = selectedForDiscard.has(card.id);
             const canPlay = isMyTurn && canOperate;
-            const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀');
+            const __atomType = pending?.atom?.type;
+            const __reqType = (pending?.atom as Record<string, unknown>)?.requestType;
+            const __isPeachPending = __atomType === '请求回应' && __reqType === '求桃';
+            const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀' || (__isPeachPending && card.name === '桃'));
             const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
             const canClick = canPlay || isAwaiting || canDiscardClick;
             const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
@@ -845,13 +1114,24 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         </div>
       </div>
       {/* ─── 武将技能区(基于 defineAction 注册表) ─── */}
-      {isMyTurn && canOperate && view.phase === '出牌' && skillActions.length > 0 && (
+      {/* 按 prompt 类型决定渲染方式: */}
+      {/* - confirm/distribute/choosePlayer: 显示独立触发按钮 */}
+      {/* - useCard/useCardAndTarget/selectTarget: 影响手牌区可选性,不显示按钮 */}
+      {(() => {
+        const triggerableActions = skillActions.filter(a =>
+          a.prompt.type === 'confirm' ||
+          a.prompt.type === 'distribute' ||
+          a.prompt.type === 'choosePlayer'
+        );
+        if (!(isMyTurn && canOperate && view.phase === '出牌' && triggerableActions.length > 0)) return null;
+        return (
         <div className={skillSection}>
           <div className={skillTitle}>武将技能:</div>
           <div className={skillList}>
-            {skillActions.map(action => (
+            {triggerableActions.map(action => (
               <button key={`${action.skillId}:${action.actionType}`}
                 className={skillBtn}
+                style={action.style === 'danger' ? { borderColor: '#e74c3c' } : action.style === 'primary' ? { borderColor: '#f39c12' } : undefined}
                 onClick={() => handleSkillAction(action)}
                 title={action.prompt.title}
               >
@@ -860,7 +1140,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             ))}
           </div>
         </div>
-      )}
+        );
+      })()}
 
 
       {/* ─── 操作面板 ─── */}
@@ -883,7 +1164,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       </div>
 
       {/* ─── 目标选择 ─── */}
-      {selectedCardId && canOperate && isMyTurn && !isMyAwaiting && (
+      {selectedCardId && canOperate && isMyTurn && !pending && (
         <div className={targetSection}>
           <div className={targetTitle}>选择目标:</div>
           <div className={targetList}>
@@ -938,8 +1219,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               {Object.entries(p.equipment).map(([slot, cardId]) => (
                 <span key={slot}> [{slot}:{equipName(slot as EquipSlot, cardId as string)}]</span>
               ))}
-              {p.skills.filter(s => !BASIC_SKILLS.has(s)).length > 0 && (
-                <span> 技能:{p.skills.filter(s => !BASIC_SKILLS.has(s)).join(',')}</span>
+              {p.skills.filter(s => !DEFAULT_SKILLS.has(s)).length > 0 && (
+                <span> 技能:{p.skills.filter(s => !DEFAULT_SKILLS.has(s)).join(',')}</span>
               )}
             </div>
           ))}
@@ -1014,6 +1295,9 @@ function PlayerSeatView({
               {player.identity}
             </span>
           )}
+          {!player.identity && player.identityHidden && (
+            <span className={hiddenBadge}>暗</span>
+          )}
           {isPerspective && <span className={youBadge}>视角</span>}
           {isCurrentPlayer && <span className={turnBadge}>回合</span>}
           {isDead && <span> 💀</span>}
@@ -1026,7 +1310,7 @@ function PlayerSeatView({
         </div>
       </div>
       <div className={skillRow}>
-        {player.skills.filter(s => !BASIC_SKILLS.has(s)).map(s => (
+        {player.skills.filter(s => !DEFAULT_SKILLS.has(s)).map(s => (
           <span key={s} className={skillTag}>{s}</span>
         ))}
       </div>
@@ -1217,6 +1501,10 @@ const rebelBadge = css`
 const renegadeBadge = css`
   background: #8e44ad; border-radius: 3px; padding: 1px 5px;
   font-size: 10px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
+const hiddenBadge = css`
+  background: #555; border-radius: 3px; padding: 1px 5px;
+  font-size: 10px; color: #bbb; margin-left: 4px; font-weight: bold;
 `;
 const hpFull = css`color: #2ecc71; font-weight: bold; font-size: 13px;`;
 const hpMid = css`color: #e67e22; font-weight: bold; font-size: 13px;`;
