@@ -24,7 +24,7 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = [
   { name: '孙权', skills: ['制衡'] },
   { name: '关羽', skills: ['武圣'] },
   { name: '郭嘉', skills: ['遗计'] },
-  { name: '主公', skills: [] },
+  { name: '司马懿', skills: ['反馈'] },
 ];
 
 const RECONNECT_GRACE_MS = 30_000;
@@ -90,7 +90,19 @@ export class GameSession {
       gameId: this.room.id,
     };
     this.state = create(config);
-    await bootstrap(this.state, config);
+    // 挂载 state 变更回调:必须在 bootstrap 之前挂载!
+    // 因为交互式选将(选将询问)会在 bootstrap 中创建 pending,
+    // 需要 onStateChange 回调广播给客户端才能让玩家选将。
+    this.actionLog = this.state.actionLog;
+    this.attachStateListener();
+    setRoomStatus(this.room.id, '进行中');
+    // bootstrap 可能因选将 pending 而挂起(fire-and-forget dispatch)
+    // 不 await — 让 startGame 立即返回,客户端收到选将 pending 后响应
+    void bootstrap(this.state, config).then(() => {
+      this.broadcastNewState();
+    }).catch(err => {
+      this.logger.error('bootstrap error', { error: String(err) });
+    });
 
     // 建立 playerId → 座次下标 映射
     const state = this.state;
@@ -115,11 +127,6 @@ export class GameSession {
     this.actionLog = state.actionLog;
     this.lastActivityAt = Date.now();
 
-    // 挂载 state 变更回调:每次 applyAtom 结束后广播+持久化+检查结束。
-    // dispatch 是 fire-and-forget,所有 session 副作用由此回调驱动。
-    this.attachStateListener();
-
-    setRoomStatus(this.room.id, '进行中');
     this.sendInitialViewToAll();
     this.resetIdleTimer();
     return true;

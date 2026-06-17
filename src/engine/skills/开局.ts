@@ -2,6 +2,7 @@
 //   start action:抽身份 → 选将 → 初始化洗牌 → 发牌(lordBonus=1) → 回合开始(主公) → 阶段开始(主公,准备)
 import type { ActionEntry, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
+import { createRng } from '../../shared/rng';
 import {
   registerActionEntry,
   unregisterActionEntry,
@@ -50,8 +51,42 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       // 1. 抽身份(每人一张,主公亮明)
       await applyAtom(state, { type: '抽身份', playerCount, seed });
 
-      // 2. 选将(从武将池分配)
-      await applyAtom(state, { type: '选将', characters, seed });
+      // 2. 选将(交互式):主公先选,其他人依次选
+      //    从武将池随机抽 N 张给每人选 1 张,已选的武将不再出现
+      const charRng = createRng(seed + 1);
+      const charPool = [...characters].filter(c => c.name !== '主公');
+      // 打乱武将池
+      for (let i = charPool.length - 1; i > 0; i--) {
+        const j = charRng.nextInt(i + 1);
+        const tmp = charPool[i];
+        charPool[i] = charPool[j];
+        charPool[j] = tmp;
+      }
+      const used = new Set<string>();
+      let poolIdx = 0;
+      // 主公先选,然后按座次顺序
+      const lordIdx = state.players.findIndex(p => p.vars['身份'] === '主公');
+      const selectOrder: number[] = [];
+      if (lordIdx >= 0) selectOrder.push(lordIdx);
+      for (let i = 0; i < state.players.length; i++) {
+        if (i !== lordIdx) selectOrder.push(i);
+      }
+      for (const playerIdx of selectOrder) {
+        // 从剩余池中取 5 张(或全部)作为候选人
+        const available: Array<{ name: string; skills: string[] }> = [];
+        for (let j = poolIdx; j < charPool.length && available.length < 5; j++) {
+          if (!used.has(charPool[j].name)) {
+            available.push(charPool[j]);
+          }
+        }
+        if (available.length === 0) break;
+        // 等待玩家选择(选将询问 是等待型 atom,Promise 挂起到玩家回应)
+        await applyAtom(state, { type: '选将询问', target: playerIdx, candidates: available });
+        // 玩家选完后,选将 respond execute 已设置 p.character
+        // 标记已用
+        const chosen = state.players[playerIdx].character;
+        if (chosen) used.add(chosen);
+      }
 
       // 2.5 注册技能实例(回合管理等默认技能)——必须在阶段推进前注册
       //     选将 已设置 player.skills,但技能实例需要 registerSkillsFromState 实例化

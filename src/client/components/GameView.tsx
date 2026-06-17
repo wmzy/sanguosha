@@ -36,6 +36,34 @@ const SUIT_COLOR: Record<string, string> = {
   '♠': '#ccc', '♣': '#ccc', '♥': '#e74c3c', '♦': '#e74c3c',
 };
 
+// ─── 卡牌描述(用于 hover tooltip) ───
+const CARD_DESCRIPTIONS: Record<string, string> = {
+  '杀': '对攻击范围内的一名角色使用,目标可出闪抵消。默认每回合限一次。',
+  '闪': '抵消一次杀的效果。',
+  '桃': '濒死时回复 1 点体力,或自己的出牌阶段回复 1 点体力。',
+  '酒': '出牌阶段使用,本回合下一张杀伤害+1;或濒死时当桃用。',
+  '过河拆桥': '弃置目标区域内一张牌(无距离限制)。',
+  '顺手牵羊': '获取目标区域内一张牌(距离限制1)。',
+  '无中生有': '摸两张牌。',
+  '桃园结义': '所有角色回复 1 点体力。',
+  '借刀杀人': '令目标对其攻击范围内的另一角色出杀。',
+  '决斗': '与目标轮流出杀,先不出杀的一方受 1 点伤害。',
+  '南蛮入侵': '所有其他角色需出杀,否则受 1 点伤害。',
+  '万箭齐发': '所有其他角色需出闪,否则受 1 点伤害。',
+  '乐不思蜀': '延时锦囊,判定非红桃则跳过出牌阶段。',
+  '无懈可击': '抵消一张锦囊牌的效果。',
+  '闪电': '延时锦囊,判定黑桃2-9则造成 3 点伤害。',
+  '兵粮寸断': '延时锦囊,判定非草花则跳过摸牌阶段。',
+  '诸葛连弩': '武器,攻击范围1,出杀次数不限。',
+  '青龙偃月刀': '武器,攻击范围3,杀被闪后可再出一张杀。',
+  '贯石斧': '武器,攻击范围3,杀被闪后可弃2张牌强命。',
+  '赤兔': '进攻马,距离+1。',
+  '八卦阵': '防具,需出闪时可判定,红牌视为闪。',
+};
+function getCardDescription(name: string): string {
+  return CARD_DESCRIPTIONS[name] || '';
+}
+
 // ─── 引擎声明的默认通用技能(技能按钮区/座位卡均过滤这些) ───
 // 对应 src/engine/atoms/选将.ts:DEFAULT_SKILLS
 const DEFAULT_SKILLS = new Set([
@@ -43,6 +71,15 @@ const DEFAULT_SKILLS = new Set([
   '过河拆桥', '顺手牵羊', '无中生有', '桃园结义',
   '借刀杀人', '决斗', '南蛮入侵', '万箭齐发',
   '乐不思蜀', '无懈可击',
+]);
+
+// 装备牌名字——这些 skill id 在装备时被动态挂载为技能。
+// 座位卡上已显示装备区,不应在技能区重复出现。
+const EQUIPMENT_SKILLS = new Set([
+  '诸葛连弩', '青釭剑', '青龙偃月刀', '雌雄双股剑', '贯石斧',
+  '丈八蛇矛', '方天画戟', '麒麟弓', '寒冰剑',
+  '八卦阵', '仁王盾', '藤甲', '白银狮子',
+  '赤兔', '紫骍', '大宛', '的卢', '绝影', '爪黄飞电',
 ]);
 
 // ─── 延时锦囊:validate 用 `params.target`(单数),非 targets(数组) ───
@@ -57,7 +94,7 @@ interface CharPoolItem {
 }
 const CHAR_POOL: CharPoolItem[] = [
   { name: '刘备', faction: '蜀', skills: ['仁德'], maxHealth: 4 },
-  { name: '曹操', faction: '魏', skills: ['奸雄'], maxHealth: 4 },
+  { name: '曹操', faction: '魏', skills: ['护甲'], maxHealth: 4 },
   { name: '孙权', faction: '吴', skills: ['制衡'], maxHealth: 4 },
   { name: '关羽', faction: '蜀', skills: ['武圣'], maxHealth: 4 },
   { name: '郭嘉', faction: '魏', skills: ['天妒', '遗计'], maxHealth: 3 },
@@ -205,16 +242,23 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
-  const [showIdentityReveal, setShowIdentityReveal] = useState(true);
-  const [showCharSelect, setShowCharSelect] = useState(false);
+  /** 转化模式:点武圣等转化技能后进入此模式,匹配卡牌显示为转化后的牌 */
+  const [transformMode, setTransformMode] = useState<{
+    skillId: string;
+    actionType: string;
+    cardFilter: (c: Card) => boolean;
+    wrapperName: string;
+  } | null>(null);
+  const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
+  // 选将遮罩:读 view.pending.atom.type === '选将询问'
+  // 候选人从 view.pending.atom.candidates 获取(引擎生成)
+  const isCharSelectPending = view.pending?.atom?.type === '选将询问';
+  const charCandidates: Array<{ name: string; skills: string[] }> = isCharSelectPending
+    ? (view.pending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
+    : [];
+  const charSelectTarget = isCharSelectPending ? view.pending.target : -1;
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
-
-  // 选将:随机抽 5 张(仅组件挂载时生成一次)
-  const charOptions = useMemo(() => {
-    const shuffled = [...CHAR_POOL].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 5);
-  }, []);
-
+  useEffect(() => { setSelectedCharIdx(null); }, [isCharSelectPending, charSelectTarget]);
   // ─── 动画状态 ───
   const anim = useAnimationState(view, perspectiveIdx);
   const handListRef = useRef<HTMLDivElement>(null);
@@ -297,12 +341,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setPerspectiveIdx(next);
     setSelectedCardId(null);
     setSelectedTarget(null);
+    setTransformMode(null);
   }, [perspectiveIdx, view.players.length]);
 
   const goToCurrentPlayer = useCallback(() => {
     setPerspectiveIdx(view.currentPlayerIndex);
     setSelectedCardId(null);
     setSelectedTarget(null);
+    setTransformMode(null);
   }, [view.currentPlayerIndex]);
 
   // 发送 action
@@ -468,21 +514,42 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     switch (prompt.type) {
       case 'useCard':
         // 选牌型:需要 selectedCardId
-        if (!selectedCardId) { alert(prompt.title); return; }
+        if (!selectedCardId) return;
         params.cardId = selectedCardId;
         break;
       case 'selectTarget':
         // 选目标型:需要 selectedTarget
-        if (!selectedTarget) { alert(prompt.title); return; }
+        if (!selectedTarget) return;
         params.target = nameToIndex(selectedTarget);
         break;
       case 'useCardAndTarget':
         // 选牌+选目标型
-        if (!selectedCardId) { alert(prompt.title + ' — 请先选中手牌'); return; }
-        if (!selectedTarget) { alert(prompt.title + ' — 请选择目标'); return; }
+        // 转化技能(如武圣):进入转化模式,用户从手牌中选匹配卡牌后再选目标
+        if (action.transform) {
+          if (prompt.cardFilter?.filter) {
+            // 用第一张手牌中匹配的牌调用 transform,得到 wrapper.name(如“杀”)
+            const sample = perspectiveHand.find(c => prompt.cardFilter!.filter!(c))
+              ?? viewerHand.find(c => prompt.cardFilter!.filter!(c));
+            const wrapperName = sample
+              ? action.transform(sample).name
+              : action.skillId;
+            setTransformMode({
+              skillId,
+              actionType,
+              cardFilter: prompt.cardFilter.filter,
+              wrapperName,
+            });
+            setSelectedCardId(null);
+            setSelectedTarget(null);
+            return;
+          }
+        }
+        if (!selectedCardId) return;
+        if (!selectedTarget) return;
         {
           const idx = nameToIndex(selectedTarget);
-          if (idx < 0) { alert(prompt.title + ' — 目标无效'); return; }
+          if (idx < 0) return;
+
           // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
           const trickCard = perspectiveHand.find(c => c.id === selectedCardId)
             ?? viewerHand.find(c => c.id === selectedCardId);
@@ -498,17 +565,36 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         break;
       case 'choosePlayer':
         // 选玩家型:需要 selectedTarget
-        if (!selectedTarget) { alert(prompt.title); return; }
+        if (!selectedTarget) return;
         params.target = nameToIndex(selectedTarget);
         break;
       case 'distribute':
-        // 分配型:暂不支持,提示
-        alert('分配型技能暂未实现'); return;
+        // 分配型:暂不支持
+        return;
       default:
         break;
     }
 
     send(skillId, actionType, params);
+    setSelectedCardId(null);
+    setSelectedTarget(null);
+  }
+
+  // ─── 转化模式:选完目标后,提交 preceding=[transform] + 转化后的牌.use ───
+  function handleTransformPlay(targetName: string) {
+    if (!transformMode || !selectedCardId) return;
+    const targetCard = perspectiveHand.find(c => c.id === selectedCardId) ?? viewerHand.find(c => c.id === selectedCardId);
+    if (!targetCard) return;
+    const idx = nameToIndex(targetName);
+    if (idx < 0) return;
+    const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
+    // 转化后的主出牌:wrapper.name(use),preceding=[武圣.transform]
+    send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [{
+      skillId: transformMode.skillId,
+      actionType: transformMode.actionType,
+      params: { cardId: selectedCardId },
+    }]);
+    setTransformMode(null);
     setSelectedCardId(null);
     setSelectedTarget(null);
   }
@@ -582,6 +668,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       const isPeachPending = atomType === '请求回应' && reqType === '求桃';
       if (card.name === '闪' || card.name === '杀' || (isPeachPending && card.name === '桃')) {
         handleRespond(card.id);
+      }
+      return;
+    }
+    // 转化模式(如武圣):只允许点击匹配的卡牌作为“被转化的原牌”
+    if (transformMode && isMyTurn && canOperate) {
+      if (!transformMode.cardFilter(card)) return; // 过滤不匹配的牌
+      if (selectedCardId === card.id) {
+        setSelectedCardId(null);
+        setSelectedTarget(null);
+      } else {
+        setSelectedCardId(card.id);
+        setSelectedTarget(null);
       }
       return;
     }
@@ -668,7 +766,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           <button
             onClick={() => {
               setShowIdentityReveal(false);
-              setShowCharSelect(true);
+              sessionStorage.setItem('sgs_identity_shown', '1');
+              // 选将已通过 charSelectSeat 状态管理,不需要额外触发
             }}
             style={{
               marginTop: 32,
@@ -689,8 +788,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           </button>
         </div>
       )}
-      {/* ─── 选将遮罩 ─── */}
-      {showCharSelect && (
+      {/* ─── 选将遮罩(读 view.pending) ─── */}
+      {isCharSelectPending && charSelectTarget >= 0 && (() => {
+        const seatPlayer = view.players[charSelectTarget];
+        const isLord = seatPlayer?.identity === '主公';
+        // 用引擎提供的候选人(已排除已选武将)
+        const candidates = charCandidates;
+        // 从 CHAR_POOL 查势力色用于渲染
+        const getFactionInfo = (name: string) => {
+          const c = CHAR_POOL.find(ch => ch.name === name);
+          return { faction: c?.faction || '群', maxHealth: c?.maxHealth || 4 };
+        };
+        return (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -702,30 +811,32 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           background: 'rgba(0,0,0,0.9)',
         }}>
           <div style={{
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: 'bold',
             color: '#ffd700',
-            marginBottom: 32,
+            marginBottom: 8,
             letterSpacing: 4,
-            textShadow: '0 2px 12px rgba(255,215,0,0.3)',
           }}>
-            选择你的武将
+            {isLord ? '主公选将' : `${seatPlayer?.name || ('P' + charSelectTarget)} 选将`}
           </div>
+          {isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>主公已亮明身份</div>}
+          {!isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>选将保密</div>}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            gridTemplateColumns: `repeat(${Math.min(candidates.length, 5)}, 1fr)`,
             gap: 16,
             maxWidth: 800,
             width: '90%',
           }}>
-            {charOptions.map((ch, i) => {
+            {candidates.map((ch, i) => {
               const isSelected = selectedCharIdx === i;
+              const fi = getFactionInfo(ch.name);
               return (
                 <div
                   key={ch.name}
                   onClick={() => setSelectedCharIdx(i)}
                   style={{
-                    background: FACTION_BG[ch.faction] || '#333',
+                    background: FACTION_BG[fi.faction] || '#333',
                     borderRadius: 12,
                     padding: '24px 12px',
                     display: 'flex',
@@ -740,49 +851,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                     transform: isSelected ? 'translateY(-8px) scale(1.03)' : 'translateY(0)',
                     transition: 'all 0.25s cubic-bezier(0.23, 1, 0.32, 1)',
                   }}
-                  onMouseEnter={e => {
-                    if (!isSelected) {
-                      e.currentTarget.style.transform = 'translateY(-6px)';
-                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)';
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)';
-                    }
-                  }}
+                  onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)'; } }}
+                  onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)'; } }}
                 >
-                  <div style={{
-                    fontSize: 22,
-                    fontWeight: 'bold',
-                    color: '#fff',
-                    textShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                  }}>
-                    {ch.name}
-                  </div>
-                  <div style={{
-                    fontSize: 12,
-                    color: 'rgba(255,255,255,0.7)',
-                    background: 'rgba(0,0,0,0.2)',
-                    borderRadius: 6,
-                    padding: '2px 8px',
-                  }}>
-                    {ch.faction} · {ch.skills.join(' / ')}
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    gap: 3,
-                    marginTop: 4,
-                  }}>
-                    {Array.from({ length: ch.maxHealth }, (_, j) => (
-                      <div key={j} style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: '#e74c3c',
-                        boxShadow: '0 0 4px rgba(231,76,60,0.5)',
-                      }} />
+                  <div style={{ fontSize: 22, fontWeight: 'bold', color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{ch.name}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '2px 8px' }}>{fi.faction} · {ch.skills.join(' / ')}</div>
+                  <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                    {Array.from({ length: fi.maxHealth }, (_, j) => (
+                      <div key={j} style={{ width: 10, height: 10, borderRadius: '50%', background: '#e74c3c', boxShadow: '0 0 4px rgba(231,76,60,0.5)' }} />
                     ))}
                   </div>
                 </div>
@@ -792,33 +868,31 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           <button
             disabled={selectedCharIdx === null}
             onClick={() => {
-              if (selectedCharIdx !== null) {
-                setShowCharSelect(false);
+              if (selectedCharIdx !== null && candidates[selectedCharIdx]) {
+                // 发送选将 respond action 到引擎
+                onAction({
+                  skillId: '系统规则',
+                  actionType: '选将',
+                  ownerId: charSelectTarget,
+                  params: { character: candidates[selectedCharIdx].name },
+                });
+                setSelectedCharIdx(null);
               }
             }}
             style={{
-              marginTop: 32,
-              padding: '12px 56px',
-              fontSize: 18,
-              fontWeight: 'bold',
+              marginTop: 32, padding: '12px 56px', fontSize: 18, fontWeight: 'bold',
               color: selectedCharIdx !== null ? '#000' : '#666',
-              background: selectedCharIdx !== null
-                ? 'linear-gradient(135deg, #ffd700, #f0c000)'
-                : '#333',
-              border: 'none',
-              borderRadius: 8,
-              cursor: selectedCharIdx !== null ? 'pointer' : 'not-allowed',
-              boxShadow: selectedCharIdx !== null
-                ? '0 4px 16px rgba(255,215,0,0.3)'
-                : 'none',
-              transition: 'all 0.2s',
-              letterSpacing: 2,
+              background: selectedCharIdx !== null ? 'linear-gradient(135deg, #ffd700, #f0c000)' : '#333',
+              border: 'none', borderRadius: 8, cursor: selectedCharIdx !== null ? 'pointer' : 'not-allowed',
+              boxShadow: selectedCharIdx !== null ? '0 4px 16px rgba(255,215,0,0.3)' : 'none',
+              transition: 'all 0.2s', letterSpacing: 2,
             }}
           >
             确认选择
           </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* ─── 头部 ─── */}
       <div className={headerBar}>
@@ -962,102 +1036,98 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         </div>
       )}
 
-      {/* ─── 座位布局 ─── */}
+      {/* ─── 座位布局(弧形) ─── */}
       <div className={seatingArea}>
-        {/* 上排: 2人 */}
-        <div className={seatRowCenter}>
-          {orderedPlayers[3] && <PlayerSeatView
-            player={orderedPlayers[3]}
-            index={(perspectiveIdx + 3) % view.players.length}
-            view={view}
-            isCurrentPlayer={orderedPlayers[3].name === currentPlayerName}
-            isPerspective={orderedPlayers[3].name === perspectiveName}
-            needsTarget={selectedNeedsTarget}
-            isTargetable={isTargetable((perspectiveIdx + 3) % view.players.length)}
-            selectedTarget={selectedTarget}
-            remainingSeconds={orderedPlayers[3].name === currentPlayerName ? remainingSeconds : null}
-            onTargetClick={handleTargetClick}
-            onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
-            isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 3) % view.players.length)}
-            damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 3) % view.players.length) ?? 0}
-            isTurnGlow={orderedPlayers[3].name === currentPlayerName && anim.turnVersion > 0}
-            turnGlowVersion={anim.turnVersion}
-          />}
-          {orderedPlayers[2] && <PlayerSeatView
-            player={orderedPlayers[2]}
-            index={(perspectiveIdx + 2) % view.players.length}
-            view={view}
-            isCurrentPlayer={orderedPlayers[2].name === currentPlayerName}
-            isPerspective={orderedPlayers[2].name === perspectiveName}
-            needsTarget={selectedNeedsTarget}
-            isTargetable={isTargetable((perspectiveIdx + 2) % view.players.length)}
-            selectedTarget={selectedTarget}
-            remainingSeconds={orderedPlayers[2].name === currentPlayerName ? remainingSeconds : null}
-            onTargetClick={handleTargetClick}
-            onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
-            isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 2) % view.players.length)}
-            damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 2) % view.players.length) ?? 0}
-            isTurnGlow={orderedPlayers[2].name === currentPlayerName && anim.turnVersion > 0}
-            turnGlowVersion={anim.turnVersion}
-          />}
-        </div>
-
-        {/* 中排: 左下 | 中央信息 | 右下 */}
-        <div className={seatRowSpread}>
-          <div className={seatSlot160}>
-            {orderedPlayers[4] && <PlayerSeatView
-              player={orderedPlayers[4]}
-              index={(perspectiveIdx + 4) % view.players.length}
-              view={view}
-              isCurrentPlayer={orderedPlayers[4].name === currentPlayerName}
-              isPerspective={orderedPlayers[4].name === perspectiveName}
-              needsTarget={selectedNeedsTarget}
-              isTargetable={isTargetable((perspectiveIdx + 4) % view.players.length)}
-              selectedTarget={selectedTarget}
-              remainingSeconds={orderedPlayers[4].name === currentPlayerName ? remainingSeconds : null}
-              onTargetClick={handleTargetClick}
-              onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
-              isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 4) % view.players.length)}
-              damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 4) % view.players.length) ?? 0}
-              isTurnGlow={orderedPlayers[4].name === currentPlayerName && anim.turnVersion > 0}
-              turnGlowVersion={anim.turnVersion}
-            />}
-          </div>
-
-          <div className={centerMeta}>
-            <div className={metaText}>
-              牌堆: {Object.keys(view.cardMap).length} 张
-            </div>
-            {deadline != null && remainingSeconds !== null && (
-              <div className={countdownText}>
-                ⏱ {remainingSeconds}s
+        {/* 其他玩家沿弧形排列 */}
+        <div className={seatArcContainer}>
+          {orderedPlayers.slice(1).length > 0 && orderedPlayers.slice(1).map((player, i) => {
+            const totalOthers = orderedPlayers.length - 1;
+            const realIdx = view.players.findIndex(p => p.name === player.name);
+            // 沿 180° 弧形分布: 左端5% 右端95%, Y轴弧线中间高两端低
+            const t = totalOthers <= 1 ? 0.5 : i / (totalOthers - 1);
+            const leftPct = 5 + 90 * t;
+            const arcH = 1 - Math.cos(Math.PI * t); // 0→1→0
+            const topPct = 55 - 52 * arcH * 0.5;
+            return (
+              <div
+                key={player.name}
+                className={seatArcSlot}
+                style={{ left: `${leftPct}%`, top: `${topPct}%` }}
+              >
+                <PlayerSeatView
+                  player={player}
+                  index={realIdx}
+                  view={view}
+                  isCurrentPlayer={player.name === currentPlayerName}
+                  isPerspective={player.name === perspectiveName}
+                  needsTarget={selectedNeedsTarget}
+                  isTargetable={isTargetable(realIdx)}
+                  selectedTarget={selectedTarget}
+                  remainingSeconds={player.name === currentPlayerName ? remainingSeconds : null}
+                  onTargetClick={handleTargetClick}
+                  onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
+                  isDamaged={anim.damageFlashIndices.has(realIdx)}
+                  damageVersion={anim.damageFlashIndices.get(realIdx) ?? 0}
+                  isTurnGlow={player.name === currentPlayerName && anim.turnVersion > 0}
+                  turnGlowVersion={anim.turnVersion}
+                />
               </div>
-            )}
-          </div>
-
-          <div className={seatSlot160}>
-            {orderedPlayers[1] && <PlayerSeatView
-              player={orderedPlayers[1]}
-              index={(perspectiveIdx + 1) % view.players.length}
-              view={view}
-              isCurrentPlayer={orderedPlayers[1].name === currentPlayerName}
-              isPerspective={orderedPlayers[1].name === perspectiveName}
-              needsTarget={selectedNeedsTarget}
-              isTargetable={isTargetable((perspectiveIdx + 1) % view.players.length)}
-              selectedTarget={selectedTarget}
-              remainingSeconds={orderedPlayers[1].name === currentPlayerName ? remainingSeconds : null}
-              onTargetClick={handleTargetClick}
-              onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
-              isDamaged={anim.damageFlashIndices.has((perspectiveIdx + 1) % view.players.length)}
-              damageVersion={anim.damageFlashIndices.get((perspectiveIdx + 1) % view.players.length) ?? 0}
-              isTurnGlow={orderedPlayers[1].name === currentPlayerName && anim.turnVersion > 0}
-              turnGlowVersion={anim.turnVersion}
-            />}
-          </div>
+            );
+          })}
         </div>
 
-        {/* 下排: 自己 */}
-        <div className={seatRowCenter}>
+        {/* 中央信息区 */}
+        <div className={centerMeta}>
+          <div className={metaText}>
+            牌堆: {view.zones?.deckCount ?? Object.keys(view.cardMap).length} 张
+          </div>
+          {/* 处理区:中间结算的牌(判定牌 / 闪抵消杀) */}
+          {(() => {
+            const procIds = view.zones?.processing ?? [];
+            if (procIds.length === 0) return null;
+            return (
+              <div className={processingRow} title="处理区:正在结算的中间牌(判定/抵消等)">
+                <span className={processingLabel}>处理区:</span>
+                {procIds.map((cardId: string) => {
+                  const card = view.cardMap[cardId];
+                  if (!card) return null;
+                  const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
+                  const desc = getCardDescription(card.name);
+                  return (
+                    <span
+                      key={cardId}
+                      className={processingTag}
+                      style={{ color: suitColor, borderColor: suitColor }}
+                      title={desc || card.name}
+                    >
+                      {card.name} {card.suit}{card.rank}
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          {/* 弃牌堆:右上角一个小图标 + 数字 */}
+          <div className={discardPileRow}>
+            <span
+              className={discardPileIcon}
+              title="弃牌堆"
+            >
+              🗂
+            </span>
+            <span className={discardPileCount}>
+              弃牌: {view.zones?.discardPileCount ?? 0}
+            </span>
+          </div>
+          {deadline != null && remainingSeconds !== null && (
+            <div className={countdownText}>
+              ⏱ {remainingSeconds}s
+            </div>
+          )}
+        </div>
+
+        {/* 自己:底部中央 */}
+        <div className={seatBottom}>
           {orderedPlayers[0] && <PlayerSeatView
             player={orderedPlayers[0]}
             index={perspectiveIdx}
@@ -1084,8 +1154,22 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           <span className={handTitle}>
             {perspectiveName} 的手牌 ({perspectiveHand.length})
             {perspectiveIdx !== view.viewer && <span className={debugHint}> (调试视角)</span>}
+            {transformMode && (
+              <span className={debugHint} style={{ color: '#f1c40f', marginLeft: 8 }}>
+                ⚡ 转化模式:选1张{transformMode.wrapperName} · 源技能 {transformMode.skillId}
+              </span>
+            )}
           </span>
-          {selectedCardId && (
+          {transformMode && (
+            <button className={cancelBtn} onClick={() => {
+              setTransformMode(null);
+              setSelectedCardId(null);
+              setSelectedTarget(null);
+            }}>
+              取消转化
+            </button>
+          )}
+          {!transformMode && selectedCardId && (
             <button className={cancelBtn} onClick={() => { setSelectedCardId(null); setSelectedTarget(null); }}>
               取消选择
             </button>
@@ -1101,17 +1185,45 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             const __isPeachPending = __atomType === '请求回应' && __reqType === '求桃';
             const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀' || (__isPeachPending && card.name === '桃'));
             const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
-            const canClick = canPlay || isAwaiting || canDiscardClick;
+            // 转化模式下:只有匹配 filter 的牌可点(且是出牌阶段)
+            const isTransformMatch = transformMode !== null && transformMode.cardFilter(card);
+            const isTransformActive = transformMode !== null && isMyTurn && canOperate;
+            const isTransformDisabled = isTransformActive && !isTransformMatch;
+            const canClick = canPlay || isAwaiting || canDiscardClick || isTransformActive;
             const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
             const isNew = anim.newCardIds.has(card.id);
+            // 转化模式下:显示转化后的名称 + 原始牌名提示
+            const displayName = isTransformMatch && transformMode ? transformMode.wrapperName : card.name;
+            const totalHand = perspectiveHand.length;
+            // 扇形角度:从左到右 -10deg ~ +10deg
+            const fanAngle = totalHand > 1 ? -10 + 20 * (i / (totalHand - 1)) : 0;
+            const isHovered = false; // hover state handled by CSS
             return (
               <div
                 key={card.id}
                 data-card-id={card.id}
-                className={cx(handCard, isSelected && handCardSelected, (!canPlay && !isAwaiting && !canDiscardClick) && handCardDisabled, isAwaiting && handCardRespondable, isDiscardSelected && discardCardSelected, isNew && handCardNew)}
-                onClick={() => canClick && handleCardClick(card)}
+                className={cx(
+                  handCard,
+                  isSelected && handCardSelected,
+                  (!canPlay && !isAwaiting && !canDiscardClick && !isTransformActive) && handCardDisabled,
+                  isAwaiting && handCardRespondable,
+                  isDiscardSelected && discardCardSelected,
+                  isNew && handCardNew,
+                  isTransformMatch && handCardTransform,
+                  isTransformDisabled && handCardTransformDisabled,
+                )}
+                style={{ transform: `rotate(${fanAngle}deg)`, zIndex: i }}
+                onClick={() => canClick && !isTransformDisabled && handleCardClick(card)}
+                title={
+                  isTransformMatch && transformMode
+                    ? `${displayName} ${card.suit}${card.rank}\n(原:${card.name}) ${getCardDescription(displayName)}`.trim()
+                    : `${card.name} ${card.suit}${card.rank}\n${getCardDescription(card.name)}`
+                }
               >
-                <div className={cardName} style={{ color: suitColor }}>{card.name}</div>
+                <div className={cardName} style={{ color: suitColor }}>{displayName}</div>
+                {isTransformMatch && transformMode && (
+                  <div className={cardOrigin} style={{ color: suitColor }}>(原: {card.name})</div>
+                )}
                 <div className={cardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
               </div>
             );
@@ -1122,12 +1234,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       {/* ─── 武将技能区(基于 defineAction 注册表) ─── */}
       {/* 按 prompt 类型决定渲染方式: */}
       {/* - confirm/distribute/choosePlayer: 显示独立触发按钮 */}
-      {/* - useCard/useCardAndTarget/selectTarget: 影响手牌区可选性,不显示按钮 */}
+      {/* - useCardAndTarget + transform(转化技能): 显示独立触发按钮 */}
+      {/* - useCard/useCardAndTarget(非转化)/selectTarget: 影响手牌区可选性,不显示按钮 */}
       {(() => {
         const triggerableActions = skillActions.filter(a =>
           a.prompt.type === 'confirm' ||
           a.prompt.type === 'distribute' ||
-          a.prompt.type === 'choosePlayer'
+          a.prompt.type === 'choosePlayer' ||
+          (a.prompt.type === 'useCardAndTarget' && a.transform)
         );
         if (!(isMyTurn && canOperate && view.phase === '出牌' && triggerableActions.length > 0)) return null;
         return (
@@ -1139,7 +1253,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                 className={skillBtn}
                 style={action.style === 'danger' ? { borderColor: '#e74c3c' } : action.style === 'primary' ? { borderColor: '#f39c12' } : undefined}
                 onClick={() => handleSkillAction(action)}
-                title={action.prompt.title}
+                title={`${action.label}: ${action.prompt.title}`}
               >
                 {action.label}
               </button>
@@ -1152,7 +1266,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
       {/* ─── 操作面板 ─── */}
       <div className={actionBar}>
-        {canOperate && isMyTurn && view.phase === '出牌' && selectedCardId && (() => {
+        {/* 转化模式:在选中卡 + 选中目标后,提交 preceding + wrapper.use */}
+        {canOperate && isMyTurn && view.phase === '出牌' && transformMode && selectedCardId && (
+          <button className={playBtn} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}
+            style={selectedTarget ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
+            使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
+          </button>
+        )}
+        {canOperate && isMyTurn && view.phase === '出牌' && !transformMode && selectedCardId && (() => {
           const card = perspectiveHand.find(c => c.id === selectedCardId);
           const needsTarget = card ? TARGET_REQUIRED_CARDS.has(card.name) : false;
           const canPlay = !needsTarget || !!selectedTarget;
@@ -1269,6 +1390,15 @@ function PlayerSeatView({
 }: PlayerSeatProps) {
   const isDead = !player.alive;
   const isClickable = needsTarget && !isDead && isTargetable;
+  // 势力信息
+  const displayChar = player.character;
+  const charInfo = displayChar ? CHAR_POOL.find(c => c.name === displayChar) : null;
+  const faction = charInfo?.faction || '群';
+  const factionColor = FACTION_BG[faction] || '#8e44ad';
+
+  // 身份
+  const identity = player.identity;
+  const showIdentity = identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
 
   return (
     <div
@@ -1287,56 +1417,62 @@ function PlayerSeatView({
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onPerspectiveChange(index)}
     >
-      <div className={seatHeader}>
-        <div>
-          <span className={seatIndexBadge}>[{index + 1}号]</span>
-          <span className={seatName}>{player.name}</span>
-          {player.character && <span className={seatChar}>({player.character})</span>}
-          {/* 身份显示:hideIdentity=true 时隐藏非自己/非主公/非死亡的身份 */}
-          {(() => {
-            // debug 模式下前端自己计算身份可见性
-            // 服务端 debug=true 暴露所有 identity,前端按规则只显示自己/主公/死亡
-            const identity = player.identity;
-            if (!identity) {
-              if (player.identityHidden) return <span className={hiddenBadge}>暗</span>;
-              return null;
-            }
-            // hideIdentity 模式(debug 多人):只显示自己/主公/死亡
-            if (hideIdentity && !isPerspective && identity !== '主公' && player.alive) {
-              return <span className={hiddenBadge}>暗</span>;
-            }
-            return (
+      {/* 势力色顶部条:武将名 + 座号 + 身份 */}
+      <div className={seatCardHeader} style={{ background: factionColor }}>
+        <div className={seatCardHeaderTop}>
+          <span className={seatIndexBadge}>#{index + 1}</span>
+          <span className={seatName}>{player.name.slice(0, 6)}</span>
+          <div>
+            {isPerspective && <span className={youBadge}>我</span>}
+            {isCurrentPlayer && <span className={turnBadge}>回合</span>}
+            {isDead && <span style={{ fontSize: 10, color: '#fff', marginLeft: 2 }}>亡</span>}
+            {showIdentity && identity && (
               <span
                 className={
                   identity === '主公' ? lordBadge :
                   identity === '忠臣' ? loyalistBadge :
                   identity === '反贼' ? rebelBadge :
-                  renegadeBadge
+                  identity === '内奸' ? renegadeBadge :
+                  ''
                 }
               >
                 {identity}
               </span>
-            );
-          })()}
-          {isPerspective && <span className={youBadge}>视角</span>}
-          {isCurrentPlayer && <span className={turnBadge}>回合</span>}
-          {isDead && <span> 💀</span>}
+            )}
+            {!showIdentity && player.identityHidden !== false && (
+              <span className={hiddenBadge}>暗</span>
+            )}
+          </div>
         </div>
-        <div className={cx(
-          player.health === 1 ? hpLow : player.health <= player.maxHealth / 2 ? hpMid : hpFull,
-          isDamaged && hpFlash,
-        )} key={`hp-${damageVersion}`}>
-          ♥ {player.health}/{player.maxHealth}
-        </div>
+        <div className={seatCharName}>{displayChar || '未知'}</div>
       </div>
-      <div className={skillRow}>
-        {player.skills.filter(s => !DEFAULT_SKILLS.has(s)).map(s => (
-          <span key={s} className={skillTag}>{s}</span>
+      {/* 体力红心 */}
+      <div className={seatHpRow}>
+        {Array.from({ length: player.maxHealth }, (_, i) => (
+          <span
+            key={i}
+            className={cx(i < player.health ? hpHeartFull : hpHeartEmpty, isDamaged && hpFlash)}
+          >
+            ♥
+          </span>
         ))}
       </div>
+      {/* 技能标签 */}
+      {player.skills.filter(s => !DEFAULT_SKILLS.has(s)).filter(s => !EQUIPMENT_SKILLS.has(s)).length > 0 && (
+        <div className={skillRow} style={{ padding: '2px 10px' }}>
+          {player.skills
+            .filter(s => !DEFAULT_SKILLS.has(s))
+            .filter(s => !EQUIPMENT_SKILLS.has(s))
+            .map(s => (
+              <span key={s} className={skillTag}>{s}</span>
+            ))}
+        </div>
+      )}
+      {/* 手牌数 + 基本信息 */}
       <div className={infoRow}>
         <span>手牌: {player.handCount}</span>
       </div>
+      {/* 装备区 */}
       {Object.keys(player.equipment).length > 0 && (
         <div className={equipRow}>
           {Object.entries(player.equipment).map(([slot, cardId]) => {
@@ -1347,10 +1483,35 @@ function PlayerSeatView({
               slot === '进攻马' ? '🐎+' :
               slot === '防御马' ? '🐎-' :
               '💎';
-            return <span key={slot}>{icon}{card?.name ?? cardId}</span>;
+            return <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>{icon}{card?.name ?? cardId}</span>;
           })}
         </div>
       )}
+      {/* 判定区(延时锦囊) */}
+      {(() => {
+        const ids = player.pendingTricks ?? [];
+        if (ids.length === 0) return null;
+        return (
+          <div className={judgeRow}>
+            <span className={judgeRowLabel}>判定:</span>
+            {ids.map((cardId: string) => {
+              const card = view.cardMap[cardId];
+              const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
+              const desc = card ? getCardDescription(card.name) : '';
+              return (
+                <span
+                  key={cardId}
+                  className={judgeTag}
+                  style={{ color: suitColor, borderColor: suitColor }}
+                  title={desc || card?.name || cardId}
+                >
+                  {card?.name ?? cardId}{card ? ` ${card.suit}${card.rank}` : ''}
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
       {player.marks.length > 0 && (
         <div className={markRow}>
           {player.marks.map(m => (
@@ -1367,12 +1528,12 @@ function PlayerSeatView({
   );
 }
 
-// ==================== Styles ====================
+// ==================== Styles ====================```
 
 const pageRoot = css`
   padding: 12px;
   font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
-  background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%);
+  background: linear-gradient(180deg, #1a0f0a 0%, #2d1810 30%, #1e1008 70%, #0d0804 100%);
   color: #e0e0e0;
   min-height: 100vh;
   overflow-x: hidden;
@@ -1457,42 +1618,109 @@ const waitingHint = css`
   text-align: center; color: #888; font-size: 13px; margin-bottom: 12px;
 `;
 
-// Seating
-const seatingArea = css`margin-bottom: 16px;`;
-const seatRowCenter = css`
-  display: flex; justify-content: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap;
+// Seating — arc layout
+const seatingArea = css`
+  position: relative;
+  margin-bottom: 16px;
+  min-height: 320px;
 `;
-const seatRowSpread = css`
-  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
+// 弧形排列容器:其他玩家沿上半部分弧线分布
+const seatArcContainer = css`
+  position: relative;
+  width: 100%;
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  overflow: visible;
 `;
-const seatSlot160 = css`width: 160px;`;
+// 弧形中每个座位槽位:用 absolute 精确定位
+const seatArcSlot = css`
+  position: absolute;
+  transform: translateX(-50%);
+`;
+// 自己座位:底部居中
+const seatBottom = css`
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+`;
 const centerMeta = css`
-  text-align: center; flex: 1;
+  text-align: center;
+  margin: 8px auto;
+  max-width: 300px;
 `;
 const metaText = css`font-size: 12px; color: #888;`;
 const countdownText = css`font-size: 18px; color: #e67e22; font-weight: bold; margin-top: 4px;`;
 
-// Seat card
+// Seat card — 武将卡风格:势力色 header + 体力红心 + 技能标签
 const seatCard = css`
-  border: 1px solid #333; border-radius: 8px; padding: 10px 14px;
-  background: rgba(22,33,62,0.8); transition: all 0.2s; min-width: 180px;
+  border: 1px solid #444;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.5);
+  transition: all 0.25s;
+  min-width: 170px;
+  max-width: 200px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
 `;
-const seatCardActive = css`border: 2px solid #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.2);`;
-const seatCardPerspective = css`border: 2px solid #3498db;`;
-const seatCardDead = css`opacity: 0.35;`;
-const seatCardClickable = css`cursor: pointer; &:hover { border-color: #e74c3c; }`;
-const seatCardTargeted = css`outline: 3px solid #e74c3c;`;
+// 势力色顶部条:武将名 + 身份
+const seatCardHeader = css`
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+const seatCardHeaderTop = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+const seatCharName = css`
+  font-weight: bold;
+  font-size: 15px;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+`;
+// 体力行:红心表示 HP
+const seatHpRow = css`
+  display: flex;
+  gap: 2px;
+  padding: 4px 10px;
+  background: rgba(0,0,0,0.3);
+`;
+const hpHeartFull = css`
+  color: #e74c3c;
+  font-size: 16px;
+  text-shadow: 0 0 4px rgba(231,76,60,0.5);
+`;
+const hpHeartEmpty = css`
+  color: #555;
+  font-size: 14px;
+`;
+const seatCardActive = css`
+  box-shadow: 0 0 18px rgba(255,215,0,0.35), inset 0 0 8px rgba(255,215,0,0.1);
+  outline: 2px solid #ffd700;
+`;
+const seatCardPerspective = css`
+  border: 2px solid #3498db;
+  box-shadow: 0 0 8px rgba(52,152,219,0.25);
+`;
+const seatCardDead = css`opacity: 0.35; filter: grayscale(1);`;
+const seatCardClickable = css`cursor: pointer; &:hover { outline: 2px solid #e74c3c; }`;
+const seatCardTargeted = css`outline: 3px solid #e74c3c; box-shadow: 0 0 12px rgba(231,76,60,0.4);`;
 const seatHeader = css`
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+  display: flex; justify-content: space-between; align-items: center;
 `;
-const seatName = css`font-weight: bold; font-size: 14px;`;
+const seatName = css`font-weight: bold; font-size: 12px; color: rgba(255,255,255,0.85);`;
 const seatIndexBadge = css`
   display: inline-block;
-  background: rgba(136,153,170,0.25);
-  color: #8899aa;
+  background: rgba(0,0,0,0.2);
+  color: rgba(255,255,255,0.6);
   border-radius: 3px;
   padding: 1px 5px;
-  margin-right: 6px;
+  margin-right: 4px;
   font-size: 10px;
   font-weight: normal;
   vertical-align: middle;
@@ -1500,27 +1728,27 @@ const seatIndexBadge = css`
 const seatChar = css`color: #8899aa; font-size: 12px; margin-left: 4px;`;
 const youBadge = css`
   background: #3498db; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #fff; margin-left: 6px; font-weight: bold;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
 `;
 const turnBadge = css`
   background: #ffd700; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #000; margin-left: 4px; font-weight: bold;
+  font-size: 9px; color: #000; margin-left: 4px; font-weight: bold;
 `;
 const lordBadge = css`
-  background: #ffd700; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #4a2800; margin-left: 4px; font-weight: bold;
+  background: #FFD700; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #4a2800; margin-left: 4px; font-weight: bold;
 `;
 const loyalistBadge = css`
-  background: #4a90e2; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #4A90E2; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
 `;
 const rebelBadge = css`
-  background: #e74c3c; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #E74C3C; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
 `;
 const renegadeBadge = css`
-  background: #8e44ad; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #9B59B6; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
 `;
 const hiddenBadge = css`
   background: #555; border-radius: 3px; padding: 1px 5px;
@@ -1530,27 +1758,73 @@ const hpFull = css`color: #2ecc71; font-weight: bold; font-size: 13px;`;
 const hpMid = css`color: #e67e22; font-weight: bold; font-size: 13px;`;
 const hpLow = css`color: #e74c3c; font-weight: bold; font-size: 13px;`;
 const equipRow = css`
-  font-size: 12px;
+  font-size: 11px;
   color: #f39c12;
-  margin-top: 2px;
+  padding: 0 10px 4px;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 `;
+// 判定区(延时锦囊):斜体、紫色边框,亮眼能看清
+const judgeRow = css`
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  margin-top: 2px; font-size: 11px;
+`;
+const judgeRowLabel = css`color: #b78bff; font-weight: bold;`;
+const judgeTag = css`
+  display: inline-block; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid; background: rgba(155, 89, 182, 0.12);
+  font-weight: bold;
+`;
+// 处理区:游戏中央的一排小卡
+const processingRow = css`
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  margin: 6px auto; padding: 4px 8px;
+  background: rgba(231, 126, 34, 0.12);
+  border: 1px dashed #e67e22;
+  border-radius: 6px;
+  max-width: 240px;
+  font-size: 11px;
+  justify-content: center;
+`;
+const processingLabel = css`color: #e67e22; font-weight: bold;`;
+const processingTag = css`
+  display: inline-block; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid; background: rgba(230, 126, 34, 0.08);
+  font-weight: bold;
+`;
+// 弃牌堆:小图标 + 计数
+const discardPileRow = css`
+  display: flex; align-items: center; gap: 4px;
+  justify-content: center;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #aaa;
+`;
+const discardPileIcon = css`
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  background: rgba(231, 76, 60, 0.18);
+  border: 1px solid #e74c3c;
+  border-radius: 4px;
+  font-size: 14px;
+`;
+const discardPileCount = css`color: #e0e0e0; font-weight: bold;`;
 const skillRow = css`margin-bottom: 4px;`;
 const skillTag = css`
-  display: inline-block; background: #0f3460; border-radius: 4px;
-  padding: 1px 6px; margin-right: 4px; font-size: 11px; color: #8899aa;
+  display: inline-block; background: rgba(15,52,96,0.6); border-radius: 3px;
+  padding: 1px 5px; margin-right: 3px; font-size: 10px; color: #8899aa;
 `;
 const infoRow = css`
-  font-size: 12px; color: #888; display: flex; flex-wrap: wrap; gap: 8px;
+  font-size: 11px; color: #999; display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 2px 10px 4px;
 `;
-const markRow = css`font-size: 11px; color: #666; margin-top: 2px;`;
+const markRow = css`font-size: 10px; color: #666; padding: 0 10px 4px;`;
 const markTag = css`margin-right: 6px;`;
 const timerText = css`font-size: 12px; color: #e67e22; margin-top: 4px; font-weight: bold;`;
 
 // Hand cards
-const handSection = css`margin-bottom: 12px;`;
+const handSection = css`margin-bottom: 12px; padding: 0 8px;`;
 const handHeader = css`
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
 `;
@@ -1560,15 +1834,39 @@ const cancelBtn = css`
   border: 1px solid #555; border-radius: 4px; padding: 2px 8px;
   cursor: pointer; background: transparent; color: #aaa; font-size: 11px;
 `;
-const handList = css`display: flex; flex-wrap: wrap; gap: 8px;`;
+const handList = css`
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0;
+  margin-bottom: 8px;
+  min-height: 120px;
+  padding: 8px 0 0;
+`;
 const handCard = css`
-  border: 2px solid #444; border-radius: 8px; padding: 10px 14px;
-  cursor: pointer; background: rgba(22,33,62,0.9); min-width: 70px;
-  text-align: center; transition: all 0.15s;
+  border: 2px solid #555;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: linear-gradient(180deg, rgba(30,20,15,0.95) 0%, rgba(20,12,8,0.95) 100%);
+  min-width: 72px;
+  width: 80px;
+  text-align: center;
+  transition: all 0.2s;
+  transform-origin: bottom center;
+  box-shadow: -1px 2px 6px rgba(0,0,0,0.3);
+  margin-left: -16px;
+  &:first-of-type { margin-left: 0; }
+  &:hover {
+    z-index: 100 !important;
+    margin-bottom: 8px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+    border-color: #888;
+  }
 `;
 const handCardSelected = css`
-  border: 2px solid #3498db; background: rgba(52,152,219,0.2);
-  transform: translateY(-4px); box-shadow: 0 4px 12px rgba(52,152,219,0.3);
+  border: 2px solid #3498db; background: rgba(52,152,219,0.18);
+  margin-bottom: 8px; box-shadow: 0 4px 12px rgba(52,152,219,0.3);
 `;
 const handCardDisabled = css`opacity: 0.4; cursor: default;`;
 const handCardRespondable = css`
@@ -1576,14 +1874,25 @@ const handCardRespondable = css`
   box-shadow: 0 0 10px rgba(255,215,0,0.4);
   background: rgba(255,215,0,0.08);
 `;
+// 转化模式:匹配卡牌用金色高亮表示可作为“转化后的牌”点选
+const handCardTransform = css`
+  border: 2px solid #f1c40f;
+  box-shadow: 0 0 10px rgba(241,196,15,0.5);
+  background: rgba(241,196,15,0.08);
+  cursor: pointer;
+  &:hover { background: rgba(241,196,15,0.18); }
+`;
+// 转化模式:不匹配卡牌变灰、不可点
+const handCardTransformDisabled = css`opacity: 0.3; cursor: not-allowed;`;
 const discardCardSelected = css`
   opacity: 0.5;
   border: 2px solid #e74c3c;
   border-radius: 6px;
   background: rgba(231,76,60,0.18);
 `;
-const cardName = css`font-weight: bold; font-size: 15px; margin-bottom: 2px;`;
-const cardSuit = css`font-size: 12px;`;
+const cardName = css`font-weight: bold; font-size: 16px; margin-bottom: 2px; letter-spacing: 1px;`;
+const cardSuit = css`font-size: 13px; margin-top: 2px;`;
+const cardOrigin = css`font-size: 10px; opacity: 0.7; margin-bottom: 2px; font-style: italic;`;
 const emptyHand = css`color: #555; font-size: 13px; padding: 12px;`;
 
 // ─── 动画状态样式 ───

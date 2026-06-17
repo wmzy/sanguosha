@@ -12,9 +12,10 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(_skill: Skill, ownerId: number): () => void {
   registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'number') return 'target required';
-      if (params.target === ownerId) return '不能对自己使用';
-      const target = state.players[params.target];
+      if (!Array.isArray(params.targets) || typeof params.targets[0] !== 'number') return 'target required';
+      const targetIdx = params.targets[0];
+      if (targetIdx === ownerId) return '不能对自己使用';
+      const target = state.players[targetIdx];
       if (!target?.alive) return '目标不存在或已死亡';
       const hasCards = target.hand.length > 0 || Object.keys(target.equipment).length > 0;
       if (!hasCards) return '目标没有牌';
@@ -24,7 +25,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const from = ownerId;
       pushFrame(state, '过河拆桥', from, { ...params });
       const cardId = params.cardId as string;
-      const target = params.target as number;
+      const target = (params.targets as number[])?.[0] ?? params.target as number;
       // 移锦囊到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 询问无懈可击

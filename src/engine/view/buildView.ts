@@ -77,6 +77,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       handCount: p.hand.length,
       hand: (i === viewer || debug) ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
       marks: p.marks,
+      // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)
+      pendingTricks: p.pendingTricks.map(t => t.card.id),
       ...(() => {
         const rawIdentity = p.vars['身份'] as string | undefined;
         if (!rawIdentity) return { identity: undefined, identityHidden: false };
@@ -94,5 +96,11 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     pending,
     turnDeadline,
     log,
+    zones: {
+      deckCount: state.zones.deck.length,
+      discardPileCount: state.zones.discardPile.length,
+      // 处理区:判定牌 / 中间结算的卡(闪抵消杀等)
+      processing: [...state.zones.processing],
+    },
   };
 }

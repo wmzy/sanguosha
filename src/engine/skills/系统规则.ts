@@ -42,6 +42,32 @@ export function onInit(_skill: Skill, _ownerId: number): () => void {
     }
   });
 
+  // ── 选将 respond action:玩家选择武将 ──
+  // respond action: 系统规则:-1:选将, 客户端发 {skillId:'系统规则', actionType:'选将', ownerId: target, params:{character:'刘备'}}
+  registerAction('系统规则', -1, '选将', (state, params) => {
+    const slot = state.pendingSlot;
+    if (!slot) return '当前不需要回应';
+    if (slot.atom.type !== '选将询问') return '当前不是选将窗口';
+    const character = params.character as string;
+    if (typeof character !== 'string') return 'character required';
+    const candidates = (slot.atom as { candidates: Array<{ name: string }> }).candidates;
+    if (!candidates.some(c => c.name === character)) return '选择的武将不在候选人中';
+    return null;
+  }, async (state, params) => {
+    const slot = state.pendingSlot!;
+    const target = (slot.atom as { target: number }).target;
+    const character = params.character as string;
+    const candidates = (slot.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates;
+    const selected = candidates.find(c => c.name === character)!;
+    const p = state.players[target];
+    if (!p) return;
+    p.character = selected.name;
+    p.name = selected.name;
+    // 保留 DEFAULT_SKILLS 引擎里已定义的默认技能列表
+    const DEFAULT = ['回合管理', '装备通用', '杀', '闪', '桃', '酒', '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '借刀杀人', '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击'];
+    p.skills = [...selected.skills, ...DEFAULT];
+  });
+
   // ── 弃牌阶段 respond action:玩家选择弃哪些牌 ──
   registerAction('系统规则', -1, 'respond', (state: GameState, params: Record<string, Json>) => {
     const slot = state.pendingSlot;

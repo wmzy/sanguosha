@@ -5,7 +5,7 @@
 // 提交时一个 ClientMessage:preceding=[武圣.transform] + 主 action=杀.use。
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
-import type { Card, GameState, Json, Skill } from '../types';
+import type { Card, CardWrapper, GameState, Json, Skill } from '../types';
 import { registerAction, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -72,16 +72,18 @@ export function onInit(skill: Skill, ownerId: number): () => void {
 }
 
 export function onMount(skill: Skill, api: { defineAction: Function }): void {
-  // 前端:武圣是转化技,defineAction 声明可选红牌。
-  // 前端 UI 流程:点武圣 → 选红牌(加"杀"显示) → 点杀选目标 → 提交 preceding+主 action。
+  // 前端:武圣是转化技,defineAction 声明红牌+目标。
+  // 前端 UI 流程:选红牌 → 选目标 → 点武圣按钮 → 提交 preceding=[武圣.transform] + 主 action=杀.use。
   api.defineAction('transform', {
     label: '武圣',
     style: 'passive',
     prompt: {
-      type: 'useCard',
+      type: 'useCardAndTarget',
       title: '选择一张红色牌当杀使用',
       cardFilter: { filter: (c: Card) => c.suit === '♥' || c.suit === '♦', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 1 },
     },
+    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id } as CardWrapper),
   });
   return;
 }

@@ -232,7 +232,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   let entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
   // 系统级 respond 回退:玩家 ownerId 找不到时,尝试系统级(-1)注册
   // 仅在有 pendingSlot 时(即 respond 路径)启用,use() 路径不受影响
-  if (!entry && message.actionType === 'respond' && state.pendingSlot) {
+  if (!entry && (message.actionType === 'respond' || message.actionType === '选将') && state.pendingSlot) {
     entry = findActionEntry(message.skillId, -1, message.actionType);
   }
   if (!entry || entry.validate(state, message.params) !== null){
@@ -521,6 +521,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
           }
         }
         promoteChoiceQueue(state);
+        notifyStateChange(state);
         safeResolve();
       };
       slot._fireTimeoutNow = fireTimeoutNow;

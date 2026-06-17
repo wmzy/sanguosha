@@ -1,7 +1,7 @@
 // src/engine/atoms/选将.ts
 // 游戏初始化 atoms:抽身份、选将、发牌
 // 每个 atom 做一件事,符合三国杀身份局规则
-import type { AtomDefinition, PlayerState } from '../types';
+import type { ActionPrompt, AtomDefinition, PlayerState } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
 import { registerAtom } from '../atom';
@@ -104,17 +104,17 @@ export const 选将: AtomDefinition<{
       pool[j] = tmp;
     }
 
-    // 主公从池中选(取第一个),其他人依次分配
-    const lord = pool.find(c => c.name === '主公');
+    // 主公从池中选(取第一个非主公角色),其他人依次分配
     const others = pool.filter(c => c.name !== '主公');
-    const selected = lord ? [lord, ...others.slice(0, playerCount - 1)] : others.slice(0, playerCount);
+    const selected = others.slice(0, playerCount);
 
-    // 更新玩家武将和技能
+    // 更新玩家武将、技能和显示名
     for (let i = 0; i < state.players.length; i++) {
       const char = selected[i];
       if (!char) continue;
       const p = state.players[i];
       p.character = char.name;
+      p.name = char.name;
       p.skills = [...char.skills, ...DEFAULT_SKILLS];
     }
   },
@@ -177,3 +177,34 @@ registerAtom(抽身份);
 registerAtom(选将);
 registerAtom(初始化洗牌);
 registerAtom(发牌);
+
+// ── 选将询问(交互式选将) ──────────────────────────────
+// 等待型 atom:给目标玩家展示候选人,等待选择。
+// 开局.execute 依次为每个玩家 applyAtom(选将询问)。
+// 候选人列表存在 atom.candidates 字段,前端从 view.pending.atom.candidates 渲染。
+// respond action(系统规则:respond, requestType='__选将') 读取玩家选择并分配武将。
+export const 选将询问: AtomDefinition<{
+  type: '选将询问';
+  target: number;
+  candidates: Array<{ name: string; skills: string[] }>;
+  prompt?: ActionPrompt;
+}> = {
+  type: '选将询问',
+  validate(state, atom) {
+    if (!state.players[atom.target]) return `target ${atom.target} not found`;
+    if (!Array.isArray(atom.candidates) || atom.candidates.length === 0) return 'candidates required';
+    return null;
+  },
+  apply(_state) {
+    // 等待型 atom——apply 不修改 state
+  },
+  pending: {
+    onTimeout: { type: '无操作' },
+    // 前端从 atom 实例读 candidates 和 prompt
+    prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
+    timeout: 60,
+  },
+  effect: { blockUntilDone: true, duration: 200 },
+};
+
+registerAtom(选将询问);

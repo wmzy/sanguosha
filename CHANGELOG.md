@@ -18,6 +18,11 @@ All notable changes to this project will be documented in this file.
 - **P1 buildView 读取定义级 prompt**: 丢弃了 atom 实例的动态 prompt。修复:优先读 atom 实例 prompt。
 - **P1 pending UI 硬编码**: 只渲染闪/杀按钮。修复:根据 requestType 动态渲染(求桃→出桃/不救)。
 - **P1 身份可见性规则**: debug 模式全可见,正式模式按规则隐藏。
+- **P0 主公分配假角色**: CHARACTERS 含 `{name:'主公',skills:[]}` 假角色,选将 atom 优先分给主公座次导致无武将技能。修复:删除假角色,主公选真实武将。(`src/server/session.ts`, `src/engine/atoms/选将.ts`)
+- **P0 刷新重复展示身份/选将**: useState 刷新后重置。修复:sessionStorage 标记。(`src/client/components/GameView.tsx`)
+- **P0 pending 超时不推进**: fireTimeout 后未调 notifyStateChange。修复:补充调用。(`src/engine/create-engine.ts`)
+- **P1 过河拆桥 targets/target 契约错配**: validate 改为兼容 targets 数组。(`src/engine/skills/过河拆桥.ts`)
+- **P1 武圣不能使用**: prompt 类型改为 useCardAndTarget + transform + preceding 提交。(`src/engine/skills/武圣.ts`, `src/client/components/GameView.tsx`)
 
 #### Added
 - **选将 UI**: 游戏开始展示武将选择遮罩(5张随机武将卡,阵营色,hover 效果,确认选择)。(`src/client/components/GameView.tsx`)

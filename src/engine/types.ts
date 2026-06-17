@@ -151,7 +151,8 @@ export type ActionPrompt =
   | UseCardAndTargetPrompt
   | ConfirmPrompt
   | DistributePrompt
-  | ChoosePlayerPrompt;
+  | ChoosePlayerPrompt
+  | ChooseCharacterPrompt;
 
 export interface CardFilter {
   filter?: (card: Card) => boolean;
@@ -206,6 +207,15 @@ export interface ChoosePlayerPrompt {
   min: number;
   max: number;
   filter?: (view: GameView, target: number) => boolean;
+}
+
+/** 选将(从候选人中选一个武将) */
+export interface ChooseCharacterPrompt {
+  type: 'chooseCharacter';
+  title: string;
+  description?: string;
+  /** 可选武将列表 */
+  candidates: Array<{ name: string; skills: string[] }>;
 }
 
 // ==================== Atom ====================
@@ -310,6 +320,7 @@ export type Atom =
   // 初始化
   | { type: '抽身份'; playerCount: number; seed: number }
   | { type: '选将'; characters: Array<{ name: string; skills: string[] }>; seed: number }
+  | { type: '选将询问'; target: number; candidates: Array<{ name: string; skills: string[] }>; prompt?: ActionPrompt }
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number; lordBonus?: number }
   | { type: '判定'; player: number; judgeType: string }
@@ -376,12 +387,23 @@ export interface GameView {
     /** 该玩家的身份已分配但当前视角不可见。identity 为 undefined 时,
      *  若 identityHidden=true 则显示「暗」,否则不渲染身份徽章(尚未分配)。 */
     identityHidden?: boolean;
+    /** 判定区(延时锦囊)。元素为 cardId,通过 cardMap 查 Card */
+    pendingTricks?: string[];
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;
   /** 出牌/弃牌阶段的操作截止时间(独立于 pending) */
   turnDeadline: number | null;
   log: { time: number; player: number; text: string }[];
+  /** 公共区域摘要(供前端渲染牌堆/弃牌堆/处理区) */
+  zones?: {
+    /** 牌堆剩余牌数 */
+    deckCount: number;
+    /** 弃牌堆数量 */
+    discardPileCount: number;
+    /** 处理区的卡牌(判定/出杀等中间结算)。元素为 cardId */
+    processing: string[];
+  };
 }
 
 /**
