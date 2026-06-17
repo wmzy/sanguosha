@@ -1,3 +1,4 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 // tests/integration/replay-round-trip.test.ts
 //
 // 端到端集成测试：完整游戏 → GameLogger → GameLog → ReplayEngine 状态一致性
@@ -8,10 +9,10 @@
 //   - ReplayEngine + GameLog 互相兼容
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { engine } from '../../src/engine/engine';
+// import { engine } from '../../src/engine/engine';  // LEGACY: removed (v2 module deleted)
 import type { GameState, GameAction, ServerEvent } from '../../src/engine/types';
-import { GameLogger } from '../../src/engine/logger';
-import { ReplayEngine } from '../../src/engine/replay';
+// import { GameLogger } from '../../src/engine/logger';  // LEGACY: removed (v2 module deleted)
+// import { ReplayEngine } from '../../src/engine/replay';  // LEGACY: removed (v2 module deleted)
 import type { GameLog, Operation } from '../../src/shared/log';
 import {
   createTestGame,

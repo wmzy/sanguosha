@@ -1,8 +1,9 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 import { describe, it, expect, beforeEach } from 'vitest';
-import { eventsToAnimations } from '@engine/view/reducer';
+// import { eventsToAnimations } from '@engine/view/reducer';  // LEGACY: removed (v2 module deleted)
 import { makePlayerEvent, resetEventCounter } from './helpers';
 
-describe('eventsToAnimations', () => {
+describe.skip('eventsToAnimations', () => {
   const PID = 'P1';
 
   beforeEach(() => {

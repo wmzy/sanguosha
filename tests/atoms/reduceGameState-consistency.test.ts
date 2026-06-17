@@ -1,6 +1,7 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 import { describe, it, expect } from 'vitest';
 import { applyAtoms } from '@engine/atom';
-import { reduceGameState } from '@engine/view/reducer';
+// import { reduceGameState } from '@engine/view/reducer';  // LEGACY: removed (v2 module deleted)
 import { createTestGame } from '../engine-helpers';
 import '@engine/atoms/index';
 import type { GameState } from '@engine/types';

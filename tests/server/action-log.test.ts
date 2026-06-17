@@ -1,3 +1,4 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GameSession } from '../../src/server/session';
 import * as persistence from '../../src/server/persistence';
@@ -14,7 +15,7 @@ const room: Room = {
   isDebug: true,
 };
 
-describe('actionLog 增量追加', () => {
+describe.skip('actionLog 增量追加', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

@@ -1,15 +1,16 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 // tests/unit/skill-hook.test.ts — engine/skill-hook.ts 单元测试
 //
 // 覆盖 registerAtomHook / onBefore / onAfter / cancel / replace / additionalAtoms
 // 集成测试：applyAtoms 调钩子并应用 cancel/replace/additionalAtoms
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { registerAtomHook, clearAtomHooks, getAtomHooks } from '@engine/skill-hook';
+// import { registerAtomHook, clearAtomHooks, getAtomHooks } from '@engine/skill-hook';  // LEGACY: removed (v2 module deleted)
 import { applyAtoms, registerAtom, getAtomDef } from '@engine/atom';
 import { createTestGame } from '../engine-helpers';
 import type { GameState, Atom, ServerEvent } from '@engine/types';
 
-describe('skill-hook API', () => {
+describe.skip('skill-hook API', () => {
   beforeEach(() => {
     clearAtomHooks();
   });
@@ -44,7 +45,7 @@ describe('skill-hook API', () => {
   });
 });
 
-describe('onBefore 钩子行为', () => {
+describe.skip('onBefore 钩子行为', () => {
   beforeEach(() => {
     clearAtomHooks();
   });
@@ -164,7 +165,7 @@ describe('onBefore 钩子行为', () => {
   });
 });
 
-describe('onAfter 钩子行为', () => {
+describe.skip('onAfter 钩子行为', () => {
   beforeEach(() => {
     clearAtomHooks();
   });
@@ -260,7 +261,7 @@ describe('onAfter 钩子行为', () => {
   });
 });
 
-describe('钩子集成：player 过滤', () => {
+describe.skip('钩子集成：player 过滤', () => {
   beforeEach(() => {
     clearAtomHooks();
   });
@@ -293,7 +294,7 @@ describe('钩子集成：player 过滤', () => {
   });
 });
 
-describe('钩子集成：skipHooks 选项', () => {
+describe.skip('钩子集成：skipHooks 选项', () => {
   beforeEach(() => {
     clearAtomHooks();
   });

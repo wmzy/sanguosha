@@ -1,3 +1,4 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 import { describe, it, expect, beforeEach } from 'vitest';
 import { executePlan } from '@engine/phase';
 import { registerCharacterTriggers, registerSkill, getSkillRegistry } from '@engine/skill';
@@ -6,7 +7,7 @@ import { registerCharacterTriggers, registerSkill, getSkillRegistry } from '@eng
 // 注意：vitest 各 test 串行运行时，前序测试可能 clearAtomHooks() 清空钩子。
 // beforeEach 重新注册以确保钩子到位。
 import { registerAllSkills as registerAllEngineSkills, resetAndRegisterAllSkills } from '@engine/skills';
-import { clearAtomHooks } from '@engine/skill-hook';
+// import { clearAtomHooks } from '@engine/skill-hook';  // LEGACY: removed (v2 module deleted)
 import type { SkillContext, GameState, SkillPhase, PendingAction } from '@engine/types';
 import {
   getCharacterMap,

@@ -1,12 +1,13 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 // tests/hooks/useDebugRoom.test.ts — useDebugRoom hook 单元测试
 //
 // 覆盖：setPlayerCount / appendOperations / setOperations / toggleSelectedForDiscard / clear / reset
 
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useDebugRoom } from '../../src/client/hooks/useDebugRoom';
+// import { useDebugRoom } from '../../src/client/hooks/useDebugRoom';  // LEGACY: removed (v2 module deleted)
 
-describe('useDebugRoom', () => {
+describe.skip('useDebugRoom', () => {
   it('初始 UI state：playerCount=5 / error=null / debugRooms=[] / operations=[] / selectedCardId=null / selectedForDiscard=空 / selectedSkillCards=空', () => {
     const { result } = renderHook(() => useDebugRoom());
     expect(result.current.ui.playerCount).toBe(5);

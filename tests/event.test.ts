@@ -1,5 +1,6 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 import { describe, it, expect, beforeEach } from 'vitest';
-import { makeServerEvent, makePlayerEvent, resetEventCounter } from '@engine/event';
+// import { makeServerEvent, makePlayerEvent, resetEventCounter } from '@engine/event';  // LEGACY: removed (v2 module deleted)
 
 describe.skip('makeServerEvent', () => {
   beforeEach(() => resetEventCounter(0));

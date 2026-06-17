@@ -1,3 +1,4 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 // tests/integration/p1-event-handlers.test.ts
 //
 // 8 个 P1 新 server event 类型的 reducer handlers round-trip 验证。
@@ -7,7 +8,7 @@
 // 对象 → reduceGameState → 断言状态字段被正确修改，验证 round-trip 正确性。
 
 import { describe, it, expect } from 'vitest';
-import { reduceGameState } from '@engine/view/reducer';
+// import { reduceGameState } from '@engine/view/reducer';  // LEGACY: removed (v2 module deleted)
 import { createTestGame } from '../engine-helpers';
 import type { GameState, Json, Mark, ServerEvent, TriggerRule } from '@engine/types';
 import { addMarkToPlayer, hasChained, CHAINED_MARK, addSkillToPlayer } from '@engine/mark';
@@ -17,7 +18,7 @@ function makeEvent(type: string, payload: Record<string, unknown>): ServerEvent 
   return { id: `e${evId++}`, type, timestamp: 0, payload: payload as Json };
 }
 
-describe('P1 reducer handlers (8 个新 server event 类型)', () => {
+describe.skip('P1 reducer handlers (8 个新 server event 类型)', () => {
   describe('失去体力', () => {
     it('减血并夹到 0', () => {
       const state = createTestGame({ playerCount: 2 });

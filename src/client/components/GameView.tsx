@@ -778,6 +778,7 @@ const pageRoot = css`
   background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%);
   color: #e0e0e0;
   min-height: 100vh;
+  overflow-x: hidden;
 `;
 
 // Header
@@ -862,10 +863,10 @@ const waitingHint = css`
 // Seating
 const seatingArea = css`margin-bottom: 16px;`;
 const seatRowCenter = css`
-  display: flex; justify-content: center; gap: 12px; margin-bottom: 8px;
+  display: flex; justify-content: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap;
 `;
 const seatRowSpread = css`
-  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
 `;
 const seatSlot160 = css`width: 160px;`;
 const centerMeta = css`

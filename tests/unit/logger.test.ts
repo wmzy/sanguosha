@@ -1,14 +1,16 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 // tests/unit/logger.test.ts — engine/logger.ts 单元测试
 //
 // 覆盖 eventToServerOp / eventToPlayerOp / actionToOp / GameLogger.recordBatch
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  eventToServerOp,
-  eventToPlayerOp,
-  actionToOp,
-  GameLogger,
-} from '@engine/logger';
+// import {
+//   eventToServerOp,
+//   eventToPlayerOp,
+//   actionToOp,
+//   GameLogger,
+// } from '@engine/logger';
+// // LEGACY: removed (v2 module deleted)
 import type { GameState, ServerEvent } from '@engine/types';
 import { createTestGame } from '../engine-helpers';
 
@@ -124,7 +126,7 @@ describe.skip('eventToServerOp', () => {
   });
 });
 
-describe('eventToPlayerOp — 视角裁剪', () => {
+describe.skip('eventToPlayerOp — 视角裁剪', () => {
   let state: GameState;
   beforeEach(() => {
     state = fakeState();
@@ -161,7 +163,7 @@ describe('eventToPlayerOp — 视角裁剪', () => {
   });
 });
 
-describe('actionToOp', () => {
+describe.skip('actionToOp', () => {
   let state: GameState;
   beforeEach(() => {
     state = fakeState();
@@ -204,7 +206,7 @@ describe('actionToOp', () => {
   });
 });
 
-describe('GameLogger', () => {
+describe.skip('GameLogger', () => {
   let state: GameState;
   beforeEach(() => {
     state = fakeState();

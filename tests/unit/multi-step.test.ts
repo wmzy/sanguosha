@@ -1,3 +1,4 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 // tests/unit/multi-step.test.ts — multiStep SkillPhase 骨架测试
 //
 // 覆盖：
@@ -10,11 +11,11 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearAtomRegistry } from '@engine/atom';
-import { registerAllAtoms } from '@engine/atoms';
+// import { registerAllAtoms } from '@engine/atoms';  // LEGACY: removed (registerAllAtoms no longer exported)
 import { createTestGame } from '../engine-helpers';
 import { executePlan } from '@engine/phase';
 import type { SkillPhase, GameState, TriggerRule } from '@engine/types';
-import { buildSkillContext } from '@engine/context';
+// import { buildSkillContext } from '@engine/context';  // LEGACY: removed (v2 module deleted)
 import '../../src/engine/phases/index';
 
 describe.skip('multiStep SkillPhase', () => {

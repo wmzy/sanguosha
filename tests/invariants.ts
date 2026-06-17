@@ -5,9 +5,18 @@
  * 用于 safeEngine 包装器，套到所有现用测试上。
  */
 
+// LEGACY TEST: references deleted v2 modules - skipped
+// v2 引擎已删除（@engine/engine）; 该 helper 仅在测试加载时被解析。
+// 测试本身（import 此 helper 的 test 文件）已通过 LEGACY 标记跳过，
+// safeEngine 也不会被实际调用。
 import { expect } from 'vitest';
-import { engine } from '@engine/engine';
+// import { engine } from '@engine/engine';  // LEGACY: removed (v2 module deleted)
 import type { GameState, GameAction, EngineResult } from '@engine/types';
+
+// LEGACY stub: 替代已删除的 @engine/engine
+const engine = (_state: GameState, _action: GameAction): EngineResult => {
+  throw new Error('LEGACY: @engine/engine deleted in v3');
+};
 
 /**
  * 收集所有可见卡牌 ID（牌堆、弃牌堆、手牌、装备区、判定区）。

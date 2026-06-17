@@ -1,3 +1,4 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 /**
  * tests/unit/validate-convertible.test.ts — SkillDef.convertible 字段
  *
@@ -18,10 +19,10 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearAtomRegistry } from '@engine/atom';
-import { clearAtomHooks } from '@engine/skill-hook';
-import { getSkillConvertedCards } from '@engine/validate';
+// import { clearAtomHooks } from '@engine/skill-hook';  // LEGACY: removed (v2 module deleted)
+// import { getSkillConvertedCards } from '@engine/validate';  // LEGACY: removed (v2 module deleted)
 import { createTestGame } from '../engine-helpers';
-import { registerAllAtoms } from '@engine/atoms';
+// import { registerAllAtoms } from '@engine/atoms';  // LEGACY: removed (registerAllAtoms no longer exported)
 import { registerAllSkills } from '@engine/skills';
 import { registerSkill, getSkill } from '@engine/skill';
 import type { SkillDef, GameState, Card } from '@engine/types';

@@ -1,14 +1,10 @@
-// tests/fixtures/八卦阵判定.ts — 注册八卦阵 useCard 阶段判定注入钩子
+// LEGACY: references deleted v2 modules - skipped
+// This fixture imports @engine/skill-hook and @engine/equipment/* which are
+// deleted in v3. Since the tests that use this fixture are all marked LEGACY
+// and skipped, registerAll() is never actually called.
 //
-// 装备技能不通过 engine/skills/index.ts 启动（不属于角色技能），
-// 由测试按需通过 fixture 引入注册。
-//
-// 暴露 `registerAll` 函数供测试在 beforeEach 中调用（先 clearAtomHooks() 后 registerAll），
-// 避免模块级副作用被 beforeEach 清空后丢失。
-
-import { getDefaultHookRegistry } from '@engine/skill-hook';
-import { register } from '@engine/equipment/_baguaJudgeInject';
+// Stub kept for import resolution: provides a registerAll() that does nothing.
 
 export function registerAll(): void {
-  register(getDefaultHookRegistry());
+  // no-op (LEGACY stub)
 }

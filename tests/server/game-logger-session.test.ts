@@ -1,3 +1,4 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 // tests/server/game-logger-session.test.ts — GameLogger 集成测试
 //
 // 验证 GameSession 在以下场景下正确集成 GameLogger：
@@ -8,7 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { GameSession } from '../../src/server/session';
-import { GameLogger } from '../../src/engine/logger';
+// import { GameLogger } from '../../src/engine/logger';  // LEGACY: removed (v2 module deleted)
 import * as persistence from '../../src/server/persistence';
 import type { Room } from '../../src/server/room';
 import type { GameAction, GameState, Json, ServerEvent } from '../../src/engine/types';

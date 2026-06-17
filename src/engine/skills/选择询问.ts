@@ -18,7 +18,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       const slot = state.pendingSlot;
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== '选择询问') return '当前不是选择询问窗口';
+      if (atom.requestType !== '__选择询问') return '当前不是选择询问窗口';
       const choiceIdx = (params.choice as number) ?? 0;
       const choice = state.choiceQueue?.[choiceIdx];
       if (!choice) return '选择询问选项不存在';

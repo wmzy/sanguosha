@@ -235,23 +235,32 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     return;
   }
   // 回应路径:若 pending slot 的超时已在处理中(isTimeout),丢弃该 action;否则 pause 取消定时器
-  if (state.pendingSlot) {
-    if (state.pendingSlot.isTimeout) {
+  const oldSlot = state.pendingSlot;
+  if (oldSlot) {
+    if (oldSlot.isTimeout) {
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
       return;
     }
-    state.pendingSlot.pause();
+    oldSlot.pause();
   }
 
-  const resolve = state.pendingSlot?.resolve ?? (() => {});
-  state.pendingSlot = undefined;
+  const resolve = oldSlot?.resolve ?? (() => {});
+  // 注意:不在 execute 前清除 pendingSlot——respond execute 需要读 slot 信息
+  // (如系统规则弃牌 execute 读 slot.atom.target)。execute 完成后才清除旧 slot
+  // (仅当 execute 未创建新 pending 时)。
   logAction(state, message);
   state.seq += 1;
   // fire-and-forget 启动 execute,完成后 resolve 旧 slot(父 execute 恢复)。
   // 返回 execute promise:session 不 await(继续 fire-and-forget),
   // 测试可 await 它等到 respond execute 跑完;父 execute resume 跑到下一个 pending
   // 需调用方再让出一个微任务(见 harness 的 flush)。
-  return entry.execute(state, message.params).then(resolve);
+  return entry.execute(state, message.params).then(() => {
+    // execute 完成后:如果 pendingSlot 未被替换(execute 未创建新 pending),清除旧 slot
+    if (state.pendingSlot === oldSlot) state.pendingSlot = undefined;
+    // respond 完成后:如果有 choiceQueue 剩余,推进下一个 slot 为 pending
+    if (!state.pendingSlot) promoteChoiceQueue(state);
+    resolve();
+  });
 }
 
 /**

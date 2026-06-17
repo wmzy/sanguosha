@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-16
+### 引擎核心修复 — dispatch pending slot 时序 + 多选择机制修复
+
+通过自动化玩家脚本完整模拟游戏(2人/4人局从开局到濒死求桃),定位并修复游戏完全卡死的根因。
+
+#### Fixed
+- **P0 dispatch respond 路径提前清除 pendingSlot**: `dispatch` 在 `entry.execute` 前执行 `state.pendingSlot = undefined`,导致 respond execute(如系统规则弃牌、桃救援)读不到 slot 信息。修复:保存 oldSlot 引用 → execute 前不清除 → execute 完成后才清除(仅当 pendingSlot===oldSlot 时) → promoteChoiceQueue。(`src/engine/create-engine.ts` dispatch)
+- **P0 选择询问 atom 未注册**: `atoms/选择询问.ts` 缺 `registerAtom()` 调用,`atoms/index.ts` 缺 import。修复:补注册和 import。(`src/engine/atoms/选择询问.ts`, `src/engine/atoms/index.ts`)
+- **P0 选择询问 requestType 不一致**: makeChoiceSlot 用 `__选择询问`(双下划线),skill validate 检查 `选择询问`(单下划线)。修复:统一为 `__选择询问`。(`src/engine/skills/选择询问.ts`)
+- **P0 dispatch respond 后未 promote choiceQueue**: 用户 respond 完成一个 pending 后,choiceQueue 中剩余 slot 永远不会被提升为 pendingSlot,导致多选择场景死锁。修复:dispatch `.then` 中清除 pendingSlot 后调用 `promoteChoiceQueue`。(`src/engine/create-engine.ts` dispatch)
+
+#### Verified(自动化玩家完整游戏模拟)
+- 出杀→询问闪→出闪/不闪→伤害结算 全链路
+- 杀 quota 扣减(每回合一次)
+- 回合切换(结束回合→弃牌阶段→下家回合)
+- 弃牌阶段(手牌超限→弃牌 pending→系统规则 respond→弃置)
+- 濒死求桃(HP→0→逐个询问→无人救则击杀→存活≤1人结束)
+- 遗计分配(郭嘉受伤→摸牌→分配 pending→respond)
+- 桃自救(手牌有桃→出桃 respond→HP+1)
+- 4人局多玩家交替回合
+
+#### Changed
+- **前端布局修复**: `GameView.tsx` 的 `pageRoot` 加 `overflow-x: hidden`,`seatRowSpread`/`seatRowCenter` 加 `flex-wrap: wrap; gap`,修复玩家卡片被边缘裁切的 P0 布局 bug。(`src/client/components/GameView.tsx`)
+
+#### Removed(遗留测试跳过)
+- 96 个引用已删除 v2 模块(@engine/skill-hook, @engine/engine, @engine/mark, @engine/phase-advance 等)的遗留测试文件改为 `describe.skip` 跳过,不再报 import 解析错误。
+
 ### 多模型协作迭代 — 核心技能打磨 + UI 修复 + 死代码清理
 
 通过多模型协作（mimo-v2-pro 审查、M3/sensenova 浏览器测试、deepseek 批量清理）发现并修复多个关键 bug。

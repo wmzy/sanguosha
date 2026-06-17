@@ -1,4 +1,5 @@
 import type { AtomDefinition } from "../types";
+import { registerAtom } from "../atom";
 
 export const 选择询问: AtomDefinition<{ choice: number }> = { 
     type: '选择询问', validate: (state) => {
@@ -11,3 +12,5 @@ export const 选择询问: AtomDefinition<{ choice: number }> = {
     state.choiceQueue = state.choiceQueue?.filter((_, i) => i !== choice);
   }
 };
+
+registerAtom(选择询问);

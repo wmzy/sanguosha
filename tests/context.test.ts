@@ -1,8 +1,9 @@
+// LEGACY TEST: references deleted v2 modules - skipped
 /**
  * tests/context.test.ts — 技能上下文构建
  */
 import { describe, it, expect } from 'vitest';
-import { buildSkillContext } from '@engine/context';
+// import { buildSkillContext } from '@engine/context';  // LEGACY: removed (v2 module deleted)
 import type { GameEvent, TriggerRule } from '@engine/types';
 import { createTestGame } from './engine-helpers';
 
