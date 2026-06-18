@@ -44,8 +44,12 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   // respond:濒死求桃时出桃救援
   registerAction(skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
-      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
+      // pending 必须是 请求回应 且 requestType='求桃'
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
+      if (slot.atom.type !== '请求回应') return '当前不是求桃';
+      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType !== '求桃') return '当前不是求桃';
       const cardId = params.cardId as string | undefined;
       if (cardId) {

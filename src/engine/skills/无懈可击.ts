@@ -27,6 +27,8 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     (state: GameState, params: Record<string, Json>) => {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
+      // 无懈可击是广播型(target=-2),不限制 ownerId,但仍需校验 pending 类型
+      if (slot.atom.type !== '请求回应') return '当前不是无懈可击窗口';
       const atom = slot.atom as { requestType?: string };
       if (atom.requestType !== '无懈可击') return '当前不是无懈可击窗口';
       const cardId = params.cardId as string | undefined;

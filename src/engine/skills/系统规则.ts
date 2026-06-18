@@ -48,6 +48,7 @@ export function registerSystemRespondActions(ownerId: number): () => void {
   unloads.push(registerAction('系统规则', ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
     const slot = state.pendingSlots.get(ownerId);
     if (!slot) return '当前不需要回应';
+    if (slot.atom.type !== '请求回应') return '当前不是弃牌窗口';
     const atom = slot.atom as { requestType?: string; target: number };
     if (atom.requestType !== '__弃牌') return '当前不是弃牌窗口';
     if (atom.target !== ownerId) return '不是你的弃牌回合';

@@ -12,6 +12,11 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
+      // pending 必须询问闪(正向条件)
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
+      if (slot.atom.type !== '询问闪') return '当前不是出闪的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {
         const self = state.players[ownerId];
