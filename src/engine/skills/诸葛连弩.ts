@@ -1,8 +1,9 @@
 // 诸葛连弩(武器,攻击范围 1):出牌阶段使用【杀】无次数限制。
 //   出牌阶段开始时设 turn.vars['杀/quota'] = Infinity(杀.ts 的 validate 读此变量)。
-import type { AtomBeforeContext, Skill } from '../types';
+//   中途装备时通过 after hook(装备) 补设 quota,防止换装后漏刷。
+import type { AtomAfterContext, AtomBeforeContext, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerBeforeHook, type SkillModule } from '../skill';
+import { registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '诸葛连弩', description: '武器:出牌阶段使用【杀】无次数限制' };
@@ -23,6 +24,20 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     // 设出杀次数为无限(通用机制,见 添加技能.md §1.6.1)
     ctx.state.turn.vars['杀/quota'] = Infinity;
   });
+
+  // 中途装备诸葛连弩时:立即刷新杀次数为无限(修复换装不刷新 quota)
+  registerAfterHook(skill.id, ownerId, '装备', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { player?: number };
+    if (atom.player !== ownerId) return;
+    const me = ctx.state.players[ownerId];
+    if (!me) return;
+    const weaponId = me.equipment?.['武器'];
+    if (!weaponId) return;
+    const card = ctx.state.cardMap[weaponId];
+    if (card?.name !== '诸葛连弩') return;
+    ctx.state.turn.vars['杀/quota'] = Infinity;
+  });
+
   return () => {};
 }
 

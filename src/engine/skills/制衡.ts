@@ -16,8 +16,10 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, ownerId: number): () => void {
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      const cardIds = params.cardIds as string[] | undefined;
-      if (!Array.isArray(cardIds) || cardIds.length === 0) return 'cardIds required (at least 1)';
+      // 兼容 cardIds 数组和单数 cardId(前端 handlePlayCard 发 cardId)
+      const cardIds = (params.cardIds as string[] | undefined)
+        ?? (typeof params.cardId === 'string' ? [params.cardId as string] : undefined);
+      if (!Array.isArray(cardIds) || cardIds.length === 0) return 'cardIds required (at least 1)';;
       if (state.players[ownerId]?.vars['制衡/usedThisTurn']) return '本回合已使用过制衡';
       const self = state.players[ownerId];
       if (!self) return 'player not found';

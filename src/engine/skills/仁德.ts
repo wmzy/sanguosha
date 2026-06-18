@@ -24,16 +24,28 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       const selfAlive = self?.alive === true;
       // 每回合限一次
       const notUsed = !self?.vars['仁德/usedThisTurn'];
-      const targets = params.targets as Array<{ target: number; cardIds: string[] }> | undefined;
-      const hasTargets = Array.isArray(targets) && targets.length > 0;
-      const total = hasTargets ? targets!.reduce((n, t) => n + (Array.isArray(t.cardIds) ? t.cardIds.length : 0), 0) : 0;
-      const hasCards = total > 0;
+      // 仁德有两种调用格式:
+      // 1. 分配格式: params.targets = [{target, cardIds}](多牌多目标)
+      // 2. 简单格式: params.cardId + params.targets=[idx](单牌单目标,前端 handlePlayCard)
+      const allocTargets = params.targets as Array<{ target: number; cardIds: string[] }> | undefined;
+      const simpleCardId = params.cardId as string | undefined;
+      const simpleTargets = params.targets as number[] | undefined;
+      // 统一为分配格式
+      let normalized: Array<{ target: number; cardIds: string[] }>;
+      if (Array.isArray(allocTargets) && allocTargets.length > 0 && Array.isArray(allocTargets[0].cardIds)) {
+        normalized = allocTargets;
+      } else if (simpleCardId && Array.isArray(simpleTargets) && simpleTargets.length > 0) {
+        normalized = [{ target: simpleTargets[0], cardIds: [simpleCardId] }];
+      } else {
+        return '需要指定牌和目标';
+      }
+      const hasCards = normalized.reduce((n, t) => n + t.cardIds.length, 0) > 0;
       // 收集所有 cardId 检查重复 + 都在手牌
       const allCardIds: string[] = [];
       let noDuplicates = true;
       let allInHand = true;
-      if (hasTargets) {
-        for (const t of targets!) {
+      if (hasCards) {
+        for (const t of normalized) {
           if (!Array.isArray(t.cardIds)) { allInHand = false; continue; }
           for (const cardId of t.cardIds) {
             if (allCardIds.includes(cardId)) { noDuplicates = false; }
@@ -43,23 +55,30 @@ export function onInit(skill: Skill, ownerId: number): () => void {
         }
       }
       // 目标合法:不是自己 + 存活
-      const targetsLegal = hasTargets && targets!.every(t => t.target !== ownerId && state.players[t.target]?.alive === true);
-      const ok = myTurn && inActPhase && free && selfAlive && notUsed && hasTargets && hasCards && noDuplicates && allInHand && targetsLegal;
+      const targetsLegal = hasCards && normalized.every(t => t.target !== ownerId && state.players[t.target]?.alive === true);
+      const ok = myTurn && inActPhase && free && selfAlive && notUsed && hasCards && noDuplicates && allInHand && targetsLegal;
       return ok ? null : '现在不能使用仁德';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       pushFrame(state, '仁德', from, { ...params });
-      const targets = params.targets as Array<{ target: number; cardIds: string[] }>;
+      // 规范化分配格式
+      const rawTargets = params.targets as Array<{ target: number; cardIds: string[] }> | number[] | undefined;
+      let targets: Array<{ target: number; cardIds: string[] }>;
+      if (Array.isArray(rawTargets) && rawTargets.length > 0 && Array.isArray((rawTargets[0] as { cardIds?: unknown }).cardIds)) {
+        targets = rawTargets as Array<{ target: number; cardIds: string[] }>;
+      } else {
+        targets = [{ target: (rawTargets as number[])[0], cardIds: [params.cardId as string] }];
+      }
       for (const t of targets) {
         for (const cardId of t.cardIds) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '手牌', player: t.target } });
         }
       }
       const total = targets.reduce((n, t) => n + t.cardIds.length, 0);
-      if (total >= 2 && !state.players[from].vars['仁德/healedThisTurn']) {
+      // 每回合限一次(usedThisTurn),此处 heal 不再需要额外 guard
+      if (total >= 2) {
         await applyAtom(state, { type: '回复体力', target: from, amount: 1 });
-        state.players[from].vars['仁德/healedThisTurn'] = true;
       }
       state.players[from].vars['仁德/usedThisTurn'] = true;
       popFrame(state);

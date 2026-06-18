@@ -17,25 +17,26 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     const self = state.players[ownerId];
     const selfAlive = self?.alive === true;
     if (typeof params.cardId !== 'string') return 'cardId required';
-    if (typeof params.target !== 'number') return 'target required';
+    // target 兼容单数 target 和复数 targets[0](前端非延时锦囊发 targets 数组)
+    const target = params.target as number | undefined ?? (params.targets as number[] | undefined)?.[0];
+    if (typeof target !== 'number') return 'target required';
     const cardInHand = !!self?.hand.includes(params.cardId);
     const cardNameOk = state.cardMap[params.cardId]?.name === '顺手牵羊';
-    const notSelf = params.target !== ownerId;
-    // 距离检查:目标必须在距离 1 以内(委托 distance.ts,含 进攻马/防御马 修正)
-    const inRange = effectiveDistance(state, ownerId, params.target as number) <= 1;
-    const target = state.players[params.target];
-    const targetAlive = target?.alive === true;
-    const targetHasHand = !!target && target.hand.length > 0;
-    const targetHasEquip = !!target && Object.keys(target.equipment).length > 0;
+    const notSelf = target !== ownerId;
+    // 距离检查
+    const inRange = effectiveDistance(state, ownerId, target as number) <= 1;
+    const targetPlayer = state.players[target];
+    const targetAlive = targetPlayer?.alive === true;
+    const targetHasHand = !!targetPlayer && targetPlayer.hand.length > 0;
+    const targetHasEquip = !!targetPlayer && Object.keys(targetPlayer.equipment).length > 0;
     const targetHasCard = targetHasHand || targetHasEquip;
     const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notSelf && inRange && targetAlive && targetHasCard;
     return ok ? null : '顺手牵羊使用条件不满足';
     }, async (state: GameState, params: Record<string, Json>) => {
-
       const from = ownerId;
       pushFrame(state, '顺手牵羊', from, { ...params });
       const cardId = params.cardId as string;
-      const target = params.target as number;
+      const target = (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0] as number;
       // 移锦囊到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 询问无懈可击:锦囊异常安全 + localVars 初始化/清理

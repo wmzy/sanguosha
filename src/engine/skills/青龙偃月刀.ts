@@ -57,7 +57,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     if (!ctx.state.localVars['青龙偃月刀/confirmed']) return;
     delete ctx.state.localVars['青龙偃月刀/confirmed'];
 
-    // 追杀:先把刚才的闪移出处理区(杀的结算流程会检查,但这里我们已经接管了)
+    // 追杀:先把刚才的闪移出处理区
     await applyAtom(ctx.state, {
       type: '移动牌',
       cardId: dodgeCardId,
@@ -65,24 +65,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       to: { zone: '弃牌堆' },
     });
 
-    // 再次询问闪
+    // 再次询问闪——不再自行结算伤害或清理第二张闪:
+    // 询问闪 的 after hook 递归回来后,把处理区的最终状态留给杀.execute。
+    // 杀.execute 检查处理区:有闪→抵消;无闪→自行造成伤害,避免双重扣血。
     await applyAtom(ctx.state, { type: '询问闪', target: atom.target!, source: ownerId });
-
-    // 检查处理区:有闪 = 出了闪;没有 = 伤害
-    const dodge2CardId = ctx.state.zones.processing.find(id => {
-      const c = ctx.state.cardMap[id];
-      return c && c.name === '闪';
-    });
-    if (dodge2CardId) {
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: dodge2CardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    } else {
-      await applyAtom(ctx.state, { type: '造成伤害', target: atom.target!, amount: 1, source: ownerId });
-    }
   });
 
   return () => {};

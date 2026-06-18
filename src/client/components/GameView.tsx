@@ -556,6 +556,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         // 选牌型:需要 selectedCardId
         if (!selectedCardId) return;
         params.cardId = selectedCardId;
+        params.cardIds = [selectedCardId]; // 兼容多牌技能(如制衡)的单牌调用
         break;
       case 'selectTarget':
         // 选目标型:需要 selectedTarget
@@ -589,7 +590,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         {
           const idx = nameToIndex(selectedTarget);
           if (idx < 0) return;
-
+          params.cardId = selectedCardId;
           // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
           const trickCard = perspectiveHand.find(c => c.id === selectedCardId)
             ?? viewerHand.find(c => c.id === selectedCardId);

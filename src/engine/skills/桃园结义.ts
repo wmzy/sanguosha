@@ -30,8 +30,8 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       try {
         await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
         if (!state.localVars['无懈/被抵消']) {
-          // 所有存活角色回复1点
-          const players = state.players.filter(p => p.alive);
+          // 所有存活且未满血角色回复1点(跳过满血避免冗余 atom + 空 view event)
+          const players = state.players.filter(p => p.alive && p.health < p.maxHealth);
           for (const p of players) {
             await applyAtom(state, { type: '回复体力', target: p.index, amount: 1 });
           }

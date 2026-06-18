@@ -59,7 +59,8 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     if (!ctx.state.localVars['贯石斧/confirmed']) return;
     delete ctx.state.localVars['贯石斧/confirmed'];
 
-    // 弃 2 张手牌 + 把闪移出处理区 + 直接造成伤害
+    // 弃 2 张手牌 + 把闪移出处理区。不直接造成伤害——杀.execute 发现
+    // 处理区无闪后自行结算伤害,避免 after hook 和 execute 双重扣血。
     const discardCards = self.hand.slice(0, 2);
     await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: discardCards });
     await applyAtom(ctx.state, {
@@ -68,7 +69,6 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       from: { zone: '处理区' },
       to: { zone: '弃牌堆' },
     });
-    await applyAtom(ctx.state, { type: '造成伤害', target: atom.target!, amount: 1, source: ownerId });
   });
 
   return () => {};
