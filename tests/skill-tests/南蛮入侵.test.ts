@@ -109,4 +109,39 @@ describe('南蛮入侵', () => {
     // pending 期间 P1 再用
     await P1.expectRejected({ skillId: '南蛮入侵', actionType: 'use', params: { cardId: 'nm1', targets: [] } });
   });
+
+  // Bug1 回归:4人局中当前为 index 0,顺时针顺序应为 1→2→3。
+  // 修复前 filter() 顺序是 1→2→3(刚好也对),无法区分;改用 3 人局 from=2 验证。
+  it('3人局 from=2: 顺时针目标顺序应为 [0, 1](从下家 0 开始)', async () => {
+    const state = build({ p3: true });
+    // 改 currentPlayerIndex 为 2(P3 为发起者)
+    state.currentPlayerIndex = 2;
+    // 让 P3 持有南蛮
+    state.players[2].hand = ['nm1'];
+    state.players[2].skills = ['南蛮入侵', '杀'];
+    await harness.setup(state);
+    const P3 = harness.player('P3');
+
+    await P3.useCardAndTarget('南蛮入侵', 'nm1', []);
+    // 先过无懈窗口
+    const wuxieSlot = [...harness.state.pendingSlots.values()][0];
+    if (wuxieSlot && (wuxieSlot.atom as { type: string }).type === '请求回应') {
+      await harness.player(0).pass();
+    }
+    // 期望先问 P1(index 0),再问 P2(index 1)
+    harness.player(0).expectPending('询问杀');
+    await harness.player(0).pass();
+    // 第二个询问杀
+    const wuxieSlot2 = [...harness.state.pendingSlots.values()][0];
+    if (wuxieSlot2 && (wuxieSlot2.atom as { type: string }).type === '请求回应') {
+      await harness.player(1).pass();
+    }
+    harness.player(1).expectPending('询问杀');
+    await harness.player(1).pass();
+
+    // P1、P2 都未出杀 → 各扣 1 血;P3 自己是发起者不扣血
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[1].health).toBe(3);
+    expect(harness.state.players[2].health).toBe(4);
+  });
 });

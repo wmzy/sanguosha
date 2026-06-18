@@ -60,7 +60,17 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       // 翻转抵消状态:打出一张无懈 = 翻转当前锦囊是否被抵消
       const cancelled = state.localVars['无懈/被抵消'] as boolean | undefined;
       state.localVars['无懈/被抵消'] = !cancelled;
-      // slot 由 dispatch 正常 resolve(不 resume),锦囊 execute 读 localVars 决定是否抵消。
+
+      // 重新激活 broadcast slot(target=-2),让原窗口继续接受反无懈等更多回应。
+      // slot.resume() 重置定时器为满 timeout 并标记 _keepAlive=true;
+      // dispatch 在 respond execute 完成后看到 _keepAlive=true 时不会 resolve,
+      // 直到定时器自然过期才结束窗口。
+      const slot = state.pendingSlots.get(ownerId)
+        ?? [...state.pendingSlots.values()].find(s => {
+          const a = s.atom as { type?: string; requestType?: string; target?: unknown };
+          return a.type === '请求回应' && a.requestType === '无懈可击' && typeof a.target === 'number' && a.target < 0;
+        });
+      slot?.resume?.();
     },
   );
   return () => {};

@@ -251,7 +251,8 @@ describe('无懈可击链路', () => {
     }
 
     // 双无懈 = 抵消反转 → 锦囊恢复生效
-    expect(state.localVars['无懈/被抵消']).toBe(false);
+    // (localVars 被 trick 的 finally 块清理为 undefined)
+    expect(state.localVars['无懈/被抵消']).toBeUndefined();
     // P1 失去第一张手牌(锦囊生效)
     expect(state.players[1].hand).not.toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(p1FirstCard);

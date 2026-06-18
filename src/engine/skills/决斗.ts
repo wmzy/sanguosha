@@ -52,7 +52,16 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
           // 决斗循环:目标先出杀,之后发起者出杀,轮流。
           let turn = 0; // 0=目标, 1=发起者
           let loser: number | null = null;
+          // 上限保护:极端情况下(武圣/丈八 把任意牌当杀)可能无限循环;
+          // 现实中手牌+牌堆不可能产出这么多杀,100 轮远超正常上限。
+          const MAX_ROUNDS = 100;
+          let rounds = 0;
           while (loser === null) {
+            if (rounds++ >= MAX_ROUNDS) {
+              // 兜底:记当前玩家为输家,跳出死循环(理论不应触发)。
+              loser = turn === 0 ? target : from;
+              break;
+            }
             const current = turn === 0 ? target : from;
             await applyAtom(state, { type: '询问杀', target: current, source: turn === 0 ? from : target });
             // 检查处理区:有杀牌 = 出了杀,移走它;没有 = 没出,输

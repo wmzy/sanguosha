@@ -31,7 +31,18 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const cardId = params.cardId as string;
       pushFrame(state, '万箭齐发', from, { ...params });
 
-      const targets = state.players.filter(p => p.index !== from && p.alive).map(p => p.index);
+      // 从使用者下家开始,按座次顺序结算(state.players 数组顺序 = seat index 顺序)
+      const alivePlayers = state.players.filter(p => p.alive);
+      const n = alivePlayers.length;
+      const targets: number[] = [];
+      if (n > 1) {
+        const fromPos = alivePlayers.findIndex(p => p.index === from);
+        if (fromPos >= 0) {
+          for (let i = 1; i < n; i++) {
+            targets.push(alivePlayers[(fromPos + i) % n].index);
+          }
+        }
+      }
 
       // 锦囊进处理区
       await applyAtom(state, {
@@ -49,6 +60,8 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
           // 逐个询问闪,检查处理区判断是否出闪
           const notDodged: number[] = [];
           for (const target of targets) {
+            // 每次结算前重算存活:前一个目标可能已被其他效果击杀
+            if (!state.players[target]?.alive) continue;
             await applyAtom(state, { type: '询问闪', target, source: from });
             // 检查处理区
             const dodgeCardId = state.zones.processing.find(id => {
@@ -70,6 +83,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
 
           // 对未闪避者造成伤害
           for (const target of notDodged) {
+            if (!state.players[target]?.alive) continue;
             await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId });
           }
         }

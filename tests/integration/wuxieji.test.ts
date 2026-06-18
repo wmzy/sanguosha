@@ -95,7 +95,7 @@ describe('无懈可击 dispatch 链路', () => {
     });
 
     // respond execute 翻转被抵消=true;slot.resume() 重启定时器,窗口继续
-    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.localVars['无懈/被抵消']).toBe(true);
     expect(state.pendingSlots.size).toBe(1); // 窗口保持
     expect(state.players[1].hand).not.toContain(wuxieId); // 无懈牌已入弃牌堆
 
@@ -134,7 +134,7 @@ describe('无懈可击 dispatch 链路', () => {
       skillId: '无懈可击', actionType: 'respond', ownerId: 1,
       params: { cardId: wuxie1Id }, baseSeq: state.seq,
     });
-    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.localVars['无懈/被抵消']).toBe(true); // P1 抵消锦囊
     expect(state.pendingSlots.size).toBe(1); // 窗口保持(原 slot resume)
 
     // P0 出反无懈
@@ -142,7 +142,7 @@ describe('无懈可击 dispatch 链路', () => {
       skillId: '无懈可击', actionType: 'respond', ownerId: 0,
       params: { cardId: wuxie0Id }, baseSeq: state.seq,
     });
-    expect(state.localVars['无懈/被抵消']).toBeUndefined(); // 翻转回 false后被 finally 清理
+    expect(state.localVars['无懈/被抵消']).toBe(false); // 翻转回 false:反无懈抵消了无懈
     expect(state.pendingSlots.size).toBe(1);
 
     // 超时结束窗口
@@ -152,6 +152,7 @@ describe('无懈可击 dispatch 链路', () => {
     expect(state.players[1].hand).not.toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(gqId);
+    expect(state.localVars['无懈/被抵消']).toBeUndefined(); // trick finally 清理
   });
 
   // 用例 4:无人出无懈 → fireTimeout → 锦囊正常生效
