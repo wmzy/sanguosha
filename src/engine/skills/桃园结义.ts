@@ -26,17 +26,24 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const cardId = params.cardId as string;
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 询问无懈可击
-      delete state.localVars['无懈/被抵消'];
-      await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-      if (!state.localVars['无懈/被抵消']) {
-        // 所有存活角色回复1点
-        const players = state.players.filter(p => p.alive);
-        for (const p of players) {
-          await applyAtom(state, { type: '回复体力', target: p.index, amount: 1 });
+      state.localVars['无懈/被抵消'] = false;
+      try {
+        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+        if (!state.localVars['无懈/被抵消']) {
+          // 所有存活角色回复1点
+          const players = state.players.filter(p => p.alive);
+          for (const p of players) {
+            await applyAtom(state, { type: '回复体力', target: p.index, amount: 1 });
+          }
         }
+        await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      } finally {
+        if (state.zones.processing.includes(cardId)) {
+          await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+        }
+        delete state.localVars['无懈/被抵消'];
+        popFrame(state);
       }
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      popFrame(state);
     }, );
   return () => {};
 }

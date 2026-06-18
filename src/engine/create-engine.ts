@@ -82,10 +82,13 @@ export interface GameConfig {
  */
 const SYSTEM_OWNER = -1;
 
-/** 从 pending atom 中提取等待目标玩家(座次下标)。所有内置等待型 atom 都有 target 字段 */
+/** 从 pending atom 中提取等待目标玩家(座次下标)。所有内置等待型 atom 都有 target 字段。
+ *  返回 -1 表示系统(广播/系统级 pending),不抛错以兼容多 owner 场景。
+ *  注意:与 SYSTEM_OWNER 同值,广播型 pending slot 的 Map key 就会是 -1,
+ *  任何依赖 ownerId 精确查找 slot 的代码需先用 fallback 找 target<0 的 slot。 */
 function extractPendingTarget(atom: Atom): number {
   if ('target' in atom && typeof atom.target === 'number') return atom.target;
-  return -1;
+  return SYSTEM_OWNER;
 }
 
 /** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
@@ -231,11 +234,23 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
  */
 export async function dispatch(state: GameState, message: ClientMessage): Promise<void> {
   const rollbacks: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
+  // 辅助:preceding 阶段抛错 / 失败时,清理可能由 execute 创建的残留 pending slot。
+  // execute 是 fire-and-forget 风格的 applyAtom,可能在 pendingSlots 留下未 resolve 的 slot。
+  // 若 main 不启动,这些 slot 的父 await 永远不返回 → 死锁。
+  const cleanupResidualPending = () => {
+    for (const [k, slot] of state.pendingSlots) {
+      // preceding execute 不应创建 _keepAlive=true 的 slot(resume 是 respond 路径才调)
+      if (slot._keepAlive) continue;
+      try { slot.resolve(); } catch { /* safeResolve 已防重入 */ }
+      state.pendingSlots.delete(k);
+    }
+  };
   if (message.preceding) {
     for (const p of message.preceding) {
       const pEntry = findActionEntry(p.skillId, message.ownerId, p.actionType);
       if (!pEntry || pEntry.validate(state, p.params) !== null){
         rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
+        cleanupResidualPending();
         return;
       }
       await pEntry.execute(state, p.params);
@@ -274,6 +289,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   logAction(state, message);
   state.seq += 1;
   // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot。
+  // finally 兜底:execute 抛错时(开发期 bug / 测试场景)仍必须释放 slot,避免父 execute 永久卡死。
   return entry.execute(state, message.params).then(() => {
     if (oldSlot) {
       // execute 完成后:如果该 slot 仍未被替换(execute 未创建新 pending),清除它
@@ -292,6 +308,15 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       }
     }
     resolve();
+  }).finally(() => {
+    // 兜底:execute 抛错路径下,.then 的清理逻辑不会执行,但父 execute 仍必须 resolve + 删 slot,
+    // 否则 pendingSlots 永久残留 + 父 await 永远不返回。_keepAlive 已被 onInit 设为 true 的例外保留。
+    if (oldSlot && !oldSlot._keepAlive) {
+      for (const [k, v] of state.pendingSlots) {
+        if (v === oldSlot) { state.pendingSlots.delete(k); break; }
+      }
+      try { resolve(); } catch { /* resolve 已被 safeResolve 保护 */ }
+    }
   });
 }
 
@@ -307,10 +332,14 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
  * 触发后 slot resolve → 父 execute 恢复。广播由 applyAtom 内部的 onStateChange 驱动。
  */
 export async function fireTimeout(state: GameState): Promise<void> {
-  // 触发所有活跃 slot 的 onTimeout(并行场景下多个 slot 可能同时超时)
+  // 触发所有活跃 slot 的 onTimeout。串行执行:多个 slot 超时可能并行 mutate state
+  // (如两个 __弃牌 slot 同时读 players[p].hand 后同时调弃置 → 数据竞争)。
+  // 串行避免该问题,且超时本身不属于热路径(测试/调试使用),性能不是首要考虑。
   const slots = [...state.pendingSlots.values()];
   if (slots.length === 0) return;
-  await Promise.all(slots.map(s => s._fireTimeoutNow?.()));
+  for (const s of slots) {
+    await s._fireTimeoutNow?.();
+  }
 }
 
 /** 测试用:模块级清空(skill instances + events)。 */
@@ -522,21 +551,24 @@ function createAndAwaitSlot(
       if (paused) return;
       timedOut = true;
       clearTimeout(timer);
-      await applyAtom(state, pending.onTimeout);
-      // 弃牌 pending 超时:自动弃超出手牌
-      const slotAtom = atom as { requestType?: string; target?: number };
-      if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
-        const p = state.players[slotAtom.target];
-        if (p && p.hand.length > p.maxHealth) {
-          const excess = p.hand.length - p.maxHealth;
-          const toDiscard = p.hand.slice(-excess);
-          await applyAtom(state, { type: '弃置', player: slotAtom.target, cardIds: toDiscard });
+      try {
+        await applyAtom(state, pending.onTimeout);
+        // 弃牌 pending 超时:自动弃超出手牌
+        const slotAtom = atom as { requestType?: string; target?: number };
+        if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
+          const p = state.players[slotAtom.target];
+          if (p && p.hand.length > p.maxHealth) {
+            const excess = p.hand.length - p.maxHealth;
+            const toDiscard = p.hand.slice(-excess);
+            await applyAtom(state, { type: '弃置', player: slotAtom.target, cardIds: toDiscard });
+          }
         }
+        notifyStateChange(state);
+      } finally {
+        // 兑底:applyAtom 抛错时仍必须清理 slot 并 resolve 父 execute,避免死锁。
+        if (state.pendingSlots.get(target) === slot) state.pendingSlots.delete(target);
+        safeResolve();
       }
-      notifyStateChange(state);
-      // 从 Map 清除已 resolve 的 slot
-      if (state.pendingSlots.get(target) === slot) state.pendingSlots.delete(target);
-      safeResolve();
     };
     slot._fireTimeoutNow = fireTimeoutNow;
     let timer: ReturnType<typeof setTimeout> = setTimeout(fireTimeoutNow, timeoutMs);

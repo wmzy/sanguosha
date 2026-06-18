@@ -1060,7 +1060,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             {pending.prompt.description && <span> — {pending.prompt.description}</span>}
           </div>
           {canOperate && (() => {
-            // confirm 类 pending(反馈/遗计/八卦阵):渲染 发动/不发动 按钮
+            // distribute 类 pending(遗计分配):渲染分配 UI
+            if (pending.prompt.type === 'distribute') {
+              const info = pendingRespondInfo();
+              const skillId = info?.skillId ?? '系统规则';
+              const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
+              const maxPerTarget = (pending.prompt as { maxPerTarget?: number }).maxPerTarget ?? 2;
+              return <DistributeUI skillId={skillId} cardIds={cardIds} players={view.players} viewer={perspectiveIdx} maxPerTarget={maxPerTarget} onSend={send} cardMap={view.cardMap} />;
+            }
+            // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
             if (pending.prompt.type === 'confirm') {
               const confirmLabel = pending.prompt.confirmLabel || '确认';
               const cancelLabel = pending.prompt.cancelLabel || '取消';
@@ -1382,7 +1390,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         {/* ─── 右：手牌 + 统一倒计时 + 操作 + 目标 ─── */}
         <div className={handColumn}>
           {/* 统一倒计时进度条（顺滑） */}
-          <CountdownBar deadline={deadline} totalMs={DEFAULT_COUNTDOWN_TOTAL_MS} />
+          <CountdownBar deadline={deadline} totalMs={pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS} />
           {/* 转化模式提示 + 取消选择 */}
           <div className={handHeader}>
             <span className={handTitle}>
@@ -1433,8 +1441,11 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               <div className={targetHint}>已选择目标: {selectedTarget}</div>
             )}
           </div>
-          {/* 目标选择 — 转化模式或有选牌都需要显示,且当前不能有待回应 pending */}
-          {(selectedCardId && canOperate && isMyTurn && !pending) && (
+          {/* 目标选择 — 只对需要目标的牌显示, 且当前不能有待回应 pending */}
+          {(selectedCardId && canOperate && isMyTurn && !pending && (() => {
+            const card = perspectiveHand.find(c => c.id === selectedCardId);
+            return card && TARGET_REQUIRED_CARDS.has(card.name);
+          })()) && (
             <div className={targetSection}>
               <div className={targetTitle}>选择目标:</div>
               <div className={targetList}>
@@ -1462,10 +1473,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               const isSelected = selectedCardId === card.id;
               const isDiscardSelected = selectedForDiscard.has(card.id);
               const canPlay = isMyTurn && canOperate;
-              const __atomType = pending?.atom?.type;
-              const __reqType = (pending?.atom as Record<string, unknown>)?.requestType;
-              const __isPeachPending = __atomType === '请求回应' && __reqType === '求桃';
-              const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀' || (__isPeachPending && card.name === '桃'));
+              const isAwaiting = isMyAwaiting && (() => {
+                const info = pendingRespondInfo();
+                return !!info?.cardFilter?.(card);
+              })();
               const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
               const isTransformMatch = transformMode !== null && transformMode.cardFilter(card);
               const isTransformActive = transformMode !== null && isMyTurn && canOperate;
@@ -1569,6 +1580,71 @@ function CountdownBar({ deadline, totalMs }: CountdownBarProps) {
     <div className={countdownBar} title={`剩余 ${sec} 秒`}>
       <div className={countdownBarFill} ref={fillRef} style={{ width: '100%' }} />
       <span className={countdownBarText}>⏱ {sec}s</span>
+    </div>
+  );
+}
+
+// ─── 分配 UI(distribute 类 prompt,如遗计) ───
+function DistributeUI({ skillId, cardIds, players, viewer, maxPerTarget, onSend, cardMap }: {
+  skillId: string;
+  cardIds: string[];
+  players: EngineGameView['players'];
+  viewer: number;
+  maxPerTarget: number;
+  onSend: (skillId: string, actionType: string, params: Record<string, Json>) => void;
+  cardMap: EngineGameView['cardMap'];
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [allocations, setAllocations] = useState<Array<{ target: number; cardIds: string[] }>>([]);
+  const toggle = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  /** 每个目标已分配的卡牌数 */
+  const perTargetCount = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const a of allocations) map.set(a.target, (map.get(a.target) ?? 0) + a.cardIds.length);
+    return map;
+  }, [allocations]);
+  const give = (targetIdx: number) => {
+    if (selected.size === 0) return;
+    const already = perTargetCount.get(targetIdx) ?? 0;
+    if (already + selected.size > maxPerTarget) return; // 超过上限
+    const newAlloc = [...allocations, { target: targetIdx, cardIds: [...selected] }];
+    setAllocations(newAlloc);
+    setSelected(new Set());
+    if (newAlloc.flatMap(a => a.cardIds).length >= cardIds.length) {
+      onSend(skillId, 'respond', { allocation: newAlloc });
+      setAllocations([]);
+    }
+  };
+  const givenIds = new Set(allocations.flatMap(a => a.cardIds));
+  const remaining = cardIds.filter(id => !givenIds.has(id) && !selected.has(id));
+  return (
+    <div className={promptActions} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {remaining.map(id => {
+          const c = cardMap[id];
+          return (
+            <button key={id} className={promptBtnPrimary} onClick={() => toggle(id)} style={selected.has(id) ? { borderColor: '#2ecc71', borderWidth: 2 } : undefined}>
+              {c?.name ?? id} {c ? `${c.suit}${c.rank}` : ''}
+            </button>
+          );
+        })}
+        {selected.size > 0 && <span style={{ fontSize: 12, color: '#aaa', alignSelf: 'center' }}>已选 {selected.size} 张,点击下方玩家分配</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {players.map((p, i) => {
+          if (!p.alive) return null;
+          const already = perTargetCount.get(i) ?? 0;
+          const atLimit = already >= maxPerTarget;
+          return (
+            <button key={i} className={promptBtn} disabled={selected.size === 0 || atLimit} onClick={() => give(i)}>
+              {p.name}{already > 0 ? ` (${already}/${maxPerTarget})` : ''}
+            </button>
+          );
+        })}
+        <button className={promptBtn} onClick={() => { onSend(skillId, 'respond', { allocation: allocations }); setAllocations([]); setSelected(new Set()); }} disabled={allocations.length === 0}>
+          提交分配
+        </button>
+      </div>
     </div>
   );
 }
@@ -2168,10 +2244,11 @@ const handColumn = css`
 const countdownBar = css`
   position: relative;
   width: 100%;
-  height: 6px;
-  background: rgba(231,126,34,0.18);
-  border-radius: 3px;
+  height: 20px;
+  background: rgba(231,126,34,0.15);
+  border-radius: 4px;
   overflow: hidden;
+  border: 1px solid rgba(231,126,34,0.3);
 `;
 const countdownBarFill = css`
   height: 100%;
@@ -2180,13 +2257,14 @@ const countdownBarFill = css`
 `;
 const countdownBarText = css`
   position: absolute;
-  top: 50%; right: 8px;
+  top: 50%; right: 10px;
   transform: translateY(-50%);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: bold;
-  color: #e67e22;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  color: #fff;
+  text-shadow: 0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.8);
   pointer-events: none;
+  z-index: 1;
 `;
 
 // ─── 角色大卡 (左侧) ───

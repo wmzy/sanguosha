@@ -55,6 +55,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // slot.deadline 是相对开局时间 (Date.now() - state.startedAt + timeoutMs),
       // 前端用 (deadline - Date.now()) / 1000 算剩余秒数,需要绝对时间戳。
       deadline: state.startedAt + slot.deadline,
+      // totalMs = slot 的 timeout 秒数 * 1000, 前端进度条用
+      totalMs: ((slot.atom as { timeout?: number }).timeout ?? 15) * 1000,
     };
   }
 

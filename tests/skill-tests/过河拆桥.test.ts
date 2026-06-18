@@ -230,4 +230,45 @@ describe('过河拆桥', () => {
       params: { cardId: 'gq1', targets: [1] },
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 9. Bug2:拆判定区(延时锦囊)
+  // ─────────────────────────────────────────────────────────────
+  it('Bug2:P2 判定区有乐不思蜀 → 过河拆桥可拆判定区,pendingTricks 清空', async () => {
+    // 乐不思蜀 卡牌(判定区卡)
+    const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
+    // 手动构造 state:P2 判定区有乐不思蜀(PendingTrick 结构)
+    const state = buildState({ p2Hand: [], extraCards: { lb1: lb } });
+    state.players[1].pendingTricks = [
+      { name: '乐不思蜀', source: 0, card: lb },
+    ];
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass();
+
+    // 判定区被拆空
+    expect(harness.state.players[1].pendingTricks).toEqual([]);
+    // 过河拆桥进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('gq1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 10. Bug2:validate 接受纯判定区目标(手牌装备均无)
+  // ─────────────────────────────────────────────────────────────
+  it('Bug2:P2 只有判定区无手牌无装备 → 过河拆桥 validate 放行', async () => {
+    const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
+    const state = buildState({ p2Hand: [], extraCards: { lb1: lb } });
+    state.players[1].pendingTricks = [
+      { name: '乐不思蜀', source: 0, card: lb },
+    ];
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 以前会被拒(只有判定区),现在放行
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass();
+    expect(harness.state.zones.discardPile).toContain('gq1');
+  });
 });

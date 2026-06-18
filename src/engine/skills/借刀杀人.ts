@@ -47,68 +47,71 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
 
       // 被无懈抵消则跳过效果
-      delete state.localVars['无懈/被抵消'];
-      await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-      if (state.localVars['无懈/被抵消']) {
-        await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-        popFrame(state);
-        return;
-      }
-
-      // 请求回应:目标选择出杀或交出武器
-      // 使用 useCard 提示让目标选择一张杀牌;选中的杀通过 杀.respond 移入处理区
-      await applyAtom(state, {
-        type: '请求回应',
-        requestType: '借刀杀人/forceKill',
-        target,
-        prompt: { type: 'useCard', title: '借刀杀人:请打出一张杀', cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 } },
-        timeout: 15,
-      });
-
-      // 检查处理区:有杀 = 出了杀
-      const killCardId = state.zones.processing.find(id => {
-        const c = state.cardMap[id];
-        return c && c.name === '杀';
-      });
-
-      if (killCardId) {
-        // 目标出了杀:移到弃牌堆,执行杀的效果(对 killTarget 询问闪)
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: killCardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-        await applyAtom(state, { type: '指定目标', source: target, target: killTarget, cardId: killCardId });
-        await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
-        // 检查处理区:有闪 = 出了闪,没闪 = 伤害
-        const dodgeCardId = state.zones.processing.find(id => {
-          const c = state.cardMap[id];
-          return c && c.name === '闪';
-        });
-        if (dodgeCardId) {
+      state.localVars['无懈/被抵消'] = false;
+      try {
+        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+        if (!state.localVars['无懈/被抵消']) {
+          // 请求回应:目标选择出杀或交出武器
+          // 使用 useCard 提示让目标选择一张杀牌;选中的杀通过 杀.respond 移入处理区
           await applyAtom(state, {
-            type: '移动牌',
-            cardId: dodgeCardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
+            type: '请求回应',
+            requestType: '借刀杀人/forceKill',
+            target,
+            prompt: { type: 'useCard', title: '借刀杀人:请打出一张杀', cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 } },
+            timeout: 15,
           });
-        } else {
-          await applyAtom(state, { type: '造成伤害', target: killTarget, amount: 1, source: target, cardId: killCardId });
-        }
-      } else {
-        // 不出杀:获得目标的武器
-        const targetPlayer = state.players[target];
-        const weaponId = targetPlayer?.equipment?.['武器'];
-        if (weaponId) {
-          await applyAtom(state, { type: '卸下', player: target, slot: '武器' });
-          await applyAtom(state, { type: '获得', player: from, cardId: weaponId, from: target });
-        }
-      }
 
-      // 锦囊移出处理区→弃牌堆
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      popFrame(state);
+          // 检查处理区:有杀 = 出了杀
+          const killCardId = state.zones.processing.find(id => {
+            const c = state.cardMap[id];
+            return c && c.name === '杀';
+          });
+
+          if (killCardId) {
+            // 目标出了杀:移到弃牌堆,执行杀的效果(对 killTarget 询问闪)
+            await applyAtom(state, {
+              type: '移动牌',
+              cardId: killCardId,
+              from: { zone: '处理区' },
+              to: { zone: '弃牌堆' },
+            });
+            await applyAtom(state, { type: '指定目标', source: target, target: killTarget, cardId: killCardId });
+            await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
+            // 检查处理区:有闪 = 出了闪,没闪 = 伤害
+            const dodgeCardId = state.zones.processing.find(id => {
+              const c = state.cardMap[id];
+              return c && c.name === '闪';
+            });
+            if (dodgeCardId) {
+              await applyAtom(state, {
+                type: '移动牌',
+                cardId: dodgeCardId,
+                from: { zone: '处理区' },
+                to: { zone: '弃牌堆' },
+              });
+            } else {
+              await applyAtom(state, { type: '造成伤害', target: killTarget, amount: 1, source: target, cardId: killCardId });
+            }
+          } else {
+            // 不出杀:获得目标的武器
+            const targetPlayer = state.players[target];
+            const weaponId = targetPlayer?.equipment?.['武器'];
+            if (weaponId) {
+              await applyAtom(state, { type: '卸下', player: target, slot: '武器' });
+              await applyAtom(state, { type: '获得', player: from, cardId: weaponId, from: target });
+            }
+          }
+        }
+        // 锦囊移出处理区→弃牌堆
+        await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      } finally {
+        // 异常时保证处理区清理与状态恢复
+        if (state.zones.processing.includes(cardId)) {
+          await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+        }
+        delete state.localVars['无懈/被抵消'];
+        popFrame(state);
+      }
     },
   );
   return () => {};

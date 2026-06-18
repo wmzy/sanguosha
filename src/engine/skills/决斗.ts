@@ -45,9 +45,37 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       });
 
       // 被无懈抵消则跳过效果
-      delete state.localVars['无懈/被抵消'];
-      await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-      if (state.localVars['无懈/被抵消']) {
+      state.localVars['无懈/被抵消'] = false;
+      try {
+        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+        if (!state.localVars['无懈/被抵消']) {
+          // 决斗循环:目标先出杀,之后发起者出杀,轮流。
+          let turn = 0; // 0=目标, 1=发起者
+          let loser: number | null = null;
+          while (loser === null) {
+            const current = turn === 0 ? target : from;
+            await applyAtom(state, { type: '询问杀', target: current, source: turn === 0 ? from : target });
+            // 检查处理区:有杀牌 = 出了杀,移走它;没有 = 没出,输
+            const killCardId = state.zones.processing.find(id => {
+              const c = state.cardMap[id];
+              return c && c.name === '杀';
+            });
+            if (killCardId) {
+              // 出了杀:移到弃牌堆,切换轮次
+              await applyAtom(state, {
+                type: '移动牌',
+                cardId: killCardId,
+                from: { zone: '处理区' },
+                to: { zone: '弃牌堆' },
+              });
+              turn = turn === 0 ? 1 : 0;
+            } else {
+              loser = current;
+            }
+          }
+          const winner = loser === target ? from : target;
+          await applyAtom(state, { type: '造成伤害', target: loser, amount: 1, source: winner, cardId });
+        }
         // 决斗锦囊移出处理区→弃牌堆
         await applyAtom(state, {
           type: '移动牌',
@@ -55,44 +83,19 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
           from: { zone: '处理区' },
           to: { zone: '弃牌堆' },
         });
-        popFrame(state);
-        return;
-      }
-
-      // 决斗循环:目标先出杀,之后发起者出杀,轮流。
-      let turn = 0; // 0=目标, 1=发起者
-      let loser: number | null = null;
-      while (loser === null) {
-        const current = turn === 0 ? target : from;
-        await applyAtom(state, { type: '询问杀', target: current, source: turn === 0 ? from : target });
-        // 检查处理区:有杀牌 = 出了杀,移走它;没有 = 没出,输
-        const killCardId = state.zones.processing.find(id => {
-          const c = state.cardMap[id];
-          return c && c.name === '杀';
-        });
-        if (killCardId) {
-          // 出了杀:移到弃牌堆,切换轮次
+      } finally {
+        // 异常时保证处理区清理与状态恢复
+        if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, {
             type: '移动牌',
-            cardId: killCardId,
+            cardId,
             from: { zone: '处理区' },
             to: { zone: '弃牌堆' },
           });
-          turn = turn === 0 ? 1 : 0;
-        } else {
-          loser = current;
         }
+        delete state.localVars['无懈/被抵消'];
+        popFrame(state);
       }
-      const winner = loser === target ? from : target;
-      await applyAtom(state, { type: '造成伤害', target: loser, amount: 1, source: winner, cardId });
-      // 决斗锦囊移出处理区→弃牌堆
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-      popFrame(state);
     },
   );
   return () => {};

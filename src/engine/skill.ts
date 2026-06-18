@@ -73,6 +73,15 @@ function unregisterActionsForInstance(skillId: string, ownerId: number): void {
   for (const key of [...actions.keys()]) {
     if (key.startsWith(prefix)) actions.delete(key);
   }
+  // 同实例的 before/after hook 也必须清理,否则 instantiateSkill 重注册时
+  // 老 hook 仍挂在全局表里,与新 hook 同时触发 → 重复结算(隐性的全局污染)。
+  for (const list of [beforeHooks, afterHooks]) {
+    for (const [atomType, arr] of list) {
+      const filtered = arr.filter((e) => !(e.skillId === skillId && e.ownerId === ownerId));
+      if (filtered.length === 0) list.delete(atomType);
+      else if (filtered.length !== arr.length) list.set(atomType, filtered);
+    }
+  }
 }
 
 export function getBeforeHooks(atomType: string): AtomHookEntry[] {

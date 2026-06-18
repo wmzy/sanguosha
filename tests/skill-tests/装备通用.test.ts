@@ -12,6 +12,7 @@
 //   6. 负面:不是装备牌(基本牌当装备) → 拒绝(无 subtype)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
+import { findActionEntry } from '../../src/engine/skill';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -209,5 +210,36 @@ describe('装备通用', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({ skillId: '装备通用', actionType: 'use', params: { cardId: 's1' } });
+  });
+
+  // ─── Bug1:装备替换时旧装备技能实例被卸载 ─────────────────
+  it('Bug1:装备替换时旧装备技能(诸葛连弩)被卸载,旧 hook 实例消失', async () => {
+    const crossbow = makeEquip('c1', '诸葛连弩', '♣', '武器', 'A', 1);
+    const sword = makeEquip('w1', '青釭剑', '♠', '武器', 'A', 2);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'w1'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1: crossbow, w1: sword },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 装诸葛连弩 → 诸葛连弩 skill 注册(玩家0 上有 阶段开始 hook)
+    await P1.useCard('装备通用', 'c1');
+    expect(harness.state.players[0].equipment['武器']).toBe('c1');
+    expect(harness.state.players[0].skills).toContain('诸葛连弩');
+
+    // 替换为青釭剑 → 诸葛连弩 应从 skills 列表移除并卸载
+    await P1.useCard('装备通用', 'w1');
+    expect(harness.state.players[0].equipment['武器']).toBe('w1');
+    expect(harness.state.players[0].skills).not.toContain('诸葛连弩');
+    expect(harness.state.players[0].skills).toContain('青釭剑');
+    // 旧装备卡已进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('c1');
   });
 });

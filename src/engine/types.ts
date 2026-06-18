@@ -472,6 +472,8 @@ export interface PendingView {
   prompt: ActionPrompt;
   target: number;
   deadline: number;
+  /** 倒计时总时长(ms),前端进度条用 deadline-totalMs..deadline 映射 */
+  totalMs: number;
 }
 
 /**

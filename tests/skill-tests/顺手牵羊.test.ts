@@ -194,4 +194,47 @@ describe('顺手牵羊', () => {
       params: { cardId: 'sq1', target: 0 },
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 8. Bug3:顺手牵羊可拿装备区
+  // ─────────────────────────────────────────────────────────────
+  it('Bug3:P2 无手牌只有装备(诸葛连弩) → 顺手牵羊拿到装备,装备区被卸载', async () => {
+    const weapon = makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌');
+    const state = buildState({
+      p2Hand: [],
+      extraCards: { wp1: weapon },
+    });
+    // P2 装备区有武器(诸葛连弩)
+    state.players[1].equipment = { 武器: 'wp1' };
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
+    await P1.pass(); // 跳过无懈窗口
+
+    // P1 拿到诸葛连弩
+    expect(harness.state.players[0].hand).toContain('wp1');
+    // P2 装备区被卸载
+    expect(harness.state.players[1].equipment['武器']).toBeUndefined();
+    // 锦囊进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('sq1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 9. Bug3:validate 接受纯装备区目标(无手牌)
+  // ─────────────────────────────────────────────────────────────
+  it('Bug3:P2 无手牌只有装备 → 顺手牵羊 validate 放行(以前会被拒)', async () => {
+    const weapon = makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌');
+    const state = buildState({
+      p2Hand: [],
+      extraCards: { wp1: weapon },
+    });
+    state.players[1].equipment = { 武器: 'wp1' };
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
+    await P1.pass();
+    expect(harness.state.players[0].hand).toContain('wp1');
+  });
 });

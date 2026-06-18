@@ -34,6 +34,11 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
         const slot = card.subtype as '武器' | '防具' | '进攻马' | '防御马' | '宝物';
         const currentEquip = state.players[from]?.equipment?.[slot];
         if (currentEquip) {
+          // 替换前先卸下旧装备的自带技能实例(防止旧技能 hook 残留,见 Bug1)
+          const oldCard = state.cardMap[currentEquip];
+          if (oldCard?.name && skillLoaders[oldCard.name]) {
+            await applyAtom(state, { type: '移除技能', player: from, skillId: oldCard.name });
+          }
           await applyAtom(state, { type: '卸下', player: from, slot });
           await applyAtom(state, {
             type: '移动牌',

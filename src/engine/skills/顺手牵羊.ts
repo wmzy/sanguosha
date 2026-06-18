@@ -26,7 +26,9 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     const target = state.players[params.target];
     const targetAlive = target?.alive === true;
     const targetHasHand = !!target && target.hand.length > 0;
-    const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notSelf && inRange && targetAlive && targetHasHand;
+    const targetHasEquip = !!target && Object.keys(target.equipment).length > 0;
+    const targetHasCard = targetHasHand || targetHasEquip;
+    const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notSelf && inRange && targetAlive && targetHasCard;
     return ok ? null : '顺手牵羊使用条件不满足';
     }, async (state: GameState, params: Record<string, Json>) => {
 
@@ -36,19 +38,36 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const target = params.target as number;
       // 移锦囊到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 询问无懈可击
-      delete state.localVars['无懈/被抵消'];
-      await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-      if (!state.localVars['无懈/被抵消']) {
-        // 获得目标一张牌(简化:手牌第一张)
-        const targetPlayer = state.players[target];
-        if (targetPlayer && targetPlayer.hand.length > 0) {
-          await applyAtom(state, { type: '获得', player: from, cardId: targetPlayer.hand[0], from: target });
+      // 询问无懈可击:锦囊异常安全 + localVars 初始化/清理
+      state.localVars['无懈/被抵消'] = false;
+      try {
+        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+        if (!state.localVars['无懈/被抵消']) {
+          // 获得目标一张牌:优先手牌,手牌空时拿装备区第一槽(获得 atom 同时从装备区移除)
+          const targetPlayer = state.players[target];
+          if (targetPlayer) {
+            if (targetPlayer.hand.length > 0) {
+              await applyAtom(state, { type: '获得', player: from, cardId: targetPlayer.hand[0], from: target });
+            } else {
+              for (const slot of ['武器', '防具', '进攻马', '防御马', '宝物'] as const) {
+                const id = targetPlayer.equipment?.[slot];
+                if (id) {
+                  await applyAtom(state, { type: '获得', player: from, cardId: id, from: target });
+                  break;
+                }
+              }
+            }
+          }
         }
+        // 移锦囊到弃牌堆
+        await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      } finally {
+        if (state.zones.processing.includes(cardId)) {
+          await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+        }
+        delete state.localVars['无懈/被抵消'];
+        popFrame(state);
       }
-      // 移锦囊到弃牌堆
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      popFrame(state);
     }, );
   return () => {};
 }
@@ -65,4 +84,3 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-
