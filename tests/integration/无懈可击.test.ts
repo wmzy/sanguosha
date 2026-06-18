@@ -129,10 +129,9 @@ describe('无懈可击链路', () => {
   // ─────────────────────────────────────────────────────────────
   // 用例 3:抵消场景:P1 持有无懈可击 → respond 打无懈 → 锦囊被抵消
   // ─────────────────────────────────────────────────────────────
-  // TODO: 嵌套无纶可击的 dispatch respond 路径需要重构——
-  // 当前 slot.resolve 和 respond execute 并发导致两个 execute 冲突。
-  // 用例 1/2(无抵消场景)已通过,用例 3/4(嵌套无纶)待 dispatch 重构。
-  it.skip('用例3:P1 出无纶可击 → 锦囊被抵消(目标牌未被弃)', async () => {
+  // dispatch 重构:无懈 respond execute 不再递归创建新 pending,而是调用 slot.resume()
+  // 重启原广播 slot 定时器;dispatch 根据 _keepAlive 标记决定是否清除 slot。
+  it('用例3:P1 出无纶可击 → 锦囊被抵消(目标牌未被弃)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
     state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
@@ -190,7 +189,7 @@ describe('无懈可击链路', () => {
   // ─────────────────────────────────────────────────────────────
   // 用例 4:双无懈:出无懈抵消 → 再出无懈抵消无懈 → 锦囊恢复生效
   // ─────────────────────────────────────────────────────────────
-  it.skip('用例4:双无纶抵消 → 锦囊恢复生效(目标失去手牌)', async () => {
+  it('用例4:双无纶抵消 → 锦囊恢复生效(目标失去手牌)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
     state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };

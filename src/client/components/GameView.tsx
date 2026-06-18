@@ -437,13 +437,19 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     return effectiveDist(fromIdx, toIdx) <= range;
   }
 
-  /** 选中的牌是否需要攻击范围才能选目标 */
+  /** 选中的牌 */
   const selectedCard = selectedCardId ? (perspectiveHand.find(c => c.id === selectedCardId) ?? viewerHand.find(c => c.id === selectedCardId)) : null;
-  const selectedNeedsRange = selectedCard ? RANGE_REQUIRED_CARDS.has(selectedCard.name) : false;
+
+  // 转化模式下,被"虚拟"的牌名(如武圣红牌当杀):决定是否需要距离检查/是否需要目标
+  // 转化前 selectedCard.name 是原牌名(如闪/桃),转化后语义上等于 wrapperName(如杀)
+  const effectiveCardName = (transformMode && selectedCardId)
+    ? transformMode.wrapperName
+    : selectedCard?.name;
 
   /** 判断目标 i 是否可被选中(距离/范围检查) */
   function isTargetable(i: number): boolean {
-    if (!selectedNeedsRange) return true;
+    // 转化模式下 wrapperName 才决定距离约束
+    if (!RANGE_REQUIRED_CARDS.has(effectiveCardName ?? '')) return true;
     const result = canAttack(perspectiveIdx, i);
     if (!result) {
       const fromP = view.players[perspectiveIdx];
@@ -461,9 +467,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const TARGET_REQUIRED_CARDS = new Set(['杀', '过河拆桥', '顺手牵羊', '借刀杀人', '决斗', '乐不思蜀']);
 
   // 当前是否需要选目标(出牌或使用技能时)
-  const selectedNeedsTarget = selectedCard
-    ? TARGET_REQUIRED_CARDS.has(selectedCard.name)
-    : false;
+  // 转化模式按 wrapperName(如杀)决定;普通出牌按原牌名
+  const selectedNeedsTarget = (transformMode && selectedCardId)
+    ? TARGET_REQUIRED_CARDS.has(transformMode.wrapperName)
+    : selectedCard
+      ? TARGET_REQUIRED_CARDS.has(selectedCard.name)
+      : false;
   // 自动以自己为目标的牌
   const SELF_TARGET_CARDS = new Set(['桃', '酒']);
   // 只能作为回应打出的牌(不能主动出)
@@ -630,6 +639,53 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setSelectedTarget(null);
   }
 
+  // 根据当前 pending 通用推导 respond 的 skillId + 可出牌过滤。
+  // prompt.cardFilter.filter 是函数——不能走 JSON 序列化，所以 server-side
+  // buildView 不会带过来。前端需根据 prompt 描述重构过滤函数。
+  // - 询问闪 atom → 只能点 闪
+  // - 询问杀 atom → 只能点 杀
+  // - 求桃 / requestType='求桃' → 只能点 桃
+  // - 无辨可击 / requestType='无辨可击' → 只能点 无辨可击
+  // - 其他 requestType 取 '/' 前缀为 skillId，保留 prompt.cardFilter.filter(若存在)
+  function pendingRespondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
+    if (!pending) return null;
+    const atom = pending.atom as Record<string, unknown>;
+    const atomType = pending.atom?.type ?? '';
+    const prompt = pending.prompt;
+    const reqType = typeof atom['requestType'] === 'string' ? (atom['requestType'] as string) : '';
+
+    // 询问X atom → skillId=X(去「询问」前缀),cardFilter 限定牌名
+    if (atomType.startsWith('询问')) {
+      const cardName = atomType.slice(2);
+      return { skillId: cardName, cardFilter: (c: Card) => c.name === cardName };
+    }
+
+    // requestType 限定的特定回应类型(求桃 / 无辨可击)
+    if (reqType === '求桃') {
+      return { skillId: '桃', cardFilter: (c: Card) => c.name === '桃' };
+    }
+    if (reqType === '无辨可击') {
+      return { skillId: '无辨可击', cardFilter: (c: Card) => c.name === '无辨可击' };
+    }
+    if (reqType === '__弃牌') {
+      // 弃牌窗口无牌名限制——以 selectedForDiscard 为准
+      return { skillId: '系统规则', cardFilter: () => true };
+    }
+
+    // 请求回应 / 并行回应 → requestType 取 '/' 前缀作 skillId
+    if (atomType === '请求回应' || atomType === '并行回应') {
+      if (!reqType) return null;
+      const slashIdx = reqType.indexOf('/');
+      const skillId = slashIdx >= 0 ? reqType.slice(0, slashIdx) : reqType;
+      // prompt 里带了 filter 函数则保留(本地 prompt 定义时可能有)；否则按牌名放行
+      const filter = (prompt?.type === 'useCard' || prompt?.type === 'useCardAndTarget')
+        ? prompt.cardFilter?.filter
+        : undefined;
+      return { skillId, cardFilter: filter };
+    }
+    return null;
+  }
+
   // 回应
   function handleRespond(cardId?: string) {
     if (!pending) return;
@@ -645,25 +701,17 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       }
       return;
     }
+    const info = pendingRespondInfo();
+    if (!info) return;
     if (cardId) {
+      // 校验:点的牌必须匹配 pending 的 cardFilter(防询问闪时点杀)
       const card = perspectiveHand.find(c => c.id === cardId);
-      if (card) send(card.name, 'respond', { cardId });
+      if (!card) return;
+      if (info.cardFilter && !info.cardFilter(card)) return; // 不匹配,忽略
+      send(info.skillId, 'respond', { cardId });
     } else {
-      // 不出闪/杀/桃:用对应 skill respond 但不带 cardId(后端 skill 收到空 cardId → 不做操作)
-      // 根据当前 pending 的 atom type 和 requestType 决定用哪个 skill
-      const atomType = pending?.atom?.type;
-      const reqType = (pending?.atom as Record<string, unknown>)?.requestType;
-      let skillId: string;
-      if (atomType === '询问杀') {
-        skillId = '杀';
-      } else if (atomType === '询问闪') {
-        skillId = '闪';
-      } else if (atomType === '请求回应' && reqType === '求桃') {
-        skillId = '桃';
-      } else {
-        skillId = '闪';
-      }
-      send(skillId, 'respond', {});
+      // 不出牌:空 respond(后端 execute 收到空 cardId → 不做操作)
+      send(info.skillId, 'respond', {});
     }
   }
 
@@ -694,11 +742,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     }
     // 回应模式(只有自己视角才能操作)
     if (isMyAwaiting) {
-      const atomType = pending?.atom?.type;
-      const reqType = (pending?.atom as Record<string, unknown>)?.requestType;
-      const isPeachPending = atomType === '请求回应' && reqType === '求桃';
-      if (card.name === '闪' || card.name === '杀' || (isPeachPending && card.name === '桃')) {
-        handleRespond(card.id);
+      // 只允许点击匹配当前 pending cardFilter 的牌(通用,不硬编码技能名)
+      const info = pendingRespondInfo();
+      if (info && info.cardFilter) {
+        if (info.cardFilter(card)) handleRespond(card.id);
       }
       return;
     }
@@ -1013,28 +1060,27 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             {pending.prompt.description && <span> — {pending.prompt.description}</span>}
           </div>
           {canOperate && (() => {
-            const atomType = pending?.atom?.type;
-            const reqType = (pending?.atom as Record<string, unknown>)?.requestType;
-            // 根据 pending 类型决定按钮文案和展示的牌
-            let declineLabel: string;
-            let cardFilter: string[];
-            if (atomType === '询问闪') {
-              declineLabel = '不闪';
-              cardFilter = ['闪'];
-            } else if (atomType === '询问杀') {
-              declineLabel = '不出杀';
-              cardFilter = ['杀'];
-            } else if (atomType === '请求回应' && reqType === '求桃') {
-              declineLabel = '不救';
-              cardFilter = ['桃'];
-            } else {
-              declineLabel = '不回应';
-              cardFilter = [];
+            // confirm 类 pending(反馈/遗计/八卦阵):渲染 发动/不发动 按钮
+            if (pending.prompt.type === 'confirm') {
+              const confirmLabel = pending.prompt.confirmLabel || '确认';
+              const cancelLabel = pending.prompt.cancelLabel || '取消';
+              const info = pendingRespondInfo();
+              const skillId = info?.skillId ?? '系统规则';
+              return (
+                <div className={promptActions}>
+                  <button className={promptBtnPrimary} onClick={() => send(skillId, 'respond', { choice: true })}>{confirmLabel}</button>
+                  <button className={promptBtn} onClick={() => send(skillId, 'respond', { choice: false })}>{cancelLabel}</button>
+                </div>
+              );
             }
+            // useCard 类 pending:渲染 可出的牌按钮 + 不回应
+            const info = pendingRespondInfo();
+            const filterFn = info?.cardFilter;
+            const respondableCards = filterFn ? perspectiveHand.filter(filterFn) : [];
             return (
               <div className={promptActions}>
-                <button className={promptBtn} onClick={() => handleRespond()}>{declineLabel}</button>
-                {cardFilter.length > 0 && perspectiveHand.filter(c => cardFilter.includes(c.name)).map(c => (
+                <button className={promptBtn} onClick={() => handleRespond()}>不回应</button>
+                {respondableCards.map(c => (
                   <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
                     {c.name} {c.suit}{c.rank}
                   </button>
@@ -1387,8 +1433,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               <div className={targetHint}>已选择目标: {selectedTarget}</div>
             )}
           </div>
-          {/* 目标选择 */}
-          {selectedCardId && canOperate && isMyTurn && !pending && (
+          {/* 目标选择 — 转化模式或有选牌都需要显示,且当前不能有待回应 pending */}
+          {(selectedCardId && canOperate && isMyTurn && !pending) && (
             <div className={targetSection}>
               <div className={targetTitle}>选择目标:</div>
               <div className={targetList}>

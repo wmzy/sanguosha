@@ -247,13 +247,19 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
     return;
   }
-  // 回应路径:按 ownerId 从 pendingSlots 定位该玩家的 slot。
-  // 单 target 询问(询问闪/杀/弃牌):Map 只有该 target 一个 slot。
-  // 并行询问(拼点/选将):Map 有多个 slot,各自独立 resolve。
-  // 无雕竞态(target=-2):任何玩家 respond 都命中同一 slot(先到先得)。
+  // 回应路径:定位该玩家对应的 slot。
+  // 单 target 询问(询问闪/杀/弃牌):Map 只有该 target 一个 slot → 直接 ownerId 命中。
+  // 并行询问(拼点/选将):Map 有多个 slot,各自独立 resolve → ownerId 各自命中。
+  // 无懈可击广播型(target=-2):任意玩家 respond 都命中同一 slot(先到先得)。
+  //   先按 ownerId 查(支持常规 single-target),未命中时查找唯一的 broadcast slot
+  //   (atom.target < 0,如无懈可击 target=-2)。
   const targetKey = message.ownerId;
   const oldSlot = state.pendingSlots.get(targetKey)
-    ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
+    ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined)
+    ?? [...state.pendingSlots.values()].find(s => {
+      const t = (s.atom as { target?: unknown }).target;
+      return typeof t === 'number' && t < 0;
+    });
   if (oldSlot) {
     if (oldSlot.isTimeout) {
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
@@ -269,8 +275,15 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   state.seq += 1;
   // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot。
   return entry.execute(state, message.params).then(() => {
-    // execute 完成后:如果该 slot 仍未被替换(execute 未创建新 pending),清除它
     if (oldSlot) {
+      // execute 完成后:如果该 slot 仍未被替换(execute 未创建新 pending),清除它
+      // 异常路径:无懈可击 broadcast slot 由 respond execute 调 slot.resume() 主动续期,
+      // 此时 _keepAlive 标记为 true,表示该 slot 还要继续接收回应,不要 resolve。
+      // 默认() 响应时 _keepAlive=false(其他 respond 仍走原逻辑:清除 + resolve)。
+      if (oldSlot._keepAlive) {
+        // slot 主动续期了——保持原状,不要 resolve,让定时器自然过期
+        return;
+      }
       const key = extractPendingTarget(oldSlot.atom);
       if (state.pendingSlots.get(key) === oldSlot) state.pendingSlots.delete(key);
       // 无雕等 target<0 的广播 slot:dispatch 用 ownerId 找不到精确 key,需按 slot 引用清除
@@ -490,6 +503,19 @@ function createAndAwaitSlot(
         paused = true;
         clearTimeout(timer);
       },
+      // 恢复定时器(由 respond execute 调用):重置为满 timeout,让广播型 slot 在被
+      // respond 后还能继续接受反无懈等更多回应。已超时或已 resolve 则无效。
+      resume() {
+        if (timedOut || resolveCalled) return;
+        paused = false;
+        clearTimeout(timer);
+        const newDeadline = Date.now() - state.startedAt + timeoutMs;
+        slot.deadline = newDeadline;
+        slot.startTime = Date.now() - state.startedAt;
+        slot._keepAlive = true;
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        timer = setTimeout(fireTimeoutNow, timeoutMs);
+      },
     };
     const fireTimeoutNow = async (): Promise<void> => {
       if (state.pendingSlots.get(target) !== slot) return;
@@ -513,7 +539,7 @@ function createAndAwaitSlot(
       safeResolve();
     };
     slot._fireTimeoutNow = fireTimeoutNow;
-    const timer = setTimeout(fireTimeoutNow, timeoutMs);
+    let timer: ReturnType<typeof setTimeout> = setTimeout(fireTimeoutNow, timeoutMs);
 
     // 存入 pendingSlots Map(按 target 索引)。不同 target 的 slot 共存,各自独立 resolve。
     state.pendingSlots.set(target, slot);
