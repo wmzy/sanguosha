@@ -58,13 +58,12 @@ export type ClientMessage =
   | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq };
 
 export interface RoomInfo {
-  roomId: string;
-  roomName: string;
+  id: string;
+  name: string;
+  playerCount: number;
   maxPlayers: number;
-  currentPlayers: number;
-  hasPassword: boolean;
-  gameStarted: boolean;
-  debug: boolean;
+  status: string;
+  isDebug?: boolean;
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {

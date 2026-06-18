@@ -142,24 +142,30 @@ function useCountdownSeconds(deadline: number | null): number | null {
   return sec;
 }
 
-/** 顺滑倒计时:返回剩余比例(0-1),rAF 每帧更新 */
+/** 顺滑倒计时:进度条用 ref 直接设 width(rAF,不触发重渲染);
+ *  文字秒数用 useCountdownSeconds(每秒 1 次轻量重渲染)。
+ *  不用每帧 setState——60fps 重渲染纯为进度条浪费。 */
 function useCountdownFraction(
   deadline: number | null,
   totalMs: number = DEFAULT_COUNTDOWN_TOTAL_MS,
-): number | null {
-  const [frac, setFrac] = useState<number | null>(null);
+): React.RefObject<HTMLDivElement | null> {
+  const fillRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (deadline == null) { setFrac(null); return; }
+    if (deadline == null) {
+      if (fillRef.current) fillRef.current.style.width = '0%';
+      return;
+    }
     let raf = 0;
     const tick = () => {
       const remaining = Math.max(0, deadline - Date.now());
-      setFrac(Math.max(0, Math.min(1, remaining / totalMs)));
+      const frac = Math.max(0, Math.min(1, remaining / totalMs));
+      if (fillRef.current) fillRef.current.style.width = `${frac * 100}%`;
       if (remaining > 0) raf = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(raf);
   }, [deadline, totalMs]);
-  return frac;
+  return fillRef;
 }
 
 // ─── 动画状态追踪 hook ───
@@ -1280,11 +1286,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                           </span>
                         );
                       })}
-                      {equipSkillActions.map(a => (
+                      {showSkillButtons && equipSkillActions.map(a => (
                         <button
                           key={`${a.skillId}:${a.actionType}`}
                           className={equipSkillBtn}
-                          style={showSkillButtons ? undefined : { display: 'none' }}
                           onClick={() => handleSkillAction(a)}
                           title={`${a.label}: ${a.prompt.title}`}
                         >
@@ -1511,12 +1516,12 @@ interface CountdownBarProps {
   totalMs: number;
 }
 function CountdownBar({ deadline, totalMs }: CountdownBarProps) {
-  const frac = useCountdownFraction(deadline, totalMs);
-  if (deadline == null || frac == null) return null;
-  const sec = Math.ceil(frac * totalMs / 1000);
+  const fillRef = useCountdownFraction(deadline, totalMs);
+  const sec = useCountdownSeconds(deadline);
+  if (deadline == null || sec == null) return null;
   return (
     <div className={countdownBar} title={`剩余 ${sec} 秒`}>
-      <div className={countdownBarFill} style={{ width: `${frac * 100}%` }} />
+      <div className={countdownBarFill} ref={fillRef} style={{ width: '100%' }} />
       <span className={countdownBarText}>⏱ {sec}s</span>
     </div>
   );
@@ -2126,9 +2131,6 @@ const countdownBarFill = css`
   height: 100%;
   background: linear-gradient(90deg, #f39c12, #e74c3c);
   border-radius: 3px;
-  /* rAF 每帧更新 fraction；linear transition 让 width 顺滑插值 */
-  transition: width 0.15s linear;
-  will-change: width;
 `;
 const countdownBarText = css`
   position: absolute;
