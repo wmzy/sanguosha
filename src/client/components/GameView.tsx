@@ -1,8 +1,8 @@
 // src/client/components/GameView.tsx
 // 新 ENGINE-DESIGN 完整游戏界面 — 参照老 GameBoard + DebugPlayerList 设计
 //
-// 布局: GameHeader → 提示区 → 座位布局(5人) → 手牌区 → 操作面板 → 调试面板
-// 特性: 视角切换、倒计时、装备区、座位布局、操作提示、弃牌选择
+// 布局: GameHeader → 提示区 → 座位弧形(其他玩家) → [左:角色大卡 | 右:倒计时+操作+目标+手牌] → 日志/调试面板
+// 特性: 视角切换、顺滑倒计时、装备区独立、座位布局、主动技点击、手牌选择、弃牌选择
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { css, cx } from '@linaria/core';
 import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt } from '../../engine/types';
@@ -125,6 +125,11 @@ function formatTime(ms: number): string {
 }
 
 // ─── 倒计时 hook ───
+// useCountdownSeconds:返回剩余秒数(整数,向下取整)。用于倒计时文字显示。
+// useCountdownFraction:返回 0-1 的剩余比例,每帧(rAF)更新,进度条用此值才能顺滑。
+// 注意两者都用同一个 deadline 参数;外部组件按需选择。
+const DEFAULT_COUNTDOWN_TOTAL_MS = 15_000;
+
 function useCountdownSeconds(deadline: number | null): number | null {
   const [sec, setSec] = useState<number | null>(null);
   useEffect(() => {
@@ -135,6 +140,26 @@ function useCountdownSeconds(deadline: number | null): number | null {
     return () => clearInterval(id);
   }, [deadline]);
   return sec;
+}
+
+/** 顺滑倒计时:返回剩余比例(0-1),rAF 每帧更新 */
+function useCountdownFraction(
+  deadline: number | null,
+  totalMs: number = DEFAULT_COUNTDOWN_TOTAL_MS,
+): number | null {
+  const [frac, setFrac] = useState<number | null>(null);
+  useEffect(() => {
+    if (deadline == null) { setFrac(null); return; }
+    let raf = 0;
+    const tick = () => {
+      const remaining = Math.max(0, deadline - Date.now());
+      setFrac(Math.max(0, Math.min(1, remaining / totalMs)));
+      if (remaining > 0) raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [deadline, totalMs]);
+  return frac;
 }
 
 // ─── 动画状态追踪 hook ───
@@ -328,10 +353,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const canOperate = true; // debug 模式永远允许操作
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
 
-  // 倒计时:pending 回应优先,否则用 turnDeadline
+// 倒计时:pending 回应优先,否则用 turnDeadline
+  // 顺滑进度条由 CountdownBar (使用 useCountdownFraction + CSS transition) 渲染。
   const deadline = pending?.deadline ?? view.turnDeadline;
-  const remainingSeconds = useCountdownSeconds(deadline);
-  // 注意:不再在客户端 remainingSeconds<=0 时自动 respond/endTurn。
+  // 注意:不在客户端 deadline<=0 时自动 respond/endTurn。
   // 旧逻辑是 debug 模式自动操作,但会导致「出杀时跳过问闪」——pending 刚渲染就被自动 handleRespond() 当作「不出」处理。
   // 现在依赖服务端真实超时(默认 15s):服务端 advance → view.pending 清空 → UI 自然恢复。
 
@@ -712,11 +737,17 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     return card?.name ?? cardId;
   }
 
-  // 座位排列: [自己, 右下, 右上, 左上, 左下]
+  // 座位排列: 自己始终在 result[0]（底部中央）；
+  // 其余玩家从“上家”开始逆时针排，这样弧形座位按 leftPct 从左到右呈现
+  //   [上家(左) ... 下家(右)]
+  // 符合三国杀惯例：自己正对面为逆时针出牌方向，自己的下家在右手侧。
   const orderedPlayers = useMemo(() => {
-    const result: typeof view.players = [];
-    for (let i = 0; i < view.players.length; i++) {
-      result.push(view.players[(perspectiveIdx + i) % view.players.length]);
+    const n = view.players.length;
+    if (n === 0) return [] as typeof view.players;
+    const result: typeof view.players = [view.players[perspectiveIdx]];
+    for (let i = 1; i < n; i++) {
+      // (perspectiveIdx - i + n) % n 走的是 [上家, 上上家, ..., 下家] 的逆时针路径
+      result.push(view.players[(perspectiveIdx - i + n) % n]);
     }
     return result;
   }, [view.players, perspectiveIdx]);
@@ -792,6 +823,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       {isCharSelectPending && charSelectTarget >= 0 && (() => {
         const seatPlayer = view.players[charSelectTarget];
         const isLord = seatPlayer?.identity === '主公';
+        // 选将保密:非主公且非自己选将时,不暴露 seat 玩家名字
+        const isSelfSelecting = charSelectTarget === view.viewer;
         // 用引擎提供的候选人(已排除已选武将)
         const candidates = charCandidates;
         // 从 CHAR_POOL 查势力色用于渲染
@@ -799,6 +832,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           const c = CHAR_POOL.find(ch => ch.name === name);
           return { faction: c?.faction || '群', maxHealth: c?.maxHealth || 4 };
         };
+        // 当前 viewer 的身份色(主公金/忠臣蓝/反贼红/内奸紫)
+        const myIdentityColor = perspective?.identity
+          ? (IDENTITY_COLORS[perspective.identity] || '#888')
+          : null;
         return (
         <div style={{
           position: 'fixed',
@@ -817,10 +854,51 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             marginBottom: 8,
             letterSpacing: 4,
           }}>
-            {isLord ? '主公选将' : `${seatPlayer?.name || ('P' + charSelectTarget)} 选将`}
+            {isLord ? '主公选将' : `P${charSelectTarget} 选将中`}
           </div>
           {isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>主公已亮明身份</div>}
-          {!isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>选将保密</div>}
+          {isSelfSelecting && !isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>你正在选将(他人不可见你的选择)</div>}
+          {!isLord && !isSelfSelecting && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>选将保密</div>}
+          {/* ─── 自身信息区:身份牌 + 座次 ─── */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            marginBottom: 24,
+          }}>
+            {perspective?.identity && myIdentityColor && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+                padding: '8px 18px',
+                borderRadius: 8,
+                background: myIdentityColor,
+                color: '#fff',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+                minWidth: 90,
+              }}>
+                <div style={{ fontSize: 11, opacity: 0.85, letterSpacing: 2 }}>你的身份</div>
+                <div style={{ fontSize: 20, fontWeight: 'bold', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{perspective.identity}</div>
+              </div>
+            )}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4,
+              padding: '8px 18px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff',
+              minWidth: 90,
+            }}>
+              <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2 }}>你的座次</div>
+              <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{view.viewer}</div>
+            </div>
+          </div>
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${Math.min(candidates.length, 5)}, 1fr)`,
@@ -903,9 +981,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           <span className={currentPlayerText}>
             当前: {currentPlayerName} {currentPlayer?.character ? `(${currentPlayer.character})` : ''}
           </span>
-          {remainingSeconds !== null && (
-            <span className={headerCountdown}>⏱ {remainingSeconds}s</span>
-          )}
         </div>
         <div className={headerRight}>
           <button className={perspectiveBtn} onClick={switchPerspective}>
@@ -962,16 +1037,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             );
           })()}
           {!canOperate && <div className={waitingHint}>等待 {perspectiveName} 回应...</div>}
-          {/* 倒计时进度条:remainingSeconds 是秒数,15s 总长(询问闪/杀约定 timeout) */}
-          {remainingSeconds !== null && (() => {
-            const total = 15;
-            const ratio = Math.max(0, Math.min(1, remainingSeconds / total));
-            return (
-              <div className={promptCountdownBar}>
-                <div className={promptCountdownFill} style={{ width: `${ratio * 100}%` }} />
-              </div>
-            );
-          })()}
         </div>
       )}
 
@@ -1024,15 +1089,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               )}
             </div>
           )}
-          {remainingSeconds !== null && (() => {
-            const total = 30;
-            const ratio = Math.max(0, Math.min(1, remainingSeconds / total));
-            return (
-              <div className={promptCountdownBar}>
-                <div className={promptCountdownFill} style={{ width: `${ratio * 100}%` }} />
-              </div>
-            );
-          })()}
         </div>
       )}
 
@@ -1063,7 +1119,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   needsTarget={selectedNeedsTarget}
                   isTargetable={isTargetable(realIdx)}
                   selectedTarget={selectedTarget}
-                  remainingSeconds={player.name === currentPlayerName ? remainingSeconds : null}
                   onTargetClick={handleTargetClick}
                   onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
                   isDamaged={anim.damageFlashIndices.has(realIdx)}
@@ -1119,200 +1174,291 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               弃牌: {view.zones?.discardPileCount ?? 0}
             </span>
           </div>
-          {deadline != null && remainingSeconds !== null && (
-            <div className={countdownText}>
-              ⏱ {remainingSeconds}s
+        </div>
+      </div>
+
+      {/* ─── 下方主区域：左 角色大卡 / 右 手牌+操作 ─── */}
+      <div className={bottomLayout}>
+        {/* ─── 左：角色大卡（势力/身份/体力/技能/装备） ─── */}
+        <div className={playerCardLarge}>
+          {(() => {
+            const p = perspective;
+            if (!p) return null;
+            const isDead = !p.alive;
+            const charInfo = p.character ? CHAR_POOL.find(c => c.name === p.character) : null;
+            const faction = charInfo?.faction || '群';
+            const factionColor = FACTION_BG[faction] || '#8e44ad';
+            const identity = p.identity;
+            // 技能列表（过滤默认技能与装备技能）
+            const visibleSkills = p.skills.filter(s => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILLS.has(s));
+            // 装备技能集合：动态装备的技能可主动点击
+            const equipSkillActions = skillActions.filter(a => EQUIPMENT_SKILLS.has(a.skillId));
+            // 主动技（confirm/distribute/choosePlayer/转化类）渲染为可点按钮
+            const triggerableActions = skillActions.filter(a =>
+              a.prompt.type === 'confirm' ||
+              a.prompt.type === 'distribute' ||
+              a.prompt.type === 'choosePlayer' ||
+              (a.prompt.type === 'useCardAndTarget' && a.transform)
+            );
+            const showSkillButtons = isMyTurn && canOperate && view.phase === '出牌';
+            return (
+              <>
+                {/* 势力色顶部条 */}
+                <div className={playerCardHeader} style={{ background: factionColor }}>
+                  <div className={playerCardHeaderTop}>
+                    <span className={playerCardName}>{p.name}</span>
+                    <div>
+                      {perspectiveIdx === view.viewer && <span className={youBadge}>我</span>}
+                      {isPerspectiveTurn && <span className={turnBadge}>回合</span>}
+                      {isDead && <span className={youBadge} style={{ background: '#555' }}>亡</span>}
+                      {identity && (
+                        <span
+                          className={
+                            identity === '主公' ? lordBadge :
+                            identity === '忠臣' ? loyalistBadge :
+                            identity === '反贼' ? rebelBadge :
+                            identity === '内奸' ? renegadeBadge :
+                            ''
+                          }
+                        >
+                          {identity}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={playerCardChar}>{p.character || '未知'}</div>
+                </div>
+                {/* 体力红心 */}
+                <div className={seatHpRow}>
+                  {Array.from({ length: p.maxHealth }, (_, i) => (
+                    <span
+                      key={i}
+                      className={cx(i < p.health ? hpHeartFull : hpHeartEmpty, anim.damageFlashIndices.has(perspectiveIdx) && hpFlash)}
+                    >
+                      ♥
+                    </span>
+                  ))}
+                </div>
+                {/* 技能区：被动为标签，可主动点击的为按钮 */}
+                {visibleSkills.length > 0 && (
+                  <div className={skillRow} style={{ padding: '8px 12px' }}>
+                    {visibleSkills.map(s => {
+                      const btn = triggerableActions.find(a => a.skillId === s);
+                      if (showSkillButtons && btn) {
+                        return (
+                          <button
+                            key={s}
+                            className={skillBtn}
+                            style={btn.style === 'danger' ? { borderColor: '#e74c3c' } : btn.style === 'primary' ? { borderColor: '#f39c12' } : undefined}
+                            onClick={() => handleSkillAction(btn)}
+                            title={`${btn.label}: ${btn.prompt.title}`}
+                          >
+                            {s}
+                          </button>
+                        );
+                      }
+                      return <span key={s} className={skillTag}>{s}</span>;
+                    })}
+                  </div>
+                )}
+                {/* 装备区：独立显示，不在手牌里 */}
+                {(Object.keys(p.equipment).length > 0 || equipSkillActions.length > 0) && (
+                  <div className={playerCardEquip}>
+                    <div className={playerCardEquipTitle}>装备区</div>
+                    <div className={equipRow}>
+                      {Object.entries(p.equipment).map(([slot, cardId]) => {
+                        const card = view.cardMap[cardId as string];
+                        const icon =
+                          slot === '武器' ? '⚔' :
+                          slot === '防具' ? '🛡' :
+                          slot === '进攻马' ? '🐎+' :
+                          slot === '防御马' ? '🐎-' :
+                          '💎';
+                        return (
+                          <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>
+                            {icon} {card?.name ?? cardId}
+                          </span>
+                        );
+                      })}
+                      {equipSkillActions.map(a => (
+                        <button
+                          key={`${a.skillId}:${a.actionType}`}
+                          className={equipSkillBtn}
+                          style={showSkillButtons ? undefined : { display: 'none' }}
+                          onClick={() => handleSkillAction(a)}
+                          title={`${a.label}: ${a.prompt.title}`}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 判定区 */}
+                {(() => {
+                  const ids = p.pendingTricks ?? [];
+                  if (ids.length === 0) return null;
+                  return (
+                    <div className={judgeRow} style={{ padding: '0 12px 8px' }}>
+                      <span className={judgeRowLabel}>判定:</span>
+                      {ids.map((cardId: string) => {
+                        const card = view.cardMap[cardId];
+                        const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
+                        const desc = card ? getCardDescription(card.name) : '';
+                        return (
+                          <span
+                            key={cardId}
+                            className={judgeTag}
+                            style={{ color: suitColor, borderColor: suitColor }}
+                            title={desc || card?.name || cardId}
+                          >
+                            {card?.name ?? cardId}{card ? ` ${card.suit}${card.rank}` : ''}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                {/* 手牌数 */}
+                <div className={infoRow}>
+                  <span>手牌: {p.handCount}</span>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+
+        {/* ─── 右：手牌 + 统一倒计时 + 操作 + 目标 ─── */}
+        <div className={handColumn}>
+          {/* 统一倒计时进度条（顺滑） */}
+          <CountdownBar deadline={deadline} totalMs={DEFAULT_COUNTDOWN_TOTAL_MS} />
+          {/* 转化模式提示 + 取消选择 */}
+          <div className={handHeader}>
+            <span className={handTitle}>
+              {perspectiveName} 的手牌 ({perspectiveHand.length})
+              {perspectiveIdx !== view.viewer && <span className={debugHint}> (调试视角)</span>}
+              {transformMode && (
+                <span className={debugHint} style={{ color: '#f1c40f', marginLeft: 8 }}>
+                  ⚡ 转化模式:选1张{transformMode.wrapperName} · 源技能 {transformMode.skillId}
+                </span>
+              )}
+            </span>
+            {transformMode && (
+              <button className={cancelBtn} onClick={() => {
+                setTransformMode(null);
+                setSelectedCardId(null);
+                setSelectedTarget(null);
+              }}>
+                取消转化
+              </button>
+            )}
+            {!transformMode && selectedCardId && (
+              <button className={cancelBtn} onClick={() => { setSelectedCardId(null); setSelectedTarget(null); }}>
+                取消选择
+              </button>
+            )}
+          </div>
+          {/* 操作面板：出牌/结束回合/目标提示 */}
+          <div className={actionBar}>
+            {canOperate && isMyTurn && view.phase === '出牌' && transformMode && selectedCardId && (
+              <button className={playBtn} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}
+                style={selectedTarget ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
+                使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
+              </button>
+            )}
+            {canOperate && isMyTurn && view.phase === '出牌' && !transformMode && selectedCardId && (() => {
+              const card = perspectiveHand.find(c => c.id === selectedCardId);
+              const needsTarget = card ? TARGET_REQUIRED_CARDS.has(card.name) : false;
+              const canPlay = !needsTarget || !!selectedTarget;
+              return <button className={playBtn} onClick={handlePlayCard} disabled={!canPlay}
+                style={canPlay ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
+                出牌{selectedTarget ? ` → ${selectedTarget}` : needsTarget ? ' (请选目标)' : ''}
+              </button>;
+            })()}
+            {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
+              <button className={endTurnBtn} onClick={handleEndTurn}>结束回合</button>
+            )}
+            {selectedCardId && selectedTarget && canOperate && isMyTurn && (
+              <div className={targetHint}>已选择目标: {selectedTarget}</div>
+            )}
+          </div>
+          {/* 目标选择 */}
+          {selectedCardId && canOperate && isMyTurn && !pending && (
+            <div className={targetSection}>
+              <div className={targetTitle}>选择目标:</div>
+              <div className={targetList}>
+                {view.players.map((p, i) => {
+                  if (!p.alive || i === perspectiveIdx) return null;
+                  const targetable = isTargetable(i);
+                  return (
+                    <button
+                      key={i}
+                      className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
+                      disabled={!targetable}
+                      onClick={() => handleTargetClick(p.name)}
+                    >
+                      {p.name} ({p.character}) ♥{p.health}
+                      {!targetable && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
-        </div>
-
-        {/* 自己:底部中央 */}
-        <div className={seatBottom}>
-          {orderedPlayers[0] && <PlayerSeatView
-            player={orderedPlayers[0]}
-            index={perspectiveIdx}
-            view={view}
-            isCurrentPlayer={orderedPlayers[0].name === currentPlayerName}
-            isPerspective={true}
-            needsTarget={false}
-            isTargetable={true}
-            selectedTarget={null}
-            remainingSeconds={orderedPlayers[0].name === currentPlayerName ? remainingSeconds : null}
-            onTargetClick={handleTargetClick}
-            onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
-            isDamaged={anim.damageFlashIndices.has(perspectiveIdx)}
-            damageVersion={anim.damageFlashIndices.get(perspectiveIdx) ?? 0}
-            isTurnGlow={orderedPlayers[0].name === currentPlayerName && anim.turnVersion > 0}
-            turnGlowVersion={anim.turnVersion}
-          />}
-        </div>
-      </div>
-
-      {/* ─── 手牌区 ─── */}
-      <div className={handSection}>
-        <div className={handHeader}>
-          <span className={handTitle}>
-            {perspectiveName} 的手牌 ({perspectiveHand.length})
-            {perspectiveIdx !== view.viewer && <span className={debugHint}> (调试视角)</span>}
-            {transformMode && (
-              <span className={debugHint} style={{ color: '#f1c40f', marginLeft: 8 }}>
-                ⚡ 转化模式:选1张{transformMode.wrapperName} · 源技能 {transformMode.skillId}
-              </span>
-            )}
-          </span>
-          {transformMode && (
-            <button className={cancelBtn} onClick={() => {
-              setTransformMode(null);
-              setSelectedCardId(null);
-              setSelectedTarget(null);
-            }}>
-              取消转化
-            </button>
-          )}
-          {!transformMode && selectedCardId && (
-            <button className={cancelBtn} onClick={() => { setSelectedCardId(null); setSelectedTarget(null); }}>
-              取消选择
-            </button>
-          )}
-        </div>
-        <div className={handList} ref={handListRef}>
-          {perspectiveHand.map((card, i) => {
-            const isSelected = selectedCardId === card.id;
-            const isDiscardSelected = selectedForDiscard.has(card.id);
-            const canPlay = isMyTurn && canOperate;
-            const __atomType = pending?.atom?.type;
-            const __reqType = (pending?.atom as Record<string, unknown>)?.requestType;
-            const __isPeachPending = __atomType === '请求回应' && __reqType === '求桃';
-            const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀' || (__isPeachPending && card.name === '桃'));
-            const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
-            // 转化模式下:只有匹配 filter 的牌可点(且是出牌阶段)
-            const isTransformMatch = transformMode !== null && transformMode.cardFilter(card);
-            const isTransformActive = transformMode !== null && isMyTurn && canOperate;
-            const isTransformDisabled = isTransformActive && !isTransformMatch;
-            const canClick = canPlay || isAwaiting || canDiscardClick || isTransformActive;
-            const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
-            const isNew = anim.newCardIds.has(card.id);
-            // 转化模式下:显示转化后的名称 + 原始牌名提示
-            const displayName = isTransformMatch && transformMode ? transformMode.wrapperName : card.name;
-            const totalHand = perspectiveHand.length;
-            // 扇形角度:从左到右 -10deg ~ +10deg
-            const fanAngle = totalHand > 1 ? -10 + 20 * (i / (totalHand - 1)) : 0;
-            const isHovered = false; // hover state handled by CSS
-            return (
-              <div
-                key={card.id}
-                data-card-id={card.id}
-                className={cx(
-                  handCard,
-                  isSelected && handCardSelected,
-                  (!canPlay && !isAwaiting && !canDiscardClick && !isTransformActive) && handCardDisabled,
-                  isAwaiting && handCardRespondable,
-                  isDiscardSelected && discardCardSelected,
-                  isNew && handCardNew,
-                  isTransformMatch && handCardTransform,
-                  isTransformDisabled && handCardTransformDisabled,
-                )}
-                style={{ transform: `rotate(${fanAngle}deg)`, zIndex: i }}
-                onClick={() => canClick && !isTransformDisabled && handleCardClick(card)}
-                title={
-                  isTransformMatch && transformMode
-                    ? `${displayName} ${card.suit}${card.rank}\n(原:${card.name}) ${getCardDescription(displayName)}`.trim()
-                    : `${card.name} ${card.suit}${card.rank}\n${getCardDescription(card.name)}`
-                }
-              >
-                <div className={cardName} style={{ color: suitColor }}>{displayName}</div>
-                {isTransformMatch && transformMode && (
-                  <div className={cardOrigin} style={{ color: suitColor }}>(原: {card.name})</div>
-                )}
-                <div className={cardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
-              </div>
-            );
-          })}
-          {perspectiveHand.length === 0 && <div className={emptyHand}>无手牌</div>}
-        </div>
-      </div>
-      {/* ─── 武将技能区(基于 defineAction 注册表) ─── */}
-      {/* 按 prompt 类型决定渲染方式: */}
-      {/* - confirm/distribute/choosePlayer: 显示独立触发按钮 */}
-      {/* - useCardAndTarget + transform(转化技能): 显示独立触发按钮 */}
-      {/* - useCard/useCardAndTarget(非转化)/selectTarget: 影响手牌区可选性,不显示按钮 */}
-      {(() => {
-        const triggerableActions = skillActions.filter(a =>
-          a.prompt.type === 'confirm' ||
-          a.prompt.type === 'distribute' ||
-          a.prompt.type === 'choosePlayer' ||
-          (a.prompt.type === 'useCardAndTarget' && a.transform)
-        );
-        if (!(isMyTurn && canOperate && view.phase === '出牌' && triggerableActions.length > 0)) return null;
-        return (
-        <div className={skillSection}>
-          <div className={skillTitle}>武将技能:</div>
-          <div className={skillList}>
-            {triggerableActions.map(action => (
-              <button key={`${action.skillId}:${action.actionType}`}
-                className={skillBtn}
-                style={action.style === 'danger' ? { borderColor: '#e74c3c' } : action.style === 'primary' ? { borderColor: '#f39c12' } : undefined}
-                onClick={() => handleSkillAction(action)}
-                title={`${action.label}: ${action.prompt.title}`}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        );
-      })()}
-
-
-      {/* ─── 操作面板 ─── */}
-      <div className={actionBar}>
-        {/* 转化模式:在选中卡 + 选中目标后,提交 preceding + wrapper.use */}
-        {canOperate && isMyTurn && view.phase === '出牌' && transformMode && selectedCardId && (
-          <button className={playBtn} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}
-            style={selectedTarget ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
-            使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
-          </button>
-        )}
-        {canOperate && isMyTurn && view.phase === '出牌' && !transformMode && selectedCardId && (() => {
-          const card = perspectiveHand.find(c => c.id === selectedCardId);
-          const needsTarget = card ? TARGET_REQUIRED_CARDS.has(card.name) : false;
-          const canPlay = !needsTarget || !!selectedTarget;
-          return <button className={playBtn} onClick={handlePlayCard} disabled={!canPlay}
-            style={canPlay ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
-            出牌{selectedTarget ? ` → ${selectedTarget}` : needsTarget ? ' (请选目标)' : ''}
-          </button>;
-        })()}
-        {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
-          <button className={endTurnBtn} onClick={handleEndTurn}>结束回合</button>
-        )}
-        {selectedCardId && selectedTarget && canOperate && isMyTurn && (
-          <div className={targetHint}>已选择目标: {selectedTarget}</div>
-        )}
-      </div>
-
-      {/* ─── 目标选择 ─── */}
-      {selectedCardId && canOperate && isMyTurn && !pending && (
-        <div className={targetSection}>
-          <div className={targetTitle}>选择目标:</div>
-          <div className={targetList}>
-            {view.players.map((p, i) => {
-              if (!p.alive || i === perspectiveIdx) return null;
-              const targetable = isTargetable(i);
+          {/* 手牌区 */}
+          <div className={handList} ref={handListRef}>
+            {perspectiveHand.map((card, i) => {
+              const isSelected = selectedCardId === card.id;
+              const isDiscardSelected = selectedForDiscard.has(card.id);
+              const canPlay = isMyTurn && canOperate;
+              const __atomType = pending?.atom?.type;
+              const __reqType = (pending?.atom as Record<string, unknown>)?.requestType;
+              const __isPeachPending = __atomType === '请求回应' && __reqType === '求桃';
+              const isAwaiting = isMyAwaiting && (card.name === '闪' || card.name === '杀' || (__isPeachPending && card.name === '桃'));
+              const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
+              const isTransformMatch = transformMode !== null && transformMode.cardFilter(card);
+              const isTransformActive = transformMode !== null && isMyTurn && canOperate;
+              const isTransformDisabled = isTransformActive && !isTransformMatch;
+              const canClick = canPlay || isAwaiting || canDiscardClick || isTransformActive;
+              const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
+              const isNew = anim.newCardIds.has(card.id);
+              const displayName = isTransformMatch && transformMode ? transformMode.wrapperName : card.name;
+              const totalHand = perspectiveHand.length;
+              const fanAngle = totalHand > 1 ? -10 + 20 * (i / (totalHand - 1)) : 0;
               return (
-                <button
-                  key={i}
-                  className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
-                  disabled={!targetable}
-                  onClick={() => handleTargetClick(p.name)}
+                <div
+                  key={card.id}
+                  data-card-id={card.id}
+                  className={cx(
+                    handCard,
+                    isSelected && handCardSelected,
+                    (!canPlay && !isAwaiting && !canDiscardClick && !isTransformActive) && handCardDisabled,
+                    isAwaiting && handCardRespondable,
+                    isDiscardSelected && discardCardSelected,
+                    isNew && handCardNew,
+                    isTransformMatch && handCardTransform,
+                    isTransformDisabled && handCardTransformDisabled,
+                  )}
+                  style={{ transform: `rotate(${fanAngle}deg)`, zIndex: i }}
+                  onClick={() => canClick && !isTransformDisabled && handleCardClick(card)}
+                  title={
+                    isTransformMatch && transformMode
+                      ? `${displayName} ${card.suit}${card.rank}\n(原:${card.name}) ${getCardDescription(displayName)}`.trim()
+                      : `${card.name} ${card.suit}${card.rank}\n${getCardDescription(card.name)}`
+                  }
                 >
-                  {p.name} ({p.character}) ♥{p.health}
-                  {!targetable && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
-                </button>
+                  <div className={cardName} style={{ color: suitColor }}>{displayName}</div>
+                  {isTransformMatch && transformMode && (
+                    <div className={cardOrigin} style={{ color: suitColor }}>(原: {card.name})</div>
+                  )}
+                  <div className={cardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
+                </div>
               );
             })}
+            {perspectiveHand.length === 0 && <div className={emptyHand}>无手牌</div>}
           </div>
         </div>
-      )}
+      </div>
 
       {/* ─── 游戏日志 ─── */}
       <details className={logPanel}>
@@ -1357,6 +1503,25 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   );
 }
 
+// ─── 统一倒计时进度条 ───
+// 使用 rAF 每帧更新，CSS transition 在每次 fraction 更新时顺滑插值。
+// 不再是秒级跳跃。
+interface CountdownBarProps {
+  deadline: number | null;
+  totalMs: number;
+}
+function CountdownBar({ deadline, totalMs }: CountdownBarProps) {
+  const frac = useCountdownFraction(deadline, totalMs);
+  if (deadline == null || frac == null) return null;
+  const sec = Math.ceil(frac * totalMs / 1000);
+  return (
+    <div className={countdownBar} title={`剩余 ${sec} 秒`}>
+      <div className={countdownBarFill} style={{ width: `${frac * 100}%` }} />
+      <span className={countdownBarText}>⏱ {sec}s</span>
+    </div>
+  );
+}
+
 // ─── 玩家座位视图 ───
 interface PlayerSeatProps {
   player: EngineGameView['players'][number];
@@ -1367,7 +1532,6 @@ interface PlayerSeatProps {
   needsTarget: boolean;
   isTargetable: boolean;
   selectedTarget: string | null;
-  remainingSeconds: number | null;
   onTargetClick: (name: string) => void;
   onPerspectiveChange: (index: number) => void;
   /** 该玩家是否刚受到伤害 */
@@ -1383,7 +1547,7 @@ interface PlayerSeatProps {
 
 function PlayerSeatView({
   player, index, view, isCurrentPlayer, isPerspective,
-  needsTarget, isTargetable, selectedTarget, remainingSeconds,
+  needsTarget, isTargetable, selectedTarget,
   onTargetClick, onPerspectiveChange,
   isDamaged = false, damageVersion = 0, isTurnGlow = false, turnGlowVersion = 0,
   hideIdentity = true,
@@ -1521,9 +1685,6 @@ function PlayerSeatView({
           ))}
         </div>
       )}
-      {remainingSeconds !== null && (
-        <div className={timerText}>⏱ {remainingSeconds}s</div>
-      )}
     </div>
   );
 }
@@ -1572,11 +1733,6 @@ const goToBtn = css`
   border: 1px solid #555; border-radius: 4px; padding: 4px 10px;
   cursor: pointer; background: transparent; color: #aaa; font-size: 12px;
 `;
-const headerCountdown = css`
-  color: #e67e22; font-weight: bold; font-size: 16px;
-  background: rgba(230,126,34,0.15); border-radius: 4px; padding: 2px 8px;
-  animation: pulse 1s ease-in-out infinite;
-`;
 
 // Prompt
 const promptBox = css`
@@ -1587,20 +1743,6 @@ const promptBoxAwaiting = css`
   border: 2px solid #e74c3c; border-left: 4px solid #e74c3c;
   border-radius: 8px; padding: 12px 16px;
   background: rgba(231,76,60,0.1); margin-bottom: 12px;
-`;
-const promptCountdownBar = css`
-  position: relative;
-  width: 100%;
-  height: 4px;
-  background: rgba(231,76,60,0.2);
-  border-radius: 2px;
-  margin-top: 8px;
-  overflow: hidden;
-`;
-const promptCountdownFill = css`
-  height: 100%;
-  background: #e74c3c;
-  transition: width 0.2s linear;
 `;
 const promptTitle = css`color: #e67e22; font-weight: bold; font-size: 15px; margin-bottom: 4px;`;
 const promptDesc = css`font-size: 14px; margin-bottom: 8px;`;
@@ -1640,19 +1782,12 @@ const seatArcSlot = css`
   position: absolute;
   transform: translateX(-50%);
 `;
-// 自己座位:底部居中
-const seatBottom = css`
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-`;
 const centerMeta = css`
   text-align: center;
   margin: 8px auto;
   max-width: 300px;
 `;
 const metaText = css`font-size: 12px; color: #888;`;
-const countdownText = css`font-size: 18px; color: #e67e22; font-weight: bold; margin-top: 4px;`;
 
 // Seat card — 武将卡风格:势力色 header + 体力红心 + 技能标签
 const seatCard = css`
@@ -1821,10 +1956,7 @@ const infoRow = css`
 `;
 const markRow = css`font-size: 10px; color: #666; padding: 0 10px 4px;`;
 const markTag = css`margin-right: 6px;`;
-const timerText = css`font-size: 12px; color: #e67e22; margin-top: 4px; font-weight: bold;`;
-
 // Hand cards
-const handSection = css`margin-bottom: 12px; padding: 0 8px;`;
 const handHeader = css`
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
 `;
@@ -1947,14 +2079,116 @@ const targetBtn = css`
 `;
 const targetBtnActive = css`border: 2px solid #e74c3c; background: rgba(231,76,60,0.2);`;
 const targetBtnDisabled = css`opacity: 0.35; cursor: not-allowed; border-style: dashed;`;
-// Skill buttons
-const skillSection = css`margin-bottom: 8px;`;
-const skillTitle = css`font-size: 13px; color: #aaa; margin-bottom: 6px; font-weight: bold;`;
-const skillList = css`display: flex; gap: 8px; flex-wrap: wrap;`;
+// Skill buttons (技能在角色卡上显示，这里只保留按钮本体样式)
 const skillBtn = css`
-  border: 1px solid #9b59b6; border-radius: 6px; padding: 6px 14px;
-  cursor: pointer; background: rgba(155,89,182,0.15); color: #bb8fce; font-size: 13px; font-weight: bold;
+  border: 1px solid #9b59b6; border-radius: 4px; padding: 2px 8px;
+  cursor: pointer; background: rgba(155,89,182,0.15); color: #bb8fce; font-size: 11px; font-weight: bold;
+  margin-right: 3px;
   &:hover { background: rgba(155,89,182,0.3); }
+`;
+// 装备区中可点使用的装备技能按钮
+const equipSkillBtn = css`
+  border: 1px solid #f39c12; border-radius: 4px; padding: 1px 6px;
+  cursor: pointer; background: rgba(243,156,18,0.18); color: #f39c12; font-size: 10px; font-weight: bold;
+  &:hover { background: rgba(243,156,18,0.32); }
+`;
+
+// ─── 下方主布局 ───
+// 左:角色大卡 (320px) 右:手牌列 (flex 1)
+const bottomLayout = css`
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  padding: 0 8px;
+  margin-top: 12px;
+  @media (max-width: 900px) {
+    flex-direction: column;
+  }
+`;
+const handColumn = css`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+// ─── 统一倒计时进度条 ───
+const countdownBar = css`
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(231,126,34,0.18);
+  border-radius: 3px;
+  overflow: hidden;
+`;
+const countdownBarFill = css`
+  height: 100%;
+  background: linear-gradient(90deg, #f39c12, #e74c3c);
+  border-radius: 3px;
+  /* rAF 每帧更新 fraction；linear transition 让 width 顺滑插值 */
+  transition: width 0.15s linear;
+  will-change: width;
+`;
+const countdownBarText = css`
+  position: absolute;
+  top: 50%; right: 8px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: bold;
+  color: #e67e22;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  pointer-events: none;
+`;
+
+// ─── 角色大卡 (左侧) ───
+const playerCardLarge = css`
+  flex: 0 0 320px;
+  border: 1px solid #444;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.55);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  @media (max-width: 900px) {
+    flex: 1 1 auto;
+  }
+`;
+const playerCardHeader = css`
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+const playerCardHeaderTop = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+const playerCardName = css`
+  font-weight: bold;
+  font-size: 18px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+`;
+const playerCardChar = css`
+  font-weight: bold;
+  font-size: 14px;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+`;
+const playerCardEquip = css`
+  padding: 6px 12px 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  background: rgba(243,156,18,0.05);
+`;
+const playerCardEquipTitle = css`
+  font-size: 11px;
+  color: #f39c12;
+  font-weight: bold;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
 `;
 
 // Debug panel

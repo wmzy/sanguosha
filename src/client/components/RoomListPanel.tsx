@@ -9,6 +9,12 @@ interface RoomListPanelProps {
   onJoin: (roomId: string) => void;
   onDelete?: (roomId: string) => void;
   emptyText?: string;
+  /**
+   * 调试房间专用:status 限制(等待中)不生效,join 按钮始终可点(除非已满)。
+   * 普通房间可不传。debug 房间需要这个能力,因为创建后服务端会 fire-and-forget startGame,
+   * 状态变成"游戏中",但 debug 设计上仍允许多客户端随时加入观察/代打。
+   */
+  allowJoinAlways?: boolean;
 }
 
 const panelRoot = css`
@@ -76,9 +82,16 @@ const roomActions = css`
   flex-shrink: 0;
 `;
 
-export const RoomListPanel = memo(({ rooms, onRefresh, onJoin, onDelete, emptyText }: RoomListPanelProps) => {
-  return (
-    <div className={panelRoot}>
+export const RoomListPanel = memo(
+  ({ rooms, onRefresh, onJoin, onDelete, emptyText, allowJoinAlways = false }: RoomListPanelProps) => {
+    // join 可点条件: 房间未满,且(status 是等待中 或 allowJoinAlways 开启)
+    const isJoinable = (room: RoomInfo) => {
+      if (room.playerCount >= room.maxPlayers) return false;
+      if (allowJoinAlways) return true;
+      return room.status === '等待中';
+    };
+    return (
+      <div className={panelRoot}>
       <h2 className={panelTitle}>房间列表</h2>
 
       <div className={refreshRow}>
@@ -106,18 +119,13 @@ export const RoomListPanel = memo(({ rooms, onRefresh, onJoin, onDelete, emptyTe
               <div className={roomActions}>
                 <button
                   onClick={() => onJoin(room.id)}
-                  disabled={room.status !== '等待中' || room.playerCount >= room.maxPlayers}
+                  disabled={!isJoinable(room)}
                   style={styles.btn(
-                    room.status === '等待中' && room.playerCount < room.maxPlayers
-                      ? colors.accent.green
-                      : colors.text.dim,
+                    isJoinable(room) ? colors.accent.green : colors.text.dim,
                     {
                       padding: '8px 16px',
                       fontSize: 13,
-                      cursor:
-                        room.status === '等待中' && room.playerCount < room.maxPlayers
-                          ? 'pointer'
-                          : 'not-allowed',
+                      cursor: isJoinable(room) ? 'pointer' : 'not-allowed',
                     },
                   )}
                 >

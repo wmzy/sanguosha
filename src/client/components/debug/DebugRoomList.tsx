@@ -124,6 +124,7 @@ export function DebugRoomList({
         onJoin={onJoin}
         onDelete={onDelete}
         emptyText="暂无调试房间"
+        allowJoinAlways
       />
     </div>
   );
