@@ -82,8 +82,8 @@ describe('遗计', () => {
     // distribute
     P2.expectPending('请求回应');
     await P2.distribute('遗计/distribute', [
-      { target: 'P3', cardIds: ['d1'] },
-      { target: 'P1', cardIds: ['d2'] },
+      { target: 2, cardIds: ['d1'] },
+      { target: 0, cardIds: ['d2'] },
     ]);
 
     expect(harness.state.players.find(p => p.name === 'P3')!.hand).toContain('d1');

@@ -131,7 +131,7 @@ describe('杀 + 装备 + 距离', () => {
       params: { cardId: slash.id, targets: [1] },
       baseSeq: 0,
     });
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
     expect(state.players[1].health).toBe(beforeHealth); // 还没扣血
 
     // 第二步:P1 出闪回应
@@ -152,7 +152,7 @@ describe('杀 + 装备 + 距离', () => {
     expect(state.zones.processing).not.toContain(slash.id);
     expect(state.zones.processing).not.toContain(dodge.id);
     // pending 已消费
-    expect(state.pendingSlot).toBeUndefined();
+    expect(state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ describe('杀 + 装备 + 距离', () => {
       params: { cardId: slash.id, targets: [1] },
       baseSeq: 0,
     });
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
     expect(state.players[1].health).toBe(beforeHealth);
 
     // 第二步:模拟超时(不出闪)→ 触发 onTimeout (无操作) → 杀结算伤害
@@ -195,7 +195,7 @@ describe('杀 + 装备 + 距离', () => {
     // 杀进弃牌堆
     expect(state.zones.discardPile).toContain(slash.id);
     // pending 已消费
-    expect(state.pendingSlot).toBeUndefined();
+    expect(state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ describe('杀 + 装备 + 距离', () => {
       params: { cardId: slash1.id, targets: [1] },
       baseSeq: 1,
     });
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
     const healthAfterFirst = state.players[1].health;
 
     // 不出闪 → 扣血
@@ -260,7 +260,7 @@ describe('杀 + 装备 + 距离', () => {
       params: { cardId: slash2.id, targets: [1] },
       baseSeq: 2,
     });
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
 
     // 第二次也不出闪 → 再扣血
     await fireTimeoutAndWait(state);

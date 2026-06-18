@@ -8,41 +8,32 @@
 //   4. 救回场景:P1(HP=1) 濒死 → 有人出桃 → P1 HP>0 → 存活
 //   5. 濒死状态观察:HP=0 但 alive 仍为 true(在求桃窗口期内)
 //
-// 模式:create + bootstrap 真实开局 → dispatch 走真实 action 路径
+// 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  create,
-  bootstrap,
-  dispatch,
-  fireTimeout,
   resetForTest,
-  type GameConfig,
+  registerSkillsFromState,
 } from '../../src/engine/create-engine';
-import { fireTimeoutAndWait,  dispatchAndWait } from '../engine-harness';
+import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
-
-function buildConfig(playerCount: number): GameConfig {
-  return {
-    characters: [
-      { name: '刘备', skills: ['仁德', '激将'] },
-      { name: '曹操', skills: ['护甲'] },
-    ].slice(0, playerCount),
-    playerCount,
-    seed: 42,
-    gameId: `dying-${playerCount}`,
-  };
-}
+import { createGameState } from '../../src/engine/types';
 
 /** 反复 fireTimeout 直到没有 pending 或超过 safety。返回跳过的 pending 数 */
 async function drainTimeouts(state: GameState, safety = 30): Promise<number> {
   let n = 0;
-  while (state.pendingSlot && n < safety) {
+  while (state.pendingSlots.size > 0 && n < safety) {
     await fireTimeoutAndWait(state);
     n += 1;
   }
   return n;
+}
+
+/** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
+function firstPendingAtom(state: GameState): unknown | undefined {
+  if (state.pendingSlots.size === 0) return undefined;
+  return [...state.pendingSlots.values()][0].atom;
 }
 
 /** 给指定玩家一张指定类型的牌(从手牌空位置抽 cardId) */
@@ -64,8 +55,27 @@ describe('濒死求桃', () => {
 
   beforeEach(async () => {
     resetForTest();
-    state = create(buildConfig(2));
-    await bootstrap(state, buildConfig(2));
+    state = createGameState({
+      players: [
+        {
+          index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
+          hand: [], equipment: {},
+          skills: ['回合管理', '杀', '桃'],
+          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+        },
+        {
+          index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
+          hand: [], equipment: {},
+          skills: ['回合管理', '闪', '桃', '装备通用'],
+          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+        },
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -95,11 +105,11 @@ describe('濒死求桃', () => {
     });
 
     // 应有 pending:闪/求桃/其他窗口
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
 
     // 反复 fireTimeout:消耗 闪 → 受伤 → 濒死 → 求桃 轮次
     let loops = 0;
-    while (state.pendingSlot && loops < 30) {
+    while (state.pendingSlots.size > 0 && loops < 30) {
       await fireTimeoutAndWait(state);
       loops += 1;
     }
@@ -135,8 +145,8 @@ describe('濒死求桃', () => {
 
     // 第一次 fireTimeout:消耗 闪 → 受伤 → HP=0 → 触发濒死
     // 先 fireTimeout 闪
-    if (state.pendingSlot) {
-      const atom = state.pendingSlot.atom as { type?: string; requestType?: string };
+    if (state.pendingSlots.size > 0) {
+      const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
       const isDodgePrompt = atom.type === '询问闪' ||
         (atom.type === '请求回应' && (atom.requestType === '闪' || atom.requestType === '出闪'));
       if (isDodgePrompt || atom.type === '请求回应') {
@@ -145,8 +155,8 @@ describe('濒死求桃', () => {
     }
 
     // 此时:已受伤,进入求桃窗口
-    if (state.pendingSlot) {
-      const atom = state.pendingSlot.atom as { type?: string; requestType?: string };
+    if (state.pendingSlots.size > 0) {
+      const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
       // 应该是求桃 pending
       const isPeachPrompt = atom.type === '请求回应' && atom.requestType === '求桃';
       if (isPeachPrompt) {
@@ -178,12 +188,12 @@ describe('濒死求桃', () => {
     });
 
     // 消耗闪窗口
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
     await fireTimeoutAndWait(state); // 闪超时 → 受伤
 
     // 假设现在进入求桃窗口
-    if (state.pendingSlot) {
-      const atom = state.pendingSlot.atom as { type?: string; requestType?: string };
+    if (state.pendingSlots.size > 0) {
+      const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
       // 跳到 P1 求桃 → P1 回应
       if (atom.type === '请求回应' && atom.requestType === '求桃') {
         const target = (atom as { target?: number }).target;

@@ -41,7 +41,7 @@ describe('组合 action(武圣转化 + 杀使用)', () => {
     });
     await waitForStable(state);
     // 杀.execute 会 applyAtom 询问闪 → 进入 pending。需要 P2 respond(这里 pass 即不闪)。
-    if (state.pendingSlot) {
+    if (state.pendingSlots.size > 0) {
       await fireTimeout(state);
       await waitForStable(state);
     }

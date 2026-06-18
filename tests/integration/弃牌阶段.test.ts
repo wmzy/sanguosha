@@ -7,31 +7,22 @@
 //   3. 手牌未超限:跳过弃牌阶段,无 pending
 //   4. 探索:若新引擎弃牌阶段尚未实装,标记 skip 并说明原因
 //
-// 模式:create + bootstrap 真实开局 → dispatch 走真实 action 路径
+// 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  create,
-  bootstrap,
-  dispatch,
-  fireTimeout,
   resetForTest,
-  type GameConfig,
+  registerSkillsFromState,
 } from '../../src/engine/create-engine';
-import { dispatchAndWait } from '../engine-harness';
+import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
 
-function buildConfig(playerCount: number): GameConfig {
-  return {
-    characters: [
-      { name: '刘备', skills: ['仁德', '激将'] },
-      { name: '曹操', skills: ['护甲'] },
-    ].slice(0, playerCount),
-    playerCount,
-    seed: 42,
-    gameId: `discard-phase-${playerCount}`,
-  };
+/** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
+function firstPendingAtom(state: GameState): unknown | undefined {
+  if (state.pendingSlots.size === 0) return undefined;
+  return [...state.pendingSlots.values()][0].atom;
 }
 
 describe('弃牌阶段', () => {
@@ -39,8 +30,33 @@ describe('弃牌阶段', () => {
 
   beforeEach(async () => {
     resetForTest();
-    state = create(buildConfig(2));
-    await bootstrap(state, buildConfig(2));
+    state = createGameState({
+      players: [
+        {
+          index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
+          hand: ['c1', 'c2', 'c3', 'c4', 'c5'], equipment: {},
+          skills: ['回合管理'],
+          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+        },
+        {
+          index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
+          hand: [], equipment: {},
+          skills: ['回合管理'],
+          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+        },
+      ],
+      cardMap: {
+        c1: { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' },
+        c2: { id: 'c2', name: '闪', suit: '♥', rank: '2', type: '基本牌' },
+        c3: { id: 'c3', name: '桃', suit: '♥', rank: '3', type: '基本牌' },
+        c4: { id: 'c4', name: '杀', suit: '♠', rank: '4', type: '基本牌' },
+        c5: { id: 'c5', name: '杀', suit: '♠', rank: '5', type: '基本牌' },
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -72,8 +88,8 @@ describe('弃牌阶段', () => {
     });
 
     // 期望:手牌超限 → 弃牌阶段产生 pending 交互(请求回应 / 弃置 / 弃牌阶段)
-    const slot = state.pendingSlot;
-    if (!slot) {
+    const atom = firstPendingAtom(state);
+    if (!atom) {
       // 当前新引擎 (skills/回合管理.ts) 的弃牌阶段尚未实装手牌超限检查:
       //  阶段结束(弃牌)后直接跳到下家回合,无任何 pending 或弃牌逻辑。
       // 验证当前现状:手牌不变(未弃)、进入下家回合
@@ -86,9 +102,8 @@ describe('弃牌阶段', () => {
     }
 
     // 若实装了:验证 pending 类型(请求回应/弃置/弃牌阶段 三选一)
-    const atom = slot.atom as { type?: string; requestType?: string };
-    const atomType = atom.type ?? '';
-    const requestType = atom.requestType;
+    const atomType = (atom as { type?: string; requestType?: string }).type ?? '';
+    const requestType = (atom as { requestType?: string }).requestType;
     expect(
       atomType === '请求回应' || atomType === '弃置' || atomType === '弃牌阶段',
     ).toBe(true);
@@ -119,15 +134,15 @@ describe('弃牌阶段', () => {
       baseSeq: state.seq,
     });
 
-    if (!state.pendingSlot) {
+    if (state.pendingSlots.size === 0) {
       // 弃牌阶段未实装 → skip
       return;
     }
 
     // 自动超时:消耗 pending
     let safety = 5;
-    while (state.pendingSlot && safety-- > 0) {
-      await fireTimeout(state);
+    while (state.pendingSlots.size > 0 && safety-- > 0) {
+      await fireTimeoutAndWait(state);
     }
 
     // 期望:手牌数 ≤ 体力上限 (4)
@@ -154,8 +169,8 @@ describe('弃牌阶段', () => {
     });
 
     // 期望:无弃牌 pending
-    if (state.pendingSlot) {
-      const atom = state.pendingSlot.atom as { type?: string; requestType?: string };
+    if (state.pendingSlots.size > 0) {
+      const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
       const isDiscardPending =
         atom.type === '弃置' ||
         atom.type === '弃牌阶段' ||

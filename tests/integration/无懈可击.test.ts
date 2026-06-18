@@ -8,31 +8,22 @@
 //   4. 双无懈场景:P0 出无懈抵消锦囊 → P1 再出无懈抵消无懈 → 锦囊恢复生效
 //   5. 处理区:锦囊在无懈窗口期间位于 processing,生效后移入 discardPile
 //
-// 模式:create + bootstrap 真实开局 → dispatch 走真实 action 路径
+// 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  create,
-  bootstrap,
-  dispatch,
-  fireTimeout,
   resetForTest,
-  type GameConfig,
+  registerSkillsFromState,
 } from '../../src/engine/create-engine';
-import { fireTimeoutAndWait,  dispatchAndWait } from '../engine-harness';
+import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
 
-function buildConfig(playerCount: number): GameConfig {
-  return {
-    characters: [
-      { name: '刘备', skills: ['仁德', '激将'] },
-      { name: '曹操', skills: ['护甲'] },
-    ].slice(0, playerCount),
-    playerCount,
-    seed: 42,
-    gameId: `wuxie-${playerCount}`,
-  };
+/** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
+function firstPendingAtom(state: GameState): unknown | undefined {
+  if (state.pendingSlots.size === 0) return undefined;
+  return [...state.pendingSlots.values()][0].atom;
 }
 
 describe('无懈可击链路', () => {
@@ -40,8 +31,30 @@ describe('无懈可击链路', () => {
 
   beforeEach(async () => {
     resetForTest();
-    state = create(buildConfig(2));
-    await bootstrap(state, buildConfig(2));
+    state = createGameState({
+      players: [
+        {
+          index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
+          hand: [], equipment: {},
+          skills: ['回合管理', '过河拆桥', '无懈可击'],
+          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+        },
+        {
+          index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
+          // 给 P1 一张基础牌(用于 过河拆桥)
+          hand: ['d1'], equipment: {},
+          skills: ['回合管理', '过河拆桥', '无懈可击'],
+          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+        },
+      ],
+      cardMap: {
+        d1: { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' },
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -59,13 +72,13 @@ describe('无懈可击链路', () => {
       skillId: '过河拆桥',
       actionType: 'use',
       ownerId: 0,
-      params: { cardId: gqId, target: 1 },
+      params: { cardId: gqId, targets: [1] },
       baseSeq: state.seq,
     });
 
     // 应有无懈可击 pending (请求回应 requestType='无懈可击')
-    expect(state.pendingSlot).toBeDefined();
-    const atom = state.pendingSlot!.atom as { type?: string; requestType?: string };
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
+    const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
     expect(atom.type).toBe('请求回应');
     expect(atom.requestType).toBe('无懈可击');
     // 锦囊在处理区
@@ -91,10 +104,10 @@ describe('无懈可击链路', () => {
       skillId: '过河拆桥',
       actionType: 'use',
       ownerId: 0,
-      params: { cardId: gqId, target: 1 },
+      params: { cardId: gqId, targets: [1] },
       baseSeq: state.seq,
     });
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
 
     // fireTimeout:消耗无懈窗口
     await fireTimeoutAndWait(state);
@@ -110,7 +123,7 @@ describe('无懈可击链路', () => {
     expect(state.zones.discardPile).toContain(gqId);
     expect(state.zones.processing).not.toContain(gqId);
     // pending 已消费
-    expect(state.pendingSlot).toBeUndefined();
+    expect(state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -135,11 +148,11 @@ describe('无懈可击链路', () => {
       skillId: '过河拆桥',
       actionType: 'use',
       ownerId: 0,
-      params: { cardId: gqId, target: 1 },
+      params: { cardId: gqId, targets: [1] },
       baseSeq: state.seq,
     });
-    expect(state.pendingSlot).toBeDefined();
-    const atom = state.pendingSlot!.atom as { type?: string; requestType?: string };
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
+    const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
     expect(atom.requestType).toBe('无懈可击');
 
     // P1 回应无懈可击
@@ -155,7 +168,7 @@ describe('无懈可击链路', () => {
     // (dispatch respond 路径) —— 没有反无懈,直接消耗
     // 反复 fireTimeout 直到没有 pending
     let loops = 0;
-    while (state.pendingSlot && loops < 10) {
+    while (state.pendingSlots.size > 0 && loops < 10) {
       await fireTimeoutAndWait(state);
       loops += 1;
     }
@@ -200,11 +213,11 @@ describe('无懈可击链路', () => {
       skillId: '过河拆桥',
       actionType: 'use',
       ownerId: 0,
-      params: { cardId: gqId, target: 1 },
+      params: { cardId: gqId, targets: [1] },
       baseSeq: state.seq,
     });
     // 等待无懈窗口
-    expect(state.pendingSlot).toBeDefined();
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
 
     // P1 出无懈抵消锦囊
     await dispatchAndWait(state, {
@@ -217,8 +230,8 @@ describe('无懈可击链路', () => {
 
     // 此时:无懈respond执行完 → 翻转被抵消=true → 询问反无懈
     // 应是请求回应 requestType='无懈可击'
-    expect(state.pendingSlot).toBeDefined();
-    const atom = state.pendingSlot!.atom as { type?: string; requestType?: string };
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
+    const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
     expect(atom.type).toBe('请求回应');
     expect(atom.requestType).toBe('无懈可击');
 
@@ -233,7 +246,7 @@ describe('无懈可击链路', () => {
 
     // 反复 fireTimeout 直到没有 pending
     let loops = 0;
-    while (state.pendingSlot && loops < 10) {
+    while (state.pendingSlots.size > 0 && loops < 10) {
       await fireTimeoutAndWait(state);
       loops += 1;
     }
