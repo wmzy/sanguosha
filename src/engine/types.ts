@@ -70,6 +70,8 @@ export interface PlayerState {
   /** 标签集合——轻量无 payload 标记(如 '八卦阵/autoDodge'),通过 加标签/去标签 atom 维护。
    *  可选:未设置时引擎视同空数组(由 createGameState 兜底) */
   tags?: string[];
+  /** 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)。可选,未设置视同空数组 */
+  judgeZone?: string[];
   /** 身份局角色身份。主公开局亮明,其他角色死亡时翻开 */
   identity?: Identity;
   /** 武将势力(魏蜀吴群),影响部分技能(如激将、无懈可击·国) */

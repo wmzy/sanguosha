@@ -28,9 +28,13 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     text: formatLogEntry(e.message),
   }));
 
-  // 从 GameState.pendingSlots 构建 pending view(Map 中取活跃 slot)
+  // 从 GameState.pendingSlots 构建 pending view。
+  // 多 target 并行(拼点/选将)时,每个 viewer 只看到自己的 slot;
+  // 单 target 场景 Map 只有1个 slot。
   let pending: GameView['pending'] = null;
-  const slot = state.pendingSlots.size > 0 ? [...state.pendingSlots.values()][0] : undefined;
+  const mySlot = viewer >= 0 ? state.pendingSlots.get(viewer) : undefined;
+  // fallback:如果 viewer 没有专属 slot,取唯一的 slot(单 target 场景)
+  const slot = mySlot ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
   if (slot) {
     const def = slot.definition;
     const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
