@@ -251,8 +251,9 @@ export class PlayerSession {
   /** 断言事件流中包含指定 atom 类型(子序列匹配,忽略 notify 事件) */
   expectAtoms(...types: string[]): void {
     const atoms = getEvents(0)
-      .filter((e): e is { kind: 'atom'; atom: { type: string } } => e.kind === 'atom')
-      .map(e => e.atom.type);
+      .filter((e) => { const ge = e as Record<string, unknown>; return ge.kind === 'atom'; })
+      .map((e) => { const ge = e as Record<string, unknown> & { atom?: { type: string } }; return ge.atom?.type ?? ''; })
+      .filter(t => t !== '');
     let searchFrom = 0;
     for (const t of types) {
       const idx = atoms.indexOf(t, searchFrom);
@@ -264,13 +265,63 @@ export class PlayerSession {
   /** 断言事件流的 atom 类型严格匹配(忽略 notify 事件) */
   expectExactAtoms(...types: string[]): void {
     const atoms = getEvents(0)
-      .filter((e): e is { kind: 'atom'; atom: { type: string } } => e.kind === 'atom')
-      .map(e => e.atom.type);
+      .filter((e) => { const ge = e as Record<string, unknown>; return ge.kind === 'atom'; })
+      .map((e) => { const ge = e as Record<string, unknown> & { atom?: { type: string } }; return ge.atom?.type ?? ''; })
+      .filter(t => t !== '');
     const expected = types.join(', ');
     const actual = atoms.join(', ');
     if (expected !== actual) {
       throw new Error(`expectExactAtoms: 期望 [${expected}],实际 [${actual}]`);
     }
+  }
+
+  // ─── pending 回应推导(等价于前端 pendingRespondInfo) ───
+
+  /**
+   * 从当前 pending + skillActions(defineAction 声明)推导 respond 信息。
+   * skillId: 从 atom type/requestType 通用推导。
+   * cardFilter: 从 FakeFrontendAPI 收集的 respond action 声明取(原始函数引用,不丢)。
+   * 返回 null = 当前无 pending 或无法推导。
+   */
+  respondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
+    const slots = this.harness.state.pendingSlots;
+    const slot = slots.get(this.playerIndex)
+      ?? (slots.size === 1 ? [...slots.values()][0] : undefined)
+      ?? [...slots.values()].find(s => { const t = (s.atom as { target?: unknown }).target; return typeof t === 'number' && t < 0; });
+    if (!slot) return null;
+    const atom = slot.atom as Record<string, unknown>;
+    const atomType = (atom['type'] as string) ?? '';
+    const reqType = typeof atom['requestType'] === 'string' ? (atom['requestType'] as string) : '';
+
+    // 通用推导 skillId
+    let skillId: string | null = null;
+    if (atomType.startsWith('询问')) {
+      skillId = atomType.slice(2);
+    } else if (reqType === '__弃牌') {
+      skillId = '系统规则';
+    } else if (atomType === '请求回应' || atomType === '并行回应') {
+      skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null);
+    }
+    if (!skillId) return null;
+
+    // 从 FakeFrontendAPI 收集的 action 声明取 cardFilter(函数引用)
+    const action = this.frontend.getActions().find(a => a.skillId === skillId && a.actionType === 'respond');
+    const cardFilter = action ? extractCardFilter(action.prompt) ?? undefined : undefined;
+    return { skillId, cardFilter };
+  }
+
+  /** 当前 pending 下可出的牌(用 respondInfo 的 cardFilter 过滤手牌) */
+  respondableCards(): Card[] {
+    const info = this.respondInfo();
+    if (!info?.cardFilter) return [];
+    const player = this.harness.state.players[this.playerIndex];
+    if (!player) return [];
+    const result: Card[] = [];
+    for (const cardId of player.hand) {
+      const card = this.harness.state.cardMap[cardId];
+      if (card && info.cardFilter!(card)) result.push(card);
+    }
+    return result;
   }
 
   // ─── 组合 action(转化技) ─────────────────────

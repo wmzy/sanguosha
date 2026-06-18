@@ -640,51 +640,43 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setSelectedTarget(null);
   }
 
-  // 根据当前 pending 通用推导 respond 的 skillId + 可出牌过滤。
-  // prompt.cardFilter.filter 是函数——不能走 JSON 序列化，所以 server-side
-  // buildView 不会带过来。前端需根据 prompt 描述重构过滤函数。
-  // - 询问闪 atom → 只能点 闪
-  // - 询问杀 atom → 只能点 杀
-  // - 求桃 / requestType='求桃' → 只能点 桃
-  // - 无懈可击 / requestType='无懈可击' → 只能点 无懈可击
-  // - 其他 requestType 取 '/' 前缀为 skillId，保留 prompt.cardFilter.filter(若存在)
+  // 根据当前 pending 从技能 defineAction 声明(skillActionRegistry)推导:
+  // - skillId: 从 atom type/requestType 通用推导(询问X→X, 请求回应 requestType→skillId)
+  // - cardFilter: 从 registry 里该 skillId 的 respond action 声明取(原始函数引用,不丢)
+  // 不硬编码具体技能名——完全由技能自己的 defineAction 驱动。
+  /** 从 SkillActionDef 的 prompt 提取 cardFilter 函数(不走 JSON 序列化,函数引用保留) */
+  function extractCardFilterFromAction(action: SkillActionDef): ((c: Card) => boolean) | undefined {
+    const p = action.prompt;
+    if ((p.type === 'useCard' || p.type === 'useCardAndTarget') && p.cardFilter?.filter) {
+      return p.cardFilter.filter;
+    }
+    return undefined;
+  }
+
   function pendingRespondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
     if (!pending) return null;
     const atom = pending.atom as Record<string, unknown>;
     const atomType = pending.atom?.type ?? '';
-    const prompt = pending.prompt;
     const reqType = typeof atom['requestType'] === 'string' ? (atom['requestType'] as string) : '';
 
-    // 询问X atom → skillId=X(去「询问」前缀),cardFilter 限定牌名
+    // 通用推导 skillId
+    let skillId: string | null = null;
     if (atomType.startsWith('询问')) {
-      const cardName = atomType.slice(2);
-      return { skillId: cardName, cardFilter: (c: Card) => c.name === cardName };
+      skillId = atomType.slice(2); // 询问闪→闪
+    } else if (reqType === '__弃牌') {
+      skillId = '系统规则';
+    } else if (atomType === '请求回应' || atomType === '并行回应') {
+      skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null);
     }
+    if (!skillId) return null;
 
-    // requestType 限定的特定回应类型(求桃 / 无辨可击)
-    if (reqType === '求桃') {
-      return { skillId: '桃', cardFilter: (c: Card) => c.name === '桃' };
-    }
-    if (reqType === '无懈可击') {
-      return { skillId: '无懈可击', cardFilter: (c: Card) => c.name === '无懈可击' };
-    }
-    if (reqType === '__弃牌') {
-      // 弃牌窗口无牌名限制——以 selectedForDiscard 为准
-      return { skillId: '系统规则', cardFilter: () => true };
-    }
+    // 从 skillActionRegistry 取该 skillId 的 respond action 声明的 cardFilter(函数引用,不丢)
+    const action = skillActions.find(a => a.skillId === skillId && a.actionType === 'respond');
+    const cardFilter = action
+      ? extractCardFilterFromAction(action)
+      : undefined;
 
-    // 请求回应 / 并行回应 → requestType 取 '/' 前缀作 skillId
-    if (atomType === '请求回应' || atomType === '并行回应') {
-      if (!reqType) return null;
-      const slashIdx = reqType.indexOf('/');
-      const skillId = slashIdx >= 0 ? reqType.slice(0, slashIdx) : reqType;
-      // prompt 里带了 filter 函数则保留(本地 prompt 定义时可能有)；否则按牌名放行
-      const filter = (prompt?.type === 'useCard' || prompt?.type === 'useCardAndTarget')
-        ? prompt.cardFilter?.filter
-        : undefined;
-      return { skillId, cardFilter: filter };
-    }
-    return null;
+    return { skillId, cardFilter };
   }
 
   // 回应
