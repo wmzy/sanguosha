@@ -446,6 +446,60 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   pushEvent({ kind: 'atom', atom: current, viewEvents });
   notifyStateChange(state);
 
+  if (def.pending) {
+    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应多 target)。
+    // 并行回应 为每个 target 创建独立 slot,Promise.all 等全部 resolve(语义同 Promise.all)。
+    const isParallel = current.type === '并行回应';
+    const targets: number[] = isParallel
+      ? (current as unknown as { targets: number[] }).targets
+      : [extractPendingTarget(current)];
+
+    // 为每个 target 构造一个单 target 的虚拟 atom(并行回应拆分;单 target 原样)
+    const slotAtoms: Atom[] = isParallel
+      ? targets.map(t => ({
+          ...current,
+          type: '请求回应' as const,
+          target: t,
+        } as unknown as Atom))
+      : [current];
+
+    const slotPromises: Promise<void>[] = [];
+    for (let i = 0; i < slotAtoms.length; i++) {
+      const slotAtom = slotAtoms[i];
+      const slotTarget = targets[i];
+      slotPromises.push(createAndAwaitSlot(state, slotAtom, def, slotTarget));
+    }
+    await Promise.all(slotPromises);
+
+    // 等待型 atom:技能 after hooks 和 def.afterHooks 都在 pending resolve 之后跑
+    // ——这样贯石斧/青龙偃月刀等技能能在看到 P2 出完闪/不出后再做决策。
+    const afterHooks = getAfterHooks(current.type);
+    const sortedHooks = [...afterHooks].sort((a, b) => {
+      if (a.ownerId === -1 && b.ownerId !== -1) return 1;
+      if (a.ownerId !== -1 && b.ownerId === -1) return -1;
+      return 0;
+    });
+    for (const h of sortedHooks) {
+      const curFrame = topFrame(state) ?? emptyFrame();
+      const afterCtx: AtomAfterContext = {
+        state,
+        atom: current,
+        ownerId: h.ownerId,
+        frame: curFrame,
+        params: (curFrame.params ?? {}) as Record<string, Json>,
+      };
+      await h.handler(afterCtx);
+    }
+
+    if (def.afterHooks) {
+      def.afterHooks(state, current);
+    }
+
+    state.atomStack.pop();
+    return;
+  }
+
+  // 非等待型 atom:技能 after hooks 立即跑(原顺序)
   const afterHooks = getAfterHooks(current.type);
   // 系统级 hooks(ownerId=-1)最后执行——确保遗计/反馈等"受伤害后"技能先触发
   const sortedHooks = [...afterHooks].sort((a, b) => {
@@ -471,32 +525,6 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   }
 
   state.atomStack.pop();
-
-  if (def.pending) {
-    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应多 target)。
-    // 并行回应 为每个 target 创建独立 slot,Promise.all 等全部 resolve(语义同 Promise.all)。
-    const isParallel = current.type === '并行回应';
-    const targets: number[] = isParallel
-      ? (current as unknown as { targets: number[] }).targets
-      : [extractPendingTarget(current)];
-
-    // 为每个 target 构造一个单 target 的虚拟 atom(并行回应拆分;单 target 原样)
-    const slotAtoms: Atom[] = isParallel
-      ? targets.map(t => ({
-          ...current,
-          type: '请求回应' as const,
-          target: t,
-        } as unknown as Atom))
-      : [current];
-
-    const slotPromises: Promise<void>[] = [];
-    for (let i = 0; i < slotAtoms.length; i++) {
-      const slotAtom = slotAtoms[i];
-      const slotTarget = targets[i];
-      slotPromises.push(createAndAwaitSlot(state, slotAtom, def, slotTarget));
-    }
-    await Promise.all(slotPromises);
-  }
 }
 
 /** 为单个 target 创建 PendingSlot 并 await 到它 resolve。 */

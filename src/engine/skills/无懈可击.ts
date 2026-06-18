@@ -60,15 +60,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       // 翻转抵消状态:打出一张无懈 = 翻转当前锦囊是否被抵消
       const cancelled = state.localVars['无懈/被抵消'] as boolean | undefined;
       state.localVars['无懈/被抵消'] = !cancelled;
-
-      // 找到被 respond 的原 slot 并 resume:同一个窗口继续接受反无懈等更多回应。
-      // 无懈是广播型(target=-2),slot key = -2;按 ownerId 查不到,需要遍历 Map
-      // 找广播型 slot(resume 后该 slot 仍接受 respond,奇数次 = 抵消,偶数次 = 恢复)。
-      const broadcastSlot = [...state.pendingSlots.values()].find(s => {
-        const a = s.atom as { type?: string; target?: unknown; requestType?: string };
-        return a.type === '请求回应' && a.requestType === '无懈可击' && typeof a.target === 'number' && a.target < 0;
-      });
-      broadcastSlot?.resume?.();
+      // slot 由 dispatch 正常 resolve(不 resume),锦囊 execute 读 localVars 决定是否抵消。
     },
   );
   return () => {};

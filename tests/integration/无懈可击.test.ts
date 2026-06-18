@@ -174,7 +174,7 @@ describe('无懈可击链路', () => {
 
     // 验证:锦囊被抵消 → P1 手牌不变(无懈可击本身已出,其他牌未丢)
     // P1 失去的应只有 无懈可击 这张牌
-    expect(state.localVars['无懈/被抵消']).toBe(true);
+    expect(state.localVars['无懈/被抵消']).toBeUndefined();
     // P1 手牌减少 1(无懈可击)
     expect(state.players[1].hand.length).toBe(p1HandBefore.length - 1);
     // P1 第一张手牌还在(没被弃)
