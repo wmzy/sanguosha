@@ -646,7 +646,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // - 询问闪 atom → 只能点 闪
   // - 询问杀 atom → 只能点 杀
   // - 求桃 / requestType='求桃' → 只能点 桃
-  // - 无辨可击 / requestType='无辨可击' → 只能点 无辨可击
+  // - 无懈可击 / requestType='无懈可击' → 只能点 无懈可击
   // - 其他 requestType 取 '/' 前缀为 skillId，保留 prompt.cardFilter.filter(若存在)
   function pendingRespondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
     if (!pending) return null;
@@ -665,8 +665,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     if (reqType === '求桃') {
       return { skillId: '桃', cardFilter: (c: Card) => c.name === '桃' };
     }
-    if (reqType === '无辨可击') {
-      return { skillId: '无辨可击', cardFilter: (c: Card) => c.name === '无辨可击' };
+    if (reqType === '无懈可击') {
+      return { skillId: '无懈可击', cardFilter: (c: Card) => c.name === '无懈可击' };
     }
     if (reqType === '__弃牌') {
       // 弃牌窗口无牌名限制——以 selectedForDiscard 为准

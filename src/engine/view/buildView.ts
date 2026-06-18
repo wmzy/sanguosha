@@ -32,9 +32,13 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   // 多 target 并行(拼点/选将)时,每个 viewer 只看到自己的 slot;
   // 单 target 场景 Map 只有1个 slot。
   let pending: GameView['pending'] = null;
+  // 优先取 viewer 专属 slot;其次取广播 slot(target<0,如无辨可击全桌可见);最后取唯一 slot
   const mySlot = viewer >= 0 ? state.pendingSlots.get(viewer) : undefined;
-  // fallback:如果 viewer 没有专属 slot,取唯一的 slot(单 target 场景)
-  const slot = mySlot ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
+  const broadcastSlot = [...state.pendingSlots.values()].find(s => {
+    const t = (s.atom as { target?: unknown }).target;
+    return typeof t === 'number' && t < 0;
+  });
+  const slot = mySlot ?? broadcastSlot ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
   if (slot) {
     const def = slot.definition;
     const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
