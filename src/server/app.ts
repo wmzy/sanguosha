@@ -16,6 +16,7 @@ import {
   findRoomByPlayerId,
   broadcastMessage,
   addRoom,
+  setSessionChecker,
   type Room,
 } from './room';
 import { GameSession } from './session';
@@ -491,5 +492,8 @@ function handleReconnect(currentPlayerId: string, previousPlayerId: string, last
     ws.send(serialize({ type: 'error', message: '重连失败' }));
   }
 }
+
+// 注册 session 检查器:getRoomList 用它过滤掉没有活跃 session 的房间
+setSessionChecker((roomId) => gameSessions.has(roomId));
 
 export default app;
