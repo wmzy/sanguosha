@@ -94,7 +94,7 @@ describe('借刀杀人', () => {
   // 1. 正面:A 不出杀(pass)→ 发起者获得 A 的武器
   //    全程 expectPending + respondInfo 验证 pending + cardFilter
   // ────────────────────────────────────────────────────────────
-  it('P1 对 P2(有武器)借刀杀人,killTarget=P3 → expectPending(请求回应)无懈 → pass → expectPending(请求回应)借刀杀人/forceKill → P2 pass → P1 获得武器', async () => {
+  it('P1 对 P2(有武器)借刀杀人,killTarget=P3 → expectPending(请求回应)无懈 → pass → expectPending(请求回应)杀/forceKill → P2 pass → P1 获得武器', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
     const state = buildState({
       p2Equipment: { 武器: 'wp1' },
@@ -114,14 +114,14 @@ describe('借刀杀人', () => {
     expect(info1?.cardFilter).toBeDefined();
     await P1.pass(); // 消耗无懈窗口
 
-    // 窗口 2:借刀杀人/forceKill(target=P2)
+    // 窗口 2:杀/forceKill(target=P2)
     // 注:此窗口委托 杀 skill 响应(杀.respond 处理 forceKill requestType),
     //    respondInfo 推导 skillId='借刀杀人'(strip /forceKill),但其 onMount
     //    只声明 'use' action 无 'respond' → cardFilter 查不到。
     //    验证委托链路:从 slot.atom.prompt 提取实际的 cardFilter(来自 借刀杀人.ts inline)。
     P2.expectPending('请求回应');
     const info2 = P2.respondInfo();
-    expect(info2?.skillId).toBe('借刀杀人');
+    expect(info2?.skillId).toBe('杀');
     // 直接从 slot.atom 拿 prompt.cardFilter 验证“仅接受 杀”委托关系
     const slot2 = harness.state.pendingSlots.get(1)!;
     const prompt2 = (slot2.atom as { prompt: { cardFilter?: { filter?: (c: Card) => boolean } } }).prompt;
@@ -141,9 +141,9 @@ describe('借刀杀人', () => {
 
   // ────────────────────────────────────────────────────────────
   // 1b. 正面:cardFilter 过滤正确 — P2 手中只有杀时,委托 filter 接受杀
-  //    (借刀杀人/forceKill 委托 杀 skill 响应;从 slot.atom.prompt 取 cardFilter 验证)
+  //    (杀/forceKill 委托 杀 skill 响应;从 slot.atom.prompt 取 cardFilter 验证)
   // ────────────────────────────────────────────────────────────
-  it('P2 有杀时,借刀杀人/forceKill 窗口的 slot.atom.prompt.cardFilter 接受 P2 手里的杀', async () => {
+  it('P2 有杀时,杀/forceKill 窗口的 slot.atom.prompt.cardFilter 接受 P2 手里的杀', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
     const s2 = makeCard('p2s', '杀', '♥', '5', '基本牌');
     const state = buildState({

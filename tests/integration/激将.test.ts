@@ -10,7 +10,7 @@
 //
 // 关键机制(激将.ts):
 //   - ownerId === 0 视为"主公位"硬约束(validate 拒绝非主公)
-//   - requestType='激将/respondKill' 供 杀.respond 匹配(详见 杀.ts 回应 validate)
+//   - requestType='杀/respondKill' 供 杀.respond 匹配(详见 杀.ts 回应 validate)
 //   - 杀牌进处理区 → 激将 execute 检查 zones.processing 是否有 杀
 //   - 出了杀 → 指定目标 + 询问闪 + 造成伤害
 //   - 不出(超时)→ 主公摸 1 张
@@ -147,7 +147,7 @@ describe('激将:主公请求蜀势力角色出杀', () => {
     const slot = [...state.pendingSlots.values()][0];
     const slotAtom = slot.atom as { type: string; requestType?: string; target: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('激将/respondKill');
+    expect(slotAtom.requestType).toBe('杀/respondKill');
     expect(slotAtom.target).toBe(1);
 
     // 目标不出杀(超时)

@@ -47,7 +47,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       // 请求回应:目标选择出杀
       await applyAtom(state, {
         type: '请求回应',
-        requestType: '激将/respondKill',
+        requestType: '杀/respondKill',
         target,
         prompt: { type: 'confirm', title: '主公激将:是否出杀?' },
         timeout: 15,

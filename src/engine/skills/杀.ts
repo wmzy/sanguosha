@@ -132,7 +132,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       const reqType = (slot.atom as { requestType?: string }).requestType;
       const pendingMatches =
         atomType === '询问杀' ||
-        (atomType === '请求回应' && (reqType === '借刀杀人/forceKill' || reqType === '激将/respondKill'));
+        (atomType === '请求回应' && (reqType === '杀/forceKill' || reqType === '杀/respondKill'));
       if (!pendingMatches) return '当前不是出杀的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {

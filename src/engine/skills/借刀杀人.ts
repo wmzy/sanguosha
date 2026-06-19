@@ -55,7 +55,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
           // 使用 useCard 提示让目标选择一张杀牌;选中的杀通过 杀.respond 移入处理区
           await applyAtom(state, {
             type: '请求回应',
-            requestType: '借刀杀人/forceKill',
+            requestType: '杀/forceKill',
             target,
             prompt: { type: 'useCard', title: '借刀杀人:请打出一张杀', cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 } },
             timeout: 15,
