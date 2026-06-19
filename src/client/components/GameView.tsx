@@ -902,9 +902,13 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           }}>
             {isLord ? '主公选将' : `P${charSelectTarget} 选将中`}
           </div>
-          {isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>主公已亮明身份</div>}
-          {isSelfSelecting && !isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>你正在选将(他人不可见你的选择)</div>}
-          {!isLord && !isSelfSelecting && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 24 }}>选将保密</div>}
+          {isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>主公已亮明身份</div>}
+          {isSelfSelecting && !isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>你正在选将(他人不可见你的选择)</div>}
+          {!isLord && !isSelfSelecting && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>选将保密</div>}
+          {/* 倒计时进度条 */}
+          <div style={{ width: 300, marginBottom: 24 }}>
+            <CountdownBar deadline={view.pending?.deadline ?? null} totalMs={view.pending?.totalMs ?? 30000} />
+          </div>
           {/* ─── 自身信息区:身份牌 + 座次 ─── */}
           <div style={{
             display: 'flex',
