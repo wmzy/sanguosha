@@ -191,23 +191,18 @@ describe('诸葛连弩', () => {
     // 旧诸葛连弩进弃牌堆
     expect(harness.state.zones.discardPile).toContain('c1');
 
-    // quota 现在已被卸载的诸葛连弩 hook 不再维护,需要切换阶段才会由 阶段开始 hook 重新判定
-    // 当前出牌阶段 quota 保持 Infinity 直到杀一次后扣减,或者新的诸葛连弩再次装上
-    // 这里我们直接用 expectUnmodified 验证换装后 quota 状态
-    // 实际上换装后没有 hook 把 quota 改回 1,但诸葛连弩 after hook 也不会再触发(因为装备不是 诸葛连弩)
-    // 所以 quota 仍是 Infinity(直到第一次杀扣减,之后变 0)
+    // BUG 修复后:卸载时诸葛连弩的 after 移除技能 hook 清 quota → quota 恢复 1
+    expect(harness.state.turn.vars['杀/quota']).toBe(1);
 
-    // 第一张杀:成功(quota Infinity)
+    // 第一张杀:成功(quota 1)
     await P1.useCardAndTarget('杀', 's1', [1]);
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
-    // quota Infinity 扣减后仍是 Infinity
-    expect(harness.state.turn.vars['杀/quota']).toBe(Infinity);
+    // quota 扣减后为 0
+    expect(harness.state.turn.vars['杀/quota']).toBe(0);
 
-    // 第二张杀:仍能出(quota Infinity)
-    await P1.useCardAndTarget('杀', 's2', [1]);
-    await P2.pass();
-    expect(harness.state.players[1].health).toBe(2);
+    // 第二张杀:quota=0 → 被拒
+    await P1.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: 's2', targets: [1] } });
   });
 
   // ─── 负面:无诸葛连弩时 quota = 1(默认) ────────────

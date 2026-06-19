@@ -38,6 +38,17 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     ctx.state.turn.vars['杀/quota'] = Infinity;
   });
 
+  // 诸葛连弩实例被移除(换装/弃装)时:清除出杀次数配额,恢复默认 1。
+  // 此 hook 在 系统规则 的 after 移除技能 hook 之前执行,此时本实例 hook 仍在全局表里。
+  registerAfterHook(skill.id, ownerId, '移除技能', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { player?: number; skillId?: string };
+    if (atom.player !== ownerId) return;
+    if (atom.skillId !== '诸葛连弩') return;
+    // 恢复默认出杀次数(1)。validate 读 quota 时 typeof === 'number' 时取 quota,否则取 1,
+    // 这里直接重置为 1 让语义清晰(即便此后再经过 阶段开始 hook,也无诸葛连弩 → quota 仍是 1)。
+    ctx.state.turn.vars['杀/quota'] = 1;
+  });
+
   return () => {};
 }
 

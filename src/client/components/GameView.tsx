@@ -1438,8 +1438,13 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               <div className={targetHint}>已选择目标: {selectedTarget}</div>
             )}
           </div>
-          {/* 目标选择 — 只对需要目标的牌显示, 且当前不能有待回应 pending */}
+          {/* 目标选择 — 需要目标的牌或转化模式(转化的目标牌可能需要目标) */}
           {(selectedCardId && canOperate && isMyTurn && !pending && (() => {
+            // 转化模式:检查 wrapperName 是否需要目标
+            if (transformMode) {
+              return TARGET_REQUIRED_CARDS.has(transformMode.wrapperName)
+                || RANGE_REQUIRED_CARDS.has(transformMode.wrapperName);
+            }
             const card = perspectiveHand.find(c => c.id === selectedCardId);
             return card && TARGET_REQUIRED_CARDS.has(card.name);
           })()) && (
@@ -1454,7 +1459,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                       key={i}
                       className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
                       disabled={!targetable}
-                      onClick={() => handleTargetClick(p.name)}
+                      onClick={() => transformMode ? handleTransformPlay(p.name) : handleTargetClick(p.name)}
                     >
                       {p.name} ({p.character}) ♥{p.health}
                       {!targetable && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
