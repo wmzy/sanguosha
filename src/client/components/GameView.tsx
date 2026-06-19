@@ -298,6 +298,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   // 自动视角切换开关(默认开,多 agent 协作时可关)
   const [autoSwitch, setAutoSwitch] = useState(true);
+  // 广播型 pending(如无懈可击)"不回应"后本地跳过标记,避免重复显示 prompt
+  const [skippedBroadcast, setSkippedBroadcast] = useState<Set<string>>(new Set());
 
   // 有待回应请求时,自动切换视角到被问询玩家;无 pending 时回到当前回合玩家
   useEffect(() => {
@@ -349,13 +351,17 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 待回应:调试模式下自动跟到 pending target 的视角
   const pending = view.pending;
   const pendingTargetIdx = pending?.target ?? -1;
-  const isPerspectiveAwaiting = pending !== null && pendingTargetIdx === perspectiveIdx;
+  // 广播型 slot(target < 0,如无懈可击 target=-2)所有人都可回应
+  const isPerspectiveAwaiting = pending !== null && (pendingTargetIdx < 0 || pendingTargetIdx === perspectiveIdx);
   // 弃牌窗口:engine 在 弃牌阶段 创建 requestType='__弃牌' 的 pending
   const isDiscardPhase = pending !== null && (pending.atom as { requestType?: string }).requestType === '__弃牌';
   const discardMin = isDiscardPhase ? ((pending.atom as { prompt: { cardFilter?: { min?: number } } }).prompt.cardFilter?.min ?? 0) : 0;
   const discardMax = isDiscardPhase ? ((pending.atom as { prompt: { cardFilter?: { max?: number } } }).prompt.cardFilter?.max ?? discardMin) : 0;
   // 弃牌窗口出现/切换时清空已选
   useEffect(() => { setSelectedForDiscard(new Set()); }, [pending]);
+  // pending 变化时清空广播跳过标记(新 pending = 新窗口)
+  const pendingKey = pending ? `${pending.atom?.type}:${(pending.atom as { requestType?: string }).requestType}` : '';
+  useEffect(() => { setSkippedBroadcast(new Set()); }, [pendingKey]);
   // 切牌/重选牌时,同步重置借刀杀人的第二目标
   useEffect(() => { setSelectedKillTarget(null); }, [selectedCardId]);
   // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
@@ -799,8 +805,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       if (!card) return;
       if (info.cardFilter && !info.cardFilter(card)) return; // 不匹配,忽略
       send(info.skillId, 'respond', { cardId });
+    } else if (pendingTargetIdx < 0) {
+      // 广播型 pending(如无懈可击 target=-2):"不回应"不发 action,仅本地标记跳过。
+      // slot 继续等待其他玩家回应或超时,不能通过空 respond resolve 广播 slot。
+      setSkippedBroadcast(prev => new Set(prev).add(pending!.atom?.type + ':' + (pending!.atom as { requestType?: string }).requestType));
     } else {
-      // 不出牌:空 respond(后端 execute 收到空 cardId → 不做操作)
+      // 单 target pending:空 respond(后端 execute 收到空 cardId → 不做操作)
       send(info.skillId, 'respond', {});
     }
   }
@@ -1150,53 +1160,62 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
       {/* ─── 操作提示 ─── */}
       {/* 优先级: 弃牌 pending > 回应 pending > 出牌/弃牌阶段提示 */}
-      {isPerspectiveAwaiting && pending && !isDiscardPhase && (
-        <div className={promptBoxAwaiting}>
-          <div className={promptTitle}>⚡ 需要回应 — {perspectiveName}</div>
-          <div className={promptDesc}>
-            {pending.prompt.title}
-            {pending.prompt.description && <span> — {pending.prompt.description}</span>}
-          </div>
-          {canOperate && (() => {
-            // distribute 类 pending(遗计分配):渲染分配 UI
-            if (pending.prompt.type === 'distribute') {
+      {isPerspectiveAwaiting && pending && !isDiscardPhase && (() => {
+        // 广播型 pending 且已本地跳过:显示已跳过提示
+        const isBroadcast = pendingTargetIdx < 0;
+        const broadcastKey = `${pending.atom?.type}:${(pending.atom as { requestType?: string }).requestType}`;
+        const isSkipped = isBroadcast && skippedBroadcast.has(broadcastKey);
+        return (
+          <div className={promptBoxAwaiting}>
+            <div className={promptTitle}>⚡ 需要回应 — {perspectiveName}</div>
+            <div className={promptDesc}>
+              {pending.prompt.title}
+              {pending.prompt.description && <span> — {pending.prompt.description}</span>}
+            </div>
+            {isSkipped ? (
+              <div className={waitingHint}>已跳过，等待其他玩家回应...</div>
+            ) : canOperate ? (() => {
+              // distribute 类 pending(遗计分配):渲染分配 UI
+              if (pending.prompt.type === 'distribute') {
+                const info = pendingRespondInfo();
+                const skillId = info?.skillId ?? '系统规则';
+                const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
+                const maxPerTarget = (pending.prompt as { maxPerTarget?: number }).maxPerTarget ?? 2;
+                return <DistributeUI skillId={skillId} cardIds={cardIds} players={view.players} viewer={perspectiveIdx} maxPerTarget={maxPerTarget} onSend={send} cardMap={view.cardMap} />;
+              }
+              // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
+              if (pending.prompt.type === 'confirm') {
+                const confirmLabel = pending.prompt.confirmLabel || '确认';
+                const cancelLabel = pending.prompt.cancelLabel || '取消';
+                const info = pendingRespondInfo();
+                const skillId = info?.skillId ?? '系统规则';
+                return (
+                  <div className={promptActions}>
+                    <button className={promptBtnPrimary} onClick={() => send(skillId, 'respond', { choice: true })}>{confirmLabel}</button>
+                    <button className={promptBtn} onClick={() => send(skillId, 'respond', { choice: false })}>{cancelLabel}</button>
+                  </div>
+                );
+              }
+              // useCard 类 pending:渲染 可出的牌按钮 + 不回应
               const info = pendingRespondInfo();
-              const skillId = info?.skillId ?? '系统规则';
-              const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
-              const maxPerTarget = (pending.prompt as { maxPerTarget?: number }).maxPerTarget ?? 2;
-              return <DistributeUI skillId={skillId} cardIds={cardIds} players={view.players} viewer={perspectiveIdx} maxPerTarget={maxPerTarget} onSend={send} cardMap={view.cardMap} />;
-            }
-            // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
-            if (pending.prompt.type === 'confirm') {
-              const confirmLabel = pending.prompt.confirmLabel || '确认';
-              const cancelLabel = pending.prompt.cancelLabel || '取消';
-              const info = pendingRespondInfo();
-              const skillId = info?.skillId ?? '系统规则';
+              const filterFn = info?.cardFilter;
+              const respondableCards = filterFn ? perspectiveHand.filter(filterFn) : [];
               return (
                 <div className={promptActions}>
-                  <button className={promptBtnPrimary} onClick={() => send(skillId, 'respond', { choice: true })}>{confirmLabel}</button>
-                  <button className={promptBtn} onClick={() => send(skillId, 'respond', { choice: false })}>{cancelLabel}</button>
+                  <button className={promptBtn} onClick={() => handleRespond()}>不回应</button>
+                  {respondableCards.map(c => (
+                    <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
+                      {c.name} {c.suit}{c.rank}
+                    </button>
+                  ))}
                 </div>
               );
-            }
-            // useCard 类 pending:渲染 可出的牌按钮 + 不回应
-            const info = pendingRespondInfo();
-            const filterFn = info?.cardFilter;
-            const respondableCards = filterFn ? perspectiveHand.filter(filterFn) : [];
-            return (
-              <div className={promptActions}>
-                <button className={promptBtn} onClick={() => handleRespond()}>不回应</button>
-                {respondableCards.map(c => (
-                  <button key={c.id} className={promptBtnPrimary} onClick={() => handleRespond(c.id)}>
-                    {c.name} {c.suit}{c.rank}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
-          {!canOperate && <div className={waitingHint}>等待 {perspectiveName} 回应...</div>}
-        </div>
-      )}
+            })() : (
+              <div className={waitingHint}>等待 {perspectiveName} 回应...</div>
+            )}
+          </div>
+        );
+      })()}
 
       {!isPerspectiveTurn && !isPerspectiveAwaiting && !isDiscardPhase && (
         <div className={waitingHint}>等待 {currentPlayerName} 操作...</div>

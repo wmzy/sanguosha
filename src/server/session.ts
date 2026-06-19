@@ -211,10 +211,11 @@ export class GameSession {
   private broadcastNewState(): void {
     if (!this.state) return;
     if (this.debug) {
-      // debug 模式:发全量 view(debug=true 暴露所有信息),前端按 perspectiveIdx 计算身份可见性
+      // debug 模式:每个玩家用自己被分配的座次作为 viewer(支持切换视角)
       const state = this.state;
-      const view = buildView(state, 0, this.debug);
       for (const [pid] of this.room.players) {
+        const viewer = this.playerNames.get(pid) ?? 0;
+        const view = buildView(state, viewer, this.debug);
         this.sendToPlayer(pid, { type: 'debugGameState', state: view, lastSeq: state.seq });
       }
       return;
