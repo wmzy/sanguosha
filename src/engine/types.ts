@@ -16,6 +16,10 @@ export type Card = {
   rank: string;
   type: '基本牌' | '锦囊牌' | '装备牌';
   subtype?: string;
+  /** 卡牌描述 */
+  description?: string;
+  /** 锦囊子类型 */
+  trickSubtype?: '普通锦囊' | '延时锦囊' | '响应锦囊';
   /** 武器攻击范围(仅武器装备牌)。徒手默认 1,由 distance.ts 兜底 */
   range?: number;
   /**

@@ -1,6 +1,7 @@
 import type { Card, Suit, Rank } from './types';
 import type { Rng } from './rng';
 import { 装备牌列表 } from './cards/equipment';
+import { getCardDescription } from './cards/description';
 
 const suits: Suit[] = ['♠', '♥', '♣', '♦'];
 const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -10,22 +11,20 @@ for (const def of 装备牌列表) {
   if (typeof def.range === 'number') equipmentRangeMap.set(def.name, def.range);
 }
 
-function _card(name: string, type: Card['type'], subtype: Card['subtype'], suit: Suit, rank: Rank): Card {
-  return { name, type, subtype, suit, rank, description: '', id: `${name}-${suit}-${rank}` };
-}
-
 export function createStandardDeck(): Card[] {
   const deck: Card[] = [];
   let id = 0;
 
-  function add(name: string, type: Card['type'], subtype: Card['subtype'], count: number, suitList?: Suit[]) {
+  function add(name: string, type: Card['type'], subtype: Card['subtype'], count: number, suitList?: Suit[], trickSubtype?: Card['trickSubtype']) {
     const ss = suitList ?? suits;
     const range = equipmentRangeMap.get(name);
+    const description = getCardDescription(name);
     for (let i = 0; i < count; i++) {
       const s = ss[i % ss.length];
       const r = ranks[(id++) % ranks.length];
-      const card: Card = { name, type, subtype, suit: s, rank: r, description: '', id: `${name}-${s}-${r}-${deck.length}` };
+      const card: Card = { name, type, subtype, suit: s, rank: r, description, id: `${name}-${s}-${r}-${deck.length}` };
       if (range != null) card.range = range;
+      if (trickSubtype) card.trickSubtype = trickSubtype;
       deck.push(card);
     }
   }
@@ -42,10 +41,10 @@ export function createStandardDeck(): Card[] {
   add('南蛮入侵', '锦囊牌', '锦囊', 3);
   add('桃园结义', '锦囊牌', '锦囊', 1);
   add('五谷丰登', '锦囊牌', '锦囊', 2);
-  add('乐不思蜀', '锦囊牌', '锦囊', 1, ['♥']);
-  add('兵粮寸断', '锦囊牌', '锦囊', 1, ['♣']);
-  add('闪电', '锦囊牌', '锦囊', 2, ['♠']);
-  add('无懈可击', '锦囊牌', '锦囊', 4);
+  add('乐不思蜀', '锦囊牌', '锦囊', 1, ['♥'], '延时锦囊');
+  add('兵粮寸断', '锦囊牌', '锦囊', 1, ['♣'], '延时锦囊');
+  add('闪电', '锦囊牌', '锦囊', 2, ['♠'], '延时锦囊');
+  add('无懈可击', '锦囊牌', '锦囊', 4, undefined, '响应锦囊');
 
   add('诸葛连弩', '装备牌', '武器', 1, ['♠', '♣']);
   add('青釭剑', '装备牌', '武器', 1, ['♠']);

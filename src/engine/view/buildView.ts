@@ -80,6 +80,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       index: i,
       name: p.name,
       character: p.character,
+      faction: p.faction,
       health: p.health,
       maxHealth: p.maxHealth,
       alive: p.alive,

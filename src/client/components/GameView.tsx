@@ -7,6 +7,12 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { css, cx } from '@linaria/core';
 import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt } from '../../engine/types';
 import { getActionsForPlayer, registerSkillActions, clearRegistry, findActionAcrossOwners, type SkillActionDef } from '../skillActionRegistry';
+import { seatDistance, effectiveDist, canAttack } from '../utils/distance';
+import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
+import { CharSelectOverlay } from './CharSelectOverlay';
+import { IdentityRevealOverlay } from './IdentityRevealOverlay';
+import { FACTION_BG, IDENTITY_COLORS } from './gameViewConstants';
+import { getCharacterMeta } from '../../engine/character-meta';
 
 
 // ─── ActionMsg: 发给 controller(不含 baseSeq) ───
@@ -36,136 +42,24 @@ const SUIT_COLOR: Record<string, string> = {
   '♠': '#ccc', '♣': '#ccc', '♥': '#e74c3c', '♦': '#e74c3c',
 };
 
-// ─── 卡牌描述(用于 hover tooltip) ───
-const CARD_DESCRIPTIONS: Record<string, string> = {
-  '杀': '对攻击范围内的一名角色使用,目标可出闪抵消。默认每回合限一次。',
-  '闪': '抵消一次杀的效果。',
-  '桃': '濒死时回复 1 点体力,或自己的出牌阶段回复 1 点体力。',
-  '酒': '出牌阶段使用,本回合下一张杀伤害+1;或濒死时当桃用。',
-  '过河拆桥': '弃置目标区域内一张牌(无距离限制)。',
-  '顺手牵羊': '获取目标区域内一张牌(距离限制1)。',
-  '无中生有': '摸两张牌。',
-  '桃园结义': '所有角色回复 1 点体力。',
-  '借刀杀人': '令目标对其攻击范围内的另一角色出杀。',
-  '决斗': '与目标轮流出杀,先不出杀的一方受 1 点伤害。',
-  '南蛮入侵': '所有其他角色需出杀,否则受 1 点伤害。',
-  '万箭齐发': '所有其他角色需出闪,否则受 1 点伤害。',
-  '乐不思蜀': '延时锦囊,判定非红桃则跳过出牌阶段。',
-  '无懈可击': '抵消一张锦囊牌的效果。',
-  '闪电': '延时锦囊,判定黑桃2-9则造成 3 点伤害。',
-  '兵粮寸断': '延时锦囊,判定非草花则跳过摸牌阶段。',
-  '诸葛连弩': '武器,攻击范围1,出杀次数不限。',
-  '青龙偃月刀': '武器,攻击范围3,杀被闪后可再出一张杀。',
-  '贯石斧': '武器,攻击范围3,杀被闪后可弃2张牌强命。',
-  '赤兔': '进攻马,距离+1。',
-  '八卦阵': '防具,需出闪时可判定,红牌视为闪。',
-};
-function getCardDescription(name: string): string {
-  return CARD_DESCRIPTIONS[name] || '';
-}
+
 
 // ─── 引擎声明的默认通用技能(技能按钮区/座位卡均过滤这些) ───
-// 对应 src/engine/atoms/选将.ts:DEFAULT_SKILLS
-const DEFAULT_SKILLS = new Set([
-  '回合管理', '装备通用', '杀', '闪', '桃', '酒',
-  '过河拆桥', '顺手牵羊', '无中生有', '桃园结义',
-  '借刀杀人', '决斗', '南蛮入侵', '万箭齐发',
-  '乐不思蜀', '无懈可击',
-]);
-
-// 装备牌名字——这些 skill id 在装备时被动态挂载为技能。
-// 座位卡上已显示装备区,不应在技能区重复出现。
-const EQUIPMENT_SKILLS = new Set([
+import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
+import { isEquipment, isDelayedTrick, isRespondOnly } from '../../engine/card-meta';
+const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
+const EQUIPMENT_SKILL_NAMES = new Set([
   '诸葛连弩', '青釭剑', '青龙偃月刀', '雌雄双股剑', '贯石斧',
   '丈八蛇矛', '方天画戟', '麒麟弓', '寒冰剑',
   '八卦阵', '仁王盾', '藤甲', '白银狮子',
   '赤兔', '紫骍', '大宛', '的卢', '绝影', '爪黄飞电',
 ]);
 
-// ─── 延时锦囊:validate 用 `params.target`(单数),非 targets(数组) ───
-const DELAYED_TRICKS = new Set(['乐不思蜀', '闪电', '兵粮寸断']);
-
-// ─── 选将:武将池 ───
-interface CharPoolItem {
-  name: string;
-  faction: string;
-  skills: string[];
-  maxHealth: number;
-}
-const CHAR_POOL: CharPoolItem[] = [
-  { name: '刘备', faction: '蜀', skills: ['仁德'], maxHealth: 4 },
-  { name: '曹操', faction: '魏', skills: ['护甲'], maxHealth: 4 },
-  { name: '孙权', faction: '吴', skills: ['制衡'], maxHealth: 4 },
-  { name: '关羽', faction: '蜀', skills: ['武圣'], maxHealth: 4 },
-  { name: '郭嘉', faction: '魏', skills: ['天妒', '遗计'], maxHealth: 3 },
-  { name: '张飞', faction: '蜀', skills: ['咆哮'], maxHealth: 4 },
-  { name: '诸葛亮', faction: '蜀', skills: ['观星', '空城'], maxHealth: 3 },
-  { name: '司马懿', faction: '魏', skills: ['反馈'], maxHealth: 3 },
-  { name: '夏侯惇', faction: '魏', skills: ['刚烈'], maxHealth: 4 },
-  { name: '甄姬', faction: '魏', skills: ['倾国'], maxHealth: 3 },
-  { name: '赵云', faction: '蜀', skills: ['龙胆'], maxHealth: 4 },
-  { name: '周瑜', faction: '吴', skills: ['英姿', '反间'], maxHealth: 3 },
-  { name: '吕布', faction: '群', skills: ['无双'], maxHealth: 4 },
-  { name: '华佗', faction: '群', skills: ['急救', '青囊'], maxHealth: 3 },
-  { name: '貂蝉', faction: '群', skills: ['离间', '闭月'], maxHealth: 3 },
-  { name: '张角', faction: '群', skills: ['雷击', '鬼道', '黄天'], maxHealth: 3 },
-];
-const FACTION_BG: Record<string, string> = {
-  '魏': '#2c3e50',
-  '蜀': '#27ae60',
-  '吴': '#c0392b',
-  '群': '#8e44ad',
-};
-
 // ─── 时间格式化 ───
 function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
   return m > 0 ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
-}
-
-// ─── 倒计时 hook ───
-// useCountdownSeconds:返回剩余秒数(整数,向下取整)。用于倒计时文字显示。
-// useCountdownFraction:返回 0-1 的剩余比例,每帧(rAF)更新,进度条用此值才能顺滑。
-// 注意两者都用同一个 deadline 参数;外部组件按需选择。
-const DEFAULT_COUNTDOWN_TOTAL_MS = 15_000;
-
-function useCountdownSeconds(deadline: number | null): number | null {
-  const [sec, setSec] = useState<number | null>(null);
-  useEffect(() => {
-    if (deadline == null) { setSec(null); return; }
-    const tick = () => setSec(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 200);
-    return () => clearInterval(id);
-  }, [deadline]);
-  return sec;
-}
-
-/** 顺滑倒计时:进度条用 ref 直接设 width(rAF,不触发重渲染);
- *  文字秒数用 useCountdownSeconds(每秒 1 次轻量重渲染)。
- *  不用每帧 setState——60fps 重渲染纯为进度条浪费。 */
-function useCountdownFraction(
-  deadline: number | null,
-  totalMs: number = DEFAULT_COUNTDOWN_TOTAL_MS,
-): React.RefObject<HTMLDivElement | null> {
-  const fillRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (deadline == null) {
-      if (fillRef.current) fillRef.current.style.width = '0%';
-      return;
-    }
-    let raf = 0;
-    const tick = () => {
-      const remaining = Math.max(0, deadline - Date.now());
-      const frac = Math.max(0, Math.min(1, remaining / totalMs));
-      if (fillRef.current) fillRef.current.style.width = `${frac * 100}%`;
-      if (remaining > 0) raf = requestAnimationFrame(tick);
-    };
-    tick();
-    return () => cancelAnimationFrame(raf);
-  }, [deadline, totalMs]);
-  return fillRef;
 }
 
 // ─── 动画状态追踪 hook ───
@@ -284,13 +178,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
   // 选将遮罩:读 view.pending.atom.type === '选将询问'
   // 候选人从 view.pending.atom.candidates 获取(引擎生成)
-  const isCharSelectPending = view.pending?.atom?.type === '选将询问';
-  const charCandidates: Array<{ name: string; skills: string[] }> = isCharSelectPending
-    ? (view.pending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
+  const charSelectPending = view.pending?.atom?.type === '选将询问' ? view.pending : null;
+  const isCharSelectPending = charSelectPending !== null;
+  const charCandidates: Array<{ name: string; skills: string[] }> = charSelectPending
+    ? (charSelectPending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
     : [];
-  const charSelectTarget = isCharSelectPending ? view.pending.target : -1;
-  const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
-  useEffect(() => { setSelectedCharIdx(null); }, [isCharSelectPending, charSelectTarget]);
+  const charSelectTarget = charSelectPending ? charSelectPending.target : -1;
   // ─── 动画状态 ───
   const anim = useAnimationState(view, perspectiveIdx);
   const handListRef = useRef<HTMLDivElement>(null);
@@ -406,46 +299,9 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     [onAction, perspectiveIdx],
   );
 
-  // ─── 距离和攻击范围计算(纯函数，基于 GameView) ───
-  const WEAPON_RANGE: Record<string, number> = {
-    '诸葛连弩': 1, '青釭剑': 2, '雌雄双股剑': 2, '贯石斧': 3,
-    '青龙偃月刀': 3, '丈八蛇矛': 3, '方天画戟': 4, '麒麟弓': 5, '寒冰剑': 2,
-  };
+  // ─── 距离和攻击范围计算(纯函数，委托 src/client/utils/distance) ───
   /** 需要攻击范围内才能选目标的牌 */
   const RANGE_REQUIRED_CARDS = new Set(['杀', '顺手牵羊']);
-
-  /** 计算 from 到 to 的座位距离(只算存活玩家) */
-  function seatDistance(fromIdx: number, toIdx: number): number {
-    const alive = view.players.filter(p => p.alive);
-    const n = alive.length;
-    if (n <= 1) return 0;
-    const aliveFromIdx = alive.findIndex(p => p.name === view.players[fromIdx]?.name);
-    const aliveToIdx = alive.findIndex(p => p.name === view.players[toIdx]?.name);
-    if (aliveFromIdx < 0 || aliveToIdx < 0) return Infinity;
-    const d = Math.abs(aliveFromIdx - aliveToIdx);
-    return Math.min(d, n - d);
-  }
-
-  /** 计算 from 到 to 的实际距离(含马修正) */
-  function effectiveDist(fromIdx: number, toIdx: number): number {
-    let dist = seatDistance(fromIdx, toIdx);
-    const fromP = view.players[fromIdx];
-    const toP = view.players[toIdx];
-    if (fromP?.equipment?.['进攻马']) dist -= 1;
-    if (toP?.equipment?.['防御马']) dist += 1;
-    return Math.max(1, dist);
-  }
-
-  /** from 是否能攻击到 to */
-  function canAttack(fromIdx: number, toIdx: number): boolean {
-    const fromP = view.players[fromIdx];
-    let range = 1;
-    if (fromP?.equipment?.['武器']) {
-      const weapon = view.cardMap[fromP.equipment['武器']];
-      if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
-    }
-    return effectiveDist(fromIdx, toIdx) <= range;
-  }
 
   /** 选中的牌 */
   const selectedCard = selectedCardId ? (perspectiveHand.find(c => c.id === selectedCardId) ?? viewerHand.find(c => c.id === selectedCardId)) : null;
@@ -460,15 +316,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   function isTargetable(i: number): boolean {
     // 转化模式下 wrapperName 才决定距离约束
     if (!RANGE_REQUIRED_CARDS.has(effectiveCardName ?? '')) return true;
-    const result = canAttack(perspectiveIdx, i);
+    const result = canAttack(view.players, view.cardMap, perspectiveIdx, i);
     if (!result) {
       const fromP = view.players[perspectiveIdx];
       let range = 1;
       if (fromP?.equipment?.['武器']) {
         const weapon = view.cardMap[fromP.equipment['武器']];
-        if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
+        if (weapon) range = weapon.range ?? 1;
       }
-      console.log('[isTargetable] 无法选中', i, 'dist=', effectiveDist(perspectiveIdx, i), 'range=', range);
+      console.log('[isTargetable] 无法选中', i, 'dist=', effectiveDist(view.players, perspectiveIdx, i), 'range=', range);
     }
     return result;
   }
@@ -518,7 +374,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             const kIdx = nameToIndex(selectedKillTarget);
             if (kIdx >= 0) params.killTarget = kIdx;
           }
-        } else if (DELAYED_TRICKS.has(card.name)) {
+        } else if (isDelayedTrick(card)) {
           // 延时锦囊 validate 用单数 target
           params.target = idx;
         } else {
@@ -589,16 +445,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   }
 
   /** from 是否能攻击 to(纯函数,用于借刀杀人 B 选择范围限制) */
-  function isTargetableByPlayer(fromIdx: number, toIdx: number): boolean {
-    const fromP = view.players[fromIdx];
-    let range = 1;
-    if (fromP?.equipment?.['武器']) {
-      const weapon = view.cardMap[fromP.equipment['武器']];
-      if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
-    }
-    return effectiveDist(fromIdx, toIdx) <= range;
-  }
-
   // ─── 武将技能使用(基于 ActionPrompt 类型驱动) ───
   function handleSkillAction(action: SkillActionDef) {
     const { skillId, actionType, prompt } = action;
@@ -647,7 +493,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
           const trickCard = perspectiveHand.find(c => c.id === selectedCardId)
             ?? viewerHand.find(c => c.id === selectedCardId);
-          if (trickCard && DELAYED_TRICKS.has(trickCard.name)) {
+          if (trickCard && isDelayedTrick(trickCard)) {
             params.target = idx;
           } else {
             params.targets = [idx];
@@ -906,242 +752,44 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   }, [view.players, perspectiveIdx]);
 
 
-  // ─── 身份牌颜色映射 ───
-  const IDENTITY_COLORS: Record<string, string> = {
-    '主公': '#FFD700',
-    '忠臣': '#4A90E2',
-    '反贼': '#E74C3C',
-    '内奸': '#9B59B6',
-  };
+  // ─── 身份牌颜色映射(已迁入 gameViewConstants,这里从顶层导入) ───
 
   return (
     <div className={pageRoot}>
           {/* ─── 身份揭示遮罩 ─── */}
       {showIdentityReveal && view.players[view.viewer]?.identity && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 10000,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.85)',
-          animation: 'overlayFadeIn 0.5s ease-out both',
-        }}>
-          <div style={{
-            width: 200,
-            height: 280,
-            borderRadius: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 16,
-            background: IDENTITY_COLORS[view.players[view.viewer].identity] || '#888',
-            color: '#fff',
-            boxShadow: '0 0 40px rgba(0,0,0,0.5)',
-            animation: 'identityCardFlip 1s cubic-bezier(0.23, 1, 0.32, 1) both',
-            transformStyle: 'preserve-3d',
-          }}>
-            <div style={{ fontSize: 14, opacity: 0.8, letterSpacing: 2 }}>你的身份</div>
-            <div style={{ fontSize: 36, fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{view.players[view.viewer].identity}</div>
-          </div>
-          <button
-            onClick={() => {
-              setShowIdentityReveal(false);
-              sessionStorage.setItem('sgs_identity_shown', '1');
-              // 选将已通过 charSelectSeat 状态管理,不需要额外触发
-            }}
-            style={{
-              marginTop: 32,
-              padding: '10px 48px',
-              fontSize: 16,
-              fontWeight: 'bold',
-              color: '#fff',
-              background: 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: 8,
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
-          >
-            确认
-          </button>
-        </div>
+        <IdentityRevealOverlay
+          identity={view.players[view.viewer].identity!}
+          onConfirm={() => {
+            setShowIdentityReveal(false);
+            sessionStorage.setItem('sgs_identity_shown', '1');
+            // 选将已通过 charSelectSeat 状态管理,不需要额外触发
+          }}
+        />
       )}
       {/* ─── 选将遮罩(读 view.pending) ─── */}
-      {isCharSelectPending && charSelectTarget >= 0 && (() => {
-        const seatPlayer = view.players[charSelectTarget];
-        const isLord = seatPlayer?.identity === '主公';
-        // 选将保密:非主公且非自己选将时,不暴露 seat 玩家名字
-        const isSelfSelecting = charSelectTarget === view.viewer;
-        // 用引擎提供的候选人(已排除已选武将)
-        const candidates = charCandidates;
-        // 从 CHAR_POOL 查势力色用于渲染
-        const getFactionInfo = (name: string) => {
-          const c = CHAR_POOL.find(ch => ch.name === name);
-          return { faction: c?.faction || '群', maxHealth: c?.maxHealth || 4 };
-        };
-        // 当前 viewer 的身份色(主公金/忠臣蓝/反贼红/内奸紫)
-        const myIdentityColor = perspective?.identity
-          ? (IDENTITY_COLORS[perspective.identity] || '#888')
-          : null;
-        return (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.9)',
-        }}>
-          <div style={{
-            fontSize: 24,
-            fontWeight: 'bold',
-            color: '#ffd700',
-            marginBottom: 8,
-            letterSpacing: 4,
-          }}>
-            {isLord ? '主公选将' : `P${charSelectTarget} 选将中`}
-          </div>
-          {isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>主公已亮明身份</div>}
-          {isSelfSelecting && !isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>你正在选将(他人不可见你的选择)</div>}
-          {!isLord && !isSelfSelecting && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>选将保密</div>}
-          {/* 倒计时进度条 */}
-          <div style={{ width: 300, marginBottom: 24 }}>
-            <CountdownBar deadline={view.pending?.deadline ?? null} totalMs={view.pending?.totalMs ?? 30000} />
-          </div>
-          {/* ─── 自身信息区:身份牌 + 座次 ─── */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-            marginBottom: 24,
-          }}>
-            {view.players[view.viewer]?.identity && (() => {
-              const viewerIdentity = view.players[view.viewer].identity;
-              const viewerColor = IDENTITY_COLORS[viewerIdentity] || '#888';
-              return (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '8px 18px',
-                  borderRadius: 8,
-                  background: viewerColor,
-                  color: '#fff',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
-                  minWidth: 90,
-                }}>
-                  <div style={{ fontSize: 11, opacity: 0.85, letterSpacing: 2 }}>你的身份</div>
-                  <div style={{ fontSize: 20, fontWeight: 'bold', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{viewerIdentity}</div>
-                </div>
-              );
-            })()}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              padding: '8px 18px',
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: '#fff',
-              minWidth: 90,
-            }}>
-              <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2 }}>你的座次</div>
-              <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{view.viewer}</div>
-            </div>
-          </div>
-          {isSelfSelecting ? (<>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${Math.min(candidates.length, 5)}, 1fr)`,
-            gap: 16,
-            maxWidth: 800,
-            width: '90%',
-          }}>
-            {candidates.map((ch, i) => {
-              const isSelected = selectedCharIdx === i;
-              const fi = getFactionInfo(ch.name);
-              return (
-                <div
-                  key={ch.name}
-                  onClick={() => setSelectedCharIdx(i)}
-                  style={{
-                    background: FACTION_BG[fi.faction] || '#333',
-                    borderRadius: 12,
-                    padding: '24px 12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 8,
-                    cursor: 'pointer',
-                    border: isSelected ? '3px solid #ffd700' : '3px solid transparent',
-                    boxShadow: isSelected
-                      ? '0 0 20px rgba(255,215,0,0.4), 0 4px 16px rgba(0,0,0,0.3)'
-                      : '0 4px 16px rgba(0,0,0,0.3)',
-                    transform: isSelected ? 'translateY(-8px) scale(1.03)' : 'translateY(0)',
-                    transition: 'all 0.25s cubic-bezier(0.23, 1, 0.32, 1)',
-                  }}
-                  onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)'; } }}
-                  onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)'; } }}
-                >
-                  <div style={{ fontSize: 22, fontWeight: 'bold', color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{ch.name}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '2px 8px' }}>{fi.faction} · {ch.skills.join(' / ')}</div>
-                  <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-                    {Array.from({ length: fi.maxHealth }, (_, j) => (
-                      <div key={j} style={{ width: 10, height: 10, borderRadius: '50%', background: '#e74c3c', boxShadow: '0 0 4px rgba(231,76,60,0.5)' }} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <button
-            disabled={selectedCharIdx === null}
-            onClick={() => {
-              if (selectedCharIdx !== null && candidates[selectedCharIdx]) {
-                // 发送选将 respond action 到引擎
-                onAction({
-                  skillId: '系统规则',
-                  actionType: '选将',
-                  ownerId: charSelectTarget,
-                  params: { character: candidates[selectedCharIdx].name },
-                });
-                setSelectedCharIdx(null);
-              }
-            }}
-            style={{
-              marginTop: 32, padding: '12px 56px', fontSize: 18, fontWeight: 'bold',
-              color: selectedCharIdx !== null ? '#000' : '#666',
-              background: selectedCharIdx !== null ? 'linear-gradient(135deg, #ffd700, #f0c000)' : '#333',
-              border: 'none', borderRadius: 8, cursor: selectedCharIdx !== null ? 'pointer' : 'not-allowed',
-              boxShadow: selectedCharIdx !== null ? '0 4px 16px rgba(255,215,0,0.3)' : 'none',
-              transition: 'all 0.2s', letterSpacing: 2,
-            }}
-          >
-            确认选择
-          </button>
-          </>) : isLord ? (
-            <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
-              主公正在选将，请等待...
-            </div>
-          ) : (
-            <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
-              等待 P{charSelectTarget} 选将...
-            </div>
-          )}
-        </div>
-        );
-      })()}
+      {isCharSelectPending && charSelectTarget >= 0 && (
+        <CharSelectOverlay
+          candidates={charCandidates}
+          charSelectTarget={charSelectTarget}
+          isSelfSelecting={charSelectTarget === view.viewer}
+          isLord={view.players[charSelectTarget]?.identity === '主公'}
+          viewer={view.viewer}
+          viewerIdentity={view.players[view.viewer]?.identity}
+          deadline={pending?.deadline ?? null}
+          totalMs={pending?.totalMs ?? 30000}
+          getCharacterMeta={getCharacterMeta}
+          onSelect={(characterName) => {
+            // 发送选将 respond action 到引擎
+            onAction({
+              skillId: '系统规则',
+              actionType: '选将',
+              ownerId: charSelectTarget,
+              params: { character: characterName },
+            });
+          }}
+        />
+      )}
 
       {/* ─── 头部 ─── */}
       <div className={headerBar}>
@@ -1334,7 +982,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   const card = view.cardMap[cardId];
                   if (!card) return null;
                   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
-                  const desc = getCardDescription(card.name);
+                  const desc = card.description ?? '';
                   return (
                     <span
                       key={cardId}
@@ -1372,14 +1020,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             const p = perspective;
             if (!p) return null;
             const isDead = !p.alive;
-            const charInfo = p.character ? CHAR_POOL.find(c => c.name === p.character) : null;
-            const faction = charInfo?.faction || '群';
+            const charInfo = p.character ? getCharacterMeta(p.character) : undefined;
+            const faction = charInfo?.faction ?? '群';
             const factionColor = FACTION_BG[faction] || '#8e44ad';
             const identity = p.identity;
             // 技能列表（过滤默认技能与装备技能）
-            const visibleSkills = p.skills.filter(s => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILLS.has(s));
+            const visibleSkills = p.skills.filter(s => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILL_NAMES.has(s));
             // 装备技能集合：动态装备的技能可主动点击
-            const equipSkillActions = skillActions.filter(a => EQUIPMENT_SKILLS.has(a.skillId));
+            const equipSkillActions = skillActions.filter(a => EQUIPMENT_SKILL_NAMES.has(a.skillId));
             // 主动技（confirm/distribute/choosePlayer/转化类）渲染为可点按钮
             const triggerableActions = skillActions.filter(a =>
               a.prompt.type === 'confirm' ||
@@ -1490,7 +1138,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                       {ids.map((cardId: string) => {
                         const card = view.cardMap[cardId];
                         const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-                        const desc = card ? getCardDescription(card.name) : '';
+                        const desc = card?.description ?? '';
                         return (
                           <span
                             key={cardId}
@@ -1628,7 +1276,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                             if (p.name === selectedTarget) return null; // 不能选 A 当 B
                             const aIdx = view.players.findIndex(x => x.name === selectedTarget);
                             // B 必须在 A 攻击范围内(在范围内 = 可被出杀)
-                            const inAARange = aIdx >= 0 ? isTargetableByPlayer(aIdx, i) : false;
+                            const inAARange = aIdx >= 0 ? canAttack(view.players, view.cardMap, aIdx, i) : false;
                             return (
                               <button
                                 key={i}
@@ -1708,8 +1356,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   onClick={() => canClick && !isTransformDisabled && handleCardClick(card)}
                   title={
                     isTransformMatch && transformMode
-                      ? `${displayName} ${card.suit}${card.rank}\n(原:${card.name}) ${getCardDescription(displayName)}`.trim()
-                      : `${card.name} ${card.suit}${card.rank}\n${getCardDescription(card.name)}`
+                      ? `${displayName} ${card.suit}${card.rank}\n(原:${card.name}) ${card.description ?? ''}`.trim()
+                      : `${card.name} ${card.suit}${card.rank}\n${card.description ?? ''}`
                   }
                 >
                   <div className={cardName} style={{ color: suitColor }}>{displayName}</div>
@@ -1764,25 +1412,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           ))}
         </div>
       </details>
-    </div>
-  );
-}
-
-// ─── 统一倒计时进度条 ───
-// 使用 rAF 每帧更新，CSS transition 在每次 fraction 更新时顺滑插值。
-// 不再是秒级跳跃。
-interface CountdownBarProps {
-  deadline: number | null;
-  totalMs: number;
-}
-function CountdownBar({ deadline, totalMs }: CountdownBarProps) {
-  const fillRef = useCountdownFraction(deadline, totalMs);
-  const sec = useCountdownSeconds(deadline);
-  if (deadline == null || sec == null) return null;
-  return (
-    <div className={countdownBar} title={`剩余 ${sec} 秒`}>
-      <div className={countdownBarFill} ref={fillRef} style={{ width: '100%' }} />
-      <span className={countdownBarText}>⏱ {sec}s</span>
     </div>
   );
 }
@@ -1886,8 +1515,8 @@ function PlayerSeatView({
   const isClickable = needsTarget && !isDead && isTargetable;
   // 势力信息
   const displayChar = player.character;
-  const charInfo = displayChar ? CHAR_POOL.find(c => c.name === displayChar) : null;
-  const faction = charInfo?.faction || '群';
+  const charInfo = displayChar ? getCharacterMeta(displayChar) : undefined;
+  const faction = charInfo?.faction ?? '群';
   const factionColor = FACTION_BG[faction] || '#8e44ad';
 
   // 身份
@@ -1952,11 +1581,11 @@ function PlayerSeatView({
         ))}
       </div>
       {/* 技能标签 */}
-      {player.skills.filter(s => !DEFAULT_SKILLS.has(s)).filter(s => !EQUIPMENT_SKILLS.has(s)).length > 0 && (
+      {player.skills.filter(s => !DEFAULT_SKILLS.has(s)).filter(s => !EQUIPMENT_SKILL_NAMES.has(s)).length > 0 && (
         <div className={skillRow} style={{ padding: '2px 10px' }}>
           {player.skills
             .filter(s => !DEFAULT_SKILLS.has(s))
-            .filter(s => !EQUIPMENT_SKILLS.has(s))
+            .filter(s => !EQUIPMENT_SKILL_NAMES.has(s))
             .map(s => (
               <span key={s} className={skillTag}>{s}</span>
             ))}
@@ -1991,7 +1620,7 @@ function PlayerSeatView({
             {ids.map((cardId: string) => {
               const card = view.cardMap[cardId];
               const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-              const desc = card ? getCardDescription(card.name) : '';
+              const desc = card?.description ?? '';
               return (
                 <span
                   key={cardId}
@@ -2441,33 +2070,6 @@ const handColumn = css`
   display: flex;
   flex-direction: column;
   gap: 8px;
-`;
-
-// ─── 统一倒计时进度条 ───
-const countdownBar = css`
-  position: relative;
-  width: 100%;
-  height: 20px;
-  background: rgba(231,126,34,0.15);
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(231,126,34,0.3);
-`;
-const countdownBarFill = css`
-  height: 100%;
-  background: linear-gradient(90deg, #f39c12, #e74c3c);
-  border-radius: 3px;
-`;
-const countdownBarText = css`
-  position: absolute;
-  top: 50%; right: 10px;
-  transform: translateY(-50%);
-  font-size: 13px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.8);
-  pointer-events: none;
-  z-index: 1;
 `;
 
 // ─── 角色大卡 (左侧) ───

@@ -4,6 +4,7 @@
 import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance, type SkillModule } from '../skill';
+import { DEFAULT_SKILLS } from '../atoms/选将';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '系统规则', description: '引擎级规则(判定清理/技能生命周期/濒死)' };
@@ -40,8 +41,7 @@ export function registerSystemRespondActions(ownerId: number): () => void {
     p.character = selected.name;
     p.name = selected.name;
     // 保留 DEFAULT_SKILLS 引擎里已定义的默认技能列表
-    const DEFAULT = ['回合管理', '装备通用', '杀', '闪', '桃', '酒', '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '借刀杀人', '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击'];
-    p.skills = [...selected.skills, ...DEFAULT];
+    p.skills = [...selected.skills, ...DEFAULT_SKILLS];
   }));
 
   // ── 弃牌阶段 respond action:玩家选择弃哪些牌 ──

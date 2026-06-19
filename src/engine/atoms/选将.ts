@@ -7,7 +7,7 @@ import { createStandardDeck, shuffle } from '../../shared/deck';
 import { registerAtom } from '../atom';
 
 /** 默认通用技能列表 */
-const DEFAULT_SKILLS = [
+export const DEFAULT_SKILLS = [
   '回合管理', '装备通用', '杀', '闪', '桃', '酒',
   '过河拆桥', '顺手牵羊', '无中生有', '桃园结义',
   '借刀杀人', '决斗', '南蛮入侵', '万箭齐发',
