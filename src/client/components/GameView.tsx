@@ -974,7 +974,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                         return (
                           <button
                             key={s}
-                            className={skillBtn}
+                            className={styles.skillBtn}
                             style={btn.style === 'danger' ? { borderColor: '#e74c3c' } : btn.style === 'primary' ? { borderColor: '#f39c12' } : undefined}
                             onClick={() => handleSkillAction(btn)}
                             title={`${btn.label}: ${btn.prompt.title}`}
@@ -983,15 +983,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                           </button>
                         );
                       }
-                      return <span key={s} className={skillTag}>{s}</span>;
+                      return <span key={s} className={styles.skillTag}>{s}</span>;
                     })}
                   </div>
                 )}
                 {/* 装备区：独立显示，不在手牌里 */}
                 {(Object.keys(p.equipment).length > 0 || equipSkillActions.length > 0) && (
-                  <div className={playerCardEquip}>
-                    <div className={playerCardEquipTitle}>装备区</div>
-                    <div className={equipRow}>
+                  <div className={styles.playerCardEquip}>
+                    <div className={styles.playerCardEquipTitle}>装备区</div>
+                    <div className={styles.equipRow}>
                       {Object.entries(p.equipment).map(([slot, cardId]) => {
                         const card = view.cardMap[cardId as string];
                         const icon =
@@ -1009,7 +1009,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                       {showSkillButtons && equipSkillActions.map(a => (
                         <button
                           key={`${a.skillId}:${a.actionType}`}
-                          className={equipSkillBtn}
+                          className={styles.equipSkillBtn}
                           onClick={() => handleSkillAction(a)}
                           title={`${a.label}: ${a.prompt.title}`}
                         >
@@ -1024,8 +1024,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   const ids = p.pendingTricks ?? [];
                   if (ids.length === 0) return null;
                   return (
-                    <div className={judgeRow} style={{ padding: '0 12px 8px' }}>
-                      <span className={judgeRowLabel}>判定:</span>
+                    <div className={styles.judgeRow} style={{ padding: '0 12px 8px' }}>
+                      <span className={styles.judgeRowLabel}>判定:</span>
                       {ids.map((cardId: string) => {
                         const card = view.cardMap[cardId];
                         const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
@@ -1033,7 +1033,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                         return (
                           <span
                             key={cardId}
-                            className={judgeTag}
+                            className={styles.judgeTag}
                             style={{ color: suitColor, borderColor: suitColor }}
                             title={desc || card?.name || cardId}
                           >
@@ -1045,7 +1045,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   );
                 })()}
                 {/* 手牌数 */}
-                <div className={infoRow}>
+                <div className={styles.infoRow}>
                   <span>手牌: {p.handCount}</span>
                 </div>
               </>
@@ -1054,22 +1054,22 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         </div>
 
         {/* ─── 右：手牌 + 统一倒计时 + 操作 + 目标 ─── */}
-        <div className={handColumn}>
+        <div className={styles.handColumn}>
           {/* 统一倒计时进度条（顺滑） */}
           <CountdownBar deadline={deadline} totalMs={pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS} />
           {/* 转化模式提示 + 取消选择 */}
-          <div className={handHeader}>
-            <span className={handTitle}>
+          <div className={styles.handHeader}>
+            <span className={styles.handTitle}>
               {perspectiveName} 的手牌 ({perspectiveHand.length})
-              {perspectiveIdx !== view.viewer && <span className={debugHint}> (调试视角)</span>}
+              {perspectiveIdx !== view.viewer && <span className={styles.debugHint}> (调试视角)</span>}
               {transformMode && (
-                <span className={debugHint} style={{ color: '#f1c40f', marginLeft: 8 }}>
+                <span className={styles.debugHint} style={{ color: '#f1c40f', marginLeft: 8 }}>
                   ⚡ 转化模式:选1张{transformMode.wrapperName} · 源技能 {transformMode.skillId}
                 </span>
               )}
             </span>
             {transformMode && (
-              <button className={cancelBtn} onClick={() => {
+              <button className={styles.cancelBtn} onClick={() => {
                 setTransformMode(null);
                 setSelectedCardId(null);
                 setSelectedTarget(null);
@@ -1078,15 +1078,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               </button>
             )}
             {!transformMode && selectedCardId && (
-              <button className={cancelBtn} onClick={() => { setSelectedCardId(null); setSelectedTarget(null); }}>
+              <button className={styles.cancelBtn} onClick={() => { setSelectedCardId(null); setSelectedTarget(null); }}>
                 取消选择
               </button>
             )}
           </div>
           {/* 操作面板：出牌/结束回合/目标提示 */}
-          <div className={actionBar}>
+          <div className={styles.actionBar}>
             {canOperate && isMyTurn && view.phase === '出牌' && transformMode && selectedCardId && (
-              <button className={playBtn} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}
+              <button className={styles.playBtn} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}
                 style={selectedTarget ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
                 使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
               </button>
@@ -1103,16 +1103,16 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   ? ` → A=${selectedTarget} B=${selectedKillTarget}`
                   : ' (请选 A/B 两个目标)')
                 : (selectedTarget ? ` → ${selectedTarget}` : needsTarget ? ' (请选目标)' : '');
-              return <button className={playBtn} onClick={handlePlayCard} disabled={!canPlay}
+              return <button className={styles.playBtn} onClick={handlePlayCard} disabled={!canPlay}
                 style={canPlay ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
                 出牌{targetLabel}
               </button>;
             })()}
             {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
-              <button className={endTurnBtn} onClick={handleEndTurn}>结束回合</button>
+              <button className={styles.endTurnBtn} onClick={handleEndTurn}>结束回合</button>
             )}
             {selectedCardId && selectedTarget && canOperate && isMyTurn && (
-              <div className={targetHint}>已选择目标: {selectedTarget}</div>
+              <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
             )}
           </div>
           {/* 目标选择 — 需要目标的牌或转化模式(转化的目标牌可能需要目标) */}
@@ -1132,21 +1132,21 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             // 这里仅前端限制;服务端 validate 会严格检查。
             const isTwoTarget = TWO_TARGET_CARDS.has(cardName);
             return (
-              <div className={targetSection}>
+              <div className={styles.targetSection}>
                 {isTwoTarget ? (
                   <>
-                    <div className={targetTitle}>
+                    <div className={styles.targetTitle}>
                       ① 选 A 角色(装备区有武器):
                       {selectedTarget && <span style={{ color: '#f1c40f', marginLeft: 8 }}>{selectedTarget}</span>}
                     </div>
-                    <div className={targetList}>
+                    <div className={styles.targetList}>
                       {view.players.map((p, i) => {
                         if (!p.alive || i === perspectiveIdx) return null;
                         const targetable = true; // A 选择不卡距离
                         return (
                           <button
                             key={i}
-                            className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
+                            className={cx(styles.targetBtn, selectedTarget === p.name && styles.targetBtnActive, !targetable && styles.targetBtnDisabled)}
                             disabled={!targetable}
                             onClick={() => handleTwoTargetClick(p.name, 'A')}
                           >
@@ -1157,11 +1157,11 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                     </div>
                     {selectedTarget && (
                       <>
-                        <div className={targetTitle} style={{ marginTop: 8 }}>
+                        <div className={styles.targetTitle} style={{ marginTop: 8 }}>
                           ② 选 B 角色(A 对其出杀):
                           {selectedKillTarget && <span style={{ color: '#f1c40f', marginLeft: 8 }}>{selectedKillTarget}</span>}
                         </div>
-                        <div className={targetList}>
+                        <div className={styles.targetList}>
                           {view.players.map((p, i) => {
                             if (!p.alive || i === perspectiveIdx) return null;
                             if (p.name === selectedTarget) return null; // 不能选 A 当 B
@@ -1171,7 +1171,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                             return (
                               <button
                                 key={i}
-                                className={cx(targetBtn, selectedKillTarget === p.name && targetBtnActive, !inAARange && targetBtnDisabled)}
+                                className={cx(styles.targetBtn, selectedKillTarget === p.name && styles.targetBtnActive, !inAARange && styles.targetBtnDisabled)}
                                 disabled={!inAARange}
                                 onClick={() => handleTwoTargetClick(p.name, 'B')}
                               >
@@ -1186,15 +1186,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   </>
                 ) : (
                   <>
-                    <div className={targetTitle}>选择目标:</div>
-                    <div className={targetList}>
+                    <div className={styles.targetTitle}>选择目标:</div>
+                    <div className={styles.targetList}>
                       {view.players.map((p, i) => {
                         if (!p.alive || i === perspectiveIdx) return null;
                         const targetable = isTargetable(i);
                         return (
                           <button
                             key={i}
-                            className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
+                            className={cx(styles.targetBtn, selectedTarget === p.name && styles.targetBtnActive, !targetable && styles.targetBtnDisabled)}
                             disabled={!targetable}
                             onClick={() => transformMode ? handleTransformPlay(p.name) : handleTargetClick(p.name)}
                           >
@@ -1210,7 +1210,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             );
           })()}
           {/* 手牌区 */}
-          <div className={handList} ref={handListRef}>
+          <div className={styles.handList} ref={handListRef}>
             {perspectiveHand.map((card, i) => {
               const isSelected = selectedCardId === card.id;
               const isDiscardSelected = selectedForDiscard.has(card.id);
@@ -1234,14 +1234,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   key={card.id}
                   data-card-id={card.id}
                   className={cx(
-                    handCard,
-                    isSelected && handCardSelected,
-                    (!canPlay && !isAwaiting && !canDiscardClick && !isTransformActive) && handCardDisabled,
-                    isAwaiting && handCardRespondable,
-                    isDiscardSelected && discardCardSelected,
-                    isNew && handCardNew,
-                    isTransformMatch && handCardTransform,
-                    isTransformDisabled && handCardTransformDisabled,
+                    styles.handCard,
+                    isSelected && styles.handCardSelected,
+                    (!canPlay && !isAwaiting && !canDiscardClick && !isTransformActive) && styles.handCardDisabled,
+                    isAwaiting && styles.handCardRespondable,
+                    isDiscardSelected && styles.discardCardSelected,
+                    isNew && styles.handCardNew,
+                    isTransformMatch && styles.handCardTransform,
+                    isTransformDisabled && styles.handCardTransformDisabled,
                   )}
                   style={{ transform: `rotate(${fanAngle}deg)`, zIndex: i }}
                   onClick={() => canClick && !isTransformDisabled && handleCardClick(card)}
@@ -1251,44 +1251,44 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                       : `${card.name} ${card.suit}${card.rank}\n${card.description ?? ''}`
                   }
                 >
-                  <div className={cardName} style={{ color: suitColor }}>{displayName}</div>
+                  <div className={styles.cardName} style={{ color: suitColor }}>{displayName}</div>
                   {isTransformMatch && transformMode && (
-                    <div className={cardOrigin} style={{ color: suitColor }}>(原: {card.name})</div>
+                    <div className={styles.cardOrigin} style={{ color: suitColor }}>(原: {card.name})</div>
                   )}
-                  <div className={cardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
+                  <div className={styles.cardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
                 </div>
               );
             })}
-            {perspectiveHand.length === 0 && <div className={emptyHand}>无手牌</div>}
+            {perspectiveHand.length === 0 && <div className={styles.emptyHand}>无手牌</div>}
           </div>
         </div>
       </div>
 
       {/* ─── 游戏日志 ─── */}
-      <details className={logPanel}>
-        <summary className={logSummary}>📜 游戏日志 ({view.log.length})</summary>
-        <div className={logContent}>
-          {view.log.length === 0 && <div className={logEmpty}>暂无记录</div>}
+      <details className={styles.logPanel}>
+        <summary className={styles.logSummary}>📜 游戏日志 ({view.log.length})</summary>
+        <div className={styles.logContent}>
+          {view.log.length === 0 && <div className={styles.logEmpty}>暂无记录</div>}
           {view.log.slice().reverse().map((entry, i) => (
-            <div key={i} className={logEntry}>
-              <span className={logTime}>{formatTime(entry.time)}</span>
-              <span className={logPlayer}>{entry.player}</span>
-              <span className={logText}>{entry.text}</span>
+            <div key={i} className={styles.logEntry}>
+              <span className={styles.logTime}>{formatTime(entry.time)}</span>
+              <span className={styles.logPlayer}>{entry.player}</span>
+              <span className={styles.logText}>{entry.text}</span>
             </div>
           ))}
         </div>
       </details>
       {/* ─── 调试面板 ─── */}
-      <details className={debugPanel}>
-        <summary className={debugSummary}>调试信息</summary>
-        <div className={debugContent}>
+      <details className={styles.debugPanel}>
+        <summary className={styles.debugSummary}>调试信息</summary>
+        <div className={styles.debugContent}>
           <div>phase: {view.phase} | round: {view.turn.round} | currentPlayer: {currentPlayerName}</div>
           <div>viewer: {view.players[view.viewer]?.name} | perspective: {perspectiveName}</div>
           <div>pending: {pending ? `${pending.prompt.title} → ${pending.target}` : 'none'}</div>
-          <hr className={debugHr} />
+          <hr className={styles.debugHr} />
           {view.players.map((p, i) => (
-            <div key={i} className={debugPlayer}>
-              <span className={!p.alive ? debugDead : undefined}>
+            <div key={i} className={styles.debugPlayer}>
+              <span className={!p.alive ? styles.debugDead : undefined}>
                 {p.name}({p.character}) HP:{p.health}/{p.maxHealth}
                 {!p.alive && ' [阵亡]'}
               </span>
