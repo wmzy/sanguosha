@@ -107,11 +107,11 @@ export class GameSession {
     // 建立 playerId → 座次下标 映射
     const state = this.state;
     if (this.debug) {
-      // debug 模式:单连接控制所有角色。第一个连接者映射到 player[0]
-      // (前端通过 perspectiveIdx 切换视角,可操作任意角色)
-      const playerId = this.room.players.keys().next().value;
-      if (!playerId) return false;
-      this.playerNames.set(playerId, 0);
+      // debug 模式:为所有已连接玩家分配座次(按连接顺序)
+      const playerIds = [...this.room.players.keys()];
+      for (let i = 0; i < playerIds.length && i < state.players.length; i++) {
+        this.playerNames.set(playerIds[i], i);
+      }
     } else {
       const playerIds = [...this.room.players.keys()];
       for (let i = 0; i < playerIds.length && i < state.players.length; i++) {

@@ -1060,6 +1060,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{view.viewer}</div>
             </div>
           </div>
+          {isSelfSelecting ? (<>
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${Math.min(candidates.length, 5)}, 1fr)`,
@@ -1129,6 +1130,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           >
             确认选择
           </button>
+          </>) : isLord ? (
+            <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
+              主公正在选将，请等待...
+            </div>
+          ) : (
+            <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
+              等待 P{charSelectTarget} 选将...
+            </div>
+          )}
         </div>
         );
       })()}
