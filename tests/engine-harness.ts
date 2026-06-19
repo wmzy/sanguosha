@@ -409,6 +409,14 @@ export class SkillTestHarness {
       if (!p.tags) p.tags = [];
     }
     this._state = state;
+    // 自动填充测试牌堆(如果为空):创建 N 张测试牌供摸牌 atom 使用
+    if (state.zones.deck.length === 0) {
+      for (let i = 0; i < 20; i++) {
+        const id = `__test_deck_${i}`;
+        state.cardMap[id] = { id, name: i % 3 === 0 ? '杀' : i % 3 === 1 ? '闪' : '桃', suit: '♠', rank: String(i + 2), type: '基本牌' };
+        state.zones.deck.push(id);
+      }
+    }
     await registerSkillsFromState(state);
     this.sessions.clear();
     for (const player of state.players) {
