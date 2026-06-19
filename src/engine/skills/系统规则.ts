@@ -123,7 +123,7 @@ async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> 
 
     await applyAtom(state, {
       type: '请求回应',
-      requestType: '求桃',
+      requestType: '桃/求桃',
       target: playerIdx,
       prompt: { type: 'confirm', title: `${state.players[targetIdx].name} 濒死,是否使用桃救援?`, confirmLabel: '出桃', cancelLabel: '不救' },
       timeout: 15,

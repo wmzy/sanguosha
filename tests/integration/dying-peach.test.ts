@@ -106,7 +106,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     let slot = [...harness.state.pendingSlots.values()][0];
     let slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('求桃');
+    expect(slotAtom.requestType).toBe('桃/求桃');
     expect(slotAtom.target).toBe(1);
 
     // P1 不救(无桃)
@@ -117,7 +117,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     slot = [...harness.state.pendingSlots.values()][0];
     slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('求桃');
+    expect(slotAtom.requestType).toBe('桃/求桃');
     expect(slotAtom.target).toBe(2);
 
     // P2 不救(也无桃)
@@ -128,7 +128,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     slot = [...harness.state.pendingSlots.values()][0];
     slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('求桃');
+    expect(slotAtom.requestType).toBe('桃/求桃');
     expect(slotAtom.target).toBe(0);
 
     // P0 不救(也无桃)
@@ -187,7 +187,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slot1 = [...harness.state.pendingSlots.values()][0];
     const slotAtom1 = slot1.atom as { type: string; requestType?: string; target?: number };
-    expect(slotAtom1.requestType).toBe('求桃');
+    expect(slotAtom1.requestType).toBe('桃/求桃');
     expect(slotAtom1.target).toBe(1);
     // P1 不救
     await P1.pass();
@@ -196,7 +196,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slot2 = [...harness.state.pendingSlots.values()][0];
     const slotAtom2 = slot2.atom as { type: string; requestType?: string; target?: number };
-    expect(slotAtom2.requestType).toBe('求桃');
+    expect(slotAtom2.requestType).toBe('桃/求桃');
     expect(slotAtom2.target).toBe(2);
 
     // P2 出桃救回
@@ -309,7 +309,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     const slot = [...harness.state.pendingSlots.values()][0];
     const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('求桃');
+    expect(slotAtom.requestType).toBe('桃/求桃');
     expect(slotAtom.target).toBe(1);
 
     // P1 用桃救自己

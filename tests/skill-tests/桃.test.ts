@@ -228,7 +228,7 @@ describe('桃', () => {
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slotAtom = [...harness.state.pendingSlots.values()][0].atom as { type?: string; requestType?: string; target?: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('求桃');
+    expect(slotAtom.requestType).toBe('桃/求桃');
 
     // 求桃 pending 目标应该是濒死者(P1,index=1)或下一个活人
     // P1 自己的桃:dispatch 桃 respond,ownerId=1

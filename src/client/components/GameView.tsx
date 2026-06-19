@@ -666,10 +666,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     } else if (reqType === '__弃牌') {
       skillId = '系统规则';
     } else if (atomType === '请求回应' || atomType === '并行回应') {
-      // requestType 可能是 skillId 本身(无辨可击/系统规则/反馈),
-      // 也可能是 'skillId/xxx' 格式, 或特殊映射(求桃→桃)
       if (!reqType) return null;
-      if (reqType === '求桃') return { skillId: '桃' };
       skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null);
     }
     if (!skillId) return null;

@@ -158,7 +158,7 @@ describe('濒死求桃', () => {
     if (state.pendingSlots.size > 0) {
       const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
       // 应该是求桃 pending
-      const isPeachPrompt = atom.type === '请求回应' && atom.requestType === '求桃';
+      const isPeachPrompt = atom.type === '请求回应' && atom.requestType === '桃/求桃';
       if (isPeachPrompt) {
         // HP=0 但 alive 仍为 true(在求桃窗口内)
         expect(state.players[1].health).toBeLessThanOrEqual(0);
@@ -195,7 +195,7 @@ describe('濒死求桃', () => {
     if (state.pendingSlots.size > 0) {
       const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
       // 跳到 P1 求桃 → P1 回应
-      if (atom.type === '请求回应' && atom.requestType === '求桃') {
+      if (atom.type === '请求回应' && atom.requestType === '桃/求桃') {
         const target = (atom as { target?: number }).target;
         // 求桃的目标是 P1(濒死者本人)还是别人? 这里是 P1
         // 让 P1 回应出桃

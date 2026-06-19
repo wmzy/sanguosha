@@ -49,7 +49,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     (state: GameState, params: Record<string, Json>) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '求桃') return '当前不是求桃';
+      if (requestType !== '桃/求桃') return '当前不是求桃';
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
       const self = state.players[ownerId];

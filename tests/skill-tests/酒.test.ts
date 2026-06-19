@@ -214,7 +214,7 @@ describe('酒', () => {
     expect(harness.state.players[1].health).toBe(0);
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slotAtom = [...harness.state.pendingSlots.values()][0].atom as { type?: string; requestType?: string; target?: number };
-    expect(slotAtom.requestType).toBe('求桃');
+    expect(slotAtom.requestType).toBe('桃/求桃');
 
     // P1(或被询问者)出酒救援
     const dyingTarget = slotAtom.target!;

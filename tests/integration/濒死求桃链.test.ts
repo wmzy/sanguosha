@@ -115,7 +115,7 @@ describe('濒死求桃链:多人依次问', () => {
       const slot = [...state.pendingSlots.values()][0];
       const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
       // 求桃给 P1 时 target=1,给 P2 时 target=2
-      if (slotAtom.type === '请求回应' && slotAtom.requestType === '求桃' && slotAtom.target === 1) {
+      if (slotAtom.type === '请求回应' && slotAtom.requestType === '桃/求桃' && slotAtom.target === 1) {
         await fireTimeoutAndWait(state);
       }
     }
@@ -124,7 +124,7 @@ describe('濒死求桃链:多人依次问', () => {
       const slot = [...state.pendingSlots.values()][0];
       const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
       expect(slotAtom.type).toBe('请求回应');
-      expect(slotAtom.requestType).toBe('求桃');
+      expect(slotAtom.requestType).toBe('桃/求桃');
       expect(slotAtom.target).toBe(2);
 
       // P2 出桃救回
@@ -253,7 +253,7 @@ describe('濒死求桃链:多人依次问', () => {
       const slot = [...state.pendingSlots.values()][0];
       const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
       expect(slotAtom.type).toBe('请求回应');
-      expect(slotAtom.requestType).toBe('求桃');
+      expect(slotAtom.requestType).toBe('桃/求桃');
       expect(slotAtom.target).toBe(1);
 
       // P1 用桃救自己
@@ -324,7 +324,7 @@ describe('濒死求桃链:多人依次问', () => {
       const slot = [...state.pendingSlots.values()][0];
       const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
       expect(slotAtom.type).toBe('请求回应');
-      expect(slotAtom.requestType).toBe('求桃');
+      expect(slotAtom.requestType).toBe('桃/求桃');
       expect(slotAtom.target).toBe(2);
       // P2 出桃
       await dispatchAndWait(state, {

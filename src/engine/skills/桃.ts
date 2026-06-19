@@ -50,7 +50,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
       if (slot.atom.type !== '请求回应') return '当前不是求桃';
       const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '求桃') return '当前不是求桃';
+      if (requestType !== '桃/求桃') return '当前不是求桃';
       const cardId = params.cardId as string | undefined;
       if (cardId) {
         const self = state.players[ownerId];

@@ -303,9 +303,7 @@ export class PlayerSession {
     } else if (reqType === '__弃牌') {
       skillId = '系统规则';
     } else if (atomType === '请求回应' || atomType === '并行回应') {
-      // 求桃→桃(requestType 不等于 skillId)
-      if (reqType === '求桃') { skillId = '桃'; }
-      else { skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null); }
+      skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null);
     }
     if (!skillId) return null;
 
