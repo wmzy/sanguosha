@@ -123,15 +123,15 @@ describe('用户报告问题回归', () => {
     expect(h.state.players[0].health).toBe(4);
   });
 
-  // 9. 借刀杀人:目标出杀杀第三方 (KNOWN BUG: P1 respond后借刀杀人execute没resume创建询问闪)
-  it.skip('借刀杀人→目标出杀→第三方被询问闪 [KNOWN BUG]', async () => {
+  // 9. 借刀杀人:目标出杀杀第三方
+  it('借刀杀人→目标出杀→第三方被询问闪', async () => {
     const jdsr: Card = { id: 'jdsr', name: '借刀杀人', suit: '♠', rank: 'Q', type: '锦囊牌' };
     const weapon: Card = { id: 'wp1', name: '诸葛连弩', suit: '♠', rank: 'A', type: '装备牌' };
     const slash2: Card = { id: 's2', name: '杀', suit: '♣', rank: '5', type: '基本牌' };
     const state3 = createGameState({
       players: [
         { index:0,name:'P0',character:'X',health:4,maxHealth:4,alive:true,hand:['jdsr'],equipment:{},skills:['借刀杀人'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
-        { index:1,name:'P1',character:'Y',health:4,maxHealth:4,alive:true,hand:['s2'],equipment:{weapon:'wp1'},skills:['杀','闪'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
+        { index:1,name:'P1',character:'Y',health:4,maxHealth:4,alive:true,hand:['s2'],equipment:{'武器':'wp1'},skills:['杀','闪'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
         { index:2,name:'P2',character:'Z',health:4,maxHealth:4,alive:true,hand:[],equipment:{},skills:['闪'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
       ],
       cardMap: { jdsr, wp1: weapon, s2: slash2 },
