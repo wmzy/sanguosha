@@ -32,6 +32,7 @@
 import type {
   ActionEntry,
   ActionLogEntry,
+  ActionPrompt,
   Atom,
   AtomAfterContext,
   AtomBeforeContext,
@@ -447,27 +448,46 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   notifyStateChange(state);
 
   if (def.pending) {
-    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应多 target)。
-    // 并行回应 为每个 target 创建独立 slot,Promise.all 等全部 resolve(语义同 Promise.all)。
-    const isParallel = current.type === '并行回应';
-    const targets: number[] = isParallel
-      ? (current as unknown as { targets: number[] }).targets
-      : [extractPendingTarget(current)];
+    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应/并行选将多 target)。
+    // 并行回应 / 并行选将 为每个 target 创建独立 slot,Promise.all 等全部 resolve(语义同 Promise.all)。
+    const isParallelRespond = current.type === '并行回应';
+    const isParallelSelect = current.type === '并行选将';
+    const isParallel = isParallelRespond || isParallelSelect;
 
-    // 为每个 target 构造一个单 target 的虚拟 atom(并行回应拆分;单 target 原样)
-    const slotAtoms: Atom[] = isParallel
-      ? targets.map(t => ({
-          ...current,
-          type: '请求回应' as const,
-          target: t,
-        } as unknown as Atom))
-      : [current];
+    // 拆分目标列表 + 每个 target 对应的虚拟 slot atom
+    let targets: number[];
+    let slotAtoms: Atom[];
+    if (isParallelRespond) {
+      // 并行回应:所有 target 共用同一 prompt/requestType,拆成 请求回应
+      const cur = current as unknown as { targets: number[]; requestType: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number };
+      targets = cur.targets;
+      slotAtoms = targets.map(t => ({
+        ...cur,
+        type: '请求回应' as const,
+        target: t,
+      } as unknown as Atom));
+    } else if (isParallelSelect) {
+      // 并行选将:每个 target 有各自的 candidates,拆成 选将询问(保留各自候选人)
+      const cur = current as unknown as { selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> };
+      targets = cur.selections.map(s => s.target);
+      slotAtoms = cur.selections.map(s => ({
+        type: '选将询问' as const,
+        target: s.target,
+        candidates: s.candidates,
+      } as unknown as Atom));
+    } else {
+      // 单 target:原样
+      targets = [extractPendingTarget(current)];
+      slotAtoms = [current];
+    }
 
     const slotPromises: Promise<void>[] = [];
     for (let i = 0; i < slotAtoms.length; i++) {
       const slotAtom = slotAtoms[i];
       const slotTarget = targets[i];
-      slotPromises.push(createAndAwaitSlot(state, slotAtom, def, slotTarget));
+      // 并行选将拆出的 slot 是 选将询问 类型,用其 def;其他用当前 atom 的 def
+      const slotDef = isParallelSelect ? getAtomDef('选将询问') : def;
+      slotPromises.push(createAndAwaitSlot(state, slotAtom, slotDef, slotTarget));
     }
     await Promise.all(slotPromises);
 

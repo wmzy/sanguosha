@@ -208,3 +208,36 @@ export const 选将询问: AtomDefinition<{
 };
 
 registerAtom(选将询问);
+
+// ── 并行选将(交互式,多人同时选)──────────────────────
+// 等待型 atom:给多个目标玩家同时展示各自的候选人,各自独立选择、独立 resolve。
+// 全部 resolve 后父 applyAtom 的 Promise 才 resolve(语义同 Promise.all)。
+//
+// 与 串行选将询问 的区别:主公先选(串行)后,其余人同时选(并行),加快开局。
+// 引擎管线(create-engine.ts)把它拆成多个单 target 的 选将询问 slot,各 slot 独立 pending。
+// respond action(系统规则:选将)按 slot.atom.target 精确匹配,与串行路径完全一致。
+export const 并行选将: AtomDefinition<{
+  type: '并行选将';
+  selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }>;
+}> = {
+  type: '并行选将',
+  validate(state, atom) {
+    if (!Array.isArray(atom.selections) || atom.selections.length === 0) return 'selections required';
+    for (const s of atom.selections) {
+      if (!state.players[s.target]) return `target ${s.target} not found`;
+      if (!Array.isArray(s.candidates) || s.candidates.length === 0) return `candidates required for target ${s.target}`;
+    }
+    return null;
+  },
+  apply(_state) {
+    // 等待型 atom——apply 不修改 state
+  },
+  pending: {
+    onTimeout: { type: '无操作' },
+    prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
+    timeout: 60,
+  },
+  effect: { blockUntilDone: true, duration: 200 },
+};
+
+registerAtom(并行选将);

@@ -90,6 +90,11 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     ? (charSelectPending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
     : [];
   const charSelectTarget = charSelectPending ? charSelectPending.target : -1;
+  // 选将阶段进行中:仍有玩家未选将(character 为空)且游戏未进入第一回合(阶段准备)。
+  // 用于并行选将场景:自己已选完但其他人还在选时,显示"等待其他玩家选将"遮罩。
+  const charSelectInProgress = view.phase === '准备'
+    && view.players.some(p => !p.character);
+  const myCharSelected = !!view.players[view.viewer]?.character;
   // ─── 动画状态 ───
   const anim = useAnimationState(view, perspectiveIdx);
   const handListRef = useRef<HTMLDivElement>(null);
@@ -734,6 +739,30 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           currentPlayerName={currentPlayerName}
           perspectiveName={perspectiveName}
         />
+      )}
+
+      {/* ─── 选将阶段等待遮罩(并行选将:自己已选完但其他人还在选)─── */}
+      {!isCharSelectPending && charSelectInProgress && myCharSelected && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9998,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.9)',
+            color: '#f1c40f',
+            fontSize: 18,
+            gap: 12,
+          }}
+        >
+          <div>⏳ 已选择武将,等待其他玩家选将...</div>
+          <div style={{ fontSize: 13, color: '#aaa' }}>
+            {view.players.filter(p => !p.character).map(p => p.name).join('、')} 正在选将
+          </div>
+        </div>
       )}
 
       {/* ─── 头部 ─── */}

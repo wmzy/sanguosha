@@ -51,8 +51,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       // 1. 抽身份(每人一张,主公亮明)
       await applyAtom(state, { type: '抽身份', playerCount, seed });
 
-      // 2. 选将(交互式):主公先选,其他人依次选
-      //    从武将池随机抽 N 张给每人选 1 张,已选的武将不再出现
+      // 2. 选将(交互式):主公先选(串行),其他人同时选(并行)
       const charRng = createRng(seed + 1);
       const charPool = [...characters].filter(c => c.name !== '主公');
       // 打乱武将池
@@ -63,29 +62,47 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
         charPool[j] = tmp;
       }
       const used = new Set<string>();
-      let poolIdx = 0;
-      // 主公先选,然后按座次顺序
+      // 主公先选(串行),然后其他人同时选(并行)
       const lordIdx = state.players.findIndex(p => p.vars['身份'] === '主公');
-      const selectOrder: number[] = [];
-      if (lordIdx >= 0) selectOrder.push(lordIdx);
-      for (let i = 0; i < state.players.length; i++) {
-        if (i !== lordIdx) selectOrder.push(i);
+
+      // 2a. 主公先选:从池首取 5 张作为候选人
+      if (lordIdx >= 0) {
+        const lordAvail: Array<{ name: string; skills: string[] }> = [];
+        for (const c of charPool) {
+          if (lordAvail.length >= 5) break;
+          if (!used.has(c.name)) lordAvail.push(c);
+        }
+        if (lordAvail.length > 0) {
+          await applyAtom(state, { type: '选将询问', target: lordIdx, candidates: lordAvail });
+          const lordChosen = state.players[lordIdx].character;
+          if (lordChosen) used.add(lordChosen);
+        }
       }
-      for (const playerIdx of selectOrder) {
-        // 从剩余池中取 5 张(或全部)作为候选人
-        const available: Array<{ name: string; skills: string[] }> = [];
-        for (let j = poolIdx; j < charPool.length && available.length < 5; j++) {
-          if (!used.has(charPool[j].name)) {
-            available.push(charPool[j]);
+
+      // 2b. 其他人并行选:从剩余武将池(扣除主公已选)给每人分配候选人。
+      // 池子足够大时按座次切片不重叠;池子小时所有非主公共享同一份候选人(先选先得,respond validate 保证唯一)。
+      const others = state.players
+        .map((_, i) => i)
+        .filter(i => i !== lordIdx);
+      if (others.length > 0) {
+        const remaining = charPool.filter(c => !used.has(c.name));
+        const perPlayer = 5;
+        const selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> = [];
+        for (let k = 0; k < others.length; k++) {
+          const start = k * perPlayer;
+          let cand = remaining.slice(start, start + perPlayer);
+          // 不足 5 张:回退为全部剩余(允许跨玩家候选人重叠,由 respond validate 保证唯一)
+          if (cand.length === 0) cand = remaining.slice(0, perPlayer);
+          if (cand.length === 0) break;
+          selections.push({ target: others[k], candidates: cand });
+        }
+        if (selections.length > 0) {
+          await applyAtom(state, { type: '并行选将', selections });
+          for (const idx of others) {
+            const chosen = state.players[idx]?.character;
+            if (chosen) used.add(chosen);
           }
         }
-        if (available.length === 0) break;
-        // 等待玩家选择(选将询问 是等待型 atom,Promise 挂起到玩家回应)
-        await applyAtom(state, { type: '选将询问', target: playerIdx, candidates: available });
-        // 玩家选完后,选将 respond execute 已设置 p.character
-        // 标记已用
-        const chosen = state.players[playerIdx].character;
-        if (chosen) used.add(chosen);
       }
 
       // 2.5 注册技能实例(回合管理等默认技能)——必须在阶段推进前注册

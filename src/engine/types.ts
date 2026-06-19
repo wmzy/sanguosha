@@ -346,6 +346,7 @@ export type Atom =
   | { type: '抽身份'; playerCount: number; seed: number }
   | { type: '选将'; characters: Array<{ name: string; skills: string[] }>; seed: number }
   | { type: '选将询问'; target: number; candidates: Array<{ name: string; skills: string[] }>; prompt?: ActionPrompt }
+  | { type: '并行选将'; selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> }
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number; lordBonus?: number }
   | { type: '判定'; player: number; judgeType: string }

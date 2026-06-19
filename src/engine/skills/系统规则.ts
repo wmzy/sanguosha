@@ -29,6 +29,10 @@ export function registerSystemRespondActions(ownerId: number): () => void {
     if (typeof character !== 'string') return 'character required';
     const candidates = (slot.atom as { candidates: Array<{ name: string }> }).candidates;
     if (!candidates.some(c => c.name === character)) return '选择的武将不在候选人中';
+    // 并行选将场景:同一武将不能被两人选(先选先得)。
+    // 串行场景下每人候选人本就不重叠,此检查也不会误拒。
+    const takenByOther = state.players.some(p => p.index !== ownerId && p.character === character);
+    if (takenByOther) return '该武将已被其他玩家选择';
     return null;
   }, async (state, params) => {
     const slot = state.pendingSlots.get(ownerId)!;
