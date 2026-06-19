@@ -907,7 +907,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   return (
     <div className={pageRoot}>
           {/* ─── 身份揭示遮罩 ─── */}
-      {showIdentityReveal && perspective?.identity && (
+      {showIdentityReveal && view.players[view.viewer]?.identity && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -928,14 +928,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             alignItems: 'center',
             justifyContent: 'center',
             gap: 16,
-            background: IDENTITY_COLORS[perspective.identity] || '#888',
+            background: IDENTITY_COLORS[view.players[view.viewer].identity] || '#888',
             color: '#fff',
             boxShadow: '0 0 40px rgba(0,0,0,0.5)',
             animation: 'identityCardFlip 1s cubic-bezier(0.23, 1, 0.32, 1) both',
             transformStyle: 'preserve-3d',
           }}>
             <div style={{ fontSize: 14, opacity: 0.8, letterSpacing: 2 }}>你的身份</div>
-            <div style={{ fontSize: 36, fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{perspective.identity}</div>
+            <div style={{ fontSize: 36, fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{view.players[view.viewer].identity}</div>
           </div>
           <button
             onClick={() => {
@@ -1013,23 +1013,27 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             gap: 16,
             marginBottom: 24,
           }}>
-            {perspective?.identity && myIdentityColor && (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 4,
-                padding: '8px 18px',
-                borderRadius: 8,
-                background: myIdentityColor,
-                color: '#fff',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
-                minWidth: 90,
-              }}>
-                <div style={{ fontSize: 11, opacity: 0.85, letterSpacing: 2 }}>你的身份</div>
-                <div style={{ fontSize: 20, fontWeight: 'bold', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{perspective.identity}</div>
-              </div>
-            )}
+            {view.players[view.viewer]?.identity && (() => {
+              const viewerIdentity = view.players[view.viewer].identity;
+              const viewerColor = IDENTITY_COLORS[viewerIdentity] || '#888';
+              return (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '8px 18px',
+                  borderRadius: 8,
+                  background: viewerColor,
+                  color: '#fff',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+                  minWidth: 90,
+                }}>
+                  <div style={{ fontSize: 11, opacity: 0.85, letterSpacing: 2 }}>你的身份</div>
+                  <div style={{ fontSize: 20, fontWeight: 'bold', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{viewerIdentity}</div>
+                </div>
+              );
+            })()}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
