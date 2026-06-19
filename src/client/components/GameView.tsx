@@ -84,17 +84,24 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
   // 选将遮罩:读 view.pending.atom.type === '选将询问'
   // 候选人从 view.pending.atom.candidates 获取(引擎生成)
-  const charSelectPending = view.pending?.atom?.type === '选将询问' ? view.pending : null;
+  // debug 模式下并行选将:viewer 自己已选完时,view.pending 为空,
+  // 从 view.allCharSelectSlots 按 perspectiveIdx 找对应玩家的选将 slot(代打)。
+  const ownCharSelect = view.pending?.atom?.type === '选将询问' ? view.pending : null;
+  const parallelSlotForPerspective = view.allCharSelectSlots?.find(
+    s => s.atom.type === '选将询问' && s.target === perspectiveIdx,
+  ) ?? null;
+  const charSelectPending = ownCharSelect ?? parallelSlotForPerspective;
   const isCharSelectPending = charSelectPending !== null;
   const charCandidates: Array<{ name: string; skills: string[] }> = charSelectPending
     ? (charSelectPending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
     : [];
   const charSelectTarget = charSelectPending ? charSelectPending.target : -1;
   // 选将阶段进行中:仍有玩家未选将(character 为空)且游戏未进入第一回合(阶段准备)。
-  // 用于并行选将场景:自己已选完但其他人还在选时,显示"等待其他玩家选将"遮罩。
+  // 用于并行选将场景:当前视角玩家已选完但其他人还在选时,显示"等待其他玩家选将"遮罩。
   const charSelectInProgress = view.phase === '准备'
     && view.players.some(p => !p.character);
-  const myCharSelected = !!view.players[view.viewer]?.character;
+  // 当前视角玩家是否已选将(debug 代打时随 perspectiveIdx 变化)
+  const perspectiveCharSelected = !!view.players[perspectiveIdx]?.character;
   // ─── 动画状态 ───
   const anim = useAnimationState(view, perspectiveIdx);
   const handListRef = useRef<HTMLDivElement>(null);
@@ -119,12 +126,13 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 有待回应请求时,自动切换视角到被问询玩家;无 pending 时回到当前回合玩家
   // 选将期间:自动跟随选将 target,但用户手动切换后停止跟随;
   //  charSelectTarget 变化(下一个玩家选将)时重置,继续跟随新 target。
+  //  debug 并行选将:viewer 自己选完后 view.pending 为空,但 allCharSelectSlots 有其他玩家的 slot,
+  //  自动跟到第一个未选完的玩家(代打),直到用户手动切换。
   useEffect(() => {
     if (!autoSwitch) return;
     const isCharSelect = view.pending?.atom?.type === '选将询问';
     if (isCharSelect) {
       const t = view.pending!.target;
-      // target 变化时重置手动切换标记(新一轮选将)
       if (t !== prevCharSelectTargetRef.current) {
         prevCharSelectTargetRef.current = t;
         charSelectManualSwitchRef.current = false;
@@ -134,15 +142,23 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       }
       return;
     }
+    // debug 并行选将:viewer 无 pending 但有并行选将 slot → 跟到第一个未选完的玩家
+    if (charSelectInProgress && view.allCharSelectSlots && view.allCharSelectSlots.length > 0 && !charSelectManualSwitchRef.current) {
+      const firstUnselectedSlot = view.allCharSelectSlots.find(s => !view.players[s.target]?.character);
+      if (firstUnselectedSlot && firstUnselectedSlot.target >= 0 && firstUnselectedSlot.target < view.players.length) {
+        setPerspectiveIdx(firstUnselectedSlot.target);
+      }
+      return;
+    }
     if (view.pending) {
       const targetIdx = view.pending.target;
       if (targetIdx >= 0 && targetIdx < view.players.length) setPerspectiveIdx(targetIdx);
-    } else {
+    } else if (!charSelectInProgress) {
       setPerspectiveIdx(view.currentPlayerIndex);
     }
-  }, [view.pending?.target, view.currentPlayerIndex, autoSwitch, view.pending?.atom?.type]);
-  // 初次加载:默认看自己的座次
-  useEffect(() => { setPerspectiveIdx(view.viewer); }, [view.viewer]);
+  }, [view.pending?.target, view.currentPlayerIndex, autoSwitch, view.pending?.atom?.type, charSelectInProgress, view.allCharSelectSlots]);
+  // 初次加载:默认看自己的座次(选将进行中时不覆盖,由上面的自动切换 effect 接管)
+  useEffect(() => { if (!charSelectInProgress) setPerspectiveIdx(view.viewer); }, [view.viewer, charSelectInProgress]);
 
   const perspective = view.players[perspectiveIdx];
   const perspectiveName = perspective?.name ?? `P${perspectiveIdx}`;
@@ -741,8 +757,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         />
       )}
 
-      {/* ─── 选将阶段等待遮罩(并行选将:自己已选完但其他人还在选)─── */}
-      {!isCharSelectPending && charSelectInProgress && myCharSelected && (
+      {/* ─── 选将阶段等待遮罩(并行选将:当前视角玩家已选完但其他人还在选)─── */}
+      {!isCharSelectPending && charSelectInProgress && perspectiveCharSelected && (
         <div
           style={{
             position: 'fixed',
@@ -758,10 +774,27 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             gap: 12,
           }}
         >
-          <div>⏳ 已选择武将,等待其他玩家选将...</div>
+          <div>⏳ {perspectiveName} 已选择武将,等待其他玩家选将...</div>
           <div style={{ fontSize: 13, color: '#aaa' }}>
             {view.players.filter(p => !p.character).map(p => p.name).join('、')} 正在选将
           </div>
+          {/* debug 模式:切换到未选玩家代其选将 */}
+          <button
+            onClick={switchPerspective}
+            style={{
+              marginTop: 16,
+              padding: '8px 18px',
+              fontSize: 14,
+              fontWeight: 'bold',
+              color: '#fff',
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+          >
+            切换视角 → {view.players[(perspectiveIdx + 1) % view.players.length]?.name}
+          </button>
         </div>
       )}
 

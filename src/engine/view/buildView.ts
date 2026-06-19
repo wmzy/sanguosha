@@ -71,6 +71,30 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     turnDeadline = Date.now() + 60_000;
   }
 
+  // debug 模式:收集所有并行选将 slot,供单客户端代打时切换视角帮其他玩家选将。
+  // 正式模式不填充(viewer 隔离:只看自己的 pending)。
+  let allCharSelectSlots: GameView['allCharSelectSlots'];
+  if (debug) {
+    const selectSlots = [...state.pendingSlots.values()].filter(s => s.atom.type === '选将询问');
+    if (selectSlots.length > 1) {
+      allCharSelectSlots = selectSlots.map(s => {
+        const def = s.definition;
+        const prompt = (s.atom as { prompt?: ActionPrompt }).prompt
+          ?? def.pending?.prompt
+          ?? { type: 'chooseCharacter' as const, title: '请选择武将', candidates: [] };
+        const t = 'target' in s.atom && typeof s.atom.target === 'number' ? s.atom.target : -1;
+        return {
+          type: 'awaits' as const,
+          atom: s.atom,
+          prompt,
+          target: t,
+          deadline: state.startedAt + s.deadline,
+          totalMs: ((s.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 60) * 1000,
+        };
+      });
+    }
+  }
+
   return {
     viewer,
     currentPlayerIndex: state.currentPlayerIndex,
@@ -106,6 +130,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     })),
     cardMap: state.cardMap,
     pending,
+    allCharSelectSlots,
     turnDeadline,
     log,
     zones: {

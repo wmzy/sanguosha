@@ -420,6 +420,11 @@ export interface GameView {
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;
+  /** debug 模式专用:所有并行选将 slot 的列表(含其他玩家的候选人)。
+   *  正式模式不填充(viewer 隔离)。debug 单客户端代打时,前端按 perspectiveIdx
+   *  从此列表找对应玩家的选将 pending,支持切换视角帮其他玩家选将。
+   *  仅在多 target 并行选将(主公已选、其他人同时选)时非空。 */
+  allCharSelectSlots?: PendingView[];
   /** 出牌/弃牌阶段的操作截止时间(独立于 pending) */
   turnDeadline: number | null;
   log: { time: number; player: number; text: string }[];

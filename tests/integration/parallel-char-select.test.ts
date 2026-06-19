@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom, buildView } from '../../src/engine/create-engine';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 
@@ -134,5 +134,69 @@ describe('并行选将:多 target 同时选将', () => {
     });
     await waitForStable(harness.state);
     expect(harness.state.pendingSlots.size).toBe(0);
+  });
+});
+
+describe('buildView debug 模式:并行选将 allCharSelectSlots', () => {
+  let harness: SkillTestHarness;
+
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
+
+  it('debug 模式:viewer 已选完时,allCharSelectSlots 含其他玩家的选将 slot', async () => {
+    const state: GameState = createGameState({
+      players: [
+        { ...makePlayer({ index: 0, name: 'P0' }), character: '主公选的' },
+        makePlayer({ index: 1, name: 'P1' }),
+        makePlayer({ index: 2, name: 'P2' }),
+      ],
+      cardMap: {},
+    });
+    await harness.setup(state);
+
+    // 并行选将是等待型 atom,fire-and-forget(不 await,它会挂起在 pending)
+    void applyAtom(harness.state, {
+      type: '并行选将',
+      selections: [
+        { target: 1, candidates: [{ name: '刘备', skills: ['仁德'] }] },
+        { target: 2, candidates: [{ name: '孙权', skills: ['制衡'] }] },
+      ],
+    });
+    await waitForStable(harness.state);
+
+    // debug 模式 viewer=0(主公,已选):pending 为空,但 allCharSelectSlots 应含 P1/P2 的 slot
+    const debugView = buildView(harness.state, 0, true);
+    expect(debugView.pending).toBe(null);
+    expect(debugView.allCharSelectSlots).toBeDefined();
+    expect(debugView.allCharSelectSlots!.length).toBe(2);
+    const targets = debugView.allCharSelectSlots!.map(s => s.target).sort();
+    expect(targets).toEqual([1, 2]);
+    // 各 slot 候选人独立
+    const p1Slot = debugView.allCharSelectSlots!.find(s => s.target === 1)!;
+    expect((p1Slot.atom as { candidates: Array<{ name: string }> }).candidates[0].name).toBe('刘备');
+  });
+
+  it('正式模式(debug=false):不填充 allCharSelectSlots(viewer 隔离)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        { ...makePlayer({ index: 0, name: 'P0' }), character: '主公选的' },
+        makePlayer({ index: 1, name: 'P1' }),
+      ],
+      cardMap: {},
+    });
+    await harness.setup(state);
+
+    void applyAtom(harness.state, {
+      type: '并行选将',
+      selections: [
+        { target: 1, candidates: [{ name: '孙权', skills: ['制衡'] }] },
+      ],
+    });
+    await waitForStable(harness.state);
+
+    // 正式模式 viewer=0:allCharSelectSlots 不填充(即使单 slot fallback 让 pending 非空)
+    const formalView = buildView(harness.state, 0, false);
+    expect(formalView.allCharSelectSlots).toBeUndefined();
   });
 });
