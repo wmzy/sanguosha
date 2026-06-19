@@ -234,7 +234,9 @@ export class GameSession {
 
   private sendDebugGameState(playerId: string, lastSeq?: number): void {
     if (!this.state) return;
-    const view = buildView(this.state, 0, this.debug);
+    // debug 模式:用玩家被分配的座次作为 viewer(支持切换视角)
+    const viewer = this.debug ? (this.playerNames.get(playerId) ?? 0) : (this.playerNames.get(playerId) ?? 0);
+    const view = buildView(this.state, viewer, this.debug);
     const state = this.state;
     this.sendToPlayer(playerId, { type: 'debugGameState', state: view, lastSeq: lastSeq ?? state.seq });
   }
