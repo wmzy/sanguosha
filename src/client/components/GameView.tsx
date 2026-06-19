@@ -46,7 +46,7 @@ const SUIT_COLOR: Record<string, string> = {
 
 // ─── 引擎声明的默认通用技能(技能按钮区/座位卡均过滤这些) ───
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
-import { isEquipment, isDelayedTrick, isRespondOnly } from '../../engine/card-meta';
+import { isEquipment, isDelayedTrick, isRespondOnly, RANGE_REQUIRED_CARDS, TARGET_REQUIRED_CARDS, TWO_TARGET_CARDS, SELF_TARGET_CARDS, RESPOND_ONLY_CARDS } from '../../engine/card-meta';
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 const EQUIPMENT_SKILL_NAMES = new Set([
   '诸葛连弩', '青釭剑', '青龙偃月刀', '雌雄双股剑', '贯石斧',
@@ -300,8 +300,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   );
 
   // ─── 距离和攻击范围计算(纯函数，委托 src/client/utils/distance) ───
-  /** 需要攻击范围内才能选目标的牌 */
-  const RANGE_REQUIRED_CARDS = new Set(['杀', '顺手牵羊']);
 
   /** 选中的牌 */
   const selectedCard = selectedCardId ? (perspectiveHand.find(c => c.id === selectedCardId) ?? viewerHand.find(c => c.id === selectedCardId)) : null;
@@ -329,11 +327,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     return result;
   }
 
-  // 需要选目标的牌
-  const TARGET_REQUIRED_CARDS = new Set(['杀', '过河拆桥', '顺手牵羊', '借刀杀人', '决斗', '乐不思蜀']);
 
-  /** 需要选两个目标(A + B)的牌 */
-  const TWO_TARGET_CARDS = new Set(['借刀杀人']);
 
   // 当前是否需要选目标(出牌或使用技能时)
   // 转化模式按 wrapperName(如杀)决定;普通出牌按原牌名
@@ -342,10 +336,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     : selectedCard
       ? TARGET_REQUIRED_CARDS.has(selectedCard.name)
       : false;
-  // 自动以自己为目标的牌
-  const SELF_TARGET_CARDS = new Set(['桃', '酒']);
-  // 只能作为回应打出的牌(不能主动出)
-  const RESPOND_ONLY = new Set(['闪', '无懈可击']);
+
   // 出牌
   /** 玩家名 → 座次下标(UI 层用 name,dispatch 时转 index) */
   function nameToIndex(name: string): number {
@@ -356,7 +347,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     if (!selectedCardId) return;
     const card = perspectiveHand.find(c => c.id === selectedCardId);
     if (!card) return;
-    if (RESPOND_ONLY.has(card.name)) return; // 不能主动出
+    if (RESPOND_ONLY_CARDS.has(card.name)) return; // 不能主动出
     const selfName = view.players[view.viewer].name;
     const needsTarget = TARGET_REQUIRED_CARDS.has(card.name);
     const needsTwoTargets = TWO_TARGET_CARDS.has(card.name);
