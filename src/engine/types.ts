@@ -202,9 +202,28 @@ export interface DistributePrompt {
   type: 'distribute';
   title: string;
   description?: string;
-  cardIds: string[];
-  minPerTarget: number;
-  maxPerTarget: number;
+  /** 分配模式:
+   *  - 'allocate'(默认,遗计/仁德):把手牌逐张分配给若干目标,提交 `allocation=[{target,cardIds}]`。
+   *  - 'select'(制衡):只选若干张牌,提交 `cardIds=[...]`。
+   * 被动 pending(遗计)走 allocate;主动技(仁德/制衡)由 onMount 指定。 */
+  mode?: 'allocate' | 'select';
+  /** 静态牌列表(遗计 pending 用:引擎摸出的指定两张)。
+   *  与 source 二选一:有 cardIds = 静态;有 source = 动态;都没有 = 默认当前视角手牌。 */
+  cardIds?: string[];
+  /** 动态选牌来源(主动技用,随手牌/装备变化):
+   *  - 'hand' 或缺省:当前视角手牌。
+   *  - 'handAndEquip':手牌 + 装备区(制衡用)。 */
+  source?: 'hand' | 'handAndEquip';
+  /** allocate 模式:每个目标最少/最多收几张。默认 1..99。 */
+  minPerTarget?: number;
+  maxPerTarget?: number;
+  /** 总选牌数限制(两种模式通用)。默认 1..99。select 模式主要约束。 */
+  minTotal?: number;
+  maxTotal?: number;
+  /** allocate 模式:是否允许分配给自己(仁德不允许,遗计允许)。默认 true。 */
+  allowSelf?: boolean;
+  /** allocate 模式:目标合法性过滤(存活/非自己等由前端组合判断)。 */
+  targetFilter?: (view: GameView, target: number) => boolean;
 }
 export interface ChoosePlayerPrompt {
   type: 'choosePlayer';

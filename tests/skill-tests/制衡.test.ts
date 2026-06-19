@@ -184,7 +184,7 @@ describe('制衡', () => {
 
   // ─── defineAction 声明验证 ─────────────────────────
 
-  it('availableActions:列出 use action,prompt 是 useCard(可多选)', async () => {
+  it('availableActions:列出 use action,prompt 是 distribute select(可多选)', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: [] }),
@@ -202,10 +202,12 @@ describe('制衡', () => {
     const zhiheng = actions.find(a => a.skillId === '制衡' && a.actionType === 'use');
     expect(zhiheng).toBeDefined();
     expect(zhiheng!.label).toBe('制衡');
-    expect(zhiheng!.prompt.type).toBe('useCard');
-    if (zhiheng!.prompt.type === 'useCard') {
-      expect(zhiheng!.prompt.cardFilter.min).toBe(1);
-      expect(zhiheng!.prompt.cardFilter.max).toBe(99);
+    expect(zhiheng!.prompt.type).toBe('distribute');
+    if (zhiheng!.prompt.type === 'distribute') {
+      expect(zhiheng!.prompt.mode).toBe('select');
+      expect(zhiheng!.prompt.source).toBe('handAndEquip');
+      expect(zhiheng!.prompt.minTotal).toBe(1);
+      expect(zhiheng!.prompt.maxTotal).toBe(99);
     }
   });
 

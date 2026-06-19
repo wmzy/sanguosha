@@ -51,9 +51,12 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
     label: '制衡',
     style: 'primary',
     prompt: {
-      type: 'useCard',
+      type: 'distribute',
+      mode: 'select',
       title: '制衡：选择要弃置的牌（可多选）',
-      cardFilter: { min: 1, max: 99 },
+      source: 'handAndEquip',
+      minTotal: 1,
+      maxTotal: 99,
     },
   });
   return () => {};

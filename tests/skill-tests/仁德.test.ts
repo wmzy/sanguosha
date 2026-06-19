@@ -137,6 +137,35 @@ describe('仁德', () => {
     expect(harness.state.players[2].hand).toContain('c2');
   });
 
+  // ─── distribute UI 提交路径(params.allocation)────────────
+
+  it('use:通过 allocation 提交(distribute UI 路径)→ 等同 targets 分配格式', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const c2 = makeCard('c2', '桃', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], health: 3, maxHealth: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: [] }),
+      ],
+      cardMap: { c1, c2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // distribute allocate UI 提交的格式:allocation=[{target,cardIds}]
+    await P1.triggerAction('仁德', 'use', {
+      allocation: [{ target: 1, cardIds: ['c1', 'c2'] }],
+    });
+
+    // 2 张 → 回 1 血
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].hand).toEqual([]);
+    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['c1', 'c2']));
+  });
+
   // ─── 限一次 ─────────────────────────────
 
   it('限一次:第二次发动 → 拒绝(usedThisTurn 标记)', async () => {

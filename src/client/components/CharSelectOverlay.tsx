@@ -44,6 +44,19 @@ interface CharSelectOverlayProps {
    *  通过 prop 注入而非直接 import,便于解耦与单元测试。
    *  找不到时回退 faction='群'、maxHealth=4。 */
   getCharacterMeta: (name: string) => CharacterMeta | undefined;
+  /** ── debug 模式视角切换(可选) ── */
+  /** 当前视角下标(可能与 viewer 不同,debug 模式可切换) */
+  perspectiveIdx?: number;
+  /** 总玩家数 */
+  playerCount?: number;
+  /** 切换到下一个视角 */
+  onSwitchPerspective?: () => void;
+  /** 跳到当前回合玩家视角 */
+  onGoToCurrentPlayer?: () => void;
+  /** 当前回合玩家名(显示在按钮上) */
+  currentPlayerName?: string;
+  /** 视角玩家名 */
+  perspectiveName?: string;
 }
 
 /**
@@ -62,6 +75,12 @@ export function CharSelectOverlay({
   totalMs,
   onSelect,
   getCharacterMeta,
+  perspectiveIdx,
+  playerCount,
+  onSwitchPerspective,
+  onGoToCurrentPlayer,
+  currentPlayerName,
+  perspectiveName,
 }: CharSelectOverlayProps) {
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
   // pending/target 变化时清空选中态
@@ -82,6 +101,51 @@ export function CharSelectOverlay({
         background: 'rgba(0, 0, 0, 0.9)',
       }}
     >
+      {/* ── debug 视角切换栏 ── */}
+      {onSwitchPerspective && playerCount !== undefined && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 16,
+            display: 'flex',
+            gap: 8,
+            zIndex: 10000,
+          }}
+        >
+          <button
+            onClick={onSwitchPerspective}
+            style={{
+              padding: '6px 14px',
+              fontSize: 13,
+              fontWeight: 'bold',
+              color: '#fff',
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+          >
+            视角: {perspectiveName ?? `P${perspectiveIdx}`}
+          </button>
+          {onGoToCurrentPlayer && currentPlayerName && (
+            <button
+              onClick={onGoToCurrentPlayer}
+              style={{
+                padding: '6px 14px',
+                fontSize: 13,
+                color: '#fff',
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              查看当前玩家
+            </button>
+          )}
+        </div>
+      )}
       {/* 标题:主公选将 / P<n> 选将中 */}
       <div
         style={{
@@ -146,7 +210,7 @@ export function CharSelectOverlay({
           }}
         >
           <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2 }}>你的座次</div>
-          <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{viewer}</div>
+          <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{viewer + 1}</div>
         </div>
       </div>
 

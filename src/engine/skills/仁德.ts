@@ -24,15 +24,19 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       const selfAlive = self?.alive === true;
       // 每回合限一次
       const notUsed = !self?.vars['仁德/usedThisTurn'];
-      // 仁德有两种调用格式:
-      // 1. 分配格式: params.targets = [{target, cardIds}](多牌多目标)
-      // 2. 简单格式: params.cardId + params.targets=[idx](单牌单目标,前端 handlePlayCard)
+      // 仁德有三种调用格式:
+      // 1. 分配格式(distribute UI 提交): params.allocation = [{target, cardIds}](多牌多目标)
+      // 2. 分配格式(旧): params.targets = [{target, cardIds}]
+      // 3. 简单格式(前端 handlePlayCard): params.cardId + params.targets=[idx](单牌单目标)
+      const allocParam = params.allocation as Array<{ target: number; cardIds: string[] }> | undefined;
       const allocTargets = params.targets as Array<{ target: number; cardIds: string[] }> | undefined;
       const simpleCardId = params.cardId as string | undefined;
       const simpleTargets = params.targets as number[] | undefined;
       // 统一为分配格式
       let normalized: Array<{ target: number; cardIds: string[] }>;
-      if (Array.isArray(allocTargets) && allocTargets.length > 0 && Array.isArray(allocTargets[0].cardIds)) {
+      if (Array.isArray(allocParam) && allocParam.length > 0 && Array.isArray(allocParam[0].cardIds)) {
+        normalized = allocParam;
+      } else if (Array.isArray(allocTargets) && allocTargets.length > 0 && Array.isArray(allocTargets[0].cardIds)) {
         normalized = allocTargets;
       } else if (simpleCardId && Array.isArray(simpleTargets) && simpleTargets.length > 0) {
         normalized = [{ target: simpleTargets[0], cardIds: [simpleCardId] }];
@@ -62,10 +66,13 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       pushFrame(state, '仁德', from, { ...params });
-      // 规范化分配格式
+      // 规范化分配格式(兼容 allocation / targets 分配数组 / 简单格式)
+      const allocParam = params.allocation as Array<{ target: number; cardIds: string[] }> | undefined;
       const rawTargets = params.targets as Array<{ target: number; cardIds: string[] }> | number[] | undefined;
       let targets: Array<{ target: number; cardIds: string[] }>;
-      if (Array.isArray(rawTargets) && rawTargets.length > 0 && Array.isArray((rawTargets[0] as { cardIds?: unknown }).cardIds)) {
+      if (Array.isArray(allocParam) && allocParam.length > 0 && Array.isArray((allocParam[0] as { cardIds?: unknown }).cardIds)) {
+        targets = allocParam;
+      } else if (Array.isArray(rawTargets) && rawTargets.length > 0 && Array.isArray((rawTargets[0] as { cardIds?: unknown }).cardIds)) {
         targets = rawTargets as Array<{ target: number; cardIds: string[] }>;
       } else {
         targets = [{ target: (rawTargets as number[])[0], cardIds: [params.cardId as string] }];
@@ -92,10 +99,15 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
     label: '仁德',
     style: 'primary',
     prompt: {
-      type: 'useCardAndTarget',
+      type: 'distribute',
+      mode: 'allocate',
       title: '仁德：选择要送出的手牌和目标角色',
-      cardFilter: { min: 1, max: 99 },
-      targetFilter: { min: 1, max: 1 },
+      source: 'hand',
+      minPerTarget: 1,
+      maxPerTarget: 99,
+      minTotal: 1,
+      maxTotal: 99,
+      allowSelf: false,
     },
   });
   return () => {};

@@ -6,7 +6,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
-import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt } from '../../engine/types';
+import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt, DistributePrompt } from '../../engine/types';
 import { getActionsForPlayer, registerSkillActions, clearRegistry, findActionAcrossOwners, type SkillActionDef } from '../skillActionRegistry';
 import { seatDistance, effectiveDist, canAttack } from '../utils/distance';
 import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
@@ -75,6 +75,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     cardFilter: (c: Card) => boolean;
     wrapperName: string;
   } | null>(null);
+  /** 分配模式:点仁德/制衡等 distribute 主动技后进入此模式,弹出 DistributeUI 选牌/分配 */
+  const [distributeMode, setDistributeMode] = useState<{
+    skillId: string;
+    actionType: string;
+    prompt: DistributePrompt;
+  } | null>(null);
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
   // 选将遮罩:读 view.pending.atom.type === '选将询问'
   // 候选人从 view.pending.atom.candidates 获取(引擎生成)
@@ -91,19 +97,45 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   // 自动视角切换开关(默认开,多 agent 协作时可关)
   const [autoSwitch, setAutoSwitch] = useState(true);
+  // 选将期间用户手动切换过视角后,停止自动跟随选将 target
+  const charSelectManualSwitchRef = useRef(false);
+  const prevCharSelectTargetRef = useRef(-1);
+  const pendingRef = useRef(view.pending);
+  useEffect(() => { pendingRef.current = view.pending; }, [view.pending]);
+  useEffect(() => {
+    if (!view.pending) {
+      charSelectManualSwitchRef.current = false;
+      prevCharSelectTargetRef.current = -1;
+    }
+  }, [view.pending]);
   // 广播型 pending(如无懈可击)"不回应"后本地跳过标记,避免重复显示 prompt
   const [skippedBroadcast, setSkippedBroadcast] = useState<Set<string>>(new Set());
 
   // 有待回应请求时,自动切换视角到被问询玩家;无 pending 时回到当前回合玩家
+  // 选将期间:自动跟随选将 target,但用户手动切换后停止跟随;
+  //  charSelectTarget 变化(下一个玩家选将)时重置,继续跟随新 target。
   useEffect(() => {
     if (!autoSwitch) return;
+    const isCharSelect = view.pending?.atom?.type === '选将询问';
+    if (isCharSelect) {
+      const t = view.pending!.target;
+      // target 变化时重置手动切换标记(新一轮选将)
+      if (t !== prevCharSelectTargetRef.current) {
+        prevCharSelectTargetRef.current = t;
+        charSelectManualSwitchRef.current = false;
+      }
+      if (!charSelectManualSwitchRef.current && t >= 0 && t < view.players.length) {
+        setPerspectiveIdx(t);
+      }
+      return;
+    }
     if (view.pending) {
       const targetIdx = view.pending.target;
       if (targetIdx >= 0 && targetIdx < view.players.length) setPerspectiveIdx(targetIdx);
     } else {
       setPerspectiveIdx(view.currentPlayerIndex);
     }
-  }, [view.pending?.target, view.currentPlayerIndex, autoSwitch]);
+  }, [view.pending?.target, view.currentPlayerIndex, autoSwitch, view.pending?.atom?.type]);
   // 初次加载:默认看自己的座次
   useEffect(() => { setPerspectiveIdx(view.viewer); }, [view.viewer]);
 
@@ -175,6 +207,9 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setSelectedCardId(null);
     setSelectedTarget(null);
     setTransformMode(null);
+    setDistributeMode(null);
+    // 选将期间手动切换后,停止自动跟随
+    if (pendingRef.current?.atom?.type === '选将询问') charSelectManualSwitchRef.current = true;
   }, [perspectiveIdx, view.players.length]);
 
   const goToCurrentPlayer = useCallback(() => {
@@ -182,6 +217,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setSelectedCardId(null);
     setSelectedTarget(null);
     setTransformMode(null);
+    setDistributeMode(null);
   }, [view.currentPlayerIndex]);
 
   // 发送 action
@@ -197,6 +233,15 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       setSelectedKillTarget(null);
     },
     [onAction, perspectiveIdx],
+  );
+
+  /** distribute 主动技提交后退出分配模式 */
+  const sendDistribute = useCallback(
+    (skillId: string, actionType: string, params: Record<string, Json>) => {
+      send(skillId, actionType, params);
+      setDistributeMode(null);
+    },
+    [send],
   );
 
   // ─── 距离和攻击范围计算(纯函数，委托 src/client/utils/distance) ───
@@ -400,7 +445,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         params.target = nameToIndex(selectedTarget);
         break;
       case 'distribute':
-        // 分配型:暂不支持
+        // 分配型(仁德/制衡):进入 distributeMode,由弹窗 UI 选牌/分配后提交
+        setDistributeMode({ skillId, actionType, prompt });
+        setSelectedCardId(null);
+        setSelectedTarget(null);
         return;
       default:
         break;
@@ -663,10 +711,10 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         <CharSelectOverlay
           candidates={charCandidates}
           charSelectTarget={charSelectTarget}
-          isSelfSelecting={charSelectTarget === view.viewer}
+          isSelfSelecting={charSelectTarget === perspectiveIdx}
           isLord={view.players[charSelectTarget]?.identity === '主公'}
-          viewer={view.viewer}
-          viewerIdentity={view.players[view.viewer]?.identity}
+          viewer={perspectiveIdx}
+          viewerIdentity={view.players[perspectiveIdx]?.identity}
           deadline={pending?.deadline ?? null}
           totalMs={pending?.totalMs ?? 30000}
           getCharacterMeta={getCharacterMeta}
@@ -679,6 +727,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               params: { character: characterName },
             });
           }}
+          perspectiveIdx={perspectiveIdx}
+          playerCount={view.players.length}
+          onSwitchPerspective={switchPerspective}
+          onGoToCurrentPlayer={goToCurrentPlayer}
+          currentPlayerName={currentPlayerName}
+          perspectiveName={perspectiveName}
         />
       )}
 
@@ -729,8 +783,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                 const info = pendingRespondInfo();
                 const skillId = info?.skillId ?? '系统规则';
                 const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
-                const maxPerTarget = (pending.prompt as { maxPerTarget?: number }).maxPerTarget ?? 2;
-                return <DistributeUI skillId={skillId} cardIds={cardIds} players={view.players} viewer={perspectiveIdx} maxPerTarget={maxPerTarget} onSend={send} cardMap={view.cardMap} />;
+                return <DistributeUI skillId={skillId} actionType="respond" prompt={pending.prompt} cardIds={cardIds} players={view.players} viewer={perspectiveIdx} onSend={send} cardMap={view.cardMap} />;
               }
               // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
               if (pending.prompt.type === 'confirm') {
@@ -783,6 +836,38 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           </div>
         </div>
       )}
+      {/* distribute 主动技弹窗(仁德/制衡):点击技能按钮后进入此模式 */}
+      {distributeMode && canOperate && isMyTurn && view.phase === '出牌' && (() => {
+        const { skillId, actionType, prompt } = distributeMode;
+        // 按 source 解析可选牌列表(手牌/装备都是 Card 对象,取 .id)
+        let cardIds: string[];
+        if (Array.isArray(prompt.cardIds) && prompt.cardIds.length > 0) {
+          cardIds = prompt.cardIds;
+        } else if (prompt.source === 'handAndEquip') {
+          const equipIds = Object.values(perspective?.equipment ?? {});
+          cardIds = [...perspectiveHand.map(c => c.id), ...equipIds];
+        } else {
+          cardIds = perspectiveHand.map(c => c.id);
+        }
+        return (
+          <div className={styles.promptBoxAwaiting}>
+            <div className={styles.promptTitle}>🤝 {prompt.title}</div>
+            <DistributeUI
+              skillId={skillId}
+              actionType={actionType}
+              prompt={prompt}
+              cardIds={cardIds}
+              players={view.players}
+              viewer={perspectiveIdx}
+              onSend={sendDistribute}
+              cardMap={view.cardMap}
+            />
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
+              <button className={styles.cancelBtn} onClick={() => setDistributeMode(null)}>取消</button>
+            </div>
+          </div>
+        );
+      })()}
       {isPerspectiveTurn && view.phase === '弃牌' && !isPerspectiveAwaiting && !isDiscardPhase && (
         <div className={styles.promptBox}>
           <div className={styles.promptTitle}>🗑️ {perspectiveName} — 弃牌阶段</div>
@@ -919,12 +1004,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             const visibleSkills = p.skills.filter(s => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILL_NAMES.has(s));
             // 装备技能集合：动态装备的技能可主动点击
             const equipSkillActions = skillActions.filter(a => EQUIPMENT_SKILL_NAMES.has(a.skillId));
-            // 主动技（confirm/distribute/choosePlayer/转化类）渲染为可点按钮
+            // 主动技（confirm/choosePlayer/转化类/distribute 主动技）渲染为可点按钮
             const triggerableActions = skillActions.filter(a =>
               a.prompt.type === 'confirm' ||
-              a.prompt.type === 'distribute' ||
               a.prompt.type === 'choosePlayer' ||
-              (a.prompt.type === 'useCardAndTarget' && a.transform)
+              (a.prompt.type === 'useCardAndTarget' && a.transform) ||
+              a.prompt.type === 'distribute'
             );
             const showSkillButtons = isMyTurn && canOperate && view.phase === '出牌';
             return (
