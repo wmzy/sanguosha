@@ -12,7 +12,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
     return null;
   },
   apply(state, atom) {
-    if (atom.from) {
+    if (atom.from !== undefined) {
       const fromP = state.players[atom.from];
       fromP.hand = fromP.hand.filter(id => id !== atom.cardId);
       const equipment: Record<string, string> = {};
