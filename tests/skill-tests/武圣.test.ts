@@ -222,4 +222,45 @@ describe('武圣', () => {
     expect(harness.state.cardMap['c1#武圣']).toBeUndefined();
     expect(harness.state.players[0].hand).toEqual(['c1']);
   });
+
+  // ─── defineAction 声明验证 ─────────────────────────
+
+  it('availableActions:武圣 声明 transform action,prompt 卡过滤是红牌', async () => {
+    const redHeart = makeCard('c1', '桃', '♥', 'A');
+    const redDiamond = makeCard('c2', '桃', '♦', '2');
+    const blackSpade = makeCard('c3', '杀', '♠', 'A');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2', 'c3'], skills: ['武圣', '杀'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1: redHeart, c2: redDiamond, c3: blackSpade },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 武圣 的 transform action 应在 availableActions 里
+    const actions = P1.availableActions();
+    const wusheng = actions.find(a => a.skillId === '武圣' && a.actionType === 'transform');
+    expect(wusheng).toBeDefined();
+    expect(wusheng!.label).toBe('武圣');
+    // 武圣 的 transform prompt 是 useCardAndTarget(红色 + 选目标)
+    expect(wusheng!.prompt.type).toBe('useCardAndTarget');
+
+    // 用 transform prompt 的 cardFilter 过滤手牌:只应返回红牌 c1,c2
+    const cardFilter = wusheng!.prompt.type === 'useCardAndTarget'
+      ? wusheng!.prompt.cardFilter.filter
+      : null;
+    expect(cardFilter).toBeDefined();
+    const allowed: string[] = [];
+    for (const cardId of harness.state.players[0].hand) {
+      const card = harness.state.cardMap[cardId];
+      if (cardFilter!(card)) allowed.push(cardId);
+    }
+    expect(allowed).toEqual(expect.arrayContaining(['c1', 'c2']));
+    expect(allowed).not.toContain('c3'); // 黑桃排除
+  });
 });

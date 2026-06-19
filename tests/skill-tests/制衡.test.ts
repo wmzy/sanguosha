@@ -1,0 +1,304 @@
+// tests/skill-tests/制衡.test.ts
+// 制衡(孙权·技能)测试:
+//   use:出牌阶段限一次,弃任意数量的手牌或装备,摸等量的牌。
+//
+// 验证:
+//   1. 正面:弃 1 张手牌 → 摸 1 张,手牌数先 -1 再 +1
+//   2. 正面:弃 N 张手牌 → 摸 N 张
+//   3. 正面:装备也能制衡(武器/防具→手牌数不变但装备卸下)
+//   4. 正面:defineAction use action 声明可用(availableActions())
+//   5. 限一次:第二次发动 → 拒绝
+//   6. 负面:非自己回合 → 拒绝
+//   7. 负面:不存在的 cardId → 拒绝
+//   8. 负面:cardIds=空数组 → 拒绝
+//   9. 负面:不在手牌也不在装备区的牌 → 拒绝
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SkillTestHarness } from '../engine-harness';
+import '../../src/engine/atoms';
+import '../../src/engine/skills';
+import { createGameState } from '../../src/engine/types';
+import type { Card, GameState } from '../../src/engine/types';
+
+function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+  return { id, name, suit, rank, type };
+}
+
+function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物', rank = 'A', range?: number): Card {
+  return { id, name, suit, rank, type: '装备牌', subtype, range };
+}
+
+function makePlayer(opts: {
+  index: number;
+  name: string;
+  hand?: string[];
+  skills?: string[];
+  health?: number;
+  maxHealth?: number;
+  equipment?: Record<string, string>;
+}) {
+  return {
+    index: opts.index,
+    name: opts.name,
+    character: '孙权',
+    health: opts.health ?? 4,
+    maxHealth: opts.maxHealth ?? 4,
+    alive: true,
+    hand: opts.hand ?? [],
+    equipment: opts.equipment ?? {},
+    skills: opts.skills ?? ['制衡'],
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    judgeZone: [],
+  };
+}
+
+describe('制衡', () => {
+  let harness: SkillTestHarness;
+
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
+
+  // ─── 正面:弃手牌 → 摸等量 ───────────────────────────
+
+  it('use:弃 1 张手牌 → 摸 1 张(净手牌数不变)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const deck1 = makeCard('d1', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1, d1: deck1 },
+      zones: { deck: ['d1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('制衡', 'use', { cardIds: ['c1'] });
+
+    // P1 弃了 c1,摸了 d1
+    expect(harness.state.players[0].hand).toEqual(['d1']);
+    expect(harness.state.zones.discardPile).toContain('c1');
+    expect(harness.state.zones.deck).toEqual([]);
+  });
+
+  it('use:弃 3 张手牌 → 摸 3 张(净手牌数 +2)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const c2 = makeCard('c2', '闪', '♥', '2');
+    const c3 = makeCard('c3', '桃', '♦', '5');
+    const d1 = makeCard('d1', '杀', '♠', '3');
+    const d2 = makeCard('d2', '闪', '♥', '7');
+    const d3 = makeCard('d3', '桃', '♦', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2', 'c3'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1, c2, c3, d1, d2, d3 },
+      zones: { deck: ['d1', 'd2', 'd3'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('制衡', 'use', { cardIds: ['c1', 'c2', 'c3'] });
+
+    // 弃 3 摸 3:手牌从 [c1,c2,c3] → [d3,d2,d1](摸牌倒序入栈)
+    expect(harness.state.players[0].hand).toHaveLength(3);
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['d1', 'd2', 'd3']));
+    expect(harness.state.players[0].hand).not.toContain('c1');
+    expect(harness.state.players[0].hand).not.toContain('c2');
+    expect(harness.state.players[0].hand).not.toContain('c3');
+    // 弃 3 张
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c1', 'c2', 'c3']));
+  });
+
+  // ─── 正面:装备也能制衡 ─────────────────────────────
+
+  it('use:装备(武器/防具)也能制衡 → 卸下装备 + 摸等量', async () => {
+    const weapon = makeEquip('w1', '诸葛连弩', '♣', '武器', 'A', 1);
+    const armor = makeEquip('a1', '八卦阵', '♣', '防具', 'A');
+    const d1 = makeCard('d1', '杀', '♠', '3');
+    const d2 = makeCard('d2', '闪', '♥', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], equipment: { '武器': 'w1', '防具': 'a1' } }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { w1: weapon, a1: armor, d1, d2 },
+      zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('制衡', 'use', { cardIds: ['w1', 'a1'] });
+
+    // 装备栏清空(装备卸下→弃牌堆)
+    expect(harness.state.players[0].equipment['武器']).toBeUndefined();
+    expect(harness.state.players[0].equipment['防具']).toBeUndefined();
+    // 弃牌堆有 2 张装备
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['w1', 'a1']));
+    // 摸 2 张
+    expect(harness.state.players[0].hand).toHaveLength(2);
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['d1', 'd2']));
+  });
+
+  it('use:手牌 + 装备混合制衡', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const weapon = makeEquip('w1', '诸葛连弩', '♣', '武器', 'A', 1);
+    const d1 = makeCard('d1', '闪', '♥', '7');
+    const d2 = makeCard('d2', '杀', '♠', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1'], equipment: { '武器': 'w1' } }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1, w1: weapon, d1, d2 },
+      zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('制衡', 'use', { cardIds: ['c1', 'w1'] });
+
+    // 装备栏清空(装备卸下→弃牌堆)
+    expect(harness.state.players[0].equipment['武器']).toBeUndefined();
+    // 弃牌堆有 c1 + w1
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c1', 'w1']));
+    // 摸 2 张(deck 必须有 ≥2)
+    expect(harness.state.players[0].hand).toHaveLength(2);
+  });
+
+  // ─── defineAction 声明验证 ─────────────────────────
+
+  it('availableActions:列出 use action,prompt 是 useCard(可多选)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    const actions = P1.availableActions();
+    const zhiheng = actions.find(a => a.skillId === '制衡' && a.actionType === 'use');
+    expect(zhiheng).toBeDefined();
+    expect(zhiheng!.label).toBe('制衡');
+    expect(zhiheng!.prompt.type).toBe('useCard');
+    if (zhiheng!.prompt.type === 'useCard') {
+      expect(zhiheng!.prompt.cardFilter.min).toBe(1);
+      expect(zhiheng!.prompt.cardFilter.max).toBe(99);
+    }
+  });
+
+  // ─── 限一次 ─────────────────────────────
+
+  it('限一次:第二次发动 → 拒绝(usedThisTurn 标记)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const c2 = makeCard('c2', '闪', '♥', '2');
+    const d1 = makeCard('d1', '桃', '♦', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1, c2, d1 },
+      zones: { deck: ['d1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 第一次:成功
+    await P1.triggerAction('制衡', 'use', { cardIds: ['c1'] });
+    // P1 起始 [c1, c2],制衡弃 c1 摸 d1 → 手牌变 [c2, d1]
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['c2', 'd1']));
+    expect(harness.state.players[0].hand).not.toContain('c1');
+
+    // 第二次:拒绝(限一次)
+    await P1.expectRejected({
+      skillId: '制衡', actionType: 'use', params: { cardIds: ['c2'] },
+    });
+  });
+
+  // ─── 负面 ─────────────────────────────
+
+  it('负面:cardIds=空数组 → 拒绝', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.expectRejected({
+      skillId: '制衡', actionType: 'use', params: { cardIds: [] },
+    });
+  });
+
+  it('负面:不在手牌也不在装备区的牌 → 拒绝', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [] }), // c1 不在 P1 手牌
+        makePlayer({ index: 1, name: 'P2', hand: ['c1'] }), // c1 在 P2 手牌
+      ],
+      cardMap: { c1 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // P1 想制衡 P2 的牌 → 拒绝
+    await P1.expectRejected({
+      skillId: '制衡', actionType: 'use', params: { cardIds: ['c1'] },
+    });
+  });
+
+  it('负面:不存在的 cardId → 拒绝', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.expectRejected({
+      skillId: '制衡', actionType: 'use', params: { cardIds: ['nonexistent'] },
+    });
+  });
+});

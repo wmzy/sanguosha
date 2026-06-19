@@ -285,9 +285,12 @@ export class PlayerSession {
    */
   respondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
     const slots = this.harness.state.pendingSlots;
-    const slot = slots.get(this.playerIndex)
-      ?? (slots.size === 1 ? [...slots.values()][0] : undefined)
-      ?? [...slots.values()].find(s => { const t = (s.atom as { target?: unknown }).target; return typeof t === 'number' && t < 0; });
+    const mySlot = slots.get(this.playerIndex);
+    const broadcastSlot = [...slots.values()].find(s => {
+      const t = (s.atom as { target?: unknown }).target;
+      return typeof t === 'number' && t < 0;
+    });
+    const slot = mySlot ?? broadcastSlot ?? (slots.size === 1 ? [...slots.values()][0] : undefined);
     if (!slot) return null;
     const atom = slot.atom as Record<string, unknown>;
     const atomType = (atom['type'] as string) ?? '';
