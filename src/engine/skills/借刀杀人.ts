@@ -19,18 +19,33 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'number') return 'target required';
-      if (typeof params.killTarget !== 'number') return 'killTarget required';
+      // 兼容两种目标格式:
+      //   1) params.target + params.killTarget(显式两字段,旧契约)
+      //   2) params.targets = [A, B](复数数组,与其他多目标牌对齐)
+      let targetIdx: number | undefined;
+      let killTargetIdx: number | undefined;
+      if (Array.isArray(params.targets) && (params.targets as unknown[]).length >= 2
+        && typeof (params.targets as unknown[])[0] === 'number'
+        && typeof (params.targets as unknown[])[1] === 'number') {
+        const arr = params.targets as number[];
+        targetIdx = arr[0];
+        killTargetIdx = arr[1];
+      } else {
+        if (typeof params.target === 'number') targetIdx = params.target;
+        if (typeof params.killTarget === 'number') killTargetIdx = params.killTarget;
+      }
+      if (typeof targetIdx !== 'number') return 'target required';
+      if (typeof killTargetIdx !== 'number') return 'killTarget required';
       const cardInHand = !!self?.hand.includes(params.cardId);
       const cardNameOk = state.cardMap[params.cardId]?.name === '借刀杀人';
-      const target = state.players[params.target];
+      const target = state.players[targetIdx];
       const targetAlive = target?.alive === true;
       const targetHasWeapon = !!target?.equipment?.['武器'];
-      const notSelf = params.target !== ownerId;
-      const killTargetPlayer = state.players[params.killTarget];
+      const notSelf = targetIdx !== ownerId;
+      const killTargetPlayer = state.players[killTargetIdx];
       const killTargetAlive = killTargetPlayer?.alive === true;
-      const killTargetNotOwner = params.killTarget !== ownerId;
-      const killTargetNotTarget = params.killTarget !== params.target;
+      const killTargetNotOwner = killTargetIdx !== ownerId;
+      const killTargetNotTarget = killTargetIdx !== targetIdx;
       const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk
         && targetAlive && targetHasWeapon && notSelf
         && killTargetAlive && killTargetNotOwner && killTargetNotTarget;
@@ -39,8 +54,19 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      const target = params.target as number;
-      const killTarget = params.killTarget as number;
+      // 兼容两种目标格式:与 validate 对齐
+      let target: number;
+      let killTarget: number;
+      if (Array.isArray(params.targets) && (params.targets as unknown[]).length >= 2
+        && typeof (params.targets as unknown[])[0] === 'number'
+        && typeof (params.targets as unknown[])[1] === 'number') {
+        const arr = params.targets as number[];
+        target = arr[0];
+        killTarget = arr[1];
+      } else {
+        target = params.target as number;
+        killTarget = params.killTarget as number;
+      }
       pushFrame(state, '借刀杀人', from, { ...params });
 
       // 锦囊进处理区

@@ -77,6 +77,27 @@ export function getActionsForPlayer(playerIndex: number): SkillActionDef[] {
   return result;
 }
 
+/**
+ * 跨所有 ownerId 查找指定 skillId + actionType 的 action 定义。
+ * 用于视角切换的瞬态场景:target 玩家 action 已被清/未注册到当前 perspective 时
+ * 仍能在 registry 里找到定义。
+ */
+export function findActionAcrossOwners(skillId: string, actionType: string): SkillActionDef | undefined {
+  for (const def of registry.values()) {
+    if (def.skillId === skillId && def.actionType === actionType) {
+      return def;
+    }
+  }
+  return undefined;
+}
+
+/** 获取当前注册表里所有 ownerId(用于调试/扩展) */
+export function getRegisteredOwnerIds(): number[] {
+  const set = new Set<number>();
+  for (const def of registry.values()) set.add(def.ownerId);
+  return [...set];
+}
+
 /** 清空注册表（用于测试隔离或重连） */
 export function clearRegistry(): void {
   registry.clear();

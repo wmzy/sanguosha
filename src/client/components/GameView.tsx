@@ -6,7 +6,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { css, cx } from '@linaria/core';
 import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt } from '../../engine/types';
-import { getActionsForPlayer, registerSkillActions, clearRegistry, type SkillActionDef } from '../skillActionRegistry';
+import { getActionsForPlayer, registerSkillActions, clearRegistry, findActionAcrossOwners, type SkillActionDef } from '../skillActionRegistry';
 
 
 // ─── ActionMsg: 发给 controller(不含 baseSeq) ───
@@ -272,6 +272,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const [perspectiveIdx, setPerspectiveIdx] = useState(view.viewer);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
+  const [selectedKillTarget, setSelectedKillTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
   /** 转化模式:点武圣等转化技能后进入此模式,匹配卡牌显示为转化后的牌 */
   const [transformMode, setTransformMode] = useState<{
@@ -355,6 +356,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   const discardMax = isDiscardPhase ? ((pending.atom as { prompt: { cardFilter?: { max?: number } } }).prompt.cardFilter?.max ?? discardMin) : 0;
   // 弃牌窗口出现/切换时清空已选
   useEffect(() => { setSelectedForDiscard(new Set()); }, [pending]);
+  // 切牌/重选牌时,同步重置借刀杀人的第二目标
+  useEffect(() => { setSelectedKillTarget(null); }, [selectedCardId]);
   // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
   const canOperate = true; // debug 模式永远允许操作
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
@@ -392,6 +395,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       onAction({ skillId, actionType, ownerId, params, preceding });
       setSelectedCardId(null);
       setSelectedTarget(null);
+      setSelectedKillTarget(null);
     },
     [onAction, perspectiveIdx],
   );
@@ -466,6 +470,9 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 需要选目标的牌
   const TARGET_REQUIRED_CARDS = new Set(['杀', '过河拆桥', '顺手牵羊', '借刀杀人', '决斗', '乐不思蜀']);
 
+  /** 需要选两个目标(A + B)的牌 */
+  const TWO_TARGET_CARDS = new Set(['借刀杀人']);
+
   // 当前是否需要选目标(出牌或使用技能时)
   // 转化模式按 wrapperName(如杀)决定;普通出牌按原牌名
   const selectedNeedsTarget = (transformMode && selectedCardId)
@@ -490,16 +497,26 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     if (RESPOND_ONLY.has(card.name)) return; // 不能主动出
     const selfName = view.players[view.viewer].name;
     const needsTarget = TARGET_REQUIRED_CARDS.has(card.name);
+    const needsTwoTargets = TWO_TARGET_CARDS.has(card.name);
     if (needsTarget && !selectedTarget) return; // 需要目标但没选
+    if (needsTwoTargets && (!selectedTarget || !selectedKillTarget)) return; // 需两个目标
     const targetName = selectedTarget ?? (SELF_TARGET_CARDS.has(card.name) ? selfName : undefined);
     const params: Record<string, Json> = { cardId: card.id };
     if (targetName) {
       const idx = nameToIndex(targetName);
       if (idx >= 0) {
-        // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
-        if (DELAYED_TRICKS.has(card.name)) {
+        // 借刀杀人需要 A + B 两个目标,显式字段更清晰
+        if (needsTwoTargets) {
+          params.target = idx;
+          if (selectedKillTarget) {
+            const kIdx = nameToIndex(selectedKillTarget);
+            if (kIdx >= 0) params.killTarget = kIdx;
+          }
+        } else if (DELAYED_TRICKS.has(card.name)) {
+          // 延时锦囊 validate 用单数 target
           params.target = idx;
         } else {
+          // 其他牌用 targets 数组(与杀、过河拆桥等对齐)
           params.targets = [idx];
         }
       }
@@ -544,6 +561,36 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     const idx = view.players.findIndex(p => p.name === name);
     if (idx >= 0 && !isTargetable(idx)) return; // 距离外,禁止选中
     setSelectedTarget(selectedTarget === name ? null : name);
+  }
+
+  // 借刀杀人:两阶段目标选择(A = 持武器人,B = 被 A 杀的人)
+  // 点 A:设 selectedTarget;点 B:设 selectedKillTarget;点 A 再次:清除 B
+  function handleTwoTargetClick(name: string, which: 'A' | 'B') {
+    if (which === 'A') {
+      if (selectedTarget === name) {
+        // 取消选 A,同时清 B
+        setSelectedTarget(null);
+        setSelectedKillTarget(null);
+      } else {
+        // 切换 A,清 B
+        setSelectedTarget(name);
+        setSelectedKillTarget(null);
+      }
+    } else {
+      // 选 B(允许再次点 B 取消)
+      setSelectedKillTarget(selectedKillTarget === name ? null : name);
+    }
+  }
+
+  /** from 是否能攻击 to(纯函数,用于借刀杀人 B 选择范围限制) */
+  function isTargetableByPlayer(fromIdx: number, toIdx: number): boolean {
+    const fromP = view.players[fromIdx];
+    let range = 1;
+    if (fromP?.equipment?.['武器']) {
+      const weapon = view.cardMap[fromP.equipment['武器']];
+      if (weapon) range = WEAPON_RANGE[weapon.name] ?? 1;
+    }
+    return effectiveDist(fromIdx, toIdx) <= range;
   }
 
   // ─── 武将技能使用(基于 ActionPrompt 类型驱动) ───
@@ -640,10 +687,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setSelectedTarget(null);
   }
 
-  // 根据当前 pending 从技能 defineAction 声明(skillActionRegistry)推导:
+  // 根据当前 pending 推导 respond 信息:
   // - skillId: 从 atom type/requestType 通用推导(询问X→X, 请求回应 requestType→skillId)
-  // - cardFilter: 从 registry 里该 skillId 的 respond action 声明取(原始函数引用,不丢)
-  // 不硬编码具体技能名——完全由技能自己的 defineAction 驱动。
+  // - cardFilter: 优先从 skillActionRegistry(本玩家或所有玩家)取;取不到则从 atom 类型本地重建
+  //
+  // 为什么不完全依赖 registry:
+  //   registry 是 async 加载(dynamic import 技能模块);视角切换会触发 clearRegistry + 重注册,
+  //   重注册期间(异步窗口)registry 是空的;React state 里还保留旧的列表,但旧列表可能因为
+  //   perspectiveIdx 切换而不再包含目标玩家;此外 WS 走 JSON.stringify,后端 prompt 的
+  //   cardFilter.filter 函数会被丢弃——前端拿不到原始函数引用。
+  //   所以增加本地重建兜底:对当前所有 respond 提示(cardFilter 都是 c => c.name === '<cardName>')
+  //   都能稳定构造。
+
   /** 从 SkillActionDef 的 prompt 提取 cardFilter 函数(不走 JSON 序列化,函数引用保留) */
   function extractCardFilterFromAction(action: SkillActionDef): ((c: Card) => boolean) | undefined {
     const p = action.prompt;
@@ -651,6 +706,46 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       return p.cardFilter.filter;
     }
     return undefined;
+  }
+
+  /**
+   * 从 atom 类型本地构造 cardFilter 函数(不依赖 registry)。
+   * 当前所有 respond 提示的 filter 都是 `c => c.name === '<cardName>'`,
+   * 包括:询问X → c.name==='X';请求回应 R/Y → c.name===R;请求回应 R → c.name===R;__弃牌 → ()=>true。
+   */
+  function deriveCardFilterFromAtom(atomType: string, reqType: string): ((c: Card) => boolean) | undefined {
+    // 询问X (X∈{闪,杀,...}):X = atomType.slice(2)
+    if (atomType.startsWith('询问')) {
+      const cardName = atomType.slice(2);
+      if (!cardName) return undefined;
+      return (c) => c.name === cardName;
+    }
+    // 请求回应 / 并行回应:
+    //   - 'R/Y' → R 是 cardName(R 例如 杀/forceKill, 杀/respondKill)
+    //   - 'R'   → R 是 cardName(例如 无懈可击)
+    //   - '__弃牌' → filter=()=>true(由 min/max 决定,前端另走 isDiscardPhase 路径)
+    if (atomType === '请求回应' || atomType === '并行回应') {
+      if (!reqType) return undefined;
+      if (reqType === '__弃牌') return () => true;
+      const slashIdx = reqType.indexOf('/');
+      const cardName = slashIdx >= 0 ? reqType.slice(0, slashIdx) : reqType;
+      if (!cardName) return undefined;
+      return (c) => c.name === cardName;
+    }
+    return undefined;
+  }
+
+  /**
+   * 从 skillActionRegistry(已注册的所有玩家 actions)中查找某 skillId 的 respond action。
+   * 不限定 ownerId:当 perspective 切换期间,目标玩家的 action 可能已被清掉,
+   * 但 React state 里 skillActions 还保留旧列表——这种情况下需要放宽 ownerId 匹配。
+   */
+  function findRespondAction(skillId: string): SkillActionDef | undefined {
+    // 1. 优先当前 perspective 玩家(快路径,避免遍历整个 registry)
+    const own = skillActions.find(a => a.skillId === skillId && a.actionType === 'respond');
+    if (own) return own;
+    // 2. 退路:跨所有 ownerId 扫描(registry 是模块级单例,不依赖 React state 时序)
+    return findActionAcrossOwners(skillId, 'respond');
   }
 
   function pendingRespondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
@@ -671,11 +766,12 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     }
     if (!skillId) return null;
 
-    // 从 skillActionRegistry 取该 skillId 的 respond action 声明的 cardFilter(函数引用,不丢)
-    const action = skillActions.find(a => a.skillId === skillId && a.actionType === 'respond');
-    const cardFilter = action
-      ? extractCardFilterFromAction(action)
-      : undefined;
+    // 1. 优先:从 registry(当前 perspective + 所有玩家)取 cardFilter
+    const action = findRespondAction(skillId);
+    const registryFilter = action ? extractCardFilterFromAction(action) : undefined;
+    // 2. 兜底:从 atom 类型本地重建(不依赖 async 加载/registry 时序)
+    const localFilter = deriveCardFilterFromAtom(atomType, reqType);
+    const cardFilter = registryFilter ?? localFilter;
 
     return { skillId, cardFilter };
   }
@@ -1426,10 +1522,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             {canOperate && isMyTurn && view.phase === '出牌' && !transformMode && selectedCardId && (() => {
               const card = perspectiveHand.find(c => c.id === selectedCardId);
               const needsTarget = card ? TARGET_REQUIRED_CARDS.has(card.name) : false;
-              const canPlay = !needsTarget || !!selectedTarget;
+              const needsTwoTargets = card ? TWO_TARGET_CARDS.has(card.name) : false;
+              const canPlay = needsTwoTargets
+                ? (!!selectedTarget && !!selectedKillTarget)
+                : (!needsTarget || !!selectedTarget);
+              const targetLabel = needsTwoTargets
+                ? (selectedTarget && selectedKillTarget
+                  ? ` → A=${selectedTarget} B=${selectedKillTarget}`
+                  : ' (请选 A/B 两个目标)')
+                : (selectedTarget ? ` → ${selectedTarget}` : needsTarget ? ' (请选目标)' : '');
               return <button className={playBtn} onClick={handlePlayCard} disabled={!canPlay}
                 style={canPlay ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
-                出牌{selectedTarget ? ` → ${selectedTarget}` : needsTarget ? ' (请选目标)' : ''}
+                出牌{targetLabel}
               </button>;
             })()}
             {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
@@ -1448,28 +1552,91 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             }
             const card = perspectiveHand.find(c => c.id === selectedCardId);
             return card && TARGET_REQUIRED_CARDS.has(card.name);
-          })()) && (
-            <div className={targetSection}>
-              <div className={targetTitle}>选择目标:</div>
-              <div className={targetList}>
-                {view.players.map((p, i) => {
-                  if (!p.alive || i === perspectiveIdx) return null;
-                  const targetable = isTargetable(i);
-                  return (
-                    <button
-                      key={i}
-                      className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
-                      disabled={!targetable}
-                      onClick={() => transformMode ? handleTransformPlay(p.name) : handleTargetClick(p.name)}
-                    >
-                      {p.name} ({p.character}) ♥{p.health}
-                      {!targetable && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
-                    </button>
-                  );
-                })}
+          })()) && (() => {
+            const card = perspectiveHand.find(c => c.id === selectedCardId);
+            const cardName = card?.name ?? '';
+            // 借刀杀人: 两步目标(先 A:有武器的相邻玩家,再 B:被 A 杀的人)
+            // 简化为 A 可被任何存活非自己角色选, B 可被任何存活非自己且 ≠ A 选(距离 A≤1 规则)
+            // 这里仅前端限制;服务端 validate 会严格检查。
+            const isTwoTarget = TWO_TARGET_CARDS.has(cardName);
+            return (
+              <div className={targetSection}>
+                {isTwoTarget ? (
+                  <>
+                    <div className={targetTitle}>
+                      ① 选 A 角色(装备区有武器):
+                      {selectedTarget && <span style={{ color: '#f1c40f', marginLeft: 8 }}>{selectedTarget}</span>}
+                    </div>
+                    <div className={targetList}>
+                      {view.players.map((p, i) => {
+                        if (!p.alive || i === perspectiveIdx) return null;
+                        const targetable = true; // A 选择不卡距离
+                        return (
+                          <button
+                            key={i}
+                            className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
+                            disabled={!targetable}
+                            onClick={() => handleTwoTargetClick(p.name, 'A')}
+                          >
+                            {p.name} ({p.character}) ♥{p.health}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedTarget && (
+                      <>
+                        <div className={targetTitle} style={{ marginTop: 8 }}>
+                          ② 选 B 角色(A 对其出杀):
+                          {selectedKillTarget && <span style={{ color: '#f1c40f', marginLeft: 8 }}>{selectedKillTarget}</span>}
+                        </div>
+                        <div className={targetList}>
+                          {view.players.map((p, i) => {
+                            if (!p.alive || i === perspectiveIdx) return null;
+                            if (p.name === selectedTarget) return null; // 不能选 A 当 B
+                            const aIdx = view.players.findIndex(x => x.name === selectedTarget);
+                            // B 必须在 A 攻击范围内(在范围内 = 可被出杀)
+                            const inAARange = aIdx >= 0 ? isTargetableByPlayer(aIdx, i) : false;
+                            return (
+                              <button
+                                key={i}
+                                className={cx(targetBtn, selectedKillTarget === p.name && targetBtnActive, !inAARange && targetBtnDisabled)}
+                                disabled={!inAARange}
+                                onClick={() => handleTwoTargetClick(p.name, 'B')}
+                              >
+                                {p.name} ({p.character}) ♥{p.health}
+                                {!inAARange && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className={targetTitle}>选择目标:</div>
+                    <div className={targetList}>
+                      {view.players.map((p, i) => {
+                        if (!p.alive || i === perspectiveIdx) return null;
+                        const targetable = isTargetable(i);
+                        return (
+                          <button
+                            key={i}
+                            className={cx(targetBtn, selectedTarget === p.name && targetBtnActive, !targetable && targetBtnDisabled)}
+                            disabled={!targetable}
+                            onClick={() => transformMode ? handleTransformPlay(p.name) : handleTargetClick(p.name)}
+                          >
+                            {p.name} ({p.character}) ♥{p.health}
+                            {!targetable && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
           {/* 手牌区 */}
           <div className={handList} ref={handListRef}>
             {perspectiveHand.map((card, i) => {
