@@ -1,0 +1,338 @@
+// src/client/components/PlayerSeatView.tsx
+// 玩家座位视图(弧形座位上的每张武将卡) — 从 GameView.tsx 抽出
+import { css, cx } from '@linaria/core';
+import type { GameView } from '../../engine/types';
+import type { SkillActionDef } from '../skillActionRegistry';
+import { FACTION_BG, SUIT_COLOR } from './gameViewConstants';
+import { getCharacterMeta } from '../../engine/character-meta';
+import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
+
+const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
+const DEFAULT_EQUIPMENT_SKILL_NAMES: Set<string> = new Set([
+  '诸葛连弩', '青釭剑', '青龙偃月刀', '雌雄双股剑', '贯石斧',
+  '丈八蛇矛', '方天画戟', '麒麟弓', '寒冰剑',
+  '八卦阵', '仁王盾', '藤甲', '白银狮子',
+  '赤兔', '紫骍', '大宛', '的卢', '绝影', '爪黄飞电',
+]);
+
+export interface PlayerSeatProps {
+  player: GameView['players'][number];
+  index: number;
+  view: GameView;
+  isCurrentPlayer: boolean;
+  isPerspective: boolean;
+  needsTarget: boolean;
+  isTargetable: boolean;
+  selectedTarget: string | null;
+  onTargetClick: (name: string) => void;
+  onPerspectiveChange: (index: number) => void;
+  /** 该玩家是否刚受到伤害 */
+  isDamaged?: boolean;
+  /** 伤害动画版本号(每次伤害递增,触发 key 变化重放动画) */
+  damageVersion?: number;
+  /** 是否触发新回合光环 */
+  isTurnGlow?: boolean;
+  turnGlowVersion?: number;
+  /** debug 模式:是否在前端隐藏身份(非视角/非主公/非死亡) */
+  hideIdentity?: boolean;
+  /** 视角玩家可主动发动的技能动作列表(预留,目前仅接受不渲染) */
+  skillActions?: SkillActionDef[];
+  /** 装备技能集合,用于从座位卡过滤装备被动技能名 */
+  EQUIPMENT_SKILL_NAMES?: Set<string>;
+}
+
+export function PlayerSeatView({
+  player, index, view, isCurrentPlayer, isPerspective,
+  needsTarget, isTargetable, selectedTarget,
+  onTargetClick, onPerspectiveChange,
+  isDamaged = false, damageVersion = 0, isTurnGlow = false, turnGlowVersion = 0,
+  hideIdentity = true,
+  skillActions: _skillActions, // 预留:未来用于在座位卡上显示可点使用的技能按钮
+  EQUIPMENT_SKILL_NAMES = DEFAULT_EQUIPMENT_SKILL_NAMES,
+}: PlayerSeatProps) {
+  void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
+  const isDead = !player.alive;
+  const isClickable = needsTarget && !isDead && isTargetable;
+  // 势力信息
+  const displayChar = player.character;
+  const charInfo = displayChar ? getCharacterMeta(displayChar) : undefined;
+  const faction = charInfo?.faction ?? '群';
+  const factionColor = FACTION_BG[faction] || '#8e44ad';
+
+  // 身份
+  const identity = player.identity;
+  const showIdentity = identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
+
+  return (
+    <div
+      className={cx(
+        seatCard,
+        isCurrentPlayer && seatCardActive,
+        isPerspective && seatCardPerspective,
+        isDead && seatCardDead,
+        isClickable && seatCardClickable,
+        selectedTarget === player.name && seatCardTargeted,
+        isDamaged && seatShaking,
+        isDamaged && seatDamageOverlay,
+        isTurnGlow && turnGlowing,
+      )}
+      key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
+      onClick={() => isClickable && onTargetClick(player.name)}
+      onDoubleClick={() => onPerspectiveChange(index)}
+    >
+      {/* 势力色顶部条:武将名 + 座号 + 身份 */}
+      <div className={seatCardHeader} style={{ background: factionColor }}>
+        <div className={seatCardHeaderTop}>
+          <span className={seatIndexBadge}>#{index + 1}</span>
+          <span className={seatName}>{player.name.slice(0, 6)}</span>
+          <div>
+            {isPerspective && <span className={youBadge}>我</span>}
+            {isCurrentPlayer && <span className={turnBadge}>回合</span>}
+            {isDead && <span style={{ fontSize: 10, color: '#fff', marginLeft: 2 }}>亡</span>}
+            {showIdentity && identity && (
+              <span
+                className={
+                  identity === '主公' ? lordBadge :
+                  identity === '忠臣' ? loyalistBadge :
+                  identity === '反贼' ? rebelBadge :
+                  identity === '内奸' ? renegadeBadge :
+                  ''
+                }
+              >
+                {identity}
+              </span>
+            )}
+            {!showIdentity && player.identityHidden !== false && (
+              <span className={hiddenBadge}>暗</span>
+            )}
+          </div>
+        </div>
+        <div className={seatCharName}>{displayChar || '未知'}</div>
+      </div>
+      {/* 体力红心 */}
+      <div className={seatHpRow}>
+        {Array.from({ length: player.maxHealth }, (_, i) => (
+          <span
+            key={i}
+            className={cx(i < player.health ? hpHeartFull : hpHeartEmpty, isDamaged && hpFlash)}
+          >
+            ♥
+          </span>
+        ))}
+      </div>
+      {/* 技能标签 */}
+      {player.skills.filter(s => !DEFAULT_SKILLS.has(s)).filter(s => !EQUIPMENT_SKILL_NAMES.has(s)).length > 0 && (
+        <div className={skillRow} style={{ padding: '2px 10px' }}>
+          {player.skills
+            .filter(s => !DEFAULT_SKILLS.has(s))
+            .filter(s => !EQUIPMENT_SKILL_NAMES.has(s))
+            .map(s => (
+              <span key={s} className={skillTag}>{s}</span>
+            ))}
+        </div>
+      )}
+      {/* 手牌数 + 基本信息 */}
+      <div className={infoRow}>
+        <span>手牌: {player.handCount}</span>
+      </div>
+      {/* 装备区 */}
+      {Object.keys(player.equipment).length > 0 && (
+        <div className={equipRow}>
+          {Object.entries(player.equipment).map(([slot, cardId]) => {
+            const card = view.cardMap[cardId as string];
+            const icon =
+              slot === '武器' ? '⚔' :
+              slot === '防具' ? '🛡' :
+              slot === '进攻马' ? '🐎+' :
+              slot === '防御马' ? '🐎-' :
+              '💎';
+            return <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>{icon}{card?.name ?? cardId}</span>;
+          })}
+        </div>
+      )}
+      {/* 判定区(延时锦囊) */}
+      {(() => {
+        const ids = player.pendingTricks ?? [];
+        if (ids.length === 0) return null;
+        return (
+          <div className={judgeRow}>
+            <span className={judgeRowLabel}>判定:</span>
+            {ids.map((cardId: string) => {
+              const card = view.cardMap[cardId];
+              const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
+              const desc = card?.description ?? '';
+              return (
+                <span
+                  key={cardId}
+                  className={judgeTag}
+                  style={{ color: suitColor, borderColor: suitColor }}
+                  title={desc || card?.name || cardId}
+                >
+                  {card?.name ?? cardId}{card ? ` ${card.suit}${card.rank}` : ''}
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
+      {player.marks.length > 0 && (
+        <div className={markRow}>
+          {player.marks.map(m => (
+            <span key={m.id} className={markTag}>
+              {m.id}{m.payload ? `(${JSON.stringify(m.payload)})` : ''}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Styles ───
+const seatCard = css`
+  border: 1px solid #444;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.5);
+  transition: all 0.25s;
+  min-width: 170px;
+  max-width: 200px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+`;
+// 势力色顶部条:武将名 + 身份
+const seatCardHeader = css`
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+const seatCardHeaderTop = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+const seatCharName = css`
+  font-weight: bold;
+  font-size: 15px;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+`;
+// 体力行:红心表示 HP
+const seatHpRow = css`
+  display: flex;
+  gap: 2px;
+  padding: 4px 10px;
+  background: rgba(0,0,0,0.3);
+`;
+const hpHeartFull = css`
+  color: #e74c3c;
+  font-size: 16px;
+  text-shadow: 0 0 4px rgba(231,76,60,0.5);
+`;
+const hpHeartEmpty = css`
+  color: #555;
+  font-size: 14px;
+`;
+const seatCardActive = css`
+  box-shadow: 0 0 18px rgba(255,215,0,0.35), inset 0 0 8px rgba(255,215,0,0.1);
+  outline: 2px solid #ffd700;
+`;
+const seatCardPerspective = css`
+  border: 2px solid #3498db;
+  box-shadow: 0 0 8px rgba(52,152,219,0.25);
+`;
+const seatCardDead = css`opacity: 0.35; filter: grayscale(1);`;
+const seatCardClickable = css`cursor: pointer; &:hover { outline: 2px solid #e74c3c; }`;
+const seatCardTargeted = css`outline: 3px solid #e74c3c; box-shadow: 0 0 12px rgba(231,76,60,0.4);`;
+const seatName = css`font-weight: bold; font-size: 12px; color: rgba(255,255,255,0.85);`;
+const seatIndexBadge = css`
+  display: inline-block;
+  background: rgba(0,0,0,0.2);
+  color: rgba(255,255,255,0.6);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-right: 4px;
+  font-size: 10px;
+  font-weight: normal;
+  vertical-align: middle;
+`;
+const youBadge = css`
+  background: #3498db; border-radius: 3px; padding: 1px 5px;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
+const turnBadge = css`
+  background: #ffd700; border-radius: 3px; padding: 1px 5px;
+  font-size: 9px; color: #000; margin-left: 4px; font-weight: bold;
+`;
+const lordBadge = css`
+  background: #FFD700; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #4a2800; margin-left: 4px; font-weight: bold;
+`;
+const loyalistBadge = css`
+  background: #4A90E2; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
+const rebelBadge = css`
+  background: #E74C3C; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
+const renegadeBadge = css`
+  background: #9B59B6; border-radius: 3px; padding: 1px 6px;
+  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+`;
+const hiddenBadge = css`
+  background: #555; border-radius: 3px; padding: 1px 5px;
+  font-size: 10px; color: #bbb; margin-left: 4px; font-weight: bold;
+`;
+const equipRow = css`
+  font-size: 11px;
+  color: #f39c12;
+  padding: 0 10px 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+`;
+// 判定区(延时锦囊):斜体、紫色边框,亮眼能看清
+const judgeRow = css`
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  margin-top: 2px; font-size: 11px;
+`;
+const judgeRowLabel = css`color: #b78bff; font-weight: bold;`;
+const judgeTag = css`
+  display: inline-block; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid; background: rgba(155, 89, 182, 0.12);
+  font-weight: bold;
+`;
+const skillRow = css`margin-bottom: 4px;`;
+const skillTag = css`
+  display: inline-block; background: rgba(15,52,96,0.6); border-radius: 3px;
+  padding: 1px 5px; margin-right: 3px; font-size: 10px; color: #8899aa;
+`;
+const infoRow = css`
+  font-size: 11px; color: #999; display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 2px 10px 4px;
+`;
+const markRow = css`font-size: 10px; color: #666; padding: 0 10px 4px;`;
+const markTag = css`margin-right: 6px;`;
+
+// ─── 动画状态样式 ───
+const hpFlash = css`
+  animation: damageFlash 0.6s ease-out both;
+`;
+const seatShaking = css`
+  animation: damageShake 0.5s ease-out both;
+`;
+const seatDamageOverlay = css`
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    pointer-events: none;
+    animation: damageOverlay 0.6s ease-out both;
+  }
+  position: relative;
+`;
+const turnGlowing = css`
+  animation: newTurnGlow 0.8s ease-out both;
+`;
