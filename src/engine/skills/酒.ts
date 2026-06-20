@@ -86,9 +86,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     label: '酒',
     style: 'default',
     prompt: {
-      type: 'useCard',
+      type: 'useCardAndTarget',
       title: '使用酒',
       cardFilter: { filter: (c) => c.name === '酒', min: 1, max: 1 },
+      // 对自己使用:前端无需选目标,自动以自己为目标提交
+      selfTarget: true,
+      targetFilter: { min: 1, max: 1 },
     },
   });
   api.defineAction('respond', {

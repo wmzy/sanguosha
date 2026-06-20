@@ -170,6 +170,14 @@ export interface TargetFilter {
   min: number;
   max: number;
   filter?: (view: GameView, target: number) => boolean;
+  /** 多槽位目标(语义不同的多个目标,如借刀杀人 A 持武器 + B 在 A 攻击范围)。
+   *  有 slots 时 min/max 忽略,前端按槽位顺序渲染,每个槽位独立选择。
+   *  ctx.selected 包含已选座次(前序槽位),供后续槽位依赖前序选择。
+   *  filter 仅为前端 UI 提示(高亮/禁用),不参与后端 validate。 */
+  slots?: Array<{
+    label: string;
+    filter?: (view: GameView, target: number, ctx: { selected: number[] }) => boolean;
+  }>;
 }
 
 export interface UseCardPrompt {
@@ -190,6 +198,8 @@ export interface UseCardAndTargetPrompt {
   description?: string;
   cardFilter: CardFilter;
   targetFilter: TargetFilter;
+  /** 自动以自己为目标(桃/酒):前端无需手动选目标,直接提交 target=self。 */
+  selfTarget?: boolean;
 }
 export interface ConfirmPrompt {
   type: 'confirm';

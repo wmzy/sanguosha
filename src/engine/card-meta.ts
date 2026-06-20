@@ -25,24 +25,12 @@ export function getWeaponRange(c: Card): number {
   return c.range ?? 1;
 }
 
-// ─── 出牌规则常量 ───
-// 这些定义了哪些牌需要选目标、需要几个目标、自动以自己为目标等。
-// 集中定义避免在前端多处重复硬编码。
-
-/** 需要攻击范围内才能选目标的牌 */
-export const RANGE_REQUIRED_CARDS = new Set(['杀', '顺手牵羊']);
-
-/** 需要选目标的牌(使用时必须指定 target) */
-export const TARGET_REQUIRED_CARDS = new Set(['杀', '过河拆桥', '顺手牵羊', '借刀杀人', '决斗', '乐不思蜀']);
-
-/** 需要选两个目标(A + B)的牌 */
-export const TWO_TARGET_CARDS = new Set(['借刀杀人']);
-
-/** 自动以自己为目标的牌(无需手动选目标) */
-export const SELF_TARGET_CARDS = new Set(['桃', '酒']);
-
-/** 只能作为回应打出的牌(不能主动使用) */
-export const RESPOND_ONLY_CARDS = new Set(['闪', '无懈可击']);
+// 出牌规则(目标数/距离/自疗)已迁移到各牌技能 onMount 的 defineAction prompt:
+//   - targetFilter.min/max/slots 表达目标数(含借刀杀人多槽位)
+//   - targetFilter.filter 表达距离检查(杀/顺手牵羊/乐不思蜀)
+//   - selfTarget 表达自疗(桃/酒)
+//   - RESPOND_ONLY 由"该牌是否有 use action"隐含判断
+// 前端通过 findActionAcrossOwners 读 use action 的 prompt 驱动 UI。
 
 // ─── 装备技能名(从卡牌数据派生,非写死) ───
 // 装备牌装上时会以 card.name 作 skillId 动态挂载技能实例(见 装备通用.ts)。

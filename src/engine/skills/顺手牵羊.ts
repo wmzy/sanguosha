@@ -1,9 +1,10 @@
 // 顺手牵羊(普通锦囊):
 //   出牌阶段,对距离 1 内的一名其他角色使用,获得其一张牌。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
+import { viewEffectiveDistance } from '../viewDistance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '顺手牵羊', description: '锦囊:获得目标一张牌' };
@@ -81,7 +82,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
       type: 'useCardAndTarget',
       title: '顺手牵羊',
       cardFilter: { filter: (c) => c.name === '顺手牵羊', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 1 },
+      targetFilter: {
+        min: 1, max: 1,
+        // 距离≤1 检查:filter 仅为前端 UI 提示,后端 validate 独立校验
+        filter: (view: GameView, t: number) => viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
+      },
     },
   });
 }

@@ -76,9 +76,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     label: '桃',
     style: 'primary',
     prompt: {
-      type: 'useCard',
+      type: 'useCardAndTarget',
       title: '使用桃',
       cardFilter: { filter: (c) => c.name === '桃', min: 1, max: 1 },
+      // 自疗:前端无需选目标,自动以自己为目标提交
+      selfTarget: true,
+      targetFilter: { min: 1, max: 1 },
     },
   });
   api.defineAction('respond', {

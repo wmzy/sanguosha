@@ -5,8 +5,9 @@
 // 提交时一个 ClientMessage:preceding=[武圣.transform] + 主 action=杀.use。
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
-import type { Card, CardWrapper, GameState, Json, Skill } from '../types';
+import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
 import { registerAction, type SkillModule } from '../skill';
+import { viewCanAttack } from '../viewDistance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -85,7 +86,11 @@ export function onMount(skill: Skill, api: { defineAction: Function }): void {
       type: 'useCardAndTarget',
       title: '选择一张红色牌当杀使用',
       cardFilter: { filter: (c: Card) => c.suit === '♥' || c.suit === '♦', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 1 },
+      targetFilter: {
+        min: 1, max: 1,
+        // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示
+        filter: (view: GameView, t: number) => viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+      },
     },
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id } as CardWrapper),
   });

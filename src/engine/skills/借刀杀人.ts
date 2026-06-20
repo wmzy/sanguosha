@@ -5,6 +5,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
+import { viewCanAttack } from '../viewDistance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '借刀杀人', description: '锦囊:令目标出杀或获得其武器' };
@@ -151,7 +152,15 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
       type: 'useCardAndTarget',
       title: '借刀杀人',
       cardFilter: { filter: (c) => c.name === '借刀杀人', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 1 },
+      // 两槽位目标:A = 装备区有武器的角色;B = 在 A 出杀范围内的角色(依赖 A)。
+      // filter 仅为前端 UI 提示,后端 validate 已独立校验全部条件。
+      targetFilter: {
+        min: 2, max: 2,
+        slots: [
+          { label: '持武器者', filter: (view, t) => !!view.players[t]?.equipment?.['武器'] },
+          { label: '被杀者', filter: (view, t, ctx) => viewCanAttack(view.players, view.cardMap, ctx.selected[0], t) },
+        ],
+      },
     },
   });
 }

@@ -6,6 +6,7 @@ import type {
   AtomBeforeContext,
   Card,
   FrontendAPI,
+  GameView,
   GameState,
   Json,
   Skill,
@@ -13,6 +14,7 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
+import { viewEffectiveDistance } from '../viewDistance';
 
 /** 跳过出牌阶段的 tag 名(实现为 mark id='tag:乐不思蜀/跳过出牌') */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
@@ -143,7 +145,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
       type: 'useCardAndTarget',
       title: '乐不思蜀',
       cardFilter: { filter: (c) => c.name === '乐不思蜀', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 1 },
+      targetFilter: {
+        min: 1, max: 1,
+        // 距离≤1 检查:filter 仅为前端 UI 提示,后端 validate 独立校验
+        filter: (view: GameView, t: number) => viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
+      },
     },
   });
 }
