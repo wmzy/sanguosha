@@ -4,9 +4,60 @@
 // 这些函数封装"构造 action params"和"UI 布局计算"两类纯逻辑,
 // 让组件/hook 专注于状态管理,函数专注于数据转换。
 
-import type { Card, GameView, Json, DistributePrompt, TargetFilter } from '../../engine/types';
+import type { ActionContext, ActionPrompt, Card, GameView, Json, DistributePrompt, TargetFilter } from '../../engine/types';
+import type { SkillActionDef } from '../skillActionRegistry';
+
+// ─── use action 查找(filter-based) ───
+// 设计原则:action 声明即真相——技能 onMount 调 defineAction('use') 时通过
+// prompt.cardFilter 声明"我适用于哪些牌",前端遍历当前玩家的 use action 跑 filter
+// 匹配选中卡,而非用 card.name→skillId 反查。这消除了 playCardSkillId 这类
+// 桥接表达,让"这张牌能触发哪些 use action"只有一个真相(声明里的 cardFilter)。
+// 镜像 tests/engine-harness.ts 的 findValidCard。
+
+/** 从 use action 的 prompt 中提取 cardFilter 函数(若有) */
+export function extractCardFilter(prompt: ActionPrompt): ((card: Card) => boolean) | null {
+  switch (prompt.type) {
+    case 'useCard':
+    case 'useCardAndTarget':
+      return prompt.cardFilter.filter ?? null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * 在一组 action 中,找出适用于指定卡牌的 use action(actionType='use' 且
+ * cardFilter 匹配)。返回第一个匹配项——同一种交互(使用牌)下,每张牌
+ * 恰好对应一个 use action(装备牌→装备通用,基本牌/锦囊→对应牌名的技能)。
+ * @param actions 候选 action 集合(通常是当前视角玩家的 skillActions)
+ * @param card   当前选中的卡牌
+ */
+export function findUseActionForCard(actions: SkillActionDef[], card: Card): SkillActionDef | undefined {
+  return actions.find(a => {
+    if (a.actionType !== 'use') return false;
+    const filter = extractCardFilter(a.prompt);
+    return filter ? filter(card) : false;
+  });
+}
 
 // ─── params 构造 ───
+
+/** action 激活默认条件(缺省 activeWhen 时):出牌阶段 + 当前视角回合 + 无 pending。
+ *  这是绝大多数主动出牌/用技场景的激活条件。主动技(仁德/制衡/转化)若需要
+ *  不同条件,在 defineAction 声明 activeWhen 覆盖。 */
+const DEFAULT_PLAY_ACTIVE = (ctx: ActionContext): boolean => {
+  const { view, perspectiveIdx } = ctx;
+  return view.currentPlayerIndex === perspectiveIdx
+    && view.phase === '出牌'
+    && view.pending === null;
+};
+
+/** 判断一个 action 在给定上下文下是否激活。
+ *  优先用 action 声明的 activeWhen;未声明则用 DEFAULT_PLAY_ACTIVE(出牌场景默认)。
+ *  这是"声明时机"原则的落地点:激活条件由 action 自己说,GameView 不再硬编码分支。 */
+export function isActiveAction(action: SkillActionDef, ctx: ActionContext): boolean {
+  return action.activeWhen ? action.activeWhen(ctx) : DEFAULT_PLAY_ACTIVE(ctx);
+}
 
 /** 出牌规则(从 use action 的 prompt 派生,替代 card-meta Set) */
 export interface PlayRules {
@@ -76,11 +127,6 @@ export function buildPlayParams(
   }
   // 无目标牌(无中生有/桃园结义/装备等)
   return { cardId: card.id };
-}
-
-/** 出牌的 skillId:装备牌走"装备通用",其他走 card.name */
-export function playCardSkillId(card: Card): string {
-  return card.type === '装备牌' ? '装备通用' : card.name;
 }
 
 // ─── distribute cardIds 解析 ───

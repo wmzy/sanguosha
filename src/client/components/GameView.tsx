@@ -16,8 +16,7 @@ import { PlayerCardLarge } from './PlayerCardLarge';
 import { GameLog } from './GameLog';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
 import { resolvePendingRespond } from '../utils/pendingRespond';
-import { buildPlayParams, playCardSkillId, derivePlayRules } from '../utils/gameViewHelpers';
-import { findActionAcrossOwners } from '../skillActionRegistry';
+import { buildPlayParams, derivePlayRules, findUseActionForCard, isActiveAction } from '../utils/gameViewHelpers';
 
 // ─── 抽取的子组件 ───
 import { GameHeader } from './GameHeader';
@@ -159,7 +158,7 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
     if (!selectedCardId) return;
     const card = perspectiveHand.find(c => c.id === selectedCardId);
     if (!card) return;
-    // RESPOND_ONLY(闪/无懈)不能主动出:没有 use action 时 useAction 为 undefined
+    // use action 由 filter-based 查找得到(见下方 selectedUseAction 派生)
     if (!selectedUseAction) return;
     const rules = derivePlayRules(selectedTargetFilter, selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget);
     const params = buildPlayParams(view.players, perspectiveIdx, card, rules, selectedTarget, selectedKillTarget);
@@ -169,7 +168,7 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
     if (cardEl) {
       createCardFlyAnimation(cardEl, card);
     }
-    send(playCardSkillId(card), 'use', params);
+    send(selectedUseAction.skillId, 'use', params);
   }
 
   function handleTargetClick(name: string) {
@@ -363,16 +362,19 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
     setSelectedForDiscard(new Set());
   }
 
-  // ─── 出牌按钮是否可点(actionBar 用) ───
-  // ─── 选中卡的 targetFilter(从 registry 的 use action 派生)───
-  // 转化模式用 wrapperName 的 use action;普通出牌用 card.name。
-  // 用于 TargetSelector 渲染 + playButtonState 可点性判断。
-  const selectedCardName = (transformMode && selectedCardId)
-    ? transformMode.wrapperName
-    : (selectedCardId ? perspectiveHand.find(c => c.id === selectedCardId)?.name : undefined);
-  const selectedUseAction = selectedCardName
-    ? findActionAcrossOwners(selectedCardName, 'use')
-    : undefined;
+  // ─── 选中卡的 use action(filter-based 查找)───
+  // action 声明即真相:技能 defineAction('use') 时声明 cardFilter 表达"我适用于哪些牌",
+  // 这里遍历当前视角玩家的 use action 跑 filter 匹配选中卡,而非用 card.name→skillId 反查。
+  // 装备牌的 use action 以 skillId '装备通用' 注册但声明 cardFilter=装备牌,自然被匹配到。
+  // 转化模式(武圣红牌当杀)用 wrapperName 对应牌的 use action(如"杀")。
+  const selectedUseAction = (() => {
+    if (!selectedCard) return undefined;
+    if (transformMode) {
+      // 转化模式:用转化后的牌名(杀)去匹配 use action
+      return skillActions.find(a => a.actionType === 'use' && a.skillId === transformMode.wrapperName);
+    }
+    return findUseActionForCard(skillActions, selectedCard);
+  })();
   const selectedTargetFilter = selectedUseAction?.prompt.type === 'useCardAndTarget'
     ? selectedUseAction.prompt.targetFilter
     : null;
@@ -403,11 +405,13 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
     return { canPlay, targetLabel };
   })();
 
-  // 是否需要渲染目标选择面板:需要目标且非 selfTarget 时渲染
+  // 是否需要渲染目标选择面板:选中卡的 use action 处于激活态 + 需要目标且非 selfTarget。
+  // 激活态由 action 声明决定(缺省=出牌阶段+自己回合+无 pending),不再硬编码分支。
   const playRules = selectedUseAction
     ? derivePlayRules(selectedTargetFilter, selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget)
     : null;
-  const showTargetSelector = selectedCardId !== null && canOperate && isMyTurn && !pending && !!playRules && playRules.needsTarget;
+  const selectedActive = selectedUseAction ? isActiveAction(selectedUseAction, { view, perspectiveIdx }) : false;
+  const showTargetSelector = selectedCardId !== null && canOperate && selectedActive && !!playRules && playRules.needsTarget;
 
   return (
     <div className={styles.pageRoot}>
@@ -508,7 +512,6 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
             viewer={view.viewer}
             view={view}
             damageFlashIndices={anim.damageFlashIndices}
-            isMyTurn={isMyTurn}
             canOperate={canOperate}
             isPerspectiveTurn={isPerspectiveTurn}
             skillActions={skillActions}
@@ -546,12 +549,12 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
           </div>
           {/* 操作面板:出牌/结束回合/目标提示 */}
           <div className={styles.actionBar}>
-            {canOperate && isMyTurn && view.phase === '出牌' && transformMode && selectedCardId && (
+            {canOperate && selectedActive && transformMode && selectedCardId && (
               <button className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}>
                 使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
               </button>
             )}
-            {canOperate && isMyTurn && view.phase === '出牌' && !transformMode && selectedCardId && playButtonState && (
+            {canOperate && selectedActive && !transformMode && selectedCardId && playButtonState && (
               <button className={cx(styles.playBtn, !playButtonState.canPlay && styles.btnDisabled)} onClick={handlePlayCard} disabled={!playButtonState.canPlay}>
                 出牌{playButtonState.targetLabel}
               </button>

@@ -2,7 +2,7 @@
 // 前端技能 action 注册表：收集技能 onMount 调用 defineAction 注册的 UI 配置
 // import skills/index 触发 setSkillModuleResolver(动态 import 按需加载)
 import '../engine/skills';
-import type { ActionPrompt, Card, CardWrapper, FrontendAPI, Skill } from '../engine/types';
+import type { ActionActiveWhen, ActionPrompt, Card, CardWrapper, FrontendAPI, Skill } from '../engine/types';
 import { getSkillModule } from '../engine/skill';
 
 export interface SkillActionDef {
@@ -14,6 +14,8 @@ export interface SkillActionDef {
   style?: 'primary' | 'danger' | 'default' | 'passive';
   prompt: ActionPrompt;
   transform?: (card: Card) => CardWrapper;
+  /** 激活谓词(undefined = 用前端默认出牌激活条件) */
+  activeWhen?: ActionActiveWhen;
 }
 
 // 全局注册表：key = "skillId:ownerId:actionType"
@@ -37,6 +39,7 @@ function makeFrontendAPI(skillId: string, ownerId: number): FrontendAPI {
         style: opts.style,
         prompt: opts.prompt,
         transform: opts.transform,
+        activeWhen: opts.activeWhen,
       });
     },
     playEffect() {},

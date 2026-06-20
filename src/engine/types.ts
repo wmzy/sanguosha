@@ -151,6 +151,21 @@ export function createGameState(partial: Partial<GameState> & { players: PlayerS
 
 // ==================== ActionPrompt ====================
 
+/** action 激活上下文:传给 activeWhen 谓词,供 action 声明"我什么时候该被激活"。
+ *  这是 view 的一个子集——只包含决定激活与否的字段,避免谓词读到过多状态。
+ *  语义:前端在渲染前为每个 action 计算 isActive = activeWhen?.(ctx) ?? false,
+ *  只有 active 的 action 才渲染为可交互控件(出牌按钮/技能按钮高亮)。
+ *  缺省 activeWhen = "出牌阶段且为当前视角回合且无 pending"(最常见的主动出牌场景)。 */
+export interface ActionContext {
+  /** 当前 view(完整,供谓词按需读取 phase/players/pending 等) */
+  view: GameView;
+  /** 当前视角座次(看谁;正式模式 = viewer) */
+  perspectiveIdx: number;
+}
+
+/** action 激活谓词。返回 true = 该 action 在当前上下文下应被激活(渲染为可交互)。 */
+export type ActionActiveWhen = (ctx: ActionContext) => boolean;
+
 export type ActionPrompt =
   | UseCardPrompt
   | SelectTargetPrompt
@@ -656,6 +671,10 @@ export interface FrontendAPI {
       style?: 'primary' | 'danger' | 'default' | 'passive';
       prompt: ActionPrompt;
       transform?: (card: Card) => CardWrapper;
+      /** 激活谓词:声明该 action 何时该被前端渲染为可交互控件。
+       *  缺省(undefined)时的语义由前端集中实现:出牌类(use)缺省 = 出牌阶段+当前视角回合+无 pending。
+       *  主动技(confirm/distribute/转化)按需声明更宽或更窄的条件。 */
+      activeWhen?: ActionActiveWhen;
     },
   ): void;
   playEffect(effect: AtomEffect): void;

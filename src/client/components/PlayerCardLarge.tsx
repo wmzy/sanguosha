@@ -5,6 +5,7 @@ import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
+import { isActiveAction } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
@@ -20,8 +21,6 @@ export interface PlayerCardLargeProps {
   view: GameView;
   /** 动画状态(体力闪烁) */
   damageFlashIndices: Map<number, number>;
-  /** 是否视角玩家的回合(用于技能按钮显隐) */
-  isMyTurn: boolean;
   /** 是否可操作(debug 模式恒 true) */
   canOperate: boolean;
   /** 是否当前回合(用于「回合」徽章) */
@@ -41,7 +40,7 @@ function skillBtnVariant(style: string | undefined): string {
 
 export function PlayerCardLarge({
   perspectiveIdx, viewer, view, damageFlashIndices,
-  isMyTurn, canOperate, isPerspectiveTurn, skillActions, onSkillAction,
+  canOperate, isPerspectiveTurn, skillActions, onSkillAction,
 }: PlayerCardLargeProps) {
   const p = view.players[perspectiveIdx];
   if (!p) return null;
@@ -62,7 +61,10 @@ export function PlayerCardLarge({
     (a.prompt.type === 'useCardAndTarget' && a.transform) ||
     a.prompt.type === 'distribute'
   );
-  const showSkillButtons = isMyTurn && canOperate && view.phase === '出牌';
+  // 技能按钮显隐:由 action 声明的 activeWhen 决定(缺省=出牌阶段+自己回合+无 pending)。
+  // canOperate(debug 可操作性开关)作为外层闸门;激活时机不再硬编码在组件里。
+  const actionCtx = { view, perspectiveIdx };
+  const isSkillActive = (a: SkillActionDef) => canOperate && isActiveAction(a, actionCtx);
   const identityBadgeClass =
     identity === '主公' ? styles.lordBadge :
     identity === '忠臣' ? styles.loyalistBadge :
@@ -101,7 +103,7 @@ export function PlayerCardLarge({
         <div className={cx(styles.skillRow, styles.skillRowPad)}>
           {visibleSkills.map(s => {
             const btn = triggerableActions.find(a => a.skillId === s);
-            if (showSkillButtons && btn) {
+            if (btn && isSkillActive(btn)) {
               return (
                 <button
                   key={s}
@@ -131,7 +133,7 @@ export function PlayerCardLarge({
                 </span>
               );
             })}
-            {showSkillButtons && equipSkillActions.map(a => (
+            {equipSkillActions.map(a => isSkillActive(a) && (
               <button
                 key={`${a.skillId}:${a.actionType}`}
                 className={styles.equipSkillBtn}

@@ -43,6 +43,7 @@ export interface ActionDef {
   label: string;
   prompt: ActionPrompt;
   transform?: (card: Card) => CardWrapper;
+  activeWhen?: (ctx: { view: GameView; perspectiveIdx: number }) => boolean;
 }
 
 // ─── FakeFrontendAPI ──────────────────────────────────────────
@@ -65,6 +66,7 @@ class FakeFrontendAPI implements FrontendAPI {
     style?: string;
     prompt: ActionPrompt;
     transform?: (card: Card) => CardWrapper;
+    activeWhen?: (ctx: { view: GameView; perspectiveIdx: number }) => boolean;
   }): void {
     this.actions.push({
       skillId: this.skillId,
@@ -73,6 +75,7 @@ class FakeFrontendAPI implements FrontendAPI {
       label: opts.label,
       prompt: opts.prompt,
       transform: opts.transform,
+      activeWhen: opts.activeWhen,
     });
   }
 
