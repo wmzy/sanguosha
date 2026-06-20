@@ -44,8 +44,10 @@ export function registerSystemRespondActions(ownerId: number): () => void {
     if (!p) return;
     p.character = selected.name;
     p.name = selected.name;
-    // 保留 DEFAULT_SKILLS 引擎里已定义的默认技能列表
-    p.skills = [...selected.skills, ...DEFAULT_SKILLS];
+    // 只保留引擎默认技能(回合管理/装备通用/杀闪桃酒等)。
+    // 武将自身技能暂不实例化:候选人 atom 仍携带 skills 字段供选将 UI 显示,
+    // 但选完后不进入 player.skills,开局 instantiateSkill 循环因此跳过武将技能。
+    p.skills = [...DEFAULT_SKILLS];
   }));
 
   // ── 弃牌阶段 respond action:玩家选择弃哪些牌 ──

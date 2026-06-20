@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-06-20
+### 选将 bug 修复 — idle timer 误触发/超时空武将/武将池缺失
+
+修复实际运行中选将流程的三个阻断性问题:玩家超时或选将间隙时游戏被错误推进导致空武将、武将池只有 6 个导致常备主公拆分无意义。
+
+#### Fixed
+- **选将间隙 idle timer 误触发自动结束回合**: `resetIdleTimer` 在主公选完→并行选将创建之间的间隙(pendingSlots.size===0)启动了 50s 定时器,玩家选将慢时误触发"自动结束回合",清掉所有选将 pending。修复:选将阶段(phase==='准备' 且仍有玩家未选完武将)不启动 idle timer。(`src/server/session.ts`)
+- **选将超时后玩家武将为空**: 选将询问 slot 超时(60s)只执行 `无操作` atom,未给玩家分配武将,导致游戏带着空武将(character 为空)进入出牌阶段,显示"未知"且不可玩。修复:`createAndAwaitSlot` 的 `fireTimeoutNow` 对选将询问 slot 特殊处理——超时后从该玩家候选列表随机分配一个未被选走的武将(与 respond 一致设 DEFAULT_SKILLS),不留空武将。(`src/engine/create-engine.ts`)
+
+#### Changed
+- **session 武将池改用引擎全量武将**: `session.ts` 原硬编码 6 个武将(刘备/曹操/孙权/关羽/郭嘉/司马懿),现改用 `allCharacters`(57 个),使常备主公 5+非常备 2 拆分与按身份分配有实际意义。(`src/server/session.ts`)
+
+#### Added
+- **选将超时自动分配测试**: 验证选将 slot 超时后玩家从候选列表自动分配武将、无空武将、跨玩家不重复。(`tests/integration/char-select-distribution.test.ts`)
+
+## [Unreleased] — 2026-06-19
+### 选将逻辑重构 — 按身份分配候选武将 + 不实例化武将技能
+
+修正选将分配逻辑:主公选完后未选的武将进入候选池,其余玩家按身份从候选池随机抽取特定数量的候选武将(不重复),候选池不足时从总池补足;选将完成后只实例化引擎默认技能,暂不实例化武将自身技能。
+
+#### Changed
+- **选将候选数改为按身份配置**: 新增 `CANDIDATES_PER_IDENTITY` 配置表(主公 7/忠臣 5/反贼 4/内奸 5,对齐三国杀OL身份模式)。主公先选完后,池中未被选中的武将全部进入候选池。(`src/engine/skills/开局.ts`)
+- **主公候选池拆分为常备/非常备**: 常备主公(拥有主公技的武将:刘备/曹操/孙权/孙策/张角/董卓/刘禅)随机 5 + 非常备随机 2,合并为 7 张候选人。常备不足时用非常备补足,总数仍不足则给现有全部。(`src/engine/skills/开局.ts`)
+- **非主公候选人按身份分配**: 从候选池随机抽取,跨玩家不重复(独占模式)。(`src/engine/skills/开局.ts`)
+- **候选池不足时自动补足**: 池不足以覆盖全部需求时回退共享模式——所有非主公玩家共享同一批候选人,由 respond validate 保证最终唯一(先选先得),不再阻塞开局。(`src/engine/skills/开局.ts`)
+- **选将后不实例化武将技能**: respond action 选定武将后 `player.skills` 只保留引擎默认技能(`DEFAULT_SKILLS`),武将自身技能不进入 `player.skills`、不被 `instantiateSkill` 注册。候选人 atom 仍携带 `skills` 字段供选将 UI 显示。(`src/engine/skills/系统规则.ts`)
+
+#### Added
+- **CharacterMeta 增加 isLord 字段**: 新增 `LORD_CANDIDATES` 常量(7 个常备主公名单)作为 isLord 判定唯一来源,`CharacterMeta.isLord` 与 `isLord(name)` 查询函数。(`src/engine/character-meta.ts`)
+- **选将分配集成测试**: 覆盖按身份分配数量、候选池入池、候选人携带 skills 字段、不实例化武将技能、池不足共享模式、主公候选 5+2 拆分六个场景。(`tests/integration/char-select-distribution.test.ts`)
+
 ## [Unreleased] — 2026-06-17
 ### 前端游戏流程修复 — 选将/身份动画/技能过滤/出杀问闪/弃牌 UI
 

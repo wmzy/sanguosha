@@ -82,8 +82,9 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
       seed: 42,
       gameId: 'test',
     });
-    // bootstrap 初始化(抽身份/打乱池)需要微任务推进,轮询等主公选将 slot 出现
-    for (let i = 0; i < 10 && state.pendingSlots.size === 0; i++) {
+    // bootstrap 初始化(抽身份/打乱池/动态 import 开局+character-meta)需要微任务推进,
+    // 轮询等主公选将 slot 出现(窗口留定足,避免环境抖动导致误判)
+    for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
       await new Promise(r => setTimeout(r, 10));
     }
     await waitForStable(state);

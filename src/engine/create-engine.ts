@@ -47,6 +47,7 @@ import type {
 } from './types';
 import { createGameState } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
+import { DEFAULT_SKILLS } from './atoms/选将';
 import {
   clearAllSkillInstances,
   findActionEntry,
@@ -602,13 +603,29 @@ function createAndAwaitSlot(
       try {
         await applyAtom(state, pending.onTimeout);
         // 弃牌 pending 超时:自动弃超出手牌
-        const slotAtom = atom as { requestType?: string; target?: number };
+        const slotAtom = atom as { requestType?: string; target?: number; candidates?: Array<{ name: string }> };
         if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
           const p = state.players[slotAtom.target];
           if (p && p.hand.length > p.maxHealth) {
             const excess = p.hand.length - p.maxHealth;
             const toDiscard = p.hand.slice(-excess);
             await applyAtom(state, { type: '弃置', player: slotAtom.target, cardIds: toDiscard });
+          }
+        }
+        // 选将询问 pending 超时:从候选人中随机分配一个未被选走的武将。
+        // 否则玩家超时未选 → character 空 → 游戏带空武将进入出牌阶段(不可玩)。
+        if (atom.type === '选将询问' && typeof slotAtom.target === 'number' && Array.isArray(slotAtom.candidates)) {
+          const p = state.players[slotAtom.target];
+          if (p && !p.character) {
+            const taken = new Set(state.players.map(pl => pl.character));
+            const available = slotAtom.candidates.filter(c => !taken.has(c.name));
+            const pool = available.length > 0 ? available : slotAtom.candidates;
+            // 用 Date.now() 做超时场景的随机(超时本身非确定),避免引入 rng 依赖
+            const pick = pool[Date.now() % pool.length];
+            p.character = pick.name;
+            p.name = pick.name;
+            // 与 respond action 一致:超时分配也只保留引擎默认技能,不实例化武将技能
+            p.skills = [...DEFAULT_SKILLS];
           }
         }
         notifyStateChange(state);

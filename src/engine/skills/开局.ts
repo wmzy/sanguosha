@@ -9,6 +9,8 @@ import {
   instantiateSkill,
   type SkillModule,
 } from '../skill';
+import { DEFAULT_SKILLS } from '../atoms/选将';
+import { isLord } from '../character-meta';
 
 /**
  * system 命名空间占位 ownerId(座次下标 -1,不对应任何玩家槽位)。
@@ -16,6 +18,54 @@ import {
  * engine 内部 dispatch 只在 bootstrap 路径用到它。
  */
 const SYSTEM_OWNER = -1;
+
+/** 按身份发放的候选武将数量(三国杀OL身份模式标准)。
+ *  主公:常备主公 + 非常备主公共 7 个候选位置;
+ *  忠臣/内奸:比普通玩家多 1 个,即 5 个;
+ *  反贼:基础 4 个。 */
+const CANDIDATES_PER_IDENTITY: Record<string, number> = {
+  主公: 7,
+  忠臣: 5,
+  反贼: 4,
+  内奸: 5,
+};
+
+/** 主公候选的拆分:从常备主公池随机取 5,从非常备池随机取 2,合并为 7 张候选人。
+ *  当池不足时按"先常备后非常备、不重复"补到 7,仍不够则给全部。 */
+const CANDIDATES_LORD = 5;
+const CANDIDATES_NON_LORD = 2;
+
+/** 从已打乱的 charPool 中拆分主公候选:常备 5 + 非常备 2(总 7)。
+ *  - charPool 需为 seed 打乱后的顺序,取前 N 即随机抽取。
+ *  - isLord 判断走 character-meta.isLord,适用于任何数据来源的武将名。
+ *  - 兑底:常备 < 5 时,用非常备补足到 7;总数仍不足则给现有全部。 */
+function pickLordCandidates(
+  charPool: Array<{ name: string; skills: string[] }>,
+): Array<{ name: string; skills: string[] }> {
+  const target = CANDIDATES_PER_IDENTITY['主公']; // 7
+  const lordPicked: Array<{ name: string; skills: string[] }> = [];
+  const nonLordPicked: Array<{ name: string; skills: string[] }> = [];
+  for (const c of charPool) {
+    if (lordPicked.length >= CANDIDATES_LORD && nonLordPicked.length >= CANDIDATES_NON_LORD) break;
+    if (isLord(c.name)) {
+      if (lordPicked.length < CANDIDATES_LORD) lordPicked.push(c);
+    } else {
+      if (nonLordPicked.length < CANDIDATES_NON_LORD) nonLordPicked.push(c);
+    }
+  }
+  let result = [...lordPicked, ...nonLordPicked];
+  // 兑底:常备不足 5 时,用非常备补足
+  if (result.length < target) {
+    const used = new Set(result.map(c => c.name));
+    for (const c of charPool) {
+      if (result.length >= target) break;
+      if (used.has(c.name)) continue;
+      used.add(c.name);
+      result.push(c);
+    }
+  }
+  return result;
+}
 
 /** 开局配置 */
 interface GameConfig {
@@ -51,27 +101,26 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       // 1. 抽身份(每人一张,主公亮明)
       await applyAtom(state, { type: '抽身份', playerCount, seed });
 
-      // 2. 选将(交互式):主公先选(串行),其他人同时选(并行)
+      // 2. 选将(交互式):主公先选(串行),然后其他人同时选(并行)
+      //    候选人按身份发放数量(见 CANDIDATES_PER_IDENTITY)。
       const charRng = createRng(seed + 1);
       const charPool = [...characters].filter(c => c.name !== '主公');
-      // 打乱武将池
+      // 打乱武将池(主公选将与此后候选池抽取都从这个打乱后的序列里取)
       for (let i = charPool.length - 1; i > 0; i--) {
         const j = charRng.nextInt(i + 1);
         const tmp = charPool[i];
         charPool[i] = charPool[j];
         charPool[j] = tmp;
       }
-      const used = new Set<string>();
-      // 主公先选(串行),然后其他人同时选(并行)
       const lordIdx = state.players.findIndex(p => p.vars['身份'] === '主公');
 
-      // 2a. 主公先选:从池首取 5 张作为候选人
+      // 2a. 主公先选(串行):从池中按 isLord 拆成常备/非常备两组,合并为 7 张候选人。
+      //     拆分:常备主公随机 5 + 非常备随机 2(charPool 已 seed 打乱,取前 N 即随机)。
+      //     池不足时:常备不足用非常备补足,总数仍不足则给现有全部。
+      //     主公选完后,池中【未被选中】的武将全部进入候选池,供其他身份玩家分配。
+      const used = new Set<string>();
       if (lordIdx >= 0) {
-        const lordAvail: Array<{ name: string; skills: string[] }> = [];
-        for (const c of charPool) {
-          if (lordAvail.length >= 5) break;
-          if (!used.has(c.name)) lordAvail.push(c);
-        }
+        const lordAvail = pickLordCandidates(charPool);
         if (lordAvail.length > 0) {
           await applyAtom(state, { type: '选将询问', target: lordIdx, candidates: lordAvail });
           const lordChosen = state.players[lordIdx].character;
@@ -79,22 +128,43 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
         }
       }
 
-      // 2b. 其他人并行选:从剩余武将池(扣除主公已选)给每人分配候选人。
-      // 池子足够大时按座次切片不重叠;池子小时所有非主公共享同一份候选人(先选先得,respond validate 保证唯一)。
+      // 2b. 其他人并行选:从【候选池=主公未选的剩余武将】随机抽,按身份发候选数张。
+      //     - 池足够:候选人跨玩家不重复(每人独占一批)。
+      //     - 池不足:从总池补足去重;仍不够时回退为共享模式——
+      //       所有非主公玩家共享同一批候选人(候选池全部),按身份取前 N 张,
+      //       由 respond validate 保证最终唯一(先选先得)。
       const others = state.players
         .map((_, i) => i)
         .filter(i => i !== lordIdx);
       if (others.length > 0) {
-        const remaining = charPool.filter(c => !used.has(c.name));
-        const perPlayer = 5;
+        // 候选池:主公未选的全部武将(顺序即打乱后顺序,等价于随机)
+        const candidatePool = charPool.filter(c => !used.has(c.name));
+        // 各非主公玩家按身份的需求量
+        const wantByPlayer = others.map(idx => {
+          const identity = state.players[idx].vars['身份'] as string | undefined;
+          return CANDIDATES_PER_IDENTITY[identity ?? ''] ?? CANDIDATES_PER_IDENTITY['反贼'];
+        });
+        const totalWant = wantByPlayer.reduce((a, b) => a + b, 0);
+
         const selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> = [];
-        for (let k = 0; k < others.length; k++) {
-          const start = k * perPlayer;
-          let cand = remaining.slice(start, start + perPlayer);
-          // 不足 5 张:回退为全部剩余(允许跨玩家候选人重叠,由 respond validate 保证唯一)
-          if (cand.length === 0) cand = remaining.slice(0, perPlayer);
-          if (cand.length === 0) break;
-          selections.push({ target: others[k], candidates: cand });
+        // 独占模式:候选池(去重后)能覆盖全部需求 → 每人取一批不重叠候选人
+        if (candidatePool.length >= totalWant) {
+          const allocated = new Set<string>(used);
+          for (let k = 0; k < others.length; k++) {
+            const want = wantByPlayer[k];
+            const cand = candidatePool
+              .filter(c => !allocated.has(c.name))
+              .slice(0, want);
+            for (const c of cand) allocated.add(c.name);
+            selections.push({ target: others[k], candidates: cand });
+          }
+        } else {
+          // 共享模式:候选池不足,所有非主公玩家共享同一批(候选池全部,按身份数量截取)
+          for (let k = 0; k < others.length; k++) {
+            const want = Math.min(wantByPlayer[k], candidatePool.length);
+            const cand = candidatePool.slice(0, want);
+            selections.push({ target: others[k], candidates: cand });
+          }
         }
         if (selections.length > 0) {
           await applyAtom(state, { type: '并行选将', selections });

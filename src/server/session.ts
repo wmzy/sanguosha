@@ -7,6 +7,7 @@ import type {
   GameView,
 } from '../engine/types';
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
+import { allCharacters } from '../engine/cards/characters';
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -17,15 +18,12 @@ import { createLogger } from './logger';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
 
-/** 默认武将列表 */
-const CHARACTERS: Array<{ name: string; skills: string[] }> = [
-  { name: '刘备', skills: ['仁德'] },
-  { name: '曹操', skills: ['护甲'] },
-  { name: '孙权', skills: ['制衡'] },
-  { name: '关羽', skills: ['武圣'] },
-  { name: '郭嘉', skills: ['遗计'] },
-  { name: '司马懿', skills: ['反馈'] },
-];
+/** 默认武将列表:使用引擎全量武将(allCharacters),供选将池使用。
+ *  skills 字段来自武将数据(供选将 UI 显示);选完后只实例化引擎默认技能(见 系统规则·选将)。 */
+const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map(c => ({
+  name: c.name,
+  skills: c.skills.map(s => s.name),
+}));
 
 const RECONNECT_GRACE_MS = 30_000;
 const IDLE_TIMEOUT_MS = 50_000;
@@ -341,6 +339,10 @@ export class GameSession {
     const state = this.state;
     // 只在游戏进行中且有当前玩家时启动定时器
     if (state.players.some(p => !p.alive) || state.pendingSlots.size > 0) return;
+    // 选将阶段(phase==='准备' 且仍有玩家未选完武将)不启动 idle timer:
+    // 选将 pending 创建之间会短暂出现 pendingSlots.size===0 的间隙(主公选完→并行选将创建前),
+    // 若此时启动 timer,玩家选将慢时会在选将期间误触发"自动结束回合",清掉所有 pending。
+    if (state.phase === '准备' && state.players.some(p => !p.character)) return;
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.alive) return;
     this.idleTimer = setTimeout(() => {
