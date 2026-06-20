@@ -165,9 +165,14 @@ export class GameSession {
       this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedIndex });
       return;
     }
-    // CAS 校验:baseSeq 不匹配则静默丢弃
+    // CAS 校验:baseSeq 不匹配则静默丢弃。
+    // 但【respond 路径】(该 ownerId 有 pending slot)跳过 CAS——
+    // 并行选将/并行回应场景下,多个玩家同时 respond 会让 seq 连续 +1,
+    // 其它玩家基于旧 seq 的合法 respond 会被误拒,导致选将卡住直到超时。
+    // respond 是对已存在 pending 的回应,只要 slot 还在就应允许;主动 action 才需 CAS。
     const curState = this.state;
-    if (action.baseSeq !== undefined && action.baseSeq !== curState.seq) {
+    const hasOwnSlot = curState.pendingSlots.has(action.ownerId);
+    if (!hasOwnSlot && action.baseSeq !== undefined && action.baseSeq !== curState.seq) {
       return;
     }
 

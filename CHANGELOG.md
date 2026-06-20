@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-20
+### 选将 bug 修复 — 并行选将卡住直到超时
+
+修复并行选将场景下,多个玩家同时 respond 选将时,后发的 respond 被 CAS 校验误拒,导致选将流程卡住直到 60s 超时才能开始的阻断性问题。
+
+#### Fixed
+- **并行选将卡住直到超时**: `session.handleAction` 的 CAS 校验(`baseSeq !== curState.seq`)在并行选将/并行回应场景下错误地拒掉了合法 respond。多个玩家同时 respond 选将会让 `state.seq` 连续 +1,其它玩家基于旧 `lastSeq`(广播有延迟)发的 respond 会被 CAS 误拒,导致选将流程卡死,只能等 60s 超时自动分配。修复:respond 路径(该 ownerId 存在对应的 pending slot)跳过 CAS 校验——respond 本质是对已存在 pending 的回应,只要 slot 还在就应允许;只有主动 action(无 pending slot)才需要 CAS 防止陈旧操作。这也顺带修复了"其它玩家看不到主公选将完成"的表现——那是选将流程被卡住的副作用。(`src/server/session.ts`)
+
+#### Added
+- **session CAS 行为回归测试**: 验证并行选将中基于陈旧 baseSeq 的 respond 仍被接受(选将完成,不卡到超时),以及主动 action 在无 pending 时仍受 CAS 保护。(`tests/server/session-cas-respond.test.ts`)
+
+## [Unreleased] — 2026-06-20
 ### 选将 bug 修复 — idle timer 误触发/超时空武将/武将池缺失
 
 修复实际运行中选将流程的三个阻断性问题:玩家超时或选将间隙时游戏被错误推进导致空武将、武将池只有 6 个导致常备主公拆分无意义。
