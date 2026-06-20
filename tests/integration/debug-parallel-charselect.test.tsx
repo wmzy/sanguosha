@@ -122,8 +122,8 @@ describe('GameView:debug 并行选将切换视角', () => {
     });
   });
 
-  it('当前视角玩家已选完且仍有他人未选时,显示等待遮罩(含切换按钮)', async () => {
-    // viewer=0 已选,手动切回 player-0(主公,已选)→ 应显示等待遮罩
+  it('当前视角玩家已选完且仍有他人未选时,通过 activeSlot 回退显示第一个选将玩家的遮罩', async () => {
+    // viewer=0 已选,手动切回 player-0(主公,已选)→ 应通过 activeSlot 回退显示仍在选将的玩家遮罩
     const view = makeView();
     render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} />);
 
@@ -137,9 +137,9 @@ describe('GameView:debug 并行选将切换视角', () => {
     await waitFor(() => expect(screen.getByText(/P2 选将中/)).toBeDefined());
     fireEvent.click(switchBtn()); // → player-0(主公,已选)
 
-    // 应显示等待遮罩(主公已选,等待 P1/P2)
+    // activeSlot 回退:取第一个仍在选将的 slot(P1),显示其选将遮罩
     await waitFor(() => {
-      expect(screen.getByText(/player-0 已选择武将,等待其他玩家选将/)).toBeDefined();
+      expect(screen.getByText(/P1 选将中/)).toBeDefined();
     });
   });
 });

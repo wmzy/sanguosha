@@ -308,6 +308,8 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       if (key < 0) {
         for (const [k, v] of state.pendingSlots) if (v === oldSlot) { state.pendingSlots.delete(k); break; }
       }
+      // slot 已清理:通知 session 重建 view,确保下次 buildView 不包含已解决的 slot
+      notifyStateChange(state);
     }
     resolve();
   }).finally(() => {

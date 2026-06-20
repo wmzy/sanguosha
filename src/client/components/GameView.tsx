@@ -86,11 +86,16 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 候选人从 view.pending.atom.candidates 获取(引擎生成)
   // debug 模式下并行选将:viewer 自己已选完时,view.pending 为空,
   // 从 view.allCharSelectSlots 按 perspectiveIdx 找对应玩家的选将 slot(代打)。
+  // 第三层回退:slot 尚未为当前视角创建时,取第一个仍在选将的 slot,
+  // 确保选将期间始终有遮罩覆盖全屏。
   const ownCharSelect = view.pending?.atom?.type === '选将询问' ? view.pending : null;
   const parallelSlotForPerspective = view.allCharSelectSlots?.find(
     s => s.atom.type === '选将询问' && s.target === perspectiveIdx,
   ) ?? null;
-  const charSelectPending = ownCharSelect ?? parallelSlotForPerspective;
+  const activeSlot = view.allCharSelectSlots?.find(
+    s => s.atom.type === '选将询问' && !view.players[s.target]?.character,
+  ) ?? null;
+  const charSelectPending = ownCharSelect ?? parallelSlotForPerspective ?? activeSlot;
   const isCharSelectPending = charSelectPending !== null;
   const charCandidates: Array<{ name: string; skills: string[] }> = charSelectPending
     ? (charSelectPending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
@@ -717,13 +722,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   return (
     <div className={styles.pageRoot}>
           {/* ─── 身份揭示遮罩 ─── */}
-      {showIdentityReveal && view.players[view.viewer]?.identity && (
+      {/* 选将阶段(charSelectPending 或 charSelectInProgress)不显示身份弹窗——
+          选将遮罩已含"你的身份"信息,身份弹窗 zIndex 更高会盖住选将界面和倒计时。
+          选将完成后若仍未确认过身份,再显示。*/}
+      {showIdentityReveal
+        && view.players[view.viewer]?.identity
+        && !isCharSelectPending
+        && !charSelectInProgress && (
         <IdentityRevealOverlay
           identity={view.players[view.viewer].identity!}
           onConfirm={() => {
             setShowIdentityReveal(false);
             sessionStorage.setItem('sgs_identity_shown', '1');
-            // 选将已通过 charSelectSeat 状态管理,不需要额外触发
           }}
         />
       )}
@@ -736,8 +746,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           isLord={view.players[charSelectTarget]?.identity === '主公'}
           viewer={perspectiveIdx}
           viewerIdentity={view.players[perspectiveIdx]?.identity}
-          deadline={pending?.deadline ?? null}
-          totalMs={pending?.totalMs ?? 30000}
+          deadline={charSelectPending?.deadline ?? null}
+          totalMs={charSelectPending?.totalMs ?? 60_000}
           getCharacterMeta={getCharacterMeta}
           onSelect={(characterName) => {
             // 发送选将 respond action 到引擎
@@ -758,45 +768,57 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       )}
 
       {/* ─── 选将阶段等待遮罩(并行选将:当前视角玩家已选完但其他人还在选)─── */}
-      {!isCharSelectPending && charSelectInProgress && perspectiveCharSelected && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9998,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0, 0, 0, 0.9)',
-            color: '#f1c40f',
-            fontSize: 18,
-            gap: 12,
-          }}
-        >
-          <div>⏳ {perspectiveName} 已选择武将,等待其他玩家选将...</div>
-          <div style={{ fontSize: 13, color: '#aaa' }}>
-            {view.players.filter(p => !p.character).map(p => p.name).join('、')} 正在选将
-          </div>
-          {/* debug 模式:切换到未选玩家代其选将 */}
-          <button
-            onClick={switchPerspective}
+      {!isCharSelectPending && charSelectInProgress && perspectiveCharSelected && (() => {
+        // 从 allCharSelectSlots 取第一个仍在选将的 slot 的 deadline,用于倒计时
+        const activeSlot = view.allCharSelectSlots?.find(
+          s => s.atom.type === '选将询问' && !view.players[s.target]?.character,
+        );
+        const selectDeadline = activeSlot?.deadline ?? null;
+        const selectTotalMs = activeSlot?.totalMs ?? 60_000;
+        return (
+          <div
             style={{
-              marginTop: 16,
-              padding: '8px 18px',
-              fontSize: 14,
-              fontWeight: 'bold',
-              color: '#fff',
-              background: 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: 6,
-              cursor: 'pointer',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9998,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0, 0, 0, 0.9)',
+              color: '#f1c40f',
+              fontSize: 18,
+              gap: 12,
             }}
           >
-            切换视角 → {view.players[(perspectiveIdx + 1) % view.players.length]?.name}
-          </button>
-        </div>
-      )}
+            <div>⏳ {perspectiveName} 已选择武将,等待其他玩家选将...</div>
+            <div style={{ fontSize: 13, color: '#aaa' }}>
+              {view.players.filter(p => !p.character).map(p => p.name).join('、')} 正在选将
+            </div>
+            {/* 选将倒计时 */}
+            <div style={{ width: 300, marginTop: 8 }}>
+              <CountdownBar deadline={selectDeadline} totalMs={selectTotalMs} />
+            </div>
+            {/* debug 模式:切换到未选玩家代其选将 */}
+            <button
+              onClick={switchPerspective}
+              style={{
+                marginTop: 16,
+                padding: '8px 18px',
+                fontSize: 14,
+                fontWeight: 'bold',
+                color: '#fff',
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              切换视角 → {view.players[(perspectiveIdx + 1) % view.players.length]?.name}
+            </button>
+          </div>
+        );
+      })()}
 
       {/* ─── 头部 ─── */}
       <div className={styles.headerBar}>
@@ -825,7 +847,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
       {/* ─── 操作提示 ─── */}
       {/* 优先级: 弃牌 pending > 回应 pending > 出牌/弃牌阶段提示 */}
-      {isPerspectiveAwaiting && pending && !isDiscardPhase && (() => {
+      {/* 选将期间不渲染 promptBox — CharSelectOverlay 已覆盖全屏,避免弹窗视觉干扰 */}
+      {isPerspectiveAwaiting && pending && !isDiscardPhase && pending?.atom?.type !== '选将询问' && (() => {
         // 广播型 pending 且已本地跳过:显示已跳过提示
         const isBroadcast = pendingTargetIdx < 0;
         const broadcastKey = `${pending.atom?.type}:${(pending.atom as { requestType?: string }).requestType}`;
