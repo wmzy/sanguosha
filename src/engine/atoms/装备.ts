@@ -1,6 +1,8 @@
 // 装备:玩家装备 cardId(从手牌移除,放入 equipment 槽位)
-// 副作用:根据装备类型设 player.vars 距离修正(进攻马/防御马/武器范围)。
-// 对应 卸下 atom 负责清除。
+// 副作用:武器攻击范围写入 vars(距离/出杀范围)。
+// 进攻马/防御马的距离修正不再在此硬编码——由马匹技能(赤兔/的卢等)通过
+// 添加技能/移除技能 hook 设置 vars(距离/进攻修正|距离/防御修正),与马术等武将技能一致。
+// 对应 卸下 atom 负责清除武器范围;马匹 vars 由技能卸载清理。
 import type { AtomDefinition, EquipSlot, GameState } from '../types';
 import { registerAtom } from '../atom';
 
@@ -15,19 +17,11 @@ function inferSlot(cardType: string | undefined): EquipSlot | null {
   }
 }
 
-/** 设装备带来的距离修正 vars */
+/** 设装备带来的距离修正 vars(仅武器攻击范围;马匹由技能处理) */
 function applyEquipVars(state: GameState, playerIdx: number, slot: EquipSlot, card: { name: string; range?: number }): void {
   const vars = state.players[playerIdx].vars;
-  switch (slot) {
-    case '进攻马':
-      vars['距离/进攻修正'] = 1;
-      break;
-    case '防御马':
-      vars['距离/防御修正'] = 1;
-      break;
-    case '武器':
-      vars['距离/出杀范围'] = card.range ?? 1;
-      break;
+  if (slot === '武器') {
+    vars['距离/出杀范围'] = card.range ?? 1;
   }
 }
 

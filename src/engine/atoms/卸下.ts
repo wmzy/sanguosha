@@ -1,21 +1,14 @@
 // 卸下:玩家卸下指定槽位的装备,返回手牌
-// 副作用:清除装备带来的距离修正 vars(对应 装备 atom 的设置)。
+// 副作用:清除武器攻击范围 vars(距离/出杀范围)。
+// 进攻马/防御马的 vars 由马匹技能的 移除技能 hook 清理,不在此硬编码。
 import type { AtomDefinition, EquipSlot, GameState } from '../types';
 import { registerAtom } from '../atom';
 
-/** 清除装备带来的距离修正 vars */
+/** 清除装备带来的 vars(仅武器范围;马匹由技能处理) */
 function clearEquipVars(state: GameState, playerIdx: number, slot: EquipSlot): void {
   const vars = state.players[playerIdx].vars;
-  switch (slot) {
-    case '进攻马':
-      delete vars['距离/进攻修正'];
-      break;
-    case '防御马':
-      delete vars['距离/防御修正'];
-      break;
-    case '武器':
-      delete vars['距离/出杀范围'];
-      break;
+  if (slot === '武器') {
+    delete vars['距离/出杀范围'];
   }
 }
 

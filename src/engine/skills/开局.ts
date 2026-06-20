@@ -179,7 +179,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       //     选将 已设置 player.skills,但技能实例需要 registerSkillsFromState 实例化
       for (const player of state.players) {
         for (const skillId of player.skills) {
-          await instantiateSkill(skillId, player.index);
+          await instantiateSkill(skillId, player.index, state);
         }
       }
 

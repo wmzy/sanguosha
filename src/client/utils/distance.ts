@@ -23,21 +23,26 @@ export function seatDistance(players: GameView['players'], fromIdx: number, toId
 
 /**
  * 计算 from 到 to 的实际距离(含马修正)
- * 进攻马:距离 -1;防御马:距离 +1;最小值为 1
+ * 进攻修正(进攻马/马术):距离 -进攻Mod;防御修正(防御马):距离 +防御Mod;最小值为 1
+ * 与引擎 distance.ts 的 effectiveDistance 用同一套 vars(distanceVars 投影)。
  * @returns 实际距离(>= 1)
  */
 export function effectiveDist(players: GameView['players'], fromIdx: number, toIdx: number): number {
   let dist = seatDistance(players, fromIdx, toIdx);
   const fromP = players[fromIdx];
   const toP = players[toIdx];
-  if (fromP?.equipment?.['进攻马']) dist -= 1;
-  if (toP?.equipment?.['防御马']) dist += 1;
+  // 进攻修正:缩短距离(进攻马/马术等技能设此 var)
+  const attackMod = fromP?.distanceVars?.attackMod ?? 0;
+  dist -= attackMod;
+  // 防御修正:增加距离(防御马等技能设此 var)
+  const defenseMod = toP?.distanceVars?.defenseMod ?? 0;
+  dist += defenseMod;
   return Math.max(1, dist);
 }
 
 /**
- * from 是否能攻击到 to(基于 from 装备的武器的攻击范围;徒手默认 1)
- * 武器范围来自 view.cardMap[weaponId].range(由 src/shared/deck.ts 写入)
+ * from 是否能攻击到 to(基于 from 的出杀范围;徒手默认 1)
+ * 出杀范围来自 distanceVars.attackRange(武器/诸葛连弩等在装备时设值)
  */
 export function canAttack(
   players: GameView['players'],
@@ -46,10 +51,6 @@ export function canAttack(
   toIdx: number,
 ): boolean {
   const fromP = players[fromIdx];
-  let range = 1;
-  if (fromP?.equipment?.['武器']) {
-    const weapon = cardMap[fromP.equipment['武器']];
-    if (weapon) range = weapon.range ?? 1;
-  }
+  const range = fromP?.distanceVars?.attackRange ?? 1;
   return effectiveDist(players, fromIdx, toIdx) <= range;
 }

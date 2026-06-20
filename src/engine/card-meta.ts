@@ -2,6 +2,8 @@
 // 卡牌元数据查询函数。供前端/工具模块复用,避免在多处重复硬编码类型/子类型判定。
 
 import type { Card } from './types';
+import { 装备牌列表 } from '../shared/cards/equipment';
+import { skillLoaders } from './skills';
 
 /** 装备牌 */
 export function isEquipment(c: Card): boolean {
@@ -41,3 +43,19 @@ export const SELF_TARGET_CARDS = new Set(['桃', '酒']);
 
 /** 只能作为回应打出的牌(不能主动使用) */
 export const RESPOND_ONLY_CARDS = new Set(['闪', '无懈可击']);
+
+// ─── 装备技能名(从卡牌数据派生,非写死) ───
+// 装备牌装上时会以 card.name 作 skillId 动态挂载技能实例(见 装备通用.ts)。
+// 哪些装备牌「自带技能」的唯一判据是:卡牌名能在 skillLoaders 里查到。
+// 这里取 装备牌列表.name ∩ skillLoaders 的 key,避免前端写死名单漂移。
+// 马匹(赤兔等)不在 skillLoaders 中,自动排除;未实现技能的装备(如麒麟弓)同理排除。
+const EQUIPMENT_SKILL_NAMES_CACHE: ReadonlySet<string> = new Set(
+  装备牌列表
+    .map(def => def.name)
+    .filter(name => Object.prototype.hasOwnProperty.call(skillLoaders, name)),
+);
+
+/** 装备牌自带的技能名集合(从卡牌数据 + 技能注册表派生)。 */
+export function getEquipmentSkillNames(): ReadonlySet<string> {
+  return EQUIPMENT_SKILL_NAMES_CACHE;
+}

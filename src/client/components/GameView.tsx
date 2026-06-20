@@ -8,14 +8,16 @@ import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt, DistributePrompt } from '../../engine/types';
 import { getActionsForPlayer, registerSkillActions, clearRegistry, findActionAcrossOwners, type SkillActionDef } from '../skillActionRegistry';
-import { seatDistance, effectiveDist, canAttack } from '../utils/distance';
+import { effectiveDist, canAttack } from '../utils/distance';
 import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
 import { CharSelectOverlay } from './CharSelectOverlay';
+import { CharSelectWaitingOverlay } from './CharSelectWaitingOverlay';
 import { IdentityRevealOverlay } from './IdentityRevealOverlay';
-import { FACTION_BG, IDENTITY_COLORS, SUIT_COLOR } from './gameViewConstants';
+import { FACTION_BG, SUIT_COLOR, PHASE_LABELS, EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON, formatTime } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { DistributeUI } from './DistributeUI';
 import { PlayerSeatView } from './PlayerSeatView';
+import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
 
 
 // ─── ActionMsg: 发给 controller(不含 baseSeq) ───
@@ -34,29 +36,10 @@ interface Props {
   onDeleteRoom: () => void;
 }
 
-// ─── 阶段中文名 ───
-const PHASE_LABELS: Record<string, string> = {
-  '准备': '准备阶段', '判定': '判定阶段', '摸牌': '摸牌阶段',
-  '出牌': '出牌阶段', '弃牌': '弃牌阶段', '回合结束': '回合结束',
-};
-
 // ─── 引擎声明的默认通用技能(技能按钮区/座位卡均过滤这些) ───
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
-import { isEquipment, isDelayedTrick, isRespondOnly, RANGE_REQUIRED_CARDS, TARGET_REQUIRED_CARDS, TWO_TARGET_CARDS, SELF_TARGET_CARDS, RESPOND_ONLY_CARDS } from '../../engine/card-meta';
+import { isDelayedTrick, RANGE_REQUIRED_CARDS, TARGET_REQUIRED_CARDS, TWO_TARGET_CARDS, SELF_TARGET_CARDS, RESPOND_ONLY_CARDS } from '../../engine/card-meta';
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
-const EQUIPMENT_SKILL_NAMES = new Set([
-  '诸葛连弩', '青釭剑', '青龙偃月刀', '雌雄双股剑', '贯石斧',
-  '丈八蛇矛', '方天画戟', '麒麟弓', '寒冰剑',
-  '八卦阵', '仁王盾', '藤甲', '白银狮子',
-  '赤兔', '紫骍', '大宛', '的卢', '绝影', '爪黄飞电',
-]);
-
-// ─── 时间格式化 ───
-function formatTime(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  return m > 0 ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
-}
 
 import { useAnimationState } from '../hooks/useAnimationState';
 
@@ -288,11 +271,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     const result = canAttack(view.players, view.cardMap, perspectiveIdx, i);
     if (!result) {
       const fromP = view.players[perspectiveIdx];
-      let range = 1;
-      if (fromP?.equipment?.['武器']) {
-        const weapon = view.cardMap[fromP.equipment['武器']];
-        if (weapon) range = weapon.range ?? 1;
-      }
+      const range = fromP?.distanceVars?.attackRange ?? 1;
       console.log('[isTargetable] 无法选中', i, 'dist=', effectiveDist(view.players, perspectiveIdx, i), 'range=', range);
     }
     return result;
@@ -348,32 +327,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     // ─── 出牌飞行动画:在 card 消失前捕获位置,生成浮动元素 ───
     const cardEl = handListRef.current?.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement | null;
     if (cardEl) {
-      const rect = cardEl.getBoundingClientRect();
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2 - 40;
-      const flyDx = cx - rect.left - rect.width / 2;
-      const flyDy = cy - rect.top - rect.height / 2;
-      const floating = document.createElement('div');
-      floating.style.cssText = `
-        position: fixed; left: ${rect.left}px; top: ${rect.top}px;
-        width: ${rect.width}px; height: ${rect.height}px;
-        border: 2px solid #3498db; border-radius: 8px; padding: 10px 14px;
-        background: rgba(22,33,62,0.95); color: #e0e0e0;
-        text-align: center; pointer-events: none; z-index: 9999;
-        --fly-dx: ${flyDx}px; --fly-dy: ${flyDy}px;
-        animation: flyToCenter 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-        box-shadow: 0 0 16px rgba(52,152,219,0.6);
-      `;
-      const nameDiv = document.createElement('div');
-      nameDiv.style.cssText = `font-weight: bold; font-size: 15px; margin-bottom: 2px; color: ${SUIT_COLOR[card.suit] ?? '#ccc'};`;
-      nameDiv.textContent = card.name;
-      const suitDiv = document.createElement('div');
-      suitDiv.style.cssText = `font-size: 12px; color: ${SUIT_COLOR[card.suit] ?? '#ccc'};`;
-      suitDiv.textContent = `${card.suit}${card.rank}`;
-      floating.appendChild(nameDiv);
-      floating.appendChild(suitDiv);
-      document.body.appendChild(floating);
-      floating.addEventListener('animationend', () => floating.remove());
+      createCardFlyAnimation(cardEl, card);
     }
     // 装备牌统一走"装备通用" skillId,其他牌走 card.name
     const skillId = card.type === '装备牌' ? '装备通用' : card.name;
@@ -769,57 +723,14 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       )}
 
       {/* ─── 选将阶段等待遮罩(并行选将:当前视角玩家已选完但其他人还在选)─── */}
-      {!isCharSelectPending && charSelectInProgress && perspectiveCharSelected && (() => {
-        // 从 allCharSelectSlots 取第一个仍在选将的 slot 的 deadline,用于倒计时
-        const activeSlot = view.allCharSelectSlots?.find(
-          s => s.atom.type === '选将询问' && !view.players[s.target]?.character,
-        );
-        const selectDeadline = activeSlot?.deadline ?? null;
-        const selectTotalMs = activeSlot?.totalMs ?? 60_000;
-        return (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9998,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(0, 0, 0, 0.9)',
-              color: '#f1c40f',
-              fontSize: 18,
-              gap: 12,
-            }}
-          >
-            <div>⏳ {perspectiveName} 已选择武将,等待其他玩家选将...</div>
-            <div style={{ fontSize: 13, color: '#aaa' }}>
-              {view.players.filter(p => !p.character).map(p => p.name).join('、')} 正在选将
-            </div>
-            {/* 选将倒计时 */}
-            <div style={{ width: 300, marginTop: 8 }}>
-              <CountdownBar deadline={selectDeadline} totalMs={selectTotalMs} />
-            </div>
-            {/* debug 模式:切换到未选玩家代其选将 */}
-            <button
-              onClick={switchPerspective}
-              style={{
-                marginTop: 16,
-                padding: '8px 18px',
-                fontSize: 14,
-                fontWeight: 'bold',
-                color: '#fff',
-                background: 'rgba(255,255,255,0.15)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
-            >
-              切换视角 → {view.players[(perspectiveIdx + 1) % view.players.length]?.name}
-            </button>
-          </div>
-        );
-      })()}
+      {!isCharSelectPending && charSelectInProgress && perspectiveCharSelected && (
+        <CharSelectWaitingOverlay
+          view={view}
+          perspectiveIdx={perspectiveIdx}
+          perspectiveName={perspectiveName}
+          onSwitchPerspective={switchPerspective}
+        />
+      )}
 
       {/* ─── 头部 ─── */}
       <div className={styles.headerBar}>
@@ -837,8 +748,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           </button>
           <button className={styles.goToBtn} onClick={goToCurrentPlayer}>查看当前玩家</button>
           <button
-            className={styles.goToBtn}
-            style={autoSwitch ? { background: '#27ae60', color: '#fff' } : undefined}
+            className={cx(styles.goToBtn, autoSwitch && styles.autoSwitchActive)}
             onClick={() => setAutoSwitch(!autoSwitch)}
           >
             自动切换{autoSwitch ? '✓' : '✗'}
@@ -948,7 +858,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               onSend={sendDistribute}
               cardMap={view.cardMap}
             />
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
+            <div className={styles.distributeCancelRow}>
               <button className={styles.cancelBtn} onClick={() => setDistributeMode(null)}>取消</button>
             </div>
           </div>
@@ -1107,7 +1017,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                     <div>
                       {perspectiveIdx === view.viewer && <span className={styles.youBadge}>我</span>}
                       {isPerspectiveTurn && <span className={styles.turnBadge}>回合</span>}
-                      {isDead && <span className={styles.youBadge} style={{ background: '#555' }}>亡</span>}
+                      {isDead && <span className={cx(styles.youBadge, styles.deadBadge)}>亡</span>}
                       {identity && (
                         <span
                           className={
@@ -1138,15 +1048,18 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                 </div>
                 {/* 技能区：被动为标签，可主动点击的为按钮 */}
                 {visibleSkills.length > 0 && (
-                  <div className={styles.skillRow} style={{ padding: '8px 12px' }}>
+                  <div className={cx(styles.skillRow, styles.skillRowPad)}>
                     {visibleSkills.map(s => {
                       const btn = triggerableActions.find(a => a.skillId === s);
                       if (showSkillButtons && btn) {
                         return (
                           <button
                             key={s}
-                            className={styles.skillBtn}
-                            style={btn.style === 'danger' ? { borderColor: '#e74c3c' } : btn.style === 'primary' ? { borderColor: '#f39c12' } : undefined}
+                            className={cx(
+                              styles.skillBtn,
+                              btn.style === 'danger' && styles.skillBtnDanger,
+                              btn.style === 'primary' && styles.skillBtnPrimary,
+                            )}
                             onClick={() => handleSkillAction(btn)}
                             title={`${btn.label}: ${btn.prompt.title}`}
                           >
@@ -1165,12 +1078,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                     <div className={styles.equipRow}>
                       {Object.entries(p.equipment).map(([slot, cardId]) => {
                         const card = view.cardMap[cardId as string];
-                        const icon =
-                          slot === '武器' ? '⚔' :
-                          slot === '防具' ? '🛡' :
-                          slot === '进攻马' ? '🐎+' :
-                          slot === '防御马' ? '🐎-' :
-                          '💎';
+                        const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
                         return (
                           <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>
                             {icon} {card?.name ?? cardId}
@@ -1195,7 +1103,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   const ids = p.pendingTricks ?? [];
                   if (ids.length === 0) return null;
                   return (
-                    <div className={styles.judgeRow} style={{ padding: '0 12px 8px' }}>
+                    <div className={cx(styles.judgeRow, styles.judgeRowPad)}>
                       <span className={styles.judgeRowLabel}>判定:</span>
                       {ids.map((cardId: string) => {
                         const card = view.cardMap[cardId];
@@ -1234,7 +1142,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               {perspectiveName} 的手牌 ({perspectiveHand.length})
               {perspectiveIdx !== view.viewer && <span className={styles.debugHint}> (调试视角)</span>}
               {transformMode && (
-                <span className={styles.debugHint} style={{ color: '#f1c40f', marginLeft: 8 }}>
+                <span className={cx(styles.debugHint, styles.transformHint)}>
                   ⚡ 转化模式:选1张{transformMode.wrapperName} · 源技能 {transformMode.skillId}
                 </span>
               )}
@@ -1257,8 +1165,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           {/* 操作面板：出牌/结束回合/目标提示 */}
           <div className={styles.actionBar}>
             {canOperate && isMyTurn && view.phase === '出牌' && transformMode && selectedCardId && (
-              <button className={styles.playBtn} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}
-                style={selectedTarget ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
+              <button className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}>
                 使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
               </button>
             )}
@@ -1274,8 +1181,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   ? ` → A=${selectedTarget} B=${selectedKillTarget}`
                   : ' (请选 A/B 两个目标)')
                 : (selectedTarget ? ` → ${selectedTarget}` : needsTarget ? ' (请选目标)' : '');
-              return <button className={styles.playBtn} onClick={handlePlayCard} disabled={!canPlay}
-                style={canPlay ? undefined : { opacity: 0.4, cursor: 'not-allowed' }}>
+              return <button className={cx(styles.playBtn, !canPlay && styles.btnDisabled)} onClick={handlePlayCard} disabled={!canPlay}>
                 出牌{targetLabel}
               </button>;
             })()}
@@ -1308,7 +1214,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   <>
                     <div className={styles.targetTitle}>
                       ① 选 A 角色(装备区有武器):
-                      {selectedTarget && <span style={{ color: '#f1c40f', marginLeft: 8 }}>{selectedTarget}</span>}
+                      {selectedTarget && <span className={styles.selectedTargetText}>{selectedTarget}</span>}
                     </div>
                     <div className={styles.targetList}>
                       {view.players.map((p, i) => {
@@ -1328,9 +1234,9 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                     </div>
                     {selectedTarget && (
                       <>
-                        <div className={styles.targetTitle} style={{ marginTop: 8 }}>
+                        <div className={cx(styles.targetTitle)} style={{ marginTop: 8 }}>
                           ② 选 B 角色(A 对其出杀):
-                          {selectedKillTarget && <span style={{ color: '#f1c40f', marginLeft: 8 }}>{selectedKillTarget}</span>}
+                          {selectedKillTarget && <span className={styles.selectedTargetText}>{selectedKillTarget}</span>}
                         </div>
                         <div className={styles.targetList}>
                           {view.players.map((p, i) => {
@@ -1347,7 +1253,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                                 onClick={() => handleTwoTargetClick(p.name, 'B')}
                               >
                                 {p.name} ({p.character}) ♥{p.health}
-                                {!inAARange && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
+                                {!inAARange && <span className={styles.mutedHint}>距离外</span>}
                               </button>
                             );
                           })}
@@ -1370,7 +1276,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                             onClick={() => transformMode ? handleTransformPlay(p.name) : handleTargetClick(p.name)}
                           >
                             {p.name} ({p.character}) ♥{p.health}
-                            {!targetable && <span style={{ fontSize: 11, color: '#999', marginLeft: 4 }}>距离外</span>}
+                            {!targetable && <span className={styles.mutedHint}>距离外</span>}
                           </button>
                         );
                       })}

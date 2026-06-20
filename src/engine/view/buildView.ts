@@ -113,6 +113,12 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       handCount: p.hand.length,
       hand: (i === viewer || debug) ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
       marks: p.marks,
+      // 距离修正 vars(只投影距离相关三个 key,不暴露身份等敏感 vars)
+      distanceVars: {
+        attackMod: p.vars['距离/进攻修正'] as number | undefined,
+        defenseMod: p.vars['距离/防御修正'] as number | undefined,
+        attackRange: p.vars['距离/出杀范围'] as number | undefined,
+      },
       // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)
       pendingTricks: p.pendingTricks.map(t => t.card.id),
       ...(() => {

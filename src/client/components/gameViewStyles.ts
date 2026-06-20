@@ -516,3 +516,83 @@ export const logEntry = css`
 export const logTime = css`color: #666; min-width: 40px; flex-shrink: 0;`;
 export const logPlayer = css`color: #3498db; font-weight: bold; min-width: 40px; flex-shrink: 0;`;
 export const logText = css`color: #ccc;`;
+
+// ─── 选将等待遮罩(并行选将:当前视角玩家已选完但其他人还在选)───
+export const charSelectWaitingOverlay = css`
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  color: #f1c40f;
+  font-size: 18px;
+  gap: 12px;
+`;
+export const charSelectWaitingSub = css`
+  font-size: 13px;
+  color: #aaa;
+`;
+export const charSelectWaitingCountdown = css`
+  width: 300px;
+  margin-top: 8px;
+`;
+export const charSelectWaitingSwitchBtn = css`
+  margin-top: 16px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+`;
+
+// ─── 辅助状态样式 ───
+/** 自动切换按钮激活态(绿色)。 */
+export const autoSwitchActive = css`
+  background: #27ae60;
+  color: #fff;
+`;
+/** 转化模式提示文案色。 */
+export const transformHint = css`
+  color: #f1c40f;
+  margin-left: 8px;
+`;
+/** 已选目标金色高亮 span(复用转化提示色系)。 */
+export const selectedTargetText = css`
+  color: #f1c40f;
+  margin-left: 8px;
+`;
+/** 「距离外」等辅助提示小字(灰)。 */
+export const mutedHint = css`
+  font-size: 11px;
+  color: #999;
+  margin-left: 4px;
+`;
+/** 死亡「亡」徽章背景(覆盖 youBadge 的蓝色)。 */
+export const deadBadge = css`
+  background: #555;
+`;
+/** 技能按钮 danger 变体边框。 */
+export const skillBtnDanger = css`border-color: #e74c3c;`;
+/** 技能按钮 primary 变体边框。 */
+export const skillBtnPrimary = css`border-color: #f39c12;`;
+/** 按钮禁用态(出牌/转化出牌)。 */
+export const btnDisabled = css`
+  opacity: 0.4;
+  cursor: not-allowed;
+`;
+/** distribute 取消按钮居中容器。 */
+export const distributeCancelRow = css`
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+`;
+/** 角色大卡技能区 padding 覆盖。 */
+export const skillRowPad = css`padding: 8px 12px;`;
+/** 角色大卡判定区 padding 覆盖。 */
+export const judgeRowPad = css`padding: 0 12px 8px;`;

@@ -415,6 +415,13 @@ export interface GameView {
     /** 该玩家的身份已分配但当前视角不可见。identity 为 undefined 时,
      *  若 identityHidden=true 则显示「暗」,否则不渲染身份徽章(尚未分配)。 */
     identityHidden?: boolean;
+    /** 距离修正 vars(只投影距离相关的三个 key,不暴露身份等敏感 vars)。
+     *  供前端 distance.ts 与引擎 distance.ts 用同一套数据计算距离。 */
+    distanceVars?: {
+      attackMod?: number;
+      defenseMod?: number;
+      attackRange?: number;
+    };
     /** 判定区(延时锦囊)。元素为 cardId,通过 cardMap 查 Card */
     pendingTricks?: string[];
   }[];

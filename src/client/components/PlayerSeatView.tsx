@@ -1,19 +1,13 @@
 // src/client/components/PlayerSeatView.tsx
 // 玩家座位视图(弧形座位上的每张武将卡) — 从 GameView.tsx 抽出
 import { css, cx } from '@linaria/core';
-import type { GameView } from '../../engine/types';
+import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
-import { FACTION_BG, SUIT_COLOR } from './gameViewConstants';
+import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
-const DEFAULT_EQUIPMENT_SKILL_NAMES: Set<string> = new Set([
-  '诸葛连弩', '青釭剑', '青龙偃月刀', '雌雄双股剑', '贯石斧',
-  '丈八蛇矛', '方天画戟', '麒麟弓', '寒冰剑',
-  '八卦阵', '仁王盾', '藤甲', '白银狮子',
-  '赤兔', '紫骍', '大宛', '的卢', '绝影', '爪黄飞电',
-]);
 
 export interface PlayerSeatProps {
   player: GameView['players'][number];
@@ -37,8 +31,6 @@ export interface PlayerSeatProps {
   hideIdentity?: boolean;
   /** 视角玩家可主动发动的技能动作列表(预留,目前仅接受不渲染) */
   skillActions?: SkillActionDef[];
-  /** 装备技能集合,用于从座位卡过滤装备被动技能名 */
-  EQUIPMENT_SKILL_NAMES?: Set<string>;
 }
 
 export function PlayerSeatView({
@@ -48,7 +40,6 @@ export function PlayerSeatView({
   isDamaged = false, damageVersion = 0, isTurnGlow = false, turnGlowVersion = 0,
   hideIdentity = true,
   skillActions: _skillActions, // 预留:未来用于在座位卡上显示可点使用的技能按钮
-  EQUIPMENT_SKILL_NAMES = DEFAULT_EQUIPMENT_SKILL_NAMES,
 }: PlayerSeatProps) {
   void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
   const isDead = !player.alive;
@@ -57,7 +48,7 @@ export function PlayerSeatView({
   const displayChar = player.character;
   const charInfo = displayChar ? getCharacterMeta(displayChar) : undefined;
   const faction = charInfo?.faction ?? '群';
-  const factionColor = FACTION_BG[faction] || '#8e44ad';
+  const factionColor = FACTION_BG[faction] ?? '#8e44ad';
 
   // 身份
   const identity = player.identity;
@@ -140,12 +131,7 @@ export function PlayerSeatView({
         <div className={equipRow}>
           {Object.entries(player.equipment).map(([slot, cardId]) => {
             const card = view.cardMap[cardId as string];
-            const icon =
-              slot === '武器' ? '⚔' :
-              slot === '防具' ? '🛡' :
-              slot === '进攻马' ? '🐎+' :
-              slot === '防御马' ? '🐎-' :
-              '💎';
+            const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
             return <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>{icon}{card?.name ?? cardId}</span>;
           })}
         </div>

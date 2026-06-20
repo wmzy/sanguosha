@@ -50,6 +50,13 @@ export const skillLoaders: Record<string, Loader> = {
   '藤甲': load(() => import('./藤甲')),
   '白银狮子': load(() => import('./白银狮子')),
   '乐不思蜀': load(() => import('./乐不思蜀')),
+  // 马匹(进攻马/防御马):效果=距离修正,与马术等技能统一走 vars
+  '赤兔': () => import('./马匹技能').then(m => m.赤兔),
+  '紫骍': () => import('./马匹技能').then(m => m.紫骍),
+  '大宛': () => import('./马匹技能').then(m => m.大宛),
+  '的卢': () => import('./马匹技能').then(m => m.的卢),
+  '绝影': () => import('./马匹技能').then(m => m.绝影),
+  '爪黄飞电': () => import('./马匹技能').then(m => m.爪黄飞电),
   // 即时锦囊
   '过河拆桥': load(() => import('./过河拆桥')),
   '顺手牵羊': load(() => import('./顺手牵羊')),

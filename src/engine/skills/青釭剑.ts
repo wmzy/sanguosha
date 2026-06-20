@@ -55,7 +55,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     for (const skillId of ARMOR_SKILLS) {
       if (targetPlayer.skills.includes(skillId)) {
         unloaded.push({ target, skillId });
-        unloadSkillInstance(skillId, target);
+        unloadSkillInstance(skillId, target, ctx.state);
       }
     }
     if (unloaded.length > 0) {
@@ -69,7 +69,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     const unloaded = tempUnloadMap.get(ownerId);
     if (!unloaded || unloaded.length === 0) return;
     for (const { target, skillId } of unloaded) {
-      await instantiateSkill(skillId, target);
+      await instantiateSkill(skillId, target, ctx.state);
     }
     tempUnloadMap.delete(ownerId);
   });

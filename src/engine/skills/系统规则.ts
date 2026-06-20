@@ -80,13 +80,13 @@ export function onInit(_skill: Skill, _ownerId: number): () => void {
   // ── 添加技能 after hook:实例化技能(注册 action/hook) ──
   registerAfterHook('系统规则', -1, '添加技能', async (ctx) => {
     const atom = ctx.atom as { skillId: string; player: number };
-    await instantiateSkill(atom.skillId, atom.player);
+    await instantiateSkill(atom.skillId, atom.player, ctx.state);
   });
 
   // ── 移除技能 after hook:卸载技能实例 ──
   registerAfterHook('系统规则', -1, '移除技能', async (ctx) => {
     const atom = ctx.atom as { skillId: string; player: number };
-    unloadSkillInstance(atom.skillId, atom.player);
+    unloadSkillInstance(atom.skillId, atom.player, ctx.state);
   });
 
   // ── 造成伤害 after hook:濒死检查(最后执行,确保遗计等技能先触发) ──
