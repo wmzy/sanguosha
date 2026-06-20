@@ -165,6 +165,13 @@ export function CharSelectOverlay({
       {isSelfSelecting && !isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>你正在选将(他人不可见你的选择)</div>}
       {!isLord && !isSelfSelecting && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>选将保密</div>}
 
+      {/* 主公已选武将(主公身份公开,选将结果所有人可见) */}
+      {!isLord && lordCharacter && (
+        <div style={{ fontSize: 15, color: '#ffd700', marginBottom: 8, fontWeight: 'bold' }}>
+          主公已选择: {lordCharacter}
+        </div>
+      )}
+
       {/* 倒计时进度条 */}
       <div style={{ width: 300, marginBottom: 24 }}>
         <CountdownBar deadline={deadline} totalMs={totalMs} />
@@ -318,10 +325,8 @@ export function CharSelectOverlay({
           </button>
         </>
       ) : isLord ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 32 }}>
-          <div style={{ fontSize: 18, color: '#aaa' }}>
-            {lordCharacter ? `主公已选择: ${lordCharacter}` : '主公正在选将，请等待...'}
-          </div>
+        <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
+          主公正在选将，请等待...
         </div>
       ) : (
         <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
