@@ -70,7 +70,7 @@ describe('GameView:选将阶段身份揭示弹窗不覆盖选将界面', () => {
 
   it('主公选将阶段:身份揭示弹窗不显示,选将遮罩可见(含身份信息)', () => {
     const view = makeLordSelectingView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} />);
+    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
 
     // 选将遮罩可见:标题"主公选将" + 候选人"刘备"
     expect(screen.getByText('主公选将')).toBeDefined();
@@ -96,7 +96,7 @@ describe('GameView:选将阶段身份揭示弹窗不覆盖选将界面', () => {
 
   it('选将阶段倒计时可见(不被身份弹窗遮挡)', () => {
     const view = makeLordSelectingView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} />);
+    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
 
     // CountdownBar 渲染剩余秒数(60s timeout,deadline 是 now+60s)
     // 选将遮罩里的倒计时文字应该可见
@@ -124,7 +124,7 @@ describe('GameView:选将阶段身份揭示弹窗不覆盖选将界面', () => {
       turnDeadline: null,
       log: [],
     };
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} />);
+    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
 
     // 此时不在选将阶段,身份揭示弹窗应该显示
     const confirmButtons = screen.getAllByRole('button').filter(b =>

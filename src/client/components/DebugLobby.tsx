@@ -5,9 +5,11 @@
 
 import { useNavigate } from 'react-router-dom';
 import { useDebugLobbyController } from '../hooks/useDebugLobbyController';
+import { useDebugPerspective } from '../hooks/useDebugPerspective';
 import { DebugControls } from './debug/DebugControls';
 import { DebugRoomList } from './debug/DebugRoomList';
-import { GameViewComponent } from './GameView';
+import { GameViewComponent, type ActionMsg } from './GameView';
+import { DebugInfo } from './DebugInfo';
 import { styles } from '../theme';
 import type { RoomInfo } from '../../server/protocol';
 
@@ -23,7 +25,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   if (c.view) {
     return (
       <div>
-        <GameViewComponent
+        <DebugGameView
           view={c.view}
           onAction={c.sendAction}
           onDeleteRoom={c.handleDeleteRoom}
@@ -48,5 +50,33 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
       />
       {c.error && <div style={styles.errorToast()}>{c.error}</div>}
     </div>
+  );
+}
+
+/** debug 模式游戏视图:GameView + 视角管理 + 调试面板。 */
+function DebugGameView({
+  view, onAction, onDeleteRoom,
+}: {
+  view: import('../../engine/types').GameView;
+  onAction: (action: ActionMsg) => void;
+  onDeleteRoom: () => void;
+}) {
+  const { perspective, switchPerspective, goToCurrentPlayer, setPerspective, autoSwitchCtl } = useDebugPerspective(view);
+  const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
+  return (
+    <>
+      <GameViewComponent
+        view={view}
+        onAction={onAction}
+        perspective={perspective}
+        onSwitchPerspective={switchPerspective}
+        onGoToCurrentPlayer={goToCurrentPlayer}
+        onPerspectiveChange={setPerspective}
+        autoSwitchCtl={autoSwitchCtl}
+        onDeleteRoom={onDeleteRoom}
+      />
+      {/* debug 专属:调试信息面板(日志在 GameView 内,正常功能) */}
+      <DebugInfo view={view} perspectiveName={perspectiveName} pending={view.pending} />
+    </>
   );
 }

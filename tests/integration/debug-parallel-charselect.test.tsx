@@ -6,9 +6,26 @@
 //   3. 帮选后,视角自动跟到下一个未选玩家
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { GameViewComponent } from '../../src/client/components/GameView';
+import { GameViewComponent, type ActionMsg } from '../../src/client/components/GameView';
+import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView } from '../../engine/types';
+
+/** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角)。 */
+function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
+  const { perspective, switchPerspective, goToCurrentPlayer, setPerspective, autoSwitchCtl } = useDebugPerspective(view);
+  return (
+    <GameViewComponent
+      view={view}
+      onAction={onAction}
+      perspective={perspective}
+      onSwitchPerspective={switchPerspective}
+      onGoToCurrentPlayer={goToCurrentPlayer}
+      onPerspectiveChange={setPerspective}
+      autoSwitchCtl={autoSwitchCtl}
+    />
+  );
+}
 
 function makeView(): GameView {
   // debug 模式:viewer=0(主公,已选刘备)。P1/P2 未选,有并行选将 slot。
@@ -64,7 +81,7 @@ describe('GameView:debug 并行选将切换视角', () => {
 
   it('viewer(主公)已选完时,自动切到第一个未选玩家(player-1)显示其选将界面', async () => {
     const view = makeView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} />);
+    render(<TestGameView view={view} onAction={() => {}} />);
 
     // 应自动切到 player-1 视角并显示选将界面(CharSelectOverlay 标题 "P1 选将中")
     await waitFor(() => {
@@ -77,7 +94,7 @@ describe('GameView:debug 并行选将切换视角', () => {
 
   it('手动切换视角到 player-2 后,显示 player-2 的候选人(关羽/郭嘉)', async () => {
     const view = makeView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} />);
+    render(<TestGameView view={view} onAction={() => {}} />);
 
     // 先等 player-1 选将界面出现
     await waitFor(() => {
@@ -99,7 +116,7 @@ describe('GameView:debug 并行选将切换视角', () => {
   it('帮 player-1 选将后,onAction 以正确 ownerId 提交', async () => {
     const view = makeView();
     const onAction = vi.fn();
-    render(<GameViewComponent view={view} onAction={onAction} onDeleteRoom={() => {}} />);
+    render(<TestGameView view={view} onAction={onAction} />);
 
     await waitFor(() => {
       expect(screen.getByText(/P1 选将中/)).toBeDefined();
@@ -122,10 +139,10 @@ describe('GameView:debug 并行选将切换视角', () => {
     });
   });
 
-  it('当前视角玩家已选完且仍有他人未选时,通过 activeSlot 回退显示第一个选将玩家的遮罩', async () => {
-    // viewer=0 已选,手动切回 player-0(主公,已选)→ 应通过 activeSlot 回退显示仍在选将的玩家遮罩
+  it('手动切到已选完的玩家后,显示等待遮罩(含切换视角按钮)', async () => {
+    // viewer=0 已选,手动切到 player-0(主公,已选)→ 显示等待遮罩 + 切换按钮
     const view = makeView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} />);
+    render(<TestGameView view={view} onAction={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText(/P1 选将中/)).toBeDefined();
@@ -137,9 +154,10 @@ describe('GameView:debug 并行选将切换视角', () => {
     await waitFor(() => expect(screen.getByText(/P2 选将中/)).toBeDefined());
     fireEvent.click(switchBtn()); // → player-0(主公,已选)
 
-    // activeSlot 回退:取第一个仍在选将的 slot(P1),显示其选将遮罩
+    // player-0 已选完:显示等待遮罩,而非选将界面
     await waitFor(() => {
-      expect(screen.getByText(/P1 选将中/)).toBeDefined();
+      expect(screen.getByText(/已选择武将.*等待其他玩家选将/)).toBeDefined();
     });
+    expect(screen.getByRole('button', { name: /切换视角/ })).toBeDefined();
   });
 });

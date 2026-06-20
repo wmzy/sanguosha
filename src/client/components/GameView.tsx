@@ -6,22 +6,25 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
-import type { GameView as EngineGameView, Card, Json, PendingView, EquipSlot, ActionPrompt, DistributePrompt } from '../../engine/types';
-import { getActionsForPlayer, registerSkillActions, clearRegistry, findActionAcrossOwners, type SkillActionDef } from '../skillActionRegistry';
+import type { GameView as EngineGameView, Card, Json, ActionPrompt, DistributePrompt } from '../../engine/types';
+import { getActionsForPlayer, registerSkillActions, clearRegistry, type SkillActionDef } from '../skillActionRegistry';
 import { effectiveDist, canAttack } from '../utils/distance';
 import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
 import { CharSelectOverlay } from './CharSelectOverlay';
 import { CharSelectWaitingOverlay } from './CharSelectWaitingOverlay';
 import { IdentityRevealOverlay } from './IdentityRevealOverlay';
-import { FACTION_BG, SUIT_COLOR, PHASE_LABELS, EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON, formatTime } from './gameViewConstants';
+import { SUIT_COLOR, PHASE_LABELS } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { DistributeUI } from './DistributeUI';
 import { PlayerSeatView } from './PlayerSeatView';
+import { PlayerCardLarge } from './PlayerCardLarge';
+import { GameLog } from './GameLog';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
+import { resolvePendingRespond } from '../utils/pendingRespond';
 
 
 // ─── ActionMsg: 发给 controller(不含 baseSeq) ───
-interface ActionMsg {
+export interface ActionMsg {
   skillId: string;
   actionType: string;
   ownerId: number;
@@ -33,7 +36,18 @@ interface ActionMsg {
 interface Props {
   view: EngineGameView;
   onAction: (action: ActionMsg) => void;
-  onDeleteRoom: () => void;
+  /** 当前视角座次(看谁)。正式模式 = viewer;debug 模式由上层控制(多视角切换)。 */
+  perspective: number;
+  /** 循环切换到下一视角(debug 模式提供时,header 渲染视角切换按钮)。 */
+  onSwitchPerspective?: () => void;
+  /** 跳转到当前玩家回调(debug 模式提供时,header 渲染「查看当前玩家」按钮)。 */
+  onGoToCurrentPlayer?: () => void;
+  /** 直接切到指定座次(点座位卡切换视角等)。 */
+  onPerspectiveChange?: (idx: number) => void;
+  /** 自动跟随开关状态(debug 模式提供时,header 渲染「自动切换」按钮)。 */
+  autoSwitchCtl?: { enabled: boolean; toggle: () => void };
+  /** 退出/删除房间(可选;debug 模式提供时渲染「退出」按钮)。 */
+  onDeleteRoom?: () => void;
 }
 
 // ─── 引擎声明的默认通用技能(技能按钮区/座位卡均过滤这些) ───
@@ -44,9 +58,12 @@ const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 import { useAnimationState } from '../hooks/useAnimationState';
 
 // ─── 主组件 ───
-export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
-  // 视角: 默认看自己,可切换
-  const [perspectiveIdx, setPerspectiveIdx] = useState(view.viewer);
+// 纯净的单视角组件:perspective(看谁)由上层决定。
+//   正式模式:上层传 perspective=view.viewer,固定看自己。
+//   debug 模式:上层(DebugLobby)管理视角切换,传当前 perspective。
+// 多视角切换/自动跟随/代打逻辑不在本组件内——那是上层的职责。
+export function GameViewComponent({ view, onAction, perspective, onSwitchPerspective, onGoToCurrentPlayer, onPerspectiveChange, autoSwitchCtl, onDeleteRoom }: Props) {
+  const perspectiveIdx = perspective;
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedKillTarget, setSelectedKillTarget] = useState<string | null>(null);
@@ -65,27 +82,21 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     prompt: DistributePrompt;
   } | null>(null);
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
-  // 选将遮罩:读 view.pending.atom.type === '选将询问'
-  // 候选人从 view.pending.atom.candidates 获取(引擎生成)
-  // debug 模式下并行选将:viewer 自己已选完时,view.pending 为空,
-  // 从 view.allCharSelectSlots 按 perspectiveIdx 找对应玩家的选将 slot(代打)。
-  // 回退顺序:专属slot > 视角slot > 任意活跃slot。
-  // parallelSlotForPerspective 优先于 activeSlot,避免切视角时显示错误玩家的候选人。
+  // 选将遮罩:候选人从选将 slot 的 atom.candidates 获取(引擎生成)。
+  // 正式模式:view.pending 是自己的选将询问(viewer 隔离)。
+  // debug 模式:上层已将 perspective 切到待选将玩家,从 allCharSelectSlots 取该玩家的 slot
+  //   (viewer 自己选完时 view.pending 为空,靠 allCharSelectSlots 代打其他玩家)。
   const ownCharSelect = view.pending?.atom?.type === '选将询问' ? view.pending : null;
   const parallelSlotForPerspective = view.allCharSelectSlots?.find(
     s => s.atom.type === '选将询问' && s.target === perspectiveIdx,
   ) ?? null;
-  const activeSlot = view.allCharSelectSlots?.find(
-    s => s.atom.type === '选将询问' && !view.players[s.target]?.character,
-  ) ?? null;
-  const charSelectPending = ownCharSelect ?? parallelSlotForPerspective ?? activeSlot;
+  const charSelectPending = ownCharSelect ?? parallelSlotForPerspective;
   const isCharSelectPending = charSelectPending !== null;
   const charCandidates: Array<{ name: string; skills: string[] }> = charSelectPending
     ? (charSelectPending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
     : [];
   const charSelectTarget = charSelectPending ? charSelectPending.target : -1;
-  // 选将阶段进行中:仍有玩家未选将(character 为空)且游戏未进入第一回合(阶段准备)。
-  // 用于并行选将场景:当前视角玩家已选完但其他人还在选时,显示"等待其他玩家选将"遮罩。
+  // 选将阶段进行中:仍有玩家未选将(character 为空)且游戏未进入第一回合(阶段准备)
   const charSelectInProgress = view.phase === '准备'
     && view.players.some(p => !p.character);
   // 当前视角玩家是否已选将(debug 代打时随 perspectiveIdx 变化)
@@ -93,67 +104,13 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // ─── 动画状态 ───
   const anim = useAnimationState(view, perspectiveIdx);
   const handListRef = useRef<HTMLDivElement>(null);
-  const prevPhaseForGlow = useRef(view.phase);
-
-  // 自动视角切换开关(默认开,多 agent 协作时可关)
-  const [autoSwitch, setAutoSwitch] = useState(true);
-  // 选将期间用户手动切换过视角后,停止自动跟随选将 target
-  const charSelectManualSwitchRef = useRef(false);
-  const prevCharSelectTargetRef = useRef(-1);
-  const pendingRef = useRef(view.pending);
-  useEffect(() => { pendingRef.current = view.pending; }, [view.pending]);
-  useEffect(() => {
-    if (!view.pending) {
-      charSelectManualSwitchRef.current = false;
-      prevCharSelectTargetRef.current = -1;
-    }
-  }, [view.pending]);
   // 广播型 pending(如无懈可击)"不回应"后本地跳过标记,避免重复显示 prompt
   const [skippedBroadcast, setSkippedBroadcast] = useState<Set<string>>(new Set());
 
-  // 有待回应请求时,自动切换视角到被问询玩家;无 pending 时回到当前回合玩家
-  // 选将期间:自动跟随选将 target,但用户手动切换后停止跟随;
-  //  charSelectTarget 变化(下一个玩家选将)时重置,继续跟随新 target。
-  //  debug 并行选将:viewer 自己选完后 view.pending 为空,但 allCharSelectSlots 有其他玩家的 slot,
-  //  自动跟到第一个未选完的玩家(代打),直到用户手动切换。
-  useEffect(() => {
-    if (!autoSwitch) return;
-    const isCharSelect = view.pending?.atom?.type === '选将询问';
-    if (isCharSelect) {
-      const t = view.pending!.target;
-      if (t !== prevCharSelectTargetRef.current) {
-        prevCharSelectTargetRef.current = t;
-        charSelectManualSwitchRef.current = false;
-      }
-      if (!charSelectManualSwitchRef.current && t >= 0 && t < view.players.length) {
-        setPerspectiveIdx(t);
-      }
-      return;
-    }
-    // debug 并行选将:viewer 无 pending 但有并行选将 slot → 跟到第一个未选完的玩家
-    if (charSelectInProgress && view.allCharSelectSlots && view.allCharSelectSlots.length > 0 && !charSelectManualSwitchRef.current) {
-      const firstUnselectedSlot = view.allCharSelectSlots.find(s => !view.players[s.target]?.character);
-      if (firstUnselectedSlot && firstUnselectedSlot.target >= 0 && firstUnselectedSlot.target < view.players.length) {
-        setPerspectiveIdx(firstUnselectedSlot.target);
-      }
-      return;
-    }
-    if (view.pending) {
-      const targetIdx = view.pending.target;
-      if (targetIdx >= 0 && targetIdx < view.players.length) setPerspectiveIdx(targetIdx);
-    } else if (!charSelectInProgress) {
-      setPerspectiveIdx(view.currentPlayerIndex);
-    }
-  }, [view.pending?.target, view.currentPlayerIndex, autoSwitch, view.pending?.atom?.type, charSelectInProgress, view.allCharSelectSlots]);
-  // 初次加载:默认看自己的座次(选将进行中时不覆盖,由上面的自动切换 effect 接管)
-  useEffect(() => { if (!charSelectInProgress) setPerspectiveIdx(view.viewer); }, [view.viewer, charSelectInProgress]);
-
-  const perspective = view.players[perspectiveIdx];
-  const perspectiveName = perspective?.name ?? `P${perspectiveIdx}`;
+  const perspectivePlayer = view.players[perspectiveIdx];
+  const perspectiveName = perspectivePlayer?.name ?? `P${perspectiveIdx}`;
   const isPerspectiveTurn = view.currentPlayerIndex === perspectiveIdx;
-  // debug 模式:viewer 可以代打任何玩家,所以"是不是我的回合"以"正在看的玩家"为准
   const isMyTurn = isPerspectiveTurn;
-  const isMyViewerTurn = view.currentPlayerIndex === view.viewer;
   const currentPlayer = view.players[view.currentPlayerIndex];
   const currentPlayerName = currentPlayer?.name ?? '';
 
@@ -178,9 +135,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     return () => { cancelled = true; };
   }, [skillActionsKey, perspectiveIdx]);
 
-  // 视角玩家的手牌(debug 模式所有人可见)
-  const perspectiveHand: Card[] = perspective?.hand ?? [];
-  const viewerHand: Card[] = view.players[view.viewer]?.hand ?? [];
+  // 视角玩家的手牌(正式模式=自己;debug 模式上层保证可见性,这里只取视角玩家的)
+  const perspectiveHand: Card[] = perspectivePlayer?.hand ?? [];
 
   // 待回应:调试模式下自动跟到 pending target 的视角
   const pending = view.pending;
@@ -198,45 +154,22 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   useEffect(() => { setSkippedBroadcast(new Set()); }, [pendingKey]);
   // 切牌/重选牌时,同步重置借刀杀人的第二目标
   useEffect(() => { setSelectedKillTarget(null); }, [selectedCardId]);
-  // debug 模式:viewer 可以代打任何玩家;正式模式:必须视角=自己
-  const canOperate = true; // debug 模式永远允许操作
+  // 当前视角玩家是否可操作。上层传入 perspective 即意味着该视角可操作(正式模式只传 viewer,
+  // debug 模式上层保证视角合法性),故恒为 true。后续 handler 仅检查 isMyTurn/isPerspectiveAwaiting。
+  const canOperate = true;
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
 
-// 倒计时:pending 回应优先,否则用 turnDeadline
+  // 倒计时:pending 回应优先,否则用 turnDeadline
   // 顺滑进度条由 CountdownBar (使用 useCountdownFraction + CSS transition) 渲染。
   const deadline = pending?.deadline ?? view.turnDeadline;
   // 注意:不在客户端 deadline<=0 时自动 respond/endTurn。
-  // 旧逻辑是 debug 模式自动操作,但会导致「出杀时跳过问闪」——pending 刚渲染就被自动 handleRespond() 当作「不出」处理。
   // 现在依赖服务端真实超时(默认 15s):服务端 advance → view.pending 清空 → UI 自然恢复。
 
-  // 切换视角
-  const switchPerspective = useCallback(() => {
-    const next = (perspectiveIdx + 1) % view.players.length;
-    setPerspectiveIdx(next);
-    setSelectedCardId(null);
-    setSelectedTarget(null);
-    setTransformMode(null);
-    setDistributeMode(null);
-    // 选将期间手动切换后,停止自动跟随
-    if (pendingRef.current?.atom?.type === '选将询问') charSelectManualSwitchRef.current = true;
-  }, [perspectiveIdx, view.players.length]);
-
-  const goToCurrentPlayer = useCallback(() => {
-    setPerspectiveIdx(view.currentPlayerIndex);
-    setSelectedCardId(null);
-    setSelectedTarget(null);
-    setTransformMode(null);
-    setDistributeMode(null);
-  }, [view.currentPlayerIndex]);
-
-  // 发送 action
-  // debug 模式:以"正在看的玩家"作为 ownerId(代打)
-  // 正式模式:必须以自己(viewer)为 ownerId
+  // 发送 action:ownerId = 当前视角玩家(正式模式=viewer;debug 模式上层传入的 perspective)
   /** 发送 action。preceding 用于组合 action(转化技:武圣红牌当杀) */
   const send = useCallback(
     (skillId: string, actionType: string, params: Record<string, Json>, preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>) => {
-      const ownerId = perspectiveIdx;
-      onAction({ skillId, actionType, ownerId, params, preceding });
+      onAction({ skillId, actionType, ownerId: perspectiveIdx, params, preceding });
       setSelectedCardId(null);
       setSelectedTarget(null);
       setSelectedKillTarget(null);
@@ -256,7 +189,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // ─── 距离和攻击范围计算(纯函数，委托 src/client/utils/distance) ───
 
   /** 选中的牌 */
-  const selectedCard = selectedCardId ? (perspectiveHand.find(c => c.id === selectedCardId) ?? viewerHand.find(c => c.id === selectedCardId)) : null;
+  const selectedCard = selectedCardId ? perspectiveHand.find(c => c.id === selectedCardId) ?? null : null;
 
   // 转化模式下,被"虚拟"的牌名(如武圣红牌当杀):决定是否需要距离检查/是否需要目标
   // 转化前 selectedCard.name 是原牌名(如闪/桃),转化后语义上等于 wrapperName(如杀)
@@ -384,8 +317,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         if (action.transform) {
           if (prompt.cardFilter?.filter) {
             // 用第一张手牌中匹配的牌调用 transform,得到 wrapper.name(如“杀”)
-            const sample = perspectiveHand.find(c => prompt.cardFilter!.filter!(c))
-              ?? viewerHand.find(c => prompt.cardFilter!.filter!(c));
+            const sample = perspectiveHand.find(c => prompt.cardFilter!.filter!(c));
             const wrapperName = sample
               ? action.transform(sample).name
               : action.skillId;
@@ -407,8 +339,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           if (idx < 0) return;
           params.cardId = selectedCardId;
           // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
-          const trickCard = perspectiveHand.find(c => c.id === selectedCardId)
-            ?? viewerHand.find(c => c.id === selectedCardId);
+          const trickCard = perspectiveHand.find(c => c.id === selectedCardId);
           if (trickCard && isDelayedTrick(trickCard)) {
             params.target = idx;
           } else {
@@ -442,7 +373,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // ─── 转化模式:选完目标后,提交 preceding=[transform] + 转化后的牌.use ───
   function handleTransformPlay(targetName: string) {
     if (!transformMode || !selectedCardId) return;
-    const targetCard = perspectiveHand.find(c => c.id === selectedCardId) ?? viewerHand.find(c => c.id === selectedCardId);
+    const targetCard = perspectiveHand.find(c => c.id === selectedCardId);
     if (!targetCard) return;
     const idx = nameToIndex(targetName);
     if (idx < 0) return;
@@ -458,94 +389,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     setSelectedTarget(null);
   }
 
-  // 根据当前 pending 推导 respond 信息:
-  // - skillId: 从 atom type/requestType 通用推导(询问X→X, 请求回应 requestType→skillId)
-  // - cardFilter: 优先从 skillActionRegistry(本玩家或所有玩家)取;取不到则从 atom 类型本地重建
-  //
-  // 为什么不完全依赖 registry:
-  //   registry 是 async 加载(dynamic import 技能模块);视角切换会触发 clearRegistry + 重注册,
-  //   重注册期间(异步窗口)registry 是空的;React state 里还保留旧的列表,但旧列表可能因为
-  //   perspectiveIdx 切换而不再包含目标玩家;此外 WS 走 JSON.stringify,后端 prompt 的
-  //   cardFilter.filter 函数会被丢弃——前端拿不到原始函数引用。
-  //   所以增加本地重建兜底:对当前所有 respond 提示(cardFilter 都是 c => c.name === '<cardName>')
-  //   都能稳定构造。
-
-  /** 从 SkillActionDef 的 prompt 提取 cardFilter 函数(不走 JSON 序列化,函数引用保留) */
-  function extractCardFilterFromAction(action: SkillActionDef): ((c: Card) => boolean) | undefined {
-    const p = action.prompt;
-    if ((p.type === 'useCard' || p.type === 'useCardAndTarget') && p.cardFilter?.filter) {
-      return p.cardFilter.filter;
-    }
-    return undefined;
-  }
-
-  /**
-   * 从 atom 类型本地构造 cardFilter 函数(不依赖 registry)。
-   * 当前所有 respond 提示的 filter 都是 `c => c.name === '<cardName>'`,
-   * 包括:询问X → c.name==='X';请求回应 R/Y → c.name===R;请求回应 R → c.name===R;__弃牌 → ()=>true。
-   */
-  function deriveCardFilterFromAtom(atomType: string, reqType: string): ((c: Card) => boolean) | undefined {
-    // 询问X (X∈{闪,杀,...}):X = atomType.slice(2)
-    if (atomType.startsWith('询问')) {
-      const cardName = atomType.slice(2);
-      if (!cardName) return undefined;
-      return (c) => c.name === cardName;
-    }
-    // 请求回应 / 并行回应:
-    //   - 'R/Y' → R 是 cardName(R 例如 杀/forceKill, 杀/respondKill)
-    //   - 'R'   → R 是 cardName(例如 无懈可击)
-    //   - '__弃牌' → filter=()=>true(由 min/max 决定,前端另走 isDiscardPhase 路径)
-    if (atomType === '请求回应' || atomType === '并行回应') {
-      if (!reqType) return undefined;
-      if (reqType === '__弃牌') return () => true;
-      const slashIdx = reqType.indexOf('/');
-      const cardName = slashIdx >= 0 ? reqType.slice(0, slashIdx) : reqType;
-      if (!cardName) return undefined;
-      return (c) => c.name === cardName;
-    }
-    return undefined;
-  }
-
-  /**
-   * 从 skillActionRegistry(已注册的所有玩家 actions)中查找某 skillId 的 respond action。
-   * 不限定 ownerId:当 perspective 切换期间,目标玩家的 action 可能已被清掉,
-   * 但 React state 里 skillActions 还保留旧列表——这种情况下需要放宽 ownerId 匹配。
-   */
-  function findRespondAction(skillId: string): SkillActionDef | undefined {
-    // 1. 优先当前 perspective 玩家(快路径,避免遍历整个 registry)
-    const own = skillActions.find(a => a.skillId === skillId && a.actionType === 'respond');
-    if (own) return own;
-    // 2. 退路:跨所有 ownerId 扫描(registry 是模块级单例,不依赖 React state 时序)
-    return findActionAcrossOwners(skillId, 'respond');
-  }
-
-  function pendingRespondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
-    if (!pending) return null;
-    const atom = pending.atom as Record<string, unknown>;
-    const atomType = pending.atom?.type ?? '';
-    const reqType = typeof atom['requestType'] === 'string' ? (atom['requestType'] as string) : '';
-
-    // 通用推导 skillId
-    let skillId: string | null = null;
-    if (atomType.startsWith('询问')) {
-      skillId = atomType.slice(2); // 询问闪→闪
-    } else if (reqType === '__弃牌') {
-      skillId = '系统规则';
-    } else if (atomType === '请求回应' || atomType === '并行回应') {
-      if (!reqType) return null;
-      skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null);
-    }
-    if (!skillId) return null;
-
-    // 1. 优先:从 registry(当前 perspective + 所有玩家)取 cardFilter
-    const action = findRespondAction(skillId);
-    const registryFilter = action ? extractCardFilterFromAction(action) : undefined;
-    // 2. 兜底:从 atom 类型本地重建(不依赖 async 加载/registry 时序)
-    const localFilter = deriveCardFilterFromAtom(atomType, reqType);
-    const cardFilter = registryFilter ?? localFilter;
-
-    return { skillId, cardFilter };
-  }
+  // pending → respond 信息推导(skillId + cardFilter)已抽到 utils/pendingRespond.ts
 
   // 回应
   function handleRespond(cardId?: string) {
@@ -562,7 +406,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       }
       return;
     }
-    const info = pendingRespondInfo();
+    const info = resolvePendingRespond(pending, skillActions);
     if (!info) return;
     if (cardId) {
       // 校验:点的牌必须匹配 pending 的 cardFilter(防询问闪时点杀)
@@ -608,7 +452,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
     // 回应模式(只有自己视角才能操作)
     if (isMyAwaiting) {
       // 只允许点击匹配当前 pending cardFilter 的牌(通用,不硬编码技能名)
-      const info = pendingRespondInfo();
+      const info = resolvePendingRespond(pending, skillActions);
       if (info && info.cardFilter) {
         if (info.cardFilter(card)) handleRespond(card.id);
       }
@@ -648,12 +492,6 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
 
   // 选弃牌(暂未实现UI)
   // function toggleDiscard(cardId: string) { ... }
-
-  // 装备名
-  function equipName(_slot: EquipSlot, cardId: string): string {
-    const card = view.cardMap[cardId];
-    return card?.name ?? cardId;
-  }
 
   // 座位排列: 自己始终在 result[0]（底部中央）；
   // 其余玩家从“上家”开始逆时针排，这样弧形座位按 leftPct 从左到右呈现
@@ -714,8 +552,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           }}
           perspectiveIdx={perspectiveIdx}
           playerCount={view.players.length}
-          onSwitchPerspective={switchPerspective}
-          onGoToCurrentPlayer={goToCurrentPlayer}
+          onSwitchPerspective={onSwitchPerspective}
+          onGoToCurrentPlayer={onGoToCurrentPlayer}
           currentPlayerName={currentPlayerName}
           perspectiveName={perspectiveName}
           lordCharacter={view.players.find(p => p.identity === '主公')?.character}
@@ -728,13 +566,13 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           view={view}
           perspectiveIdx={perspectiveIdx}
           perspectiveName={perspectiveName}
-          onSwitchPerspective={switchPerspective}
+          onSwitchPerspective={onSwitchPerspective}
         />
       )}
 
       {/* ─── 头部 ─── */}
       <div className={styles.headerBar}>
-        <button className={styles.backBtn} onClick={onDeleteRoom}>← 退出</button>
+        {onDeleteRoom && <button className={styles.backBtn} onClick={onDeleteRoom}>← 退出</button>}
         <div className={styles.headerCenter}>
           <span className={cx(styles.roundBadge, anim.turnVersion > 0 && styles.turnGlowing)} key={`turn-${anim.turnVersion}`}>第 {view.turn.round} 轮</span>
           <span className={cx(styles.phaseBadge, anim.phaseVersion > 0 && styles.phaseAnimating)} key={`phase-${anim.phaseVersion}`}>{PHASE_LABELS[view.phase] ?? view.phase}</span>
@@ -742,18 +580,23 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             当前: {currentPlayerName} {currentPlayer?.character ? `(${currentPlayer.character})` : ''}
           </span>
         </div>
-        <div className={styles.headerRight}>
-          <button className={styles.perspectiveBtn} onClick={switchPerspective}>
-            视角: {perspectiveName}
-          </button>
-          <button className={styles.goToBtn} onClick={goToCurrentPlayer}>查看当前玩家</button>
-          <button
-            className={cx(styles.goToBtn, autoSwitch && styles.autoSwitchActive)}
-            onClick={() => setAutoSwitch(!autoSwitch)}
-          >
-            自动切换{autoSwitch ? '✓' : '✗'}
-          </button>
-        </div>
+        {/* debug 模式:视角切换 / 跳转 / 自动跟随(onSwitchPerspective 存在时才渲染) */}
+        {onSwitchPerspective && (
+          <div className={styles.headerRight}>
+            <button className={styles.perspectiveBtn} onClick={onSwitchPerspective}>
+              视角: {perspectiveName}
+            </button>
+            {onGoToCurrentPlayer && <button className={styles.goToBtn} onClick={onGoToCurrentPlayer}>查看当前玩家</button>}
+            {autoSwitchCtl && (
+              <button
+                className={cx(styles.goToBtn, autoSwitchCtl.enabled && styles.autoSwitchActive)}
+                onClick={autoSwitchCtl.toggle}
+              >
+                自动切换{autoSwitchCtl.enabled ? '✓' : '✗'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ─── 操作提示 ─── */}
@@ -776,7 +619,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
             ) : canOperate ? (() => {
               // distribute 类 pending(遗计分配):渲染分配 UI
               if (pending.prompt.type === 'distribute') {
-                const info = pendingRespondInfo();
+                const info = resolvePendingRespond(pending, skillActions);
                 const skillId = info?.skillId ?? '系统规则';
                 const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
                 return <DistributeUI skillId={skillId} actionType="respond" prompt={pending.prompt} cardIds={cardIds} players={view.players} viewer={perspectiveIdx} onSend={send} cardMap={view.cardMap} />;
@@ -785,7 +628,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               if (pending.prompt.type === 'confirm') {
                 const confirmLabel = pending.prompt.confirmLabel || '确认';
                 const cancelLabel = pending.prompt.cancelLabel || '取消';
-                const info = pendingRespondInfo();
+                const info = resolvePendingRespond(pending, skillActions);
                 const skillId = info?.skillId ?? '系统规则';
                 return (
                   <div className={styles.promptActions}>
@@ -795,7 +638,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                 );
               }
               // useCard 类 pending:渲染 可出的牌按钮 + 不回应
-              const info = pendingRespondInfo();
+              const info = resolvePendingRespond(pending, skillActions);
               const filterFn = info?.cardFilter;
               const respondableCards = filterFn ? perspectiveHand.filter(filterFn) : [];
               return (
@@ -840,7 +683,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         if (Array.isArray(prompt.cardIds) && prompt.cardIds.length > 0) {
           cardIds = prompt.cardIds;
         } else if (prompt.source === 'handAndEquip') {
-          const equipIds = Object.values(perspective?.equipment ?? {});
+          const equipIds = Object.values(perspectivePlayer?.equipment ?? {});
           cardIds = [...perspectiveHand.map(c => c.id), ...equipIds];
         } else {
           cardIds = perspectiveHand.map(c => c.id);
@@ -927,7 +770,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
                   isTargetable={isTargetable(realIdx)}
                   selectedTarget={selectedTarget}
                   onTargetClick={handleTargetClick}
-                  onPerspectiveChange={(idx) => { setPerspectiveIdx(idx); setSelectedCardId(null); setSelectedTarget(null); }}
+                  onPerspectiveChange={(idx) => { onPerspectiveChange?.(idx); }}
                   isDamaged={anim.damageFlashIndices.has(realIdx)}
                   damageVersion={anim.damageFlashIndices.get(realIdx) ?? 0}
                   isTurnGlow={player.name === currentPlayerName && anim.turnVersion > 0}
@@ -988,148 +831,17 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
       <div className={styles.bottomLayout}>
         {/* ─── 左：角色大卡（势力/身份/体力/技能/装备） ─── */}
         <div className={styles.playerCardLarge}>
-          {(() => {
-            const p = perspective;
-            if (!p) return null;
-            const isDead = !p.alive;
-            const charInfo = p.character ? getCharacterMeta(p.character) : undefined;
-            const faction = charInfo?.faction ?? '群';
-            const factionColor = FACTION_BG[faction] || '#8e44ad';
-            const identity = p.identity;
-            // 技能列表（过滤默认技能与装备技能）
-            const visibleSkills = p.skills.filter(s => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILL_NAMES.has(s));
-            // 装备技能集合：动态装备的技能可主动点击
-            const equipSkillActions = skillActions.filter(a => EQUIPMENT_SKILL_NAMES.has(a.skillId));
-            // 主动技（confirm/choosePlayer/转化类/distribute 主动技）渲染为可点按钮
-            const triggerableActions = skillActions.filter(a =>
-              a.prompt.type === 'confirm' ||
-              a.prompt.type === 'choosePlayer' ||
-              (a.prompt.type === 'useCardAndTarget' && a.transform) ||
-              a.prompt.type === 'distribute'
-            );
-            const showSkillButtons = isMyTurn && canOperate && view.phase === '出牌';
-            return (
-              <>
-                {/* 势力色顶部条 */}
-                <div className={styles.playerCardHeader} style={{ background: factionColor }}>
-                  <div className={styles.playerCardHeaderTop}>
-                    <span className={styles.playerCardName}>{p.name}</span>
-                    <div>
-                      {perspectiveIdx === view.viewer && <span className={styles.youBadge}>我</span>}
-                      {isPerspectiveTurn && <span className={styles.turnBadge}>回合</span>}
-                      {isDead && <span className={cx(styles.youBadge, styles.deadBadge)}>亡</span>}
-                      {identity && (
-                        <span
-                          className={
-                            identity === '主公' ? styles.lordBadge :
-                            identity === '忠臣' ? styles.loyalistBadge :
-                            identity === '反贼' ? styles.rebelBadge :
-                            identity === '内奸' ? styles.renegadeBadge :
-                            ''
-                          }
-                        >
-                          {identity}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className={styles.playerCardChar}>{p.character || '未知'}</div>
-                </div>
-                {/* 体力红心 */}
-                <div className={styles.seatHpRow}>
-                  {Array.from({ length: p.maxHealth }, (_, i) => (
-                    <span
-                      key={i}
-                      className={cx(i < p.health ? styles.hpHeartFull : styles.hpHeartEmpty, anim.damageFlashIndices.has(perspectiveIdx) && styles.hpFlash)}
-                    >
-                      ♥
-                    </span>
-                  ))}
-                </div>
-                {/* 技能区：被动为标签，可主动点击的为按钮 */}
-                {visibleSkills.length > 0 && (
-                  <div className={cx(styles.skillRow, styles.skillRowPad)}>
-                    {visibleSkills.map(s => {
-                      const btn = triggerableActions.find(a => a.skillId === s);
-                      if (showSkillButtons && btn) {
-                        return (
-                          <button
-                            key={s}
-                            className={cx(
-                              styles.skillBtn,
-                              btn.style === 'danger' && styles.skillBtnDanger,
-                              btn.style === 'primary' && styles.skillBtnPrimary,
-                            )}
-                            onClick={() => handleSkillAction(btn)}
-                            title={`${btn.label}: ${btn.prompt.title}`}
-                          >
-                            {s}
-                          </button>
-                        );
-                      }
-                      return <span key={s} className={styles.skillTag}>{s}</span>;
-                    })}
-                  </div>
-                )}
-                {/* 装备区：独立显示，不在手牌里 */}
-                {(Object.keys(p.equipment).length > 0 || equipSkillActions.length > 0) && (
-                  <div className={styles.playerCardEquip}>
-                    <div className={styles.playerCardEquipTitle}>装备区</div>
-                    <div className={styles.equipRow}>
-                      {Object.entries(p.equipment).map(([slot, cardId]) => {
-                        const card = view.cardMap[cardId as string];
-                        const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
-                        return (
-                          <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>
-                            {icon} {card?.name ?? cardId}
-                          </span>
-                        );
-                      })}
-                      {showSkillButtons && equipSkillActions.map(a => (
-                        <button
-                          key={`${a.skillId}:${a.actionType}`}
-                          className={styles.equipSkillBtn}
-                          onClick={() => handleSkillAction(a)}
-                          title={`${a.label}: ${a.prompt.title}`}
-                        >
-                          {a.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* 判定区 */}
-                {(() => {
-                  const ids = p.pendingTricks ?? [];
-                  if (ids.length === 0) return null;
-                  return (
-                    <div className={cx(styles.judgeRow, styles.judgeRowPad)}>
-                      <span className={styles.judgeRowLabel}>判定:</span>
-                      {ids.map((cardId: string) => {
-                        const card = view.cardMap[cardId];
-                        const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-                        const desc = card?.description ?? '';
-                        return (
-                          <span
-                            key={cardId}
-                            className={styles.judgeTag}
-                            style={{ color: suitColor, borderColor: suitColor }}
-                            title={desc || card?.name || cardId}
-                          >
-                            {card?.name ?? cardId}{card ? ` ${card.suit}${card.rank}` : ''}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-                {/* 手牌数 */}
-                <div className={styles.infoRow}>
-                  <span>手牌: {p.handCount}</span>
-                </div>
-              </>
-            );
-          })()}
+          <PlayerCardLarge
+            perspectiveIdx={perspectiveIdx}
+            viewer={view.viewer}
+            view={view}
+            damageFlashIndices={anim.damageFlashIndices}
+            isMyTurn={isMyTurn}
+            canOperate={canOperate}
+            isPerspectiveTurn={isPerspectiveTurn}
+            skillActions={skillActions}
+            onSkillAction={handleSkillAction}
+          />
         </div>
 
         {/* ─── 右：手牌 + 统一倒计时 + 操作 + 目标 ─── */}
@@ -1293,7 +1005,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
               const isDiscardSelected = selectedForDiscard.has(card.id);
               const canPlay = isMyTurn && canOperate;
               const isAwaiting = isMyAwaiting && (() => {
-                const info = pendingRespondInfo();
+                const info = resolvePendingRespond(pending, skillActions);
                 return !!info?.cardFilter?.(card);
               })();
               const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
@@ -1341,45 +1053,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
         </div>
       </div>
 
-      {/* ─── 游戏日志 ─── */}
-      <details className={styles.logPanel}>
-        <summary className={styles.logSummary}>📜 游戏日志 ({view.log.length})</summary>
-        <div className={styles.logContent}>
-          {view.log.length === 0 && <div className={styles.logEmpty}>暂无记录</div>}
-          {view.log.slice().reverse().map((entry, i) => (
-            <div key={i} className={styles.logEntry}>
-              <span className={styles.logTime}>{formatTime(entry.time)}</span>
-              <span className={styles.logPlayer}>{entry.player}</span>
-              <span className={styles.logText}>{entry.text}</span>
-            </div>
-          ))}
-        </div>
-      </details>
-      {/* ─── 调试面板 ─── */}
-      <details className={styles.debugPanel}>
-        <summary className={styles.debugSummary}>调试信息</summary>
-        <div className={styles.debugContent}>
-          <div>phase: {view.phase} | round: {view.turn.round} | currentPlayer: {currentPlayerName}</div>
-          <div>viewer: {view.players[view.viewer]?.name} | perspective: {perspectiveName}</div>
-          <div>pending: {pending ? `${pending.prompt.title} → ${pending.target}` : 'none'}</div>
-          <hr className={styles.debugHr} />
-          {view.players.map((p, i) => (
-            <div key={i} className={styles.debugPlayer}>
-              <span className={!p.alive ? styles.debugDead : undefined}>
-                {p.name}({p.character}) HP:{p.health}/{p.maxHealth}
-                {!p.alive && ' [阵亡]'}
-              </span>
-              <span> 手牌:{p.handCount}</span>
-              {Object.entries(p.equipment).map(([slot, cardId]) => (
-                <span key={slot}> [{slot}:{equipName(slot as EquipSlot, cardId as string)}]</span>
-              ))}
-              {p.skills.filter(s => !DEFAULT_SKILLS.has(s)).length > 0 && (
-                <span> 技能:{p.skills.filter(s => !DEFAULT_SKILLS.has(s)).join(',')}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </details>
+      {/* ─── 游戏日志(正常功能,非 debug 专属) ─── */}
+      <GameLog view={view} />
     </div>
   );
 }

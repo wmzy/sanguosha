@@ -10,7 +10,7 @@ export interface CharSelectWaitingOverlayProps {
   view: GameView;
   perspectiveIdx: number;
   perspectiveName: string;
-  onSwitchPerspective: () => void;
+  onSwitchPerspective?: () => void;
 }
 
 export function CharSelectWaitingOverlay({
@@ -34,9 +34,11 @@ export function CharSelectWaitingOverlay({
         <CountdownBar deadline={selectDeadline} totalMs={selectTotalMs} />
       </div>
       {/* debug 模式:切换到未选玩家代其选将 */}
-      <button className={styles.charSelectWaitingSwitchBtn} onClick={onSwitchPerspective}>
-        切换视角 → {nextName}
-      </button>
+      {onSwitchPerspective && (
+        <button className={styles.charSelectWaitingSwitchBtn} onClick={onSwitchPerspective}>
+          切换视角 → {nextName}
+        </button>
+      )}
     </div>
   );
 }

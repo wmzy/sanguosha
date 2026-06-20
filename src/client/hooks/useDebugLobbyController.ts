@@ -15,7 +15,7 @@ import type { ServerMessage, RoomInfo } from '../../server/protocol';
 interface ActionMsg {
   skillId: string;
   actionType: string;
-  ownerId: string;
+  ownerId: number;
   params: Record<string, Json>;
 }
 
