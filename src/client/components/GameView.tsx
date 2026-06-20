@@ -86,8 +86,8 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
   // 候选人从 view.pending.atom.candidates 获取(引擎生成)
   // debug 模式下并行选将:viewer 自己已选完时,view.pending 为空,
   // 从 view.allCharSelectSlots 按 perspectiveIdx 找对应玩家的选将 slot(代打)。
-  // 第三层回退:slot 尚未为当前视角创建时,取第一个仍在选将的 slot,
-  // 确保选将期间始终有遮罩覆盖全屏。
+  // 回退顺序:专属slot > 视角slot > 任意活跃slot。
+  // parallelSlotForPerspective 优先于 activeSlot,避免切视角时显示错误玩家的候选人。
   const ownCharSelect = view.pending?.atom?.type === '选将询问' ? view.pending : null;
   const parallelSlotForPerspective = view.allCharSelectSlots?.find(
     s => s.atom.type === '选将询问' && s.target === perspectiveIdx,
@@ -764,6 +764,7 @@ export function GameViewComponent({ view, onAction, onDeleteRoom }: Props) {
           onGoToCurrentPlayer={goToCurrentPlayer}
           currentPlayerName={currentPlayerName}
           perspectiveName={perspectiveName}
+          lordCharacter={view.players.find(p => p.identity === '主公')?.character}
         />
       )}
 

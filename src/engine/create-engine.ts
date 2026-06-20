@@ -308,8 +308,6 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       if (key < 0) {
         for (const [k, v] of state.pendingSlots) if (v === oldSlot) { state.pendingSlots.delete(k); break; }
       }
-      // slot 已清理:通知 session 重建 view,确保下次 buildView 不包含已解决的 slot
-      notifyStateChange(state);
     }
     resolve();
   }).finally(() => {
@@ -626,8 +624,8 @@ function createAndAwaitSlot(
             const pick = pool[Date.now() % pool.length];
             p.character = pick.name;
             p.name = pick.name;
-            // 与 respond action 一致:超时分配也只保留引擎默认技能,不实例化武将技能
-            p.skills = [...DEFAULT_SKILLS];
+            // 与 respond action 一致:超时分配也写入默认技能 + 武将技能
+            p.skills = [...DEFAULT_SKILLS, ...pick.skills];
           }
         }
         notifyStateChange(state);

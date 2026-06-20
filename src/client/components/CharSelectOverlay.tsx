@@ -57,6 +57,8 @@ interface CharSelectOverlayProps {
   currentPlayerName?: string;
   /** 视角玩家名 */
   perspectiveName?: string;
+  /** 主公已选的武将名(主公选完后,其他玩家查看时展示) */
+  lordCharacter?: string;
 }
 
 /**
@@ -81,6 +83,7 @@ export function CharSelectOverlay({
   onGoToCurrentPlayer,
   currentPlayerName,
   perspectiveName,
+  lordCharacter,
 }: CharSelectOverlayProps) {
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
   // pending/target 变化时清空选中态
@@ -315,8 +318,10 @@ export function CharSelectOverlay({
           </button>
         </>
       ) : isLord ? (
-        <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
-          主公正在选将，请等待...
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 32 }}>
+          <div style={{ fontSize: 18, color: '#aaa' }}>
+            {lordCharacter ? `主公已选择: ${lordCharacter}` : '主公正在选将，请等待...'}
+          </div>
         </div>
       ) : (
         <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>

@@ -36,8 +36,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const n = alivePlayers.length;
       const targets: number[] = [];
       if (n > 1) {
+        // 找到 from 在 alivePlayers 中的位置
         const fromPos = alivePlayers.findIndex(p => p.index === from);
         if (fromPos >= 0) {
+          // 从 from+1 开始顺时针取 n-1 个目标
           for (let i = 1; i < n; i++) {
             targets.push(alivePlayers[(fromPos + i) % n].index);
           }

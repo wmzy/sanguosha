@@ -50,15 +50,16 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
         await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
         if (!state.localVars['无懈/被抵消']) {
           // 决斗循环:目标先出杀,之后发起者出杀,轮流。
-          let turn = 0; // 0=目标, 1=发起者
-          let loser: number | null = null;
           // 上限保护:极端情况下(武圣/丈八 把任意牌当杀)可能无限循环;
           // 现实中手牌+牌堆不可能产出这么多杀,100 轮远超正常上限。
           const MAX_ROUNDS = 100;
+          let turn = 0; // 0=目标, 1=发起者
+          let loser: number | null = null;
           let rounds = 0;
           while (loser === null) {
             if (rounds++ >= MAX_ROUNDS) {
-              // 兜底:记当前玩家为输家,跳出死循环(理论不应触发)。
+              // 理论不应触发:任一玩家手牌+牌堆合起来也产不出这么多杀。
+              // 兜底:记当前玩家为输家,跳出死循环。
               loser = turn === 0 ? target : from;
               break;
             }

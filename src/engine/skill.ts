@@ -205,10 +205,16 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
  * 再重新注册。保证 registerSkillsFromState 重入、并发 dispatch、动态 添加技能 等场景不会因
  * `registerActionEntry` 的 "already registered" 抛错。
  */
-export async function instantiateSkill(skillId: string, ownerId: number): Promise<Skill> {
+export async function instantiateSkill(skillId: string, ownerId: number): Promise<Skill | null> {
   // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册抛错
   unloadSkillInstance(skillId, ownerId);
-  const module = await getSkillModule(skillId);
+  let module;
+  try {
+    module = await getSkillModule(skillId);
+  } catch {
+    // 技能模块未注册(如候选人 skills 中的描述性名称):跳过,不中断开局流程
+    return null;
+  }
   const skill = module.createSkill(skillId, ownerId);
   if (module.onInit) {
     const unload = module.onInit(skill, ownerId);
