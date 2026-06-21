@@ -80,9 +80,9 @@ describe('过河拆桥', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 1. 正面效果:拆目标手牌
-  // ─────────────────────────────────────────────────────────────
-  it('P1 对 P2 出过河拆桥 → P2 失去第一张手牌,锦囊进弃牌堆', async () => {
+  // 1. 正面效果:拆目标手牌(盲选第 0 张)
+  // ────────────────────────────────────────────────────────────
+  it('P1 对 P2 出过河拆桥 → P2 失去被盲选的手牌,锦囊进弃牌堆', async () => {
     const victimCard = makeCard('v1', '杀', '♥', '5', '基本牌');
     const state = buildState({
       p2Hand: ['v1', 'v2'],
@@ -94,8 +94,10 @@ describe('过河拆桥', () => {
     await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
     // 无懈窗口 → 无人打无懈 → 继续
     await P1.pass();
+    // 盲选窗口:P1 选择第 0 张(对应 P2 hand[0]=v1)
+    await P1.respond('过河拆桥', { handIndex: 0 });
 
-    // P2 的第一张手牌(v1)被弃
+    // P2 被盲选的手牌(v1)被弃
     expect(harness.state.players[1].hand).not.toContain('v1');
     expect(harness.state.zones.discardPile).toContain('v1');
     // 过河拆桥本身进弃牌堆
@@ -142,6 +144,8 @@ describe('过河拆桥', () => {
     // 距离 > 1 但过河拆桥无距离限制
     await P1.useCardAndTarget('过河拆桥', 'gq1', [2]);
     await P1.pass();
+    // 盲选窗口:P1 选择第 0 张
+    await P1.respond('过河拆桥', { handIndex: 0 });
 
     // P3 失去 v1
     expect(harness.state.players[2].hand).not.toContain('v1');
@@ -234,7 +238,7 @@ describe('过河拆桥', () => {
   // ─────────────────────────────────────────────────────────────
   // 9. Bug2:拆判定区(延时锦囊)
   // ─────────────────────────────────────────────────────────────
-  it('Bug2:P2 判定区有乐不思蜀 → 过河拆桥可拆判定区,pendingTricks 清空', async () => {
+  it('Bug2:P2 判定区有乐不思蜀 → 过河拆桥指定 equipCardId 拆判定区,pendingTricks 清空', async () => {
     // 乐不思蜀 卡牌(判定区卡)
     const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
     // 手动构造 state:P2 判定区有乐不思蜀(PendingTrick 结构)
@@ -245,7 +249,10 @@ describe('过河拆桥', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    // 明牌区:use 时直接指定判定区卡的 equipCardId
+    await P1.triggerAction('过河拆桥', 'use', {
+      cardId: 'gq1', targets: [1], equipCardId: 'lb1',
+    });
     await P1.pass();
 
     // 判定区被拆空

@@ -112,6 +112,9 @@ describe('无懈可击链路', () => {
     // fireTimeout:消耗无懈窗口
     await fireTimeoutAndWait(state);
 
+    // 盲选窗口也超时(defaultChoice=0 兜底)
+    await fireTimeoutAndWait(state);
+
     // 锦囊正常结算:
     //   1. P1 失去第一张手牌
     //   2. 锦囊本身也进弃牌堆

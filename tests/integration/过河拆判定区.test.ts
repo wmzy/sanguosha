@@ -143,7 +143,7 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
 
     const P0 = harness.player('P0');
 
-    await P0.useCardAndTarget('过河拆桥', gq.id, [1]);
+    await P0.triggerAction('过河拆桥', 'use', { cardId: gq.id, targets: [1], equipCardId: lb.id });
     await P0.pass();
 
     // 判定区被清空
@@ -183,15 +183,16 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
 
     const P0 = harness.player('P0');
 
-    // 第一次拆判定区
-    await P0.useCardAndTarget('过河拆桥', gq1.id, [1]);
+    // 第一次拆判定区(明牌指定)
+    await P0.triggerAction('过河拆桥', 'use', { cardId: gq1.id, targets: [1], equipCardId: lb.id });
     await P0.pass();
     expect(harness.state.players[1].pendingTricks).toHaveLength(0);
     expect(harness.state.players[1].hand).toContain(victimHand.id);
 
-    // 第二次拆手牌
+    // 第二次拆手牌(盲选)
     await P0.useCardAndTarget('过河拆桥', gq2.id, [1]);
     await P0.pass();
+    await P0.respond('过河拆桥', { handIndex: 0 });
     expect(harness.state.players[1].hand).not.toContain(victimHand.id);
     expect(harness.state.zones.discardPile).toContain(victimHand.id);
   });

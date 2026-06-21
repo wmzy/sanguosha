@@ -46,6 +46,7 @@ export interface GameEventEnvelope {
  */
 export type ClientMessage =
   | { type: 'action'; action: EngineClientMessage; baseSeq: EventSeq }
+  | { type: 'reorder_hand'; order: string[] }
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
   | { type: 'create_room'; name: string; maxPlayers: number }
@@ -73,6 +74,10 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
   switch (t) {
     case 'action':
       return typeof d['baseSeq'] === 'number' && isValidEngineClientMessage(d['action']);
+    case 'reorder_hand': {
+      const order = d['order'];
+      return Array.isArray(order) && order.every((id: unknown) => typeof id === 'string');
+    }
     case 'ready':
     case 'delete_room':
     case 'start_game':

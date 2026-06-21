@@ -28,6 +28,7 @@ export interface DebugLobbyController {
   playerCount: number;
   setPlayerCount: (n: number) => void;
   sendAction: (action: ActionMsg) => void;
+  reorderHand: (order: string[]) => void;
   refreshRoomList: () => void;
   handleCreateDebugRoom: () => Promise<void>;
   handleDeleteRoom: () => void;
@@ -114,6 +115,14 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     [send],
   );
 
+  // 整理手牌:重排顺序,不走 action 消息,直接 mutate 后端 hand
+  const reorderHand = useCallback(
+    (order: string[]) => {
+      send({ type: 'reorder_hand', order });
+    },
+    [send],
+  );
+
   const refreshRoomList = useCallback(() => send({ type: 'list_rooms', filter: 'debug' }), [send]);
 
   const handleCreateDebugRoom = useCallback(async () => {
@@ -180,6 +189,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     playerCount,
     setPlayerCount,
     sendAction,
+    reorderHand,
     refreshRoomList,
     handleCreateDebugRoom,
     handleDeleteRoom,

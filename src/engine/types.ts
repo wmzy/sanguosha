@@ -173,7 +173,8 @@ export type ActionPrompt =
   | ConfirmPrompt
   | DistributePrompt
   | ChoosePlayerPrompt
-  | ChooseCharacterPrompt;
+  | ChooseCharacterPrompt
+  | PickHandIndexPrompt;
 
 export interface CardFilter {
   filter?: (card: Card) => boolean;
@@ -266,6 +267,20 @@ export interface ChooseCharacterPrompt {
   description?: string;
   /** 可选武将列表 */
   candidates: Array<{ name: string; skills: string[] }>;
+}
+
+/** 盲选手牌位置(过河拆桥/顺手牵羊拿手牌时,使用者选"第几张")。
+ *  目标手牌对使用者不可见(GameView 只给 handCount),所以使用者只能凭牌背位置选择 ——
+ *  这正是"顺手牵羊/过河拆桥"的博弈核心:目标可偷偷调整手牌顺序,使用者根据历史推测规律,
+ *  目标可反向博弈。返回 params.handIndex(0-based)定位目标 player.hand[handIndex]。 */
+export interface PickHandIndexPrompt {
+  type: 'pickHandIndex';
+  title: string;
+  description?: string;
+  /** 被盲选的玩家座次 */
+  target: number;
+  /** 目标当前手牌张数(前端渲染 N 个牌背) */
+  handCount: number;
 }
 
 // ==================== Atom ====================

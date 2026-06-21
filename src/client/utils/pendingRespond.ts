@@ -83,7 +83,9 @@ export function resolvePendingRespond(
     skillId = '系统规则';
   } else if (atomType === '请求回应' || atomType === '并行回应') {
     if (!reqType) return null;
-    skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null);
+    // 'R/Y' → R 是 skillId;'R' → R 是 skillId;'R_盲选' → R 是 skillId
+    const sepIdx = reqType.search(/[/_]/);
+    skillId = sepIdx >= 0 ? reqType.slice(0, sepIdx) : (reqType || null);
   }
   if (!skillId) return null;
 

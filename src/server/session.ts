@@ -188,6 +188,38 @@ export class GameSession {
     });
   }
 
+  /**
+   * 整理手牌:玩家拖拽重排自己的手牌顺序。
+   * 这是纯显示偏好,不调 dispatch、不写 actionLog、不触发 seq 变化 ——
+   * 直接 mutate state.players[i].hand,只给该玩家广播最新 view。
+   *
+   * 重放确定性由盲选 action 在 actionLog 里 splice 的"设置手牌顺序"条目保证
+   * (过河拆桥/顺手牵羊盲选时会快照顺序),state 快照也会随 persistAsync 保存最新顺序。
+   * 即使重启丢失了 state 快照,下次有人盲选时顺序仍会从 actionLog 恢复。
+   */
+  async handleReorderHand(playerId: string, order: string[]): Promise<void> {
+    if (this.destroyed || !this.state) return;
+    const playerIndex = this.playerNames.get(playerId);
+    if (playerIndex === undefined) return;
+    // debug 模式不校验 ownerId——单人控制所有角色
+    const player = this.state.players[playerIndex];
+    if (!player) return;
+    // 校验:order 必须是当前 hand 的合法排列(同集合,防注入不存在的卡)
+    if (order.length !== player.hand.length) return;
+    const handSet = new Set(player.hand);
+    for (const id of order) {
+      if (!handSet.has(id)) return;
+    }
+    // 直接 mutate hand 顺序
+    player.hand = [...order];
+    // 只给该玩家广播最新 view(其他人看到的 handCount 不变,无需广播)
+    const state = this.state;
+    const view = buildView(state, playerIndex, this.debug);
+    this.sendToPlayer(playerId, { type: this.debug ? 'debugGameState' : 'initialView', state: view, lastSeq: state.seq });
+    // 触发持久化(state 快照会带上最新顺序),但不走 onStateChange(避免全量广播)
+    this.persistAsync();
+  }
+
   private handleGameOver(winner?: number): void {
     setRoomStatus(this.room.id, '已结束');
     this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });

@@ -148,6 +148,9 @@ describe('无懈可击 dispatch 链路', () => {
     // 超时结束窗口
     await fireTimeoutAndWait(state);
 
+    // 盲选窗口也超时(defaultChoice=0 兜底)
+    await fireTimeoutAndWait(state);
+
     // 锦囊恢复生效 → P1 失去基础牌
     expect(state.players[1].hand).not.toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(p1FirstCard);
@@ -169,6 +172,9 @@ describe('无懈可击 dispatch 链路', () => {
     });
     expect(state.pendingSlots.size).toBe(1);
 
+    await fireTimeoutAndWait(state);
+
+    // 盲选窗口也超时(defaultChoice=0 兜底)
     await fireTimeoutAndWait(state);
 
     expect(state.localVars['无懈/被抵消']).toBeUndefined();

@@ -251,6 +251,9 @@ export function handleWsMessage(
     case 'action':
       handleAction(playerId, message.action);
       break;
+    case 'reorder_hand':
+      handleReorderHand(playerId, message.order);
+      break;
     case 'leave_room':
       handleLeaveRoom(playerId);
       break;
@@ -369,6 +372,16 @@ function handleAction(playerId: string, action: import('../engine/types').Client
   if (!session) return;
 
   void session.handleAction(playerId, action);
+}
+
+function handleReorderHand(playerId: string, order: string[]): void {
+  const roomId = playerRoomMap.get(playerId);
+  if (!roomId) return;
+
+  const session = gameSessions.get(roomId);
+  if (!session) return;
+
+  void session.handleReorderHand(playerId, order);
 }
 
 // 新 ENGINE-DESIGN 不再需要 handleAsyncHookResponse

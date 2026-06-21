@@ -49,6 +49,31 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
       {isSkipped ? (
         <div className={styles.waitingHint}>已跳过，等待其他玩家回应...</div>
       ) : canOperate ? (() => {
+        // pickHandIndex 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
+        // 渲染目标手牌的牌背序列,使用者点击位置选择
+        if (pending.prompt.type === 'pickHandIndex') {
+          const info = resolvePendingRespond(pending, skillActions);
+          const skillId = info?.skillId ?? '系统规则';
+          const handCount = pending.prompt.handCount;
+          const targetName = pending.target >= 0 && pending.target < 20 ? `${pending.target} 号位` : '目标';
+          return (
+            <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
+              <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>
+                选择牌背位置（目标手牌不可见，凭位置盲选）:
+              </span>
+              {Array.from({ length: handCount }, (_, i) => (
+                <button
+                  key={i}
+                  className={styles.promptBtn}
+                  style={{ minWidth: '40px', fontSize: '14px' }}
+                  onClick={() => onSend(skillId, 'respond', { handIndex: i })}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          );
+        }
         // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
         if (pending.prompt.type === 'confirm') {
           const confirmLabel = pending.prompt.confirmLabel || '确认';

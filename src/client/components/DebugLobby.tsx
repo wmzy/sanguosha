@@ -28,6 +28,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         <DebugGameView
           view={c.view}
           onAction={c.sendAction}
+          onReorderHand={c.reorderHand}
           onDeleteRoom={c.handleDeleteRoom}
         />
       </div>
@@ -55,10 +56,11 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
 
 /** debug 模式游戏视图:GameView + 视角管理 + 调试面板。 */
 function DebugGameView({
-  view, onAction, onDeleteRoom,
+  view, onAction, onReorderHand, onDeleteRoom,
 }: {
   view: import('../../engine/types').GameView;
   onAction: (action: ActionMsg) => void;
+  onReorderHand?: (order: string[]) => void;
   onDeleteRoom: () => void;
 }) {
   const { perspective, switchPerspective, goToCurrentPlayer, setPerspective, autoSwitchCtl } = useDebugPerspective(view);
@@ -68,6 +70,7 @@ function DebugGameView({
       <GameViewComponent
         view={view}
         onAction={onAction}
+        onReorderHand={onReorderHand}
         perspective={perspective}
         onSwitchPerspective={switchPerspective}
         onGoToCurrentPlayer={goToCurrentPlayer}

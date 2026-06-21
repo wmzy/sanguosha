@@ -90,6 +90,8 @@ describe('顺手牵羊', () => {
     // 顺手牵羊 的 validate 使用 params.target(单数),不是 targets
     await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
     await P1.pass(); // 消耗无懈窗口
+    // 盲选窗口:P1 选择第 0 张(对应 P2 hand[0]=v1)
+    await P1.respond('顺手牵羊', { handIndex: 0 });
 
     // P2 失去 v1
     expect(harness.state.players[1].hand).not.toContain('v1');

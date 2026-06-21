@@ -51,6 +51,8 @@ export interface ActionMsg {
 interface Props {
   view: EngineGameView;
   onAction: (action: ActionMsg) => void;
+  /** 整理手牌:重排顺序(不走 action,直接 mutate 后端 hand) */
+  onReorderHand?: (order: string[]) => void;
   /** 当前视角座次(看谁)。正式模式 = viewer;debug 模式由上层控制(多视角切换)。 */
   perspective: number;
   /** 循环切换到下一视角(debug 模式提供时,header 渲染视角切换按钮)。 */
@@ -78,7 +80,7 @@ interface TransformMode {
 //   正式模式:上层传 perspective=view.viewer,固定看自己。
 //   debug 模式:上层(DebugLobby)管理视角切换,传当前 perspective。
 // 多视角切换/自动跟随/代打逻辑不在本组件内——那是上层的职责。
-export function GameViewComponent({ view, onAction, perspective, onSwitchPerspective, onGoToCurrentPlayer, onPerspectiveChange, autoSwitchCtl, onDeleteRoom }: Props) {
+export function GameViewComponent({ view, onAction, onReorderHand, perspective, onSwitchPerspective, onGoToCurrentPlayer, onPerspectiveChange, autoSwitchCtl, onDeleteRoom }: Props) {
   const perspectiveIdx = perspective;
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
@@ -90,6 +92,11 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
   const [distSelected, setDistSelected] = useState<Set<string>>(new Set());
   const [distAllocations, setDistAllocations] = useState<Array<{ target: number; cardIds: string[] }>>([]);
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
+  // 整理手牌:本地顺序状态(拖拽时实时更新,拖拽结束发 reorder_hand)
+  // null = 用服务端顺序;非 null = 用本地重排顺序(需与服务端手牌集合一致)
+  const [localHandOrder, setLocalHandOrder] = useState<string[] | null>(null);
+  const dragSrcIdx = useRef<number | null>(null);
+  const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── 状态派生(hooks) ───
   const { skillActions } = useSkillActions(view, perspectiveIdx);
@@ -108,6 +115,51 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
   const currentPlayer = view.players[view.currentPlayerIndex];
   const currentPlayerName = currentPlayer?.name ?? '';
   const perspectiveHand: Card[] = perspectivePlayer?.hand ?? [];
+
+  // 整理手牌:本地顺序与服务端手牌集合一致性校验
+  // 服务端手牌变化(摸/出/弃)时,如果 localHandOrder 不再是合法排列,自动重置
+  const serverHandIds = perspectiveHand.map(c => c.id);
+  const localOrderValid = localHandOrder !== null
+    && localHandOrder.length === serverHandIds.length
+    && serverHandIds.every(id => localHandOrder.includes(id));
+  // orderedHand:本地顺序优先(拖拽实时预览),无效则用服务端顺序
+  const orderedHand: Card[] = localOrderValid
+    ? (localHandOrder!.map(id => perspectiveHand.find(c => c.id === id)).filter(Boolean) as Card[])
+    : perspectiveHand;
+  // 服务端已同步本地顺序时,清除本地状态(避免陈旧覆盖)
+  useEffect(() => {
+    if (localHandOrder && localOrderValid) {
+      const serverOrder = perspectiveHand.map(c => c.id);
+      const synced = serverOrder.length === localHandOrder.length
+        && serverOrder.every((id, i) => id === localHandOrder[i]);
+      if (synced) setLocalHandOrder(null);
+    }
+    // localOrderValid 为 false 时也清除(手牌集合已变)
+    if (localHandOrder && !localOrderValid) setLocalHandOrder(null);
+  }, [localHandOrder, localOrderValid, perspectiveHand]);
+
+  // 拖拽重排:dragstart 记录源位置,dragover 阻止默认(允许 drop),drop 时重排
+  const handleDragStart = useCallback((idx: number) => {
+    dragSrcIdx.current = idx;
+  }, []);
+  const handleDrop = useCallback((targetIdx: number) => {
+    const srcIdx = dragSrcIdx.current;
+    dragSrcIdx.current = null;
+    if (srcIdx === null || srcIdx === targetIdx) return;
+    // 基于当前 orderedHand 重排
+    const ids = orderedHand.map(c => c.id);
+    const [moved] = ids.splice(srcIdx, 1);
+    ids.splice(targetIdx, 0, moved);
+    setLocalHandOrder(ids);
+    // 去抖发送 reorder_hand(避免快速拖拽频繁发消息)
+    if (onReorderHand) {
+      if (reorderTimer.current) clearTimeout(reorderTimer.current);
+      reorderTimer.current = setTimeout(() => {
+        onReorderHand(ids);
+        reorderTimer.current = null;
+      }, 400);
+    }
+  }, [orderedHand, onReorderHand]);
 
   // 上层传入 perspective 即意味着该视角可操作(正式模式只传 viewer,
   // debug 模式上层保证视角合法性),故恒为 true。后续 handler 仅检查 isMyTurn/isPerspectiveAwaiting。
@@ -689,7 +741,7 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
           )}
           {/* 手牌区 */}
           <div className={styles.handList} ref={handListRef}>
-            {perspectiveHand.map((card, i) => {
+            {orderedHand.map((card, i) => {
               const isSelected = selectedCardId === card.id;
               const isDiscardSelected = selectedForDiscard.has(card.id);
               const canPlay = isMyTurn && canOperate;
@@ -709,11 +761,17 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
               const isDistAllocated = isDistributeActive && distAllocations.some(a => a.cardIds.includes(card.id));
               const isNew = anim.newCardIds.has(card.id);
               return (
-                <HandCard
+                <div
                   key={card.id}
+                  draggable={!!onReorderHand && !isSelected && !isDiscardSelected && !isDistSelected}
+                  onDragStart={() => handleDragStart(i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDrop(i)}
+                >
+                <HandCard
                   card={card}
                   index={i}
-                  totalHand={perspectiveHand.length}
+                  totalHand={orderedHand.length}
                   isSelected={isSelected}
                   isDiscardSelected={isDiscardSelected}
                   canPlay={canPlay}
@@ -730,6 +788,7 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
                   isDistributeActive={isDistributeActive}
                   onClick={() => handleCardClick(card)}
                 />
+                </div>
               );
             })}
             {perspectiveHand.length === 0 && <div className={styles.emptyHand}>无手牌</div>}

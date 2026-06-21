@@ -73,6 +73,31 @@ export function registerSystemRespondActions(ownerId: number): () => void {
     await applyAtom(state, { type: '弃置', player: target, cardIds });
   }));
 
+  // ── 设置手牌顺序 action(盲选重放辅助):重排目标 player.hand 顺序 ──
+  // 该 action 不由客户端直接发起,而是由"过河拆桥/顺手牵羊"的 use execute 在盲选前
+  // 以 ClientMessage 形式插入 actionLog,保证重放时目标手牌顺序先恢复、盲选后执行。
+  // params: { target: 目标座次, order: 卡牌ID数组(须为当前 hand 的合法排列) }
+  unloads.push(registerAction('系统规则', ownerId, '设置手牌顺序', (state, params) => {
+    const target = params.target as number | undefined;
+    if (typeof target !== 'number') return 'target required';
+    const player = state.players[target];
+    if (!player) return 'target not found';
+    const order = params.order;
+    if (!Array.isArray(order)) return 'order required';
+    if (order.length !== player.hand.length) return 'order length mismatch';
+    const handSet = new Set(player.hand);
+    for (const id of order) {
+      if (typeof id !== 'string' || !handSet.has(id)) return `card ${id} not in hand`;
+    }
+    return null;
+  }, async (state, params) => {
+    const target = params.target as number;
+    const order = params.order as string[];
+    const player = state.players[target];
+    if (!player) return;
+    player.hand = [...order];
+  }));
+
   return () => unloads.forEach(fn => fn());
 }
 
