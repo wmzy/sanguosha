@@ -49,39 +49,26 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       pushFrame(state, '兵粮寸断', from, { ...params });
       // 移牌到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 询问无懈可击(延时锦囊在放置时也可被抵消)
-      state.localVars['无懈/被抵消'] = false;
-      try {
-        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-        if (!state.localVars['无懈/被抵消']) {
-          // 添加延时锦囊到目标
-          const trickCard = state.cardMap[cardId];
-          const pendingCard: Card = trickCard ?? {
-            id: cardId,
-            name: '兵粮寸断',
-            suit: '♣',
-            rank: 'A',
-            type: '锦囊牌',
-          };
-          await applyAtom(state, {
-            type: '添加延时锦囊',
-            player: target,
-            trick: { name: '兵粮寸断', source: from, card: pendingCard },
-          });
-        }
-        // 移牌到弃牌堆(原使用卡)
-        await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      } finally {
-        // 异常时保证处理区清理与状态恢复
-        if (state.zones.processing.includes(cardId)) {
-          await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-        }
-        delete state.localVars['无懈/被抵消'];
-        popFrame(state);
-      }
+      // 延时锦囊:使用时仅放置到判定区,无懈可击问询延迟到判定阶段判定前
+      const trickCard = state.cardMap[cardId];
+      const pendingCard: Card = trickCard ?? {
+        id: cardId,
+        name: '兵粮寸断',
+        suit: '♣',
+        rank: 'A',
+        type: '锦囊牌',
+      };
+      await applyAtom(state, {
+        type: '添加延时锦囊',
+        player: target,
+        trick: { name: '兵粮寸断', source: from, card: pendingCard },
+      });
+      // 移牌到弃牌堆(原使用卡)
+      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      popFrame(state);
     });
 
-  // ─── 判定阶段:有 兵粮寸断 → 触发判定 ────────────────────────
+  // ─── 判定阶段:有 兵粮寸断 → 先问无懈可击,未被抵消才触发判定 ───
   registerBeforeHook(_skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
@@ -91,7 +78,20 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     if (!self) return;
     if (!self.pendingTricks.some(t => t.name === '兵粮寸断')) return;
     if (ctx.state.zones.deck.length === 0) return;
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '兵粮寸断' });
+
+    // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问)
+    ctx.state.localVars['无懈/被抵消'] = false;
+    try {
+      await applyAtom(ctx.state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+      if (ctx.state.localVars['无懈/被抵消']) {
+        // 被无懈抵消:移除延时锦囊,跳过判定
+        await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '兵粮寸断' });
+        return;
+      }
+      await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '兵粮寸断' });
+    } finally {
+      delete ctx.state.localVars['无懈/被抵消'];
+    }
   });
 
   // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────

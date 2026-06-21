@@ -22,7 +22,7 @@ import {
   registerSkillsFromState,
   applyAtom,
 } from '../../src/engine/create-engine';
-import { dispatchAndWait } from '../engine-harness';
+import { dispatchAndWait, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState, PendingTrick } from '../../src/engine/types';
@@ -106,10 +106,12 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     expect(state.players[0].pendingTricks.some(t => t.name === '乐不思蜀')).toBe(true);
     expect(state.players[0].tags ?? []).not.toContain(SKIP_TAG);
 
-    // 触发 阶段开始 判定 → 乐不思蜀 hook:有 乐不思蜀 → applyAtom 判定
+    // 触发 阶段开始 判定 → 乐不思蜀 hook:有 乐不思蜀 → 先问无懈(超时跳过)→ applyAtom 判定
     // 判定 atom:从 deck 顶翻 judgeCard 到 processing
     // 判定 after hook:读 suit = ♠ → 加 SKIP_TAG + 移除延时锦囊
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    void applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // 判定牌应已被消费:从 deck 到 discardPile(after hook 末尾的 dispose)
     expect(state.zones.deck).not.toContain(judgeCard.id);
@@ -159,7 +161,9 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     });
     await registerSkillsFromState(state);
 
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    void applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // 判定♥ → SKIP_TAG 不加
     expect(state.players[0].tags ?? []).not.toContain(SKIP_TAG);
@@ -254,8 +258,10 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     state.phase = '判定';
     state.turn.phase = '判定';
 
-    // 触发 阶段开始 判定 → P1 身上的 乐不思蜀 钩子触发 → 判定 ♠
-    await applyAtom(state, { type: '阶段开始', player: 1, phase: '判定' });
+    // 触发 阶段开始 判定 → P1 身上的 乐不思蜀 钩子触发 → 先问无懈(超时)→ 判定 ♠
+    void applyAtom(state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // P1 身上的 乐不思蜀 被移除 + SKIP_TAG 被加
     expect(state.players[1].pendingTricks.some(t => t.name === '乐不思蜀')).toBe(false);

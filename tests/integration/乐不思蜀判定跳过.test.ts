@@ -16,7 +16,7 @@ import {
   registerSkillsFromState,
   applyAtom,
 } from '../../src/engine/create-engine';
-import { dispatchAndWait } from '../engine-harness';
+import { dispatchAndWait, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -106,8 +106,10 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     state.phase = '判定';
     state.turn.phase = '判定';
 
-    // P1 触发 阶段开始 判定 → 乐不思蜀 hook 看到 判定区有 乐不思蜀 → applyAtom 判定
-    await applyAtom(state, { type: '阶段开始', player: 1, phase: '判定' });
+    // P1 触发 阶段开始 判定 → 乐不思蜀 hook:有 乐不思蜀 → 先问无懈(超时)→ applyAtom 判定
+    void applyAtom(state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // 判定 ♠(非♥)→ SKIP_TAG 加 + 移除延时锦囊
     expect(harness.state.players[1].tags ?? []).toContain(SKIP_TAG);
@@ -150,7 +152,9 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
 
     expect(state.players[0].pendingTricks).toHaveLength(2);
 
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    void applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // SKIP_TAG 加(因判定 ♠ → 非♥)
     expect(state.players[0].tags ?? []).toContain(SKIP_TAG);
@@ -187,7 +191,9 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     });
     await registerSkillsFromState(state);
 
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    void applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
     expect(state.players[0].tags ?? []).toContain(SKIP_TAG);
 
     await applyAtom(state, { type: '阶段开始', player: 0, phase: '出牌' });
@@ -218,7 +224,9 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     });
     await registerSkillsFromState(state);
 
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    void applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // 判定♥ → 乐不思蜀 无效移除,SKIP_TAG 不加
     expect(state.players[0].tags ?? []).not.toContain(SKIP_TAG);
@@ -257,7 +265,9 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     });
     await registerSkillsFromState(state);
 
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    void applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(state); // 等到无懈 pending
+    await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // 乐不思蜀 被解(判定 ♠ 非♥)
     expect(state.players[0].pendingTricks.find(t => t.name === '乐不思蜀')).toBeUndefined();

@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-20
+### 延时锦囊 bug 修复 — 无懈可击问询时机错误
+
+修复闪电/乐不思蜀/兵粮寸断三类延时锦囊的无懈可击问询时机:延时锦囊的生效时机是判定阶段而非使用时,无懈可击问询应在判定前才出现。同时修补了乐不思蜀遗漏无懈可击问询的 bug。
+
+#### Fixed
+- **闪电无懈可击问询时机错误**: 原实现在出牌阶段使用时即问询无懈可击,但闪电此时只是放入判定区尚未生效。修复:从 `use` action 移除无懈问询,改到判定阶段 before hook 中——判定前先问无懈,被抵消则移除延时锦囊并跳过判定。(`src/engine/skills/闪电.ts`)
+- **兵粮寸断无懈可击问询时机错误**: 与闪电同样的问题,使用时问询无懈。修复:同闪电——use action 仅放置延时锦囊,无懈问询移到判定阶段判定前。(`src/engine/skills/兵粮寸断.ts`)
+- **乐不思蜀遗漏无懈可击问询**: 乐不思蜀原实现完全没有无懈可击问询(使用时和判定前都没有),玩家无法对乐不思蜀打出无懈。修复:在判定阶段 before hook 判定前补上无懈可击问询,与闪电/兵粮寸断一致。(`src/engine/skills/乐不思蜀.ts`)
+
+#### Added
+- **延时锦囊被无懈抵消测试**: 验证闪电在判定前被打出无懈可击后被抵消——闪电移除、不判定、不受伤、不传递,判定牌未被翻动。(`tests/skill-tests/闪电.test.ts`)
+- **更新延时锦囊测试适配新时机**: 闪电/兵粮寸断的 use action 测试不再需要消耗无懈窗口;判定阶段测试改为 fire-and-forget + fireTimeoutAndWait 模式以处理新增的无懈 pending。(`tests/skill-tests/闪电.test.ts`、`tests/skill-tests/乐不思蜀.test.ts`、`tests/skill-tests/兵粮寸断.test.ts`、`tests/integration/乐不思蜀.test.ts`、`tests/integration/乐不思蜀判定跳过.test.ts`)
+
+## [Unreleased] — 2026-06-20
 ### 选将 bug 修复 — 并行选将卡住直到超时
 
 修复并行选将场景下,多个玩家同时 respond 选将时,后发的 respond 被 CAS 校验误拒,导致选将流程卡住直到 60s 超时才能开始的阻断性问题。

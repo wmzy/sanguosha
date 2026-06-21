@@ -2,7 +2,7 @@
 // 兵粮寸断(延时锦囊):对距离1以内一名其他角色使用。
 //   判定:非梅花 → 跳过摸牌阶段;梅花 → 无效弃置。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -57,9 +57,8 @@ describe('兵粮寸断', () => {
     await harness.setup(state);
 
     const P1 = harness.player('P1');
-    // P1 出 兵粮寸断(对距离1以内 P2);无懈窗口超时
+    // P1 出 兵粮寸断(对距离1以内 P2);使用时不再问无懈
     await P1.triggerAction('兵粮寸断', 'use', { cardId: 'b1', target: 1 });
-    await P1.pass(); // 消耗无懈窗口
 
     expect(harness.state.players[1].pendingTricks.length).toBe(1);
     expect(harness.state.players[1].pendingTricks[0].name).toBe('兵粮寸断');
@@ -91,7 +90,9 @@ describe('兵粮寸断', () => {
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
 
-    await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 pending
+    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
 
     // 梅花 → 仅移除延时锦囊,不加跳过摸牌标签
     expect(harness.state.players[1].pendingTricks.length).toBe(0);
@@ -123,7 +124,9 @@ describe('兵粮寸断', () => {
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
 
-    await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 pending
+    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
 
     expect(harness.state.players[1].pendingTricks.length).toBe(0);
     const hasSkipTag = harness.state.players[1].tags?.includes('兵粮寸断/跳过摸牌');

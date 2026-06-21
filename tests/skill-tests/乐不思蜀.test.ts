@@ -1,7 +1,7 @@
 // tests/skill-tests/乐不思蜀.test.ts
 // 验证乐不思蜀延时锦囊:对目标判定区放入 + 判定阶段判定 + 跳过出牌阶段
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -85,7 +85,9 @@ describe('乐不思蜀', () => {
 
     // 触发 阶段开始 判定 之前先注册 P2 的技能实例(loadFrontend 已做)
     // 模拟 P2 的回合进入判定阶段:发 阶段开始 判定 atom
-    await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 pending
+    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
 
     // 红桃 → 仅移除延时锦囊,不加跳过出牌标签
     expect(harness.state.players[1].pendingTricks.length).toBe(0);
@@ -115,7 +117,9 @@ describe('乐不思蜀', () => {
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
 
-    await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 pending
+    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
 
     // 黑桃 → 移除延时锦囊 + 加跳过出牌标签
     expect(harness.state.players[1].pendingTricks.length).toBe(0);
@@ -145,7 +149,9 @@ describe('乐不思蜀', () => {
     await harness.setup(state);
 
     // 阶段开始 判定 → 触发 判定 → 加跳过标签
-    await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 pending
+    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
     const hasSkipTagBefore = harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌');
     expect(hasSkipTagBefore).toBe(true);
 

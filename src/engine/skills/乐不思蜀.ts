@@ -68,7 +68,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       popFrame(state);
     });
 
-  // ─── 判定阶段:有 乐不思蜀 → 触发判定 ────────────────────────
+  // ─── 判定阶段:有 乐不思蜀 → 先问无懈可击,未被抵消才触发判定 ───
   registerBeforeHook(_skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
@@ -80,9 +80,22 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
     // 牌堆空:无法判定,跳过(规则允许直接弃置,但避免引擎崩;这里 no-op)
     if (ctx.state.zones.deck.length === 0) return;
-    // 触发判定:判定 atom 是事件标记,引擎会自动从牌堆翻一张到 judgeZone,
-    // 然后在 after hook 中读顶牌花色决定效果。
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '乐不思蜀' });
+
+    // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问)
+    ctx.state.localVars['无懈/被抵消'] = false;
+    try {
+      await applyAtom(ctx.state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
+      if (ctx.state.localVars['无懈/被抵消']) {
+        // 被无懈抵消:移除延时锦囊,跳过判定
+        await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '乐不思蜀' });
+        return;
+      }
+      // 触发判定:判定 atom 是事件标记,引擎会自动从牌堆翻一张到 judgeZone,
+      // 然后在 after hook 中读顶牌花色决定效果。
+      await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '乐不思蜀' });
+    } finally {
+      delete ctx.state.localVars['无懈/被抵消'];
+    }
   });
 
   // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────
