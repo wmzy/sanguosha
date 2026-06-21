@@ -16,7 +16,7 @@ import { PlayerCardLarge } from './PlayerCardLarge';
 import { GameLog } from './GameLog';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
 import { resolvePendingRespond } from '../utils/pendingRespond';
-import { buildPlayParams, derivePlayRules, findUseActionForCard, isActiveAction } from '../utils/gameViewHelpers';
+import { buildPlayParams, derivePlayRules, findUseActionForCard, isActiveAction, resolveDistributeCardIds } from '../utils/gameViewHelpers';
 
 // ─── 抽取的子组件 ───
 import { GameHeader } from './GameHeader';
@@ -27,6 +27,7 @@ import { TargetSelector } from './TargetSelector';
 import { SeatArcLayout } from './SeatArcLayout';
 import { ZoneInfoBar } from './ZoneInfoBar';
 import { HandCard } from './HandCard';
+import { DistributeUI } from './DistributeUI';
 
 // ─── 抽取的 hooks ───
 import { useAnimationState } from '../hooks/useAnimationState';
@@ -85,6 +86,9 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformMode | null>(null);
   const [distributeMode, setDistributeMode] = useState<{ skillId: string; actionType: string; prompt: DistributePrompt } | null>(null);
+  // distribute 选牌状态(主动技 + 被动遗计共用):驱动手牌区高亮
+  const [distSelected, setDistSelected] = useState<Set<string>>(new Set());
+  const [distAllocations, setDistAllocations] = useState<Array<{ target: number; cardIds: string[] }>>([]);
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
 
   // ─── 状态派生(hooks) ───
@@ -110,9 +114,37 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
   const canOperate = true;
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
 
+  // ─── distribute 上下文(主动技 + 被动遗计共用)───
+  // 统一两个来源:distributeMode(仁德/制衡主动技)、pending.prompt.type==='distribute'(遗计被动)。
+  // 二者都用手牌区选牌 + DistributeUI 提示/分配。
+  const perspectiveEquipment = perspectivePlayer?.equipment ?? {};
+  const activeDistribute = (() => {
+    // 1. 主动技优先
+    if (distributeMode) {
+      const { skillId, actionType, prompt } = distributeMode;
+      const cardIds = resolveDistributeCardIds(prompt, perspectiveHand, perspectiveEquipment);
+      return { skillId, actionType, prompt, cardIds };
+    }
+    // 2. 被动 distribute pending(遗计分配)
+    if (isMyAwaiting && pending && pending.prompt.type === 'distribute') {
+      const info = resolvePendingRespond(pending, skillActions);
+      const skillId = info?.skillId ?? '系统规则';
+      const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
+      return { skillId, actionType: 'respond', prompt: pending.prompt, cardIds };
+    }
+    return null;
+  })();
+  const isDistributeActive = activeDistribute !== null;
+
   // ─── state 重置 effects(切牌/切 pending 时清理) ───
   // 弃牌窗口出现/切换时清空已选
   useEffect(() => { setSelectedForDiscard(new Set()); }, [pending]);
+  // distribute 上下文切换(主动技进入/退出 或 pending 变化)时清空选牌状态
+  const distKey = activeDistribute ? `${activeDistribute.skillId}:${activeDistribute.actionType}:${activeDistribute.prompt.mode ?? 'allocate'}` : '';
+  useEffect(() => {
+    setDistSelected(new Set());
+    setDistAllocations([]);
+  }, [distKey]);
   // 切牌/重选牌时,同步重置借刀杀人的第二目标
   useEffect(() => { setSelectedKillTarget(null); }, [selectedCardId]);
 
@@ -128,14 +160,60 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
     [onAction, perspectiveIdx],
   );
 
-  /** distribute 主动技提交后退出分配模式 */
-  const sendDistribute = useCallback(
-    (skillId: string, actionType: string, params: Record<string, Json>) => {
-      send(skillId, actionType, params);
-      setDistributeMode(null);
-    },
-    [send],
-  );
+  /** distribute 选牌:切换某张牌的选中态(受 maxTotal 约束) */
+  const handleDistToggle = useCallback((id: string) => {
+    if (!activeDistribute) return;
+    const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
+    setDistSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) {
+        n.delete(id);
+      } else {
+        if (n.size >= maxTotal) return prev;
+        n.add(id);
+      }
+      return n;
+    });
+  }, [activeDistribute]);
+
+  /** distribute allocate 模式:把当前 selected 分配给某目标 */
+  const handleDistAllocate = useCallback((targetIdx: number) => {
+    if (!activeDistribute) return;
+    const maxPerTarget = activeDistribute.prompt.maxPerTarget ?? 99;
+    if (distSelected.size === 0) return;
+    setDistAllocations(prev => {
+      const already = prev.filter(a => a.target === targetIdx).reduce((s, a) => s + a.cardIds.length, 0);
+      if (already + distSelected.size > maxPerTarget) return prev;
+      return [...prev, { target: targetIdx, cardIds: [...distSelected] }];
+    });
+    setDistSelected(new Set());
+  }, [activeDistribute, distSelected]);
+
+  /** distribute 提交(select → cardIds;allocate → allocation) */
+  const handleDistSubmit = useCallback(() => {
+    if (!activeDistribute) return;
+    const { skillId, actionType, prompt } = activeDistribute;
+    const mode = prompt.mode ?? 'allocate';
+    const minTotal = prompt.minTotal ?? 1;
+    if (mode === 'select') {
+      const total = distSelected.size;
+      if (total < minTotal) return;
+      send(skillId, actionType, { cardIds: [...distSelected] });
+    } else {
+      const total = distAllocations.flatMap(a => a.cardIds).length;
+      if (total < minTotal) return;
+      send(skillId, actionType, { allocation: distAllocations });
+    }
+    setDistSelected(new Set());
+    setDistAllocations([]);
+    setDistributeMode(null);
+  }, [activeDistribute, distSelected, distAllocations, send]);
+
+  /** distribute 清空选牌 + 分配 */
+  const handleDistClear = useCallback(() => {
+    setDistSelected(new Set());
+    setDistAllocations([]);
+  }, []);
 
   // ─── 选中的牌 ───
   const selectedCard = selectedCardId ? perspectiveHand.find(c => c.id === selectedCardId) ?? null : null;
@@ -309,6 +387,13 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
   }
 
   function handleCardClick(card: Card) {
+    // distribute 选牌(主动技仁德/制衡 + 被动遗计):仅候选牌可点
+    if (isDistributeActive && activeDistribute) {
+      const candidateSet = new Set(activeDistribute.cardIds);
+      if (!candidateSet.has(card.id)) return;
+      handleDistToggle(card.id);
+      return;
+    }
     // 弃牌窗口:切换弃牌选中状态
     if (isDiscardPhase && isPerspectiveAwaiting && canOperate) {
       setSelectedForDiscard(prev => {
@@ -480,8 +565,9 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
         </div>
 
         <div className={styles.handColumn}>
-          {/* ─── 提示区(pending 回应 + 出牌/弃牌阶段提示),放在手牌区上方 ─── */}
-          {isPerspectiveAwaiting && pending && !isDiscardPhase && pending?.atom?.type !== '选将询问' && (
+          {/* ─── 待回应区(pending 回应,非弃牌/非选将/非 distribute)─── */}
+          {/* distribute pending(遗计)由下方统一分配面板处理 */}
+          {isPerspectiveAwaiting && pending && !isDiscardPhase && pending?.atom?.type !== '选将询问' && pending.prompt.type !== 'distribute' && (
             <AwaitingPrompt
               pending={pending}
               pendingTargetIdx={pendingTargetIdx}
@@ -492,8 +578,6 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
               canOperate={canOperate}
               onSend={send}
               onRespond={handleRespond}
-              view={view}
-              perspectiveIdx={perspectiveIdx}
             />
           )}
           <PlayPhasePrompt
@@ -512,12 +596,34 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
             discardMin={discardMin}
             discardMax={discardMax}
             selectedForDiscard={selectedForDiscard}
-            distributeMode={distributeMode}
-            onCancelDistribute={() => setDistributeMode(null)}
             onClearDiscard={() => setSelectedForDiscard(new Set())}
             onConfirmDiscard={handleConfirmDiscard}
-            onSendDistribute={sendDistribute}
           />
+          {/* ─── 统一分配面板(仁德/制衡主动技 + 遗计被动 pending)─── */}
+          {/* 选牌已下沉到手牌区,这里只显示提示文案 + 目标分配 + 提交 */}
+          {isDistributeActive && activeDistribute && (
+            <div className={styles.promptBoxAwaiting}>
+              <div className={styles.promptTitle}>🤝 {activeDistribute.prompt.title}</div>
+              <DistributeUI
+                prompt={activeDistribute.prompt}
+                cardIds={activeDistribute.cardIds}
+                players={view.players}
+                viewer={perspectiveIdx}
+                selected={distSelected}
+                allocations={distAllocations}
+                onToggleCard={handleDistToggle}
+                onAllocate={handleDistAllocate}
+                onClear={handleDistClear}
+                onSubmit={handleDistSubmit}
+              />
+              {/* 主动技可取消;被动 pending 不能取消 */}
+              {distributeMode && (
+                <div className={styles.distributeCancelRow}>
+                  <button className={styles.cancelBtn} onClick={() => setDistributeMode(null)}>取消</button>
+                </div>
+              )}
+            </div>
+          )}
           <CountdownBar deadline={deadline} totalMs={pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS} />
           {/* 转化模式提示 + 取消选择 */}
           <div className={styles.handHeader}>
@@ -587,7 +693,8 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
               const isSelected = selectedCardId === card.id;
               const isDiscardSelected = selectedForDiscard.has(card.id);
               const canPlay = isMyTurn && canOperate;
-              const isAwaiting = isMyAwaiting && (() => {
+              // distribute 激活时不走 useCard 回应高亮(避免遗计 pending 双高亮)
+              const isAwaiting = !isDistributeActive && isMyAwaiting && (() => {
                 const info = resolvePendingRespond(pending, skillActions);
                 return !!info?.cardFilter?.(card);
               })();
@@ -595,6 +702,11 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
               const isTransformMatch = transformMode !== null && transformMode.cardFilter(card);
               const isTransformActive = transformMode !== null && isMyTurn && canOperate;
               const isTransformDisabled = isTransformActive && !isTransformMatch;
+              // distribute(仁德/制衡/遗计):候选/选中/已分配
+              const distCandidateIds = activeDistribute ? new Set(activeDistribute.cardIds) : null;
+              const isDistCandidate = isDistributeActive && !!distCandidateIds?.has(card.id);
+              const isDistSelected = isDistributeActive && distSelected.has(card.id);
+              const isDistAllocated = isDistributeActive && distAllocations.some(a => a.cardIds.includes(card.id));
               const isNew = anim.newCardIds.has(card.id);
               return (
                 <HandCard
@@ -612,6 +724,10 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
                   isTransformDisabled={isTransformDisabled}
                   isNew={isNew}
                   transformWrapperName={transformMode?.wrapperName}
+                  isDistributeCandidate={isDistCandidate}
+                  isDistributeSelected={isDistSelected}
+                  isDistributeAllocated={isDistAllocated}
+                  isDistributeActive={isDistributeActive}
                   onClick={() => handleCardClick(card)}
                 />
               );

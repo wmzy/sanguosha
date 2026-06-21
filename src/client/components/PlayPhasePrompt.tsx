@@ -3,9 +3,7 @@
 // 不持有任何业务状态,所有数据/回调由 props 传入。
 
 import * as styles from './gameViewStyles';
-import type { GameView, Card, Json, DistributePrompt } from '../../engine/types';
-import { DistributeUI } from './DistributeUI';
-import { resolveDistributeCardIds } from '../utils/gameViewHelpers';
+import type { GameView, Card } from '../../engine/types';
 
 export interface PlayPhasePromptProps {
   view: GameView;
@@ -23,12 +21,8 @@ export interface PlayPhasePromptProps {
   discardMin: number;
   discardMax: number;
   selectedForDiscard: Set<string>;
-  /** distribute 主动技模式(仁德/制衡等)。点击技能按钮后进入此模式。 */
-  distributeMode: { skillId: string; actionType: string; prompt: DistributePrompt } | null;
-  onCancelDistribute: () => void;
   onClearDiscard: () => void;
   onConfirmDiscard: () => void;
-  onSendDistribute: (skillId: string, actionType: string, params: Record<string, Json>) => void;
 }
 
 export function PlayPhasePrompt(props: PlayPhasePromptProps) {
@@ -48,11 +42,8 @@ export function PlayPhasePrompt(props: PlayPhasePromptProps) {
     discardMin,
     discardMax,
     selectedForDiscard,
-    distributeMode,
-    onCancelDistribute,
     onClearDiscard,
     onConfirmDiscard,
-    onSendDistribute,
   } = props;
 
   return (
@@ -78,33 +69,7 @@ export function PlayPhasePrompt(props: PlayPhasePromptProps) {
         </div>
       )}
 
-      {/* 3. distribute 主动技弹窗(仁德/制衡):点击技能按钮后进入此模式 */}
-      {distributeMode && canOperate && isMyTurn && view.phase === '出牌' && (() => {
-        const { skillId, actionType, prompt } = distributeMode;
-        const cardIds = resolveDistributeCardIds(
-          prompt,
-          perspectiveHand,
-          view.players[perspectiveIdx]?.equipment ?? {},
-        );
-        return (
-          <div className={styles.promptBoxAwaiting}>
-            <div className={styles.promptTitle}>🤝 {prompt.title}</div>
-            <DistributeUI
-              skillId={skillId}
-              actionType={actionType}
-              prompt={prompt}
-              cardIds={cardIds}
-              players={view.players}
-              viewer={perspectiveIdx}
-              onSend={onSendDistribute}
-              cardMap={view.cardMap}
-            />
-            <div className={styles.distributeCancelRow}>
-              <button className={styles.cancelBtn} onClick={onCancelDistribute}>取消</button>
-            </div>
-          </div>
-        );
-      })()}
+      {/* 3. distribute 主动技弹窗(仁德/制衡)已移至 GameView 统一分配面板 */}
 
       {/* 4. 弃牌阶段提示(自己回合、非 awaiting) */}
       {isPerspectiveTurn && view.phase === '弃牌' && !isPerspectiveAwaiting && !isDiscardPhase && (

@@ -341,6 +341,26 @@ export const handCardTransform = css`
 `;
 // 转化模式:不匹配卡牌变灰、不可点
 export const handCardTransformDisabled = css`opacity: 0.3; cursor: not-allowed;`;
+// distribute(仁德/制衡/遗计):候选可分配牌金色高亮
+export const handCardDistributeCandidate = css`
+  border: 2px solid #f1c40f;
+  box-shadow: 0 0 10px rgba(241,196,15,0.4);
+  cursor: pointer;
+  &:hover { background: rgba(241,196,15,0.15); }
+`;
+// distribute:已选中牌(待分配/待提交)绿色加粗边框
+export const handCardDistributeSelected = css`
+  border: 2px solid #2ecc71;
+  box-shadow: 0 0 12px rgba(46,204,113,0.5);
+  background: rgba(46,204,113,0.15);
+  margin-bottom: 8px;
+`;
+// distribute:已分配给目标(allocate 模式)半透明、不可再点
+export const handCardDistributeAllocated = css`
+  opacity: 0.4;
+  cursor: default;
+  border-color: #888;
+`;
 export const discardCardSelected = css`
   opacity: 0.5;
   border: 2px solid #e74c3c;

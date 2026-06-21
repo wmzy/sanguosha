@@ -1,9 +1,9 @@
 // src/client/components/AwaitingPrompt.tsx
-// 等待回应区:渲染 pending prompt 的回应面板(distribute / confirm / useCard 三分支)。
+// 等待回应区:渲染 pending prompt 的回应面板(confirm / useCard 两分支)。
+// distribute 类 pending(遗计分配)不在本组件渲染——由 GameView 统一分配面板处理(选牌在手牌区)。
 // 纯展示,所有数据与回调通过 props 传入。
 import * as styles from './gameViewStyles';
-import type { GameView, Card, Json, PendingView } from '../../engine/types';
-import { DistributeUI } from './DistributeUI';
+import type { Card, Json, PendingView } from '../../engine/types';
 import { resolvePendingRespond } from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
 
@@ -19,9 +19,6 @@ export interface AwaitingPromptProps {
   onSend: (skillId: string, actionType: string, params: Record<string, Json>) => void;
   /** 回应(不传 = 不回应;传 cardId = 打出该牌回应) */
   onRespond: (cardId?: string) => void;
-  /** view 相关(DistributeUI 需要) */
-  view: GameView;
-  perspectiveIdx: number;
 }
 
 export function AwaitingPrompt(props: AwaitingPromptProps) {
@@ -35,8 +32,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
     canOperate,
     onSend,
     onRespond,
-    view,
-    perspectiveIdx,
   } = props;
 
   // 广播型 pending 且已本地跳过:显示已跳过提示
@@ -54,13 +49,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
       {isSkipped ? (
         <div className={styles.waitingHint}>已跳过，等待其他玩家回应...</div>
       ) : canOperate ? (() => {
-        // distribute 类 pending(遗计分配):渲染分配 UI
-        if (pending.prompt.type === 'distribute') {
-          const info = resolvePendingRespond(pending, skillActions);
-          const skillId = info?.skillId ?? '系统规则';
-          const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
-          return <DistributeUI skillId={skillId} actionType="respond" prompt={pending.prompt} cardIds={cardIds} players={view.players} viewer={perspectiveIdx} onSend={onSend} cardMap={view.cardMap} />;
-        }
         // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
         if (pending.prompt.type === 'confirm') {
           const confirmLabel = pending.prompt.confirmLabel || '确认';
