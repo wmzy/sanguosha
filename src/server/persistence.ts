@@ -120,8 +120,10 @@ function sanitizeState(state: GameState): GameState {
     pendingSlots: new Map(),
     atomStack: [],
     settlementStack: state.settlementStack.map(f => {
-      const { _executor, ...rest } = f as Record<string, unknown>;
-      return rest as typeof f;
+      // SettlementFrame 运行时挂有 _executor 函数引用(不可序列化),持久化时剩离。
+      // 经 unknown 中转:SettlementFrame 与 Record 结构重叠不足,TS 要求显式两步转换。
+      const { _executor, ...rest } = f as unknown as Record<string, unknown>;
+      return rest as unknown as typeof f;
     }),
   };
 }

@@ -2,23 +2,22 @@
 // 集成测试:诸葛连弩(武器,范围 1)——出牌阶段使用【杀】无次数限制
 //
 // 覆盖:
-//   1. 装备诸葛连弩后,出牌阶段 quota 被设为 Infinity(阶段开始 hook)
-//   2. quota=Infinity 时:同回合可以连续出多张杀(至少 2 张,验证 quota 不被扣到 0)
-//   3. 卸下诸葛连弩后,quota 回到默认 1(本回合已经出过杀则扣回 0)
+//   1. 装备诸葛连弩后,slashMax = Infinity(上限提供者注册)
+//   2. slashMax=Infinity 时:同回合可以连续出多张杀(至少 3 张,验证 usedCount 不会触顶)
+//   3. 卸下诸葛连弩后,slashMax 回到默认 1(出过一次杀则 usedCount=1,第二次被拒)
 //
 // 关键机制(诸葛连弩.ts):
-//   阶段开始 出牌 的 before hook 设 turn.vars['杀/quota'] = Infinity。
-//   杀.ts validate 读 quota(默认 1),Inf - 1 = Inf(永远够用)。
-//   装备卸下(添加技能 reverse)不主动清 quota(规则上 quota 是出牌阶段的一次性变量,
-//   跨装备可能泄漏 — 但不影响本测试:装备时再触发 阶段开始 出牌 重设)。
+//   onInit 注册上限提供者返回 Infinity → slashMax = ∞
+//   杀.ts canSlash 读 slashUsed/slashMax(默认 1),Inf - usedCount = Inf(永远够用)。
+//   装备卸下(onDestroy)反注册上限提供者,slashMax 回落基础 1。
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   resetForTest,
   registerSkillsFromState,
-  applyAtom,
 } from '../../src/engine/create-engine';
+import { slashMax, slashUsed } from '../../src/engine/slash-quota';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -56,15 +55,15 @@ function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' 
   return { id, name, suit, rank, type, subtype, range };
 }
 
-describe('诸葛连弩:连续出杀 quota=Infinity', () => {
+describe('诸葛连弩:连续出杀 slashMax=Infinity', () => {
   beforeEach(() => {
     resetForTest();
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 1:装备诸葛连弩 → 阶段开始 出牌 → quota 被设为 Infinity
+  // 用例 1:装备诸葛连弩 → 上限提供者注册 → slashMax = Infinity
   // ─────────────────────────────────────────────────────────────
-  it('用例1:装备诸葛连弩后,阶段开始 出牌 hook 把 quota 设为 Infinity', async () => {
+  it('用例1:装备诸葛连弩后,onInit 注册上限提供者使 slashMax = Infinity', async () => {
     const zhuge: Card = makeCard('wp-zg', '诸葛连弩', '♣', 'A', '装备牌', '武器', 1);
 
     const state: GameState = createGameState({
@@ -79,8 +78,8 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
     });
     await registerSkillsFromState(state);
 
-    // 装备前:quota 未设置(validate 时默认 1)
-    expect(state.turn.vars['杀/quota']).toBeUndefined();
+    // 装备前:slashMax 默认 1(无上限提供者)
+    expect(slashMax(state, 0)).toBe(1);
 
     // 装备诸葛连弩 → 系统规则 添加技能 after hook 实例化 诸葛连弩 skill
     await dispatchAndWait(state, {
@@ -92,16 +91,14 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
     });
     expect(state.players[0].equipment['武器']).toBe(zhuge.id);
 
-    // 装备刚完成,hook 还没触发(当前在 出牌 中段,阶段开始事件需要重新触发)
-    // 手动触发 阶段开始 出牌 → 诸葛连弩 的 before hook 把 quota 设为 Infinity
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '出牌' });
-    expect(state.turn.vars['杀/quota']).toBe(Infinity);
+    // 装备即注册上限提供者(无需再触发 阶段开始)
+    expect(slashMax(state, 0)).toBe(Infinity);
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 2:quota=Infinity → 连续出 2 张杀都不被 validate 拒绝
+  // 用例 2:slashMax=Infinity → 连续出 3 张杀都不被 validate 拒绝
   // ─────────────────────────────────────────────────────────────
-  it('用例2:装备诸葛连弩后,同回合连续出 2 张杀(P1 扣 2 血)', async () => {
+  it('用例2:装备诸葛连弩后,同回合连续出 3 张杀(P1 扣 3 血)', async () => {
     const zhuge: Card = makeCard('wp-zg', '诸葛连弩', '♣', 'A', '装备牌', '武器', 1);
     const slash1: Card = makeCard('k1', '杀', '♠', '7');
     const slash2: Card = makeCard('k2', '杀', '♠', '8');
@@ -124,7 +121,7 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
     });
     await registerSkillsFromState(state);
 
-    // 装备诸葛连弩
+    // 装备诸葛连弩 → 上限提供者注册(无需 阶段开始)
     await dispatchAndWait(state, {
       skillId: '装备通用',
       actionType: 'use',
@@ -132,9 +129,7 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
       params: { cardId: zhuge.id },
       baseSeq: state.seq,
     });
-    // 手动触发 阶段开始 出牌(让 诸葛连弩 hook 把 quota 设为 Infinity)
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '出牌' });
-    expect(state.turn.vars['杀/quota']).toBe(Infinity);
+    expect(slashMax(state, 0)).toBe(Infinity);
 
     const healthBefore = state.players[1].health;
 
@@ -150,10 +145,10 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
     // P1 不出闪 → 扣血
     await fireTimeoutAndWait(state);
     expect(state.players[1].health).toBe(healthBefore - 1);
-    // quota 仍为 Infinity(Infinity - 1 = Infinity)
-    expect(state.turn.vars['杀/quota']).toBe(Infinity);
+    // usedCount=1,上限仍 ∞ → 可继续出
+    expect(slashUsed(state)).toBe(1);
 
-    // 第二次出杀:应被允许(quota=Infinity,默认 1 时第二次会被拒)
+    // 第二次出杀:应被允许(slashMax=Infinity,默认 1 时第二次会被拒)
     await dispatchAndWait(state, {
       skillId: '杀',
       actionType: 'use',
@@ -164,9 +159,9 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
     expect(state.pendingSlots.size).toBeGreaterThan(0);
     await fireTimeoutAndWait(state);
     expect(state.players[1].health).toBe(healthBefore - 2);
-    expect(state.turn.vars['杀/quota']).toBe(Infinity);
+    expect(slashUsed(state)).toBe(2);
 
-    // 第三次出杀:也应被允许(quota 始终 Infinity)
+    // 第三次出杀:也应被允许(上限始终 Infinity)
     await dispatchAndWait(state, {
       skillId: '杀',
       actionType: 'use',
@@ -187,7 +182,7 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
   // ─────────────────────────────────────────────────────────────
   // 用例 3:对比:无诸葛连弩时第二次出杀被 validate 拒绝
   // ─────────────────────────────────────────────────────────────
-  it('用例3:回归——无诸葛连弩时,出完一张杀后 quota=0,第二次出杀被拒绝', async () => {
+  it('用例3:回归——无诸葛连弩时,出完一张杀后 usedCount=1,第二次出杀被拒绝', async () => {
     const slash1: Card = makeCard('k1', '杀', '♠', '7');
     const slash2: Card = makeCard('k2', '杀', '♠', '8');
 
@@ -208,8 +203,9 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
     });
     await registerSkillsFromState(state);
 
-    // 默认 quota 未设置 → 视为 1
-    expect(state.turn.vars['杀/quota']).toBeUndefined();
+    // 默认 slashMax=1,usedCount=0(未出过杀)
+    expect(slashMax(state, 0)).toBe(1);
+    expect(slashUsed(state)).toBe(0);
 
     // 第一次出杀
     await dispatchAndWait(state, {
@@ -221,8 +217,8 @@ describe('诸葛连弩:连续出杀 quota=Infinity', () => {
     });
     await fireTimeoutAndWait(state);
 
-    // quota=0(出杀后 1-1)
-    expect(state.turn.vars['杀/quota']).toBe(0);
+    // usedCount=1(默认上限 1 → 已用满)
+    expect(slashUsed(state)).toBe(1);
 
     // 第二次出杀应被 validate 拒绝
     const seqBefore = state.seq;

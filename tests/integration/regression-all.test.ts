@@ -8,7 +8,7 @@ import { createGameState } from '../../src/engine/types';
 
 function build2p(opts?: { p0Hand?: string[]; p1Hand?: string[]; p0Skills?: string[]; p1Skills?: string[]; extraCards?: Record<string, Card> }): GameState {
   const cards: Record<string, Card> = {};
-  const mk = (id: string, name: string, suit = '♠', rank = 'A', type = '基本牌') => { cards[id] = { id, name, suit, rank, type }; return id; };
+  const mk = (id: string, name: string, suit: Card['suit'] = '♠', rank = 'A', type: Card['type'] = '基本牌') => { cards[id] = { id, name, suit, rank, type }; return id; };
   const p0h = opts?.p0Hand ?? [mk('s0', '杀')];
   const p1h = opts?.p1Hand ?? [];
   if (opts?.extraCards) Object.assign(cards, opts.extraCards);

@@ -50,8 +50,9 @@ describe('session.handleAction:respond 路径跳过 CAS', () => {
     // 等主公选将 slot 出现
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) await sleep(10);
     expect(state.pendingSlots.size).toBe(1);
-    const lordTarget = [...state.pendingSlots.values()][0].atom.target as number;
-    const lordCandidates = [...state.pendingSlots.values()][0].atom.candidates as Array<{ name: string }>;
+    const lordSlotAtom = [...state.pendingSlots.values()][0].atom as { target: number; candidates: Array<{ name: string }> };
+    const lordTarget = lordSlotAtom.target;
+    const lordCandidates = lordSlotAtom.candidates;
 
     // 主公 respond(baseSeq 是当前 seq,正常通过 CAS)
     await session.handleAction('p0', {
@@ -72,7 +73,7 @@ describe('session.handleAction:respond 路径跳过 CAS', () => {
     await Promise.all(others.map(async t => {
       const slot = state.pendingSlots.get(t);
       if (!slot) return;
-      const cand = (slot.atom.candidates as Array<{ name: string }>)[0];
+      const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
       await session.handleAction('p' + t, {
         skillId: '系统规则', actionType: '选将', ownerId: t,
         params: { character: cand.name }, baseSeq: staleBaseSeq,
@@ -96,8 +97,9 @@ describe('session.handleAction:respond 路径跳过 CAS', () => {
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) await sleep(10);
 
     // 主公选
-    const lordTarget = [...state.pendingSlots.values()][0].atom.target as number;
-    const lordCand = ([...state.pendingSlots.values()][0].atom.candidates as Array<{ name: string }>)[0];
+    const lordSlot2 = [...state.pendingSlots.values()][0].atom as { target: number; candidates: Array<{ name: string }> };
+    const lordTarget = lordSlot2.target;
+    const lordCand = lordSlot2.candidates[0];
     await session.handleAction('p0', {
       skillId: '系统规则', actionType: '选将', ownerId: lordTarget,
       params: { character: lordCand.name }, baseSeq: state.seq,
@@ -108,7 +110,7 @@ describe('session.handleAction:respond 路径跳过 CAS', () => {
     const others = [...state.pendingSlots.keys()];
     for (const t of others) {
       const slot = state.pendingSlots.get(t)!;
-      const cand = (slot.atom.candidates as Array<{ name: string }>)[0];
+      const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
       await session.handleAction('p' + t, {
         skillId: '系统规则', actionType: '选将', ownerId: t,
         params: { character: cand.name }, baseSeq: state.seq,

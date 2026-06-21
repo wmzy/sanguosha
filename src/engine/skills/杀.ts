@@ -16,6 +16,7 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
+import { canSlash, incSlashUsed } from '../slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
@@ -38,9 +39,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       const targetsExist = Array.isArray(targets) && targets.length > 0;
       const targetsAlive = targetsExist && targets!.every(t => state.players[t]?.alive === true);
       const inRange = targetsExist && targets!.every(t => inAttackRange(state, ownerId, t));
-      const quota = state.turn.vars['杀/quota'] as number | undefined;
-      const remaining = typeof quota === 'number' ? quota : 1;
-      const hasQuota = remaining > 0;
+      const hasQuota = canSlash(state, ownerId);
       const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetsAlive && inRange && hasQuota;
       return ok ? null : '现在不能出杀';
     },
@@ -114,10 +113,8 @@ export function onInit(skill: Skill, ownerId: number): () => void {
           }).catch(() => {});
         }
         popFrame(state);
-        // 扣减出杀次数(Infinity 时不变)
-        const q = state.turn.vars['杀/quota'] as number | undefined;
-        const cur = typeof q === 'number' ? q : 1;
-        state.turn.vars['杀/quota'] = cur === Infinity ? Infinity : cur - 1;
+        // 记录一次出杀(已用次数 +1;上限由 slashMax 计算,连弩的 ∞ 由标签体现)
+        incSlashUsed(state);
       }
     },
   );

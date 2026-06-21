@@ -78,6 +78,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
       actionType: 'respond',
       ownerId: 1,
       params: {},
+      baseSeq: 0,
     });
     const p2 = state.players.find(p => p.name === 'P2')!;
     expect(p2.health).toBe(3);
@@ -93,7 +94,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
     });
     // 第二步:P2 不出闪 → 结算
     await dispatchAndWait(state, {
-      skillId: '闪', actionType: 'respond', ownerId: 1, params: {},
+      skillId: '闪', actionType: 'respond', ownerId: 1, params: {}, baseSeq: 0,
     });
     // 准备第二张杀
     const c2: Card = { id: 'c2', name: '杀', suit: '♠', rank: '2', type: '基本牌' };

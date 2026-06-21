@@ -3,8 +3,6 @@ import { describe, it, expect } from 'vitest';
 import {
   isRecord,
   hasStringProperty,
-  isCardInfo,
-  isPendingAction,
   isJsonValue,
   assertDefined,
   narrowArray,
@@ -33,30 +31,6 @@ describe('hasStringProperty', () => {
   });
   it('should return false when property is not a string', () => {
     expect(hasStringProperty({ name: 42 }, 'name')).toBe(false);
-  });
-});
-
-describe('isCardInfo', () => {
-  it('should return true for valid card info', () => {
-    expect(isCardInfo({ id: '1', name: '杀', type: '基本牌', subtype: '杀', suit: '♠', rank: 'A', description: '' })).toBe(true);
-  });
-  it('should return false for missing fields', () => {
-    expect(isCardInfo({ id: '1' })).toBe(false);
-  });
-  it('should return false for null', () => {
-    expect(isCardInfo(null)).toBe(false);
-  });
-});
-
-describe('isPendingAction', () => {
-  it('should return true for valid pending types', () => {
-    expect(isPendingAction({ type: '出牌阶段', id: '1', player: 'a', timeout: 0, deadline: 0, onTimeout: { type: 'pass' } })).toBe(true);
-  });
-  it('should return false for invalid type', () => {
-    expect(isPendingAction({ type: 'invalid' })).toBe(false);
-  });
-  it('should return false for non-objects', () => {
-    expect(isPendingAction('string')).toBe(false);
   });
 });
 

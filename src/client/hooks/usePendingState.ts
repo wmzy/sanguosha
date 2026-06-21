@@ -29,6 +29,8 @@ export interface PendingState {
   markBroadcastSkipped: (key: string) => void;
   /** 倒计时基准(pending 优先,否则 turnDeadline) */
   deadline: number | null;
+  /** 倒计时总时长(ms):pending 优先用 pending.totalMs,否则用 turnTotalMs。 */
+  deadlineTotalMs: number;
 }
 
 interface AtomLike {
@@ -67,6 +69,7 @@ export function usePendingState(view: GameView, perspectiveIdx: number): Pending
   }, []);
 
   const deadline = pending?.deadline ?? view.turnDeadline;
+  const deadlineTotalMs = pending ? pending.totalMs : view.turnTotalMs;
 
   return {
     pending,
@@ -78,5 +81,6 @@ export function usePendingState(view: GameView, perspectiveIdx: number): Pending
     skippedBroadcast,
     markBroadcastSkipped,
     deadline,
+    deadlineTotalMs,
   };
 }

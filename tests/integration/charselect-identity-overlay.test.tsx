@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView } from '../../engine/types';
+import type { GameView } from '../../src/engine/types';
 
 function makePlayer(index: number, character: string, identity?: string) {
   return {
@@ -57,6 +57,7 @@ function makeLordSelectingView(): GameView {
     },
     allCharSelectSlots: undefined,
     turnDeadline: null,
+    turnTotalMs: 0,
     log: [],
   };
 }
@@ -122,6 +123,7 @@ describe('GameView:选将阶段身份揭示弹窗不覆盖选将界面', () => {
       pending: null,
       allCharSelectSlots: undefined,
       turnDeadline: null,
+      turnTotalMs: 0,
       log: [],
     };
     render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);

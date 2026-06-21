@@ -18,10 +18,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   resetForTest,
   registerSkillsFromState,
-  applyAtom,
 } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import { dispatchAndWait } from '../engine-harness';
+import { slashMax } from '../../src/engine/slash-quota';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -71,9 +71,9 @@ describe('装备替换:旧装备技能实例被卸载', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 1:装诸葛连弩 → quota=Infinity;再装寒冰剑 → quota 回归默认
+  // 用例 1:装诸葛连弩 → 注册上限提供者(∞);再装寒冰剑 → 上限提供者被取消注册
   // ─────────────────────────────────────────────────────────────
-  it('用例1:诸葛连弩 → 寒冰剑(替换同栏位)→ 诸葛连弩 hook 被卸载,quota 不再被设 Infinity', async () => {
+  it('用例1:诸葛连弩 → 寒冰剑(替换同栏位)→ 连弩 skill 卸载,上限提供者被取消注册', async () => {
     const zhuge: Card = makeCard('wp-zg', '诸葛连弩', '♣', 'A', '武器', 1);
     const hanbing: Card = makeCard('wp-hb', '寒冰剑', '♠', '6', '武器', 2);
 
@@ -94,7 +94,7 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     });
     await registerSkillsFromState(state);
 
-    // 装诸葛连弩
+    // 装诸葛连弩 → onInit 注册上限提供者(∞)
     await dispatchAndWait(state, {
       skillId: '装备通用',
       actionType: 'use',
@@ -105,14 +105,8 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     expect(state.players[0].equipment['武器']).toBe(zhuge.id);
     // 诸葛连弩 skill 实例已注册(玩家 skills 含 诸葛连弩)
     expect(state.players[0].skills).toContain('诸葛连弩');
-
-    // 手动触发 阶段开始 出牌 → 诸葛连弩 before hook 把 quota 设为 Infinity
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '出牌' });
-    expect(state.turn.vars['杀/quota']).toBe(Infinity);
-
-    // 重置 quota 为 undefined,以便后续观测 hook 是否重新触发
-    delete state.turn.vars['杀/quota'];
-    expect(state.turn.vars['杀/quota']).toBeUndefined();
+    // 上限提供者已注册(onInit 同步注册,返回 ∞ → slashMax = Infinity)
+    expect(slashMax(state, 0)).toBe(Infinity);
 
     // 装备寒冰剑(同槽位 武器,会触发 装备通用 里的 移除技能 + 卸下 + 装备 + 添加技能 序列)
     await dispatchAndWait(state, {
@@ -130,11 +124,8 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     expect(state.players[0].skills).not.toContain('诸葛连弩');
     expect(state.players[0].skills).toContain('寒冰剑');
 
-    // 重新触发 阶段开始 出牌 → 此时诸葛连弩 hook 已被 unloadSkillInstance 清理
-    //   → quota 不应被设 Infinity(没有 hook 会动它)
-    delete state.turn.vars['杀/quota'];
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '出牌' });
-    expect(state.turn.vars['杀/quota']).toBeUndefined();
+    // 卸载取消注册 → slashMax 回落到基础 1(连弩实例已卸载)
+    expect(slashMax(state, 0)).toBe(1);
   });
 
   // ─────────────────────────────────────────────────────────────

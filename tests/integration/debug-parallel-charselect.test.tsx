@@ -9,7 +9,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { GameViewComponent, type ActionMsg } from '../../src/client/components/GameView';
 import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView } from '../../engine/types';
+import type { GameView } from '../../src/engine/types';
 
 /** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角)。 */
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
@@ -68,6 +68,7 @@ function makeView(): GameView {
       },
     ],
     turnDeadline: null,
+    turnTotalMs: 0,
     log: [],
   };
 }

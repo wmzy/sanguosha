@@ -168,8 +168,8 @@ describe('青釭剑:杀无视防具', () => {
     const blackSlash2: Card = { id: 'k2', name: '杀', suit: '♣', rank: '8', type: '基本牌' };
     state.cardMap[blackSlash2.id] = blackSlash2;
     state.players[0].hand.push(blackSlash2.id);
-    // 重置出杀 quota(默认 1,首次出杀后减为 0)以便第二次能出
-    state.turn.vars['杀/quota'] = 1;
+    // 重置已出杀次数(默认 0,首次出杀后 +1 为 1)以便第二次能出
+    state.turn.vars['杀/usedCount'] = 0;
 
     const healthBefore2 = state.players[1].health;
     await dispatchAndWait(state, {

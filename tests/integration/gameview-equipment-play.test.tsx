@@ -13,7 +13,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import { findUseActionForCard } from '../../src/client/utils/gameViewHelpers';
-import type { GameView, Card } from '../../engine/types';
+import type { GameView, Card } from '../../src/engine/types';
 
 function makeEquipCard(id: string, name: string, subtype: string): Card {
   return { id, name, suit: '♠', rank: 'A', type: '装备牌', subtype } as Card;
@@ -55,6 +55,7 @@ function makeView(overrides: Partial<GameView> = {}): GameView {
     cardMap: { wp1: makeEquipCard('wp1', '诸葛连弩', '武器') },
     pending: null,
     turnDeadline: null,
+    turnTotalMs: 0,
     log: [],
     ...overrides,
   };

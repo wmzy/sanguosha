@@ -8,6 +8,7 @@ import type {
 } from '../engine/types';
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 import { allCharacters } from '../engine/cards/characters';
+import { TURN_IDLE_TIMEOUT_MS } from '../engine/view/buildView';
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -26,7 +27,8 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map(
 }));
 
 const RECONNECT_GRACE_MS = 30_000;
-const IDLE_TIMEOUT_MS = 50_000;
+/** 出牌/弃牌阶段空闲超时——复用引擎 buildView 的口径,保证前端倒计时与此处一致 */
+const IDLE_TIMEOUT_MS = TURN_IDLE_TIMEOUT_MS;
 
 export class GameSession {
   private state: GameState | null = null;
@@ -44,6 +46,8 @@ export class GameSession {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private sessionSeed: number;
   private logger = createLogger('session');
+  /** 调试房间:首人加入后开局的玩家人数(由 app 写入,handleJoinDebugRoom 读取后清空) */
+  public pendingPlayerCount?: number;
 
   constructor(room: Room, debug = false, sessionSeed?: number) {
     this.room = room;
@@ -387,6 +391,12 @@ export class GameSession {
       state,
       this.actionLog,
     );
+  }
+
+  /** 返回游戏动作日志(供 /api/rooms/:id/log 端点)。无 state 时返回 null。 */
+  getGameLog(): ActionLogEntry[] | null {
+    if (!this.state) return null;
+    return this.actionLog;
   }
 
   private sendToPlayer(playerId: string, message: ServerMessage): void {

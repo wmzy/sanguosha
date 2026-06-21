@@ -292,7 +292,9 @@ export interface AtomEffect {
   blockUntilDone?: boolean;
 }
 
-/** 前端视图事件——后端 atom 的前端投影。纯数据，可序列化。 */
+/** 前端视图事件——后端 atom 的前端投影。纯数据，可序列化。
+ *  索引签名值类型用 unknown 而非 Json:effect/pending 内含 ActionPrompt
+ *  (带函数类型),非纯 Json;各 atom 塞任意字段,前端 applyView 用 as 断言读取。 */
 export interface ViewEvent {
   /** 事件类型（与后端 atom type 一致，可按需别名，如 移动牌→弃牌） */
   type: string;
@@ -303,7 +305,7 @@ export interface ViewEvent {
    */
   atomType?: string;
   /** 事件数据（已脱敏，只含前端需要的字段） */
-  [key: string]: Json;
+  [key: string]: unknown;
   /** 内联动画/音效 */
   effect?: AtomEffect;
   /** 等待信息（仅等待型 atom） */
@@ -459,6 +461,8 @@ export interface GameView {
   allCharSelectSlots?: PendingView[];
   /** 出牌/弃牌阶段的操作截止时间(独立于 pending) */
   turnDeadline: number | null;
+  /** 出牌/弃牌阶段倒计时总时长(ms);turnDeadline 为 null 时为 0 */
+  turnTotalMs: number;
   log: { time: number; player: number; text: string }[];
   /** 公共区域摘要(供前端渲染牌堆/弃牌堆/处理区) */
   zones?: {

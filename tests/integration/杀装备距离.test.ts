@@ -16,10 +16,10 @@ import {
   fireTimeout,
   resetForTest,
   registerSkillsFromState,
-  applyAtom,
 } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait,  dispatchAndWait } from '../engine-harness';
 import { inAttackRange } from '../../src/engine/distance';
+import { slashMax } from '../../src/engine/slash-quota';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -140,6 +140,7 @@ describe('杀 + 装备 + 距离', () => {
       actionType: 'respond',
       ownerId: 1,
       params: { cardId: dodge.id },
+      baseSeq: 0,
     });
 
     // 出闪后:P1 血量不变
@@ -229,10 +230,9 @@ describe('杀 + 装备 + 距离', () => {
     });
     expect(state.players[0].equipment['武器']).toBe(zhuge.id);
 
-    // 诸葛连弩的钩子在"出牌阶段开始"时设 turn.vars['杀/quota'] = Infinity
-    // 当前 state.phase 已经是 '出牌' — 直接触发 阶段开始 atom 跑钩子
-    await applyAtom(state, { type: '阶段开始', player: 0, phase: '出牌' });
-    expect(state.turn.vars['杀/quota']).toBe(Infinity);
+    // 装诸葛连弩 → onInit 注册上限提供者 → slashMax = ∞
+    // 新模型不依赖 阶段开始 hook:提供者在装备(添加技能)时注册
+    expect(slashMax(state, 0)).toBe(Infinity);
 
     // 第一次出杀
     await dispatchAndWait(state, {
@@ -249,10 +249,10 @@ describe('杀 + 装备 + 距离', () => {
     await fireTimeoutAndWait(state);
     expect(state.players[1].health).toBe(healthAfterFirst - 1);
 
-    // quota 仍为 Infinity(出杀后扣减 1 但 Infinity - 1 = Infinity)
-    expect(state.turn.vars['杀/quota']).toBe(Infinity);
+    // usedCount 0 → 1(上限 ∞ → 可出)
+    expect(state.turn.vars['杀/usedCount']).toBe(1);
 
-    // 第二次出杀:应被允许(quota=Infinity)
+    // 第二次出杀:应被允许(usedCount 1 < ∞)
     await dispatchAndWait(state, {
       skillId: '杀',
       actionType: 'use',

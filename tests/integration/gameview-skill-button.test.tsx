@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView, Card } from '../../engine/types';
+import type { GameView, Card } from '../../src/engine/types';
 
 function makeCard(id: string, name: string): Card {
   return { id, name, suit: '♠', rank: 'A', type: '基本牌' };
@@ -51,6 +51,7 @@ function makeView(overrides: Partial<GameView> = {}): GameView {
     cardMap: { c1: makeCard('c1', '杀'), c2: makeCard('c2', '桃') },
     pending: null,
     turnDeadline: null,
+    turnTotalMs: 0,
     log: [],
     ...overrides,
   };

@@ -94,7 +94,7 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
   // ─── 状态派生(hooks) ───
   const { skillActions } = useSkillActions(view, perspectiveIdx);
   const pendingState = usePendingState(view, perspectiveIdx);
-  const { pending, pendingTargetIdx, isPerspectiveAwaiting, isDiscardPhase, discardMin, discardMax, skippedBroadcast, markBroadcastSkipped, deadline } = pendingState;
+  const { pending, pendingTargetIdx, isPerspectiveAwaiting, isDiscardPhase, discardMin, discardMax, skippedBroadcast, markBroadcastSkipped, deadline, deadlineTotalMs } = pendingState;
   const { isCharSelectPending, charSelect, charSelectInProgress, perspectiveCharSelected } = useCharSelect(view, perspectiveIdx);
   const orderedPlayers = useSeatOrder(view, perspectiveIdx);
   const anim = useAnimationState(view, perspectiveIdx);
@@ -624,7 +624,7 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
               )}
             </div>
           )}
-          <CountdownBar deadline={deadline} totalMs={pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS} />
+          <CountdownBar deadline={deadline} totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS} />
           {/* 转化模式提示 + 取消选择 */}
           <div className={styles.handHeader}>
             <span className={styles.handTitle}>

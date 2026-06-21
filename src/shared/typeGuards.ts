@@ -1,6 +1,5 @@
 // shared/typeGuards.ts
-import type { PendingAction, Json } from '../engine/types';
-import type { CardInfo } from '../engine/view/types';
+import type { Json } from '../engine/types';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -11,25 +10,6 @@ export function hasStringProperty<K extends string>(
   key: K,
 ): value is Record<K, string> {
   return isRecord(value) && typeof value[key] === 'string';
-}
-
-export function isCardInfo(value: unknown): value is CardInfo {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.id === 'string' &&
-    typeof value.name === 'string' &&
-    typeof value.type === 'string' &&
-    typeof value.subtype === 'string'
-  );
-}
-
-export function isPendingAction(value: unknown): value is PendingAction {
-  if (!isRecord(value)) return false;
-  const type = value.type;
-  return (
-    typeof type === 'string' &&
-    ['出牌阶段', '响应窗口', '技能选择', '弃牌阶段', '濒死窗口', 'selectCard', '收获选牌'].includes(type)
-  );
 }
 
 export function isJsonValue(value: unknown): value is Json {

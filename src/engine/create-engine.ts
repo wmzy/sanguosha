@@ -59,6 +59,7 @@ import {
 } from './skill';
 import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
 import { clearEvents, pushEvent } from './event-stream';
+import { clearSlashMaxProviders } from './slash-quota';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
 // 必须 import skills/index 来设置 skillModuleResolver + 注册系统规则全局 hooks
@@ -348,6 +349,7 @@ export async function fireTimeout(state: GameState): Promise<void> {
 export function resetForTest(): void {
   clearAllSkillInstances();
   clearEvents();
+  clearSlashMaxProviders();
   // 重新注册系统规则全局 hooks(被 clearAllSkillInstances 清掉了)
   init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, -1);
 }
@@ -603,7 +605,7 @@ function createAndAwaitSlot(
       try {
         await applyAtom(state, pending.onTimeout);
         // 弃牌 pending 超时:自动弃超出手牌
-        const slotAtom = atom as { requestType?: string; target?: number; candidates?: Array<{ name: string }> };
+        const slotAtom = atom as { requestType?: string; target?: number; candidates?: Array<{ name: string; skills: string[] }> };
         if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
           const p = state.players[slotAtom.target];
           if (p && p.hand.length > p.maxHealth) {

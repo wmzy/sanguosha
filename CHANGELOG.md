@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-21
+### 出杀次数上限重构 + 摸牌重洗实装 + 马匹描述修复
+
+重构出杀次数上限为查询型提供者模式,彻底解决诸葛连弩换装时序 bug;
+实装摸牌/洗牌/重洗的 RNG 与牌堆补充逻辑;修正马匹描述。
+
+#### Changed
+- **出杀次数上限重构为查询型提供者模式**: 旧机制用单个 `turn.vars['杀/quota']`
+  同时承载「上限」与「剩余次数」,导致换装时丢失「已出过杀」信息。新机制拆分:
+  上限由技能注册的提供者动态计算(基础 1 + Σ贡献;任一 ∞ 即 ∞),已用次数由
+  `turn.vars['杀/usedCount']` 独立累计。新增 `src/engine/slash-quota.ts` 提供
+  `slashMax/slashUsed/canSlash/incSlashUsed/registerSlashMaxProvider` API。
+  技能不预写状态,卸载即停止贡献,多技能天然叠加。(`src/engine/slash-quota.ts`,
+  `src/engine/skills/杀.ts`)
+
+#### Fixed
+- **诸葛连弩换装后出杀次数错误**: 旧 `杀/quota` 方案下,换装重置 quota 会丢失
+  「已出过杀」信息——装连弩前出过杀,换装后配额被重置仍可继续出。改为提供者模式后,
+  卸载连弩只取消上限加成(回到 1),`usedCount` 保留 → 正确拒绝。同时修复原 `after
+  hook(移除技能)` 是死代码(卸载时已被清理,永不触发)的问题。连弩现用
+  `onInit` 注册 `() => Infinity` 提供者,unloader 随实例生命周期自动清理。
+  (`src/engine/skills/诸葛连弩.ts`)
+- **赤兔描述反字**: `description.ts` 中赤兔写为「进攻马,距离+1」,与实际效果相反。
+  修正为「距离-1」,并补齐其他 5 匹马描述。(`src/shared/cards/description.ts`)
+- **重洗 ViewEvent 字段语义模糊**: `deckCount` 在 apply 前调用实际表示合并总数,
+  改名为 `totalCards` 并加注释。(`src/engine/atoms/重洗.ts`)
+
+#### Added
+- **摸牌牌堆不足时重洗补充**: 牌堆不足时自动合并弃牌堆 Fisher-Yates 重洗补充
+  (标准三国杀规则);`planDraw` 纯函数供 apply 与 toViewEvents 共用,保证一致。
+  (`src/engine/atoms/摸牌.ts`, `src/engine/atoms/洗牌.ts`, `src/engine/atoms/重洗.ts`)
+- **出杀次数重构回归测试**: 装连弩前出过杀 → 换装后 usedCount 保留不能再用;
+  提供者随装备注册/卸载;非出牌阶段装备被拒。(`tests/skill-tests/诸葛连弩.test.ts`,
+  `tests/integration/zhuge-crossbow.test.ts`, `tests/integration/draw-reshuffle.test.ts`)
+
+## [Unreleased] — 2026-06-21
 ### 仁德/制衡 bug 修复 — 发动次数与时序漏洞
 
 修复仁德规则错误(错误地限一次)和制衡可重复发动的时序 bug(fire-and-forget 窗口期 `usedThisTurn` 未设)。
