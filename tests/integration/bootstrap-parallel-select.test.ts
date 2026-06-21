@@ -127,8 +127,15 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
     }
 
     // 全部选完 → 进入游戏(发牌 + 回合开始),无 pending 残留
-    // bootstrap 后续流程(技能注册/洗牌/发牌/回合开始)需要多次微任务推进
-    await new Promise(r => setTimeout(r, 500));
+    // bootstrap 后续流程(技能注册/洗牌/发牌/回合开始)需要多次微任务推进。
+    // 轮询直到所有玩家都拿到手牌(发牌完成的可观察信号),避免固定 setTimeout 在
+    // 高负载/多技能实例化场景下的 flaky(更多 DEFAULT_SKILLS → 更多 dynamic import)。
+    const bootDeadline = Date.now() + 8000;
+    while (Date.now() < bootDeadline) {
+      await waitForStable(state);
+      if (state.pendingSlots.size === 0 && state.players.every(p => p.hand.length > 0)) break;
+      await new Promise(r => setTimeout(r, 50));
+    }
     await waitForStable(state);
     expect(state.pendingSlots.size).toBe(0);
 
@@ -140,5 +147,5 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
     for (const p of state.players) {
       expect(p.hand.length).toBeGreaterThan(0);
     }
-  }, 10000);
+  }, 15000);
 });

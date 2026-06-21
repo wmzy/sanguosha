@@ -362,17 +362,17 @@ registerAtomHook({
 | 基本 | 杀 / 闪 / 桃 | 🟢 | `src/engine/handlers/card-handlers.ts:73-260` |
 | 基本 | 酒 | 🔴 | `src/shared/cards/basic.ts` 未定义 |
 | 基本 | 火杀 / 雷杀 | 🔴 | `src/shared/cards/basic.ts` 未定义 |
-| 锦囊 | 过河拆桥 / 顺手牵羊 | 🟢 | `src/engine/handlers/card-handlers.ts:181-407` 手写 |
-| 锦囊 | 南蛮入侵 / 万箭齐发 | 🟢 | `src/engine/handlers/response/aoe.ts` |
-| 锦囊 | 决斗 | 🟢 | `src/engine/handlers/response/duel.ts` |
-| 锦囊 | 无中生有 / 桃园结义 / 五谷丰登 | 🟢 | `src/engine/handlers/card-handlers.ts:181-407` 手写 |
-| 锦囊 | 借刀杀人 | 🔴 | 未实现 |
+| 锦囊 | 过河拆桥 / 顺手牵羊 | 🟢 | `src/engine/skills/过河拆桥.ts` / `顺手牵羊.ts` |
+| 锦囊 | 南蛮入侵 / 万箭齐发 | 🟢 | `src/engine/skills/南蛮入侵.ts` / `万箭齐发.ts` |
+| 锦囊 | 决斗 | 🟢 | `src/engine/skills/决斗.ts` |
+| 锦囊 | 无中生有 / 桃园结义 / 五谷丰登 | 🟢 | `src/engine/skills/无中生有.ts` / `桃园结义.ts` / `五谷丰登.ts` |
+| 锦囊 | 借刀杀人 | 🟢 | `src/engine/skills/借刀杀人.ts` |
 | 锦囊 | 火攻 | 🔴 | 未实现 |
 | 锦囊 | 铁索连环 | 🔴 | 卡牌定义存在但连环状态未建 |
-| 锦囊 | 无懈可击 | 🟢 | `src/engine/handlers/response/trick.ts:17-62` |
-| 延时 | 乐不思蜀 / 兵粮寸断 | 🟢 | `src/engine/atoms/pendingTrick.ts` |
-| 延时 | 闪电 | 🟡 卡牌定义在，phase-advance 未处理 | `src/shared/cards/tricks.ts:82-89` |
-| 装备 | 16 张全部 | 🟢 | `src/engine/atoms/equip.ts` |
+| 锦囊 | 无懈可击 | 🟢 | `src/engine/skills/无懈可击.ts` |
+| 延时 | 乐不思蜀 / 兵粮寸断 | 🟢 | `src/engine/skills/乐不思蜀.ts` / `兵粮寸断.ts` |
+| 延时 | 闪电 | 🟢 | `src/engine/skills/闪电.ts`(判胜≥2~9:3 点无来源伤害,否则传下家) |
+| 装备 | 16 张全部 | 🟢 | `src/engine/skills/装备通用.ts` + 各装备 skill(麒麟弓.ts 等) |
 
 **待新增**：
 - 酒 / 火杀 / 雷杀 基本牌

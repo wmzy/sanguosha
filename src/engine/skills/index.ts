@@ -45,11 +45,14 @@ export const skillLoaders: Record<string, Loader> = {
   '丈八蛇矛': load(() => import('./丈八蛇矛')),
   '方天画戟': load(() => import('./方天画戟')),
   '寒冰剑': load(() => import('./寒冰剑')),
+  '麒麟弓': load(() => import('./麒麟弓')),
   // 防具/延时锦囊
   '仁王盾': load(() => import('./仁王盾')),
   '藤甲': load(() => import('./藤甲')),
   '白银狮子': load(() => import('./白银狮子')),
   '乐不思蜀': load(() => import('./乐不思蜀')),
+  '兵粮寸断': load(() => import('./兵粮寸断')),
+  '闪电': load(() => import('./闪电')),
   // 马匹(进攻马/防御马):效果=距离修正,与马术等技能统一走 vars
   '赤兔': () => import('./马匹技能').then(m => m.赤兔),
   '紫骍': () => import('./马匹技能').then(m => m.紫骍),
@@ -62,6 +65,7 @@ export const skillLoaders: Record<string, Loader> = {
   '顺手牵羊': load(() => import('./顺手牵羊')),
   '无中生有': load(() => import('./无中生有')),
   '桃园结义': load(() => import('./桃园结义')),
+  '五谷丰登': load(() => import('./五谷丰登')),
   '借刀杀人': load(() => import('./借刀杀人')),
   '无懈可击': load(() => import('./无懈可击')),
   // 通用
