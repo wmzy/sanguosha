@@ -174,7 +174,7 @@ export type ActionPrompt =
   | DistributePrompt
   | ChoosePlayerPrompt
   | ChooseCharacterPrompt
-  | PickHandIndexPrompt;
+  | PickTargetCardPrompt;
 
 export interface CardFilter {
   filter?: (card: Card) => boolean;
@@ -269,17 +269,28 @@ export interface ChooseCharacterPrompt {
   candidates: Array<{ name: string; skills: string[] }>;
 }
 
-/** 盲选手牌位置(过河拆桥/顺手牵羊拿手牌时,使用者选"第几张")。
- *  目标手牌对使用者不可见(GameView 只给 handCount),所以使用者只能凭牌背位置选择 ——
- *  这正是"顺手牵羊/过河拆桥"的博弈核心:目标可偷偷调整手牌顺序,使用者根据历史推测规律,
- *  目标可反向博弈。返回 params.handIndex(0-based)定位目标 player.hand[handIndex]。 */
-export interface PickHandIndexPrompt {
-  type: 'pickHandIndex';
+/** 选牌面板(过河拆桥/顺手牵羊生效后,使用者从目标区域选一张牌)。
+ *  流程:选牌 → 选目标(任一区域有牌即合法) → 出牌(不指定具体卡) → 询问无懈 →
+ *        本 pending 弹出 → 使用者按区域选具体牌 → respond。
+ *
+ *  - 装备区/判定区是明牌:使用者可见,直接选具体 cardId。
+ *  - 手牌是暗牌:使用者只能凭牌背位置盲选第 K 张 —— 这正是博弈核心:
+ *    目标可偷偷调整手牌顺序,使用者根据历史推测规律,目标可反向博弈。
+ *
+ *  respond params:
+ *    { zone: 'equipment', cardId } / { zone: 'judge', cardId } / { zone: 'hand', handIndex }
+ *  超时默认:若目标有明牌选第一张明牌,否则盲选 hand[0]。 */
+export interface PickTargetCardPrompt {
+  type: 'pickTargetCard';
   title: string;
   description?: string;
-  /** 被盲选的玩家座次 */
+  /** 被选牌的玩家座次 */
   target: number;
-  /** 目标当前手牌张数(前端渲染 N 个牌背) */
+  /** 装备区明牌候选(使用者可见) */
+  equipment: Array<{ slot: string; cardId: string; cardName: string }>;
+  /** 判定区明牌候选(使用者可见) */
+  judge: Array<{ cardId: string; cardName: string }>;
+  /** 手牌张数(盲选用,前端渲染 N 个牌背) */
   handCount: number;
 }
 

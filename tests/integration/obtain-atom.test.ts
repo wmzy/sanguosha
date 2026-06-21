@@ -201,7 +201,7 @@ describe('获得 atom:从来源移除 + 加到目标', () => {
     // 消耗无懈窗口
     await P0.pass();
     // 盲选窗口:P0 选第 0 张
-    await P0.respond('顺手牵羊', { handIndex: 0 });
+    await P0.respond('顺手牵羊', { zone: 'hand', handIndex: 0 });
 
     // P1 失去第一张手牌
     expect(harness.state.players[1].hand).not.toContain(p1Before[0]);

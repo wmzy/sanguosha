@@ -95,7 +95,7 @@ describe('过河拆桥', () => {
     // 无懈窗口 → 无人打无懈 → 继续
     await P1.pass();
     // 盲选窗口:P1 选择第 0 张(对应 P2 hand[0]=v1)
-    await P1.respond('过河拆桥', { handIndex: 0 });
+    await P1.respond('过河拆桥', { zone: 'hand', handIndex: 0 });
 
     // P2 被盲选的手牌(v1)被弃
     expect(harness.state.players[1].hand).not.toContain('v1');
@@ -120,6 +120,8 @@ describe('过河拆桥', () => {
 
     await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
     await P1.pass();
+    // 选牌面板:P1 选装备(zone=equipment)
+    await P1.respond('过河拆桥', { zone: 'equipment', cardId: 'wp1' });
 
     // 武器被卸下(不再装备)
     expect(harness.state.players[1].equipment['武器']).toBeUndefined();
@@ -145,7 +147,7 @@ describe('过河拆桥', () => {
     await P1.useCardAndTarget('过河拆桥', 'gq1', [2]);
     await P1.pass();
     // 盲选窗口:P1 选择第 0 张
-    await P1.respond('过河拆桥', { handIndex: 0 });
+    await P1.respond('过河拆桥', { zone: 'hand', handIndex: 0 });
 
     // P3 失去 v1
     expect(harness.state.players[2].hand).not.toContain('v1');
@@ -238,7 +240,7 @@ describe('过河拆桥', () => {
   // ─────────────────────────────────────────────────────────────
   // 9. Bug2:拆判定区(延时锦囊)
   // ─────────────────────────────────────────────────────────────
-  it('Bug2:P2 判定区有乐不思蜀 → 过河拆桥指定 equipCardId 拆判定区,pendingTricks 清空', async () => {
+  it('Bug2:P2 判定区有乐不思蜀 → 过河拆桥出牌后选牌面板选判定区,pendingTricks 清空', async () => {
     // 乐不思蜀 卡牌(判定区卡)
     const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
     // 手动构造 state:P2 判定区有乐不思蜀(PendingTrick 结构)
@@ -249,11 +251,10 @@ describe('过河拆桥', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    // 明牌区:use 时直接指定判定区卡的 equipCardId
-    await P1.triggerAction('过河拆桥', 'use', {
-      cardId: 'gq1', targets: [1], equipCardId: 'lb1',
-    });
+    // 出牌(不指定具体卡)→ 无懈 → 选牌面板选判定区
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
     await P1.pass();
+    await P1.respond('过河拆桥', { zone: 'judge', cardId: 'lb1' });
 
     // 判定区被拆空
     expect(harness.state.players[1].pendingTricks).toEqual([]);
@@ -276,6 +277,8 @@ describe('过河拆桥', () => {
     // 以前会被拒(只有判定区),现在放行
     await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
     await P1.pass();
+    // 选牌面板选判定区
+    await P1.respond('过河拆桥', { zone: 'judge', cardId: 'lb1' });
     expect(harness.state.zones.discardPile).toContain('gq1');
   });
 });

@@ -59,7 +59,7 @@ describe('用户报告问题回归', () => {
     // 无懈 pass
     if (h.state.pendingSlots.size > 0) await P1.pass();
     // 盲选窗口:P0 选第 0 张
-    await P0.respond('顺手牵羊', { handIndex: 0 });
+    await P0.respond('顺手牵羊', { zone: 'hand', handIndex: 0 });
     expect(h.state.players[0].hand).toContain('d1');
     expect(h.state.players[1].hand).not.toContain('d1');
   });

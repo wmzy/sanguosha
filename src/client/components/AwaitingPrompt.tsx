@@ -51,26 +51,48 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
       ) : canOperate ? (() => {
         // pickHandIndex 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
         // 渲染目标手牌的牌背序列,使用者点击位置选择
-        if (pending.prompt.type === 'pickHandIndex') {
+        if (pending.prompt.type === 'pickTargetCard') {
           const info = resolvePendingRespond(pending, skillActions);
           const skillId = info?.skillId ?? '系统规则';
-          const handCount = pending.prompt.handCount;
-          const targetName = pending.target >= 0 && pending.target < 20 ? `${pending.target} 号位` : '目标';
+          const p = pending.prompt;
           return (
             <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
-              <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>
-                选择牌背位置（目标手牌不可见，凭位置盲选）:
-              </span>
-              {Array.from({ length: handCount }, (_, i) => (
+              {/* 装备区明牌 */}
+              {p.equipment.length > 0 && (
+                <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>装备区:</span>
+              )}
+              {p.equipment.map(({ slot, cardId, cardName }) => (
                 <button
-                  key={i}
+                  key={cardId}
                   className={styles.promptBtn}
-                  style={{ minWidth: '40px', fontSize: '14px' }}
-                  onClick={() => onSend(skillId, 'respond', { handIndex: i })}
-                >
-                  {i + 1}
-                </button>
+                  onClick={() => onSend(skillId, 'respond', { zone: 'equipment', cardId })}
+                >{slot}:{cardName}</button>
               ))}
+              {/* 判定区明牌 */}
+              {p.judge.length > 0 && (
+                <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>判定区:</span>
+              )}
+              {p.judge.map(({ cardId, cardName }) => (
+                <button
+                  key={cardId}
+                  className={styles.promptBtn}
+                  onClick={() => onSend(skillId, 'respond', { zone: 'judge', cardId })}
+                >{cardName}</button>
+              ))}
+              {/* 手牌盲选 */}
+              {p.handCount > 0 && (
+                <>
+                  <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>手牌（凭位置盲选）:</span>
+                  {Array.from({ length: p.handCount }, (_, i) => (
+                    <button
+                      key={i}
+                      className={styles.promptBtn}
+                      style={{ minWidth: '40px' }}
+                      onClick={() => onSend(skillId, 'respond', { zone: 'hand', handIndex: i })}
+                    >{i + 1}</button>
+                  ))}
+                </>
+              )}
             </div>
           );
         }

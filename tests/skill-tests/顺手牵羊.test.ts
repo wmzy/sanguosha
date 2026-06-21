@@ -91,7 +91,7 @@ describe('顺手牵羊', () => {
     await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
     await P1.pass(); // 消耗无懈窗口
     // 盲选窗口:P1 选择第 0 张(对应 P2 hand[0]=v1)
-    await P1.respond('顺手牵羊', { handIndex: 0 });
+    await P1.respond('顺手牵羊', { zone: 'hand', handIndex: 0 });
 
     // P2 失去 v1
     expect(harness.state.players[1].hand).not.toContain('v1');
@@ -213,6 +213,8 @@ describe('顺手牵羊', () => {
 
     await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
     await P1.pass(); // 跳过无懈窗口
+    // 选牌面板选装备
+    await P1.respond('顺手牵羊', { zone: 'equipment', cardId: 'wp1' });
 
     // P1 拿到诸葛连弩
     expect(harness.state.players[0].hand).toContain('wp1');
@@ -237,6 +239,8 @@ describe('顺手牵羊', () => {
 
     await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
     await P1.pass();
+    // 选牌面板选装备
+    await P1.respond('顺手牵羊', { zone: 'equipment', cardId: 'wp1' });
     expect(harness.state.players[0].hand).toContain('wp1');
   });
 });

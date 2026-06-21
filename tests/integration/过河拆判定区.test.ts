@@ -100,6 +100,8 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
     await P0.useCardAndTarget('过河拆桥', gq.id, [1]);
     // 跳过 无懈可击 窗口
     await P0.pass();
+    // 选牌面板选判定区
+    await P0.respond('过河拆桥', { zone: 'judge', cardId: lb.id });
 
     // 判定区被清空
     expect(harness.state.players[1].pendingTricks).toHaveLength(0);
@@ -143,8 +145,10 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
 
     const P0 = harness.player('P0');
 
-    await P0.triggerAction('过河拆桥', 'use', { cardId: gq.id, targets: [1], equipCardId: lb.id });
+    await P0.useCardAndTarget('过河拆桥', gq.id, [1]);
     await P0.pass();
+    // 选牌面板:P0 选判定区(zone=judge)
+    await P0.respond('过河拆桥', { zone: 'judge', cardId: lb.id });
 
     // 判定区被清空
     expect(harness.state.players[1].pendingTricks).toHaveLength(0);
@@ -183,16 +187,17 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
 
     const P0 = harness.player('P0');
 
-    // 第一次拆判定区(明牌指定)
-    await P0.triggerAction('过河拆桥', 'use', { cardId: gq1.id, targets: [1], equipCardId: lb.id });
+    // 第一次拆判定区(选牌面板选 judge)
+    await P0.useCardAndTarget('过河拆桥', gq1.id, [1]);
     await P0.pass();
+    await P0.respond('过河拆桥', { zone: 'judge', cardId: lb.id });
     expect(harness.state.players[1].pendingTricks).toHaveLength(0);
     expect(harness.state.players[1].hand).toContain(victimHand.id);
 
     // 第二次拆手牌(盲选)
     await P0.useCardAndTarget('过河拆桥', gq2.id, [1]);
     await P0.pass();
-    await P0.respond('过河拆桥', { handIndex: 0 });
+    await P0.respond('过河拆桥', { zone: 'hand', handIndex: 0 });
     expect(harness.state.players[1].hand).not.toContain(victimHand.id);
     expect(harness.state.zones.discardPile).toContain(victimHand.id);
   });
@@ -234,6 +239,8 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
     const seqBefore = harness.state.seq;
     await P0.useCardAndTarget('过河拆桥', gq.id, [1]);
     await P0.pass();
+    // 选牌面板选判定区
+    await P0.respond('过河拆桥', { zone: 'judge', cardId: lb.id });
 
     expect(harness.state.seq).toBeGreaterThan(seqBefore);
     // 判定区被清空
@@ -278,8 +285,10 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
 
     await P0.useCardAndTarget('过河拆桥', gq.id, [1]);
     await P0.pass();
+    // 选牌面板选第一个判定区(乐不思蜀)
+    await P0.respond('过河拆桥', { zone: 'judge', cardId: lb.id });
 
-    // 拆一个(优先级:pendingTricks[0])
+    // 拆一个(使用者选的乐不思蜀)
     expect(harness.state.players[1].pendingTricks).toHaveLength(1);
     // 留下的应该是第二个(闪电),不是被拆的(乐不思蜀)
     expect(harness.state.players[1].pendingTricks[0].name).toBe('闪电');
