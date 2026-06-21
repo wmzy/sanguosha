@@ -14,6 +14,7 @@
 //   9. 负面:不在手牌也不在装备区的牌 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
+import { dispatch as engineDispatch } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -241,6 +242,45 @@ describe('制衡', () => {
     await P1.expectRejected({
       skillId: '制衡', actionType: 'use', params: { cardIds: ['c2'] },
     });
+  });
+
+  it('时序防回归:连发两次 dispatch(不等第一次稳定)→ 第二次被拒', async () => {
+    // 模拟真实 session 行为:void dispatch 连发,不 await 第一次完成。
+    // 修复前 usedThisTurn 在 execute 末尾才设,第二次 validate 在第一次 execute 设标记前跑 → 通过 → bug。
+    // 修复后 usedThisTurn 在 execute 开头同步设置,第二次 validate 必然拒绝。
+    // JS 单线程:async 函数的同步部分在调用时立即执行到第一个 await。
+    // 第一次 engineDispatch 同步部分(validate1 → seq+=1 → 启动 execute1 → execute1 同步跑到首个 await)
+    // 跑完后才进入第二次 engineDispatch 的同步部分(validate2)。
+    // 因此 validate2 看到的 usedThisTurn 状态由 execute1 同步部分决定。
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const c2 = makeCard('c2', '闪', '♥', '2');
+    const d1 = makeCard('d1', '桃', '♦', '5');
+    const d2 = makeCard('d2', '桃', '♦', '6');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1, c2, d1, d2 },
+      zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const seq0 = state.seq;
+    // 连发:第一次 dispatch(同步部分含 execute1 同步到首个 await),紧接着第二次。
+    void engineDispatch(state, { skillId: '制衡', actionType: 'use', ownerId: 0, baseSeq: seq0, params: { cardIds: ['c1'] } });
+    const seqAfterFirst = state.seq; // execute1 同步部分跑完后 seq 已 +1
+    void engineDispatch(state, { skillId: '制衡', actionType: 'use', ownerId: 0, baseSeq: seqAfterFirst, params: { cardIds: ['c2'] } });
+    await harness.waitForStable();
+
+    // 修复后:第二次 validate 拒绝(seq 只 +1);修复前:+2
+    expect(state.seq).toBe(seq0 + 1);
+    expect(harness.state.zones.discardPile).toContain('c1');
+    expect(harness.state.zones.discardPile).not.toContain('c2');
+    expect(harness.state.players[0].hand).toContain('c2');
   });
 
   // ─── 负面 ─────────────────────────────

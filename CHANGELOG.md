@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-06-21
+### 仁德/制衡 bug 修复 — 发动次数与时序漏洞
+
+修复仁德规则错误(错误地限一次)和制衡可重复发动的时序 bug(fire-and-forget 窗口期 `usedThisTurn` 未设)。
+
+#### Fixed
+- **制衡可重复发动(fire-and-forget 时序 bug)**: `制衡/usedThisTurn` 标记原在 execute 末尾(`applyAtom(摸牌)` 之后)才设,但 dispatch 是 fire-and-forget——session 不 await,execute 内的 `await applyAtom` 会让出事件循环,前端收到中间状态广播后技能按钮仍亮,用户可再次点击发 dispatch。第二次 dispatch 的 validate 在第一次 execute 设标记之前就跑 → 通过 → 可重复发动。修复:把 `usedThisTurn = true` 移到 execute 最开头(第一个 `await` 之前),dispatch 同步阶段即设好标记,第二次 validate 必然拒绝。(`src/engine/skills/制衡.ts`)
+- **仁德规则错误(误实现为限一次)**: 原实现把仁德写成了「出牌阶段限一次」,但标准版/国战版仁德可多次发动——「出牌阶段,可以将任意张手牌交给其他角色;以此法失去第二张牌时回复 1 点体力」。修复:移除 `仁德/usedThisTurn` 限制,改用 `仁德/givenCount` 累计计数 + `仁德/healed` 标记。给出牌时累加 `givenCount`,当从 1 跨越到 2(首次达到 2 张)时回血一次并设 `healed`,之后继续给牌只累计不再回血。回合结束清理新增标记。(`src/engine/skills/仁德.ts`、`src/engine/atoms/回合结束.ts`)
+
+#### Added
+- **仁德新规则测试**: 覆盖可多次发动(第一次给 1 张不回血,第二次再给 1 张累计 2 张回血)、回血仅一次(累计≥2 张后继续给牌不再回血)、分三次各给 1 张的累计回血时序。(`tests/skill-tests/仁德.test.ts`)
+- **制衡时序防回归测试**: 连发两次 `dispatch`(不等第一次稳定),验证第二次被拒(seq 只 +1,修复前为 +2)。该测试在回退修复后确定性地失败,证明能捕获时序 bug。(`tests/skill-tests/制衡.test.ts`)
+
+## [Unreleased] — 2026-06-21
+### 牌堆耗尽 bug 修复 — 摸牌未合并弃牌堆重洗补充
+
+修复牌堆耗尽时摸牌直接失败、未将弃牌堆重新洗牌补充的问题。同时实装了长期空置的 `重洗`/`洗牌` atom(TODO 占位)。
+
+#### Fixed
+- **摸牌牌堆不足未重洗弃牌堆补充**: `摸牌` atom 的 validate 在牌堆不足时直接报错 `'deck empty'`,apply 不执行,导致回合摸牌/制衡/无中生有等抽牌流程在牌堆耗尽时直接卡死。修复:validate 改为只在牌堆+弃牌堆总数都不足以满足 count 时才报错;apply 在牌堆不足时合并 deck+discardPile,Fisher–Yates 洗牌后抽足,弃牌堆清空。`toViewEvents` 与 apply 共用同一纯函数 `planDraw`,保证 owner 看到的具体牌面与实际摸入一致。(`src/engine/atoms/摸牌.ts`)
+- **`重洗` atom 长期空置**: 原 `apply` 为空 TODO(`// TODO: 弃牌堆+牌堆合并并洗牌(待 RNG 接入)`)。修复:实装为合并 deck+discardPile → Fisher–Yates 洗牌 → 弃牌堆清空,用 `state.rngSeed` 派生 RNG(推进后写回),保证重放确定性。(`src/engine/atoms/重洗.ts`)
+- **`洗牌` atom 长期空置**: 原 `apply` 为空 TODO(`// TODO: 真正的随机化洗牌(待 RNG 接入)`)。修复:实装为对当前 deck 做 Fisher–Yates 洗牌,用 `state.rngSeed` 派生 RNG(推进后写回)。(`src/engine/atoms/洗牌.ts`)
+
+#### Added
+- **摸牌重洗补充集成测试**: 覆盖牌堆不足触发重洗、牌堆完全为空从弃牌堆补足、牌堆+弃牌堆都不足时 validate 拒绝、牌堆充足不触发重洗、相同 rngSeed 可重放、重洗后 rngSeed 被推进,以及 `重洗`/`洗牌` atom 的独立单元验证。(`tests/integration/draw-reshuffle.test.ts`)
+
 ## [Unreleased] — 2026-06-20
 ### 延时锦囊 bug 修复 — 无懈可击问询时机错误
 

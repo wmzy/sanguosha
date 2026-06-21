@@ -32,6 +32,11 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
+      // [时序修复] 标记必须在第一个 await 之前设置:dispatch 是 fire-and-forget,
+      // session 不 await → execute 内的 await applyAtom 会让出事件循环,前端可能在此期间
+      // 再次点击技能按钮发 dispatch。若标记在 execute 末尾才设,第二次 validate 会通过 → 可重复发动。
+      // 移到开头后,dispatch 同步阶段(启动 execute 前)就完成标记,第二次 validate 必然拒绝。
+      state.players[ownerId].vars['制衡/usedThisTurn'] = true;
       const from = ownerId;
       pushFrame(state, '制衡', from, { ...params });
       const cardIds = params.cardIds as string[];
@@ -39,8 +44,9 @@ export function onInit(skill: Skill, ownerId: number): () => void {
       await applyAtom(state, { type: '弃置', player: from, cardIds });
       // 摸 N 张
       await applyAtom(state, { type: '摸牌', player: from, count: cardIds.length });
-      state.players[from].vars['制衡/usedThisTurn'] = true;
       popFrame(state);
+      // execute 抛错时标记已设但效果未完成——这是可接受的:限一次本就防止重复,
+      // 且 execute 内部 applyAtom 失败会静默 return(validate 拒绝),不会部分执行。
     },
   );
   return () => {};
