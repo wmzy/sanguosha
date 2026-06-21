@@ -8,6 +8,21 @@ import type { GameView } from '../../engine/types';
 import * as styles from './gameViewStyles';
 import { arcLayout } from '../utils/gameViewHelpers';
 import { PlayerSeatView } from './PlayerSeatView';
+import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
+
+/** 计算指定座次的倒计时 deadline。
+ *  - pending 精准命中该座次(target === idx)→ pending.deadline
+ *  - 广播型 pending(target < 0,如无懈可击)→ 所有活玩家的座次都共享此 deadline
+ *  - 否则 → null(该座次不在等待) */
+function deadlineForSeat(view: GameView, idx: number): number | null {
+  const pending = view.pending;
+  if (!pending) return null;
+  if (pending.target < 0) {
+    // 广播型:活玩家共享
+    return view.players[idx]?.alive ? pending.deadline : null;
+  }
+  return pending.target === idx ? pending.deadline : null;
+}
 
 export interface SeatArcLayoutProps {
   view: GameView;
@@ -49,6 +64,8 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
         const realIdx = view.players.findIndex(p => p.name === player.name);
         // 沿 180° 弧形分布: 左端5% 右端95%, Y轴弧线中间高两端低
         const { leftPct, topPct } = arcLayout(totalOthers, i);
+        const seatDeadline = deadlineForSeat(view, realIdx);
+        const seatTotalMs = view.pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS;
         return (
           <div
             key={player.name}
@@ -71,6 +88,10 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
               isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
               turnGlowVersion={turnVersion}
             />
+            {/* 其他角色等待进度条:仅当该座次正在等待回应时显示 */}
+            {seatDeadline !== null && (
+              <CountdownBar deadline={seatDeadline} totalMs={seatTotalMs} />
+            )}
           </div>
         );
       })}

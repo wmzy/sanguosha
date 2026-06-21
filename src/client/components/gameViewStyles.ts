@@ -100,6 +100,11 @@ export const seatArcContainer = css`
 export const seatArcSlot = css`
   position: absolute;
   transform: translateX(-50%);
+  /* 给定宽度,使内部 CountdownBar 等子元素宽度与卡片对齐 */
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 `;
 export const centerMeta = css`
   text-align: center;

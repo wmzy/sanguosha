@@ -446,46 +446,6 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
         onDeleteRoom={onDeleteRoom}
       />
 
-      {/* ─── 待回应区(pending 回应,非弃牌/非选将) ─── */}
-      {isPerspectiveAwaiting && pending && !isDiscardPhase && pending?.atom?.type !== '选将询问' && (
-        <AwaitingPrompt
-          pending={pending}
-          pendingTargetIdx={pendingTargetIdx}
-          perspectiveName={perspectiveName}
-          perspectiveHand={perspectiveHand}
-          skillActions={skillActions}
-          skippedBroadcast={skippedBroadcast}
-          canOperate={canOperate}
-          onSend={send}
-          onRespond={handleRespond}
-          view={view}
-          perspectiveIdx={perspectiveIdx}
-        />
-      )}
-
-      <PlayPhasePrompt
-        view={view}
-        perspectiveName={perspectiveName}
-        currentPlayerName={currentPlayerName}
-        perspectiveIdx={perspectiveIdx}
-        perspectiveHand={perspectiveHand}
-        isPerspectiveTurn={isPerspectiveTurn}
-        isPerspectiveAwaiting={isPerspectiveAwaiting}
-        isDiscardPhase={isDiscardPhase}
-        isMyTurn={isMyTurn}
-        canOperate={canOperate}
-        selectedCardId={selectedCardId}
-        selectedTarget={selectedTarget}
-        discardMin={discardMin}
-        discardMax={discardMax}
-        selectedForDiscard={selectedForDiscard}
-        distributeMode={distributeMode}
-        onCancelDistribute={() => setDistributeMode(null)}
-        onClearDiscard={() => setSelectedForDiscard(new Set())}
-        onConfirmDiscard={handleConfirmDiscard}
-        onSendDistribute={sendDistribute}
-      />
-
       {/* ─── 座位布局(弧形) + 中央信息 ─── */}
       <div className={styles.seatingArea}>
         <SeatArcLayout
@@ -520,6 +480,44 @@ export function GameViewComponent({ view, onAction, perspective, onSwitchPerspec
         </div>
 
         <div className={styles.handColumn}>
+          {/* ─── 提示区(pending 回应 + 出牌/弃牌阶段提示),放在手牌区上方 ─── */}
+          {isPerspectiveAwaiting && pending && !isDiscardPhase && pending?.atom?.type !== '选将询问' && (
+            <AwaitingPrompt
+              pending={pending}
+              pendingTargetIdx={pendingTargetIdx}
+              perspectiveName={perspectiveName}
+              perspectiveHand={perspectiveHand}
+              skillActions={skillActions}
+              skippedBroadcast={skippedBroadcast}
+              canOperate={canOperate}
+              onSend={send}
+              onRespond={handleRespond}
+              view={view}
+              perspectiveIdx={perspectiveIdx}
+            />
+          )}
+          <PlayPhasePrompt
+            view={view}
+            perspectiveName={perspectiveName}
+            currentPlayerName={currentPlayerName}
+            perspectiveIdx={perspectiveIdx}
+            perspectiveHand={perspectiveHand}
+            isPerspectiveTurn={isPerspectiveTurn}
+            isPerspectiveAwaiting={isPerspectiveAwaiting}
+            isDiscardPhase={isDiscardPhase}
+            isMyTurn={isMyTurn}
+            canOperate={canOperate}
+            selectedCardId={selectedCardId}
+            selectedTarget={selectedTarget}
+            discardMin={discardMin}
+            discardMax={discardMax}
+            selectedForDiscard={selectedForDiscard}
+            distributeMode={distributeMode}
+            onCancelDistribute={() => setDistributeMode(null)}
+            onClearDiscard={() => setSelectedForDiscard(new Set())}
+            onConfirmDiscard={handleConfirmDiscard}
+            onSendDistribute={sendDistribute}
+          />
           <CountdownBar deadline={deadline} totalMs={pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS} />
           {/* 转化模式提示 + 取消选择 */}
           <div className={styles.handHeader}>

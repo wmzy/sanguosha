@@ -74,18 +74,19 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
             </div>
           );
         }
-        // useCard 类 pending:渲染 可出的牌按钮 + 不回应
+        // useCard 类 pending:手牌区已对可回应的牌(杀/闪/桃/酒)高亮,直接在手牌区点击出牌。
+        // 这里只显示文案提示 + 「不回应」按钮,不再单独列出候选牌。
         const info = resolvePendingRespond(pending, skillActions);
         const filterFn = info?.cardFilter;
-        const respondableCards = filterFn ? perspectiveHand.filter(filterFn) : [];
+        const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
         return (
           <div className={styles.promptActions}>
+            <span className={styles.promptDesc} style={{ marginBottom: 0, alignSelf: 'center' }}>
+              {respondableCount > 0
+                ? `点击下方手牌区高亮的牌出牌回应（共 ${respondableCount} 张可选）`
+                : '当前没有可出的牌回应'}
+            </span>
             <button className={styles.promptBtn} onClick={() => onRespond()}>不回应</button>
-            {respondableCards.map(c => (
-              <button key={c.id} className={styles.promptBtnPrimary} onClick={() => onRespond(c.id)}>
-                {c.name} {c.suit}{c.rank}
-              </button>
-            ))}
           </div>
         );
       })() : (
