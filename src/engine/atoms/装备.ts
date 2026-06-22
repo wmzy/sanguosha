@@ -66,6 +66,11 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     if (slot) {
       view.players[pi].equipment[slot] = event.cardId as string;
     }
+    // 装备从手牌移出:handCount - 1
+    view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
+    if (view.players[pi].hand) {
+      view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== event.cardId);
+    }
   },
 };
 

@@ -69,7 +69,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     }
 
     // 通用 fallback
-    const view: ViewEvent = { type: '移动牌', cardId: atom.cardId, from: atom.from, to: atom.to };
+    const view: ViewEvent = { type: '移动牌', cardId: atom.cardId, from: atom.from, to: atom.to, player: fromPlayer ?? toPlayer };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
@@ -92,6 +92,21 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         view.players[pi].handCount += count;
         if (event.cards && view.players[pi].hand) {
           view.players[pi].hand!.push(...(event.cards as any[]));
+        }
+        break;
+      }
+      default: {
+        // 通用移动(装备/转化等):from 手牌 → handCount - 1, to 手牌 → handCount + 1
+        const from = (event as any).from;
+        const to = (event as any).to;
+        if (from?.zone === '手牌' && from?.player === view.players[pi].index) {
+          view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
+          if (view.players[pi].hand) {
+            view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== (event as any).cardId);
+          }
+        }
+        if (to?.zone === '手牌' && to?.player === view.players[pi].index) {
+          view.players[pi].handCount += 1;
         }
         break;
       }

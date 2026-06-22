@@ -84,6 +84,12 @@ describe('诸葛连弩', () => {
     expect(harness.state.players[0].equipment['武器']).toBe('c1');
     expect(harness.state.players[0].skills).toContain('诸葛连弩');
     expect(harness.state.players[0].hand).not.toContain('c1');
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].equipment['武器']).toBe('c1');
+      expect(v.players[0].handCount).toBe(0);
+    });
   });
 
   // ─── 回归:出牌阶段中途装备诸葛连弩 → 本回合立即可连续出杀 ────

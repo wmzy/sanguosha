@@ -103,6 +103,12 @@ describe('贯石斧', () => {
     expect(harness.state.zones.discardPile).toContain('d1'); // 闪也移走
     // P1 手牌只剩 k1 已出,空了
     expect(harness.state.players[0].hand).toHaveLength(0);
+    // view 级断言
+    P2.processEvents();
+    P2.expectView(v => {
+      expect(v.players[1].health).toBe(3);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─── 不发动 ─────────────────────────────

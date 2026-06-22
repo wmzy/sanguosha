@@ -75,6 +75,12 @@ describe('装备通用', () => {
 
     expect(harness.state.players[0].equipment['武器']).toBe('c1');
     expect(harness.state.players[0].hand).not.toContain('c1');
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].equipment['武器']).toBe('c1');
+      expect(v.players[0].handCount).toBe(0);
+    });
   });
 
   it('use:装防具(八卦阵) → equipment.防具 = id', async () => {
@@ -95,6 +101,12 @@ describe('装备通用', () => {
     await P1.useCard('装备通用', 'b1');
 
     expect(harness.state.players[0].equipment['防具']).toBe('b1');
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].equipment['防具']).toBe('b1');
+      expect(v.players[0].handCount).toBe(0);
+    });
   });
 
   // ─── 装备替换 ─────────────────────────────

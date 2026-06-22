@@ -97,6 +97,12 @@ describe('丈八蛇矛', () => {
     // P2 不闪 → 扣血
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
+    // view 级断言
+    P2.processEvents();
+    P2.expectView(v => {
+      expect(v.players[1].health).toBe(3);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─── 负面:transform 校验 ─────────────────────────────
