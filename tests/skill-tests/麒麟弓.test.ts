@@ -7,6 +7,7 @@
 //   3. 杀命中 + 装备麒麟弓 + 目标无马 → 不询问(直接伤害)
 //   4. 杀命中 + 无麒麟弓 → 不触发弃马
 import { describe, it, expect, beforeEach } from 'vitest';
+import { SkillTestHarness } from '../engine-harness';
 import {
   resetForTest,
   registerSkillsFromState,
@@ -45,7 +46,9 @@ function makePlayer(opts: {
 }
 
 describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
+  let harness: SkillTestHarness;
   beforeEach(() => {
+    harness = new SkillTestHarness();
     resetForTest();
   });
 
@@ -60,57 +63,43 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
-          hand: [slash.id],
-          // 出杀范围设为 5(麒麟弓已装备)
+          index: 0, name: 'P0', hand: [slash.id],
           equipment: { 武器: qilin.id },
           skills: ['杀', '装备通用', '麒麟弓'],
           vars: { '距离/出杀范围': 5 },
         }),
         makePlayer({
-          index: 1, name: 'P1',
-          hand: [],
+          index: 1, name: 'P1', hand: [],
           equipment: { 进攻马: mount.id },
           skills: ['闪'],
         }),
       ],
-      cardMap: {
-        [qilin.id]: qilin,
-        [mount.id]: mount,
-        [slash.id]: slash,
-      },
-      currentPlayerIndex: 0,
-      phase: '出牌',
+      cardMap: { [qilin.id]: qilin, [mount.id]: mount, [slash.id]: slash },
+      currentPlayerIndex: 0, phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    await registerSkillsFromState(state);
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
 
-    const p1HealthBefore = state.players[1].health;
+    const p1HealthBefore = harness.state.players[1].health;
 
-    // P0 出杀
-    await dispatchAndWait(state, {
-      skillId: '杀', actionType: 'use', ownerId: 0,
-      params: { cardId: slash.id, targets: [1] }, baseSeq: state.seq,
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
+    await P1.pass(); // 不出闪
+    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
+    await P0.respond('麒麟弓', { choice: true });
+
+    expect(harness.state.players[1].equipment['进攻马']).toBeUndefined();
+    expect(harness.state.zones.discardPile).toContain(mount.id);
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
+    expect(harness.state.pendingSlots.size).toBe(0);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[1].health).toBe(p1HealthBefore - 1);
+      expect(v.pending).toBeNull();
     });
-
-    // 先到 询问闪 pending
-    expect(state.pendingSlots.size).toBeGreaterThan(0);
-    // P1 不出闪
-    await fireTimeoutAndWait(state);
-
-    // 杀命中 → 麒麟弓询问弃马 pending
-    expect(state.pendingSlots.size).toBeGreaterThan(0);
-    // P0 确认发动(出 respond)
-    await dispatchAndWait(state, {
-      skillId: '麒麟弓', actionType: 'respond', ownerId: 0,
-      params: { choice: true }, baseSeq: state.seq,
-    });
-
-    // 关键断言:B1 进攻马被弃 + 扣1血
-    expect(state.players[1].equipment['进攻马']).toBeUndefined();
-    expect(state.zones.discardPile).toContain(mount.id);
-    expect(state.players[1].health).toBe(p1HealthBefore - 1);
-    expect(state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
