@@ -106,6 +106,22 @@ describe('询问闪事件流(applyView 增量路径)', () => {
     expect(P2.processedView.players[1].health).toBe(3);
   });
 
+  it('不回应(respond 空 params)后:pending 清除 + 掉血', async () => {
+    await harness.setup(buildState({ p2Hand: ['c3'] }));
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'c1', [1]);
+    // P2 不回应(空 params)
+    await P2.respond('闪', {});
+
+    // 两边 pending 都应清除
+    expect(P1.processedView.pending).toBeNull();
+    expect(P2.processedView.pending).toBeNull();
+    // P2 扣血
+    expect(P2.processedView.players[1].health).toBe(3);
+  });
+
   it('target viewer 的 pending.prompt 必须有 cardFilter(前端据此高亮可出的牌)', async () => {
     await harness.setup(buildState({ p2Hand: ['c3'] }));
     const P1 = harness.player('P1');

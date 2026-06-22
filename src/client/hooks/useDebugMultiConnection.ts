@@ -76,7 +76,7 @@ export function useDebugMultiConnection(
       seat.lastSeq = msg.lastSeq;
       setViews(prev => {
         const next = new Map(prev);
-        next.set(msg.viewer, structuredClone(msg.state));
+        next.set(msg.viewer, msg.state);
         return next;
       });
       if (onFirstViewRef.current && msg.viewer === 0) {
@@ -85,24 +85,25 @@ export function useDebugMultiConnection(
     } else if (msg.type === 'events') {
       const seat = seatsRef.current.get(seatViewer);
       if (!seat?.view) return;
-      const viewCopy = structuredClone(seat.view);
+      // 直接原地突变 seat.view——reducer(applyView/applyNotify)本身就是突变模型,
+      // 不用 structuredClone(它在 view 含函数引用如 cardFilter.filter 时会抛 DOMException)。
+      // setViews 创建新 Map 保证 React 检测到状态变更。
       const eventsToPlay: Array<{ seq: number; event: ViewEvent }> = [];
       for (const env of (msg.events as GameEventEnvelope[])) {
         if (env.viewEvent) {
-          viewReducer(viewCopy, env.viewEvent);
+          viewReducer(seat.view, env.viewEvent);
           eventsToPlay.push({ seq: env.seq, event: env.viewEvent });
         }
         if (env.notify) {
-          applyNotify(viewCopy, env.notify);
+          applyNotify(seat.view, env.notify);
         }
       }
       if (msg.events.length > 0) {
         seat.lastSeq = msg.events[msg.events.length - 1].seq;
       }
-      seat.view = viewCopy;
       setViews(prev => {
         const next = new Map(prev);
-        next.set(msg.viewer, viewCopy);
+        next.set(msg.viewer, seat.view!);
         return next;
       });
       if (msg.viewer === perspectiveRef.current) {
