@@ -361,6 +361,7 @@ export class GameSession {
     // 重连:发当前完整 state 作为 baseline
     // state 此时应已有数据(bootstrap 已完成或进行中)
     this.sendInitialViewToPlayer(playerId);
+    this.baselineSent.add(playerId);
     this.broadcast({ type: 'player_reconnected', playerId });
     return true;
   }

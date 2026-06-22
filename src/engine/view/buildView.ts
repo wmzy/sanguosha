@@ -43,7 +43,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     const t = (s.atom as { target?: unknown }).target;
     return typeof t === 'number' && t < 0;
   });
-  const slot = mySlot ?? broadcastSlot ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
+  const slot = mySlot ?? broadcastSlot;
   if (slot) {
     const def = slot.definition;
     const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
