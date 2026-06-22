@@ -740,3 +740,15 @@ export type GameEvent =
 export type AppliedAtomEntry =
   | { kind: 'atom'; seq: number; atom: Atom; viewEvents: ViewEventSplit }
   | { kind: 'notify'; seq: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
+
+/** 事件 envelope(per-viewer 已分叉)。session 广播用。
+ *  从 engine/types 导出避免 engine→server 循环依赖。 */
+export interface GameEventEnvelope {
+  seq: number;
+  /** 事件 timestamp,相对 game startedAt */
+  timestamp: number;
+  /** atom 事件(per-viewer 分叉后的视图事件,含 effect) */
+  viewEvent?: ViewEvent;
+  /** 通知事件(per-viewer 分叉后的 data) */
+  notify?: { skillId: string; eventType: string; data: Json };
+}

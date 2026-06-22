@@ -2,8 +2,9 @@
 // 服务端协议层 — 按 ENGINE-DESIGN §8.2 事件流分叉广播。
 // 服务端按 viewer 对事件流做 per-player 分叉,推送该 viewer 可见的 ViewEvent[]。
 // 断线重连:拉 initialView baseline + 续推 lastSeq 之后的 events。
-import type { ClientMessage as EngineClientMessage, GameView, Json, ViewEvent } from '../engine/types';
+import type { ClientMessage as EngineClientMessage, GameEventEnvelope, GameView, Json, ViewEvent } from '../engine/types';
 import type { Operation } from '../shared/log';
+export type { GameEventEnvelope } from '../engine/types';
 
 export type EventSeq = number;
 
@@ -26,22 +27,6 @@ export type ServerMessage =
   | { type: 'player_disconnected'; playerId: string; graceMs: number }
   | { type: 'player_reconnected'; playerId: string }
   | { type: 'game_started' };
-
-/**
- * 推送给客户端的事件 envelope(per-viewer 已分叉)。
- * session 从 ViewEventSplit 按 viewer 可见性投影后,填入 viewEvent(或 notify)。
- * - viewEvent: atom 转换后的前端视图事件(含 effect),前端走 viewReducer + playEffect。
- * - notify: 技能通知事件(按 views 分叉后),前端按 skillId+eventType 订阅。
- */
-export interface GameEventEnvelope {
-  seq: EventSeq;
-  /** 事件 timestamp,相对 game startedAt */
-  timestamp: number;
-  /** atom 事件(per-viewer 分叉后的视图事件,含 effect) */
-  viewEvent?: ViewEvent;
-  /** 通知事件(per-viewer 分叉后的 data) */
-  notify?: { skillId: string; eventType: string; data: Json };
-}
 
 /**
  * 客户端发往服务端的消息。
