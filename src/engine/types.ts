@@ -615,6 +615,10 @@ export interface PendingSlot {
   definition: AtomDefinition;
   startTime: number;
   deadline: number;
+  /** 创建时的 state.seq，作为 pending 窗口版本号。
+   *  respond 路径用 action.pendingSeq 与此对比：不匹配 = 响应了过期窗口 → 拒绝。
+   *  close-reopen 时新 slot 会有新 createdSeq。 */
+  createdSeq: number;
   resolve: () => void;
   /** 超时定时器是否已触发(已被 fireTimeout 接管)。dispatch 据 this 丢弃竞态中的用户 action */
   isTimeout: boolean;
@@ -643,6 +647,10 @@ export interface ClientMessage {
   ownerId: number;
   params: Record<string, Json>;
   baseSeq: number;
+  /** 可选：respond 响应的 pending 窗口 seq。
+   *  服务端校验 slot.createdSeq === pendingSeq：不匹配 = 响应了过期窗口 → 拒绝。
+   *  主动 action 不带此字段（不影响）。 */
+  pendingSeq?: number;
   /**
    * 可选:在主 action 前顺序执行的前置 action 序列(转化类)。
    * dispatch 逐个 validate+execute;主 action validate 失败时,对已执行的 preceding
