@@ -10,7 +10,7 @@ import type {
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 import { allCharacters } from '../engine/cards/characters';
 import { TURN_IDLE_TIMEOUT_MS } from '../engine/view/buildView';
-import { getEvents, clearEvents } from '../engine/event-stream';
+
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -48,7 +48,7 @@ export class GameSession {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private sessionSeed: number;
   private logger = createLogger('session');
-  private lastEventIndex = 0;
+  private lastBroadcastSeq = 0;
   private baselineSent = new Set<string>();
   /** 调试房间:首人加入后开局的玩家人数(由 app 写入,handleJoinDebugRoom 读取后清空) */
   public pendingPlayerCount?: number;
@@ -255,7 +255,7 @@ export class GameSession {
   private broadcastNewState(): void {
     if (!this.state) return;
     const state = this.state;
-    const allEvents = getEvents(this.lastEventIndex);
+    const allEvents = state.atomHistory.filter(e => e.seq > this.lastBroadcastSeq);
 
     for (const [playerId, viewer] of this.playerNames) {
       if (viewer < 0 || viewer >= state.players.length) continue;
@@ -266,11 +266,10 @@ export class GameSession {
       }
       const envelopes = this.projectEventsForViewer(allEvents, viewer, state.startedAt);
       if (envelopes.length > 0) {
-        this.sendToPlayer(playerId, { type: 'events', viewer, fromSeq: this.lastEventIndex, events: envelopes });
+        this.sendToPlayer(playerId, { type: 'events', viewer, fromSeq: this.lastBroadcastSeq, events: envelopes });
       }
     }
-    this.lastEventIndex = 0;
-    clearEvents();
+    this.lastBroadcastSeq = state.seq;
   }
 
   /**

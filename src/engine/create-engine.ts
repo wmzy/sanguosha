@@ -7,7 +7,7 @@
 //   - dispatch(state, msg): 接受 state,执行 client message
 //   - buildView(state, viewer): 接受 state,返回 view
 //   - fireTimeout(state): 触发 pending slot 的 onTimeout
-//   - resetForTest(): 模块级清空(skill instances + events)
+//   - resetForTest(): 模块级清空(skill instances)
 //
 // create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
 // 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
@@ -58,7 +58,7 @@ import {
   unloadSkillInstance,
 } from './skill';
 import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
-import { clearEvents, pushEvent } from './event-stream';
+
 import { clearSlashMaxProviders } from './slash-quota';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
@@ -106,7 +106,7 @@ function notifyStateChange(state: GameState): void {
  *  target<0 = 广播型 slot(如无懈可击),所有 viewer 都应清除。 */
 function notifyPendingResolved(state: GameState, slot: PendingSlot): void {
   const target = extractPendingTarget(slot.atom);
-  pushEvent({
+  state.atomHistory.push({
     kind: 'notify',
     seq: state.seq,
     skillId: '',
@@ -367,10 +367,9 @@ export async function fireTimeout(state: GameState): Promise<void> {
   }
 }
 
-/** 测试用:模块级清空(skill instances + events)。 */
+/** 测试用:模块级清空(skill instances + slash quota providers)。 */
 export function resetForTest(): void {
   clearAllSkillInstances();
-  clearEvents();
   clearSlashMaxProviders();
   // 重新注册系统规则全局 hooks(被 clearAllSkillInstances 清掉了)
   init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, createGameState({ players: [], cardMap: {} }));
@@ -417,7 +416,7 @@ function emptyFrame(): SettlementFrame {
 
 /** 推送 notify 事件(不改变 state) */
 export function pushNotify(state: GameState, event: NotifyEvent): void {
-  pushEvent({ kind: 'notify', seq: state.seq, ...event });
+  state.atomHistory.push({ kind: 'notify', seq: state.seq, ...event });
 }
 
 // ─── Atom apply 管线 ────────────────────────────────────────
@@ -469,7 +468,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   applyAtomImpl(state, current);
 
-  pushEvent({ kind: 'atom', seq: state.seq, atom: current, viewEvents });
+  state.atomHistory.push({ kind: 'atom', seq: state.seq, atom: current, viewEvents: viewEvents! });
   notifyStateChange(state);
 
   if (def.pending) {

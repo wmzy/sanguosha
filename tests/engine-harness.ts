@@ -32,7 +32,7 @@ import {
   resetForTest,
   registerSkillsFromState,
 } from '../src/engine/create-engine';
-import { getEventCount, getEvents } from '../src/engine/event-stream';
+
 import { getAtomDef } from '../src/engine/atom';
 import { getSkillModule } from '../src/engine/skill';
 
@@ -126,9 +126,9 @@ export class PlayerSession {
 
   /** 取自上次以来的新事件(per-player 分叉:toViewEvents → 按 viewer 过滤) */
   newEvents(): ViewEvent[] {
-    const all = getEvents(this.lastEventIndex);
-    this.lastEventIndex = getEventCount();
-    return this.splitEventsForPlayer(all);
+    const all = this.harness.state.atomHistory.slice(this.lastEventIndex);
+    this.lastEventIndex = this.harness.state.atomHistory.length;
+    return this.splitEventsForPlayer(all as unknown as GameEvent[]);
   }
 
   /** 将全局 GameEvent 按 toViewEvents 分叉为当前玩家可见的 ViewEvent[] */
@@ -331,9 +331,9 @@ export class PlayerSession {
 
   /** 断言事件流中包含指定 atom 类型(子序列匹配,忽略 notify 事件) */
   expectAtoms(...types: string[]): void {
-    const atoms = getEvents(0)
-      .filter((e) => { const ge = e as Record<string, unknown>; return ge.kind === 'atom'; })
-      .map((e) => { const ge = e as Record<string, unknown> & { atom?: { type: string } }; return ge.atom?.type ?? ''; })
+    const atoms = (this.harness.state.atomHistory as Array<{ kind: string; atom?: { type: string } }>)
+      .filter(e => e.kind === 'atom')
+      .map(e => e.atom?.type ?? '')
       .filter(t => t !== '');
     let searchFrom = 0;
     for (const t of types) {
@@ -345,9 +345,9 @@ export class PlayerSession {
 
   /** 断言事件流的 atom 类型严格匹配(忽略 notify 事件) */
   expectExactAtoms(...types: string[]): void {
-    const atoms = getEvents(0)
-      .filter((e) => { const ge = e as Record<string, unknown>; return ge.kind === 'atom'; })
-      .map((e) => { const ge = e as Record<string, unknown> & { atom?: { type: string } }; return ge.atom?.type ?? ''; })
+    const atoms = (this.harness.state.atomHistory as Array<{ kind: string; atom?: { type: string } }>)
+      .filter(e => e.kind === 'atom')
+      .map(e => e.atom?.type ?? '')
       .filter(t => t !== '');
     const expected = types.join(', ');
     const actual = atoms.join(', ');
@@ -576,7 +576,7 @@ export class SkillTestHarness {
   }
 
   get events(): GameEvent[] {
-    return getEvents(0);
+    return this.state.atomHistory as unknown as GameEvent[];
   }
 }
 
