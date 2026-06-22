@@ -79,29 +79,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     turnTotalMs = TURN_IDLE_TIMEOUT_MS;
   }
 
-  // debug 模式:收集所有并行选将 slot,供单客户端代打时切换视角帮其他玩家选将。
-  // 正式模式不填充(viewer 隔离:只看自己的 pending)。
-  let allCharSelectSlots: GameView['allCharSelectSlots'];
-  if (debug) {
-    const selectSlots = [...state.pendingSlots.values()].filter(s => s.atom.type === '选将询问');
-    if (selectSlots.length > 1) {
-      allCharSelectSlots = selectSlots.map(s => {
-        const def = s.definition;
-        const prompt = (s.atom as { prompt?: ActionPrompt }).prompt
-          ?? def.pending?.prompt
-          ?? { type: 'chooseCharacter' as const, title: '请选择武将', candidates: [] };
-        const t = 'target' in s.atom && typeof s.atom.target === 'number' ? s.atom.target : -1;
-        return {
-          type: 'awaits' as const,
-          atom: s.atom,
-          prompt,
-          target: t,
-          deadline: state.startedAt + s.deadline,
-          totalMs: ((s.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 60) * 1000,
-        };
-      });
-    }
-  }
+  void debug;  // 保留参数签名兼容调用点,但不再影响隔离逻辑
 
   return {
     viewer,
@@ -119,7 +97,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       equipment: p.equipment,
       skills: p.skills,
       handCount: p.hand.length,
-      hand: (i === viewer || debug) ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
+      hand: i === viewer ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
       marks: p.marks,
       // 距离修正 vars(只投影距离相关三个 key,不暴露身份等敏感 vars)
       distanceVars: {
@@ -132,8 +110,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       ...(() => {
         const rawIdentity = p.vars['身份'] as string | undefined;
         if (!rawIdentity) return { identity: undefined, identityHidden: false };
-        // 自己:可见(debug 模式全部暴露,前端按 perspectiveIdx 隐藏)
-        if (i === viewer || debug) return { identity: rawIdentity, identityHidden: false };
+        // 自己:可见
+        if (i === viewer) return { identity: rawIdentity, identityHidden: false };
         // 主公:公开
         if (rawIdentity === '主公') return { identity: rawIdentity, identityHidden: false };
         // 死亡:揭示
@@ -144,7 +122,6 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     })),
     cardMap: state.cardMap,
     pending,
-    allCharSelectSlots,
     turnDeadline,
     /** 出牌/弃牌阶段倒计时总时长;为 0 表示非出牌/弃牌阶段(无 turnDeadline) */
     turnTotalMs,

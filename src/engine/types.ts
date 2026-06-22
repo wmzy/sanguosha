@@ -497,11 +497,6 @@ export interface GameView {
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;
-  /** debug 模式专用:所有并行选将 slot 的列表(含其他玩家的候选人)。
-   *  正式模式不填充(viewer 隔离)。debug 单客户端代打时,前端按 perspectiveIdx
-   *  从此列表找对应玩家的选将 pending,支持切换视角帮其他玩家选将。
-   *  仅在多 target 并行选将(主公已选、其他人同时选)时非空。 */
-  allCharSelectSlots?: PendingView[];
   /** 出牌/弃牌阶段的操作截止时间(独立于 pending) */
   turnDeadline: number | null;
   /** 出牌/弃牌阶段倒计时总时长(ms);turnDeadline 为 null 时为 0 */
@@ -728,5 +723,5 @@ export interface FrontendAPI {
 }
 
 export type GameEvent =
-  | { kind: 'atom'; atom: Atom; viewEvents?: ViewEventSplit }
-  | { kind: 'notify'; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
+  | { kind: 'atom'; seq: number; atom: Atom; viewEvents?: ViewEventSplit }
+  | { kind: 'notify'; seq: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };

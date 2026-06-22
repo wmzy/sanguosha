@@ -30,11 +30,17 @@ export interface DistributeUIProps {
   onClear: () => void;
   /** 提交(select → cardIds;allocate → allocation) */
   onSubmit: () => void;
+  /** 外部目标选择模式(仁德主动技):目标由座位区点选,本组件不渲染目标按钮,
+   *  仅显示提示 + 已选目标 + 确定。需配合 externalTargetName 使用。 */
+  externalTargetSelection?: boolean;
+  /** 外部目标选择模式下,当前已选目标玩家名(null=未选) */
+  externalTargetName?: string | null;
 }
 
 export function DistributeUI({
   prompt, cardIds, players, viewer,
   selected, allocations, onAllocate, onClear, onSubmit,
+  externalTargetSelection, externalTargetName,
 }: DistributeUIProps) {
   void cardIds; // 候选牌已下沉到手牌区,这里仅用于派生提示文案的 total
   const mode = prompt.mode ?? 'allocate';
@@ -69,6 +75,26 @@ export function DistributeUI({
   // ─── allocate 模式:分配牌给目标 ────────────────────────
   const totalAllocated = allocations.flatMap(a => a.cardIds).length;
   const allAllocated = totalAllocated >= totalCandidate;
+
+  // ─── 外部目标选择模式(仁德):目标由座位区选,本组件只显示提示 + 确定 ──
+  if (externalTargetSelection) {
+    const canSubmit = selected.size >= minTotal && selected.size <= maxTotal && !!externalTargetName;
+    return (
+      <div className={promptActions} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+        <div className={promptHint}>
+          {prompt.title} · 已选 {selected.size} 张
+          {externalTargetName ? <> · 目标 <span className={allocSelHint}>{externalTargetName}</span></> : <span className={allocSelHint}> · 点玩家选目标</span>}
+        </div>
+        <div className={actionRow}>
+          <button className={promptBtn} onClick={onClear} disabled={selected.size === 0 && !externalTargetName}>清空</button>
+          <button className={promptBtnPrimary} onClick={onSubmit} disabled={!canSubmit}>
+            确定({selected.size}){externalTargetName ? ` → ${externalTargetName}` : ''}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={promptActions} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
       <div className={promptHint}>

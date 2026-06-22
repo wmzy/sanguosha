@@ -394,8 +394,8 @@ function emptyFrame(): SettlementFrame {
 // ─── Notify 事件 ────────────────────────────────────────────
 
 /** 推送 notify 事件(不改变 state) */
-export function pushNotify(_state: GameState, event: NotifyEvent): void {
-  pushEvent({ kind: 'notify', ...event });
+export function pushNotify(state: GameState, event: NotifyEvent): void {
+  pushEvent({ kind: 'notify', seq: state.seq, ...event });
 }
 
 // ─── Atom apply 管线 ────────────────────────────────────────
@@ -447,7 +447,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   applyAtomImpl(state, current);
 
-  pushEvent({ kind: 'atom', atom: current, viewEvents });
+  pushEvent({ kind: 'atom', seq: state.seq, atom: current, viewEvents });
   notifyStateChange(state);
 
   if (def.pending) {

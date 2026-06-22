@@ -98,6 +98,8 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
   // distribute 选牌状态(主动技 + 被动遗计共用):驱动手牌区高亮
   const [distSelected, setDistSelected] = useState<Set<string>>(new Set());
   const [distAllocations, setDistAllocations] = useState<Array<{ target: number; cardIds: string[] }>>([]);
+  // 仁德类(主动 allocate + externalTargetSelection):座位选的目标
+  const [distTargetName, setDistTargetName] = useState<string | null>(null);
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
   // 整理手牌:本地顺序状态(拖拽时实时更新,拖拽结束发 reorder_hand)
   // null = 用服务端顺序;非 null = 用本地重排顺序(需与服务端手牌集合一致)
@@ -182,14 +184,16 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
     if (distributeMode) {
       const { skillId, actionType, prompt } = distributeMode;
       const cardIds = resolveDistributeCardIds(prompt, perspectiveHand, perspectiveEquipment);
-      return { skillId, actionType, prompt, cardIds };
+      // 主动 allocate(仁德):目标由座位区点选,不走 DistributeUI 内部目标按钮
+      const externalTargetSelection = (prompt.mode ?? 'allocate') === 'allocate';
+      return { skillId, actionType, prompt, cardIds, externalTargetSelection };
     }
     // 2. 被动 distribute pending(遗计分配/贯石斧选牌)
     if (isMyAwaiting && pending && pending.prompt.type === 'distribute') {
       const info = resolvePendingRespond(pending, skillActions);
       const skillId = info?.skillId ?? '系统规则';
       const cardIds = resolveDistributeCardIds(pending.prompt, perspectiveHand, perspectiveEquipment);
-      return { skillId, actionType: 'respond', prompt: pending.prompt, cardIds };
+      return { skillId, actionType: 'respond', prompt: pending.prompt, cardIds, externalTargetSelection: false };
     }
     return null;
   })();
@@ -203,6 +207,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
   useEffect(() => {
     setDistSelected(new Set());
     setDistAllocations([]);
+    setDistTargetName(null);
   }, [distKey]);
   // 切牌/重选牌时,同步重置借刀杀人的第二目标
   useEffect(() => { setSelectedKillTarget(null); }, [selectedCardId]);
@@ -248,16 +253,24 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
     setDistSelected(new Set());
   }, [activeDistribute, distSelected]);
 
-  /** distribute 提交(select → cardIds;allocate → allocation) */
+  /** distribute 提交(select → cardIds;allocate → allocation;
+   *  仁德 externalTargetSelection → allocation=[{target:idx, cardIds:[...selected]}]) */
   const handleDistSubmit = useCallback(() => {
     if (!activeDistribute) return;
-    const { skillId, actionType, prompt } = activeDistribute;
+    const { skillId, actionType, prompt, externalTargetSelection } = activeDistribute;
     const mode = prompt.mode ?? 'allocate';
     const minTotal = prompt.minTotal ?? 1;
     if (mode === 'select') {
       const total = distSelected.size;
       if (total < minTotal) return;
       send(skillId, actionType, { cardIds: [...distSelected] });
+    } else if (externalTargetSelection) {
+      // 仁德:座位选目标 + 手牌多选 → 单目标 allocation
+      if (distSelected.size < minTotal) return;
+      if (!distTargetName) return;
+      const idx = nameToIndex(distTargetName);
+      if (idx < 0) return;
+      send(skillId, actionType, { allocation: [{ target: idx, cardIds: [...distSelected] }] });
     } else {
       const total = distAllocations.flatMap(a => a.cardIds).length;
       if (total < minTotal) return;
@@ -265,13 +278,15 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
     }
     setDistSelected(new Set());
     setDistAllocations([]);
+    setDistTargetName(null);
     setDistributeMode(null);
-  }, [activeDistribute, distSelected, distAllocations, send]);
+  }, [activeDistribute, distSelected, distAllocations, distTargetName, send]);
 
   /** distribute 清空选牌 + 分配 */
   const handleDistClear = useCallback(() => {
     setDistSelected(new Set());
     setDistAllocations([]);
+    setDistTargetName(null);
   }, []);
 
   // ─── 选中的牌 ───
@@ -281,6 +296,11 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
    *  由选中卡 use action 的 targetFilter.filter 驱动(杀/顺手牵羊等声明了距离 filter)。
    *  无 filter 时恒可选(距离规则已后端 validate 兜底)。 */
   function isTargetable(i: number): boolean {
+    // 仁德 externalTargetSelection:允许所有存活非自己玩家(无距离限制)
+    if (isDistributeActive && activeDistribute?.externalTargetSelection) {
+      if (!activeDistribute.prompt.allowSelf && i === perspectiveIdx) return false;
+      return view.players[i]?.alive === true;
+    }
     const filter = selectedTargetFilter?.filter;
     if (!filter) return true;
     return filter(view, i);
@@ -311,6 +331,13 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
   function handleTargetClick(name: string) {
     const idx = view.players.findIndex(p => p.name === name);
     if (idx >= 0 && !isTargetable(idx)) return; // 距离外,禁止选中
+    // 仁德 externalTargetSelection 模式:座位选目标写入 distTargetName
+    if (isDistributeActive && activeDistribute?.externalTargetSelection) {
+      // allowSelf=false(仁德)则禁止选自己
+      if (!activeDistribute.prompt.allowSelf && idx === perspectiveIdx) return;
+      setDistTargetName(distTargetName === name ? null : name);
+      return;
+    }
     setSelectedTarget(selectedTarget === name ? null : name);
   }
 
@@ -633,8 +660,8 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
           orderedPlayers={orderedPlayers}
           perspectiveName={perspectiveName}
           currentPlayerName={currentPlayerName}
-          selectedNeedsTarget={!!playRules && playRules.needsTarget}
-          selectedTarget={selectedTarget}
+          selectedNeedsTarget={(!!playRules && playRules.needsTarget) || (isDistributeActive && !!activeDistribute?.externalTargetSelection)}
+          selectedTarget={isDistributeActive && activeDistribute?.externalTargetSelection ? distTargetName : selectedTarget}
           isTargetable={isTargetable}
           onTargetClick={handleTargetClick}
           onPerspectiveChange={onPerspectiveChange}
@@ -710,6 +737,8 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
                 onAllocate={handleDistAllocate}
                 onClear={handleDistClear}
                 onSubmit={handleDistSubmit}
+                externalTargetSelection={activeDistribute.externalTargetSelection}
+                externalTargetName={activeDistribute.externalTargetSelection ? distTargetName : undefined}
               />
               {/* 主动技可取消;被动 pending 不能取消 */}
               {distributeMode && (
