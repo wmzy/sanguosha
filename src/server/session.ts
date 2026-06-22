@@ -257,7 +257,6 @@ export class GameSession {
   /**
    * 广播状态变更:按 §8.2 per-viewer 分叉推送 events。
    * 首次推送 initialView 作为 baseline,后续发增量 events。
-   * 所有状态变更都通过 atom 管线(toViewEvents + applyView)。
    */
   private broadcastNewState(): void {
     if (!this.state) return;
@@ -359,8 +358,9 @@ export class GameSession {
     this.disconnectedAt.delete(playerId);
     this.clearGraceTimer();
     this.room.players.set(playerId, ws);
-    // 不发 initialView——bootstrap 可能还没跑完,发的是空白 state。
-    // broadcastNewState 会在 bootstrap 推进后发当前最新状态。
+    // 重连:发当前完整 state 作为 baseline
+    // state 此时应已有数据(bootstrap 已完成或进行中)
+    this.sendInitialViewToPlayer(playerId);
     this.broadcast({ type: 'player_reconnected', playerId });
     return true;
   }

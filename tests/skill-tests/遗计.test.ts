@@ -60,6 +60,9 @@ describe('遗计', () => {
     // 杀还在处理区(execute 没完成),P2 已扣血
     expect(harness.state.players.find(p => p.name === 'P2')!.health).toBe(3);
     expect(harness.state.zones.processing).toContain('c1');
+    // view 级断言:health 通过 applyView 同步
+    P2.processEvents();
+    P2.expectView(v => expect(v.players[1].health).toBe(3));
   });
 
   // 完整链路(杀→不出闪→confirm→摸牌→distribute)需要引擎支持嵌套 pending,

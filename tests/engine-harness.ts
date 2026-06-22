@@ -104,6 +104,11 @@ export class PlayerSession {
     this.frontend = new FakeFrontendAPI(playerIndex);
   }
 
+  /** 在 setup 完成后调用,用当前 state 创建 baseline view */
+  initProcessedView(): void {
+    this._processedView = engineBuildView(this.harness.state, this.playerIndex);
+  }
+
   // ─── 视图 ─────────────────────────────────────
 
   /** 从 state 重建的完整 view(向后兼容,不走 event 路径) */
@@ -111,10 +116,10 @@ export class PlayerSession {
     return engineBuildView(this.harness.state, this.playerIndex);
   }
 
-  /** 通过 event + applyView 增量维护的 view。processEvents() 后可用。 */
+  /** 通过 event + applyView 增量维护的 view。setup 后自动初始化。 */
   get processedView(): GameView {
     if (!this._processedView) {
-      this._processedView = engineBuildView(this.harness.state, this.playerIndex);
+      throw new Error('processedView: 请先在 setup 后调用 initProcessedView()');
     }
     return this._processedView;
   }
@@ -160,7 +165,10 @@ export class PlayerSession {
       if (!type || type === 'notify') continue;
       try {
         const def = getAtomDef(type);
-        def.applyView?.(this.processedView, evt);
+        if (def.applyView) {
+          // applyView debug log (disabled)
+          def.applyView(this.processedView, evt);
+        }
       } catch {
         // atom 未注册或 applyView 报错——静默跳过,让 expectView 捕获不一致
       }
@@ -512,6 +520,7 @@ export class SkillTestHarness {
     for (const player of state.players) {
       const session = new PlayerSession(player.index, this);
       await session.loadFrontend();
+      session.initProcessedView();
       this.sessions.set(player.index, session);
     }
   }

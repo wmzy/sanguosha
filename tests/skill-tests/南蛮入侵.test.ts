@@ -45,6 +45,9 @@ describe('南蛮入侵', () => {
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('nm1');
     expect(harness.state.zones.processing).not.toContain('nm1');
+    // view 级断言:health 通过 applyView 同步
+    P2.processEvents();
+    P2.expectView(v => expect(v.players[1].health).toBe(3));
   });
 
   it('P2 出杀 → P2 不扣血, 杀和南蛮都进弃牌堆', async () => {

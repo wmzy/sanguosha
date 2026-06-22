@@ -88,6 +88,9 @@ describe('武圣', () => {
     expect(harness.state.players[1].health).toBe(3);
     // 杀进入弃牌堆(实际是原卡 c1 — 因为影子最终还原)
     expect(harness.state.zones.discardPile).toContain('c1');
+    // view 级断言:health 通过 applyView 同步
+    P2.processEvents();
+    P2.expectView(v => expect(v.players[1].health).toBe(3));
   });
 
   it('transformThenUse:方块(♦)红牌当杀 → 同样成功', async () => {

@@ -45,6 +45,9 @@ describe('杀', () => {
 
     expect(P2.view.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('c1');
+    // view 级断言:health 通过 applyView 同步
+    P2.processEvents();
+    P2.expectView(v => expect(v.players[1].health).toBe(3));
   });
 
   it('P1 对 P2 出杀,P2 出闪 → 双方不扣血,杀和闪结算完毕进入弃牌堆', async () => {
@@ -64,6 +67,9 @@ describe('杀', () => {
       expect.arrayContaining(['c1', 'c3']),
     );
     expect(harness.state.zones.processing).toEqual([]);
+    // view 级断言:health 通过 applyView 同步
+    P2.processEvents();
+    P2.expectView(v => expect(v.players[1].health).toBe(4));
   });
 
   it('同回合不能出第二张杀', async () => {
@@ -80,5 +86,8 @@ describe('杀', () => {
     // 第二刀:validate 失败(出杀次数已用尽)→ 静默丢弃,无副作用(P2 血量未再扣)
     await P1.useCardAndTarget('杀', 'c2', [1]);
     expect(harness.state.players[1].health).toBe(healthAfterFirst);
+    // view 级断言:health 不变(第二刀被拒绝)
+    P2.processEvents();
+    P2.expectView(v => expect(v.players[1].health).toBe(healthAfterFirst));
   });
 });

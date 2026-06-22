@@ -84,6 +84,12 @@ describe('八卦阵', () => {
     expect(harness.state.players[0].equipment['防具']).toBe('b1');
     expect(harness.state.players[0].skills).toContain('八卦阵');
     expect(harness.state.players[0].hand).not.toContain('b1');
+    // view 级断言:equipment 和 skills 通过 applyView 同步
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].equipment['防具']).toBe('b1');
+      expect(v.players[0].skills).toContain('八卦阵');
+    });
   });
 
   // ─── 正面:八卦阵判定成功(红色)= 视为出闪 → 不扣血 ────────────
@@ -122,6 +128,10 @@ describe('八卦阵', () => {
     expect(harness.state.players[0].health).toBe(4);
     // 判定牌已进弃牌堆
     expect(harness.state.zones.discardPile).toContain('j1');
+    // view 级断言:health 通过 applyView 同步
+    P1.processEvents();
+    P1.expectView(v => expect(v.players[0].health).toBe(4));
+
   });
 
   it('判定成功(红色 ♦):同样视为出闪', async () => {
@@ -177,6 +187,7 @@ describe('八卦阵', () => {
 
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('j1');
+
   });
 
   it('判定失败(黑色 ♣):同样不视为闪', async () => {
@@ -203,6 +214,10 @@ describe('八卦阵', () => {
 
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('j1');
+    // view 级断言:health 通过 applyView 同步
+    P1.processEvents();
+    P1.expectView(v => expect(v.players[0].health).toBe(3));
+
   });
 
   // ─── 正面:P1 有真闪 → 出真闪 → 正常闪避,八卦阵判定仍生效 ────────────
@@ -243,6 +258,7 @@ describe('八卦阵', () => {
     expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['d1']));
     // 判定牌 j1 进弃牌堆
     expect(harness.state.zones.discardPile).toContain('j1');
+
   });
 
   // ─── 负面:非自己回合装八卦阵 → 拒绝 ────────────

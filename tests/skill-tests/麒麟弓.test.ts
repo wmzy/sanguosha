@@ -106,7 +106,7 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
       params: { choice: true }, baseSeq: state.seq,
     });
 
-    // 关键断言:P1 进攻马被弃 + 扣1血
+    // 关键断言:B1 进攻马被弃 + 扣1血
     expect(state.players[1].equipment['进攻马']).toBeUndefined();
     expect(state.zones.discardPile).toContain(mount.id);
     expect(state.players[1].health).toBe(p1HealthBefore - 1);
@@ -161,7 +161,7 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     // 麒麟弓询问 → P0 超时(等同不发动)
     await fireTimeoutAndWait(state);
 
-    // P1 马保留 + 扣1血
+    // B1 马保留 + 扣1血
     expect(state.players[1].equipment['进攻马']).toBe(mount.id);
     expect(state.players[1].health).toBe(p1HealthBefore - 1);
     expect(state.pendingSlots.size).toBe(0);
@@ -207,7 +207,7 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     // 询问闪
     await fireTimeoutAndWait(state);
 
-    // 杀命中后无麒麟弓询问(P1 无马)→ 直接扣血
+    // 杀命中后无麒麟弓询问(B1 无马)→ 直接扣血
     expect(state.players[1].health).toBe(p1HealthBefore - 1);
     expect(state.pendingSlots.size).toBe(0);
   });

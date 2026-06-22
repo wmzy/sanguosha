@@ -131,7 +131,7 @@ describe('贯石斧', () => {
     // 贯石斧 confirm 询问 → P1 不发动
     await P1.respond('贯石斧', { choice: false });
 
-    // 正常被闪:P2 不扣血
+    // 正常被闪:B2 不扣血
     expect(harness.state.players[1].health).toBe(4);
     expect(harness.state.players[0].hand).toContain('x1'); // P1 未弃牌
   });
@@ -169,7 +169,7 @@ describe('贯石斧', () => {
     // 从装备区弃 2 张马
     await P1.respond('贯石斧', { cardIds: ['h1', 'h2'] });
 
-    // 强命:P2 扣血
+    // 强命:B2 扣血
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('h1');
     expect(harness.state.zones.discardPile).toContain('h2');
@@ -203,7 +203,7 @@ describe('贯石斧', () => {
     await P2.respond('闪', { cardId: 'd1' });
 
     // 出杀后 P1 手牌 0 + 装备 1 = 1 张可弃 < 2 → 跳过 confirm
-    // 杀正常被闪:P2 不扣血,无 pending
+    // 杀正常被闪:B2 不扣血,无 pending
     expect(harness.state.players[1].health).toBe(4);
     expect(harness.state.pendingSlots.size).toBe(0);
   });
