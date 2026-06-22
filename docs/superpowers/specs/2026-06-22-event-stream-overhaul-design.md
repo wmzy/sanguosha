@@ -22,14 +22,13 @@
 - `reconnectPlayer`(`session.ts:333`)只发 initialView 快照,从不补推差量
 - 设计意图(`2026-06-21-event-playback-design.md:41-46`)与实现不符
 
-### P0-C:CAS `baseSeq` 频繁误拒 → "前端等待与后端不一致"
+### P0-C:全局 CAS 在无锈窗口误拒合法 respond
 
-- 客户端 `lastSeq` 取事件里的 `state.seq`(`useDebugMultiConnection.ts:112`)
-- `state.seq` 在每次 dispatch `+= 1`(`create-engine.ts:319`)
-- 任何其他 dispatch(他人 respond / pending resolve / idle timer)推进 seq → 客户端基于旧 seq 的合法 action 被 `session.ts:124` 静默丢弃
-- 直接表现:玩家点按钮没反应,一直卡在等待态
+- `state.seq` 在每次合法 dispatch `+= 1`(`create-engine.ts:311`),包括 respond
+- 无锈广播窗口内:B 响应推进 seq,C 基于 seq=旧值 的合法 respond 被 `session.ts:179` 误拒
+- 注:跨玩家主动 action 的并发误拒**不存在**——三国杀严格回合制,validate 拒绝非当前回合玩家的主动 action。全局 CAS 的唯一误拒场景就在无锈窗口,而这正是 pending-scoped 版本(§5.6)要精确替代的
 
-**CAS 还在破坏无懈可击链**:无懈广播 slot key=-2 不匹配 `ownerId`,故 `hasOwnSlot=false` → CAS 强制执行 → B 响应后 seq+1 → C 的反无懈(旧 seq)被误拒。
+**全局 CAS 还在破坏无锈可击链**:无锈广播 slot key=-2 不匹配 `ownerId`,故 `hasOwnSlot=false` → CAS 强制执行 → B 响应后 seq+1 → C 的反无锈(旧 seq)被误拒。
 
 ### P1-A:pending 倒计时客户端硬编码 30s,与服务端脱钩
 
@@ -70,7 +69,7 @@
 | 事件缓冲归属 | `GameState.atomHistory` | 引擎自洽,多 session 天然隔离 |
 | 派生时机 | apply 时缓存 split | `toViewEvents` 依赖 pre-mutation state |
 | 重连 | 全量保留历史 + seq 差量推 | 每局几百 atom,<1MB,内存可忽略 |
-| CAS | **删除全局 CAS** | 全局 seq 被所有合法操作推进,误拒无关的合法 action(validate 已足够保证主动 action 合法性) |
+| CAS | **删除全局 CAS** | 三国杀严格回合制,跨玩家合法主动 action 的并发不存在(validate 已拒非法)。全局 CAS 的唯一作用在无锈广播窗口——但这正是 pending-scoped 版本要精确替代的,且全局 CAS 会误拒'窗口未变但 seq 被 respond 推进'的合法 respond,与 pending-scoped 冲突,必须删 |
 | pending 窗口版本 | **新增**:respond 携带 `pendingSeq`(响应哪个窗口);服务端按 slot 创建 seq 校验 | 精确解决无锈意图问题(C 的在途 respond 不 counter B),只拒绝过期窗口的 respond,不影响主动 action |
 | dispatch 返回值 | `Promise<boolean>` | 替代静默丢弃,session 回 ACK/NAK |
 | pending 倒计时 | events 消息携带 deadline | 对齐已验证的 turnDeadline 模式 |
