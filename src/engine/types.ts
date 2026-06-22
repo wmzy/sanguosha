@@ -113,6 +113,11 @@ export interface GameState {
   startedAt: number;
   actionLog: ActionLogEntry[];
 
+  /** 引擎唯一权威事件源：apply 时写入 atom + 缓存的 ViewEventSplit。
+   *  session 据此为任意 viewer 派生事件序列（广播/重连差量）。
+   *  永不清空——每局几百条，内存 <1MB，换取重连差量推送正确性。 */
+  atomHistory: AppliedAtomEntry[];
+
   /** state 变更回调:每次 applyAtom 完成(pushEvent 后)触发。
    *  session 订阅后据此广播 view,不再 await dispatch。fire-and-forget 模型下
    *  dispatch 返回时 execute 可能还在跑,广播时机由本回调驱动。 */
@@ -144,6 +149,7 @@ export function createGameState(partial: Partial<GameState> & { players: PlayerS
     seq: 0,
     startedAt: 0,
     actionLog: [],
+    atomHistory: [],
     ...partial,
     players,
   };
@@ -727,4 +733,10 @@ export interface FrontendAPI {
 
 export type GameEvent =
   | { kind: 'atom'; seq: number; atom: Atom; viewEvents?: ViewEventSplit }
+  | { kind: 'notify'; seq: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
+
+/** 引擎唯一权威事件源条目。apply 时写入，不可变。
+ *  替代旧的模块级 event-stream 单例。 */
+export type AppliedAtomEntry =
+  | { kind: 'atom'; seq: number; atom: Atom; viewEvents: ViewEventSplit }
   | { kind: 'notify'; seq: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
