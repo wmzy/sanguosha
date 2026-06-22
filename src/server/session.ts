@@ -219,12 +219,6 @@ export class GameSession {
     }
     // 直接 mutate hand 顺序
     player.hand = [...order];
-    // 只给该玩家发其座次的 initialView(其他人 handCount 不变,无需广播)
-    const state = this.state;
-    const view = buildView(state, playerIndex);
-    this.sendToPlayer(playerId, { type: 'initialView', viewer: playerIndex, state: view, lastSeq: state.seq });
-    // 触发持久化(state 快照会带上最新顺序),但不走 onStateChange(避免全量广播)
-    this.persistAsync();
   }
 
   private handleGameOver(winner?: number): void {

@@ -41,9 +41,8 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   const rooms: RoomInfo[] = c.debugRooms;
   return (
     <div style={styles.page(40)}>
-      <DebugControls onBack={() => navigate('/')} showConnection connected={c.connected} />
+      <DebugControls onBack={() => navigate('/')} />
       <DebugRoomList
-        connected={c.connected}
         playerCount={c.playerCount}
         onPlayerCountChange={c.setPlayerCount}
         onCreateRoom={c.handleCreateDebugRoom}
@@ -78,7 +77,7 @@ function DebugGameView({
   if (!currentView) {
     return (
       <div style={styles.page(40)}>
-        <DebugControls onBack={() => onDeleteRoom()} showConnection connected={conn.anyConnected} />
+        <DebugControls onBack={() => onDeleteRoom()} />
         <div style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>
           正在连接各座次视角…
         </div>

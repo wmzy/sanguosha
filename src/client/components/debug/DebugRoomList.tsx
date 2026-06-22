@@ -9,8 +9,6 @@ import { colors, styles } from '../../theme';
 import { RoomListPanel } from '../RoomListPanel';
 
 interface DebugRoomListProps {
-  /** WebSocket 是否已连接（控制创建按钮可用性） */
-  connected: boolean;
   /** 当前选中的玩家人数 */
   playerCount: number;
   /** 切换玩家人数下拉 */
@@ -67,18 +65,12 @@ const createBtnBase = css`
   font-weight: bold;
 `;
 
-const createBtnConnected = css`
+const createBtn = css`
   background-color: ${colors.accent.orange};
   cursor: pointer;
 `;
 
-const createBtnDisconnected = css`
-  background-color: ${colors.disabled};
-  cursor: not-allowed;
-`;
-
 export function DebugRoomList({
-  connected,
   playerCount,
   onPlayerCountChange,
   onCreateRoom,
@@ -109,11 +101,7 @@ export function DebugRoomList({
         </div>
         <button
           onClick={onCreateRoom}
-          disabled={!connected}
-          className={cx(
-            createBtnBase,
-            connected ? createBtnConnected : createBtnDisconnected,
-          )}
+          className={cx(createBtnBase, createBtn)}
         >
           创建调试房间
         </button>

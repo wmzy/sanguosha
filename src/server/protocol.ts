@@ -25,8 +25,7 @@ export type ServerMessage =
   | { type: 'player_left'; playerId: string }
   | { type: 'player_disconnected'; playerId: string; graceMs: number }
   | { type: 'player_reconnected'; playerId: string }
-  | { type: 'game_started' }
-  | { type: 'room_list'; rooms: RoomInfo[] };
+  | { type: 'game_started' };
 
 /**
  * 推送给客户端的事件 envelope(per-viewer 已分叉)。
@@ -55,12 +54,9 @@ export type ClientMessage =
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
   | { type: 'create_room'; name: string; maxPlayers: number }
-  | { type: 'create_debug_room'; playerCount: number }
   | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
-  | { type: 'delete_room' }
   | { type: 'start_game' }
   | { type: 'leave_room' }
-  | { type: 'list_rooms'; filter?: 'debug' | 'multiplayer' }
   | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq };
 
 export interface RoomInfo {
@@ -84,7 +80,6 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
       return Array.isArray(order) && order.every((id: unknown) => typeof id === 'string');
     }
     case 'ready':
-    case 'delete_room':
     case 'start_game':
     case 'leave_room':
       return true;
@@ -95,10 +90,6 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
       return typeof d['playerId'] === 'string';
     case 'create_room':
       return typeof d['name'] === 'string' && typeof d['maxPlayers'] === 'number';
-    case 'create_debug_room':
-      return typeof d['playerCount'] === 'number';
-    case 'list_rooms':
-      return d['filter'] === undefined || d['filter'] === 'debug' || d['filter'] === 'multiplayer';
     default:
       return false;
   }

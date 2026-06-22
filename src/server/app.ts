@@ -239,9 +239,6 @@ export function handleWsMessage(
     case 'join_room':
       handleJoinRoom(playerId, message.roomId, ws);
       break;
-    case 'list_rooms':
-      ws.send(serialize({ type: 'room_list', rooms: getRoomList(message.filter) }));
-      break;
     case 'ready':
       handleReady(playerId);
       break;
@@ -260,14 +257,8 @@ export function handleWsMessage(
     case 'reconnect':
       handleReconnect(playerId, message.playerId, message.lastSeq ?? 0, ws);
       break;
-    case 'create_debug_room':
-      void handleCreateDebugRoom(playerId, message.playerCount, ws);
-      break;
     case 'join_debug_room':
       void handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws);
-      break;
-    case 'delete_room':
-      handleDeleteRoom(playerId);
       break;
   }
 }
@@ -417,38 +408,6 @@ function handleDisconnect(playerId: string): void {
   if (session) {
     session.handleDisconnect(playerId);
   }
-}
-
-async function handleCreateDebugRoom(playerId: string, playerCount: number, ws: WSContext): Promise<void> {
-  if (playerCount < 2 || playerCount > 8) {
-    ws.send(serialize({ type: 'error', message: '玩家人数须在2-8之间' }));
-    return;
-  }
-  const room = createDebugRoom(`调试${playerCount}人`, playerCount);
-  const session = new GameSession(room, true);
-  session.pendingPlayerCount = playerCount;
-  gameSessions.set(room.id, session);
-  // host 自动 join：和 handleJoinDebugRoom 走相同流程
-  await handleJoinDebugRoom(playerId, room.id, 0, ws);
-}
-
-function handleDeleteRoom(playerId: string): void {
-  const roomId = playerRoomMap.get(playerId);
-  if (!roomId) return;
-  const room = getRoom(roomId);
-  if (!room?.isDebug) return;
-  const session = gameSessions.get(roomId);
-  if (session) {
-    void session.destroy();
-    gameSessions.delete(roomId);
-  }
-  const playerIds = [...room.players.keys()];
-  for (const pid of playerIds) {
-    playerRoomMap.delete(pid);
-    leaveRoom(roomId, pid);
-  }
-  deleteRoom(roomId);
-  void deletePersistedRoom(roomId);
 }
 
 async function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: number, ws: WSContext): Promise<void> {

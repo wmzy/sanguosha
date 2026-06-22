@@ -44,8 +44,6 @@ export function useDebugMultiConnection(
   params: UseDebugMultiConnectionParams,
 ): {
   views: Map<number, GameView>;
-  connected: boolean;
-  anyConnected: boolean;
   currentEvent: import('./useEventPlayback').QueuedEvent | null;
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
@@ -189,8 +187,6 @@ export function useDebugMultiConnection(
 
   return {
     views,
-    connected: connectedCount >= playerCount,
-    anyConnected: connectedCount > 0,
     currentEvent: playback.current,
     sendAction,
     reorderHand,
