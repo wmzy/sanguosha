@@ -68,8 +68,8 @@ export function usePendingState(view: GameView, perspectiveIdx: number): Pending
     setSkippedBroadcast(prev => new Set(prev).add(key));
   }, []);
 
-  const deadline = pending?.deadline ?? view.turnDeadline;
-  const deadlineTotalMs = pending ? pending.totalMs : view.turnTotalMs;
+  const deadline = pending?.deadline ?? view.turnDeadline ?? null;
+  const deadlineTotalMs = pending?.totalMs ?? view.turnTotalMs;
 
   return {
     pending,

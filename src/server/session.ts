@@ -46,6 +46,7 @@ export class GameSession {
   private maxPlayers: number;
   private destroyed = false;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private idleDeadline: number | null = null;
   private sessionSeed: number;
   private logger = createLogger('session');
   private lastBroadcastSeq = 0;
@@ -229,20 +230,41 @@ export class GameSession {
       if (this.destroyed || !this.state) return;
       this.actionLog = this.state.actionLog;
       this.lastActivityAt = Date.now();
+      this.resetIdleTimer();
       this.broadcastNewState();
       this.persistAsync();
       const { gameOver, winner } = checkGameOver(this.state);
       if (gameOver) {
         this.handleGameOver(winner);
       }
-      this.resetIdleTimer();
     };
   }
 
 
+  /** 读取该 viewer 可见 pending slot 的 deadline/totalMs (供 events 消息下发) */
+  private pendingForViewer(state: GameState, viewer: number): { target: number; deadline: number; totalMs: number } | null {
+    // 优先 viewer 专属 slot，其次广播 slot（target<0）
+    const mySlot = state.pendingSlots.get(viewer);
+    let slot = mySlot;
+    if (!slot) {
+      for (const s of state.pendingSlots.values()) {
+        const t = (s.atom as { target?: number }).target;
+        if (typeof t === 'number' && t < 0) { slot = s; break; }
+      }
+    }
+    if (!slot) return null;
+    const target = (slot.atom as { target?: number }).target ?? -1;
+    return {
+      target,
+      deadline: state.startedAt + slot.deadline,
+      totalMs: slot.deadline - slot.startTime,
+    };
+  }
+
   /**
    * 广播状态变更:按 §8.2 per-viewer 分叉推送 events。
    * 首次推送 initialView 作为 baseline,后续发增量 events。
+   * events 消息携带 pending 倒计时(turnDeadline/turnTotalMs)权威数据。
    */
   private broadcastNewState(): void {
     if (!this.state) return;
@@ -257,7 +279,12 @@ export class GameSession {
       }
       const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
       if (envelopes.length > 0) {
-        this.sendToPlayer(playerId, { type: 'events', viewer, fromSeq: this.lastBroadcastSeq, events: envelopes });
+        this.sendToPlayer(playerId, {
+          type: 'events', viewer, fromSeq: this.lastBroadcastSeq, events: envelopes,
+          pending: this.pendingForViewer(state, viewer),
+          turnDeadline: this.idleDeadline,
+          turnTotalMs: this.idleDeadline !== null ? IDLE_TIMEOUT_MS : 0,
+        });
       }
     }
     this.lastBroadcastSeq = state.seq;
@@ -380,6 +407,7 @@ export class GameSession {
     if (state.phase === '准备' && state.players.some(p => !p.character)) return;
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.alive) return;
+    this.idleDeadline = Date.now() + IDLE_TIMEOUT_MS;
     this.idleTimer = setTimeout(() => {
       if (this.destroyed || !this.state) return;
       this.logger.info('idle timeout, auto-ending turn', { player: currentPlayer.name });
@@ -402,6 +430,7 @@ export class GameSession {
       clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
+    this.idleDeadline = null;
   }
   private persistAsync(): void {
     if (!this.state) return;

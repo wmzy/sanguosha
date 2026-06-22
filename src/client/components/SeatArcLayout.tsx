@@ -19,9 +19,9 @@ function deadlineForSeat(view: GameView, idx: number): number | null {
   if (!pending) return null;
   if (pending.target < 0) {
     // 广播型:活玩家共享
-    return view.players[idx]?.alive ? pending.deadline : null;
+    return view.players[idx]?.alive ? (pending.deadline ?? null) : null;
   }
-  return pending.target === idx ? pending.deadline : null;
+  return pending.target === idx ? (pending.deadline ?? null) : null;
 }
 
 export interface SeatArcLayoutProps {

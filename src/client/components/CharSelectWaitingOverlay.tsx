@@ -26,8 +26,8 @@ export function CharSelectWaitingOverlay({
   // debug 多 WS 模型下,每个座次连接的 view.pending 直接就是该座次的选将询问;
   // 当前视角连接的 pending 是选将询问时,直接取其 deadline 用于倒计时。
   const isPendingCharSelect = view.pending?.atom?.type === '选将询问';
-  const selectDeadline = isPendingCharSelect ? view.pending!.deadline : null;
-  const selectTotalMs = isPendingCharSelect ? view.pending!.totalMs : 60_000;
+  const selectDeadline = isPendingCharSelect ? (view.pending!.deadline ?? null) : null;
+  const selectTotalMs = isPendingCharSelect ? (view.pending!.totalMs ?? 60_000) : 60_000;
   const nextName = view.players[(perspectiveIdx + 1) % view.players.length]?.name;
   const selectingNames = view.players.filter(p => !p.character).map(p => p.name).join('、');
 

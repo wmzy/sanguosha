@@ -95,3 +95,41 @@ describe('重连 initialView', () => {
     expect(lb).toBeGreaterThanOrEqual(seqAtReconnect);
   }, 15000);
 });
+
+describe('pending 倒计时下发', () => {
+  let session: GameSession;
+  beforeEach(() => { resetForTest(); session = new GameSession(makeRoom(), true, 42); });
+
+  it('events 消息携带 pending 的 deadline/totalMs', async () => {
+    await session.startGame(2);
+    const state = getState(session);
+    // 等选将 pending 出现
+    for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) await sleep(10);
+    expect(state.pendingSlots.size).toBeGreaterThan(0);
+
+    const fakeWs = new FakeWS();
+    (session as any).playerNames.set('p0', 0);
+    // 注册 WS 到 room
+    const room = (session as any).room as Room;
+    room.players.set('p0', fakeWs as any);
+    // 重置 lastBroadcastSeq 强制重发已有事件（startGame 期间 broadcastNewState 已推进过水位）
+    (session as any).lastBroadcastSeq = 0;
+    // 触发一次广播
+    (session as any).broadcastNewState();
+
+    // initialView 应该已发送
+    const initMsg = fakeWs.messages.find(m => m.type === 'initialView');
+    expect(initMsg).toBeDefined();
+    // events 消息应携带 pending 字段
+    const eventsMsg = fakeWs.messages.find(m => m.type === 'events') as Extract<ServerMessage, { type: 'events' }> | undefined;
+    expect(eventsMsg).toBeDefined();
+    expect(eventsMsg!.pending).toBeDefined();
+    expect(eventsMsg!.pending).not.toBeNull();
+    expect(eventsMsg!.pending!.deadline).toBeTypeOf('number');
+    expect(eventsMsg!.pending!.totalMs).toBeTypeOf('number');
+    // deadline 应为绝对 epoch 时间戳（与 buildView 口径一致）
+    expect(eventsMsg!.pending!.deadline).toBeGreaterThan(Date.now());
+    // 选将询问 timeout=60s
+    expect(eventsMsg!.pending!.totalMs).toBe(60_000);
+  }, 15000);
+});

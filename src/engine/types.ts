@@ -581,9 +581,10 @@ export interface PendingView {
   atom: Atom;
   prompt: ActionPrompt;
   target: number;
-  deadline: number;
-  /** 倒计时总时长(ms),前端进度条用 deadline-totalMs..deadline 映射 */
-  totalMs: number;
+  /** 由 events 消息权威下发;applyView 不再硬编码 */
+  deadline?: number;
+  /** 倒计时总时长(ms),前端进度条用 deadline-totalMs..deadline 映射;由 events 消息权威下发 */
+  totalMs?: number;
 }
 
 /**
