@@ -181,7 +181,6 @@ export class PlayerSession {
       try {
         const def = getAtomDef(type);
         if (def.applyView) {
-          // applyView debug log (disabled)
           def.applyView(this.processedView, evt);
         }
       } catch {
@@ -218,7 +217,7 @@ export class PlayerSession {
   async pass(): Promise<void> {
     await engineFireTimeout(this.harness.state);
     await this.harness.waitForStable();
-    this.processEvents();
+    this.harness.processAllEvents();
   }
 
   /** 确认/取消(八卦阵、遗计确认等)。choice=false 等同 pass()。 */
@@ -499,7 +498,9 @@ export class PlayerSession {
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
   ): Promise<void> {
     await this.tryDispatch(msg);
-    this.processEvents();
+    // 推进所有 player 的事件:真实前端是 broadcastNewState 给所有连接推 events,
+    // 每个连接的 handleMessage 都会处理。harness 必须模拟这个广播语义。
+    this.harness.processAllEvents();
   }
 }
 
@@ -546,6 +547,17 @@ export class SkillTestHarness {
    */
   async waitForStable(): Promise<void> {
     await waitForStable(this._state);
+  }
+
+  /**
+   * 推进所有 player session 的 processedView。
+   * 模拟真实前端 broadcastNewState 后所有连接都收到 events 的语义。
+   * 在任何 dispatch/pass/respond 后自动调用。
+   */
+  processAllEvents(): void {
+    for (const session of this.sessions.values()) {
+      session.processEvents();
+    }
   }
 
   /** 按名字或座次取玩家 session(测试可传 'P1' 或 0) */

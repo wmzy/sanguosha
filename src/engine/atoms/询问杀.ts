@@ -41,13 +41,22 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
     };
   },
   applyView(view, event) {
-    // 只有被问询的玩家才设置 pending
-    if (view.viewer === event.target) {
+    const target = event.target as number;
+    if (view.viewer === target) {
       view.pending = {
         type: 'awaits',
-        atom: { type: '询问杀', target: event.target, source: event.source } as unknown as import('../types').Atom,
+        atom: { type: '询问杀', target, source: event.source } as unknown as import('../types').Atom,
         prompt: PROMPT,
-        target: event.target,
+        target,
+        deadline: Date.now() + TIMEOUT_MS,
+        totalMs: TIMEOUT_MS,
+      };
+    } else {
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '询问杀', target, source: event.source } as unknown as import('../types').Atom,
+        prompt: { type: 'confirm', title: `等待出杀`, cancelLabel: '' },
+        target,
         deadline: Date.now() + TIMEOUT_MS,
         totalMs: TIMEOUT_MS,
       };

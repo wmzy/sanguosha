@@ -56,21 +56,31 @@ export const 并行回应: AtomDefinition<{
     return { ownerViews, othersView };
   },
   applyView(view, event) {
-    // 并行回应 的 ownerView 是拆成 请求回应 的,view.viewer === event.target 时设置 pending。
-    // othersView 不含 prompt,跳过。
     const target = event.target as number;
     const requestType = event.requestType as string | undefined;
     const prompt = event.prompt as ActionPrompt | undefined;
-    if (view.viewer !== target) return;
-    if (!prompt) return;
-    view.pending = {
-      type: 'awaits',
-      atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
-      prompt,
-      target,
-      deadline: Date.now() + DEFAULT_TIMEOUT_MS,
-      totalMs: DEFAULT_TIMEOUT_MS,
-    };
+    // target viewer:完整 pending（可操作）
+    if (view.viewer === target) {
+      if (!prompt) return;
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+        prompt,
+        target,
+        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
+        totalMs: DEFAULT_TIMEOUT_MS,
+      };
+    } else {
+      // 其他 viewer:观察型 pending（不可操作,但 target 供视角自动跟随）
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType, target } as unknown as import('../types').Atom,
+        prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
+        target,
+        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
+        totalMs: DEFAULT_TIMEOUT_MS,
+      };
+    }
   },
 };
 

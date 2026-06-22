@@ -59,18 +59,41 @@ export const 请求回应: AtomDefinition<{
     const target = event.target as number;
     const requestType = event.requestType as string | undefined;
     const prompt = event.prompt as ActionPrompt | undefined;
-    // 广播型(target<0,如无懈可击):所有 viewer 都设置 pending
-    // 单 target:仅被问询的玩家设置
-    if (target >= 0 && view.viewer !== target) return;
-    if (!prompt) return;
-    view.pending = {
-      type: 'awaits',
-      atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
-      prompt,
-      target,
-      deadline: Date.now() + DEFAULT_TIMEOUT_MS,
-      totalMs: DEFAULT_TIMEOUT_MS,
-    };
+    // 广播型(target<0,如无辨可击):所有 viewer 都设置 pending
+    if (target < 0) {
+      if (!prompt) return;
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+        prompt,
+        target,
+        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
+        totalMs: DEFAULT_TIMEOUT_MS,
+      };
+      return;
+    }
+    // target viewer:完整 pending（可操作）
+    if (view.viewer === target) {
+      if (!prompt) return;
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+        prompt,
+        target,
+        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
+        totalMs: DEFAULT_TIMEOUT_MS,
+      };
+    } else {
+      // 其他 viewer:观察型 pending（不可操作,但 target 供视角自动跟随）
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType, target } as unknown as import('../types').Atom,
+        prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
+        target,
+        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
+        totalMs: DEFAULT_TIMEOUT_MS,
+      };
+    }
   },
 };
 

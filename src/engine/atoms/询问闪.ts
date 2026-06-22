@@ -42,13 +42,24 @@ export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
     };
   },
   applyView(view, event) {
-    // 只有被问询的玩家才设置 pending
-    if (view.viewer === event.target) {
+    const target = event.target as number;
+    // target viewer: 完整 pending（可操作）
+    if (view.viewer === target) {
       view.pending = {
         type: 'awaits',
-        atom: { type: '询问闪', target: event.target, source: event.source } as unknown as import('../types').Atom,
+        atom: { type: '询问闪', target, source: event.source } as unknown as import('../types').Atom,
         prompt: PROMPT,
-        target: event.target,
+        target,
+        deadline: Date.now() + TIMEOUT_MS,
+        totalMs: TIMEOUT_MS,
+      };
+    } else {
+      // 其他 viewer:观察型 pending（不可操作,但 target 供视角自动跟随）
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '询问闪', target, source: event.source } as unknown as import('../types').Atom,
+        prompt: { type: 'confirm', title: `等待出闪`, cancelLabel: '' },
+        target,
         deadline: Date.now() + TIMEOUT_MS,
         totalMs: TIMEOUT_MS,
       };
