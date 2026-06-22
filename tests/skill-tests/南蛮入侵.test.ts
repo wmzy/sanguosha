@@ -180,7 +180,7 @@ describe('南蛮入侵', () => {
     const wuxieSlot = [...harness.state.pendingSlots.values()][0];
     expect((wuxieSlot.atom as { requestType?: string }).requestType).toBe('无懈可击');
     await P3.respond('无懈可击', { cardId: 'wx1' });
-    // 无懈 respond 后 slot.resume 重启窗口,需 pass 结束
+    // 无懈 close-reopen:respond 后旧 slot resolve，askWuxie 创建新窗口，需 pass 结束
     await P3.pass();
 
     // P2 被抵消 → 不会被询问杀,直接结束

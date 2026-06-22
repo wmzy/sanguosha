@@ -625,21 +625,8 @@ export interface PendingSlot {
   isTimeout: boolean;
   /** 取消超时定时器(不触发)。dispatch 走用户 action 路径前调用,让 respond execute 独占推进 */
   pause: () => void;
-  /**
-   * 重启超时定时器为满 timeout(由 respond execute 主动调用以保持窗口开放)。
-   * 用于广播型 slot(如无懈可击 target=-2):一个 respond execute 完成后,
-   * 原 slot 可继续接收反无懈等更多回应,直到自然超时才结束窗口。
-   * dispatch 在 respond execute 完成后若发现 slot 仍挂在 Map 上,则不会 resolve,
-   * 让定时器自然过期。
-   */
-  resume?: () => void;
   /** 内部:由引擎创建 pending 时挂上,供 fireTimeout 立即触发 onTimeout(绕过真实 setTimeout) */
   _fireTimeoutNow?: () => Promise<void>;
-  /**
-   * 内部:respond execute 调 slot.resume() 后为 true。dispatch 据此判定该 slot 要继续
-   * 保留(不 resolve、不删)以接收更多回应。默认 false,响应完成后 dispatch 走清除+resolve。
-   */
-  _keepAlive?: boolean;
 }
 
 export interface ClientMessage {

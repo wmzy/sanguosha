@@ -94,13 +94,14 @@ describe('无懈可击 dispatch 链路', () => {
       params: { cardId: wuxieId }, baseSeq: state.seq,
     });
 
-    // dispatch respond execute 翻转 localVars[`无懈/被抵消/${target}`]=true;slot.resume() 重启定时器
+    // dispatch respond execute 翻转 localVars[`无懈/被抵消/${target}`]=true;
+    // close-reopen:旧 slot resolve,askWuxie 循环创建新窗口(新 createdSeq)
     // 过河拆桥是单目标锦囊,target=1
     expect(state.localVars['无懈/被抵消/1']).toBe(true);
-    expect(state.pendingSlots.size).toBe(1); // 窗口保持
+    expect(state.pendingSlots.size).toBe(1); // 新窗口
     expect(state.players[1].hand).not.toContain(wuxieId); // 无懈牌已入弃牌堆
 
-    // fireTimeout 结束窗口
+    // fireTimeout 结束新窗口(无人反无懈)
     await fireTimeoutAndWait(state);
 
     // 锦囊被抵消 → P1 基础牌未丢
@@ -136,7 +137,7 @@ describe('无懈可击 dispatch 链路', () => {
       params: { cardId: wuxie1Id }, baseSeq: state.seq,
     });
     expect(state.localVars['无懈/被抵消/1']).toBe(true); // P1 抵消锦囊
-    expect(state.pendingSlots.size).toBe(1); // 窗口保持(原 slot resume)
+    expect(state.pendingSlots.size).toBe(1); // close-reopen:新窗口
 
     // P0 出反无懈
     await dispatchAndWait(state, {
@@ -144,7 +145,7 @@ describe('无懈可击 dispatch 链路', () => {
       params: { cardId: wuxie0Id }, baseSeq: state.seq,
     });
     expect(state.localVars['无懈/被抵消/1']).toBe(false); // 翻转回 false:反无懈抵消了无懈
-    expect(state.pendingSlots.size).toBe(1);
+    expect(state.pendingSlots.size).toBe(1); // close-reopen:新窗口
 
     // 超时结束窗口
     await fireTimeoutAndWait(state);

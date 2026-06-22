@@ -100,7 +100,6 @@ describe('反馈', () => {
       resolve: fakeResolve,
       isTimeout: false,
       pause() {},
-      resume() {},
       _fireTimeoutNow: undefined,
     });
 
@@ -135,7 +134,6 @@ describe('反馈', () => {
       resolve: () => {},
       isTimeout: false,
       pause() {},
-      resume() {},
       _fireTimeoutNow: undefined,
     });
 

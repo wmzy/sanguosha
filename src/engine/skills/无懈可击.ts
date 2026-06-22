@@ -5,16 +5,15 @@
 //   单目标锦囊(过河拆桥/借刀杀人/决斗)抵消整个锦囊。
 //   延时锦囊(乐/兵粮/闪电)在判定前抵消整个延时锦囊。
 //
-// 流程:
-//   锦囊 execute → askWuxie(state, wuxieTarget) → 检查 localVars[`无懈/被抵消/${wuxieTarget}`]
-//     - 无人打 → 被抵消=false → 对该目标生效
+// 流程(close-reopen):
+//   锦囊 execute → askWuxie(state, wuxieTarget) → 循环检测 localVars[`无懈/被抵消/${wuxieTarget}`]
+//     - 无人打 → 超时 → break → 被抵消=false → 对该目标生效
 //     - 有人打 → 无懈 respond execute:
-//         移牌 → 翻转 localVars[`无懈/被抵消/${wuxieTarget}`] → slot.resume() 重启定时器
-//       respond execute 不创建新的 pending(避免与原 key=-2 slot 冲突),
-//       而是直接调 slot.resume() 让原 slot 定时器重置为满 timeout,
-//       同一窗口继续接受反无懈等更多回应。
-//       dispatch 在 respond execute 完成后看到 slot 仍挂在 Map 上 → 不 resolve,
-//       让定时器自然过期后才结束窗口。奇数次无懈 = 被抵消, 偶数次 = 恢复生效。
+//         移牌 → 翻转 localVars[`无懈/被抵消/${wuxieTarget}`]
+//         → 设置 localVars[`无懈/已回应/${wuxieTarget}`]=true
+//       slot 正常 resolve → askWuxie 检测 responded=true → 创建新窗口
+//       新窗口有新 createdSeq,旧窗口过期 respond 被 pending-scoped 校验拒绝。
+//       奇数次无懈 = 被抵消, 偶数次 = 恢复生效。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
@@ -80,11 +79,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cancelled = state.localVars[cancelKey] as boolean | undefined;
       state.localVars[cancelKey] = !cancelled;
 
-      // 重新激活 broadcast slot(target=-2),让原窗口继续接受反无懈等更多回应。
-      // slot.resume() 重置定时器为满 timeout 并标记 _keepAlive=true;
-      // dispatch 在 respond execute 完成后看到 _keepAlive=true 时不会 resolve,
-      // 直到定时器自然过期才结束窗口。
-      slot?.resume?.();
+      // 标记本次窗口有人 respond，askWuxie 循环据此决定是否开新窗口。
+      // close-reopen:slot 不再 resume，正常 resolve → askWuxie 创建新窗口(新 createdSeq)。
+      state.localVars[`无懈/已回应/${wuxieTarget}`] = true;
     },
   );
   return () => {};

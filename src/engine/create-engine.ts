@@ -258,8 +258,6 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   const cleanupResidualPending = () => {
     const resolved: PendingSlot[] = [];
     for (const [k, slot] of state.pendingSlots) {
-      // preceding execute 不应创建 _keepAlive=true 的 slot(resume 是 respond 路径才调)
-      if (slot._keepAlive) continue;
       try { slot.resolve(); } catch { /* safeResolve 已防重入 */ }
       state.pendingSlots.delete(k);
       resolved.push(slot);
@@ -323,17 +321,10 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   entry.execute(state, message.params).then(() => {
     if (oldSlot) {
       // execute 完成后:如果该 slot 仍未被替换(execute 未创建新 pending),清除它
-      // 异常路径:无懈可击 broadcast slot 由 respond execute 调 slot.resume() 主动续期,
-      // 此时 _keepAlive 标记为 true,表示该 slot 还要继续接收回应,不要 resolve。
-      // 默认() 响应时 _keepAlive=false(其他 respond 仍走原逻辑:清除 + resolve)。
-      if (oldSlot._keepAlive) {
-        // slot 主动续期了——保持原状,不要 resolve,让定时器自然过期
-        return;
-      }
       const key = extractPendingTarget(oldSlot.atom);
       let deleted = false;
       if (state.pendingSlots.get(key) === oldSlot) { state.pendingSlots.delete(key); deleted = true; }
-      // 无雕等 target<0 的广播 slot:dispatch 用 ownerId 找不到精确 key,需按 slot 引用清除
+      // 无懈等 target<0 的广播 slot:dispatch 用 ownerId 找不到精确 key,需按 slot 引用清除
       if (key < 0) {
         for (const [k, v] of state.pendingSlots) if (v === oldSlot) { state.pendingSlots.delete(k); deleted = true; break; }
       }
@@ -342,8 +333,8 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     resolve();
   }).finally(() => {
     // 兜底:execute 抛错路径下,.then 的清理逻辑不会执行,但父 execute 仍必须 resolve + 删 slot,
-    // 否则 pendingSlots 永久残留 + 父 await 永远不返回。_keepAlive 已被 onInit 设为 true 的例外保留。
-    if (oldSlot && !oldSlot._keepAlive) {
+    // 否则 pendingSlots 永久残留 + 父 await 永远不返回。
+    if (oldSlot) {
       let deleted = false;
       for (const [k, v] of state.pendingSlots) {
         if (v === oldSlot) { state.pendingSlots.delete(k); deleted = true; break; }
@@ -614,19 +605,6 @@ function createAndAwaitSlot(
         if (timedOut) return;
         paused = true;
         clearTimeout(timer);
-      },
-      // 恢复定时器(由 respond execute 调用):重置为满 timeout,让广播型 slot 在被
-      // respond 后还能继续接受反无懈等更多回应。已超时或已 resolve 则无效。
-      resume() {
-        if (timedOut || resolveCalled) return;
-        paused = false;
-        clearTimeout(timer);
-        const newDeadline = Date.now() - state.startedAt + timeoutMs;
-        slot.deadline = newDeadline;
-        slot.startTime = Date.now() - state.startedAt;
-        slot._keepAlive = true;
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
-        timer = setTimeout(fireTimeoutNow, timeoutMs);
       },
     };
     const fireTimeoutNow = async (): Promise<void> => {

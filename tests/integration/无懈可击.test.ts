@@ -132,8 +132,7 @@ describe('无懈可击链路', () => {
   // ─────────────────────────────────────────────────────────────
   // 用例 3:抵消场景:P1 持有无懈可击 → respond 打无懈 → 锦囊被抵消
   // ─────────────────────────────────────────────────────────────
-  // dispatch 重构:无懈 respond execute 不再递归创建新 pending,而是调用 slot.resume()
-  // 重启原广播 slot 定时器;dispatch 根据 _keepAlive 标记决定是否清除 slot。
+  // close-reopen:旧 slot resolve,askWuxie 循环创建新窗口(新 createdSeq)
   it('用例3:P1 出无纶可击 → 锦囊被抵消(目标牌未被弃)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
@@ -230,6 +229,7 @@ describe('无懈可击链路', () => {
       baseSeq: state.seq,
     });
 
+    // close-reopen:旧 slot resolve,askWuxie 循环创建新窗口
     // 此时:无懈respond执行完 → 翻转被抵消=true → 询问反无懈
     // 应是请求回应 requestType='无懈可击'
     expect(state.pendingSlots.size).toBeGreaterThan(0);

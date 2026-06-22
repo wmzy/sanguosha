@@ -2,6 +2,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
+import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '无中生有', description: '锦囊:摸两张牌' };
@@ -26,11 +27,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       pushFrame(state, '无中生有', from, { ...params });
       const cardId = params.cardId as string;
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 询问无懈可击
-      state.localVars['无懈/被抵消'] = false;
+      // 询问无懈可击(close-reopen:askWuxie 循环管理窗口)
       try {
-        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-        if (!state.localVars['无懈/被抵消']) {
+        const cancelled = await askWuxie(state, from);
+        if (!cancelled) {
           await applyAtom(state, { type: '摸牌', player: from, count: 2 });
         }
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
@@ -38,7 +38,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        delete state.localVars['无懈/被抵消'];
         popFrame(state);
       }
     }, );
