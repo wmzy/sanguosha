@@ -131,6 +131,12 @@ describe('决斗', () => {
     // 所有牌进弃牌堆
     expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['jd1', 'p1s', 'p2s']));
     expect(harness.state.zones.processing).toEqual([]);
+    // view 级断言
+    P2.processEvents();
+    P2.expectView(v => {
+      expect(v.players[1].health).toBe(p2HealthBefore - 1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -161,6 +167,12 @@ describe('决斗', () => {
 
     expect(harness.state.players[1].health).toBe(p2HealthBefore - 1);
     expect(harness.state.zones.discardPile).toContain('jd1');
+    // view 级断言
+    P2.processEvents();
+    P2.expectView(v => {
+      expect(v.players[1].health).toBe(p2HealthBefore - 1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────

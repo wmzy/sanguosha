@@ -81,6 +81,12 @@ describe('桃', () => {
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.zones.discardPile).toContain('t1');
     expect(harness.state.players[0].hand).not.toContain('t1');
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].health).toBe(4);
+      expect(v.players[0].handCount).toBe(0);
+    });
   });
 
   it('use:出牌阶段对受伤的其他角色使用 → 目标 +1 血', async () => {
@@ -102,6 +108,9 @@ describe('桃', () => {
 
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('t1');
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => expect(v.players[1].health).toBe(3));
   });
 
   // ─── 负面:use ─────────────────────────────
@@ -241,6 +250,12 @@ describe('桃', () => {
     }
     // 桃进弃牌堆
     expect(harness.state.zones.discardPile).toContain('p1');
+    // view 级断言
+    P2.processEvents();
+    P2.expectView(v => {
+      expect(v.players[dyingTarget].health).toBe(1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─── 负面:respond ─────────────────────────

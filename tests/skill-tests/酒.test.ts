@@ -79,6 +79,9 @@ describe('酒', () => {
     // 加 mark:酒/nextKillDamageBonus
     const hasMark = harness.state.players[0].marks.some(m => m.id === '酒/nextKillDamageBonus');
     expect(hasMark).toBe(true);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => expect(v.players[0].handCount).toBe(0));
   });
 
   it('use + 杀 → 下一张杀增伤 +1(mark 消费)', async () => {
@@ -111,6 +114,9 @@ describe('酒', () => {
     // mark 应已被消费
     const hasMark = harness.state.players[0].marks.some(m => m.id === '酒/nextKillDamageBonus');
     expect(hasMark).toBe(false);
+    // view 级断言
+    P2.processEvents();
+    P2.expectView(v => expect(v.players[1].health).toBe(2));
   });
 
   // ─── 负面:use ─────────────────────────────
