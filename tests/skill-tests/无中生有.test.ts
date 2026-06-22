@@ -117,6 +117,13 @@ describe('无中生有', () => {
     // 牌堆 -2
     expect(harness.state.zones.deck).not.toContain('d1');
     expect(harness.state.zones.deck).not.toContain('d2');
+    // view 级断言:P1 视角手牌含 d1/d2 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].hand!.map(c => c.id)).toEqual(expect.arrayContaining(['d1', 'd2']));
+      expect(v.players[0].handCount).toBe(handBefore + 1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────

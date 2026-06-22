@@ -101,6 +101,13 @@ describe('顺手牵羊', () => {
     // 锦囊进弃牌堆
     expect(harness.state.zones.discardPile).toContain('sq1');
     expect(harness.state.zones.processing).not.toContain('sq1');
+    // view 级断言:P1 视角手牌 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].hand!.map(c => c.id)).toContain('v1');
+      expect(v.players[0].handCount).toBe(1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -222,6 +229,12 @@ describe('顺手牵羊', () => {
     expect(harness.state.players[1].equipment['武器']).toBeUndefined();
     // 锦囊进弃牌堆
     expect(harness.state.zones.discardPile).toContain('sq1');
+    // view 级断言:P1 视角装备到手
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].hand!.map(c => c.id)).toContain('wp1');
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────

@@ -100,6 +100,14 @@ describe('桃园结义', () => {
     expect(harness.state.players[2].health).toBe(4); // 3 + 1
     expect(harness.state.zones.discardPile).toContain('ty1');
     expect(harness.state.zones.processing).not.toContain('ty1');
+    // view 级断言:P1 视角 3 人各回 1 血
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].health).toBe(3);
+      expect(v.players[1].health).toBe(2);
+      expect(v.players[2].health).toBe(4);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -117,6 +125,13 @@ describe('桃园结义', () => {
 
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.players[1].health).toBe(4);
+    // view 级断言:满血不超 maxHealth
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].health).toBe(4);
+      expect(v.players[1].health).toBe(4);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────

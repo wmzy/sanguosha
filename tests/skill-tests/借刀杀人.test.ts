@@ -137,6 +137,14 @@ describe('借刀杀人', () => {
     // 借刀杀人进弃牌堆
     expect(harness.state.zones.discardPile).toContain('jd1');
     expect(harness.state.zones.processing).toEqual([]);
+    // view 级断言:P1 视角武器到手 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].hand!.map(c => c.id)).toContain('wp1');
+      expect(v.players[0].handCount).toBe(1);
+      expect(v.players[1].equipment['武器']).toBeUndefined();
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ────────────────────────────────────────────────────────────
@@ -212,6 +220,13 @@ describe('借刀杀人', () => {
     // 借刀杀人进弃牌堆
     expect(harness.state.zones.discardPile).toContain('jd1');
     expect(harness.state.zones.processing).toEqual([]);
+    // view 级断言:P3 视角自己扣血 + P2 武器保留
+    P3.processEvents();
+    P3.expectView(v => {
+      expect(v.players[2].health).toBe(p3HealthBefore - 1);
+      expect(v.players[1].equipment['武器']).toBe('wp1');
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────

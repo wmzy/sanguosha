@@ -103,6 +103,12 @@ describe('过河拆桥', () => {
     // 过河拆桥本身进弃牌堆
     expect(harness.state.zones.discardPile).toContain('gq1');
     expect(harness.state.zones.processing).not.toContain('gq1');
+    // view 级断言:P1 视角 P2 失去手牌 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[1].handCount).toBe(1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -128,6 +134,12 @@ describe('过河拆桥', () => {
     // 武器进弃牌堆
     expect(harness.state.zones.discardPile).toContain('wp1');
     expect(harness.state.zones.discardPile).toContain('gq1');
+    // view 级断言:P1 视角 P2 装备区空 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.zones!.discardPileCount).toBeGreaterThan(0);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -152,6 +164,12 @@ describe('过河拆桥', () => {
     // P3 失去 v1
     expect(harness.state.players[2].hand).not.toContain('v1');
     expect(harness.state.zones.discardPile).toContain('v1');
+    // view 级断言:P1 视角 P3 失去手牌
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[2].handCount).toBe(0);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────

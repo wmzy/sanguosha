@@ -97,6 +97,12 @@ describe('五谷丰登', () => {
     expect(harness.state.zones.processing.length).toBe(0);
     // 无残留 pending
     expect(harness.state.pendingSlots.size).toBe(0);
+    // view 级断言:P1 视角处理区空 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.zones!.processing.length).toBe(0);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -143,6 +149,12 @@ describe('五谷丰登', () => {
     expect(harness.state.zones.processing.length).toBe(0);
     expect(harness.state.zones.discardPile).toContain('wg1');
     expect(harness.state.pendingSlots.size).toBe(0);
+    // view 级断言:处理区空 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.zones!.processing.length).toBe(0);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -191,6 +203,12 @@ describe('五谷丰登', () => {
     expect(harness.state.zones.discardPile).toContain('wg1');
     expect(harness.state.zones.processing.length).toBe(0);
     expect(harness.state.pendingSlots.size).toBe(0);
+    // view 级断言:处理区空 + 无 pending
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.zones!.processing.length).toBe(0);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
