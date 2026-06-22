@@ -84,6 +84,13 @@ describe('仁德', () => {
     expect(harness.state.players[1].hand).toContain('c1');
     // 1 张牌 → 不回血
     expect(harness.state.players[0].health).toBe(3);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].health).toBe(3);
+      expect(v.players[0].handCount).toBe(0);
+      expect(v.pending).toBeNull();
+    });
   });
 
   it('use:给 1 人 2 张牌 → 自己回 1 血(等同 4/4)', async () => {
@@ -109,6 +116,13 @@ describe('仁德', () => {
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['c1', 'c2']));
     expect(harness.state.players[0].hand).toEqual([]);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].health).toBe(4);
+      expect(v.players[0].handCount).toBe(0);
+      expect(v.pending).toBeNull();
+    });
   });
 
   it('use:给多人各 1 张牌,总数 ≥2 → 自己也回 1 血', async () => {

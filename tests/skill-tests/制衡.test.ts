@@ -86,6 +86,12 @@ describe('制衡', () => {
     expect(harness.state.players[0].hand).toEqual(['d1']);
     expect(harness.state.zones.discardPile).toContain('c1');
     expect(harness.state.zones.deck).toEqual([]);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].handCount).toBe(1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   it('use:弃 3 张手牌 → 摸 3 张(净手牌数 +2)', async () => {

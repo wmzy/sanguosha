@@ -100,6 +100,11 @@ describe('回合管理', () => {
     expect(harness.state.phase).toBe('出牌');
     // P2 摸了 2 张
     expect(harness.state.players[1].hand.length).toBe(2);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.phase).toBe('出牌');
+    });
   });
 
   it('弃牌阶段:手牌超上限 → 弃牌 pending 出现', async () => {
