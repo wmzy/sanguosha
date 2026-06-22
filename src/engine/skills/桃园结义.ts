@@ -2,6 +2,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
+import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '桃园结义', description: '锦囊:所有角色各回复1点体力' };
@@ -25,15 +26,18 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       pushFrame(state, '桃园结义', from, { ...params });
       const cardId = params.cardId as string;
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 询问无懈可击
-      state.localVars['无懈/被抵消'] = false;
+      // 无懈可击对全体锦囊只抵消特定 1 名角色:逐目标询问无懈,被抵消的目标跳过回血。
       try {
-        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-        if (!state.localVars['无懈/被抵消']) {
-          // 所有存活且未满血角色回复1点(跳过满血避免冗余 atom + 空 view event)
-          const players = state.players.filter(p => p.alive && p.health < p.maxHealth);
-          for (const p of players) {
-            await applyAtom(state, { type: '回复体力', target: p.index, amount: 1 });
+        // 所有存活目标,按座次顺序逐个结算(含使用者自己)
+        const targets = state.players.filter(p => p.alive).map(p => p.index);
+        for (const t of targets) {
+          if (!state.players[t]?.alive) continue;
+          const cancelled = await askWuxie(state, t);
+          if (cancelled) continue;
+          // 未满血才回 1 点(跳过满血避免冗余 atom + 空 view event)
+          const p = state.players[t];
+          if (p && p.health < p.maxHealth) {
+            await applyAtom(state, { type: '回复体力', target: t, amount: 1 });
           }
         }
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
@@ -41,7 +45,6 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        delete state.localVars['无懈/被抵消'];
         popFrame(state);
       }
     }, );

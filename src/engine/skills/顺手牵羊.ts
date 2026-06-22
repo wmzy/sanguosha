@@ -8,6 +8,7 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
+import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '顺手牵羊', description: '锦囊:获得目标一张牌' };
@@ -40,11 +41,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       const target = (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0] as number;
       // 移锦囊到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 询问无懈可击
-      state.localVars['无懈/被抵消'] = false;
+      // 询问无懈可击(单目标锦囊:抵消整个锦囊)
       try {
-        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-        if (!state.localVars['无懈/被抵消']) {
+        const cancelled = await askWuxie(state, target);
+        if (!cancelled) {
           const targetPlayer = state.players[target];
           if (targetPlayer) {
             await runPickTargetCardObtain(state, from, target, targetPlayer);
@@ -56,7 +56,6 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        delete state.localVars['无懈/被抵消'];
         popFrame(state);
       }
     }, );

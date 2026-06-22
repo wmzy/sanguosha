@@ -67,12 +67,19 @@ interface Props {
   onDeleteRoom?: () => void;
 }
 
-/** 转化模式:点武圣等转化技能后进入此模式,匹配卡牌显示为转化后的牌 */
+/** 转化模式:点转化技能(武圣/丈八蛇矛)后进入此模式,匹配卡牌显示为转化后的牌
+ *  单卡转化(minCards=1):选 1 张卡 → 选目标 → 提交(武圣)
+ *  多卡转化(minCards>1):选 N 张卡 → 选目标 → 提交(丈八蛇矛=2) */
 interface TransformMode {
   skillId: string;
   actionType: string;
   cardFilter: (c: Card) => boolean;
   wrapperName: string;
+  /** 选牌数量范围(来自 cardFilter.min/max),单卡转化=1..1 */
+  minCards: number;
+  maxCards: number;
+  /** 多卡模式下选中的卡 id 列表(单卡模式用 selectedCardId) */
+  selectedCardIds: string[];
 }
 
 // ─── 主组件 ───
@@ -177,11 +184,11 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
       const cardIds = resolveDistributeCardIds(prompt, perspectiveHand, perspectiveEquipment);
       return { skillId, actionType, prompt, cardIds };
     }
-    // 2. 被动 distribute pending(遗计分配)
+    // 2. 被动 distribute pending(遗计分配/贯石斧选牌)
     if (isMyAwaiting && pending && pending.prompt.type === 'distribute') {
       const info = resolvePendingRespond(pending, skillActions);
       const skillId = info?.skillId ?? '系统规则';
-      const cardIds = (pending.prompt as { cardIds?: string[] }).cardIds ?? [];
+      const cardIds = resolveDistributeCardIds(pending.prompt, perspectiveHand, perspectiveEquipment);
       return { skillId, actionType: 'respond', prompt: pending.prompt, cardIds };
     }
     return null;
@@ -339,14 +346,16 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
         params.target = nameToIndex(selectedTarget);
         break;
       case 'useCardAndTarget':
-        // 转化技能(如武圣):进入转化模式,用户从手牌中选匹配卡牌后再选目标
+        // 转化技能(如武圣/丈八蛇矛):进入转化模式,用户从手牌中选匹配卡牌后再选目标
         if (action.transform) {
           if (prompt.cardFilter?.filter) {
             const sample = perspectiveHand.find(c => prompt.cardFilter!.filter!(c));
             const wrapperName = sample
               ? action.transform(sample).name
               : action.skillId;
-            setTransformMode({ skillId, actionType, cardFilter: prompt.cardFilter.filter, wrapperName });
+            const minCards = prompt.cardFilter.min ?? 1;
+            const maxCards = prompt.cardFilter.max ?? 1;
+            setTransformMode({ skillId, actionType, cardFilter: prompt.cardFilter.filter, wrapperName, minCards, maxCards, selectedCardIds: [] });
             setSelectedCardId(null);
             setSelectedTarget(null);
             return;
@@ -386,19 +395,35 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
     setSelectedTarget(null);
   }
 
-  // ─── 转化模式:选完目标后,提交 preceding=[transform] + 转化后的牌.use ───
+  // ─── 转化模式:选完目标后,提交 preceding=[transform] + 转化后的牌.use ──
   function handleTransformPlay(targetName: string) {
-    if (!transformMode || !selectedCardId) return;
-    const targetCard = perspectiveHand.find(c => c.id === selectedCardId);
-    if (!targetCard) return;
+    if (!transformMode) return;
     const idx = nameToIndex(targetName);
     if (idx < 0) return;
-    const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
-    send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [{
-      skillId: transformMode.skillId,
-      actionType: transformMode.actionType,
-      params: { cardId: selectedCardId },
-    }]);
+
+    if (transformMode.minCards > 1) {
+      // 多卡转化(丈八蛇矛):提交 preceding params.cardIds=[id1,id2,...] +
+      // 主 action cardId = ${id1}#${id2}#...#skillId
+      const ids = transformMode.selectedCardIds;
+      if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
+      const shadowCardId = `${ids.join('#')}#${transformMode.skillId}`;
+      send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [{
+        skillId: transformMode.skillId,
+        actionType: transformMode.actionType,
+        params: { cardIds: ids },
+      }]);
+    } else {
+      // 单卡转化(武圣)
+      if (!selectedCardId) return;
+      const targetCard = perspectiveHand.find(c => c.id === selectedCardId);
+      if (!targetCard) return;
+      const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
+      send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [{
+        skillId: transformMode.skillId,
+        actionType: transformMode.actionType,
+        params: { cardId: selectedCardId },
+      }]);
+    }
     setTransformMode(null);
     setSelectedCardId(null);
     setSelectedTarget(null);
@@ -468,15 +493,28 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
       }
       return;
     }
-    // 转化模式(如武圣):只允许点击匹配的卡牌作为"被转化的原牌"
+    // 转化模式(如武圣/丈八蛇矛):只允许点击匹配的卡牌作为"被转化的原牌"
     if (transformMode && isMyTurn && canOperate) {
       if (!transformMode.cardFilter(card)) return;
-      if (selectedCardId === card.id) {
+      if (transformMode.minCards > 1) {
+        // 多卡转化(丈八蛇矛):toggle 选中,受 maxCards 约束
         setSelectedCardId(null);
+        setTransformMode(prev => prev && {
+          ...prev,
+          selectedCardIds: prev.selectedCardIds.includes(card.id)
+            ? prev.selectedCardIds.filter(id => id !== card.id)
+            : (prev.selectedCardIds.length < prev.maxCards ? [...prev.selectedCardIds, card.id] : prev.selectedCardIds),
+        });
         setSelectedTarget(null);
       } else {
-        setSelectedCardId(card.id);
-        setSelectedTarget(null);
+        // 单卡转化(武圣)
+        if (selectedCardId === card.id) {
+          setSelectedCardId(null);
+          setSelectedTarget(null);
+        } else {
+          setSelectedCardId(card.id);
+          setSelectedTarget(null);
+        }
       }
       return;
     }
@@ -548,7 +586,12 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
     ? derivePlayRules(selectedTargetFilter, selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget)
     : null;
   const selectedActive = selectedUseAction ? isActiveAction(selectedUseAction, { view, perspectiveIdx }) : false;
-  const showTargetSelector = selectedCardId !== null && canOperate && selectedActive && !!playRules && playRules.needsTarget;
+  // 多卡转化模式(丈八蛇矛):选够 N 张后即可选目标(selectedCardId 为 null)
+  const multiTransformReady = !!(transformMode && transformMode.minCards > 1
+    && transformMode.selectedCardIds.length >= transformMode.minCards
+    && transformMode.selectedCardIds.length <= transformMode.maxCards);
+  const showTargetSelector = canOperate && selectedActive && !!playRules && playRules.needsTarget
+    && (selectedCardId !== null || multiTransformReady);
 
   return (
     <div className={styles.pageRoot}>
@@ -684,7 +727,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
               {perspectiveIdx !== view.viewer && <span className={styles.debugHint}> (调试视角)</span>}
               {transformMode && (
                 <span className={cx(styles.debugHint, styles.transformHint)}>
-                  ⚡ 转化模式:选1张{transformMode.wrapperName} · 源技能 {transformMode.skillId}
+                  ⚡ 转化模式:选{transformMode.minCards > 1 ? `${transformMode.minCards}张` : '1张'}{transformMode.wrapperName}{transformMode.minCards > 1 ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})` : ''} · 源技能 {transformMode.skillId}
                 </span>
               )}
             </span>
@@ -705,7 +748,16 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
           </div>
           {/* 操作面板:出牌/结束回合/目标提示 */}
           <div className={styles.actionBar}>
-            {canOperate && selectedActive && transformMode && selectedCardId && (
+            {canOperate && selectedActive && transformMode && transformMode.minCards > 1 && (() => {
+              const ids = transformMode.selectedCardIds;
+              const enough = ids.length >= transformMode.minCards && ids.length <= transformMode.maxCards;
+              return (
+                <button className={cx(styles.playBtn, (!enough || !selectedTarget) && styles.btnDisabled)} onClick={() => selectedTarget && enough && handleTransformPlay(selectedTarget)} disabled={!enough || !selectedTarget}>
+                  使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : enough ? ' (请选目标)' : ` (还需选 ${transformMode.minCards - ids.length} 张)`}
+                </button>
+              );
+            })()}
+            {canOperate && selectedActive && transformMode && transformMode.minCards === 1 && selectedCardId && (
               <button className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)} onClick={() => selectedTarget && handleTransformPlay(selectedTarget)} disabled={!selectedTarget}>
                 使用{transformMode.wrapperName}{selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
               </button>
@@ -723,11 +775,11 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
             )}
           </div>
           {/* 目标选择面板 */}
-          {showTargetSelector && selectedCardId && (
+          {showTargetSelector && (selectedCardId || multiTransformReady) && (
             <TargetSelector
               view={view}
               perspectiveIdx={perspectiveIdx}
-              selectedCardId={selectedCardId}
+              selectedCardId={selectedCardId ?? ''}
               perspectiveHand={perspectiveHand}
               transformMode={transformMode}
               targetFilter={selectedTargetFilter}
@@ -742,7 +794,8 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
           {/* 手牌区 */}
           <div className={styles.handList} ref={handListRef}>
             {orderedHand.map((card, i) => {
-              const isSelected = selectedCardId === card.id;
+              const isSelected = selectedCardId === card.id
+                || !!(transformMode && transformMode.minCards > 1 && transformMode.selectedCardIds.includes(card.id));
               const isDiscardSelected = selectedForDiscard.has(card.id);
               const canPlay = isMyTurn && canOperate;
               // distribute 激活时不走 useCard 回应高亮(避免遗计 pending 双高亮)

@@ -5,6 +5,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
+import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '南蛮入侵', description: '对所有其他角色使用,每名目标需出杀,否则受 1 点伤害' };
@@ -54,37 +55,32 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
         to: { zone: '处理区' },
       });
 
-      // 被无懈抵消则跳过效果
-      state.localVars['无懈/被抵消'] = false;
+      // 无懈可击对全体锦囊只抵消特定 1 名角色:逐目标询问无懈,被抵消的目标跳过。
+      // 逐个询问杀:对每个目标先问无懈,未被抵消才检查是否出杀。
       try {
-        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-        if (!state.localVars['无懈/被抵消']) {
-          // 逐个询问杀,检查处理区判断是否出杀
-          const notResponded: number[] = [];
-          for (const target of targets) {
-            // 每次结算前重算存活:前一个目标可能已被其他效果击杀
-            if (!state.players[target]?.alive) continue;
-            await applyAtom(state, { type: '询问杀', target, source: from });
-            // 检查处理区
-            const killCardId = state.zones.processing.find(id => {
-              const c = state.cardMap[id];
-              return c && c.name === '杀';
-            });
-            if (killCardId) {
-              // 出了杀:移到弃牌堆
-              await applyAtom(state, {
-                type: '移动牌',
-                cardId: killCardId,
-                from: { zone: '处理区' },
-                to: { zone: '弃牌堆' },
-              });
-            } else {
-              notResponded.push(target);
-            }
-          }
+        for (const target of targets) {
+          // 每次结算前重算存活
+          if (!state.players[target]?.alive) continue;
+          // 无懈抵消该目标 → 跳过
+          const cancelled = await askWuxie(state, target);
+          if (cancelled) continue;
 
-          // 对未出杀者造成伤害
-          for (const target of notResponded) {
+          await applyAtom(state, { type: '询问杀', target, source: from });
+          // 检查处理区
+          const killCardId = state.zones.processing.find(id => {
+            const c = state.cardMap[id];
+            return c && c.name === '杀';
+          });
+          if (killCardId) {
+            // 出了杀:移到弃牌堆
+            await applyAtom(state, {
+              type: '移动牌',
+              cardId: killCardId,
+              from: { zone: '处理区' },
+              to: { zone: '弃牌堆' },
+            });
+          } else {
+            // 没出杀:受伤害
             if (!state.players[target]?.alive) continue;
             await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId });
           }
@@ -106,7 +102,6 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
             to: { zone: '弃牌堆' },
           });
         }
-        delete state.localVars['无懈/被抵消'];
         popFrame(state);
       }
     },

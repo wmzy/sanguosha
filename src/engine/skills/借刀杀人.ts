@@ -6,6 +6,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
 import { viewCanAttack } from '../viewDistance';
+import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '借刀杀人', description: '锦囊:令目标出杀或获得其武器' };
@@ -73,11 +74,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       // 锦囊进处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
 
-      // 被无懈抵消则跳过效果
-      state.localVars['无懈/被抵消'] = false;
+      // 询问无懈可击(单目标锦囊:抵消整个锦囊)
       try {
-        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-        if (!state.localVars['无懈/被抵消']) {
+        const cancelled = await askWuxie(state, target);
+        if (!cancelled) {
           // 请求回应:目标选择出杀或交出武器
           // 使用 useCard 提示让目标选择一张杀牌;选中的杀通过 杀.respond 移入处理区
           await applyAtom(state, {
@@ -136,7 +136,6 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        delete state.localVars['无懈/被抵消'];
         popFrame(state);
       }
     },

@@ -90,7 +90,10 @@ describe('桃园结义', () => {
     const P1 = harness.player('P1');
 
     await P1.useCard('桃园结义', 'ty1');
-    await P1.pass(); // 消耗无懈窗口
+    // 3 个目标(P1,P2,P3,含使用者)逐个询问无懈 → 各 pass
+    await P1.pass();
+    await P1.pass();
+    await P1.pass();
 
     expect(harness.state.players[0].health).toBe(3); // 2 + 1
     expect(harness.state.players[1].health).toBe(2); // 1 + 1
@@ -108,6 +111,8 @@ describe('桃园结义', () => {
     const P1 = harness.player('P1');
 
     await P1.useCard('桃园结义', 'ty1');
+    // 2 个目标(P1,P2)逐个询问无懈 → 各 pass
+    await P1.pass();
     await P1.pass();
 
     expect(harness.state.players[0].health).toBe(4);

@@ -37,9 +37,17 @@ interface CharSelectAtom {
  * @param perspectiveIdx 当前视角座次
  */
 export function useCharSelect(view: GameView, perspectiveIdx: number): CharSelectState {
-  const ownCharSelect = view.pending?.atom?.type === '选将询问' ? view.pending : null;
+  const ownCharSelect = view.pending?.atom?.type === '选将询问'
+    && !view.players[view.pending.target]?.character
+    ? view.pending : null;
+  // debug 模式下从 allCharSelectSlots 查找当前视角玩家的选将 slot。
+  // 必须排除已选完玩家的 slot——选将完成后 slot 理论上随 pending resolve 被清理,
+  // 但 view 是快照,时序边界上可能残留已选完玩家的 slot(其 target 玩家已有 character),
+  // 此时不应再展示选将 UI,只展示「你已选择 XXX」的结果遮罩。
   const parallelSlot = view.allCharSelectSlots?.find(
-    s => s.atom.type === '选将询问' && s.target === perspectiveIdx,
+    s => s.atom.type === '选将询问'
+      && s.target === perspectiveIdx
+      && !view.players[s.target]?.character,
   ) ?? null;
   const charSelectPending = ownCharSelect ?? parallelSlot;
 

@@ -5,6 +5,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule } from '../skill';
+import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '决斗', description: '对一名角色使用,双方轮流出杀,先不出者受 1 点伤害' };
@@ -44,11 +45,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
         to: { zone: '处理区' },
       });
 
-      // 被无懈抵消则跳过效果
-      state.localVars['无懈/被抵消'] = false;
+      // 询问无懈可击(单目标锦囊:抵消整个锦囊)
       try {
-        await applyAtom(state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-        if (!state.localVars['无懈/被抵消']) {
+        const cancelled = await askWuxie(state, target);
+        if (!cancelled) {
           // 决斗循环:目标先出杀,之后发起者出杀,轮流。
           // 上限保护:极端情况下(武圣/丈八 把任意牌当杀)可能无限循环;
           // 现实中手牌+牌堆不可能产出这么多杀,100 轮远超正常上限。
@@ -103,7 +103,6 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
             to: { zone: '弃牌堆' },
           });
         }
-        delete state.localVars['无懈/被抵消'];
         popFrame(state);
       }
     },

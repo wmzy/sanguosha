@@ -174,6 +174,7 @@ export type ActionPrompt =
   | DistributePrompt
   | ChoosePlayerPrompt
   | ChooseCharacterPrompt
+  | PickProcessingCardPrompt
   | PickTargetCardPrompt;
 
 export interface CardFilter {
@@ -267,6 +268,19 @@ export interface ChooseCharacterPrompt {
   description?: string;
   /** 可选武将列表 */
   candidates: Array<{ name: string; skills: string[] }>;
+}
+
+/** 选牌面板(五谷丰登:从处理区亮出的 N 张明牌中选一张到手牌)。
+ *  使用者可看见全部候选牌,直接点具体 cardId。
+ *
+ *  respond params: { cardId }
+ *  超时默认:选候选列表第一张牌(不放弃选牌机会)。 */
+export interface PickProcessingCardPrompt {
+  type: 'pickProcessingCard';
+  title: string;
+  description?: string;
+  /** 处理区明牌候选(使用者可见) */
+  cards: Array<{ cardId: string; cardName: string; suit: Card['suit']; rank: string }>;
 }
 
 /** 选牌面板(过河拆桥/顺手牵羊生效后,使用者从目标区域选一张牌)。
@@ -407,7 +421,10 @@ export type Atom =
   | { type: '无操作' }
   | { type: '询问闪'; target: number; source: number }
   | { type: '询问杀'; target: number; source: number }
-  | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
+  | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number;
+     /** 仅用于 requestType='无懈可击':本次无懈抵消的目标座次(-1=整体抵消/单目标锦囊,N=全体锦囊的某个目标)。
+      * 无懈 respond execute 据此翻转 localVars[`无懈/被抵消/${wuxieTarget}`]。 */
+     wuxieTarget?: number }
   // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
   | { type: '并行回应'; requestType: string; targets: number[]; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
   // 牌包装(武圣转化)

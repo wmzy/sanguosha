@@ -378,8 +378,11 @@ export class GameSession {
     }
     if (!this.state) return;
     const state = this.state;
-    // 只在游戏进行中且有当前玩家时启动定时器
-    if (state.players.some(p => !p.alive) || state.pendingSlots.size > 0) return;
+    // 有未决 pending(询问闪/无懈等)时不启动 idle timer——此时玩家须先回应询问,不应被回合超时打断。
+    // 注意:不应判断"是否有玩家死亡"——三国杀阵亡玩家会一直保留在 players 中,该条件会导致
+    // 一旦有人阵亡,所有后续出牌/弃牌阶段的 idle timer 永远不启动(前端倒计时归零却不会结束阶段)。
+    // 当前玩家是否存活由下方 currentPlayer?.alive 判断。
+    if (state.pendingSlots.size > 0) return;
     // 选将阶段(phase==='准备' 且仍有玩家未选完武将)不启动 idle timer:
     // 选将 pending 创建之间会短暂出现 pendingSlots.size===0 的间隙(主公选完→并行选将创建前),
     // 若此时启动 timer,玩家选将慢时会在选将期间误触发"自动结束回合",清掉所有 pending。

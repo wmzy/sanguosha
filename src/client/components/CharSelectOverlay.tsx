@@ -86,8 +86,15 @@ export function CharSelectOverlay({
   lordCharacter,
 }: CharSelectOverlayProps) {
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
-  // pending/target 变化时清空选中态
-  useEffect(() => { setSelectedCharIdx(null); }, [isSelfSelecting, charSelectTarget]);
+  // 已提交锁定态:点「确认选择」后记录选中的武将名,锁定候选区与按钮,
+  // 直到引擎广播新 view(选将 slot resolve → pending 切换 → 本组件卸载或重置)。
+  // 此前遮罩仍在渲染,必须禁止重复点击其他武将 + 再次提交。
+  const [submittedChar, setSubmittedChar] = useState<string | null>(null);
+  // pending/target 变化时清空选中态与锁定态(新选将窗口开启)
+  useEffect(() => {
+    setSelectedCharIdx(null);
+    setSubmittedChar(null);
+  }, [isSelfSelecting, charSelectTarget]);
 
   const viewerColor = viewerIdentity ? (IDENTITY_COLORS[viewerIdentity] || '#888') : null;
 
@@ -238,13 +245,19 @@ export function CharSelectOverlay({
           >
             {candidates.map((ch, i) => {
               const isSelected = selectedCharIdx === i;
+              // 已提交后:选中的武将高亮锁定,其他候选变灰不可点
+              const isLockedOut = submittedChar !== null && submittedChar !== ch.name;
+              const isSubmittedPick = submittedChar === ch.name;
               const meta = getCharacterMeta(ch.name);
               const faction = meta?.faction ?? '群';
               const maxHealth = meta?.maxHealth ?? 4;
               return (
                 <div
                   key={ch.name}
-                  onClick={() => setSelectedCharIdx(i)}
+                  onClick={() => {
+                    if (submittedChar !== null) return; // 已提交,禁止重选
+                    setSelectedCharIdx(i);
+                  }}
                   style={{
                     background: FACTION_BG[faction] || '#333',
                     borderRadius: 12,
@@ -253,21 +266,25 @@ export function CharSelectOverlay({
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 8,
-                    cursor: 'pointer',
-                    border: isSelected ? '3px solid #ffd700' : '3px solid transparent',
-                    boxShadow: isSelected
+                    cursor: submittedChar !== null ? 'default' : 'pointer',
+                    border: (isSelected || isSubmittedPick) ? '3px solid #ffd700' : '3px solid transparent',
+                    boxShadow: (isSelected || isSubmittedPick)
                       ? '0 0 20px rgba(255, 215, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3)'
                       : '0 4px 16px rgba(0, 0, 0, 0.3)',
-                    transform: isSelected ? 'translateY(-8px) scale(1.03)' : 'translateY(0)',
+                    transform: (isSelected || isSubmittedPick) ? 'translateY(-8px) scale(1.03)' : 'translateY(0)',
                     transition: 'all 0.25s cubic-bezier(0.23, 1, 0.32, 1)',
+                    opacity: isLockedOut ? 0.35 : 1,
+                    filter: isLockedOut ? 'grayscale(0.8)' : 'none',
                   }}
                   onMouseEnter={e => {
+                    if (submittedChar !== null) return; // 已提交,禁用 hover 效果
                     if (!isSelected) {
                       e.currentTarget.style.transform = 'translateY(-6px)';
                       e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.4)';
                     }
                   }}
                   onMouseLeave={e => {
+                    if (submittedChar !== null) return; // 已提交,禁用 hover 效果
                     if (!isSelected) {
                       e.currentTarget.style.transform = 'translateY(0)';
                       e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
@@ -297,13 +314,16 @@ export function CharSelectOverlay({
             })}
           </div>
 
-          {/* 确认按钮 */}
+          {/* 确认按钮:提交后锁定为「已选择 XXX」,禁止重复提交 */}
           <button
-            disabled={selectedCharIdx === null}
+            disabled={submittedChar !== null || selectedCharIdx === null}
             onClick={() => {
+              if (submittedChar !== null) return;
               if (selectedCharIdx !== null && candidates[selectedCharIdx]) {
-                onSelect(candidates[selectedCharIdx].name);
+                const picked = candidates[selectedCharIdx].name;
+                setSubmittedChar(picked); // 锁定,禁止重选
                 setSelectedCharIdx(null);
+                onSelect(picked);
               }
             }}
             style={{
@@ -311,17 +331,21 @@ export function CharSelectOverlay({
               padding: '12px 56px',
               fontSize: 18,
               fontWeight: 'bold',
-              color: selectedCharIdx !== null ? '#000' : '#666',
-              background: selectedCharIdx !== null ? 'linear-gradient(135deg, #ffd700, #f0c000)' : '#333',
+              color: submittedChar !== null ? '#fff' : (selectedCharIdx !== null ? '#000' : '#666'),
+              background: submittedChar !== null
+                ? 'linear-gradient(135deg, #27ae60, #1e8449)'
+                : (selectedCharIdx !== null ? 'linear-gradient(135deg, #ffd700, #f0c000)' : '#333'),
               border: 'none',
               borderRadius: 8,
-              cursor: selectedCharIdx !== null ? 'pointer' : 'not-allowed',
-              boxShadow: selectedCharIdx !== null ? '0 4px 16px rgba(255, 215, 0, 0.3)' : 'none',
+              cursor: (submittedChar !== null || selectedCharIdx === null) ? 'not-allowed' : 'pointer',
+              boxShadow: submittedChar !== null
+                ? '0 4px 16px rgba(39, 174, 96, 0.4)'
+                : (selectedCharIdx !== null ? '0 4px 16px rgba(255, 215, 0, 0.3)' : 'none'),
               transition: 'all 0.2s',
               letterSpacing: 2,
             }}
           >
-            确认选择
+            {submittedChar !== null ? `✅ 已选择 ${submittedChar}` : '确认选择'}
           </button>
         </>
       ) : isLord ? (

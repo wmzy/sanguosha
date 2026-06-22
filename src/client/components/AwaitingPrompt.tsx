@@ -96,6 +96,27 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
             </div>
           );
         }
+        // pickProcessingCard 类 pending(五谷丰登:从处理区亮的明牌选一张):
+        // 渲染处理区全部明牌为可点按钮,使用者点具体 cardId 选中
+        if (pending.prompt.type === 'pickProcessingCard') {
+          const info = resolvePendingRespond(pending, skillActions);
+          const skillId = info?.skillId ?? '系统规则';
+          const p = pending.prompt;
+          return (
+            <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
+              {p.cards.length > 0 && (
+                <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>处理区可选牌:</span>
+              )}
+              {p.cards.map(({ cardId, cardName, suit, rank }) => (
+                <button
+                  key={cardId}
+                  className={styles.promptBtn}
+                  onClick={() => onSend(skillId, 'respond', { cardId })}
+                >{cardName} {suit}{rank}</button>
+              ))}
+            </div>
+          );
+        }
         // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
         if (pending.prompt.type === 'confirm') {
           const confirmLabel = pending.prompt.confirmLabel || '确认';

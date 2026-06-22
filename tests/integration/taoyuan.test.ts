@@ -85,8 +85,8 @@ describe('桃园结义:多人回血端到端', () => {
     const P1 = harness.player('P1');
 
     await P1.useCard('桃园结义', ty.id);
-    // 跳过 无懈可击 窗口
-    await P1.pass();
+    // 跳过 无懈可击 窗口(逐目标广播,3 个存活目标各一次)
+    for (let i = 0; i < 3; i++) await P1.pass();
 
     // 各回 1 血
     expect(harness.state.players[0].health).toBe(3);
@@ -121,7 +121,8 @@ describe('桃园结义:多人回血端到端', () => {
 
     const P1 = harness.player('P1');
     await P1.useCard('桃园结义', ty.id);
-    await P1.pass();
+    // 跳过 无懈可击 窗口(逐目标广播,2 个存活目标各一次)
+    for (let i = 0; i < 2; i++) await P1.pass();
 
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.players[1].health).toBe(4);
@@ -150,7 +151,8 @@ describe('桃园结义:多人回血端到端', () => {
 
     const P1 = harness.player('P1');
     await P1.useCard('桃园结义', ty.id);
-    await P1.pass();
+    // 跳过 无懈可击 窗口(逐目标广播,3 个存活目标各一次)
+    for (let i = 0; i < 3; i++) await P1.pass();
 
     // P1 满血 → 4(不动);P2 掉血 → 3(+1);P3 满血 → 4(不动)
     expect(harness.state.players[0].health).toBe(4);
@@ -180,7 +182,8 @@ describe('桃园结义:多人回血端到端', () => {
 
     const P1 = harness.player('P1');
     await P1.useCard('桃园结义', ty.id);
-    await P1.pass();
+    // 跳过 无懈可击 窗口(逐目标广播,4 个存活目标各一次)
+    for (let i = 0; i < 4; i++) await P1.pass();
 
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.players[1].health).toBe(3);
@@ -211,7 +214,8 @@ describe('桃园结义:多人回血端到端', () => {
 
     const P1 = harness.player('P1');
     await P1.useCard('桃园结义', ty.id);
-    await P1.pass();
+    // 跳过 无懈可击 窗口(P2 死亡不触发,2 个存活目标各一次)
+    for (let i = 0; i < 2; i++) await P1.pass();
 
     // P1 +1(3→4)、P2 跳过(死亡,0→0)、P3 +1(2→3)
     expect(harness.state.players[0].health).toBe(4);

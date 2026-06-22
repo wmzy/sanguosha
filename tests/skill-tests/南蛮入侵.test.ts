@@ -144,4 +144,48 @@ describe('南蛮入侵', () => {
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.players[2].health).toBe(4);
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 逐目标无懈(新规则):对全体锦囊的某个目标出无懈,只抵消该目标的效果。
+  // 3 人局:P3 出南蛮,P1 无杀、P2 无杀。P3 对 P2 出无懈 → P2 被抵消不扣血,
+  // P1 正常受伤害。
+  // ─────────────────────────────────────────────────────────────
+  it('3人局:对 P2 出无懈 → P2 被抵消不扣血,P1 正常受伤害', async () => {
+    const state = build({ p3: true });
+    // 改为 P3 出南蛮
+    state.currentPlayerIndex = 2;
+    state.players[2].hand = ['nm1'];
+    state.players[2].skills = ['南蛮入侵', '杀'];
+    // 给 P3 一张无懈可击,用于抵消对 P2 的效果
+    state.cardMap['wx1'] = { id: 'wx1', name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.players[2].hand.push('wx1');
+    state.players[2].skills.push('无懈可击');
+    await harness.setup(state);
+    const P3 = harness.player('P3');
+
+    await P3.useCardAndTarget('南蛮入侵', 'nm1', []);
+
+    // 目标顺序 [P1, P2],每个目标独立询问无懈
+    // 第一个目标 P1 的无懈窗口:pass
+    await harness.player(0).pass();
+    // P1 被询问杀 → 不出
+    harness.player(0).expectPending('询问杀');
+    await harness.player(0).pass();
+
+    // 第二个目标 P2 的无懈窗口:P3 出无懈抵消对 P2 的效果
+    // 当前 pending 应是无懈可击广播窗口
+    const wuxieSlot = [...harness.state.pendingSlots.values()][0];
+    expect((wuxieSlot.atom as { requestType?: string }).requestType).toBe('无懈可击');
+    await P3.respond('无懈可击', { cardId: 'wx1' });
+    // 无懈 respond 后 slot.resume 重启窗口,需 pass 结束
+    await P3.pass();
+
+    // P2 被抵消 → 不会被询问杀,直接结束
+    expect(harness.state.players[0].health).toBe(3); // P1 正常受伤
+    expect(harness.state.players[1].health).toBe(4); // P2 被抵消不受伤
+    expect(harness.state.players[2].health).toBe(4); // P3 发起者
+    expect(harness.state.zones.discardPile).toContain('nm1');
+    expect(harness.state.zones.discardPile).toContain('wx1');
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
 });

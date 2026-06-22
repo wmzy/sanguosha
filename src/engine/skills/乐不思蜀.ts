@@ -15,6 +15,7 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
+import { askWuxie } from '../wuxie';
 
 /** 跳过出牌阶段的 tag 名(实现为 mark id='tag:乐不思蜀/跳过出牌') */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
@@ -81,11 +82,10 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     // 牌堆空:无法判定,跳过(规则允许直接弃置,但避免引擎崩;这里 no-op)
     if (ctx.state.zones.deck.length === 0) return;
 
-    // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问)
-    ctx.state.localVars['无懈/被抵消'] = false;
+    // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问;抵消整个延时锦囊)
     try {
-      await applyAtom(ctx.state, { type: '请求回应', requestType: '无懈可击', target: -2, prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: (c) => c.name === '无懈可击', min: 1, max: 1 } }, timeout: 10 });
-      if (ctx.state.localVars['无懈/被抵消']) {
+      const cancelled = await askWuxie(ctx.state, ownerId);
+      if (cancelled) {
         // 被无懈抵消:移除延时锦囊,跳过判定
         await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '乐不思蜀' });
         return;
@@ -94,7 +94,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
       // 然后在 after hook 中读顶牌花色决定效果。
       await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '乐不思蜀' });
     } finally {
-      delete ctx.state.localVars['无懈/被抵消'];
+      // askWuxie 内部已清理 localVars
     }
   });
 

@@ -576,6 +576,47 @@ export const charSelectWaitingSwitchBtn = css`
   cursor: pointer;
 `;
 
+// ─── 已选武将卡(选将完成后展示在等待遮罩中,明确反馈选择结果)───
+export const selectedCharCard = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 36px;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(255, 215, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 215, 0, 0.6);
+  min-width: 200px;
+`;
+export const selectedCharLabel = css`
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 2px;
+`;
+export const selectedCharName = css`
+  font-size: 28px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+`;
+export const selectedCharFaction = css`
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 3px 10px;
+`;
+export const selectedCharSkills = css`
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+`;
+export const selectedCharHpRow = css`
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+`;
+
 // ─── 辅助状态样式 ───
 /** 自动切换按钮激活态(绿色)。 */
 export const autoSwitchActive = css`

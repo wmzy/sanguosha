@@ -1,7 +1,7 @@
 // src/engine/skills/丈八蛇矛.ts
 // 丈八蛇矛(武器,攻击范围 3):你可以将 2 张手牌当【杀】使用或打出(转化技)。
 //
-// 模型(组合 action,与武圣同形):前端两步 UI(点丈八蛇矛给手牌加"杀"显示
+// 模型(组合 action,与武圣同形):前端两步 UI(点丈八蛇矛选 2 张手牌加"杀"显示
 // → 点出杀选目标),提交时一个 ClientMessage:preceding=[丈八蛇矛.transform]
 // + 主 action=杀.use。
 // 后端 dispatch 先执行 丈八蛇矛.transform(用两张手牌创建一张影子杀),
@@ -14,8 +14,13 @@
 // shadowOf 置空,因为不存在一一对应的"原卡")。因此 rollback 路径
 // 必须在 execute 前后保留原卡 id,自己完成"删影子/还原卡"配对,引擎
 // shadowOf 还原机制不适用。
-import type { Card, GameState, Json, Skill } from '../types';
+//
+// 前端多卡转化:TransformMode.minCards/maxCards 声明选牌数(2..2),
+// handleTransformPlay 提交 preceding params.cardIds=[id1,id2] + 主 action
+// cardId = ${id1}#${id2}#丈八蛇矛。
+import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
 import { registerAction, type SkillModule } from '../skill';
+import { viewCanAttack } from '../viewDistance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -44,7 +49,7 @@ export function onInit(skill: Skill, ownerId: number): () => void {
     (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
+      const free = state.pendingSlots.size === 0;
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       const cardIds = params.cardIds;
@@ -110,17 +115,25 @@ export function onInit(skill: Skill, ownerId: number): () => void {
 }
 
 export function onMount(skill: Skill, api: { defineAction: Function }): void {
-  // 前端:丈八蛇矛是转化技,defineAction 声明可选两张手牌。
-  // 前端 UI 流程:点丈八蛇矛 → 选 2 张手牌(加"杀"显示) → 点杀选目标
-  //   → 提交 preceding+主 action。
+  // 前端:丈八蛇矛是多卡转化技。transform 把选中两张卡包装成 CardWrapper。
+  // 前端通过 prompt.cardFilter.min/max (2..2) 识别多卡选牌,
+  // 进入多选转化模式,提交 preceding params.cardIds=[id1,id2]。
   api.defineAction('transform', {
     label: '丈八蛇矛',
     style: 'passive',
     prompt: {
-      type: 'useCard',
+      type: 'useCardAndTarget',
       title: '选择 2 张手牌当杀使用',
       cardFilter: { filter: () => true, min: 2, max: 2 },
+      targetFilter: {
+        min: 1, max: 1,
+        // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示
+        filter: (view: GameView, t: number) => viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+      },
     },
+    // transform 接收第一张选中卡,返回 CardWrapper(供前端显示"杀")。
+    // 多卡选牌 id 由前端在 handleTransformPlay 中拼成 ${id1}#${id2}#丈八蛇矛。
+    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id } as CardWrapper),
   });
   return;
 }

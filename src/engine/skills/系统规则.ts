@@ -25,6 +25,9 @@ export function registerSystemRespondActions(ownerId: number): () => void {
     if (slot.atom.type !== '选将询问') return '当前不是选将窗口';
     // 只有被问询的玩家能回应
     if ((slot.atom as { target: number }).target !== ownerId) return '不是你的选将回合';
+    // 纵深防御:已选将的玩家禁止重新选将(选将完成后 slot 理论上已 resolve 删除,
+    // 但客户端在网络抖动/重复点击下可能重发 action,引擎层必须拒绝二次写入)。
+    if (state.players[ownerId]?.character) return '已选择武将,不能重新选将';
     const character = params.character as string;
     if (typeof character !== 'string') return 'character required';
     const candidates = (slot.atom as { candidates: Array<{ name: string }> }).candidates;

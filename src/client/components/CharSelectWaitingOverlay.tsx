@@ -1,10 +1,17 @@
 // src/client/components/CharSelectWaitingOverlay.tsx
 // 并行选将期间:当前视角玩家已选完但其他人还在选时显示的全屏等待遮罩。
 // 从 GameView.tsx 抽出,样式全部走 gameViewStyles,消除内联 style hardcode。
+// 选将完成后:遮罩中央展示玩家已选的武将卡(势力色背景 + 武将名 + 体力 + 技能),
+// 明确反馈选择结果,禁止重新选将。
 
 import type { GameView } from '../../engine/types';
 import { CountdownBar } from './CountdownBar';
+import { FACTION_BG } from './gameViewConstants';
+import { getCharacterMeta } from '../../engine/character-meta';
+import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import * as styles from './gameViewStyles';
+
+const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
 export interface CharSelectWaitingOverlayProps {
   view: GameView;
@@ -25,9 +32,45 @@ export function CharSelectWaitingOverlay({
   const nextName = view.players[(perspectiveIdx + 1) % view.players.length]?.name;
   const selectingNames = view.players.filter(p => !p.character).map(p => p.name).join('、');
 
+  // 当前视角玩家已选的武将信息(用于展示选择结果)
+  const me = view.players[perspectiveIdx];
+  const selectedChar = me?.character ?? '';
+  const charInfo = selectedChar ? getCharacterMeta(selectedChar) : undefined;
+  const faction = charInfo?.faction ?? '群';
+  const factionColor = FACTION_BG[faction] ?? '#8e44ad';
+  const maxHealth = charInfo?.maxHealth ?? 4;
+  // player.skills 包含默认技能,只展示武将自身技能(过滤掉默认技能)
+  const charSkills = (me?.skills ?? []).filter(s => !DEFAULT_SKILLS.has(s));
+
   return (
     <div className={styles.charSelectWaitingOverlay}>
-      <div>⏳ {perspectiveName} 已选择武将,等待其他玩家选将...</div>
+      {/* 已选武将卡:明确反馈选择结果,禁止重新选将 */}
+      {selectedChar && (
+        <div className={styles.selectedCharCard} style={{ background: factionColor }}>
+          <div className={styles.selectedCharLabel}>你的选择</div>
+          <div className={styles.selectedCharName}>{selectedChar}</div>
+          <div className={styles.selectedCharFaction}>{faction}</div>
+          <div className={styles.selectedCharHpRow}>
+            {Array.from({ length: maxHealth }, (_, i) => (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-block',
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  background: '#e74c3c',
+                  boxShadow: '0 0 4px rgba(231, 76, 60, 0.5)',
+                }}
+              />
+            ))}
+          </div>
+          {charSkills.length > 0 && (
+            <div className={styles.selectedCharSkills}>{charSkills.join(' / ')}</div>
+          )}
+        </div>
+      )}
+      <div>✅ 已选择武将,等待其他玩家选将...</div>
       <div className={styles.charSelectWaitingSub}>{selectingNames} 正在选将</div>
       {/* 选将倒计时 */}
       <div className={styles.charSelectWaitingCountdown}>
