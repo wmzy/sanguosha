@@ -13,9 +13,9 @@
 // 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
 // 完成了开局,不需要再 dispatch 开局 start。
 //
-// dispatch 路径(fire-and-forget):
-//   启动 execute 后立即返回,不等 pending 创建。preceding/validate 同步跑完,
-//   通过 entry.execute(...).then(resolve) 启动后即返回。
+// dispatch 路径(Promise<boolean>):
+//   同步跑 preceding/validate;通过则启动 fire-and-forget execute 并返回 true,
+//   拒绝则 rollback 并返回 false。execute 内 await pending slot 可能阻塞,但 dispatch 本身立即返回。
 //   1) 主动 action(无 pending slot):execute 跑到 applyAtom 建 pending 时自然挂起。
 //   2) 回应 action(有 pending slot):slot.pause() 取消定时器 → respond execute 跑完
 //      → .then(resolve) 恢复父 execute。递归 pending(如无纶递归)下 respond execute
@@ -202,7 +202,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   // 登记实例 unload,使 unloadSkillInstance/clearAllSkillInstances 能正确清理 开局:系统
   setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
-  // 3. dispatch 开局 start(dispatch void:非法 action 静默丢弃,开局失败通过后续 state 检查暴露)
+  // 3. dispatch 开局 start(dispatch 返回 boolean:validate 拒绝返回 false,开局失败通过后续 state 检查暴露)
   // 先为每个玩家注册选将/弃牌 respond action(注册到具体座次,开局流程内会等待这些 respond)
   const 系统规则mod = await import('./skills/系统规则');
   for (const player of state.players) {
@@ -242,15 +242,15 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
 }
 
 /**
- * 执行一条 client message。dispatch 是 fire-and-forget 的输入分发器:
- * 同步跑 preceding/validate,启动 execute 后立即返回,不等 pending 创建。
- * session 不 await dispatch——state 变更通过 applyAtom 末尾的 onStateChange 回调驱动广播。
+ * 执行一条 client message。同步跑 preceding/validate;通过则启动 fire-and-forget execute 并返回 true,
+ * 拒绝则 rollback 并返回 false。execute 内部 await pending slot 可能阻塞,但 dispatch 本身不等 execute 完成。
+ * session 根据返回值决定 ACK/NAK;state 变更通过 applyAtom 末尾的 onStateChange 回调驱动广播。
  *
  * 回应路径(有 pendingSlot):slot.pause() 取消其超时定时器,让 respond execute 独占推进;
  * respond execute 完成后 .then(resolve) 恢复父 execute。若 slot.isTimeout(超时已在处理中),
  * 丢弃该 action,避免超时与用户回应竞态。
  */
-export async function dispatch(state: GameState, message: ClientMessage): Promise<void> {
+export async function dispatch(state: GameState, message: ClientMessage): Promise<boolean> {
   const rollbacks: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
   // 辅助:preceding 阶段抛错 / 失败时,清理可能由 execute 创建的残留 pending slot。
   // execute 是 fire-and-forget 风格的 applyAtom,可能在 pendingSlots 留下未 resolve 的 slot。
@@ -272,7 +272,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       if (!pEntry || pEntry.validate(state, p.params) !== null){
         rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
         cleanupResidualPending();
-        return;
+        return false;
       }
       await pEntry.execute(state, p.params);
       rollbacks.push({ entry: pEntry, params: p.params });
@@ -281,7 +281,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   let entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
   if (!entry || entry.validate(state, message.params) !== null){
     rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
-    return;
+    return false;
   }
   // 回应路径:定位该玩家对应的 slot。
   // 单 target 询问(询问闪/杀/弃牌):Map 只有该 target 一个 slot → 直接 ownerId 命中。
@@ -299,7 +299,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   if (oldSlot) {
     if (oldSlot.isTimeout) {
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
-      return;
+      return false;
     }
     oldSlot.pause();
   }
@@ -311,7 +311,10 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   state.seq += 1;
   // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot。
   // finally 兜底:execute 抛错时(开发期 bug / 测试场景)仍必须释放 slot,避免父 execute 永久卡死。
-  return entry.execute(state, message.params).then(() => {
+  // 注意:不 return execute 的 promise——execute 内 await pending slot 可能阻塞到玩家回应,
+  // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
+  // dispatch 返回 true 表示"已接受"(validate 通过+execute 已启动),不等 execute 完成。
+  entry.execute(state, message.params).then(() => {
     if (oldSlot) {
       // execute 完成后:如果该 slot 仍未被替换(execute 未创建新 pending),清除它
       // 异常路径:无懈可击 broadcast slot 由 respond execute 调 slot.resume() 主动续期,
@@ -342,7 +345,8 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       if (deleted) notifyPendingResolved(state, oldSlot);
       try { resolve(); } catch { /* resolve 已被 safeResolve 保护 */ }
     }
-  });
+  }).catch(() => { /* fire-and-forget: 防止 unhandled rejection; 兜底清理已在 finally */ });
+  return true;
 }
 
 /**

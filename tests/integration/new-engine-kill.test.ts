@@ -118,7 +118,7 @@ describe('新 ENGINE-DESIGN 顶层 API — 出杀全流程', () => {
       skillId: '不存在的 skill', actionType: 'use', ownerId: 0,
       params: { cardId: 'c1', targets: [1] }, baseSeq: 0,
     });
-    // 未注册的 action:dispatch 返回 {}(静默丢弃),state 不变
+    // 未注册的 action:dispatch 返回 false(validate 拒绝),state 不变
     expect(state.seq).toBe(beforeSeq);
   });
 });

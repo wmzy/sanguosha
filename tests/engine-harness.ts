@@ -307,7 +307,7 @@ export class PlayerSession {
   // ─── 断言:validate 拒绝 ─────────────────────
 
   /**
-   * 发出一个 action,断言它被 validate 拒绝(dispatch 静默 return,state.seq 不增加)。
+   * 发出一个 action,断言它被 validate 拒绝(dispatch 返回 false,state.seq 不增加)。
    * 用于负面测试:不自己回合出牌 / pending 期间出牌 / 死人出牌 / 无牌出牌等。
    */
   async expectRejected(
@@ -477,21 +477,19 @@ export class PlayerSession {
   }
 
   /**
-   * 发出 action 并返回是否被接受(dispatch 改变了 state.seq)。
-   * validate 拒绝时 dispatch 静默 rollback,state.seq 不增加 → 返回 false。
-   * dispatch 是 fire-and-forget(void),harness 不依赖返回值——通过观察 state 变化判断。
+   * 发出 action 并返回是否被接受(dispatch 返回 boolean)。
+   * validate 拒绝时 dispatch 返回 false,execute 成功时返回 true。
    */
   async tryDispatch(
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
   ): Promise<boolean> {
-    const seqBefore = this.harness.state.seq;
-    void engineDispatch(this.harness.state, {
+    const accepted = await engineDispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerIndex,
       baseSeq: this.harness.state.seq,
-    }).catch(() => { /* dispatch 内部不抛错;吞掉防御性 */ });
+    }).catch(() => false);
     await this.harness.waitForStable();
-    return this.harness.state.seq > seqBefore;
+    return accepted;
   }
 
   private async dispatch(

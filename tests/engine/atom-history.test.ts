@@ -104,6 +104,26 @@ describe('eventsForViewer', () => {
   });
 });
 
+describe('dispatch 返回 boolean', () => {
+  beforeEach(() => resetForTest());
+
+  it('非法 action 返回 false（不存在的 skillId）', async () => {
+    const state = createGameState({
+      players: [{
+        index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4,
+        alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
+      }],
+      cardMap: {}, seq: 0, currentPlayerIndex: 0, phase: '出牌',
+    });
+    const { dispatch } = await import('../../src/engine/create-engine');
+    const msg = {
+      skillId: '不存在', actionType: 'use' as const, ownerId: 0, params: {}, baseSeq: 0,
+    };
+    const result = await dispatch(state, msg);
+    expect(result).toBe(false);
+  });
+});
+
 describe('atomHistory: applyAtom 写入', () => {
   beforeEach(() => resetForTest());
 

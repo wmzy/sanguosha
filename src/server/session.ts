@@ -187,12 +187,15 @@ export class GameSession {
       return;
     }
 
-    // dispatch 是 fire-and-forget:启动 execute 后立即返回。
+    // dispatch 返回 boolean:true=accepted,false=rejected。
     // state 变更的广播/持久化/结束检查由 onStateChange 回调驱动(见 attachStateListener)。
-    // dispatch 同步部分(preceding/validate)不应抛错;用 void 吞掉潜在的 async rejection。
-    void dispatch(this.state, action).catch((err) => {
+    const accepted = await dispatch(this.state, action).catch((err) => {
       this.logger.error('dispatch error', { error: String(err) });
+      return false;
     });
+    if (!accepted) {
+      this.sendToPlayer(playerId, { type: 'error', message: '操作无效' });
+    }
   }
 
   /**
