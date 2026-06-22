@@ -18,8 +18,11 @@ export type EventSeq = number;
  */
 export type ServerMessage =
   | { type: 'initialView'; viewer: number; state: GameView; lastSeq: EventSeq }
-  | { type: 'events'; viewer: number; fromSeq: EventSeq; events: GameEventEnvelope[]; operations?: Operation[] }
+  | { type: 'events'; viewer: number; fromSeq: EventSeq; events: GameEventEnvelope[]; operations?: Operation[];
+      pending?: { target: number; deadline: number; totalMs: number } | null;
+      turnDeadline?: number | null; turnTotalMs?: number }
   | { type: 'error'; message: string }
+  | { type: 'actionRejected' }
   | { type: 'gameOver'; winner: string }
   | { type: 'room_joined'; roomId: string; playerId: string; seatIndex?: number }
   | { type: 'player_joined'; playerId: string }

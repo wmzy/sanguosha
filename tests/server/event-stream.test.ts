@@ -5,6 +5,7 @@ import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
+import type { ServerMessage } from '../../src/server/protocol';
 
 function makeRoom(): Room {
   return {
@@ -58,5 +59,39 @@ describe('全局 CAS 删除', () => {
     await sleep(200);
     // CAS 删除后：action 被接受 → seq 推进
     expect(state.seq).toBeGreaterThan(seqBefore);
+  }, 15000);
+});
+
+class FakeWS {
+  messages: ServerMessage[] = [];
+  send(data: string) { this.messages.push(JSON.parse(data)); }
+  readyState = 1; // OPEN
+}
+
+describe('重连 initialView', () => {
+  let session: GameSession;
+  beforeEach(() => { resetForTest(); session = new GameSession(makeRoom(), true, 42); });
+
+  it('reconnectPlayer 发 initialView 且同步 lastBroadcastSeq', async () => {
+    await session.startGame(2);
+    const state = getState(session);
+    // 等选将完成 + 游戏进行中
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(200);
+
+    const seqAtReconnect = state.seq;
+    const fakeWs = new FakeWS();
+    (session as any).playerNames.set('p0', 0);
+    session.reconnectPlayer('p0', fakeWs as any, 0);
+
+    // 应收到 initialView（全量状态）
+    const initMsg = fakeWs.messages.find(m => m.type === 'initialView');
+    expect(initMsg).toBeDefined();
+    // 不应收到 events 差量——initialView 已含全量状态
+    const eventsMsg = fakeWs.messages.find(m => m.type === 'events');
+    expect(eventsMsg).toBeUndefined();
+    // lastBroadcastSeq 应已同步到 state.seq
+    const lb = (session as any).lastBroadcastSeq as number;
+    expect(lb).toBeGreaterThanOrEqual(seqAtReconnect);
   }, 15000);
 });

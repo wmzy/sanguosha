@@ -183,7 +183,7 @@ export class GameSession {
       return false;
     });
     if (!accepted) {
-      this.sendToPlayer(playerId, { type: 'error', message: '操作无效' });
+      this.sendToPlayer(playerId, { type: 'actionRejected' });
     }
   }
 
@@ -313,15 +313,16 @@ export class GameSession {
     this.broadcast({ type: 'gameOver', winner: '无人' });
   }
 
-  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, _lastSeq = 0): boolean {
+  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, lastSeq = 0): boolean {
     if (!this.state) return false;
     this.disconnectedAt.delete(playerId);
     this.clearGraceTimer();
     this.room.players.set(playerId, ws);
-    // 重连:发当前完整 state 作为 baseline
-    // state 此时应已有数据(bootstrap 已完成或进行中)
     this.sendInitialViewToPlayer(playerId);
     this.baselineSent.add(playerId);
+    // initialView 已是全量状态，不需要补推差量。
+    // 同步水位标记，避免后续 broadcastNewState 重发已含在 initialView 中的事件。
+    this.lastBroadcastSeq = Math.max(this.lastBroadcastSeq, this.state.seq);
     this.broadcast({ type: 'player_reconnected', playerId });
     return true;
   }
