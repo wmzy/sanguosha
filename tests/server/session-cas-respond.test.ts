@@ -1,9 +1,10 @@
 // tests/server/session-cas-respond.test.ts
-// 验证 session.handleAction 的 CAS 行为:respond 路径(该 ownerId 有 pending slot)
-// 跳过 CAS 校验。这是修复"并行选将卡住直到超时"bug 的回归测试。
+// 验证 session.handleAction 的行为:
+// 1. respond 路径(该 ownerId 有 pending slot)始终被接受(并行选将不卡死)。
+// 2. 全局 CAS 已删除:主动 action 不再因陈旧 baseSeq 被静默丢弃。
 //
 // 核心场景:并行选将时多个玩家同时 respond,state.seq 连续 +1,
-// 后发的 respond 基于旧 lastSeq 会被 CAS 误拒,导致选将卡死直到超时。
+// 后发的 respond 基于旧 lastSeq 仍能被引擎 validate 接受。
 //
 // 测试通过 reflection 访问 session.state(私有),用真实 dispatch 路径验证。
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -33,7 +34,7 @@ function getState(session: GameSession): GameState {
   return (session as unknown as { state: GameState }).state;
 }
 
-describe('session.handleAction:respond 路径跳过 CAS', () => {
+describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受', () => {
   let session: GameSession;
 
   beforeEach(() => {
@@ -90,7 +91,12 @@ describe('session.handleAction:respond 路径跳过 CAS', () => {
     }
   }, 15000);
 
-  it('主动 action(无 pending slot)仍受 CAS 保护:陈旧 baseSeq 被拒', async () => {
+  it('主动 action 不再受 CAS 保护:陈旧 baseSeq 被接受', async () => {
+    // 等待上一个测试的 fire-and-forget bootstrap 完成
+    await sleep(200);
+    resetForTest();
+    session = new GameSession(makeRoom(), true, 42);
+
     // 启动并完成选将
     await session.startGame(4);
     const state = getState(session);
@@ -120,7 +126,10 @@ describe('session.handleAction:respond 路径跳过 CAS', () => {
     for (let i = 0; i < 200 && state.pendingSlots.size > 0; i++) await sleep(10);
     expect(state.pendingSlots.size).toBe(0);
 
-    // 现在进入游戏,无 pending。用陈旧 baseSeq 发主动 action 应被 CAS 拒掉
+    // 等待进入 player 0 的出牌阶段(bootstrap 完成后回合管理自动推进到出牌)
+    for (let i = 0; i < 300 && (state.currentPlayerIndex !== 0 || state.phase !== '出牌' || state.pendingSlots.size > 0); i++) await sleep(10);
+
+    // 现在进入游戏,处于出牌阶段。用陈旧 baseSeq 发主动 action
     const veryStaleSeq = state.seq - 10;
     const beforeSeq = state.seq;
     await session.handleAction('p0', {
@@ -128,7 +137,7 @@ describe('session.handleAction:respond 路径跳过 CAS', () => {
       params: {}, baseSeq: veryStaleSeq,
     });
     await sleep(200);
-    // 没有任何 dispatch 发生(seq 不变)
-    expect(state.seq).toBe(beforeSeq);
+    // CAS 删除后:action 被接受 → seq 推进
+    expect(state.seq).toBeGreaterThan(beforeSeq);
   }, 15000);
 });

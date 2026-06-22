@@ -5,16 +5,16 @@ import type {
   ClientMessage as EngineClientMessage,
   GameState,
   GameView,
-  ViewEvent,
 } from '../engine/types';
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
+import { eventsForViewer } from '../engine/view/events-for-viewer';
 import { allCharacters } from '../engine/cards/characters';
 import { TURN_IDLE_TIMEOUT_MS } from '../engine/view/buildView';
 
 
 import '../engine/atoms';
 import '../engine/skills';
-import type { ServerMessage, GameEventEnvelope } from './protocol';
+import type { ServerMessage } from './protocol';
 import { serialize } from './protocol';
 import type { Room } from './room';
 import { createLogger } from './logger';
@@ -176,17 +176,6 @@ export class GameSession {
       this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedIndex });
       return;
     }
-    // CAS 校验:baseSeq 不匹配则静默丢弃。
-    // 但【respond 路径】(该 ownerId 有 pending slot)跳过 CAS——
-    // 并行选将/并行回应场景下,多个玩家同时 respond 会让 seq 连续 +1,
-    // 其它玩家基于旧 seq 的合法 respond 会被误拒,导致选将卡住直到超时。
-    // respond 是对已存在 pending 的回应,只要 slot 还在就应允许;主动 action 才需 CAS。
-    const curState = this.state;
-    const hasOwnSlot = curState.pendingSlots.has(action.ownerId);
-    if (!hasOwnSlot && action.baseSeq !== undefined && action.baseSeq !== curState.seq) {
-      return;
-    }
-
     // dispatch 返回 boolean:true=accepted,false=rejected。
     // state 变更的广播/持久化/结束检查由 onStateChange 回调驱动(见 attachStateListener)。
     const accepted = await dispatch(this.state, action).catch((err) => {
@@ -258,7 +247,6 @@ export class GameSession {
   private broadcastNewState(): void {
     if (!this.state) return;
     const state = this.state;
-    const allEvents = state.atomHistory.filter(e => e.seq > this.lastBroadcastSeq);
 
     for (const [playerId, viewer] of this.playerNames) {
       if (viewer < 0 || viewer >= state.players.length) continue;
@@ -267,42 +255,12 @@ export class GameSession {
         this.sendToPlayer(playerId, { type: 'initialView', viewer, state: view, lastSeq: state.seq });
         this.baselineSent.add(playerId);
       }
-      const envelopes = this.projectEventsForViewer(allEvents, viewer, state.startedAt);
+      const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
       if (envelopes.length > 0) {
         this.sendToPlayer(playerId, { type: 'events', viewer, fromSeq: this.lastBroadcastSeq, events: envelopes });
       }
     }
     this.lastBroadcastSeq = state.seq;
-  }
-
-  /**
-   * 把全局事件流按 viewer 可见性投影为 envelope 列表(§8.2.2)。
-   */
-  private projectEventsForViewer(
-    events: import('../engine/types').GameEvent[],
-    viewer: number,
-    startedAt: number,
-  ): GameEventEnvelope[] {
-    const out: GameEventEnvelope[] = [];
-    const timestamp = Date.now() - startedAt;
-    for (const e of events) {
-      if (e.kind === 'atom' && e.viewEvents) {
-        const owner = e.viewEvents.ownerViews.get(viewer);
-        if (owner === null) continue;
-        const viewEvent: ViewEvent | undefined | null = owner ?? e.viewEvents.othersView;
-        if (!viewEvent) continue;
-        out.push({ seq: e.seq, timestamp, viewEvent });
-      } else if (e.kind === 'atom') {
-        const viewEvent = e.viewEvents?.othersView;
-        if (viewEvent) out.push({ seq: e.seq, timestamp, viewEvent });
-      } else if (e.kind === 'notify') {
-        const data = e.views ? (e.views.get(String(viewer)) ?? null) : e.data;
-        if (data !== null) {
-          out.push({ seq: e.seq, timestamp, notify: { skillId: e.skillId, eventType: e.eventType, data } });
-        }
-      }
-    }
-    return out;
   }
 
   /**
