@@ -171,6 +171,21 @@ export const 发牌: AtomDefinition<{
     }
     state.zones.deck = state.zones.deck.slice(cursor);
   },
+  applyView(view, event) {
+    const handSize = (event.handSize as number) ?? 4;
+    const lordBonus = (event.lordBonus as number) ?? 1;
+    for (const p of view.players) {
+      const isLord = p.identity === '主公';
+      const bonus = isLord ? lordBonus : 0;
+      p.handCount += handSize + bonus;
+    }
+    // 牌堆减少(粗略:减去总发牌数)
+    const total = view.players.reduce((sum, p) => {
+      const isLord = p.identity === '主公';
+      return sum + handSize + (isLord ? lordBonus : 0);
+    }, 0);
+    if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - total);
+  },
 };
 
 registerAtom(抽身份);
@@ -198,9 +213,46 @@ export const 选将询问: AtomDefinition<{
   apply(_state) {
     // 等待型 atom——apply 不修改 state
   },
+  toViewEvents(_state, atom) {
+    const target = atom.target;
+    const candidates = atom.candidates;
+    // 主公(被问询者)看到候选人列表
+    const ownerView: import('../types').ViewEvent = {
+      type: '选将询问',
+      target,
+      candidates,
+      pending: { startTime: Date.now(), deadline: Date.now() + 60000, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } },
+      effect: { blockUntilDone: true, duration: 200 },
+    };
+    // 其他人看到"等待主公选将"
+    const othersView: import('../types').ViewEvent = {
+      type: '等待选将',
+      waitingFor: target,
+      waitingForName: '主公',
+      effect: { duration: 200 },
+    };
+    return {
+      ownerViews: new Map([[target, ownerView]]),
+      othersView,
+    };
+  },
+  applyView(view, event) {
+    const target = event.target as number;
+    const candidates = (event.candidates ?? []) as Array<{ name: string; skills: string[] }>;
+    // 只有被问询的玩家才设置 pending
+    if (view.viewer === target) {
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '选将询问', target, candidates } as unknown as import('../types').Atom,
+        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } as import('../types').ActionPrompt,
+        target,
+        deadline: Date.now() + 60000,
+        totalMs: 60000,
+      };
+    }
+  },
   pending: {
     onTimeout: { type: '无操作' },
-    // 前端从 atom 实例读 candidates 和 prompt
     prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
     timeout: 60,
   },
@@ -232,6 +284,62 @@ export const 并行选将: AtomDefinition<{
   apply(_state) {
     // 等待型 atom——apply 不修改 state
   },
+  toViewEvents(state, atom) {
+    const selections = atom.selections;
+    // 找主公已选的角色(主公在并行选将之前已完成选将)
+    const lordIdx = state.players.findIndex(p => p.vars['身份'] === '主公');
+    const lordCharacter = lordIdx >= 0 ? state.players[lordIdx].character : '';
+    const lordName = lordIdx >= 0 ? state.players[lordIdx].name : '';
+    // 找主公的候选人(主公选将时的候选人列表,用于展示)
+    const lordCandidates = lordIdx >= 0 ? [] : []; // 主公已选完,候选人不在 state 里
+    // ownerViews:每个目标玩家看到自己的候选人 + 主公已选角色
+    const ownerViews = new Map<number, import('../types').ViewEvent>();
+    for (const s of selections) {
+      ownerViews.set(s.target, {
+        type: '并行选将',
+        selections: selections.map(sel => ({ target: sel.target, candidates: sel.candidates })),
+        lordCharacter,
+        lordName,
+        pending: { startTime: Date.now(), deadline: Date.now() + 60000, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates } },
+        effect: { blockUntilDone: true, duration: 200 },
+      });
+    }
+    // othersView:已选完的玩家(如主公)看到"等待其他玩家选将"
+    const othersView: import('../types').ViewEvent = {
+      type: '等待选将',
+      waitingFor: -1,
+      waitingForName: '其他玩家',
+      lordCharacter,
+      lordName,
+      effect: { duration: 200 },
+    };
+    return { ownerViews, othersView };
+  },
+  applyView(view, event) {
+    const selections = (event.selections ?? []) as Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }>;
+    const lordCharacter = (event.lordCharacter as string) ?? '';
+    const lordName = (event.lordName as string) ?? '';
+    // 更新主公角色(如果 view 中主公还是空的)
+    if (lordCharacter) {
+      const lordPlayer = view.players.find(p => p.identity === '主公');
+      if (lordPlayer && !lordPlayer.character) {
+        lordPlayer.character = lordCharacter;
+        lordPlayer.name = lordName || lordCharacter;
+      }
+    }
+    // 找当前 viewer 是否在 selections 中
+    const mySelection = selections.find(s => s.target === view.viewer);
+    if (mySelection) {
+      view.pending = {
+        type: 'awaits',
+        atom: { type: '选将询问', target: mySelection.target, candidates: mySelection.candidates } as unknown as import('../types').Atom,
+        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: mySelection.candidates } as import('../types').ActionPrompt,
+        target: mySelection.target,
+        deadline: Date.now() + 60000,
+        totalMs: 60000,
+      };
+    }
+  },
   pending: {
     onTimeout: { type: '无操作' },
     prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
@@ -241,3 +349,4 @@ export const 并行选将: AtomDefinition<{
 };
 
 registerAtom(并行选将);
+

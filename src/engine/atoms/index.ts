@@ -42,4 +42,5 @@ import './询问杀';
 import './请求回应';
 import './并行回应';
 import './选将';
+import './分配武将';
 

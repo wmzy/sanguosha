@@ -616,6 +616,7 @@ function createAndAwaitSlot(
         }
         // 选将询问 pending 超时:从候选人中随机分配一个未被选走的武将。
         // 否则玩家超时未选 → character 空 → 游戏带空武将进入出牌阶段(不可玩)。
+        // 走 atom 管线:applyAtom(分配武将) → toViewEvents → applyView → 事件广播
         if (atom.type === '选将询问' && typeof slotAtom.target === 'number' && Array.isArray(slotAtom.candidates)) {
           const p = state.players[slotAtom.target];
           if (p && !p.character) {
@@ -624,10 +625,12 @@ function createAndAwaitSlot(
             const pool = available.length > 0 ? available : slotAtom.candidates;
             // 用 Date.now() 做超时场景的随机(超时本身非确定),避免引入 rng 依赖
             const pick = pool[Date.now() % pool.length];
-            p.character = pick.name;
-            p.name = pick.name;
-            // 与 respond action 一致:超时分配也写入默认技能 + 武将技能
-            p.skills = [...DEFAULT_SKILLS, ...pick.skills];
+            await applyAtom(state, {
+              type: '分配武将',
+              target: slotAtom.target,
+              character: pick.name,
+              skills: [...DEFAULT_SKILLS, ...pick.skills],
+            });
           }
         }
         notifyStateChange(state);

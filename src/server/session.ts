@@ -10,7 +10,7 @@ import type {
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 import { allCharacters } from '../engine/cards/characters';
 import { TURN_IDLE_TIMEOUT_MS } from '../engine/view/buildView';
-import { getEventsSince, clearEvents } from '../engine/event-stream';
+import { getEvents, clearEvents } from '../engine/event-stream';
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -48,8 +48,8 @@ export class GameSession {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private sessionSeed: number;
   private logger = createLogger('session');
-  /** 上一次广播到的 seq。broadcastNewState 推 (lastBroadcastSeq, state.seq] 之间的事件。 */
-  private lastBroadcastSeq = 0;
+  private lastEventIndex = 0;
+  private baselineSent = new Set<string>();
   /** 调试房间:首人加入后开局的玩家人数(由 app 写入,handleJoinDebugRoom 读取后清空) */
   public pendingPlayerCount?: number;
 
@@ -105,6 +105,8 @@ export class GameSession {
     // bootstrap 可能因选将 pending 而挂起(fire-and-forget dispatch)
     // 不 await — 让 startGame 立即返回,客户端收到选将 pending 后响应
     void bootstrap(this.state, config).then(() => {
+      // bootstrap 完成后:所有角色/手牌/技能已就绪,强制刷新 baseline
+      this.baselineSent.clear();
       this.broadcastNewState();
     }).catch(err => {
       this.logger.error('bootstrap error', { error: String(err) });
@@ -133,7 +135,8 @@ export class GameSession {
     this.actionLog = state.actionLog;
     this.lastActivityAt = Date.now();
 
-    this.sendInitialViewToAll();
+    // sendInitialViewToAll 已移除——bootstrap 的 onStateChange 会触发 broadcastNewState,
+    // 此时 state 已推进(至少完成抽身份),发给前端的是有意义的状态。
     this.resetIdleTimer();
     return true;
   }
@@ -252,34 +255,33 @@ export class GameSession {
 
 
   /**
-   * 广播状态变更:按 ENGINE-DESIGN §8.2 per-viewer 分叉推送 events。
-   * debug 与正式模式统一:每个已连接 viewer 收到自己座次的分叉事件。
-   * debug 多 WS 模型下,每个座次是独立连接,自然只收自己的分叉。
+   * 广播状态变更:按 §8.2 per-viewer 分叉推送 events。
+   * 首次推送 initialView 作为 baseline,后续发增量 events。
+   * 所有状态变更都通过 atom 管线(toViewEvents + applyView)。
    */
   private broadcastNewState(): void {
     if (!this.state) return;
     const state = this.state;
-    const allEvents = getEventsSince(this.lastBroadcastSeq);
-    const newSeq = state.seq;
+    const allEvents = getEvents(this.lastEventIndex);
 
     for (const [playerId, viewer] of this.playerNames) {
       if (viewer < 0 || viewer >= state.players.length) continue;
+      if (!this.baselineSent.has(playerId)) {
+        const view = buildView(state, viewer);
+        this.sendToPlayer(playerId, { type: 'initialView', viewer, state: view, lastSeq: state.seq });
+        this.baselineSent.add(playerId);
+      }
       const envelopes = this.projectEventsForViewer(allEvents, viewer, state.startedAt);
-      this.sendToPlayer(playerId, {
-        type: 'events',
-        viewer,
-        fromSeq: this.lastBroadcastSeq,
-        events: envelopes,
-      });
+      if (envelopes.length > 0) {
+        this.sendToPlayer(playerId, { type: 'events', viewer, fromSeq: this.lastEventIndex, events: envelopes });
+      }
     }
-    this.lastBroadcastSeq = newSeq;
+    this.lastEventIndex = 0;
     clearEvents();
   }
 
   /**
    * 把全局事件流按 viewer 可见性投影为 envelope 列表(§8.2.2)。
-   * - atom 事件:ownerViews.get(viewer) 命中用专属内容;null=隐藏跳过;否则用 othersView
-   * - notify 事件:按 views map 分叉(未实现 views 时全体可见)
    */
   private projectEventsForViewer(
     events: import('../engine/types').GameEvent[],
@@ -291,9 +293,9 @@ export class GameSession {
     for (const e of events) {
       if (e.kind === 'atom' && e.viewEvents) {
         const owner = e.viewEvents.ownerViews.get(viewer);
-        if (owner === null) continue;             // 隐藏
+        if (owner === null) continue;
         const viewEvent: ViewEvent | undefined | null = owner ?? e.viewEvents.othersView;
-        if (!viewEvent) continue;                  // 无可见内容
+        if (!viewEvent) continue;
         out.push({ seq: e.seq, timestamp, viewEvent });
       } else if (e.kind === 'atom') {
         const viewEvent = e.viewEvents?.othersView;
@@ -309,23 +311,9 @@ export class GameSession {
   }
 
   /**
-   * 向所有已连接玩家发送 initialView baseline(首次/重连用)。
-   * 每个 viewer 收到自己座次的完整 GameView,后续增量走 events。
+   * 向单个玩家发其座次的 initialView(重连/后加入用)。
+   * 重连时发当前完整 state 作为 baseline。
    */
-  private sendInitialViewToAll(): void {
-    if (!this.state) return;
-    const state = this.state;
-    for (const [playerId, viewer] of this.playerNames) {
-      if (viewer < 0 || viewer >= state.players.length) continue;
-      const view = buildView(state, viewer);
-      this.sendToPlayer(playerId, { type: 'initialView', viewer, state: view, lastSeq: state.seq });
-    }
-    // baseline 后同步 lastBroadcastSeq,避免 baseline 内容又被 events 重发
-    this.lastBroadcastSeq = state.seq;
-    clearEvents();
-  }
-
-  /** 向单个玩家发其座次的 initialView(重连用) */
   private sendInitialViewToPlayer(playerId: string): void {
     if (!this.state) return;
     const viewer = this.playerNames.get(playerId);
@@ -371,8 +359,8 @@ export class GameSession {
     this.disconnectedAt.delete(playerId);
     this.clearGraceTimer();
     this.room.players.set(playerId, ws);
-    // 重连:发 initialView baseline,后续 events 从 lastSeq 续上
-    this.sendInitialViewToPlayer(playerId);
+    // 不发 initialView——bootstrap 可能还没跑完,发的是空白 state。
+    // broadcastNewState 会在 bootstrap 推进后发当前最新状态。
     this.broadcast({ type: 'player_reconnected', playerId });
     return true;
   }

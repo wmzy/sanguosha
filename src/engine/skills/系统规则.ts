@@ -43,14 +43,13 @@ export function registerSystemRespondActions(ownerId: number): () => void {
     const character = params.character as string;
     const candidates = (slot.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates;
     const selected = candidates.find(c => c.name === character)!;
-    const p = state.players[target];
-    if (!p) return;
-    p.character = selected.name;
-    p.name = selected.name;
-    // 引擎默认技能 + 武将自身技能(如仁德/制衡/奸雄等)。
-    // 选将 UI 从 candidates[].skills 展示技能描述;选完后写入 player.skills,
-    // 开局 instantiateSkill 循环会逐个实例化并注册 action/hook。
-    p.skills = [...DEFAULT_SKILLS, ...selected.skills];
+    // 走 atom 管线:applyAtom(分配武将) → toViewEvents → applyView → 事件广播
+    await applyAtom(state, {
+      type: '分配武将',
+      target,
+      character: selected.name,
+      skills: [...DEFAULT_SKILLS, ...selected.skills],
+    });
   }));
 
   // ── 弃牌阶段 respond action:玩家选择弃哪些牌 ──
