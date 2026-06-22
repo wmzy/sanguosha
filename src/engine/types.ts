@@ -581,23 +581,25 @@ export interface PendingView {
 }
 
 /**
- * 结算帧:execute 本地状态。
- * 帧是纯数据——所有"操作"通过 EngineApi(apply/notify)进行。
- * 技能通过 api.pushFrame 创建并压入 settlementStack;技能负责 api.popFrame 配对弹出。
+ * 结算帧:execute 本地状态。纯数据——所有状态变更通过顶层函数 applyAtom/pushNotify。
+ * 技能通过 pushFrame 创建并压入 settlementStack;技能负责 popFrame 配对弹出。
  *
- * `params` 原则上只读(在 pushFrame 时初始化一次,后续不允许修改)。
- * 跨 atom 通信(尤其是父 action 读 respond 结果)走 state 观察(zones/tags/marks/localVars),
- * 不通过此字段。
+ * `params` 的两层语义:
+ *  - **配置数据**(cardId/targets 等):pushFrame 时初始化,后续只读。
+ *  - **可变结算状态**(如 resolvedTargets):允许 mutate 数组元素(引用语义),
+ *    用于被动技能在 hook 中修改结算目标。典型:流离在 成为目标 after hook 中
+ *    改写 frame.params.resolvedTargets[i],杀在后续结算循环读到新目标。
+ *    这种 mutate 绑定在特定帧上,天然支持嵌套(南蛮→杀→流离 各有独立帧),
+ *    优于迁到全局 localVars(会被嵌套同名帧覆盖)。
+ *  - 不要替换 params 对象本身,只改内部字段。
  *
- * **临时过渡**:目前 TS 未强制 readonly——旧 skill 仍通过 mutation 写 __Xxx 字段。
- * 新 skill 应通过 state 观察(stage B 后续统一改造时再改 readonly)。
+ * 跨 atom 通信的一般途径是 state 观察(zones/tags/marks/localVars);
+ * params 的可变字段是针对"结算目标在 hook 中被改写"这一场景的特设机制。
  */
 export interface SettlementFrame {
   skillId: string;
   from: number;
-  /** execute 本地参数(跨 atom 共享的配置,如 cardId/targets 列表)。
-   *  pushFrame 时初始化一次。被动技能(如流离)可 mutate 数组元素修改结算目标(引用语义)。
-   *  新代码不要替换 params 对象本身,只改内部字段。 */
+  /** execute 本地参数。pushFrame 时初始化;配置字段只读,resolvedTargets 等可变字段允许 mutate 元素。 */
   params: Record<string, Json>;
 }
 
