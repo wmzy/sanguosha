@@ -63,6 +63,11 @@ describe('闪电', () => {
     expect(harness.state.players[0].pendingTricks.length).toBe(1);
     expect(harness.state.players[0].pendingTricks[0].name).toBe('闪电');
     expect(harness.state.zones.discardPile).toContain('sd1');
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -89,6 +94,7 @@ describe('闪电', () => {
     });
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
+    const P1 = harness.player('P1');
 
     void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
     await waitForStable(harness.state); // 等到无懈 pending
@@ -98,6 +104,12 @@ describe('闪电', () => {
     expect(harness.state.players[0].health).toBe(1); // 4 - 3
     // 闪电被移除
     expect(harness.state.players[0].pendingTricks.length).toBe(0);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].health).toBe(1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -124,6 +136,7 @@ describe('闪电', () => {
     });
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
+    const P1 = harness.player('P1');
 
     void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
     await waitForStable(harness.state); // 等到无懈 pending
@@ -136,6 +149,12 @@ describe('闪电', () => {
     // P1 判定区收到闪电
     expect(harness.state.players[1].pendingTricks.length).toBe(1);
     expect(harness.state.players[1].pendingTricks[0].name).toBe('闪电');
+    // view 级断言
+    P1.processEvents();
+    P1.expectView(v => {
+      expect(v.players[0].health).toBe(4);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
