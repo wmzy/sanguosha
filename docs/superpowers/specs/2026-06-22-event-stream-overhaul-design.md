@@ -70,10 +70,11 @@
 | 事件缓冲归属 | `GameState.atomHistory` | 引擎自洽,多 session 天然隔离 |
 | 派生时机 | apply 时缓存 split | `toViewEvents` 依赖 pre-mutation state |
 | 重连 | 全量保留历史 + seq 差量推 | 每局几百 atom,<1MB,内存可忽略 |
-| CAS | **删除** | 主动靠 validate,respond 靠 ownerId+pendingSlots 结构路由;CAS 反而破坏无懈链 |
+| CAS | **删除全局 CAS** | 全局 seq 被所有合法操作推进,误拒无关的合法 action(validate 已足够保证主动 action 合法性) |
+| pending 窗口版本 | **新增**:respond 携带 `pendingSeq`(响应哪个窗口);服务端按 slot 创建 seq 校验 | 精确解决无锈意图问题(C 的在途 respond 不 counter B),只拒绝过期窗口的 respond,不影响主动 action |
 | dispatch 返回值 | `Promise<boolean>` | 替代静默丢弃,session 回 ACK/NAK |
 | pending 倒计时 | events 消息携带 deadline | 对齐已验证的 turnDeadline 模式 |
-| 无懈 in-flight 重解读 | 不修 | 规则正确(每张无懈必结算),修需引入 CAS 违反决策 |
+| 无锈 in-flight 重解读 | **修复**:pending-scoped 版本控制 | 用户明确要求对齐官方三国杀OL 行为(C 的在途 respond 应被拒并重新询问) |
 
 ---
 
@@ -217,7 +218,48 @@ atom 的 `applyView` 不再设置 deadline:
 - `请求回应.ts` / `并行回应.ts` 删除 `DEFAULT_TIMEOUT_MS` 常量
 - applyView 只设 `view.pending = { type:'awaits', atom, prompt, target }`,deadline/totalMs 由 events 消息下发后由客户端填入
 
-### 5.5 广播合并
+### 5.6 pending 窗口版本控制(根治无锈意图问题)
+
+**问题**:A 打锦囊 → 开无锈窗口 W1。B、C 同时想无锈 A 的锦囊。B 先到服务端 → 应关闭 W1、开新窗口 W2(反无锈)。C 的在途 respond 意图是 W1(响应 A),不应被错误解释为 counter B(响应 W2)。官方三国杀OL 行为:C 的过期 respond 被拒,C 看到新窗口重新决定。
+
+**错误机制**:当前 `无锈可击.ts:88` 用 `slot.resume()` 保持同一 slot 开着,C 的 respond 自动打到同一 slot → 被解释为 counter B。这是 bug。
+
+**解法:pending-scoped 版本**(不是全局 CAS):
+
+1. **PendingSlot 加 `createdSeq` 字段**:创建时赋 `state.seq`
+2. **respond action 携带 `pendingSeq`**:客户端发 respond 时带当前 view.pending 对应的 seq(即客户端看到的询问窗口)
+3. **服务端校验**:respond 路径里检查 `slot.createdSeq === action.pendingSeq`
+   - 匹配 → accept,正常结算
+   - 不匹配(slot 已被新窗口替换)→ **拒绝** + `actionRejected`
+4. **无锈 close-reopen**:respond execute 不再调 `slot.resume()` 复用旧 slot;改为 `slot.resolve()` 关闭旧窗口 + 创建新 PendingSlot(新 createdSeq)
+
+```ts
+// PendingSlot 扩展
+interface PendingSlot {
+  // ...既有字段
+  createdSeq: number;   // 创建时的 state.seq,作为窗口版本号
+}
+
+// dispatch respond 路径(只影响 respond,不碰主动 action)
+if (oldSlot && action.pendingSeq !== undefined && oldSlot.createdSeq !== action.pendingSeq) {
+  return false;   // 拒绝过期窗口的 respond
+}
+```
+
+**与全局 CAS 的本质区别**:
+
+| | 全局 CAS | pending-scoped 版本 |
+|---|---|---|
+| 校验对象 | 所有 action | 只校验 respond |
+| 版本来源 | `state.seq`(全局,所有操作推进) | `slot.createdSeq`(局部,只随该 pending 窗口变化) |
+| 主动 action | 被误拒 | **不受影响** |
+| respond 过期窗口 | 误拒或误接受(看 seq 时机) | **精确拒绝** |
+
+**客户端侧**:view.pending 被设置时记下 seq(来自 events 消息的 fromSeq 或 envelope seq);发 respond 时带上。pending 为空时不带 pendingSeq。
+
+**无锈技能改动**(`无锈可击.ts` execute):`slot.resume()` 调用改为触发 close-reopen——旧 slot resolve、父 execute 创建新 请求回应 atom 带新窗口。具体实现细节实施时定,本 spec 约定语义:respond 后必关旧窗口、开新窗口。
+
+### 5.7 广播合并
 
 **engine 层**(`resolveViewEvents` 调用顺序)不变——仍在 `applyAtomImpl` 之前调,保证读 pre-mutation state(见约束 2)。
 
@@ -234,23 +276,24 @@ atom 的 `applyView` 不再设置 deadline:
 | 文件 | 改动 |
 |---|---|
 | `event-stream.ts` | **删除整个文件** |
-| `create-engine.ts` | `pushEvent`→`state.atomHistory.push`;`notifyPendingResolved` 推 atomHistory;`dispatch` 返回 `Promise<boolean>`;`resetForTest` 删 `clearEvents`;`notifyStateChange` 合并语义 |
-| `types.ts` | `GameState` 加 `atomHistory`;定义 `AppliedAtomEntry` 判别联合;`GameEvent` 类型对齐或删除(由 AppliedAtomEntry 替代) |
+| `create-engine.ts` | `pushEvent`→`state.atomHistory.push`;`notifyPendingResolved` 推 atomHistory;`dispatch` 返回 `Promise<boolean>` + respond 路径 pending-scoped 版本校验;`createAndAwaitSlot` 设 `createdSeq`;`resetForTest` 删 `clearEvents`;`notifyStateChange` 合并语义 |
+| `types.ts` | `GameState` 加 `atomHistory`;定义 `AppliedAtomEntry` 判别联合;`PendingSlot` 加 `createdSeq`;`ClientMessage` 加可选 `pendingSeq`;`GameEvent` 类型对齐或删除(由 AppliedAtomEntry 替代) |
 | `atoms/请求回应.ts` | 删 `DEFAULT_TIMEOUT_MS`;applyView 不设 deadline |
 | `atoms/并行回应.ts` | 同上 |
+| `skills/无锈可击.ts` | execute 的 `slot.resume()` 改为 close-reopen(旧 slot resolve + 新 slot 带新 createdSeq) |
 
 ### server
 
 | 文件 | 改动 |
 |---|---|
-| `session.ts` | 删 CAS 块;`broadcastNewState` 用 `lastBroadcastSeq`+`eventsForViewer`;`reconnectPlayer` 补差量;events 消息携带 pending/turnDeadline;dispatch ACK;`lastEventIndex`→`lastBroadcastSeq`;`pendingForViewer` helper |
-| `protocol.ts` | `events` 加 `pending`/`turnDeadline`/`turnTotalMs`;加 `actionRejected` 消息类型 |
+| `session.ts` | 删全局 CAS 块;respond 路径保留 pending-scoped 校验(转发给 dispatch);`broadcastNewState` 用 `lastBroadcastSeq`+`eventsForViewer`;`reconnectPlayer` 补差量;events 消息携带 pending/turnDeadline;dispatch ACK;`lastEventIndex`→`lastBroadcastSeq`;`pendingForViewer` helper |
+| `protocol.ts` | `events` 加 `pending`/`turnDeadline`/`turnTotalMs`;加 `actionRejected` 消息类型;`ClientMessage` 的 action 加可选 `pendingSeq` |
 
 ### client
 
 | 文件 | 改动 |
 |---|---|
-| `useDebugMultiConnection.ts` | 处理 `actionRejected`;events 消息读 `pending`/`turnDeadline` 填 view |
+| `useDebugMultiConnection.ts` | 处理 `actionRejected`;events 消息读 `pending`/`turnDeadline` 填 view;发 respond 时携带 `pendingSeq`(当前 view.pending 对应的 seq) |
 | `useWebSocket.ts`(正式模式路径) | 同上 |
 
 ### test
@@ -259,7 +302,8 @@ atom 的 `applyView` 不再设置 deadline:
 |---|---|
 | `tests/server/session-turn-deadline.test.ts` | 适配新协议(pending 改由 events 消息下发) |
 | `tests/engine-harness.ts` | `getEvents`→读 `state.atomHistory`;`lastEventIndex`→seq |
-| **新增** `tests/server/event-stream.test.ts` | 多 session 隔离;重连差量;CAS 删除后合法 action 不被拒;dispatch ACK |
+| **新增** `tests/server/event-stream.test.ts` | 多 session 隔离;重连差量;全局 CAS 删除后合法 action 不被拒;dispatch ACK |
+| **新增** `tests/engine/pending-version.test.ts` | pending-scoped 版本:过期窗口 respond 被拒;新窗口 respond 被接受;主动 action 不受 pendingSeq 影响;无锈 close-reopen 后 C 的在途 respond 被拒 |
 
 ### 不动的
 
@@ -304,17 +348,18 @@ atom 的 `applyView` 不再设置 deadline:
 
 1. **engine 核心**:`atomHistory` 数据模型 + `pushEvent` 改写 + `event-stream.ts` 删除 + `resetForTest`
 2. **dispatch 返回 boolean** + 引擎层调用点适配
-3. **session**:`broadcastNewState` 重写(`lastBroadcastSeq` + `eventsForViewer`)+ CAS 删除 + dispatch ACK
-4. **session 重连**:`reconnectPlayer` 差量推送
-5. **protocol**:`events` 消息扩展(pending/turnDeadline)+ `actionRejected`
-6. **pending 倒计时**:atom applyView 删硬编码 + session 下发 + 客户端读取
-7. **客户端**:`useDebugMultiConnection` / `useWebSocket` 适配
-8. **测试**:新增 + 适配既有;全绿
+3. **pending-scoped 版本**:`PendingSlot.createdSeq` + `ClientMessage.pendingSeq` + dispatch respond 路径校验
+4. **无锈 close-reopen**:`无锈可击.ts` execute 改 resolve+重建,删 `slot.resume()` 复用
+5. **session**:`broadcastNewState` 重写(`lastBroadcastSeq` + `eventsForViewer`)+ 全局 CAS 删除 + dispatch ACK
+6. **session 重连**:`reconnectPlayer` 差量推送
+7. **protocol**:`events` 消息扩展(pending/turnDeadline)+ `actionRejected`
+8. **pending 倒计时**:atom applyView 删硬编码 + session 下发 + 客户端读取
+9. **客户端**:`useDebugMultiConnection` / `useWebSocket` 适配(含 respond 携带 pendingSeq)
+10. **测试**:新增(event-stream / pending-version)+ 适配既有;全绿
 
 ---
 
 ## 十、未纳入(后续独立修复)
 
-- **无懈可击 in-flight 重解读**:C 的在途响应到达时窗口仍在,会被解释为 counter B 的 counter。这是规则正确行为(每张无懈必结算)。若要拒绝 in-flight 响应,需引入版本号/seq 机制——违反 CAS 删除决策。接受为固有行为。
-- **dispatch 并发 mutation 竞态**:极端并发下两个 execute 读同一 `localVars` 再翻转,净效果可能为零。需要 dispatch 序列化(互斥锁),独立问题。
+- **dispatch 并发 mutation 竞态**:极端并发下两个 execute 读同一 `localVars` 再翻转,净效果可能为零。需要 dispatch 序列化(互斥锁),独立问题。pending-scoped 版本控制解决了无锈意图问题(C 的在途 respond 被拒),但两个 respond 在同一 tick 进入 execute 的竞态仍需 future 的 dispatch 序列化。
 - **`events` 消息的 `operations` 字段**:`protocol.ts:32` 死字段,本次不清理。
