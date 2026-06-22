@@ -23,6 +23,7 @@ import type {
   GameView,
   Json,
   TargetFilter,
+  ViewEvent,
 } from '../src/engine/types';
 import {
   dispatch as engineDispatch,
@@ -32,6 +33,7 @@ import {
   registerSkillsFromState,
 } from '../src/engine/create-engine';
 import { getEventCount, getEvents } from '../src/engine/event-stream';
+import { getAtomDef } from '../src/engine/atom';
 import { getSkillModule } from '../src/engine/skill';
 
 // ─── 公开类型 ──────────────────────────────────────────────────
@@ -93,6 +95,8 @@ export class PlayerSession {
   private harness: SkillTestHarness;
   private frontend: FakeFrontendAPI;
   private lastEventIndex = 0;
+  /** 增量维护的 view(通过 viewReducer + applyView 更新) */
+  private _processedView: GameView | null = null;
 
   constructor(playerIndex: number, harness: SkillTestHarness) {
     this.playerIndex = playerIndex;
@@ -102,15 +106,66 @@ export class PlayerSession {
 
   // ─── 视图 ─────────────────────────────────────
 
+  /** 从 state 重建的完整 view(向后兼容,不走 event 路径) */
   get view(): GameView {
     return engineBuildView(this.harness.state, this.playerIndex);
   }
 
-  get newEvents(): GameEvent[] {
-    const all = getEvents(0);
-    const slice = all.slice(this.lastEventIndex);
-    this.lastEventIndex = all.length;
-    return slice;
+  /** 通过 event + applyView 增量维护的 view。processEvents() 后可用。 */
+  get processedView(): GameView {
+    if (!this._processedView) {
+      this._processedView = engineBuildView(this.harness.state, this.playerIndex);
+    }
+    return this._processedView;
+  }
+
+  /** 取自上次以来的新事件(per-player 分叉:toViewEvents → 按 viewer 过滤) */
+  newEvents(): ViewEvent[] {
+    const all = getEvents(this.lastEventIndex);
+    this.lastEventIndex = getEventCount();
+    return this.splitEventsForPlayer(all);
+  }
+
+  /** 将全局 GameEvent 按 toViewEvents 分叉为当前玩家可见的 ViewEvent[] */
+  private splitEventsForPlayer(events: GameEvent[]): ViewEvent[] {
+    const result: ViewEvent[] = [];
+    for (const e of events) {
+      if (e.kind === 'atom' && e.viewEvents) {
+        const owner = e.viewEvents.ownerViews.get(this.playerIndex);
+        if (owner === null) continue;  // 隐藏
+        const viewEvent = owner ?? e.viewEvents.othersView;
+        if (viewEvent) result.push(viewEvent);
+      } else if (e.kind === 'atom') {
+        const viewEvent = e.viewEvents?.othersView;
+        if (viewEvent) result.push(viewEvent);
+      } else if (e.kind === 'notify') {
+        const data = e.views ? (e.views.get(String(this.playerIndex)) ?? null) : e.data;
+        if (data !== null) {
+          result.push({ type: 'notify', skillId: e.skillId, eventType: e.eventType, data } as unknown as ViewEvent);
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * 处理新事件:取 per-player 分叉事件,通过 viewReducer(applyView) 增量更新 processedView。
+   * 每次 dispatch/pass 后自动调用。断言前必须先 processEvents()。
+   */
+  processEvents(): ViewEvent[] {
+    const events = this.newEvents();
+    for (const evt of events) {
+      const raw = evt as Record<string, unknown>;
+      const type = typeof raw.atomType === 'string' ? raw.atomType : (typeof raw.type === 'string' ? raw.type : '');
+      if (!type || type === 'notify') continue;
+      try {
+        const def = getAtomDef(type);
+        def.applyView?.(this.processedView, evt);
+      } catch {
+        // atom 未注册或 applyView 报错——静默跳过,让 expectView 捕获不一致
+      }
+    }
+    return events;
   }
 
   availableActions(): ActionDef[] {
@@ -140,6 +195,7 @@ export class PlayerSession {
   async pass(): Promise<void> {
     await engineFireTimeout(this.harness.state);
     await this.harness.waitForStable();
+    this.processEvents();
   }
 
   /** 确认/取消(八卦阵、遗计确认等)。choice=false 等同 pass()。 */
@@ -150,7 +206,7 @@ export class PlayerSession {
     }
     const slot = [...this.harness.state.pendingSlots.values()][0];
     if (!slot) throw new Error('confirm() 但无 pending');
-    return this.dispatch({
+    await this.dispatch({
       skillId: (slot.atom as Record<string, Json>).requestType as string ?? '请求回应',
       actionType: 'confirm',
       params: { choice: true },
@@ -278,6 +334,36 @@ export class PlayerSession {
     }
   }
 
+  /**
+   * 断言 processedView 内容。fn 接收当前玩家的增量 view,可在其中检查字段。
+   * 必须在 processEvents() 之后调用。
+   */
+  expectView(fn: (view: GameView) => void): void {
+    if (!this._processedView) {
+      throw new Error('expectView(): 请先调用 processEvents() 初始化 processedView');
+    }
+    try {
+      fn(this._processedView);
+    } catch (e) {
+      const view = this._processedView;
+      const players = view.players.map(p => `P${p.index}:${p.character || '?'} hp=${p.health} hand=${p.handCount}`).join(', ');
+      throw new Error(`expectView 断言失败: ${players}\n${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  /**
+   * 断言 processedView 中指定玩家的角色名。
+   */
+  expectCharacter(playerIndex: number, expected: string): void {
+    this.expectView(v => {
+      const p = v.players.find(pl => pl.index === playerIndex);
+      if (!p) throw new Error(`玩家 ${playerIndex} 不存在`);
+      if (p.character !== expected) {
+        throw new Error(`P${playerIndex}.character = '${p.character}', 期望 '${expected}'`);
+      }
+    });
+  }
+
   // ─── pending 回应推导(等价于前端 pendingRespondInfo) ───
 
   /**
@@ -390,6 +476,7 @@ export class PlayerSession {
     msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
   ): Promise<void> {
     await this.tryDispatch(msg);
+    this.processEvents();
   }
 }
 
