@@ -1,6 +1,6 @@
 // src/engine/atoms/回合结束.ts
 // 回合结束:清空本回合临时 vars,清 turn 持续 mark
-import type { AtomDefinition } from '../types';
+import type { AtomDefinition, GameView } from '../types';
 import { registerAtom } from '../atom';
 
 export const 回合结束: AtomDefinition<{ player: number }> = {
@@ -23,7 +23,15 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
       );
     }
   },
-  effect: { sound: 'turn_end', duration: 200 },
+  effect: { sound: 'turn_end', duration: 800 },
+  applyView(view: GameView) {
+    // 清空本回合临时 vars(与 apply 对称)
+    view.turn.vars = {};
+    // 清理每个玩家 duration==='turn' 的 marks(view 侧可见)
+    for (const p of view.players) {
+      p.marks = p.marks.filter(m => m.duration !== 'turn');
+    }
+  },
 };
 
 registerAtom(回合结束);

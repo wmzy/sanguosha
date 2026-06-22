@@ -20,9 +20,9 @@ export const 造成伤害: AtomDefinition<{
     // 注意:扣到 0 不直接设 alive=false——进入濒死流程(求桃),无人救才 击杀
     // alive 的清理由 击杀 atom 负责
   },
-  effect: { sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 400 },
+  effect: { sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 1000 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { sound: 'damage_physical' as const, animation: 'shake' as const, particles: 'blood' as const, duration: 400 };
+    const effect = { sound: 'damage_physical' as const, animation: 'shake' as const, particles: 'blood' as const, duration: 1000 };
     const view: ViewEvent = {
       type: '造成伤害',
       target: atom.target,

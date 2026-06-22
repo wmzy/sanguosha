@@ -4,11 +4,12 @@
 //   1. 选将完成后(perspective 玩家已有 character,但仍在选将阶段):
 //      不展示选将遮罩(CharSelectOverlay),只展示等待遮罩(CharSelectWaitingOverlay)。
 //   2. 等待遮罩中央展示已选武将卡:武将名、势力、体力上限、技能。
-//   3. debug 模式下 allCharSelectSlots 残留已选完玩家的 slot 时,
-//      useCharSelect 正确过滤,不展示该玩家的选将界面。
-//   4. 正式模式:viewer 已选完,pending 为空,phase 仍为'准备'(他人未选),
+//   3. 正式模式:viewer 已选完,pending 为空,phase 仍为'准备'(他人未选),
 //      展示等待遮罩 + 已选武将卡。
+//   4. debug 多 WS 模型下切到目标座次连接即看其选将 pending,
+//      本文件不再覆盖跨连接「代打选将」场景(已迁出,见 debug-parallel-charselect)。
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GameViewComponent, type ActionMsg } from '../../src/client/components/GameView';
 import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
@@ -17,7 +18,8 @@ import type { GameView } from '../../src/engine/types';
 
 /** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角) */
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
-  const { perspective, switchPerspective, goToCurrentPlayer, setPerspective, autoSwitchCtl } = useDebugPerspective(view);
+  const [perspective, setPerspective] = useState(view.viewer);
+  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(view, perspective, view.players.length, setPerspective);
   return (
     <GameViewComponent
       view={view}
@@ -65,7 +67,6 @@ function makeFormalWaitingView(): GameView {
     ],
     cardMap: {},
     pending: null, // viewer 已选完,无 pending
-    allCharSelectSlots: undefined, // 正式模式不填充
     turnDeadline: null,
     turnTotalMs: 0,
     log: [],
@@ -73,8 +74,9 @@ function makeFormalWaitingView(): GameView {
 }
 
 /**
- * debug 模式:viewer(主公)已选完,allCharSelectSlots 含其他未选玩家 slot。
- * 期望:自动切到第一个未选玩家展示其选将界面。
+ * debug 多 WS 模型:viewer(主公)已选完,本连接无 pending。
+ * (旧 allCharSelectSlots 代打场景已迁出 — 现在切到目标连接即可看到其 pending。)
+ * 保留此函数返回占位结构供回归用例渲染,assertions 不再依赖跨连接 slot。
  */
 function makeDebugWaitingView(): GameView {
   return {
@@ -89,20 +91,6 @@ function makeDebugWaitingView(): GameView {
     ],
     cardMap: {},
     pending: null,
-    allCharSelectSlots: [
-      {
-        type: 'awaits',
-        atom: { type: '选将询问', target: 1, candidates: [{ name: '孙权', skills: ['制衡'] }] },
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
-        target: 1, deadline: Date.now() + 60000, totalMs: 60000,
-      },
-      {
-        type: 'awaits',
-        atom: { type: '选将询问', target: 2, candidates: [{ name: '关羽', skills: ['武圣'] }] },
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
-        target: 2, deadline: Date.now() + 60000, totalMs: 60000,
-      },
-    ],
     turnDeadline: null,
     turnTotalMs: 0,
     log: [],
@@ -140,16 +128,30 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
     expect(screen.queryByText('主公选将')).toBeNull();
   });
 
-  it('debug 模式:viewer 已选完,自动切到未选玩家展示其选将界面(viewer 自己看不到选将遮罩)', () => {
+  it('debug 模式:viewer 已选完,本连接显示等待遮罩(viewer 自己已选武将卡,看不到他人选将 pending)', () => {
+    // 新模型:每个座次是独立 viewer,viewer(主公)连接看不到 player-1 的选将 pending。
+    // useDebugPerspective 自动跟随没有 pending → 回 currentPlayerIndex(=0)→ perspective 保持 0。
+    // 渲染:CharSelectWaitingOverlay(因为 !isCharSelectPending && charSelectInProgress && perspectiveCharSelected),
+    //       中央展示当前 perspective(主公)已选的武将卡。
     const view = makeDebugWaitingView();
     render(<TestGameView view={view} onAction={() => {}} />);
 
-    // 等待自动切换到第一个未选玩家(player-1)的选将界面
-    // player-1 的候选人"孙权"应可见
-    expect(screen.getByText('孙权')).toBeDefined();
+    // 等待遮罩文案(已选武将 + 等待其他玩家)
+    expect(screen.getByText(/已选择武将,等待其他玩家选将/)).toBeDefined();
 
-    // viewer(主公刘备)的选将界面不应出现:不应有 P0 选将中
+    // 中央展示当前 perspective 玩家的已选武将卡(主公刘备)
+    expect(screen.getByText('你的选择')).toBeDefined();
+    expect(screen.getAllByText('刘备').length).toBeGreaterThan(0);
+    expect(screen.getByText('蜀')).toBeDefined();
+    // 武将自身技能(过滤默认技能后):仁德
+    expect(screen.getAllByText(/仁德/).length).toBeGreaterThan(0);
+
+    // viewer 连接的 view.pending 为空 → 不应展示 CharSelectOverlay 的候选人/确认按钮
+    expect(screen.queryByRole('button', { name: /确认选择/ })).toBeNull();
+    // 等待遮罩列出"player-1、player-2 正在选将",但不暴露他人的选将界面
     expect(screen.queryByText(/P0 选将中/)).toBeNull();
+    expect(screen.queryByText(/P1 选将中/)).toBeNull();
+    expect(screen.queryByText('孙权')).toBeNull();
   });
 
   it('正式模式:未选完的玩家仍展示选将遮罩(pending 非空),不展示已选武将卡', () => {
@@ -175,7 +177,6 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
         target: 1, deadline: Date.now() + 60000, totalMs: 60000,
       },
-      allCharSelectSlots: undefined,
       turnDeadline: null,
       turnTotalMs: 0,
       log: [],
@@ -215,7 +216,6 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
         target: 0, deadline: Date.now() + 60000, totalMs: 60000,
       },
-      allCharSelectSlots: undefined,
       turnDeadline: null,
       turnTotalMs: 0,
       log: [],

@@ -48,21 +48,21 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
 
     // 弃牌堆目标 → 弃牌事件
     if (atom.to.zone === '弃牌堆' && fromPlayer && cardInfo) {
-      const effect = { sound: 'discard' as const, duration: 200 };
+      const effect = { sound: 'discard' as const, duration: 600 };
       const view: ViewEvent = { type: '弃牌', player: fromPlayer, card: cardInfo, effect };
       return { ownerViews: new Map(), othersView: view };
     }
 
     // 手牌→处理区 = 打出
     if (atom.to.zone === '处理区' && fromPlayer && cardInfo) {
-      const effect = { sound: 'play_card' as const, duration: 200 };
+      const effect = { sound: 'play_card' as const, duration: 800 };
       const view: ViewEvent = { type: '打出', player: fromPlayer, card: cardInfo, effect };
       return { ownerViews: new Map(), othersView: view };
     }
 
     // 牌堆→手牌 = 摸牌（信息分级）
     if (atom.from.zone === '牌堆' && toPlayer && cardInfo) {
-      const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 200 };
+      const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
       const ownerView: ViewEvent = { type: '摸牌', player: toPlayer, count: 1, cards: [cardInfo], effect };
       const othersView: ViewEvent = { type: '摸牌', player: toPlayer, count: 1, effect };
       return { ownerViews: new Map([[toPlayer, ownerView]]), othersView };

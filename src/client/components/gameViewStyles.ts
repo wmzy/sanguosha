@@ -287,6 +287,12 @@ export const handHeader = css`
 `;
 export const handTitle = css`font-size: 14px; color: #aaa; font-weight: bold;`;
 export const debugHint = css`color: #666; font-weight: normal; font-size: 12px;`;
+
+// ─── Event overlay(延时展示,非阻塞) ───
+export const eventOverlay = css`
+  pointer-events: none;
+  user-select: none;
+`;
 export const cancelBtn = css`
   border: 1px solid #555; border-radius: 4px; padding: 2px 8px;
   cursor: pointer; background: transparent; color: #aaa; font-size: 11px;

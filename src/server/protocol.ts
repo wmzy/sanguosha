@@ -1,20 +1,23 @@
 // src/server/protocol.ts
-// 服务端协议层 — 切到新 ENGINE-DESIGN ClientMessage + GameView
-// 新 ENGINE-DESIGN 没有独立的事件流序号(SequencedEvent 取消),
-// 客户端轮询/订阅 state.seq 即可,断线重连直接拉最新 GameView。
-import type { ClientMessage as EngineClientMessage, GameView, Json } from '../engine/types';
+// 服务端协议层 — 按 ENGINE-DESIGN §8.2 事件流分叉广播。
+// 服务端按 viewer 对事件流做 per-player 分叉,推送该 viewer 可见的 ViewEvent[]。
+// 断线重连:拉 initialView baseline + 续推 lastSeq 之后的 events。
+import type { ClientMessage as EngineClientMessage, GameView, Json, ViewEvent } from '../engine/types';
 import type { Operation } from '../shared/log';
 
 export type EventSeq = number;
 
 /**
  * 服务端发往客户端的消息。
- * initialView / debugGameState 用新 ENGINE-DESIGN 的 GameView(viewer 隔离)。
+ * - initialView: 全量 baseline(首次/重连),viewer 隔离的 GameView。
+ *   debug 多 WS 模型下,每个座次是独立连接,各自收自己 viewer 的 initialView。
+ * - events: 增量事件流(§8.2.2),per-viewer 分叉后的 ViewEvent[],
+ *   客户端走 viewReducer 增量更新 + playEffect 播放动画。
+ * 两种消息都携带 viewer 字段,标识归属哪个座次视角。
  */
 export type ServerMessage =
-  | { type: 'initialView'; state: GameView; lastSeq: EventSeq }
-  | { type: 'debugGameState'; state: GameView; lastSeq: EventSeq }
-  | { type: 'events'; fromSeq: EventSeq; events: GameEventEnvelope[]; operations?: Operation[] }
+  | { type: 'initialView'; viewer: number; state: GameView; lastSeq: EventSeq }
+  | { type: 'events'; viewer: number; fromSeq: EventSeq; events: GameEventEnvelope[]; operations?: Operation[] }
   | { type: 'error'; message: string }
   | { type: 'gameOver'; winner: string }
   | { type: 'room_joined'; roomId: string; playerId: string; seatIndex?: number }
@@ -26,16 +29,18 @@ export type ServerMessage =
   | { type: 'room_list'; rooms: RoomInfo[] };
 
 /**
- * 推送给客户端的事件 envelope(per-player 视图)。
- * 新 ENGINE-DESIGN 的事件流由 atom + notify 组成(见 types.ts GameEvent)。
+ * 推送给客户端的事件 envelope(per-viewer 已分叉)。
+ * session 从 ViewEventSplit 按 viewer 可见性投影后,填入 viewEvent(或 notify)。
+ * - viewEvent: atom 转换后的前端视图事件(含 effect),前端走 viewReducer + playEffect。
+ * - notify: 技能通知事件(按 views 分叉后),前端按 skillId+eventType 订阅。
  */
 export interface GameEventEnvelope {
   seq: EventSeq;
   /** 事件 timestamp,相对 game startedAt */
   timestamp: number;
-  /** atom 事件 */
-  atom?: import('../engine/types').Atom;
-  /** 通知事件 */
+  /** atom 事件(per-viewer 分叉后的视图事件,含 effect) */
+  viewEvent?: ViewEvent;
+  /** 通知事件(per-viewer 分叉后的 data) */
   notify?: { skillId: string; eventType: string; data: Json };
 }
 

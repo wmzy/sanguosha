@@ -1,6 +1,6 @@
 // src/engine/atoms/获得.ts
 // 获得:玩家获得一张牌(可选从指定玩家处)
-import type { AtomDefinition } from '../types';
+import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 获得: AtomDefinition<{ player: number; cardId: string; from?: number }> = {
@@ -22,6 +22,27 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
       fromP.equipment = equipment;
     }
     state.players[atom.player].hand.push(atom.cardId);
+  },
+  effect: { sound: 'obtain', animation: 'slide', duration: 600 },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const view: ViewEvent = {
+      type: '获得',
+      player: atom.player,
+      cardId: atom.cardId,
+      ...(atom.from !== undefined ? { from: atom.from } : {}),
+      effect: { sound: 'obtain' as const, animation: 'slide' as const, duration: 600 },
+    };
+    return { ownerViews: new Map(), othersView: view };
+  },
+  applyView(view, event) {
+    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    if (pi < 0) return;
+    const cardId = event.cardId as string | undefined;
+    view.players[pi].handCount += 1;
+    if (cardId && view.players[pi].hand) {
+      const card = view.cardMap[cardId];
+      if (card) view.players[pi].hand!.push(card);
+    }
   },
 };
 

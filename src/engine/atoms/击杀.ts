@@ -23,9 +23,9 @@ export const 击杀: AtomDefinition<{ player: number }> = {
       }
     }
   },
-  effect: { sound: 'death', animation: 'fade', duration: 1000 },
+  effect: { sound: 'death', animation: 'fade', duration: 1500 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const view: ViewEvent = { type: '击杀', player: atom.player, effect: { sound: 'death', animation: 'fade', duration: 1000 } };
+    const view: ViewEvent = { type: '击杀', player: atom.player, effect: { sound: 'death', animation: 'fade', duration: 1500 } };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {

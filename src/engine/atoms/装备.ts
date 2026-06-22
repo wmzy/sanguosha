@@ -3,7 +3,7 @@
 // 进攻马/防御马的距离修正不再在此硬编码——由马匹技能(赤兔/的卢等)通过
 // 添加技能/移除技能 hook 设置 vars(距离/进攻修正|距离/防御修正),与马术等武将技能一致。
 // 对应 卸下 atom 负责清除武器范围;马匹 vars 由技能卸载清理。
-import type { AtomDefinition, EquipSlot, GameState } from '../types';
+import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 function inferSlot(cardType: string | undefined): EquipSlot | null {
@@ -45,6 +45,27 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     player.equipment[slot] = atom.cardId;
     // 设距离修正 vars(卸下 atom 清除)
     applyEquipVars(state, atom.player, slot, card);
+  },
+  effect: { sound: 'equip', animation: 'glow', duration: 400 },
+  toViewEvents(state, atom): ViewEventSplit {
+    const card = state.cardMap[atom.cardId];
+    const slot = inferSlot(card.subtype) ?? '武器';
+    const view: ViewEvent = {
+      type: '装备',
+      player: atom.player,
+      cardId: atom.cardId,
+      slot,
+      effect: { sound: 'equip' as const, animation: 'glow' as const, duration: 400 },
+    };
+    return { ownerViews: new Map(), othersView: view };
+  },
+  applyView(view, event) {
+    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    if (pi < 0) return;
+    const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
+    if (slot) {
+      view.players[pi].equipment[slot] = event.cardId as string;
+    }
   },
 };
 

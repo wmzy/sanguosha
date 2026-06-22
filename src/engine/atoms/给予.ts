@@ -1,6 +1,6 @@
 // src/engine/atoms/给予.ts
 // 给予:从 from 玩家手牌将 cardId 给予 to 玩家
-import type { AtomDefinition } from '../types';
+import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }> = {
@@ -18,6 +18,35 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
     const toIdx = atom.to;
     state.players[fromIdx].hand = state.players[fromIdx].hand.filter(id => id !== atom.cardId);
     state.players[toIdx].hand.push(atom.cardId);
+  },
+  effect: { sound: 'give', animation: 'slide', duration: 600 },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const view: ViewEvent = {
+      type: '给予',
+      cardId: atom.cardId,
+      from: atom.from,
+      to: atom.to,
+      effect: { sound: 'give' as const, animation: 'slide' as const, duration: 600 },
+    };
+    return { ownerViews: new Map(), othersView: view };
+  },
+  applyView(view, event) {
+    const cardId = event.cardId as string | undefined;
+    const fromPi = view.players.findIndex(p => p.index === (event.from as number));
+    if (fromPi >= 0) {
+      view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
+      if (cardId && view.players[fromPi].hand) {
+        view.players[fromPi].hand = view.players[fromPi].hand!.filter(c => c.id !== cardId);
+      }
+    }
+    const toPi = view.players.findIndex(p => p.index === (event.to as number));
+    if (toPi >= 0) {
+      view.players[toPi].handCount += 1;
+      if (cardId && view.players[toPi].hand) {
+        const card = view.cardMap[cardId];
+        if (card) view.players[toPi].hand!.push(card);
+      }
+    }
   },
 };
 

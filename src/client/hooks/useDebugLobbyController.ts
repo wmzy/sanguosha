@@ -1,34 +1,26 @@
-// src/hooks/useDebugLobbyController.ts — 调试大厅控制器 hook
+// src/client/hooks/useDebugLobbyController.ts
+// 调试大厅控制器 hook — 管理房间列表/创建/删除(非游戏内逻辑)。
 //
-// 新 ENGINE-DESIGN: 服务器发 GameView,客户端发 ClientMessage。
-// 不再用 SequencedEvent / reduceGameState / GameAction。
+// 游戏内逻辑(view/action/多 WS 连接)由 useDebugMultiConnection 处理。
+// 本 hook 只负责:房间列表刷新、创建 debug 房、删除房间、错误提示。
+// 已加入房间后,DebugLobby 用 useDebugMultiConnection 管理游戏连接。
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from './useWebSocket';
 import { storeSession, loadSession, clearSession } from '../utils/debugSession';
 import { apiFetch, ApiError } from '../api/client';
-import type { GameView, Json } from '../../engine/types';
 import type { ServerMessage, RoomInfo } from '../../server/protocol';
 
-/** 客户端发的 action(不含 baseSeq) */
-interface ActionMsg {
-  skillId: string;
-  actionType: string;
-  ownerId: number;
-  params: Record<string, Json>;
-}
-
 export interface DebugLobbyController {
+  /** 控制用 WS 连接(房间列表/创建,非游戏连接) */
   connected: boolean;
-  view: GameView | null;
-  playerNames: string[];
+  /** 当前已加入的房间 ID(null = 未加入) */
+  activeRoomId: string | null;
   debugRooms: RoomInfo[];
   error: string | null;
   playerCount: number;
   setPlayerCount: (n: number) => void;
-  sendAction: (action: ActionMsg) => void;
-  reorderHand: (order: string[]) => void;
   refreshRoomList: () => void;
   handleCreateDebugRoom: () => Promise<void>;
   handleDeleteRoom: () => void;
@@ -43,85 +35,37 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   const { connected, send, onMessage } = useWebSocket(wsUrl);
 
-  const [view, setView] = useState<GameView | null>(null);
-  const [playerNames, setPlayerNames] = useState<string[]>([]);
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [debugRooms, setDebugRooms] = useState<RoomInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [playerCount, setPlayerCount] = useState(5);
-  const lastSeqRef = useRef(0);
-  const viewRef = useRef<GameView | null>(null);
-
 
   useEffect(() => {
     if (connected) send({ type: 'list_rooms', filter: 'debug' });
   }, [connected, send]);
 
-  // 加入房间: connected 时 initialRoomId 变化也触发
-  // disconnect 时重置 prevRoomRef,确保重连后重新 join
+  // initialRoomId:进入页面时自动加入指定房间
   const prevRoomRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!connected) { prevRoomRef.current = undefined; return; }
     if (!initialRoomId) return;
     if (prevRoomRef.current === initialRoomId) return;
     prevRoomRef.current = initialRoomId;
+    setActiveRoomId(initialRoomId);
+  }, [connected, initialRoomId]);
 
-    const session = loadSession();
-    if (session?.roomId === initialRoomId) {
-      send({ type: 'reconnect', playerId: session.playerId, lastSeq: lastSeqRef.current });
-    } else {
-      send({ type: 'join_debug_room', roomId: initialRoomId, lastSeq: lastSeqRef.current });
-    }
-  }, [connected, initialRoomId, send]);
-
-  useEffect(() => { viewRef.current = view; }, [view]);
-
-  // 消息处理
+  // 消息处理:只处理房间列表/错误(游戏消息由多连接 hook 处理)
   useEffect(() => {
     const unsubscribe = onMessage((msg: ServerMessage) => {
-      if (msg.type === 'debugGameState') {
-        lastSeqRef.current = msg.lastSeq;
-        setView(msg.state);
-        // 从 GameView 推导 playerNames(调试模式 server 不单独下发)
-        // GameView 没有 name 字段,用 index 编号
-        if (playerNames.length === 0 && msg.state.players.length > 0) {
-          setPlayerNames(msg.state.players.map((_, i) => `P${i + 1}`));
-        }
-      } else if (msg.type === 'initialView') {
-        lastSeqRef.current = msg.lastSeq;
-        setView(msg.state);
-      } else if (msg.type === 'room_list') {
+      if (msg.type === 'room_list') {
         setDebugRooms(msg.rooms);
-      } else if (msg.type === 'room_joined') {
-        storeSession(msg.roomId, msg.playerId);
-        window.history.replaceState(null, '', `/debug/${msg.roomId}`);
       } else if (msg.type === 'error') {
-        if (initialRoomId && !viewRef.current) {
-          clearSession();
-          navigate('/debug', { replace: true });
-        } else {
-          setError(msg.message);
-          setTimeout(() => setError(null), 3000);
-        }
+        setError(msg.message);
+        setTimeout(() => setError(null), 3000);
       }
     });
     return unsubscribe;
-  }, [onMessage, initialRoomId, navigate, playerNames.length]);
-
-  // 发送 action(自动加 baseSeq)
-  const sendAction = useCallback(
-    (action: ActionMsg) => {
-      send({ type: 'action', action: { ...action, baseSeq: lastSeqRef.current }, baseSeq: lastSeqRef.current });
-    },
-    [send],
-  );
-
-  // 整理手牌:重排顺序,不走 action 消息,直接 mutate 后端 hand
-  const reorderHand = useCallback(
-    (order: string[]) => {
-      send({ type: 'reorder_hand', order });
-    },
-    [send],
-  );
+  }, [onMessage]);
 
   const refreshRoomList = useCallback(() => send({ type: 'list_rooms', filter: 'debug' }), [send]);
 
@@ -132,9 +76,9 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerCount }),
       });
-      // navigate 在同 path 下可能不触发路由切换。
-      // 用 window.location.href 强制刷新，确保新组件挂载 + useEffect join 触发。
-      window.location.href = `/debug/${data.roomId}`;
+      storeSession(data.roomId, `debug-${data.roomId}-lobby`);
+      window.history.replaceState(null, '', `/debug/${data.roomId}`);
+      setActiveRoomId(data.roomId);
     } catch (err) {
       if (err instanceof ApiError) {
         setError((err.body as { error?: string }).error ?? '创建失败');
@@ -143,53 +87,38 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       }
       setTimeout(() => setError(null), 3000);
     }
-  }, [playerCount, navigate, send]);
+  }, [playerCount]);
 
   const handleDeleteRoom = useCallback(() => {
-    const session = loadSession();
-    if (session?.roomId) {
-      apiFetch<void>(`/api/rooms/${session.roomId}`, { method: 'DELETE' }).catch(() => {});
-    }
+    if (!activeRoomId) return;
+    apiFetch<void>(`/api/rooms/${activeRoomId}`, { method: 'DELETE' }).catch(() => {});
     clearSession();
-    lastSeqRef.current = 0;
-    setView(null);
-    setPlayerNames([]);
+    setActiveRoomId(null);
     navigate('/');
-  }, [navigate]);
+  }, [activeRoomId, navigate]);
 
-  const handleJoinDebugRoom = useCallback(
-    (roomId: string) => {
-      lastSeqRef.current = 0;
-      setPlayerNames([]);
-      send({ type: 'join_debug_room', roomId });
-    },
-    [send],
-  );
+  const handleJoinDebugRoom = useCallback((roomId: string) => {
+    setActiveRoomId(roomId);
+    window.history.replaceState(null, '', `/debug/${roomId}`);
+  }, []);
 
-  const handleDeleteDebugRoom = useCallback(
-    (roomId: string) => {
-      apiFetch<void>(`/api/rooms/${roomId}`, { method: 'DELETE' })
-        .then(() => send({ type: 'list_rooms', filter: 'debug' }))
-        .catch(() => {});
-    },
-    [send],
-  );
+  const handleDeleteDebugRoom = useCallback((roomId: string) => {
+    apiFetch<void>(`/api/rooms/${roomId}`, { method: 'DELETE' })
+      .then(() => send({ type: 'list_rooms', filter: 'debug' }))
+      .catch(() => {});
+  }, [send]);
 
   const handleExit = useCallback(() => {
     handleDeleteRoom();
-    navigate('/');
-  }, [handleDeleteRoom, navigate]);
+  }, [handleDeleteRoom]);
 
   return {
     connected,
-    view,
-    playerNames,
+    activeRoomId,
     debugRooms,
     error,
     playerCount,
     setPlayerCount,
-    sendAction,
-    reorderHand,
     refreshRoomList,
     handleCreateDebugRoom,
     handleDeleteRoom,

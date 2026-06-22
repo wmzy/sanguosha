@@ -5,14 +5,16 @@ import type {
   ClientMessage as EngineClientMessage,
   GameState,
   GameView,
+  ViewEvent,
 } from '../engine/types';
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 import { allCharacters } from '../engine/cards/characters';
 import { TURN_IDLE_TIMEOUT_MS } from '../engine/view/buildView';
+import { getEventsSince, clearEvents } from '../engine/event-stream';
 
 import '../engine/atoms';
 import '../engine/skills';
-import type { ServerMessage } from './protocol';
+import type { ServerMessage, GameEventEnvelope } from './protocol';
 import { serialize } from './protocol';
 import type { Room } from './room';
 import { createLogger } from './logger';
@@ -46,6 +48,8 @@ export class GameSession {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private sessionSeed: number;
   private logger = createLogger('session');
+  /** 上一次广播到的 seq。broadcastNewState 推 (lastBroadcastSeq, state.seq] 之间的事件。 */
+  private lastBroadcastSeq = 0;
   /** 调试房间:首人加入后开局的玩家人数(由 app 写入,handleJoinDebugRoom 读取后清空) */
   public pendingPlayerCount?: number;
 
@@ -212,10 +216,10 @@ export class GameSession {
     }
     // 直接 mutate hand 顺序
     player.hand = [...order];
-    // 只给该玩家广播最新 view(其他人看到的 handCount 不变,无需广播)
+    // 只给该玩家发其座次的 initialView(其他人 handCount 不变,无需广播)
     const state = this.state;
-    const view = buildView(state, playerIndex, this.debug);
-    this.sendToPlayer(playerId, { type: this.debug ? 'debugGameState' : 'initialView', state: view, lastSeq: state.seq });
+    const view = buildView(state, playerIndex);
+    this.sendToPlayer(playerId, { type: 'initialView', viewer: playerIndex, state: view, lastSeq: state.seq });
     // 触发持久化(state 快照会带上最新顺序),但不走 onStateChange(避免全量广播)
     this.persistAsync();
   }
@@ -247,38 +251,87 @@ export class GameSession {
   }
 
 
+  /**
+   * 广播状态变更:按 ENGINE-DESIGN §8.2 per-viewer 分叉推送 events。
+   * debug 与正式模式统一:每个已连接 viewer 收到自己座次的分叉事件。
+   * debug 多 WS 模型下,每个座次是独立连接,自然只收自己的分叉。
+   */
   private broadcastNewState(): void {
     if (!this.state) return;
-    if (this.debug) {
-      // debug 模式:每个玩家用自己被分配的座次作为 viewer(支持切换视角)
-      const state = this.state;
-      for (const [pid] of this.room.players) {
-        const viewer = this.playerNames.get(pid) ?? 0;
-        const view = buildView(state, viewer, this.debug);
-        this.sendToPlayer(pid, { type: 'debugGameState', state: view, lastSeq: state.seq });
-      }
-      return;
-    }
     const state = this.state;
-    for (const [playerId, playerIndex] of this.playerNames) {
-      if (playerIndex < 0 || playerIndex >= state.players.length) continue;
-      const view = buildView(state, playerIndex);
-      this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
+    const allEvents = getEventsSince(this.lastBroadcastSeq);
+    const newSeq = state.seq;
+
+    for (const [playerId, viewer] of this.playerNames) {
+      if (viewer < 0 || viewer >= state.players.length) continue;
+      const envelopes = this.projectEventsForViewer(allEvents, viewer, state.startedAt);
+      this.sendToPlayer(playerId, {
+        type: 'events',
+        viewer,
+        fromSeq: this.lastBroadcastSeq,
+        events: envelopes,
+      });
     }
+    this.lastBroadcastSeq = newSeq;
+    clearEvents();
   }
 
+  /**
+   * 把全局事件流按 viewer 可见性投影为 envelope 列表(§8.2.2)。
+   * - atom 事件:ownerViews.get(viewer) 命中用专属内容;null=隐藏跳过;否则用 othersView
+   * - notify 事件:按 views map 分叉(未实现 views 时全体可见)
+   */
+  private projectEventsForViewer(
+    events: import('../engine/types').GameEvent[],
+    viewer: number,
+    startedAt: number,
+  ): GameEventEnvelope[] {
+    const out: GameEventEnvelope[] = [];
+    const timestamp = Date.now() - startedAt;
+    for (const e of events) {
+      if (e.kind === 'atom' && e.viewEvents) {
+        const owner = e.viewEvents.ownerViews.get(viewer);
+        if (owner === null) continue;             // 隐藏
+        const viewEvent: ViewEvent | undefined | null = owner ?? e.viewEvents.othersView;
+        if (!viewEvent) continue;                  // 无可见内容
+        out.push({ seq: e.seq, timestamp, viewEvent });
+      } else if (e.kind === 'atom') {
+        const viewEvent = e.viewEvents?.othersView;
+        if (viewEvent) out.push({ seq: e.seq, timestamp, viewEvent });
+      } else if (e.kind === 'notify') {
+        const data = e.views ? (e.views.get(String(viewer)) ?? null) : e.data;
+        if (data !== null) {
+          out.push({ seq: e.seq, timestamp, notify: { skillId: e.skillId, eventType: e.eventType, data } });
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * 向所有已连接玩家发送 initialView baseline(首次/重连用)。
+   * 每个 viewer 收到自己座次的完整 GameView,后续增量走 events。
+   */
   private sendInitialViewToAll(): void {
     if (!this.state) return;
-    this.broadcastNewState();
+    const state = this.state;
+    for (const [playerId, viewer] of this.playerNames) {
+      if (viewer < 0 || viewer >= state.players.length) continue;
+      const view = buildView(state, viewer);
+      this.sendToPlayer(playerId, { type: 'initialView', viewer, state: view, lastSeq: state.seq });
+    }
+    // baseline 后同步 lastBroadcastSeq,避免 baseline 内容又被 events 重发
+    this.lastBroadcastSeq = state.seq;
+    clearEvents();
   }
 
-  private sendDebugGameState(playerId: string, lastSeq?: number): void {
+  /** 向单个玩家发其座次的 initialView(重连用) */
+  private sendInitialViewToPlayer(playerId: string): void {
     if (!this.state) return;
-    // debug 模式:用玩家被分配的座次作为 viewer(支持切换视角)
-    const viewer = this.debug ? (this.playerNames.get(playerId) ?? 0) : (this.playerNames.get(playerId) ?? 0);
-    const view = buildView(this.state, viewer, this.debug);
-    const state = this.state;
-    this.sendToPlayer(playerId, { type: 'debugGameState', state: view, lastSeq: lastSeq ?? state.seq });
+    const viewer = this.playerNames.get(playerId);
+    if (viewer === undefined || viewer < 0 || viewer >= this.state.players.length) return;
+    const view = buildView(this.state, viewer);
+    this.sendToPlayer(playerId, { type: 'initialView', viewer, state: view, lastSeq: this.state.seq });
   }
 
   handleDisconnect(playerId: string): void {
@@ -318,20 +371,8 @@ export class GameSession {
     this.disconnectedAt.delete(playerId);
     this.clearGraceTimer();
     this.room.players.set(playerId, ws);
-
-    if (this.debug) {
-      const state = this.state;
-      this.sendDebugGameState(playerId, state.seq);
-    } else {
-      const playerIndex = this.playerNames.get(playerId);
-      if (playerIndex !== undefined && playerIndex >= 0) {
-        const state = this.state;
-        if (playerIndex < state.players.length) {
-          const view = buildView(state, playerIndex);
-          this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
-        }
-      }
-    }
+    // 重连:发 initialView baseline,后续 events 从 lastSeq 续上
+    this.sendInitialViewToPlayer(playerId);
     this.broadcast({ type: 'player_reconnected', playerId });
     return true;
   }

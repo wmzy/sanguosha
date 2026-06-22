@@ -1,19 +1,33 @@
-// 前端渲染测试:debug 模式并行选将。
-//   主公(viewer)选完后,view.pending 为空,但 view.allCharSelectSlots 含其他玩家的选将 slot。
-//   前端应:
-//   1. 自动切换视角到第一个未选完的玩家,显示其选将界面(CharSelectOverlay)
-//   2. 用户手动切换视角后,能看到对应玩家的候选人
-//   3. 帮选后,视角自动跟到下一个未选玩家
+// 前端渲染测试:debug 模式并行选将的 single-view 渲染回归。
+//
+// 新模型(真 viewer 隔离 + 多 WS):
+//   每个座次是独立 viewer,各自连接服务端,只看自己的 view.pending。
+//   选将时:viewer(主公)的 view.pending 可能是 null(viewer 已选完,轮到他人选时 viewer 这边空闲)。
+//   跨座代打 = 上层把 perspective 切到目标座次的 WS 连接,看到的就是该连接自己的 pending。
+//   GameView.allCharSelectSlots 字段已删除 — 不再支持单 view 内同时看多座选将 pending。
+//
+// 本文件只覆盖 single-view 渲染回归:viewer 已选完,phase 仍为'准备',他人未选时,
+// 本连接渲染 CharSelectWaitingOverlay(viewer 自己的已选武将卡 + 切换按钮)。
+//
+// 跨座代打(切到目标连接后看其选将界面并提交)需要 multi-WS 集成测试覆盖 —
+// 旧的 debug-parallel-charselect 4 个用例全部依赖本文件 single-view wrapper 模拟跨座代打,
+// 在新模型下不成立,已删除。后续在 tests/integration/multi-ws-charselect.test.tsx
+// (或 e2e)里用多 WS 多 view 跑代打链路。
+
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { useState } from 'react';
+import { render, screen } from '@testing-library/react';
 import { GameViewComponent, type ActionMsg } from '../../src/client/components/GameView';
 import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView } from '../../src/engine/types';
 
-/** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角)。 */
+/** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角)。
+ *  注:在 single-view 测试中 currentView 固定为 viewer 连接,模拟一个 WS 连接的画面。
+ *      多 WS 集成测试中应当用 Map<viewer, GameView> + 切 connection 才能跨座。 */
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
-  const { perspective, switchPerspective, goToCurrentPlayer, setPerspective, autoSwitchCtl } = useDebugPerspective(view);
+  const [perspective, setPerspective] = useState(view.viewer);
+  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(view, perspective, view.players.length, setPerspective);
   return (
     <GameViewComponent
       view={view}
@@ -28,7 +42,7 @@ function TestGameView({ view, onAction }: { view: GameView; onAction: (a: Action
 }
 
 function makeView(): GameView {
-  // debug 模式:viewer=0(主公,已选刘备)。P1/P2 未选,有并行选将 slot。
+  // debug 模式:viewer=0(主公,已选刘备)。P1/P2 未选,本连接 viewer 的 view.pending 为 null。
   return {
     viewer: 0,
     currentPlayerIndex: 0,
@@ -52,113 +66,43 @@ function makeView(): GameView {
       },
     ],
     cardMap: {},
-    pending: null, // viewer(主公)已选完,无自己的 pending
-    allCharSelectSlots: [
-      {
-        type: 'awaits',
-        atom: { type: '选将询问', target: 1, candidates: [{ name: '孙权', skills: ['制衡'] }, { name: '曹操', skills: ['护甲'] }] },
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
-        target: 1, deadline: Date.now() + 60000, totalMs: 60000,
-      },
-      {
-        type: 'awaits',
-        atom: { type: '选将询问', target: 2, candidates: [{ name: '关羽', skills: ['武圣'] }, { name: '郭嘉', skills: ['遗计'] }] },
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
-        target: 2, deadline: Date.now() + 60000, totalMs: 60000,
-      },
-    ],
+    pending: null, // viewer(主公)连接:viewer 已选完,本连接无 pending
     turnDeadline: null,
     turnTotalMs: 0,
     log: [],
   };
 }
 
-describe('GameView:debug 并行选将切换视角', () => {
+describe('GameView:debug 模式 viewer 已选完 — single-view 等待遮罩渲染', () => {
   beforeEach(() => {
     clearRegistry();
     // 关闭身份揭示遮罩(避免盖住选将界面)
     sessionStorage.setItem('sgs_identity_shown', '1');
   });
 
-  it('viewer(主公)已选完时,自动切到第一个未选玩家(player-1)显示其选将界面', async () => {
+  it('viewer 已选完、phase=准备、他人未选时,本连接渲染 CharSelectWaitingOverlay(viewer 已选武将卡 + 切换视角按钮)', () => {
+    // 新模型下:viewer 连接 view.pending=null → useDebugPerspective 自动跟随没有 pending target,
+    // 退化为跟随 currentPlayerIndex(=0)→ perspective 保持 0(viewer 自己)。
+    // 渲染条件:!isCharSelectPending && charSelectInProgress(phase=准备 && 仍有 player.character 为空)
+    //          && perspectiveCharSelected(perspective=0 已选刘备) → 显示 CharSelectWaitingOverlay。
     const view = makeView();
     render(<TestGameView view={view} onAction={() => {}} />);
 
-    // 应自动切到 player-1 视角并显示选将界面(CharSelectOverlay 标题 "P1 选将中")
-    await waitFor(() => {
-      expect(screen.getByText(/P1 选将中/)).toBeDefined();
-    });
-    // 显示 player-1 的候选人(孙权/曹操)
-    expect(screen.getByText('孙权')).toBeDefined();
-    expect(screen.getByText('曹操')).toBeDefined();
-  });
-
-  it('手动切换视角到 player-2 后,显示 player-2 的候选人(关羽/郭嘉)', async () => {
-    const view = makeView();
-    render(<TestGameView view={view} onAction={() => {}} />);
-
-    // 先等 player-1 选将界面出现
-    await waitFor(() => {
-      expect(screen.getByText(/P1 选将中/)).toBeDefined();
-    });
-
-    // 点视角切换按钮(CharSelectOverlay 里的 "视角: ..." 按钮)切到 player-2
-    // 有两个"视角:"按钮(遮罩内 + 顶部 header),取遮罩内的(zIndex 10000 容器)
-    const switchBtns = screen.getAllByRole('button', { name: /视角:/ });
-    fireEvent.click(switchBtns[0]);
-    await waitFor(() => {
-      expect(screen.getByText(/P2 选将中/)).toBeDefined();
-    });
-    // player-2 的候选人
-    expect(screen.getByText('关羽')).toBeDefined();
-    expect(screen.getByText('郭嘉')).toBeDefined();
-  });
-
-  it('帮 player-1 选将后,onAction 以正确 ownerId 提交', async () => {
-    const view = makeView();
-    const onAction = vi.fn();
-    render(<TestGameView view={view} onAction={onAction} />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/P1 选将中/)).toBeDefined();
-    });
-
-    // 点候选人 孙权(CharSelectOverlay 里候选人卡是 div,点击文本选中高亮)
-    fireEvent.click(screen.getByText('孙权'));
-    // 再点"确认选择"按钮提交
-    const confirmBtn = screen.getByRole('button', { name: /确认选择/ });
-    fireEvent.click(confirmBtn);
-
-    // 应以 ownerId=1(player-1) 提交选将 action
-    await waitFor(() => {
-      expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
-        skillId: '系统规则',
-        actionType: '选将',
-        ownerId: 1,
-        params: { character: '孙权' },
-      }));
-    });
-  });
-
-  it('手动切到已选完的玩家后,显示等待遮罩(含切换视角按钮)', async () => {
-    // viewer=0 已选,手动切到 player-0(主公,已选)→ 显示等待遮罩 + 切换按钮
-    const view = makeView();
-    render(<TestGameView view={view} onAction={() => {}} />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/P1 选将中/)).toBeDefined();
-    });
-
-    // 切到主公(需切两次:player-1 → player-2 → player-0)
-    const switchBtn = () => screen.getAllByRole('button', { name: /视角:/ })[0];
-    fireEvent.click(switchBtn()); // → player-2
-    await waitFor(() => expect(screen.getByText(/P2 选将中/)).toBeDefined());
-    fireEvent.click(switchBtn()); // → player-0(主公,已选)
-
-    // player-0 已选完:显示等待遮罩,而非选将界面
-    await waitFor(() => {
-      expect(screen.getByText(/已选择武将.*等待其他玩家选将/)).toBeDefined();
-    });
+    // 1. 等待遮罩文案
+    expect(screen.getByText(/已选择武将,等待其他玩家选将/)).toBeDefined();
+    // 2. 中央展示当前 perspective(主公)已选武将卡
+    expect(screen.getByText('你的选择')).toBeDefined();
+    expect(screen.getAllByText('刘备').length).toBeGreaterThan(0);
+    expect(screen.getByText('蜀')).toBeDefined();
+    expect(screen.getAllByText(/仁德/).length).toBeGreaterThan(0);
+    // 3. 等待遮罩列出"还在选将"的玩家名(P1/P2)
+    expect(screen.getAllByText(/player-1.*player-2|player-2.*player-1/).length).toBeGreaterThan(0);
+    // 4. debug 模式下等待遮罩渲染"切换视角 → P1"按钮(onSwitchPerspective 已提供)
     expect(screen.getByRole('button', { name: /切换视角/ })).toBeDefined();
+    // 5. 不展示 CharSelectOverlay(本连接 viewer.pending 为空,viewer 自己看不到选将界面)
+    expect(screen.queryByRole('button', { name: /确认选择/ })).toBeNull();
+    expect(screen.queryByText(/P0 选将中/)).toBeNull();
+    // 6. 不暴露他人连接的选将候选人(隔离)
+    expect(screen.queryByText('孙权')).toBeNull();
   });
 });

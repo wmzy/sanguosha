@@ -1,17 +1,23 @@
-// src/components/DebugLobby.tsx — 调试大厅入口（新 ENGINE-DESIGN）
+// src/components/DebugLobby.tsx — 调试大厅入口(多 WS 版)
 //
-// 用 useDebugLobbyController 拿 GameView + sendAction。
-// 已加入房间 → <GameViewComponent>, 否则 → <DebugRoomList>。
+// useDebugLobbyController 管理房间列表/创建/删除。
+// useDebugMultiConnection 管理 N 个座次连接 + views Map。
+// useDebugPerspective 管理视角切换。
+// 已加入房间 → <GameViewComponent>(渲染当前 perspective 的 view), 否则 → <DebugRoomList>。
 
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDebugLobbyController } from '../hooks/useDebugLobbyController';
+import { useDebugMultiConnection, type ActionMsg } from '../hooks/useDebugMultiConnection';
 import { useDebugPerspective } from '../hooks/useDebugPerspective';
 import { DebugControls } from './debug/DebugControls';
 import { DebugRoomList } from './debug/DebugRoomList';
-import { GameViewComponent, type ActionMsg } from './GameView';
+import { GameViewComponent } from './GameView';
 import { DebugInfo } from './DebugInfo';
+import { EventOverlay } from './EventOverlay';
 import { styles } from '../theme';
 import type { RoomInfo } from '../../server/protocol';
+import type { GameView as EngineGameView } from '../../engine/types';
 
 interface DebugLobbyProps {
   onExit: () => void;
@@ -22,16 +28,13 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   const navigate = useNavigate();
   const c = useDebugLobbyController(initialRoomId);
 
-  if (c.view) {
+  if (c.activeRoomId) {
     return (
-      <div>
-        <DebugGameView
-          view={c.view}
-          onAction={c.sendAction}
-          onReorderHand={c.reorderHand}
-          onDeleteRoom={c.handleDeleteRoom}
-        />
-      </div>
+      <DebugGameView
+        roomId={c.activeRoomId}
+        playerCount={c.playerCount}
+        onDeleteRoom={c.handleDeleteRoom}
+      />
     );
   }
 
@@ -54,31 +57,52 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
   );
 }
 
-/** debug 模式游戏视图:GameView + 视角管理 + 调试面板。 */
+/** debug 模式游戏视图:多 WS 连接 + 视角管理 + 调试面板 + 事件 overlay。 */
 function DebugGameView({
-  view, onAction, onReorderHand, onDeleteRoom,
+  roomId, playerCount, onDeleteRoom,
 }: {
-  view: import('../../engine/types').GameView;
-  onAction: (action: ActionMsg) => void;
-  onReorderHand?: (order: string[]) => void;
+  roomId: string;
+  playerCount: number;
   onDeleteRoom: () => void;
 }) {
-  const { perspective, switchPerspective, goToCurrentPlayer, setPerspective, autoSwitchCtl } = useDebugPerspective(view);
+  const [perspective, setPerspective] = useState(0);
+  const conn = useDebugMultiConnection({
+    roomId,
+    playerCount,
+    perspective,
+    onFirstView: (v) => setPerspective(v),
+  });
+  const currentView = conn.views.get(perspective) ?? null;
+  const pctl = useDebugPerspective(currentView, perspective, playerCount, setPerspective);
+
+  if (!currentView) {
+    return (
+      <div style={styles.page(40)}>
+        <DebugControls onBack={() => onDeleteRoom()} showConnection connected={conn.anyConnected} />
+        <div style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>
+          正在连接各座次视角…
+        </div>
+      </div>
+    );
+  }
+
+  const view = currentView as unknown as EngineGameView;
   const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
+
   return (
     <>
       <GameViewComponent
         view={view}
-        onAction={onAction}
-        onReorderHand={onReorderHand}
+        onAction={conn.sendAction}
+        onReorderHand={conn.reorderHand}
         perspective={perspective}
-        onSwitchPerspective={switchPerspective}
-        onGoToCurrentPlayer={goToCurrentPlayer}
+        onSwitchPerspective={pctl.switchPerspective}
+        onGoToCurrentPlayer={pctl.goToCurrentPlayer}
         onPerspectiveChange={setPerspective}
-        autoSwitchCtl={autoSwitchCtl}
+        autoSwitchCtl={pctl.autoSwitchCtl}
         onDeleteRoom={onDeleteRoom}
       />
-      {/* debug 专属:调试信息面板(日志在 GameView 内,正常功能) */}
+      <EventOverlay current={conn.currentEvent} view={view} perspective={perspective} />
       <DebugInfo view={view} perspectiveName={perspectiveName} pending={view.pending} />
     </>
   );

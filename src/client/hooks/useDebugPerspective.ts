@@ -1,15 +1,17 @@
 // src/client/hooks/useDebugPerspective.ts
-// Debug 模式视角管理 hook。
-// 封装原 GameView 内部的「多视角切换」逻辑:自动跟随 pending/选将 target/当前玩家、
-// 手动循环切换、代打选将跟随。正式模式不用本 hook(GameView 的 perspective 固定 = viewer)。
+// Debug 模式视角管理 hook(多 WS 版)。
 //
-// 用法(DebugLobby):
-//   const { perspective, switchPerspective, goToCurrentPlayer, setPerspective, autoSwitchCtl } = useDebugPerspective(view);
-//   <GameViewComponent view={view} perspective={perspective}
-//     onSwitchPerspective={switchPerspective} onGoToCurrentPlayer={goToCurrentPlayer}
-//     onPerspectiveChange={setPerspective} autoSwitchCtl={autoSwitchCtl} ... />
+// 多 WS 模型:每个座次是独立连接,views: Map<viewer, GameView>。
+// perspective 由 DebugLobby 持有,本 hook 接收当前 perspective 对应的 currentView,
+// 提供切换/自动跟随逻辑。
+//
+// 自动跟随:基于 currentPlayerIndex(所有 view 共有的公开信息)。
+//   有 pending 时跟随到 pending.target;无 pending 时回当前回合玩家。
+//
+// 稳定性关键:effect 不直接依赖 perspective(否则 setPerspective→perspective 变→
+// effect 重跑→死循环)。用 ref 读 perspective 做判断。
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameView } from '../../engine/types';
 
 export interface AutoSwitchCtl {
@@ -18,93 +20,60 @@ export interface AutoSwitchCtl {
 }
 
 export interface DebugPerspective {
-  /** 当前视角座次 */
-  perspective: number;
-  /** 循环切到下一视角 */
   switchPerspective: () => void;
-  /** 跳到当前回合玩家 */
   goToCurrentPlayer: () => void;
-  /** 直接设到指定座次(点座位卡等) */
-  setPerspective: (idx: number) => void;
-  /** 自动跟随开关 */
   autoSwitchCtl: AutoSwitchCtl;
 }
 
-export function useDebugPerspective(view: GameView): DebugPerspective {
-  const [perspective, setPerspectiveIdx] = useState(view.viewer);
+export function useDebugPerspective(
+  currentView: GameView | null,
+  perspective: number,
+  playerCount: number,
+  setPerspective: (idx: number) => void,
+): DebugPerspective {
   const [autoSwitch, setAutoSwitch] = useState(true);
-  // 选将期间用户手动切换过视角后,停止自动跟随选将 target
-  const charSelectManualSwitchRef = useRef(false);
-  const prevCharSelectTargetRef = useRef(-1);
-  const pendingRef = useRef(view.pending);
-  useEffect(() => { pendingRef.current = view.pending; }, [view.pending]);
+  const [manualOverride, setManualOverride] = useState(false);
+  // ref 读 perspective,避免 effect 依赖它导致循环
+  const perspectiveRef = useRef(perspective);
+  perspectiveRef.current = perspective;
 
-  // pending 清空时重置手动切换标记
+  // pending 清空时重置手动标记
   useEffect(() => {
-    if (!view.pending) {
-      charSelectManualSwitchRef.current = false;
-      prevCharSelectTargetRef.current = -1;
+    if (!currentView?.pending) {
+      setManualOverride(false);
     }
-  }, [view.pending]);
+  }, [currentView?.pending]);
 
-  const charSelectInProgress = view.phase === '准备' && view.players.some(p => !p.character);
-
-  // 自动跟随:有待回应/选将时跟到 target;无 pending 时回当前回合玩家。
-  // 选将期间手动切换后停止跟随;charSelectTarget 变化时重置继续跟随。
-  // debug 并行选将:viewer 自己选完后 pending 空,但 allCharSelectSlots 有其他玩家 slot →
-  //   跟到第一个未选完的玩家(代打),直到用户手动切换。
+  // 自动跟随:只依赖 currentView 的派生值,不依赖 perspective
+  const pendingTarget = currentView?.pending?.target;
+  const currentPlayer = currentView?.currentPlayerIndex;
+  const hasPending = !!currentView?.pending;
   useEffect(() => {
-    if (!autoSwitch) return;
-    const isCharSelect = view.pending?.atom?.type === '选将询问';
-    if (isCharSelect) {
-      const t = view.pending!.target;
-      if (t !== prevCharSelectTargetRef.current) {
-        prevCharSelectTargetRef.current = t;
-        charSelectManualSwitchRef.current = false;
-      }
-      if (!charSelectManualSwitchRef.current && t >= 0 && t < view.players.length) {
-        setPerspectiveIdx(t);
-      }
-      return;
+    if (!autoSwitch || !currentView || manualOverride) return;
+    const p = perspectiveRef.current;
+    if (typeof pendingTarget === 'number' && pendingTarget >= 0 && pendingTarget !== p) {
+      setPerspective(pendingTarget);
+    } else if (!hasPending && typeof currentPlayer === 'number' && currentPlayer !== p) {
+      setPerspective(currentPlayer);
     }
-    if (charSelectInProgress && view.allCharSelectSlots && view.allCharSelectSlots.length > 0 && !charSelectManualSwitchRef.current) {
-      const firstUnselectedSlot = view.allCharSelectSlots.find(s => !view.players[s.target]?.character);
-      if (firstUnselectedSlot && firstUnselectedSlot.target >= 0 && firstUnselectedSlot.target < view.players.length) {
-        setPerspectiveIdx(firstUnselectedSlot.target);
-      }
-      return;
-    }
-    if (view.pending) {
-      const targetIdx = view.pending.target;
-      if (targetIdx >= 0 && targetIdx < view.players.length) setPerspectiveIdx(targetIdx);
-    } else if (!charSelectInProgress) {
-      setPerspectiveIdx(view.currentPlayerIndex);
-    }
-  }, [view.pending?.target, view.currentPlayerIndex, autoSwitch, view.pending?.atom?.type, charSelectInProgress, view.allCharSelectSlots]);
-
-  // 初次加载:默认看自己(选将进行中时由上面的自动切换 effect 接管)
-  useEffect(() => { if (!charSelectInProgress) setPerspectiveIdx(view.viewer); }, [view.viewer, charSelectInProgress]);
+    // 刻意不把 perspective/setPerspective 放进依赖:用 ref 读避免循环
+  }, [pendingTarget, currentPlayer, hasPending, autoSwitch, manualOverride, currentView, setPerspective]);
 
   const switchPerspective = useCallback(() => {
-    const next = (perspective + 1) % view.players.length;
-    setPerspectiveIdx(next);
-    // 选将期间手动切换后,停止自动跟随
-    if (pendingRef.current?.atom?.type === '选将询问') charSelectManualSwitchRef.current = true;
-  }, [perspective, view.players.length]);
+    setManualOverride(true);
+    setPerspective((perspective + 1) % playerCount);
+  }, [perspective, playerCount, setPerspective]);
 
   const goToCurrentPlayer = useCallback(() => {
-    setPerspectiveIdx(view.currentPlayerIndex);
-  }, [view.currentPlayerIndex]);
+    setManualOverride(true);
+    if (currentView) setPerspective(currentView.currentPlayerIndex);
+  }, [currentView, setPerspective]);
 
-  const setPerspective = useCallback((idx: number) => {
-    setPerspectiveIdx(idx);
-  }, []);
+  const toggle = useCallback(() => setAutoSwitch(a => !a), []);
 
   return {
-    perspective,
     switchPerspective,
     goToCurrentPlayer,
-    setPerspective,
-    autoSwitchCtl: { enabled: autoSwitch, toggle: useCallback(() => setAutoSwitch(v => !v), []) },
+    autoSwitchCtl: { enabled: autoSwitch, toggle },
   };
 }
