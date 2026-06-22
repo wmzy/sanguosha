@@ -700,7 +700,7 @@ export interface AtomHookEntry {
  */
 export interface SkillModule {
   createSkill: (id: string, ownerId: number) => Skill;
-  onInit?: (skill: Skill, ownerId: number) => (() => void) | void;
+  onInit?: (skill: Skill, state: GameState) => (() => void) | void;
   onMount?: (skill: Skill, api: FrontendAPI) => (() => void) | void;
 }
 

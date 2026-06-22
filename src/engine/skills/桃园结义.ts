@@ -8,8 +8,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '桃园结义', description: '锦囊:所有角色各回复1点体力' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
       const free = state.pendingSlots.size === 0
@@ -51,7 +52,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('use', {
     label: '桃园结义',
     style: 'primary',

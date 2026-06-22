@@ -165,7 +165,7 @@ export function create(gameConfig: GameConfig): GameState {
  * bootstrap 是调用方 bug,直接抛错暴露,而非"幂等"重跑。
  *
  *   1. 动态 import 开局 skill 模块
- *   2. 调 开局.onInit(skill, gameConfig) 注册 start action
+ *   2. 调 开局.onInit(skill, state) 注册 start action
  *   3. dispatch 开局 start → 跑完抽身份/选将/洗牌/发牌/启动第一回合
  *   4. registerSkillsFromState(state) 给每个 player 的 skills 注册实例
  *
@@ -181,9 +181,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   // 全局注册表幂等:先卸载旧实例(await import 之后、onInit 之前),避免
   // 跨 session/跨 test 时因微任务交织导致 "already registered" 抛错。
   unloadSkillInstance('开局', SYSTEM_OWNER);
-  // 开局.onInit(skill, gameConfig) 是 system skill 的特殊接口
-  // @ts-ignore 开局的 onInit 签名是 (skill, gameConfig),不是 SkillModule 标准 (skill, ownerId)
-  const off开局 = 开局mod.onInit(syntheticSkill, gameConfig);
+  const off开局 = 开局mod.onInit(syntheticSkill, state);
   // 登记实例 unload,使 unloadSkillInstance/clearAllSkillInstances 能正确清理 开局:系统
   setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
@@ -351,7 +349,7 @@ export function resetForTest(): void {
   clearEvents();
   clearSlashMaxProviders();
   // 重新注册系统规则全局 hooks(被 clearAllSkillInstances 清掉了)
-  init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, -1);
+  init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, createGameState({ players: [], cardMap: {} }));
 }
 
 // ==================== 从 engine-api.ts 合并的导出 ====================

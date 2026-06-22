@@ -1,13 +1,14 @@
 // 藤甲(防具):普通杀/非属性锦囊伤害 -1,火焰伤害 +1。
-import type { AtomBeforeContext, HookResult, Skill } from '../types';
+import type { AtomBeforeContext, HookResult, Skill, GameState} from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '藤甲', description: '防具:普通杀伤害-1,火焰伤害+1' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; amount?: number; damageType?: string };
     if (atom.target !== ownerId) return;
 

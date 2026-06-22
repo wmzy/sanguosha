@@ -3,6 +3,7 @@
 // 动态加载是合理的：每局游戏只选 4 个武将 +部分装备，不需要全量加载 37 个模块。
 import type { SkillModule } from '../skill';
 import { setSkillModuleResolver } from '../skill';
+import { createGameState } from '../types';
 // 系统规则是全局 hooks(判定清理/技能生命周期/濒死),import 时立即注册
 import { onInit as init系统规则 } from './系统规则';
 
@@ -80,4 +81,4 @@ setSkillModuleResolver(async (id: string): Promise<SkillModule> => {
 });
 
 // 系统规则是全局 hooks,模块加载时立即注册
-init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, -1);
+init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, createGameState({ players: [], cardMap: {} }));

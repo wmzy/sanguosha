@@ -10,7 +10,7 @@
 //
 // 注意:移除技能 只卸载 hook 实例,不触发 卸下(装备仍在装备区)。
 // 白银狮子的"失去装备回血"监听 卸下 atom,不会被 移除技能 触发——正确。
-import type { AtomBeforeContext, AtomAfterContext, Skill } from '../types';
+import type { AtomBeforeContext, AtomAfterContext, Skill, GameState} from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook, unloadSkillInstance, instantiateSkill, type SkillModule } from '../skill';
 
@@ -28,7 +28,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '青釭剑', description: '武器:杀无视目标防具' };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // 指定目标 after hook:杀指定目标后,临时卸载目标的防具技能
   registerAfterHook(skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
     if ((ctx.atom as { source?: number }).source !== ownerId) return;

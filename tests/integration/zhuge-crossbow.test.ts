@@ -90,7 +90,7 @@ describe('诸葛连弩:上限提供者(∞) + 连续出杀 + 卸载', () => {
 
     const healthBefore = harness.state.players[1].health;
 
-    // 装诸葛连弩 → onInstantiate 注册上限提供者(∞) → slashMax = ∞
+    // 装诸葛连弩 → onInit 注册上限提供者(∞) → slashMax = ∞
     await P0.useCard('装备通用', zhuge.id);
     expect(harness.state.players[0].equipment['武器']).toBe(zhuge.id);
     expect(slashMax(harness.state, 0)).toBe(Infinity);
@@ -151,7 +151,7 @@ describe('诸葛连弩:上限提供者(∞) + 连续出杀 + 卸载', () => {
     expect(harness.state.players[0].skills).toContain('青釭剑');
     expect(harness.state.zones.discardPile).toContain(zhuge.id);
 
-    // onDestroy 卸载上限提供者 → slashMax 回到 1;usedCount 保留(未出过杀仍为 undefined/0)
+    // 卸载函数取消注册上限提供者 → slashMax 回到 1;usedCount 保留(未出过杀仍为 undefined/0)
     expect(slashMax(harness.state, 0)).toBe(1);
   });
 

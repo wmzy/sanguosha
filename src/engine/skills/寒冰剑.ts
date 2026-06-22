@@ -1,6 +1,6 @@
 // 寒冰剑(武器,攻击范围 2):
 //   每当你使用【杀】对目标造成伤害时,你可以防止此伤害,改为弃置其两张牌。
-import type { AtomBeforeContext, FrontendAPI, HookResult, Json, Skill } from '../types';
+import type { AtomBeforeContext, FrontendAPI, HookResult, Json, Skill, GameState} from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -8,8 +8,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为弃目标2张牌' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerAction(_skill.id, ownerId, 'respond',
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerAction(skill.id, ownerId, 'respond',
     (state, params) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
@@ -21,7 +22,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     },
   );
 
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];
@@ -54,7 +55,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '寒冰剑',
     style: 'default',

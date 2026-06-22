@@ -1,7 +1,7 @@
 // 麒麟弓(武器,攻击范围 5):
 //   每当你使用【杀】对目标角色造成伤害时,你可以弃置其1张坐骑牌(+1马或-1马)。
 //   不防止伤害——只是额外弃马(与寒冰剑的关键区别)。
-import type { AtomBeforeContext, FrontendAPI, HookResult, Json, Skill } from '../types';
+import type { AtomBeforeContext, FrontendAPI, HookResult, Json, Skill, GameState} from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -9,9 +9,10 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // ── respond:玩家确认是否发动 ──
-  registerAction(_skill.id, ownerId, 'respond',
+  registerAction(skill.id, ownerId, 'respond',
     (state, params) => {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
@@ -27,7 +28,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   );
 
   // ── 造成伤害 before hook:杀命中后额外弃马 ──
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];
@@ -72,7 +73,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '麒麟弓',
     style: 'default',

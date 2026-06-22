@@ -1,6 +1,6 @@
 // 白银狮子(防具):当你受到伤害时,此伤害值最多为 1。
 //   失去装备区的白银狮子时回复 1 点体力。
-import type { AtomAfterContext, AtomBeforeContext, HookResult, Skill } from '../types';
+import type { AtomAfterContext, AtomBeforeContext, HookResult, Skill, GameState} from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -8,8 +8,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '白银狮子', description: '防具:每次受伤最多1点' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; amount?: number; source?: number; cardId?: string };
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 1) return;
@@ -22,7 +23,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   });
 
   // 失去白银狮子时回 1 血:监听 卸下(防具) after hook
-  registerAfterHook(_skill.id, ownerId, '卸下', async (ctx: AtomAfterContext) => {
+  registerAfterHook(skill.id, ownerId, '卸下', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { player?: number; slot?: string };
     if (atom.player !== ownerId) return;
     if (atom.slot !== '防具') return;

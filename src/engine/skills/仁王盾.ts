@@ -2,15 +2,16 @@
 // 时机:询问闪 before hook——黑色杀直接 cancel 询问闪(跳过出闪流程),
 // 往处理区放一张虚拟闪牌表示"杀无效",杀.execute 检查处理区发现有闪就不造成伤害。
 // 和八卦阵统一模式:杀零感知仁王盾,只看处理区。
-import type { AtomBeforeContext, Card, HookResult, Skill } from '../types';
+import type { AtomBeforeContext, Card, HookResult, Skill, GameState} from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '仁王盾', description: '防具:黑色杀对你无效' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; source?: number };
     if (atom.target !== ownerId) return;
 

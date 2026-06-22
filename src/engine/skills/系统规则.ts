@@ -103,7 +103,7 @@ export function registerSystemRespondActions(ownerId: number): () => void {
   return () => unloads.forEach(fn => fn());
 }
 
-export function onInit(_skill: Skill, _ownerId: number): () => void {
+export function onInit(_skill: Skill, _state: GameState): () => void {
   // ── 添加技能 after hook:实例化技能(注册 action/hook) ──
   registerAfterHook('系统规则', -1, '添加技能', async (ctx) => {
     const atom = ctx.atom as { skillId: string; player: number };

@@ -10,8 +10,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '装备', description: '装备到对应栏位' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
       const free = state.pendingSlots.size === 0
@@ -59,7 +60,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('use', {
     label: '装备',
     style: 'default',

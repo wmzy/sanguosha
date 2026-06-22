@@ -1,5 +1,5 @@
 // 反馈(司马懿·被动技):当你受到伤害后,你可以获得伤害来源的一张牌。
-import type { AtomAfterContext, FrontendAPI, Json, Skill } from '../types';
+import type { AtomAfterContext, FrontendAPI, Json, Skill, GameState} from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -12,7 +12,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // respond:被询问"是否发动反馈"时回应,设 localVars 标记结果
   registerAction(skill.id, ownerId, 'respond',
     (state, params) => {

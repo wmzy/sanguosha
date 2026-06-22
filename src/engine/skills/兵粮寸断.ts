@@ -24,9 +24,10 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '兵粮寸断', description: '延时锦囊:判定非梅花则跳过摸牌阶段' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // ─── use action:对目标放置延时锦囊 ────────────────────────
-  registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
       const free = state.pendingSlots.size === 0;
@@ -70,7 +71,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     });
 
   // ─── 判定阶段:有 兵粮寸断 → 先问无懈可击,未被抵消才触发判定 ───
-  registerBeforeHook(_skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
@@ -95,7 +96,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   });
 
   // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────
-  registerAfterHook(_skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
+  registerAfterHook(skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '兵粮寸断') return;
@@ -123,7 +124,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   });
 
   // ─── 摸牌阶段:有跳过标签 → 跳过摸牌阶段 ────────────────────
-  registerBeforeHook(_skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
@@ -144,7 +145,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('use', {
     label: '兵粮寸断',
     style: 'danger',

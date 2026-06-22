@@ -13,7 +13,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       // 兼容 cardIds 数组和单数 cardId(前端 handlePlayCard 发 cardId)

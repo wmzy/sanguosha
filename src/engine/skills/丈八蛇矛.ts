@@ -39,7 +39,8 @@ function shadowIdOf(id1: string, id2: string): string {
 /** localVars 键:供 rollback 找回本次合并的两张原卡 id */
 const LOCAL_VARS_KEY = '丈八蛇矛/原卡';
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // transform action:把 2 张手牌转化为影子"杀"(新建 Card 实体,shadowOf 留空)。
   // 作为 preceding 在 杀.use 之前执行。杀.validate 读 cardMap[影子id] 看到"杀"。
   registerAction(

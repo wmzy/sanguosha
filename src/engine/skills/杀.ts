@@ -22,7 +22,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // ── use:主动出杀 ──
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {

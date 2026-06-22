@@ -83,9 +83,10 @@ async function runPickProcessingCard(
   }
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // ── use:主动打出五谷丰登 ──
-  registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
       const free = state.pendingSlots.size === 0;
@@ -144,7 +145,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     });
 
   // ── respond:玩家选1张牌(从处理区亮的牌中) ──
-  registerAction(_skill.id, ownerId, 'respond',
+  registerAction(skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
@@ -165,7 +166,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('use', {
     label: '五谷丰登',
     style: 'primary',

@@ -10,7 +10,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '桃', description: '出牌阶段对已受伤角色使用,回复 1 体力(濒死时可对濒死角色使用)' };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法

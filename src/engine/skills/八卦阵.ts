@@ -3,7 +3,7 @@
 // afterHooks 清理后判定牌进弃牌堆。八卦阵读弃牌堆顶判定牌花色。
 // 红色 → 往处理区放入一张虚拟闪牌,杀检查处理区发现闪就视为闪避。
 // 杀不需要知道八卦阵——只看处理区有没有闪牌。
-import type { AtomBeforeContext, Card, Skill } from '../types';
+import type { AtomBeforeContext, Card, Skill, GameState} from '../types';
 import { applyAtom } from '../create-engine';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
@@ -16,7 +16,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext) => {
     if ((ctx.atom as { target?: number }).target !== ownerId) return;
     if (ctx.state.zones.deck.length === 0) return;

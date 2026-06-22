@@ -5,7 +5,7 @@
 //   1. 询问闪 after hook:目标出闪 → confirm 询问"是否发动贯石斧"(requestType=贯石斧/confirm)
 //   2. 玩家选发动 → select prompt 让玩家选 2 张牌弃置(requestType=贯石斧/select)
 //   3. 弃完后把处理区的闪移到弃牌堆,杀.execute 检测处理区无闪 → 自行造成伤害
-import type { AtomAfterContext, FrontendAPI, Json, Skill } from '../types';
+import type { AtomAfterContext, FrontendAPI, Json, Skill, GameState} from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -18,9 +18,10 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   // 单一 respond action,按当前 pending 的 requestType 分流(confirm / select)
-  registerAction(_skill.id, ownerId, 'respond',
+  registerAction(skill.id, ownerId, 'respond',
     (state, params) => {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
@@ -54,7 +55,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     },
   );
 
-  registerAfterHook(_skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
+  registerAfterHook(skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];
@@ -126,7 +127,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '贯石斧',
     style: 'danger',

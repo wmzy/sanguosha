@@ -1,5 +1,5 @@
 // 护甲(项目自定义锁定技):当你受到【杀】造成的伤害时,若此杀为黑色,伤害 -1。
-import type { AtomBeforeContext, HookResult, Skill } from '../types';
+import type { AtomBeforeContext, HookResult, Skill, GameState} from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -11,8 +11,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerBeforeHook(_skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; cardId?: string; amount?: number; type: string };
     if (atom.target !== ownerId) return;
     if (typeof atom.cardId !== 'string') return;

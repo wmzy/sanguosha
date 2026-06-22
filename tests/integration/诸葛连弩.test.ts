@@ -9,7 +9,7 @@
 // 关键机制(诸葛连弩.ts):
 //   onInit 注册上限提供者返回 Infinity → slashMax = ∞
 //   杀.ts canSlash 读 slashUsed/slashMax(默认 1),Inf - usedCount = Inf(永远够用)。
-//   装备卸下(onDestroy)反注册上限提供者,slashMax 回落基础 1。
+//   装备卸下(卸载函数)反注册上限提供者,slashMax 回落基础 1。
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';

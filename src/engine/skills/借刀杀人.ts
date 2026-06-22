@@ -12,8 +12,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '借刀杀人', description: '锦囊:令目标出杀或获得其武器' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerAction(_skill.id, ownerId, 'use',
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
@@ -143,7 +144,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('use', {
     label: '借刀杀人',
     style: 'danger',

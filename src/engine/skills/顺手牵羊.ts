@@ -14,8 +14,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '顺手牵羊', description: '锦囊:获得目标一张牌' };
 }
 
-export function onInit(_skill: Skill, ownerId: number): () => void {
-  registerAction(_skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
     const myTurn = state.currentPlayerIndex === ownerId;
     const inActPhase = state.phase === '出牌';
     const free = state.pendingSlots.size === 0;
@@ -61,7 +62,7 @@ export function onInit(_skill: Skill, ownerId: number): () => void {
     }, );
 
   // ── 选牌 respond:使用者从目标区域选一张牌 ──
-  registerAction(_skill.id, ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
+  registerAction(skill.id, ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
     const slot = state.pendingSlots.get(ownerId);
     if (!slot) return '当前不需要回应';
     if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
@@ -185,7 +186,7 @@ async function runPickTargetCardObtain(
   }
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('use', {
     label: '顺手牵羊',
     style: 'danger',

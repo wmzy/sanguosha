@@ -28,7 +28,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   registerAction(
     skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {

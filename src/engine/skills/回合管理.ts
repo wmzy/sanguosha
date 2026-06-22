@@ -30,7 +30,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '回合管理', description: '监听上家回合结束,自动开始自己的回合' };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   const me = skill.ownerId;
 
   // ─── 阶段结束 → 自动推进到下一阶段(自己回合内) ───

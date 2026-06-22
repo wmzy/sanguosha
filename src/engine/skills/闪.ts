@@ -9,7 +9,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '闪', description: '需要打出闪时,打出一张闪' };
 }
 
-export function onInit(skill: Skill, ownerId: number): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       // pending 必须询问闪(正向条件)

@@ -21,17 +21,10 @@ import type {
 
 export interface SkillModule {
   createSkill: (id: string, ownerId: number) => Skill;
-  /** 注册时拿到 skill + ownerId(per player instance);内部直接 import 注册函数 */
-  onInit?: (skill: Skill, ownerId: number) => (() => void) | void;
+  /** 注册时拿到 skill + state;ownerId 从 skill.ownerId 取。
+   *  返回卸载函数,由 unloadSkillInstance 调用清理(装备类技能如马匹在此设/清 vars)。 */
+  onInit?: (skill: Skill, state: GameState) => (() => void) | void;
   onMount?: (skill: Skill, api: FrontendAPI) => (() => void) | void;
-  /** 技能实例被创建时同步调用,可基于当前 state 初始化持续效果(如设 player.vars)。
-   *  在 onInit 之后执行。与 onInit 的区别:onInit 只能注册 hook(无法直接操作 state),
-   *  而 onInstantiate 拿到 state,适合装备类技能(马匹等)在装备当帧立即生效。
-   *  对应清理在 onDestroy(由 unloadSkillInstance 调用)。 */
-  onInstantiate?: (state: GameState, ownerId: number) => void;
-  /** 技能实例被卸载时同步调用,清理 onInstantiate 设置的持续效果(如清 player.vars)。
-   *  在 hook/action 注销之前执行。 */
-  onDestroy?: (state: GameState, ownerId: number) => void;
 }
 
 // ─── module 查询 ───────────────────────────────────────────
@@ -58,7 +51,7 @@ export async function getSkillModule(id: string): Promise<SkillModule> {
   return mod;
 }
 
-/** 同步获取已加载过的技能模块(未加载返回 undefined)。用于 onDestroy 等必须在卸载时同步查模块的场景。 */
+/** 同步获取已加载过的技能模块(未加载返回 undefined)。用于卸载时同步查模块的场景。 */
 export function getCachedSkillModule(id: string): SkillModule | undefined {
   return moduleCache.get(id);
 }
@@ -186,15 +179,8 @@ export function setSkillInstanceUnload(skillId: string, ownerId: number, unload:
 }
 
 export function unloadSkillInstance(skillId: string, ownerId: number, state?: GameState): void {
+  void state; // 保留参数 for API 稳定性(卸载逻辑由 onInit 返回的闭包处理)
   const key = instanceKey(skillId, ownerId);
-  // 先调 onDestroy 清理持续效果(如马匹 vars),此时模块还能查到
-  if (state) {
-    // 不走 getSkillModule(异步):模块可能已加载过,直接尝试同步获取缓存。
-    // onDestroy 只在实例存在时调,而实例存在意味着模块已加载过。
-    let mod: SkillModule | undefined;
-    try { mod = getCachedSkillModule(skillId); } catch { mod = undefined; }
-    mod?.onDestroy?.(state, ownerId);
-  }
   const unload = instanceUnloads.get(key);
   if (unload) {
     unload();
@@ -243,14 +229,9 @@ export async function instantiateSkill(skillId: string, ownerId: number, state?:
     return null;
   }
   const skill = module.createSkill(skillId, ownerId);
-  if (module.onInit) {
-    const unload = module.onInit(skill, ownerId);
+  if (module.onInit && state) {
+    const unload = module.onInit(skill, state);
     setSkillInstanceUnload(skillId, ownerId, typeof unload === 'function' ? unload : () => {});
-  }
-  // onInstantiate:基于当前 state 同步初始化持续效果(马匹 vars 等)。
-  // 在 onInit 之后执行,此时 hook/action 已注册。
-  if (state && module.onInstantiate) {
-    module.onInstantiate(state, ownerId);
   }
   return skill;
 }
