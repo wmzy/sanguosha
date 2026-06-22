@@ -95,8 +95,25 @@ function extractPendingTarget(atom: Atom): number {
 }
 
 /** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
+/** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
 function notifyStateChange(state: GameState): void {
   state.onStateChange?.();
+}
+
+/** 通知前端:某 pending slot 已 resolve(respond 完成 / 超时),前端应清除 view.pending。
+ *  事件流模式下 view.pending 不再由 buildView 每次重建,而由 applyView 增量维护,
+ *  因此 slot 的删除(服务端静默 mutation)必须显式发事件,否则前端 pending 永驻。
+ *  target<0 = 广播型 slot(如无懈可击),所有 viewer 都应清除。 */
+function notifyPendingResolved(state: GameState, slot: PendingSlot): void {
+  const target = extractPendingTarget(slot.atom);
+  pushEvent({
+    kind: 'notify',
+    seq: state.seq,
+    skillId: '',
+    eventType: 'pendingResolved',
+    data: { target, atomType: slot.atom.type },
+  });
+  notifyStateChange(state);
 }
 
 /** 兜底:补全老 state 缺失的字段(原地变更) */
@@ -125,7 +142,7 @@ function logAction(state: GameState, message: ClientMessage): void {
  *  结束条件:存活 ≤ 1 人,或主公死亡。 */
 export function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
   // 主公死亡 → 游戏立即结束
-  const lord = state.players.find(p => p.identity === '主公' || p.vars['身份'] === '主公');
+  const lord = state.players.find(p => p.identity === '主公');
   if (lord && !lord.alive) {
     return { gameOver: true, winner: undefined };
   }
@@ -239,12 +256,15 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // execute 是 fire-and-forget 风格的 applyAtom,可能在 pendingSlots 留下未 resolve 的 slot。
   // 若 main 不启动,这些 slot 的父 await 永远不返回 → 死锁。
   const cleanupResidualPending = () => {
+    const resolved: PendingSlot[] = [];
     for (const [k, slot] of state.pendingSlots) {
       // preceding execute 不应创建 _keepAlive=true 的 slot(resume 是 respond 路径才调)
       if (slot._keepAlive) continue;
       try { slot.resolve(); } catch { /* safeResolve 已防重入 */ }
       state.pendingSlots.delete(k);
+      resolved.push(slot);
     }
+    for (const slot of resolved) notifyPendingResolved(state, slot);
   };
   if (message.preceding) {
     for (const p of message.preceding) {
@@ -302,20 +322,24 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
         return;
       }
       const key = extractPendingTarget(oldSlot.atom);
-      if (state.pendingSlots.get(key) === oldSlot) state.pendingSlots.delete(key);
+      let deleted = false;
+      if (state.pendingSlots.get(key) === oldSlot) { state.pendingSlots.delete(key); deleted = true; }
       // 无雕等 target<0 的广播 slot:dispatch 用 ownerId 找不到精确 key,需按 slot 引用清除
       if (key < 0) {
-        for (const [k, v] of state.pendingSlots) if (v === oldSlot) { state.pendingSlots.delete(k); break; }
+        for (const [k, v] of state.pendingSlots) if (v === oldSlot) { state.pendingSlots.delete(k); deleted = true; break; }
       }
+      if (deleted) notifyPendingResolved(state, oldSlot);
     }
     resolve();
   }).finally(() => {
     // 兜底:execute 抛错路径下,.then 的清理逻辑不会执行,但父 execute 仍必须 resolve + 删 slot,
     // 否则 pendingSlots 永久残留 + 父 await 永远不返回。_keepAlive 已被 onInit 设为 true 的例外保留。
     if (oldSlot && !oldSlot._keepAlive) {
+      let deleted = false;
       for (const [k, v] of state.pendingSlots) {
-        if (v === oldSlot) { state.pendingSlots.delete(k); break; }
+        if (v === oldSlot) { state.pendingSlots.delete(k); deleted = true; break; }
       }
+      if (deleted) notifyPendingResolved(state, oldSlot);
       try { resolve(); } catch { /* resolve 已被 safeResolve 保护 */ }
     }
   });
@@ -634,7 +658,9 @@ function createAndAwaitSlot(
         notifyStateChange(state);
       } finally {
         // 兑底:applyAtom 抛错时仍必须清理 slot 并 resolve 父 execute,避免死锁。
-        if (state.pendingSlots.get(target) === slot) state.pendingSlots.delete(target);
+        let deleted = false;
+        if (state.pendingSlots.get(target) === slot) { state.pendingSlots.delete(target); deleted = true; }
+        if (deleted) notifyPendingResolved(state, slot);
         safeResolve();
       }
     };

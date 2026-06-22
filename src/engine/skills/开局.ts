@@ -112,7 +112,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
         charPool[i] = charPool[j];
         charPool[j] = tmp;
       }
-      const lordIdx = state.players.findIndex(p => p.vars['身份'] === '主公');
+      const lordIdx = state.players.findIndex(p => p.identity === '主公');
 
       // 2a. 主公先选(串行):从池中按 isLord 拆成常备/非常备两组,合并为 7 张候选人。
       //     拆分:常备主公随机 5 + 非常备随机 2(charPool 已 seed 打乱,取前 N 即随机)。
@@ -141,7 +141,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
         const candidatePool = charPool.filter(c => !used.has(c.name));
         // 各非主公玩家按身份的需求量
         const wantByPlayer = others.map(idx => {
-          const identity = state.players[idx].vars['身份'] as string | undefined;
+          const identity = state.players[idx].identity;
           return CANDIDATES_PER_IDENTITY[identity ?? ''] ?? CANDIDATES_PER_IDENTITY['反贼'];
         });
         const totalWant = wantByPlayer.reduce((a, b) => a + b, 0);
@@ -190,7 +190,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       await applyAtom(state, { type: '发牌', handSize, lordBonus: 1 });
 
       // 5. 启动第一回合(从主公开始)
-      const lord = state.players.find(p => p.vars.身份 === '主公');
+      const lord = state.players.find(p => p.identity === '主公');
       if (lord) {
         await applyAtom(state, { type: '回合开始', player: lord.index });
         await applyAtom(state, { type: '阶段开始', player: lord.index, phase: '准备' });

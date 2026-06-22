@@ -67,10 +67,9 @@ export const 抽身份: AtomDefinition<{
       identities[0] = '主公';
     }
 
-    // 更新玩家身份(存入 vars + identity 字段)
+    // 更新玩家身份(单一来源:identity 字段)
     for (let i = 0; i < state.players.length; i++) {
       const id = identities[i] || '未知';
-      state.players[i].vars['身份'] = id;
       state.players[i].identity = id as PlayerState['identity'];
     }
   },
@@ -162,7 +161,7 @@ export const 发牌: AtomDefinition<{
     const { handSize, lordBonus = 1 } = atom;
     let cursor = 0;
     for (const p of state.players) {
-      const isLord = p.vars['身份'] === '主公';
+      const isLord = p.identity === '主公';
       const bonus = isLord ? lordBonus : 0;
       const drawCount = handSize + bonus;
       const drawn = state.zones.deck.slice(cursor, cursor + drawCount);
@@ -287,7 +286,7 @@ export const 并行选将: AtomDefinition<{
   toViewEvents(state, atom) {
     const selections = atom.selections;
     // 找主公已选的角色(主公在并行选将之前已完成选将)
-    const lordIdx = state.players.findIndex(p => p.vars['身份'] === '主公');
+    const lordIdx = state.players.findIndex(p => p.identity === '主公');
     const lordCharacter = lordIdx >= 0 ? state.players[lordIdx].character : '';
     const lordName = lordIdx >= 0 ? state.players[lordIdx].name : '';
     // 找主公的候选人(主公选将时的候选人列表,用于展示)

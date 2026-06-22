@@ -157,7 +157,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     const allCandidates: string[] = [];
     for (const s of state.pendingSlots.values()) {
       const t = (s.atom as { target: number }).target;
-      const id = state.players[t].vars['身份'] as string;
+      const id = state.players[t].identity as string;
       const cnt = slotCandidates(s).length;
       identityCount[id] = (identityCount[id] ?? 0) + 1;
       allCandidates.push(...slotCandidates(s));
@@ -172,7 +172,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     // 按身份数量校验
     for (const s of state.pendingSlots.values()) {
       const t = (s.atom as { target: number }).target;
-      const id = state.players[t].vars['身份'] as string;
+      const id = state.players[t].identity as string;
       const cnt = slotCandidates(s).length;
       if (id === '忠臣') expect(cnt).toBe(5);
       if (id === '反贼') expect(cnt).toBe(4);

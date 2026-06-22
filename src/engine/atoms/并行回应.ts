@@ -8,6 +8,8 @@
 import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 export const 并行回应: AtomDefinition<{
   requestType: string;
   targets: number[];
@@ -52,6 +54,23 @@ export const 并行回应: AtomDefinition<{
       effect: { duration: 200 },
     };
     return { ownerViews, othersView };
+  },
+  applyView(view, event) {
+    // 并行回应 的 ownerView 是拆成 请求回应 的,view.viewer === event.target 时设置 pending。
+    // othersView 不含 prompt,跳过。
+    const target = event.target as number;
+    const requestType = event.requestType as string | undefined;
+    const prompt = event.prompt as ActionPrompt | undefined;
+    if (view.viewer !== target) return;
+    if (!prompt) return;
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+      prompt,
+      target,
+      deadline: Date.now() + DEFAULT_TIMEOUT_MS,
+      totalMs: DEFAULT_TIMEOUT_MS,
+    };
   },
 };
 

@@ -3,6 +3,8 @@
 import type { ActionPrompt, AtomDefinition, Json, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 export const 请求回应: AtomDefinition<{
   requestType: string;
   target: number;
@@ -35,6 +37,12 @@ export const 请求回应: AtomDefinition<{
       prompt: atom.prompt,
       effect,
     };
+    // 广播型(target<0,如无懈可击 target=-2):所有存活玩家都可回应,
+    // 故 ownerViews 无人命中(Map key=target<0 不匹配真实 viewer),
+    // 将 othersView 设为带 prompt 的完整视图,让所有人都能看到回应提示。
+    if (atom.target < 0) {
+      return { ownerViews: new Map([[atom.target, targetView]]), othersView: targetView };
+    }
     // 其他人只看到"某人被请求回应"
     const othersView: ViewEvent = {
       type: '请求回应',
@@ -45,6 +53,23 @@ export const 请求回应: AtomDefinition<{
     return {
       ownerViews: new Map([[atom.target, targetView]]),
       othersView,
+    };
+  },
+  applyView(view, event) {
+    const target = event.target as number;
+    const requestType = event.requestType as string | undefined;
+    const prompt = event.prompt as ActionPrompt | undefined;
+    // 广播型(target<0,如无懈可击):所有 viewer 都设置 pending
+    // 单 target:仅被问询的玩家设置
+    if (target >= 0 && view.viewer !== target) return;
+    if (!prompt) return;
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+      prompt,
+      target,
+      deadline: Date.now() + DEFAULT_TIMEOUT_MS,
+      totalMs: DEFAULT_TIMEOUT_MS,
     };
   },
 };

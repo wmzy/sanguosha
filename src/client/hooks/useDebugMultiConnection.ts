@@ -10,7 +10,7 @@
 // 选择 N 连接:每个 viewer 是独立实体,传输层隔离更干净。
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { viewReducer } from '../view/reducer';
+import { viewReducer, applyNotify } from '../view/reducer';
 import { useEventPlayback } from './useEventPlayback';
 import { createLogger } from '../utils/logger';
 import type { GameView, Json, ViewEvent } from '../../engine/types';
@@ -91,6 +91,9 @@ export function useDebugMultiConnection(
         if (env.viewEvent) {
           viewReducer(viewCopy, env.viewEvent);
           eventsToPlay.push({ seq: env.seq, event: env.viewEvent });
+        }
+        if (env.notify) {
+          applyNotify(viewCopy, env.notify);
         }
       }
       if (msg.events.length > 0) {

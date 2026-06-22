@@ -162,7 +162,22 @@ export class PlayerSession {
     for (const evt of events) {
       const raw = evt as Record<string, unknown>;
       const type = typeof raw.atomType === 'string' ? raw.atomType : (typeof raw.type === 'string' ? raw.type : '');
-      if (!type || type === 'notify') continue;
+      // notify 事件(pendingResolved 等):单独处理
+      if (type === 'notify') {
+        const eventType = raw.eventType as string | undefined;
+        if (eventType === 'pendingResolved') {
+          const data = raw.data as { target?: number } | undefined;
+          const target = data?.target;
+          if (target === undefined) continue;
+          if (target < 0) {
+            this.processedView.pending = null;
+          } else if (this.processedView.pending && this.processedView.pending.target === target) {
+            this.processedView.pending = null;
+          }
+        }
+        continue;
+      }
+      if (!type) continue;
       try {
         const def = getAtomDef(type);
         if (def.applyView) {

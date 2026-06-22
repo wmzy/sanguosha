@@ -108,7 +108,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)
       pendingTricks: p.pendingTricks.map(t => t.card.id),
       ...(() => {
-        const rawIdentity = p.vars['身份'] as string | undefined;
+        const rawIdentity = p.identity;
         if (!rawIdentity) return { identity: undefined, identityHidden: false };
         // 自己:可见
         if (i === viewer) return { identity: rawIdentity, identityHidden: false };
