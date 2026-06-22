@@ -322,7 +322,13 @@ export class GameSession {
   }
 
   handleDisconnect(playerId: string): void {
-    if (this.debug) return;
+    if (this.debug) {
+      // debug 模式:立即清理座次映射,避免幽灵连接(StrictMode 双重挂载)占用座次
+      this.playerNames.delete(playerId);
+      this.baselineSent.delete(playerId);
+      this.room.players.delete(playerId);
+      return;
+    }
     this.disconnectedAt.set(playerId, Date.now());
     if (this.graceTimer === null && this.allPlayersDisconnected()) {
       this.graceTimer = setTimeout(() => this.endDueToDisconnect(), RECONNECT_GRACE_MS);

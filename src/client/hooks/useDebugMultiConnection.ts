@@ -119,19 +119,23 @@ export function useDebugMultiConnection(
     playbackRef.current.reset(0);
     setConnectedCount(0);
 
+    // StrictMode 安全:cleanup 后不再发 join,避免幽灵连接占用座次
+    let cancelled = false;
+
     const cleanups: Array<() => void> = [];
     for (let i = 0; i < playerCount; i++) {
       const viewerIndex = i;
-      const playerId = `debug-${roomId}-${viewerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const ws = new WebSocket(wsUrl);
       const seat: SeatInfo = { ws, viewer: viewerIndex, view: null, lastSeq: 0 };
       seatsRef.current.set(viewerIndex, seat);
 
       ws.onopen = () => {
+        if (cancelled) { try { ws.close(); } catch { /* */ } return; }
         ws.send(JSON.stringify({ type: 'join_debug_room', roomId } as ClientMessage));
         setConnectedCount(prev => prev + 1);
       };
       ws.onmessage = (event) => {
+        if (cancelled) return;
         try {
           handleMessage(viewerIndex, JSON.parse(event.data as string) as ServerMessage);
         } catch (e) {
@@ -146,7 +150,10 @@ export function useDebugMultiConnection(
       cleanups.push(() => { try { ws.close(); } catch { /* */ } });
     }
 
-    return () => { for (const c of cleanups) c(); };
+    return () => {
+      cancelled = true;
+      for (const c of cleanups) c();
+    };
   }, [roomId, playerCount, wsUrl, handleMessage]);
 
   /** 发送 action:走 ownerId 对应的连接 */
