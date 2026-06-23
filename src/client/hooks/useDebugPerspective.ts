@@ -5,7 +5,7 @@
 // perspective 由 DebugLobby 持有,本 hook 接收所有座次的 views,
 // 提供切换/自动跟随逻辑。
 //
-// 自动跟随:选将阶段优先扫描所有 views 找下一个有待选将 pending 的座次;
+// 自动跟随:选将阶段扫描所有 views,找下一个有待选将 pending 或尚未选完的座次;
 // 非选将阶段(出牌/弃牌)跟随 currentPlayerIndex。
 //
 // 稳定性关键:effect 不直接依赖 perspective(否则 setPerspective→perspective 变→
@@ -38,6 +38,19 @@ function isCharSelectPhase(view: GameView | null | undefined): boolean {
   return view?.phase === '准备' && view.players.some(p => !p.character);
 }
 
+/**
+ * 选将阶段:某座次是否"正在等待选将"(该连接的玩家还没选完)。
+ * 与 isCharSelectPendingForView 的区别:后者要求 view.pending 非空(引擎已建立 slot)。
+ * 本函数也覆盖"pending 事件还没到达客户端"的时间窗口:
+ * phase=准备 + 该座次玩家还没选 + 无 pending → 正在等引擎分配 slot。
+ */
+function isWaitingToSelect(view: GameView | null | undefined, viewerIdx: number): boolean {
+  if (!view) return false;
+  if (view.phase !== '准备') return false;
+  const player = view.players[viewerIdx];
+  return !!player && !player.character;
+}
+
 export function useDebugPerspective(
   allViews: Map<number, GameView>,
   perspective: number,
@@ -52,9 +65,9 @@ export function useDebugPerspective(
 
   const currentView = allViews.get(perspective) ?? null;
 
-  // pending 清空且不在选将阶段时重置手动标记
+  // 选将阶段结束后(所有玩家已选完且不在准备阶段)重置手动标记
   useEffect(() => {
-    if (!currentView?.pending && !isCharSelectPhase(currentView)) {
+    if (!isCharSelectPhase(currentView)) {
       setManualOverride(false);
     }
   }, [currentView]);
@@ -68,19 +81,22 @@ export function useDebugPerspective(
     if (!autoSwitch || !currentView || manualOverride) return;
     const p = perspectiveRef.current;
 
-    // 选将阶段:优先扫描找下一个有选将 pending 的座次
+    // 选将阶段:扫描找下一个有待选将 pending 或等待选将的座次
     if (charSelectInProgress) {
-      // 当前视角自己有选将 pending → 保持
+      // 当前视角自己有选将 pending → 保持(正在选)
       if (isCharSelectPendingForView(currentView)) return;
-      // 扫描其他座次,找第一个有待选将 pending 的
-      for (let i = 0; i < playerCount; i++) {
-        const v = allViews.get(i);
-        if (isCharSelectPendingForView(v) && i !== p) {
-          setPerspective(i);
+      // 当前视角玩家还没选完(没有 pending 但也没 character) → 保持(等 slot 建立)
+      if (isWaitingToSelect(currentView, p)) return;
+      // 扫描其他座次,找第一个有待选将 pending 或等待选将的
+      for (let i = 1; i <= playerCount; i++) {
+        const idx = (p + i) % playerCount;
+        const v = allViews.get(idx);
+        if (isCharSelectPendingForView(v) || isWaitingToSelect(v, idx)) {
+          setPerspective(idx);
           return;
         }
       }
-      // 没找到待选将座次,但选将仍在进行(可能在过渡中)→ 保持当前
+      // 所有座次都已选完(视角数据还没更新到选将结束) → 保持
       return;
     }
 
@@ -96,22 +112,23 @@ export function useDebugPerspective(
   /** 切换视角:选将阶段切到下一个待选将座次,否则简单 +1 */
   const switchPerspective = useCallback(() => {
     setManualOverride(true);
+    const p = perspectiveRef.current;
     if (charSelectInProgress) {
-      // 找下一个待选将座次
+      // 从 p+1 开始找下一个待选将座次
       for (let i = 1; i <= playerCount; i++) {
-        const idx = (perspective + i) % playerCount;
+        const idx = (p + i) % playerCount;
         const v = allViews.get(idx);
-        if (isCharSelectPendingForView(v)) {
+        if (isCharSelectPendingForView(v) || isWaitingToSelect(v, idx)) {
           setPerspective(idx);
           return;
         }
       }
-      // 没找到待选将座次 → 回主公
+      // 没找到 → 回主公
       setPerspective(0);
       return;
     }
-    setPerspective((perspective + 1) % playerCount);
-  }, [perspective, playerCount, setPerspective, allViews, charSelectInProgress]);
+    setPerspective((p + 1) % playerCount);
+  }, [playerCount, setPerspective, allViews, charSelectInProgress]);
 
   const goToCurrentPlayer = useCallback(() => {
     setManualOverride(true);
