@@ -95,7 +95,6 @@ function extractPendingTarget(atom: Atom): number {
 }
 
 /** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
-/** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
 function notifyStateChange(state: GameState): void {
   state.onStateChange?.();
 }
