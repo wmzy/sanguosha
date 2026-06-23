@@ -287,23 +287,23 @@ export class GameSession {
         this.lastSentDeadline.set(playerId, this.deadlineKey(view));
       }
       const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
-      // 只下发 view 事件;notify(pendingResolved)由权威 deadline(null)替代
-      const viewEnvelopes = envelopes.filter(e => e.view);
-      if (viewEnvelopes.length > 0) {
+      if (envelopes.length > 0) {
         // 计算 effective deadline:pending 优先,否则出牌/弃牌阶段的 idleDeadline
         const dl = this.effectiveDeadline(state, viewer);
         const dlKey = dl ? `${dl.deadline}:${dl.totalMs}` : null;
         const prevKey = this.lastSentDeadline.get(playerId) ?? undefined;
         // deadline 仅在变化时附加在最后一条 event 上(减少冗余)
-        for (let i = 0; i < viewEnvelopes.length; i++) {
-          const env = viewEnvelopes[i];
-          const isLast = i === viewEnvelopes.length - 1;
+        // 逐条发送 view + notify envelopes(view=atom 事件, notify=pendingResolved 等)
+        for (let i = 0; i < envelopes.length; i++) {
+          const env = envelopes[i];
+          const isLast = i === envelopes.length - 1;
           const attachDeadline = isLast && dlKey !== prevKey;
           this.sendToPlayer(playerId, {
             type: 'event',
             seq: env.seq,
             timestamp: env.timestamp,
-            view: env.view!,
+            ...(env.view ? { view: env.view } : {}),
+            ...(env.notify ? { notify: env.notify } : {}),
             ...(attachDeadline ? { deadline: dl } : {}),
           });
         }

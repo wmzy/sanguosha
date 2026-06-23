@@ -38,7 +38,7 @@ class FakeWS {
 function allViews(ws: FakeWS): { seq: number; view: import('../../src/engine/types').ViewEvent }[] {
   const out: { seq: number; view: import('../../src/engine/types').ViewEvent }[] = [];
   for (const msg of ws.messages) {
-    if (msg.type === 'event') {
+    if (msg.type === 'event' && msg.view) {
       out.push({ seq: msg.seq, view: msg.view });
     }
   }

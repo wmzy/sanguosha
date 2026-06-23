@@ -21,14 +21,18 @@ export interface DeadlineInfo {
  * 服务端发往客户端的消息。
  * - initialView: 全量 baseline(首次/重连),viewer 隔离的 GameView。
  *   debug 多 WS 模型下,每个座次是独立连接,各自收自己 viewer 的 initialView。
- * - event: 单个视图事件。每次 atom apply 后逐条发送。
+ * - event: 单个事件。每次 atom apply / pending resolve 后逐条发送。
  *   viewer 由 WS 连接标识,不在消息中携带。
+ *   view: 视图事件(atom apply)。notify: 通知事件(pendingResolved 等)。
+ *   一条 event 消息通常只含 view 或 notify 之一;服务端按 seq 顺序逐条发。
  *   effect 不下发,前端通过 AtomDefinition.effect 静态查表。
  *   deadline 仅在变化时附加(合并了 pending deadline 和 turn idle deadline)。
  */
 export type ServerMessage =
   | { type: 'initialView'; state: GameView; lastSeq: EventSeq }
-  | { type: 'event'; seq: EventSeq; timestamp: number; view: ViewEvent;
+  | { type: 'event'; seq: EventSeq; timestamp: number;
+      view?: ViewEvent;
+      notify?: { skillId: string; eventType: string; data: Json };
       deadline?: DeadlineInfo | null }
   | { type: 'error'; message: string }
   | { type: 'actionRejected' }

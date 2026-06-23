@@ -12,32 +12,41 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
+import { applyAtom } from '../../src/engine/create-engine';
 
 function makePlayer(opts: {
   index: number;
   name: string;
   hand?: string[];
+  equipment?: Record<string, string>;
   skills?: string[];
   alive?: boolean;
+  health?: number;
+  maxHealth?: number;
 }) {
   return {
     index: opts.index,
     name: opts.name,
     character: '主公',
-    health: 4,
-    maxHealth: 4,
+    health: opts.health ?? 4,
+    maxHealth: opts.maxHealth ?? 4,
     alive: opts.alive ?? true,
     hand: opts.hand ?? [],
-    equipment: {},
+    equipment: opts.equipment ?? {},
     skills: opts.skills ?? ['顺手牵羊', '杀'],
     vars: {},
     marks: [],
     pendingTricks: [],
     judgeZone: [],
+    tags: [],
   };
 }
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+  return { id, name, suit, rank, type };
+}
+
+function makeBasicCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
   return { id, name, suit, rank, type };
 }
 
@@ -255,5 +264,129 @@ describe('顺手牵羊', () => {
     // 选牌面板选装备
     await P1.respond('顺手牵羊', { zone: 'equipment', cardId: 'wp1' });
     expect(harness.state.players[0].hand).toContain('wp1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 10. 顺手牵羊 端到端(获得 atom 验证)
+  // ─────────────────────────────────────────────────────────────
+  // 来源: tests/integration/obtain-atom.test.ts test 5
+  it('顺手牵羊 端到端:P0 出锦囊 → P0 拿 P1 一张手牌 → P1.hand -1,P0 拿到该牌', async () => {
+    const sq: Card = makeCard('sq1', '顺手牵羊', '♠', '4', '锦囊牌');
+    const stolen: Card = makeBasicCard('st1', '桃', '♥', '5');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [sq.id], skills: ['顺手牵羊', '杀'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [stolen.id], skills: [] }),
+      ],
+      cardMap: { [sq.id]: sq, [stolen.id]: stolen },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    const p0Before = [...harness.state.players[0].hand];
+    const p1Before = [...harness.state.players[1].hand];
+
+    // P0 对 P1 出 顺手牵羊
+    await P0.triggerAction('顺手牵羊', 'use', { cardId: sq.id, target: 1 });
+    // 消耗无懈窗口
+    await P0.pass();
+    // 盲选窗口:P0 选第 0 张
+    await P0.respond('顺手牵羊', { zone: 'hand', handIndex: 0 });
+
+    // P1 失去第一张手牌
+    expect(harness.state.players[1].hand).not.toContain(p1Before[0]);
+    // P1.hand -1
+    expect(harness.state.players[1].hand.length).toBe(p1Before.length - 1);
+    // P0 拿到 P1 那张
+    expect(harness.state.players[0].hand).toEqual([p1Before[0]]);
+    // 总牌数守恒(顺手牵羊 进弃牌堆)
+    const totalAfter = harness.state.players[0].hand.length + harness.state.players[1].hand.length;
+    expect(totalAfter).toBe(p0Before.length + p1Before.length - 1);
+  });
+});
+
+// ─── 获得 atom 单元测试 ─────────────────────────────────────
+// 来源: tests/integration/obtain-atom.test.ts tests 1-3
+// 验证 获得 atom 从来源手牌/装备区移除并加到目标。之前 bug:atom apply 只加没移导致牌被复制。
+describe('获得 atom 单元', () => {
+  let harness: SkillTestHarness;
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
+
+  // ─── 1. 单元:从手牌拿牌 ─────────────────────
+  it('单元:从 P0 手牌拿一张 → P0.hand 减少,P1.hand 增加', async () => {
+    const slash: Card = makeBasicCard('k1', '杀', '♠', '7');
+    const dodge: Card = makeBasicCard('d1', '闪', '♥', '5');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, dodge.id], skills: [] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: [] }),
+      ],
+      cardMap: { [slash.id]: slash, [dodge.id]: dodge },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    // P1 拿 P0 的杀
+    await applyAtom(harness.state, { type: '获得', player: 1, cardId: slash.id, from: 0 });
+
+    expect(harness.state.players[0].hand).toEqual([dodge.id]); // P0 剩闪
+    expect(harness.state.players[1].hand).toEqual([slash.id]); // P1 拿到杀
+    expect(harness.state.players[0].hand).not.toContain(slash.id);
+    expect(harness.state.players[1].hand).not.toContain(dodge.id);
+  });
+
+  // ─── 2. 单元:从装备区拿牌 ────────────────────
+  it('单元:从 P0 装备区拿一张 → P0.equipment 该槽清空,P1.hand 增加', async () => {
+    const weapon: Card = makeBasicCard('w1', '诸葛连弩', '♣', '1', '装备牌');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', equipment: { 武器: weapon.id }, skills: [] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: [] }),
+      ],
+      cardMap: { [weapon.id]: weapon },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    await applyAtom(harness.state, { type: '获得', player: 1, cardId: weapon.id, from: 0 });
+
+    expect(harness.state.players[0].equipment['武器']).toBeUndefined();
+    expect(harness.state.players[1].hand).toEqual([weapon.id]);
+  });
+
+  // ─── 3. 单元:from 缺省(只加不移) ─────────────
+  it('单元:from 缺省 → 目标 +1,无来源变化(摸牌/给予类场景)', async () => {
+    const slash: Card = makeBasicCard('k1', '杀', '♠', '7');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: [] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: [] }),
+      ],
+      cardMap: { [slash.id]: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    // 模拟 摸牌:不传 from
+    await applyAtom(harness.state, { type: '获得', player: 1, cardId: slash.id });
+
+    expect(harness.state.players[1].hand).toContain(slash.id);
   });
 });

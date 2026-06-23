@@ -1,4 +1,8 @@
-// 用户报告的所有问题回归测试
+// 用户报告的所有问题回归测试(烟雾测试)
+//
+// 目的:每个用户报告过的 bug 验证其核心场景仍然正常,作为 PR 合入前快速检查的回归契约。
+// 注意:每个场景的完整覆盖在对应的 skill-tests/<技能名>.test.ts 中,
+//       本文件不追求穷尽——只验证「核心链路通」即可。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';

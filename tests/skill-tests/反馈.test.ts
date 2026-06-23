@@ -42,6 +42,16 @@ function makePlayer(opts: {
   };
 }
 
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
+  return { id, name, suit, rank, type };
+}
+
 describe('反馈', () => {
   let harness: SkillTestHarness;
 
@@ -140,5 +150,47 @@ describe('反馈', () => {
     await P1.expectAccepted({ skillId: '反馈', actionType: 'respond', params: {} });
     await harness.waitForStable();
     expect(state.localVars['反馈/confirmed']).toBeFalsy();
+  });
+
+  // ─── 端到端:伤害→反馈→获得牌 ─────────────────────
+  // 来源: tests/integration/obtain-atom.test.ts test 4
+  it('反馈 端到端:P0 杀 P1 → P1 confirm → P0 不再持有被拿牌,P1 持有该牌', async () => {
+    const slash: Card = makeCard('k1', '杀', '♠', '7');
+    const stolen: Card = makeCard('s1', '闪', '♥', '5');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, stolen.id], skills: ['杀'] }),
+        makePlayer({
+          index: 1, name: 'P1',
+          hand: [],
+          skills: ['反馈', '闪'],
+          health: 4, maxHealth: 4,
+        }),
+      ],
+      cardMap: { [slash.id]: slash, [stolen.id]: stolen },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    // P0 杀 P1
+    await P0.useCardAndTarget('杀', slash.id, [1]);
+    // P1 不出闪 → 扣血 → 反馈 询问发动
+    await P1.pass();
+    P1.expectPending('请求回应');
+    // P1 confirm=true 发动反馈
+    await P1.respond('反馈', { choice: true });
+
+    // 关键合约:P0 不再持有被拿的牌
+    expect(harness.state.players[0].hand).not.toContain(stolen.id);
+    // P1 持有该牌
+    expect(harness.state.players[1].hand).toContain(stolen.id);
+    // P1 拿到了正好一张牌(从 P0)
+    expect(harness.state.players[1].hand.length).toBe(1);
   });
 });

@@ -86,10 +86,23 @@ export function useDebugMultiConnection(
     } else if (msg.type === 'event') {
       const seat = seatsRef.current.get(seatViewer);
       if (!seat?.view) return;
-      // 直接原地突变 seat.view——reducer(applyView)本身就是突变模型,
-      // 不用 structuredClone(它在 view 含函数引用如 cardFilter.filter 时会抛 DOMException)。
-      // setViews 创建新 Map 保证 React 检测到状态变更。
-      viewReducer(seat.view, msg.view, msg.timestamp);
+      // 处理 notify 事件(pendingResolved):清除该 viewer 的 view.pending
+      // target 匹配或为广播型(TARGET_BROADCAST=-2)即清除。这与引擎 notifyPendingResolved 对齐。
+      if (msg.notify) {
+        if (msg.notify.eventType === 'pendingResolved') {
+          const target = (msg.notify.data as { target?: number }).target;
+          if (target !== undefined && (target === seatViewer || target < 0) && seat.view.pending) {
+            seat.view.pending = null;
+          }
+        }
+      }
+      // 处理 view 事件(atom apply):原地突变 + 权威 deadline 覆盖
+      if (msg.view) {
+        // 直接原地突变 seat.view——reducer(applyView)本身就是突变模型,
+        // 不用 structuredClone(它在 view 含函数引用如 cardFilter.filter 时会抛 DOMException)。
+        // setViews 创建新 Map 保证 React 检测到状态变更。
+        viewReducer(seat.view, msg.view, msg.timestamp);
+      }
       // 更新 lastSeq
       seat.lastSeq = msg.seq;
       // 权威 deadline 覆盖:pending 优先写入 view.pending,否则写入 view.deadline
@@ -97,10 +110,6 @@ export function useDebugMultiConnection(
         if (msg.deadline !== null && seat.view.pending) {
           seat.view.pending.deadline = msg.deadline.deadline;
           seat.view.pending.totalMs = msg.deadline.totalMs;
-        }
-        // deadline === null 表示 pending 已解决（服务端权威信号）
-        if (msg.deadline === null) {
-          seat.view.pending = null;
         }
         // view.deadline 用于出牌/弃牌阶段(无 pending 时)
         seat.view.deadline = msg.deadline !== null ? msg.deadline.deadline : null;
@@ -111,7 +120,7 @@ export function useDebugMultiConnection(
         next.set(seatViewer, seat.view!);
         return next;
       });
-      if (seatViewer === perspectiveRef.current) {
+      if (msg.view && seatViewer === perspectiveRef.current) {
         playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
       }
     } else if (msg.type === 'actionRejected') {
