@@ -89,7 +89,7 @@ export function useDebugMultiConnection(
       // 直接原地突变 seat.view——reducer(applyView)本身就是突变模型,
       // 不用 structuredClone(它在 view 含函数引用如 cardFilter.filter 时会抛 DOMException)。
       // setViews 创建新 Map 保证 React 检测到状态变更。
-      viewReducer(seat.view, msg.view);
+      viewReducer(seat.view, msg.view, msg.timestamp);
       // 更新 lastSeq
       seat.lastSeq = msg.seq;
       // 权威 deadline 覆盖:pending 优先写入 view.pending,否则写入 view.deadline

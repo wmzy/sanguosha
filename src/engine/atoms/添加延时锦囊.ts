@@ -38,6 +38,10 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
       if (!list.includes(cardId)) list.push(cardId);
     }
   },
+  toViewLog(event) {
+    const trick = event.trick as { name?: string } | undefined;
+    return { player: event.player as number, text: `判定区放入 ${trick?.name ?? '延时锦囊'}` };
+  },
 };
 
 registerAtom(添加延时锦囊);

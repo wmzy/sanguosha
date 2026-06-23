@@ -482,6 +482,12 @@ export interface AtomDefinition<A = unknown> {
   applyView?(view: GameView, event: ViewEvent): void;
   /** effect 作为 toViewEvents 未实现时的 fallback。 */
   effect?: AtomEffect;
+  /**
+   * 前端根据 ViewEvent 生成游戏日志条目。纯展示层，不在网络传输中携带。
+   * ViewEvent 已含生成日志所需的所有数据（player/target/amount/cardName 等）。
+   * 返回 null 表示该事件不写日志。
+   */
+  toViewLog?(event: ViewEvent): { player: number; text: string } | null;
 }
 export interface GameView {
   viewer: number;

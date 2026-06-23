@@ -29,6 +29,7 @@ export const 造成伤害: AtomDefinition<{
       amount: atom.amount,
       source: atom.source,
       effect,
+
     };
     return {
       ownerViews: new Map(),
@@ -42,6 +43,9 @@ export const 造成伤害: AtomDefinition<{
       p.health = Math.max(0, p.health - (event.amount as number));
       // alive 由 击杀 atom 的 applyView 更新,这里不提前设
     }
+  },
+  toViewLog(event) {
+    return { player: event.source as number, text: `造成了 ${event.amount ?? 0} 点伤害` };
   },
 };
 

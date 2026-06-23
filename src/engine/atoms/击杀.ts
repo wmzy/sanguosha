@@ -44,6 +44,9 @@ export const 击杀: AtomDefinition<{ player: number }> = {
       p.equipment = {};
     }
   },
+  toViewLog(event) {
+    return { player: event.player as number, text: '阵亡' };
+  },
 };
 
 registerAtom(击杀);

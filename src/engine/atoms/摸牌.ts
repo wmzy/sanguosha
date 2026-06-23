@@ -96,6 +96,9 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
       view.players[pi].hand!.push(...(event.cards as any[]));
     }
   },
+  toViewLog(event) {
+    return { player: event.player as number, text: `摸了 ${event.count ?? 0} 张牌` };
+  },
 };
 
 registerAtom(摸牌);

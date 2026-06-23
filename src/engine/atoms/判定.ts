@@ -1,7 +1,7 @@
 // 判定:从牌堆顶翻一张到处理区(亮出判定牌)。
 // 技能 after hooks(八卦阵/乐不思蜀等)从处理区读判定牌花色。
 // atom.afterHooks 结束后把判定牌从处理区移入弃牌堆。
-import type { AtomDefinition, GameView } from '../types';
+import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
@@ -23,6 +23,14 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     const cardId = state.zones.processing.splice(idx, 1)[0];
     state.zones.discardPile.push(cardId);
   },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const view: ViewEvent = {
+      type: '判定',
+      player: atom.player,
+      judgeType: atom.judgeType,
+    };
+    return { ownerViews: new Map(), othersView: view };
+  },
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 1800 },
   applyView(view: GameView) {
     // apply: deck → processing (shift); afterHooks: processing → discardPile (splice+push)
@@ -33,6 +41,9 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
       view.zones.processing.pop();
     }
     view.zones.discardPileCount += 1;
+  },
+  toViewLog(event) {
+    return { player: event.player as number, text: `判定 ${event.judgeType ?? ''}` };
   },
 };
 

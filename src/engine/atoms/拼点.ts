@@ -38,6 +38,9 @@ export const 拼点: AtomDefinition<{
       view.zones.discardPileCount += cardIds.length;
     }
   },
+  toViewLog(event) {
+    return { player: event.initiator as number, text: '拼点' };
+  },
 };
 
 registerAtom(拼点);

@@ -20,12 +20,17 @@ import type { GameView, ViewEvent } from '../../engine/types';
  *
  * - 查找 AtomDefinition:优先 event.atomType(转换语义),fallback event.type
  * - 调用 applyView(view, event) 增量更新
+ * - 调用 toViewLog(event) 生成日志条目并 push 到 view.log(time 来自 envelope timestamp)
  * - 未实现 applyView 的 atom:view 不变(调用方可选择 fallback 全量 buildView)
  *
  * 注意:本函数原地突变 view(与后端 apply 原地突变 state 对称),不返回新对象。
  */
-export function viewReducer(view: GameView, event: ViewEvent): void {
+export function viewReducer(view: GameView, event: ViewEvent, time = 0): void {
   const type = event.atomType ?? event.type;
   const def = getAtomDef(type);
   def.applyView?.(view, event);
+  const logEntry = def.toViewLog?.(event);
+  if (logEntry) {
+    view.log.push({ time, player: logEntry.player, text: logEntry.text });
+  }
 }

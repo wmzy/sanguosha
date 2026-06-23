@@ -28,6 +28,7 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
       type: '弃置',
       player: atom.player,
       cardIds: atom.cardIds,
+
     };
     return { ownerViews: new Map(), othersView: view };
   },
@@ -57,6 +58,10 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
     if (view.zones) {
       view.zones.discardPileCount += cardIds.length;
     }
+  },
+  toViewLog(event) {
+    const cardIds = event.cardIds;
+    return { player: event.player as number, text: `弃置了 ${Array.isArray(cardIds) ? cardIds.length : 0} 张牌` };
   },
 };
 

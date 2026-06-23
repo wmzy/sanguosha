@@ -8,22 +8,22 @@ import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 export const TURN_IDLE_TIMEOUT_MS = 50_000;
 
 
-/** 从 ClientMessage 生成可读日志文本 */
-function formatLogEntry(msg: ClientMessage): string {
-  const { skillId, actionType, ownerId, params } = msg;
+/** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
+export function formatLogEntry(msg: ClientMessage): string {
+  const { skillId, actionType, params } = msg;
   if (actionType === 'use') {
     const cardId = params.cardId as string | undefined;
     const targets = params.targets as string[] | undefined;
     const targetStr = targets?.length ? ` → ${targets.join(',')}` : '';
-    return `${ownerId} 使用 ${skillId}${cardId ? `(${cardId})` : ''}${targetStr}`;
+    return `使用 ${skillId}${cardId ? `(${cardId})` : ''}${targetStr}`;
   }
   if (actionType === 'respond') {
     const cardId = params.cardId as string | undefined;
-    return cardId ? `${ownerId} 响应 ${cardId}` : `${ownerId} 不响应`;
+    return cardId ? `响应 ${cardId}` : '不响应';
   }
-  if (actionType === 'start') return `${ownerId} 开始游戏`;
-  if (actionType === 'end') return `${ownerId} 结束回合`;
-  return `${ownerId} ${skillId}:${actionType}`;
+  if (actionType === 'start') return '开始游戏';
+  if (actionType === 'end') return '结束回合';
+  return `${skillId}:${actionType}`;
 }
 
 export function buildView(state: GameState, viewer: number, debug = false): GameView {

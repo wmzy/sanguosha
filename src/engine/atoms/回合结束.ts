@@ -1,6 +1,6 @@
 // src/engine/atoms/回合结束.ts
 // 回合结束:清空本回合临时 vars,清 turn 持续 mark
-import type { AtomDefinition, GameView } from '../types';
+import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 回合结束: AtomDefinition<{ player: number }> = {
@@ -23,6 +23,13 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
       );
     }
   },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const view: ViewEvent = {
+      type: '回合结束',
+      player: atom.player,
+    };
+    return { ownerViews: new Map(), othersView: view };
+  },
   effect: { sound: 'turn_end', duration: 800 },
   applyView(view: GameView) {
     // 清空本回合临时 vars(与 apply 对称)
@@ -31,6 +38,9 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
     for (const p of view.players) {
       p.marks = p.marks.filter(m => m.duration !== 'turn');
     }
+  },
+  toViewLog(event) {
+    return { player: event.player as number, text: '回合结束' };
   },
 };
 

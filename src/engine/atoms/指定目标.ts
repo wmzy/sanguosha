@@ -14,18 +14,25 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
     // 事件标记——目标关系在事件流中记录
   },
   effect: { sound: 'target', animation: 'highlight', duration: 400 },
-  toViewEvents(_state, atom): ViewEventSplit {
+  toViewEvents(state, atom): ViewEventSplit {
+    const cardName = atom.cardId ? (state.cardMap[atom.cardId]?.name ?? atom.cardId) : undefined;
     const view: ViewEvent = {
       type: '指定目标',
       source: atom.source,
       target: atom.target,
       ...(atom.cardId !== undefined ? { cardId: atom.cardId } : {}),
+      ...(cardName !== undefined ? { cardName } : {}),
     };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(_view, _event) {
     // 事件标记——目标关系在事件流中记录,前端 highlight 通过 effect 动画展示。
     // 无 GameView 字段需要直接更新(高亮态由前端处理 effect 期间临时绘制)。
+  },
+  toViewLog(event) {
+    return event.cardId
+      ? { player: event.source as number, text: `使用 ${event.cardName ?? event.cardId} 指定目标` }
+      : { player: event.source as number, text: '指定目标' };
   },
 };
 

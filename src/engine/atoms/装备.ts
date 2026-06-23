@@ -50,10 +50,12 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
   toViewEvents(state, atom): ViewEventSplit {
     const card = state.cardMap[atom.cardId];
     const slot = inferSlot(card.subtype) ?? '武器';
+    const cardName = state.cardMap[atom.cardId]?.name ?? atom.cardId;
     const view: ViewEvent = {
       type: '装备',
       player: atom.player,
       cardId: atom.cardId,
+      cardName,
       slot,
     };
     return { ownerViews: new Map(), othersView: view };
@@ -70,6 +72,9 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     if (view.players[pi].hand) {
       view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== event.cardId);
     }
+  },
+  toViewLog(event) {
+    return { player: event.player as number, text: `装备了 ${event.cardName ?? event.cardId}` };
   },
 };
 
