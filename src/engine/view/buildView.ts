@@ -101,14 +101,10 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   }
 
   // 出牌/弃牌阶段(无 pending 时)的空闲超时。
-  // 这是近似值,session 的 idleTimer 权威值通过 event 消息覆盖。
+  // 读 state.idleDeadline(由 session resetIdleTimer 写入的权威值),保证前端倒计时与实际超时一致。
   // pending 存在时为 null(此时用 pending.deadline/totalMs)。
-  let deadline: number | null = null;
-  let deadlineTotalMs = 0;
-  if (!pending && (state.phase === '出牌' || state.phase === '弃牌')) {
-    deadline = Date.now() + TURN_IDLE_TIMEOUT_MS;
-    deadlineTotalMs = TURN_IDLE_TIMEOUT_MS;
-  }
+  const deadline = !pending ? (state.idleDeadline ?? null) : null;
+  const deadlineTotalMs = deadline !== null ? TURN_IDLE_TIMEOUT_MS : 0;
 
   void debug;  // 保留参数签名兼容调用点,但不再影响隔离逻辑
 
@@ -163,5 +159,31 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // 处理区:判定牌 / 中间结算的卡(闪抵消杀等)
       processing: [...state.zones.processing],
     },
+  };
+}
+
+/** 读取指定 viewer 可见 pending slot 的 deadline/totalMs(供 session 广播 event 时附加倒计时)。
+ *  与 buildView 内部 pending 构建逻辑同源:优先 viewer 专属 slot,其次广播型 slot(target===TARGET_BROADCAST)。
+ *  无 pending 返回 null。 */
+export function getPendingDeadline(
+  state: GameState,
+  viewer: number,
+): { target: number; deadline: number; totalMs: number } | null {
+  const slot = viewer >= 0
+    ? (state.pendingSlots.get(viewer)
+        ?? [...state.pendingSlots.values()].find(s =>
+            (s.atom as { target?: number }).target === TARGET_BROADCAST))
+    : undefined;
+  if (!slot) return null;
+  const def = slot.definition;
+  const target = 'target' in slot.atom && typeof slot.atom.target === 'number'
+    ? slot.atom.target
+    : TARGET_SYSTEM;
+  const timeoutSec = (slot.atom as { timeout?: number }).timeout
+    ?? def.pending?.timeout ?? 30;
+  return {
+    target,
+    deadline: state.startedAt + slot.deadline,
+    totalMs: timeoutSec * 1000,
   };
 }

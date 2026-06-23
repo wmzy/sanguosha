@@ -147,8 +147,8 @@ describe('选将倒计时独立性', () => {
   }, 15000);
 
   it('选将期间 idle timer 不启动(idleDeadline 为 null)', async () => {
-    // 选将期间 idleDeadline 应为 null
-    const idleDeadline = (session as unknown as { idleDeadline: number | null }).idleDeadline;
+    // 选将期间 idleDeadline 应为 null(state.idleDeadline 为权威值)
+    const idleDeadline = state.idleDeadline ?? null;
     expect(idleDeadline).toBeNull();
 
     // 主公选完后、并行选将创建前的间隙也不应启动
@@ -163,7 +163,7 @@ describe('选将倒计时独立性', () => {
     await sleep(50);
 
     // 并行选将期间 idleDeadline 仍应为 null
-    const idleDeadline2 = (session as unknown as { idleDeadline: number | null }).idleDeadline;
+    const idleDeadline2 = state.idleDeadline ?? null;
     expect(idleDeadline2).toBeNull();
 
     // 清理

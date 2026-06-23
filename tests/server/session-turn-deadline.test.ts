@@ -41,9 +41,10 @@ function setState(session: GameSession, state: GameState): void {
   (session as unknown as { state: GameState }).state = state;
 }
 
-/** 通过 reflection 取 session.idleDeadline(私有字段) */
+/** 通过 reflection 取 state.idleDeadline(权威值,由 resetIdleTimer 写入) */
 function getIdleDeadline(session: GameSession): number | null {
-  return (session as unknown as { idleDeadline: number | null }).idleDeadline;
+  const state = (session as unknown as { state: GameState | null }).state;
+  return state?.idleDeadline ?? null;
 }
 
 /** 伪 WebSocket,收集所有发给该 player 的消息 */
@@ -118,7 +119,8 @@ describe('session:出牌/弃牌阶段倒计时前后端同步', () => {
     room.players.set(playerId, ws as unknown as import('hono/ws').WSContext);
     (session as unknown as { playerNames: Map<string, number> }).playerNames.set(playerId, 0);
 
-    // 触发一次广播(broadcastNewState 内部会先调 resetIdleTimer 设置 deadline)
+    // 触发一次广播:先调 resetIdleTimer 写入 state.idleDeadline,broadcastNewState 据此下发
+    (session as unknown as { resetIdleTimer: () => void }).resetIdleTimer();
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
 
     // 应收到 initialView(首次) 且其 state.deadline 非空

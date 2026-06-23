@@ -127,6 +127,12 @@ export interface GameState {
    *  session 订阅后据此广播 view,不再 await dispatch。fire-and-forget 模型下
    *  dispatch 返回时 execute 可能还在跑,广播时机由本回调驱动。 */
   onStateChange?: () => void;
+
+  /** 出牌/弃牌阶段的回合空闲超时绝对时间戳(Date.now() 口径)。
+   *  由 session 的 resetIdleTimer 写入(滑动续期);buildView 直接读此字段作为权威值,
+   *  不再各自近似计算。为 null 表示当前无空闲倒计时(有 pending / 非出牌弃牌阶段 / 选将期)。
+   *  持久化时会随 state 快照保存;restore 路径若值过期,resetIdleTimer 会重写。 */
+  idleDeadline?: number | null;
 }
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
@@ -155,6 +161,7 @@ export function createGameState(partial: Partial<GameState> & { players: PlayerS
     startedAt: 0,
     actionLog: [],
     atomHistory: [],
+    idleDeadline: null,
     ...partial,
     players,
   };

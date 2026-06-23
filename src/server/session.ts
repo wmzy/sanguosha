@@ -6,11 +6,10 @@ import type {
   GameState,
   GameView,
 } from '../engine/types';
-import { TARGET_BROADCAST } from '../engine/types';
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
+import { TURN_IDLE_TIMEOUT_MS, getPendingDeadline } from '../engine/view/buildView';
 import { allCharacters } from '../engine/cards/characters';
-import { TURN_IDLE_TIMEOUT_MS } from '../engine/view/buildView';
 
 
 import '../engine/atoms';
@@ -47,7 +46,6 @@ export class GameSession {
   private maxPlayers: number;
   private destroyed = false;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  private idleDeadline: number | null = null;
   /** debug 房间断线时暂停 idle 定时器，避免无 WS 连接时 idle timer 自循环泄漏 */
   private idleSuspended = false;
   private sessionSeed: number;
@@ -247,25 +245,20 @@ export class GameSession {
 
 
   /** 读取该 viewer 可见 pending slot 的 deadline/totalMs (供 events 消息下发) */
-  private pendingForViewer(state: GameState, viewer: number): { target: number; deadline: number; totalMs: number } | null {
-    // 优先 viewer 专属 slot，其次广播型 slot(target === TARGET_BROADCAST)
-    const mySlot = state.pendingSlots.get(viewer);
-    let slot = mySlot;
-    if (!slot) {
-      slot = [...state.pendingSlots.values()].find(s =>
-        (s.atom as { target?: number }).target === TARGET_BROADCAST);
-    }
-    if (!slot) return null;
-    const target = (slot.atom as { target?: number }).target ?? -1;
-    // totalMs 从 slot 定义读取 timeout(与 createAndAwaitSlot 的定时器口径一致),
-    // 不用 slot.deadline - slot.startTime —— 两者分别用 Date.now() 计算,有 ±1ms 抖动。
-    const timeoutSec = (slot.atom as { timeout?: number }).timeout
-      ?? slot.definition.pending?.timeout ?? 30;
-    return {
-      target,
-      deadline: state.startedAt + slot.deadline,
-      totalMs: timeoutSec * 1000,
-    };
+  /** 计算某 viewer 的有效 deadline(pending 优先,否则出牌/弃牌阶段空闲超时)。
+   *  读 state.idleDeadline(权威值,由 resetIdleTimer 写入)和引擎 getPendingDeadline(纯函数,与 buildView 同源)。
+   *  deadline 单一来源,session 不再重复 slot 查找逻辑。 */
+  private effectiveDeadline(state: GameState, viewer: number): DeadlineInfo | null {
+    const p = getPendingDeadline(state, viewer);
+    if (p) return { deadline: p.deadline, totalMs: p.totalMs };
+    const idle = state.idleDeadline ?? null;
+    if (idle !== null) return { deadline: idle, totalMs: IDLE_TIMEOUT_MS };
+    return null;
+  }
+
+  /** 从 deadline 值构建缓存 key(避免重复发送不变的倒计时) */
+  private deadlineKey(dl: DeadlineInfo | null): string | null {
+    return dl ? `${dl.deadline}:${dl.totalMs}` : null;
   }
 
   /**
@@ -284,13 +277,13 @@ export class GameSession {
         this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
         this.baselineSent.add(playerId);
         // baseline 已含完整状态,初始化 deadline 缓存
-        this.lastSentDeadline.set(playerId, this.deadlineKey(view));
+        this.lastSentDeadline.set(playerId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
       }
       const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
       if (envelopes.length > 0) {
         // 计算 effective deadline:pending 优先,否则出牌/弃牌阶段的 idleDeadline
         const dl = this.effectiveDeadline(state, viewer);
-        const dlKey = dl ? `${dl.deadline}:${dl.totalMs}` : null;
+        const dlKey = this.deadlineKey(dl);
         const prevKey = this.lastSentDeadline.get(playerId) ?? undefined;
         // deadline 仅在变化时附加在最后一条 event 上(减少冗余)
         // 逐条发送 view + notify envelopes(view=atom 事件, notify=pendingResolved 等)
@@ -313,27 +306,6 @@ export class GameSession {
     this.lastBroadcastSeq = state.seq;
   }
 
-  /** 计算 effective deadline:pending slot 优先,否则出牌/弃牌阶段的 idleDeadline。
-   *  合并了旧 pendingForViewer + turnDeadline 逻辑。 */
-  private effectiveDeadline(state: GameState, viewer: number): DeadlineInfo | null {
-    // pending 优先
-    const p = this.pendingForViewer(state, viewer);
-    if (p) return { deadline: p.deadline, totalMs: p.totalMs };
-    // 出牌/弃牌阶段:idleDeadline
-    if (this.idleDeadline !== null && (state.phase === '出牌' || state.phase === '弃牌')) {
-      return { deadline: this.idleDeadline, totalMs: IDLE_TIMEOUT_MS };
-    }
-    return null;
-  }
-
-  /** 从 GameView 提取 deadline 缓存 key */
-  private deadlineKey(view: GameView): string | null {
-    const p = view.pending;
-    if (p?.deadline && p?.totalMs) return `${p.deadline}:${p.totalMs}`;
-    if (view.deadline) return `${view.deadline}:${view.deadlineTotalMs}`;
-    return null;
-  }
-
   /**
    * 向单个玩家发其座次的 initialView(重连/后加入用)。
    * 重连时发当前完整 state 作为 baseline。
@@ -342,9 +314,10 @@ export class GameSession {
     if (!this.state) return;
     const viewer = this.playerNames.get(playerId);
     if (viewer === undefined || viewer < 0 || viewer >= this.state.players.length) return;
-    const view = buildView(this.state, viewer);
-    this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: this.state.seq });
-    this.lastSentDeadline.set(playerId, this.deadlineKey(view));
+    const state = this.state;
+    const view = buildView(state, viewer);
+    this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
+    this.lastSentDeadline.set(playerId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
   }
 
   handleDisconnect(playerId: string): void {
@@ -478,7 +451,8 @@ export class GameSession {
     if (state.phase === '准备' && state.players.some(p => !p.character)) return;
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.alive) return;
-    this.idleDeadline = Date.now() + IDLE_TIMEOUT_MS;
+    // 写入 state.idleDeadline(权威值),buildView 和 effectiveDeadline 都读此单一来源。
+    state.idleDeadline = Date.now() + IDLE_TIMEOUT_MS;
     this.idleTimer = setTimeout(() => {
       if (this.destroyed || !this.state) return;
       this.logger.info('idle timeout, auto-ending turn', { player: currentPlayer.name });
@@ -501,7 +475,7 @@ export class GameSession {
       clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
-    this.idleDeadline = null;
+    if (this.state) this.state.idleDeadline = null;
   }
   private persistAsync(): void {
     if (!this.state) return;
