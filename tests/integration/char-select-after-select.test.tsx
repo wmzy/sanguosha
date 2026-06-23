@@ -19,7 +19,8 @@ import type { GameView } from '../../src/engine/types';
 /** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角) */
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
   const [perspective, setPerspective] = useState(view.viewer);
-  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(view, perspective, view.players.length, setPerspective);
+  const views = new Map<number, GameView>([[view.viewer, view]]);
+  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(views, perspective, view.players.length, setPerspective);
   return (
     <GameViewComponent
       view={view}

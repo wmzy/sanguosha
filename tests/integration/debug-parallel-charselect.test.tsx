@@ -27,7 +27,8 @@ import type { GameView } from '../../src/engine/types';
  *      多 WS 集成测试中应当用 Map<viewer, GameView> + 切 connection 才能跨座。 */
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
   const [perspective, setPerspective] = useState(view.viewer);
-  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(view, perspective, view.players.length, setPerspective);
+  const views = new Map<number, GameView>([[view.viewer, view]]);
+  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(views, perspective, view.players.length, setPerspective);
   return (
     <GameViewComponent
       view={view}

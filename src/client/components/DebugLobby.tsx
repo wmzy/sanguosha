@@ -72,7 +72,7 @@ function DebugGameView({
     onFirstView: (v) => setPerspective(v),
   });
   const currentView = conn.views.get(perspective) ?? null;
-  const pctl = useDebugPerspective(currentView, perspective, playerCount, setPerspective);
+  const pctl = useDebugPerspective(conn.views, perspective, playerCount, setPerspective);
 
   if (!currentView) {
     return (

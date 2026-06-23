@@ -28,7 +28,9 @@ export function CharSelectWaitingOverlay({
   const isPendingCharSelect = view.pending?.atom?.type === '选将询问';
   const selectDeadline = isPendingCharSelect ? (view.pending!.deadline ?? null) : null;
   const selectTotalMs = isPendingCharSelect ? (view.pending!.totalMs ?? 60_000) : 60_000;
-  const nextName = view.players[(perspectiveIdx + 1) % view.players.length]?.name;
+  // 找下一个未选将的座次名(用于切换按钮显示)
+  const nextUnselected = view.players.find(p => !p.character && p.index !== perspectiveIdx);
+  const nextName = nextUnselected?.name ?? view.players[(perspectiveIdx + 1) % view.players.length]?.name;
   const selectingNames = view.players.filter(p => !p.character).map(p => p.name).join('、');
 
   // 当前视角玩家已选的武将信息(用于展示选择结果)
