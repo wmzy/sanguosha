@@ -57,6 +57,8 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
       cardId: atom.cardId,
       cardName,
       slot,
+      // 武器攻击范围:applyView 需要同步到 distanceVars.attackRange
+      ...(slot === '武器' ? { range: card.range ?? 1 } : {}),
     };
     return { ownerViews: new Map(), othersView: view };
   },
@@ -66,6 +68,13 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
     if (slot) {
       view.players[pi].equipment[slot] = event.cardId as string;
+    }
+    // 武器攻击范围同步到 distanceVars
+    if (slot === '武器' && typeof event.range === 'number') {
+      view.players[pi].distanceVars = {
+        ...view.players[pi].distanceVars,
+        attackRange: event.range,
+      };
     }
     // 装备从手牌移出:handCount - 1
     view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);

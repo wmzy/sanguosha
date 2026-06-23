@@ -96,13 +96,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       try {
         // 1. 先翻 X 张到处理区(X = 存活玩家数)
+        //    用 移动牌 atom(牌堆→处理区)而非直接 mutate:直接 mutate 不产生 ViewEvent,
+        //    processedView 的 zones 永远不同步(harness 自动对比会报)。
+        //    摸牌顺序与原 shift() 一致(牌堆顶 = deck[0])。
         const allTargets = alivePlayersFrom(state, from);
         const cardCount = allTargets.length;
         const revealedIds: string[] = [];
         for (let i = 0; i < cardCount; i++) {
           if (state.zones.deck.length === 0) break;
-          const topId = state.zones.deck.shift()!;
-          state.zones.processing.push(topId);
+          const topId = state.zones.deck[0];
+          await applyAtom(state, { type: '移动牌', cardId: topId, from: { zone: '牌堆' }, to: { zone: '处理区' } });
           revealedIds.push(topId);
         }
 

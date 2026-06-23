@@ -34,12 +34,11 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 1800 },
   applyView(view: GameView) {
     // apply: deck → processing (shift); afterHooks: processing → discardPile (splice+push)
-    // applyView 对应: deckCount - 1, processing pop(已由 afterHook 移走), discardPileCount + 1
+    // applyView 对应: deckCount - 1, processing net-zero(apply 加 + afterHooks 减 = 不变), discardPileCount + 1
+    // ⚠️ 不能 processing.pop()——判定可能嵌套在其他 atom 的 hook 中(如八卦阵),processing
+    // 最后一张未必是判定牌。apply+afterHooks 净效果 = processing 不变。
     if (!view.zones) return;
     view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
-    if (view.zones.processing.length > 0) {
-      view.zones.processing.pop();
-    }
     view.zones.discardPileCount += 1;
   },
   toViewLog(event) {

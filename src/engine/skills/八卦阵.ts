@@ -32,7 +32,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const judgeCard = ctx.state.cardMap[judgeCardId];
     if (!judgeCard) return;
 
-    // 红色:往处理区放虚拟闪牌
+    // 红色:往处理区放虚拟闪牌(通过移动牌 atom 产生 ViewEvent,保持 processedView 同步)
     if (judgeCard.suit === '♥' || judgeCard.suit === '♦') {
       const dodgeId = `八卦阵:${ownerId}:${judgeCardId}`;
       const virtualDodge: Card = {
@@ -43,7 +43,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         type: '基本牌',
       };
       ctx.state.cardMap[dodgeId] = virtualDodge;
-      ctx.state.zones.processing.push(dodgeId);
+      await applyAtom(ctx.state, {
+        type: '移动牌',
+        cardId: dodgeId,
+        from: { zone: '处理区' },
+        to: { zone: '处理区' },
+      });
     }
   });
   return () => {};

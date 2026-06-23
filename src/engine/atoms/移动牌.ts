@@ -49,14 +49,14 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     // 弃牌堆目标 → 弃牌事件
     if (atom.to.zone === '弃牌堆' && fromPlayer !== undefined && cardInfo) {
       const effect = { sound: 'discard' as const, duration: 600 };
-      const view: ViewEvent = { type: '弃牌', player: fromPlayer, card: cardInfo, effect };
+      const view: ViewEvent = { type: '弃牌', player: fromPlayer, card: cardInfo, cardId: atom.cardId, effect };
       return { ownerViews: new Map(), othersView: view };
     }
 
     // 手牌→处理区 = 打出
     if (atom.to.zone === '处理区' && fromPlayer !== undefined && cardInfo) {
       const effect = { sound: 'play_card' as const, duration: 800 };
-      const view: ViewEvent = { type: '打出', player: fromPlayer, card: cardInfo, effect };
+      const view: ViewEvent = { type: '打出', player: fromPlayer, card: cardInfo, cardId: atom.cardId, effect };
       return { ownerViews: new Map(), othersView: view };
     }
 
@@ -73,10 +73,34 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
+    // 通用移动牌:zone 同步必须在 player guard 之前,因为某些移动(如处理区→弃牌堆)无 player
+    if (event.type === '移动牌' && view.zones) {
+      const from = (event as any).from;
+      const to = (event as any).to;
+      const cardId = (event as any).cardId as string;
+      if (from?.zone === '牌堆') view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
+      else if (from?.zone === '弃牌堆') view.zones.discardPileCount = Math.max(0, view.zones.discardPileCount - 1);
+      else if (from?.zone === '处理区') view.zones.processing = view.zones.processing.filter((id: string) => id !== cardId);
+
+      if (to?.zone === '牌堆') view.zones.deckCount += 1;
+      else if (to?.zone === '弃牌堆') view.zones.discardPileCount += 1;
+      else if (to?.zone === '处理区') view.zones.processing.push(cardId);
+    }
+
     const pi = view.players.findIndex(p => p.index === (event.player as number));
     if (pi < 0) return;
     switch (event.type) {
-      case '弃牌':
+      case '弃牌': {
+        view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
+        if (view.players[pi].hand) {
+          const card = event.card as any;
+          view.players[pi].hand = view.players[pi].hand!.filter(
+            (c: any) => !(c.name === card?.name && c.suit === card?.suit && c.rank === card?.rank)
+          );
+        }
+        if (view.zones) view.zones.discardPileCount += 1;
+        break;
+      }
       case '打出': {
         view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
         if (view.players[pi].hand) {
@@ -85,6 +109,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
             (c: any) => !(c.name === card?.name && c.suit === card?.suit && c.rank === card?.rank)
           );
         }
+        if (view.zones && event.cardId) view.zones.processing.push(event.cardId as string);
         break;
       }
       case '摸牌': {
@@ -93,20 +118,33 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         if (event.cards && view.players[pi].hand) {
           view.players[pi].hand!.push(...(event.cards as any[]));
         }
+        if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
         break;
       }
       default: {
-        // 通用移动(装备/转化等):from 手牌 → handCount - 1, to 手牌 → handCount + 1
+        // 通用移动(装备/转化等):from/to 手牌 → handCount ±1
+        // 必须独立查找 from/to 玩家,因为 event.player 只是其中之一
         const from = (event as any).from;
         const to = (event as any).to;
-        if (from?.zone === '手牌' && from?.player === view.players[pi].index) {
-          view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-          if (view.players[pi].hand) {
-            view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== (event as any).cardId);
+        const cardId = (event as any).cardId as string;
+        if (from?.zone === '手牌' && from?.player !== undefined) {
+          const fromPi = view.players.findIndex(p => p.index === from.player);
+          if (fromPi >= 0) {
+            view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
+            if (view.players[fromPi].hand) {
+              view.players[fromPi].hand = view.players[fromPi].hand!.filter((c: any) => c.id !== cardId);
+            }
           }
         }
-        if (to?.zone === '手牌' && to?.player === view.players[pi].index) {
-          view.players[pi].handCount += 1;
+        if (to?.zone === '手牌' && to?.player !== undefined) {
+          const toPi = view.players.findIndex(p => p.index === to.player);
+          if (toPi >= 0) {
+            view.players[toPi].handCount += 1;
+            if (cardId && view.players[toPi].hand) {
+              const card = view.cardMap[cardId];
+              if (card) view.players[toPi].hand!.push(card);
+            }
+          }
         }
         break;
       }

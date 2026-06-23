@@ -23,12 +23,22 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
     state.zones.discardPile.push(...atom.cardIds);
   },
   effect: { sound: 'discard', animation: 'flip', duration: 600 },
-  toViewEvents(_state, atom): ViewEventSplit {
+  toViewEvents(state, atom): ViewEventSplit {
+    // toViewEvents 在 apply 之前调用,此时 state 尚未变更。
+    // 记录每张牌所在区域(zone),供 applyView 精确扣减 handCount/equipment。
+    const player = state.players[atom.player];
+    const equipSet = new Set(Object.values(player.equipment).filter(Boolean));
+    const zones: Record<string, string> = {};
+    for (const cardId of atom.cardIds) {
+      if (player.hand.includes(cardId)) zones[cardId] = 'hand';
+      else if (equipSet.has(cardId)) zones[cardId] = 'equipment';
+      else zones[cardId] = 'judge';
+    }
     const view: ViewEvent = {
       type: '弃置',
       player: atom.player,
       cardIds: atom.cardIds,
-
+      zones,
     };
     return { ownerViews: new Map(), othersView: view };
   },
@@ -36,6 +46,7 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
     const pi = view.players.findIndex(p => p.index === (event.player as number));
     if (pi < 0) return;
     const cardIds = (event.cardIds as string[]) ?? [];
+    const zones = (event.zones as Record<string, string>) ?? {};
     const discardSet = new Set(cardIds);
     // 装备区:清除被弃的装备(与 apply 对称),并统计装备移除数
     let equipRemoved = 0;
@@ -48,9 +59,8 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
       }
     }
     view.players[pi].equipment = equipment;
-    // 手牌:handCount 按总数(弃牌总数 - 装备移除数)减;
-    // hand 可见时从 hand 移除匹配的牌。
-    const handRemoved = cardIds.length - equipRemoved;
+    // 手牌:只减在 hand 区域的牌(判定区牌不在 hand/equip,不应减 handCount)
+    const handRemoved = cardIds.filter(id => zones[id] === 'hand').length;
     view.players[pi].handCount = Math.max(0, view.players[pi].handCount - handRemoved);
     if (view.players[pi].hand && handRemoved > 0) {
       view.players[pi].hand = view.players[pi].hand!.filter(c => !discardSet.has(c.id));

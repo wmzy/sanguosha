@@ -44,6 +44,18 @@ export function createMountSkill(name: string, kind: MountKind, desc: string): S
   };
 }
 
+/** Mount skill IDs → distanceVars delta (for view sync in 添加技能/移除技能 atoms).
+ * Mount skills set/clear vars via onInit (after hook), not via atom apply,
+ * so the atoms must include this info in ViewEvents for applyView to sync. */
+export const MOUNT_DISTANCE_VARS: Record<string, { attackMod?: number; defenseMod?: number }> = {
+  '赤兔': { attackMod: 1 },
+  '紫骍': { attackMod: 1 },
+  '大宛': { attackMod: 1 },
+  '的卢': { defenseMod: 1 },
+  '绝影': { defenseMod: 1 },
+  '爪黄飞电': { defenseMod: 1 },
+};
+
 // ─── 进攻马 ───
 export const 赤兔 = createMountSkill('赤兔', '进攻', '进攻马:你与其他角色的距离-1');
 export const 紫骍 = createMountSkill('紫骍', '进攻', '进攻马:你与其他角色的距离-1');

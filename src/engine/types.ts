@@ -441,9 +441,9 @@ export type Atom =
      wuxieTarget?: number }
   // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
   | { type: '并行回应'; requestType: string; targets: number[]; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
-  // 牌包装(武圣转化)
-  | { type: '武圣包装'; cardId: string }
-  | { type: '武圣还原'; cardId: string };
+  // 牌包装(武圣转化 / 丈八蛇矛双卡转化)
+  | { type: '武圣包装'; player: number; cardId: string; secondCardId?: string }
+  | { type: '武圣还原'; player: number; cardId: string; secondCardId?: string };
 
 
 export interface AtomDefinition<A = unknown> {

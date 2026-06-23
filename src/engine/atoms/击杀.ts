@@ -33,13 +33,18 @@ export const 击杀: AtomDefinition<{ player: number }> = {
     if (pi >= 0) {
       const p = view.players[pi];
       // 弃牌堆计数:手牌数 + 装备数(与 apply 对称)
-      const handCount = p.hand?.length ?? 0;
+      // 用 p.handCount 而非 p.hand?.length —— 非 owner 的 hand 是 undefined
+      const handCount = p.handCount;
       const equipCount = Object.values(p.equipment).filter(Boolean).length;
       if (view.zones) {
         view.zones.discardPileCount += handCount + equipCount;
       }
       p.alive = false;
-      p.hand = [];
+      // 只有 owner(viewer === 阵亡玩家)才清 hand 为 [];
+      // 非 owner 的 hand 是 undefined,保持 undefined
+      if (view.viewer === (event.player as number)) {
+        p.hand = [];
+      }
       p.handCount = 0;
       p.equipment = {};
     }

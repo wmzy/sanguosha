@@ -7,6 +7,7 @@
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
 import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
 import { registerAction, type SkillModule } from '../skill';
+import { applyAtom } from '../create-engine';
 import { viewCanAttack } from '../viewDistance';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -47,22 +48,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
-      const orig = state.cardMap[cardId];
-      const sId = shadowIdOf(cardId);
-      // 新建影子卡:name='杀',其余属性同原卡,shadowOf 指向原卡
-      const shadow: Card = {
-        id: sId,
-        name: '杀',
-        suit: orig.suit,
-        rank: orig.rank,
-        type: '基本牌',
-        shadowOf: cardId,
-      };
-      state.cardMap[sId] = shadow;
-      // 手牌:原卡替换为影子卡(玩家"持有"这张杀)
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(cardId);
-      if (idx >= 0) self.hand[idx] = sId;
+      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+      await applyAtom(state, { type: '武圣包装', player: ownerId, cardId });
     },
     // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
     (state: GameState, params: Record<string, Json>) => {

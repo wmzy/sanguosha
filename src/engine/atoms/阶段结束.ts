@@ -1,6 +1,6 @@
 // src/engine/atoms/阶段结束.ts
 // 阶段结束:事件标记
-import type { AtomDefinition, GameView, TurnPhase } from '../types';
+import type { AtomDefinition, GameView, TurnPhase, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 阶段结束: AtomDefinition<{ player: number; phase: string }> = {
@@ -12,6 +12,14 @@ export const 阶段结束: AtomDefinition<{ player: number; phase: string }> = {
   apply(_state) {
     // 事件标记
   },
+  toViewEvents(_state, atom): ViewEventSplit {
+    const view: ViewEvent = {
+      type: '阶段结束',
+      player: atom.player,
+      phase: atom.phase,
+    };
+    return { ownerViews: new Map(), othersView: view };
+  },
   effect: { sound: 'phase_end', duration: 600 },
   applyView(view: GameView, event) {
     // apply 是事件标记(state.phase 不变),仅当 event.phase 与当前视角阶段不一致时才更新
@@ -19,6 +27,9 @@ export const 阶段结束: AtomDefinition<{ player: number; phase: string }> = {
     if (view.phase !== phase) {
       view.phase = phase;
     }
+  },
+  toViewLog(event) {
+    return { player: event.player as number, text: `${event.phase}阶段结束` };
   },
 };
 

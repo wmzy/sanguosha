@@ -47,7 +47,12 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
       ...(atom.from !== undefined ? { from: atom.from, fromZone } : {}),
       effect,
     };
-    return { ownerViews: new Map([[atom.player, ownerView]]), othersView };
+    // 给予者也需要看到 cardId 以同步手牌移除(applyView 需要 cardId 做 filter)
+    const ownerViews = new Map([[atom.player, ownerView]]);
+    if (atom.from !== undefined) {
+      ownerViews.set(atom.from, ownerView);
+    }
+    return { ownerViews, othersView };
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;

@@ -66,6 +66,7 @@ describe('杀完整结算流程', () => {
     await harness.setup(build({ p2Hand: ['s2'], extraCards: { s2: slash2 } }));
     // 手动给 P2 加杀技能
     harness.state.players[1].skills.push('杀');
+    harness.rebuildViews();
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 

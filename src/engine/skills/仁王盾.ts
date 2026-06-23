@@ -3,6 +3,7 @@
 // 往处理区放一张虚拟闪牌表示"杀无效",杀.execute 检查处理区发现有闪就不造成伤害。
 // 和八卦阵统一模式:杀零感知仁王盾,只看处理区。
 import type { AtomBeforeContext, Card, HookResult, Skill, GameState} from '../types';
+import { applyAtom } from '../create-engine';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -35,7 +36,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         type: '基本牌',
       };
       ctx.state.cardMap[virtualDodgeId] = virtualDodge;
-      ctx.state.zones.processing.push(virtualDodgeId);
+      await applyAtom(ctx.state, {
+        type: '移动牌',
+        cardId: virtualDodgeId,
+        from: { zone: '处理区' },
+        to: { zone: '处理区' },
+      });
       return { kind: 'cancel' };
     }
   });

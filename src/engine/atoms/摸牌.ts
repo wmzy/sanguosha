@@ -65,22 +65,18 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
   effect: { sound: 'draw', animation: 'slide', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {
     const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
-    const { drawn } = planDraw(state, atom.count);
-    const cards = drawn.map(id => state.cardMap[id]).filter(Boolean);
-    const ownerView: ViewEvent = {
-      type: '摸牌',
-      player: atom.player,
-      count: atom.count,
-      cards,
-      effect,
-    };
-    // 其他人只看到数量
-    const othersView: ViewEvent = {
-      type: '摸牌',
+    const plan = planDraw(state, atom.count);
+    const cards = plan.drawn.map(id => state.cardMap[id]).filter(Boolean);
+    const base = {
+      type: '摸牌' as const,
       player: atom.player,
       count: atom.count,
       effect,
+      reshuffled: plan.reshuffled,
+      ...(plan.reshuffled ? { newDeckCount: plan.newDeck!.length, newDiscardPileCount: 0 } : {}),
     };
+    const ownerView: ViewEvent = { ...base, cards };
+    const othersView: ViewEvent = { ...base };
     return {
       ownerViews: new Map([[atom.player, ownerView]]),
       othersView,
@@ -94,6 +90,15 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
     // owner 有 cards 字段，加入手牌；others 没有
     if (event.cards && view.players[pi].hand) {
       view.players[pi].hand!.push(...(event.cards as any[]));
+    }
+    // zone 同步
+    if (view.zones) {
+      if (event.reshuffled) {
+        view.zones.deckCount = (event.newDeckCount as number) ?? Math.max(0, view.zones.deckCount - count);
+        view.zones.discardPileCount = (event.newDiscardPileCount as number) ?? 0;
+      } else {
+        view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
+      }
     }
   },
   toViewLog(event) {

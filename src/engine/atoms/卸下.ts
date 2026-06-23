@@ -43,8 +43,25 @@ export const 卸下: AtomDefinition<{ player: number; slot: '武器' | '防具' 
     const pi = view.players.findIndex(p => p.index === (event.player as number));
     if (pi < 0) return;
     const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
+    const cardId = event.cardId as string | undefined;
     if (slot) {
       delete view.players[pi].equipment[slot];
+    }
+    // apply 把卸下的牌返回手牌(player.hand.push(cardId)),applyView 必须镜像:
+    // handCount + 1;可见时(owner 视角)把牌加回 hand 数组。
+    if (cardId) {
+      view.players[pi].handCount += 1;
+      if (view.players[pi].hand) {
+        const card = view.cardMap[cardId];
+        if (card) view.players[pi].hand!.push(card);
+      }
+    }
+    // 武器卸下:清除 distanceVars.attackRange(马匹由 移除技能 atom 处理)
+    if (slot === '武器' && view.players[pi].distanceVars) {
+      view.players[pi].distanceVars = {
+        ...view.players[pi].distanceVars,
+        attackRange: undefined,
+      };
     }
   },
 };

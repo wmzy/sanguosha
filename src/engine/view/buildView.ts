@@ -38,16 +38,17 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   // 多 target 并行(拼点/选将)时,每个 viewer 只看到自己的 slot;
   // 单 target 场景 Map 只有1个 slot。
   let pending: GameView['pending'] = null;
-  // 只匹配 viewer 专属 slot 或广播型 slot(target === TARGET_BROADCAST)。
+  // 优先匹配 viewer 专属 slot,其次广播型 slot(target === TARGET_BROADCAST)。
   // 不使用 findPendingSlot 的 size===1 fallback —— 那会让主公选将期间(单 slot)
   // 的其他 viewer 错误匹配到主公 slot,导致"共用倒计时":其他角色看到主公的
   // 选将 atom/deadline/target,前端据此渲染主公的选将界面和倒计时。
-  const slot = viewer >= 0
+  const ownOrBroadcastSlot = viewer >= 0
     ? (state.pendingSlots.get(viewer)
         ?? [...state.pendingSlots.values()].find(s =>
             (s.atom as { target?: number }).target === TARGET_BROADCAST))
     : undefined;
-  if (slot) {
+  if (ownOrBroadcastSlot) {
+    const slot = ownOrBroadcastSlot;
     const def = slot.definition;
     const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
       ?? def.pending?.prompt
@@ -71,6 +72,32 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // 回退到 def.pending.timeout —— 与 createAndAwaitSlot 的实际定时器口径一致
       totalMs: ((slot.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 30) * 1000,
     };
+  } else if (viewer >= 0) {
+    // 观察型 pending:当前 viewer 既无自己的 slot 也无广播 slot,但场上存在其他
+    // 玩家的 pending slot(真实玩家 target>=0)。与事件流 applyView(询问闪/询问杀/
+    // 请求回应 对非 target viewer 设观察型 pending)对齐:让初始视图/重连视图也能
+    // 看到"某人在被询问",供视角自动跟随。
+    // 不渲染可操作 prompt(仅给 target 供跟随),避免"共用倒计时"误导。
+    // 仅限游戏进行中的问询类 atom —— 选将询问/选将 等开局 atom 的 pending 是
+    // 隔离的(只有被问询者见),不应观察型投影(charselect-pending-isolation 契约)。
+    const OBSERVER_PENDING_TYPES = new Set(['询问闪', '询问杀', '请求回应']);
+    const observerSlot = [...state.pendingSlots.values()].find(s => {
+      const t = (s.atom as { target?: number }).target;
+      return typeof t === 'number' && t >= 0 && t !== viewer
+        && OBSERVER_PENDING_TYPES.has(s.atom.type);
+    });
+    if (observerSlot) {
+      const slot = observerSlot;
+      const target = (slot.atom as { target: number }).target;
+      pending = {
+        type: 'awaits',
+        atom: slot.atom,
+        prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
+        target,
+        deadline: state.startedAt + slot.deadline,
+        totalMs: ((slot.atom as { timeout?: number }).timeout ?? slot.definition.pending?.timeout ?? 30) * 1000,
+      };
+    }
   }
 
   // 出牌/弃牌阶段(无 pending 时)的空闲超时。

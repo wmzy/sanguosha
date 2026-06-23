@@ -44,4 +44,6 @@ import './请求回应';
 import './并行回应';
 import './选将';
 import './分配武将';
+import './武圣包装';
+import './武圣还原';
 

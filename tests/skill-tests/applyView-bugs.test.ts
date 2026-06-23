@@ -32,7 +32,7 @@ function mockView(overrides: Partial<GameView> = {}): GameView {
 
 describe('applyView 一致性 bug', () => {
   describe('弃置 atom: equipment 未清除', () => {
-    it('apply 清 equipment 但 applyView 不清 → 装备被弃后前端仍显示', () => {
+    it('apply 清 equipment, applyView 也清 equipment + handCount 按 zone 精确扣减', () => {
       const def = getAtomDef('弃置');
       const view = mockView({
         players: [
@@ -45,12 +45,13 @@ describe('applyView 一致性 bug', () => {
         ],
       });
 
-      // 弃置 w1 (装备) 和 h1 (手牌)
-      def.applyView!(view, { type: '弃置', player: 0, cardIds: ['w1', 'h1'] } as any);
+      // 弃置 w1 (装备) 和 h1 (手牌)。zones 字段由 toViewEvents 生成(apply 前 state 快照),
+      // 标记每张牌所在区域,applyView 据此精确扣减(判定区牌不计 handCount)。
+      def.applyView!(view, { type: '弃置', player: 0, cardIds: ['w1', 'h1'], zones: { w1: 'equipment', h1: 'hand' } } as any);
 
-      expect(view.players[0].handCount).toBe(0);       // ✅ 正确
-      expect(view.players[0].hand).toEqual([]);         // ✅ 正确
-      expect(view.players[0].equipment['武器']).toBeUndefined(); // ❌ BUG: 实际仍是 'w1'
+      expect(view.players[0].handCount).toBe(0);
+      expect(view.players[0].hand).toEqual([]);
+      expect(view.players[0].equipment['武器']).toBeUndefined();
     });
   });
 

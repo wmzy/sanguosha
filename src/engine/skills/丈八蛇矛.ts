@@ -20,6 +20,7 @@
 // cardId = ${id1}#${id2}#丈八蛇矛。
 import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
 import { registerAction, type SkillModule } from '../skill';
+import { applyAtom } from '../create-engine';
 import { viewCanAttack } from '../viewDistance';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -35,9 +36,6 @@ export function createSkill(id: string, ownerId: number): Skill {
 function shadowIdOf(id1: string, id2: string): string {
   return `${id1}#${id2}#丈八蛇矛`;
 }
-
-/** localVars 键:供 rollback 找回本次合并的两张原卡 id */
-const LOCAL_VARS_KEY = '丈八蛇矛/原卡';
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
@@ -71,26 +69,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (state: GameState, params: Record<string, Json>) => {
       const [id1, id2] = params.cardIds as string[];
-      const c1 = state.cardMap[id1];
-      const sId = shadowIdOf(id1, id2);
-      // 新建影子卡:name='杀',suit/rank 取第一张原卡;shadowOf 留空(2 张合一,无单一原卡)
-      const shadow: Card = {
-        id: sId,
-        name: '杀',
-        suit: c1.suit,
-        rank: c1.rank,
-        type: '基本牌',
-      };
-      state.cardMap[sId] = shadow;
-      // 手牌:移除两张原卡,影子卡追加到末尾。validate 阶段已确认两张牌在手中,
-      // 此处用 filter+push(2 合一位置不固定,validate/UI 都不依赖手牌顺序)。
-      const self = state.players[ownerId];
-      self.hand = self.hand.filter(c => c !== id1 && c !== id2);
-      self.hand.push(sId);
-      // 记录原卡 id,供 rollback 恢复
-      state.localVars[LOCAL_VARS_KEY] = [id1, id2];
+      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+      await applyAtom(state, { type: '武圣包装', player: ownerId, cardId: id1, secondCardId: id2 });
     },
-    // rollback:主 action validate 失败时,撤销转化(删影子 + 还原卡 + 清 localVars)
+    // rollback:主 action validate 失败时,撤销转化(删影子 + 还原卡)
     (state: GameState, params: Record<string, Json>) => {
       const cardIds = params.cardIds;
       const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
@@ -100,16 +82,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const self = state.players[ownerId];
         const idx = self.hand.indexOf(sId);
         if (idx >= 0) self.hand.splice(idx, 1);
-        // 把两张原卡按 localVars 记录的顺序放回手牌;若 localVars 缺失(异常路径),
-        // 退化为直接 push(避免卡牌丢失)。
-        const stored = state.localVars[LOCAL_VARS_KEY] as string[] | undefined;
-        if (stored && stored.length === 2) {
-          self.hand.push(stored[0], stored[1]);
-        } else if (id1 && id2) {
-          self.hand.push(id1, id2);
-        }
+        self.hand.push(id1, id2);
       }
-      delete state.localVars[LOCAL_VARS_KEY];
     },
   );
   return () => {};

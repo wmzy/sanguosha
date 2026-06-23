@@ -109,6 +109,13 @@ export class PlayerSession {
     this._processedView = engineBuildView(this.harness.state, this.playerIndex);
   }
 
+  /** 从当前 state 重建 processedView 并重置事件游标。
+   *  用于测试中手动 mutate state 后重新同步视图。 */
+  rebuildView(): void {
+    this._processedView = engineBuildView(this.harness.state, this.playerIndex);
+    this.lastEventIndex = this.harness.state.atomHistory.length;
+  }
+
   // ─── 视图 ─────────────────────────────────────
 
   /** 从 state 重建的完整 view(向后兼容,不走 event 路径) */
@@ -182,6 +189,16 @@ export class PlayerSession {
         const def = getAtomDef(type);
         if (def.applyView) {
           def.applyView(this.processedView, evt);
+        }
+        // 与真实前端 src/client/view/reducer.ts:viewReducer 对齐:
+        // applyView 后调 toViewLog 生成日志条目。time 取事件 seq 近似(测试不需要真实时间)。
+        const logEntry = def.toViewLog?.(evt);
+        if (logEntry) {
+          this.processedView.log.push({
+            time: (evt as Record<string, unknown>).seq as number ?? 0,
+            player: logEntry.player,
+            text: logEntry.text,
+          });
         }
       } catch {
         // atom 未注册或 applyView 报错——静默跳过,让 expectView 捕获不一致
@@ -548,13 +565,38 @@ export class SkillTestHarness {
   }
 
   /**
-   * 推进所有 player session 的 processedView。
+   * 推进所有 player session 的 processedView,并自动对比每个 viewer 的
+   * processedView 与 buildView(权威全量)是否一致。
    * 模拟真实前端 broadcastNewState 后所有连接都收到 events 的语义。
    * 在任何 dispatch/pass/respond 后自动调用。
+   *
+   * 自动对比:toViewEvents/applyView 的契约是增量视图必须收敛于全量视图。
+   * 一旦某 atom 的前端投影与后端 apply 不对称,这里立即报出,无需测试手写对比。
    */
   processAllEvents(): void {
-    for (const session of this.sessions.values()) {
+    const sessions = [...this.sessions.values()];
+    for (const session of sessions) {
       session.processEvents();
+    }
+    if (autoCompareEnabled) {
+      // 收集所有 viewer 的差异后一次性抛出,避免只看到第一个 viewer 的问题
+      const allDiffs: string[] = [];
+      for (const session of sessions) {
+        const baseline = engineBuildView(this._state, session.playerIndex);
+        const expected = normalizeViewForCompare(baseline);
+        const actual = normalizeViewForCompare(session.processedView);
+        const diffs = deepDiff(expected, actual);
+        if (diffs.length > 0) {
+          allDiffs.push(`--- viewer=${session.playerIndex} ---\n` + diffs.map((d, i) => `  ${i + 1}. ${d}`).join('\n'));
+        }
+      }
+      if (allDiffs.length > 0) {
+        throw new Error(
+          `视图不一致(buildView 权威 vs processedView 增量)。\n` +
+          `通常意味着某 atom 的 toViewEvents/applyView 与 apply 不对称:\n\n` +
+          allDiffs.join('\n\n'),
+        );
+      }
     }
   }
 
@@ -573,9 +615,160 @@ export class SkillTestHarness {
     return this._state;
   }
 
+  /** 从当前 state 重建所有 player session 的 processedView。
+   *  用于测试中手动 mutate state 后重新同步视图。 */
+  rebuildViews(): void {
+    for (const session of this.sessions.values()) {
+      session.rebuildView();
+    }
+  }
+
   get events(): GameEvent[] {
     return this.state.atomHistory as unknown as GameEvent[];
   }
+}
+
+// ─── 视图一致性自动对比 ────────────────────────────────────────
+// 每次 processAllEvents 后对每个 viewer 自动对比:
+//   buildView(state, viewer)(权威全量重建)
+//   vs
+//   processedView(事件流 applyView 增量维护)
+// 二者必须收敛——这正是 toViewEvents/applyView 的契约。
+// 排除非 atom 职责字段(log 来源不同 / deadline 是 Date.now() 近似值 / prompt 内含函数)。
+// 不一致时收集所有差异后一次性抛出,便于定位。
+
+/** 控制自动对比开关(测试可用 disableAutoCompare() 临时关闭) */
+let autoCompareEnabled = true;
+
+/** 关闭自动对比(返回恢复函数)。仅用于绕过已知不可比场景。 */
+export function disableAutoCompare(): () => void {
+  const prev = autoCompareEnabled;
+  autoCompareEnabled = false;
+  return () => { autoCompareEnabled = prev; };
+}
+
+/** 规范化 prompt 用于对比:只留 type/title/min/max,丢弃 filter 函数(不可比) */
+function normalizePrompt(prompt: ActionPrompt | undefined): unknown {
+  if (!prompt) return null;
+  const base: Record<string, unknown> = { type: prompt.type };
+  if ('title' in prompt && prompt.title) base.title = prompt.title;
+  // cardFilter:只比 min/max,filter 是函数不可比
+  if ('cardFilter' in prompt && prompt.cardFilter) {
+    base.cardFilter = { min: prompt.cardFilter.min, max: prompt.cardFilter.max };
+  }
+  // targetFilter: 只 SelectTargetPrompt / UseCardAndTargetPrompt 有 TargetFilter(含 min/max);
+  // DistributePrompt.targetFilter 是函数不可比。按 type 收窄。
+  if ((prompt.type === 'selectTarget' || prompt.type === 'useCardAndTarget') && prompt.targetFilter) {
+    base.targetFilter = { min: prompt.targetFilter.min, max: prompt.targetFilter.max };
+  }
+  return base;
+}
+
+/** 规范化 pending 用于对比:type/target/atomType 总比;prompt 仅对 target viewer
+ *  (可操作)比 —— observer(非 target)的 prompt 是展示装饰,buildView(初始/重连)
+ *  与 applyView(事件流)的 observer prompt 标题可能不同(如"等待回应" vs "等待出闪"),
+ *  属预期差异,不纳入对比。丢弃 deadline/totalMs(Date.now() 近似值)。 */
+function normalizePending(pending: GameView['pending'], viewer: number): unknown {
+  if (!pending) return null;
+  const isOwner = pending.target === viewer;
+  return {
+    type: pending.type,
+    target: pending.target,
+    atomType: pending.atom?.type,
+    // 仅 target viewer 比可操作 prompt;observer 的 prompt 跳过
+    ...(isOwner ? { prompt: normalizePrompt(pending.prompt) } : {}),
+  };
+}
+
+/** 规范化整个 view 用于对比:去掉非 atom 职责字段,规范化含函数的字段 */
+function normalizeViewForCompare(view: GameView): unknown {
+  return {
+    viewer: view.viewer,
+    currentPlayerIndex: view.currentPlayerIndex,
+    phase: view.phase,
+    turn: view.turn,
+    players: view.players.map(p => ({
+      index: p.index,
+      name: p.name,
+      character: p.character,
+      health: p.health,
+      maxHealth: p.maxHealth,
+      alive: p.alive,
+      equipment: p.equipment,
+      skills: p.skills,
+      handCount: p.handCount,
+      // hand 是 owner 专属:owner 见牌面,其他人 undefined。两边都按 viewer 走 buildView,
+      // 所以同一 viewer 的 hand 可比。card 是纯数据可深比。
+      hand: p.hand,
+      marks: p.marks,
+      identity: p.identity,
+      identityHidden: p.identityHidden,
+      distanceVars: p.distanceVars,
+      pendingTricks: p.pendingTricks,
+    })),
+    // cardMap 是全局共享纯数据,可比(但量大,只在不一致时报具体 key)
+    cardMap: view.cardMap,
+    pending: normalizePending(view.pending, view.viewer),
+    zones: view.zones,
+    // log: 排除 —— buildView 用 actionLog(formatLogEntry),
+    // processedView 用 toViewLog(ViewEvent),来源不同。log 完整性由专门检查覆盖。
+    // deadline/deadlineTotalMs: 排除 —— Date.now() 近似值,两条路径必不同步。
+  };
+}
+
+/** 深度比较两个值,函数视为相等(不可比)。返回差异路径列表(空=一致)。 */
+function deepDiff(expected: unknown, actual: unknown, path = ''): string[] {
+  // 函数不可比 —— 跳过(标记相等)
+  if (typeof expected === 'function' || typeof actual === 'function') return [];
+  // 严格相等(含 undefined/null/number/string/boolean)
+  if (Object.is(expected, actual)) return [];
+  // 类型不同
+  const eType = expected === null ? 'null' : typeof expected;
+  const aType = actual === null ? 'null' : typeof actual;
+  if (eType !== aType) return [`${path || '<root>'}: 类型期望 ${eType},实际 ${aType} (期望 ${JSON.stringify(expected)},实际 ${JSON.stringify(actual)})`];
+  // 数组
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(actual)) return [`${path || '<root>'}: 期望数组,实际非数组`];
+    const diffs: string[] = [];
+    const maxLen = Math.max(expected.length, actual.length);
+    for (let i = 0; i < maxLen; i++) {
+      const d = deepDiff(expected[i], actual[i], `${path}[${i}]`);
+      diffs.push(...d);
+    }
+    return diffs;
+  }
+  // 对象
+  if (eType === 'object') {
+    const diffs: string[] = [];
+    const keys = new Set([...Object.keys(expected as object), ...Object.keys(actual as object)]);
+    for (const key of keys) {
+      const e = (expected as Record<string, unknown>)[key];
+      const a = (actual as Record<string, unknown>)[key];
+      const d = deepDiff(e, a, path ? `${path}.${key}` : key);
+      diffs.push(...d);
+    }
+    return diffs;
+  }
+  // 原始值不等
+  return [`${path || '<root>'}: 期望 ${JSON.stringify(expected)},实际 ${JSON.stringify(actual)}`];
+}
+
+/**
+ * 对比单个 viewer 的 processedView(事件流增量)与 buildView(state, viewer)(权威全量)。
+ * 不一致时抛出含所有差异的详细错误。
+ * 这是 toViewEvents/applyView 契约的自动验证器:增量视图必须收敛于全量视图。
+ */
+export function assertViewConsistency(view: GameView, state: GameState, viewer: number): void {
+  const baseline = engineBuildView(state, viewer);
+  const expected = normalizeViewForCompare(baseline);
+  const actual = normalizeViewForCompare(view);
+  const diffs = deepDiff(expected, actual);
+  if (diffs.length === 0) return;
+  const header = `视图不一致 [viewer=${viewer}]:(buildView 权威 vs processedView 增量)
+  这通常意味着某 atom 的 toViewEvents/applyView 与 apply 不对称。
+  diff 基准 = buildView(state, ${viewer}),被比 = processedView`;
+  const body = diffs.map((d, i) => `  ${i + 1}. ${d}`).join('\n');
+  throw new Error(`${header}\n${body}`);
 }
 
 // ─── 内部 helper(私有) ───────────────────────────────────────
