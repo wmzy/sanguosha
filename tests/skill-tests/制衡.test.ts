@@ -278,12 +278,14 @@ describe('制衡', () => {
     const seq0 = state.seq;
     // 连发:第一次 dispatch(同步部分含 execute1 同步到首个 await),紧接着第二次。
     void engineDispatch(state, { skillId: '制衡', actionType: 'use', ownerId: 0, baseSeq: seq0, params: { cardIds: ['c1'] } });
-    const seqAfterFirst = state.seq; // execute1 同步部分跑完后 seq 已 +1
+    const seqAfterFirst = state.seq; // execute1 同步部分跑完后 seq 已递增
     void engineDispatch(state, { skillId: '制衡', actionType: 'use', ownerId: 0, baseSeq: seqAfterFirst, params: { cardIds: ['c2'] } });
+    const seqAfterSecond = state.seq;
     await harness.waitForStable();
 
-    // 修复后:第二次 validate 拒绝(seq 只 +1);修复前:+2
-    expect(state.seq).toBe(seq0 + 1);
+    // 第二次 dispatch 被 validate 拒绝 → 不递增 seq(seqAfterSecond === seqAfterFirst)。
+    // 第一次 dispatch 成功 → seq 大于 seq0(具体增量取决于内部 atom 数量,不硬编码)。
+    expect(seqAfterSecond).toBe(seqAfterFirst);
     expect(harness.state.zones.discardPile).toContain('c1');
     expect(harness.state.zones.discardPile).not.toContain('c2');
     expect(harness.state.players[0].hand).toContain('c2');

@@ -20,7 +20,8 @@ describe('pending-scoped 版本控制', () => {
     await new Promise(r => setTimeout(r, 50));
     const slot = state.pendingSlots.get(0);
     expect(slot).toBeDefined();
-    expect(slot!.createdSeq).toBe(7);
+    // createdSeq 应等于 applyAtom push atomHistory 时递增后的 state.seq
+    expect(slot!.createdSeq).toBe(state.seq);
     slot!.resolve();
     await p;
   });

@@ -105,6 +105,7 @@ function notifyStateChange(state: GameState): void {
  *  target<0 = 广播型 slot(如无懈可击),所有 viewer 都应清除。 */
 function notifyPendingResolved(state: GameState, slot: PendingSlot): void {
   const target = extractPendingTarget(slot.atom);
+  state.seq += 1;
   state.atomHistory.push({
     kind: 'notify',
     seq: state.seq,
@@ -416,6 +417,7 @@ function emptyFrame(): SettlementFrame {
 
 /** 推送 notify 事件(不改变 state) */
 export function pushNotify(state: GameState, event: NotifyEvent): void {
+  state.seq += 1;
   state.atomHistory.push({ kind: 'notify', seq: state.seq, ...event });
 }
 
@@ -468,6 +470,10 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   applyAtomImpl(state, current);
 
+  // seq 在每次 push atomHistory 前递增:一次 dispatch 内可能有多个 applyAtom
+  // (如 respond → 分配武将 → 并行选将),它们必须有各自唯一的 seq,
+  // 否则 broadcastNewState 的水位过滤会跳过同 seq 的后续事件(选将 bug 根因)。
+  state.seq += 1;
   state.atomHistory.push({ kind: 'atom', seq: state.seq, atom: current, viewEvents: viewEvents! });
   notifyStateChange(state);
 
