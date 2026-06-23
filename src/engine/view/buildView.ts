@@ -1,5 +1,7 @@
 // src/engine/view/buildView.ts
 import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, PendingSlot } from '../types';
+import { TARGET_SYSTEM } from '../types';
+import { findPendingSlot } from '../skill';
 
 /** 出牌/弃牌阶段的回合空闲超时(ms)。
  *  服务端 resetIdleTimer 与此处 turnDeadline 必须使用同一口径——
@@ -37,13 +39,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   // 多 target 并行(拼点/选将)时,每个 viewer 只看到自己的 slot;
   // 单 target 场景 Map 只有1个 slot。
   let pending: GameView['pending'] = null;
-  // 优先取 viewer 专属 slot;其次取广播 slot(target<0,如无辨可击全桌可见);最后取唯一 slot
-  const mySlot = viewer >= 0 ? state.pendingSlots.get(viewer) : undefined;
-  const broadcastSlot = [...state.pendingSlots.values()].find(s => {
-    const t = (s.atom as { target?: unknown }).target;
-    return typeof t === 'number' && t < 0;
-  });
-  const slot = mySlot ?? broadcastSlot;
+  // 优先取 viewer 专属或广播 slot(findPendingSlot 统一查找)
+  const slot = viewer >= 0 ? findPendingSlot(state, viewer) : undefined;
   // 无专属 slot 但其他玩家有 active slot(如并行选将期间非选将玩家的 view):
   // 展示通用的"等待其他玩家" pending,避免 view.pending 意外为 null 导致重连后无等待指示。
   if (!slot && state.pendingSlots.size > 0) {
@@ -53,7 +50,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       type: 'awaits',
       atom: firstSlot.atom,
       prompt: { type: 'confirm', title: '等待其他玩家回应', cancelLabel: '' },
-      target: -1,
+      target: TARGET_SYSTEM,
       deadline: state.startedAt + firstSlot.deadline,
       totalMs: ((firstSlot.atom as { timeout?: number }).timeout ?? firstDef.pending?.timeout ?? 30) * 1000,
     };
@@ -68,7 +65,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         : { type: 'confirm' as const, title: '请回应' });
     const target = 'target' in slot.atom && typeof slot.atom.target === 'number'
       ? slot.atom.target
-      : -1;
+      : TARGET_SYSTEM;
     pending = {
       type: 'awaits',
       atom: slot.atom,

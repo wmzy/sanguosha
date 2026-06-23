@@ -45,11 +45,12 @@ import type {
   PendingSlot,
   SettlementFrame,
 } from './types';
-import { createGameState } from './types';
+import { createGameState, TARGET_SYSTEM } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
 import {
   clearAllSkillInstances,
   findActionEntry,
+  findPendingSlot,
   getAfterHooks,
   getBeforeHooks,
   registerSkillsFromState as skillRebootstrap,
@@ -80,14 +81,14 @@ export interface GameConfig {
 
 /**
  * system 命名空间占位座次。引擎只认座次下标,玩家真实 ID 由 session 层映射。
- * -1 = 系统(开局 action),不对应任何真实玩家槽位。
+ * TARGET_SYSTEM(-1) = 系统(开局 action),不对应任何真实玩家槽位。
  */
-const SYSTEM_OWNER = -1;
+const SYSTEM_OWNER = TARGET_SYSTEM;
 
 /** 从 pending atom 中提取等待目标玩家(座次下标)。所有内置等待型 atom 都有 target 字段。
- *  返回 -1 表示系统(广播/系统级 pending),不抛错以兼容多 owner 场景。
- *  注意:与 SYSTEM_OWNER 同值,广播型 pending slot 的 Map key 就会是 -1,
- *  任何依赖 ownerId 精确查找 slot 的代码需先用 fallback 找 target<0 的 slot。 */
+ *  返回 TARGET_SYSTEM(-1)表示系统(开局 action),不对应任何真实玩家槽位。
+ *  注意:TARGET_SYSTEM 与广播型 target(TARGET_BROADCAST=-2)不同,
+ *  广播型 slot 本身已携带 target=TARGET_BROADCAST,能被此函数准确提取。 */
 function extractPendingTarget(atom: Atom): number {
   if ('target' in atom && typeof atom.target === 'number') return atom.target;
   return SYSTEM_OWNER;
@@ -114,16 +115,6 @@ function notifyPendingResolved(state: GameState, slot: PendingSlot): void {
     data: { target, atomType: slot.atom.type },
   });
   notifyStateChange(state);
-}
-
-/** 兜底:补全老 state 缺失的字段(原地变更) */
-function ensureStateShape(state: GameState): void {
-  if (!state.cardWrappers) state.cardWrappers = {};
-  if (!state.atomStack) state.atomStack = [];
-  if (!state.settlementStack) state.settlementStack = [];
-  for (const p of state.players) {
-    if (!p.tags) p.tags = [];
-  }
 }
 
 function logAction(state: GameState, message: ClientMessage): void {
@@ -171,7 +162,6 @@ export function create(gameConfig: GameConfig): GameState {
   }));
 
   const state = createGameState({ players: stubPlayers, cardMap: {} });
-  ensureStateShape(state);
   state.startedAt = Date.now();
   return state;
 }
@@ -284,16 +274,10 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // 回应路径:定位该玩家对应的 slot。
   // 单 target 询问(询问闪/杀/弃牌):Map 只有该 target 一个 slot → 直接 ownerId 命中。
   // 并行询问(拼点/选将):Map 有多个 slot,各自独立 resolve → ownerId 各自命中。
-  // 无懈可击广播型(target=-2):任意玩家 respond 都命中同一 slot(先到先得)。
-  //   先按 ownerId 查(支持常规 single-target),未命中时查找唯一的 broadcast slot
-  //   (atom.target < 0,如无懈可击 target=-2)。
+  // 无瓣可击广播型(target===TARGET_BROADCAST):任意玩家 respond 都命中同一 slot(先到先得)。
+  //   findPendingSlot 负责按 ownerId→广播→唯一 slot 的 fallback 顺序查找。
   const targetKey = message.ownerId;
-  const oldSlot = state.pendingSlots.get(targetKey)
-    ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined)
-    ?? [...state.pendingSlots.values()].find(s => {
-      const t = (s.atom as { target?: unknown }).target;
-      return typeof t === 'number' && t < 0;
-    });
+  const oldSlot = findPendingSlot(state, targetKey);
   if (oldSlot) {
     if (oldSlot.isTimeout) {
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
@@ -361,7 +345,7 @@ export function resetForTest(): void {
   clearAllSkillInstances();
   clearSlashMaxProviders();
   // 重新注册系统规则全局 hooks(被 clearAllSkillInstances 清掉了)
-  init系统规则({ id: '系统规则', ownerId: -1, name: '系统规则', description: '' }, createGameState({ players: [], cardMap: {} }));
+  init系统规则({ id: '系统规则', ownerId: TARGET_SYSTEM, name: '系统规则', description: '' }, createGameState({ players: [], cardMap: {} }));
 }
 
 // ==================== 从 engine-api.ts 合并的导出 ====================
@@ -397,7 +381,7 @@ export function topFrame(state: GameState): SettlementFrame | undefined {
 
 /** 兑底空帧 */
 function emptyFrame(): SettlementFrame {
-  return { skillId: '', from: -1, params: Object.freeze({}) };
+  return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}) };
 }
 
 
@@ -411,12 +395,12 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
 
 // ─── Atom apply 管线 ────────────────────────────────────────
 
-/** 运行 after hooks:系统级 hooks(ownerId=-1)最后执行,
+/** 运行 after hooks:系统级 hooks(ownerId===TARGET_SYSTEM)最后执行,
  *  确保遗计/反馈等“受伤害后”技能先于濒死检查触发。 */
 async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
   const sortedHooks = [...getAfterHooks(atom.type)].sort((a, b) => {
-    if (a.ownerId === -1 && b.ownerId !== -1) return 1;
-    if (a.ownerId !== -1 && b.ownerId === -1) return -1;
+    if (a.ownerId === TARGET_SYSTEM && b.ownerId !== TARGET_SYSTEM) return 1;
+    if (a.ownerId !== TARGET_SYSTEM && b.ownerId === TARGET_SYSTEM) return -1;
     return 0;
   });
   for (const h of sortedHooks) {
@@ -488,32 +472,14 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   if (def.pending) {
     // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应/并行选将多 target)。
-    // 并行回应 / 并行选将 为每个 target 创建独立 slot,Promise.all 等全部 resolve(语义同 Promise.all)。
-    const isParallelRespond = current.type === '并行回应';
-    const isParallelSelect = current.type === '并行选将';
-    const isParallel = isParallelRespond || isParallelSelect;
-
-    // 拆分目标列表 + 每个 target 对应的虚拟 slot atom
+    // parallelSplit 声明在 atom 定义上,引擎不再硬编码 type 偏序。
     let targets: number[];
     let slotAtoms: Atom[];
-    if (isParallelRespond) {
-      // 并行回应:所有 target 共用同一 prompt/requestType,拆成 请求回应
-      const cur = current as unknown as { targets: number[]; requestType: string; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number };
-      targets = cur.targets;
-      slotAtoms = targets.map(t => ({
-        ...cur,
-        type: '请求回应' as const,
-        target: t,
-      } as unknown as Atom));
-    } else if (isParallelSelect) {
-      // 并行选将:每个 target 有各自的 candidates,拆成 选将询问(保留各自候选人)
-      const cur = current as unknown as { selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> };
-      targets = cur.selections.map(s => s.target);
-      slotAtoms = cur.selections.map(s => ({
-        type: '选将询问' as const,
-        target: s.target,
-        candidates: s.candidates,
-      } as unknown as Atom));
+    const splits = def.parallelSplit?.(current);
+    if (splits && splits.length > 0) {
+      // 并行型:拆出多个 slotAtom,各自类型不同(如 请求回应/选将询问),用各自的 def
+      targets = splits.map(s => s.target);
+      slotAtoms = splits.map(s => s.slotAtom);
     } else {
       // 单 target:原样
       targets = [extractPendingTarget(current)];
@@ -524,8 +490,8 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
     for (let i = 0; i < slotAtoms.length; i++) {
       const slotAtom = slotAtoms[i];
       const slotTarget = targets[i];
-      // 并行选将拆出的 slot 是 选将询问 类型,用其 def;其他用当前 atom 的 def
-      const slotDef = isParallelSelect ? getAtomDef('选将询问') : def;
+      // 每个 slot 用自己 atom type 对应的 def(并行回应→请求回应,并行选将→选将询问)
+      const slotDef = slotAtom.type !== current.type ? getAtomDef(slotAtom.type) : def;
       slotPromises.push(createAndAwaitSlot(state, slotAtom, slotDef, slotTarget));
     }
     await Promise.all(slotPromises);

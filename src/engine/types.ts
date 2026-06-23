@@ -1,6 +1,11 @@
 // src/engine/types.ts
 // 新引擎类型定义。详见 docs/ENGINE-DESIGN.md §3-7
 
+/** 系统级 owner / target:不对应任何真实玩家槽位(开局 action、无来源伤害)。 */
+export const TARGET_SYSTEM = -1;
+/** 广播型 target:所有存活玩家都可回应(无懈可击询问)。 */
+export const TARGET_BROADCAST = -2;
+
 export type Json =
   | string
   | number
@@ -101,7 +106,7 @@ export interface GameState {
    * 多 target 并行询问(拼点/选将):Map size=2+,各 target 独立 respond、独立 resolve,
    * 互不阻塞,全部 resolve 后父 execute 继续(`await Promise.all`)。
    *
-   * target 为特殊值时:key 用负数(-1=系统, -2=广播竞态如无懈可击)。 */
+   * target 为特殊值时:key 用负数(TARGET_SYSTEM=-1=系统, TARGET_BROADCAST=-2=广播竞态如无瓣可击)。 */
   pendingSlots: Map<number, PendingSlot>;
   cardMap: Record<string, Card>;
   cardWrappers: Record<string, CardWrapper>;
@@ -453,6 +458,11 @@ export interface AtomDefinition<A = unknown> {
    */
   afterHooks?(state: GameState, atom: A): void;
   pending?: AtomPending<A>;
+  /** 并行等待型 atom:声明如何拆分为多个单-target slot。
+   *  引擎据此自动拆分,无需硬编码偏序判断。未实现 = 单 target。
+   *  返回值中的 slotAtom 作为子 slot 的 atom,会使用自身 type 对应的 def 做 pending。
+   *  典型场景:并行回应(拆成 请求回应)、并行选将(拆成 选将询问)。 */
+  parallelSplit?: (atom: A) => Array<{ target: number; slotAtom: Atom }>;
   /**
    * 将后端 atom 转换为前端可消费的视图事件。
    *

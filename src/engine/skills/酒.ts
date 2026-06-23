@@ -5,7 +5,7 @@
 // 方法Ⅱ的增伤效果通过 before hook(造成伤害)消费 mark 实现。
 import type { AtomBeforeContext, FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerBeforeHook, type SkillModule, validateUseCard } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '酒', description: '出牌阶段对自己使用,本回合下一张杀的伤害+1' };
@@ -15,20 +15,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      const cardIdOk = typeof params.cardId === 'string';
-      const cardInHand = cardIdOk && self?.hand.includes(params.cardId as string);
-      const cardNameOk = cardIdOk && state.cardMap[params.cardId as string]?.name === '酒';
-      // 酒对自己使用:无 target/targets 时默认给自己
       const rawTarget = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined;
-      const targetSelf = rawTarget === undefined || rawTarget === ownerId;
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetSelf;
-      return ok ? null : '现在不能使用酒';
+      return validateUseCard(state, ownerId, params, { cardName: '酒' })
+        ?? (rawTarget === undefined || rawTarget === ownerId ? null : '只能对自己使用酒');
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

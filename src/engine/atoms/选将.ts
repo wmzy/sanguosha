@@ -2,6 +2,7 @@
 // 游戏初始化 atoms:抽身份、选将、发牌
 // 每个 atom 做一件事,符合三国杀身份局规则
 import type { ActionPrompt, Atom, AtomDefinition, GameState, PlayerState } from '../types';
+import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
 import { registerAtom } from '../atom';
@@ -280,7 +281,7 @@ export const 并行选将: AtomDefinition<{
     // othersView:已选完的玩家(如主公)看到"等待其他玩家选将"
     const othersView: import('../types').ViewEvent = {
       type: '等待选将',
-      waitingFor: -1,
+      waitingFor: TARGET_SYSTEM,
       waitingForName: '其他玩家',
       lordCharacter,
       lordName,
@@ -317,6 +318,13 @@ export const 并行选将: AtomDefinition<{
     onTimeout: { type: '无操作' },
     prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
     timeout: 60,
+  },
+  // 并行选将拆成多个单-target 选将询问 slot,各 target 独立选择、独立 resolve
+  parallelSplit(atom) {
+    return atom.selections.map(s => ({
+      target: s.target,
+      slotAtom: { type: '选将询问' as const, target: s.target, candidates: s.candidates } as unknown as Atom,
+    }));
   },
   effect: { blockUntilDone: true, duration: 200 },
 };

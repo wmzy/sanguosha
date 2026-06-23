@@ -9,7 +9,7 @@
 //   重放确定性:盲选时在 actionLog 的当前条目前 splice "设置手牌顺序" 条目。
 import type { ActionLogEntry, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -58,23 +58,8 @@ function spliceHandOrderEntry(state: GameState, target: number): void {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0;
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      if (!Array.isArray(params.targets) || typeof params.targets[0] !== 'number') return 'target required';
-      const targetIdx = params.targets[0];
-      const cardInHand = !!self?.hand.includes(params.cardId);
-      const cardNameOk = state.cardMap[params.cardId]?.name === '过河拆桥';
-      const targetPlayer = state.players[targetIdx];
-      const notSelf = targetIdx !== ownerId;
-      const targetAlive = targetPlayer?.alive === true;
-      // 目标合法性:任一区域有牌即可(手牌/装备区/判定区)
-      const targetHasCards = !!targetPlayer && (targetPlayer.hand.length > 0 || Object.keys(targetPlayer.equipment).length > 0 || targetPlayer.pendingTricks.length > 0);
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notSelf && targetAlive && targetHasCards;
-      return ok ? null : '过河拆桥使用条件不满足';
+      return validateUseCard(state, ownerId, params, { cardName: '过河拆桥', requireTarget: true })
+        ?? (Array.isArray(params.targets) && (params.targets as number[]).every(t => state.players[t]?.alive === true) ? null : '目标不合法');
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;

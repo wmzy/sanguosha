@@ -4,7 +4,7 @@
 //   runDyingFlow 检查此标志判断是否有人救援。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule, validateUseCard } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '桃', description: '出牌阶段对已受伤角色使用,回复 1 体力(濒死时可对濒死角色使用)' };
@@ -14,21 +14,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      const cardIdOk = typeof params.cardId === 'string';
-      const cardInHand = cardIdOk && self?.hand.includes(params.cardId as string);
-      const cardNameOk = cardIdOk && state.cardMap[params.cardId as string]?.name === '桃';
-      const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined;
-      const targetExists = typeof target === 'number' && !!state.players[target];
-      const targetAlive = targetExists && state.players[target as number]?.alive === true;
-      const targetInjured = targetExists && state.players[target as number]!.health < state.players[target as number]!.maxHealth;
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetAlive && targetInjured;
-      return ok ? null : '现在不能使用桃';
+      return validateUseCard(state, ownerId, params, { cardName: '桃' })
+        ?? (() => {
+          const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined ?? ownerId;
+          return state.players[target]?.alive === true && state.players[target]?.health < state.players[target]?.maxHealth
+            ? null : '桃只能对受伤角色使用';
+        })();
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

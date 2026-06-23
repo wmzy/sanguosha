@@ -1,7 +1,7 @@
 // 桃园结义(普通锦囊):出牌阶段,对所有存活角色使用,每名目标回复 1 点体力。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -11,16 +11,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      const cardInHand = !!self?.hand.includes(params.cardId);
-      const cardNameOk = state.cardMap[params.cardId]?.name === '桃园结义';
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk;
-      return ok ? null : '桃园结义使用条件不满足';
+      return validateUseCard(state, ownerId, params, { cardName: '桃园结义' });
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;

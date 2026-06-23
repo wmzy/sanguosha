@@ -5,7 +5,7 @@
 // 区别:获得(而非弃置)目标牌。判定区延时锦囊也可被获得。
 import type { ActionLogEntry, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { askWuxie } from '../wuxie';
@@ -17,24 +17,12 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-    const myTurn = state.currentPlayerIndex === ownerId;
-    const inActPhase = state.phase === '出牌';
-    const free = state.pendingSlots.size === 0;
-    const self = state.players[ownerId];
-    const selfAlive = self?.alive === true;
-    if (typeof params.cardId !== 'string') return 'cardId required';
-    const target = params.target as number | undefined ?? (params.targets as number[] | undefined)?.[0];
-    if (typeof target !== 'number') return 'target required';
-    const cardInHand = !!self?.hand.includes(params.cardId);
-    const cardNameOk = state.cardMap[params.cardId]?.name === '顺手牵羊';
-    const notSelf = target !== ownerId;
-    const inRange = effectiveDistance(state, ownerId, target as number) <= 1;
-    const targetPlayer = state.players[target];
-    const targetAlive = targetPlayer?.alive === true;
-    // 目标合法性:任一区域有牌即可(手牌/装备区/判定区)
-    const targetHasCards = !!targetPlayer && (targetPlayer.hand.length > 0 || Object.keys(targetPlayer.equipment).length > 0 || targetPlayer.pendingTricks.length > 0);
-    const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notSelf && inRange && targetAlive && targetHasCards;
-    return ok ? null : '顺手牵羊使用条件不满足';
+    return validateUseCard(state, ownerId, params, { cardName: '顺手牵羊' })
+      ?? (() => {
+        const target = (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
+        return target !== undefined && state.players[target]?.alive && effectiveDistance(state, ownerId, target) <= 1
+          ? null : '目标不合法';
+      })();
     }, async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       pushFrame(state, '顺手牵羊', from, { ...params });

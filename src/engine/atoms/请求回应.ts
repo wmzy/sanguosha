@@ -1,6 +1,7 @@
 // src/engine/atoms/请求回应.ts
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
 import type { ActionPrompt, Atom, AtomDefinition, GameState, Json, ViewEventSplit, ViewEvent } from '../types';
+import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 import { registerAtom } from '../atom';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -13,7 +14,7 @@ export const 请求回应: AtomDefinition<{
 }> = {
   type: '请求回应',
   validate(state, atom) {
-    // target=-1(系统)和 target=-2(广播)是合法的特殊值
+    // target===TARGET_SYSTEM(-1)和 target===TARGET_BROADCAST(-2)是合法的特殊值
     if (atom.target < 0) return null;
     if (!state.players[atom.target]) return `target not found`;
     return null;
@@ -47,7 +48,7 @@ export const 请求回应: AtomDefinition<{
       prompt: atom.prompt,
       effect,
     };
-    // 广播型(target<0,如无懈可击 target=-2):所有存活玩家都可回应,
+    // 广播型(target=TARGET_BROADCAST,如无懈可击):所有存活玩家都可回应,
     // 故 ownerViews 无人命中(Map key=target<0 不匹配真实 viewer),
     // 将 othersView 设为带 prompt 的完整视图,让所有人都能看到回应提示。
     if (atom.target < 0) {
@@ -69,7 +70,7 @@ export const 请求回应: AtomDefinition<{
     const target = event.target as number;
     const requestType = event.requestType as string | undefined;
     const prompt = event.prompt as ActionPrompt | undefined;
-    // 广播型(target<0,如无辨可击):所有 viewer 都设置 pending
+    // 广播型(target=TARGET_BROADCAST,如无懈可击):所有 viewer 都设置 pending
     if (target < 0) {
       if (!prompt) return;
       view.pending = {

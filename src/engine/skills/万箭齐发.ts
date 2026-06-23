@@ -4,7 +4,7 @@
 // 询问闪 后检查处理区:有闪牌 = 出了闪;没有 = 受伤害。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -15,18 +15,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const cardInHand = cardIdOk && self?.hand.includes(cardId);
-      const cardNameOk = cardIdOk && state.cardMap[cardId]?.name === '万箭齐发';
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk;
-      return ok ? null : '现在不能使用万箭齐发';
+      return validateUseCard(state, ownerId, params, { cardName: '万箭齐发' });
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

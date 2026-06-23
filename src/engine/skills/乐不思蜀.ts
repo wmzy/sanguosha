@@ -12,7 +12,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule, validateUseCard } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { askWuxie } from '../wuxie';
@@ -28,22 +28,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ─── use action:对目标放置延时锦囊 ────────────────────────
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'number') return 'target required';
-      const cardInHand = !!self?.hand.includes(params.cardId);
-      const cardNameOk = state.cardMap[params.cardId]?.name === '乐不思蜀';
-      const target = state.players[params.target];
-      const targetAlive = target?.alive === true;
-      const notSelf = params.target !== ownerId;
-      // 乐不思蜀对距离 1 以内一名角色使用
-      const inRange = effectiveDistance(state, ownerId, params.target as number) <= 1;
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetAlive && notSelf && inRange;
-      return ok ? null : '乐不思蜀使用条件不满足';
+      return validateUseCard(state, ownerId, params, { cardName: '乐不思蜀' })
+        ?? (() => {
+          const t = params.target ?? (params.targets as number[] | undefined)?.[0] as number | undefined;
+          return typeof t === 'number' && t !== ownerId && state.players[t]?.alive && effectiveDistance(state, ownerId, t) <= 1
+            ? null : '目标不合法';
+        })();
     }, async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;

@@ -16,7 +16,7 @@
 //       奇数次无懈 = 被抵消, 偶数次 = 恢复生效。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { findPendingSlot, registerAction, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -32,13 +32,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAction(
     skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
-      // 无懈可击是广播型(target=-2):先按 ownerId 查(并行询问场景下 ownerId 也可能命中),
-      // 未命中时查找广播型 slot(任何存活角色都可 respond)。
-      const slot = state.pendingSlots.get(ownerId)
-        ?? [...state.pendingSlots.values()].find(s => {
-          const a = s.atom as { type?: string; requestType?: string; target?: unknown };
-          return a.type === '请求回应' && a.requestType === '无懈可击' && typeof a.target === 'number' && a.target < 0;
-        });
+      // 无懈可击是广播型(target=TARGET_BROADCAST):先按 ownerId 查(并行询问场景下 ownerId 也可能命中),
+      // 未命中时查找广播型 slot(findPendingSlot 统一 fallback)。
+      const slot = findPendingSlot(state, ownerId);
       if (!slot) return '当前不需要回应';
       if (slot.atom.type !== '请求回应') return '当前不是无懈可击窗口';
       const atom = slot.atom as { requestType?: string };
@@ -66,11 +62,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // - 全体锦囊:wuxieTarget = 某个具体目标座次 N
       // - 单目标/延时锦囊:wuxieTarget = 该锦囊的目标座次
       // 找不到 wuxieTarget 时(旧调用路径)退化为整体抵消 key='_all'
-      const slot = state.pendingSlots.get(ownerId)
-        ?? [...state.pendingSlots.values()].find(s => {
-          const a = s.atom as { type?: string; requestType?: string; target?: unknown };
-          return a.type === '请求回应' && a.requestType === '无懈可击' && typeof a.target === 'number' && a.target < 0;
-        });
+      const slot = findPendingSlot(state, ownerId);
       const wuxieAtom = slot?.atom as { wuxieTarget?: number } | undefined;
       const wuxieTarget = typeof wuxieAtom?.wuxieTarget === 'number' ? wuxieAtom.wuxieTarget : -1;
       const cancelKey = `无懈/被抵消/${wuxieTarget}`;

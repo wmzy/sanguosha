@@ -23,6 +23,7 @@
 //   const cancelled = await askWuxie(state, target);
 //   if (!cancelled) { /* 执行效果 */ }
 import type { GameState, Json } from './types';
+import { TARGET_BROADCAST } from './types';
 import { applyAtom } from './create-engine';
 
 /**
@@ -44,7 +45,7 @@ export async function askWuxie(state: GameState, wuxieTarget: number): Promise<b
       await applyAtom(state, {
         type: '请求回应',
         requestType: '无懈可击',
-        target: -2,
+        target: TARGET_BROADCAST,
         wuxieTarget,
         prompt: {
           type: 'useCard',

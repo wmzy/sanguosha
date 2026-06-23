@@ -13,7 +13,7 @@
 // 杀在下轮结算时读帧上的 currentTarget 而非原始 targets[i]。
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
 import { canSlash, incSlashUsed } from '../slash-quota';
@@ -27,22 +27,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── use:主动出杀 ──
   registerAction(skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      const cardIdOk = typeof params.cardId === 'string';
-      const cardInHand = cardIdOk && self?.hand.includes(params.cardId as string);
-      const cardNameOk = cardIdOk && state.cardMap[params.cardId as string]?.name === '杀';
-      const targets = params.targets as number[] | undefined;
-      const targetsExist = Array.isArray(targets) && targets.length > 0;
-      const targetsAlive = targetsExist && targets!.every(t => state.players[t]?.alive === true);
-      const inRange = targetsExist && targets!.every(t => inAttackRange(state, ownerId, t));
-      const hasQuota = canSlash(state, ownerId);
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetsAlive && inRange && hasQuota;
-      return ok ? null : '现在不能出杀';
+      return validateUseCard(state, ownerId, params, { cardName: '杀', requireTarget: true })
+        ?? (Array.isArray(params.targets) && (params.targets as number[]).every(t => state.players[t]?.alive === true && inAttackRange(state, ownerId, t)) ? null : '目标不合法')
+        ?? (canSlash(state, ownerId) ? null : '出杀次数已达上限');
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

@@ -16,8 +16,10 @@ import type {
   GameState,
   HookResult,
   Json,
+  PendingSlot,
   Skill,
 } from './types';
+import { TARGET_SYSTEM } from './types';
 
 export interface SkillModule {
   createSkill: (id: string, ownerId: number) => Skill;
@@ -54,6 +56,45 @@ export async function getSkillModule(id: string): Promise<SkillModule> {
 /** 同步获取已加载过的技能模块(未加载返回 undefined)。用于卸载时同步查模块的场景。 */
 export function getCachedSkillModule(id: string): SkillModule | undefined {
   return moduleCache.get(id);
+}
+
+/** 查找某玩家的活跃 pending slot。
+ *  查找顺序:ownerId 精确匹配 → 广播型(target<TARGET_SYSTEM) → 唯一活跃 slot(兜底)。
+ *  无匹配返回 undefined。 */
+export function findPendingSlot(state: GameState, ownerId: number): PendingSlot | undefined {
+  return state.pendingSlots.get(ownerId)
+    ?? [...state.pendingSlots.values()].find(s => {
+      const t = (s.atom as { target?: unknown }).target;
+      return typeof t === 'number' && t < TARGET_SYSTEM;
+    })
+    ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
+}
+
+/** 出牌阶段使用牌 action 的通用 validate,覆盖 90% 的 use 场景。
+ *  检查:自己回合、出牌阶段、无 pending、存活、手牌中有牌。
+ *  返回 null=通过,字符串=拒绝理由。skills 可在此之上追加校验。
+ *  @param opts.cardName 需要的卡牌名称。缺省则不校验牌名。
+ *  @param opts.requireTarget 是否需要非空 targets 数组。缺省则不校验目标。 */
+export function validateUseCard(
+  state: GameState,
+  ownerId: number,
+  params: Record<string, Json>,
+  opts?: { cardName?: string; requireTarget?: boolean },
+): string | null {
+  if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
+  if (state.phase !== '出牌') return '不是出牌阶段';
+  if (state.pendingSlots.size > 0) return '当前有等待响应';
+  const self = state.players[ownerId];
+  if (!self?.alive) return '你已死亡';
+  const cardId = params.cardId as string | undefined;
+  if (!cardId) return 'cardId required';
+  if (!self.hand.includes(cardId)) return '牌不在手牌中';
+  if (opts?.cardName && state.cardMap[cardId]?.name !== opts.cardName) return `不是${opts.cardName}`;
+  if (opts?.requireTarget) {
+    const targets = params.targets as number[] | undefined;
+    if (!Array.isArray(targets) || targets.length === 0) return 'target required';
+  }
+  return null;
 }
 
 // ─── 实例级注册表(action + hook) ──────────────────────────────

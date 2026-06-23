@@ -3,7 +3,7 @@
 //     ♠2~9(黑桃 2 到 9) → 受到 3 点无来源雷电伤害,闪电置入弃牌堆。
 //     其他结果 → 无效,闪电传递给下家(下家的判定区)。
 //   传递规则:按座次顺序找到下一个判定区没有 闪电 的存活玩家。
-//   无来源伤害用 source: -1 约定(系统惯例,见 造成伤害 atom)。
+// 无来源伤害用 source: TARGET_SYSTEM 约定(系统惯例,见 造成伤害 atom)。
 import type {
   AtomAfterContext,
   AtomBeforeContext,
@@ -16,6 +16,7 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 import { askWuxie } from '../wuxie';
+import { TARGET_SYSTEM } from '../types';
 
 const TRICK_NAME = '闪电';
 
@@ -132,7 +133,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     if (isLightningHit(judgeCard)) {
       // 黑桃 2-9:受到 3 点无来源雷电伤害 + 移除闪电(进弃牌堆)
-      await applyAtom(ctx.state, { type: '造成伤害', target: ownerId, amount: 3, source: -1 });
+      await applyAtom(ctx.state, { type: '造成伤害', target: ownerId, amount: 3, source: TARGET_SYSTEM });
       await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: TRICK_NAME });
     } else {
       // 其他:移除当前玩家闪电,传递给下家(无下家可接时,闪电消失进弃牌堆)
