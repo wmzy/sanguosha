@@ -176,6 +176,16 @@ export function useDebugMultiConnection(
       log.warn('no open connection for viewer', action.ownerId);
       return;
     }
+    // 选将 action 发出时乐观清除本地 view.pending:防止 pendingResolved 延迟导致重选 UI。
+    // 服务端事件到达后会用正确的 view 覆盖(分配武将 / actionRejected)。
+    if (action.actionType === '选将' && seat.view?.pending) {
+      seat.view.pending = null;
+      setViews(prev => {
+        const next = new Map(prev);
+        next.set(action.ownerId, seat.view!);
+        return next;
+      });
+    }
     // respond action 携带 pendingSeq（当前 view.pending 对应的窗口 seq）
     const pendingSeq = seat.view?.pending ? seat.lastSeq : undefined;
     seat.ws.send(JSON.stringify({
