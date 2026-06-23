@@ -31,10 +31,17 @@ export const 击杀: AtomDefinition<{ player: number }> = {
   applyView(view, event) {
     const pi = view.players.findIndex(p => p.index === (event.player as number));
     if (pi >= 0) {
-      view.players[pi].alive = false;
-      view.players[pi].hand = [];
-      view.players[pi].handCount = 0;
-      view.players[pi].equipment = {};
+      const p = view.players[pi];
+      // 弃牌堆计数:手牌数 + 装备数(与 apply 对称)
+      const handCount = p.hand?.length ?? 0;
+      const equipCount = Object.values(p.equipment).filter(Boolean).length;
+      if (view.zones) {
+        view.zones.discardPileCount += handCount + equipCount;
+      }
+      p.alive = false;
+      p.hand = [];
+      p.handCount = 0;
+      p.equipment = {};
     }
   },
 };

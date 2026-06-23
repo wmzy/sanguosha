@@ -107,11 +107,11 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       health: p.health,
       maxHealth: p.maxHealth,
       alive: p.alive,
-      equipment: p.equipment,
-      skills: p.skills,
+      equipment: { ...p.equipment },
+      skills: [...p.skills],
       handCount: p.hand.length,
       hand: i === viewer ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
-      marks: p.marks,
+      marks: [...p.marks],
       // 距离修正 vars(只投影距离相关三个 key,不暴露身份等敏感 vars)
       distanceVars: {
         attackMod: p.vars['距离/进攻修正'] as number | undefined,

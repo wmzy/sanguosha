@@ -36,14 +36,27 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
     const pi = view.players.findIndex(p => p.index === (event.player as number));
     if (pi < 0) return;
     const cardIds = (event.cardIds as string[]) ?? [];
-    const count = cardIds.length;
-    view.players[pi].handCount = Math.max(0, view.players[pi].handCount - count);
-    if (view.players[pi].hand && cardIds.length > 0) {
-      const discardSet = new Set(cardIds);
+    const discardSet = new Set(cardIds);
+    // 装备区:清除被弃的装备(与 apply 对称),并统计装备移除数
+    let equipRemoved = 0;
+    const equipment: Partial<Record<string, string>> = {};
+    for (const [slot, id] of Object.entries(view.players[pi].equipment)) {
+      if (id && discardSet.has(id)) {
+        equipRemoved++;
+      } else if (id) {
+        equipment[slot] = id;
+      }
+    }
+    view.players[pi].equipment = equipment;
+    // 手牌:handCount 按总数(弃牌总数 - 装备移除数)减;
+    // hand 可见时从 hand 移除匹配的牌。
+    const handRemoved = cardIds.length - equipRemoved;
+    view.players[pi].handCount = Math.max(0, view.players[pi].handCount - handRemoved);
+    if (view.players[pi].hand && handRemoved > 0) {
       view.players[pi].hand = view.players[pi].hand!.filter(c => !discardSet.has(c.id));
     }
     if (view.zones) {
-      view.zones.discardPileCount += count;
+      view.zones.discardPileCount += cardIds.length;
     }
   },
 };

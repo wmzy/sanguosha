@@ -25,8 +25,10 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   },
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 1800 },
   applyView(view: GameView) {
-    // fallback event 不含 cardId,只能 best-effort:从处理区弹出顶部一张(atom 刚放进去的那张)并 +1 弃牌堆计数
+    // apply: deck → processing (shift); afterHooks: processing → discardPile (splice+push)
+    // applyView 对应: deckCount - 1, processing pop(已由 afterHook 移走), discardPileCount + 1
     if (!view.zones) return;
+    view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
     if (view.zones.processing.length > 0) {
       view.zones.processing.pop();
     }

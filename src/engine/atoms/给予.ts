@@ -21,14 +21,27 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
   },
   effect: { sound: 'give', animation: 'slide', duration: 600 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const view: ViewEvent = {
+    const effect = { sound: 'give' as const, animation: 'slide' as const, duration: 600 };
+    // toViewEvents 在 apply 之前调用,此时 cardId 还在 from 手牌里。
+    // ownerView (from+to):都应看到 cardId(从谁给到谁,什么牌)
+    const ownerView: ViewEvent = {
       type: '给予',
       cardId: atom.cardId,
       from: atom.from,
       to: atom.to,
-      effect: { sound: 'give' as const, animation: 'slide' as const, duration: 600 },
+      effect,
     };
-    return { ownerViews: new Map(), othersView: view };
+    // othersView:第三方只看到「谁给了谁一张牌」,不暴露 cardId
+    const othersView: ViewEvent = {
+      type: '给予',
+      from: atom.from,
+      to: atom.to,
+      effect,
+    };
+    return {
+      ownerViews: new Map([[atom.from, ownerView], [atom.to, ownerView]]),
+      othersView,
+    };
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;
