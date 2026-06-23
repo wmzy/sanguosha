@@ -152,11 +152,16 @@ export function useDebugMultiConnection(
       };
       ws.onmessage = (event) => {
         if (cancelled) return;
+        let msg: ServerMessage;
         try {
-          handleMessage(viewerIndex, JSON.parse(event.data as string) as ServerMessage);
+          msg = JSON.parse(event.data as string) as ServerMessage;
         } catch (e) {
-          log.warn('parse error:', e);
+          log.warn('JSON 解析失败:', e);
+          return;
         }
+        // handleMessage 的异常不吞掉——让它在 console 显示完整错误信息,
+        // 而不是伪装成无害的 'parse error' 导致问题难以排查。
+        handleMessage(viewerIndex, msg);
       };
       ws.onclose = () => {
         setConnectedCount(prev => Math.max(0, prev - 1));
