@@ -1,7 +1,7 @@
 // src/engine/atoms/选将.ts
 // 游戏初始化 atoms:抽身份、选将、发牌
 // 每个 atom 做一件事,符合三国杀身份局规则
-import type { ActionPrompt, Atom, AtomDefinition, GameState, PlayerState } from '../types';
+import type { ActionPrompt, Atom, AtomDefinition, Card, GameState, PlayerState, ViewEvent, ViewEventSplit } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
@@ -127,6 +127,31 @@ export const 发牌: AtomDefinition<{
     }
     state.zones.deck = state.zones.deck.slice(cursor);
   },
+  toViewEvents(state, atom): ViewEventSplit {
+    const { handSize, lordBonus = 1 } = atom;
+    const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
+    // 每个玩家收到自己分到的牌面(ownerView);其他人只看到数量信息(othersView)。
+    const ownerViews = new Map<number, ViewEvent>();
+    let cursor = 0;
+    for (const p of state.players) {
+      const isLord = p.identity === '主公';
+      const bonus = isLord ? lordBonus : 0;
+      const drawCount = handSize + bonus;
+      const cards = state.zones.deck.slice(cursor, cursor + drawCount)
+        .map(id => state.cardMap[id])
+        .filter(Boolean);
+      cursor += drawCount;
+      ownerViews.set(p.index, {
+        type: '发牌',
+        handSize,
+        lordBonus,
+        cards,
+        effect,
+      });
+    }
+    const othersView: ViewEvent = { type: '发牌', handSize, lordBonus, effect };
+    return { ownerViews, othersView };
+  },
   applyView(view, event) {
     const handSize = (event.handSize as number) ?? 4;
     const lordBonus = (event.lordBonus as number) ?? 1;
@@ -134,6 +159,10 @@ export const 发牌: AtomDefinition<{
       const isLord = p.identity === '主公';
       const bonus = isLord ? lordBonus : 0;
       p.handCount += handSize + bonus;
+      // ownerView 携带自己分到的 cards,加入手牌;othersView 无 cards 字段
+      if (event.cards && p.hand) {
+        (p.hand as Card[]).push(...(event.cards as Card[]));
+      }
     }
     // 牌堆减少(粗略:减去总发牌数)
     const total = view.players.reduce((sum, p) => {

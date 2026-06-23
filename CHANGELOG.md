@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Registered display-only atoms (等待选将, 打出) to prevent viewReducer from crashing on non-dispatch ViewEvent types used in othersView
 - Isolated pending slots during serial character selection (主公先选) to prevent non-selecting players from seeing the lord's selection UI and shared countdown
+- Added toViewEvents to 发牌 atom with information-leveled view events so each player sees their own dealt cards; others see only count metadata
 ## [Unreleased] — 2026-06-21
 ### 仁德/制衡 bug 修复 — 发动次数与时序漏洞
 
