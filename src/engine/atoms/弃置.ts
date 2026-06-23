@@ -28,7 +28,6 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
       type: '弃置',
       player: atom.player,
       cardIds: atom.cardIds,
-      effect: { sound: 'discard' as const, animation: 'flip' as const, duration: 600 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

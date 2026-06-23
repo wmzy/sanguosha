@@ -76,8 +76,8 @@ function makeViewWithWuguPending(): GameView {
       totalMs: 20000,
       startTime: Date.now(),
     },
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
     zones: { deckCount: 18, processing: ['pa', 'pb'], discardPileCount: 0 },
   } as unknown as GameView;

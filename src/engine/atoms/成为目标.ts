@@ -23,7 +23,6 @@ export const 成为目标: AtomDefinition<{ source: number; cardId?: string; tar
       source: atom.source,
       target: atom.target,
       ...(atom.cardId !== undefined ? { cardId: atom.cardId } : {}),
-      effect: { sound: 'target' as const, animation: 'highlight' as const, duration: 400 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

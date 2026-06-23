@@ -21,8 +21,8 @@ function mockView(overrides: Partial<GameView> = {}): GameView {
     ],
     cardMap: {},
     pending: null,
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
     zones: { deckCount: 10, discardPileCount: 0, processing: [] },
     ...overrides,
@@ -144,7 +144,7 @@ describe('applyView 一致性 bug', () => {
         { type: '获得', player: 0, cardId: 'c2', from: 1 } as any,
       );
       // othersView 不应携带 cardId（第三方不应知道获得了什么牌）
-      expect((split.othersView as any)?.cardId).toBeUndefined();
+      expect((split?.othersView as any)?.cardId).toBeUndefined();
     });
   });
 });

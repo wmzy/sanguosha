@@ -39,14 +39,12 @@ export const 请求回应: AtomDefinition<{
   },
   effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { blockUntilDone: true as const, duration: 200 };
     // target 看到带 prompt 的请求
     const targetView: ViewEvent = {
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.target,
       prompt: atom.prompt,
-      effect,
     };
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有存活玩家都可回应,
     // 故 ownerViews 无人命中(Map key=target<0 不匹配真实 viewer),
@@ -59,7 +57,6 @@ export const 请求回应: AtomDefinition<{
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.target,
-      effect: { duration: 200 },
     };
     return {
       ownerViews: new Map([[atom.target, targetView]]),

@@ -18,7 +18,6 @@ export const 加标记: AtomDefinition<{ player: number; mark: Mark }> = {
       type: '加标记',
       player: atom.player,
       mark: atom.mark,
-      effect: { sound: 'mark' as const, animation: 'pulse' as const, duration: 400 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

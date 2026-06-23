@@ -69,8 +69,8 @@ function makeView(): GameView {
     ],
     cardMap: {},
     pending: null, // viewer(主公)连接:viewer 已选完,本连接无 pending
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
   };
 }

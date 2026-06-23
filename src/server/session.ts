@@ -15,7 +15,7 @@ import { TURN_IDLE_TIMEOUT_MS } from '../engine/view/buildView';
 
 import '../engine/atoms';
 import '../engine/skills';
-import type { ServerMessage } from './protocol';
+import type { ServerMessage, DeadlineInfo } from './protocol';
 import { serialize } from './protocol';
 import type { Room } from './room';
 import { createLogger } from './logger';
@@ -52,6 +52,8 @@ export class GameSession {
   private logger = createLogger('session');
   private lastBroadcastSeq = 0;
   private baselineSent = new Set<string>();
+  /** per-player 上次发送的 deadline 缓存,避免重复发送不变的倒计时 */
+  private lastSentDeadline = new Map<string, string | null>();
   /** 调试房间:首人加入后开局的玩家人数(由 app 写入,handleJoinDebugRoom 读取后清空) */
   public pendingPlayerCount?: number;
 
@@ -265,9 +267,9 @@ export class GameSession {
   }
 
   /**
-   * 广播状态变更:按 §8.2 per-viewer 分叉推送 events。
-   * 首次推送 initialView 作为 baseline,后续发增量 events。
-   * events 消息携带 pending 倒计时(turnDeadline/turnTotalMs)权威数据。
+   * 广播状态变更:每次 atom apply 后同步触发(onStateChange 回调)。
+   * 逐条发送 event 消息,deadline 仅在变化时附加。
+   * 首次推送 initialView 作为 baseline,后续发增量 event。
    */
   private broadcastNewState(): void {
     if (!this.state) return;
@@ -277,20 +279,57 @@ export class GameSession {
       if (viewer < 0 || viewer >= state.players.length) continue;
       if (!this.baselineSent.has(playerId)) {
         const view = buildView(state, viewer);
-        this.sendToPlayer(playerId, { type: 'initialView', viewer, state: view, lastSeq: state.seq });
+        this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
         this.baselineSent.add(playerId);
+        // baseline 已含完整状态,初始化 deadline 缓存
+        this.lastSentDeadline.set(playerId, this.deadlineKey(view));
       }
       const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
-      if (envelopes.length > 0) {
-        this.sendToPlayer(playerId, {
-          type: 'events', viewer, fromSeq: this.lastBroadcastSeq, events: envelopes,
-          pending: this.pendingForViewer(state, viewer),
-          turnDeadline: this.idleDeadline,
-          turnTotalMs: this.idleDeadline !== null ? IDLE_TIMEOUT_MS : 0,
-        });
+      // 只下发 view 事件;notify(pendingResolved)由权威 deadline(null)替代
+      const viewEnvelopes = envelopes.filter(e => e.view);
+      if (viewEnvelopes.length > 0) {
+        // 计算 effective deadline:pending 优先,否则出牌/弃牌阶段的 idleDeadline
+        const dl = this.effectiveDeadline(state, viewer);
+        const dlKey = dl ? `${dl.deadline}:${dl.totalMs}` : null;
+        const prevKey = this.lastSentDeadline.get(playerId) ?? undefined;
+        // deadline 仅在变化时附加在最后一条 event 上(减少冗余)
+        for (let i = 0; i < viewEnvelopes.length; i++) {
+          const env = viewEnvelopes[i];
+          const isLast = i === viewEnvelopes.length - 1;
+          const attachDeadline = isLast && dlKey !== prevKey;
+          this.sendToPlayer(playerId, {
+            type: 'event',
+            seq: env.seq,
+            timestamp: env.timestamp,
+            view: env.view!,
+            ...(attachDeadline ? { deadline: dl } : {}),
+          });
+        }
+        this.lastSentDeadline.set(playerId, dlKey);
       }
     }
     this.lastBroadcastSeq = state.seq;
+  }
+
+  /** 计算 effective deadline:pending slot 优先,否则出牌/弃牌阶段的 idleDeadline。
+   *  合并了旧 pendingForViewer + turnDeadline 逻辑。 */
+  private effectiveDeadline(state: GameState, viewer: number): DeadlineInfo | null {
+    // pending 优先
+    const p = this.pendingForViewer(state, viewer);
+    if (p) return { deadline: p.deadline, totalMs: p.totalMs };
+    // 出牌/弃牌阶段:idleDeadline
+    if (this.idleDeadline !== null && (state.phase === '出牌' || state.phase === '弃牌')) {
+      return { deadline: this.idleDeadline, totalMs: IDLE_TIMEOUT_MS };
+    }
+    return null;
+  }
+
+  /** 从 GameView 提取 deadline 缓存 key */
+  private deadlineKey(view: GameView): string | null {
+    const p = view.pending;
+    if (p?.deadline && p?.totalMs) return `${p.deadline}:${p.totalMs}`;
+    if (view.deadline) return `${view.deadline}:${view.deadlineTotalMs}`;
+    return null;
   }
 
   /**
@@ -302,7 +341,8 @@ export class GameSession {
     const viewer = this.playerNames.get(playerId);
     if (viewer === undefined || viewer < 0 || viewer >= this.state.players.length) return;
     const view = buildView(this.state, viewer);
-    this.sendToPlayer(playerId, { type: 'initialView', viewer, state: view, lastSeq: this.state.seq });
+    this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: this.state.seq });
+    this.lastSentDeadline.set(playerId, this.deadlineKey(view));
   }
 
   handleDisconnect(playerId: string): void {
@@ -310,6 +350,7 @@ export class GameSession {
       // debug 模式:立即清理座次映射,避免幽灵连接(StrictMode 双重挂载)占用座次
       this.playerNames.delete(playerId);
       this.baselineSent.delete(playerId);
+      this.lastSentDeadline.delete(playerId);
       this.room.players.delete(playerId);
       return;
     }

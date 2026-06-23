@@ -23,7 +23,6 @@ export const 拼点: AtomDefinition<{
       target: atom.target,
       initiatorCard: atom.initiatorCard,
       targetCard: atom.targetCard,
-      effect: { sound: 'pindian' as const, animation: 'flip' as const, duration: 1500 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

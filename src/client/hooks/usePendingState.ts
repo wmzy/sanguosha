@@ -27,9 +27,9 @@ export interface PendingState {
   skippedBroadcast: Set<string>;
   /** 标记某广播 pending 已跳过(无懈可击"不回应"后避免重复弹窗) */
   markBroadcastSkipped: (key: string) => void;
-  /** 倒计时基准(pending 优先,否则 turnDeadline) */
+  /** 倒计时基准(pending 优先,否则 deadline) */
   deadline: number | null;
-  /** 倒计时总时长(ms):pending 优先用 pending.totalMs,否则用 turnTotalMs。 */
+  /** 倒计时总时长(ms):pending 优先用 pending.totalMs,否则用 deadlineTotalMs。 */
   deadlineTotalMs: number;
 }
 
@@ -68,8 +68,8 @@ export function usePendingState(view: GameView, perspectiveIdx: number): Pending
     setSkippedBroadcast(prev => new Set(prev).add(key));
   }, []);
 
-  const deadline = pending?.deadline ?? view.turnDeadline ?? null;
-  const deadlineTotalMs = pending?.totalMs ?? view.turnTotalMs;
+  const deadline = pending?.deadline ?? view.deadline ?? null;
+  const deadlineTotalMs = pending?.totalMs ?? view.deadlineTotalMs;
 
   return {
     pending,

@@ -18,8 +18,8 @@ function makeView(): GameView {
     zones: { deckCount: 0, discardCount: 0, processingCount: 0 },
     log: [],
     pending: null,
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
   } as unknown as GameView;
 }
 

@@ -6,16 +6,16 @@
 //
 // N 连接 vs 1 连接:
 //   N 连接:每个 viewer 独立传输,服务端按 viewer 分叉发 events,前端无需过滤
-//   1 连接:所有 viewer 共享传输,服务端给所有 viewer 发 events,前端按 viewer 过滤
+//   1 连接:所有 viewer 共享传输,服务端给所有 viewer 发 event,前端按 viewer 过滤
 // 选择 N 连接:每个 viewer 是独立实体,传输层隔离更干净。
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { viewReducer, applyNotify } from '../view/reducer';
+import { viewReducer } from '../view/reducer';
 import { useEventPlayback } from './useEventPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './SubmittedCharSelectCtx';
 import { createLogger } from '../utils/logger';
-import type { GameView, Json, ViewEvent } from '../../engine/types';
-import type { ServerMessage, GameEventEnvelope, ClientMessage } from '../../server/protocol';
+import type { GameView, Json } from '../../engine/types';
+import type { ServerMessage, ClientMessage } from '../../server/protocol';
 
 const log = createLogger('useDebugMultiConnection');
 
@@ -77,50 +77,38 @@ export function useDebugMultiConnection(
       seat.lastSeq = msg.lastSeq;
       setViews(prev => {
         const next = new Map(prev);
-        next.set(msg.viewer, msg.state);
+        next.set(seatViewer, msg.state);
         return next;
       });
-      if (onFirstViewRef.current && msg.viewer === 0) {
+      if (onFirstViewRef.current && seatViewer === 0) {
         onFirstViewRef.current(0);
       }
-    } else if (msg.type === 'events') {
+    } else if (msg.type === 'event') {
       const seat = seatsRef.current.get(seatViewer);
       if (!seat?.view) return;
-      // 直接原地突变 seat.view——reducer(applyView/applyNotify)本身就是突变模型,
+      // 直接原地突变 seat.view——reducer(applyView)本身就是突变模型,
       // 不用 structuredClone(它在 view 含函数引用如 cardFilter.filter 时会抛 DOMException)。
       // setViews 创建新 Map 保证 React 检测到状态变更。
-      const eventsToPlay: Array<{ seq: number; event: ViewEvent }> = [];
-      for (const env of (msg.events as GameEventEnvelope[])) {
-        if (env.viewEvent) {
-          viewReducer(seat.view, env.viewEvent);
-          eventsToPlay.push({ seq: env.seq, event: env.viewEvent });
+      viewReducer(seat.view, msg.view);
+      // 更新 lastSeq
+      seat.lastSeq = msg.seq;
+      // 权威 deadline 覆盖:pending 优先写入 view.pending,否则写入 view.deadline
+      if (msg.deadline !== undefined) {
+        if (msg.deadline !== null && seat.view.pending) {
+          seat.view.pending.deadline = msg.deadline.deadline;
+          seat.view.pending.totalMs = msg.deadline.totalMs;
         }
-        if (env.notify) {
-          applyNotify(seat.view, env.notify);
-        }
-      }
-      if (msg.events.length > 0) {
-        seat.lastSeq = msg.events[msg.events.length - 1].seq;
-      }
-      // events 消息携带权威 pending 倒计时 → 覆盖 applyView 的 fallback 值
-      if (msg.pending !== undefined && msg.pending !== null && seat.view.pending) {
-        seat.view.pending.deadline = msg.pending.deadline;
-        seat.view.pending.totalMs = msg.pending.totalMs;
-      }
-      // turnDeadline 权威下发
-      if (msg.turnDeadline !== undefined) {
-        seat.view.turnDeadline = msg.turnDeadline;
-        if (msg.turnTotalMs !== undefined) {
-          seat.view.turnTotalMs = msg.turnTotalMs;
-        }
+        // view.deadline 用于出牌/弃牌阶段(无 pending 时)
+        seat.view.deadline = msg.deadline !== null ? msg.deadline.deadline : null;
+        seat.view.deadlineTotalMs = msg.deadline !== null ? msg.deadline.totalMs : 0;
       }
       setViews(prev => {
         const next = new Map(prev);
-        next.set(msg.viewer, seat.view!);
+        next.set(seatViewer, seat.view!);
         return next;
       });
-      if (msg.viewer === perspectiveRef.current) {
-        playbackRef.current.enqueue(eventsToPlay);
+      if (seatViewer === perspectiveRef.current) {
+        playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
       }
     } else if (msg.type === 'actionRejected') {
       log.warn('action rejected for viewer', seatViewer);

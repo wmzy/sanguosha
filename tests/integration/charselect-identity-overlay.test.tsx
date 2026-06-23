@@ -55,8 +55,8 @@ function makeLordSelectingView(): GameView {
       deadline: Date.now() + 60000,
       totalMs: 60000,
     },
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
   };
 }
@@ -120,8 +120,8 @@ describe('GameView:选将阶段身份揭示弹窗不覆盖选将界面', () => {
       ],
       cardMap: {},
       pending: null,
-      turnDeadline: null,
-      turnTotalMs: 0,
+      deadline: null,
+      deadlineTotalMs: 0,
       log: [],
     };
     render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);

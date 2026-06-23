@@ -348,8 +348,9 @@ export interface AtomEffect {
 }
 
 /** 前端视图事件——后端 atom 的前端投影。纯数据，可序列化。
- *  索引签名值类型用 unknown 而非 Json:effect/pending 内含 ActionPrompt
- *  (带函数类型),非纯 Json;各 atom 塞任意字段,前端 applyView 用 as 断言读取。 */
+ *  索引签名值类型用 unknown 而非 Json:pending 内含 ActionPrompt
+ *  (带函数类型),非纯 Json;各 atom 塞任意字段,前端 applyView 用 as 断言读取。
+ *  动画/音效(effect)不下发,前端通过 AtomDefinition.effect 静态查表获取。 */
 export interface ViewEvent {
   /** 事件类型（与后端 atom type 一致，可按需别名，如 移动牌→弃牌） */
   type: string;
@@ -361,8 +362,6 @@ export interface ViewEvent {
   atomType?: string;
   /** 事件数据（已脱敏，只含前端需要的字段） */
   [key: string]: unknown;
-  /** 内联动画/音效 */
-  effect?: AtomEffect;
   /** 等待信息（仅等待型 atom） */
   pending?: { startTime: number; deadline: number; prompt: ActionPrompt };
 }
@@ -517,10 +516,12 @@ export interface GameView {
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;
-  /** 出牌/弃牌阶段的操作截止时间(独立于 pending) */
-  turnDeadline: number | null;
-  /** 出牌/弃牌阶段倒计时总时长(ms);turnDeadline 为 null 时为 0 */
-  turnTotalMs: number;
+  /** 出牌/弃牌阶段(无 pending 时)的空闲超时截止时间戳。
+   *  pending 存在时为 null(此时用 pending.deadline)。
+   *  由 session 的 idleTimer 权威下发。 */
+  deadline: number | null;
+  /** deadline 对应的倒计时总时长(ms);deadline 为 null 时无意义 */
+  deadlineTotalMs: number;
   log: { time: number; player: number; text: string }[];
   /** 公共区域摘要(供前端渲染牌堆/弃牌堆/处理区) */
   zones?: {
@@ -757,8 +758,8 @@ export interface GameEventEnvelope {
   seq: number;
   /** 事件 timestamp,相对 game startedAt */
   timestamp: number;
-  /** atom 事件(per-viewer 分叉后的视图事件,含 effect) */
-  viewEvent?: ViewEvent;
+  /** atom 事件(per-viewer 分叉后的视图事件) */
+  view?: ViewEvent;
   /** 通知事件(per-viewer 分叉后的 data) */
   notify?: { skillId: string; eventType: string; data: Json };
 }

@@ -21,7 +21,6 @@ export const 去标记: AtomDefinition<{ player: number; markId: string }> = {
       type: '去标记',
       player: atom.player,
       markId: atom.markId,
-      effect: { sound: 'mark' as const, animation: 'pulse' as const, duration: 300 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

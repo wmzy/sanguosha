@@ -3,7 +3,7 @@ import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, 
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 
 /** 出牌/弃牌阶段的回合空闲超时(ms)。
- *  服务端 resetIdleTimer 与此处 turnDeadline 必须使用同一口径——
+ *  服务端 resetIdleTimer 与此处 deadline 必须使用同一口径——
  *  否则前端倒计时与实际超时不一致(表现为进度条未走完回合就被结束)。 */
 export const TURN_IDLE_TIMEOUT_MS = 50_000;
 
@@ -73,13 +73,14 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     };
   }
 
-  // 出牌/弃牌阶段:独立的 turnDeadline(不创建 fake pending)。
-  // 与服务端 resetIdleTimer 使用同一 TURN_IDLE_TIMEOUT_MS 口径,避免倒计时与实际超时偏差。
-  let turnDeadline: number | null = null;
-  let turnTotalMs = 0;
-  if (state.phase === '出牌' || state.phase === '弃牌') {
-    turnDeadline = Date.now() + TURN_IDLE_TIMEOUT_MS;
-    turnTotalMs = TURN_IDLE_TIMEOUT_MS;
+  // 出牌/弃牌阶段(无 pending 时)的空闲超时。
+  // 这是近似值,session 的 idleTimer 权威值通过 event 消息覆盖。
+  // pending 存在时为 null(此时用 pending.deadline/totalMs)。
+  let deadline: number | null = null;
+  let deadlineTotalMs = 0;
+  if (!pending && (state.phase === '出牌' || state.phase === '弃牌')) {
+    deadline = Date.now() + TURN_IDLE_TIMEOUT_MS;
+    deadlineTotalMs = TURN_IDLE_TIMEOUT_MS;
   }
 
   void debug;  // 保留参数签名兼容调用点,但不再影响隔离逻辑
@@ -125,9 +126,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     })),
     cardMap: state.cardMap,
     pending,
-    turnDeadline,
-    /** 出牌/弃牌阶段倒计时总时长;为 0 表示非出牌/弃牌阶段(无 turnDeadline) */
-    turnTotalMs,
+    deadline,
+    /** deadline 对应的倒计时总时长(ms);deadline 为 null 时无意义 */
+    deadlineTotalMs,
     log,
     zones: {
       deckCount: state.zones.deck.length,

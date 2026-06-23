@@ -14,7 +14,7 @@ import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
-import type { ServerMessage, GameEventEnvelope } from '../../src/server/protocol';
+import type { ServerMessage } from '../../src/server/protocol';
 
 function makeRoom(): Room {
   return {
@@ -34,12 +34,12 @@ class FakeWS {
   send(data: string) { this.messages.push(JSON.parse(data)); }
 }
 
-/** 从 FakeWS 收到的消息中提取所有 events envelope 的 viewEvent */
-function allViewEvents(ws: FakeWS): GameEventEnvelope[] {
-  const out: GameEventEnvelope[] = [];
+/** 从 FakeWS 收到的消息中提取所有 event 的 view */
+function allViews(ws: FakeWS): { seq: number; view: import('../../src/engine/types').ViewEvent }[] {
+  const out: { seq: number; view: import('../../src/engine/types').ViewEvent }[] = [];
   for (const msg of ws.messages) {
-    if (msg.type === 'events') {
-      out.push(...(msg.events as GameEventEnvelope[]));
+    if (msg.type === 'event') {
+      out.push({ seq: msg.seq, view: msg.view });
     }
   }
   return out;
@@ -97,19 +97,19 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
     const realHand0 = state.players[0].hand;
     expect(realHand0.length).toBeGreaterThanOrEqual(4);
 
-    // 从 p0 收到的 events 中找发牌事件
-    const events0 = allViewEvents(ws0);
-    const dealEvents0 = events0.filter(e => e.viewEvent?.type === '发牌');
+    // 从 p0 收到的 event 中找发牌事件
+    const views0 = allViews(ws0);
+    const dealEvents0 = views0.filter(e => e.view?.type === '发牌');
     expect(dealEvents0.length).toBe(1);
-    const dealCards0 = dealEvents0[0].viewEvent?.cards as unknown[] | undefined;
+    const dealCards0 = dealEvents0[0].view?.cards as unknown[] | undefined;
     expect(dealCards0).toBeDefined();
     expect(dealCards0!.length).toBeGreaterThanOrEqual(4);
 
-    // 从 p1 收到的 events 中找发牌事件
-    const events1 = allViewEvents(ws1);
-    const dealEvents1 = events1.filter(e => e.viewEvent?.type === '发牌');
+    // 从 p1 收到的 event 中找发牌事件
+    const views1 = allViews(ws1);
+    const dealEvents1 = views1.filter(e => e.view?.type === '发牌');
     expect(dealEvents1.length).toBe(1);
-    const dealCards1 = dealEvents1[0].viewEvent?.cards as unknown[] | undefined;
+    const dealCards1 = dealEvents1[0].view?.cards as unknown[] | undefined;
     expect(dealCards1).toBeDefined();
     expect(dealCards1!.length).toBeGreaterThanOrEqual(4);
   }, 20000);

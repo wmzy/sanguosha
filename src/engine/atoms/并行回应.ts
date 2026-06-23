@@ -41,7 +41,6 @@ export const 并行回应: AtomDefinition<{
   },
   effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { blockUntilDone: true as const, duration: 200 };
     // 每个 target 看到带 prompt 的请求
     const ownerViews = new Map<number, ViewEvent>();
     for (const target of atom.targets) {
@@ -50,7 +49,6 @@ export const 并行回应: AtomDefinition<{
         requestType: atom.requestType,
         target,
         prompt: atom.prompt,
-        effect,
       });
     }
     // 其他人只看到"有玩家被请求回应"
@@ -58,7 +56,6 @@ export const 并行回应: AtomDefinition<{
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.targets[0],
-      effect: { duration: 200 },
     };
     return { ownerViews, othersView };
   },

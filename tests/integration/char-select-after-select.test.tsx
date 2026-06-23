@@ -68,8 +68,8 @@ function makeFormalWaitingView(): GameView {
     ],
     cardMap: {},
     pending: null, // viewer 已选完,无 pending
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
   };
 }
@@ -92,8 +92,8 @@ function makeDebugWaitingView(): GameView {
     ],
     cardMap: {},
     pending: null,
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
   };
 }
@@ -178,8 +178,8 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
         target: 1, deadline: Date.now() + 60000, totalMs: 60000,
       },
-      turnDeadline: null,
-      turnTotalMs: 0,
+      deadline: null,
+      deadlineTotalMs: 0,
       log: [],
     };
     render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
@@ -217,8 +217,8 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
         target: 0, deadline: Date.now() + 60000, totalMs: 60000,
       },
-      turnDeadline: null,
-      turnTotalMs: 0,
+      deadline: null,
+      deadlineTotalMs: 0,
       log: [],
     };
     const onAction = vi.fn();

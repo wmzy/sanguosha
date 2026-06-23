@@ -36,14 +36,14 @@ describe('eventsForViewer', () => {
     // viewer 0 = owner,看到 ownerView
     const e0 = eventsForViewer(state, 0, 0);
     expect(e0).toHaveLength(1);
-    expect(e0[0].viewEvent).toBe(ownerView);
+    expect(e0[0].view).toBe(ownerView);
     // viewer 1 = 被隐藏(ownerViews=null)
     const e1 = eventsForViewer(state, 1, 0);
     expect(e1).toHaveLength(0);
     // viewer 2 = others
     const e2 = eventsForViewer(state, 2, 0);
     expect(e2).toHaveLength(1);
-    expect(e2[0].viewEvent).toBe(othersView);
+    expect(e2[0].view).toBe(othersView);
   });
 
   it('sinceSeq 过滤:只返回 seq > sinceSeq 的事件', () => {

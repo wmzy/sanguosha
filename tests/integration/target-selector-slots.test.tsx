@@ -27,7 +27,7 @@ function makeView(): GameView {
     ],
     cardMap: { jd: makeCard('jd', '借刀杀人', '锦囊牌'), wp0: makeCard('wp0', '诸葛连弩', '装备牌'), wp1: makeCard('wp1', '诸葛连弩', '装备牌') },
     pending: null,
-    turnDeadline: null,
+    deadline: null,
     log: [],
   } as unknown as GameView;
 }

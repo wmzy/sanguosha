@@ -2,7 +2,7 @@
 // atom 注册表 + 基础 apply 引擎(同步,无 awaits)
 // 完整 apply pipeline(含 before/after 钩子 + awaits 等待)由 create-engine.ts 接管
 
-import type { Atom, AtomDefinition, GameState, ViewEvent, ViewEventSplit, AtomEffect } from './types';
+import type { Atom, AtomDefinition, GameState, ViewEvent, ViewEventSplit } from './types';
 
 const registry = new Map<string, AtomDefinition<any>>();
 
@@ -54,9 +54,9 @@ export function resolveViewEvents(
     };
   }
 
-  // Fallback：构造一个带 effect 的视图事件，所有人看到相同内容
-  const effect: AtomEffect | undefined = def.effect;
-  const viewEvent = { ...atom, ...(effect ? { effect } : {}) } as ViewEvent;
+  // Fallback：构造原始 atom 作为视图事件，所有人看到相同内容。
+  // effect 不下发,前端通过 AtomDefinition.effect 静态查表获取。
+  const viewEvent = { ...atom } as ViewEvent;
   return {
     ownerViews: new Map(),
     othersView: viewEvent,

@@ -20,7 +20,7 @@ export function eventsForViewer(
       if (owner === null) continue;
       const viewEvent = owner ?? e.viewEvents.othersView;
       if (!viewEvent) continue;
-      out.push({ seq: e.seq, timestamp: e.timestamp, viewEvent });
+      out.push({ seq: e.seq, timestamp: e.timestamp, view: viewEvent });
     } else {
       // kind === 'notify'
       const data = e.views ? (e.views.get(String(viewer)) ?? null) : e.data;

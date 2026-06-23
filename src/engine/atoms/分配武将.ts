@@ -25,7 +25,6 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
       target: atom.target,
       character: atom.character,
       skills: atom.skills,
-      effect: { duration: 200 },
     };
     // 所有玩家都能看到角色分配结果(角色名是公开信息)
     return { ownerViews: new Map(), othersView: view };

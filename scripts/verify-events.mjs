@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 验证新事件流协议:连接 debug 房,观察收到的消息类型(events vs initialView)。
+// 验证新事件流协议:连接 debug 房,观察收到的消息类型(event vs initialView)。
 // 用法:node scripts/verify-events.mjs [playerCount]
 import WebSocket from 'ws';
 
@@ -30,14 +30,11 @@ async function main() {
     const m = JSON.parse(data.toString());
     msgTypes.push(m.type);
     if (m.type === 'initialView') {
-      console.log(`[initialView] viewer=${m.viewer} lastSeq=${m.lastSeq} phase=${m.state?.phase} players=${m.state?.players?.length}`);
+      console.log(`[initialView] lastSeq=${m.lastSeq} phase=${m.state?.phase} players=${m.state?.players?.length}`);
       console.log(`  hand isolation: P0 hand=${m.state?.players?.[0]?.hand?.length ?? 'undefined'} P1 hand=${m.state?.players?.[1]?.hand?.length ?? 'undefined'}`);
-    } else if (m.type === 'events') {
+    } else if (m.type === 'event') {
       eventCount++;
-      console.log(`[events] viewer=${m.viewer} fromSeq=${m.fromSeq} count=${m.events?.length}`);
-      for (const e of (m.events || []).slice(0, 5)) {
-        console.log(`  seq=${e.seq} viewEvent.type=${e.viewEvent?.type} effect.duration=${e.viewEvent?.effect?.duration ?? '-'}`);
-      }
+      console.log(`[event] seq=${m.seq} view.type=${m.view?.type} deadline=${m.deadline ? 'yes' : 'no'}`);
     } else {
       console.log(`[${m.type}]`, JSON.stringify(m).slice(0, 120));
     }
@@ -47,7 +44,7 @@ async function main() {
 
   // 3. 跑 10 秒收消息后退出
   await new Promise(r => setTimeout(r, 10000));
-  console.log(`\n[summary] total msgs=${msgTypes.length} types=${[...new Set(msgTypes)].join(',')} events batches=${eventCount}`);
+  console.log(`\n[summary] total msgs=${msgTypes.length} types=${[...new Set(msgTypes)].join(',')} events=${eventCount}`);
   ws.close();
   process.exit(0);
 }

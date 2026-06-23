@@ -55,7 +55,6 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
       player: atom.player,
       cardId: atom.cardId,
       slot,
-      effect: { sound: 'equip' as const, animation: 'glow' as const, duration: 400 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

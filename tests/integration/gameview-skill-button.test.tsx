@@ -50,8 +50,8 @@ function makeView(overrides: Partial<GameView> = {}): GameView {
     ],
     cardMap: { c1: makeCard('c1', '杀'), c2: makeCard('c2', '桃') },
     pending: null,
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
     ...overrides,
   };

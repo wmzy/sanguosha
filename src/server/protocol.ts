@@ -1,26 +1,35 @@
 // src/server/protocol.ts
-// 服务端协议层 — 按 ENGINE-DESIGN §8.2 事件流分叉广播。
-// 服务端按 viewer 对事件流做 per-player 分叉,推送该 viewer 可见的 ViewEvent[]。
-// 断线重连:拉 initialView baseline + 续推 lastSeq 之后的 events。
-import type { ClientMessage as EngineClientMessage, GameEventEnvelope, GameView, Json, ViewEvent } from '../engine/types';
-import type { Operation } from '../shared/log';
+// 服务端协议层 — 事件流广播。
+// 每次 atom apply 后,服务端逐条发送 event 消息给该 viewer 可见的事件。
+// 断线重连:拉 initialView baseline(全量 GameView),之后继续推 event。
+// viewer 由 WS 连接标识,不需要在消息中携带。
+import type { ClientMessage as EngineClientMessage, GameView, Json, ViewEvent } from '../engine/types';
 export type { GameEventEnvelope } from '../engine/types';
 
 export type EventSeq = number;
+
+/** 倒计时信息(pending 优先,否则出牌/弃牌阶段的 idleDeadline)。
+ *  仅在 deadline 变化时附在 event 消息上,减少冗余传输。 */
+export interface DeadlineInfo {
+  /** 截止时间戳(绝对,Date.now() 口径) */
+  deadline: number;
+  /** 倒计时总时长(ms) */
+  totalMs: number;
+}
 
 /**
  * 服务端发往客户端的消息。
  * - initialView: 全量 baseline(首次/重连),viewer 隔离的 GameView。
  *   debug 多 WS 模型下,每个座次是独立连接,各自收自己 viewer 的 initialView。
- * - events: 增量事件流(§8.2.2),per-viewer 分叉后的 ViewEvent[],
- *   客户端走 viewReducer 增量更新 + playEffect 播放动画。
- * 两种消息都携带 viewer 字段,标识归属哪个座次视角。
+ * - event: 单个视图事件。每次 atom apply 后逐条发送。
+ *   viewer 由 WS 连接标识,不在消息中携带。
+ *   effect 不下发,前端通过 AtomDefinition.effect 静态查表。
+ *   deadline 仅在变化时附加(合并了 pending deadline 和 turn idle deadline)。
  */
 export type ServerMessage =
-  | { type: 'initialView'; viewer: number; state: GameView; lastSeq: EventSeq }
-  | { type: 'events'; viewer: number; fromSeq: EventSeq; events: GameEventEnvelope[]; operations?: Operation[];
-      pending?: { target: number; deadline: number; totalMs: number } | null;
-      turnDeadline?: number | null; turnTotalMs?: number }
+  | { type: 'initialView'; state: GameView; lastSeq: EventSeq }
+  | { type: 'event'; seq: EventSeq; timestamp: number; view: ViewEvent;
+      deadline?: DeadlineInfo | null }
   | { type: 'error'; message: string }
   | { type: 'actionRejected' }
   | { type: 'gameOver'; winner: string }

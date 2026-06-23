@@ -22,19 +22,16 @@ export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
   },
   effect: { sound: 'dodge_request', blockUntilDone: true, duration: 200 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { sound: 'dodge_request' as const, blockUntilDone: true as const, duration: 200 };
     // target 看到带 prompt 的询问，其他人只看到"某人被要求出闪"
     const targetView: ViewEvent = {
       type: '询问闪',
       target: atom.target,
       source: atom.source,
-      effect,
     };
     const othersView: ViewEvent = {
       type: '询问闪',
       target: atom.target,
       source: atom.source,
-      effect: { duration: 200 },
     };
     return {
       ownerViews: new Map([[atom.target, targetView]]),

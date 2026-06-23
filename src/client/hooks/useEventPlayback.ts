@@ -1,7 +1,7 @@
 // src/client/hooks/useEventPlayback.ts
 // 事件播放队列 hook。
 //
-// 收到 ViewEvent[] 后(来自服务端 events 消息),按 seq 入队,逐个播放。
+// 收到 ViewEvent 后(来自服务端 event 消息),按 seq 入队,逐个播放。
 // "播放" = 暴露 current event 给 EventOverlay 渲染延时展示,
 // duration 到点后出队,推下一个。
 //
@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ViewEvent } from '../../engine/types';
+import { getAtomDef } from '../../engine/atom';
 
 /** 最小可见时长(ms),保证事件能被看清,即便 effect.duration 偏短 */
 const MIN_VISIBLE_MS = 400;
@@ -52,7 +53,9 @@ export function useEventPlayback() {
       return;
     }
     setCurrent(next);
-    const duration = next.event.effect?.duration ?? MIN_VISIBLE_MS;
+    // duration 从 AtomDefinition.effect 静态查表获取(ViewEvent 不再携带 effect)
+    const type = next.event.atomType ?? next.event.type;
+    const duration = getAtomDef(type).effect?.duration ?? MIN_VISIBLE_MS;
     const wait = Math.max(duration, MIN_VISIBLE_MS);
     timerRef.current = setTimeout(() => {
       lastPlayedSeqRef.current = next.seq;

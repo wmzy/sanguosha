@@ -40,7 +40,7 @@ async function main() {
     console.log(`\n===== Seat ${seat.ws.idx}: ${seat.msgs.length} messages =====`);
     for (const m of seat.msgs) {
       if (m.type === 'initialView') {
-        console.log(`[initialView] viewer=${m.viewer} lastSeq=${m.lastSeq}`);
+        console.log(`[initialView] lastSeq=${m.lastSeq}`);
         const s = m.state;
         console.log(`  phase=${s.phase} currentPlayerIndex=${s.currentPlayerIndex}`);
         console.log(`  players count=${s.players?.length}`);
@@ -51,11 +51,8 @@ async function main() {
         }
         console.log(`  pending=${s.pending ? `type=${s.pending.atom?.type} target=${s.pending.target}` : 'null'}`);
         console.log(`  zones deck=${s.zones?.deckCount} processing=${s.zones?.processing?.length}`);
-      } else if (m.type === 'events') {
-        console.log(`[events] viewer=${m.viewer} fromSeq=${m.fromSeq} count=${m.events?.length}`);
-        for (const e of (m.events || []).slice(0, 8)) {
-          console.log(`  seq=${e.seq} type=${e.viewEvent?.type} fields=${Object.keys(e.viewEvent || {}).join(',')}`);
-        }
+      } else if (m.type === 'event') {
+        console.log(`[event] seq=${m.seq} type=${m.view?.type} fields=${Object.keys(m.view || {}).join(',')} deadline=${m.deadline ? 'yes' : 'no'}`);
       } else if (m.type === 'room_joined') {
         console.log(`[room_joined] playerId=${m.playerId} seatIndex=${m.seatIndex}`);
       } else if (m.type === 'error') {

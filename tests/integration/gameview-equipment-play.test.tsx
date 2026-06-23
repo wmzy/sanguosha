@@ -54,8 +54,8 @@ function makeView(overrides: Partial<GameView> = {}): GameView {
     ],
     cardMap: { wp1: makeEquipCard('wp1', '诸葛连弩', '武器') },
     pending: null,
-    turnDeadline: null,
-    turnTotalMs: 0,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: [],
     ...overrides,
   };

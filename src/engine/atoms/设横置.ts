@@ -22,7 +22,6 @@ export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
       type: '设横置',
       player: atom.player,
       chained: atom.chained,
-      effect: { sound: 'chain' as const, animation: 'pulse' as const, duration: 500 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

@@ -30,9 +30,9 @@ class FakeWS {
   send(data: string) { this.messages.push(JSON.parse(data)); }
 }
 
-function getLastEvents(ws: FakeWS) {
-  const ev = [...ws.messages].reverse().find(m => m.type === 'events') as
-    Extract<ServerMessage, { type: 'events' }> | undefined;
+function getLastEventWithDeadline(ws: FakeWS) {
+  const ev = [...ws.messages].reverse().find(m => m.type === 'event' && m.deadline !== undefined) as
+    Extract<ServerMessage, { type: 'event' }> | undefined;
   return ev;
 }
 
@@ -66,25 +66,26 @@ describe('选将倒计时独立性', () => {
     // 清空消息,触发一次广播
     for (const ws of wss) ws.messages = [];
     (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
+    (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline = new Map();
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
     await sleep(50);
 
-    // 主公(viewer 0)的 events 应携带 pending
-    const lordEvents = getLastEvents(wss[0]);
-    expect(lordEvents).toBeDefined();
-    expect(lordEvents!.pending).not.toBeNull();
-    expect(lordEvents!.pending!.totalMs).toBe(60_000);
-    const lordDeadline = lordEvents!.pending!.deadline;
+    // 主公(viewer 0)的 event 应携带 deadline(pending 的)
+    const lordEvent = getLastEventWithDeadline(wss[0]);
+    expect(lordEvent).toBeDefined();
+    expect(lordEvent!.deadline).not.toBeNull();
+    expect(lordEvent!.deadline!.totalMs).toBe(60_000);
+    const lordDeadline = lordEvent!.deadline!.deadline;
     // deadline 应约为 now + 60s(允许几秒误差)
     expect(lordDeadline).toBeGreaterThan(Date.now() + 55_000);
     expect(lordDeadline).toBeLessThan(Date.now() + 65_000);
 
-    // 其他玩家(viewer 1-4)的 events pending 应为 null(不共享主公倒计时)
+    // 其他玩家(viewer 1-4)不应收到主公的 pending deadline
     for (let i = 1; i < 5; i++) {
-      const ev = getLastEvents(wss[i]);
+      const ev = getLastEventWithDeadline(wss[i]);
       if (ev) {
         // 非选将玩家不应收到主公的 pending deadline
-        expect(ev.pending).toBeNull();
+        expect(ev.deadline).toBeNull();
       }
     }
   }, 15000);
@@ -113,16 +114,17 @@ describe('选将倒计时独立性', () => {
     // 清空消息,广播
     for (const ws of wss) ws.messages = [];
     (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
+    (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline = new Map();
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
     await sleep(50);
 
-    // 每个并行选将玩家应有独立的 pending,deadline ≈ now + 60s
+    // 每个并行选将玩家应有独立的 deadline ≈ now + 60s
     for (let i = 1; i < 5; i++) {
-      const ev = getLastEvents(wss[i]);
+      const ev = getLastEventWithDeadline(wss[i]);
       expect(ev).toBeDefined();
-      expect(ev!.pending).not.toBeNull();
-      expect(ev!.pending!.totalMs).toBe(60_000);
-      const deadline = ev!.pending!.deadline;
+      expect(ev!.deadline).not.toBeNull();
+      expect(ev!.deadline!.totalMs).toBe(60_000);
+      const deadline = ev!.deadline!.deadline;
       // deadline 应基于 slot 创建时间(afterLordRespond 附近)+ 60s
       // 不应受主公选将耗时影响(deadline 应在 now + 55s ~ now + 65s 之间)
       expect(deadline).toBeGreaterThan(Date.now() + 55_000);

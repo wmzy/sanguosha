@@ -17,7 +17,6 @@ export const 陷入濒死: AtomDefinition<{ target: number }> = {
     const view: ViewEvent = {
       type: '陷入濒死',
       target: atom.target,
-      effect: { sound: 'dying', animation: 'flash_red', duration: 600 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

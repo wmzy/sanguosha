@@ -21,7 +21,6 @@ export const 移除延时锦囊: AtomDefinition<{ player: number; trickName: str
       player: atom.player,
       trickName: atom.trickName,
       ...(trick?.card?.id ? { cardId: trick.card.id } : {}),
-      effect: { sound: 'judge_remove' as const, animation: 'fade' as const, duration: 600 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

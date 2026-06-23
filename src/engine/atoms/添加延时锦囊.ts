@@ -21,7 +21,6 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
       player: atom.player,
       trickName: atom.trick.name,
       trick: atom.trick,
-      effect: { sound: 'judge_attach' as const, animation: 'glow' as const, duration: 800 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

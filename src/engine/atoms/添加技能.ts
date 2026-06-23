@@ -20,7 +20,6 @@ export const 添加技能: AtomDefinition<{ player: number; skillId: string }> =
       type: '添加技能',
       player: atom.player,
       skillId: atom.skillId,
-      effect: { sound: 'skill_add' as const, animation: 'glow' as const, duration: 500 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

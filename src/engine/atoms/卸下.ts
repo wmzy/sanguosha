@@ -36,7 +36,6 @@ export const 卸下: AtomDefinition<{ player: number; slot: '武器' | '防具' 
       player: atom.player,
       slot: atom.slot,
       ...(cardId ? { cardId } : {}),
-      effect: { sound: 'unequip' as const, animation: 'fade' as const, duration: 400 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

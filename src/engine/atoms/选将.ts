@@ -129,7 +129,6 @@ export const 发牌: AtomDefinition<{
   },
   toViewEvents(state, atom): ViewEventSplit {
     const { handSize, lordBonus = 1 } = atom;
-    const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
     // 每个玩家收到自己分到的牌面(ownerView);其他人只看到数量信息(othersView)。
     const ownerViews = new Map<number, ViewEvent>();
     let cursor = 0;
@@ -146,10 +145,9 @@ export const 发牌: AtomDefinition<{
         handSize,
         lordBonus,
         cards,
-        effect,
       });
     }
-    const othersView: ViewEvent = { type: '发牌', handSize, lordBonus, effect };
+    const othersView: ViewEvent = { type: '发牌', handSize, lordBonus };
     return { ownerViews, othersView };
   },
   applyView(view, event) {
@@ -206,14 +204,12 @@ export const 选将询问: AtomDefinition<{
       target,
       candidates,
       pending: { startTime: Date.now(), deadline: Date.now() + 60000, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } },
-      effect: { blockUntilDone: true, duration: 200 },
     };
     // 其他人看到"等待主公选将"
     const othersView: import('../types').ViewEvent = {
       type: '等待选将',
       waitingFor: target,
       waitingForName: '主公',
-      effect: { duration: 200 },
     };
     return {
       ownerViews: new Map([[target, ownerView]]),
@@ -304,7 +300,6 @@ export const 并行选将: AtomDefinition<{
         lordCharacter,
         lordName,
         pending: { startTime: Date.now(), deadline: Date.now() + 60000, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates } },
-        effect: { blockUntilDone: true, duration: 200 },
       });
     }
     // othersView:已选完的玩家(如主公)看到"等待其他玩家选将"
@@ -314,7 +309,6 @@ export const 并行选将: AtomDefinition<{
       waitingForName: '其他玩家',
       lordCharacter,
       lordName,
-      effect: { duration: 200 },
     };
     return { ownerViews, othersView };
   },

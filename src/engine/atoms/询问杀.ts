@@ -22,18 +22,15 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
   },
   effect: { sound: 'slash_request', blockUntilDone: true, duration: 200 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { sound: 'slash_request' as const, blockUntilDone: true as const, duration: 200 };
     const targetView: ViewEvent = {
       type: '询问杀',
       target: atom.target,
       source: atom.source,
-      effect,
     };
     const othersView: ViewEvent = {
       type: '询问杀',
       target: atom.target,
       source: atom.source,
-      effect: { duration: 200 },
     };
     return {
       ownerViews: new Map([[atom.target, targetView]]),

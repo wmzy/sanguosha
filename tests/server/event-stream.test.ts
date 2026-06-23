@@ -87,9 +87,9 @@ describe('重连 initialView', () => {
     // 应收到 initialView（全量状态）
     const initMsg = fakeWs.messages.find(m => m.type === 'initialView');
     expect(initMsg).toBeDefined();
-    // 不应收到 events 差量——initialView 已含全量状态
-    const eventsMsg = fakeWs.messages.find(m => m.type === 'events');
-    expect(eventsMsg).toBeUndefined();
+    // 不应收到 event 差量——initialView 已含全量状态
+    const eventMsg = fakeWs.messages.find(m => m.type === 'event');
+    expect(eventMsg).toBeUndefined();
     // lastBroadcastSeq 应已同步到 state.seq
     const lb = (session as any).lastBroadcastSeq as number;
     expect(lb).toBeGreaterThanOrEqual(seqAtReconnect);
@@ -100,7 +100,7 @@ describe('pending 倒计时下发', () => {
   let session: GameSession;
   beforeEach(() => { resetForTest(); session = new GameSession(makeRoom(), true, 42); });
 
-  it('events 消息携带 pending 的 deadline/totalMs', async () => {
+  it('event 消息携带 deadline(pending 的 deadline/totalMs)', async () => {
     await session.startGame(2);
     const state = getState(session);
     // 等选将 pending 出现
@@ -114,22 +114,22 @@ describe('pending 倒计时下发', () => {
     room.players.set('p0', fakeWs as any);
     // 重置 lastBroadcastSeq 强制重发已有事件（startGame 期间 broadcastNewState 已推进过水位）
     (session as any).lastBroadcastSeq = 0;
+    // 重置 deadline 缓存,确保 pending deadline 被发送
+    (session as any).lastSentDeadline = new Map();
     // 触发一次广播
     (session as any).broadcastNewState();
 
-    // initialView 应该已发送
-    const initMsg = fakeWs.messages.find(m => m.type === 'initialView');
+    // initialView 应该已发送(且其 pending 含 deadline)
+    const initMsg = fakeWs.messages.find(m => m.type === 'initialView') as Extract<ServerMessage, { type: 'initialView' }> | undefined;
     expect(initMsg).toBeDefined();
-    // events 消息应携带 pending 字段
-    const eventsMsg = fakeWs.messages.find(m => m.type === 'events') as Extract<ServerMessage, { type: 'events' }> | undefined;
-    expect(eventsMsg).toBeDefined();
-    expect(eventsMsg!.pending).toBeDefined();
-    expect(eventsMsg!.pending).not.toBeNull();
-    expect(eventsMsg!.pending!.deadline).toBeTypeOf('number');
-    expect(eventsMsg!.pending!.totalMs).toBeTypeOf('number');
-    // deadline 应为绝对 epoch 时间戳（与 buildView 口径一致）
-    expect(eventsMsg!.pending!.deadline).toBeGreaterThan(Date.now());
-    // 选将询问 timeout=60s
-    expect(eventsMsg!.pending!.totalMs).toBe(60_000);
+    // initialView 的 pending 含 deadline(totalMs=60s)
+    expect(initMsg!.state.pending).not.toBeNull();
+    expect(initMsg!.state.pending!.deadline).toBeTypeOf('number');
+    expect(initMsg!.state.pending!.totalMs).toBe(60_000);
+    // deadline 应为绝对 epoch 时间戳
+    expect(initMsg!.state.pending!.deadline).toBeGreaterThan(Date.now());
+    // 也应有 event 消息(view 事件)
+    const eventMsg = fakeWs.messages.find(m => m.type === 'event');
+    expect(eventMsg).toBeDefined();
   }, 15000);
 });

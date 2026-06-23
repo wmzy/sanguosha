@@ -18,7 +18,6 @@ export const 移除技能: AtomDefinition<{ player: number; skillId: string }> =
       type: '移除技能',
       player: atom.player,
       skillId: atom.skillId,
-      effect: { sound: 'skill_remove' as const, animation: 'fade' as const, duration: 400 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

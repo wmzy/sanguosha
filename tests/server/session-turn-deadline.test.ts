@@ -1,15 +1,15 @@
 // tests/server/session-turn-deadline.test.ts
 // 回归测试:验证出牌/弃牌阶段倒计时的前后端同步。
 //
-// 根因:turnDeadline 只在 buildView(首次 initialView)中计算,后续 events 消息不携带,
-// 前端 view.turnDeadline 永远卡在初始值;且服务端 resetIdleTimer 每次 action 滑动续期,
+// 根因:deadline 只在 buildView(首次 initialView)中计算,后续 events 消息不携带,
+// 前端 view.deadline 永远卡在初始值;且服务端 resetIdleTimer 每次 action 滑动续期,
 // 前端无从得知,导致倒计时与实际超时严重不一致(前端比后端提前超时)。
 //
 // 修复要点:
 // 1. session 维护 idleDeadline,resetIdleTimer 设置它
 // 2. resetIdleTimer 在 broadcastNewState 之前调用(顺序修正)
-// 3. broadcastNewState 的 events 消息携带 turnDeadline/turnTotalMs
-// 4. buildView 的 turnDeadline guard 对齐 resetIdleTimer(有 pending 时不计时)
+// 3. broadcastNewState 的 event 消息携带 deadline(仅在变化时)
+// 4. buildView 的 deadline guard 对齐 resetIdleTimer(有 pending 时不计时)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
@@ -109,7 +109,7 @@ describe('session:出牌/弃牌阶段倒计时前后端同步', () => {
     expect(getIdleDeadline(session)).toBeNull();
   });
 
-  it('events 消息携带 turnDeadline,前端据此同步倒计时', () => {
+  it('event 消息携带 deadline,前端据此同步倒计时', () => {
     const state = getState(session);
     // 接一个玩家 WS
     const ws = new FakeWS();
@@ -121,13 +121,13 @@ describe('session:出牌/弃牌阶段倒计时前后端同步', () => {
     // 触发一次广播(broadcastNewState 内部会先调 resetIdleTimer 设置 deadline)
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
 
-    // 应收到 initialView(首次) 且其 state.turnDeadline 非空
+    // 应收到 initialView(首次) 且其 state.deadline 非空
     const initialMsg = ws.messages.find(m => m.type === 'initialView');
     expect(initialMsg).toBeDefined();
     if (initialMsg!.type === 'initialView') {
-      // buildView 对齐了 guard:出牌阶段无 pending → turnDeadline 非空
-      expect(initialMsg!.state.turnDeadline).not.toBeNull();
-      expect(initialMsg!.state.turnTotalMs).toBe(TURN_IDLE_TIMEOUT_MS);
+      // buildView 对齐了 guard:出牌阶段无 pending → deadline 非空
+      expect(initialMsg!.state.deadline).not.toBeNull();
+      expect(initialMsg!.state.deadlineTotalMs).toBe(TURN_IDLE_TIMEOUT_MS);
     }
     void state;
   });
