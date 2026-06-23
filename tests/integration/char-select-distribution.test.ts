@@ -1,10 +1,9 @@
-// 选将分配逻辑测试:验证按身份发放候选武将、候选池入池、池不足时的兜底。
+// 选将分配逻辑测试:验证按身份发放候选武将、候选池入池。
 //
 // 覆盖点:
 //   1. 主公选将数量为 7(身份配置);主公未选的武将全部进入候选池供其他人分配。
-//   2. 非主公按身份分配候选数(忠臣5/反贼4/内奸5);池足够时候选人跨玩家不重复。
-//   3. 池不足时回退共享模式:每个玩家仍能拿到候选人,respond 保证最终唯一。
-//   4. 选将完成后只实例化引擎默认技能,武将自身技能不进入 player.skills。
+//   2. 非主公按身份分配候选数(忠臣5/反贼4/内奸5);候选人跨玩家不重复。
+//   3. 选将完成后只实例化引擎默认技能,武将自身技能不进入 player.skills。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -251,45 +250,6 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
         // 至少包含默认技能,不要求为空
         expect(p.skills.length).toBeGreaterThanOrEqual(DEFAULT_SKILLS.length);
       }
-    }
-  }, 10000);
-
-  it('池不足时回退共享模式:每玩家仍拿到候选人,最终唯一', async () => {
-    // 仅 6 武将,4 人局:主公选走 1 个后剩 5,需求 5+4+5=14 > 5 → 共享
-    const pool = makeBigCharPool(6);
-    void bootstrap(state, { characters: pool, playerCount: 4, seed: 5, gameId: 't' });
-    for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
-    }
-    await waitForStable(state);
-
-    // 主公选(池6 < 7,给全部6张)
-    const lordSlot = [...state.pendingSlots.values()][0];
-    expect(slotCandidates(lordSlot).length).toBe(6);
-    const lordTarget = (lordSlot.atom as { target: number }).target;
-    await respondCharSelect(state, lordTarget, slotCandidates(lordSlot)[0]);
-    await waitForStable(state);
-
-    // 3 人并行 slot 都存在
-    expect(state.pendingSlots.size).toBe(3);
-
-    // 共享模式:各玩家候选都来自同一池(5 个),可能重叠
-    // 逐个选,validate 保证唯一
-    const taken = new Set<string>([slotCandidates(lordSlot)[0]]);
-    for (const t of state.pendingSlots.keys()) {
-      const slot = state.pendingSlots.get(t)!;
-      const cand = slotCandidates(slot);
-      const choice = cand.find(c => !taken.has(c));
-      expect(choice).toBeDefined();
-      taken.add(choice!);
-      await respondCharSelect(state, t, choice!);
-    }
-
-    await new Promise(r => setTimeout(r, 500));
-    await waitForStable(state);
-    expect(state.pendingSlots.size).toBe(0);
-    for (const p of state.players) {
-      expect(p.character).toBeTruthy();
     }
   }, 10000);
 

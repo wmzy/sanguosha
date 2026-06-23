@@ -18,8 +18,20 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = [
   { name: '曹操', skills: ['护甲'] },
   { name: '孙权', skills: ['制衡'] },
   { name: '关羽', skills: ['武圣'] },
+  { name: '张飞', skills: ['咆哮'] },
+  { name: '赵云', skills: ['龙胆'] },
   { name: '郭嘉', skills: ['遗计'] },
   { name: '司马懿', skills: ['反馈'] },
+  { name: '荀彧', skills: ['驱虎'] },
+  { name: '貂蝉', skills: ['离间'] },
+  { name: '周瑜', skills: ['英姿'] },
+  { name: '陆逊', skills: ['连营'] },
+  { name: '吕布', skills: ['无双'] },
+  { name: '华佗', skills: ['青囊'] },
+  { name: '张角', skills: ['雷击'] },
+  { name: '甄姬', skills: ['倾国'] },
+  { name: '甘宁', skills: ['奇袭'] },
+  { name: '黄月英', skills: ['集智'] },
 ];
 
 function makePlayer(index: number, name: string) {

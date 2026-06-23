@@ -75,50 +75,6 @@ export const 抽身份: AtomDefinition<{
   },
 };
 
-// ── 选将 ──────────────────────────────────────────────
-// 从武将池中随机分配武将给每个玩家
-// 注:实际游戏中主公先选、其他人依次选,这里简化为随机分配
-
-export const 选将: AtomDefinition<{
-  type: '选将';
-  characters: Array<{ name: string; skills: string[] }>;
-  seed: number;
-}> = {
-  type: '选将',
-  validate: (state) => {
-    if (state.players.length === 0) return '没有玩家';
-    return null;
-  },
-  apply(state, atom) {
-    const { characters, seed } = atom;
-    const rng = createRng(seed);
-    const playerCount = state.players.length;
-
-    // 打乱武将池
-    const pool = [...characters];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = rng.nextInt(i + 1);
-      const tmp = pool[i];
-      pool[i] = pool[j];
-      pool[j] = tmp;
-    }
-
-    // 主公从池中选(取第一个非主公角色),其他人依次分配
-    const others = pool.filter(c => c.name !== '主公');
-    const selected = others.slice(0, playerCount);
-
-    // 更新玩家武将、技能和显示名
-    for (let i = 0; i < state.players.length; i++) {
-      const char = selected[i];
-      if (!char) continue;
-      const p = state.players[i];
-      p.character = char.name;
-      p.name = char.name;
-      p.skills = [...char.skills, ...DEFAULT_SKILLS];
-    }
-  },
-};
-
 // ── 初始化洗牌 ──────────────────────────────────────────
 // 创建标准牌堆并用 seed 洗牌(仅在开局时使用)
 
@@ -188,7 +144,6 @@ export const 发牌: AtomDefinition<{
 };
 
 registerAtom(抽身份);
-registerAtom(选将);
 registerAtom(初始化洗牌);
 registerAtom(发牌);
 
@@ -289,8 +244,6 @@ export const 并行选将: AtomDefinition<{
     const lordIdx = state.players.findIndex(p => p.identity === '主公');
     const lordCharacter = lordIdx >= 0 ? state.players[lordIdx].character : '';
     const lordName = lordIdx >= 0 ? state.players[lordIdx].name : '';
-    // 找主公的候选人(主公选将时的候选人列表,用于展示)
-    const lordCandidates = lordIdx >= 0 ? [] : []; // 主公已选完,候选人不在 state 里
     // ownerViews:每个目标玩家看到自己的候选人 + 主公已选角色
     const ownerViews = new Map<number, import('../types').ViewEvent>();
     for (const s of selections) {

@@ -1,5 +1,5 @@
 // src/engine/view/buildView.ts
-import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
+import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, PendingSlot } from '../types';
 
 /** 出牌/弃牌阶段的回合空闲超时(ms)。
  *  服务端 resetIdleTimer 与此处 turnDeadline 必须使用同一口径——
@@ -44,7 +44,20 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     return typeof t === 'number' && t < 0;
   });
   const slot = mySlot ?? broadcastSlot;
-  if (slot) {
+  // 无专属 slot 但其他玩家有 active slot(如并行选将期间非选将玩家的 view):
+  // 展示通用的"等待其他玩家" pending,避免 view.pending 意外为 null 导致重连后无等待指示。
+  if (!slot && state.pendingSlots.size > 0) {
+    const firstSlot = state.pendingSlots.values().next().value as PendingSlot;
+    const firstDef = firstSlot.definition;
+    pending = {
+      type: 'awaits',
+      atom: firstSlot.atom,
+      prompt: { type: 'confirm', title: '等待其他玩家回应', cancelLabel: '' },
+      target: -1,
+      deadline: state.startedAt + firstSlot.deadline,
+      totalMs: ((firstSlot.atom as { timeout?: number }).timeout ?? firstDef.pending?.timeout ?? 30) * 1000,
+    };
+  } else if (slot) {
     const def = slot.definition;
     const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
       ?? def.pending?.prompt

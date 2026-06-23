@@ -417,7 +417,6 @@ export type Atom =
   | { type: '拼点'; initiator: number; target: number; initiatorCard: string; targetCard: string }
   // 初始化
   | { type: '抽身份'; playerCount: number; seed: number }
-  | { type: '选将'; characters: Array<{ name: string; skills: string[] }>; seed: number }
   | { type: '选将询问'; target: number; candidates: Array<{ name: string; skills: string[] }>; prompt?: ActionPrompt }
   | { type: '并行选将'; selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> }
   | { type: '分配武将'; target: number; character: string; skills: string[] }

@@ -301,6 +301,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     }
     // pending-scoped 版本校验：只影响 respond 路径
     // pendingSeq 不匹配 = 客户端响应了过期窗口（已被 close-reopen 替换）→ 拒绝
+    // pendingSeq 缺省跳过校验（向后兼容旧客户端；新客户端应始终传 pendingSeq）
     if (message.pendingSeq !== undefined && oldSlot.createdSeq !== message.pendingSeq) {
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
       return false;
@@ -309,39 +310,27 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   }
 
   const resolve = oldSlot?.resolve ?? (() => {});
-  // 注意:不在 execute 前清除 slot——respond execute 需要读 slot 信息
-  // (如系统规则弃牌 execute 读 slot.atom.target)。execute 完成后才清除该玩家的 slot。
   logAction(state, message);
-  // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot.
-  // finally 兜底:execute 抛错时(开发期 bug / 测试场景)仍必须释放 slot,避免父 execute 永久卡死。
-  // 注意:不 return execute 的 promise——execute 内 await pending slot 可能阻塞到玩家回应,
-  // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
-  // dispatch 返回 true 表示"已接受"(validate 通过+execute 已启动),不等 execute 完成。
-  entry.execute(state, message.params).then(() => {
-    if (oldSlot) {
-      // execute 完成后:如果该 slot 仍未被替换(execute 未创建新 pending),清除它
-      const key = extractPendingTarget(oldSlot.atom);
-      let deleted = false;
-      if (state.pendingSlots.get(key) === oldSlot) { state.pendingSlots.delete(key); deleted = true; }
-      // 无懈等 target<0 的广播 slot:dispatch 用 ownerId 找不到精确 key,需按 slot 引用清除
-      if (key < 0) {
-        for (const [k, v] of state.pendingSlots) if (v === oldSlot) { state.pendingSlots.delete(k); deleted = true; break; }
-      }
-      if (deleted) notifyPendingResolved(state, oldSlot);
-    }
-    resolve();
-  }).finally(() => {
-    // 兜底:execute 抛错路径下,.then 的清理逻辑不会执行,但父 execute 仍必须 resolve + 删 slot,
-    // 否则 pendingSlots 永久残留 + 父 await 永远不返回。
-    if (oldSlot) {
-      let deleted = false;
+  // 统一 slot 清理 helper：按 key 精确匹配 → 引用遍历兜底 → resolve
+  const cleanupSlot = () => {
+    if (!oldSlot) return;
+    const key = extractPendingTarget(oldSlot.atom);
+    let deleted = false;
+    if (state.pendingSlots.get(key) === oldSlot) { state.pendingSlots.delete(key); deleted = true; }
+    if (!deleted) {
       for (const [k, v] of state.pendingSlots) {
         if (v === oldSlot) { state.pendingSlots.delete(k); deleted = true; break; }
       }
-      if (deleted) notifyPendingResolved(state, oldSlot);
-      try { resolve(); } catch { /* resolve 已被 safeResolve 保护 */ }
     }
-  }).catch(() => { /* fire-and-forget: 防止 unhandled rejection; 兜底清理已在 finally */ });
+    if (deleted) notifyPendingResolved(state, oldSlot);
+    resolve();
+  };
+  // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot.
+  // then/finally 都走 cleanupSlot。safeResolve 防重入 + 删除幂等 → 无副作用重复执行。
+  // 注意:不 return execute 的 promise——execute 内 await pending slot 可能阻塞到玩家回应,
+  // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
+  // dispatch 返回 true 表示"已接受"(validate 通过+execute 已启动),不等 execute 完成。
+  entry.execute(state, message.params).then(cleanupSlot).finally(cleanupSlot).catch(() => {});
   return true;
 }
 

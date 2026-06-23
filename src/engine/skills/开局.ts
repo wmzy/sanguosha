@@ -93,7 +93,11 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
     skillId: '开局',
     ownerId: SYSTEM_OWNER,
     actionType: 'start',
-    validate: (_state: GameState, _params: Record<string, Json>) => null,
+    validate: (state: GameState, params: Record<string, Json>) => {
+      const config = params as unknown as GameConfig;
+      if (config.playerCount < 2) return '至少需要2名玩家';
+      return null;
+    },
     execute: async (state: GameState, params: Record<string, Json>) => {
       const config = params as unknown as GameConfig;
       const { characters, playerCount, seed, handSize = 4 } = config;
@@ -129,42 +133,31 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       }
 
       // 2b. 其他人并行选:从【候选池=主公未选的剩余武将】随机抽,按身份发候选数张。
-      //     - 池足够:候选人跨玩家不重复(每人独占一批)。
-      //     - 池不足:从总池补足去重;仍不够时回退为共享模式——
-      //       所有非主公玩家共享同一批候选人(候选池全部),按身份取前 N 张,
-      //       由 respond validate 保证最终唯一(先选先得)。
+      //     候选池必须覆盖所有人的需求——池不足时报错（不允许共享候选以避免 data race）。
       const others = state.players
         .map((_, i) => i)
         .filter(i => i !== lordIdx);
       if (others.length > 0) {
         // 候选池:主公未选的全部武将(顺序即打乱后顺序,等价于随机)
         const candidatePool = charPool.filter(c => !used.has(c.name));
-        // 各非主公玩家按身份的需求量
         const wantByPlayer = others.map(idx => {
           const identity = state.players[idx].identity;
           return CANDIDATES_PER_IDENTITY[identity ?? ''] ?? CANDIDATES_PER_IDENTITY['反贼'];
         });
         const totalWant = wantByPlayer.reduce((a, b) => a + b, 0);
+        if (candidatePool.length < totalWant) {
+          throw new Error(`武将池不足: 需要 ${totalWant} 个候选提供给非主公玩家，当前池中只有 ${candidatePool.length} 个`);
+        }
 
         const selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> = [];
-        // 独占模式:候选池(去重后)能覆盖全部需求 → 每人取一批不重叠候选人
-        if (candidatePool.length >= totalWant) {
-          const allocated = new Set<string>(used);
-          for (let k = 0; k < others.length; k++) {
-            const want = wantByPlayer[k];
-            const cand = candidatePool
-              .filter(c => !allocated.has(c.name))
-              .slice(0, want);
-            for (const c of cand) allocated.add(c.name);
-            selections.push({ target: others[k], candidates: cand });
-          }
-        } else {
-          // 共享模式:候选池不足,所有非主公玩家共享同一批(候选池全部,按身份数量截取)
-          for (let k = 0; k < others.length; k++) {
-            const want = Math.min(wantByPlayer[k], candidatePool.length);
-            const cand = candidatePool.slice(0, want);
-            selections.push({ target: others[k], candidates: cand });
-          }
+        const allocated = new Set<string>(used);
+        for (let k = 0; k < others.length; k++) {
+          const want = wantByPlayer[k];
+          const cand = candidatePool
+            .filter(c => !allocated.has(c.name))
+            .slice(0, want);
+          for (const c of cand) allocated.add(c.name);
+          selections.push({ target: others[k], candidates: cand });
         }
         if (selections.length > 0) {
           await applyAtom(state, { type: '并行选将', selections });
