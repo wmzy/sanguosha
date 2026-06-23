@@ -89,6 +89,15 @@ export function useDebugPerspective(
   const [followCurrentPlayer, setFollowCurrentPlayer] = useState(false);
   const perspectiveRef = useRef(perspective);
   perspectiveRef.current = perspective;
+  // 手动切视角标记:阻止 auto-switch effect 在手动切换后立即覆盖用户选择。
+  // effect 消费后重置,后续游戏事件推进时 auto-switch 恢复正常。
+  const manualSwitchRef = useRef(false);
+
+  // 包装 setPerspective:手动切换时设标记,阻止 auto-switch 覆盖
+  const manualSetPerspective = useCallback((idx: number) => {
+    manualSwitchRef.current = true;
+    setPerspective(idx);
+  }, [setPerspective]);
 
   const currentView = allViews.get(perspective) ?? null;
 
@@ -106,6 +115,11 @@ export function useDebugPerspective(
 
   useEffect(() => {
     if (!autoSwitch || !currentView) return;
+    // 用户手动切视角不触发 auto-switch(等待状态没变) — 消费标记后跳过本次
+    if (manualSwitchRef.current) {
+      manualSwitchRef.current = false;
+      return;
+    }
     const p = perspectiveRef.current;
 
     if (charSelectInProgress) {
@@ -136,19 +150,19 @@ export function useDebugPerspective(
   /** 手动切换:始终 +1 循环,选将阶段也允许切到任意座次(debug 需要查看所有人) */
   const switchPerspective = useCallback(() => {
     const p = perspectiveRef.current;
-    setPerspective((p + 1) % playerCount);
-  }, [playerCount, setPerspective]);
+    manualSetPerspective((p + 1) % playerCount);
+  }, [playerCount, manualSetPerspective]);
 
   /** 切到下一个未选将座次(选将等待蒙层用:文字和行为一致) */
   const switchToNextUnselected = useCallback(() => {
     const p = perspectiveRef.current;
     const next = findNextSelectTarget(allViews, playerCount, p, submitted);
-    setPerspective(next >= 0 ? next : (p + 1) % playerCount);
-  }, [playerCount, setPerspective, allViews, submitted]);
+    manualSetPerspective(next >= 0 ? next : (p + 1) % playerCount);
+  }, [playerCount, manualSetPerspective, allViews, submitted]);
 
   const goToCurrentPlayer = useCallback(() => {
-    if (currentView) setPerspective(currentView.currentPlayerIndex);
-  }, [currentView, setPerspective]);
+    if (currentView) manualSetPerspective(currentView.currentPlayerIndex);
+  }, [currentView, manualSetPerspective]);
 
   const toggle = useCallback(() => setAutoSwitch(a => !a), []);
 
