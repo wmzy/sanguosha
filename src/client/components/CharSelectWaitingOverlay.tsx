@@ -1,8 +1,11 @@
 // src/client/components/CharSelectWaitingOverlay.tsx
-// 并行选将期间:当前视角玩家已选完但其他人还在选时显示的全屏等待遮罩。
-// 从 GameView.tsx 抽出,样式全部走 gameViewStyles,消除内联 style hardcode。
-// 选将完成后:遮罩中央展示玩家已选的武将卡(势力色背景 + 武将名 + 体力 + 技能),
+// 选将期间的等待遮罩。两种场景:
+//   A) 并行选将:当前视角已选完但其他人还在选 → 展示已选武将卡 + 等待提示
+//   B) 串行选将(主公先选):当前视角还没轮到选 → 仅展示等待提示(无武将卡)
+// 选将完成后(场景 A):遮罩中央展示玩家已选的武将卡(势力色背景 + 武将名 + 体力 + 技能),
 // 明确反馈选择结果,禁止重新选将。
+// 倒计时只在当前视角连接有选将 pending 时显示(场景 A 中自己还没选完的 slot);
+// 不会显示其他玩家的倒计时(避免「共用倒计时」混淆)。
 
 import type { GameView } from '../../engine/types';
 import { CountdownBar } from './CountdownBar';
@@ -71,7 +74,7 @@ export function CharSelectWaitingOverlay({
           )}
         </div>
       )}
-      <div>✅ 已选择武将,等待其他玩家选将...</div>
+      <div>{selectedChar ? '✅ 已选择武将,等待其他玩家选将...' : '⏳ 等待其他玩家选将...'}</div>
       <div className={styles.charSelectWaitingSub}>{selectingNames} 正在选将</div>
       {/* 选将倒计时 */}
       <div className={styles.charSelectWaitingCountdown}>

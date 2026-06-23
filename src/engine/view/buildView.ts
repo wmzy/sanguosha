@@ -1,7 +1,6 @@
 // src/engine/view/buildView.ts
 import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, PendingSlot } from '../types';
-import { TARGET_SYSTEM } from '../types';
-import { findPendingSlot } from '../skill';
+import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 
 /** 出牌/弃牌阶段的回合空闲超时(ms)。
  *  服务端 resetIdleTimer 与此处 turnDeadline 必须使用同一口径——
@@ -39,22 +38,16 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   // 多 target 并行(拼点/选将)时,每个 viewer 只看到自己的 slot;
   // 单 target 场景 Map 只有1个 slot。
   let pending: GameView['pending'] = null;
-  // 优先取 viewer 专属或广播 slot(findPendingSlot 统一查找)
-  const slot = viewer >= 0 ? findPendingSlot(state, viewer) : undefined;
-  // 无专属 slot 但其他玩家有 active slot(如并行选将期间非选将玩家的 view):
-  // 展示通用的"等待其他玩家" pending,避免 view.pending 意外为 null 导致重连后无等待指示。
-  if (!slot && state.pendingSlots.size > 0) {
-    const firstSlot = state.pendingSlots.values().next().value as PendingSlot;
-    const firstDef = firstSlot.definition;
-    pending = {
-      type: 'awaits',
-      atom: firstSlot.atom,
-      prompt: { type: 'confirm', title: '等待其他玩家回应', cancelLabel: '' },
-      target: TARGET_SYSTEM,
-      deadline: state.startedAt + firstSlot.deadline,
-      totalMs: ((firstSlot.atom as { timeout?: number }).timeout ?? firstDef.pending?.timeout ?? 30) * 1000,
-    };
-  } else if (slot) {
+  // 只匹配 viewer 专属 slot 或广播型 slot(target === TARGET_BROADCAST)。
+  // 不使用 findPendingSlot 的 size===1 fallback —— 那会让主公选将期间(单 slot)
+  // 的其他 viewer 错误匹配到主公 slot,导致"共用倒计时":其他角色看到主公的
+  // 选将 atom/deadline/target,前端据此渲染主公的选将界面和倒计时。
+  const slot = viewer >= 0
+    ? (state.pendingSlots.get(viewer)
+        ?? [...state.pendingSlots.values()].find(s =>
+            (s.atom as { target?: number }).target === TARGET_BROADCAST))
+    : undefined;
+  if (slot) {
     const def = slot.definition;
     const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
       ?? def.pending?.prompt

@@ -6,6 +6,7 @@ import type {
   GameState,
   GameView,
 } from '../engine/types';
+import { TARGET_BROADCAST } from '../engine/types';
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import { allCharacters } from '../engine/cards/characters';
@@ -243,21 +244,23 @@ export class GameSession {
 
   /** 读取该 viewer 可见 pending slot 的 deadline/totalMs (供 events 消息下发) */
   private pendingForViewer(state: GameState, viewer: number): { target: number; deadline: number; totalMs: number } | null {
-    // 优先 viewer 专属 slot，其次广播 slot（target<0）
+    // 优先 viewer 专属 slot，其次广播型 slot(target === TARGET_BROADCAST)
     const mySlot = state.pendingSlots.get(viewer);
     let slot = mySlot;
     if (!slot) {
-      for (const s of state.pendingSlots.values()) {
-        const t = (s.atom as { target?: number }).target;
-        if (typeof t === 'number' && t < 0) { slot = s; break; }
-      }
+      slot = [...state.pendingSlots.values()].find(s =>
+        (s.atom as { target?: number }).target === TARGET_BROADCAST);
     }
     if (!slot) return null;
     const target = (slot.atom as { target?: number }).target ?? -1;
+    // totalMs 从 slot 定义读取 timeout(与 createAndAwaitSlot 的定时器口径一致),
+    // 不用 slot.deadline - slot.startTime —— 两者分别用 Date.now() 计算,有 ±1ms 抖动。
+    const timeoutSec = (slot.atom as { timeout?: number }).timeout
+      ?? slot.definition.pending?.timeout ?? 30;
     return {
       target,
       deadline: state.startedAt + slot.deadline,
-      totalMs: slot.deadline - slot.startTime,
+      totalMs: timeoutSec * 1000,
     };
   }
 

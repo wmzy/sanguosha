@@ -95,8 +95,15 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
         />
       )}
 
-      {/* ─── 选将阶段等待遮罩(并行选将:当前视角玩家已选完但其他人还在选)─── */}
-      {!isCharSelectPending && charSelectInProgress && perspectiveCharSelected && (
+      {/* ─── 选将阶段等待遮罩 ───
+          两种场景统一用 CharSelectWaitingOverlay:
+          A) 并行选将:当前视角已选但其他人还在选(perspectiveCharSelected=true)
+          B) 串行选将(主公先选):当前视角还没轮到选,但选将正在进行
+             (isCharSelectPending=false, charSelectInProgress=true, perspectiveCharSelected=false)
+          场景 B 之前靠 buildView 的 fake pending(view.pending 指向主公 slot)驱动
+          CharSelectOverlay 渲染「等待主公选将」,但 fake pending 会造成倒计时共用 bug。
+          现在 buildView 不再给非选将玩家设 pending,改由这里直接渲染等待遮罩。*/}
+      {!isCharSelectPending && charSelectInProgress && (
         <CharSelectWaitingOverlay
           view={view}
           perspectiveIdx={perspectiveIdx}

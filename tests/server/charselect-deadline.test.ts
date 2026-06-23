@@ -1,0 +1,178 @@
+// 验证选将期间倒计时行为:
+// 1. 主公选将 slot 与并行选将 slot 的 deadline/totalMs 相互独立
+// 2. 主公选将用较长时间后,并行选将 slot 仍有完整 60s
+// 3. 选将期间 idle timer 不启动(不会提前结束回合)
+// 4. 非选将玩家的 events 消息 pending 为 null(不共享主公的倒计时)
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetForTest } from '../../src/engine/create-engine';
+import '../../src/engine/atoms';
+import '../../src/engine/skills';
+import { GameSession } from '../../src/server/session';
+import type { Room } from '../../src/server/room';
+import type { GameState } from '../../src/engine/types';
+import type { ServerMessage } from '../../src/server/protocol';
+
+function makeRoom(): Room {
+  return {
+    id: 'test-' + Math.random().toString(36).slice(2, 8),
+    name: '测试', maxPlayers: 8, players: new Map(),
+    isDebug: true, createdAt: Date.now(), status: '进行中',
+  } as unknown as Room;
+}
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+function getState(session: GameSession): GameState {
+  return (session as unknown as { state: GameState }).state;
+}
+
+class FakeWS {
+  messages: ServerMessage[] = [];
+  readyState = 1;
+  send(data: string) { this.messages.push(JSON.parse(data)); }
+}
+
+function getLastEvents(ws: FakeWS) {
+  const ev = [...ws.messages].reverse().find(m => m.type === 'events') as
+    Extract<ServerMessage, { type: 'events' }> | undefined;
+  return ev;
+}
+
+describe('选将倒计时独立性', () => {
+  let session: GameSession;
+  let state: GameState;
+  let wss: FakeWS[];
+
+  beforeEach(async () => {
+    resetForTest();
+    session = new GameSession(makeRoom(), true, 42);
+    wss = [];
+    // 预注册 5 个玩家 WS
+    const room = (session as unknown as { room: Room }).room;
+    for (let i = 0; i < 5; i++) {
+      const ws = new FakeWS();
+      wss.push(ws);
+      room.players.set('p' + i, ws as never);
+    }
+    await session.startGame(5);
+    state = getState(session);
+    // 等主公选将 slot 出现
+    for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) await sleep(10);
+  }, 15000);
+
+  it('主公选将期间:主公的 pending deadline ≈ now+60s,其他玩家 pending 为 null', async () => {
+    const lordIdx = 0; // debug 模式主公固定 0 号位
+    const lordSlot = state.pendingSlots.get(lordIdx)!;
+    expect(lordSlot).toBeDefined();
+
+    // 清空消息,触发一次广播
+    for (const ws of wss) ws.messages = [];
+    (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
+    (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
+    await sleep(50);
+
+    // 主公(viewer 0)的 events 应携带 pending
+    const lordEvents = getLastEvents(wss[0]);
+    expect(lordEvents).toBeDefined();
+    expect(lordEvents!.pending).not.toBeNull();
+    expect(lordEvents!.pending!.totalMs).toBe(60_000);
+    const lordDeadline = lordEvents!.pending!.deadline;
+    // deadline 应约为 now + 60s(允许几秒误差)
+    expect(lordDeadline).toBeGreaterThan(Date.now() + 55_000);
+    expect(lordDeadline).toBeLessThan(Date.now() + 65_000);
+
+    // 其他玩家(viewer 1-4)的 events pending 应为 null(不共享主公倒计时)
+    for (let i = 1; i < 5; i++) {
+      const ev = getLastEvents(wss[i]);
+      if (ev) {
+        // 非选将玩家不应收到主公的 pending deadline
+        expect(ev.pending).toBeNull();
+      }
+    }
+  }, 15000);
+
+  it('主公选完后:并行选将 slot 的 deadline 是独立的(基于各自创建时间)', async () => {
+    const lordIdx = 0;
+    const lordSlot = state.pendingSlots.get(lordIdx)!;
+    const lordCand = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates;
+
+    // 记录主公选完的时间
+    const beforeLordRespond = Date.now();
+
+    // 主公选将
+    await session.handleAction('p0', {
+      skillId: '系统规则', actionType: '选将', ownerId: lordIdx,
+      params: { character: lordCand[0].name }, baseSeq: state.seq,
+    });
+    // 等并行选将 slot 出现
+    for (let i = 0; i < 100 && state.pendingSlots.size !== 4; i++) await sleep(10);
+    await sleep(50);
+
+    expect(state.pendingSlots.size).toBe(4);
+    const afterLordRespond = Date.now();
+    const lordElapsed = afterLordRespond - beforeLordRespond;
+
+    // 清空消息,广播
+    for (const ws of wss) ws.messages = [];
+    (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
+    (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
+    await sleep(50);
+
+    // 每个并行选将玩家应有独立的 pending,deadline ≈ now + 60s
+    for (let i = 1; i < 5; i++) {
+      const ev = getLastEvents(wss[i]);
+      expect(ev).toBeDefined();
+      expect(ev!.pending).not.toBeNull();
+      expect(ev!.pending!.totalMs).toBe(60_000);
+      const deadline = ev!.pending!.deadline;
+      // deadline 应基于 slot 创建时间(afterLordRespond 附近)+ 60s
+      // 不应受主公选将耗时影响(deadline 应在 now + 55s ~ now + 65s 之间)
+      expect(deadline).toBeGreaterThan(Date.now() + 55_000);
+      expect(deadline).toBeLessThan(Date.now() + 65_000);
+      // 关键:deadline 不应被主公选将耗时提前
+      // 如果共用倒计时,deadline 会是 startedAt + 60s - lordElapsed(提前)
+      expect(deadline).toBeGreaterThan(Date.now() + 55_000);
+    }
+
+    // 清理:选完剩余玩家避免 timer 残留
+    for (const t of [...state.pendingSlots.keys()]) {
+      const slot = state.pendingSlots.get(t)!;
+      const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
+      await session.handleAction('p' + t, {
+        skillId: '系统规则', actionType: '选将', ownerId: t,
+        params: { character: cand.name }, baseSeq: state.seq,
+      });
+      await sleep(30);
+    }
+  }, 15000);
+
+  it('选将期间 idle timer 不启动(idleDeadline 为 null)', async () => {
+    // 选将期间 idleDeadline 应为 null
+    const idleDeadline = (session as unknown as { idleDeadline: number | null }).idleDeadline;
+    expect(idleDeadline).toBeNull();
+
+    // 主公选完后、并行选将创建前的间隙也不应启动
+    const lordSlot = [...state.pendingSlots.values()][0];
+    const lordTarget = (lordSlot.atom as { target: number }).target;
+    const lordCand = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates;
+
+    await session.handleAction('p0', {
+      skillId: '系统规则', actionType: '选将', ownerId: lordTarget,
+      params: { character: lordCand[0].name }, baseSeq: state.seq,
+    });
+    await sleep(50);
+
+    // 并行选将期间 idleDeadline 仍应为 null
+    const idleDeadline2 = (session as unknown as { idleDeadline: number | null }).idleDeadline;
+    expect(idleDeadline2).toBeNull();
+
+    // 清理
+    for (const t of [...state.pendingSlots.keys()]) {
+      const slot = state.pendingSlots.get(t)!;
+      const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
+      await session.handleAction('p' + t, {
+        skillId: '系统规则', actionType: '选将', ownerId: t,
+        params: { character: cand.name }, baseSeq: state.seq,
+      });
+      await sleep(30);
+    }
+  }, 15000);
+});
