@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameView } from '../../engine/types';
+import { useSubmittedCharSelects } from './SubmittedCharSelectCtx';
 
 export interface AutoSwitchCtl {
   enabled: boolean;
@@ -44,9 +45,10 @@ function isCharSelectPhase(view: GameView | null | undefined): boolean {
  *   1. view.pending 非空(引擎已建立选将 slot)
  *   2. view.pending 为空但 phase=准备 且该座次玩家还没选(事件还没到达客户端)
  */
-function isWaitingToSelect(view: GameView | null | undefined, viewerIdx: number): boolean {
+function isWaitingToSelect(view: GameView | null | undefined, viewerIdx: number, submitted?: Set<number>): boolean {
   if (!view) return false;
   if (view.phase !== '准备') return false;
+  if (submitted?.has(viewerIdx)) return false; // 已提交选将
   const player = view.players[viewerIdx];
   return !!player && !player.character;
 }
@@ -60,11 +62,12 @@ function findNextSelectTarget(
   allViews: Map<number, GameView>,
   playerCount: number,
   fromIdx: number,
+  submitted?: Set<number>,
 ): number {
   for (let i = 1; i <= playerCount; i++) {
     const idx = (fromIdx + i) % playerCount;
     const v = allViews.get(idx);
-    if (hasCharSelectPending(v) || isWaitingToSelect(v, idx)) {
+    if (hasCharSelectPending(v) || isWaitingToSelect(v, idx, submitted)) {
       return idx;
     }
   }
@@ -78,6 +81,7 @@ export function useDebugPerspective(
   setPerspective: (idx: number) => void,
 ): DebugPerspective {
   const [autoSwitch, setAutoSwitch] = useState(true);
+  const submitted = useSubmittedCharSelects();
   // 选将阶段结束后重置的标记(非选将阶段 auto-switch 跟随 currentPlayerIndex)
   const [followCurrentPlayer, setFollowCurrentPlayer] = useState(false);
   const perspectiveRef = useRef(perspective);
@@ -106,9 +110,9 @@ export function useDebugPerspective(
       // 当前视角有活跃选将 pending → 保持(正在选)
       if (hasCharSelectPending(currentView)) return;
       // 当前视角正在等选将(没有 pending 但还没选完) → 保持
-      if (isWaitingToSelect(currentView, p)) return;
+      if (isWaitingToSelect(currentView, p, submitted)) return;
       // 当前视角已选完 → 找下一个待选将座次,切过去
-      const next = findNextSelectTarget(allViews, playerCount, p);
+      const next = findNextSelectTarget(allViews, playerCount, p, submitted);
       if (next >= 0 && next !== p) {
         setPerspective(next);
       }
@@ -130,7 +134,7 @@ export function useDebugPerspective(
   const switchPerspective = useCallback(() => {
     const p = perspectiveRef.current;
     if (charSelectInProgress) {
-      const next = findNextSelectTarget(allViews, playerCount, p);
+      const next = findNextSelectTarget(allViews, playerCount, p, submitted);
       setPerspective(next >= 0 ? next : (p + 1) % playerCount);
       return;
     }

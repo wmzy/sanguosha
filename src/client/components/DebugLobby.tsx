@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDebugLobbyController } from '../hooks/useDebugLobbyController';
 import { useDebugMultiConnection, type ActionMsg } from '../hooks/useDebugMultiConnection';
 import { useDebugPerspective } from '../hooks/useDebugPerspective';
+import { SubmittedCharSelectProvider } from '../hooks/SubmittedCharSelectCtx';
 import { DebugControls } from './debug/DebugControls';
 import { DebugRoomList } from './debug/DebugRoomList';
 import { GameViewComponent } from './GameView';
@@ -58,6 +59,20 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
 
 /** debug 模式游戏视图:多 WS 连接 + 视角管理 + 调试面板 + 事件 overlay。 */
 function DebugGameView({
+  roomId, playerCount, onDeleteRoom,
+}: {
+  roomId: string;
+  playerCount: number;
+  onDeleteRoom: () => void;
+}) {
+  return (
+    <SubmittedCharSelectProvider>
+      <DebugGameViewInner roomId={roomId} playerCount={playerCount} onDeleteRoom={onDeleteRoom} />
+    </SubmittedCharSelectProvider>
+  );
+}
+
+function DebugGameViewInner({
   roomId, playerCount, onDeleteRoom,
 }: {
   roomId: string;

@@ -5,6 +5,7 @@
 // 切到目标座次的连接即可看到其 pending,不需要从 view 跨连接读其他玩家的 slot。
 
 import type { GameView, PendingView } from '../../engine/types';
+import { useSubmittedCharSelects } from './SubmittedCharSelectCtx';
 
 export interface CharSelectSlot {
   /** 候选武将 */
@@ -36,8 +37,10 @@ interface CharSelectAtom {
  * @param perspectiveIdx 当前视角座次
  */
 export function useCharSelect(view: GameView, perspectiveIdx: number): CharSelectState {
+  const submittedCharSelects = useSubmittedCharSelects();
   const charSelectPending = view.pending?.atom?.type === '选将询问'
     && !view.players[view.pending.target]?.character
+    && !submittedCharSelects.has(view.pending.target)
     ? view.pending : null;
 
   const isCharSelectPending = charSelectPending !== null;
