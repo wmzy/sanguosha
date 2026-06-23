@@ -98,6 +98,10 @@ export function useDebugMultiConnection(
           seat.view.pending.deadline = msg.deadline.deadline;
           seat.view.pending.totalMs = msg.deadline.totalMs;
         }
+        // deadline === null 表示 pending 已解决（服务端权威信号）
+        if (msg.deadline === null) {
+          seat.view.pending = null;
+        }
         // view.deadline 用于出牌/弃牌阶段(无 pending 时)
         seat.view.deadline = msg.deadline !== null ? msg.deadline.deadline : null;
         seat.view.deadlineTotalMs = msg.deadline !== null ? msg.deadline.totalMs : 0;
