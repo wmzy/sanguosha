@@ -109,6 +109,7 @@ function notifyPendingResolved(state: GameState, slot: PendingSlot): void {
   state.atomHistory.push({
     kind: 'notify',
     seq: state.seq,
+    timestamp: Date.now() - state.startedAt,
     skillId: '',
     eventType: 'pendingResolved',
     data: { target, atomType: slot.atom.type },
@@ -406,7 +407,7 @@ function emptyFrame(): SettlementFrame {
 /** 推送 notify 事件(不改变 state) */
 export function pushNotify(state: GameState, event: NotifyEvent): void {
   state.seq += 1;
-  state.atomHistory.push({ kind: 'notify', seq: state.seq, ...event });
+  state.atomHistory.push({ kind: 'notify', seq: state.seq, timestamp: Date.now() - state.startedAt, ...event });
 }
 
 // ─── Atom apply 管线 ────────────────────────────────────────
@@ -462,7 +463,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   // (如 respond → 分配武将 → 并行选将),它们必须有各自唯一的 seq,
   // 否则 broadcastNewState 的水位过滤会跳过同 seq 的后续事件(选将 bug 根因)。
   state.seq += 1;
-  state.atomHistory.push({ kind: 'atom', seq: state.seq, atom: current, viewEvents: viewEvents! });
+  state.atomHistory.push({ kind: 'atom', seq: state.seq, timestamp: Date.now() - state.startedAt, atom: current, viewEvents: viewEvents! });
   notifyStateChange(state);
 
   if (def.pending) {

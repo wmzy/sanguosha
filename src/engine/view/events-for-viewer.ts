@@ -11,10 +11,8 @@ export function eventsForViewer(
   state: GameState,
   viewer: number,
   sinceSeq = 0,
-  now: number = Date.now(),
 ): GameEventEnvelope[] {
   const out: GameEventEnvelope[] = [];
-  const timestamp = now - state.startedAt;
   for (const e of state.atomHistory) {
     if (e.seq <= sinceSeq) continue;
     if (e.kind === 'atom') {
@@ -22,12 +20,12 @@ export function eventsForViewer(
       if (owner === null) continue;
       const viewEvent = owner ?? e.viewEvents.othersView;
       if (!viewEvent) continue;
-      out.push({ seq: e.seq, timestamp, viewEvent });
+      out.push({ seq: e.seq, timestamp: e.timestamp, viewEvent });
     } else {
       // kind === 'notify'
       const data = e.views ? (e.views.get(String(viewer)) ?? null) : e.data;
       if (data !== null) {
-        out.push({ seq: e.seq, timestamp, notify: { skillId: e.skillId, eventType: e.eventType, data } });
+        out.push({ seq: e.seq, timestamp: e.timestamp, notify: { skillId: e.skillId, eventType: e.eventType, data } });
       }
     }
   }

@@ -734,8 +734,8 @@ export type GameEvent =
 /** 引擎唯一权威事件源条目。apply 时写入，不可变。
  *  替代旧的模块级 event-stream 单例。 */
 export type AppliedAtomEntry =
-  | { kind: 'atom'; seq: number; atom: Atom; viewEvents: ViewEventSplit }
-  | { kind: 'notify'; seq: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
+  | { kind: 'atom'; seq: number; timestamp: number; atom: Atom; viewEvents: ViewEventSplit }
+  | { kind: 'notify'; seq: number; timestamp: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
 
 /** 事件 envelope(per-viewer 已分叉)。session 广播用。
  *  从 engine/types 导出避免 engine→server 循环依赖。 */
