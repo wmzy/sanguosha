@@ -21,7 +21,10 @@ export interface AutoSwitchCtl {
 }
 
 export interface DebugPerspective {
+  /** 手动切换:始终 +1 循环,任意座次 */
   switchPerspective: () => void;
+  /** 切到下一个未选将座次(选将等待蒙层用) */
+  switchToNextUnselected: () => void;
   goToCurrentPlayer: () => void;
   autoSwitchCtl: AutoSwitchCtl;
 }
@@ -130,16 +133,18 @@ export function useDebugPerspective(
   }, [charSelectInProgress, currentViewPendingTarget, currentPlayer, autoSwitch,
     followCurrentPlayer, currentView, allViews, playerCount, setPerspective]);
 
-  /** 手动切换:简单 +1,选将阶段也切到下一个待选将座次 */
+  /** 手动切换:始终 +1 循环,选将阶段也允许切到任意座次(debug 需要查看所有人) */
   const switchPerspective = useCallback(() => {
     const p = perspectiveRef.current;
-    if (charSelectInProgress) {
-      const next = findNextSelectTarget(allViews, playerCount, p, submitted);
-      setPerspective(next >= 0 ? next : (p + 1) % playerCount);
-      return;
-    }
     setPerspective((p + 1) % playerCount);
-  }, [playerCount, setPerspective, allViews, charSelectInProgress]);
+  }, [playerCount, setPerspective]);
+
+  /** 切到下一个未选将座次(选将等待蒙层用:文字和行为一致) */
+  const switchToNextUnselected = useCallback(() => {
+    const p = perspectiveRef.current;
+    const next = findNextSelectTarget(allViews, playerCount, p, submitted);
+    setPerspective(next >= 0 ? next : (p + 1) % playerCount);
+  }, [playerCount, setPerspective, allViews, submitted]);
 
   const goToCurrentPlayer = useCallback(() => {
     if (currentView) setPerspective(currentView.currentPlayerIndex);
@@ -149,6 +154,7 @@ export function useDebugPerspective(
 
   return {
     switchPerspective,
+    switchToNextUnselected,
     goToCurrentPlayer,
     autoSwitchCtl: { enabled: autoSwitch, toggle },
   };

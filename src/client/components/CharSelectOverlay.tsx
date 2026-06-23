@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react';
 import { FACTION_BG, IDENTITY_COLORS } from './gameViewConstants';
 import { CountdownBar } from './CountdownBar';
+import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 
 export interface CharSelectOverlayCandidate {
   name: string;
@@ -57,6 +58,8 @@ interface CharSelectOverlayProps {
   currentPlayerName?: string;
   /** 视角玩家名 */
   perspectiveName?: string;
+  /** 自动跟随开关 */
+  autoSwitchCtl?: { enabled: boolean; toggle: () => void };
   /** 主公已选的武将名(主公选完后,其他玩家查看时展示) */
   lordCharacter?: string;
 }
@@ -83,6 +86,7 @@ export function CharSelectOverlay({
   onGoToCurrentPlayer,
   currentPlayerName,
   perspectiveName,
+  autoSwitchCtl,
   lordCharacter,
 }: CharSelectOverlayProps) {
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
@@ -118,42 +122,15 @@ export function CharSelectOverlay({
             position: 'absolute',
             top: 12,
             right: 16,
-            display: 'flex',
-            gap: 8,
             zIndex: 10000,
           }}
         >
-          <button
-            onClick={onSwitchPerspective}
-            style={{
-              padding: '6px 14px',
-              fontSize: 13,
-              fontWeight: 'bold',
-              color: '#fff',
-              background: 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: 6,
-              cursor: 'pointer',
-            }}
-          >
-            视角: {perspectiveName ?? `P${perspectiveIdx}`}
-          </button>
-          {onGoToCurrentPlayer && currentPlayerName && (
-            <button
-              onClick={onGoToCurrentPlayer}
-              style={{
-                padding: '6px 14px',
-                fontSize: 13,
-                color: '#fff',
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
-            >
-              查看当前玩家
-            </button>
-          )}
+          <DebugPerspectiveBar
+            perspectiveName={perspectiveName ?? `P${perspectiveIdx}`}
+            onSwitchPerspective={onSwitchPerspective}
+            onGoToCurrentPlayer={onGoToCurrentPlayer}
+            autoSwitchCtl={autoSwitchCtl}
+          />
         </div>
       )}
       {/* 标题:主公选将 / P<n> 选将中 */}

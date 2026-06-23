@@ -4,6 +4,7 @@
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import { PHASE_LABELS } from './gameViewConstants';
+import { DebugPerspectiveBar, type DebugPerspectiveBarProps } from './DebugPerspectiveBar';
 import type { GameView } from '../../engine/types';
 
 interface GameHeaderProps {
@@ -43,23 +44,12 @@ export function GameHeader({
           当前: {currentPlayerName} {currentPlayer?.character ? `(${currentPlayer.character})` : ''}
         </span>
       </div>
-      {/* debug 模式:视角切换 / 跳转 / 自动跟随(onSwitchPerspective 存在时才渲染) */}
-      {onSwitchPerspective && (
-        <div className={styles.headerRight}>
-          <button className={styles.perspectiveBtn} onClick={onSwitchPerspective}>
-            视角: {perspectiveName}
-          </button>
-          {onGoToCurrentPlayer && <button className={styles.goToBtn} onClick={onGoToCurrentPlayer}>查看当前玩家</button>}
-          {autoSwitchCtl && (
-            <button
-              className={cx(styles.goToBtn, autoSwitchCtl.enabled && styles.autoSwitchActive)}
-              onClick={autoSwitchCtl.toggle}
-            >
-              自动切换{autoSwitchCtl.enabled ? '✓' : '✗'}
-            </button>
-          )}
-        </div>
-      )}
+      <DebugPerspectiveBar
+        perspectiveName={perspectiveName}
+        onSwitchPerspective={onSwitchPerspective}
+        onGoToCurrentPlayer={onGoToCurrentPlayer}
+        autoSwitchCtl={autoSwitchCtl}
+      />
     </div>
   );
 }

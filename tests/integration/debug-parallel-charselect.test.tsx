@@ -28,13 +28,14 @@ import type { GameView } from '../../src/engine/types';
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
   const [perspective, setPerspective] = useState(view.viewer);
   const views = new Map<number, GameView>([[view.viewer, view]]);
-  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(views, perspective, view.players.length, setPerspective);
+  const { switchPerspective, switchToNextUnselected, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(views, perspective, view.players.length, setPerspective);
   return (
     <GameViewComponent
       view={view}
       onAction={onAction}
       perspective={perspective}
       onSwitchPerspective={switchPerspective}
+      onSwitchToNextUnselected={switchToNextUnselected}
       onGoToCurrentPlayer={goToCurrentPlayer}
       onPerspectiveChange={setPerspective}
       autoSwitchCtl={autoSwitchCtl}

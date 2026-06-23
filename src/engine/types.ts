@@ -698,7 +698,8 @@ export interface AtomHookEntry {
 
 /**
  * 旧 BackendAPI(给 onInit 传闭包)已删除。
- * 新版 onInit 签名:`(skill: Skill, ownerId: string) => (() => void) | void`。
+ * 新版 onInit 签名:`(skill: Skill, ownerId: number) => (() => void) | void`。
+ * ownerId 是座次下标(与 PlayerState.index 一致)。
  * skill 内部直接 import { registerAction, registerBeforeHook, registerAfterHook } from '../skill'
  * 并调用,ownerId 由 onInit 第二参数注入。
  */

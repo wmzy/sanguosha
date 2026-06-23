@@ -19,7 +19,10 @@ export interface OverlaysLayerProps {
   onIdentityConfirm: () => void;
   // 视角切换回调(透传给选将遮罩)
   onSwitchPerspective?: () => void;
+  /** 切到下一个未选将座次(选将等待蒙层用) */
+  onSwitchToNextUnselected?: () => void;
   onGoToCurrentPlayer?: () => void;
+  autoSwitchCtl?: { enabled: boolean; toggle: () => void };
   onAction: (action: { skillId: string; actionType: string; ownerId: number; params: Record<string, Json> }) => void;
 }
 
@@ -36,7 +39,9 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
     showIdentityReveal,
     onIdentityConfirm,
     onSwitchPerspective,
+    onSwitchToNextUnselected,
     onGoToCurrentPlayer,
+    autoSwitchCtl,
     onAction,
   } = props;
 
@@ -83,6 +88,7 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
           playerCount={view.players.length}
           onSwitchPerspective={onSwitchPerspective}
           onGoToCurrentPlayer={onGoToCurrentPlayer}
+          autoSwitchCtl={autoSwitchCtl}
           currentPlayerName={currentPlayerName}
           perspectiveName={perspectiveName}
           lordCharacter={view.players.find(p => p.identity === '主公')?.character}
@@ -95,7 +101,7 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
           view={view}
           perspectiveIdx={perspectiveIdx}
           perspectiveName={perspectiveName}
-          onSwitchPerspective={onSwitchPerspective}
+          onSwitchPerspective={onSwitchToNextUnselected}
         />
       )}
     </>

@@ -111,6 +111,7 @@ function DebugGameViewInner({
         onReorderHand={conn.reorderHand}
         perspective={perspective}
         onSwitchPerspective={pctl.switchPerspective}
+        onSwitchToNextUnselected={pctl.switchToNextUnselected}
         onGoToCurrentPlayer={pctl.goToCurrentPlayer}
         onPerspectiveChange={setPerspective}
         autoSwitchCtl={pctl.autoSwitchCtl}

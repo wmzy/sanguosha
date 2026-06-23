@@ -57,6 +57,8 @@ interface Props {
   perspective: number;
   /** 循环切换到下一视角(debug 模式提供时,header 渲染视角切换按钮)。 */
   onSwitchPerspective?: () => void;
+  /** 切到下一个未选将座次(选将等待蒙层用)。 */
+  onSwitchToNextUnselected?: () => void;
   /** 跳转到当前玩家回调(debug 模式提供时,header 渲染「查看当前玩家」按钮)。 */
   onGoToCurrentPlayer?: () => void;
   /** 直接切到指定座次(点座位卡切换视角等)。 */
@@ -87,7 +89,7 @@ interface TransformMode {
 //   正式模式:上层传 perspective=view.viewer,固定看自己。
 //   debug 模式:上层(DebugLobby)管理视角切换,传当前 perspective。
 // 多视角切换/自动跟随/代打逻辑不在本组件内——那是上层的职责。
-export function GameViewComponent({ view, onAction, onReorderHand, perspective, onSwitchPerspective, onGoToCurrentPlayer, onPerspectiveChange, autoSwitchCtl, onDeleteRoom }: Props) {
+export function GameViewComponent({ view, onAction, onReorderHand, perspective, onSwitchPerspective, onSwitchToNextUnselected, onGoToCurrentPlayer, onPerspectiveChange, autoSwitchCtl, onDeleteRoom }: Props) {
   const perspectiveIdx = perspective;
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
@@ -637,7 +639,9 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
           sessionStorage.setItem('sgs_identity_shown', '1');
         }}
         onSwitchPerspective={onSwitchPerspective}
+        onSwitchToNextUnselected={onSwitchToNextUnselected}
         onGoToCurrentPlayer={onGoToCurrentPlayer}
+        autoSwitchCtl={autoSwitchCtl}
         onAction={onAction}
       />
 
