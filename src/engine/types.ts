@@ -319,9 +319,13 @@ export interface PickTargetCardPrompt {
 /** Atom 等待配置(pending)。有此字段 = 等待型 atom。apply 流程走完后进 pending 区。
  * 等待型 atom 不可被取消——必走完(响应/超时)之一(没有 drop 机制)。
  * `timeout` 与 `onTimeout` 都是必填,无合理默认值。*/
-export interface AtomPending {
+export interface AtomPending<A = Atom> {
   /** 超时后的行为:一个 atom,和普通 apply 一样压栈执行。**必填**——典型 `{ type: '无操作' }` */
   onTimeout: Atom;
+  /** 超时时的动态行为钩子:根据当前 state 和 pending 的 atom 返回一个 atom 替代静态 onTimeout。
+   *  用于需要读取 state 才能决定超时做什么的场景(如弃牌超时自动弃牌、选将超时自动分配武将)。
+   *  返回 undefined = 回退到静态 onTimeout。未实现 = 用静态 onTimeout。 */
+  onTimeoutDynamic?: (state: GameState, atom: A) => Atom | undefined;
   /** 前端提示(告诉前端渲染什么 UI) */
   prompt: ActionPrompt;
   /** 超时毫秒。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s */
@@ -448,7 +452,7 @@ export interface AtomDefinition<A = unknown> {
    * 与技能 after hooks 区分:这是 atom 定义自身的职责,不是技能 hook。
    */
   afterHooks?(state: GameState, atom: A): void;
-  pending?: AtomPending;
+  pending?: AtomPending<A>;
   /**
    * 将后端 atom 转换为前端可消费的视图事件。
    *

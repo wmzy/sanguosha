@@ -1,7 +1,7 @@
 // src/engine/atoms/选将.ts
 // 游戏初始化 atoms:抽身份、选将、发牌
 // 每个 atom 做一件事,符合三国杀身份局规则
-import type { ActionPrompt, AtomDefinition, PlayerState } from '../types';
+import type { ActionPrompt, Atom, AtomDefinition, GameState, PlayerState } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
 import { registerAtom } from '../atom';
@@ -147,7 +147,7 @@ registerAtom(抽身份);
 registerAtom(初始化洗牌);
 registerAtom(发牌);
 
-// ── 选将询问(交互式选将) ──────────────────────────────
+// 选将询问(交互式选将)
 // 等待型 atom:给目标玩家展示候选人,等待选择。
 // 开局.execute 依次为每个玩家 applyAtom(选将询问)。
 // 候选人列表存在 atom.candidates 字段,前端从 view.pending.atom.candidates 渲染。
@@ -207,6 +207,27 @@ export const 选将询问: AtomDefinition<{
   },
   pending: {
     onTimeout: { type: '无操作' },
+    // 选将超时:从候选人中随机分配一个未被选走的武将(确定性:用 state.seq 做种子)。
+    // 否则玩家超时未选 → character 空 → 游戏带空武将进入出牌阶段(不可玩)。
+    // 并行选将被引擎拆成多个 选将询问 slot,超时也走这里。
+    onTimeoutDynamic(state, atom) {
+      const target = atom.target;
+      const p = state.players[target];
+      if (!p || p.character) return undefined;
+      const candidates = atom.candidates;
+      const taken = new Set(state.players.map(pl => pl.character));
+      const available = candidates.filter(c => !taken.has(c.name));
+      const pool = available.length > 0 ? available : candidates;
+      // 用 state.seq 做种子:单调递增,对同一局游戏确定性可复现
+      const rng = createRng(state.seq ^ (target * 2654435761));
+      const pick = pool[rng.nextInt(pool.length)];
+      return {
+        type: '分配武将',
+        target,
+        character: pick.name,
+        skills: [...DEFAULT_SKILLS, ...pick.skills],
+      };
+    },
     prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
     timeout: 60,
   },

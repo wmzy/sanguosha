@@ -47,7 +47,6 @@ import type {
 } from './types';
 import { createGameState } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
-import { DEFAULT_SKILLS } from './atoms/选将';
 import {
   clearAllSkillInstances,
   findActionEntry,
@@ -412,6 +411,27 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
 
 // ─── Atom apply 管线 ────────────────────────────────────────
 
+/** 运行 after hooks:系统级 hooks(ownerId=-1)最后执行,
+ *  确保遗计/反馈等“受伤害后”技能先于濒死检查触发。 */
+async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
+  const sortedHooks = [...getAfterHooks(atom.type)].sort((a, b) => {
+    if (a.ownerId === -1 && b.ownerId !== -1) return 1;
+    if (a.ownerId !== -1 && b.ownerId === -1) return -1;
+    return 0;
+  });
+  for (const h of sortedHooks) {
+    const curFrame = topFrame(state) ?? emptyFrame();
+    const afterCtx: AtomAfterContext = {
+      state,
+      atom,
+      ownerId: h.ownerId,
+      frame: curFrame,
+      params: (curFrame.params ?? {}) as Record<string, Json>,
+    };
+    await h.handler(afterCtx);
+  }
+}
+
 /**
  * 应用一个 atom:走完整 pipeline(before hooks → validate → apply → emit event → after hooks → pending)。
  * 等待型 atom 的 Promise 会挂起直到回应/超时。
@@ -512,23 +532,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
     // 等待型 atom:技能 after hooks 和 def.afterHooks 都在 pending resolve 之后跑
     // ——这样贯石斧/青龙偃月刀等技能能在看到 P2 出完闪/不出后再做决策。
-    const afterHooks = getAfterHooks(current.type);
-    const sortedHooks = [...afterHooks].sort((a, b) => {
-      if (a.ownerId === -1 && b.ownerId !== -1) return 1;
-      if (a.ownerId !== -1 && b.ownerId === -1) return -1;
-      return 0;
-    });
-    for (const h of sortedHooks) {
-      const curFrame = topFrame(state) ?? emptyFrame();
-      const afterCtx: AtomAfterContext = {
-        state,
-        atom: current,
-        ownerId: h.ownerId,
-        frame: curFrame,
-        params: (curFrame.params ?? {}) as Record<string, Json>,
-      };
-      await h.handler(afterCtx);
-    }
+    await runAfterHooks(state, current);
 
     if (def.afterHooks) {
       def.afterHooks(state, current);
@@ -539,24 +543,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   }
 
   // 非等待型 atom:技能 after hooks 立即跑(原顺序)
-  const afterHooks = getAfterHooks(current.type);
-  // 系统级 hooks(ownerId=-1)最后执行——确保遗计/反馈等"受伤害后"技能先触发
-  const sortedHooks = [...afterHooks].sort((a, b) => {
-    if (a.ownerId === -1 && b.ownerId !== -1) return 1;
-    if (a.ownerId !== -1 && b.ownerId === -1) return -1;
-    return 0;
-  });
-  for (const h of sortedHooks) {
-    const curFrame = topFrame(state) ?? emptyFrame();
-    const afterCtx: AtomAfterContext = {
-      state,
-      atom: current,
-      ownerId: h.ownerId,
-      frame: curFrame,
-      params: (curFrame.params ?? {}) as Record<string, Json>,
-    };
-    await h.handler(afterCtx);
-  }
+  await runAfterHooks(state, current);
 
   // atom 自身的后处理(在技能 after hooks 之后):如判定牌从处理区移入弃牌堆
   if (def.afterHooks) {
@@ -607,36 +594,11 @@ function createAndAwaitSlot(
       timedOut = true;
       clearTimeout(timer);
       try {
-        await applyAtom(state, pending.onTimeout);
-        // 弃牌 pending 超时:自动弃超出手牌
-        const slotAtom = atom as { requestType?: string; target?: number; candidates?: Array<{ name: string; skills: string[] }> };
-        if (slotAtom.requestType === '__弃牌' && typeof slotAtom.target === 'number') {
-          const p = state.players[slotAtom.target];
-          if (p && p.hand.length > p.maxHealth) {
-            const excess = p.hand.length - p.maxHealth;
-            const toDiscard = p.hand.slice(-excess);
-            await applyAtom(state, { type: '弃置', player: slotAtom.target, cardIds: toDiscard });
-          }
-        }
-        // 选将询问 pending 超时:从候选人中随机分配一个未被选走的武将。
-        // 否则玩家超时未选 → character 空 → 游戏带空武将进入出牌阶段(不可玩)。
-        // 走 atom 管线:applyAtom(分配武将) → toViewEvents → applyView → 事件广播
-        if (atom.type === '选将询问' && typeof slotAtom.target === 'number' && Array.isArray(slotAtom.candidates)) {
-          const p = state.players[slotAtom.target];
-          if (p && !p.character) {
-            const taken = new Set(state.players.map(pl => pl.character));
-            const available = slotAtom.candidates.filter(c => !taken.has(c.name));
-            const pool = available.length > 0 ? available : slotAtom.candidates;
-            // 用 Date.now() 做超时场景的随机(超时本身非确定),避免引入 rng 依赖
-            const pick = pool[Date.now() % pool.length];
-            await applyAtom(state, {
-              type: '分配武将',
-              target: slotAtom.target,
-              character: pick.name,
-              skills: [...DEFAULT_SKILLS, ...pick.skills],
-            });
-          }
-        }
+        // 超时行为优先用动态钩子(onTimeoutDynamic),可读 state 决定超时做什么;
+        // 未实现或返回 undefined 时回退到静态 onTimeout。
+        // 业务逻辑(弃牌超时/选将超时等)由各自 atom 定义声明,引擎核心只管调度。
+        const timeoutAtom = pending.onTimeoutDynamic?.(state, atom) ?? pending.onTimeout;
+        await applyAtom(state, timeoutAtom);
         notifyStateChange(state);
       } finally {
         // 兑底:applyAtom 抛错时仍必须清理 slot 并 resolve 父 execute,避免死锁。

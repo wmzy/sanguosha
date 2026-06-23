@@ -1,6 +1,6 @@
 // src/engine/atoms/请求回应.ts
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
-import type { ActionPrompt, AtomDefinition, Json, ViewEventSplit, ViewEvent } from '../types';
+import type { ActionPrompt, Atom, AtomDefinition, GameState, Json, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -23,6 +23,16 @@ export const 请求回应: AtomDefinition<{
   },
   pending: {
     onTimeout: { type: '无操作' },
+    // 弃牌询问超时:自动弃超出手牌(逆序)。其他 requestType 超时为无操作。
+    onTimeoutDynamic(state, atom) {
+      if (atom.requestType !== '__弃牌') return undefined;
+      const target = atom.target;
+      const p = state.players[target];
+      if (!p || p.hand.length <= p.maxHealth) return undefined;
+      const excess = p.hand.length - p.maxHealth;
+      const toDiscard = p.hand.slice(-excess);
+      return { type: '弃置', player: target, cardIds: toDiscard };
+    },
     prompt: { type: 'confirm', title: '请回应' },
     timeout: 30,
   },
