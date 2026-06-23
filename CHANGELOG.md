@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - 出牌阶段使用卡牌的统一前置校验(validateUseCard)提取至 skill.ts,消除 14 张卡牌技能中的重复校验逻辑。
+
+### Fixed
+- Registered display-only atoms (等待选将, 打出) to prevent viewReducer from crashing on non-dispatch ViewEvent types used in othersView
 ## [Unreleased] — 2026-06-21
 ### 仁德/制衡 bug 修复 — 发动次数与时序漏洞
 
