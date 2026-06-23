@@ -135,8 +135,8 @@ CI 中两个项目都跑，失败独立报告。
 class SkillTestHarness {
   readonly engine: EngineInstance;
 
-  /** 初始化：重置引擎 → bootstrap state → 为每个玩家创建 session 并加载 onMount */
-  setup(state: GameState): void;
+  /** 初始化：重置引擎 → bootstrap state → 为每个玩家创建 session 并加载 onMount。异步:需动态 import 技能模块 */
+  setup(state: GameState): Promise<void>;
 
   /** 获取玩家会话 */
   player(name: string): PlayerSession;
@@ -156,7 +156,7 @@ class SkillTestHarness {
 
 ```ts
 const harness = new SkillTestHarness();
-harness.setup(createGameState({...}));
+await harness.setup(createGameState({...}));
 
 // 测试操作...
 
@@ -406,8 +406,8 @@ await P2.confirm(true);                          // 发动八卦阵
 describe('杀 — 无回应扣血', () => {
   const harness = new SkillTestHarness();
 
-  beforeEach(() => {
-    harness.setup(createGameState({
+  beforeEach(async () => {
+    await harness.setup(createGameState({
       players: [
         { ..., name: 'P1', hand: ['c1'], skills: ['杀'] },
         { ..., name: 'P2', hand: [], skills: [] },
@@ -461,8 +461,8 @@ it('P1 出杀 → P2 出闪 → 不扣血', async () => {
 describe('八卦阵', () => {
   const harness = new SkillTestHarness();
 
-  beforeEach(() => {
-    harness.setup(createGameState({
+  beforeEach(async () => {
+    await harness.setup(createGameState({
       players: [
         { ..., name: 'P1', hand: ['c1'], skills: ['杀'] },
         { ..., name: 'P2', hand: [], equipment: { 防具: 'armor1' }, skills: ['八卦阵'] },
@@ -503,8 +503,8 @@ describe('八卦阵', () => {
 describe('遗计', () => {
   const harness = new SkillTestHarness();
 
-  beforeEach(() => {
-    harness.setup(createGameState({
+  beforeEach(async () => {
+    await harness.setup(createGameState({
       players: [
         { ..., name: 'P1', hand: ['c1'], skills: ['杀'] },
         { ..., name: 'P2', character: '郭嘉', hand: [], skills: ['遗计'] },
@@ -551,8 +551,8 @@ describe('遗计', () => {
 describe('武圣', () => {
   const harness = new SkillTestHarness();
 
-  beforeEach(() => {
-    harness.setup(createGameState({
+  beforeEach(async () => {
+    await harness.setup(createGameState({
       players: [
         { ..., name: 'P1', hand: ['c1'], skills: ['杀'] },
         { ..., name: 'P2', character: '关羽', hand: ['c2'], skills: ['武圣', '杀'] },
@@ -597,8 +597,8 @@ describe('武圣', () => {
 describe('前后端契约', () => {
   const harness = new SkillTestHarness();
 
-  it('每个 registerAction 都有对应的 defineAction', () => {
-    harness.setup(createGameState({
+  it('每个 registerAction 都有对应的 defineAction', async () => {
+    await harness.setup(createGameState({
       players: [
         { ..., name: 'P1', skills: ['杀', '闪', '桃'] },
       ],
@@ -615,7 +615,7 @@ describe('前后端契约', () => {
 
   it('cardFilter 允许的牌 = validate 接受的牌', async () => {
     // 构造一手混合牌，验证 filter 和 validate 对每张牌的判定一致
-    harness.setup(createGameState({
+    await harness.setup(createGameState({
       players: [
         { ..., name: 'P1', hand: ['c1', 'c2', 'c3'], skills: ['杀'] },
         { ..., name: 'P2', skills: [] },
