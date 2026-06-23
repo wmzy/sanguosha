@@ -59,7 +59,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '过河拆桥', requireTarget: true })
-        ?? (Array.isArray(params.targets) && (params.targets as number[]).every(t => state.players[t]?.alive === true) ? null : '目标不合法');
+        ?? (() => {
+          const targets = params.targets as number[] | undefined;
+          if (!Array.isArray(targets) || targets.length === 0) return '目标不合法';
+          for (const t of targets) {
+            if (t === ownerId) return '不能对自己使用';
+            if (!state.players[t]?.alive) return '目标已死亡';
+            const p = state.players[t];
+            if (!p) return '目标不合法';
+            const hasCards = p.hand.length > 0 || Object.keys(p.equipment).length > 0 || p.pendingTricks.length > 0;
+            if (!hasCards) return '目标无可弃置的牌';
+          }
+          return null;
+        })();
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;

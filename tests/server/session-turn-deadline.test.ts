@@ -26,7 +26,7 @@ function makeRoom(): Room {
     id: 'test-room-' + Math.random().toString(36).slice(2, 8),
     name: '测试',
     maxPlayers: 4,
-    players: new Map(),
+    players: new Map([['fake-player', new FakeWS() as never]]),
     isDebug: true,
     createdAt: Date.now(),
     status: '进行中',

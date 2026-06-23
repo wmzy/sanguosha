@@ -390,6 +390,10 @@ function handleLeaveRoom(playerId: string): void {
     broadcastMessage(room, serialize({ type: 'player_left', playerId }));
   }
 
+  const session = gameSessions.get(roomId);
+  if (session) {
+    void session.destroy();
+  }
   gameSessions.delete(roomId);
 }
 

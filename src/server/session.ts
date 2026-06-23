@@ -48,6 +48,8 @@ export class GameSession {
   private destroyed = false;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private idleDeadline: number | null = null;
+  /** debug 房间断线时暂停 idle 定时器，避免无 WS 连接时 idle timer 自循环泄漏 */
+  private idleSuspended = false;
   private sessionSeed: number;
   private logger = createLogger('session');
   private lastBroadcastSeq = 0;
@@ -352,6 +354,8 @@ export class GameSession {
       this.baselineSent.delete(playerId);
       this.lastSentDeadline.delete(playerId);
       this.room.players.delete(playerId);
+      // 暂停 idle timer 防止无 WS 连接时自循环泄漏
+      this.suspendIdleTimer();
       return;
     }
     this.disconnectedAt.set(playerId, Date.now());
@@ -382,6 +386,8 @@ export class GameSession {
     setRoomStatus(this.room.id, '已结束');
     this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
     this.broadcast({ type: 'gameOver', winner: '无人' });
+    // 必须 destroy 以清理 idle timer，否则定时器会通过 onStateChange 自循环
+    void this.destroy();
   }
 
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, lastSeq = 0): boolean {
@@ -391,6 +397,8 @@ export class GameSession {
     this.room.players.set(playerId, ws);
     this.sendInitialViewToPlayer(playerId);
     this.baselineSent.add(playerId);
+    // 重连后恢复 idle timer（debug 房间断线时 suspendIdleTimer 会暂停它）
+    this.resumeIdleTimer();
     // initialView 已是全量状态，不需要补推差量。
     // 同步水位标记，避免后续 broadcastNewState 重发已含在 initialView 中的事件。
     this.lastBroadcastSeq = Math.max(this.lastBroadcastSeq, this.state.seq);
@@ -433,13 +441,32 @@ export class GameSession {
     }
   }
 
+  /**
+   * 暂停 idle timer（debug 房间断线时使用）。
+   * 不 destroy session——断线玩家可以重连重开游戏。
+   */
+  suspendIdleTimer(): void {
+    this.idleSuspended = true;
+    this.clearIdleTimer();
+  }
+
+  /** 恢复 idle timer（debug 房间重连时使用） */
+  resumeIdleTimer(): void {
+    this.idleSuspended = false;
+    this.resetIdleTimer();
+  }
+
   /** 重置空闲超时定时器(在每次 action 和 startGame 后调用) */
   private resetIdleTimer(): void {
+    if (this.idleSuspended) return;
     if (this.idleTimer !== null) {
       clearTimeout(this.idleTimer);
     }
     if (!this.state) return;
     const state = this.state;
+    // 没有活跃 WS 连接时不启动 idle timer
+    // （持久化恢复的无连接房间、debug 房间全断线后的自循环保护）
+    if (this.room.players.size === 0) return;
     // 有未决 pending(询问闪/无懈等)时不启动 idle timer——此时玩家须先回应询问,不应被回合超时打断。
     // 注意:不应判断"是否有玩家死亡"——三国杀阵亡玩家会一直保留在 players 中,该条件会导致
     // 一旦有人阵亡,所有后续出牌/弃牌阶段的 idle timer 永远不启动(前端倒计时归零却不会结束阶段)。

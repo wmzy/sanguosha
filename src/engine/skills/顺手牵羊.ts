@@ -20,8 +20,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     return validateUseCard(state, ownerId, params, { cardName: '顺手牵羊' })
       ?? (() => {
         const target = (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
-        return target !== undefined && state.players[target]?.alive && effectiveDistance(state, ownerId, target) <= 1
-          ? null : '目标不合法';
+        if (target === undefined) return '目标不合法';
+        if (target === ownerId) return '不能对自己使用';
+        if (!state.players[target]?.alive) return '目标已死亡';
+        if (effectiveDistance(state, ownerId, target) > 1) return '距离太远';
+        const p = state.players[target];
+        if (!p) return '目标不合法';
+        const hasCards = p.hand.length > 0 || Object.keys(p.equipment).length > 0 || p.pendingTricks.length > 0;
+        if (!hasCards) return '目标无可获取的牌';
+        return null;
       })();
     }, async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;

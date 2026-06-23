@@ -115,7 +115,7 @@ describe('顺手牵羊', () => {
   // ─────────────────────────────────────────────────────────────
   it('P1 对 P3(距离 2)出顺手牵羊 → 被拒绝(距离 > 1)', async () => {
     // 3 个存活玩家,P1 (idx 0) → P3 (idx 2):座位距离 = 2
-    await harness.setup(buildState({ playerCount: 3 }));
+    await harness.setup(buildState({ playerCount: 4 }));
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '顺手牵羊',
