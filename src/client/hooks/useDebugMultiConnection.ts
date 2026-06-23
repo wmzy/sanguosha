@@ -99,6 +99,18 @@ export function useDebugMultiConnection(
       if (msg.events.length > 0) {
         seat.lastSeq = msg.events[msg.events.length - 1].seq;
       }
+      // events 消息携带权威 pending 倒计时 → 覆盖 applyView 的 fallback 值
+      if (msg.pending !== undefined && msg.pending !== null && seat.view.pending) {
+        seat.view.pending.deadline = msg.pending.deadline;
+        seat.view.pending.totalMs = msg.pending.totalMs;
+      }
+      // turnDeadline 权威下发
+      if (msg.turnDeadline !== undefined) {
+        seat.view.turnDeadline = msg.turnDeadline;
+        if (msg.turnTotalMs !== undefined) {
+          seat.view.turnTotalMs = msg.turnTotalMs;
+        }
+      }
       setViews(prev => {
         const next = new Map(prev);
         next.set(msg.viewer, seat.view!);
@@ -107,6 +119,8 @@ export function useDebugMultiConnection(
       if (msg.viewer === perspectiveRef.current) {
         playbackRef.current.enqueue(eventsToPlay);
       }
+    } else if (msg.type === 'actionRejected') {
+      log.warn('action rejected for viewer', seatViewer);
     }
   }, []);
 
@@ -162,9 +176,11 @@ export function useDebugMultiConnection(
       log.warn('no open connection for viewer', action.ownerId);
       return;
     }
+    // respond action 携带 pendingSeq（当前 view.pending 对应的窗口 seq）
+    const pendingSeq = seat.view?.pending ? seat.lastSeq : undefined;
     seat.ws.send(JSON.stringify({
       type: 'action',
-      action: { ...action, baseSeq: seat.lastSeq },
+      action: { ...action, baseSeq: seat.lastSeq, pendingSeq },
       baseSeq: seat.lastSeq,
     } as ClientMessage));
   }, []);
