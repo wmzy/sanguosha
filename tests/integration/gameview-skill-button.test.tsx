@@ -84,8 +84,8 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
       // 标题区 + DistributeUI 内部都有该文本,用 getAllByText
       expect(screen.getAllByText(/仁德：选择要送出的手牌和目标角色/).length).toBeGreaterThan(0);
     });
-    // allocate 模式:显示提示文字"已分配 0/2"
-    expect(screen.getByText(/已分配/)).toBeDefined();
+    // externalTargetSelection 模式:显示提示文字"已选 0 张"
+    expect(screen.getByText(/已选/)).toBeDefined();
   });
 
   it('切换视角到孙权(P1)且为孙权回合:制衡按钮渲染并可点击弹出 select 弹窗', async () => {
@@ -119,7 +119,7 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
   it('点击仁德按钮选牌并手动提交分配,onAction 以 allocation 格式提交', async () => {
     const view = makeView();
     const onAction = vi.fn();
-    render(<GameViewComponent view={view} onAction={onAction} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    const { container } = render(<GameViewComponent view={view} onAction={onAction} onDeleteRoom={() => {}} perspective={view.viewer} />);
 
     const rendeBtn = await screen.findByRole('button', { name: '仁德' });
     fireEvent.click(rendeBtn);
@@ -128,17 +128,19 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
       expect(screen.getAllByText(/仁德：选择要送出的手牌和目标角色/).length).toBeGreaterThan(0);
     });
 
-    // 选一张手牌(杀)给 P2,然后手动点"提交分配"
-    const allButtons = screen.getAllByRole('button');
-    const killCardBtn = allButtons.find(b => /^杀/.test(b.textContent ?? ''));
-    expect(killCardBtn).toBeDefined();
-    fireEvent.click(killCardBtn!);
-    // 第一次点 P2:分配 1 张,按钮 name 变为 'P2 (1/99)';用模糊匹配
-    const p2Btn = screen.getByRole('button', { name: /P2/ });
-    fireEvent.click(p2Btn);
+    // 选一张手牌(杀)给 P2
+    // 手牌渲染为 <div data-card-id="c1">,不是 button
+    const killCardEl = container.querySelector('[data-card-id="c1"]');
+    expect(killCardEl).toBeDefined();
+    fireEvent.click(killCardEl!);
+    // externalTargetSelection 模式:目标由座位区点选(点 P2 座位元素)
+    // P2 座位名渲染在 <span> 内,点击冒泡到 PlayerSeatView 的 onClick
+    const p2SeatName = screen.getByText('P2');
+    expect(p2SeatName).toBeDefined();
+    fireEvent.click(p2SeatName);
 
-    // 手动提交(allocate 模式有"提交分配"按钮,minTotal=1 已满足)
-    const submitBtn = screen.getByRole('button', { name: /提交分配/ });
+    // externalTargetSelection 模式:确定按钮(非"提交分配")
+    const submitBtn = screen.getByRole('button', { name: /确定/ });
     fireEvent.click(submitBtn);
 
     // allocation 格式: [{target: 1, cardIds: ['c1']}]
