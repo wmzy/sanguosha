@@ -128,7 +128,7 @@ function ensureStateShape(state: GameState): void {
 
 function logAction(state: GameState, message: ClientMessage): void {
   state.actionLog.push({
-    id: String(state.seq),
+    id: String(state.actionLog.length),
     timestamp: Date.now() - state.startedAt,
     message,
     baseSeq: message.baseSeq ?? -1,
@@ -312,8 +312,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // 注意:不在 execute 前清除 slot——respond execute 需要读 slot 信息
   // (如系统规则弃牌 execute 读 slot.atom.target)。execute 完成后才清除该玩家的 slot。
   logAction(state, message);
-  state.seq += 1;
-  // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot。
+  // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot.
   // finally 兜底:execute 抛错时(开发期 bug / 测试场景)仍必须释放 slot,避免父 execute 永久卡死。
   // 注意:不 return execute 的 promise——execute 内 await pending slot 可能阻塞到玩家回应,
   // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。

@@ -107,7 +107,7 @@ function spliceHandOrderEntry(state: GameState, target: number): void {
     }
   }
   const entry: ActionLogEntry = {
-    id: `order-${state.seq}-${target}`,
+    id: `order-${log.length}-${target}`,
     timestamp: Date.now() - state.startedAt,
     message: {
       skillId: '系统规则',
