@@ -135,7 +135,9 @@ function serializeStateForSnapshot(state: GameState): GameState & { pendingSlots
 function timestampId(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  // 追加 4 位随机后缀,避免同一秒内对同一 roomId 连续快照时文件名碰撞覆盖
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${suffix}`;
 }
 
 async function ensureSnapshotDir(): Promise<void> {

@@ -237,6 +237,11 @@ app.post('/api/snapshot', async (c) => {
   if (!body || typeof body.roomId !== 'string') {
     return c.json({ error: '缺少 roomId' }, 400);
   }
+  if (typeof body.perspective !== 'number'
+    || typeof body.frontendSeqs !== 'object' || body.frontendSeqs === null
+    || typeof body.frontendViews !== 'object' || body.frontendViews === null) {
+    return c.json({ error: '缺少 perspective/frontendSeqs/frontendViews' }, 400);
+  }
   const session = gameSessions.get(body.roomId);
   if (!session) return c.json({ error: '会话不存在' }, 404);
   const result = await createSnapshot(session, body as unknown as CreateSnapshotRequest);

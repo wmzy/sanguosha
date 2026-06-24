@@ -52,7 +52,7 @@ describe('debug 快照功能', () => {
       const { readdir } = await import('node:fs/promises');
       const files = await readdir(SNAPSHOT_DIR).catch(() => []);
       for (const f of files) {
-        if (f.startsWith('snap-test-') || f.includes('snap-test-')) {
+        if (f.includes('snap-test-')) {
           await rm(join(SNAPSHOT_DIR, f));
         }
       }
