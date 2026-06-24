@@ -59,8 +59,9 @@ export async function registerSkillActions(playerIndex: number, skillIds: string
       const skill: Skill = mod.createSkill(skillId, playerIndex);
       const api = makeFrontendAPI(skillId, playerIndex);
       mod.onMount(skill, api);
-    } catch (e) {
-      console.warn(`[skillActionRegistry] 注册 ${skillId} 失败:`, e);
+    } catch {
+      // 技能模块未实现(吕布/华佗等 stub 技能 path 为空)→ 静默跳过。
+      // 引擎 instantiateSkill 对同样情况也是 catch 后返回 null,这里保持一致,避免控制台被刷屏。
     }
   }
 }

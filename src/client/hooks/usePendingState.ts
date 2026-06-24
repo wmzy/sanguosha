@@ -51,7 +51,10 @@ function readAtom(pending: PendingView | null): AtomLike | null {
 export function usePendingState(view: GameView, perspectiveIdx: number): PendingState {
   const pending = view.pending;
   const pendingTargetIdx = pending?.target ?? -1;
-  const isPerspectiveAwaiting = pending !== null && (pendingTargetIdx < 0 || pendingTargetIdx === perspectiveIdx);
+  // 非阻塞型 pending(出牌窗口)不计入 awaiting —— 它是出牌阶段的控制权 token,
+  // 不是需要回应的询问。isBlocking !== false 即视为阻塞(旧数据缺省兼容)。
+  const isBlocking = pending !== null && pending.isBlocking !== false;
+  const isPerspectiveAwaiting = isBlocking && (pendingTargetIdx < 0 || pendingTargetIdx === perspectiveIdx);
 
   const atom = readAtom(pending);
   const reqType = atom?.requestType;

@@ -52,14 +52,18 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         : slot.atom.type === '询问杀'
         ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
         : { type: 'confirm' as const, title: '请回应' });
+    // target 提取:'target' 字段优先;出牌窗口 用 'player';都无则 TARGET_SYSTEM
     const target = 'target' in slot.atom && typeof slot.atom.target === 'number'
       ? slot.atom.target
+      : 'player' in slot.atom && typeof slot.atom.player === 'number'
+      ? (slot.atom as { player: number }).player
       : TARGET_SYSTEM;
     pending = {
       type: 'awaits',
       atom: slot.atom,
       prompt,
       target,
+      isBlocking: slot.isBlocking,
       // slot.deadline 是相对开局时间 (Date.now() - state.startedAt + timeoutMs),
       // 前端用 (deadline - Date.now()) / 1000 算剩余秒数,需要绝对时间戳。
       deadline: state.startedAt + slot.deadline,
@@ -75,20 +79,24 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     // 不渲染可操作 prompt(仅给 target 供跟随),避免"共用倒计时"误导。
     // 仅限游戏进行中的问询类 atom —— 选将询问/选将 等开局 atom 的 pending 是
     // 隔离的(只有被问询者见),不应观察型投影(charselect-pending-isolation 契约)。
-    const OBSERVER_PENDING_TYPES = new Set(['询问闪', '询问杀', '请求回应']);
+    const OBSERVER_PENDING_TYPES = new Set(['询问闪', '询问杀', '请求回应', '出牌窗口']);
     const observerSlot = [...state.pendingSlots.values()].find(s => {
-      const t = (s.atom as { target?: number }).target;
+      // target 字段优先;出牌窗口用 player
+      const t = (s.atom as { target?: number; player?: number }).target
+        ?? (s.atom as { player?: number }).player;
       return typeof t === 'number' && t >= 0 && t !== viewer
         && OBSERVER_PENDING_TYPES.has(s.atom.type);
     });
     if (observerSlot) {
       const slot = observerSlot;
-      const target = (slot.atom as { target: number }).target;
+      const target = (slot.atom as { target?: number; player?: number }).target
+        ?? (slot.atom as { player: number }).player;
       pending = {
         type: 'awaits',
         atom: slot.atom,
         prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
         target,
+        isBlocking: slot.isBlocking,
         deadline: state.startedAt + slot.deadline,
         totalMs: ((slot.atom as { timeout?: number }).timeout ?? slot.definition.pending?.timeout ?? 30) * 1000,
       };
@@ -172,6 +180,8 @@ export function getPendingDeadline(
   const def = slot.definition;
   const target = 'target' in slot.atom && typeof slot.atom.target === 'number'
     ? slot.atom.target
+    : 'player' in slot.atom && typeof slot.atom.player === 'number'
+    ? (slot.atom as { player: number }).player
     : TARGET_SYSTEM;
   const timeoutSec = (slot.atom as { timeout?: number }).timeout
     ?? def.pending?.timeout ?? 30;

@@ -42,14 +42,17 @@ export function findUseActionForCard(actions: SkillActionDef[], card: Card): Ski
 
 // ─── params 构造 ───
 
-/** action 激活默认条件(缺省 activeWhen 时):出牌阶段 + 当前视角回合 + 无 pending。
- *  这是绝大多数主动出牌/用技场景的激活条件。主动技(仁德/制衡/转化)若需要
- *  不同条件,在 defineAction 声明 activeWhen 覆盖。 */
+/** action 激活默认条件(缺省 activeWhen 时):出牌阶段 + 当前视角回合 + 无阻塞型 pending。
+ *  非阻塞型 pending(出牌窗口)不阻止出牌/用技。这是绝大多数主动出牌/用技场景的激活条件。
+ *  主动技(仁德/制衡/转化)若需要不同条件,在 defineAction 声明 activeWhen 覆盖。 */
 const DEFAULT_PLAY_ACTIVE = (ctx: ActionContext): boolean => {
   const { view, perspectiveIdx } = ctx;
+  const pending = view.pending;
+  // pending.isBlocking !== false → true 表示阻塞型(或旧数据缺省,视为阻塞)
+  const blocked = pending != null && pending.isBlocking !== false;
   return view.currentPlayerIndex === perspectiveIdx
     && view.phase === '出牌'
-    && view.pending === null;
+    && !blocked;
 };
 
 /** 判断一个 action 在给定上下文下是否激活。

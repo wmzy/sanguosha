@@ -137,10 +137,16 @@ export function useDebugPerspective(
     }
 
     // ── 非选将阶段(出牌/弃牌) ──
+    // 注意:buildView 对非 target viewer 会投影一个「观察型 pending」(target 指向被
+    // 问询者),仅用于让其他座次知道"有人在被询问"。这个观察型 pending 的 target
+    // !== 当前 viewer,绝不能用来驱动视角切换——否则 current 玩家(观察者,看到
+    // target=被问询者)会切到被问询者,而被问询者视角的 currentPlayer !== 自己又会
+    // 切回 current 玩家,形成 0↔2 死循环(杀/决斗/南蛮 等问询场景必现)。
+    // 只有「自己专属 pending」(target === p,即当前视角玩家本人在被问询)才保持视角;
+    // 否则一律跟随 currentPlayer(稳定的锚点)。
     if (followCurrentPlayer || !currentView.pending) {
-      if (typeof currentViewPendingTarget === 'number' && currentViewPendingTarget >= 0 && currentViewPendingTarget !== p) {
-        setPerspective(currentViewPendingTarget);
-      } else if (typeof currentPlayer === 'number' && currentPlayer !== p) {
+      const hasOwnPending = currentView.pending && currentViewPendingTarget === p;
+      if (!hasOwnPending && typeof currentPlayer === 'number' && currentPlayer !== p) {
         setPerspective(currentPlayer);
       }
     }
