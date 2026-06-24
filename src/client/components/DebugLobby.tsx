@@ -5,11 +5,12 @@
 // useDebugPerspective 管理视角切换。
 // 已加入房间 → <GameViewComponent>(渲染当前 perspective 的 view), 否则 → <DebugRoomList>。
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDebugLobbyController } from '../hooks/useDebugLobbyController';
 import { useDebugMultiConnection, type ActionMsg } from '../hooks/useDebugMultiConnection';
 import { useDebugPerspective } from '../hooks/useDebugPerspective';
+import { useSnapshot } from '../hooks/useSnapshot';
 import { SubmittedCharSelectProvider } from '../hooks/SubmittedCharSelectCtx';
 import { DebugControls } from './debug/DebugControls';
 import { DebugRoomList } from './debug/DebugRoomList';
@@ -87,6 +88,34 @@ function DebugGameViewInner({
     perspective,
     onFirstView: (v) => setPerspective(v),
   });
+
+  const snap = useSnapshot();
+  const { createSnapshot: createSnap, patchDescription: patchSnap, clearError: clearSnapError } = snap;
+  const { views: connViews, getSeq: connGetSeq } = conn;
+
+  const handleSaveSnapshot = useCallback(async () => {
+    const snapshotId = await createSnap({
+      roomId,
+      perspective,
+      views: connViews,
+      getSeqForView: (seat) => connGetSeq(seat),
+    });
+    if (snapshotId) {
+      const desc = window.prompt('快照已保存。请描述你发现的 bug(可留空):');
+      if (desc !== null && desc.trim()) {
+        await patchSnap(snapshotId, desc.trim());
+      }
+    }
+  }, [createSnap, patchSnap, roomId, perspective, connViews, connGetSeq]);
+
+  // 3 秒后自动清除 toast/error
+  useEffect(() => {
+    if (snap.lastSnapshotPath || snap.error) {
+      const t = setTimeout(() => clearSnapError(), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [snap.lastSnapshotPath, snap.error, clearSnapError]);
+
   const currentView = conn.views.get(perspective) ?? null;
   const pctl = useDebugPerspective(conn.views, perspective, playerCount, setPerspective);
 
@@ -115,6 +144,10 @@ function DebugGameViewInner({
       onGoToCurrentPlayer={pctl.goToCurrentPlayer}
       autoSwitchCtl={pctl.autoSwitchCtl}
       onDeleteRoom={onDeleteRoom}
+      onSaveSnapshot={handleSaveSnapshot}
+      snapshotSaving={snap.saving}
+      snapshotToast={snap.lastSnapshotPath ? `已保存: ${snap.lastSnapshotPath}` : null}
+      snapshotError={snap.error}
     />
   );
   const overlayBar = (
@@ -125,6 +158,10 @@ function DebugGameViewInner({
       onGoToCurrentPlayer={pctl.goToCurrentPlayer}
       autoSwitchCtl={pctl.autoSwitchCtl}
       onDeleteRoom={onDeleteRoom}
+      onSaveSnapshot={handleSaveSnapshot}
+      snapshotSaving={snap.saving}
+      snapshotToast={snap.lastSnapshotPath ? `已保存: ${snap.lastSnapshotPath}` : null}
+      snapshotError={snap.error}
     />
   );
 
