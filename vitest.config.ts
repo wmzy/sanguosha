@@ -10,6 +10,9 @@ const sharedAlias = {
 };
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify('0.0.0-test'),
+  },
   plugins: [react()],
   test: {
     globals: true,
