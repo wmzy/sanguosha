@@ -310,11 +310,8 @@ export class GameSession {
 
   handleDisconnect(playerId: string): void {
     if (this.debug) {
-      // debug 模式:立即清理座次映射,避免幽灵连接(StrictMode 双重挂载)占用座次
-      this.playerNames.delete(playerId);
-      this.baselineSent.delete(playerId);
-      this.lastSentDeadline.delete(playerId);
-      this.room.players.delete(playerId);
+      this.clearDebugPlayer(playerId);
+      // room.players 也由 clearDebugPlayer 内部删除
       return;
     }
     this.disconnectedAt.set(playerId, Date.now());
@@ -326,6 +323,23 @@ export class GameSession {
       playerId,
       graceMs: RECONNECT_GRACE_MS,
     });
+  }
+
+  /** debug 模式:刷新重连复用座次时,由 app.ts 调用清理旧 playerId 的映射。
+   *  与 handleDisconnect 的区别:room.players 已由 joinDebugRoom 删除,这里不重复删。 */
+  evictDebugPlayer(playerId: string): void {
+    this.clearDebugPlayer(playerId, /* deleteFromRoom */ false);
+  }
+
+  /** debug 模式清理 playerId 的所有映射。deleteFromRoom=false 用于刷新重连
+   *  (room.players 已由调用方处理)。 */
+  private clearDebugPlayer(playerId: string, deleteFromRoom = true): void {
+    this.playerNames.delete(playerId);
+    this.baselineSent.delete(playerId);
+    this.lastSentDeadline.delete(playerId);
+    if (deleteFromRoom) {
+      this.room.players.delete(playerId);
+    }
   }
 
   private allPlayersDisconnected(): boolean {

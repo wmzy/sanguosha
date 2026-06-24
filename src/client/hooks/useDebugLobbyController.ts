@@ -57,14 +57,26 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     void fetchRooms();
   }, [fetchRooms]);
 
-  // initialRoomId:进入页面时自动加入指定房间
+  // initialRoomId:从 URL 进入时自动加入指定房间,并从房间信息恢复 playerCount。
+  // 刷新后 playerCount 会重置为默认值(5),若实际房间是 3 人,会创建错误数量的连接。
   const prevRoomRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!initialRoomId) return;
     if (prevRoomRef.current === initialRoomId) return;
     prevRoomRef.current = initialRoomId;
-    setActiveRoomId(initialRoomId);
-  }, [initialRoomId]);
+
+    // 从房间信息恢复 playerCount(用 maxPlayers,即游戏人数)
+    void apiFetch<{ maxPlayers: number }>(`/api/rooms/${initialRoomId}`)
+      .then((info) => {
+        setPlayerCount(info.maxPlayers);
+        storeSession(initialRoomId, `debug-${initialRoomId}-url`);
+        setActiveRoomId(initialRoomId);
+      })
+      .catch(() => {
+        // 房间不存在或会话已结束:回退到调试大厅列表
+        navigate('/debug', { replace: true });
+      });
+  }, [initialRoomId, navigate]);
 
   const refreshRoomList = useCallback(() => {
     void fetchRooms();

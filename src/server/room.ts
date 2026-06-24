@@ -91,14 +91,34 @@ export function addRoom(room: Room): void {
 }
 
 /** 调试玩家加入调试房间。 */
-export function joinDebugRoom(roomId: string, playerId: string, ws: WSContext): Room | null {
+export interface JoinDebugResult {
+  room: Room;
+  /** 被替换下线的旧 playerId（刷新重连时复用座次） */
+  replacedPlayerId?: string;
+}
+
+/** 调试玩家加入调试房间。
+ *  Debug 模式为“一人多连接”:一个浏览器开 N 个 WS 连接,每个代表一个座次。
+ *  刷新页面时旧 WS 的 TCP close 有延迟,新连接到达时房间可能已满。
+ *  此时踢掉最早加入的连接(插入序 FIFO),让新连接复用其座次 ——
+ *  符合“刷新后重新接管所有座次”的语义。 */
+export function joinDebugRoom(roomId: string, playerId: string, ws: WSContext): JoinDebugResult | null {
   const room = roomList.get(roomId);
   if (!room?.isDebug) return null;
-  if (room.players.size >= room.maxPlayers) return null;
   if (room.players.has(playerId)) return null;
 
+  let replacedPlayerId: string | undefined;
+  if (room.players.size >= room.maxPlayers) {
+    // 踢掉最早加入的连接,复用其座次
+    replacedPlayerId = room.players.keys().next().value;
+    if (replacedPlayerId === undefined) return null;
+    const oldWs = room.players.get(replacedPlayerId);
+    room.players.delete(replacedPlayerId);
+    try { oldWs?.close(); } catch { /* */ }
+  }
+
   room.players.set(playerId, ws);
-  return room;
+  return { room, replacedPlayerId };
 }
 
 export function leaveRoom(roomId: string, playerId: string): Room | null {

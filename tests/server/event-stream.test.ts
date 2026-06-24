@@ -3,7 +3,7 @@ import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
-import type { Room } from '../../src/server/room';
+import { joinDebugRoom, createDebugRoom, addRoom, type Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import type { ServerMessage } from '../../src/server/protocol';
 
@@ -131,5 +131,73 @@ describe('pending 倒计时下发', () => {
     // 也应有 event 消息(view 事件)
     const eventMsg = fakeWs.messages.find(m => m.type === 'event');
     expect(eventMsg).toBeDefined();
+  }, 15000);
+});
+
+describe('debug 房间刷新重连', () => {
+  let session: GameSession;
+  let room: Room;
+  beforeEach(() => {
+    resetForTest();
+    room = createDebugRoom('测试刷新', 2);
+    addRoom(room);
+    session = new GameSession(room, true, 42);
+  });
+
+  it('满员时 joinDebugRoom 复用最早座次并返回被替换的 playerId', async () => {
+    await session.startGame(2);
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(200);
+
+    // 初始两个连接占满 2 个座次
+    const ws1 = new FakeWS();
+    const ws2 = new FakeWS();
+    const r1 = joinDebugRoom(room.id, 'p1', ws1 as never);
+    const r2 = joinDebugRoom(room.id, 'p2', ws2 as never);
+    expect(r1).not.toBeNull();
+    expect(r2).not.toBeNull();
+    session.assignDebugSeat('p1');
+    session.assignDebugSeat('p2');
+    expect(room.players.size).toBe(2);
+
+    // 模拟刷新:房间已满,第三个连接应复用 p1 的座次
+    const ws3 = new FakeWS();
+    const r3 = joinDebugRoom(room.id, 'p3', ws3 as never);
+    expect(r3).not.toBeNull();
+    expect(r3!.replacedPlayerId).toBe('p1');
+    // 旧连接被弱踢出
+    expect(room.players.has('p1')).toBe(false);
+    expect(room.players.has('p3')).toBe(true);
+    expect(room.players.size).toBe(2);
+  }, 15000);
+
+  it('evictDebugPlayer 清理旧 playerId 映射,新连接重新分配同一座次', async () => {
+    await session.startGame(2);
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(200);
+
+    const ws1 = new FakeWS();
+    const ws2 = new FakeWS();
+    joinDebugRoom(room.id, 'p1', ws1 as never);
+    joinDebugRoom(room.id, 'p2', ws2 as never);
+    const seat1 = session.assignDebugSeat('p1');
+    const seat2 = session.assignDebugSeat('p2');
+    expect(seat1).toBe(0);
+    expect(seat2).toBe(1);
+
+    // 模拟刷新重连:p1 被替换 → evictDebugPlayer 清理 → p3 接管座次 0
+    const ws3 = new FakeWS();
+    const r3 = joinDebugRoom(room.id, 'p3', ws3 as never);
+    expect(r3!.replacedPlayerId).toBe('p1');
+    session.evictDebugPlayer('p1');
+    const seat3 = session.assignDebugSeat('p3');
+    expect(seat3).toBe(0); // 复用被释放的座次 0
+
+    // p3 重连后能收到 initialView
+    session.reconnectPlayer('p3', ws3 as never, 0);
+    const initMsg = ws3.messages.find(m => m.type === 'initialView');
+    expect(initMsg).toBeDefined();
   }, 15000);
 });

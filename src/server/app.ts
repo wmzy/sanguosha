@@ -406,15 +406,18 @@ function handleDisconnect(playerId: string): void {
   if (!roomId) return;
 
   const room = getRoom(roomId);
-  // 调试房间：保留映射和会话（供重连使用），手动删除时才清理
-  if (room?.isDebug) {
-    return;
-  }
-
-  // 真人游戏：通知 session 进入重连宽限期，由 session 决定何时真正结束游戏
   const session = gameSessions.get(roomId);
   if (session) {
+    // session.handleDisconnect 内部按 debug/非 debug 分支处理:
+    // debug 模式立即清理座次映射(避免幽灵连接占用座次),
+    // 非debug 模式进入重连宽限期。
     session.handleDisconnect(playerId);
+  }
+
+  // debug 模式:playerId 一次性使用,清理映射防泄漏。
+  // 非debug 模式:保留映射供 reconnect 消息恢复。
+  if (room?.isDebug) {
+    playerRoomMap.delete(playerId);
   }
 }
 
@@ -437,6 +440,13 @@ async function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: nu
     return;
   }
   playerRoomMap.set(playerId, roomId);
+
+  // 刷新重连复用座次:被替换的旧连接需清理 session 映射,
+  // 其座次由 assignDebugSeat 重新分配给新 playerId。
+  if (joined.replacedPlayerId) {
+    session.evictDebugPlayer(joined.replacedPlayerId);
+    playerRoomMap.delete(joined.replacedPlayerId);
+  }
 
   const pendingPlayerCount = session.pendingPlayerCount;
   if (pendingPlayerCount != null) {
