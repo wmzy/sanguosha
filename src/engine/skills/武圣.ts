@@ -6,7 +6,7 @@
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
 import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { applyAtom } from '../create-engine';
 import { viewCanAttack } from '../viewDistance';
 
@@ -35,7 +35,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 红牌
       const myTurn = state.currentPlayerIndex === ownerId;
-      const free = state.pendingSlots.size === 0
+      const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       const cardId = params.cardId as string;

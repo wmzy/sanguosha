@@ -2,11 +2,6 @@
 import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, PendingSlot } from '../types';
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 
-/** 出牌/弃牌阶段的回合空闲超时(ms)。
- *  服务端 resetIdleTimer 与此处 deadline 必须使用同一口径——
- *  否则前端倒计时与实际超时不一致(表现为进度条未走完回合就被结束)。 */
-export const TURN_IDLE_TIMEOUT_MS = 50_000;
-
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -100,11 +95,10 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     }
   }
 
-  // 出牌/弃牌阶段(无 pending 时)的空闲超时。
-  // 读 state.idleDeadline(由 session resetIdleTimer 写入的权威值),保证前端倒计时与实际超时一致。
-  // pending 存在时为 null(此时用 pending.deadline/totalMs)。
-  const deadline = !pending ? (state.idleDeadline ?? null) : null;
-  const deadlineTotalMs = deadline !== null ? TURN_IDLE_TIMEOUT_MS : 0;
+  // deadline 来自 pending slot 的超时(出牌阶段的 __出牌 询问、询问闪/弃牌等)。
+  // 无 pending 时为 null(没有倒计时)。
+  const deadline = pending?.deadline ?? null;
+  const deadlineTotalMs = pending?.totalMs ?? 0;
 
   void debug;  // 保留参数签名兼容调用点,但不再影响隔离逻辑
 

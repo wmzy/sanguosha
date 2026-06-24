@@ -4,7 +4,7 @@
 //   请求回应 后检查处理区:有杀 = 出了杀;没有 = 不出(获得武器)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { viewCanAttack } from '../viewDistance';
 import { askWuxie } from '../wuxie';
 
@@ -18,7 +18,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
+      const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';

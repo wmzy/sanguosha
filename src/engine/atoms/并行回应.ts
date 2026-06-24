@@ -28,7 +28,8 @@ export const 并行回应: AtomDefinition<{
     // 等待型 atom——apply 不修改 state
   },
   pending: {
-    onTimeout: { type: '无操作' },
+    // 超时:无操作,结算继续。被拆成的各请求回应 slot 各自独立超时
+    onTimeout: async () => {},
     prompt: { type: 'confirm', title: '请回应' },
     timeout: 30,
   },

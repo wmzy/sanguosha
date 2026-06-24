@@ -1,8 +1,10 @@
 // 验证选将期间倒计时行为:
 // 1. 主公选将 slot 与并行选将 slot 的 deadline/totalMs 相互独立
 // 2. 主公选将用较长时间后,并行选将 slot 仍有完整 60s
-// 3. 选将期间 idle timer 不启动(不会提前结束回合)
-// 4. 非选将玩家的 events 消息 pending 为 null(不共享主公的倒计时)
+// 3. 非选将玩家的 events 消息 pending 为 null(不共享主公的倒计时)
+//
+// 注:出牌阶段的倒计时现在由引擎内的 __出牌 pending 循环管理(session 不再有 idle timer)。
+// 选将期间的 deadline 完全来自选将 pending slot,本测试验证其独立性。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
@@ -135,38 +137,6 @@ describe('选将倒计时独立性', () => {
     }
 
     // 清理:选完剩余玩家避免 timer 残留
-    for (const t of [...state.pendingSlots.keys()]) {
-      const slot = state.pendingSlots.get(t)!;
-      const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
-      await session.handleAction('p' + t, {
-        skillId: '系统规则', actionType: '选将', ownerId: t,
-        params: { character: cand.name }, baseSeq: state.seq,
-      });
-      await sleep(30);
-    }
-  }, 15000);
-
-  it('选将期间 idle timer 不启动(idleDeadline 为 null)', async () => {
-    // 选将期间 idleDeadline 应为 null(state.idleDeadline 为权威值)
-    const idleDeadline = state.idleDeadline ?? null;
-    expect(idleDeadline).toBeNull();
-
-    // 主公选完后、并行选将创建前的间隙也不应启动
-    const lordSlot = [...state.pendingSlots.values()][0];
-    const lordTarget = (lordSlot.atom as { target: number }).target;
-    const lordCand = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates;
-
-    await session.handleAction('p0', {
-      skillId: '系统规则', actionType: '选将', ownerId: lordTarget,
-      params: { character: lordCand[0].name }, baseSeq: state.seq,
-    });
-    await sleep(50);
-
-    // 并行选将期间 idleDeadline 仍应为 null
-    const idleDeadline2 = state.idleDeadline ?? null;
-    expect(idleDeadline2).toBeNull();
-
-    // 清理
     for (const t of [...state.pendingSlots.keys()]) {
       const slot = state.pendingSlots.get(t)!;
       const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];

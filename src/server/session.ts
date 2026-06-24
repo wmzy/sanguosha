@@ -8,7 +8,7 @@ import type {
 } from '../engine/types';
 import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
-import { TURN_IDLE_TIMEOUT_MS, getPendingDeadline } from '../engine/view/buildView';
+import { getPendingDeadline } from '../engine/view/buildView';
 import { allCharacters } from '../engine/cards/characters';
 
 
@@ -29,9 +29,6 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map(
 }));
 
 const RECONNECT_GRACE_MS = 30_000;
-/** 出牌/弃牌阶段空闲超时——复用引擎 buildView 的口径,保证前端倒计时与此处一致 */
-const IDLE_TIMEOUT_MS = TURN_IDLE_TIMEOUT_MS;
-
 export class GameSession {
   private state: GameState | null = null;
   private actionLog: ActionLogEntry[] = [];
@@ -45,9 +42,6 @@ export class GameSession {
   private roomName: string;
   private maxPlayers: number;
   private destroyed = false;
-  private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  /** debug 房间断线时暂停 idle 定时器，避免无 WS 连接时 idle timer 自循环泄漏 */
-  private idleSuspended = false;
   private sessionSeed: number;
   private logger = createLogger('session');
   private lastBroadcastSeq = 0;
@@ -141,7 +135,6 @@ export class GameSession {
 
     // sendInitialViewToAll 已移除——bootstrap 的 onStateChange 会触发 broadcastNewState,
     // 此时 state 已推进(至少完成抽身份),发给前端的是有意义的状态。
-    this.resetIdleTimer();
     return true;
   }
 
@@ -233,7 +226,6 @@ export class GameSession {
       if (this.destroyed || !this.state) return;
       this.actionLog = this.state.actionLog;
       this.lastActivityAt = Date.now();
-      this.resetIdleTimer();
       this.broadcastNewState();
       this.persistAsync();
       const { gameOver, winner } = checkGameOver(this.state);
@@ -244,16 +236,12 @@ export class GameSession {
   }
 
 
-  /** 读取该 viewer 可见 pending slot 的 deadline/totalMs (供 events 消息下发) */
-  /** 计算某 viewer 的有效 deadline(pending 优先,否则出牌/弃牌阶段空闲超时)。
-   *  读 state.idleDeadline(权威值,由 resetIdleTimer 写入)和引擎 getPendingDeadline(纯函数,与 buildView 同源)。
-   *  deadline 单一来源,session 不再重复 slot 查找逻辑。 */
+  /** 计算某 viewer 的有效 deadline(来自 pending slot 的超时)。
+   *  出牌阶段有 __出牌 询问(50s 超时),其他阶段有各自的询问(询问闪/弃牌等)。
+   *  无 pending 返回 null。 */
   private effectiveDeadline(state: GameState, viewer: number): DeadlineInfo | null {
     const p = getPendingDeadline(state, viewer);
-    if (p) return { deadline: p.deadline, totalMs: p.totalMs };
-    const idle = state.idleDeadline ?? null;
-    if (idle !== null) return { deadline: idle, totalMs: IDLE_TIMEOUT_MS };
-    return null;
+    return p ? { deadline: p.deadline, totalMs: p.totalMs } : null;
   }
 
   /** 从 deadline 值构建缓存 key(避免重复发送不变的倒计时) */
@@ -327,8 +315,6 @@ export class GameSession {
       this.baselineSent.delete(playerId);
       this.lastSentDeadline.delete(playerId);
       this.room.players.delete(playerId);
-      // 暂停 idle timer 防止无 WS 连接时自循环泄漏
-      this.suspendIdleTimer();
       return;
     }
     this.disconnectedAt.set(playerId, Date.now());
@@ -370,8 +356,6 @@ export class GameSession {
     this.room.players.set(playerId, ws);
     this.sendInitialViewToPlayer(playerId);
     this.baselineSent.add(playerId);
-    // 重连后恢复 idle timer（debug 房间断线时 suspendIdleTimer 会暂停它）
-    this.resumeIdleTimer();
     // initialView 已是全量状态，不需要补推差量。
     // 同步水位标记，避免后续 broadcastNewState 重发已含在 initialView 中的事件。
     this.lastBroadcastSeq = Math.max(this.lastBroadcastSeq, this.state.seq);
@@ -382,7 +366,6 @@ export class GameSession {
   async destroy(): Promise<void> {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.clearIdleTimer();
     this.clearGraceTimer();
     // 先断开 state 变更回调:防止挂起的 execute resume 后触发已销毁 session 的广播
     if (this.state) this.state.onStateChange = undefined;
@@ -412,70 +395,6 @@ export class GameSession {
       clearTimeout(this.graceTimer);
       this.graceTimer = null;
     }
-  }
-
-  /**
-   * 暂停 idle timer（debug 房间断线时使用）。
-   * 不 destroy session——断线玩家可以重连重开游戏。
-   */
-  suspendIdleTimer(): void {
-    this.idleSuspended = true;
-    this.clearIdleTimer();
-  }
-
-  /** 恢复 idle timer（debug 房间重连时使用） */
-  resumeIdleTimer(): void {
-    this.idleSuspended = false;
-    this.resetIdleTimer();
-  }
-
-  /** 重置空闲超时定时器(在每次 action 和 startGame 后调用) */
-  private resetIdleTimer(): void {
-    if (this.idleSuspended) return;
-    if (this.idleTimer !== null) {
-      clearTimeout(this.idleTimer);
-    }
-    if (!this.state) return;
-    const state = this.state;
-    // 没有活跃 WS 连接时不启动 idle timer
-    // （持久化恢复的无连接房间、debug 房间全断线后的自循环保护）
-    if (this.room.players.size === 0) return;
-    // 有未决 pending(询问闪/无懈等)时不启动 idle timer——此时玩家须先回应询问,不应被回合超时打断。
-    // 注意:不应判断"是否有玩家死亡"——三国杀阵亡玩家会一直保留在 players 中,该条件会导致
-    // 一旦有人阵亡,所有后续出牌/弃牌阶段的 idle timer 永远不启动(前端倒计时归零却不会结束阶段)。
-    // 当前玩家是否存活由下方 currentPlayer?.alive 判断。
-    if (state.pendingSlots.size > 0) return;
-    // 选将阶段(phase==='准备' 且仍有玩家未选完武将)不启动 idle timer:
-    // 选将 pending 创建之间会短暂出现 pendingSlots.size===0 的间隙(主公选完→并行选将创建前),
-    // 若此时启动 timer,玩家选将慢时会在选将期间误触发"自动结束回合",清掉所有 pending。
-    if (state.phase === '准备' && state.players.some(p => !p.character)) return;
-    const currentPlayer = state.players[state.currentPlayerIndex];
-    if (!currentPlayer?.alive) return;
-    // 写入 state.idleDeadline(权威值),buildView 和 effectiveDeadline 都读此单一来源。
-    state.idleDeadline = Date.now() + IDLE_TIMEOUT_MS;
-    this.idleTimer = setTimeout(() => {
-      if (this.destroyed || !this.state) return;
-      this.logger.info('idle timeout, auto-ending turn', { player: currentPlayer.name });
-      const seq = this.state.seq;
-      // fire-and-forget:广播/持久化由 onStateChange 回调驱动
-      void dispatch(this.state, {
-        skillId: '回合管理',
-        actionType: 'end',
-        ownerId: currentPlayer.index,
-        params: {},
-        baseSeq: seq,
-      }).catch((err) => {
-        this.logger.error('idle dispatch error', { error: String(err) });
-      });
-    }, IDLE_TIMEOUT_MS);
-  }
-
-  private clearIdleTimer(): void {
-    if (this.idleTimer !== null) {
-      clearTimeout(this.idleTimer);
-      this.idleTimer = null;
-    }
-    if (this.state) this.state.idleDeadline = null;
   }
   private persistAsync(): void {
     if (!this.state) return;

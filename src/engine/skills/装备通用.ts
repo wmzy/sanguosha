@@ -3,7 +3,7 @@
 //   若装备牌自带技能(以 card.name 作 skillId),动态挂载技能实例。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { skillLoaders } from './index';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -15,7 +15,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
+      const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';

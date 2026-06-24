@@ -127,12 +127,6 @@ export interface GameState {
    *  session 订阅后据此广播 view,不再 await dispatch。fire-and-forget 模型下
    *  dispatch 返回时 execute 可能还在跑,广播时机由本回调驱动。 */
   onStateChange?: () => void;
-
-  /** 出牌/弃牌阶段的回合空闲超时绝对时间戳(Date.now() 口径)。
-   *  由 session 的 resetIdleTimer 写入(滑动续期);buildView 直接读此字段作为权威值,
-   *  不再各自近似计算。为 null 表示当前无空闲倒计时(有 pending / 非出牌弃牌阶段 / 选将期)。
-   *  持久化时会随 state 快照保存;restore 路径若值过期,resetIdleTimer 会重写。 */
-  idleDeadline?: number | null;
 }
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
@@ -161,7 +155,6 @@ export function createGameState(partial: Partial<GameState> & { players: PlayerS
     startedAt: 0,
     actionLog: [],
     atomHistory: [],
-    idleDeadline: null,
     ...partial,
     players,
   };
@@ -329,15 +322,13 @@ export interface PickTargetCardPrompt {
 // ==================== Atom ====================
 
 /** Atom 等待配置(pending)。有此字段 = 等待型 atom。apply 流程走完后进 pending 区。
- * 等待型 atom 不可被取消——必走完(响应/超时)之一(没有 drop 机制)。
- * `timeout` 与 `onTimeout` 都是必填,无合理默认值。*/
+ 等待型 atom 不可被取消——必走完(响应/超时)之一(没有 drop 机制)。
+ `timeout` 与 `onTimeout` 都是必填,无合理默认值。*/
 export interface AtomPending<A = Atom> {
-  /** 超时后的行为:一个 atom,和普通 apply 一样压栈执行。**必填**——典型 `{ type: '无操作' }` */
-  onTimeout: Atom;
-  /** 超时时的动态行为钩子:根据当前 state 和 pending 的 atom 返回一个 atom 替代静态 onTimeout。
-   *  用于需要读取 state 才能决定超时做什么的场景(如弃牌超时自动弃牌、选将超时自动分配武将)。
-   *  返回 undefined = 回退到静态 onTimeout。未实现 = 用静态 onTimeout。 */
-  onTimeoutDynamic?: (state: GameState, atom: A) => Atom | undefined;
+  /** 超时后的行为。**必填**——一个 async 函数,引擎在 slot 超时时调用。
+   *  内部可自由编排 applyAtom(支持多步操作),每个 applyAtom 照常走完整 pipeline(hooks 正常触发)。
+   *  典型:无副作用 `async () => {}`;自动弃牌 `async (s, a) => { await applyAtom(s, 弃牌atom) }` */
+  onTimeout: (state: GameState, atom: A) => Promise<void>;
   /** 前端提示(告诉前端渲染什么 UI) */
   prompt: ActionPrompt;
   /** 超时毫秒。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s */
@@ -439,7 +430,6 @@ export type Atom =
   | { type: '发牌'; handSize: number; lordBonus?: number }
   | { type: '判定'; player: number; judgeType: string }
   // 等待回应
-  | { type: '无操作' }
   | { type: '询问闪'; target: number; source: number }
   | { type: '询问杀'; target: number; source: number }
   | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number;
@@ -529,9 +519,8 @@ export interface GameView {
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;
-  /** 出牌/弃牌阶段(无 pending 时)的空闲超时截止时间戳。
-   *  pending 存在时为 null(此时用 pending.deadline)。
-   *  由 session 的 idleTimer 权威下发。 */
+  /** 当前 pending slot 的超时截止时间戳(出牌阶段的 __出牌 询问、询问闪/弃牌等)。
+   *  无 pending 时为 null。 */
   deadline: number | null;
   /** deadline 对应的倒计时总时长(ms);deadline 为 null 时无意义 */
   deadlineTotalMs: number;

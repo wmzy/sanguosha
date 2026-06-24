@@ -3,7 +3,7 @@
 //   无发动次数限制(可多次使用,但回血每回合仅一次)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -21,7 +21,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0;
+      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       // 仁德有三种调用格式:

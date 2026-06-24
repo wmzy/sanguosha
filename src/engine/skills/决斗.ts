@@ -4,7 +4,7 @@
 // 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 没出(输)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -18,7 +18,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0
+      const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       const cardId = params.cardId as string;

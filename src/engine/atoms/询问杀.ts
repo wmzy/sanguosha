@@ -16,7 +16,8 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
     // 等待型 atom——apply 不修改 state
   },
   pending: {
-    onTimeout: { type: '无操作' },
+    // 超时:不出杀,结算继续
+    onTimeout: async () => {},
     prompt: PROMPT,
     timeout: 15,
   },

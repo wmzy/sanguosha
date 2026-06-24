@@ -5,6 +5,7 @@ import type { ActionPrompt, Atom, AtomDefinition, Card, GameState, PlayerState, 
 import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
+import { applyAtom } from '../create-engine';
 import { registerAtom } from '../atom';
 
 /** 默认通用技能列表 */
@@ -232,14 +233,13 @@ export const 选将询问: AtomDefinition<{
     }
   },
   pending: {
-    onTimeout: { type: '无操作' },
     // 选将超时:从候选人中随机分配一个未被选走的武将(确定性:用 state.seq 做种子)。
     // 否则玩家超时未选 → character 空 → 游戏带空武将进入出牌阶段(不可玩)。
     // 并行选将被引擎拆成多个 选将询问 slot,超时也走这里。
-    onTimeoutDynamic(state, atom) {
+    async onTimeout(state, atom) {
       const target = atom.target;
       const p = state.players[target];
-      if (!p || p.character) return undefined;
+      if (!p || p.character) return;
       const candidates = atom.candidates;
       const taken = new Set(state.players.map(pl => pl.character));
       const available = candidates.filter(c => !taken.has(c.name));
@@ -247,12 +247,12 @@ export const 选将询问: AtomDefinition<{
       // 用 state.seq 做种子:单调递增,对同一局游戏确定性可复现
       const rng = createRng(state.seq ^ (target * 2654435761));
       const pick = pool[rng.nextInt(pool.length)];
-      return {
+      await applyAtom(state, {
         type: '分配武将',
         target,
         character: pick.name,
         skills: [...DEFAULT_SKILLS, ...pick.skills],
-      };
+      });
     },
     prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
     timeout: 60,
@@ -338,7 +338,8 @@ export const 并行选将: AtomDefinition<{
     }
   },
   pending: {
-    onTimeout: { type: '无操作' },
+    // 超时:无操作。并行选将拆成多个单-target 选将询问 slot,各 slot 用选将询问的 onTimeout
+    onTimeout: async () => {},
     prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
     timeout: 60,
   },

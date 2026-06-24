@@ -19,7 +19,7 @@
 // handleTransformPlay 提交 preceding params.cardIds=[id1,id2] + 主 action
 // cardId = ${id1}#${id2}#丈八蛇矛。
 import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { applyAtom } from '../create-engine';
 import { viewCanAttack } from '../viewDistance';
 
@@ -48,7 +48,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0;
+      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       const cardIds = params.cardIds;

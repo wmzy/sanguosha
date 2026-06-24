@@ -330,4 +330,55 @@ describe('回合管理', () => {
     const entry1 = findActionEntry('系统规则', 1, '选将')!;
     expect(entry1.validate(state, { character: '刘备' })).not.toBeNull();
   });
+
+  // ─── 出牌阶段 __出牌 循环与超时 ─────────────────
+
+  it('__出牌 超时 → 自动结束回合,推进到下家', async () => {
+    // P0 摸牌阶段(即将推进到出牌),P0 有 1 张手牌(不超体力)
+    // 从摸牌阶段开始,让 hook 链自然推进到出牌 → __出牌 循环启动
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1'] }),
+        makePlayer({ index: 1, name: 'P2', hand: [] }),
+      ],
+      cardMap: { c1: makeCard('c1', '杀', '♠', 'A') },
+      currentPlayerIndex: 0,
+      phase: '摸牌',
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    // 给 deck 一些牌让 P2 摸牌
+    for (let i = 0; i < 20; i++) {
+      const id = `d${i}`;
+      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: String(i + 1), type: '基本牌' };
+      state.zones.deck.push(id);
+    }
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 触发阶段结束(摸牌)→ hook 推进到出牌 → __出牌 循环启动
+    const { dispatch } = await import('../../src/engine/create-engine');
+    // 用 applyAtom 触发阶段链
+    const { applyAtom } = await import('../../src/engine/create-engine');
+    await applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+
+    // 出牌阶段应该有 __出牌 pending
+    expect(harness.state.phase).toBe('出牌');
+    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
+
+    // 模拟超时:触发 __出牌 slot 的 onTimeout → 自动结束回合
+    // 不用 P1.pass()(会触发 processAllEvents 自动对比,在过渡期间视图增量可能有滞后);
+    // 直接 fireTimeout 并等待稳定后检查引擎状态(权威来源)。
+    const { fireTimeout } = await import('../../src/engine/create-engine');
+    await fireTimeout(harness.state);
+    await harness.waitForStable();
+
+    // 超时后应推进到下家(P2)出牌阶段
+    expect(harness.state.currentPlayerIndex).toBe(1);
+    expect(harness.state.phase).toBe('出牌');
+    // P2 摸了 2 张
+    expect(harness.state.players[1].hand.length).toBe(2);
+    void P1;
+    void dispatch;
+  });
 });

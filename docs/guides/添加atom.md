@@ -22,7 +22,7 @@ interface AtomDefinition<A = Atom> {
   toViewEvents?(state, atom): ViewEventSplit | undefined;  // 信息分级(apply 前调用)
   applyView?(view, event): void;            // 前端增量更新
   effect?: AtomEffect;                      // 动画/音效(fallback,toViewEvents 未实现时用)
-  pending?: { onTimeout: Atom; prompt: ActionPrompt; timeout: number };  // 等待型(可选)
+  pending?: { onTimeout: (state: GameState, atom: Atom) => Promise<void>; prompt: ActionPrompt; timeout: number };  // 等待型(可选)
 }
 ```
 
@@ -34,7 +34,7 @@ interface AtomDefinition<A = Atom> {
 | **玩家用座次下标(number)** | `atom.target`/`atom.player`/`atom.source` 都是 `number`,`state.players[atom.target]` |
 | **toViewEvents 在 apply 前调用** | 此时 state 未变更,可读取即将被消费的数据(如牌堆顶牌面) |
 | **信息分级** | `ownerViews`(指定玩家看到专属内容) + `othersView`(其余人看到的通用内容);`null` = 该玩家看不到 |
-| **pending 三件套都必填** | `onTimeout`(超时 atom)、`prompt`(前端 UI)、`timeout`(秒数) |
+| **pending 三件套都必填** | `onTimeout`(超时 async 函数)、`prompt`(前端 UI)、`timeout`(秒数) |
 
 ## 二、添加 atom 的步骤
 
@@ -108,7 +108,7 @@ export const 求桃: AtomDefinition<{ target: number }> = {
   validate(state, atom) { /* ... */ return null; },
   apply() { /* 等待型 atom——apply 不修改 state */ },
   pending: {
-    onTimeout: { type: '击杀', player: atom.target },  // 超时 = 死亡
+    onTimeout: async (state) => { await applyAtom(state, { type: '击杀', player: atom.target }); },  // 超时 = 死亡
     prompt: { type: 'confirm', title: '是否使用桃救援?' },
     timeout: 15,  // 秒
   },
@@ -124,7 +124,7 @@ export const 求桃: AtomDefinition<{ target: number }> = {
 **pending 核心规则**:
 - 同时只有一个 pending——引擎不变量
 - 等待型 atom 不可被取消——必走"响应到达"或"超时"之一
-- `onTimeout` 声明一个 atom(如 `{ type: '无操作' }` 或 `{ type: '击杀', player: target }`),引擎用 `applyAtom(state, onTimeout)` 执行
+- `onTimeout` 是一个 async 函数 `(state, atom) => Promise<void>`,引擎在 slot 超时时调用(内部可自由编排 `applyAtom`,每个 applyAtom 走完整 pipeline)
 
 ## 四、toViewEvents 信息分级
 
@@ -159,7 +159,7 @@ return {
 - [ ] `toViewEvents` 做信息分级(本人 vs 其他人)
 - [ ] `toViewEvents` 在 apply 前调用(读未变更的 state)
 - [ ] `applyView` 与 `apply` 对称(apply 改 GameState,applyView 改 GameView)
-- [ ] 等待型 atom:`pending.onTimeout`/`prompt`/`timeout` 三件套齐全
+- [ ] 等待型 atom:`pending.onTimeout`(async 函数)/`prompt`/`timeout` 三件套齐全
 - [ ] 在 `atoms/index.ts` 注册 import
 
 ## 六、AI 提示词
@@ -179,7 +179,7 @@ return {
 参数字段:${字段名:类型, ...}
 语义:${这个 atom 表示什么游戏事件}
 状态变更:${apply 具体改什么 state}
-等待型:${是/否}(若是:onTimeout 是什么、prompt 是什么、timeout 多少秒)
+等待型:${是/否}(若是:onTimeout 做什么、prompt 是什么、timeout 多少秒)
 信息分级:${谁看到什么}
 
 ## 引擎规范(必须遵守)
@@ -191,7 +191,7 @@ return {
 5. 玩家用座次下标(number):atom.target/atom.player/atom.source
 6. toViewEvents 在 apply 前调用,做信息分级(ownerViews/othersView)
 7. applyView 与 apply 对称
-8. 等待型 atom 的 pending 三件套(onTimeout/prompt/timeout)必填
+8. 等待型 atom 的 pending 三件套(onTimeout async 函数/prompt/timeout)必填
 
 ## 要求
 

@@ -70,8 +70,20 @@ export function findPendingSlot(state: GameState, ownerId: number): PendingSlot 
     ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
 }
 
+/** 是否存在阻塞型 pending——即需要玩家先回应的询问(询问闪/杀/无懈/弃牌等)。
+ *  出牌阶段的 __出牌 询问是非阻塞的(玩家可以在期间自由出牌),不计入阻塞判断。
+ *  validateUseCard 和 end action 用此函数替代旧的 pendingSlots.size > 0 检查。 */
+export function hasBlockingPending(state: GameState): boolean {
+  for (const slot of state.pendingSlots.values()) {
+    const rt = (slot.atom as { requestType?: string }).requestType;
+    if (rt === '__出牌') continue;
+    return true;
+  }
+  return false;
+}
+
 /** 出牌阶段使用牌 action 的通用 validate,覆盖 90% 的 use 场景。
- *  检查:自己回合、出牌阶段、无 pending、存活、手牌中有牌。
+ *  检查:自己回合、出牌阶段、无阻塞型 pending、存活、手牌中有牌。
  *  返回 null=通过,字符串=拒绝理由。skills 可在此之上追加校验。
  *  @param opts.cardName 需要的卡牌名称。缺省则不校验牌名。
  *  @param opts.requireTarget 是否需要非空 targets 数组。缺省则不校验目标。 */
@@ -83,7 +95,7 @@ export function validateUseCard(
 ): string | null {
   if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
   if (state.phase !== '出牌') return '不是出牌阶段';
-  if (state.pendingSlots.size > 0) return '当前有等待响应';
+  if (hasBlockingPending(state)) return '当前有等待响应';
   const self = state.players[ownerId];
   if (!self?.alive) return '你已死亡';
   const cardId = params.cardId as string | undefined;

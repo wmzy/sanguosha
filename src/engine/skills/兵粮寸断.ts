@@ -12,7 +12,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill'
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { askWuxie } from '../wuxie';
@@ -30,7 +30,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = state.pendingSlots.size === 0;
+      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
       const selfAlive = self?.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';

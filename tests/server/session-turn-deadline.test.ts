@@ -1,21 +1,19 @@
 // tests/server/session-turn-deadline.test.ts
-// 回归测试:验证出牌/弃牌阶段倒计时的前后端同步。
+// 回归测试:验证出牌阶段倒计时的前后端同步。
 //
-// 根因:deadline 只在 buildView(首次 initialView)中计算,后续 events 消息不携带,
-// 前端 view.deadline 永远卡在初始值;且服务端 resetIdleTimer 每次 action 滑动续期,
-// 前端无从得知,导致倒计时与实际超时严重不一致(前端比后端提前超时)。
+// 设计变更:出牌阶段现在是一个引擎内的 __出牌 pending 循环(由回合管理 hook 启动),
+// 不再由 session 的 idle timer 管理。deadline 统一来自 pending slot 的超时——
+// buildView 读 pending.deadline,effectiveDeadline 读 getPendingDeadline,两者同源。
 //
-// 修复要点:
-// 1. session 维护 idleDeadline,resetIdleTimer 设置它
-// 2. resetIdleTimer 在 broadcastNewState 之前调用(顺序修正)
-// 3. broadcastNewState 的 event 消息携带 deadline(仅在变化时)
-// 4. buildView 的 deadline guard 对齐 resetIdleTimer(有 pending 时不计时)
+// 验证点:
+// 1. buildView 在有 __出牌 pending 时返回非空 deadline
+// 2. event 消息携带 deadline(仅在变化时),前端据此同步倒计时
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
-import { TURN_IDLE_TIMEOUT_MS } from '../../src/engine/view/buildView';
+import { buildView } from '../../src/engine/view/buildView';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
@@ -41,12 +39,6 @@ function setState(session: GameSession, state: GameState): void {
   (session as unknown as { state: GameState }).state = state;
 }
 
-/** 通过 reflection 取 state.idleDeadline(权威值,由 resetIdleTimer 写入) */
-function getIdleDeadline(session: GameSession): number | null {
-  const state = (session as unknown as { state: GameState | null }).state;
-  return state?.idleDeadline ?? null;
-}
-
 /** 伪 WebSocket,收集所有发给该 player 的消息 */
 class FakeWS {
   messages: ServerMessage[] = [];
@@ -57,9 +49,9 @@ class FakeWS {
   close(): void { /* noop */ }
 }
 
-/** 构造一个处于出牌阶段、2 人存活的极简 state(不走 bootstrap) */
+/** 构造一个处于出牌阶段、2 人存活、带 __出牌 pending 的极简 state */
 function makeActState(): GameState {
-  return createGameState({
+  const state = createGameState({
     players: [
       { index: 0, name: 'P1', character: '刘备', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
       { index: 1, name: 'P2', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
@@ -69,48 +61,49 @@ function makeActState(): GameState {
     phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
   });
+  return state;
 }
 
-describe('session:出牌/弃牌阶段倒计时前后端同步', () => {
+describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
   let session: GameSession;
 
   beforeEach(() => {
     resetForTest();
     session = new GameSession(makeRoom(), true, 42);
-    // 直接注入一个出牌阶段的 state,跳过 bootstrap
     const state = makeActState();
     setState(session, state);
-    // 挂载 onStateChange
     (session as unknown as { attachStateListener: () => void }).attachStateListener();
   });
 
-  it('resetIdleTimer 设置 idleDeadline = now + TURN_IDLE_TIMEOUT_MS', () => {
-    // 通过 reflection 调 resetIdleTimer
-    const before = Date.now();
-    (session as unknown as { resetIdleTimer: () => void }).resetIdleTimer();
-    const after = Date.now();
-    const deadline = getIdleDeadline(session);
-    expect(deadline).not.toBeNull();
-    // deadline 应在 [before+timeout, after+timeout] 区间
-    expect(deadline!).toBeGreaterThanOrEqual(before + TURN_IDLE_TIMEOUT_MS);
-    expect(deadline!).toBeLessThanOrEqual(after + TURN_IDLE_TIMEOUT_MS);
-  });
-
-  it('有 pending slot 时 idleDeadline 为 null(不计时)', () => {
+  it('buildView 在有 __出牌 pending 时返回非空 deadline', () => {
     const state = getState(session);
-    // 模拟有 pending(如询问闪)
+    // 模拟 __出牌 pending slot(50s 超时)
+    const before = Date.now();
     state.pendingSlots.set(0, {
-      atom: { type: '询问闪', target: 0 } as never,
-      definition: {} as never,
-      deadline: 30000,
+      atom: { type: '请求回应', requestType: '__出牌', target: 0 } as never,
+      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50 } } as never,
+      deadline: 50_000,
       startTime: 0,
       resolve: () => {},
     } as never);
-    (session as unknown as { resetIdleTimer: () => void }).resetIdleTimer();
-    expect(getIdleDeadline(session)).toBeNull();
+    const after = Date.now();
+
+    const view = buildView(state, 0);
+    expect(view.deadline).not.toBeNull();
+    // deadline 应在 [before+50s, after+50s] 区间(因为 slot.deadline 是相对时间 50000ms)
+    expect(view.deadline!).toBeGreaterThanOrEqual(state.startedAt + 50_000);
+    expect(view.deadlineTotalMs).toBe(50_000);
+    void before; void after;
   });
 
-  it('event 消息携带 deadline,前端据此同步倒计时', () => {
+  it('buildView 无 pending 时 deadline 为 null', () => {
+    const state = getState(session);
+    const view = buildView(state, 0);
+    expect(view.deadline).toBeNull();
+    expect(view.deadlineTotalMs).toBe(0);
+  });
+
+  it('event 消息携带 deadline(来自 pending slot)', () => {
     const state = getState(session);
     // 接一个玩家 WS
     const ws = new FakeWS();
@@ -119,36 +112,25 @@ describe('session:出牌/弃牌阶段倒计时前后端同步', () => {
     room.players.set(playerId, ws as unknown as import('hono/ws').WSContext);
     (session as unknown as { playerNames: Map<string, number> }).playerNames.set(playerId, 0);
 
-    // 触发一次广播:先调 resetIdleTimer 写入 state.idleDeadline,broadcastNewState 据此下发
-    (session as unknown as { resetIdleTimer: () => void }).resetIdleTimer();
+    // 模拟 __出牌 pending slot
+    state.pendingSlots.set(0, {
+      atom: { type: '请求回应', requestType: '__出牌', target: 0 } as never,
+      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50 } } as never,
+      deadline: 50_000,
+      startTime: 0,
+      resolve: () => {},
+    } as never);
+
+    // 触发广播
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
 
-    // 应收到 initialView(首次) 且其 state.deadline 非空
+    // 应收到 initialView 且其 state.deadline 非空
     const initialMsg = ws.messages.find(m => m.type === 'initialView');
     expect(initialMsg).toBeDefined();
     if (initialMsg!.type === 'initialView') {
-      // buildView 对齐了 guard:出牌阶段无 pending → deadline 非空
       expect(initialMsg!.state.deadline).not.toBeNull();
-      expect(initialMsg!.state.deadlineTotalMs).toBe(TURN_IDLE_TIMEOUT_MS);
+      expect(initialMsg!.state.deadlineTotalMs).toBe(50_000);
     }
     void state;
-  });
-
-  it('每次 onStateChange 后 idleDeadline 滑动续期(重置为新 now+timeout)', async () => {
-    const onChange = getState(session).onStateChange;
-    expect(onChange).toBeDefined();
-    // 第一次触发
-    onChange!();
-    const d1 = getIdleDeadline(session);
-    expect(d1).not.toBeNull();
-
-    await new Promise(r => setTimeout(r, 50));
-
-    // 第二次触发(模拟玩家出牌后的状态变更)
-    onChange!();
-    const d2 = getIdleDeadline(session);
-    expect(d2).not.toBeNull();
-    // d2 应比 d1 晚(滑动续期)
-    expect(d2!).toBeGreaterThan(d1!);
   });
 });

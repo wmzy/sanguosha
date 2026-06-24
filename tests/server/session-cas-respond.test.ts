@@ -124,10 +124,12 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
       await sleep(50);
     }
     for (let i = 0; i < 200 && state.pendingSlots.size > 0; i++) await sleep(10);
-    expect(state.pendingSlots.size).toBe(0);
+    // 选将完成后无阻塞型 pending(出牌阶段会有 __出牌 询问,但不阻塞)
+    expect(state.pendingSlots.size <= 1).toBe(true);
 
     // 等待进入 player 0 的出牌阶段(bootstrap 完成后回合管理自动推进到出牌)
-    for (let i = 0; i < 300 && (state.currentPlayerIndex !== 0 || state.phase !== '出牌' || state.pendingSlots.size > 0); i++) await sleep(10);
+    // 出牌阶段会有 __出牌 询问(非阻塞型 pending),不检查 pendingSlots.size
+    for (let i = 0; i < 300 && (state.currentPlayerIndex !== 0 || state.phase !== '出牌'); i++) await sleep(10);
 
     // 现在进入游戏,处于出牌阶段。用陈旧 baseSeq 发主动 action
     const veryStaleSeq = state.seq - 10;

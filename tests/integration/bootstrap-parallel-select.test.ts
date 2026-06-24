@@ -11,6 +11,7 @@ import '../../src/engine/skills';
 import { bootstrap, dispatch, resetForTest } from '../../src/engine/create-engine';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
+import { hasBlockingPending } from '../../src/engine/skill';
 
 // 复刻 session.ts 的默认武将列表(测试独立,避免 import server)
 const CHARACTERS: Array<{ name: string; skills: string[] }> = [
@@ -138,18 +139,19 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
       await respondCharSelect(state, t, choice!.name);
     }
 
-    // 全部选完 → 进入游戏(发牌 + 回合开始),无 pending 残留
+    // 全部选完 → 进入游戏(发牌 + 回合开始)
     // bootstrap 后续流程(技能注册/洗牌/发牌/回合开始)需要多次微任务推进。
     // 轮询直到所有玩家都拿到手牌(发牌完成的可观察信号),避免固定 setTimeout 在
     // 高负载/多技能实例化场景下的 flaky(更多 DEFAULT_SKILLS → 更多 dynamic import)。
+    // 注意:出牌阶段会有 __出牌 询问(非阻塞型 pending),不计入 hasBlockingPending。
     const bootDeadline = Date.now() + 8000;
     while (Date.now() < bootDeadline) {
       await waitForStable(state);
-      if (state.pendingSlots.size === 0 && state.players.every(p => p.hand.length > 0)) break;
+      if (!hasBlockingPending(state) && state.players.every(p => p.hand.length > 0)) break;
       await new Promise(r => setTimeout(r, 50));
     }
     await waitForStable(state);
-    expect(state.pendingSlots.size).toBe(0);
+    expect(hasBlockingPending(state)).toBe(false);
 
     // 所有玩家都选了武将
     for (const p of state.players) {

@@ -13,7 +13,7 @@ import {
   resetForTest,
   registerSkillsFromState,
 } from '../../src/engine/create-engine';
-import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
+import { dispatchAndWait, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -139,10 +139,14 @@ describe('弃牌阶段', () => {
       return;
     }
 
-    // 自动超时:消耗 pending
-    let safety = 5;
-    while (state.pendingSlots.size > 0 && safety-- > 0) {
-      await fireTimeoutAndWait(state);
+    // 自动超时:只触发弃牌 pending(不触发 __出牌 循环)
+    // 找到 __弃牌 slot 并触发其超时
+    const discardSlot = [...state.pendingSlots.values()].find(
+      s => (s.atom as { requestType?: string }).requestType === '__弃牌'
+    );
+    if (discardSlot) {
+      await discardSlot._fireTimeoutNow?.();
+      await waitForStable(state);
     }
 
     // 期望:手牌数 ≤ 体力上限 (4)

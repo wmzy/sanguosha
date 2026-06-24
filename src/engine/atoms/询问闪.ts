@@ -16,7 +16,8 @@ export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
     // 等待型 atom——apply 不修改 state
   },
   pending: {
-    onTimeout: { type: '无操作' },
+    // 超时:不出闪,结算继续(父 action 检查处理区无闪牌则造成伤害)
+    onTimeout: async () => {},
     prompt: PROMPT,
     timeout: 15,
   },

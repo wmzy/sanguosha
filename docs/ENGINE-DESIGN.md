@@ -283,7 +283,7 @@ async (state: GameState, params: Record<string, Json>) => {
 
   // 等待型 atom:进入 pending,Promise 挂起
   await applyAtom(state, { type: '询问闪', target: 1, source: from });
-  // ↑ 闪 respond 后(或超时 onTimeout=无操作)Promise resolve
+  // ↑ 闪 respond 后(或超时 onTimeout 为空函数)Promise resolve
   // 父 action 通过观察 state.zones.processing 判断是否闪避(见 §4.10)
 
   // 结算后:清理 + 牌入弃牌堆
@@ -319,7 +319,7 @@ async (state: GameState, params: Record<string, Json>) => {
 + 等待型 atom 的 `AtomDefinition` 声明 `pending` 字段（§5）
 + `applyAtom(state, 等待型atom)` 执行完 before hooks → validate → apply → after hooks → 弹栈后，进入 **pending 区**，`applyAtom` 返回的 Promise 挂起
 + pending 区只有一个位置——**同时只有一个等待**
-+ 等待结束方式: **响应到达**(target 的 respond action execute 完,slot 被消费) 或 **超时**(`pending.onTimeout` 声明的 atom 走普通 apply 路径)
++ 等待结束方式: **响应到达**(target 的 respond action execute 完,slot 被消费) 或 **超时**(`pending.onTimeout` 声明的 async 函数被调用,内部可自由编排 applyAtom)
 + **等待型 atom 不可被丢弃/取消**——必走完上述两条路径之一(没有 `drop()` 机制)
 + `pending.timeout` 与 `pending.onTimeout` **都是必填**——没有合理默认值
 
@@ -342,7 +342,7 @@ applyAtom(state, 询问闪):
   // 所有 before hooks 结束
   validate → apply → after → 弹栈
   检测到 pending → 进入 pending 区 → Promise 挂起
-  // 等用户出闪或超时(onTimeout={ type: '无操作' })
+  // 等用户出闪或超时(onTimeout 为空函数)
 ```
 
 > **实现注**：实际八卦阵实现不走「请求回应（是否发动八卦阵）」的确认步骤——三国杀标准规则下判定自动触发。上面流程图只展示 hook 嵌套调用的一般能力（hook 中可以 `await applyAtom` 任何 atom，包括等待型），实际八卦阵的简洁实现见 §4.10 八卦阵示例。
@@ -351,7 +351,7 @@ applyAtom(state, 询问闪):
 + 新 atom 走完整 apply 流程后入 slot
 + 典型场景: 闪响应后用户在 5s 内又发动某技能,新生成的等待顶替
 
-**超时行为**：`pending.onTimeout` 声明一个 atom,引擎用 `applyAtom(state, onTimeout)` 执行——和普通 apply 一样压栈、走钩子、弹栈。**onTimeout 必填**——典型场景是 `{ type: '无操作' }` 占位 atom(空 apply),表示"超时不做事,继续结算"。
+**超时行为**：`pending.onTimeout` 是一个 async 函数 `(state, atom) => Promise<void>`,引擎在 slot 超时时调用。函数内部可自由编排 `applyAtom`(支持多步操作),每个 applyAtom 照常走完整 pipeline(before/after hooks 正常触发)。**onTimeout 必填**——典型场景是 `async () => {}`(超时不做事,继续结算);需要做事的如弃牌超时 `async (s, a) => { await applyAtom(s, 弃牌atom) }`。
 
 **前端感知**：等待型 atom 进入 pending 区时下发 atom 事件,事件带时间戳：
 
@@ -389,7 +389,8 @@ hook B:applyAtom(请求回应-B) → 发现 pendingSlot 已占
 // 锦囊 execute 内
 let wuxieCount = 0;
 while (true) {
-  await applyAtom(state, { type: '请求回应', requestType: '无懈', target: 广播, onTimeout: 无操作 });
+  await applyAtom(state, { type: '请求回应', requestType: '无懈', target: 广播 });
+  // 注:请求回应 的 onTimeout 默认为空函数(超时=本轮无人打无懈)
   if (!state.localVars['无懈/本轮已打']) break;  // 超时=本轮无人打无懈
   wuxieCount++;
 }
@@ -444,7 +445,7 @@ interface AtomAfterContext {
 
 **`询问闪` 的 before 钩子示例**:
 - 八卦阵: 判定 → 红色 → 往处理区插入一张虚拟的闪牌。杀不需要知道八卦阵——只检查处理区有没有闪牌。
-- 询问闪继续走完 validate/apply 并进入 pending(等用户出闪);若用户最终未出闪,onTimeout=`无操作` 触发,杀.execute 检查处理区无闪牌则造成伤害
+- 询问闪继续走完 validate/apply 并进入 pending(等用户出闪);若用户最终未出闪,onTimeout 为空函数触发,杀.execute 检查处理区无闪牌则造成伤害
 
 **闪的回应 action execute**: 移牌从手牌→**处理区**(不是直接进弃牌堆)。父 action(杀/万箭齐发)结算时检查处理区有没有闪牌,有则移入弃牌堆(闪避成功),没有则造成伤害。
 
@@ -1198,7 +1199,6 @@ type Atom =
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number; lordBonus?: number }
   // 等待回应(进入 pending 区,等待玩家操作或超时)
-  | { type: '无操作' }                                                   // 超时占位 atom(空 apply),表示"超时不做事"
   | { type: '询问闪'; target: number; source: number }
   | { type: '询问杀'; target: number; source: number }
   | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number; wuxieTarget?: number }
@@ -1234,13 +1234,14 @@ interface AtomDefinition<A = unknown> {
    */
   pending?: {
     /**
-     * 超时后的行为:一个 atom,和普通 apply 一样压栈执行。
-     * **必填**——典型场景是 `{ type: '无操作' }` 占位 atom(空 apply),表示"超时不做事,继续结算"。
+     * 超时后的行为:一个 async 函数,引擎在 slot 超时时调用。
+     * 内部可自由编排 applyAtom(支持多步操作),每个 applyAtom 照常走完整 pipeline(hooks 正常触发)。
+     * **必填**——典型场景是 `async () => {}`(超时不做事,继续结算)。
      */
-    onTimeout: Atom;
+    onTimeout: (state: GameState, atom: Atom) => Promise<void>;
     /** 前端提示(告诉前端渲染什么 UI) */
     prompt: ActionPrompt;
-    /** 超时毫秒。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s
+    /** 超时秒数。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s
      * 运行时:优先读 atom 字段 `timeout`(如 `请求回应` 的 `timeout` 参数),fallback 到 def.pending.timeout。
      * 这样可以在创建等待型 atom 时动态指定超时,不被 def 的默认值锁定。
      */
@@ -1430,7 +1431,7 @@ for (const event of viewEvents) {
    - 新 atom 进入 **pending 区**，`applyAtom` 返回的 Promise **挂起**
    - 前端收到带 `pending: { startTime, deadline }` 的 atom 事件
 **原子性保证**：before 钩子通过返回 `HookResult`(§4.5)干预当前 atom:`modify` 改参数(叠加生效)、`cancel` 取消。validate 在钩子折叠之后执行,基于(可能被 modify 过的)最新参数检查。
-   - 等待结束: 响应到达(target 的 respond action execute 完,slot 被消费)或 超时(`pending.onTimeout` 声明的 atom 走普通 apply 路径,必填)
+   - 等待结束: 响应到达(target 的 respond action execute 完,slot 被消费)或 超时(`pending.onTimeout` async 函数被调用,必填)
 
 
 **普通 atom vs 等待型 atom 的唯一区别**：步骤 8。没有 `pending` 声明的 atom 在步骤 7 后 Promise 直接 resolve；有 `pending` 声明的 atom 进入 pending 区等待。
@@ -1452,7 +1453,7 @@ await applyAtom(state, { type: '询问闪', target, source: 0 })
 //    判定失败 → 不做事 → 询问闪继续
 // ↑ 询问闪进 pending 区后:
 //    用户出闪 → 闪 action execute(移牌到弃牌堆) → pending 消费 → Promise resolve
-//    或超时 → onTimeout=无操作 → Promise resolve
+//    或超时 → onTimeout 为空函数 → Promise resolve
 
 // Promise resolve 后,父 action 观察 state.zones.discardPile 增量判断闪避
 const beforeCount = ...; // 等待前快照
@@ -1489,14 +1490,14 @@ interface PendingSlot {
 
 + **入队**: 等待型 atom 的 apply 流程走完后,从 atom 栈弹出,进入 pending 区(若已有旧 slot,旧 slot 立即被替换,见 §6.1)
 + **消费**: 用户发 action → action execute → pending 被消费 → `resolve()` → 技能的 `await applyAtom(state, ...)` 从暂停点恢复
-+ **超时**: 定时器触发 → `clearTimeout(timer)` → 执行 `pending.onTimeout`(必填)走普通 apply 路径 → `resolve()` → 技能恢复
++ **超时**: 定时器触发 → `clearTimeout(timer)` → 执行 `pending.onTimeout`(必填)async 函数 → `resolve()` → 技能恢复
 + **没有 `drop()` 清除机制**——等待型 atom 必走完(消费/超时)之一
 
 **嵌套等待**: before hook 中可以 `await applyAtom(ctx.state, 等待型atom)` 插入新的等待。此时外层 atom 还在 apply 栈上没弹出,内层等待型 atom 先执行完其 apply 流程,先进入 pending 区。内层被消费后,外层 atom 的 before hooks 继续——外层 atom 继续执行其 apply 流程,也进入 pending 区(若内层是替换进来的,旧 slot 也已 resolve)。
 
 ### 6.3 超时配置
 
-`AtomDefinition.pending.timeout` **必填**(无合理默认值——隐藏 30s、超时无操作 = 挂死,都不可接受)。常见值:
+`AtomDefinition.pending.timeout` **必填**(无合理默认值——隐藏 30s、超时不做事 = 挂死,都不可接受)。常见值:
 + 询问闪 / 询问杀: 15 秒
 + 请求回应(技能确认/分配): 30 秒
 

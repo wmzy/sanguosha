@@ -560,11 +560,10 @@ function createAndAwaitSlot(
       timedOut = true;
       clearTimeout(timer);
       try {
-        // 超时行为优先用动态钩子(onTimeoutDynamic),可读 state 决定超时做什么;
-        // 未实现或返回 undefined 时回退到静态 onTimeout。
-        // 业务逻辑(弃牌超时/选将超时等)由各自 atom 定义声明,引擎核心只管调度。
-        const timeoutAtom = pending.onTimeoutDynamic?.(state, atom) ?? pending.onTimeout;
-        await applyAtom(state, timeoutAtom);
+        // 超时行为:调用 atom 定义的 onTimeout 编排函数。
+        // 内部可自由编排 applyAtom(支持多步操作),每个 applyAtom 走完整 pipeline(hooks 正常触发)。
+        // 业务逻辑(弃牌超时/选将超时/出牌超时等)由各自 atom 定义声明,引擎核心只管调度。
+        await pending.onTimeout(state, atom);
         notifyStateChange(state);
       } finally {
         // 兑底:applyAtom 抛错时仍必须清理 slot 并 resolve 父 execute,避免死锁。
