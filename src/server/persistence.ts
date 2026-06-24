@@ -112,7 +112,7 @@ export interface PersistedRoom {
 }
 
 /** 清理 GameState 中的循环引用(函数、定时器等,不可 JSON 序列化) */
-function sanitizeState(state: GameState): GameState {
+export function sanitizeState(state: GameState): GameState {
   return {
     ...state,
     // pendingSlots 含 resolve/pause/定时器等函数引用,持久化时清空。
