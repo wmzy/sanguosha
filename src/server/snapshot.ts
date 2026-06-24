@@ -158,7 +158,7 @@ export interface CreateSnapshotRequest {
 export async function createSnapshot(
   session: GameSession,
   req: CreateSnapshotRequest,
-): Promise<{ snapshotId: string } | { error: string; status: number }> {
+): Promise<{ snapshotId: string } | { error: string; status: 400 | 403 | 404 | 500 }> {
   const state = session.getState();
   if (!state) return { error: '会话无状态', status: 404 };
 
@@ -217,7 +217,7 @@ export async function createSnapshot(
 export async function patchSnapshotDescription(
   snapshotId: string,
   description: string,
-): Promise<{ success: true } | { error: string; status: number }> {
+): Promise<{ success: true } | { error: string; status: 400 | 403 | 404 | 500 }> {
   const path = snapshotPath(snapshotId);
   try {
     const raw = await readFile(path, 'utf-8');

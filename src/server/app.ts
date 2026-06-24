@@ -22,6 +22,7 @@ import {
 import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
+import { createSnapshot, patchSnapshotDescription, type CreateSnapshotRequest } from './snapshot';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
 // 新 ENGINE-DESIGN 不再需要 protocol-adapter(回应 action 走 ClientMessage 直接 dispatch)
 
@@ -228,6 +229,30 @@ app.post('/api/debug-room', async (c) => {
     log.error('创建调试房间失败', { error: String(err) });
     return c.json({ error: `创建调试房间失败: ${String(err)}` }, 500);
   }
+});
+
+// Debug 快照:保存前后端完整游戏状态到 data/snapshots/
+app.post('/api/snapshot', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  if (!body || typeof body.roomId !== 'string') {
+    return c.json({ error: '缺少 roomId' }, 400);
+  }
+  const session = gameSessions.get(body.roomId);
+  if (!session) return c.json({ error: '会话不存在' }, 404);
+  const result = await createSnapshot(session, body as unknown as CreateSnapshotRequest);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json(result);
+});
+
+app.patch('/api/snapshot/:id', async (c) => {
+  const snapshotId = c.req.param('id');
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  if (!body || typeof body.description !== 'string') {
+    return c.json({ error: '缺少 description' }, 400);
+  }
+  const result = await patchSnapshotDescription(snapshotId, body.description);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json(result);
 });
 
 // WebSocket 消息处理
