@@ -14,7 +14,7 @@ function buildStateWithSkills(skillIds: string[]): GameState {
     players: [
       {
         index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
-        hand: [], equipment: {}, skills: skillIds, vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+        hand: [], equipment: {}, skills: skillIds, vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
       },
     ],
     cardMap: {},

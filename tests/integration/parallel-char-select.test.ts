@@ -28,6 +28,7 @@ function makePlayer(opts: { index: number; name: string }) {
     vars: {},
     marks: [],
     pendingTricks: [],
+    tags: [],
     judgeZone: [],
   };
 }
@@ -120,20 +121,18 @@ describe('并行选将:多 target 同时选将', () => {
     expect(resolved).toBe(true);
   });
 
-  it('validate:selections 为空 → 不创建 pending(静默返回)', async () => {
+  it('validate:selections 为空 → 抛出异常', async () => {
     const state: GameState = createGameState({
       players: [makePlayer({ index: 0, name: 'P1' })],
       cardMap: {},
     });
     await harness.setup(state);
 
-    // applyAtom validate 失败时不抛错(引擎设计),静默返回且不创建 pending
-    await applyAtom(harness.state, {
+    // applyAtom validate 失败时抛出异常
+    await expect(applyAtom(harness.state, {
       type: '并行选将',
       selections: [],
-    });
-    await waitForStable(harness.state);
-    expect(harness.state.pendingSlots.size).toBe(0);
+    })).rejects.toThrow('selections required');
   });
 });
 

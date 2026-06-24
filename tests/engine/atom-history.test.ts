@@ -111,6 +111,7 @@ describe('dispatch 返回 boolean', () => {
       players: [{
         index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4,
         alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
+    tags: [],
       }],
       cardMap: {}, seq: 0, currentPlayerIndex: 0, phase: '出牌',
     });
@@ -131,6 +132,7 @@ describe('atomHistory: applyAtom 写入', () => {
       players: [{
         index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4,
         alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
+    tags: [],
       }],
       cardMap: { c1: { id: 'c1', name: '杀', suit: '♠', rank: '7', type: '基本牌', subtype: '' } as any },
       zones: { deck: ['c1'], discardPile: [], processing: [] },

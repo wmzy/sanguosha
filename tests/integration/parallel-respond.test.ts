@@ -16,8 +16,8 @@ function build(): GameState {
   for (const c of cards) cardMap[c.id] = c;
   return createGameState({
     players: [
-      { index: 0, name: 'A', character: 'X', health: 4, maxHealth: 4, alive: true, hand: ['a1'], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
-      { index: 1, name: 'B', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: ['b1'], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      { index: 0, name: 'A', character: 'X', health: 4, maxHealth: 4, alive: true, hand: ['a1'], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      { index: 1, name: 'B', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: ['b1'], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     ],
     cardMap,
     currentPlayerIndex: 0,

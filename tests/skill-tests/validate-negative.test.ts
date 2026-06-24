@@ -14,9 +14,9 @@ function build(opts?: { p0Extra?: string[]; extraCards?: Record<string, Card> })
     players: [
       { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
         hand: ['c1', ...(opts?.p0Extra ?? [])], equipment: {}, skills: ['杀'],
-        vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+        vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
       { index: 1, name: 'P2', character: '反', health: 4, maxHealth: 4, alive: true,
-        hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+        hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     ],
     cardMap: cards,
     currentPlayerIndex: 0,

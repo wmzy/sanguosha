@@ -201,8 +201,9 @@ export function broadcastMessage(room: Room, message: string, excludeId?: string
       try {
         ws.send(message);
       } catch (err) {
-        // 单点失败不影响其他玩家
-        log.warn(`ws.send failed for player ${id}: ${String(err)}`);
+        // 单点失败不影响其他玩家,但必须记录完整堆栈
+        const e = err instanceof Error ? err : new Error(String(err));
+        log.error(`ws.send failed for player ${id}`, { error: e.stack ?? String(e) });
       }
     }
   }

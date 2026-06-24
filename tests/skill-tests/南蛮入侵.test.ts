@@ -12,13 +12,13 @@ function build(opts?: { p2Hand?: string[]; p3?: boolean; extraCards?: Record<str
   const cards: Record<string, Card> = { c0: slash, nm1: nanman, ...opts?.extraCards };
   const players = [
     { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
-      hand: ['nm1'], equipment: {}, skills: ['南蛮入侵'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      hand: ['nm1'], equipment: {}, skills: ['南蛮入侵'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     { index: 1, name: 'P2', character: '反', health: 4, maxHealth: 4, alive: true,
-      hand: opts?.p2Hand ?? [], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      hand: opts?.p2Hand ?? [], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
   ];
   if (opts?.p3) {
     players.push({ index: 2, name: 'P3', character: '反', health: 4, maxHealth: 4, alive: true,
-      hand: [], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] });
+      hand: [], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] });
   }
   return createGameState({ players, cardMap: cards, currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} } });
 }

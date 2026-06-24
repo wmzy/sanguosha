@@ -36,15 +36,15 @@ export const 抽身份: AtomDefinition<{
   seed: number;
 }> = {
   type: '抽身份',
-  validate: (state) => {
+  validate: (state, atom) => {
     if (state.players.length === 0) return '没有玩家';
+    if (!IDENTITY_COUNTS[atom.playerCount]) return `不支持的玩家数量: ${atom.playerCount}`;
     return null;
   },
   apply(state, atom) {
     const { playerCount, seed } = atom;
     const rng = createRng(seed);
     const counts = IDENTITY_COUNTS[playerCount];
-    if (!counts) return;
 
     // 构建身份牌堆
     const identities: string[] = [];

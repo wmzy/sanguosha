@@ -61,7 +61,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players[ownerId];
-    if (!self) return;
     const hasMark = self.marks.some(m => m.id === '酒/nextKillDamageBonus');
     if (!hasMark) return;
     await applyAtom(ctx.state, { type: '去标记', player: ownerId, markId: '酒/nextKillDamageBonus' });

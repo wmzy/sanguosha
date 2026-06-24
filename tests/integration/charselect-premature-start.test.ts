@@ -16,7 +16,7 @@ const CHARACTERS = allCharacters.map(c => ({
 function makePlayer(index: number, name: string) {
   return {
     index, name, character: '', health: 4, maxHealth: 4, alive: true,
-    hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+    hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
   };
 }
 

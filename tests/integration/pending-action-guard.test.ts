@@ -22,8 +22,8 @@ function buildState(overrides: Partial<GameState> = {}): GameState {
   for (const c of cards) cardMap[c.id] = c;
   return createGameState({
     players: [
-      { index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4, alive: true, hand, equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
-      { index: 1, name: 'P1', character: '关羽', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      { index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4, alive: true, hand, equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      { index: 1, name: 'P1', character: '关羽', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['回合管理'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     ],
     cardMap,
     currentPlayerIndex: 0,

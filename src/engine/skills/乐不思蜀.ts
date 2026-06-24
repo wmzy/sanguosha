@@ -67,8 +67,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
     if (atom.phase !== '判定') return;
     const self = ctx.state.players[ownerId];
-    if (!self) return;
-    // 判定区是否有 乐不思蜀
     if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
     // 牌堆空:无法判定,跳过(规则允许直接弃置,但避免引擎崩;这里 no-op)
     if (ctx.state.zones.deck.length === 0) return;
@@ -97,7 +95,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
 
     const self = ctx.state.players[ownerId];
-    if (!self) return;
     // 没有 pendingTrick → 不处理(可能已被 过河拆桥 拆掉)
     if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
 
@@ -125,9 +122,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
     if (atom.phase !== '出牌') return;
     const self = ctx.state.players[ownerId];
-    if (!self) return;
     // 检查跳过标签(tags 数组)
-    if (!self.tags?.includes(SKIP_TAG)) return;
+    if (!self.tags.includes(SKIP_TAG)) return;
 
     // 顺序很重要:
     //   1) 先去标签(否则 阶段结束 出牌 之后回合管理阶段链会再次命中本 hook)

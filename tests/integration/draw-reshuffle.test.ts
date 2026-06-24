@@ -34,8 +34,8 @@ function makePlayer(opts: { index: number; name: string; hand?: string[] }) {
     vars: {},
     marks: [],
     pendingTricks: [],
-    judgeZone: [],
     tags: [],
+    judgeZone: [],
   };
 }
 
@@ -126,12 +126,8 @@ describe('摸牌:牌堆不足时重洗弃牌堆补充', () => {
     await harness.setup(state);
 
     const handBefore = state.players[0].hand.length;
-    // total=2 < count=5 → validate 拦截,apply 不执行
-    await applyAtom(state, { type: '摸牌', player: 0, count: 5 });
-
-    expect(state.players[0].hand.length).toBe(handBefore);
-    expect(state.zones.deck).toEqual(['d1']);
-    expect(state.zones.discardPile).toEqual(['p1']);
+    // total=2 < count=5 → validate 抛出异常
+    await expect(applyAtom(state, { type: '摸牌', player: 0, count: 5 })).rejects.toThrow('no cards available');
   });
 
   // ─── 4. 牌堆充足不触发重洗 ─────────────────────
@@ -257,10 +253,7 @@ describe('重洗 / 洗牌 atom 单元', () => {
     });
     await harness.setup(state);
 
-    await applyAtom(state, { type: '重洗' });
-
-    // validate 拒绝 → deck 不变
-    expect(state.zones.deck).toEqual(['d1']);
+    await expect(applyAtom(state, { type: '重洗' })).rejects.toThrow('discardPile is empty');
   });
 
   it('洗牌:deck 牌序被打乱(确定性)', async () => {

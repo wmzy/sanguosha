@@ -54,6 +54,7 @@ function makePlayer(index: number, name: string) {
     vars: {},
     marks: [],
     pendingTricks: [],
+    tags: [],
     judgeZone: [],
   };
 }

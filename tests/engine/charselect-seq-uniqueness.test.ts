@@ -24,6 +24,7 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
       players: [{
         index: 0, name: 'p0', character: '', health: 4, maxHealth: 4,
         alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
+    tags: [],
       }],
       cardMap: {
         c1: { id: 'c1', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
@@ -50,6 +51,7 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
       players: [{
         index: 0, name: 'p0', character: '', health: 4, maxHealth: 4,
         alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
+    tags: [],
       }],
       cardMap: {
         c1: { id: 'c1', name: '杀', suit: '♠', rank: '7', type: '基本牌' },

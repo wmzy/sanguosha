@@ -26,6 +26,7 @@ function makePlayer(opts: { index: number; name: string; hand?: string[]; skills
     vars: {},
     marks: [],
     pendingTricks: [],
+    tags: [],
     judgeZone: [],
   };
 }

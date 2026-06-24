@@ -14,8 +14,8 @@ function buildState(): GameState {
   const dodge: Card = { id: 'c3', name: '闪', suit: '♣', rank: '2', type: '基本牌' };
   return createGameState({
     players: [
-      { index: 0, name: 'P1', character: '关羽', health: 4, maxHealth: 4, alive: true, hand: ['c1'], equipment: {}, skills: ['杀', '武圣'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['闪'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      { index: 0, name: 'P1', character: '关羽', health: 4, maxHealth: 4, alive: true, hand: ['c1'], equipment: {}, skills: ['杀', '武圣'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      { index: 1, name: 'P2', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['闪'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     ],
     cardMap: { c1: red, c3: dodge },
     currentPlayerIndex: 0,

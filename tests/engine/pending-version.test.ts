@@ -12,7 +12,7 @@ describe('pending-scoped 版本控制', () => {
   it('PendingSlot 有 createdSeq 字段，值=创建时 state.seq', async () => {
     const state = createGameState({
       players: [
-        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [] },
+        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [] },
       ],
       cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
     });
@@ -29,7 +29,7 @@ describe('pending-scoped 版本控制', () => {
   it('respond 携带陈旧的 pendingSeq → dispatch 返回 false', async () => {
     const state = createGameState({
       players: [
-        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [] },
+        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [] },
       ],
       cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
     });
@@ -53,7 +53,7 @@ describe('pending-scoped 版本控制', () => {
   it('respond 不带 pendingSeq → 跳过校验（向后兼容）', async () => {
     const state = createGameState({
       players: [
-        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [] },
+        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [] },
       ],
       cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
     });
@@ -85,13 +85,13 @@ describe('pending-scoped 版本控制', () => {
           index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
           hand: [], equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
         {
           index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
           hand: ['d1'], equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
       ],
       cardMap: {

@@ -14,7 +14,7 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
   },
   apply(state, atom) {
     const p = state.players[atom.target];
-    if (!p) return;
+    if (!p) throw new Error(`分配武将: target ${atom.target} not found (validate 已通过)`);
     p.character = atom.character;
     p.name = atom.character;
     p.skills = atom.skills;

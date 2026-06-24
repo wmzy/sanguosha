@@ -77,8 +77,8 @@ export interface PlayerState {
   vars: Record<string, Json>;
   marks: Mark[];
   /** 标签集合——轻量无 payload 标记(如 '八卦阵/autoDodge'),通过 加标签/去标签 atom 维护。
-   *  可选:未设置时引擎视同空数组(由 createGameState 兜底) */
-  tags?: string[];
+   *  createGameState 保证初始化为空数组 */
+  tags: string[];
   /** 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)。可选,未设置视同空数组 */
   judgeZone?: string[];
   /** 身份局角色身份。主公开局亮明,其他角色死亡时翻开 */
@@ -127,17 +127,19 @@ export interface GameState {
    *  session 订阅后据此广播 view,不再 await dispatch。fire-and-forget 模型下
    *  dispatch 返回时 execute 可能还在跑,广播时机由本回调驱动。 */
   onStateChange?: () => void;
+
+  /** 引擎错误回调:execute fire-and-forget 抛错时触发。
+   *  session 订阅后记录完整堆栈,避免错误被静默吞掉。
+   *  fire-and-forget 的 execute promise 无人 await,其 rejection 只能通过此回调暴露。 */
+  onError?: (error: Error) => void;
 }
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
 export function createGameState(partial: Partial<GameState> & { players: PlayerState[]; cardMap: Record<string, Card> }): GameState {
-  // 兜底:为缺失 tags 字段的 players 补默认值
-  const players = partial.players.map((p): PlayerState => {
-    if (p.tags) return p;
-    const { tags: _ignored, ...rest } = p as PlayerState & { tags?: string[] };
-    void _ignored;
-    return { ...rest, tags: [] };
-  });
+  // 兜底:为缺失 tags 字段的 players 补默认值(tags 是必填,但外部构造 PlayerState 时可能遗漏)
+  const players = partial.players.map((p): PlayerState =>
+    p.tags ? p : { ...p, tags: [] }
+  );
   return {
     currentPlayerIndex: 0,
     phase: '准备',

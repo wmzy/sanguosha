@@ -12,9 +12,9 @@ function build(opts?: { p1Hand?: string[]; p2Hand?: string[]; extraCards?: Recor
   return createGameState({
     players: [
       { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
-        hand: ['s0'], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+        hand: ['s0'], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
       { index: 1, name: 'P2', character: '反', health: 4, maxHealth: 4, alive: true,
-        hand: opts?.p2Hand ?? [], equipment: {}, skills: ['闪'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+        hand: opts?.p2Hand ?? [], equipment: {}, skills: ['闪'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     ],
     cardMap: cards,
     currentPlayerIndex: 0,

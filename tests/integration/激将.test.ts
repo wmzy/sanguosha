@@ -47,8 +47,8 @@ function makePlayer(opts: {
     vars: {},
     marks: [],
     pendingTricks: [],
-    judgeZone: [],
     tags: [],
+    judgeZone: [],
     faction: opts.faction,
   };
 }

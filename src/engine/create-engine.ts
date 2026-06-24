@@ -163,6 +163,7 @@ export function create(gameConfig: GameConfig): GameState {
     vars: {} as Record<string, Json>,
     marks: [],
     pendingTricks: [],
+    tags: [],
   }));
 
   // 预填充 cardMap(所有标准牌),确保 initialView 在 bootstrap execute 之前发出时
@@ -259,7 +260,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   const cleanupResidualPending = () => {
     const resolved: PendingSlot[] = [];
     for (const [k, slot] of state.pendingSlots) {
-      try { slot.resolve(); } catch { /* safeResolve 已防重入 */ }
+      slot.resolve();
       state.pendingSlots.delete(k);
       resolved.push(slot);
     }
@@ -325,7 +326,15 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // 注意:不 return execute 的 promise——execute 内 await pending slot 可能阻塞到玩家回应,
   // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
   // dispatch 返回 true 表示"已接受"(validate 通过+execute 已启动),不等 execute 完成。
-  entry.execute(state, message.params).then(cleanupSlot).finally(cleanupSlot).catch(() => {});
+  // execute 无人 await,其 rejection 只能通过 onError 回调暴露——绝不静默吞掉。
+  entry.execute(state, message.params)
+    .then(cleanupSlot)
+    .finally(cleanupSlot)
+    .catch((err: unknown) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      state.onError?.(e);
+      throw err;
+    });
   return true;
 }
 
@@ -466,7 +475,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   const error = def.validate(state, current);
   if (error !== null) {
     state.atomStack.pop();
-    return;
+    throw new Error(`applyAtom validate 失败: ${current.type} → ${error}`);
   }
 
   // toViewEvents 必须在 apply 之前调用——此时 state 尚未变更
@@ -578,7 +587,9 @@ function createAndAwaitSlot(
         await pending.onTimeout(state, atom);
         notifyStateChange(state);
       } finally {
-        // 兑底:applyAtom 抛错时仍必须清理 slot 并 resolve 父 execute,避免死锁。
+        // 错误恢复边界(非防御性编程):onTimeout 内部编排若抛错,引擎状态已不可信,
+        // 但仍必须清理 pendingSlots + resolve 父 execute 的 Promise,否则 execute
+        // 永远 await → 游戏死锁。异常本身会通过 dispatch 的 .catch→onError 上报。
         let deleted = false;
         if (state.pendingSlots.get(target) === slot) { state.pendingSlots.delete(target); deleted = true; }
         if (deleted) notifyPendingResolved(state, slot);

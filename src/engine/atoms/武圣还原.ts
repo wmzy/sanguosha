@@ -25,7 +25,7 @@ export const 武圣还原: AtomDefinition<{
   },
   apply(state, atom) {
     const self = state.players[atom.player];
-    if (!self) return;
+    if (!self) throw new Error(`武圣还原: player ${atom.player} not found`);
     if (atom.secondCardId) {
       // 丈八蛇矛还原:删影子 + 还原两张原卡
       const sId = shadowIdOfZhangba(atom.cardId, atom.secondCardId);

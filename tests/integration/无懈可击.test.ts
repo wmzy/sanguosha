@@ -37,14 +37,14 @@ describe('无懈可击链路', () => {
           index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
           hand: [], equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
         {
           index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
           // 给 P1 一张基础牌(用于 过河拆桥)
           hand: ['d1'], equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
       ],
       cardMap: {
@@ -274,14 +274,14 @@ describe('无懈可击 dispatch 链路', () => {
           index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
           hand: [], equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
         {
           index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
           // P1 手牌:基础牌(过河拆桥目标要丢的) + 无懈可击
           hand: ['d1'], equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
       ],
       cardMap: {

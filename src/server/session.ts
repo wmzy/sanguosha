@@ -107,7 +107,8 @@ export class GameSession {
       this.baselineSent.clear();
       this.broadcastNewState();
     }).catch(err => {
-      this.logger.error('bootstrap error', { error: String(err) });
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('bootstrap error', { error: e.stack ?? String(e) });
     });
 
     // 建立 playerId → 座次下标 映射
@@ -176,7 +177,8 @@ export class GameSession {
     // dispatch 返回 boolean:true=accepted,false=rejected。
     // state 变更的广播/持久化/结束检查由 onStateChange 回调驱动(见 attachStateListener)。
     const accepted = await dispatch(this.state, action).catch((err) => {
-      this.logger.error('dispatch error', { error: String(err) });
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('dispatch error', { error: e.stack ?? String(e) });
       return false;
     });
     if (!accepted) {
@@ -232,6 +234,9 @@ export class GameSession {
       if (gameOver) {
         this.handleGameOver(winner);
       }
+    };
+    this.state.onError = (error: Error) => {
+      this.logger.error('引擎 execute 抛错', { error: error.stack ?? String(error) });
     };
   }
 
@@ -438,7 +443,8 @@ export class GameSession {
     try {
       ws.send(serialize(message));
     } catch (err) {
-      this.logger.warn(`sendToPlayer failed for ${playerId}`, { error: String(err) });
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error(`sendToPlayer failed for ${playerId}`, { error: e.stack ?? String(e) });
     }
   }
 
@@ -448,7 +454,8 @@ export class GameSession {
       try {
         ws.send(data);
       } catch (err) {
-        this.logger.warn('broadcast send failed', { error: String(err) });
+        const e = err instanceof Error ? err : new Error(String(err));
+        this.logger.error('broadcast send failed', { error: e.stack ?? String(e) });
       }
     }
   }

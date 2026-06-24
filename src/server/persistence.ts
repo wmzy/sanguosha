@@ -54,7 +54,9 @@ async function writeNow(roomId: string, wrapper: PersistedWrapper): Promise<void
   try {
     await writeFile(filePath(roomId), JSON.stringify(wrapper));
   } catch (err) {
-    log.warn(`save failed for room ${roomId}: ${String(err)}`);
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error(`save failed for room ${roomId}`, { error: e.stack ?? String(e) });
+    throw e;
   }
 }
 
@@ -66,9 +68,10 @@ async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | n
     if (!isPersistedWrapper(parsed)) return null;
     return parsed;
   } catch (err) {
-  if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    log.warn(`read failed for room ${roomId}: ${String(err)}`);
-    return null;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error(`read failed for room ${roomId}`, { error: e.stack ?? String(e) });
+    throw e;
   }
 }
 
@@ -78,7 +81,9 @@ async function deleteFile(roomId: string): Promise<void> {
     await unlink(path);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
-    log.warn(`delete failed for room ${roomId}: ${String(err)}`);
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error(`delete failed for room ${roomId}`, { error: e.stack ?? String(e) });
+    throw e;
   }
 }
 

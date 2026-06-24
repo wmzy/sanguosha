@@ -92,13 +92,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
           to: { zone: '弃牌堆' },
         });
       } finally {
-        // 异常安全:保证帧弹出 + 杀牌不滞留处理区(即使上面 await 抛错)
+        // 异常安全:保证帧弹出 + 杀牌不滞留处理区(即使上面 await 抛错)。
+        // 不吞错——如果清理用的 移动牌 也抛,说明状态已损坏,应让异常传播暴露问题。
         const stillInProc = state.zones.processing.includes(cardId);
         if (stillInProc) {
           await applyAtom(state, {
             type: '移动牌', cardId,
             from: { zone: '处理区' }, to: { zone: '弃牌堆' },
-          }).catch(() => {});
+          });
         }
         popFrame(state);
         // 记录一次出杀(已用次数 +1;上限由 slashMax 计算,连弩的 ∞ 由标签体现)

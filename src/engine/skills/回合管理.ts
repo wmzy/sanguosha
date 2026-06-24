@@ -46,7 +46,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     await applyAtom(ctx.state, { type: '阶段开始', player, phase: next });
 
-    // 摸牌阶段自动摸 2 张
+    // 摸牌阶段自动摸 2 张(摸牌 atom 内部处理牌堆不足时的洗牌补充)
     if (next === '摸牌') {
       await applyAtom(ctx.state, { type: '摸牌', player, count: 2 });
     }

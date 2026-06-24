@@ -40,8 +40,8 @@ function makePlayer(opts: {
     vars: (opts.vars ?? {}) as Record<string, Json>,
     marks: [],
     pendingTricks: [],
-    judgeZone: [],
     tags: [],
+    judgeZone: [],
   };
 }
 

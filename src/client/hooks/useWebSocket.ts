@@ -61,7 +61,11 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       }, 3000);
     };
 
-    ws.onerror = () => {};
+    ws.onerror = (event) => {
+      // WebSocket error 事件不携带可读错误信息(浏览器安全限制),
+      // 但它会先于 close 触发。记录事件本身,便于排查连接层问题。
+      log.error('WebSocket onerror', { event: String(event) });
+    };
 
     wsRef.current = ws;
   }, [url, cleanup]);

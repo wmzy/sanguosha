@@ -32,8 +32,8 @@ function buildState(opts?: { p2Hand?: string[]; p2Equip?: Record<string, string>
   };
   return createGameState({
     players: [
-      { index: 0, name: 'P1', character: 'X', health: 4, maxHealth: 4, alive: true, hand: ['gq1'], equipment: {}, skills: ['过河拆桥', '顺手牵羊', '杀'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: opts?.p2Hand ?? ['v1', 'v2', 'v3'], equipment: opts?.p2Equip ?? {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      { index: 0, name: 'P1', character: 'X', health: 4, maxHealth: 4, alive: true, hand: ['gq1'], equipment: {}, skills: ['过河拆桥', '顺手牵羊', '杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      { index: 1, name: 'P2', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: opts?.p2Hand ?? ['v1', 'v2', 'v3'], equipment: opts?.p2Equip ?? {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     ],
     cardMap: cards,
     currentPlayerIndex: 0,

@@ -40,7 +40,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       state.players[ownerId].vars['制衡/usedThisTurn'] = true;
       const from = ownerId;
       pushFrame(state, '制衡', from, { ...params });
-      const cardIds = params.cardIds as string[];
+      // 兼容 cardId 单数和 cardIds 数组,与 validate 中的逻辑一致
+      const cardIds = (params.cardIds as string[] | undefined)
+        ?? (typeof params.cardId === 'string' ? [params.cardId as string] : []);
       // 弃置 N 张
       await applyAtom(state, { type: '弃置', player: from, cardIds });
       // 摸 N 张

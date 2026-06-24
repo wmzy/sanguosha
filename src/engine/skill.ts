@@ -41,6 +41,13 @@ export function setSkillModuleResolver(fn: (id: string) => Promise<SkillModule>)
   skillModuleResolver = fn;
 }
 
+/** 同步检查技能模块是否注册。由 skills/index.ts 设置,用于避免 try-catch 控制流。 */
+let skillModuleChecker: ((id: string) => boolean) | null = null;
+
+export function setSkillModuleChecker(fn: (id: string) => boolean): void {
+  skillModuleChecker = fn;
+}
+
 /** 通过解析器查找技能模块(动态 import,按需加载)。加载后缓存,供 getCachedSkillModule 同步获取。 */
 const moduleCache = new Map<string, SkillModule>();
 
@@ -282,13 +289,10 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
 export async function instantiateSkill(skillId: string, ownerId: number, state?: GameState): Promise<Skill | null> {
   // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册抛错
   unloadSkillInstance(skillId, ownerId, state);
-  let module;
-  try {
-    module = await getSkillModule(skillId);
-  } catch {
-    // 技能模块未注册(如候选人 skills 中的描述性名称):跳过,不中断开局流程
-    return null;
-  }
+  // 同步检查:技能模块未注册(如候选人 skills 中的描述性名称)则跳过,不中断开局流程。
+  // 用 checker 而非 try-catch 控制流——不确定性不应被 catch 遮蔽。
+  if (skillModuleChecker && !skillModuleChecker(skillId)) return null;
+  const module = await getSkillModule(skillId);
   const skill = module.createSkill(skillId, ownerId);
   if (module.onInit && state) {
     const unload = module.onInit(skill, state);

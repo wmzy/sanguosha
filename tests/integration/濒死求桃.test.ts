@@ -61,13 +61,13 @@ describe('濒死求桃', () => {
           index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
           hand: [], equipment: {},
           skills: ['回合管理', '杀', '桃'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
         {
           index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
           hand: [], equipment: {},
           skills: ['回合管理', '闪', '桃', '装备通用'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
       ],
       cardMap: {},
@@ -255,8 +255,8 @@ function makePlayer(opts: {
     vars: {},
     marks: [],
     pendingTricks: [],
-    judgeZone: [],
     tags: [],
+    judgeZone: [],
   };
 }
 

@@ -12,9 +12,9 @@ function build3p(): GameState {
   const s2: Card = { id: 's2', name: '杀', suit: '♣', rank: '5', type: '基本牌' };
   return createGameState({
     players: [
-      { index:0,name:'P0',character:'X',health:4,maxHealth:4,alive:true,hand:['jdsr'],equipment:{},skills:['借刀杀人'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
-      { index:1,name:'P1',character:'Y',health:4,maxHealth:4,alive:true,hand:['s2'],equipment:{'武器':'wp1'},skills:['杀','闪'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
-      { index:2,name:'P2',character:'Z',health:4,maxHealth:4,alive:true,hand:[],equipment:{},skills:['闪'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
+      { index:0,name:'P0',character:'X',health:4,maxHealth:4,alive:true,hand:['jdsr'],equipment:{},skills:['借刀杀人'],vars:{},marks:[],pendingTricks:[],tags:[],judgeZone:[]},
+      { index:1,name:'P1',character:'Y',health:4,maxHealth:4,alive:true,hand:['s2'],equipment:{'武器':'wp1'},skills:['杀','闪'],vars:{},marks:[],pendingTricks:[],tags:[],judgeZone:[]},
+      { index:2,name:'P2',character:'Z',health:4,maxHealth:4,alive:true,hand:[],equipment:{},skills:['闪'],vars:{},marks:[],pendingTricks:[],tags:[],judgeZone:[]},
     ],
     cardMap: { jdsr, wp1, s2 }, currentPlayerIndex:0,phase:'出牌',turn:{round:1,phase:'出牌',vars:{}},
   });

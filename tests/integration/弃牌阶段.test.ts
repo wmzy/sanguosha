@@ -36,13 +36,13 @@ describe('弃牌阶段', () => {
           index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
           hand: ['c1', 'c2', 'c3', 'c4', 'c5'], equipment: {},
           skills: ['回合管理'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
         {
           index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
           hand: [], equipment: {},
           skills: ['回合管理'],
-          vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
         },
       ],
       cardMap: {
@@ -51,10 +51,13 @@ describe('弃牌阶段', () => {
         c3: { id: 'c3', name: '桃', suit: '♥', rank: '3', type: '基本牌' },
         c4: { id: 'c4', name: '杀', suit: '♠', rank: '4', type: '基本牌' },
         c5: { id: 'c5', name: '杀', suit: '♠', rank: '5', type: '基本牌' },
+        d1: { id: 'd1', name: '杀', suit: '♠', rank: '6', type: '基本牌' },
+        d2: { id: 'd2', name: '闪', suit: '♥', rank: '7', type: '基本牌' },
       },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
+      zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
     });
     await registerSkillsFromState(state);
   });

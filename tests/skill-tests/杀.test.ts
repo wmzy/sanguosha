@@ -25,7 +25,7 @@ function buildState(opts?: { p2Hand?: string[]; extraCardMap?: Record<string, Ca
 function makePlayer(opts: { index: number; name: string; hand: string[]; skills: string[] }) {
   return {
     ...opts, character: '主公', health: 4, maxHealth: 4, alive: true,
-    equipment: {}, vars: {}, marks: [], pendingTricks: [], judgeZone: [],
+    equipment: {}, vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
   };
 }
 

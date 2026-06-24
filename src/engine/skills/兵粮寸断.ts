@@ -77,7 +77,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
     if (atom.phase !== '判定') return;
     const self = ctx.state.players[ownerId];
-    if (!self) return;
     if (!self.pendingTricks.some(t => t.name === '兵粮寸断')) return;
     if (ctx.state.zones.deck.length === 0) return;
 
@@ -103,7 +102,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
 
     const self = ctx.state.players[ownerId];
-    if (!self) return;
     if (!self.pendingTricks.some(t => t.name === '兵粮寸断')) return;
 
     // 读判定牌:判定牌在处理区(afterHooks 才移到弃牌堆)
@@ -130,8 +128,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
     if (atom.phase !== '摸牌') return;
     const self = ctx.state.players[ownerId];
-    if (!self) return;
-    if (!self.tags?.includes(SKIP_TAG)) return;
+    if (!self.tags.includes(SKIP_TAG)) return;
 
     // 顺序很重要:
     //   1) 先去标签(否则 阶段结束 摸牌 之后回合管理阶段链会再次命中本 hook)

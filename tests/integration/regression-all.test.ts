@@ -19,8 +19,8 @@ function build2p(opts?: { p0Hand?: string[]; p1Hand?: string[]; p0Skills?: strin
   for (const id of [...p0h, ...p1h]) { if (!cards[id]) cards[id] = { id, name: '杀', suit: '♠', rank: '7', type: '基本牌' }; }
   return createGameState({
     players: [
-      { index: 0, name: 'P0', character: 'X', health: 4, maxHealth: 4, alive: true, hand: p0h, equipment: {}, skills: opts?.p0Skills ?? ['杀'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
-      { index: 1, name: 'P1', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: p1h, equipment: {}, skills: opts?.p1Skills ?? ['闪'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      { index: 0, name: 'P0', character: 'X', health: 4, maxHealth: 4, alive: true, hand: p0h, equipment: {}, skills: opts?.p0Skills ?? ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      { index: 1, name: 'P1', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: p1h, equipment: {}, skills: opts?.p1Skills ?? ['闪'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
     ],
     cardMap: cards, currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} },
   });
@@ -136,9 +136,9 @@ describe('用户报告问题回归', () => {
     const slash2: Card = { id: 's2', name: '杀', suit: '♣', rank: '5', type: '基本牌' };
     const state3 = createGameState({
       players: [
-        { index:0,name:'P0',character:'X',health:4,maxHealth:4,alive:true,hand:['jdsr'],equipment:{},skills:['借刀杀人'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
-        { index:1,name:'P1',character:'Y',health:4,maxHealth:4,alive:true,hand:['s2'],equipment:{'武器':'wp1'},skills:['杀','闪'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
-        { index:2,name:'P2',character:'Z',health:4,maxHealth:4,alive:true,hand:[],equipment:{},skills:['闪'],vars:{},marks:[],pendingTricks:[],judgeZone:[]},
+        { index:0,name:'P0',character:'X',health:4,maxHealth:4,alive:true,hand:['jdsr'],equipment:{},skills:['借刀杀人'],vars:{},marks:[],pendingTricks:[],tags:[],judgeZone:[]},
+        { index:1,name:'P1',character:'Y',health:4,maxHealth:4,alive:true,hand:['s2'],equipment:{'武器':'wp1'},skills:['杀','闪'],vars:{},marks:[],pendingTricks:[],tags:[],judgeZone:[]},
+        { index:2,name:'P2',character:'Z',health:4,maxHealth:4,alive:true,hand:[],equipment:{},skills:['闪'],vars:{},marks:[],pendingTricks:[],tags:[],judgeZone:[]},
       ],
       cardMap: { jdsr, wp1: weapon, s2: slash2 },
       currentPlayerIndex:0,phase:'出牌',turn:{round:1,phase:'出牌',vars:{}},

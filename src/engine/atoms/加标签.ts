@@ -11,7 +11,6 @@ export const 加标签: AtomDefinition<{ player: number; tag: string }> = {
   },
   apply(state, atom) {
     const player = state.players[atom.player];
-    if (!player.tags) player.tags = [];
     if (!player.tags.includes(atom.tag)) player.tags.push(atom.tag);
   },
 };
