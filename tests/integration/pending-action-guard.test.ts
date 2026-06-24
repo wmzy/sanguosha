@@ -52,7 +52,7 @@ describe('回合管理 validate 正向判断合法性', () => {
     // 模拟弃牌 pending 挂起
     state.pendingSlots.set(0, {
       atom: { type: '请求回应', requestType: '__弃牌', target: 0, prompt: { type: 'useCard', title: '弃牌', cardFilter: { filter: () => true, min: 2, max: 2 } }, timeout: 30 },
-      resolve: () => {}, pause: () => {}, _fireTimeoutNow: undefined, deadline: 99, isTimeout: false,
+      resolve: () => {}, pause: () => {}, _fireTimeoutNow: undefined, deadline: 99, isTimeout: false, isBlocking: true,
     } as any);
     const entry = findActionEntry('回合管理', 0, 'end')!;
     expect(entry.validate(state, {})).not.toBeNull();

@@ -49,7 +49,7 @@ class FakeWS {
   close(): void { /* noop */ }
 }
 
-/** 构造一个处于出牌阶段、2 人存活、带 __出牌 pending 的极简 state */
+/** 构造一个处于出牌阶段、2 人存活、带 出牌窗口 pending 的极简 state */
 function makeActState(): GameState {
   const state = createGameState({
     players: [
@@ -75,15 +75,17 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     (session as unknown as { attachStateListener: () => void }).attachStateListener();
   });
 
-  it('buildView 在有 __出牌 pending 时返回非空 deadline', () => {
+  it('buildView 在有 出牌窗口 pending 时返回非空 deadline', () => {
     const state = getState(session);
-    // 模拟 __出牌 pending slot(50s 超时)
+    // 模拟 出牌窗口 pending slot(50s 超时)
     const before = Date.now();
     state.pendingSlots.set(0, {
-      atom: { type: '请求回应', requestType: '__出牌', target: 0 } as never,
-      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50 } } as never,
+      atom: { type: '出牌窗口', player: 0 } as never,
+      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50, isBlocking: false } } as never,
       deadline: 50_000,
       startTime: 0,
+      createdSeq: 0,
+      isBlocking: false,
       resolve: () => {},
     } as never);
     const after = Date.now();
@@ -112,12 +114,14 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     room.players.set(playerId, ws as unknown as import('hono/ws').WSContext);
     (session as unknown as { playerNames: Map<string, number> }).playerNames.set(playerId, 0);
 
-    // 模拟 __出牌 pending slot
+    // 模拟 出牌窗口 pending slot
     state.pendingSlots.set(0, {
-      atom: { type: '请求回应', requestType: '__出牌', target: 0 } as never,
-      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50 } } as never,
+      atom: { type: '出牌窗口', player: 0 } as never,
+      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50, isBlocking: false } } as never,
       deadline: 50_000,
       startTime: 0,
+      createdSeq: 0,
+      isBlocking: false,
       resolve: () => {},
     } as never);
 
