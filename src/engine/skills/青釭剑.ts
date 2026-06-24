@@ -36,7 +36,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const me = ctx.state.players[ownerId];
     if (!me) return;
-    const weaponId = me.equipment?.['武器'];
+    const weaponId = me.equipment['武器'];
     if (!weaponId) return;
     const weaponCard = ctx.state.cardMap[weaponId];
     if (!weaponCard || weaponCard.name !== '青釭剑') return;

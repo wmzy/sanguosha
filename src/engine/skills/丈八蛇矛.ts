@@ -50,7 +50,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       const cardIds = params.cardIds;
       if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张手牌';
       const [id1, id2] = cardIds as string[];
@@ -61,7 +61,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const c2 = state.cardMap[id2];
       const cardsExist = !!c1 && !!c2;
       // 武器校核:必须装备丈八蛇矛(动态检查,允许同帧内换下后不再触发)
-      const weaponId = self?.equipment?.['武器'];
+      const weaponId = self.equipment['武器'];
       const weaponCard = weaponId ? state.cardMap[weaponId] : undefined;
       const hasZhangba = weaponCard?.name === '丈八蛇矛';
       const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardsExist && hasZhangba;

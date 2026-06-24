@@ -35,10 +35,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 每 1 点伤害触发一次遗计
     for (let i = 0; i < amount; i++) {
-      const handBefore = ctx.state.players[ownerId]?.hand.length ?? 0;
+      const handBefore = ctx.state.players[ownerId].hand.length;
       await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 2 });
-      const selfPlayer = ctx.state.players[ownerId];
-      const drawnCards = selfPlayer ? selfPlayer.hand.slice(handBefore) : [];
+      const drawnCards = ctx.state.players[ownerId].hand.slice(handBefore);
 
       // 询问分配
       delete ctx.state.localVars['遗计/allocation'];

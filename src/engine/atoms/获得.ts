@@ -8,7 +8,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
   validate(state, atom) {
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
     if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    if (atom.from && !state.players[atom.from]) return `from ${atom.from} not found`;
+    if (atom.from !== undefined && !state.players[atom.from]) return `from ${atom.from} not found`;
     return null;
   },
   apply(state, atom) {
@@ -28,7 +28,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
     const effect = { sound: 'obtain' as const, animation: 'slide' as const, duration: 600 };
     // 判断牌来自哪个区域(供 applyView 精确更新)
     const fromZone = atom.from !== undefined
-      ? (state.players[atom.from]?.hand.includes(atom.cardId)
+      ? (state.players[atom.from].hand.includes(atom.cardId)
         ? 'hand' as const
         : 'equipment' as const)
       : undefined;

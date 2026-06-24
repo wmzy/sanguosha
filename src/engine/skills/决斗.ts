@@ -20,10 +20,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       const cardId = params.cardId as string;
       const cardIdOk = typeof cardId === 'string';
-      const cardInHand = cardIdOk && self?.hand.includes(cardId);
+      const cardInHand = cardIdOk && self.hand.includes(cardId);
       const cardNameOk = cardIdOk && state.cardMap[cardId]?.name === '决斗';
       const targetIdx = params.target as number | undefined;
       const targetExists = typeof targetIdx === 'number' && !!state.players[targetIdx];

@@ -323,7 +323,10 @@ describe('回合管理', () => {
     // 构造选将询问 pending,target=0
     const state: any = {
       pendingSlots: new Map([[0, { atom: { type: '选将询问', target: 0, candidates: [{ name: '刘备', skills: ['仁德'] }] } }]]),
-      players: [],
+      players: [
+        { index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        { index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      ],
     };
     // 玩家0 能回应(被问询)
     expect(entry0.validate(state, { character: '刘备' })).toBeNull();

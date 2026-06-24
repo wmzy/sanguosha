@@ -37,11 +37,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const myTurn = state.currentPlayerIndex === ownerId;
       const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       const cardId = params.cardId as string;
       const cardIdOk = typeof cardId === 'string';
       const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self?.hand.includes(cardId);
+      const cardInHand = cardIdOk && self.hand.includes(cardId);
       const isRed = !!card && (card.suit === '♥' || card.suit === '♦');
       const ok = myTurn && free && selfAlive && cardInHand && isRed;
       return ok ? null : '现在不能使用武圣';

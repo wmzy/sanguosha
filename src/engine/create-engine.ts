@@ -430,7 +430,7 @@ async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
       atom,
       ownerId: h.ownerId,
       frame: curFrame,
-      params: (curFrame.params ?? {}) as Record<string, Json>,
+      params: curFrame.params,
     };
     await h.handler(afterCtx);
   }
@@ -455,7 +455,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
       atom: current,
       ownerId: h.ownerId,
       frame,
-      params: (frame.params ?? {}) as Record<string, Json>,
+      params: frame.params,
     };
     const result = await h.handler(beforeCtx);
     if (result === undefined) continue;             // void = pass(向后兼容)

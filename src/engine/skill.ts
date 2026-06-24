@@ -111,7 +111,7 @@ export function validateUseCard(
   if (state.phase !== '出牌') return '不是出牌阶段';
   if (hasBlockingPending(state)) return '当前有等待响应';
   const self = state.players[ownerId];
-  if (!self?.alive) return '你已死亡';
+  if (!self.alive) return '你已死亡';
   const cardId = params.cardId as string | undefined;
   if (!cardId) return 'cardId required';
   if (!self.hand.includes(cardId)) return '牌不在手牌中';

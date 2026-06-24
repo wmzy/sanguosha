@@ -28,10 +28,10 @@ export function effectiveDistance(state: GameState, from: number, to: number): n
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   let dist = seatDistance(alive.length, aliveFrom, aliveTo);
   // 进攻修正:缩短距离(进攻马/马术)
-  const attackMod = (state.players[from]?.vars['距离/进攻修正'] as number) ?? 0;
+  const attackMod = (state.players[from].vars['距离/进攻修正'] as number) ?? 0;
   dist -= attackMod;
   // 防御修正:增加距离(防御马)
-  const defenseMod = (state.players[to]?.vars['距离/防御修正'] as number) ?? 0;
+  const defenseMod = (state.players[to].vars['距离/防御修正'] as number) ?? 0;
   dist += defenseMod;
   return Math.max(1, dist);
 }
@@ -45,6 +45,6 @@ export function effectiveDistance(state: GameState, from: number, to: number): n
  */
 export function inAttackRange(state: GameState, from: number, to: number): boolean {
   if (from === to) return false;
-  const range = (state.players[from]?.vars['距离/出杀范围'] as number) ?? 1;
+  const range = (state.players[from].vars['距离/出杀范围'] as number) ?? 1;
   return effectiveDistance(state, from, to) <= range;
 }

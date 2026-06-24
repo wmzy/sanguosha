@@ -30,7 +30,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     } else if (atom.to.zone === '弃牌堆') {
       // 影子卡牌还原:转化牌(武圣红牌当杀)入弃牌堆时,用原卡替换
       const card = state.cardMap[atom.cardId];
-      if (card?.shadowOf) {
+      if (card.shadowOf) {
         state.zones.discardPile.push(card.shadowOf);
         delete state.cardMap[atom.cardId]; // 删除影子,原卡 cardMap[shadowOf] 仍在
       } else {

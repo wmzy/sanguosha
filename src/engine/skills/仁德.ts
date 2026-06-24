@@ -23,7 +23,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       // 仁德有三种调用格式:
       // 1. 分配格式(distribute UI 提交): params.allocation = [{target, cardIds}](多牌多目标)
       // 2. 分配格式(旧): params.targets = [{target, cardIds}]
@@ -54,7 +54,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           for (const cardId of t.cardIds) {
             if (allCardIds.includes(cardId)) { noDuplicates = false; }
             allCardIds.push(cardId);
-            if (!self?.hand.includes(cardId)) { allInHand = false; }
+            if (!self.hand.includes(cardId)) { allInHand = false; }
           }
         }
       }

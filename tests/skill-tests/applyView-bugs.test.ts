@@ -142,7 +142,10 @@ describe('applyView 一致性 bug', () => {
     it('获得 toViewEvents 用 othersView 公开 cardId → 第三方知道顺手牵羊拿了什么牌', () => {
       const def = getAtomDef('获得');
       const split = def.toViewEvents!(
-        { players: [], cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', rank: '3', type: '基本牌' } }, zones: { deck: [], discardPile: [], processing: [] } } as any,
+        { players: [
+            { index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+            { index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: { '防具': 'c2' }, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+          ], cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', rank: '3', type: '基本牌' } }, zones: { deck: [], discardPile: [], processing: [] } } as any,
         { type: '获得', player: 0, cardId: 'c2', from: 1 } as any,
       );
       // othersView 不应携带 cardId（第三方不应知道获得了什么牌）

@@ -37,7 +37,7 @@ function hasCharSelectPending(view: GameView | null | undefined): boolean {
   if (!view?.pending) return false;
   if (view.pending.atom?.type !== '选将询问') return false;
   const target = view.pending.target;
-  return !view.players[target]?.character;
+  return !view.players[target].character;
 }
 
 /** 检查某座次的 view 是否处于选将阶段(有玩家未选完) */

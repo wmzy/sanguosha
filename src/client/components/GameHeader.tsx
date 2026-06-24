@@ -34,7 +34,7 @@ export function GameHeader({
         <span className={cx(styles.roundBadge, animTurnVersion > 0 && styles.turnGlowing)} key={`turn-${animTurnVersion}`}>第 {view.turn.round} 轮</span>
         <span className={cx(styles.phaseBadge, animPhaseVersion > 0 && styles.phaseAnimating)} key={`phase-${animPhaseVersion}`}>{PHASE_LABELS[view.phase] ?? view.phase}</span>
         <span className={styles.currentPlayerText}>
-          当前: {currentPlayerName} {currentPlayer?.character ? `(${currentPlayer.character})` : ''}
+          当前: {currentPlayerName} {currentPlayer.character ? `(${currentPlayer.character})` : ''}
         </span>
       </div>
       {headerSlot}

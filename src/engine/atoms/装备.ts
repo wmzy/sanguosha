@@ -49,13 +49,12 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
   effect: { sound: 'equip', animation: 'glow', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const card = state.cardMap[atom.cardId];
-    const slot = inferSlot(card.subtype) ?? '武器';
-    const cardName = state.cardMap[atom.cardId]?.name ?? atom.cardId;
+    const slot = inferSlot(card.subtype)!;
     const view: ViewEvent = {
       type: '装备',
       player: atom.player,
       cardId: atom.cardId,
-      cardName,
+      cardName: card.name,
       slot,
       // 武器攻击范围:applyView 需要同步到 distanceVars.attackRange
       ...(slot === '武器' ? { range: card.range ?? 1 } : {}),

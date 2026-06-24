@@ -26,7 +26,8 @@ export const 武圣包装: AtomDefinition<{
   type: '武圣包装',
   validate(state, atom) {
     const self = state.players[atom.player];
-    if (!self?.alive) return 'player not alive';
+    if (!self) return `player ${atom.player} not found`;
+    if (!self.alive) return 'player not alive';
     if (atom.secondCardId) {
       // 丈八蛇矛:两张牌都必须在手中
       if (!self.hand.includes(atom.cardId) || !self.hand.includes(atom.secondCardId)) return 'cards not in hand';

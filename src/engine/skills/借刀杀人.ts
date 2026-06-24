@@ -20,7 +20,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
       // 兼容两种目标格式:
       //   1) params.target + params.killTarget(显式两字段,旧契约)
@@ -39,11 +39,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       if (typeof targetIdx !== 'number') return 'target required';
       if (typeof killTargetIdx !== 'number') return 'killTarget required';
-      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardInHand = !!self.hand.includes(params.cardId);
       const cardNameOk = state.cardMap[params.cardId]?.name === '借刀杀人';
       const target = state.players[targetIdx];
       const targetAlive = target?.alive === true;
-      const targetHasWeapon = !!target?.equipment?.['武器'];
+      const targetHasWeapon = !!target?.equipment['武器'];
       const notSelf = targetIdx !== ownerId;
       const killTargetPlayer = state.players[killTargetIdx];
       const killTargetAlive = killTargetPlayer?.alive === true;
@@ -123,7 +123,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           } else {
             // 不出杀:获得目标的武器
             const targetPlayer = state.players[target];
-            const weaponId = targetPlayer?.equipment?.['武器'];
+            const weaponId = targetPlayer.equipment['武器'];
             if (weaponId) {
               await applyAtom(state, { type: '卸下', player: target, slot: '武器' });
               await applyAtom(state, { type: '获得', player: from, cardId: weaponId, from: target });

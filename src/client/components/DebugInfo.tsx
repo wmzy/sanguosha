@@ -20,14 +20,14 @@ function equipName(cardMap: GameView['cardMap'], cardId: string): string {
 }
 
 export function DebugInfo({ view, perspectiveName, pending }: DebugInfoProps) {
-  const currentPlayerName = view.players[view.currentPlayerIndex]?.name ?? '';
+  const currentPlayerName = view.players[view.currentPlayerIndex].name;
 
   return (
     <details className={styles.debugPanel}>
       <summary className={styles.debugSummary}>调试信息</summary>
       <div className={styles.debugContent}>
         <div>phase: {view.phase} | round: {view.turn.round} | currentPlayer: {currentPlayerName}</div>
-        <div>viewer: {view.players[view.viewer]?.name} | perspective: {perspectiveName}</div>
+        <div>viewer: {view.players[view.viewer].name} | perspective: {perspectiveName}</div>
         <div>pending: {pending ? `${pending.prompt.title} → ${pending.target}` : 'none'}</div>
         <hr className={styles.debugHr} />
         {view.players.map((p, i) => (

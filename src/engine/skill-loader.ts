@@ -8,5 +8,5 @@ export interface SkillInstance {
 }
 
 export function getPlayerSkills(state: GameState, playerIndex: number): string[] {
-  return state.players[playerIndex]?.skills ?? [];
+  return state.players[playerIndex].skills;
 }

@@ -53,12 +53,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
-      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardInHand = !!self.hand.includes(params.cardId);
       const cardNameOk = state.cardMap[params.cardId]?.name === TRICK_NAME;
       // 闪电对自己使用;若自己判定区已有闪电则不可重复放置
-      const notAlready = !self?.pendingTricks.some(t => t.name === TRICK_NAME);
+      const notAlready = !self.pendingTricks.some(t => t.name === TRICK_NAME);
       const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notAlready;
       return ok ? null : '闪电使用条件不满足';
     }, async (state: GameState, params: Record<string, Json>) => {

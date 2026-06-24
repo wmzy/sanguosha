@@ -23,7 +23,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       // 激将是主公技:仅主公位可用(以 character.isLord 或主公位身份判断,这里以主公位 ownerId===0 为依据)
       const isLord = ownerId === 0;
       // 目标合法:不是自己 + 存活 + 蜀势力

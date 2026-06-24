@@ -17,9 +17,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state)
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
-      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardInHand = !!self.hand.includes(params.cardId);
       const card = state.cardMap[params.cardId];
       const hasSubtype = !!card?.subtype;
       const ok = myTurn && inActPhase && free && selfAlive && cardInHand && hasSubtype;
@@ -31,9 +31,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardId = params.cardId as string;
       // 先卸下同栏位装备(如果有):卸下→手牌,再 移动牌→弃牌堆
       const card = state.cardMap[cardId];
-      if (card?.subtype) {
+      if (card.subtype) {
         const slot = card.subtype as '武器' | '防具' | '进攻马' | '防御马' | '宝物';
-        const currentEquip = state.players[from]?.equipment?.[slot];
+        const currentEquip = state.players[from].equipment[slot];
         if (currentEquip) {
           // 替换前先卸下旧装备的自带技能实例(防止旧技能 hook 残留,见 Bug1)
           const oldCard = state.cardMap[currentEquip];

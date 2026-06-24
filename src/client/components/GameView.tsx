@@ -118,12 +118,12 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
   const handListRef = useRef<HTMLDivElement>(null);
 
   const perspectivePlayer = view.players[perspectiveIdx];
-  const perspectiveName = perspectivePlayer?.name ?? `P${perspectiveIdx}`;
+  const perspectiveName = perspectivePlayer.name ?? `P${perspectiveIdx}`;
   const isPerspectiveTurn = view.currentPlayerIndex === perspectiveIdx;
   const isMyTurn = isPerspectiveTurn;
   const currentPlayer = view.players[view.currentPlayerIndex];
-  const currentPlayerName = currentPlayer?.name ?? '';
-  const perspectiveHand: Card[] = perspectivePlayer?.hand ?? [];
+  const currentPlayerName = currentPlayer.name;
+  const perspectiveHand: Card[] = perspectivePlayer.hand ?? [];
 
   // 整理手牌:本地顺序与服务端手牌集合一致性校验
   // 服务端手牌变化(摸/出/弃)时,如果 localHandOrder 不再是合法排列,自动重置

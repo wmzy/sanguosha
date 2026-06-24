@@ -21,7 +21,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardId = params.cardId as string | undefined;
       if (cardId) {
         const self = state.players[ownerId];
-        if (!self?.hand.includes(cardId)) return '牌不在手牌中';
+        if (!self.hand.includes(cardId)) return '牌不在手牌中';
         const card = state.cardMap[cardId];
         if (card?.name !== '闪') return '只能打出闪';
       }

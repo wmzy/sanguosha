@@ -42,7 +42,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
       const self = state.players[ownerId];
-      if (!self?.alive) return '你已死亡';
+      if (!self.alive) return '你已死亡';
       if (!self.hand.includes(cardId)) return '牌不在手牌中';
       const card = state.cardMap[cardId];
       if (card.name !== '无懈可击') return '只能打出无懈可击';

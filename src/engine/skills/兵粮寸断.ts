@@ -32,10 +32,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
+      const selfAlive = self.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
       if (typeof params.target !== 'number') return 'target required';
-      const cardInHand = !!self?.hand.includes(params.cardId);
+      const cardInHand = !!self.hand.includes(params.cardId);
       const cardNameOk = state.cardMap[params.cardId]?.name === '兵粮寸断';
       const target = state.players[params.target];
       const targetAlive = target?.alive === true;

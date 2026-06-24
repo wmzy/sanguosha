@@ -15,7 +15,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 1) return;
     const me = ctx.state.players[ownerId];
-    const armorId = me?.equipment?.['防具'];
+    const armorId = me.equipment['防具'];
     if (!armorId) return;
     const card = ctx.state.cardMap[armorId];
     if (card?.name !== '白银狮子') return;
