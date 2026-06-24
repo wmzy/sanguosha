@@ -9,6 +9,7 @@ import type { GameState, ActionLogEntry, AppliedAtomEntry, ViewEventSplit, Json,
 import type { GameSession } from './session';
 import { sanitizeState } from './persistence';
 import { createLogger } from './logger';
+import { ENGINE_VERSION } from './version';
 
 const log = createLogger('snapshot');
 
@@ -181,7 +182,7 @@ export async function createSnapshot(
       description: null,
       playerCount: state.players.length,
       debug: isDebug,
-      engineVersion: __APP_VERSION__,
+      engineVersion: ENGINE_VERSION,
     },
     alignment: {
       frontendSeqs: req.frontendSeqs,

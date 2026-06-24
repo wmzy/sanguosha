@@ -1,16 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import wyw from '@wyw-in-js/vite';
 import path from 'path';
 import { honoApiPlugin } from './src/server/vite-plugin';
 
-const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
-
 export default defineConfig({
-  define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
-  },
   base: process.env.VITE_BASE ?? '/',
   plugins: [
     react({ exclude: ['node_modules/**'] }),
