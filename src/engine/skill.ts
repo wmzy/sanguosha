@@ -67,17 +67,24 @@ export function findPendingSlot(state: GameState, ownerId: number): PendingSlot 
       const t = (s.atom as { target?: unknown }).target;
       return typeof t === 'number' && t < TARGET_SYSTEM;
     })
-    ?? (state.pendingSlots.size === 1 ? [...state.pendingSlots.values()][0] : undefined);
+    ?? (state.pendingSlots.size === 1
+      ? (() => {
+          const slot = [...state.pendingSlots.values()][0];
+          // size===1 fallback:只返回属于请求者的 slot,不能误匹配其他玩家的出牌窗口等非阻塞 pending
+          const target = (slot.atom as { target?: number }).target
+            ?? (slot.atom as { player?: number }).player;
+          return typeof target === 'number' && target === ownerId ? slot : undefined;
+        })()
+      : undefined);
 }
 
-/** 是否存在阻塞型 pending——即需要玩家先回应的询问(询问闪/杀/无懈/弃牌等)。
- *  出牌阶段的 __出牌 询问是非阻塞的(玩家可以在期间自由出牌),不计入阻塞判断。
+/** 是否存在阻塞型 pending——即需要玩家先回应的询问(询问闪/杀/无瓣/弃牌等)。
+ *  非阻塞型 pending(出牌阶段的 出牌窗口)不阻止玩家出牌/用技,不计入此判断。
+ *  判断依据是 slot.isBlocking 字段,由 atom 定义的 pending.isBlocking 声明。
  *  validateUseCard 和 end action 用此函数替代旧的 pendingSlots.size > 0 检查。 */
 export function hasBlockingPending(state: GameState): boolean {
   for (const slot of state.pendingSlots.values()) {
-    const rt = (slot.atom as { requestType?: string }).requestType;
-    if (rt === '__出牌') continue;
-    return true;
+    if (slot.isBlocking) return true;
   }
   return false;
 }
@@ -121,7 +128,8 @@ function actionKey(skillId: string, ownerId: number, actionType: string): string
 
 export function registerActionEntry(entry: ActionEntry): void {
   const k = actionKey(entry.skillId, entry.ownerId, entry.actionType);
-  if (actions.has(k)) throw new Error(`Action "${k}" already registered`);
+  // 先删后加:全局注册表跨房间共享,同一 key 可能被前一个房间占用
+  actions.delete(k);
   actions.set(k, entry);
 }
 

@@ -88,9 +88,11 @@ const SYSTEM_OWNER = TARGET_SYSTEM;
 /** 从 pending atom 中提取等待目标玩家(座次下标)。所有内置等待型 atom 都有 target 字段。
  *  返回 TARGET_SYSTEM(-1)表示系统(开局 action),不对应任何真实玩家槽位。
  *  注意:TARGET_SYSTEM 与广播型 target(TARGET_BROADCAST=-2)不同,
- *  广播型 slot 本身已携带 target=TARGET_BROADCAST,能被此函数准确提取。 */
+ *  广播型 slot 本身已携带 target=TARGET_BROADCAST,能被此函数准确提取。
+ *  出牌窗口 atom 用 player 字段而非 target,此处兼容。 */
 function extractPendingTarget(atom: Atom): number {
   if ('target' in atom && typeof atom.target === 'number') return atom.target;
+  if ('player' in atom && typeof atom.player === 'number') return atom.player;
   return SYSTEM_OWNER;
 }
 
@@ -546,6 +548,7 @@ function createAndAwaitSlot(
       startTime: Date.now() - state.startedAt,
       deadline: Date.now() - state.startedAt + timeoutMs,
       createdSeq: state.seq,
+      isBlocking: pending.isBlocking !== false,
       resolve: safeResolve,
       get isTimeout() { return timedOut; },
       pause() {

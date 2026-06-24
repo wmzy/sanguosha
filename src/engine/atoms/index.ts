@@ -41,6 +41,7 @@ import './询问闪';
 import './询问杀';
 import './请求回应';
 import './并行回应';
+import './出牌窗口';
 import './选将';
 import './分配武将';
 import './武圣包装';

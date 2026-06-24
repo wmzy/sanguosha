@@ -73,19 +73,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
     }
 
-    // 出牌阶段:启动 __出牌 循环(fire-and-forget,不阻塞 hook)
-    // 循环创建 __出牌 询问。玩家出牌(use action)会 resolve 当前询问,
-    // 循环检查 phase 仍为 '出牌' 则重新创建。玩家点 end 或超时则 phase 改变,循环退出。
-    // 必须不阻塞 hook:否则调用方的 await applyAtom(阶段结束) 永远不会 resolve
-    // (如兵粮寸断的 阶段开始 before hook 在 cancel 前 await 阶段结束)。
+    // 出牌阶段:启动 出牌窗口 循环(fire-and-forget,不阻塞 hook)
+    // 循环创建 出牌窗口 atom(非阻塞型 pending)。仅当当前出牌玩家为本玩家时运行。
+    // 循环在以下任一条件满足时退出:
+    //   1) phase 不再是 '出牌'(本回合推进到弃牌)
+    //   2) currentPlayerIndex 不再是本玩家(本回合结束,轮到下家)
+    // 条件 2 防止旧 IIFE 在下家出牌阶段因 phase 相同而持续为旧玩家创建出牌窗口。
     if (next === '出牌') {
       void (async () => {
-        while (ctx.state.phase === '出牌') {
+        while (ctx.state.phase === '出牌' && ctx.state.currentPlayerIndex === player) {
           await applyAtom(ctx.state, {
-            type: '请求回应',
-            requestType: '__出牌',
-            target: player,
-            prompt: { type: 'confirm', title: '出牌阶段' },
+            type: '出牌窗口',
+            player,
             timeout: 50,
           });
         }

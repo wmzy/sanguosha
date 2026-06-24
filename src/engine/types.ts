@@ -333,6 +333,10 @@ export interface AtomPending<A = Atom> {
   prompt: ActionPrompt;
   /** 超时毫秒。**必填**——无合理默认值,常见值:询问闪/询问杀 15s,请求回应 30s */
   timeout: number;
+  /** 是否为阻塞型 pending(需要玩家先回应才能继续)。默认 true。
+   *  非阻塞型 pending 表示一个"控制权 token"——玩家可在其期间自由操作(如出牌阶段的 出牌窗口),
+   *  出牌/用技的 validate 只检查阻塞型 pending。*/
+  isBlocking?: boolean;
 }
 
 export interface AtomEffect {
@@ -438,6 +442,9 @@ export type Atom =
      wuxieTarget?: number }
   // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
   | { type: '并行回应'; requestType: string; targets: number[]; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
+  // 出牌阶段的控制权 token——非阻塞型 pending,表示"当前玩家可自由出牌/用技"。
+  // 玩家每次操作都 resolve 它(重建),超时则结束回合。不计入 hasBlockingPending。
+  | { type: '出牌窗口'; player: number; timeout?: number }
   // 牌包装(武圣转化 / 丈八蛇矛双卡转化)
   | { type: '武圣包装'; player: number; cardId: string; secondCardId?: string }
   | { type: '武圣还原'; player: number; cardId: string; secondCardId?: string };
@@ -597,6 +604,8 @@ export interface PendingView {
   atom: Atom;
   prompt: ActionPrompt;
   target: number;
+  /** 是否为阻塞型 pending(需玩家回应)。非阻塞型(如出牌阶段的出牌窗口)在前端不计入 awaiting 判断。*/
+  isBlocking?: boolean;
   /** 由 events 消息权威下发;applyView 不再硬编码 */
   deadline?: number;
   /** 倒计时总时长(ms),前端进度条用 deadline-totalMs..deadline 映射;由 events 消息权威下发 */
@@ -632,6 +641,8 @@ export interface PendingSlot {
   definition: AtomDefinition;
   startTime: number;
   deadline: number;
+  /** 是否为阻塞型 pending。非阻塞型(出牌窗口)不阻止玩家出牌/用技,不计入 hasBlockingPending。*/
+  isBlocking: boolean;
   /** 创建时的 state.seq，作为 pending 窗口版本号。
    *  respond 路径用 action.pendingSeq 与此对比：不匹配 = 响应了过期窗口 → 拒绝。
    *  close-reopen 时新 slot 会有新 createdSeq。 */

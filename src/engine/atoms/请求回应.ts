@@ -36,16 +36,6 @@ export const 请求回应: AtomDefinition<{
         await applyAtom(state, { type: '弃置', player: target, cardIds: toDiscard });
         return;
       }
-      // 出牌询问超时:自动结束回合(与玩家点 end 走相同路径)
-      if (atom.requestType === '__出牌') {
-        const player = atom.target;
-        await applyAtom(state, { type: '阶段结束', player, phase: '出牌' });
-        await applyAtom(state, { type: '阶段结束', player, phase: '弃牌' });
-        await applyAtom(state, { type: '清过期标记', player });
-        await applyAtom(state, { type: '下一玩家' });
-        await applyAtom(state, { type: '回合结束', player });
-        return;
-      }
       // 其他 requestType 超时:无操作
     },
     prompt: { type: 'confirm', title: '请回应' },
