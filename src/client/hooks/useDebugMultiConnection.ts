@@ -75,14 +75,15 @@ export function useDebugMultiConnection(
       const seat = seatsRef.current.get(seatViewer);
       if (!seat) return;
       seat.view = msg.state;
+      seat.viewer = msg.state.viewer;
       seat.lastSeq = msg.lastSeq;
       setViews(prev => {
         const next = new Map(prev);
-        next.set(seatViewer, msg.state);
+        next.set(msg.state.viewer, msg.state);
         return next;
       });
       if (onFirstViewRef.current && seatViewer === 0) {
-        onFirstViewRef.current(0);
+        onFirstViewRef.current(msg.state.viewer);
       }
     } else if (msg.type === 'event') {
       const seat = seatsRef.current.get(seatViewer);
@@ -92,7 +93,7 @@ export function useDebugMultiConnection(
       if (msg.notify) {
         if (msg.notify.eventType === 'pendingResolved') {
           const target = (msg.notify.data as { target?: number }).target;
-          if (target !== undefined && (target === seatViewer || target < 0) && seat.view.pending) {
+          if (target !== undefined && (target === seat.viewer || target < 0) && seat.view.pending) {
             seat.view.pending = null;
           }
         }
@@ -118,10 +119,10 @@ export function useDebugMultiConnection(
       }
       setViews(prev => {
         const next = new Map(prev);
-        next.set(seatViewer, seat.view!);
+        next.set(seat.viewer, seat.view!);
         return next;
       });
-      if (msg.view && seatViewer === perspectiveRef.current) {
+      if (msg.view && seat.viewer === perspectiveRef.current) {
         playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
       }
     } else if (msg.type === 'actionRejected') {
@@ -180,9 +181,10 @@ export function useDebugMultiConnection(
     };
   }, [roomId, playerCount, wsUrl, handleMessage]);
 
-  /** 发送 action:走 ownerId 对应的连接 */
+  /** 发送 action:走 ownerId 对应 viewer 的连接 */
   const sendAction = useCallback((action: ActionMsg) => {
-    const seat = seatsRef.current.get(action.ownerId);
+    // seatsRef 按循环索引 key,遍历按实际 viewer 字段查找
+    const seat = [...seatsRef.current.values()].find(s => s.viewer === action.ownerId);
     if (!seat || seat.ws.readyState !== WebSocket.OPEN) {
       log.warn('no open connection for viewer', action.ownerId);
       return;
@@ -209,9 +211,10 @@ export function useDebugMultiConnection(
     } as ClientMessage));
   }, []);
 
-  /** 整理手牌:走当前 perspective 的连接 */
+  /** 整理手牌:走当前 perspective viewer 的连接 */
   const reorderHand = useCallback((order: string[]) => {
-    const seat = seatsRef.current.get(perspectiveRef.current);
+    // seatsRef 按循环索引 key,遍历按实际 viewer 字段查找
+    const seat = [...seatsRef.current.values()].find(s => s.viewer === perspectiveRef.current);
     if (!seat || seat.ws.readyState !== WebSocket.OPEN) return;
     seat.ws.send(JSON.stringify({ type: 'reorder_hand', order } as ClientMessage));
   }, []);
@@ -225,8 +228,10 @@ export function useDebugMultiConnection(
     setConnectedCount(0);
   }, []);
 
-  const getSeq = useCallback((seat: number): number => {
-    return seatsRef.current.get(seat)?.lastSeq ?? 0;
+  const getSeq = useCallback((viewer: number): number => {
+    // seatsRef 按循环索引 key,遍历按实际 viewer 字段查找
+    const seat = [...seatsRef.current.values()].find(s => s.viewer === viewer);
+    return seat?.lastSeq ?? 0;
   }, []);
 
   return {
