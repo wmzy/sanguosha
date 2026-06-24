@@ -365,7 +365,10 @@ export class GameSession {
     this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
     this.broadcast({ type: 'gameOver', winner: '无人' });
     // 必须 destroy 以清理 idle timer，否则定时器会通过 onStateChange 自循环
-    void this.destroy();
+    void this.destroy().catch(err => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('destroy after disconnect failed', { error: e.stack ?? String(e) });
+    });
   }
 
   reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, lastSeq = 0): boolean {
@@ -428,7 +431,10 @@ export class GameSession {
       },
       state,
       this.actionLog,
-    );
+    ).catch(err => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('saveRoom failed', { error: e.stack ?? String(e) });
+    });
   }
 
   /** 返回游戏动作日志(供 /api/rooms/:id/log 端点)。无 state 时返回 null。 */

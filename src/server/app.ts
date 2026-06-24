@@ -130,7 +130,10 @@ async function restorePersistedRooms(): Promise<void> {
   }
 }
 
-void restorePersistedRooms();
+void restorePersistedRooms().catch(err => {
+  const e = err instanceof Error ? err : new Error(String(err));
+  log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
+});
 
 // REST API
 app.get('/api/rooms', (c) => {
@@ -277,7 +280,10 @@ export function handleWsMessage(
       handleReady(playerId);
       break;
     case 'start_game':
-      void handleStartGame(playerId);
+      void handleStartGame(playerId).catch(err => {
+        const e = err instanceof Error ? err : new Error(String(err));
+        log.error('handleStartGame failed', { playerId, error: e.stack ?? String(e) });
+      });
       break;
     case 'action':
       handleAction(playerId, message.action);
@@ -292,7 +298,10 @@ export function handleWsMessage(
       handleReconnect(playerId, message.playerId, message.lastSeq ?? 0, ws);
       break;
     case 'join_debug_room':
-      void handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws);
+      void handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws).catch(err => {
+        const e = err instanceof Error ? err : new Error(String(err));
+        log.error('handleJoinDebugRoom failed', { playerId, roomId: message.roomId, error: e.stack ?? String(e) });
+      });
       break;
   }
 }
@@ -396,7 +405,10 @@ function handleAction(playerId: string, action: import('../engine/types').Client
   const session = gameSessions.get(roomId);
   if (!session) return;
 
-  void session.handleAction(playerId, action);
+  void session.handleAction(playerId, action).catch(err => {
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error('session.handleAction failed', { playerId, error: e.stack ?? String(e) });
+  });
 }
 
 function handleReorderHand(playerId: string, order: string[]): void {
@@ -406,7 +418,10 @@ function handleReorderHand(playerId: string, order: string[]): void {
   const session = gameSessions.get(roomId);
   if (!session) return;
 
-  void session.handleReorderHand(playerId, order);
+  void session.handleReorderHand(playerId, order).catch(err => {
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error('session.handleReorderHand failed', { playerId, error: e.stack ?? String(e) });
+  });
 }
 
 // 新 ENGINE-DESIGN 不再需要 handleAsyncHookResponse
@@ -426,7 +441,10 @@ function handleLeaveRoom(playerId: string): void {
 
   const session = gameSessions.get(roomId);
   if (session) {
-    void session.destroy();
+    void session.destroy().catch(err => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      log.error('session.destroy failed', { roomId, error: e.stack ?? String(e) });
+    });
   }
   gameSessions.delete(roomId);
 }
