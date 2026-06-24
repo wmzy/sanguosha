@@ -7,7 +7,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { viewReducer } from '../../src/client/view/reducer';
 import { getAtomDef } from '../../src/engine/atom';
-import type { GameView, ViewEvent } from '../../src/engine/types';
+import type { GameView, ViewEvent, Card } from '../../src/engine/types';
 
 /** 构造一个最小化 mock GameView 用于直接调用 applyView */
 function mockView(overrides: Partial<GameView> = {}): GameView {
@@ -147,6 +147,69 @@ describe('applyView 一致性 bug', () => {
       );
       // othersView 不应携带 cardId（第三方不应知道获得了什么牌）
       expect((split?.othersView as any)?.cardId).toBeUndefined();
+    });
+  });
+
+  // ── 重复牌打出/弃牌导致 hand.length 与 handCount 脱节 ──
+  // 标准牌堆中同名同花色同点数的牌有多张(如 杀♠7 有 4 张)。
+  // 移动牌.applyView 的「打出」「弃牌」分支按 name+suit+rank 过滤移除手牌,
+  // 会一次性移除所有重复牌,但 handCount 只 -1 → 前端手牌区(hand.length)
+  // 与武将卡片手牌数(handCount)不一致。这就是「玩一会后手牌数对不上」的根因。
+  describe('移动牌 atom: 重复牌打出导致 hand 与 handCount 脱节', () => {
+    // 两张完全相同的杀(id 不同,但 name/suit/rank 相同)
+    const dupCards: Card[] = [
+      { id: 's1', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
+      { id: 's2', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
+    ];
+
+    it('打出分支: 打出 1 张重复杀, hand 应只移除 1 张, handCount 只 -1', () => {
+      const def = getAtomDef('移动牌');
+      const view = mockView({
+        players: [
+          {
+            index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
+            equipment: {}, skills: [], handCount: 2, hand: [...dupCards], marks: [],
+          },
+          { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+        ],
+        cardMap: { s1: dupCards[0], s2: dupCards[1] },
+      });
+
+      // 打出 s1: 手牌→处理区。toViewEvents 生成 { type: '打出', player: 0, card: {name,suit,rank}, cardId: 's1' }
+      def.applyView!(view, {
+        type: '打出', player: 0, cardId: 's1',
+        card: { name: '杀', suit: '♠', rank: '7' },
+      } as any);
+
+      // ❌ BUG: filter 按 name/suit/rank 匹配,s2 也会被移除 → hand 变空但 handCount=1
+      expect(view.players[0].handCount).toBe(1); // handCount 只 -1 ✓
+      expect(view.players[0].hand?.length).toBe(1); // hand 应剩 1 张(s2)
+      // 残留的牌必须是 s2(没被打出的那张),不能是 s1
+      expect(view.players[0].hand?.[0]?.id).toBe('s2');
+    });
+
+    it('弃牌分支: 弃 1 张重复杀, hand 应只移除 1 张, handCount 只 -1', () => {
+      const def = getAtomDef('移动牌');
+      const view = mockView({
+        players: [
+          {
+            index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
+            equipment: {}, skills: [], handCount: 2, hand: [...dupCards], marks: [],
+          },
+          { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+        ],
+        cardMap: { s1: dupCards[0], s2: dupCards[1] },
+      });
+
+      // 弃牌: 手牌→弃牌堆。toViewEvents 生成 { type: '弃牌', player: 0, card: {...}, cardId: 's1' }
+      def.applyView!(view, {
+        type: '弃牌', player: 0, cardId: 's1',
+        card: { name: '杀', suit: '♠', rank: '7' },
+      } as any);
+
+      expect(view.players[0].handCount).toBe(1);
+      expect(view.players[0].hand?.length).toBe(1);
+      expect(view.players[0].hand?.[0]?.id).toBe('s2');
     });
   });
 });

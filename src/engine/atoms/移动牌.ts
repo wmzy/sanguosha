@@ -92,22 +92,22 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     switch (event.type) {
       case '弃牌': {
         view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-        if (view.players[pi].hand) {
-          const card = event.card as any;
-          view.players[pi].hand = view.players[pi].hand!.filter(
-            (c: any) => !(c.name === card?.name && c.suit === card?.suit && c.rank === card?.rank)
-          );
+        if (view.players[pi].hand && event.cardId) {
+          const cardId = event.cardId as string;
+          // 用 cardId 精确移除单张,不能用 name/suit/rank 过滤——
+          // 标准牌堆中同名同花色同点数的牌有多张(如 杀♠7 有 4 张),
+          // 按 name/suit/rank 会误删所有重复牌,导致 hand.length < handCount。
+          view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== cardId);
         }
         if (view.zones) view.zones.discardPileCount += 1;
         break;
       }
       case '打出': {
         view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-        if (view.players[pi].hand) {
-          const card = event.card as any;
-          view.players[pi].hand = view.players[pi].hand!.filter(
-            (c: any) => !(c.name === card?.name && c.suit === card?.suit && c.rank === card?.rank)
-          );
+        if (view.players[pi].hand && event.cardId) {
+          const cardId = event.cardId as string;
+          // 同上:用 cardId 精确移除,避免重复牌误删。
+          view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== cardId);
         }
         if (view.zones && event.cardId) view.zones.processing.push(event.cardId as string);
         break;
