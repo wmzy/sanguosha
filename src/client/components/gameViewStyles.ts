@@ -668,3 +668,21 @@ export const distributeCancelRow = css`
 export const skillRowPad = css`padding: 8px 12px;`;
 /** 角色大卡判定区 padding 覆盖。 */
 export const judgeRowPad = css`padding: 0 12px 8px;`;
+
+// ─── Debug 快照 ───
+export const snapshotBtn = css`
+  background: #2d4a2d; color: #7ee787; border: 1px solid #4a8a4a;
+  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;
+  &:hover { background: #3d5a3d; }
+  &:disabled { opacity: 0.5; cursor: wait; }
+`;
+export const snapshotToast = css`
+  position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
+  background: #1f3d1f; color: #7ee787; padding: 10px 20px; border-radius: 6px;
+  border: 1px solid #4a8a4a; font-size: 13px; z-index: 9999;
+`;
+export const snapshotErrorToast = css`
+  position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
+  background: #3d1f1f; color: #ff7b72; padding: 10px 20px; border-radius: 6px;
+  border: 1px solid #8a4a4a; font-size: 13px; z-index: 9999;
+`;

@@ -49,6 +49,7 @@ export function useDebugMultiConnection(
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
   disconnectAll: () => void;
+  getSeq: (seat: number) => number;
 } {
   const { roomId, playerCount, perspective } = params;
   // 座次 → 连接信息(key = viewer index)
@@ -224,11 +225,16 @@ export function useDebugMultiConnection(
     setConnectedCount(0);
   }, []);
 
+  const getSeq = useCallback((seat: number): number => {
+    return seatsRef.current.get(seat)?.lastSeq ?? 0;
+  }, []);
+
   return {
     views,
     currentEvent: playback.current,
     sendAction,
     reorderHand,
     disconnectAll,
+    getSeq,
   };
 }

@@ -1,5 +1,5 @@
 // src/client/components/DebugPerspectiveBar.tsx
-// debug 模式视角控制栏:视角切换 / 跳转当前玩家 / 自动跟随开关 / 退出房间。
+// debug 模式视角控制栏:视角切换 / 跳转当前玩家 / 自动跟随开关 / 退出房间 / 保存快照。
 // 由上层(DebugLobby)渲染到 GameViewComponent 的 headerSlot / overlaySlot,
 // GameViewComponent 本身不感知视角切换。
 import { cx } from '@linaria/core';
@@ -14,6 +14,11 @@ export interface DebugPerspectiveBarProps {
   autoSwitchCtl?: { enabled: boolean; toggle: () => void };
   /** 退出/删除房间(可选;渲染「退出」按钮)。 */
   onDeleteRoom?: () => void;
+  /** 保存快照(可选;渲染「保存快照」按钮)。 */
+  onSaveSnapshot?: () => void;
+  snapshotSaving?: boolean;
+  snapshotToast?: string | null;
+  snapshotError?: string | null;
 }
 
 export function DebugPerspectiveBar({
@@ -23,8 +28,12 @@ export function DebugPerspectiveBar({
   onGoToCurrentPlayer,
   autoSwitchCtl,
   onDeleteRoom,
+  onSaveSnapshot,
+  snapshotSaving,
+  snapshotToast,
+  snapshotError,
 }: DebugPerspectiveBarProps) {
-  if (!onSwitchPerspective && !onDeleteRoom && !onSwitchToNextUnselected) return null;
+  if (!onSwitchPerspective && !onDeleteRoom && !onSwitchToNextUnselected && !onSaveSnapshot) return null;
   return (
     <div className={styles.headerRight}>
       {onDeleteRoom && <button className={styles.backBtn} onClick={onDeleteRoom}>← 退出</button>}
@@ -44,6 +53,20 @@ export function DebugPerspectiveBar({
         >
           自动切换{autoSwitchCtl.enabled ? '✓' : '✗'}
         </button>
+      )}
+      {onSaveSnapshot && (
+        <button
+          className={styles.snapshotBtn}
+          onClick={onSaveSnapshot}
+          disabled={snapshotSaving}
+        >
+          {snapshotSaving ? '保存中…' : '保存快照'}
+        </button>
+      )}
+      {snapshotError ? (
+        <div className={styles.snapshotErrorToast}>{snapshotError}</div>
+      ) : (
+        snapshotToast && <div className={styles.snapshotToast}>{snapshotToast}</div>
       )}
     </div>
   );
