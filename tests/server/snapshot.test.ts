@@ -177,4 +177,11 @@ describe('debug 快照功能', () => {
     expect(result).toHaveProperty('error');
     expect((result as { status: number }).status).toBe(404);
   });
+
+  it('追加描述:含路径遍历的 snapshotId → 返回 400,不访问文件系统', async () => {
+    // snapshotId 来自 URL :id,客户端可控。含 / 或 .. 时必须拒绝,防止逃逸快照目录。
+    const result = await patchSnapshotDescription('../../../../etc/passwd', '恶意');
+    expect(result).toHaveProperty('error');
+    expect((result as { status: number }).status).toBe(400);
+  });
 });

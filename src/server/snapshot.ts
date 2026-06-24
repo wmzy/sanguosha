@@ -216,11 +216,19 @@ export async function createSnapshot(
   }
 }
 
+/** snapshotId 合法字符白名单:服务端生成的格式为 `<时间戳>-<4位随机>-<房间ID>`,
+ *  只含字母/数字/连字符。任何路径分隔符(/\)或 .. 都应被拒绝,防止路径遍历。 */
+const SAFE_SNAPSHOT_ID = /^[A-Za-z0-9-]+$/;
+
 /** 追加描述到已有快照 */
 export async function patchSnapshotDescription(
   snapshotId: string,
   description: string,
 ): Promise<{ success: true } | { error: string; status: 400 | 403 | 404 | 500 }> {
+  // snapshotId 来自 URL 参数(:id),客户端可控。必须校验,否则 ../ 可逃逸快照目录。
+  if (!SAFE_SNAPSHOT_ID.test(snapshotId)) {
+    return { error: '非法快照 ID', status: 400 };
+  }
   const path = snapshotPath(snapshotId);
   try {
     const raw = await readFile(path, 'utf-8');
