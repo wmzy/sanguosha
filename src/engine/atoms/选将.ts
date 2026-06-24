@@ -90,12 +90,16 @@ export const 初始化洗牌: AtomDefinition<{
     const rng = createRng(atom.seed);
     const allCards = shuffle(createStandardDeck(), rng);
 
-    state.cardMap = {};
+    // 原地替换 cardMap 条目,而非 state.cardMap = {} 创建新对象——
+    // 视图可能持有旧 cardMap 引用,换引用会导致视图的 cardMap 永远为空,
+    // 后续 applyView 的 移动牌 通用 fallback 查不到卡牌对象(handCount++
+    // 但卡不加入 hand[],引起手牌数不一致)。
+    const keys = Object.keys(state.cardMap);
+    for (const key of keys) delete state.cardMap[key];
+    for (const card of allCards) state.cardMap[card.id] = card;
+
     state.zones.deck.length = 0;
-    for (const card of allCards) {
-      state.cardMap[card.id] = card;
-      state.zones.deck.push(card.id);
-    }
+    for (const card of allCards) state.zones.deck.push(card.id);
     state.rngSeed = atom.seed;
   },
 };

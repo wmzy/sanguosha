@@ -44,6 +44,7 @@ import type {
   NotifyEvent,
   PendingSlot,
   SettlementFrame,
+  Card,
 } from './types';
 import { createGameState, TARGET_SYSTEM } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
@@ -58,6 +59,7 @@ import {
   unloadSkillInstance,
 } from './skill';
 import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
+import { createStandardDeck } from '../shared/deck';
 
 import { clearSlashMaxProviders } from './slash-quota';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
@@ -163,7 +165,14 @@ export function create(gameConfig: GameConfig): GameState {
     pendingTricks: [],
   }));
 
-  const state = createGameState({ players: stubPlayers, cardMap: {} });
+  // 预填充 cardMap(所有标准牌),确保 initialView 在 bootstrap execute 之前发出时
+  // cardMap 不为空。applyView 的 移动牌 通用 fallback 依赖 cardMap 查卡牌对象,
+  // 若 cardMap 为空且后续被 state.cardMap = {} 替换引用,视图的 cardMap 引用就永远空了。
+  const allCards = createStandardDeck();
+  const cardMap: Record<string, Card> = {};
+  for (const c of allCards) cardMap[c.id] = c;
+
+  const state = createGameState({ players: stubPlayers, cardMap });
   state.startedAt = Date.now();
   return state;
 }
