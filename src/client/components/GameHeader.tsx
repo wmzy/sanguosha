@@ -1,10 +1,11 @@
 // src/client/components/GameHeader.tsx
-// 头部条:轮次徽章 + 阶段徽章 + 当前玩家 + (debug 模式)视角切换/跳转/自动跟随/退出按钮。
-// 从 GameView.tsx 逐字迁移,纯展示组件。
+// 头部条:轮次徽章 + 阶段徽章 + 当前玩家。
+// 纯展示组件,不含任何视角切换逻辑。
+// 右侧由上层通过 headerSlot 注入(视角控制/退出按钮等 debug UI)。
+import { type ReactNode } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import { PHASE_LABELS } from './gameViewConstants';
-import { DebugPerspectiveBar, type DebugPerspectiveBarProps } from './DebugPerspectiveBar';
 import type { GameView } from '../../engine/types';
 
 interface GameHeaderProps {
@@ -14,11 +15,8 @@ interface GameHeaderProps {
   /** 阶段动画版本号 */
   animPhaseVersion: number;
   currentPlayerName: string;
-  perspectiveName: string;
-  onSwitchPerspective?: () => void;
-  onGoToCurrentPlayer?: () => void;
-  autoSwitchCtl?: { enabled: boolean; toggle: () => void };
-  onDeleteRoom?: () => void;
+  /** 右侧插槽:上层渲染视角控制/退出等 debug UI。 */
+  headerSlot?: ReactNode;
 }
 
 export function GameHeader({
@@ -26,17 +24,12 @@ export function GameHeader({
   animTurnVersion,
   animPhaseVersion,
   currentPlayerName,
-  perspectiveName,
-  onSwitchPerspective,
-  onGoToCurrentPlayer,
-  autoSwitchCtl,
-  onDeleteRoom,
+  headerSlot,
 }: GameHeaderProps) {
   const currentPlayer = view.players[view.currentPlayerIndex];
 
   return (
     <div className={styles.headerBar}>
-      {onDeleteRoom && <button className={styles.backBtn} onClick={onDeleteRoom}>← 退出</button>}
       <div className={styles.headerCenter}>
         <span className={cx(styles.roundBadge, animTurnVersion > 0 && styles.turnGlowing)} key={`turn-${animTurnVersion}`}>第 {view.turn.round} 轮</span>
         <span className={cx(styles.phaseBadge, animPhaseVersion > 0 && styles.phaseAnimating)} key={`phase-${animPhaseVersion}`}>{PHASE_LABELS[view.phase] ?? view.phase}</span>
@@ -44,12 +37,7 @@ export function GameHeader({
           当前: {currentPlayerName} {currentPlayer?.character ? `(${currentPlayer.character})` : ''}
         </span>
       </div>
-      <DebugPerspectiveBar
-        perspectiveName={perspectiveName}
-        onSwitchPerspective={onSwitchPerspective}
-        onGoToCurrentPlayer={onGoToCurrentPlayer}
-        autoSwitchCtl={autoSwitchCtl}
-      />
+      {headerSlot}
     </div>
   );
 }

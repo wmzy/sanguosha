@@ -7,6 +7,7 @@
 // 倒计时只在当前视角连接有选将 pending 时显示(场景 A 中自己还没选完的 slot);
 // 不会显示其他玩家的倒计时(避免「共用倒计时」混淆)。
 
+import type { ReactNode } from 'react';
 import type { GameView } from '../../engine/types';
 import { CountdownBar } from './CountdownBar';
 import { FACTION_BG } from './gameViewConstants';
@@ -19,21 +20,18 @@ const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 export interface CharSelectWaitingOverlayProps {
   view: GameView;
   perspectiveIdx: number;
-  perspectiveName: string;
-  onSwitchPerspective?: () => void;
+  /** 底部插槽:上层渲染视角控制等 debug UI(如「切换视角」按钮)。 */
+  overlaySlot?: ReactNode;
 }
 
 export function CharSelectWaitingOverlay({
-  view, perspectiveIdx, perspectiveName, onSwitchPerspective,
+  view, perspectiveIdx, overlaySlot,
 }: CharSelectWaitingOverlayProps) {
   // debug 多 WS 模型下,每个座次连接的 view.pending 直接就是该座次的选将询问;
   // 当前视角连接的 pending 是选将询问时,直接取其 deadline 用于倒计时。
   const isPendingCharSelect = view.pending?.atom?.type === '选将询问';
   const selectDeadline = isPendingCharSelect ? (view.pending!.deadline ?? null) : null;
   const selectTotalMs = isPendingCharSelect ? (view.pending!.totalMs ?? 60_000) : 60_000;
-  // 找下一个未选将的座次名(用于切换按钮显示)
-  const nextUnselected = view.players.find(p => !p.character && p.index !== perspectiveIdx);
-  const nextName = nextUnselected?.name ?? view.players[(perspectiveIdx + 1) % view.players.length]?.name;
   const selectingNames = view.players.filter(p => !p.character).map(p => p.name).join('、');
 
   // 当前视角玩家已选的武将信息(用于展示选择结果)
@@ -80,12 +78,8 @@ export function CharSelectWaitingOverlay({
       <div className={styles.charSelectWaitingCountdown}>
         <CountdownBar deadline={selectDeadline} totalMs={selectTotalMs} />
       </div>
-      {/* debug 模式:切换到未选玩家代其选将 */}
-      {onSwitchPerspective && (
-        <button className={styles.charSelectWaitingSwitchBtn} onClick={onSwitchPerspective}>
-          切换视角 → {nextName}
-        </button>
-      )}
+      {/* 底部插槽(debug 视角控制等,由上层注入) */}
+      {overlaySlot}
     </div>
   );
 }

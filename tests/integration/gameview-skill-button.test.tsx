@@ -64,7 +64,7 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
 
   it('仁德在出牌阶段渲染为可点击按钮(非纯文本标签)', async () => {
     const view = makeView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // registerSkillActions 是 async(dynamic import),需等待按钮出现
     // 按钮文本是技能名 '仁德'(skillRow 里 visibleSkills 渲染)
@@ -74,7 +74,7 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
 
   it('点击仁德按钮后弹出 distribute 分配弹窗(含 DistributeUI)', async () => {
     const view = makeView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
 
     const rendeBtn = await screen.findByRole('button', { name: '仁德' });
     fireEvent.click(rendeBtn);
@@ -105,7 +105,7 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
         c3: makeCard('c3', '闪'), c4: makeCard('c4', '杀'),
       },
     });
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
 
     const zhihengBtn = await screen.findByRole('button', { name: '制衡' });
     fireEvent.click(zhihengBtn);
@@ -119,7 +119,7 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
   it('点击仁德按钮选牌并手动提交分配,onAction 以 allocation 格式提交', async () => {
     const view = makeView();
     const onAction = vi.fn();
-    const { container } = render(<GameViewComponent view={view} onAction={onAction} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    const { container } = render(<GameViewComponent view={view} onAction={onAction} />);
 
     const rendeBtn = await screen.findByRole('button', { name: '仁德' });
     fireEvent.click(rendeBtn);

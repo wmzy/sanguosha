@@ -36,7 +36,8 @@ export interface SeatArcLayoutProps {
   /** 父组件传入的距离检查函数 */
   isTargetable: (idx: number) => boolean;
   onTargetClick: (name: string) => void;
-  onPerspectiveChange?: (idx: number) => void;
+  /** 双击座次卡片(透传给 PlayerSeatView)。 */
+  onSeatDoubleClick?: (index: number) => void;
   /** 动画 */
   damageFlashIndices: Map<number, number>;
   turnVersion: number;
@@ -51,8 +52,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
     selectedNeedsTarget,
     selectedTarget,
     isTargetable,
-    onTargetClick,
-    onPerspectiveChange,
+    onTargetClick, onSeatDoubleClick,
     damageFlashIndices,
     turnVersion,
   } = props;
@@ -82,7 +82,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
               isTargetable={isTargetable(realIdx)}
               selectedTarget={selectedTarget}
               onTargetClick={onTargetClick}
-              onPerspectiveChange={(idx) => { onPerspectiveChange?.(idx); }}
+              onSeatDoubleClick={onSeatDoubleClick}
               isDamaged={damageFlashIndices.has(realIdx)}
               damageVersion={damageFlashIndices.get(realIdx) ?? 0}
               isTurnGlow={player.name === currentPlayerName && turnVersion > 0}

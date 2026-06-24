@@ -19,7 +19,8 @@ export interface PlayerSeatProps {
   isTargetable: boolean;
   selectedTarget: string | null;
   onTargetClick: (name: string) => void;
-  onPerspectiveChange: (index: number) => void;
+  /** 双击座次卡片(通用 UI 事件;上层决定具体行为,如切换视角)。 */
+  onSeatDoubleClick?: (index: number) => void;
   /** 该玩家是否刚受到伤害 */
   isDamaged?: boolean;
   /** 伤害动画版本号(每次伤害递增,触发 key 变化重放动画) */
@@ -36,7 +37,7 @@ export interface PlayerSeatProps {
 export function PlayerSeatView({
   player, index, view, isCurrentPlayer, isPerspective,
   needsTarget, isTargetable, selectedTarget,
-  onTargetClick, onPerspectiveChange,
+  onTargetClick, onSeatDoubleClick,
   isDamaged = false, damageVersion = 0, isTurnGlow = false, turnGlowVersion = 0,
   hideIdentity = true,
   skillActions: _skillActions, // 预留:未来用于在座位卡上显示可点使用的技能按钮
@@ -69,7 +70,7 @@ export function PlayerSeatView({
       )}
       key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
       onClick={() => isClickable && onTargetClick(player.name)}
-      onDoubleClick={() => onPerspectiveChange(index)}
+      onDoubleClick={() => onSeatDoubleClick?.(index)}
     >
       {/* 势力色顶部条:武将名 + 座号 + 身份 */}
       <div className={seatCardHeader} style={{ background: factionColor }}>

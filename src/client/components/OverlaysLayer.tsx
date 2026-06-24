@@ -1,3 +1,7 @@
+// src/client/components/OverlaysLayer.tsx
+// 选将/身份遮罩层。纯展示组件,不含视角切换逻辑。
+// 视角控制 UI 由上层通过 overlaySlot 注入,透传到各遮罩的角落。
+import { type ReactNode } from 'react';
 import { CharSelectOverlay } from './CharSelectOverlay';
 import { CharSelectWaitingOverlay } from './CharSelectWaitingOverlay';
 import { IdentityRevealOverlay } from './IdentityRevealOverlay';
@@ -7,42 +11,29 @@ import type { GameView, PendingView, Json } from '../../engine/types';
 export interface OverlaysLayerProps {
   view: GameView;
   perspectiveIdx: number;
-  perspectiveName: string;
-  currentPlayerName: string;
   // 选将状态(由 useCharSelect 派生,父组件传入)
   isCharSelectPending: boolean;
   charSelect: { candidates: Array<{ name: string; skills: string[] }>; target: number; pending: PendingView | null } | null;
   charSelectInProgress: boolean;
-  perspectiveCharSelected: boolean;
   // 身份揭示态(父组件持有)
   showIdentityReveal: boolean;
   onIdentityConfirm: () => void;
-  // 视角切换回调(透传给选将遮罩)
-  onSwitchPerspective?: () => void;
-  /** 切到下一个未选将座次(选将等待蒙层用) */
-  onSwitchToNextUnselected?: () => void;
-  onGoToCurrentPlayer?: () => void;
-  autoSwitchCtl?: { enabled: boolean; toggle: () => void };
   onAction: (action: { skillId: string; actionType: string; ownerId: number; params: Record<string, Json> }) => void;
+  /** 遮罩角落插槽:上层渲染视角控制等 debug UI。 */
+  overlaySlot?: ReactNode;
 }
 
 export function OverlaysLayer(props: OverlaysLayerProps) {
   const {
     view,
     perspectiveIdx,
-    perspectiveName,
-    currentPlayerName,
     isCharSelectPending,
     charSelect,
     charSelectInProgress,
-    perspectiveCharSelected,
     showIdentityReveal,
     onIdentityConfirm,
-    onSwitchPerspective,
-    onSwitchToNextUnselected,
-    onGoToCurrentPlayer,
-    autoSwitchCtl,
     onAction,
+    overlaySlot,
   } = props;
 
   const charCandidates = charSelect?.candidates ?? [];
@@ -84,14 +75,8 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
               params: { character: characterName },
             });
           }}
-          perspectiveIdx={perspectiveIdx}
-          playerCount={view.players.length}
-          onSwitchPerspective={onSwitchPerspective}
-          onGoToCurrentPlayer={onGoToCurrentPlayer}
-          autoSwitchCtl={autoSwitchCtl}
-          currentPlayerName={currentPlayerName}
-          perspectiveName={perspectiveName}
           lordCharacter={view.players.find(p => p.identity === '主公')?.character}
+          overlaySlot={overlaySlot}
         />
       )}
 
@@ -107,8 +92,7 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
         <CharSelectWaitingOverlay
           view={view}
           perspectiveIdx={perspectiveIdx}
-          perspectiveName={perspectiveName}
-          onSwitchPerspective={onSwitchToNextUnselected}
+          overlaySlot={overlaySlot}
         />
       )}
     </>

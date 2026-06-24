@@ -7,10 +7,9 @@
 // 选将保密:非自身选将时,不暴露 seat 玩家名字(避免情报泄漏)。
 // 选将逻辑:玩家点选后,内部维护 selectedCharIdx,点「确认」才向引擎发 respond action。
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { FACTION_BG, IDENTITY_COLORS } from './gameViewConstants';
 import { CountdownBar } from './CountdownBar';
-import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 
 export interface CharSelectOverlayCandidate {
   name: string;
@@ -45,23 +44,10 @@ interface CharSelectOverlayProps {
    *  通过 prop 注入而非直接 import,便于解耦与单元测试。
    *  找不到时回退 faction='群'、maxHealth=4。 */
   getCharacterMeta: (name: string) => CharacterMeta | undefined;
-  /** ── debug 模式视角切换(可选) ── */
-  /** 当前视角下标(可能与 viewer 不同,debug 模式可切换) */
-  perspectiveIdx?: number;
-  /** 总玩家数 */
-  playerCount?: number;
-  /** 切换到下一个视角 */
-  onSwitchPerspective?: () => void;
-  /** 跳到当前回合玩家视角 */
-  onGoToCurrentPlayer?: () => void;
-  /** 当前回合玩家名(显示在按钮上) */
-  currentPlayerName?: string;
-  /** 视角玩家名 */
-  perspectiveName?: string;
-  /** 自动跟随开关 */
-  autoSwitchCtl?: { enabled: boolean; toggle: () => void };
   /** 主公已选的武将名(主公选完后,其他玩家查看时展示) */
   lordCharacter?: string;
+  /** 右上角插槽:上层渲染视角控制等 debug UI。 */
+  overlaySlot?: ReactNode;
 }
 
 /**
@@ -80,14 +66,8 @@ export function CharSelectOverlay({
   totalMs,
   onSelect,
   getCharacterMeta,
-  perspectiveIdx,
-  playerCount,
-  onSwitchPerspective,
-  onGoToCurrentPlayer,
-  currentPlayerName,
-  perspectiveName,
-  autoSwitchCtl,
   lordCharacter,
+  overlaySlot,
 }: CharSelectOverlayProps) {
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
   // 已提交锁定态:点「确认选择」后记录选中的武将名,锁定候选区与按钮,
@@ -115,8 +95,8 @@ export function CharSelectOverlay({
         background: 'rgba(0, 0, 0, 0.9)',
       }}
     >
-      {/* ── debug 视角切换栏 ── */}
-      {onSwitchPerspective && playerCount !== undefined && (
+      {/* ── 右上角插槽(debug 视角控制等,由上层注入) ── */}
+      {overlaySlot && (
         <div
           style={{
             position: 'absolute',
@@ -125,12 +105,7 @@ export function CharSelectOverlay({
             zIndex: 10000,
           }}
         >
-          <DebugPerspectiveBar
-            perspectiveName={perspectiveName ?? `P${perspectiveIdx}`}
-            onSwitchPerspective={onSwitchPerspective}
-            onGoToCurrentPlayer={onGoToCurrentPlayer}
-            autoSwitchCtl={autoSwitchCtl}
-          />
+          {overlaySlot}
         </div>
       )}
       {/* 标题:主公选将 / P<n> 选将中 */}

@@ -90,7 +90,7 @@ describe('五谷丰登选牌面板(pickProcessingCard)', () => {
 
   it('渲染处理区明牌为可点按钮(杀/桃)', async () => {
     const view = makeViewWithWuguPending();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 等待技能 actions 加载完成(pickProcessingCard 渲染不依赖 registry,但 AwaitingPrompt 可能异步推导)
     await waitFor(() => {
@@ -102,7 +102,7 @@ describe('五谷丰登选牌面板(pickProcessingCard)', () => {
   it('点击某张牌按钮后,onAction 以 { cardId } 格式提交 respond', async () => {
     const view = makeViewWithWuguPending();
     const onAction = vi.fn();
-    render(<GameViewComponent view={view} onAction={onAction} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={onAction} />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /桃/ })).toBeDefined();

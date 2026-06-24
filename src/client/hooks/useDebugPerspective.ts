@@ -2,14 +2,16 @@
 // Debug 模式视角管理 hook(多 WS 版)。
 //
 // 多 WS 模型:每个座次是独立连接,views: Map<viewer, GameView>。
-// perspective 由 DebugLobby 持有,本 hook 接收所有座次的 views,
-// 提供切换/自动跟随逻辑。
+// perspective 由 DebugLobby 持有,本 hook 接收所有座次的 views,提供自动跟随 + 手动切换。
 //
-// 自动跟随:选将阶段始终扫描所有 views,找到下一个待选将座次自动切过去。
-// 用户可随时手动切到任意座次查看,auto-switch 只在"下一个待选将座次"变化时触发。
+// 自动跟随原则:
+//   选将阶段:跟随第一个还没选完武将的座次(详见 hasCharSelectPending/isWaitingToSelect)。
+//     hasCharSelectPending 只看引擎真实状态(该 target 是否已选完),不看乐观提交集合,
+//     否则在「最后一人 pending 还在、但已被乐观标记」的竞态下会被拉走 → 最后一人选不了。
+//   非选将阶段:当前座次自己有专属阻塞 pending(被问询)→ 保持;
+//     否则跟到第一个被问询的玩家(请求闪等切到被问询者),都不需要操作时跟随 currentPlayer。
 //
-// 稳定性关键:effect 不直接依赖 perspective(否则 setPerspective→perspective 变→
-// effect 重跑→死循环)。用 ref 读 perspective 做判断。
+// 用户可随时手动切换(切换后本次不触发自动跟随,等下一次状态变化再恢复)。
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameView } from '../../engine/types';
@@ -29,7 +31,8 @@ export interface DebugPerspective {
   autoSwitchCtl: AutoSwitchCtl;
 }
 
-/** 检查某座次的 view 是否有活跃的选将 pending(需选将且未选完) */
+/** 检查某座次的 view 是否有活跃的选将 pending(需选将且未选完)。
+ *  注意:只看引擎真实状态(view.players[target].character),不看乐观提交集合。 */
 function hasCharSelectPending(view: GameView | null | undefined): boolean {
   if (!view?.pending) return false;
   if (view.pending.atom?.type !== '选将询问') return false;
@@ -77,6 +80,13 @@ function findNextSelectTarget(
   return -1;
 }
 
+/** 非选将阶段:某座次是否有「自己专属」阻塞型 pending(被问询/需弃牌等)。
+ *  严格用 target===viewer 判断,观察型 pending(target!==viewer)不算,避免死循环。 */
+function hasOwnBlockingPending(view: GameView | null | undefined, viewerIdx: number): boolean {
+  const pending = view?.pending;
+  return !!pending && pending.isBlocking !== false && pending.target === viewerIdx;
+}
+
 export function useDebugPerspective(
   allViews: Map<number, GameView>,
   perspective: number,
@@ -85,15 +95,14 @@ export function useDebugPerspective(
 ): DebugPerspective {
   const [autoSwitch, setAutoSwitch] = useState(true);
   const submitted = useSubmittedCharSelects();
-  // 选将阶段结束后重置的标记(非选将阶段 auto-switch 跟随 currentPlayerIndex)
+  // 选将阶段结束后重置的标记:控制非选将阶段是否跟随 currentPlayer
   const [followCurrentPlayer, setFollowCurrentPlayer] = useState(false);
   const perspectiveRef = useRef(perspective);
   perspectiveRef.current = perspective;
-  // 手动切视角标记:阻止 auto-switch effect 在手动切换后立即覆盖用户选择。
-  // effect 消费后重置,后续游戏事件推进时 auto-switch 恢复正常。
+  // 手动切视角标记:阻止自动跟随在手动切换后立即覆盖。effect 消费后重置。
   const manualSwitchRef = useRef(false);
 
-  // 包装 setPerspective:手动切换时设标记,阻止 auto-switch 覆盖
+  // 包装 setPerspective:手动切换时设标记,阻止自动跟随覆盖
   const manualSetPerspective = useCallback((idx: number) => {
     manualSwitchRef.current = true;
     setPerspective(idx);
@@ -101,7 +110,7 @@ export function useDebugPerspective(
 
   const currentView = allViews.get(perspective) ?? null;
 
-  // 选将阶段结束后,切到 currentPlayerIndex 并启用常规跟随
+  // 选将阶段结束后,启用常规跟随(currentPlayer)
   useEffect(() => {
     if (!isCharSelectPhase(currentView)) {
       setFollowCurrentPlayer(true);
@@ -111,11 +120,10 @@ export function useDebugPerspective(
   // 自动跟随
   const charSelectInProgress = isCharSelectPhase(currentView);
   const currentPlayer = currentView?.currentPlayerIndex;
-  const currentViewPendingTarget = currentView?.pending?.target;
 
   useEffect(() => {
     if (!autoSwitch || !currentView) return;
-    // 用户手动切视角不触发 auto-switch(等待状态没变) — 消费标记后跳过本次
+    // 手动切换后本次跳过(消费标记)
     if (manualSwitchRef.current) {
       manualSwitchRef.current = false;
       return;
@@ -137,23 +145,24 @@ export function useDebugPerspective(
     }
 
     // ── 非选将阶段(出牌/弃牌) ──
-    // 注意:buildView 对非 target viewer 会投影一个「观察型 pending」(target 指向被
-    // 问询者),仅用于让其他座次知道"有人在被询问"。这个观察型 pending 的 target
-    // !== 当前 viewer,绝不能用来驱动视角切换——否则 current 玩家(观察者,看到
-    // target=被问询者)会切到被问询者,而被问询者视角的 currentPlayer !== 自己又会
-    // 切回 current 玩家,形成 0↔2 死循环(杀/决斗/南蛮 等问询场景必现)。
-    // 只有「自己专属 pending」(target === p,即当前视角玩家本人在被问询)才保持视角;
-    // 否则一律跟随 currentPlayer(稳定的锚点)。
-    if (followCurrentPlayer || !currentView.pending) {
-      const hasOwnPending = currentView.pending && currentViewPendingTarget === p;
-      if (!hasOwnPending && typeof currentPlayer === 'number' && currentPlayer !== p) {
-        setPerspective(currentPlayer);
+    // 当前座次自己有专属阻塞 pending(被问询)→ 保持。
+    // 否则跟到第一个被问询的玩家(请求闪等切到被问询者,而非停在出杀的 currentPlayer);
+    // 都不需要操作时跟随 currentPlayer。
+    if (hasOwnBlockingPending(currentView, p)) return;
+    for (let i = 0; i < playerCount; i++) {
+      const v = allViews.get(i);
+      if (i !== p && hasOwnBlockingPending(v, i)) {
+        setPerspective(i);
+        return;
       }
     }
-  }, [charSelectInProgress, currentViewPendingTarget, currentPlayer, autoSwitch,
-    followCurrentPlayer, currentView, allViews, playerCount, setPerspective]);
+    if (followCurrentPlayer && typeof currentPlayer === 'number' && currentPlayer !== p) {
+      setPerspective(currentPlayer);
+    }
+  }, [charSelectInProgress, currentPlayer, autoSwitch,
+    followCurrentPlayer, currentView, allViews, playerCount, setPerspective, submitted]);
 
-  /** 手动切换:始终 +1 循环,选将阶段也允许切到任意座次(debug 需要查看所有人) */
+  /** 手动切换:+1 循环,选将阶段也允许切到任意座次(debug 需要查看所有人) */
   const switchPerspective = useCallback(() => {
     const p = perspectiveRef.current;
     manualSetPerspective((p + 1) % playerCount);

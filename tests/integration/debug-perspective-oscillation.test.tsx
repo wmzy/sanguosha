@@ -1,14 +1,16 @@
-// 回归测试:debug 模式自动切换视角在「问询场景」(杀/决斗/南蛮)下不再死循环。
+// 回归测试:debug 模式自动跟随「第一个需操作的玩家」,且在问询场景下不震荡。
 //
-// 背景:buildView 对非 target viewer 会投影一个「观察型 pending」(target 指向被问询者)。
-// 旧版 auto-switch 把这个 target 当成「该切过去的座次」,导致:
-//   current 玩家(观察者,target=被问询者)→ 切到被问询者
-//   被问询者视角(currentPlayer !== 自己)→ 切回 current 玩家
-//   → 0↔2 死循环,React "Maximum update depth exceeded"。
+// 自动跟随原则(useDebugPerspective):
+//   1. 当前视角自己要操作(阻塞型 pending target===viewer,或选将未完成)→ 保持。
+//   2. 否则跟到第一个需操作的玩家(被问询者/未选将者)。
+//   3. 都不需要操作时跟随 currentPlayer。
 //
-// 修复:只有「自己专属 pending」(target === 当前 viewer)才保持视角;否则跟随 currentPlayer。
+// 关键点:只有「自己专属 pending」(target === viewer)才算「该玩家在操作」,
+// 观察型 pending(target 指向被问询者但 target !== viewer)不算——否则 current 玩家与
+// 被问询者之间会 0↔2 死循环(杀/决斗/南蛮必现)。isAwaitingAction 严格用 target===viewer 判断,
+// 故每个 viewer 视角的「第一个需操作的玩家」是同一个被问询者,视角稳定收敛到它。
 //
-// 本文件来源:auto-switch 死循环 bug 修复。若后续合并 debug 视角测试,可并入
+// 本文件来源:auto-switch 行为测试。若后续合并 debug 视角测试,可并入
 // tests/integration/debug-*.test.tsx 系列。
 
 import { describe, it, expect } from 'vitest';
@@ -89,8 +91,8 @@ function renderWithProvider(ui: ReactNode) {
   return render(<SubmittedCharSelectProvider>{ui}</SubmittedCharSelectProvider>);
 }
 
-describe('useDebugPerspective:问询场景不死循环', () => {
-  it('杀问询期间:从观察者(非 current/非 target)开始 → 稳定跟到 currentPlayer', async () => {
+describe('useDebugPerspective:问询场景跟随被问询者且不死循环', () => {
+  it('杀问询期间:从观察者(非 current/非 target)开始 → 跟到被问询者(第一个需操作的玩家)', async () => {
     // player 2(current)出杀问询 player 0;无 __出牌 pending(出牌循环挂起)
     const views = makeAskViews(5, 2, 0);
     perspectiveTrace = [];
@@ -100,10 +102,10 @@ describe('useDebugPerspective:问询场景不死循环', () => {
     await act(async () => { await new Promise(r => setTimeout(r, 100)); });
 
     const trace = perspectiveTrace;
-    // 不应震荡(旧版会 0↔2 死循环)
+    // 不应震荡
     expect(trace.length).toBeLessThan(10);
-    // 观察者无自己专属 pending → 跟随 currentPlayer(2)
-    expect(trace[trace.length - 1]).toBe(2);
+    // 观察者无自己专属 pending → 跟随第一个需操作的玩家(被问询者 0)
+    expect(trace[trace.length - 1]).toBe(0);
   });
 
   it('杀问询期间:从被问询者开始 → 保持(看自己被问询),不跳走', async () => {
@@ -120,7 +122,7 @@ describe('useDebugPerspective:问询场景不死循环', () => {
     expect(trace[trace.length - 1]).toBe(0);
   });
 
-  it('决斗轮流问询:从 current 玩家(观察者)开始 → 保持看自己', async () => {
+  it('决斗轮流问询:从 current 玩家(观察者)开始 → 跟到被问询者', async () => {
     // player 2 出决斗给 player 0,round 0: 问询 player 0。player 2 是观察者(无专属 pending)
     const views = makeAskViews(5, 2, 0);
     perspectiveTrace = [];
@@ -130,12 +132,12 @@ describe('useDebugPerspective:问询场景不死循环', () => {
 
     const trace = perspectiveTrace;
     expect(trace.length).toBeLessThan(10);
-    // current 玩家无专属 pending(target=0 !== p=2),但 currentPlayer === p → 保持
-    expect(trace[trace.length - 1]).toBe(2);
+    // current 玩家无专属 pending(target=0 !== p=2)→ 跟随第一个需操作的玩家(被问询者 0)
+    expect(trace[trace.length - 1]).toBe(0);
   });
 
-  it('南蛮入侵多目标问询:观察者跟随 current,不震荡', async () => {
-    // player 2 出南蛮,问询 player 1(观察者 projection target=1)
+  it('南蛮入侵多目标问询:观察者跟随被问询者,不震荡', async () => {
+    // player 2 出南蛮,问询 player 1(被问询者自己 view 的 target===1)
     const views = makeAskViews(5, 2, 1);
     perspectiveTrace = [];
 
@@ -145,6 +147,7 @@ describe('useDebugPerspective:问询场景不死循环', () => {
 
     const trace = perspectiveTrace;
     expect(trace.length).toBeLessThan(10);
-    expect(trace[trace.length - 1]).toBe(2);
+    // 跟随第一个需操作的玩家(被问询者 1)
+    expect(trace[trace.length - 1]).toBe(1);
   });
 });

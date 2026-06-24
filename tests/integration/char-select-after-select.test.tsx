@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GameViewComponent, type ActionMsg } from '../../src/client/components/GameView';
 import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
+import { DebugPerspectiveBar } from '../../src/client/components/DebugPerspectiveBar';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView } from '../../src/engine/types';
 
@@ -21,15 +22,21 @@ function TestGameView({ view, onAction }: { view: GameView; onAction: (a: Action
   const [perspective, setPerspective] = useState(view.viewer);
   const views = new Map<number, GameView>([[view.viewer, view]]);
   const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(views, perspective, view.players.length, setPerspective);
+  const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
+  const bar = (
+    <DebugPerspectiveBar
+      perspectiveName={perspectiveName}
+      onSwitchPerspective={switchPerspective}
+      onGoToCurrentPlayer={goToCurrentPlayer}
+      autoSwitchCtl={autoSwitchCtl}
+    />
+  );
   return (
     <GameViewComponent
       view={view}
       onAction={onAction}
-      perspective={perspective}
-      onSwitchPerspective={switchPerspective}
-      onGoToCurrentPlayer={goToCurrentPlayer}
-      onPerspectiveChange={setPerspective}
-      autoSwitchCtl={autoSwitchCtl}
+      headerSlot={bar}
+      overlaySlot={bar}
     />
   );
 }
@@ -106,7 +113,7 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
 
   it('正式模式:viewer 选将完成后展示等待遮罩 + 已选武将卡(武将名/势力/技能)', () => {
     const view = makeFormalWaitingView();
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 等待遮罩文案
     expect(screen.getByText(/已选择武将/)).toBeDefined();
@@ -182,7 +189,7 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
       deadlineTotalMs: 0,
       log: [],
     };
-    render(<GameViewComponent view={view} onAction={() => {}} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 选将遮罩可见:候选人"孙权"+"确认选择"按钮
     expect(screen.getByText('孙权')).toBeDefined();
@@ -222,7 +229,7 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
       log: [],
     };
     const onAction = vi.fn();
-    render(<GameViewComponent view={view} onAction={onAction} onDeleteRoom={() => {}} perspective={view.viewer} />);
+    render(<GameViewComponent view={view} onAction={onAction} />);
 
     // 选刘备 → 点确认
     fireEvent.click(screen.getByText('刘备'));

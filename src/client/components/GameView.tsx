@@ -1,13 +1,19 @@
 // src/client/components/GameView.tsx
-// 完整游戏界面主组件(重构后)。
+// 完整游戏界面主组件。
 //
 // 职责:状态管理 + 事件 handler + 编排子组件。
 // 展示逻辑全部委托给子组件(GameHeader/OverlaysLayer/AwaitingPrompt/PlayPhasePrompt/
 // TargetSelector/SeatArcLayout/ZoneInfoBar/HandCard/PlayerCardLarge)。
 // 状态派生委托给 hooks(useSkillActions/usePendingState/useCharSelect/useSeatOrder/useAnimationState)。
 //
+// 不感知视角切换:本组件只渲染 view.viewer 这一个视角的游戏画面。
+//   正式模式:上层直接传入 view,viewer 就是当前玩家。
+//   debug 模式:上层(DebugLobby)管理多连接 + 视角切换,把当前视角连接的 view 传入,
+//   并通过 headerSlot/overlaySlot 注入视角控制 UI。切换视图、自动跟随、代打等逻辑
+//   均在上层,本组件不可见。
+//
 // 布局: GameHeader → 提示区 → 座位弧形(其他玩家) → [左:角色大卡 | 右:倒计时+操作+目标+手牌] → 日志
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView as EngineGameView, Card, Json, DistributePrompt } from '../../engine/types';
@@ -53,20 +59,12 @@ interface Props {
   onAction: (action: ActionMsg) => void;
   /** 整理手牌:重排顺序(不走 action,直接 mutate 后端 hand) */
   onReorderHand?: (order: string[]) => void;
-  /** 当前视角座次(看谁)。正式模式 = viewer;debug 模式由上层控制(多视角切换)。 */
-  perspective: number;
-  /** 循环切换到下一视角(debug 模式提供时,header 渲染视角切换按钮)。 */
-  onSwitchPerspective?: () => void;
-  /** 切到下一个未选将座次(选将等待蒙层用)。 */
-  onSwitchToNextUnselected?: () => void;
-  /** 跳转到当前玩家回调(debug 模式提供时,header 渲染「查看当前玩家」按钮)。 */
-  onGoToCurrentPlayer?: () => void;
-  /** 直接切到指定座次(点座位卡切换视角等)。 */
-  onPerspectiveChange?: (idx: number) => void;
-  /** 自动跟随开关状态(debug 模式提供时,header 渲染「自动切换」按钮)。 */
-  autoSwitchCtl?: { enabled: boolean; toggle: () => void };
-  /** 退出/删除房间(可选;debug 模式提供时渲染「退出」按钮)。 */
-  onDeleteRoom?: () => void;
+  /** 双击其他座次卡片(通用 UI 事件;上层决定行为,如切换视角)。 */
+  onSeatDoubleClick?: (index: number) => void;
+  /** 顶部栏右侧插槽:上层渲染视角控制/退出等 debug UI。不提供则右侧为空。 */
+  headerSlot?: ReactNode;
+  /** 遮罩角落插槽:上层在选将/等待遮罩内渲染视角控制 UI。 */
+  overlaySlot?: ReactNode;
 }
 
 /** 转化模式:点转化技能(武圣/丈八蛇矛)后进入此模式,匹配卡牌显示为转化后的牌
@@ -85,12 +83,12 @@ interface TransformMode {
 }
 
 // ─── 主组件 ───
-// 纯净的单视角组件:perspective(看谁)由上层决定。
-//   正式模式:上层传 perspective=view.viewer,固定看自己。
-//   debug 模式:上层(DebugLobby)管理视角切换,传当前 perspective。
-// 多视角切换/自动跟随/代打逻辑不在本组件内——那是上层的职责。
-export function GameViewComponent({ view, onAction, onReorderHand, perspective, onSwitchPerspective, onSwitchToNextUnselected, onGoToCurrentPlayer, onPerspectiveChange, autoSwitchCtl, onDeleteRoom }: Props) {
-  const perspectiveIdx = perspective;
+// 纯净的单视角组件:只渲染 view.viewer 的游戏画面,不感知视角切换。
+//   正式模式:上层直接传入当前玩家的 view。
+//   debug 模式:上层(DebugLobby)管理多连接和视角切换,把当前视角连接的 view 传入,
+//   并通过 headerSlot/overlaySlot 注入视角控制 UI。
+export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleClick, headerSlot, overlaySlot }: Props) {
+  const perspectiveIdx = view.viewer;
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedKillTarget, setSelectedKillTarget] = useState<string | null>(null);
@@ -113,7 +111,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
   const { skillActions } = useSkillActions(view, perspectiveIdx);
   const pendingState = usePendingState(view, perspectiveIdx);
   const { pending, pendingTargetIdx, isPerspectiveAwaiting, isDiscardPhase, discardMin, discardMax, skippedBroadcast, markBroadcastSkipped, deadline, deadlineTotalMs } = pendingState;
-  const { isCharSelectPending, charSelect, charSelectInProgress, perspectiveCharSelected } = useCharSelect(view, perspectiveIdx);
+  const { isCharSelectPending, charSelect, charSelectInProgress } = useCharSelect(view, perspectiveIdx);
   const orderedPlayers = useSeatOrder(view, perspectiveIdx);
   const anim = useAnimationState(view, perspectiveIdx);
 
@@ -627,22 +625,16 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
       <OverlaysLayer
         view={view}
         perspectiveIdx={perspectiveIdx}
-        perspectiveName={perspectiveName}
-        currentPlayerName={currentPlayerName}
         isCharSelectPending={isCharSelectPending}
         charSelect={charSelect}
         charSelectInProgress={charSelectInProgress}
-        perspectiveCharSelected={perspectiveCharSelected}
         showIdentityReveal={showIdentityReveal}
         onIdentityConfirm={() => {
           setShowIdentityReveal(false);
           sessionStorage.setItem('sgs_identity_shown', '1');
         }}
-        onSwitchPerspective={onSwitchPerspective}
-        onSwitchToNextUnselected={onSwitchToNextUnselected}
-        onGoToCurrentPlayer={onGoToCurrentPlayer}
-        autoSwitchCtl={autoSwitchCtl}
         onAction={onAction}
+        overlaySlot={overlaySlot}
       />
 
       <GameHeader
@@ -650,11 +642,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
         animTurnVersion={anim.turnVersion}
         animPhaseVersion={anim.phaseVersion}
         currentPlayerName={currentPlayerName}
-        perspectiveName={perspectiveName}
-        onSwitchPerspective={onSwitchPerspective}
-        onGoToCurrentPlayer={onGoToCurrentPlayer}
-        autoSwitchCtl={autoSwitchCtl}
-        onDeleteRoom={onDeleteRoom}
+        headerSlot={headerSlot}
       />
 
       {/* ─── 座位布局(弧形) + 中央信息 ─── */}
@@ -668,7 +656,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
           selectedTarget={isDistributeActive && activeDistribute?.externalTargetSelection ? distTargetName : selectedTarget}
           isTargetable={isTargetable}
           onTargetClick={handleTargetClick}
-          onPerspectiveChange={onPerspectiveChange}
+          onSeatDoubleClick={onSeatDoubleClick}
           damageFlashIndices={anim.damageFlashIndices}
           turnVersion={anim.turnVersion}
         />
@@ -757,7 +745,6 @@ export function GameViewComponent({ view, onAction, onReorderHand, perspective, 
           <div className={styles.handHeader}>
             <span className={styles.handTitle}>
               {perspectiveName} 的手牌 ({perspectiveHand.length})
-              {perspectiveIdx !== view.viewer && <span className={styles.debugHint}> (调试视角)</span>}
               {transformMode && (
                 <span className={cx(styles.debugHint, styles.transformHint)}>
                   ⚡ 转化模式:选{transformMode.minCards > 1 ? `${transformMode.minCards}张` : '1张'}{transformMode.wrapperName}{transformMode.minCards > 1 ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})` : ''} · 源技能 {transformMode.skillId}

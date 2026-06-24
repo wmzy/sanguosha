@@ -14,6 +14,7 @@ import { SubmittedCharSelectProvider } from '../hooks/SubmittedCharSelectCtx';
 import { DebugControls } from './debug/DebugControls';
 import { DebugRoomList } from './debug/DebugRoomList';
 import { GameViewComponent } from './GameView';
+import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 import { DebugInfo } from './DebugInfo';
 import { EventOverlay } from './EventOverlay';
 import { styles } from '../theme';
@@ -103,19 +104,39 @@ function DebugGameViewInner({
   const view = currentView as unknown as EngineGameView;
   const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
 
+  // debug 模式视角控制 UI:渲染到 GameViewComponent 的插槽,不进入组件内部。
+  // headerSlot(顶部栏右侧):视角切换 / 跳转 / 自动跟随 / 退出。
+  // overlaySlot(选将/等待遮罩角落):额外提供「下一个待选者」按钮,跳过已选完座次,
+  //   确保最后一个待选者总能被切到(并行选将时不会在已选完玩家间打转)。
+  const headerBar = (
+    <DebugPerspectiveBar
+      perspectiveName={perspectiveName}
+      onSwitchPerspective={pctl.switchPerspective}
+      onGoToCurrentPlayer={pctl.goToCurrentPlayer}
+      autoSwitchCtl={pctl.autoSwitchCtl}
+      onDeleteRoom={onDeleteRoom}
+    />
+  );
+  const overlayBar = (
+    <DebugPerspectiveBar
+      perspectiveName={perspectiveName}
+      onSwitchPerspective={pctl.switchPerspective}
+      onSwitchToNextUnselected={pctl.switchToNextUnselected}
+      onGoToCurrentPlayer={pctl.goToCurrentPlayer}
+      autoSwitchCtl={pctl.autoSwitchCtl}
+      onDeleteRoom={onDeleteRoom}
+    />
+  );
+
   return (
     <>
       <GameViewComponent
         view={view}
         onAction={conn.sendAction}
         onReorderHand={conn.reorderHand}
-        perspective={perspective}
-        onSwitchPerspective={pctl.switchPerspective}
-        onSwitchToNextUnselected={pctl.switchToNextUnselected}
-        onGoToCurrentPlayer={pctl.goToCurrentPlayer}
-        onPerspectiveChange={setPerspective}
-        autoSwitchCtl={pctl.autoSwitchCtl}
-        onDeleteRoom={onDeleteRoom}
+        onSeatDoubleClick={setPerspective}
+        headerSlot={headerBar}
+        overlaySlot={overlayBar}
       />
       <EventOverlay current={conn.currentEvent} view={view} perspective={perspective} />
       <DebugInfo view={view} perspectiveName={perspectiveName} pending={view.pending} />
