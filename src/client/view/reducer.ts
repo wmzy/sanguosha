@@ -2,7 +2,7 @@
 // 前端视图 reducer(ENGINE-DESIGN §8.2.3)。
 //
 // 收到 ViewEvent 后,按 event.atomType ?? event.type 查找 AtomDefinition,
-// 调用其 applyView 增量更新 GameView。effect 的播放由 useEventPlayback 处理,
+// 调用其 applyView 增量更新 GameView。effect 的播放由 useEventPlayback + EventBanner 处理,
 // 不在此处(本 reducer 只负责 view 状态更新,纯数据变换)。
 //
 // pending 的清除由 session 下发的权威 deadline(null)驱动,

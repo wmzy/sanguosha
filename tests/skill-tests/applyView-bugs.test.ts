@@ -89,6 +89,24 @@ describe('applyView 一致性 bug', () => {
       // processing 被 pop（afterHook 模拟），但 deckCount 应该 -1（牌从牌堆翻出）
       expect(view.zones!.deckCount).toBe(before - 1); // ❌ BUG: 实际仍为 10
     });
+
+    it('applyView 净效果: deckCount-1 + discardPileCount+1, processing 不变', () => {
+      const def = getAtomDef('判定');
+      const view = mockView();
+
+      def.applyView!(view, {
+        type: '判定',
+        player: 0,
+        judgeType: '乐不思蜀',
+        cardId: 'j1',
+        card: { name: '杀', suit: '♠', rank: '7' },
+      } as any);
+
+      // 净效果:判定牌最终进弃牌堆,processing 不变(apply 加 + afterHooks 减)
+      expect(view.zones!.processing).toHaveLength(0);
+      expect(view.zones!.discardPileCount).toBe(1);
+      expect(view.zones!.deckCount).toBe(9);
+    });
   });
 
   describe('加标记 atom: 缺少 applyView', () => {

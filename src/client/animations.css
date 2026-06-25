@@ -151,3 +151,39 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
+
+/* ─── 事件卡牌翻入:从牌堆弹出 + 3D 翻转揭示 + 停留 + 淡出 ───
+   三阶段动画(总时长 = effect.duration,默认 1800ms):
+     入场(0~30%): 从上方弹出 + 180°→0° 翻转揭示
+     停留(30%~70%): 保持静止,玩家看清花色点数
+     淡出(70%~100%): 缓慢上浮 + 淡出(准备进入处理区) */
+@keyframes cardFlipIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-60px) scale(0.6) rotateY(180deg);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(-15px) scale(0.85) rotateY(130deg);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06) rotateY(-10deg);
+  }
+  38% {
+    opacity: 1;
+    transform: translateY(0) scale(0.99) rotateY(3deg);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateY(0deg);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateY(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95) rotateY(0deg);
+  }
+}

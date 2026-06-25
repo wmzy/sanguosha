@@ -288,10 +288,52 @@ export const handHeader = css`
 export const handTitle = css`font-size: 14px; color: #aaa; font-weight: bold;`;
 export const debugHint = css`color: #666; font-weight: normal; font-size: 12px;`;
 
-// ─── Event overlay(延时展示,非阻塞) ───
-export const eventOverlay = css`
+// ─── Event card flip(翻牌动效,非阻塞) ───
+// 中央浮动卡牌:从上方弹出 + 3D 翻转揭示花色点数
+export const eventCardLayer = css`
   pointer-events: none;
-  user-select: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 0;
+  margin: 0;
+`;
+export const eventCardFlip = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  perspective: 800px;
+  animation: cardFlipIn var(--flip-duration, 1800ms) cubic-bezier(0.22, 0.61, 0.36, 1) both;
+`;
+export const eventCardLabel = css`
+  font-size: 11px;
+  font-weight: bold;
+  color: #b78bff;
+  background: rgba(155, 89, 182, 0.2);
+  padding: 1px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(155, 89, 182, 0.4);
+`;
+export const eventCardBody = css`
+  min-width: 60px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+  border: 2px solid #c9a227;
+  box-shadow: 0 4px 20px rgba(201, 162, 39, 0.4);
+  text-align: center;
+  transform-style: preserve-3d;
+`;
+export const eventCardName = css`
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.3;
+`;
+export const eventCardSuit = css`
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 2px;
 `;
 export const cancelBtn = css`
   border: 1px solid #555; border-radius: 4px; padding: 2px 8px;

@@ -17,7 +17,6 @@ import { DebugRoomList } from './debug/DebugRoomList';
 import { GameViewComponent } from './GameView';
 import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 import { DebugInfo } from './DebugInfo';
-import { EventOverlay } from './EventOverlay';
 import { styles } from '../theme';
 import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/debugTelemetry';
 import type { RoomInfo } from '../../server/protocol';
@@ -190,8 +189,8 @@ function DebugGameViewInner({
         onSeatDoubleClick={handleSetPerspective}
         headerSlot={headerBar}
         overlaySlot={overlayBar}
+        currentEvent={conn.currentEvent}
       />
-      <EventOverlay current={conn.currentEvent} view={view} perspective={perspective} />
       <DebugInfo view={view} perspectiveName={perspectiveName} pending={view.pending} />
     </>
   );

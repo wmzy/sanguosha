@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-24
 
+### Refactored — 删除 EventOverlay,事件展示移入 GameView 内部(effect 驱动翻牌动效)
+
+旧的事件展示组件 `EventOverlay` 是一个独立于 `GameViewComponent` 的 fixed overlay( zIndex 9000),在 `DebugLobby` 中作为兄弟元素渲染。它存在两个架构问题:(1)脱离子 GameView 的布局上下文;(2)`summarizeEvent` 函数用 hardcode switch 按事件类型拼文案,与引擎 `toViewLog` 重复定义。
+
+本次重构将事件展示能力移入 `GameView` 内部,**由 `AtomDefinition.effect` 驱动**而非 hardcode:
+
+- **新增 EventBanner 组件**: GameView 内部的 effect 驱动卡牌动效层,渲染在 GameHeader 与座位区之间。当 `current event` 的 `effect.animation === 'flip'` 且 ViewEvent 携带 `card` 字段时,渲染一张中央浮动卡牌:从上方弹出(牌堆)→ 3D 翻转揭示花色点数→ effect.duration 后消失。判定事件额外显示 judgeType 标签。(`src/client/components/EventBanner.tsx`)
+- **cardFlipIn 动画**: 新增 CSS keyframes,模拟翻牌:从牌堆位置弹出(`translateY(-40px) scale(0.7) rotateY(180deg)`)→ 翻转过程中(`rotateY(120°→0°)`)→ 定格。动画时长取 `effect.duration`(上限 1200ms)。(`src/client/animations.css`)
+- **GameViewComponent 新增 currentEvent prop**: 上层(DebugLobby)将 `useEventPlayback` 的 current event 传入,EventBanner 消费。正式模式可不传。(`src/client/components/GameView.tsx`)
+- **删除 EventOverlay.tsx**: 移除文件、hardcode 的 `summarizeEvent` switch、以及 DebugLobby 中的引用。(`src/client/components/EventOverlay.tsx` 删除,`src/client/components/DebugLobby.tsx`)
+- **清理废弃样式**: 删除 `eventOverlay`/`eventBanner`/`eventBannerVisible` 等旧样式,新增 `eventCardLayer`/`eventCardFlip`/`eventCardBody`/`eventCardName`/`eventCardSuit`/`eventCardLabel`。(`src/client/components/gameViewStyles.ts`)
+- **更新注释**: useEventPlayback/reducer/useDebugMultiConnection 中关于 EventOverlay 的引用更新为 EventBanner。(`src/client/hooks/useEventPlayback.ts`, `src/client/view/reducer.ts`, `src/client/hooks/useDebugMultiConnection.ts`)
+
+### Added — 判定牌信息展示(日志+处理区停留)
+
+判定事件此前在前端日志中只显示 `判定 乐不思蜀` 等干瘪文本,不展示判定牌的花色点数和牌名;判定牌也从不在处理区(ZoneInfoBar)显示——后端 `afterHooks` 立即将判定牌从 processing 移入弃牌堆,前端 `applyView` 净效果为 processing 不变。本次改进让玩家能看清判定翻出了什么牌:
+
+- **toViewEvents 携带判定牌信息**: `判定` atom 的 `toViewEvents` 从牌堆顶读取判定牌,在 ViewEvent 中携带 `cardId` + `card`(花色/点数/牌名)。判定牌是公开信息,所有玩家可见。(`src/engine/atoms/判定.ts`)
+- **toViewLog 展示判定牌详情**: 日志从 `判定 乐不思蜀` 改为 `判定(乐不思蜀):♠7 杀`,所有视角都能看到判定牌信息。(`src/engine/atoms/判定.ts`)
+- **EventOverlay 判定结果增强**: 中央弹窗从干瘪的 `判定结果` 改为 `P1 判定·乐不思蜀` + `♠7 杀`,玩家能快速识别谁在判定什么。(`src/client/components/EventOverlay.tsx`)
+- **判定牌在处理区停留 2.5 秒**: 前端 `useDebugMultiConnection` 收到判定事件后,主动将判定牌临时加入 `view.zones.processing` 展示(ZoneInfoBar 处理区可见),2.5 秒后自动移除。后端引擎状态不受影响(`afterHooks` 仍立即移走),展示层与数据层分离。(`src/client/hooks/useDebugMultiConnection.ts`)
+- **测试**: `toViewLog-perspective.test.ts` 新增 3 例(带 card 展示牌面/所有视角可见/无 card 降级),`applyView-bugs.test.ts` 新增 1 例(净效果验证:deckCount-1 + discardPileCount+1 + processing 不变)。(`tests/skill-tests/toViewLog-perspective.test.ts`, `tests/skill-tests/applyView-bugs.test.ts`)
+
 ### Fixed — 身份揭示弹窗时机修正(选将前弹出)
 
 开局身份揭示弹窗(`IdentityRevealOverlay`, zIndex 10000)此前被 `!isCharSelectPending && !charSelectInProgress` 条件屏蔽整个选将阶段,导致身份牌在选将**之后**才弹出。修正后身份牌在抽身份后立即显示,盖在选将遮罩(9999)之上,玩家点「确认」后才露出选将界面,符合开局「先亮身份再选将」的流程。(`src/client/components/OverlaysLayer.tsx`)

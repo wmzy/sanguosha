@@ -2,10 +2,10 @@
 // 事件播放队列 hook。
 //
 // 收到 ViewEvent 后(来自服务端 event 消息),按 seq 入队,逐个播放。
-// "播放" = 暴露 current event 给 EventOverlay 渲染延时展示,
+// "播放" = 暴露 current event 给 GameView 内部的 EventBanner 渲染延时展示,
 // duration 到点后出队,推下一个。
 //
-// 非阻塞语义:overlay 由 EventOverlay 用 pointer-events:none 实现,
+// 非阻塞语义:EventBanner 用 pointer-events:none 实现,
 // 本 hook 只负责时序调度,不拦截交互。
 //
 // 过时事件处理:若新批次 seq <= lastPlayedSeq(状态回退/重连),丢弃。
@@ -37,21 +37,27 @@ export interface EventPlaybackState {
  * @returns 当前播放状态 { current }
  *
  * 用法:useEventPlayback 在收到 events 消息时调用 enqueue,
- * 返回的 current 传给 EventOverlay 渲染。
+ * 返回的 current 传给 GameView 的 currentEvent prop(EventBanner 渲染)。
  */
 export function useEventPlayback() {
   const [current, setCurrent] = useState<QueuedEvent | null>(null);
   const queueRef = useRef<QueuedEvent[]>([]);
   const lastPlayedSeqRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 用 ref 而非 current state 判断是否正在播放:多条 WS 消息在同一 tick 内同步到达时,
+  // current state 在闭包中还是旧值(null),会导致 playNext 被重复调用,事件被瞬间覆盖。
+  // ref 是同步可变的,不受 React render 周期影响。
+  const isPlayingRef = useRef(false);
 
   /** 从队列取下一个播放 */
   const playNext = useCallback(() => {
     const next = queueRef.current.shift();
     if (!next) {
+      isPlayingRef.current = false;
       setCurrent(null);
       return;
     }
+    isPlayingRef.current = true;
     setCurrent(next);
     // duration 从 AtomDefinition.effect 静态查表获取(ViewEvent 不再携带 effect)
     const type = next.event.atomType ?? next.event.type;
@@ -73,11 +79,11 @@ export function useEventPlayback() {
     const fresh = events.filter(e => e.seq > lastPlayedSeqRef.current);
     if (fresh.length === 0) return;
     queueRef.current.push(...fresh);
-    // 若空闲,立即开始播放
-    if (current === null) {
+    // 若空闲,立即开始播放(用 ref 判断,避免闭包竞态)
+    if (!isPlayingRef.current) {
       playNext();
     }
-  }, [current, playNext]);
+  }, [playNext]);
 
   /** 重置(重连时清空状态,避免播放历史事件) */
   const reset = useCallback((baselineSeq: number) => {
@@ -86,6 +92,7 @@ export function useEventPlayback() {
       timerRef.current = null;
     }
     queueRef.current = [];
+    isPlayingRef.current = false;
     setCurrent(null);
     lastPlayedSeqRef.current = baselineSeq;
   }, []);

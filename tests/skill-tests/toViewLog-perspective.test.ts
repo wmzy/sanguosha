@@ -151,4 +151,53 @@ describe('toViewLog 视角区分', () => {
       expect(log.text).toContain('2');
     });
   });
+
+  describe('判定', () => {
+    const def = getAtomDef('判定');
+
+    it('带 card 时展示花色点数+牌名(公开信息)', () => {
+      const event: ViewEvent = {
+        type: '判定',
+        player: 0,
+        judgeType: '乐不思蜀',
+        cardId: 'j1',
+        card: { name: '杀', suit: '♠', rank: '7' } as Card,
+      };
+      const log = def.toViewLog!(event, 0)!;
+      expect(log.player).toBe(0);
+      expect(log.text).toContain('乐不思蜀');
+      expect(log.text).toContain('♠');
+      expect(log.text).toContain('7');
+      expect(log.text).toContain('杀');
+    });
+
+    it('所有视角都看到判定牌信息(判定牌为公开信息)', () => {
+      const event: ViewEvent = {
+        type: '判定',
+        player: 1,
+        judgeType: '闪电',
+        cardId: 'j1',
+        card: { name: '桃', suit: '♥', rank: '3' } as Card,
+      };
+      // P0 视角看 P1 的判定
+      const log0 = def.toViewLog!(event, 0)!;
+      expect(log0.text).toContain('♥');
+      expect(log0.text).toContain('桃');
+      // P2 视角看 P1 的判定
+      const log2 = def.toViewLog!(event, 2)!;
+      expect(log2.text).toContain('♥');
+      expect(log2.text).toContain('桃');
+    });
+
+    it('无 card 时降级为仅 judgeType', () => {
+      const event: ViewEvent = {
+        type: '判定',
+        player: 0,
+        judgeType: '八卦阵',
+      };
+      const log = def.toViewLog!(event, 0)!;
+      expect(log.text).toBe('判定(八卦阵)');
+      expect(log.text).not.toContain('♠');
+    });
+  });
 });

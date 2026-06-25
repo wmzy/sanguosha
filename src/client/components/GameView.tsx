@@ -21,6 +21,7 @@ import type { GameView as EngineGameView, Card, Json } from '../../engine/types'
 import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
 import { PlayerCardLarge } from './PlayerCardLarge';
 import { GameLog } from './GameLog';
+import { EventBanner } from './EventBanner';
 
 // ─── 抽取的子组件 ───
 import { GameHeader } from './GameHeader';
@@ -43,6 +44,8 @@ import { useSeatOrder } from '../hooks/useSeatOrder';
 import { useHandReorder } from '../hooks/useHandReorder';
 import { usePlayInteraction } from '../hooks/usePlayInteraction';
 
+import type { QueuedEvent } from '../hooks/useEventPlayback';
+
 import type { ActionMsg } from '../types';
 
 interface Props {
@@ -56,6 +59,9 @@ interface Props {
   headerSlot?: ReactNode;
   /** 遮罩角落插槽:上层在选将/等待遮罩内渲染视角控制 UI。 */
   overlaySlot?: ReactNode;
+  /** 当前播放的事件(来自 useEventPlayback),用于 GameView 内部事件横幅展示。
+ *  正式模式可不传(无事件播放队列)。 */
+  currentEvent?: QueuedEvent | null;
 }
 
 // ─── 主组件 ───
@@ -63,7 +69,7 @@ interface Props {
 //   正式模式:上层直接传入当前玩家的 view。
 //   debug 模式:上层(DebugLobby)管理多连接和视角切换,把当前视角连接的 view 传入,
 //   并通过 headerSlot/overlaySlot 注入视角控制 UI。
-export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleClick, headerSlot, overlaySlot }: Props) {
+export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleClick, headerSlot, overlaySlot, currentEvent }: Props) {
   const perspectiveIdx = view.viewer;
   const [showIdentityReveal, setShowIdentityReveal] = useState(() => !sessionStorage.getItem('sgs_identity_shown'));
 
@@ -144,6 +150,9 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
         currentPlayerName={currentPlayerName}
         headerSlot={headerSlot}
       />
+
+      {/* ─── 事件横幅(延时展示,非阻塞) ─── */}
+      <EventBanner current={currentEvent ?? null} view={view} />
 
       {/* ─── 座位布局(弧形) + 中央信息 ─── */}
       <div className={styles.seatingArea}>

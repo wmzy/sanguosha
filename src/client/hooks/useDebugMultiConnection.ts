@@ -21,6 +21,9 @@ import type { ActionMsg } from '../types';
 
 const log = createLogger('useDebugMultiConnection');
 
+/** 判定牌在处理区停留时间(ms),供玩家看清花色点数后移除 */
+const JUDGE_CARD_LINGER_MS = 2500;
+
 export type { ActionMsg };
 
 export interface UseDebugMultiConnectionParams {
@@ -100,6 +103,44 @@ export function useDebugMultiConnection(
         // 不用 structuredClone(它在 view 含函数引用如 cardFilter.filter 时会抛 DOMException)。
         // setViews 创建新 Map 保证 React 检测到状态变更。
         viewReducer(seat.view, msg.view, msg.timestamp);
+
+        // 判定牌在处理区停留几秒供玩家看清花色点数:
+        // 后端 afterHooks 立即把判定牌从 processing 移入弃牌堆(applyView 净效果 = processing 不变),
+        // 前端在此处主动把判定牌加入 processing 展示,几秒后移除。
+        // cardMap 里要确保判定牌可查(ViewEvent 携带 card 快照)。
+        // ZoneInfoBar(GameView 内部组件)会从 view.zones.processing 读取并渲染。
+        // EventBanner(GameView 内部组件)会从 toViewLog 读取文案展示横幅。
+        const evtType = msg.view.atomType ?? msg.view.type;
+        if (evtType === '判定') {
+          const judgeCardId = msg.view.cardId as string | undefined;
+          const judgeCard = msg.view.card as { name: string; suit: string; rank: string } | undefined;
+          if (judgeCardId) {
+            // 确保 cardMap 有判定牌快照(供 ZoneInfoBar 渲染花色点数)
+            if (judgeCard && !seat.view.cardMap[judgeCardId]) {
+              seat.view.cardMap[judgeCardId] = {
+                id: judgeCardId, name: judgeCard.name, suit: judgeCard.suit as any,
+                rank: judgeCard.rank, type: '基本牌',
+              };
+            }
+            // 加入 processing 展示
+            if (!seat.view.zones?.processing.includes(judgeCardId)) {
+              seat.view.zones!.processing.push(judgeCardId);
+            }
+            // 几秒后移除
+            setTimeout(() => {
+              const s = seatsRef.current.get(seatViewer);
+              if (!s?.view?.zones?.processing) return;
+              const idx = s.view.zones.processing.indexOf(judgeCardId);
+              if (idx < 0) return; // 已被移除(重连/状态重置)
+              s.view.zones.processing.splice(idx, 1);
+              setViews(prev => {
+                const next = new Map(prev);
+                next.set(s.viewer, s.view!);
+                return next;
+              });
+            }, JUDGE_CARD_LINGER_MS);
+          }
+        }
       }
       // 更新 lastSeq
       seat.lastSeq = msg.seq;
