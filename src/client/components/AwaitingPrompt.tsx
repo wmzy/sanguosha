@@ -7,6 +7,7 @@ import * as styles from './gameViewStyles';
 import type { Card, Json, PendingView } from '../../engine/types';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
+import type { ProcessingPickState } from '../hooks/useProcessingPicks';
 
 export interface AwaitingPromptProps {
   pending: PendingView;
@@ -21,6 +22,8 @@ export interface AwaitingPromptProps {
   skillActions: SkillActionDef[];
   skippedBroadcast: Set<string>;
   canOperate: boolean;
+  /** 五谷丰登选牌展示增强:被选走的牌标注选牌者并禁用 */
+  processingPicks?: ProcessingPickState | null;
   /** 发送动作(无 preceding,本组件不涉及前置 action) */
   onSend: (skillId: string, actionType: string, params: Record<string, Json>) => void;
   /** 回应(不传 = 不回应;传 cardId = 打出该牌回应) */
@@ -38,6 +41,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
     skillActions: _skillActions,
     skippedBroadcast,
     canOperate,
+    processingPicks,
     onSend,
     onRespond,
   } = props;
@@ -105,21 +109,33 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           );
         }
         // pickProcessingCard 类 pending(五谷丰登:从处理区亮的明牌选一张):
-        // 渲染处理区全部明牌为可点按钮,使用者点具体 cardId 选中
+        // 渲染全量候选牌(含已被选走的),被选走的牌置暗禁用并标注选牌者。
+        // processingPicks 由渲染层累积公开的「处理区→手牌」移动事件得到,不改引擎契约。
         if (pending.prompt.type === 'pickProcessingCard') {
           const p = pending.prompt;
+          // 有累积状态时用全量候选(含已选牌),否则回退到 pending 原始 cards
+          const cards = processingPicks?.allCards ?? p.cards;
+          const pickedBy = processingPicks?.pickedBy;
           return (
             <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
-              {p.cards.length > 0 && (
+              {cards.length > 0 && (
                 <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>处理区可选牌:</span>
               )}
-              {p.cards.map(({ cardId, cardName, suit, rank }) => (
-                <button
-                  key={cardId}
-                  className={styles.promptBtn}
-                  onClick={() => onSend(skillId, 'respond', { cardId })}
-                >{cardName} {suit}{rank}</button>
-              ))}
+              {cards.map(({ cardId, cardName, suit, rank }) => {
+                const picker = pickedBy?.get(cardId);
+                const isPicked = !!picker;
+                return (
+                  <button
+                    key={cardId}
+                    className={isPicked ? styles.promptBtnDisabled : styles.promptBtn}
+                    disabled={isPicked}
+                    onClick={() => !isPicked && onSend(skillId, 'respond', { cardId })}
+                  >
+                    {cardName} {suit}{rank}
+                    {isPicked && <span className={styles.pickedByTag}>已被{picker}选走</span>}
+                  </button>
+                );
+              })}
             </div>
           );
         }

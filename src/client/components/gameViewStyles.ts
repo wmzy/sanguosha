@@ -74,6 +74,16 @@ export const promptBtnPrimary = css`
   border: 1px solid #27ae60; border-radius: 6px; padding: 6px 14px;
   cursor: pointer; background: rgba(39,174,96,0.2); color: #2ecc71; font-size: 13px; font-weight: bold;
 `;
+// 五谷丰登:被选走的牌(置暗禁用)
+export const promptBtnDisabled = css`
+  border: 1px solid #555; border-radius: 6px; padding: 6px 14px;
+  cursor: not-allowed; background: rgba(40,40,40,0.5); color: #666; font-size: 13px;
+  opacity: 0.6; display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+`;
+export const pickedByTag = css`
+  font-size: 10px; color: #e74c3c; font-weight: normal;
+  text-decoration: line-through;
+`;
 
 export const waitingHint = css`
   text-align: center; color: #888; font-size: 13px; margin-bottom: 12px;

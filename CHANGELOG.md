@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-24
 
+### Enhanced — 五谷丰登选牌面板:被选牌置暗禁用并标注选牌者
+
+五谷丰登选牌时,引擎给每个选牌者弹的 `pickProcessingCard` pending 只含「仍在处理区的牌」——被选走的牌从 `state.zones.processing` 移除后,后续选牌者的面板上看不到它被谁选走。本次为**纯渲染层增强**(零引擎改动),让被选牌保留在面板上展示为禁用态并标注选牌者:
+
+- **新增 useProcessingPicks hook**: 渲染层订阅已到达的公开「移动牌」事件(`from:处理区 → to:手牌`),累积「被选记录」(`cardId → 选牌者名称`)。全量候选 = 已被选走的牌(从事件流累积,卡牌信息从 `view.cardMap` 查得)∪ 当前 pending.cards。处理区清空(五谷丰登结算结束)时重置。与判定牌在 `useDebugMultiConnection` 里临时加入 processing 展示同一性质——纯前端展示增强,不碰引擎 `applyView`/`buildView` 契约。(`src/client/hooks/useProcessingPicks.ts`)
+- **AwaitingPrompt 渲染禁用态**: pickProcessingCard 分支用 `allCards`(含已选牌)替代原始 `pending.cards`,有 `pickedBy` 的牌渲染为禁用按钮(`disabled`)并标注「已被 XX 选走」,不可点击。(`src/client/components/AwaitingPrompt.tsx`)
+- **新增禁用态样式**: `promptBtnDisabled`(置暗、cursor not-allowed)+ `pickedByTag`(红色删除线标注)。(`src/client/components/gameViewStyles.ts`)
+- **测试**: `wugu-pick-processing.test.tsx` 新增 2 例(被选牌禁用且不可点击/标注正确的选牌者名称),模拟 P2 视角下 pending 只含 pb/pc 但 currentEvent 携带 pa 被选走的场景。(`tests/integration/wugu-pick-processing.test.tsx`)
+
 ### Refactored — 删除 EventOverlay,事件展示移入 GameView 内部(effect 驱动翻牌动效)
 
 旧的事件展示组件 `EventOverlay` 是一个独立于 `GameViewComponent` 的 fixed overlay( zIndex 9000),在 `DebugLobby` 中作为兄弟元素渲染。它存在两个架构问题:(1)脱离子 GameView 的布局上下文;(2)`summarizeEvent` 函数用 hardcode switch 按事件类型拼文案,与引擎 `toViewLog` 重复定义。

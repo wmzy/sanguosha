@@ -43,6 +43,7 @@ import { useCharSelect } from '../hooks/useCharSelect';
 import { useSeatOrder } from '../hooks/useSeatOrder';
 import { useHandReorder } from '../hooks/useHandReorder';
 import { usePlayInteraction } from '../hooks/usePlayInteraction';
+import { useProcessingPicks } from '../hooks/useProcessingPicks';
 
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
@@ -105,6 +106,9 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
   );
 
   // ─── 出牌交互状态机(已抽出到 usePlayInteraction) ───
+  // 五谷丰登选牌展示增强:累积「处理区→手牌」的公开移动事件,标注被选走的牌
+  const processingPicks = useProcessingPicks(currentEvent, view);
+
   const play = usePlayInteraction(isMyTurn, canOperate, {
     view, perspectiveIdx, perspectiveHand, skillActions,
     pending, isDiscardPhase, discardMin, discardMax,
@@ -201,6 +205,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
               skillActions={skillActions}
               skippedBroadcast={skippedBroadcast}
               canOperate={canOperate}
+              processingPicks={processingPicks}
               onSend={send}
               onRespond={handleRespond}
             />
