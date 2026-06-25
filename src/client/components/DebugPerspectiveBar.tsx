@@ -5,6 +5,7 @@
 import { useState, useCallback } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
+import { copyToClipboard } from '../utils/clipboard';
 
 export interface DebugPerspectiveBarProps {
   perspectiveName: string;
@@ -42,13 +43,12 @@ export function DebugPerspectiveBar({
   const [copied, setCopied] = useState(false);
   const handleCopy = useCallback(async () => {
     if (!snapshotPath) return;
-    try {
-      await navigator.clipboard.writeText(snapshotPath);
+    const ok = await copyToClipboard(snapshotPath);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard API 不可用时静默失败(fallback:选中文本供用户手动复制)
     }
+    // fallback 也失败时静默:此时无可靠手段,不弹错打扰用户
   }, [snapshotPath]);
   if (!onSwitchPerspective && !onDeleteRoom && !onSwitchToNextUnselected && !onSaveSnapshot) return null;
   return (
