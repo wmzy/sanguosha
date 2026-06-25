@@ -14,6 +14,7 @@ import { viewReducer } from '../view/reducer';
 import { useEventPlayback } from './useEventPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './SubmittedCharSelectCtx';
 import { createLogger } from '../utils/logger';
+import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
 import type { GameView, Json } from '../../engine/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
 
@@ -162,6 +163,7 @@ export function useDebugMultiConnection(
           log.warn('JSON 解析失败:', e);
           return;
         }
+        logWsMessage(viewerIndex, 'in', msg);
         // handleMessage 的异常不吞掉——让它在 console 显示完整错误信息,
         // 而不是伪装成无害的 'parse error' 导致问题难以排查。
         handleMessage(viewerIndex, msg);
@@ -207,11 +209,14 @@ export function useDebugMultiConnection(
     // （否则 server 会用 slot.createdSeq 校验不匹配而拒绝）
     const pending = seat.view?.pending;
     const pendingSeq = pending?.isBlocking ? seat.lastSeq : undefined;
-    seat.ws.send(JSON.stringify({
+    const clientMsg: ClientMessage = {
       type: 'action',
       action: { ...action, baseSeq: seat.lastSeq, pendingSeq },
       baseSeq: seat.lastSeq,
-    } as ClientMessage));
+    };
+    logWsMessage(action.ownerId, 'out', clientMsg);
+    logUserAction('action', action);
+    seat.ws.send(JSON.stringify(clientMsg));
   }, []);
 
   /** 整理手牌:走当前 perspective viewer 的连接 */
@@ -219,7 +224,10 @@ export function useDebugMultiConnection(
     // seatsRef 按循环索引 key,遍历按实际 viewer 字段查找
     const seat = [...seatsRef.current.values()].find(s => s.viewer === perspectiveRef.current);
     if (!seat || seat.ws.readyState !== WebSocket.OPEN) return;
-    seat.ws.send(JSON.stringify({ type: 'reorder_hand', order } as ClientMessage));
+    const clientMsg: ClientMessage = { type: 'reorder_hand', order };
+    logWsMessage(perspectiveRef.current, 'out', clientMsg);
+    logUserAction('reorder', order);
+    seat.ws.send(JSON.stringify(clientMsg));
   }, []);
 
   const disconnectAll = useCallback(() => {

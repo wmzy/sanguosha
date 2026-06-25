@@ -19,6 +19,7 @@ import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 import { DebugInfo } from './DebugInfo';
 import { EventOverlay } from './EventOverlay';
 import { styles } from '../theme';
+import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/debugTelemetry';
 import type { RoomInfo } from '../../server/protocol';
 import type { GameView as EngineGameView } from '../../engine/types';
 
@@ -89,6 +90,19 @@ function DebugGameViewInner({
     onFirstView: (v) => setPerspective(v),
   });
 
+  // 安装遥测:debug 游戏视图挂载时启动,卸载时清理。
+  // 幂等(install/uninstall 内部有 installed 守卫),StrictMode 双挂载安全。
+  useEffect(() => {
+    installTelemetry();
+    return () => uninstallTelemetry();
+  }, []);
+
+  // 视角切换记录到遥测(包装 setPerspective)
+  const handleSetPerspective = useCallback((p: number) => {
+    logUserAction('perspective', p);
+    setPerspective(p);
+  }, []);
+
   const snap = useSnapshot();
   const { createSnapshot: createSnap, patchDescription: patchSnap, clearError: clearSnapError } = snap;
   const { views: connViews, getSeq: connGetSeq } = conn;
@@ -117,7 +131,7 @@ function DebugGameViewInner({
   }, [snap.lastSnapshotPath, snap.error, clearSnapError]);
 
   const currentView = conn.views.get(perspective) ?? null;
-  const pctl = useDebugPerspective(conn.views, perspective, playerCount, setPerspective);
+  const pctl = useDebugPerspective(conn.views, perspective, playerCount, handleSetPerspective);
 
   if (!currentView) {
     return (
@@ -147,6 +161,7 @@ function DebugGameViewInner({
       onSaveSnapshot={handleSaveSnapshot}
       snapshotSaving={snap.saving}
       snapshotToast={snap.lastSnapshotPath ? `已保存: ${snap.lastSnapshotPath}` : null}
+      snapshotPath={snap.lastSnapshotPath}
       snapshotError={snap.error}
     />
   );
@@ -161,6 +176,7 @@ function DebugGameViewInner({
       onSaveSnapshot={handleSaveSnapshot}
       snapshotSaving={snap.saving}
       snapshotToast={snap.lastSnapshotPath ? `已保存: ${snap.lastSnapshotPath}` : null}
+      snapshotPath={snap.lastSnapshotPath}
       snapshotError={snap.error}
     />
   );
@@ -171,7 +187,7 @@ function DebugGameViewInner({
         view={view}
         onAction={conn.sendAction}
         onReorderHand={conn.reorderHand}
-        onSeatDoubleClick={setPerspective}
+        onSeatDoubleClick={handleSetPerspective}
         headerSlot={headerBar}
         overlaySlot={overlayBar}
       />

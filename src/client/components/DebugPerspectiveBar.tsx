@@ -2,6 +2,7 @@
 // debug 模式视角控制栏:视角切换 / 跳转当前玩家 / 自动跟随开关 / 退出房间 / 保存快照。
 // 由上层(DebugLobby)渲染到 GameViewComponent 的 headerSlot / overlaySlot,
 // GameViewComponent 本身不感知视角切换。
+import { useState, useCallback } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 
@@ -17,7 +18,10 @@ export interface DebugPerspectiveBarProps {
   /** 保存快照(可选;渲染「保存快照」按钮)。 */
   onSaveSnapshot?: () => void;
   snapshotSaving?: boolean;
+  /** toast 文案(如「已保存: data/snapshots/xxx/」) */
   snapshotToast?: string | null;
+  /** 快照目录路径(传给复制按钮;为 null 时不渲染复制按钮) */
+  snapshotPath?: string | null;
   snapshotError?: string | null;
 }
 
@@ -31,8 +35,21 @@ export function DebugPerspectiveBar({
   onSaveSnapshot,
   snapshotSaving,
   snapshotToast,
+  snapshotPath,
   snapshotError,
 }: DebugPerspectiveBarProps) {
+  // 复制反馈:点击后短暂显示「已复制」,2 秒后恢复
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(async () => {
+    if (!snapshotPath) return;
+    try {
+      await navigator.clipboard.writeText(snapshotPath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard API 不可用时静默失败(fallback:选中文本供用户手动复制)
+    }
+  }, [snapshotPath]);
   if (!onSwitchPerspective && !onDeleteRoom && !onSwitchToNextUnselected && !onSaveSnapshot) return null;
   return (
     <div className={styles.headerRight}>
@@ -66,7 +83,19 @@ export function DebugPerspectiveBar({
       {snapshotError ? (
         <div className={styles.snapshotErrorToast}>{snapshotError}</div>
       ) : (
-        snapshotToast && <div className={styles.snapshotToast}>{snapshotToast}</div>
+        snapshotToast && (
+          <div className={styles.snapshotToast}>
+            {snapshotToast}
+            {snapshotPath && (
+              <button
+                className={cx(styles.copyBtn, copied && styles.copyBtnDone)}
+                onClick={handleCopy}
+              >
+                {copied ? '✓ 已复制' : '复制'}
+              </button>
+            )}
+          </div>
+        )
       )}
     </div>
   );

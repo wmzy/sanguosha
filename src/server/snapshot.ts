@@ -45,6 +45,28 @@ interface SnapshotBackend {
   lastActivityAt: number;
 }
 
+/** 前端遥测原始数据(由 collectTelemetry 采集,随 POST 发来) */
+export interface TelemetryPayload {
+  consoleLog: Json[];
+  wsMessages: Json[];
+  userActions: Json[];
+  domHtml: string;
+  capturedAt: number;
+  viewport: { width: number; height: number };
+  url: string;
+}
+
+/** 快照中的遥测元数据(sidecar 文件引用,不内联大数据) */
+interface SnapshotTelemetryMeta {
+  console: { filename: string; entryCount: number };
+  wsMessages: { filename: string; entryCount: number };
+  dom: { filename: string; sizeBytes: number };
+  userActions: { entryCount: number };
+  capturedAt: number;
+  viewport: { width: number; height: number };
+  url: string;
+}
+
 /** 快照文件根结构 */
 export interface DebugSnapshot {
   meta: {
@@ -68,6 +90,8 @@ export interface DebugSnapshot {
     perspective: number;
     views: Record<string, GameView>;
   };
+  /** 遥测 sidecar 元数据(仅当前端安装了 telemetry 时存在) */
+  telemetry?: SnapshotTelemetryMeta;
 }
 
 /** 序列化 ViewEventSplit 的 Map 为数组对(可 JSON 序列化) */
@@ -140,12 +164,14 @@ function timestampId(): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${suffix}`;
 }
 
-async function ensureSnapshotDir(): Promise<void> {
-  await mkdir(SNAPSHOT_DIR, { recursive: true });
+async function ensureSnapshotDir(snapshotId: string): Promise<void> {
+  // 每个快照独占一个目录:data/snapshots/<snapshotId>/
+  await mkdir(join(SNAPSHOT_DIR, snapshotId), { recursive: true });
 }
 
-function snapshotPath(snapshotId: string): string {
-  return join(SNAPSHOT_DIR, `${snapshotId}.json`);
+function snapshotPath(snapshotId: string, filename?: string): string {
+  // 每个快照是一个目录。主文件: snapshot.json, sidecars: console.txt / ws.jsonl / dom.html
+  return join(SNAPSHOT_DIR, snapshotId, filename ?? 'snapshot.json');
 }
 
 /** 创建快照请求体 */
@@ -154,6 +180,8 @@ export interface CreateSnapshotRequest {
   perspective: number;
   frontendSeqs: Record<string, number>;
   frontendViews: Record<string, GameView>;
+  /** 前端遥测数据(可选;前端安装 debugTelemetry 时提供) */
+  telemetry?: TelemetryPayload;
 }
 
 /** 创建快照:同步只读采集 session 状态,写入 data/snapshots/。
@@ -175,38 +203,69 @@ export async function createSnapshot(
   // 取 sessionSeed(私有字段,reflection 读取)
   const sessionSeed = (session as unknown as { sessionSeed: number }).sessionSeed;
 
-  const snapshot: DebugSnapshot = {
-    meta: {
-      snapshotId,
-      roomId: req.roomId,
-      roomName: (session as unknown as { room: { name: string } }).room.name,
-      createdAt: backendCapturedAt,
-      description: null,
-      playerCount: state.players.length,
-      debug: isDebug,
-      engineVersion: ENGINE_VERSION,
-    },
-    alignment: {
-      frontendSeqs: req.frontendSeqs,
-      backendSeq: state.seq,
-      backendCapturedAt,
-      note: 'backendSeq - frontendSeq[i] = 未到达该座次的事件数',
-    },
-    backend: {
-      state: serializeStateForSnapshot(state),
-      actionLog: session.getGameLog() ?? [],
-      atomHistory: serializeAtomHistory(state.atomHistory),
-      sessionSeed,
-      lastActivityAt: session.getLastActivityAt(),
-    },
-    frontend: {
-      perspective: req.perspective,
-      views: req.frontendViews,
-    },
-  };
-
   try {
-    await ensureSnapshotDir();
+    await ensureSnapshotDir(snapshotId);
+
+    // 前端遥测写入独立 sidecar 文件(避免主快照 .json 膨胀)
+    let telemetryMeta: SnapshotTelemetryMeta | undefined;
+    if (req.telemetry) {
+      const t = req.telemetry;
+
+      const consoleText = t.consoleLog.map((e) => {
+        const entry = e as { time: number; level: string; message: string };
+        return `[${new Date(entry.time).toISOString()}] [${entry.level}] ${entry.message}`;
+      }).join('\n');
+      const wsLines = t.wsMessages.map((e) => JSON.stringify(e)).join('\n');
+      const domHtml = t.domHtml;
+
+      await Promise.all([
+        writeFile(snapshotPath(snapshotId, 'console.txt'), consoleText),
+        writeFile(snapshotPath(snapshotId, 'ws.jsonl'), wsLines),
+        writeFile(snapshotPath(snapshotId, 'dom.html'), domHtml),
+      ]);
+
+      telemetryMeta = {
+        console: { filename: 'console.txt', entryCount: t.consoleLog.length },
+        wsMessages: { filename: 'ws.jsonl', entryCount: t.wsMessages.length },
+        dom: { filename: 'dom.html', sizeBytes: Buffer.byteLength(domHtml, 'utf-8') },
+        userActions: { entryCount: t.userActions.length },
+        capturedAt: t.capturedAt,
+        viewport: t.viewport,
+        url: t.url,
+      };
+    }
+
+    const snapshot: DebugSnapshot = {
+      meta: {
+        snapshotId,
+        roomId: req.roomId,
+        roomName: (session as unknown as { room: { name: string } }).room.name,
+        createdAt: backendCapturedAt,
+        description: null,
+        playerCount: state.players.length,
+        debug: isDebug,
+        engineVersion: ENGINE_VERSION,
+      },
+      alignment: {
+        frontendSeqs: req.frontendSeqs,
+        backendSeq: state.seq,
+        backendCapturedAt,
+        note: 'backendSeq - frontendSeq[i] = 未到达该座次的事件数',
+      },
+      backend: {
+        state: serializeStateForSnapshot(state),
+        actionLog: session.getGameLog() ?? [],
+        atomHistory: serializeAtomHistory(state.atomHistory),
+        sessionSeed,
+        lastActivityAt: session.getLastActivityAt(),
+      },
+      frontend: {
+        perspective: req.perspective,
+        views: req.frontendViews,
+      },
+      telemetry: telemetryMeta,
+    };
+
     await writeFile(snapshotPath(snapshotId), JSON.stringify(snapshot, null, 2));
     log.info(`快照已保存: ${snapshotId}`);
     return { snapshotId };

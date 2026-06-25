@@ -680,6 +680,16 @@ export const snapshotToast = css`
   position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
   background: #1f3d1f; color: #7ee787; padding: 10px 20px; border-radius: 6px;
   border: 1px solid #4a8a4a; font-size: 13px; z-index: 9999;
+  display: flex; align-items: center; gap: 10px;
+`;
+export const copyBtn = css`
+  background: #2d4a2d; color: #7ee787; border: 1px solid #4a8a4a;
+  padding: 2px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  white-space: nowrap;
+  &:hover { background: #3d5a3d; }
+`;
+export const copyBtnDone = css`
+  background: #1a3d1a; border-color: #2a6a2a; cursor: default;
 `;
 export const snapshotErrorToast = css`
   position: fixed; top: 50px; left: 50%; transform: translateX(-50%);

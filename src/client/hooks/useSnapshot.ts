@@ -3,6 +3,7 @@
 // 不触碰 WS 连接、不调 sendAction、不改游戏渲染状态树——只读旁路。
 import { useState, useCallback } from 'react';
 import type { GameView } from '../../engine/types';
+import { collectTelemetry } from '../utils/debugTelemetry';
 
 export interface UseSnapshotResult {
   /** 是否正在保存中(POST 进行中,按钮应禁用) */
@@ -55,6 +56,7 @@ export function useSnapshot(): UseSnapshotResult {
           perspective: params.perspective,
           frontendSeqs,
           frontendViews,
+          telemetry: collectTelemetry(),
         }),
       });
       if (!resp.ok) {
@@ -63,7 +65,7 @@ export function useSnapshot(): UseSnapshotResult {
       }
       const data = await resp.json() as { snapshotId: string };
       setLastSnapshotId(data.snapshotId);
-      setLastSnapshotPath(`data/snapshots/${data.snapshotId}.json`);
+      setLastSnapshotPath(`data/snapshots/${data.snapshotId}/`);
       return data.snapshotId;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

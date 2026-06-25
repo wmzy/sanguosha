@@ -37,7 +37,7 @@ function getState(session: GameSession): GameState {
 }
 
 async function readSnapshot(snapshotId: string): Promise<unknown> {
-  const raw = await readFile(join(SNAPSHOT_DIR, `${snapshotId}.json`), 'utf-8');
+  const raw = await readFile(join(SNAPSHOT_DIR, snapshotId, 'snapshot.json'), 'utf-8');
   return JSON.parse(raw);
 }
 
@@ -47,13 +47,13 @@ describe('debug 快照功能', () => {
   });
 
   afterEach(async () => {
-    // 清理测试快照文件
+    // 清理测试快照目录
     try {
       const { readdir } = await import('node:fs/promises');
-      const files = await readdir(SNAPSHOT_DIR).catch(() => []);
-      for (const f of files) {
-        if (f.includes('snap-test-')) {
-          await rm(join(SNAPSHOT_DIR, f));
+      const entries = await readdir(SNAPSHOT_DIR).catch(() => []);
+      for (const e of entries) {
+        if (e.includes('snap-test-')) {
+          await rm(join(SNAPSHOT_DIR, e), { recursive: true });
         }
       }
     } catch {
@@ -184,4 +184,98 @@ describe('debug 快照功能', () => {
     expect(result).toHaveProperty('error');
     expect((result as { status: number }).status).toBe(400);
   });
+
+  it('带 telemetry:写 sidecar 文件(.console.txt/.ws.jsonl/.dom.html)且主快照含元数据', async () => {
+    const room = makeRoom(true);
+    const session = new GameSession(room, true, 42);
+    await session.startGame(4);
+    const state = getState(session);
+    for (let i = 0; i < 50 && !state.players.length; i++) await sleep(10);
+    expect(state.players.length).toBeGreaterThan(0);
+
+    const result = await createSnapshot(session, {
+      roomId: room.id,
+      perspective: 1,
+      frontendSeqs: { '0': 3 },
+      frontendViews: { '0': { viewer: 0 } as never },
+      telemetry: {
+        consoleLog: [
+          { time: 1782360000000, level: 'error', message: 'Test error 1' },
+          { time: 1782360001000, level: 'warn', message: 'Test warning' },
+        ],
+        wsMessages: [
+          { time: 1782360000000, seat: 0, dir: 'in', msg: { type: 'event', seq: 1 } },
+          { time: 1782360000500, seat: 1, dir: 'out', msg: { type: 'action' } },
+        ],
+        userActions: [
+          { time: 1782360000000, kind: 'perspective', detail: 2 },
+        ],
+        domHtml: '<div id="root"><span class="seat">P0</span></div>',
+        capturedAt: 1782360000000,
+        viewport: { width: 1280, height: 720 },
+        url: 'http://localhost:3000/debug/TEST',
+      },
+    });
+
+    const snapshotId = (result as { snapshotId: string }).snapshotId;
+
+    // 主快照含 telemetry 元数据
+    const snapshot = (await readSnapshot(snapshotId)) as {
+      telemetry: {
+        console: { filename: string; entryCount: number };
+        wsMessages: { filename: string; entryCount: number };
+        dom: { filename: string; sizeBytes: number };
+        userActions: { entryCount: number };
+        capturedAt: number;
+        viewport: { width: number; height: number };
+        url: string;
+      };
+    };
+    expect(snapshot.telemetry).toBeDefined();
+    expect(snapshot.telemetry.console.entryCount).toBe(2);
+    expect(snapshot.telemetry.wsMessages.entryCount).toBe(2);
+    expect(snapshot.telemetry.userActions.entryCount).toBe(1);
+    expect(snapshot.telemetry.viewport).toEqual({ width: 1280, height: 720 });
+
+    // sidecar 文件落盘且内容正确(位于快照子目录内)
+    const dir = join(SNAPSHOT_DIR, snapshotId);
+    const consoleContent = await readFile(join(dir, snapshot.telemetry.console.filename), 'utf-8');
+    expect(consoleContent).toContain('Test error 1');
+    expect(consoleContent).toContain('Test warning');
+    expect(consoleContent).toContain('[error]');
+    expect(consoleContent).toContain('[warn]');
+
+    const wsContent = await readFile(join(dir, snapshot.telemetry.wsMessages.filename), 'utf-8');
+    expect(wsContent).toContain('"seat":0');
+    expect(wsContent).toContain('"dir":"in"');
+    // JSONL 格式:每行一个 JSON
+    expect(wsContent.trim().split('\n')).toHaveLength(2);
+
+    const domContent = await readFile(join(dir, snapshot.telemetry.dom.filename), 'utf-8');
+    expect(domContent).toContain('<span class="seat">P0</span>');
+    expect(snapshot.telemetry.dom.sizeBytes).toBe(Buffer.byteLength(domContent, 'utf-8'));
+  }, 15000);
+
+  it('不带 telemetry:主快照 telemetry 字段为 undefined,无 sidecar 文件', async () => {
+    const room = makeRoom(true);
+    const session = new GameSession(room, true, 42);
+    await session.startGame(4);
+    const state = getState(session);
+    for (let i = 0; i < 50 && !state.players.length; i++) await sleep(10);
+
+    const result = await createSnapshot(session, {
+      roomId: room.id,
+      perspective: 0,
+      frontendSeqs: {},
+      frontendViews: {},
+      // 不提供 telemetry
+    });
+    const snapshotId = (result as { snapshotId: string }).snapshotId;
+    const snapshot = (await readSnapshot(snapshotId)) as { telemetry?: unknown };
+    expect(snapshot.telemetry).toBeUndefined();
+    // 目录里只有主文件,没有 sidecar
+    const { readdir } = await import('node:fs/promises');
+    const files = await readdir(join(SNAPSHOT_DIR, snapshotId));
+    expect(files).toEqual(['snapshot.json']);
+  }, 15000);
 });

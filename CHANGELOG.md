@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — 2026-06-21
+## [Unreleased] — 2026-06-24
+
+### Added — debug 快照遥测扩展(HTML 快照 + 控制台日志 + WS 消息流)
+
+在现有 debug 快照(前后端游戏状态)基础上,新增三类前端运行时遥测数据采集,排查「数据对但画面/行为错」的前端 bug。遵循非侵入旁路原则:不改引擎、不改 session、不触游戏渲染状态树。每次快照的全部数据落在同一个目录 `data/snapshots/<snapshotId>/`,用户可直接复制该目录路径给 AI 审查。
+
+- **HTML DOM 快照**:点击「保存快照」时序列化 `#root` 的 `outerHTML`,写入 `dom.html`。React 实际渲染的结构证据,排查渲染错乱/元素缺失/overlay 遮挡。
+- **控制台日志**:劫持 `console.error`/`console.warn` + 监听 `window.onerror`/`unhandledrejection`,写入 ring buffer(上限 300 条),快照时落盘为 `console.txt`。前端报错、React warning、未捕获异常的唯一来源。
+- **WebSocket 消息流**:在 `useDebugMultiConnection` 的 `onmessage`/`sendAction`/`reorderHand` 采集原始收发消息,写入 ring buffer(上限 500 条),快照时落盘为 `ws.jsonl`。排查事件到达顺序/消息丢失/seq 跳变/action reject。
+- **用户操作时间线**:记录出牌/视角切换/整理手牌(上限 200 条),存入主快照 `telemetry.userActions`。
+- **目录化快照存储**:每次快照独占 `data/snapshots/<snapshotId>/` 目录,包含 `snapshot.json`(主快照)+ `console.txt`/`ws.jsonl`/`dom.html`(sidecar)。前端 toast 展示目录路径(而非单文件),方便用户一键复制给 AI。
+- **后端 sidecar 机制**:`createSnapshot` 接受可选 `telemetry` 字段,写 3 个独立 sidecar 文件(避免主快照 `.json` 膨胀),主快照增加 `telemetry` 元数据块(文件引用 + 条目数 + viewport + url)。(`src/server/snapshot.ts`)
+- **遥测核心模块**:新增 `src/client/utils/debugTelemetry.ts`,提供 `installTelemetry`/`uninstallTelemetry`/`logWsMessage`/`logUserAction`/`collectTelemetry`。在 `DebugGameViewInner` 挂载时安装、卸载时清理(StrictMode 双挂载安全)。
+- **测试**:`tests/client/telemetry.test.ts`(10 例,覆盖 ring buffer/全局异常捕获/DOM 采集/幂等)、`tests/server/snapshot.test.ts` 新增 2 例(带 telemetry 写 sidecar 文件、不带 telemetry 兼容)。
 
 ### Changed
 - 出牌阶段使用卡牌的统一前置校验(validateUseCard)提取至 skill.ts,消除 14 张卡牌技能中的重复校验逻辑。
