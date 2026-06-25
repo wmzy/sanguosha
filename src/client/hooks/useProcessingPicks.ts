@@ -1,13 +1,12 @@
 // src/client/hooks/useProcessingPicks.ts
-// 五谷丰登选牌展示增强(纯渲染层读取引擎权威数据)。
+// 五谷丰登选牌展示增强(读取引擎结算帧数据)。
 //
-// 引擎在五谷丰登技能的结算帧 params 里维护:
-//   - revealedIds: 亮出的牌(牌堆顶翻出的 N 张)
-//   - pickedBy: { cardId → 选牌者名称 } 的映射
-// 这些通过「结算帧入栈」atom 同步到 view.settlementStack,前端直接读取。
+// 数据来源(全部通过 atom 同步,前端即时可见):
+//   - 帧的 cards: 候选牌(移动牌 atom 同步),被选走的牌会从 cards 移除
+//   - params.revealedIds: 全量亮出牌(帧参数赋值 atom 同步),用于展示被选牌
+//   - params.pickedBy: {cardId→选牌者} 映射(帧参数赋值 atom 同步)
 //
-// 全量候选 = revealedIds(亮出的牌) ∩ cardMap 可查的牌。
-// 被选走的牌(在 pickedBy 中)渲染为禁用并标注选牌者。
+// 全量候选 = revealedIds(亮出的牌,含已选走的),被选牌从 pickedBy 标注为禁用。
 import { useMemo } from 'react';
 import type { GameView, Card, Json } from '../../engine/types';
 
@@ -19,13 +18,13 @@ export interface ProcessingPickCard {
 }
 
 export interface ProcessingPickState {
-  /** 全量候选牌(亮出的牌,按亮牌顺序) */
+  /** 全量候选牌(亮出的牌,含已选走的) */
   allCards: ProcessingPickCard[];
   /** 被选走的牌:cardId → 选牌者名称 */
   pickedBy: Map<string, string>;
 }
 
-/** 从 view.cardMap 查卡牌信息(buildView 返回全量 cardMap,被选走的牌仍在其中) */
+/** 从 view.cardMap 查卡牌信息 */
 function cardFromMap(view: GameView, cardId: string): ProcessingPickCard | null {
   const c = view.cardMap[cardId];
   if (!c) return null;
@@ -34,9 +33,6 @@ function cardFromMap(view: GameView, cardId: string): ProcessingPickCard | null 
 
 /**
  * 从 view.settlementStack 读取五谷丰登选牌状态。
- *
- * 引擎通过「结算帧入栈」atom 同步 settlementStack,帧 params 含
- * revealedIds(亮出牌)和 pickedBy(被选映射)。前端即时读取,不依赖延时事件回放。
  */
 export function useProcessingPicks(view: GameView): ProcessingPickState | null {
   return useMemo(() => {
@@ -44,24 +40,30 @@ export function useProcessingPicks(view: GameView): ProcessingPickState | null {
     const isPickPending = pending?.prompt?.type === 'pickProcessingCard';
     if (!isPickPending) return null;
 
-    // 从结算帧栈查找五谷丰登帧(可能在非栈顶——嵌套结算时)
-    const wuguFrame = view.settlementStack.find(
-      f => f.skillId === '五谷丰登',
-    );
+    const wuguFrame = view.settlementStack.find(f => f.skillId === '五谷丰登');
     if (!wuguFrame) return null;
 
-    const revealedIds = (wuguFrame.params.revealedIds as string[] | undefined) ?? [];
+    // 全量候选:优先用 params.revealedIds(含已选走的牌),回退到帧 cards(当前剩余)
+    const revealedIds = (wuguFrame.params.revealedIds as string[] | undefined);
     const pickedByRaw = (wuguFrame.params.pickedBy as Record<string, Json> | undefined) ?? {};
     const pickedBy = new Map<string, string>();
     for (const [cardId, name] of Object.entries(pickedByRaw)) {
       if (typeof name === 'string') pickedBy.set(cardId, name);
     }
 
-    // 全量候选 = 亮出的牌(revealedIds 顺序 = 亮牌顺序)
     const allCards: ProcessingPickCard[] = [];
-    for (const cardId of revealedIds) {
-      const c = cardFromMap(view, cardId);
-      if (c) allCards.push(c);
+    if (revealedIds && revealedIds.length > 0) {
+      // revealedIds 已同步:全量候选(含被选牌)
+      for (const cardId of revealedIds) {
+        const c = cardFromMap(view, cardId);
+        if (c) allCards.push(c);
+      }
+    } else {
+      // revealedIds 未到(亮牌事件还在队列):回退到帧 cards(当前处理区剩余)
+      for (const cardId of wuguFrame.cards) {
+        const c = cardFromMap(view, cardId);
+        if (c) allCards.push(c);
+      }
     }
 
     return { allCards, pickedBy };

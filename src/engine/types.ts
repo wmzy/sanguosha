@@ -452,7 +452,9 @@ export type Atom =
   | { type: '武圣还原'; player: number; cardId: string; secondCardId?: string }
   // 结算帧管理(走 atom 管线,保证前后端 settlementStack 同步)
   | { type: '结算帧入栈'; skillId: string; from: number; params?: Record<string, Json> }
-  | { type: '结算帧出栈' };
+  | { type: '结算帧出栈' }
+  // 结算帧 params 变更(走 atom,保证前端同步)
+  | { type: '帧参数赋值'; key: string; value: Json };
 
 
 export interface AtomDefinition<A = unknown> {

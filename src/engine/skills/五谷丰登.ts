@@ -81,9 +81,10 @@ async function runPickProcessingCard(
       from: { zone: '处理区' },
       to: { zone: '手牌', player: target },
     });
-    // 记录选牌者到帧上(前端从 view.settlementStack 读取,即时渲染被选牌标注)
+    // 记录选牌者到帧上(通过 atom 同步到前端,即时渲染被选牌标注)
     const pickerName = state.players[target]?.name ?? `P${target}`;
-    (frame.params.pickedBy as Record<string, string>)[cardId] = pickerName;
+    const cur = (frame.params.pickedBy as Record<string, string> | undefined) ?? {};
+    await applyAtom(state, { type: '帧参数赋值', key: 'pickedBy', value: { ...cur, [cardId]: pickerName } });
   }
 }
 
@@ -112,8 +113,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           await applyAtom(state, { type: '移动牌', cardId: topId, from: { zone: '牌堆' }, to: { zone: '处理区' } });
           revealedIds.push(topId);
         }
-        // 记录亮出的牌到帧上(前端从 view.settlementStack 读取)
-        frame.params.revealedIds = revealedIds;
+        // 记录亮出的牌到帧上(通过 atom 同步到前端)
+        await applyAtom(state, { type: '帧参数赋值', key: 'revealedIds', value: revealedIds });
 
         // 2. 从使用者开始按座次,每名目标轮到时先问无懈,未抵消才选牌
         for (const targetIdx of allTargets) {
