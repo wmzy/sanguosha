@@ -36,6 +36,40 @@ import {
 import { getAtomDef } from '../src/engine/atom';
 import { getSkillModule } from '../src/engine/skill';
 
+// ─── 引擎异常收集器(消灭盲区 2)──────────────────────────────
+// dispatch 的 execute 是 fire-and-forget:其 .catch 调 state.onError?.(e) 后 throw,
+// 但该 throw 无人 await → unhandledRejection,在 vitest forks pool 下可能被吞。
+// 收集器在首次接触 state 时注入 onError,把异常存到 WeakMap,在断言点统一检查。
+// 幂等:同一 state 只注入一次(WeakSet 标记),避免多次调用链式叠加 onError。
+
+const engineErrorMap = new WeakMap<GameState, Error[]>();
+const trackedStates = new WeakSet<GameState>();
+
+/** 为 state 注入引擎异常收集器(幂等)。已注入过则 no-op。 */
+function trackEngineErrorsIfNotTracked(state: GameState): void {
+  if (trackedStates.has(state)) return;
+  trackedStates.add(state);
+  engineErrorMap.set(state, []);
+  const prevOnError = state.onError;
+  state.onError = (e: Error) => {
+    engineErrorMap.get(state)?.push(e);
+    prevOnError?.(e);
+  };
+}
+
+/** 断言 state 无引擎异常,有则抛出聚合错误。检查后清除(避免重复报)。 */
+export function assertNoEngineErrors(state: GameState): void {
+  const errors = engineErrorMap.get(state);
+  if (!errors || errors.length === 0) return;
+  engineErrorMap.set(state, []);  // clear after read
+  const msgs = errors.map((e, i) =>
+    `  ${i + 1}. ${e.message}\n${e.stack?.split('\n').slice(1, 4).join('\n')}`,
+  ).join('\n');
+  throw new Error(
+    `检测到引擎异常(fire-and-forget execute 抛错,之前会被静默吞掉):\n${msgs}`,
+  );
+}
+
 // ─── 公开类型 ──────────────────────────────────────────────────
 
 export interface ActionDef {
@@ -160,9 +194,12 @@ export class PlayerSession {
     return result;
   }
 
+  private applyViewErrors: string[] = [];
+
   /**
    * 处理新事件:取 per-player 分叉事件,通过 viewReducer(applyView) 增量更新 processedView。
    * 每次 dispatch/pass 后自动调用。断言前必须先 processEvents()。
+   * applyView 抛错不静默吞:收集到 applyViewErrors,在 processAllEvents 末尾统一检查。
    */
   processEvents(): ViewEvent[] {
     const events = this.newEvents();
@@ -200,11 +237,21 @@ export class PlayerSession {
             text: logEntry.text,
           });
         }
-      } catch {
-        // atom 未注册或 applyView 报错——静默跳过,让 expectView 捕获不一致
+      } catch (e) {
+        // 不再静默吞:记录错误,processAllEvents 末尾统一抛出
+        const msg = e instanceof Error ? e.message : String(e);
+        this.applyViewErrors.push(`atom '${type}': ${msg}`);
       }
     }
     return events;
+  }
+
+  /** 取出并清除收集到的 applyView 错误。空则返回 null。 */
+  drainApplyViewErrors(): string[] | null {
+    if (this.applyViewErrors.length === 0) return null;
+    const errs = this.applyViewErrors;
+    this.applyViewErrors = [];
+    return errs;
   }
 
   availableActions(): ActionDef[] {
@@ -538,6 +585,9 @@ export class SkillTestHarness {
       if (!p.tags) p.tags = [];
     }
     this._state = state;
+    // 注入引擎异常收集器(幂等):setup 后 state.onError 被接管,
+    // 所有 fire-and-forget execute 抛错都被收集到 WeakMap,在断言点暴露。
+    trackEngineErrorsIfNotTracked(state);
     // 自动填充测试牌堆(如果为空):创建 N 张测试牌供摸牌 atom 使用
     if (state.zones.deck.length === 0) {
       for (let i = 0; i < 20; i++) {
@@ -574,10 +624,29 @@ export class SkillTestHarness {
    * 一旦某 atom 的前端投影与后端 apply 不对称,这里立即报出,无需测试手写对比。
    */
   processAllEvents(): void {
+    // 1. 引擎异常检查(高优先级:execute fire-and-forget 抛错最先暴露)
+    assertNoEngineErrors(this._state);
+    // 2. applyView 错误检查(各 session processEvents 中收集)
     const sessions = [...this.sessions.values()];
     for (const session of sessions) {
       session.processEvents();
     }
+    // 3. 检查 applyView 错误:各 session drainApplyViewErrors
+    const allApplyViewErrors: string[] = [];
+    for (const session of sessions) {
+      const errs = session.drainApplyViewErrors();
+      if (errs) {
+        allApplyViewErrors.push(`--- viewer=${session.playerIndex} ---\n` +
+          errs.map((e, i) => `  ${i + 1}. ${e}`).join('\n'));
+      }
+    }
+    if (allApplyViewErrors.length > 0) {
+      throw new Error(
+        `applyView 抛错(之前会被静默吞掉):\n\n` +
+        allApplyViewErrors.join('\n\n'),
+      );
+    }
+    // 4. 视图一致性自动对比(buildView vs processedView)
     if (autoCompareEnabled) {
       // 收集所有 viewer 的差异后一次性抛出,避免只看到第一个 viewer 的问题
       const allDiffs: string[] = [];
@@ -586,6 +655,7 @@ export class SkillTestHarness {
         const expected = normalizeViewForCompare(baseline);
         const actual = normalizeViewForCompare(session.processedView);
         const diffs = deepDiff(expected, actual);
+       
         if (diffs.length > 0) {
           allDiffs.push(`--- viewer=${session.playerIndex} ---\n` + diffs.map((d, i) => `  ${i + 1}. ${d}`).join('\n'));
         }
@@ -802,7 +872,7 @@ function extractTargetFilter(prompt: ActionPrompt): TargetFilter | null {
  */
 export async function dispatchAndWait(state: GameState, message: ClientMessage): Promise<void> {
   // fire-and-forget:不 await dispatch 的 promise(主动 action 的 execute 会挂在 pending 上永不 resolve)。
-  // waitForStable 负责等到下一个稳定点(pending 创建或 execute 跑完)。
+  // waitForStable 负责等到下一个稳定点(pending 创建或 execute 跑完),并检查引擎异常。
   void engineDispatch(state, message);
   await waitForStable(state);
 }
@@ -825,14 +895,17 @@ export async function fireTimeoutAndWait(state: GameState): Promise<void> {
  * 手写集成测试(直接用 dispatch、不经 SkillTestHarness)可 import 此函数。
  */
 export async function waitForStable(state: GameState): Promise<void> {
+  trackEngineErrorsIfNotTracked(state);
   const deadline = Date.now() + 2000;
   let lastChange = Date.now();
   let lastSnapshot = '';
-  // 让出整个微任务队列(用 setTimeout 0 而非 Promise.resolve),
-  // 使 fire-and-forget 的 execute 能跨多层 await applyAtom 推进到 pending 或结束。
+  // 先检查一次:若入口时 execute 已抛错,立即暴露
+  assertNoEngineErrors(state);
   const yieldToMicrotasks = () => new Promise<void>((r) => setTimeout(r, 0));
   while (Date.now() < deadline) {
     await yieldToMicrotasks();
+    // execute 在 fire-and-forget 链里抛错 → 收集器已捕获,这里立即 throw,不等超时
+    assertNoEngineErrors(state);
     const snapshot = `${state.pendingSlots.size}|${state.atomStack.length}|${state.seq}`;
     if (snapshot !== lastSnapshot) {
       lastSnapshot = snapshot;
@@ -840,5 +913,14 @@ export async function waitForStable(state: GameState): Promise<void> {
     }
     if (state.pendingSlots.size > 0) return;
     if (state.atomStack.length === 0 && Date.now() - lastChange > 20) return;
+  }
+  // 超时不再静默返回:若已经稳定(pendingSlots>0 刚被清错判)则正常,
+  // 否则报错,避免测试基于半成品 state 断言出假绿。
+  // 真正的稳定点一定是 pendingSlots>0 或 atomStack 清空。能走到这里说明 execute 卡住了。
+  if (state.pendingSlots.size === 0 && state.atomStack.length > 0) {
+    throw new Error(
+      `waitForStable 超时(2s):atomStack 非空(${state.atomStack.length})且无 pending。\n` +
+      `execute 可能卡在 fire-and-forget 链上未推进。atomStack 顶: ${state.atomStack[state.atomStack.length - 1]?.type ?? 'unknown'}`,
+    );
   }
 }
