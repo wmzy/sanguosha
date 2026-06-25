@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-24
 
+### Fixed — 请求回应 atom: applyView 倒计时口径与后端不一致
+
+`请求回应` atom 的 `applyView`（前端增量路径）硬编码 `DEFAULT_TIMEOUT_MS = 30_000`（30秒），而后端真实超时读 `atom.timeout ?? pending.timeout`——无懈可击传 `atom.timeout = 10`（10秒）。导致前端倒计时显示 30s、后端 10s 超时，二者不一致。虽有 session 的 `msg.deadline` 权威覆盖机制最终修正，但覆盖前的渲染间隙会显示错误的 30s，且依赖覆盖兜底本身脆弱。同一 atom 的全量路径 `buildView.ts:72` 已正确读 `atom.timeout`，唯独增量 `applyView` 遗漏——两条路径口径分歧是 bug 根源。
+
+- **toViewEvents 透传 timeout**: `请求回应` atom 的 `toViewEvents` 现在在 `targetView`/`othersView` 中带上 `timeout` 字段（优先 `atom.timeout`，回退 `pending.timeout`）。(`src/engine/atoms/请求回应.ts`)
+- **applyView 读取 event.timeout**: 三处 pending 构建（广播型/target viewer/其他 viewer）从 `event.timeout` 读取超时秒数并换算为 ms，fallback 到 30s（`pending.timeout`）。与 `出牌窗口.ts` 同模式，与后端 `create-engine.ts:562` 的 `timeoutMs = atom.timeout ?? pending.timeout` 口径一致。(`src/engine/atoms/请求回应.ts`)
+- **atom 类型扩展**: `请求回应` 的 `AtomDefinition` 泛型参数加上 `timeout?: number` 和 `wuxieTarget?: number`（后者原已在无懈链路使用但未在类型声明）。移除未使用的 `DEFAULT_TIMEOUT_MS` 常量。(`src/engine/atoms/请求回应.ts`)
+- **测试**: `applyView-bugs.test.ts` 新增 3 例（广播型 timeout=10s、target viewer timeout=15s、未传 timeout fallback 30s），验证 `totalMs` 与 `deadline` 口径。(`tests/skill-tests/applyView-bugs.test.ts`)
+
 ### Enhanced — 五谷丰登选牌面板:被选牌置暗禁用并标注选牌者
 
 五谷丰登选牌时,引擎给每个选牌者弹的 `pickProcessingCard` pending 只含「仍在处理区的牌」——被选走的牌从 `state.zones.processing` 移除后,后续选牌者的面板上看不到它被谁选走。本次为**纯渲染层增强**(零引擎改动),让被选牌保留在面板上展示为禁用态并标注选牌者:

@@ -278,3 +278,61 @@ describe('展示型 ViewEvent 注册', () => {
     expect(view.players[0].character).toBe('刘备');
   });
 });
+
+// ── 请求回应 atom: applyView 的 deadline/totalMs 必须与后端真实超时口径一致 ──
+// 后端 create-engine 计算 timeoutMs = atom.timeout ?? pending.timeout。
+// 无懈可击传 atom.timeout=10(秒),故真实超时为 10s。
+// applyView 必须从 event.timeout 读取并换算,而非硬编码 30s,
+// 否则前端倒计时(applyView 增量路径)与后端真实超时不一致。
+describe('请求回应 atom: deadline/totalMs 口径一致性', () => {
+  const TIMEOUT_MS = 10_000; // 无懈可击 atom.timeout=10(秒)
+
+  it('广播型(无懈可击): applyView 的 totalMs = atom.timeout*1000', () => {
+    const def = getAtomDef('请求回应');
+    const view = mockView();
+    // 模拟 toViewEvents 生成的 event(广播型,带 timeout)
+    const event = {
+      type: '请求回应',
+      requestType: '无懈可击',
+      target: -2, // TARGET_BROADCAST
+      prompt: { type: 'useCard', title: '是否打出无懈可击?' },
+      timeout: 10,
+    } as unknown as ViewEvent;
+    def.applyView!(view, event);
+    expect(view.pending).not.toBeNull();
+    expect(view.pending!.totalMs).toBe(TIMEOUT_MS);
+    // deadline ≈ now + 10s(允许 100ms 漂移)
+    expect(view.pending!.deadline).toBeGreaterThan(Date.now() + TIMEOUT_MS - 200);
+    expect(view.pending!.deadline).toBeLessThan(Date.now() + TIMEOUT_MS + 200);
+  });
+
+  it('target viewer: applyView 的 totalMs = atom.timeout*1000', () => {
+    const def = getAtomDef('请求回应');
+    const view = mockView({ viewer: 1 });
+    const event = {
+      type: '请求回应',
+      requestType: '询问杀',
+      target: 1,
+      prompt: { type: 'useCard', title: '请出杀' },
+      timeout: 15,
+    } as unknown as ViewEvent;
+    def.applyView!(view, event);
+    expect(view.pending).not.toBeNull();
+    expect(view.pending!.totalMs).toBe(15_000);
+  });
+
+  it('未传 timeout 时 fallback 到 pending.timeout(30s)', () => {
+    const def = getAtomDef('请求回应');
+    const view = mockView();
+    const event = {
+      type: '请求回应',
+      requestType: '询问杀',
+      target: -2,
+      prompt: { type: 'useCard', title: '请出杀' },
+      // 不带 timeout → fallback
+    } as unknown as ViewEvent;
+    def.applyView!(view, event);
+    expect(view.pending).not.toBeNull();
+    expect(view.pending!.totalMs).toBe(30_000);
+  });
+});

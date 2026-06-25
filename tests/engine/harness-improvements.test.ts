@@ -19,9 +19,9 @@ function build(): GameState {
   return createGameState({
     players: [
       { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
-        hand: ['s0'], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+        hand: ['s0'], equipment: {}, skills: ['杀'], tags: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
       { index: 1, name: 'P2', character: '反', health: 4, maxHealth: 4, alive: true,
-        hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+        hand: [], equipment: {}, skills: [], tags: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
     ],
     cardMap: { s0: slash },
     currentPlayerIndex: 0,

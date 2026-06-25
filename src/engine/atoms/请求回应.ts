@@ -5,13 +5,15 @@ import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAtom } from '../atom';
 
-const DEFAULT_TIMEOUT_MS = 30_000;
-
 export const 请求回应: AtomDefinition<{
   requestType: string;
   target: number;
   prompt: ActionPrompt;
   defaultChoice?: Json;
+  /** 超时秒数:覆盖 pending.timeout(无懈可击=10,默认 30) */
+  timeout?: number;
+  /** 无懈可击抵消目标座次(仅 requestType='无懈可击' 时存在) */
+  wuxieTarget?: number;
 }> = {
   type: '请求回应',
   validate(state, atom) {
@@ -43,12 +45,17 @@ export const 请求回应: AtomDefinition<{
   },
   effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(_state, atom): ViewEventSplit {
+    // 超时秒数:优先 atom 自带 timeout,回退到 pending.timeout。
+    // 透传给 applyView,使其 deadline/totalMs 与后端真实定时器口径一致
+    // (create-engine.ts 计算 timeoutMs = atom.timeout ?? pending.timeout)。
+    const timeoutSec = atom.timeout ?? 请求回应.pending!.timeout;
     // target 看到带 prompt 的请求
     const targetView: ViewEvent = {
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.target,
       prompt: atom.prompt,
+      timeout: timeoutSec,
     };
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有存活玩家都可回应,
     // 故 ownerViews 无人命中(Map key=target<0 不匹配真实 viewer),
@@ -61,6 +68,7 @@ export const 请求回应: AtomDefinition<{
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.target,
+      timeout: timeoutSec,
     };
     return {
       ownerViews: new Map([[atom.target, targetView]]),
@@ -71,6 +79,10 @@ export const 请求回应: AtomDefinition<{
     const target = event.target as number;
     const requestType = event.requestType as string | undefined;
     const prompt = event.prompt as ActionPrompt | undefined;
+    // 超时:优先 event.timeout(由 toViewEvents 透传的 atom.timeout),
+    // 回退到 DEFAULT_TIMEOUT_MS。与后端 create-engine.ts 的
+    // timeoutMs = atom.timeout ?? pending.timeout 口径一致。
+    const timeoutMs = ((event.timeout as number | undefined) ?? 30) * 1000;
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有 viewer 都设置 pending
     if (target < 0) {
       if (!prompt) return;
@@ -79,8 +91,8 @@ export const 请求回应: AtomDefinition<{
         atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
         prompt,
         target,
-        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
-        totalMs: DEFAULT_TIMEOUT_MS,
+        deadline: Date.now() + timeoutMs,
+        totalMs: timeoutMs,
       };
       return;
     }
@@ -92,8 +104,8 @@ export const 请求回应: AtomDefinition<{
         atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
         prompt,
         target,
-        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
-        totalMs: DEFAULT_TIMEOUT_MS,
+        deadline: Date.now() + timeoutMs,
+        totalMs: timeoutMs,
       };
     } else {
       // 其他 viewer:观察型 pending（不可操作,但 target 供视角自动跟随）
@@ -102,8 +114,8 @@ export const 请求回应: AtomDefinition<{
         atom: { type: '请求回应', requestType, target } as unknown as import('../types').Atom,
         prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
         target,
-        deadline: Date.now() + DEFAULT_TIMEOUT_MS,
-        totalMs: DEFAULT_TIMEOUT_MS,
+        deadline: Date.now() + timeoutMs,
+        totalMs: timeoutMs,
       };
     }
   },
