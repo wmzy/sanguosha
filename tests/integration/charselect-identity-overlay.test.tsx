@@ -1,10 +1,6 @@
-// 前端渲染测试:选将阶段身份揭示弹窗不覆盖选将界面。
-// 场景:开局抽身份后,身份揭示弹窗(IdentityRevealOverlay, zIndex=10000)与
-// 选将遮罩(CharSelectOverlay, zIndex=9999)同时渲染,前者会完全盖住后者,
-// 导致玩家看不到候选人列表和选将倒计时。
-//
-// 修复:选将阶段(isCharSelectPending 或 charSelectInProgress)强制隐藏身份揭示弹窗——
-// 选将遮罩已含"你的身份"信息,不需要额外弹窗。
+// 前端渲染测试:开局身份揭示弹窗在选将之前/期间显示(zIndex 10000 > 选将遮罩 9999),
+// 玩家点「确认」后才露出下方的选将界面。
+// 场景:bootstrap 先抽身份再选将,身份分配后立即弹出身份牌,确认后进入选将。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
@@ -61,47 +57,44 @@ function makeLordSelectingView(): GameView {
   };
 }
 
-describe('GameView:选将阶段身份揭示弹窗不覆盖选将界面', () => {
+describe('GameView:身份揭示弹窗在选将之前/期间显示', () => {
   beforeEach(() => {
     clearRegistry();
-    // 强制身份揭示弹窗显示(模拟首次进入)
+    // 默认模拟首次进入(未确认身份)
     sessionStorage.clear();
   });
 
-  it('主公选将阶段:身份揭示弹窗不显示,选将遮罩可见(含身份信息)', () => {
+  it('主公选将阶段未确认身份:身份弹窗显示(盖在选将遮罩之上)', () => {
     const view = makeLordSelectingView();
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
-    // 选将遮罩可见:标题"主公选将" + 候选人"刘备"
-    expect(screen.getByText('主公选将')).toBeDefined();
-    expect(screen.getByText('刘备')).toBeDefined();
+    // 身份揭示弹窗的"确认"按钮(身份弹窗独有)应存在——选将遮罩被它盖住
+    const identityConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认');
+    expect(identityConfirm).toBeDefined();
 
-    // 身份揭示弹窗的"确认"按钮(身份弹窗独有)不应存在
-    // 选将遮罩的按钮是"确认选择",与身份弹窗的"确认"不同
-    const confirmButtons = screen.getAllByRole('button').filter(b =>
-      b.textContent === '确认' || b.textContent === '确认选择'
-    );
-    const identityConfirm = confirmButtons.find(b => b.textContent === '确认');
-    expect(identityConfirm).toBeUndefined();
-
-    // 选将遮罩的"确认选择"按钮存在
-    const charSelectConfirm = confirmButtons.find(b => b.textContent === '确认选择');
-    expect(charSelectConfirm).toBeDefined();
-
-    // 身份信息通过选将遮罩显示(viewer 身份 = 主公)
-    // 选将遮罩里有"你的身份"标签 + 身份值
-    expect(screen.getByText('你的身份')).toBeDefined();
+    // 身份弹窗内的身份文字可见(身份弹窗 + 选将遮罩都可能含"你的身份")
+    expect(screen.getAllByText('你的身份').length).toBeGreaterThan(0);
     expect(screen.getAllByText('主公').length).toBeGreaterThan(0);
+
+    // 选将遮罩仍在 DOM 中(被身份弹窗遮盖,但渲染了),确认选择按钮存在
+    const charSelectConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认选择');
+    expect(charSelectConfirm).toBeDefined();
   });
 
-  it('选将阶段倒计时可见(不被身份弹窗遮挡)', () => {
+  it('主公选将阶段已确认身份:身份弹窗消失,选将遮罩可见', () => {
+    // 已确认身份(sessionStorage 标记) → 身份弹窗不显示
+    sessionStorage.setItem('sgs_identity_shown', '1');
     const view = makeLordSelectingView();
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
-    // CountdownBar 渲染剩余秒数(60s timeout,deadline 是 now+60s)
-    // 选将遮罩里的倒计时文字应该可见
+    // 身份弹窗的"确认"按钮不应存在
+    const identityConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认');
+    expect(identityConfirm).toBeUndefined();
+
+    // 选将遮罩可见:标题"主公选将" + 候选人 + 选将倒计时
+    expect(screen.getByText('主公选将')).toBeDefined();
+    expect(screen.getByText('刘备')).toBeDefined();
     const countdownText = document.body.textContent ?? '';
-    // 倒计时显示为 "⏱ Ns" 或类似格式
     expect(countdownText).toMatch(/⏱\s*\d+s/);
   });
 
@@ -127,10 +120,7 @@ describe('GameView:选将阶段身份揭示弹窗不覆盖选将界面', () => {
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 此时不在选将阶段,身份揭示弹窗应该显示
-    const confirmButtons = screen.getAllByRole('button').filter(b =>
-      b.textContent === '确认' || b.textContent === '确认选择'
-    );
-    const identityConfirm = confirmButtons.find(b => b.textContent === '确认');
+    const identityConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认');
     expect(identityConfirm).toBeDefined();
   });
 });

@@ -42,13 +42,11 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
 
   return (
     <>
-      {/* 选将阶段(charSelectPending 或 charSelectInProgress)不显示身份弹窗——
-          选将遮罩已含"你的身份"信息,身份弹窗 zIndex 更高会盖住选将界面和倒计时。
-          选将完成后若仍未确认过身份,再显示。*/}
+      {/* 身份揭示弹窗:身份分配后立即显示,盖在选将遮罩之上(zIndex 10000 > 9999)。
+          玩家点「确认」后 showIdentityReveal 置 false,露出下方的选将界面。
+          因此身份揭示发生在选将之前,符合开局先亮身份再选将的流程。*/}
       {showIdentityReveal
-        && view.players[view.viewer]?.identity
-        && !isCharSelectPending
-        && !charSelectInProgress && (
+        && view.players[view.viewer]?.identity && (
         <IdentityRevealOverlay
           identity={view.players[view.viewer].identity!}
           onConfirm={onIdentityConfirm}

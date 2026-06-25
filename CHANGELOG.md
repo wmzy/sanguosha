@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-24
 
+### Fixed — 身份揭示弹窗时机修正(选将前弹出)
+
+开局身份揭示弹窗(`IdentityRevealOverlay`, zIndex 10000)此前被 `!isCharSelectPending && !charSelectInProgress` 条件屏蔽整个选将阶段,导致身份牌在选将**之后**才弹出。修正后身份牌在抽身份后立即显示,盖在选将遮罩(9999)之上,玩家点「确认」后才露出选将界面,符合开局「先亮身份再选将」的流程。(`src/client/components/OverlaysLayer.tsx`)
+
 ### Added — debug 快照遥测扩展(HTML 快照 + 控制台日志 + WS 消息流)
 
 在现有 debug 快照(前后端游戏状态)基础上,新增三类前端运行时遥测数据采集,排查「数据对但画面/行为错」的前端 bug。遵循非侵入旁路原则:不改引擎、不改 session、不触游戏渲染状态树。每次快照的全部数据落在同一个目录 `data/snapshots/<snapshotId>/`,用户可直接复制该目录路径给 AI 审查。
