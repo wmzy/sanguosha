@@ -203,7 +203,10 @@ export function useDebugMultiConnection(
       }
     }
     // respond action 携带 pendingSeq（当前 view.pending 对应的窗口 seq）
-    const pendingSeq = seat.view?.pending ? seat.lastSeq : undefined;
+    // 非阻塞 pending（如出牌窗口）期间主动出牌/用技不应携带 pendingSeq
+    // （否则 server 会用 slot.createdSeq 校验不匹配而拒绝）
+    const pending = seat.view?.pending;
+    const pendingSeq = pending?.isBlocking ? seat.lastSeq : undefined;
     seat.ws.send(JSON.stringify({
       type: 'action',
       action: { ...action, baseSeq: seat.lastSeq, pendingSeq },

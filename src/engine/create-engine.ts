@@ -295,10 +295,11 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
       return false;
     }
-    // pending-scoped 版本校验：只影响 respond 路径
+    // pending-scoped 版本校验：只影响 respond 路径(阻塞型 pending 如 请求回应/询问闪)
+    // 出牌窗口是非阻塞 pending，主动出牌/用技不应校验 pendingSeq
     // pendingSeq 不匹配 = 客户端响应了过期窗口（已被 close-reopen 替换）→ 拒绝
     // pendingSeq 缺省跳过校验（向后兼容旧客户端；新客户端应始终传 pendingSeq）
-    if (message.pendingSeq !== undefined && oldSlot.createdSeq !== message.pendingSeq) {
+    if (oldSlot.isBlocking && message.pendingSeq !== undefined && oldSlot.createdSeq !== message.pendingSeq) {
       rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
       return false;
     }

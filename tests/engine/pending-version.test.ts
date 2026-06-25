@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetForTest, dispatch, applyAtom, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerAction } from '../../src/engine/skill';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
@@ -159,5 +160,48 @@ describe('pending-scoped 版本控制', () => {
     // 双无懈 → 抵消反转 → 锦囊恢复生效
     // P1 失去手牌
     expect(state.players[1].hand).not.toContain('d1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 出牌窗口(非阻塞 pending):主动出牌/用技不应被 pendingSeq 校验拒绝
+  // 回归:出牌窗口由回合管理 IIFE 每次 resolve 后重建，createdSeq 频繁变化；
+  //       旧逻辑无条件校验 pendingSeq === createdSeq 会误拒合法的主动操作。
+  // ─────────────────────────────────────────────────────────────
+  it('出牌窗口期间：携带任意 pendingSeq 的主动 action 不应被 slot 校验拒绝', async () => {
+    const state = createGameState({
+      players: [
+        {
+          index: 0, name: 'p0', character: '', health: 4, maxHealth: 4, alive: true,
+          hand: [], equipment: {}, skills: [],
+          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+        },
+      ],
+      cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
+    });
+
+    // 注册一个轻量测试 action：validate 永过、execute 空，专为验证 pendingSeq 校验路径
+    const unregister = registerAction('测试', 0, 'probe', () => null, async () => {});
+
+    // 建一个出牌窗口(非阻塞 pending)
+    const windowP = applyAtom(state, { type: '出牌窗口', player: 0, timeout: 50 });
+    await new Promise(r => setTimeout(r, 50));
+    const slot = state.pendingSlots.get(0)!;
+    expect(slot.isBlocking).toBe(false);
+
+    // 篡改 createdSeq，模拟窗口已被重建 → pendingSeq 与 createdSeq 不匹配
+    slot.createdSeq = 999;
+
+    // 主动 action 路径：oldSlot 存在但 isBlocking===false → 守卫跳过 pendingSeq 校验
+    // 旧逻辑(无 isBlocking 守卫)会在此 rollback 返回 false；新逻辑应返回 true。
+    const accepted = await dispatch(state, {
+      skillId: '测试', actionType: 'probe', ownerId: 0,
+      params: {}, baseSeq: state.seq, pendingSeq: 7, // 故意与 createdSeq=999 不匹配
+    }).catch(() => false);
+    expect(accepted).toBe(true);
+
+    // 清理：resolve 出牌窗口 + 注销测试 action
+    slot.resolve();
+    await windowP.catch(() => {});
+    unregister();
   });
 });
