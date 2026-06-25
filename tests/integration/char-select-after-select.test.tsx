@@ -11,7 +11,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { GameViewComponent, type ActionMsg } from '../../src/client/components/GameView';
+import { GameViewComponent } from '../../src/client/components/GameView';
+import type { ActionMsg } from '../../src/client/types';
 import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
 import { DebugPerspectiveBar } from '../../src/client/components/DebugPerspectiveBar';
 import { clearRegistry } from '../../src/client/skillActionRegistry';

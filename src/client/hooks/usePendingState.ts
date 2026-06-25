@@ -6,10 +6,14 @@
 //   isDiscardPhase / discardMin / discardMax — 弃牌窗口
 //   skippedBroadcast — 广播型 pending 的本地跳过标记(无懈可击等)
 //   deadline — 倒计时基准
+//   pendingRespondInfo — 已 resolve 的 respond 信息(memo 化,避免渲染期重复 resolve)
+//   broadcastKey — 广播去重 key(memo 化,统一调用点)
 // pending 变化时自动重置 skippedBroadcast 和弃牌选中。
 
 import { useState, useEffect, useMemo } from 'react';
 import type { GameView, PendingView } from '../../engine/types';
+import { resolvePendingRespond, getBroadcastKey, type PendingRespondInfo } from '../utils/pendingRespond';
+import type { SkillActionDef } from '../skillActionRegistry';
 
 export interface PendingState {
   /** 原始 pending(可能 null) */
@@ -31,6 +35,10 @@ export interface PendingState {
   deadline: number | null;
   /** 倒计时总时长(ms):pending 优先用 pending.totalMs,否则用 deadlineTotalMs。 */
   deadlineTotalMs: number;
+  /** 已 resolve 的 respond 信息(memo 化);消费方不应再自行调 resolvePendingRespond。 */
+  pendingRespondInfo: PendingRespondInfo | null;
+  /** 广播去重 key(memo 化);pending 为 null 时为空串。 */
+  broadcastKey: string;
 }
 
 interface AtomLike {
@@ -47,8 +55,13 @@ function readAtom(pending: PendingView | null): AtomLike | null {
  * 推导 pending 相关派生状态。
  * @param view          引擎视图
  * @param perspectiveIdx 当前视角座次
+ * @param skillActions   当前视角玩家的技能 actions(用于 resolvePendingRespond memo)
  */
-export function usePendingState(view: GameView, perspectiveIdx: number): PendingState {
+export function usePendingState(
+  view: GameView,
+  perspectiveIdx: number,
+  skillActions: SkillActionDef[],
+): PendingState {
   const pending = view.pending;
   const pendingTargetIdx = pending?.target ?? -1;
   // 非阻塞型 pending(出牌窗口)不计入 awaiting —— 它是出牌阶段的控制权 token,
@@ -74,6 +87,17 @@ export function usePendingState(view: GameView, perspectiveIdx: number): Pending
   const deadline = pending?.deadline ?? view.deadline ?? null;
   const deadlineTotalMs = pending?.totalMs ?? view.deadlineTotalMs;
 
+  // memo:一次 resolve,避免渲染期多次调用(AwaitingPrompt/GameView 手牌 map 原先各调 4+ 次)。
+  // 依赖 pending + skillActions 引用;skillActions 由 useSkillActions 在 view 变化时更新引用。
+  const pendingRespondInfo = useMemo(
+    () => resolvePendingRespond(pending, skillActions),
+    [pending, skillActions],
+  );
+  const broadcastKey = useMemo(
+    () => pending ? getBroadcastKey(pending) : '',
+    [pending],
+  );
+
   return {
     pending,
     pendingTargetIdx,
@@ -85,5 +109,7 @@ export function usePendingState(view: GameView, perspectiveIdx: number): Pending
     markBroadcastSkipped,
     deadline,
     deadlineTotalMs,
+    pendingRespondInfo,
+    broadcastKey,
   };
 }

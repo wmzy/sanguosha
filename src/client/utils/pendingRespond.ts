@@ -11,6 +11,21 @@ import type { Card, PendingView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { findActionAcrossOwners } from '../skillActionRegistry';
 
+/** 安全读取 pending.atom.requestType(消除散落各处的 `as { requestType?: string }` 断言)。
+ *  atom 可能为 null 或不含 requestType 字段,统一在此处理。 */
+export function getPendingRequestType(pending: PendingView): string {
+  const atom = pending.atom as Record<string, unknown> | null;
+  const v = atom?.['requestType'];
+  return typeof v === 'string' ? v : '';
+}
+
+/** 构造广播型 pending 的去重 key("<atomType>:<requestType>")。
+ *  用于 markBroadcastSkipped / skippedBroadcast 判重,避免同一 pending 重复弹窗。 */
+export function getBroadcastKey(pending: PendingView): string {
+  const atomType = pending.atom?.type ?? '';
+  return `${atomType}:${getPendingRequestType(pending)}`;
+}
+
 /** 从 SkillActionDef 的 prompt 提取 cardFilter 函数(不走 JSON 序列化,函数引用保留) */
 export function extractCardFilterFromAction(action: SkillActionDef): ((c: Card) => boolean) | undefined {
   const p = action.prompt;
@@ -71,9 +86,8 @@ export function resolvePendingRespond(
   skillActions: SkillActionDef[],
 ): PendingRespondInfo | null {
   if (!pending) return null;
-  const atom = pending.atom as Record<string, unknown>;
   const atomType = pending.atom?.type ?? '';
-  const reqType = typeof atom['requestType'] === 'string' ? (atom['requestType'] as string) : '';
+  const reqType = getPendingRequestType(pending);
 
   // 通用推导 skillId
   let skillId: string | null = null;

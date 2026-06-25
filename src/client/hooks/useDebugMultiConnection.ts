@@ -15,18 +15,13 @@ import { useEventPlayback } from './useEventPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './SubmittedCharSelectCtx';
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
-import type { GameView, Json } from '../../engine/types';
+import type { GameView } from '../../engine/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
+import type { ActionMsg } from '../types';
 
 const log = createLogger('useDebugMultiConnection');
 
-export interface ActionMsg {
-  skillId: string;
-  actionType: string;
-  ownerId: number;
-  params: Record<string, Json>;
-  preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>;
-}
+export type { ActionMsg };
 
 export interface UseDebugMultiConnectionParams {
   roomId: string;

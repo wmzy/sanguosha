@@ -57,22 +57,28 @@ export function useAnimationState(view: GameView, perspectiveIdx: number): Anima
   useEffect(() => {
     const hpMap = new Map(view.players.map((p, i) => [i, p.health]));
     const prevHp = prevHpRef.current;
-    const newFlash = new Map<number, number>();
-    let changed = false;
+    // 先收集本帧 HP 下降的座次,再在 setState updater 里读最新 state 计算版本号,
+    // 避免闭包基准值(state.damageFlashIndices)在连续伤害 batching 下读到旧快照。
+    const damagedIndices: number[] = [];
     for (const [i, hp] of hpMap) {
       const prev = prevHp.get(i);
       if (prev !== undefined && hp < prev) {
-        newFlash.set(i, (state.damageFlashIndices.get(i) ?? 0) + 1);
-        changed = true;
+        damagedIndices.push(i);
       }
     }
-    if (changed) {
-      setState(s => ({ ...s, damageFlashIndices: new Map([...s.damageFlashIndices, ...newFlash]) }));
+    if (damagedIndices.length > 0) {
+      setState(s => {
+        const newFlash = new Map<number, number>();
+        for (const i of damagedIndices) {
+          newFlash.set(i, (s.damageFlashIndices.get(i) ?? 0) + 1);
+        }
+        return { ...s, damageFlashIndices: new Map([...s.damageFlashIndices, ...newFlash]) };
+      });
       // 动画结束后清除(0.6s)
       setTimeout(() => {
         setState(s => {
           const next = new Map(s.damageFlashIndices);
-          for (const [i] of newFlash) next.delete(i);
+          for (const i of damagedIndices) next.delete(i);
           return { ...s, damageFlashIndices: next };
         });
       }, 650);

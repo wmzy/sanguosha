@@ -2,9 +2,10 @@
 // 等待回应区:渲染 pending prompt 的回应面板(confirm / useCard 两分支)。
 // distribute 类 pending(遗计分配)不在本组件渲染——由 GameView 统一分配面板处理(选牌在手牌区)。
 // 纯展示,所有数据与回调通过 props 传入。
+// pendingRespondInfo 由 usePendingState memo 后从父组件传入,不再在此重复 resolve。
 import * as styles from './gameViewStyles';
 import type { Card, Json, PendingView } from '../../engine/types';
-import { resolvePendingRespond } from '../utils/pendingRespond';
+import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
 
 export interface AwaitingPromptProps {
@@ -12,6 +13,11 @@ export interface AwaitingPromptProps {
   pendingTargetIdx: number;
   perspectiveName: string;
   perspectiveHand: Card[];
+  /** 已 resolve 的 respond 信息(由 usePendingState memo 后传入) */
+  pendingRespondInfo: PendingRespondInfo | null;
+  /** 广播去重 key(由 usePendingState memo 后传入) */
+  broadcastKey: string;
+  /** skillActions 仅用于类型兼容旧调用点;respond 信息已在父组件 resolve */
   skillActions: SkillActionDef[];
   skippedBroadcast: Set<string>;
   canOperate: boolean;
@@ -27,7 +33,9 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
     pendingTargetIdx,
     perspectiveName,
     perspectiveHand,
-    skillActions,
+    pendingRespondInfo,
+    broadcastKey,
+    skillActions: _skillActions,
     skippedBroadcast,
     canOperate,
     onSend,
@@ -36,7 +44,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
 
   // 广播型 pending 且已本地跳过:显示已跳过提示
   const isBroadcast = pendingTargetIdx < 0;
-  const broadcastKey = `${pending.atom?.type}:${(pending.atom as { requestType?: string }).requestType}`;
   const isSkipped = isBroadcast && skippedBroadcast.has(broadcastKey);
 
   return (
@@ -49,11 +56,12 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
       {isSkipped ? (
         <div className={styles.waitingHint}>已跳过，等待其他玩家回应...</div>
       ) : canOperate ? (() => {
+        // respond 信息由 usePendingState memo 后传入,不再在此重复 resolve(原先每个分支调一次)。
+        const skillId = pendingRespondInfo?.skillId ?? '系统规则';
+        const filterFn = pendingRespondInfo?.cardFilter;
         // pickHandIndex 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
         // 渲染目标手牌的牌背序列,使用者点击位置选择
         if (pending.prompt.type === 'pickTargetCard') {
-          const info = resolvePendingRespond(pending, skillActions);
-          const skillId = info?.skillId ?? '系统规则';
           const p = pending.prompt;
           return (
             <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
@@ -99,8 +107,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
         // pickProcessingCard 类 pending(五谷丰登:从处理区亮的明牌选一张):
         // 渲染处理区全部明牌为可点按钮,使用者点具体 cardId 选中
         if (pending.prompt.type === 'pickProcessingCard') {
-          const info = resolvePendingRespond(pending, skillActions);
-          const skillId = info?.skillId ?? '系统规则';
           const p = pending.prompt;
           return (
             <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
@@ -121,8 +127,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
         if (pending.prompt.type === 'confirm') {
           const confirmLabel = pending.prompt.confirmLabel || '确认';
           const cancelLabel = pending.prompt.cancelLabel || '取消';
-          const info = resolvePendingRespond(pending, skillActions);
-          const skillId = info?.skillId ?? '系统规则';
           return (
             <div className={styles.promptActions}>
               <button className={styles.promptBtnPrimary} onClick={() => onSend(skillId, 'respond', { choice: true })}>{confirmLabel}</button>
@@ -132,8 +136,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
         }
         // useCard 类 pending:手牌区已对可回应的牌(杀/闪/桃/酒)高亮,直接在手牌区点击出牌。
         // 这里只显示文案提示 + 「不回应」按钮,不再单独列出候选牌。
-        const info = resolvePendingRespond(pending, skillActions);
-        const filterFn = info?.cardFilter;
         const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
         return (
           <div className={styles.promptActions}>
