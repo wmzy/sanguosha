@@ -29,6 +29,14 @@ export interface PlayerCardLargeProps {
   skillActions: SkillActionDef[];
   /** 点击技能按钮(武将技/装备技统一入口) */
   onSkillAction: (action: SkillActionDef) => void;
+  /** distribute(制衡/仁德)激活时可作为候选的装备 cardId 集合 */
+  distCandidateEquipIds?: Set<string> | null;
+  /** distribute 已选中的装备 cardId 集合 */
+  distSelectedEquipIds?: Set<string> | null;
+  /** distribute 是否激活(决定装备区是否可点选) */
+  isDistributeActive?: boolean;
+  /** 点击装备区卡牌(distribute 选装备时触发) */
+  onEquipCardClick?: (cardId: string) => void;
 }
 
 /** 技能按钮样式变体 → className 后缀 */
@@ -41,6 +49,7 @@ function skillBtnVariant(style: string | undefined): string {
 export function PlayerCardLarge({
   perspectiveIdx, viewer, view, damageFlashIndices,
   canOperate, isPerspectiveTurn, skillActions, onSkillAction,
+  distCandidateEquipIds, distSelectedEquipIds, isDistributeActive, onEquipCardClick,
 }: PlayerCardLargeProps) {
   const p = view.players[perspectiveIdx];
   if (!p) return null;
@@ -119,14 +128,32 @@ export function PlayerCardLarge({
           })}
         </div>
       )}
-      {/* 装备区:独立显示,不在手牌里 */}
+      {/* 装备区:独立显示,不在手牌里。
+          distribute(制衡/仁德)激活时,候选装备可点击选中,与手牌候选高亮一致。 */}
       {(Object.keys(p.equipment).length > 0 || equipSkillActions.length > 0) && (
         <div className={styles.playerCardEquip}>
           <div className={styles.playerCardEquipTitle}>装备区</div>
           <div className={styles.equipRow}>
             {Object.entries(p.equipment).map(([slot, cardId]) => {
-              const card = view.cardMap[cardId as string];
+              const id = cardId as string;
+              const card = view.cardMap[id];
               const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
+              // distribute 候选装备:可点击选中
+              const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
+              const isDistSelected = !!distSelectedEquipIds?.has(id);
+              if (isDistCandidate && onEquipCardClick) {
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    className={cx(styles.equipDistBtn, isDistSelected && styles.equipDistSelected)}
+                    onClick={() => onEquipCardClick(id)}
+                    title={card ? `${card.name}(${slot})` : id}
+                  >
+                    {icon} {card?.name ?? id}
+                  </button>
+                );
+              }
               return (
                 <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>
                   {icon} {card?.name ?? cardId}

@@ -5,6 +5,7 @@ import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance, type SkillModule } from '../skill';
 import { DEFAULT_SKILLS } from '../atoms/选将';
+import { skillLoaders } from './index';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '系统规则', description: '引擎级规则(判定清理/技能生命周期/濒死)' };
@@ -116,6 +117,28 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
   registerAfterHook('系统规则', -1, '移除技能', async (ctx) => {
     const atom = ctx.atom as { skillId: string; player: number };
     unloadSkillInstance(atom.skillId, atom.player, ctx.state);
+  });
+
+  // ── 弃置 after hook:卸载被弃装备自带的技能实例 ──
+  // 换装备(装备通用)走显式 移除技能 序列,技能正常卸载;
+  // 但 制衡/寒冰剑/麒麟弓/过河拆桥/弃牌阶段 等用 弃置 atom 直接 equipment→弃牌堆,
+  // 没走 装备通用 → 装备技能实例(hook/vars/action)残留。这里统一兜底:
+  // 弃置 apply 后,被弃的牌若原属装备区且其 name 是已挂载的装备技能,触发 移除技能 卸载。
+  // apply 后 equipment 已不含该牌,用 skillLoaders(name 判据)+ player.skills(是否挂载)双判。
+  registerAfterHook('系统规则', -1, '弃置', async (ctx) => {
+    const atom = ctx.atom as { player: number; cardIds: string[] };
+    const player = ctx.state.players[atom.player];
+    if (!player) return;
+    for (const cardId of atom.cardIds) {
+      const card = ctx.state.cardMap[cardId];
+      // 只处理装备牌且其 name 是已挂载的装备技能(双重过滤):
+      //   card.type==='装备牌' 排除同名基本牌(如 弃一张 name='杀' 的牌不应卸载 杀 技能);
+      //   skillLoaders[name] 判断该装备是否自带技能;
+      //   player.skills.includes 确认确实挂载着(避免对未挂载的装备多发 移除技能)。
+      if (card?.type === '装备牌' && card?.name && skillLoaders[card.name] && player.skills.includes(card.name)) {
+        await applyAtom(ctx.state, { type: '移除技能', player: atom.player, skillId: card.name });
+      }
+    }
   });
 
   // ── 造成伤害 after hook:濒死检查(最后执行,确保遗计等技能先触发) ──

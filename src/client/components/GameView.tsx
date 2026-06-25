@@ -188,6 +188,13 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
             isPerspectiveTurn={isPerspectiveTurn}
             skillActions={skillActions}
             onSkillAction={handleSkillAction}
+            distCandidateEquipIds={activeDistribute ? new Set(activeDistribute.cardIds) : null}
+            distSelectedEquipIds={distSelected}
+            isDistributeActive={isDistributeActive}
+            onEquipCardClick={(cardId) => {
+              const card = view.cardMap[cardId];
+              if (card) handleCardClick(card);
+            }}
           />
         </div>
 

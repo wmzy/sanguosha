@@ -495,6 +495,18 @@ export const equipSkillBtn = css`
   cursor: pointer; background: rgba(243,156,18,0.18); color: #f39c12; font-size: 10px; font-weight: bold;
   &:hover { background: rgba(243,156,18,0.32); }
 `;
+// 装备区 distribute(制衡/仁德)候选装备:可点击选中,金色高亮(与手牌候选一致)
+export const equipDistBtn = css`
+  border: 2px solid #f1c40f; border-radius: 4px; padding: 1px 6px;
+  cursor: pointer; background: rgba(241,196,15,0.12); color: #f1c40f; font-size: 10px; font-weight: bold;
+  box-shadow: 0 0 8px rgba(241,196,15,0.35);
+  &:hover { background: rgba(241,196,15,0.22); }
+`;
+// 装备区 distribute 已选中装备:绿色边框(与手牌选中一致)
+export const equipDistSelected = css`
+  border-color: #2ecc71; color: #2ecc71; background: rgba(46,204,113,0.15);
+  box-shadow: 0 0 10px rgba(46,204,113,0.5);
+`;
 
 // ─── 下方主布局 ───
 // 左:角色大卡 (320px) 右:手牌列 (flex 1)
