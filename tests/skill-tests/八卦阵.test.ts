@@ -95,9 +95,9 @@ describe('八卦阵', () => {
 
   // ─── 正面:八卦阵判定成功(红色)= 视为出闪 → 不扣血 ────────────
 
-  it('判定成功(红色 ♥):P2 杀 P1 → P1 不出闪仍不扣血(虚拟闪抵消)', async () => {
+  it('判定成功(红色 ♥):P2 杀 P1 → P1 发动八卦阵 → 不出闪仍不扣血(虚拟闪抵消)', async () => {
     // P1 装好八卦阵(预加载 skill 实例)
-    // P2 对 P1 出杀,P1 判定牌为红色(♥) → 视为出闪 → 不扣血
+    // P2 对 P1 出杀 → 先询问是否发动八卦阵 → P1 发动 → 判定红桃 → 视为出闪 → 不扣血
     const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
     const slash = makeCard('s1', '杀', '♠', 'A');
     // deck 顶放红色牌(让八卦阵判定翻到红桃)
@@ -123,6 +123,9 @@ describe('八卦阵', () => {
 
     // P2 出杀对 P1
     await P2.useCardAndTarget('杀', 's1', [0]);
+    // P1 被询问是否发动八卦阵
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: true });
 
     // P1 不出真闪(没闪牌)→ 八卦阵判定翻开 ♥ j1 → 视为出闪(虚拟闪进处理区)
     // 杀检查处理区发现闪 → 不造成伤害
@@ -135,7 +138,7 @@ describe('八卦阵', () => {
 
   });
 
-  it('判定成功(红色 ♦):同样视为出闪', async () => {
+  it('判定成功(红色 ♦):发动八卦阵 → 同样视为出闪', async () => {
     const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
     const slash = makeCard('s1', '杀', '♠', 'A');
     const judgeCard = makeCard('j1', '杀', '♦', '7'); // 方块红色
@@ -155,6 +158,9 @@ describe('八卦阵', () => {
     const P2 = harness.player('P2');
 
     await P2.useCardAndTarget('杀', 's1', [0]);
+    // P1 发动八卦阵
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: true });
 
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.zones.discardPile).toContain('j1');
@@ -162,7 +168,7 @@ describe('八卦阵', () => {
 
   // ─── 正面:判定失败(黑色)= 不视为闪 → 正常询问闪 → 扣血 ────────────
 
-  it('判定失败(黑色 ♠):P2 杀 P1 → P1 不出闪 → 扣 1 血', async () => {
+  it('判定失败(黑色 ♠):P2 杀 P1 → P1 发动八卦阵 → 判定黑 → 不出闪 → 扣 1 血', async () => {
     const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
     const slash = makeCard('s1', '杀', '♠', 'A');
     const judgeCard = makeCard('j1', '杀', '♠', '5'); // 黑桃黑色
@@ -182,6 +188,9 @@ describe('八卦阵', () => {
     const P2 = harness.player('P2');
 
     await P2.useCardAndTarget('杀', 's1', [0]);
+    // P1 发动八卦阵
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: true });
     // 八卦阵判定翻开 ♠ → 不视为闪 → 进入询问闪 pending
     // P1 没有闪牌 → pass() 触发 fireTimeout → 无闪 → 扣血
     await P1.pass();
@@ -191,7 +200,7 @@ describe('八卦阵', () => {
 
   });
 
-  it('判定失败(黑色 ♣):同样不视为闪', async () => {
+  it('判定失败(黑色 ♣):发动八卦阵 → 同样不视为闪', async () => {
     const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
     const slash = makeCard('s1', '杀', '♠', 'A');
     const judgeCard = makeCard('j1', '桃', '♣', '5'); // 梅花黑色
@@ -211,6 +220,10 @@ describe('八卦阵', () => {
     const P2 = harness.player('P2');
 
     await P2.useCardAndTarget('杀', 's1', [0]);
+    // P1 发动八卦阵
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: true });
+    // 判定黑色 → 进入询问闪 → P1 不出闪 → 扣血
     await P1.pass();
 
     expect(harness.state.players[0].health).toBe(3);
@@ -243,8 +256,11 @@ describe('八卦阵', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    // 先验证 respondableCards:在询问闪 pending 中,P1 应该可以出闪(d1)
+    // P2 出杀对 P1
     await P2.useCardAndTarget('杀', 's1', [0]);
+    // 先被询问是否发动八卦阵 → P1 发动 → 判定红色(虚拟闪进处理区)
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: true });
     // 现在 pending 是 询问闪(P1 出闪),respondableCards 应该返回 [d1]
     const info = P1.respondInfo();
     expect(info?.skillId).toBe('闪');
@@ -303,5 +319,72 @@ describe('八卦阵', () => {
     await P1.expectRejected({
       skillId: '装备通用', actionType: 'use', params: { cardId: 'nonexistent' },
     });
+  });
+
+  // ─── 正面:不发动八卦阵 → 不判定,直接进入询问闪 ────────────
+
+  it('不发动:P2 杀 P1 → P1 选不发动 → 不判定 → P1 不出闪 → 扣血', async () => {
+    const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
+    const slash = makeCard('s1', '杀', '♠', 'A');
+    // deck 顶放红色牌——若发动应判定成功,但本用例验证「不发动」不判定
+    const judgeCard = makeCard('j1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
+      ],
+      cardMap: { b1: bagua, s1: slash, j1: judgeCard },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P2.useCardAndTarget('杀', 's1', [0]);
+    // P1 选不发动
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: false });
+    // 不发动 → 不判定(判定牌 j1 仍在牌堆)→ 进入询问闪
+    expect(harness.state.zones.deck).toContain('j1');
+    // P1 不出闪 → 扣血
+    await P1.pass();
+    expect(harness.state.players[0].health).toBe(3);
+    // 判定牌仍未翻动(未进弃牌堆)
+    expect(harness.state.zones.discardPile).not.toContain('j1');
+  });
+
+  // ─── 正面:询问超时 → 等同不发动 → 不判定 ────────────
+
+  it('超时不发动:P2 杀 P1 → 询问超时 → 不判定 → P1 不出闪 → 扣血', async () => {
+    const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
+    const slash = makeCard('s1', '杀', '♠', 'A');
+    const judgeCard = makeCard('j1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
+      ],
+      cardMap: { b1: bagua, s1: slash, j1: judgeCard },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P2.useCardAndTarget('杀', 's1', [0]);
+    // 询问是否发动八卦阵超时(pass=fireTimeout)
+    P1.expectPending('请求回应');
+    await P1.pass();
+    // 超时 → 不判定(defaultChoice=false)→ 进入询问闪
+    expect(harness.state.zones.deck).toContain('j1');
+    // P1 不出闪 → 扣血
+    await P1.pass();
+    expect(harness.state.players[0].health).toBe(3);
   });
 });

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-06-25
+
+### Changed — 八卦阵需先询问是否发动
+
+八卦阵(防具)原实现为「需要出闪时自动判定」,判定红色自动视为出闪。标准三国杀规则下八卦阵是可选技能——装备者可选择不发动。本次改为判定前先询问玩家是否发动,与 反馈/寒冰剑/贯石斧/麒麟弓 等技能统一走 `请求回应`(requestType=`八卦阵/confirm`)+ `respond` action 模式。
+
+- **判定前插入询问**: `询问闪` before hook 中,先 `applyAtom(请求回应, requestType='八卦阵/confirm', defaultChoice=false, timeout=10)`,玩家选发动(choice=true)才执行判定;选不发动或超时则跳过判定直接进入询问闪。(`src/engine/skills/八卦阵.ts`)
+- **注册 respond action**: 新增 `八卦阵/respond` action 处理玩家确认回应,用 `localVars['八卦阵/confirmed']` 传递结果(与反馈/寒冰剑等完全一致的模式)。(`src/engine/skills/八卦阵.ts`)
+- **前端 defineAction 声明**: 新增 `onMount` 调 `api.defineAction('respond', ...)`,前端渲染「发动/不发动」按钮(`AwaitingPrompt` confirm 分支)。(`src/engine/skills/八卦阵.ts`)
+- **测试更新**: 原有 8 例自动判定场景补 `respond('八卦阵', {choice:true})` 步骤;新增「不发动」(choice=false 不判定)和「超时不发动」(fireTimeout 不判定) 2 例。(`tests/skill-tests/八卦阵.test.ts`)
+
 ## [Unreleased] — 2026-06-24
 
 ### Fixed — 请求回应 atom: applyView 倒计时口径与后端不一致

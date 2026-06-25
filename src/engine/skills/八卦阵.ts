@@ -1,26 +1,53 @@
-// 八卦阵(防具):当你需要出闪时,判定,若为红色则视为出闪。
-// 实现:在 询问闪 before hook 中 applyAtom(判定) → 判定牌在处理区→技能 after hooks 读取→
-// afterHooks 清理后判定牌进弃牌堆。八卦阵读弃牌堆顶判定牌花色。
-// 红色 → 往处理区放入一张虚拟闪牌,杀检查处理区发现闪就视为闪避。
+// 八卦阵(防具):当你需要出闪时,可以判定,若为红色则视为出闪。
+// 实现:在 询问闪 before hook 中
+//   1. 先 请求回应 询问是否发动(requestType=八卦阵/confirm)
+//   2. 玩家选发动 → applyAtom(判定) → 判定牌进弃牌堆,读花色
+//   3. 红色 → 往处理区放入一张虚拟闪牌,杀检查处理区发现闪就视为闪避
+//   4. 玩家选不发动 / 超时 → 直接进入正常询问闪
 // 杀不需要知道八卦阵——只看处理区有没有闪牌。
-import type { AtomBeforeContext, Card, Skill, GameState} from '../types';
+import type { AtomBeforeContext, Card, FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
     name: '八卦阵',
-    description: '防具技:当你需要出闪时,判定,若为红色则视为出闪',
+    description: '防具技:当你需要出闪时,可以判定,若为红色则视为出闪',
   };
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
+export function onInit(skill: Skill, _state: GameState): () => void {
   const ownerId = skill.ownerId;
+  // respond:被询问"是否发动八卦阵"时回应,设 localVars 标记结果
+  registerAction(skill.id, ownerId, 'respond',
+    (state, _params) => {
+      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
+      if (requestType !== '八卦阵/confirm') return '当前不是八卦阵确认';
+      return null;
+    },
+    async (state, params) => {
+      state.localVars['八卦阵/confirmed'] = params.choice === true || params.confirmed === true;
+    },
+  );
+
   registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext) => {
     if ((ctx.atom as { target?: number }).target !== ownerId) return;
     if (ctx.state.zones.deck.length === 0) return;
+
+    // 询问是否发动八卦阵
+    delete ctx.state.localVars['八卦阵/confirmed'];
+    await applyAtom(ctx.state, {
+      type: '请求回应',
+      requestType: '八卦阵/confirm',
+      target: ownerId,
+      prompt: { type: 'confirm', title: '是否发动八卦阵?', confirmLabel: '发动', cancelLabel: '不发动' },
+      defaultChoice: false,
+      timeout: 10,
+    });
+    if (!ctx.state.localVars['八卦阵/confirmed']) return;
 
     // 判定:牌堆顶→处理区→技能 after hooks 读取→afterHooks 清理(处理区→弃牌堆)
     await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '八卦阵' });
@@ -52,4 +79,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
   return () => {};
+}
+
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  api.defineAction('respond', {
+    label: '八卦阵',
+    style: 'default',
+    prompt: { type: 'confirm', title: '是否发动八卦阵？', confirmLabel: '发动', cancelLabel: '不发动' },
+  });
 }
