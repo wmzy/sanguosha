@@ -30,9 +30,10 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
     // 无 GameView 字段需要直接更新(高亮态由前端处理 effect 期间临时绘制)。
   },
   toViewLog(event) {
+    const target = event.target as number;
     return event.cardId
-      ? { player: event.source as number, text: `使用 ${event.cardName ?? event.cardId} 指定目标` }
-      : { player: event.source as number, text: '指定目标' };
+      ? { player: event.source as number, text: `使用 ${event.cardName ?? event.cardId} 指定 P${target} 为目标` }
+      : { player: event.source as number, text: `指定 P${target} 为目标` };
   },
 };
 

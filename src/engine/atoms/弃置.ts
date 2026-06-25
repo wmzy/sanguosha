@@ -39,6 +39,8 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
       player: atom.player,
       cardIds: atom.cardIds,
       zones,
+      // 弃牌堆是公开信息:所有玩家都能看到弃了什么牌
+      cardNames: atom.cardIds.map(id => state.cardMap[id]?.name).filter(Boolean),
     };
     return { ownerViews: new Map(), othersView: view };
   },
@@ -69,9 +71,15 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
       view.zones.discardPileCount += cardIds.length;
     }
   },
-  toViewLog(event) {
+  toViewLog(event, viewer) {
     const cardIds = event.cardIds;
-    return { player: event.player as number, text: `弃置了 ${Array.isArray(cardIds) ? cardIds.length : 0} 张牌` };
+    const count = Array.isArray(cardIds) ? cardIds.length : 0;
+    const cardNames = event.cardNames as string[] | undefined;
+    if (cardNames && cardNames.length > 0) {
+      const names = cardNames.join('、');
+      return { player: event.player as number, text: `弃置了 ${count} 张牌：${names}` };
+    }
+    return { player: event.player as number, text: `弃置了 ${count} 张牌` };
   },
 };
 

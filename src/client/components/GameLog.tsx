@@ -18,7 +18,11 @@ export function GameLog({ view }: GameLogProps) {
         {view.log.length === 0 && <div className={styles.logEmpty}>暂无记录</div>}
         {view.log.slice().reverse().map((entry, i) => {
           // player 是玩家座次下标(数字);映射为名字,系统(-1/负数)显示为「系统」
-          const playerName = entry.player >= 0 ? (view.players[entry.player]?.name ?? `P${entry.player}`) : '系统';
+          // 当前视角玩家加「（我）」标志
+          const isMe = entry.player === view.viewer;
+          const playerName = entry.player >= 0
+            ? `${view.players[entry.player]?.name ?? `P${entry.player}`}${isMe ? '（我）' : ''}`
+            : '系统';
           return (
             <div key={i} className={styles.logEntry}>
               <span className={styles.logTime}>{formatTime(entry.time)}</span>

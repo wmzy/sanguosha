@@ -45,7 +45,10 @@ export const 造成伤害: AtomDefinition<{
     }
   },
   toViewLog(event) {
-    return { player: event.source as number, text: `造成了 ${event.amount ?? 0} 点伤害` };
+    const target = event.target as number;
+    const source = event.source as number;
+    const amount = event.amount ?? 0;
+    return { player: source, text: `对 P${target} 造成了 ${amount} 点伤害` };
   },
 };
 

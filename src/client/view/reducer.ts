@@ -29,7 +29,7 @@ export function viewReducer(view: GameView, event: ViewEvent, time = 0): void {
   const type = event.atomType ?? event.type;
   const def = getAtomDef(type);
   def.applyView?.(view, event);
-  const logEntry = def.toViewLog?.(event);
+  const logEntry = def.toViewLog?.(event, view.viewer);
   if (logEntry) {
     view.log.push({ time, player: logEntry.player, text: logEntry.text });
   }

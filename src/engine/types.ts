@@ -491,9 +491,12 @@ export interface AtomDefinition<A = unknown> {
   /**
    * 前端根据 ViewEvent 生成游戏日志条目。纯展示层，不在网络传输中携带。
    * ViewEvent 已含生成日志所需的所有数据（player/target/amount/cardName 等）。
+   *
+   * event 已经过 toViewEvents 分叉:当前视角能看到的字段（如 owner 的摸牌 cards）
+   * 已包含在 event 中。viewer 为当前视角座次，便于进一步判断「我」相关文案。
    * 返回 null 表示该事件不写日志。
    */
-  toViewLog?(event: ViewEvent): { player: number; text: string } | null;
+  toViewLog?(event: ViewEvent, viewer: number): { player: number; text: string } | null;
 }
 export interface GameView {
   viewer: number;

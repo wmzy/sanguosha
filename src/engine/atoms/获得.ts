@@ -37,6 +37,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
       type: '获得',
       player: atom.player,
       cardId: atom.cardId,
+      cardName: state.cardMap[atom.cardId]?.name,
       ...(atom.from !== undefined ? { from: atom.from, fromZone } : {}),
       effect,
     };
@@ -85,6 +86,23 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
         }
       }
     }
+  },
+  toViewLog(event, viewer) {
+    const player = event.player as number;
+    const cardName = event.cardName as string | undefined;
+    const from = event.from as number | undefined;
+    // owner 视角(获得者/给予者)能看到具体牌面
+    const isOwner = player === viewer || from === viewer;
+    if (from !== undefined) {
+      if (isOwner && cardName) {
+        return { player, text: `从 P${from} 处获得了 ${cardName}` };
+      }
+      return { player, text: `从 P${from} 处获得了一张牌` };
+    }
+    if (isOwner && cardName) {
+      return { player, text: `获得了 ${cardName}` };
+    }
+    return { player, text: '获得了一张牌' };
   },
 };
 

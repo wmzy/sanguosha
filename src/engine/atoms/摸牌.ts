@@ -101,8 +101,16 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
       }
     }
   },
-  toViewLog(event) {
-    return { player: event.player as number, text: `摸了 ${event.count ?? 0} 张牌` };
+  toViewLog(event, viewer) {
+    const count = event.count ?? 0;
+    // owner 视角:展示具体牌面(摸牌 ownerevent 带 cards 字段)
+    const cards = event.cards as Array<{ name: string; suit?: string; rank?: string }> | undefined;
+    const isOwner = event.player === viewer || (cards && cards.length > 0);
+    if (isOwner && cards && cards.length > 0) {
+      const cardNames = cards.map(c => `${c.suit ?? ''}${c.rank ?? ''}${c.name}`).join('、');
+      return { player: event.player as number, text: `摸了 ${count} 张牌：${cardNames}` };
+    }
+    return { player: event.player as number, text: `摸了 ${count} 张牌` };
   },
 };
 

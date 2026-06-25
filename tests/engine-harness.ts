@@ -229,7 +229,7 @@ export class PlayerSession {
         }
         // 与真实前端 src/client/view/reducer.ts:viewReducer 对齐:
         // applyView 后调 toViewLog 生成日志条目。time 取事件 seq 近似(测试不需要真实时间)。
-        const logEntry = def.toViewLog?.(evt);
+        const logEntry = def.toViewLog?.(evt, this.processedView.viewer);
         if (logEntry) {
           this.processedView.log.push({
             time: (evt as Record<string, unknown>).seq as number ?? 0,
