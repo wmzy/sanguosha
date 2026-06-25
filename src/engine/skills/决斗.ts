@@ -36,7 +36,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = params.target as number;
-      pushFrame(state, '决斗', from, { ...params });
+      await pushFrame(state, '决斗', from, { ...params });
 
       // 决斗锦囊进处理区
       await applyAtom(state, {
@@ -104,7 +104,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             to: { zone: '弃牌堆' },
           });
         }
-        popFrame(state);
+        await popFrame(state);
       }
     },
   );

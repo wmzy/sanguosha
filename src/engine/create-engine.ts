@@ -374,25 +374,28 @@ export function resetForTest(): void {
 
 // ─── 帧管理 ──────────────────────────────────────────────────
 
-/** 创建帧并压入 state.settlementStack,返回帧引用 */
-export function pushFrame(
+/** 创建帧并压入 state.settlementStack,返回帧引用。
+ *
+ *  走 applyAtom({ type: '结算帧入栈' }) 管线,保证 view.settlementStack 与后端同步。
+ *  返回被压入的 frame 引用(从栈顶取,与入栈 atom apply 写入的是同一对象)。
+ *  变为 async(applyAtom 是 async);技能 execute 已是 async,加 await 即可。 */
+export async function pushFrame(
   state: GameState,
   skillId: string,
   from: number,
   params?: Record<string, Json>,
-): SettlementFrame {
-  const frame: SettlementFrame = {
-    skillId,
-    from,
-    params: params ? { ...params } : {},
-  };
-  state.settlementStack.push(frame);
-  return frame;
+): Promise<SettlementFrame> {
+  await applyAtom(state, { type: '结算帧入栈', skillId, from, params });
+  // 入栈 atom 的 apply 已将帧压入栈,返回栈顶引用
+  return state.settlementStack[state.settlementStack.length - 1];
 }
 
-/** 弹出栈顶帧 */
-export function popFrame(state: GameState): void {
-  if (state.settlementStack.length > 0) state.settlementStack.pop();
+/** 弹出栈顶帧。
+ *
+ *  走 applyAtom({ type: '结算帧出栈' }) 管线,保证 view.settlementStack 同步。
+ *  变为 async;技能 execute 加 await。 */
+export async function popFrame(state: GameState): Promise<void> {
+  await applyAtom(state, { type: '结算帧出栈' });
 }
 
 /** 取栈顶帧(只读引用) */

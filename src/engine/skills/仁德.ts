@@ -65,7 +65,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
-      pushFrame(state, '仁德', from, { ...params });
+      await pushFrame(state, '仁德', from, { ...params });
       // 规范化分配格式(兼容 allocation / targets 分配数组 / 简单格式)
       const allocParam = params.allocation as Array<{ target: number; cardIds: string[] }> | undefined;
       const rawTargets = params.targets as Array<{ target: number; cardIds: string[] }> | number[] | undefined;
@@ -97,7 +97,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         await applyAtom(state, { type: '回复体力', target: from, amount: 1 });
         self.vars['仁德/healed'] = true;
       }
-      popFrame(state);
+      await popFrame(state);
     },
   );
   return () => {};

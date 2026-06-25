@@ -80,6 +80,7 @@ function makeView(): GameView {
     deadline: null,
     deadlineTotalMs: 0,
     log: [],
+    settlementStack: [],
   };
 }
 
@@ -142,7 +143,7 @@ function makeLastPendingViews(): Map<number, GameView> {
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
         target: 2, deadline: Date.now() + 60000, totalMs: 60000,
       } : null,
-      deadline: null, deadlineTotalMs: 0, log: [],
+      deadline: null, deadlineTotalMs: 0, log: [], settlementStack: [],
     });
   }
   return views;

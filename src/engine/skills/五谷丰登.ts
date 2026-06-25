@@ -12,7 +12,7 @@
 //   - 选牌用 `请求回应`(prompt: pickProcessingCard),候选是处理区明牌
 //   - respond action 接受 cardId,校验在处理区,移牌到手牌
 //   - 超时兜底:选第一张处理区牌(不放弃选牌机会)
-import type { FrontendAPI, GameState, Json, Skill, Card } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, Card, SettlementFrame } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { askWuxie } from '../wuxie';
@@ -41,6 +41,7 @@ async function runPickProcessingCard(
   state: GameState,
   target: number,
   revealedIds: string[],
+  frame: SettlementFrame,
 ): Promise<void> {
   // 候选 = 仍在处理区的亮出牌(已被选走的剔除)
   const available = revealedIds.filter(id => state.zones.processing.includes(id));
@@ -80,6 +81,9 @@ async function runPickProcessingCard(
       from: { zone: '处理区' },
       to: { zone: '手牌', player: target },
     });
+    // 记录选牌者到帧上(前端从 view.settlementStack 读取,即时渲染被选牌标注)
+    const pickerName = state.players[target]?.name ?? `P${target}`;
+    (frame.params.pickedBy as Record<string, string>)[cardId] = pickerName;
   }
 }
 
@@ -91,7 +95,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }, async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      pushFrame(state, '五谷丰登', from, { ...params });
+      const frame = await pushFrame(state, '五谷丰登', from, { ...params, revealedIds: [] as string[], pickedBy: {} as Record<string, Json> });
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
 
       try {
@@ -108,6 +112,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           await applyAtom(state, { type: '移动牌', cardId: topId, from: { zone: '牌堆' }, to: { zone: '处理区' } });
           revealedIds.push(topId);
         }
+        // 记录亮出的牌到帧上(前端从 view.settlementStack 读取)
+        frame.params.revealedIds = revealedIds;
 
         // 2. 从使用者开始按座次,每名目标轮到时先问无懈,未抵消才选牌
         for (const targetIdx of allTargets) {
@@ -119,7 +125,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (cancelled) continue;
 
           if (revealedIds.some(id => state.zones.processing.includes(id)) === false) break;
-          await runPickProcessingCard(state, targetIdx, revealedIds);
+          await runPickProcessingCard(state, targetIdx, revealedIds, frame);
         }
 
         // 3. 剩余亮出的牌进弃牌堆
@@ -134,7 +140,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
         delete state.localVars['五谷丰登/选择'];
-        popFrame(state);
+        await popFrame(state);
       }
     });
 

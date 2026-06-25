@@ -43,7 +43,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const target = params.target as number;
       const killTarget = params.killTarget as number | undefined;
-      pushFrame(state, '激将', from, { ...params });
+      await pushFrame(state, '激将', from, { ...params });
 
       // 请求回应:目标选择出杀
       await applyAtom(state, {
@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 不出:主公摸 1 张
         await applyAtom(state, { type: '摸牌', player: from, count: 1 });
       }
-      popFrame(state);
+      await popFrame(state);
     },
   );
   return () => {};

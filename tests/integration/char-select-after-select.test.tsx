@@ -79,6 +79,7 @@ function makeFormalWaitingView(): GameView {
     deadline: null,
     deadlineTotalMs: 0,
     log: [],
+    settlementStack: [],
   };
 }
 
@@ -103,6 +104,7 @@ function makeDebugWaitingView(): GameView {
     deadline: null,
     deadlineTotalMs: 0,
     log: [],
+    settlementStack: [],
   };
 }
 
@@ -189,6 +191,7 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
       deadline: null,
       deadlineTotalMs: 0,
       log: [],
+      settlementStack: [],
     };
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
@@ -228,6 +231,7 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
       deadline: null,
       deadlineTotalMs: 0,
       log: [],
+      settlementStack: [],
     };
     const onAction = vi.fn();
     render(<GameViewComponent view={view} onAction={onAction} />);

@@ -48,7 +48,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = params.target as number;
-      pushFrame(state, '兵粮寸断', from, { ...params });
+      await pushFrame(state, '兵粮寸断', from, { ...params });
       // 移牌到处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 延时锦囊:使用时仅放置到判定区,无懈可击问询延迟到判定阶段判定前
@@ -67,7 +67,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       // 移牌到弃牌堆(原使用卡)
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      popFrame(state);
+      await popFrame(state);
     });
 
   // ─── 判定阶段:有 兵粮寸断 → 先问无懈可击,未被抵消才触发判定 ───

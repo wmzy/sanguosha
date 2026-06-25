@@ -54,6 +54,7 @@ function makeLordSelectingView(): GameView {
     deadline: null,
     deadlineTotalMs: 0,
     log: [],
+    settlementStack: [],
   };
 }
 
@@ -116,6 +117,7 @@ describe('GameView:身份揭示弹窗在选将之前/期间显示', () => {
       deadline: null,
       deadlineTotalMs: 0,
       log: [],
+      settlementStack: [],
     };
     render(<GameViewComponent view={view} onAction={() => {}} />);
 

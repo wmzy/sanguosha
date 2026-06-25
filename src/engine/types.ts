@@ -449,7 +449,10 @@ export type Atom =
   | { type: '出牌窗口'; player: number; timeout?: number }
   // 牌包装(武圣转化 / 丈八蛇矛双卡转化)
   | { type: '武圣包装'; player: number; cardId: string; secondCardId?: string }
-  | { type: '武圣还原'; player: number; cardId: string; secondCardId?: string };
+  | { type: '武圣还原'; player: number; cardId: string; secondCardId?: string }
+  // 结算帧管理(走 atom 管线,保证前后端 settlementStack 同步)
+  | { type: '结算帧入栈'; skillId: string; from: number; params?: Record<string, Json> }
+  | { type: '结算帧出栈' };
 
 
 export interface AtomDefinition<A = unknown> {
@@ -546,6 +549,9 @@ export interface GameView {
     /** 处理区的卡牌(判定/出杀等中间结算)。元素为 cardId */
     processing: string[];
   };
+  /** 结算帧栈(投影 state.settlementStack)。玩家视角可见的全部结算上下文。
+   *  通过「结算帧入栈/出栈」atom 同步到前端,与后端状态一致。 */
+  settlementStack: SettlementFrame[];
 }
 
 /**

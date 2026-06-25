@@ -35,7 +35,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       const targets = params.targets as number[];
-      const frame = pushFrame(state, '杀', from, { ...params, resolvedTargets: [...targets] });
+      const frame = await pushFrame(state, '杀', from, { ...params, resolvedTargets: [...targets] });
 
       try {
         // 杀牌进处理区
@@ -101,7 +101,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             from: { zone: '处理区' }, to: { zone: '弃牌堆' },
           });
         }
-        popFrame(state);
+        await popFrame(state);
         // 记录一次出杀(已用次数 +1;上限由 slashMax 计算,连弩的 ∞ 由标签体现)
         incSlashUsed(state);
       }

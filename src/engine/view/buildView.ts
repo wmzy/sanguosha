@@ -161,6 +161,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // 处理区:判定牌 / 中间结算的卡(闪抵消杀等)
       processing: [...state.zones.processing],
     },
+    settlementStack: state.settlementStack.map(f => ({ skillId: f.skillId, from: f.from, params: { ...f.params } })),
   };
 }
 

@@ -70,7 +70,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target = params.target as number;
         killTarget = params.killTarget as number;
       }
-      pushFrame(state, '借刀杀人', from, { ...params });
+      await pushFrame(state, '借刀杀人', from, { ...params });
 
       // 锦囊进处理区
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
@@ -137,7 +137,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        popFrame(state);
+        await popFrame(state);
       }
     },
   );

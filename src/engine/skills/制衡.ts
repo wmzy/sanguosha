@@ -39,7 +39,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 移到开头后,dispatch 同步阶段(启动 execute 前)就完成标记,第二次 validate 必然拒绝。
       state.players[ownerId].vars['制衡/usedThisTurn'] = true;
       const from = ownerId;
-      pushFrame(state, '制衡', from, { ...params });
+      await pushFrame(state, '制衡', from, { ...params });
       // 兼容 cardId 单数和 cardIds 数组,与 validate 中的逻辑一致
       const cardIds = (params.cardIds as string[] | undefined)
         ?? (typeof params.cardId === 'string' ? [params.cardId as string] : []);
@@ -47,7 +47,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(state, { type: '弃置', player: from, cardIds });
       // 摸 N 张
       await applyAtom(state, { type: '摸牌', player: from, count: cardIds.length });
-      popFrame(state);
+      await popFrame(state);
       // execute 抛错时标记已设但效果未完成——这是可接受的:限一次本就防止重复,
       // 且 execute 内部 applyAtom 失败会静默 return(validate 拒绝),不会部分执行。
     },

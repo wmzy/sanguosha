@@ -26,6 +26,7 @@ function mockView(overrides: Partial<GameView> = {}): GameView {
     deadlineTotalMs: 0,
     log: [],
     zones: { deckCount: 10, discardPileCount: 0, processing: [] },
+    settlementStack: [],
     ...overrides,
   };
 }

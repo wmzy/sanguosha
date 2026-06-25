@@ -20,7 +20,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      pushFrame(state, '南蛮入侵', from, { ...params });
+      await pushFrame(state, '南蛮入侵', from, { ...params });
 
       // 从使用者下家开始,按座次顺序结算(state.players 数组顺序 = seat index 顺序)
       const alivePlayers = state.players.filter(p => p.alive);
@@ -92,7 +92,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             to: { zone: '弃牌堆' },
           });
         }
-        popFrame(state);
+        await popFrame(state);
       }
     },
   );

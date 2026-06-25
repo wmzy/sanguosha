@@ -65,6 +65,7 @@ function makeAskViews(
       deadline: null,
       deadlineTotalMs: 0,
       log: [],
+      settlementStack: [],
     });
   }
   return views;

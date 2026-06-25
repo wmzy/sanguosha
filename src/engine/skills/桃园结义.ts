@@ -15,7 +15,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;
-      pushFrame(state, '桃园结义', from, { ...params });
+      await pushFrame(state, '桃园结义', from, { ...params });
       const cardId = params.cardId as string;
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 无懈可击对全体锦囊只抵消特定 1 名角色:逐目标询问无懈,被抵消的目标跳过回血。
@@ -37,7 +37,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        popFrame(state);
+        await popFrame(state);
       }
     }, );
   return () => {};

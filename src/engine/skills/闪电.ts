@@ -65,7 +65,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       // 延时锦囊:使用时仅放置到判定区,无懈可击问询延迟到判定阶段判定前
-      pushFrame(state, TRICK_NAME, from, { ...params });
+      await pushFrame(state, TRICK_NAME, from, { ...params });
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       const trickCard = state.cardMap[cardId];
       const pendingCard: Card = trickCard ?? {
@@ -81,7 +81,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         trick: { name: TRICK_NAME, source: from, card: pendingCard },
       });
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      popFrame(state);
+      await popFrame(state);
     });
 
   // ─── 判定阶段:有 闪电 → 先问无懈可击,未被抵消才触发判定 ────

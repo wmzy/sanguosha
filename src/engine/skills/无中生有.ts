@@ -15,7 +15,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;
-      pushFrame(state, '无中生有', from, { ...params });
+      await pushFrame(state, '无中生有', from, { ...params });
       const cardId = params.cardId as string;
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       // 询问无懈可击(close-reopen:askWuxie 循环管理窗口)
@@ -29,7 +29,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        popFrame(state);
+        await popFrame(state);
       }
     }, );
   return () => {};

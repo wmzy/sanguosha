@@ -27,7 +27,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }, async (state: GameState, params: Record<string, Json>) => {
       
       const from = ownerId;
-      pushFrame(state, '装备通用', from, { ...params });
+      await pushFrame(state, '装备通用', from, { ...params });
       const cardId = params.cardId as string;
       // 先卸下同栏位装备(如果有):卸下→手牌,再 移动牌→弃牌堆
       const card = state.cardMap[cardId];
@@ -55,7 +55,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (card?.name && skillLoaders[card.name]) {
         await applyAtom(state, { type: '添加技能', player: from, skillId: card.name });
       }
-      popFrame(state);
+      await popFrame(state);
     }, );
   return () => {};
 }

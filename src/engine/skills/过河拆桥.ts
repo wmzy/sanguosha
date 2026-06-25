@@ -75,7 +75,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }, async (state: GameState, params: Record<string, Json>) => {
 
       const from = ownerId;
-      pushFrame(state, '过河拆桥', from, { ...params });
+      await pushFrame(state, '过河拆桥', from, { ...params });
       const cardId = params.cardId as string;
       const target = (params.targets as number[])?.[0] ?? params.target as number;
       // 移锦囊到处理区
@@ -96,7 +96,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (state.zones.processing.includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
-        popFrame(state);
+        await popFrame(state);
       }
     }, );
 

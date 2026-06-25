@@ -25,11 +25,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number;
-      pushFrame(state, '桃', from, { ...params });
+      await pushFrame(state, '桃', from, { ...params });
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       await applyAtom(state, { type: '回复体力', target, amount: 1, source: from });
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      popFrame(state);
+      await popFrame(state);
     },
   );
 

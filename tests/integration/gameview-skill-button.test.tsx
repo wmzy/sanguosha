@@ -53,6 +53,7 @@ function makeView(overrides: Partial<GameView> = {}): GameView {
     deadline: null,
     deadlineTotalMs: 0,
     log: [],
+    settlementStack: [],
     ...overrides,
   };
 }

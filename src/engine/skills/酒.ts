@@ -22,7 +22,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      pushFrame(state, '酒', from, { ...params });
+      await pushFrame(state, '酒', from, { ...params });
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
       await applyAtom(state, {
         type: '加标记',
@@ -30,7 +30,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         mark: { id: '酒/nextKillDamageBonus', scope: -1, payload: 1, duration: 'turn' },
       });
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
-      popFrame(state);
+      await popFrame(state);
     },
   );
 
