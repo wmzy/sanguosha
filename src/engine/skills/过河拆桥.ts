@@ -8,7 +8,7 @@
 //   手牌盲选是博弈核心:目标可偷偷调整顺序,使用者凭牌背位置推测。
 //   重放确定性:盲选时在 actionLog 的当前条目前 splice "设置手牌顺序" 条目。
 import type { ActionLogEntry, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { askWuxie } from '../wuxie';
 
@@ -93,7 +93,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 移锦囊到弃牌堆
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       } finally {
-        if (state.zones.processing.includes(cardId)) {
+        if (frameCards(state).includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
         await popFrame(state);

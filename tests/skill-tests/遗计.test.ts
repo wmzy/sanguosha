@@ -1,4 +1,5 @@
 // tests/skill-tests/遗计.test.ts
+import { frameCards } from '../../src/engine/create-engine';
 // 遗计(郭嘉):受到伤害后摸2张牌,然后将2张牌交给任意角色
 //
 // 注:完整的 杀→不出闪→遗计confirm→摸牌→distribute 链路涉及嵌套 pending,
@@ -59,7 +60,7 @@ describe('遗计', () => {
     // 遗计 after hook → 请求回应(是否发动) → 新 pending → execute 挂住
     // 杀还在处理区(execute 没完成),P2 已扣血
     expect(harness.state.players.find(p => p.name === 'P2')!.health).toBe(3);
-    expect(harness.state.zones.processing).toContain('c1');
+    expect(frameCards(harness.state)).toContain('c1');
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
     P2.expectView(v => expect(v.players[1].health).toBe(3));

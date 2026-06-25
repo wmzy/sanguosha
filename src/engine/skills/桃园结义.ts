@@ -1,6 +1,6 @@
 // 桃园结义(普通锦囊):出牌阶段,对所有存活角色使用,每名目标回复 1 点体力。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { askWuxie } from '../wuxie';
 
@@ -34,7 +34,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       } finally {
-        if (state.zones.processing.includes(cardId)) {
+        if (frameCards(state).includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
         await popFrame(state);

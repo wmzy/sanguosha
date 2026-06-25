@@ -644,6 +644,9 @@ export interface SettlementFrame {
   from: number;
   /** execute 本地参数。pushFrame 时初始化;配置字段只读,resolvedTargets 等可变字段允许 mutate 元素。 */
   params: Record<string, Json>;
+  /** 本帧的牌区(替代全局 zones.processing)。牌的进出通过 移动牌 atom({ zone: '处理区' }) 隐式操作栈顶帧的此字段。
+   *  嵌套结算时各帧各自独立——天然隔离,无需 find(name) 脆弱区分。 */
+  cards: string[];
 }
 
 /** Pending 区——等待玩家操作的 slot */

@@ -11,7 +11,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill'
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
@@ -105,7 +105,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self.pendingTricks.some(t => t.name === '兵粮寸断')) return;
 
     // 读判定牌:判定牌在处理区(afterHooks 才移到弃牌堆)
-    const processing = ctx.state.zones.processing;
+    const processing = frameCards(ctx.state);
     if (processing.length === 0) return;
     const judgeCardId = processing[processing.length - 1];
     const judgeCard = ctx.state.cardMap[judgeCardId];

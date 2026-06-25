@@ -6,7 +6,7 @@
 //   2. 玩家选发动 → select prompt 让玩家选 2 张牌弃置(requestType=贯石斧/select)
 //   3. 弃完后把处理区的闪移到弃牌堆,杀.execute 检测处理区无闪 → 自行造成伤害
 import type { AtomAfterContext, FrontendAPI, Json, Skill, GameState} from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -66,7 +66,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!weapon || weapon.name !== '贯石斧') return;
 
     // 检查处理区是否有闪(目标出了闪)
-    const dodgeCardId = ctx.state.zones.processing.find(id => {
+    const dodgeCardId = frameCards(ctx.state).find(id => {
       const c = ctx.state.cardMap[id];
       return c && c.name === '闪';
     });

@@ -18,7 +18,9 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     } else if (atom.from.zone === '弃牌堆') {
       state.zones.discardPile = state.zones.discardPile.filter(id => id !== atom.cardId);
     } else if (atom.from.zone === '处理区') {
-      state.zones.processing = state.zones.processing.filter(id => id !== atom.cardId);
+      const frame = state.settlementStack[state.settlementStack.length - 1];
+      if (frame) frame.cards = frame.cards.filter(id => id !== atom.cardId);
+      else state.zones.processing = state.zones.processing.filter(id => id !== atom.cardId);
     }
 
     // to
@@ -37,7 +39,9 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         state.zones.discardPile.push(atom.cardId);
       }
     } else if (atom.to.zone === '处理区') {
-      state.zones.processing.push(atom.cardId);
+      const frame = state.settlementStack[state.settlementStack.length - 1];
+      if (frame) frame.cards.push(atom.cardId);
+      else state.zones.processing.push(atom.cardId);
     }
   },
   toViewEvents(state, atom): ViewEventSplit {
@@ -80,11 +84,19 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       const cardId = (event as any).cardId as string;
       if (from?.zone === '牌堆') view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
       else if (from?.zone === '弃牌堆') view.zones.discardPileCount = Math.max(0, view.zones.discardPileCount - 1);
-      else if (from?.zone === '处理区') view.zones.processing = view.zones.processing.filter((id: string) => id !== cardId);
+      else if (from?.zone === '处理区') {
+        const f = view.settlementStack[view.settlementStack.length - 1];
+        if (f) f.cards = f.cards.filter((id: string) => id !== cardId);
+        if (view.zones) view.zones.processing = view.zones.processing.filter((id: string) => id !== cardId);
+      }
 
       if (to?.zone === '牌堆') view.zones.deckCount += 1;
       else if (to?.zone === '弃牌堆') view.zones.discardPileCount += 1;
-      else if (to?.zone === '处理区') view.zones.processing.push(cardId);
+      else if (to?.zone === '处理区') {
+        const f = view.settlementStack[view.settlementStack.length - 1];
+        if (f) f.cards.push(cardId);
+        if (view.zones) view.zones.processing.push(cardId);
+      }
     }
 
     const pi = view.players.findIndex(p => p.index === (event.player as number));
@@ -109,7 +121,11 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
           // 同上:用 cardId 精确移除,避免重复牌误删。
           view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== cardId);
         }
-        if (view.zones && event.cardId) view.zones.processing.push(event.cardId as string);
+        if (view.zones && event.cardId) {
+          view.zones.processing.push(event.cardId as string);
+          const f = view.settlementStack[view.settlementStack.length - 1];
+          if (f) f.cards.push(event.cardId as string);
+        }
         break;
       }
       case '摸牌': {

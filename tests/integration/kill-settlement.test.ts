@@ -1,4 +1,5 @@
 // 杀的完整结算流程测试:出杀→询问闪→出闪/不出闪→伤害/miss→处理区清理
+import { frameCards } from '../../src/engine/create-engine';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -41,7 +42,7 @@ describe('杀完整结算流程', () => {
     // 杀牌进弃牌堆
     expect(harness.state.zones.discardPile).toContain('s0');
     // 处理区清空
-    expect(harness.state.zones.processing).toEqual([]);
+    expect(frameCards(harness.state)).toEqual([]);
   });
 
   it('出杀→P2 出闪→不扣血→杀和闪都进弃牌堆→处理区清空', async () => {
@@ -57,7 +58,7 @@ describe('杀完整结算流程', () => {
     expect(harness.state.players[1].health).toBe(4); // 不扣血
     expect(harness.state.zones.discardPile).toContain('s0');
     expect(harness.state.zones.discardPile).toContain('d1');
-    expect(harness.state.zones.processing).toEqual([]);
+    expect(frameCards(harness.state)).toEqual([]);
   });
 
   it('BUG验证:被询问闪时不能 respond 杀(P2有杀技能)', async () => {
@@ -75,7 +76,7 @@ describe('杀完整结算流程', () => {
     // P2 尝试用杀 respond(应该被拒绝——当前是询问闪不是询问杀)
     await P2.expectRejected({ skillId: '杀', actionType: 'respond', params: { cardId: 's2' } });
     // 处理区应该只有杀牌(没被污染)
-    expect(harness.state.zones.processing).toEqual(['s0']);
+    expect(frameCards(harness.state)).toEqual(['s0']);
   });
 
   it('出杀后处理区状态:只有杀牌(无其他泄漏)', async () => {
@@ -85,9 +86,9 @@ describe('杀完整结算流程', () => {
 
     await P1.useCardAndTarget('杀', 's0', [1]);
     // 询问闪期间,处理区应该只有杀牌
-    expect(harness.state.zones.processing).toEqual(['s0']);
+    expect(frameCards(harness.state)).toEqual(['s0']);
     await P2.pass();
     // 结算后处理区清空
-    expect(harness.state.zones.processing).toEqual([]);
+    expect(frameCards(harness.state)).toEqual([]);
   });
 });

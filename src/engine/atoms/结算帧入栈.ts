@@ -17,6 +17,7 @@ export const 结算帧入栈: AtomDefinition<{ skillId: string; from: number; pa
       skillId: atom.skillId,
       from: atom.from,
       params: { ...(atom.params ?? {}) },
+      cards: [],
     };
     state.settlementStack.push(frame);
   },
@@ -39,6 +40,7 @@ export const 结算帧入栈: AtomDefinition<{ skillId: string; from: number; pa
       skillId: event.skillId as string,
       from: event.from as number,
       params: { ...(event.params as Record<string, import('../types').Json> ?? {}) },
+      cards: [],
     });
   },
 };

@@ -103,6 +103,7 @@ function makeViewWithWuguPendingForP2(
     skillId: '五谷丰登',
     from: 0,
     params: { revealedIds, pickedBy: pickedBy as unknown as Record<string, Json> },
+    cards: available,
   };
   return {
     viewer: 1,

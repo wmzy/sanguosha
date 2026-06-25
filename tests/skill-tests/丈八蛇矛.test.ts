@@ -1,4 +1,5 @@
 // tests/skill-tests/丈八蛇矛.test.ts
+import { frameCards } from '../../src/engine/create-engine';
 // 丈八蛇矛(武器,攻击范围 3)·转化技:你可以将 2 张手牌当【杀】使用或打出。
 //
 // 模型:preceding=[丈八蛇矛.transform cardIds=[id1,id2]] + 主 action=杀.use
@@ -92,7 +93,7 @@ describe('丈八蛇矛', () => {
     expect(harness.state.players[0].hand).not.toContain('c1');
     expect(harness.state.players[0].hand).not.toContain('c2');
     // 影子杀在处理区(杀牌已被杀.use 移到处理区)
-    expect(harness.state.zones.processing).toContain('c1#c2#丈八蛇矛');
+    expect(frameCards(harness.state)).toContain('c1#c2#丈八蛇矛');
 
     // P2 不闪 → 扣血
     await P2.pass();

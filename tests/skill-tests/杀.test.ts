@@ -1,4 +1,5 @@
 // tests/skill-tests/杀.test.ts
+import { frameCards } from '../../src/engine/create-engine';
 // 杀(基本牌)技能测试示范
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
@@ -57,7 +58,7 @@ describe('杀', () => {
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
     // 中间状态:杀已离开 P1 手牌,正在处理区,等待 P2 出闪
-    expect(harness.state.zones.processing).toContain('c1');
+    expect(frameCards(harness.state)).toContain('c1');
     expect(P1.view.players[0].hand).not.toContain('c1');
 
     await P2.respond('闪', { cardId: 'c3' });
@@ -66,7 +67,7 @@ describe('杀', () => {
     expect(harness.state.zones.discardPile).toEqual(
       expect.arrayContaining(['c1', 'c3']),
     );
-    expect(harness.state.zones.processing).toEqual([]);
+    expect(frameCards(harness.state)).toEqual([]);
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
     P2.expectView(v => expect(v.players[1].health).toBe(4));

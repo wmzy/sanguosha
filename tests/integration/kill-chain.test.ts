@@ -1,4 +1,5 @@
 // 完整结算链路验证:杀→询问闪→出闪/不出闪 + 被询问闪时不能出杀
+import { frameCards } from '../../src/engine/create-engine';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -35,7 +36,7 @@ describe('杀结算链路 + 前端校验对齐', () => {
     P2.expectPending('询问闪');
     await P2.respond('闪', { cardId: 'd1' });
     expect(harness.state.players[1].health).toBe(4);
-    expect(harness.state.zones.processing).toEqual([]);
+    expect(frameCards(harness.state)).toEqual([]);
     expect(harness.state.zones.discardPile).toContain('s0');
     expect(harness.state.zones.discardPile).toContain('d1');
   });
@@ -48,7 +49,7 @@ describe('杀结算链路 + 前端校验对齐', () => {
     P2.expectPending('询问闪');
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
-    expect(harness.state.zones.processing).toEqual([]);
+    expect(frameCards(harness.state)).toEqual([]);
   });
 
   it('被询问闪时出杀被respond validate拒绝(FixRespond修复验证)', async () => {
@@ -60,7 +61,7 @@ describe('杀结算链路 + 前端校验对齐', () => {
     // P2 尝试用杀 respond —— 必须被拒绝
     await P2.expectRejected({ skillId: '杀', actionType: 'respond', params: { cardId: 's2' } });
     // 处理区应该只有杀牌
-    expect(harness.state.zones.processing).toEqual(['s0']);
+    expect(frameCards(harness.state)).toEqual(['s0']);
     // 询问闪仍在
     P2.expectPending('询问闪');
   });

@@ -158,10 +158,10 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     zones: {
       deckCount: state.zones.deck.length,
       discardPileCount: state.zones.discardPile.length,
-      // 处理区:判定牌 / 中间结算的卡(闪抵消杀等)
-      processing: [...state.zones.processing],
+      // 结算区:所有结算帧的牌聚合(供 ZoneInfoBar 展示)。真相源是 settlementStack 的各帧 cards。
+      processing: state.settlementStack.flatMap(f => f.cards),
     },
-    settlementStack: state.settlementStack.map(f => ({ skillId: f.skillId, from: f.from, params: { ...f.params } })),
+    settlementStack: state.settlementStack.map(f => ({ skillId: f.skillId, from: f.from, params: { ...f.params }, cards: [...f.cards] })),
   };
 }
 

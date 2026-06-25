@@ -13,7 +13,7 @@
 //   - respond action 接受 cardId,校验在处理区,移牌到手牌
 //   - 超时兜底:选第一张处理区牌(不放弃选牌机会)
 import type { FrontendAPI, GameState, Json, Skill, Card, SettlementFrame } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { askWuxie } from '../wuxie';
 
@@ -44,7 +44,7 @@ async function runPickProcessingCard(
   frame: SettlementFrame,
 ): Promise<void> {
   // 候选 = 仍在处理区的亮出牌(已被选走的剔除)
-  const available = revealedIds.filter(id => state.zones.processing.includes(id));
+  const available = revealedIds.filter(id => frameCards(state).includes(id));
   if (available.length === 0) return;
 
   const cards = available
@@ -70,7 +70,7 @@ async function runPickProcessingCard(
   // 读取该目标的选择(超时兜底:候选列表第一张)
   const pickedId = state.localVars['五谷丰登/选择'] as string | undefined;
   delete state.localVars['五谷丰登/选择'];
-  const stillAvailable = revealedIds.filter(id => state.zones.processing.includes(id));
+  const stillAvailable = revealedIds.filter(id => frameCards(state).includes(id));
   const cardId = pickedId && stillAvailable.includes(pickedId)
     ? pickedId
     : stillAvailable[0];
@@ -118,25 +118,25 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 2. 从使用者开始按座次,每名目标轮到时先问无懈,未抵消才选牌
         for (const targetIdx of allTargets) {
           if (!state.players[targetIdx]?.alive) continue;
-          if (revealedIds.some(id => state.zones.processing.includes(id)) === false) break;
+          if (revealedIds.some(id => frameCards(state).includes(id)) === false) break;
 
           // 该目标选牌前询问一次无懈(被抵消 → 该目标不参与选牌)
           const cancelled = await askWuxie(state, targetIdx);
           if (cancelled) continue;
 
-          if (revealedIds.some(id => state.zones.processing.includes(id)) === false) break;
+          if (revealedIds.some(id => frameCards(state).includes(id)) === false) break;
           await runPickProcessingCard(state, targetIdx, revealedIds, frame);
         }
 
         // 3. 剩余亮出的牌进弃牌堆
-        const leftover = [...state.zones.processing];
+        const leftover = [...frameCards(state)];
         for (const id of leftover) {
           await applyAtom(state, { type: '移动牌', cardId: id, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
         // 原锦囊卡进弃牌堆
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       } finally {
-        if (state.zones.processing.includes(cardId)) {
+        if (frameCards(state).includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
         delete state.localVars['五谷丰登/选择'];
@@ -154,7 +154,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (atom.requestType !== '五谷丰登/select') return '当前不是五谷丰登选牌窗口';
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
-      if (!state.zones.processing.includes(cardId)) return '该牌不在可选范围';
+      if (!frameCards(state).includes(cardId)) return '该牌不在可选范围';
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {

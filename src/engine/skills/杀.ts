@@ -12,7 +12,7 @@
 // 流离/转移类技能:在 成为目标 after hook 修改帧 params.currentTarget,
 // 杀在下轮结算时读帧上的 currentTarget 而非原始 targets[i]。
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
@@ -65,7 +65,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           await applyAtom(state, { type: '询问闪', target, source: from });
 
           // 检查处理区:有没有闪牌(目标出闪 / 防具放入的虚拟闪)——drain 所有闪
-          const dodgeIds = state.zones.processing.filter(id => {
+          const dodgeIds = frameCards(state).filter(id => {
             const c = state.cardMap[id];
             return c && c.name === '闪';
           });
@@ -94,7 +94,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       } finally {
         // 异常安全:保证帧弹出 + 杀牌不滞留处理区(即使上面 await 抛错)。
         // 不吞错——如果清理用的 移动牌 也抛,说明状态已损坏,应让异常传播暴露问题。
-        const stillInProc = state.zones.processing.includes(cardId);
+        const stillInProc = frameCards(state).includes(cardId);
         if (stillInProc) {
           await applyAtom(state, {
             type: '移动牌', cardId,

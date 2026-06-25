@@ -1,4 +1,5 @@
 // 用户报告的所有问题回归测试(烟雾测试)
+import { frameCards } from '../../src/engine/create-engine';
 //
 // 目的:每个用户报告过的 bug 验证其核心场景仍然正常,作为 PR 合入前快速检查的回归契约。
 // 注意:每个场景的完整覆盖在对应的 skill-tests/<技能名>.test.ts 中,
@@ -39,7 +40,7 @@ describe('用户报告问题回归', () => {
     P1.expectPending('询问闪');
     await P1.pass();
     expect(h.state.players[1].health).toBe(3);
-    expect(h.state.zones.processing).toEqual([]);
+    expect(frameCards(h.state)).toEqual([]);
   });
 
   // 2. 被询问闪时不能 respond 杀
@@ -50,7 +51,7 @@ describe('用户报告问题回归', () => {
     await P0.useCardAndTarget('杀', 's0', [1]);
     P1.expectPending('询问闪');
     await P1.expectRejected({ skillId: '杀', actionType: 'respond', params: { cardId: 's2' } });
-    expect(h.state.zones.processing).toEqual(['s0']);
+    expect(frameCards(h.state)).toEqual(['s0']);
   });
 
   // 3. 顺手牵羊可以使用

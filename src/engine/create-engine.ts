@@ -403,9 +403,16 @@ export function topFrame(state: GameState): SettlementFrame | undefined {
   return state.settlementStack[state.settlementStack.length - 1];
 }
 
+/** 取栈顶帧的牌区(替代全局 zones.processing)。
+ *  无栈时回退到 state.zones.processing(仅用于无帧上下文的兼容场景)。 */
+export function frameCards(state: GameState): string[] {
+  const frame = state.settlementStack[state.settlementStack.length - 1];
+  return frame ? frame.cards : state.zones.processing;
+}
+
 /** 兑底空帧 */
 function emptyFrame(): SettlementFrame {
-  return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}) };
+  return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}), cards: [] };
 }
 
 

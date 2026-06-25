@@ -13,7 +13,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill'
 import { askWuxie } from '../wuxie';
 import { TARGET_SYSTEM } from '../types';
@@ -121,7 +121,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self.pendingTricks.some(t => t.name === TRICK_NAME)) return;
 
     // 读判定牌(在判定 atom.afterHooks 把它移入弃牌堆之前)
-    const processing = ctx.state.zones.processing;
+    const processing = frameCards(ctx.state);
     if (processing.length === 0) return;
     const judgeCardId = processing[processing.length - 1];
     const judgeCard = ctx.state.cardMap[judgeCardId];

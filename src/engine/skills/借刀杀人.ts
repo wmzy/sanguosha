@@ -3,7 +3,7 @@
 //   A 须选择:对使用者指定的另一名角色 B 使用 1 张杀,或交出武器。
 //   请求回应 后检查处理区:有杀 = 出了杀;没有 = 不出(获得武器)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { viewCanAttack } from '../viewDistance';
 import { askWuxie } from '../wuxie';
@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           });
 
           // 检查处理区:有杀 = 出了杀
-          const killCardId = state.zones.processing.find(id => {
+          const killCardId = frameCards(state).find(id => {
             const c = state.cardMap[id];
             return c && c.name === '杀';
           });
@@ -106,7 +106,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             await applyAtom(state, { type: '指定目标', source: target, target: killTarget, cardId: killCardId });
             await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
             // 检查处理区:有闪 = 出了闪,没闪 = 伤害
-            const dodgeCardId = state.zones.processing.find(id => {
+            const dodgeCardId = frameCards(state).find(id => {
               const c = state.cardMap[id];
               return c && c.name === '闪';
             });
@@ -134,7 +134,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       } finally {
         // 异常时保证处理区清理与状态恢复
-        if (state.zones.processing.includes(cardId)) {
+        if (frameCards(state).includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
         await popFrame(state);

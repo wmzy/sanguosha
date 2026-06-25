@@ -16,16 +16,20 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     return null;
   },
   apply(state) {
-    // 牌堆顶翻一张到处理区(亮出判定牌)
+    // 牌堆顶翻一张到栈顶结算帧的牌区(亮出判定牌)
     if (state.zones.deck.length === 0) return;
     const topCardId = state.zones.deck.shift()!;
-    state.zones.processing.push(topCardId);
+    const frame = state.settlementStack[state.settlementStack.length - 1];
+    if (frame) frame.cards.push(topCardId);
+    else state.zones.processing.push(topCardId);
   },
   afterHooks(state) {
-    // 所有技能 after hooks 读完判定牌后,把处理区顶部的判定牌移入弃牌堆
-    const idx = state.zones.processing.length - 1;
+    // 所有技能 after hooks 读完判定牌后,把判定牌从结算帧移入弃牌堆
+    const frame = state.settlementStack[state.settlementStack.length - 1];
+    const cards = frame ? frame.cards : state.zones.processing;
+    const idx = cards.length - 1;
     if (idx < 0) return;
-    const cardId = state.zones.processing.splice(idx, 1)[0];
+    const cardId = cards.splice(idx, 1)[0];
     state.zones.discardPile.push(cardId);
   },
   toViewEvents(state, atom): ViewEventSplit {

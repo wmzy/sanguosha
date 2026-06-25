@@ -4,7 +4,7 @@
 // 选牌交互同过河拆桥:出牌 → 询问无懈 → 弹选牌面板 → 使用者按区域选。
 // 区别:获得(而非弃置)目标牌。判定区延时锦囊也可被获得。
 import type { ActionLogEntry, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
@@ -49,7 +49,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 移锦囊到弃牌堆
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       } finally {
-        if (state.zones.processing.includes(cardId)) {
+        if (frameCards(state).includes(cardId)) {
           await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
         }
         await popFrame(state);

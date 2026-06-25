@@ -2,7 +2,7 @@
 //   出牌阶段,主公可请求一名蜀势力角色出杀。
 //   该角色选择出杀或不出(不出则主公摸 1 张)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -55,7 +55,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
 
       // 检查处理区:有杀 = 出了杀
-      const killCardId = state.zones.processing.find(id => {
+      const killCardId = frameCards(state).find(id => {
         const c = state.cardMap[id];
         return c && c.name === '杀';
       });
@@ -71,7 +71,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (typeof killTarget === 'number') {
           await applyAtom(state, { type: '指定目标', source: target, target: killTarget, cardId: killCardId });
           await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
-          const dodgeCardId = state.zones.processing.find(id => {
+          const dodgeCardId = frameCards(state).find(id => {
             const c = state.cardMap[id];
             return c && c.name === '闪';
           });

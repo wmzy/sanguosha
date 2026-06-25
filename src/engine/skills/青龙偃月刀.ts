@@ -2,7 +2,7 @@
 //   你使用的【杀】被【闪】抵消后,你可以对相同目标再使用 1 张杀。
 //   可以连续追击直到命中或无杀可用。
 import type { AtomAfterContext, FrontendAPI, Json, Skill, GameState} from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -39,7 +39,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!weapon || weapon.name !== '青龙偃月刀') return;
 
     // 检查处理区是否有闪(目标出了闪)
-    const dodgeCardId = ctx.state.zones.processing.find(id => {
+    const dodgeCardId = frameCards(ctx.state).find(id => {
       const c = ctx.state.cardMap[id];
       return c && c.name === '闪';
     });

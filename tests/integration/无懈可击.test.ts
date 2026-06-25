@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   resetForTest,
   registerSkillsFromState,
-} from '../../src/engine/create-engine';
+frameCards } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -82,7 +82,7 @@ describe('无懈可击链路', () => {
     expect(atom.type).toBe('请求回应');
     expect(atom.requestType).toBe('无懈可击');
     // 锦囊在处理区
-    expect(state.zones.processing).toContain(gqId);
+    expect(frameCards(state)).toContain(gqId);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ describe('无懈可击链路', () => {
     expect(state.zones.discardPile).toContain(p1FirstCard);
     // 锦囊进弃牌堆
     expect(state.zones.discardPile).toContain(gqId);
-    expect(state.zones.processing).not.toContain(gqId);
+    expect(frameCards(state)).not.toContain(gqId);
     // pending 已消费
     expect(state.pendingSlots.size).toBe(0);
   });
