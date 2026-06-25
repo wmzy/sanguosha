@@ -6,7 +6,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView, Card } from '../../src/engine/types';
-import type { QueuedEvent } from '../../src/client/hooks/useEventPlayback';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A'): Card {
   return { id, name, suit, rank, type: '基本牌' };
@@ -84,12 +83,17 @@ function makeViewWithWuguPending(): GameView {
   } as unknown as GameView;
 }
 
-/** P2 视角:引擎发的 pending 只含未被选走的牌(pa 已从 processing 移除),
- *  但 view.cardMap 仍含全量牌,P2 玩家名=孙权。 */
-function makeViewWithWuguPendingForP2(cards: Record<string, Card>): GameView {
-  const ids = Object.keys(cards);
-  // pending 只含仍在处理区的牌(排除已被选走的 pa)
-  const available = ids.filter(id => id !== 'pa');
+/** 构造 P2 视角的五谷丰登 view。
+ *  cards: cardMap 全量牌; processingIds: 当前处理区(已排除被选牌);
+ *  pendingIds: pending.cards 中列出的候选(=processingIds);
+ *  handCounts: [P1手牌数, P2手牌数],用于 diff 推导选牌者。
+ *  P2 玩家名=孙权。 */
+function makeViewWithWuguPendingForP2(
+  cards: Record<string, Card>,
+  processingIds: string[],
+  handCounts: [number, number],
+): GameView {
+  const available = processingIds.slice();
   return {
     viewer: 1,
     currentPlayerIndex: 0,
@@ -105,7 +109,7 @@ function makeViewWithWuguPendingForP2(cards: Record<string, Card>): GameView {
         alive: true,
         equipment: {},
         skills: ['五谷丰登', '无懈可击'],
-        handCount: 0,
+        handCount: handCounts[0],
         hand: [],
         marks: [],
       },
@@ -118,7 +122,7 @@ function makeViewWithWuguPendingForP2(cards: Record<string, Card>): GameView {
         alive: true,
         equipment: {},
         skills: ['五谷丰登', '无懈可击'],
-        handCount: 1,
+        handCount: handCounts[1],
         marks: [],
       },
     ],
@@ -212,24 +216,20 @@ describe('五谷丰登选牌展示增强(被选牌禁用渲染)', () => {
   });
 
   it('被选走的牌渲染为禁用且不可点击,未选牌仍可点', async () => {
-    // P2 视角:引擎发的 pending 只含 pb/pc(pa 已被 P1 选走从 processing 移除)
-    // 但 view.cardMap 仍含全量牌,且 currentEvent 携带 pa 被选走的公开事件
+    // P2 视角:模拟五谷丰登选牌流程的状态变化。
+    // hook 通过对 view 快照的 diff 推导被选牌(不依赖延时事件回放)。
     const pa = makeCard('pa', '杀', '♠', '7');
     const pb = makeCard('pb', '桃', '♥', '2');
     const pc = makeCard('pc', '闪', '♣', '8');
-    const view = makeViewWithWuguPendingForP2({ pa, pb, pc });
-    // 模拟 pa 被 P1 选走的公开事件
-    const pickEvent: QueuedEvent = {
-      seq: 10,
-      event: {
-        type: '移动牌',
-        cardId: 'pa',
-        from: { zone: '处理区' },
-        to: { zone: '手牌', player: 0 },
-      },
-    };
+    const cards = { pa, pb, pc };
 
-    render(<GameViewComponent view={view} onAction={() => {}} currentEvent={pickEvent} />);
+    // 步骤1:初始状态——三张牌都在处理区,各玩家手牌为0(建立基线快照)
+    const initial = makeViewWithWuguPendingForP2(cards, ['pa', 'pb', 'pc'], [0, 0]);
+    const { rerender } = render(<GameViewComponent view={initial} onAction={() => {}} />);
+
+    // 步骤2:pa 被 P1 选走——pa 从 processing 消失,P1 handCount +1,pending 只剩 pb/pc
+    const afterPick = makeViewWithWuguPendingForP2(cards, ['pb', 'pc'], [1, 0]);
+    rerender(<GameViewComponent view={afterPick} onAction={() => {}} />);
 
     // pa 应渲染为禁用按钮并标注选牌者
     await waitFor(() => {
@@ -249,21 +249,78 @@ describe('五谷丰登选牌展示增强(被选牌禁用渲染)', () => {
   it('被选走的牌标注正确的选牌者名称', async () => {
     const pa = makeCard('pa', '杀', '♠', '7');
     const pb = makeCard('pb', '桃', '♥', '2');
-    const view = makeViewWithWuguPendingForP2({ pa, pb });
-    const pickEvent: QueuedEvent = {
-      seq: 11,
-      event: {
-        type: '移动牌',
-        cardId: 'pa',
-        from: { zone: '处理区' },
-        to: { zone: '手牌', player: 0 }, // player 0 = P1
-      },
-    };
+    const cards = { pa, pb };
 
-    render(<GameViewComponent view={view} onAction={() => {}} currentEvent={pickEvent} />);
+    // 基线:pa/pb 都在处理区,手牌为0
+    const initial = makeViewWithWuguPendingForP2(cards, ['pa', 'pb'], [0, 0]);
+    const { rerender } = render(<GameViewComponent view={initial} onAction={() => {}} />);
+
+    // pa 被 P1 选走:processing=['pb'],P1 handCount=1
+    const afterPick = makeViewWithWuguPendingForP2(cards, ['pb'], [1, 0]);
+    rerender(<GameViewComponent view={afterPick} onAction={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /已被P1选走/ })).toBeDefined();
     });
+  });
+
+  it('多张牌被不同玩家选走时全部标注(不只有第一张)', async () => {
+    // 这是原始 bug 的核心场景:旧实现依赖单一 currentEvent,只能捕获第一张被选牌,
+    // 后续被选牌直接从 pending.cards/processing 消失,没有事件捕获就没了。
+    // 新方案通过 view diff 累积所有被选牌。
+    const pa = makeCard('pa', '杀', '♠', '7');
+    const pb = makeCard('pb', '桃', '♥', '2');
+    const pc = makeCard('pc', '闪', '♣', '8');
+    const cards: Record<string, Card> = { pa, pb, pc };
+
+    // P3 视角,3 玩家:P1=刘备, P2=孙权, P3=曹操(viewer=2)
+    // 手工构造 view(现有 helper 只支持 2 玩家)
+    const makeView3P = (processingIds: string[], handCounts: number[], target: number): GameView => ({
+      viewer: 2,
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+      players: [
+        { index: 0, name: 'P1', character: '刘备', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: ['五谷丰登'], handCount: handCounts[0], hand: [], marks: [] },
+        { index: 1, name: 'P2', character: '孙权', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: ['五谷丰登'], handCount: handCounts[1], hand: [], marks: [] },
+        { index: 2, name: 'P3', character: '曹操', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: ['五谷丰登'], handCount: handCounts[2], hand: [], marks: [] },
+      ],
+      cardMap: cards,
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '五谷丰登/select', target, prompt: { type: 'pickProcessingCard', title: '五谷丰登:选择 1 张牌', cards: processingIds.map(id => ({ cardId: id, cardName: cards[id].name, suit: cards[id].suit, rank: cards[id].rank })) }, timeout: 20 },
+        prompt: { type: 'pickProcessingCard', title: '五谷丰登:选择 1 张牌', cards: processingIds.map(id => ({ cardId: id, cardName: cards[id].name, suit: cards[id].suit, rank: cards[id].rank })) },
+        target,
+        deadline: Date.now() + 20000,
+        totalMs: 20000,
+        startTime: Date.now(),
+      },
+      deadline: null,
+      deadlineTotalMs: 0,
+      log: [],
+      zones: { deckCount: 15, processing: processingIds, discardPileCount: 0 },
+    } as unknown as GameView);
+
+    // 基线:三张牌都在处理区,手牌均为0,pending 指向 P1
+    const initial = makeView3P(['pa', 'pb', 'pc'], [0, 0, 0], 0);
+    const { rerender } = render(<GameViewComponent view={initial} onAction={() => {}} />);
+
+    // P1 选 pa:processing=['pb','pc'],P1 handCount=1,pending 仍指向 P1(P1 视角看不到这个 P3 视角)
+    const afterP1 = makeView3P(['pb', 'pc'], [1, 0, 0], 0);
+    rerender(<GameViewComponent view={afterP1} onAction={() => {}} />);
+
+    // P2 选 pb:processing=['pc'],P2 handCount=1,pending 指向 P3
+    const afterP2 = makeView3P(['pc'], [1, 1, 0], 2);
+    rerender(<GameViewComponent view={afterP2} onAction={() => {}} />);
+
+    // pa 和 pb 都应被标注为已被选走(不只第一张)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /已被P1选走/ })).toBeDefined();
+      expect(screen.getByRole('button', { name: /已被P2选走/ })).toBeDefined();
+    });
+
+    // pc 仍可点
+    const pcBtn = screen.getByRole('button', { name: /闪/ });
+    expect(pcBtn.hasAttribute('disabled')).toBe(false);
   });
 });

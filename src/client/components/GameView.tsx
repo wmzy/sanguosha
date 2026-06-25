@@ -106,8 +106,8 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
   );
 
   // ─── 出牌交互状态机(已抽出到 usePlayInteraction) ───
-  // 五谷丰登选牌展示增强:累积「处理区→手牌」的公开移动事件,标注被选走的牌
-  const processingPicks = useProcessingPicks(currentEvent, view);
+  // 五谷丰登选牌展示增强:通过对 view 快照的 diff 推导被选走的牌,标注选牌者
+  const processingPicks = useProcessingPicks(view);
 
   const play = usePlayInteraction(isMyTurn, canOperate, {
     view, perspectiveIdx, perspectiveHand, skillActions,
