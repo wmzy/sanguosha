@@ -59,111 +59,125 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
       </div>
       {isSkipped ? (
         <div className={styles.waitingHint}>已跳过，等待其他玩家回应...</div>
-      ) : canOperate ? (() => {
-        // respond 信息由 usePendingState memo 后传入,不再在此重复 resolve(原先每个分支调一次)。
-        const skillId = pendingRespondInfo?.skillId ?? '系统规则';
-        const filterFn = pendingRespondInfo?.cardFilter;
-        // pickHandIndex 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
-        // 渲染目标手牌的牌背序列,使用者点击位置选择
-        if (pending.prompt.type === 'pickTargetCard') {
-          const p = pending.prompt;
-          return (
-            <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
-              {/* 装备区明牌 */}
-              {p.equipment.length > 0 && (
-                <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>装备区:</span>
-              )}
-              {p.equipment.map(({ slot, cardId, cardName }) => (
-                <button
-                  key={cardId}
-                  className={styles.promptBtn}
-                  onClick={() => onSend(skillId, 'respond', { zone: 'equipment', cardId })}
-                >{slot}:{cardName}</button>
-              ))}
-              {/* 判定区明牌 */}
-              {p.judge.length > 0 && (
-                <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>判定区:</span>
-              )}
-              {p.judge.map(({ cardId, cardName }) => (
-                <button
-                  key={cardId}
-                  className={styles.promptBtn}
-                  onClick={() => onSend(skillId, 'respond', { zone: 'judge', cardId })}
-                >{cardName}</button>
-              ))}
-              {/* 手牌盲选 */}
-              {p.handCount > 0 && (
-                <>
-                  <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>手牌（凭位置盲选）:</span>
-                  {Array.from({ length: p.handCount }, (_, i) => (
-                    <button
-                      key={i}
-                      className={styles.promptBtn}
-                      style={{ minWidth: '40px' }}
-                      onClick={() => onSend(skillId, 'respond', { zone: 'hand', handIndex: i })}
-                    >{i + 1}</button>
-                  ))}
-                </>
-              )}
-            </div>
-          );
-        }
-        // pickProcessingCard 类 pending(五谷丰登:从处理区亮的明牌选一张):
-        // 渲染全量候选牌(含已被选走的),被选走的牌置暗禁用并标注选牌者。
-        // processingPicks 由渲染层累积公开的「处理区→手牌」移动事件得到,不改引擎契约。
-        if (pending.prompt.type === 'pickProcessingCard') {
-          const p = pending.prompt;
-          // 有累积状态时用全量候选(含已选牌),否则回退到 pending 原始 cards
-          const cards = processingPicks?.allCards ?? p.cards;
-          const pickedBy = processingPicks?.pickedBy;
-          return (
-            <div className={styles.promptActions} style={{ flexWrap: 'wrap', gap: '6px' }}>
-              {cards.length > 0 && (
-                <span className={styles.promptDesc} style={{ width: '100%', marginBottom: 0 }}>处理区可选牌:</span>
-              )}
-              {cards.map(({ cardId, cardName, suit, rank }) => {
-                const picker = pickedBy?.get(cardId);
-                const isPicked = !!picker;
-                return (
+      ) : canOperate ? (
+        (() => {
+          // respond 信息由 usePendingState memo 后传入,不再在此重复 resolve(原先每个分支调一次)。
+          const skillId = pendingRespondInfo?.skillId ?? '系统规则';
+          const filterFn = pendingRespondInfo?.cardFilter;
+          // pickHandIndex 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
+          // 渲染目标手牌的牌背序列,使用者点击位置选择
+          if (pending.prompt.type === 'pickTargetCard') {
+            const p = pending.prompt;
+            return (
+              <div className={styles.promptActionsWrap}>
+                {/* 装备区明牌 */}
+                {p.equipment.length > 0 && <span className={styles.promptDescFull}>装备区:</span>}
+                {p.equipment.map(({ slot, cardId, cardName }) => (
                   <button
                     key={cardId}
-                    className={isPicked ? styles.promptBtnDisabled : styles.promptBtn}
-                    disabled={isPicked}
-                    onClick={() => !isPicked && onSend(skillId, 'respond', { cardId })}
+                    className={styles.promptBtn}
+                    onClick={() => onSend(skillId, 'respond', { zone: 'equipment', cardId })}
                   >
-                    {cardName} {suit}{rank}
-                    {isPicked && <span className={styles.pickedByTag}>已被{picker}选走</span>}
+                    {slot}:{cardName}
                   </button>
-                );
-              })}
-            </div>
-          );
-        }
-        // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
-        if (pending.prompt.type === 'confirm') {
-          const confirmLabel = pending.prompt.confirmLabel || '确认';
-          const cancelLabel = pending.prompt.cancelLabel || '取消';
+                ))}
+                {/* 判定区明牌 */}
+                {p.judge.length > 0 && <span className={styles.promptDescFull}>判定区:</span>}
+                {p.judge.map(({ cardId, cardName }) => (
+                  <button
+                    key={cardId}
+                    className={styles.promptBtn}
+                    onClick={() => onSend(skillId, 'respond', { zone: 'judge', cardId })}
+                  >
+                    {cardName}
+                  </button>
+                ))}
+                {/* 手牌盲选 */}
+                {p.handCount > 0 && (
+                  <>
+                    <span className={styles.promptDescFull}>手牌（凭位置盲选）:</span>
+                    {Array.from({ length: p.handCount }, (_, i) => (
+                      <button
+                        key={i}
+                        className={styles.promptBtnMin}
+                        onClick={() => onSend(skillId, 'respond', { zone: 'hand', handIndex: i })}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            );
+          }
+          // pickProcessingCard 类 pending(五谷丰登:从处理区亮的明牌选一张):
+          // 渲染全量候选牌(含已被选走的),被选走的牌置暗禁用并标注选牌者。
+          // processingPicks 由渲染层累积公开的「处理区→手牌」移动事件得到,不改引擎契约。
+          if (pending.prompt.type === 'pickProcessingCard') {
+            const p = pending.prompt;
+            // 有累积状态时用全量候选(含已选牌),否则回退到 pending 原始 cards
+            const cards = processingPicks?.allCards ?? p.cards;
+            const pickedBy = processingPicks?.pickedBy;
+            return (
+              <div className={styles.promptActionsWrap}>
+                {cards.length > 0 && <span className={styles.promptDescFull}>处理区可选牌:</span>}
+                {cards.map(({ cardId, cardName, suit, rank }) => {
+                  const picker = pickedBy?.get(cardId);
+                  const isPicked = !!picker;
+                  return (
+                    <button
+                      key={cardId}
+                      className={isPicked ? styles.promptBtnDisabled : styles.promptBtn}
+                      disabled={isPicked}
+                      onClick={() => !isPicked && onSend(skillId, 'respond', { cardId })}
+                    >
+                      {cardName} {suit}
+                      {rank}
+                      {isPicked && <span className={styles.pickedByTag}>已被{picker}选走</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          }
+          // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
+          if (pending.prompt.type === 'confirm') {
+            const confirmLabel = pending.prompt.confirmLabel || '确认';
+            const cancelLabel = pending.prompt.cancelLabel || '取消';
+            return (
+              <div className={styles.promptActions}>
+                <button
+                  className={styles.promptBtnPrimary}
+                  onClick={() => onSend(skillId, 'respond', { choice: true })}
+                >
+                  {confirmLabel}
+                </button>
+                <button
+                  className={styles.promptBtn}
+                  onClick={() => onSend(skillId, 'respond', { choice: false })}
+                >
+                  {cancelLabel}
+                </button>
+              </div>
+            );
+          }
+          // useCard 类 pending:手牌区已对可回应的牌(杀/闪/桃/酒)高亮,直接在手牌区点击出牌。
+          // 这里只显示文案提示 + 「不回应」按钮,不再单独列出候选牌。
+          const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
           return (
             <div className={styles.promptActions}>
-              <button className={styles.promptBtnPrimary} onClick={() => onSend(skillId, 'respond', { choice: true })}>{confirmLabel}</button>
-              <button className={styles.promptBtn} onClick={() => onSend(skillId, 'respond', { choice: false })}>{cancelLabel}</button>
+              <span className={styles.promptDescInline}>
+                {respondableCount > 0
+                  ? `点击下方手牌区高亮的牌出牌回应（共 ${respondableCount} 张可选）`
+                  : '当前没有可出的牌回应'}
+              </span>
+              <button className={styles.promptBtn} onClick={() => onRespond()}>
+                不回应
+              </button>
             </div>
           );
-        }
-        // useCard 类 pending:手牌区已对可回应的牌(杀/闪/桃/酒)高亮,直接在手牌区点击出牌。
-        // 这里只显示文案提示 + 「不回应」按钮,不再单独列出候选牌。
-        const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
-        return (
-          <div className={styles.promptActions}>
-            <span className={styles.promptDesc} style={{ marginBottom: 0, alignSelf: 'center' }}>
-              {respondableCount > 0
-                ? `点击下方手牌区高亮的牌出牌回应（共 ${respondableCount} 张可选）`
-                : '当前没有可出的牌回应'}
-            </span>
-            <button className={styles.promptBtn} onClick={() => onRespond()}>不回应</button>
-          </div>
-        );
-      })() : (
+        })()
+      ) : (
         <div className={styles.waitingHint}>等待 {perspectiveName} 回应...</div>
       )}
     </div>

@@ -26,67 +26,171 @@ export const headerBar = css`
   align-items: center;
   margin-bottom: 12px;
   padding: 8px 12px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
 `;
 export const backBtn = css`
-  border: 1px solid #555; border-radius: 4px; padding: 4px 12px;
-  cursor: pointer; background: transparent; color: #e0e0e0; font-size: 13px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  background: transparent;
+  color: #e0e0e0;
+  font-size: 13px;
 `;
-export const headerCenter = css`display: flex; align-items: center; gap: 12px; font-size: 14px;`;
+export const headerCenter = css`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+`;
 export const roundBadge = css`
-  background: #0f3460; border-radius: 4px; padding: 2px 8px;
-  font-size: 12px; color: #8899aa;
+  background: #0f3460;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #8899aa;
 `;
 export const phaseBadge = css`
-  background: #e67e22; border-radius: 4px; padding: 2px 8px;
-  font-size: 12px; color: #fff; font-weight: bold;
+  background: #e67e22;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #fff;
+  font-weight: bold;
 `;
-export const currentPlayerText = css`color: #ffd700;`;
-export const headerRight = css`display: flex; gap: 8px;`;
+export const currentPlayerText = css`
+  color: #ffd700;
+`;
+export const headerRight = css`
+  display: flex;
+  gap: 8px;
+`;
 export const perspectiveBtn = css`
-  border: 1px solid #3498db; border-radius: 4px; padding: 4px 10px;
-  cursor: pointer; background: transparent; color: #3498db; font-size: 12px;
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  background: transparent;
+  color: #3498db;
+  font-size: 12px;
 `;
 export const goToBtn = css`
-  border: 1px solid #555; border-radius: 4px; padding: 4px 10px;
-  cursor: pointer; background: transparent; color: #aaa; font-size: 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  background: transparent;
+  color: #aaa;
+  font-size: 12px;
 `;
 
 // ─── Prompt ───
 export const promptBox = css`
-  border: 2px solid #e67e22; border-radius: 8px; padding: 12px 16px;
-  background: rgba(230,126,34,0.15); margin-bottom: 12px;
+  border: 2px solid #e67e22;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: rgba(230, 126, 34, 0.15);
+  margin-bottom: 12px;
 `;
 export const promptBoxAwaiting = css`
-  border: 2px solid #e74c3c; border-left: 4px solid #e74c3c;
-  border-radius: 8px; padding: 12px 16px;
-  background: rgba(231,76,60,0.1); margin-bottom: 12px;
+  border: 2px solid #e74c3c;
+  border-left: 4px solid #e74c3c;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: rgba(231, 76, 60, 0.1);
+  margin-bottom: 12px;
 `;
-export const promptTitle = css`color: #e67e22; font-weight: bold; font-size: 15px; margin-bottom: 4px;`;
-export const promptDesc = css`font-size: 14px; margin-bottom: 8px;`;
-export const promptActions = css`display: flex; gap: 8px; flex-wrap: wrap;`;
+export const promptTitle = css`
+  color: #e67e22;
+  font-weight: bold;
+  font-size: 15px;
+  margin-bottom: 4px;
+`;
+export const promptDesc = css`
+  font-size: 14px;
+  margin-bottom: 8px;
+`;
+export const promptActions = css`
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+`;
+// prompt 动作区变体:装备/判定/手牌盲选等多行内容,换行间距更紧
+export const promptActionsWrap = css`
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+`;
+// prompt 描述变体:占满整行(分组标题,如「装备区:」)
+export const promptDescFull = css`
+  font-size: 14px;
+  width: 100%;
+  margin-bottom: 0;
+`;
+// prompt 描述变体:单行内联(垂直居中,无下边距)
+export const promptDescInline = css`
+  font-size: 14px;
+  margin-bottom: 0;
+  align-self: center;
+`;
 export const promptBtn = css`
-  border: 1px solid #888; border-radius: 6px; padding: 6px 14px;
-  cursor: pointer; background: rgba(0,0,0,0.3); color: #e0e0e0; font-size: 13px;
+  border: 1px solid #888;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+  color: #e0e0e0;
+  font-size: 13px;
+`;
+// prompt 按钮变体:手牌盲选用,保证序号按钮最小可点区域
+export const promptBtnMin = css`
+  border: 1px solid #888;
+  border-radius: 6px;
+  padding: 6px 14px;
+  min-width: 40px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+  color: #e0e0e0;
+  font-size: 13px;
 `;
 export const promptBtnPrimary = css`
-  border: 1px solid #27ae60; border-radius: 6px; padding: 6px 14px;
-  cursor: pointer; background: rgba(39,174,96,0.2); color: #2ecc71; font-size: 13px; font-weight: bold;
+  border: 1px solid #27ae60;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  background: rgba(39, 174, 96, 0.2);
+  color: #2ecc71;
+  font-size: 13px;
+  font-weight: bold;
 `;
 // 五谷丰登:被选走的牌(置暗禁用)
 export const promptBtnDisabled = css`
-  border: 1px solid #555; border-radius: 6px; padding: 6px 14px;
-  cursor: not-allowed; background: rgba(40,40,40,0.5); color: #666; font-size: 13px;
-  opacity: 0.6; display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: not-allowed;
+  background: rgba(40, 40, 40, 0.5);
+  color: #666;
+  font-size: 13px;
+  opacity: 0.6;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 `;
 export const pickedByTag = css`
-  font-size: 10px; color: #e74c3c; font-weight: normal;
+  font-size: 10px;
+  color: #e74c3c;
+  font-weight: normal;
   text-decoration: line-through;
 `;
 
 export const waitingHint = css`
-  text-align: center; color: #888; font-size: 13px; margin-bottom: 12px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+  margin-bottom: 12px;
 `;
 
 // ─── Seating — arc layout ───
@@ -109,6 +213,8 @@ export const seatArcContainer = css`
 // 弧形中每个座位槽位:用 absolute 精确定位
 export const seatArcSlot = css`
   position: absolute;
+  left: var(--seat-left, 0);
+  top: var(--seat-top, 0);
   transform: translateX(-50%);
   /* 给定宽度,使内部 CountdownBar 等子元素宽度与卡片对齐 */
   width: 180px;
@@ -121,18 +227,21 @@ export const centerMeta = css`
   margin: 8px auto;
   max-width: 300px;
 `;
-export const metaText = css`font-size: 12px; color: #888;`;
+export const metaText = css`
+  font-size: 12px;
+  color: #888;
+`;
 
 // ─── Seat card — 武将卡风格:势力色 header + 体力红心 + 技能标签 ───
 export const seatCard = css`
   border: 1px solid #444;
   border-radius: 10px;
   overflow: hidden;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   transition: all 0.25s;
   min-width: 170px;
   max-width: 200px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 `;
 // 势力色顶部条:武将名 + 身份
 export const seatCardHeader = css`
@@ -149,44 +258,63 @@ export const seatCardHeaderTop = css`
 export const seatCharName = css`
   font-weight: bold;
   font-size: 15px;
-  color: rgba(255,255,255,0.9);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 `;
 // 体力行:红心表示 HP
 export const seatHpRow = css`
   display: flex;
   gap: 2px;
   padding: 4px 10px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
 `;
 export const hpHeartFull = css`
   color: #e74c3c;
   font-size: 16px;
-  text-shadow: 0 0 4px rgba(231,76,60,0.5);
+  text-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
 `;
 export const hpHeartEmpty = css`
   color: #555;
   font-size: 14px;
 `;
 export const seatCardActive = css`
-  box-shadow: 0 0 18px rgba(255,215,0,0.35), inset 0 0 8px rgba(255,215,0,0.1);
+  box-shadow:
+    0 0 18px rgba(255, 215, 0, 0.35),
+    inset 0 0 8px rgba(255, 215, 0, 0.1);
   outline: 2px solid #ffd700;
 `;
 export const seatCardPerspective = css`
   border: 2px solid #3498db;
-  box-shadow: 0 0 8px rgba(52,152,219,0.25);
+  box-shadow: 0 0 8px rgba(52, 152, 219, 0.25);
 `;
-export const seatCardDead = css`opacity: 0.35; filter: grayscale(1);`;
-export const seatCardClickable = css`cursor: pointer; &:hover { outline: 2px solid #e74c3c; }`;
-export const seatCardTargeted = css`outline: 3px solid #e74c3c; box-shadow: 0 0 12px rgba(231,76,60,0.4);`;
+export const seatCardDead = css`
+  opacity: 0.35;
+  filter: grayscale(1);
+`;
+export const seatCardClickable = css`
+  cursor: pointer;
+  &:hover {
+    outline: 2px solid #e74c3c;
+  }
+`;
+export const seatCardTargeted = css`
+  outline: 3px solid #e74c3c;
+  box-shadow: 0 0 12px rgba(231, 76, 60, 0.4);
+`;
 export const seatHeader = css`
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 `;
-export const seatName = css`font-weight: bold; font-size: 12px; color: rgba(255,255,255,0.85);`;
+export const seatName = css`
+  font-weight: bold;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+`;
 export const seatIndexBadge = css`
   display: inline-block;
-  background: rgba(0,0,0,0.2);
-  color: rgba(255,255,255,0.6);
+  background: rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.6);
   border-radius: 3px;
   padding: 1px 5px;
   margin-right: 4px;
@@ -194,38 +322,89 @@ export const seatIndexBadge = css`
   font-weight: normal;
   vertical-align: middle;
 `;
-export const seatChar = css`color: #8899aa; font-size: 12px; margin-left: 4px;`;
+export const seatChar = css`
+  color: #8899aa;
+  font-size: 12px;
+  margin-left: 4px;
+`;
 export const youBadge = css`
-  background: #3498db; border-radius: 3px; padding: 1px 5px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #3498db;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 export const turnBadge = css`
-  background: #ffd700; border-radius: 3px; padding: 1px 5px;
-  font-size: 9px; color: #000; margin-left: 4px; font-weight: bold;
+  background: #ffd700;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 9px;
+  color: #000;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 export const lordBadge = css`
-  background: #FFD700; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #4a2800; margin-left: 4px; font-weight: bold;
+  background: #ffd700;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #4a2800;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 export const loyalistBadge = css`
-  background: #4A90E2; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #4a90e2;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 export const rebelBadge = css`
-  background: #E74C3C; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #e74c3c;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 export const renegadeBadge = css`
-  background: #9B59B6; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #9b59b6;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 export const hiddenBadge = css`
-  background: #555; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #bbb; margin-left: 4px; font-weight: bold;
+  background: #555;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: #bbb;
+  margin-left: 4px;
+  font-weight: bold;
 `;
-export const hpFull = css`color: #2ecc71; font-weight: bold; font-size: 13px;`;
-export const hpMid = css`color: #e67e22; font-weight: bold; font-size: 13px;`;
-export const hpLow = css`color: #e74c3c; font-weight: bold; font-size: 13px;`;
+export const hpFull = css`
+  color: #2ecc71;
+  font-weight: bold;
+  font-size: 13px;
+`;
+export const hpMid = css`
+  color: #e67e22;
+  font-weight: bold;
+  font-size: 13px;
+`;
+export const hpLow = css`
+  color: #e74c3c;
+  font-weight: bold;
+  font-size: 13px;
+`;
 export const equipRow = css`
   font-size: 11px;
   color: #f39c12;
@@ -236,19 +415,34 @@ export const equipRow = css`
 `;
 // 判定区(延时锦囊):斜体、紫色边框,亮眼能看清
 export const judgeRow = css`
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-  margin-top: 2px; font-size: 11px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 11px;
 `;
-export const judgeRowLabel = css`color: #b78bff; font-weight: bold;`;
+export const judgeRowLabel = css`
+  color: #b78bff;
+  font-weight: bold;
+`;
 export const judgeTag = css`
-  display: inline-block; padding: 1px 6px; border-radius: 4px;
-  border: 1px solid; background: rgba(155, 89, 182, 0.12);
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--suit-color, #ccc);
+  color: var(--suit-color, #ccc);
+  background: rgba(155, 89, 182, 0.12);
   font-weight: bold;
 `;
 // 处理区:游戏中央的一排小卡
 export const processingRow = css`
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-  margin: 6px auto; padding: 4px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 6px auto;
+  padding: 4px 8px;
   background: rgba(231, 126, 34, 0.12);
   border: 1px dashed #e67e22;
   border-radius: 6px;
@@ -256,47 +450,90 @@ export const processingRow = css`
   font-size: 11px;
   justify-content: center;
 `;
-export const processingLabel = css`color: #e67e22; font-weight: bold;`;
+export const processingLabel = css`
+  color: #e67e22;
+  font-weight: bold;
+`;
 export const processingTag = css`
-  display: inline-block; padding: 1px 6px; border-radius: 4px;
-  border: 1px solid; background: rgba(230, 126, 34, 0.08);
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--suit-color, #ccc);
+  color: var(--suit-color, #ccc);
+  background: rgba(230, 126, 34, 0.08);
   font-weight: bold;
 `;
 // 弃牌堆:小图标 + 计数
 export const discardPileRow = css`
-  display: flex; align-items: center; gap: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   justify-content: center;
   margin-top: 4px;
   font-size: 12px;
   color: #aaa;
 `;
 export const discardPileIcon = css`
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   background: rgba(231, 76, 60, 0.18);
   border: 1px solid #e74c3c;
   border-radius: 4px;
   font-size: 14px;
 `;
-export const discardPileCount = css`color: #e0e0e0; font-weight: bold;`;
-export const skillRow = css`margin-bottom: 4px;`;
+export const discardPileCount = css`
+  color: #e0e0e0;
+  font-weight: bold;
+`;
+export const skillRow = css`
+  margin-bottom: 4px;
+`;
 export const skillTag = css`
-  display: inline-block; background: rgba(15,52,96,0.6); border-radius: 3px;
-  padding: 1px 5px; margin-right: 3px; font-size: 10px; color: #8899aa;
+  display: inline-block;
+  background: rgba(15, 52, 96, 0.6);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-right: 3px;
+  font-size: 10px;
+  color: #8899aa;
 `;
 export const infoRow = css`
-  font-size: 11px; color: #999; display: flex; flex-wrap: wrap; gap: 6px;
+  font-size: 11px;
+  color: #999;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 2px 10px 4px;
 `;
-export const markRow = css`font-size: 10px; color: #666; padding: 0 10px 4px;`;
-export const markTag = css`margin-right: 6px;`;
+export const markRow = css`
+  font-size: 10px;
+  color: #666;
+  padding: 0 10px 4px;
+`;
+export const markTag = css`
+  margin-right: 6px;
+`;
 
 // ─── Hand cards ───
 export const handHeader = css`
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 `;
-export const handTitle = css`font-size: 14px; color: #aaa; font-weight: bold;`;
-export const debugHint = css`color: #666; font-weight: normal; font-size: 12px;`;
+export const handTitle = css`
+  font-size: 14px;
+  color: #aaa;
+  font-weight: bold;
+`;
+export const debugHint = css`
+  color: #666;
+  font-weight: normal;
+  font-size: 12px;
+`;
 
 // ─── Event card flip(翻牌动效,非阻塞) ───
 // 中央浮动卡牌:从上方弹出 + 3D 翻转揭示花色点数
@@ -339,15 +576,22 @@ export const eventCardName = css`
   font-size: 16px;
   font-weight: bold;
   line-height: 1.3;
+  color: var(--suit-color, #ccc);
 `;
 export const eventCardSuit = css`
   font-size: 13px;
   font-weight: bold;
   margin-top: 2px;
+  color: var(--suit-color, #ccc);
 `;
 export const cancelBtn = css`
-  border: 1px solid #555; border-radius: 4px; padding: 2px 8px;
-  cursor: pointer; background: transparent; color: #aaa; font-size: 11px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  background: transparent;
+  color: #aaa;
+  font-size: 11px;
 `;
 export const handList = css`
   display: flex;
@@ -363,54 +607,70 @@ export const handCard = css`
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
-  background: linear-gradient(180deg, rgba(30,20,15,0.95) 0%, rgba(20,12,8,0.95) 100%);
+  background: linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%);
   min-width: 72px;
   width: 80px;
   text-align: center;
   transition: all 0.2s;
+  transform: rotate(var(--fan-angle, 0deg));
   transform-origin: bottom center;
-  box-shadow: -1px 2px 6px rgba(0,0,0,0.3);
+  z-index: var(--card-z, 0);
+  box-shadow: -1px 2px 6px rgba(0, 0, 0, 0.3);
   margin-left: -16px;
-  &:first-of-type { margin-left: 0; }
+  &:first-of-type {
+    margin-left: 0;
+  }
   &:hover {
     z-index: 100 !important;
     margin-bottom: 8px;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
     border-color: #888;
   }
 `;
 export const handCardSelected = css`
-  border: 2px solid #3498db; background: rgba(52,152,219,0.18);
-  margin-bottom: 8px; box-shadow: 0 4px 12px rgba(52,152,219,0.3);
+  border: 2px solid #3498db;
+  background: rgba(52, 152, 219, 0.18);
+  margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
 `;
-export const handCardDisabled = css`opacity: 0.4; cursor: default;`;
+export const handCardDisabled = css`
+  opacity: 0.4;
+  cursor: default;
+`;
 export const handCardRespondable = css`
   border: 2px solid #ffd700;
-  box-shadow: 0 0 10px rgba(255,215,0,0.4);
-  background: rgba(255,215,0,0.08);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+  background: rgba(255, 215, 0, 0.08);
 `;
 // 转化模式:匹配卡牌用金色高亮表示可作为“转化后的牌”点选
 export const handCardTransform = css`
   border: 2px solid #f1c40f;
-  box-shadow: 0 0 10px rgba(241,196,15,0.5);
-  background: rgba(241,196,15,0.08);
+  box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+  background: rgba(241, 196, 15, 0.08);
   cursor: pointer;
-  &:hover { background: rgba(241,196,15,0.18); }
+  &:hover {
+    background: rgba(241, 196, 15, 0.18);
+  }
 `;
 // 转化模式:不匹配卡牌变灰、不可点
-export const handCardTransformDisabled = css`opacity: 0.3; cursor: not-allowed;`;
+export const handCardTransformDisabled = css`
+  opacity: 0.3;
+  cursor: not-allowed;
+`;
 // distribute(仁德/制衡/遗计):候选可分配牌金色高亮
 export const handCardDistributeCandidate = css`
   border: 2px solid #f1c40f;
-  box-shadow: 0 0 10px rgba(241,196,15,0.4);
+  box-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
   cursor: pointer;
-  &:hover { background: rgba(241,196,15,0.15); }
+  &:hover {
+    background: rgba(241, 196, 15, 0.15);
+  }
 `;
 // distribute:已选中牌(待分配/待提交)绿色加粗边框
 export const handCardDistributeSelected = css`
   border: 2px solid #2ecc71;
-  box-shadow: 0 0 12px rgba(46,204,113,0.5);
-  background: rgba(46,204,113,0.15);
+  box-shadow: 0 0 12px rgba(46, 204, 113, 0.5);
+  background: rgba(46, 204, 113, 0.15);
   margin-bottom: 8px;
 `;
 // distribute:已分配给目标(allocate 模式)半透明、不可再点
@@ -423,12 +683,32 @@ export const discardCardSelected = css`
   opacity: 0.5;
   border: 2px solid #e74c3c;
   border-radius: 6px;
-  background: rgba(231,76,60,0.18);
+  background: rgba(231, 76, 60, 0.18);
 `;
-export const cardName = css`font-weight: bold; font-size: 16px; margin-bottom: 2px; letter-spacing: 1px;`;
-export const cardSuit = css`font-size: 13px; margin-top: 2px;`;
-export const cardOrigin = css`font-size: 10px; opacity: 0.7; margin-bottom: 2px; font-style: italic;`;
-export const emptyHand = css`color: #555; font-size: 13px; padding: 12px;`;
+export const cardName = css`
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 2px;
+  letter-spacing: 1px;
+  color: var(--suit-color, #ccc);
+`;
+export const cardSuit = css`
+  font-size: 13px;
+  margin-top: 2px;
+  color: var(--suit-color, #ccc);
+`;
+export const cardOrigin = css`
+  font-size: 10px;
+  opacity: 0.7;
+  margin-bottom: 2px;
+  font-style: italic;
+  color: var(--suit-color, #ccc);
+`;
+export const emptyHand = css`
+  color: #555;
+  font-size: 13px;
+  padding: 12px;
+`;
 
 // ─── 动画状态样式 ───
 export const handCardNew = css`
@@ -460,52 +740,119 @@ export const turnGlowing = css`
 
 // ─── Action bar ───
 export const actionBar = css`
-  display: flex; gap: 12px; align-items: center; margin-bottom: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
 `;
 export const playBtn = css`
-  border: none; border-radius: 6px; padding: 8px 20px;
-  cursor: pointer; background: #27ae60; color: #fff; font-weight: bold; font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  cursor: pointer;
+  background: #27ae60;
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
 `;
 export const endTurnBtn = css`
-  border: none; border-radius: 6px; padding: 8px 20px;
-  cursor: pointer; background: #e74c3c; color: #fff; font-weight: bold; font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  cursor: pointer;
+  background: #e74c3c;
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
 `;
-export const targetHint = css`font-size: 13px; color: #ffd700;`;
+export const targetHint = css`
+  font-size: 13px;
+  color: #ffd700;
+`;
 
 // ─── Target selection ───
-export const targetSection = css`margin-bottom: 12px;`;
-export const targetTitle = css`font-size: 13px; color: #aaa; margin-bottom: 8px; font-weight: bold;`;
-export const targetList = css`display: flex; gap: 8px; flex-wrap: wrap;`;
-export const targetBtn = css`
-  border: 1px solid #444; border-radius: 6px; padding: 6px 14px;
-  cursor: pointer; background: rgba(22,33,62,0.8); color: #e0e0e0; font-size: 13px;
+export const targetSection = css`
+  margin-bottom: 12px;
 `;
-export const targetBtnActive = css`border: 2px solid #e74c3c; background: rgba(231,76,60,0.2);`;
-export const targetBtnDisabled = css`opacity: 0.35; cursor: not-allowed; border-style: dashed;`;
+export const targetTitle = css`
+  font-size: 13px;
+  color: #aaa;
+  margin-bottom: 8px;
+  font-weight: bold;
+`;
+export const targetList = css`
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+`;
+export const targetBtn = css`
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  background: rgba(22, 33, 62, 0.8);
+  color: #e0e0e0;
+  font-size: 13px;
+`;
+export const targetBtnActive = css`
+  border: 2px solid #e74c3c;
+  background: rgba(231, 76, 60, 0.2);
+`;
+export const targetBtnDisabled = css`
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-style: dashed;
+`;
 // Skill buttons (技能在角色卡上显示，这里只保留按钮本体样式)
 export const skillBtn = css`
-  border: 1px solid #9b59b6; border-radius: 4px; padding: 2px 8px;
-  cursor: pointer; background: rgba(155,89,182,0.15); color: #bb8fce; font-size: 11px; font-weight: bold;
+  border: 1px solid #9b59b6;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  background: rgba(155, 89, 182, 0.15);
+  color: #bb8fce;
+  font-size: 11px;
+  font-weight: bold;
   margin-right: 3px;
-  &:hover { background: rgba(155,89,182,0.3); }
+  &:hover {
+    background: rgba(155, 89, 182, 0.3);
+  }
 `;
 // 装备区中可点使用的装备技能按钮
 export const equipSkillBtn = css`
-  border: 1px solid #f39c12; border-radius: 4px; padding: 1px 6px;
-  cursor: pointer; background: rgba(243,156,18,0.18); color: #f39c12; font-size: 10px; font-weight: bold;
-  &:hover { background: rgba(243,156,18,0.32); }
+  border: 1px solid #f39c12;
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+  background: rgba(243, 156, 18, 0.18);
+  color: #f39c12;
+  font-size: 10px;
+  font-weight: bold;
+  &:hover {
+    background: rgba(243, 156, 18, 0.32);
+  }
 `;
 // 装备区 distribute(制衡/仁德)候选装备:可点击选中,金色高亮(与手牌候选一致)
 export const equipDistBtn = css`
-  border: 2px solid #f1c40f; border-radius: 4px; padding: 1px 6px;
-  cursor: pointer; background: rgba(241,196,15,0.12); color: #f1c40f; font-size: 10px; font-weight: bold;
-  box-shadow: 0 0 8px rgba(241,196,15,0.35);
-  &:hover { background: rgba(241,196,15,0.22); }
+  border: 2px solid #f1c40f;
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+  background: rgba(241, 196, 15, 0.12);
+  color: #f1c40f;
+  font-size: 10px;
+  font-weight: bold;
+  box-shadow: 0 0 8px rgba(241, 196, 15, 0.35);
+  &:hover {
+    background: rgba(241, 196, 15, 0.22);
+  }
 `;
 // 装备区 distribute 已选中装备:绿色边框(与手牌选中一致)
 export const equipDistSelected = css`
-  border-color: #2ecc71; color: #2ecc71; background: rgba(46,204,113,0.15);
-  box-shadow: 0 0 10px rgba(46,204,113,0.5);
+  border-color: #2ecc71;
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.15);
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
 `;
 
 // ─── 下方主布局 ───
@@ -534,8 +881,8 @@ export const playerCardLarge = css`
   border: 1px solid #444;
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(0,0,0,0.55);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   @media (max-width: 900px) {
@@ -547,6 +894,7 @@ export const playerCardHeader = css`
   display: flex;
   flex-direction: column;
   gap: 4px;
+  background: var(--faction-color, transparent);
 `;
 export const playerCardHeaderTop = css`
   display: flex;
@@ -557,18 +905,18 @@ export const playerCardName = css`
   font-weight: bold;
   font-size: 18px;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 `;
 export const playerCardChar = css`
   font-weight: bold;
   font-size: 14px;
-  color: rgba(255,255,255,0.85);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 `;
 export const playerCardEquip = css`
   padding: 6px 12px 8px;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  background: rgba(243,156,18,0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(243, 156, 18, 0.05);
 `;
 export const playerCardEquipTitle = css`
   font-size: 11px;
@@ -580,37 +928,80 @@ export const playerCardEquipTitle = css`
 
 // ─── Debug panel ───
 export const debugPanel = css`
-  margin-top: 16px; border: 1px solid #333; border-radius: 8px;
-  background: rgba(0,0,0,0.2);
+  margin-top: 16px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
 `;
 export const debugSummary = css`
-  padding: 8px 12px; cursor: pointer; color: #888; font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #888;
+  font-size: 12px;
 `;
-export const debugContent = css`padding: 8px 12px; font-size: 12px; color: #aaa; font-family: monospace;`;
-export const debugHr = css`border: none; border-top: 1px solid #333; margin: 8px 0;`;
-export const debugPlayer = css`margin-bottom: 4px;`;
-export const debugDead = css`text-decoration: line-through; opacity: 0.5;`;
+export const debugContent = css`
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #aaa;
+  font-family: monospace;
+`;
+export const debugHr = css`
+  border: none;
+  border-top: 1px solid #333;
+  margin: 8px 0;
+`;
+export const debugPlayer = css`
+  margin-bottom: 4px;
+`;
+export const debugDead = css`
+  text-decoration: line-through;
+  opacity: 0.5;
+`;
 
 // ─── Log panel ───
 export const logPanel = css`
-  margin-top: 12px; border: 1px solid #333; border-radius: 8px;
-  background: rgba(0,0,0,0.2);
+  margin-top: 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
 `;
 export const logSummary = css`
-  padding: 8px 12px; cursor: pointer; color: #888; font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #888;
+  font-size: 12px;
 `;
 export const logContent = css`
-  padding: 8px 12px; font-size: 12px; color: #aaa;
-  max-height: 200px; overflow-y: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #aaa;
+  max-height: 200px;
+  overflow-y: auto;
 `;
-export const logEmpty = css`color: #555; font-style: italic;`;
+export const logEmpty = css`
+  color: #555;
+  font-style: italic;
+`;
 export const logEntry = css`
-  display: flex; gap: 8px; padding: 2px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 `;
-export const logTime = css`color: #666; min-width: 40px; flex-shrink: 0;`;
-export const logPlayer = css`color: #3498db; font-weight: bold; min-width: 40px; flex-shrink: 0;`;
-export const logText = css`color: #ccc;`;
+export const logTime = css`
+  color: #666;
+  min-width: 40px;
+  flex-shrink: 0;
+`;
+export const logPlayer = css`
+  color: #3498db;
+  font-weight: bold;
+  min-width: 40px;
+  flex-shrink: 0;
+`;
+export const logText = css`
+  color: #ccc;
+`;
 
 // ─── 选将等待遮罩(并行选将:当前视角玩家已选完但其他人还在选)───
 export const charSelectWaitingOverlay = css`
@@ -654,9 +1045,12 @@ export const selectedCharCard = css`
   gap: 8px;
   padding: 18px 36px;
   border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(255, 215, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 4px 24px rgba(255, 215, 0, 0.25),
+    0 4px 16px rgba(0, 0, 0, 0.4);
   border: 2px solid rgba(255, 215, 0, 0.6);
   min-width: 200px;
+  background: var(--faction-color, #8e44ad);
 `;
 export const selectedCharLabel = css`
   font-size: 12px;
@@ -686,6 +1080,15 @@ export const selectedCharHpRow = css`
   gap: 4px;
   margin-top: 2px;
 `;
+// 已选武将卡体力点(选将/等待遮罩共用)
+export const selectedCharHpDot = css`
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e74c3c;
+  box-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
+`;
 
 // ─── 辅助状态样式 ───
 /** 自动切换按钮激活态(绿色)。 */
@@ -714,9 +1117,13 @@ export const deadBadge = css`
   background: #555;
 `;
 /** 技能按钮 danger 变体边框。 */
-export const skillBtnDanger = css`border-color: #e74c3c;`;
+export const skillBtnDanger = css`
+  border-color: #e74c3c;
+`;
 /** 技能按钮 primary 变体边框。 */
-export const skillBtnPrimary = css`border-color: #f39c12;`;
+export const skillBtnPrimary = css`
+  border-color: #f39c12;
+`;
 /** 按钮禁用态(出牌/转化出牌)。 */
 export const btnDisabled = css`
   opacity: 0.4;
@@ -729,34 +1136,75 @@ export const distributeCancelRow = css`
   margin-top: 6px;
 `;
 /** 角色大卡技能区 padding 覆盖。 */
-export const skillRowPad = css`padding: 8px 12px;`;
+export const skillRowPad = css`
+  padding: 8px 12px;
+`;
 /** 角色大卡判定区 padding 覆盖。 */
-export const judgeRowPad = css`padding: 0 12px 8px;`;
+export const judgeRowPad = css`
+  padding: 0 12px 8px;
+`;
 
 // ─── Debug 快照 ───
 export const snapshotBtn = css`
-  background: #2d4a2d; color: #7ee787; border: 1px solid #4a8a4a;
-  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;
-  &:hover { background: #3d5a3d; }
-  &:disabled { opacity: 0.5; cursor: wait; }
+  background: #2d4a2d;
+  color: #7ee787;
+  border: 1px solid #4a8a4a;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  &:hover {
+    background: #3d5a3d;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
 `;
 export const snapshotToast = css`
-  position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
-  background: #1f3d1f; color: #7ee787; padding: 10px 20px; border-radius: 6px;
-  border: 1px solid #4a8a4a; font-size: 13px; z-index: 9999;
-  display: flex; align-items: center; gap: 10px;
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f3d1f;
+  color: #7ee787;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: 1px solid #4a8a4a;
+  font-size: 13px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `;
 export const copyBtn = css`
-  background: #2d4a2d; color: #7ee787; border: 1px solid #4a8a4a;
-  padding: 2px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  background: #2d4a2d;
+  color: #7ee787;
+  border: 1px solid #4a8a4a;
+  padding: 2px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
   white-space: nowrap;
-  &:hover { background: #3d5a3d; }
+  &:hover {
+    background: #3d5a3d;
+  }
 `;
 export const copyBtnDone = css`
-  background: #1a3d1a; border-color: #2a6a2a; cursor: default;
+  background: #1a3d1a;
+  border-color: #2a6a2a;
+  cursor: default;
 `;
 export const snapshotErrorToast = css`
-  position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
-  background: #3d1f1f; color: #ff7b72; padding: 10px 20px; border-radius: 6px;
-  border: 1px solid #8a4a4a; font-size: 13px; z-index: 9999;
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #3d1f1f;
+  color: #ff7b72;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: 1px solid #8a4a4a;
+  font-size: 13px;
+  z-index: 9999;
 `;

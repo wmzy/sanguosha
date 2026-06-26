@@ -19,7 +19,14 @@ import { GameViewComponent } from './GameView';
 import { GameResultOverlay } from './GameResultOverlay';
 import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 import { DebugInfo } from './DebugInfo';
-import { styles } from '../theme';
+import { pageStyle, errorToastStyle } from '../theme';
+import { css } from '@linaria/core';
+
+const connectingHint = css`
+  color: #aaa;
+  text-align: center;
+  margin-top: 40px;
+`;
 import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/debugTelemetry';
 import type { RoomInfo } from '../../server/protocol';
 import type { GameView as EngineGameView } from '../../engine/types';
@@ -45,7 +52,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
 
   const rooms: RoomInfo[] = c.debugRooms;
   return (
-    <div style={styles.page(40)}>
+    <div className={pageStyle} style={{ '--page-padding': '40px' } as React.CSSProperties}>
       <DebugControls onBack={() => navigate('/')} />
       <DebugRoomList
         playerCount={c.playerCount}
@@ -56,14 +63,16 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         onJoin={c.handleJoinDebugRoom}
         onDelete={c.handleDeleteDebugRoom}
       />
-      {c.error && <div style={styles.errorToast()}>{c.error}</div>}
+      {c.error && <div className={errorToastStyle}>{c.error}</div>}
     </div>
   );
 }
 
 /** debug 模式游戏视图:多 WS 连接 + 视角管理 + 调试面板 + 事件 overlay。 */
 function DebugGameView({
-  roomId, playerCount, onDeleteRoom,
+  roomId,
+  playerCount,
+  onDeleteRoom,
 }: {
   roomId: string;
   playerCount: number;
@@ -77,7 +86,9 @@ function DebugGameView({
 }
 
 function DebugGameViewInner({
-  roomId, playerCount, onDeleteRoom,
+  roomId,
+  playerCount,
+  onDeleteRoom,
 }: {
   roomId: string;
   playerCount: number;
@@ -105,7 +116,11 @@ function DebugGameViewInner({
   }, []);
 
   const snap = useSnapshot();
-  const { createSnapshot: createSnap, patchDescription: patchSnap, clearError: clearSnapError } = snap;
+  const {
+    createSnapshot: createSnap,
+    patchDescription: patchSnap,
+    clearError: clearSnapError,
+  } = snap;
   const { views: connViews, getSeq: connGetSeq } = conn;
 
   const handleSaveSnapshot = useCallback(async () => {
@@ -138,7 +153,9 @@ function DebugGameViewInner({
   if (!conn.gameStarted && !currentView) {
     return (
       <RoomConfigPanel
-        config={conn.roomState?.config ?? { name: '', timeoutScale: 1, charPool: 'all', handSize: 4 }}
+        config={
+          conn.roomState?.config ?? { name: '', timeoutScale: 1, charPool: 'all', handSize: 4 }
+        }
         readyPlayers={conn.roomState?.readyPlayers ?? []}
         playerIds={conn.roomState?.playerIds ?? []}
         seatPlayerIds={conn.seatPlayerIds}
@@ -157,11 +174,9 @@ function DebugGameViewInner({
 
   if (!currentView) {
     return (
-      <div style={styles.page(40)}>
+      <div className={pageStyle} style={{ '--page-padding': '40px' } as React.CSSProperties}>
         <DebugControls onBack={() => onDeleteRoom()} />
-        <div style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>
-          正在连接各座次视角…
-        </div>
+        <div className={connectingHint}>正在连接各座次视角…</div>
       </div>
     );
   }

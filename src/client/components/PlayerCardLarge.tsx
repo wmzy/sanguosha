@@ -6,7 +6,12 @@ import * as styles from './gameViewStyles';
 import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
-import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
+import {
+  FACTION_BG,
+  SUIT_COLOR,
+  EQUIPMENT_SKILL_NAMES,
+  EQUIP_SLOT_ICON,
+} from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 
@@ -47,9 +52,18 @@ function skillBtnVariant(style: string | undefined): string {
 }
 
 export function PlayerCardLarge({
-  perspectiveIdx, viewer, view, damageFlashIndices,
-  canOperate, isPerspectiveTurn, skillActions, onSkillAction,
-  distCandidateEquipIds, distSelectedEquipIds, isDistributeActive, onEquipCardClick,
+  perspectiveIdx,
+  viewer,
+  view,
+  damageFlashIndices,
+  canOperate,
+  isPerspectiveTurn,
+  skillActions,
+  onSkillAction,
+  distCandidateEquipIds,
+  distSelectedEquipIds,
+  isDistributeActive,
+  onEquipCardClick,
 }: PlayerCardLargeProps) {
   const p = view.players[perspectiveIdx];
   if (!p) return null;
@@ -60,31 +74,41 @@ export function PlayerCardLarge({
   const factionColor = FACTION_BG[faction] || '#8e44ad';
   const identity = p.identity;
   // 技能列表(过滤默认技能与装备技能)
-  const visibleSkills = p.skills.filter(s => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILL_NAMES.has(s));
+  const visibleSkills = p.skills.filter(
+    (s) => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILL_NAMES.has(s),
+  );
   // 装备技能:动态装备的技能可主动点击
-  const equipSkillActions = skillActions.filter(a => EQUIPMENT_SKILL_NAMES.has(a.skillId));
+  const equipSkillActions = skillActions.filter((a) => EQUIPMENT_SKILL_NAMES.has(a.skillId));
   // 主动技(confirm/choosePlayer/转化类/distribute)渲染为可点按钮
-  const triggerableActions = skillActions.filter(a =>
-    a.prompt.type === 'confirm' ||
-    a.prompt.type === 'choosePlayer' ||
-    (a.prompt.type === 'useCardAndTarget' && a.transform) ||
-    a.prompt.type === 'distribute'
+  const triggerableActions = skillActions.filter(
+    (a) =>
+      a.prompt.type === 'confirm' ||
+      a.prompt.type === 'choosePlayer' ||
+      (a.prompt.type === 'useCardAndTarget' && a.transform) ||
+      a.prompt.type === 'distribute',
   );
   // 技能按钮显隐:由 action 声明的 activeWhen 决定(缺省=出牌阶段+自己回合+无 pending)。
   // canOperate(debug 可操作性开关)作为外层闸门;激活时机不再硬编码在组件里。
   const actionCtx = { view, perspectiveIdx };
   const isSkillActive = (a: SkillActionDef) => canOperate && isActiveAction(a, actionCtx);
   const identityBadgeClass =
-    identity === '主公' ? styles.lordBadge :
-    identity === '忠臣' ? styles.loyalistBadge :
-    identity === '反贼' ? styles.rebelBadge :
-    identity === '内奸' ? styles.renegadeBadge :
-    '';
+    identity === '主公'
+      ? styles.lordBadge
+      : identity === '忠臣'
+        ? styles.loyalistBadge
+        : identity === '反贼'
+          ? styles.rebelBadge
+          : identity === '内奸'
+            ? styles.renegadeBadge
+            : '';
 
   return (
     <>
       {/* 势力色顶部条 */}
-      <div className={styles.playerCardHeader} style={{ background: factionColor }}>
+      <div
+        className={styles.playerCardHeader}
+        style={{ '--faction-color': factionColor } as React.CSSProperties}
+      >
         <div className={styles.playerCardHeaderTop}>
           <span className={styles.playerCardName}>{p.name}</span>
           <div>
@@ -101,7 +125,10 @@ export function PlayerCardLarge({
         {Array.from({ length: p.maxHealth }, (_, i) => (
           <span
             key={i}
-            className={cx(i < p.health ? styles.hpHeartFull : styles.hpHeartEmpty, damageFlashIndices.has(perspectiveIdx) && styles.hpFlash)}
+            className={cx(
+              i < p.health ? styles.hpHeartFull : styles.hpHeartEmpty,
+              damageFlashIndices.has(perspectiveIdx) && styles.hpFlash,
+            )}
           >
             ♥
           </span>
@@ -110,8 +137,8 @@ export function PlayerCardLarge({
       {/* 技能区:被动为标签,可主动点击的为按钮 */}
       {visibleSkills.length > 0 && (
         <div className={cx(styles.skillRow, styles.skillRowPad)}>
-          {visibleSkills.map(s => {
-            const btn = triggerableActions.find(a => a.skillId === s);
+          {visibleSkills.map((s) => {
+            const btn = triggerableActions.find((a) => a.skillId === s);
             if (btn && isSkillActive(btn)) {
               return (
                 <button
@@ -124,7 +151,11 @@ export function PlayerCardLarge({
                 </button>
               );
             }
-            return <span key={s} className={styles.skillTag}>{s}</span>;
+            return (
+              <span key={s} className={styles.skillTag}>
+                {s}
+              </span>
+            );
           })}
         </div>
       )}
@@ -160,16 +191,19 @@ export function PlayerCardLarge({
                 </span>
               );
             })}
-            {equipSkillActions.map(a => isSkillActive(a) && (
-              <button
-                key={`${a.skillId}:${a.actionType}`}
-                className={styles.equipSkillBtn}
-                onClick={() => onSkillAction(a)}
-                title={`${a.label}: ${a.prompt.title}`}
-              >
-                {a.label}
-              </button>
-            ))}
+            {equipSkillActions.map(
+              (a) =>
+                isSkillActive(a) && (
+                  <button
+                    key={`${a.skillId}:${a.actionType}`}
+                    className={styles.equipSkillBtn}
+                    onClick={() => onSkillAction(a)}
+                    title={`${a.label}: ${a.prompt.title}`}
+                  >
+                    {a.label}
+                  </button>
+                ),
+            )}
           </div>
         </div>
       )}
@@ -184,10 +218,11 @@ export function PlayerCardLarge({
               <span
                 key={cardId}
                 className={styles.judgeTag}
-                style={{ color: suitColor, borderColor: suitColor }}
+                style={{ '--suit-color': suitColor } as React.CSSProperties}
                 title={card?.description ?? card?.name ?? cardId}
               >
-                {card?.name ?? cardId}{card ? ` ${card.suit}${card.rank}` : ''}
+                {card?.name ?? cardId}
+                {card ? ` ${card.suit}${card.rank}` : ''}
               </span>
             );
           })}

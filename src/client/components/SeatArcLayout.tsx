@@ -52,49 +52,53 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
     selectedNeedsTarget,
     selectedTarget,
     isTargetable,
-    onTargetClick, onSeatDoubleClick,
+    onTargetClick,
+    onSeatDoubleClick,
     damageFlashIndices,
     turnVersion,
   } = props;
 
   return (
     <div className={styles.seatArcContainer}>
-      {orderedPlayers.slice(1).length > 0 && orderedPlayers.slice(1).map((player, i) => {
-        const totalOthers = orderedPlayers.length - 1;
-        const realIdx = view.players.findIndex(p => p.name === player.name);
-        // 沿 180° 弧形分布: 左端5% 右端95%, Y轴弧线中间高两端低
-        const { leftPct, topPct } = arcLayout(totalOthers, i);
-        const seatDeadline = deadlineForSeat(view, realIdx);
-        const seatTotalMs = view.pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS;
-        return (
-          <div
-            key={player.name}
-            className={styles.seatArcSlot}
-            style={{ left: `${leftPct}%`, top: `${topPct}%` }}
-          >
-            <PlayerSeatView
-              player={player}
-              index={realIdx}
-              view={view}
-              isCurrentPlayer={player.name === currentPlayerName}
-              isPerspective={player.name === perspectiveName}
-              needsTarget={selectedNeedsTarget}
-              isTargetable={isTargetable(realIdx)}
-              selectedTarget={selectedTarget}
-              onTargetClick={onTargetClick}
-              onSeatDoubleClick={onSeatDoubleClick}
-              isDamaged={damageFlashIndices.has(realIdx)}
-              damageVersion={damageFlashIndices.get(realIdx) ?? 0}
-              isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
-              turnGlowVersion={turnVersion}
-            />
-            {/* 其他角色等待进度条:仅当该座次正在等待回应时显示 */}
-            {seatDeadline !== null && (
-              <CountdownBar deadline={seatDeadline} totalMs={seatTotalMs} />
-            )}
-          </div>
-        );
-      })}
+      {orderedPlayers.slice(1).length > 0 &&
+        orderedPlayers.slice(1).map((player, i) => {
+          const totalOthers = orderedPlayers.length - 1;
+          const realIdx = view.players.findIndex((p) => p.name === player.name);
+          // 沿 180° 弧形分布: 左端5% 右端95%, Y轴弧线中间高两端低
+          const { leftPct, topPct } = arcLayout(totalOthers, i);
+          const seatDeadline = deadlineForSeat(view, realIdx);
+          const seatTotalMs = view.pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS;
+          return (
+            <div
+              key={player.name}
+              className={styles.seatArcSlot}
+              style={
+                { '--seat-left': `${leftPct}%`, '--seat-top': `${topPct}%` } as React.CSSProperties
+              }
+            >
+              <PlayerSeatView
+                player={player}
+                index={realIdx}
+                view={view}
+                isCurrentPlayer={player.name === currentPlayerName}
+                isPerspective={player.name === perspectiveName}
+                needsTarget={selectedNeedsTarget}
+                isTargetable={isTargetable(realIdx)}
+                selectedTarget={selectedTarget}
+                onTargetClick={onTargetClick}
+                onSeatDoubleClick={onSeatDoubleClick}
+                isDamaged={damageFlashIndices.has(realIdx)}
+                damageVersion={damageFlashIndices.get(realIdx) ?? 0}
+                isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
+                turnGlowVersion={turnVersion}
+              />
+              {/* 其他角色等待进度条:仅当该座次正在等待回应时显示 */}
+              {seatDeadline !== null && (
+                <CountdownBar deadline={seatDeadline} totalMs={seatTotalMs} />
+              )}
+            </div>
+          );
+        })}
     </div>
   );
 }

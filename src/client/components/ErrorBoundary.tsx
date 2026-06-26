@@ -1,6 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { css } from '@linaria/core';
-import { colors, styles } from '../theme';
+import { colors, btnStyle } from '../theme';
 import { createLogger } from '../utils/logger';
 
 const rootLog = createLogger('ErrorBoundary');
@@ -111,7 +111,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     const ctx = this.props.context ?? 'root';
     const log = createLogger(`ErrorBoundary:${ctx}`);
-    log.error('React Error Boundary caught', { error: String(error), componentStack: errorInfo.componentStack });
+    log.error('React Error Boundary caught', {
+      error: String(error),
+      componentStack: errorInfo.componentStack,
+    });
     // 同时写一份到 root log，保证未配置 context 时也有输出
     rootLog.error('React Error Boundary caught', { context: ctx, error: String(error) });
   }
@@ -134,9 +137,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       const ctx = this.props.context;
       const isRoot = !ctx || ctx === 'root';
       const containerClass = isRoot ? rootBox : panelBox;
-      const containerStyle = isRoot
-        ? undefined
-        : ({ minHeight: 200 } as const);
+      const containerStyle = isRoot ? undefined : ({ minHeight: 200 } as const);
 
       return (
         <div className={containerClass} style={containerStyle}>
@@ -155,7 +156,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <div className={buttonRow}>
             <button
               onClick={this.resetError}
-              style={styles.btn(colors.accent.green, { padding: '10px 24px', fontSize: 14 })}
+              className={btnStyle}
+              style={
+                {
+                  '--btn-bg': colors.accent.green,
+                  '--btn-padding': '10px 24px',
+                  '--btn-font-size': '14px',
+                } as React.CSSProperties
+              }
               data-testid="error-boundary-retry"
             >
               {isRoot ? '重试' : '局部重试'}
@@ -163,7 +171,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {isRoot && (
               <button
                 onClick={() => window.location.reload()}
-                style={styles.btn(colors.accent.blue, { padding: '12px 32px', fontSize: 16 })}
+                className={btnStyle}
+                style={
+                  {
+                    '--btn-bg': colors.accent.blue,
+                    '--btn-padding': '12px 32px',
+                    '--btn-font-size': '16px',
+                  } as React.CSSProperties
+                }
               >
                 重新加载
               </button>

@@ -25,14 +25,19 @@ export interface CharSelectWaitingOverlayProps {
 }
 
 export function CharSelectWaitingOverlay({
-  view, perspectiveIdx, overlaySlot,
+  view,
+  perspectiveIdx,
+  overlaySlot,
 }: CharSelectWaitingOverlayProps) {
   // debug 多 WS 模型下,每个座次连接的 view.pending 直接就是该座次的选将询问;
   // 当前视角连接的 pending 是选将询问时,直接取其 deadline 用于倒计时。
   const isPendingCharSelect = view.pending?.atom?.type === '选将询问';
   const selectDeadline = isPendingCharSelect ? (view.pending!.deadline ?? null) : null;
   const selectTotalMs = isPendingCharSelect ? (view.pending!.totalMs ?? 60_000) : 60_000;
-  const selectingNames = view.players.filter(p => !p.character).map(p => p.name).join('、');
+  const selectingNames = view.players
+    .filter((p) => !p.character)
+    .map((p) => p.name)
+    .join('、');
 
   // 当前视角玩家已选的武将信息(用于展示选择结果)
   const me = view.players[perspectiveIdx];
@@ -42,29 +47,22 @@ export function CharSelectWaitingOverlay({
   const factionColor = FACTION_BG[faction] ?? '#8e44ad';
   const maxHealth = charInfo?.maxHealth ?? 4;
   // player.skills 包含默认技能,只展示武将自身技能(过滤掉默认技能)
-  const charSkills = (me?.skills ?? []).filter(s => !DEFAULT_SKILLS.has(s));
+  const charSkills = (me?.skills ?? []).filter((s) => !DEFAULT_SKILLS.has(s));
 
   return (
     <div className={styles.charSelectWaitingOverlay}>
       {/* 已选武将卡:明确反馈选择结果,禁止重新选将 */}
       {selectedChar && (
-        <div className={styles.selectedCharCard} style={{ background: factionColor }}>
+        <div
+          className={styles.selectedCharCard}
+          style={{ '--faction-color': factionColor } as React.CSSProperties}
+        >
           <div className={styles.selectedCharLabel}>你的选择</div>
           <div className={styles.selectedCharName}>{selectedChar}</div>
           <div className={styles.selectedCharFaction}>{faction}</div>
           <div className={styles.selectedCharHpRow}>
             {Array.from({ length: maxHealth }, (_, i) => (
-              <span
-                key={i}
-                style={{
-                  display: 'inline-block',
-                  width: 14,
-                  height: 14,
-                  borderRadius: '50%',
-                  background: '#e74c3c',
-                  boxShadow: '0 0 4px rgba(231, 76, 60, 0.5)',
-                }}
-              />
+              <span key={i} className={styles.selectedCharHpDot} />
             ))}
           </div>
           {charSkills.length > 0 && (

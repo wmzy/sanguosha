@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { css } from '@linaria/core';
 import type { RoomInfo } from '../../server/protocol';
-import { colors, styles } from '../theme';
+import { colors, btnStyle } from '../theme';
 
 interface RoomListPanelProps {
   rooms: RoomInfo[];
@@ -83,7 +83,14 @@ const roomActions = css`
 `;
 
 export const RoomListPanel = memo(
-  ({ rooms, onRefresh, onJoin, onDelete, emptyText, allowJoinAlways = false }: RoomListPanelProps) => {
+  ({
+    rooms,
+    onRefresh,
+    onJoin,
+    onDelete,
+    emptyText,
+    allowJoinAlways = false,
+  }: RoomListPanelProps) => {
     // join 可点条件: 房间未满,且(status 是等待中 或 allowJoinAlways 开启)
     const isJoinable = (room: RoomInfo) => {
       if (room.playerCount >= room.maxPlayers) return false;
@@ -92,58 +99,74 @@ export const RoomListPanel = memo(
     };
     return (
       <div className={panelRoot}>
-      <h2 className={panelTitle}>房间列表</h2>
+        <h2 className={panelTitle}>房间列表</h2>
 
-      <div className={refreshRow}>
-        <button
-          onClick={onRefresh}
-          style={styles.btn(colors.accent.blue, { padding: '8px 16px', fontSize: 13 })}
-        >
-          刷新列表
-        </button>
-      </div>
+        <div className={refreshRow}>
+          <button
+            onClick={onRefresh}
+            className={btnStyle}
+            style={
+              {
+                '--btn-bg': colors.accent.blue,
+                '--btn-padding': '8px 16px',
+                '--btn-font-size': '13px',
+              } as React.CSSProperties
+            }
+          >
+            刷新列表
+          </button>
+        </div>
 
-      <div className={scrollList}>
-        {rooms.length === 0 ? (
-          <div className={emptyTextStyle}>{emptyText ?? '暂无房间'}</div>
-        ) : (
-          rooms.map(room => (
-            <div key={room.id} className={roomItem}>
-              <div className={roomInfo}>
-                <div className={roomName}>{room.name}</div>
-                <div className={roomIdMono}>{room.id}</div>
-                <div className={roomMeta}>
-                  {room.playerCount}/{room.maxPlayers} 玩家 | {room.status}
+        <div className={scrollList}>
+          {rooms.length === 0 ? (
+            <div className={emptyTextStyle}>{emptyText ?? '暂无房间'}</div>
+          ) : (
+            rooms.map((room) => (
+              <div key={room.id} className={roomItem}>
+                <div className={roomInfo}>
+                  <div className={roomName}>{room.name}</div>
+                  <div className={roomIdMono}>{room.id}</div>
+                  <div className={roomMeta}>
+                    {room.playerCount}/{room.maxPlayers} 玩家 | {room.status}
+                  </div>
+                </div>
+                <div className={roomActions}>
+                  <button
+                    onClick={() => onJoin(room.id)}
+                    disabled={!isJoinable(room)}
+                    className={btnStyle}
+                    style={
+                      {
+                        '--btn-bg': isJoinable(room) ? colors.accent.green : colors.text.dim,
+                        '--btn-padding': '8px 16px',
+                        '--btn-font-size': '13px',
+                        '--btn-cursor': isJoinable(room) ? 'pointer' : 'not-allowed',
+                      } as React.CSSProperties
+                    }
+                  >
+                    加入
+                  </button>
+                  {onDelete && (
+                    <button
+                      onClick={() => onDelete(room.id)}
+                      className={btnStyle}
+                      style={
+                        {
+                          '--btn-bg': colors.accent.red,
+                          '--btn-padding': '8px 16px',
+                          '--btn-font-size': '13px',
+                        } as React.CSSProperties
+                      }
+                    >
+                      删除
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className={roomActions}>
-                <button
-                  onClick={() => onJoin(room.id)}
-                  disabled={!isJoinable(room)}
-                  style={styles.btn(
-                    isJoinable(room) ? colors.accent.green : colors.text.dim,
-                    {
-                      padding: '8px 16px',
-                      fontSize: 13,
-                      cursor: isJoinable(room) ? 'pointer' : 'not-allowed',
-                    },
-                  )}
-                >
-                  加入
-                </button>
-                {onDelete && (
-                  <button
-                    onClick={() => onDelete(room.id)}
-                    style={styles.btn(colors.accent.red, { padding: '8px 16px', fontSize: 13 })}
-                  >
-                    删除
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  },
+);

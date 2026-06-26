@@ -5,7 +5,7 @@
 
 import { css, cx } from '@linaria/core';
 import type { RoomInfo } from '../../../server/protocol';
-import { colors, styles } from '../../theme';
+import { colors, inputStyle } from '../../theme';
 import { RoomListPanel } from '../RoomListPanel';
 
 interface DebugRoomListProps {
@@ -87,8 +87,8 @@ export function DebugRoomList({
           <label className={formLabel}>玩家人数</label>
           <select
             value={playerCount}
-            onChange={e => onPlayerCountChange(Number(e.target.value))}
-            style={styles.input()}
+            onChange={(e) => onPlayerCountChange(Number(e.target.value))}
+            className={inputStyle}
           >
             <option value={2}>2人</option>
             <option value={3}>3人</option>
@@ -99,10 +99,7 @@ export function DebugRoomList({
             <option value={8}>8人</option>
           </select>
         </div>
-        <button
-          onClick={onCreateRoom}
-          className={cx(createBtnBase, createBtn)}
-        >
+        <button onClick={onCreateRoom} className={cx(createBtnBase, createBtn)}>
           创建调试房间
         </button>
       </div>

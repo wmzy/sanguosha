@@ -50,7 +50,12 @@ export function HandCard(props: HandCardProps) {
     onClick,
   } = props;
 
-  const canClick = canPlay || isAwaiting || canDiscardClick || isTransformActive || (isDistributeActive && isDistributeCandidate);
+  const canClick =
+    canPlay ||
+    isAwaiting ||
+    canDiscardClick ||
+    isTransformActive ||
+    (isDistributeActive && isDistributeCandidate);
   const isDistributeDisabled = isDistributeActive && !isDistributeCandidate;
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
   const displayName = isTransformMatch && transformWrapperName ? transformWrapperName : card.name;
@@ -62,7 +67,12 @@ export function HandCard(props: HandCardProps) {
       className={cx(
         styles.handCard,
         isSelected && styles.handCardSelected,
-        (!canPlay && !isAwaiting && !canDiscardClick && !isTransformActive && !isDistributeCandidate) && styles.handCardDisabled,
+        !canPlay &&
+          !isAwaiting &&
+          !canDiscardClick &&
+          !isTransformActive &&
+          !isDistributeCandidate &&
+          styles.handCardDisabled,
         isAwaiting && styles.handCardRespondable,
         isDiscardSelected && styles.discardCardSelected,
         isNew && styles.handCardNew,
@@ -73,7 +83,13 @@ export function HandCard(props: HandCardProps) {
         isDistributeAllocated && styles.handCardDistributeAllocated,
         isDistributeDisabled && styles.handCardDisabled,
       )}
-      style={{ transform: `rotate(${fanAngle}deg)`, zIndex: index }}
+      style={
+        {
+          '--fan-angle': `${fanAngle}deg`,
+          '--card-z': index,
+          '--suit-color': suitColor,
+        } as React.CSSProperties
+      }
       onClick={() => canClick && !isTransformDisabled && !isDistributeDisabled && onClick()}
       title={
         isTransformMatch && transformWrapperName
@@ -81,11 +97,14 @@ export function HandCard(props: HandCardProps) {
           : `${card.name} ${card.suit}${card.rank}\n${card.description ?? ''}`
       }
     >
-      <div className={styles.cardName} style={{ color: suitColor }}>{displayName}</div>
+      <div className={styles.cardName}>{displayName}</div>
       {isTransformMatch && transformWrapperName && (
-        <div className={styles.cardOrigin} style={{ color: suitColor }}>(原: {card.name})</div>
+        <div className={styles.cardOrigin}>(原: {card.name})</div>
       )}
-      <div className={styles.cardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
+      <div className={styles.cardSuit}>
+        {card.suit}
+        {card.rank}
+      </div>
     </div>
   );
 }

@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Refactored — 主题和组件样式从 CSSProperties 迁移至 Linaria
+
+所有客户端组件从 `CSSProperties` 对象内联样式迁移到 Linaria `css` 标记模板,实现零运行时 CSS-in-JS。
+
+#### Changed
+- **theme.ts**:移除 `styles` 工厂函数(`page`/`btn`/`input`/`errorToast`),替换为 Linaria `css` 具名导出(`pageStyle`/`btnStyle`/`inputStyle`/`errorToastStyle`);动态值通过 CSS 自定义属性(`--page-padding`/`--btn-bg`等)传入。
+- **gameViewStyles.ts**:从 `CSSProperties` 对象重写为 Linaria `css` 模板,样式规模大幅扩展(新增布局/flex/定位等声明式样式)。
+- **全部 UI 组件**:`import { styles }` → `import { pageStyle, btnStyle, … }`,内联 `style={}` 替换为 `className`。
+
 ### Fixed — 阵亡角色未亮明身份
 
 角色阵亡后其他玩家视角仍显示身份为「暗」,未能按规则揭示。根因:`击杀` atom 的 `applyView` 只置 `alive=false`,未同步身份;前端走事件流(`viewReducer` → `applyView`)增量更新,而 `buildView` 的全量快照揭示逻辑在此路径上不生效,导致阵亡身份不公开。

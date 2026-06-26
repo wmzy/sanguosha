@@ -32,10 +32,11 @@ export function ZoneInfoBar(props: ZoneInfoBarProps) {
                 <span
                   key={cardId}
                   className={styles.processingTag}
-                  style={{ color: suitColor, borderColor: suitColor }}
+                  style={{ '--suit-color': suitColor } as React.CSSProperties}
                   title={desc || card.name}
                 >
-                  {card.name} {card.suit}{card.rank}
+                  {card.name} {card.suit}
+                  {card.rank}
                 </span>
               );
             })}
@@ -44,15 +45,10 @@ export function ZoneInfoBar(props: ZoneInfoBarProps) {
       })()}
       {/* 弃牌堆:右上角一个小图标 + 数字 */}
       <div className={styles.discardPileRow}>
-        <span
-          className={styles.discardPileIcon}
-          title="弃牌堆"
-        >
+        <span className={styles.discardPileIcon} title="弃牌堆">
           🗂
         </span>
-        <span className={styles.discardPileCount}>
-          弃牌: {view.zones?.discardPileCount ?? 0}
-        </span>
+        <span className={styles.discardPileCount}>弃牌: {view.zones?.discardPileCount ?? 0}</span>
       </div>
     </div>
   );

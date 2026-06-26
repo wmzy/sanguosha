@@ -47,16 +47,22 @@ export function EventBanner({ current, view: _view }: EventBannerProps) {
     <div className={styles.eventCardLayer}>
       <div
         className={styles.eventCardFlip}
-        style={{ '--flip-duration': `${effect?.duration ?? 1800}ms` } as React.CSSProperties}
+        style={
+          {
+            '--flip-duration': `${effect?.duration ?? 1800}ms`,
+            '--suit-color': suitColor,
+          } as React.CSSProperties
+        }
       >
         {/* judgeType 小标签(判定事件) */}
-        {judgeType && (
-          <div className={styles.eventCardLabel}>{judgeType}</div>
-        )}
+        {judgeType && <div className={styles.eventCardLabel}>{judgeType}</div>}
         {/* 卡牌主体 */}
         <div className={styles.eventCardBody}>
-          <div className={styles.eventCardName} style={{ color: suitColor }}>{card.name}</div>
-          <div className={styles.eventCardSuit} style={{ color: suitColor }}>{card.suit}{card.rank}</div>
+          <div className={styles.eventCardName}>{card.name}</div>
+          <div className={styles.eventCardSuit}>
+            {card.suit}
+            {card.rank}
+          </div>
         </div>
       </div>
     </div>

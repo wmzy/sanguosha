@@ -3,7 +3,12 @@
 import { css, cx } from '@linaria/core';
 import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
-import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
+import {
+  FACTION_BG,
+  SUIT_COLOR,
+  EQUIPMENT_SKILL_NAMES,
+  EQUIP_SLOT_ICON,
+} from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 
@@ -35,10 +40,20 @@ export interface PlayerSeatProps {
 }
 
 export function PlayerSeatView({
-  player, index, view, isCurrentPlayer, isPerspective,
-  needsTarget, isTargetable, selectedTarget,
-  onTargetClick, onSeatDoubleClick,
-  isDamaged = false, damageVersion = 0, isTurnGlow = false, turnGlowVersion = 0,
+  player,
+  index,
+  view,
+  isCurrentPlayer,
+  isPerspective,
+  needsTarget,
+  isTargetable,
+  selectedTarget,
+  onTargetClick,
+  onSeatDoubleClick,
+  isDamaged = false,
+  damageVersion = 0,
+  isTurnGlow = false,
+  turnGlowVersion = 0,
   hideIdentity = true,
   skillActions: _skillActions, // 预留:未来用于在座位卡上显示可点使用的技能按钮
 }: PlayerSeatProps) {
@@ -53,7 +68,8 @@ export function PlayerSeatView({
 
   // 身份
   const identity = player.identity;
-  const showIdentity = identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
+  const showIdentity =
+    identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
 
   return (
     <div
@@ -73,22 +89,29 @@ export function PlayerSeatView({
       onDoubleClick={() => onSeatDoubleClick?.(index)}
     >
       {/* 势力色顶部条:武将名 + 座号 + 身份 */}
-      <div className={seatCardHeader} style={{ background: factionColor }}>
+      <div
+        className={seatCardHeader}
+        style={{ '--faction-color': factionColor } as React.CSSProperties}
+      >
         <div className={seatCardHeaderTop}>
           <span className={seatIndexBadge}>#{index + 1}</span>
           <span className={seatName}>{player.name.slice(0, 6)}</span>
           <div>
             {isPerspective && <span className={youBadge}>我</span>}
             {isCurrentPlayer && <span className={turnBadge}>回合</span>}
-            {isDead && <span style={{ fontSize: 10, color: '#fff', marginLeft: 2 }}>亡</span>}
+            {isDead && <span className={deadBadgeText}>亡</span>}
             {showIdentity && identity && (
               <span
                 className={
-                  identity === '主公' ? lordBadge :
-                  identity === '忠臣' ? loyalistBadge :
-                  identity === '反贼' ? rebelBadge :
-                  identity === '内奸' ? renegadeBadge :
-                  ''
+                  identity === '主公'
+                    ? lordBadge
+                    : identity === '忠臣'
+                      ? loyalistBadge
+                      : identity === '反贼'
+                        ? rebelBadge
+                        : identity === '内奸'
+                          ? renegadeBadge
+                          : ''
                 }
               >
                 {identity}
@@ -113,13 +136,17 @@ export function PlayerSeatView({
         ))}
       </div>
       {/* 技能标签 */}
-      {player.skills.filter(s => !DEFAULT_SKILLS.has(s)).filter(s => !EQUIPMENT_SKILL_NAMES.has(s)).length > 0 && (
-        <div className={skillRow} style={{ padding: '2px 10px' }}>
+      {player.skills
+        .filter((s) => !DEFAULT_SKILLS.has(s))
+        .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s)).length > 0 && (
+        <div className={skillRow}>
           {player.skills
-            .filter(s => !DEFAULT_SKILLS.has(s))
-            .filter(s => !EQUIPMENT_SKILL_NAMES.has(s))
-            .map(s => (
-              <span key={s} className={skillTag}>{s}</span>
+            .filter((s) => !DEFAULT_SKILLS.has(s))
+            .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
+            .map((s) => (
+              <span key={s} className={skillTag}>
+                {s}
+              </span>
             ))}
         </div>
       )}
@@ -133,7 +160,12 @@ export function PlayerSeatView({
           {Object.entries(player.equipment).map(([slot, cardId]) => {
             const card = view.cardMap[cardId as string];
             const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
-            return <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>{icon}{card?.name ?? cardId}</span>;
+            return (
+              <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>
+                {icon}
+                {card?.name ?? cardId}
+              </span>
+            );
           })}
         </div>
       )}
@@ -152,10 +184,11 @@ export function PlayerSeatView({
                 <span
                   key={cardId}
                   className={judgeTag}
-                  style={{ color: suitColor, borderColor: suitColor }}
+                  style={{ '--suit-color': suitColor } as React.CSSProperties}
                   title={desc || card?.name || cardId}
                 >
-                  {card?.name ?? cardId}{card ? ` ${card.suit}${card.rank}` : ''}
+                  {card?.name ?? cardId}
+                  {card ? ` ${card.suit}${card.rank}` : ''}
                 </span>
               );
             })}
@@ -164,9 +197,10 @@ export function PlayerSeatView({
       })()}
       {player.marks.length > 0 && (
         <div className={markRow}>
-          {player.marks.map(m => (
+          {player.marks.map((m) => (
             <span key={m.id} className={markTag}>
-              {m.id}{m.payload ? `(${JSON.stringify(m.payload)})` : ''}
+              {m.id}
+              {m.payload ? `(${JSON.stringify(m.payload)})` : ''}
             </span>
           ))}
         </div>
@@ -180,11 +214,11 @@ const seatCard = css`
   border: 1px solid #444;
   border-radius: 10px;
   overflow: hidden;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   transition: all 0.25s;
   min-width: 170px;
   max-width: 200px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 `;
 // 势力色顶部条:武将名 + 身份
 const seatCardHeader = css`
@@ -192,6 +226,7 @@ const seatCardHeader = css`
   display: flex;
   flex-direction: column;
   gap: 2px;
+  background: var(--faction-color, transparent);
 `;
 const seatCardHeaderTop = css`
   display: flex;
@@ -201,41 +236,58 @@ const seatCardHeaderTop = css`
 const seatCharName = css`
   font-weight: bold;
   font-size: 15px;
-  color: rgba(255,255,255,0.9);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 `;
 // 体力行:红心表示 HP
 const seatHpRow = css`
   display: flex;
   gap: 2px;
   padding: 4px 10px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
 `;
 const hpHeartFull = css`
   color: #e74c3c;
   font-size: 16px;
-  text-shadow: 0 0 4px rgba(231,76,60,0.5);
+  text-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
 `;
 const hpHeartEmpty = css`
   color: #555;
   font-size: 14px;
 `;
 const seatCardActive = css`
-  box-shadow: 0 0 18px rgba(255,215,0,0.35), inset 0 0 8px rgba(255,215,0,0.1);
+  box-shadow:
+    0 0 18px rgba(255, 215, 0, 0.35),
+    inset 0 0 8px rgba(255, 215, 0, 0.1);
   outline: 2px solid #ffd700;
 `;
 const seatCardPerspective = css`
   border: 2px solid #3498db;
-  box-shadow: 0 0 8px rgba(52,152,219,0.25);
+  box-shadow: 0 0 8px rgba(52, 152, 219, 0.25);
 `;
-const seatCardDead = css`opacity: 0.35; filter: grayscale(1);`;
-const seatCardClickable = css`cursor: pointer; &:hover { outline: 2px solid #e74c3c; }`;
-const seatCardTargeted = css`outline: 3px solid #e74c3c; box-shadow: 0 0 12px rgba(231,76,60,0.4);`;
-const seatName = css`font-weight: bold; font-size: 12px; color: rgba(255,255,255,0.85);`;
+const seatCardDead = css`
+  opacity: 0.35;
+  filter: grayscale(1);
+`;
+const seatCardClickable = css`
+  cursor: pointer;
+  &:hover {
+    outline: 2px solid #e74c3c;
+  }
+`;
+const seatCardTargeted = css`
+  outline: 3px solid #e74c3c;
+  box-shadow: 0 0 12px rgba(231, 76, 60, 0.4);
+`;
+const seatName = css`
+  font-weight: bold;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+`;
 const seatIndexBadge = css`
   display: inline-block;
-  background: rgba(0,0,0,0.2);
-  color: rgba(255,255,255,0.6);
+  background: rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.6);
   border-radius: 3px;
   padding: 1px 5px;
   margin-right: 4px;
@@ -244,32 +296,67 @@ const seatIndexBadge = css`
   vertical-align: middle;
 `;
 const youBadge = css`
-  background: #3498db; border-radius: 3px; padding: 1px 5px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #3498db;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 const turnBadge = css`
-  background: #ffd700; border-radius: 3px; padding: 1px 5px;
-  font-size: 9px; color: #000; margin-left: 4px; font-weight: bold;
+  background: #ffd700;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 9px;
+  color: #000;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 const lordBadge = css`
-  background: #FFD700; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #4a2800; margin-left: 4px; font-weight: bold;
+  background: #ffd700;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #4a2800;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 const loyalistBadge = css`
-  background: #4A90E2; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #4a90e2;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 const rebelBadge = css`
-  background: #E74C3C; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #e74c3c;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 const renegadeBadge = css`
-  background: #9B59B6; border-radius: 3px; padding: 1px 6px;
-  font-size: 9px; color: #fff; margin-left: 4px; font-weight: bold;
+  background: #9b59b6;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 const hiddenBadge = css`
-  background: #555; border-radius: 3px; padding: 1px 5px;
-  font-size: 10px; color: #bbb; margin-left: 4px; font-weight: bold;
+  background: #555;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: #bbb;
+  margin-left: 4px;
+  font-weight: bold;
 `;
 const equipRow = css`
   font-size: 11px;
@@ -281,26 +368,61 @@ const equipRow = css`
 `;
 // 判定区(延时锦囊):斜体、紫色边框,亮眼能看清
 const judgeRow = css`
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-  margin-top: 2px; font-size: 11px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 11px;
 `;
-const judgeRowLabel = css`color: #b78bff; font-weight: bold;`;
-const judgeTag = css`
-  display: inline-block; padding: 1px 6px; border-radius: 4px;
-  border: 1px solid; background: rgba(155, 89, 182, 0.12);
+const judgeRowLabel = css`
+  color: #b78bff;
   font-weight: bold;
 `;
-const skillRow = css`margin-bottom: 4px;`;
+const judgeTag = css`
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--suit-color, #ccc);
+  color: var(--suit-color, #ccc);
+  background: rgba(155, 89, 182, 0.12);
+  font-weight: bold;
+`;
+const skillRow = css`
+  margin-bottom: 4px;
+  padding: 2px 10px;
+`;
 const skillTag = css`
-  display: inline-block; background: rgba(15,52,96,0.6); border-radius: 3px;
-  padding: 1px 5px; margin-right: 3px; font-size: 10px; color: #8899aa;
+  display: inline-block;
+  background: rgba(15, 52, 96, 0.6);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-right: 3px;
+  font-size: 10px;
+  color: #8899aa;
 `;
 const infoRow = css`
-  font-size: 11px; color: #999; display: flex; flex-wrap: wrap; gap: 6px;
+  font-size: 11px;
+  color: #999;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 2px 10px 4px;
 `;
-const markRow = css`font-size: 10px; color: #666; padding: 0 10px 4px;`;
-const markTag = css`margin-right: 6px;`;
+const markRow = css`
+  font-size: 10px;
+  color: #666;
+  padding: 0 10px 4px;
+`;
+const markTag = css`
+  margin-right: 6px;
+`;
+// 死亡「亡」小标签
+const deadBadgeText = css`
+  font-size: 10px;
+  color: #fff;
+  margin-left: 2px;
+`;
 
 // ─── 动画状态样式 ───
 const hpFlash = css`

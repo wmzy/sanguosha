@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { css } from '@linaria/core';
 
 export const colors = {
   bg: {
@@ -42,87 +42,48 @@ export const colors = {
   overlay: 'rgba(0,0,0,0.8)',
 } as const;
 
-export const styles = {
-  page: (padding = 20): CSSProperties => ({
-    padding,
-    backgroundColor: colors.bg.page,
-    minHeight: '100vh',
-    color: colors.text.primary,
-  }),
+// ─── 页面/按钮/输入/提示通用样式(原 theme.ts styles 工厂,迁至 linaria css) ───
+// 动态值(padding/背景色等)通过 CSS 自定义属性传入,使用时:
+//   className={btnStyle} style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
 
-  btn: (bg: string, opts?: { padding?: string; fontSize?: number; cursor?: string }): CSSProperties => ({
-    padding: opts?.padding ?? '8px 24px',
-    backgroundColor: bg,
-    color: colors.white,
-    border: 'none',
-    borderRadius: 6,
-    cursor: opts?.cursor ?? 'pointer',
-    fontSize: opts?.fontSize ?? 14,
-    fontWeight: 'bold',
-  }),
+/** 页面容器。padding 由 --page-padding 控制(默认 20px)。 */
+export const pageStyle = css`
+  padding: var(--page-padding, 20px);
+  background-color: #1a1a2e;
+  min-height: 100vh;
+  color: #eee;
+`;
 
-  smallBtn: (bg: string): CSSProperties => ({
-    padding: '4px 12px',
-    backgroundColor: bg,
-    color: colors.white,
-    border: 'none',
-    borderRadius: 4,
-    cursor: 'pointer',
-    fontSize: 12,
-  }),
+/** 通用按钮。bg/padding/fontSize/cursor 由 CSS 变量控制。 */
+export const btnStyle = css`
+  padding: var(--btn-padding, 8px 24px);
+  background-color: var(--btn-bg, #555);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: var(--btn-cursor, pointer);
+  font-size: var(--btn-font-size, 14px);
+  font-weight: bold;
+`;
 
-  flexCenter: (gap = 12): CSSProperties => ({
-    display: 'flex',
-    justifyContent: 'center',
-    gap,
-    marginBottom: gap,
-  }),
+/** 通用输入框(无参数,纯静态)。 */
+export const inputStyle = css`
+  width: 100%;
+  padding: 10px 12px;
+  background-color: #34495e;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+`;
 
-  input: (): CSSProperties => ({
-    width: '100%',
-    padding: '10px 12px',
-    backgroundColor: colors.bg.input,
-    border: 'none',
-    borderRadius: 6,
-    color: colors.white,
-    fontSize: 14,
-  }),
-
-  errorToast: (): CSSProperties => ({
-    position: 'fixed',
-    top: 20,
-    right: 20,
-    backgroundColor: colors.accent.red,
-    padding: '15px 25px',
-    borderRadius: 8,
-    zIndex: 1000,
-  }),
-
-  logContainer: (): CSSProperties => ({
-    maxHeight: 200,
-    overflow: 'auto',
-    backgroundColor: colors.bg.panel,
-    borderRadius: 8,
-    padding: 12,
-  }),
-
-  card: (opts: { selected?: boolean; playable?: boolean; discardMode?: boolean }): CSSProperties => {
-    const { selected, playable, discardMode } = opts;
-    let border: string = colors.card.borderDefault;
-    let bg: string = colors.bg.page;
-    if (selected) {
-      border = discardMode ? colors.card.borderDiscard : colors.card.borderSelected;
-      bg = discardMode ? colors.card.discardSelected : colors.card.selected;
-    } else if (playable) {
-      border = colors.card.borderPlayable;
-      bg = colors.card.playable;
-    }
-    return {
-      border: `2px solid ${border}`,
-      backgroundColor: bg,
-      borderRadius: 8,
-      padding: 8,
-      cursor: playable ? 'pointer' : 'default',
-    };
-  },
-};
+/** 错误提示 toast(固定右上角,无参数)。 */
+export const errorToastStyle = css`
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #e74c3c;
+  padding: 15px 25px;
+  border-radius: 8px;
+  z-index: 1000;
+`;

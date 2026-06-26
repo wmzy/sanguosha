@@ -8,6 +8,7 @@
 //     主公/忠臣 → 主公方;反贼 → 反贼;内奸 → 内奸
 
 import type { GameView } from '../../engine/types';
+import { css, cx } from '@linaria/core';
 import { IDENTITY_COLORS } from './gameViewConstants';
 
 export interface GameResultOverlayProps {
@@ -41,128 +42,58 @@ function winningCamp(winner: string, players: GameView['players']): string {
   }
 }
 
-export function GameResultOverlay({ winner, players, perspectiveIdx, onRestart, onExit }: GameResultOverlayProps) {
+export function GameResultOverlay({
+  winner,
+  players,
+  perspectiveIdx,
+  onRestart,
+  onExit,
+}: GameResultOverlayProps) {
   const camp = winningCamp(winner, players);
-  const campColor = winner === '无人'
-    ? '#999'
-    : IDENTITY_COLORS[players[Number(winner)]?.identity ?? ''] ?? '#ccc';
+  const campColor =
+    winner === '无人'
+      ? '#999'
+      : (IDENTITY_COLORS[players[Number(winner)]?.identity ?? ''] ?? '#ccc');
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 10001,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.88)',
-        animation: 'overlayFadeIn 0.4s ease-out both',
-      }}
-    >
-      <div
-        style={{
-          minWidth: 360,
-          maxWidth: 520,
-          padding: '32px 40px',
-          borderRadius: 16,
-          background: 'linear-gradient(160deg, #2a2a35, #1a1a22)',
-          border: `2px solid ${campColor}`,
-          boxShadow: `0 0 60px ${campColor}55`,
-          color: '#fff',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 20,
-        }}
-      >
-        <div style={{ fontSize: 14, letterSpacing: 4, opacity: 0.6 }}>游戏结束</div>
-        <div
-          style={{
-            fontSize: 34,
-            fontWeight: 'bold',
-            color: campColor,
-            textShadow: `0 2px 12px ${campColor}88`,
-          }}
-        >
-          {camp}
-        </div>
+    <div className={overlayRoot}>
+      <div className={resultCard} style={{ '--camp-color': campColor } as React.CSSProperties}>
+        <div className={endLabel}>游戏结束</div>
+        <div className={campName}>{camp}</div>
 
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+        <div className={playerList}>
           {players.map((p, i) => {
             const idColor = IDENTITY_COLORS[p.identity ?? ''] ?? '#888';
             const isMe = i === perspectiveIdx;
             return (
               <div
                 key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  background: isMe ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
-                  border: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
-                  opacity: p.alive ? 1 : 0.5,
-                }}
+                className={cx(playerRow, isMe && playerRowMe, !p.alive && playerRowDead)}
               >
-                <span style={{ width: 16, textAlign: 'center', color: '#FFD700' }}>{isMe ? '★' : ''}</span>
-                <span style={{ flex: '0 0 auto', width: 84, fontWeight: isMe ? 'bold' : 'normal' }}>{p.name}</span>
-                <span style={{ flex: 1, opacity: 0.7 }}>{p.character || '—'}</span>
+                <span className={rowStar}>{isMe ? '★' : ''}</span>
+                <span className={cx(rowName, isMe && rowNameMe)}>{p.name}</span>
+                <span className={rowChar}>{p.character || '—'}</span>
                 <span
-                  style={{
-                    padding: '2px 10px',
-                    borderRadius: 4,
-                    fontSize: 13,
-                    fontWeight: 'bold',
-                    color: '#fff',
-                    background: idColor,
-                    textShadow: '0 1px 2px rgba(0,0,0,0.4)',
-                  }}
+                  className={rowIdentityTag}
+                  style={{ '--id-color': idColor } as React.CSSProperties}
                 >
                   {p.identity}
                 </span>
-                <span style={{ width: 36, fontSize: 12, opacity: 0.6 }}>{p.alive ? '存活' : '阵亡'}</span>
+                <span className={rowAlive}>{p.alive ? '存活' : '阵亡'}</span>
               </div>
             );
           })}
         </div>
 
-        <div style={{ display: 'flex', gap: 14, marginTop: 12 }}>
+        <div className={actionRow}>
           <button
+            className={restartBtn}
+            style={{ '--camp-color': campColor } as React.CSSProperties}
             onClick={onRestart}
-            style={{
-              padding: '10px 32px',
-              fontSize: 16,
-              fontWeight: 'bold',
-              color: '#fff',
-              background: campColor,
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-              transition: 'filter 0.2s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-            onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
           >
             再来一局
           </button>
-          <button
-            onClick={onExit}
-            style={{
-              padding: '10px 32px',
-              fontSize: 16,
-              fontWeight: 'bold',
-              color: '#fff',
-              background: 'rgba(255, 255, 255, 0.12)',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: 8,
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)')}
-          >
+          <button className={exitBtn} onClick={onExit}>
             返回大厅
           </button>
         </div>
@@ -170,3 +101,145 @@ export function GameResultOverlay({ winner, players, perspectiveIdx, onRestart, 
     </div>
   );
 }
+
+/* ───────── 样式定义 ───────── */
+
+const overlayRoot = css`
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.88);
+  animation: overlayFadeIn 0.4s ease-out both;
+`;
+
+const resultCard = css`
+  min-width: 360px;
+  max-width: 520px;
+  padding: 32px 40px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #2a2a35, #1a1a22);
+  border: 2px solid var(--camp-color);
+  box-shadow: 0 0 60px color-mix(in srgb, var(--camp-color) 33%, transparent);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+`;
+
+const endLabel = css`
+  font-size: 14px;
+  letter-spacing: 4px;
+  opacity: 0.6;
+`;
+
+const campName = css`
+  font-size: 34px;
+  font-weight: bold;
+  color: var(--camp-color);
+  text-shadow: 0 2px 12px color-mix(in srgb, var(--camp-color) 53%, transparent);
+`;
+
+const playerList = css`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+`;
+
+const playerRow = css`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+`;
+
+const playerRowMe = css`
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+`;
+
+const playerRowDead = css`
+  opacity: 0.5;
+`;
+
+const rowStar = css`
+  width: 16px;
+  text-align: center;
+  color: #ffd700;
+`;
+
+const rowName = css`
+  flex: 0 0 auto;
+  width: 84px;
+`;
+
+const rowNameMe = css`
+  font-weight: bold;
+`;
+
+const rowChar = css`
+  flex: 1;
+  opacity: 0.7;
+`;
+
+const rowIdentityTag = css`
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  background: var(--id-color);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+`;
+
+const rowAlive = css`
+  width: 36px;
+  font-size: 12px;
+  opacity: 0.6;
+`;
+
+const actionRow = css`
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+`;
+
+const restartBtn = css`
+  padding: 10px 32px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  background: var(--camp-color);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.2s;
+
+  &:hover {
+    filter: brightness(1.15);
+  }
+`;
+
+const exitBtn = css`
+  padding: 10px 32px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+`;

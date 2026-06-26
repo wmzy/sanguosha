@@ -8,6 +8,7 @@
 // 选将逻辑:玩家点选后,内部维护 selectedCharIdx,点「确认」才向引擎发 respond action。
 
 import { useState, useEffect, type ReactNode } from 'react';
+import { css, cx } from '@linaria/core';
 import { FACTION_BG, IDENTITY_COLORS } from './gameViewConstants';
 import { CountdownBar } from './CountdownBar';
 
@@ -80,106 +81,42 @@ export function CharSelectOverlay({
     setSubmittedChar(null);
   }, [isSelfSelecting, charSelectTarget]);
 
-  const viewerColor = viewerIdentity ? (IDENTITY_COLORS[viewerIdentity] || '#888') : null;
+  const viewerColor = viewerIdentity ? IDENTITY_COLORS[viewerIdentity] || '#888' : null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.9)',
-      }}
-    >
+    <div className={overlayRoot}>
       {/* ── 右上角插槽(debug 视角控制等,由上层注入) ── */}
-      {overlaySlot && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 16,
-            zIndex: 10000,
-          }}
-        >
-          {overlaySlot}
-        </div>
-      )}
+      {overlaySlot && <div className={overlaySlotWrap}>{overlaySlot}</div>}
       {/* 标题:主公选将 / P<n> 选将中 */}
-      <div
-        style={{
-          fontSize: 24,
-          fontWeight: 'bold',
-          color: '#ffd700',
-          marginBottom: 8,
-          letterSpacing: 4,
-        }}
-      >
-        {isLord ? '主公选将' : `P${charSelectTarget} 选将中`}
-      </div>
-      {isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>主公已亮明身份</div>}
-      {isSelfSelecting && !isLord && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>你正在选将(他人不可见你的选择)</div>}
-      {!isLord && !isSelfSelecting && <div style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>选将保密</div>}
+      <div className={selectTitle}>{isLord ? '主公选将' : `P${charSelectTarget} 选将中`}</div>
+      {isLord && <div className={subHint}>主公已亮明身份</div>}
+      {isSelfSelecting && !isLord && <div className={subHint}>你正在选将(他人不可见你的选择)</div>}
+      {!isLord && !isSelfSelecting && <div className={subHint}>选将保密</div>}
 
       {/* 主公已选武将(主公身份公开,选将结果所有人可见) */}
       {!isLord && lordCharacter && (
-        <div style={{ fontSize: 15, color: '#ffd700', marginBottom: 8, fontWeight: 'bold' }}>
-          主公已选择: {lordCharacter}
-        </div>
+        <div className={lordPickedHint}>主公已选择: {lordCharacter}</div>
       )}
 
       {/* 倒计时进度条 */}
-      <div style={{ width: 300, marginBottom: 24 }}>
+      <div className={countdownWrap}>
         <CountdownBar deadline={deadline} totalMs={totalMs} />
       </div>
 
       {/* 自身信息区:身份牌 + 座次 */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
+      <div className={selfInfoRow}>
         {viewerColor && viewerIdentity && (
           <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              padding: '8px 18px',
-              borderRadius: 8,
-              background: viewerColor,
-              color: '#fff',
-              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.4)',
-              minWidth: 90,
-            }}
+            className={identityBadge}
+            style={{ '--viewer-color': viewerColor } as React.CSSProperties}
           >
-            <div style={{ fontSize: 11, opacity: 0.85, letterSpacing: 2 }}>你的身份</div>
-            <div style={{ fontSize: 20, fontWeight: 'bold', textShadow: '0 1px 4px rgba(0, 0, 0, 0.3)' }}>{viewerIdentity}</div>
+            <div className={badgeLabel}>你的身份</div>
+            <div className={badgeValue}>{viewerIdentity}</div>
           </div>
         )}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 4,
-            padding: '8px 18px',
-            borderRadius: 8,
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#fff',
-            minWidth: 90,
-          }}
-        >
-          <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2 }}>你的座次</div>
-          <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{viewer}</div>
+        <div className={seatBadge}>
+          <div className={badgeLabel}>你的座次</div>
+          <div className={badgeValue}>P{viewer}</div>
         </div>
       </div>
 
@@ -187,13 +124,8 @@ export function CharSelectOverlay({
         <>
           {/* 候选网格(最多 5 列) */}
           <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${Math.min(candidates.length, 5)}, 1fr)`,
-              gap: 16,
-              maxWidth: 800,
-              width: '90%',
-            }}
+            className={candidateGrid}
+            style={{ '--cols': Math.min(candidates.length, 5) } as React.CSSProperties}
           >
             {candidates.map((ch, i) => {
               const isSelected = selectedCharIdx === i;
@@ -206,59 +138,27 @@ export function CharSelectOverlay({
               return (
                 <div
                   key={ch.name}
+                  className={cx(
+                    candidateCard,
+                    (isSelected || isSubmittedPick) && candidateCardSelected,
+                    isLockedOut && candidateCardLockedOut,
+                    submittedChar !== null && candidateCardFrozen,
+                  )}
+                  style={
+                    { '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties
+                  }
                   onClick={() => {
                     if (submittedChar !== null) return; // 已提交,禁止重选
                     setSelectedCharIdx(i);
                   }}
-                  style={{
-                    background: FACTION_BG[faction] || '#333',
-                    borderRadius: 12,
-                    padding: '24px 12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 8,
-                    cursor: submittedChar !== null ? 'default' : 'pointer',
-                    border: (isSelected || isSubmittedPick) ? '3px solid #ffd700' : '3px solid transparent',
-                    boxShadow: (isSelected || isSubmittedPick)
-                      ? '0 0 20px rgba(255, 215, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3)'
-                      : '0 4px 16px rgba(0, 0, 0, 0.3)',
-                    transform: (isSelected || isSubmittedPick) ? 'translateY(-8px) scale(1.03)' : 'translateY(0)',
-                    transition: 'all 0.25s cubic-bezier(0.23, 1, 0.32, 1)',
-                    opacity: isLockedOut ? 0.35 : 1,
-                    filter: isLockedOut ? 'grayscale(0.8)' : 'none',
-                  }}
-                  onMouseEnter={e => {
-                    if (submittedChar !== null) return; // 已提交,禁用 hover 效果
-                    if (!isSelected) {
-                      e.currentTarget.style.transform = 'translateY(-6px)';
-                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.4)';
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (submittedChar !== null) return; // 已提交,禁用 hover 效果
-                    if (!isSelected) {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
-                    }
-                  }}
                 >
-                  <div style={{ fontSize: 22, fontWeight: 'bold', color: '#fff', textShadow: '0 1px 4px rgba(0, 0, 0, 0.3)' }}>{ch.name}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.7)', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 6, padding: '2px 8px' }}>
+                  <div className={candidateName}>{ch.name}</div>
+                  <div className={candidateFaction}>
                     {faction} · {ch.skills.join(' / ')}
                   </div>
-                  <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                  <div className={hpDots}>
                     {Array.from({ length: maxHealth }, (_, j) => (
-                      <div
-                        key={j}
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: '#e74c3c',
-                          boxShadow: '0 0 4px rgba(231, 76, 60, 0.5)',
-                        }}
-                      />
+                      <div key={j} className={hpDot} />
                     ))}
                   </div>
                 </div>
@@ -268,6 +168,14 @@ export function CharSelectOverlay({
 
           {/* 确认按钮:提交后锁定为「已选择 XXX」,禁止重复提交 */}
           <button
+            className={cx(
+              confirmBtn,
+              submittedChar !== null
+                ? confirmBtnSubmitted
+                : selectedCharIdx !== null
+                  ? confirmBtnReady
+                  : confirmBtnIdle,
+            )}
             disabled={submittedChar !== null || selectedCharIdx === null}
             onClick={() => {
               if (submittedChar !== null) return;
@@ -278,37 +186,232 @@ export function CharSelectOverlay({
                 onSelect(picked);
               }
             }}
-            style={{
-              marginTop: 32,
-              padding: '12px 56px',
-              fontSize: 18,
-              fontWeight: 'bold',
-              color: submittedChar !== null ? '#fff' : (selectedCharIdx !== null ? '#000' : '#666'),
-              background: submittedChar !== null
-                ? 'linear-gradient(135deg, #27ae60, #1e8449)'
-                : (selectedCharIdx !== null ? 'linear-gradient(135deg, #ffd700, #f0c000)' : '#333'),
-              border: 'none',
-              borderRadius: 8,
-              cursor: (submittedChar !== null || selectedCharIdx === null) ? 'not-allowed' : 'pointer',
-              boxShadow: submittedChar !== null
-                ? '0 4px 16px rgba(39, 174, 96, 0.4)'
-                : (selectedCharIdx !== null ? '0 4px 16px rgba(255, 215, 0, 0.3)' : 'none'),
-              transition: 'all 0.2s',
-              letterSpacing: 2,
-            }}
           >
             {submittedChar !== null ? `✅ 已选择 ${submittedChar}` : '确认选择'}
           </button>
         </>
       ) : isLord ? (
-        <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
-          主公正在选将，请等待...
-        </div>
+        <div className={waitingHint}>主公正在选将，请等待...</div>
       ) : (
-        <div style={{ fontSize: 18, color: '#aaa', marginTop: 32 }}>
-          等待 P{charSelectTarget} 选将...
-        </div>
+        <div className={waitingHint}>等待 P{charSelectTarget} 选将...</div>
       )}
     </div>
   );
 }
+
+// ─── Styles ───
+const overlayRoot = css`
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+`;
+
+const overlaySlotWrap = css`
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 10000;
+`;
+
+const selectTitle = css`
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffd700;
+  margin-bottom: 8px;
+  letter-spacing: 4px;
+`;
+
+const subHint = css`
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 8px;
+`;
+
+const lordPickedHint = css`
+  font-size: 15px;
+  color: #ffd700;
+  margin-bottom: 8px;
+  font-weight: bold;
+`;
+
+const countdownWrap = css`
+  width: 300px;
+  margin-bottom: 24px;
+`;
+
+const selfInfoRow = css`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+`;
+
+const identityBadge = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: var(--viewer-color);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  min-width: 90px;
+`;
+
+const seatBadge = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  min-width: 90px;
+`;
+
+const badgeLabel = css`
+  font-size: 11px;
+  opacity: 0.85;
+  letter-spacing: 2px;
+`;
+
+const badgeValue = css`
+  font-size: 20px;
+  font-weight: bold;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+`;
+
+const candidateGrid = css`
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: 16px;
+  max-width: 800px;
+  width: 90%;
+`;
+
+const candidateCard = css`
+  background: var(--faction-color);
+  border-radius: 12px;
+  padding: 24px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: 3px solid transparent;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transform: translateY(0);
+  transition: all 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+  opacity: 1;
+  filter: none;
+
+  &:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  }
+`;
+
+const candidateCardSelected = css`
+  border: 3px solid #ffd700;
+  box-shadow:
+    0 0 20px rgba(255, 215, 0, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+  transform: translateY(-8px) scale(1.03);
+
+  &:hover {
+    transform: translateY(-8px) scale(1.03);
+    box-shadow:
+      0 0 20px rgba(255, 215, 0, 0.4),
+      0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+`;
+
+const candidateCardLockedOut = css`
+  opacity: 0.35;
+  filter: grayscale(0.8);
+  cursor: default;
+`;
+
+const candidateCardFrozen = css`
+  cursor: default;
+
+  &:hover {
+    transform: translateY(0);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+`;
+
+const candidateName = css`
+  font-size: 22px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+`;
+
+const candidateFaction = css`
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 2px 8px;
+`;
+
+const hpDots = css`
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+`;
+
+const hpDot = css`
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e74c3c;
+  box-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
+`;
+
+const confirmBtn = css`
+  margin-top: 32px;
+  padding: 12px 56px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  transition: all 0.2s;
+  letter-spacing: 2px;
+`;
+
+const confirmBtnIdle = css`
+  color: #666;
+  background: #333;
+  cursor: not-allowed;
+  box-shadow: none;
+`;
+
+const confirmBtnReady = css`
+  color: #000;
+  background: linear-gradient(135deg, #ffd700, #f0c000);
+  box-shadow: 0 4px 16px rgba(255, 215, 0, 0.3);
+  cursor: pointer;
+`;
+
+const confirmBtnSubmitted = css`
+  color: #fff;
+  background: linear-gradient(135deg, #27ae60, #1e8449);
+  box-shadow: 0 4px 16px rgba(39, 174, 96, 0.4);
+  cursor: not-allowed;
+`;
+
+const waitingHint = css`
+  font-size: 18px;
+  color: #aaa;
+  margin-top: 32px;
+`;

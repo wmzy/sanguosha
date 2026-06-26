@@ -2,6 +2,7 @@
 // 身份揭示遮罩:开局亮明身份(主公金/忠臣蓝/反贼红/内奸紫),翻牌动画 + 确认按钮。
 // 从 GameView.tsx 抽出,组件自包含样式,纯 props 控制。
 
+import { css } from '@linaria/core';
 import { IDENTITY_COLORS } from './gameViewConstants';
 
 interface IdentityRevealOverlayProps {
@@ -19,58 +20,78 @@ interface IdentityRevealOverlayProps {
 export function IdentityRevealOverlay({ identity, onConfirm }: IdentityRevealOverlayProps) {
   const color = IDENTITY_COLORS[identity] || '#888';
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 10000,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.85)',
-        animation: 'overlayFadeIn 0.5s ease-out both',
-      }}
-    >
-      <div
-        style={{
-          width: 200,
-          height: 280,
-          borderRadius: 12,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 16,
-          background: color,
-          color: '#fff',
-          boxShadow: '0 0 40px rgba(0, 0, 0, 0.5)',
-          animation: 'identityCardFlip 1s cubic-bezier(0.23, 1, 0.32, 1) both',
-          transformStyle: 'preserve-3d',
-        }}
-      >
-        <div style={{ fontSize: 14, opacity: 0.8, letterSpacing: 2 }}>你的身份</div>
-        <div style={{ fontSize: 36, fontWeight: 'bold', textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}>{identity}</div>
+    <div className={overlayRoot}>
+      <div className={identityCard} style={{ '--identity-color': color } as React.CSSProperties}>
+        <div className={identityLabel}>你的身份</div>
+        <div className={identityName}>{identity}</div>
       </div>
-      <button
-        onClick={onConfirm}
-        style={{
-          marginTop: 32,
-          padding: '10px 48px',
-          fontSize: 16,
-          fontWeight: 'bold',
-          color: '#fff',
-          background: 'rgba(255, 255, 255, 0.15)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          borderRadius: 8,
-          cursor: 'pointer',
-          transition: 'background 0.2s',
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
-      >
+      <button className={confirmBtn} onClick={onConfirm}>
         确认
       </button>
     </div>
   );
 }
+
+/* ── 样式定义 ── */
+
+/** 全屏遮罩根节点:固定定位 + 黑色半透明 + 渐入动画 */
+const overlayRoot = css`
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  animation: overlayFadeIn 0.5s ease-out both;
+`;
+
+/** 身份卡片:200×280,圆角12,翻牌动画,背景色由 CSS 变量控制 */
+const identityCard = css`
+  width: 200px;
+  height: 280px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--identity-color);
+  color: #fff;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  animation: identityCardFlip 1s cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-style: preserve-3d;
+`;
+
+/** 「你的身份」小标签 */
+const identityLabel = css`
+  font-size: 14px;
+  opacity: 0.8;
+  letter-spacing: 2px;
+`;
+
+/** 身份名称(大号加粗 + 文字阴影) */
+const identityName = css`
+  font-size: 36px;
+  font-weight: bold;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+`;
+
+/** 确认按钮:半透明边框 + hover 高亮 */
+const confirmBtn = css`
+  margin-top: 32px;
+  padding: 10px 48px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+`;

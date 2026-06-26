@@ -20,6 +20,7 @@ const countdownBar = css`
 `;
 
 const countdownBarFill = css`
+  width: 100%;
   height: 100%;
   background: linear-gradient(90deg, #f39c12, #e74c3c);
   border-radius: 3px;
@@ -27,12 +28,15 @@ const countdownBarFill = css`
 
 const countdownBarText = css`
   position: absolute;
-  top: 50%; right: 10px;
+  top: 50%;
+  right: 10px;
   transform: translateY(-50%);
   font-size: 13px;
   font-weight: bold;
   color: #fff;
-  text-shadow: 0 0 3px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.8);
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.8);
   pointer-events: none;
   z-index: 1;
 `;
@@ -41,7 +45,10 @@ const countdownBarText = css`
 export function useCountdownSeconds(deadline: number | null): number | null {
   const [sec, setSec] = useState<number | null>(null);
   useEffect(() => {
-    if (deadline == null) { setSec(null); return; }
+    if (deadline == null) {
+      setSec(null);
+      return;
+    }
     const tick = () => setSec(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
     tick();
     const id = setInterval(tick, 200);
@@ -87,7 +94,7 @@ export function CountdownBar({ deadline, totalMs }: CountdownBarProps) {
   if (deadline == null || sec == null) return null;
   return (
     <div className={countdownBar} title={`剩余 ${sec} 秒`}>
-      <div className={countdownBarFill} ref={fillRef} style={{ width: '100%' }} />
+      <div className={countdownBarFill} ref={fillRef} />
       <span className={countdownBarText}>⏱ {sec}s</span>
     </div>
   );
