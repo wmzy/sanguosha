@@ -155,6 +155,31 @@ describe('applyView 一致性 bug', () => {
       // apply: 2 手牌 + 1 装备 = 3 张进弃牌堆
       expect(view.zones!.discardPileCount).toBe(before + 3); // ❌ BUG: 实际仍为 0
     });
+
+    it('阵亡身份对所有视角揭示(toViewEvents 携带 identity, applyView 揭示)', () => {
+      const def = getAtomDef('击杀');
+      // mock state: P1 是反贼(真实身份)
+      const mockState = {
+        players: [{ identity: '主公' }, { identity: '反贼' }],
+      } as any;
+      // mock view: P1 对 viewer=0 隐藏身份
+      const view = mockView({
+        viewer: 0,
+        players: [
+          { index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [], identity: '主公', identityHidden: false },
+          { index: 1, name: 'P1', character: '', health: 0, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [], identity: undefined, identityHidden: true },
+        ],
+      });
+
+      // toViewEvents 应携带阵亡者身份(死亡即公开)
+      const split = def.toViewEvents!(mockState, { type: '击杀', player: 1 } as any);
+      expect((split!.othersView as any).identity).toBe('反贼');
+
+      // applyView 揭示身份:前端走事件流时能看到阵亡者的真实身份
+      def.applyView!(view, split!.othersView!);
+      expect(view.players[1].identity).toBe('反贼');
+      expect(view.players[1].identityHidden).toBe(false);
+    });
   });
 
   describe('获得/给予 atom: 信息分级泄露', () => {

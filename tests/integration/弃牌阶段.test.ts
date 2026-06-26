@@ -185,4 +185,39 @@ describe('弃牌阶段', () => {
       expect(isDiscardPending).toBe(false);
     }
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 4:受伤后手牌超过当前体力值(非体力上限)→ 应进入弃牌阶段
+  // 标准 三国杀规则:弃牌阶段手牌上限 = 当前体力值(非体力上限)。
+  // 场景:health=2 < maxHealth=4,手牌 3 张。旧逻辑用 maxHealth 判定
+  //       (3 ≤ 4 不弃)——错误;修复后按 health 判定 (3 > 2,弃 1 张)。
+  // ─────────────────────────────────────────────────────────────
+  it('用例4:受伤后手牌超过当前体力值 → 应按当前体力值弃牌', async () => {
+    const lord = state.players[0];
+    // 受伤:health=2, maxHealth=4
+    lord.health = 2;
+    lord.maxHealth = 4;
+    // 手牌压到 3 张:3 > health(2) 应弃 1,但 3 ≤ maxHealth(4) 旧逻辑不弃
+    lord.hand = lord.hand.slice(0, 3);
+    expect(lord.hand.length).toBe(3);
+    expect(lord.hand.length).toBeGreaterThan(lord.health);
+    expect(lord.hand.length).toBeLessThanOrEqual(lord.maxHealth);
+
+    await dispatchAndWait(state, {
+      skillId: '回合管理',
+      actionType: 'end',
+      ownerId: 0,
+      params: {},
+      baseSeq: state.seq,
+    });
+
+    // 期望:进入弃牌阶段,产生 __弃牌 pending,excess = 3 - 2 = 1
+    const discardSlot = [...state.pendingSlots.values()].find(
+      s => (s.atom as { requestType?: string }).requestType === '__弃牌',
+    );
+    expect(discardSlot, '受伤后手牌(3)超过当前体力值(2)应进入弃牌阶段').toBeDefined();
+
+    const prompt = (discardSlot!.atom as { prompt?: { cardFilter?: { min?: number } } }).prompt;
+    expect(prompt?.cardFilter?.min).toBe(1);
+  });
 });

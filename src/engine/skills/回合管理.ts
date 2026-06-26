@@ -56,13 +56,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '摸牌', player, count: 2 });
     }
 
-    // 弃牌阶段:检查手牌是否超过体力上限
+    // 弃牌阶段:手牌上限=当前体力值(受伤时低于体力上限,标准三国杀规则)
     if (next === '弃牌') {
       const playerState = ctx.state.players[player];
       const handCount = playerState.hand.length;
-      const maxHealth = playerState.maxHealth;
-      if (handCount > maxHealth) {
-        const excess = handCount - maxHealth;
+      const health = playerState.health;
+      if (handCount > health) {
+        const excess = handCount - health;
         // 创建弃牌 pending,等玩家选择弃哪些牌
         await applyAtom(ctx.state, {
           type: '请求回应',

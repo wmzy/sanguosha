@@ -24,8 +24,10 @@ export const 击杀: AtomDefinition<{ player: number }> = {
     }
   },
   effect: { sound: 'death', animation: 'fade', duration: 1500 },
-  toViewEvents(_state, atom): ViewEventSplit {
-    const view: ViewEvent = { type: '击杀', player: atom.player };
+  toViewEvents(state, atom): ViewEventSplit {
+    // 携带阵亡玩家身份——死亡即公开,所有视角都需揭示
+    const identity = state.players[atom.player]?.identity;
+    const view: ViewEvent = { type: '击杀', player: atom.player, identity };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
@@ -40,6 +42,12 @@ export const 击杀: AtomDefinition<{ player: number }> = {
         view.zones.discardPileCount += handCount + equipCount;
       }
       p.alive = false;
+      // 揭示阵亡身份(死亡即公开,所有视角可见)
+      const identity = event.identity as string | undefined;
+      if (identity) {
+        p.identity = identity;
+        p.identityHidden = false;
+      }
       // 只有 owner(viewer === 阵亡玩家)才清 hand 为 [];
       // 非 owner 的 hand 是 undefined,保持 undefined
       if (view.viewer === (event.player as number)) {

@@ -32,8 +32,8 @@ export const 请求回应: AtomDefinition<{
       if (atom.requestType === '__弃牌') {
         const target = atom.target;
         const p = state.players[target];
-        if (!p || p.hand.length <= p.maxHealth) return;
-        const excess = p.hand.length - p.maxHealth;
+        if (!p || p.hand.length <= p.health) return;
+        const excess = p.hand.length - p.health;
         const toDiscard = p.hand.slice(-excess);
         await applyAtom(state, { type: '弃置', player: target, cardIds: toDiscard });
         return;

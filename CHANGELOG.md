@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Fixed — 阵亡角色未亮明身份
+
+角色阵亡后其他玩家视角仍显示身份为「暗」,未能按规则揭示。根因:`击杀` atom 的 `applyView` 只置 `alive=false`,未同步身份;前端走事件流(`viewReducer` → `applyView`)增量更新,而 `buildView` 的全量快照揭示逻辑在此路径上不生效,导致阵亡身份不公开。
+
+#### Fixed
+- **击杀事件携带并揭示身份**:`击杀.toViewEvents` 从 state 读取阵亡者真实身份写入事件(死亡即公开),`applyView` 据此把 `identity`/`identityHidden` 置为揭示态。(`src/engine/atoms/击杀.ts`)
+- **回归用例**:验证 toViewEvents 携带身份、applyView 后所有视角可见阵亡者身份。(`tests/skill-tests/applyView-bugs.test.ts`)
+
+### Fixed — 弃牌阶段按体力上限而非当前体力值判定
+
+弃牌阶段手牌上限应等于角色**当前体力值**(受伤时低于体力上限),但弃牌检查与超时自动弃牌均误用 `maxHealth`(体力上限)。结果受伤角色手牌数介于当前体力值与体力上限之间时该弃不弃(或弃牌数偏少)。例如体力上限 4、当前体力 2、手牌 3 张,旧逻辑判定 3 ≤ 4 不进入弃牌阶段,正确应弃 1 张。
+
+#### Fixed
+- **弃牌上限改用 `health`**:回合管理弃牌阶段检查(`回合管理.ts`)与请求回应超时自动弃牌(`请求回应.ts`)均由 `maxHealth` 改为 `health`,与标准三国杀规则一致。(`src/engine/skills/回合管理.ts`、`src/engine/atoms/请求回应.ts`)
+- **回归用例**:新增受伤(health=2 < maxHealth=4)手牌 3 张的弃牌用例,验证按当前体力值进入弃牌阶段且 excess=1。(`tests/integration/弃牌阶段.test.ts`)
+
 ### Fixed — 主公阵亡显示"无人获胜"而非反贼获胜
 
 主公阵亡时 `checkGameOver` 返回 `winner: undefined`,session 据此广播 `winner: '无人'`,结算界面显示"无人获胜"。按三国杀规则主公阵亡应由反贼获胜(内奸清场单挑残局除外)。根因:胜负判定函数未区分主公阵亡时的阵营归属。
