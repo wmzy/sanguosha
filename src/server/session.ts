@@ -83,7 +83,7 @@ export class GameSession {
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
 
-    // 清空模块级状态(技能实例 + 事件流)以避免历史注册污染
+    // 清空模块级 slash quota providers(skill 注册表已随 state 自动隔离)
     resetForTest();
 
     // 调用 create + bootstrap 建好完整可玩 state:抽身份 + 选将 + 洗牌 + 发牌 + 启动第一回合

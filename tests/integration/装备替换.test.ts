@@ -288,7 +288,7 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     });
 
     // findActionEntry 应返回 undefined(诸葛连弩.ts 不注册 action,但即使注册了也应被卸)
-    const entry = findActionEntry('诸葛连弩', 0, 'use');
+    const entry = findActionEntry(state, '诸葛连弩', 0, 'use');
     expect(entry).toBeUndefined();
   });
 });

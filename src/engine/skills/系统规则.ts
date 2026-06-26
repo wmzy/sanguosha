@@ -15,12 +15,12 @@ export function createSkill(id: string, ownerId: number): Skill {
 // 选将和弃牌 respond 是每个玩家的操作入口,注册到 (系统规则, 座次, actionType),
 // dispatch 用精确座次查找即可命中,无需 -1 回退。
 // action 体从 slot.atom.target 读取目标玩家,不依赖注册的 ownerId,因此各座次的 entry 逻辑一致。
-export function registerSystemRespondActions(ownerId: number): () => void {
+export function registerSystemRespondActions(state: GameState, ownerId: number): () => void {
   const unloads: Array<() => void> = [];
 
   // ── 选将 action:玩家选择武将 ──
   // 客户端发 {skillId:'系统规则', actionType:'选将', ownerId: target, params:{character:'刘备'}}
-  unloads.push(registerAction('系统规则', ownerId, '选将', (state, params) => {
+  unloads.push(registerAction(state, '系统规则', ownerId, '选将', (state, params) => {
     const slot = state.pendingSlots.get(ownerId);
     if (!slot) return '当前不需要回应';
     if (slot.atom.type !== '选将询问') return '当前不是选将窗口';
@@ -56,7 +56,7 @@ export function registerSystemRespondActions(ownerId: number): () => void {
   }));
 
   // ── 弃牌阶段 respond action:玩家选择弃哪些牌 ──
-  unloads.push(registerAction('系统规则', ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
+  unloads.push(registerAction(state, '系统规则', ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
     const slot = state.pendingSlots.get(ownerId);
     if (!slot) return '当前不需要回应';
     if (slot.atom.type !== '请求回应') return '当前不是弃牌窗口';
@@ -82,7 +82,7 @@ export function registerSystemRespondActions(ownerId: number): () => void {
   // 该 action 不由客户端直接发起,而是由"过河拆桥/顺手牵羊"的 use execute 在盲选前
   // 以 ClientMessage 形式插入 actionLog,保证重放时目标手牌顺序先恢复、盲选后执行。
   // params: { target: 目标座次, order: 卡牌ID数组(须为当前 hand 的合法排列) }
-  unloads.push(registerAction('系统规则', ownerId, '设置手牌顺序', (state, params) => {
+  unloads.push(registerAction(state, '系统规则', ownerId, '设置手牌顺序', (state, params) => {
     const target = params.target as number | undefined;
     if (typeof target !== 'number') return 'target required';
     const player = state.players[target];
@@ -106,17 +106,17 @@ export function registerSystemRespondActions(ownerId: number): () => void {
   return () => unloads.forEach(fn => fn());
 }
 
-export function onInit(_skill: Skill, _state: GameState): () => void {
+export function onInit(_skill: Skill, state: GameState): () => void {
   // ── 添加技能 after hook:实例化技能(注册 action/hook) ──
-  registerAfterHook('系统规则', -1, '添加技能', async (ctx) => {
+  registerAfterHook(state, '系统规则', -1, '添加技能', async (ctx) => {
     const atom = ctx.atom as { skillId: string; player: number };
-    await instantiateSkill(atom.skillId, atom.player, ctx.state);
+    await instantiateSkill(ctx.state, atom.skillId, atom.player);
   });
 
   // ── 移除技能 after hook:卸载技能实例 ──
-  registerAfterHook('系统规则', -1, '移除技能', async (ctx) => {
+  registerAfterHook(state, '系统规则', -1, '移除技能', async (ctx) => {
     const atom = ctx.atom as { skillId: string; player: number };
-    unloadSkillInstance(atom.skillId, atom.player, ctx.state);
+    unloadSkillInstance(ctx.state, atom.skillId, atom.player);
   });
 
   // ── 弃置 after hook:卸载被弃装备自带的技能实例 ──
@@ -125,7 +125,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
   // 没走 装备通用 → 装备技能实例(hook/vars/action)残留。这里统一兜底:
   // 弃置 apply 后,被弃的牌若原属装备区且其 name 是已挂载的装备技能,触发 移除技能 卸载。
   // apply 后 equipment 已不含该牌,用 skillLoaders(name 判据)+ player.skills(是否挂载)双判。
-  registerAfterHook('系统规则', -1, '弃置', async (ctx) => {
+  registerAfterHook(state, '系统规则', -1, '弃置', async (ctx) => {
     const atom = ctx.atom as { player: number; cardIds: string[] };
     const player = ctx.state.players[atom.player];
     if (!player) return;
@@ -142,7 +142,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
   });
 
   // ── 造成伤害 after hook:濒死检查(最后执行,确保遗计等技能先触发) ──
-  registerAfterHook('系统规则', -1, '造成伤害', async (ctx) => {
+  registerAfterHook(state, '系统规则', -1, '造成伤害', async (ctx) => {
     const atom = ctx.atom as { target?: number };
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];
@@ -152,7 +152,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
   });
 
   // ── 失去体力 after hook:濒死检查(最后执行) ──
-  registerAfterHook('系统规则', -1, '失去体力', async (ctx) => {
+  registerAfterHook(state, '系统规则', -1, '失去体力', async (ctx) => {
     const atom = ctx.atom as { target?: number };
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];

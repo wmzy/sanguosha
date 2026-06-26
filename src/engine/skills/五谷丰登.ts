@@ -91,7 +91,7 @@ async function runPickProcessingCard(
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ── use:主动打出五谷丰登 ──
-  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '五谷丰登' });
     }, async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
@@ -146,7 +146,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
 
   // ── respond:玩家选1张牌(从处理区亮的牌中) ──
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';

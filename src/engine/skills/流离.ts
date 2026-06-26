@@ -18,7 +18,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // respond:流离 confirm 和 chooseTarget
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state, params) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
@@ -35,7 +35,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(skill.id, ownerId, '成为目标', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '成为目标', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
     if (atom.target !== ownerId) return;
     const selfPlayer = ctx.state.players[ownerId];

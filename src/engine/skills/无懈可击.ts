@@ -30,7 +30,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(
-    skill.id, ownerId, 'respond',
+    state, skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       // 无懈可击是广播型(target=TARGET_BROADCAST):先按 ownerId 查(并行询问场景下 ownerId 也可能命中),
       // 未命中时查找广播型 slot(findPendingSlot 统一 fallback)。

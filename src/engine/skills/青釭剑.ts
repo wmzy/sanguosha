@@ -31,7 +31,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // 指定目标 after hook:杀指定目标后,临时卸载目标的防具技能
-  registerAfterHook(skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
     if ((ctx.atom as { source?: number }).source !== ownerId) return;
 
     const me = ctx.state.players[ownerId];
@@ -56,7 +56,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     for (const skillId of ARMOR_SKILLS) {
       if (targetPlayer.skills.includes(skillId)) {
         unloaded.push({ target, skillId });
-        unloadSkillInstance(skillId, target, ctx.state);
+        unloadSkillInstance(ctx.state, skillId, target);
       }
     }
     if (unloaded.length > 0) {
@@ -65,12 +65,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // 造成伤害 after hook:杀结算完毕后,恢复被临时卸载的防具技能
-  registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
     if ((ctx.atom as { source?: number }).source !== ownerId) return;
     const unloaded = tempUnloadMap.get(ownerId);
     if (!unloaded || unloaded.length === 0) return;
     for (const { target, skillId } of unloaded) {
-      await instantiateSkill(skillId, target, ctx.state);
+      await instantiateSkill(ctx.state, skillId, target);
     }
     tempUnloadMap.delete(ownerId);
   });

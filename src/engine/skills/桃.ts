@@ -12,7 +12,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'use',
+  registerAction(state, skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '桃' })
         ?? (() => {
@@ -34,7 +34,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // respond:濒死求桃时出桃救援
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       // pending 必须是 请求回应 且 requestType='求桃'
       const slot = state.pendingSlots.get(ownerId);

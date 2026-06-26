@@ -46,7 +46,7 @@ describe('前端 → 后端契约', () => {
     expect(declared.length).toBeGreaterThan(0);
 
     for (const def of declared) {
-      const found = findActionEntry(def.skillId, def.ownerId, def.actionType);
+      const found = findActionEntry(h.state, def.skillId, def.ownerId, def.actionType);
       expect(
         found,
         `defineAction 声明了 ${def.skillId}:${def.actionType},但后端无对应 registerAction`,

@@ -12,7 +12,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state)

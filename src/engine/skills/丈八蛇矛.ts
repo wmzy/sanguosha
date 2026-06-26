@@ -42,6 +42,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // transform action:把 2 张手牌转化为影子"杀"(新建 Card 实体,shadowOf 留空)。
   // 作为 preceding 在 杀.use 之前执行。杀.validate 读 cardMap[影子id] 看到"杀"。
   registerAction(
+    state,
     skill.id,
     ownerId,
     'transform',

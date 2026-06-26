@@ -10,7 +10,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state, params) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
@@ -22,7 +22,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+  registerBeforeHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];

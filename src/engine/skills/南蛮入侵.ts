@@ -13,7 +13,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'use',
+  registerAction(state, skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '南蛮入侵' });
     },

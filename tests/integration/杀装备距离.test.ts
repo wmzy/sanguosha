@@ -271,3 +271,71 @@ describe('杀 + 装备 + 距离', () => {
     expect(state.zones.discardPile).toContain(slash2.id);
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// 回归测试:skill 注册表 state 隔离
+//
+// 背景:bug「孙权被询问是否发动流离」——-seat 0(孙权)被杀指定为目标后,
+// 引擎错误弹出 流离/confirm 确认框。孙权没有流离技能,本局也无任何玩家有流离。
+// 根因:afterHooks 是模块级全局 Map,跨对局泄漏 + ownerId 碰巧匹配 target 就错误触发。
+// 修复:注册表搬到 state-bound(WeakMap 外挂),state 隔离 = 注册表隔离,泄漏物理不可能。
+//
+// 本测试验证:state A 注册了流离(ownerId=0),state B(独立)杀 seat 0 时不触发流离。
+// 旧架构下 state A 的流离 hook 会泄漏到全局表,state B 的杀结算会错误触发。
+// ─────────────────────────────────────────────────────────────
+describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
+  beforeEach(() => {
+    resetForTest();
+  });
+
+  it('state A 注册流离后,state B(无流离玩家)杀 seat 0 不触发 流离/confirm', async () => {
+    const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+
+    // state A:seat 0 有流离技能(会注册流离 after hook 到 state A 的注册表)
+    const stateA = createGameState({
+      players: [
+        { index: 0, name: '大乔', character: '大乔', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['流离', '闪', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        { index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, hand: [slash.id], equipment: {}, skills: ['杀', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      ],
+      cardMap: { c1: slash },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(stateA);
+
+    // state B:5 人局(孙权/黄盖/夏侯渊/庞德/荀彧),无人有流离
+    const slashB: Card = { id: 'c2', name: '杀', suit: '♥', rank: '3', type: '基本牌' };
+    const stateB = createGameState({
+      players: [
+        { index: 0, name: '孙权', character: '孙权', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['制衡', '闪', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        { index: 1, name: '黄盖', character: '黄盖', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['苦肉', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        { index: 2, name: '夏侯渊', character: '夏侯渊', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['神速', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        { index: 3, name: '庞德', character: '庞德', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['马术', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        { index: 4, name: '荀彧', character: '荀彧', health: 4, maxHealth: 4, alive: true, hand: [slashB.id], equipment: {}, skills: ['驱虎', '杀', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      ],
+      cardMap: { c2: slashB },
+      currentPlayerIndex: 4,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(stateB);
+
+    // state B:seat 4 对 seat 0 出杀
+    await dispatchAndWait(stateB, {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 4,
+      params: { cardId: slashB.id, targets: [0] },
+      baseSeq: 0,
+    });
+
+    // 关键断言:不应出现 流离/confirm 的 pending
+    const pendingAtoms = [...stateB.pendingSlots.values()].map(s => (s.atom as { requestType?: string }).requestType);
+    expect(pendingAtoms).not.toContain('流离/confirm');
+
+    // 应该是正常的 询问闪 pending(杀结算的正常流程)
+    const pendingTypes = [...stateB.pendingSlots.values()].map(s => (s.atom as { type: string }).type);
+    expect(pendingTypes.some(t => t === '询问闪' || t === '请求回应')).toBe(true);
+  });
+});

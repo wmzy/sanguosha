@@ -79,7 +79,7 @@ describe('激将:主公请求蜀势力角色出杀', () => {
 
     // 验证 validate 直接拒绝
     const { findActionEntry } = await import('../../src/engine/skill');
-    const entry = findActionEntry('激将', 1, 'use');
+    const entry = findActionEntry(state, '激将', 1, 'use');
     expect(entry).toBeDefined();
     const err = entry!.validate(state, { target: 1, killTarget: 0 });
     expect(err).not.toBeNull();
@@ -104,7 +104,7 @@ describe('激将:主公请求蜀势力角色出杀', () => {
     await registerSkillsFromState(state);
 
     const { findActionEntry } = await import('../../src/engine/skill');
-    const entry = findActionEntry('激将', 0, 'use')!;
+    const entry = findActionEntry(state, '激将', 0, 'use')!;
     // 目标是 P1(魏势力)→ 拒绝
     const err = entry.validate(state, { target: 1, killTarget: 1 });
     expect(err).not.toBeNull();

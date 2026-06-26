@@ -16,7 +16,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'use',
+  registerAction(state, skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 主公身份 + 目标合法
       const myTurn = state.currentPlayerIndex === ownerId;

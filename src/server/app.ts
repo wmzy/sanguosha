@@ -84,10 +84,8 @@ setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
 async function restorePersistedRooms(): Promise<void> {
   const roomIds = await listPersistedRooms();
   log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
-  // 清理上一轮残留的技能注册(全局 action/hook 注册表),
-  // 避免跨房间恢复时 "已注册" 冲突。rooms 恢复完后 bootstrap 会重新注册。
-  const { clearAllSkillInstances } = await import('../engine/skill');
-  clearAllSkillInstances();
+  // skill 注册表是 state-bound(WeakMap 外挂),每个房间的 state 自带独立注册表,
+  // 无需启动时清理全局表。bootstrap 会为每个 state 注册各自的技能实例。
   // 清理超过 1 小时没活动的房间(debug 房间不需要跨重启保留)
   const ONE_HOUR = 60 * 60 * 1000;
   const now = Date.now();

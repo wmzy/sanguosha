@@ -11,7 +11,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAfterHook(skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
     if (atom.source !== ownerId) return;
     // 只在杀的指定目标时触发

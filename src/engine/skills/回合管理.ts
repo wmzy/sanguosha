@@ -35,7 +35,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const me = skill.ownerId;
 
   // ─── 阶段结束 → 自动推进到下一阶段(自己回合内) ───
-  registerAfterHook(skill.id, ownerId, '阶段结束', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
     if (ctx.atom.type !== '阶段结束') return;
     const { player, phase } = ctx.atom;
     // 只让本回合所属玩家实例处理,避免和其他玩家的实例重复
@@ -99,7 +99,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 上家回合结束 → 如果我是下一家,启动自己的回合 ───
-  registerAfterHook(skill.id, ownerId, '回合结束', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
     if (ctx.atom.type !== '回合结束') return;
     const finishedIndex = ctx.atom.player;
     const state = ctx.state;
@@ -116,7 +116,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ─── 主动结束回合 ───
   // 合法条件:自己的出牌或弃牌阶段,且无 pending 挂起(须先回应询问)
-  registerAction(skill.id, ownerId, 'end', (state: GameState, _params: Record<string, Json>) => {
+  registerAction(state, skill.id, ownerId, 'end', (state: GameState, _params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌' || state.phase === '弃牌';
       const free = !hasBlockingPending(state)
@@ -139,7 +139,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ─── 首次开局(由主公位玩家触发)───
   // 合法条件:主公位(ownerId===0 且 currentPlayerIndex===0),处于初始准备阶段,且无 pending
-  registerAction(skill.id, ownerId, 'start', (state: GameState, _params: Record<string, Json>) => {
+  registerAction(state, skill.id, ownerId, 'start', (state: GameState, _params: Record<string, Json>) => {
       const isLordSeat = ownerId === 0 && state.currentPlayerIndex === 0;
       const atInitial = state.phase === '准备' && state.pendingSlots.size === 0;
       if (isLordSeat && atInitial) return null;

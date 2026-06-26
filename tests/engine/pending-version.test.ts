@@ -180,7 +180,7 @@ describe('pending-scoped 版本控制', () => {
     });
 
     // 注册一个轻量测试 action：validate 永过、execute 空，专为验证 pendingSeq 校验路径
-    const unregister = registerAction('测试', 0, 'probe', () => null, async () => {});
+    const unregister = registerAction(state, '测试', 0, 'probe', () => null, async () => {});
 
     // 建一个出牌窗口(非阻塞 pending)
     const windowP = applyAtom(state, { type: '出牌窗口', player: 0, timeout: 50 });

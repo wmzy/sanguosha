@@ -57,7 +57,7 @@ function spliceHandOrderEntry(state: GameState, target: number): void {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '过河拆桥', requireTarget: true })
         ?? (() => {
           const targets = params.targets as number[] | undefined;
@@ -101,7 +101,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }, );
 
   // ── 选牌 respond:使用者从目标区域选一张牌 ──
-  registerAction(skill.id, ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
+  registerAction(state, skill.id, ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
     const slot = state.pendingSlots.get(ownerId);
     if (!slot) return '当前不需要回应';
     if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';

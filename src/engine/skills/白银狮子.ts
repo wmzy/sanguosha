@@ -10,7 +10,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+  registerBeforeHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { target?: number; amount?: number; source?: number; cardId?: string };
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 1) return;
@@ -23,7 +23,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // 失去白银狮子时回 1 血:监听 卸下(防具) after hook
-  registerAfterHook(skill.id, ownerId, '卸下', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '卸下', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { player?: number; slot?: string };
     if (atom.player !== ownerId) return;
     if (atom.slot !== '防具') return;

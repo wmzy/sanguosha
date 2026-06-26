@@ -25,7 +25,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ── use:主动出杀 ──
-  registerAction(skill.id, ownerId, 'use',
+  registerAction(state, skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '杀', requireTarget: true })
         ?? (Array.isArray(params.targets) && (params.targets as number[]).every(t => state.players[t]?.alive === true && inAttackRange(state, ownerId, t)) ? null : '目标不合法')
@@ -109,7 +109,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── respond:被询问出杀(决斗/南蛮入侵等)——杀牌进处理区供调用方结算 ──
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       // pending 必须是 询问杀 或 请求回应(借刀杀人/激将)
       const slot = state.pendingSlots.get(ownerId);

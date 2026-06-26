@@ -1,10 +1,13 @@
 // src/engine/skill.ts
-// action/hook 实例注册 + 实例管理(全部顶层函数式 API)。
+// action/hook 实例注册 + 实例管理(state-bound 注册表)。
 //
-// skill 直接 import 以下函数使用:
-//   - registerAction(skillId, ownerId, actionType, validate, execute)
-//   - registerBeforeHook(skillId, ownerId, atomType, handler)
-//   - registerAfterHook(skillId, ownerId, atomType, handler)
+// 注册表通过 WeakMap 外挂在 GameState 上,实现 state 隔离 = 注册表隔离。
+// 这消除了模块级全局状态导致的跨对局泄漏(如 流离 hook 残留错误触发)。
+//
+// skill 直接 import 以下函数使用(state 作为注册表句柄,首参):
+//   - registerAction(state, skillId, ownerId, actionType, validate, execute)
+//   - registerBeforeHook(state, skillId, ownerId, atomType, handler)
+//   - registerAfterHook(state, skillId, ownerId, atomType, handler)
 //   - 对应的 unregisterXxx 配套
 
 import type {
@@ -65,6 +68,43 @@ export function getCachedSkillModule(id: string): SkillModule | undefined {
   return moduleCache.get(id);
 }
 
+// ─── state-bound 注册表(WeakMap 外挂) ────────────────────────
+
+interface SkillRegistry {
+  actions: Map<string, ActionEntry>;
+  beforeHooks: Map<string, AtomHookEntry[]>;
+  afterHooks: Map<string, AtomHookEntry[]>;
+  instanceUnloads: Map<string, () => void>;
+}
+
+/** state → 注册表的外挂映射。WeakMap 随 state 自动 GC,无需手动清理。 */
+const registries = new WeakMap<GameState, SkillRegistry>();
+
+/** 取(或懒创建)state 绑定的注册表。 */
+function getRegistry(state: GameState): SkillRegistry {
+  let r = registries.get(state);
+  if (!r) {
+    r = {
+      actions: new Map(),
+      beforeHooks: new Map(),
+      afterHooks: new Map(),
+      instanceUnloads: new Map(),
+    };
+    registries.set(state, r);
+  }
+  return r;
+}
+
+function actionKey(skillId: string, ownerId: number, actionType: string): string {
+  return `${skillId}:${ownerId}:${actionType}`;
+}
+
+function instanceKey(skillId: string, ownerId: number): string {
+  return `${skillId}:${ownerId}`;
+}
+
+// ─── pending slot / validateUseCard 等只读 helper(state 参数已有,无需改注册表) ───
+
 /** 查找某玩家的活跃 pending slot。
  *  查找顺序:ownerId 精确匹配 → 广播型(target<TARGET_SYSTEM) → 唯一活跃 slot(兜底)。
  *  无匹配返回 undefined。 */
@@ -123,39 +163,30 @@ export function validateUseCard(
   return null;
 }
 
-// ─── 实例级注册表(action + hook) ──────────────────────────────
+// ─── 实例级注册表(action + hook,state-bound) ──────────────────
 
-const actions = new Map<string, ActionEntry>();
-const beforeHooks = new Map<string, AtomHookEntry[]>();
-const afterHooks = new Map<string, AtomHookEntry[]>();
-
-function actionKey(skillId: string, ownerId: number, actionType: string): string {
-  return `${skillId}:${ownerId}:${actionType}`;
-}
-
-export function registerActionEntry(entry: ActionEntry): void {
+export function registerActionEntry(state: GameState, entry: ActionEntry): void {
   const k = actionKey(entry.skillId, entry.ownerId, entry.actionType);
-  // 先删后加:全局注册表跨房间共享,同一 key 可能被前一个房间占用
-  actions.delete(k);
-  actions.set(k, entry);
+  getRegistry(state).actions.set(k, entry);
 }
 
-export function findActionEntry(skillId: string, ownerId: number, actionType: string): ActionEntry | undefined {
-  return actions.get(actionKey(skillId, ownerId, actionType));
+export function findActionEntry(state: GameState, skillId: string, ownerId: number, actionType: string): ActionEntry | undefined {
+  return getRegistry(state).actions.get(actionKey(skillId, ownerId, actionType));
 }
 
-export function unregisterActionEntry(skillId: string, ownerId: number, actionType: string): void {
-  actions.delete(actionKey(skillId, ownerId, actionType));
+export function unregisterActionEntry(state: GameState, skillId: string, ownerId: number, actionType: string): void {
+  getRegistry(state).actions.delete(actionKey(skillId, ownerId, actionType));
 }
 
-function unregisterActionsForInstance(skillId: string, ownerId: number): void {
+function unregisterActionsForInstance(state: GameState, skillId: string, ownerId: number): void {
+  const reg = getRegistry(state);
   const prefix = `${skillId}:${ownerId}:`;
-  for (const key of [...actions.keys()]) {
-    if (key.startsWith(prefix)) actions.delete(key);
+  for (const key of [...reg.actions.keys()]) {
+    if (key.startsWith(prefix)) reg.actions.delete(key);
   }
   // 同实例的 before/after hook 也必须清理,否则 instantiateSkill 重注册时
-  // 老 hook 仍挂在全局表里,与新 hook 同时触发 → 重复结算(隐性的全局污染)。
-  for (const list of [beforeHooks, afterHooks]) {
+  // 老 hook 仍挂在注册表里,与新 hook 同时触发 → 重复结算。
+  for (const list of [reg.beforeHooks, reg.afterHooks]) {
     for (const [atomType, arr] of list) {
       const filtered = arr.filter((e) => !(e.skillId === skillId && e.ownerId === ownerId));
       if (filtered.length === 0) list.delete(atomType);
@@ -164,12 +195,12 @@ function unregisterActionsForInstance(skillId: string, ownerId: number): void {
   }
 }
 
-export function getBeforeHooks(atomType: string): AtomHookEntry[] {
-  return beforeHooks.get(atomType) ?? [];
+export function getBeforeHooks(state: GameState, atomType: string): AtomHookEntry[] {
+  return getRegistry(state).beforeHooks.get(atomType) ?? [];
 }
 
-export function getAfterHooks(atomType: string): AtomHookEntry[] {
-  return afterHooks.get(atomType) ?? [];
+export function getAfterHooks(state: GameState, atomType: string): AtomHookEntry[] {
+  return getRegistry(state).afterHooks.get(atomType) ?? [];
 }
 
 // ─── 顶层注册 helper(skill 在 onInit 内直接调用) ─────────────
@@ -179,6 +210,7 @@ export function getAfterHooks(atomType: string): AtomHookEntry[] {
  * 内部封装 registerActionEntry;返回 unloader。
  */
 export function registerAction(
+  state: GameState,
   skillId: string,
   ownerId: number,
   actionType: string,
@@ -187,8 +219,8 @@ export function registerAction(
   rollback?: (state: GameState, params: Record<string, Json>) => void,
 ): () => void {
   const entry: ActionEntry = { skillId, ownerId, actionType, validate, execute, rollback };
-  registerActionEntry(entry);
-  return () => unregisterActionEntry(skillId, ownerId, actionType);
+  registerActionEntry(state, entry);
+  return () => unregisterActionEntry(state, skillId, ownerId, actionType);
 }
 
 /**
@@ -196,17 +228,19 @@ export function registerAction(
  * before 钩子可返回 HookResult(pass/modify/cancel),after 钩子返回 void。
  */
 export function registerBeforeHook(
+  state: GameState,
   skillId: string,
   ownerId: number,
   atomType: string,
   handler: (ctx: AtomBeforeContext) => Promise<HookResult | void>,
 ): () => void {
   const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'before', handler };
-  const list = beforeHooks.get(atomType) ?? [];
+  const reg = getRegistry(state);
+  const list = reg.beforeHooks.get(atomType) ?? [];
   list.push(entry);
-  beforeHooks.set(atomType, list);
+  reg.beforeHooks.set(atomType, list);
   return () => {
-    const arr = beforeHooks.get(atomType);
+    const arr = reg.beforeHooks.get(atomType);
     if (!arr) return;
     const idx = arr.indexOf(entry);
     if (idx >= 0) arr.splice(idx, 1);
@@ -217,66 +251,50 @@ export function registerBeforeHook(
  * 注册一个 after atom 钩子。ownerId 在注册时绑定。
  */
 export function registerAfterHook(
+  state: GameState,
   skillId: string,
   ownerId: number,
   atomType: string,
   handler: (ctx: AtomAfterContext) => Promise<void>,
 ): () => void {
   const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'after', handler };
-  const list = afterHooks.get(atomType) ?? [];
+  const reg = getRegistry(state);
+  const list = reg.afterHooks.get(atomType) ?? [];
   list.push(entry);
-  afterHooks.set(atomType, list);
+  reg.afterHooks.set(atomType, list);
   return () => {
-    const arr = afterHooks.get(atomType);
+    const arr = reg.afterHooks.get(atomType);
     if (!arr) return;
     const idx = arr.indexOf(entry);
     if (idx >= 0) arr.splice(idx, 1);
   };
 }
 
-// ─── 实例管理 ──────────────────────────────────────────────
+// ─── 实例管理(state-bound) ──────────────────────────────────
 
-const instanceUnloads = new Map<string, () => void>();
-
-function instanceKey(skillId: string, ownerId: number): string {
-  return `${skillId}:${ownerId}`;
+export function setSkillInstanceUnload(state: GameState, skillId: string, ownerId: number, unload: () => void): void {
+  getRegistry(state).instanceUnloads.set(instanceKey(skillId, ownerId), unload);
 }
 
-export function setSkillInstanceUnload(skillId: string, ownerId: number, unload: () => void): void {
-  instanceUnloads.set(instanceKey(skillId, ownerId), unload);
-}
-
-export function unloadSkillInstance(skillId: string, ownerId: number, state?: GameState): void {
-  void state; // 保留参数 for API 稳定性(卸载逻辑由 onInit 返回的闭包处理)
+export function unloadSkillInstance(state: GameState, skillId: string, ownerId: number): void {
+  const reg = getRegistry(state);
   const key = instanceKey(skillId, ownerId);
-  const unload = instanceUnloads.get(key);
+  const unload = reg.instanceUnloads.get(key);
   if (unload) {
     unload();
-    instanceUnloads.delete(key);
+    reg.instanceUnloads.delete(key);
   }
-  unregisterActionsForInstance(skillId, ownerId);
+  unregisterActionsForInstance(state, skillId, ownerId);
 }
 
-export function clearAllSkillInstances(): void {
-  for (const unload of instanceUnloads.values()) {
-    unload();
-  }
-  instanceUnloads.clear();
-  actions.clear();
-  beforeHooks.clear();
-  afterHooks.clear();
-}
-
-// ─── skill 注册 ─────────────────────────────────────────────
-
-/** 遍历 state.players,给每个 skill 调 onInit 注册实例(并保存 unload)。
- *  bootstrap 用此在 开局 流程注入 player.skills 后注册;测试用此给预构造 state 注册技能。 */
-export async function registerSkillsFromState(state: GameState): Promise<void> {
+export function registerSkillsFromState(state: GameState): Promise<void> {
+  const tasks: Promise<Skill | null>[] = [];
   for (const player of state.players) {
     for (const skillId of player.skills) {
-      await instantiateSkill(skillId, player.index, state);
+      tasks.push(instantiateSkill(state, skillId, player.index));
     }
   }
+  return Promise.all(tasks).then(() => undefined);
 }
 
 /**
@@ -286,17 +304,17 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
  * 再重新注册。保证 registerSkillsFromState 重入、并发 dispatch、动态 添加技能 等场景不会因
  * `registerActionEntry` 的 "already registered" 抛错。
  */
-export async function instantiateSkill(skillId: string, ownerId: number, state?: GameState): Promise<Skill | null> {
+export async function instantiateSkill(state: GameState, skillId: string, ownerId: number): Promise<Skill | null> {
   // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册抛错
-  unloadSkillInstance(skillId, ownerId, state);
+  unloadSkillInstance(state, skillId, ownerId);
   // 同步检查:技能模块未注册(如候选人 skills 中的描述性名称)则跳过,不中断开局流程。
   // 用 checker 而非 try-catch 控制流——不确定性不应被 catch 遮蔽。
   if (skillModuleChecker && !skillModuleChecker(skillId)) return null;
   const module = await getSkillModule(skillId);
   const skill = module.createSkill(skillId, ownerId);
-  if (module.onInit && state) {
+  if (module.onInit) {
     const unload = module.onInit(skill, state);
-    setSkillInstanceUnload(skillId, ownerId, typeof unload === 'function' ? unload : () => {});
+    setSkillInstanceUnload(state, skillId, ownerId, typeof unload === 'function' ? unload : () => {});
   }
   return skill;
 }

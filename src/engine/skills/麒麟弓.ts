@@ -12,7 +12,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ── respond:玩家确认是否发动 ──
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state, params) => {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
@@ -28,7 +28,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 before hook:杀命中后额外弃马 ──
-  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+  registerBeforeHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];

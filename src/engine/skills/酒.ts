@@ -13,7 +13,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'use',
+  registerAction(state, skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
       const rawTarget = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined;
       return validateUseCard(state, ownerId, params, { cardName: '酒' })
@@ -35,7 +35,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // respond:濒死时酒当桃用
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
@@ -56,7 +56,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // before hook:造成伤害时消费 mark,增伤 +1
-  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+  registerBeforeHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     const atom = ctx.atom as { source?: number; amount?: number; type: string };
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

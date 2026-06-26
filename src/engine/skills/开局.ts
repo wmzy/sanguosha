@@ -88,7 +88,7 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(_skill: Skill, _state: GameState): () => void {
+export function onInit(_skill: Skill, state: GameState): () => void {
   const entry: ActionEntry = {
     skillId: '开局',
     ownerId: SYSTEM_OWNER,
@@ -172,7 +172,7 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       //     选将 已设置 player.skills,但技能实例需要 registerSkillsFromState 实例化
       for (const player of state.players) {
         for (const skillId of player.skills) {
-          await instantiateSkill(skillId, player.index, state);
+          await instantiateSkill(state, skillId, player.index);
         }
       }
 
@@ -192,8 +192,8 @@ export function onInit(_skill: Skill, _state: GameState): () => void {
       }
     },
   };
-  registerActionEntry(entry);
-  return () => unregisterActionEntry('开局', SYSTEM_OWNER, 'start');
+  registerActionEntry(state, entry);
+  return () => unregisterActionEntry(state, '开局', SYSTEM_OWNER, 'start');
 }
 
 // module_开局 不再走 SkillModule.onInit 路径 —— bootstrap() 直接调顶层 onInit。

@@ -44,7 +44,7 @@ describe('回合管理 validate 正向判断合法性', () => {
   });
 
   it('end:自己出牌阶段无 pending 时合法', () => {
-    const entry = findActionEntry('回合管理', 0, 'end')!;
+    const entry = findActionEntry(state, '回合管理', 0, 'end')!;
     expect(entry.validate(state, {})).toBeNull();
   });
 
@@ -54,31 +54,31 @@ describe('回合管理 validate 正向判断合法性', () => {
       atom: { type: '请求回应', requestType: '__弃牌', target: 0, prompt: { type: 'useCard', title: '弃牌', cardFilter: { filter: () => true, min: 2, max: 2 } }, timeout: 30 },
       resolve: () => {}, pause: () => {}, _fireTimeoutNow: undefined, deadline: 99, isTimeout: false, isBlocking: true,
     } as any);
-    const entry = findActionEntry('回合管理', 0, 'end')!;
+    const entry = findActionEntry(state, '回合管理', 0, 'end')!;
     expect(entry.validate(state, {})).not.toBeNull();
   });
 
   it('end:非自己回合时拒绝', () => {
     state.currentPlayerIndex = 1;
-    const entry = findActionEntry('回合管理', 0, 'end')!;
+    const entry = findActionEntry(state, '回合管理', 0, 'end')!;
     expect(entry.validate(state, {})).not.toBeNull();
   });
 
   it('end:非出牌/弃牌阶段时拒绝', () => {
     state.phase = '摸牌';
-    const entry = findActionEntry('回合管理', 0, 'end')!;
+    const entry = findActionEntry(state, '回合管理', 0, 'end')!;
     expect(entry.validate(state, {})).not.toBeNull();
   });
 
   it('start:主公位、准备阶段、无 pending 时合法', () => {
     state.phase = '准备';
-    const entry = findActionEntry('回合管理', 0, 'start')!;
+    const entry = findActionEntry(state, '回合管理', 0, 'start')!;
     expect(entry.validate(state, {})).toBeNull();
   });
 
   it('start:非主公位拒绝', () => {
     state.phase = '准备';
-    const entry = findActionEntry('回合管理', 1, 'start')!;
+    const entry = findActionEntry(state, '回合管理', 1, 'start')!;
     expect(entry.validate(state, {})).not.toBeNull();
   });
 });

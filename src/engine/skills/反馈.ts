@@ -15,7 +15,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // respond:被询问"是否发动反馈"时回应,设 localVars 标记结果
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state, params) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
@@ -27,7 +27,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { target?: number; source?: number; amount?: number };
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

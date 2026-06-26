@@ -27,7 +27,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ─── use action:对目标放置延时锦囊 ────────────────────────
-  registerAction(skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '乐不思蜀' })
         ?? (() => {
           const t = params.target ?? (params.targets as number[] | undefined)?.[0] as number | undefined;
@@ -61,7 +61,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
 
   // ─── 判定阶段:有 乐不思蜀 → 先问无懈可击,未被抵消才触发判定 ───
-  registerBeforeHook(skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
@@ -88,7 +88,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────
-  registerAfterHook(skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '乐不思蜀') return;
@@ -116,7 +116,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 出牌阶段:有跳过标签 → 跳过出牌阶段 ────────────────────
-  registerBeforeHook(skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;

@@ -49,7 +49,6 @@ import type {
 import { createGameState, TARGET_SYSTEM } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
 import {
-  clearAllSkillInstances,
   findActionEntry,
   findPendingSlot,
   getAfterHooks,
@@ -64,9 +63,8 @@ import { createStandardDeck } from '../shared/deck';
 import { clearSlashMaxProviders } from './slash-quota';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
-// 必须 import skills/index 来设置 skillModuleResolver + 注册系统规则全局 hooks
+// 必须 import skills/index 来设置 skillModuleResolver
 import './skills';
-import { onInit as init系统规则 } from './skills/系统规则';
 
 
 
@@ -197,18 +195,20 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   }
   const 开局mod = await import('./skills/开局');
   const syntheticSkill = 开局mod.createSkill('开局', SYSTEM_OWNER);
-  // 全局注册表幂等:先卸载旧实例(await import 之后、onInit 之前),避免
-  // 跨 session/跨 test 时因微任务交织导致 "already registered" 抛错。
-  unloadSkillInstance('开局', SYSTEM_OWNER);
+  // state-bound 注册表幂等:先卸载旧实例(await import 之后、onInit 之前),避免
+  // 重入时因微任务交织导致重复注册。
+  unloadSkillInstance(state, '开局', SYSTEM_OWNER);
   const off开局 = 开局mod.onInit(syntheticSkill, state);
-  // 登记实例 unload,使 unloadSkillInstance/clearAllSkillInstances 能正确清理 开局:系统
-  setSkillInstanceUnload('开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
+  // 登记实例 unload,使 unloadSkillInstance 能正确清理 开局:系统
+  setSkillInstanceUnload(state, '开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
 
   // 3. dispatch 开局 start(dispatch 返回 boolean:validate 拒绝返回 false,开局失败通过后续 state 检查暴露)
   // 先为每个玩家注册选将/弃牌 respond action(注册到具体座次,开局流程内会等待这些 respond)
   const 系统规则mod = await import('./skills/系统规则');
+  // 注册系统规则全局 hooks(添加技能/移除技能/弃置/濒死检查)到本 state(state-bound 注册表)
+  系统规则mod.onInit(系统规则mod.createSkill('系统规则', TARGET_SYSTEM), state);
   for (const player of state.players) {
-    系统规则mod.registerSystemRespondActions(player.index);
+    系统规则mod.registerSystemRespondActions(state, player.index);
   }
   await dispatch(state, {
     skillId: '开局',
@@ -236,10 +236,11 @@ export async function restore(state: GameState, gameConfig: GameConfig, actionLo
 export async function registerSkillsFromState(state: GameState): Promise<void> {
   const { registerSkillsFromState: registerSkills } = await import('./skill');
   await registerSkills(state);
-  // 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)
+  // 注册系统规则全局 hooks + 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)
   const 系统规则mod = await import('./skills/系统规则');
+  系统规则mod.onInit(系统规则mod.createSkill('系统规则', TARGET_SYSTEM), state);
   for (const player of state.players) {
-    系统规则mod.registerSystemRespondActions(player.index);
+    系统规则mod.registerSystemRespondActions(state, player.index);
   }
 }
 
@@ -268,7 +269,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   };
   if (message.preceding) {
     for (const p of message.preceding) {
-      const pEntry = findActionEntry(p.skillId, message.ownerId, p.actionType);
+      const pEntry = findActionEntry(state, p.skillId, message.ownerId, p.actionType);
       if (!pEntry || pEntry.validate(state, p.params) !== null){
         rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
         cleanupResidualPending();
@@ -278,7 +279,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       rollbacks.push({ entry: pEntry, params: p.params });
     }
   }
-  let entry = findActionEntry(message.skillId, message.ownerId, message.actionType);
+  let entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
   if (!entry || entry.validate(state, message.params) !== null){
     rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
     return false;
@@ -361,12 +362,11 @@ export async function fireTimeout(state: GameState): Promise<void> {
   }
 }
 
-/** 测试用:模块级清空(skill instances + slash quota providers)。 */
+/** 测试用:清空模块级 slash quota providers。
+ *  skill 注册表现在是 state-bound(WeakMap 外挂),随 state 自动隔离,无需在此清理。
+ *  保留此函数用于兼容旧测试调用(现在只清 slash quota)。 */
 export function resetForTest(): void {
-  clearAllSkillInstances();
   clearSlashMaxProviders();
-  // 重新注册系统规则全局 hooks(被 clearAllSkillInstances 清掉了)
-  init系统规则({ id: '系统规则', ownerId: TARGET_SYSTEM, name: '系统规则', description: '' }, createGameState({ players: [], cardMap: {} }));
 }
 
 // ==================== 从 engine-api.ts 合并的导出 ====================
@@ -429,7 +429,7 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
 /** 运行 after hooks:系统级 hooks(ownerId===TARGET_SYSTEM)最后执行,
  *  确保遗计/反馈等“受伤害后”技能先于濒死检查触发。 */
 async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
-  const sortedHooks = [...getAfterHooks(atom.type)].sort((a, b) => {
+  const sortedHooks = [...getAfterHooks(state, atom.type)].sort((a, b) => {
     if (a.ownerId === TARGET_SYSTEM && b.ownerId !== TARGET_SYSTEM) return 1;
     if (a.ownerId !== TARGET_SYSTEM && b.ownerId === TARGET_SYSTEM) return -1;
     return 0;
@@ -459,7 +459,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   // cancel 终止(仁王盾取消后后续 hook 不跑,atom 不进入 validate/apply/after)。
   let current = atom;
   let cancelled = false;
-  for (const h of [...getBeforeHooks(atom.type)]) {
+  for (const h of [...getBeforeHooks(state, atom.type)]) {
     const frame = topFrame(state) ?? emptyFrame();
     const beforeCtx: AtomBeforeContext = {
       state,

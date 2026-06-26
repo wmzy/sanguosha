@@ -19,10 +19,10 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, _state: GameState): () => void {
+export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // respond:被询问"是否发动八卦阵"时回应,设 localVars 标记结果
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state, _params) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
@@ -34,7 +34,7 @@ export function onInit(skill: Skill, _state: GameState): () => void {
     },
   );
 
-  registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+  registerBeforeHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     if ((ctx.atom as { target?: number }).target !== ownerId) return;
     if (ctx.state.zones.deck.length === 0) return;
 

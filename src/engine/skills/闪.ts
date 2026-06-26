@@ -11,7 +11,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(skill.id, ownerId, 'respond',
+  registerAction(state, skill.id, ownerId, 'respond',
     (state: GameState, params: Record<string, Json>) => {
       // pending 必须询问闪(正向条件)
       const slot = state.pendingSlots.get(ownerId);
