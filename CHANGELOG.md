@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-25
 
+### Fixed — 青龙偃月刀追杀未消耗杀牌(凭空杀人)
+
+青龙偃月刀原实现:杀被闪后,确认追杀时直接再次 `询问闪`，**未让 owner 先出一张杀牌**——相当于凭空造了一张杀。标准规则下「追杀」是「再使用一张杀」，必须消耗手牌中的杀。本次改为与贯石斧统一的两步 respond 模式:confirm 追杀 → 选一张杀牌 → 杀牌进处理区 → 再询问闪。
+
+- **respond action 扩展为两阶段**: 原 `respond` 只处理 `青龙偃月刀/confirm`；现新增 `青龙偃月刀/useKill` 阶段(validate 校验 cardId 是 owner 手牌中的一张杀,apply 把 cardId 存入 `localVars['青龙偃月刀/killCardId']`)。(`src/engine/skills/青龙偃月刀.ts`)
+- **hook 流程修正**: confirm 追杀后,先发 `请求回应`(requestType=`青龙偃月刀/useKill`,useCard prompt,cardFilter 杀)让 owner 选杀牌;选中的杀牌 `移动牌` 从手牌进处理区;移走旧闪后再 `询问闪`。(`src/engine/skills/青龙偃月刀.ts`)
+- **无杀不触发**: owner 手牌无杀时跳过 confirm 直接被闪,避免无意义询问。(`src/engine/skills/青龙偃月刀.ts`)
+- **杀牌清理**: 追杀的杀牌在询问闪结束后移入弃牌堆(杀.execute 收尾只移走原始杀,不认识追杀的杀,需在 hook 内清理避免滞留处理区)。(`src/engine/skills/青龙偃月刀.ts`)
+- **测试**: 新增 `tests/skill-tests/青龙偃月刀.test.ts` 7 例(追杀命中/连续追杀/不追杀/无杀跳过/超时放弃/被闪不追/选非杀拒绝)。
+
 ### Changed — 八卦阵需先询问是否发动
 
 八卦阵(防具)原实现为「需要出闪时自动判定」,判定红色自动视为出闪。标准三国杀规则下八卦阵是可选技能——装备者可选择不发动。本次改为判定前先询问玩家是否发动,与 反馈/寒冰剑/贯石斧/麒麟弓 等技能统一走 `请求回应`(requestType=`八卦阵/confirm`)+ `respond` action 模式。

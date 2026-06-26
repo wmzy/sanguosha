@@ -499,7 +499,6 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   // 否则 broadcastNewState 的水位过滤会跳过同 seq 的后续事件(选将 bug 根因)。
   state.seq += 1;
   state.atomHistory.push({ kind: 'atom', seq: state.seq, timestamp: Date.now() - state.startedAt, atom: current, viewEvents: viewEvents! });
-  notifyStateChange(state);
 
   if (def.pending) {
     // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应/并行选将多 target)。
@@ -539,6 +538,12 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
     return;
   }
 
+  // 非等待型 atom:push 后立即广播。必须在 after hooks 之前——after hooks 内
+  // 嵌套的 applyAtom 会各自广播并推进 seq,若此处延后到 after hooks 之后才广播,
+  // 当前 atom(seq 较小)会被 broadcastNewState 的水位过滤(sinceSeq)吞掉。
+  // (等待型 atom 不在此广播——其 notifyStateChange 由 createAndAwaitSlot 在
+  // pendingSlots.set 之后触发,确保 buildView.pending 已含候选将等 slot 数据。)
+  notifyStateChange(state);
   // 非等待型 atom:技能 after hooks 立即跑(原顺序)
   await runAfterHooks(state, current);
 
