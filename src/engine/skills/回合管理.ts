@@ -46,6 +46,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     await applyAtom(ctx.state, { type: '阶段开始', player, phase: next });
 
+    // 若 阶段开始 被 before hook cancel/改写(如兵粮寸断判定生效后跳过摸牌阶段,
+    // 其 hook 内部已把阶段推进到出牌),state.phase 已偏离 next —— 该阶段被跳过,
+    // 不再执行其自动动作(摸牌/弃牌检查/自动结束),否则会让本应跳过的阶段仍摸牌。
+    if (ctx.state.phase !== next) return;
+
     // 摸牌阶段自动摸 2 张(摸牌 atom 内部处理牌堆不足时的洗牌补充)
     if (next === '摸牌') {
       await applyAtom(ctx.state, { type: '摸牌', player, count: 2 });

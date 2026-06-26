@@ -348,4 +348,148 @@ describe('青龙偃月刀', () => {
     // 命中
     expect(harness.state.players[1].health).toBe(3);
   });
+
+  // ─── 被八卦阵(判定红)视为出闪 → 应询问追杀 ─────────────
+  // 回归:武器技挂载点从询问闪 after 迁到独立的"被抵消" atom after。
+  //   旧架构:武器技挂询问闪 after,八卦阵 cancel 询问闪 → after 不执行 → 追杀不触发。
+  //   新架构:杀.execute 检测处理区有闪 → applyAtom(被抵消) → 武器技 after 触发。
+  //   八卦阵 cancel 询问闪(不再问目标)不影响——被抵消是独立 atom,与询问闪是否 cancel 无关。
+  it('用例8:被八卦阵(判定红)视为出闪 → 询问追杀;追杀命中', async () => {
+    const bagua = makeCard('b1', '八卦阵', '♣', 'A', '装备牌');
+    const kill1 = makeCard('k1', '杀', '♠', '7');
+    const kill2 = makeCard('k2', '杀', '♠', '8');
+    // deck 顶放红色牌(红桃):八卦阵判定翻到 → 视为出闪
+    const judgeRed = makeCard('j1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '八卦阵'], equipment: { 防具: 'b1' } }),
+      ],
+      cardMap: { ql: QINGLONG, b1: bagua, k1: kill1, k2: kill2, j1: judgeRed },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P1 出杀 → 触发八卦阵询问
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    // P2 发动八卦阵
+    await P2.respond('八卦阵', { choice: true });
+    // 判定红桃 j1 → 视为出闪(虚拟闪进处理区)
+
+    // 【修复核心】青龙偃月刀 after hook 应触发,询问 P1 是否追杀
+    expect(harness.state.pendingSlots.get(0)).toBeDefined();
+    const confirmAtom = (harness.state.pendingSlots.get(0)!.atom as unknown as { requestType?: string });
+    expect(confirmAtom.requestType).toBe('青龙偃月刀/confirm');
+
+    // P1 选择追杀 + 选杀牌
+    await P1.respond('青龙偃月刀', { choice: true });
+    await P1.respond('青龙偃月刀', { cardId: 'k2' });
+
+    // 追杀的杀再次触发八卦阵,但 deck 已空 → 八卦阵不发动 → 正常询问闪 → P2 无闪 pass
+    await P2.pass();
+
+    // 追杀命中:P2 扣血
+    expect(harness.state.players[1].health).toBe(3);
+    // k2(追杀杀)、k1(原始杀)、j1(判定牌)均进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('k2');
+    expect(harness.state.zones.discardPile).toContain('k1');
+    expect(harness.state.zones.discardPile).toContain('j1');
+  });
+
+  // ─── 仁王盾黑杀无效 → 不触发武器技(与用例8对照) ─────────────
+  // 验证时机隔离:仁王盾挂"检测有效性"before(杀无效→cancel),青龙挂"被抵消"after。
+  // 仁王盾 cancel 检测有效性 → 杀.execute 跳过该目标,根本不到"被抵消",青龙不触发。
+  // 这正是重构的价值:仁王盾(无效)与八卦阵(视为出闪)由时机 atom 天然区分,不再共用询问闪 cancel。
+  it('用例9:P1 黑杀 P2(持仁王盾)→ 杀无效,不询问追杀,P2 不扣血', async () => {
+    const renwang = makeCard('r1', '仁王盾', '♣', '2', '装备牌');
+    const blackKill = makeCard('k1', '杀', '♠', '7'); // 黑桃=黑色 → 仁王盾无效
+    const spareKill = makeCard('k2', '杀', '♥', '8'); // 备用杀(若误触发追杀会消耗)
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '仁王盾'], equipment: { 防具: 'r1' } }),
+      ],
+      cardMap: { ql: QINGLONG, r1: renwang, k1: blackKill, k2: spareKill },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P1 黑杀 P2 → 仁王盾在检测有效性 cancel → 杀.execute 跳过 P2
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+
+    // 杀无效:不询问闪(无 pending)、不造成伤害、不触发青龙追杀
+    P1.expectNoPending();
+    P2.expectNoPending();
+    expect(harness.state.players[1].health).toBe(4); // 不扣血
+    // k1(黑杀)进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('k1');
+    // k2(备用杀)仍在 P1 手中——证明青龙未误触发追杀
+    expect(harness.state.players[0].hand).toContain('k2');
+  });
+
+  // ─── 连续两次八卦判红 → 连续两次追杀 → 第三次命中 ────────
+  // 验证追杀的新杀能再次触发八卦阵判定,且青龙递归追杀正常工作。
+  // deck 放 2 张红色牌:第一次判定用 j1,第二次判定用 j2,两次都判红视为出闪。
+  it('用例10:P2 八卦阵连续判红两次,P1 连续追杀两次 → 第三次命中', async () => {
+    const bagua = makeCard('b1', '八卦阵', '♣', 'A', '装备牌');
+    const kill1 = makeCard('k1', '杀', '♠', '7');
+    const kill2 = makeCard('k2', '杀', '♠', '8');
+    const kill3 = makeCard('k3', '杀', '♠', '9');
+    // deck 顶两张红色牌:连续两次八卦判定都判红
+    const judgeRed1 = makeCard('j1', '桃', '♥', '5');
+    const judgeRed2 = makeCard('j2', '桃', '♦', '6');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2', 'k3'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '八卦阵'], equipment: { 防具: 'b1' } }),
+      ],
+      cardMap: { ql: QINGLONG, b1: bagua, k1: kill1, k2: kill2, k3: kill3, j1: judgeRed1, j2: judgeRed2 },
+      zones: { deck: ['j1', 'j2'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P1 第一次出杀 → 八卦阵判定(j1 红桃)→ 视为出闪
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    await P2.respond('八卦阵', { choice: true });
+
+    // 被抵消 → 青龙触发:confirm 追杀
+    await P1.respond('青龙偃月刀', { choice: true });
+    await P1.respond('青龙偃月刀', { cardId: 'k2' });
+
+    // 追杀的杀(k2)再次触发八卦阵判定(j2 方块红)→ 视为出闪 → 被抵消 → 青龙再次触发
+    await P2.respond('八卦阵', { choice: true });
+
+    // 第二次被抵消 → 青龙再次 confirm 追杀
+    await P1.respond('青龙偃月刀', { choice: true });
+    await P1.respond('青龙偃月刀', { cardId: 'k3' });
+
+    // 第三次追杀:deck 已空 → 八卦阵不发动 → P2 无闪 pass → 命中
+    await P2.pass();
+
+    // 第三次命中:P2 扣血
+    expect(harness.state.players[1].health).toBe(3);
+    // 三张杀都进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('k1');
+    expect(harness.state.zones.discardPile).toContain('k2');
+    expect(harness.state.zones.discardPile).toContain('k3');
+    // 两张判定牌进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('j1');
+    expect(harness.state.zones.discardPile).toContain('j2');
+    // P1 手牌空
+    expect(harness.state.players[0].hand).toHaveLength(0);
+  });
 });

@@ -37,6 +37,8 @@ import './添加延时锦囊';
 import './移除延时锦囊';
 import './拼点';
 import './展示事件';
+import './检测有效性';
+import './被抵消';
 import './询问闪';
 import './询问杀';
 import './请求回应';

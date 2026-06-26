@@ -278,4 +278,46 @@ describe('贯石斧', () => {
       skillId: '贯石斧', actionType: 'respond', params: { cardIds: ['x1', 'x1'] },
     });
   });
+
+  // ─── 八卦阵判红视为出闪 → 贯石斧可强命 ────────────────
+  // 验证贯石斧挂载点迁移到"被抵消"after 后,八卦阵判红(视为出闪)能正确触发贯石斧。
+  it('用例7:P2 八卦阵判红视为出闪,P1 贯石斧弃2牌强命 → P2 扣血', async () => {
+    const bagua = makeCard('b1', '八卦阵', '♣', 'A', '装备牌');
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const discard1 = makeCard('x1', '桃', '♥', '3');
+    const discard2 = makeCard('x2', '桃', '♥', '4');
+    // deck 顶红色牌:八卦阵判红视为出闪
+    const judgeRed = makeCard('j1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'x1', 'x2'], skills: ['杀', '贯石斧'], equipment: { 武器: 'gs' } }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '八卦阵'], equipment: { 防具: 'b1' } }),
+      ],
+      cardMap: { gs: GUANSHI, b1: bagua, k1: kill, x1: discard1, x2: discard2, j1: judgeRed },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P1 出杀 → 八卦阵判红视为出闪
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    await P2.respond('八卦阵', { choice: true });
+
+    // 被抵消 → 贯石斧触发:confirm 强命
+    expect(harness.state.pendingSlots.get(0)).toBeDefined();
+    await P1.respond('贯石斧', { choice: true });
+    // 选 2 张牌弃置
+    await P1.respond('贯石斧', { cardIds: ['x1', 'x2'] });
+
+    // 强命:P2 扣血
+    expect(harness.state.players[1].health).toBe(3);
+    expect(harness.state.zones.discardPile).toContain('x1');
+    expect(harness.state.zones.discardPile).toContain('x2');
+    expect(harness.state.zones.discardPile).toContain('j1'); // 判定牌
+    expect(harness.state.zones.discardPile).toContain('k1'); // 原始杀
+  });
 });

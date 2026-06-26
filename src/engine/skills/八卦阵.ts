@@ -3,9 +3,13 @@
 //   1. 先 请求回应 询问是否发动(requestType=八卦阵/confirm)
 //   2. 玩家选发动 → applyAtom(判定) → 判定牌进弃牌堆,读花色
 //   3. 红色 → 往处理区放入一张虚拟闪牌,再 cancel 主 询问闪 atom
-//      (判定红色即视为出闪,不再询问目标出闪;与仁王盾统一模式)
-//   4. 黑色 / 玩家选不发动 / 超时 → 不 cancel,直接进入正常询问闪
+//      (判定红色即视为出闪,不再询问目标出闪)。杀.execute 检测处理区有闪 →
+//      走"被抵消"分支 → 武器技(贯石斧/青龙腰月刀)正常触发。
+//   4. 黑色 / 玩家选不发动 / 超时 → 不干预,直接进入正常询问闪
 // 杀不需要知道八卦阵——只看处理区有没有闪牌。
+// cancel 询问闪不会跳过杀.execute 的后续逻辑:杀.execute 在 applyAtom(询问闪)
+// 返回后自己检查处理区,与询问闪是否被 cancel 无关。武器技挂在独立的"被抵消"
+// atom after(非询问闪 after),故不受询问闪 cancel 影响。
 import type { AtomBeforeContext, Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
@@ -62,7 +66,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 红色:往处理区放虚拟闪牌(通过移动牌 atom 产生 ViewEvent,保持 processedView 同步)
     // 然后 cancel 主 询问闪 atom —— 判定红色即视为出闪,不再询问目标出闪。
-    // 与仁王盾统一模式:杀只看处理区有无闪牌,不感知防具。
+    // 杀.execute 检测处理区有闪 → 走"被抵消"分支 → 武器技正常触发。
+    // 武器技挂在"被抵消" atom after(非询问闪 after),不受询问闪 cancel 影响。
     if (judgeCard.suit === '♥' || judgeCard.suit === '♦') {
       const dodgeId = `八卦阵:${ownerId}:${judgeCardId}`;
       const virtualDodge: Card = {

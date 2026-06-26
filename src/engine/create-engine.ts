@@ -467,12 +467,12 @@ async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
  * 应用一个 atom:走完整 pipeline(before hooks → validate → apply → emit event → after hooks → pending)。
  * 等待型 atom 的 Promise 会挂起直到回应/超时。
  */
-export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
+export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> {
   state.atomStack.push(atom);
 
   // before 阶段:折叠(folding)语义。hooks 按注册顺序(座次序)依次跑,
   // 每个 hook 可 pass/modify/cancel。modify 叠加(藤甲-1 后白银狮子看到减过的值);
-  // cancel 终止(仁王盾取消后后续 hook 不跑,atom 不进入 validate/apply/after)。
+  // cancel 终止(仁王盾/检测有效性 cancel 后后续 hook 不跑,atom 不进入 validate/apply/after)。
   let current = atom;
   let cancelled = false;
   for (const h of [...getBeforeHooks(state, atom.type)]) {
@@ -492,10 +492,10 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
 
   if (cancelled) {
     state.atomStack.pop();
-    // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消")
+    // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消"/"目标无效")
     pushNotify(state, { skillId: '', eventType: 'atomCancelled', data: { atomType: atom.type } });
     notifyStateChange(state);
-    return;
+    return false;   // 被 before hook cancel(如仁王盾:目标无效)
   }
 
   const def = getAtomDef(current.type);
@@ -551,7 +551,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
     }
 
     state.atomStack.pop();
-    return;
+    return true;
   }
 
   // 非等待型 atom:push 后立即广播。必须在 after hooks 之前——after hooks 内
@@ -569,6 +569,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<void> {
   }
 
   state.atomStack.pop();
+  return true;
 }
 
 /** 为单个 target 创建 PendingSlot 并 await 到它 resolve。 */

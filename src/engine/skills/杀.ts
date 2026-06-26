@@ -51,7 +51,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           await applyAtom(state, { type: '指定目标', source: from, target, cardId });
         }
 
-        // 第二阶段:逐个结算(成为目标 → 询问闪 → 检查处理区 → 伤害)
+        // 第二阶段:逐个结算(成为目标 → 检测有效性 → 询问闪 → 被抵消 → 检查处理区 → 伤害)
         // resolvedTargets 从帧上读取:流离等技能可能修改帧上的 resolvedTargets
         for (let i = 0; i < targets.length; i++) {
           // 从帧上读当前目标(可能被流离等技能修改)
@@ -61,22 +61,40 @@ export function onInit(skill: Skill, state: GameState): () => void {
           // 成为目标:触发"成为目标后"hook(如流离转移),可被 cancel(空城等)
           await applyAtom(state, { type: '成为目标', source: from, target, cardId });
 
-          // 询问闪(等待目标回应,防具如仁王盾/八卦阵在此 cancel 或放虚拟闪)
+          // 使用结算开始时:检测有效性(仁王盾黑杀无效在此 cancel)。
+          // cancel=false 表示目标无效,跳过该目标(不询问闪、不伤害、不触发被抵消)。
+          const valid = await applyAtom(state, { type: '检测有效性', source: from, target, cardId });
+          if (!valid) continue;
+
+          // 生效前:询问闪(等待目标回应;八卦阵判红放虚拟闪后 cancel)
           await applyAtom(state, { type: '询问闪', target, source: from });
 
-          // 检查处理区:有没有闪牌(目标出闪 / 防具放入的虚拟闪)——drain 所有闪
+          // 检查处理区:有没有闪牌(目标出闪 / 八卦阵虚拟闪)
           const dodgeIds = frameCards(state).filter(id => {
             const c = state.cardMap[id];
             return c && c.name === '闪';
           });
           if (dodgeIds.length > 0) {
-            for (const dodgeCardId of dodgeIds) {
-              await applyAtom(state, {
-                type: '移动牌',
-                cardId: dodgeCardId,
-                from: { zone: '处理区' },
-                to: { zone: '弃牌堆' },
-              });
+            // 被抵消:触发武器技(贯石斧强命移闪 / 青龙追杀)。
+            // 武器技在 after hook 可能改变处理区状态,故 apply 后重新检查。
+            await applyAtom(state, { type: '被抵消', source: from, target, cardId });
+            const remaining = frameCards(state).filter(id => {
+              const c = state.cardMap[id];
+              return c && c.name === '闪';
+            });
+            if (remaining.length > 0) {
+              // 仍被抵消:drain 所有闪
+              for (const dodgeCardId of remaining) {
+                await applyAtom(state, {
+                  type: '移动牌',
+                  cardId: dodgeCardId,
+                  from: { zone: '处理区' },
+                  to: { zone: '弃牌堆' },
+                });
+              }
+            } else {
+              // 武器技逆转(贯石斧强命 / 青龙追杀命中):处理区无闪 → 造成伤害
+              await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId });
             }
           } else {
             // 没闪:造成伤害(触发藤甲/白银狮子/遗计/反馈等,濒死由引擎核心处理)

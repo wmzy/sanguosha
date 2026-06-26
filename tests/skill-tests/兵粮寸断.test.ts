@@ -192,4 +192,46 @@ describe('兵粮寸断', () => {
       params: { cardId: 'b1', target: 2 },
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 6. 回合流转回归:判定阶段结束 → 摸牌被跳过 → 不摸牌且推进到出牌
+  //    回归 bug:回合管理「阶段结束」after hook 在 applyAtom(阶段开始,摸牌) 被
+  //    兵粮寸断 before hook cancel 后,仍无条件执行 摸牌(×2) 与 阶段结束(摸牌),
+  //    导致兵粮寸断「跳过摸牌阶段」失效——判定生效后依然摸了牌。
+  //    修复要点:after hook 应在推进阶段后校验当前实际 phase,被跳过则不再摸牌。
+  // ─────────────────────────────────────────────────────────────
+  it('回合流转:判定阶段结束 → 摸牌被跳过 → 不摸牌且推进到出牌', async () => {
+    const c1 = makeCard('d1', '杀', '♠', '7', '基本牌');
+    const c2 = makeCard('d2', '闪', '♥', '2', '基本牌');
+    const c3 = makeCard('d3', '桃', '♥', '3', '基本牌');
+    const c4 = makeCard('d4', '杀', '♣', '8', '基本牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['回合管理'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['兵粮寸断', '回合管理'],
+          tags: ['兵粮寸断/跳过摸牌'],
+        }),
+      ],
+      cardMap: { d1: c1, d2: c2, d3: c3, d4: c4 },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] };
+    await harness.setup(state);
+
+    const handBefore = harness.state.players[1].hand.length;
+    // 判定阶段结束 → 回合管理推进:阶段开始(摸牌)[被兵粮寸断 cancel]→出牌
+    await applyAtom(harness.state, { type: '阶段结束', player: 1, phase: '判定' });
+
+    // 摸牌阶段被跳过:手牌不增加
+    expect(harness.state.players[1].hand.length).toBe(handBefore);
+    // 标签清除
+    expect(harness.state.players[1].tags?.includes('兵粮寸断/跳过摸牌')).toBe(false);
+    // 阶段推进到出牌
+    expect(harness.state.phase).toBe('出牌');
+  });
 });

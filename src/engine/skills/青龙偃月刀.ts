@@ -3,12 +3,15 @@
 //   可以连续追击直到命中或无杀可用。
 //
 // 两步流程(均通过 respond action):
-//   1. 询问闪 after hook:目标出闪 → confirm 询问"是否追杀"(requestType=青龙偃月刀/confirm)
-//   2. 玩家选追杀 → useCard prompt 让玩家选 1 张杀牌(requestType=青龙偃月刀/useKill)
-//   3. 杀牌进处理区 → 移走旧闪 → 再次询问闪(after hook 递归回来,可继续追杀)
+//   1. 被抵消 after hook:杀被闪抵消 → confirm 询问"是否追杀"(requestType=青龙腰月刀/confirm)
+//   2. 玩家选追杀 → useCard prompt 让玩家选 1 张杀牌(requestType=青龙腰月刀/useKill)
+//   3. 杀牌进处理区 → 移走旧闪 → 再次询问闪 → 若再被闪则 applyAtom(被抵消)递归追杀
+//
+// 挂载点:被抵消 atom after(对应规则"【杀】被抵消时"时机)。
+// 只对杀生效(ctx.frame.skillId==='杀'),万箭齐发等锦囊不触发。
 //
 // 与贯石斧的差异:贯石斧弃 2 张牌让原杀强命(原杀还在处理区);
-// 青龙偃月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
+// 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
 import type { AtomAfterContext, FrontendAPI, Json, Skill, GameState} from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
@@ -57,7 +60,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '被抵消', async (ctx: AtomAfterContext) => {
+    // 只对杀生效:万箭齐发等锦囊被闪抵消不触发武器技(规则:青龙腰月刀是"你使用的杀被闪抵消")
+    if (ctx.frame.skillId !== '杀') return;
     const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];
@@ -125,9 +130,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       to: { zone: '弃牌堆' },
     });
 
-    // 再次询问闪——after hook 递归回来后,把处理区的最终状态留给杀.execute。
-    // 杀.execute 检查处理区:有闪→抵消;无闪→自行造成伤害,避免双重扣血。
+    // 再次询问闪:询问目标对追杀的杀是否出闪
     await applyAtom(ctx.state, { type: '询问闪', target: atom.target!, source: ownerId });
+
+    // 递归检测:追杀的杀若被闪,applyAtom(被抵消) 再次触发本 hook(连续追杀)。
+    // 青龙已迁至"被抵消"after,故询问闪不再自动递归,需在此显式 apply。
+    const 追杀Dodge = frameCards(ctx.state).find(id => ctx.state.cardMap[id]?.name === '闪');
+    if (追杀Dodge) {
+      await applyAtom(ctx.state, { type: '被抵消', source: ownerId, target: atom.target!, cardId: killCardId });
+    }
 
     // 清理追杀的杀牌:杀.execute 的收尾只移走原始杀(cardId),不认识追杀的杀牌。
     // 若不移走,追杀的杀会滞留处理区导致视图不一致。

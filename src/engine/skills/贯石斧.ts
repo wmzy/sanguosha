@@ -55,7 +55,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '被抵消', async (ctx: AtomAfterContext) => {
+    // 只对杀生效:万箭齐发等锦囊被闪抵消不触发武器技(规则:贯石斧是"你使用的杀被抵消")
+    if (ctx.frame.skillId !== '杀') return;
     const atom = ctx.atom as { source?: number; target?: number };
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];

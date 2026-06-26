@@ -60,7 +60,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
             return c && c.name === '闪';
           });
           if (dodgeCardId) {
-            // 出了闪:移到弃牌堆
+            // 出了闪 → 被抵消(复用通用时机 atom;万箭是锦囊不是杀,武器技自行跳过)
+            await applyAtom(state, { type: '被抵消', source: from, target, cardId });
+            // 移走闪到弃牌堆
             await applyAtom(state, {
               type: '移动牌',
               cardId: dodgeCardId,

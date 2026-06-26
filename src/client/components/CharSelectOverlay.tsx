@@ -179,7 +179,7 @@ export function CharSelectOverlay({
           }}
         >
           <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2 }}>你的座次</div>
-          <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{viewer + 1}</div>
+          <div style={{ fontSize: 20, fontWeight: 'bold' }}>P{viewer}</div>
         </div>
       </div>
 

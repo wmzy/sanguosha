@@ -1,9 +1,12 @@
 // 仁王盾(防具):锁定技,黑色【杀】对你无效。
-// 时机:询问闪 before hook——黑色杀直接 cancel 询问闪(跳过出闪流程),
-// 往处理区放一张虚拟闪牌表示"杀无效",杀.execute 检查处理区发现有闪就不造成伤害。
-// 和八卦阵统一模式:杀零感知仁王盾,只看处理区。
-import type { AtomBeforeContext, Card, HookResult, Skill, GameState} from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+// 时机:使用结算开始时(检测有效性 before hook)——对应规则"使用结算开始时:检测有效性"。
+// 黑色杀 → cancel(表示该目标无效),杀.execute 据返回值跳过该目标
+// (不询问闪、不造成伤害、不触发"被抵消")。
+//
+// 与八卦阵的区别:仁王盾是"杀无效"(在生效前终止,不触发武器技);
+// 八卦阵是"视为出闪"(杀被抵消,触发武器技)。两者由时机 atom 天然区分,
+// 不再共用 询问闪 的 cancel。
+import type { AtomBeforeContext, HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -12,39 +15,18 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerBeforeHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-    const atom = ctx.atom as { target?: number; source?: number };
+  registerBeforeHook(state, skill.id, ownerId, '检测有效性', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+    const atom = ctx.atom as { target?: number; cardId?: string };
     if (atom.target !== ownerId) return;
-
-    // 查杀牌:从处理区找当前正在结算的杀(最近一张进处理区的杀牌)
-    const killCardId = frameCards(ctx.state).find(id => {
-      const c = ctx.state.cardMap[id];
-      return c && c.name === '杀';
-    });
+    const killCardId = atom.cardId;
     if (!killCardId) return;
     const killCard = ctx.state.cardMap[killCardId];
-    if (!killCard) return;
+    if (!killCard || killCard.name !== '杀') return;   // 仅对杀生效(防御未来锦囊复用此 atom)
 
-    // 黑色杀无效:往处理区放虚拟闪牌,取消询问闪
+    // 黑色杀无效:cancel 检测有效性 → 杀.execute 跳过该目标
     if (killCard.suit === '♠' || killCard.suit === '♣') {
-      const virtualDodgeId = `仁王盾:${ownerId}:${killCardId}`;
-      const virtualDodge: Card = {
-        id: virtualDodgeId,
-        name: '闪',
-        suit: killCard.suit,
-        rank: killCard.rank,
-        type: '基本牌',
-      };
-      ctx.state.cardMap[virtualDodgeId] = virtualDodge;
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: virtualDodgeId,
-        from: { zone: '处理区' },
-        to: { zone: '处理区' },
-      });
       return { kind: 'cancel' };
     }
   });
   return () => {};
 }
-

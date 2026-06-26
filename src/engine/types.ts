@@ -439,6 +439,9 @@ export type Atom =
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number; lordBonus?: number }
   | { type: '判定'; player: number; judgeType: string }
+  // 使用结算时机(通用:杀/锦囊等)
+  | { type: '检测有效性'; source: number; target: number; cardId: string }
+  | { type: '被抵消'; source: number; target: number; cardId: string }
   // 等待回应
   | { type: '询问闪'; target: number; source: number }
   | { type: '询问杀'; target: number; source: number }
@@ -573,8 +576,9 @@ export interface GameView {
  * - modify:修改 atom 参数,管线用新 atom 继续 validate/apply。后续 before 钩子收到修改后的 atom。
  *   典型:藤甲减伤、护甲减伤、酒加伤——叠加生效(座次序)。
  * - cancel:取消当前 atom,不进入 validate/apply/after hooks。
- *   典型:仁王盾黑杀无效、寒冰剑改为弃牌。后续 before 钩子不再跑。
+ *   典型:仁王盾黑杀无效、寒冰剑改为弃牌、检测有效性目标无效。后续 before 钩子不再跑。
  *   cancel 是确定性事件:管线推一个 notify 事件让前端感知(非静默)。
+ *   调用方可通过 applyAtom 返回值(false)感知 cancel,据此跳过后续逻辑(如杀跳过无效目标)。
  */
 export type HookResult =
   | { kind: 'pass' }

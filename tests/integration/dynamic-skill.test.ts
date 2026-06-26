@@ -58,8 +58,8 @@ describe('动态技能生命周期(添加技能/移除技能 atom)', () => {
 
   it('添加技能 幂等:重复添加同一 skill 不抛错', async () => {
     await applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' });
-    // 再次添加(已存在)→ 不抛错,action 仍注册
-    await expect(applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' })).resolves.toBeUndefined();
+    // 再次添加(已存在)→ 不抛错,action 仍注册(applyAtom 返回 true=正常完成)
+    await expect(applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' })).resolves.toBe(true);
     expect(findActionEntry(state, '杀', 0, 'use')).toBeDefined();
   });
 

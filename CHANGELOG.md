@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Fixed — 兵粮寸断判定生效后仍摸牌
+
+兵粮寸断判定为非梅花(生效)后本应跳过摸牌阶段,却仍摸了 2 张牌。根因:兵粮寸断通过 `registerBeforeHook` cancel 当前 `阶段开始(摸牌)` atom,并在 hook 内部自行把阶段推进到出牌;但回合管理的「阶段结束」after hook 在 `applyAtom(阶段开始, 摸牌)` 返回后**无条件**继续执行 `摸牌(×2)` 与 `阶段结束(摸牌)`——它并未察觉该 atom 已被 before hook 取消。结果「跳过摸牌阶段」只取消了阶段开始事件,摸牌动作照常发生,日志表现为出现两次「摸牌阶段结束」且仍「摸了 2 张牌」。乐不思蜀/闪电不受影响:乐不思蜀跳过的是出牌阶段(非自动阶段,after hook 无强制后续动作),闪电不跳过阶段。
+
+#### Fixed
+- **回合管理阶段推进加 phase 守卫**:`阶段结束` after hook 在 `applyAtom(阶段开始, next)` 之后校验 `ctx.state.phase === next`;若阶段被 before hook cancel/改写(如兵粮寸断跳过摸牌),`state.phase` 已偏离 `next`,直接 return,不再执行该阶段的自动动作(摸牌/弃牌检查/自动结束)。(`src/engine/skills/回合管理.ts`)
+
+#### Changed
+- **新增完整回合流转回归用例**:验证判定阶段结束 → 摸牌被兵粮寸断跳过 → 手牌不增加、标签清除、阶段推进到出牌;此前用例只直接 dispatch `阶段开始(摸牌)` 绕过回合管理,无法捕获本回归。(`tests/skill-tests/兵粮寸断.test.ts`)
+
 ### Fixed — 八卦阵确认发动后判定翻牌动画期间询问闪提前弹出
 
 八卦阵确认发动后进入判定,引擎逻辑本身正确(红色视为闪 → cancel 询问闪、黑色才询问闪,已用裸 dispatch+pendingSeq 复现验证)。问题在前端时序:判定翻牌动画(`effect.animation='flip'`, `blockUntilDone`, 1800ms)本应阻塞,而 `useEventPlayback` 是非阻塞调度、询问闪的 `applyView` 又是同步写 `view.pending`。结果黑色判定时判定牌还在翻(EventBanner flip),询问闪面板(AwaitingPrompt)就已经弹出——玩家感觉「确认发动后没等判定结果就直接询问闪」。根本原因:`blockUntilDone` 语义在前端一直未实现。
