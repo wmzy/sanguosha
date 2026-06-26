@@ -4,7 +4,7 @@
 // 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 没出(输)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
+import { registerAction, validateUseCard, type SkillModule } from '../skill'
 import { askWuxie } from '../wuxie';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -15,27 +15,21 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(state, skill.id, ownerId, 'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 手牌 + 牌名 + 目标合法
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state)
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const cardNameOk = cardIdOk && state.cardMap[cardId]?.name === '决斗';
-      const targetIdx = params.target as number | undefined;
-      const targetExists = typeof targetIdx === 'number' && !!state.players[targetIdx];
-      const targetAlive = targetExists && state.players[targetIdx as number]?.alive === true;
-      const targetNotSelf = targetIdx !== ownerId;
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetExists && targetAlive && targetNotSelf;
-      return ok ? null : '现在不能使用决斗';
+      // 通用合法条件(对齐杀):自己回合 + 出牌阶段 + 无阻塞 pending + 存活 + 手牌 + 牌名 + 非空 targets
+      const base = validateUseCard(state, ownerId, params, { cardName: '决斗', requireTarget: true });
+      if (base) return base;
+      // 决斗是单目标锦囊:targets 必须恰好 1 个
+      const targets = params.targets as number[];
+      if (targets.length !== 1) return '决斗只能指定一名目标';
+      const target = targets[0];
+      if (target === ownerId) return '不能对自己使用决斗';
+      if (!state.players[target]?.alive) return '目标不合法';
+      return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      const target = params.target as number;
+      const target = (params.targets as number[])[0];
       await pushFrame(state, '决斗', from, { ...params });
 
       // 决斗锦囊进处理区

@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Refactored — skill 注册表 state-bound(WeakMap 外挂),跨 session 隔离
+
+技能注册表(action/hook 实例)从模块级全局 Map 改为 WeakMap<GameState, SkillRegistry>。
+消除了跨 session/跨测试套件时旧实例泄漏导致「已注册」冲突的问题,也顺带修复了
+「孙权被询问是否发动流离」的幽灵 bug——上一局未被正常的流离注册泄漏到下一局。
+
+- **SkillRegistry**: 新增 `getRegistry(state)` + 接口类型,action/hook/before/after 注册表
+  全部 key 在 state 上,随 GameState 生命周期自动 GC。
+- **API 签名变更**: `registerAction(state, …)` / `registerBeforeHook(state, …)` /
+  `registerAfterHook(state, …)` / `findActionEntry(state, …)` /
+  `getBeforeHooks(state, type)` / `getAfterHooks(state, type)` /
+  `unloadSkillInstance(state, …)` / `registerSystemRespondActions(state, …)`。
+  所有 caller(skills 目录 40+ 文件 + 测试文件 + create-engine + server) 同步更新。
+- **移除 `clearAllSkillInstances()`**: 模块级不用再「清全部实例」,testCleanup 改为只清 slash
+  quota providers;`src/server/app.ts` 的开局清理调用一并删除。
+- **`系统规则` 全局 hooks 改走 `onInit`**: `restore` 路径补 `系统规则mod.onInit()` 调用,
+  保证恢复时也注册全局 hook(之前只有 `clearAllSkillInstances` 后的重注册,现在 state-bound
+  无需清理所以得主动注册)。
+- **回归测试**: `tests/integration/杀装备距离.test.ts` 末尾新增「孙权无流离不应被询问」场景,
+  构造双 session 验证跨 state 注册表隔离。(`src/engine/skill.ts`, `src/engine/create-engine.ts`,
+  `src/engine/skills/*.ts`(40+), `src/server/app.ts`, `src/server/session.ts`, 8 个测试文件)
+
 ### Fixed — 八卦阵判定红色后仍询问目标出闪
 
 八卦阵(防具)原实现:判定翻开红色牌后,只往处理区放一张虚拟闪牌,但 before hook 返回 `void`(= pass),导致主 `询问闪` atom 仍然执行——目标玩家再次被弹出「是否出闪」的询问。按三国杀规则,八卦阵判定红色即视为出闪,**不应再给目标出真闪的机会**。根本原因:遗漏了与仁王盾一致的 cancel 语义——仁王盾同样往处理区放虚拟闪后 `return { kind: 'cancel' }` 终止主 atom,八卦阵漏了这步。

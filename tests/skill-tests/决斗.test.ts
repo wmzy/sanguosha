@@ -90,8 +90,8 @@ describe('决斗', () => {
 
     const p2HealthBefore = harness.state.players[1].health;
 
-    // 出决斗(params 用单数 target)
-    await P1.triggerAction('决斗', 'use', { cardId: 'jd1', target: 1 });
+    // 出决斗(params 用 targets 数组,前端统一格式)
+    await P1.triggerAction('决斗', 'use', { cardId: "jd1", targets: [1] });
 
     // 窗口 1:无懈可击(broadcast target=-2)→ P2 视角推导 skillId=无懈可击 + cardFilter
     P1.expectPending('请求回应');
@@ -155,7 +155,7 @@ describe('决斗', () => {
 
     const p2HealthBefore = harness.state.players[1].health;
 
-    await P1.triggerAction('决斗', 'use', { cardId: 'jd1', target: 1 });
+    await P1.triggerAction('决斗', 'use', { cardId: "jd1", targets: [1] });
     await P1.pass(); // 消耗无懈窗口
 
     P2.expectPending('询问杀');
@@ -185,7 +185,7 @@ describe('决斗', () => {
     await P2.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: 'jd1', target: 0 },
+      params: { cardId: "jd1", targets: [0] },
     });
   });
 
@@ -208,20 +208,20 @@ describe('决斗', () => {
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: 'jd1', target: 1 },
+      params: { cardId: "jd1", targets: [1] },
     });
   });
 
   // ─────────────────────────────────────────────────────────────
   // 5. validate 拒绝:目标是自己
   // ─────────────────────────────────────────────────────────────
-  it('对自己出决斗 → 被拒绝(targetNotSelf)', async () => {
+  it('对自己出决斗 → 被拒绝(不能指定自己)', async () => {
     await harness.setup(buildState({ p1Skills: ['杀', '决斗'] }));
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: 'jd1', target: 0 },
+      params: { cardId: "jd1", targets: [0] },
     });
   });
 
@@ -240,7 +240,7 @@ describe('决斗', () => {
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: 's1', target: 1 },
+      params: { cardId: "s1", targets: [1] },
     });
   });
 
@@ -254,7 +254,7 @@ describe('决斗', () => {
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: 'jd1', target: 1 },
+      params: { cardId: "jd1", targets: [1] },
     });
   });
 });
