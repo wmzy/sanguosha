@@ -10,6 +10,7 @@ import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, re
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import { getPendingDeadline } from '../engine/view/buildView';
 import { allCharacters } from '../engine/cards/characters';
+import { weiCharacters, shuCharacters, wuCharacters, qunCharacters } from '../engine/cards/characters';
 
 
 import '../engine/atoms';
@@ -28,6 +29,25 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map(
   skills: c.skills.map(s => s.name),
 }));
 
+/** 将池预设解析:按预设裁剪武将列表。
+ *  - 'standard':标准经典(各势力前 8 名),约 32 人
+ *  - 'extended':扩展(标准 + 剩余),约全量
+ *  - 'all':全量(60 人) */
+function resolveCharPool(preset: string): Array<{ name: string; skills: string[] }> {
+  const toList = (chars: typeof allCharacters) => chars.map(c => ({ name: c.name, skills: c.skills.map(s => s.name) }));
+  if (preset === 'standard') {
+    // 各势力取前 8 个经典武将
+    return [
+      ...toList(weiCharacters.slice(0, 8)),
+      ...toList(shuCharacters.slice(0, 8)),
+      ...toList(wuCharacters.slice(0, 8)),
+      ...toList(qunCharacters.slice(0, 8)),
+    ];
+  }
+  // extended / all 均为全量(当前数据集即扩展版;后续数据扩充时细化 extended)
+  return CHARACTERS;
+}
+
 const RECONNECT_GRACE_MS = 30_000;
 export class GameSession {
   private state: GameState | null = null;
@@ -42,15 +62,16 @@ export class GameSession {
   private roomName: string;
   private maxPlayers: number;
   private destroyed = false;
+  /** 游戏已结束(主公阵亡/仅剩一人):拦截后续 state 广播与新 action。
+   *  避免 gameOver 广播后,杀.execute finally 的 移动牌/popFrame、父帧恢复产生的
+   *  出牌窗口 等事件仍被下发,导致前端无法进入结算界面。 */
+  private gameOverHandled = false;
   private sessionSeed: number;
   private logger = createLogger('session');
   private lastBroadcastSeq = 0;
   private baselineSent = new Set<string>();
   /** per-player 上次发送的 deadline 缓存,避免重复发送不变的倒计时 */
   private lastSentDeadline = new Map<string, string | null>();
-  /** 调试房间:首人加入后开局的玩家人数(由 app 写入,handleJoinDebugRoom 读取后清空) */
-  public pendingPlayerCount?: number;
-
   constructor(room: Room, debug = false, sessionSeed?: number) {
     this.room = room;
     this.roomName = room.name;
@@ -65,10 +86,12 @@ export class GameSession {
     this.lastActivityAt = Date.now();
     // config 重构:seed 来自 state,playerCount 从 state.players,characters 用全局表
     const config: GameConfig = {
-      characters: CHARACTERS,
+      characters: resolveCharPool(this.room.config.charPool),
       playerCount: state.players.length,
       seed: state.rngSeed,
       gameId: this.room.id,
+      handSize: this.room.config.handSize,
+      timeoutScale: this.room.config.timeoutScale,
     };
     const fresh = create(config);
     await bootstrap(fresh, config);
@@ -86,12 +109,15 @@ export class GameSession {
     // 清空模块级 slash quota providers(skill 注册表已随 state 自动隔离)
     resetForTest();
 
-    // 调用 create + bootstrap 建好完整可玩 state:抽身份 + 选将 + 洗牌 + 发牌 + 启动第一回合
+    // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 超时倍率
+    const cfg = this.room.config;
     const config: GameConfig = {
-      characters: CHARACTERS,
+      characters: resolveCharPool(cfg.charPool),
       playerCount: count,
       seed: this.sessionSeed,
       gameId: this.room.id,
+      handSize: cfg.handSize,
+      timeoutScale: cfg.timeoutScale,
     };
     this.state = create(config);
     // 挂载 state 变更回调:必须在 bootstrap 之前挂载!
@@ -114,10 +140,16 @@ export class GameSession {
     // 建立 playerId → 座次下标 映射
     const state = this.state;
     if (this.debug) {
-      // debug 模式:为所有已连接玩家分配座次(按连接顺序)
+      // debug 模式:座次已在 joinDebugRoom 时由 assignDebugSeat 分配(配置阶段)。
+      // 这里仅补充 startGame 后新加入连接(超出预期座次数),不再覆盖已有映射。
       const playerIds = [...this.room.players.keys()];
       for (let i = 0; i < playerIds.length && i < state.players.length; i++) {
-        this.playerNames.set(playerIds[i], i);
+        if (this.playerNames.has(playerIds[i])) continue;
+        // 未分配:找下一个未占用座次
+        const used = new Set([...this.playerNames.values()]);
+        let seat = i;
+        while (used.has(seat) && seat < state.players.length) seat++;
+        if (seat < state.players.length) this.playerNames.set(playerIds[i], seat);
       }
     } else {
       const playerIds = [...this.room.players.keys()];
@@ -140,18 +172,18 @@ export class GameSession {
   }
 
   /**
-   * debug 模式:为新连接的玩家分配座次。
+   * debug 模式:为连接的玩家分配座次(配置阶段即可调用,不依赖 state)。
    * 按连接顺序分配 player[0], player[1], ...
-   * 返回分配的座次下标,超出玩家数时返回 0(观察者)。
+   * 返回分配的座次下标,超出 maxPlayers 时返回 0(观察者)。
    */
   assignDebugSeat(playerId: string): number {
-    if (!this.debug || !this.state) return 0;
+    if (!this.debug) return 0;
     // 已分配过则直接返回
     const existing = this.playerNames.get(playerId);
     if (existing !== undefined) return existing;
-    // 找到下一个未占用的座次
+    // 找到下一个未占用的座次(上限为房间 maxPlayers)
     const used = new Set([...this.playerNames.values()]);
-    for (let i = 0; i < this.state.players.length; i++) {
+    for (let i = 0; i < this.maxPlayers; i++) {
       if (!used.has(i)) {
         this.playerNames.set(playerId, i);
         return i;
@@ -163,7 +195,7 @@ export class GameSession {
   }
 
   async handleAction(playerId: string, action: EngineClientMessage): Promise<void> {
-    if (this.destroyed || !this.state) return;
+    if (this.destroyed || !this.state || this.gameOverHandled) return;
     // debug 模式:允许以任意角色名发 action
     // 非 debug 模式:校验 ownerId 必须匹配预期玩家
     const expectedIndex = this.playerNames.get(playerId);
@@ -213,6 +245,9 @@ export class GameSession {
   }
 
   private handleGameOver(winner?: number): void {
+    // 标记游戏结束:拦截后续 onStateChange 广播与 handleAction。
+    // 所有触发 gameOver 的路径(onStateChange/startGame/恢复)统一在此设值。
+    this.gameOverHandled = true;
     setRoomStatus(this.room.id, '已结束');
     this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
   }
@@ -226,12 +261,18 @@ export class GameSession {
     if (!this.state) return;
     this.state.onStateChange = () => {
       if (this.destroyed || !this.state) return;
+      // 游戏已结束:拦截 gameOver 之后的残留广播。本次 onStateChange 已广播了触发
+      // gameOver 的 atom(如 击杀主公);标记后,杀.execute finally 的 移动牌/popFrame、
+      // 父帧恢复产生的 出牌窗口 等后续 atom 的 onStateChange 直接 return,不再下发。
+      if (this.gameOverHandled) return;
       this.actionLog = this.state.actionLog;
       this.lastActivityAt = Date.now();
       this.broadcastNewState();
       this.persistAsync();
       const { gameOver, winner } = checkGameOver(this.state);
       if (gameOver) {
+        // handleGameOver 内部设 gameOverHandled=true:本次已广播触发 gameOver 的 atom
+        // (如 击杀主公),后续 atom(移动牌/popFrame/出牌窗口)的 onStateChange 被 return 拦截。
         this.handleGameOver(winner);
       }
     };

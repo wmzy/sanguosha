@@ -2,6 +2,8 @@
 import { Hono } from 'hono';
 import type { WSContext } from 'hono/ws';
 import { serialize } from './protocol';
+import type { RoomConfig } from './protocol';
+import { normalizeRoomConfig } from './protocol';
 import {
   createRoom,
   createDebugRoom,
@@ -17,6 +19,7 @@ import {
   broadcastMessage,
   addRoom,
   setSessionChecker,
+  updateConfig,
   type Room,
 } from './room';
 import { GameSession } from './session';
@@ -51,6 +54,24 @@ registerLifecycle('playerRoomMap', playerRoomMap, () => {
 
 const IDLE_ROOM_TTL_MS = 60 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+/** 广播房间准备状态(room_state)给房间内所有连接。
+ *  调试房间配置阶段:玩家加入/离开/准备/配置更新时触发。 */
+function broadcastRoomState(room: Room): void {
+  broadcastMessage(room, serialize({
+    type: 'room_state',
+    readyPlayers: [...room.readyPlayers],
+    playerIds: [...room.players.keys()],
+    hostId: room.hostId,
+    maxPlayers: room.maxPlayers,
+    config: room.config,
+  }));
+}
+
+/** 广播房间配置变更(room_config)。 */
+function broadcastRoomConfig(room: Room): void {
+  broadcastMessage(room, serialize({ type: 'room_config', config: room.config }));
+}
 
 function cleanupIdleRooms(): void {
   const now = Date.now();
@@ -106,6 +127,10 @@ async function restorePersistedRooms(): Promise<void> {
         await deletePersistedRoom(roomId);
         continue;
       }
+      // 从持久化 state.config 恢复房间配置;旧数据无 config 时用默认值
+      const restoredConfig = (state.config && typeof state.config.timeoutScale === 'number')
+        ? { ...normalizeRoomConfig(undefined), timeoutScale: state.config.timeoutScale, name: persisted.roomName || `恢复-${roomId}` }
+        : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };
       const room: Room = {
         id: roomId,
         name: persisted.roomName || `恢复-${roomId}`,
@@ -115,6 +140,7 @@ async function restorePersistedRooms(): Promise<void> {
         hostId: persisted.hostId,
         readyPlayers: new Set(),
         isDebug: persisted.debug,
+        config: restoredConfig,
       };
       addRoom(room);
       const session = new GameSession(room, persisted.debug);
@@ -219,10 +245,12 @@ app.post('/api/debug-room', async (c) => {
   }
 
   try {
-    const room = createDebugRoom(`调试${playerCount}人`, playerCount);
+    const config = normalizeRoomConfig(raw.config);
+    const room = createDebugRoom(config.name || `调试${playerCount}人`, playerCount, config);
 
+    // 创建占位 session(不 startGame)。hasSession 检查需要它存在,房间才会出现在列表。
+    // 进入「配置+准备」阶段;所有座次就绪后由 start_game 触发 startGame。
     const session = new GameSession(room, true);
-    session.pendingPlayerCount = playerCount;
     gameSessions.set(room.id, session);
 
     return c.json({ roomId: room.id });
@@ -269,7 +297,7 @@ export function handleWsMessage(
 ): void {
   switch (message.type) {
     case 'create_room':
-      handleCreateRoom(playerId, message.name, message.maxPlayers, ws);
+      handleCreateRoom(playerId, message.name, message.maxPlayers, message.config, ws);
       break;
     case 'join_room':
       handleJoinRoom(playerId, message.roomId, ws);
@@ -295,6 +323,12 @@ export function handleWsMessage(
     case 'reconnect':
       handleReconnect(playerId, message.playerId, message.lastSeq ?? 0, ws);
       break;
+    case 'create_debug_room':
+      handleCreateDebugRoom(playerId, message.config, message.playerCount, ws);
+      break;
+    case 'update_room_config':
+      handleUpdateConfig(playerId, message.config);
+      break;
     case 'join_debug_room':
       void handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws).catch(err => {
         const e = err instanceof Error ? err : new Error(String(err));
@@ -317,6 +351,7 @@ function handleCreateRoom(
   playerId: string,
   name: string,
   maxPlayers: number,
+  config: RoomConfig | undefined,
   ws: WSContext,
 ): void {
   const existingRoom = findRoomByPlayerId(playerId);
@@ -325,7 +360,7 @@ function handleCreateRoom(
     playerRoomMap.delete(playerId);
   }
 
-  const room = createRoom(name, maxPlayers, playerId, ws);
+  const room = createRoom(name, maxPlayers, playerId, ws, config);
   playerRoomMap.set(playerId, room.id);
 
   ws.send(serialize({
@@ -333,6 +368,7 @@ function handleCreateRoom(
     roomId: room.id,
     playerId,
   }));
+  broadcastRoomState(room);
 }
 
 function handleJoinRoom(playerId: string, roomId: string, ws: WSContext): void {
@@ -361,12 +397,35 @@ function handleJoinRoom(playerId: string, roomId: string, ws: WSContext): void {
     serialize({ type: 'player_joined', playerId }),
     playerId,
   );
+  broadcastRoomState(room);
 }
 
 function handleReady(playerId: string): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;
-  setReady(roomId, playerId);
+  const ok = setReady(roomId, playerId);
+  if (!ok) return;
+  const room = getRoom(roomId);
+  if (!room) return;
+  // 通知所有人该玩家已准备
+  broadcastMessage(room, serialize({ type: 'player_ready', playerId }));
+  broadcastRoomState(room);
+}
+
+/** 更新房间配置(仅房主;调试房间任意玩家)。 */
+function handleUpdateConfig(playerId: string, config: RoomConfig): void {
+  const roomId = playerRoomMap.get(playerId);
+  if (!roomId) return;
+  const room = getRoom(roomId);
+  if (!room) return;
+  const updated = updateConfig(roomId, config, playerId);
+  if (!updated) {
+    const ws = room.players.get(playerId);
+    if (ws) ws.send(serialize({ type: 'error', message: '无法更新房间配置' }));
+    return;
+  }
+  broadcastRoomConfig(room);
+  broadcastRoomState(room);
 }
 
 async function handleStartGame(playerId: string): Promise<void> {
@@ -376,7 +435,8 @@ async function handleStartGame(playerId: string): Promise<void> {
   const room = getRoom(roomId);
   if (!room) return;
 
-  if (room.hostId !== playerId) {
+  // debug 房间无房主,任意座次可触发开始;普通房间仅房主
+  if (!room.isDebug && room.hostId !== playerId) {
     const ws = room.players.get(playerId);
     if (ws) ws.send(serialize({ type: 'error', message: '只有房主可以开始游戏' }));
     return;
@@ -388,12 +448,45 @@ async function handleStartGame(playerId: string): Promise<void> {
     return;
   }
 
-  const session = new GameSession(room);
-  gameSessions.set(roomId, session);
+  // debug 房间:复用创建时已建好的占位 session;普通房间新建
+  let session = room.isDebug ? gameSessions.get(roomId) ?? undefined : undefined;
+  if (!session) {
+    session = new GameSession(room, room.isDebug === true);
+    gameSessions.set(roomId, session);
+  }
 
-  if (await session.startGame()) {
+  const count = room.isDebug ? room.maxPlayers : undefined;
+  if (await session.startGame(count)) {
     broadcastMessage(room, serialize({ type: 'game_started' }));
   }
+}
+
+/** WS 入口创建调试房间(与 REST /api/debug-room 等价)。 */
+function handleCreateDebugRoom(
+  playerId: string,
+  config: RoomConfig | undefined,
+  playerCount: number | undefined,
+  ws: WSContext,
+): void {
+  const existingRoom = findRoomByPlayerId(playerId);
+  if (existingRoom) {
+    leaveRoom(existingRoom.id, playerId);
+    playerRoomMap.delete(playerId);
+  }
+  const count = Math.min(Math.max(playerCount ?? 5, 2), 8);
+  const normalized = normalizeRoomConfig(config);
+  const room = createDebugRoom(normalized.name || `调试${count}人`, count, normalized);
+
+  const session = new GameSession(room, true);
+  gameSessions.set(room.id, session);
+
+  playerRoomMap.set(playerId, room.id);
+  // 创建者自动加入(第一个座次)
+  joinDebugRoom(room.id, playerId, ws);
+  const seatIndex = session.assignDebugSeat(playerId);
+
+  ws.send(serialize({ type: 'room_joined', roomId: room.id, playerId, seatIndex }));
+  broadcastRoomState(room);
 }
 
 function handleAction(playerId: string, action: import('../engine/types').ClientMessage): void {
@@ -494,15 +587,15 @@ async function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: nu
     playerRoomMap.delete(joined.replacedPlayerId);
   }
 
-  const pendingPlayerCount = session.pendingPlayerCount;
-  if (pendingPlayerCount != null) {
-    session.pendingPlayerCount = undefined;
-    await session.startGame(pendingPlayerCount);
-    const seatIndex = session.assignDebugSeat(playerId);
+  // 分配座次(配置阶段即可分配,不依赖 state)
+  const seatIndex = session.assignDebugSeat(playerId);
+
+  if (room.status === '等待中') {
+    // 配置+准备阶段:发送 room_joined + 当前房间状态
     ws.send(serialize({ type: 'room_joined', roomId, playerId, seatIndex }));
+    broadcastRoomState(room);
   } else {
-    // 后续连接的玩家分配座次
-    const seatIndex = session.assignDebugSeat(playerId);
+    // 游戏已开始(刷新重连):发送 room_joined + 恢复视图
     session.reconnectPlayer(playerId, ws, lastSeq);
     ws.send(serialize({ type: 'room_joined', roomId, playerId, seatIndex }));
   }

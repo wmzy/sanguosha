@@ -74,6 +74,19 @@ export interface GameConfig {
   seed: number;
   gameId: string;
   handSize?: number;
+  /** pending 超时倍率(房间配置)。1=默认; <1 更快; >1 更慢; Infinity=无限。 */
+  timeoutScale?: number;
+}
+
+/** 计算应用了房间配置后的 pending 超时毫秒数。
+ *  scale=Infinity(无限)时返回一个极大值(约 24.8 天),定时器实际不会触发。
+ *  slot 创建(createAndAwaitSlot)与 view deadline(applyView/toViewEvents)共用此函数,
+ *  保证后端真实定时器与前端倒计时口径一致。 */
+export function resolveTimeoutMs(state: GameState, baseSeconds: number): number {
+  const scale = state.config?.timeoutScale ?? 1;
+  if (!Number.isFinite(scale)) return Number.MAX_SAFE_INTEGER;
+  const sec = baseSeconds * scale;
+  return sec * 1000;
 }
 
 
@@ -173,6 +186,9 @@ export function create(gameConfig: GameConfig): GameState {
 
   const state = createGameState({ players: stubPlayers, cardMap });
   state.startedAt = Date.now();
+  if (gameConfig.timeoutScale !== undefined) {
+    state.config = { timeoutScale: gameConfig.timeoutScale };
+  }
   return state;
 }
 
@@ -566,7 +582,9 @@ function createAndAwaitSlot(
     const pending = def.pending!;
     const atomTimeout = (atom as Record<string, unknown>).timeout;
     const timeoutSec = typeof atomTimeout === 'number' ? atomTimeout : pending.timeout;
-    const timeoutMs = timeoutSec * 1000;
+    // 应用房间配置的 timeoutScale(Infinity=无限)。
+    // resolveTimeoutMs 在 Infinity 时返回 MAX_SAFE_INTEGER,定时器实际不会触发。
+    const timeoutMs = resolveTimeoutMs(state, timeoutSec);
     let resolveCalled = false;
     let timedOut = false;
     let paused = false;

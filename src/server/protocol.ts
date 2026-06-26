@@ -8,6 +8,44 @@ export type { GameEventEnvelope } from '../engine/types';
 
 export type EventSeq = number;
 
+/** 将池预设 */
+export type CharPoolPreset = 'standard' | 'extended' | 'all';
+
+/** 房间级游戏配置(调试/普通房间通用)。在 startGame 时传给引擎。 */
+export interface RoomConfig {
+  /** 房间名 */
+  name: string;
+  /** 出牌/操作倒计时倍率。1=默认; <1 更快; >1 更慢; Infinity=无限 */
+  timeoutScale: number;
+  /** 将池预设 */
+  charPool: CharPoolPreset;
+  /** 每人初始手牌数(默认 4) */
+  handSize: number;
+}
+
+/** 默认房间配置 */
+export const DEFAULT_ROOM_CONFIG: RoomConfig = {
+  name: '调试房间',
+  timeoutScale: 1,
+  charPool: 'all',
+  handSize: 4,
+};
+
+/** 校验并规范化 RoomConfig:修正非法字段为默认值。 */
+export function normalizeRoomConfig(raw: unknown): RoomConfig {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const name = typeof r['name'] === 'string' && r['name'].trim() ? r['name'].trim().slice(0, 40) : DEFAULT_ROOM_CONFIG.name;
+  let timeoutScale = typeof r['timeoutScale'] === 'number' && r['timeoutScale'] > 0 ? r['timeoutScale'] : DEFAULT_ROOM_CONFIG.timeoutScale;
+  if (!Number.isFinite(timeoutScale) || timeoutScale > 1000) timeoutScale = Infinity;
+  const charPool: CharPoolPreset = r['charPool'] === 'standard' || r['charPool'] === 'extended' || r['charPool'] === 'all'
+    ? r['charPool']
+    : DEFAULT_ROOM_CONFIG.charPool;
+  const handSize = typeof r['handSize'] === 'number' && r['handSize'] >= 0 && r['handSize'] <= 20
+    ? Math.floor(r['handSize'])
+    : DEFAULT_ROOM_CONFIG.handSize;
+  return { name, timeoutScale, charPool, handSize };
+}
+
 /** 倒计时信息(pending 优先,否则出牌/弃牌阶段的 idleDeadline)。
  *  仅在 deadline 变化时附在 event 消息上,减少冗余传输。 */
 export interface DeadlineInfo {
@@ -42,7 +80,10 @@ export type ServerMessage =
   | { type: 'player_left'; playerId: string }
   | { type: 'player_disconnected'; playerId: string; graceMs: number }
   | { type: 'player_reconnected'; playerId: string }
-  | { type: 'game_started' };
+  | { type: 'game_started' }
+  | { type: 'room_config'; config: RoomConfig }
+  | { type: 'room_state'; readyPlayers: string[]; playerIds: string[]; hostId: string | null; maxPlayers: number; config: RoomConfig }
+  | { type: 'player_ready'; playerId: string };
 
 /**
  * 客户端发往服务端的消息。
@@ -54,11 +95,13 @@ export type ClientMessage =
   | { type: 'reorder_hand'; order: string[] }
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
-  | { type: 'create_room'; name: string; maxPlayers: number }
+  | { type: 'create_room'; name: string; maxPlayers: number; config?: RoomConfig }
   | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
   | { type: 'start_game' }
   | { type: 'leave_room' }
-  | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq };
+  | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq }
+  | { type: 'create_debug_room'; config?: RoomConfig; playerCount?: number }
+  | { type: 'update_room_config'; config: RoomConfig };
 
 export interface RoomInfo {
   id: string;
@@ -67,6 +110,7 @@ export interface RoomInfo {
   maxPlayers: number;
   status: string;
   isDebug?: boolean;
+  config?: RoomConfig;
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {
@@ -91,6 +135,11 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
       return typeof d['playerId'] === 'string';
     case 'create_room':
       return typeof d['name'] === 'string' && typeof d['maxPlayers'] === 'number';
+    case 'create_debug_room':
+      // config 可选(旧版只传 playerCount)。playerCount 可选(新版只传 config)
+      return d['config'] === undefined || typeof d['config'] === 'object';
+    case 'update_room_config':
+      return typeof d['config'] === 'object' && d['config'] !== null;
     default:
       return false;
   }

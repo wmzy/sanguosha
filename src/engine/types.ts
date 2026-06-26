@@ -114,6 +114,10 @@ export interface GameState {
   marks: Mark[];
   localVars: Record<string, Json>;
   meta: { gameId: string; createdAt: number };
+  /** 房间级游戏配置(由 session 在 create 时注入)。原子操作/视图层据此调整超时等行为。
+   *  timeoutScale: pending 超时倍率。1=默认, <1 更快, >1 更慢, Infinity=无限。
+   *  若未设置(旧测试 state)按默认 1 处理。 */
+  config?: { timeoutScale: number };
   seq: number;
   startedAt: number;
   actionLog: ActionLogEntry[];

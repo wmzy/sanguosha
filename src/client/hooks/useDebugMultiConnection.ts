@@ -38,6 +38,17 @@ interface SeatInfo {
   viewer: number;
   view: GameView | null;
   lastSeq: number;
+  /** 该座次的 playerId(由 room_joined 消息返回) */
+  playerId?: string;
+}
+
+/** 房间准备状态(配置阶段)。由 room_state 消息驱动更新。 */
+export interface RoomState {
+  readyPlayers: string[];
+  playerIds: string[];
+  hostId: string | null;
+  maxPlayers: number;
+  config: import('../../server/protocol').RoomConfig;
 }
 
 export function useDebugMultiConnection(
@@ -49,12 +60,33 @@ export function useDebugMultiConnection(
   reorderHand: (order: string[]) => void;
   disconnectAll: () => void;
   getSeq: (seat: number) => number;
+  /** 配置阶段:房间准备状态 */
+  roomState: RoomState | null;
+  /** 配置阶段:游戏是否已开始 */
+  gameStarted: boolean;
+  /** 游戏结束结果(null=进行中);收到后触发结算界面 */
+  gameOver: { winner: string } | null;
+  /** 配置阶段:座次→playerId 映射 */
+  seatPlayerIds: Map<number, string>;
+  /** 配置阶段:指定座次发送准备 */
+  sendReady: (seat: number) => void;
+  /** 配置阶段:发送开始游戏(任意座次连接) */
+  sendStartGame: () => void;
+  /** 配置阶段:更新房间配置 */
+  sendUpdateConfig: (config: import('../../server/protocol').RoomConfig) => void;
+  /** 已连接座次数 */
+  connectedCount: number;
 } {
   const { roomId, playerCount, perspective } = params;
   // 座次 → 连接信息(key = viewer index)
   const seatsRef = useRef<Map<number, SeatInfo>>(new Map());
   const [views, setViews] = useState<Map<number, GameView>>(new Map());
   const [connectedCount, setConnectedCount] = useState(0);
+  const [roomState, setRoomState] = useState<RoomState | null>(null);
+  const [gameStarted, setGameStarted] = useState(false);
+  /** 游戏结束结果(winner=胜方座次号字符串,或 '无人')。收到 gameOver 消息后设置。 */
+  const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
+  const [seatPlayerIds, setSeatPlayerIds] = useState<Map<number, string>>(new Map());
   const playback = useEventPlayback();
   const playbackRef = useRef(playback);
   useEffect(() => { playbackRef.current = playback; }, [playback]);
@@ -70,6 +102,51 @@ export function useDebugMultiConnection(
 
   /** 处理消息(稳定引用,通过 ref 读动态值) */
   const handleMessage = useCallback((seatViewer: number, msg: ServerMessage) => {
+    // ── 游戏结束:记录胜方,触发结算界面 ──
+    if (msg.type === 'gameOver') {
+      setGameOver({ winner: msg.winner });
+      return;
+    }
+    // ── 配置阶段消息(游戏未开始) ──
+    if (msg.type === 'room_joined') {
+      const seat = seatsRef.current.get(seatViewer);
+      if (seat) {
+        seat.playerId = msg.playerId;
+        if (typeof msg.seatIndex === 'number') seat.viewer = msg.seatIndex;
+      }
+      setSeatPlayerIds(prev => {
+        const next = new Map(prev);
+        next.set(seatViewer, msg.playerId);
+        return next;
+      });
+      return;
+    }
+    if (msg.type === 'room_state') {
+      setRoomState({
+        readyPlayers: msg.readyPlayers,
+        playerIds: msg.playerIds,
+        hostId: msg.hostId,
+        maxPlayers: msg.maxPlayers,
+        config: msg.config,
+      });
+      return;
+    }
+    if (msg.type === 'room_config') {
+      setRoomState(prev => prev ? { ...prev, config: msg.config } : prev);
+      return;
+    }
+    if (msg.type === 'player_ready') {
+      // 增量准备通知;room_state 会随后到来作为权威状态,这里做乐观更新
+      setRoomState(prev => prev
+        ? { ...prev, readyPlayers: prev.readyPlayers.includes(msg.playerId) ? prev.readyPlayers : [...prev.readyPlayers, msg.playerId] }
+        : prev);
+      return;
+    }
+    if (msg.type === 'game_started') {
+      setGameStarted(true);
+      return;
+    }
+    // ── 游戏阶段消息 ──
     if (msg.type === 'initialView') {
       const seat = seatsRef.current.get(seatViewer);
       if (!seat) return;
@@ -174,6 +251,7 @@ export function useDebugMultiConnection(
     setViews(new Map());
     playbackRef.current.reset(0);
     setConnectedCount(0);
+    setGameOver(null);
 
     // StrictMode 安全:cleanup 后不再发 join,避免幽灵连接占用座次
     let cancelled = false;
@@ -273,12 +351,47 @@ export function useDebugMultiConnection(
     seatsRef.current.clear();
     setViews(new Map());
     setConnectedCount(0);
+    setRoomState(null);
+    setGameStarted(false);
+    setSeatPlayerIds(new Map());
   }, []);
 
   const getSeq = useCallback((viewer: number): number => {
     // seatsRef 按循环索引 key,遍历按实际 viewer 字段查找
     const seat = [...seatsRef.current.values()].find(s => s.viewer === viewer);
     return seat?.lastSeq ?? 0;
+  }, []);
+
+  // ── 配置阶段方法 ──
+
+  /** 指定座次发送准备(seat 是本地循环索引,对应 seatsRef key) */
+  const sendReady = useCallback((seat: number) => {
+    const s = seatsRef.current.get(seat);
+    if (!s || s.ws.readyState !== WebSocket.OPEN) return;
+    const msg: ClientMessage = { type: 'ready' };
+    logWsMessage(seat, 'out', msg);
+    logUserAction('ready', seat);
+    s.ws.send(JSON.stringify(msg));
+  }, []);
+
+  /** 发送开始游戏(用座次 0 的连接) */
+  const sendStartGame = useCallback(() => {
+    const s = seatsRef.current.get(0);
+    if (!s || s.ws.readyState !== WebSocket.OPEN) return;
+    const msg: ClientMessage = { type: 'start_game' };
+    logWsMessage(0, 'out', msg);
+    logUserAction('start_game', null);
+    s.ws.send(JSON.stringify(msg));
+  }, []);
+
+  /** 更新房间配置(用座次 0 的连接;调试房间任意玩家可改) */
+  const sendUpdateConfig = useCallback((config: import('../../server/protocol').RoomConfig) => {
+    const s = seatsRef.current.get(0);
+    if (!s || s.ws.readyState !== WebSocket.OPEN) return;
+    const msg: ClientMessage = { type: 'update_room_config', config };
+    logWsMessage(0, 'out', msg);
+    logUserAction('update_config', config);
+    s.ws.send(JSON.stringify(msg));
   }, []);
 
   return {
@@ -288,5 +401,13 @@ export function useDebugMultiConnection(
     reorderHand,
     disconnectAll,
     getSeq,
+    roomState,
+    gameStarted,
+    gameOver,
+    seatPlayerIds,
+    sendReady,
+    sendStartGame,
+    sendUpdateConfig,
+    connectedCount,
   };
 }

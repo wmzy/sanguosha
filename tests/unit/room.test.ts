@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { WSContext } from 'hono/ws';
 import {
   createRoom,
+  createDebugRoom,
   joinRoom,
   leaveRoom,
   setReady,
@@ -10,7 +11,12 @@ import {
   getRoom,
   getRoomList,
   findRoomByPlayerId,
+  updateConfig,
 } from '../../src/server/room';
+import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
+import { resolveTimeoutMs } from '../../src/engine/create-engine';
+import type { GameState } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
 
 // Mock WebSocket context
 function createMockWS(): WSContext {
@@ -158,5 +164,93 @@ describe('房间管理', () => {
     const result = findRoomByPlayerId(uniqueId);
     expect(result).not.toBeNull();
     expect(result!.id).toBe(room.id);
+  });
+});
+
+describe('房间配置', () => {
+  it('创建普通房间应携带默认 config', () => {
+    const ws = createMockWS();
+    const room = createRoom('测试', 4, 'host1', ws);
+    expect(room.config).toBeDefined();
+    expect(room.config.timeoutScale).toBe(1);
+    expect(room.config.charPool).toBe('all');
+    expect(room.config.handSize).toBe(4);
+    expect(room.config.name).toBe('测试');
+  });
+
+  it('创建调试房间应携带默认 config', () => {
+    const room = createDebugRoom('调试', 5);
+    expect(room.config).toBeDefined();
+    expect(room.config.timeoutScale).toBe(1);
+    expect(room.config.name).toBe('调试');
+  });
+
+  it('创建房间可传入自定义 config', () => {
+    const ws = createMockWS();
+    const customConfig = { name: '自定义', timeoutScale: 0.6, charPool: 'standard' as const, handSize: 5 };
+    const room = createRoom('x', 4, 'h', ws, customConfig);
+    expect(room.config.timeoutScale).toBe(0.6);
+    expect(room.config.charPool).toBe('standard');
+    expect(room.config.handSize).toBe(5);
+  });
+
+  it('updateConfig 应更新配置并同步房间名', () => {
+    const ws = createMockWS();
+    const room = createRoom('原名', 4, 'host1', ws);
+    const updated = updateConfig(room.id, { name: '新名', timeoutScale: 2, charPool: 'standard', handSize: 3 }, 'host1');
+    expect(updated).not.toBeNull();
+    expect(updated!.name).toBe('新名');
+    expect(updated!.timeoutScale).toBe(2);
+    expect(room.config.timeoutScale).toBe(2);
+    expect(room.name).toBe('新名');
+  });
+
+  it('updateConfig 普通房间仅房主可调用', () => {
+    const ws = createMockWS();
+    const room = createRoom('测试', 4, 'host1', ws);
+    // 非房主应失败
+    const result = updateConfig(room.id, { name: 'x', timeoutScale: 1, charPool: 'all', handSize: 4 }, 'other');
+    expect(result).toBeNull();
+  });
+
+  it('updateConfig 调试房间任意玩家可调用', () => {
+    const room = createDebugRoom('调试', 4);
+    const result = updateConfig(room.id, { name: '改名', timeoutScale: 1.5, charPool: 'extended', handSize: 4 }, 'anyone');
+    expect(result).not.toBeNull();
+    expect(result!.timeoutScale).toBe(1.5);
+  });
+
+  it('normalizeRoomConfig 应修正非法字段', () => {
+    const cfg = normalizeRoomConfig({ name: '   ', timeoutScale: -1, charPool: 'invalid', handSize: 999 });
+    expect(cfg.name).toBe(DEFAULT_ROOM_CONFIG.name); // 空名回退默认
+    expect(cfg.timeoutScale).toBe(1); // 非法回退默认
+    expect(cfg.charPool).toBe('all'); // 非法回退默认
+    expect(cfg.handSize).toBe(4); // 超范围回退默认
+  });
+
+  it('normalizeRoomConfig Infinity 表示无限时', () => {
+    const cfg = normalizeRoomConfig({ name: '无限', timeoutScale: Infinity, charPool: 'all', handSize: 4 });
+    expect(cfg.timeoutScale).toBe(Infinity);
+  });
+});
+
+describe('resolveTimeoutMs', () => {
+  it('默认 timeoutScale=1 返回原值', () => {
+    const state: GameState = createGameState({ players: [], cardMap: {} });
+    expect(resolveTimeoutMs(state, 30)).toBe(30000);
+  });
+
+  it('应用 timeoutScale 倍率', () => {
+    const state: GameState = createGameState({ players: [], cardMap: {} });
+    state.config = { timeoutScale: 0.5 };
+    expect(resolveTimeoutMs(state, 30)).toBe(15000);
+    state.config = { timeoutScale: 2 };
+    expect(resolveTimeoutMs(state, 15)).toBe(30000);
+  });
+
+  it('Infinity 返回极大值(定时器实际不触发)', () => {
+    const state: GameState = createGameState({ players: [], cardMap: {} });
+    state.config = { timeoutScale: Infinity };
+    expect(resolveTimeoutMs(state, 30)).toBe(Number.MAX_SAFE_INTEGER);
   });
 });

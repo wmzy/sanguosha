@@ -2,7 +2,7 @@
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
 import type { ActionPrompt, AtomDefinition, GameState, Json, ViewEventSplit, ViewEvent } from '../types';
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom, resolveTimeoutMs } from '../create-engine';
 import { registerAtom } from '../atom';
 
 export const 请求回应: AtomDefinition<{
@@ -44,18 +44,19 @@ export const 请求回应: AtomDefinition<{
     timeout: 30,
   },
   effect: { blockUntilDone: true, duration: 200 },
-  toViewEvents(_state, atom): ViewEventSplit {
-    // 超时秒数:优先 atom 自带 timeout,回退到 pending.timeout。
-    // 透传给 applyView,使其 deadline/totalMs 与后端真实定时器口径一致
-    // (create-engine.ts 计算 timeoutMs = atom.timeout ?? pending.timeout)。
+  toViewEvents(state, atom): ViewEventSplit {
+    // 应用房间 timeoutScale:优先 atom 自带 timeout,回退到 pending.timeout。
+    // 透传 timeoutMs 给 applyView,使其 deadline/totalMs 与后端真实定时器口径一致
+    // (createAndAwaitSlot 同样走 resolveTimeoutMs)。
     const timeoutSec = atom.timeout ?? 请求回应.pending!.timeout;
+    const timeoutMs = resolveTimeoutMs(state, timeoutSec);
     // target 看到带 prompt 的请求
     const targetView: ViewEvent = {
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.target,
       prompt: atom.prompt,
-      timeout: timeoutSec,
+      timeoutMs,
     };
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有存活玩家都可回应,
     // 故 ownerViews 无人命中(Map key=target<0 不匹配真实 viewer),
@@ -68,7 +69,7 @@ export const 请求回应: AtomDefinition<{
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.target,
-      timeout: timeoutSec,
+      timeoutMs,
     };
     return {
       ownerViews: new Map([[atom.target, targetView]]),
@@ -79,10 +80,9 @@ export const 请求回应: AtomDefinition<{
     const target = event.target as number;
     const requestType = event.requestType as string | undefined;
     const prompt = event.prompt as ActionPrompt | undefined;
-    // 超时:优先 event.timeout(由 toViewEvents 透传的 atom.timeout),
-    // 回退到 DEFAULT_TIMEOUT_MS。与后端 create-engine.ts 的
-    // timeoutMs = atom.timeout ?? pending.timeout 口径一致。
-    const timeoutMs = ((event.timeout as number | undefined) ?? 30) * 1000;
+    // 超时:优先 event.timeoutMs(由 toViewEvents 经 resolveTimeoutMs 计算并透传),
+    // 回退到默认 30s。与后端 createAndAwaitSlot 口径一致。
+    const timeoutMs = (event.timeoutMs as number | undefined) ?? 30 * 1000;
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有 viewer 都设置 pending
     if (target < 0) {
       if (!prompt) return;

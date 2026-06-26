@@ -32,7 +32,7 @@ export interface WsEntry {
 
 export interface ActionEntry {
   time: number;
-  kind: 'action' | 'reorder' | 'perspective';
+  kind: 'action' | 'reorder' | 'perspective' | 'ready' | 'start_game' | 'update_config';
   detail: unknown;
 }
 
@@ -144,7 +144,7 @@ export function logWsMessage(seat: number, dir: 'in' | 'out', msg: unknown): voi
 }
 
 /** 记录一条用户操作。仅 installed 时生效。 */
-export function logUserAction(kind: 'action' | 'reorder' | 'perspective', detail: unknown): void {
+export function logUserAction(kind: 'action' | 'reorder' | 'perspective' | 'ready' | 'start_game' | 'update_config', detail: unknown): void {
   if (!installed) return;
   actionBuffer.push({ time: Date.now(), kind, detail });
   if (actionBuffer.length > MAX_ACTIONS) actionBuffer.shift();

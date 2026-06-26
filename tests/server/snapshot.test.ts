@@ -27,6 +27,7 @@ function makeRoom(isDebug = true): Room {
     isDebug,
     createdAt: Date.now(),
     status: '进行中',
+    config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
   } as unknown as Room;
 }
 

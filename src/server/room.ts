@@ -1,6 +1,7 @@
 // server/room.ts
 import type { WSContext } from 'hono/ws';
-import type { RoomInfo } from './protocol';
+import type { RoomInfo, RoomConfig } from './protocol';
+import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../shared/rng';
 import { register } from './lifecycles';
 import { createLogger } from './logger';
@@ -13,10 +14,12 @@ export interface Room {
   players: Map<string, WSContext>;
   maxPlayers: number;
   status: '等待中' | '进行中' | '已结束';
-  /** 房主；调试房间无房主 */
+  /** 房主;调试房间无房主(null) */
   hostId: string | null;
   readyPlayers: Set<string>;
   isDebug?: boolean;
+  /** 房间级游戏配置 */
+  config: RoomConfig;
 }
 
 const roomList = new Map<string, Room>();
@@ -42,8 +45,8 @@ function clampPlayers(n: number): number {
   return Math.min(Math.max(n, 2), 8);
 }
 
-/** 创建普通房间：需要 host 玩家立刻加入。 */
-export function createRoom(name: string, maxPlayers: number, hostId: string, ws: WSContext): Room {
+/** 创建普通房间:需要 host 玩家立刻加入。 */
+export function createRoom(name: string, maxPlayers: number, hostId: string, ws: WSContext, config?: RoomConfig): Room {
   const id = generateRoomId();
   const room: Room = {
     id,
@@ -53,13 +56,15 @@ export function createRoom(name: string, maxPlayers: number, hostId: string, ws:
     status: '等待中',
     hostId,
     readyPlayers: new Set(),
+    config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
   };
   roomList.set(id, room);
   return room;
 }
 
-/** 创建调试房间：无人加入、无 host。后续由 host 玩家调用 joinDebugRoom 进入。 */
-export function createDebugRoom(name: string, maxPlayers: number): Room {
+/** 创建调试房间:无人加入、无 host。后续由玩家调用 joinDebugRoom 进入。
+ *  不立即开局——进入「配置+准备」阶段,所有座次就绪后由 start_game 触发。 */
+export function createDebugRoom(name: string, maxPlayers: number, config?: RoomConfig): Room {
   const id = generateRoomId();
   const room: Room = {
     id,
@@ -70,6 +75,7 @@ export function createDebugRoom(name: string, maxPlayers: number): Room {
     hostId: null,
     readyPlayers: new Set(),
     isDebug: true,
+    config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
   };
   roomList.set(id, room);
   return room;
@@ -141,6 +147,19 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
   return room;
 }
 
+/** 更新房间配置。仅房主可调用(调试房间无房主时任意座次可调用)。返回更新后的配置。 */
+export function updateConfig(roomId: string, config: unknown, playerId: string): RoomConfig | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  if (room.status !== '等待中') return null;
+  // 房主校验:调试房间无房主时允许任意玩家;否则仅房主
+  if (room.hostId !== null && room.hostId !== playerId) return null;
+  const normalized = normalizeRoomConfig(config);
+  room.config = normalized;
+  room.name = normalized.name;
+  return normalized;
+}
+
 export function setReady(roomId: string, playerId: string): boolean {
   const room = roomList.get(roomId);
   if (room?.status !== '等待中') return false;
@@ -183,6 +202,7 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
       maxPlayers: room.maxPlayers,
       status: room.status,
       isDebug: room.isDebug === true,
+      config: room.config,
     });
   }
   return result;

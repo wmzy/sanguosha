@@ -14,7 +14,9 @@ import { useSnapshot } from '../hooks/useSnapshot';
 import { SubmittedCharSelectProvider } from '../hooks/SubmittedCharSelectCtx';
 import { DebugControls } from './debug/DebugControls';
 import { DebugRoomList } from './debug/DebugRoomList';
+import { RoomConfigPanel } from './debug/RoomConfigPanel';
 import { GameViewComponent } from './GameView';
+import { GameResultOverlay } from './GameResultOverlay';
 import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 import { DebugInfo } from './DebugInfo';
 import { styles } from '../theme';
@@ -132,6 +134,27 @@ function DebugGameViewInner({
   const currentView = conn.views.get(perspective) ?? null;
   const pctl = useDebugPerspective(conn.views, perspective, playerCount, handleSetPerspective);
 
+  // ── 配置阶段:游戏未开始时显示配置面板 ──
+  if (!conn.gameStarted && !currentView) {
+    return (
+      <RoomConfigPanel
+        config={conn.roomState?.config ?? { name: '', timeoutScale: 1, charPool: 'all', handSize: 4 }}
+        readyPlayers={conn.roomState?.readyPlayers ?? []}
+        playerIds={conn.roomState?.playerIds ?? []}
+        seatPlayerIds={conn.seatPlayerIds}
+        maxPlayers={playerCount}
+        connectedCount={conn.connectedCount}
+        perspective={perspective}
+        onSwitchPerspective={handleSetPerspective}
+        onReady={conn.sendReady}
+        onStart={conn.sendStartGame}
+        onUpdateConfig={conn.sendUpdateConfig}
+        onExit={onDeleteRoom}
+        error={null}
+      />
+    );
+  }
+
   if (!currentView) {
     return (
       <div style={styles.page(40)}>
@@ -192,6 +215,14 @@ function DebugGameViewInner({
         currentEvent={conn.currentEvent}
       />
       <DebugInfo view={view} perspectiveName={perspectiveName} pending={view.pending} />
+      {conn.gameOver && (
+        <GameResultOverlay
+          winner={conn.gameOver.winner}
+          players={view.players}
+          perspectiveIdx={perspective}
+          onExit={onDeleteRoom}
+        />
+      )}
     </>
   );
 }

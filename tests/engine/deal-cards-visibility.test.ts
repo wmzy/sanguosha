@@ -21,6 +21,7 @@ function makeRoom(): Room {
     id: 'test-' + Math.random().toString(36).slice(2, 8),
     name: '测试', maxPlayers: 4, players: new Map(),
     isDebug: true, createdAt: Date.now(), status: '进行中',
+    config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
   } as unknown as Room;
 }
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));

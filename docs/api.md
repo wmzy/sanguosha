@@ -59,12 +59,23 @@ POST /api/rooms/:id/join
 POST /api/debug-room
 Content-Type: application/json
 
-{ "playerCount": 5 }
+{ "playerCount": 5, "config": { ... } }
 ```
 
-`playerCount` 须在 2-8 之间。立即开启会话（无需玩家准备）。
+`playerCount` 须在 2-8 之间。`config` 可选(见 `RoomConfig`)。创建房间后**不立即开局**——进入「配置+准备」阶段，玩家逐个准备后由 WS `start_game` 触发。
 
 **响应 200** — `{ "roomId": "ABC123" }`
+
+#### RoomConfig
+
+```typescript
+interface RoomConfig {
+  name: string;        // 房间名
+  timeoutScale: number; // 操作倒计时倍率(1=默认,0.6=快,1.8=慢,Infinity=无限)
+  charPool: 'standard' | 'extended' | 'all'; // 将池预设
+  handSize: number;    // 每人初始手牌数(默认 4)
+}
+```
 
 ### 删除调试房间
 
@@ -88,16 +99,15 @@ type EventSeq = number;  // 服务端 GameSession 维护的全局递增序号
 
 type ClientMessage =
   | { type: 'action'; action: GameAction; baseSeq: EventSeq }
-  | { type: 'response'; baseSeq: EventSeq; choice: unknown }
+  | { type: 'reorder_hand'; order: string[] }
   | { type: 'ready' }
   | { type: 'join_room'; roomId: string }
-  | { type: 'create_room'; name: string; maxPlayers: number }
-  | { type: 'create_debug_room'; playerCount: number }
+  | { type: 'create_room'; name: string; maxPlayers: number; config?: RoomConfig }
+  | { type: 'create_debug_room'; config?: RoomConfig; playerCount?: number }
   | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
-  | { type: 'delete_room' }
   | { type: 'start_game' }
+  | { type: 'update_room_config'; config: RoomConfig }
   | { type: 'leave_room' }
-  | { type: 'list_rooms'; filter?: 'debug' | 'multiplayer' }
   | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq };
 ```
 
@@ -108,30 +118,31 @@ type ClientMessage =
 ### 服务器 → 客户端（ServerMessage）
 
 ```typescript
-type SequencedEvent = ServerEvent & { seq: EventSeq };
-
 type ServerMessage =
-  | { type: 'initialView'; state: FrontendState; lastSeq: EventSeq }
-  | { type: 'debugGameState'; state: GameState; lastSeq: EventSeq }
-  | { type: 'events'; fromSeq: EventSeq; events: SequencedEvent[] }
+  | { type: 'initialView'; state: GameView; lastSeq: EventSeq }
+  | { type: 'event'; seq: EventSeq; timestamp: number; view?: ViewEvent; notify?: ...; deadline?: DeadlineInfo | null }
   | { type: 'error'; message: string }
+  | { type: 'actionRejected' }
   | { type: 'gameOver'; winner: string }
-  | { type: 'room_joined'; roomId: string; playerId: string }
+  | { type: 'room_joined'; roomId: string; playerId: string; seatIndex?: number }
   | { type: 'player_joined'; playerId: string }
   | { type: 'player_left'; playerId: string }
   | { type: 'player_disconnected'; playerId: string; graceMs: number }
   | { type: 'player_reconnected'; playerId: string }
   | { type: 'game_started' }
-  | { type: 'room_list'; rooms: RoomInfo[] };
+  | { type: 'room_config'; config: RoomConfig }
+  | { type: 'room_state'; readyPlayers: string[]; playerIds: string[]; hostId: string | null; maxPlayers: number; config: RoomConfig }
+  | { type: 'player_ready'; playerId: string };
 ```
 
 ### 流程
 
-1. 客户端 `create_room` 或 `join_room` → 服务器返回 `room_joined`（含 `playerId`）
-2. 房主 `ready`，所有人 ready 后 `start_game` → 服务器广播 `game_started` 并发送 `initialView`
-3. 轮到自己回合时，服务器通过 `events` 推送事件（部分 `events` 携带 `pending` 字段）
-4. 客户端读取 `pending`，用 `response` + `baseSeq` + `choice` 提交选择
-5. 任何时候可用 `action` + `baseSeq` 提交玩家操作（如 `playCard`/`endTurn`/`discard`）
+1. 客户端 `create_room`/`create_debug_room` 或 `join_room`/`join_debug_room` → 服务器返回 `room_joined`（含 `playerId`、`seatIndex`）
+2. 房主(调试房间任意玩家)用 `update_room_config` 修改配置;广播 `room_config` + `room_state`
+3. 玩家 `ready` → 广播 `player_ready` + `room_state`;所有人 ready 后 `start_game` → 广播 `game_started` 并发送 `initialView`
+4. 轮到自己回合时,服务器通过 `event` 推送事件(部分 `event` 携带 `pending` 字段)
+5. 客户端读取 `pending`,用 `action` + `baseSeq` + `pendingSeq` 提交回应
+6. 任何时候可用 `action` + `baseSeq` 提交玩家操作
 
 **baseSeq 来源**: 客户端从最近一次 `events` / `initialView` / `debugGameState` 消息中拿到 `lastSeq`/`fromSeq` 作为本地 `lastAppliedSeq`，发操作时填入 `baseSeq`。
 

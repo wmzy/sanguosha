@@ -5,7 +5,7 @@ import type { ActionPrompt, Atom, AtomDefinition, Card, GameState, PlayerState, 
 import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
-import { applyAtom } from '../create-engine';
+import { applyAtom, resolveTimeoutMs } from '../create-engine';
 import { registerAtom } from '../atom';
 
 /** 默认通用技能列表 */
@@ -200,15 +200,17 @@ export const 选将询问: AtomDefinition<{
   apply(_state) {
     // 等待型 atom——apply 不修改 state
   },
-  toViewEvents(_state, atom) {
+  toViewEvents(state, atom) {
     const target = atom.target;
     const candidates = atom.candidates;
+    const timeoutMs = resolveTimeoutMs(state, 60);
     // 主公(被问询者)看到候选人列表
     const ownerView: import('../types').ViewEvent = {
       type: '选将询问',
       target,
       candidates,
-      pending: { startTime: Date.now(), deadline: Date.now() + 60000, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } },
+      timeoutMs,
+      pending: { startTime: Date.now(), deadline: Date.now() + timeoutMs, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } },
     };
     // 其他人看到"等待主公选将"
     const othersView: import('../types').ViewEvent = {
@@ -224,6 +226,7 @@ export const 选将询问: AtomDefinition<{
   applyView(view, event) {
     const target = event.target as number;
     const candidates = (event.candidates ?? []) as Array<{ name: string; skills: string[] }>;
+    const timeoutMs = (event.timeoutMs as number | undefined) ?? 60000;
     // 只有被问询的玩家才设置 pending
     if (view.viewer === target) {
       view.pending = {
@@ -231,8 +234,8 @@ export const 选将询问: AtomDefinition<{
         atom: { type: '选将询问', target, candidates } as unknown as import('../types').Atom,
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } as import('../types').ActionPrompt,
         target,
-        deadline: Date.now() + 60000,
-        totalMs: 60000,
+        deadline: Date.now() + timeoutMs,
+        totalMs: timeoutMs,
       };
     }
   },
@@ -291,6 +294,7 @@ export const 并行选将: AtomDefinition<{
   },
   toViewEvents(state, atom) {
     const selections = atom.selections;
+    const timeoutMs = resolveTimeoutMs(state, 60);
     // 找主公已选的角色(主公在并行选将之前已完成选将)
     const lordIdx = state.players.findIndex(p => p.identity === '主公');
     const lordCharacter = lordIdx >= 0 ? state.players[lordIdx].character : '';
@@ -303,7 +307,8 @@ export const 并行选将: AtomDefinition<{
         selections: selections.map(sel => ({ target: sel.target, candidates: sel.candidates })),
         lordCharacter,
         lordName,
-        pending: { startTime: Date.now(), deadline: Date.now() + 60000, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates } },
+        timeoutMs,
+        pending: { startTime: Date.now(), deadline: Date.now() + timeoutMs, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates } },
       });
     }
     // othersView:已选完的玩家(如主公)看到"等待其他玩家选将"
@@ -331,13 +336,14 @@ export const 并行选将: AtomDefinition<{
     // 找当前 viewer 是否在 selections 中
     const mySelection = selections.find(s => s.target === view.viewer);
     if (mySelection) {
+      const timeoutMs = (event.timeoutMs as number | undefined) ?? 60000;
       view.pending = {
         type: 'awaits',
         atom: { type: '选将询问', target: mySelection.target, candidates: mySelection.candidates } as unknown as import('../types').Atom,
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: mySelection.candidates } as import('../types').ActionPrompt,
         target: mySelection.target,
-        deadline: Date.now() + 60000,
-        totalMs: 60000,
+        deadline: Date.now() + timeoutMs,
+        totalMs: timeoutMs,
       };
     }
   },
