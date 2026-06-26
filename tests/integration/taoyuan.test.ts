@@ -8,8 +8,9 @@
 //   4. 跨回合:桃园结义使用后状态稳定,无残留 pending
 //
 // 关键机制(桃园结义.ts):
-//   use → applyAtom 移动牌到处理区 → 请求回应 无懈可击(broadcast target=-2)
-//   → 若未被抵消:对所有存活且 HP<maxHealth 的玩家 回复体力(+1)
+//   use → applyAtom 移动牌到处理区 → 逐目标结算:
+//     满血目标(HP>=maxHealth)跳过(不询问无懈也不回血,无可抵消的效果)
+//     未满血目标 → 请求回应 无懈可击(broadcast)→ 若未被抵消则回复体力(+1)
 //   → 移动牌到弃牌堆
 //
 // 模式:SkillTestHarness + useCard + pass(跳过 无懈可击 窗口)
@@ -121,8 +122,7 @@ describe('桃园结义:多人回血端到端', () => {
 
     const P1 = harness.player('P1');
     await P1.useCard('桃园结义', ty.id);
-    // 跳过 无懈可击 窗口(逐目标广播,2 个存活目标各一次)
-    for (let i = 0; i < 2; i++) await P1.pass();
+    // P1/P2 均满血 → 不询问无懈可击(useCard 内 waitForStable 即结算完成)
 
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.players[1].health).toBe(4);
@@ -151,8 +151,8 @@ describe('桃园结义:多人回血端到端', () => {
 
     const P1 = harness.player('P1');
     await P1.useCard('桃园结义', ty.id);
-    // 跳过 无懈可击 窗口(逐目标广播,3 个存活目标各一次)
-    for (let i = 0; i < 3; i++) await P1.pass();
+    // 仅 P2 未满血 → 只对 P2 询问无懈(P1/P3 满血不问询),1 次 pass
+    for (let i = 0; i < 1; i++) await P1.pass();
 
     // P1 满血 → 4(不动);P2 掉血 → 3(+1);P3 满血 → 4(不动)
     expect(harness.state.players[0].health).toBe(4);

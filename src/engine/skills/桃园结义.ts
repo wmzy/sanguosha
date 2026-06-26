@@ -23,14 +23,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 所有存活目标,按座次顺序逐个结算(含使用者自己)
         const targets = state.players.filter(p => p.alive).map(p => p.index);
         for (const t of targets) {
-          if (!state.players[t]?.alive) continue;
+          const p = state.players[t];
+          if (!p?.alive) continue;
+          // 满血目标:桃园结义对其无效果(无可抵消的效果),不询问无懈可击也不回血。
+          if (p.health >= p.maxHealth) continue;
           const cancelled = await askWuxie(state, t);
           if (cancelled) continue;
-          // 未满血才回 1 点(跳过满血避免冗余 atom + 空 view event)
-          const p = state.players[t];
-          if (p && p.health < p.maxHealth) {
-            await applyAtom(state, { type: '回复体力', target: t, amount: 1 });
-          }
+          await applyAtom(state, { type: '回复体力', target: t, amount: 1 });
         }
         await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
       } finally {

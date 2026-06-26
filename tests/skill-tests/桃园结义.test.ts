@@ -3,7 +3,8 @@
 //
 // 覆盖:
 //   1. 多人回 1 血:P1 出锦囊,P1/P2/P3 各回 1 血
-//   2. 满血不回:P2 已满血,使用后仍为 4 血(不超 maxHealth)
+//   2. 满血不回:P1/P2 已满血,使用后仍为 4 血(不超 maxHealth)
+//   2b. 满血不问询无懈:满血目标不产生无懈窗口,仅未满血目标询问
 //   3. validate 拒绝(negative):非出牌阶段 / pending 期间 / 牌不在手 / 牌名错
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
@@ -120,9 +121,7 @@ describe('桃园结义', () => {
     const P1 = harness.player('P1');
 
     await P1.useCard('桃园结义', 'ty1');
-    // 2 个目标(P1,P2)逐个询问无懈 → 各 pass
-    await P1.pass();
-    await P1.pass();
+    // P1/P2 均满血 → 桃园结义对其无效果,不询问无懈可击(useCard 内 waitForStable 即结算完成)
 
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.players[1].health).toBe(4);
@@ -133,6 +132,32 @@ describe('桃园结义', () => {
       expect(v.players[1].health).toBe(4);
       expect(v.pending).toBeNull();
     });
+    // state 级:满血目标不问询无懈 → useCard 后无 pending
+    P1.expectNoPending();
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 2b. 满血目标不问询无懈可击(桃园结义对其无效果,无可抵消的效果)
+  // ─────────────────────────────────────────────────────────────
+  it('满血目标不问询无懈 → 仅未满血目标产生无懈窗口', async () => {
+    // P1 满血(4/4)、P2 未满血(2/4)、P3 未满血(3/4)
+    const state = buildState({ p1Health: 4, p2Health: 2, p3Health: 3, playerCount: 3 });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCard('桃园结义', 'ty1');
+    // P1 满血 → 不问询无懈;按座次首个窗口是 P2 的无懈(而非 P1 的)
+    P1.expectPending('请求回应');
+    await P1.pass();
+    // P3 未满血 → 第二个无懈窗口(P1 满血无窗口)
+    P1.expectPending('请求回应');
+    await P1.pass();
+
+    // P1 满血不回血;P2/P3 各 +1
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[1].health).toBe(3);
+    expect(harness.state.players[2].health).toBe(4);
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────

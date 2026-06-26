@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Fixed — 桃园结义对满血目标不问询无懈可击
+
+桃园结义对满血角色本就无回复效果(无法回血),原实现对满血目标仍逐个广播询问无懈可击——既冗余(无可抵消的效果),又拖慢结算节奏、徒增无意义窗口。现满血目标直接跳过整个结算(不询问无懈、不回血),与三国杀标准实现一致。
+
+#### Fixed
+- **桃园结义满血目标跳过无懈问询**:逐目标结算循环中,满血目标(`HP >= maxHealth`)直接 `continue`,既不调用 `askWuxie` 也不 `回复体力`。(`src/engine/skills/桃园结义.ts`)
+
+#### Changed
+- **测试适配无懈窗口次数**:全满血场景不再需要 `pass`(`useCard` 内 `waitForStable` 即结算完成);部分满血场景 `pass` 次数=未满血存活目标数。同步更新机制注释。(`tests/integration/taoyuan.test.ts`、`tests/integration/taoyuan-heal.test.ts`、`tests/skill-tests/桃园结义.test.ts`)
+- **新增「满血不问询无懈」针对性用例**:混合场景(P1 满血、P2/P3 未满血)断言仅未满血目标产生无懈窗口(2 次 pass),满血目标 P1 无窗口。(`tests/skill-tests/桃园结义.test.ts`)
+
+## [Unreleased] — 2026-06-26
+
 ### Added — 房间配置功能(配置+准备阶段)
 
 调试房间创建后不再立即开局,进入「配置+准备」阶段。房主(调试房间任意玩家)可配置房间名、操作倒计时倍率、将池预设、初始手牌数。所有玩家(调试房间逐座次)准备后可开始。配置模型对普通/调试房间通用,前端先只接调试房间。
