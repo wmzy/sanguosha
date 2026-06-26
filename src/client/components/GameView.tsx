@@ -18,6 +18,7 @@ import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView as EngineGameView, Card, Json } from '../../engine/types';
+import { getAtomDef } from '../../engine/atom';
 import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
 import { PlayerCardLarge } from './PlayerCardLarge';
 import { GameLog } from './GameLog';
@@ -130,6 +131,18 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
 
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
 
+  // 判定翻牌动画(effect.animation='flip', blockUntilDone)期间,延迟询问类 pending 渲染。
+  // 否则玩家会在判定结果(八卦阵/乐不思蜀等翻牌)还没看清时就被弹出「是否出闪」打断。
+  // useEventPlayback 是非阻塞调度,这里据此实现 blockUntilDone 语义:翻牌动画播放完才显示 pending。
+  const isPlayingFlipAnim = !!currentEvent && (() => {
+    const t = (currentEvent.event as { atomType?: string; type?: string }).atomType ?? currentEvent.event.type;
+    try {
+      return getAtomDef(t)?.effect?.animation === 'flip';
+    } catch {
+      return false;
+    }
+  })();
+
   return (
     <div className={styles.pageRoot}>
       <OverlaysLayer
@@ -201,7 +214,8 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
         <div className={styles.handColumn}>
           {/* ─── 待回应区(pending 回应,非弃牌/非选将/非 distribute)─── */}
           {/* distribute pending(遗计)由下方统一分配面板处理 */}
-          {isPerspectiveAwaiting && pending && !isDiscardPhase && pending?.atom?.type !== '选将询问' && pending.prompt.type !== 'distribute' && (
+          {/* 翻牌动画(blockUntilDone)期间延迟:让玩家先看清判定结果再弹出询问 */}
+          {isPerspectiveAwaiting && pending && !isDiscardPhase && !isPlayingFlipAnim && pending?.atom?.type !== '选将询问' && pending.prompt.type !== 'distribute' && (
             <AwaitingPrompt
               pending={pending}
               pendingTargetIdx={pendingTargetIdx}

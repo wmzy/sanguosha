@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Fixed — 八卦阵确认发动后判定翻牌动画期间询问闪提前弹出
+
+八卦阵确认发动后进入判定,引擎逻辑本身正确(红色视为闪 → cancel 询问闪、黑色才询问闪,已用裸 dispatch+pendingSeq 复现验证)。问题在前端时序:判定翻牌动画(`effect.animation='flip'`, `blockUntilDone`, 1800ms)本应阻塞,而 `useEventPlayback` 是非阻塞调度、询问闪的 `applyView` 又是同步写 `view.pending`。结果黑色判定时判定牌还在翻(EventBanner flip),询问闪面板(AwaitingPrompt)就已经弹出——玩家感觉「确认发动后没等判定结果就直接询问闪」。根本原因:`blockUntilDone` 语义在前端一直未实现。
+
+- **实现 blockUntilDone 语义**:`GameView` 计算 `isPlayingFlipAnim`(当前播放事件的 atom `effect.animation === 'flip'`),flip 翻牌动画期间延迟 `AwaitingPrompt` 渲染,让玩家先看清判定结果再弹出询问。红色判定不受影响(引擎 cancel,根本不产生询问闪事件)。(`src/client/components/GameView.tsx`)
+- **测试**:新增 GameView 渲染时序测试,断言判定 flip 动画播放中询问闪面板不渲染、动画播完后正常渲染;并验证移除修复后用例失败(捕获回归)。(`tests/integration/gameview-judge-flip-delay.test.tsx`)
+
 ### Fixed — 桃园结义对满血目标不问询无懈可击
 
 桃园结义对满血角色本就无回复效果(无法回血),原实现对满血目标仍逐个广播询问无懈可击——既冗余(无可抵消的效果),又拖慢结算节奏、徒增无意义窗口。现满血目标直接跳过整个结算(不询问无懈、不回血),与三国杀标准实现一致。
