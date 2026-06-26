@@ -13,7 +13,7 @@ export const 请求回应: AtomDefinition<{
   /** 超时秒数:覆盖 pending.timeout(无懈可击=10,默认 30) */
   timeout?: number;
   /** 无懈可击抵消目标座次(仅 requestType='无懈可击' 时存在) */
-  wuxieTarget?: number;
+  cancelTarget?: number;
 }> = {
   type: '请求回应',
   validate(state, atom) {

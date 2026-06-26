@@ -127,16 +127,16 @@ describe('南蛮入侵', () => {
 
     await P3.useCardAndTarget('南蛮入侵', 'nm1', []);
     // 先过无懈窗口
-    const wuxieSlot = [...harness.state.pendingSlots.values()][0];
-    if (wuxieSlot && (wuxieSlot.atom as { type: string }).type === '请求回应') {
+    const nullifSlot = [...harness.state.pendingSlots.values()][0];
+    if (nullifSlot && (nullifSlot.atom as { type: string }).type === '请求回应') {
       await harness.player(0).pass();
     }
     // 期望先问 P1(index 0),再问 P2(index 1)
     harness.player(0).expectPending('询问杀');
     await harness.player(0).pass();
     // 第二个询问杀
-    const wuxieSlot2 = [...harness.state.pendingSlots.values()][0];
-    if (wuxieSlot2 && (wuxieSlot2.atom as { type: string }).type === '请求回应') {
+    const nullifSlot2 = [...harness.state.pendingSlots.values()][0];
+    if (nullifSlot2 && (nullifSlot2.atom as { type: string }).type === '请求回应') {
       await harness.player(1).pass();
     }
     harness.player(1).expectPending('询问杀');
@@ -177,10 +177,10 @@ describe('南蛮入侵', () => {
 
     // 第二个目标 P2 的无懈窗口:P3 出无懈抵消对 P2 的效果
     // 当前 pending 应是无懈可击广播窗口
-    const wuxieSlot = [...harness.state.pendingSlots.values()][0];
-    expect((wuxieSlot.atom as { requestType?: string }).requestType).toBe('无懈可击');
+    const nullifSlot = [...harness.state.pendingSlots.values()][0];
+    expect((nullifSlot.atom as { requestType?: string }).requestType).toBe('无懈可击');
     await P3.respond('无懈可击', { cardId: 'wx1' });
-    // 无懈 close-reopen:respond 后旧 slot resolve，askWuxie 创建新窗口，需 pass 结束
+    // 无懈 close-reopen:respond 后旧 slot resolve，询问无懈可击 创建新窗口，需 pass 结束
     await P3.pass();
 
     // P2 被抵消 → 不会被询问杀,直接结束

@@ -15,7 +15,7 @@
 import type { FrontendAPI, GameState, Json, Skill, Card, SettlementFrame } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
-import { askWuxie } from '../wuxie';
+import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '五谷丰登', description: '锦囊:从牌堆亮出N张,全体依次选1张' };
@@ -122,7 +122,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (revealedIds.some(id => frameCards(state).includes(id)) === false) break;
 
           // 该目标选牌前询问一次无懈(被抵消 → 该目标不参与选牌)
-          const cancelled = await askWuxie(state, targetIdx);
+          const cancelled = await 询问无懈可击(state, targetIdx);
           if (cancelled) continue;
 
           if (revealedIds.some(id => frameCards(state).includes(id)) === false) break;

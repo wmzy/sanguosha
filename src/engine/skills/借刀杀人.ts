@@ -6,7 +6,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { viewCanAttack } from '../viewDistance';
-import { askWuxie } from '../wuxie';
+import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '借刀杀人', description: '锦囊:令目标出杀或获得其武器' };
@@ -77,7 +77,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 询问无懈可击(单目标锦囊:抵消整个锦囊)
       try {
-        const cancelled = await askWuxie(state, target);
+        const cancelled = await 询问无懈可击(state, target);
         if (!cancelled) {
           // 请求回应:目标选择出杀或交出武器
           // 使用 useCard 提示让目标选择一张杀牌;选中的杀通过 杀.respond 移入处理区

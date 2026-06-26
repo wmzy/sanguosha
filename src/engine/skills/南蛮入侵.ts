@@ -5,7 +5,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
-import { askWuxie } from '../wuxie';
+import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '南蛮入侵', description: '对所有其他角色使用,每名目标需出杀,否则受 1 点伤害' };
@@ -52,7 +52,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           // 每次结算前重算存活
           if (!state.players[target]?.alive) continue;
           // 无懈抵消该目标 → 跳过
-          const cancelled = await askWuxie(state, target);
+          const cancelled = await 询问无懈可击(state, target);
           if (cancelled) continue;
 
           await applyAtom(state, { type: '询问杀', target, source: from });

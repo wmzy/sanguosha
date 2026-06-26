@@ -132,16 +132,16 @@ describe('无懈可击链路', () => {
   // ─────────────────────────────────────────────────────────────
   // 用例 3:抵消场景:P1 持有无懈可击 → respond 打无懈 → 锦囊被抵消
   // ─────────────────────────────────────────────────────────────
-  // close-reopen:旧 slot resolve,askWuxie 循环创建新窗口(新 createdSeq)
+  // close-reopen:旧 slot resolve,询问无懈可击 循环创建新窗口(新 createdSeq)
   it('用例3:P1 出无纶可击 → 锦囊被抵消(目标牌未被弃)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
     state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
     // 给 P1 一张无懈可击
-    const wuxieId = `wuxie-${state.players[1].hand.length}`;
-    state.cardMap[wuxieId] = { id: wuxieId, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.players[1].hand.push(wuxieId);
+    const nullifId = `nullif-${state.players[1].hand.length}`;
+    state.cardMap[nullifId] = { id: nullifId, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.players[1].hand.push(nullifId);
 
     const p1HandBefore = state.players[1].hand.slice();
 
@@ -161,7 +161,7 @@ describe('无懈可击链路', () => {
       skillId: '无懈可击',
       actionType: 'respond',
       ownerId: 1,
-      params: { cardId: wuxieId },
+      params: { cardId: nullifId },
       baseSeq: state.seq,
     });
 
@@ -180,7 +180,7 @@ describe('无懈可击链路', () => {
     // P1 手牌减少 1(无懈可击)
     expect(state.players[1].hand.length).toBe(p1HandBefore.length - 1);
     // P1 第一张手牌还在(没被弃)
-    const p1FirstCard = p1HandBefore.find(id => id !== wuxieId);
+    const p1FirstCard = p1HandBefore.find(id => id !== nullifId);
     if (p1FirstCard) {
       expect(state.players[1].hand).toContain(p1FirstCard);
     }
@@ -197,13 +197,13 @@ describe('无懈可击链路', () => {
     state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
     // 给 P1 一张无懈可击
-    const wuxie1Id = `wuxie-1-${state.players[1].hand.length}`;
-    state.cardMap[wuxie1Id] = { id: wuxie1Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.players[1].hand.push(wuxie1Id);
+    const nullif1Id = `nullif-1-${state.players[1].hand.length}`;
+    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.players[1].hand.push(nullif1Id);
     // 给 P0 一张无懈可击(反无懈)
-    const wuxie0Id = `wuxie-0-${state.players[0].hand.length}`;
-    state.cardMap[wuxie0Id] = { id: wuxie0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.players[0].hand.push(wuxie0Id);
+    const nullif0Id = `nullif-0-${state.players[0].hand.length}`;
+    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.players[0].hand.push(nullif0Id);
 
     const p1HandBefore = state.players[1].hand.slice();
     const p1FirstCard = p1HandBefore[0];
@@ -225,11 +225,11 @@ describe('无懈可击链路', () => {
       skillId: '无懈可击',
       actionType: 'respond',
       ownerId: 1,
-      params: { cardId: wuxie1Id },
+      params: { cardId: nullif1Id },
       baseSeq: state.seq,
     });
 
-    // close-reopen:旧 slot resolve,askWuxie 循环创建新窗口
+    // close-reopen:旧 slot resolve,询问无懈可击 循环创建新窗口
     // 此时:无懈respond执行完 → 翻转被抵消=true → 询问反无懈
     // 应是请求回应 requestType='无懈可击'
     expect(state.pendingSlots.size).toBeGreaterThan(0);
@@ -242,7 +242,7 @@ describe('无懈可击链路', () => {
       skillId: '无懈可击',
       actionType: 'respond',
       ownerId: 0,
-      params: { cardId: wuxie0Id },
+      params: { cardId: nullif0Id },
       baseSeq: state.seq,
     });
 
@@ -262,7 +262,7 @@ describe('无懈可击链路', () => {
   });
 });
 
-// ── 以下为从 wuxieji.test.ts 合并的 dispatch 链路测试 ──
+// ── 以下为从 早期无懈测试 合并的 dispatch 链路测试 ──
 describe('无懈可击 dispatch 链路', () => {
   let state: GameState;
 
@@ -317,9 +317,9 @@ describe('无懈可击 dispatch 链路', () => {
     const gqId = `gq-${state.players[0].hand.length}`;
     state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
-    const wuxieId = `wx-${state.players[1].hand.length}`;
-    state.cardMap[wuxieId] = { id: wuxieId, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.players[1].hand.push(wuxieId);
+    const nullifId = `wx-${state.players[1].hand.length}`;
+    state.cardMap[nullifId] = { id: nullifId, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.players[1].hand.push(nullifId);
 
     const p1HandBefore = state.players[1].hand.slice();
     const p1FirstCard = 'd1';
@@ -333,15 +333,15 @@ describe('无懈可击 dispatch 链路', () => {
     // dispatch respond:ownerId=1 → pendingSlots.get(1) 找不到 → fallback 命中 -2 广播 slot
     await dispatchAndWait(state, {
       skillId: '无懈可击', actionType: 'respond', ownerId: 1,
-      params: { cardId: wuxieId }, baseSeq: state.seq,
+      params: { cardId: nullifId }, baseSeq: state.seq,
     });
 
     // dispatch respond execute 翻转 localVars[`无懈/被抵消/${target}`]=true;
-    // close-reopen:旧 slot resolve,askWuxie 循环创建新窗口(新 createdSeq)
+    // close-reopen:旧 slot resolve,询问无懈可击 循环创建新窗口(新 createdSeq)
     // 过河拆桥是单目标锦囊,target=1
     expect(state.localVars['无懈/被抵消/1']).toBe(true);
     expect(state.pendingSlots.size).toBe(1); // 新窗口
-    expect(state.players[1].hand).not.toContain(wuxieId); // 无懈牌已入弃牌堆
+    expect(state.players[1].hand).not.toContain(nullifId); // 无懈牌已入弃牌堆
 
     // fireTimeout 结束新窗口(无人反无懈)
     await fireTimeoutAndWait(state);
@@ -358,12 +358,12 @@ describe('无懈可击 dispatch 链路', () => {
     const gqId = `gq-${state.players[0].hand.length}`;
     state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
-    const wuxie1Id = `wx1-${state.players[1].hand.length}`;
-    state.cardMap[wuxie1Id] = { id: wuxie1Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.players[1].hand.push(wuxie1Id);
-    const wuxie0Id = `wx0-${state.players[0].hand.length}`;
-    state.cardMap[wuxie0Id] = { id: wuxie0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.players[0].hand.push(wuxie0Id);
+    const nullif1Id = `wx1-${state.players[1].hand.length}`;
+    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.players[1].hand.push(nullif1Id);
+    const nullif0Id = `wx0-${state.players[0].hand.length}`;
+    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.players[0].hand.push(nullif0Id);
 
     const p1FirstCard = 'd1';
 
@@ -376,7 +376,7 @@ describe('无懈可击 dispatch 链路', () => {
     // P1 出无懈抵消
     await dispatchAndWait(state, {
       skillId: '无懈可击', actionType: 'respond', ownerId: 1,
-      params: { cardId: wuxie1Id }, baseSeq: state.seq,
+      params: { cardId: nullif1Id }, baseSeq: state.seq,
     });
     expect(state.localVars['无懈/被抵消/1']).toBe(true); // P1 抵消锦囊
     expect(state.pendingSlots.size).toBe(1); // close-reopen:新窗口
@@ -384,7 +384,7 @@ describe('无懈可击 dispatch 链路', () => {
     // P0 出反无懈
     await dispatchAndWait(state, {
       skillId: '无懈可击', actionType: 'respond', ownerId: 0,
-      params: { cardId: wuxie0Id }, baseSeq: state.seq,
+      params: { cardId: nullif0Id }, baseSeq: state.seq,
     });
     expect(state.localVars['无懈/被抵消/1']).toBe(false); // 翻转回 false:反无懈抵消了无懈
     expect(state.pendingSlots.size).toBe(1); // close-reopen:新窗口

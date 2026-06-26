@@ -387,14 +387,14 @@ hook B:applyAtom(请求回应-B) → 发现 pendingSlot 已占
 - **抢占式(无懈可击)**:每轮一个 pending,允许**任一活着的玩家**回应(非单 target);第一个有效 respond 占用并 resolve,下一轮无懈是新的 pending。父 execute 用循环收集无懈数量,奇偶决定原锦囊是否生效:
 ```ts
 // 锦囊 execute 内
-let wuxieCount = 0;
+let cancelCount = 0;
 while (true) {
   await applyAtom(state, { type: '请求回应', requestType: '无懈', target: 广播 });
   // 注:请求回应 的 onTimeout 默认为空函数(超时=本轮无人打无懈)
   if (!state.localVars['无懈/本轮已打']) break;  // 超时=本轮无人打无懈
-  wuxieCount++;
+  cancelCount++;
 }
-const 生效 = wuxieCount % 2 === 0;  // 偶数=原锦囊生效,奇数=被抵消
+const 生效 = cancelCount % 2 === 0;  // 偶数=原锦囊生效,奇数=被抵消
 ```
 抢占式 pending 的"任一玩家可回应"是数据层约定(`请求回应` 声明合法回应者集合),不打破单槽不变量——仍是同时只一个 pending,只是回应者不限于单一 target。
 
@@ -1201,7 +1201,7 @@ type Atom =
   // 等待回应(进入 pending 区,等待玩家操作或超时)
   | { type: '询问闪'; target: number; source: number }
   | { type: '询问杀'; target: number; source: number }
-  | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number; wuxieTarget?: number }
+  | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number; cancelTarget?: number }
   | { type: '并行回应'; requestType: string; targets: number[]; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }  // 多目标并行盲选(拼点):为每个 target 创建独立 slot
   // 牌包装(武圣转化,仅由 武圣 skill 使用)
   | { type: '武圣包装'; cardId: string }

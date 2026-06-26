@@ -447,8 +447,8 @@ export type Atom =
   | { type: '询问杀'; target: number; source: number }
   | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number;
      /** 仅用于 requestType='无懈可击':本次无懈抵消的目标座次(-1=整体抵消/单目标锦囊,N=全体锦囊的某个目标)。
-      * 无懈 respond execute 据此翻转 localVars[`无懈/被抵消/${wuxieTarget}`]。 */
-     wuxieTarget?: number }
+      * 无懈 respond execute 据此翻转 localVars[`无懈/被抵消/${cancelTarget}`]。 */
+     cancelTarget?: number }
   // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
   | { type: '并行回应'; requestType: string; targets: number[]; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
   // 出牌阶段的控制权 token——非阻塞型 pending,表示"当前玩家可自由出牌/用技"。

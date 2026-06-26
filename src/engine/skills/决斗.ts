@@ -5,7 +5,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard, type SkillModule } from '../skill'
-import { askWuxie } from '../wuxie';
+import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '决斗', description: '对一名角色使用,双方轮流出杀,先不出者受 1 点伤害' };
@@ -42,7 +42,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 询问无懈可击(单目标锦囊:抵消整个锦囊)
       try {
-        const cancelled = await askWuxie(state, target);
+        const cancelled = await 询问无懈可击(state, target);
         if (!cancelled) {
           // 决斗循环:目标先出杀,之后发起者出杀,轮流。
           // 上限保护:极端情况下(武圣/丈八 把任意牌当杀)可能无限循环;

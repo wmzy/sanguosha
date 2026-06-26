@@ -297,7 +297,7 @@ describe('五谷丰登', () => {
       makeCard('pb', '桃', '♥', '2', '基本牌'),
       makeCard('pc', '闪', '♦', '3', '基本牌'),
     ];
-    const wuxie: Card = makeCard('wx1', '无懈可击', '♣', 'K');
+    const nullif: Card = makeCard('wx1', '无懈可击', '♣', 'K');
 
     const state: GameState = createGameState({
       players: [
@@ -305,7 +305,7 @@ describe('五谷丰登', () => {
         makePlayer({ index: 1, name: 'P2', hand: ['wx1'], skills: ['五谷丰登', '无懈可击'] }),
         makePlayer({ index: 2, name: 'P3', hand: [], skills: ['五谷丰登', '无懈可击'] }),
       ],
-      cardMap: { wg1: wugu, pa: cards[0], pb: cards[1], pc: cards[2], wx1: wuxie },
+      cardMap: { wg1: wugu, pa: cards[0], pb: cards[1], pc: cards[2], wx1: nullif },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

@@ -6,12 +6,12 @@
 //   延时锦囊(乐/兵粮/闪电)在判定前抵消整个延时锦囊。
 //
 // 流程(close-reopen):
-//   锦囊 execute → askWuxie(state, wuxieTarget) → 循环检测 localVars[`无懈/被抵消/${wuxieTarget}`]
+//   锦囊 execute → 询问无懈可击(state, cancelTarget) → 循环检测 localVars[`无懈/被抵消/${cancelTarget}`]
 //     - 无人打 → 超时 → break → 被抵消=false → 对该目标生效
 //     - 有人打 → 无懈 respond execute:
-//         移牌 → 翻转 localVars[`无懈/被抵消/${wuxieTarget}`]
-//         → 设置 localVars[`无懈/已回应/${wuxieTarget}`]=true
-//       slot 正常 resolve → askWuxie 检测 responded=true → 创建新窗口
+//         移牌 → 翻转 localVars[`无懈/被抵消/${cancelTarget}`]
+//         → 设置 localVars[`无懈/已回应/${cancelTarget}`]=true
+//       slot 正常 resolve → 询问无懈可击 检测 responded=true → 创建新窗口
 //       新窗口有新 createdSeq,旧窗口过期 respond 被 pending-scoped 校验拒绝。
 //       奇数次无懈 = 被抵消, 偶数次 = 恢复生效。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
@@ -58,22 +58,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
         to: { zone: '弃牌堆' },
       });
 
-      // 确定本次抵消的目标:从当前 broadcast slot 的 atom.wuxieTarget 读取。
-      // - 全体锦囊:wuxieTarget = 某个具体目标座次 N
-      // - 单目标/延时锦囊:wuxieTarget = 该锦囊的目标座次
-      // 找不到 wuxieTarget 时(旧调用路径)退化为整体抵消 key='_all'
+      // 确定本次抵消的目标:从当前 broadcast slot 的 atom.cancelTarget 读取。
+      // - 全体锦囊:cancelTarget = 某个具体目标座次 N
+      // - 单目标/延时锦囊:cancelTarget = 该锦囊的目标座次
+      // 找不到 cancelTarget 时(旧调用路径)退化为整体抵消 key='_all'
       const slot = findPendingSlot(state, ownerId);
-      const wuxieAtom = slot?.atom as { wuxieTarget?: number } | undefined;
-      const wuxieTarget = typeof wuxieAtom?.wuxieTarget === 'number' ? wuxieAtom.wuxieTarget : -1;
-      const cancelKey = `无懈/被抵消/${wuxieTarget}`;
+      const cancelAtom = slot?.atom as { cancelTarget?: number } | undefined;
+      const cancelTarget = typeof cancelAtom?.cancelTarget === 'number' ? cancelAtom.cancelTarget : -1;
+      const cancelKey = `无懈/被抵消/${cancelTarget}`;
 
-      // 翻转抵消状态:打出一张无懈 = 翻转当前锦囊对 wuxieTarget 是否被抵消
+      // 翻转抵消状态:打出一张无懈 = 翻转当前锦囊对 cancelTarget 是否被抵消
       const cancelled = state.localVars[cancelKey] as boolean | undefined;
       state.localVars[cancelKey] = !cancelled;
 
-      // 标记本次窗口有人 respond，askWuxie 循环据此决定是否开新窗口。
-      // close-reopen:slot 不再 resume，正常 resolve → askWuxie 创建新窗口(新 createdSeq)。
-      state.localVars[`无懈/已回应/${wuxieTarget}`] = true;
+      // 标记本次窗口有人 respond，询问无懈可击 循环据此决定是否开新窗口。
+      // close-reopen:slot 不再 resume，正常 resolve → 询问无懈可击 创建新窗口(新 createdSeq)。
+      state.localVars[`无懈/已回应/${cancelTarget}`] = true;
     },
   );
   return () => {};

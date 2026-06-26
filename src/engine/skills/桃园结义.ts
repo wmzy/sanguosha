@@ -2,7 +2,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
-import { askWuxie } from '../wuxie';
+import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '桃园结义', description: '锦囊:所有角色各回复1点体力' };
@@ -27,7 +27,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (!p?.alive) continue;
           // 满血目标:桃园结义对其无效果(无可抵消的效果),不询问无懈可击也不回血。
           if (p.health >= p.maxHealth) continue;
-          const cancelled = await askWuxie(state, t);
+          const cancelled = await 询问无懈可击(state, t);
           if (cancelled) continue;
           await applyAtom(state, { type: '回复体力', target: t, amount: 1 });
         }

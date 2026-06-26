@@ -2,7 +2,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
-import { askWuxie } from '../wuxie';
+import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '无中生有', description: '锦囊:摸两张牌' };
@@ -18,9 +18,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await pushFrame(state, '无中生有', from, { ...params });
       const cardId = params.cardId as string;
       await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
-      // 询问无懈可击(close-reopen:askWuxie 循环管理窗口)
+      // 询问无懈可击(close-reopen:询问无懈可击 循环管理窗口)
       try {
-        const cancelled = await askWuxie(state, from);
+        const cancelled = await 询问无懈可击(state, from);
         if (!cancelled) {
           await applyAtom(state, { type: '摸牌', player: from, count: 2 });
         }

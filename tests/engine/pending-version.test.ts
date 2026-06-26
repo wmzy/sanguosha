@@ -105,12 +105,12 @@ describe('pending-scoped 版本控制', () => {
     await registerSkillsFromState(state);
 
     // 给双方各一张无懈可击
-    const wuxie0Id = 'wx0';
-    const wuxie1Id = 'wx1';
-    state.cardMap[wuxie0Id] = { id: wuxie0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.cardMap[wuxie1Id] = { id: wuxie1Id, name: '无懈可击', suit: '♠', rank: 'K', type: '锦囊牌' };
-    state.players[0].hand.push(wuxie0Id);
-    state.players[1].hand.push(wuxie1Id);
+    const nullif0Id = 'wx0';
+    const nullif1Id = 'wx1';
+    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', rank: 'K', type: '锦囊牌' };
+    state.players[0].hand.push(nullif0Id);
+    state.players[1].hand.push(nullif1Id);
 
     // P0 出过河拆桥 → 无懈窗口 W1
     const gqId = 'gq1';
@@ -130,7 +130,7 @@ describe('pending-scoped 版本控制', () => {
     // P1 出无懈可击 → W1 close, W2 open
     await dispatchAndWait(state, {
       skillId: '无懈可击', actionType: 'respond', ownerId: 1,
-      params: { cardId: wuxie1Id }, baseSeq: state.seq,
+      params: { cardId: nullif1Id }, baseSeq: state.seq,
     });
 
     // W2 创建完成，createdSeq != W1
@@ -141,14 +141,14 @@ describe('pending-scoped 版本控制', () => {
     // P0 用 W1 的旧 pendingSeq 尝试 respond → 被拒绝
     const rejected = await dispatch(state, {
       skillId: '无懈可击', actionType: 'respond', ownerId: 0,
-      params: { cardId: wuxie0Id }, baseSeq: state.seq, pendingSeq: w1Seq,
+      params: { cardId: nullif0Id }, baseSeq: state.seq, pendingSeq: w1Seq,
     });
     expect(rejected).toBe(false);
 
     // P0 用 W2 的正确 pendingSeq respond → 成功
     const accepted = await dispatch(state, {
       skillId: '无懈可击', actionType: 'respond', ownerId: 0,
-      params: { cardId: wuxie0Id }, baseSeq: state.seq, pendingSeq: w2.createdSeq,
+      params: { cardId: nullif0Id }, baseSeq: state.seq, pendingSeq: w2.createdSeq,
     });
     expect(accepted).toBe(true);
 

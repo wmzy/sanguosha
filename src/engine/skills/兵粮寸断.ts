@@ -15,7 +15,7 @@ import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill'
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
-import { askWuxie } from '../wuxie';
+import { 询问无懈可击 } from '../无懈可击';
 
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';
@@ -82,7 +82,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问;抵消整个延时锦囊)
     try {
-      const cancelled = await askWuxie(ctx.state, ownerId);
+      const cancelled = await 询问无懈可击(ctx.state, ownerId);
       if (cancelled) {
         // 被无懈抵消:移除延时锦囊,跳过判定
         await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '兵粮寸断' });
@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '兵粮寸断' });
     } finally {
-      // askWuxie 内部已清理 localVars
+      // 询问无懈可击 内部已清理 localVars
     }
   });
 

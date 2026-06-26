@@ -269,7 +269,7 @@ describe('闪电', () => {
     // 判定牌为黑桃5(命中)——若未被无懈抵消将造成 3 点伤害
     const judgeCard = makeCard('j1', '判定牌', '♠', '5');
     // P1 持有一张无懈可击
-    const wuxieCard = makeCard('wx1', '无懈可击', '♠', 'J');
+    const nullifCard = makeCard('wx1', '无懈可击', '♠', 'J');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -281,7 +281,7 @@ describe('闪电', () => {
         }),
         makePlayer({ index: 1, name: 'P2', hand: ['wx1'], skills: ['无懈可击', '闪电', '回合管理'], health: 4 }),
       ],
-      cardMap: { sd1: card, j1: judgeCard, wx1: wuxieCard },
+      cardMap: { sd1: card, j1: judgeCard, wx1: nullifCard },
       currentPlayerIndex: 0,
       phase: '判定',
       turn: { round: 1, phase: '判定', vars: {} },
