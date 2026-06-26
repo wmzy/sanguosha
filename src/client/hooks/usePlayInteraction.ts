@@ -175,10 +175,16 @@ export function usePlayInteraction(
   const selectedCard = selectedCardId ? perspectiveHand.find(c => c.id === selectedCardId) ?? null : null;
 
   const selectedUseAction = (() => {
-    if (!selectedCard) return undefined;
     if (transformMode) {
+      // 多卡转化(丈八蛇矛):selectedCardId 为 null,直接用包装牌的 use action
+      if (transformMode.minCards > 1) {
+        return skillActions.find(a => a.actionType === 'use' && a.skillId === transformMode.wrapperName);
+      }
+      // 单卡转化(武圣):需选中一张卡
+      if (!selectedCard) return undefined;
       return skillActions.find(a => a.actionType === 'use' && a.skillId === transformMode.wrapperName);
     }
+    if (!selectedCard) return undefined;
     return findUseActionForCard(skillActions, selectedCard);
   })();
   const selectedTargetFilter = selectedUseAction?.prompt.type === 'useCardAndTarget'

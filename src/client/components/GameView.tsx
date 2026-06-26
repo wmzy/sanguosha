@@ -339,9 +339,13 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
               const respondFilter = pendingRespondInfo?.cardFilter;
               const isAwaiting = !isDistributeActive && isMyAwaiting && !!respondFilter?.(card);
               const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
-              const isTransformMatch = transformMode !== null && transformMode.cardFilter(card);
+              const isTransformCandidate = transformMode !== null && transformMode.cardFilter(card);
               const isTransformActive = transformMode !== null && isMyTurn && canOperate;
-              const isTransformDisabled = isTransformActive && !isTransformMatch;
+              // 显示转化后牌名:单卡转化(武圣)= 所有候选牌;多卡转化(丈八蛇矛)= 仅已选中牌
+              const isTransformMatch = isTransformCandidate
+                && (transformMode?.minCards === 1 || !!transformMode?.selectedCardIds.includes(card.id));
+              // 置灰/不可点:转化激活但非候选牌(丈八蛇矛任意牌都是候选,故不置灰)
+              const isTransformDisabled = isTransformActive && !isTransformCandidate;
               // distribute(仁德/制衡/遗计):候选/选中/已分配
               const distCandidateIds = activeDistribute ? new Set(activeDistribute.cardIds) : null;
               const isDistCandidate = isDistributeActive && !!distCandidateIds?.has(card.id);
