@@ -2,10 +2,11 @@
 // 实现:在 询问闪 before hook 中
 //   1. 先 请求回应 询问是否发动(requestType=八卦阵/confirm)
 //   2. 玩家选发动 → applyAtom(判定) → 判定牌进弃牌堆,读花色
-//   3. 红色 → 往处理区放入一张虚拟闪牌,杀检查处理区发现闪就视为闪避
-//   4. 玩家选不发动 / 超时 → 直接进入正常询问闪
+//   3. 红色 → 往处理区放入一张虚拟闪牌,再 cancel 主 询问闪 atom
+//      (判定红色即视为出闪,不再询问目标出闪;与仁王盾统一模式)
+//   4. 黑色 / 玩家选不发动 / 超时 → 不 cancel,直接进入正常询问闪
 // 杀不需要知道八卦阵——只看处理区有没有闪牌。
-import type { AtomBeforeContext, Card, FrontendAPI, GameState, Skill } from '../types';
+import type { AtomBeforeContext, Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -33,7 +34,7 @@ export function onInit(skill: Skill, _state: GameState): () => void {
     },
   );
 
-  registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
     if ((ctx.atom as { target?: number }).target !== ownerId) return;
     if (ctx.state.zones.deck.length === 0) return;
 
@@ -60,6 +61,8 @@ export function onInit(skill: Skill, _state: GameState): () => void {
     if (!judgeCard) return;
 
     // 红色:往处理区放虚拟闪牌(通过移动牌 atom 产生 ViewEvent,保持 processedView 同步)
+    // 然后 cancel 主 询问闪 atom —— 判定红色即视为出闪,不再询问目标出闪。
+    // 与仁王盾统一模式:杀只看处理区有无闪牌,不感知防具。
     if (judgeCard.suit === '♥' || judgeCard.suit === '♦') {
       const dodgeId = `八卦阵:${ownerId}:${judgeCardId}`;
       const virtualDodge: Card = {
@@ -76,6 +79,7 @@ export function onInit(skill: Skill, _state: GameState): () => void {
         from: { zone: '处理区' },
         to: { zone: '处理区' },
       });
+      return { kind: 'cancel' };
     }
   });
   return () => {};

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-06-26
+
+### Fixed — 八卦阵判定红色后仍询问目标出闪
+
+八卦阵(防具)原实现:判定翻开红色牌后,只往处理区放一张虚拟闪牌,但 before hook 返回 `void`(= pass),导致主 `询问闪` atom 仍然执行——目标玩家再次被弹出「是否出闪」的询问。按三国杀规则,八卦阵判定红色即视为出闪,**不应再给目标出真闪的机会**。根本原因:遗漏了与仁王盾一致的 cancel 语义——仁王盾同样往处理区放虚拟闪后 `return { kind: 'cancel' }` 终止主 atom,八卦阵漏了这步。
+
+- **判定红色后 cancel 主 询问闪 atom**: `询问闪` before hook 中,判定牌花色为 ♥/♦ 时,放虚拟闪进处理区后增加 `return { kind: 'cancel' }`,终止主 `询问闪` atom。杀.execute 仍只检查处理区有无闪牌(零感知防具),虚拟闪使其判定为已闪避。(`src/engine/skills/八卦阵.ts`)
+- **hook 返回类型修正**: `registerBeforeHook` handler 显式标注 `Promise<HookResult | void>`,与仁王盾一致。(`src/engine/skills/八卦阵.ts`)
+- **测试更新**: 原有「判定红色」用例补 `expectNoPending()` 断言暴露 bug;原「判定成功 + P1 出真闪」用例验证的是错误行为(判定红色后仍弹出询问闪),按规则重写为「判定红色 + 手中有真闪时不再被询问、真闪留在手里」。(`tests/skill-tests/八卦阵.test.ts`)
+
 ## [Unreleased] — 2026-06-25
 
 ### Fixed — 青龙偃月刀追杀未消耗杀牌(凭空杀人)

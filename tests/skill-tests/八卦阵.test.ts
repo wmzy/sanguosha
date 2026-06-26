@@ -132,6 +132,8 @@ describe('八卦阵', () => {
     expect(harness.state.players[0].health).toBe(4);
     // 判定牌已进弃牌堆
     expect(harness.state.zones.discardPile).toContain('j1');
+    // 关键:判定红色已视为出闪,不应再询问目标出闪(无 pending)
+    P1.expectNoPending();
     // view 级断言:health 通过 applyView 同步
     P1.processEvents();
     P1.expectView(v => expect(v.players[0].health).toBe(4));
@@ -234,9 +236,9 @@ describe('八卦阵', () => {
 
   });
 
-  // ─── 正面:P1 有真闪 → 出真闪 → 正常闪避,八卦阵判定仍生效 ────────────
+  // ─── 正面:判定红色 + P1 手里有真闪 → 不再询问出闪,真闪留在手里 ────────────
 
-  it('判定成功 + P1 出真闪:P1 仍正常闪避(虚拟闪不入正库)', async () => {
+  it('判定成功(红色)+ P1 有真闪:P1 不被询问出闪,真闪留在手里(虚拟闪抵消杀)', async () => {
     const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
     const slash = makeCard('s1', '杀', '♠', 'A');
     const dodge = makeCard('d1', '闪', '♥', '2');
@@ -256,26 +258,22 @@ describe('八卦阵', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    // P2 出杀对 P1
+    // P2 出杀对 P1 → P1 发动八卦阵 → 判定红色 → 视为出闪
     await P2.useCardAndTarget('杀', 's1', [0]);
-    // 先被询问是否发动八卦阵 → P1 发动 → 判定红色(虚拟闪进处理区)
     P1.expectPending('请求回应');
     await P1.respond('八卦阵', { choice: true });
-    // 现在 pending 是 询问闪(P1 出闪),respondableCards 应该返回 [d1]
-    const info = P1.respondInfo();
-    expect(info?.skillId).toBe('闪');
-    const cards = P1.respondableCards();
-    expect(cards).toHaveLength(1);
-    expect(cards[0].id).toBe('d1');
 
-    // P1 出真闪 → 闪避成功,不扣血
-    await P1.respond('闪', { cardId: 'd1' });
+    // 判定红色已视为出闪:不应再出现 询问闪 pending
+    P1.expectNoPending();
+    // P1 不扣血
     expect(harness.state.players[0].health).toBe(4);
-    // 闪牌进弃牌堆(注意:八卦阵也放了虚拟闪,但被杀结算时 drain 闪牌区会一起移走)
-    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['d1']));
+    // 真闪 d1 仍在 P1 手里(未被消耗)
+    expect(harness.state.players[0].hand).toContain('d1');
     // 判定牌 j1 进弃牌堆
     expect(harness.state.zones.discardPile).toContain('j1');
-
+    // view 级断言:health 通过 applyView 同步
+    P1.processEvents();
+    P1.expectView(v => expect(v.players[0].health).toBe(4));
   });
 
   // ─── 负面:非自己回合装八卦阵 → 拒绝 ────────────
