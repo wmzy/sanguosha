@@ -21,8 +21,6 @@ export interface PlayPhasePromptProps {
   discardMin: number;
   discardMax: number;
   selectedForDiscard: Set<string>;
-  onClearDiscard: () => void;
-  onConfirmDiscard: () => void;
 }
 
 export function PlayPhasePrompt(props: PlayPhasePromptProps) {
@@ -42,8 +40,6 @@ export function PlayPhasePrompt(props: PlayPhasePromptProps) {
     discardMin,
     discardMax,
     selectedForDiscard,
-    onClearDiscard,
-    onConfirmDiscard,
   } = props;
 
   return (
@@ -90,22 +86,6 @@ export function PlayPhasePrompt(props: PlayPhasePromptProps) {
                 : `请选择 ${discardMin}–${discardMax} 张手牌弃置`
               : `等待 ${perspectiveName} 弃牌...`}
           </div>
-          {canOperate && (
-            <div className={styles.promptActions}>
-              <button
-                className={styles.promptBtnPrimary}
-                disabled={selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax}
-                onClick={onConfirmDiscard}
-              >
-                确认弃牌 ({selectedForDiscard.size}/{discardMin})
-              </button>
-              {selectedForDiscard.size > 0 && (
-                <button className={styles.promptBtn} onClick={onClearDiscard}>
-                  清空选择
-                </button>
-              )}
-            </div>
-          )}
         </div>
       )}
     </>

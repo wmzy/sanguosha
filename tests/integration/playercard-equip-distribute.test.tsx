@@ -1,8 +1,8 @@
-// 前端组件测试:PlayerCardLarge 装备区在 distribute(制衡)激活时可点击选牌。
+// 前端组件测试:EquipColumn 装备区在 distribute(制衡)激活时可点击选牌。
 //
-// 背景:此前装备区渲染为纯展示 <span>,distribute 激活时虽把装备列入候选集
+// 背景:此前装备区渲染为纯展示文本,distribute 激活时虽把装备列入候选集
 // (resolveDistributeCardIds source='handAndEquip'),但 UI 无法点击 → 制衡无法选装备。
-// 本测试只验证组件渲染契约:
+// 装备区已从 PlayerCardLarge 抽出为独立的纵向 EquipColumn 组件,本测试验证其渲染契约:
 //   1. distribute 未激活:装备是普通文本(不可点)
 //   2. distribute 激活 + 装备是候选:装备渲染为 button
 //   3. 点击候选装备 → 进入选中态(class 变化);再点 → 回退
@@ -11,7 +11,7 @@
 // 技能语义(弃装备摸等量、限一次等)由 tests/skill-tests/制衡.test.ts 覆盖,此处不重复。
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { PlayerCardLarge } from '../../src/client/components/PlayerCardLarge';
+import { EquipColumn } from '../../src/client/components/EquipColumn';
 import * as styles from '../../src/client/components/gameViewStyles';
 import type { GameView } from '../../src/engine/types';
 
@@ -38,27 +38,27 @@ function makeView(equipment: Record<string, string>): GameView {
   };
 }
 
-describe('PlayerCardLarge:装备区 distribute 选牌', () => {
-  it('distribute 未激活:装备渲染为不可点的 span', () => {
+describe('EquipColumn:装备区 distribute 选牌', () => {
+  it('distribute 未激活:装备渲染为不可点的文本', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <PlayerCardLarge
-        perspectiveIdx={0} viewer={0} view={view}
-        damageFlashIndices={new Map()} canOperate skillActions={[]}
-        isPerspectiveTurn onSkillAction={() => {}}
+      <EquipColumn
+        perspectiveIdx={0} view={view}
+        canOperate skillActions={[]} onSkillAction={() => {}}
       />,
     );
     const node = screen.getByText(/诸葛连弩/);
+    // 非候选装备渲染为 equipColumnItem 内的文本 span,不可点击
     expect(node.tagName).toBe('SPAN');
+    expect(node.closest('button')).toBeNull();
   });
 
   it('distribute 激活 + 装备是候选:装备渲染为 button', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <PlayerCardLarge
-        perspectiveIdx={0} viewer={0} view={view}
-        damageFlashIndices={new Map()} canOperate skillActions={[]}
-        isPerspectiveTurn onSkillAction={() => {}}
+      <EquipColumn
+        perspectiveIdx={0} view={view}
+        canOperate skillActions={[]} onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set(['wp1'])}
         distSelectedEquipIds={new Set()}
@@ -74,10 +74,9 @@ describe('PlayerCardLarge:装备区 distribute 选牌', () => {
   it('装备被选中:带 equipDistSelected 样式', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <PlayerCardLarge
-        perspectiveIdx={0} viewer={0} view={view}
-        damageFlashIndices={new Map()} canOperate skillActions={[]}
-        isPerspectiveTurn onSkillAction={() => {}}
+      <EquipColumn
+        perspectiveIdx={0} view={view}
+        canOperate skillActions={[]} onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set(['wp1'])}
         distSelectedEquipIds={new Set(['wp1'])}
@@ -92,10 +91,9 @@ describe('PlayerCardLarge:装备区 distribute 选牌', () => {
     const view = makeView({ 武器: 'wp1' });
     const clicked: string[] = [];
     render(
-      <PlayerCardLarge
-        perspectiveIdx={0} viewer={0} view={view}
-        damageFlashIndices={new Map()} canOperate skillActions={[]}
-        isPerspectiveTurn onSkillAction={() => {}}
+      <EquipColumn
+        perspectiveIdx={0} view={view}
+        canOperate skillActions={[]} onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set(['wp1'])}
         distSelectedEquipIds={new Set()}
@@ -106,19 +104,18 @@ describe('PlayerCardLarge:装备区 distribute 选牌', () => {
     expect(clicked).toEqual(['wp1']);
   });
 
-  it('distribute 激活但装备非候选:仍渲染为 span(不可点)', () => {
+  it('distribute 激活但装备非候选:仍渲染为文本(不可点)', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <PlayerCardLarge
-        perspectiveIdx={0} viewer={0} view={view}
-        damageFlashIndices={new Map()} canOperate skillActions={[]}
-        isPerspectiveTurn onSkillAction={() => {}}
+      <EquipColumn
+        perspectiveIdx={0} view={view}
+        canOperate skillActions={[]} onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set()} // 候选集为空 → 该装备非候选
         distSelectedEquipIds={new Set()}
         onEquipCardClick={() => {}}
       />,
     );
-    expect(screen.getByText(/诸葛连弩/).tagName).toBe('SPAN');
+    expect(screen.getByText(/诸葛连弩/).closest('button')).toBeNull();
   });
 });

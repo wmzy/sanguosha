@@ -840,8 +840,9 @@ export const equipDistBtn = css`
   cursor: pointer;
   background: rgba(241, 196, 15, 0.12);
   color: #f1c40f;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: bold;
+  text-align: left;
   box-shadow: 0 0 8px rgba(241, 196, 15, 0.35);
   &:hover {
     background: rgba(241, 196, 15, 0.22);
@@ -855,8 +856,59 @@ export const equipDistSelected = css`
   box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
 `;
 
+// ─── 装备区纵向列(最左侧) ───
+export const equipColumn = css`
+  flex: 0 0 168px;
+  border: 1px solid #444;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  align-self: stretch;
+  @media (max-width: 900px) {
+    flex: 1 1 auto;
+  }
+`;
+export const equipColumnTitle = css`
+  font-size: 11px;
+  color: #f39c12;
+  font-weight: bold;
+  padding: 8px 12px 6px;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(243, 156, 18, 0.15);
+`;
+export const equipColumnList = css`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+`;
+export const equipColumnItem = css`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #f39c12;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(243, 156, 18, 0.06);
+  border: 1px solid rgba(243, 156, 18, 0.15);
+`;
+export const equipColumnIcon = css`
+  font-size: 14px;
+  flex-shrink: 0;
+`;
+export const equipColumnEmpty = css`
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  padding: 12px 0;
+`;
+
 // ─── 下方主布局 ───
-// 左:角色大卡 (320px) 右:手牌列 (flex 1)
+// 左:装备区纵向列 / 中:手牌列 (flex 1) / 右:角色大卡 (320px)
 export const bottomLayout = css`
   display: flex;
   gap: 12px;
@@ -875,9 +927,9 @@ export const handColumn = css`
   gap: 8px;
 `;
 
-// ─── 角色大卡 (左侧) ───
+// ─── 角色大卡 (右侧) ───
 export const playerCardLarge = css`
-  flex: 0 0 320px;
+  flex: 0 0 300px;
   border: 1px solid #444;
   border-radius: 12px;
   overflow: hidden;
@@ -888,6 +940,14 @@ export const playerCardLarge = css`
   @media (max-width: 900px) {
     flex: 1 1 auto;
   }
+`;
+// 自己处于回合时:金色高亮边框(谁的回合一目了然)
+export const playerCardTurn = css`
+  box-shadow:
+    0 0 20px rgba(255, 215, 0, 0.45),
+    inset 0 0 8px rgba(255, 215, 0, 0.08);
+  outline: 2px solid #ffd700;
+  outline-offset: -2px;
 `;
 export const playerCardHeader = css`
   padding: 10px 14px;

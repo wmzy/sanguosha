@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Changed — 对局界面布局优化:装备区纵向列、武将卡片右置
+
+优化对局下方主区域布局与出牌提示信息呈现,使装备/武将/手牌分区更清晰,回合归属与等待状态更直观。
+
+#### Changed
+- **装备区独立成列(最左侧,纵向)**:装备区从 `PlayerCardLarge` 抽出为独立的纵向 `EquipColumn` 组件,置于布局最左侧纵向排列装备槽位;武将卡片(`playerCardLarge`)移至最右侧。下方主区域由「左武将/右手牌」两栏改为「左装备/中手牌/右武将」三栏。(`src/client/components/EquipColumn.tsx` 新增,`GameView.tsx`、`PlayerCardLarge.tsx`)
+- **回合武将卡片高亮边框**:当前回合玩家的武将卡片显示金色 `outline` + 发光(`playerCardTurn`),谁的回合一目了然。(`gameViewStyles.ts`、`GameView.tsx`)
+- **弃牌按钮移入操作栏**:弃牌阶段的「确认弃牌」「清空选择」按钮从 `PlayPhasePrompt` 提示框移至 `actionBar`,与「结束回合」并排放置。(`PlayPhasePrompt.tsx`、`GameView.tsx`)
+- **进度条仅等待时显示**:自己武将的倒计时进度条(`CountdownBar`)由常驻改为仅当自己处于等待回应(`isPerspectiveAwaiting`)时显示,避免出牌阶段无关进度条干扰。(`GameView.tsx`)
+- **装备区分发测试适配**:装备区分发选牌测试由 `PlayerCardLarge` 适配为 `EquipColumn`。(`tests/integration/playercard-equip-distribute.test.tsx`)
+
 ### Refactored — 主题和组件样式从 CSSProperties 迁移至 Linaria
 
 所有客户端组件从 `CSSProperties` 对象内联样式迁移到 Linaria `css` 标记模板,实现零运行时 CSS-in-JS。

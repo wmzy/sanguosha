@@ -35,6 +35,7 @@ import { ZoneInfoBar } from './ZoneInfoBar';
 import { HandCard } from './HandCard';
 import { DistributeUI } from './DistributeUI';
 import { CancelButton } from './CancelButton';
+import { EquipColumn } from './EquipColumn';
 
 // ─── 抽取的 hooks ───
 import { useAnimationState } from '../hooks/useAnimationState';
@@ -191,25 +192,21 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
 
       {/* ─── 下方主区域:左 角色大卡 / 右 手牌+操作 ─── */}
       <div className={styles.bottomLayout}>
-        <div className={styles.playerCardLarge}>
-          <PlayerCardLarge
-            perspectiveIdx={perspectiveIdx}
-            viewer={view.viewer}
-            view={view}
-            damageFlashIndices={anim.damageFlashIndices}
-            canOperate={canOperate}
-            isPerspectiveTurn={isPerspectiveTurn}
-            skillActions={skillActions}
-            onSkillAction={handleSkillAction}
-            distCandidateEquipIds={activeDistribute ? new Set(activeDistribute.cardIds) : null}
-            distSelectedEquipIds={distSelected}
-            isDistributeActive={isDistributeActive}
-            onEquipCardClick={(cardId) => {
-              const card = view.cardMap[cardId];
-              if (card) handleCardClick(card);
-            }}
-          />
-        </div>
+        {/* ─── 左:装备区纵向列 ─── */}
+        <EquipColumn
+          perspectiveIdx={perspectiveIdx}
+          view={view}
+          canOperate={canOperate}
+          skillActions={skillActions}
+          onSkillAction={handleSkillAction}
+          distCandidateEquipIds={activeDistribute ? new Set(activeDistribute.cardIds) : null}
+          distSelectedEquipIds={distSelected}
+          isDistributeActive={isDistributeActive}
+          onEquipCardClick={(cardId) => {
+            const card = view.cardMap[cardId];
+            if (card) handleCardClick(card);
+          }}
+        />
 
         <div className={styles.handColumn}>
           {/* ─── 待回应区(pending 回应,非弃牌/非选将/非 distribute)─── */}
@@ -247,8 +244,6 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
             discardMin={discardMin}
             discardMax={discardMax}
             selectedForDiscard={selectedForDiscard}
-            onClearDiscard={clearDiscard}
-            onConfirmDiscard={handleConfirmDiscard}
           />
           {/* ─── 统一分配面板(仁德/制衡主动技 + 遗计被动 pending)─── */}
           {/* 选牌已下沉到手牌区,这里只显示提示文案 + 目标分配 + 提交 */}
@@ -277,7 +272,10 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
               )}
             </div>
           )}
-          <CountdownBar deadline={deadline} totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS} />
+          {/* 自己的进度条:仅当自己处于等待回应时才显示 */}
+          {isPerspectiveAwaiting && (
+            <CountdownBar deadline={deadline} totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS} />
+          )}
           {/* 转化模式提示 + 取消选择 */}
           <div className={styles.handHeader}>
             <span className={styles.handTitle}>
@@ -318,6 +316,26 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
             )}
             {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
               <button className={styles.endTurnBtn} onClick={handleEndTurn}>结束回合</button>
+            )}
+            {/* 弃牌阶段:确认弃牌 / 清空选择(与结束回合并排) */}
+            {canOperate && isDiscardPhase && isPerspectiveAwaiting && (
+              <>
+                <button
+                  className={cx(
+                    styles.promptBtnPrimary,
+                    (selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax) && styles.btnDisabled,
+                  )}
+                  disabled={selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax}
+                  onClick={handleConfirmDiscard}
+                >
+                  确认弃牌 ({selectedForDiscard.size}/{discardMin})
+                </button>
+                {selectedForDiscard.size > 0 && (
+                  <button className={styles.promptBtn} onClick={clearDiscard}>
+                    清空选择
+                  </button>
+                )}
+              </>
             )}
             {selectedCardId && selectedTarget && canOperate && isMyTurn && (
               <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
@@ -399,6 +417,20 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
             })}
             {perspectiveHand.length === 0 && <div className={styles.emptyHand}>无手牌</div>}
           </div>
+        </div>
+
+        {/* ─── 右:自己的武将卡片(回合金色高亮边框) ─── */}
+        <div className={cx(styles.playerCardLarge, isPerspectiveTurn && styles.playerCardTurn)}>
+          <PlayerCardLarge
+            perspectiveIdx={perspectiveIdx}
+            viewer={view.viewer}
+            view={view}
+            damageFlashIndices={anim.damageFlashIndices}
+            canOperate={canOperate}
+            isPerspectiveTurn={isPerspectiveTurn}
+            skillActions={skillActions}
+            onSkillAction={handleSkillAction}
+          />
         </div>
       </div>
 
