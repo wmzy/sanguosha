@@ -252,6 +252,32 @@ export class GameSession {
     this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
   }
 
+  /** 游戏结束后重置房间到「配置+准备」阶段,供「再来一局」复用同一 session。
+   *  清除 gameOverHandled/state/广播水位,房间状态回到「等待中」,清空准备记录。
+   *  广播 game_reset 通知客户端清除 gameOver/gameStarted/views,回到配置面板。
+   *  app 层随后调用 broadcastRoomState 同步准备状态。 */
+  resetToLobby(): void {
+    this.gameOverHandled = false;
+    // 断开旧 state 回调并丢弃,防止残留 execute resume 后触发已重置 session 的广播
+    if (this.state) this.state.onStateChange = undefined;
+    this.state = null;
+    this.actionLog = [];
+    this.baselineSent.clear();
+    this.lastSentDeadline.clear();
+    this.lastBroadcastSeq = 0;
+    // 重新生成 seed,新一局随机序列不同
+    this.sessionSeed = Date.now();
+    setRoomStatus(this.room.id, '等待中');
+    this.room.readyPlayers.clear();
+    // 清除旧持久化数据,避免重启时恢复到已结束的局面
+    void deletePersistedRoom(this.room.id).catch(err => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('resetToLobby: deletePersistedRoom failed', { error: e.stack ?? String(e) });
+    });
+    // 通知所有连接:游戏已重置,客户端清除 gameOver/gameStarted/views
+    this.broadcast({ type: 'game_reset' });
+  }
+
   /**
    * 挂载 state.onStateChange 回调:每次 applyAtom 结束后同步 broadcastNewState +
    * persistAsync + checkGameOver。dispatch fire-and-forget 模型下,所有 session

@@ -145,12 +145,22 @@ function logAction(state: GameState, message: ClientMessage): void {
 // ==================== 公开 API ====================
 
 /** 检查游戏是否结束。纯函数,基于 state 计算。
- *  结束条件:存活 ≤ 1 人,或主公死亡。 */
+ *  结束条件:存活 ≤ 1 人,或主公死亡。
+ *  胜方判定:winner 为某阵营代表座次,前端按其 identity 推导获胜阵营文案。
+ *  - 主公阵亡:反贼仍存活 → 反贼胜;反贼全灭且内奸存活(内奸清场单挑残局)→ 内奸胜;
+ *    极端(反贼/内奸均无存活)→ 仍判反贼胜。
+ *  - 仅剩一人存活:winner=存活者(主公→主公方,反贼→反贼,内奸→内奸)。 */
 export function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
   // 主公死亡 → 游戏立即结束
   const lord = state.players.find(p => p.identity === '主公');
   if (lord && !lord.alive) {
-    return { gameOver: true, winner: undefined };
+    const aliveRebel = state.players.find(p => p.alive && p.identity === '反贼');
+    if (aliveRebel) return { gameOver: true, winner: aliveRebel.index };
+    const aliveRenegade = state.players.find(p => p.alive && p.identity === '内奸');
+    if (aliveRenegade) return { gameOver: true, winner: aliveRenegade.index };
+    // 极端(反贼/内奸均无存活,如闪电连劈)→ 仍判反贼获胜,取任一反贼座次作阵营代表
+    const anyRebel = state.players.find(p => p.identity === '反贼');
+    return { gameOver: true, winner: anyRebel?.index };
   }
   const aliveCount = state.players.filter((p) => p.alive).length;
   if (aliveCount <= 1) {

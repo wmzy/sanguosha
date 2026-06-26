@@ -75,6 +75,7 @@ export type ServerMessage =
   | { type: 'error'; message: string }
   | { type: 'actionRejected' }
   | { type: 'gameOver'; winner: string }
+  | { type: 'game_reset' }
   | { type: 'room_joined'; roomId: string; playerId: string; seatIndex?: number }
   | { type: 'player_joined'; playerId: string }
   | { type: 'player_left'; playerId: string }
@@ -98,6 +99,7 @@ export type ClientMessage =
   | { type: 'create_room'; name: string; maxPlayers: number; config?: RoomConfig }
   | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
   | { type: 'start_game' }
+  | { type: 'restart_game' }
   | { type: 'leave_room' }
   | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq }
   | { type: 'create_debug_room'; config?: RoomConfig; playerCount?: number }
@@ -126,6 +128,7 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
     }
     case 'ready':
     case 'start_game':
+    case 'restart_game':
     case 'leave_room':
       return true;
     case 'join_room':

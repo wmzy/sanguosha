@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Fixed — 主公阵亡显示"无人获胜"而非反贼获胜
+
+主公阵亡时 `checkGameOver` 返回 `winner: undefined`,session 据此广播 `winner: '无人'`,结算界面显示"无人获胜"。按三国杀规则主公阵亡应由反贼获胜(内奸清场单挑残局除外)。根因:胜负判定函数未区分主公阵亡时的阵营归属。
+
+#### Fixed
+- **主公阵亡胜负判定**:`checkGameOver` 主公阵亡分支改为按存活阵营判定胜方——反贼仍存活→反贼获胜;反贼全灭且内奸存活(内奸清场残局)→内奸获胜;极端(反贼/内奸均无存活)→仍判反贼获胜。`winner` 返回对应阵营代表座次,前端 `winningCamp` 据其 identity 推导阵营文案。(`src/engine/create-engine.ts`)
+
+### Added — 游戏结束后"再来一局"重新进入准备阶段
+
+游戏结束结算界面此前仅有"返回大厅"(删除房间)。现新增"再来一局":复用同一 session 重置房间到「配置+准备」阶段,玩家重新准备后即可开始新一局,无需重建房间。
+
+#### Added
+- **协议扩展**:新增 `restart_game`(客户端→服务端)与 `game_reset`(服务端→客户端)消息。(`src/server/protocol.ts`)
+- **session.resetToLobby**:`gameOverHandled` 复位、丢弃旧 state、清空广播水位/准备记录、房间状态回到「等待中」、广播 `game_reset` 通知客户端清除结算界面回到配置面板。(`src/server/session.ts`)
+- **restart_game 路由**:debug 房间任意座次可触发,复用 session 重置后广播 `room_state`。(`src/server/app.ts`)
+- **结算界面新增"再来一局"按钮**:`GameResultOverlay` 增加 `onRestart`,与"返回大厅"并排;客户端收到 `game_reset` 后清除 gameOver/gameStarted/views 缓存回到配置面板。(`src/client/components/GameResultOverlay.tsx`、`src/client/hooks/useDebugMultiConnection.ts`、`src/client/components/DebugLobby.tsx`)
+
+#### Changed
+- **新增胜负判定与重置回归用例**:主公阵亡反贼/内奸胜方判定、resetToLobby 房间复位。(`tests/server/session-turn-deadline.test.ts`)
+
 ### Fixed — 兵粮寸断判定生效后仍摸牌
 
 兵粮寸断判定为非梅花(生效)后本应跳过摸牌阶段,却仍摸了 2 张牌。根因:兵粮寸断通过 `registerBeforeHook` cancel 当前 `阶段开始(摸牌)` atom,并在 hook 内部自行把阶段推进到出牌;但回合管理的「阶段结束」after hook 在 `applyAtom(阶段开始, 摸牌)` 返回后**无条件**继续执行 `摸牌(×2)` 与 `阶段结束(摸牌)`——它并未察觉该 atom 已被 before hook 取消。结果「跳过摸牌阶段」只取消了阶段开始事件,摸牌动作照常发生,日志表现为出现两次「摸牌阶段结束」且仍「摸了 2 张牌」。乐不思蜀/闪电不受影响:乐不思蜀跳过的是出牌阶段(非自动阶段,after hook 无强制后续动作),闪电不跳过阶段。

@@ -220,6 +220,7 @@ function DebugGameViewInner({
           winner={conn.gameOver.winner}
           players={view.players}
           perspectiveIdx={perspective}
+          onRestart={conn.sendRestart}
           onExit={onDeleteRoom}
         />
       )}

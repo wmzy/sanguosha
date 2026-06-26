@@ -72,6 +72,8 @@ export function useDebugMultiConnection(
   sendReady: (seat: number) => void;
   /** 配置阶段:发送开始游戏(任意座次连接) */
   sendStartGame: () => void;
+  /** 发送重新开始游戏(再来一局) */
+  sendRestart: () => void;
   /** 配置阶段:更新房间配置 */
   sendUpdateConfig: (config: import('../../server/protocol').RoomConfig) => void;
   /** 已连接座次数 */
@@ -105,6 +107,19 @@ export function useDebugMultiConnection(
     // ── 游戏结束:记录胜方,触发结算界面 ──
     if (msg.type === 'gameOver') {
       setGameOver({ winner: msg.winner });
+      return;
+    }
+    // ── 游戏重置(再来一局):清除 gameOver/gameStarted/views,回到配置面板 ──
+    if (msg.type === 'game_reset') {
+      setGameOver(null);
+      setGameStarted(false);
+      // 清空所有座次的视图缓存,使 currentView → null,触发回到 RoomConfigPanel
+      for (const [, seat] of seatsRef.current) {
+        seat.view = null;
+        seat.lastSeq = 0;
+      }
+      setViews(new Map());
+      clearSubmitted();
       return;
     }
     // ── 配置阶段消息(游戏未开始) ──
@@ -384,6 +399,16 @@ export function useDebugMultiConnection(
     s.ws.send(JSON.stringify(msg));
   }, []);
 
+  /** 发送重新开始游戏(再来一局,用座次 0 的连接) */
+  const sendRestart = useCallback(() => {
+    const s = seatsRef.current.get(0);
+    if (!s || s.ws.readyState !== WebSocket.OPEN) return;
+    const msg: ClientMessage = { type: 'restart_game' };
+    logWsMessage(0, 'out', msg);
+    logUserAction('restart_game', null);
+    s.ws.send(JSON.stringify(msg));
+  }, []);
+
   /** 更新房间配置(用座次 0 的连接;调试房间任意玩家可改) */
   const sendUpdateConfig = useCallback((config: import('../../server/protocol').RoomConfig) => {
     const s = seatsRef.current.get(0);
@@ -407,6 +432,7 @@ export function useDebugMultiConnection(
     seatPlayerIds,
     sendReady,
     sendStartGame,
+    sendRestart,
     sendUpdateConfig,
     connectedCount,
   };

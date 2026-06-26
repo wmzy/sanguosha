@@ -311,6 +311,9 @@ export function handleWsMessage(
         log.error('handleStartGame failed', { playerId, error: e.stack ?? String(e) });
       });
       break;
+    case 'restart_game':
+      handleRestartGame(playerId);
+      break;
     case 'action':
       handleAction(playerId, message.action);
       break;
@@ -459,6 +462,19 @@ async function handleStartGame(playerId: string): Promise<void> {
   if (await session.startGame(count)) {
     broadcastMessage(room, serialize({ type: 'game_started' }));
   }
+}
+
+/** 游戏结束后重新进入「配置+准备」阶段(再来一局)。
+ *  debug 房间任意座次可触发;复用同一 session,重置后由玩家重新准备 → start_game。 */
+function handleRestartGame(playerId: string): void {
+  const roomId = playerRoomMap.get(playerId);
+  if (!roomId) return;
+  const room = getRoom(roomId);
+  if (!room) return;
+  const session = gameSessions.get(roomId);
+  if (!session) return;
+  session.resetToLobby();
+  broadcastRoomState(room);
 }
 
 /** WS 入口创建调试房间(与 REST /api/debug-room 等价)。 */

@@ -16,6 +16,9 @@ export interface GameResultOverlayProps {
   players: GameView['players'];
   /** 当前视角座次(高亮己方) */
   perspectiveIdx: number;
+  /** 再来一局:重置房间回「配置+准备」阶段 */
+  onRestart: () => void;
+  /** 退出房间(返回大厅) */
   onExit: () => void;
 }
 
@@ -38,7 +41,7 @@ function winningCamp(winner: string, players: GameView['players']): string {
   }
 }
 
-export function GameResultOverlay({ winner, players, perspectiveIdx, onExit }: GameResultOverlayProps) {
+export function GameResultOverlay({ winner, players, perspectiveIdx, onRestart, onExit }: GameResultOverlayProps) {
   const camp = winningCamp(winner, players);
   const campColor = winner === '无人'
     ? '#999'
@@ -125,25 +128,44 @@ export function GameResultOverlay({ winner, players, perspectiveIdx, onExit }: G
           })}
         </div>
 
-        <button
-          onClick={onExit}
-          style={{
-            marginTop: 12,
-            padding: '10px 56px',
-            fontSize: 16,
-            fontWeight: 'bold',
-            color: '#fff',
-            background: 'rgba(255, 255, 255, 0.12)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            borderRadius: 8,
-            cursor: 'pointer',
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)')}
-        >
-          返回大厅
-        </button>
+        <div style={{ display: 'flex', gap: 14, marginTop: 12 }}>
+          <button
+            onClick={onRestart}
+            style={{
+              padding: '10px 32px',
+              fontSize: 16,
+              fontWeight: 'bold',
+              color: '#fff',
+              background: campColor,
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              transition: 'filter 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
+            onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+          >
+            再来一局
+          </button>
+          <button
+            onClick={onExit}
+            style={{
+              padding: '10px 32px',
+              fontSize: 16,
+              fontWeight: 'bold',
+              color: '#fff',
+              background: 'rgba(255, 255, 255, 0.12)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: 8,
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)')}
+          >
+            返回大厅
+          </button>
+        </div>
       </div>
     </div>
   );
