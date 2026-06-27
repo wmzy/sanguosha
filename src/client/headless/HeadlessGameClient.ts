@@ -20,6 +20,8 @@ export class HeadlessGameClient {
   private _roomState: RoomState | null = null;
   private _gameOverWinner: string | null = null;
   private _pendingNewEvents: ViewEvent[] = [];
+  /** 连接就绪前缓冲的待发消息（open 后 flush） */
+  private _outbox: ClientMessage[] = [];
   private readonly callbacks: HeadlessCallbacks;
   private readonly serverUrl: string;
 
@@ -57,9 +59,15 @@ export class HeadlessGameClient {
 
   private openSocket() {
     this.ws = new WebSocket(this.serverUrl);
-    this.ws.onopen = () => { this.setPhase('lobby'); };
+    this.ws.onopen = () => {
+      this.setPhase('lobby');
+      // flush 连接前缓冲的待发消息
+      for (const m of this._outbox) this.ws!.send(JSON.stringify(m));
+      this._outbox = [];
+    };
     this.ws.onmessage = (ev) => this.handleRaw(typeof ev.data === 'string' ? ev.data : ev.data.toString());
-    this.ws.onerror = () => { this.callbacks.onError?.(new Error('WebSocket error')); };
+    this.ws.onerror = () => { this.callbacks.onError?.(new Error('WebSocket error'));
+    };
     this.ws.onclose = () => { /* 一期不重连 */ };
   }
 
@@ -83,6 +91,7 @@ export class HeadlessGameClient {
       this.callbacks.onGameOver?.(r.gameOverWinner);
     }
     if (r.playerId) this._playerId = r.playerId;
+    if (r.roomId) this._roomId = r.roomId;
     if (r.seatIndex !== undefined) this._seatIndex = r.seatIndex;
     if (r.roomState) {
       this._roomState = r.roomState;
@@ -182,7 +191,13 @@ export class HeadlessGameClient {
   sendRestart(): void { this.send({ type: 'restart_game' }); }
   sendUpdateConfig(config: RoomConfig): void { this.send({ type: 'update_room_config', config }); }
 
-  private send(msg: ClientMessage) { this.ws?.send(JSON.stringify(msg)); }
+  private send(msg: ClientMessage) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(msg));
+    } else {
+      this._outbox.push(msg);
+    }
+  }
   disconnect() { this.ws?.close(); this.ws = null; }
 
   /** 角色确定后，为本座次注册技能 actions（供 getAvailableActions）。 */

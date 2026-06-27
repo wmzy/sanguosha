@@ -10,6 +10,7 @@ export interface ViewSnapshot {
   view: GameView | null;
   lastSeq: number;
   playerId?: string;
+  roomId?: string;
   seatIndex?: number;
 }
 
@@ -79,7 +80,7 @@ export function applyServerMessage(
     case 'game_reset':
       return { ...base, view: null, lastSeq: 0, resetToLobby: true, phaseChangedTo: 'lobby' };
     case 'room_joined':
-      return { ...base, playerId: msg.playerId, seatIndex: typeof msg.seatIndex === 'number' ? msg.seatIndex : base.seatIndex };
+      return { ...base, playerId: msg.playerId, roomId: msg.roomId, seatIndex: typeof msg.seatIndex === 'number' ? msg.seatIndex : base.seatIndex };
     case 'room_state':
       return { ...base, roomState: { readyPlayers: msg.readyPlayers, playerIds: msg.playerIds, hostId: msg.hostId, maxPlayers: msg.maxPlayers, config: msg.config } };
     case 'room_config':
