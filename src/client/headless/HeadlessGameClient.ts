@@ -1,0 +1,192 @@
+// src/client/headless/HeadlessGameClient.ts
+// 单座次无头 WS 玩家客户端。框架无关（零 React 依赖）。
+// 用全局 WebSocket（浏览器/Node22/Bun 都有），不 import 'ws'，避免污染浏览器 bundle。
+import type { GameView, ViewEvent, Json, ClientMessage as EngineClientMessage } from '../../engine/types';
+import type { ServerMessage, ClientMessage, RoomConfig } from '../../server/protocol';
+import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
+import { enumerateAvailableActions } from './availableActions';
+import { resolvePendingRespond, getPendingRequestType } from '../utils/pendingRespond';
+import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistry';
+import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState } from './types';
+
+export class HeadlessGameClient {
+  private ws: WebSocket | null = null;
+  private _view: GameView | null = null;
+  private _lastSeq = 0;
+  private _phase: ClientPhase = 'connecting';
+  private _playerId: string | null = null;
+  private _seatIndex = 0;
+  private _roomId: string | null = null;
+  private _roomState: RoomState | null = null;
+  private _gameOverWinner: string | null = null;
+  private _pendingNewEvents: ViewEvent[] = [];
+  private readonly callbacks: HeadlessCallbacks;
+  private readonly serverUrl: string;
+
+  constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}) {
+    this.serverUrl = serverUrl;
+    this.callbacks = callbacks;
+  }
+
+  get phase(): ClientPhase { return this._phase; }
+  get view(): GameView | null { return this._view; }
+  get roomId(): string | null { return this._roomId; }
+  get playerId(): string | null { return this._playerId; }
+  get seatIndex(): number { return this._seatIndex; }
+  get lastSeq(): number { return this._lastSeq; }
+  get roomState(): RoomState | null { return this._roomState; }
+  get gameOverWinner(): string | null { return this._gameOverWinner; }
+
+  private setPhase(p: ClientPhase) {
+    if (this._phase !== p) { this._phase = p; this.callbacks.onPhaseChange?.(p); }
+  }
+
+  /** 创建 debug 房间并自动 join 0 号座 */
+  createDebugRoom(playerCount: number, config?: RoomConfig): void {
+    this.openSocket();
+    this.send({ type: 'create_debug_room', config, playerCount });
+  }
+
+  /** 连接并 join 指定房间 */
+  connect(roomId: string, seatIndex?: number): void {
+    this._roomId = roomId;
+    this._seatIndex = seatIndex ?? this._seatIndex;
+    this.openSocket();
+    this.send({ type: 'join_debug_room', roomId, lastSeq: 0 });
+  }
+
+  private openSocket() {
+    this.ws = new WebSocket(this.serverUrl);
+    this.ws.onopen = () => { this.setPhase('lobby'); };
+    this.ws.onmessage = (ev) => this.handleRaw(typeof ev.data === 'string' ? ev.data : ev.data.toString());
+    this.ws.onerror = () => { this.callbacks.onError?.(new Error('WebSocket error')); };
+    this.ws.onclose = () => { /* 一期不重连 */ };
+  }
+
+  private handleRaw(raw: string) {
+    let msg: ServerMessage;
+    try {
+      msg = JSON.parse(raw) as ServerMessage;
+    } catch {
+      return;
+    }
+    const r = applyServerMessage(this._view, this._lastSeq, msg);
+    this._view = r.view;
+    this._lastSeq = r.lastSeq;
+    if (r.newEvents.length) {
+      this._pendingNewEvents.push(...r.newEvents);
+      if (this._view) this.callbacks.onView?.(this._view, r.newEvents);
+    }
+    if (r.phaseChangedTo) this.setPhase(r.phaseChangedTo);
+    if (r.gameOverWinner !== undefined) {
+      this._gameOverWinner = r.gameOverWinner;
+      this.callbacks.onGameOver?.(r.gameOverWinner);
+    }
+    if (r.playerId) this._playerId = r.playerId;
+    if (r.seatIndex !== undefined) this._seatIndex = r.seatIndex;
+    if (r.roomState) {
+      this._roomState = r.roomState;
+      this.callbacks.onRoomState?.(r.roomState);
+    }
+    // room_config 增量：viewMaintainer 交由调用方合并
+    if (msg.type === 'room_config') {
+      this._roomState = mergeRoomConfig(this._roomState, msg.config);
+      this.callbacks.onRoomState?.(this._roomState);
+    }
+    if (r.resetToLobby) { this._view = null; this._lastSeq = 0; }
+    if (r.actionRejected) this.callbacks.onActionRejected?.();
+  }
+
+  drainNewEvents(): ViewEvent[] {
+    const e = this._pendingNewEvents;
+    this._pendingNewEvents = [];
+    return e;
+  }
+
+  needsAction(): boolean {
+    const v = this._view;
+    if (!v || !v.pending) return false;
+    const p = v.pending;
+    // 广播型（target<0，如无懈可击询问）或阻塞型 target===本座次
+    return p.target < 0 ? true : (p.isBlocking !== false && p.target === this._seatIndex);
+  }
+
+  getAvailableActions(): AvailableAction[] {
+    const v = this._view;
+    if (!v) return [];
+    const skillActions = getActionsForPlayer(this._seatIndex);
+    const actions = enumerateAvailableActions(v, this._seatIndex, skillActions);
+    // 追加 respond/discard 类（pending 驱动）
+    if (v.pending && (v.pending.target === this._seatIndex || v.pending.target < 0)) {
+      this.appendRespondActions(v, skillActions, actions);
+    }
+    return actions;
+  }
+
+  private appendRespondActions(
+    view: GameView,
+    skillActions: import('../skillActionRegistry').SkillActionDef[],
+    out: AvailableAction[],
+  ) {
+    const reqType = getPendingRequestType(view.pending!);
+    if (reqType === '__弃牌') {
+      out.push({
+        description: '进入弃牌阶段',
+        message: { skillId: '弃牌阶段', actionType: 'discard', ownerId: this._seatIndex, params: {}, baseSeq: 0 },
+        validTargets: [],
+        category: 'discard',
+      });
+      return;
+    }
+    const info = resolvePendingRespond(view.pending!, skillActions);
+    if (info?.skillId) {
+      out.push({
+        description: `回应【${info.skillId}】`,
+        message: { skillId: info.skillId, actionType: 'respond', ownerId: this._seatIndex, params: {}, baseSeq: 0 },
+        validTargets: [],
+        category: 'respond',
+      });
+    }
+  }
+
+  // ── 操作 ──
+
+  sendAction(action: EngineClientMessage): void {
+    this.send({ type: 'action', action, baseSeq: this._lastSeq });
+  }
+
+  useCardAndTarget(skillId: string, cardId: string, targets: number[]): void {
+    this.sendAction({ skillId, actionType: 'use', ownerId: this._seatIndex, params: { cardId, targets }, baseSeq: 0 });
+  }
+
+  useCard(skillId: string, cardId: string): void {
+    this.sendAction({ skillId, actionType: 'use', ownerId: this._seatIndex, params: { cardId }, baseSeq: 0 });
+  }
+
+  respond(skillId: string, params?: Record<string, Json>): void {
+    this.sendAction({ skillId, actionType: 'respond', ownerId: this._seatIndex, params: params ?? {}, baseSeq: 0 });
+  }
+
+  selectCharacter(character: string): void {
+    this.sendAction({ skillId: '选将', actionType: 'select', ownerId: this._seatIndex, params: { character }, baseSeq: 0 });
+  }
+
+  pass(): void {
+    this.sendAction({ skillId: '__pass', actionType: 'pass', ownerId: this._seatIndex, params: {}, baseSeq: 0 });
+  }
+
+  // ── 大厅 ──
+
+  sendReady(): void { this.send({ type: 'ready' }); }
+  sendStartGame(): void { this.send({ type: 'start_game' }); }
+  sendRestart(): void { this.send({ type: 'restart_game' }); }
+  sendUpdateConfig(config: RoomConfig): void { this.send({ type: 'update_room_config', config }); }
+
+  private send(msg: ClientMessage) { this.ws?.send(JSON.stringify(msg)); }
+  disconnect() { this.ws?.close(); this.ws = null; }
+
+  /** 角色确定后，为本座次注册技能 actions（供 getAvailableActions）。 */
+  async loadSkillActions(skillIds: string[]): Promise<void> {
+    await registerSkillActions(this._seatIndex, skillIds);
+  }
+}
