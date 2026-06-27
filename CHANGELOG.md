@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Changed — 装备区三态可选重构 + 移除 distribute 分配面板
+
+装备技能与装备展示融合为统一可点击卡片,装备区恒定保留宽度;distribute(制衡/仁德/遗计)不再使用独立分配面板,候选牌在手牌/装备区卡片选,目标在座位区选,提交按钮入操作栏。
+
+#### Changed
+- **装备区恒定渲染**:移除 `EquipColumn` 无装备时的 `return null`,装备区始终保留 168px 宽度,无装备显示「无装备」占位,不再因空装备塌缩宽度。(`src/client/components/EquipColumn.tsx`)
+- **装备技能融合到装备卡片**:装备技能不再作为装备区底部独立按钮(`equipSkillBtn`),而是绑定到对应装备槽位卡片(技能 `skillId === 装备牌名`)。技能可发动时卡片显示橙色发光 + ⚡ 徽标,点击即发动(行为与原按钮一致)。(`EquipColumn.tsx`、`gameViewStyles.ts`)
+- **装备三态可选**:统一装备卡片为三种可交互状态——技能可发动(橙色发光)、distribute 候选(金色边框)、已选中(`translateX(8px)` 向右偏移 + 绿色高亮,与手牌选中一致)。移除 `equipDistBtn`/`equipDistSelected` 独立候选样式。(`EquipColumn.tsx`、`gameViewStyles.ts`)
+- **移除 DistributeUI 分配面板**:删除 `DistributeUI` 组件,distribute 提示文案移至 `handHeader`(🤝 title · 已选 N),提交/清空按钮移至 `actionBar`(与出牌/结束回合并列)。三种模式目标选择统一:制衡(select)无目标,仁德/遗计通过座位区点玩家(遗计点玩家即分配当前选中牌)。(`src/client/components/DistributeUI.tsx` 删除,`GameView.tsx`、`usePlayInteraction.ts`)
+- **handleTargetClick/isTargetable 扩展**:`usePlayInteraction` 的目标点击与可点判断支持 distribute 三模式——制衡忽略座位点击,仁德设目标,遗计触发分配;遗计按 `prompt.targetFilter`/`allowSelf` 过滤可点座位。(`src/client/hooks/usePlayInteraction.ts`)
+- **测试适配**:装备技能按钮测试适配新的 `div[role=button]` 结构(正则匹配 accessible name);distribute 弹窗测试适配 handHeader/actionBar 结构;移除 `DistributeUI` 相关注释。(`tests/integration/playercard-equip-distribute.test.tsx`、`gameview-equipment-play.test.tsx`、`gameview-skill-button.test.tsx`)
+
 ### Changed — 对局界面布局优化:装备区纵向列、武将卡片右置
 
 优化对局下方主区域布局与出牌提示信息呈现,使装备/武将/手牌分区更清晰,回合归属与等待状态更直观。

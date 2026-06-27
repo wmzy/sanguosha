@@ -48,16 +48,17 @@ export function EquipColumn({
   const p = view.players[perspectiveIdx];
   if (!p) return null;
 
-  const equipEntries = Object.entries(p.equipment);
-  // 装备技能:动态装备的技能可主动点击
+  const equipEntries = Object.entries(p.equipment) as [EquipSlot, string][];
+  // 装备技能:动态装备的技能可主动发动。skillId === 装备牌名(见 card-meta.ts)。
+  // 将可发动的技能融合到对应装备卡片,不再在底部单独列出技能按钮。
   const equipSkillActions = skillActions.filter((a) => EQUIPMENT_SKILL_NAMES.has(a.skillId));
   const actionCtx = { view, perspectiveIdx };
-  const isSkillActive = (a: SkillActionDef) => canOperate && isActiveAction(a, actionCtx);
+  const activeSkillByEquipName = new Map<string, SkillActionDef>();
+  for (const a of equipSkillActions) {
+    if (canOperate && isActiveAction(a, actionCtx)) activeSkillByEquipName.set(a.skillId, a);
+  }
 
-  const activeEquipSkills = equipSkillActions.filter(isSkillActive);
   const hasEquip = equipEntries.length > 0;
-  // 无装备也无可用装备技能时不渲染整列
-  if (!hasEquip && activeEquipSkills.length === 0) return null;
 
   return (
     <div className={styles.equipColumn}>
@@ -65,49 +66,43 @@ export function EquipColumn({
       <div className={styles.equipColumnList}>
         {hasEquip ? (
           equipEntries.map(([slot, cardId]) => {
-            const id = cardId as string;
+            const id = cardId;
             const card = view.cardMap[id];
-            const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
-            // distribute 候选装备:可点击选中
+            const icon = EQUIP_SLOT_ICON[slot] ?? '💎';
+            const name = card?.name ?? id;
+            // 三态:技能可发动 / distribute 候选 / 选中(向右偏移)
+            const activeSkill = activeSkillByEquipName.get(name);
             const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
             const isDistSelected = !!distSelectedEquipIds?.has(id);
-            if (isDistCandidate && onEquipCardClick) {
-              return (
-                <button
-                  key={slot}
-                  type="button"
-                  className={cx(styles.equipDistBtn, isDistSelected && styles.equipDistSelected)}
-                  onClick={() => onEquipCardClick(id)}
-                  title={card ? `${card.name}(${slot})` : id}
-                >
-                  {icon} {card?.name ?? id}
-                </button>
-              );
-            }
+            const clickable = !!activeSkill || isDistCandidate;
+            const handleClick = activeSkill
+              ? () => onSkillAction(activeSkill)
+              : isDistCandidate
+                ? () => onEquipCardClick?.(id)
+                : undefined;
+            const stateHint = activeSkill ? ' · 可发动' : isDistCandidate ? ' · 可选中' : '';
             return (
               <div
                 key={slot}
-                className={styles.equipColumnItem}
-                title={card ? `${card.name}(${slot})` : String(cardId)}
+                className={cx(
+                  styles.equipColumnItem,
+                  activeSkill && styles.equipSkillActive,
+                  isDistCandidate && styles.equipDistCandidate,
+                  isDistSelected && styles.equipSelected,
+                )}
+                role={clickable ? 'button' : undefined}
+                onClick={handleClick}
+                title={card ? `${name}(${slot})${stateHint}` : id}
               >
                 <span className={styles.equipColumnIcon}>{icon}</span>
-                <span>{card?.name ?? cardId}</span>
+                <span>{name}</span>
+                {activeSkill && <span className={styles.equipSkillBadge}>⚡</span>}
               </div>
             );
           })
         ) : (
           <div className={styles.equipColumnEmpty}>无装备</div>
         )}
-        {activeEquipSkills.map((a) => (
-          <button
-            key={`${a.skillId}:${a.actionType}`}
-            className={styles.equipSkillBtn}
-            onClick={() => onSkillAction(a)}
-            title={`${a.label}: ${a.prompt.title}`}
-          >
-            {a.label}
-          </button>
-        ))}
       </div>
     </div>
   );

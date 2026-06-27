@@ -818,42 +818,38 @@ export const skillBtn = css`
     background: rgba(155, 89, 182, 0.3);
   }
 `;
-// 装备区中可点使用的装备技能按钮
-export const equipSkillBtn = css`
-  border: 1px solid #f39c12;
-  border-radius: 4px;
-  padding: 1px 6px;
+// 装备卡片:技能可发动态(橙色发光,可点击发动)
+export const equipSkillActive = css`
   cursor: pointer;
-  background: rgba(243, 156, 18, 0.18);
-  color: #f39c12;
-  font-size: 10px;
-  font-weight: bold;
+  border-color: #f39c12;
+  background: rgba(243, 156, 18, 0.2);
+  box-shadow: 0 0 8px rgba(243, 156, 18, 0.5);
   &:hover {
-    background: rgba(243, 156, 18, 0.32);
+    background: rgba(243, 156, 18, 0.34);
   }
 `;
-// 装备区 distribute(制衡/仁德)候选装备:可点击选中,金色高亮(与手牌候选一致)
-export const equipDistBtn = css`
-  border: 2px solid #f1c40f;
-  border-radius: 4px;
-  padding: 1px 6px;
+// 装备卡片:distribute 候选态(金色边框,可点击选中)
+export const equipDistCandidate = css`
   cursor: pointer;
-  background: rgba(241, 196, 15, 0.12);
-  color: #f1c40f;
-  font-size: 11px;
-  font-weight: bold;
-  text-align: left;
-  box-shadow: 0 0 8px rgba(241, 196, 15, 0.35);
+  border-color: #f1c40f;
+  background: rgba(241, 196, 15, 0.14);
+  box-shadow: 0 0 8px rgba(241, 196, 15, 0.4);
   &:hover {
-    background: rgba(241, 196, 15, 0.22);
+    background: rgba(241, 196, 15, 0.24);
   }
 `;
-// 装备区 distribute 已选中装备:绿色边框(与手牌选中一致)
-export const equipDistSelected = css`
+// 装备卡片:已选中态(向右偏移 + 绿色高亮,与手牌选中一致)
+export const equipSelected = css`
+  transform: translateX(8px);
   border-color: #2ecc71;
   color: #2ecc71;
-  background: rgba(46, 204, 113, 0.15);
-  box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+  background: rgba(46, 204, 113, 0.16);
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.55);
+`;
+// 装备卡片:可发动技能徽标(靠右)
+export const equipSkillBadge = css`
+  margin-left: auto;
+  font-size: 11px;
 `;
 
 // ─── 装备区纵向列(最左侧) ───
@@ -1161,6 +1157,11 @@ export const transformHint = css`
   color: #f1c40f;
   margin-left: 8px;
 `;
+/** distribute(制衡/仁德/遗计)提示文案色。 */
+export const distHint = css`
+  color: #1abc9c;
+  margin-left: 8px;
+`;
 /** 已选目标金色高亮 span(复用转化提示色系)。 */
 export const selectedTargetText = css`
   color: #f1c40f;
@@ -1188,12 +1189,6 @@ export const skillBtnPrimary = css`
 export const btnDisabled = css`
   opacity: 0.4;
   cursor: not-allowed;
-`;
-/** distribute 取消按钮居中容器。 */
-export const distributeCancelRow = css`
-  display: flex;
-  justify-content: center;
-  margin-top: 6px;
 `;
 /** 角色大卡技能区 padding 覆盖。 */
 export const skillRowPad = css`

@@ -33,7 +33,6 @@ import { TargetSelector } from './TargetSelector';
 import { SeatArcLayout } from './SeatArcLayout';
 import { ZoneInfoBar } from './ZoneInfoBar';
 import { HandCard } from './HandCard';
-import { DistributeUI } from './DistributeUI';
 import { CancelButton } from './CancelButton';
 import { EquipColumn } from './EquipColumn';
 
@@ -126,7 +125,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
     handleCardClick, handlePlayCard, handleTargetClick, handleSlotSelect,
     handleSkillAction, handleTransformPlay, handleRespond, handleEndTurn,
     handleConfirmDiscard, isTargetable,
-    handleDistToggle, handleDistAllocate, handleDistSubmit, handleDistClear,
+    handleDistSubmit, handleDistClear,
     cancelTransform, cancelSelection, clearDiscard, setDistributeMode,
   } = play;
 
@@ -245,33 +244,6 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
             discardMax={discardMax}
             selectedForDiscard={selectedForDiscard}
           />
-          {/* ─── 统一分配面板(仁德/制衡主动技 + 遗计被动 pending)─── */}
-          {/* 选牌已下沉到手牌区,这里只显示提示文案 + 目标分配 + 提交 */}
-          {isDistributeActive && activeDistribute && (
-            <div className={styles.promptBoxAwaiting}>
-              <div className={styles.promptTitle}>🤝 {activeDistribute.prompt.title}</div>
-              <DistributeUI
-                prompt={activeDistribute.prompt}
-                cardIds={activeDistribute.cardIds}
-                players={view.players}
-                viewer={perspectiveIdx}
-                selected={distSelected}
-                allocations={distAllocations}
-                onToggleCard={handleDistToggle}
-                onAllocate={handleDistAllocate}
-                onClear={handleDistClear}
-                onSubmit={handleDistSubmit}
-                externalTargetSelection={activeDistribute.externalTargetSelection}
-                externalTargetName={activeDistribute.externalTargetSelection ? distTargetName : undefined}
-              />
-              {/* 主动技可取消;被动 pending 不能取消 */}
-              {distributeMode && (
-                <div className={styles.distributeCancelRow}>
-                  <CancelButton onClick={() => setDistributeMode(null)} />
-                </div>
-              )}
-            </div>
-          )}
           {/* 自己的进度条:仅当自己处于等待回应时才显示 */}
           {isPerspectiveAwaiting && (
             <CountdownBar deadline={deadline} totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS} />
@@ -280,6 +252,11 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
           <div className={styles.handHeader}>
             <span className={styles.handTitle}>
               {perspectiveName} 的手牌 ({perspectiveHand.length})
+              {isDistributeActive && activeDistribute && (
+                <span className={cx(styles.debugHint, styles.distHint)}>
+                  🤝 {activeDistribute.prompt.title} · 已选 {distSelected.size}
+                </span>
+              )}
               {transformMode && (
                 <span className={cx(styles.debugHint, styles.transformHint)}>
                   ⚡ 转化模式:选{transformMode.minCards > 1 ? `${transformMode.minCards}张` : '1张'}{transformMode.wrapperName}{transformMode.minCards > 1 ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})` : ''} · 源技能 {transformMode.skillId}
@@ -337,6 +314,32 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
                 )}
               </>
             )}
+            {/* distribute(制衡/仁德/遗计):提交/清空按钮。候选牌在手牌区+装备区卡片选,目标在座位区选 */}
+            {canOperate && isDistributeActive && activeDistribute && (() => {
+              const mode = activeDistribute.prompt.mode ?? 'allocate';
+              const minTotal = activeDistribute.prompt.minTotal ?? 1;
+              const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
+              let canSubmit: boolean;
+              let label: string;
+              if (mode === 'select') {
+                canSubmit = distSelected.size >= minTotal && distSelected.size <= maxTotal;
+                label = `确认(${distSelected.size})`;
+              } else if (activeDistribute.externalTargetSelection) {
+                canSubmit = distSelected.size >= minTotal && distSelected.size <= maxTotal && !!distTargetName;
+                label = `确定(${distSelected.size})${distTargetName ? ` → ${distTargetName}` : ''}`;
+              } else {
+                const total = distAllocations.flatMap(a => a.cardIds).length;
+                canSubmit = total >= minTotal;
+                label = `提交分配(${total})`;
+              }
+              return (
+                <>
+                  <button className={styles.promptBtn} onClick={handleDistClear} disabled={distSelected.size === 0 && distAllocations.length === 0}>清空</button>
+                  <button className={cx(styles.promptBtnPrimary, !canSubmit && styles.btnDisabled)} onClick={handleDistSubmit} disabled={!canSubmit}>{label}</button>
+                  {distributeMode && <CancelButton label="取消" onClick={() => setDistributeMode(null)} />}
+                </>
+              );
+            })()}
             {selectedCardId && selectedTarget && canOperate && isMyTurn && (
               <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
             )}

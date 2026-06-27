@@ -230,8 +230,12 @@ export function usePlayInteraction(
   }, [view.players]);
 
   const isTargetable = useCallback((i: number): boolean => {
-    if (isDistributeActive && activeDistribute?.externalTargetSelection) {
+    if (isDistributeActive && activeDistribute) {
+      const mode = activeDistribute.prompt.mode ?? 'allocate';
+      // 制衡(select)无目标选择
+      if (mode === 'select') return false;
       if (!activeDistribute.prompt.allowSelf && i === perspectiveIdx) return false;
+      if (activeDistribute.prompt.targetFilter && !activeDistribute.prompt.targetFilter(view, i)) return false;
       return view.players[i]?.alive === true;
     }
     const filter = selectedTargetFilter?.filter;
@@ -255,13 +259,30 @@ export function usePlayInteraction(
   const handleTargetClick = useCallback((name: string) => {
     const idx = view.players.findIndex(pl => pl.name === name);
     if (idx >= 0 && !isTargetable(idx)) return;
-    if (isDistributeActive && activeDistribute?.externalTargetSelection) {
-      if (!activeDistribute.prompt.allowSelf && idx === perspectiveIdx) return;
-      setDistTargetName(distTargetName === name ? null : name);
+    if (isDistributeActive && activeDistribute) {
+      const mode = activeDistribute.prompt.mode ?? 'allocate';
+      // 制衡(select)无目标,座位点击忽略
+      if (mode === 'select') return;
+      if (activeDistribute.externalTargetSelection) {
+        // 仁德:点玩家设为目标
+        if (!activeDistribute.prompt.allowSelf && idx === perspectiveIdx) return;
+        setDistTargetName(distTargetName === name ? null : name);
+        return;
+      }
+      // 遗计(内部 allocate):点玩家 = 分配当前选中牌
+      if (distSelected.size > 0) {
+        const maxPerTarget = activeDistribute.prompt.maxPerTarget ?? 99;
+        setDistAllocations(prev => {
+          const already = prev.filter(a => a.target === idx).reduce((s, a) => s + a.cardIds.length, 0);
+          if (already + distSelected.size > maxPerTarget) return prev;
+          return [...prev, { target: idx, cardIds: [...distSelected] }];
+        });
+        setDistSelected(new Set());
+      }
       return;
     }
     setSelectedTarget(selectedTarget === name ? null : name);
-  }, [view.players, isTargetable, isDistributeActive, activeDistribute, perspectiveIdx, distTargetName, selectedTarget]);
+  }, [view.players, isTargetable, isDistributeActive, activeDistribute, perspectiveIdx, distTargetName, selectedTarget, distSelected]);
 
   const handleSlotSelect = useCallback((name: string, slotIdx: number) => {
     if (slotIdx === 0) {

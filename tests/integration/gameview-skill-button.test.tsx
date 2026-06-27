@@ -1,5 +1,6 @@
 // 前端渲染测试:仁德/制衡等 distribute 主动技能在出牌阶段渲染为可点击按钮,
-// 点击后弹出 DistributeUI 选牌/分配弹窗(而非 useCard/useCardAndTarget 那样只显示文本标签)。
+// 点击后进入 distribute 模式:候选牌在手牌区选,提示在 handHeader,提交按钮在 actionBar。
+// (DistributeUI 分配面板已移除,目标选择统一到座位区点击)
 //
 // 回归根因:GameView 的 triggerableActions 过滤条件此前只包含
 //   confirm/choosePlayer/(useCardAndTarget+transform),
@@ -73,7 +74,7 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
     expect(rendeBtn).toBeDefined();
   });
 
-  it('点击仁德按钮后弹出 distribute 分配弹窗(含 DistributeUI)', async () => {
+  it('点击仁德按钮后进入 distribute 模式(handHeader 提示)', async () => {
     const view = makeView();
     render(<GameViewComponent view={view} onAction={() => {}} />);
 

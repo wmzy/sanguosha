@@ -50,7 +50,7 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const node = screen.getByText(/诸葛连弩/);
     // 非候选装备渲染为 equipColumnItem 内的文本 span,不可点击
     expect(node.tagName).toBe('SPAN');
-    expect(node.closest('button')).toBeNull();
+    expect(node.closest('[role="button"]')).toBeNull();
   });
 
   it('distribute 激活 + 装备是候选:装备渲染为 button', () => {
@@ -67,8 +67,8 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     );
     const btn = screen.getByRole('button', { name: /诸葛连弩/ });
     // 候选态:带 equipDistBtn 样式,不带选中样式
-    expect(btn.className).toContain(styles.equipDistBtn);
-    expect(btn.className).not.toContain(styles.equipDistSelected);
+    expect(btn.className).toContain(styles.equipDistCandidate);
+    expect(btn.className).not.toContain(styles.equipSelected);
   });
 
   it('装备被选中:带 equipDistSelected 样式', () => {
@@ -84,7 +84,7 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
       />,
     );
     const btn = screen.getByRole('button', { name: /诸葛连弩/ });
-    expect(btn.className).toContain(styles.equipDistSelected);
+    expect(btn.className).toContain(styles.equipSelected);
   });
 
   it('点击候选装备 → onEquipCardClick 以 cardId 回调', () => {
@@ -116,6 +116,6 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
         onEquipCardClick={() => {}}
       />,
     );
-    expect(screen.getByText(/诸葛连弩/).closest('button')).toBeNull();
+    expect(screen.getByText(/诸葛连弩/).closest('[role="button"]')).toBeNull();
   });
 });

@@ -255,7 +255,7 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 点装备区丈八蛇矛按钮 → 多卡转化模式
-    const zhangbaBtn = await screen.findByRole('button', { name: '丈八蛇矛' });
+    const zhangbaBtn = await screen.findByRole('button', { name: /丈八蛇矛/ });
     fireEvent.click(zhangbaBtn);
     await waitFor(() => expect(screen.getByText(/转化模式/)).toBeDefined());
 
@@ -276,7 +276,7 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
     const view = makeZhangbaView();
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
-    const zhangbaBtn = await screen.findByRole('button', { name: '丈八蛇矛' });
+    const zhangbaBtn = await screen.findByRole('button', { name: /丈八蛇矛/ });
     fireEvent.click(zhangbaBtn);
 
     fireEvent.click(document.querySelector('[data-card-id="c1"]')!);
@@ -293,7 +293,7 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
     const onAction = vi.fn();
     render(<GameViewComponent view={view} onAction={onAction} />);
 
-    const zhangbaBtn = await screen.findByRole('button', { name: '丈八蛇矛' });
+    const zhangbaBtn = await screen.findByRole('button', { name: /丈八蛇矛/ });
     fireEvent.click(zhangbaBtn);
 
     fireEvent.click(document.querySelector('[data-card-id="c1"]')!);
