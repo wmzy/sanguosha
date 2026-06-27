@@ -6,6 +6,7 @@
 
 import type { ActionContext, ActionPrompt, Card, GameView, Json, DistributePrompt, TargetFilter } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
+import { defaultPlayActive } from '../../engine/action-active';
 
 // ─── use action 查找(filter-based) ───
 // 设计原则:action 声明即真相——技能 onMount 调 defineAction('use') 时通过
@@ -42,24 +43,13 @@ export function findUseActionForCard(actions: SkillActionDef[], card: Card): Ski
 
 // ─── params 构造 ───
 
-/** action 激活默认条件(缺省 activeWhen 时):出牌阶段 + 当前视角回合 + 无阻塞型 pending。
- *  非阻塞型 pending(出牌窗口)不阻止出牌/用技。这是绝大多数主动出牌/用技场景的激活条件。
- *  主动技(仁德/制衡/转化)若需要不同条件,在 defineAction 声明 activeWhen 覆盖。 */
-const DEFAULT_PLAY_ACTIVE = (ctx: ActionContext): boolean => {
-  const { view, perspectiveIdx } = ctx;
-  const pending = view.pending;
-  // pending.isBlocking !== false → true 表示阻塞型(或旧数据缺省,视为阻塞)
-  const blocked = pending != null && pending.isBlocking !== false;
-  return view.currentPlayerIndex === perspectiveIdx
-    && view.phase === '出牌'
-    && !blocked;
-};
-
 /** 判断一个 action 在给定上下文下是否激活。
- *  优先用 action 声明的 activeWhen;未声明则用 DEFAULT_PLAY_ACTIVE(出牌场景默认)。
- *  这是"声明时机"原则的落地点:激活条件由 action 自己说,GameView 不再硬编码分支。 */
+ *  优先用 action 声明的 activeWhen;未声明则用 defaultPlayActive(出牌场景默认:
+ *  当前视角回合 + 出牌阶段 + 无阻塞型 pending)。
+ *  这是“声明时机”原则的落地点:激活条件由 action 自己说,GameView 不再硬编码分支。
+ *  defaultPlayActive 与 engine/action-active 同源(技能 onMount 也复用它)。 */
 export function isActiveAction(action: SkillActionDef, ctx: ActionContext): boolean {
-  return action.activeWhen ? action.activeWhen(ctx) : DEFAULT_PLAY_ACTIVE(ctx);
+  return action.activeWhen ? action.activeWhen(ctx) : defaultPlayActive(ctx);
 }
 
 /** 出牌规则(从 use action 的 prompt 派生,替代 card-meta Set) */

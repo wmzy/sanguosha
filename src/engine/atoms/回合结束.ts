@@ -37,6 +37,8 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
     // 清理每个玩家 duration==='turn' 的 marks(view 侧可见)
     for (const p of view.players) {
       p.marks = p.marks.filter(m => m.duration !== 'turn');
+      // 清空本回合用量(出杀计数/限一次标记),与 apply 清 state vars 对称
+      p.turnUsage = {};
     }
   },
   toViewLog(event) {

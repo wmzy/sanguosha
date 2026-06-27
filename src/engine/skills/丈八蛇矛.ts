@@ -18,10 +18,11 @@
 // 前端多卡转化:TransformMode.minCards/maxCards 声明选牌数(2..2),
 // handleTransformPlay 提交 preceding params.cardIds=[id1,id2] + 主 action
 // cardId = ${id1}#${id2}#丈八蛇矛。
-import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
+import type { Card, CardWrapper, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { applyAtom } from '../create-engine';
 import { viewCanAttack } from '../viewDistance';
+import { defaultPlayActive, viewCanSlash } from '../action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -90,7 +91,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(skill: Skill, api: { defineAction: Function }): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   // 前端:丈八蛇矛是多卡转化技。transform 把选中两张卡包装成 CardWrapper。
   // 前端通过 prompt.cardFilter.min/max (2..2) 识别多卡选牌,
   // 进入多选转化模式,提交 preceding params.cardIds=[id1,id2]。
@@ -110,6 +111,15 @@ export function onMount(skill: Skill, api: { defineAction: Function }): void {
     // transform 接收第一张选中卡,返回 CardWrapper(供前端显示"杀")。
     // 多卡选牌 id 由前端在 handleTransformPlay 中拼成 ${id1}#${id2}#丈八蛇矛。
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id } as CardWrapper),
+    activeWhen: (ctx) => {
+      if (!defaultPlayActive(ctx)) return false;
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p) return false;
+      const weaponId = p.equipment['武器'];
+      const weapon = weaponId ? ctx.view.cardMap[weaponId] : undefined;
+      if (weapon?.name !== '丈八蛇矛') return false;
+      return p.handCount >= 2 && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+    },
   });
   return;
 }

@@ -352,4 +352,36 @@ describe('制衡', () => {
       skillId: '制衡', actionType: 'use', params: { cardIds: ['nonexistent'] },
     });
   });
+
+  // ─── turnUsage view 同步(前端禁用制衡重复发动的数据源)─────────────
+
+  it('turnUsage:发动后 usedThisTurn 同步到 view(event 流 + buildView)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const c2 = makeCard('c2', '杀', '♥', '2');
+    const deck1 = makeCard('d1', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['制衡'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1, c2, d1: deck1 },
+      zones: { deck: ['d1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 初始:未发动制衡
+    P1.processEvents();
+    expect(P1.processedView.players[0].turnUsage?.['制衡/usedThisTurn']).toBeUndefined();
+
+    await P1.triggerAction('制衡', 'use', { cardIds: ['c1'] });
+
+    // 发动后:usedThisTurn=true(event 流与 buildView 双路径一致)
+    P1.processEvents();
+    expect(P1.processedView.players[0].turnUsage?.['制衡/usedThisTurn']).toBe(true);
+    expect(P1.view.players[0].turnUsage?.['制衡/usedThisTurn']).toBe(true);
+  });
 });
