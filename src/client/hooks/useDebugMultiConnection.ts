@@ -115,6 +115,8 @@ export function useDebugMultiConnection(
     // StrictMode 安全：cleanup 后不再 join，避免幽灵连接占用座次
     let cancelled = false;
     const cleanups: Array<() => void> = [];
+    // 只通过 onPhaseChange 递增（WS 真正 open 时），不在 effect 体中立即加，避免 StrictMode 翻倍
+    let connectionOpenCount = 0;
 
     for (let i = 0; i < playerCount; i++) {
       const viewerIndex = i;
@@ -134,6 +136,11 @@ export function useDebugMultiConnection(
         onPhaseChange: (phase: ClientPhase) => {
           if (cancelled) return;
           if (phase === 'playing') setGameStarted(true);
+          // connectedCount 只在 WS 真正 open 时递增（与原始 hook 的 onopen 对齐）
+          if (phase === 'lobby' || phase === 'playing') {
+            connectionOpenCount++;
+            setConnectedCount(connectionOpenCount);
+          }
         },
         onGameOver: (winner: string) => {
           if (cancelled) return;
@@ -152,7 +159,6 @@ export function useDebugMultiConnection(
       });
       clientsRef.current.set(viewerIndex, hgc);
       hgc.connect(roomId, viewerIndex);
-      setConnectedCount(prev => prev + 1);
       cleanups.push(() => { try { hgc.disconnect(); } catch { /* */ } });
     }
 
@@ -169,10 +175,10 @@ export function useDebugMultiConnection(
   const handleDisplayMessage = useCallback((viewerIndex: number, msg: ServerMessage) => {
     switch (msg.type) {
       case 'room_joined': {
-        const seat = typeof msg.seatIndex === 'number' ? msg.seatIndex : viewerIndex;
+        // 与原始 hook 一致：用 viewerIndex（循环索引）而非 msg.seatIndex 做 key
         setSeatPlayerIds(prev => {
           const next = new Map(prev);
-          next.set(seat, msg.playerId);
+          next.set(viewerIndex, msg.playerId);
           return next;
         });
         break;

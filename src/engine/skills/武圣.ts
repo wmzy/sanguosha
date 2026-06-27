@@ -5,10 +5,11 @@
 // 提交时一个 ClientMessage:preceding=[武圣.transform] + 主 action=杀.use。
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
-import type { Card, CardWrapper, GameView, GameState, Json, Skill } from '../types';
+import type { Card, CardWrapper, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
 import { applyAtom } from '../create-engine';
-import { viewCanAttack } from '../viewDistance';
+import { viewCanAttack } from '../viewDistance'
+import { defaultPlayActive, viewCanSlash } from '../action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -65,7 +66,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(skill: Skill, api: { defineAction: Function }): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   // 前端:武圣是转化技,defineAction 声明红牌+目标。
   // 前端 UI 流程:选红牌 → 选目标 → 点武圣按钮 → 提交 preceding=[武圣.transform] + 主 action=杀.use。
   api.defineAction('transform', {
@@ -82,6 +83,13 @@ export function onMount(skill: Skill, api: { defineAction: Function }): void {
       },
     },
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id } as CardWrapper),
+    activeWhen: (ctx) => {
+      if (!defaultPlayActive(ctx)) return false;
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p) return false;
+      const hasRed = p.hand?.some(c => c.suit === '♥' || c.suit === '♦') ?? false;
+      return hasRed && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+    },
   });
   return;
 }

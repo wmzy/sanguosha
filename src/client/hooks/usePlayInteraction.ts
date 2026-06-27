@@ -168,6 +168,22 @@ export function usePlayInteraction(
   }, [distKey]);
   useEffect(() => { setSelectedKillTarget(null); }, [selectedCardId]);
 
+  // 转化模式自动取消:转化条件(回合/装备/手牌)随 view 变化可能不再满足
+  // (如出牌阶段超时回合结束、丈八蛇矛被卸下、手牌不足)。此时若仍停留在转化模式,
+  // 玩家会卡在无法提交的 UI。监听 transformMode 对应 action 的 active 状态,
+  // 不再 active(或技能已卸载/视角切换)时自动退出转化模式。
+  useEffect(() => {
+    if (!transformMode) return;
+    const action = skillActions.find(
+      a => a.skillId === transformMode.skillId && a.actionType === transformMode.actionType,
+    );
+    if (!action || !isActiveAction(action, { view, perspectiveIdx })) {
+      setTransformMode(null);
+      setSelectedCardId(null);
+      setSelectedTarget(null);
+    }
+  }, [transformMode, view, perspectiveIdx, skillActions]);
+
   // ─── 派生:选中的牌 + use action ───
   const selectedCard = selectedCardId ? perspectiveHand.find(c => c.id === selectedCardId) ?? null : null;
 

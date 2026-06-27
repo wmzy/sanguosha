@@ -461,7 +461,9 @@ export type Atom =
   | { type: '结算帧入栈'; skillId: string; from: number; params?: Record<string, Json> }
   | { type: '结算帧出栈' }
   // 结算帧 params 变更(走 atom,保证前端同步)
-  | { type: '帧参数赋值'; key: string; value: Json };
+  | { type: '帧参数赋值'; key: string; value: Json }
+  // 回合用量(view 同步):出杀计数/限一次标记同步到前端 turnUsage
+  | { type: '回合用量'; player: number; key: string; value: Json };
 
 
 export interface AtomDefinition<A = unknown> {

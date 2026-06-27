@@ -134,6 +134,18 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         defenseMod: p.vars['距离/防御修正'] as number | undefined,
         attackRange: p.vars['距离/出杀范围'] as number | undefined,
       },
+      // 本回合用量(出杀计数 + 限一次标记)的 view 投影。
+      // baseline/重连时从此处初值;运行期由「回合用量」atom applyView 增量维护。
+      turnUsage: {
+        ...(typeof state.turn.vars['杀/usedCount'] === 'number'
+          ? { '杀/usedCount': state.turn.vars['杀/usedCount'] }
+          : {}),
+        ...Object.fromEntries(
+          Object.entries(p.vars).filter(
+            ([k, v]) => k.endsWith('/usedThisTurn') && v,
+          ),
+        ),
+      },
       // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)
       pendingTricks: p.pendingTricks.map(t => t.card.id),
       ...(() => {

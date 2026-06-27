@@ -91,4 +91,42 @@ describe('杀', () => {
     P2.processEvents();
     P2.expectView(v => expect(v.players[1].health).toBe(healthAfterFirst));
   });
+
+  // ─── turnUsage view 同步(前端禁用出杀超上限的数据源)─────────────
+
+  it('出杀后 turnUsage.杀/usedCount 同步到 view(event 流 + buildView)', async () => {
+    await harness.setup(buildState());
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // 初始:未出杀,turnUsage 无计数
+    P1.processEvents();
+    expect(P1.processedView.players[0].turnUsage?.['杀/usedCount']).toBeUndefined();
+    expect(P1.view.players[0].turnUsage?.['杀/usedCount']).toBeUndefined();
+
+    await P1.useCardAndTarget('杀', 'c1', [1]);
+    await P2.pass();
+
+    // 出杀后:计数=1(event 流 processedView 与 buildView 双路径一致)
+    P1.processEvents();
+    expect(P1.processedView.players[0].turnUsage?.['杀/usedCount']).toBe(1);
+    expect(P1.view.players[0].turnUsage?.['杀/usedCount']).toBe(1);
+  });
+
+  it('回合结束后 turnUsage 清空(出杀计数重置)', async () => {
+    await harness.setup(buildState());
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'c1', [1]);
+    await P2.pass();
+    P1.processEvents();
+    expect(P1.processedView.players[0].turnUsage?.['杀/usedCount']).toBe(1);
+
+    // 回合结束 atom 的 applyView 清空 turnUsage(与 apply 清 state.turn.vars 对称)。
+    // 直接验证 atom 定义,避免完整的回合推进流程(需 回合管理 技能+deck 配置)。
+    const { 回合结束 } = await import('../../src/engine/atoms/回合结束');
+    回合结束.applyView!(P1.processedView, { type: '回合结束', player: 0 } as any);
+    expect(P1.processedView.players[0].turnUsage?.['杀/usedCount']).toBeUndefined();
+  });
 });

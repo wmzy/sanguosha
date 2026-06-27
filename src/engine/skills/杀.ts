@@ -16,7 +16,8 @@ import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, type SkillModule, validateUseCard } from '../skill';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
-import { canSlash, incSlashUsed } from '../slash-quota';
+import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
+import { defaultPlayActive, viewCanSlash } from '../action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
@@ -122,6 +123,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
         await popFrame(state);
         // 记录一次出杀(已用次数 +1;上限由 slashMax 计算,连弩的 ∞ 由标签体现)
         incSlashUsed(state);
+        // 同步出杀计数到 view:processedView 不增量维护 turn.vars,需经 atom
+        // event 让前端 turnUsage 实时更新(杀超上限时禁用)。紧跟 incSlashUsed
+        // 投影最新计数。
+        await applyAtom(state, { type: '回合用量', player: ownerId, key: '杀/usedCount', value: slashUsed(state) });
       }
     },
   );
@@ -178,6 +183,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
         filter: (view: GameView, t: number) => viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
       },
     },
+    activeWhen: (ctx) => defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
   });
   api.defineAction('respond', {
     label: '出杀',

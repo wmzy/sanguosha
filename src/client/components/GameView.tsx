@@ -34,6 +34,7 @@ import { ZoneInfoBar } from './ZoneInfoBar';
 import { HandCard } from './HandCard';
 import { CancelButton } from './CancelButton';
 import { EquipColumn } from './EquipColumn';
+import { findUseActionForCard, isActiveAction } from '../utils/gameViewHelpers';
 
 // ─── 抽取的 hooks ───
 import { useAnimationState } from '../hooks/useAnimationState';
@@ -360,7 +361,11 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
               const isSelected = selectedCardId === card.id
                 || !!(transformMode && transformMode.minCards > 1 && transformMode.selectedCardIds.includes(card.id));
               const isDiscardSelected = selectedForDiscard.has(card.id);
-              const canPlay = isMyTurn && canOperate;
+              // 出牌阶段该牌是否仍可玩:有 use action 但不 active(如杀超上限)时不可选中。
+              // 无 use action 的牌(闪,出牌阶段本就不可主动出)不受此限,保持原行为。
+              const useAction = findUseActionForCard(skillActions, card);
+              const playBlocked = isMyTurn && canOperate && !!useAction && !isActiveAction(useAction, { view, perspectiveIdx });
+              const canPlay = isMyTurn && canOperate && !playBlocked;
               // distribute 激活时不走 useCard 回应高亮(避免遗计 pending 双高亮)
               const respondFilter = pendingRespondInfo?.cardFilter;
               const isAwaiting = !isDistributeActive && isMyAwaiting && !!respondFilter?.(card);
