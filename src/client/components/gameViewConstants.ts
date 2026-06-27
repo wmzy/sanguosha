@@ -29,6 +29,9 @@ export const EQUIP_SLOT_ICON: Record<EquipSlot, string> = {
   '宝物': '💎',
 };
 
+/** 装备区固定槽位顺序。渲染时始终展示全部 5 槽,空槽显示占位卡框(布局固定不抖动)。 */
+export const EQUIP_SLOT_ORDER: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
+
 /** 花色 → 文字色(黑桃/梅花灰色,红桃/方块红色) */
 export const SUIT_COLOR: Record<string, string> = {
   '♠': '#ccc',

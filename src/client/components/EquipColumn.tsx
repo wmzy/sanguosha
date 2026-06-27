@@ -8,10 +8,10 @@
 
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
-import type { EquipSlot, GameView } from '../../engine/types';
+import type { GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
-import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
+import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON, EQUIP_SLOT_ORDER } from './gameViewConstants';
 
 export interface EquipColumnProps {
   /** 视角玩家在 view.players 中的下标 */
@@ -48,7 +48,6 @@ export function EquipColumn({
   const p = view.players[perspectiveIdx];
   if (!p) return null;
 
-  const equipEntries = Object.entries(p.equipment) as [EquipSlot, string][];
   // 装备技能:动态装备的技能可主动发动。skillId === 装备牌名(见 card-meta.ts)。
   // 将可发动的技能融合到对应装备卡片,不再在底部单独列出技能按钮。
   const equipSkillActions = skillActions.filter((a) => EQUIPMENT_SKILL_NAMES.has(a.skillId));
@@ -58,51 +57,55 @@ export function EquipColumn({
     if (canOperate && isActiveAction(a, actionCtx)) activeSkillByEquipName.set(a.skillId, a);
   }
 
-  const hasEquip = equipEntries.length > 0;
-
   return (
     <div className={styles.equipColumn}>
       <div className={styles.equipColumnTitle}>装备区</div>
       <div className={styles.equipColumnList}>
-        {hasEquip ? (
-          equipEntries.map(([slot, cardId]) => {
-            const id = cardId;
-            const card = view.cardMap[id];
-            const icon = EQUIP_SLOT_ICON[slot] ?? '💎';
-            const name = card?.name ?? id;
-            // 三态:技能可发动 / distribute 候选 / 选中(向右偏移)
-            const activeSkill = activeSkillByEquipName.get(name);
-            const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
-            const isDistSelected = !!distSelectedEquipIds?.has(id);
-            const clickable = !!activeSkill || isDistCandidate;
-            const handleClick = activeSkill
-              ? () => onSkillAction(activeSkill)
-              : isDistCandidate
-                ? () => onEquipCardClick?.(id)
-                : undefined;
-            const stateHint = activeSkill ? ' · 可发动' : isDistCandidate ? ' · 可选中' : '';
+        {EQUIP_SLOT_ORDER.map((slot) => {
+          const cardId = p.equipment[slot];
+          const icon = EQUIP_SLOT_ICON[slot] ?? '💎';
+          // 空槽:固定占位卡框(布局稳定,不因装备数变化而抖动)
+          if (!cardId) {
             return (
-              <div
-                key={slot}
-                className={cx(
-                  styles.equipColumnItem,
-                  activeSkill && styles.equipSkillActive,
-                  isDistCandidate && styles.equipDistCandidate,
-                  isDistSelected && styles.equipSelected,
-                )}
-                role={clickable ? 'button' : undefined}
-                onClick={handleClick}
-                title={card ? `${name}(${slot})${stateHint}` : id}
-              >
+              <div key={slot} className={cx(styles.equipColumnItem, styles.equipSlotEmpty)}>
                 <span className={styles.equipColumnIcon}>{icon}</span>
-                <span>{name}</span>
-                {activeSkill && <span className={styles.equipSkillBadge}>⚡</span>}
+                <span className={styles.equipSlotEmptyLabel}>{slot}</span>
               </div>
             );
-          })
-        ) : (
-          <div className={styles.equipColumnEmpty}>无装备</div>
-        )}
+          }
+          const id = cardId;
+          const card = view.cardMap[id];
+          const name = card?.name ?? id;
+          // 三态:技能可发动 / distribute 候选 / 选中(向右偏移)
+          const activeSkill = activeSkillByEquipName.get(name);
+          const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
+          const isDistSelected = !!distSelectedEquipIds?.has(id);
+          const clickable = !!activeSkill || isDistCandidate;
+          const handleClick = activeSkill
+            ? () => onSkillAction(activeSkill)
+            : isDistCandidate
+              ? () => onEquipCardClick?.(id)
+              : undefined;
+          const stateHint = activeSkill ? ' · 可发动' : isDistCandidate ? ' · 可选中' : '';
+          return (
+            <div
+              key={slot}
+              className={cx(
+                styles.equipColumnItem,
+                activeSkill && styles.equipSkillActive,
+                isDistCandidate && styles.equipDistCandidate,
+                isDistSelected && styles.equipSelected,
+              )}
+              role={clickable ? 'button' : undefined}
+              onClick={handleClick}
+              title={card ? `${name}(${slot})${stateHint}` : id}
+            >
+              <span className={styles.equipColumnIcon}>{icon}</span>
+              <span>{name}</span>
+              {activeSkill && <span className={styles.equipSkillBadge}>⚡</span>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
