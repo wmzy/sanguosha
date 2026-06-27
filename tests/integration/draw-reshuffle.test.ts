@@ -14,10 +14,11 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
 import type { Card, GameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A'): Card {
-  return { id, name, suit, rank, type: '基本牌' };
+  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
 }
 
 function makePlayer(opts: { index: number; name: string; hand?: string[] }) {

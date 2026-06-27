@@ -57,6 +57,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         id: cardId,
         name: '兵粮寸断',
         suit: '♣',
+        color: '黑',
         rank: 'A',
         type: '锦囊牌',
       };

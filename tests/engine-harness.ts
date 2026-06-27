@@ -592,7 +592,7 @@ export class SkillTestHarness {
     if (state.zones.deck.length === 0) {
       for (let i = 0; i < 20; i++) {
         const id = `__test_deck_${i}`;
-        state.cardMap[id] = { id, name: i % 3 === 0 ? '杀' : i % 3 === 1 ? '闪' : '桃', suit: '♠', rank: String(i + 2), type: '基本牌' };
+        state.cardMap[id] = { id, name: i % 3 === 0 ? '杀' : i % 3 === 1 ? '闪' : '桃', suit: '♠', color: '黑', rank: String(i + 2), type: '基本牌' };
         state.zones.deck.push(id);
       }
     }

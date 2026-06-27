@@ -19,13 +19,14 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 import { resetForTest } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import { registerSystemRespondActions } from '../../src/engine/skills/系统规则';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makePlayer(opts: {
@@ -87,7 +88,7 @@ describe('回合管理', () => {
     const deckCards: Card[] = [];
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      deckCards.push({ id, name: '杀', suit: '♠', rank: String(i + 1), type: '基本牌' });
+      deckCards.push({ id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' });
       state.cardMap[id] = deckCards[i];
       state.zones.deck.push(id);
     }
@@ -177,7 +178,7 @@ describe('回合管理', () => {
     // 给 deck 一些牌
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
       state.zones.deck.push(id);
     }
     await harness.setup(state);
@@ -287,7 +288,7 @@ describe('回合管理', () => {
     });
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
       state.zones.deck.push(id);
     }
     await harness.setup(state);
@@ -355,7 +356,7 @@ describe('回合管理', () => {
     // 给 deck 一些牌让 P2 摸牌
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
       state.zones.deck.push(id);
     }
     await harness.setup(state);

@@ -70,9 +70,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return ok ? null : '丈八蛇矛转化条件不满足';
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const [id1, id2] = params.cardIds as string[];
+      const cardIds = params.cardIds as string[];
+      const [id1, id2] = cardIds;
+      const shadowId = shadowIdOf(id1, id2);
       // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, { type: '武圣包装', player: ownerId, cardId: id1, secondCardId: id2 });
+      await applyAtom(state, { type: '当作', player: ownerId, cardIds, shadowId, outputName: '杀' });
     },
     // rollback:主 action validate 失败时,撤销转化(删影子 + 还原卡)
     (state: GameState, params: Record<string, Json>) => {

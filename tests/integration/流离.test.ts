@@ -61,8 +61,8 @@ describe('流离:成为杀的目标时转移', () => {
   // (localVars['流离/target'] 始终 undefined)。
   // 本测试只验证 confirm 阶段成功 + chooseTarget pending 创建。
   it('用例1:P1 发动流离(confirm)→ 流离/chooseTarget pending 出现', async () => {
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
-    const discard1: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const discard1: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -130,8 +130,8 @@ describe('流离:成为杀的目标时转移', () => {
   // 用例 2:回归——P1 不发动流离 → 杀正常命中 P1
   // ─────────────────────────────────────────────────────────────
   it('用例2:P1 不发动流离(默认)→ 杀命中 P1,P1 扣血', async () => {
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
-    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -186,7 +186,7 @@ describe('流离:成为杀的目标时转移', () => {
   // 用例 3:P1 无手牌 → 不应出现流离询问,直接进入询问闪
   // ─────────────────────────────────────────────────────────────
   it('用例3:P1 无手牌 → 跳过流离询问,直接进入询问闪,P1 受伤', async () => {
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [

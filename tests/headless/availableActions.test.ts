@@ -20,7 +20,7 @@ function makeView(seat: number, phase: GameView['phase'], hand: Card[], currentP
   };
 }
 
-const killCard: Card = { id: 'c1', name: '杀', suit: '♠', rank: '5', type: '基本牌' };
+const killCard: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '5', type: '基本牌' };
 
 // 杀的 use action：useCardAndTarget，cardFilter 匹配 name==='杀'，targetFilter 选一个其他玩家
 const killUseAction: SkillActionDef = {

@@ -7,8 +7,8 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function build(opts?: { p2Hand?: string[]; p3?: boolean; extraCards?: Record<string, Card> }): GameState {
-  const slash: Card = { id: 'c0', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
-  const nanman: Card = { id: 'nm1', name: '南蛮入侵', suit: '♠', rank: '7', type: '锦囊牌' };
+  const slash: Card = { id: 'c0', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
+  const nanman: Card = { id: 'nm1', name: '南蛮入侵', suit: '♠', color: '黑', rank: '7', type: '锦囊牌' };
   const cards: Record<string, Card> = { c0: slash, nm1: nanman, ...opts?.extraCards };
   const players = [
     { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
@@ -51,7 +51,7 @@ describe('南蛮入侵', () => {
   });
 
   it('P2 出杀 → P2 不扣血, 杀和南蛮都进弃牌堆', async () => {
-    await harness.setup(build({ p2Hand: ['c0'], extraCards: { c0: { id: 'c0', name: '杀', suit: '♠', rank: '2', type: '基本牌' } } }));
+    await harness.setup(build({ p2Hand: ['c0'], extraCards: { c0: { id: 'c0', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' } } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
@@ -70,7 +70,7 @@ describe('南蛮入侵', () => {
   });
 
   it('3人局: P2出杀P3无杀 → P3扣血', async () => {
-    const c2: Card = { id: 'c2', name: '杀', suit: '♠', rank: '3', type: '基本牌' };
+    const c2: Card = { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '3', type: '基本牌' };
     await harness.setup(build({ p2Hand: ['c2'], p3: true, extraCards: { c2 } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -160,7 +160,7 @@ describe('南蛮入侵', () => {
     state.players[2].hand = ['nm1'];
     state.players[2].skills = ['南蛮入侵', '杀'];
     // 给 P3 一张无懈可击,用于抵消对 P2 的效果
-    state.cardMap['wx1'] = { id: 'wx1', name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap['wx1'] = { id: 'wx1', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
     state.players[2].hand.push('wx1');
     state.players[2].skills.push('无懈可击');
     await harness.setup(state);

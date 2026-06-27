@@ -53,7 +53,7 @@ describe('遗计:端到端(harness)', () => {
   // 用例 1:受伤 → 摸2牌 → 全部分配给 P2
   // ─────────────────────────────────────────────────────────────
   it('用例1:P0 杀 P1(遗计) → 不出闪 → 摸2牌 → 全部分配给 P2', async () => {
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -108,7 +108,7 @@ describe('遗计:端到端(harness)', () => {
   // 用例 2:受伤 → 摸2牌 → 分配给多方(P0 和 P2)
   // ─────────────────────────────────────────────────────────────
   it('用例2:受伤 → 摸2牌 → 分配给 P0 和 P2 各一张', async () => {
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -153,7 +153,7 @@ describe('遗计:端到端(harness)', () => {
   // 用例 3:受伤 → 摸2牌 → 全分配给自己(不放)
   // ─────────────────────────────────────────────────────────────
   it('用例3:受伤 → 摸2牌 → 全分配给自己(P1)', async () => {
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [

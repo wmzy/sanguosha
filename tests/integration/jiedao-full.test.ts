@@ -7,9 +7,9 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function build3p(): GameState {
-  const jdsr: Card = { id: 'jdsr', name: '借刀杀人', suit: '♠', rank: 'Q', type: '锦囊牌' };
-  const wp1: Card = { id: 'wp1', name: '诸葛连弩', suit: '♠', rank: 'A', type: '装备牌' };
-  const s2: Card = { id: 's2', name: '杀', suit: '♣', rank: '5', type: '基本牌' };
+  const jdsr: Card = { id: 'jdsr', name: '借刀杀人', suit: '♠', color: '黑', rank: 'Q', type: '锦囊牌' };
+  const wp1: Card = { id: 'wp1', name: '诸葛连弩', suit: '♠', color: '黑', rank: 'A', type: '装备牌' };
+  const s2: Card = { id: 's2', name: '杀', suit: '♣', color: '黑', rank: '5', type: '基本牌' };
   return createGameState({
     players: [
       { index:0,name:'P0',character:'X',health:4,maxHealth:4,alive:true,hand:['jdsr'],equipment:{},skills:['借刀杀人'],vars:{},marks:[],pendingTricks:[],tags:[],judgeZone:[]},
@@ -48,7 +48,7 @@ describe('借刀杀人完整流程', () => {
   });
 
   it('P1出杀→P2出闪→不扣血', async () => {
-    const d1: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+    const d1: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
     const state = build3p();
     state.players[2].hand = ['d1'];
     state.cardMap['d1'] = d1;

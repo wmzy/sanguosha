@@ -47,7 +47,7 @@ const dodgePending = {
 // 判定翻牌事件(effect.animation='flip', EventBanner 会渲染翻牌)
 const judgeFlipEvent = {
   seq: 10,
-  event: { type: '判定', player: 0, judgeType: '八卦阵', cardId: 'j1', card: { name: '桃', suit: '♥', rank: '5' } },
+  event: { type: '判定', player: 0, judgeType: '八卦阵', cardId: 'j1', card: { name: '桃', suit: '♥', color: '红', rank: '5' } },
 };
 
 describe('GameView:判定翻牌动画期间延迟询问类 pending', () => {

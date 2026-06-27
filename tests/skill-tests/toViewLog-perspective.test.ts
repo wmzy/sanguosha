@@ -10,9 +10,9 @@ import '../../src/engine/atoms';
 import { getAtomDef } from '../../src/engine/atom';
 import type { ViewEvent, Card } from '../../src/engine/types';
 
-const CARD_KILL: Card = { id: 'c1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
-const CARD_DODGE: Card = { id: 'c2', name: '闪', suit: '♥', rank: 'J', type: '基本牌' };
-const CARD_PEACH: Card = { id: 'c3', name: '桃', suit: '♦', rank: '3', type: '基本牌' };
+const CARD_KILL: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+const CARD_DODGE: Card = { id: 'c2', name: '闪', suit: '♥', color: '红', rank: 'J', type: '基本牌' };
+const CARD_PEACH: Card = { id: 'c3', name: '桃', suit: '♦', color: '红', rank: '3', type: '基本牌' };
 
 describe('toViewLog 视角区分', () => {
   describe('摸牌', () => {
@@ -161,7 +161,7 @@ describe('toViewLog 视角区分', () => {
         player: 0,
         judgeType: '乐不思蜀',
         cardId: 'j1',
-        card: { name: '杀', suit: '♠', rank: '7' } as Card,
+        card: { name: '杀', suit: '♠', color: '黑', rank: '7' } as Card,
       };
       const log = def.toViewLog!(event, 0)!;
       expect(log.player).toBe(0);
@@ -177,7 +177,7 @@ describe('toViewLog 视角区分', () => {
         player: 1,
         judgeType: '闪电',
         cardId: 'j1',
-        card: { name: '桃', suit: '♥', rank: '3' } as Card,
+        card: { name: '桃', suit: '♥', color: '红', rank: '3' } as Card,
       };
       // P0 视角看 P1 的判定
       const log0 = def.toViewLog!(event, 0)!;

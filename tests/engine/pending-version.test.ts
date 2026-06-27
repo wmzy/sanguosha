@@ -96,7 +96,7 @@ describe('pending-scoped 版本控制', () => {
         },
       ],
       cardMap: {
-        d1: { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' },
+        d1: { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
       },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -107,14 +107,14 @@ describe('pending-scoped 版本控制', () => {
     // 给双方各一张无懈可击
     const nullif0Id = 'wx0';
     const nullif1Id = 'wx1';
-    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
-    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', rank: 'K', type: '锦囊牌' };
+    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'K', type: '锦囊牌' };
     state.players[0].hand.push(nullif0Id);
     state.players[1].hand.push(nullif1Id);
 
     // P0 出过河拆桥 → 无懈窗口 W1
     const gqId = 'gq1';
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
 
     await dispatchAndWait(state, {

@@ -48,7 +48,7 @@ describe('无懈可击链路', () => {
         },
       ],
       cardMap: {
-        d1: { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' },
+        d1: { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
       },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -64,7 +64,7 @@ describe('无懈可击链路', () => {
     const lord = state.players[0];
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
 
     // 锦囊在 P0 → P1
@@ -92,7 +92,7 @@ describe('无懈可击链路', () => {
     const lord = state.players[0];
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
 
     // 记录 P1 弃牌前手牌
@@ -136,11 +136,11 @@ describe('无懈可击链路', () => {
   it('用例3:P1 出无纶可击 → 锦囊被抵消(目标牌未被弃)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
     // 给 P1 一张无懈可击
     const nullifId = `nullif-${state.players[1].hand.length}`;
-    state.cardMap[nullifId] = { id: nullifId, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullifId] = { id: nullifId, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
     state.players[1].hand.push(nullifId);
 
     const p1HandBefore = state.players[1].hand.slice();
@@ -194,15 +194,15 @@ describe('无懈可击链路', () => {
   it('用例4:双无纶抵消 → 锦囊恢复生效(目标失去手牌)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
     // 给 P1 一张无懈可击
     const nullif1Id = `nullif-1-${state.players[1].hand.length}`;
-    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
     state.players[1].hand.push(nullif1Id);
     // 给 P0 一张无懈可击(反无懈)
     const nullif0Id = `nullif-0-${state.players[0].hand.length}`;
-    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
     state.players[0].hand.push(nullif0Id);
 
     const p1HandBefore = state.players[1].hand.slice();
@@ -285,7 +285,7 @@ describe('无懈可击 dispatch 链路', () => {
         },
       ],
       cardMap: {
-        d1: { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' },
+        d1: { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
       },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -297,7 +297,7 @@ describe('无懈可击 dispatch 链路', () => {
   // 用例 1:锦囊 → 无懈 pending (target=-2 广播) 出现
   it('用例1:出过河拆桥 → 产生无懈可击 pending (broadcast)', async () => {
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
 
     await dispatchAndWait(state, {
@@ -315,10 +315,10 @@ describe('无懈可击 dispatch 链路', () => {
   // 用例 2:P1 respond 出无懈 → 锦囊被抵消 → P1 牌未丢
   it('用例2:P1 出无懈可击 → 锦囊被抵消(目标牌未弃)', async () => {
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
     const nullifId = `wx-${state.players[1].hand.length}`;
-    state.cardMap[nullifId] = { id: nullifId, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullifId] = { id: nullifId, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
     state.players[1].hand.push(nullifId);
 
     const p1HandBefore = state.players[1].hand.slice();
@@ -356,13 +356,13 @@ describe('无懈可击 dispatch 链路', () => {
   // 用例 3:双无懈:P1 出无懈抵消 → P0 出无懈反抵消 → 锦囊恢复生效
   it('用例3:双无懈抵消 → 锦囊恢复生效(目标失去手牌)', async () => {
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
     const nullif1Id = `wx1-${state.players[1].hand.length}`;
-    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
     state.players[1].hand.push(nullif1Id);
     const nullif0Id = `wx0-${state.players[0].hand.length}`;
-    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', rank: 'J', type: '锦囊牌' };
+    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
     state.players[0].hand.push(nullif0Id);
 
     const p1FirstCard = 'd1';
@@ -405,7 +405,7 @@ describe('无懈可击 dispatch 链路', () => {
   // 用例 4:无人出无懈 → fireTimeout → 锦囊正常生效
   it('用例4:fireTimeout → 无人出无懈 → 锦囊正常结算(目标失去手牌)', async () => {
     const gqId = `gq-${state.players[0].hand.length}`;
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     state.players[0].hand.push(gqId);
 
     const p1FirstCard = 'd1';

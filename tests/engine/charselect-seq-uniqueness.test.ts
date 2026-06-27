@@ -27,8 +27,8 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
     tags: [],
       }],
       cardMap: {
-        c1: { id: 'c1', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
-        c2: { id: 'c2', name: '杀', suit: '♠', rank: '8', type: '基本牌' },
+        c1: { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
+        c2: { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '8', type: '基本牌' },
       },
       zones: { deck: ['c1', 'c2'], discardPile: [], processing: [] },
       seq: 0,
@@ -54,8 +54,8 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
     tags: [],
       }],
       cardMap: {
-        c1: { id: 'c1', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
-        c2: { id: 'c2', name: '杀', suit: '♠', rank: '8', type: '基本牌' },
+        c1: { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
+        c2: { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '8', type: '基本牌' },
       },
       zones: { deck: ['c1', 'c2'], discardPile: [], processing: [] },
       seq: 0,

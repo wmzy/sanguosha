@@ -17,10 +17,11 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makePlayer(opts: {
@@ -197,5 +198,67 @@ describe('丈八蛇矛', () => {
     expect(harness.state.cardMap['c1#c2#丈八蛇矛']).toBeUndefined();
     expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['c1', 'c2']));
     expect(harness.state.players[0].hand).toHaveLength(2);
+  });
+
+  // ─── color 字段:多张转化的花色/颜色规则 ──────────────────
+
+  it('transformThenUse:两张同色(♠+♣) → 影子卡 color=黑, suit=空', async () => {
+    const c1 = makeCard('c1', '闪', '♠', '2');
+    const c2 = makeCard('c2', '桃', '♣', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['丈八蛇矛', '杀', '闪'], equipment: { 武器: 'zb' } }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'] }),
+      ],
+      cardMap: { zb: ZHANGBA, c1, c2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.transformThenUse(
+      '丈八蛇矛',
+      { cardIds: ['c1', 'c2'] },
+      '杀',
+      { cardId: 'c1#c2#丈八蛇矛', targets: [1] },
+    );
+
+    const shadow = harness.state.cardMap['c1#c2#丈八蛇矛'];
+    // 多张转化:花色清空,颜色取同色(黑)
+    expect(shadow.suit).toBe('');
+    expect(shadow.color).toBe('黑');
+    expect(shadow.shadowOf).toBeUndefined();
+  });
+
+  it('transformThenUse:两张异色(♠+♥) → 影子卡 color=无色, suit=空', async () => {
+    const c1 = makeCard('c1', '闪', '♠', '2');
+    const c2 = makeCard('c2', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['丈八蛇矛', '杀', '闪'], equipment: { 武器: 'zb' } }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'] }),
+      ],
+      cardMap: { zb: ZHANGBA, c1, c2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.transformThenUse(
+      '丈八蛇矛',
+      { cardIds: ['c1', 'c2'] },
+      '杀',
+      { cardId: 'c1#c2#丈八蛇矛', targets: [1] },
+    );
+
+    const shadow = harness.state.cardMap['c1#c2#丈八蛇矛'];
+    // 异色混合 → 无色杀(不被仁王盾/护甲防御)
+    expect(shadow.suit).toBe('');
+    expect(shadow.color).toBe('无色');
+    expect(shadow.shadowOf).toBeUndefined();
   });
 });

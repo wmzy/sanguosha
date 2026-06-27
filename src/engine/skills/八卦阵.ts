@@ -74,6 +74,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         id: dodgeId,
         name: '闪',
         suit: judgeCard.suit,
+        color: judgeCard.color,
         rank: judgeCard.rank,
         type: '基本牌',
       };

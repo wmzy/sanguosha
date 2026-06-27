@@ -56,9 +56,9 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 1. 杀命中 + 确认弃马 → 弃进攻马 + 伤害照常
   // ─────────────────────────────────────────────────────────────
   it('用例1:P0 麒麟弓杀P1(持进攻马)→ 确认发动 → P1 马被弃 + 扣1血', async () => {
-    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
-    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', rank: '5', type: '装备牌', subtype: '进攻马' };
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
+    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '进攻马' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -106,9 +106,9 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 2. 杀命中 + 不发动 → 目标马保留 + 伤害照常
   // ─────────────────────────────────────────────────────────────
   it('用例2:P0 麒麟弓杀P1(持进攻马)→ 不发动 → P1 马保留 + 扣1血', async () => {
-    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
-    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', rank: '5', type: '装备牌', subtype: '进攻马' };
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
+    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '进攻马' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -160,8 +160,8 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 3. 杀命中 + 目标无马 → 不询问
   // ─────────────────────────────────────────────────────────────
   it('用例3:P0 麒麟弓杀P1(无马)→ 不询问,直接扣血', async () => {
-    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -205,8 +205,8 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 4. 回归:无麒麟弓时,杀命中后不触发弃马
   // ─────────────────────────────────────────────────────────────
   it('用例4:无麒麟弓时,杀命中后不触发弃马询问', async () => {
-    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', rank: '5', type: '装备牌', subtype: '进攻马' };
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '进攻马' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [

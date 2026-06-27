@@ -60,8 +60,8 @@ describe('杀 + 装备 + 距离', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例1:装备丈八蛇矛(范围 3)后,P0 可以攻击座位距离 2 的 P2', async () => {
     // 卡定义:丈八蛇矛(范围 3)
-    const weapon: Card = { id: 'wp-zh', name: '丈八蛇矛', suit: '♠', rank: 'A', type: '装备牌', subtype: '武器', range: 3 };
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const weapon: Card = { id: 'wp-zh', name: '丈八蛇矛', suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 3 };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -106,8 +106,8 @@ describe('杀 + 装备 + 距离', () => {
   // 用例 2:出杀 → 出闪 → 伤害为 0
   // ─────────────────────────────────────────────────────────────
   it('用例2:出杀 → P1 出闪 → P1 不扣血,杀和闪都进弃牌堆', async () => {
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
-    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -160,7 +160,7 @@ describe('杀 + 装备 + 距离', () => {
   // 用例 3:出杀 → 不出闪 → 扣血
   // ─────────────────────────────────────────────────────────────
   it('用例3:出杀 → P1 不出闪(超时)→ P1 扣 1 血', async () => {
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -204,9 +204,9 @@ describe('杀 + 装备 + 距离', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例4:装备诸葛连弩后,同回合可以出多张杀', async () => {
     // 诸葛连弩卡(range=1,武器)
-    const zhuge: Card = { id: 'wp-zg', name: '诸葛连弩', suit: '♣', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
-    const slash1: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
-    const slash2: Card = { id: 'k2', name: '杀', suit: '♠', rank: '8', type: '基本牌' };
+    const zhuge: Card = { id: 'wp-zg', name: '诸葛连弩', suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
+    const slash1: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const slash2: Card = { id: 'k2', name: '杀', suit: '♠', color: '黑', rank: '8', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -289,7 +289,7 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
   });
 
   it('state A 注册流离后,state B(无流离玩家)杀 seat 0 不触发 流离/confirm', async () => {
-    const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+    const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 
     // state A:seat 0 有流离技能(会注册流离 after hook 到 state A 的注册表)
     const stateA = createGameState({
@@ -305,7 +305,7 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
     await registerSkillsFromState(stateA);
 
     // state B:5 人局(孙权/黄盖/夏侯渊/庞德/荀彧),无人有流离
-    const slashB: Card = { id: 'c2', name: '杀', suit: '♥', rank: '3', type: '基本牌' };
+    const slashB: Card = { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' };
     const stateB = createGameState({
       players: [
         { index: 0, name: '孙权', character: '孙权', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['制衡', '闪', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },

@@ -34,10 +34,10 @@ function makePlayer(opts: {
 }
 
 function makeEquip(id: string, name: string, subtype: string, range?: number): Card {
-  return { id, name, suit: '♣', rank: 'A', type: '装备牌', subtype, range };
+  return { id, name, suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype, range };
 }
 function makeCard(id: string, name: string): Card {
-  return { id, name, suit: '♠', rank: 'A', type: '基本牌' };
+  return { id, name, suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 }
 
 describe('弃置装备:卸载自带技能实例', () => {

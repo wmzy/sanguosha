@@ -18,6 +18,7 @@ import { fireTimeoutAndWait, dispatchAndWait, SkillTestHarness } from '../engine
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 /** 反复 fireTimeout 直到没有 pending 或超过 safety。返回跳过的 pending 数 */
@@ -42,7 +43,7 @@ function giveCard(state: GameState, ownerIndex: number, name: string, idHint: st
   state.cardMap[id] = {
     id,
     name,
-    suit,
+    suit, color: suitColor(suit),
     rank: '7',
     type: type ?? (name === '桃' ? '基本牌' : '锦囊牌'),
   };
@@ -89,7 +90,7 @@ describe('濒死求桃', () => {
     state.players[1].maxHealth = 1;
     // 给 P1 一张装备(看后续是否会被弃掉)
     const equipId = giveCard(state, 1, '诸葛连弩', 'wp');
-    state.cardMap[equipId] = { id: equipId, name: '诸葛连弩', suit: '♣', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
+    state.cardMap[equipId] = { id: equipId, name: '诸葛连弩', suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
     state.players[1].equipment['武器'] = equipId;
     state.players[1].hand = state.players[1].hand.filter(id => id !== equipId);
     const p1HealthBefore = state.players[1].health;
@@ -267,7 +268,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 // ── 以下为从 dying-peach.test.ts 合并的 SkillTestHarness 路径测试 ──

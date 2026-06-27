@@ -17,6 +17,7 @@ import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './Subm
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
 import type { GameView, ViewEvent } from '../../engine/types';
+import { suitColor, type Suit } from '../../shared/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
 import type { ActionMsg } from '../types';
 
@@ -207,6 +208,7 @@ export function useDebugMultiConnection(
               if (!v.cardMap[judgeCardId] && judgeCard) {
                 v.cardMap[judgeCardId] = {
                   id: judgeCardId, name: judgeCard.name, suit: judgeCard.suit as GameView['cardMap'][string]['suit'],
+                  color: suitColor(judgeCard.suit as Suit),
                   rank: judgeCard.rank, type: '基本牌',
                 };
               }

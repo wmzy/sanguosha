@@ -72,6 +72,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         id: cardId,
         name: TRICK_NAME,
         suit: '♠',
+        color: '黑',
         rank: 'A',
         type: '锦囊牌',
       };

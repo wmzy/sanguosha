@@ -1,5 +1,15 @@
 export type Suit = '♠' | '♥' | '♣' | '♦';
 
+/** 牌的颜色：♥♦→红，♠♣→黑，多牌混合转化→无色。与花色(suit)正交。 */
+export type Color = '红' | '黑' | '无色';
+
+/** 由花色派生颜色。仅用于真实花色牌(♥♦→红, ♠♣→黑)；空花色(转化合成卡)→无色。 */
+export function suitColor(suit: Suit | ''): Color {
+  if (suit === '♥' || suit === '♦') return '红';
+  if (suit === '♠' || suit === '♣') return '黑';
+  return '无色';
+}
+
 export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
 
 export type CardType = '基本牌' | '锦囊牌' | '装备牌';
@@ -14,6 +24,8 @@ export interface Card {
   type: CardType;
   subtype: CardSubType;
   suit: Suit;
+  /** 颜色，独立于花色。转化合成卡可为'无色'。 */
+  color: Color;
   rank: Rank;
   description: string;
   range?: number;

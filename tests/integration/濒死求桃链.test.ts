@@ -23,6 +23,7 @@ import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../engine
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -59,7 +60,7 @@ function makeCard(
   rank = '7',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 describe('濒死求桃链:多人依次问', () => {
@@ -158,7 +159,7 @@ describe('濒死求桃链:多人依次问', () => {
     // 给 P1 一张废牌(应被打入弃牌堆)
     const deadHandCard: Card = makeCard('d1', '杀', '♥', '9');
     // 给 P1 一件装备
-    const wp: Card = { id: 'wp1', name: '诸葛连弩', suit: '♣', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
+    const wp: Card = { id: 'wp1', name: '诸葛连弩', suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
 
     const state: GameState = createGameState({
       players: [

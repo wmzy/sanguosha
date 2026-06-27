@@ -14,10 +14,11 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function buildState(opts?: { p2Hand?: string[]; p2Equip?: Record<string, string>; p2Tricks?: Array<{ name: string; card: Card }>; extraCards?: Record<string, Card> }): GameState {

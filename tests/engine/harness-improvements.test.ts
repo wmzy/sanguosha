@@ -15,7 +15,7 @@ import type { Atom, Card, GameState, GameView, ViewEvent } from '../../src/engin
 import { dispatch as engineDispatch } from '../../src/engine/create-engine';
 
 function build(): GameState {
-  const slash: Card = { id: 's0', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+  const slash: Card = { id: 's0', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
   return createGameState({
     players: [
       { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,

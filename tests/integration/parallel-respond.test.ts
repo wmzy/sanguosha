@@ -9,8 +9,8 @@ import { createGameState } from '../../src/engine/types';
 
 function build(): GameState {
   const cards: Card[] = [
-    { id: 'a1', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
-    { id: 'b1', name: '杀', suit: '♣', rank: '3', type: '基本牌' },
+    { id: 'a1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
+    { id: 'b1', name: '杀', suit: '♣', color: '黑', rank: '3', type: '基本牌' },
   ];
   const cardMap: Record<string, Card> = {};
   for (const c of cards) cardMap[c.id] = c;

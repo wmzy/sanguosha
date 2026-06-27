@@ -32,7 +32,7 @@ function makeView(equipment: Record<string, string>): GameView {
       },
     ],
     cardMap: {
-      wp1: { id: 'wp1', name: '诸葛连弩', suit: '♠', rank: 'A', type: '装备牌', subtype: '武器' },
+      wp1: { id: 'wp1', name: '诸葛连弩', suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype: '武器' },
     },
     pending: null, deadline: null, deadlineTotalMs: 0, log: [], settlementStack: [],
   };

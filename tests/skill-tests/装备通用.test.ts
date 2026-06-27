@@ -16,10 +16,11 @@ import { findActionEntry } from '../../src/engine/skill';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物', rank = 'A', range?: number): Card {
-  return { id, name, suit, rank, type: '装备牌', subtype, range };
+  return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
 function makePlayer(opts: {
@@ -208,7 +209,7 @@ describe('装备通用', () => {
   it('use:不是装备牌(基本牌当装备) → 拒绝(无 subtype)', async () => {
     // 装备 validate:hasSubtype = !!card?.subtype
     // 一张杀(type=基本牌)没有 subtype → 拒绝
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['s1'] }),

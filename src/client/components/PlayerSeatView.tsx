@@ -88,6 +88,7 @@ export function PlayerSeatView({
         isDamaged && seatDamageOverlay,
         isTurnGlow && turnGlowing,
       )}
+      data-player-name={player.name}
       key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onSeatDoubleClick?.(index)}

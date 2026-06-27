@@ -10,7 +10,7 @@ function makeFullView(): GameView {
     players: [{
       index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4,
       alive: true, equipment: {}, skills: ['仁德'], handCount: 1,
-      hand: [{ id: 'c1', name: '杀', suit: '♠', rank: '5', type: '基本牌' }], marks: [],
+      hand: [{ id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '5', type: '基本牌' }], marks: [],
       distanceVars: { attackMod: 0, defenseMod: 0, attackRange: 1 },
     }],
     cardMap: {}, pending: null, deadline: null, deadlineTotalMs: 0,

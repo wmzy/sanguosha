@@ -14,6 +14,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -50,7 +51,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 describe('反馈:端到端(harness)', () => {
