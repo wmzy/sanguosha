@@ -1,7 +1,7 @@
 // src/client/headless/types.ts
 // HeadlessGameClient 公开类型。框架无关（零 React 依赖）。
 import type { GameView, ViewEvent, ClientMessage as EngineClientMessage, Card } from '../../engine/types';
-import type { RoomConfig } from '../../server/protocol';
+import type { RoomConfig, ServerMessage } from '../../server/protocol';
 
 /** 配置阶段房间准备状态（由 room_state 消息驱动）。 */
 export interface RoomState {
@@ -15,18 +15,14 @@ export interface RoomState {
 export type ClientPhase = 'connecting' | 'lobby' | 'playing' | 'ended';
 
 export interface HeadlessCallbacks {
-  /** view 每次更新（initialView 或增量 event 后）。携带自上次以来的新事件窗口 */
   onView?: (view: GameView, newEvents: ViewEvent[]) => void;
-  /** 配置阶段房间状态变化 */
   onRoomState?: (state: RoomState | null) => void;
-  /** 阶段切换（进入 lobby/playing/ended） */
   onPhaseChange?: (phase: ClientPhase) => void;
-  /** 游戏结束 */
   onGameOver?: (winner: string) => void;
-  /** 出牌被拒（CAS baseSeq 失配或 validate 失败） */
   onActionRejected?: () => void;
-  /** 连接异常/断开 */
   onError?: (err: Error) => void;
+  /** 每条原始 ServerMessage 到达后调用（供宿主做展示层增强：telemetry/判定牌延迟等）。在 view 更新之后。 */
+  onMessage?: (msg: ServerMessage) => void;
 }
 
 /** AI 决策的核心输入：一个可直接执行的操作。 */

@@ -104,6 +104,7 @@ export class HeadlessGameClient {
     }
     if (r.resetToLobby) { this._view = null; this._lastSeq = 0; }
     if (r.actionRejected) this.callbacks.onActionRejected?.();
+    this.callbacks.onMessage?.(msg);
   }
 
   drainNewEvents(): ViewEvent[] {
@@ -161,8 +162,14 @@ export class HeadlessGameClient {
   // ── 操作 ──
 
   sendAction(action: EngineClientMessage): void {
-    this.send({ type: 'action', action, baseSeq: this._lastSeq });
+    // 阻塞型 pending 期间 respond 携带 pendingSeq（当前窗口 seq），非阻塞（出牌窗口）不带
+    const pending = this._view?.pending;
+    const pendingSeq = pending?.isBlocking ? this._lastSeq : undefined;
+    this.send({ type: 'action', action: { ...action, baseSeq: this._lastSeq, pendingSeq }, baseSeq: this._lastSeq });
   }
+
+  /** 重排手牌（对应 reorder_hand 协议消息） */
+  reorderHand(order: string[]): void { this.send({ type: 'reorder_hand', order }); }
 
   useCardAndTarget(skillId: string, cardId: string, targets: number[]): void {
     this.sendAction({ skillId, actionType: 'use', ownerId: this._seatIndex, params: { cardId, targets }, baseSeq: 0 });
