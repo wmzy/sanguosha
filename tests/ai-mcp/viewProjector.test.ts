@@ -26,8 +26,8 @@ describe('projectView', () => {
     expect(snap.viewer).toBe(0);
     expect(snap.players[0].hand).toHaveLength(1);
     expect(snap.log.length).toBeLessThanOrEqual(20); // 截断
-    expect((snap.players[0] as Record<string, unknown>).distanceVars).toBeUndefined(); // 丢弃
-    expect((snap as Record<string, unknown>).settlementStack).toBeUndefined();
+    expect((snap.players[0] as { distanceVars?: unknown }).distanceVars).toBeUndefined(); // 丢弃
+    expect((snap as { settlementStack?: unknown }).settlementStack).toBeUndefined();
   });
 
   it('无 zones 时回退为 0', () => {
@@ -41,10 +41,10 @@ describe('projectView', () => {
     const view = makeFullView();
     view.pending = {
       type: 'awaits',
-      atom: { type: '询问闪', player: 0 } as GameView['pending'] extends infer P ? P extends { atom: infer A } ? A : never : never,
-      prompt: { type: 'useCard', title: '请出闪', cardFilter: { filter: () => true, min: 1, max: 1 } } as never,
+      atom: { type: '询问闪', player: 0 } as unknown as GameView['pending'] extends infer P ? P extends { atom: infer A } ? A : never : never,
+      prompt: { type: 'useCard', title: '请出闪', cardFilter: { filter: () => true, min: 1, max: 1 } } as unknown as GameView['pending'] extends infer P ? P extends { prompt: infer PR } ? PR : never : never,
       target: 0, isBlocking: true,
-    };
+    } as unknown as GameView['pending'];
     const snap = projectView(view);
     expect(snap.pending).not.toBeNull();
     expect(snap.pending!.target).toBe(0);
