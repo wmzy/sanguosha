@@ -13,7 +13,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import { findUseActionForCard } from '../../src/client/utils/gameViewHelpers';
-import type { GameView, Card } from '../../src/engine/types';
+import type { GameView, Card, PendingView } from '../../src/engine/types';
 
 function makeEquipCard(id: string, name: string, subtype: string): Card {
   return { id, name, suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype } as Card;
@@ -322,5 +322,50 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
         preceding: [{ skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } }],
       }));
     });
+  });
+});
+
+// ── 出牌阶段倒计时显示(回归 isBlocking 区分) ──
+// 回归根因:引入 pending.isBlocking 后,出牌窗口(isBlocking=false)被排除出
+// isPerspectiveAwaiting,而「自己的倒计时」显示条件错误复用了它 → 出牌阶段倒计时消失。
+// 修复:倒计时条件补充「自己出牌阶段」(isMyTurn && phase==='出牌'),与 isPerspectiveAwaiting 解耦。
+// 出牌窗口虽是非阻塞 pending(不计入「询问」),但当前视角仍需在此时段内操作,必须显示倒计时。
+describe('GameView:出牌阶段倒计时显示(回归 isBlocking 区分)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('自己出牌阶段(出牌窗口为非阻塞 pending)显示倒计时', async () => {
+    // 出牌窗口 isBlocking=false → isPerspectiveAwaiting=false(不计入询问),
+    // 但出牌阶段自己回合仍应显示倒计时(修复前被 isPerspectiveAwaiting 条件隐藏)
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '出牌窗口', player: 0 },
+        prompt: { type: 'useCard', title: '出牌阶段' },
+        target: 0,
+        isBlocking: false,
+        deadline: Date.now() + 15_000,
+        totalMs: 15_000,
+      } as unknown as PendingView,
+    });
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/⏱ \d+s/)).toBeDefined();
+    });
+  });
+
+  it('自己回合但非出牌阶段(无 pending)不显示倒计时 — 防 isMyTurn 误触发', () => {
+    // 边界:仅 isMyTurn 不够,还须 phase==='出牌'。判定阶段自己回合不应弹倒计时。
+    const view = makeView({
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+      pending: null,
+      deadline: null,
+    });
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    expect(screen.queryByText(/⏱ \d+s/)).toBeNull();
   });
 });

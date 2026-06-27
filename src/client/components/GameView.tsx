@@ -248,8 +248,10 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
             discardMax={discardMax}
             selectedForDiscard={selectedForDiscard}
           />
-          {/* 自己的进度条:仅当自己处于等待回应时才显示 */}
-          {isPerspectiveAwaiting && (
+          {/* 自己的进度条:自己需要操作时显示 ——
+              1) 被询问(isPerspectiveAwaiting:阻塞型 pending 命中自己)
+              2) 自己出牌阶段(出牌窗口是非阻塞 pending,不计入 awaiting,但同样需要倒计时) */}
+          {(isPerspectiveAwaiting || (isMyTurn && view.phase === '出牌')) && (
             <CountdownBar deadline={deadline} totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS} />
           )}
           {/* 转化模式提示 + 取消选择 */}
