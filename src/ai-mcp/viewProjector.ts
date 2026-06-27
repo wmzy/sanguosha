@@ -32,6 +32,11 @@ export function projectView(view: GameView): AiViewSnapshot {
           isBlocking: view.pending.isBlocking !== false,
           promptTitle: (view.pending.prompt as { title?: string }).title ?? view.pending.prompt.type,
           requestType: getPendingRequestType(view.pending),
+          candidates:
+            (view.pending.atom as { type: string; candidates?: Array<{ name: string; skills: string[] }> }).type ===
+            '选将询问'
+              ? (view.pending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
+              : undefined,
         }
       : null,
     zones: view.zones

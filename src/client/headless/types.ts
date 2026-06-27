@@ -61,6 +61,8 @@ export interface AiViewSnapshot {
     isBlocking: boolean;
     promptTitle: string;
     requestType: string;
+    /** 选将询问时的候选武将列表（仅选将 pending 非空） */
+    candidates?: Array<{ name: string; skills: string[] }>;
   } | null;
   zones: { deckCount: number; discardPileCount: number };
   log: { time: number; player: number; text: string }[];

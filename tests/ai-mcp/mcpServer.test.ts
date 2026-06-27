@@ -12,6 +12,7 @@ function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameC
     getAvailableActions: () => [],
     drainNewEvents: () => [],
     sendAction: vi.fn(),
+    consumeActionRejected: () => false,
     ...overrides,
   } as unknown as HeadlessGameClient;
 }

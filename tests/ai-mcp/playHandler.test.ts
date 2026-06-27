@@ -14,6 +14,7 @@ function makeFake(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameClie
     getAvailableActions: () => [],
     drainNewEvents: () => [],
     sendAction: vi.fn(),
+    consumeActionRejected: () => false,
     ...overrides,
   } as unknown as HeadlessGameClient;
 }
@@ -44,5 +45,12 @@ describe('runPlay', () => {
     const fake = makeFake({ needsAction: () => false } as any);
     const res = await runPlay(fake, { waitTimeoutMs: 80 });
     expect(res.needsAction).toBe(false);
+  });
+
+  it('action 被服务端拒后报告 rejected', async () => {
+    const fake = makeFake({ consumeActionRejected: () => true } as any);
+    const action: EngineClientMessage = { skillId: '杀', actionType: 'use', ownerId: 0, params: { cardId: 'c1' }, baseSeq: 0 };
+    const res = await runPlay(fake, { action: { message: action }, waitTimeoutMs: 80 });
+    expect(res.lastActionResult).toBe('rejected');
   });
 });

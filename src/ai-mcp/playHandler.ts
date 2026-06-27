@@ -45,6 +45,10 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
     });
     const settle = () => resolve(snapshot());
     const tick = () => {
+      // 服务端拒了本次 action：报告 rejected，继续等下一个 needsAction 点
+      if (hgc.consumeActionRejected()) {
+        lastActionResult = 'rejected';
+      }
       if (hgc.phase === 'ended' || hgc.gameOverWinner !== null) return settle();
       if (hgc.needsAction()) return settle();
       if (Date.now() >= deadline) {

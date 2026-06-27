@@ -22,6 +22,8 @@ export class HeadlessGameClient {
   private _pendingNewEvents: ViewEvent[] = [];
   /** 连接就绪前缓冲的待发消息（open 后 flush） */
   private _outbox: ClientMessage[] = [];
+  /** 最近一次 action 是否被服务端拒（供 runPlay 轮询）。每次 sendAction 重置。 */
+  private _lastActionRejected = false;
   private readonly callbacks: HeadlessCallbacks;
   private readonly serverUrl: string;
 
@@ -79,11 +81,15 @@ export class HeadlessGameClient {
       return;
     }
     const r = applyServerMessage(this._view, this._lastSeq, msg);
+    const viewChanged = this._view !== r.view;
     this._view = r.view;
     this._lastSeq = r.lastSeq;
-    if (r.newEvents.length) {
+    // onView: view 变化即触发（initialView baseline 或增量 event 后），不止于 newEvents 非空
+    if (viewChanged && this._view) {
+      if (r.newEvents.length) this._pendingNewEvents.push(...r.newEvents);
+      this.callbacks.onView?.(this._view, r.newEvents);
+    } else if (r.newEvents.length) {
       this._pendingNewEvents.push(...r.newEvents);
-      if (this._view) this.callbacks.onView?.(this._view, r.newEvents);
     }
     if (r.phaseChangedTo) this.setPhase(r.phaseChangedTo);
     if (r.gameOverWinner !== undefined) {
@@ -102,8 +108,13 @@ export class HeadlessGameClient {
       this._roomState = mergeRoomConfig(this._roomState, msg.config);
       this.callbacks.onRoomState?.(this._roomState);
     }
-    if (r.resetToLobby) { this._view = null; this._lastSeq = 0; }
-    if (r.actionRejected) this.callbacks.onActionRejected?.();
+    if (r.resetToLobby) {
+      this._view = null;
+      this._lastSeq = 0;
+      this._gameOverWinner = null;
+      this._pendingNewEvents = [];
+    }
+    if (r.actionRejected) { this._lastActionRejected = true; this.callbacks.onActionRejected?.(); }
     this.callbacks.onMessage?.(msg);
   }
 
@@ -138,17 +149,34 @@ export class HeadlessGameClient {
     skillActions: import('../skillActionRegistry').SkillActionDef[],
     out: AvailableAction[],
   ) {
-    const reqType = getPendingRequestType(view.pending!);
+    const pending = view.pending!;
+    const atom = pending.atom as { type: string; candidates?: Array<{ name: string; skills: string[] }>; requestType?: string };
+    // 选将询问：每个候选武将一个 selectChar action（引擎注册 系统规则:选将）
+    if (atom.type === '选将询问' && Array.isArray(atom.candidates)) {
+      for (const c of atom.candidates) {
+        out.push({
+          description: `选择武将【${c.name}】`,
+          message: { skillId: '系统规则', actionType: '选将', ownerId: this._seatIndex, params: { character: c.name }, baseSeq: 0 },
+          validTargets: [],
+          category: 'selectChar',
+        });
+      }
+      return;
+    }
+    const reqType = getPendingRequestType(pending);
+    // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
+    // 此处给出一个“选择弃牌”占位 action，agent 须自行从手牌选足 discardMin 张填入 cardIds。
     if (reqType === '__弃牌') {
       out.push({
-        description: '进入弃牌阶段',
-        message: { skillId: '弃牌阶段', actionType: 'discard', ownerId: this._seatIndex, params: {}, baseSeq: 0 },
+        description: '弃牌（需选弃牌张数后提交 cardIds）',
+        message: { skillId: '系统规则', actionType: 'respond', ownerId: this._seatIndex, params: { cardIds: [] }, baseSeq: 0 },
         validTargets: [],
         category: 'discard',
       });
       return;
     }
-    const info = resolvePendingRespond(view.pending!, skillActions);
+    // 通用回应（出闪/出杀等）：引擎按 pendingRespondInfo 推导 skillId，respond 携带 cardId 或空
+    const info = resolvePendingRespond(pending, skillActions);
     if (info?.skillId) {
       out.push({
         description: `回应【${info.skillId}】`,
@@ -162,10 +190,18 @@ export class HeadlessGameClient {
   // ── 操作 ──
 
   sendAction(action: EngineClientMessage): void {
+    this._lastActionRejected = false;
     // 阻塞型 pending 期间 respond 携带 pendingSeq（当前窗口 seq），非阻塞（出牌窗口）不带
     const pending = this._view?.pending;
     const pendingSeq = pending?.isBlocking ? this._lastSeq : undefined;
     this.send({ type: 'action', action: { ...action, baseSeq: this._lastSeq, pendingSeq }, baseSeq: this._lastSeq });
+  }
+
+  /** 返回并清除最近一次 action 是否被服务端拒（供 runPlay 轮询，已拒则报告 rejected）。 */
+  consumeActionRejected(): boolean {
+    const r = this._lastActionRejected;
+    this._lastActionRejected = false;
+    return r;
   }
 
   /** 重排手牌（对应 reorder_hand 协议消息） */
@@ -183,12 +219,23 @@ export class HeadlessGameClient {
     this.sendAction({ skillId, actionType: 'respond', ownerId: this._seatIndex, params: params ?? {}, baseSeq: 0 });
   }
 
+  /** 选择武将（对应选将询问 pending）。引擎注册 系统规则:选将。 */
   selectCharacter(character: string): void {
-    this.sendAction({ skillId: '选将', actionType: 'select', ownerId: this._seatIndex, params: { character }, baseSeq: 0 });
+    this.sendAction({ skillId: '系统规则', actionType: '选将', ownerId: this._seatIndex, params: { character }, baseSeq: 0 });
   }
 
+  /** 弃牌：提交要弃的 cardIds。引擎注册 系统规则:respond。 */
+  discard(cardIds: string[]): void {
+    this.respond('系统规则', { cardIds });
+  }
+
+  /** 放弃当前 pending（不回应）：空 respond。 */
   pass(): void {
-    this.sendAction({ skillId: '__pass', actionType: 'pass', ownerId: this._seatIndex, params: {}, baseSeq: 0 });
+    // 广播型 pending（无懈可击等）无特定 skillId，用当前 pending 推导的 skillId
+    const pending = this._view?.pending;
+    const info = pending ? resolvePendingRespond(pending, getActionsForPlayer(this._seatIndex)) : null;
+    const skillId = info?.skillId ?? '__pass';
+    this.sendAction({ skillId, actionType: 'respond', ownerId: this._seatIndex, params: {}, baseSeq: 0 });
   }
 
   // ── 大厅 ──

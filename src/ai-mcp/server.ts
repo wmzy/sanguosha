@@ -3,7 +3,7 @@
 // 读 stdin 每行一条 JSON-RPC（NDJSON），响应写 stdout，日志写 stderr。
 //
 // 环境变量：
-//   SGS_SERVER_URL（默认 ws://localhost:3930）
+//   SGS_SERVER_URL（默认 ws://localhost:3930/ws，注意 /ws 路径）
 //   SGS_ROOM_ID（不提供则首次 play 用 startGame 创建 debug 房）
 //   SGS_SEAT（默认 0）
 //   SGS_PLAYER_COUNT（创建房时用，默认 2）
@@ -11,7 +11,7 @@ import * as readline from 'node:readline';
 import { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import { handleMcpRequest, type JsonRpcRequest, type JsonRpcResponse, type McpHandlerContext } from './mcpServer';
 
-const SERVER_URL = process.env.SGS_SERVER_URL ?? 'ws://localhost:3930';
+const SERVER_URL = process.env.SGS_SERVER_URL ?? 'ws://localhost:3930/ws';
 const ROOM_ID = process.env.SGS_ROOM_ID ?? null;
 const SEAT = Number(process.env.SGS_SEAT ?? '0');
 const PLAYER_COUNT = Number(process.env.SGS_PLAYER_COUNT ?? '2');
