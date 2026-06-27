@@ -32,7 +32,8 @@ export interface SeatArcLayoutProps {
   currentPlayerName: string;
   /** 目标选择相关(透传给 PlayerSeatView) */
   selectedNeedsTarget: boolean;
-  selectedTarget: string | null;
+  /** 已选中目标 name 集合(透传给座位高亮;双目标含 A+B) */
+  selectedTargetNames: string[];
   /** 父组件传入的距离检查函数 */
   isTargetable: (idx: number) => boolean;
   onTargetClick: (name: string) => void;
@@ -50,7 +51,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
     perspectiveName,
     currentPlayerName,
     selectedNeedsTarget,
-    selectedTarget,
+    selectedTargetNames,
     isTargetable,
     onTargetClick,
     onSeatDoubleClick,
@@ -84,7 +85,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
                 isPerspective={player.name === perspectiveName}
                 needsTarget={selectedNeedsTarget}
                 isTargetable={isTargetable(realIdx)}
-                selectedTarget={selectedTarget}
+                selectedTargetNames={selectedTargetNames}
                 onTargetClick={onTargetClick}
                 onSeatDoubleClick={onSeatDoubleClick}
                 isDamaged={damageFlashIndices.has(realIdx)}

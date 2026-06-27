@@ -8,7 +8,7 @@
 //   - distribute 选中/分配(distSelected/distAllocations/distTargetName)
 //   - 出牌飞行动画触发(通过 onCardFly 回调)
 // 以及由这些状态派生的 UI 量:
-//   - selectedUseAction / selectedTargetFilter / playButtonState / showTargetSelector 等
+//   - selectedUseAction / selectedTargetFilter / playButtonState 等
 //
 // 不管理:手牌拖拽重排(useHandReorder)、视角切换、WS 连接。
 
@@ -93,13 +93,10 @@ export interface PlayInteractionResult {
   playRules: import('../utils/gameViewHelpers').PlayRules | null;
   selectedActive: boolean;
   playButtonState: { canPlay: boolean; targetLabel: string } | null;
-  multiTransformReady: boolean;
-  showTargetSelector: boolean;
   // ─── handlers ───
   handleCardClick: (card: Card) => void;
   handlePlayCard: () => void;
   handleTargetClick: (name: string) => void;
-  handleSlotSelect: (name: string, slotIdx: number) => void;
   handleSkillAction: (action: SkillActionDef) => void;
   handleTransformPlay: (targetName: string) => void;
   handleRespond: (cardId?: string) => void;
@@ -218,12 +215,6 @@ export function usePlayInteraction(
     return { canPlay, targetLabel };
   })();
 
-  const multiTransformReady = !!(transformMode && transformMode.minCards > 1
-    && transformMode.selectedCardIds.length >= transformMode.minCards
-    && transformMode.selectedCardIds.length <= transformMode.maxCards);
-  const showTargetSelector = canOperate && selectedActive && !!playRules && playRules.needsTarget
-    && (selectedCardId !== null || multiTransformReady);
-
   // ─── handlers ───
   const nameToIndex = useCallback((name: string): number => {
     return view.players.findIndex(pl => pl.name === name);
@@ -238,10 +229,20 @@ export function usePlayInteraction(
       if (activeDistribute.prompt.targetFilter && !activeDistribute.prompt.targetFilter(view, i)) return false;
       return view.players[i]?.alive === true;
     }
-    const filter = selectedTargetFilter?.filter;
+    const tf = selectedTargetFilter;
+    // 多槽位目标(借刀杀人 A+B):按当前选择进度取对应槽位 filter 判断可选性
+    if (tf?.slots && tf.slots.length > 1) {
+      const slotIdx = selectedTarget ? 1 : 0;
+      // 后续槽位不能重复选已选座次
+      if (slotIdx === 1 && view.players[i]?.name === selectedTarget) return false;
+      const slot = tf.slots[slotIdx];
+      const ctxSelected = slotIdx === 1 ? [view.players.findIndex(p => p.name === selectedTarget)] : [];
+      return slot?.filter ? slot.filter(view, i, { selected: ctxSelected }) : true;
+    }
+    const filter = tf?.filter;
     if (!filter) return true;
     return filter(view, i);
-  }, [isDistributeActive, activeDistribute, perspectiveIdx, view, selectedTargetFilter]);
+  }, [isDistributeActive, activeDistribute, perspectiveIdx, view, selectedTargetFilter, selectedTarget]);
 
   const handlePlayCard = useCallback(() => {
     if (!selectedCardId) return;
@@ -281,22 +282,24 @@ export function usePlayInteraction(
       }
       return;
     }
-    setSelectedTarget(selectedTarget === name ? null : name);
-  }, [view.players, isTargetable, isDistributeActive, activeDistribute, perspectiveIdx, distTargetName, selectedTarget, distSelected]);
-
-  const handleSlotSelect = useCallback((name: string, slotIdx: number) => {
-    if (slotIdx === 0) {
-      if (selectedTarget === name) {
-        setSelectedTarget(null);
-        setSelectedKillTarget(null);
+    // 多槽位目标(借刀杀人):首次点选 A(slot 0),再点选 B(slot 1)
+    if (playRules?.hasSlots) {
+      const slotIdx = selectedTarget ? 1 : 0;
+      if (slotIdx === 0) {
+        if (selectedTarget === name) {
+          setSelectedTarget(null);
+          setSelectedKillTarget(null);
+        } else {
+          setSelectedTarget(name);
+          setSelectedKillTarget(null);
+        }
       } else {
-        setSelectedTarget(name);
-        setSelectedKillTarget(null);
+        setSelectedKillTarget(selectedKillTarget === name ? null : name);
       }
-    } else {
-      setSelectedKillTarget(selectedKillTarget === name ? null : name);
+      return;
     }
-  }, [selectedTarget, selectedKillTarget]);
+    setSelectedTarget(selectedTarget === name ? null : name);
+  }, [view.players, isTargetable, isDistributeActive, activeDistribute, perspectiveIdx, distTargetName, selectedTarget, selectedKillTarget, distSelected, playRules]);
 
   const handleSkillAction = useCallback((action: SkillActionDef) => {
     const { skillId, actionType, prompt } = action;
@@ -550,8 +553,8 @@ export function usePlayInteraction(
     transformMode, distributeMode, activeDistribute, isDistributeActive,
     distSelected, distAllocations, distTargetName,
     selectedCard, selectedUseAction, selectedTargetFilter, playRules,
-    selectedActive, playButtonState, multiTransformReady, showTargetSelector,
-    handleCardClick, handlePlayCard, handleTargetClick, handleSlotSelect,
+    selectedActive, playButtonState,
+    handleCardClick, handlePlayCard, handleTargetClick,
     handleSkillAction, handleTransformPlay, handleRespond, handleEndTurn,
     handleConfirmDiscard, isTargetable,
     handleDistToggle, handleDistAllocate, handleDistSubmit, handleDistClear,

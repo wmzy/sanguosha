@@ -764,45 +764,13 @@ export const endTurnBtn = css`
   color: #fff;
   font-weight: bold;
   font-size: 14px;
+  margin-left: auto;
 `;
 export const targetHint = css`
   font-size: 13px;
   color: #ffd700;
 `;
 
-// ─── Target selection ───
-export const targetSection = css`
-  margin-bottom: 12px;
-`;
-export const targetTitle = css`
-  font-size: 13px;
-  color: #aaa;
-  margin-bottom: 8px;
-  font-weight: bold;
-`;
-export const targetList = css`
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-`;
-export const targetBtn = css`
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 6px 14px;
-  cursor: pointer;
-  background: rgba(22, 33, 62, 0.8);
-  color: #e0e0e0;
-  font-size: 13px;
-`;
-export const targetBtnActive = css`
-  border: 2px solid #e74c3c;
-  background: rgba(231, 76, 60, 0.2);
-`;
-export const targetBtnDisabled = css`
-  opacity: 0.35;
-  cursor: not-allowed;
-  border-style: dashed;
-`;
 // Skill buttons (技能在角色卡上显示，这里只保留按钮本体样式)
 export const skillBtn = css`
   border: 1px solid #9b59b6;
@@ -1161,17 +1129,6 @@ export const transformHint = css`
 export const distHint = css`
   color: #1abc9c;
   margin-left: 8px;
-`;
-/** 已选目标金色高亮 span(复用转化提示色系)。 */
-export const selectedTargetText = css`
-  color: #f1c40f;
-  margin-left: 8px;
-`;
-/** 「距离外」等辅助提示小字(灰)。 */
-export const mutedHint = css`
-  font-size: 11px;
-  color: #999;
-  margin-left: 4px;
 `;
 /** 死亡「亡」徽章背景(覆盖 youBadge 的蓝色)。 */
 export const deadBadge = css`

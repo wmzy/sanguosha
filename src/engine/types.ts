@@ -540,6 +540,12 @@ export interface GameView {
     };
     /** 判定区(延时锦囊)。元素为 cardId,通过 cardMap 查 Card */
     pendingTricks?: string[];
+    /** 本回合用量(前端禁用超限/已用操作,与后端 validate 一致)。
+     *  数字 key = 已用次数(如 '杀/usedCount');真值 key = 限一次标记(如 '制衡/usedThisTurn')。
+     *  由「回合用量」atom 的 applyView 增量维护,buildView 投影初值,回合结束清空。
+     *  这是后端 turn.vars/player.vars 中限次相关 key 的 view 侧投影——
+     *  processedView 不增量维护原始 vars,故单独同步此派生字段。 */
+    turnUsage?: Record<string, Json>;
   }[];
   cardMap: Record<string, Card>;
   pending: PendingView | null;

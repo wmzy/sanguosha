@@ -3,7 +3,7 @@
 //
 // 职责:编排子组件 + 转发 hook 产出的状态/handler 到对应展示组件。
 // 展示逻辑全部委托给子组件(GameHeader/OverlaysLayer/AwaitingPrompt/PlayPhasePrompt/
-// TargetSelector/SeatArcLayout/ZoneInfoBar/HandCard/PlayerCardLarge)。
+// SeatArcLayout/ZoneInfoBar/HandCard/PlayerCardLarge)。
 // 状态派生委托给 hooks(useSkillActions/usePendingState/useCharSelect/useSeatOrder/
 // useAnimationState/useHandReorder/usePlayInteraction)。
 //
@@ -29,7 +29,6 @@ import { GameHeader } from './GameHeader';
 import { OverlaysLayer } from './OverlaysLayer';
 import { AwaitingPrompt } from './AwaitingPrompt';
 import { PlayPhasePrompt } from './PlayPhasePrompt';
-import { TargetSelector } from './TargetSelector';
 import { SeatArcLayout } from './SeatArcLayout';
 import { ZoneInfoBar } from './ZoneInfoBar';
 import { HandCard } from './HandCard';
@@ -120,9 +119,8 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
     selectedCardId, selectedTarget, selectedKillTarget, selectedForDiscard,
     transformMode, distributeMode, activeDistribute, isDistributeActive,
     distSelected, distAllocations, distTargetName,
-    selectedActive, playButtonState, multiTransformReady, showTargetSelector,
-    selectedTargetFilter, playRules,
-    handleCardClick, handlePlayCard, handleTargetClick, handleSlotSelect,
+    selectedActive, playButtonState, playRules,
+    handleCardClick, handlePlayCard, handleTargetClick,
     handleSkillAction, handleTransformPlay, handleRespond, handleEndTurn,
     handleConfirmDiscard, isTargetable,
     handleDistSubmit, handleDistClear,
@@ -179,7 +177,13 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
           perspectiveName={perspectiveName}
           currentPlayerName={currentPlayerName}
           selectedNeedsTarget={(!!playRules && playRules.needsTarget) || (isDistributeActive && !!activeDistribute?.externalTargetSelection)}
-          selectedTarget={isDistributeActive && activeDistribute?.externalTargetSelection ? distTargetName : selectedTarget}
+          selectedTargetNames={
+            isDistributeActive && activeDistribute?.externalTargetSelection
+              ? (distTargetName ? [distTargetName] : [])
+              : playRules?.hasSlots
+                ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
+                : (selectedTarget ? [selectedTarget] : [])
+          }
           isTargetable={isTargetable}
           onTargetClick={handleTargetClick}
           onSeatDoubleClick={onSeatDoubleClick}
@@ -224,7 +228,6 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
               canOperate={canOperate}
               processingPicks={processingPicks}
               onSend={send}
-              onRespond={handleRespond}
             />
           )}
           <PlayPhasePrompt
@@ -270,8 +273,13 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
               <CancelButton label="取消选择" onClick={cancelSelection} />
             )}
           </div>
-          {/* 操作面板:出牌/结束回合/目标提示 */}
+          {/* 操作面板:出牌/不回应/结束回合 */}
           <div className={styles.actionBar}>
+            {/* useCard 待回应:不回应按钮(从 AwaitingPrompt 移至统一操作区)。 */}
+            {/* 排除弃牌阶段:弃牌 pending 复用 useCard prompt,由「确认弃牌」处理。 */}
+            {isMyAwaiting && !isDiscardPhase && pending?.prompt?.type === 'useCard' && (
+              <button className={styles.promptBtn} onClick={() => handleRespond()}>不回应</button>
+            )}
             {canOperate && selectedActive && transformMode && transformMode.minCards > 1 && (() => {
               const ids = transformMode.selectedCardIds;
               const enough = ids.length >= transformMode.minCards && ids.length <= transformMode.maxCards;
@@ -344,23 +352,6 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
               <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
             )}
           </div>
-          {/* 目标选择面板 */}
-          {showTargetSelector && (selectedCardId || multiTransformReady) && (
-            <TargetSelector
-              view={view}
-              perspectiveIdx={perspectiveIdx}
-              selectedCardId={selectedCardId ?? ''}
-              perspectiveHand={perspectiveHand}
-              transformMode={transformMode}
-              targetFilter={selectedTargetFilter}
-              selectedTarget={selectedTarget}
-              selectedKillTarget={selectedKillTarget}
-              isTargetable={isTargetable}
-              onTargetClick={handleTargetClick}
-              onSlotSelect={handleSlotSelect}
-              onTransformPlay={handleTransformPlay}
-            />
-          )}
           {/* 手牌区 */}
           <div className={styles.handList} ref={handListRef}>
             {/* respond cardFilter 提取到 map 外部(memo 后的 pendingRespondInfo),

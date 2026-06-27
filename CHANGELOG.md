@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Changed — 选目标改为点角色卡片 + 不回应/结束回合移入操作栏
+
+移除独立的目标选择面板(TargetSelector),改为直接点击座位上的角色卡片选目标,不可选座位置灰;「不回应」按钮从顶部待回应区移入下方操作栏(actionBar),「结束回合」靠操作栏右端。
+
+#### Changed
+- **移除目标选择面板**:删除 `TargetSelector` 组件,出牌时直接点击弧形座位上的角色卡片选目标(原已有 `onTargetClick` 机制)。借刀杀人等双目标(slots)牌改为按选择进度依次点选 A、B(首次点选 A,再次点选 B),`isTargetable` 在 slots 模式按当前槽位 filter 判断可选性。(`src/client/components/TargetSelector.tsx` 删除,`src/client/hooks/usePlayInteraction.ts`、`GameView.tsx`)
+- **不可选座位置灰**:选目标阶段不满足条件的座位(距离外/不满足槽位条件)应用置灰样式(`seatCardUntargetable`:opacity 0.4 + grayscale 0.8),与可选座位形成视觉对比。(`src/client/components/PlayerSeatView.tsx`)
+- **座位高亮支持多目标**:`PlayerSeatView` 的选中高亮 prop 由单值 `selectedTarget` 改为集合 `selectedTargetNames`(借刀杀人双目标 A+B 同时高亮)。(`PlayerSeatView.tsx`、`SeatArcLayout.tsx`、`GameView.tsx`)
+- **「不回应」移入操作栏**:`AwaitingPrompt` 的 useCard 待回应分支移除「不回应」按钮(仅留提示文案),按钮移至 `actionBar`(条件 `isMyAwaiting && !isDiscardPhase && prompt.type==='useCard'`,排除弃牌阶段复用 useCard prompt 的误显示)。(`AwaitingPrompt.tsx`、`GameView.tsx`)
+- **「结束回合」靠右**:`endTurnBtn` 增加 `margin-left: auto`,将其推至操作栏右端。(`gameViewStyles.ts`)
+- **死代码清理**:移除 `showTargetSelector`/`handleSlotSelect`/`multiTransformReady` 等 TargetSelector 专用派生量;移除 `targetSection`/`targetBtn*`/`mutedHint` 等专用样式。(`usePlayInteraction.ts`、`gameViewStyles.ts`)
+
 ### Changed — 装备区三态可选重构 + 移除 distribute 分配面板
 
 装备技能与装备展示融合为统一可点击卡片,装备区恒定保留宽度;distribute(制衡/仁德/遗计)不再使用独立分配面板,候选牌在手牌/装备区卡片选,目标在座位区选,提交按钮入操作栏。

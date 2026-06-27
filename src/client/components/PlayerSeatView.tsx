@@ -22,7 +22,8 @@ export interface PlayerSeatProps {
   isPerspective: boolean;
   needsTarget: boolean;
   isTargetable: boolean;
-  selectedTarget: string | null;
+  /** 已选中的目标 name 集合(借刀杀人等双目标会含 A+B) */
+  selectedTargetNames: string[];
   onTargetClick: (name: string) => void;
   /** 双击座次卡片(通用 UI 事件;上层决定具体行为,如切换视角)。 */
   onSeatDoubleClick?: (index: number) => void;
@@ -47,7 +48,7 @@ export function PlayerSeatView({
   isPerspective,
   needsTarget,
   isTargetable,
-  selectedTarget,
+  selectedTargetNames = [],
   onTargetClick,
   onSeatDoubleClick,
   isDamaged = false,
@@ -60,6 +61,8 @@ export function PlayerSeatView({
   void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
   const isDead = !player.alive;
   const isClickable = needsTarget && !isDead && isTargetable;
+  // 选目标阶段:不可选的活座位置灰(距离外/不满足槽位条件),与可选座位形成对比
+  const isUntargetable = needsTarget && !isDead && !isTargetable;
   // 势力信息
   const displayChar = player.character;
   const charInfo = displayChar ? getCharacterMeta(displayChar) : undefined;
@@ -79,7 +82,8 @@ export function PlayerSeatView({
         isPerspective && seatCardPerspective,
         isDead && seatCardDead,
         isClickable && seatCardClickable,
-        selectedTarget === player.name && seatCardTargeted,
+        isUntargetable && seatCardUntargetable,
+        selectedTargetNames.includes(player.name) && seatCardTargeted,
         isDamaged && seatShaking,
         isDamaged && seatDamageOverlay,
         isTurnGlow && turnGlowing,
@@ -274,6 +278,12 @@ const seatCardClickable = css`
   &:hover {
     outline: 2px solid #e74c3c;
   }
+`;
+// 选目标时不可选的座位置灰(距离外/不满足槽位条件),与可选座位形成视觉对比
+const seatCardUntargetable = css`
+  opacity: 0.4;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
 `;
 const seatCardTargeted = css`
   outline: 3px solid #e74c3c;

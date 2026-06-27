@@ -26,8 +26,6 @@ export interface AwaitingPromptProps {
   processingPicks?: ProcessingPickState | null;
   /** 发送动作(无 preceding,本组件不涉及前置 action) */
   onSend: (skillId: string, actionType: string, params: Record<string, Json>) => void;
-  /** 回应(不传 = 不回应;传 cardId = 打出该牌回应) */
-  onRespond: (cardId?: string) => void;
 }
 
 export function AwaitingPrompt(props: AwaitingPromptProps) {
@@ -43,7 +41,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
     canOperate,
     processingPicks,
     onSend,
-    onRespond,
   } = props;
 
   // 广播型 pending 且已本地跳过:显示已跳过提示
@@ -162,18 +159,15 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
             );
           }
           // useCard 类 pending:手牌区已对可回应的牌(杀/闪/桃/酒)高亮,直接在手牌区点击出牌。
-          // 这里只显示文案提示 + 「不回应」按钮,不再单独列出候选牌。
+          // 「不回应」按钮已移至下方统一操作区(actionBar),此处仅显示文案提示。
           const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
           return (
             <div className={styles.promptActions}>
               <span className={styles.promptDescInline}>
                 {respondableCount > 0
-                  ? `点击下方手牌区高亮的牌出牌回应（共 ${respondableCount} 张可选）`
-                  : '当前没有可出的牌回应'}
+                  ? `点击下方手牌区高亮的牌出牌回应（共 ${respondableCount} 张可选），或点「不回应」跳过`
+                  : '当前没有可出的牌回应，点「不回应」跳过'}
               </span>
-              <button className={styles.promptBtn} onClick={() => onRespond()}>
-                不回应
-              </button>
             </div>
           );
         })()
