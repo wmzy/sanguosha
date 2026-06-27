@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Added — AI 代打 MCP server
+
+把三国杀引擎包装成游戏环境，通过 MCP server 暴露给外部通用 agent（Claude Code/OMP），由 agent 驱动某个座次的完整生命周期（进房间/准备/开始/选将/出牌循环）。游戏项目不集成 LLM，推理交给外部 agent。
+
+#### Added
+- **HeadlessGameClient 共享核心**：抽出家框架无关的单座次无头 WS 玩家客户端（`src/client/headless/`），封装 WS 连接、view 增量维护（复用 `viewReducer`）、可执行操作枚举（复用 `gameViewHelpers`/`pendingRespond`/`skillActionRegistry`）、房间生命周期。与 debug 前端共用，消除重复逻辑。(`src/client/headless/HeadlessGameClient.ts`、`viewMaintainer.ts`、`availableActions.ts`、`types.ts`)
+- **MCP server**：手写 JSON-RPC 2.0 over stdio（不依赖破损的 `@modelcontextprotocol/sdk` v1.29.0，其 exports map 对 `McpServer`/`StdioServerTransport` 不可达）。`play` 工具统一「动作→观察」循环：执行操作 → 阻塞等待本座次 needsAction/游戏结束/超时 → 返回 view 快照 + 可执行操作枚举。(`src/ai-mcp/server.ts`、`mcpServer.ts`、`playHandler.ts`、`viewProjector.ts`)
+- **npm 脚本**：`pnpm mcp:serve` 启动 MCP server（开发用，生产用 `npx tsx src/ai-mcp/server.ts` 避开 pnpm banner 污染 stdout）。
+
+#### Changed
+- **debug 多座次前端迁移到 HeadlessGameClient**：`useDebugMultiConnection` 从「单 hook 管 N 连接」重构为「N 个 HGC 实例 + 协调器」，view 维护/连接逻辑收敛到 HGC，hook 只保留展示层增强（判定牌 processing 延迟、seatPlayerIds、event playback）。净减 100 行。浏览器回归验证 4 人局全流程零错误。(`src/client/hooks/useDebugMultiConnection.ts`)
+
 ### Changed — 选目标改为点角色卡片 + 不回应/结束回合移入操作栏
 
 移除独立的目标选择面板(TargetSelector),改为直接点击座位上的角色卡片选目标,不可选座位置灰;「不回应」按钮从顶部待回应区移入下方操作栏(actionBar),「结束回合」靠操作栏右端。
