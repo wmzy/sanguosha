@@ -96,3 +96,60 @@ docs/             # 文档
 |------|--------|------|
 | `PORT` | `3930` | 服务器端口 |
 | `HOST` | `true` | 绑定地址（`true` = 所有网卡） |
+
+## AI agent 接入
+
+让 AI agent（Claude Code / Cursor / Codex / Windsurf 等）通过 MCP server 接管三国杀对局。
+
+### 1. 配置 MCP server（sanguosha-mcp）
+
+MCP server 是一个 stdio 进程，连游戏服务器驱动对局。安装方式按 agent 不同：
+
+**Claude Code**
+
+```bash
+claude mcp add sanguosha -- env SGS_SERVER_URL=wss://<服务器>/ws npx -y sanguosha-mcp
+```
+
+或写入项目 `.mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "sanguosha": {
+      "command": "npx",
+      "args": ["-y", "sanguosha-mcp"],
+      "env": { "SGS_SERVER_URL": "wss://<服务器>/ws" }
+    }
+  }
+}
+```
+
+**Cursor** — 写入 `~/.cursor/mcp.json`（结构同上）。
+
+**Windsurf** — 写入 `~/.codeium/windsurf/mcp_config.json`（结构同上）。
+
+**Codex** — 按其 MCP 配置文件写入（结构同上）。
+
+### 2. 安装玩家向 skill
+
+```bash
+npx skills add wmzy/sanguosha --skill sanguosha-play
+# 或交互式选择
+npx skills add wmzy/sanguosha
+```
+
+skill 会装到当前 agent 的 skills 目录，教 agent 如何用 MCP 玩游戏 + 三国杀规则速查。
+
+### 3. 环境变量
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `SGS_SERVER_URL` | 是 | 游戏服务器 WS 地址（注意 `/ws` 路径） |
+| `SGS_ROOM_ID` | 否 | 加入指定房间（省略则建房） |
+| `SGS_SEAT` | 否 | 座次下标，默认 `0` |
+| `SGS_PLAYER_COUNT` | 否 | 建房人数，默认 `2` |
+
+### 本仓库开发
+
+本仓库自身开发用源码直跑（`pnpm mcp:serve`，连 `ws://localhost:3930/ws`），配置见仓库根 `.mcp.json`。发布 npm 包用 `pnpm build:mcp` 打包成单文件。
