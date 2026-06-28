@@ -161,13 +161,22 @@ export function MultiplayerPage() {
           <p className={winnerText}>
             {mp.gameOver?.winner === '无人' ? '平局' : `胜方：${mp.gameOver?.winner ?? '未知'}`}
           </p>
-          <button
-            className={btnStyle}
-            style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-            onClick={() => { mp.leaveRoom(); navigate('/'); }}
-          >
-            返回大厅
-          </button>
+          <div className={buttonRow}>
+            <button
+              className={btnStyle}
+              style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
+              onClick={mp.sendRestart}
+            >
+              再来一局
+            </button>
+            <button
+              className={btnStyle}
+              style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
+              onClick={() => { mp.leaveRoom(); navigate('/'); }}
+            >
+              返回大厅
+            </button>
+          </div>
         </div>
       </div>
     );

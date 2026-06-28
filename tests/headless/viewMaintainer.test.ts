@@ -88,4 +88,17 @@ describe('applyServerMessage', () => {
     expect(out.playerId).toBe('pid-1');
     expect(out.seatIndex).toBe(0);
   });
+
+  it('game_reset 清空 view、置 resetToLobby 标记、phase 切到 lobby', () => {
+    const baseline = makeBaseline(0);
+    const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 5 });
+    expect(start.view).not.toBeNull();
+    expect(start.lastSeq).toBe(5);
+    // 再来一局:服务端广播 game_reset,客户端清场回到准备阶段
+    const out = applyServerMessage(start.view, start.lastSeq, { type: 'game_reset' });
+    expect(out.view).toBeNull();
+    expect(out.lastSeq).toBe(0);
+    expect(out.resetToLobby).toBe(true);
+    expect(out.phaseChangedTo).toBe('lobby');
+  });
 });

@@ -465,7 +465,8 @@ async function handleStartGame(playerId: string): Promise<void> {
 }
 
 /** 游戏结束后重新进入「配置+准备」阶段(再来一局)。
- *  debug 房间任意座次可触发;复用同一 session,重置后由玩家重新准备 → start_game。 */
+ *  任意座次/玩家可触发(debug 一人多座 / 多人各自连接);复用同一 session,
+ *  重置后由玩家重新准备 → start_game。resetToLobby 幂等,重复触发无害。 */
 function handleRestartGame(playerId: string): void {
   const roomId = playerRoomMap.get(playerId);
   if (!roomId) return;

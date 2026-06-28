@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — 2026-06-26
+## [Unreleased] — 2026-06-27
+
+### Added — 多人游戏结束后「再来一局」回到准备状态
+
+此前多人模式(MultiplayerPage)游戏结束后仅有「返回大厅」(断开连接退出房间),想再打一局需重建房间、重新分享房间码。现新增「再来一局」:复用 debug 模式已有的 `restart_game`/`game_reset` 协议与 `session.resetToLobby`,结算界面并列两个按钮,点「再来一局」重置同一房间到「等待大厅」阶段,玩家重新准备后即可开始新一局。服务端 `handleRestartGame` 原本就对普通房间生效(无 debug 限制),本次只是补齐多人客户端。
+
+#### Added
+- **useMultiplayerRoom 暴露 sendRestart 并处理 game_reset**:`onMessage` 收到 `game_reset` 时清除 gameOver/view、ready 复位、stage 切回 `waiting`(保留 roomId/playerId,未退出房间);新增 `sendRestart` 调用 `hgc.sendRestart()` 发送 `restart_game`。(`src/client/hooks/useMultiplayerRoom.ts`)
+- **结算界面新增「再来一局」按钮**:`MultiplayerPage` 结束分支在「返回大厅」旁并列「再来一局」(绿色),点击调用 `mp.sendRestart`。(`src/client/pages/MultiplayerPage.tsx`)
+- **useMultiplayerRoom hook 测试**:mock WebSocket 验证 createRoom 进入 waiting、sendRestart 发送 restart_game、game_reset 后从 ended 回到 waiting 并清除 gameOver/view、reset 后仍保留 roomId/playerId。(`tests/client/useMultiplayerRoom.test.tsx`)
+- **viewMaintainer game_reset 契约测试**:锁定 `game_reset` 消息产生 `view:null/lastSeq:0/resetToLobby:true/phaseChangedTo:'lobby'`。(`tests/headless/viewMaintainer.test.ts`)
+
+#### Changed
+- **服务端注释更正**:`handleRestartGame` 注释由「debug 房间任意座次可触发」更正为「任意座次/玩家可触发(debug 一人多座 / 多人各自连接)」,反映对多人房间的实际支持。(`src/server/app.ts`)
 
 ### Fixed — distribute 主动技选牌状态在 action 失活时未自动清除
 

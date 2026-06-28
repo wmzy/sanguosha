@@ -40,6 +40,8 @@ export interface MultiplayerRoom {
   joinRoom: (roomId: string) => void;
   toggleReady: () => void;
   startGame: () => void;
+  /** 游戏结束后再来一局:重置房间回「配置+准备」阶段(复用同一连接)。 */
+  sendRestart: () => void;
   leaveRoom: () => void;
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
@@ -88,6 +90,14 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       onGameOver: (winner) => setGameOver({ winner }),
       onError: () => { /* 一期不重连 */ },
       onMessage: (msg: ServerMessage) => {
+        // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
+        // HGC 内部已重置 view/gameOverWinner,这里同步 React state(roomId/playerId 保留)。
+        if (msg.type === 'game_reset') {
+          setGameOver(null);
+          setView(null);
+          setReady(false);
+          setStage('waiting');
+        }
         if (msg.type === 'error') {
           setError(msg.message);
           setTimeout(() => setError(null), 3000);
@@ -158,6 +168,13 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     log.info('startGame');
   }, []);
 
+  const sendRestart = useCallback(() => {
+    const hgc = hgcRef.current;
+    if (!hgc) return;
+    hgc.sendRestart();
+    log.info('sendRestart');
+  }, []);
+
   const leaveRoom = useCallback(() => {
     setCommand({ type: 'idle' });
     setStage('lobby');
@@ -184,6 +201,6 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
   return {
     stage, roomId, playerId, roomState, view, gameOver, error, isHost, ready,
-    createRoom, joinRoom, toggleReady, startGame, leaveRoom, sendAction, reorderHand,
+    createRoom, joinRoom, toggleReady, startGame, sendRestart, leaveRoom, sendAction, reorderHand,
   };
 }
