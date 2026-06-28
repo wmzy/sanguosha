@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-26
 
+### Fixed — distribute 主动技选牌状态在 action 失活时未自动清除
+
+debug 模式下，孙权点制衡进入选牌面板后不操作，出牌窗口超时引擎结束回合切到下一玩家，前端制衡选牌状态仍驻留，需手动点取消。仁德等其它 distribute 主动技同理。
+
+#### Fixed
+- **distribute 主动技自动取消**：`usePlayInteraction` 此前只为转化模式(transformMode，武圣/丈八蛇矛)提供「action 失活自动退出」effect，distribute 主动技分支(`distributeMode`，制衡/仁德)缺失对称逻辑。新增同名 effect：当 `distributeMode` 对应的 action 不再 active(出牌阶段超时回合结束 / debug 切视角到非当前回合玩家 / 限一次已用 / 技能被卸载)时，清除 `distributeMode` 及关联的 `distSelected`/`distAllocations`/`distTargetName`。被动 pending 分支(遗计)由 pending 驱动，pending 消失自然归 null，无需清理。(`src/client/hooks/usePlayInteraction.ts`)
+
 ### Added — AI 代打 MCP server
 
 把三国杀引擎包装成游戏环境，通过 MCP server 暴露给外部通用 agent（Claude Code/OMP），由 agent 驱动某个座次的完整生命周期（进房间/准备/开始/选将/出牌循环）。游戏项目不集成 LLM，推理交给外部 agent。

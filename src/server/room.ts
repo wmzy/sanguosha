@@ -193,8 +193,9 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
   for (const room of roomList.values()) {
     if (type === 'debug' && !room.isDebug) continue;
     if (type === 'multiplayer' && room.isDebug) continue;
-    // 过滤掉没有活跃 session 的房间(无法加入)
-    if (!hasSession(room.id)) continue;
+    // 进行中/已结束的房间必须有活跃 session 才可见;
+    // 等待中的房间(新建未开局)无需 session 即可被发现和加入。
+    if (room.status !== '等待中' && !hasSession(room.id)) continue;
     result.push({
       id: room.id,
       name: room.name,
@@ -231,7 +232,7 @@ export function broadcastMessage(room: Room, message: string, excludeId?: string
 
 // session 活跃检查器:由 app.ts 注册(避免 room.ts 直接依赖 app.ts 的 gameSessions)。
 let sessionChecker: ((roomId: string) => boolean) | null = null;
-export function setSessionChecker(fn: (roomId: string) => boolean): void {
+export function setSessionChecker(fn: ((roomId: string) => boolean) | null): void {
   sessionChecker = fn;
 }
 function hasSession(roomId: string): boolean {

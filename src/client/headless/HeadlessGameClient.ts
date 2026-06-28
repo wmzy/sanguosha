@@ -59,6 +59,28 @@ export class HeadlessGameClient {
     this.send({ type: 'join_debug_room', roomId, lastSeq: 0 });
   }
 
+  /** 声明 playerId(连接初期调用)。给定则采用该值,否则服务端自动生成。 */
+  setPlayerId(playerId?: string): void {
+    if (playerId && playerId.trim()) {
+      this.send({ type: 'set_player_id', playerId: playerId.trim() });
+    }
+  }
+
+  /** 创建普通(多人)房间:本连接成为房主。 */
+  createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string): void {
+    this.openSocket();
+    this.setPlayerId(playerId);
+    this.send({ type: 'create_room', name, maxPlayers, config });
+  }
+
+  /** 加入普通(多人)房间。 */
+  joinRoom(roomId: string, playerId?: string): void {
+    this._roomId = roomId;
+    this.openSocket();
+    this.setPlayerId(playerId);
+    this.send({ type: 'join_room', roomId });
+  }
+
   private openSocket() {
     this.ws = new WebSocket(this.serverUrl);
     this.ws.onopen = () => {

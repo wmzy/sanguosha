@@ -9,12 +9,14 @@
 //   SGS_PLAYER_COUNT（创建房时用，默认 2）
 import * as readline from 'node:readline';
 import { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
-import { handleMcpRequest, type JsonRpcRequest, type JsonRpcResponse, type McpHandlerContext } from './mcpServer';
+import { handleMcpRequest, normalizeStartGame, type JsonRpcRequest, type JsonRpcResponse, type McpHandlerContext, type StartGameOpts } from './mcpServer';
+import { joinAndStartRoom } from './lobby';
 
 const SERVER_URL = process.env.SGS_SERVER_URL ?? 'ws://localhost:3930/ws';
 const ROOM_ID = process.env.SGS_ROOM_ID ?? null;
 const SEAT = Number(process.env.SGS_SEAT ?? '0');
 const PLAYER_COUNT = Number(process.env.SGS_PLAYER_COUNT ?? '2');
+const PLAYER_ID = process.env.SGS_PLAYER_ID ?? null;
 
 function logErr(msg: string): void {
   process.stderr.write(`[sanguosha-mcp] ${msg}\n`);
@@ -27,17 +29,31 @@ async function main(): Promise<void> {
     onGameOver: (w) => logErr(`game over: ${w}`),
   });
   let started = false;
-  const ensureStarted = async (): Promise<void> => {
+  // 环境变量作为默认值,被 opts 覆盖
+  const ensureStarted = async (opts?: StartGameOpts): Promise<void> => {
     if (started) return;
     started = true;
-    if (ROOM_ID) {
-      await hgc.connect(ROOM_ID, SEAT);
+    const o = opts ?? normalizeStartGame(true);
+    if (o.mode === 'multiplayer') {
+      const result = await joinAndStartRoom(hgc, {
+        mode: o.roomId ? 'join' : 'create',
+        roomId: o.roomId ?? ROOM_ID ?? undefined,
+        name: o.name,
+        maxPlayers: o.maxPlayers ?? PLAYER_COUNT,
+        playerId: o.playerId ?? PLAYER_ID ?? undefined,
+        readyTimeoutMs: o.readyTimeoutMs,
+      });
+      logErr(`multiplayer room ready: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`);
+      return;
+    }
+    // debug 模式(旧路径)
+    if (o.roomId ?? ROOM_ID) {
+      await hgc.connect(o.roomId ?? ROOM_ID!, SEAT);
     } else {
-      hgc.createDebugRoom(PLAYER_COUNT);
+      hgc.createDebugRoom(o.playerCount ?? PLAYER_COUNT);
     }
     hgc.sendReady();
-    // 创建房者（无 ROOM_ID）为房主，发 start
-    if (!ROOM_ID) hgc.sendStartGame();
+    if (!(o.roomId ?? ROOM_ID)) hgc.sendStartGame();
   };
 
   const ctx: McpHandlerContext = { hgc, ensureStarted, seat: SEAT };

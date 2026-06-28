@@ -7,10 +7,36 @@
 //
 // MCP stdio 传输：每行一条 JSON-RPC 消息（NDJSON）。响应写到 stdout，日志写到 stderr。
 import { runPlay } from './playHandler';
+import { getSkillDescriptionAsync } from '../engine/skill';
 import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import type { ClientMessage as EngineClientMessage } from '../engine/types';
 
 const PROTOCOL_VERSION = '2024-11-05';
+
+/** 把 startGame 参数(boolean | object)归一化为 StartGameOpts。 */
+export function normalizeStartGame(raw: unknown): StartGameOpts {
+  if (raw === true || raw === undefined) {
+    // 旧 debug 默认
+    return { mode: 'debug' };
+  }
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const mode = o['mode'] === 'multiplayer' ? 'multiplayer' : 'debug';
+  if (mode === 'debug') {
+    return {
+      mode: 'debug',
+      roomId: typeof o['roomId'] === 'string' ? o['roomId'] : undefined,
+      playerCount: typeof o['playerCount'] === 'number' ? o['playerCount'] : undefined,
+    };
+  }
+  return {
+    mode: 'multiplayer',
+    roomId: typeof o['roomId'] === 'string' ? o['roomId'] : undefined,
+    name: typeof o['name'] === 'string' ? o['name'] : undefined,
+    maxPlayers: typeof o['maxPlayers'] === 'number' ? o['maxPlayers'] : undefined,
+    playerId: typeof o['playerId'] === 'string' ? o['playerId'] : undefined,
+    readyTimeoutMs: typeof o['readyTimeoutMs'] === 'number' ? o['readyTimeoutMs'] : undefined,
+  };
+}
 
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -31,12 +57,29 @@ export const PLAY_TOOL = {
   name: 'play',
   description:
     '驱动一个三国杀座次：执行一个操作并阻塞等待直到轮到本座次决策或游戏结束。' +
-    '首次调用传 {startGame:true} 创建/加入房间并开始游戏。' +
+    '首次调用传 startGame 创建/加入房间并开始游戏。' +
     'action 从上次返回的 availableActions 取一条；省略 action 表示纯等待。',
   inputSchema: {
     type: 'object' as const,
     properties: {
-      startGame: { type: 'boolean', description: '首次调用：创建/加入房间并开始游戏' },
+      startGame: {
+        oneOf: [
+          { type: 'boolean', description: 'true=旧 debug 模式(创建 debug 房)' },
+          {
+            type: 'object',
+            description: '多人模式开局控制',
+            properties: {
+              mode: { type: 'string', enum: ['multiplayer', 'debug'], description: "multiplayer=普通多人房(默认); debug=调试房" },
+              roomId: { type: 'string', description: 'join 指定房间;省略则建房(房主)' },
+              name: { type: 'string', description: '建房时的房间名' },
+              maxPlayers: { type: 'number', description: '最大人数,默认 2' },
+              playerId: { type: 'string', description: '玩家 id,给定则采用,否则自动生成' },
+              readyTimeoutMs: { type: 'number', description: '等待全员就绪超时(ms)' },
+            },
+          },
+        ],
+        description: '首次调用：创建/加入房间并开始游戏。',
+      },
       action: {
         type: 'object',
         description: '要执行的操作（从上次返回的 availableActions 取）',
@@ -53,13 +96,54 @@ export const PLAY_TOOL = {
   },
 };
 
+/** getSkillInfo 工具的输入 schema:按名称查询技能/卡牌效果描述。 */
+export const SKILL_INFO_TOOL = {
+  name: 'getSkillInfo',
+  description:
+    '查询三国杀技能或卡牌的效果描述。传入技能/卡牌名称(如"杀""制衡""顺手牵羊""丈八蛇矛"),' +
+    '返回每个名称的描述文案。当需要理解 view 中某个技能/卡牌的作用、或不确定某张牌如何结算时调用。',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      names: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '技能/卡牌名称数组(对应 view.players[].skills 与卡牌名)',
+        minItems: 1,
+      },
+    },
+    required: ['names'],
+  },
+};
+
+/** getSkillInfo 工具的结果项:name 恒返回,description 缺失为 null(供 AI 区分"查无"与"无描述")。 */
+export interface SkillInfoEntry {
+  name: string;
+  description: string | null;
+}
+
+/** 并发查询多个技能名描述;输入归一化(非数组/非字符串过滤)。 */
+async function getSkillInfoResult(names: unknown): Promise<SkillInfoEntry[]> {
+  const arr = Array.isArray(names) ? names.filter((n): n is string => typeof n === 'string') : [];
+  return Promise.all(
+    arr.map(async (name) => {
+      const desc = await getSkillDescriptionAsync(name);
+      return { name, description: desc ?? null };
+    }),
+  );
+}
+
 export interface McpHandlerContext {
   hgc: HeadlessGameClient;
   /** 启动房间（创建/加入 + ready + 必要时 start）。幂等。 */
-  ensureStarted: () => Promise<void>;
+  ensureStarted: (opts?: StartGameOpts) => Promise<void>;
   /** 默认座次（baseSeq/ownerId 占位回填用） */
   seat: number;
 }
+
+export type StartGameOpts =
+  | { mode: 'debug'; roomId?: string; playerCount?: number }
+  | { mode: 'multiplayer'; roomId?: string; name?: string; maxPlayers?: number; playerId?: string; readyTimeoutMs?: number };
 
 /**
  * 处理一条 JSON-RPC 请求，返回响应（通知无 id 时返回 null）。
@@ -88,14 +172,23 @@ export async function handleMcpRequest(
           },
         };
       case 'tools/list':
-        return { jsonrpc: '2.0', id, result: { tools: [PLAY_TOOL] } };
+        return { jsonrpc: '2.0', id, result: { tools: [PLAY_TOOL, SKILL_INFO_TOOL] } };
       case 'tools/call': {
         const params = (req.params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
+        if (params.name === 'getSkillInfo') {
+          const results = await getSkillInfoResult(params.arguments?.names);
+          const text = JSON.stringify({ skills: results });
+          return {
+            jsonrpc: '2.0',
+            id,
+            result: { content: [{ type: 'text', text }], structuredContent: { skills: results } },
+          };
+        }
         if (params.name !== 'play') {
           return { jsonrpc: '2.0', id, error: { code: -32601, message: `unknown tool: ${params.name}` } };
         }
         const args = params.arguments ?? {};
-        if (args.startGame) await ctx.ensureStarted();
+        if (args.startGame) await ctx.ensureStarted(normalizeStartGame(args.startGame));
         const action = args.action as { skillId?: string; actionType?: string; ownerId?: number; params?: Record<string, unknown> } | undefined;
         const result = await runPlay(ctx.hgc, {
           action: action && action.skillId

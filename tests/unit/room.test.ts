@@ -12,6 +12,8 @@ import {
   getRoomList,
   findRoomByPlayerId,
   updateConfig,
+  setRoomStatus,
+  setSessionChecker,
 } from '../../src/server/room';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
 import { resolveTimeoutMs } from '../../src/engine/create-engine';
@@ -164,6 +166,41 @@ describe('房间管理', () => {
     const result = findRoomByPlayerId(uniqueId);
     expect(result).not.toBeNull();
     expect(result!.id).toBe(room.id);
+  });
+
+  it('等待中的多人房间无 session 仍可被发现(多人模式加入)', () => {
+    // 注册一个返回 false 的 checker(模拟无 session)
+    setSessionChecker(() => false);
+    const room = createRoom('多人房-待加入', 4, 'host-mp', createMockWS());
+
+    const list = getRoomList('multiplayer');
+    const found = list.find(r => r.id === room.id);
+    expect(found).toBeDefined();
+    expect(found!.status).toBe('等待中');
+
+    // 恢复默认 checker
+    setSessionChecker(null);
+  });
+
+  it('进行中的房间无 session 不应可见', () => {
+    setSessionChecker(() => false);
+    const room = createRoom('多人房-进行中', 4, 'host-mp2', createMockWS());
+    setRoomStatus(room.id, '进行中');
+
+    const list = getRoomList('multiplayer');
+    const found = list.find(r => r.id === room.id);
+    expect(found).toBeUndefined();
+
+    setSessionChecker(null);
+  });
+
+  it('multiplayer 过滤排除 debug 房间', () => {
+    const mpRoom = createRoom('多人房', 4, 'host-mp3', createMockWS());
+    createDebugRoom('调试房', 4);
+
+    const list = getRoomList('multiplayer');
+    expect(list.some(r => r.id === mpRoom.id)).toBe(true);
+    expect(list.every(r => !r.isDebug)).toBe(true);
   });
 });
 
