@@ -3,7 +3,7 @@
 // 读 stdin 每行一条 JSON-RPC（NDJSON），响应写 stdout，日志写 stderr。
 //
 // 环境变量：
-//   SGS_SERVER_URL（默认 ws://localhost:3930/ws，注意 /ws 路径）
+//   SGS_SERVER_URL（覆盖默认服务器地址，注意 /ws 路径）
 //   SGS_ROOM_ID（不提供则首次 play 用 startGame 创建 debug 房）
 //   SGS_SEAT（默认 0）
 //   SGS_PLAYER_COUNT（创建房时用，默认 2）
@@ -12,7 +12,15 @@ import { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import { handleMcpRequest, normalizeStartGame, type JsonRpcRequest, type JsonRpcResponse, type McpHandlerContext, type StartGameOpts } from './mcpServer';
 import { joinAndStartRoom } from './lobby';
 
-const SERVER_URL = process.env.SGS_SERVER_URL ?? 'ws://localhost:3930/ws';
+// 构建期注入的默认服务器 URL。
+// tsx 直跑源码时该符号未定义 → typeof 守卫避免 ReferenceError，兜底 localhost（本仓库开发用）。
+// vite build 时 vite.mcp.config.ts 的 define 把它替换为 SGS_PUBLIC_URL 注入值。
+declare const __SGS_DEFAULT_URL__: string | undefined;
+const DEFAULT_URL =
+  typeof __SGS_DEFAULT_URL__ !== 'undefined' && __SGS_DEFAULT_URL__
+    ? __SGS_DEFAULT_URL__
+    : 'ws://localhost:3930/ws';
+const SERVER_URL = process.env.SGS_SERVER_URL ?? DEFAULT_URL;
 const ROOM_ID = process.env.SGS_ROOM_ID ?? null;
 const SEAT = Number(process.env.SGS_SEAT ?? '0');
 const PLAYER_COUNT = Number(process.env.SGS_PLAYER_COUNT ?? '2');
