@@ -47,12 +47,19 @@ const linkOrange = css`
   background-color: ${colors.accent.orange};
 `;
 
+const linkBlue = css`
+  background-color: ${colors.accent.blue};
+`;
+
 export function HomePage() {
   return (
     <div className={page}>
       <h1 className={title}>三国杀</h1>
       <p className={subtitle}>数字卡牌游戏</p>
       <div className={actionList}>
+        <Link to="/play" className={`${linkButtonBase} ${linkBlue}`}>
+          多人游戏
+        </Link>
         <Link to="/debug" className={`${linkButtonBase} ${linkOrange}`}>
           调试游戏
         </Link>

@@ -15,10 +15,11 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makePlayer(opts: {
@@ -266,5 +267,36 @@ describe('武圣', () => {
     }
     expect(allowed).toEqual(expect.arrayContaining(['c1', 'c2']));
     expect(allowed).not.toContain('c3'); // 黑桃排除
+  });
+
+  // ─── color 字段:单张转化保留原花色与颜色 ──────────────────
+
+  it('transformThenUse:方块(♦)红牌当杀 → 影子卡保留 ♦ 花色与红颜色', async () => {
+    const red = makeCard('d1', '桃', '♦', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['d1'], skills: ['武圣', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
+      ],
+      cardMap: { d1: red },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.transformThenUse(
+      '武圣',
+      { cardId: 'd1' },
+      '杀',
+      { cardId: 'd1#武圣', targets: [1] },
+    );
+
+    const shadow = harness.state.cardMap['d1#武圣'];
+    // 单张转化:保留原花色(♦ 不被退化为 ♥)与颜色
+    expect(shadow.suit).toBe('♦');
+    expect(shadow.color).toBe('红');
+    expect(shadow.shadowOf).toBe('d1');
   });
 });

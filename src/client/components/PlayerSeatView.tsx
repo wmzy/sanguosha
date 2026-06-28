@@ -3,6 +3,7 @@
 import { css, cx } from '@linaria/core';
 import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
+import { getSkillDescription } from '../../engine/skill';
 import {
   FACTION_BG,
   SUIT_COLOR,
@@ -88,6 +89,7 @@ export function PlayerSeatView({
         isDamaged && seatDamageOverlay,
         isTurnGlow && turnGlowing,
       )}
+      data-player-name={player.name}
       key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onSeatDoubleClick?.(index)}
@@ -148,7 +150,7 @@ export function PlayerSeatView({
             .filter((s) => !DEFAULT_SKILLS.has(s))
             .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
             .map((s) => (
-              <span key={s} className={skillTag}>
+              <span key={s} className={skillTag} title={getSkillDescription(s)}>
                 {s}
               </span>
             ))}

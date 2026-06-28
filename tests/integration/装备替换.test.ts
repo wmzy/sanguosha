@@ -25,6 +25,7 @@ import { slashMax } from '../../src/engine/slash-quota';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -62,7 +63,7 @@ function makeCard(
   subtype?: string,
   range?: number,
 ): Card {
-  return { id, name, suit, rank, type: '装备牌', subtype, range };
+  return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
 describe('装备替换:旧装备技能实例被卸载', () => {

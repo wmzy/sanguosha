@@ -22,6 +22,7 @@ import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../engine
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -52,7 +53,7 @@ function makePlayer(opts: {
 }
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = '7', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌', subtype?: string, range?: number): Card {
-  return { id, name, suit, rank, type, subtype, range };
+  return { id, name, suit, color: suitColor(suit), rank, type, subtype, range };
 }
 
 describe('诸葛连弩:连续出杀 slashMax=Infinity', () => {

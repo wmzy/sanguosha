@@ -129,6 +129,9 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
   } = play;
 
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
+  // 广播型 pending(无懈可击等)当前视角已点「不回应」:本地标记跳过,
+  // 隐藏自己的倒计时和「不回应」按钮(广播型 pending 仍在,其他座次照常显示)。
+  const broadcastSkipped = pendingTargetIdx < 0 && skippedBroadcast.has(broadcastKey);
 
   // 判定翻牌动画(effect.animation='flip', blockUntilDone)期间,延迟询问类 pending 渲染。
   // 否则玩家会在判定结果(八卦阵/乐不思蜀等翻牌)还没看清时就被弹出「是否出闪」打断。
@@ -248,8 +251,10 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
             discardMax={discardMax}
             selectedForDiscard={selectedForDiscard}
           />
-          {/* 自己的进度条:仅当自己处于等待回应时才显示 */}
-          {isPerspectiveAwaiting && (
+          {/* 自己的进度条:自己需要操作时显示 ——
+              1) 被询问(isPerspectiveAwaiting:阻塞型 pending 命中自己)
+              2) 自己出牌阶段(出牌窗口是非阻塞 pending,不计入 awaiting,但同样需要倒计时) */}
+          {(isPerspectiveAwaiting || (isMyTurn && view.phase === '出牌')) && !broadcastSkipped && (
             <CountdownBar deadline={deadline} totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS} />
           )}
           {/* 转化模式提示 + 取消选择 */}
@@ -278,7 +283,7 @@ export function GameViewComponent({ view, onAction, onReorderHand, onSeatDoubleC
           <div className={styles.actionBar}>
             {/* useCard 待回应:不回应按钮(从 AwaitingPrompt 移至统一操作区)。 */}
             {/* 排除弃牌阶段:弃牌 pending 复用 useCard prompt,由「确认弃牌」处理。 */}
-            {isMyAwaiting && !isDiscardPhase && pending?.prompt?.type === 'useCard' && (
+            {isMyAwaiting && !isDiscardPhase && pending?.prompt?.type === 'useCard' && !broadcastSkipped && (
               <button className={styles.promptBtn} onClick={() => handleRespond()}>不回应</button>
             )}
             {canOperate && selectedActive && transformMode && transformMode.minCards > 1 && (() => {

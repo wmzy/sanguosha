@@ -18,14 +18,15 @@ import { dispatch as engineDispatch } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物', rank = 'A', range?: number): Card {
-  return { id, name, suit, rank, type: '装备牌', subtype, range };
+  return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
 function makePlayer(opts: {

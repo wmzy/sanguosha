@@ -1,6 +1,8 @@
 // src/engine/types.ts
 // 新引擎类型定义。详见 docs/ENGINE-DESIGN.md §3-7
 
+import type { Color } from '../shared/types';
+
 /** 系统级 owner / target:不对应任何真实玩家槽位(开局 action、无来源伤害)。 */
 export const TARGET_SYSTEM = -1;
 /** 广播型 target:所有存活玩家都可回应(无懈可击询问)。 */
@@ -17,7 +19,9 @@ export type Json =
 export type Card = {
   id: string;
   name: string;
-  suit: '♠' | '♥' | '♣' | '♦';
+  suit: '♠' | '♥' | '♣' | '♦' | '';
+  /** 颜色，独立于花色。转化合成卡(多张)为'无色'。 */
+  color: Color;
   rank: string;
   type: '基本牌' | '锦囊牌' | '装备牌';
   subtype?: string;
@@ -454,9 +458,8 @@ export type Atom =
   // 出牌阶段的控制权 token——非阻塞型 pending,表示"当前玩家可自由出牌/用技"。
   // 玩家每次操作都 resolve 它(重建),超时则结束回合。不计入 hasBlockingPending。
   | { type: '出牌窗口'; player: number; timeout?: number }
-  // 牌包装(武圣转化 / 丈八蛇矛双卡转化)
-  | { type: '武圣包装'; player: number; cardId: string; secondCardId?: string }
-  | { type: '武圣还原'; player: number; cardId: string; secondCardId?: string }
+  // 转化包装:将 N 张手牌当【杀】使用(武圣/丈八蛇矛等通用)
+  | { type: '当作'; player: number; cardIds: string[]; shadowId: string; outputName: string }
   // 结算帧管理(走 atom 管线,保证前后端 settlementStack 同步)
   | { type: '结算帧入栈'; skillId: string; from: number; params?: Record<string, Json> }
   | { type: '结算帧出栈' }

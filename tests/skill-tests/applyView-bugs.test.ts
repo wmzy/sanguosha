@@ -8,6 +8,7 @@ import '../../src/engine/skills';
 import { viewReducer } from '../../src/client/view/reducer';
 import { getAtomDef } from '../../src/engine/atom';
 import type { GameView, ViewEvent, Card } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 
 /** 构造一个最小化 mock GameView 用于直接调用 applyView */
 function mockView(overrides: Partial<GameView> = {}): GameView {
@@ -40,7 +41,7 @@ describe('applyView 一致性 bug', () => {
           {
             index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
             equipment: { 武器: 'w1' }, skills: [], handCount: 1,
-            hand: [{ id: 'h1', name: '杀', suit: '♠', rank: '1', type: '基本牌' }], marks: [],
+            hand: [{ id: 'h1', name: '杀', suit: '♠', color: '黑', rank: '1', type: '基本牌' }], marks: [],
           },
           { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
         ],
@@ -65,10 +66,10 @@ describe('applyView 一致性 bug', () => {
           {
             index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true,
             equipment: {}, skills: [], handCount: 1,
-            hand: [{ id: 'c2', name: '杀', suit: '♥', rank: '3', type: '基本牌' }], marks: [],
+            hand: [{ id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' }], marks: [],
           },
         ],
-        cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', rank: '3', type: '基本牌' } },
+        cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' } },
       });
 
       // P0 从 P1 获得 c2
@@ -100,7 +101,7 @@ describe('applyView 一致性 bug', () => {
         player: 0,
         judgeType: '乐不思蜀',
         cardId: 'j1',
-        card: { name: '杀', suit: '♠', rank: '7' },
+        card: { name: '杀', suit: '♠', color: '黑', rank: '7' },
       } as any);
 
       // 净效果:判定牌最终进弃牌堆,processing 不变(apply 加 + afterHooks 减)
@@ -140,8 +141,8 @@ describe('applyView 一致性 bug', () => {
             index: 0, name: 'P1', character: '', health: 0, maxHealth: 4, alive: true,
             equipment: { 武器: 'e1' }, skills: [], handCount: 2,
             hand: [
-              { id: 'h1', name: '杀', suit: '♠', rank: '1', type: '基本牌' },
-              { id: 'h2', name: '闪', suit: '♥', rank: '2', type: '基本牌' },
+              { id: 'h1', name: '杀', suit: '♠', color: '黑', rank: '1', type: '基本牌' },
+              { id: 'h2', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
             ],
             marks: [],
           },
@@ -189,7 +190,7 @@ describe('applyView 一致性 bug', () => {
         { players: [
             { index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
             { index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: { '防具': 'c2' }, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-          ], cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', rank: '3', type: '基本牌' } }, zones: { deck: [], discardPile: [], processing: [] } } as any,
+          ], cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' } }, zones: { deck: [], discardPile: [], processing: [] } } as any,
         { type: '获得', player: 0, cardId: 'c2', from: 1 } as any,
       );
       // othersView 不应携带 cardId（第三方不应知道获得了什么牌）
@@ -205,8 +206,8 @@ describe('applyView 一致性 bug', () => {
   describe('移动牌 atom: 重复牌打出导致 hand 与 handCount 脱节', () => {
     // 两张完全相同的杀(id 不同,但 name/suit/rank 相同)
     const dupCards: Card[] = [
-      { id: 's1', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
-      { id: 's2', name: '杀', suit: '♠', rank: '7', type: '基本牌' },
+      { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
+      { id: 's2', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
     ];
 
     it('打出分支: 打出 1 张重复杀, hand 应只移除 1 张, handCount 只 -1', () => {
@@ -222,10 +223,10 @@ describe('applyView 一致性 bug', () => {
         cardMap: { s1: dupCards[0], s2: dupCards[1] },
       });
 
-      // 打出 s1: 手牌→处理区。toViewEvents 生成 { type: '打出', player: 0, card: {name,suit,rank}, cardId: 's1' }
+      // 打出 s1: 手牌→处理区。toViewEvents 生成 { type: '打出', player: 0, card: {name,suit, color: suitColor(suit),rank}, cardId: 's1' }
       def.applyView!(view, {
         type: '打出', player: 0, cardId: 's1',
-        card: { name: '杀', suit: '♠', rank: '7' },
+        card: { name: '杀', suit: '♠', color: '黑', rank: '7' },
       } as any);
 
       // ❌ BUG: filter 按 name/suit/rank 匹配,s2 也会被移除 → hand 变空但 handCount=1
@@ -251,7 +252,7 @@ describe('applyView 一致性 bug', () => {
       // 弃牌: 手牌→弃牌堆。toViewEvents 生成 { type: '弃牌', player: 0, card: {...}, cardId: 's1' }
       def.applyView!(view, {
         type: '弃牌', player: 0, cardId: 's1',
-        card: { name: '杀', suit: '♠', rank: '7' },
+        card: { name: '杀', suit: '♠', color: '黑', rank: '7' },
       } as any);
 
       expect(view.players[0].handCount).toBe(1);

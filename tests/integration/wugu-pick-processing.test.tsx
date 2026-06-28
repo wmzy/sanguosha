@@ -9,9 +9,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView, Card, SettlementFrame, Json } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A'): Card {
-  return { id, name, suit, rank, type: '基本牌' };
+  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
 }
 
 function makeViewWithWuguPending(): GameView {
@@ -60,8 +61,8 @@ function makeViewWithWuguPending(): GameView {
           type: 'pickProcessingCard',
           title: '五谷丰登:选择 1 张牌',
           cards: [
-            { cardId: 'pa', cardName: '杀', suit: '♠', rank: '7' },
-            { cardId: 'pb', cardName: '桃', suit: '♥', rank: '2' },
+            { cardId: 'pa', cardName: '杀', suit: '♠', color: '黑', rank: '7' },
+            { cardId: 'pb', cardName: '桃', suit: '♥', color: '红', rank: '2' },
           ],
         },
         timeout: 20,
@@ -70,8 +71,8 @@ function makeViewWithWuguPending(): GameView {
         type: 'pickProcessingCard',
         title: '五谷丰登:选择 1 张牌',
         cards: [
-          { cardId: 'pa', cardName: '杀', suit: '♠', rank: '7' },
-          { cardId: 'pb', cardName: '桃', suit: '♥', rank: '2' },
+          { cardId: 'pa', cardName: '杀', suit: '♠', color: '黑', rank: '7' },
+          { cardId: 'pb', cardName: '桃', suit: '♥', color: '红', rank: '2' },
         ],
       },
       target: 0,

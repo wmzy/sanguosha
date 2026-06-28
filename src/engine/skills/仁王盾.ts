@@ -24,7 +24,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!killCard || killCard.name !== '杀') return;   // 仅对杀生效(防御未来锦囊复用此 atom)
 
     // 黑色杀无效:cancel 检测有效性 → 杀.execute 跳过该目标
-    if (killCard.suit === '♠' || killCard.suit === '♣') {
+    if (killCard.color === '黑') {
       return { kind: 'cancel' };
     }
   });

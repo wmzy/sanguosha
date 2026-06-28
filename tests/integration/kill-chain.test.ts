@@ -8,9 +8,9 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function build(): GameState {
-  const slash: Card = { id: 's0', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
-  const dodge: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
-  const slash2: Card = { id: 's2', name: '杀', suit: '♣', rank: '5', type: '基本牌' };
+  const slash: Card = { id: 's0', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
+  const dodge: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
+  const slash2: Card = { id: 's2', name: '杀', suit: '♣', color: '黑', rank: '5', type: '基本牌' };
   return createGameState({
     players: [
       { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,

@@ -68,6 +68,40 @@ export function getCachedSkillModule(id: string): SkillModule | undefined {
   return moduleCache.get(id);
 }
 
+// ─── 技能描述查询(静态数据,前端 tooltip / MCP 工具共享) ─────────
+// createSkill 返回的 description 不依赖 ownerId(每个技能固定文案),
+// 故用 ownerId=0 取一次并缓存,供前端 hover tip 与 MCP getSkillInfo 复用,
+// 避免在多处重复硬编码或重复调用 createSkill。
+const descriptionCache = new Map<string, string>();
+
+/** 同步获取技能描述。依赖技能模块已加载(moduleCache 命中);未加载返回 undefined。
+ *  前端 useSkillActions 在 view 变化时为所有玩家 registerSkillActions → 全量加载技能模块,
+ *  故渲染时基本能命中;首次渲染(effect 未跑完)的极少数情况优雅降级(只显示技能名)。
+ *  需要确保命中的场景(MCP 工具/服务端)用 getSkillDescriptionAsync。 */
+export function getSkillDescription(id: string): string | undefined {
+  if (descriptionCache.has(id)) return descriptionCache.get(id);
+  const mod = moduleCache.get(id);
+  if (!mod) return undefined;
+  try {
+    const desc = mod.createSkill(id, 0).description;
+    descriptionCache.set(id, desc);
+    return desc;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 异步获取技能描述:先查缓存,未命中则加载模块再取。模块缺失(无对应技能)返回 undefined。 */
+export async function getSkillDescriptionAsync(id: string): Promise<string | undefined> {
+  if (descriptionCache.has(id)) return descriptionCache.get(id);
+  try {
+    await getSkillModule(id);
+  } catch {
+    return undefined;
+  }
+  return getSkillDescription(id);
+}
+
 // ─── state-bound 注册表(WeakMap 外挂) ────────────────────────
 
 interface SkillRegistry {

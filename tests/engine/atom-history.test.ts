@@ -134,7 +134,7 @@ describe('atomHistory: applyAtom 写入', () => {
         alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
     tags: [],
       }],
-      cardMap: { c1: { id: 'c1', name: '杀', suit: '♠', rank: '7', type: '基本牌', subtype: '' } as any },
+      cardMap: { c1: { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌', subtype: '' } as any },
       zones: { deck: ['c1'], discardPile: [], processing: [] },
       seq: 0,
     });

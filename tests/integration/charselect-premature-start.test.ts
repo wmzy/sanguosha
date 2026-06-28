@@ -49,7 +49,7 @@ describe('5 人选将防提前结束', () => {
     });
     for (let i = 0; i < 60; i++) {
       const id = `deck_${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
       state.zones.deck.push(id);
     }
   });

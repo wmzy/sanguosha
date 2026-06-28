@@ -63,6 +63,10 @@ import { createStandardDeck } from '../shared/deck';
 import { clearSlashMaxProviders } from './slash-quota';
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
+// 系统规则 用静态导入而非 await import：系统规则 与本模块互依（系统规则 import applyAtom），
+// 动态导入会让打包器（Rollup inlineDynamicImports）因循环依赖拆出独立 chunk，无法生成单文件发布包。
+// 系统规则模块顶层无副作用，静态/动态加载语义等价（ESM live binding 解析循环）。
+import * as 系统规则mod from './skills/系统规则';
 // 必须 import skills/index 来设置 skillModuleResolver
 import './skills';
 
@@ -230,7 +234,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
 
   // 3. dispatch 开局 start(dispatch 返回 boolean:validate 拒绝返回 false,开局失败通过后续 state 检查暴露)
   // 先为每个玩家注册选将/弃牌 respond action(注册到具体座次,开局流程内会等待这些 respond)
-  const 系统规则mod = await import('./skills/系统规则');
+  // 系统规则mod 为模块顶部静态导入(见文件头)
   // 注册系统规则全局 hooks(添加技能/移除技能/弃置/濒死检查)到本 state(state-bound 注册表)
   系统规则mod.onInit(系统规则mod.createSkill('系统规则', TARGET_SYSTEM), state);
   for (const player of state.players) {
@@ -263,7 +267,7 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   const { registerSkillsFromState: registerSkills } = await import('./skill');
   await registerSkills(state);
   // 注册系统规则全局 hooks + 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)
-  const 系统规则mod = await import('./skills/系统规则');
+  // 系统规则mod 为模块顶部静态导入(见文件头)
   系统规则mod.onInit(系统规则mod.createSkill('系统规则', TARGET_SYSTEM), state);
   for (const player of state.players) {
     系统规则mod.registerSystemRespondActions(state, player.index);

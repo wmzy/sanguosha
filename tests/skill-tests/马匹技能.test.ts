@@ -6,10 +6,11 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '进攻马' | '防御马'): Card {
-  return { id, name, suit, rank: 'A', type: '装备牌', subtype };
+  return { id, name, suit, color: suitColor(suit), rank: 'A', type: '装备牌', subtype };
 }
 
 function makePlayer(opts: { index: number; name: string; hand?: string[]; skills?: string[] }) {

@@ -8,7 +8,7 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function build(opts?: { p1Hand?: string[]; p2Hand?: string[]; extraCards?: Record<string, Card> }): GameState {
-  const slash: Card = { id: 's0', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+  const slash: Card = { id: 's0', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
   const cards: Record<string, Card> = { s0: slash, ...opts?.extraCards };
   return createGameState({
     players: [
@@ -29,7 +29,7 @@ describe('杀完整结算流程', () => {
   beforeEach(() => { harness = new SkillTestHarness(); });
 
   it('出杀→P2 不出闪→扣1血→杀牌进弃牌堆→处理区清空', async () => {
-    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
     await harness.setup(build({ p2Hand: ['d1'], extraCards: { d1: dodge } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -46,7 +46,7 @@ describe('杀完整结算流程', () => {
   });
 
   it('出杀→P2 出闪→不扣血→杀和闪都进弃牌堆→处理区清空', async () => {
-    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
     await harness.setup(build({ p2Hand: ['d1'], extraCards: { d1: dodge } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -63,7 +63,7 @@ describe('杀完整结算流程', () => {
 
   it('BUG验证:被询问闪时不能 respond 杀(P2有杀技能)', async () => {
     // P2 同时有杀和闪技能,手牌只有杀
-    const slash2: Card = { id: 's2', name: '杀', suit: '♣', rank: '5', type: '基本牌' };
+    const slash2: Card = { id: 's2', name: '杀', suit: '♣', color: '黑', rank: '5', type: '基本牌' };
     await harness.setup(build({ p2Hand: ['s2'], extraCards: { s2: slash2 } }));
     // 手动给 P2 加杀技能
     harness.state.players[1].skills.push('杀');

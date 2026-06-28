@@ -103,7 +103,8 @@ export type ClientMessage =
   | { type: 'leave_room' }
   | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq }
   | { type: 'create_debug_room'; config?: RoomConfig; playerCount?: number }
-  | { type: 'update_room_config'; config: RoomConfig };
+  | { type: 'update_room_config'; config: RoomConfig }
+  | { type: 'set_player_id'; playerId: string };
 
 export interface RoomInfo {
   id: string;
@@ -131,6 +132,8 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
     case 'restart_game':
     case 'leave_room':
       return true;
+    case 'set_player_id':
+      return typeof d['playerId'] === 'string' && d['playerId'].length > 0;
     case 'join_room':
     case 'join_debug_room':
       return typeof d['roomId'] === 'string';

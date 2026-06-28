@@ -47,6 +47,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         id: cardId,
         name: '乐不思蜀',
         suit: '♠',
+        color: '黑',
         rank: 'A',
         type: '锦囊牌',
       };

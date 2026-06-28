@@ -13,10 +13,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import { findUseActionForCard } from '../../src/client/utils/gameViewHelpers';
-import type { GameView, Card } from '../../src/engine/types';
+import type { GameView, Card, PendingView } from '../../src/engine/types';
 
 function makeEquipCard(id: string, name: string, subtype: string): Card {
-  return { id, name, suit: '♠', rank: 'A', type: '装备牌', subtype } as Card;
+  return { id, name, suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype } as Card;
 }
 
 function makeView(overrides: Partial<GameView> = {}): GameView {
@@ -141,7 +141,7 @@ describe('findUseActionForCard:filter-based 匹配(声明即真相)', () => {
 
   it('装备牌被 装备通用 的 cardFilter 匹配,而非靠 card.name 反查', async () => {
     // 构造一张 card.name 与 skillId '装备通用' 毫无拼写关系的装备牌
-    const weirdEquip: Card = { id: 'weird', name: '某种从没见过的武器', suit: '♠', rank: 'A', type: '装备牌', subtype: '武器' } as Card;
+    const weirdEquip: Card = { id: 'weird', name: '某种从没见过的武器', suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype: '武器' } as Card;
     await registerSkillActions(0, ['装备通用', '杀']);
     const actions = getActionsForPlayer(0);
     const matched = findUseActionForCard(actions, weirdEquip);
@@ -149,7 +149,7 @@ describe('findUseActionForCard:filter-based 匹配(声明即真相)', () => {
   });
 
   it('基本牌(杀)被对应牌名技能的 cardFilter 匹配', async () => {
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', rank: '7', type: '基本牌' } as Card;
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' } as Card;
     await registerSkillActions(0, ['杀', '装备通用']);
     const actions = getActionsForPlayer(0);
     const matched = findUseActionForCard(actions, slash);
@@ -157,7 +157,7 @@ describe('findUseActionForCard:filter-based 匹配(声明即真相)', () => {
   });
 
   it('没有匹配的 use action 时返回 undefined(如只有装备通用时出杀)', async () => {
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', rank: '7', type: '基本牌' } as Card;
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' } as Card;
     await registerSkillActions(0, ['装备通用']); // 只有装备 use action
     const actions = getActionsForPlayer(0);
     expect(findUseActionForCard(actions, slash)).toBeUndefined();
@@ -221,10 +221,10 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
   });
 
   function makeZhangbaView(): GameView {
-    const zb = { id: 'zb', name: '丈八蛇矛', suit: '♠', rank: 'Q', type: '装备牌', subtype: '武器', range: 3 } as Card;
-    const c1 = { id: 'c1', name: '闪', suit: '♠', rank: '2', type: '基本牌' } as Card;
-    const c2 = { id: 'c2', name: '桃', suit: '♣', rank: '3', type: '基本牌' } as Card;
-    const c3 = { id: 'c3', name: '无中生有', suit: '♥', rank: 'A', type: '锦囊牌' } as Card;
+    const zb = { id: 'zb', name: '丈八蛇矛', suit: '♠', color: '黑', rank: 'Q', type: '装备牌', subtype: '武器', range: 3 } as Card;
+    const c1 = { id: 'c1', name: '闪', suit: '♠', color: '黑', rank: '2', type: '基本牌' } as Card;
+    const c2 = { id: 'c2', name: '桃', suit: '♣', color: '黑', rank: '3', type: '基本牌' } as Card;
+    const c3 = { id: 'c3', name: '无中生有', suit: '♥', color: '红', rank: 'A', type: '锦囊牌' } as Card;
     return {
       viewer: 0,
       currentPlayerIndex: 0,
@@ -299,9 +299,21 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
     fireEvent.click(document.querySelector('[data-card-id="c1"]')!);
     fireEvent.click(document.querySelector('[data-card-id="c2"]')!);
 
-    // 目标选择面板(showTargetSelector 修复后显示)中点 P2 → onTransformPlay 直接提交
-    const p2Target = await screen.findByRole('button', { name: /P2 \(曹操\)/ });
-    fireEvent.click(p2Target);
+    // 目标选择面板(showTargetSelector 修复后显示)中点 P2 座位 → onTransformPlay 直接提交
+    await waitFor(() => {
+      const p2Seat = document.querySelector('[data-player-name="P2"]');
+      expect(p2Seat).toBeTruthy();
+    });
+    fireEvent.click(document.querySelector('[data-player-name="P2"]')!);
+
+    // 按钮变为"使用 杀 → P2"且启用,点击提交
+    await waitFor(() => {
+      const playBtn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('使用'));
+      expect(playBtn).toBeTruthy();
+      expect(playBtn!.hasAttribute('disabled')).toBe(false);
+    });
+    const playBtn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('使用'))!;
+    fireEvent.click(playBtn);
 
     await waitFor(() => {
       expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
@@ -310,5 +322,50 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
         preceding: [{ skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } }],
       }));
     });
+  });
+});
+
+// ── 出牌阶段倒计时显示(回归 isBlocking 区分) ──
+// 回归根因:引入 pending.isBlocking 后,出牌窗口(isBlocking=false)被排除出
+// isPerspectiveAwaiting,而「自己的倒计时」显示条件错误复用了它 → 出牌阶段倒计时消失。
+// 修复:倒计时条件补充「自己出牌阶段」(isMyTurn && phase==='出牌'),与 isPerspectiveAwaiting 解耦。
+// 出牌窗口虽是非阻塞 pending(不计入「询问」),但当前视角仍需在此时段内操作,必须显示倒计时。
+describe('GameView:出牌阶段倒计时显示(回归 isBlocking 区分)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('自己出牌阶段(出牌窗口为非阻塞 pending)显示倒计时', async () => {
+    // 出牌窗口 isBlocking=false → isPerspectiveAwaiting=false(不计入询问),
+    // 但出牌阶段自己回合仍应显示倒计时(修复前被 isPerspectiveAwaiting 条件隐藏)
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '出牌窗口', player: 0 },
+        prompt: { type: 'useCard', title: '出牌阶段' },
+        target: 0,
+        isBlocking: false,
+        deadline: Date.now() + 15_000,
+        totalMs: 15_000,
+      } as unknown as PendingView,
+    });
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/⏱ \d+s/)).toBeDefined();
+    });
+  });
+
+  it('自己回合但非出牌阶段(无 pending)不显示倒计时 — 防 isMyTurn 误触发', () => {
+    // 边界:仅 isMyTurn 不够,还须 phase==='出牌'。判定阶段自己回合不应弹倒计时。
+    const view = makeView({
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+      pending: null,
+      deadline: null,
+    });
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    expect(screen.queryByText(/⏱ \d+s/)).toBeNull();
   });
 });

@@ -21,6 +21,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "server": "tsx src/server/index.ts",
+    "mcp:serve": "tsx src/ai-mcp/server.ts",
+    "build:mcp": "node scripts/build-mcp.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

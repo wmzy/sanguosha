@@ -1,4 +1,5 @@
 import type { Card, Suit, Rank } from './types';
+import { suitColor } from './types';
 import type { Rng } from './rng';
 import { 装备牌列表 } from './cards/equipment';
 import { getCardDescription } from './cards/description';
@@ -22,7 +23,7 @@ export function createStandardDeck(): Card[] {
     for (let i = 0; i < count; i++) {
       const s = ss[i % ss.length];
       const r = ranks[(id++) % ranks.length];
-      const card: Card = { name, type, subtype, suit: s, rank: r, description, id: `${name}-${s}-${r}-${deck.length}` };
+      const card: Card = { name, type, subtype, suit: s, color: suitColor(s), rank: r, description, id: `${name}-${s}-${r}-${deck.length}` };
       if (range != null) card.range = range;
       if (trickSubtype) card.trickSubtype = trickSubtype;
       deck.push(card);

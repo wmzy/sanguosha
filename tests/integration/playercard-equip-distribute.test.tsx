@@ -32,7 +32,7 @@ function makeView(equipment: Record<string, string>): GameView {
       },
     ],
     cardMap: {
-      wp1: { id: 'wp1', name: '诸葛连弩', suit: '♠', rank: 'A', type: '装备牌', subtype: '武器' },
+      wp1: { id: 'wp1', name: '诸葛连弩', suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype: '武器' },
     },
     pending: null, deadline: null, deadlineTotalMs: 0, log: [], settlementStack: [],
   };
@@ -117,5 +117,38 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
       />,
     );
     expect(screen.getByText(/诸葛连弩/).closest('[role="button"]')).toBeNull();
+  });
+
+  // ── 固定槽位:空槽显示占位卡框(布局稳定,不因装备数变化而抖动) ──
+  it('完全无装备:5 个槽位均渲染为空占位卡框', () => {
+    const view = makeView({});
+    render(
+      <EquipColumn
+        perspectiveIdx={0} view={view}
+        canOperate skillActions={[]} onSkillAction={() => {}}
+      />,
+    );
+    for (const slot of ['武器', '防具', '进攻马', '防御马', '宝物']) {
+      const label = screen.getByText(slot);
+      expect(label.className).toContain(styles.equipSlotEmptyLabel);
+      expect(label.parentElement?.className).toContain(styles.equipSlotEmpty);
+    }
+  });
+
+  it('部分装备:有装备的槽显示装备名,空槽显示占位', () => {
+    const view = makeView({ 武器: 'wp1' });
+    render(
+      <EquipColumn
+        perspectiveIdx={0} view={view}
+        canOperate skillActions={[]} onSkillAction={() => {}}
+      />,
+    );
+    // 武器槽显示装备名(非占位) → 不显示“武器”占位文本
+    expect(screen.queryByText('武器')).toBeNull();
+    expect(screen.getByText(/诸葛连弩/).tagName).toBe('SPAN');
+    // 其余 4 槽为空占位
+    for (const slot of ['防具', '进攻马', '防御马', '宝物']) {
+      expect(screen.getByText(slot).className).toContain(styles.equipSlotEmptyLabel);
+    }
   });
 });

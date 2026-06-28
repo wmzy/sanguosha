@@ -9,8 +9,8 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function buildState(opts?: { p2Hand?: string[]; extraCardMap?: Record<string, Card> }): GameState {
-  const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
-  const dodge: Card = { id: 'c3', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+  const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
+  const dodge: Card = { id: 'c3', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
   return createGameState({
     players: [
       makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),
@@ -74,7 +74,7 @@ describe('杀', () => {
   });
 
   it('同回合不能出第二张杀', async () => {
-    const c2: Card = { id: 'c2', name: '杀', suit: '♠', rank: '2', type: '基本牌' };
+    const c2: Card = { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' };
     await harness.setup(buildState({ extraCardMap: { c2 } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');

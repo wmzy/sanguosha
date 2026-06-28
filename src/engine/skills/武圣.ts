@@ -44,14 +44,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardIdOk = typeof cardId === 'string';
       const card = cardIdOk ? state.cardMap[cardId] : undefined;
       const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isRed = !!card && (card.suit === '♥' || card.suit === '♦');
+      const isRed = !!card && card.color === '红';
       const ok = myTurn && free && selfAlive && cardInHand && isRed;
       return ok ? null : '现在不能使用武圣';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
+      const shadowId = shadowIdOf(cardId);
       // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, { type: '武圣包装', player: ownerId, cardId });
+      await applyAtom(state, { type: '当作', player: ownerId, cardIds: [cardId], shadowId, outputName: '杀' });
     },
     // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
     (state: GameState, params: Record<string, Json>) => {
@@ -75,7 +76,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     prompt: {
       type: 'useCardAndTarget',
       title: '选择一张红色牌当杀使用',
-      cardFilter: { filter: (c: Card) => c.suit === '♥' || c.suit === '♦', min: 1, max: 1 },
+      cardFilter: { filter: (c: Card) => c.color === '红', min: 1, max: 1 },
       targetFilter: {
         min: 1, max: 1,
         // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示
@@ -87,7 +88,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
-      const hasRed = p.hand?.some(c => c.suit === '♥' || c.suit === '♦') ?? false;
+      const hasRed = p.hand?.some(c => c.color === '红') ?? false;
       return hasRed && viewCanSlash(ctx.view, ctx.perspectiveIdx);
     },
   });

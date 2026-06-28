@@ -115,8 +115,8 @@ describe('激将:主公请求蜀势力角色出杀', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例3:目标不出杀(超时)→ 主公摸 1 张牌', async () => {
     // 准备牌堆:2 张普通牌,供摸牌
-    const deckCard1: Card = { id: 'd1', name: '杀', suit: '♠', rank: '3', type: '基本牌' };
-    const deckCard2: Card = { id: 'd2', name: '闪', suit: '♥', rank: '5', type: '基本牌' };
+    const deckCard1: Card = { id: 'd1', name: '杀', suit: '♠', color: '黑', rank: '3', type: '基本牌' };
+    const deckCard2: Card = { id: 'd2', name: '闪', suit: '♥', color: '红', rank: '5', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -165,7 +165,7 @@ describe('激将:主公请求蜀势力角色出杀', () => {
   // 用例 4:正面——目标出杀 → 杀进入处理区 → 激将检测到 → 杀结算
   // ─────────────────────────────────────────────────────────────
   it('用例4:目标(P1)出杀 → 杀进处理区 → 激将触发杀 → P2 不出闪 → P2 扣血', async () => {
-    const slash: Card = { id: 'k1', name: '杀', suit: '♠', rank: '7', type: '基本牌' };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [

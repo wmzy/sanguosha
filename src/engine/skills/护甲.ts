@@ -20,7 +20,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const card = ctx.state.cardMap[atom.cardId];
     if (!card) return;
     if (!card.name.includes('杀')) return;
-    if (card.suit !== '♠' && card.suit !== '♣') return;  // 仅黑色
+    if (card.color !== '黑') return;  // 仅黑色
     const baseAmount = atom.amount ?? 0;
     if (baseAmount <= 0) return;
     return { kind: 'modify', atom: { ...ctx.atom, amount: baseAmount - 1 } as typeof ctx.atom };

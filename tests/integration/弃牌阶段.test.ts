@@ -46,13 +46,13 @@ describe('弃牌阶段', () => {
         },
       ],
       cardMap: {
-        c1: { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' },
-        c2: { id: 'c2', name: '闪', suit: '♥', rank: '2', type: '基本牌' },
-        c3: { id: 'c3', name: '桃', suit: '♥', rank: '3', type: '基本牌' },
-        c4: { id: 'c4', name: '杀', suit: '♠', rank: '4', type: '基本牌' },
-        c5: { id: 'c5', name: '杀', suit: '♠', rank: '5', type: '基本牌' },
-        d1: { id: 'd1', name: '杀', suit: '♠', rank: '6', type: '基本牌' },
-        d2: { id: 'd2', name: '闪', suit: '♥', rank: '7', type: '基本牌' },
+        c1: { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' },
+        c2: { id: 'c2', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
+        c3: { id: 'c3', name: '桃', suit: '♥', color: '红', rank: '3', type: '基本牌' },
+        c4: { id: 'c4', name: '杀', suit: '♠', color: '黑', rank: '4', type: '基本牌' },
+        c5: { id: 'c5', name: '杀', suit: '♠', color: '黑', rank: '5', type: '基本牌' },
+        d1: { id: 'd1', name: '杀', suit: '♠', color: '黑', rank: '6', type: '基本牌' },
+        d2: { id: 'd2', name: '闪', suit: '♥', color: '红', rank: '7', type: '基本牌' },
       },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -74,7 +74,7 @@ describe('弃牌阶段', () => {
     const padCount = 6;
     for (let i = 0; i < padCount; i++) {
       const id = `pad-${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
       lord.hand.push(id);
     }
     const handAfter = lord.hand.length;
@@ -122,7 +122,7 @@ describe('弃牌阶段', () => {
     const handBefore = lord.hand.length;
     for (let i = 0; i < 6; i++) {
       const id = `pad-${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
       lord.hand.push(id);
     }
     const before = lord.hand.length;

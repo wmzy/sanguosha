@@ -8,7 +8,7 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function build(opts?: { p0Extra?: string[]; extraCards?: Record<string, Card> }): GameState {
-  const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+  const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
   const cards: Record<string, Card> = { c1: slash, ...opts?.extraCards };
   return createGameState({
     players: [
@@ -30,7 +30,7 @@ describe('validate 负面测试示范(expectRejected)', () => {
   beforeEach(() => { harness = new SkillTestHarness(); });
 
   it('出不在手牌的牌被拒绝', async () => {
-    const fake: Card = { id: 'cX', name: '杀', suit: '♠', rank: '2', type: '基本牌' };
+    const fake: Card = { id: 'cX', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' };
     await harness.setup(build({ extraCards: { cX: fake } }));
     const P1 = harness.player('P1');
     // cX 不在 P1 手牌中
@@ -38,7 +38,7 @@ describe('validate 负面测试示范(expectRejected)', () => {
   });
 
   it('出的牌名不是杀被拒绝(用闪的 cardId 出杀)', async () => {
-    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
     await harness.setup(build({ p0Extra: ['d1'], extraCards: { d1: dodge } }));
     const P1 = harness.player('P1');
     await P1.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: 'd1', targets: [1] } });
@@ -51,7 +51,7 @@ describe('validate 负面测试示范(expectRejected)', () => {
     // 出杀 → P2 询问闪 pending
     await P1.useCardAndTarget('杀', 'c1', [1]);
     // 此时 pending 存在,P1 再出杀应被拒
-    const slash2: Card = { id: 'c2', name: '杀', suit: '♠', rank: '3', type: '基本牌' };
+    const slash2: Card = { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '3', type: '基本牌' };
     harness.state.cardMap['c2'] = slash2;
     harness.state.players[0].hand.push('c2');
     await P1.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: 'c2', targets: [1] } });

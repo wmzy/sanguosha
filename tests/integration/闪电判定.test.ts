@@ -22,6 +22,7 @@ import { getAtomDef } from '../../src/engine/atom';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState, PendingTrick } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -59,7 +60,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 describe('闪电:延时锦囊判定 plumbing', () => {

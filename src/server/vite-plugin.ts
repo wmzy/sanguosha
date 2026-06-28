@@ -9,6 +9,7 @@ import app from './app';
 import { handleWsOpen, handleWsClose, handleWsMessage } from './app';
 import { deserialize } from './protocol';
 import { generatePlayerId } from './utils';
+import { findRoomByPlayerId } from './room';
 import { createLogger } from './logger';
 
 const log = createLogger('vite-plugin');
@@ -75,16 +76,26 @@ export function honoApiPlugin(): Plugin {
 
             ws.on('message', (data: Buffer) => {
               const message = deserialize(data.toString());
-              if (message) {
-                handleWsMessage(playerId, message, {
-                  send: (msg: string) => ws.send(msg),
-                  close: () => ws.close(),
-                } as never);
+              if (!message) return;
+              const currentId = wsClients.get(ws) ?? playerId;
+              // set_player_id: 连接初期声明期望 playerId(供 AI/客户端指定稳定标识)。
+              // 仅在未加入房间时允许(避免游戏中篡改身份)。与 src/server/index.ts 保持一致。
+              if (message.type === 'set_player_id') {
+                const newId = message.playerId.trim();
+                if (newId && !findRoomByPlayerId(currentId)) {
+                  wsClients.set(ws, newId);
+                }
+                return;
               }
+              handleWsMessage(currentId, message, {
+                send: (msg: string) => ws.send(msg),
+                close: () => ws.close(),
+              } as never);
             });
 
             ws.on('close', () => {
-              handleWsClose(playerId);
+              const finalId = wsClients.get(ws) ?? playerId;
+              handleWsClose(finalId);
               wsClients.delete(ws);
             });
           });

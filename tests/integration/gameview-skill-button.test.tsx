@@ -13,7 +13,7 @@ import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView, Card } from '../../src/engine/types';
 
 function makeCard(id: string, name: string): Card {
-  return { id, name, suit: '♠', rank: 'A', type: '基本牌' };
+  return { id, name, suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 }
 
 function makeView(overrides: Partial<GameView> = {}): GameView {

@@ -3,6 +3,8 @@ name: add-atom
 description: 添加三国杀引擎的原子操作(atom)。实现 AtomDefinition(validate/apply/toViewEvents/applyView),处理信息分级和等待型 pending。当用户要求添加/创建新的 atom 时使用。
 argument-hint: [atom类型名]
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git *), Bash(npx tsc *)
+metadata:
+  internal: true
 ---
 
 ## 事实依据(严格遵守)

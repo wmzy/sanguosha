@@ -8,6 +8,7 @@ import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
+import { getSkillDescription } from '../../engine/skill';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
@@ -126,14 +127,14 @@ export function PlayerCardLarge({
                   key={s}
                   className={cx(styles.skillBtn, skillBtnVariant(btn.style))}
                   onClick={() => onSkillAction(btn)}
-                  title={`${btn.label}: ${btn.prompt.title}`}
+                  title={`${s}：${getSkillDescription(s) ?? btn.prompt.title}`}
                 >
                   {s}
                 </button>
               );
             }
             return (
-              <span key={s} className={styles.skillTag}>
+              <span key={s} className={styles.skillTag} title={getSkillDescription(s)}>
                 {s}
               </span>
             );

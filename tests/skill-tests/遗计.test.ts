@@ -20,9 +20,9 @@ function makePlayer(opts: { index: number; name: string; hand: string[]; skills:
 }
 
 function buildState(): GameState {
-  const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
-  const d1: Card = { id: 'd1', name: '桃', suit: '♥', rank: '3', type: '基本牌' };
-  const d2: Card = { id: 'd2', name: '桃', suit: '♦', rank: '4', type: '基本牌' };
+  const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
+  const d1: Card = { id: 'd1', name: '桃', suit: '♥', color: '红', rank: '3', type: '基本牌' };
+  const d2: Card = { id: 'd2', name: '桃', suit: '♦', color: '红', rank: '4', type: '基本牌' };
   return createGameState({
     players: [
       makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),
@@ -103,7 +103,7 @@ describe('confirm / distribute API', () => {
   });
 
   it('confirm(false) 等同 pass()', async () => {
-    const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+    const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
     await harness.setup(createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),

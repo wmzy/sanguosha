@@ -864,11 +864,14 @@ export const equipColumnIcon = css`
   font-size: 14px;
   flex-shrink: 0;
 `;
-export const equipColumnEmpty = css`
-  font-size: 11px;
-  color: #666;
-  text-align: center;
-  padding: 12px 0;
+// 空装备槽占位卡框:与 equipColumnItem 同尺寸,虚线边框 + 半透明,保证 5 槽布局固定
+export const equipSlotEmpty = css`
+  opacity: 0.4;
+  border: 1px dashed rgba(243, 156, 18, 0.22);
+  background: transparent;
+`;
+export const equipSlotEmptyLabel = css`
+  color: #777;
 `;
 
 // ─── 下方主布局 ───

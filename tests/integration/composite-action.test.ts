@@ -10,8 +10,8 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function buildState(): GameState {
-  const red: Card = { id: 'c1', name: '桃园结义', suit: '♥', rank: 'A', type: '锦囊牌' };
-  const dodge: Card = { id: 'c3', name: '闪', suit: '♣', rank: '2', type: '基本牌' };
+  const red: Card = { id: 'c1', name: '桃园结义', suit: '♥', color: '红', rank: 'A', type: '锦囊牌' };
+  const dodge: Card = { id: 'c3', name: '闪', suit: '♣', color: '黑', rank: '2', type: '基本牌' };
   return createGameState({
     players: [
       { index: 0, name: 'P1', character: '关羽', health: 4, maxHealth: 4, alive: true, hand: ['c1'], equipment: {}, skills: ['杀', '武圣'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
@@ -58,7 +58,7 @@ describe('组合 action(武圣转化 + 杀使用)', () => {
 
   it('preceding validate 失败(非红牌)→ 整个消息丢弃,无副作用', async () => {
     // 把 c1 换成黑桃
-    state.cardMap['c1'] = { id: 'c1', name: '过河拆桥', suit: '♠', rank: '3', type: '锦囊牌' };
+    state.cardMap['c1'] = { id: 'c1', name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
     const healthBefore = state.players[1].health;
     void dispatch(state, {
       skillId: '杀', actionType: 'use', ownerId: 0,

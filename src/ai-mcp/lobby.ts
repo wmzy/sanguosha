@@ -1,0 +1,133 @@
+// src/ai-mcp/lobby.ts
+// 大厅编排：建/加入普通多人房 → 准备 → 等待全员就绪 → (房主)开局。
+// 基于 HGC 同步 getter 轮询（沿用 playHandler 的 tick 模型），无 WS 直接依赖。
+import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
+import type { RoomConfig } from '../server/protocol';
+
+export interface LobbyOpts {
+  /** 'create'=建房(房主)；'join'=加入指定房间 */
+  mode: 'create' | 'join';
+  /** join 模式必填 */
+  roomId?: string;
+  /** create 模式：房间名 */
+  name?: string;
+  /** create 模式：最大人数，默认 2 */
+  maxPlayers?: number;
+  /** create 模式：房间配置 */
+  config?: RoomConfig;
+  /** 玩家 id：给定则采用，否则服务端自动生成 */
+  playerId?: string;
+  /** 等待全员就绪的超时(ms)，默认 300000 (5min) */
+  readyTimeoutMs?: number;
+}
+
+export interface LobbyResult {
+  roomId: string;
+  playerId: string;
+  /** 是否房主 */
+  isHost: boolean;
+  /** 实际座次数 */
+  playerCount: number;
+  /** 'playing'=已开局；'lobby'=超时仍未开局 */
+  phase: 'playing' | 'lobby';
+}
+
+const DEFAULT_READY_TIMEOUT_MS = 300_000;
+const TICK_MS = 50;
+
+/** 判定全员就绪：readyPlayers 集合 === playerIds 集合，且至少 2 人。 */
+function isAllReady(hgc: HeadlessGameClient): boolean {
+  const rs = hgc.roomState;
+  if (!rs) return false;
+  if (rs.playerIds.length < 2) return false;
+  if (rs.readyPlayers.length !== rs.playerIds.length) return false;
+  return true;
+}
+
+/**
+ * 加入房间并推进到开局。
+ * create 模式：建房→准备→等待他人加入并就绪→房主开局。
+ * join 模式：加入→准备→等待房主开局。
+ * 返回时 phase 应为 'playing'（已开局）；超时则 phase='lobby'。
+ */
+export async function joinAndStartRoom(hgc: HeadlessGameClient, opts: LobbyOpts): Promise<LobbyResult> {
+  // 1. 建/加入房间
+  if (opts.mode === 'create') {
+    hgc.createRoom(
+      opts.name ?? `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      opts.maxPlayers ?? 2,
+      opts.config,
+      opts.playerId,
+    );
+  } else {
+    if (!opts.roomId) throw new Error('join 模式需要 roomId');
+    hgc.joinRoom(opts.roomId, opts.playerId);
+  }
+
+  // 2. 等 room_joined（playerId 就绪）
+  const joinDeadline = Date.now() + 10_000;
+  await waitFor(() => hgc.playerId !== null, joinDeadline, '加入房间超时');
+
+  // 3. 准备
+  hgc.sendReady();
+
+  // 4. 等待全员就绪(超时静默返回 lobby,由调用方决定后续)
+  const readyDeadline = Date.now() + (opts.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
+  await waitFor(() => isAllReady(hgc), readyDeadline, '等待全员就绪超时', false);
+  if (!isAllReady(hgc)) {
+    return {
+      roomId: hgc.roomId ?? '',
+      playerId: hgc.playerId ?? '',
+      isHost: hgc.roomState?.hostId === hgc.playerId,
+      playerCount: hgc.roomState?.playerIds.length ?? 0,
+      phase: 'lobby',
+    };
+  }
+
+  // 5. 房主开局；非房主等开局
+  const rs = hgc.roomState;
+  const isHost = rs?.hostId === hgc.playerId;
+  if (isHost) {
+    hgc.sendStartGame();
+  }
+
+  // 6. 等开局（phase→playing）
+  const startDeadline = Date.now() + 15_000;
+  await waitFor(
+    () => hgc.phase === 'playing',
+    startDeadline,
+    '开局超时',
+    // 超时不抛错：返回 lobby 状态，让调用方决定
+    false,
+  );
+
+  const finalRs = hgc.roomState;
+  const roomId = hgc.roomId ?? '';
+  const playerId = hgc.playerId ?? '';
+  return {
+    roomId,
+    playerId,
+    isHost,
+    playerCount: finalRs?.playerIds.length ?? 0,
+    phase: hgc.phase === 'playing' ? 'playing' : 'lobby',
+  };
+}
+
+/** 轮询条件直至满足或超时。throwOnTimeout=false 时超时静默返回。 */
+function waitFor(
+  cond: () => boolean,
+  deadline: number,
+  errorMsg: string,
+  throwOnTimeout = true,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const tick = () => {
+      if (cond()) return resolve();
+      if (Date.now() >= deadline) {
+        return throwOnTimeout ? reject(new Error(errorMsg)) : resolve();
+      }
+      setTimeout(tick, TICK_MS);
+    };
+    tick();
+  });
+}

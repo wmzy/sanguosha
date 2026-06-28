@@ -184,6 +184,24 @@ export function usePlayInteraction(
     }
   }, [transformMode, view, perspectiveIdx, skillActions]);
 
+  // distribute(主动技)自动取消:distributeMode 对应的 action 不再 active 时
+  // (如出牌阶段超时回合结束、视角切换、制衡/仁德限一次已用),清除 distribute 选择状态,
+  // 避免玩家卡在无法提交的 UI。与上方 transformMode 自动取消逻辑对称。
+  // 仅清理主动技分支(distributeMode);被动 pending 分支(遗计)由 pending 驱动,
+  // pending 消失 activeDistribute 自然归 null,无需此处清理。
+  useEffect(() => {
+    if (!distributeMode) return;
+    const action = skillActions.find(
+      a => a.skillId === distributeMode.skillId && a.actionType === distributeMode.actionType,
+    );
+    if (!action || !isActiveAction(action, { view, perspectiveIdx })) {
+      setDistributeMode(null);
+      setDistSelected(new Set());
+      setDistAllocations([]);
+      setDistTargetName(null);
+    }
+  }, [distributeMode, view, perspectiveIdx, skillActions]);
+
   // ─── 派生:选中的牌 + use action ───
   const selectedCard = selectedCardId ? perspectiveHand.find(c => c.id === selectedCardId) ?? null : null;
 

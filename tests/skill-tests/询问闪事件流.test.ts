@@ -22,8 +22,8 @@ function makePlayer(opts: { index: number; name: string; hand: string[]; skills:
 }
 
 function buildState(opts?: { p2Hand?: string[]; extraCardMap?: Record<string, Card> }): GameState {
-  const slash: Card = { id: 'c1', name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
-  const dodge: Card = { id: 'c3', name: '闪', suit: '♥', rank: '2', type: '基本牌' };
+  const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
+  const dodge: Card = { id: 'c3', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
   return createGameState({
     players: [
       makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),

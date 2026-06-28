@@ -21,6 +21,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState, PendingTrick } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -58,7 +59,7 @@ function makeCard(
   rank = '7',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, rank, type };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 const SKIP_TAG = '乐不思蜀/跳过出牌';

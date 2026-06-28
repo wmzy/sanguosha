@@ -15,7 +15,7 @@ function buildState(overrides: Partial<GameState> = {}): GameState {
   const hand: string[] = [];
   for (let i = 0; i < 6; i++) {
     const id = `c${i}`;
-    cards.push({ id, name: '杀', suit: '♣', rank: '7', type: '基本牌' });
+    cards.push({ id, name: '杀', suit: '♣', color: '黑', rank: '7', type: '基本牌' });
     hand.push(id);
   }
   const cardMap: Record<string, Card> = {};

@@ -83,7 +83,7 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
     // 自动填充牌堆(bootstrap 发牌需要)
     for (let i = 0; i < 40; i++) {
       const id = `deck_${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', rank: 'A', type: '基本牌' };
+      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
       state.zones.deck.push(id);
     }
   });
