@@ -3,6 +3,8 @@ name: add-skill
 description: 添加三国杀技能。读取技能描述文档,分解原子操作和钩子时机,产出契约清单,实现技能代码并独立编写触发测试。当用户要求添加/实现某个武将技能时使用。
 argument-hint: [技能名]
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git *), Bash(npx tsc *), Bash(npx vitest *)
+metadata:
+  internal: true
 ---
 
 ## 事实依据(严格遵守)
