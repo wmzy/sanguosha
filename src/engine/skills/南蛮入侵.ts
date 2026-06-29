@@ -4,16 +4,25 @@
 // 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 受伤害。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, type SkillModule, validateUseCard } from '../skill';
+import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '南蛮入侵', description: '对所有其他角色使用,每名目标需出杀,否则受 1 点伤害' };
+  return {
+    id,
+    ownerId,
+    name: '南蛮入侵',
+    description: '对所有其他角色使用,每名目标需出杀,否则受 1 点伤害',
+  };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
     (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '南蛮入侵' });
     },
@@ -23,12 +32,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await pushFrame(state, '南蛮入侵', from, { ...params });
 
       // 从使用者下家开始,按座次顺序结算(state.players 数组顺序 = seat index 顺序)
-      const alivePlayers = state.players.filter(p => p.alive);
+      const alivePlayers = state.players.filter((p) => p.alive);
       const n = alivePlayers.length;
       const targets: number[] = [];
       if (n > 1) {
         // 找到 from 在 alivePlayers 中的位置
-        const fromPos = alivePlayers.findIndex(p => p.index === from);
+        const fromPos = alivePlayers.findIndex((p) => p.index === from);
         if (fromPos >= 0) {
           // 从 from+1 开始顺时针取 n-1 个目标
           for (let i = 1; i < n; i++) {
@@ -57,9 +66,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
           await applyAtom(state, { type: '询问杀', target, source: from });
           // 检查处理区
-          const killCardId = frameCards(state).find(id => {
+          const killCardId = frameCards(state).find((id) => {
             const c = state.cardMap[id];
-            return c && c.name === '杀';
+            return c?.name === '杀';
           });
           if (killCardId) {
             // 出了杀:移到弃牌堆
@@ -110,4 +119,3 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-

@@ -6,12 +6,12 @@
 //   4) 主动 start action:仅主公位首次开局触发
 import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook, hasBlockingPending, type SkillModule } from '../skill'
+import { registerAction, registerAfterHook, hasBlockingPending } from '../skill';
 
 const PHASE_ORDER = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'] as const;
 
 function nextPhase(current: string): string | null {
-  const idx = PHASE_ORDER.indexOf(current as typeof PHASE_ORDER[number]);
+  const idx = PHASE_ORDER.indexOf(current as (typeof PHASE_ORDER)[number]);
   if (idx < 0 || idx >= PHASE_ORDER.length - 1) return null;
   return PHASE_ORDER[idx + 1];
 }
@@ -121,14 +121,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ─── 主动结束回合 ───
   // 合法条件:自己的出牌或弃牌阶段,且无 pending 挂起(须先回应询问)
-  registerAction(state, skill.id, ownerId, 'end', (state: GameState, _params: Record<string, Json>) => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'end',
+    (state: GameState, _params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌' || state.phase === '弃牌';
-      const free = !hasBlockingPending(state)
+      const free = !hasBlockingPending(state);
       if (myTurn && inActPhase && free) return null;
       return '现在不能结束回合';
-    }, async (state: GameState, params: Record<string, Json>) => {
-      
+    },
+    async (state: GameState, _params: Record<string, Json>) => {
       const player = ownerId;
 
       await applyAtom(state, { type: '阶段结束', player, phase: '出牌' });
@@ -140,24 +145,30 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(state, { type: '下一玩家' });
       // 触发所有 onAtomAfter('回合结束') 钩子——下家实例发现自己接手,启动回合
       await applyAtom(state, { type: '回合结束', player });
-    }, );
+    },
+  );
 
   // ─── 首次开局(由主公位玩家触发)───
   // 合法条件:主公位(ownerId===0 且 currentPlayerIndex===0),处于初始准备阶段,且无 pending
-  registerAction(state, skill.id, ownerId, 'start', (state: GameState, _params: Record<string, Json>) => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'start',
+    (state: GameState, _params: Record<string, Json>) => {
       const isLordSeat = ownerId === 0 && state.currentPlayerIndex === 0;
       const atInitial = state.phase === '准备' && state.pendingSlots.size === 0;
       if (isLordSeat && atInitial) return null;
       return '现在不能开局';
-    }, async (state: GameState, params: Record<string, Json>) => {
-      
+    },
+    async (state: GameState, _params: Record<string, Json>) => {
       const player = ownerId;
       await applyAtom(state, { type: '回合开始', player });
       await applyAtom(state, { type: '阶段开始', player, phase: '准备' });
       // 触发阶段结束,让阶段推进钩子跑(准备→判定→摸牌→出牌)
       await applyAtom(state, { type: '阶段结束', player, phase: '准备' });
-    }, );
+    },
+  );
 
   return () => {};
 }
-

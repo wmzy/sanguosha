@@ -30,16 +30,20 @@ class MockWebSocket {
     MockWebSocket.last = this;
     MockWebSocket.instances.push(this);
   }
+
   send(data: string) {
     this.sent.push(JSON.parse(data));
   }
+
   close() {
     this.closed = true;
   }
+
   /** 测试驱动:模拟服务端推送消息 */
   emit(msg: ServerMessage) {
     this.onmessage?.({ data: JSON.stringify(msg) });
   }
+
   static reset() {
     MockWebSocket.last = null;
     MockWebSocket.instances = [];
@@ -52,10 +56,21 @@ function makeBaseline(viewer: number): GameView {
     currentPlayerIndex: viewer,
     phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
-    players: [{
-      index: viewer, name: 'P0', character: '主公', health: 4, maxHealth: 4,
-      alive: true, equipment: {}, skills: [], handCount: 4, hand: [], marks: [],
-    }],
+    players: [
+      {
+        index: viewer,
+        name: 'P0',
+        character: '主公',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 4,
+        hand: [],
+        marks: [],
+      },
+    ],
     cardMap: {},
     pending: null,
     deadline: null,

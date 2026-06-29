@@ -14,7 +14,16 @@ export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 
 
 export type CardType = '基本牌' | '锦囊牌' | '装备牌';
 
-export type CardSubType = '杀' | '闪' | '桃' | '锦囊' | '武器' | '防具' | '马' | '进攻马' | '防御马';
+export type CardSubType =
+  | '杀'
+  | '闪'
+  | '桃'
+  | '锦囊'
+  | '武器'
+  | '防具'
+  | '马'
+  | '进攻马'
+  | '防御马';
 
 export type TrickSubType = '普通锦囊' | '延时锦囊' | '响应锦囊';
 
@@ -53,16 +62,36 @@ export type EffectPrimitive =
   | { type: 'damage'; amount: number; damageType?: '普通' | '雷电' | '火焰' }
   | { type: '回复体力'; amount: number; target?: string }
   | { type: '弃置'; source?: string; count: number | 'any'; target?: string }
-  | { type: '获得'; from?: string; source?: 'damageSourceCard' | 'attacker' | 'judgeCard' | 'otherPlayers' | 'selected' | 'deck'; count?: number }
+  | {
+      type: '获得';
+      from?: string;
+      source?: 'damageSourceCard' | 'attacker' | 'judgeCard' | 'otherPlayers' | 'selected' | 'deck';
+      count?: number;
+    }
   | { type: 'skipPhase'; phase?: TurnPhase; target?: string }
   | { type: 'skipDraw' }
-  | { type: '判定'; condition?: string; expectedSuit?: string; repeatOnBlack?: boolean; redResult?: string; failEffect?: string; onSuccess?: Effect; onFail?: Effect }
+  | {
+      type: '判定';
+      condition?: string;
+      expectedSuit?: string;
+      repeatOnBlack?: boolean;
+      redResult?: string;
+      failEffect?: string;
+      onSuccess?: Effect;
+      onFail?: Effect;
+    }
   | { type: '添加延时锦囊'; trickName: string; target: string }
   | { type: 'convert'; from: string; to: string }
   | { type: 'redirect'; from: string; to: string }
   | { type: 'giveCards'; count: number | 'any'; target: string }
   | { type: 'lookAtTopCards'; count: number | string }
-  | { type: 'dealDamage'; amount?: number; target?: string; condition?: string; bonusDamage?: number };
+  | {
+      type: 'dealDamage';
+      amount?: number;
+      target?: string;
+      condition?: string;
+      bonusDamage?: number;
+    };
 
 export type Effect =
   | EffectPrimitive

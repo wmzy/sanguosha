@@ -4,7 +4,10 @@ import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 拼点: AtomDefinition<{
-  initiator: number; target: number; initiatorCard: string; targetCard: string;
+  initiator: number;
+  target: number;
+  initiatorCard: string;
+  targetCard: string;
 }> = {
   type: '拼点',
   validate(state, atom) {
@@ -33,7 +36,7 @@ export const 拼点: AtomDefinition<{
     if (view.zones) {
       // 两张拼点牌从处理区进入弃牌堆
       if (view.zones.processing.length > 0) {
-        view.zones.processing = view.zones.processing.filter(id => !cardIds.includes(id));
+        view.zones.processing = view.zones.processing.filter((id) => !cardIds.includes(id));
       }
       view.zones.discardPileCount += cardIds.length;
     }

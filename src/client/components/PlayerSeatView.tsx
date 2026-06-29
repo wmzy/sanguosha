@@ -164,7 +164,7 @@ export function PlayerSeatView({
       {Object.keys(player.equipment).length > 0 && (
         <div className={equipRow}>
           {Object.entries(player.equipment).map(([slot, cardId]) => {
-            const card = view.cardMap[cardId as string];
+            const card = view.cardMap[cardId];
             const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
             return (
               <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>

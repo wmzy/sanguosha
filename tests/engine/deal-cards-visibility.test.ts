@@ -18,13 +18,17 @@ import type { ServerMessage } from '../../src/server/protocol';
 
 function makeRoom(): Room {
   return {
-    id: 'test-' + Math.random().toString(36).slice(2, 8),
-    name: '测试', maxPlayers: 4, players: new Map(),
-    isDebug: true, createdAt: Date.now(), status: '进行中',
+    id: `test-${Math.random().toString(36).slice(2, 8)}`,
+    name: '测试',
+    maxPlayers: 4,
+    players: new Map(),
+    isDebug: true,
+    createdAt: Date.now(),
+    status: '进行中',
     config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
   } as unknown as Room;
 }
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function getState(session: GameSession): GameState {
   return (session as unknown as { state: GameState }).state;
 }
@@ -32,7 +36,9 @@ function getState(session: GameSession): GameState {
 class FakeWS {
   messages: ServerMessage[] = [];
   readyState = 1; // OPEN
-  send(data: string) { this.messages.push(JSON.parse(data)); }
+  send(data: string) {
+    this.messages.push(JSON.parse(data));
+  }
 }
 
 /** 从 FakeWS 收到的消息中提取所有 event 的 view */
@@ -80,13 +86,19 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
         const isCharSelect = atom.type === '选将询问' && Array.isArray(atom.candidates);
         // 纵深防御:已选将的玩家不再响应(引擎层也会拒,这里提前避免无效 dispatch)
         if (isCharSelect && !state.players[t]?.character) {
-          await session.handleAction('p' + t, {
-            skillId: '系统规则', actionType: '选将', ownerId: t,
-            params: { character: atom.candidates![0].name }, baseSeq: state.seq,
+          await session.handleAction(`p${t}`, {
+            skillId: '系统规则',
+            actionType: '选将',
+            ownerId: t,
+            params: { character: atom.candidates![0].name },
+            baseSeq: state.seq,
           });
         }
       }
-      if ((state.players[0]?.hand?.length ?? 0) >= 4) { bootstrapDone = true; break; }
+      if ((state.players[0]?.hand?.length ?? 0) >= 4) {
+        bootstrapDone = true;
+        break;
+      }
       await sleep(20);
     }
     // 明确断言:bootstrap 必须完成发牌,否则后续 dealEvents 断言无意义
@@ -95,7 +107,7 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
 
     // 从 p0 收到的 event 中找发牌事件
     const views0 = allViews(ws0);
-    const dealEvents0 = views0.filter(e => e.view?.type === '发牌');
+    const dealEvents0 = views0.filter((e) => e.view?.type === '发牌');
     expect(dealEvents0.length).toBe(1);
     const dealCards0 = dealEvents0[0].view?.cards as unknown[] | undefined;
     expect(dealCards0).toBeDefined();
@@ -103,7 +115,7 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
 
     // 从 p1 收到的 event 中找发牌事件
     const views1 = allViews(ws1);
-    const dealEvents1 = views1.filter(e => e.view?.type === '发牌');
+    const dealEvents1 = views1.filter((e) => e.view?.type === '发牌');
     expect(dealEvents1.length).toBe(1);
     const dealCards1 = dealEvents1[0].view?.cards as unknown[] | undefined;
     expect(dealCards1).toBeDefined();

@@ -5,7 +5,11 @@ import { registerAtom } from '../atom';
 import { resolveTimeoutMs } from '../create-engine';
 
 const TIMEOUT_SEC = 15;
-const PROMPT: ActionPrompt = { type: 'useCard', title: '是否出杀', cardFilter: { filter: c => c.name === '杀', min: 1, max: 1 } };
+const PROMPT: ActionPrompt = {
+  type: 'useCard',
+  title: '是否出杀',
+  cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+};
 
 export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
   type: '询问杀',
@@ -49,7 +53,11 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
     if (view.viewer === target) {
       view.pending = {
         type: 'awaits',
-        atom: { type: '询问杀', target, source: event.source } as unknown as import('../types').Atom,
+        atom: {
+          type: '询问杀',
+          target,
+          source: event.source,
+        } as unknown as import('../types').Atom,
         prompt: PROMPT,
         target,
         deadline: Date.now() + timeoutMs,
@@ -58,7 +66,11 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
     } else {
       view.pending = {
         type: 'awaits',
-        atom: { type: '询问杀', target, source: event.source } as unknown as import('../types').Atom,
+        atom: {
+          type: '询问杀',
+          target,
+          source: event.source,
+        } as unknown as import('../types').Atom,
         prompt: { type: 'confirm', title: `等待出杀`, cancelLabel: '' },
         target,
         deadline: Date.now() + timeoutMs,

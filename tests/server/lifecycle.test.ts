@@ -6,7 +6,10 @@ describe('setupGracefulShutdown', () => {
 
   beforeEach(() => {
     listeners.length = 0;
-    vi.spyOn(process, 'on').mockImplementation(((signal: string | symbol, handler: (...args: unknown[]) => void) => {
+    vi.spyOn(process, 'on').mockImplementation(((
+      signal: string | symbol,
+      handler: (...args: unknown[]) => void,
+    ) => {
       listeners.push({ signal: String(signal), handler });
       return process;
     }) as never);

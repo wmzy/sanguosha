@@ -20,7 +20,13 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -67,7 +73,13 @@ describe('丈八蛇矛', () => {
     const c2 = makeCard('c2', '桃', '♣', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['丈八蛇矛', '杀', '闪'], equipment: { 武器: 'zb' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 'c2'],
+          skills: ['丈八蛇矛', '杀', '闪'],
+          equipment: { 武器: 'zb' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'] }),
       ],
       cardMap: { zb: ZHANGBA, c1, c2 },
@@ -80,12 +92,10 @@ describe('丈八蛇矛', () => {
     const P2 = harness.player('P2');
 
     // 转化:2 张手牌当杀。影子杀 id = c1#c2#丈八蛇矛
-    await P1.transformThenUse(
-      '丈八蛇矛',
-      { cardIds: ['c1', 'c2'] },
-      '杀',
-      { cardId: 'c1#c2#丈八蛇矛', targets: [1] },
-    );
+    await P1.transformThenUse('丈八蛇矛', { cardIds: ['c1', 'c2'] }, '杀', {
+      cardId: 'c1#c2#丈八蛇矛',
+      targets: [1],
+    });
 
     // 影子卡应已建立,并作为杀牌进了处理区(transform 执行后紧接着杀.use)
     expect(harness.state.cardMap['c1#c2#丈八蛇矛']).toBeDefined();
@@ -101,7 +111,7 @@ describe('丈八蛇矛', () => {
     expect(harness.state.players[1].health).toBe(3);
     // view 级断言
     P2.processEvents();
-    P2.expectView(v => {
+    P2.expectView((v) => {
       expect(v.players[1].health).toBe(3);
       expect(v.pending).toBeNull();
     });
@@ -113,7 +123,13 @@ describe('丈八蛇矛', () => {
     const c1 = makeCard('c1', '闪', '♠', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['丈八蛇矛'], equipment: { 武器: 'zb' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['丈八蛇矛'],
+          equipment: { 武器: 'zb' },
+        }),
         makePlayer({ index: 1, name: 'P2', skills: [] }),
       ],
       cardMap: { zb: ZHANGBA, c1 },
@@ -125,7 +141,9 @@ describe('丈八蛇矛', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1'] },
+      skillId: '丈八蛇矛',
+      actionType: 'transform',
+      params: { cardIds: ['c1'] },
     });
   });
 
@@ -133,7 +151,13 @@ describe('丈八蛇矛', () => {
     const c1 = makeCard('c1', '闪', '♠', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['丈八蛇矛'], equipment: { 武器: 'zb' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['丈八蛇矛'],
+          equipment: { 武器: 'zb' },
+        }),
         makePlayer({ index: 1, name: 'P2', skills: [] }),
       ],
       cardMap: { zb: ZHANGBA, c1 },
@@ -145,7 +169,9 @@ describe('丈八蛇矛', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c1'] },
+      skillId: '丈八蛇矛',
+      actionType: 'transform',
+      params: { cardIds: ['c1', 'c1'] },
     });
   });
 
@@ -166,7 +192,9 @@ describe('丈八蛇矛', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] },
+      skillId: '丈八蛇矛',
+      actionType: 'transform',
+      params: { cardIds: ['c1', 'c2'] },
     });
   });
 
@@ -177,7 +205,13 @@ describe('丈八蛇矛', () => {
     const c2 = makeCard('c2', '桃', '♣', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['丈八蛇矛', '杀'], equipment: { 武器: 'zb' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 'c2'],
+          skills: ['丈八蛇矛', '杀'],
+          equipment: { 武器: 'zb' },
+        }),
         makePlayer({ index: 1, name: 'P2', skills: ['闪'] }),
       ],
       cardMap: { zb: ZHANGBA, c1, c2 },
@@ -190,8 +224,12 @@ describe('丈八蛇矛', () => {
 
     // 没有 targets,杀 validate 拒绝 → rollback 丈八蛇矛 transform
     await P1.expectRejected({
-      skillId: '杀', actionType: 'use', params: { cardId: 'c1#c2#丈八蛇矛' },
-      preceding: [{ skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } }],
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: 'c1#c2#丈八蛇矛' },
+      preceding: [
+        { skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } },
+      ],
     });
 
     // 状态应当完全还原:c1/c2 在手牌,影子卡不应存在
@@ -207,7 +245,13 @@ describe('丈八蛇矛', () => {
     const c2 = makeCard('c2', '桃', '♣', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['丈八蛇矛', '杀', '闪'], equipment: { 武器: 'zb' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 'c2'],
+          skills: ['丈八蛇矛', '杀', '闪'],
+          equipment: { 武器: 'zb' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'] }),
       ],
       cardMap: { zb: ZHANGBA, c1, c2 },
@@ -218,12 +262,10 @@ describe('丈八蛇矛', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.transformThenUse(
-      '丈八蛇矛',
-      { cardIds: ['c1', 'c2'] },
-      '杀',
-      { cardId: 'c1#c2#丈八蛇矛', targets: [1] },
-    );
+    await P1.transformThenUse('丈八蛇矛', { cardIds: ['c1', 'c2'] }, '杀', {
+      cardId: 'c1#c2#丈八蛇矛',
+      targets: [1],
+    });
 
     const shadow = harness.state.cardMap['c1#c2#丈八蛇矛'];
     // 多张转化:花色清空,颜色取同色(黑)
@@ -237,7 +279,13 @@ describe('丈八蛇矛', () => {
     const c2 = makeCard('c2', '桃', '♥', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['丈八蛇矛', '杀', '闪'], equipment: { 武器: 'zb' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 'c2'],
+          skills: ['丈八蛇矛', '杀', '闪'],
+          equipment: { 武器: 'zb' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'] }),
       ],
       cardMap: { zb: ZHANGBA, c1, c2 },
@@ -248,12 +296,10 @@ describe('丈八蛇矛', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.transformThenUse(
-      '丈八蛇矛',
-      { cardIds: ['c1', 'c2'] },
-      '杀',
-      { cardId: 'c1#c2#丈八蛇矛', targets: [1] },
-    );
+    await P1.transformThenUse('丈八蛇矛', { cardIds: ['c1', 'c2'] }, '杀', {
+      cardId: 'c1#c2#丈八蛇矛',
+      targets: [1],
+    });
 
     const shadow = harness.state.cardMap['c1#c2#丈八蛇矛'];
     // 异色混合 → 无色杀(不被仁王盾/护甲防御)

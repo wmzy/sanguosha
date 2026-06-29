@@ -41,7 +41,13 @@ function makePlayer(opts: {
   };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -58,7 +64,13 @@ function buildState(opts?: {
   const cards: Record<string, Card> = { ty1: ty, ...(opts?.extraCards ?? {}) };
   const n = opts?.playerCount ?? 2;
   const players = [
-    makePlayer({ index: 0, name: 'P1', hand: opts?.p1Hand ?? ['ty1'], health: opts?.p1Health ?? 3, skills: ['桃园结义'] }),
+    makePlayer({
+      index: 0,
+      name: 'P1',
+      hand: opts?.p1Hand ?? ['ty1'],
+      health: opts?.p1Health ?? 3,
+      skills: ['桃园结义'],
+    }),
     makePlayer({ index: 1, name: 'P2', health: opts?.p2Health ?? 3 }),
   ];
   for (let i = 2; i < n; i++) {
@@ -105,7 +117,7 @@ describe('桃园结义', () => {
     expect(harness.state.zones.processing).not.toContain('ty1');
     // view 级断言:P1 视角 3 人各回 1 血
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].health).toBe(3);
       expect(v.players[1].health).toBe(2);
       expect(v.players[2].health).toBe(4);
@@ -128,7 +140,7 @@ describe('桃园结义', () => {
     expect(harness.state.players[1].health).toBe(4);
     // view 级断言:满血不超 maxHealth
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].health).toBe(4);
       expect(v.players[1].health).toBe(4);
       expect(v.pending).toBeNull();

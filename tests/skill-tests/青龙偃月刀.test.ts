@@ -23,7 +23,13 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -71,7 +77,13 @@ describe('青龙偃月刀', () => {
     const dodge1 = makeCard('d1', '闪', '♦', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { ql: QINGLONG, k1: kill1, k2: kill2, d1: dodge1 },
@@ -121,7 +133,13 @@ describe('青龙偃月刀', () => {
     const dodge2 = makeCard('d2', '闪', '♦', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2', 'k3'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2', 'k3'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1', 'd2'], skills: ['闪'] }),
       ],
       cardMap: { ql: QINGLONG, k1: kill1, k2: kill2, k3: kill3, d1: dodge1, d2: dodge2 },
@@ -169,7 +187,13 @@ describe('青龙偃月刀', () => {
     const dodge1 = makeCard('d1', '闪', '♦', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { ql: QINGLONG, k1: kill1, k2: kill2, d1: dodge1 },
@@ -203,7 +227,13 @@ describe('青龙偃月刀', () => {
     const dodge1 = makeCard('d1', '闪', '♦', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'p1'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'p1'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { ql: QINGLONG, k1: kill1, p1: peach, d1: dodge1 },
@@ -235,7 +265,13 @@ describe('青龙偃月刀', () => {
     const dodge1 = makeCard('d1', '闪', '♦', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { ql: QINGLONG, k1: kill1, k2: kill2, d1: dodge1 },
@@ -272,7 +308,13 @@ describe('青龙偃月刀', () => {
     const dodge2 = makeCard('d2', '闪', '♦', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1', 'd2'], skills: ['闪'] }),
       ],
       cardMap: { ql: QINGLONG, k1: kill1, k2: kill2, d1: dodge1, d2: dodge2 },
@@ -317,7 +359,13 @@ describe('青龙偃月刀', () => {
     const dodge1 = makeCard('d1', '闪', '♦', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2', 'p1'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2', 'p1'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { ql: QINGLONG, k1: kill1, k2: kill2, p1: peach, d1: dodge1 },
@@ -363,8 +411,20 @@ describe('青龙偃月刀', () => {
     const judgeRed = makeCard('j1', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
-        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '八卦阵'], equipment: { 防具: 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: ['闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
       ],
       cardMap: { ql: QINGLONG, b1: bagua, k1: kill1, k2: kill2, j1: judgeRed },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
@@ -384,7 +444,9 @@ describe('青龙偃月刀', () => {
 
     // 【修复核心】青龙偃月刀 after hook 应触发,询问 P1 是否追杀
     expect(harness.state.pendingSlots.get(0)).toBeDefined();
-    const confirmAtom = (harness.state.pendingSlots.get(0)!.atom as unknown as { requestType?: string });
+    const confirmAtom = harness.state.pendingSlots.get(0)!.atom as unknown as {
+      requestType?: string;
+    };
     expect(confirmAtom.requestType).toBe('青龙偃月刀/confirm');
 
     // P1 选择追杀 + 选杀牌
@@ -412,8 +474,20 @@ describe('青龙偃月刀', () => {
     const spareKill = makeCard('k2', '杀', '♥', '8'); // 备用杀(若误触发追杀会消耗)
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
-        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '仁王盾'], equipment: { 防具: 'r1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: ['闪', '仁王盾'],
+          equipment: { 防具: 'r1' },
+        }),
       ],
       cardMap: { ql: QINGLONG, r1: renwang, k1: blackKill, k2: spareKill },
       currentPlayerIndex: 0,
@@ -450,10 +524,30 @@ describe('青龙偃月刀', () => {
     const judgeRed2 = makeCard('j2', '桃', '♦', '6');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'k2', 'k3'], skills: ['杀', '青龙偃月刀'], equipment: { 武器: 'ql' } }),
-        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '八卦阵'], equipment: { 防具: 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'k2', 'k3'],
+          skills: ['杀', '青龙偃月刀'],
+          equipment: { 武器: 'ql' },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: ['闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
       ],
-      cardMap: { ql: QINGLONG, b1: bagua, k1: kill1, k2: kill2, k3: kill3, j1: judgeRed1, j2: judgeRed2 },
+      cardMap: {
+        ql: QINGLONG,
+        b1: bagua,
+        k1: kill1,
+        k2: kill2,
+        k3: kill3,
+        j1: judgeRed1,
+        j2: judgeRed2,
+      },
       zones: { deck: ['j1', 'j2'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',

@@ -14,8 +14,17 @@ import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: { index: number; name: string; hand: string[]; skills: string[] }) {
   return {
-    ...opts, character: '主公', health: 4, maxHealth: 4, alive: true,
-    equipment: {}, vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+    ...opts,
+    character: '主公',
+    health: 4,
+    maxHealth: 4,
+    alive: true,
+    equipment: {},
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    tags: [],
+    judgeZone: [],
   };
 }
 
@@ -59,11 +68,11 @@ describe('遗计', () => {
     // fireTimeout 消费了询问闪 → 杀 execute 恢复 → 造成伤害 →
     // 遗计 after hook → 请求回应(是否发动) → 新 pending → execute 挂住
     // 杀还在处理区(execute 没完成),P2 已扣血
-    expect(harness.state.players.find(p => p.name === 'P2')!.health).toBe(3);
+    expect(harness.state.players.find((p) => p.name === 'P2')!.health).toBe(3);
     expect(frameCards(harness.state)).toContain('c1');
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
-    P2.expectView(v => expect(v.players[1].health).toBe(3));
+    P2.expectView((v) => expect(v.players[1].health).toBe(3));
   });
 
   // 完整链路(杀→不出闪→confirm→摸牌→distribute)需要引擎支持嵌套 pending,
@@ -90,9 +99,9 @@ describe('遗计', () => {
       { target: 0, cardIds: ['d2'] },
     ]);
 
-    expect(harness.state.players.find(p => p.name === 'P3')!.hand).toContain('d1');
-    expect(harness.state.players.find(p => p.name === 'P1')!.hand).toContain('d2');
-    expect(harness.state.players.find(p => p.name === 'P2')!.hand).toEqual([]);
+    expect(harness.state.players.find((p) => p.name === 'P3')!.hand).toContain('d1');
+    expect(harness.state.players.find((p) => p.name === 'P1')!.hand).toContain('d2');
+    expect(harness.state.players.find((p) => p.name === 'P2')!.hand).toEqual([]);
   });
 });
 
@@ -104,16 +113,18 @@ describe('confirm / distribute API', () => {
 
   it('confirm(false) 等同 pass()', async () => {
     const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
-    await harness.setup(createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
-      ],
-      cardMap: { c1: slash },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    }));
+    await harness.setup(
+      createGameState({
+        players: [
+          makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),
+          makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
+        ],
+        cardMap: { c1: slash },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
 
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -122,7 +133,7 @@ describe('confirm / distribute API', () => {
     P2.expectPending('询问闪');
     await P2.confirm(false);
 
-    expect(harness.state.players.find(p => p.name === 'P2')!.health).toBe(3);
+    expect(harness.state.players.find((p) => p.name === 'P2')!.health).toBe(3);
   });
 
   it('distribute 构造正确的 dispatch params', () => {

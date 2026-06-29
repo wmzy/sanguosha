@@ -2,7 +2,14 @@
 // 前端技能 action 注册表：收集技能 onMount 调用 defineAction 注册的 UI 配置
 // import skills/index 触发 setSkillModuleResolver(动态 import 按需加载)
 import '../engine/skills';
-import type { ActionActiveWhen, ActionPrompt, Card, CardWrapper, FrontendAPI, Skill } from '../engine/types';
+import type {
+  ActionActiveWhen,
+  ActionPrompt,
+  Card,
+  CardWrapper,
+  FrontendAPI,
+  Skill,
+} from '../engine/types';
 import { getSkillModule } from '../engine/skill';
 
 export interface SkillActionDef {
@@ -29,7 +36,9 @@ function actionKey(skillId: string, ownerId: number, actionType: string): string
 function makeFrontendAPI(skillId: string, ownerId: number): FrontendAPI {
   return {
     viewer: ownerId,
-    onEvent() { return () => {}; },
+    onEvent() {
+      return () => {};
+    },
     defineAction(actionType, opts) {
       registry.set(actionKey(skillId, ownerId, actionType), {
         skillId,
@@ -86,7 +95,10 @@ export function getActionsForPlayer(playerIndex: number): SkillActionDef[] {
  * 用于视角切换的瞬态场景:target 玩家 action 已被清/未注册到当前 perspective 时
  * 仍能在 registry 里找到定义。
  */
-export function findActionAcrossOwners(skillId: string, actionType: string): SkillActionDef | undefined {
+export function findActionAcrossOwners(
+  skillId: string,
+  actionType: string,
+): SkillActionDef | undefined {
   for (const def of registry.values()) {
     if (def.skillId === skillId && def.actionType === actionType) {
       return def;

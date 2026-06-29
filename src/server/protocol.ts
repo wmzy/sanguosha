@@ -3,7 +3,12 @@
 // 每次 atom apply 后,服务端逐条发送 event 消息给该 viewer 可见的事件。
 // 断线重连:拉 initialView baseline(全量 GameView),之后继续推 event。
 // viewer 由 WS 连接标识,不需要在消息中携带。
-import type { ClientMessage as EngineClientMessage, GameView, Json, ViewEvent } from '../engine/types';
+import type {
+  ClientMessage as EngineClientMessage,
+  GameView,
+  Json,
+  ViewEvent,
+} from '../engine/types';
 export type { GameEventEnvelope } from '../engine/types';
 
 export type EventSeq = number;
@@ -34,15 +39,23 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
 /** 校验并规范化 RoomConfig:修正非法字段为默认值。 */
 export function normalizeRoomConfig(raw: unknown): RoomConfig {
   const r = (raw ?? {}) as Record<string, unknown>;
-  const name = typeof r['name'] === 'string' && r['name'].trim() ? r['name'].trim().slice(0, 40) : DEFAULT_ROOM_CONFIG.name;
-  let timeoutScale = typeof r['timeoutScale'] === 'number' && r['timeoutScale'] > 0 ? r['timeoutScale'] : DEFAULT_ROOM_CONFIG.timeoutScale;
+  const name =
+    typeof r['name'] === 'string' && r['name'].trim()
+      ? r['name'].trim().slice(0, 40)
+      : DEFAULT_ROOM_CONFIG.name;
+  let timeoutScale =
+    typeof r['timeoutScale'] === 'number' && r['timeoutScale'] > 0
+      ? r['timeoutScale']
+      : DEFAULT_ROOM_CONFIG.timeoutScale;
   if (!Number.isFinite(timeoutScale) || timeoutScale > 1000) timeoutScale = Infinity;
-  const charPool: CharPoolPreset = r['charPool'] === 'standard' || r['charPool'] === 'extended' || r['charPool'] === 'all'
-    ? r['charPool']
-    : DEFAULT_ROOM_CONFIG.charPool;
-  const handSize = typeof r['handSize'] === 'number' && r['handSize'] >= 0 && r['handSize'] <= 20
-    ? Math.floor(r['handSize'])
-    : DEFAULT_ROOM_CONFIG.handSize;
+  const charPool: CharPoolPreset =
+    r['charPool'] === 'standard' || r['charPool'] === 'extended' || r['charPool'] === 'all'
+      ? r['charPool']
+      : DEFAULT_ROOM_CONFIG.charPool;
+  const handSize =
+    typeof r['handSize'] === 'number' && r['handSize'] >= 0 && r['handSize'] <= 20
+      ? Math.floor(r['handSize'])
+      : DEFAULT_ROOM_CONFIG.handSize;
   return { name, timeoutScale, charPool, handSize };
 }
 
@@ -68,10 +81,14 @@ export interface DeadlineInfo {
  */
 export type ServerMessage =
   | { type: 'initialView'; state: GameView; lastSeq: EventSeq }
-  | { type: 'event'; seq: EventSeq; timestamp: number;
+  | {
+      type: 'event';
+      seq: EventSeq;
+      timestamp: number;
       view?: ViewEvent;
       notify?: { skillId: string; eventType: string; data: Json };
-      deadline?: DeadlineInfo | null }
+      deadline?: DeadlineInfo | null;
+    }
   | { type: 'error'; message: string }
   | { type: 'actionRejected' }
   | { type: 'gameOver'; winner: string }
@@ -83,7 +100,14 @@ export type ServerMessage =
   | { type: 'player_reconnected'; playerId: string }
   | { type: 'game_started' }
   | { type: 'room_config'; config: RoomConfig }
-  | { type: 'room_state'; readyPlayers: string[]; playerIds: string[]; hostId: string | null; maxPlayers: number; config: RoomConfig }
+  | {
+      type: 'room_state';
+      readyPlayers: string[];
+      playerIds: string[];
+      hostId: string | null;
+      maxPlayers: number;
+      config: RoomConfig;
+    }
   | { type: 'player_ready'; playerId: string };
 
 /**
@@ -154,11 +178,14 @@ export function isValidClientMessage(data: unknown): data is ClientMessage {
 function isValidEngineClientMessage(data: unknown): data is EngineClientMessage {
   if (typeof data !== 'object' || data === null) return false;
   const d = data as Record<string, unknown>;
-  return typeof d['skillId'] === 'string'
-    && typeof d['actionType'] === 'string'
-    && typeof d['ownerId'] === 'number'
-    && typeof d['params'] === 'object' && d['params'] !== null
-    && typeof d['baseSeq'] === 'number';
+  return (
+    typeof d['skillId'] === 'string' &&
+    typeof d['actionType'] === 'string' &&
+    typeof d['ownerId'] === 'number' &&
+    typeof d['params'] === 'object' &&
+    d['params'] !== null &&
+    typeof d['baseSeq'] === 'number'
+  );
 }
 
 export function serialize(msg: ServerMessage): string {

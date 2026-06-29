@@ -31,7 +31,12 @@ import type { GameView } from '../../src/engine/types';
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
   const [perspective, setPerspective] = useState(view.viewer);
   const views = new Map<number, GameView>([[view.viewer, view]]);
-  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(views, perspective, view.players.length, setPerspective);
+  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(
+    views,
+    perspective,
+    view.players.length,
+    setPerspective,
+  );
   const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
   const bar = (
     <DebugPerspectiveBar
@@ -41,14 +46,7 @@ function TestGameView({ view, onAction }: { view: GameView; onAction: (a: Action
       autoSwitchCtl={autoSwitchCtl}
     />
   );
-  return (
-    <GameViewComponent
-      view={view}
-      onAction={onAction}
-      headerSlot={bar}
-      overlaySlot={bar}
-    />
-  );
+  return <GameViewComponent view={view} onAction={onAction} headerSlot={bar} overlaySlot={bar} />;
 }
 
 function makeView(): GameView {
@@ -60,19 +58,41 @@ function makeView(): GameView {
     turn: { round: 1, phase: '准备', vars: {} },
     players: [
       {
-        index: 0, name: 'player-0', character: '刘备',
-        health: 4, maxHealth: 4, alive: true, equipment: {}, skills: ['仁德'],
-        handCount: 0, marks: [], identity: '主公',
+        index: 0,
+        name: 'player-0',
+        character: '刘备',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: ['仁德'],
+        handCount: 0,
+        marks: [],
+        identity: '主公',
       },
       {
-        index: 1, name: 'player-1', character: '',
-        health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [],
-        handCount: 0, marks: [],
+        index: 1,
+        name: 'player-1',
+        character: '',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 0,
+        marks: [],
       },
       {
-        index: 2, name: 'player-2', character: '',
-        health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [],
-        handCount: 0, marks: [],
+        index: 2,
+        name: 'player-2',
+        character: '',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 0,
+        marks: [],
       },
     ],
     cardMap: {},
@@ -127,23 +147,72 @@ import { useDebugPerspective as _useDebugPerspective } from '../../src/client/ho
 
 function makeLastPendingViews(): Map<number, GameView> {
   const players = [
-    { index: 0, name: 'player-0', character: '刘备', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: ['仁德'], handCount: 0, marks: [], identity: '主公' },
-    { index: 1, name: 'player-1', character: '关羽', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: ['武圣'], handCount: 0, marks: [] },
-    { index: 2, name: 'player-2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+    {
+      index: 0,
+      name: 'player-0',
+      character: '刘备',
+      health: 4,
+      maxHealth: 4,
+      alive: true,
+      equipment: {},
+      skills: ['仁德'],
+      handCount: 0,
+      marks: [],
+      identity: '主公',
+    },
+    {
+      index: 1,
+      name: 'player-1',
+      character: '关羽',
+      health: 4,
+      maxHealth: 4,
+      alive: true,
+      equipment: {},
+      skills: ['武圣'],
+      handCount: 0,
+      marks: [],
+    },
+    {
+      index: 2,
+      name: 'player-2',
+      character: '',
+      health: 4,
+      maxHealth: 4,
+      alive: true,
+      equipment: {},
+      skills: [],
+      handCount: 0,
+      marks: [],
+    },
   ];
   const views = new Map<number, GameView>();
   for (let v = 0; v < 3; v++) {
     views.set(v, {
-      viewer: v, currentPlayerIndex: 0, phase: '准备', turn: { round: 1, phase: '准备', vars: {} },
+      viewer: v,
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
       players: players.map((p, i) => ({ ...p, hand: i === v ? [] : undefined })),
       cardMap: {},
-      pending: v === 2 ? {
-        type: 'awaits',
-        atom: { type: '选将询问', target: 2, candidates: [{ name: '张飞', skills: ['咆哮'] }] } as never,
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
-        target: 2, deadline: Date.now() + 60000, totalMs: 60000,
-      } : null,
-      deadline: null, deadlineTotalMs: 0, log: [], settlementStack: [],
+      pending:
+        v === 2
+          ? {
+              type: 'awaits',
+              atom: {
+                type: '选将询问',
+                target: 2,
+                candidates: [{ name: '张飞', skills: ['咆哮'] }],
+              } as never,
+              prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
+              target: 2,
+              deadline: Date.now() + 60000,
+              totalMs: 60000,
+            }
+          : null,
+      deadline: null,
+      deadlineTotalMs: 0,
+      log: [],
+      settlementStack: [],
     });
   }
   return views;
@@ -159,8 +228,14 @@ describe('useDebugPerspective:选将阶段自动跟随最后一个待选者', ()
       _useDebugPerspective(views, perspective, 3, setPerspective);
       return null;
     }
-    render(<SubmittedCharSelectProvider><Tracker /></SubmittedCharSelectProvider>);
-    await act(async () => { await new Promise(r => setTimeout(r, 50)); });
+    render(
+      <SubmittedCharSelectProvider>
+        <Tracker />
+      </SubmittedCharSelectProvider>,
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
     expect(finalPerspective).toBe(2);
   });
 
@@ -173,8 +248,14 @@ describe('useDebugPerspective:选将阶段自动跟随最后一个待选者', ()
       _useDebugPerspective(views, perspective, 3, setPerspective);
       return null;
     }
-    render(<SubmittedCharSelectProvider><Tracker /></SubmittedCharSelectProvider>);
-    await act(async () => { await new Promise(r => setTimeout(r, 50)); });
+    render(
+      <SubmittedCharSelectProvider>
+        <Tracker />
+      </SubmittedCharSelectProvider>,
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
     // P2 是选将阶段唯一需操作的玩家 → 必须保持,不能切到 currentPlayer(主公 0)
     expect(finalPerspective).toBe(2);
   });
@@ -184,18 +265,27 @@ describe('useDebugPerspective:选将阶段自动跟随最后一个待选者', ()
     // (view.pending 仍指向 P2)。此竞态下 must not 把视角拉走,否则最后一人选不上。
     const views = makeLastPendingViews();
     let finalPerspective = -1;
-    const { useMarkCharSelectSubmitted } = await import('../../src/client/hooks/SubmittedCharSelectCtx');
+    const { useMarkCharSelectSubmitted } =
+      await import('../../src/client/hooks/SubmittedCharSelectCtx');
     function Tracker() {
       const [perspective, setPerspective] = useState(2);
       finalPerspective = perspective;
       const markSubmitted = useMarkCharSelectSubmitted();
       // 挂载即乐观标记 P2 已提交(模拟点确认后、引擎 confirm 前的竞态)
-      useEffect(() => { markSubmitted(2); }, [markSubmitted]);
+      useEffect(() => {
+        markSubmitted(2);
+      }, [markSubmitted]);
       _useDebugPerspective(views, perspective, 3, setPerspective);
       return null;
     }
-    render(<SubmittedCharSelectProvider><Tracker /></SubmittedCharSelectProvider>);
-    await act(async () => { await new Promise(r => setTimeout(r, 50)); });
+    render(
+      <SubmittedCharSelectProvider>
+        <Tracker />
+      </SubmittedCharSelectProvider>,
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
     // hasCharSelectPending 不看乐观提交集合,只看引擎真实状态(P2 pending 在)→ 保持 P2
     expect(finalPerspective).toBe(2);
   });

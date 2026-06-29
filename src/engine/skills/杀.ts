@@ -13,7 +13,7 @@
 // 杀在下轮结算时读帧上的 currentTarget 而非原始 targets[i]。
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, type SkillModule, validateUseCard } from '../skill';
+import { registerAction, validateUseCard } from '../skill';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
@@ -26,17 +26,31 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ── use:主动出杀 ──
-  registerAction(state, skill.id, ownerId, 'use',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
     (state: GameState, params: Record<string, Json>) => {
-      return validateUseCard(state, ownerId, params, { cardName: '杀', requireTarget: true })
-        ?? (Array.isArray(params.targets) && (params.targets as number[]).every(t => state.players[t]?.alive === true && inAttackRange(state, ownerId, t)) ? null : '目标不合法')
-        ?? (canSlash(state, ownerId) ? null : '出杀次数已达上限');
+      return (
+        validateUseCard(state, ownerId, params, { cardName: '杀', requireTarget: true }) ??
+        (Array.isArray(params.targets) &&
+        (params.targets as number[]).every(
+          (t) => state.players[t]?.alive === true && inAttackRange(state, ownerId, t),
+        )
+          ? null
+          : '目标不合法') ??
+        (canSlash(state, ownerId) ? null : '出杀次数已达上限')
+      );
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       const targets = params.targets as number[];
-      const frame = await pushFrame(state, '杀', from, { ...params, resolvedTargets: [...targets] });
+      const frame = await pushFrame(state, '杀', from, {
+        ...params,
+        resolvedTargets: [...targets],
+      });
 
       try {
         // 杀牌进处理区
@@ -64,24 +78,29 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
           // 使用结算开始时:检测有效性(仁王盾黑杀无效在此 cancel)。
           // cancel=false 表示目标无效,跳过该目标(不询问闪、不伤害、不触发被抵消)。
-          const valid = await applyAtom(state, { type: '检测有效性', source: from, target, cardId });
+          const valid = await applyAtom(state, {
+            type: '检测有效性',
+            source: from,
+            target,
+            cardId,
+          });
           if (!valid) continue;
 
           // 生效前:询问闪(等待目标回应;八卦阵判红放虚拟闪后 cancel)
           await applyAtom(state, { type: '询问闪', target, source: from });
 
           // 检查处理区:有没有闪牌(目标出闪 / 八卦阵虚拟闪)
-          const dodgeIds = frameCards(state).filter(id => {
+          const dodgeIds = frameCards(state).filter((id) => {
             const c = state.cardMap[id];
-            return c && c.name === '闪';
+            return c?.name === '闪';
           });
           if (dodgeIds.length > 0) {
             // 被抵消:触发武器技(贯石斧强命移闪 / 青龙追杀)。
             // 武器技在 after hook 可能改变处理区状态,故 apply 后重新检查。
             await applyAtom(state, { type: '被抵消', source: from, target, cardId });
-            const remaining = frameCards(state).filter(id => {
+            const remaining = frameCards(state).filter((id) => {
               const c = state.cardMap[id];
-              return c && c.name === '闪';
+              return c?.name === '闪';
             });
             if (remaining.length > 0) {
               // 仍被抵消:drain 所有闪
@@ -116,8 +135,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const stillInProc = frameCards(state).includes(cardId);
         if (stillInProc) {
           await applyAtom(state, {
-            type: '移动牌', cardId,
-            from: { zone: '处理区' }, to: { zone: '弃牌堆' },
+            type: '移动牌',
+            cardId,
+            from: { zone: '处理区' },
+            to: { zone: '弃牌堆' },
           });
         }
         await popFrame(state);
@@ -126,13 +147,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 同步出杀计数到 view:processedView 不增量维护 turn.vars,需经 atom
         // event 让前端 turnUsage 实时更新(杀超上限时禁用)。紧跟 incSlashUsed
         // 投影最新计数。
-        await applyAtom(state, { type: '回合用量', player: ownerId, key: '杀/usedCount', value: slashUsed(state) });
+        await applyAtom(state, {
+          type: '回合用量',
+          player: ownerId,
+          key: '杀/usedCount',
+          value: slashUsed(state),
+        });
       }
     },
   );
 
   // ── respond:被询问出杀(决斗/南蛮入侵等)——杀牌进处理区供调用方结算 ──
-  registerAction(state, skill.id, ownerId, 'respond',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'respond',
     (state: GameState, params: Record<string, Json>) => {
       // pending 必须是 询问杀 或 请求回应(借刀杀人/激将)
       const slot = state.pendingSlots.get(ownerId);
@@ -149,7 +179,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const self = state.players[ownerId];
         if (!self.hand.includes(cardId)) return '牌不在手牌中';
         const card = state.cardMap[cardId];
-        if (!card || card.name !== '杀') return '只能打出杀';
+        if (card?.name !== '杀') return '只能打出杀';
       }
       return null;
     },
@@ -178,9 +208,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
       title: '出杀',
       cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
       targetFilter: {
-        min: 1, max: 3,
+        min: 1,
+        max: 3,
         // 攻击范围检查:filter 仅为前端 UI 提示(高亮/禁用),后端 validate 独立校验
-        filter: (view: GameView, t: number) => viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+        filter: (view: GameView, t: number) =>
+          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
       },
     },
     activeWhen: (ctx) => defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
@@ -195,4 +227,3 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-

@@ -25,8 +25,17 @@ function buildState(opts?: { p2Hand?: string[]; extraCardMap?: Record<string, Ca
 
 function makePlayer(opts: { index: number; name: string; hand: string[]; skills: string[] }) {
   return {
-    ...opts, character: '主公', health: 4, maxHealth: 4, alive: true,
-    equipment: {}, vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+    ...opts,
+    character: '主公',
+    health: 4,
+    maxHealth: 4,
+    alive: true,
+    equipment: {},
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    tags: [],
+    judgeZone: [],
   };
 }
 
@@ -48,7 +57,7 @@ describe('杀', () => {
     expect(harness.state.zones.discardPile).toContain('c1');
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
-    P2.expectView(v => expect(v.players[1].health).toBe(3));
+    P2.expectView((v) => expect(v.players[1].health).toBe(3));
   });
 
   it('P1 对 P2 出杀,P2 出闪 → 双方不扣血,杀和闪结算完毕进入弃牌堆', async () => {
@@ -64,13 +73,11 @@ describe('杀', () => {
     await P2.respond('闪', { cardId: 'c3' });
     // 结算完成:杀和闪都已最终落到弃牌堆
     expect(P2.view.players[1].health).toBe(4);
-    expect(harness.state.zones.discardPile).toEqual(
-      expect.arrayContaining(['c1', 'c3']),
-    );
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c1', 'c3']));
     expect(frameCards(harness.state)).toEqual([]);
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
-    P2.expectView(v => expect(v.players[1].health).toBe(4));
+    P2.expectView((v) => expect(v.players[1].health).toBe(4));
   });
 
   it('同回合不能出第二张杀', async () => {
@@ -89,7 +96,7 @@ describe('杀', () => {
     expect(harness.state.players[1].health).toBe(healthAfterFirst);
     // view 级断言:health 不变(第二刀被拒绝)
     P2.processEvents();
-    P2.expectView(v => expect(v.players[1].health).toBe(healthAfterFirst));
+    P2.expectView((v) => expect(v.players[1].health).toBe(healthAfterFirst));
   });
 
   // ─── turnUsage view 同步(前端禁用出杀超上限的数据源)─────────────
@@ -126,7 +133,7 @@ describe('杀', () => {
     // 回合结束 atom 的 applyView 清空 turnUsage(与 apply 清 state.turn.vars 对称)。
     // 直接验证 atom 定义,避免完整的回合推进流程(需 回合管理 技能+deck 配置)。
     const { 回合结束 } = await import('../../src/engine/atoms/回合结束');
-    回合结束.applyView!(P1.processedView, { type: '回合结束', player: 0 } as any);
+    回合结束.applyView!(P1.processedView, { type: '回合结束', player: 0 });
     expect(P1.processedView.players[0].turnUsage?.['杀/usedCount']).toBeUndefined();
   });
 });

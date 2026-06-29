@@ -31,7 +31,7 @@ export const 击杀: AtomDefinition<{ player: number }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi >= 0) {
       const p = view.players[pi];
       // 弃牌堆计数:手牌数 + 装备数(与 apply 对称)

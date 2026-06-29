@@ -46,7 +46,13 @@ function clampPlayers(n: number): number {
 }
 
 /** 创建普通房间:需要 host 玩家立刻加入。 */
-export function createRoom(name: string, maxPlayers: number, hostId: string, ws: WSContext, config?: RoomConfig): Room {
+export function createRoom(
+  name: string,
+  maxPlayers: number,
+  hostId: string,
+  ws: WSContext,
+  config?: RoomConfig,
+): Room {
   const id = generateRoomId();
   const room: Room = {
     id,
@@ -108,7 +114,11 @@ export interface JoinDebugResult {
  *  刷新页面时旧 WS 的 TCP close 有延迟,新连接到达时房间可能已满。
  *  此时踢掉最早加入的连接(插入序 FIFO),让新连接复用其座次 ——
  *  符合“刷新后重新接管所有座次”的语义。 */
-export function joinDebugRoom(roomId: string, playerId: string, ws: WSContext): JoinDebugResult | null {
+export function joinDebugRoom(
+  roomId: string,
+  playerId: string,
+  ws: WSContext,
+): JoinDebugResult | null {
   const room = roomList.get(roomId);
   if (!room?.isDebug) return null;
   if (room.players.has(playerId)) return null;
@@ -120,7 +130,11 @@ export function joinDebugRoom(roomId: string, playerId: string, ws: WSContext): 
     if (replacedPlayerId === undefined) return null;
     const oldWs = room.players.get(replacedPlayerId);
     room.players.delete(replacedPlayerId);
-    try { oldWs?.close(); } catch { /* */ }
+    try {
+      oldWs?.close();
+    } catch {
+      /* */
+    }
   }
 
   room.players.set(playerId, ws);

@@ -5,10 +5,17 @@
 // 提交时一个 ClientMessage:preceding=[武圣.transform] + 主 action=杀.use。
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
-import type { Card, CardWrapper, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
+// src/engine/skills/武圣.ts
+// 武圣(关羽·转化技):将一张红色牌当【杀】使用或打出。
+//
+// 模型(组合 action):前端两步 UI(点武圣给红牌加"杀"显示 → 点出杀选目标),
+// 提交时一个 ClientMessage:preceding=[武圣.transform] + 主 action=杀.use。
+// 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
+// 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
+import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
+import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom } from '../create-engine';
-import { viewCanAttack } from '../viewDistance'
+import { viewCanAttack } from '../viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -37,7 +44,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 红牌
       const myTurn = state.currentPlayerIndex === ownerId;
-      const free = !hasBlockingPending(state)
+      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
       const selfAlive = self.alive === true;
       const cardId = params.cardId as string;
@@ -52,7 +59,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardId = params.cardId as string;
       const shadowId = shadowIdOf(cardId);
       // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, { type: '当作', player: ownerId, cardIds: [cardId], shadowId, outputName: '杀' });
+      await applyAtom(state, {
+        type: '当作',
+        player: ownerId,
+        cardIds: [cardId],
+        shadowId,
+        outputName: '杀',
+      });
     },
     // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
     (state: GameState, params: Record<string, Json>) => {
@@ -78,20 +91,21 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       title: '选择一张红色牌当杀使用',
       cardFilter: { filter: (c: Card) => c.color === '红', min: 1, max: 1 },
       targetFilter: {
-        min: 1, max: 1,
+        min: 1,
+        max: 1,
         // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示
-        filter: (view: GameView, t: number) => viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+        filter: (view: GameView, t: number) =>
+          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
       },
     },
-    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id } as CardWrapper),
+    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
       if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
-      const hasRed = p.hand?.some(c => c.color === '红') ?? false;
+      const hasRed = p.hand?.some((c) => c.color === '红') ?? false;
       return hasRed && viewCanSlash(ctx.view, ctx.perspectiveIdx);
     },
   });
   return;
 }
-

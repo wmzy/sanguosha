@@ -36,10 +36,7 @@ const navLabel = css`
   color: ${colors.text.muted};
 `;
 
-export function DebugControls({
-  onBack,
-  onDeleteRoom,
-}: DebugControlsProps) {
+export function DebugControls({ onBack, onDeleteRoom }: DebugControlsProps) {
   return (
     <nav className={navBar}>
       <button onClick={onBack} className={navLink}>

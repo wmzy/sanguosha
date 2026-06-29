@@ -69,7 +69,11 @@ export const PLAY_TOOL = {
             type: 'object',
             description: '多人模式开局控制',
             properties: {
-              mode: { type: 'string', enum: ['multiplayer', 'debug'], description: "multiplayer=普通多人房(默认); debug=调试房" },
+              mode: {
+                type: 'string',
+                enum: ['multiplayer', 'debug'],
+                description: 'multiplayer=普通多人房(默认); debug=调试房',
+              },
               roomId: { type: 'string', description: 'join 指定房间;省略则建房(房主)' },
               name: { type: 'string', description: '建房时的房间名' },
               maxPlayers: { type: 'number', description: '最大人数,默认 2' },
@@ -143,7 +147,14 @@ export interface McpHandlerContext {
 
 export type StartGameOpts =
   | { mode: 'debug'; roomId?: string; playerCount?: number }
-  | { mode: 'multiplayer'; roomId?: string; name?: string; maxPlayers?: number; playerId?: string; readyTimeoutMs?: number };
+  | {
+      mode: 'multiplayer';
+      roomId?: string;
+      name?: string;
+      maxPlayers?: number;
+      playerId?: string;
+      readyTimeoutMs?: number;
+    };
 
 /**
  * 处理一条 JSON-RPC 请求，返回响应（通知无 id 时返回 null）。
@@ -185,14 +196,30 @@ export async function handleMcpRequest(
           };
         }
         if (params.name !== 'play') {
-          return { jsonrpc: '2.0', id, error: { code: -32601, message: `unknown tool: ${params.name}` } };
+          return {
+            jsonrpc: '2.0',
+            id,
+            error: { code: -32601, message: `unknown tool: ${params.name}` },
+          };
         }
         const args = params.arguments ?? {};
         if (args.startGame) await ctx.ensureStarted(normalizeStartGame(args.startGame));
-        const action = args.action as { skillId?: string; actionType?: string; ownerId?: number; params?: Record<string, unknown> } | undefined;
+        const action = args.action as
+          | {
+              skillId?: string;
+              actionType?: string;
+              ownerId?: number;
+              params?: Record<string, unknown>;
+            }
+          | undefined;
         const result = await runPlay(ctx.hgc, {
-          action: action && action.skillId
-            ? { message: { ...(action as EngineClientMessage), ownerId: action.ownerId ?? ctx.seat } }
+          action: action?.skillId
+            ? {
+                message: {
+                  ...(action as EngineClientMessage),
+                  ownerId: action.ownerId ?? ctx.seat,
+                },
+              }
             : undefined,
           waitTimeoutMs: typeof args.waitTimeoutMs === 'number' ? args.waitTimeoutMs : undefined,
         });
@@ -204,12 +231,14 @@ export async function handleMcpRequest(
         };
       }
       default:
-        return { jsonrpc: '2.0', id, error: { code: -32601, message: `method not found: ${req.method}` } };
+        return {
+          jsonrpc: '2.0',
+          id,
+          error: { code: -32601, message: `method not found: ${req.method}` },
+        };
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { jsonrpc: '2.0', id, error: { code: -32603, message: msg } };
   }
 }
-
-

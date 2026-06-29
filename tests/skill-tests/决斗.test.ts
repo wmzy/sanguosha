@@ -41,7 +41,13 @@ function makePlayer(opts: {
   };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -56,8 +62,18 @@ function buildState(opts?: {
   const cards: Record<string, Card> = { jd1: duel, ...(opts?.extraCards ?? {}) };
   return createGameState({
     players: [
-      makePlayer({ index: 0, name: 'P1', hand: opts?.p1Hand ?? ['jd1'], skills: opts?.p1Skills ?? ['杀', '决斗'] }),
-      makePlayer({ index: 1, name: 'P2', hand: opts?.p2Hand ?? [], skills: opts?.p2Skills ?? ['杀'] }),
+      makePlayer({
+        index: 0,
+        name: 'P1',
+        hand: opts?.p1Hand ?? ['jd1'],
+        skills: opts?.p1Skills ?? ['杀', '决斗'],
+      }),
+      makePlayer({
+        index: 1,
+        name: 'P2',
+        hand: opts?.p2Hand ?? [],
+        skills: opts?.p2Skills ?? ['杀'],
+      }),
     ],
     cardMap: cards,
     currentPlayerIndex: 0,
@@ -92,7 +108,7 @@ describe('决斗', () => {
     const p2HealthBefore = harness.state.players[1].health;
 
     // 出决斗(params 用 targets 数组,前端统一格式)
-    await P1.triggerAction('决斗', 'use', { cardId: "jd1", targets: [1] });
+    await P1.triggerAction('决斗', 'use', { cardId: 'jd1', targets: [1] });
 
     // 窗口 1:无懈可击(broadcast target=-2)→ P2 视角推导 skillId=无懈可击 + cardFilter
     P1.expectPending('请求回应');
@@ -109,7 +125,7 @@ describe('决斗', () => {
     expect(info2?.skillId).toBe('杀'); // '询问杀' → skillId='杀'
     expect(info2?.cardFilter).toBeDefined();
     // P2 手中 [p2s] → respondableCards 仅包含 p2s
-    expect(P2.respondableCards().map(c => c.id)).toEqual(['p2s']);
+    expect(P2.respondableCards().map((c) => c.id)).toEqual(['p2s']);
     await P2.respond('杀', { cardId: 'p2s' });
 
     // 窗口 3:轮转 → P1 被询问出杀
@@ -117,7 +133,7 @@ describe('决斗', () => {
     const info3 = P1.respondInfo();
     expect(info3?.skillId).toBe('杀');
     // P1 手中 [p1s] → 可出
-    expect(P1.respondableCards().map(c => c.id)).toEqual(['p1s']);
+    expect(P1.respondableCards().map((c) => c.id)).toEqual(['p1s']);
     await P1.respond('杀', { cardId: 'p1s' });
 
     // 窗口 4:再轮转 → P2 被询问(手中已无杀)
@@ -135,7 +151,7 @@ describe('决斗', () => {
     expect(harness.state.zones.processing).toEqual([]);
     // view 级断言
     P2.processEvents();
-    P2.expectView(v => {
+    P2.expectView((v) => {
       expect(v.players[1].health).toBe(p2HealthBefore - 1);
       expect(v.pending).toBeNull();
     });
@@ -156,7 +172,7 @@ describe('决斗', () => {
 
     const p2HealthBefore = harness.state.players[1].health;
 
-    await P1.triggerAction('决斗', 'use', { cardId: "jd1", targets: [1] });
+    await P1.triggerAction('决斗', 'use', { cardId: 'jd1', targets: [1] });
     await P1.pass(); // 消耗无懈窗口
 
     P2.expectPending('询问杀');
@@ -171,7 +187,7 @@ describe('决斗', () => {
     expect(harness.state.zones.discardPile).toContain('jd1');
     // view 级断言
     P2.processEvents();
-    P2.expectView(v => {
+    P2.expectView((v) => {
       expect(v.players[1].health).toBe(p2HealthBefore - 1);
       expect(v.pending).toBeNull();
     });
@@ -186,7 +202,7 @@ describe('决斗', () => {
     await P2.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: "jd1", targets: [0] },
+      params: { cardId: 'jd1', targets: [0] },
     });
   });
 
@@ -209,7 +225,7 @@ describe('决斗', () => {
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: "jd1", targets: [1] },
+      params: { cardId: 'jd1', targets: [1] },
     });
   });
 
@@ -222,7 +238,7 @@ describe('决斗', () => {
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: "jd1", targets: [0] },
+      params: { cardId: 'jd1', targets: [0] },
     });
   });
 
@@ -241,7 +257,7 @@ describe('决斗', () => {
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: "s1", targets: [1] },
+      params: { cardId: 's1', targets: [1] },
     });
   });
 
@@ -255,7 +271,7 @@ describe('决斗', () => {
     await P1.expectRejected({
       skillId: '决斗',
       actionType: 'use',
-      params: { cardId: "jd1", targets: [1] },
+      params: { cardId: 'jd1', targets: [1] },
     });
   });
 });

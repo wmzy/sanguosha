@@ -21,15 +21,29 @@ import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
-  index: number; name: string;
-  hand?: string[]; equipment?: Record<string, string>;
-  skills?: string[]; health?: number; maxHealth?: number;
+  index: number;
+  name: string;
+  hand?: string[];
+  equipment?: Record<string, string>;
+  skills?: string[];
+  health?: number;
+  maxHealth?: number;
 }) {
   return {
-    index: opts.index, name: opts.name, character: '',
-    health: opts.health ?? 4, maxHealth: opts.maxHealth ?? 4, alive: true,
-    hand: opts.hand ?? [], equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+    index: opts.index,
+    name: opts.name,
+    character: '',
+    health: opts.health ?? 4,
+    maxHealth: opts.maxHealth ?? 4,
+    alive: true,
+    hand: opts.hand ?? [],
+    equipment: opts.equipment ?? {},
+    skills: opts.skills ?? [],
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    tags: [],
+    judgeZone: [],
   };
 }
 
@@ -41,7 +55,9 @@ function makeCard(id: string, name: string): Card {
 }
 
 describe('弃置装备:卸载自带技能实例', () => {
-  beforeEach(() => { resetForTest(); });
+  beforeEach(() => {
+    resetForTest();
+  });
 
   it('制衡弃掉武器(诸葛连弩)→ skills 不再含 诸葛连弩,slashMax 提供者消失', async () => {
     const zhuge = makeEquip('wp-zg', '诸葛连弩', '武器', 1);
@@ -51,7 +67,9 @@ describe('弃置装备:卸载自带技能实例', () => {
         // 初始已装备诸葛连弩:skills 含 '诸葛连弩' 让 registerSkillsFromState 实例化它。
         // 武器范围 vars(距离/出杀范围)由 装备 atom 设,初始装备不走 atom,这里手动补齐。
         makePlayer({
-          index: 0, name: 'P0', hand: [],
+          index: 0,
+          name: 'P0',
+          hand: [],
           equipment: { 武器: 'wp-zg' },
           skills: ['制衡', '杀', '诸葛连弩'],
         }),
@@ -59,7 +77,9 @@ describe('弃置装备:卸载自带技能实例', () => {
       ],
       cardMap: { 'wp-zg': zhuge, d1 },
       zones: { deck: ['d1'], discardPile: [], processing: [] },
-      currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
     });
     state.players[0].vars['距离/出杀范围'] = 1;
     await registerSkillsFromState(state);
@@ -70,8 +90,11 @@ describe('弃置装备:卸载自带技能实例', () => {
 
     // 制衡:弃掉装备区的诸葛连弩
     await dispatchAndWait(state, {
-      skillId: '制衡', actionType: 'use', ownerId: 0,
-      params: { cardIds: ['wp-zg'] }, baseSeq: state.seq,
+      skillId: '制衡',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardIds: ['wp-zg'] },
+      baseSeq: state.seq,
     });
 
     // 装备走了
@@ -89,7 +112,9 @@ describe('弃置装备:卸载自带技能实例', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0', hand: [],
+          index: 0,
+          name: 'P0',
+          hand: [],
           equipment: { 防具: 'ar-bg' },
           skills: ['制衡', '杀', '八卦阵'],
         }),
@@ -97,15 +122,20 @@ describe('弃置装备:卸载自带技能实例', () => {
       ],
       cardMap: { 'ar-bg': bagua, d1 },
       zones: { deck: ['d1'], discardPile: [], processing: [] },
-      currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
     });
     await registerSkillsFromState(state);
 
     expect(state.players[0].skills).toContain('八卦阵');
 
     await dispatchAndWait(state, {
-      skillId: '制衡', actionType: 'use', ownerId: 0,
-      params: { cardIds: ['ar-bg'] }, baseSeq: state.seq,
+      skillId: '制衡',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardIds: ['ar-bg'] },
+      baseSeq: state.seq,
     });
 
     expect(state.players[0].equipment['防具']).toBeUndefined();
@@ -119,7 +149,9 @@ describe('弃置装备:卸载自带技能实例', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0', hand: [],
+          index: 0,
+          name: 'P0',
+          hand: [],
           equipment: { 进攻马: 'mt-ct' },
           skills: ['制衡', '杀', '赤兔'],
         }),
@@ -127,7 +159,9 @@ describe('弃置装备:卸载自带技能实例', () => {
       ],
       cardMap: { 'mt-ct': chitu, d1 },
       zones: { deck: ['d1'], discardPile: [], processing: [] },
-      currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
     });
     await registerSkillsFromState(state);
 
@@ -136,8 +170,11 @@ describe('弃置装备:卸载自带技能实例', () => {
     expect(state.players[0].vars['距离/进攻修正']).toBe(1);
 
     await dispatchAndWait(state, {
-      skillId: '制衡', actionType: 'use', ownerId: 0,
-      params: { cardIds: ['mt-ct'] }, baseSeq: state.seq,
+      skillId: '制衡',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardIds: ['mt-ct'] },
+      baseSeq: state.seq,
     });
 
     expect(state.players[0].equipment['进攻马']).toBeUndefined();
@@ -157,15 +194,20 @@ describe('弃置装备:卸载自带技能实例', () => {
       ],
       cardMap: { h1, d1 },
       zones: { deck: ['d1'], discardPile: [], processing: [] },
-      currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
     });
     await registerSkillsFromState(state);
 
     const skillsBefore = state.players[0].skills.slice();
 
     await dispatchAndWait(state, {
-      skillId: '制衡', actionType: 'use', ownerId: 0,
-      params: { cardIds: ['h1'] }, baseSeq: state.seq,
+      skillId: '制衡',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardIds: ['h1'] },
+      baseSeq: state.seq,
     });
 
     // 手牌制衡不应改变 skills

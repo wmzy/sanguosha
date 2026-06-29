@@ -8,13 +8,26 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
+import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
-function makePlayer(opts: { index: number; name: string; hand?: string[]; skills?: string[]; pendingTricks?: Array<{ name: string; source: number; card: Card }>; tags?: string[] }): PlayerState {
+function makePlayer(opts: {
+  index: number;
+  name: string;
+  hand?: string[];
+  skills?: string[];
+  pendingTricks?: Array<{ name: string; source: number; card: Card }>;
+  tags?: string[];
+}): PlayerState {
   return {
     index: opts.index,
     name: opts.name,
@@ -25,7 +38,7 @@ function makePlayer(opts: { index: number; name: string; hand?: string[]; skills
     hand: opts.hand ?? [],
     equipment: {},
     skills: opts.skills ?? [],
-    vars: {} as Record<string, Json>,
+    vars: {},
     marks: [],
     pendingTricks: opts.pendingTricks ?? [],
     judgeZone: [],
@@ -189,7 +202,8 @@ describe('兵粮寸断', () => {
     // P1 (index 0) 对 P3 (index 2) 距离 = 2(5人环:0→1→2 = 2,或 0→4→3→2 = 3,min=2)
     // 距离 2 > 1 → 应被拒绝
     await P1.expectRejected({
-      skillId: '兵粮寸断', actionType: 'use',
+      skillId: '兵粮寸断',
+      actionType: 'use',
       params: { cardId: 'b1', target: 2 },
     });
   });

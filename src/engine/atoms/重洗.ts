@@ -28,12 +28,18 @@ export const 重洗: AtomDefinition<Record<string, never>> = {
     // toViewEvents 在 apply 之前调用,此时 deck+discardPile 尚未合并。
     // totalCards = 重洗后的新牌堆张数(deck 与 discardPile 合并后的总数)。
     const totalCards = state.zones.deck.length + state.zones.discardPile.length;
-    const event: ViewEvent = { type: '重洗', totalCards, newDeckCount: totalCards, newDiscardPileCount: 0 };
+    const event: ViewEvent = {
+      type: '重洗',
+      totalCards,
+      newDeckCount: totalCards,
+      newDiscardPileCount: 0,
+    };
     return { ownerViews: new Map(), othersView: event };
   },
   applyView(view, event) {
     if (view.zones) {
-      view.zones.deckCount = (event.newDeckCount as number) ?? view.zones.deckCount + view.zones.discardPileCount;
+      view.zones.deckCount =
+        (event.newDeckCount as number) ?? view.zones.deckCount + view.zones.discardPileCount;
       view.zones.discardPileCount = (event.newDiscardPileCount as number) ?? 0;
     }
   },

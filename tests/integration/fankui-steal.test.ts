@@ -71,10 +71,12 @@ describe('反馈:端到端(harness)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id, victimCard.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           skills: ['反馈', '闪'],
-          health: 4, maxHealth: 4,
+          health: 4,
+          maxHealth: 4,
         }),
       ],
       cardMap: { [slash.id]: slash, [victimCard.id]: victimCard },
@@ -120,7 +122,14 @@ describe('反馈:端到端(harness)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id, victimCard.id], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['反馈', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['反馈', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
       ],
       cardMap: { [slash.id]: slash, [victimCard.id]: victimCard },
       currentPlayerIndex: 0,
@@ -132,7 +141,7 @@ describe('反馈:端到端(harness)', () => {
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
 
-    const p0HandBefore = harness.state.players[0].hand.length;
+    const _p0HandBefore = harness.state.players[0].hand.length;
     const p1HandBefore = harness.state.players[1].hand.length;
 
     await P0.useCardAndTarget('杀', slash.id, [1]);

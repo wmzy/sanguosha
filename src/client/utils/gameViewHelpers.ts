@@ -4,7 +4,15 @@
 // 这些函数封装"构造 action params"和"UI 布局计算"两类纯逻辑,
 // 让组件/hook 专注于状态管理,函数专注于数据转换。
 
-import type { ActionContext, ActionPrompt, Card, GameView, Json, DistributePrompt, TargetFilter } from '../../engine/types';
+import type {
+  ActionContext,
+  ActionPrompt,
+  Card,
+  GameView,
+  Json,
+  DistributePrompt,
+  TargetFilter,
+} from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { defaultPlayActive } from '../../engine/action-active';
 
@@ -33,8 +41,11 @@ export function extractCardFilter(prompt: ActionPrompt): ((card: Card) => boolea
  * @param actions 候选 action 集合(通常是当前视角玩家的 skillActions)
  * @param card   当前选中的卡牌
  */
-export function findUseActionForCard(actions: SkillActionDef[], card: Card): SkillActionDef | undefined {
-  return actions.find(a => {
+export function findUseActionForCard(
+  actions: SkillActionDef[],
+  card: Card,
+): SkillActionDef | undefined {
+  return actions.find((a) => {
     if (a.actionType !== 'use') return false;
     const filter = extractCardFilter(a.prompt);
     return filter ? filter(card) : false;
@@ -67,12 +78,23 @@ export interface PlayRules {
 }
 
 /** 从 targetFilter + selfTarget 派生出牌规则 */
-export function derivePlayRules(targetFilter: TargetFilter | null | undefined, selfTarget?: boolean): PlayRules {
+export function derivePlayRules(
+  targetFilter: TargetFilter | null | undefined,
+  selfTarget?: boolean,
+): PlayRules {
   const slots = targetFilter?.slots;
   const hasSlots = !!slots && slots.length > 1;
   const slotCount = slots?.length ?? 0;
-  const needsTarget = selfTarget ? false : (hasSlots || (targetFilter ? targetFilter.max >= 1 : false));
-  return { needsTarget, hasSlots, slotCount, selfTarget: !!selfTarget, targetFilter: targetFilter ?? null };
+  const needsTarget = selfTarget
+    ? false
+    : hasSlots || (targetFilter ? targetFilter.max >= 1 : false);
+  return {
+    needsTarget,
+    hasSlots,
+    slotCount,
+    selfTarget: !!selfTarget,
+    targetFilter: targetFilter ?? null,
+  };
 }
 
 /**
@@ -98,19 +120,19 @@ export function buildPlayParams(
   if (rules.hasSlots) {
     // 借刀杀人:需 A + B 两个目标
     if (!selectedTarget || !selectedKillTarget) return null;
-    const aIdx = players.findIndex(p => p.name === selectedTarget);
-    const bIdx = players.findIndex(p => p.name === selectedKillTarget);
+    const aIdx = players.findIndex((p) => p.name === selectedTarget);
+    const bIdx = players.findIndex((p) => p.name === selectedKillTarget);
     if (aIdx < 0 || bIdx < 0) return null;
     return { cardId: card.id, target: aIdx, killTarget: bIdx };
   }
   if (rules.selfTarget) {
     // 桃/酒:自动以自己为目标
-    const selfIdx = players.findIndex(p => p.name === selfName);
+    const selfIdx = players.findIndex((p) => p.name === selfName);
     return { cardId: card.id, targets: [selfIdx >= 0 ? selfIdx : perspectiveIdx] };
   }
   if (rules.needsTarget) {
     if (!selectedTarget) return null;
-    const idx = players.findIndex(p => p.name === selectedTarget);
+    const idx = players.findIndex((p) => p.name === selectedTarget);
     if (idx < 0) return null;
     // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
     if (card.type === '锦囊牌' && card.trickSubtype === '延时锦囊') {
@@ -138,9 +160,9 @@ export function resolveDistributeCardIds(
   }
   if (prompt.source === 'handAndEquip') {
     const equipIds = Object.values(equipment).filter((id): id is string => typeof id === 'string');
-    return [...hand.map(c => c.id), ...equipIds];
+    return [...hand.map((c) => c.id), ...equipIds];
   }
-  return hand.map(c => c.id);
+  return hand.map((c) => c.id);
 }
 
 // ─── 弧形布局 ───

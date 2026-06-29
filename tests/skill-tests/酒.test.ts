@@ -19,7 +19,13 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -79,11 +85,11 @@ describe('酒', () => {
     expect(harness.state.zones.discardPile).toContain('w1');
     expect(harness.state.players[0].hand).not.toContain('w1');
     // 加 mark:酒/nextKillDamageBonus
-    const hasMark = harness.state.players[0].marks.some(m => m.id === '酒/nextKillDamageBonus');
+    const hasMark = harness.state.players[0].marks.some((m) => m.id === '酒/nextKillDamageBonus');
     expect(hasMark).toBe(true);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => expect(v.players[0].handCount).toBe(0));
+    P1.expectView((v) => expect(v.players[0].handCount).toBe(0));
   });
 
   it('use + 杀 → 下一张杀增伤 +1(mark 消费)', async () => {
@@ -92,7 +98,14 @@ describe('酒', () => {
     const slash = makeCard('s1', '杀', '♠', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['w1', 's1'], skills: ['酒', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['w1', 's1'],
+          skills: ['酒', '杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
       ],
       cardMap: { w1: wine, s1: slash },
@@ -106,7 +119,9 @@ describe('酒', () => {
 
     // 用酒
     await P1.useCard('酒', 'w1');
-    expect(harness.state.players[0].marks.some(m => m.id === '酒/nextKillDamageBonus')).toBe(true);
+    expect(harness.state.players[0].marks.some((m) => m.id === '酒/nextKillDamageBonus')).toBe(
+      true,
+    );
 
     // 出杀 → P2 不闪 → 受到 2 点伤害(原本 1 + 酒增伤 1)
     await P1.useCardAndTarget('杀', 's1', [1]);
@@ -114,11 +129,11 @@ describe('酒', () => {
     // 4 - 2 = 2
     expect(harness.state.players[1].health).toBe(2);
     // mark 应已被消费
-    const hasMark = harness.state.players[0].marks.some(m => m.id === '酒/nextKillDamageBonus');
+    const hasMark = harness.state.players[0].marks.some((m) => m.id === '酒/nextKillDamageBonus');
     expect(hasMark).toBe(false);
     // view 级断言
     P2.processEvents();
-    P2.expectView(v => expect(v.players[1].health).toBe(2));
+    P2.expectView((v) => expect(v.players[1].health).toBe(2));
   });
 
   // ─── 负面:use ─────────────────────────────
@@ -176,7 +191,11 @@ describe('酒', () => {
     const P1 = harness.player('P1');
 
     // 把酒给 P2 用 → 酒只能自己用(targetSelf=false)
-    await P1.expectRejected({ skillId: '酒', actionType: 'use', params: { cardId: 'w1', targets: [1] } });
+    await P1.expectRejected({
+      skillId: '酒',
+      actionType: 'use',
+      params: { cardId: 'w1', targets: [1] },
+    });
   });
 
   it('use:不在手牌的酒 → 拒绝', async () => {
@@ -204,8 +223,22 @@ describe('酒', () => {
     const wine = makeCard('w1', '酒', '♠', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀', '酒', '闪', '桃'], health: 4, maxHealth: 4 }),
-        makePlayer({ index: 1, name: 'P2', hand: ['w1'], skills: ['杀', '酒', '闪', '桃'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['杀', '酒', '闪', '桃'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['w1'],
+          skills: ['杀', '酒', '闪', '桃'],
+          health: 1,
+          maxHealth: 4,
+        }),
       ],
       cardMap: { c1: slash, w1: wine },
       currentPlayerIndex: 0,
@@ -221,7 +254,11 @@ describe('酒', () => {
     await P2.pass();
     expect(harness.state.players[1].health).toBe(0);
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as { type?: string; requestType?: string; target?: number };
+    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+      type?: string;
+      requestType?: string;
+      target?: number;
+    };
     expect(slotAtom.requestType).toBe('桃/求桃');
 
     // P1(或被询问者)出酒救援

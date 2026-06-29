@@ -5,7 +5,11 @@
 import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { getSkillDescription, getSkillDescriptionAsync, getSkillModule } from '../../src/engine/skill';
+import {
+  getSkillDescription,
+  getSkillDescriptionAsync,
+  getSkillModule,
+} from '../../src/engine/skill';
 
 describe('getSkillDescription', () => {
   it('模块加载后同步返回技能描述', async () => {

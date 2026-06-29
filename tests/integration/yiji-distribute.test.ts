@@ -58,7 +58,14 @@ describe('遗计:端到端(harness)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['s1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['遗计', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['遗计', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: [] }),
       ],
       cardMap: { s1: slash },
@@ -71,7 +78,7 @@ describe('遗计:端到端(harness)', () => {
 
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', 's1', [1]);
@@ -113,7 +120,14 @@ describe('遗计:端到端(harness)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['s1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['遗计', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['遗计', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: [] }),
       ],
       cardMap: { s1: slash },
@@ -158,7 +172,14 @@ describe('遗计:端到端(harness)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['s1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['遗计', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['遗计', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: [] }),
       ],
       cardMap: { s1: slash },

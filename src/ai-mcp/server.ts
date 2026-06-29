@@ -9,7 +9,13 @@
 //   SGS_PLAYER_COUNT（创建房时用，默认 2）
 import * as readline from 'node:readline';
 import { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
-import { handleMcpRequest, normalizeStartGame, type JsonRpcRequest, type JsonRpcResponse, type McpHandlerContext, type StartGameOpts } from './mcpServer';
+import {
+  handleMcpRequest,
+  normalizeStartGame,
+  type JsonRpcRequest,
+  type McpHandlerContext,
+  type StartGameOpts,
+} from './mcpServer';
 import { joinAndStartRoom } from './lobby';
 
 // 构建期注入的默认服务器 URL。
@@ -51,7 +57,9 @@ async function main(): Promise<void> {
         playerId: o.playerId ?? PLAYER_ID ?? undefined,
         readyTimeoutMs: o.readyTimeoutMs,
       });
-      logErr(`multiplayer room ready: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`);
+      logErr(
+        `multiplayer room ready: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`,
+      );
       return;
     }
     // debug 模式(旧路径)
@@ -99,6 +107,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((e) => {
-  logErr(`fatal: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
+  logErr(`fatal: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
   process.exit(1);
 });

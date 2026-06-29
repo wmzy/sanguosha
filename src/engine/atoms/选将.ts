@@ -1,7 +1,17 @@
 // src/engine/atoms/选将.ts
 // 游戏初始化 atoms:抽身份、选将、发牌
 // 每个 atom 做一件事,符合三国杀身份局规则
-import type { ActionPrompt, Atom, AtomDefinition, Card, GameState, PlayerState, ViewEvent, ViewEventSplit } from '../types';
+// src/engine/atoms/选将.ts
+// 游戏初始化 atoms:抽身份、选将、发牌
+// 每个 atom 做一件事,符合三国杀身份局规则
+import type {
+  ActionPrompt,
+  AtomDefinition,
+  Card,
+  PlayerState,
+  ViewEvent,
+  ViewEventSplit,
+} from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
@@ -10,22 +20,38 @@ import { registerAtom } from '../atom';
 
 /** 默认通用技能列表 */
 export const DEFAULT_SKILLS = [
-  '回合管理', '装备通用', '杀', '闪', '桃', '酒',
-  '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '五谷丰登',
-  '借刀杀人', '决斗', '南蛮入侵', '万箭齐发',
-  '乐不思蜀', '兵粮寸断', '闪电', '无懈可击',
+  '回合管理',
+  '装备通用',
+  '杀',
+  '闪',
+  '桃',
+  '酒',
+  '过河拆桥',
+  '顺手牵羊',
+  '无中生有',
+  '桃园结义',
+  '五谷丰登',
+  '借刀杀人',
+  '决斗',
+  '南蛮入侵',
+  '万箭齐发',
+  '乐不思蜀',
+  '兵粮寸断',
+  '闪电',
+  '无懈可击',
 ];
 
 /** 身份牌配置 */
-const IDENTITY_COUNTS: Record<number, { 主公: number; 忠臣: number; 反贼: number; 内奸: number }> = {
-  2: { 主公: 1, 忠臣: 0, 反贼: 1, 内奸: 0 },
-  3: { 主公: 1, 忠臣: 0, 反贼: 1, 内奸: 1 },
-  4: { 主公: 1, 忠臣: 1, 反贼: 1, 内奸: 1 },
-  5: { 主公: 1, 忠臣: 1, 反贼: 2, 内奸: 1 },
-  6: { 主公: 1, 忠臣: 1, 反贼: 3, 内奸: 1 },
-  7: { 主公: 1, 忠臣: 2, 反贼: 3, 内奸: 1 },
-  8: { 主公: 1, 忠臣: 2, 反贼: 4, 内奸: 1 },
-};
+const IDENTITY_COUNTS: Record<number, { 主公: number; 忠臣: number; 反贼: number; 内奸: number }> =
+  {
+    2: { 主公: 1, 忠臣: 0, 反贼: 1, 内奸: 0 },
+    3: { 主公: 1, 忠臣: 0, 反贼: 1, 内奸: 1 },
+    4: { 主公: 1, 忠臣: 1, 反贼: 1, 内奸: 1 },
+    5: { 主公: 1, 忠臣: 1, 反贼: 2, 内奸: 1 },
+    6: { 主公: 1, 忠臣: 1, 反贼: 3, 内奸: 1 },
+    7: { 主公: 1, 忠臣: 2, 反贼: 3, 内奸: 1 },
+    8: { 主公: 1, 忠臣: 2, 反贼: 4, 内奸: 1 },
+  };
 
 // ── 抽身份 ──────────────────────────────────────────────
 // 每人抽一张身份牌,主公亮明身份
@@ -141,8 +167,9 @@ export const 发牌: AtomDefinition<{
       const isLord = p.identity === '主公';
       const bonus = isLord ? lordBonus : 0;
       const drawCount = handSize + bonus;
-      const cards = state.zones.deck.slice(cursor, cursor + drawCount)
-        .map(id => state.cardMap[id])
+      const cards = state.zones.deck
+        .slice(cursor, cursor + drawCount)
+        .map((id) => state.cardMap[id])
         .filter(Boolean);
       cursor += drawCount;
       ownerViews.set(p.index, {
@@ -164,7 +191,7 @@ export const 发牌: AtomDefinition<{
       p.handCount += handSize + bonus;
       // ownerView 携带自己分到的 cards,加入手牌;othersView 无 cards 字段
       if (event.cards && p.hand) {
-        (p.hand as Card[]).push(...(event.cards as Card[]));
+        p.hand.push(...(event.cards as Card[]));
       }
     }
     // 牌堆减少(粗略:减去总发牌数)
@@ -194,7 +221,8 @@ export const 选将询问: AtomDefinition<{
   type: '选将询问',
   validate(state, atom) {
     if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    if (!Array.isArray(atom.candidates) || atom.candidates.length === 0) return 'candidates required';
+    if (!Array.isArray(atom.candidates) || atom.candidates.length === 0)
+      return 'candidates required';
     return null;
   },
   apply(_state) {
@@ -210,7 +238,11 @@ export const 选将询问: AtomDefinition<{
       target,
       candidates,
       timeoutMs,
-      pending: { startTime: Date.now(), deadline: Date.now() + timeoutMs, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } },
+      pending: {
+        startTime: Date.now(),
+        deadline: Date.now() + timeoutMs,
+        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates },
+      },
     };
     // 其他人看到"等待主公选将"
     const othersView: import('../types').ViewEvent = {
@@ -232,7 +264,11 @@ export const 选将询问: AtomDefinition<{
       view.pending = {
         type: 'awaits',
         atom: { type: '选将询问', target, candidates } as unknown as import('../types').Atom,
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates } as import('../types').ActionPrompt,
+        prompt: {
+          type: 'chooseCharacter',
+          title: '请选择武将',
+          candidates,
+        } as import('../types').ActionPrompt,
         target,
         deadline: Date.now() + timeoutMs,
         totalMs: timeoutMs,
@@ -248,8 +284,8 @@ export const 选将询问: AtomDefinition<{
       const p = state.players[target];
       if (!p || p.character) return;
       const candidates = atom.candidates;
-      const taken = new Set(state.players.map(pl => pl.character));
-      const available = candidates.filter(c => !taken.has(c.name));
+      const taken = new Set(state.players.map((pl) => pl.character));
+      const available = candidates.filter((c) => !taken.has(c.name));
       const pool = available.length > 0 ? available : candidates;
       // 用 state.seq 做种子:单调递增,对同一局游戏确定性可复现
       const rng = createRng(state.seq ^ (target * 2654435761));
@@ -282,10 +318,12 @@ export const 并行选将: AtomDefinition<{
 }> = {
   type: '并行选将',
   validate(state, atom) {
-    if (!Array.isArray(atom.selections) || atom.selections.length === 0) return 'selections required';
+    if (!Array.isArray(atom.selections) || atom.selections.length === 0)
+      return 'selections required';
     for (const s of atom.selections) {
       if (!state.players[s.target]) return `target ${s.target} not found`;
-      if (!Array.isArray(s.candidates) || s.candidates.length === 0) return `candidates required for target ${s.target}`;
+      if (!Array.isArray(s.candidates) || s.candidates.length === 0)
+        return `candidates required for target ${s.target}`;
     }
     return null;
   },
@@ -296,7 +334,7 @@ export const 并行选将: AtomDefinition<{
     const selections = atom.selections;
     const timeoutMs = resolveTimeoutMs(state, 60);
     // 找主公已选的角色(主公在并行选将之前已完成选将)
-    const lordIdx = state.players.findIndex(p => p.identity === '主公');
+    const lordIdx = state.players.findIndex((p) => p.identity === '主公');
     const lordCharacter = lordIdx >= 0 ? state.players[lordIdx].character : '';
     const lordName = lordIdx >= 0 ? state.players[lordIdx].name : '';
     // ownerViews:每个目标玩家看到自己的候选人 + 主公已选角色
@@ -304,11 +342,15 @@ export const 并行选将: AtomDefinition<{
     for (const s of selections) {
       ownerViews.set(s.target, {
         type: '并行选将',
-        selections: selections.map(sel => ({ target: sel.target, candidates: sel.candidates })),
+        selections: selections.map((sel) => ({ target: sel.target, candidates: sel.candidates })),
         lordCharacter,
         lordName,
         timeoutMs,
-        pending: { startTime: Date.now(), deadline: Date.now() + timeoutMs, prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates } },
+        pending: {
+          startTime: Date.now(),
+          deadline: Date.now() + timeoutMs,
+          prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates },
+        },
       });
     }
     // othersView:已选完的玩家(如主公)看到"等待其他玩家选将"
@@ -322,25 +364,36 @@ export const 并行选将: AtomDefinition<{
     return { ownerViews, othersView };
   },
   applyView(view, event) {
-    const selections = (event.selections ?? []) as Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }>;
+    const selections = (event.selections ?? []) as Array<{
+      target: number;
+      candidates: Array<{ name: string; skills: string[] }>;
+    }>;
     const lordCharacter = (event.lordCharacter as string) ?? '';
     const lordName = (event.lordName as string) ?? '';
     // 更新主公角色(如果 view 中主公还是空的)
     if (lordCharacter) {
-      const lordPlayer = view.players.find(p => p.identity === '主公');
+      const lordPlayer = view.players.find((p) => p.identity === '主公');
       if (lordPlayer && !lordPlayer.character) {
         lordPlayer.character = lordCharacter;
         lordPlayer.name = lordName || lordCharacter;
       }
     }
     // 找当前 viewer 是否在 selections 中
-    const mySelection = selections.find(s => s.target === view.viewer);
+    const mySelection = selections.find((s) => s.target === view.viewer);
     if (mySelection) {
       const timeoutMs = (event.timeoutMs as number | undefined) ?? 60000;
       view.pending = {
         type: 'awaits',
-        atom: { type: '选将询问', target: mySelection.target, candidates: mySelection.candidates } as unknown as import('../types').Atom,
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: mySelection.candidates } as import('../types').ActionPrompt,
+        atom: {
+          type: '选将询问',
+          target: mySelection.target,
+          candidates: mySelection.candidates,
+        } as unknown as import('../types').Atom,
+        prompt: {
+          type: 'chooseCharacter',
+          title: '请选择武将',
+          candidates: mySelection.candidates,
+        } as import('../types').ActionPrompt,
         target: mySelection.target,
         deadline: Date.now() + timeoutMs,
         totalMs: timeoutMs,
@@ -355,13 +408,12 @@ export const 并行选将: AtomDefinition<{
   },
   // 并行选将拆成多个单-target 选将询问 slot,各 target 独立选择、独立 resolve
   parallelSplit(atom) {
-    return atom.selections.map(s => ({
+    return atom.selections.map((s) => ({
       target: s.target,
-      slotAtom: { type: '选将询问' as const, target: s.target, candidates: s.candidates } as unknown as Atom,
+      slotAtom: { type: '选将询问' as const, target: s.target, candidates: s.candidates },
     }));
   },
   effect: { blockUntilDone: true, duration: 200 },
 };
 
 registerAtom(并行选将);
-

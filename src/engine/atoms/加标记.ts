@@ -22,7 +22,7 @@ export const 加标记: AtomDefinition<{ player: number; mark: Mark }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const mark = event.mark as Mark | undefined;
     if (mark) view.players[pi].marks.push(mark);

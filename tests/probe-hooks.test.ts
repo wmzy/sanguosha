@@ -8,13 +8,58 @@ import { createGameState } from '../src/engine/types';
 function buildGuanShiFuState(): GameState {
   const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
   const dodge: Card = { id: 'c3', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
-  const weapon: Card = { id: 'w1', name: '贯石斧', suit: '♣', color: '黑', rank: '5', type: '装备牌', subtype: '武器', range: 3 };
+  const weapon: Card = {
+    id: 'w1',
+    name: '贯石斧',
+    suit: '♣',
+    color: '黑',
+    rank: '5',
+    type: '装备牌',
+    subtype: '武器',
+    range: 3,
+  };
   return createGameState({
     players: [
-      { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true, hand: ['c1', 'h1', 'h2'], equipment: { 武器: 'w1' }, skills: ['杀', '装备通用', '贯石斧'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: '忠臣', health: 4, maxHealth: 4, alive: true, hand: ['c3'], equipment: {}, skills: ['闪', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: '主公',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['c1', 'h1', 'h2'],
+        equipment: { 武器: 'w1' },
+        skills: ['杀', '装备通用', '贯石斧'],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '忠臣',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['c3'],
+        equipment: {},
+        skills: ['闪', '装备通用'],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
     ],
-    cardMap: { c1: slash, c3: dodge, w1: weapon, h1: { id: 'h1', name: '桃', suit: '♥', color: '红', rank: 'A', type: '基本牌' }, h2: { id: 'h2', name: '酒', suit: '♣', color: '黑', rank: 'A', type: '基本牌' } },
+    cardMap: {
+      c1: slash,
+      c3: dodge,
+      w1: weapon,
+      h1: { id: 'h1', name: '桃', suit: '♥', color: '红', rank: 'A', type: '基本牌' },
+      h2: { id: 'h2', name: '酒', suit: '♣', color: '黑', rank: 'A', type: '基本牌' },
+    },
     currentPlayerIndex: 0,
     phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
@@ -23,7 +68,9 @@ function buildGuanShiFuState(): GameState {
 
 describe('贯石斧 probe', () => {
   let harness: SkillTestHarness;
-  beforeEach(() => { harness = new SkillTestHarness(); });
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
 
   it('trace 贯石斧 fire', async () => {
     await harness.setup(buildGuanShiFuState());

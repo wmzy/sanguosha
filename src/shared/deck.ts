@@ -16,14 +16,30 @@ export function createStandardDeck(): Card[] {
   const deck: Card[] = [];
   let id = 0;
 
-  function add(name: string, type: Card['type'], subtype: Card['subtype'], count: number, suitList?: Suit[], trickSubtype?: Card['trickSubtype']) {
+  function add(
+    name: string,
+    type: Card['type'],
+    subtype: Card['subtype'],
+    count: number,
+    suitList?: Suit[],
+    trickSubtype?: Card['trickSubtype'],
+  ) {
     const ss = suitList ?? suits;
     const range = equipmentRangeMap.get(name);
     const description = getCardDescription(name);
     for (let i = 0; i < count; i++) {
       const s = ss[i % ss.length];
-      const r = ranks[(id++) % ranks.length];
-      const card: Card = { name, type, subtype, suit: s, color: suitColor(s), rank: r, description, id: `${name}-${s}-${r}-${deck.length}` };
+      const r = ranks[id++ % ranks.length];
+      const card: Card = {
+        name,
+        type,
+        subtype,
+        suit: s,
+        color: suitColor(s),
+        rank: r,
+        description,
+        id: `${name}-${s}-${r}-${deck.length}`,
+      };
       if (range != null) card.range = range;
       if (trickSubtype) card.trickSubtype = trickSubtype;
       deck.push(card);

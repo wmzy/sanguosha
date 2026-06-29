@@ -1,5 +1,5 @@
 // server/lifecycle.ts
-import type { Server } from 'http';
+
 import { flushPendingWrites } from './persistence';
 import { shutdownAll } from './lifecycles';
 import { createLogger } from './logger';

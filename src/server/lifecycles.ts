@@ -23,9 +23,11 @@ export function register(name: string, ref: unknown, cleanup?: Cleanup): void {
   resources.set(name, {
     name,
     ref,
-    cleanup: cleanup ?? (() => {
-      resources.delete(name);
-    }),
+    cleanup:
+      cleanup ??
+      (() => {
+        resources.delete(name);
+      }),
   });
 }
 
@@ -62,7 +64,7 @@ export async function shutdownAll(): Promise<void> {
   resources.clear();
 
   if (errors.length > 0) {
-    log.error('部分资源清理失败', { failed: errors.map(e => e.name) });
+    log.error('部分资源清理失败', { failed: errors.map((e) => e.name) });
   } else {
     log.info('所有注册资源已清理');
   }

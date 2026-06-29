@@ -9,7 +9,12 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '进攻马' | '防御马'): Card {
+function makeEquip(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  subtype: '进攻马' | '防御马',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank: 'A', type: '装备牌', subtype };
 }
 
@@ -60,7 +65,7 @@ describe('马匹技能', () => {
     expect(harness.state.players[0].vars['距离/进攻修正']).toBe(1);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].equipment['进攻马']).toBe('h1');
       expect(v.players[0].handCount).toBe(0);
     });

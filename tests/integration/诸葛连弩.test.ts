@@ -13,10 +13,7 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
 import { slashMax, slashUsed } from '../../src/engine/slash-quota';
 import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -52,7 +49,15 @@ function makePlayer(opts: {
   };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = '7', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌', subtype?: string, range?: number): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = '7',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+  subtype?: string,
+  range?: number,
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type, subtype, range };
 }
 
@@ -69,7 +74,13 @@ describe('诸葛连弩:连续出杀 slashMax=Infinity', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [zhuge.id], equipment: {}, skills: ['杀', '装备通用'] }),
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [zhuge.id],
+          equipment: {},
+          skills: ['杀', '装备通用'],
+        }),
         makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
       ],
       cardMap: { [zhuge.id]: zhuge },
@@ -108,7 +119,8 @@ describe('诸葛连弩:连续出杀 slashMax=Infinity', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, slash1.id, slash2.id, slash3.id],
           equipment: {},
           skills: ['杀', '装备通用'],
@@ -190,7 +202,8 @@ describe('诸葛连弩:连续出杀 slashMax=Infinity', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [slash1.id, slash2.id],
           equipment: {},
           skills: ['杀'],
@@ -258,7 +271,8 @@ describe('诸葛连弩:上限提供者(∞) + 连续出杀 + 卸载', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, slash1.id, slash2.id],
           skills: ['杀', '装备通用', '诸葛连弩'],
         }),
@@ -309,7 +323,8 @@ describe('诸葛连弩:上限提供者(∞) + 连续出杀 + 卸载', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, sword.id],
           skills: ['杀', '装备通用', '诸葛连弩', '青釭剑'],
         }),
@@ -356,7 +371,8 @@ describe('诸葛连弩:上限提供者(∞) + 连续出杀 + 卸载', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, sword.id, slash1.id, slash2.id],
           skills: ['杀', '装备通用', '诸葛连弩', '青釭剑'],
         }),
@@ -389,6 +405,10 @@ describe('诸葛连弩:上限提供者(∞) + 连续出杀 + 卸载', () => {
     expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
 
     // 第二张杀:usedCount(1) >= 上限(1) → 被拒(关键修复点)
-    await P0.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: slash2.id, targets: [1] } });
+    await P0.expectRejected({
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: slash2.id, targets: [1] },
+    });
   });
 });

@@ -10,10 +10,21 @@ function makeBaseline(viewer: number): GameView {
     currentPlayerIndex: viewer,
     phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
-    players: [{
-      index: viewer, name: 'P0', character: '刘备', health: 4, maxHealth: 4,
-      alive: true, equipment: {}, skills: ['仁德'], handCount: 4, hand: [], marks: [],
-    }],
+    players: [
+      {
+        index: viewer,
+        name: 'P0',
+        character: '刘备',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: ['仁德'],
+        handCount: 4,
+        hand: [],
+        marks: [],
+      },
+    ],
     cardMap: {},
     pending: null,
     deadline: null,
@@ -39,8 +50,10 @@ describe('applyServerMessage', () => {
     const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 0 });
     // 使用 加标签 atom——无 applyView 副作用，viewReducer 安全跳过，不抛错
     const evt = {
-      type: 'event', seq: 1, timestamp: 100,
-      view: { type: '加标签', player: 0, tag: 'test' } as any,
+      type: 'event',
+      seq: 1,
+      timestamp: 100,
+      view: { type: '加标签', player: 0, tag: 'test' },
     } as ServerMessage;
     const out = applyServerMessage(start.view, start.lastSeq, evt);
     expect(out.lastSeq).toBe(1);
@@ -50,13 +63,17 @@ describe('applyServerMessage', () => {
   it('event 的 notify pendingResolved 清除匹配本座次的 pending', () => {
     const baseline = makeBaseline(0);
     baseline.pending = {
-      type: 'awaits', atom: { type: '询问闪', player: 0 } as any,
+      type: 'awaits',
+      atom: { type: '询问闪', player: 0 } as any,
       prompt: { type: 'useCard', cardFilter: { filter: () => true } } as any,
-      target: 0, isBlocking: true,
+      target: 0,
+      isBlocking: true,
     };
     const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 0 });
     const evt = {
-      type: 'event', seq: 1, timestamp: 100,
+      type: 'event',
+      seq: 1,
+      timestamp: 100,
       notify: { skillId: '', eventType: 'pendingResolved', data: { target: 0 } },
     } as ServerMessage;
     const out = applyServerMessage(start.view, start.lastSeq, evt);
@@ -67,7 +84,9 @@ describe('applyServerMessage', () => {
     const baseline = makeBaseline(0);
     const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 0 });
     const evt = {
-      type: 'event', seq: 1, timestamp: 100,
+      type: 'event',
+      seq: 1,
+      timestamp: 100,
       deadline: { deadline: 9999, totalMs: 30000 },
     } as ServerMessage;
     const out = applyServerMessage(start.view, start.lastSeq, evt);
@@ -84,7 +103,12 @@ describe('applyServerMessage', () => {
   });
 
   it('room_joined 更新 playerId', () => {
-    const out = applyServerMessage(null, 0, { type: 'room_joined', roomId: 'r1', playerId: 'pid-1', seatIndex: 0 });
+    const out = applyServerMessage(null, 0, {
+      type: 'room_joined',
+      roomId: 'r1',
+      playerId: 'pid-1',
+      seatIndex: 0,
+    });
     expect(out.playerId).toBe('pid-1');
     expect(out.seatIndex).toBe(0);
   });

@@ -79,8 +79,11 @@ describe('摸牌:牌堆不足时重洗弃牌堆补充', () => {
       expect(remaining).not.toContain(id);
     }
     // 牌总数守恒:手牌增量 + (deck+discard+processing) 增量 = 0
-    const totalNow = state.zones.deck.length + state.zones.discardPile.length + state.zones.processing.length
-      + state.players.reduce((s, p) => s + p.hand.length, 0);
+    const totalNow =
+      state.zones.deck.length +
+      state.zones.discardPile.length +
+      state.zones.processing.length +
+      state.players.reduce((s, p) => s + p.hand.length, 0);
     expect(totalNow).toBe(3); // d1+p1+p2 共 3 张
   });
 
@@ -126,9 +129,11 @@ describe('摸牌:牌堆不足时重洗弃牌堆补充', () => {
     });
     await harness.setup(state);
 
-    const handBefore = state.players[0].hand.length;
+    const _handBefore = state.players[0].hand.length;
     // total=2 < count=5 → validate 抛出异常
-    await expect(applyAtom(state, { type: '摸牌', player: 0, count: 5 })).rejects.toThrow('no cards available');
+    await expect(applyAtom(state, { type: '摸牌', player: 0, count: 5 })).rejects.toThrow(
+      'no cards available',
+    );
   });
 
   // ─── 4. 牌堆充足不触发重洗 ─────────────────────
@@ -164,7 +169,13 @@ describe('摸牌:牌堆不足时重洗弃牌堆补充', () => {
       const mk = (id: string, n: string) => makeCard(id, n);
       const s: GameState = createGameState({
         players: [makePlayer({ index: 0, name: 'P1' }), makePlayer({ index: 1, name: 'P2' })],
-        cardMap: { a: mk('a', '杀'), b: mk('b', '闪'), c: mk('c', '桃'), d: mk('d', '杀'), e: mk('e', '闪') },
+        cardMap: {
+          a: mk('a', '杀'),
+          b: mk('b', '闪'),
+          c: mk('c', '桃'),
+          d: mk('d', '杀'),
+          e: mk('e', '闪'),
+        },
         // deck 非空('a')→ harness.setup 不会自动填牌
         zones: { deck: ['a'], discardPile: ['b', 'c', 'd', 'e'], processing: [] },
         currentPlayerIndex: 0,
@@ -264,7 +275,7 @@ describe('重洗 / 洗牌 atom 单元', () => {
     const state: GameState = createGameState({
       players: [makePlayer({ index: 0, name: 'P1' }), makePlayer({ index: 1, name: 'P2' })],
       cardMap,
-      zones: { deck: cards.map(c => c.id), discardPile: [], processing: [] },
+      zones: { deck: cards.map((c) => c.id), discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '摸牌',
       turn: { round: 1, phase: '摸牌', vars: {} },

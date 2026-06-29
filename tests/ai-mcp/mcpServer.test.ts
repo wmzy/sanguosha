@@ -1,6 +1,11 @@
 // tests/ai-mcp/mcpServer.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { handleMcpRequest, PLAY_TOOL, SKILL_INFO_TOOL, type McpHandlerContext } from '../../src/ai-mcp/mcpServer';
+import {
+  handleMcpRequest,
+  PLAY_TOOL,
+  SKILL_INFO_TOOL,
+  type McpHandlerContext,
+} from '../../src/ai-mcp/mcpServer';
 import '../../src/engine/skills';
 import type { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
 
@@ -37,7 +42,7 @@ describe('handleMcpRequest', () => {
   it('tools/list 返回 play 与 getSkillInfo 工具定义', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, ctx);
-    const tools = (res!.result as { tools: typeof PLAY_TOOL[] }).tools;
+    const tools = (res!.result as { tools: (typeof PLAY_TOOL)[] }).tools;
     expect(tools).toHaveLength(2);
     expect(tools.map((t) => t.name)).toEqual(['play', 'getSkillInfo']);
     expect(tools[0].inputSchema).toBeDefined();
@@ -48,13 +53,27 @@ describe('handleMcpRequest', () => {
   it('tools/call play 执行 action 并返回结构化结果', async () => {
     const hgc = makeFakeHgc();
     const ctx = makeCtx(hgc);
-    const action = { skillId: '杀', actionType: 'use', ownerId: 0, params: { cardId: 'c1', targets: [1] }, baseSeq: 0 };
+    const action = {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: 'c1', targets: [1] },
+      baseSeq: 0,
+    };
     const res = await handleMcpRequest(
-      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'play', arguments: { action } } },
+      {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'play', arguments: { action } },
+      },
       ctx,
     );
     expect(hgc.sendAction).toHaveBeenCalledWith(action);
-    const result = res!.result as { content: { text: string }[]; structuredContent: { lastActionResult: string } };
+    const result = res!.result as {
+      content: { text: string }[];
+      structuredContent: { lastActionResult: string };
+    };
     expect(result.content[0].text).toBeTypeOf('string');
     expect(result.structuredContent.lastActionResult).toBe('accepted');
   });
@@ -62,10 +81,18 @@ describe('handleMcpRequest', () => {
   it('tools/call getSkillInfo 返回技能描述(结构化 + text)', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest(
-      { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'getSkillInfo', arguments: { names: ['杀', '制衡'] } } },
+      {
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'tools/call',
+        params: { name: 'getSkillInfo', arguments: { names: ['杀', '制衡'] } },
+      },
       ctx,
     );
-    const result = res!.result as { content: { text: string }[]; structuredContent: { skills: { name: string; description: string | null }[] } };
+    const result = res!.result as {
+      content: { text: string }[];
+      structuredContent: { skills: { name: string; description: string | null }[] };
+    };
     const sc = result.structuredContent;
     expect(sc.skills).toHaveLength(2);
     expect(sc.skills[0]).toMatchObject({ name: '杀' });
@@ -78,10 +105,17 @@ describe('handleMcpRequest', () => {
   it('getSkillInfo 对不存在的名称返回 description null', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest(
-      { jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'getSkillInfo', arguments: { names: ['__无此技能__'] } } },
+      {
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'tools/call',
+        params: { name: 'getSkillInfo', arguments: { names: ['__无此技能__'] } },
+      },
       ctx,
     );
-    const result = res!.result as { structuredContent: { skills: { name: string; description: null }[] } };
+    const result = res!.result as {
+      structuredContent: { skills: { name: string; description: null }[] };
+    };
     expect(result.structuredContent.skills).toEqual([{ name: '__无此技能__', description: null }]);
   });
 
@@ -89,7 +123,12 @@ describe('handleMcpRequest', () => {
     const ensureStarted = vi.fn();
     const ctx = makeCtx(makeFakeHgc(), ensureStarted);
     await handleMcpRequest(
-      { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'play', arguments: { startGame: true } } },
+      {
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: { name: 'play', arguments: { startGame: true } },
+      },
       ctx,
     );
     expect(ensureStarted).toHaveBeenCalledTimes(1);
@@ -100,21 +139,51 @@ describe('handleMcpRequest', () => {
     const ensureStarted = vi.fn();
     const ctx = makeCtx(makeFakeHgc(), ensureStarted);
     await handleMcpRequest(
-      { jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'play', arguments: { startGame: { mode: 'multiplayer', roomId: 'ABC123', playerId: 'ai-1' } } } },
+      {
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: {
+          name: 'play',
+          arguments: { startGame: { mode: 'multiplayer', roomId: 'ABC123', playerId: 'ai-1' } },
+        },
+      },
       ctx,
     );
     expect(ensureStarted).toHaveBeenCalledTimes(1);
-    expect(ensureStarted).toHaveBeenCalledWith({ mode: 'multiplayer', roomId: 'ABC123', name: undefined, maxPlayers: undefined, playerId: 'ai-1', readyTimeoutMs: undefined });
+    expect(ensureStarted).toHaveBeenCalledWith({
+      mode: 'multiplayer',
+      roomId: 'ABC123',
+      name: undefined,
+      maxPlayers: undefined,
+      playerId: 'ai-1',
+      readyTimeoutMs: undefined,
+    });
   });
 
   it('startGame={mode:multiplayer} 建房模式(无 roomId)', async () => {
     const ensureStarted = vi.fn();
     const ctx = makeCtx(makeFakeHgc(), ensureStarted);
     await handleMcpRequest(
-      { jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'play', arguments: { startGame: { mode: 'multiplayer', name: '测试房', maxPlayers: 4 } } } },
+      {
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: {
+          name: 'play',
+          arguments: { startGame: { mode: 'multiplayer', name: '测试房', maxPlayers: 4 } },
+        },
+      },
       ctx,
     );
-    expect(ensureStarted).toHaveBeenCalledWith({ mode: 'multiplayer', roomId: undefined, name: '测试房', maxPlayers: 4, playerId: undefined, readyTimeoutMs: undefined });
+    expect(ensureStarted).toHaveBeenCalledWith({
+      mode: 'multiplayer',
+      roomId: undefined,
+      name: '测试房',
+      maxPlayers: 4,
+      playerId: undefined,
+      readyTimeoutMs: undefined,
+    });
   });
 
   it('未知工具返回 error', async () => {
@@ -129,7 +198,10 @@ describe('handleMcpRequest', () => {
 
   it('通知（无 id）返回 null', async () => {
     const ctx = makeCtx(makeFakeHgc());
-    const res = await handleMcpRequest({ jsonrpc: '2.0', method: 'notifications/initialized' }, ctx);
+    const res = await handleMcpRequest(
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+      ctx,
+    );
     expect(res).toBeNull();
   });
 

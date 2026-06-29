@@ -26,8 +26,12 @@ export function DebugInfo({ view, perspectiveName, pending }: DebugInfoProps) {
     <details className={styles.debugPanel}>
       <summary className={styles.debugSummary}>调试信息</summary>
       <div className={styles.debugContent}>
-        <div>phase: {view.phase} | round: {view.turn.round} | currentPlayer: {currentPlayerName}</div>
-        <div>viewer: {view.players[view.viewer].name} | perspective: {perspectiveName}</div>
+        <div>
+          phase: {view.phase} | round: {view.turn.round} | currentPlayer: {currentPlayerName}
+        </div>
+        <div>
+          viewer: {view.players[view.viewer].name} | perspective: {perspectiveName}
+        </div>
         <div>pending: {pending ? `${pending.prompt.title} → ${pending.target}` : 'none'}</div>
         <hr className={styles.debugHr} />
         {view.players.map((p, i) => (
@@ -38,10 +42,13 @@ export function DebugInfo({ view, perspectiveName, pending }: DebugInfoProps) {
             </span>
             <span> 手牌:{p.handCount}</span>
             {Object.entries(p.equipment).map(([slot, cardId]) => (
-              <span key={slot}> [{slot}:{equipName(view.cardMap, cardId as string)}]</span>
+              <span key={slot}>
+                {' '}
+                [{slot}:{equipName(view.cardMap, cardId)}]
+              </span>
             ))}
-            {p.skills.filter(s => !DEFAULT_SKILLS.has(s)).length > 0 && (
-              <span> 技能:{p.skills.filter(s => !DEFAULT_SKILLS.has(s)).join(',')}</span>
+            {p.skills.filter((s) => !DEFAULT_SKILLS.has(s)).length > 0 && (
+              <span> 技能:{p.skills.filter((s) => !DEFAULT_SKILLS.has(s)).join(',')}</span>
             )}
           </div>
         ))}

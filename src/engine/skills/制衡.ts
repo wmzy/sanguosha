@@ -3,7 +3,7 @@
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -16,12 +16,17 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
     (state: GameState, params: Record<string, Json>) => {
       // 兼容 cardIds 数组和单数 cardId(前端 handlePlayCard 发 cardId)
-      const cardIds = (params.cardIds as string[] | undefined)
-        ?? (typeof params.cardId === 'string' ? [params.cardId as string] : undefined);
-      if (!Array.isArray(cardIds) || cardIds.length === 0) return 'cardIds required (at least 1)';;
+      const cardIds =
+        (params.cardIds as string[] | undefined) ??
+        (typeof params.cardId === 'string' ? [params.cardId] : undefined);
+      if (!Array.isArray(cardIds) || cardIds.length === 0) return 'cardIds required (at least 1)';
       if (state.players[ownerId].vars['制衡/usedThisTurn']) return '本回合已使用过制衡';
       const self = state.players[ownerId];
       if (!self) return 'player not found';
@@ -41,12 +46,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
       state.players[ownerId].vars['制衡/usedThisTurn'] = true;
       // 同步限一次标记到 view:前端据此立即禁用制衡按钮。紧跟标记设置投影,
       // vars 已同步设(防 dispatch 重入),此处仅同步 view。
-      await applyAtom(state, { type: '回合用量', player: ownerId, key: '制衡/usedThisTurn', value: true });
+      await applyAtom(state, {
+        type: '回合用量',
+        player: ownerId,
+        key: '制衡/usedThisTurn',
+        value: true,
+      });
       const from = ownerId;
       await pushFrame(state, '制衡', from, { ...params });
       // 兼容 cardId 单数和 cardIds 数组,与 validate 中的逻辑一致
-      const cardIds = (params.cardIds as string[] | undefined)
-        ?? (typeof params.cardId === 'string' ? [params.cardId as string] : []);
+      const cardIds =
+        (params.cardIds as string[] | undefined) ??
+        (typeof params.cardId === 'string' ? [params.cardId] : []);
       // 弃置 N 张
       await applyAtom(state, { type: '弃置', player: from, cardIds });
       // 摸 N 张
@@ -71,9 +82,9 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
       minTotal: 1,
       maxTotal: 99,
     },
-    activeWhen: (ctx) => defaultPlayActive(ctx)
-      && !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['制衡/usedThisTurn'],
+    activeWhen: (ctx) =>
+      defaultPlayActive(ctx) &&
+      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['制衡/usedThisTurn'],
   });
   return () => {};
 }
-

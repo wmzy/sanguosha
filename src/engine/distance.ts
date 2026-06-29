@@ -22,9 +22,9 @@ function seatDistance(aliveCount: number, fromIdx: number, toIdx: number): numbe
  *   vars['距离/防御修正'] — 防御马等增加距离的技能(正值=增加)
  */
 export function effectiveDistance(state: GameState, from: number, to: number): number {
-  const alive = state.players.filter(p => p.alive);
-  const aliveFrom = alive.findIndex(p => p.index === from);
-  const aliveTo = alive.findIndex(p => p.index === to);
+  const alive = state.players.filter((p) => p.alive);
+  const aliveFrom = alive.findIndex((p) => p.index === from);
+  const aliveTo = alive.findIndex((p) => p.index === to);
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   let dist = seatDistance(alive.length, aliveFrom, aliveTo);
   // 进攻修正:缩短距离(进攻马/马术)

@@ -21,7 +21,11 @@ const fullReady2p: RoomState = {
  *   - sendStartGame 后：phase→playing（模拟开局）
  * 这样 lobby 的同步轮询 getter 能自然推进，无需手动控时。
  */
-function makeFakeHgc(opts: { playerId: string; roomId: string; isHost: boolean }): HeadlessGameClient {
+function makeFakeHgc(opts: {
+  playerId: string;
+  roomId: string;
+  isHost: boolean;
+}): HeadlessGameClient {
   const state = {
     _joined: false,
     _ready: false,
@@ -32,22 +36,38 @@ function makeFakeHgc(opts: { playerId: string; roomId: string; isHost: boolean }
   };
   const host = opts.isHost ? opts.playerId : 'someone-else';
   return {
-    get playerId() { return state._joined ? state._playerId : null; },
-    get roomId() { return state._roomId; },
-    get roomState() { return state._roomState; },
-    get phase() { return (state._started ? 'playing' : 'lobby') as ClientPhase; },
-    createRoom: vi.fn(() => { state._joined = true; }),
-    joinRoom: vi.fn(() => { state._joined = true; }),
+    get playerId() {
+      return state._joined ? state._playerId : null;
+    },
+    get roomId() {
+      return state._roomId;
+    },
+    get roomState() {
+      return state._roomState;
+    },
+    get phase() {
+      return (state._started ? 'playing' : 'lobby') as ClientPhase;
+    },
+    createRoom: vi.fn(() => {
+      state._joined = true;
+    }),
+    joinRoom: vi.fn(() => {
+      state._joined = true;
+    }),
     sendReady: vi.fn(() => {
       state._ready = true;
       // 模拟服务端广播全员就绪
       state._roomState = { ...fullReady2p, hostId: host };
       // 非房主:模拟远程房主随后开局(异步推进 phase→playing)
       if (!opts.isHost) {
-        setTimeout(() => { state._started = true; }, 20);
+        setTimeout(() => {
+          state._started = true;
+        }, 20);
       }
     }),
-    sendStartGame: vi.fn(() => { state._started = true; }),
+    sendStartGame: vi.fn(() => {
+      state._started = true;
+    }),
     disconnect: vi.fn(),
   } as unknown as HeadlessGameClient;
 }
@@ -55,7 +75,12 @@ function makeFakeHgc(opts: { playerId: string; roomId: string; isHost: boolean }
 describe('joinAndStartRoom', () => {
   it('create 模式：建房→准备→房主开局→playing', async () => {
     const hgc = makeFakeHgc({ playerId: 'p-host', roomId: 'ROOM1', isHost: true });
-    const res = await joinAndStartRoom(hgc, { mode: 'create', name: '测试', maxPlayers: 2, readyTimeoutMs: 1000 });
+    const res = await joinAndStartRoom(hgc, {
+      mode: 'create',
+      name: '测试',
+      maxPlayers: 2,
+      readyTimeoutMs: 1000,
+    });
 
     expect(hgc.createRoom).toHaveBeenCalledWith('测试', 2, undefined, undefined);
     expect(hgc.sendReady).toHaveBeenCalled();
@@ -68,7 +93,12 @@ describe('joinAndStartRoom', () => {
 
   it('join 模式：加入→准备→非房主等待开局', async () => {
     const hgc = makeFakeHgc({ playerId: 'p2', roomId: 'ROOM2', isHost: false });
-    const res = await joinAndStartRoom(hgc, { mode: 'join', roomId: 'ROOM2', playerId: 'p2', readyTimeoutMs: 1000 });
+    const res = await joinAndStartRoom(hgc, {
+      mode: 'join',
+      roomId: 'ROOM2',
+      playerId: 'p2',
+      readyTimeoutMs: 1000,
+    });
 
     expect(hgc.joinRoom).toHaveBeenCalledWith('ROOM2', 'p2');
     expect(hgc.sendReady).toHaveBeenCalled();

@@ -21,11 +21,24 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
-function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物', rank = 'A', range?: number): Card {
+function makeEquip(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物',
+  rank = 'A',
+  range?: number,
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
@@ -90,7 +103,7 @@ describe('制衡', () => {
     expect(harness.state.zones.deck).toEqual([]);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].handCount).toBe(1);
       expect(v.pending).toBeNull();
     });
@@ -138,7 +151,7 @@ describe('制衡', () => {
     const d2 = makeCard('d2', '闪', '♥', '7');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [], equipment: { '武器': 'w1', '防具': 'a1' } }),
+        makePlayer({ index: 0, name: 'P1', hand: [], equipment: { 武器: 'w1', 防具: 'a1' } }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
       cardMap: { w1: weapon, a1: armor, d1, d2 },
@@ -169,7 +182,7 @@ describe('制衡', () => {
     const d2 = makeCard('d2', '杀', '♠', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], equipment: { '武器': 'w1' } }),
+        makePlayer({ index: 0, name: 'P1', hand: ['c1'], equipment: { 武器: 'w1' } }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
       cardMap: { c1, w1: weapon, d1, d2 },
@@ -208,7 +221,7 @@ describe('制衡', () => {
     const P1 = harness.player('P1');
 
     const actions = P1.availableActions();
-    const zhiheng = actions.find(a => a.skillId === '制衡' && a.actionType === 'use');
+    const zhiheng = actions.find((a) => a.skillId === '制衡' && a.actionType === 'use');
     expect(zhiheng).toBeDefined();
     expect(zhiheng!.label).toBe('制衡');
     expect(zhiheng!.prompt.type).toBe('distribute');
@@ -248,7 +261,9 @@ describe('制衡', () => {
 
     // 第二次:拒绝(限一次)
     await P1.expectRejected({
-      skillId: '制衡', actionType: 'use', params: { cardIds: ['c2'] },
+      skillId: '制衡',
+      actionType: 'use',
+      params: { cardIds: ['c2'] },
     });
   });
 
@@ -279,9 +294,21 @@ describe('制衡', () => {
 
     const seq0 = state.seq;
     // 连发:第一次 dispatch(同步部分含 execute1 同步到首个 await),紧接着第二次。
-    void engineDispatch(state, { skillId: '制衡', actionType: 'use', ownerId: 0, baseSeq: seq0, params: { cardIds: ['c1'] } });
+    void engineDispatch(state, {
+      skillId: '制衡',
+      actionType: 'use',
+      ownerId: 0,
+      baseSeq: seq0,
+      params: { cardIds: ['c1'] },
+    });
     const seqAfterFirst = state.seq; // execute1 同步部分跑完后 seq 已递增
-    void engineDispatch(state, { skillId: '制衡', actionType: 'use', ownerId: 0, baseSeq: seqAfterFirst, params: { cardIds: ['c2'] } });
+    void engineDispatch(state, {
+      skillId: '制衡',
+      actionType: 'use',
+      ownerId: 0,
+      baseSeq: seqAfterFirst,
+      params: { cardIds: ['c2'] },
+    });
     const seqAfterSecond = state.seq;
     await harness.waitForStable();
 
@@ -310,7 +337,9 @@ describe('制衡', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '制衡', actionType: 'use', params: { cardIds: [] },
+      skillId: '制衡',
+      actionType: 'use',
+      params: { cardIds: [] },
     });
   });
 
@@ -331,7 +360,9 @@ describe('制衡', () => {
 
     // P1 想制衡 P2 的牌 → 拒绝
     await P1.expectRejected({
-      skillId: '制衡', actionType: 'use', params: { cardIds: ['c1'] },
+      skillId: '制衡',
+      actionType: 'use',
+      params: { cardIds: ['c1'] },
     });
   });
 
@@ -350,7 +381,9 @@ describe('制衡', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '制衡', actionType: 'use', params: { cardIds: ['nonexistent'] },
+      skillId: '制衡',
+      actionType: 'use',
+      params: { cardIds: ['nonexistent'] },
     });
   });
 

@@ -23,18 +23,46 @@ function makeView(equipment: Record<string, string>): GameView {
     turn: { round: 1, phase: '出牌', vars: {} },
     players: [
       {
-        index: 0, name: 'P1', character: '孙权', health: 4, maxHealth: 4, alive: true,
-        skills: [], equipment, handCount: 0, marks: [],
+        index: 0,
+        name: 'P1',
+        character: '孙权',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        skills: [],
+        equipment,
+        handCount: 0,
+        marks: [],
       },
       {
-        index: 1, name: 'P2', character: '曹操', health: 4, maxHealth: 4, alive: true,
-        skills: [], equipment: {}, handCount: 0, marks: [],
+        index: 1,
+        name: 'P2',
+        character: '曹操',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        skills: [],
+        equipment: {},
+        handCount: 0,
+        marks: [],
       },
     ],
     cardMap: {
-      wp1: { id: 'wp1', name: '诸葛连弩', suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype: '武器' },
+      wp1: {
+        id: 'wp1',
+        name: '诸葛连弩',
+        suit: '♠',
+        color: '黑',
+        rank: 'A',
+        type: '装备牌',
+        subtype: '武器',
+      },
     },
-    pending: null, deadline: null, deadlineTotalMs: 0, log: [], settlementStack: [],
+    pending: null,
+    deadline: null,
+    deadlineTotalMs: 0,
+    log: [],
+    settlementStack: [],
   };
 }
 
@@ -43,8 +71,11 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
       <EquipColumn
-        perspectiveIdx={0} view={view}
-        canOperate skillActions={[]} onSkillAction={() => {}}
+        perspectiveIdx={0}
+        view={view}
+        canOperate
+        skillActions={[]}
+        onSkillAction={() => {}}
       />,
     );
     const node = screen.getByText(/诸葛连弩/);
@@ -57,8 +88,11 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
       <EquipColumn
-        perspectiveIdx={0} view={view}
-        canOperate skillActions={[]} onSkillAction={() => {}}
+        perspectiveIdx={0}
+        view={view}
+        canOperate
+        skillActions={[]}
+        onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set(['wp1'])}
         distSelectedEquipIds={new Set()}
@@ -75,8 +109,11 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
       <EquipColumn
-        perspectiveIdx={0} view={view}
-        canOperate skillActions={[]} onSkillAction={() => {}}
+        perspectiveIdx={0}
+        view={view}
+        canOperate
+        skillActions={[]}
+        onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set(['wp1'])}
         distSelectedEquipIds={new Set(['wp1'])}
@@ -92,8 +129,11 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const clicked: string[] = [];
     render(
       <EquipColumn
-        perspectiveIdx={0} view={view}
-        canOperate skillActions={[]} onSkillAction={() => {}}
+        perspectiveIdx={0}
+        view={view}
+        canOperate
+        skillActions={[]}
+        onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set(['wp1'])}
         distSelectedEquipIds={new Set()}
@@ -108,8 +148,11 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
       <EquipColumn
-        perspectiveIdx={0} view={view}
-        canOperate skillActions={[]} onSkillAction={() => {}}
+        perspectiveIdx={0}
+        view={view}
+        canOperate
+        skillActions={[]}
+        onSkillAction={() => {}}
         isDistributeActive
         distCandidateEquipIds={new Set()} // 候选集为空 → 该装备非候选
         distSelectedEquipIds={new Set()}
@@ -124,8 +167,11 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const view = makeView({});
     render(
       <EquipColumn
-        perspectiveIdx={0} view={view}
-        canOperate skillActions={[]} onSkillAction={() => {}}
+        perspectiveIdx={0}
+        view={view}
+        canOperate
+        skillActions={[]}
+        onSkillAction={() => {}}
       />,
     );
     for (const slot of ['武器', '防具', '进攻马', '防御马', '宝物']) {
@@ -139,8 +185,11 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
       <EquipColumn
-        perspectiveIdx={0} view={view}
-        canOperate skillActions={[]} onSkillAction={() => {}}
+        perspectiveIdx={0}
+        view={view}
+        canOperate
+        skillActions={[]}
+        onSkillAction={() => {}}
       />,
     );
     // 武器槽显示装备名(非占位) → 不显示“武器”占位文本

@@ -7,7 +7,7 @@
 // 八卦阵是"视为出闪"(杀被抵消,触发武器技)。两者由时机 atom 天然区分,
 // 不再共用 询问闪 的 cancel。
 import type { AtomBeforeContext, HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook, type SkillModule } from '../skill';
+import { registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '仁王盾', description: '防具:黑色杀对你无效' };
@@ -15,18 +15,24 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerBeforeHook(state, skill.id, ownerId, '检测有效性', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-    const atom = ctx.atom as { target?: number; cardId?: string };
-    if (atom.target !== ownerId) return;
-    const killCardId = atom.cardId;
-    if (!killCardId) return;
-    const killCard = ctx.state.cardMap[killCardId];
-    if (!killCard || killCard.name !== '杀') return;   // 仅对杀生效(防御未来锦囊复用此 atom)
+  registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '检测有效性',
+    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      const atom = ctx.atom as { target?: number; cardId?: string };
+      if (atom.target !== ownerId) return;
+      const killCardId = atom.cardId;
+      if (!killCardId) return;
+      const killCard = ctx.state.cardMap[killCardId];
+      if (killCard?.name !== '杀') return; // 仅对杀生效(防御未来锦囊复用此 atom)
 
-    // 黑色杀无效:cancel 检测有效性 → 杀.execute 跳过该目标
-    if (killCard.color === '黑') {
-      return { kind: 'cancel' };
-    }
-  });
+      // 黑色杀无效:cancel 检测有效性 → 杀.execute 跳过该目标
+      if (killCard.color === '黑') {
+        return { kind: 'cancel' };
+      }
+    },
+  );
   return () => {};
 }

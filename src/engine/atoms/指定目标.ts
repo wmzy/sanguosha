@@ -32,7 +32,10 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
   toViewLog(event) {
     const target = event.target as number;
     return event.cardId
-      ? { player: event.source as number, text: `使用 ${event.cardName ?? event.cardId} 指定 P${target} 为目标` }
+      ? {
+          player: event.source as number,
+          text: `使用 ${event.cardName ?? event.cardId} 指定 P${target} 为目标`,
+        }
       : { player: event.source as number, text: `指定 P${target} 为目标` };
   },
 };

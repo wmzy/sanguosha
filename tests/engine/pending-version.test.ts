@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, dispatch, applyAtom, registerSkillsFromState } from '../../src/engine/create-engine';
+import {
+  resetForTest,
+  dispatch,
+  applyAtom,
+  registerSkillsFromState,
+} from '../../src/engine/create-engine';
 import { registerAction } from '../../src/engine/skill';
 import { createGameState } from '../../src/engine/types';
-import type { GameState } from '../../src/engine/types';
+
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -13,12 +18,34 @@ describe('pending-scoped 版本控制', () => {
   it('PendingSlot 有 createdSeq 字段，值=创建时 state.seq', async () => {
     const state = createGameState({
       players: [
-        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [] },
+        {
+          index: 0,
+          name: 'p0',
+          character: '测试',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+        },
       ],
-      cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
+      cardMap: {},
+      seq: 7,
+      currentPlayerIndex: 0,
+      phase: '出牌',
     });
-    const p = applyAtom(state, { type: '请求回应', requestType: 'test', target: 0, prompt: { type: 'confirm', title: 't' } });
-    await new Promise(r => setTimeout(r, 50));
+    const p = applyAtom(state, {
+      type: '请求回应',
+      requestType: 'test',
+      target: 0,
+      prompt: { type: 'confirm', title: 't' },
+    });
+    await new Promise((r) => setTimeout(r, 50));
     const slot = state.pendingSlots.get(0);
     expect(slot).toBeDefined();
     // createdSeq 应等于 applyAtom push atomHistory 时递增后的 state.seq
@@ -30,20 +57,46 @@ describe('pending-scoped 版本控制', () => {
   it('respond 携带陈旧的 pendingSeq → dispatch 返回 false', async () => {
     const state = createGameState({
       players: [
-        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [] },
+        {
+          index: 0,
+          name: 'p0',
+          character: '测试',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+        },
       ],
-      cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
+      cardMap: {},
+      seq: 7,
+      currentPlayerIndex: 0,
+      phase: '出牌',
     });
-    const p = applyAtom(state, { type: '请求回应', requestType: 'test', target: 0, prompt: { type: 'confirm', title: 't' } });
-    await new Promise(r => setTimeout(r, 50));
+    const p = applyAtom(state, {
+      type: '请求回应',
+      requestType: 'test',
+      target: 0,
+      prompt: { type: 'confirm', title: 't' },
+    });
+    await new Promise((r) => setTimeout(r, 50));
     const slot = state.pendingSlots.get(0)!;
     // 模拟 slot 被替换(close-reopen)：createdSeq 变了
     slot.createdSeq = 99;
 
     // dispatch respond，pendingSeq=7（旧）但 slot.createdSeq=99 → 拒绝
     const accepted = await dispatch(state, {
-      skillId: '系统规则', actionType: 'test', ownerId: 0,
-      params: {}, baseSeq: 7, pendingSeq: 7,
+      skillId: '系统规则',
+      actionType: 'test',
+      ownerId: 0,
+      params: {},
+      baseSeq: 7,
+      pendingSeq: 7,
     }).catch(() => false);
     expect(accepted).toBe(false);
 
@@ -54,19 +107,44 @@ describe('pending-scoped 版本控制', () => {
   it('respond 不带 pendingSeq → 跳过校验（向后兼容）', async () => {
     const state = createGameState({
       players: [
-        { index: 0, name: 'p0', character: '测试', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [] },
+        {
+          index: 0,
+          name: 'p0',
+          character: '测试',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+        },
       ],
-      cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
+      cardMap: {},
+      seq: 7,
+      currentPlayerIndex: 0,
+      phase: '出牌',
     });
-    const p = applyAtom(state, { type: '请求回应', requestType: 'test', target: 0, prompt: { type: 'confirm', title: 't' } });
-    await new Promise(r => setTimeout(r, 50));
+    const p = applyAtom(state, {
+      type: '请求回应',
+      requestType: 'test',
+      target: 0,
+      prompt: { type: 'confirm', title: 't' },
+    });
+    await new Promise((r) => setTimeout(r, 50));
 
     // 不带 pendingSeq → 不校验（向后兼容）
     // actionType='test' 无 entry → 返回 false 是因为无 entry，不是 pendingSeq
     // 这个测试验证的是"不带 pendingSeq 不报错"
     const accepted = await dispatch(state, {
-      skillId: '系统规则', actionType: 'test', ownerId: 0,
-      params: {}, baseSeq: 7,
+      skillId: '系统规则',
+      actionType: 'test',
+      ownerId: 0,
+      params: {},
+      baseSeq: 7,
     }).catch(() => false);
     // 无 entry → false，但不是因为 pendingSeq
     expect(accepted).toBe(false);
@@ -83,16 +161,36 @@ describe('pending-scoped 版本控制', () => {
     const state = createGameState({
       players: [
         {
-          index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
-          hand: [], equipment: {},
+          index: 0,
+          name: 'P0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
         },
         {
-          index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
-          hand: ['d1'], equipment: {},
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: ['d1'],
+          equipment: {},
           skills: ['回合管理', '过河拆桥', '无懈可击'],
-          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
         },
       ],
       cardMap: {
@@ -107,19 +205,43 @@ describe('pending-scoped 版本控制', () => {
     // 给双方各一张无懈可击
     const nullif0Id = 'wx0';
     const nullif1Id = 'wx1';
-    state.cardMap[nullif0Id] = { id: nullif0Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
-    state.cardMap[nullif1Id] = { id: nullif1Id, name: '无懈可击', suit: '♠', color: '黑', rank: 'K', type: '锦囊牌' };
+    state.cardMap[nullif0Id] = {
+      id: nullif0Id,
+      name: '无懈可击',
+      suit: '♠',
+      color: '黑',
+      rank: 'J',
+      type: '锦囊牌',
+    };
+    state.cardMap[nullif1Id] = {
+      id: nullif1Id,
+      name: '无懈可击',
+      suit: '♠',
+      color: '黑',
+      rank: 'K',
+      type: '锦囊牌',
+    };
     state.players[0].hand.push(nullif0Id);
     state.players[1].hand.push(nullif1Id);
 
     // P0 出过河拆桥 → 无懈窗口 W1
     const gqId = 'gq1';
-    state.cardMap[gqId] = { id: gqId, name: '过河拆桥', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' };
+    state.cardMap[gqId] = {
+      id: gqId,
+      name: '过河拆桥',
+      suit: '♠',
+      color: '黑',
+      rank: '3',
+      type: '锦囊牌',
+    };
     state.players[0].hand.push(gqId);
 
     await dispatchAndWait(state, {
-      skillId: '过河拆桥', actionType: 'use', ownerId: 0,
-      params: { cardId: gqId, targets: [1] }, baseSeq: state.seq,
+      skillId: '过河拆桥',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: gqId, targets: [1] },
+      baseSeq: state.seq,
     });
 
     // W1 创建完成
@@ -129,8 +251,11 @@ describe('pending-scoped 版本控制', () => {
 
     // P1 出无懈可击 → W1 close, W2 open
     await dispatchAndWait(state, {
-      skillId: '无懈可击', actionType: 'respond', ownerId: 1,
-      params: { cardId: nullif1Id }, baseSeq: state.seq,
+      skillId: '无懈可击',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { cardId: nullif1Id },
+      baseSeq: state.seq,
     });
 
     // W2 创建完成，createdSeq != W1
@@ -140,15 +265,23 @@ describe('pending-scoped 版本控制', () => {
 
     // P0 用 W1 的旧 pendingSeq 尝试 respond → 被拒绝
     const rejected = await dispatch(state, {
-      skillId: '无懈可击', actionType: 'respond', ownerId: 0,
-      params: { cardId: nullif0Id }, baseSeq: state.seq, pendingSeq: w1Seq,
+      skillId: '无懈可击',
+      actionType: 'respond',
+      ownerId: 0,
+      params: { cardId: nullif0Id },
+      baseSeq: state.seq,
+      pendingSeq: w1Seq,
     });
     expect(rejected).toBe(false);
 
     // P0 用 W2 的正确 pendingSeq respond → 成功
     const accepted = await dispatch(state, {
-      skillId: '无懈可击', actionType: 'respond', ownerId: 0,
-      params: { cardId: nullif0Id }, baseSeq: state.seq, pendingSeq: w2.createdSeq,
+      skillId: '无懈可击',
+      actionType: 'respond',
+      ownerId: 0,
+      params: { cardId: nullif0Id },
+      baseSeq: state.seq,
+      pendingSeq: w2.createdSeq,
     });
     expect(accepted).toBe(true);
 
@@ -171,20 +304,41 @@ describe('pending-scoped 版本控制', () => {
     const state = createGameState({
       players: [
         {
-          index: 0, name: 'p0', character: '', health: 4, maxHealth: 4, alive: true,
-          hand: [], equipment: {}, skills: [],
-          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+          index: 0,
+          name: 'p0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
         },
       ],
-      cardMap: {}, seq: 7, currentPlayerIndex: 0, phase: '出牌',
+      cardMap: {},
+      seq: 7,
+      currentPlayerIndex: 0,
+      phase: '出牌',
     });
 
     // 注册一个轻量测试 action：validate 永过、execute 空，专为验证 pendingSeq 校验路径
-    const unregister = registerAction(state, '测试', 0, 'probe', () => null, async () => {});
+    const unregister = registerAction(
+      state,
+      '测试',
+      0,
+      'probe',
+      () => null,
+      async () => {},
+    );
 
     // 建一个出牌窗口(非阻塞 pending)
     const windowP = applyAtom(state, { type: '出牌窗口', player: 0, timeout: 50 });
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     const slot = state.pendingSlots.get(0)!;
     expect(slot.isBlocking).toBe(false);
 
@@ -194,8 +348,12 @@ describe('pending-scoped 版本控制', () => {
     // 主动 action 路径：oldSlot 存在但 isBlocking===false → 守卫跳过 pendingSeq 校验
     // 旧逻辑(无 isBlocking 守卫)会在此 rollback 返回 false；新逻辑应返回 true。
     const accepted = await dispatch(state, {
-      skillId: '测试', actionType: 'probe', ownerId: 0,
-      params: {}, baseSeq: state.seq, pendingSeq: 7, // 故意与 createdSeq=999 不匹配
+      skillId: '测试',
+      actionType: 'probe',
+      ownerId: 0,
+      params: {},
+      baseSeq: state.seq,
+      pendingSeq: 7, // 故意与 createdSeq=999 不匹配
     }).catch(() => false);
     expect(accepted).toBe(true);
 

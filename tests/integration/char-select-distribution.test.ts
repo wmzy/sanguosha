@@ -71,8 +71,10 @@ async function respondCharSelect(state: GameState, target: number, character: st
 }
 
 /** 取当前选将 slot 的候选人名 */
-function slotCandidates(slot: GameState['pendingSlots'] extends Map<unknown, infer V> ? V : never): string[] {
-  return (slot.atom as { candidates: Array<{ name: string }> }).candidates.map(c => c.name);
+function slotCandidates(
+  slot: GameState['pendingSlots'] extends Map<unknown, infer V> ? V : never,
+): string[] {
+  return (slot.atom as { candidates: Array<{ name: string }> }).candidates.map((c) => c.name);
 }
 
 describe('选将分配:按身份发放 + 候选池入池', () => {
@@ -81,12 +83,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
   beforeEach(() => {
     resetForTest();
     state = createGameState({
-      players: [
-        makePlayer(0, 'P1'),
-        makePlayer(1, 'P2'),
-        makePlayer(2, 'P3'),
-        makePlayer(3, 'P4'),
-      ],
+      players: [makePlayer(0, 'P1'), makePlayer(1, 'P2'), makePlayer(2, 'P3'), makePlayer(3, 'P4')],
       cardMap: {},
     });
     for (let i = 0; i < 40; i++) {
@@ -101,7 +98,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     const pool = makeLordMixedPool(25);
     void bootstrap(state, { characters: pool, playerCount: 4, seed: 1, gameId: 't' });
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
@@ -113,7 +110,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     const lordCand = slotCandidates(lordSlot);
     expect(lordCand.length).toBe(7);
     // 主公候选拆分:恰好 5 个常备主公 + 2 个非常备(以 isLord / LORD_CANDIDATES 为依据)
-    const lordCount = lordCand.filter(n => isLord(n)).length;
+    const lordCount = lordCand.filter((n) => isLord(n)).length;
     const nonLordCount = lordCand.length - lordCount;
     expect(lordCount).toBe(5);
     expect(nonLordCount).toBe(2);
@@ -142,7 +139,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     const pool = makeBigCharPool(25);
     void bootstrap(state, { characters: pool, playerCount: 4, seed: 2, gameId: 't' });
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
@@ -158,7 +155,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     for (const s of state.pendingSlots.values()) {
       const t = (s.atom as { target: number }).target;
       const id = state.players[t].identity as string;
-      const cnt = slotCandidates(s).length;
+      const _cnt = slotCandidates(s).length;
       identityCount[id] = (identityCount[id] ?? 0) + 1;
       allCandidates.push(...slotCandidates(s));
     }
@@ -188,16 +185,18 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     const pool = makeBigCharPool(25);
     void bootstrap(state, { characters: pool, playerCount: 4, seed: 3, gameId: 't' });
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
     const lordSlot = [...state.pendingSlots.values()][0];
-    const candWithSkills = (lordSlot.atom as {
-      candidates: Array<{ name: string; skills: string[] }>;
-    }).candidates;
+    const candWithSkills = (
+      lordSlot.atom as {
+        candidates: Array<{ name: string; skills: string[] }>;
+      }
+    ).candidates;
     // 每 3 个武将有 1 个带技能,7 个候选人里至少应有携带 skills 字段的
-    const hasSkillsField = candWithSkills.filter(c => Array.isArray(c.skills));
+    const hasSkillsField = candWithSkills.filter((c) => Array.isArray(c.skills));
     expect(hasSkillsField.length).toBe(7); // 都带 skills 字段(可能为空数组)
   }, 10000);
 
@@ -206,17 +205,19 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     const pool = makeBigCharPool(25);
     void bootstrap(state, { characters: pool, playerCount: 4, seed: 4, gameId: 't' });
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
     // 主公选一个带技能的武将(武将0/3/6...带 技能X)
     const lordSlot = [...state.pendingSlots.values()][0];
     const lordTarget = (lordSlot.atom as { target: number }).target;
-    const lordCand = (lordSlot.atom as {
-      candidates: Array<{ name: string; skills: string[] }>;
-    }).candidates;
-    const skilled = lordCand.find(c => c.skills.length > 0)!;
+    const lordCand = (
+      lordSlot.atom as {
+        candidates: Array<{ name: string; skills: string[] }>;
+      }
+    ).candidates;
+    const skilled = lordCand.find((c) => c.skills.length > 0)!;
     await respondCharSelect(state, lordTarget, skilled.name);
     await waitForStable(state);
 
@@ -225,17 +226,17 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     for (const t of state.pendingSlots.keys()) {
       const slot = state.pendingSlots.get(t)!;
       const cand = slotCandidates(slot);
-      const choice = cand.find(c => !taken.has(c))!;
+      const choice = cand.find((c) => !taken.has(c))!;
       taken.add(choice);
       await respondCharSelect(state, t, choice);
     }
 
     // 等 bootstrap 完成
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
     await waitForStable(state);
 
     // 所有玩家 skills 包含 DEFAULT_SKILLS + 各自武将技能
-    const defaultSet = new Set(DEFAULT_SKILLS);
+    const _defaultSet = new Set(DEFAULT_SKILLS);
     for (const p of state.players) {
       // 至少包含默认技能
       for (const ds of DEFAULT_SKILLS) {
@@ -244,7 +245,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
       // 武将自身技能也应写入 player.skills(instantiateSkill 会跳过未注册模块)
       // 选了武将的玩家应有该武将的技能
       if (p.character) {
-        const charSkills = state.players.flatMap(pl => {
+        const _charSkills = state.players.flatMap((_pl) => {
           // 从 pendingSlots 或已 resolve 的 slot 找候选人的 skills
           return [];
         });
@@ -259,7 +260,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     const pool = makeLordMixedPool(25);
     void bootstrap(state, { characters: pool, playerCount: 4, seed: 7, gameId: 't' });
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
@@ -294,10 +295,10 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
       expect(candidatesBefore.get(t)).toContain(assigned);
     }
     // 跨玩家不重复
-    const allChars = state.players.map(p => p.character);
+    const allChars = state.players.map((p) => p.character);
     expect(new Set(allChars).size).toBe(allChars.length);
     // 分配后进入游戏(超时 resolve 所有 slot → bootstrap 继续)
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
     await waitForStable(state);
   }, 10000);
 });

@@ -28,9 +28,10 @@ function makeZhihengAction(): SkillActionDef {
       source: 'handAndEquip',
       minTotal: 1,
       maxTotal: 99,
-    } as DistributePrompt,
-    activeWhen: ctx => defaultPlayActive(ctx)
-      && !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['制衡/usedThisTurn'],
+    },
+    activeWhen: (ctx) =>
+      defaultPlayActive(ctx) &&
+      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['制衡/usedThisTurn'],
   };
 }
 
@@ -44,13 +45,30 @@ function makeView(currentPlayerIndex: number, p0TurnUsage?: Record<string, Json>
     turn: { round: 1, phase: '出牌', vars: {} },
     players: [
       {
-        index: 0, name: 'P0', character: '孙权', health: 4, maxHealth: 4, alive: true,
-        equipment: {}, skills: ['制衡'], handCount: 4, hand: [], marks: [],
+        index: 0,
+        name: 'P0',
+        character: '孙权',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: ['制衡'],
+        handCount: 4,
+        hand: [],
+        marks: [],
         turnUsage: p0TurnUsage ?? {},
       },
       {
-        index: 1, name: 'P1', character: 'X', health: 4, maxHealth: 4, alive: true,
-        equipment: {}, skills: [], handCount: 4, marks: [],
+        index: 1,
+        name: 'P1',
+        character: 'X',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 4,
+        marks: [],
       },
     ],
     cardMap: {},
@@ -62,7 +80,11 @@ function makeView(currentPlayerIndex: number, p0TurnUsage?: Record<string, Json>
   };
 }
 
-function makeParams(view: GameView, skillActions: SkillActionDef[], perspectiveIdx = 0): PlayInteractionParams {
+function makeParams(
+  view: GameView,
+  skillActions: SkillActionDef[],
+  perspectiveIdx = 0,
+): PlayInteractionParams {
   return {
     view,
     perspectiveIdx,
@@ -101,7 +123,11 @@ describe('usePlayInteraction · distribute(主动技)选牌状态自动取消', 
 
     // 玩家点制衡按钮 → 进入选牌状态
     act(() => {
-      result.current.setDistributeMode({ skillId: '制衡', actionType: 'use', prompt: ZHIHENG_PROMPT });
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: ZHIHENG_PROMPT,
+      });
     });
     expect(result.current.distributeMode).not.toBeNull();
     expect(result.current.isDistributeActive).toBe(true);
@@ -117,12 +143,17 @@ describe('usePlayInteraction · distribute(主动技)选牌状态自动取消', 
   it('debug 切换视角到非当前回合玩家后清除制衡选牌状态', () => {
     const action = makeZhihengAction();
     const { result, rerender } = renderHook(
-      ({ view, perspectiveIdx }) => usePlayInteraction(true, true, makeParams(view, [action], perspectiveIdx)),
+      ({ view, perspectiveIdx }) =>
+        usePlayInteraction(true, true, makeParams(view, [action], perspectiveIdx)),
       { initialProps: { view: makeView(0), perspectiveIdx: 0 } },
     );
 
     act(() => {
-      result.current.setDistributeMode({ skillId: '制衡', actionType: 'use', prompt: ZHIHENG_PROMPT });
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: ZHIHENG_PROMPT,
+      });
     });
     expect(result.current.isDistributeActive).toBe(true);
 
@@ -141,7 +172,11 @@ describe('usePlayInteraction · distribute(主动技)选牌状态自动取消', 
     );
 
     act(() => {
-      result.current.setDistributeMode({ skillId: '制衡', actionType: 'use', prompt: ZHIHENG_PROMPT });
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: ZHIHENG_PROMPT,
+      });
     });
     // 仍是 P0 出牌阶段(只是手牌/view 抖动)→ 选牌状态保留
     rerender({ view: makeView(0) });
@@ -157,7 +192,11 @@ describe('usePlayInteraction · distribute(主动技)选牌状态自动取消', 
     );
 
     act(() => {
-      result.current.setDistributeMode({ skillId: '制衡', actionType: 'use', prompt: ZHIHENG_PROMPT });
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: ZHIHENG_PROMPT,
+      });
     });
     expect(result.current.isDistributeActive).toBe(true);
 

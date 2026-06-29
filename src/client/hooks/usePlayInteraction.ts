@@ -16,8 +16,14 @@ import { useState, useCallback, useEffect, type RefObject } from 'react';
 import type { Card, GameView, Json, DistributePrompt, PendingView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
-import { getBroadcastKey } from '../utils/pendingRespond';
-import { buildPlayParams, derivePlayRules, findUseActionForCard, isActiveAction, resolveDistributeCardIds } from '../utils/gameViewHelpers';
+
+import {
+  buildPlayParams,
+  derivePlayRules,
+  findUseActionForCard,
+  isActiveAction,
+  resolveDistributeCardIds,
+} from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
 
 /** 转化模式:点转化技能(武圣/丈八蛇矛)后进入此模式,匹配卡牌显示为转化后的牌 */
@@ -66,7 +72,12 @@ export interface PlayInteractionParams {
   /** pending target 座次 */
   pendingTargetIdx: number;
   /** 发送 action 的底层函数(GameView 的 send) */
-  send: (skillId: string, actionType: string, params: Record<string, Json>, preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>) => void;
+  send: (
+    skillId: string,
+    actionType: string,
+    params: Record<string, Json>,
+    preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>,
+  ) => void;
   /** 手牌列表容器 ref(出牌飞行动画定位用) */
   handListRef: RefObject<HTMLDivElement | null>;
 }
@@ -112,7 +123,9 @@ export interface PlayInteractionResult {
   cancelTransform: () => void;
   cancelSelection: () => void;
   clearDiscard: () => void;
-  setDistributeMode: (mode: { skillId: string; actionType: string; prompt: DistributePrompt } | null) => void;
+  setDistributeMode: (
+    mode: { skillId: string; actionType: string; prompt: DistributePrompt } | null,
+  ) => void;
 }
 
 /**
@@ -125,7 +138,19 @@ export function usePlayInteraction(
   p: PlayInteractionParams,
 ): PlayInteractionResult {
   const { view, perspectiveIdx, perspectiveHand, skillActions } = p;
-  const { pending, isDiscardPhase, discardMin, discardMax, isPerspectiveAwaiting, pendingRespondInfo, broadcastKey, markBroadcastSkipped, pendingTargetIdx, send, handListRef } = p;
+  const {
+    pending,
+    isDiscardPhase,
+    discardMin,
+    discardMax,
+    isPerspectiveAwaiting,
+    pendingRespondInfo,
+    broadcastKey,
+    markBroadcastSkipped,
+    pendingTargetIdx,
+    send,
+    handListRef,
+  } = p;
 
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
 
@@ -135,9 +160,15 @@ export function usePlayInteraction(
   const [selectedKillTarget, setSelectedKillTarget] = useState<string | null>(null);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformMode | null>(null);
-  const [distributeMode, setDistributeMode] = useState<{ skillId: string; actionType: string; prompt: DistributePrompt } | null>(null);
+  const [distributeMode, setDistributeMode] = useState<{
+    skillId: string;
+    actionType: string;
+    prompt: DistributePrompt;
+  } | null>(null);
   const [distSelected, setDistSelected] = useState<Set<string>>(new Set());
-  const [distAllocations, setDistAllocations] = useState<Array<{ target: number; cardIds: string[] }>>([]);
+  const [distAllocations, setDistAllocations] = useState<
+    Array<{ target: number; cardIds: string[] }>
+  >([]);
   const [distTargetName, setDistTargetName] = useState<string | null>(null);
 
   // ─── distribute 上下文(主动技 + 被动遗计共用)───
@@ -149,24 +180,40 @@ export function usePlayInteraction(
       const externalTargetSelection = (prompt.mode ?? 'allocate') === 'allocate';
       return { skillId, actionType, prompt, cardIds, externalTargetSelection };
     }
-    if (isMyAwaiting && pending && pending.prompt.type === 'distribute') {
+    if (isMyAwaiting && pending?.prompt.type === 'distribute') {
       const skillId = pendingRespondInfo?.skillId ?? '系统规则';
-      const cardIds = resolveDistributeCardIds(pending.prompt, perspectiveHand, perspectiveEquipment);
-      return { skillId, actionType: 'respond', prompt: pending.prompt, cardIds, externalTargetSelection: false };
+      const cardIds = resolveDistributeCardIds(
+        pending.prompt,
+        perspectiveHand,
+        perspectiveEquipment,
+      );
+      return {
+        skillId,
+        actionType: 'respond',
+        prompt: pending.prompt,
+        cardIds,
+        externalTargetSelection: false,
+      };
     }
     return null;
   })();
   const isDistributeActive = activeDistribute !== null;
 
   // ─── state 重置 effects ───
-  useEffect(() => { setSelectedForDiscard(new Set()); }, [pending]);
-  const distKey = activeDistribute ? `${activeDistribute.skillId}:${activeDistribute.actionType}:${activeDistribute.prompt.mode ?? 'allocate'}` : '';
+  useEffect(() => {
+    setSelectedForDiscard(new Set());
+  }, [pending]);
+  const distKey = activeDistribute
+    ? `${activeDistribute.skillId}:${activeDistribute.actionType}:${activeDistribute.prompt.mode ?? 'allocate'}`
+    : '';
   useEffect(() => {
     setDistSelected(new Set());
     setDistAllocations([]);
     setDistTargetName(null);
   }, [distKey]);
-  useEffect(() => { setSelectedKillTarget(null); }, [selectedCardId]);
+  useEffect(() => {
+    setSelectedKillTarget(null);
+  }, [selectedCardId]);
 
   // 转化模式自动取消:转化条件(回合/装备/手牌)随 view 变化可能不再满足
   // (如出牌阶段超时回合结束、丈八蛇矛被卸下、手牌不足)。此时若仍停留在转化模式,
@@ -175,7 +222,7 @@ export function usePlayInteraction(
   useEffect(() => {
     if (!transformMode) return;
     const action = skillActions.find(
-      a => a.skillId === transformMode.skillId && a.actionType === transformMode.actionType,
+      (a) => a.skillId === transformMode.skillId && a.actionType === transformMode.actionType,
     );
     if (!action || !isActiveAction(action, { view, perspectiveIdx })) {
       setTransformMode(null);
@@ -192,7 +239,7 @@ export function usePlayInteraction(
   useEffect(() => {
     if (!distributeMode) return;
     const action = skillActions.find(
-      a => a.skillId === distributeMode.skillId && a.actionType === distributeMode.actionType,
+      (a) => a.skillId === distributeMode.skillId && a.actionType === distributeMode.actionType,
     );
     if (!action || !isActiveAction(action, { view, perspectiveIdx })) {
       setDistributeMode(null);
@@ -203,309 +250,449 @@ export function usePlayInteraction(
   }, [distributeMode, view, perspectiveIdx, skillActions]);
 
   // ─── 派生:选中的牌 + use action ───
-  const selectedCard = selectedCardId ? perspectiveHand.find(c => c.id === selectedCardId) ?? null : null;
+  const selectedCard = selectedCardId
+    ? (perspectiveHand.find((c) => c.id === selectedCardId) ?? null)
+    : null;
 
   const selectedUseAction = (() => {
     if (transformMode) {
       // 多卡转化(丈八蛇矛):selectedCardId 为 null,直接用包装牌的 use action
       if (transformMode.minCards > 1) {
-        return skillActions.find(a => a.actionType === 'use' && a.skillId === transformMode.wrapperName);
+        return skillActions.find(
+          (a) => a.actionType === 'use' && a.skillId === transformMode.wrapperName,
+        );
       }
       // 单卡转化(武圣):需选中一张卡
       if (!selectedCard) return undefined;
-      return skillActions.find(a => a.actionType === 'use' && a.skillId === transformMode.wrapperName);
+      return skillActions.find(
+        (a) => a.actionType === 'use' && a.skillId === transformMode.wrapperName,
+      );
     }
     if (!selectedCard) return undefined;
     return findUseActionForCard(skillActions, selectedCard);
   })();
-  const selectedTargetFilter = selectedUseAction?.prompt.type === 'useCardAndTarget'
-    ? selectedUseAction.prompt.targetFilter
-    : null;
+  const selectedTargetFilter =
+    selectedUseAction?.prompt.type === 'useCardAndTarget'
+      ? selectedUseAction.prompt.targetFilter
+      : null;
 
   const playRules = selectedUseAction
-    ? derivePlayRules(selectedTargetFilter, selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget)
+    ? derivePlayRules(
+        selectedTargetFilter,
+        selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget,
+      )
     : null;
-  const selectedActive = selectedUseAction ? isActiveAction(selectedUseAction, { view, perspectiveIdx }) : false;
+  const selectedActive = selectedUseAction
+    ? isActiveAction(selectedUseAction, { view, perspectiveIdx })
+    : false;
 
   const playButtonState = (() => {
     if (!selectedCardId) return null;
-    const card = perspectiveHand.find(c => c.id === selectedCardId);
+    const card = perspectiveHand.find((c) => c.id === selectedCardId);
     if (!card || !selectedUseAction) return null;
-    const rules = derivePlayRules(selectedTargetFilter, selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget);
+    const rules = derivePlayRules(
+      selectedTargetFilter,
+      selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget,
+    );
     let canPlay: boolean;
     let targetLabel: string;
     if (rules.hasSlots) {
       canPlay = !!selectedTarget && !!selectedKillTarget;
-      targetLabel = selectedTarget && selectedKillTarget
-        ? ` → A=${selectedTarget} B=${selectedKillTarget}`
-        : ' (请选 A/B 两个目标)';
+      targetLabel =
+        selectedTarget && selectedKillTarget
+          ? ` → A=${selectedTarget} B=${selectedKillTarget}`
+          : ' (请选 A/B 两个目标)';
     } else if (rules.selfTarget) {
       canPlay = true;
       targetLabel = '';
     } else {
       canPlay = !rules.needsTarget || !!selectedTarget;
-      targetLabel = selectedTarget ? ` → ${selectedTarget}` : rules.needsTarget ? ' (请选目标)' : '';
+      targetLabel = selectedTarget
+        ? ` → ${selectedTarget}`
+        : rules.needsTarget
+          ? ' (请选目标)'
+          : '';
     }
     return { canPlay, targetLabel };
   })();
 
   // ─── handlers ───
-  const nameToIndex = useCallback((name: string): number => {
-    return view.players.findIndex(pl => pl.name === name);
-  }, [view.players]);
+  const nameToIndex = useCallback(
+    (name: string): number => {
+      return view.players.findIndex((pl) => pl.name === name);
+    },
+    [view.players],
+  );
 
-  const isTargetable = useCallback((i: number): boolean => {
-    if (isDistributeActive && activeDistribute) {
-      const mode = activeDistribute.prompt.mode ?? 'allocate';
-      // 制衡(select)无目标选择
-      if (mode === 'select') return false;
-      if (!activeDistribute.prompt.allowSelf && i === perspectiveIdx) return false;
-      if (activeDistribute.prompt.targetFilter && !activeDistribute.prompt.targetFilter(view, i)) return false;
-      return view.players[i]?.alive === true;
-    }
-    const tf = selectedTargetFilter;
-    // 多槽位目标(借刀杀人 A+B):按当前选择进度取对应槽位 filter 判断可选性
-    if (tf?.slots && tf.slots.length > 1) {
-      const slotIdx = selectedTarget ? 1 : 0;
-      // 后续槽位不能重复选已选座次
-      if (slotIdx === 1 && view.players[i]?.name === selectedTarget) return false;
-      const slot = tf.slots[slotIdx];
-      const ctxSelected = slotIdx === 1 ? [view.players.findIndex(p => p.name === selectedTarget)] : [];
-      return slot?.filter ? slot.filter(view, i, { selected: ctxSelected }) : true;
-    }
-    const filter = tf?.filter;
-    if (!filter) return true;
-    return filter(view, i);
-  }, [isDistributeActive, activeDistribute, perspectiveIdx, view, selectedTargetFilter, selectedTarget]);
+  const isTargetable = useCallback(
+    (i: number): boolean => {
+      if (isDistributeActive && activeDistribute) {
+        const mode = activeDistribute.prompt.mode ?? 'allocate';
+        // 制衡(select)无目标选择
+        if (mode === 'select') return false;
+        if (!activeDistribute.prompt.allowSelf && i === perspectiveIdx) return false;
+        if (activeDistribute.prompt.targetFilter && !activeDistribute.prompt.targetFilter(view, i))
+          return false;
+        return view.players[i]?.alive === true;
+      }
+      const tf = selectedTargetFilter;
+      // 多槽位目标(借刀杀人 A+B):按当前选择进度取对应槽位 filter 判断可选性
+      if (tf?.slots && tf.slots.length > 1) {
+        const slotIdx = selectedTarget ? 1 : 0;
+        // 后续槽位不能重复选已选座次
+        if (slotIdx === 1 && view.players[i]?.name === selectedTarget) return false;
+        const slot = tf.slots[slotIdx];
+        const ctxSelected =
+          slotIdx === 1 ? [view.players.findIndex((p) => p.name === selectedTarget)] : [];
+        return slot?.filter ? slot.filter(view, i, { selected: ctxSelected }) : true;
+      }
+      const filter = tf?.filter;
+      if (!filter) return true;
+      return filter(view, i);
+    },
+    [
+      isDistributeActive,
+      activeDistribute,
+      perspectiveIdx,
+      view,
+      selectedTargetFilter,
+      selectedTarget,
+    ],
+  );
 
   const handlePlayCard = useCallback(() => {
     if (!selectedCardId) return;
-    const card = perspectiveHand.find(c => c.id === selectedCardId);
+    const card = perspectiveHand.find((c) => c.id === selectedCardId);
     if (!card || !selectedUseAction) return;
-    const rules = derivePlayRules(selectedTargetFilter, selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget);
-    const params = buildPlayParams(view.players, perspectiveIdx, card, rules, selectedTarget, selectedKillTarget);
+    const rules = derivePlayRules(
+      selectedTargetFilter,
+      selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget,
+    );
+    const params = buildPlayParams(
+      view.players,
+      perspectiveIdx,
+      card,
+      rules,
+      selectedTarget,
+      selectedKillTarget,
+    );
     if (params === null) return;
     // 出牌飞行动画:在 card 消失前捕获位置
-    const cardEl = handListRef.current?.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement | null;
+    const cardEl = handListRef.current?.querySelector(
+      `[data-card-id="${card.id}"]`,
+    ) as HTMLElement | null;
     if (cardEl) createCardFlyAnimation(cardEl, card);
     send(selectedUseAction.skillId, 'use', params);
-  }, [selectedCardId, perspectiveHand, selectedUseAction, selectedTargetFilter, view.players, perspectiveIdx, selectedTarget, selectedKillTarget, handListRef, send]);
+  }, [
+    selectedCardId,
+    perspectiveHand,
+    selectedUseAction,
+    selectedTargetFilter,
+    view.players,
+    perspectiveIdx,
+    selectedTarget,
+    selectedKillTarget,
+    handListRef,
+    send,
+  ]);
 
-  const handleTargetClick = useCallback((name: string) => {
-    const idx = view.players.findIndex(pl => pl.name === name);
-    if (idx >= 0 && !isTargetable(idx)) return;
-    if (isDistributeActive && activeDistribute) {
-      const mode = activeDistribute.prompt.mode ?? 'allocate';
-      // 制衡(select)无目标,座位点击忽略
-      if (mode === 'select') return;
-      if (activeDistribute.externalTargetSelection) {
-        // 仁德:点玩家设为目标
-        if (!activeDistribute.prompt.allowSelf && idx === perspectiveIdx) return;
-        setDistTargetName(distTargetName === name ? null : name);
+  const handleTargetClick = useCallback(
+    (name: string) => {
+      const idx = view.players.findIndex((pl) => pl.name === name);
+      if (idx >= 0 && !isTargetable(idx)) return;
+      if (isDistributeActive && activeDistribute) {
+        const mode = activeDistribute.prompt.mode ?? 'allocate';
+        // 制衡(select)无目标,座位点击忽略
+        if (mode === 'select') return;
+        if (activeDistribute.externalTargetSelection) {
+          // 仁德:点玩家设为目标
+          if (!activeDistribute.prompt.allowSelf && idx === perspectiveIdx) return;
+          setDistTargetName(distTargetName === name ? null : name);
+          return;
+        }
+        // 遗计(内部 allocate):点玩家 = 分配当前选中牌
+        if (distSelected.size > 0) {
+          const maxPerTarget = activeDistribute.prompt.maxPerTarget ?? 99;
+          setDistAllocations((prev) => {
+            const already = prev
+              .filter((a) => a.target === idx)
+              .reduce((s, a) => s + a.cardIds.length, 0);
+            if (already + distSelected.size > maxPerTarget) return prev;
+            return [...prev, { target: idx, cardIds: [...distSelected] }];
+          });
+          setDistSelected(new Set());
+        }
         return;
       }
-      // 遗计(内部 allocate):点玩家 = 分配当前选中牌
-      if (distSelected.size > 0) {
-        const maxPerTarget = activeDistribute.prompt.maxPerTarget ?? 99;
-        setDistAllocations(prev => {
-          const already = prev.filter(a => a.target === idx).reduce((s, a) => s + a.cardIds.length, 0);
-          if (already + distSelected.size > maxPerTarget) return prev;
-          return [...prev, { target: idx, cardIds: [...distSelected] }];
-        });
-        setDistSelected(new Set());
-      }
-      return;
-    }
-    // 多槽位目标(借刀杀人):首次点选 A(slot 0),再点选 B(slot 1)
-    if (playRules?.hasSlots) {
-      const slotIdx = selectedTarget ? 1 : 0;
-      if (slotIdx === 0) {
-        if (selectedTarget === name) {
-          setSelectedTarget(null);
-          setSelectedKillTarget(null);
-        } else {
-          setSelectedTarget(name);
-          setSelectedKillTarget(null);
-        }
-      } else {
-        setSelectedKillTarget(selectedKillTarget === name ? null : name);
-      }
-      return;
-    }
-    setSelectedTarget(selectedTarget === name ? null : name);
-  }, [view.players, isTargetable, isDistributeActive, activeDistribute, perspectiveIdx, distTargetName, selectedTarget, selectedKillTarget, distSelected, playRules]);
-
-  const handleSkillAction = useCallback((action: SkillActionDef) => {
-    const { skillId, actionType, prompt } = action;
-    const params: Record<string, Json> = {};
-
-    switch (prompt.type) {
-      case 'useCard':
-        if (!selectedCardId) return;
-        params.cardId = selectedCardId;
-        params.cardIds = [selectedCardId];
-        break;
-      case 'selectTarget':
-        if (!selectedTarget) return;
-        params.target = nameToIndex(selectedTarget);
-        break;
-      case 'useCardAndTarget':
-        if (action.transform) {
-          if (prompt.cardFilter?.filter) {
-            const sample = perspectiveHand.find(c => prompt.cardFilter!.filter!(c));
-            const wrapperName = sample ? action.transform(sample).name : action.skillId;
-            const minCards = prompt.cardFilter.min ?? 1;
-            const maxCards = prompt.cardFilter.max ?? 1;
-            setTransformMode({ skillId, actionType, cardFilter: prompt.cardFilter.filter, wrapperName, minCards, maxCards, selectedCardIds: [] });
-            setSelectedCardId(null);
+      // 多槽位目标(借刀杀人):首次点选 A(slot 0),再点选 B(slot 1)
+      if (playRules?.hasSlots) {
+        const slotIdx = selectedTarget ? 1 : 0;
+        if (slotIdx === 0) {
+          if (selectedTarget === name) {
             setSelectedTarget(null);
-            return;
-          }
-        }
-        if (!selectedCardId || !selectedTarget) return;
-        {
-          const idx = nameToIndex(selectedTarget);
-          if (idx < 0) return;
-          params.cardId = selectedCardId;
-          const trickCard = perspectiveHand.find(c => c.id === selectedCardId);
-          if (trickCard && trickCard.type === '锦囊牌' && trickCard.trickSubtype === '延时锦囊') {
-            params.target = idx;
+            setSelectedKillTarget(null);
           } else {
-            params.targets = [idx];
+            setSelectedTarget(name);
+            setSelectedKillTarget(null);
           }
+        } else {
+          setSelectedKillTarget(selectedKillTarget === name ? null : name);
         }
-        break;
-      case 'confirm':
-        break;
-      case 'choosePlayer':
-        if (!selectedTarget) return;
-        params.target = nameToIndex(selectedTarget);
-        break;
-      case 'distribute':
-        setDistributeMode({ skillId, actionType, prompt });
-        setSelectedCardId(null);
-        setSelectedTarget(null);
         return;
-      default:
-        break;
-    }
-
-    send(skillId, actionType, params);
-    setSelectedCardId(null);
-    setSelectedTarget(null);
-  }, [selectedCardId, selectedTarget, nameToIndex, perspectiveHand, send]);
-
-  const handleTransformPlay = useCallback((targetName: string) => {
-    if (!transformMode) return;
-    const idx = nameToIndex(targetName);
-    if (idx < 0) return;
-
-    if (transformMode.minCards > 1) {
-      const ids = transformMode.selectedCardIds;
-      if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
-      const shadowCardId = `${ids.join('#')}#${transformMode.skillId}`;
-      send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [{
-        skillId: transformMode.skillId,
-        actionType: transformMode.actionType,
-        params: { cardIds: ids },
-      }]);
-    } else {
-      if (!selectedCardId) return;
-      const targetCard = perspectiveHand.find(c => c.id === selectedCardId);
-      if (!targetCard) return;
-      const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
-      send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [{
-        skillId: transformMode.skillId,
-        actionType: transformMode.actionType,
-        params: { cardId: selectedCardId },
-      }]);
-    }
-    setTransformMode(null);
-    setSelectedCardId(null);
-    setSelectedTarget(null);
-  }, [transformMode, nameToIndex, selectedCardId, perspectiveHand, send]);
-
-  const handleRespond = useCallback((cardId?: string) => {
-    if (!pending) return;
-    if (isDiscardPhase) {
-      if (selectedForDiscard.size >= discardMin) {
-        handleConfirmDiscard();
-      } else {
-        const hand = perspectiveHand;
-        const fallback = hand.slice(-discardMin).map(c => c.id);
-        send('系统规则', 'respond', { cardIds: fallback });
-        setSelectedForDiscard(new Set());
       }
-      return;
-    }
-    const info = pendingRespondInfo;
-    if (!info) return;
-    if (cardId) {
-      const card = perspectiveHand.find(c => c.id === cardId);
-      if (!card) return;
-      if (info.cardFilter && !info.cardFilter(card)) return;
-      send(info.skillId, 'respond', { cardId });
-    } else if (pendingTargetIdx < 0) {
-      markBroadcastSkipped(broadcastKey);
-    } else {
-      send(info.skillId, 'respond', {});
-    }
-  }, [pending, isDiscardPhase, selectedForDiscard, discardMin, perspectiveHand, send, pendingRespondInfo, pendingTargetIdx, markBroadcastSkipped, broadcastKey]);
+      setSelectedTarget(selectedTarget === name ? null : name);
+    },
+    [
+      view.players,
+      isTargetable,
+      isDistributeActive,
+      activeDistribute,
+      perspectiveIdx,
+      distTargetName,
+      selectedTarget,
+      selectedKillTarget,
+      distSelected,
+      playRules,
+    ],
+  );
+
+  const handleSkillAction = useCallback(
+    (action: SkillActionDef) => {
+      const { skillId, actionType, prompt } = action;
+      const params: Record<string, Json> = {};
+
+      switch (prompt.type) {
+        case 'useCard':
+          if (!selectedCardId) return;
+          params.cardId = selectedCardId;
+          params.cardIds = [selectedCardId];
+          break;
+        case 'selectTarget':
+          if (!selectedTarget) return;
+          params.target = nameToIndex(selectedTarget);
+          break;
+        case 'useCardAndTarget':
+          if (action.transform) {
+            if (prompt.cardFilter?.filter) {
+              const sample = perspectiveHand.find((c) => prompt.cardFilter.filter!(c));
+              const wrapperName = sample ? action.transform(sample).name : action.skillId;
+              const minCards = prompt.cardFilter.min ?? 1;
+              const maxCards = prompt.cardFilter.max ?? 1;
+              setTransformMode({
+                skillId,
+                actionType,
+                cardFilter: prompt.cardFilter.filter,
+                wrapperName,
+                minCards,
+                maxCards,
+                selectedCardIds: [],
+              });
+              setSelectedCardId(null);
+              setSelectedTarget(null);
+              return;
+            }
+          }
+          if (!selectedCardId || !selectedTarget) return;
+          {
+            const idx = nameToIndex(selectedTarget);
+            if (idx < 0) return;
+            params.cardId = selectedCardId;
+            const trickCard = perspectiveHand.find((c) => c.id === selectedCardId);
+            if (trickCard?.type === '锦囊牌' && trickCard.trickSubtype === '延时锦囊') {
+              params.target = idx;
+            } else {
+              params.targets = [idx];
+            }
+          }
+          break;
+        case 'confirm':
+          break;
+        case 'choosePlayer':
+          if (!selectedTarget) return;
+          params.target = nameToIndex(selectedTarget);
+          break;
+        case 'distribute':
+          setDistributeMode({ skillId, actionType, prompt });
+          setSelectedCardId(null);
+          setSelectedTarget(null);
+          return;
+        default:
+          break;
+      }
+
+      send(skillId, actionType, params);
+      setSelectedCardId(null);
+      setSelectedTarget(null);
+    },
+    [selectedCardId, selectedTarget, nameToIndex, perspectiveHand, send],
+  );
+
+  const handleTransformPlay = useCallback(
+    (targetName: string) => {
+      if (!transformMode) return;
+      const idx = nameToIndex(targetName);
+      if (idx < 0) return;
+
+      if (transformMode.minCards > 1) {
+        const ids = transformMode.selectedCardIds;
+        if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
+        const shadowCardId = `${ids.join('#')}#${transformMode.skillId}`;
+        send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [
+          {
+            skillId: transformMode.skillId,
+            actionType: transformMode.actionType,
+            params: { cardIds: ids },
+          },
+        ]);
+      } else {
+        if (!selectedCardId) return;
+        const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
+        if (!targetCard) return;
+        const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
+        send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [
+          {
+            skillId: transformMode.skillId,
+            actionType: transformMode.actionType,
+            params: { cardId: selectedCardId },
+          },
+        ]);
+      }
+      setTransformMode(null);
+      setSelectedCardId(null);
+      setSelectedTarget(null);
+    },
+    [transformMode, nameToIndex, selectedCardId, perspectiveHand, send],
+  );
+
+  const handleRespond = useCallback(
+    (cardId?: string) => {
+      if (!pending) return;
+      if (isDiscardPhase) {
+        if (selectedForDiscard.size >= discardMin) {
+          handleConfirmDiscard();
+        } else {
+          const hand = perspectiveHand;
+          const fallback = hand.slice(-discardMin).map((c) => c.id);
+          send('系统规则', 'respond', { cardIds: fallback });
+          setSelectedForDiscard(new Set());
+        }
+        return;
+      }
+      const info = pendingRespondInfo;
+      if (!info) return;
+      if (cardId) {
+        const card = perspectiveHand.find((c) => c.id === cardId);
+        if (!card) return;
+        if (info.cardFilter && !info.cardFilter(card)) return;
+        send(info.skillId, 'respond', { cardId });
+      } else if (pendingTargetIdx < 0) {
+        markBroadcastSkipped(broadcastKey);
+      } else {
+        send(info.skillId, 'respond', {});
+      }
+    },
+    [
+      pending,
+      isDiscardPhase,
+      selectedForDiscard,
+      discardMin,
+      perspectiveHand,
+      send,
+      pendingRespondInfo,
+      pendingTargetIdx,
+      markBroadcastSkipped,
+      broadcastKey,
+    ],
+  );
 
   const handleEndTurn = useCallback(() => {
     if (!isMyTurn) return;
     send('回合管理', 'end', {});
   }, [isMyTurn, send]);
 
-  const handleCardClick = useCallback((card: Card) => {
-    // distribute 选牌
-    if (isDistributeActive && activeDistribute) {
-      const candidateSet = new Set(activeDistribute.cardIds);
-      if (!candidateSet.has(card.id)) return;
-      handleDistToggle(card.id);
-      return;
-    }
-    // 弃牌窗口
-    if (isDiscardPhase && isPerspectiveAwaiting && canOperate) {
-      setSelectedForDiscard(prev => {
-        const next = new Set(prev);
-        if (next.has(card.id)) { next.delete(card.id); return next; }
-        if (next.size >= discardMax) return prev;
-        next.add(card.id);
-        return next;
-      });
-      return;
-    }
-    // 回应模式
-    if (isMyAwaiting) {
-      if (pendingRespondInfo && pendingRespondInfo.cardFilter) {
-        if (pendingRespondInfo.cardFilter(card)) handleRespond(card.id);
+  const handleCardClick = useCallback(
+    (card: Card) => {
+      // distribute 选牌
+      if (isDistributeActive && activeDistribute) {
+        const candidateSet = new Set(activeDistribute.cardIds);
+        if (!candidateSet.has(card.id)) return;
+        handleDistToggle(card.id);
+        return;
       }
-      return;
-    }
-    // 转化模式
-    if (transformMode && isMyTurn && canOperate) {
-      if (!transformMode.cardFilter(card)) return;
-      if (transformMode.minCards > 1) {
-        setSelectedCardId(null);
-        setTransformMode(prev => prev && {
-          ...prev,
-          selectedCardIds: prev.selectedCardIds.includes(card.id)
-            ? prev.selectedCardIds.filter(id => id !== card.id)
-            : (prev.selectedCardIds.length < prev.maxCards ? [...prev.selectedCardIds, card.id] : prev.selectedCardIds),
+      // 弃牌窗口
+      if (isDiscardPhase && isPerspectiveAwaiting && canOperate) {
+        setSelectedForDiscard((prev) => {
+          const next = new Set(prev);
+          if (next.has(card.id)) {
+            next.delete(card.id);
+            return next;
+          }
+          if (next.size >= discardMax) return prev;
+          next.add(card.id);
+          return next;
         });
+        return;
+      }
+      // 回应模式
+      if (isMyAwaiting) {
+        if (pendingRespondInfo?.cardFilter) {
+          if (pendingRespondInfo.cardFilter(card)) handleRespond(card.id);
+        }
+        return;
+      }
+      // 转化模式
+      if (transformMode && isMyTurn && canOperate) {
+        if (!transformMode.cardFilter(card)) return;
+        if (transformMode.minCards > 1) {
+          setSelectedCardId(null);
+          setTransformMode(
+            (prev) =>
+              prev && {
+                ...prev,
+                selectedCardIds: prev.selectedCardIds.includes(card.id)
+                  ? prev.selectedCardIds.filter((id) => id !== card.id)
+                  : prev.selectedCardIds.length < prev.maxCards
+                    ? [...prev.selectedCardIds, card.id]
+                    : prev.selectedCardIds,
+              },
+          );
+          setSelectedTarget(null);
+        } else {
+          if (selectedCardId === card.id) {
+            setSelectedCardId(null);
+            setSelectedTarget(null);
+          } else {
+            setSelectedCardId(card.id);
+            setSelectedTarget(null);
+          }
+        }
+        return;
+      }
+      // 出牌模式
+      if (!isMyTurn || !canOperate) return;
+      if (selectedCardId === card.id) {
+        setSelectedCardId(null);
         setSelectedTarget(null);
       } else {
-        if (selectedCardId === card.id) { setSelectedCardId(null); setSelectedTarget(null); }
-        else { setSelectedCardId(card.id); setSelectedTarget(null); }
+        setSelectedCardId(card.id);
+        setSelectedTarget(null);
       }
-      return;
-    }
-    // 出牌模式
-    if (!isMyTurn || !canOperate) return;
-    if (selectedCardId === card.id) { setSelectedCardId(null); setSelectedTarget(null); }
-    else { setSelectedCardId(card.id); setSelectedTarget(null); }
-  }, [isDistributeActive, activeDistribute, isDiscardPhase, isPerspectiveAwaiting, canOperate, discardMax, isMyAwaiting, pendingRespondInfo, handleRespond, transformMode, isMyTurn, selectedCardId]);
+    },
+    [
+      isDistributeActive,
+      activeDistribute,
+      isDiscardPhase,
+      isPerspectiveAwaiting,
+      canOperate,
+      discardMax,
+      isMyAwaiting,
+      pendingRespondInfo,
+      handleRespond,
+      transformMode,
+      isMyTurn,
+      selectedCardId,
+    ],
+  );
 
   const handleConfirmDiscard = useCallback(() => {
     if (!pending || !isDiscardPhase) return;
@@ -516,28 +703,40 @@ export function usePlayInteraction(
   }, [pending, isDiscardPhase, selectedForDiscard, discardMin, discardMax, send]);
 
   // distribute handlers
-  const handleDistToggle = useCallback((id: string) => {
-    if (!activeDistribute) return;
-    const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
-    setDistSelected(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) { n.delete(id); }
-      else { if (n.size >= maxTotal) return prev; n.add(id); }
-      return n;
-    });
-  }, [activeDistribute]);
+  const handleDistToggle = useCallback(
+    (id: string) => {
+      if (!activeDistribute) return;
+      const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
+      setDistSelected((prev) => {
+        const n = new Set(prev);
+        if (n.has(id)) {
+          n.delete(id);
+        } else {
+          if (n.size >= maxTotal) return prev;
+          n.add(id);
+        }
+        return n;
+      });
+    },
+    [activeDistribute],
+  );
 
-  const handleDistAllocate = useCallback((targetIdx: number) => {
-    if (!activeDistribute) return;
-    const maxPerTarget = activeDistribute.prompt.maxPerTarget ?? 99;
-    if (distSelected.size === 0) return;
-    setDistAllocations(prev => {
-      const already = prev.filter(a => a.target === targetIdx).reduce((s, a) => s + a.cardIds.length, 0);
-      if (already + distSelected.size > maxPerTarget) return prev;
-      return [...prev, { target: targetIdx, cardIds: [...distSelected] }];
-    });
-    setDistSelected(new Set());
-  }, [activeDistribute, distSelected]);
+  const handleDistAllocate = useCallback(
+    (targetIdx: number) => {
+      if (!activeDistribute) return;
+      const maxPerTarget = activeDistribute.prompt.maxPerTarget ?? 99;
+      if (distSelected.size === 0) return;
+      setDistAllocations((prev) => {
+        const already = prev
+          .filter((a) => a.target === targetIdx)
+          .reduce((s, a) => s + a.cardIds.length, 0);
+        if (already + distSelected.size > maxPerTarget) return prev;
+        return [...prev, { target: targetIdx, cardIds: [...distSelected] }];
+      });
+      setDistSelected(new Set());
+    },
+    [activeDistribute, distSelected],
+  );
 
   const handleDistSubmit = useCallback(() => {
     if (!activeDistribute) return;
@@ -553,7 +752,7 @@ export function usePlayInteraction(
       if (idx < 0) return;
       send(skillId, actionType, { allocation: [{ target: idx, cardIds: [...distSelected] }] });
     } else {
-      const total = distAllocations.flatMap(a => a.cardIds).length;
+      const total = distAllocations.flatMap((a) => a.cardIds).length;
       if (total < minTotal) return;
       send(skillId, actionType, { allocation: distAllocations });
     }
@@ -583,15 +782,39 @@ export function usePlayInteraction(
   const clearDiscard = useCallback(() => setSelectedForDiscard(new Set()), []);
 
   return {
-    selectedCardId, selectedTarget, selectedKillTarget, selectedForDiscard,
-    transformMode, distributeMode, activeDistribute, isDistributeActive,
-    distSelected, distAllocations, distTargetName,
-    selectedCard, selectedUseAction, selectedTargetFilter, playRules,
-    selectedActive, playButtonState,
-    handleCardClick, handlePlayCard, handleTargetClick,
-    handleSkillAction, handleTransformPlay, handleRespond, handleEndTurn,
-    handleConfirmDiscard, isTargetable,
-    handleDistToggle, handleDistAllocate, handleDistSubmit, handleDistClear,
-    cancelTransform, cancelSelection, clearDiscard, setDistributeMode,
+    selectedCardId,
+    selectedTarget,
+    selectedKillTarget,
+    selectedForDiscard,
+    transformMode,
+    distributeMode,
+    activeDistribute,
+    isDistributeActive,
+    distSelected,
+    distAllocations,
+    distTargetName,
+    selectedCard,
+    selectedUseAction,
+    selectedTargetFilter,
+    playRules,
+    selectedActive,
+    playButtonState,
+    handleCardClick,
+    handlePlayCard,
+    handleTargetClick,
+    handleSkillAction,
+    handleTransformPlay,
+    handleRespond,
+    handleEndTurn,
+    handleConfirmDiscard,
+    isTargetable,
+    handleDistToggle,
+    handleDistAllocate,
+    handleDistSubmit,
+    handleDistClear,
+    cancelTransform,
+    cancelSelection,
+    clearDiscard,
+    setDistributeMode,
   };
 }

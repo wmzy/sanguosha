@@ -4,37 +4,67 @@
 //   runDyingFlow 检查此标志判断是否有人救援。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, type SkillModule, validateUseCard } from '../skill';
+import { registerAction, validateUseCard } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '桃', description: '出牌阶段对已受伤角色使用,回复 1 体力(濒死时可对濒死角色使用)' };
+  return {
+    id,
+    ownerId,
+    name: '桃',
+    description: '出牌阶段对已受伤角色使用,回复 1 体力(濒死时可对濒死角色使用)',
+  };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
     (state: GameState, params: Record<string, Json>) => {
-      return validateUseCard(state, ownerId, params, { cardName: '桃' })
-        ?? (() => {
-          const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined ?? ownerId;
-          return state.players[target]?.alive === true && state.players[target]?.health < state.players[target]?.maxHealth
-            ? null : '桃只能对受伤角色使用';
-        })();
+      return (
+        validateUseCard(state, ownerId, params, { cardName: '桃' }) ??
+        (() => {
+          const target =
+            ((params.target ?? (params.targets as number[] | undefined)?.[0]) as
+              | number
+              | undefined) ?? ownerId;
+          return state.players[target]?.alive === true &&
+            state.players[target]?.health < state.players[target]?.maxHealth
+            ? null
+            : '桃只能对受伤角色使用';
+        })()
+      );
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number;
       await pushFrame(state, '桃', from, { ...params });
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: from },
+        to: { zone: '处理区' },
+      });
       await applyAtom(state, { type: '回复体力', target, amount: 1, source: from });
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '处理区' },
+        to: { zone: '弃牌堆' },
+      });
       await popFrame(state);
     },
   );
 
   // respond:濒死求桃时出桃救援
-  registerAction(state, skill.id, ownerId, 'respond',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'respond',
     (state: GameState, params: Record<string, Json>) => {
       // pending 必须是 请求回应 且 requestType='求桃'
       const slot = state.pendingSlots.get(ownerId);
@@ -55,7 +85,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string | undefined;
       if (!cardId) return;
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: ownerId }, to: { zone: '弃牌堆' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: ownerId },
+        to: { zone: '弃牌堆' },
+      });
       state.localVars['求桃/已救'] = true;
     },
   );
@@ -86,4 +121,3 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-

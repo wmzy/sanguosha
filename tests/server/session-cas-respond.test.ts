@@ -17,7 +17,7 @@ import type { GameState } from '../../src/engine/types';
 
 function makeRoom(): Room {
   return {
-    id: 'test-room-' + Math.random().toString(36).slice(2, 8),
+    id: `test-room-${Math.random().toString(36).slice(2, 8)}`,
     name: '测试',
     maxPlayers: 4,
     players: new Map(),
@@ -28,7 +28,7 @@ function makeRoom(): Room {
   } as unknown as Room;
 }
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** 通过 reflection 取 session.state(私有字段) */
 function getState(session: GameSession): GameState {
@@ -52,14 +52,20 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
     // 等主公选将 slot 出现
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) await sleep(10);
     expect(state.pendingSlots.size).toBe(1);
-    const lordSlotAtom = [...state.pendingSlots.values()][0].atom as { target: number; candidates: Array<{ name: string }> };
+    const lordSlotAtom = [...state.pendingSlots.values()][0].atom as {
+      target: number;
+      candidates: Array<{ name: string }>;
+    };
     const lordTarget = lordSlotAtom.target;
     const lordCandidates = lordSlotAtom.candidates;
 
     // 主公 respond(baseSeq 是当前 seq,正常通过 CAS)
     await session.handleAction('p0', {
-      skillId: '系统规则', actionType: '选将', ownerId: lordTarget,
-      params: { character: lordCandidates[0].name }, baseSeq: state.seq,
+      skillId: '系统规则',
+      actionType: '选将',
+      ownerId: lordTarget,
+      params: { character: lordCandidates[0].name },
+      baseSeq: state.seq,
     });
     for (let i = 0; i < 100 && state.pendingSlots.size !== 3; i++) await sleep(10);
     expect(state.pendingSlots.size).toBe(3);
@@ -72,15 +78,20 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
     expect(others.length).toBe(3);
 
     // 并发调 handleAction
-    await Promise.all(others.map(async t => {
-      const slot = state.pendingSlots.get(t);
-      if (!slot) return;
-      const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
-      await session.handleAction('p' + t, {
-        skillId: '系统规则', actionType: '选将', ownerId: t,
-        params: { character: cand.name }, baseSeq: staleBaseSeq,
-      });
-    }));
+    await Promise.all(
+      others.map(async (t) => {
+        const slot = state.pendingSlots.get(t);
+        if (!slot) return;
+        const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
+        await session.handleAction(`p${t}`, {
+          skillId: '系统规则',
+          actionType: '选将',
+          ownerId: t,
+          params: { character: cand.name },
+          baseSeq: staleBaseSeq,
+        });
+      }),
+    );
 
     // 等所有 slot resolve
     for (let i = 0; i < 200 && state.pendingSlots.size > 0; i++) await sleep(10);
@@ -104,12 +115,18 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) await sleep(10);
 
     // 主公选
-    const lordSlot2 = [...state.pendingSlots.values()][0].atom as { target: number; candidates: Array<{ name: string }> };
+    const lordSlot2 = [...state.pendingSlots.values()][0].atom as {
+      target: number;
+      candidates: Array<{ name: string }>;
+    };
     const lordTarget = lordSlot2.target;
     const lordCand = lordSlot2.candidates[0];
     await session.handleAction('p0', {
-      skillId: '系统规则', actionType: '选将', ownerId: lordTarget,
-      params: { character: lordCand.name }, baseSeq: state.seq,
+      skillId: '系统规则',
+      actionType: '选将',
+      ownerId: lordTarget,
+      params: { character: lordCand.name },
+      baseSeq: state.seq,
     });
     for (let i = 0; i < 100 && state.pendingSlots.size !== 3; i++) await sleep(10);
 
@@ -118,9 +135,12 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
     for (const t of others) {
       const slot = state.pendingSlots.get(t)!;
       const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
-      await session.handleAction('p' + t, {
-        skillId: '系统规则', actionType: '选将', ownerId: t,
-        params: { character: cand.name }, baseSeq: state.seq,
+      await session.handleAction(`p${t}`, {
+        skillId: '系统规则',
+        actionType: '选将',
+        ownerId: t,
+        params: { character: cand.name },
+        baseSeq: state.seq,
       });
       await sleep(50);
     }
@@ -130,14 +150,18 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
 
     // 等待进入 player 0 的出牌阶段(bootstrap 完成后回合管理自动推进到出牌)
     // 出牌阶段会有 __出牌 询问(非阻塞型 pending),不检查 pendingSlots.size
-    for (let i = 0; i < 300 && (state.currentPlayerIndex !== 0 || state.phase !== '出牌'); i++) await sleep(10);
+    for (let i = 0; i < 300 && (state.currentPlayerIndex !== 0 || state.phase !== '出牌'); i++)
+      await sleep(10);
 
     // 现在进入游戏,处于出牌阶段。用陈旧 baseSeq 发主动 action
     const veryStaleSeq = state.seq - 10;
     const beforeSeq = state.seq;
     await session.handleAction('p0', {
-      skillId: '回合管理', actionType: 'end', ownerId: 0,
-      params: {}, baseSeq: veryStaleSeq,
+      skillId: '回合管理',
+      actionType: 'end',
+      ownerId: 0,
+      params: {},
+      baseSeq: veryStaleSeq,
     });
     await sleep(200);
     // CAS 删除后:action 被接受 → seq 推进

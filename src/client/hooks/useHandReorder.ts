@@ -35,23 +35,25 @@ export function useHandReorder(
 
   // 本地顺序与服务端手牌集合一致性校验:
   // 服务端手牌变化(摸/出/弃)时,如果 localHandOrder 不再是合法排列,则视为无效。
-  const serverHandIds = serverHand.map(c => c.id);
-  const localOrderValid = localHandOrder !== null
-    && localHandOrder.length === serverHandIds.length
-    && serverHandIds.every(id => localHandOrder.includes(id));
+  const serverHandIds = serverHand.map((c) => c.id);
+  const localOrderValid =
+    localHandOrder !== null &&
+    localHandOrder.length === serverHandIds.length &&
+    serverHandIds.every((id) => localHandOrder.includes(id));
 
   // orderedHand:本地顺序优先(拖拽实时预览),无效则用服务端顺序
   const orderedHand: Card[] = localOrderValid
-    ? (localHandOrder!.map(id => serverHand.find(c => c.id === id)).filter(Boolean) as Card[])
+    ? (localHandOrder.map((id) => serverHand.find((c) => c.id === id)).filter(Boolean) as Card[])
     : serverHand;
 
   // 服务端已同步本地顺序时,清除本地状态(避免陈旧覆盖);
   // localOrderValid 为 false 时也清除(手牌集合已变)。
   useEffect(() => {
     if (localHandOrder && localOrderValid) {
-      const serverOrder = serverHand.map(c => c.id);
-      const synced = serverOrder.length === localHandOrder.length
-        && serverOrder.every((id, i) => id === localHandOrder[i]);
+      const serverOrder = serverHand.map((c) => c.id);
+      const synced =
+        serverOrder.length === localHandOrder.length &&
+        serverOrder.every((id, i) => id === localHandOrder[i]);
       if (synced) setLocalHandOrder(null);
     }
     if (localHandOrder && !localOrderValid) setLocalHandOrder(null);
@@ -62,24 +64,27 @@ export function useHandReorder(
     dragSrcIdx.current = idx;
   }, []);
 
-  const handleDrop = useCallback((targetIdx: number) => {
-    const srcIdx = dragSrcIdx.current;
-    dragSrcIdx.current = null;
-    if (srcIdx === null || srcIdx === targetIdx) return;
-    // 基于当前 orderedHand 重排
-    const ids = orderedHand.map(c => c.id);
-    const [moved] = ids.splice(srcIdx, 1);
-    ids.splice(targetIdx, 0, moved);
-    setLocalHandOrder(ids);
-    // 去抖发送 reorder_hand(避免快速拖拽频繁发消息)
-    if (onReorderHand) {
-      if (reorderTimer.current) clearTimeout(reorderTimer.current);
-      reorderTimer.current = setTimeout(() => {
-        onReorderHand(ids);
-        reorderTimer.current = null;
-      }, 400);
-    }
-  }, [orderedHand, onReorderHand]);
+  const handleDrop = useCallback(
+    (targetIdx: number) => {
+      const srcIdx = dragSrcIdx.current;
+      dragSrcIdx.current = null;
+      if (srcIdx === null || srcIdx === targetIdx) return;
+      // 基于当前 orderedHand 重排
+      const ids = orderedHand.map((c) => c.id);
+      const [moved] = ids.splice(srcIdx, 1);
+      ids.splice(targetIdx, 0, moved);
+      setLocalHandOrder(ids);
+      // 去抖发送 reorder_hand(避免快速拖拽频繁发消息)
+      if (onReorderHand) {
+        if (reorderTimer.current) clearTimeout(reorderTimer.current);
+        reorderTimer.current = setTimeout(() => {
+          onReorderHand(ids);
+          reorderTimer.current = null;
+        }, 400);
+      }
+    },
+    [orderedHand, onReorderHand],
+  );
 
   return { orderedHand, handleDragStart, handleDrop };
 }

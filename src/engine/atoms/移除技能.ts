@@ -11,7 +11,9 @@ export const 移除技能: AtomDefinition<{ player: number; skillId: string }> =
     return null;
   },
   apply(state, atom) {
-    state.players[atom.player].skills = state.players[atom.player].skills.filter(id => id !== atom.skillId);
+    state.players[atom.player].skills = state.players[atom.player].skills.filter(
+      (id) => id !== atom.skillId,
+    );
   },
   effect: { sound: 'skill_remove', animation: 'fade', duration: 400 },
   toViewEvents(_state, atom): ViewEventSplit {
@@ -29,17 +31,23 @@ export const 移除技能: AtomDefinition<{ player: number; skillId: string }> =
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const skillId = event.skillId as string;
-    view.players[pi].skills = view.players[pi].skills.filter(id => id !== skillId);
+    view.players[pi].skills = view.players[pi].skills.filter((id) => id !== skillId);
     // 马匹技能:清除对应的 distanceVars(攻击马=attackMod,防御马=defenseMod)
-    const clearVars = event.clearMountDistanceVars as { attackMod?: number; defenseMod?: number } | undefined;
+    const clearVars = event.clearMountDistanceVars as
+      | { attackMod?: number; defenseMod?: number }
+      | undefined;
     if (clearVars) {
       view.players[pi].distanceVars = {
         ...view.players[pi].distanceVars,
-        attackMod: clearVars.attackMod !== undefined ? undefined : view.players[pi].distanceVars?.attackMod,
-        defenseMod: clearVars.defenseMod !== undefined ? undefined : view.players[pi].distanceVars?.defenseMod,
+        attackMod:
+          clearVars.attackMod !== undefined ? undefined : view.players[pi].distanceVars?.attackMod,
+        defenseMod:
+          clearVars.defenseMod !== undefined
+            ? undefined
+            : view.players[pi].distanceVars?.defenseMod,
       };
     }
   },

@@ -58,14 +58,17 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 /** 广播房间准备状态(room_state)给房间内所有连接。
  *  调试房间配置阶段:玩家加入/离开/准备/配置更新时触发。 */
 function broadcastRoomState(room: Room): void {
-  broadcastMessage(room, serialize({
-    type: 'room_state',
-    readyPlayers: [...room.readyPlayers],
-    playerIds: [...room.players.keys()],
-    hostId: room.hostId,
-    maxPlayers: room.maxPlayers,
-    config: room.config,
-  }));
+  broadcastMessage(
+    room,
+    serialize({
+      type: 'room_state',
+      readyPlayers: [...room.readyPlayers],
+      playerIds: [...room.players.keys()],
+      hostId: room.hostId,
+      maxPlayers: room.maxPlayers,
+      config: room.config,
+    }),
+  );
 }
 
 /** 广播房间配置变更(room_config)。 */
@@ -115,7 +118,11 @@ async function restorePersistedRooms(): Promise<void> {
       const persisted = await loadRoom(roomId);
       if (!persisted) continue;
       // 跳过超时的 debug 房间
-      if (persisted.debug && persisted.state?.startedAt && (now - persisted.state.startedAt > ONE_HOUR)) {
+      if (
+        persisted.debug &&
+        persisted.state?.startedAt &&
+        now - persisted.state.startedAt > ONE_HOUR
+      ) {
         log.info(`跳过过期 debug 房间 ${roomId}`);
         await deletePersistedRoom(roomId);
         continue;
@@ -128,9 +135,14 @@ async function restorePersistedRooms(): Promise<void> {
         continue;
       }
       // 从持久化 state.config 恢复房间配置;旧数据无 config 时用默认值
-      const restoredConfig = (state.config && typeof state.config.timeoutScale === 'number')
-        ? { ...normalizeRoomConfig(undefined), timeoutScale: state.config.timeoutScale, name: persisted.roomName || `恢复-${roomId}` }
-        : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };
+      const restoredConfig =
+        state.config && typeof state.config.timeoutScale === 'number'
+          ? {
+              ...normalizeRoomConfig(undefined),
+              timeoutScale: state.config.timeoutScale,
+              name: persisted.roomName || `恢复-${roomId}`,
+            }
+          : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };
       const room: Room = {
         id: roomId,
         name: persisted.roomName || `恢复-${roomId}`,
@@ -146,7 +158,9 @@ async function restorePersistedRooms(): Promise<void> {
       const session = new GameSession(room, persisted.debug);
       await session.restoreState(state, persisted.actionLog);
       gameSessions.set(roomId, session);
-      log.info(`恢复房间 ${roomId}（${state.players.length} 名玩家，${persisted.actionLog.length} 步操作）`);
+      log.info(
+        `恢复房间 ${roomId}（${state.players.length} 名玩家，${persisted.actionLog.length} 步操作）`,
+      );
     } catch (err) {
       log.info(`房间 ${roomId} 恢复失败: ${err},删除`);
       await deletePersistedRoom(roomId);
@@ -154,7 +168,7 @@ async function restorePersistedRooms(): Promise<void> {
   }
 }
 
-void restorePersistedRooms().catch(err => {
+void restorePersistedRooms().catch((err) => {
   const e = err instanceof Error ? err : new Error(String(err));
   log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
 });
@@ -211,8 +225,9 @@ app.delete('/api/rooms/:id', async (c) => {
 });
 
 app.post('/api/rooms', async (c) => {
-  const raw = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-  const name = (typeof raw.name === 'string' ? raw.name.trim() : '') || `房间${Date.now().toString(36)}`;
+  const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const name =
+    (typeof raw.name === 'string' ? raw.name.trim() : '') || `房间${Date.now().toString(36)}`;
   const maxPlayers = typeof raw.maxPlayers === 'number' ? raw.maxPlayers : 2;
   if (maxPlayers < 2 || maxPlayers > 8) {
     return c.json({ error: '最大玩家数须在2-8之间' }, 400);
@@ -238,7 +253,7 @@ app.post('/api/rooms/:id/join', (c) => {
 });
 
 app.post('/api/debug-room', async (c) => {
-  const raw = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const playerCount = typeof raw.playerCount === 'number' ? raw.playerCount : 5;
   if (playerCount < 2 || playerCount > 8) {
     return c.json({ error: '玩家人数须在2-8之间' }, 400);
@@ -262,13 +277,17 @@ app.post('/api/debug-room', async (c) => {
 
 // Debug 快照:保存前后端完整游戏状态到 data/snapshots/
 app.post('/api/snapshot', async (c) => {
-  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   if (!body || typeof body.roomId !== 'string') {
     return c.json({ error: '缺少 roomId' }, 400);
   }
-  if (typeof body.perspective !== 'number'
-    || typeof body.frontendSeqs !== 'object' || body.frontendSeqs === null
-    || typeof body.frontendViews !== 'object' || body.frontendViews === null) {
+  if (
+    typeof body.perspective !== 'number' ||
+    typeof body.frontendSeqs !== 'object' ||
+    body.frontendSeqs === null ||
+    typeof body.frontendViews !== 'object' ||
+    body.frontendViews === null
+  ) {
     return c.json({ error: '缺少 perspective/frontendSeqs/frontendViews' }, 400);
   }
   const session = gameSessions.get(body.roomId);
@@ -280,7 +299,7 @@ app.post('/api/snapshot', async (c) => {
 
 app.patch('/api/snapshot/:id', async (c) => {
   const snapshotId = c.req.param('id');
-  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   if (!body || typeof body.description !== 'string') {
     return c.json({ error: '缺少 description' }, 400);
   }
@@ -306,7 +325,7 @@ export function handleWsMessage(
       handleReady(playerId);
       break;
     case 'start_game':
-      void handleStartGame(playerId).catch(err => {
+      void handleStartGame(playerId).catch((err) => {
         const e = err instanceof Error ? err : new Error(String(err));
         log.error('handleStartGame failed', { playerId, error: e.stack ?? String(e) });
       });
@@ -333,9 +352,13 @@ export function handleWsMessage(
       handleUpdateConfig(playerId, message.config);
       break;
     case 'join_debug_room':
-      void handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws).catch(err => {
+      void handleJoinDebugRoom(playerId, message.roomId, message.lastSeq ?? 0, ws).catch((err) => {
         const e = err instanceof Error ? err : new Error(String(err));
-        log.error('handleJoinDebugRoom failed', { playerId, roomId: message.roomId, error: e.stack ?? String(e) });
+        log.error('handleJoinDebugRoom failed', {
+          playerId,
+          roomId: message.roomId,
+          error: e.stack ?? String(e),
+        });
       });
       break;
   }
@@ -366,11 +389,13 @@ function handleCreateRoom(
   const room = createRoom(name, maxPlayers, playerId, ws, config);
   playerRoomMap.set(playerId, room.id);
 
-  ws.send(serialize({
-    type: 'room_joined',
-    roomId: room.id,
-    playerId,
-  }));
+  ws.send(
+    serialize({
+      type: 'room_joined',
+      roomId: room.id,
+      playerId,
+    }),
+  );
   broadcastRoomState(room);
 }
 
@@ -389,17 +414,15 @@ function handleJoinRoom(playerId: string, roomId: string, ws: WSContext): void {
 
   playerRoomMap.set(playerId, roomId);
 
-  ws.send(serialize({
-    type: 'room_joined',
-    roomId,
-    playerId,
-  }));
-
-  broadcastMessage(
-    room,
-    serialize({ type: 'player_joined', playerId }),
-    playerId,
+  ws.send(
+    serialize({
+      type: 'room_joined',
+      roomId,
+      playerId,
+    }),
   );
+
+  broadcastMessage(room, serialize({ type: 'player_joined', playerId }), playerId);
   broadcastRoomState(room);
 }
 
@@ -452,7 +475,7 @@ async function handleStartGame(playerId: string): Promise<void> {
   }
 
   // debug 房间:复用创建时已建好的占位 session;普通房间新建
-  let session = room.isDebug ? gameSessions.get(roomId) ?? undefined : undefined;
+  let session = room.isDebug ? (gameSessions.get(roomId) ?? undefined) : undefined;
   if (!session) {
     session = new GameSession(room, room.isDebug === true);
     gameSessions.set(roomId, session);
@@ -513,7 +536,7 @@ function handleAction(playerId: string, action: import('../engine/types').Client
   const session = gameSessions.get(roomId);
   if (!session) return;
 
-  void session.handleAction(playerId, action).catch(err => {
+  void session.handleAction(playerId, action).catch((err) => {
     const e = err instanceof Error ? err : new Error(String(err));
     log.error('session.handleAction failed', { playerId, error: e.stack ?? String(e) });
   });
@@ -526,7 +549,7 @@ function handleReorderHand(playerId: string, order: string[]): void {
   const session = gameSessions.get(roomId);
   if (!session) return;
 
-  void session.handleReorderHand(playerId, order).catch(err => {
+  void session.handleReorderHand(playerId, order).catch((err) => {
     const e = err instanceof Error ? err : new Error(String(err));
     log.error('session.handleReorderHand failed', { playerId, error: e.stack ?? String(e) });
   });
@@ -549,7 +572,7 @@ function handleLeaveRoom(playerId: string): void {
 
   const session = gameSessions.get(roomId);
   if (session) {
-    void session.destroy().catch(err => {
+    void session.destroy().catch((err) => {
       const e = err instanceof Error ? err : new Error(String(err));
       log.error('session.destroy failed', { roomId, error: e.stack ?? String(e) });
     });
@@ -577,7 +600,12 @@ function handleDisconnect(playerId: string): void {
   }
 }
 
-async function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: number, ws: WSContext): Promise<void> {
+async function handleJoinDebugRoom(
+  playerId: string,
+  roomId: string,
+  lastSeq: number,
+  ws: WSContext,
+): Promise<void> {
   const room = getRoom(roomId);
   if (!room?.isDebug) {
     ws.send(serialize({ type: 'error', message: '房间不存在或不是调试房间' }));
@@ -618,7 +646,12 @@ async function handleJoinDebugRoom(playerId: string, roomId: string, lastSeq: nu
   }
 }
 
-function handleReconnect(currentPlayerId: string, previousPlayerId: string, lastSeq: number, ws: WSContext): void {
+function handleReconnect(
+  currentPlayerId: string,
+  previousPlayerId: string,
+  lastSeq: number,
+  ws: WSContext,
+): void {
   const roomId = playerRoomMap.get(previousPlayerId);
   if (!roomId) {
     ws.send(serialize({ type: 'error', message: '没有找到可恢复的会话' }));

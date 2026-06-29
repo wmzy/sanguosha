@@ -7,7 +7,11 @@
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
-export const 结算帧入栈: AtomDefinition<{ skillId: string; from: number; params?: Record<string, import('../types').Json> }> = {
+export const 结算帧入栈: AtomDefinition<{
+  skillId: string;
+  from: number;
+  params?: Record<string, import('../types').Json>;
+}> = {
   type: '结算帧入栈',
   validate() {
     return null;
@@ -39,7 +43,7 @@ export const 结算帧入栈: AtomDefinition<{ skillId: string; from: number; pa
     view.settlementStack.push({
       skillId: event.skillId as string,
       from: event.from as number,
-      params: { ...(event.params as Record<string, import('../types').Json> ?? {}) },
+      params: { ...((event.params as Record<string, import('../types').Json>) ?? {}) },
       cards: [],
     });
   },

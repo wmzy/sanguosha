@@ -10,18 +10,31 @@ import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 import { allCharacters } from '../../src/engine/cards/characters';
 
-const CHARACTERS = allCharacters.map(c => ({
-  name: c.name, skills: c.skills.map(s => s.name),
+const CHARACTERS = allCharacters.map((c) => ({
+  name: c.name,
+  skills: c.skills.map((s) => s.name),
 }));
 
 function makePlayer(index: number, name: string) {
   return {
-    index, name, character: '', health: 4, maxHealth: 4, alive: true,
-    hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+    index,
+    name,
+    character: '',
+    health: 4,
+    maxHealth: 4,
+    alive: true,
+    hand: [],
+    equipment: {},
+    skills: [],
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    tags: [],
+    judgeZone: [],
   };
 }
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe('buildView:选将期间 pending 隔离', () => {
   let state: GameState;
@@ -30,8 +43,11 @@ describe('buildView:选将期间 pending 隔离', () => {
     resetForTest();
     state = createGameState({
       players: [
-        makePlayer(0, 'P1'), makePlayer(1, 'P2'), makePlayer(2, 'P3'),
-        makePlayer(3, 'P4'), makePlayer(4, 'P5'),
+        makePlayer(0, 'P1'),
+        makePlayer(1, 'P2'),
+        makePlayer(2, 'P3'),
+        makePlayer(3, 'P4'),
+        makePlayer(4, 'P5'),
       ],
       cardMap: {},
     });
@@ -69,8 +85,11 @@ describe('buildView:选将期间 pending 隔离', () => {
     const lordSlot = state.pendingSlots.get(0)!;
     const lordCand = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates;
     void dispatch(state, {
-      skillId: '系统规则', actionType: '选将', ownerId: 0,
-      params: { character: lordCand[0].name }, baseSeq: 0,
+      skillId: '系统规则',
+      actionType: '选将',
+      ownerId: 0,
+      params: { character: lordCand[0].name },
+      baseSeq: 0,
     });
     for (let i = 0; i < 100 && state.pendingSlots.size !== 4; i++) await sleep(10);
 

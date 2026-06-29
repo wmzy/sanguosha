@@ -88,7 +88,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         if (phase === 'ended') setStage('ended');
       },
       onGameOver: (winner) => setGameOver({ winner }),
-      onError: () => { /* 一期不重连 */ },
+      onError: () => {
+        /* 一期不重连 */
+      },
       onMessage: (msg: ServerMessage) => {
         // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
         // HGC 内部已重置 view/gameOverWinner,这里同步 React state(roomId/playerId 保留)。
@@ -116,10 +118,13 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     }
 
     return () => {
-      try { hgc.disconnect(); } catch { /* */ }
+      try {
+        hgc.disconnect();
+      } catch {
+        /* */
+      }
       hgcRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [command, wsUrl]);
 
   // 从 HGC getter 同步 roomId/playerId(收到 room_joined 后更新,无独立回调)
@@ -140,7 +145,12 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setView(null);
     setReady(false);
     setRoomState(null);
-    setCommand({ type: 'create', name: name || `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`, maxPlayers, config });
+    setCommand({
+      type: 'create',
+      name: name || `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      maxPlayers,
+      config,
+    });
     log.info('createRoom', { name, maxPlayers });
   }, []);
 
@@ -200,7 +210,22 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   }, []);
 
   return {
-    stage, roomId, playerId, roomState, view, gameOver, error, isHost, ready,
-    createRoom, joinRoom, toggleReady, startGame, sendRestart, leaveRoom, sendAction, reorderHand,
+    stage,
+    roomId,
+    playerId,
+    roomState,
+    view,
+    gameOver,
+    error,
+    isHost,
+    ready,
+    createRoom,
+    joinRoom,
+    toggleReady,
+    startGame,
+    sendRestart,
+    leaveRoom,
+    sendAction,
+    reorderHand,
   };
 }

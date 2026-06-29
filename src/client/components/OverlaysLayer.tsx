@@ -13,12 +13,21 @@ export interface OverlaysLayerProps {
   perspectiveIdx: number;
   // 选将状态(由 useCharSelect 派生,父组件传入)
   isCharSelectPending: boolean;
-  charSelect: { candidates: Array<{ name: string; skills: string[] }>; target: number; pending: PendingView | null } | null;
+  charSelect: {
+    candidates: Array<{ name: string; skills: string[] }>;
+    target: number;
+    pending: PendingView | null;
+  } | null;
   charSelectInProgress: boolean;
   // 身份揭示态(父组件持有)
   showIdentityReveal: boolean;
   onIdentityConfirm: () => void;
-  onAction: (action: { skillId: string; actionType: string; ownerId: number; params: Record<string, Json> }) => void;
+  onAction: (action: {
+    skillId: string;
+    actionType: string;
+    ownerId: number;
+    params: Record<string, Json>;
+  }) => void;
   /** 遮罩角落插槽:上层渲染视角控制等 debug UI。 */
   overlaySlot?: ReactNode;
 }
@@ -44,9 +53,8 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
     <>
       {/* 身份揭示弹窗:身份分配后立即显示,盖在选将遮罩之上(zIndex 10000 > 9999)。
           玩家点「确认」后 showIdentityReveal 置 false,露出下方的选将界面。
-          因此身份揭示发生在选将之前,符合开局先亮身份再选将的流程。*/}
-      {showIdentityReveal
-        && view.players[view.viewer]?.identity && (
+          因此身份揭示发生在选将之前,符合开局先亮身份再选将的流程。 */}
+      {showIdentityReveal && view.players[view.viewer]?.identity && (
         <IdentityRevealOverlay
           identity={view.players[view.viewer].identity!}
           onConfirm={onIdentityConfirm}
@@ -73,7 +81,7 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
               params: { character: characterName },
             });
           }}
-          lordCharacter={view.players.find(p => p.identity === '主公')?.character}
+          lordCharacter={view.players.find((p) => p.identity === '主公')?.character}
           overlaySlot={overlaySlot}
         />
       )}
@@ -85,7 +93,7 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
              (isCharSelectPending=false, charSelectInProgress=true, perspectiveCharSelected=false)
           场景 B 之前靠 buildView 的 fake pending(view.pending 指向主公 slot)驱动
           CharSelectOverlay 渲染「等待主公选将」,但 fake pending 会造成倒计时共用 bug。
-          现在 buildView 不再给非选将玩家设 pending,改由这里直接渲染等待遮罩。*/}
+          现在 buildView 不再给非选将玩家设 pending,改由这里直接渲染等待遮罩。 */}
       {!isCharSelectPending && charSelectInProgress && (
         <CharSelectWaitingOverlay
           view={view}

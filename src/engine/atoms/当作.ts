@@ -37,9 +37,9 @@ export const 当作: AtomDefinition<{
     const self = state.players[atom.player];
     if (!self) return `player ${atom.player} not found`;
     if (!self.alive) return 'player not alive';
-    const allInHand = atom.cardIds.every(id => self.hand.includes(id));
+    const allInHand = atom.cardIds.every((id) => self.hand.includes(id));
     if (!allInHand) return 'cards not in hand';
-    const allExist = atom.cardIds.every(id => state.cardMap[id]);
+    const allExist = atom.cardIds.every((id) => state.cardMap[id]);
     if (!allExist) return 'cards not found';
     return null;
   },
@@ -57,7 +57,7 @@ export const 当作: AtomDefinition<{
       shadowOf: single ? atom.cardIds[0] : undefined,
     };
     state.cardMap[atom.shadowId] = shadow;
-    self.hand = self.hand.filter(c => !atom.cardIds.includes(c));
+    self.hand = self.hand.filter((c) => !atom.cardIds.includes(c));
     self.hand.push(atom.shadowId);
   },
   effect: { sound: 'transform', animation: 'flash', duration: 400 },
@@ -84,7 +84,7 @@ export const 当作: AtomDefinition<{
   },
   applyView(view, event) {
     const playerIdx = event.player as number;
-    const pi = view.players.findIndex(p => p.index === playerIdx);
+    const pi = view.players.findIndex((p) => p.index === playerIdx);
     if (pi < 0) return;
 
     const ev = event as Record<string, unknown>;
@@ -112,13 +112,16 @@ export const 当作: AtomDefinition<{
         view.cardMap[shadowId] = shadowCard;
       }
       const idSet = new Set(cardIds);
-      view.players[pi].hand = view.players[pi].hand!.filter(c => !idSet.has(c.id));
-      view.players[pi].hand!.push(shadowCard);
+      view.players[pi].hand = view.players[pi].hand.filter((c) => !idSet.has(c.id));
+      view.players[pi].hand.push(shadowCard);
     }
   },
   toViewLog(event) {
     const ev = event as Record<string, unknown>;
-    return { player: event.player as number, text: `使用转化出${typeof ev.outputName === 'string' ? ev.outputName : '牌'}` };
+    return {
+      player: event.player as number,
+      text: `使用转化出${typeof ev.outputName === 'string' ? ev.outputName : '牌'}`,
+    };
   },
 };
 

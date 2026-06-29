@@ -1,7 +1,12 @@
 // src/client/headless/HeadlessGameClient.ts
 // 单座次无头 WS 玩家客户端。框架无关（零 React 依赖）。
 // 用全局 WebSocket（浏览器/Node22/Bun 都有），不 import 'ws'，避免污染浏览器 bundle。
-import type { GameView, ViewEvent, Json, ClientMessage as EngineClientMessage } from '../../engine/types';
+import type {
+  GameView,
+  ViewEvent,
+  Json,
+  ClientMessage as EngineClientMessage,
+} from '../../engine/types';
 import type { ServerMessage, ClientMessage, RoomConfig } from '../../server/protocol';
 import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
 import { enumerateAvailableActions } from './availableActions';
@@ -32,17 +37,43 @@ export class HeadlessGameClient {
     this.callbacks = callbacks;
   }
 
-  get phase(): ClientPhase { return this._phase; }
-  get view(): GameView | null { return this._view; }
-  get roomId(): string | null { return this._roomId; }
-  get playerId(): string | null { return this._playerId; }
-  get seatIndex(): number { return this._seatIndex; }
-  get lastSeq(): number { return this._lastSeq; }
-  get roomState(): RoomState | null { return this._roomState; }
-  get gameOverWinner(): string | null { return this._gameOverWinner; }
+  get phase(): ClientPhase {
+    return this._phase;
+  }
+
+  get view(): GameView | null {
+    return this._view;
+  }
+
+  get roomId(): string | null {
+    return this._roomId;
+  }
+
+  get playerId(): string | null {
+    return this._playerId;
+  }
+
+  get seatIndex(): number {
+    return this._seatIndex;
+  }
+
+  get lastSeq(): number {
+    return this._lastSeq;
+  }
+
+  get roomState(): RoomState | null {
+    return this._roomState;
+  }
+
+  get gameOverWinner(): string | null {
+    return this._gameOverWinner;
+  }
 
   private setPhase(p: ClientPhase) {
-    if (this._phase !== p) { this._phase = p; this.callbacks.onPhaseChange?.(p); }
+    if (this._phase !== p) {
+      this._phase = p;
+      this.callbacks.onPhaseChange?.(p);
+    }
   }
 
   /** 创建 debug 房间并自动 join 0 号座 */
@@ -61,7 +92,7 @@ export class HeadlessGameClient {
 
   /** 声明 playerId(连接初期调用)。给定则采用该值,否则服务端自动生成。 */
   setPlayerId(playerId?: string): void {
-    if (playerId && playerId.trim()) {
+    if (playerId?.trim()) {
       this.send({ type: 'set_player_id', playerId: playerId.trim() });
     }
   }
@@ -89,10 +120,14 @@ export class HeadlessGameClient {
       for (const m of this._outbox) this.ws!.send(JSON.stringify(m));
       this._outbox = [];
     };
-    this.ws.onmessage = (ev) => this.handleRaw(typeof ev.data === 'string' ? ev.data : ev.data.toString());
-    this.ws.onerror = () => { this.callbacks.onError?.(new Error('WebSocket error'));
+    this.ws.onmessage = (ev) =>
+      this.handleRaw(typeof ev.data === 'string' ? ev.data : ev.data.toString());
+    this.ws.onerror = () => {
+      this.callbacks.onError?.(new Error('WebSocket error'));
     };
-    this.ws.onclose = () => { /* 一期不重连 */ };
+    this.ws.onclose = () => {
+      /* 一期不重连 */
+    };
   }
 
   private handleRaw(raw: string) {
@@ -136,7 +171,10 @@ export class HeadlessGameClient {
       this._gameOverWinner = null;
       this._pendingNewEvents = [];
     }
-    if (r.actionRejected) { this._lastActionRejected = true; this.callbacks.onActionRejected?.(); }
+    if (r.actionRejected) {
+      this._lastActionRejected = true;
+      this.callbacks.onActionRejected?.();
+    }
     this.callbacks.onMessage?.(msg);
   }
 
@@ -148,10 +186,10 @@ export class HeadlessGameClient {
 
   needsAction(): boolean {
     const v = this._view;
-    if (!v || !v.pending) return false;
+    if (!v?.pending) return false;
     const p = v.pending;
     // 广播型（target<0，如无懈可击询问）或阻塞型 target===本座次
-    return p.target < 0 ? true : (p.isBlocking !== false && p.target === this._seatIndex);
+    return p.target < 0 ? true : p.isBlocking !== false && p.target === this._seatIndex;
   }
 
   getAvailableActions(): AvailableAction[] {
@@ -172,13 +210,23 @@ export class HeadlessGameClient {
     out: AvailableAction[],
   ) {
     const pending = view.pending!;
-    const atom = pending.atom as { type: string; candidates?: Array<{ name: string; skills: string[] }>; requestType?: string };
+    const atom = pending.atom as {
+      type: string;
+      candidates?: Array<{ name: string; skills: string[] }>;
+      requestType?: string;
+    };
     // 选将询问：每个候选武将一个 selectChar action（引擎注册 系统规则:选将）
     if (atom.type === '选将询问' && Array.isArray(atom.candidates)) {
       for (const c of atom.candidates) {
         out.push({
           description: `选择武将【${c.name}】`,
-          message: { skillId: '系统规则', actionType: '选将', ownerId: this._seatIndex, params: { character: c.name }, baseSeq: 0 },
+          message: {
+            skillId: '系统规则',
+            actionType: '选将',
+            ownerId: this._seatIndex,
+            params: { character: c.name },
+            baseSeq: 0,
+          },
           validTargets: [],
           category: 'selectChar',
         });
@@ -191,7 +239,13 @@ export class HeadlessGameClient {
     if (reqType === '__弃牌') {
       out.push({
         description: '弃牌（需选弃牌张数后提交 cardIds）',
-        message: { skillId: '系统规则', actionType: 'respond', ownerId: this._seatIndex, params: { cardIds: [] }, baseSeq: 0 },
+        message: {
+          skillId: '系统规则',
+          actionType: 'respond',
+          ownerId: this._seatIndex,
+          params: { cardIds: [] },
+          baseSeq: 0,
+        },
         validTargets: [],
         category: 'discard',
       });
@@ -202,7 +256,13 @@ export class HeadlessGameClient {
     if (info?.skillId) {
       out.push({
         description: `回应【${info.skillId}】`,
-        message: { skillId: info.skillId, actionType: 'respond', ownerId: this._seatIndex, params: {}, baseSeq: 0 },
+        message: {
+          skillId: info.skillId,
+          actionType: 'respond',
+          ownerId: this._seatIndex,
+          params: {},
+          baseSeq: 0,
+        },
         validTargets: [],
         category: 'respond',
       });
@@ -216,7 +276,11 @@ export class HeadlessGameClient {
     // 阻塞型 pending 期间 respond 携带 pendingSeq（当前窗口 seq），非阻塞（出牌窗口）不带
     const pending = this._view?.pending;
     const pendingSeq = pending?.isBlocking ? this._lastSeq : undefined;
-    this.send({ type: 'action', action: { ...action, baseSeq: this._lastSeq, pendingSeq }, baseSeq: this._lastSeq });
+    this.send({
+      type: 'action',
+      action: { ...action, baseSeq: this._lastSeq, pendingSeq },
+      baseSeq: this._lastSeq,
+    });
   }
 
   /** 返回并清除最近一次 action 是否被服务端拒（供 runPlay 轮询，已拒则报告 rejected）。 */
@@ -227,23 +291,49 @@ export class HeadlessGameClient {
   }
 
   /** 重排手牌（对应 reorder_hand 协议消息） */
-  reorderHand(order: string[]): void { this.send({ type: 'reorder_hand', order }); }
+  reorderHand(order: string[]): void {
+    this.send({ type: 'reorder_hand', order });
+  }
 
   useCardAndTarget(skillId: string, cardId: string, targets: number[]): void {
-    this.sendAction({ skillId, actionType: 'use', ownerId: this._seatIndex, params: { cardId, targets }, baseSeq: 0 });
+    this.sendAction({
+      skillId,
+      actionType: 'use',
+      ownerId: this._seatIndex,
+      params: { cardId, targets },
+      baseSeq: 0,
+    });
   }
 
   useCard(skillId: string, cardId: string): void {
-    this.sendAction({ skillId, actionType: 'use', ownerId: this._seatIndex, params: { cardId }, baseSeq: 0 });
+    this.sendAction({
+      skillId,
+      actionType: 'use',
+      ownerId: this._seatIndex,
+      params: { cardId },
+      baseSeq: 0,
+    });
   }
 
   respond(skillId: string, params?: Record<string, Json>): void {
-    this.sendAction({ skillId, actionType: 'respond', ownerId: this._seatIndex, params: params ?? {}, baseSeq: 0 });
+    this.sendAction({
+      skillId,
+      actionType: 'respond',
+      ownerId: this._seatIndex,
+      params: params ?? {},
+      baseSeq: 0,
+    });
   }
 
   /** 选择武将（对应选将询问 pending）。引擎注册 系统规则:选将。 */
   selectCharacter(character: string): void {
-    this.sendAction({ skillId: '系统规则', actionType: '选将', ownerId: this._seatIndex, params: { character }, baseSeq: 0 });
+    this.sendAction({
+      skillId: '系统规则',
+      actionType: '选将',
+      ownerId: this._seatIndex,
+      params: { character },
+      baseSeq: 0,
+    });
   }
 
   /** 弃牌：提交要弃的 cardIds。引擎注册 系统规则:respond。 */
@@ -255,26 +345,49 @@ export class HeadlessGameClient {
   pass(): void {
     // 广播型 pending（无懈可击等）无特定 skillId，用当前 pending 推导的 skillId
     const pending = this._view?.pending;
-    const info = pending ? resolvePendingRespond(pending, getActionsForPlayer(this._seatIndex)) : null;
+    const info = pending
+      ? resolvePendingRespond(pending, getActionsForPlayer(this._seatIndex))
+      : null;
     const skillId = info?.skillId ?? '__pass';
-    this.sendAction({ skillId, actionType: 'respond', ownerId: this._seatIndex, params: {}, baseSeq: 0 });
+    this.sendAction({
+      skillId,
+      actionType: 'respond',
+      ownerId: this._seatIndex,
+      params: {},
+      baseSeq: 0,
+    });
   }
 
   // ── 大厅 ──
 
-  sendReady(): void { this.send({ type: 'ready' }); }
-  sendStartGame(): void { this.send({ type: 'start_game' }); }
-  sendRestart(): void { this.send({ type: 'restart_game' }); }
-  sendUpdateConfig(config: RoomConfig): void { this.send({ type: 'update_room_config', config }); }
+  sendReady(): void {
+    this.send({ type: 'ready' });
+  }
+
+  sendStartGame(): void {
+    this.send({ type: 'start_game' });
+  }
+
+  sendRestart(): void {
+    this.send({ type: 'restart_game' });
+  }
+
+  sendUpdateConfig(config: RoomConfig): void {
+    this.send({ type: 'update_room_config', config });
+  }
 
   private send(msg: ClientMessage) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     } else {
       this._outbox.push(msg);
     }
   }
-  disconnect() { this.ws?.close(); this.ws = null; }
+
+  disconnect() {
+    this.ws?.close();
+    this.ws = null;
+  }
 
   /** 角色确定后，为本座次注册技能 actions（供 getAvailableActions）。 */
   async loadSkillActions(skillIds: string[]): Promise<void> {

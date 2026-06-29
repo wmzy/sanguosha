@@ -1,6 +1,11 @@
 // src/client/headless/types.ts
 // HeadlessGameClient 公开类型。框架无关（零 React 依赖）。
-import type { GameView, ViewEvent, ClientMessage as EngineClientMessage, Card } from '../../engine/types';
+import type {
+  GameView,
+  ViewEvent,
+  ClientMessage as EngineClientMessage,
+  Card,
+} from '../../engine/types';
 import type { RoomConfig, ServerMessage } from '../../server/protocol';
 
 /** 配置阶段房间准备状态（由 room_state 消息驱动）。 */

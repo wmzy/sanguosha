@@ -17,7 +17,7 @@ export const 设上限: AtomDefinition<{ player: number; amount: number }> = {
     player.health = Math.min(player.health, atom.amount);
   },
   applyView(view: GameView, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const p = view.players[pi];
     p.maxHealth = event.amount as number;

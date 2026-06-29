@@ -22,12 +22,11 @@ export const 回复体力: AtomDefinition<{ target: number; amount: number; sour
       type: '回复体力',
       target: atom.target,
       amount: atom.amount,
-
     };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view: GameView, event) {
-    const pi = view.players.findIndex(p => p.index === (event.target as number));
+    const pi = view.players.findIndex((p) => p.index === (event.target as number));
     if (pi < 0) return;
     const p = view.players[pi];
     p.health = Math.min(p.maxHealth, p.health + (event.amount as number));

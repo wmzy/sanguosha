@@ -1,4 +1,3 @@
-
 import type { GameState } from '../../engine/types';
 import type { GameLog } from '../../shared/log';
 

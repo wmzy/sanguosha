@@ -61,7 +61,12 @@ function makeAskViews(
       turn: { round: 1, phase: '出牌', vars: {} },
       players: players.map((p, i) => ({ ...p, hand: i === v ? [] : undefined })),
       cardMap: {},
-      pending: { type: 'awaits', atom: { type: '询问闪' } as unknown as Atom, prompt: { type: 'useCard', title: '请出闪', cardFilter: { min: 1, max: 1 } }, target: pendingTarget },
+      pending: {
+        type: 'awaits',
+        atom: { type: '询问闪' } as unknown as Atom,
+        prompt: { type: 'useCard', title: '请出闪', cardFilter: { min: 1, max: 1 } },
+        target: pendingTarget,
+      },
       deadline: null,
       deadlineTotalMs: 0,
       log: [],
@@ -74,7 +79,9 @@ function makeAskViews(
 /** 测试 wrapper:捕获 perspective 的变化序列(用于检测死循环)。
  *  initialPerspective:起始视角。 */
 function PerspectiveTracker({
-  views, playerCount, initialPerspective = 0,
+  views,
+  playerCount,
+  initialPerspective = 0,
 }: {
   views: Map<number, GameView>;
   playerCount: number;
@@ -82,7 +89,8 @@ function PerspectiveTracker({
 }) {
   const [perspective, setPerspective] = useState(initialPerspective);
   // 记录每次 perspective 变化
-  if (perspectiveTrace[perspectiveTrace.length - 1] !== perspective) perspectiveTrace.push(perspective);
+  if (perspectiveTrace[perspectiveTrace.length - 1] !== perspective)
+    perspectiveTrace.push(perspective);
 
   useDebugPerspective(views, perspective, playerCount, setPerspective);
   return null;
@@ -100,7 +108,9 @@ describe('useDebugPerspective:问询场景跟随被问询者且不死循环', ()
 
     // 从观察者 player 1 开始(既不是 current 也不是 target)
     renderWithProvider(<PerspectiveTracker views={views} playerCount={5} initialPerspective={1} />);
-    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
 
     const trace = perspectiveTrace;
     // 不应震荡
@@ -115,7 +125,9 @@ describe('useDebugPerspective:问询场景跟随被问询者且不死循环', ()
 
     // 从被问询者 player 0 开始(自己专属 pending)
     renderWithProvider(<PerspectiveTracker views={views} playerCount={5} initialPerspective={0} />);
-    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
 
     const trace = perspectiveTrace;
     expect(trace.length).toBeLessThan(10);
@@ -129,7 +141,9 @@ describe('useDebugPerspective:问询场景跟随被问询者且不死循环', ()
     perspectiveTrace = [];
 
     renderWithProvider(<PerspectiveTracker views={views} playerCount={5} initialPerspective={2} />);
-    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
 
     const trace = perspectiveTrace;
     expect(trace.length).toBeLessThan(10);
@@ -144,7 +158,9 @@ describe('useDebugPerspective:问询场景跟随被问询者且不死循环', ()
 
     // 从观察者 player 3 开始(既不是 current 也不是 target)
     renderWithProvider(<PerspectiveTracker views={views} playerCount={5} initialPerspective={3} />);
-    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
 
     const trace = perspectiveTrace;
     expect(trace.length).toBeLessThan(10);

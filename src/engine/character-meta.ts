@@ -42,14 +42,17 @@ interface CharacterSource {
 const META: ReadonlyMap<string, CharacterMeta> = new Map(
   allCharacters.map((c) => {
     const src = c as unknown as CharacterSource;
-    return [src.name, {
-      name: src.name,
-      faction: src.faction,
-      maxHealth: src.maxHealth,
-      skills: src.skills.map(s => s.name),
-      isLord: src.isLord === true || LORD_CANDIDATES.includes(src.name),
-    } satisfies CharacterMeta];
-  })
+    return [
+      src.name,
+      {
+        name: src.name,
+        faction: src.faction,
+        maxHealth: src.maxHealth,
+        skills: src.skills.map((s) => s.name),
+        isLord: src.isLord === true || LORD_CANDIDATES.includes(src.name),
+      } satisfies CharacterMeta,
+    ];
+  }),
 );
 
 export function getCharacterMeta(name: string): CharacterMeta | undefined {

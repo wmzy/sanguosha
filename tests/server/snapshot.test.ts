@@ -20,7 +20,7 @@ const SNAPSHOT_DIR = join(process.cwd(), 'data', 'snapshots');
 
 function makeRoom(isDebug = true): Room {
   return {
-    id: 'snap-test-' + Math.random().toString(36).slice(2, 8),
+    id: `snap-test-${Math.random().toString(36).slice(2, 8)}`,
     name: '快照测试房',
     maxPlayers: 4,
     players: new Map(),
@@ -31,7 +31,7 @@ function makeRoom(isDebug = true): Room {
   } as unknown as Room;
 }
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function getState(session: GameSession): GameState {
   return (session as unknown as { state: GameState }).state;
@@ -74,8 +74,8 @@ describe('debug 快照功能', () => {
     const result = await createSnapshot(session, {
       roomId: room.id,
       perspective: 0,
-      frontendSeqs: { '0': 5, '1': 5, '2': 4, '3': 5 },
-      frontendViews: { '0': { viewer: 0 } as never, '1': { viewer: 1 } as never },
+      frontendSeqs: { 0: 5, 1: 5, 2: 4, 3: 5 },
+      frontendViews: { 0: { viewer: 0 } as never, 1: { viewer: 1 } as never },
     });
 
     expect(result).not.toHaveProperty('error');
@@ -197,8 +197,8 @@ describe('debug 快照功能', () => {
     const result = await createSnapshot(session, {
       roomId: room.id,
       perspective: 1,
-      frontendSeqs: { '0': 3 },
-      frontendViews: { '0': { viewer: 0 } as never },
+      frontendSeqs: { 0: 3 },
+      frontendViews: { 0: { viewer: 0 } as never },
       telemetry: {
         consoleLog: [
           { time: 1782360000000, level: 'error', message: 'Test error 1' },
@@ -208,9 +208,7 @@ describe('debug 快照功能', () => {
           { time: 1782360000000, seat: 0, dir: 'in', msg: { type: 'event', seq: 1 } },
           { time: 1782360000500, seat: 1, dir: 'out', msg: { type: 'action' } },
         ],
-        userActions: [
-          { time: 1782360000000, kind: 'perspective', detail: 2 },
-        ],
+        userActions: [{ time: 1782360000000, kind: 'perspective', detail: 2 }],
         domHtml: '<div id="root"><span class="seat">P0</span></div>',
         capturedAt: 1782360000000,
         viewport: { width: 1280, height: 720 },

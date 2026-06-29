@@ -22,11 +22,24 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物', rank = 'A', range?: number): Card {
+function makeEquip(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物',
+  rank = 'A',
+  range?: number,
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -88,7 +101,7 @@ describe('八卦阵', () => {
     expect(harness.state.players[0].hand).not.toContain('b1');
     // view 级断言:equipment 和 skills 通过 applyView 同步
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].equipment['防具']).toBe('b1');
       expect(v.players[0].skills).toContain('八卦阵');
     });
@@ -105,7 +118,13 @@ describe('八卦阵', () => {
     const judgeCard = makeCard('j1', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
       ],
       cardMap: { b1: bagua, s1: slash, j1: judgeCard },
@@ -137,8 +156,7 @@ describe('八卦阵', () => {
     P1.expectNoPending();
     // view 级断言:health 通过 applyView 同步
     P1.processEvents();
-    P1.expectView(v => expect(v.players[0].health).toBe(4));
-
+    P1.expectView((v) => expect(v.players[0].health).toBe(4));
   });
 
   it('判定成功(红色 ♦):发动八卦阵 → 同样视为出闪', async () => {
@@ -147,7 +165,13 @@ describe('八卦阵', () => {
     const judgeCard = makeCard('j1', '杀', '♦', '7'); // 方块红色
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
       ],
       cardMap: { b1: bagua, s1: slash, j1: judgeCard },
@@ -177,7 +201,13 @@ describe('八卦阵', () => {
     const judgeCard = makeCard('j1', '杀', '♠', '5'); // 黑桃黑色
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
       ],
       cardMap: { b1: bagua, s1: slash, j1: judgeCard },
@@ -200,7 +230,6 @@ describe('八卦阵', () => {
 
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('j1');
-
   });
 
   it('判定失败(黑色 ♣):发动八卦阵 → 同样不视为闪', async () => {
@@ -209,7 +238,13 @@ describe('八卦阵', () => {
     const judgeCard = makeCard('j1', '桃', '♣', '5'); // 梅花黑色
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
       ],
       cardMap: { b1: bagua, s1: slash, j1: judgeCard },
@@ -233,8 +268,7 @@ describe('八卦阵', () => {
     expect(harness.state.zones.discardPile).toContain('j1');
     // view 级断言:health 通过 applyView 同步
     P1.processEvents();
-    P1.expectView(v => expect(v.players[0].health).toBe(3));
-
+    P1.expectView((v) => expect(v.players[0].health).toBe(3));
   });
 
   // ─── 正面:判定红色 + P1 手里有真闪 → 不再询问出闪,真闪留在手里 ────────────
@@ -246,7 +280,13 @@ describe('八卦阵', () => {
     const judgeCard = makeCard('j1', '桃', '♥', '5'); // 红色
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['d1'], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['d1'],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
       ],
       cardMap: { b1: bagua, s1: slash, d1: dodge, j1: judgeCard },
@@ -274,7 +314,7 @@ describe('八卦阵', () => {
     expect(harness.state.zones.discardPile).toContain('j1');
     // view 级断言:health 通过 applyView 同步
     P1.processEvents();
-    P1.expectView(v => expect(v.players[0].health).toBe(4));
+    P1.expectView((v) => expect(v.players[0].health).toBe(4));
   });
 
   // ─── 负面:非自己回合装八卦阵 → 拒绝 ────────────
@@ -295,7 +335,9 @@ describe('八卦阵', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '装备通用', actionType: 'use', params: { cardId: 'b1' },
+      skillId: '装备通用',
+      actionType: 'use',
+      params: { cardId: 'b1' },
     });
   });
 
@@ -316,7 +358,9 @@ describe('八卦阵', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '装备通用', actionType: 'use', params: { cardId: 'nonexistent' },
+      skillId: '装备通用',
+      actionType: 'use',
+      params: { cardId: 'nonexistent' },
     });
   });
 
@@ -329,7 +373,13 @@ describe('八卦阵', () => {
     const judgeCard = makeCard('j1', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
       ],
       cardMap: { b1: bagua, s1: slash, j1: judgeCard },
@@ -363,7 +413,13 @@ describe('八卦阵', () => {
     const judgeCard = makeCard('j1', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['装备通用', '闪', '八卦阵'], equipment: { '防具': 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
       ],
       cardMap: { b1: bagua, s1: slash, j1: judgeCard },

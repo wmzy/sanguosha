@@ -11,7 +11,7 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
   },
   apply(state, atom) {
     const player = state.players[atom.player];
-    if (player.pendingTricks.some(t => t.name === atom.trick.name)) return;
+    if (player.pendingTricks.some((t) => t.name === atom.trick.name)) return;
     player.pendingTricks.push(atom.trick);
   },
   effect: { sound: 'judge_attach', animation: 'glow', duration: 800 },
@@ -25,7 +25,7 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     if (!view.players[pi].pendingTricks) {
       view.players[pi].pendingTricks = [];
@@ -33,7 +33,7 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
     // trick 是 PendingTrick{ name, source, card };GameView 仅存 cardId
     const trick = event.trick as { name?: string; card?: { id: string } } | undefined;
     if (trick?.card?.id) {
-      const list = view.players[pi].pendingTricks!;
+      const list = view.players[pi].pendingTricks;
       const cardId = trick.card.id;
       if (!list.includes(cardId)) list.push(cardId);
     }

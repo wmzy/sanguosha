@@ -23,7 +23,7 @@ export const 陷入濒死: AtomDefinition<{ target: number }> = {
   applyView(view: GameView, event) {
     // 陷入濒死:体力归零(造成伤害/失去体力 已把 health 扣过,这里强制兜底为 0),
     // alive 由 击杀 atom 的 applyView 更新,这里不提前设
-    const pi = view.players.findIndex(p => p.index === (event.target as number));
+    const pi = view.players.findIndex((p) => p.index === (event.target as number));
     if (pi >= 0) {
       view.players[pi].health = 0;
     }

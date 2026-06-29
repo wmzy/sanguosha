@@ -10,7 +10,7 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
 };
 
 const currentLevel: LogLevel =
-  (typeof process !== 'undefined' && process.env?.LOG_LEVEL as LogLevel) || 'info';
+  (typeof process !== 'undefined' && (process.env?.LOG_LEVEL as LogLevel)) || 'info';
 
 function shouldLog(level: LogLevel): boolean {
   return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[currentLevel];

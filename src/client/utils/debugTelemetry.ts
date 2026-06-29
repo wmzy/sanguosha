@@ -32,7 +32,14 @@ export interface WsEntry {
 
 export interface ActionEntry {
   time: number;
-  kind: 'action' | 'reorder' | 'perspective' | 'ready' | 'start_game' | 'restart_game' | 'update_config';
+  kind:
+    | 'action'
+    | 'reorder'
+    | 'perspective'
+    | 'ready'
+    | 'start_game'
+    | 'restart_game'
+    | 'update_config';
   detail: unknown;
 }
 
@@ -92,9 +99,10 @@ function handleWindowError(e: ErrorEvent): void {
 }
 
 function handleRejection(e: PromiseRejectionEvent): void {
-  const reason = e.reason instanceof Error
-    ? `${e.reason.message}\n${e.reason.stack ?? ''}`
-    : formatArg(e.reason);
+  const reason =
+    e.reason instanceof Error
+      ? `${e.reason.message}\n${e.reason.stack ?? ''}`
+      : formatArg(e.reason);
   pushConsole('error', `unhandledrejection: ${reason}`);
 }
 
@@ -144,7 +152,17 @@ export function logWsMessage(seat: number, dir: 'in' | 'out', msg: unknown): voi
 }
 
 /** 记录一条用户操作。仅 installed 时生效。 */
-export function logUserAction(kind: 'action' | 'reorder' | 'perspective' | 'ready' | 'start_game' | 'restart_game' | 'update_config', detail: unknown): void {
+export function logUserAction(
+  kind:
+    | 'action'
+    | 'reorder'
+    | 'perspective'
+    | 'ready'
+    | 'start_game'
+    | 'restart_game'
+    | 'update_config',
+  detail: unknown,
+): void {
   if (!installed) return;
   actionBuffer.push({ time: Date.now(), kind, detail });
   if (actionBuffer.length > MAX_ACTIONS) actionBuffer.shift();

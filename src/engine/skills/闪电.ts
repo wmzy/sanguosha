@@ -14,21 +14,40 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill'
+import {
+  registerAction,
+  registerAfterHook,
+  registerBeforeHook,
+  hasBlockingPending,
+} from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 import { TARGET_SYSTEM } from '../types';
 
 const TRICK_NAME = '闪电';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: TRICK_NAME, description: '延时锦囊:判定黑桃2-9则受3点雷电伤害,否则传给下家' };
+  return {
+    id,
+    ownerId,
+    name: TRICK_NAME,
+    description: '延时锦囊:判定黑桃2-9则受3点雷电伤害,否则传给下家',
+  };
 }
 
 /** 判定结果是否触发:黑桃 2~9 */
 function isLightningHit(card: Card): boolean {
   if (card.suit !== '♠') return false;
   const rank = card.rank;
-  const n = rank === 'A' ? 1 : rank === 'J' ? 11 : rank === 'Q' ? 12 : rank === 'K' ? 13 : parseInt(rank, 10);
+  const n =
+    rank === 'A'
+      ? 1
+      : rank === 'J'
+        ? 11
+        : rank === 'Q'
+          ? 12
+          : rank === 'K'
+            ? 13
+            : parseInt(rank, 10);
   return n >= 2 && n <= 9;
 }
 
@@ -39,7 +58,7 @@ function findNextRecipient(state: GameState, current: number): number | null {
     const idx = (current + i) % n;
     const p = state.players[idx];
     if (!p.alive) continue;
-    if (p.pendingTricks.some(t => t.name === TRICK_NAME)) continue;
+    if (p.pendingTricks.some((t) => t.name === TRICK_NAME)) continue;
     return idx;
   }
   return null;
@@ -48,7 +67,12 @@ function findNextRecipient(state: GameState, current: number): number | null {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ─── use action:对自己判定区放置延时锦囊 ────────────────────
-  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
+    (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state);
@@ -58,15 +82,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardInHand = !!self.hand.includes(params.cardId);
       const cardNameOk = state.cardMap[params.cardId]?.name === TRICK_NAME;
       // 闪电对自己使用;若自己判定区已有闪电则不可重复放置
-      const notAlready = !self.pendingTricks.some(t => t.name === TRICK_NAME);
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notAlready;
+      const notAlready = !self.pendingTricks.some((t) => t.name === TRICK_NAME);
+      const ok =
+        myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && notAlready;
       return ok ? null : '闪电使用条件不满足';
-    }, async (state: GameState, params: Record<string, Json>) => {
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       // 延时锦囊:使用时仅放置到判定区,无懈可击问询延迟到判定阶段判定前
       await pushFrame(state, TRICK_NAME, from, { ...params });
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: from },
+        to: { zone: '处理区' },
+      });
       const trickCard = state.cardMap[cardId];
       const pendingCard: Card = trickCard ?? {
         id: cardId,
@@ -81,9 +112,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
         player: from,
         trick: { name: TRICK_NAME, source: from, card: pendingCard },
       });
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '处理区' },
+        to: { zone: '弃牌堆' },
+      });
       await popFrame(state);
-    });
+    },
+  );
 
   // ─── 判定阶段:有 闪电 → 先问无懈可击,未被抵消才触发判定 ────
   registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
@@ -93,7 +130,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.phase !== '判定') return;
     const self = ctx.state.players[ownerId];
     if (!self) return;
-    if (!self.pendingTricks.some(t => t.name === TRICK_NAME)) return;
+    if (!self.pendingTricks.some((t) => t.name === TRICK_NAME)) return;
     if (ctx.state.zones.deck.length === 0) return;
 
     // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问;抵消整个延时锦囊)
@@ -101,7 +138,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cancelled = await 询问无懈可击(ctx.state, ownerId);
       if (cancelled) {
         // 被无懈抵消:移除延时锦囊,跳过判定
-        await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: TRICK_NAME });
+        await applyAtom(ctx.state, {
+          type: '移除延时锦囊',
+          player: ownerId,
+          trickName: TRICK_NAME,
+        });
         return;
       }
       await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: TRICK_NAME });
@@ -119,7 +160,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const self = ctx.state.players[ownerId];
     if (!self) return;
-    if (!self.pendingTricks.some(t => t.name === TRICK_NAME)) return;
+    if (!self.pendingTricks.some((t) => t.name === TRICK_NAME)) return;
 
     // 读判定牌(在判定 atom.afterHooks 把它移入弃牌堆之前)
     const processing = frameCards(ctx.state);
@@ -129,12 +170,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!judgeCard) return;
 
     // 保留原 trick 条目引用(实体卡)——传递时复用同一张卡,不丢失实体
-    const trickEntry = self.pendingTricks.find(t => t.name === TRICK_NAME);
+    const trickEntry = self.pendingTricks.find((t) => t.name === TRICK_NAME);
     const lightningCard: Card = trickEntry?.card ?? judgeCard;
 
     if (isLightningHit(judgeCard)) {
       // 黑桃 2-9:受到 3 点无来源雷电伤害 + 移除闪电(进弃牌堆)
-      await applyAtom(ctx.state, { type: '造成伤害', target: ownerId, amount: 3, source: TARGET_SYSTEM });
+      await applyAtom(ctx.state, {
+        type: '造成伤害',
+        target: ownerId,
+        amount: 3,
+        source: TARGET_SYSTEM,
+      });
       await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: TRICK_NAME });
     } else {
       // 其他:移除当前玩家闪电,传递给下家(无下家可接时,闪电消失进弃牌堆)

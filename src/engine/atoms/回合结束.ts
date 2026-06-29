@@ -12,13 +12,12 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
   apply(state) {
     state.turn.vars = {};
     for (const p of state.players) {
-      p.marks = p.marks.filter(m => m.duration !== 'turn');
+      p.marks = p.marks.filter((m) => m.duration !== 'turn');
       // 清理所有 per-turn 标记(约定后缀):/usedThisTurn(限一次)、/healed(已回血)、/givenCount(累计计数)
       p.vars = Object.fromEntries(
-        Object.entries(p.vars).filter(([k]) =>
-          !k.endsWith('/usedThisTurn') &&
-          !k.endsWith('/healed') &&
-          !k.endsWith('/givenCount'),
+        Object.entries(p.vars).filter(
+          ([k]) =>
+            !k.endsWith('/usedThisTurn') && !k.endsWith('/healed') && !k.endsWith('/givenCount'),
         ),
       );
     }
@@ -36,7 +35,7 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
     view.turn.vars = {};
     // 清理每个玩家 duration==='turn' 的 marks(view 侧可见)
     for (const p of view.players) {
-      p.marks = p.marks.filter(m => m.duration !== 'turn');
+      p.marks = p.marks.filter((m) => m.duration !== 'turn');
       // 清空本回合用量(出杀计数/限一次标记),与 apply 清 state vars 对称
       p.turnUsage = {};
     }

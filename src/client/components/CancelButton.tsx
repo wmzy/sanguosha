@@ -11,6 +11,8 @@ export interface CancelButtonProps {
 
 export function CancelButton({ label = '取消', onClick }: CancelButtonProps) {
   return (
-    <button className={styles.cancelBtn} onClick={onClick}>{label}</button>
+    <button className={styles.cancelBtn} onClick={onClick}>
+      {label}
+    </button>
   );
 }

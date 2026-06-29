@@ -245,7 +245,7 @@ export function RoomConfigPanel({
   const [editConfig, setEditConfig] = useState<RoomConfig>(config);
 
   const handleField = useCallback(<K extends keyof RoomConfig>(key: K, value: RoomConfig[K]) => {
-    setEditConfig(prev => ({ ...prev, [key]: value }));
+    setEditConfig((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const handleApply = useCallback(() => {
@@ -267,9 +267,7 @@ export function RoomConfigPanel({
     <div className={page}>
       <div className={card}>
         <h2 className={title}>房间配置</h2>
-        <p className={subtitle}>
-          配置完成后,切换到每个座次视角点「准备」。全部准备后可开始。
-        </p>
+        <p className={subtitle}>配置完成后,切换到每个座次视角点「准备」。全部准备后可开始。</p>
 
         {/* 房间名 */}
         <div className={formGroup}>
@@ -279,7 +277,7 @@ export function RoomConfigPanel({
             type="text"
             value={editConfig.name}
             maxLength={40}
-            onChange={e => handleField('name', e.target.value)}
+            onChange={(e) => handleField('name', e.target.value)}
             onBlur={handleApply}
           />
         </div>
@@ -291,14 +289,20 @@ export function RoomConfigPanel({
             <select
               className={select}
               value={editConfig.charPool}
-              onChange={e => {
+              onChange={(e) => {
                 handleField('charPool', e.target.value as CharPoolPreset);
                 // select 立即提交
-                setTimeout(() => onUpdateConfig({ ...editConfig, charPool: e.target.value as CharPoolPreset }), 0);
+                setTimeout(
+                  () =>
+                    onUpdateConfig({ ...editConfig, charPool: e.target.value as CharPoolPreset }),
+                  0,
+                );
               }}
             >
-              {POOL_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+              {POOL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
@@ -309,14 +313,16 @@ export function RoomConfigPanel({
             <select
               className={select}
               value={editConfig.timeoutScale}
-              onChange={e => {
+              onChange={(e) => {
                 const v = e.target.value === 'Infinity' ? Infinity : Number(e.target.value);
                 handleField('timeoutScale', v);
                 setTimeout(() => onUpdateConfig({ ...editConfig, timeoutScale: v }), 0);
               }}
             >
-              {TIMEOUT_OPTIONS.map(o => (
-                <option key={o.label} value={o.value === Infinity ? 'Infinity' : o.value}>{o.label}</option>
+              {TIMEOUT_OPTIONS.map((o) => (
+                <option key={o.label} value={o.value === Infinity ? 'Infinity' : o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
@@ -330,14 +336,16 @@ export function RoomConfigPanel({
               min={0}
               max={10}
               value={editConfig.handSize}
-              onChange={e => handleField('handSize', Number(e.target.value))}
+              onChange={(e) => handleField('handSize', Number(e.target.value))}
               onBlur={handleApply}
             />
           </div>
         </div>
 
         {/* 座次列表 */}
-        <label className={label}>座次与准备 ({connectedCount}/{maxPlayers} 已连接)</label>
+        <label className={label}>
+          座次与准备 ({connectedCount}/{maxPlayers} 已连接)
+        </label>
         <div className={seatsGrid}>
           {Array.from({ length: maxPlayers }, (_, i) => {
             const pid = seatPlayerIds.get(i);
@@ -347,7 +355,12 @@ export function RoomConfigPanel({
             return (
               <div
                 key={i}
-                className={cx(seatCardBase, isCurrent && seatCurrent, isReady && seatReadyCls, !isConnected && seatDisconnected)}
+                className={cx(
+                  seatCardBase,
+                  isCurrent && seatCurrent,
+                  isReady && seatReadyCls,
+                  !isConnected && seatDisconnected,
+                )}
                 onClick={() => onSwitchPerspective(i)}
               >
                 <div className={seatLabel}>座次 {i + 1}</div>
@@ -372,10 +385,18 @@ export function RoomConfigPanel({
 
         {/* 操作按钮 */}
         <div className={actionsRow}>
-          {allSeatsReady
-            ? <button className={btnPrimary} onClick={onStart}>开始游戏</button>
-            : <button className={btnPrimaryDisabled} disabled>等待全部准备</button>}
-          <button className={btnSecondary} onClick={onExit}>退出</button>
+          {allSeatsReady ? (
+            <button className={btnPrimary} onClick={onStart}>
+              开始游戏
+            </button>
+          ) : (
+            <button className={btnPrimaryDisabled} disabled>
+              等待全部准备
+            </button>
+          )}
+          <button className={btnSecondary} onClick={onExit}>
+            退出
+          </button>
         </div>
       </div>
       {error && <div className={errorBox}>{error}</div>}

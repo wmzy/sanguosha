@@ -50,7 +50,10 @@ function isAllReady(hgc: HeadlessGameClient): boolean {
  * join 模式：加入→准备→等待房主开局。
  * 返回时 phase 应为 'playing'（已开局）；超时则 phase='lobby'。
  */
-export async function joinAndStartRoom(hgc: HeadlessGameClient, opts: LobbyOpts): Promise<LobbyResult> {
+export async function joinAndStartRoom(
+  hgc: HeadlessGameClient,
+  opts: LobbyOpts,
+): Promise<LobbyResult> {
   // 1. 建/加入房间
   if (opts.mode === 'create') {
     hgc.createRoom(

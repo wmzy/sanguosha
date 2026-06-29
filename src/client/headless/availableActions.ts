@@ -1,11 +1,22 @@
 // src/client/headless/availableActions.ts
 // 枚举当前座次可执行操作。纯函数，零副作用。
 // 复用 gameViewHelpers 的 isActiveAction / findUseActionForCard / derivePlayRules / buildPlayParams。
-import type { GameView, Card, ActionContext, ClientMessage as EngineClientMessage, TargetFilter } from '../../engine/types';
+// src/client/headless/availableActions.ts
+// 枚举当前座次可执行操作。纯函数，零副作用。
+// 复用 gameViewHelpers 的 isActiveAction / findUseActionForCard / derivePlayRules / buildPlayParams。
+import type {
+  GameView,
+  ActionContext,
+  ClientMessage as EngineClientMessage,
+  TargetFilter,
+} from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { AvailableAction } from './types';
 import {
-  isActiveAction, findUseActionForCard, derivePlayRules, buildPlayParams,
+  isActiveAction,
+  findUseActionForCard,
+  derivePlayRules,
+  buildPlayParams,
 } from '../utils/gameViewHelpers';
 
 /** 从 use action 的 prompt 取 targetFilter（useCardAndTarget/selectTarget 才有）。 */
@@ -49,9 +60,9 @@ function enumeratePlayActions(
     // 构造示例 message：无目标牌直接完整；有目标牌 targets 待 agent 补全
     const sampleParams = rules.selfTarget
       ? buildPlayParams(view.players, seatIndex, card, rules, null, null)
-      : (rules.needsTarget && !rules.hasSlots
+      : rules.needsTarget && !rules.hasSlots
         ? { cardId: card.id }
-        : buildPlayParams(view.players, seatIndex, card, rules, null, null));
+        : buildPlayParams(view.players, seatIndex, card, rules, null, null);
     const message: EngineClientMessage = {
       skillId: action.skillId,
       actionType: 'use',
@@ -61,9 +72,10 @@ function enumeratePlayActions(
     };
     const cardDesc = `${card.suit}${card.rank}`;
     result.push({
-      description: rules.needsTarget && !rules.selfTarget
-        ? `使用【${card.name}】(${cardDesc}) 选择目标`
-        : `使用【${card.name}】(${cardDesc})`,
+      description:
+        rules.needsTarget && !rules.selfTarget
+          ? `使用【${card.name}】(${cardDesc}) 选择目标`
+          : `使用【${card.name}】(${cardDesc})`,
       message,
       validTargets,
       category: 'play',

@@ -8,13 +8,7 @@ export const TARGET_SYSTEM = -1;
 /** 广播型 target:所有存活玩家都可回应(无懈可击询问)。 */
 export const TARGET_BROADCAST = -2;
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | Json[]
-  | { [key: string]: Json };
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 
 export type Card = {
   id: string;
@@ -56,7 +50,6 @@ export interface Mark {
   payload?: Json;
   duration?: 'turn' | 'round' | number;
 }
-
 
 export interface PendingTrick {
   name: string;
@@ -143,11 +136,11 @@ export interface GameState {
 }
 
 /** 创建 GameState 的统一工厂。缺失字段自动补默认值 */
-export function createGameState(partial: Partial<GameState> & { players: PlayerState[]; cardMap: Record<string, Card> }): GameState {
+export function createGameState(
+  partial: Partial<GameState> & { players: PlayerState[]; cardMap: Record<string, Card> },
+): GameState {
   // 兜底:为缺失 tags 字段的 players 补默认值(tags 是必填,但外部构造 PlayerState 时可能遗漏)
-  const players = partial.players.map((p): PlayerState =>
-    p.tags ? p : { ...p, tags: [] }
-  );
+  const players = partial.players.map((p): PlayerState => (p.tags ? p : { ...p, tags: [] }));
   return {
     currentPlayerIndex: 0,
     phase: '准备',
@@ -333,7 +326,7 @@ export interface PickTargetCardPrompt {
 
 /** Atom 等待配置(pending)。有此字段 = 等待型 atom。apply 流程走完后进 pending 区。
  等待型 atom 不可被取消——必走完(响应/超时)之一(没有 drop 机制)。
- `timeout` 与 `onTimeout` 都是必填,无合理默认值。*/
+ `timeout` 与 `onTimeout` 都是必填,无合理默认值。 */
 export interface AtomPending<A = Atom> {
   /** 超时后的行为。**必填**——一个 async 函数,引擎在 slot 超时时调用。
    *  内部可自由编排 applyAtom(支持多步操作),每个 applyAtom 照常走完整 pipeline(hooks 正常触发)。
@@ -345,7 +338,7 @@ export interface AtomPending<A = Atom> {
   timeout: number;
   /** 是否为阻塞型 pending(需要玩家先回应才能继续)。默认 true。
    *  非阻塞型 pending 表示一个"控制权 token"——玩家可在其期间自由操作(如出牌阶段的 出牌窗口),
-   *  出牌/用技的 validate 只检查阻塞型 pending。*/
+   *  出牌/用技的 validate 只检查阻塞型 pending。 */
   isBlocking?: boolean;
 }
 
@@ -437,8 +430,16 @@ export type Atom =
   | { type: '拼点'; initiator: number; target: number; initiatorCard: string; targetCard: string }
   // 初始化
   | { type: '抽身份'; playerCount: number; seed: number }
-  | { type: '选将询问'; target: number; candidates: Array<{ name: string; skills: string[] }>; prompt?: ActionPrompt }
-  | { type: '并行选将'; selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }> }
+  | {
+      type: '选将询问';
+      target: number;
+      candidates: Array<{ name: string; skills: string[] }>;
+      prompt?: ActionPrompt;
+    }
+  | {
+      type: '并行选将';
+      selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }>;
+    }
   | { type: '分配武将'; target: number; character: string; skills: string[] }
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number; lordBonus?: number }
@@ -449,12 +450,26 @@ export type Atom =
   // 等待回应
   | { type: '询问闪'; target: number; source: number }
   | { type: '询问杀'; target: number; source: number }
-  | { type: '请求回应'; requestType: string; target: number; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number;
-     /** 仅用于 requestType='无懈可击':本次无懈抵消的目标座次(-1=整体抵消/单目标锦囊,N=全体锦囊的某个目标)。
-      * 无懈 respond execute 据此翻转 localVars[`无懈/被抵消/${cancelTarget}`]。 */
-     cancelTarget?: number }
+  | {
+      type: '请求回应';
+      requestType: string;
+      target: number;
+      prompt: ActionPrompt;
+      defaultChoice?: Json;
+      timeout?: number;
+      /** 仅用于 requestType='无懈可击':本次无懈抵消的目标座次(-1=整体抵消/单目标锦囊,N=全体锦囊的某个目标)。
+       * 无懈 respond execute 据此翻转 localVars[`无懈/被抵消/${cancelTarget}`]。 */
+      cancelTarget?: number;
+    }
   // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
-  | { type: '并行回应'; requestType: string; targets: number[]; prompt: ActionPrompt; defaultChoice?: Json; timeout?: number }
+  | {
+      type: '并行回应';
+      requestType: string;
+      targets: number[];
+      prompt: ActionPrompt;
+      defaultChoice?: Json;
+      timeout?: number;
+    }
   // 出牌阶段的控制权 token——非阻塞型 pending,表示"当前玩家可自由出牌/用技"。
   // 玩家每次操作都 resolve 它(重建),超时则结束回合。不计入 hasBlockingPending。
   | { type: '出牌窗口'; player: number; timeout?: number }
@@ -467,7 +482,6 @@ export type Atom =
   | { type: '帧参数赋值'; key: string; value: Json }
   // 回合用量(view 同步):出杀计数/限一次标记同步到前端 turnUsage
   | { type: '回合用量'; player: number; key: string; value: Json };
-
 
 export interface AtomDefinition<A = unknown> {
   type: string;
@@ -591,10 +605,7 @@ export interface GameView {
  *   cancel 是确定性事件:管线推一个 notify 事件让前端感知(非静默)。
  *   调用方可通过 applyAtom 返回值(false)感知 cancel,据此跳过后续逻辑(如杀跳过无效目标)。
  */
-export type HookResult =
-  | { kind: 'pass' }
-  | { kind: 'modify'; atom: Atom }
-  | { kind: 'cancel' };
+export type HookResult = { kind: 'pass' } | { kind: 'modify'; atom: Atom } | { kind: 'cancel' };
 
 /** before 钩子上下文:atom 执行前调用 */
 export interface AtomBeforeContext {
@@ -619,8 +630,6 @@ export interface AtomAfterContext {
   readonly params: Record<string, Json>;
 }
 
-
-
 // ==================== Skill ====================
 
 export interface Skill {
@@ -630,13 +639,12 @@ export interface Skill {
   description: string;
 }
 
-
 export interface PendingView {
   type: 'awaits';
   atom: Atom;
   prompt: ActionPrompt;
   target: number;
-  /** 是否为阻塞型 pending(需玩家回应)。非阻塞型(如出牌阶段的出牌窗口)在前端不计入 awaiting 判断。*/
+  /** 是否为阻塞型 pending(需玩家回应)。非阻塞型(如出牌阶段的出牌窗口)在前端不计入 awaiting 判断。 */
   isBlocking?: boolean;
   /** 由 events 消息权威下发;applyView 不再硬编码 */
   deadline?: number;
@@ -676,7 +684,7 @@ export interface PendingSlot {
   definition: AtomDefinition;
   startTime: number;
   deadline: number;
-  /** 是否为阻塞型 pending。非阻塞型(出牌窗口)不阻止玩家出牌/用技,不计入 hasBlockingPending。*/
+  /** 是否为阻塞型 pending。非阻塞型(出牌窗口)不阻止玩家出牌/用技,不计入 hasBlockingPending。 */
   isBlocking: boolean;
   /** 创建时的 state.seq，作为 pending 窗口版本号。
    *  respond 路径用 action.pendingSeq 与此对比：不匹配 = 响应了过期窗口 → 拒绝。
@@ -792,13 +800,28 @@ export interface FrontendAPI {
 
 export type GameEvent =
   | { kind: 'atom'; seq: number; atom: Atom; viewEvents?: ViewEventSplit }
-  | { kind: 'notify'; seq: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
+  | {
+      kind: 'notify';
+      seq: number;
+      skillId: string;
+      eventType: string;
+      data: Json;
+      views?: ReadonlyMap<string, Json>;
+    };
 
 /** 引擎唯一权威事件源条目。apply 时写入，不可变。
  *  替代旧的模块级 event-stream 单例。 */
 export type AppliedAtomEntry =
   | { kind: 'atom'; seq: number; timestamp: number; atom: Atom; viewEvents: ViewEventSplit }
-  | { kind: 'notify'; seq: number; timestamp: number; skillId: string; eventType: string; data: Json; views?: ReadonlyMap<string, Json> };
+  | {
+      kind: 'notify';
+      seq: number;
+      timestamp: number;
+      skillId: string;
+      eventType: string;
+      data: Json;
+      views?: ReadonlyMap<string, Json>;
+    };
 
 /** 事件 envelope(per-viewer 已分叉)。session 广播用。
  *  从 engine/types 导出避免 engine→server 循环依赖。 */

@@ -13,20 +13,51 @@ function build(): GameState {
   const slash2: Card = { id: 's2', name: '杀', suit: '♣', color: '黑', rank: '5', type: '基本牌' };
   return createGameState({
     players: [
-      { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
-        hand: ['s0'], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: '反', health: 4, maxHealth: 4, alive: true,
-        hand: ['d1', 's2'], equipment: {}, skills: ['闪', '杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: '主公',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['s0'],
+        equipment: {},
+        skills: ['杀'],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '反',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['d1', 's2'],
+        equipment: {},
+        skills: ['闪', '杀'],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
     ],
     cardMap: { s0: slash, d1: dodge, s2: slash2 },
-    currentPlayerIndex: 0, phase: '出牌',
+    currentPlayerIndex: 0,
+    phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
   });
 }
 
 describe('杀结算链路 + 前端校验对齐', () => {
   let harness: SkillTestHarness;
-  beforeEach(() => { harness = new SkillTestHarness(); });
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
 
   it('出杀→P2出闪→不扣血→处理区清空', async () => {
     await harness.setup(build());

@@ -22,7 +22,9 @@ function calcNextPlayer(state: { players: { alive: boolean }[]; currentPlayerInd
 
 export const 下一玩家: AtomDefinition<Record<string, never>> = {
   type: '下一玩家',
-  validate() { return null; },
+  validate() {
+    return null;
+  },
   apply(state) {
     const { nextIdx, roundIncrement } = calcNextPlayer(state);
     if (roundIncrement) state.turn.round += 1;

@@ -12,10 +12,7 @@
 //   - 修改帧 params.resolvedTargets:把流离原目标替换为新目标
 //   - 杀.execute 下一轮 结算 读帧 resolvedTargets[i] 而非原始 targets[i]
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -62,25 +59,35 @@ describe('流离:成为杀的目标时转移', () => {
   // 本测试只验证 confirm 阶段成功 + chooseTarget pending 创建。
   it('用例1:P1 发动流离(confirm)→ 流离/chooseTarget pending 出现', async () => {
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
-    const discard1: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
+    const discard1: Card = {
+      id: 'd1',
+      name: '闪',
+      suit: '♥',
+      color: '红',
+      rank: '2',
+      type: '基本牌',
+    };
 
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [slash.id],
           equipment: {},
           skills: ['杀', '闪'],
         }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [discard1.id],
           equipment: {},
           skills: ['流离', '闪'],
           health: 4,
         }),
         makePlayer({
-          index: 2, name: 'P2',
+          index: 2,
+          name: 'P2',
           hand: [],
           equipment: {},
           skills: ['闪'],
@@ -104,7 +111,10 @@ describe('流离:成为杀的目标时转移', () => {
     });
     // 应出现 流离/confirm pending
     expect(state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom = [...state.pendingSlots.values()][0].atom as { type: string; requestType?: string };
+    const slotAtom = [...state.pendingSlots.values()][0].atom as {
+      type: string;
+      requestType?: string;
+    };
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('流离/confirm');
 
@@ -122,7 +132,10 @@ describe('流离:成为杀的目标时转移', () => {
 
     // 现在应进入 流离/chooseTarget pending
     expect(state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom2 = [...state.pendingSlots.values()][0].atom as { type: string; requestType?: string };
+    const slotAtom2 = [...state.pendingSlots.values()][0].atom as {
+      type: string;
+      requestType?: string;
+    };
     expect(slotAtom2.requestType).toBe('流离/chooseTarget');
   });
 
@@ -214,7 +227,10 @@ describe('流离:成为杀的目标时转移', () => {
     // 关键断言:流离的 after hook 因 P1.hand.length === 0 直接 return,
     // 所以 pending 应该是 询问闪,不是 流离/confirm
     expect(state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom = [...state.pendingSlots.values()][0].atom as { type: string; requestType?: string };
+    const slotAtom = [...state.pendingSlots.values()][0].atom as {
+      type: string;
+      requestType?: string;
+    };
     expect(slotAtom.type).toBe('询问闪');
     expect(slotAtom.requestType).toBeUndefined();
 

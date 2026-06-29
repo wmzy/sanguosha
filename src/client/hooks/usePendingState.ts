@@ -12,7 +12,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { GameView, PendingView } from '../../engine/types';
-import { resolvePendingRespond, getBroadcastKey, type PendingRespondInfo } from '../utils/pendingRespond';
+import {
+  resolvePendingRespond,
+  getBroadcastKey,
+  type PendingRespondInfo,
+} from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
 
 export interface PendingState {
@@ -67,7 +71,8 @@ export function usePendingState(
   // 非阻塞型 pending(出牌窗口)不计入 awaiting —— 它是出牌阶段的控制权 token,
   // 不是需要回应的询问。isBlocking !== false 即视为阻塞(旧数据缺省兼容)。
   const isBlocking = pending !== null && pending.isBlocking !== false;
-  const isPerspectiveAwaiting = isBlocking && (pendingTargetIdx < 0 || pendingTargetIdx === perspectiveIdx);
+  const isPerspectiveAwaiting =
+    isBlocking && (pendingTargetIdx < 0 || pendingTargetIdx === perspectiveIdx);
 
   const atom = readAtom(pending);
   const reqType = atom?.requestType;
@@ -78,11 +83,16 @@ export function usePendingState(
   // pending 变化时清空广播跳过标记
   const pendingKey = pending ? `${pending.atom?.type}:${reqType}` : '';
   const [skippedBroadcast, setSkippedBroadcast] = useState<Set<string>>(new Set());
-  useEffect(() => { setSkippedBroadcast(new Set()); }, [pendingKey]);
+  useEffect(() => {
+    setSkippedBroadcast(new Set());
+  }, [pendingKey]);
 
-  const markBroadcastSkipped = useMemo(() => (key: string) => {
-    setSkippedBroadcast(prev => new Set(prev).add(key));
-  }, []);
+  const markBroadcastSkipped = useMemo(
+    () => (key: string) => {
+      setSkippedBroadcast((prev) => new Set(prev).add(key));
+    },
+    [],
+  );
 
   const deadline = pending?.deadline ?? view.deadline ?? null;
   const deadlineTotalMs = pending?.totalMs ?? view.deadlineTotalMs;
@@ -93,10 +103,7 @@ export function usePendingState(
     () => resolvePendingRespond(pending, skillActions),
     [pending, skillActions],
   );
-  const broadcastKey = useMemo(
-    () => pending ? getBroadcastKey(pending) : '',
-    [pending],
-  );
+  const broadcastKey = useMemo(() => (pending ? getBroadcastKey(pending) : ''), [pending]);
 
   return {
     pending,

@@ -9,7 +9,7 @@
 //   重放确定性:盲选时在 actionLog 的当前条目前 splice "设置手牌顺序" 条目。
 import type { ActionLogEntry, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, type SkillModule, validateUseCard } from '../skill';
+import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -34,8 +34,11 @@ function spliceHandOrderEntry(state: GameState, target: number): void {
       (prev.message.params.target as number) === target
     ) {
       const prevOrder = prev.message.params.order as string[];
-      if (Array.isArray(prevOrder) && prevOrder.length === order.length &&
-          prevOrder.every((id, i) => id === order[i])) {
+      if (
+        Array.isArray(prevOrder) &&
+        prevOrder.length === order.length &&
+        prevOrder.every((id, i) => id === order[i])
+      ) {
         return; // 顺序未变,跳过
       }
     }
@@ -57,9 +60,15 @@ function spliceHandOrderEntry(state: GameState, target: number): void {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      return validateUseCard(state, ownerId, params, { cardName: '过河拆桥', requireTarget: true })
-        ?? (() => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
+    (state: GameState, params: Record<string, Json>) => {
+      return (
+        validateUseCard(state, ownerId, params, { cardName: '过河拆桥', requireTarget: true }) ??
+        (() => {
           const targets = params.targets as number[] | undefined;
           if (!Array.isArray(targets) || targets.length === 0) return '目标不合法';
           for (const t of targets) {
@@ -67,19 +76,28 @@ export function onInit(skill: Skill, state: GameState): () => void {
             if (!state.players[t]?.alive) return '目标已死亡';
             const p = state.players[t];
             if (!p) return '目标不合法';
-            const hasCards = p.hand.length > 0 || Object.keys(p.equipment).length > 0 || p.pendingTricks.length > 0;
+            const hasCards =
+              p.hand.length > 0 ||
+              Object.keys(p.equipment).length > 0 ||
+              p.pendingTricks.length > 0;
             if (!hasCards) return '目标无可弃置的牌';
           }
           return null;
-        })();
-    }, async (state: GameState, params: Record<string, Json>) => {
-
+        })()
+      );
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       await pushFrame(state, '过河拆桥', from, { ...params });
       const cardId = params.cardId as string;
-      const target = (params.targets as number[])?.[0] ?? params.target as number;
+      const target = (params.targets as number[])?.[0] ?? (params.target as number);
       // 移锦囊到处理区
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: from },
+        to: { zone: '处理区' },
+      });
       // 询问无懈可击(单目标锦囊:抵消整个锦囊)
       try {
         const cancelled = await 询问无懈可击(state, target);
@@ -87,38 +105,60 @@ export function onInit(skill: Skill, state: GameState): () => void {
           const targetPlayer = state.players[target];
           if (targetPlayer) {
             // 弹选牌面板:使用者从目标区域选一张牌
-            await runPickTargetCard(state, from, target, targetPlayer, /*obtain=*/ false);
+            await runPickTargetCard(state, from, target, targetPlayer, /* obtain= */ false);
           }
         }
         // 移锦囊到弃牌堆
-        await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
       } finally {
         if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+          await applyAtom(state, {
+            type: '移动牌',
+            cardId,
+            from: { zone: '处理区' },
+            to: { zone: '弃牌堆' },
+          });
         }
         await popFrame(state);
       }
-    }, );
+    },
+  );
 
   // ── 选牌 respond:使用者从目标区域选一张牌 ──
-  registerAction(state, skill.id, ownerId, 'respond', (state: GameState, params: Record<string, Json>) => {
-    const slot = state.pendingSlots.get(ownerId);
-    if (!slot) return '当前不需要回应';
-    if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
-    const atom = slot.atom as { requestType?: string };
-    if (atom.requestType !== '过河拆桥_选牌') return '当前不是选牌窗口';
-    const zone = params.zone;
-    if (zone === 'equipment' || zone === 'judge') {
-      if (typeof params.cardId !== 'string') return 'cardId required';
-    } else if (zone === 'hand') {
-      if (typeof params.handIndex !== 'number') return 'handIndex required';
-    } else {
-      return 'zone required (equipment|judge|hand)';
-    }
-    return null;
-  }, async (state: GameState, params: Record<string, Json>) => {
-    state.localVars['选牌/结果'] = { zone: params.zone, cardId: params.cardId ?? null, handIndex: params.handIndex ?? null };
-  });
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'respond',
+    (state: GameState, params: Record<string, Json>) => {
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
+      const atom = slot.atom as { requestType?: string };
+      if (atom.requestType !== '过河拆桥_选牌') return '当前不是选牌窗口';
+      const zone = params.zone;
+      if (zone === 'equipment' || zone === 'judge') {
+        if (typeof params.cardId !== 'string') return 'cardId required';
+      } else if (zone === 'hand') {
+        if (typeof params.handIndex !== 'number') return 'handIndex required';
+      } else {
+        return 'zone required (equipment|judge|hand)';
+      }
+      return null;
+    },
+    async (state: GameState, params: Record<string, Json>) => {
+      state.localVars['选牌/结果'] = {
+        zone: params.zone,
+        cardId: params.cardId ?? null,
+        handIndex: params.handIndex ?? null,
+      };
+    },
+  );
 
   return () => {};
 }
@@ -133,16 +173,20 @@ async function runPickTargetCard(
 ): Promise<void> {
   const equipment = Object.entries(targetPlayer.equipment)
     .filter(([, id]) => typeof id === 'string')
-    .map(([slot, id]) => ({ slot, cardId: id as string, cardName: state.cardMap[id as string]?.name ?? '?' }));
-  const judge = targetPlayer.pendingTricks.map(t => ({ cardId: t.card.id, cardName: t.card.name }));
+    .map(([slot, id]) => ({ slot, cardId: id, cardName: state.cardMap[id]?.name ?? '?' }));
+  const judge = targetPlayer.pendingTricks.map((t) => ({
+    cardId: t.card.id,
+    cardName: t.card.name,
+  }));
   const handCount = targetPlayer.hand.length;
 
   // 超时默认选择:明牌优先(装备第一张→判定第一张),否则手牌[0]
-  const defaultZone = equipment.length > 0
-    ? { zone: 'equipment', cardId: equipment[0].cardId }
-    : judge.length > 0
-      ? { zone: 'judge', cardId: judge[0].cardId }
-      : { zone: 'hand', handIndex: 0 };
+  const defaultZone =
+    equipment.length > 0
+      ? { zone: 'equipment', cardId: equipment[0].cardId }
+      : judge.length > 0
+        ? { zone: 'judge', cardId: judge[0].cardId }
+        : { zone: 'hand', handIndex: 0 };
 
   // 手牌存在时,splice 顺序快照(重放确定性)
   if (handCount > 0) {
@@ -167,7 +211,9 @@ async function runPickTargetCard(
   });
 
   // 读取使用者选择
-  const result = state.localVars['选牌/结果'] as { zone: string; cardId: string | null; handIndex: number | null } | undefined;
+  const result = state.localVars['选牌/结果'] as
+    | { zone: string; cardId: string | null; handIndex: number | null }
+    | undefined;
   delete state.localVars['选牌/结果'];
   const zone = result?.zone ?? (defaultZone as { zone: string }).zone;
 
@@ -176,7 +222,7 @@ async function runPickTargetCard(
     await applyAtom(state, { type: '弃置', player: target, cardIds: [cardId] });
   } else if (zone === 'judge') {
     const cardId = (result?.cardId ?? defaultZone.cardId) as string;
-    const trick = targetPlayer.pendingTricks.find(t => t.card.id === cardId);
+    const trick = targetPlayer.pendingTricks.find((t) => t.card.id === cardId);
     if (trick) {
       await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: trick.name });
       await applyAtom(state, { type: '弃置', player: target, cardIds: [cardId] });

@@ -13,7 +13,7 @@ export function projectView(view: GameView): AiViewSnapshot {
     currentPlayerIndex: view.currentPlayerIndex,
     phase: view.phase,
     turn: { round: view.turn.round },
-    players: view.players.map(p => ({
+    players: view.players.map((p) => ({
       index: p.index,
       name: p.name,
       character: p.character,
@@ -30,12 +30,18 @@ export function projectView(view: GameView): AiViewSnapshot {
       ? {
           target: view.pending.target,
           isBlocking: view.pending.isBlocking !== false,
-          promptTitle: (view.pending.prompt as { title?: string }).title ?? view.pending.prompt.type,
+          promptTitle:
+            (view.pending.prompt as { title?: string }).title ?? view.pending.prompt.type,
           requestType: getPendingRequestType(view.pending),
           candidates:
-            (view.pending.atom as { type: string; candidates?: Array<{ name: string; skills: string[] }> }).type ===
-            '选将询问'
-              ? (view.pending.atom as { candidates: Array<{ name: string; skills: string[] }> }).candidates
+            (
+              view.pending.atom as {
+                type: string;
+                candidates?: Array<{ name: string; skills: string[] }>;
+              }
+            ).type === '选将询问'
+              ? (view.pending.atom as { candidates: Array<{ name: string; skills: string[] }> })
+                  .candidates
               : undefined,
         }
       : null,

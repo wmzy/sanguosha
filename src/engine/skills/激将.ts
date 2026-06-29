@@ -3,7 +3,7 @@
 //   该角色选择出杀或不出(不出则主公摸 1 张)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
+import { registerAction, hasBlockingPending } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -16,12 +16,16 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
     (state: GameState, params: Record<string, Json>) => {
       // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 主公身份 + 目标合法
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state)
+      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
       const selfAlive = self.alive === true;
       // 激将是主公技:仅主公位可用(以 character.isLord 或主公位身份判断,这里以主公位 ownerId===0 为依据)
@@ -29,14 +33,26 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 目标合法:不是自己 + 存活 + 蜀势力
       const targetIdx = params.target as number | undefined;
       const targetExists = typeof targetIdx === 'number' && !!state.players[targetIdx];
-      const target = targetExists ? state.players[targetIdx as number] : null;
+      const target = targetExists ? state.players[targetIdx] : null;
       const targetNotSelf = targetIdx !== ownerId;
       const targetAlive = target?.alive === true;
       const targetShu = target?.faction === '蜀';
       // killTarget 校验:可选,若提供则需存活
       const killTargetIdx = params.killTarget as number | undefined;
-      const killTargetValid = killTargetIdx === undefined || (state.players[killTargetIdx]?.alive === true && killTargetIdx !== targetIdx);
-      const ok = myTurn && inActPhase && free && selfAlive && isLord && targetExists && targetNotSelf && targetAlive && targetShu && killTargetValid;
+      const killTargetValid =
+        killTargetIdx === undefined ||
+        (state.players[killTargetIdx]?.alive === true && killTargetIdx !== targetIdx);
+      const ok =
+        myTurn &&
+        inActPhase &&
+        free &&
+        selfAlive &&
+        isLord &&
+        targetExists &&
+        targetNotSelf &&
+        targetAlive &&
+        targetShu &&
+        killTargetValid;
       return ok ? null : '现在不能使用激将';
     },
     async (state: GameState, params: Record<string, Json>) => {
@@ -55,9 +71,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
 
       // 检查处理区:有杀 = 出了杀
-      const killCardId = frameCards(state).find(id => {
+      const killCardId = frameCards(state).find((id) => {
         const c = state.cardMap[id];
-        return c && c.name === '杀';
+        return c?.name === '杀';
       });
 
       if (killCardId) {
@@ -69,11 +85,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
           to: { zone: '弃牌堆' },
         });
         if (typeof killTarget === 'number') {
-          await applyAtom(state, { type: '指定目标', source: target, target: killTarget, cardId: killCardId });
+          await applyAtom(state, {
+            type: '指定目标',
+            source: target,
+            target: killTarget,
+            cardId: killCardId,
+          });
           await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
-          const dodgeCardId = frameCards(state).find(id => {
+          const dodgeCardId = frameCards(state).find((id) => {
             const c = state.cardMap[id];
-            return c && c.name === '闪';
+            return c?.name === '闪';
           });
           if (dodgeCardId) {
             await applyAtom(state, {
@@ -83,7 +104,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
               to: { zone: '弃牌堆' },
             });
           } else {
-            await applyAtom(state, { type: '造成伤害', target: killTarget, amount: 1, source: target, cardId: killCardId });
+            await applyAtom(state, {
+              type: '造成伤害',
+              target: killTarget,
+              amount: 1,
+              source: target,
+              cardId: killCardId,
+            });
           }
         }
       } else {
@@ -109,4 +136,3 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
   });
   return () => {};
 }
-

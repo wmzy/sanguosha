@@ -22,7 +22,12 @@ import type { GameView } from '../../src/engine/types';
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {
   const [perspective, setPerspective] = useState(view.viewer);
   const views = new Map<number, GameView>([[view.viewer, view]]);
-  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(views, perspective, view.players.length, setPerspective);
+  const { switchPerspective, goToCurrentPlayer, autoSwitchCtl } = useDebugPerspective(
+    views,
+    perspective,
+    view.players.length,
+    setPerspective,
+  );
   const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
   const bar = (
     <DebugPerspectiveBar
@@ -32,14 +37,7 @@ function TestGameView({ view, onAction }: { view: GameView; onAction: (a: Action
       autoSwitchCtl={autoSwitchCtl}
     />
   );
-  return (
-    <GameViewComponent
-      view={view}
-      onAction={onAction}
-      headerSlot={bar}
-      overlaySlot={bar}
-    />
-  );
+  return <GameViewComponent view={view} onAction={onAction} headerSlot={bar} overlaySlot={bar} />;
 }
 
 function makePlayer(index: number, character: string, identity?: string, skills: string[] = []) {
@@ -94,11 +92,7 @@ function makeDebugWaitingView(): GameView {
     currentPlayerIndex: 0,
     phase: '准备',
     turn: { round: 1, phase: '准备', vars: {} },
-    players: [
-      makePlayer(0, '刘备', '主公', ['仁德']),
-      makePlayer(1, ''),
-      makePlayer(2, ''),
-    ],
+    players: [makePlayer(0, '刘备', '主公', ['仁德']), makePlayer(1, ''), makePlayer(2, '')],
     cardMap: {},
     pending: null,
     deadline: null,
@@ -182,11 +176,17 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
       pending: {
         type: 'awaits',
         atom: {
-          type: '选将询问', target: 1,
-          candidates: [{ name: '孙权', skills: ['制衡'] }, { name: '曹操', skills: ['奸雄'] }],
+          type: '选将询问',
+          target: 1,
+          candidates: [
+            { name: '孙权', skills: ['制衡'] },
+            { name: '曹操', skills: ['奸雄'] },
+          ],
         },
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
-        target: 1, deadline: Date.now() + 60000, totalMs: 60000,
+        target: 1,
+        deadline: Date.now() + 60000,
+        totalMs: 60000,
       },
       deadline: null,
       deadlineTotalMs: 0,
@@ -210,23 +210,22 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
       currentPlayerIndex: 0,
       phase: '准备',
       turn: { round: 1, phase: '准备', vars: {} },
-      players: [
-        makePlayer(0, '', '主公'),
-        makePlayer(1, ''),
-        makePlayer(2, ''),
-      ],
+      players: [makePlayer(0, '', '主公'), makePlayer(1, ''), makePlayer(2, '')],
       cardMap: {},
       pending: {
         type: 'awaits',
         atom: {
-          type: '选将询问', target: 0,
+          type: '选将询问',
+          target: 0,
           candidates: [
             { name: '刘备', skills: ['仁德'] },
             { name: '曹操', skills: ['奸雄'] },
           ],
         },
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
-        target: 0, deadline: Date.now() + 60000, totalMs: 60000,
+        target: 0,
+        deadline: Date.now() + 60000,
+        totalMs: 60000,
       },
       deadline: null,
       deadlineTotalMs: 0,
@@ -243,10 +242,12 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
 
     // onAction 被调用一次(提交刘备)
     expect(onAction).toHaveBeenCalledTimes(1);
-    expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
-      actionType: '选将',
-      params: { character: '刘备' },
-    }));
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: '选将',
+        params: { character: '刘备' },
+      }),
+    );
 
     // 按钮变为「已选择 刘备」禁用态(锁定)
     expect(screen.getByRole('button', { name: /已选择 刘备/ })).toBeDefined();

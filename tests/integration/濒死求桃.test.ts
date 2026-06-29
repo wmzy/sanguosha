@@ -10,10 +10,7 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait, dispatchAndWait, SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -38,12 +35,20 @@ function firstPendingAtom(state: GameState): unknown | undefined {
 }
 
 /** 给指定玩家一张指定类型的牌(从手牌空位置抽 cardId) */
-function giveCard(state: GameState, ownerIndex: number, name: string, idHint: string, suit: '♠' | '♥' | '♣' | '♦' = '♥', type?: '基本牌' | '锦囊牌' | '装备牌'): string {
+function giveCard(
+  state: GameState,
+  ownerIndex: number,
+  name: string,
+  idHint: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♥',
+  type?: '基本牌' | '锦囊牌' | '装备牌',
+): string {
   const id = `${idHint}-${ownerIndex}-${state.players[ownerIndex].hand.length}`;
   state.cardMap[id] = {
     id,
     name,
-    suit, color: suitColor(suit),
+    suit,
+    color: suitColor(suit),
     rank: '7',
     type: type ?? (name === '桃' ? '基本牌' : '锦囊牌'),
   };
@@ -59,16 +64,36 @@ describe('濒死求桃', () => {
     state = createGameState({
       players: [
         {
-          index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
-          hand: [], equipment: {},
+          index: 0,
+          name: 'P0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
           skills: ['回合管理', '杀', '桃'],
-          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
         },
         {
-          index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
-          hand: [], equipment: {},
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
           skills: ['回合管理', '闪', '桃', '装备通用'],
-          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
         },
       ],
       cardMap: {},
@@ -84,15 +109,24 @@ describe('濒死求桃', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例1:P0 出杀 → P1(HP=1)不出闪 → 求桃 → 无人救 → 死亡', async () => {
     // 准备:P0 杀 + P1 HP=1
-    const lord = state.players[0];
+    const _lord = state.players[0];
     const killId = giveCard(state, 0, '杀', 'kill', '♥', '基本牌');
     state.players[1].health = 1;
     state.players[1].maxHealth = 1;
     // 给 P1 一张装备(看后续是否会被弃掉)
     const equipId = giveCard(state, 1, '诸葛连弩', 'wp');
-    state.cardMap[equipId] = { id: equipId, name: '诸葛连弩', suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
+    state.cardMap[equipId] = {
+      id: equipId,
+      name: '诸葛连弩',
+      suit: '♣',
+      color: '黑',
+      rank: 'A',
+      type: '装备牌',
+      subtype: '武器',
+      range: 1,
+    };
     state.players[1].equipment['武器'] = equipId;
-    state.players[1].hand = state.players[1].hand.filter(id => id !== equipId);
+    state.players[1].hand = state.players[1].hand.filter((id) => id !== equipId);
     const p1HealthBefore = state.players[1].health;
     expect(p1HealthBefore).toBe(1);
 
@@ -130,7 +164,7 @@ describe('濒死求桃', () => {
   // 用例 2:濒死状态:HP=0 但求桃窗口期内 alive=true
   // ─────────────────────────────────────────────────────────────
   it('用例2:HP=0 时,濒死流程将玩家标为濒死状态', async () => {
-    const lord = state.players[0];
+    const _lord = state.players[0];
     const killId = giveCard(state, 0, '杀', 'kill', '♥', '基本牌');
     state.players[1].health = 1;
     state.players[1].maxHealth = 1;
@@ -148,7 +182,8 @@ describe('濒死求桃', () => {
     // 先 fireTimeout 闪
     if (state.pendingSlots.size > 0) {
       const atom = firstPendingAtom(state) as { type?: string; requestType?: string };
-      const isDodgePrompt = atom.type === '询问闪' ||
+      const isDodgePrompt =
+        atom.type === '询问闪' ||
         (atom.type === '请求回应' && (atom.requestType === '闪' || atom.requestType === '出闪'));
       if (isDodgePrompt || atom.type === '请求回应') {
         await fireTimeoutAndWait(state);
@@ -172,7 +207,7 @@ describe('濒死求桃', () => {
   // 用例 3:救回场景:HP=1 濒死 → 有人出桃 → 存活
   // ─────────────────────────────────────────────────────────────
   it('用例3:P1(HP=1)濒死 → P0 出桃救回 → P1 存活', async () => {
-    const lord = state.players[0];
+    const _lord = state.players[0];
     const killId = giveCard(state, 0, '杀', 'kill', '♥', '基本牌');
     // P1 一张桃(手牌)
     const peachId = giveCard(state, 1, '桃', 'peach');
@@ -292,11 +327,13 @@ describe('濒死求桃链:端到端(harness)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [deadHand.id],
           equipment: { 武器: wp.id },
           skills: ['桃', '闪'],
-          health: 1, maxHealth: 4,
+          health: 1,
+          maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: ['桃', '闪'] }),
       ],
@@ -330,7 +367,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     // 第二个 求桃 应该问 P2(target=2)
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     slot = [...harness.state.pendingSlots.values()][0];
-    slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
+    slotAtom = slot.atom;
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('桃/求桃');
     expect(slotAtom.target).toBe(2);
@@ -341,7 +378,7 @@ describe('濒死求桃链:端到端(harness)', () => {
     // 求桃链绕一圈:链尾是 P0(targetIdx=1 → P1 → P2 → P0)
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     slot = [...harness.state.pendingSlots.values()][0];
-    slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
+    slotAtom = slot.atom;
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('桃/求桃');
     expect(slotAtom.target).toBe(0);
@@ -375,10 +412,12 @@ describe('濒死求桃链:端到端(harness)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           skills: ['桃', '闪'],
-          health: 1, maxHealth: 4,
+          health: 1,
+          maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
       ],
@@ -440,7 +479,14 @@ describe('濒死求桃链:端到端(harness)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['桃', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
         makePlayer({ index: 3, name: 'P3', hand: [], skills: ['桃', '闪'] }),
       ],
@@ -497,10 +543,12 @@ describe('濒死求桃链:端到端(harness)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [peach.id],
           skills: ['桃', '闪'],
-          health: 1, maxHealth: 4,
+          health: 1,
+          maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [decoy.id], skills: ['桃', '闪'] }),
       ],

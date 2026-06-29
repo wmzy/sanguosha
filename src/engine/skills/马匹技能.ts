@@ -16,8 +16,8 @@ import type { SkillModule } from '../skill';
 type MountKind = '进攻' | '防御';
 
 const VAR_KEY: Record<MountKind, string> = {
-  '进攻': '距离/进攻修正',
-  '防御': '距离/防御修正',
+  进攻: '距离/进攻修正',
+  防御: '距离/防御修正',
 };
 
 /**
@@ -48,12 +48,12 @@ export function createMountSkill(name: string, kind: MountKind, desc: string): S
  * Mount skills set/clear vars via onInit (after hook), not via atom apply,
  * so the atoms must include this info in ViewEvents for applyView to sync. */
 export const MOUNT_DISTANCE_VARS: Record<string, { attackMod?: number; defenseMod?: number }> = {
-  '赤兔': { attackMod: 1 },
-  '紫骍': { attackMod: 1 },
-  '大宛': { attackMod: 1 },
-  '的卢': { defenseMod: 1 },
-  '绝影': { defenseMod: 1 },
-  '爪黄飞电': { defenseMod: 1 },
+  赤兔: { attackMod: 1 },
+  紫骍: { attackMod: 1 },
+  大宛: { attackMod: 1 },
+  的卢: { defenseMod: 1 },
+  绝影: { defenseMod: 1 },
+  爪黄飞电: { defenseMod: 1 },
 };
 
 // ─── 进攻马 ───

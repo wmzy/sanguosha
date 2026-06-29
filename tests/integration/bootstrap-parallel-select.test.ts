@@ -72,12 +72,7 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
   beforeEach(() => {
     resetForTest();
     state = createGameState({
-      players: [
-        makePlayer(0, 'P1'),
-        makePlayer(1, 'P2'),
-        makePlayer(2, 'P3'),
-        makePlayer(3, 'P4'),
-      ],
+      players: [makePlayer(0, 'P1'), makePlayer(1, 'P2'), makePlayer(2, 'P3'), makePlayer(3, 'P4')],
       cardMap: {},
     });
     // 自动填充牌堆(bootstrap 发牌需要)
@@ -99,7 +94,7 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
     // bootstrap 初始化(抽身份/打乱池/动态 import 开局+character-meta)需要微任务推进,
     // 轮询等主公选将 slot 出现(窗口留定足,避免环境抖动导致误判)
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
@@ -119,7 +114,9 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
 
     // 第二步:其余 3 人并行选(3 个 slot 同时存在)
     expect(state.pendingSlots.size).toBe(3);
-    const parallelTargets = [...state.pendingSlots.values()].map(s => (s.atom as { target: number }).target);
+    const parallelTargets = [...state.pendingSlots.values()].map(
+      (s) => (s.atom as { target: number }).target,
+    );
     expect(parallelTargets).not.toContain(lordTarget);
     expect(parallelTargets.length).toBe(3);
 
@@ -134,7 +131,7 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
     for (const t of parallelTargets) {
       const slot = state.pendingSlots.get(t)!;
       const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates;
-      const choice = cand.find(c => !taken.has(c.name));
+      const choice = cand.find((c) => !taken.has(c.name));
       expect(choice).toBeDefined();
       taken.add(choice!.name);
       await respondCharSelect(state, t, choice!.name);
@@ -148,8 +145,8 @@ describe('开局 bootstrap:主公串行 + 其他人并行选将', () => {
     const bootDeadline = Date.now() + 8000;
     while (Date.now() < bootDeadline) {
       await waitForStable(state);
-      if (!hasBlockingPending(state) && state.players.every(p => p.hand.length > 0)) break;
-      await new Promise(r => setTimeout(r, 50));
+      if (!hasBlockingPending(state) && state.players.every((p) => p.hand.length > 0)) break;
+      await new Promise((r) => setTimeout(r, 50));
     }
     await waitForStable(state);
     expect(hasBlockingPending(state)).toBe(false);

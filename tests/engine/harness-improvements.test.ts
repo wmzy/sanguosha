@@ -1,27 +1,51 @@
 // 验证 harness 改进:确认引擎异常 + applyView 异常不再被静默吞掉。
 // 这是回归测试:如果未来有人撤销了 harness 的防护,此文件会立即失败。
-import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  SkillTestHarness,
-  dispatchAndWait,
-  fireTimeoutAndWait,
-  assertNoEngineErrors,
-} from '../engine-harness';
+// 验证 harness 改进:确认引擎异常 + applyView 异常不再被静默吞掉。
+// 这是回归测试:如果未来有人撤销了 harness 的防护,此文件会立即失败。
+import { describe, it, expect } from 'vitest';
+import { SkillTestHarness, assertNoEngineErrors } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { getAtomDef, registerAtom } from '../../src/engine/atom';
-import type { Atom, Card, GameState, GameView, ViewEvent } from '../../src/engine/types';
-import { dispatch as engineDispatch } from '../../src/engine/create-engine';
+import { registerAtom } from '../../src/engine/atom';
+import type { Atom, Card, GameState, ViewEvent } from '../../src/engine/types';
 
 function build(): GameState {
   const slash: Card = { id: 's0', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
   return createGameState({
     players: [
-      { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
-        hand: ['s0'], equipment: {}, skills: ['杀'], tags: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: '反', health: 4, maxHealth: 4, alive: true,
-        hand: [], equipment: {}, skills: [], tags: [], vars: {}, marks: [], pendingTricks: [], judgeZone: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: '主公',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['s0'],
+        equipment: {},
+        skills: ['杀'],
+        tags: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        judgeZone: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '反',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: [],
+        equipment: {},
+        skills: [],
+        tags: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        judgeZone: [],
+      },
     ],
     cardMap: { s0: slash },
     currentPlayerIndex: 0,
@@ -86,8 +110,13 @@ describe('harness 改进:引擎异常不再静默吞掉', () => {
       type: FAKE_TYPE,
       validate: () => null,
       apply: () => {},
-      toViewEvents: () => ({ ownerViews: new Map(), othersView: { atomType: FAKE_TYPE } as unknown as ViewEvent }),
-      applyView: () => { throw new Error('applyView 故意抛错'); },
+      toViewEvents: () => ({
+        ownerViews: new Map(),
+        othersView: { atomType: FAKE_TYPE } as unknown as ViewEvent,
+      }),
+      applyView: () => {
+        throw new Error('applyView 故意抛错');
+      },
     });
 
     // 手动推一个 atomHistory 条目(模拟引擎 apply 了一个 atom 但 applyView 坏了)
@@ -97,7 +126,10 @@ describe('harness 改进:引擎异常不再静默吞掉', () => {
       seq: harness.state.seq,
       timestamp: 0,
       atom: { type: FAKE_TYPE } as unknown as Atom,
-      viewEvents: { ownerViews: new Map(), othersView: { atomType: FAKE_TYPE } as unknown as ViewEvent },
+      viewEvents: {
+        ownerViews: new Map(),
+        othersView: { atomType: FAKE_TYPE } as unknown as ViewEvent,
+      },
     });
 
     // processAllEvents 应该抛出 applyView 错误(同时匹配两个模式)

@@ -13,7 +13,6 @@ import { createGameState } from '../../src/engine/types';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import type { GameState } from '../../src/engine/types';
 
 describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', () => {
   beforeEach(() => resetForTest());
@@ -21,11 +20,23 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
   it('连续 applyAtom 的 atomHistory entry 各有唯一 seq', async () => {
     const { applyAtom } = await import('../../src/engine/create-engine');
     const state = createGameState({
-      players: [{
-        index: 0, name: 'p0', character: '', health: 4, maxHealth: 4,
-        alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
-    tags: [],
-      }],
+      players: [
+        {
+          index: 0,
+          name: 'p0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+        },
+      ],
       cardMap: {
         c1: { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
         c2: { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '8', type: '基本牌' },
@@ -38,7 +49,7 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
     await applyAtom(state, { type: '摸牌', player: 0, count: 1 } as any);
     await applyAtom(state, { type: '摸牌', player: 0, count: 1 } as any);
 
-    const atomEntries = state.atomHistory.filter(e => e.kind === 'atom');
+    const atomEntries = state.atomHistory.filter((e) => e.kind === 'atom');
     expect(atomEntries.length).toBe(2);
     // 核心:两个 atom 的 seq 必须不同
     expect(atomEntries[0].seq).not.toBe(atomEntries[1].seq);
@@ -48,11 +59,23 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
   it('水位过滤不丢同批次事件:sinceSeq=第一个 atom seq,第二个 atom 仍可见', async () => {
     const { applyAtom } = await import('../../src/engine/create-engine');
     const state = createGameState({
-      players: [{
-        index: 0, name: 'p0', character: '', health: 4, maxHealth: 4,
-        alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [],
-    tags: [],
-      }],
+      players: [
+        {
+          index: 0,
+          name: 'p0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+        },
+      ],
       cardMap: {
         c1: { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
         c2: { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '8', type: '基本牌' },
@@ -62,7 +85,7 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
     });
 
     await applyAtom(state, { type: '摸牌', player: 0, count: 1 } as any);
-    const firstSeq = state.atomHistory.find(e => e.kind === 'atom')!.seq;
+    const firstSeq = state.atomHistory.find((e) => e.kind === 'atom')!.seq;
 
     await applyAtom(state, { type: '摸牌', player: 0, count: 1 } as any);
 

@@ -15,10 +15,7 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import { dispatchAndWait } from '../engine-harness';
 import { slashMax } from '../../src/engine/slash-quota';
@@ -81,7 +78,8 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, hanbing.id],
           equipment: {},
           skills: ['杀', '装备通用'],
@@ -139,7 +137,8 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, hanbing.id],
           equipment: {},
           skills: ['杀', '装备通用'],
@@ -191,7 +190,8 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, bagua1.id, bagua2.id],
           equipment: {},
           skills: ['杀', '装备通用'],
@@ -233,9 +233,9 @@ describe('装备替换:旧装备技能实例被卸载', () => {
       params: { cardId: bagua2.id },
       baseSeq: state.seq,
     });
-    expect(state.players[0].equipment['武器']).toBe(zhuge.id);  // 武器保留
+    expect(state.players[0].equipment['武器']).toBe(zhuge.id); // 武器保留
     expect(state.players[0].equipment['防具']).toBe(bagua2.id); // 防具换了
-    expect(state.zones.discardPile).toContain(bagua1.id);       // 旧防具进弃牌堆
+    expect(state.zones.discardPile).toContain(bagua1.id); // 旧防具进弃牌堆
     // 诸葛连弩 skill 仍在(未受影响)
     expect(state.players[0].skills).toContain('诸葛连弩');
   });
@@ -257,7 +257,8 @@ describe('装备替换:旧装备技能实例被卸载', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [zhuge.id, hanbing.id],
           equipment: {},
           skills: ['杀', '装备通用'],

@@ -16,8 +16,38 @@ function build(): GameState {
   for (const c of cards) cardMap[c.id] = c;
   return createGameState({
     players: [
-      { index: 0, name: 'A', character: 'X', health: 4, maxHealth: 4, alive: true, hand: ['a1'], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-      { index: 1, name: 'B', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: ['b1'], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      {
+        index: 0,
+        name: 'A',
+        character: 'X',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['a1'],
+        equipment: {},
+        skills: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
+      {
+        index: 1,
+        name: 'B',
+        character: 'Y',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['b1'],
+        equipment: {},
+        skills: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
     ],
     cardMap,
     currentPlayerIndex: 0,
@@ -25,7 +55,7 @@ function build(): GameState {
     turn: { round: 1, phase: '出牌', vars: {} },
   });
 }
-const tick = () => new Promise(r => setTimeout(r, 100));
+const tick = () => new Promise((r) => setTimeout(r, 100));
 
 describe('并行回应 atom 引擎机制', () => {
   let state: GameState;

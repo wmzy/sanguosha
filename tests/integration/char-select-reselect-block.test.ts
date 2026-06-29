@@ -77,12 +77,7 @@ describe('选将完成后禁止重新选将', () => {
   beforeEach(() => {
     resetForTest();
     state = createGameState({
-      players: [
-        makePlayer(0, 'P1'),
-        makePlayer(1, 'P2'),
-        makePlayer(2, 'P3'),
-        makePlayer(3, 'P4'),
-      ],
+      players: [makePlayer(0, 'P1'), makePlayer(1, 'P2'), makePlayer(2, 'P3'), makePlayer(3, 'P4')],
       cardMap: {},
     });
     for (let i = 0; i < 40; i++) {
@@ -96,14 +91,16 @@ describe('选将完成后禁止重新选将', () => {
     const pool = makePool();
     void bootstrap(state, { characters: pool, playerCount: 4, seed: 1, gameId: 't' });
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
     // 主公选将阶段:只有主公 1 个 slot
     const lordSlot = [...state.pendingSlots.values()][0];
     expect(lordSlot.atom.type).toBe('选将询问');
-    const lordCands = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates.map(c => c.name);
+    const lordCands = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates.map(
+      (c) => c.name,
+    );
     const firstPick = lordCands[0];
 
     // 主公选将
@@ -125,26 +122,30 @@ describe('选将完成后禁止重新选将', () => {
     const pool = makePool();
     void bootstrap(state, { characters: pool, playerCount: 4, seed: 2, gameId: 't' });
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
     // 主公先选
     const lordSlot = [...state.pendingSlots.values()][0];
-    const lordCands = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates.map(c => c.name);
+    const lordCands = (lordSlot.atom as { candidates: Array<{ name: string }> }).candidates.map(
+      (c) => c.name,
+    );
     await respondCharSelect(state, 0, lordCands[0]);
     await waitForStable(state);
 
     // 等并行选将 slot 出现(非主公玩家)
     for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     }
     await waitForStable(state);
 
     // 并行选将:为 player-1 选将
     const p1Slot = state.pendingSlots.get(1);
     if (p1Slot) {
-      const p1Cands = (p1Slot.atom as { candidates: Array<{ name: string }> }).candidates.map(c => c.name);
+      const p1Cands = (p1Slot.atom as { candidates: Array<{ name: string }> }).candidates.map(
+        (c) => c.name,
+      );
       await respondCharSelect(state, 1, p1Cands[0]);
       expect(state.players[1].character).toBe(p1Cands[0]);
 

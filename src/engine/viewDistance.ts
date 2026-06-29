@@ -14,19 +14,27 @@
 import type { GameView } from './types';
 
 /** GameView 上 from 到 to 的环形座位距离(只算存活玩家) */
-export function viewSeatDistance(players: GameView['players'], fromIdx: number, toIdx: number): number {
-  const alive = players.filter(p => p.alive);
+export function viewSeatDistance(
+  players: GameView['players'],
+  fromIdx: number,
+  toIdx: number,
+): number {
+  const alive = players.filter((p) => p.alive);
   const n = alive.length;
   if (n <= 1) return 0;
-  const aliveFrom = alive.findIndex(p => p.name === players[fromIdx]?.name);
-  const aliveTo = alive.findIndex(p => p.name === players[toIdx]?.name);
+  const aliveFrom = alive.findIndex((p) => p.name === players[fromIdx]?.name);
+  const aliveTo = alive.findIndex((p) => p.name === players[toIdx]?.name);
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   const d = Math.abs(aliveFrom - aliveTo);
   return Math.min(d, n - d);
 }
 
 /** GameView 上 from 到 to 的实际距离(含马修正,>= 1) */
-export function viewEffectiveDistance(players: GameView['players'], fromIdx: number, toIdx: number): number {
+export function viewEffectiveDistance(
+  players: GameView['players'],
+  fromIdx: number,
+  toIdx: number,
+): number {
   let dist = viewSeatDistance(players, fromIdx, toIdx);
   const fromP = players[fromIdx];
   const toP = players[toIdx];

@@ -12,11 +12,7 @@
 // 模式:不依赖 SkillTestHarness(dispatch 路径对判定 atom 不直接暴露),
 // 用 applyAtom 直接驱动。
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-  applyAtom,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
 import { SkillTestHarness } from '../engine-harness';
 import { getAtomDef } from '../../src/engine/atom';
 import '../../src/engine/atoms';
@@ -109,7 +105,8 @@ describe('闪电:延时锦囊判定 plumbing', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '闪电', source: 0, card: sd }],
         }),
       ],
@@ -141,7 +138,8 @@ describe('闪电:延时锦囊判定 plumbing', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [
             { name: '闪电', source: 0, card: sd },
             { name: '乐不思蜀', source: 1, card: lb },
@@ -179,7 +177,8 @@ describe('闪电:延时锦囊判定 plumbing', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '闪电', source: 0, card: sd }],
         }),
       ],
@@ -213,7 +212,8 @@ describe('闪电:延时锦囊判定 plumbing', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '闪电', source: 0, card: sd }],
         }),
       ],
@@ -246,9 +246,7 @@ describe('闪电:延时锦囊判定 plumbing', () => {
     const sd: Card = makeCard('sd1', '闪电', '♠', 'A');
 
     const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P0' }),
-      ],
+      players: [makePlayer({ index: 0, name: 'P0' })],
       cardMap: { [sd.id]: sd },
       currentPlayerIndex: 0,
       phase: '判定',
@@ -321,7 +319,8 @@ describe('闪电:延时锦囊判定(端到端 plumbing)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '闪电', source: 1, card: sd }],
         }),
       ],
@@ -352,7 +351,8 @@ describe('闪电:延时锦囊判定(端到端 plumbing)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [
             { name: '闪电', source: 1, card: sd },
             { name: '乐不思蜀', source: 1, card: lb },
@@ -400,7 +400,8 @@ describe('闪电:延时锦囊判定(端到端 plumbing)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [
             { name: '闪电', source: 1, card: sd },
             { name: '乐不思蜀', source: 1, card: lb },
@@ -445,7 +446,8 @@ describe('闪电:延时锦囊判定(端到端 plumbing)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '闪电', source: 1, card: sd1 }],
         }),
       ],
@@ -481,7 +483,8 @@ describe('闪电:延时锦囊判定(端到端 plumbing)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '闪电', source: 1, card: sd1 }],
         }),
       ],
@@ -564,7 +567,8 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '闪电', source: 0, card: sd }],
         }),
       ],
@@ -610,8 +614,10 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
-          health: 4, maxHealth: 4,
+          index: 0,
+          name: 'P0',
+          health: 4,
+          maxHealth: 4,
           pendingTricks: [{ name: '闪电', source: 0, card: sd }],
         }),
       ],

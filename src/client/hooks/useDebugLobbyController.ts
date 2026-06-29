@@ -110,11 +110,14 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     window.history.replaceState(null, '', `/debug/${roomId}`);
   }, []);
 
-  const handleDeleteDebugRoom = useCallback((roomId: string) => {
-    apiFetch<void>(`/api/rooms/${roomId}`, { method: 'DELETE' })
-      .then(() => fetchRooms())
-      .catch((err) => showErrorFor(err, '删除失败', setError));
-  }, [fetchRooms]);
+  const handleDeleteDebugRoom = useCallback(
+    (roomId: string) => {
+      apiFetch<void>(`/api/rooms/${roomId}`, { method: 'DELETE' })
+        .then(() => fetchRooms())
+        .catch((err) => showErrorFor(err, '删除失败', setError));
+    },
+    [fetchRooms],
+  );
 
   const handleExit = useCallback(() => {
     handleDeleteRoom();

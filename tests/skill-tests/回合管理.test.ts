@@ -25,7 +25,13 @@ import { resetForTest } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import { registerSystemRespondActions } from '../../src/engine/skills/系统规则';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -67,9 +73,9 @@ describe('回合管理', () => {
 
   it('end:出牌阶段 end → 进入弃牌 → 推进到下家(下家出牌阶段 + 摸 2 张)', async () => {
     // 准备:构建 deck 让下家能摸牌
-    const deck: string[] = [];
+    const _deck: string[] = [];
     for (let i = 0; i < 10; i++) {
-      const id = `d${i}`;
+      const _id = `d${i}`;
       harness; // ensure harness defined
       // 直接构造 cardMap
     }
@@ -88,7 +94,14 @@ describe('回合管理', () => {
     const deckCards: Card[] = [];
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      deckCards.push({ id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' });
+      deckCards.push({
+        id,
+        name: '杀',
+        suit: '♠',
+        color: '黑',
+        rank: String(i + 1),
+        type: '基本牌',
+      });
       state.cardMap[id] = deckCards[i];
       state.zones.deck.push(id);
     }
@@ -108,7 +121,7 @@ describe('回合管理', () => {
     expect(harness.state.players[1].hand.length).toBe(2);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.phase).toBe('出牌');
     });
   });
@@ -117,7 +130,13 @@ describe('回合管理', () => {
     // 准备:HP=2,手牌 5 张 > HP=2 → 超限 3 张
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2', 'c3', 'c4', 'c5'], health: 2, maxHealth: 2 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 'c2', 'c3', 'c4', 'c5'],
+          health: 2,
+          maxHealth: 2,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [] }),
       ],
       cardMap: {
@@ -144,7 +163,11 @@ describe('回合管理', () => {
     const pendingSlots = [...harness.state.pendingSlots.values()];
     if (pendingSlots.length > 0) {
       // 当前新引擎的弃牌阶段实装了手牌超限检查
-      const slotAtom = pendingSlots[0].atom as { type?: string; requestType?: string; target?: number };
+      const slotAtom = pendingSlots[0].atom as {
+        type?: string;
+        requestType?: string;
+        target?: number;
+      };
       expect(slotAtom.type).toBe('请求回应');
       expect(slotAtom.requestType).toBe('__弃牌');
       expect(slotAtom.target).toBe(0);
@@ -158,7 +181,10 @@ describe('回合管理', () => {
       // BUG: 弃牌阶段未实装手牌超限检查
       // 测试:实际行为是跳过了弃牌阶段(进下家),手牌仍是 5 张
       // 这是已知缺陷——记录当前行为
-      console.warn('BUG: 弃牌阶段未实装手牌超限检查,当前手牌数 =', harness.state.players[0].hand.length);
+      console.warn(
+        'BUG: 弃牌阶段未实装手牌超限检查,当前手牌数 =',
+        harness.state.players[0].hand.length,
+      );
       expect(harness.state.players[0].hand.length).toBe(5);
     }
   });
@@ -178,7 +204,14 @@ describe('回合管理', () => {
     // 给 deck 一些牌
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = {
+        id,
+        name: '杀',
+        suit: '♠',
+        color: '黑',
+        rank: String(i + 1),
+        type: '基本牌',
+      };
       state.zones.deck.push(id);
     }
     await harness.setup(state);
@@ -191,7 +224,7 @@ describe('回合管理', () => {
     // P2 摸 2 张
     expect(harness.state.players[1].hand.length).toBe(2);
     // 无 __弃牌 pending
-    const discardSlots = [...harness.state.pendingSlots.values()].filter(s => {
+    const discardSlots = [...harness.state.pendingSlots.values()].filter((s) => {
       const a = s.atom as { requestType?: string };
       return a.requestType === '__弃牌';
     });
@@ -288,7 +321,14 @@ describe('回合管理', () => {
     });
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = {
+        id,
+        name: '杀',
+        suit: '♠',
+        color: '黑',
+        rank: String(i + 1),
+        type: '基本牌',
+      };
       state.zones.deck.push(id);
     }
     await harness.setup(state);
@@ -325,10 +365,47 @@ describe('回合管理', () => {
     const entry0 = findActionEntry(regState, '系统规则', 0, '选将')!;
     // 构造选将询问 pending,target=0
     const state: any = {
-      pendingSlots: new Map([[0, { atom: { type: '选将询问', target: 0, candidates: [{ name: '刘备', skills: ['仁德'] }] } }]]),
+      pendingSlots: new Map([
+        [
+          0,
+          {
+            atom: { type: '选将询问', target: 0, candidates: [{ name: '刘备', skills: ['仁德'] }] },
+          },
+        ],
+      ]),
       players: [
-        { index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        {
+          index: 0,
+          name: 'P0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
       ],
     };
     // 玩家0 能回应(被问询)
@@ -356,7 +433,14 @@ describe('回合管理', () => {
     // 给 deck 一些牌让 P2 摸牌
     for (let i = 0; i < 20; i++) {
       const id = `d${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = {
+        id,
+        name: '杀',
+        suit: '♠',
+        color: '黑',
+        rank: String(i + 1),
+        type: '基本牌',
+      };
       state.zones.deck.push(id);
     }
     await harness.setup(state);

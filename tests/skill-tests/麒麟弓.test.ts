@@ -8,10 +8,7 @@
 //   4. 杀命中 + 无麒麟弓 → 不触发弃马
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import {
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -56,26 +53,48 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 1. 杀命中 + 确认弃马 → 弃进攻马 + 伤害照常
   // ─────────────────────────────────────────────────────────────
   it('用例1:P0 麒麟弓杀P1(持进攻马)→ 确认发动 → P1 马被弃 + 扣1血', async () => {
-    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
-    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '进攻马' };
+    const qilin: Card = {
+      id: 'wp-ql',
+      name: '麒麟弓',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '武器',
+      range: 5,
+    };
+    const mount: Card = {
+      id: 'mt-chitu',
+      name: '赤兔',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '进攻马',
+    };
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0', hand: [slash.id],
+          index: 0,
+          name: 'P0',
+          hand: [slash.id],
           equipment: { 武器: qilin.id },
           skills: ['杀', '装备通用', '麒麟弓'],
           vars: { '距离/出杀范围': 5 },
         }),
         makePlayer({
-          index: 1, name: 'P1', hand: [],
+          index: 1,
+          name: 'P1',
+          hand: [],
           equipment: { 进攻马: mount.id },
           skills: ['闪'],
         }),
       ],
       cardMap: { [qilin.id]: qilin, [mount.id]: mount, [slash.id]: slash },
-      currentPlayerIndex: 0, phase: '出牌',
+      currentPlayerIndex: 0,
+      phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
@@ -96,7 +115,7 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[1].health).toBe(p1HealthBefore - 1);
       expect(v.pending).toBeNull();
     });
@@ -106,21 +125,40 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 2. 杀命中 + 不发动 → 目标马保留 + 伤害照常
   // ─────────────────────────────────────────────────────────────
   it('用例2:P0 麒麟弓杀P1(持进攻马)→ 不发动 → P1 马保留 + 扣1血', async () => {
-    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
-    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '进攻马' };
+    const qilin: Card = {
+      id: 'wp-ql',
+      name: '麒麟弓',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '武器',
+      range: 5,
+    };
+    const mount: Card = {
+      id: 'mt-chitu',
+      name: '赤兔',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '进攻马',
+    };
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [slash.id],
           equipment: { 武器: qilin.id },
           skills: ['杀', '装备通用', '麒麟弓'],
           vars: { '距离/出杀范围': 5 },
         }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           equipment: { 进攻马: mount.id },
           skills: ['闪'],
@@ -140,8 +178,11 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     const p1HealthBefore = state.players[1].health;
 
     await dispatchAndWait(state, {
-      skillId: '杀', actionType: 'use', ownerId: 0,
-      params: { cardId: slash.id, targets: [1] }, baseSeq: state.seq,
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: slash.id, targets: [1] },
+      baseSeq: state.seq,
     });
 
     // 询问闪
@@ -160,20 +201,31 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 3. 杀命中 + 目标无马 → 不询问
   // ─────────────────────────────────────────────────────────────
   it('用例3:P0 麒麟弓杀P1(无马)→ 不询问,直接扣血', async () => {
-    const qilin: Card = { id: 'wp-ql', name: '麒麟弓', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '武器', range: 5 };
+    const qilin: Card = {
+      id: 'wp-ql',
+      name: '麒麟弓',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '武器',
+      range: 5,
+    };
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [slash.id],
           equipment: { 武器: qilin.id },
           skills: ['杀', '装备通用', '麒麟弓'],
           vars: { '距离/出杀范围': 5 },
         }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           equipment: {},
           skills: ['闪'],
@@ -189,8 +241,11 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     const p1HealthBefore = state.players[1].health;
 
     await dispatchAndWait(state, {
-      skillId: '杀', actionType: 'use', ownerId: 0,
-      params: { cardId: slash.id, targets: [1] }, baseSeq: state.seq,
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: slash.id, targets: [1] },
+      baseSeq: state.seq,
     });
 
     // 询问闪
@@ -205,20 +260,30 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   // 4. 回归:无麒麟弓时,杀命中后不触发弃马
   // ─────────────────────────────────────────────────────────────
   it('用例4:无麒麟弓时,杀命中后不触发弃马询问', async () => {
-    const mount: Card = { id: 'mt-chitu', name: '赤兔', suit: '♥', color: '红', rank: '5', type: '装备牌', subtype: '进攻马' };
+    const mount: Card = {
+      id: 'mt-chitu',
+      name: '赤兔',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '进攻马',
+    };
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [slash.id],
           equipment: {},
           skills: ['杀', '装备通用'],
           vars: { '距离/出杀范围': 1 },
         }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           equipment: { 进攻马: mount.id },
           skills: ['闪'],
@@ -234,8 +299,11 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     const p1HealthBefore = state.players[1].health;
 
     await dispatchAndWait(state, {
-      skillId: '杀', actionType: 'use', ownerId: 0,
-      params: { cardId: slash.id, targets: [1] }, baseSeq: state.seq,
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: slash.id, targets: [1] },
+      baseSeq: state.seq,
     });
 
     // 询问闪

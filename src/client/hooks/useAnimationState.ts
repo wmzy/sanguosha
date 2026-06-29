@@ -36,14 +36,14 @@ export function useAnimationState(view: GameView, perspectiveIdx: number): Anima
   // 摸牌检测:当前视角手牌 ID 相对上一次新增的
   useEffect(() => {
     const hand = view.players[perspectiveIdx]?.hand ?? [];
-    const handIds = hand.map(c => c.id);
+    const handIds = hand.map((c) => c.id);
     const prevIds = prevHandRef.current;
-    const newIds = handIds.filter(id => !prevIds.includes(id));
+    const newIds = handIds.filter((id) => !prevIds.includes(id));
     if (newIds.length > 0) {
-      setState(s => ({ ...s, newCardIds: new Set([...s.newCardIds, ...newIds]) }));
+      setState((s) => ({ ...s, newCardIds: new Set([...s.newCardIds, ...newIds]) }));
       // 动画结束后清除标记(0.5s 留余量)
       setTimeout(() => {
-        setState(s => {
+        setState((s) => {
           const next = new Set(s.newCardIds);
           for (const id of newIds) next.delete(id);
           return { ...s, newCardIds: next };
@@ -67,7 +67,7 @@ export function useAnimationState(view: GameView, perspectiveIdx: number): Anima
       }
     }
     if (damagedIndices.length > 0) {
-      setState(s => {
+      setState((s) => {
         const newFlash = new Map<number, number>();
         for (const i of damagedIndices) {
           newFlash.set(i, (s.damageFlashIndices.get(i) ?? 0) + 1);
@@ -76,7 +76,7 @@ export function useAnimationState(view: GameView, perspectiveIdx: number): Anima
       });
       // 动画结束后清除(0.6s)
       setTimeout(() => {
-        setState(s => {
+        setState((s) => {
           const next = new Map(s.damageFlashIndices);
           for (const i of damagedIndices) next.delete(i);
           return { ...s, damageFlashIndices: next };
@@ -89,10 +89,14 @@ export function useAnimationState(view: GameView, perspectiveIdx: number): Anima
   // 阶段变化检测
   useEffect(() => {
     if (view.phase !== prevPhaseRef.current) {
-      setState(s => ({ ...s, phaseVersion: s.phaseVersion + 1, discardPhase: view.phase === '弃牌' }));
+      setState((s) => ({
+        ...s,
+        phaseVersion: s.phaseVersion + 1,
+        discardPhase: view.phase === '弃牌',
+      }));
       prevPhaseRef.current = view.phase;
       if (view.phase !== '弃牌') {
-        setTimeout(() => setState(s => ({ ...s, discardPhase: false })), 400);
+        setTimeout(() => setState((s) => ({ ...s, discardPhase: false })), 400);
       }
     }
   }, [view.phase]);
@@ -100,7 +104,7 @@ export function useAnimationState(view: GameView, perspectiveIdx: number): Anima
   // 新回合检测
   useEffect(() => {
     if (view.turn.round !== prevRoundRef.current) {
-      setState(s => ({ ...s, turnVersion: s.turnVersion + 1 }));
+      setState((s) => ({ ...s, turnVersion: s.turnVersion + 1 }));
       prevRoundRef.current = view.turn.round;
     }
   }, [view.turn.round]);

@@ -17,15 +17,27 @@ import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
-function buildState(opts?: { p2Hand?: string[]; p2Equip?: Record<string, string>; p2Tricks?: Array<{ name: string; card: Card }>; extraCards?: Record<string, Card> }): GameState {
+function buildState(opts?: {
+  p2Hand?: string[];
+  p2Equip?: Record<string, string>;
+  p2Tricks?: Array<{ name: string; card: Card }>;
+  extraCards?: Record<string, Card>;
+}): GameState {
   const gq = makeCard('gq1', '过河拆桥', '♠', '3');
   const sq = makeCard('sq1', '顺手牵羊', '♠', '3');
   const cards: Record<string, Card> = {
-    gq1: gq, sq1: sq,
+    gq1: gq,
+    sq1: sq,
     v1: makeCard('v1', '杀', '♥', '5', '基本牌'),
     v2: makeCard('v2', '闪', '♦', '6', '基本牌'),
     v3: makeCard('v3', '桃', '♣', '2', '基本牌'),
@@ -33,8 +45,38 @@ function buildState(opts?: { p2Hand?: string[]; p2Equip?: Record<string, string>
   };
   return createGameState({
     players: [
-      { index: 0, name: 'P1', character: 'X', health: 4, maxHealth: 4, alive: true, hand: ['gq1'], equipment: {}, skills: ['过河拆桥', '顺手牵羊', '杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: 'Y', health: 4, maxHealth: 4, alive: true, hand: opts?.p2Hand ?? ['v1', 'v2', 'v3'], equipment: opts?.p2Equip ?? {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: 'X',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: ['gq1'],
+        equipment: {},
+        skills: ['过河拆桥', '顺手牵羊', '杀'],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: 'Y',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: opts?.p2Hand ?? ['v1', 'v2', 'v3'],
+        equipment: opts?.p2Equip ?? {},
+        skills: ['杀'],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
     ],
     cardMap: cards,
     currentPlayerIndex: 0,
@@ -45,7 +87,9 @@ function buildState(opts?: { p2Hand?: string[]; p2Equip?: Record<string, string>
 
 describe('选牌面板(pickTargetCard)', () => {
   let harness: SkillTestHarness;
-  beforeEach(() => { harness = new SkillTestHarness(); });
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
 
   // ─────────────────────────────────────────────────────────────
   // 1. 盲选第 2 张 → 取 hand[1]=v2
@@ -75,7 +119,9 @@ describe('选牌面板(pickTargetCard)', () => {
     await P1.respond('过河拆桥', { zone: 'hand', handIndex: 2 });
 
     const log = harness.state.actionLog;
-    const useIdx = log.findIndex(e => e.message.skillId === '过河拆桥' && e.message.actionType === 'use');
+    const useIdx = log.findIndex(
+      (e) => e.message.skillId === '过河拆桥' && e.message.actionType === 'use',
+    );
     expect(useIdx).toBeGreaterThan(0);
     const prev = log[useIdx - 1];
     expect(prev.message.skillId).toBe('系统规则');
@@ -104,11 +150,13 @@ describe('选牌面板(pickTargetCard)', () => {
   // ─────────────────────────────────────────────────────────────
   it('过河拆桥选装备(zone=equipment)→ 弃掉指定装备,手牌不动', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌');
-    await harness.setup(buildState({
-      p2Hand: ['v1', 'v2'],
-      p2Equip: { 武器: 'wp1' },
-      extraCards: { wp1: weapon },
-    }));
+    await harness.setup(
+      buildState({
+        p2Hand: ['v1', 'v2'],
+        p2Equip: { 武器: 'wp1' },
+        extraCards: { wp1: weapon },
+      }),
+    );
     const P1 = harness.player('P1');
 
     await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);

@@ -11,12 +11,8 @@
 //
 // 关键机制:见 乐不思蜀.ts
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-  applyAtom,
-} from '../../src/engine/create-engine';
-import { dispatchAndWait, fireTimeoutAndWait, waitForStable } from '../engine-harness';
+import { resetForTest, registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
+import { fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -135,7 +131,8 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [
             { name: '乐不思蜀', source: 1, card: lb1 },
             { name: '乐不思蜀', source: 1, card: lb2 },
@@ -179,7 +176,8 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '乐不思蜀', source: 1, card: lb }],
           skills: ['乐不思蜀'],
         }),
@@ -212,7 +210,8 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [{ name: '乐不思蜀', source: 1, card: lb }],
           skills: ['乐不思蜀'],
         }),
@@ -250,7 +249,8 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           pendingTricks: [
             { name: '乐不思蜀', source: 1, card: lb },
             { name: '闪电', source: 1, card: sd },
@@ -271,9 +271,9 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // 乐不思蜀 被解(判定 ♠ 非♥)
-    expect(state.players[0].pendingTricks.find(t => t.name === '乐不思蜀')).toBeUndefined();
+    expect(state.players[0].pendingTricks.find((t) => t.name === '乐不思蜀')).toBeUndefined();
     // 闪电 仍在判定区(无 skill 处理 → 不动)
-    expect(state.players[0].pendingTricks.find(t => t.name === '闪电')).toBeDefined();
+    expect(state.players[0].pendingTricks.find((t) => t.name === '闪电')).toBeDefined();
     // SKIP_TAG 加(因 乐不思蜀 命中)
     expect(state.players[0].tags ?? []).toContain(SKIP_TAG);
     // 判定牌进弃牌堆

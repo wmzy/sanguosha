@@ -35,12 +35,21 @@ export function applyServerMessage(
   msg: ServerMessage,
 ): ApplyResult {
   const base: ApplyResult = {
-    view: prev, lastSeq: prevSeq, newEvents: [], phaseChangedTo: null,
+    view: prev,
+    lastSeq: prevSeq,
+    newEvents: [],
+    phaseChangedTo: null,
   };
   switch (msg.type) {
     case 'initialView': {
       const view = msg.state;
-      return { ...base, view, lastSeq: msg.lastSeq, seatIndex: view.viewer, phaseChangedTo: 'playing' };
+      return {
+        ...base,
+        view,
+        lastSeq: msg.lastSeq,
+        seatIndex: view.viewer,
+        phaseChangedTo: 'playing',
+      };
     }
     case 'event': {
       if (!prev) return base;
@@ -64,7 +73,11 @@ export function applyServerMessage(
         if (msg.deadline !== null && view.pending) {
           view = {
             ...view,
-            pending: { ...view.pending, deadline: msg.deadline.deadline, totalMs: msg.deadline.totalMs },
+            pending: {
+              ...view.pending,
+              deadline: msg.deadline.deadline,
+              totalMs: msg.deadline.totalMs,
+            },
           };
         }
         view = {
@@ -80,9 +93,23 @@ export function applyServerMessage(
     case 'game_reset':
       return { ...base, view: null, lastSeq: 0, resetToLobby: true, phaseChangedTo: 'lobby' };
     case 'room_joined':
-      return { ...base, playerId: msg.playerId, roomId: msg.roomId, seatIndex: typeof msg.seatIndex === 'number' ? msg.seatIndex : base.seatIndex };
+      return {
+        ...base,
+        playerId: msg.playerId,
+        roomId: msg.roomId,
+        seatIndex: typeof msg.seatIndex === 'number' ? msg.seatIndex : base.seatIndex,
+      };
     case 'room_state':
-      return { ...base, roomState: { readyPlayers: msg.readyPlayers, playerIds: msg.playerIds, hostId: msg.hostId, maxPlayers: msg.maxPlayers, config: msg.config } };
+      return {
+        ...base,
+        roomState: {
+          readyPlayers: msg.readyPlayers,
+          playerIds: msg.playerIds,
+          hostId: msg.hostId,
+          maxPlayers: msg.maxPlayers,
+          config: msg.config,
+        },
+      };
     case 'room_config':
       return { ...base }; // 由调用方合并到现有 roomState
     case 'player_ready':
@@ -97,9 +124,6 @@ export function applyServerMessage(
 }
 
 /** 合并 room_config 增量到现有 roomState。viewMaintainer 不持有 roomState，供 HeadlessGameClient 用。 */
-export function mergeRoomConfig(
-  prev: RoomState | null,
-  config: RoomConfig,
-): RoomState | null {
+export function mergeRoomConfig(prev: RoomState | null, config: RoomConfig): RoomState | null {
   return prev ? { ...prev, config } : prev;
 }

@@ -13,7 +13,12 @@ export function hasStringProperty<K extends string>(
 }
 
 export function isJsonValue(value: unknown): value is Json {
-  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
     return true;
   }
   if (Array.isArray(value)) {
@@ -25,7 +30,10 @@ export function isJsonValue(value: unknown): value is Json {
   return false;
 }
 
-export function assertDefined<T>(value: T | undefined | null, message?: string): asserts value is T {
+export function assertDefined<T>(
+  value: T | undefined | null,
+  message?: string,
+): asserts value is T {
   if (value === undefined || value === null) {
     throw new Error(message ?? 'Expected defined value');
   }
@@ -40,7 +48,10 @@ export function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
-export function isRecordOf<T>(value: unknown, guard: (v: unknown) => v is T): value is Record<string, T> {
+export function isRecordOf<T>(
+  value: unknown,
+  guard: (v: unknown) => v is T,
+): value is Record<string, T> {
   if (!isRecord(value)) return false;
   return Object.values(value).every(guard);
 }

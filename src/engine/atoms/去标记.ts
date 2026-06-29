@@ -11,7 +11,7 @@ export const 去标记: AtomDefinition<{ player: number; markId: string }> = {
   },
   apply(state, atom) {
     const player = state.players[atom.player];
-    const idx = player.marks.findIndex(m => m.id === atom.markId);
+    const idx = player.marks.findIndex((m) => m.id === atom.markId);
     if (idx < 0) return;
     player.marks.splice(idx, 1);
   },
@@ -25,11 +25,11 @@ export const 去标记: AtomDefinition<{ player: number; markId: string }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const markId = event.markId as string | undefined;
     if (markId) {
-      view.players[pi].marks = view.players[pi].marks.filter(m => m.id !== markId);
+      view.players[pi].marks = view.players[pi].marks.filter((m) => m.id !== markId);
     }
   },
 };

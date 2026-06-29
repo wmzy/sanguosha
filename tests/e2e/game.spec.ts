@@ -15,22 +15,93 @@ function createTestLog() {
       seed: 12345,
     },
     serverOps: [
-      { seq: 0, timestamp: Date.now(), type: '游戏开始', data: { players: [{ name: '曹操', character: '曹操', role: '主公' }, { name: '刘备', character: '刘备', role: '反贼' }] }, description: '游戏开始' },
-      { seq: 1, timestamp: Date.now(), type: '阶段变更', data: { phase: '判定', player: '曹操' }, description: '进入判定阶段' },
-      { seq: 2, timestamp: Date.now(), type: '阶段变更', data: { phase: '摸牌', player: '曹操' }, description: '进入摸牌阶段' },
-      { seq: 3, timestamp: Date.now(), type: '摸牌', data: { player: '曹操', cards: [{ name: '杀', suit: '♠', color: '黑', rank: '3' }, { name: '闪', suit: '♥', color: '红', rank: '5' }] }, description: '曹操摸了2张牌' },
-      { seq: 4, timestamp: Date.now(), type: '阶段变更', data: { phase: '出牌', player: '曹操' }, description: '进入出牌阶段' },
-      { seq: 5, timestamp: Date.now(), type: '造成伤害', data: { source: '曹操', target: '刘备', amount: 1, cardName: '杀' }, description: '曹操对刘备使用杀，造成1点伤害' },
+      {
+        seq: 0,
+        timestamp: Date.now(),
+        type: '游戏开始',
+        data: {
+          players: [
+            { name: '曹操', character: '曹操', role: '主公' },
+            { name: '刘备', character: '刘备', role: '反贼' },
+          ],
+        },
+        description: '游戏开始',
+      },
+      {
+        seq: 1,
+        timestamp: Date.now(),
+        type: '阶段变更',
+        data: { phase: '判定', player: '曹操' },
+        description: '进入判定阶段',
+      },
+      {
+        seq: 2,
+        timestamp: Date.now(),
+        type: '阶段变更',
+        data: { phase: '摸牌', player: '曹操' },
+        description: '进入摸牌阶段',
+      },
+      {
+        seq: 3,
+        timestamp: Date.now(),
+        type: '摸牌',
+        data: {
+          player: '曹操',
+          cards: [
+            { name: '杀', suit: '♠', color: '黑', rank: '3' },
+            { name: '闪', suit: '♥', color: '红', rank: '5' },
+          ],
+        },
+        description: '曹操摸了2张牌',
+      },
+      {
+        seq: 4,
+        timestamp: Date.now(),
+        type: '阶段变更',
+        data: { phase: '出牌', player: '曹操' },
+        description: '进入出牌阶段',
+      },
+      {
+        seq: 5,
+        timestamp: Date.now(),
+        type: '造成伤害',
+        data: { source: '曹操', target: '刘备', amount: 1, cardName: '杀' },
+        description: '曹操对刘备使用杀，造成1点伤害',
+      },
     ],
     playerOps: {
       曹操: [
-        { seq: 0, timestamp: Date.now(), type: '游戏开始', data: {}, description: '游戏开始，你是 曹操（主公）' },
+        {
+          seq: 0,
+          timestamp: Date.now(),
+          type: '游戏开始',
+          data: {},
+          description: '游戏开始，你是 曹操（主公）',
+        },
         { seq: 1, timestamp: Date.now(), type: '摸牌', data: {}, description: '你摸了 杀、闪' },
-        { seq: 2, timestamp: Date.now(), type: '造成伤害', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
+        {
+          seq: 2,
+          timestamp: Date.now(),
+          type: '造成伤害',
+          data: {},
+          description: '曹操对刘备使用杀，造成1点伤害',
+        },
       ],
       刘备: [
-        { seq: 0, timestamp: Date.now(), type: '游戏开始', data: {}, description: '游戏开始，你是 刘备（反贼）' },
-        { seq: 1, timestamp: Date.now(), type: '造成伤害', data: {}, description: '曹操对刘备使用杀，造成1点伤害' },
+        {
+          seq: 0,
+          timestamp: Date.now(),
+          type: '游戏开始',
+          data: {},
+          description: '游戏开始，你是 刘备（反贼）',
+        },
+        {
+          seq: 1,
+          timestamp: Date.now(),
+          type: '造成伤害',
+          data: {},
+          description: '曹操对刘备使用杀，造成1点伤害',
+        },
       ],
     },
   };
@@ -75,7 +146,7 @@ test.describe('调试游戏 — 真实游戏流程', () => {
     // 找到杀牌
     const 杀牌 = page.locator('div[style*="cursor: pointer"]').filter({ hasText: /^杀$/ }).first();
 
-    if (await 杀牌.count() > 0) {
+    if ((await 杀牌.count()) > 0) {
       await 杀牌.click();
       await page.waitForTimeout(200);
 
@@ -93,7 +164,7 @@ test.describe('调试游戏 — 真实游戏流程', () => {
   test('出牌阶段可以使用桃', async ({ page }) => {
     const 桃牌 = page.locator('div[style*="cursor: pointer"]').filter({ hasText: /^桃$/ }).first();
 
-    if (await 桃牌.count() > 0) {
+    if ((await 桃牌.count()) > 0) {
       await 桃牌.click();
       await page.waitForTimeout(200);
 
@@ -176,7 +247,7 @@ test.describe('保存日志', () => {
 test.describe('回放功能', () => {
   let logFile: string;
 
-  test.beforeEach(({}, testInfo) => { // eslint-disable-line no-empty-pattern
+  test.beforeEach(({}, testInfo) => {
     // 使用唯一文件名避免并行冲突
     fs.mkdirSync(LOG_DIR, { recursive: true });
     logFile = path.join(LOG_DIR, `test-${testInfo.retry}-${Date.now()}.json`);
@@ -244,7 +315,12 @@ test.describe('回放功能', () => {
     // 使用更精确的选择器
     await expect(page.getByText('曹操 (你)')).toBeVisible();
     // 刘备可能在多个地方出现（面板、下拉框），检查面板中的
-    await expect(page.locator('div').filter({ hasText: /^刘备$/ }).first()).toBeVisible();
+    await expect(
+      page
+        .locator('div')
+        .filter({ hasText: /^刘备$/ })
+        .first(),
+    ).toBeVisible();
   });
 
   test('切换视角', async ({ page }) => {

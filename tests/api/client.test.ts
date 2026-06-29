@@ -26,7 +26,10 @@ describe('apiFetch', () => {
 
     const result = await apiFetch<{ roomId: string }>('/api/rooms');
     expect(result).toEqual({ roomId: 'abc123' });
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/rooms', expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/rooms',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('4xx 错误抛出 ApiError', async () => {
@@ -37,7 +40,7 @@ describe('apiFetch', () => {
       json: () => Promise.resolve(errorBody),
     });
 
-    const err = await apiFetch('/api/rooms').catch(e => e);
+    const err = await apiFetch('/api/rooms').catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(400);
     expect((err as ApiError).body).toEqual(errorBody);
@@ -51,7 +54,7 @@ describe('apiFetch', () => {
       json: () => Promise.resolve({ message: 'Internal Server Error' }),
     });
 
-    const err = await apiFetch('/api/rooms').catch(e => e);
+    const err = await apiFetch('/api/rooms').catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(500);
   });
@@ -60,13 +63,15 @@ describe('apiFetch', () => {
     const controller = new AbortController();
     controller.abort();
 
-    globalThis.fetch = vi.fn().mockImplementation((_url: string, options: { signal: AbortSignal }) => {
-      return new Promise((_resolve, reject) => {
-        if (options.signal.aborted) {
-          reject(new DOMException('The operation was aborted.', 'AbortError'));
-        }
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation((_url: string, options: { signal: AbortSignal }) => {
+        return new Promise((_resolve, reject) => {
+          if (options.signal.aborted) {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          }
+        });
       });
-    });
 
     await expect(apiFetch('/api/rooms', { signal: controller.signal })).rejects.toThrow();
   });
@@ -74,13 +79,15 @@ describe('apiFetch', () => {
   it('超时自动中止请求', async () => {
     vi.useFakeTimers();
 
-    globalThis.fetch = vi.fn().mockImplementation((_url: string, options: { signal: AbortSignal }) => {
-      return new Promise((_resolve, reject) => {
-        options.signal.addEventListener('abort', () => {
-          reject(new DOMException('The operation was aborted.', 'AbortError'));
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation((_url: string, options: { signal: AbortSignal }) => {
+        return new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
         });
       });
-    });
 
     const promise = apiFetch('/api/rooms', { timeout: 1000 });
 

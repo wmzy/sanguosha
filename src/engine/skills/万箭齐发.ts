@@ -4,16 +4,25 @@
 // 询问闪 后检查处理区:有闪牌 = 出了闪;没有 = 受伤害。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, type SkillModule, validateUseCard } from '../skill';
+import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '万箭齐发', description: '对所有其他角色使用,每名目标需出闪,否则受 1 点伤害' };
+  return {
+    id,
+    ownerId,
+    name: '万箭齐发',
+    description: '对所有其他角色使用,每名目标需出闪,否则受 1 点伤害',
+  };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
     (state: GameState, params: Record<string, Json>) => {
       return validateUseCard(state, ownerId, params, { cardName: '万箭齐发' });
     },
@@ -23,12 +32,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await pushFrame(state, '万箭齐发', from, { ...params });
 
       // 从使用者下家开始,按座次顺序结算(state.players 数组顺序 = seat index 顺序)
-      const alivePlayers = state.players.filter(p => p.alive);
+      const alivePlayers = state.players.filter((p) => p.alive);
       const n = alivePlayers.length;
       const targets: number[] = [];
       if (n > 1) {
         // 找到 from 在 alivePlayers 中的位置
-        const fromPos = alivePlayers.findIndex(p => p.index === from);
+        const fromPos = alivePlayers.findIndex((p) => p.index === from);
         if (fromPos >= 0) {
           // 从 from+1 开始顺时针取 n-1 个目标
           for (let i = 1; i < n; i++) {
@@ -55,9 +64,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
           await applyAtom(state, { type: '询问闪', target, source: from });
           // 检查处理区
-          const dodgeCardId = frameCards(state).find(id => {
+          const dodgeCardId = frameCards(state).find((id) => {
             const c = state.cardMap[id];
-            return c && c.name === '闪';
+            return c?.name === '闪';
           });
           if (dodgeCardId) {
             // 出了闪 → 被抵消(复用通用时机 atom;万箭是锦囊不是杀,武器技自行跳过)
@@ -110,4 +119,3 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-

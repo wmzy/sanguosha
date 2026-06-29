@@ -2,7 +2,7 @@
 // 集成测试:动态技能生命周期(添加技能/移除技能 atom 触发实例化/卸载)
 // 覆盖 ENGINE-DESIGN §4.13 —— 添加技能 atom 后引擎应 import 模块 → onInit 注册 action/hook
 import { describe, it, expect, beforeEach } from 'vitest';
-import { dispatch, registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
+import { registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
 import { applyAtom } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import '../../src/engine/atoms';
@@ -13,8 +13,38 @@ import type { GameState } from '../../src/engine/types';
 function buildInitialState(): GameState {
   return createGameState({
     players: [
-      { index: 0, name: 'P1', character: '刘备', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: '刘备',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: [],
+        equipment: {},
+        skills: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '曹操',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: [],
+        equipment: {},
+        skills: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
     ],
     cardMap: {},
     currentPlayerIndex: 0,
@@ -59,7 +89,9 @@ describe('动态技能生命周期(添加技能/移除技能 atom)', () => {
   it('添加技能 幂等:重复添加同一 skill 不抛错', async () => {
     await applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' });
     // 再次添加(已存在)→ 不抛错,action 仍注册(applyAtom 返回 true=正常完成)
-    await expect(applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' })).resolves.toBe(true);
+    await expect(applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' })).resolves.toBe(
+      true,
+    );
     expect(findActionEntry(state, '杀', 0, 'use')).toBeDefined();
   });
 

@@ -24,12 +24,11 @@ export const 失去体力: AtomDefinition<{ target: number; amount: number }> = 
       type: '失去体力',
       target: atom.target,
       amount: atom.amount,
-
     };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view: GameView, event) {
-    const pi = view.players.findIndex(p => p.index === (event.target as number));
+    const pi = view.players.findIndex((p) => p.index === (event.target as number));
     if (pi < 0) return;
     const p = view.players[pi];
     p.health = Math.max(0, p.health - (event.amount as number));

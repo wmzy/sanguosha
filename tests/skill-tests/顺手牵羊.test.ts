@@ -43,11 +43,23 @@ function makePlayer(opts: {
   };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
-function makeBasicCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeBasicCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -63,8 +75,18 @@ function buildState(opts?: {
   const cards: Record<string, Card> = { sq1: sq, ...(opts?.extraCards ?? {}) };
   const n = opts?.playerCount ?? 2;
   const players = [
-    makePlayer({ index: 0, name: 'P1', hand: opts?.p1Hand ?? ['sq1'], skills: opts?.p1Skills ?? ['顺手牵羊', '杀'] }),
-    makePlayer({ index: 1, name: 'P2', hand: opts?.p2Hand ?? [], skills: opts?.p2Skills ?? ['杀'] }),
+    makePlayer({
+      index: 0,
+      name: 'P1',
+      hand: opts?.p1Hand ?? ['sq1'],
+      skills: opts?.p1Skills ?? ['顺手牵羊', '杀'],
+    }),
+    makePlayer({
+      index: 1,
+      name: 'P2',
+      hand: opts?.p2Hand ?? [],
+      skills: opts?.p2Skills ?? ['杀'],
+    }),
   ];
   for (let i = 2; i < n; i++) {
     players.push(makePlayer({ index: i, name: `P${i + 1}`, skills: [] }));
@@ -113,8 +135,8 @@ describe('顺手牵羊', () => {
     expect(harness.state.zones.processing).not.toContain('sq1');
     // view 级断言:P1 视角手牌 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
-      expect(v.players[0].hand!.map(c => c.id)).toContain('v1');
+    P1.expectView((v) => {
+      expect(v.players[0].hand!.map((c) => c.id)).toContain('v1');
       expect(v.players[0].handCount).toBe(1);
       expect(v.pending).toBeNull();
     });
@@ -241,8 +263,8 @@ describe('顺手牵羊', () => {
     expect(harness.state.zones.discardPile).toContain('sq1');
     // view 级断言:P1 视角装备到手
     P1.processEvents();
-    P1.expectView(v => {
-      expect(v.players[0].hand!.map(c => c.id)).toContain('wp1');
+    P1.expectView((v) => {
+      expect(v.players[0].hand!.map((c) => c.id)).toContain('wp1');
       expect(v.pending).toBeNull();
     });
   });
@@ -288,7 +310,7 @@ describe('顺手牵羊', () => {
     await harness.setup(state);
 
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     const p0Before = [...harness.state.players[0].hand];
     const p1Before = [...harness.state.players[1].hand];

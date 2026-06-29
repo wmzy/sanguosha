@@ -137,7 +137,9 @@ describe('ErrorBoundary — context 日志', () => {
       </ErrorBoundary>,
     );
     const calls: string[] = errorSpy.mock.calls.flat().map((c: unknown) => String(c));
-    const hasRootLog = calls.some((c) => c.includes('context: root') || c.includes('ErrorBoundary:'));
+    const hasRootLog = calls.some(
+      (c) => c.includes('context: root') || c.includes('ErrorBoundary:'),
+    );
     expect(hasRootLog).toBe(true);
   });
 });

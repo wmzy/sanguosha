@@ -15,9 +15,17 @@ try {
   const socket = new net.Socket();
   serverUp = await new Promise<boolean>((resolve) => {
     socket.setTimeout(1000);
-    socket.once('connect', () => { resolve(true); socket.destroy(); });
-    socket.once('error', () => { resolve(false); });
-    socket.once('timeout', () => { resolve(false); socket.destroy(); });
+    socket.once('connect', () => {
+      resolve(true);
+      socket.destroy();
+    });
+    socket.once('error', () => {
+      resolve(false);
+    });
+    socket.once('timeout', () => {
+      resolve(false);
+      socket.destroy();
+    });
     socket.connect(3930, 'localhost');
   });
 } catch {
@@ -30,9 +38,15 @@ describe.skipIf(!serverUp)('HeadlessGameClient 集成', () => {
   it('createDebugRoom 后收到 room_joined（playerId/roomId 填充）', async () => {
     const got: string[] = [];
     const hgc = new HeadlessGameClient(SERVER, {
-      onView: (view) => { got.push(`view viewer=${view.viewer}`); },
-      onRoomState: () => { got.push('room_state'); },
-      onError: (e) => { got.push(`error: ${e.message}`); },
+      onView: (view) => {
+        got.push(`view viewer=${view.viewer}`);
+      },
+      onRoomState: () => {
+        got.push('room_state');
+      },
+      onError: (e) => {
+        got.push(`error: ${e.message}`);
+      },
     });
     hgc.createDebugRoom(2);
 

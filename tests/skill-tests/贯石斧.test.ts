@@ -22,7 +22,13 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -71,7 +77,13 @@ describe('贯石斧', () => {
     const discard2 = makeCard('x2', '桃', '♥', '4');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'x1', 'x2'], skills: ['杀', '贯石斧'], equipment: { 武器: 'gs' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'x1', 'x2'],
+          skills: ['杀', '贯石斧'],
+          equipment: { 武器: 'gs' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { gs: GUANSHI, k1: kill, d1: dodge, x1: discard1, x2: discard2 },
@@ -106,7 +118,7 @@ describe('贯石斧', () => {
     expect(harness.state.players[0].hand).toHaveLength(0);
     // view 级断言
     P2.processEvents();
-    P2.expectView(v => {
+    P2.expectView((v) => {
       expect(v.players[1].health).toBe(3);
       expect(v.pending).toBeNull();
     });
@@ -120,7 +132,13 @@ describe('贯石斧', () => {
     const extra = makeCard('x1', '桃', '♥', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'x1'], skills: ['杀', '贯石斧'], equipment: { 武器: 'gs' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'x1'],
+          skills: ['杀', '贯石斧'],
+          equipment: { 武器: 'gs' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { gs: GUANSHI, k1: kill, d1: dodge, x1: extra },
@@ -154,7 +172,9 @@ describe('贯石斧', () => {
       players: [
         // P1 只剩 k1 手牌 + 2 匹马装备(共 2 张可弃)
         makePlayer({
-          index: 0, name: 'P1', hand: ['k1'],
+          index: 0,
+          name: 'P1',
+          hand: ['k1'],
           skills: ['杀', '贯石斧'],
           equipment: { 武器: 'gs', 进攻马: 'h1', 防御马: 'h2' },
         }),
@@ -191,7 +211,9 @@ describe('贯石斧', () => {
       players: [
         // P1 只有 k1(出杀后 0 张手牌)+ 装备贯石斧(1 张,不足 2)
         makePlayer({
-          index: 0, name: 'P1', hand: ['k1'],
+          index: 0,
+          name: 'P1',
+          hand: ['k1'],
           skills: ['杀', '贯石斧'],
           equipment: { 武器: 'gs' }, // 只有 1 张装备
         }),
@@ -224,7 +246,13 @@ describe('贯石斧', () => {
     const x2 = makeCard('x2', '桃', '♥', '4');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'x1', 'x2'], skills: ['杀', '贯石斧'], equipment: { 武器: 'gs' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'x1', 'x2'],
+          skills: ['杀', '贯石斧'],
+          equipment: { 武器: 'gs' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { gs: GUANSHI, k1: kill, d1: dodge, x1, x2 },
@@ -242,7 +270,9 @@ describe('贯石斧', () => {
 
     // select 阶段只给 1 张牌 → 拒绝
     await P1.expectRejected({
-      skillId: '贯石斧', actionType: 'respond', params: { cardIds: ['x1'] },
+      skillId: '贯石斧',
+      actionType: 'respond',
+      params: { cardIds: ['x1'] },
     });
 
     // 补正常提交 2 张
@@ -258,7 +288,13 @@ describe('贯石斧', () => {
     const x1 = makeCard('x1', '桃', '♥', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'x1'], skills: ['杀', '贯石斧'], equipment: { 武器: 'gs' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'x1'],
+          skills: ['杀', '贯石斧'],
+          equipment: { 武器: 'gs' },
+        }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
       cardMap: { gs: GUANSHI, k1: kill, d1: dodge, x1 },
@@ -276,7 +312,9 @@ describe('贯石斧', () => {
 
     // 选同一张牌 → 拒绝
     await P1.expectRejected({
-      skillId: '贯石斧', actionType: 'respond', params: { cardIds: ['x1', 'x1'] },
+      skillId: '贯石斧',
+      actionType: 'respond',
+      params: { cardIds: ['x1', 'x1'] },
     });
   });
 
@@ -291,8 +329,20 @@ describe('贯石斧', () => {
     const judgeRed = makeCard('j1', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1', 'x1', 'x2'], skills: ['杀', '贯石斧'], equipment: { 武器: 'gs' } }),
-        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪', '八卦阵'], equipment: { 防具: 'b1' } }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'x1', 'x2'],
+          skills: ['杀', '贯石斧'],
+          equipment: { 武器: 'gs' },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: ['闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
       ],
       cardMap: { gs: GUANSHI, b1: bagua, k1: kill, x1: discard1, x2: discard2, j1: judgeRed },
       zones: { deck: ['j1'], discardPile: [], processing: [] },

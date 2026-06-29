@@ -41,7 +41,13 @@ function makePlayer(opts: {
   };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -59,7 +65,12 @@ function buildState(opts?: {
   const cards: Record<string, Card> = { gq1: gq, ...(opts?.extraCards ?? {}) };
   return createGameState({
     players: [
-      makePlayer({ index: 0, name: 'P1', hand: opts?.p1Hand ?? ['gq1'], skills: opts?.p1Skills ?? ['过河拆桥', '杀'] }),
+      makePlayer({
+        index: 0,
+        name: 'P1',
+        hand: opts?.p1Hand ?? ['gq1'],
+        skills: opts?.p1Skills ?? ['过河拆桥', '杀'],
+      }),
       makePlayer({
         index: 1,
         name: 'P2',
@@ -107,7 +118,7 @@ describe('过河拆桥', () => {
     expect(harness.state.zones.processing).not.toContain('gq1');
     // view 级断言:P1 视角 P2 失去手牌 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[1].handCount).toBe(1);
       expect(v.pending).toBeNull();
     });
@@ -138,7 +149,7 @@ describe('过河拆桥', () => {
     expect(harness.state.zones.discardPile).toContain('gq1');
     // view 级断言:P1 视角 P2 装备区空 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.zones!.discardPileCount).toBeGreaterThan(0);
       expect(v.pending).toBeNull();
     });
@@ -150,9 +161,7 @@ describe('过河拆桥', () => {
   it('P1 对 P3(隔一存活角色)出过河拆桥 → 距离无限制,正常生效', async () => {
     // 加 P3 让距离 = 2(顺时针跳过 P2 到 P3)
     const base = buildState({ p2Hand: ['v1'] });
-    base.players.push(
-      makePlayer({ index: 2, name: 'P3', hand: ['v1'], skills: [] }),
-    );
+    base.players.push(makePlayer({ index: 2, name: 'P3', hand: ['v1'], skills: [] }));
     base.cardMap['v1'] = makeCard('v1', '杀', '♥', '5', '基本牌');
     await harness.setup(base);
     const P1 = harness.player('P1');
@@ -168,7 +177,7 @@ describe('过河拆桥', () => {
     expect(harness.state.zones.discardPile).toContain('v1');
     // view 级断言:P1 视角 P3 失去手牌
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[2].handCount).toBe(0);
       expect(v.pending).toBeNull();
     });
@@ -265,9 +274,7 @@ describe('过河拆桥', () => {
     const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
     // 手动构造 state:P2 判定区有乐不思蜀(PendingTrick 结构)
     const state = buildState({ p2Hand: [], extraCards: { lb1: lb } });
-    state.players[1].pendingTricks = [
-      { name: '乐不思蜀', source: 0, card: lb },
-    ];
+    state.players[1].pendingTricks = [{ name: '乐不思蜀', source: 0, card: lb }];
     await harness.setup(state);
     const P1 = harness.player('P1');
 
@@ -288,9 +295,7 @@ describe('过河拆桥', () => {
   it('Bug2:P2 只有判定区无手牌无装备 → 过河拆桥 validate 放行', async () => {
     const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
     const state = buildState({ p2Hand: [], extraCards: { lb1: lb } });
-    state.players[1].pendingTricks = [
-      { name: '乐不思蜀', source: 0, card: lb },
-    ];
+    state.players[1].pendingTricks = [{ name: '乐不思蜀', source: 0, card: lb }];
     await harness.setup(state);
     const P1 = harness.player('P1');
 

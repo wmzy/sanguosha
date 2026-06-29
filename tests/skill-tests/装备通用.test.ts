@@ -12,14 +12,21 @@
 //   6. 负面:不是装备牌(基本牌当装备) → 拒绝(无 subtype)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { findActionEntry } from '../../src/engine/skill';
+
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物', rank = 'A', range?: number): Card {
+function makeEquip(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物',
+  rank = 'A',
+  range?: number,
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
@@ -79,7 +86,7 @@ describe('装备通用', () => {
     expect(harness.state.players[0].hand).not.toContain('c1');
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].equipment['武器']).toBe('c1');
       expect(v.players[0].handCount).toBe(0);
     });
@@ -105,7 +112,7 @@ describe('装备通用', () => {
     expect(harness.state.players[0].equipment['防具']).toBe('b1');
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].equipment['防具']).toBe('b1');
       expect(v.players[0].handCount).toBe(0);
     });

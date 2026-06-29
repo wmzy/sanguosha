@@ -15,10 +15,7 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -78,7 +75,14 @@ describe('濒死求桃链:多人依次问', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['桃', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
       ],
       cardMap: { [slash.id]: slash, [peach.id]: peach },
@@ -116,7 +120,11 @@ describe('濒死求桃链:多人依次问', () => {
       const slot = [...state.pendingSlots.values()][0];
       const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
       // 求桃给 P1 时 target=1,给 P2 时 target=2
-      if (slotAtom.type === '请求回应' && slotAtom.requestType === '桃/求桃' && slotAtom.target === 1) {
+      if (
+        slotAtom.type === '请求回应' &&
+        slotAtom.requestType === '桃/求桃' &&
+        slotAtom.target === 1
+      ) {
         await fireTimeoutAndWait(state);
       }
     }
@@ -159,17 +167,28 @@ describe('濒死求桃链:多人依次问', () => {
     // 给 P1 一张废牌(应被打入弃牌堆)
     const deadHandCard: Card = makeCard('d1', '杀', '♥', '9');
     // 给 P1 一件装备
-    const wp: Card = { id: 'wp1', name: '诸葛连弩', suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
+    const wp: Card = {
+      id: 'wp1',
+      name: '诸葛连弩',
+      suit: '♣',
+      color: '黑',
+      rank: 'A',
+      type: '装备牌',
+      subtype: '武器',
+      range: 1,
+    };
 
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [deadHandCard.id],
           equipment: { 武器: wp.id },
           skills: ['桃', '闪'],
-          health: 1, maxHealth: 4,
+          health: 1,
+          maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: ['桃', '闪'] }),
       ],
@@ -220,13 +239,16 @@ describe('濒死求桃链:多人依次问', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [peach.id],
           skills: ['桃', '闪'],
-          health: 1, maxHealth: 4,
+          health: 1,
+          maxHealth: 4,
         }),
         makePlayer({
-          index: 2, name: 'P2',
+          index: 2,
+          name: 'P2',
           hand: [decoy.id],
           skills: ['桃', '闪'],
         }),
@@ -289,7 +311,14 @@ describe('濒死求桃链:多人依次问', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
         // P1 濒死(被 P0 杀)
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['桃', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
         // P2 有桃 — 第二个被问(targetIdx+1)
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
         // P3 无桃 — 第三个被问(targetIdx+2)
@@ -375,7 +404,14 @@ describe('濒死求桃多人链:链顺序与断链端到端', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['桃', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
         makePlayer({ index: 3, name: 'P3', hand: [], skills: ['桃', '闪'] }),
       ],
@@ -430,11 +466,13 @@ describe('濒死求桃多人链:链顺序与断链端到端', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [decoyHand.id],
           equipment: { 武器: wp.id },
           skills: ['桃', '闪'],
-          health: 1, maxHealth: 4,
+          health: 1,
+          maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: ['桃', '闪'] }),
         makePlayer({ index: 3, name: 'P3', hand: [], skills: ['桃', '闪'] }),
@@ -490,7 +528,14 @@ describe('濒死求桃多人链:链顺序与断链端到端', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['桃', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: ['桃', '闪'], health: 4 }),
         makePlayer({ index: 3, name: 'P3', hand: [], skills: ['桃', '闪'], health: 4 }),
       ],
@@ -540,12 +585,27 @@ describe('濒死求桃多人链:链顺序与断链端到端', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash1.id, slash2.id], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['桃', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 2, name: 'P2', hand: [peach1.id], skills: ['桃', '闪'] }),
-        makePlayer({ index: 3, name: 'P3', hand: [], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 3,
+          name: 'P3',
+          hand: [],
+          skills: ['桃', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
       ],
       cardMap: {
-        [slash1.id]: slash1, [slash2.id]: slash2,
+        [slash1.id]: slash1,
+        [slash2.id]: slash2,
         [peach1.id]: peach1,
       },
       currentPlayerIndex: 0,

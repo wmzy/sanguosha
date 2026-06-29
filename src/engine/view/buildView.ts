@@ -1,7 +1,7 @@
 // src/engine/view/buildView.ts
-import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, PendingSlot } from '../types';
+// src/engine/view/buildView.ts
+import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
-
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -37,27 +37,31 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   // 不使用 findPendingSlot 的 size===1 fallback —— 那会让主公选将期间(单 slot)
   // 的其他 viewer 错误匹配到主公 slot,导致"共用倒计时":其他角色看到主公的
   // 选将 atom/deadline/target,前端据此渲染主公的选将界面和倒计时。
-  const ownOrBroadcastSlot = viewer >= 0
-    ? (state.pendingSlots.get(viewer)
-        ?? [...state.pendingSlots.values()].find(s =>
-            (s.atom as { target?: number }).target === TARGET_BROADCAST))
-    : undefined;
+  const ownOrBroadcastSlot =
+    viewer >= 0
+      ? (state.pendingSlots.get(viewer) ??
+        [...state.pendingSlots.values()].find(
+          (s) => (s.atom as { target?: number }).target === TARGET_BROADCAST,
+        ))
+      : undefined;
   if (ownOrBroadcastSlot) {
     const slot = ownOrBroadcastSlot;
     const def = slot.definition;
-    const prompt = (slot.atom as { prompt?: ActionPrompt }).prompt
-      ?? def.pending?.prompt
-      ?? (slot.atom.type === '询问闪'
+    const prompt =
+      (slot.atom as { prompt?: ActionPrompt }).prompt ??
+      def.pending?.prompt ??
+      (slot.atom.type === '询问闪'
         ? { type: 'useCard' as const, title: '请出闪', cardFilter: { min: 1, max: 1 } }
         : slot.atom.type === '询问杀'
-        ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
-        : { type: 'confirm' as const, title: '请回应' });
+          ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
+          : { type: 'confirm' as const, title: '请回应' });
     // target 提取:'target' 字段优先;出牌窗口 用 'player';都无则 TARGET_SYSTEM
-    const target = 'target' in slot.atom && typeof slot.atom.target === 'number'
-      ? slot.atom.target
-      : 'player' in slot.atom && typeof slot.atom.player === 'number'
-      ? (slot.atom as { player: number }).player
-      : TARGET_SYSTEM;
+    const target =
+      'target' in slot.atom && typeof slot.atom.target === 'number'
+        ? slot.atom.target
+        : 'player' in slot.atom && typeof slot.atom.player === 'number'
+          ? (slot.atom as { player: number }).player
+          : TARGET_SYSTEM;
     pending = {
       type: 'awaits',
       atom: slot.atom,
@@ -80,17 +84,20 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     // 仅限游戏进行中的问询类 atom —— 选将询问/选将 等开局 atom 的 pending 是
     // 隔离的(只有被问询者见),不应观察型投影(charselect-pending-isolation 契约)。
     const OBSERVER_PENDING_TYPES = new Set(['询问闪', '询问杀', '请求回应', '出牌窗口']);
-    const observerSlot = [...state.pendingSlots.values()].find(s => {
+    const observerSlot = [...state.pendingSlots.values()].find((s) => {
       // target 字段优先;出牌窗口用 player
-      const t = (s.atom as { target?: number; player?: number }).target
-        ?? (s.atom as { player?: number }).player;
-      return typeof t === 'number' && t >= 0 && t !== viewer
-        && OBSERVER_PENDING_TYPES.has(s.atom.type);
+      const t =
+        (s.atom as { target?: number; player?: number }).target ??
+        (s.atom as { player?: number }).player;
+      return (
+        typeof t === 'number' && t >= 0 && t !== viewer && OBSERVER_PENDING_TYPES.has(s.atom.type)
+      );
     });
     if (observerSlot) {
       const slot = observerSlot;
-      const target = (slot.atom as { target?: number; player?: number }).target
-        ?? (slot.atom as { player: number }).player;
+      const target =
+        (slot.atom as { target?: number; player?: number }).target ??
+        (slot.atom as { player: number }).player;
       pending = {
         type: 'awaits',
         atom: slot.atom,
@@ -98,7 +105,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         target,
         isBlocking: slot.isBlocking,
         deadline: state.startedAt + slot.deadline,
-        totalMs: ((slot.atom as { timeout?: number }).timeout ?? slot.definition.pending?.timeout ?? 30) * 1000,
+        totalMs:
+          ((slot.atom as { timeout?: number }).timeout ?? slot.definition.pending?.timeout ?? 30) *
+          1000,
       };
     }
   }
@@ -108,7 +117,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   const deadline = pending?.deadline ?? null;
   const deadlineTotalMs = pending?.totalMs ?? 0;
 
-  void debug;  // 保留参数签名兼容调用点,但不再影响隔离逻辑
+  void debug; // 保留参数签名兼容调用点,但不再影响隔离逻辑
 
   return {
     viewer,
@@ -126,7 +135,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       equipment: { ...p.equipment },
       skills: [...p.skills],
       handCount: p.hand.length,
-      hand: i === viewer ? p.hand.map(id => state.cardMap[id]).filter(Boolean) : undefined,
+      hand: i === viewer ? p.hand.map((id) => state.cardMap[id]).filter(Boolean) : undefined,
       marks: [...p.marks],
       // 距离修正 vars(只投影距离相关三个 key,不暴露身份等敏感 vars)
       distanceVars: {
@@ -141,13 +150,11 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
           ? { '杀/usedCount': state.turn.vars['杀/usedCount'] }
           : {}),
         ...Object.fromEntries(
-          Object.entries(p.vars).filter(
-            ([k, v]) => k.endsWith('/usedThisTurn') && v,
-          ),
+          Object.entries(p.vars).filter(([k, v]) => k.endsWith('/usedThisTurn') && v),
         ),
       },
       // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)
-      pendingTricks: p.pendingTricks.map(t => t.card.id),
+      pendingTricks: p.pendingTricks.map((t) => t.card.id),
       ...(() => {
         const rawIdentity = p.identity;
         if (!rawIdentity) return { identity: undefined, identityHidden: false };
@@ -171,9 +178,14 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       deckCount: state.zones.deck.length,
       discardPileCount: state.zones.discardPile.length,
       // 结算区:所有结算帧的牌聚合(供 ZoneInfoBar 展示)。真相源是 settlementStack 的各帧 cards。
-      processing: state.settlementStack.flatMap(f => f.cards),
+      processing: state.settlementStack.flatMap((f) => f.cards),
     },
-    settlementStack: state.settlementStack.map(f => ({ skillId: f.skillId, from: f.from, params: { ...f.params }, cards: [...f.cards] })),
+    settlementStack: state.settlementStack.map((f) => ({
+      skillId: f.skillId,
+      from: f.from,
+      params: { ...f.params },
+      cards: [...f.cards],
+    })),
   };
 }
 
@@ -184,20 +196,22 @@ export function getPendingDeadline(
   state: GameState,
   viewer: number,
 ): { target: number; deadline: number; totalMs: number } | null {
-  const slot = viewer >= 0
-    ? (state.pendingSlots.get(viewer)
-        ?? [...state.pendingSlots.values()].find(s =>
-            (s.atom as { target?: number }).target === TARGET_BROADCAST))
-    : undefined;
+  const slot =
+    viewer >= 0
+      ? (state.pendingSlots.get(viewer) ??
+        [...state.pendingSlots.values()].find(
+          (s) => (s.atom as { target?: number }).target === TARGET_BROADCAST,
+        ))
+      : undefined;
   if (!slot) return null;
   const def = slot.definition;
-  const target = 'target' in slot.atom && typeof slot.atom.target === 'number'
-    ? slot.atom.target
-    : 'player' in slot.atom && typeof slot.atom.player === 'number'
-    ? (slot.atom as { player: number }).player
-    : TARGET_SYSTEM;
-  const timeoutSec = (slot.atom as { timeout?: number }).timeout
-    ?? def.pending?.timeout ?? 30;
+  const target =
+    'target' in slot.atom && typeof slot.atom.target === 'number'
+      ? slot.atom.target
+      : 'player' in slot.atom && typeof slot.atom.player === 'number'
+        ? (slot.atom as { player: number }).player
+        : TARGET_SYSTEM;
+  const timeoutSec = (slot.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 30;
   return {
     target,
     deadline: state.startedAt + slot.deadline,

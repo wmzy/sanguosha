@@ -12,7 +12,10 @@ function clearEquipVars(state: GameState, playerIdx: number, slot: EquipSlot): v
   }
 }
 
-export const 卸下: AtomDefinition<{ player: number; slot: '武器' | '防具' | '进攻马' | '防御马' | '宝物' }> = {
+export const 卸下: AtomDefinition<{
+  player: number;
+  slot: '武器' | '防具' | '进攻马' | '防御马' | '宝物';
+}> = {
   type: '卸下',
   validate(state, atom) {
     const p = state.players[atom.player];
@@ -40,7 +43,7 @@ export const 卸下: AtomDefinition<{ player: number; slot: '武器' | '防具' 
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
     const cardId = event.cardId as string | undefined;
@@ -53,7 +56,7 @@ export const 卸下: AtomDefinition<{ player: number; slot: '武器' | '防具' 
       view.players[pi].handCount += 1;
       if (view.players[pi].hand) {
         const card = view.cardMap[cardId];
-        if (card) view.players[pi].hand!.push(card);
+        if (card) view.players[pi].hand.push(card);
       }
     }
     // 武器卸下:清除 distanceVars.attackRange(马匹由 移除技能 atom 处理)

@@ -1,9 +1,12 @@
 // 流离(大乔·被动技):当你成为【杀】的目标时,可以弃一张牌,
 // 将此杀转移给攻击范围内的一名其他角色。
 // 时机:成为目标 after hook(结算阶段),修改杀帧的 resolvedTargets。
-import type { AtomAfterContext, FrontendAPI, Json, Skill, GameState} from '../types';
+// 流离(大乔·被动技):当你成为【杀】的目标时,可以弃一张牌,
+// 将此杀转移给攻击范围内的一名其他角色。
+// 时机:成为目标 after hook(结算阶段),修改杀帧的 resolvedTargets。
+import type { AtomAfterContext, FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook } from '../skill';
 import { inAttackRange } from '../distance';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -18,19 +21,28 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // respond:流离 confirm 和 chooseTarget
-  registerAction(state, skill.id, ownerId, 'respond',
-    (state, params) => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'respond',
+    (state, _params) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '流离/confirm' && requestType !== '流离/chooseTarget') return '当前不是流离回应';
+      const requestType = (
+        state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
+      ).requestType as string;
+      if (requestType !== '流离/confirm' && requestType !== '流离/chooseTarget')
+        return '当前不是流离回应';
       return null;
     },
     async (state, params) => {
-      const requestType = (state.pendingSlots.get(ownerId)?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const requestType = (
+        state.pendingSlots.get(ownerId)?.atom as unknown as Record<string, unknown>
+      )?.requestType as string;
       if (requestType === '流离/confirm') {
         state.localVars['流离/confirmed'] = params.choice === true || params.confirmed === true;
       } else {
-        state.localVars['流离/target'] = params.target as number;
+        state.localVars['流离/target'] = params.target;
       }
     },
   );
@@ -47,7 +59,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       type: '请求回应',
       requestType: '流离/confirm',
       target: ownerId,
-      prompt: { type: 'confirm', title: '是否发动流离?', confirmLabel: '发动', cancelLabel: '不发动' },
+      prompt: {
+        type: 'confirm',
+        title: '是否发动流离?',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
+      },
       defaultChoice: false,
       timeout: 10,
     });
@@ -64,7 +81,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
         title: '流离:选择转移目标',
         min: 1,
         max: 1,
-        filter: (view, target) => target !== ownerId && view.players[target]?.alive === true && inAttackRange(ctx.state, atom.source!, target),
+        filter: (view, target) =>
+          target !== ownerId &&
+          view.players[target]?.alive === true &&
+          inAttackRange(ctx.state, atom.source!, target),
       },
       timeout: 15,
     });
@@ -91,7 +111,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '流离',
     style: 'default',
-    prompt: { type: 'confirm', title: '是否发动流离？', confirmLabel: '发动', cancelLabel: '不发动' },
+    prompt: {
+      type: 'confirm',
+      title: '是否发动流离？',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
+    },
   });
 }
-

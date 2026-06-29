@@ -11,7 +11,7 @@ export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
   },
   apply(state, atom) {
     const player = state.players[atom.player];
-    player.marks = player.marks.filter(m => m.id !== 'chained');
+    player.marks = player.marks.filter((m) => m.id !== 'chained');
     if (atom.chained) {
       player.marks.push({ id: 'chained', scope: player.index });
     }
@@ -26,10 +26,10 @@ export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const chained = event.chained as boolean;
-    view.players[pi].marks = view.players[pi].marks.filter(m => m.id !== 'chained');
+    view.players[pi].marks = view.players[pi].marks.filter((m) => m.id !== 'chained');
     if (chained) {
       view.players[pi].marks.push({ id: 'chained', scope: view.players[pi].index });
     }

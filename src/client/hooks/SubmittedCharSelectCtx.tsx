@@ -21,7 +21,7 @@ const Ctx = createContext<SubmittedCharSelectCtl>({
 export function SubmittedCharSelectProvider({ children }: { children: ReactNode }) {
   const [submitted, setSubmitted] = useState(() => new Set<number>());
   const markSubmitted = useCallback((target: number) => {
-    setSubmitted(prev => {
+    setSubmitted((prev) => {
       if (prev.has(target)) return prev;
       const next = new Set(prev);
       next.add(target);
@@ -29,11 +29,7 @@ export function SubmittedCharSelectProvider({ children }: { children: ReactNode 
     });
   }, []);
   const clearAll = useCallback(() => setSubmitted(new Set()), []);
-  return (
-    <Ctx.Provider value={{ submitted, markSubmitted, clearAll }}>
-      {children}
-    </Ctx.Provider>
-  );
+  return <Ctx.Provider value={{ submitted, markSubmitted, clearAll }}>{children}</Ctx.Provider>;
 }
 
 /** useCharSelect 调用:检查座次是否已提交选将 */

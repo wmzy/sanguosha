@@ -10,7 +10,12 @@
 
 import { useState, useEffect } from 'react';
 import type { GameView } from '../../engine/types';
-import { getActionsForPlayer, registerSkillActions, clearRegistry, type SkillActionDef } from '../skillActionRegistry';
+import {
+  getActionsForPlayer,
+  registerSkillActions,
+  clearRegistry,
+  type SkillActionDef,
+} from '../skillActionRegistry';
 
 export interface UseSkillActionsResult {
   /** 当前视角玩家已注册的技能 actions(技能按钮区/装备技能按钮用) */
@@ -24,7 +29,7 @@ export interface UseSkillActionsResult {
  */
 export function useSkillActions(view: GameView, perspectiveIdx: number): UseSkillActionsResult {
   // 注册 key:players + skills 组合变化时重新注册
-  const skillActionsKey = view.players.map(p => `${p.name}:${p.skills.join(',')}`).join('|');
+  const skillActionsKey = view.players.map((p) => `${p.name}:${p.skills.join(',')}`).join('|');
   const [skillActions, setSkillActions] = useState<SkillActionDef[]>([]);
 
   useEffect(() => {
@@ -38,7 +43,9 @@ export function useSkillActions(view: GameView, perspectiveIdx: number): UseSkil
         setSkillActions(getActionsForPlayer(perspectiveIdx));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [skillActionsKey, perspectiveIdx]);
 
   return { skillActions };

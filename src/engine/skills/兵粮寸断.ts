@@ -12,7 +12,12 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill'
+import {
+  registerAction,
+  registerAfterHook,
+  registerBeforeHook,
+  hasBlockingPending,
+} from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { 询问无懈可击 } from '../无懈可击';
@@ -27,7 +32,12 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ─── use action:对目标放置延时锦囊 ────────────────────────
-  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
+    (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
       const free = !hasBlockingPending(state);
@@ -41,16 +51,31 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const targetAlive = target?.alive === true;
       const notSelf = params.target !== ownerId;
       // 兵粮寸断对距离 1 以内一名其他角色使用(与乐不思蜀一致)
-      const inRange = effectiveDistance(state, ownerId, params.target as number) <= 1;
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardNameOk && targetAlive && notSelf && inRange;
+      const inRange = effectiveDistance(state, ownerId, params.target) <= 1;
+      const ok =
+        myTurn &&
+        inActPhase &&
+        free &&
+        selfAlive &&
+        cardInHand &&
+        cardNameOk &&
+        targetAlive &&
+        notSelf &&
+        inRange;
       return ok ? null : '兵粮寸断使用条件不满足';
-    }, async (state: GameState, params: Record<string, Json>) => {
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = params.target as number;
       await pushFrame(state, '兵粮寸断', from, { ...params });
       // 移牌到处理区
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: from },
+        to: { zone: '处理区' },
+      });
       // 延时锦囊:使用时仅放置到判定区,无懈可击问询延迟到判定阶段判定前
       const trickCard = state.cardMap[cardId];
       const pendingCard: Card = trickCard ?? {
@@ -67,9 +92,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
         trick: { name: '兵粮寸断', source: from, card: pendingCard },
       });
       // 移牌到弃牌堆(原使用卡)
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '处理区' },
+        to: { zone: '弃牌堆' },
+      });
       await popFrame(state);
-    });
+    },
+  );
 
   // ─── 判定阶段:有 兵粮寸断 → 先问无懈可击,未被抵消才触发判定 ───
   registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
@@ -78,7 +109,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
     if (atom.phase !== '判定') return;
     const self = ctx.state.players[ownerId];
-    if (!self.pendingTricks.some(t => t.name === '兵粮寸断')) return;
+    if (!self.pendingTricks.some((t) => t.name === '兵粮寸断')) return;
     if (ctx.state.zones.deck.length === 0) return;
 
     // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问;抵消整个延时锦囊)
@@ -86,7 +117,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cancelled = await 询问无懈可击(ctx.state, ownerId);
       if (cancelled) {
         // 被无懈抵消:移除延时锦囊,跳过判定
-        await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '兵粮寸断' });
+        await applyAtom(ctx.state, {
+          type: '移除延时锦囊',
+          player: ownerId,
+          trickName: '兵粮寸断',
+        });
         return;
       }
       await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '兵粮寸断' });
@@ -103,7 +138,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
 
     const self = ctx.state.players[ownerId];
-    if (!self.pendingTricks.some(t => t.name === '兵粮寸断')) return;
+    if (!self.pendingTricks.some((t) => t.name === '兵粮寸断')) return;
 
     // 读判定牌:判定牌在处理区(afterHooks 才移到弃牌堆)
     const processing = frameCards(ctx.state);
@@ -152,8 +187,10 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       title: '兵粮寸断',
       cardFilter: { filter: (c) => c.name === '兵粮寸断', min: 1, max: 1 },
       targetFilter: {
-        min: 1, max: 1,
-        filter: (view: GameView, t: number) => viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
+        min: 1,
+        max: 1,
+        filter: (view: GameView, t: number) =>
+          viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
       },
     },
   });

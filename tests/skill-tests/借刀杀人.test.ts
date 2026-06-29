@@ -46,7 +46,13 @@ function makePlayer(opts: {
   };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -65,7 +71,12 @@ function buildState(opts?: {
   const cards: Record<string, Card> = { jd1: jd, ...(opts?.extraCards ?? {}) };
   const n = opts?.playerCount ?? 3;
   const players = [
-    makePlayer({ index: 0, name: 'P1', hand: opts?.p1Hand ?? ['jd1'], skills: opts?.p1Skills ?? ['借刀杀人', '杀'] }),
+    makePlayer({
+      index: 0,
+      name: 'P1',
+      hand: opts?.p1Hand ?? ['jd1'],
+      skills: opts?.p1Skills ?? ['借刀杀人', '杀'],
+    }),
     makePlayer({
       index: 1,
       name: 'P2',
@@ -75,7 +86,9 @@ function buildState(opts?: {
     }),
   ];
   for (let i = 2; i < n; i++) {
-    players.push(makePlayer({ index: i, name: `P${i + 1}`, hand: opts?.p3Hand, skills: opts?.p3Skills }));
+    players.push(
+      makePlayer({ index: i, name: `P${i + 1}`, hand: opts?.p3Hand, skills: opts?.p3Skills }),
+    );
   }
   return createGameState({
     players,
@@ -92,7 +105,7 @@ describe('借刀杀人', () => {
     harness = new SkillTestHarness();
   });
 
-// ────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────
   // 1. 正面:A 不出杀(pass)→ 发起者获得 A 的武器
   //    全程 expectPending + respondInfo 验证 pending + cardFilter
   // ────────────────────────────────────────────────────────────
@@ -126,7 +139,8 @@ describe('借刀杀人', () => {
     expect(info2?.skillId).toBe('杀');
     // 直接从 slot.atom 拿 prompt.cardFilter 验证“仅接受 杀”委托关系
     const slot2 = harness.state.pendingSlots.get(1)!;
-    const prompt2 = (slot2.atom as { prompt: { cardFilter?: { filter?: (c: Card) => boolean } } }).prompt;
+    const prompt2 = (slot2.atom as { prompt: { cardFilter?: { filter?: (c: Card) => boolean } } })
+      .prompt;
     expect(prompt2.cardFilter?.filter?.(makeCard('x', '杀', '♠', 'A', '基本牌'))).toBe(true);
     expect(prompt2.cardFilter?.filter?.(makeCard('y', '闪', '♥', '5', '基本牌'))).toBe(false);
 
@@ -141,8 +155,8 @@ describe('借刀杀人', () => {
     expect(harness.state.zones.processing).toEqual([]);
     // view 级断言:P1 视角武器到手 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
-      expect(v.players[0].hand!.map(c => c.id)).toContain('wp1');
+    P1.expectView((v) => {
+      expect(v.players[0].hand!.map((c) => c.id)).toContain('wp1');
       expect(v.players[0].handCount).toBe(1);
       expect(v.players[1].equipment['武器']).toBeUndefined();
       expect(v.pending).toBeNull();
@@ -171,7 +185,8 @@ describe('借刀杀人', () => {
 
     P2.expectPending('请求回应');
     const slot = harness.state.pendingSlots.get(1)!;
-    const prompt = (slot.atom as { prompt: { cardFilter?: { filter?: (c: Card) => boolean } } }).prompt;
+    const prompt = (slot.atom as { prompt: { cardFilter?: { filter?: (c: Card) => boolean } } })
+      .prompt;
     const filter = prompt.cardFilter?.filter;
     expect(filter).toBeDefined();
     // 杀牌过,p2s 应通过
@@ -224,7 +239,7 @@ describe('借刀杀人', () => {
     expect(harness.state.zones.processing).toEqual([]);
     // view 级断言:P3 视角自己扣血 + P2 武器保留
     P3.processEvents();
-    P3.expectView(v => {
+    P3.expectView((v) => {
       expect(v.players[2].health).toBe(p3HealthBefore - 1);
       expect(v.players[1].equipment['武器']).toBe('wp1');
       expect(v.pending).toBeNull();
@@ -235,9 +250,11 @@ describe('借刀杀人', () => {
   // 3. validate 拒绝:A 无武器
   // ─────────────────────────────────────────────────────────────
   it('A(P2)无武器 → 被拒绝(targetHasWeapon=false)', async () => {
-    await harness.setup(buildState({
-      p2Equipment: {},
-    }));
+    await harness.setup(
+      buildState({
+        p2Equipment: {},
+      }),
+    );
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '借刀杀人',
@@ -251,10 +268,12 @@ describe('借刀杀人', () => {
   // ─────────────────────────────────────────────────────────────
   it('killTarget = A(P2) → 被拒绝(killTargetNotTarget)', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
-    await harness.setup(buildState({
-      p2Equipment: { 武器: 'wp1' },
-      extraCards: { wp1: weapon },
-    }));
+    await harness.setup(
+      buildState({
+        p2Equipment: { 武器: 'wp1' },
+        extraCards: { wp1: weapon },
+      }),
+    );
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '借刀杀人',
@@ -268,10 +287,12 @@ describe('借刀杀人', () => {
   // ─────────────────────────────────────────────────────────────
   it('killTarget = 发起者(P1) → 被拒绝(killTargetNotOwner)', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
-    await harness.setup(buildState({
-      p2Equipment: { 武器: 'wp1' },
-      extraCards: { wp1: weapon },
-    }));
+    await harness.setup(
+      buildState({
+        p2Equipment: { 武器: 'wp1' },
+        extraCards: { wp1: weapon },
+      }),
+    );
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '借刀杀人',
@@ -316,10 +337,12 @@ describe('借刀杀人', () => {
   // ─────────────────────────────────────────────────────────────
   it('killTarget 不存在(idx 99)→ 被拒绝(killTargetAlive=false)', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
-    await harness.setup(buildState({
-      p2Equipment: { 武器: 'wp1' },
-      extraCards: { wp1: weapon },
-    }));
+    await harness.setup(
+      buildState({
+        p2Equipment: { 武器: 'wp1' },
+        extraCards: { wp1: weapon },
+      }),
+    );
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '借刀杀人',
@@ -333,11 +356,13 @@ describe('借刀杀人', () => {
   // ─────────────────────────────────────────────────────────────
   it('出不在手牌的借刀杀人 → 被拒绝', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
-    await harness.setup(buildState({
-      p1Hand: [],
-      p2Equipment: { 武器: 'wp1' },
-      extraCards: { wp1: weapon },
-    }));
+    await harness.setup(
+      buildState({
+        p1Hand: [],
+        p2Equipment: { 武器: 'wp1' },
+        extraCards: { wp1: weapon },
+      }),
+    );
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '借刀杀人',
@@ -352,11 +377,13 @@ describe('借刀杀人', () => {
   it('用杀当借刀杀人出 → 被拒绝(cardNameOk=false)', async () => {
     const slash = makeCard('s1', '杀', '♠', '7', '基本牌');
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
-    await harness.setup(buildState({
-      p1Hand: ['s1'],
-      p2Equipment: { 武器: 'wp1' },
-      extraCards: { s1: slash, wp1: weapon },
-    }));
+    await harness.setup(
+      buildState({
+        p1Hand: ['s1'],
+        p2Equipment: { 武器: 'wp1' },
+        extraCards: { s1: slash, wp1: weapon },
+      }),
+    );
     const P1 = harness.player('P1');
     await P1.expectRejected({
       skillId: '借刀杀人',

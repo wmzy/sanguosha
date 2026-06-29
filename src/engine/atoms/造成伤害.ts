@@ -3,7 +3,10 @@ import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 造成伤害: AtomDefinition<{
-  target: number; amount: number; source: number; cardId?: string;
+  target: number;
+  amount: number;
+  source: number;
+  cardId?: string;
 }> = {
   type: '造成伤害',
   validate(state, atom) {
@@ -22,14 +25,18 @@ export const 造成伤害: AtomDefinition<{
   },
   effect: { sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 1000 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { sound: 'damage_physical' as const, animation: 'shake' as const, particles: 'blood' as const, duration: 1000 };
+    const effect = {
+      sound: 'damage_physical' as const,
+      animation: 'shake' as const,
+      particles: 'blood' as const,
+      duration: 1000,
+    };
     const view: ViewEvent = {
       type: '造成伤害',
       target: atom.target,
       amount: atom.amount,
       source: atom.source,
       effect,
-
     };
     return {
       ownerViews: new Map(),
@@ -37,7 +44,7 @@ export const 造成伤害: AtomDefinition<{
     };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.target as number));
+    const pi = view.players.findIndex((p) => p.index === (event.target as number));
     if (pi >= 0) {
       const p = view.players[pi];
       p.health = Math.max(0, p.health - (event.amount as number));

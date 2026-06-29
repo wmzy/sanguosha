@@ -15,9 +15,7 @@ export function defaultPlayActive(ctx: ActionContext): boolean {
   const { view, perspectiveIdx } = ctx;
   const pending = view.pending;
   const blocked = pending != null && pending.isBlocking !== false;
-  return view.currentPlayerIndex === perspectiveIdx
-    && view.phase === '出牌'
-    && !blocked;
+  return view.currentPlayerIndex === perspectiveIdx && view.phase === '出牌' && !blocked;
 }
 
 /** 前端可计算的出杀次数上限(基于 view 装备推断)。

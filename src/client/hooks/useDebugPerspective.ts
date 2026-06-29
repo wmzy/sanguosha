@@ -42,7 +42,7 @@ function hasCharSelectPending(view: GameView | null | undefined): boolean {
 
 /** 检查某座次的 view 是否处于选将阶段(有玩家未选完) */
 function isCharSelectPhase(view: GameView | null | undefined): boolean {
-  return view?.phase === '准备' && view.players.some(p => !p.character);
+  return view?.phase === '准备' && view.players.some((p) => !p.character);
 }
 
 /**
@@ -51,7 +51,11 @@ function isCharSelectPhase(view: GameView | null | undefined): boolean {
  *   1. view.pending 非空(引擎已建立选将 slot)
  *   2. view.pending 为空但 phase=准备 且该座次玩家还没选(事件还没到达客户端)
  */
-function isWaitingToSelect(view: GameView | null | undefined, viewerIdx: number, submitted?: Set<number>): boolean {
+function isWaitingToSelect(
+  view: GameView | null | undefined,
+  viewerIdx: number,
+  submitted?: Set<number>,
+): boolean {
   if (!view) return false;
   if (view.phase !== '准备') return false;
   if (submitted?.has(viewerIdx)) return false; // 已提交选将
@@ -103,10 +107,13 @@ export function useDebugPerspective(
   const manualSwitchRef = useRef(false);
 
   // 包装 setPerspective:手动切换时设标记,阻止自动跟随覆盖
-  const manualSetPerspective = useCallback((idx: number) => {
-    manualSwitchRef.current = true;
-    setPerspective(idx);
-  }, [setPerspective]);
+  const manualSetPerspective = useCallback(
+    (idx: number) => {
+      manualSwitchRef.current = true;
+      setPerspective(idx);
+    },
+    [setPerspective],
+  );
 
   const currentView = allViews.get(perspective) ?? null;
 
@@ -159,8 +166,17 @@ export function useDebugPerspective(
     if (followCurrentPlayer && typeof currentPlayer === 'number' && currentPlayer !== p) {
       setPerspective(currentPlayer);
     }
-  }, [charSelectInProgress, currentPlayer, autoSwitch,
-    followCurrentPlayer, currentView, allViews, playerCount, setPerspective, submitted]);
+  }, [
+    charSelectInProgress,
+    currentPlayer,
+    autoSwitch,
+    followCurrentPlayer,
+    currentView,
+    allViews,
+    playerCount,
+    setPerspective,
+    submitted,
+  ]);
 
   /** 手动切换:+1 循环,选将阶段也允许切到任意座次(debug 需要查看所有人) */
   const switchPerspective = useCallback(() => {
@@ -179,7 +195,7 @@ export function useDebugPerspective(
     if (currentView) manualSetPerspective(currentView.currentPlayerIndex);
   }, [currentView, manualSetPerspective]);
 
-  const toggle = useCallback(() => setAutoSwitch(a => !a), []);
+  const toggle = useCallback(() => setAutoSwitch((a) => !a), []);
 
   return {
     switchPerspective,

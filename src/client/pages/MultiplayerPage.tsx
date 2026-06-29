@@ -138,7 +138,10 @@ export function MultiplayerPage() {
     mp.joinRoom(code);
   };
 
-  const allReady = mp.roomState && mp.roomState.readyPlayers.length === mp.roomState.playerIds.length && mp.roomState.playerIds.length >= 2;
+  const allReady =
+    mp.roomState &&
+    mp.roomState.readyPlayers.length === mp.roomState.playerIds.length &&
+    mp.roomState.playerIds.length >= 2;
   const readyCount = mp.roomState?.readyPlayers.length ?? 0;
   const playerCount = mp.roomState?.playerIds.length ?? 0;
   const maxPlayers = mp.roomState?.maxPlayers ?? createMax;
@@ -172,7 +175,10 @@ export function MultiplayerPage() {
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-              onClick={() => { mp.leaveRoom(); navigate('/'); }}
+              onClick={() => {
+                mp.leaveRoom();
+                navigate('/');
+              }}
             >
               返回大厅
             </button>
@@ -211,7 +217,12 @@ export function MultiplayerPage() {
             {mp.isHost && (
               <button
                 className={btnStyle}
-                style={{ '--btn-bg': allReady ? colors.accent.orange : colors.disabled, '--btn-cursor': allReady ? 'pointer' : 'not-allowed' } as React.CSSProperties}
+                style={
+                  {
+                    '--btn-bg': allReady ? colors.accent.orange : colors.disabled,
+                    '--btn-cursor': allReady ? 'pointer' : 'not-allowed',
+                  } as React.CSSProperties
+                }
                 disabled={!allReady}
                 onClick={mp.startGame}
               >
@@ -221,7 +232,10 @@ export function MultiplayerPage() {
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
-              onClick={() => { mp.leaveRoom(); navigate('/'); }}
+              onClick={() => {
+                mp.leaveRoom();
+                navigate('/');
+              }}
             >
               退出
             </button>
@@ -274,7 +288,9 @@ export function MultiplayerPage() {
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             placeholder="输入6位房间码"
             maxLength={8}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleJoin(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleJoin();
+            }}
           />
           <button
             className={btnStyle}

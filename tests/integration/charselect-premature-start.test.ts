@@ -9,28 +9,44 @@ import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 import { allCharacters } from '../../src/engine/cards/characters';
 
-const CHARACTERS = allCharacters.map(c => ({
-  name: c.name, skills: c.skills.map(s => s.name),
+const CHARACTERS = allCharacters.map((c) => ({
+  name: c.name,
+  skills: c.skills.map((s) => s.name),
 }));
 
 function makePlayer(index: number, name: string) {
   return {
-    index, name, character: '', health: 4, maxHealth: 4, alive: true,
-    hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+    index,
+    name,
+    character: '',
+    health: 4,
+    maxHealth: 4,
+    alive: true,
+    hand: [],
+    equipment: {},
+    skills: [],
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    tags: [],
+    judgeZone: [],
   };
 }
 
 async function respondCharSelect(state: GameState, target: number, character: string) {
   void dispatch(state, {
-    skillId: '系统规则', actionType: '选将', ownerId: target,
-    params: { character }, baseSeq: 0,
+    skillId: '系统规则',
+    actionType: '选将',
+    ownerId: target,
+    params: { character },
+    baseSeq: 0,
   });
   await waitForStable(state);
 }
 
 async function waitForLordSlot(state: GameState) {
   for (let i = 0; i < 200 && state.pendingSlots.size === 0; i++) {
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
   }
   await waitForStable(state);
 }
@@ -42,8 +58,11 @@ describe('5 人选将防提前结束', () => {
     resetForTest();
     state = createGameState({
       players: [
-        makePlayer(0, 'P1'), makePlayer(1, 'P2'), makePlayer(2, 'P3'),
-        makePlayer(3, 'P4'), makePlayer(4, 'P5'),
+        makePlayer(0, 'P1'),
+        makePlayer(1, 'P2'),
+        makePlayer(2, 'P3'),
+        makePlayer(3, 'P4'),
+        makePlayer(4, 'P5'),
       ],
       cardMap: {},
     });
@@ -73,7 +92,7 @@ describe('5 人选将防提前结束', () => {
     await waitForStable(state);
 
     expect(state.pendingSlots.size).toBe(3);
-    expect(state.players.some(p => p.hand.length > 0)).toBe(false);
+    expect(state.players.some((p) => p.hand.length > 0)).toBe(false);
   }, 15000);
 
   it('主公选完后,2 人选将时不应进入游戏', async () => {
@@ -97,6 +116,6 @@ describe('5 人选将防提前结束', () => {
     }
 
     expect(state.pendingSlots.size).toBe(2);
-    expect(state.players.some(p => p.hand.length > 0)).toBe(false);
+    expect(state.players.some((p) => p.hand.length > 0)).toBe(false);
   }, 15000);
 });

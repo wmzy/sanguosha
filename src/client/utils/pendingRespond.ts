@@ -27,7 +27,9 @@ export function getBroadcastKey(pending: PendingView): string {
 }
 
 /** 从 SkillActionDef 的 prompt 提取 cardFilter 函数(不走 JSON 序列化,函数引用保留) */
-export function extractCardFilterFromAction(action: SkillActionDef): ((c: Card) => boolean) | undefined {
+export function extractCardFilterFromAction(
+  action: SkillActionDef,
+): ((c: Card) => boolean) | undefined {
   const p = action.prompt;
   if ((p.type === 'useCard' || p.type === 'useCardAndTarget') && p.cardFilter?.filter) {
     return p.cardFilter.filter;
@@ -40,7 +42,10 @@ export function extractCardFilterFromAction(action: SkillActionDef): ((c: Card) 
  * 当前所有 respond 提示的 filter 都是 `c => c.name === '<cardName>'`:
  *   询问X → c.name==='X';请求回应 R/Y → c.name===R;__弃牌 → ()=>true。
  */
-export function deriveCardFilterFromAtom(atomType: string, reqType: string): ((c: Card) => boolean) | undefined {
+export function deriveCardFilterFromAtom(
+  atomType: string,
+  reqType: string,
+): ((c: Card) => boolean) | undefined {
   // 询问X (X∈{闪,杀,...}):X = atomType.slice(2)
   if (atomType.startsWith('询问')) {
     const cardName = atomType.slice(2);
@@ -64,8 +69,11 @@ export function deriveCardFilterFromAtom(atomType: string, reqType: string): ((c
  * 从 skillActionRegistry(已注册的所有玩家 actions)中查找某 skillId 的 respond action。
  * 优先当前 perspective 玩家(快路径),退路跨所有 ownerId 扫描(单例,不依赖 React state 时序)。
  */
-export function findRespondAction(skillId: string, skillActions: SkillActionDef[]): SkillActionDef | undefined {
-  const own = skillActions.find(a => a.skillId === skillId && a.actionType === 'respond');
+export function findRespondAction(
+  skillId: string,
+  skillActions: SkillActionDef[],
+): SkillActionDef | undefined {
+  const own = skillActions.find((a) => a.skillId === skillId && a.actionType === 'respond');
   if (own) return own;
   return findActionAcrossOwners(skillId, 'respond');
 }
@@ -99,7 +107,7 @@ export function resolvePendingRespond(
     if (!reqType) return null;
     // 'R/Y' → R 是 skillId;'R' → R 是 skillId;'R_盲选' → R 是 skillId
     const sepIdx = reqType.search(/[/_]/);
-    skillId = sepIdx >= 0 ? reqType.slice(0, sepIdx) : (reqType || null);
+    skillId = sepIdx >= 0 ? reqType.slice(0, sepIdx) : reqType || null;
   }
   if (!skillId) return null;
 

@@ -5,10 +5,16 @@
 // useDebugPerspective 管理视角切换。
 // 已加入房间 → <GameViewComponent>(渲染当前 perspective 的 view), 否则 → <DebugRoomList>。
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+// src/components/DebugLobby.tsx — 调试大厅入口(多 WS 版)
+//
+// useDebugLobbyController 管理房间列表/创建/删除。
+// useDebugMultiConnection 管理 N 个座次连接 + views Map。
+// useDebugPerspective 管理视角切换。
+// 已加入房间 → <GameViewComponent>(渲染当前 perspective 的 view), 否则 → <DebugRoomList>。
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDebugLobbyController } from '../hooks/useDebugLobbyController';
-import { useDebugMultiConnection, type ActionMsg } from '../hooks/useDebugMultiConnection';
+import { useDebugMultiConnection } from '../hooks/useDebugMultiConnection';
 import { useDebugPerspective } from '../hooks/useDebugPerspective';
 import { useSnapshot } from '../hooks/useSnapshot';
 import { SubmittedCharSelectProvider } from '../hooks/SubmittedCharSelectCtx';
@@ -29,7 +35,6 @@ const connectingHint = css`
 `;
 import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/debugTelemetry';
 import type { RoomInfo } from '../../server/protocol';
-import type { GameView as EngineGameView } from '../../engine/types';
 
 interface DebugLobbyProps {
   onExit: () => void;
@@ -181,7 +186,7 @@ function DebugGameViewInner({
     );
   }
 
-  const view = currentView as unknown as EngineGameView;
+  const view = currentView;
   const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
 
   // debug 模式视角控制 UI:渲染到 GameViewComponent 的插槽,不进入组件内部。

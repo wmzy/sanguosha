@@ -33,66 +33,72 @@ export function useSnapshot(): UseSnapshotResult {
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null);
   const [lastSnapshotPath, setLastSnapshotPath] = useState<string | null>(null);
 
-  const createSnapshot = useCallback(async (params: {
-    roomId: string;
-    perspective: number;
-    views: Map<number, GameView>;
-    getSeqForView: (seat: number) => number;
-  }): Promise<string | null> => {
-    setSaving(true);
-    setError(null);
-    try {
-      const frontendSeqs: Record<string, number> = {};
-      const frontendViews: Record<string, GameView> = {};
-      for (const [seat, view] of params.views) {
-        frontendSeqs[String(seat)] = params.getSeqForView(seat);
-        frontendViews[String(seat)] = view;
+  const createSnapshot = useCallback(
+    async (params: {
+      roomId: string;
+      perspective: number;
+      views: Map<number, GameView>;
+      getSeqForView: (seat: number) => number;
+    }): Promise<string | null> => {
+      setSaving(true);
+      setError(null);
+      try {
+        const frontendSeqs: Record<string, number> = {};
+        const frontendViews: Record<string, GameView> = {};
+        for (const [seat, view] of params.views) {
+          frontendSeqs[String(seat)] = params.getSeqForView(seat);
+          frontendViews[String(seat)] = view;
+        }
+        const resp = await fetch('/api/snapshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roomId: params.roomId,
+            perspective: params.perspective,
+            frontendSeqs,
+            frontendViews,
+            telemetry: collectTelemetry(),
+          }),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({}));
+          throw new Error(body.error || `保存失败 (${resp.status})`);
+        }
+        const data = (await resp.json()) as { snapshotId: string };
+        setLastSnapshotId(data.snapshotId);
+        setLastSnapshotPath(`data/snapshots/${data.snapshotId}/`);
+        return data.snapshotId;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        return null;
+      } finally {
+        setSaving(false);
       }
-      const resp = await fetch('/api/snapshot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: params.roomId,
-          perspective: params.perspective,
-          frontendSeqs,
-          frontendViews,
-          telemetry: collectTelemetry(),
-        }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.error || `保存失败 (${resp.status})`);
-      }
-      const data = await resp.json() as { snapshotId: string };
-      setLastSnapshotId(data.snapshotId);
-      setLastSnapshotPath(`data/snapshots/${data.snapshotId}/`);
-      return data.snapshotId;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      return null;
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
-  const patchDescription = useCallback(async (snapshotId: string, description: string): Promise<boolean> => {
-    setError(null);
-    try {
-      const resp = await fetch(`/api/snapshot/${snapshotId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.error || `描述保存失败 (${resp.status})`);
+  const patchDescription = useCallback(
+    async (snapshotId: string, description: string): Promise<boolean> => {
+      setError(null);
+      try {
+        const resp = await fetch(`/api/snapshot/${snapshotId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description }),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({}));
+          throw new Error(body.error || `描述保存失败 (${resp.status})`);
+        }
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        return false;
       }
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      return false;
-    }
-  }, []);
+    },
+    [],
+  );
 
   const clearError = useCallback(() => setError(null), []);
 

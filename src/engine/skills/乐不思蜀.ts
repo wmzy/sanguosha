@@ -12,7 +12,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule, validateUseCard } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, validateUseCard } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { 询问无懈可击 } from '../无懈可击';
@@ -27,20 +27,37 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ─── use action:对目标放置延时锦囊 ────────────────────────
-  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
-      return validateUseCard(state, ownerId, params, { cardName: '乐不思蜀' })
-        ?? (() => {
-          const t = params.target ?? (params.targets as number[] | undefined)?.[0] as number | undefined;
-          return typeof t === 'number' && t !== ownerId && state.players[t]?.alive && effectiveDistance(state, ownerId, t) <= 1
-            ? null : '目标不合法';
-        })();
-    }, async (state: GameState, params: Record<string, Json>) => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
+    (state: GameState, params: Record<string, Json>) => {
+      return (
+        validateUseCard(state, ownerId, params, { cardName: '乐不思蜀' }) ??
+        (() => {
+          const t = params.target ?? (params.targets as number[] | undefined)?.[0];
+          return typeof t === 'number' &&
+            t !== ownerId &&
+            state.players[t]?.alive &&
+            effectiveDistance(state, ownerId, t) <= 1
+            ? null
+            : '目标不合法';
+        })()
+      );
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       const target = params.target as number;
       await pushFrame(state, '乐不思蜀', from, { ...params });
       // 移牌到处理区
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '手牌', player: from }, to: { zone: '处理区' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: from },
+        to: { zone: '处理区' },
+      });
       // 添加延时锦囊到目标(用 cardMap 里的真卡;suit/rank 保留)
       const trickCard = state.cardMap[cardId];
       const pendingCard: Card = trickCard ?? {
@@ -57,9 +74,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
         trick: { name: '乐不思蜀', source: from, card: pendingCard },
       });
       // 移牌到弃牌堆(原使用卡)
-      await applyAtom(state, { type: '移动牌', cardId, from: { zone: '处理区' }, to: { zone: '弃牌堆' } });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '处理区' },
+        to: { zone: '弃牌堆' },
+      });
       await popFrame(state);
-    });
+    },
+  );
 
   // ─── 判定阶段:有 乐不思蜀 → 先问无懈可击,未被抵消才触发判定 ───
   registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
@@ -68,7 +91,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
     if (atom.phase !== '判定') return;
     const self = ctx.state.players[ownerId];
-    if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
+    if (!self.pendingTricks.some((t) => t.name === '乐不思蜀')) return;
     // 牌堆空:无法判定,跳过(规则允许直接弃置,但避免引擎崩;这里 no-op)
     if (ctx.state.zones.deck.length === 0) return;
 
@@ -77,7 +100,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cancelled = await 询问无懈可击(ctx.state, ownerId);
       if (cancelled) {
         // 被无懈抵消:移除延时锦囊,跳过判定
-        await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '乐不思蜀' });
+        await applyAtom(ctx.state, {
+          type: '移除延时锦囊',
+          player: ownerId,
+          trickName: '乐不思蜀',
+        });
         return;
       }
       // 触发判定:判定 atom 是事件标记,引擎会自动从牌堆翻一张到 judgeZone,
@@ -97,7 +124,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const self = ctx.state.players[ownerId];
     // 没有 pendingTrick → 不处理(可能已被 过河拆桥 拆掉)
-    if (!self.pendingTricks.some(t => t.name === '乐不思蜀')) return;
+    if (!self.pendingTricks.some((t) => t.name === '乐不思蜀')) return;
 
     // 读判定牌:判定牌在处理区(afterHooks 才移到弃牌堆)
     const processing = frameCards(ctx.state);
@@ -147,9 +174,11 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       title: '乐不思蜀',
       cardFilter: { filter: (c) => c.name === '乐不思蜀', min: 1, max: 1 },
       targetFilter: {
-        min: 1, max: 1,
+        min: 1,
+        max: 1,
         // 距离≤1 检查:filter 仅为前端 UI 提示,后端 validate 独立校验
-        filter: (view: GameView, t: number) => viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
+        filter: (view: GameView, t: number) =>
+          viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
       },
     },
   });

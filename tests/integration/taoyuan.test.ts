@@ -73,7 +73,14 @@ describe('桃园结义:多人回血端到端', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 2, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 2,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 1, maxHealth: 4 }),
         makePlayer({ index: 2, name: 'P3', health: 3, maxHealth: 4 }),
       ],
@@ -111,7 +118,14 @@ describe('桃园结义:多人回血端到端', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 4, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 4,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 4, maxHealth: 4 }),
       ],
       cardMap: { [ty.id]: ty },
@@ -139,7 +153,14 @@ describe('桃园结义:多人回血端到端', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 4, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 4,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 2, maxHealth: 4 }),
         makePlayer({ index: 2, name: 'P3', health: 4, maxHealth: 4 }),
       ],
@@ -169,7 +190,14 @@ describe('桃园结义:多人回血端到端', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 3, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 3,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 2, maxHealth: 4 }),
         makePlayer({ index: 2, name: 'P3', health: 1, maxHealth: 4 }),
         makePlayer({ index: 3, name: 'P4', health: 3, maxHealth: 4 }),
@@ -201,7 +229,14 @@ describe('桃园结义:多人回血端到端', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 3, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 3,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         // P2 死亡
         makePlayer({ index: 1, name: 'P2', health: 0, maxHealth: 4, alive: false }),
         makePlayer({ index: 2, name: 'P3', health: 2, maxHealth: 4 }),

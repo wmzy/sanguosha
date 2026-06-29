@@ -9,13 +9,26 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
+import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
-function makePlayer(opts: { index: number; name: string; hand?: string[]; skills?: string[]; pendingTricks?: Array<{ name: string; source: number; card: Card }>; health?: number }): PlayerState {
+function makePlayer(opts: {
+  index: number;
+  name: string;
+  hand?: string[];
+  skills?: string[];
+  pendingTricks?: Array<{ name: string; source: number; card: Card }>;
+  health?: number;
+}): PlayerState {
   return {
     index: opts.index,
     name: opts.name,
@@ -26,7 +39,7 @@ function makePlayer(opts: { index: number; name: string; hand?: string[]; skills
     hand: opts.hand ?? [],
     equipment: {},
     skills: opts.skills ?? [],
-    vars: {} as Record<string, Json>,
+    vars: {},
     marks: [],
     pendingTricks: opts.pendingTricks ?? [],
     judgeZone: [],
@@ -66,7 +79,7 @@ describe('闪电', () => {
     expect(harness.state.zones.discardPile).toContain('sd1');
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.pending).toBeNull();
     });
   });
@@ -107,7 +120,7 @@ describe('闪电', () => {
     expect(harness.state.players[0].pendingTricks.length).toBe(0);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].health).toBe(1);
       expect(v.pending).toBeNull();
     });
@@ -152,7 +165,7 @@ describe('闪电', () => {
     expect(harness.state.players[1].pendingTricks[0].name).toBe('闪电');
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].health).toBe(4);
       expect(v.pending).toBeNull();
     });
@@ -185,8 +198,8 @@ describe('闪电', () => {
       await harness.setup(state);
 
       void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
-    await waitForStable(harness.state); // 等到无懈 pending
-    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
+      await waitForStable(harness.state); // 等到无懈 pending
+      await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
 
       expect(harness.state.players[0].health).toBe(1); // 4 - 3
       expect(harness.state.players[0].pendingTricks.length).toBe(0);
@@ -220,8 +233,8 @@ describe('闪电', () => {
       await harness.setup(state);
 
       void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
-    await waitForStable(harness.state); // 等到无懈 pending
-    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
+      await waitForStable(harness.state); // 等到无懈 pending
+      await fireTimeoutAndWait(harness.state); // 消耗无懈窗口
 
       expect(harness.state.players[0].health).toBe(4);
       expect(harness.state.players[1].pendingTricks.length).toBe(1);
@@ -280,7 +293,13 @@ describe('闪电', () => {
           pendingTricks: [{ name: '闪电', source: 0, card }],
           health: 4,
         }),
-        makePlayer({ index: 1, name: 'P2', hand: ['wx1'], skills: ['无懈可击', '闪电', '回合管理'], health: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['wx1'],
+          skills: ['无懈可击', '闪电', '回合管理'],
+          health: 4,
+        }),
       ],
       cardMap: { sd1: card, j1: judgeCard, wx1: nullifCard },
       currentPlayerIndex: 0,

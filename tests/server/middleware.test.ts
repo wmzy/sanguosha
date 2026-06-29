@@ -1,5 +1,6 @@
 // tests/server/middleware.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// tests/server/middleware.test.ts
+import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { cors, requestLogger, rateLimit, errorHandler } from '../../src/server/middleware';
 
@@ -9,9 +10,11 @@ describe('CORS middleware', () => {
     app.use('*', cors);
     app.get('/test', (c) => c.json({ ok: true }));
 
-    const res = await app.fetch(new Request('http://localhost/test', {
-      headers: { Origin: 'http://example.com' },
-    }));
+    const res = await app.fetch(
+      new Request('http://localhost/test', {
+        headers: { Origin: 'http://example.com' },
+      }),
+    );
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://example.com');
     expect(res.status).toBe(200);
   });
@@ -21,10 +24,12 @@ describe('CORS middleware', () => {
     app.use('*', cors);
     app.get('/test', (c) => c.json({ ok: true }));
 
-    const res = await app.fetch(new Request('http://localhost/test', {
-      method: 'OPTIONS',
-      headers: { Origin: 'http://example.com' },
-    }));
+    const res = await app.fetch(
+      new Request('http://localhost/test', {
+        method: 'OPTIONS',
+        headers: { Origin: 'http://example.com' },
+      }),
+    );
     expect(res.status).toBe(204);
     expect(res.headers.get('Access-Control-Allow-Methods')).toBeTruthy();
     expect(res.headers.get('Access-Control-Max-Age')).toBe('86400');
@@ -70,9 +75,11 @@ describe('rateLimit middleware', () => {
 
     const results = [];
     for (let i = 0; i < 65; i++) {
-      const res = await app.fetch(new Request('http://localhost/test', {
-        headers: { 'X-Forwarded-For': '1.2.3.4' },
-      }));
+      const res = await app.fetch(
+        new Request('http://localhost/test', {
+          headers: { 'X-Forwarded-For': '1.2.3.4' },
+        }),
+      );
       results.push(res.status);
     }
     expect(results.filter((s) => s === 429).length).toBeGreaterThan(0);

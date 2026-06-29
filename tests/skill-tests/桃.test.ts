@@ -13,15 +13,20 @@
 //   7. 负面:无求桃 pending 时 respond 被拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
-import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
+
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -52,7 +57,24 @@ function makePlayer(opts: {
 }
 
 /** 默认技能集(刘备/曹操等的"系统级"基本技能,用于 setUp 真实开局) */
-const DEFAULT_SKILLS = ['杀', '闪', '桃', '酒', '过河拆桥', '顺手牵羊', '无中生有', '桃园结义', '借刀杀人', '决斗', '南蛮入侵', '万箭齐发', '乐不思蜀', '无懈可击', '装备通用', '回合管理'];
+const _DEFAULT_SKILLS = [
+  '杀',
+  '闪',
+  '桃',
+  '酒',
+  '过河拆桥',
+  '顺手牵羊',
+  '无中生有',
+  '桃园结义',
+  '借刀杀人',
+  '决斗',
+  '南蛮入侵',
+  '万箭齐发',
+  '乐不思蜀',
+  '无懈可击',
+  '装备通用',
+  '回合管理',
+];
 
 describe('桃', () => {
   let harness: SkillTestHarness;
@@ -85,7 +107,7 @@ describe('桃', () => {
     expect(harness.state.players[0].hand).not.toContain('t1');
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].health).toBe(4);
       expect(v.players[0].handCount).toBe(0);
     });
@@ -112,7 +134,7 @@ describe('桃', () => {
     expect(harness.state.zones.discardPile).toContain('t1');
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => expect(v.players[1].health).toBe(3));
+    P1.expectView((v) => expect(v.players[1].health).toBe(3));
   });
 
   // ─── 负面:use ─────────────────────────────
@@ -133,7 +155,11 @@ describe('桃', () => {
     const P1 = harness.player('P1');
 
     // P1 满血,P2 也满血 — P1 不能给 P2 用桃(targetInjured=false)
-    await P1.expectRejected({ skillId: '桃', actionType: 'use', params: { cardId: 't1', targets: [1] } });
+    await P1.expectRejected({
+      skillId: '桃',
+      actionType: 'use',
+      params: { cardId: 't1', targets: [1] },
+    });
   });
 
   it('use:自己满血时对自己用 → 拒绝(targetInjured 校验)', async () => {
@@ -151,7 +177,11 @@ describe('桃', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.expectRejected({ skillId: '桃', actionType: 'use', params: { cardId: 't1', targets: [0] } });
+    await P1.expectRejected({
+      skillId: '桃',
+      actionType: 'use',
+      params: { cardId: 't1', targets: [0] },
+    });
   });
 
   it('use:非自己回合 → 拒绝', async () => {
@@ -170,7 +200,11 @@ describe('桃', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.expectRejected({ skillId: '桃', actionType: 'use', params: { cardId: 't1', targets: [0] } });
+    await P1.expectRejected({
+      skillId: '桃',
+      actionType: 'use',
+      params: { cardId: 't1', targets: [0] },
+    });
   });
 
   it('use:不在手牌的卡 → 拒绝', async () => {
@@ -188,7 +222,11 @@ describe('桃', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.expectRejected({ skillId: '桃', actionType: 'use', params: { cardId: 'cX', targets: [0] } });
+    await P1.expectRejected({
+      skillId: '桃',
+      actionType: 'use',
+      params: { cardId: 'cX', targets: [0] },
+    });
   });
 
   it('use:牌名不是桃(用杀当桃) → 拒绝', async () => {
@@ -206,7 +244,11 @@ describe('桃', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.expectRejected({ skillId: '桃', actionType: 'use', params: { cardId: 's1', targets: [0] } });
+    await P1.expectRejected({
+      skillId: '桃',
+      actionType: 'use',
+      params: { cardId: 's1', targets: [0] },
+    });
   });
 
   // ─── 正面:respond(濒死求桃) ────────────────────
@@ -217,8 +259,22 @@ describe('桃', () => {
     const peach = makeCard('p1', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀', '桃', '闪', '酒'], health: 4, maxHealth: 4 }),
-        makePlayer({ index: 1, name: 'P2', hand: ['p1'], skills: ['杀', '桃', '闪', '酒'], health: 1, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['杀', '桃', '闪', '酒'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['p1'],
+          skills: ['杀', '桃', '闪', '酒'],
+          health: 1,
+          maxHealth: 4,
+        }),
       ],
       cardMap: { c1: slash, p1: peach },
       currentPlayerIndex: 0,
@@ -237,7 +293,11 @@ describe('桃', () => {
     expect(harness.state.players[1].health).toBe(0);
     // 验证 pending 存在
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as { type?: string; requestType?: string; target?: number };
+    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+      type?: string;
+      requestType?: string;
+      target?: number;
+    };
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('桃/求桃');
 
@@ -254,7 +314,7 @@ describe('桃', () => {
     expect(harness.state.zones.discardPile).toContain('p1');
     // view 级断言
     P2.processEvents();
-    P2.expectView(v => {
+    P2.expectView((v) => {
       expect(v.players[dyingTarget].health).toBe(1);
       expect(v.pending).toBeNull();
     });

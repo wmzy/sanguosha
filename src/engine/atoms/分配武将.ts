@@ -3,7 +3,6 @@
 // 走 atom 管线:toViewEvents 携带角色信息,applyView 更新前端 view。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
-import { DEFAULT_SKILLS } from './选将';
 
 export const 分配武将: AtomDefinition<{ target: number; character: string; skills: string[] }> = {
   type: '分配武将',
@@ -33,7 +32,7 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
     const target = event.target as number;
     const character = event.character as string;
     const skills = (event.skills ?? []) as string[];
-    const pi = view.players.findIndex(p => p.index === target);
+    const pi = view.players.findIndex((p) => p.index === target);
     if (pi < 0) return;
     view.players[pi].character = character;
     view.players[pi].name = character;

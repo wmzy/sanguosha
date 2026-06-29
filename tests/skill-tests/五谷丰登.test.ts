@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
+import type { Card, GameState, PlayerState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
@@ -30,7 +30,7 @@ function makePlayer(opts: {
     // 五谷丰登是通用锦囊技能(任何玩家拿到这张牌都能用、且任何玩家都可能成为目标需要 respond)
     // 所以每个玩家都必须 instantiate
     skills: opts.skills ?? ['五谷丰登', '无懈可击'],
-    vars: {} as Record<string, Json>,
+    vars: {},
     marks: [],
     pendingTricks: [],
     tags: [],
@@ -100,7 +100,7 @@ describe('五谷丰登', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
     // view 级断言:P1 视角处理区空 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.zones!.processing.length).toBe(0);
       expect(v.pending).toBeNull();
     });
@@ -152,7 +152,7 @@ describe('五谷丰登', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
     // view 级断言:处理区空 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.zones!.processing.length).toBe(0);
       expect(v.pending).toBeNull();
     });
@@ -206,7 +206,7 @@ describe('五谷丰登', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
     // view 级断言:处理区空 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.zones!.processing.length).toBe(0);
       expect(v.pending).toBeNull();
     });
@@ -231,7 +231,8 @@ describe('五谷丰登', () => {
 
     const P1 = harness.player('P1');
     await P1.expectRejected({
-      skillId: '五谷丰登', actionType: 'use',
+      skillId: '五谷丰登',
+      actionType: 'use',
       params: { cardId: 'wg1' },
     });
   });

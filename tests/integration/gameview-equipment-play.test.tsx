@@ -16,7 +16,7 @@ import { findUseActionForCard } from '../../src/client/utils/gameViewHelpers';
 import type { GameView, Card, PendingView } from '../../src/engine/types';
 
 function makeEquipCard(id: string, name: string, subtype: string): Card {
-  return { id, name, suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype } as Card;
+  return { id, name, suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype };
 }
 
 function makeView(overrides: Partial<GameView> = {}): GameView {
@@ -93,21 +93,20 @@ describe('GameView:装备牌出牌(回归 selectedUseAction 查找)', () => {
     fireEvent.click(playBtn);
 
     await waitFor(() => {
-      expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
-        skillId: '装备通用',
-        actionType: 'use',
-        params: expect.objectContaining({ cardId: 'wp1' }),
-      }));
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skillId: '装备通用',
+          actionType: 'use',
+          params: expect.objectContaining({ cardId: 'wp1' }),
+        }),
+      );
     });
   });
 
   it('进攻马(赤兔)同样能出牌 — 装备通用覆盖所有装备子类型', async () => {
     const horse = makeEquipCard('h1', '赤兔', '进攻马');
     const view = makeView({
-      players: [
-        { ...makeView().players[0], hand: [horse], handCount: 1 },
-        makeView().players[1],
-      ],
+      players: [{ ...makeView().players[0], hand: [horse], handCount: 1 }, makeView().players[1]],
       cardMap: { h1: horse },
     });
     const onAction = vi.fn();
@@ -120,11 +119,13 @@ describe('GameView:装备牌出牌(回归 selectedUseAction 查找)', () => {
     fireEvent.click(playBtn);
 
     await waitFor(() => {
-      expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
-        skillId: '装备通用',
-        actionType: 'use',
-        params: expect.objectContaining({ cardId: 'h1' }),
-      }));
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skillId: '装备通用',
+          actionType: 'use',
+          params: expect.objectContaining({ cardId: 'h1' }),
+        }),
+      );
     });
   });
 });
@@ -141,7 +142,15 @@ describe('findUseActionForCard:filter-based 匹配(声明即真相)', () => {
 
   it('装备牌被 装备通用 的 cardFilter 匹配,而非靠 card.name 反查', async () => {
     // 构造一张 card.name 与 skillId '装备通用' 毫无拼写关系的装备牌
-    const weirdEquip: Card = { id: 'weird', name: '某种从没见过的武器', suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype: '武器' } as Card;
+    const weirdEquip: Card = {
+      id: 'weird',
+      name: '某种从没见过的武器',
+      suit: '♠',
+      color: '黑',
+      rank: 'A',
+      type: '装备牌',
+      subtype: '武器',
+    };
     await registerSkillActions(0, ['装备通用', '杀']);
     const actions = getActionsForPlayer(0);
     const matched = findUseActionForCard(actions, weirdEquip);
@@ -149,7 +158,7 @@ describe('findUseActionForCard:filter-based 匹配(声明即真相)', () => {
   });
 
   it('基本牌(杀)被对应牌名技能的 cardFilter 匹配', async () => {
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' } as Card;
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
     await registerSkillActions(0, ['杀', '装备通用']);
     const actions = getActionsForPlayer(0);
     const matched = findUseActionForCard(actions, slash);
@@ -157,7 +166,7 @@ describe('findUseActionForCard:filter-based 匹配(声明即真相)', () => {
   });
 
   it('没有匹配的 use action 时返回 undefined(如只有装备通用时出杀)', async () => {
-    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' } as Card;
+    const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
     await registerSkillActions(0, ['装备通用']); // 只有装备 use action
     const actions = getActionsForPlayer(0);
     expect(findUseActionForCard(actions, slash)).toBeUndefined();
@@ -221,10 +230,26 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
   });
 
   function makeZhangbaView(): GameView {
-    const zb = { id: 'zb', name: '丈八蛇矛', suit: '♠', color: '黑', rank: 'Q', type: '装备牌', subtype: '武器', range: 3 } as Card;
+    const zb = {
+      id: 'zb',
+      name: '丈八蛇矛',
+      suit: '♠',
+      color: '黑',
+      rank: 'Q',
+      type: '装备牌',
+      subtype: '武器',
+      range: 3,
+    } as Card;
     const c1 = { id: 'c1', name: '闪', suit: '♠', color: '黑', rank: '2', type: '基本牌' } as Card;
     const c2 = { id: 'c2', name: '桃', suit: '♣', color: '黑', rank: '3', type: '基本牌' } as Card;
-    const c3 = { id: 'c3', name: '无中生有', suit: '♥', color: '红', rank: 'A', type: '锦囊牌' } as Card;
+    const c3 = {
+      id: 'c3',
+      name: '无中生有',
+      suit: '♥',
+      color: '红',
+      rank: 'A',
+      type: '锦囊牌',
+    } as Card;
     return {
       viewer: 0,
       currentPlayerIndex: 0,
@@ -232,13 +257,29 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
       turn: { round: 1, phase: '出牌', vars: {} },
       players: [
         {
-          index: 0, name: 'P1', character: '张飞', health: 4, maxHealth: 4, alive: true,
-          equipment: { 武器: 'zb' }, skills: ['丈八蛇矛', '杀'],
-          handCount: 3, hand: [c1, c2, c3], marks: [],
+          index: 0,
+          name: 'P1',
+          character: '张飞',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          equipment: { 武器: 'zb' },
+          skills: ['丈八蛇矛', '杀'],
+          handCount: 3,
+          hand: [c1, c2, c3],
+          marks: [],
         },
         {
-          index: 1, name: 'P2', character: '曹操', health: 4, maxHealth: 4, alive: true,
-          equipment: {}, skills: [], handCount: 0, marks: [],
+          index: 1,
+          name: 'P2',
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          equipment: {},
+          skills: [],
+          handCount: 0,
+          marks: [],
         },
       ],
       cardMap: { zb, c1, c2, c3 },
@@ -264,8 +305,12 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
     fireEvent.click(document.querySelector('[data-card-id="c2"]')!);
 
     // 选中的牌显示为"杀"并标注原卡名
-    expect((document.querySelector('[data-card-id="c1"]') as HTMLElement).textContent).toContain('原: 闪');
-    expect((document.querySelector('[data-card-id="c2"]') as HTMLElement).textContent).toContain('原: 桃');
+    expect((document.querySelector('[data-card-id="c1"]') as HTMLElement).textContent).toContain(
+      '原: 闪',
+    );
+    expect((document.querySelector('[data-card-id="c2"]') as HTMLElement).textContent).toContain(
+      '原: 桃',
+    );
     // 未选中的 c3 保持原名、无转化标注(修复前会显示"原: 无中生有")
     const c3 = document.querySelector('[data-card-id="c3"]') as HTMLElement;
     expect(c3.textContent).toContain('无中生有');
@@ -308,19 +353,28 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
 
     // 按钮变为"使用 杀 → P2"且启用,点击提交
     await waitFor(() => {
-      const playBtn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('使用'));
+      const playBtn = [...document.querySelectorAll('button')].find((b) =>
+        b.textContent?.includes('使用'),
+      );
       expect(playBtn).toBeTruthy();
       expect(playBtn!.hasAttribute('disabled')).toBe(false);
     });
-    const playBtn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('使用'))!;
+    const playBtn = [...document.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('使用'),
+    )!;
     fireEvent.click(playBtn);
 
     await waitFor(() => {
-      expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
-        skillId: '杀', actionType: 'use',
-        params: expect.objectContaining({ cardId: 'c1#c2#丈八蛇矛', targets: [1] }),
-        preceding: [{ skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } }],
-      }));
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skillId: '杀',
+          actionType: 'use',
+          params: expect.objectContaining({ cardId: 'c1#c2#丈八蛇矛', targets: [1] }),
+          preceding: [
+            { skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } },
+          ],
+        }),
+      );
     });
   });
 });

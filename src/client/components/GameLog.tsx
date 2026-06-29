@@ -16,21 +16,25 @@ export function GameLog({ view }: GameLogProps) {
       <summary className={styles.logSummary}>📜 游戏日志 ({view.log.length})</summary>
       <div className={styles.logContent}>
         {view.log.length === 0 && <div className={styles.logEmpty}>暂无记录</div>}
-        {view.log.slice().reverse().map((entry, i) => {
-          // player 是玩家座次下标(数字);映射为名字,系统(-1/负数)显示为「系统」
-          // 当前视角玩家加「（我）」标志
-          const isMe = entry.player === view.viewer;
-          const playerName = entry.player >= 0
-            ? `${view.players[entry.player]?.name ?? `P${entry.player}`}${isMe ? '（我）' : ''}`
-            : '系统';
-          return (
-            <div key={i} className={styles.logEntry}>
-              <span className={styles.logTime}>{formatTime(entry.time)}</span>
-              <span className={styles.logPlayer}>{playerName}</span>
-              <span className={styles.logText}>{entry.text}</span>
-            </div>
-          );
-        })}
+        {view.log
+          .slice()
+          .reverse()
+          .map((entry, i) => {
+            // player 是玩家座次下标(数字);映射为名字,系统(-1/负数)显示为「系统」
+            // 当前视角玩家加「（我）」标志
+            const isMe = entry.player === view.viewer;
+            const playerName =
+              entry.player >= 0
+                ? `${view.players[entry.player]?.name ?? `P${entry.player}`}${isMe ? '（我）' : ''}`
+                : '系统';
+            return (
+              <div key={i} className={styles.logEntry}>
+                <span className={styles.logTime}>{formatTime(entry.time)}</span>
+                <span className={styles.logPlayer}>{playerName}</span>
+                <span className={styles.logText}>{entry.text}</span>
+              </div>
+            );
+          })}
       </div>
     </details>
   );

@@ -77,7 +77,8 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [gq.id], skills: ['过河拆桥', '杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           equipment: {},
           skills: ['杀'],
@@ -125,7 +126,8 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [gq.id], skills: ['过河拆桥', '杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [victimHand.id],
           equipment: { 武器: victimWeapon.id },
           skills: ['杀'],
@@ -172,7 +174,8 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [gq1.id, gq2.id], skills: ['过河拆桥', '杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [victimHand.id],
           equipment: {},
           skills: ['杀'],
@@ -214,7 +217,8 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [gq.id], skills: ['过河拆桥', '杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           equipment: {},
           skills: ['杀'],
@@ -262,7 +266,8 @@ describe('过河拆桥:拆判定区(延时锦囊)', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [gq.id], skills: ['过河拆桥', '杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           equipment: {},
           skills: ['杀'],

@@ -5,15 +5,30 @@ import type { GameView } from '../../src/engine/types';
 
 function makeFullView(): GameView {
   return {
-    viewer: 0, currentPlayerIndex: 0, phase: '出牌',
+    viewer: 0,
+    currentPlayerIndex: 0,
+    phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: { secret: 'x' } },
-    players: [{
-      index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4,
-      alive: true, equipment: {}, skills: ['仁德'], handCount: 1,
-      hand: [{ id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '5', type: '基本牌' }], marks: [],
-      distanceVars: { attackMod: 0, defenseMod: 0, attackRange: 1 },
-    }],
-    cardMap: {}, pending: null, deadline: null, deadlineTotalMs: 0,
+    players: [
+      {
+        index: 0,
+        name: 'P0',
+        character: '刘备',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: ['仁德'],
+        handCount: 1,
+        hand: [{ id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '5', type: '基本牌' }],
+        marks: [],
+        distanceVars: { attackMod: 0, defenseMod: 0, attackRange: 1 },
+      },
+    ],
+    cardMap: {},
+    pending: null,
+    deadline: null,
+    deadlineTotalMs: 0,
     log: Array.from({ length: 30 }, (_, i) => ({ time: i, player: 0, text: `evt${i}` })),
     settlementStack: [],
     zones: { deckCount: 50, discardPileCount: 0, processing: [] },
@@ -41,9 +56,22 @@ describe('projectView', () => {
     const view = makeFullView();
     view.pending = {
       type: 'awaits',
-      atom: { type: '询问闪', player: 0 } as unknown as GameView['pending'] extends infer P ? P extends { atom: infer A } ? A : never : never,
-      prompt: { type: 'useCard', title: '请出闪', cardFilter: { filter: () => true, min: 1, max: 1 } } as unknown as GameView['pending'] extends infer P ? P extends { prompt: infer PR } ? PR : never : never,
-      target: 0, isBlocking: true,
+      atom: { type: '询问闪', player: 0 } as unknown as GameView['pending'] extends infer P
+        ? P extends { atom: infer A }
+          ? A
+          : never
+        : never,
+      prompt: {
+        type: 'useCard',
+        title: '请出闪',
+        cardFilter: { filter: () => true, min: 1, max: 1 },
+      } as unknown as GameView['pending'] extends infer P
+        ? P extends { prompt: infer PR }
+          ? PR
+          : never
+        : never,
+      target: 0,
+      isBlocking: true,
     } as unknown as GameView['pending'];
     const snap = projectView(view);
     expect(snap.pending).not.toBeNull();

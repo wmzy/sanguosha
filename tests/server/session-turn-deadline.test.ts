@@ -21,7 +21,7 @@ import type { ServerMessage } from '../../src/server/protocol';
 
 function makeRoom(): Room {
   return {
-    id: 'test-room-' + Math.random().toString(36).slice(2, 8),
+    id: `test-room-${Math.random().toString(36).slice(2, 8)}`,
     name: '测试',
     maxPlayers: 4,
     players: new Map([['fake-player', new FakeWS() as never]]),
@@ -48,15 +48,48 @@ class FakeWS {
   send(data: string): void {
     this.messages.push(JSON.parse(data) as ServerMessage);
   }
-  close(): void { /* noop */ }
+
+  close(): void {
+    /* noop */
+  }
 }
 
 /** 构造一个处于出牌阶段、2 人存活、带 出牌窗口 pending 的极简 state */
 function makeActState(): GameState {
   const state = createGameState({
     players: [
-      { index: 0, name: 'P1', character: '刘备', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-      { index: 1, name: 'P2', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: '刘备',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: [],
+        equipment: {},
+        skills: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '曹操',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        hand: [],
+        equipment: {},
+        skills: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
+      },
     ],
     cardMap: {},
     currentPlayerIndex: 0,
@@ -83,7 +116,14 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     const before = Date.now();
     state.pendingSlots.set(0, {
       atom: { type: '出牌窗口', player: 0 } as never,
-      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50, isBlocking: false } } as never,
+      definition: {
+        pending: {
+          onTimeout: async () => {},
+          prompt: { type: 'confirm' as const, title: '' },
+          timeout: 50,
+          isBlocking: false,
+        },
+      } as never,
       deadline: 50_000,
       startTime: 0,
       createdSeq: 0,
@@ -97,7 +137,8 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     // deadline 应在 [before+50s, after+50s] 区间(因为 slot.deadline 是相对时间 50000ms)
     expect(view.deadline!).toBeGreaterThanOrEqual(state.startedAt + 50_000);
     expect(view.deadlineTotalMs).toBe(50_000);
-    void before; void after;
+    void before;
+    void after;
   });
 
   it('buildView 无 pending 时 deadline 为 null', () => {
@@ -119,7 +160,14 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     // 模拟 出牌窗口 pending slot
     state.pendingSlots.set(0, {
       atom: { type: '出牌窗口', player: 0 } as never,
-      definition: { pending: { onTimeout: async () => {}, prompt: { type: 'confirm' as const, title: '' }, timeout: 50, isBlocking: false } } as never,
+      definition: {
+        pending: {
+          onTimeout: async () => {},
+          prompt: { type: 'confirm' as const, title: '' },
+          timeout: 50,
+          isBlocking: false,
+        },
+      } as never,
       deadline: 50_000,
       startTime: 0,
       createdSeq: 0,
@@ -131,7 +179,7 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
 
     // 应收到 initialView 且其 state.deadline 非空
-    const initialMsg = ws.messages.find(m => m.type === 'initialView');
+    const initialMsg = ws.messages.find((m) => m.type === 'initialView');
     expect(initialMsg).toBeDefined();
     if (initialMsg!.type === 'initialView') {
       expect(initialMsg!.state.deadline).not.toBeNull();
@@ -148,8 +196,40 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
     session = new GameSession(makeRoom(), true, 42);
     const state = createGameState({
       players: [
-        { index: 0, name: '主公', identity: '主公', character: '刘备', health: 1, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 1, name: '反贼', identity: '反贼', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        {
+          index: 0,
+          name: '主公',
+          identity: '主公',
+          character: '刘备',
+          health: 1,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 1,
+          name: '反贼',
+          identity: '反贼',
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
       ],
       cardMap: {},
       currentPlayerIndex: 0,
@@ -175,7 +255,7 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
     state.onStateChange!();
 
     expect(s.gameOverHandled).toBe(true);
-    expect(broadcastSpy.mock.calls.some(c => (c[0] as ServerMessage).type === 'gameOver')).toBe(true);
+    expect(broadcastSpy.mock.calls.some((c) => c[0].type === 'gameOver')).toBe(true);
     // 本次 onStateChange 已广播了击杀事件本身
     expect(broadcastNewStateSpy).toHaveBeenCalled();
 
@@ -197,7 +277,11 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
 
     const seqBefore = state.seq;
     await session.handleAction('fake-player', {
-      skillId: '回合管理', actionType: 'end', ownerId: 0, params: {}, baseSeq: 0,
+      skillId: '回合管理',
+      actionType: 'end',
+      ownerId: 0,
+      params: {},
+      baseSeq: 0,
     });
     // gameOverHandled=true → handleAction 首行 return,不 dispatch
     expect(state.seq).toBe(seqBefore);
@@ -205,9 +289,11 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
 });
 
 describe('checkGameOver:主公阵亡胜负判定', () => {
-  function makeState(players: Array<{ index: number; identity: string; alive: boolean }>): GameState {
+  function makeState(
+    players: Array<{ index: number; identity: string; alive: boolean }>,
+  ): GameState {
     return createGameState({
-      players: players.map(p => ({
+      players: players.map((p) => ({
         index: p.index,
         name: `P${p.index}`,
         identity: p.identity as GameState['players'][number]['identity'],
@@ -215,7 +301,14 @@ describe('checkGameOver:主公阵亡胜负判定', () => {
         health: 4,
         maxHealth: 4,
         alive: p.alive,
-        hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+        hand: [],
+        equipment: {},
+        skills: [],
+        vars: {},
+        marks: [],
+        pendingTricks: [],
+        tags: [],
+        judgeZone: [],
       })),
       cardMap: {},
       currentPlayerIndex: 0,
@@ -290,8 +383,40 @@ describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
     session = new GameSession(makeRoom(), true, 42);
     const state = createGameState({
       players: [
-        { index: 0, name: '主公', identity: '主公', character: '刘备', health: 1, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 1, name: '反贼', identity: '反贼', character: '曹操', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        {
+          index: 0,
+          name: '主公',
+          identity: '主公',
+          character: '刘备',
+          health: 1,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 1,
+          name: '反贼',
+          identity: '反贼',
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
       ],
       cardMap: {},
       currentPlayerIndex: 0,
@@ -322,7 +447,7 @@ describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
     expect(s.gameOverHandled).toBe(false);
     expect(s.room.readyPlayers.size).toBe(0);
     expect(getState(session)).toBeNull();
-    expect(broadcastSpy.mock.calls.some(c => (c[0] as ServerMessage).type === 'game_reset')).toBe(true);
+    expect(broadcastSpy.mock.calls.some((c) => c[0].type === 'game_reset')).toBe(true);
   });
 
   it('resetToLobby 后 gameOverHandled 清除,handleAction 不再被拦截', async () => {
@@ -333,7 +458,11 @@ describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
     session.resetToLobby();
     // gameOverHandled 已清除,state 为 null → handleAction 首行因 !state 直接 return(不会报错)
     await session.handleAction('fake-player', {
-      skillId: '回合管理', actionType: 'end', ownerId: 0, params: {}, baseSeq: 0,
+      skillId: '回合管理',
+      actionType: 'end',
+      ownerId: 0,
+      params: {},
+      baseSeq: 0,
     });
   });
 });

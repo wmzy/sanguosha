@@ -3,7 +3,7 @@
 // respond:把闪牌从手牌移到处理区(不是直接进弃牌堆),供杀的结算流程检查。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '闪', description: '需要打出闪时,打出一张闪' };
@@ -11,7 +11,11 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'respond',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'respond',
     (state: GameState, params: Record<string, Json>) => {
       // pending 必须询问闪(正向条件)
       const slot = state.pendingSlots.get(ownerId);
@@ -53,4 +57,3 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-

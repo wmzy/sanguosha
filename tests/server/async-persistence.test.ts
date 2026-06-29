@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  loadRoom,
-  deletePersistedRoom,
-  flushPendingWrites,
-} from '../../src/server/persistence';
+import { loadRoom, deletePersistedRoom, flushPendingWrites } from '../../src/server/persistence';
 
 describe('server/persistence async API (T16)', () => {
   it('loadRoom returns a Promise and resolves to null for missing rooms', async () => {

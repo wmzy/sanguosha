@@ -14,7 +14,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
   apply(state, atom) {
     if (atom.from !== undefined) {
       const fromP = state.players[atom.from];
-      fromP.hand = fromP.hand.filter(id => id !== atom.cardId);
+      fromP.hand = fromP.hand.filter((id) => id !== atom.cardId);
       const equipment: Record<string, string> = {};
       for (const [slot, id] of Object.entries(fromP.equipment)) {
         if (id && id !== atom.cardId) equipment[slot] = id;
@@ -27,11 +27,12 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
   toViewEvents(state, atom): ViewEventSplit {
     const effect = { sound: 'obtain' as const, animation: 'slide' as const, duration: 600 };
     // 判断牌来自哪个区域(供 applyView 精确更新)
-    const fromZone = atom.from !== undefined
-      ? (state.players[atom.from].hand.includes(atom.cardId)
-        ? 'hand' as const
-        : 'equipment' as const)
-      : undefined;
+    const fromZone =
+      atom.from !== undefined
+        ? state.players[atom.from].hand.includes(atom.cardId)
+          ? ('hand' as const)
+          : ('equipment' as const)
+        : undefined;
     // ownerView:获得者看到完整牌信息
     const ownerView: ViewEvent = {
       type: '获得',
@@ -57,18 +58,18 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     view.players[pi].handCount += 1;
     if (cardId && view.players[pi].hand) {
       const card = view.cardMap[cardId];
-      if (card) view.players[pi].hand!.push(card);
+      if (card) view.players[pi].hand.push(card);
     }
     // from 玩家:手牌/装备移除(与 apply 对称)
     const from = event.from as number | undefined;
     const fromZone = event.fromZone as 'hand' | 'equipment' | undefined;
     if (from !== undefined) {
-      const fromPi = view.players.findIndex(p => p.index === from);
+      const fromPi = view.players.findIndex((p) => p.index === from);
       if (fromPi >= 0) {
         if (fromZone === 'equipment') {
           // 从装备区移除
@@ -81,7 +82,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
           // 从手牌移除:handCount - 1;可见时同步 hand 数组
           view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
           if (cardId && view.players[fromPi].hand) {
-            view.players[fromPi].hand = view.players[fromPi].hand!.filter(c => c.id !== cardId);
+            view.players[fromPi].hand = view.players[fromPi].hand.filter((c) => c.id !== cardId);
           }
         }
       }

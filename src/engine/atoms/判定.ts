@@ -6,7 +6,15 @@
 // 判定牌在处理区“停留几秒”的视觉效果由前端 useDebugMultiConnection hook 负责
 // (在收到判定事件后临时把判定牌加入 view.zones.processing 展示,几秒后移除),
 // 不在 applyView 中处理——保持 applyView 与 buildView 一致。
-import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent, Card } from '../types';
+// 判定:从牌堆顶翻一张到处理区(亮出判定牌)。
+// 技能 after hooks(八卦阵/乐不思蜀等)从处理区读判定牌花色。
+// atom.afterHooks 结束后把判定牌从处理区移入弃牌堆。
+//
+// 前端展示:判定牌是公开信息,toViewEvents 携带 card+cardId。
+// 判定牌在处理区“停留几秒”的视觉效果由前端 useDebugMultiConnection hook 负责
+// (在收到判定事件后临时把判定牌加入 view.zones.processing 展示,几秒后移除),
+// 不在 applyView 中处理——保持 applyView 与 buildView 一致。
+import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 
 export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
@@ -41,12 +49,14 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
       player: atom.player,
       judgeType: atom.judgeType,
       // 携带判定牌信息:cardId 供前端 processing 区追踪,card 供日志/overlay 展示
-      ...(card ? { cardId: topCardId, card: { name: card.name, suit: card.suit, rank: card.rank } as Card } : {}),
+      ...(card
+        ? { cardId: topCardId, card: { name: card.name, suit: card.suit, rank: card.rank } }
+        : {}),
     };
     return { ownerViews: new Map(), othersView: view };
   },
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 1800 },
-  applyView(view: GameView, event: ViewEvent) {
+  applyView(view: GameView, _event: ViewEvent) {
     // 后端 apply+afterHooks 净效果: deck -1, processing 不变(进后出), discardPile +1。
     // applyView 对应净效果: deckCount -1, discardPileCount +1, processing 不变。
     // ⚠️ 不能 processing.pop()——判定可能嵌套在其他 atom 的 hook 中(如八卦阵),processing
@@ -61,7 +71,10 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     const card = event.card as { name?: string; suit?: string; rank?: string } | undefined;
     const judgeType = event.judgeType ?? '';
     if (card) {
-      return { player: event.player as number, text: `判定(${judgeType}):${card.suit ?? ''}${card.rank ?? ''} ${card.name ?? ''}` };
+      return {
+        player: event.player as number,
+        text: `判定(${judgeType}):${card.suit ?? ''}${card.rank ?? ''} ${card.name ?? ''}`,
+      };
     }
     return { player: event.player as number, text: `判定(${judgeType})` };
   },

@@ -50,19 +50,30 @@ export function DebugPerspectiveBar({
     }
     // fallback 也失败时静默:此时无可靠手段,不弹错打扰用户
   }, [snapshotPath]);
-  if (!onSwitchPerspective && !onDeleteRoom && !onSwitchToNextUnselected && !onSaveSnapshot) return null;
+  if (!onSwitchPerspective && !onDeleteRoom && !onSwitchToNextUnselected && !onSaveSnapshot)
+    return null;
   return (
     <div className={styles.headerRight}>
-      {onDeleteRoom && <button className={styles.backBtn} onClick={onDeleteRoom}>← 退出</button>}
+      {onDeleteRoom && (
+        <button className={styles.backBtn} onClick={onDeleteRoom}>
+          ← 退出
+        </button>
+      )}
       {onSwitchToNextUnselected && (
-        <button className={styles.goToBtn} onClick={onSwitchToNextUnselected}>下一个待选者</button>
+        <button className={styles.goToBtn} onClick={onSwitchToNextUnselected}>
+          下一个待选者
+        </button>
       )}
       {onSwitchPerspective && (
         <button className={styles.perspectiveBtn} onClick={onSwitchPerspective}>
           视角: {perspectiveName}
         </button>
       )}
-      {onGoToCurrentPlayer && <button className={styles.goToBtn} onClick={onGoToCurrentPlayer}>查看当前玩家</button>}
+      {onGoToCurrentPlayer && (
+        <button className={styles.goToBtn} onClick={onGoToCurrentPlayer}>
+          查看当前玩家
+        </button>
+      )}
       {autoSwitchCtl && (
         <button
           className={cx(styles.goToBtn, autoSwitchCtl.enabled && styles.autoSwitchActive)}
@@ -72,11 +83,7 @@ export function DebugPerspectiveBar({
         </button>
       )}
       {onSaveSnapshot && (
-        <button
-          className={styles.snapshotBtn}
-          onClick={onSaveSnapshot}
-          disabled={snapshotSaving}
-        >
+        <button className={styles.snapshotBtn} onClick={onSaveSnapshot} disabled={snapshotSaving}>
           {snapshotSaving ? '保存中…' : '保存快照'}
         </button>
       )}

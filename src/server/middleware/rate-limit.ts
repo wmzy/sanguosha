@@ -19,9 +19,10 @@ const cleanupInterval = setInterval(cleanup, 5 * 60_000);
 cleanupInterval.unref();
 
 export const rateLimit: MiddlewareHandler = async (c, next) => {
-  const ip = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
-    ?? c.req.header('X-Real-IP')
-    ?? 'unknown';
+  const ip =
+    c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ??
+    c.req.header('X-Real-IP') ??
+    'unknown';
 
   const now = Date.now();
   let entry = clients.get(ip);

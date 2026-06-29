@@ -10,10 +10,19 @@
 //   - 不 mock 任何引擎组件:复用真实 dispatch / apply pipeline
 //   - 走 fireTimeout() 触发 onTimeout(语义最准,不需 fake timers)
 
+// tests/engine-harness.ts
+// 技能集成测试 harness(用新顶层 API):
+//   SkillTestHarness  → state 生命周期 + 玩家索引
+//   PlayerSession     → 玩家操作/查询/断言
+//   FakeFrontendAPI   → 收集 defineAction 声明
+//
+// 设计原则:
+//   - 用玩家术语(pass / respond / useCard),不暴露 timer/pending/atom 机制
+//   - 断言可观察游戏状态(health / hand / zone),不断言内部 atom 序列
+//   - 不 mock 任何引擎组件:复用真实 dispatch / apply pipeline
+//   - 走 fireTimeout() 触发 onTimeout(语义最准,不需 fake timers)
 import type {
   ActionPrompt,
-  Atom,
-  AtomEffect,
   Card,
   CardWrapper,
   ClientMessage,
@@ -61,13 +70,11 @@ function trackEngineErrorsIfNotTracked(state: GameState): void {
 export function assertNoEngineErrors(state: GameState): void {
   const errors = engineErrorMap.get(state);
   if (!errors || errors.length === 0) return;
-  engineErrorMap.set(state, []);  // clear after read
-  const msgs = errors.map((e, i) =>
-    `  ${i + 1}. ${e.message}\n${e.stack?.split('\n').slice(1, 4).join('\n')}`,
-  ).join('\n');
-  throw new Error(
-    `检测到引擎异常(fire-and-forget execute 抛错,之前会被静默吞掉):\n${msgs}`,
-  );
+  engineErrorMap.set(state, []); // clear after read
+  const msgs = errors
+    .map((e, i) => `  ${i + 1}. ${e.message}\n${e.stack?.split('\n').slice(1, 4).join('\n')}`)
+    .join('\n');
+  throw new Error(`检测到引擎异常(fire-and-forget execute 抛错,之前会被静默吞掉):\n${msgs}`);
 }
 
 // ─── 公开类型 ──────────────────────────────────────────────────
@@ -97,13 +104,16 @@ class FakeFrontendAPI implements FrontendAPI {
     this.skillId = skillId;
   }
 
-  defineAction(actionType: string, opts: {
-    label: string;
-    style?: string;
-    prompt: ActionPrompt;
-    transform?: (card: Card) => CardWrapper;
-    activeWhen?: (ctx: { view: GameView; perspectiveIdx: number }) => boolean;
-  }): void {
+  defineAction(
+    actionType: string,
+    opts: {
+      label: string;
+      style?: string;
+      prompt: ActionPrompt;
+      transform?: (card: Card) => CardWrapper;
+      activeWhen?: (ctx: { view: GameView; perspectiveIdx: number }) => boolean;
+    },
+  ): void {
     this.actions.push({
       skillId: this.skillId,
       ownerId: this.viewer,
@@ -115,11 +125,21 @@ class FakeFrontendAPI implements FrontendAPI {
     });
   }
 
-  onEvent(): () => void { return () => {}; }
-  playEffect(): void { /* no-op */ }
+  onEvent(): () => void {
+    return () => {};
+  }
 
-  getActions(): ActionDef[] { return this.actions; }
-  clearActions(): void { this.actions = []; }
+  playEffect(): void {
+    /* no-op */
+  }
+
+  getActions(): ActionDef[] {
+    return this.actions;
+  }
+
+  clearActions(): void {
+    this.actions = [];
+  }
 }
 
 // ─── PlayerSession ──────────────────────────────────────────
@@ -169,7 +189,7 @@ export class PlayerSession {
   newEvents(): ViewEvent[] {
     const all = this.harness.state.atomHistory.slice(this.lastEventIndex);
     this.lastEventIndex = this.harness.state.atomHistory.length;
-    return this.splitEventsForPlayer(all as unknown as GameEvent[]);
+    return this.splitEventsForPlayer(all);
   }
 
   /** 将全局 GameEvent 按 toViewEvents 分叉为当前玩家可见的 ViewEvent[] */
@@ -178,7 +198,7 @@ export class PlayerSession {
     for (const e of events) {
       if (e.kind === 'atom' && e.viewEvents) {
         const owner = e.viewEvents.ownerViews.get(this.playerIndex);
-        if (owner === null) continue;  // 隐藏
+        if (owner === null) continue; // 隐藏
         const viewEvent = owner ?? e.viewEvents.othersView;
         if (viewEvent) result.push(viewEvent);
       } else if (e.kind === 'atom') {
@@ -187,7 +207,7 @@ export class PlayerSession {
       } else if (e.kind === 'notify') {
         const data = e.views ? (e.views.get(String(this.playerIndex)) ?? null) : e.data;
         if (data !== null) {
-          result.push({ type: 'notify', skillId: e.skillId, eventType: e.eventType, data } as unknown as ViewEvent);
+          result.push({ type: 'notify', skillId: e.skillId, eventType: e.eventType, data });
         }
       }
     }
@@ -205,7 +225,12 @@ export class PlayerSession {
     const events = this.newEvents();
     for (const evt of events) {
       const raw = evt as Record<string, unknown>;
-      const type = typeof raw.atomType === 'string' ? raw.atomType : (typeof raw.type === 'string' ? raw.type : '');
+      const type =
+        typeof raw.atomType === 'string'
+          ? raw.atomType
+          : typeof raw.type === 'string'
+            ? raw.type
+            : '';
       // notify 事件(pendingResolved 等):单独处理
       if (type === 'notify') {
         const eventType = raw.eventType as string | undefined;
@@ -215,7 +240,7 @@ export class PlayerSession {
           if (target === undefined) continue;
           if (target < 0) {
             this.processedView.pending = null;
-          } else if (this.processedView.pending && this.processedView.pending.target === target) {
+          } else if (this.processedView.pending?.target === target) {
             this.processedView.pending = null;
           }
         }
@@ -232,7 +257,7 @@ export class PlayerSession {
         const logEntry = def.toViewLog?.(evt, this.processedView.viewer);
         if (logEntry) {
           this.processedView.log.push({
-            time: (evt as Record<string, unknown>).seq as number ?? 0,
+            time: ((evt as Record<string, unknown>).seq as number) ?? 0,
             player: logEntry.player,
             text: logEntry.text,
           });
@@ -293,7 +318,7 @@ export class PlayerSession {
     const slot = [...this.harness.state.pendingSlots.values()][0];
     if (!slot) throw new Error('confirm() 但无 pending');
     await this.dispatch({
-      skillId: (slot.atom as Record<string, Json>).requestType as string ?? '请求回应',
+      skillId: ((slot.atom as Record<string, Json>).requestType as string) ?? '请求回应',
       actionType: 'confirm',
       params: { choice: true },
     });
@@ -318,7 +343,7 @@ export class PlayerSession {
   // ─── 辅助选择 ─────────────────────────────────
 
   findValidCard(actionType: string, extraFilter?: (card: Card) => boolean): Card | null {
-    const actions = this.frontend.getActions().filter(a => a.actionType === actionType);
+    const actions = this.frontend.getActions().filter((a) => a.actionType === actionType);
     for (const action of actions) {
       const filter = extractCardFilter(action.prompt);
       if (!filter) continue;
@@ -334,7 +359,7 @@ export class PlayerSession {
   }
 
   findValidTargets(actionType: string, count?: number): number[] {
-    const actions = this.frontend.getActions().filter(a => a.actionType === actionType);
+    const actions = this.frontend.getActions().filter((a) => a.actionType === actionType);
     for (const action of actions) {
       const filter = extractTargetFilter(action.prompt);
       if (!filter) continue;
@@ -357,7 +382,8 @@ export class PlayerSession {
     if (slots.size === 0) throw new Error(`expectPending('${atomType}'): 无 pending`);
     const slot = [...slots.values()][0];
     const type = (slot.atom as { type: string }).type;
-    if (type !== atomType) throw new Error(`expectPending('${atomType}'): 实际 pending 是 '${type}'`);
+    if (type !== atomType)
+      throw new Error(`expectPending('${atomType}'): 实际 pending 是 '${type}'`);
   }
 
   expectNoPending(): void {
@@ -374,45 +400,50 @@ export class PlayerSession {
    * 发出一个 action,断言它被 validate 拒绝(dispatch 返回 false,state.seq 不增加)。
    * 用于负面测试:不自己回合出牌 / pending 期间出牌 / 死人出牌 / 无牌出牌等。
    */
-  async expectRejected(
-    msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
-  ): Promise<void> {
+  async expectRejected(msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>): Promise<void> {
     const accepted = await this.tryDispatch(msg);
     if (accepted) {
-      throw new Error(`期望 action 被拒绝,但被接受了: ${msg.skillId}/${msg.actionType} ${JSON.stringify(msg.params)}`);
+      throw new Error(
+        `期望 action 被拒绝,但被接受了: ${msg.skillId}/${msg.actionType} ${JSON.stringify(msg.params)}`,
+      );
     }
   }
 
   /** 发出一个 action,断言它被接受(state.seq 增加) */
-  async expectAccepted(
-    msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
-  ): Promise<void> {
+  async expectAccepted(msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>): Promise<void> {
     const accepted = await this.tryDispatch(msg);
     if (!accepted) {
-      throw new Error(`期望 action 被接受,但被拒绝了: ${msg.skillId}/${msg.actionType} ${JSON.stringify(msg.params)}`);
+      throw new Error(
+        `期望 action 被接受,但被拒绝了: ${msg.skillId}/${msg.actionType} ${JSON.stringify(msg.params)}`,
+      );
     }
   }
 
   /** 断言事件流中包含指定 atom 类型(子序列匹配,忽略 notify 事件) */
   expectAtoms(...types: string[]): void {
-    const atoms = (this.harness.state.atomHistory as Array<{ kind: string; atom?: { type: string } }>)
-      .filter(e => e.kind === 'atom')
-      .map(e => e.atom?.type ?? '')
-      .filter(t => t !== '');
+    const atoms = (
+      this.harness.state.atomHistory as Array<{ kind: string; atom?: { type: string } }>
+    )
+      .filter((e) => e.kind === 'atom')
+      .map((e) => e.atom?.type ?? '')
+      .filter((t) => t !== '');
     let searchFrom = 0;
     for (const t of types) {
       const idx = atoms.indexOf(t, searchFrom);
-      if (idx < 0) throw new Error(`expectAtoms: 事件流中未找到 '${t}'(按序)。已有: ${atoms.join(', ')}`);
+      if (idx < 0)
+        throw new Error(`expectAtoms: 事件流中未找到 '${t}'(按序)。已有: ${atoms.join(', ')}`);
       searchFrom = idx + 1;
     }
   }
 
   /** 断言事件流的 atom 类型严格匹配(忽略 notify 事件) */
   expectExactAtoms(...types: string[]): void {
-    const atoms = (this.harness.state.atomHistory as Array<{ kind: string; atom?: { type: string } }>)
-      .filter(e => e.kind === 'atom')
-      .map(e => e.atom?.type ?? '')
-      .filter(t => t !== '');
+    const atoms = (
+      this.harness.state.atomHistory as Array<{ kind: string; atom?: { type: string } }>
+    )
+      .filter((e) => e.kind === 'atom')
+      .map((e) => e.atom?.type ?? '')
+      .filter((t) => t !== '');
     const expected = types.join(', ');
     const actual = atoms.join(', ');
     if (expected !== actual) {
@@ -432,7 +463,9 @@ export class PlayerSession {
       fn(this._processedView);
     } catch (e) {
       const view = this._processedView;
-      const players = view.players.map(p => `P${p.index}:${p.character || '?'} hp=${p.health} hand=${p.handCount}`).join(', ');
+      const players = view.players
+        .map((p) => `P${p.index}:${p.character || '?'} hp=${p.health} hand=${p.handCount}`)
+        .join(', ');
       throw new Error(`expectView 断言失败: ${players}\n${e instanceof Error ? e.message : e}`);
     }
   }
@@ -441,8 +474,8 @@ export class PlayerSession {
    * 断言 processedView 中指定玩家的角色名。
    */
   expectCharacter(playerIndex: number, expected: string): void {
-    this.expectView(v => {
-      const p = v.players.find(pl => pl.index === playerIndex);
+    this.expectView((v) => {
+      const p = v.players.find((pl) => pl.index === playerIndex);
       if (!p) throw new Error(`玩家 ${playerIndex} 不存在`);
       if (p.character !== expected) {
         throw new Error(`P${playerIndex}.character = '${p.character}', 期望 '${expected}'`);
@@ -461,7 +494,7 @@ export class PlayerSession {
   respondInfo(): { skillId: string; cardFilter?: (c: Card) => boolean } | null {
     const slots = this.harness.state.pendingSlots;
     const mySlot = slots.get(this.playerIndex);
-    const broadcastSlot = [...slots.values()].find(s => {
+    const broadcastSlot = [...slots.values()].find((s) => {
       const t = (s.atom as { target?: unknown }).target;
       return typeof t === 'number' && t < 0;
     });
@@ -469,7 +502,7 @@ export class PlayerSession {
     if (!slot) return null;
     const atom = slot.atom as Record<string, unknown>;
     const atomType = (atom['type'] as string) ?? '';
-    const reqType = typeof atom['requestType'] === 'string' ? (atom['requestType'] as string) : '';
+    const reqType = typeof atom['requestType'] === 'string' ? atom['requestType'] : '';
 
     // 通用推导 skillId
     let skillId: string | null = null;
@@ -478,13 +511,15 @@ export class PlayerSession {
     } else if (reqType === '__弃牌') {
       skillId = '系统规则';
     } else if (atomType === '请求回应' || atomType === '并行回应') {
-      skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : (reqType || null);
+      skillId = reqType.includes('/') ? reqType.slice(0, reqType.indexOf('/')) : reqType || null;
     }
     if (!skillId) return null;
 
     // 从 FakeFrontendAPI 收集的 action 声明取 cardFilter(函数引用)
-    const action = this.frontend.getActions().find(a => a.skillId === skillId && a.actionType === 'respond');
-    const cardFilter = action ? extractCardFilter(action.prompt) ?? undefined : undefined;
+    const action = this.frontend
+      .getActions()
+      .find((a) => a.skillId === skillId && a.actionType === 'respond');
+    const cardFilter = action ? (extractCardFilter(action.prompt) ?? undefined) : undefined;
     return { skillId, cardFilter };
   }
 
@@ -497,7 +532,7 @@ export class PlayerSession {
     const result: Card[] = [];
     for (const cardId of player.hand) {
       const card = this.harness.state.cardMap[cardId];
-      if (card && info.cardFilter!(card)) result.push(card);
+      if (card && info.cardFilter(card)) result.push(card);
     }
     return result;
   }
@@ -535,7 +570,10 @@ export class PlayerSession {
       const module = await getSkillModule(skillId);
       this.frontend.setCurrentSkill(skillId);
       if (module.onMount) {
-        module.onMount({ id: skillId, ownerId: this.playerIndex, name: skillId, description: '' }, this.frontend);
+        module.onMount(
+          { id: skillId, ownerId: this.playerIndex, name: skillId, description: '' },
+          this.frontend,
+        );
       }
     }
   }
@@ -544,9 +582,7 @@ export class PlayerSession {
    * 发出 action 并返回是否被接受(dispatch 返回 boolean)。
    * validate 拒绝时 dispatch 返回 false,execute 成功时返回 true。
    */
-  async tryDispatch(
-    msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
-  ): Promise<boolean> {
+  async tryDispatch(msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>): Promise<boolean> {
     const accepted = await engineDispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerIndex,
@@ -556,9 +592,7 @@ export class PlayerSession {
     return accepted;
   }
 
-  private async dispatch(
-    msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>,
-  ): Promise<void> {
+  private async dispatch(msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>): Promise<void> {
     await this.tryDispatch(msg);
     // 推进所有 player 的事件:真实前端是 broadcastNewState 给所有连接推 events,
     // 每个连接的 handleMessage 都会处理。harness 必须模拟这个广播语义。
@@ -592,7 +626,14 @@ export class SkillTestHarness {
     if (state.zones.deck.length === 0) {
       for (let i = 0; i < 20; i++) {
         const id = `__test_deck_${i}`;
-        state.cardMap[id] = { id, name: i % 3 === 0 ? '杀' : i % 3 === 1 ? '闪' : '桃', suit: '♠', color: '黑', rank: String(i + 2), type: '基本牌' };
+        state.cardMap[id] = {
+          id,
+          name: i % 3 === 0 ? '杀' : i % 3 === 1 ? '闪' : '桃',
+          suit: '♠',
+          color: '黑',
+          rank: String(i + 2),
+          type: '基本牌',
+        };
         state.zones.deck.push(id);
       }
     }
@@ -636,15 +677,15 @@ export class SkillTestHarness {
     for (const session of sessions) {
       const errs = session.drainApplyViewErrors();
       if (errs) {
-        allApplyViewErrors.push(`--- viewer=${session.playerIndex} ---\n` +
-          errs.map((e, i) => `  ${i + 1}. ${e}`).join('\n'));
+        allApplyViewErrors.push(
+          `--- viewer=${session.playerIndex} ---\n${errs
+            .map((e, i) => `  ${i + 1}. ${e}`)
+            .join('\n')}`,
+        );
       }
     }
     if (allApplyViewErrors.length > 0) {
-      throw new Error(
-        `applyView 抛错(之前会被静默吞掉):\n\n` +
-        allApplyViewErrors.join('\n\n'),
-      );
+      throw new Error(`applyView 抛错(之前会被静默吞掉):\n\n${allApplyViewErrors.join('\n\n')}`);
     }
     // 4. 视图一致性自动对比(buildView vs processedView)
     if (autoCompareEnabled) {
@@ -655,16 +696,19 @@ export class SkillTestHarness {
         const expected = normalizeViewForCompare(baseline);
         const actual = normalizeViewForCompare(session.processedView);
         const diffs = deepDiff(expected, actual);
-       
+
         if (diffs.length > 0) {
-          allDiffs.push(`--- viewer=${session.playerIndex} ---\n` + diffs.map((d, i) => `  ${i + 1}. ${d}`).join('\n'));
+          allDiffs.push(
+            `--- viewer=${session.playerIndex} ---\n${diffs.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}`,
+          );
         }
       }
       if (allDiffs.length > 0) {
         throw new Error(
           `视图不一致(buildView 权威 vs processedView 增量)。\n` +
-          `通常意味着某 atom 的 toViewEvents/applyView 与 apply 不对称:\n\n` +
-          allDiffs.join('\n\n'),
+            `通常意味着某 atom 的 toViewEvents/applyView 与 apply 不对称:\n\n${allDiffs.join(
+              '\n\n',
+            )}`,
         );
       }
     }
@@ -672,9 +716,10 @@ export class SkillTestHarness {
 
   /** 按名字或座次取玩家 session(测试可传 'P1' 或 0) */
   player(nameOrIndex: string | number): PlayerSession {
-    const index = typeof nameOrIndex === 'number'
-      ? nameOrIndex
-      : this._state.players.findIndex(p => p.name === nameOrIndex);
+    const index =
+      typeof nameOrIndex === 'number'
+        ? nameOrIndex
+        : this._state.players.findIndex((p) => p.name === nameOrIndex);
     const session = this.sessions.get(index);
     if (!session) throw new Error(`Player ${nameOrIndex} not found in harness`);
     return session;
@@ -694,7 +739,7 @@ export class SkillTestHarness {
   }
 
   get events(): GameEvent[] {
-    return this.state.atomHistory as unknown as GameEvent[];
+    return this.state.atomHistory;
   }
 }
 
@@ -714,7 +759,9 @@ let autoCompareEnabled = true;
 export function disableAutoCompare(): () => void {
   const prev = autoCompareEnabled;
   autoCompareEnabled = false;
-  return () => { autoCompareEnabled = prev; };
+  return () => {
+    autoCompareEnabled = prev;
+  };
 }
 
 /** 规范化 prompt 用于对比:只留 type/title/min/max,丢弃 filter 函数(不可比) */
@@ -728,7 +775,10 @@ function normalizePrompt(prompt: ActionPrompt | undefined): unknown {
   }
   // targetFilter: 只 SelectTargetPrompt / UseCardAndTargetPrompt 有 TargetFilter(含 min/max);
   // DistributePrompt.targetFilter 是函数不可比。按 type 收窄。
-  if ((prompt.type === 'selectTarget' || prompt.type === 'useCardAndTarget') && prompt.targetFilter) {
+  if (
+    (prompt.type === 'selectTarget' || prompt.type === 'useCardAndTarget') &&
+    prompt.targetFilter
+  ) {
     base.targetFilter = { min: prompt.targetFilter.min, max: prompt.targetFilter.max };
   }
   return base;
@@ -757,7 +807,7 @@ function normalizeViewForCompare(view: GameView): unknown {
     currentPlayerIndex: view.currentPlayerIndex,
     phase: view.phase,
     turn: view.turn,
-    players: view.players.map(p => ({
+    players: view.players.map((p) => ({
       index: p.index,
       name: p.name,
       character: p.character,
@@ -795,7 +845,10 @@ function deepDiff(expected: unknown, actual: unknown, path = ''): string[] {
   // 类型不同
   const eType = expected === null ? 'null' : typeof expected;
   const aType = actual === null ? 'null' : typeof actual;
-  if (eType !== aType) return [`${path || '<root>'}: 类型期望 ${eType},实际 ${aType} (期望 ${JSON.stringify(expected)},实际 ${JSON.stringify(actual)})`];
+  if (eType !== aType)
+    return [
+      `${path || '<root>'}: 类型期望 ${eType},实际 ${aType} (期望 ${JSON.stringify(expected)},实际 ${JSON.stringify(actual)})`,
+    ];
   // 数组
   if (Array.isArray(expected)) {
     if (!Array.isArray(actual)) return [`${path || '<root>'}: 期望数组,实际非数组`];
@@ -920,7 +973,7 @@ export async function waitForStable(state: GameState): Promise<void> {
   if (state.pendingSlots.size === 0 && state.atomStack.length > 0) {
     throw new Error(
       `waitForStable 超时(2s):atomStack 非空(${state.atomStack.length})且无 pending。\n` +
-      `execute 可能卡在 fire-and-forget 链上未推进。atomStack 顶: ${state.atomStack[state.atomStack.length - 1]?.type ?? 'unknown'}`,
+        `execute 可能卡在 fire-and-forget 链上未推进。atomStack 顶: ${state.atomStack[state.atomStack.length - 1]?.type ?? 'unknown'}`,
     );
   }
 }

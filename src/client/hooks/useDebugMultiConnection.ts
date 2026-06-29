@@ -16,7 +16,7 @@ import { useEventPlayback } from './useEventPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './SubmittedCharSelectCtx';
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
-import type { GameView, ViewEvent } from '../../engine/types';
+import type { GameView } from '../../engine/types';
 import { suitColor, type Suit } from '../../shared/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
 import type { ActionMsg } from '../types';
@@ -44,9 +44,7 @@ export interface RoomState {
   config: import('../../server/protocol').RoomConfig;
 }
 
-export function useDebugMultiConnection(
-  params: UseDebugMultiConnectionParams,
-): {
+export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): {
   views: Map<number, GameView>;
   currentEvent: import('./useEventPlayback').QueuedEvent | null;
   sendAction: (action: ActionMsg) => void;
@@ -84,11 +82,17 @@ export function useDebugMultiConnection(
   const [seatPlayerIds, setSeatPlayerIds] = useState<Map<number, string>>(new Map());
   const playback = useEventPlayback();
   const playbackRef = useRef(playback);
-  useEffect(() => { playbackRef.current = playback; }, [playback]);
+  useEffect(() => {
+    playbackRef.current = playback;
+  }, [playback]);
   const perspectiveRef = useRef(perspective);
-  useEffect(() => { perspectiveRef.current = perspective; }, [perspective]);
+  useEffect(() => {
+    perspectiveRef.current = perspective;
+  }, [perspective]);
   const onFirstViewRef = useRef(params.onFirstView);
-  useEffect(() => { onFirstViewRef.current = params.onFirstView; }, [params.onFirstView]);
+  useEffect(() => {
+    onFirstViewRef.current = params.onFirstView;
+  }, [params.onFirstView]);
   const markSubmitted = useMarkCharSelectSubmitted();
   const clearSubmitted = useClearSubmittedCharSelects();
   /** HGC 首次收到 initialView 的座次集合，用于触发 onFirstView（仅 viewer=0 一次） */
@@ -99,7 +103,7 @@ export function useDebugMultiConnection(
 
   /** 查找某 viewer 对应的 HGC（viewer 字段可能被 room_joined.seatIndex 覆盖，故按 viewer 遍历） */
   const clientByViewer = useCallback((viewer: number): HeadlessGameClient | undefined => {
-    return [...clientsRef.current.values()].find(c => c.seatIndex === viewer);
+    return [...clientsRef.current.values()].find((c) => c.seatIndex === viewer);
   }, []);
 
   // ── 建立连接：N 个 HGC 实例 ──
@@ -124,7 +128,7 @@ export function useDebugMultiConnection(
       const hgc = new HeadlessGameClient(wsUrl, {
         onView: (view, _newEvents) => {
           if (cancelled) return;
-          setViews(prev => {
+          setViews((prev) => {
             const next = new Map(prev);
             next.set(view.viewer, view);
             return next;
@@ -149,9 +153,11 @@ export function useDebugMultiConnection(
         },
         onRoomState: (state) => {
           if (cancelled || !state) return;
-          setRoomState(state as RoomState);
+          setRoomState(state);
         },
-        onError: () => { /* 一期不重连 */ },
+        onError: () => {
+          /* 一期不重连 */
+        },
         onMessage: (msg: ServerMessage) => {
           if (cancelled) return;
           logWsMessage(viewerIndex, 'in', msg);
@@ -160,7 +166,13 @@ export function useDebugMultiConnection(
       });
       clientsRef.current.set(viewerIndex, hgc);
       hgc.connect(roomId, viewerIndex);
-      cleanups.push(() => { try { hgc.disconnect(); } catch { /* */ } });
+      cleanups.push(() => {
+        try {
+          hgc.disconnect();
+        } catch {
+          /* */
+        }
+      });
     }
 
     return () => {
@@ -173,107 +185,131 @@ export function useDebugMultiConnection(
 
   /** 展示层消息增强：seatPlayerIds/game_reset/判定牌 processing 延迟/event playback。
    *  HGC 已维护 view；这里只做渲染相关的额外处理。 */
-  const handleDisplayMessage = useCallback((viewerIndex: number, msg: ServerMessage) => {
-    switch (msg.type) {
-      case 'room_joined': {
-        // 与原始 hook 一致：用 viewerIndex（循环索引）而非 msg.seatIndex 做 key
-        setSeatPlayerIds(prev => {
-          const next = new Map(prev);
-          next.set(viewerIndex, msg.playerId);
-          return next;
-        });
-        break;
-      }
-      case 'game_reset': {
-        setGameOver(null);
-        setGameStarted(false);
-        for (const [, c] of clientsRef.current) { /* HGC 内部已重置 view */ void c; }
-        setViews(new Map());
-        clearSubmitted();
-        break;
-      }
-      case 'event': {
-        // event playback：仅当前 perspective 的事件入队
-        if (msg.view) {
-          playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view as ViewEvent }]);
+  const handleDisplayMessage = useCallback(
+    (viewerIndex: number, msg: ServerMessage) => {
+      switch (msg.type) {
+        case 'room_joined': {
+          // 与原始 hook 一致：用 viewerIndex（循环索引）而非 msg.seatIndex 做 key
+          setSeatPlayerIds((prev) => {
+            const next = new Map(prev);
+            next.set(viewerIndex, msg.playerId);
+            return next;
+          });
+          break;
         }
-        // 判定牌 processing 延迟展示：判定牌加入 processing 几秒后移除
-        if (msg.view && (msg.view.atomType ?? msg.view.type) === '判定') {
-          const judgeCardId = msg.view.cardId as string | undefined;
-          const judgeCard = msg.view.card as { name: string; suit: string; rank: string } | undefined;
-          if (judgeCardId) {
-            setViews(prev => {
-              const v = prev.get(viewerIndex);
-              if (!v) return prev;
-              if (!v.cardMap[judgeCardId] && judgeCard) {
-                v.cardMap[judgeCardId] = {
-                  id: judgeCardId, name: judgeCard.name, suit: judgeCard.suit as GameView['cardMap'][string]['suit'],
-                  color: suitColor(judgeCard.suit as Suit),
-                  rank: judgeCard.rank, type: '基本牌',
-                };
-              }
-              if (v.zones && !v.zones.processing.includes(judgeCardId)) {
-                v.zones.processing.push(judgeCardId);
-              }
-              return new Map(prev).set(viewerIndex, v);
-            });
-            setTimeout(() => {
-              setViews(prev => {
+        case 'game_reset': {
+          setGameOver(null);
+          setGameStarted(false);
+          for (const [, c] of clientsRef.current) {
+            /* HGC 内部已重置 view */ void c;
+          }
+          setViews(new Map());
+          clearSubmitted();
+          break;
+        }
+        case 'event': {
+          // event playback：仅当前 perspective 的事件入队
+          if (msg.view) {
+            playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
+          }
+          // 判定牌 processing 延迟展示：判定牌加入 processing 几秒后移除
+          if (msg.view && (msg.view.atomType ?? msg.view.type) === '判定') {
+            const judgeCardId = msg.view.cardId as string | undefined;
+            const judgeCard = msg.view.card as
+              | { name: string; suit: string; rank: string }
+              | undefined;
+            if (judgeCardId) {
+              setViews((prev) => {
                 const v = prev.get(viewerIndex);
-                if (!v?.zones) return prev;
-                const idx = v.zones.processing.indexOf(judgeCardId);
-                if (idx < 0) return prev;
-                v.zones.processing.splice(idx, 1);
+                if (!v) return prev;
+                if (!v.cardMap[judgeCardId] && judgeCard) {
+                  v.cardMap[judgeCardId] = {
+                    id: judgeCardId,
+                    name: judgeCard.name,
+                    suit: judgeCard.suit as GameView['cardMap'][string]['suit'],
+                    color: suitColor(judgeCard.suit as Suit),
+                    rank: judgeCard.rank,
+                    type: '基本牌',
+                  };
+                }
+                if (v.zones && !v.zones.processing.includes(judgeCardId)) {
+                  v.zones.processing.push(judgeCardId);
+                }
                 return new Map(prev).set(viewerIndex, v);
               });
-            }, JUDGE_CARD_LINGER_MS);
+              setTimeout(() => {
+                setViews((prev) => {
+                  const v = prev.get(viewerIndex);
+                  if (!v?.zones) return prev;
+                  const idx = v.zones.processing.indexOf(judgeCardId);
+                  if (idx < 0) return prev;
+                  v.zones.processing.splice(idx, 1);
+                  return new Map(prev).set(viewerIndex, v);
+                });
+              }, JUDGE_CARD_LINGER_MS);
+            }
           }
+          break;
         }
-        break;
+        default:
+          break;
       }
-      default:
-        break;
-    }
-  }, [clearSubmitted]);
+    },
+    [clearSubmitted],
+  );
 
   /** 发送 action：走 ownerId 对应 viewer 的连接 */
-  const sendAction = useCallback((action: ActionMsg) => {
-    const hgc = clientByViewer(action.ownerId);
-    if (!hgc) {
-      log.warn('no connection for viewer', action.ownerId);
-      return;
-    }
-    // 选将 action 发出时标记该座次已提交，乐观清除 view.pending
-    if (action.actionType === '选将') {
-      markSubmitted(action.ownerId);
-      setViews(prev => {
-        const seatView = prev.get(action.ownerId);
-        if (!seatView?.pending) return prev;
-        const next = new Map(prev);
-        next.set(action.ownerId, { ...seatView, pending: null });
-        return next;
-      });
-    }
-    const clientMsg: ClientMessage = { type: 'action', action: { ...action, baseSeq: hgc.lastSeq }, baseSeq: hgc.lastSeq };
-    logWsMessage(action.ownerId, 'out', clientMsg);
-    logUserAction('action', action);
-    // HGC.sendAction 会补 pendingSeq + baseSeq
-    hgc.sendAction(action as import('../../engine/types').ClientMessage);
-  }, [clientByViewer, markSubmitted]);
+  const sendAction = useCallback(
+    (action: ActionMsg) => {
+      const hgc = clientByViewer(action.ownerId);
+      if (!hgc) {
+        log.warn('no connection for viewer', action.ownerId);
+        return;
+      }
+      // 选将 action 发出时标记该座次已提交，乐观清除 view.pending
+      if (action.actionType === '选将') {
+        markSubmitted(action.ownerId);
+        setViews((prev) => {
+          const seatView = prev.get(action.ownerId);
+          if (!seatView?.pending) return prev;
+          const next = new Map(prev);
+          next.set(action.ownerId, { ...seatView, pending: null });
+          return next;
+        });
+      }
+      const clientMsg: ClientMessage = {
+        type: 'action',
+        action: { ...action, baseSeq: hgc.lastSeq },
+        baseSeq: hgc.lastSeq,
+      };
+      logWsMessage(action.ownerId, 'out', clientMsg);
+      logUserAction('action', action);
+      // HGC.sendAction 会补 pendingSeq + baseSeq
+      hgc.sendAction(action as import('../../engine/types').ClientMessage);
+    },
+    [clientByViewer, markSubmitted],
+  );
 
   /** 整理手牌：走当前 perspective viewer 的连接 */
-  const reorderHand = useCallback((order: string[]) => {
-    const hgc = clientByViewer(perspectiveRef.current);
-    if (!hgc) return;
-    const clientMsg: ClientMessage = { type: 'reorder_hand', order };
-    logWsMessage(perspectiveRef.current, 'out', clientMsg);
-    logUserAction('reorder', order);
-    hgc.reorderHand(order);
-  }, [clientByViewer]);
+  const reorderHand = useCallback(
+    (order: string[]) => {
+      const hgc = clientByViewer(perspectiveRef.current);
+      if (!hgc) return;
+      const clientMsg: ClientMessage = { type: 'reorder_hand', order };
+      logWsMessage(perspectiveRef.current, 'out', clientMsg);
+      logUserAction('reorder', order);
+      hgc.reorderHand(order);
+    },
+    [clientByViewer],
+  );
 
   const disconnectAll = useCallback(() => {
     for (const [, hgc] of clientsRef.current) {
-      try { hgc.disconnect(); } catch { /* */ }
+      try {
+        hgc.disconnect();
+      } catch {
+        /* */
+      }
     }
     clientsRef.current.clear();
     setViews(new Map());
@@ -283,9 +319,12 @@ export function useDebugMultiConnection(
     setSeatPlayerIds(new Map());
   }, []);
 
-  const getSeq = useCallback((viewer: number): number => {
-    return clientByViewer(viewer)?.lastSeq ?? 0;
-  }, [clientByViewer]);
+  const getSeq = useCallback(
+    (viewer: number): number => {
+      return clientByViewer(viewer)?.lastSeq ?? 0;
+    },
+    [clientByViewer],
+  );
 
   // ── 配置阶段方法 ──
   const sendReady = useCallback((seat: number) => {

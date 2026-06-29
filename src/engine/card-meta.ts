@@ -39,8 +39,8 @@ export function getWeaponRange(c: Card): number {
 // 马匹(赤兔等)不在 skillLoaders 中,自动排除;未实现技能的装备(如麒麟弓)同理排除。
 const EQUIPMENT_SKILL_NAMES_CACHE: ReadonlySet<string> = new Set(
   装备牌列表
-    .map(def => def.name)
-    .filter(name => Object.prototype.hasOwnProperty.call(skillLoaders, name)),
+    .map((def) => def.name)
+    .filter((name) => Object.prototype.hasOwnProperty.call(skillLoaders, name)),
 );
 
 /** 装备牌自带的技能名集合(从卡牌数据 + 技能注册表派生)。 */

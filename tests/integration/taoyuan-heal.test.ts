@@ -67,7 +67,14 @@ describe('桃园结义:满血不超 maxHealth', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 4, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 4,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 4, maxHealth: 4 }),
         makePlayer({ index: 2, name: 'P3', health: 4, maxHealth: 4 }),
       ],
@@ -103,7 +110,14 @@ describe('桃园结义:满血不超 maxHealth', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 4, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 4,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 4, maxHealth: 4 }),
         makePlayer({ index: 2, name: 'P3', health: 4, maxHealth: 4 }),
         makePlayer({ index: 3, name: 'P4', health: 4, maxHealth: 4 }),
@@ -135,7 +149,14 @@ describe('桃园结义:满血不超 maxHealth', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 4, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 4,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 2, maxHealth: 4 }),
         makePlayer({ index: 2, name: 'P3', health: 4, maxHealth: 4 }),
       ],
@@ -167,7 +188,14 @@ describe('桃园结义:满血不超 maxHealth', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 3, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 3,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 3, maxHealth: 4 }),
         makePlayer({ index: 2, name: 'P3', health: 3, maxHealth: 4 }),
       ],
@@ -199,7 +227,14 @@ describe('桃园结义:满血不超 maxHealth', () => {
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: [ty.id], health: 4, maxHealth: 4, skills: ['桃园结义'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [ty.id],
+          health: 4,
+          maxHealth: 4,
+          skills: ['桃园结义'],
+        }),
         makePlayer({ index: 1, name: 'P2', health: 1, maxHealth: 4 }),
       ],
       cardMap: { [ty.id]: ty },

@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView, Card, SettlementFrame, Json } from '../../src/engine/types';
+import type { GameView, Card, SettlementFrame } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A'): Card {
@@ -99,11 +99,11 @@ function makeViewWithWuguPendingForP2(
   pickedBy: Record<string, string>,
 ): GameView {
   // pending 只含仍在处理区的牌(排除已被选走的)
-  const available = revealedIds.filter(id => !pickedBy[id]);
+  const available = revealedIds.filter((id) => !pickedBy[id]);
   const wuguFrame: SettlementFrame = {
     skillId: '五谷丰登',
     from: 0,
-    params: { revealedIds, pickedBy: pickedBy as unknown as Record<string, Json> },
+    params: { revealedIds, pickedBy },
     cards: available,
   };
   return {
@@ -148,7 +148,7 @@ function makeViewWithWuguPendingForP2(
         prompt: {
           type: 'pickProcessingCard',
           title: '五谷丰登:选择 1 张牌',
-          cards: available.map(id => ({
+          cards: available.map((id) => ({
             cardId: id,
             cardName: cards[id].name,
             suit: cards[id].suit,
@@ -160,7 +160,7 @@ function makeViewWithWuguPendingForP2(
       prompt: {
         type: 'pickProcessingCard',
         title: '五谷丰登:选择 1 张牌',
-        cards: available.map(id => ({
+        cards: available.map((id) => ({
           cardId: id,
           cardName: cards[id].name,
           suit: cards[id].suit,
@@ -206,11 +206,13 @@ describe('五谷丰登选牌面板(pickProcessingCard)', () => {
     fireEvent.click(screen.getByRole('button', { name: /桃/ }));
 
     await waitFor(() => {
-      expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
-        skillId: '五谷丰登',
-        actionType: 'respond',
-        params: expect.objectContaining({ cardId: 'pb' }),
-      }));
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skillId: '五谷丰登',
+          actionType: 'respond',
+          params: expect.objectContaining({ cardId: 'pb' }),
+        }),
+      );
     });
   });
 });
@@ -228,11 +230,7 @@ describe('五谷丰登选牌展示增强(被选牌禁用渲染)', () => {
     const pa = makeCard('pa', '杀', '♠', '7');
     const pb = makeCard('pb', '桃', '♥', '2');
     const pc = makeCard('pc', '闪', '♣', '8');
-    const view = makeViewWithWuguPendingForP2(
-      { pa, pb, pc },
-      ['pa', 'pb', 'pc'],
-      { pa: 'P1' },
-    );
+    const view = makeViewWithWuguPendingForP2({ pa, pb, pc }, ['pa', 'pb', 'pc'], { pa: 'P1' });
 
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
@@ -253,11 +251,7 @@ describe('五谷丰登选牌展示增强(被选牌禁用渲染)', () => {
   it('被选走的牌标注正确的选牌者名称', async () => {
     const pa = makeCard('pa', '杀', '♠', '7');
     const pb = makeCard('pb', '桃', '♥', '2');
-    const view = makeViewWithWuguPendingForP2(
-      { pa, pb },
-      ['pa', 'pb'],
-      { pa: 'P1' },
-    );
+    const view = makeViewWithWuguPendingForP2({ pa, pb }, ['pa', 'pb'], { pa: 'P1' });
 
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
@@ -271,11 +265,10 @@ describe('五谷丰登选牌展示增强(被选牌禁用渲染)', () => {
     const pa = makeCard('pa', '杀', '♠', '7');
     const pb = makeCard('pb', '桃', '♥', '2');
     const pc = makeCard('pc', '闪', '♣', '8');
-    const view = makeViewWithWuguPendingForP2(
-      { pa, pb, pc },
-      ['pa', 'pb', 'pc'],
-      { pa: 'P1', pb: 'P2' },
-    );
+    const view = makeViewWithWuguPendingForP2({ pa, pb, pc }, ['pa', 'pb', 'pc'], {
+      pa: 'P1',
+      pb: 'P2',
+    });
 
     render(<GameViewComponent view={view} onAction={() => {}} />);
 

@@ -101,10 +101,15 @@ describe('反馈', () => {
     // 通过 applyAtom 创建 请求回应(但需要走完整 pipeline,这里直接挂 slot 到 Map)
     // 替代:用 applyAtom 走真实路径 — 但测试中需要 atom 完成 applyAtom 后停在 pending。
     // 最简方式: 直接给 state 注入 fake slot(用于单元测试 validate/execute)。
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const fakeResolve = () => {};
     state.pendingSlots.set(0, {
-      atom: { type: '请求回应', requestType: '反馈/confirm', target: 0, prompt: { type: 'confirm', title: '是否发动反馈?' } },
+      atom: {
+        type: '请求回应',
+        requestType: '反馈/confirm',
+        target: 0,
+        prompt: { type: 'confirm', title: '是否发动反馈?' },
+      },
       definition: undefined as never,
       startTime: 0,
       deadline: 100000,
@@ -139,7 +144,12 @@ describe('反馈', () => {
     const P1 = harness.player('P1');
 
     state.pendingSlots.set(0, {
-      atom: { type: '请求回应', requestType: '反馈/confirm', target: 0, prompt: { type: 'confirm', title: '是否发动反馈?' } },
+      atom: {
+        type: '请求回应',
+        requestType: '反馈/confirm',
+        target: 0,
+        prompt: { type: 'confirm', title: '是否发动反馈?' },
+      },
       definition: undefined as never,
       startTime: 0,
       deadline: 100000,
@@ -166,10 +176,12 @@ describe('反馈', () => {
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id, stolen.id], skills: ['杀'] }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           skills: ['反馈', '闪'],
-          health: 4, maxHealth: 4,
+          health: 4,
+          maxHealth: 4,
         }),
       ],
       cardMap: { [slash.id]: slash, [stolen.id]: stolen },

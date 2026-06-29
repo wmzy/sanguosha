@@ -8,17 +8,28 @@ import { registerAtom } from '../atom';
 
 function inferSlot(cardType: string | undefined): EquipSlot | null {
   switch (cardType) {
-    case '武器': return '武器';
-    case '防具': return '防具';
-    case '进攻马': return '进攻马';
-    case '防御马': return '防御马';
-    case '宝物': return '宝物';
-    default: return null;
+    case '武器':
+      return '武器';
+    case '防具':
+      return '防具';
+    case '进攻马':
+      return '进攻马';
+    case '防御马':
+      return '防御马';
+    case '宝物':
+      return '宝物';
+    default:
+      return null;
   }
 }
 
 /** 设装备带来的距离修正 vars(仅武器攻击范围;马匹由技能处理) */
-function applyEquipVars(state: GameState, playerIdx: number, slot: EquipSlot, card: { name: string; range?: number }): void {
+function applyEquipVars(
+  state: GameState,
+  playerIdx: number,
+  slot: EquipSlot,
+  card: { name: string; range?: number },
+): void {
   const vars = state.players[playerIdx].vars;
   if (slot === '武器') {
     vars['距离/出杀范围'] = card.range ?? 1;
@@ -41,7 +52,7 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     const card = state.cardMap[atom.cardId];
     const slot = inferSlot(card.subtype)!;
     const player = state.players[atom.player];
-    player.hand = player.hand.filter(id => id !== atom.cardId);
+    player.hand = player.hand.filter((id) => id !== atom.cardId);
     player.equipment[slot] = atom.cardId;
     // 设距离修正 vars(卸下 atom 清除)
     applyEquipVars(state, atom.player, slot, card);
@@ -62,7 +73,7 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
     if (slot) {
@@ -78,7 +89,7 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     // 装备从手牌移出:handCount - 1
     view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
     if (view.players[pi].hand) {
-      view.players[pi].hand = view.players[pi].hand!.filter((c: any) => c.id !== event.cardId);
+      view.players[pi].hand = view.players[pi].hand.filter((c: any) => c.id !== event.cardId);
     }
   },
   toViewLog(event) {

@@ -9,14 +9,11 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
-import { dispatchAndWait, fireTimeoutAndWait, waitForStable } from '../engine-harness';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import type { Card, GameState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 /** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
@@ -33,16 +30,36 @@ describe('弃牌阶段', () => {
     state = createGameState({
       players: [
         {
-          index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
-          hand: ['c1', 'c2', 'c3', 'c4', 'c5'], equipment: {},
+          index: 0,
+          name: 'P0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: ['c1', 'c2', 'c3', 'c4', 'c5'],
+          equipment: {},
           skills: ['回合管理'],
-          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
         },
         {
-          index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
-          hand: [], equipment: {},
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
           skills: ['回合管理'],
-          vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
         },
       ],
       cardMap: {
@@ -74,7 +91,14 @@ describe('弃牌阶段', () => {
     const padCount = 6;
     for (let i = 0; i < padCount; i++) {
       const id = `pad-${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = {
+        id,
+        name: '杀',
+        suit: '♠',
+        color: '黑',
+        rank: String(i + 1),
+        type: '基本牌',
+      };
       lord.hand.push(id);
     }
     const handAfter = lord.hand.length;
@@ -106,10 +130,8 @@ describe('弃牌阶段', () => {
 
     // 若实装了:验证 pending 类型(请求回应/弃置/弃牌阶段 三选一)
     const atomType = (atom as { type?: string; requestType?: string }).type ?? '';
-    const requestType = (atom as { requestType?: string }).requestType;
-    expect(
-      atomType === '请求回应' || atomType === '弃置' || atomType === '弃牌阶段',
-    ).toBe(true);
+    const _requestType = (atom as { requestType?: string }).requestType;
+    expect(atomType === '请求回应' || atomType === '弃置' || atomType === '弃牌阶段').toBe(true);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -122,7 +144,14 @@ describe('弃牌阶段', () => {
     const handBefore = lord.hand.length;
     for (let i = 0; i < 6; i++) {
       const id = `pad-${i}`;
-      state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: String(i + 1), type: '基本牌' };
+      state.cardMap[id] = {
+        id,
+        name: '杀',
+        suit: '♠',
+        color: '黑',
+        rank: String(i + 1),
+        type: '基本牌',
+      };
       lord.hand.push(id);
     }
     const before = lord.hand.length;
@@ -145,7 +174,7 @@ describe('弃牌阶段', () => {
     // 自动超时:只触发弃牌 pending(不触发 __出牌 循环)
     // 找到 __弃牌 slot 并触发其超时
     const discardSlot = [...state.pendingSlots.values()].find(
-      s => (s.atom as { requestType?: string }).requestType === '__弃牌'
+      (s) => (s.atom as { requestType?: string }).requestType === '__弃牌',
     );
     if (discardSlot) {
       await discardSlot._fireTimeoutNow?.();
@@ -213,7 +242,7 @@ describe('弃牌阶段', () => {
 
     // 期望:进入弃牌阶段,产生 __弃牌 pending,excess = 3 - 2 = 1
     const discardSlot = [...state.pendingSlots.values()].find(
-      s => (s.atom as { requestType?: string }).requestType === '__弃牌',
+      (s) => (s.atom as { requestType?: string }).requestType === '__弃牌',
     );
     expect(discardSlot, '受伤后手牌(3)超过当前体力值(2)应进入弃牌阶段').toBeDefined();
 

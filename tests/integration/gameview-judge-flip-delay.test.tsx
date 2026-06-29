@@ -27,8 +27,33 @@ function makeView(pending: PendingView | null): GameView {
     phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
     players: [
-      { index: 0, name: 'P1', character: '测试', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, hand: [], marks: [], pendingTricks: [] },
-      { index: 1, name: 'P2', character: '测试', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 1, marks: [], pendingTricks: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: '测试',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 0,
+        hand: [],
+        marks: [],
+        pendingTricks: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '测试',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 1,
+        marks: [],
+        pendingTricks: [],
+      },
     ],
     cardMap: {},
     pending,
@@ -43,7 +68,11 @@ function makeView(pending: PendingView | null): GameView {
 const dodgePending = {
   type: 'awaits',
   atom: { type: '询问闪', target: 0, source: 1 },
-  prompt: { type: 'useCard', title: '是否出闪', cardFilter: { filter: () => true, min: 1, max: 1 } },
+  prompt: {
+    type: 'useCard',
+    title: '是否出闪',
+    cardFilter: { filter: () => true, min: 1, max: 1 },
+  },
   target: 0,
   isBlocking: true,
   deadline: Date.now() + 15000,
@@ -53,7 +82,13 @@ const dodgePending = {
 // 判定翻牌事件(effect.animation='flip', EventBanner 会渲染翻牌)
 const judgeFlipEvent = {
   seq: 10,
-  event: { type: '判定', player: 0, judgeType: '八卦阵', cardId: 'j1', card: { name: '桃', suit: '♥', color: '红', rank: '5' } },
+  event: {
+    type: '判定',
+    player: 0,
+    judgeType: '八卦阵',
+    cardId: 'j1',
+    card: { name: '桃', suit: '♥', color: '红', rank: '5' },
+  },
 };
 
 describe('GameView:判定翻牌动画期间延迟询问类 pending', () => {
@@ -63,7 +98,9 @@ describe('GameView:判定翻牌动画期间延迟询问类 pending', () => {
 
   it('判定 flip 动画播放中 → 询问闪面板不渲染(让玩家先看清判定结果)', () => {
     const view = makeView(dodgePending);
-    render(<GameViewComponent view={view} onAction={() => {}} currentEvent={judgeFlipEvent as any} />);
+    render(
+      <GameViewComponent view={view} onAction={() => {}} currentEvent={judgeFlipEvent as any} />,
+    );
     // AwaitingPrompt 头部「⚡ 需要回应」不应出现
     expect(screen.queryByText(/需要回应/)).toBeNull();
   });
@@ -79,7 +116,11 @@ describe('GameView:判定翻牌动画期间延迟询问类 pending', () => {
 const wuxieBroadcastPending = {
   type: 'awaits',
   atom: { type: '请求回应', target: -1, requestType: '无懈可击' },
-  prompt: { type: 'useCard', title: '打出无懈可击', cardFilter: { filter: () => true, min: 1, max: 1 } },
+  prompt: {
+    type: 'useCard',
+    title: '打出无懈可击',
+    cardFilter: { filter: () => true, min: 1, max: 1 },
+  },
   target: -1,
   isBlocking: true,
   deadline: Date.now() + 15000,

@@ -6,12 +6,25 @@ import type {
   GameState,
   GameView,
 } from '../engine/types';
-import { create, bootstrap, dispatch, buildView, resetForTest, checkGameOver, restore, type GameConfig } from '../engine/create-engine';
+import {
+  create,
+  bootstrap,
+  dispatch,
+  buildView,
+  resetForTest,
+  checkGameOver,
+  restore,
+  type GameConfig,
+} from '../engine/create-engine';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import { getPendingDeadline } from '../engine/view/buildView';
 import { allCharacters } from '../engine/cards/characters';
-import { weiCharacters, shuCharacters, wuCharacters, qunCharacters } from '../engine/cards/characters';
-
+import {
+  weiCharacters,
+  shuCharacters,
+  wuCharacters,
+  qunCharacters,
+} from '../engine/cards/characters';
 
 import '../engine/atoms';
 import '../engine/skills';
@@ -24,9 +37,9 @@ import { saveRoom, deletePersistedRoom } from './persistence';
 
 /** 默认武将列表:使用引擎全量武将(allCharacters),供选将池使用。
  *  skills 字段来自武将数据(供选将 UI 显示);选完后只实例化引擎默认技能(见 系统规则·选将)。 */
-const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map(c => ({
+const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map((c) => ({
   name: c.name,
-  skills: c.skills.map(s => s.name),
+  skills: c.skills.map((s) => s.name),
 }));
 
 /** 将池预设解析:按预设裁剪武将列表。
@@ -34,7 +47,8 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map(
  *  - 'extended':扩展(标准 + 剩余),约全量
  *  - 'all':全量(60 人) */
 function resolveCharPool(preset: string): Array<{ name: string; skills: string[] }> {
-  const toList = (chars: typeof allCharacters) => chars.map(c => ({ name: c.name, skills: c.skills.map(s => s.name) }));
+  const toList = (chars: typeof allCharacters) =>
+    chars.map((c) => ({ name: c.name, skills: c.skills.map((s) => s.name) }));
   if (preset === 'standard') {
     // 各势力取前 8 个经典武将
     return [
@@ -128,14 +142,16 @@ export class GameSession {
     setRoomStatus(this.room.id, '进行中');
     // bootstrap 可能因选将 pending 而挂起(fire-and-forget dispatch)
     // 不 await — 让 startGame 立即返回,客户端收到选将 pending 后响应
-    void bootstrap(this.state, config).then(() => {
-      // bootstrap 完成后:所有角色/手牌/技能已就绪,强制刷新 baseline
-      this.baselineSent.clear();
-      this.broadcastNewState();
-    }).catch(err => {
-      const e = err instanceof Error ? err : new Error(String(err));
-      this.logger.error('bootstrap error', { error: e.stack ?? String(e) });
-    });
+    void bootstrap(this.state, config)
+      .then(() => {
+        // bootstrap 完成后:所有角色/手牌/技能已就绪,强制刷新 baseline
+        this.baselineSent.clear();
+        this.broadcastNewState();
+      })
+      .catch((err) => {
+        const e = err instanceof Error ? err : new Error(String(err));
+        this.logger.error('bootstrap error', { error: e.stack ?? String(e) });
+      });
 
     // 建立 playerId → 座次下标 映射
     const state = this.state;
@@ -159,7 +175,7 @@ export class GameSession {
     }
 
     // 检查游戏是否开局时已结束(3 人场开不了,直接结束)
-    if (state.players.filter(p => p.alive).length <= 1) {
+    if (state.players.filter((p) => p.alive).length <= 1) {
       this.handleGameOver(undefined);
     }
 
@@ -203,7 +219,10 @@ export class GameSession {
     // debug 模式不校验 ownerId——单人控制所有角色
     // 非 debug 模式:校验 ownerId
     if (!this.debug && action.ownerId !== expectedIndex) {
-      this.logger.warn('ownerId mismatch', { actionOwner: action.ownerId, expected: expectedIndex });
+      this.logger.warn('ownerId mismatch', {
+        actionOwner: action.ownerId,
+        expected: expectedIndex,
+      });
       return;
     }
     // dispatch 返回 boolean:true=accepted,false=rejected。
@@ -270,9 +289,11 @@ export class GameSession {
     setRoomStatus(this.room.id, '等待中');
     this.room.readyPlayers.clear();
     // 清除旧持久化数据,避免重启时恢复到已结束的局面
-    void deletePersistedRoom(this.room.id).catch(err => {
+    void deletePersistedRoom(this.room.id).catch((err) => {
       const e = err instanceof Error ? err : new Error(String(err));
-      this.logger.error('resetToLobby: deletePersistedRoom failed', { error: e.stack ?? String(e) });
+      this.logger.error('resetToLobby: deletePersistedRoom failed', {
+        error: e.stack ?? String(e),
+      });
     });
     // 通知所有连接:游戏已重置,客户端清除 gameOver/gameStarted/views
     this.broadcast({ type: 'game_reset' });
@@ -307,7 +328,6 @@ export class GameSession {
     };
   }
 
-
   /** 计算某 viewer 的有效 deadline(来自 pending slot 的超时)。
    *  出牌阶段有 __出牌 询问(50s 超时),其他阶段有各自的询问(询问闪/弃牌等)。
    *  无 pending 返回 null。 */
@@ -337,7 +357,10 @@ export class GameSession {
         this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
         this.baselineSent.add(playerId);
         // baseline 已含完整状态,初始化 deadline 缓存
-        this.lastSentDeadline.set(playerId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
+        this.lastSentDeadline.set(
+          playerId,
+          this.deadlineKey(this.effectiveDeadline(state, viewer)),
+        );
       }
       const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
       if (envelopes.length > 0) {
@@ -424,21 +447,23 @@ export class GameSession {
     const still = [...this.disconnectedAt.keys()];
     if (still.length === 0) return;
     const state = this.state;
-    const names = still.map(id => {
-      const idx = this.playerNames.get(id);
-      return idx !== undefined ? (state?.players[idx]?.name ?? id) : id;
-    }).join('、');
+    const names = still
+      .map((id) => {
+        const idx = this.playerNames.get(id);
+        return idx !== undefined ? (state?.players[idx]?.name ?? id) : id;
+      })
+      .join('、');
     setRoomStatus(this.room.id, '已结束');
     this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
     this.broadcast({ type: 'gameOver', winner: '无人' });
     // 必须 destroy 以清理 idle timer，否则定时器会通过 onStateChange 自循环
-    void this.destroy().catch(err => {
+    void this.destroy().catch((err) => {
       const e = err instanceof Error ? err : new Error(String(err));
       this.logger.error('destroy after disconnect failed', { error: e.stack ?? String(e) });
     });
   }
 
-  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, lastSeq = 0): boolean {
+  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, _lastSeq = 0): boolean {
     if (!this.state) return false;
     this.disconnectedAt.delete(playerId);
     this.clearGraceTimer();
@@ -485,6 +510,7 @@ export class GameSession {
       this.graceTimer = null;
     }
   }
+
   private persistAsync(): void {
     if (!this.state) return;
     const state = this.state;
@@ -498,7 +524,7 @@ export class GameSession {
       },
       state,
       this.actionLog,
-    ).catch(err => {
+    ).catch((err) => {
       const e = err instanceof Error ? err : new Error(String(err));
       this.logger.error('saveRoom failed', { error: e.stack ?? String(e) });
     });

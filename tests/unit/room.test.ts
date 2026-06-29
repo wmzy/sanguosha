@@ -174,7 +174,7 @@ describe('房间管理', () => {
     const room = createRoom('多人房-待加入', 4, 'host-mp', createMockWS());
 
     const list = getRoomList('multiplayer');
-    const found = list.find(r => r.id === room.id);
+    const found = list.find((r) => r.id === room.id);
     expect(found).toBeDefined();
     expect(found!.status).toBe('等待中');
 
@@ -188,7 +188,7 @@ describe('房间管理', () => {
     setRoomStatus(room.id, '进行中');
 
     const list = getRoomList('multiplayer');
-    const found = list.find(r => r.id === room.id);
+    const found = list.find((r) => r.id === room.id);
     expect(found).toBeUndefined();
 
     setSessionChecker(null);
@@ -199,8 +199,8 @@ describe('房间管理', () => {
     createDebugRoom('调试房', 4);
 
     const list = getRoomList('multiplayer');
-    expect(list.some(r => r.id === mpRoom.id)).toBe(true);
-    expect(list.every(r => !r.isDebug)).toBe(true);
+    expect(list.some((r) => r.id === mpRoom.id)).toBe(true);
+    expect(list.every((r) => !r.isDebug)).toBe(true);
   });
 });
 
@@ -224,7 +224,12 @@ describe('房间配置', () => {
 
   it('创建房间可传入自定义 config', () => {
     const ws = createMockWS();
-    const customConfig = { name: '自定义', timeoutScale: 0.6, charPool: 'standard' as const, handSize: 5 };
+    const customConfig = {
+      name: '自定义',
+      timeoutScale: 0.6,
+      charPool: 'standard' as const,
+      handSize: 5,
+    };
     const room = createRoom('x', 4, 'h', ws, customConfig);
     expect(room.config.timeoutScale).toBe(0.6);
     expect(room.config.charPool).toBe('standard');
@@ -234,7 +239,11 @@ describe('房间配置', () => {
   it('updateConfig 应更新配置并同步房间名', () => {
     const ws = createMockWS();
     const room = createRoom('原名', 4, 'host1', ws);
-    const updated = updateConfig(room.id, { name: '新名', timeoutScale: 2, charPool: 'standard', handSize: 3 }, 'host1');
+    const updated = updateConfig(
+      room.id,
+      { name: '新名', timeoutScale: 2, charPool: 'standard', handSize: 3 },
+      'host1',
+    );
     expect(updated).not.toBeNull();
     expect(updated!.name).toBe('新名');
     expect(updated!.timeoutScale).toBe(2);
@@ -246,19 +255,32 @@ describe('房间配置', () => {
     const ws = createMockWS();
     const room = createRoom('测试', 4, 'host1', ws);
     // 非房主应失败
-    const result = updateConfig(room.id, { name: 'x', timeoutScale: 1, charPool: 'all', handSize: 4 }, 'other');
+    const result = updateConfig(
+      room.id,
+      { name: 'x', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      'other',
+    );
     expect(result).toBeNull();
   });
 
   it('updateConfig 调试房间任意玩家可调用', () => {
     const room = createDebugRoom('调试', 4);
-    const result = updateConfig(room.id, { name: '改名', timeoutScale: 1.5, charPool: 'extended', handSize: 4 }, 'anyone');
+    const result = updateConfig(
+      room.id,
+      { name: '改名', timeoutScale: 1.5, charPool: 'extended', handSize: 4 },
+      'anyone',
+    );
     expect(result).not.toBeNull();
     expect(result!.timeoutScale).toBe(1.5);
   });
 
   it('normalizeRoomConfig 应修正非法字段', () => {
-    const cfg = normalizeRoomConfig({ name: '   ', timeoutScale: -1, charPool: 'invalid', handSize: 999 });
+    const cfg = normalizeRoomConfig({
+      name: '   ',
+      timeoutScale: -1,
+      charPool: 'invalid',
+      handSize: 999,
+    });
     expect(cfg.name).toBe(DEFAULT_ROOM_CONFIG.name); // 空名回退默认
     expect(cfg.timeoutScale).toBe(1); // 非法回退默认
     expect(cfg.charPool).toBe('all'); // 非法回退默认
@@ -266,7 +288,12 @@ describe('房间配置', () => {
   });
 
   it('normalizeRoomConfig Infinity 表示无限时', () => {
-    const cfg = normalizeRoomConfig({ name: '无限', timeoutScale: Infinity, charPool: 'all', handSize: 4 });
+    const cfg = normalizeRoomConfig({
+      name: '无限',
+      timeoutScale: Infinity,
+      charPool: 'all',
+      handSize: 4,
+    });
     expect(cfg.timeoutScale).toBe(Infinity);
   });
 });

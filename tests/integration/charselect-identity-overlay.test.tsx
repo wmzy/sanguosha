@@ -30,17 +30,13 @@ function makeLordSelectingView(): GameView {
     currentPlayerIndex: 0,
     phase: '准备',
     turn: { round: 1, phase: '准备', vars: {} },
-    players: [
-      makePlayer(0, '', '主公'),
-      makePlayer(1, ''),
-      makePlayer(2, ''),
-      makePlayer(3, ''),
-    ],
+    players: [makePlayer(0, '', '主公'), makePlayer(1, ''), makePlayer(2, ''), makePlayer(3, '')],
     cardMap: {},
     pending: {
       type: 'awaits',
       atom: {
-        type: '选将询问', target: 0,
+        type: '选将询问',
+        target: 0,
         candidates: [
           { name: '刘备', skills: ['仁德'] },
           { name: '曹操', skills: ['护甲'] },
@@ -70,7 +66,7 @@ describe('GameView:身份揭示弹窗在选将之前/期间显示', () => {
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 身份揭示弹窗的"确认"按钮(身份弹窗独有)应存在——选将遮罩被它盖住
-    const identityConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认');
+    const identityConfirm = screen.getAllByRole('button').find((b) => b.textContent === '确认');
     expect(identityConfirm).toBeDefined();
 
     // 身份弹窗内的身份文字可见(身份弹窗 + 选将遮罩都可能含"你的身份")
@@ -78,7 +74,9 @@ describe('GameView:身份揭示弹窗在选将之前/期间显示', () => {
     expect(screen.getAllByText('主公').length).toBeGreaterThan(0);
 
     // 选将遮罩仍在 DOM 中(被身份弹窗遮盖,但渲染了),确认选择按钮存在
-    const charSelectConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认选择');
+    const charSelectConfirm = screen
+      .getAllByRole('button')
+      .find((b) => b.textContent === '确认选择');
     expect(charSelectConfirm).toBeDefined();
   });
 
@@ -89,7 +87,7 @@ describe('GameView:身份揭示弹窗在选将之前/期间显示', () => {
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 身份弹窗的"确认"按钮不应存在
-    const identityConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认');
+    const identityConfirm = screen.getAllByRole('button').find((b) => b.textContent === '确认');
     expect(identityConfirm).toBeUndefined();
 
     // 选将遮罩可见:标题"主公选将" + 候选人 + 选将倒计时
@@ -122,7 +120,7 @@ describe('GameView:身份揭示弹窗在选将之前/期间显示', () => {
     render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 此时不在选将阶段,身份揭示弹窗应该显示
-    const identityConfirm = screen.getAllByRole('button').find(b => b.textContent === '确认');
+    const identityConfirm = screen.getAllByRole('button').find((b) => b.textContent === '确认');
     expect(identityConfirm).toBeDefined();
   });
 });

@@ -20,7 +20,13 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -64,7 +70,14 @@ describe('武圣:端到端(harness)', () => {
     const red = makeCard('c1', '桃', '♥', 'A'); // 红桃
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['武圣', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['武圣', '杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
       ],
       cardMap: { c1: red },
@@ -77,12 +90,7 @@ describe('武圣:端到端(harness)', () => {
     const P2 = harness.player('P2');
 
     // 武圣转化:红桃当杀 + 出杀选目标 P2
-    await P1.transformThenUse(
-      '武圣',
-      { cardId: 'c1' },
-      '杀',
-      { cardId: 'c1#武圣', targets: [1] },
-    );
+    await P1.transformThenUse('武圣', { cardId: 'c1' }, '杀', { cardId: 'c1#武圣', targets: [1] });
 
     // 影子杀已在 cardMap
     expect(harness.state.cardMap['c1#武圣']).toBeDefined();
@@ -101,7 +109,14 @@ describe('武圣:端到端(harness)', () => {
     const red = makeCard('d1', '桃', '♦', '5'); // 方块
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['d1'], skills: ['武圣', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['d1'],
+          skills: ['武圣', '杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
       ],
       cardMap: { d1: red },
@@ -113,12 +128,7 @@ describe('武圣:端到端(harness)', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.transformThenUse(
-      '武圣',
-      { cardId: 'd1' },
-      '杀',
-      { cardId: 'd1#武圣', targets: [1] },
-    );
+    await P1.transformThenUse('武圣', { cardId: 'd1' }, '杀', { cardId: 'd1#武圣', targets: [1] });
 
     expect(harness.state.cardMap['d1#武圣'].name).toBe('杀');
     await P2.pass();

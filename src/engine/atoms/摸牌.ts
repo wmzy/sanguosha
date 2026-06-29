@@ -22,7 +22,10 @@ interface DrawPlan {
  * 纯函数,不修改 state——apply 与 toViewEvents 共用此逻辑,保证两边一致。
  * 调用方需保证 deck+discardPile 总数 >= count(validate 已拦截)。
  */
-function planDraw(state: { zones: { deck: string[]; discardPile: string[] }; rngSeed: number }, count: number): DrawPlan {
+function planDraw(
+  state: { zones: { deck: string[]; discardPile: string[] }; rngSeed: number },
+  count: number,
+): DrawPlan {
   if (state.zones.deck.length >= count) {
     return { drawn: state.zones.deck.slice(-count).reverse(), reshuffled: false };
   }
@@ -66,7 +69,7 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
   toViewEvents(state, atom): ViewEventSplit {
     const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
     const plan = planDraw(state, atom.count);
-    const cards = plan.drawn.map(id => state.cardMap[id]).filter(Boolean);
+    const cards = plan.drawn.map((id) => state.cardMap[id]).filter(Boolean);
     const base = {
       type: '摸牌' as const,
       player: atom.player,
@@ -83,18 +86,19 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
     };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const count = (event.count as number) ?? 0;
     view.players[pi].handCount += count;
     // owner 有 cards 字段，加入手牌；others 没有
     if (event.cards && view.players[pi].hand) {
-      view.players[pi].hand!.push(...(event.cards as any[]));
+      view.players[pi].hand.push(...(event.cards as any[]));
     }
     // zone 同步
     if (view.zones) {
       if (event.reshuffled) {
-        view.zones.deckCount = (event.newDeckCount as number) ?? Math.max(0, view.zones.deckCount - count);
+        view.zones.deckCount =
+          (event.newDeckCount as number) ?? Math.max(0, view.zones.deckCount - count);
         view.zones.discardPileCount = (event.newDiscardPileCount as number) ?? 0;
       } else {
         view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
@@ -107,7 +111,7 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
     const cards = event.cards as Array<{ name: string; suit?: string; rank?: string }> | undefined;
     const isOwner = event.player === viewer || (cards && cards.length > 0);
     if (isOwner && cards && cards.length > 0) {
-      const cardNames = cards.map(c => `${c.suit ?? ''}${c.rank ?? ''}${c.name}`).join('、');
+      const cardNames = cards.map((c) => `${c.suit ?? ''}${c.rank ?? ''}${c.name}`).join('、');
       return { player: event.player as number, text: `摸了 ${count} 张牌：${cardNames}` };
     }
     return { player: event.player as number, text: `摸了 ${count} 张牌` };

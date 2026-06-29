@@ -11,11 +11,11 @@ import type { GameView, Card } from '../../engine/types';
  * @returns 座位距离;任一方不在存活列表中时返回 Infinity
  */
 export function seatDistance(players: GameView['players'], fromIdx: number, toIdx: number): number {
-  const alive = players.filter(p => p.alive);
+  const alive = players.filter((p) => p.alive);
   const n = alive.length;
   if (n <= 1) return 0;
-  const aliveFromIdx = alive.findIndex(p => p.name === players[fromIdx]?.name);
-  const aliveToIdx = alive.findIndex(p => p.name === players[toIdx]?.name);
+  const aliveFromIdx = alive.findIndex((p) => p.name === players[fromIdx]?.name);
+  const aliveToIdx = alive.findIndex((p) => p.name === players[toIdx]?.name);
   if (aliveFromIdx < 0 || aliveToIdx < 0) return Infinity;
   const d = Math.abs(aliveFromIdx - aliveToIdx);
   return Math.min(d, n - d);
@@ -27,7 +27,11 @@ export function seatDistance(players: GameView['players'], fromIdx: number, toId
  * 与引擎 distance.ts 的 effectiveDistance 用同一套 vars(distanceVars 投影)。
  * @returns 实际距离(>= 1)
  */
-export function effectiveDist(players: GameView['players'], fromIdx: number, toIdx: number): number {
+export function effectiveDist(
+  players: GameView['players'],
+  fromIdx: number,
+  toIdx: number,
+): number {
   let dist = seatDistance(players, fromIdx, toIdx);
   const fromP = players[fromIdx];
   const toP = players[toIdx];

@@ -28,12 +28,12 @@ export function PlayPhasePrompt(props: PlayPhasePromptProps) {
     view,
     perspectiveName,
     currentPlayerName,
-    perspectiveIdx,
-    perspectiveHand,
+    perspectiveIdx: _perspectiveIdx,
+    perspectiveHand: _perspectiveHand,
     isPerspectiveTurn,
     isPerspectiveAwaiting,
     isDiscardPhase,
-    isMyTurn,
+    isMyTurn: _isMyTurn,
     canOperate,
     selectedCardId,
     selectedTarget,
@@ -71,14 +71,18 @@ export function PlayPhasePrompt(props: PlayPhasePromptProps) {
       {isPerspectiveTurn && view.phase === '弃牌' && !isPerspectiveAwaiting && !isDiscardPhase && (
         <div className={styles.promptBox}>
           <div className={styles.promptTitle}>🗑️ {perspectiveName} — 弃牌阶段</div>
-          <div className={styles.promptDesc}>{canOperate ? '请弃置多余的手牌' : `${perspectiveName} 正在弃牌...`}</div>
+          <div className={styles.promptDesc}>
+            {canOperate ? '请弃置多余的手牌' : `${perspectiveName} 正在弃牌...`}
+          </div>
         </div>
       )}
 
       {/* 5. 弃牌窗口(engine 主动发起的弃牌) */}
       {isDiscardPhase && isPerspectiveAwaiting && (
         <div className={styles.promptBoxAwaiting}>
-          <div className={styles.promptTitle}>🗑️ 弃牌阶段:需弃 {discardMin} 张牌（已选 {selectedForDiscard.size}/{discardMin}）</div>
+          <div className={styles.promptTitle}>
+            🗑️ 弃牌阶段:需弃 {discardMin} 张牌（已选 {selectedForDiscard.size}/{discardMin}）
+          </div>
           <div className={styles.promptDesc}>
             {canOperate
               ? discardMin === discardMax

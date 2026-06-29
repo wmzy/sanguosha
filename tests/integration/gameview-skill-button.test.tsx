@@ -103,8 +103,10 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
         },
       ],
       cardMap: {
-        c1: makeCard('c1', '杀'), c2: makeCard('c2', '桃'),
-        c3: makeCard('c3', '闪'), c4: makeCard('c4', '杀'),
+        c1: makeCard('c1', '杀'),
+        c2: makeCard('c2', '桃'),
+        c3: makeCard('c3', '闪'),
+        c4: makeCard('c4', '杀'),
       },
     });
     render(<GameViewComponent view={view} onAction={() => {}} />);
@@ -147,15 +149,17 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
 
     // allocation 格式: [{target: 1, cardIds: ['c1']}]
     await waitFor(() => {
-      expect(onAction).toHaveBeenCalledWith(expect.objectContaining({
-        skillId: '仁德',
-        actionType: 'use',
-        params: expect.objectContaining({
-          allocation: expect.arrayContaining([
-            expect.objectContaining({ target: 1, cardIds: expect.arrayContaining(['c1']) }),
-          ]),
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skillId: '仁德',
+          actionType: 'use',
+          params: expect.objectContaining({
+            allocation: expect.arrayContaining([
+              expect.objectContaining({ target: 1, cardIds: expect.arrayContaining(['c1']) }),
+            ]),
+          }),
         }),
-      }));
+      );
     });
   });
 });

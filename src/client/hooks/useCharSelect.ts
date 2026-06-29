@@ -38,10 +38,12 @@ interface CharSelectAtom {
  */
 export function useCharSelect(view: GameView, perspectiveIdx: number): CharSelectState {
   const submittedCharSelects = useSubmittedCharSelects();
-  const charSelectPending = view.pending?.atom?.type === '选将询问'
-    && !view.players[view.pending.target].character
-    && !submittedCharSelects.has(view.pending.target)
-    ? view.pending : null;
+  const charSelectPending =
+    view.pending?.atom?.type === '选将询问' &&
+    !view.players[view.pending.target].character &&
+    !submittedCharSelects.has(view.pending.target)
+      ? view.pending
+      : null;
 
   const isCharSelectPending = charSelectPending !== null;
   const candidates: Array<{ name: string; skills: string[] }> = charSelectPending
@@ -53,7 +55,7 @@ export function useCharSelect(view: GameView, perspectiveIdx: number): CharSelec
     ? { candidates, target: charSelectTarget, pending: charSelectPending }
     : null;
 
-  const charSelectInProgress = view.phase === '准备' && view.players.some(p => !p.character);
+  const charSelectInProgress = view.phase === '准备' && view.players.some((p) => !p.character);
   const perspectiveCharSelected = !!view.players[perspectiveIdx].character;
 
   return { isCharSelectPending, charSelect, charSelectInProgress, perspectiveCharSelected };

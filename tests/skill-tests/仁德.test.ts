@@ -24,7 +24,13 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -88,7 +94,7 @@ describe('仁德', () => {
     expect(harness.state.players[0].health).toBe(3);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].health).toBe(3);
       expect(v.players[0].handCount).toBe(0);
       expect(v.pending).toBeNull();
@@ -120,7 +126,7 @@ describe('仁德', () => {
     expect(harness.state.players[0].hand).toEqual([]);
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].health).toBe(4);
       expect(v.players[0].handCount).toBe(0);
       expect(v.pending).toBeNull();
@@ -295,9 +301,13 @@ describe('仁德', () => {
     const P1 = harness.player('P1');
 
     // 仁德不能给自己(target=0)
-    await P1.expectRejected({ skillId: '仁德', actionType: 'use', params: {
-      targets: [{ target: 0, cardIds: ['c1'] }],
-    } });
+    await P1.expectRejected({
+      skillId: '仁德',
+      actionType: 'use',
+      params: {
+        targets: [{ target: 0, cardIds: ['c1'] }],
+      },
+    });
   });
 
   it('负面:目标牌不在手牌 → 拒绝', async () => {
@@ -315,9 +325,13 @@ describe('仁德', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.expectRejected({ skillId: '仁德', actionType: 'use', params: {
-      targets: [{ target: 1, cardIds: ['c1'] }],
-    } });
+    await P1.expectRejected({
+      skillId: '仁德',
+      actionType: 'use',
+      params: {
+        targets: [{ target: 1, cardIds: ['c1'] }],
+      },
+    });
   });
 
   it('负面:重复 cardId → 拒绝', async () => {
@@ -337,12 +351,16 @@ describe('仁德', () => {
     const P1 = harness.player('P1');
 
     // 同一张牌给两个人(重复)
-    await P1.expectRejected({ skillId: '仁德', actionType: 'use', params: {
-      targets: [
-        { target: 1, cardIds: ['c1'] },
-        { target: 2, cardIds: ['c1'] },
-      ],
-    } });
+    await P1.expectRejected({
+      skillId: '仁德',
+      actionType: 'use',
+      params: {
+        targets: [
+          { target: 1, cardIds: ['c1'] },
+          { target: 2, cardIds: ['c1'] },
+        ],
+      },
+    });
   });
 
   it('负面:非自己回合 → 拒绝', async () => {
@@ -360,9 +378,13 @@ describe('仁德', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.expectRejected({ skillId: '仁德', actionType: 'use', params: {
-      targets: [{ target: 1, cardIds: ['c1'] }],
-    } });
+    await P1.expectRejected({
+      skillId: '仁德',
+      actionType: 'use',
+      params: {
+        targets: [{ target: 1, cardIds: ['c1'] }],
+      },
+    });
   });
 
   it('负面:不出牌(targets=空) → 拒绝', async () => {

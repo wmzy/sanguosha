@@ -7,7 +7,7 @@
 //   3. 每个 target 拿到各自的候选人(不混淆)
 //   4. respond 前 pendingSlots.size === selections.length;respond 后逐个减少
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, dispatchAndWait, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
@@ -55,8 +55,20 @@ describe('并行选将:多 target 同时选将', () => {
     const p = applyAtom(harness.state, {
       type: '并行选将',
       selections: [
-        { target: 0, candidates: [{ name: '刘备', skills: ['仁德'] }, { name: '关羽', skills: ['武圣'] }] },
-        { target: 1, candidates: [{ name: '孙权', skills: ['制衡'] }, { name: '曹操', skills: ['奸雄'] }] },
+        {
+          target: 0,
+          candidates: [
+            { name: '刘备', skills: ['仁德'] },
+            { name: '关羽', skills: ['武圣'] },
+          ],
+        },
+        {
+          target: 1,
+          candidates: [
+            { name: '孙权', skills: ['制衡'] },
+            { name: '曹操', skills: ['奸雄'] },
+          ],
+        },
       ],
     });
     await waitForStable(harness.state);
@@ -70,8 +82,12 @@ describe('并行选将:多 target 同时选将', () => {
     // 各 slot 候选人独立
     const slot0 = harness.state.pendingSlots.get(0)!;
     const slot1 = harness.state.pendingSlots.get(1)!;
-    expect((slot0.atom as { candidates: Array<{ name: string }> }).candidates.map(c => c.name)).toEqual(['刘备', '关羽']);
-    expect((slot1.atom as { candidates: Array<{ name: string }> }).candidates.map(c => c.name)).toEqual(['孙权', '曹操']);
+    expect(
+      (slot0.atom as { candidates: Array<{ name: string }> }).candidates.map((c) => c.name),
+    ).toEqual(['刘备', '关羽']);
+    expect(
+      (slot1.atom as { candidates: Array<{ name: string }> }).candidates.map((c) => c.name),
+    ).toEqual(['孙权', '曹操']);
 
     // P0 先选:只 resolve P0 的 slot,P1 仍 pending
     await harness.player(0).triggerAction('系统规则', '选将', { character: '关羽' });
@@ -90,10 +106,7 @@ describe('并行选将:多 target 同时选将', () => {
 
   it('并行选将未全部 respond 时,父 applyAtom 不 resolve', async () => {
     const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P1' }),
-        makePlayer({ index: 1, name: 'P2' }),
-      ],
+      players: [makePlayer({ index: 0, name: 'P1' }), makePlayer({ index: 1, name: 'P2' })],
       cardMap: {},
     });
     await harness.setup(state);
@@ -106,7 +119,9 @@ describe('并行选将:多 target 同时选将', () => {
         { target: 1, candidates: [{ name: '孙权', skills: ['制衡'] }] },
       ],
     });
-    p.then(() => { resolved = true; });
+    p.then(() => {
+      resolved = true;
+    });
     await waitForStable(harness.state);
 
     // 只 P0 respond,P1 未 respond → 父不应 resolve
@@ -129,11 +144,11 @@ describe('并行选将:多 target 同时选将', () => {
     await harness.setup(state);
 
     // applyAtom validate 失败时抛出异常
-    await expect(applyAtom(harness.state, {
-      type: '并行选将',
-      selections: [],
-    })).rejects.toThrow('selections required');
+    await expect(
+      applyAtom(harness.state, {
+        type: '并行选将',
+        selections: [],
+      }),
+    ).rejects.toThrow('selections required');
   });
 });
-
-

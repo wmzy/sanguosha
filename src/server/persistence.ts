@@ -124,7 +124,7 @@ export function sanitizeState(state: GameState): GameState {
     // restore 路径走 bootstrap 重放 actionLog,会重建 pending。
     pendingSlots: new Map(),
     atomStack: [],
-    settlementStack: state.settlementStack.map(f => {
+    settlementStack: state.settlementStack.map((f) => {
       // SettlementFrame 运行时挂有 _executor 函数引用(不可序列化),持久化时剩离。
       // 经 unknown 中转:SettlementFrame 与 Record 结构重叠不足,TS 要求显式两步转换。
       const { _executor, ...rest } = f as unknown as Record<string, unknown>;
@@ -151,7 +151,7 @@ export async function saveRoom(
     maxPlayers: meta.maxPlayers,
     hostId: meta.hostId,
     debug: meta.debug,
-    players: state.players.map(p => ({
+    players: state.players.map((p) => ({
       name: p.name,
       characterId: p.character,
       role: '主公',
@@ -225,7 +225,7 @@ export async function deletePersistedRoom(roomId: string): Promise<void> {
 export async function listPersistedRooms(): Promise<string[]> {
   await ensureDir();
   const entries = await readdir(DATA_DIR);
-  return entries.filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, ''));
+  return entries.filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
 }
 
 export async function flushPendingWrites(): Promise<void> {
@@ -253,7 +253,9 @@ export function restoreFromLog(persisted: PersistedRoom): GameState {
   const state = persisted.state;
   // JSON 反序列化后 pendingSlots 可能是普通对象,转回 Map
   if (!(state.pendingSlots instanceof Map)) {
-    const entries = state.pendingSlots as unknown as Array<[number, unknown]> | Record<string, unknown>;
+    const entries = state.pendingSlots as unknown as
+      | Array<[number, unknown]>
+      | Record<string, unknown>;
     const map = new Map<number, unknown>();
     if (Array.isArray(entries)) {
       for (const [k, v] of entries) map.set(Number(k), v);

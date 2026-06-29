@@ -29,10 +29,39 @@
 // 引擎内部不 try/catch——除 bug 外不应抛错。
 // actionLog 由引擎自动记录,session 不直接 mutate state。
 
+// src/engine/create-engine.ts
+// 引擎主入口(顶层函数,无闭包)。
+//
+// 主要导出:
+//   - create(gameConfig): 同步建 state(预创建 playerCount 个空玩家槽位),返回骨架 state
+//   - bootstrap(state, gameConfig): 异步 —— 加载 开局 skill → onInit → dispatch 开局 start → registerSkillsFromState
+//   - dispatch(state, msg): 接受 state,执行 client message
+//   - buildView(state, viewer): 接受 state,返回 view
+//   - fireTimeout(state): 触发 pending slot 的 onTimeout
+//   - resetForTest(): 模块级清空(skill instances)
+//
+// create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
+// 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
+// 完成了开局,不需要再 dispatch 开局 start。
+//
+// dispatch 路径(Promise<boolean>):
+//   同步跑 preceding/validate;通过则启动 fire-and-forget execute 并返回 true,
+//   拒绝则 rollback 并返回 false。execute 内 await pending slot 可能阻塞,但 dispatch 本身立即返回。
+//   1) 主动 action(无 pending slot):execute 跑到 applyAtom 建 pending 时自然挂起。
+//   2) 回应 action(有 pending slot):slot.pause() 取消定时器 → respond execute 跑完
+//      → .then(resolve) 恢复父 execute。递归 pending(如无纶递归)下 respond execute
+//      会挂在新 pending 上,旧 slot 待整条链 resolve 后才恢复。
+//
+// session 不 await dispatch;state 变化通过 applyAtom 末尾的 onStateChange 回调驱动广播。
+// 旧 _pendingSignal / _waitForStable / Promise.race 机制已全部移除。
+//
+// 帧由技能在 execute 中显式创建(api.pushFrame)和弹出(api.popFrame);dispatch 不管理帧。
+// atomStack / pendingSlot 是 GameState 属性,不是 frame 属性。
+// 引擎内部不 try/catch——除 bug 外不应抛错。
+// actionLog 由引擎自动记录,session 不直接 mutate state。
 import type {
   ActionEntry,
   ActionLogEntry,
-  ActionPrompt,
   Atom,
   AtomAfterContext,
   AtomBeforeContext,
@@ -53,7 +82,6 @@ import {
   findPendingSlot,
   getAfterHooks,
   getBeforeHooks,
-  registerSkillsFromState as skillRebootstrap,
   setSkillInstanceUnload,
   unloadSkillInstance,
 } from './skill';
@@ -69,8 +97,6 @@ import './atoms';
 import * as 系统规则mod from './skills/系统规则';
 // 必须 import skills/index 来设置 skillModuleResolver
 import './skills';
-
-
 
 export interface GameConfig {
   characters: Array<{ name: string; skills: string[] }>;
@@ -92,7 +118,6 @@ export function resolveTimeoutMs(state: GameState, baseSeconds: number): number 
   const sec = baseSeconds * scale;
   return sec * 1000;
 }
-
 
 // ==================== 模块级 helpers ====================
 
@@ -145,7 +170,6 @@ function logAction(state: GameState, message: ClientMessage): void {
   });
 }
 
-
 // ==================== 公开 API ====================
 
 /** 检查游戏是否结束。纯函数,基于 state 计算。
@@ -156,14 +180,14 @@ function logAction(state: GameState, message: ClientMessage): void {
  *  - 仅剩一人存活:winner=存活者(主公→主公方,反贼→反贼,内奸→内奸)。 */
 export function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
   // 主公死亡 → 游戏立即结束
-  const lord = state.players.find(p => p.identity === '主公');
+  const lord = state.players.find((p) => p.identity === '主公');
   if (lord && !lord.alive) {
-    const aliveRebel = state.players.find(p => p.alive && p.identity === '反贼');
+    const aliveRebel = state.players.find((p) => p.alive && p.identity === '反贼');
     if (aliveRebel) return { gameOver: true, winner: aliveRebel.index };
-    const aliveRenegade = state.players.find(p => p.alive && p.identity === '内奸');
+    const aliveRenegade = state.players.find((p) => p.alive && p.identity === '内奸');
     if (aliveRenegade) return { gameOver: true, winner: aliveRenegade.index };
     // 极端(反贼/内奸均无存活,如闪电连劈)→ 仍判反贼获胜,取任一反贼座次作阵营代表
-    const anyRebel = state.players.find(p => p.identity === '反贼');
+    const anyRebel = state.players.find((p) => p.identity === '反贼');
     return { gameOver: true, winner: anyRebel?.index };
   }
   const aliveCount = state.players.filter((p) => p.alive).length;
@@ -185,7 +209,7 @@ export function create(gameConfig: GameConfig): GameState {
     hand: [] as string[],
     equipment: {},
     skills: [] as string[],
-    vars: {} as Record<string, Json>,
+    vars: {},
     marks: [],
     pendingTricks: [],
     tags: [],
@@ -220,7 +244,7 @@ export function create(gameConfig: GameConfig): GameState {
  */
 export async function bootstrap(state: GameState, gameConfig: GameConfig): Promise<void> {
   // 防重入:开局已执行过(玩家已发牌)→ 抛错。不是"幂等"——状态变更不可回滚。
-  if (state.players.some(p => p.hand.length > 0)) {
+  if (state.players.some((p) => p.hand.length > 0)) {
     throw new Error('bootstrap: state 已开局(玩家已有手牌),不可重复 bootstrap');
   }
   const 开局mod = await import('./skills/开局');
@@ -230,7 +254,12 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   unloadSkillInstance(state, '开局', SYSTEM_OWNER);
   const off开局 = 开局mod.onInit(syntheticSkill, state);
   // 登记实例 unload,使 unloadSkillInstance 能正确清理 开局:系统
-  setSkillInstanceUnload(state, '开局', SYSTEM_OWNER, typeof off开局 === 'function' ? off开局 : () => {});
+  setSkillInstanceUnload(
+    state,
+    '开局',
+    SYSTEM_OWNER,
+    typeof off开局 === 'function' ? off开局 : () => {},
+  );
 
   // 3. dispatch 开局 start(dispatch 返回 boolean:validate 拒绝返回 false,开局失败通过后续 state 检查暴露)
   // 先为每个玩家注册选将/弃牌 respond action(注册到具体座次,开局流程内会等待这些 respond)
@@ -244,7 +273,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
     skillId: '开局',
     actionType: 'start',
     ownerId: SYSTEM_OWNER,
-    params: { ...gameConfig } as Record<string, Json>,
+    params: { ...gameConfig },
     baseSeq: 0,
   });
 }
@@ -255,7 +284,11 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
  *
  * actionLog[0] 是 开局 start(bootstrap 重新生成),从 [1] 开始重放。
  */
-export async function restore(state: GameState, gameConfig: GameConfig, actionLog: ActionLogEntry[]): Promise<GameState> {
+export async function restore(
+  state: GameState,
+  gameConfig: GameConfig,
+  actionLog: ActionLogEntry[],
+): Promise<GameState> {
   for (const entry of actionLog.slice(1)) {
     await dispatch(state, entry.message);
   }
@@ -300,8 +333,8 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   if (message.preceding) {
     for (const p of message.preceding) {
       const pEntry = findActionEntry(state, p.skillId, message.ownerId, p.actionType);
-      if (!pEntry || pEntry.validate(state, p.params) !== null){
-        rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
+      if (pEntry?.validate(state, p.params) !== null) {
+        rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
         cleanupResidualPending();
         return false;
       }
@@ -309,9 +342,9 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       rollbacks.push({ entry: pEntry, params: p.params });
     }
   }
-  let entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
-  if (!entry || entry.validate(state, message.params) !== null){
-    rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
+  const entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
+  if (entry?.validate(state, message.params) !== null) {
+    rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
     return false;
   }
   // 回应路径:定位该玩家对应的 slot。
@@ -323,15 +356,19 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   const oldSlot = findPendingSlot(state, targetKey);
   if (oldSlot) {
     if (oldSlot.isTimeout) {
-      rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
+      rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
       return false;
     }
     // pending-scoped 版本校验：只影响 respond 路径(阻塞型 pending 如 请求回应/询问闪)
     // 出牌窗口是非阻塞 pending，主动出牌/用技不应校验 pendingSeq
     // pendingSeq 不匹配 = 客户端响应了过期窗口（已被 close-reopen 替换）→ 拒绝
     // pendingSeq 缺省跳过校验（向后兼容旧客户端；新客户端应始终传 pendingSeq）
-    if (oldSlot.isBlocking && message.pendingSeq !== undefined && oldSlot.createdSeq !== message.pendingSeq) {
-      rollbacks.reverse().forEach(r => r.entry.rollback?.(state, r.params));
+    if (
+      oldSlot.isBlocking &&
+      message.pendingSeq !== undefined &&
+      oldSlot.createdSeq !== message.pendingSeq
+    ) {
+      rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
       return false;
     }
     oldSlot.pause();
@@ -344,10 +381,17 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     if (!oldSlot) return;
     const key = extractPendingTarget(oldSlot.atom);
     let deleted = false;
-    if (state.pendingSlots.get(key) === oldSlot) { state.pendingSlots.delete(key); deleted = true; }
+    if (state.pendingSlots.get(key) === oldSlot) {
+      state.pendingSlots.delete(key);
+      deleted = true;
+    }
     if (!deleted) {
       for (const [k, v] of state.pendingSlots) {
-        if (v === oldSlot) { state.pendingSlots.delete(k); deleted = true; break; }
+        if (v === oldSlot) {
+          state.pendingSlots.delete(k);
+          deleted = true;
+          break;
+        }
       }
     }
     if (deleted) notifyPendingResolved(state, oldSlot);
@@ -359,7 +403,8 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
   // dispatch 返回 true 表示"已接受"(validate 通过+execute 已启动),不等 execute 完成。
   // execute 无人 await,其 rejection 只能通过 onError 回调暴露——绝不静默吞掉。
-  entry.execute(state, message.params)
+  entry
+    .execute(state, message.params)
     .then(cleanupSlot)
     .finally(cleanupSlot)
     .catch((err: unknown) => {
@@ -445,13 +490,17 @@ function emptyFrame(): SettlementFrame {
   return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}), cards: [] };
 }
 
-
 // ─── Notify 事件 ────────────────────────────────────────────
 
 /** 推送 notify 事件(不改变 state) */
 export function pushNotify(state: GameState, event: NotifyEvent): void {
   state.seq += 1;
-  state.atomHistory.push({ kind: 'notify', seq: state.seq, timestamp: Date.now() - state.startedAt, ...event });
+  state.atomHistory.push({
+    kind: 'notify',
+    seq: state.seq,
+    timestamp: Date.now() - state.startedAt,
+    ...event,
+  });
 }
 
 // ─── Atom apply 管线 ────────────────────────────────────────
@@ -499,9 +548,14 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
       params: frame.params,
     };
     const result = await h.handler(beforeCtx);
-    if (result === undefined) continue;             // void = pass(向后兼容)
-    if (result.kind === 'cancel') { cancelled = true; break; }
-    if (result.kind === 'modify') { current = result.atom; }  // 后续 hook + validate + apply 用新值
+    if (result === undefined) continue; // void = pass(向后兼容)
+    if (result.kind === 'cancel') {
+      cancelled = true;
+      break;
+    }
+    if (result.kind === 'modify') {
+      current = result.atom;
+    } // 后续 hook + validate + apply 用新值
   }
 
   if (cancelled) {
@@ -509,7 +563,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消"/"目标无效")
     pushNotify(state, { skillId: '', eventType: 'atomCancelled', data: { atomType: atom.type } });
     notifyStateChange(state);
-    return false;   // 被 before hook cancel(如仁王盾:目标无效)
+    return false; // 被 before hook cancel(如仁王盾:目标无效)
   }
 
   const def = getAtomDef(current.type);
@@ -528,7 +582,13 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   // (如 respond → 分配武将 → 并行选将),它们必须有各自唯一的 seq,
   // 否则 broadcastNewState 的水位过滤会跳过同 seq 的后续事件(选将 bug 根因)。
   state.seq += 1;
-  state.atomHistory.push({ kind: 'atom', seq: state.seq, timestamp: Date.now() - state.startedAt, atom: current, viewEvents: viewEvents! });
+  state.atomHistory.push({
+    kind: 'atom',
+    seq: state.seq,
+    timestamp: Date.now() - state.startedAt,
+    atom: current,
+    viewEvents: viewEvents!,
+  });
 
   if (def.pending) {
     // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应/并行选将多 target)。
@@ -538,8 +598,8 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     const splits = def.parallelSplit?.(current);
     if (splits && splits.length > 0) {
       // 并行型:拆出多个 slotAtom,各自类型不同(如 请求回应/选将询问),用各自的 def
-      targets = splits.map(s => s.target);
-      slotAtoms = splits.map(s => s.slotAtom);
+      targets = splits.map((s) => s.target);
+      slotAtoms = splits.map((s) => s.slotAtom);
     } else {
       // 单 target:原样
       targets = [extractPendingTarget(current)];
@@ -617,7 +677,9 @@ function createAndAwaitSlot(
       createdSeq: state.seq,
       isBlocking: pending.isBlocking !== false,
       resolve: safeResolve,
-      get isTimeout() { return timedOut; },
+      get isTimeout() {
+        return timedOut;
+      },
       pause() {
         if (timedOut) return;
         paused = true;
@@ -640,13 +702,16 @@ function createAndAwaitSlot(
         // 但仍必须清理 pendingSlots + resolve 父 execute 的 Promise,否则 execute
         // 永远 await → 游戏死锁。异常本身会通过 dispatch 的 .catch→onError 上报。
         let deleted = false;
-        if (state.pendingSlots.get(target) === slot) { state.pendingSlots.delete(target); deleted = true; }
+        if (state.pendingSlots.get(target) === slot) {
+          state.pendingSlots.delete(target);
+          deleted = true;
+        }
         if (deleted) notifyPendingResolved(state, slot);
         safeResolve();
       }
     };
     slot._fireTimeoutNow = fireTimeoutNow;
-    let timer: ReturnType<typeof setTimeout> = setTimeout(fireTimeoutNow, timeoutMs);
+    const timer: ReturnType<typeof setTimeout> = setTimeout(fireTimeoutNow, timeoutMs);
 
     // 存入 pendingSlots Map(按 target 索引)。不同 target 的 slot 共存,各自独立 resolve。
     state.pendingSlots.set(target, slot);

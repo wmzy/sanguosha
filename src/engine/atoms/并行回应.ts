@@ -5,7 +5,14 @@
 // 全部 resolve 后父 applyAtom 的 Promise 才 resolve(语义等同 Promise.all)。
 //
 // 典型场景:拼点(双方暗盖一张牌)、选将(多人同时选)。
-import type { ActionPrompt, Atom, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+// src/engine/atoms/并行回应.ts
+// 并行回应:多目标并行盲选等待型 atom。
+// 与 请求回应 的区别:targets 是复数,为每个 target 创建独立 PendingSlot,
+// 各 target 独立 respond、独立 resolve,互不阻塞。
+// 全部 resolve 后父 applyAtom 的 Promise 才 resolve(语义等同 Promise.all)。
+//
+// 典型场景:拼点(双方暗盖一张牌)、选将(多人同时选)。
+import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { resolveTimeoutMs } from '../create-engine';
 import { registerAtom } from '../atom';
 
@@ -36,9 +43,9 @@ export const 并行回应: AtomDefinition<{
   },
   // 并行回应拆成多个单-target 请求回应 slot
   parallelSplit(atom) {
-    return atom.targets.map(target => ({
+    return atom.targets.map((target) => ({
       target,
-      slotAtom: { ...atom, type: '请求回应' as const, target } as unknown as Atom,
+      slotAtom: { ...atom, type: '请求回应' as const, target },
     }));
   },
   effect: { blockUntilDone: true, duration: 200 },
@@ -74,7 +81,12 @@ export const 并行回应: AtomDefinition<{
       if (!prompt) return;
       view.pending = {
         type: 'awaits',
-        atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+        atom: {
+          type: '请求回应',
+          requestType,
+          target,
+          prompt,
+        } as unknown as import('../types').Atom,
         prompt,
         target,
         deadline: Date.now() + timeoutMs,

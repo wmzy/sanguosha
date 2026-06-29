@@ -4,7 +4,6 @@
 // 需 vite dev server（localhost:3930）运行，无则 skip。
 import { describe, it, expect } from 'vitest';
 import { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
-import type { ClientMessage as EngineClientMessage } from '../../src/engine/types';
 
 const SERVER = 'ws://localhost:3930/ws';
 let serverUp = false;
@@ -13,14 +12,26 @@ try {
   const socket = new net.Socket();
   serverUp = await new Promise<boolean>((resolve) => {
     socket.setTimeout(1000);
-    socket.once('connect', () => { resolve(true); socket.destroy(); });
+    socket.once('connect', () => {
+      resolve(true);
+      socket.destroy();
+    });
     socket.once('error', () => resolve(false));
-    socket.once('timeout', () => { resolve(false); socket.destroy(); });
+    socket.once('timeout', () => {
+      resolve(false);
+      socket.destroy();
+    });
     socket.connect(3930, 'localhost');
   });
-} catch { serverUp = false; }
+} catch {
+  serverUp = false;
+}
 
-async function waitFor(predicate: () => boolean, timeoutMs: number, msg = 'timeout'): Promise<void> {
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs: number,
+  msg = 'timeout',
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return;
@@ -33,7 +44,8 @@ describe.skipIf(!serverUp)('选将流程集成', () => {
   it('选将 pending 枚举出每个候选武将的 selectChar action，且 message shape 正确', async () => {
     // 创建 2 人房
     const created = await fetch('http://localhost:3930/api/debug-room', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ playerCount: 2 }),
     }).then((r) => r.json() as Promise<{ roomId: string }>);
 
@@ -72,12 +84,17 @@ describe.skipIf(!serverUp)('选将流程集成', () => {
 
   it('selectCharacter 发送 系统规则:选将 并被服务端接受', async () => {
     const created = await fetch('http://localhost:3930/api/debug-room', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ playerCount: 2 }),
     }).then((r) => r.json() as Promise<{ roomId: string }>);
 
     let rejected = false;
-    const hgc = new HeadlessGameClient(SERVER, { onActionRejected: () => { rejected = true; } });
+    const hgc = new HeadlessGameClient(SERVER, {
+      onActionRejected: () => {
+        rejected = true;
+      },
+    });
     const hgc1 = new HeadlessGameClient(SERVER);
     hgc.connect(created.roomId, 0);
     hgc1.connect(created.roomId, 1);

@@ -16,13 +16,17 @@ import type { ServerMessage } from '../../src/server/protocol';
 
 function makeRoom(): Room {
   return {
-    id: 'test-' + Math.random().toString(36).slice(2, 8),
-    name: '测试', maxPlayers: 8, players: new Map(),
-    isDebug: true, createdAt: Date.now(), status: '进行中',
+    id: `test-${Math.random().toString(36).slice(2, 8)}`,
+    name: '测试',
+    maxPlayers: 8,
+    players: new Map(),
+    isDebug: true,
+    createdAt: Date.now(),
+    status: '进行中',
     config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
   } as unknown as Room;
 }
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function getState(session: GameSession): GameState {
   return (session as unknown as { state: GameState }).state;
 }
@@ -30,12 +34,17 @@ function getState(session: GameSession): GameState {
 class FakeWS {
   messages: ServerMessage[] = [];
   readyState = 1;
-  send(data: string) { this.messages.push(JSON.parse(data)); }
+  send(data: string) {
+    this.messages.push(JSON.parse(data));
+  }
 }
 
 function getLastEventWithDeadline(ws: FakeWS) {
-  const ev = [...ws.messages].reverse().find(m => m.type === 'event' && m.deadline !== undefined) as
-    Extract<ServerMessage, { type: 'event' }> | undefined;
+  const ev = [...ws.messages]
+    .reverse()
+    .find((m) => m.type === 'event' && m.deadline !== undefined) as
+    | Extract<ServerMessage, { type: 'event' }>
+    | undefined;
   return ev;
 }
 
@@ -53,7 +62,7 @@ describe('选将倒计时独立性', () => {
     for (let i = 0; i < 5; i++) {
       const ws = new FakeWS();
       wss.push(ws);
-      room.players.set('p' + i, ws as never);
+      room.players.set(`p${i}`, ws as never);
     }
     await session.startGame(5);
     state = getState(session);
@@ -69,7 +78,8 @@ describe('选将倒计时独立性', () => {
     // 清空消息,触发一次广播
     for (const ws of wss) ws.messages = [];
     (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
-    (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline = new Map();
+    (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline =
+      new Map();
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
     await sleep(50);
 
@@ -103,8 +113,11 @@ describe('选将倒计时独立性', () => {
 
     // 主公选将
     await session.handleAction('p0', {
-      skillId: '系统规则', actionType: '选将', ownerId: lordIdx,
-      params: { character: lordCand[0].name }, baseSeq: state.seq,
+      skillId: '系统规则',
+      actionType: '选将',
+      ownerId: lordIdx,
+      params: { character: lordCand[0].name },
+      baseSeq: state.seq,
     });
     // 等并行选将 slot 出现
     for (let i = 0; i < 100 && state.pendingSlots.size !== 4; i++) await sleep(10);
@@ -112,12 +125,13 @@ describe('选将倒计时独立性', () => {
 
     expect(state.pendingSlots.size).toBe(4);
     const afterLordRespond = Date.now();
-    const lordElapsed = afterLordRespond - beforeLordRespond;
+    const _lordElapsed = afterLordRespond - beforeLordRespond;
 
     // 清空消息,广播
     for (const ws of wss) ws.messages = [];
     (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
-    (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline = new Map();
+    (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline =
+      new Map();
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
     await sleep(50);
 
@@ -141,9 +155,12 @@ describe('选将倒计时独立性', () => {
     for (const t of [...state.pendingSlots.keys()]) {
       const slot = state.pendingSlots.get(t)!;
       const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
-      await session.handleAction('p' + t, {
-        skillId: '系统规则', actionType: '选将', ownerId: t,
-        params: { character: cand.name }, baseSeq: state.seq,
+      await session.handleAction(`p${t}`, {
+        skillId: '系统规则',
+        actionType: '选将',
+        ownerId: t,
+        params: { character: cand.name },
+        baseSeq: state.seq,
       });
       await sleep(30);
     }

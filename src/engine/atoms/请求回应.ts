@@ -1,7 +1,9 @@
 // src/engine/atoms/请求回应.ts
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
-import type { ActionPrompt, AtomDefinition, GameState, Json, ViewEventSplit, ViewEvent } from '../types';
-import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
+// src/engine/atoms/请求回应.ts
+// 请求回应:通用等待型 atom — 等待 target 玩家回应
+import type { ActionPrompt, AtomDefinition, Json, ViewEventSplit, ViewEvent } from '../types';
+
 import { applyAtom, resolveTimeoutMs } from '../create-engine';
 import { registerAtom } from '../atom';
 
@@ -88,7 +90,12 @@ export const 请求回应: AtomDefinition<{
       if (!prompt) return;
       view.pending = {
         type: 'awaits',
-        atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+        atom: {
+          type: '请求回应',
+          requestType,
+          target,
+          prompt,
+        } as unknown as import('../types').Atom,
         prompt,
         target,
         deadline: Date.now() + timeoutMs,
@@ -101,7 +108,12 @@ export const 请求回应: AtomDefinition<{
       if (!prompt) return;
       view.pending = {
         type: 'awaits',
-        atom: { type: '请求回应', requestType, target, prompt } as unknown as import('../types').Atom,
+        atom: {
+          type: '请求回应',
+          requestType,
+          target,
+          prompt,
+        } as unknown as import('../types').Atom,
         prompt,
         target,
         deadline: Date.now() + timeoutMs,

@@ -22,11 +22,24 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeEquip(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物', rank = 'A', range?: number): Card {
+function makeEquip(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  subtype: '武器' | '防具' | '进攻马' | '防御马' | '宝物',
+  rank = 'A',
+  range?: number,
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -88,7 +101,7 @@ describe('诸葛连弩', () => {
     expect(harness.state.players[0].hand).not.toContain('c1');
     // view 级断言
     P1.processEvents();
-    P1.expectView(v => {
+    P1.expectView((v) => {
       expect(v.players[0].equipment['武器']).toBe('c1');
       expect(v.players[0].handCount).toBe(0);
     });
@@ -164,7 +177,12 @@ describe('诸葛连弩', () => {
     const slash2 = makeCard('s2', '杀', '♠', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 's1', 's2'], skills: ['装备通用', '杀', '诸葛连弩'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 's1', 's2'],
+          skills: ['装备通用', '杀', '诸葛连弩'],
+        }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
       cardMap: { c1: crossbow, s1: slash1, s2: slash2 },
@@ -201,7 +219,12 @@ describe('诸葛连弩', () => {
     const slash3 = makeCard('s3', '杀', '♠', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 's1', 's2', 's3'], skills: ['装备通用', '杀', '诸葛连弩'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 's1', 's2', 's3'],
+          skills: ['装备通用', '杀', '诸葛连弩'],
+        }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
       cardMap: { c1: crossbow, s1: slash1, s2: slash2, s3: slash3 },
@@ -236,7 +259,12 @@ describe('诸葛连弩', () => {
     const slash2 = makeCard('s2', '杀', '♠', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'w1', 's1', 's2'], skills: ['装备通用', '杀', '诸葛连弩', '青釭剑'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 'w1', 's1', 's2'],
+          skills: ['装备通用', '杀', '诸葛连弩', '青釭剑'],
+        }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
       cardMap: { c1: crossbow, w1: sword, s1: slash1, s2: slash2 },
@@ -272,7 +300,11 @@ describe('诸葛连弩', () => {
     expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
 
     // 第二张杀:usedCount=1 >= 上限 1 → 被拒
-    await P1.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: 's2', targets: [1] } });
+    await P1.expectRejected({
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: 's2', targets: [1] },
+    });
   });
 
   // ─── 负面:无诸葛连弩时 quota = 1(默认) ────────────
@@ -305,7 +337,9 @@ describe('诸葛连弩', () => {
 
     // 第二张杀:usedCount=1 >= 上限 1 → 拒绝
     await P1.expectRejected({
-      skillId: '杀', actionType: 'use', params: { cardId: 's2', targets: [1] },
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: 's2', targets: [1] },
     });
     expect(harness.state.players[1].health).toBe(3);
   });
@@ -327,7 +361,9 @@ describe('诸葛连弩', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '装备通用', actionType: 'use', params: { cardId: 'nonexistent' },
+      skillId: '装备通用',
+      actionType: 'use',
+      params: { cardId: 'nonexistent' },
     });
   });
 
@@ -349,7 +385,9 @@ describe('诸葛连弩', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '装备通用', actionType: 'use', params: { cardId: 's1' },
+      skillId: '装备通用',
+      actionType: 'use',
+      params: { cardId: 's1' },
     });
   });
 
@@ -371,7 +409,9 @@ describe('诸葛连弩', () => {
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
-      skillId: '装备通用', actionType: 'use', params: { cardId: 'c1' },
+      skillId: '装备通用',
+      actionType: 'use',
+      params: { cardId: 'c1' },
     });
   });
 
@@ -387,7 +427,12 @@ describe('诸葛连弩', () => {
     const slash2 = makeCard('s2', '杀', '♠', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['s1', 'c1', 'w1', 's2'], skills: ['装备通用', '杀', '诸葛连弩', '青釭剑'] }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['s1', 'c1', 'w1', 's2'],
+          skills: ['装备通用', '杀', '诸葛连弩', '青釭剑'],
+        }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
       cardMap: { c1: crossbow, w1: sword, s1: slash1, s2: slash2 },
@@ -426,6 +471,10 @@ describe('诸葛连弩', () => {
     const slash3 = makeCard('s3', '杀', '♠', '3');
     harness.state.cardMap['s3'] = slash3;
     harness.state.players[0].hand.push('s3');
-    await P1.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: 's3', targets: [1] } });
+    await P1.expectRejected({
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: 's3', targets: [1] },
+    });
   });
 });

@@ -10,16 +10,18 @@ export const 清过期标记: AtomDefinition<{ player: number }> = {
     return null;
   },
   apply(state, atom) {
-    state.players[atom.player].marks = state.players[atom.player].marks.filter(m => m.duration !== 'turn');
+    state.players[atom.player].marks = state.players[atom.player].marks.filter(
+      (m) => m.duration !== 'turn',
+    );
   },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = { type: '清过期标记', player: atom.player };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
-    view.players[pi].marks = view.players[pi].marks.filter(m => m.duration !== 'turn');
+    view.players[pi].marks = view.players[pi].marks.filter((m) => m.duration !== 'turn');
   },
 };
 

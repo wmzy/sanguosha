@@ -32,10 +32,7 @@ export function applyAtom(state: GameState, atom: Atom): void {
  * 优先使用 AtomDefinition.toViewEvents；未实现则 fallback 为带 effect 的原始 atom。
  * 当 ViewEvent.type 与 atom.type 不同时，自动设置 atomType 供前端查找 applyView。
  */
-export function resolveViewEvents(
-  state: GameState,
-  atom: Atom,
-): ViewEventSplit | undefined {
+export function resolveViewEvents(state: GameState, atom: Atom): ViewEventSplit | undefined {
   const def = getAtomDef(atom.type);
   const explicit = def.toViewEvents?.(state, atom);
 

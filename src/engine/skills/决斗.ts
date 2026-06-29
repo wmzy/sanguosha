@@ -4,19 +4,31 @@
 // 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 没出(输)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { registerAction, validateUseCard, type SkillModule } from '../skill'
+import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '决斗', description: '对一名角色使用,双方轮流出杀,先不出者受 1 点伤害' };
+  return {
+    id,
+    ownerId,
+    name: '决斗',
+    description: '对一名角色使用,双方轮流出杀,先不出者受 1 点伤害',
+  };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
     (state: GameState, params: Record<string, Json>) => {
       // 通用合法条件(对齐杀):自己回合 + 出牌阶段 + 无阻塞 pending + 存活 + 手牌 + 牌名 + 非空 targets
-      const base = validateUseCard(state, ownerId, params, { cardName: '决斗', requireTarget: true });
+      const base = validateUseCard(state, ownerId, params, {
+        cardName: '决斗',
+        requireTarget: true,
+      });
       if (base) return base;
       // 决斗是单目标锦囊:targets 必须恰好 1 个
       const targets = params.targets as number[];
@@ -59,11 +71,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
               break;
             }
             const current = turn === 0 ? target : from;
-            await applyAtom(state, { type: '询问杀', target: current, source: turn === 0 ? from : target });
+            await applyAtom(state, {
+              type: '询问杀',
+              target: current,
+              source: turn === 0 ? from : target,
+            });
             // 检查处理区:有杀牌 = 出了杀,移走它;没有 = 没出,输
-            const killCardId = frameCards(state).find(id => {
+            const killCardId = frameCards(state).find((id) => {
               const c = state.cardMap[id];
-              return c && c.name === '杀';
+              return c?.name === '杀';
             });
             if (killCardId) {
               // 出了杀:移到弃牌堆,切换轮次
@@ -79,7 +95,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
             }
           }
           const winner = loser === target ? from : target;
-          await applyAtom(state, { type: '造成伤害', target: loser, amount: 1, source: winner, cardId });
+          await applyAtom(state, {
+            type: '造成伤害',
+            target: loser,
+            amount: 1,
+            source: winner,
+            cardId,
+          });
         }
         // 决斗锦囊移出处理区→弃牌堆
         await applyAtom(state, {
@@ -117,4 +139,3 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-

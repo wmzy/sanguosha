@@ -23,7 +23,7 @@ export const 回合开始: AtomDefinition<{ player: number }> = {
   effect: { sound: 'turn_start', duration: 1500 },
   applyView(view: GameView, event) {
     view.currentPlayerIndex = event.player as number;
-    if (typeof event.round === 'number') view.turn.round = event.round as number;
+    if (typeof event.round === 'number') view.turn.round = event.round;
   },
   toViewLog(event) {
     return { player: event.player as number, text: '回合开始' };

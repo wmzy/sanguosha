@@ -6,26 +6,87 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
-function build(opts?: { p2Hand?: string[]; p3?: boolean; extraCards?: Record<string, Card> }): GameState {
+function build(opts?: {
+  p2Hand?: string[];
+  p3?: boolean;
+  extraCards?: Record<string, Card>;
+}): GameState {
   const slash: Card = { id: 'c0', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
-  const nanman: Card = { id: 'nm1', name: '南蛮入侵', suit: '♠', color: '黑', rank: '7', type: '锦囊牌' };
+  const nanman: Card = {
+    id: 'nm1',
+    name: '南蛮入侵',
+    suit: '♠',
+    color: '黑',
+    rank: '7',
+    type: '锦囊牌',
+  };
   const cards: Record<string, Card> = { c0: slash, nm1: nanman, ...opts?.extraCards };
   const players = [
-    { index: 0, name: 'P1', character: '主公', health: 4, maxHealth: 4, alive: true,
-      hand: ['nm1'], equipment: {}, skills: ['南蛮入侵'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-    { index: 1, name: 'P2', character: '反', health: 4, maxHealth: 4, alive: true,
-      hand: opts?.p2Hand ?? [], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+    {
+      index: 0,
+      name: 'P1',
+      character: '主公',
+      health: 4,
+      maxHealth: 4,
+      alive: true,
+      hand: ['nm1'],
+      equipment: {},
+      skills: ['南蛮入侵'],
+      vars: {},
+      marks: [],
+      pendingTricks: [],
+      tags: [],
+      judgeZone: [],
+    },
+    {
+      index: 1,
+      name: 'P2',
+      character: '反',
+      health: 4,
+      maxHealth: 4,
+      alive: true,
+      hand: opts?.p2Hand ?? [],
+      equipment: {},
+      skills: ['杀'],
+      vars: {},
+      marks: [],
+      pendingTricks: [],
+      tags: [],
+      judgeZone: [],
+    },
   ];
   if (opts?.p3) {
-    players.push({ index: 2, name: 'P3', character: '反', health: 4, maxHealth: 4, alive: true,
-      hand: [], equipment: {}, skills: ['杀'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] });
+    players.push({
+      index: 2,
+      name: 'P3',
+      character: '反',
+      health: 4,
+      maxHealth: 4,
+      alive: true,
+      hand: [],
+      equipment: {},
+      skills: ['杀'],
+      vars: {},
+      marks: [],
+      pendingTricks: [],
+      tags: [],
+      judgeZone: [],
+    });
   }
-  return createGameState({ players, cardMap: cards, currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} } });
+  return createGameState({
+    players,
+    cardMap: cards,
+    currentPlayerIndex: 0,
+    phase: '出牌',
+    turn: { round: 1, phase: '出牌', vars: {} },
+  });
 }
 
 describe('南蛮入侵', () => {
   let harness: SkillTestHarness;
-  beforeEach(() => { harness = new SkillTestHarness(); });
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
 
   it('P2 无杀 → P2 扣 1 血, 南蛮进弃牌堆', async () => {
     await harness.setup(build());
@@ -47,11 +108,18 @@ describe('南蛮入侵', () => {
     expect(harness.state.zones.processing).not.toContain('nm1');
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
-    P2.expectView(v => expect(v.players[1].health).toBe(3));
+    P2.expectView((v) => expect(v.players[1].health).toBe(3));
   });
 
   it('P2 出杀 → P2 不扣血, 杀和南蛮都进弃牌堆', async () => {
-    await harness.setup(build({ p2Hand: ['c0'], extraCards: { c0: { id: 'c0', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' } } }));
+    await harness.setup(
+      build({
+        p2Hand: ['c0'],
+        extraCards: {
+          c0: { id: 'c0', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' },
+        },
+      }),
+    );
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
@@ -101,16 +169,24 @@ describe('南蛮入侵', () => {
     await harness.setup(build());
     const P2 = harness.player('P2');
     // P2 不是当前玩家
-    await P2.expectRejected({ skillId: '南蛮入侵', actionType: 'use', params: { cardId: 'nm1', targets: [] } });
+    await P2.expectRejected({
+      skillId: '南蛮入侵',
+      actionType: 'use',
+      params: { cardId: 'nm1', targets: [] },
+    });
   });
 
   it('validate: pending期间拒绝', async () => {
     await harness.setup(build());
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
     await P1.useCardAndTarget('南蛮入侵', 'nm1', []);
     // pending 期间 P1 再用
-    await P1.expectRejected({ skillId: '南蛮入侵', actionType: 'use', params: { cardId: 'nm1', targets: [] } });
+    await P1.expectRejected({
+      skillId: '南蛮入侵',
+      actionType: 'use',
+      params: { cardId: 'nm1', targets: [] },
+    });
   });
 
   // Bug1 回归:4人局中当前为 index 0,顺时针顺序应为 1→2→3。
@@ -160,7 +236,14 @@ describe('南蛮入侵', () => {
     state.players[2].hand = ['nm1'];
     state.players[2].skills = ['南蛮入侵', '杀'];
     // 给 P3 一张无懈可击,用于抵消对 P2 的效果
-    state.cardMap['wx1'] = { id: 'wx1', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
+    state.cardMap['wx1'] = {
+      id: 'wx1',
+      name: '无懈可击',
+      suit: '♠',
+      color: '黑',
+      rank: 'J',
+      type: '锦囊牌',
+    };
     state.players[2].hand.push('wx1');
     state.players[2].skills.push('无懈可击');
     await harness.setup(state);

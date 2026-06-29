@@ -12,7 +12,7 @@
 // atom after(非询问闪 after),故不受询问闪 cancel 影响。
 import type { AtomBeforeContext, Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -26,10 +26,16 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // respond:被询问"是否发动八卦阵"时回应,设 localVars 标记结果
-  registerAction(state, skill.id, ownerId, 'respond',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'respond',
     (state, _params) => {
       if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>).requestType as string;
+      const requestType = (
+        state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
+      ).requestType as string;
       if (requestType !== '八卦阵/confirm') return '当前不是八卦阵确认';
       return null;
     },
@@ -38,56 +44,67 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerBeforeHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-    if ((ctx.atom as { target?: number }).target !== ownerId) return;
-    if (ctx.state.zones.deck.length === 0) return;
+  registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '询问闪',
+    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      if ((ctx.atom as { target?: number }).target !== ownerId) return;
+      if (ctx.state.zones.deck.length === 0) return;
 
-    // 询问是否发动八卦阵
-    delete ctx.state.localVars['八卦阵/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '八卦阵/confirm',
-      target: ownerId,
-      prompt: { type: 'confirm', title: '是否发动八卦阵?', confirmLabel: '发动', cancelLabel: '不发动' },
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!ctx.state.localVars['八卦阵/confirmed']) return;
-
-    // 判定:牌堆顶→处理区→技能 after hooks 读取→afterHooks 清理(处理区→弃牌堆)
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '八卦阵' });
-
-    // 判定完成后判定牌已进弃牌堆,读弃牌堆顶
-    const discardPile = ctx.state.zones.discardPile;
-    if (discardPile.length === 0) return;
-    const judgeCardId = discardPile[discardPile.length - 1];
-    const judgeCard = ctx.state.cardMap[judgeCardId];
-    if (!judgeCard) return;
-
-    // 红色:往处理区放虚拟闪牌(通过移动牌 atom 产生 ViewEvent,保持 processedView 同步)
-    // 然后 cancel 主 询问闪 atom —— 判定红色即视为出闪,不再询问目标出闪。
-    // 杀.execute 检测处理区有闪 → 走"被抵消"分支 → 武器技正常触发。
-    // 武器技挂在"被抵消" atom after(非询问闪 after),不受询问闪 cancel 影响。
-    if (judgeCard.suit === '♥' || judgeCard.suit === '♦') {
-      const dodgeId = `八卦阵:${ownerId}:${judgeCardId}`;
-      const virtualDodge: Card = {
-        id: dodgeId,
-        name: '闪',
-        suit: judgeCard.suit,
-        color: judgeCard.color,
-        rank: judgeCard.rank,
-        type: '基本牌',
-      };
-      ctx.state.cardMap[dodgeId] = virtualDodge;
+      // 询问是否发动八卦阵
+      delete ctx.state.localVars['八卦阵/confirmed'];
       await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: dodgeId,
-        from: { zone: '处理区' },
-        to: { zone: '处理区' },
+        type: '请求回应',
+        requestType: '八卦阵/confirm',
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: '是否发动八卦阵?',
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
+        },
+        defaultChoice: false,
+        timeout: 10,
       });
-      return { kind: 'cancel' };
-    }
-  });
+      if (!ctx.state.localVars['八卦阵/confirmed']) return;
+
+      // 判定:牌堆顶→处理区→技能 after hooks 读取→afterHooks 清理(处理区→弃牌堆)
+      await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '八卦阵' });
+
+      // 判定完成后判定牌已进弃牌堆,读弃牌堆顶
+      const discardPile = ctx.state.zones.discardPile;
+      if (discardPile.length === 0) return;
+      const judgeCardId = discardPile[discardPile.length - 1];
+      const judgeCard = ctx.state.cardMap[judgeCardId];
+      if (!judgeCard) return;
+
+      // 红色:往处理区放虚拟闪牌(通过移动牌 atom 产生 ViewEvent,保持 processedView 同步)
+      // 然后 cancel 主 询问闪 atom —— 判定红色即视为出闪,不再询问目标出闪。
+      // 杀.execute 检测处理区有闪 → 走"被抵消"分支 → 武器技正常触发。
+      // 武器技挂在"被抵消" atom after(非询问闪 after),不受询问闪 cancel 影响。
+      if (judgeCard.suit === '♥' || judgeCard.suit === '♦') {
+        const dodgeId = `八卦阵:${ownerId}:${judgeCardId}`;
+        const virtualDodge: Card = {
+          id: dodgeId,
+          name: '闪',
+          suit: judgeCard.suit,
+          color: judgeCard.color,
+          rank: judgeCard.rank,
+          type: '基本牌',
+        };
+        ctx.state.cardMap[dodgeId] = virtualDodge;
+        await applyAtom(ctx.state, {
+          type: '移动牌',
+          cardId: dodgeId,
+          from: { zone: '处理区' },
+          to: { zone: '处理区' },
+        });
+        return { kind: 'cancel' };
+      }
+    },
+  );
   return () => {};
 }
 
@@ -95,6 +112,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '八卦阵',
     style: 'default',
-    prompt: { type: 'confirm', title: '是否发动八卦阵？', confirmLabel: '发动', cancelLabel: '不发动' },
+    prompt: {
+      type: 'confirm',
+      title: '是否发动八卦阵？',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
+    },
   });
 }

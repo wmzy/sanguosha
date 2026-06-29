@@ -73,17 +73,20 @@ export function useEventPlayback() {
    * 入队一批事件并开始播放(若空闲)。
    * 过时事件(seq <= lastPlayedSeq)被丢弃。
    */
-  const enqueue = useCallback((events: QueuedEvent[]) => {
-    if (events.length === 0) return;
-    // 过滤过时事件
-    const fresh = events.filter(e => e.seq > lastPlayedSeqRef.current);
-    if (fresh.length === 0) return;
-    queueRef.current.push(...fresh);
-    // 若空闲,立即开始播放(用 ref 判断,避免闭包竞态)
-    if (!isPlayingRef.current) {
-      playNext();
-    }
-  }, [playNext]);
+  const enqueue = useCallback(
+    (events: QueuedEvent[]) => {
+      if (events.length === 0) return;
+      // 过滤过时事件
+      const fresh = events.filter((e) => e.seq > lastPlayedSeqRef.current);
+      if (fresh.length === 0) return;
+      queueRef.current.push(...fresh);
+      // 若空闲,立即开始播放(用 ref 判断,避免闭包竞态)
+      if (!isPlayingRef.current) {
+        playNext();
+      }
+    },
+    [playNext],
+  );
 
   /** 重置(重连时清空状态,避免播放历史事件) */
   const reset = useCallback((baselineSeq: number) => {

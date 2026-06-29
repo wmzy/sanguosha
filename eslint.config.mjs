@@ -3,6 +3,7 @@ import tseslint from 'typescript-eslint';
 import stylistic from '@stylistic/eslint-plugin';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
   js.configs.recommended,
@@ -79,6 +80,8 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.min.js', '*.min.css', '.env*', 'eslint.config.mjs', 'prettier.config.mjs', 'vite.config.ts', 'vitest.config.ts', 'scripts/**'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.min.js', '*.min.css', '.env*', 'eslint.config.mjs', 'prettier.config.mjs', 'vite.config.ts', 'vitest.config.ts', 'scripts/**', '.worktrees/**', 'playwright-report/**', '.playwright-mcp/**', '.sisyphus/**'],
   },
+  // prettier 为格式权威;关闭 eslint 中所有与 prettier 冲突的格式规则
+  eslintConfigPrettier,
 ];

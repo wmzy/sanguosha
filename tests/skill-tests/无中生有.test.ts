@@ -46,7 +46,13 @@ function makePlayer(opts: {
   };
 }
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -62,7 +68,12 @@ function buildState(opts?: {
   const cards: Record<string, Card> = { wz1: wz, ...(opts?.extraCards ?? {}) };
   return createGameState({
     players: [
-      makePlayer({ index: 0, name: 'P1', hand: opts?.p1Hand ?? ['wz1'], skills: opts?.p1Skills ?? ['无中生有'] }),
+      makePlayer({
+        index: 0,
+        name: 'P1',
+        hand: opts?.p1Hand ?? ['wz1'],
+        skills: opts?.p1Skills ?? ['无中生有'],
+      }),
       makePlayer({ index: 1, name: 'P2', hand: opts?.p2Hand, skills: opts?.p2Skills }),
     ],
     cardMap: cards,
@@ -121,8 +132,8 @@ describe('无中生有', () => {
     expect(harness.state.zones.deck).not.toContain('d2');
     // view 级断言:P1 视角手牌含 d1/d2 + 无 pending
     P1.processEvents();
-    P1.expectView(v => {
-      expect(v.players[0].hand!.map(c => c.id)).toEqual(expect.arrayContaining(['d1', 'd2']));
+    P1.expectView((v) => {
+      expect(v.players[0].hand!.map((c) => c.id)).toEqual(expect.arrayContaining(['d1', 'd2']));
       expect(v.players[0].handCount).toBe(handBefore + 1);
       expect(v.pending).toBeNull();
     });
@@ -132,7 +143,7 @@ describe('无中生有', () => {
   // 1b. 正面:对方有无懈可击时,cardFilter 过滤正确
   // ─────────────────────────────────────────────────────────────
   it('P2 手中有无懈可击时,respondableCards 仅包含无懈可击', async () => {
-    const wz = makeCard('wz1', '无中生有', '♥', '7');
+    const _wz = makeCard('wz1', '无中生有', '♥', '7');
     const wx = makeCard('wx1', '无懈可击', '♠', 'J', '锦囊牌');
     const slash = makeCard('s1', '杀', '♠', '5', '基本牌');
     const state = buildState({
@@ -152,7 +163,7 @@ describe('无中生有', () => {
     expect(info?.skillId).toBe('无懈可击');
     // P2 手牌 [wx1, s1] → respondableCards 仅 wx1
     const cards = P2.respondableCards();
-    expect(cards.map(c => c.id)).toEqual(['wx1']);
+    expect(cards.map((c) => c.id)).toEqual(['wx1']);
   });
 
   // ─────────────────────────────────────────────────────────────

@@ -5,7 +5,14 @@
 
 import { writeFile, readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { GameState, ActionLogEntry, AppliedAtomEntry, ViewEventSplit, Json, GameView } from '../engine/types';
+import type {
+  GameState,
+  ActionLogEntry,
+  AppliedAtomEntry,
+  ViewEventSplit,
+  Json,
+  GameView,
+} from '../engine/types';
 import type { GameSession } from './session';
 import { sanitizeState } from './persistence';
 import { createLogger } from './logger';
@@ -107,7 +114,7 @@ function serializeViewEventSplit(split: ViewEventSplit): {
 
 /** 序列化 atomHistory:把 Map 结构转为数组对 */
 function serializeAtomHistory(history: AppliedAtomEntry[]): SnapshotBackend['atomHistory'] {
-  return history.map(entry => {
+  return history.map((entry) => {
     if (entry.kind === 'atom') {
       return {
         kind: 'atom' as const,
@@ -148,7 +155,9 @@ function serializePendingSlots(state: GameState): PendingSlotData[] {
 
 /** 完整序列化 GameState 用于快照:复用 sanitizeState 剥离函数,
  *  但额外保留 pendingSlots 的纯数据(审查 bug 的关键信息)。 */
-function serializeStateForSnapshot(state: GameState): GameState & { pendingSlotsData: PendingSlotData[] } {
+function serializeStateForSnapshot(
+  state: GameState,
+): GameState & { pendingSlotsData: PendingSlotData[] } {
   const sanitized = sanitizeState(state);
   return {
     ...sanitized,
@@ -211,10 +220,12 @@ export async function createSnapshot(
     if (req.telemetry) {
       const t = req.telemetry;
 
-      const consoleText = t.consoleLog.map((e) => {
-        const entry = e as { time: number; level: string; message: string };
-        return `[${new Date(entry.time).toISOString()}] [${entry.level}] ${entry.message}`;
-      }).join('\n');
+      const consoleText = t.consoleLog
+        .map((e) => {
+          const entry = e as { time: number; level: string; message: string };
+          return `[${new Date(entry.time).toISOString()}] [${entry.level}] ${entry.message}`;
+        })
+        .join('\n');
       const wsLines = t.wsMessages.map((e) => JSON.stringify(e)).join('\n');
       const domHtml = t.domHtml;
 

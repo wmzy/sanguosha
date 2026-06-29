@@ -10,6 +10,8 @@ import { dirname, resolve } from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const rootDir = resolve(dirname(__filename), '..', '..');
 
-const pkg = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf-8')) as { version: string };
+const pkg = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf-8')) as {
+  version: string;
+};
 
 export const ENGINE_VERSION: string = pkg.version;

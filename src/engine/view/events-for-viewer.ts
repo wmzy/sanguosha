@@ -25,7 +25,11 @@ export function eventsForViewer(
       // kind === 'notify'
       const data = e.views ? (e.views.get(String(viewer)) ?? null) : e.data;
       if (data !== null) {
-        out.push({ seq: e.seq, timestamp: e.timestamp, notify: { skillId: e.skillId, eventType: e.eventType, data } });
+        out.push({
+          seq: e.seq,
+          timestamp: e.timestamp,
+          notify: { skillId: e.skillId, eventType: e.eventType, data },
+        });
       }
     }
   }

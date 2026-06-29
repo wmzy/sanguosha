@@ -57,7 +57,8 @@ const moduleCache = new Map<string, SkillModule>();
 export async function getSkillModule(id: string): Promise<SkillModule> {
   const cached = moduleCache.get(id);
   if (cached) return cached;
-  if (!skillModuleResolver) throw new Error('skillModuleResolver not set (forgot to import skills/index?)');
+  if (!skillModuleResolver)
+    throw new Error('skillModuleResolver not set (forgot to import skills/index?)');
   const mod = await skillModuleResolver(id);
   moduleCache.set(id, mod);
   return mod;
@@ -143,20 +144,22 @@ function instanceKey(skillId: string, ownerId: number): string {
  *  查找顺序:ownerId 精确匹配 → 广播型(target<TARGET_SYSTEM) → 唯一活跃 slot(兜底)。
  *  无匹配返回 undefined。 */
 export function findPendingSlot(state: GameState, ownerId: number): PendingSlot | undefined {
-  return state.pendingSlots.get(ownerId)
-    ?? [...state.pendingSlots.values()].find(s => {
+  return (
+    state.pendingSlots.get(ownerId) ??
+    [...state.pendingSlots.values()].find((s) => {
       const t = (s.atom as { target?: unknown }).target;
       return typeof t === 'number' && t < TARGET_SYSTEM;
-    })
-    ?? (state.pendingSlots.size === 1
+    }) ??
+    (state.pendingSlots.size === 1
       ? (() => {
           const slot = [...state.pendingSlots.values()][0];
           // size===1 fallback:只返回属于请求者的 slot,不能误匹配其他玩家的出牌窗口等非阻塞 pending
-          const target = (slot.atom as { target?: number }).target
-            ?? (slot.atom as { player?: number }).player;
+          const target =
+            (slot.atom as { target?: number }).target ?? (slot.atom as { player?: number }).player;
           return typeof target === 'number' && target === ownerId ? slot : undefined;
         })()
-      : undefined);
+      : undefined)
+  );
 }
 
 /** 是否存在阻塞型 pending——即需要玩家先回应的询问(询问闪/杀/无瓣/弃牌等)。
@@ -189,7 +192,8 @@ export function validateUseCard(
   const cardId = params.cardId as string | undefined;
   if (!cardId) return 'cardId required';
   if (!self.hand.includes(cardId)) return '牌不在手牌中';
-  if (opts?.cardName && state.cardMap[cardId]?.name !== opts.cardName) return `不是${opts.cardName}`;
+  if (opts?.cardName && state.cardMap[cardId]?.name !== opts.cardName)
+    return `不是${opts.cardName}`;
   if (opts?.requireTarget) {
     const targets = params.targets as number[] | undefined;
     if (!Array.isArray(targets) || targets.length === 0) return 'target required';
@@ -204,11 +208,21 @@ export function registerActionEntry(state: GameState, entry: ActionEntry): void 
   getRegistry(state).actions.set(k, entry);
 }
 
-export function findActionEntry(state: GameState, skillId: string, ownerId: number, actionType: string): ActionEntry | undefined {
+export function findActionEntry(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  actionType: string,
+): ActionEntry | undefined {
   return getRegistry(state).actions.get(actionKey(skillId, ownerId, actionType));
 }
 
-export function unregisterActionEntry(state: GameState, skillId: string, ownerId: number, actionType: string): void {
+export function unregisterActionEntry(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  actionType: string,
+): void {
   getRegistry(state).actions.delete(actionKey(skillId, ownerId, actionType));
 }
 
@@ -306,7 +320,12 @@ export function registerAfterHook(
 
 // ─── 实例管理(state-bound) ──────────────────────────────────
 
-export function setSkillInstanceUnload(state: GameState, skillId: string, ownerId: number, unload: () => void): void {
+export function setSkillInstanceUnload(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  unload: () => void,
+): void {
   getRegistry(state).instanceUnloads.set(instanceKey(skillId, ownerId), unload);
 }
 
@@ -338,7 +357,11 @@ export function registerSkillsFromState(state: GameState): Promise<void> {
  * 再重新注册。保证 registerSkillsFromState 重入、并发 dispatch、动态 添加技能 等场景不会因
  * `registerActionEntry` 的 "already registered" 抛错。
  */
-export async function instantiateSkill(state: GameState, skillId: string, ownerId: number): Promise<Skill | null> {
+export async function instantiateSkill(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+): Promise<Skill | null> {
   // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册抛错
   unloadSkillInstance(state, skillId, ownerId);
   // 同步检查:技能模块未注册(如候选人 skills 中的描述性名称)则跳过,不中断开局流程。
@@ -348,7 +371,12 @@ export async function instantiateSkill(state: GameState, skillId: string, ownerI
   const skill = module.createSkill(skillId, ownerId);
   if (module.onInit) {
     const unload = module.onInit(skill, state);
-    setSkillInstanceUnload(state, skillId, ownerId, typeof unload === 'function' ? unload : () => {});
+    setSkillInstanceUnload(
+      state,
+      skillId,
+      ownerId,
+      typeof unload === 'function' ? unload : () => {},
+    );
   }
   return skill;
 }

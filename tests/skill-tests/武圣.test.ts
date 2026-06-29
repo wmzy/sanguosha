@@ -18,7 +18,13 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A', type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌'): Card {
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
@@ -61,7 +67,14 @@ describe('武圣', () => {
     const red = makeCard('c1', '桃', '♥', 'A'); // 红桃
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['武圣', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['武圣', '杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
       ],
       cardMap: { c1: red },
@@ -74,12 +87,7 @@ describe('武圣', () => {
     const P2 = harness.player('P2');
 
     // 转化:红桃当杀(useSkill='杀', 杀 id='c1#武圣')
-    await P1.transformThenUse(
-      '武圣',
-      { cardId: 'c1' },
-      '杀',
-      { cardId: 'c1#武圣', targets: [1] },
-    );
+    await P1.transformThenUse('武圣', { cardId: 'c1' }, '杀', { cardId: 'c1#武圣', targets: [1] });
 
     // 影子卡应已建立
     expect(harness.state.cardMap['c1#武圣']).toBeDefined();
@@ -92,14 +100,21 @@ describe('武圣', () => {
     expect(harness.state.zones.discardPile).toContain('c1');
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
-    P2.expectView(v => expect(v.players[1].health).toBe(3));
+    P2.expectView((v) => expect(v.players[1].health).toBe(3));
   });
 
   it('transformThenUse:方块(♦)红牌当杀 → 同样成功', async () => {
     const red = makeCard('d1', '桃', '♦', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['d1'], skills: ['武圣', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['d1'],
+          skills: ['武圣', '杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
       ],
       cardMap: { d1: red },
@@ -111,12 +126,7 @@ describe('武圣', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.transformThenUse(
-      '武圣',
-      { cardId: 'd1' },
-      '杀',
-      { cardId: 'd1#武圣', targets: [1] },
-    );
+    await P1.transformThenUse('武圣', { cardId: 'd1' }, '杀', { cardId: 'd1#武圣', targets: [1] });
 
     expect(harness.state.cardMap['d1#武圣'].name).toBe('杀');
     await P2.pass();
@@ -204,7 +214,14 @@ describe('武圣', () => {
     const red = makeCard('c1', '桃', '♥', 'A');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['武圣', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['武圣', '杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
       ],
       cardMap: { c1: red },
@@ -217,10 +234,14 @@ describe('武圣', () => {
 
     // 没有 targets,杀 validate 拒绝 → rollback 武圣 transform
     // 实际上没有 targets 应当也是被拒绝
-    await P1.expectRejected({ skillId: '杀', actionType: 'use', params: {
-      cardId: 'c1#武圣',
-      preceding: [{ skillId: '武圣', actionType: 'transform', params: { cardId: 'c1' } }],
-    } });
+    await P1.expectRejected({
+      skillId: '杀',
+      actionType: 'use',
+      params: {
+        cardId: 'c1#武圣',
+        preceding: [{ skillId: '武圣', actionType: 'transform', params: { cardId: 'c1' } }],
+      },
+    });
 
     // 状态应当完全还原:c1 仍是桃,手牌仍是 c1,影子卡不应存在
     expect(harness.state.cardMap['c1'].name).toBe('桃');
@@ -249,16 +270,15 @@ describe('武圣', () => {
 
     // 武圣 的 transform action 应在 availableActions 里
     const actions = P1.availableActions();
-    const wusheng = actions.find(a => a.skillId === '武圣' && a.actionType === 'transform');
+    const wusheng = actions.find((a) => a.skillId === '武圣' && a.actionType === 'transform');
     expect(wusheng).toBeDefined();
     expect(wusheng!.label).toBe('武圣');
     // 武圣 的 transform prompt 是 useCardAndTarget(红色 + 选目标)
     expect(wusheng!.prompt.type).toBe('useCardAndTarget');
 
     // 用 transform prompt 的 cardFilter 过滤手牌:只应返回红牌 c1,c2
-    const cardFilter = wusheng!.prompt.type === 'useCardAndTarget'
-      ? wusheng!.prompt.cardFilter.filter
-      : null;
+    const cardFilter =
+      wusheng!.prompt.type === 'useCardAndTarget' ? wusheng!.prompt.cardFilter.filter : null;
     expect(cardFilter).toBeDefined();
     const allowed: string[] = [];
     for (const cardId of harness.state.players[0].hand) {
@@ -275,7 +295,14 @@ describe('武圣', () => {
     const red = makeCard('d1', '桃', '♦', '5');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['d1'], skills: ['武圣', '杀', '闪'], health: 4, maxHealth: 4 }),
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['d1'],
+          skills: ['武圣', '杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
         makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
       ],
       cardMap: { d1: red },
@@ -286,12 +313,7 @@ describe('武圣', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.transformThenUse(
-      '武圣',
-      { cardId: 'd1' },
-      '杀',
-      { cardId: 'd1#武圣', targets: [1] },
-    );
+    await P1.transformThenUse('武圣', { cardId: 'd1' }, '杀', { cardId: 'd1#武圣', targets: [1] });
 
     const shadow = harness.state.cardMap['d1#武圣'];
     // 单张转化:保留原花色(♦ 不被退化为 ♥)与颜色

@@ -8,7 +8,6 @@ import '../../src/engine/skills';
 import { viewReducer } from '../../src/client/view/reducer';
 import { getAtomDef } from '../../src/engine/atom';
 import type { GameView, ViewEvent, Card } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
 
 /** 构造一个最小化 mock GameView 用于直接调用 applyView */
 function mockView(overrides: Partial<GameView> = {}): GameView {
@@ -18,8 +17,30 @@ function mockView(overrides: Partial<GameView> = {}): GameView {
     phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
     players: [
-      { index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
-      { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+      {
+        index: 0,
+        name: 'P1',
+        character: '',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 0,
+        marks: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 0,
+        marks: [],
+      },
     ],
     cardMap: {},
     pending: null,
@@ -39,17 +60,41 @@ describe('applyView 一致性 bug', () => {
       const view = mockView({
         players: [
           {
-            index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
-            equipment: { 武器: 'w1' }, skills: [], handCount: 1,
-            hand: [{ id: 'h1', name: '杀', suit: '♠', color: '黑', rank: '1', type: '基本牌' }], marks: [],
+            index: 0,
+            name: 'P1',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: { 武器: 'w1' },
+            skills: [],
+            handCount: 1,
+            hand: [{ id: 'h1', name: '杀', suit: '♠', color: '黑', rank: '1', type: '基本牌' }],
+            marks: [],
           },
-          { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+          {
+            index: 1,
+            name: 'P2',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 0,
+            marks: [],
+          },
         ],
       });
 
       // 弃置 w1 (装备) 和 h1 (手牌)。zones 字段由 toViewEvents 生成(apply 前 state 快照),
       // 标记每张牌所在区域,applyView 据此精确扣减(判定区牌不计 handCount)。
-      def.applyView!(view, { type: '弃置', player: 0, cardIds: ['w1', 'h1'], zones: { w1: 'equipment', h1: 'hand' } } as any);
+      def.applyView!(view, {
+        type: '弃置',
+        player: 0,
+        cardIds: ['w1', 'h1'],
+        zones: { w1: 'equipment', h1: 'hand' },
+      });
 
       expect(view.players[0].handCount).toBe(0);
       expect(view.players[0].hand).toEqual([]);
@@ -62,18 +107,39 @@ describe('applyView 一致性 bug', () => {
       const def = getAtomDef('获得');
       const view = mockView({
         players: [
-          { index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
           {
-            index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true,
-            equipment: {}, skills: [], handCount: 1,
-            hand: [{ id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' }], marks: [],
+            index: 0,
+            name: 'P1',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 0,
+            marks: [],
+          },
+          {
+            index: 1,
+            name: 'P2',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 1,
+            hand: [{ id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' }],
+            marks: [],
           },
         ],
-        cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' } },
+        cardMap: {
+          c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' },
+        },
       });
 
       // P0 从 P1 获得 c2
-      def.applyView!(view, { type: '获得', player: 0, cardId: 'c2', from: 1 } as any);
+      def.applyView!(view, { type: '获得', player: 0, cardId: 'c2', from: 1 });
 
       expect(view.players[0].handCount).toBe(1); // ✅ 获得者 +1
       expect(view.players[1].handCount).toBe(0); // ❌ BUG: from 玩家仍为 1,未 -1
@@ -102,7 +168,7 @@ describe('applyView 一致性 bug', () => {
         judgeType: '乐不思蜀',
         cardId: 'j1',
         card: { name: '杀', suit: '♠', color: '黑', rank: '7' },
-      } as any);
+      });
 
       // 净效果:判定牌最终进弃牌堆,processing 不变(apply 加 + afterHooks 减)
       expect(view.zones!.processing).toHaveLength(0);
@@ -138,20 +204,38 @@ describe('applyView 一致性 bug', () => {
       const view = mockView({
         players: [
           {
-            index: 0, name: 'P1', character: '', health: 0, maxHealth: 4, alive: true,
-            equipment: { 武器: 'e1' }, skills: [], handCount: 2,
+            index: 0,
+            name: 'P1',
+            character: '',
+            health: 0,
+            maxHealth: 4,
+            alive: true,
+            equipment: { 武器: 'e1' },
+            skills: [],
+            handCount: 2,
             hand: [
               { id: 'h1', name: '杀', suit: '♠', color: '黑', rank: '1', type: '基本牌' },
               { id: 'h2', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
             ],
             marks: [],
           },
-          { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+          {
+            index: 1,
+            name: 'P2',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 0,
+            marks: [],
+          },
         ],
       });
 
       const before = view.zones!.discardPileCount;
-      def.applyView!(view, { type: '击杀', player: 0 } as any);
+      def.applyView!(view, { type: '击杀', player: 0 });
 
       // apply: 2 手牌 + 1 装备 = 3 张进弃牌堆
       expect(view.zones!.discardPileCount).toBe(before + 3); // ❌ BUG: 实际仍为 0
@@ -167,13 +251,39 @@ describe('applyView 一致性 bug', () => {
       const view = mockView({
         viewer: 0,
         players: [
-          { index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [], identity: '主公', identityHidden: false },
-          { index: 1, name: 'P1', character: '', health: 0, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [], identity: undefined, identityHidden: true },
+          {
+            index: 0,
+            name: 'P0',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 0,
+            marks: [],
+            identity: '主公',
+            identityHidden: false,
+          },
+          {
+            index: 1,
+            name: 'P1',
+            character: '',
+            health: 0,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 0,
+            marks: [],
+            identity: undefined,
+            identityHidden: true,
+          },
         ],
       });
 
       // toViewEvents 应携带阵亡者身份(死亡即公开)
-      const split = def.toViewEvents!(mockState, { type: '击杀', player: 1 } as any);
+      const split = def.toViewEvents!(mockState, { type: '击杀', player: 1 });
       expect((split!.othersView as any).identity).toBe('反贼');
 
       // applyView 揭示身份:前端走事件流时能看到阵亡者的真实身份
@@ -187,11 +297,47 @@ describe('applyView 一致性 bug', () => {
     it('获得 toViewEvents 用 othersView 公开 cardId → 第三方知道顺手牵羊拿了什么牌', () => {
       const def = getAtomDef('获得');
       const split = def.toViewEvents!(
-        { players: [
-            { index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-            { index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, hand: [], equipment: { '防具': 'c2' }, skills: [], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-          ], cardMap: { c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' } }, zones: { deck: [], discardPile: [], processing: [] } } as any,
-        { type: '获得', player: 0, cardId: 'c2', from: 1 } as any,
+        {
+          players: [
+            {
+              index: 0,
+              name: 'P0',
+              character: '',
+              health: 4,
+              maxHealth: 4,
+              alive: true,
+              hand: [],
+              equipment: {},
+              skills: [],
+              vars: {},
+              marks: [],
+              pendingTricks: [],
+              tags: [],
+              judgeZone: [],
+            },
+            {
+              index: 1,
+              name: 'P1',
+              character: '',
+              health: 4,
+              maxHealth: 4,
+              alive: true,
+              hand: [],
+              equipment: { 防具: 'c2' },
+              skills: [],
+              vars: {},
+              marks: [],
+              pendingTricks: [],
+              tags: [],
+              judgeZone: [],
+            },
+          ],
+          cardMap: {
+            c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' },
+          },
+          zones: { deck: [], discardPile: [], processing: [] },
+        } as any,
+        { type: '获得', player: 0, cardId: 'c2', from: 1 },
       );
       // othersView 不应携带 cardId（第三方不应知道获得了什么牌）
       expect((split?.othersView as any)?.cardId).toBeUndefined();
@@ -215,19 +361,41 @@ describe('applyView 一致性 bug', () => {
       const view = mockView({
         players: [
           {
-            index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
-            equipment: {}, skills: [], handCount: 2, hand: [...dupCards], marks: [],
+            index: 0,
+            name: 'P1',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 2,
+            hand: [...dupCards],
+            marks: [],
           },
-          { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+          {
+            index: 1,
+            name: 'P2',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 0,
+            marks: [],
+          },
         ],
         cardMap: { s1: dupCards[0], s2: dupCards[1] },
       });
 
       // 打出 s1: 手牌→处理区。toViewEvents 生成 { type: '打出', player: 0, card: {name,suit, color: suitColor(suit),rank}, cardId: 's1' }
       def.applyView!(view, {
-        type: '打出', player: 0, cardId: 's1',
+        type: '打出',
+        player: 0,
+        cardId: 's1',
         card: { name: '杀', suit: '♠', color: '黑', rank: '7' },
-      } as any);
+      });
 
       // ❌ BUG: filter 按 name/suit/rank 匹配,s2 也会被移除 → hand 变空但 handCount=1
       expect(view.players[0].handCount).toBe(1); // handCount 只 -1 ✓
@@ -241,19 +409,41 @@ describe('applyView 一致性 bug', () => {
       const view = mockView({
         players: [
           {
-            index: 0, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true,
-            equipment: {}, skills: [], handCount: 2, hand: [...dupCards], marks: [],
+            index: 0,
+            name: 'P1',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 2,
+            hand: [...dupCards],
+            marks: [],
           },
-          { index: 1, name: 'P2', character: '', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, marks: [] },
+          {
+            index: 1,
+            name: 'P2',
+            character: '',
+            health: 4,
+            maxHealth: 4,
+            alive: true,
+            equipment: {},
+            skills: [],
+            handCount: 0,
+            marks: [],
+          },
         ],
         cardMap: { s1: dupCards[0], s2: dupCards[1] },
       });
 
       // 弃牌: 手牌→弃牌堆。toViewEvents 生成 { type: '弃牌', player: 0, card: {...}, cardId: 's1' }
       def.applyView!(view, {
-        type: '弃牌', player: 0, cardId: 's1',
+        type: '弃牌',
+        player: 0,
+        cardId: 's1',
         card: { name: '杀', suit: '♠', color: '黑', rank: '7' },
-      } as any);
+      });
 
       expect(view.players[0].handCount).toBe(1);
       expect(view.players[0].hand?.length).toBe(1);
@@ -271,7 +461,20 @@ describe('展示型 ViewEvent 注册', () => {
       phase: '准备',
       turn: { round: 1, phase: '准备', vars: {} },
       players: [
-        { index: 0, name: 'P1', character: '', faction: '群', health: 4, maxHealth: 4, alive: true, handCount: 0, equipment: {}, skills: [], marks: [], identity: '主公' },
+        {
+          index: 0,
+          name: 'P1',
+          character: '',
+          faction: '群',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          handCount: 0,
+          equipment: {},
+          skills: [],
+          marks: [],
+          identity: '主公',
+        },
       ],
       zones: { deckCount: 0, discardCount: 0, processingCount: 0 },
       log: [],
@@ -284,7 +487,11 @@ describe('展示型 ViewEvent 注册', () => {
   it('等待选将 已注册,viewReducer 不抛错', () => {
     expect(() => getAtomDef('等待选将')).not.toThrow();
     const view = makeView();
-    const event = { type: '等待选将', waitingFor: 0, effect: { duration: 200 } } as unknown as ViewEvent;
+    const event = {
+      type: '等待选将',
+      waitingFor: 0,
+      effect: { duration: 200 },
+    } as unknown as ViewEvent;
     expect(() => viewReducer(view, event)).not.toThrow();
     // view 不应被改变
     expect(view.phase).toBe('准备');
@@ -299,7 +506,13 @@ describe('展示型 ViewEvent 注册', () => {
 
   it('注册的实体 atom(分配武将) 正常 applyView', () => {
     const view = makeView();
-    const event = { type: '分配武将', target: 0, character: '刘备', skills: ['仁德'], effect: { duration: 200 } } as unknown as ViewEvent;
+    const event = {
+      type: '分配武将',
+      target: 0,
+      character: '刘备',
+      skills: ['仁德'],
+      effect: { duration: 200 },
+    } as unknown as ViewEvent;
     viewReducer(view, event);
     expect(view.players[0].character).toBe('刘备');
   });

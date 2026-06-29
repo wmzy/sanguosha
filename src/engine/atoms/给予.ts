@@ -16,7 +16,7 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
   apply(state, atom) {
     const fromIdx = atom.from;
     const toIdx = atom.to;
-    state.players[fromIdx].hand = state.players[fromIdx].hand.filter(id => id !== atom.cardId);
+    state.players[fromIdx].hand = state.players[fromIdx].hand.filter((id) => id !== atom.cardId);
     state.players[toIdx].hand.push(atom.cardId);
   },
   effect: { sound: 'give', animation: 'slide', duration: 600 },
@@ -40,25 +40,28 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
       effect,
     };
     return {
-      ownerViews: new Map([[atom.from, ownerView], [atom.to, ownerView]]),
+      ownerViews: new Map([
+        [atom.from, ownerView],
+        [atom.to, ownerView],
+      ]),
       othersView,
     };
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;
-    const fromPi = view.players.findIndex(p => p.index === (event.from as number));
+    const fromPi = view.players.findIndex((p) => p.index === (event.from as number));
     if (fromPi >= 0) {
       view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
       if (cardId && view.players[fromPi].hand) {
-        view.players[fromPi].hand = view.players[fromPi].hand!.filter(c => c.id !== cardId);
+        view.players[fromPi].hand = view.players[fromPi].hand.filter((c) => c.id !== cardId);
       }
     }
-    const toPi = view.players.findIndex(p => p.index === (event.to as number));
+    const toPi = view.players.findIndex((p) => p.index === (event.to as number));
     if (toPi >= 0) {
       view.players[toPi].handCount += 1;
       if (cardId && view.players[toPi].hand) {
         const card = view.cardMap[cardId];
-        if (card) view.players[toPi].hand!.push(card);
+        if (card) view.players[toPi].hand.push(card);
       }
     }
   },

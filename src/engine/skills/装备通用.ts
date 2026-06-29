@@ -3,7 +3,7 @@
 //   若装备牌自带技能(以 card.name 作 skillId),动态挂载技能实例。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill'
+import { registerAction, hasBlockingPending } from '../skill';
 import { skillLoaders } from './index';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -12,10 +12,15 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  registerAction(state, skill.id, ownerId, 'use', (state: GameState, params: Record<string, Json>) => {
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'use',
+    (state: GameState, params: Record<string, Json>) => {
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state)
+      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
       const selfAlive = self.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
@@ -24,8 +29,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const hasSubtype = !!card?.subtype;
       const ok = myTurn && inActPhase && free && selfAlive && cardInHand && hasSubtype;
       return ok ? null : '装备使用条件不满足';
-    }, async (state: GameState, params: Record<string, Json>) => {
-      
+    },
+    async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       await pushFrame(state, '装备通用', from, { ...params });
       const cardId = params.cardId as string;
@@ -56,7 +61,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         await applyAtom(state, { type: '添加技能', player: from, skillId: card.name });
       }
       await popFrame(state);
-    }, );
+    },
+  );
   return () => {};
 }
 
@@ -71,4 +77,3 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
   });
 }
-

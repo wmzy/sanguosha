@@ -16,7 +16,7 @@
 //       奇数次无懈 = 被抵消, 偶数次 = 恢复生效。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { findPendingSlot, registerAction, type SkillModule } from '../skill';
+import { findPendingSlot, registerAction } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -30,7 +30,10 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   registerAction(
-    state, skill.id, ownerId, 'respond',
+    state,
+    skill.id,
+    ownerId,
+    'respond',
     (state: GameState, params: Record<string, Json>) => {
       // 无懈可击是广播型(target=TARGET_BROADCAST):先按 ownerId 查(并行询问场景下 ownerId 也可能命中),
       // 未命中时查找广播型 slot(findPendingSlot 统一 fallback)。
@@ -64,7 +67,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 找不到 cancelTarget 时(旧调用路径)退化为整体抵消 key='_all'
       const slot = findPendingSlot(state, ownerId);
       const cancelAtom = slot?.atom as { cancelTarget?: number } | undefined;
-      const cancelTarget = typeof cancelAtom?.cancelTarget === 'number' ? cancelAtom.cancelTarget : -1;
+      const cancelTarget =
+        typeof cancelAtom?.cancelTarget === 'number' ? cancelAtom.cancelTarget : -1;
       const cancelKey = `无懈/被抵消/${cancelTarget}`;
 
       // 翻转抵消状态:打出一张无懈 = 翻转当前锦囊对 cancelTarget 是否被抵消

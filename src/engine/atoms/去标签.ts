@@ -11,7 +11,7 @@ export const 去标签: AtomDefinition<{ player: number; tag: string }> = {
   },
   apply(state, atom) {
     const player = state.players[atom.player];
-    player.tags = player.tags.filter(t => t !== atom.tag);
+    player.tags = player.tags.filter((t) => t !== atom.tag);
   },
 };
 

@@ -12,9 +12,23 @@
 //
 // 与贯石斧的差异:贯石斧弃 2 张牌让原杀强命(原杀还在处理区);
 // 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
-import type { AtomAfterContext, FrontendAPI, Json, Skill, GameState} from '../types';
+// 青龙偃月刀(武器,攻击范围 3):
+//   你使用的【杀】被【闪】抵消后,你可以对相同目标再使用 1 张杀。
+//   可以连续追击直到命中或无杀可用。
+//
+// 两步流程(均通过 respond action):
+//   1. 被抵消 after hook:杀被闪抵消 → confirm 询问"是否追杀"(requestType=青龙腰月刀/confirm)
+//   2. 玩家选追杀 → useCard prompt 让玩家选 1 张杀牌(requestType=青龙腰月刀/useKill)
+//   3. 杀牌进处理区 → 移走旧闪 → 再次询问闪 → 若再被闪则 applyAtom(被抵消)递归追杀
+//
+// 挂载点:被抵消 atom after(对应规则"【杀】被抵消时"时机)。
+// 只对杀生效(ctx.frame.skillId==='杀'),万箭齐发等锦囊不触发。
+//
+// 与贯石斧的差异:贯石斧弃 2 张牌让原杀强命(原杀还在处理区);
+// 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
+import type { AtomAfterContext, FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -28,7 +42,11 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // 单一 respond action,按当前 pending 的 requestType 分流(confirm / useKill)
-  registerAction(state, skill.id, ownerId, 'respond',
+  registerAction(
+    state,
+    skill.id,
+    ownerId,
+    'respond',
     (state, params) => {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
@@ -45,7 +63,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!self) return 'player not found';
         if (!self.hand.includes(cardId)) return '牌不在手牌中';
         const card = state.cardMap[cardId];
-        if (!card || card.name !== '杀') return '只能使用杀';
+        if (card?.name !== '杀') return '只能使用杀';
       }
       return null;
     },
@@ -53,9 +71,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const slot = state.pendingSlots.get(ownerId);
       const requestType = (slot!.atom as unknown as Record<string, unknown>).requestType as string;
       if (requestType === '青龙偃月刀/confirm') {
-        state.localVars['青龙偃月刀/confirmed'] = params.choice === true || params.confirmed === true;
+        state.localVars['青龙偃月刀/confirmed'] =
+          params.choice === true || params.confirmed === true;
       } else if (requestType === '青龙偃月刀/useKill') {
-        state.localVars['青龙偃月刀/killCardId'] = params.cardId as string;
+        state.localVars['青龙偃月刀/killCardId'] = params.cardId;
       }
     },
   );
@@ -70,17 +89,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const weaponId = self.equipment['武器'];
     if (!weaponId) return;
     const weapon = ctx.state.cardMap[weaponId];
-    if (!weapon || weapon.name !== '青龙偃月刀') return;
+    if (weapon?.name !== '青龙偃月刀') return;
 
     // 检查处理区是否有闪(目标出了闪)
-    const dodgeCardId = frameCards(ctx.state).find(id => {
+    const dodgeCardId = frameCards(ctx.state).find((id) => {
       const c = ctx.state.cardMap[id];
-      return c && c.name === '闪';
+      return c?.name === '闪';
     });
     if (!dodgeCardId) return; // 没出闪,不需要追杀
 
     // owner 手牌中没有杀 → 无法追杀,直接放弃
-    const hasKill = self.hand.some(id => ctx.state.cardMap[id]?.name === '杀');
+    const hasKill = self.hand.some((id) => ctx.state.cardMap[id]?.name === '杀');
     if (!hasKill) return;
 
     // 第一步:询问是否追杀
@@ -89,7 +108,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       type: '请求回应',
       requestType: '青龙偃月刀/confirm',
       target: ownerId,
-      prompt: { type: 'confirm', title: '青龙偃月刀:是否追杀?', confirmLabel: '追杀', cancelLabel: '不追杀' },
+      prompt: {
+        type: 'confirm',
+        title: '青龙偃月刀:是否追杀?',
+        confirmLabel: '追杀',
+        cancelLabel: '不追杀',
+      },
       defaultChoice: false,
       timeout: 10,
     });
@@ -105,7 +129,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: '青龙偃月刀:选择一张杀追杀',
-        cardFilter: { filter: c => c.name === '杀', min: 1, max: 1 },
+        cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
       },
       defaultChoice: false,
       timeout: 15,
@@ -135,9 +159,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 递归检测:追杀的杀若被闪,applyAtom(被抵消) 再次触发本 hook(连续追杀)。
     // 青龙已迁至"被抵消"after,故询问闪不再自动递归,需在此显式 apply。
-    const 追杀Dodge = frameCards(ctx.state).find(id => ctx.state.cardMap[id]?.name === '闪');
+    const 追杀Dodge = frameCards(ctx.state).find((id) => ctx.state.cardMap[id]?.name === '闪');
     if (追杀Dodge) {
-      await applyAtom(ctx.state, { type: '被抵消', source: ownerId, target: atom.target!, cardId: killCardId });
+      await applyAtom(ctx.state, {
+        type: '被抵消',
+        source: ownerId,
+        target: atom.target!,
+        cardId: killCardId,
+      });
     }
 
     // 清理追杀的杀牌:杀.execute 的收尾只移走原始杀(cardId),不认识追杀的杀牌。
@@ -161,6 +190,11 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '青龙偃月刀',
     style: 'danger',
-    prompt: { type: 'confirm', title: '青龙偃月刀：是否追杀？', confirmLabel: '追杀', cancelLabel: '不追杀' },
+    prompt: {
+      type: 'confirm',
+      title: '青龙偃月刀：是否追杀？',
+      confirmLabel: '追杀',
+      cancelLabel: '不追杀',
+    },
   });
 }

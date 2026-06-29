@@ -40,11 +40,11 @@ export function useProcessingPicks(view: GameView): ProcessingPickState | null {
     const isPickPending = pending?.prompt?.type === 'pickProcessingCard';
     if (!isPickPending) return null;
 
-    const wuguFrame = view.settlementStack.find(f => f.skillId === '五谷丰登');
+    const wuguFrame = view.settlementStack.find((f) => f.skillId === '五谷丰登');
     if (!wuguFrame) return null;
 
     // 全量候选:优先用 params.revealedIds(含已选走的牌),回退到帧 cards(当前剩余)
-    const revealedIds = (wuguFrame.params.revealedIds as string[] | undefined);
+    const revealedIds = wuguFrame.params.revealedIds as string[] | undefined;
     const pickedByRaw = (wuguFrame.params.pickedBy as Record<string, Json> | undefined) ?? {};
     const pickedBy = new Map<string, string>();
     for (const [cardId, name] of Object.entries(pickedByRaw)) {
@@ -67,6 +67,5 @@ export function useProcessingPicks(view: GameView): ProcessingPickState | null {
     }
 
     return { allCards, pickedBy };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 }

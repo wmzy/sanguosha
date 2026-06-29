@@ -11,13 +11,8 @@
 //       dispatch 走真实 action 路径(不动用 SkillTestHarness),
 //       测的是新引擎 顶层 API + 距离/装备/杀的端到端协作。
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  dispatch,
-  fireTimeout,
-  resetForTest,
-  registerSkillsFromState,
-} from '../../src/engine/create-engine';
-import { fireTimeoutAndWait,  dispatchAndWait } from '../engine-harness';
+import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
 import { inAttackRange } from '../../src/engine/distance';
 import { slashMax } from '../../src/engine/slash-quota';
 import '../../src/engine/atoms';
@@ -60,12 +55,26 @@ describe('杀 + 装备 + 距离', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例1:装备丈八蛇矛(范围 3)后,P0 可以攻击座位距离 2 的 P2', async () => {
     // 卡定义:丈八蛇矛(范围 3)
-    const weapon: Card = { id: 'wp-zh', name: '丈八蛇矛', suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 3 };
+    const weapon: Card = {
+      id: 'wp-zh',
+      name: '丈八蛇矛',
+      suit: '♠',
+      color: '黑',
+      rank: 'A',
+      type: '装备牌',
+      subtype: '武器',
+      range: 3,
+    };
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [weapon.id, slash.id], skills: ['杀', '装备通用'] }),
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [weapon.id, slash.id],
+          skills: ['杀', '装备通用'],
+        }),
         makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
         makePlayer({ index: 2, name: 'P2', hand: [], skills: [] }),
         makePlayer({ index: 3, name: 'P3', hand: [], skills: [] }),
@@ -204,13 +213,41 @@ describe('杀 + 装备 + 距离', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例4:装备诸葛连弩后,同回合可以出多张杀', async () => {
     // 诸葛连弩卡(range=1,武器)
-    const zhuge: Card = { id: 'wp-zg', name: '诸葛连弩', suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype: '武器', range: 1 };
-    const slash1: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
-    const slash2: Card = { id: 'k2', name: '杀', suit: '♠', color: '黑', rank: '8', type: '基本牌' };
+    const zhuge: Card = {
+      id: 'wp-zg',
+      name: '诸葛连弩',
+      suit: '♣',
+      color: '黑',
+      rank: 'A',
+      type: '装备牌',
+      subtype: '武器',
+      range: 1,
+    };
+    const slash1: Card = {
+      id: 'k1',
+      name: '杀',
+      suit: '♠',
+      color: '黑',
+      rank: '7',
+      type: '基本牌',
+    };
+    const slash2: Card = {
+      id: 'k2',
+      name: '杀',
+      suit: '♠',
+      color: '黑',
+      rank: '8',
+      type: '基本牌',
+    };
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [zhuge.id, slash1.id, slash2.id], skills: ['杀', '装备通用'] }),
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [zhuge.id, slash1.id, slash2.id],
+          skills: ['杀', '装备通用'],
+        }),
         makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
       ],
       cardMap: { [zhuge.id]: zhuge, [slash1.id]: slash1, [slash2.id]: slash2 },
@@ -294,8 +331,38 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
     // state A:seat 0 有流离技能(会注册流离 after hook 到 state A 的注册表)
     const stateA = createGameState({
       players: [
-        { index: 0, name: '大乔', character: '大乔', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['流离', '闪', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 1, name: 'P1', character: '', health: 4, maxHealth: 4, alive: true, hand: [slash.id], equipment: {}, skills: ['杀', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        {
+          index: 0,
+          name: '大乔',
+          character: '大乔',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['流离', '闪', '装备通用'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [slash.id],
+          equipment: {},
+          skills: ['杀', '装备通用'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
       ],
       cardMap: { c1: slash },
       currentPlayerIndex: 1,
@@ -305,14 +372,96 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
     await registerSkillsFromState(stateA);
 
     // state B:5 人局(孙权/黄盖/夏侯渊/庞德/荀彧),无人有流离
-    const slashB: Card = { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' };
+    const slashB: Card = {
+      id: 'c2',
+      name: '杀',
+      suit: '♥',
+      color: '红',
+      rank: '3',
+      type: '基本牌',
+    };
     const stateB = createGameState({
       players: [
-        { index: 0, name: '孙权', character: '孙权', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['制衡', '闪', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 1, name: '黄盖', character: '黄盖', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['苦肉', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 2, name: '夏侯渊', character: '夏侯渊', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['神速', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 3, name: '庞德', character: '庞德', health: 4, maxHealth: 4, alive: true, hand: [], equipment: {}, skills: ['马术', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
-        { index: 4, name: '荀彧', character: '荀彧', health: 4, maxHealth: 4, alive: true, hand: [slashB.id], equipment: {}, skills: ['驱虎', '杀', '装备通用'], vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [] },
+        {
+          index: 0,
+          name: '孙权',
+          character: '孙权',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['制衡', '闪', '装备通用'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 1,
+          name: '黄盖',
+          character: '黄盖',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['苦肉', '装备通用'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 2,
+          name: '夏侯渊',
+          character: '夏侯渊',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['神速', '装备通用'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 3,
+          name: '庞德',
+          character: '庞德',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['马术', '装备通用'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 4,
+          name: '荀彧',
+          character: '荀彧',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [slashB.id],
+          equipment: {},
+          skills: ['驱虎', '杀', '装备通用'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
       ],
       cardMap: { c2: slashB },
       currentPlayerIndex: 4,
@@ -331,11 +480,15 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
     });
 
     // 关键断言:不应出现 流离/confirm 的 pending
-    const pendingAtoms = [...stateB.pendingSlots.values()].map(s => (s.atom as { requestType?: string }).requestType);
+    const pendingAtoms = [...stateB.pendingSlots.values()].map(
+      (s) => (s.atom as { requestType?: string }).requestType,
+    );
     expect(pendingAtoms).not.toContain('流离/confirm');
 
     // 应该是正常的 询问闪 pending(杀结算的正常流程)
-    const pendingTypes = [...stateB.pendingSlots.values()].map(s => (s.atom as { type: string }).type);
-    expect(pendingTypes.some(t => t === '询问闪' || t === '请求回应')).toBe(true);
+    const pendingTypes = [...stateB.pendingSlots.values()].map(
+      (s) => (s.atom as { type: string }).type,
+    );
+    expect(pendingTypes.some((t) => t === '询问闪' || t === '请求回应')).toBe(true);
   });
 });

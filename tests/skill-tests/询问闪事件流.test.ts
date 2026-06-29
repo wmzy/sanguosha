@@ -16,8 +16,17 @@ import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: { index: number; name: string; hand: string[]; skills: string[] }) {
   return {
-    ...opts, character: '主公', health: 4, maxHealth: 4, alive: true,
-    equipment: {}, vars: {}, marks: [], pendingTricks: [], tags: [], judgeZone: [],
+    ...opts,
+    character: '主公',
+    health: 4,
+    maxHealth: 4,
+    alive: true,
+    equipment: {},
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    tags: [],
+    judgeZone: [],
   };
 }
 
@@ -65,7 +74,7 @@ describe('询问闪事件流(applyView 增量路径)', () => {
   it('出杀后:非 target viewer 的 processedView.pending 也有 target(供视角切换)', async () => {
     await harness.setup(buildState({ p2Hand: ['c3'] }));
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
 
@@ -129,7 +138,10 @@ describe('询问闪事件流(applyView 增量路径)', () => {
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
 
-    const prompt = P2.processedView.pending!.prompt as { type: string; cardFilter?: { filter?: (c: Card) => boolean } };
+    const prompt = P2.processedView.pending!.prompt as {
+      type: string;
+      cardFilter?: { filter?: (c: Card) => boolean };
+    };
     expect(prompt.type).toBe('useCard');
     expect(prompt.cardFilter).toBeDefined();
     expect(prompt.cardFilter!.filter).toBeDefined();

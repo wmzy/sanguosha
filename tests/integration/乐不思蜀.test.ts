@@ -17,11 +17,7 @@
 // 模式:createGameState + registerSkillsFromState + 直接用 applyAtom 推 阶段开始
 //   (因为回合管理不直接接管 test setup;我们只测 乐不思蜀 自己的 hook 序列)
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  resetForTest,
-  registerSkillsFromState,
-  applyAtom,
-} from '../../src/engine/create-engine';
+import { resetForTest, registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -87,7 +83,8 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [lb.id],
           equipment: {},
           skills: ['乐不思蜀'],
@@ -104,7 +101,7 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     await registerSkillsFromState(state);
 
     // 验证初始状态:P0 判定区有 乐不思蜀
-    expect(state.players[0].pendingTricks.some(t => t.name === '乐不思蜀')).toBe(true);
+    expect(state.players[0].pendingTricks.some((t) => t.name === '乐不思蜀')).toBe(true);
     expect(state.players[0].tags ?? []).not.toContain(SKIP_TAG);
 
     // 触发 阶段开始 判定 → 乐不思蜀 hook:有 乐不思蜀 → 先问无懈(超时跳过)→ applyAtom 判定
@@ -122,7 +119,7 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     // SKIP_TAG 应被加
     expect(state.players[0].tags ?? []).toContain(SKIP_TAG);
     // 乐不思蜀 已被移除
-    expect(state.players[0].pendingTricks.some(t => t.name === '乐不思蜀')).toBe(false);
+    expect(state.players[0].pendingTricks.some((t) => t.name === '乐不思蜀')).toBe(false);
 
     // 触发 阶段开始 出牌 → 乐不思蜀 hook:有 SKIP_TAG → 去标签 + 阶段结束 出牌 + cancel
     const outOfPhaseBefore = state.phase;
@@ -146,7 +143,8 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [lb.id],
           equipment: {},
           skills: ['乐不思蜀'],
@@ -169,7 +167,7 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     // 判定♥ → SKIP_TAG 不加
     expect(state.players[0].tags ?? []).not.toContain(SKIP_TAG);
     // 乐不思蜀 已被移除(无效)
-    expect(state.players[0].pendingTricks.some(t => t.name === '乐不思蜀')).toBe(false);
+    expect(state.players[0].pendingTricks.some((t) => t.name === '乐不思蜀')).toBe(false);
     // 判定牌进弃牌堆
     expect(state.zones.discardPile).toContain(judgeCard.id);
   });
@@ -183,7 +181,8 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [],
           equipment: {},
           skills: ['乐不思蜀'],
@@ -220,13 +219,15 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
-          index: 0, name: 'P0',
+          index: 0,
+          name: 'P0',
           hand: [lb.id],
           equipment: {},
           skills: ['乐不思蜀'],
         }),
         makePlayer({
-          index: 1, name: 'P1',
+          index: 1,
+          name: 'P1',
           hand: [],
           equipment: {},
           skills: ['乐不思蜀'], // 拥有 skill 才能装载 判定 hook
@@ -250,7 +251,7 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     });
 
     // P1 判定区收到 乐不思蜀(实际是 source=0)
-    expect(state.players[1].pendingTricks.some(t => t.name === '乐不思蜀')).toBe(true);
+    expect(state.players[1].pendingTricks.some((t) => t.name === '乐不思蜀')).toBe(true);
     // 原乐不思蜀卡进弃牌堆
     expect(state.zones.discardPile).toContain(lb.id);
 
@@ -265,7 +266,7 @@ describe('乐不思蜀:判定失败则跳过出牌', () => {
     await fireTimeoutAndWait(state); // 消耗无懈窗口
 
     // P1 身上的 乐不思蜀 被移除 + SKIP_TAG 被加
-    expect(state.players[1].pendingTricks.some(t => t.name === '乐不思蜀')).toBe(false);
+    expect(state.players[1].pendingTricks.some((t) => t.name === '乐不思蜀')).toBe(false);
     expect(state.players[1].tags ?? []).toContain(SKIP_TAG);
 
     // 触发 阶段开始 出牌 → P1 出牌阶段被 cancel(因为 SKIP_TAG 还在)

@@ -31,14 +31,16 @@ export const 添加技能: AtomDefinition<{ player: number; skillId: string }> =
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex(p => p.index === (event.player as number));
+    const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
     const skillId = event.skillId as string;
     if (!view.players[pi].skills.includes(skillId)) {
       view.players[pi].skills.push(skillId);
     }
     // 马匹技能:同步 distanceVars(攻击马=attackMod,防御马=defenseMod)
-    const mountVars = event.mountDistanceVars as { attackMod?: number; defenseMod?: number } | undefined;
+    const mountVars = event.mountDistanceVars as
+      | { attackMod?: number; defenseMod?: number }
+      | undefined;
     if (mountVars) {
       view.players[pi].distanceVars = {
         ...view.players[pi].distanceVars,
