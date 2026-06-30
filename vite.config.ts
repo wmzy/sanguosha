@@ -1,9 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import wyw from '@wyw-in-js/vite';
-import path from 'path';
 import { honoApiPlugin } from './src/server/vite-plugin';
-
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/',
   plugins: [
@@ -19,13 +17,6 @@ export default defineConfig({
     }),
     honoApiPlugin(),
   ],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src/client'),
-      '@shared': path.resolve(__dirname, './src/shared'),
-      '@engine': path.resolve(__dirname, './src/engine'),
-    },
-  },
   build: {
     outDir: './dist',
     emptyOutDir: true,

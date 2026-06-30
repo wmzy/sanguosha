@@ -18,8 +18,8 @@ import {
 } from '../engine/create-engine';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import { getPendingDeadline } from '../engine/view/buildView';
-import { allCharacters } from '../engine/cards/characters';
 import {
+  allCharacters,
   weiCharacters,
   shuCharacters,
   wuCharacters,

@@ -137,7 +137,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
           // 用 cardId 精确移除单张,不能用 name/suit/rank 过滤——
           // 标准牌堆中同名同花色同点数的牌有多张(如 杀♠7 有 4 张),
           // 按 name/suit/rank 会误删所有重复牌,导致 hand.length < handCount。
-          view.players[pi].hand = view.players[pi].hand.filter((c: any) => c.id !== cardId);
+          view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
         }
         if (view.zones) view.zones.discardPileCount += 1;
         break;
@@ -147,7 +147,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         if (view.players[pi].hand && event.cardId) {
           const cardId = event.cardId as string;
           // 同上:用 cardId 精确移除,避免重复牌误删。
-          view.players[pi].hand = view.players[pi].hand.filter((c: any) => c.id !== cardId);
+          view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
         }
         if (view.zones && event.cardId) {
           view.zones.processing.push(event.cardId as string);
@@ -160,7 +160,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         const count = (event.count as number) ?? 1;
         view.players[pi].handCount += count;
         if (event.cards && view.players[pi].hand) {
-          view.players[pi].hand.push(...(event.cards as any[]));
+          view.players[pi].hand.push(...(event.cards as Card[]));
         }
         if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
         break;
@@ -177,7 +177,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
             view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
             if (view.players[fromPi].hand) {
               view.players[fromPi].hand = view.players[fromPi].hand.filter(
-                (c: any) => c.id !== cardId,
+                (c: Card) => c.id !== cardId,
               );
             }
           }

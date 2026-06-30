@@ -3,7 +3,7 @@
 // 进攻马/防御马的距离修正不再在此硬编码——由马匹技能(赤兔/的卢等)通过
 // 添加技能/移除技能 hook 设置 vars(距离/进攻修正|距离/防御修正),与马术等武将技能一致。
 // 对应 卸下 atom 负责清除武器范围;马匹 vars 由技能卸载清理。
-import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent } from '../types';
+import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
 import { registerAtom } from '../atom';
 
 function inferSlot(cardType: string | undefined): EquipSlot | null {
@@ -89,7 +89,7 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     // 装备从手牌移出:handCount - 1
     view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
     if (view.players[pi].hand) {
-      view.players[pi].hand = view.players[pi].hand.filter((c: any) => c.id !== event.cardId);
+      view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== event.cardId);
     }
   },
   toViewLog(event) {
