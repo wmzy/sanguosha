@@ -247,12 +247,7 @@ describe('handleMcpRequest', () => {
         ctx,
       );
       expect(res).not.toBeNull();
-      const sc = res!.result!.structuredContent as {
-        ok: boolean;
-        id: string;
-        path: string;
-        timestamp: string;
-      };
+      const sc = (res!.result as { structuredContent: { ok: boolean; id: string; path: string; timestamp: string } }).structuredContent;
       expect(sc.ok).toBe(true);
       const content = JSON.parse(await fs.readFile(sc.path, 'utf8'));
       expect(content.description).toBe('杀的伤害没结算');
