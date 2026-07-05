@@ -44,6 +44,11 @@ jobs:
           # 注意：OIDC trusted publishing 模式下不设 registry-url，
           # 否则 setup-node 生成的 .npmrc 会与 semantic-release 冲突（EINVALIDNPMTOKEN）。
 
+      - name: Upgrade npm (OIDC trusted publishing 需要 npm >= 11.5.1)
+        # node 22 自带 npm 10.x 不支持 OIDC，必须升级到 npm 11+，
+        # 否则 npm publish 报 ENEEDAUTH（fallback 到传统 token 认证）。
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
