@@ -7,6 +7,7 @@ import {
   handleMcpRequest,
   PLAY_TOOL,
   SKILL_INFO_TOOL,
+  REPORT_BUG_TOOL,
   type McpHandlerContext,
 } from '../../src/ai-mcp/mcpServer';
 import '../../src/engine/skills';
@@ -47,15 +48,17 @@ describe('handleMcpRequest', () => {
     expect((res!.result as { protocolVersion: string }).protocolVersion).toBeTruthy();
   });
 
-  it('tools/list 返回 play 与 getSkillInfo 工具定义', async () => {
+  it('tools/list 返回 play、getSkillInfo、reportBug 工具定义', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, ctx);
     const tools = (res!.result as { tools: (typeof PLAY_TOOL)[] }).tools;
-    expect(tools).toHaveLength(2);
-    expect(tools.map((t) => t.name)).toEqual(['play', 'getSkillInfo']);
+    expect(tools).toHaveLength(3);
+    expect(tools.map((t) => t.name)).toEqual(['play', 'getSkillInfo', 'reportBug']);
     expect(tools[0].inputSchema).toBeDefined();
     expect(tools[1].inputSchema).toBeDefined();
+    expect(tools[2].inputSchema).toBeDefined();
     expect(SKILL_INFO_TOOL.inputSchema).toBeDefined();
+    expect(REPORT_BUG_TOOL.inputSchema).toBeDefined();
   });
 
   it('tools/call play 执行 action 并返回结构化结果', async () => {
@@ -218,9 +221,65 @@ describe('handleMcpRequest', () => {
     const res = await handleMcpRequest({ jsonrpc: '2.0', id: 6, method: 'foo/bar' }, ctx);
     expect(res!.error!.code).toBe(-32601);
   });
-});
 
-/** 构造最小 GameView stub,足够 projectView 不报错。 */
+  it('tools/call reportBug 返回 ok 且文件落盘', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sgs-fb-'));
+    process.env.SGS_FEEDBACK_DIR = tmpDir;
+    try {
+      const hgc = makeFakeHgc({ view: null, phase: 'playing', roomId: 'R1' });
+      const ctx = makeCtx(hgc);
+      const res = await handleMcpRequest(
+        {
+          jsonrpc: '2.0',
+          id: 99,
+          method: 'tools/call',
+          params: {
+            name: 'reportBug',
+            arguments: {
+              description: '杀的伤害没结算',
+              severity: 'high',
+              category: 'skill-settlement',
+              expected: '掉 1 血',
+              actual: '没掉血',
+            },
+          },
+        },
+        ctx,
+      );
+      expect(res).not.toBeNull();
+      const sc = res!.result!.structuredContent as {
+        ok: boolean;
+        id: string;
+        path: string;
+        timestamp: string;
+      };
+      expect(sc.ok).toBe(true);
+      const content = JSON.parse(await fs.readFile(sc.path, 'utf8'));
+      expect(content.description).toBe('杀的伤害没结算');
+      expect(content.severity).toBe('high');
+      expect(content.expected).toBe('掉 1 血');
+      expect(content.actual).toBe('没掉血');
+    } finally {
+      delete process.env.SGS_FEEDBACK_DIR;
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('tools/call reportBug 缺 description 返回 -32602', async () => {
+    const ctx = makeCtx(makeFakeHgc({ view: null }));
+    const res = await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 100,
+        method: 'tools/call',
+        params: { name: 'reportBug', arguments: { severity: 'high' } },
+      },
+      ctx,
+    );
+    expect(res!.error).toBeDefined();
+    expect(res!.error!.code).toBe(-32602);
+  });
+});
 function makeStubView() {
   return {
     viewer: 0,

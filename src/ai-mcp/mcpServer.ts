@@ -7,6 +7,7 @@
 //
 // MCP stdio 传输：每行一条 JSON-RPC 消息（NDJSON）。响应写到 stdout，日志写到 stderr。
 import { runPlay } from './playHandler';
+import { reportBugResult, type ReportBugInput } from './feedbackHandler';
 import { getSkillDescriptionAsync } from '../engine/skill';
 import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import type { ClientMessage as EngineClientMessage } from '../engine/types';
@@ -120,6 +121,33 @@ export const SKILL_INFO_TOOL = {
   },
 };
 
+/** reportBug 工具的输入 schema:agent 对局中发现 bug 时落盘反馈。 */
+export const REPORT_BUG_TOOL = {
+  name: 'reportBug',
+  description:
+    'AI agent 在三国杀对局中发现 bug 时调用:把问题描述 + 结构化字段 + 当时的游戏状态快照写入本地 JSON 文件。' +
+    '不影响游戏进程。返回文件路径和 id。',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      description: { type: 'string', description: 'bug 描述,自由文本' },
+      severity: {
+        type: 'string',
+        enum: ['low', 'medium', 'high', 'critical'],
+        description: '严重程度,默认 medium',
+      },
+      category: {
+        type: 'string',
+        enum: ['skill-settlement', 'state-inconsistency', 'ui', 'rule-violation', 'other'],
+        description: '分类,默认 other',
+      },
+      expected: { type: 'string', description: '期望行为(可选)' },
+      actual: { type: 'string', description: '实际行为(可选)' },
+    },
+    required: ['description'],
+  },
+};
+
 /** getSkillInfo 工具的结果项:name 恒返回,description 缺失为 null(供 AI 区分"查无"与"无描述")。 */
 export interface SkillInfoEntry {
   name: string;
@@ -183,7 +211,7 @@ export async function handleMcpRequest(
           },
         };
       case 'tools/list':
-        return { jsonrpc: '2.0', id, result: { tools: [PLAY_TOOL, SKILL_INFO_TOOL] } };
+        return { jsonrpc: '2.0', id, result: { tools: [PLAY_TOOL, SKILL_INFO_TOOL, REPORT_BUG_TOOL] } };
       case 'tools/call': {
         const params = (req.params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
         if (params.name === 'getSkillInfo') {
@@ -193,6 +221,31 @@ export async function handleMcpRequest(
             jsonrpc: '2.0',
             id,
             result: { content: [{ type: 'text', text }], structuredContent: { skills: results } },
+          };
+        }
+        if (params.name === 'reportBug') {
+          const args = (params.arguments ?? {}) as Record<string, unknown>;
+          const description = typeof args.description === 'string' ? args.description : '';
+          if (!description.trim()) {
+            return {
+              jsonrpc: '2.0',
+              id,
+              error: { code: -32602, message: 'description is required' },
+            };
+          }
+          const input: ReportBugInput = {
+            description,
+            severity: args.severity as ReportBugInput['severity'],
+            category: args.category as ReportBugInput['category'],
+            expected: typeof args.expected === 'string' ? args.expected : undefined,
+            actual: typeof args.actual === 'string' ? args.actual : undefined,
+          };
+          const result = await reportBugResult(input, ctx.hgc);
+          const text = JSON.stringify(result);
+          return {
+            jsonrpc: '2.0',
+            id,
+            result: { content: [{ type: 'text', text }], structuredContent: result },
           };
         }
         if (params.name !== 'play') {
