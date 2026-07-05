@@ -4,7 +4,7 @@ export const 曹丕 = {
   gender: '男',
   faction: '魏',
   skills: [
-    { name: '行殇', path: '' },
-    { name: '放逐', path: '' },
+    { name: '行殇', path: '../skills/行殇' },
+    { name: '放逐', path: '../skills/放逐' },
   ],
 };

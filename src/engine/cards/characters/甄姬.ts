@@ -4,7 +4,7 @@ export const 甄姬 = {
   gender: '女',
   faction: '魏',
   skills: [
-    { name: '倾国', path: '' },
-    { name: '洛神', path: '' },
+    { name: '倾国', path: '../skills/倾国' },
+    { name: '洛神', path: '../skills/洛神' },
   ],
 };

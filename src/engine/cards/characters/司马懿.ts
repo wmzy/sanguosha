@@ -5,6 +5,6 @@ export const 司马懿 = {
   faction: '魏',
   skills: [
     { name: '反馈', path: '../skills/反馈' },
-    { name: '鬼才', path: '' },
+    { name: '鬼才', path: '../skills/鬼才' },
   ],
 };

@@ -3,5 +3,5 @@ export const 夏侯渊 = {
   maxHealth: 4,
   gender: '男',
   faction: '魏',
-  skills: [{ name: '神速', path: '' }],
+  skills: [{ name: '神速', path: '../skills/神速' }],
 };
