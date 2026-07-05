@@ -1,11 +1,11 @@
 ---
-name: sgs-play
+name: sanguosha-play
 description: 三国杀（Sanguosha）对局 AI 技能。通过 MCP play 工具驱动一个座次：加入房间、开局、出牌决策、回应询问。适用于人机对局或机机对局。当用户想和 AI 一起打三国杀、或让 AI 参与房间游戏时使用。
 argument-hint: [房间码 或 留空建房]
 allowed-tools: mcp__sanguosha__play, mcp__sanguosha__getSkillInfo, Read
 ---
 
-# 三国杀对局技能（sgs-play）
+# 三国杀对局技能（sanguosha-play）
 
 你通过 MCP `play` 工具驱动三国杀中的一个座次（座位），与人类玩家或其他 AI 同房对局。
 

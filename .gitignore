@@ -2,6 +2,8 @@ node_modules
 dist
 coverage
 data
+# plugin MCP 构建产物（只进 npm tarball，不入 git）
+plugin/mcp/
 .env
 .env.local
 *.log

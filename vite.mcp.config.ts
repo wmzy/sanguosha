@@ -1,6 +1,6 @@
 // MCP server 单文件打包配置（与前端 vite.config.ts 分离）。
-// 产出 dist/sanguosha-mcp/sanguosha-mcp.mjs：带 shebang、可 `node` 直接运行、可作 npm bin。
-// 发布时 SGS_PUBLIC_URL=wss://<公开服务器>/ws pnpm build:mcp 注入默认服务器地址。
+// 产出 dist/sanguosha-mcp/sanguosha-mcp.mjs：带 shebang、可 `node` 直接运行。
+// 被 scripts/build-plugin.mjs 复用：SGS_PUBLIC_URL=wss://<公开服务器>/ws pnpm build:plugin 注入默认服务器地址并打包进 npm 包。
 import { defineConfig } from 'vite';
 
 export default defineConfig({

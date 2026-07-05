@@ -101,55 +101,47 @@ docs/             # 文档
 
 让 AI agent（Claude Code / Cursor / Codex / Windsurf 等）通过 MCP server 接管三国杀对局。
 
-### 1. 配置 MCP server（sanguosha-mcp）
+### Claude Code（plugin 一键安装）
 
-MCP server 是一个 stdio 进程，连游戏服务器驱动对局。安装方式按 agent 不同：
-
-**Claude Code**
-
-```bash
-claude mcp add sanguosha -- env SGS_SERVER_URL=wss://<服务器>/ws npx -y sanguosha-mcp
+```
+/plugin marketplace add wmzy/sanguosha
+/plugin install sanguosha-play@sanguosha
 ```
 
-或写入项目 `.mcp.json`：
+Plugin 包 `sanguosha-agent-plugin` 自包含玩家向 skill + sanguosha MCP server，一次安装全到位。安装后直接对 Claude 说「开一局三国杀」即可。
+
+### 其他 agent（Cursor / Codex / Windsurf）
+
+这些 agent 不支持 Claude Code plugin，需单独配置 MCP server：
+
+1. 从 npm 安装 MCP server：`npm i -g sanguosha-agent-plugin`（同一包，plugin 内容对它们无影响）
+2. 配置 stdio 命令指向包内 MCP：
 
 ```json
 {
   "mcpServers": {
     "sanguosha": {
-      "command": "npx",
-      "args": ["-y", "sanguosha-mcp"],
+      "command": "node",
+      "args": ["<全局 node_modules>/sanguosha-agent-plugin/mcp/sanguosha-mcp.mjs"],
       "env": { "SGS_SERVER_URL": "wss://<服务器>/ws" }
     }
   }
 }
 ```
 
-**Cursor** — 写入 `~/.cursor/mcp.json`（结构同上）。
+- **Cursor** — 写入 `~/.cursor/mcp.json`
+- **Windsurf** — 写入 `~/.codeium/windsurf/mcp_config.json`
+- **Codex** — 按其 MCP 配置文件写入
 
-**Windsurf** — 写入 `~/.codeium/windsurf/mcp_config.json`（结构同上）。
+### 环境变量
 
-**Codex** — 按其 MCP 配置文件写入（结构同上）。
-
-### 2. 安装玩家向 skill
-
-```bash
-npx skills add wmzy/sanguosha --skill sanguosha-play
-# 或交互式选择
-npx skills add wmzy/sanguosha
-```
-
-skill 会装到当前 agent 的 skills 目录，教 agent 如何用 MCP 玩游戏 + 三国杀规则速查。
-
-### 3. 环境变量
-
-| 变量 | 必填 | 说明 |
+| 变量 | 默认 | 说明 |
 |------|------|------|
-| `SGS_SERVER_URL` | 是 | 游戏服务器 WS 地址（注意 `/ws` 路径） |
-| `SGS_ROOM_ID` | 否 | 加入指定房间（省略则建房） |
-| `SGS_SEAT` | 否 | 座次下标，默认 `0` |
-| `SGS_PLAYER_COUNT` | 否 | 建房人数，默认 `2` |
+| `SGS_SERVER_URL` | build 时注入值 | 游戏服务器 WS 地址（注意 `/ws` 路径） |
+| `SGS_ROOM_ID` | 自动建房 | 加入指定房间 |
+| `SGS_SEAT` | `0` | 座次下标 |
+| `SGS_PLAYER_COUNT` | `2` | 建房人数 |
 
 ### 本仓库开发
 
-本仓库自身开发用源码直跑（`pnpm mcp:serve`，连 `ws://localhost:3930/ws`），配置见仓库根 `.mcp.json`。发布 npm 包用 `pnpm build:mcp` 打包成单文件。
+本仓库自身开发用源码直跑（`pnpm mcp:serve`，连 `ws://localhost:3930/ws`），配置见仓库根 `.mcp.json`。发布 plugin npm 包用 `pnpm build:plugin` 打包 skill + MCP 为单文件。

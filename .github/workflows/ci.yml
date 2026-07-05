@@ -45,3 +45,11 @@ jobs:
       - name: Check coverage thresholds
         run: |
           node scripts/check-coverage.mjs coverage/coverage-summary.json
+
+      - name: Build plugin MCP
+        run: pnpm build:plugin
+        env:
+          SGS_PUBLIC_URL: wss://ci-placeholder/ws
+
+      - name: Validate plugin
+        run: pnpm validate:plugin

@@ -1,0 +1,60 @@
+name: Release Agent Plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/ai-mcp/**"
+      - "plugin/**"
+      - "vite.mcp.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/release-agent-plugin.yml"
+      - ".releaserc.json"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release sanguosha-agent-plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 打 GitHub Release / git tag
+      issues: write
+      pull-requests: write
+      id-token: write # OIDC trusted publishing + npm provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          # 注意：OIDC trusted publishing 模式下不设 registry-url，
+          # 否则 setup-node 生成的 .npmrc 会与 semantic-release 冲突（EINVALIDNPMTOKEN）。
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build plugin MCP
+        run: pnpm build:plugin
+        env:
+          SGS_PUBLIC_URL: ${{ secrets.SGS_PUBLIC_URL }}
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # OIDC trusted publishing：不设 NPM_TOKEN/NODE_AUTH_TOKEN，
+          # npm CLI 自动用 OIDC token 认证，provenance 自动生成。
+        run: npx semantic-release
