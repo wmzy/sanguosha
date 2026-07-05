@@ -137,7 +137,7 @@ function DebugGameViewInner({
     });
     if (snapshotId) {
       const desc = window.prompt('快照已保存。请描述你发现的 bug(可留空):');
-      if (desc !== null && desc.trim()) {
+      if (desc?.trim()) {
         await patchSnap(snapshotId, desc.trim());
       }
     }

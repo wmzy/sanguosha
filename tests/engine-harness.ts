@@ -466,7 +466,7 @@ export class PlayerSession {
       const players = view.players
         .map((p) => `P${p.index}:${p.character || '?'} hp=${p.health} hand=${p.handCount}`)
         .join(', ');
-      throw new Error(`expectView 断言失败: ${players}\n${e instanceof Error ? e.message : e}`);
+      throw new Error(`expectView 断言失败: ${players}\n${e instanceof Error ? e.message : e}`, { cause: e });
     }
   }
 
@@ -615,7 +615,7 @@ export class SkillTestHarness {
     if (!state.settlementStack) state.settlementStack = [];
     if (!state.startedAt) state.startedAt = Date.now();
     for (const p of state.players) {
-      if (!p.judgeZone) p.judgeZone = [];
+      p.judgeZone ??= [];
       if (!p.tags) p.tags = [];
     }
     this._state = state;

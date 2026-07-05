@@ -27,9 +27,7 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
   applyView(view, event) {
     const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi < 0) return;
-    if (!view.players[pi].pendingTricks) {
-      view.players[pi].pendingTricks = [];
-    }
+    view.players[pi].pendingTricks ??= [];
     // trick 是 PendingTrick{ name, source, card };GameView 仅存 cardId
     const trick = event.trick as { name?: string; card?: { id: string } } | undefined;
     if (trick?.card?.id) {

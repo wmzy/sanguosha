@@ -40,7 +40,7 @@ export const 回合用量: AtomDefinition<{ player: number; key: string; value: 
   applyView(view: GameView, event) {
     const p = view.players[event.player as number];
     if (!p) return;
-    if (!p.turnUsage) p.turnUsage = {};
+    p.turnUsage ??= {};
     p.turnUsage[event.key as string] = event.value as Json;
   },
 };

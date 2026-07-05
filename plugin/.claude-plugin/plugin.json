@@ -1,16 +1,27 @@
 {
   "name": "sanguosha-play",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "AI 驱动三国杀对局——接管座次、出牌决策、技能查询（含 sanguosha MCP server）",
-  "author": { "name": "wmzy", "url": "https://github.com/wmzy/sanguosha" },
+  "author": {
+    "name": "wmzy",
+    "url": "https://github.com/wmzy/sanguosha"
+  },
   "homepage": "https://github.com/wmzy/sanguosha",
   "repository": "https://github.com/wmzy/sanguosha",
   "license": "MIT",
-  "keywords": ["sanguosha", "三国杀", "game", "mcp", "ai"],
+  "keywords": [
+    "sanguosha",
+    "三国杀",
+    "game",
+    "mcp",
+    "ai"
+  ],
   "mcpServers": {
     "sanguosha": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/sanguosha-mcp.mjs"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp/sanguosha-mcp.mjs"
+      ]
     }
   }
 }

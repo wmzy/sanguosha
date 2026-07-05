@@ -40,9 +40,9 @@ if (!existsSync(marketPath)) {
   const mk = JSON.parse(readFileSync(marketPath, 'utf8'));
   const entry = mk.plugins?.find(p => p.name === 'sanguosha-play');
   if (!entry) warnings.push('marketplace.json: 无 sanguosha-play 条目');
-  else if (!entry.source?.npm?.package) errors.push('marketplace.json: sanguosha-play source 应为 npm 包');
-  else if (entry.source.npm.package !== 'sanguosha-agent-plugin')
-    errors.push(`marketplace.json: npm 包名应为 sanguosha-agent-plugin，实际 ${entry.source.npm.package}`);
+  else if (entry.source?.source !== 'npm') errors.push('marketplace.json: sanguosha-play source.source 应为 npm');
+  else if (entry.source.package !== 'sanguosha-agent-plugin')
+    errors.push(`marketplace.json: npm 包名应为 sanguosha-agent-plugin，实际 ${entry.source.package}`);
 }
 
 // 4. MCP 构建产物（npm 包内容，build 后才有）

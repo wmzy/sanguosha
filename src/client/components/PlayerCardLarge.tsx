@@ -66,7 +66,7 @@ export function PlayerCardLarge({
     (a) =>
       a.prompt.type === 'confirm' ||
       a.prompt.type === 'choosePlayer' ||
-      (a.prompt.type === 'useCardAndTarget' && a.transform) ||
+      (a.prompt.type === 'useCardAndTarget' && !!a.transform) ||
       a.prompt.type === 'distribute',
   );
   // 技能按钮显隐:由 action 声明的 activeWhen 决定(缺省=出牌阶段+自己回合+无 pending)。

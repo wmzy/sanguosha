@@ -139,8 +139,8 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           }
           // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
           if (pending.prompt.type === 'confirm') {
-            const confirmLabel = pending.prompt.confirmLabel || '确认';
-            const cancelLabel = pending.prompt.cancelLabel || '取消';
+            const confirmLabel = pending.prompt.confirmLabel ?? '确认';
+            const cancelLabel = pending.prompt.cancelLabel ?? '取消';
             return (
               <div className={styles.promptActions}>
                 <button

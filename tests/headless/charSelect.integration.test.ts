@@ -24,7 +24,7 @@ try {
     socket.connect(3930, 'localhost');
   });
 } catch {
-  serverUp = false;
+  // serverUp 保持初始值 false
 }
 
 async function waitFor(

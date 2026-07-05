@@ -76,7 +76,6 @@ describe('回合管理', () => {
     const _deck: string[] = [];
     for (let i = 0; i < 10; i++) {
       const _id = `d${i}`;
-      harness; // ensure harness defined
       // 直接构造 cardMap
     }
     // P0 当前出牌阶段,P0 1 张手牌(不超限)

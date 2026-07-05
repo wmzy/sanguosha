@@ -123,6 +123,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     // 只通过 onPhaseChange 递增（WS 真正 open 时），不在 effect 体中立即加，避免 StrictMode 翻倍
     let connectionOpenCount = 0;
 
+    /* eslint-disable no-loop-func -- 回调安全捕获 effect 作用域的 cancelled/connectionOpenCount 标志,cleanup 后才置 true */
     for (let i = 0; i < playerCount; i++) {
       const viewerIndex = i;
       const hgc = new HeadlessGameClient(wsUrl, {
@@ -174,6 +175,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
         }
       });
     }
+    /* eslint-enable no-loop-func */
 
     return () => {
       cancelled = true;

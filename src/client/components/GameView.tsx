@@ -532,7 +532,7 @@ export function GameViewComponent({
               const respondFilter = pendingRespondInfo?.cardFilter;
               const isAwaiting = !isDistributeActive && isMyAwaiting && !!respondFilter?.(card);
               const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
-              const isTransformCandidate = transformMode !== null && transformMode.cardFilter(card);
+              const isTransformCandidate = !!transformMode?.cardFilter(card);
               const isTransformActive = transformMode !== null && isMyTurn && canOperate;
               // 显示转化后牌名:单卡转化(武圣)= 所有候选牌;多卡转化(丈八蛇矛)= 仅已选中牌
               const isTransformMatch =

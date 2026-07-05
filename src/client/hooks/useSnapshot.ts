@@ -62,7 +62,7 @@ export function useSnapshot(): UseSnapshotResult {
         });
         if (!resp.ok) {
           const body = await resp.json().catch(() => ({}));
-          throw new Error(body.error || `保存失败 (${resp.status})`);
+          throw new Error(body.error ?? `保存失败 (${resp.status})`);
         }
         const data = (await resp.json()) as { snapshotId: string };
         setLastSnapshotId(data.snapshotId);
@@ -89,7 +89,7 @@ export function useSnapshot(): UseSnapshotResult {
         });
         if (!resp.ok) {
           const body = await resp.json().catch(() => ({}));
-          throw new Error(body.error || `描述保存失败 (${resp.status})`);
+          throw new Error(body.error ?? `描述保存失败 (${resp.status})`);
         }
         return true;
       } catch (err) {

@@ -29,7 +29,7 @@ try {
     socket.connect(3930, 'localhost');
   });
 } catch {
-  serverUp = false;
+  // serverUp 保持初始值 false
 }
 
 // describe.skipIf 需要同步布尔值；上面的顶层 await 已 settle。
