@@ -4,7 +4,7 @@
   "plugins": [
     {
       "name": "sanguosha-play",
-      "source": { "npm": { "package": "sanguosha-agent-plugin" } },
+      "source": { "source": "npm", "package": "sanguosha-agent-plugin" },
       "description": "AI 驱动三国杀对局——接管座次、出牌决策、技能查询",
       "category": "games",
       "tags": ["sanguosha", "三国杀", "mcp", "ai"]

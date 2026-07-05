@@ -12,6 +12,8 @@ export interface PlayInput {
 }
 
 export interface PlayResult {
+  /** 当前房间码（lobby 阶段供房主分享给人类加入；playing 阶段恒定） */
+  roomId: string | null;
   phase: 'lobby' | 'playing' | 'ended';
   gameOver: { winner: string } | null;
   needsAction: boolean;
@@ -35,6 +37,7 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
   const deadline = Date.now() + timeoutMs;
   return new Promise<PlayResult>((resolve) => {
     const snapshot = (): PlayResult => ({
+      roomId: hgc.roomId,
       phase: hgc.phase === 'connecting' ? 'lobby' : hgc.phase,
       gameOver: hgc.gameOverWinner ? { winner: hgc.gameOverWinner } : null,
       needsAction: hgc.needsAction(),
