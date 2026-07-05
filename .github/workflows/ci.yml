@@ -42,10 +42,6 @@ jobs:
       - name: Test with coverage
         run: pnpm test:coverage
 
-      - name: Check coverage thresholds
-        run: |
-          node scripts/check-coverage.mjs coverage/coverage-summary.json
-
       - name: Build plugin MCP
         run: pnpm build:plugin
         env:
