@@ -560,6 +560,29 @@ export class PlayerSession {
     });
   }
 
+  /**
+   * 转化后回应(看破黑牌当无懈):preceding=[转化] + 主 action(respond)。
+   * @param transformSkill 转化技能 id(如 '看破')
+   * @param transformParams 转化参数(如 { cardId })
+   * @param respondSkill 回应技能 id(如 '无懈可击')
+   * @param respondParams 回应参数(如 { cardId: 'c1#看破' })
+   */
+  async transformThenRespond(
+    transformSkill: string,
+    transformParams: Record<string, Json>,
+    respondSkill: string,
+    respondParams: Record<string, Json>,
+  ): Promise<void> {
+    return this.dispatch({
+      skillId: respondSkill,
+      actionType: 'respond',
+      params: respondParams,
+      preceding: [
+        { skillId: transformSkill, actionType: 'transform', params: transformParams },
+      ],
+    });
+  }
+
   // ─── 前端技能加载 ─────────────────────────────
 
   async loadFrontend(): Promise<void> {

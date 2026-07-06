@@ -410,6 +410,7 @@ export type Atom =
   | { type: '去标记'; player: number; markId: string }
   | { type: '清过期标记'; player: number }
   | { type: '设横置'; player: number; chained: boolean }
+  | { type: '设上限'; player: number; amount: number }
   | { type: '加标签'; player: number; tag: string }
   | { type: '去标签'; player: number; tag: string }
   // 技能管理

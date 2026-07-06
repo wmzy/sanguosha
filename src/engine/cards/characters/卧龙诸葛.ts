@@ -4,8 +4,8 @@ export const 卧龙诸葛 = {
   gender: '男',
   faction: '蜀',
   skills: [
-    { name: '八阵', path: '' },
-    { name: '火计', path: '' },
-    { name: '看破', path: '' },
+    { name: '八阵', path: '../skills/八阵' },
+    { name: '火计', path: '../skills/火计' },
+    { name: '看破', path: '../skills/看破' },
   ],
 };

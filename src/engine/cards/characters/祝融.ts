@@ -5,6 +5,6 @@ export const 祝融 = {
   faction: '蜀',
   skills: [
     { name: '巨象', path: '../skills/巨象' },
-    { name: '烈刃', path: '' },
+    { name: '烈刃', path: '../skills/烈刃' },
   ],
 };

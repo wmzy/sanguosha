@@ -65,6 +65,9 @@ export const skillLoaders: Record<string, Loader> = {
   观星: load(() => import('./观星')),
   空城: load(() => import('./空城')),
   巨象: load(() => import('./巨象')),
+  烈刃: load(() => import('./烈刃')),
+  志继: load(() => import('./志继')),
+  若愚: load(() => import('./若愚')),
   连环: load(() => import('./连环')),
   涅槃: load(() => import('./涅槃')),
   烈弓: load(() => import('./烈弓')),
@@ -104,6 +107,13 @@ export const skillLoaders: Record<string, Loader> = {
   借刀杀人: load(() => import('./借刀杀人')),
   无懈可击: load(() => import('./无懈可击')),
   铁索连环: load(() => import('./铁索连环')),
+  火攻: load(() => import('./火攻')),
+  再起: load(() => import('./再起')),
+  放权: load(() => import('./放权')),
+  // 蜀国·卧龙诸葛
+  八阵: load(() => import('./八阵')),
+  火计: load(() => import('./火计')),
+  看破: load(() => import('./看破')),
   // 通用
   装备通用: load(() => import('./装备通用')),
 };

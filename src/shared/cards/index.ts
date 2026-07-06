@@ -15,6 +15,7 @@ export {
   闪电,
   无懈可击,
   铁索连环,
+  火攻,
 } from './tricks';
 export { 装备牌列表, 武器列表, 防具列表, 马列表 } from './equipment';
 export type { CardDef } from '../types';

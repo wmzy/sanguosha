@@ -40,6 +40,7 @@ export const DEFAULT_SKILLS = [
   '闪电',
   '无懈可击',
   '铁索连环',
+  '火攻',
 ];
 
 /** 身份牌配置 */
