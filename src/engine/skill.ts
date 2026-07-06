@@ -340,14 +340,16 @@ export function unloadSkillInstance(state: GameState, skillId: string, ownerId: 
   unregisterActionsForInstance(state, skillId, ownerId);
 }
 
-export function registerSkillsFromState(state: GameState): Promise<void> {
-  const tasks: Promise<Skill | null>[] = [];
+export async function registerSkillsFromState(state: GameState): Promise<void> {
+  // 顺序实例化(按座次 + skills 数组序),保证 after/before hook 的注册顺序确定。
+  // 此前用 Promise.all 并发,模块缓存命中时各 instantiateSkill 的 onInit 执行顺序
+  // 由微任务调度决定——会导致依赖注册顺序的技能(如鬼才须先于闪电注册才能改判)
+  // 在并发调度下顺序反转。与 开局.ts 中既有的 for-await 实例化模式保持一致。
   for (const player of state.players) {
     for (const skillId of player.skills) {
-      tasks.push(instantiateSkill(state, skillId, player.index));
+      await instantiateSkill(state, skillId, player.index);
     }
   }
-  return Promise.all(tasks).then(() => undefined);
 }
 
 /**
