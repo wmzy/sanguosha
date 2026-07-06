@@ -103,6 +103,7 @@ export const skillLoaders: Record<string, Loader> = {
   五谷丰登: load(() => import('./五谷丰登')),
   借刀杀人: load(() => import('./借刀杀人')),
   无懈可击: load(() => import('./无懈可击')),
+  铁索连环: load(() => import('./铁索连环')),
   // 通用
   装备通用: load(() => import('./装备通用')),
 };

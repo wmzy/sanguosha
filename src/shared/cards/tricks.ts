@@ -104,6 +104,15 @@ export const 无懈可击: CardDef = {
   effect: { type: 'sequence', steps: [] },
 };
 
+export const 铁索连环: CardDef = {
+  name: '铁索连环',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'other' },
+  effect: { type: 'sequence', steps: [] },
+  responseWindow: 'trick_response',
+};
+
 export const 锦囊牌列表: CardDef[] = [
   过河拆桥,
   顺手牵羊,
@@ -117,4 +126,5 @@ export const 锦囊牌列表: CardDef[] = [
   兵粮寸断,
   闪电,
   无懈可击,
+  铁索连环,
 ];

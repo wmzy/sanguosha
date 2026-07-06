@@ -140,4 +140,77 @@ describe('连环·重铸', () => {
     await PT.expectRejected({ skillId: '连环', actionType: 'recycle', params: { cardId: 'c2' } });
     expect(harness.state.players[0].hand).toContain('c2');
   });
+
+  // ─── transform:转化 ─────────────────────────────
+
+  it('transform:梅花手牌当铁索连环使用', async () => {
+    const club = mkCard('c1', '杀', '♣', '5'); // 梅花杀
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '庞统',
+            character: '庞统',
+            hand: [club.id],
+            skills: ['连环', '铁索连环'],
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+        ],
+        cardMap: { c1: club },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const PT = harness.player('庞统');
+
+    // transformThenUse: 连环.transform(c1) → 铁索连环.use(c1#连环, targets=[1])
+    await PT.transformThenUse(
+      '连环',
+      { cardId: 'c1' },
+      '铁索连环',
+      { cardId: 'c1#连环', targets: [1] },
+    );
+    // 无懈可击 pass
+    await PT.pass();
+
+    // P1 被横置
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+    // 梅花手牌被转化消耗(不在手牌)
+    expect(harness.state.players[0].hand).not.toContain('c1');
+  });
+
+  it('transform:非梅花牌拒绝', async () => {
+    const heart = mkCard('h1', '杀', '♥', '5'); // 红桃(非梅花)
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '庞统',
+            character: '庞统',
+            hand: [heart.id],
+            skills: ['连环', '铁索连环'],
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+        ],
+        cardMap: { h1: heart },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const PT = harness.player('庞统');
+
+    // 非梅花转化应被 validate 拒绝
+    await PT.expectRejected({
+      skillId: '铁索连环',
+      actionType: 'use',
+      params: { cardId: 'h1#连环', targets: [1] },
+      preceding: [{ skillId: '连环', actionType: 'transform', params: { cardId: 'h1' } }],
+    });
+    // 牌仍在手
+    expect(harness.state.players[0].hand).toContain('h1');
+  });
 });

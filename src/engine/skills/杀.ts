@@ -47,6 +47,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       const targets = params.targets as number[];
+      const damageType = state.cardMap[cardId]?.damageType;
       const frame = await pushFrame(state, '杀', from, {
         ...params,
         resolvedTargets: [...targets],
@@ -120,11 +121,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
               }
             } else {
               // 武器技逆转(贯石斧强命 / 青龙追杀命中):处理区无闪 → 造成伤害
-              await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId });
+              await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId, damageType });
             }
           } else {
             // 没闪:造成伤害(触发藤甲/白银狮子/遗计/反馈等,濒死由引擎核心处理)
-            await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId });
+            await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId, damageType });
           }
         }
 

@@ -23,6 +23,7 @@ export function createStandardDeck(): Card[] {
     count: number,
     suitList?: Suit[],
     trickSubtype?: Card['trickSubtype'],
+    damageType?: Card['damageType'],
   ) {
     const ss = suitList ?? suits;
     const range = equipmentRangeMap.get(name);
@@ -42,11 +43,14 @@ export function createStandardDeck(): Card[] {
       };
       if (range != null) card.range = range;
       if (trickSubtype) card.trickSubtype = trickSubtype;
+      if (damageType) card.damageType = damageType;
       deck.push(card);
     }
   }
 
-  add('杀', '基本牌', '杀', 30);
+  add('杀', '基本牌', '杀', 21);
+  add('杀', '基本牌', '杀', 5, ['♥'], undefined, '火焰'); // 火杀
+  add('杀', '基本牌', '杀', 4, ['♠'], undefined, '雷电'); // 雷杀
   add('闪', '基本牌', '闪', 15, ['♥', '♦']);
   add('桃', '基本牌', '桃', 8, ['♥']);
 
@@ -62,6 +66,7 @@ export function createStandardDeck(): Card[] {
   add('兵粮寸断', '锦囊牌', '锦囊', 1, ['♣'], '延时锦囊');
   add('闪电', '锦囊牌', '锦囊', 2, ['♠'], '延时锦囊');
   add('无懈可击', '锦囊牌', '锦囊', 4, undefined, '响应锦囊');
+  add('铁索连环', '锦囊牌', '锦囊', 3, ['♣', '♠', '♦']);
 
   add('诸葛连弩', '装备牌', '武器', 1, ['♠', '♣']);
   add('青釭剑', '装备牌', '武器', 1, ['♠']);

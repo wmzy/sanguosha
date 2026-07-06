@@ -180,6 +180,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target: ownerId,
         amount: 3,
         source: TARGET_SYSTEM,
+        damageType: '雷电',
       });
       await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: TRICK_NAME });
     } else {

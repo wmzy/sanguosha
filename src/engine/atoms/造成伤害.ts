@@ -7,6 +7,7 @@ export const 造成伤害: AtomDefinition<{
   amount: number;
   source: number;
   cardId?: string;
+  damageType?: '普通' | '火焰' | '雷电';
 }> = {
   type: '造成伤害',
   validate(state, atom) {
@@ -36,6 +37,7 @@ export const 造成伤害: AtomDefinition<{
       target: atom.target,
       amount: atom.amount,
       source: atom.source,
+      damageType: atom.damageType,
       effect,
     };
     return {
@@ -55,7 +57,9 @@ export const 造成伤害: AtomDefinition<{
     const target = event.target as number;
     const source = event.source as number;
     const amount = event.amount ?? 0;
-    return { player: source, text: `对 P${target} 造成了 ${amount} 点伤害` };
+    const dt = event.damageType as string | undefined;
+    const attr = dt && dt !== '普通' ? `[${dt}]` : '';
+    return { player: source, text: `对 P${target} 造成了 ${amount} 点${attr}伤害` };
   },
 };
 

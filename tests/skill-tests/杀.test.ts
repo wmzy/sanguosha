@@ -136,4 +136,64 @@ describe('杀', () => {
     回合结束.applyView!(P1.processedView, { type: '回合结束', player: 0 });
     expect(P1.processedView.players[0].turnUsage?.['杀/usedCount']).toBeUndefined();
   });
+
+  // ─── 火杀/雷杀属性伤害验证 ─────────────────────────────
+
+  it('火杀造成火焰伤害', async () => {
+    const fireSlash: Card = {
+      id: 'c1',
+      name: '杀',
+      suit: '♥',
+      color: '红',
+      rank: 'A',
+      type: '基本牌',
+      damageType: '火焰',
+    };
+    await harness.setup(buildState({ extraCardMap: { c1: fireSlash } }));
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'c1', [1]);
+    await P2.pass();
+
+    // 验证 atom 历史中有 damageType='火焰' 的造成伤害
+    const damageEvents = harness.state.atomHistory.filter(
+      (e): e is typeof e & { kind: 'atom'; atom: Record<string, unknown> } =>
+        e.kind === 'atom' &&
+        (e as { atom: Record<string, unknown> }).atom.type === '造成伤害',
+    );
+    expect(damageEvents.length).toBeGreaterThanOrEqual(1);
+    const lastDamage = damageEvents[damageEvents.length - 1].atom;
+    expect(lastDamage.damageType).toBe('火焰');
+    // P2 扣血
+    expect(harness.state.players[1].health).toBe(3);
+  });
+
+  it('雷杀造成雷电伤害', async () => {
+    const lightningSlash: Card = {
+      id: 'c1',
+      name: '杀',
+      suit: '♠',
+      color: '黑',
+      rank: '5',
+      type: '基本牌',
+      damageType: '雷电',
+    };
+    await harness.setup(buildState({ extraCardMap: { c1: lightningSlash } }));
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'c1', [1]);
+    await P2.pass();
+
+    const damageEvents = harness.state.atomHistory.filter(
+      (e): e is typeof e & { kind: 'atom'; atom: Record<string, unknown> } =>
+        e.kind === 'atom' &&
+        (e as { atom: Record<string, unknown> }).atom.type === '造成伤害',
+    );
+    expect(damageEvents.length).toBeGreaterThanOrEqual(1);
+    const lastDamage = damageEvents[damageEvents.length - 1].atom;
+    expect(lastDamage.damageType).toBe('雷电');
+    expect(harness.state.players[1].health).toBe(3);
+  });
 });

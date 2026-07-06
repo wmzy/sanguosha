@@ -1,7 +1,7 @@
 // src/engine/types.ts
 // 新引擎类型定义。详见 docs/ENGINE-DESIGN.md §3-7
 
-import type { Color } from '../shared/types';
+import type { Color, DamageType } from '../shared/types';
 
 /** 系统级 owner / target:不对应任何真实玩家槽位(开局 action、无来源伤害)。 */
 export const TARGET_SYSTEM = -1;
@@ -25,6 +25,8 @@ export type Card = {
   trickSubtype?: '普通锦囊' | '延时锦囊' | '响应锦囊';
   /** 武器攻击范围(仅武器装备牌)。徒手默认 1,由 distance.ts 兜底 */
   range?: number;
+  /** 伤害属性(仅杀牌/伤害锦囊有意义):火焰/雷电触发铁索连环传导 */
+  damageType?: DamageType;
   /**
    * 影子卡牌:若设置,本 Card 是由 shadowOf 指向的原卡"转化"而来(如武圣红牌当杀)。
    * name/suit/rank 是转化后的视图;原卡仍在 cardMap[shadowOf]。
@@ -398,7 +400,7 @@ export type Atom =
   | { type: '重洗' }
   | { type: '整理牌堆'; cards: string[] }
   // 角色状态
-  | { type: '造成伤害'; target: number; amount: number; source: number; cardId?: string }
+  | { type: '造成伤害'; target: number; amount: number; source: number; cardId?: string; damageType?: DamageType }
   | { type: '回复体力'; target: number; amount: number; source?: number }
   | { type: '失去体力'; target: number; amount: number }
   | { type: '陷入濒死'; target: number }
