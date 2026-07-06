@@ -30,7 +30,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (target === undefined) return '目标不合法';
           if (target === ownerId) return '不能对自己使用';
           if (!state.players[target]?.alive) return '目标已死亡';
-          if (effectiveDistance(state, ownerId, target) > 1) return '距离太远';
+          // 奇才(黄月英):使用锦囊牌无距离限制 → 跳过距离校验
+          const ignoreDistance = !!state.players[ownerId]?.tags.includes(
+            '奇才/无距离限制',
+          );
+          if (!ignoreDistance && effectiveDistance(state, ownerId, target) > 1)
+            return '距离太远';
           const p = state.players[target];
           if (!p) return '目标不合法';
           const hasCards =

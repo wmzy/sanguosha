@@ -4,7 +4,7 @@ export const 诸葛亮 = {
   gender: '男',
   faction: '蜀',
   skills: [
-    { name: '观星', path: '' },
-    { name: '空城', path: '' },
+    { name: '观星', path: '../skills/观星' },
+    { name: '空城', path: '../skills/空城' },
   ],
 };

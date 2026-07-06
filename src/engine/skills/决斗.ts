@@ -54,56 +54,66 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 询问无懈可击(单目标锦囊:抵消整个锦囊)
       try {
-        const cancelled = await 询问无懈可击(state, target);
-        if (!cancelled) {
-          // 决斗循环:目标先出杀,之后发起者出杀,轮流。
-          // 上限保护:极端情况下(武圣/丈八 把任意牌当杀)可能无限循环;
-          // 现实中手牌+牌堆不可能产出这么多杀,100 轮远超正常上限。
-          const MAX_ROUNDS = 100;
-          let turn = 0; // 0=目标, 1=发起者
-          let loser: number | null = null;
-          let rounds = 0;
-          while (loser === null) {
-            if (rounds++ >= MAX_ROUNDS) {
-              // 理论不应触发:任一玩家手牌+牌堆合起来也产不出这么多杀。
-              // 兜底:记当前玩家为输家,跳出死循环。
-              loser = turn === 0 ? target : from;
-              break;
-            }
-            const current = turn === 0 ? target : from;
-            await applyAtom(state, {
-              type: '询问杀',
-              target: current,
-              source: turn === 0 ? from : target,
-            });
-            // 检查处理区:有杀牌 = 出了杀,移走它;没有 = 没出,输
-            const killCardId = frameCards(state).find((id) => {
-              const c = state.cardMap[id];
-              return c?.name === '杀';
-            });
-            if (killCardId) {
-              // 出了杀:移到弃牌堆,切换轮次
+        // 成为目标:空城等"不能成为目标"技能可在此 cancel(决斗不结算)。
+        // cancel 时跳过无懈可击与决斗循环,决斗牌仍正常进弃牌堆(下方统一清理)。
+        const becameTarget = await applyAtom(state, {
+          type: '成为目标',
+          source: from,
+          target,
+          cardId,
+        });
+        if (becameTarget) {
+          const cancelled = await 询问无懈可击(state, target);
+          if (!cancelled) {
+            // 决斗循环:目标先出杀,之后发起者出杀,轮流。
+            // 上限保护:极端情况下(武圣/丈八 把任意牌当杀)可能无限循环;
+            // 现实中手牌+牌堆不可能产出这么多杀,100 轮远超正常上限。
+            const MAX_ROUNDS = 100;
+            let turn = 0; // 0=目标, 1=发起者
+            let loser: number | null = null;
+            let rounds = 0;
+            while (loser === null) {
+              if (rounds++ >= MAX_ROUNDS) {
+                // 理论不应触发:任一玩家手牌+牌堆合起来也产不出这么多杀。
+                // 兜底:记当前玩家为输家,跳出死循环。
+                loser = turn === 0 ? target : from;
+                break;
+              }
+              const current = turn === 0 ? target : from;
               await applyAtom(state, {
-                type: '移动牌',
-                cardId: killCardId,
-                from: { zone: '处理区' },
-                to: { zone: '弃牌堆' },
+                type: '询问杀',
+                target: current,
+                source: turn === 0 ? from : target,
               });
-              turn = turn === 0 ? 1 : 0;
-            } else {
-              loser = current;
+              // 检查处理区:有杀牌 = 出了杀,移走它;没有 = 没出,输
+              const killCardId = frameCards(state).find((id) => {
+                const c = state.cardMap[id];
+                return c?.name === '杀';
+              });
+              if (killCardId) {
+                // 出了杀:移到弃牌堆,切换轮次
+                await applyAtom(state, {
+                  type: '移动牌',
+                  cardId: killCardId,
+                  from: { zone: '处理区' },
+                  to: { zone: '弃牌堆' },
+                });
+                turn = turn === 0 ? 1 : 0;
+              } else {
+                loser = current;
+              }
             }
+            const winner = loser === target ? from : target;
+            await applyAtom(state, {
+              type: '造成伤害',
+              target: loser,
+              amount: 1,
+              source: winner,
+              cardId,
+            });
           }
-          const winner = loser === target ? from : target;
-          await applyAtom(state, {
-            type: '造成伤害',
-            target: loser,
-            amount: 1,
-            source: winner,
-            cardId,
-          });
         }
-        // 决斗锦囊移出处理区→弃牌堆
+        // 决斗锦囊移出处理区→弃牌堆(空城取消时也走到这里)
         await applyAtom(state, {
           type: '移动牌',
           cardId,

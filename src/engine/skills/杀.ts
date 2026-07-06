@@ -74,7 +74,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
           const target = resolved[i];
 
           // 成为目标:触发"成为目标后"hook(如流离转移),可被 cancel(空城等)
-          await applyAtom(state, { type: '成为目标', source: from, target, cardId });
+          const becameTarget = await applyAtom(state, {
+            type: '成为目标',
+            source: from,
+            target,
+            cardId,
+          });
+          if (!becameTarget) continue; // 空城等:目标不合法,跳过该目标结算
 
           // 使用结算开始时:检测有效性(仁王盾黑杀无效在此 cancel)。
           // cancel=false 表示目标无效,跳过该目标(不询问闪、不伤害、不触发被抵消)。
