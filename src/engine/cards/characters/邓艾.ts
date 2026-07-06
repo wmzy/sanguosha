@@ -5,6 +5,6 @@ export const 邓艾 = {
   faction: '魏',
   skills: [
     { name: '屯田', path: '../skills/屯田' },
-    { name: '凿险', path: '' },
+    { name: '凿险', path: '../skills/凿险' },
   ],
 };
