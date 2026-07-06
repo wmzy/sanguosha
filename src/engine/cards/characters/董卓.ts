@@ -6,5 +6,7 @@ export const 董卓 = {
   skills: [
     { name: '酒池', path: '' },
     { name: '肉林', path: '' },
+    { name: '崩坏', path: '' },
+    { name: '暴虐', path: '' },
   ],
 };
