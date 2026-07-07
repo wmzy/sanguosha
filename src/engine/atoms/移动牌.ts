@@ -53,12 +53,20 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     const toPlayer = atom.to.zone === '手牌' ? atom.to.player : undefined;
 
     // 弃牌堆目标 → 弃牌事件
+    // 影子卡牌还原:转化牌(如武圣红牌当杀)入弃牌堆时,apply 用原卡替换入堆。
+    // toViewEvents 在 apply 前调用,此时影子 cardMap 仍在、可读到 shadowOf 指向的原卡。
+    // 故 ViewEvent.card 展示原卡信息(与后端 discardPile 实际收到的牌一致);
+    // cardId 仍为影子 id,供前端从玩家手牌精确过滤(手牌引用的是影子 id)。
     if (atom.to.zone === '弃牌堆' && fromPlayer !== undefined && cardInfo) {
+      const origCard = card?.shadowOf ? state.cardMap[card.shadowOf] : undefined;
+      const shownCard = origCard
+        ? { name: origCard.name, suit: origCard.suit, rank: origCard.rank }
+        : cardInfo;
       const effect = { sound: 'discard' as const, duration: 600 };
       const view: ViewEvent = {
         type: '弃牌',
         player: fromPlayer,
-        card: cardInfo,
+        card: shownCard,
         cardId: atom.cardId,
         effect,
       };

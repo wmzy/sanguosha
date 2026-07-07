@@ -18,7 +18,7 @@
 // 限一次:player.vars['天义/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 // 目标需 respond 选拼点牌——respond action 为所有玩家注册(validate 严格校验 pending requestType)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction } from '../skill';
 import { registerSlashMaxProvider, registerSlashBlocker } from '../slash-quota';
@@ -148,18 +148,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         targetCard: targetCardId ?? '',
       });
 
-      // 4) 拼点 atom 的 backend apply 是 no-op,此处直接把两张牌从处理区移入弃牌堆。
-      //    不走 移动牌 atom:拼点 atom 的 applyView 已在视图侧完成 processing→discard 投影,
-      //    再发 移动牌 事件会导致 discardPileCount 双计(参考驱虎)。
-      const cards = frameCards(st);
-      for (const id of [initiatorCardId, targetCardId]) {
-        if (!id) continue;
-        const idx = cards.indexOf(id);
-        if (idx >= 0) {
-          cards.splice(idx, 1);
-          st.zones.discardPile.push(id);
-        }
-      }
+      // 4) 拼点 atom 的 apply 已把两张牌从处理区移入弃牌堆(后端 + 视图对称)。
+      //    此处不再手动 splice/push,避免与 apply 重复操作。
 
       // 5) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
       const win = initiatorValue > targetValue;

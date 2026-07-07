@@ -11,7 +11,7 @@
 //     validate 严格检查 pending requestType,非驱虎 pending 时拒绝(无副作用)。
 //   - 每回合限一次:用 player.vars['驱虎/usedThisTurn'] + 回合用量 atom 同步 view。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction } from '../skill';
 import { effectiveDistance, inAttackRange } from '../distance';
@@ -128,18 +128,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         targetCard: targetCardId ?? '',
       });
 
-      // 4) 拼点 atom 的 backend apply 是 no-op,此处直接把两张牌从处理区移入弃牌堆。
-      //    不走 移动牌 atom:拼点 atom 的 applyView 已在视图侧完成 processing→discard 投影,
-      //    再发 移动牌 事件会导致 discardPileCount 双计。
-      const cards = frameCards(state);
-      for (const id of [initiatorCardId, targetCardId]) {
-        if (!id) continue;
-        const idx = cards.indexOf(id);
-        if (idx >= 0) {
-          cards.splice(idx, 1);
-          state.zones.discardPile.push(id);
-        }
-      }
+      // 4) 拼点 atom 的 apply 已把两张牌从处理区移入弃牌堆(后端 + 视图对称)。
+      //    此处不再手动 splice/push,避免与 apply 重复操作。
 
       // 5) 结算输赢
       const win = initiatorValue > targetValue;

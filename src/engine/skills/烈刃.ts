@@ -21,7 +21,7 @@
 //   - 拼点点数:A=1, 2-10=面值, J=11, Q=12, K=13;大者赢,相等算没赢
 //   - 拼点流程参考驱虎.ts;获得牌参考反馈.ts
 import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '烈刃/confirm';
@@ -222,18 +222,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       targetCard: victimCardId ?? '',
     });
 
-    // 清理处理区:两张拼点牌从处理区移入弃牌堆(后端)
-    // 不走 移动牌 atom:拼点 atom 的 applyView 已在视图侧完成 processing→discard 投影,
-    // 再发 移动牌 事件会导致 discardPileCount 双计(同驱虎)。
-    const cards = frameCards(ctx.state);
-    for (const id of [ownerCardId, victimCardId]) {
-      if (!id) continue;
-      const idx = cards.indexOf(id);
-      if (idx >= 0) {
-        cards.splice(idx, 1);
-        ctx.state.zones.discardPile.push(id);
-      }
-    }
+    // 拼点 atom 的 apply 已把两张牌从处理区移入弃牌堆(后端 + 视图对称),无需手动清理。
 
     await popFrame(ctx.state);
 

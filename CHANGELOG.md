@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-06-27
 
+### Fixed — atom/技能设计原则违规修正
+
+审查 atoms 与 skills 实现中对「状态变更必经 atom」「apply/applyView 对称」原则的违反,修正两类问题。
+
+#### Fixed
+- **拼点 atom apply/applyView 对称化**:此前 `拼点` atom 的 `apply` 是 no-op(纯事件标记),`applyView` 却在视图侧把两张拼点牌从 processing 移入弃牌堆——apply 与 applyView 不对称,真正的牌移动散落在各调用方。现把牌移动集中到 `apply`(后端 frame.cards→弃牌堆),并补全 `applyView` 同步 `view.settlementStack[top].cards`(此前只清 `view.zones.processing`),后端与视图真正对称。(`src/engine/atoms/拼点.ts`)
+- **删除天义/烈刃/驱虎拼点后的直接 mutate**:三处技能在 `拼点` atom 后手动 `frameCards.splice` + `state.zones.discardPile.push` 直接改牌区,绕过 atom。现在拼点 atom 的 apply 集中移动,技能只需发 `拼点` 事件,删除三处冗余直接 mutate 与随之失效的 `frameCards` import。(`src/engine/skills/天义.ts`、`src/engine/skills/烈刃.ts`、`src/engine/skills/驱虎.ts`)
+- **移动牌 shadowOf 弃牌视图不对称**:`移动牌` atom 的 apply 把转化影子卡(武圣红牌当杀)入弃牌堆时用原卡替换,但 `toViewEvents` 仍下发影子卡的 name/suit/rank,前端弃牌堆展示的是影子卡而非实际入堆的原卡。现 `toViewEvents` 在弃牌分支读 `card.shadowOf` 对应的原卡信息下发(`cardId` 仍为影子 id 供前端手牌精确过滤)。(`src/engine/atoms/移动牌.ts`)
+
 ### Added — 多人游戏结束后「再来一局」回到准备状态
 
 此前多人模式(MultiplayerPage)游戏结束后仅有「返回大厅」(断开连接退出房间),想再打一局需重建房间、重新分享房间码。现新增「再来一局」:复用 debug 模式已有的 `restart_game`/`game_reset` 协议与 `session.resetToLobby`,结算界面并列两个按钮,点「再来一局」重置同一房间到「等待大厅」阶段,玩家重新准备后即可开始新一局。服务端 `handleRestartGame` 原本就对普通房间生效(无 debug 限制),本次只是补齐多人客户端。
