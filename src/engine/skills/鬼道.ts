@@ -1,7 +1,8 @@
 // 鬼道(张角·被动触发):当一名角色的判定牌生效前,你可以用一张黑色牌替换之。
 //
-// 与鬼才(司马懿)同构:挂「判定」atom 的 after hook,在判定牌翻开(判定.apply 完成)
-// 后、判定效果(闪电/乐不思蜀/雷击等消费方)读取判定牌前询问张角是否替换。
+// 与鬼才(司马懿)同构:注册为判定改判钩子(registerJudgeModifier),由 判定 atom 的
+// afterApply 阶段触发——在判定牌翻开(判定.apply 完成)后、判定效果(闪电/乐不思蜀/
+// 雷击等消费方)读取判定牌前询问张角是否替换。
 //
 // 与鬼才的差异:**仅限黑色牌**(♠或♣,即 color==='黑')替换;鬼才为任意手牌。
 //
@@ -9,13 +10,13 @@
 //   操作。把判定牌(frameCards 顶)移入弃牌堆,把黑色手牌压入 frameCards 顶作为新判定牌。
 //   消费方(闪电/雷击)之后读到的是替换后的牌。
 //
-// 已知限制(同鬼才):hook 执行顺序 = 注册顺序(runAfterHooks 仅把系统级 hook 排末尾)。
-//   故张角需在消费技能(闪电 等)之前实例化,即座次靠前。雷击(张角自身技能)读取判定
-//   结果在 `await applyAtom(判定)` 之后(从弃牌堆顶读),鬼道在判定 after hook 内替换,
-//   先于雷击读取,故"打闪→雷击→鬼道改判为黑桃"组合链成立。
+// 顺序保证:改判在 afterApply 阶段、消费方在 runAfterHooks 阶段,前者严格先于后者。
+//   故张角任意座次都能生效。鬼道与鬼才同场时,runJudgeModifiers 按判定目标逆时针依次
+//   询问。雷击(张角自身技能)在 `await applyAtom(判定)` 之后从弃牌堆顶读最终判定牌,
+//   改判已在 afterApply 完成,故"打闪→雷击→鬼道改判为黑桃"链成立。
 import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerJudgeModifier } from '../skill';
 
 const REPLACE_RT = '鬼道/replace';
 const REPLACE_CARD_KEY = '鬼道/replaceCard';
@@ -69,8 +70,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ─── 判定 after hook:翻开判定牌后询问是否用黑色牌替换 ────────────
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
+  // ─── 判定改判钩子:翻开判定牌后询问是否用黑色牌替换 ────────────
+  registerJudgeModifier(state, skill.id, ownerId, async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { type?: string; player?: number };
     if (atom.type !== '判定') return;
 

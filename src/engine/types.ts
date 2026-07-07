@@ -509,6 +509,21 @@ export interface AtomDefinition<A = unknown> {
    * 与技能 after hooks 区分:这是 atom 定义自身的职责,不是技能 hook。
    */
   afterHooks?(state: GameState, atom: A): void;
+  /**
+   * atom 自身的「应用后」阶段——在 apply 与视图广播之后、技能 after hooks 之前执行。
+   *
+   * 用于需要在所有消费方读取 atom 结果前完成的「就地改写」阶段。典型:判定 atom
+   * 在此触发改判钩子(鬼才/鬼道),改判完成后消费方(闪电/兵粮寸断等)的 after hook
+   * 读到的即为改判后的最终牌。
+   *
+   * 与 before hooks 区别:before hooks 在 apply 之前、可 cancel/modify atom;afterApply
+   * 在 apply 之后、只能就地 mutate state(如改判直接改写结算帧顶牌)。
+   * 与技能 after hooks 区别:afterApply 严格先于后者,且承担 atom 级编排职责而非某技能的结算。
+   *
+   * 可含异步与嵌套 applyAtom(如改判会发起 请求回应 等待玩家)。仅对 apply 能落地、
+   * 无 cancel 语义的 atom 有意义;引擎在等待型 atom 的 pending resolve 后也会调用。
+   */
+  afterApply?(state: GameState, atom: A): Promise<void>;
   pending?: AtomPending<A>;
   /** 并行等待型 atom:声明如何拆分为多个单-target slot。
    *  引擎据此自动拆分,无需硬编码偏序判断。未实现 = 单 target。

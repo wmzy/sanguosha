@@ -109,6 +109,9 @@ interface SkillRegistry {
   actions: Map<string, ActionEntry>;
   beforeHooks: Map<string, AtomHookEntry[]>;
   afterHooks: Map<string, AtomHookEntry[]>;
+  /** 判定改判钩子:key=ownerId(座次),每玩家至多一个改判能力(鬼才/鬼道)。
+   *  由 判定 atom 的 afterApply 阶段逆时针遍历触发,与普通 after hook 解耦。 */
+  judgeModifiers: Map<number, AtomHookEntry>;
   instanceUnloads: Map<string, () => void>;
 }
 
@@ -123,6 +126,7 @@ function getRegistry(state: GameState): SkillRegistry {
       actions: new Map(),
       beforeHooks: new Map(),
       afterHooks: new Map(),
+      judgeModifiers: new Map(),
       instanceUnloads: new Map(),
     };
     registries.set(state, r);
@@ -241,6 +245,9 @@ function unregisterActionsForInstance(state: GameState, skillId: string, ownerId
       else if (filtered.length !== arr.length) list.set(atomType, filtered);
     }
   }
+  // 同实例的改判钩子也需清理(按 ownerId 键)
+  const jm = reg.judgeModifiers.get(ownerId);
+  if (jm && jm.skillId === skillId) reg.judgeModifiers.delete(ownerId);
 }
 
 export function getBeforeHooks(state: GameState, atomType: string): AtomHookEntry[] {
@@ -249,6 +256,11 @@ export function getBeforeHooks(state: GameState, atomType: string): AtomHookEntr
 
 export function getAfterHooks(state: GameState, atomType: string): AtomHookEntry[] {
   return getRegistry(state).afterHooks.get(atomType) ?? [];
+}
+
+/** 取判定改判钩子表(key=ownerId 座次)。由 判定 atom 的 afterApply 阶段遍历调用。 */
+export function getJudgeModifierMap(state: GameState): Map<number, AtomHookEntry> {
+  return getRegistry(state).judgeModifiers;
 }
 
 // ─── 顶层注册 helper(skill 在 onInit 内直接调用) ─────────────
@@ -315,6 +327,31 @@ export function registerAfterHook(
     if (!arr) return;
     const idx = arr.indexOf(entry);
     if (idx >= 0) arr.splice(idx, 1);
+  };
+}
+
+/**
+ * 注册判定改判钩子(鬼才/鬼道)。每玩家座次至多一个改判能力(key=ownerId)。
+ *
+ * 由 判定 atom 的 afterApply 阶段触发——在判定牌翻开(apply 完成)后、
+ * 消费方(闪电/兵粮寸断/乐不思蜀/八卦阵…)的 after hook 读取判定牌之前。
+ *
+ * 与 registerAfterHook('判定', ...) 的关键差异:遍历顺序不依赖注册序,而是
+ * 由 runJudgeModifiers 按「从判定目标起逆时针」依次询问存活玩家,
+ * 彻底消除旧实现「改判方须座次靠前于消费方才能生效」的缺陷。
+ */
+export function registerJudgeModifier(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  handler: (ctx: AtomAfterContext) => Promise<void>,
+): () => void {
+  const entry: AtomHookEntry = { skillId, ownerId, atomType: '判定', phase: 'after', handler };
+  const reg = getRegistry(state);
+  reg.judgeModifiers.set(ownerId, entry);
+  return () => {
+    const cur = reg.judgeModifiers.get(ownerId);
+    if (cur === entry) reg.judgeModifiers.delete(ownerId);
   };
 }
 

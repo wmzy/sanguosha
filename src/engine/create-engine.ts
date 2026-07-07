@@ -82,6 +82,7 @@ import {
   findPendingSlot,
   getAfterHooks,
   getBeforeHooks,
+  getJudgeModifierMap,
   setSkillInstanceUnload,
   unloadSkillInstance,
 } from './skill';
@@ -526,6 +527,42 @@ async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
   }
 }
 
+/** 运行判定改判钩子(鬼才/鬼道):从当前判定角色起,逆时针依次询问每个
+ *  存活玩家的改判能力。在 判定 atom 的 afterApply 阶段调用。
+ *
+ *  与 runAfterHooks 的区别:遍历顺序不依赖 hook 注册序,而由判定目标座次
+ *  逆时针推导,确保「改判方座次靠后于消费方也能生效」——旧实现挂在判定
+ *  after-hook 靠注册序混排,改判方须座次靠前才能生效,此处彻底修正。
+ */
+export async function runJudgeModifiers(state: GameState): Promise<void> {
+  // 从 atomStack 栈顶取当前判定 atom(afterApply 在 push 之后、pop 之前调用)
+  const atom = state.atomStack[state.atomStack.length - 1];
+  if (!atom) return;
+  const player = (atom as { player?: number }).player;
+  if (typeof player !== 'number') return;
+  if (typeof player !== 'number') return;
+  const modifiers = getJudgeModifierMap(state);
+  if (modifiers.size === 0) return;
+  const n = state.players.length;
+  // 从判定目标起逆时针遍历(含目标自身:目标自带鬼才/鬼道也要问)
+  for (let i = 0; i < n; i++) {
+    const idx = (player - i + n) % n;
+    const entry = modifiers.get(idx);
+    if (!entry) continue;
+    const p = state.players[idx];
+    if (!p?.alive) continue;
+    const curFrame = topFrame(state) ?? emptyFrame();
+    const afterCtx: AtomAfterContext = {
+      state,
+      atom,
+      ownerId: entry.ownerId,
+      frame: curFrame,
+      params: curFrame.params,
+    };
+    await entry.handler(afterCtx);
+  }
+}
+
 /**
  * 应用一个 atom:走完整 pipeline(before hooks → validate → apply → emit event → after hooks → pending)。
  * 等待型 atom 的 Promise 会挂起直到回应/超时。
@@ -617,7 +654,8 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     await Promise.all(slotPromises);
 
     // 等待型 atom:技能 after hooks 和 def.afterHooks 都在 pending resolve 之后跑
-    // ——这样贯石斧/青龙偃月刀等技能能在看到 P2 出完闪/不出后再做决策。
+    // ——这样贯石斧/青龙妙月刀等技能能在看到 P2 出完闪/不出后再做决策。
+    if (def.afterApply) await def.afterApply(state, current);
     await runAfterHooks(state, current);
 
     if (def.afterHooks) {
@@ -634,6 +672,9 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   // (等待型 atom 不在此广播——其 notifyStateChange 由 createAndAwaitSlot 在
   // pendingSlots.set 之后触发,确保 buildView.pending 已含候选将等 slot 数据。)
   notifyStateChange(state);
+  // afterApply:apply+广播之后、技能 after hooks 之前的「就地改写」阶段。
+  // 典型:判定 atom 在此触发改判钩子(鬼才/鬼道),改判完成后消费方 after hook 读到的即为最终牌。
+  if (def.afterApply) await def.afterApply(state, current);
   // 非等待型 atom:技能 after hooks 立即跑(原顺序)
   await runAfterHooks(state, current);
 

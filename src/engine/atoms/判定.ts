@@ -16,6 +16,7 @@
 // 不在 applyView 中处理——保持 applyView 与 buildView 一致。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
+import { runJudgeModifiers } from '../create-engine';
 
 export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   type: '判定',
@@ -56,6 +57,12 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 1800 },
+  /** 改判阶段:apply(翻判定牌)+广播之后、技能 after hooks(闪电/兵粮寸断等消费方)
+   *  读取判定牌之前。逆时针从判定目标起逐个询问鬼才/鬼道是否替换判定牌。
+   *  改判直接 mutate 结算帧顶牌(代替/换走),改判完成后消费方读到的是最终牌。 */
+  async afterApply(state) {
+    await runJudgeModifiers(state);
+  },
   applyView(view: GameView, _event: ViewEvent) {
     // 后端 apply+afterHooks 净效果: deck -1, processing 不变(进后出), discardPile +1。
     // applyView 对应净效果: deckCount -1, discardPileCount +1, processing 不变。

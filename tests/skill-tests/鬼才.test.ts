@@ -6,8 +6,8 @@
 //   2. 不替换 → 闪电命中,目标受伤
 //   3. 司马懿无手牌 → 不询问(直接判定)
 //
-// 关键:司马懿(P0)座次须在闪电持有者之前,保证鬼才 afterHook 先于闪电消费 hook 执行
-// (runAfterHooks 按注册顺序,系统级 hook 排末尾,其余保持注册序)。
+// 关键:鬼才注册为判定改判钩子,由 判定 atom 的 afterApply 阶段触发(逆时针从判定目标
+// 起依次询问),严格先于消费方(闪电)的 after hook。改判是否生效不再依赖座次。
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   SkillTestHarness,
@@ -255,5 +255,63 @@ describe('鬼才', () => {
     // ♠3 命中 → P1 受 3 点伤害
     expect(harness.state.players[1].health).toBe(1);
     } finally { restoreCompare(); }
+  });
+
+  // ─── 5. 消费方座次靠前、改判方座次靠后 → 改判仍生效 ──────
+  // 旧实现(挂判定 after-hook 靠注册序混排)下此场景改判失效:消费方(闪电)
+  // 座次靠前先注册先结算,改判方后注册来不及改判。改用 afterApply 改判阶段后,
+  // 改判严格先于消费方 after hook,与座次无关。
+  it('闪电持有者(P0)座次靠前,司马懿(P1)座次靠后 → 鬼才改判仍生效', async () => {
+    const lightningCard = makeCard('sd1', '闪电', '♠');
+    const judgeCard = makeCard('j1', '判定牌', '♠', '5'); // ♠5 命中
+    const replaceCard = makeCard('r1', '杀', '♣', '5'); // ♣5 非黑桃 → 不命中
+    const state: GameState = createGameState({
+      players: [
+        // P0=闪电持有者(消费方),座次靠前
+        makePlayer({
+          index: 0,
+          name: '闪电主',
+          skills: ['闪电', '回合管理'],
+          pendingTricks: [{ name: '闪电', source: 0, card: lightningCard }],
+          health: 4,
+        }),
+        // P1=司马懿(改判方),座次靠后
+        makePlayer({
+          index: 1,
+          name: '司马懿',
+          hand: ['r1'],
+          skills: ['鬼才', '回合管理'],
+          health: 4,
+        }),
+      ],
+      cardMap: { sd1: lightningCard, j1: judgeCard, r1: replaceCard },
+      currentPlayerIndex: 0, // P0 回合
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    const restoreCompare = disableAutoCompare();
+    try {
+      state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+      await harness.setup(state);
+      const P1 = harness.player('司马懿');
+
+      void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
+      await waitForStable(harness.state); // 无懈窗口
+      await fireTimeoutAndWait(harness.state); // 跳过无懈
+      await waitForStable(harness.state); // 鬼才询问(逆时针从 P0 起,问到 P1)
+
+      // 司马懿(P1)用 ♣5 替换 ♠5
+      await P1.respond('鬼才', { choice: true, cardId: 'r1' });
+      await waitForStable(harness.state);
+
+      // 改判生效:判定牌变 ♣5 → 闪电不命中 → P0 不受伤
+      expect(harness.state.players[0].health).toBe(4);
+      // 闪电传给下家(司马懿)
+      expect(harness.state.players[1].pendingTricks.some((t) => t.name === '闪电')).toBe(true);
+      // 替换牌消耗
+      expect(harness.state.players[1].hand).not.toContain('r1');
+    } finally {
+      restoreCompare();
+    }
   });
 });
