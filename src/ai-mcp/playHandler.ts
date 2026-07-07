@@ -33,6 +33,15 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
     hgc.sendAction(input.action.message);
     lastActionResult = 'accepted';
   }
+  // 自动注册技能：选将后 view 有 character + skills 但 registry 可能未注册。
+  // 每次调 play 时检查并补注册（幂等：registerSkillActions 重复调用无害）。
+  const v = hgc.view;
+  if (v) {
+    const me = v.players[hgc.seatIndex];
+    if (me?.character && me.skills.length > 0) {
+      await hgc.loadSkillActions(me.skills);
+    }
+  }
   const timeoutMs = input.waitTimeoutMs ?? DEFAULT_WAIT_MS;
   const deadline = Date.now() + timeoutMs;
   return new Promise<PlayResult>((resolve) => {

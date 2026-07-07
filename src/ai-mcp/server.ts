@@ -16,7 +16,7 @@ import {
   type McpHandlerContext,
   type StartGameOpts,
 } from './mcpServer';
-import { joinAndStartRoom } from './lobby';
+import { joinAndReady, advanceToStart } from './lobby';
 
 // 构建期注入的默认服务器 URL。
 // tsx 直跑源码时该符号未定义 → typeof 守卫避免 ReferenceError，兜底 localhost（本仓库开发用）。
@@ -45,24 +45,34 @@ async function main(): Promise<void> {
   let started = false;
   // 环境变量作为默认值,被 opts 覆盖
   const ensureStarted = async (opts?: StartGameOpts): Promise<void> => {
-    if (started) return;
-    started = true;
     const o = opts ?? normalizeStartGame(true);
     if (o.mode === 'multiplayer') {
-      const result = await joinAndStartRoom(hgc, {
-        mode: o.roomId ? 'join' : 'create',
-        roomId: o.roomId ?? ROOM_ID ?? undefined,
-        name: o.name,
-        maxPlayers: o.maxPlayers ?? PLAYER_COUNT,
-        playerId: o.playerId ?? PLAYER_ID ?? undefined,
-        readyTimeoutMs: o.readyTimeoutMs,
-      });
-      logErr(
-        `multiplayer room ready: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`,
-      );
+      // 首次：建/加入 + ready，立即返回 lobby + roomId（不等全员就绪）。
+      // 这样房主能把房间码分享给他人，他人在独立进程加入后，再由后续 play 调用
+      // 触发 advanceToStart 推进开局。避免"阻塞等 ready 期间无法启动对方"的死锁。
+      if (!started) {
+        started = true;
+        const result = await joinAndReady(hgc, {
+          mode: o.roomId ? 'join' : 'create',
+          roomId: o.roomId ?? ROOM_ID ?? undefined,
+          name: o.name,
+          maxPlayers: o.maxPlayers ?? PLAYER_COUNT,
+          playerId: o.playerId ?? PLAYER_ID ?? undefined,
+        });
+        logErr(
+          `multiplayer room joined: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`,
+        );
+        return;
+      }
+      // 后续：若仍在 lobby，等全员就绪并推进开局（房主 sendStartGame）。
+      if (hgc.phase === 'lobby') {
+        await advanceToStart(hgc, o.readyTimeoutMs);
+      }
       return;
     }
     // debug 模式(旧路径)
+    if (started) return;
+    started = true;
     if (o.roomId ?? ROOM_ID) {
       await hgc.connect(o.roomId ?? ROOM_ID!, SEAT);
     } else {

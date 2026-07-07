@@ -188,8 +188,12 @@ export class HeadlessGameClient {
     const v = this._view;
     if (!v?.pending) return false;
     const p = v.pending;
-    // 广播型（target<0，如无懈可击询问）或阻塞型 target===本座次
-    return p.target < 0 ? true : p.isBlocking !== false && p.target === this._seatIndex;
+    if (p.target < 0) return true; // 广播型（无懈可击等）
+    if (p.target !== this._seatIndex) return false; // 别人的 pending
+    // 阻塞型 pending：必须回应
+    if (p.isBlocking !== false) return true;
+    // 非阻塞型 pending：出牌阶段的出牌窗口需要 AI 行动（可出牌或结束回合）
+    return v.phase === '出牌';
   }
 
   getAvailableActions(): AvailableAction[] {

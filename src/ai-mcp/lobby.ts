@@ -45,6 +45,64 @@ function isAllReady(hgc: HeadlessGameClient): boolean {
 }
 
 /**
+ * 建/加入房间并发送 ready（不等全员就绪）。
+ * 用于 multiplayer 分阶段编排：首次只到 ready，立即返回 lobby + roomId，
+ * 供房主把房间码分享给他人；他人加入后再用 advanceToStart 推进开局。
+ */
+export async function joinAndReady(
+  hgc: HeadlessGameClient,
+  opts: LobbyOpts,
+): Promise<{ roomId: string; playerId: string; isHost: boolean }> {
+  if (opts.mode === 'create') {
+    hgc.createRoom(
+      opts.name ?? `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      opts.maxPlayers ?? 2,
+      opts.config,
+      opts.playerId,
+    );
+  } else {
+    if (!opts.roomId) throw new Error('join 模式需要 roomId');
+    hgc.joinRoom(opts.roomId, opts.playerId);
+  }
+  const joinDeadline = Date.now() + 10_000;
+  await waitFor(() => hgc.playerId !== null, joinDeadline, '加入房间超时');
+  hgc.sendReady();
+  const rs = hgc.roomState;
+  return {
+    roomId: hgc.roomId ?? '',
+    playerId: hgc.playerId ?? '',
+    isHost: rs?.hostId === hgc.playerId,
+  };
+}
+
+/** 判定是否已进入对局阶段（封装避免 CFA 窄化 getter）。 */
+function isPlaying(hgc: HeadlessGameClient): boolean {
+  return hgc.phase === 'playing';
+}
+
+/**
+ * 等待全员就绪并推进开局（房主 sendStartGame；非房主仅等待）。
+ * 超时静默返回 false。返回 true 表示已进入 playing。
+ * 幂等：可重复调用，已在 playing 时直接返回 true。
+ */
+export async function advanceToStart(
+  hgc: HeadlessGameClient,
+  readyTimeoutMs?: number,
+): Promise<boolean> {
+  if (isPlaying(hgc)) return true;
+  const readyDeadline = Date.now() + (readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
+  await waitFor(() => isAllReady(hgc), readyDeadline, '等待全员就绪超时', false);
+  if (!isAllReady(hgc)) return false;
+  const rs = hgc.roomState;
+  if (rs?.hostId === hgc.playerId) {
+    hgc.sendStartGame();
+  }
+  const startDeadline = Date.now() + 15_000;
+  await waitFor(() => isPlaying(hgc), startDeadline, '开局超时', false);
+  return isPlaying(hgc);
+}
+
+/**
  * 加入房间并推进到开局。
  * create 模式：建房→准备→等待他人加入并就绪→房主开局。
  * join 模式：加入→准备→等待房主开局。
