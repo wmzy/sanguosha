@@ -28,6 +28,7 @@ export const skillLoaders: Record<string, Loader> = {
   激将: load(() => import('./激将')),
   护甲: load(() => import('./护甲')),
   制衡: load(() => import('./制衡')),
+  救援: load(() => import('./救援')),
   武圣: load(() => import('./武圣')),
   遗计: load(() => import('./遗计')),
   天妒: load(() => import('./天妒')),
@@ -114,13 +115,80 @@ export const skillLoaders: Record<string, Loader> = {
   铁索连环: load(() => import('./铁索连环')),
   火攻: load(() => import('./火攻')),
   再起: load(() => import('./再起')),
+  苦肉: load(() => import('./苦肉')),
   放权: load(() => import('./放权')),
+  // 吴国·甘宁
+  奇袭: load(() => import('./奇袭')),
+  // 吴国·吕蒙
+  克己: load(() => import('./克己')),
+  // 吴国·大乔
+  国色: load(() => import('./国色')),
+  // 吴国·陆逊
+  谦逊: load(() => import('./谦逊')),
+  连营: load(() => import('./连营')),
+  // 吴国·张昭张纮
+  直谏: load(() => import('./直谏')),
+  固政: load(() => import('./固政')),
+  // 吴国·孙坚
+  英魂: load(() => import('./英魂')),
+  // 吴国·孙策
+  激昂: load(() => import('./激昂')),
+  魂姿: load(() => import('./魂姿')),
+  制霸: load(() => import('./制霸')),
+  // 吴国·孙尚香
+  结姻: load(() => import('./结姻')),
+  枭姬: load(() => import('./枭姬')),
+  // 吴国·周泰
+  不屈: load(() => import('./不屈')),
+  // 吴国·太史慈
+  天义: load(() => import('./天义')),
+  // 吴国·周瑜
+  英姿: load(() => import('./英姿')),
+  反间: load(() => import('./反间')),
+  // 吴国·鲁肃
+  好施: load(() => import('./好施')),
+  缔盟: load(() => import('./缔盟')),
+  // 吴国·小乔
+  天香: load(() => import('./天香')),
+  红颜: load(() => import('./红颜')),
+  // 群雄·袁绍
+  乱击: load(() => import('./乱击')),
+  无双: load(() => import('./无双')),
+  // 群雄·颜良文丑
+  双雄: load(() => import('./双雄')),
+  // 群雄·庞德
+  鞬出: load(() => import('./鞬出')),
+  // 群雄·貂蝉
+  离间: load(() => import('./离间')),
+  闭月: load(() => import('./闭月')),
+  // 群雄·华佗
+  急救: load(() => import('./急救')),
+  青囊: load(() => import('./青囊')),
+  // 群雄·董卓
+  酒池: load(() => import('./酒池')),
+  肉林: load(() => import('./肉林')),
+  崩坏: load(() => import('./崩坏')),
+  暴虐: load(() => import('./暴虐')),
+  // 群雄·蔡文姬
+  悲歌: load(() => import('./悲歌')),
+  断肠: load(() => import('./断肠')),
+  // 群雄·贾诩
+  完杀: load(() => import('./完杀')),
+  乱武: load(() => import('./乱武')),
+  帷幕: load(() => import('./帷幕')),
+  // 群雄·张角
+  雷击: load(() => import('./雷击')),
+  鬼道: load(() => import('./鬼道')),
+  黄天: load(() => import('./黄天')),
   // 蜀国·卧龙诸葛
   八阵: load(() => import('./八阵')),
   火计: load(() => import('./火计')),
   看破: load(() => import('./看破')),
   // 通用
   装备通用: load(() => import('./装备通用')),
+  // 群雄·左慈
+  化身: load(() => import('./化身')),
+  新生: load(() => import('./新生')),
 };
 
 // 设置解析器(打破循环依赖:技能文件 import skill.ts → skill.ts 通过 resolver 查表)

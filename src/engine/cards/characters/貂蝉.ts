@@ -4,7 +4,7 @@ export const 貂蝉 = {
   gender: '女',
   faction: '群',
   skills: [
-    { name: '离间', path: '' },
-    { name: '闭月', path: '' },
+    { name: '离间', path: '../skills/离间' },
+    { name: '闭月', path: '../skills/闭月' },
   ],
 };

@@ -3,7 +3,7 @@
 // 提供按 name 查询 faction / maxHealth / skills / isLord 的便捷 API,供前端展示层复用。
 
 import { allCharacters } from './cards/characters';
-import type { Faction } from './types';
+import type { Faction, Gender } from './types';
 
 /** 常备主公名单:拥有主公技的武将。
  *  唯一来源:isLord 判定、选将拆分等都基于此常量,不在多处硬编码。 */
@@ -21,6 +21,8 @@ export interface CharacterMeta {
   name: string;
   faction: Faction;
   maxHealth: number;
+  /** 武将性别(男/女),影响结姻/雌雄双股剑等性别相关技能 */
+  gender: Gender;
   /** 技能 id 列表 */
   skills: string[];
   /** 是否常备主公(拥有主公技) */
@@ -35,6 +37,7 @@ interface CharacterSource {
   name: string;
   faction: Faction;
   maxHealth: number;
+  gender: Gender;
   skills: Array<{ name: string }>;
   isLord?: boolean;
 }
@@ -48,6 +51,7 @@ const META: ReadonlyMap<string, CharacterMeta> = new Map(
         name: src.name,
         faction: src.faction,
         maxHealth: src.maxHealth,
+        gender: src.gender,
         skills: src.skills.map((s) => s.name),
         isLord: src.isLord === true || LORD_CANDIDATES.includes(src.name),
       } satisfies CharacterMeta,
@@ -65,6 +69,11 @@ export function getFaction(name: string): Faction {
 
 export function getMaxHealth(name: string): number {
   return META.get(name)?.maxHealth ?? 4;
+}
+
+/** 查询武将性别。未知武将默认 '男'(三国杀武将绝大多数为男性)。 */
+export function getGender(name: string): Gender {
+  return META.get(name)?.gender ?? '男';
 }
 
 /** 查询武将是否是常备主公(拥有主公技)。 */

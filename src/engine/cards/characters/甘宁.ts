@@ -3,5 +3,5 @@ export const 甘宁 = {
   maxHealth: 4,
   gender: '男',
   faction: '吴',
-  skills: [{ name: '奇袭', path: '' }],
+  skills: [{ name: '奇袭', path: '../skills/奇袭' }],
 };

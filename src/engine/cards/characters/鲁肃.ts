@@ -4,7 +4,7 @@ export const 鲁肃 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '好施', path: '' },
-    { name: '缔盟', path: '' },
+    { name: '好施', path: '../skills/好施' },
+    { name: '缔盟', path: '../skills/缔盟' },
   ],
 };

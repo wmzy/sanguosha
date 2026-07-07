@@ -27,6 +27,16 @@ export type SlashMaxProvider = (state: GameState, player: number) => number;
 const providersByPlayer = new Map<number, Set<SlashMaxProvider>>();
 
 /**
+ * 出杀阻断器:返回 true 表示该玩家本回合被禁止出杀(无论剩余次数)。
+ * 用于"拼点输了本回合不能用杀"类效果(天义)。与上限提供者对称:
+ * 提供者放宽上限,阻断器直接禁用。阻断器随技能实例注册/卸载(走 unload 清理链)。
+ */
+export type SlashBlocker = (state: GameState, player: number) => boolean;
+
+/** player 索引 → 该玩家当前注册的阻断器集合 */
+const blockersByPlayer = new Map<number, Set<SlashBlocker>>();
+
+/**
  * 注册一个出杀上限提供者(技能 onInit 时调用,与 registerAction 同构)。
  * 返回取消注册函数——技能 onInit 应将其并入返回的 unload,由 setSkillInstanceUnload
  * 统一管理,卸载技能实例时自动清理。
@@ -70,8 +80,40 @@ export function slashUsed(state: GameState): number {
   return typeof used === 'number' ? used : 0;
 }
 
-/** 当前玩家是否还能出杀(已用次数 < 上限) */
+/**
+ * 注册一个出杀阻断器(技能 onInit 时调用)。返回取消注册函数——
+ * 阻断器是模块级集合(非 state-bound 注册表),必须并入 onInit 返回的 unload,
+ * 由 setSkillInstanceUnload 在卸载技能实例时自动清理。
+ */
+export function registerSlashBlocker(ownerId: number, blocker: SlashBlocker): () => void {
+  let set = blockersByPlayer.get(ownerId);
+  if (!set) {
+    set = new Set();
+    blockersByPlayer.set(ownerId, set);
+  }
+  set.add(blocker);
+  return () => {
+    const s = blockersByPlayer.get(ownerId);
+    if (s) {
+      s.delete(blocker);
+      if (s.size === 0) blockersByPlayer.delete(ownerId);
+    }
+  };
+}
+
+/** 该玩家本回合是否被阻断出杀(任一阻断器返回 true 即阻断) */
+export function isSlashBlocked(state: GameState, player: number): boolean {
+  const set = blockersByPlayer.get(player);
+  if (!set) return false;
+  for (const fn of set) {
+    if (fn(state, player)) return true;
+  }
+  return false;
+}
+
+/** 当前玩家是否还能出杀(未被阻断 且 已用次数 < 上限) */
 export function canSlash(state: GameState, player: number): boolean {
+  if (isSlashBlocked(state, player)) return false;
   return slashUsed(state) < slashMax(state, player);
 }
 
@@ -80,7 +122,8 @@ export function incSlashUsed(state: GameState): void {
   state.turn.vars[SLASH_USED_VAR] = slashUsed(state) + 1;
 }
 
-/** 测试用:清空所有上限提供者(由 create-engine.resetForTest 调用) */
+/** 测试用:清空所有上限提供者与阻断器(由 create-engine.resetForTest 调用) */
 export function clearSlashMaxProviders(): void {
   providersByPlayer.clear();
+  blockersByPlayer.clear();
 }

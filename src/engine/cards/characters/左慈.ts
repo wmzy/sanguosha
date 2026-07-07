@@ -4,7 +4,7 @@ export const 左慈 = {
   gender: '男',
   faction: '群',
   skills: [
-    { name: '化身', path: '' },
-    { name: '新生', path: '' },
+    { name: '化身', path: '../skills/化身' },
+    { name: '新生', path: '../skills/新生' },
   ],
 };

@@ -61,6 +61,7 @@ export interface PendingTrick {
 
 export type Identity = '主公' | '忠臣' | '反贼' | '内奸';
 export type Faction = '魏' | '蜀' | '吴' | '群';
+export type Gender = '男' | '女';
 
 export interface PlayerState {
   index: number;
@@ -191,7 +192,8 @@ export type ActionPrompt =
   | ChoosePlayerPrompt
   | ChooseCharacterPrompt
   | PickProcessingCardPrompt
-  | PickTargetCardPrompt;
+  | PickTargetCardPrompt
+  | ChooseSuitPrompt;
 
 export interface CardFilter {
   filter?: (card: Card) => boolean;
@@ -297,6 +299,15 @@ export interface PickProcessingCardPrompt {
   description?: string;
   /** 处理区明牌候选(使用者可见) */
   cards: Array<{ cardId: string; cardName: string; suit: Card['suit']; rank: string }>;
+}
+
+/** 选花色(反间:目标从 ♠♥♣♦ 中猜一种花色)。
+ *  respond params: { suit: '♠' | '♥' | '♣' | '♦' }。
+ *  超时默认:选 ♠(不放弃猜测机会,描述未指定超时行为)。 */
+export interface ChooseSuitPrompt {
+  type: 'chooseSuit';
+  title: string;
+  description?: string;
 }
 
 /** 选牌面板(过河拆桥/顺手牵羊生效后,使用者从目标区域选一张牌)。
@@ -484,7 +495,9 @@ export type Atom =
   // 结算帧 params 变更(走 atom,保证前端同步)
   | { type: '帧参数赋值'; key: string; value: Json }
   // 回合用量(view 同步):出杀计数/限一次标记同步到前端 turnUsage
-  | { type: '回合用量'; player: number; key: string; value: Json };
+  | { type: '回合用量'; player: number; key: string; value: Json }
+  // 周泰·不屈:牌堆顶一张牌作为"创"牌置于武将牌上
+  | { type: '置创牌'; player: number };
 
 export interface AtomDefinition<A = unknown> {
   type: string;

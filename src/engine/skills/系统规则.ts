@@ -207,6 +207,13 @@ export function onInit(_skill: Skill, state: GameState): () => void {
 async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> {
   await applyAtom(state, { type: '陷入濒死', target: targetIdx });
 
+  // 不屈(周泰·锁定技):陷入濒死 after-hook 翻创牌判定,点数不重复时设存活标记。
+  // 命中则周泰以0体力存活,濒死已化解——跳过求桃循环与击杀。
+  if (state.localVars['不屈/存活'] === targetIdx) {
+    delete state.localVars['不屈/存活'];
+    return;
+  }
+
   const n = state.players.length;
   for (let i = 0; i < n; i++) {
     const playerIdx = (targetIdx + i) % n;

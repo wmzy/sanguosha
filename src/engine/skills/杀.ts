@@ -16,6 +16,8 @@ import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
+import { enforceDualDodge } from './无双';
+import { enforceRoulinDodge } from './肉林';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 
@@ -95,6 +97,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
           // 生效前:询问闪(等待目标回应;八卦阵判红放虚拟闪后 cancel)
           await applyAtom(state, { type: '询问闪', target, source: from });
+
+          // 无双(吕布锁定技):目标需连续出两张闪。第一张闪打出后消耗,追加第二次询问。
+          await enforceDualDodge(state, from, target);
+          // 肉林(董卓锁定技):异性间杀,目标需连续出两张闪。同上机制。
+          await enforceRoulinDodge(state, from, target);
 
           // 检查处理区:有没有闪牌(目标出闪 / 八卦阵虚拟闪)
           const dodgeIds = frameCards(state).filter((id) => {

@@ -4,7 +4,7 @@ export const 庞德 = {
   gender: '男',
   faction: '群',
   skills: [
-    { name: '马术', path: '' },
-    { name: '鞬出', path: '' },
+    { name: '马术', path: '../skills/马术' },
+    { name: '鞬出', path: '../skills/鞬出' },
   ],
 };

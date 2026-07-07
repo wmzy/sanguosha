@@ -4,7 +4,7 @@ export const 陆逊 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '谦逊', path: '' },
-    { name: '连营', path: '' },
+    { name: '谦逊', path: '../skills/谦逊' },
+    { name: '连营', path: '../skills/连营' },
   ],
 };

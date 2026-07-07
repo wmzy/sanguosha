@@ -4,7 +4,7 @@ export const 小乔 = {
   gender: '女',
   faction: '吴',
   skills: [
-    { name: '天香', path: '' },
-    { name: '红颜', path: '' },
+    { name: '天香', path: '../skills/天香' },
+    { name: '红颜', path: '../skills/红颜' },
   ],
 };

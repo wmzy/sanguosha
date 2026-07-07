@@ -45,6 +45,8 @@ export function effectiveDistance(state: GameState, from: number, to: number): n
  */
 export function inAttackRange(state: GameState, from: number, to: number): boolean {
   if (from === to) return false;
+  // 天义(太史慈):拼点赢后本回合攻击范围无限。turn.vars 存发起者座次,回合结束自动清空。
+  if (state.turn.vars['天义/win'] === from) return true;
   const range = (state.players[from].vars['距离/出杀范围'] as number) ?? 1;
   return effectiveDistance(state, from, to) <= range;
 }

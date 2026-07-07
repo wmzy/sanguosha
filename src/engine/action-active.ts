@@ -27,10 +27,13 @@ export function defaultPlayActive(ctx: ActionContext): boolean {
 export function viewSlashMax(view: ActionContext['view'], player: number): number {
   const p = view.players[player];
   if (!p) return 1;
+  let max = 1;
   const weaponId = p.equipment['武器'];
   const weapon = weaponId ? view.cardMap[weaponId] : undefined;
   if (weapon?.name === '诸葛连弩') return Infinity;
-  return 1;
+  // 天义(太史慈):拼点赢后本回合 +1。turnUsage['天义/win'] 由回合用量 atom 同步。
+  if (p.turnUsage?.['天义/win']) max += 1;
+  return max;
 }
 
 /** 前端视角下某玩家本回合已出杀次数(从 view.turnUsage 投影读)。
@@ -40,7 +43,8 @@ export function viewSlashUsed(view: ActionContext['view'], player: number): numb
   return typeof used === 'number' ? used : 0;
 }
 
-/** 前端视角下某玩家本回合是否还能出杀(已用 < 上限)。 */
+/** 前端视角下某玩家本回合是否还能出杀(已用 < 上限,且未被天义拼点输阻断)。 */
 export function viewCanSlash(view: ActionContext['view'], player: number): boolean {
+  if (view.players[player]?.turnUsage?.['天义/lost']) return false;
   return viewSlashUsed(view, player) < viewSlashMax(view, player);
 }

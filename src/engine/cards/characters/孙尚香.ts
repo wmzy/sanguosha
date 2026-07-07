@@ -4,7 +4,7 @@ export const 孙尚香 = {
   gender: '女',
   faction: '吴',
   skills: [
-    { name: '结姻', path: '' },
-    { name: '枭姬', path: '' },
+    { name: '结姻', path: '../skills/结姻' },
+    { name: '枭姬', path: '../skills/枭姬' },
   ],
 };
