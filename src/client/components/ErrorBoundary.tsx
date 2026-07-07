@@ -137,10 +137,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       const ctx = this.props.context;
       const isRoot = !ctx || ctx === 'root';
       const containerClass = isRoot ? rootBox : panelBox;
-      const containerStyle = isRoot ? undefined : ({ minHeight: 200 } as const);
 
       return (
-        <div className={containerClass} style={containerStyle}>
+        <div className={containerClass}>
           <h1 className={titleText}>{isRoot ? '出错了' : `${ctx} 出错了`}</h1>
           <p className={subtitle}>
             {isRoot ? '游戏遇到了一个意外错误' : `该区域（${ctx}）遇到错误，可点击重试局部恢复`}

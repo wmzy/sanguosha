@@ -111,6 +111,21 @@ const winnerText = css`
   color: ${colors.accent.gold};
 `;
 
+const gameWrap = css`
+  min-height: 100vh;
+  background-color: ${colors.bg.page};
+`;
+
+const readyBadge = css`
+  color: ${colors.accent.green};
+  font-weight: bold;
+`;
+
+const returnHomeRow = css`
+  ${buttonRow}
+  margin-top: 8px;
+`;
+
 export function MultiplayerPage() {
   const navigate = useNavigate();
   const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
@@ -150,7 +165,7 @@ export function MultiplayerPage() {
 
   if (mp.stage === 'playing' && mp.view) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: colors.bg.page }}>
+      <div className={gameWrap}>
         <GameViewComponent view={mp.view} onAction={handleAction} onReorderHand={mp.reorderHand} />
       </div>
     );
@@ -212,7 +227,7 @@ export function MultiplayerPage() {
               </button>
             )}
             {mp.ready && (
-              <span style={{ color: colors.accent.green, fontWeight: 'bold' }}>已准备 ✓</span>
+              <span className={readyBadge}>已准备 ✓</span>
             )}
             {mp.isHost && (
               <button
@@ -300,7 +315,7 @@ export function MultiplayerPage() {
             加入房间
           </button>
         </div>
-        <div className={buttonRow} style={{ marginTop: 8 }}>
+        <div className={returnHomeRow}>
           <button
             className={btnStyle}
             style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
