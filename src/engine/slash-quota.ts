@@ -1,4 +1,3 @@
-// src/engine/slash-quota.ts
 // 出杀次数上限计算——查询型提供者模式(与 registerAction/registerBeforeHook 同构)。
 //
 // 技能不预写状态,而是在 onInit 时注册一个"出杀上限提供者",声明"我为 owner 贡献多少上限"。
@@ -11,6 +10,9 @@
 //
 // 上限 = 基础 1 + Σ(各提供者贡献);任一提供者返回 Infinity → 总上限 ∞
 // 已用次数 = turn.vars['杀/usedCount'](出杀 +1,回合结束随 turn.vars 清空)
+//
+// 注册表为 state-bound(WeakMap 外挂在 GameState 上),随 state 自动隔离与 GC,
+// 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from './types';
 
@@ -23,36 +25,55 @@ export const SLASH_USED_VAR = '杀/usedCount';
  */
 export type SlashMaxProvider = (state: GameState, player: number) => number;
 
-/** player 索引 → 该玩家当前注册的上限提供者集合 */
-const providersByPlayer = new Map<number, Set<SlashMaxProvider>>();
-
 /**
  * 出杀阻断器:返回 true 表示该玩家本回合被禁止出杀(无论剩余次数)。
  * 用于"拼点输了本回合不能用杀"类效果(天义)。与上限提供者对称:
- * 提供者放宽上限,阻断器直接禁用。阻断器随技能实例注册/卸载(走 unload 清理链)。
+ * 提供者放宽上限,阻断器直接禁用。
  */
 export type SlashBlocker = (state: GameState, player: number) => boolean;
 
-/** player 索引 → 该玩家当前注册的阻断器集合 */
-const blockersByPlayer = new Map<number, Set<SlashBlocker>>();
+// ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC) ───
+
+interface SlashRegistry {
+  /** player 索引 → 该玩家当前注册的上限提供者集合 */
+  providers: Map<number, Set<SlashMaxProvider>>;
+  /** player 索引 → 该玩家当前注册的阻断器集合 */
+  blockers: Map<number, Set<SlashBlocker>>;
+}
+
+const slashRegistries = new WeakMap<GameState, SlashRegistry>();
+
+function getSlashRegistry(state: GameState): SlashRegistry {
+  let reg = slashRegistries.get(state);
+  if (!reg) {
+    reg = { providers: new Map(), blockers: new Map() };
+    slashRegistries.set(state, reg);
+  }
+  return reg;
+}
 
 /**
  * 注册一个出杀上限提供者(技能 onInit 时调用,与 registerAction 同构)。
  * 返回取消注册函数——技能 onInit 应将其并入返回的 unload,由 setSkillInstanceUnload
  * 统一管理,卸载技能实例时自动清理。
  */
-export function registerSlashMaxProvider(ownerId: number, provider: SlashMaxProvider): () => void {
-  let set = providersByPlayer.get(ownerId);
+export function registerSlashMaxProvider(
+  state: GameState,
+  ownerId: number,
+  provider: SlashMaxProvider,
+): () => void {
+  const reg = getSlashRegistry(state);
+  let set = reg.providers.get(ownerId);
   if (!set) {
     set = new Set();
-    providersByPlayer.set(ownerId, set);
+    reg.providers.set(ownerId, set);
   }
   set.add(provider);
   return () => {
-    const s = providersByPlayer.get(ownerId);
+    const s = reg.providers.get(ownerId);
     if (s) {
       s.delete(provider);
-      if (s.size === 0) providersByPlayer.delete(ownerId);
+      if (s.size === 0) reg.providers.delete(ownerId);
     }
   };
 }
@@ -63,7 +84,7 @@ export function registerSlashMaxProvider(ownerId: number, provider: SlashMaxProv
  */
 export function slashMax(state: GameState, player: number): number {
   let max = 1; // 基础上限
-  const set = providersByPlayer.get(player);
+  const set = getSlashRegistry(state).providers.get(player);
   if (set) {
     for (const fn of set) {
       const bonus = fn(state, player);
@@ -82,28 +103,32 @@ export function slashUsed(state: GameState): number {
 
 /**
  * 注册一个出杀阻断器(技能 onInit 时调用)。返回取消注册函数——
- * 阻断器是模块级集合(非 state-bound 注册表),必须并入 onInit 返回的 unload,
- * 由 setSkillInstanceUnload 在卸载技能实例时自动清理。
+ * 必须并入 onInit 返回的 unload,由 setSkillInstanceUnload 在卸载技能实例时自动清理。
  */
-export function registerSlashBlocker(ownerId: number, blocker: SlashBlocker): () => void {
-  let set = blockersByPlayer.get(ownerId);
+export function registerSlashBlocker(
+  state: GameState,
+  ownerId: number,
+  blocker: SlashBlocker,
+): () => void {
+  const reg = getSlashRegistry(state);
+  let set = reg.blockers.get(ownerId);
   if (!set) {
     set = new Set();
-    blockersByPlayer.set(ownerId, set);
+    reg.blockers.set(ownerId, set);
   }
   set.add(blocker);
   return () => {
-    const s = blockersByPlayer.get(ownerId);
+    const s = reg.blockers.get(ownerId);
     if (s) {
       s.delete(blocker);
-      if (s.size === 0) blockersByPlayer.delete(ownerId);
+      if (s.size === 0) reg.blockers.delete(ownerId);
     }
   };
 }
 
 /** 该玩家本回合是否被阻断出杀(任一阻断器返回 true 即阻断) */
 export function isSlashBlocked(state: GameState, player: number): boolean {
-  const set = blockersByPlayer.get(player);
+  const set = getSlashRegistry(state).blockers.get(player);
   if (!set) return false;
   for (const fn of set) {
     if (fn(state, player)) return true;
@@ -120,10 +145,4 @@ export function canSlash(state: GameState, player: number): boolean {
 /** 记录一次出杀(已用次数 +1)。在杀 use 的 execute 末尾调用 */
 export function incSlashUsed(state: GameState): void {
   state.turn.vars[SLASH_USED_VAR] = slashUsed(state) + 1;
-}
-
-/** 测试用:清空所有上限提供者与阻断器(由 create-engine.resetForTest 调用) */
-export function clearSlashMaxProviders(): void {
-  providersByPlayer.clear();
-  blockersByPlayer.clear();
 }

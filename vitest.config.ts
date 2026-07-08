@@ -21,6 +21,7 @@ export default defineConfig({
     passWithNoTests: true,
     clearMocks: true,
     restoreMocks: true,
+    isolate: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'json-summary', 'html'],
@@ -43,15 +44,15 @@ export default defineConfig({
           exclude: ['tests/skill-tests/**'],
         },
       },
-      // 技能测试：纯逻辑，node 环境，forks 池 + 隔离（避免全局技能注册污染）
+      // 技能测试：纯逻辑,node 环境。模块级状态已全部改为 state-bound(WeakMap),
+      // 无跨文件污染。关闭 isolate 让 124 个文件共享 worker context + 模块缓存,
+      // 显著减少重复 import 开销(core 含 UI 测试需保持默认隔离)。
       {
         extends: true,
         test: {
           name: 'skills',
-          environment: 'node',
           include: ['tests/skill-tests/**/*.test.ts'],
-          pool: 'forks',
-          isolate: true,
+          isolate: false,
         },
       },
     ],

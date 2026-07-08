@@ -54,12 +54,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ─── 出杀上限提供者:拼点赢后本回合 +1(可额外使用一张杀)──
   const unloadProvider = registerSlashMaxProvider(
+    state,
     ownerId,
     (st: GameState, player: number) => (st.turn.vars[WIN_VAR] === player ? 1 : 0),
   );
 
   // ─── 出杀阻断器:拼点没赢后本回合禁杀(不能使用杀)──
   const unloadBlocker = registerSlashBlocker(
+    state,
     ownerId,
     (st: GameState, player: number) => st.turn.vars[LOST_VAR] === player,
   );

@@ -89,7 +89,7 @@ import {
 import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
 import { createStandardDeck } from '../shared/deck';
 
-import { clearSlashMaxProviders } from './slash-quota';
+// slash-quota 已改为 state-bound(WeakMap 外挂),无模块级状态,无需在此清理。
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
 import './atoms';
 // 系统规则 用静态导入而非 await import：系统规则 与本模块互依（系统规则 import applyAtom），
@@ -468,12 +468,10 @@ export async function fireTimeout(state: GameState): Promise<void> {
   }
 }
 
-/** 测试用:清空模块级 slash quota providers。
- *  skill 注册表现在是 state-bound(WeakMap 外挂),随 state 自动隔离,无需在此清理。
- *  保留此函数用于兼容旧测试调用(现在只清 slash quota)。 */
-export function resetForTest(): void {
-  clearSlashMaxProviders();
-}
+/** 测试用:清空模块级状态占位。
+ *  skill 注册表与 slash-quota 均已改为 state-bound(WeakMap 外挂),随 state 自动隔离,
+ *  无模块级全局状态需清理。保留此函数用于兼容旧测试调用(现为 no-op)。 */
+export function resetForTest(): void {}
 
 // ==================== 从 engine-api.ts 合并的导出 ====================
 // 以下函数原属 engine-api.ts,现已合并到本文件。skill 文件通过 import from '../create-engine' 使用。

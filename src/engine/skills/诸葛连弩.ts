@@ -16,9 +16,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '诸葛连弩', description: '武器:出牌阶段使用【杀】无次数限制' };
 }
 
-export function onInit(skill: Skill, _state: GameState): (() => void) | void {
+export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
   // 注册出杀上限提供者:返回 Infinity → slashMax = ∞ → 可无限出杀。
   // unloader 并入返回值,由 setSkillInstanceUnload 统一管理,卸载技能实例时自动取消注册。
-  return registerSlashMaxProvider(ownerId, () => Infinity);
+  return registerSlashMaxProvider(state, ownerId, () => Infinity);
 }

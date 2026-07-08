@@ -30,11 +30,20 @@ import { registerAfterHook, unloadSkillInstance, instantiateSkill } from '../ski
 const ARMOR_SKILLS = ['仁王盾', '护甲', '藤甲', '白银狮子', '八卦阵'];
 
 /**
- * 模块级:记录当前被青釭剑临时卸载的防具,供 造成伤害 after hook 恢复。
+ * state-bound:记录当前被青釭剑临时卸载的防具,供 造成伤害 after hook 恢复。
  * key = 来源玩家(青釭剑使用者)座次下标,确保多玩家同时装备青釭剑时互不干扰。
- * 这取代了旧的 state.localVars['青釭剑/临时卸载'] 跨 atom 通信。
+ * WeakMap 外挂在 GameState 上,随 state 自动隔离/GC,无模块级泄漏。
  */
-const tempUnloadMap = new Map<number, Array<{ target: number; skillId: string }>>();
+const tempUnloadByState = new WeakMap<GameState, Map<number, Array<{ target: number; skillId: string }>>>();
+
+function getTempUnloadMap(state: GameState): Map<number, Array<{ target: number; skillId: string }>> {
+  let m = tempUnloadByState.get(state);
+  if (!m) {
+    m = new Map();
+    tempUnloadByState.set(state, m);
+  }
+  return m;
+}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '青釭剑', description: '武器:杀无视目标防具' };
@@ -72,19 +81,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
     }
     if (unloaded.length > 0) {
-      tempUnloadMap.set(ownerId, unloaded);
+      getTempUnloadMap(ctx.state).set(ownerId, unloaded);
     }
   });
 
   // 造成伤害 after hook:杀结算完毕后,恢复被临时卸载的防具技能
   registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
     if ((ctx.atom as { source?: number }).source !== ownerId) return;
-    const unloaded = tempUnloadMap.get(ownerId);
+    const unloaded = getTempUnloadMap(ctx.state).get(ownerId);
     if (!unloaded || unloaded.length === 0) return;
     for (const { target, skillId } of unloaded) {
       await instantiateSkill(ctx.state, skillId, target);
     }
-    tempUnloadMap.delete(ownerId);
+    getTempUnloadMap(ctx.state).delete(ownerId);
   });
 
   return () => {};
