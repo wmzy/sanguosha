@@ -12,7 +12,7 @@
 
 **Tech Stack:** TypeScript 5.9 + vitest 4.1 + pnpm。Mark 走新 `src/src/engine/mark.ts` 模块；chained 走字段 + `damage` 钩子扩展。
 
-**Spec:** `docs/ENGINE.md` §1.2（loseHealth / chained / Mark faceDown 决策）+ §5 T-07（Mark faceDown + untilTurnEnd）+ T-08（创牌独立牌区——本 Plan **不**做创牌，只做 Mark 体系骨架）+ §4.8（PlayerState 缺字段）。
+**Spec:** `docs/ENGINE-DESIGN.md` §1.2（loseHealth / chained / Mark faceDown 决策）+ §5 T-07（Mark faceDown + untilTurnEnd）+ T-08（创牌独立牌区——本 Plan **不**做创牌，只做 Mark 体系骨架）+ §4.8（PlayerState 缺字段）。
 
 **Non-Goals:**
 - 不做铁索连环卡牌完整流程（卡牌定义在 src/shared/cards/tricks.ts 已存在，但 handler 未实现——本 Plan 只做"chained 状态字段 + 连环传导钩子"，卡牌使用流程留 P2）
@@ -26,7 +26,7 @@
 
 **Files:**
 - Modify: `src/src/engine/types.ts:54-65`（PlayerState 加 chained 字段）
-- Modify: `src/src/engine/view/reducer.ts:578`（创建 player 时默认 chained=false——按 docs/ENGINE.md §0.3 已知这不是新 bug，是补默认）
+- Modify: `src/src/engine/view/reducer.ts:578`（创建 player 时默认 chained=false——按 docs/ENGINE-DESIGN.md §0.3 已知这不是新 bug，是补默认）
 - Test: `tests/atoms/player-chained.test.ts`
 
 ### 1.1 写失败测试
@@ -92,7 +92,7 @@ export interface PlayerState {
 
 ### 1.4 找 createTestGame / reducer 创建 player 的位置
 
-`src/src/engine/view/reducer.ts:578`（按 docs/ENGINE.md §0.3 提示是已知位点）创建 player 时加 `chained: false` 显式字段。
+`src/src/engine/view/reducer.ts:578`（按 docs/ENGINE-DESIGN.md §0.3 提示是已知位点）创建 player 时加 `chained: false` 显式字段。
 
 `tests/engine-helpers.ts:createTestGame` 创建 player 时也加 `chained: false`。
 

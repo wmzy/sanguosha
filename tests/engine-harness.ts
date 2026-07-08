@@ -38,7 +38,6 @@ import {
   dispatch as engineDispatch,
   fireTimeout as engineFireTimeout,
   buildView as engineBuildView,
-  resetForTest,
   registerSkillsFromState,
 } from '../src/engine/create-engine';
 
@@ -631,7 +630,6 @@ export class SkillTestHarness {
 
   /** 初始化:重置引擎 → bootstrap state → 为每个玩家创建 session 并加载 onMount */
   async setup(state: GameState): Promise<void> {
-    resetForTest();
     // 补全 state 缺失字段
     if (!state.cardWrappers) state.cardWrappers = {};
     if (!state.atomStack) state.atomStack = [];

@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   dispatch,
   registerSkillsFromState,
-  resetForTest,
   fireTimeout,
 } from '../../src/engine/create-engine';
 import { waitForStable } from '../engine-harness';
@@ -69,7 +68,6 @@ function buildState(): GameState {
 describe('组合 action(武圣转化 + 杀使用)', () => {
   let state: GameState;
   beforeEach(async () => {
-    resetForTest();
     state = buildState();
     await registerSkillsFromState(state);
   });

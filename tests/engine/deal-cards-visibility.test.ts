@@ -8,7 +8,6 @@
 // 修复后:发牌 atom 实现 toViewEvents(信息分级:owner 看 cards,others 看数量)
 // 且 applyView 更新 owner 的 hand 数组。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
@@ -57,7 +56,6 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
   let state: GameState;
 
   beforeEach(async () => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
   });
 

@@ -3,7 +3,7 @@
 // 其他 viewer 错误匹配到主公 slot → 共用倒计时 + 渲染别人的选将界面。
 // 修复后:buildView 只匹配 viewer 专属 slot 或广播型 slot(target===TARGET_BROADCAST)。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, bootstrap, dispatch, buildView } from '../../src/engine/create-engine';
+import { bootstrap, dispatch, buildView } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -40,7 +40,6 @@ describe('buildView:选将期间 pending 隔离', () => {
   let state: GameState;
 
   beforeEach(() => {
-    resetForTest();
     state = createGameState({
       players: [
         makePlayer(0, 'P1'),

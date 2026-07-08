@@ -7,7 +7,6 @@
 //   - dispatch(state, msg): 接受 state,执行 client message
 //   - buildView(state, viewer): 接受 state,返回 view
 //   - fireTimeout(state): 触发 pending slot 的 onTimeout
-//   - resetForTest(): 模块级清空(skill instances)
 //
 // create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
 // 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
@@ -38,7 +37,6 @@
 //   - dispatch(state, msg): 接受 state,执行 client message
 //   - buildView(state, viewer): 接受 state,返回 view
 //   - fireTimeout(state): 触发 pending slot 的 onTimeout
-//   - resetForTest(): 模块级清空(skill instances)
 //
 // create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
 // 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
@@ -467,11 +465,6 @@ export async function fireTimeout(state: GameState): Promise<void> {
     await s._fireTimeoutNow?.();
   }
 }
-
-/** 测试用:清空模块级状态占位。
- *  skill 注册表与 slash-quota 均已改为 state-bound(WeakMap 外挂),随 state 自动隔离,
- *  无模块级全局状态需清理。保留此函数用于兼容旧测试调用(现为 no-op)。 */
-export function resetForTest(): void {}
 
 // ==================== 从 engine-api.ts 合并的导出 ====================
 // 以下函数原属 engine-api.ts,现已合并到本文件。skill 文件通过 import from '../create-engine' 使用。

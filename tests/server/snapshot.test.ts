@@ -6,7 +6,6 @@
 // 4. 追加描述:PATCH 后 description 更新
 // 5. 追加描述:不存在的 snapshotId → 404
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
@@ -43,10 +42,6 @@ async function readSnapshot(snapshotId: string): Promise<unknown> {
 }
 
 describe('debug 快照功能', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   afterEach(async () => {
     // 清理测试快照目录
     try {

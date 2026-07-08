@@ -1984,3 +1984,26 @@ state.playerConfig[ownerId].timeout = 60000  // 60秒
 
 // 超时优先级链: AtomAwaits.timeout < 实例配置 < 玩家配置 < 默认值
 ```
+
+---
+
+## 附录：ADR 索引
+
+决策记录（ADR）存放在 `docs/decisions/`。
+
+| 编号 | 标题 | 何时读 |
+|---|---|---|
+| [0008](./decisions/0008-styling-linaria.md) | Linaria 样式 | UI 改样式时 |
+| [0009](./decisions/0009-cas-baseSeq.md) | CAS baseSeq | 序列号 / 并发 / 断线重连 |
+| [0010](./decisions/0010-game-logger-playerops.md) | GameLogger + PlayerOps | 视图隔离 / 服务端日志 / ReplayEngine |
+| [0012](./decisions/0012-unified-apply-atoms.md) | 统一 applyAtoms | **核心**：所有 atom 必经 `src/engine/atom.ts:applyAtoms` |
+| [0013](./decisions/0013-phase-begin-end-atoms.md) | phaseBegin/End 显式成对 | 阶段推进原子化 |
+| [0013](./decisions/0013-skill-character-decouple.md) | 技能/角色/装备解耦 | **架构**：engine/{characters,skills,equipment} 分层 |
+| [0014](./decisions/0014-reshuffle-atom.md) | reshuffle atom | 修 draw 重洗不写 serverLog |
+| [0015](./decisions/0015-give-take-move-3-atoms.md) | giveCard/takeCard 3 原子 | 13+ 技能语义统一 |
+| [0016](./decisions/0016-use-card-3-atoms.md) | useCard 3 原子 | specifyTarget / becomeTarget / resolveCard |
+| [0017](./decisions/0017-skill-pindian-multistep.md) | pindian / multiStep SkillPhase | 拼点 + 多步 prompt 骨架 |
+| [0018](./decisions/0018-deprecated-test-apis.md) | 废弃全局测试 API | 测试从 `clearXxx()` 迁到 `engine.clearForTest()`；多实例隔离 |
+| [0026](./decisions/0026-unified-engine-architecture.md) | 统一引擎架构：技能编排 + Atom 执行 + 栈驱动 | **本文档概念起源**：牌=令牌、使用牌=技能、validate 下放、栈驱动执行 |
+| [0027](./decisions/0027-create-engine-top-level-functions.md) | create-engine 重构：顶层函数 + state 原地变更 | §4.2 顶层函数式 API 的来历 |
+| [0028](./decisions/0028-engine-api-top-level-functions.md) | engine-api 顶层化：无 EngineApi 闭包，无 BackendAPI 回调参数 | 技能直接 import 顶层函数，无闭包对象 |

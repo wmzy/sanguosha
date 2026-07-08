@@ -14,7 +14,7 @@
 
 **Tech Stack:** TypeScript 5.9 + vitest 4.1 + pnpm。`registerAtomHook` + `SkillDef.convertible` 字段双管齐下。
 
-**Spec:** `docs/ENGINE.md` §4.1（validate 硬编码）+ §4.2（八卦阵）+ §4.3（4 武器 stub）。
+**Spec:** `docs/ENGINE-DESIGN.md` §4.1（validate 硬编码）+ §4.2（八卦阵）+ §4.3（4 武器 stub）。
 
 **Non-Goals:**
 - 不重做 `useCard` 三原子（已 P0 完成）

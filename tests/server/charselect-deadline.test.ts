@@ -6,7 +6,6 @@
 // 注:出牌阶段的倒计时现在由引擎内的 __出牌 pending 循环管理(session 不再有 idle timer)。
 // 选将期间的 deadline 完全来自选将 pending slot,本测试验证其独立性。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
@@ -54,7 +53,6 @@ describe('选将倒计时独立性', () => {
   let wss: FakeWS[];
 
   beforeEach(async () => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
     wss = [];
     // 预注册 5 个玩家 WS

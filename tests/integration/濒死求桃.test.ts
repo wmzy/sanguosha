@@ -15,7 +15,7 @@
 //   describe('濒死求桃') = createGameState + registerSkillsFromState → dispatch
 //   describe('濒死求桃链:端到端(harness)') = SkillTestHarness
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait, dispatchAndWait, SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -65,7 +65,6 @@ describe('濒死求桃', () => {
   let state: GameState;
 
   beforeEach(async () => {
-    resetForTest();
     state = createGameState({
       players: [
         {

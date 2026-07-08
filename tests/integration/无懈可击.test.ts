@@ -11,7 +11,6 @@
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  resetForTest,
   registerSkillsFromState,
   frameCards,
   dispatch as engineDispatch,
@@ -36,7 +35,6 @@ describe('无懈可击链路', () => {
   let state: GameState;
 
   beforeEach(async () => {
-    resetForTest();
     state = createGameState({
       players: [
         {
@@ -342,7 +340,6 @@ describe('无懈可击 dispatch 链路', () => {
   let state: GameState;
 
   beforeEach(async () => {
-    resetForTest();
     state = createGameState({
       players: [
         {
@@ -605,7 +602,6 @@ describe('skip 机制:广播型 pending 放弃回应', () => {
   let state: GameState;
 
   beforeEach(async () => {
-    resetForTest();
     state = createGameState({
       players: [
         {

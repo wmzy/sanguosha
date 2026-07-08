@@ -2,7 +2,7 @@
 // 摸牌:从牌堆顶抽 count 张到手牌。
 // 牌堆不足时,合并弃牌堆重洗补充(标准三国杀规则);牌堆+弃牌堆总数仍不足时,
 // 才算不合法(validate 报错)。
-import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 import { createRng } from '../../shared/rng';
 
@@ -92,7 +92,7 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
     view.players[pi].handCount += count;
     // owner 有 cards 字段，加入手牌；others 没有
     if (event.cards && view.players[pi].hand) {
-      view.players[pi].hand.push(...(event.cards as any[]));
+      view.players[pi].hand.push(...(event.cards as Card[]));
     }
     // zone 同步
     if (view.zones) {

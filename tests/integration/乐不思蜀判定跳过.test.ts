@@ -11,7 +11,7 @@
 //
 // 关键机制:见 乐不思蜀.ts
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
+import { registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -61,10 +61,6 @@ function makeCard(
 const SKIP_TAG = '乐不思蜀/跳过出牌';
 
 describe('乐不思蜀判定跳过:端到端 + 边角', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   // ─────────────────────────────────────────────────────────────
   // 用例 1:端到端——P0 出 乐不思蜀 给 P1 → P1 下一回合判定非♥ → P1 出牌被跳过
   // ─────────────────────────────────────────────────────────────

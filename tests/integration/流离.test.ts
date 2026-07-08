@@ -12,7 +12,7 @@
 //   - 修改帧 params.resolvedTargets:把流离原目标替换为新目标
 //   - 杀.execute 下一轮 结算 读帧 resolvedTargets[i] 而非原始 targets[i]
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -46,10 +46,6 @@ function makePlayer(opts: {
 }
 
 describe('流离:成为杀的目标时转移', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   // ─────────────────────────────────────────────────────────────
   // 用例 1:P1 发动流离(confirm)→ 流离/chooseTarget pending 出现
   // ─────────────────────────────────────────────────────────────

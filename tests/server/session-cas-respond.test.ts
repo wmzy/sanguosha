@@ -8,7 +8,6 @@
 //
 // 测试通过 reflection 访问 session.state(私有),用真实 dispatch 路径验证。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
@@ -39,7 +38,6 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
   let session: GameSession;
 
   beforeEach(() => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
   });
 
@@ -106,7 +104,6 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
   it('主动 action 不再受 CAS 保护:陈旧 baseSeq 被接受', async () => {
     // 等待上一个测试的 fire-and-forget bootstrap 完成
     await sleep(200);
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
 
     // 启动并完成选将

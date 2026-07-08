@@ -2,7 +2,7 @@
 // 集成测试:动态技能生命周期(添加技能/移除技能 atom 触发实例化/卸载)
 // 覆盖 ENGINE-DESIGN §4.13 —— 添加技能 atom 后引擎应 import 模块 → onInit 注册 action/hook
 import { describe, it, expect, beforeEach } from 'vitest';
-import { registerSkillsFromState, resetForTest } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { applyAtom } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import '../../src/engine/atoms';
@@ -57,7 +57,6 @@ describe('动态技能生命周期(添加技能/移除技能 atom)', () => {
   let state: GameState;
 
   beforeEach(async () => {
-    resetForTest();
     state = buildInitialState();
     await registerSkillsFromState(state);
   });

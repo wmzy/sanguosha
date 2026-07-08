@@ -8,7 +8,7 @@
 //   4. 杀命中 + 无麒麟弓 → 不触发弃马
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -46,7 +46,6 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
   let harness: SkillTestHarness;
   beforeEach(() => {
     harness = new SkillTestHarness();
-    resetForTest();
   });
 
   // ─────────────────────────────────────────────────────────────

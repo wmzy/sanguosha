@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript 5.9 + vitest 4.1 + pnpm。`registerAtom` 单点。
 
-**Spec:** `docs/ENGINE.md` §1.2（待新增 atom 列表）+ §6 P1 `loseHealth` / `loseCard` / `removeSkill` 三项。
+**Spec:** `docs/ENGINE-DESIGN.md` §1.2（待新增 atom 列表）+ §6 P1 `loseHealth` / `loseCard` / `removeSkill` 三项。
 
 **Non-Goals:**
 - 不实现苦肉 / 过河拆桥 / 断肠技能本身（只做底层 atom）

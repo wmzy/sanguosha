@@ -15,7 +15,7 @@
 //   - 出了杀 → 指定目标 + 询问闪 + 造成伤害
 //   - 不出(超时)→ 主公摸 1 张
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -51,10 +51,6 @@ function makePlayer(opts: {
 }
 
 describe('激将:主公请求蜀势力角色出杀', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   // ─────────────────────────────────────────────────────────────
   // 用例 1:validate 拒绝——非主公(ownerId !== 0)使用激将
   // ─────────────────────────────────────────────────────────────

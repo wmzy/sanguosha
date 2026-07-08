@@ -9,7 +9,7 @@
 // 关键机制(青釭剑.ts):指定目标 after hook 临时 unload 目标防具技能;
 //   造成伤害 after hook 重新 instantiate 防具技能。用 tempUnloadMap 跨 atom 通信。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -43,10 +43,6 @@ function makePlayer(opts: {
 }
 
 describe('青釭剑:杀无视防具', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   // ─────────────────────────────────────────────────────────────
   // 用例 1:青釭剑 + 黑杀 → 仁王盾失效,P1 扣血
   // ─────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@
 //      (无 闪电 skill 时 after hook 不消耗闪电,验证 plumbing 通路)
 //   4. 重复添加去重、重新装备、validate 校验
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
+import { registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
 import { SkillTestHarness } from '../engine-harness';
 import { getAtomDef } from '../../src/engine/atom';
 import '../../src/engine/atoms';

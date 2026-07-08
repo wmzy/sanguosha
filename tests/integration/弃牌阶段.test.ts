@@ -9,7 +9,7 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -27,7 +27,6 @@ describe('弃牌阶段', () => {
   let state: GameState;
 
   beforeEach(async () => {
-    resetForTest();
     state = createGameState({
       players: [
         {

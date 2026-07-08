@@ -1,7 +1,7 @@
 // 验证 并行回应 atom 的引擎机制:多 target 独立 slot 创建 + Map 行为
 // respond 验证通过 fireTimeout 模拟(绕过 respond action 注册)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { applyAtom, fireTimeout, resetForTest } from '../../src/engine/create-engine';
+import { applyAtom, fireTimeout } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
@@ -60,7 +60,6 @@ const tick = () => new Promise((r) => setTimeout(r, 100));
 describe('并行回应 atom 引擎机制', () => {
   let state: GameState;
   beforeEach(() => {
-    resetForTest();
     state = build();
   });
 

@@ -36,7 +36,7 @@
 
 `GameEvent` union 的 `cardPlayed` 变体加 `@deprecated` JSDoc，引用本 ADR 与 [T-13] / [T-22]。
 
-**不立即删除**：38+ 现有技能仍用 `trigger.event: 'cardPlayed'`。等 [T-22] 渐进迁移完成 + 2 周稳定期后删除（详见 `docs/ENGINE.md` §5 T-22 / §6）。
+**不立即删除**：38+ 现有技能仍用 `trigger.event: 'cardPlayed'`。等 [T-22] 渐进迁移完成 + 2 周稳定期后删除（详见 `docs/ENGINE-DESIGN.md` 的 useCard 三原子章节；T-22 渐进迁移策略）。
 
 ### 引擎 entry 暂不 emit 3 atom
 

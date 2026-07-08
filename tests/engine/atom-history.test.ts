@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../../src/engine/types';
-import { resetForTest, applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/create-engine';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -153,7 +153,6 @@ describe('eventsForViewer', () => {
 });
 
 describe('dispatch 返回 boolean', () => {
-  beforeEach(() => resetForTest());
 
   it('非法 action 返回 false（不存在的 skillId）', async () => {
     const state = createGameState({
@@ -193,7 +192,6 @@ describe('dispatch 返回 boolean', () => {
 });
 
 describe('atomHistory: applyAtom 写入', () => {
-  beforeEach(() => resetForTest());
 
   it('applyAtom 把 atom 条目写入 state.atomHistory,seq 单调', async () => {
     const state = createGameState({

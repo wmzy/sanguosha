@@ -4,17 +4,13 @@
 
 import type { Atom, AtomDefinition, GameState, ViewEvent, ViewEventSplit } from './types';
 
-const registry = new Map<string, AtomDefinition<any>>();
+const registry = new Map<string, AtomDefinition>();
 
 export function registerAtom<A>(def: AtomDefinition<A>): void {
   if (registry.has(def.type)) {
     throw new Error(`Atom "${def.type}" already registered`);
   }
-  registry.set(def.type, def);
-}
-
-export function clearAtomRegistry(): void {
-  registry.clear();
+  registry.set(def.type, def as unknown as AtomDefinition);
 }
 
 export function getAtomDef(type: string): AtomDefinition {

@@ -15,7 +15,6 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
-import { resetForTest } from '../../src/engine/create-engine';
 
 function makeCard(
   id: string,
@@ -65,7 +64,6 @@ describe('克己', () => {
   let harness: SkillTestHarness;
 
   beforeEach(() => {
-    resetForTest();
     harness = new SkillTestHarness();
   });
 

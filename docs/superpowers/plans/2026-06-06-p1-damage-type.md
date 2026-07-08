@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript 5.9 + vitest 4.1 + pnpm。Atom 注册走 `src/src/engine/atom.ts:registerAtom`；事件订阅走 `src/src/engine/skill-hook.ts:registerAtomHook`。
 
-**Spec:** `docs/ENGINE.md` §1.2（damage 无 type 字段）+ §5 T-11（加 type 字段）+ §6 P1 第一项。
+**Spec:** `docs/ENGINE-DESIGN.md` §1.2（damage 无 type 字段）+ §5 T-11（加 type 字段）+ §6 P1 第一项。
 
 **Non-Goals:**
 - 不实现 chained 状态字段（Plan 1B）

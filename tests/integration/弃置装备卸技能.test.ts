@@ -12,7 +12,7 @@
 //   2. 技能 hook 实例已卸载(卸载后 slashMax 提供者消失 / vars 清除)
 //   3. 弃牌堆含被弃装备(弃置 本身仍正常)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait } from '../engine-harness';
 import { slashMax } from '../../src/engine/slash-quota';
 import '../../src/engine/atoms';
@@ -55,10 +55,6 @@ function makeCard(id: string, name: string): Card {
 }
 
 describe('弃置装备:卸载自带技能实例', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   it('制衡弃掉武器(诸葛连弩)→ skills 不再含 诸葛连弩,slashMax 提供者消失', async () => {
     const zhuge = makeEquip('wp-zg', '诸葛连弩', '武器', 1);
     const d1 = makeCard('d1', '杀');

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  resetForTest,
   dispatch,
   applyAtom,
   registerSkillsFromState,
@@ -13,8 +12,6 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 
 describe('pending-scoped 版本控制', () => {
-  beforeEach(() => resetForTest());
-
   it('PendingSlot 有 createdSeq 字段，值=创建时 state.seq', async () => {
     const state = createGameState({
       players: [
@@ -157,7 +154,6 @@ describe('pending-scoped 版本控制', () => {
   // 无懈可击 close-reopen:过期 respond 被 pending-scoped 校验拒绝
   // ─────────────────────────────────────────────────────────────
   it('无懈可击 close-reopen:旧窗口 respond 被 pendingSeq 拒绝', async () => {
-    resetForTest();
     const state = createGameState({
       players: [
         {

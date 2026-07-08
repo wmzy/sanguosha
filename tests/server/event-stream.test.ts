@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
@@ -27,7 +26,6 @@ function getState(session: GameSession): GameState {
 describe('全局 CAS 删除', () => {
   let session: GameSession;
   beforeEach(() => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
   });
 
@@ -100,7 +98,6 @@ class FakeWS {
 describe('重连 initialView', () => {
   let session: GameSession;
   beforeEach(() => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
   });
 
@@ -131,7 +128,6 @@ describe('重连 initialView', () => {
 describe('pending 倒计时下发', () => {
   let session: GameSession;
   beforeEach(() => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
   });
 
@@ -173,7 +169,6 @@ describe('debug 房间刷新重连', () => {
   let session: GameSession;
   let room: Room;
   beforeEach(() => {
-    resetForTest();
     room = createDebugRoom('测试刷新', 2);
     addRoom(room);
     session = new GameSession(room, true, 42);

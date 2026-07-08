@@ -8,15 +8,12 @@
 //
 // 修复:每个 atomHistory.push 前递增 state.seq,保证事件 seq 唯一。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest } from '../../src/engine/create-engine';
 import { createGameState } from '../../src/engine/types';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 
 describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', () => {
-  beforeEach(() => resetForTest());
-
   it('连续 applyAtom 的 atomHistory entry 各有唯一 seq', async () => {
     const { applyAtom } = await import('../../src/engine/create-engine');
     const state = createGameState({

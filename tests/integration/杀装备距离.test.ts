@@ -11,7 +11,7 @@
 //       dispatch 走真实 action 路径(不动用 SkillTestHarness),
 //       测的是新引擎 顶层 API + 距离/装备/杀的端到端协作。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
 import { inAttackRange } from '../../src/engine/distance';
 import { slashMax } from '../../src/engine/slash-quota';
@@ -46,10 +46,6 @@ function makePlayer(opts: {
 }
 
 describe('杀 + 装备 + 距离', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   // ─────────────────────────────────────────────────────────────
   // 用例 1:装备武器后攻击范围扩大
   // ─────────────────────────────────────────────────────────────
@@ -321,10 +317,6 @@ describe('杀 + 装备 + 距离', () => {
 // 旧架构下 state A 的流离 hook 会泄漏到全局表,state B 的杀结算会错误触发。
 // ─────────────────────────────────────────────────────────────
 describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
-  beforeEach(() => {
-    resetForTest();
-  });
-
   it('state A 注册流离后,state B(无流离玩家)杀 seat 0 不触发 流离/confirm', async () => {
     const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 

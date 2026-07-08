@@ -16,7 +16,7 @@
 
 **Tech Stack:** TypeScript 5.9 + vitest 4.1 + pnpm。
 
-**Spec:** `docs/ENGINE.md` §3.1 技能缺口（雷击/鬼道/化身）+ §4.2 八卦阵 var 修复 + §4.3 4 武器 stub（间接）+ §5 T-07（faceDown）+ §6 P1/P2 改进路径。
+**Spec:** `docs/ENGINE-DESIGN.md` §3.1 技能缺口（雷击/鬼道/化身）+ §4.2 八卦阵 var 修复 + §4.3 4 武器 stub（间接）+ §5 T-07（faceDown）+ §6 P1/P2 改进路径。
 
 **Non-Goals:**
 - 不重做 P0/P1/P2 已通过的 tests
@@ -825,7 +825,7 @@ git commit -m "test(phase): faceDown + 死亡玩家兼容验证（nextPlayer 已
 ## 收尾
 
 - [ ] 跑全量 typecheck + test
-- [ ] 同步 `docs/ENGINE.md`（测试数 / 状态总览 / 已知不一致 / 改进路径）
+- [ ] 同步 `docs/ENGINE-DESIGN.md`（测试数 / 状态总览 / 已知不一致 / 改进路径）
 - [ ] 提交 docs 变更
 
 ---

@@ -21,7 +21,6 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
-import { resetForTest } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import { registerSystemRespondActions } from '../../src/engine/skills/系统规则';
 
@@ -65,7 +64,6 @@ describe('回合管理', () => {
   let harness: SkillTestHarness;
 
   beforeEach(() => {
-    resetForTest();
     harness = new SkillTestHarness();
   });
 

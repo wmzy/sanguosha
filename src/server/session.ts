@@ -11,7 +11,6 @@ import {
   bootstrap,
   dispatch,
   buildView,
-  resetForTest,
   checkGameOver,
   restore,
   type GameConfig,
@@ -119,9 +118,6 @@ export class GameSession {
     if (this.destroyed) return false;
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
-
-    // 清空模块级 slash quota providers(skill 注册表已随 state 自动隔离)
-    resetForTest();
 
     // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 超时倍率
     const cfg = this.room.config;

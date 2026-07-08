@@ -192,7 +192,7 @@ registerHooks(registry) {
 **技能清单：** 仁德、放权、制衡、反间、鬼才、国色、挑衅、英魂、结姻、崩坏、直谏、巧变、断粮、放逐、奇袭、驱虎、裸衣、再起
 
 - [ ] **Step 1: 逐技能文件加 `// [v2-only] C类：包含 prompt/loop/condition，需要 v3 pendingAction 能力` 注释**
-- [ ] **Step 2: 更新 ENGINE.md §4.5 记录 C 类技能清单和后续计划**
+- [ ] **Step 2: 更新 ENGINE-DESIGN.md §4.5 记录 C 类技能清单和后续计划**
 - [ ] **Step 3: 更新 CHANGELOG.md**
 - [ ] **Step 4: 全量测试**
 - [ ] **Step 5: Commit** — `docs(engine): 标记 18 个 C 类技能为 v2-only + 更新文档`
@@ -203,7 +203,7 @@ registerHooks(registry) {
 
 - [ ] **Step 1: 全量测试** — `npx vitest run`，预期 1412+ pass
 - [ ] **Step 2: 确认 emitEvent 动态构建不再匹配已迁移技能的 v2 trigger**（因为 handler 返回空 `[]` 时跳过，但 trigger 仍在 → 需要在 handler 中检测 v3 已执行并跳过）
-- [ ] **Step 3: 更新 ENGINE.md 统计数字**
+- [ ] **Step 3: 更新 ENGINE-DESIGN.md 统计数字**
 - [ ] **Step 4: git push**
 
 ---

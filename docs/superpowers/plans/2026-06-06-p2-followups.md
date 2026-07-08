@@ -16,7 +16,7 @@
 
 **Tech Stack:** TypeScript 5.9 + vitest 4.1 + pnpm + React 19 Profiler。
 
-**Spec:** `docs/ENGINE.md` §1.4（Mark faceDown + untilTurnEnd）+ §5 T-07（faceDown）+ §5 T-11（damage.type）+ §6 P2（雷击/雷电伤害/连环/八卦阵完整判定）+ §4.7（draw 重洗）+ P1 follow-up 清单。
+**Spec:** `docs/ENGINE-DESIGN.md` §1.4（Mark faceDown + untilTurnEnd）+ §5 T-07（faceDown）+ §5 T-11（damage.type）+ §6 P2（雷击/雷电伤害/连环/八卦阵完整判定）+ §4.7（draw 重洗）+ P1 follow-up 清单。
 
 **Non-Goals:**
 - 不实现新的 user-facing UI（八卦阵的判定 UI 在 P2 仅做 server-side 逻辑 + 测试，UI 沿用现有 useCard 响应窗口）

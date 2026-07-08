@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   dispatch as engineDispatch,
   registerSkillsFromState,
-  resetForTest,
 } from '../../src/engine/create-engine';
 import { findActionEntry } from '../../src/engine/skill';
 import '../../src/engine/atoms';
@@ -72,7 +71,6 @@ const tick = () => new Promise((r) => setTimeout(r, 100));
 describe('回合管理 validate 正向判断合法性', () => {
   let state: GameState;
   beforeEach(async () => {
-    resetForTest();
     state = buildState();
     await registerSkillsFromState(state);
   });
@@ -134,7 +132,6 @@ describe('回合管理 validate 正向判断合法性', () => {
 
 describe('端到端:弃牌阶段重复 end 不死锁', () => {
   it('第一次 end 进入弃牌 pending; 第二次 end 被 validate 拒绝,不产生新 pending', async () => {
-    resetForTest();
     const state = buildState();
     await registerSkillsFromState(state);
 
@@ -170,7 +167,6 @@ describe('端到端:弃牌阶段重复 end 不死锁', () => {
   });
 
   it('弃牌 pending 期间 respond 正常工作(不被误拒)', async () => {
-    resetForTest();
     const state = buildState();
     await registerSkillsFromState(state);
 

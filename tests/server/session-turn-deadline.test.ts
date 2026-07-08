@@ -9,7 +9,7 @@
 // 1. buildView 在有 __出牌 pending 时返回非空 deadline
 // 2. event 消息携带 deadline(仅在变化时),前端据此同步倒计时
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { resetForTest, checkGameOver } from '../../src/engine/create-engine';
+import { checkGameOver } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
@@ -103,7 +103,6 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
   let session: GameSession;
 
   beforeEach(() => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
     const state = makeActState();
     setState(session, state);
@@ -192,7 +191,6 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
 describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发出牌窗口)', () => {
   let session: GameSession;
   beforeEach(() => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
     const state = createGameState({
       players: [
@@ -379,7 +377,6 @@ describe('checkGameOver:主公阵亡胜负判定', () => {
 describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
   let session: GameSession;
   beforeEach(() => {
-    resetForTest();
     session = new GameSession(makeRoom(), true, 42);
     const state = createGameState({
       players: [

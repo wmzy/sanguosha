@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { bootstrap, dispatch, resetForTest } from '../../src/engine/create-engine';
+import { bootstrap, dispatch } from '../../src/engine/create-engine';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
@@ -81,7 +81,6 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
   let state: GameState;
 
   beforeEach(() => {
-    resetForTest();
     state = createGameState({
       players: [makePlayer(0, 'P1'), makePlayer(1, 'P2'), makePlayer(2, 'P3'), makePlayer(3, 'P4')],
       cardMap: {},

@@ -113,9 +113,9 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
   applyView(view, event) {
     // 通用移动牌:zone 同步必须在 player guard 之前,因为某些移动(如处理区→弃牌堆)无 player
     if (event.type === '移动牌' && view.zones) {
-      const from = (event as any).from;
-      const to = (event as any).to;
-      const cardId = (event as any).cardId as string;
+      const from = event.from as ZoneLoc;
+      const to = event.to as ZoneLoc;
+      const cardId = event.cardId as string;
       if (from?.zone === '牌堆') view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
       else if (from?.zone === '弃牌堆')
         view.zones.discardPileCount = Math.max(0, view.zones.discardPileCount - 1);
@@ -176,9 +176,9 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       default: {
         // 通用移动(装备/转化等):from/to 手牌 → handCount ±1
         // 必须独立查找 from/to 玩家,因为 event.player 只是其中之一
-        const from = (event as any).from;
-        const to = (event as any).to;
-        const cardId = (event as any).cardId as string;
+        const from = event.from as ZoneLoc;
+        const to = event.to as ZoneLoc;
+        const cardId = event.cardId as string;
         if (from?.zone === '手牌' && from?.player !== undefined) {
           const fromPi = view.players.findIndex((p) => p.index === from.player);
           if (fromPi >= 0) {
