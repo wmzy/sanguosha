@@ -19,7 +19,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       const baseAmount = atom.amount ?? 1;
       let newAmount: number;
-      if (atom.damageType === 'fire') {
+      if (atom.damageType === '火焰') {
         newAmount = baseAmount + 1; // 火焰伤害 +1
       } else {
         newAmount = Math.max(0, baseAmount - 1); // 普通伤害 -1

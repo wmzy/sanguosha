@@ -33,16 +33,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // 失去白银狮子时回 1 血:监听 卸下(防具) after hook
+  // 失去白银狮子时回 1 血。
+  // 卸下 atom 将装备移回手牌(非弃牌堆),故在 before hook 记录被卸下的是否为白银狮子,
+  // after hook 据此回血。适用于替换装备、被偷等所有卸下场景。
+  const loseKey = `白银狮子/失去/${ownerId}`;
+  registerBeforeHook(state, skill.id, ownerId, '卸下', async (ctx: AtomBeforeContext) => {
+    const atom = ctx.atom as { player?: number; slot?: string };
+    if (atom.player !== ownerId || atom.slot !== '防具') return;
+    const armorId = ctx.state.players[ownerId]?.equipment['防具'];
+    if (!armorId) return;
+    if (ctx.state.cardMap[armorId]?.name !== '白银狮子') return;
+    ctx.state.localVars[loseKey] = armorId;
+  });
   registerAfterHook(state, skill.id, ownerId, '卸下', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { player?: number; slot?: string };
-    if (atom.player !== ownerId) return;
-    if (atom.slot !== '防具') return;
-    // 卸下 后装备从 equipment 移除,卡牌在弃牌堆。检查弃牌堆顶是否为白银狮子。
-    const discardPile = ctx.state.zones.discardPile;
-    if (discardPile.length === 0) return;
-    const topCard = ctx.state.cardMap[discardPile[discardPile.length - 1]];
-    if (topCard?.name !== '白银狮子') return;
+    if (atom.player !== ownerId || atom.slot !== '防具') return;
+    const cardId = ctx.state.localVars[loseKey];
+    if (!cardId) return;
+    delete ctx.state.localVars[loseKey];
     await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
   });
 

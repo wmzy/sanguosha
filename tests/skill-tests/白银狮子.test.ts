@@ -4,13 +4,12 @@
 // 实现(白银狮子.ts):
 //   - before hook 挂「造成伤害」:target=自己 + amount>1 + 装备白银狮子 → modify amount=1
 //   - after hook 挂「卸下(防具)」:弃牌堆顶为白银狮子 → 回复体力 1
-//   注:卸下 atom 将装备移回手牌(非弃牌堆),故常规替换流程下回血 after-hook
-//   不会命中。此处通过直接造成伤害验证减伤,并以预置弃牌堆顶 + 直接卸下验证回血代码路径。
+//   before-hook(卸下)记录被卸下的是否为白银狮子,after-hook 据此回血。
 //
 // 验证:
 //   1. 正面:受到 2 点伤害 → 减为 1(减伤生效)
 //   2. 边界:受到 1 点伤害 → 不变(amount<=1 不触发减伤)
-//   3. 回血:失去白银狮子(卸下 + 弃牌堆顶为白银狮子)→ 回复 1 点体力
+//   3. 回血:卸下白银狮子 → 回复 1 点体力
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -131,19 +130,9 @@ describe('白银狮子', () => {
     expect(harness.state.players[1].health).toBe(3);
   });
 
-  // ─── 回血:失去白银狮子 ──────────────────────────────────
+  // ─── 回血:卸下白银狮子 ──────────────────────────────────
 
-  it('回血:卸下防具且弃牌堆顶为白银狮子 → 回复 1 点体力', async () => {
-    // 预置一张白银狮子于弃牌堆顶(模拟"失去白银狮子入弃牌堆"的判定条件)
-    const seed: Card = {
-      id: 'by-seed',
-      name: '白银狮子',
-      suit: '♣',
-      color: suitColor('♣'),
-      rank: '3',
-      type: '装备牌',
-      subtype: '防具',
-    };
+  it('回血:卸下白银狮子 → 回复 1 点体力', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', skills: [] }),
@@ -155,8 +144,7 @@ describe('白银狮子', () => {
           equipment: { 防具: 'by' },
         }),
       ],
-      cardMap: { by: BAIYIN, 'by-seed': seed },
-      zones: { deck: [], discardPile: ['by-seed'], processing: [] },
+      cardMap: { by: BAIYIN },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -164,7 +152,7 @@ describe('白银狮子', () => {
     await harness.setup(state);
     expect(harness.state.players[1].health).toBe(2);
 
-    // 直接卸下防具:after-hook 见弃牌堆顶为白银狮子 → 回复 1 体力
+    // 卸下防具:before-hook 记录为白银狮子 → after-hook 回复 1 体力
     await applyAtom(harness.state, { type: '卸下', player: 1, slot: '防具' });
     await harness.waitForStable();
     harness.processAllEvents();
@@ -172,5 +160,6 @@ describe('白银狮子', () => {
     expect(harness.state.players[1].health).toBe(3);
     // 装备已卸下(移回手牌)
     expect(harness.state.players[1].equipment['防具']).toBeUndefined();
+    expect(harness.state.players[1].hand).toContain('by');
   });
 });
