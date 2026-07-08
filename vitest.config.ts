@@ -21,6 +21,9 @@ export default defineConfig({
     passWithNoTests: true,
     clearMocks: true,
     restoreMocks: true,
+    // 全局关闭文件级隔离:引擎模块级状态已全部改为 state-bound(WeakMap),
+    // DOM 清理由 setup.ts 全局注册的 afterEach(cleanup) 负责,
+    // 所有文件共享 worker context + 模块缓存,显著减少重复 import 开销。
     isolate: false,
     coverage: {
       provider: 'v8',
@@ -35,7 +38,6 @@ export default defineConfig({
 
     projects: [
       // 非 skill 测试：node 环境为主，少数 UI 测试文件顶部用 @vitest-environment 注释声明 jsdom。
-      // 单 project 单 worker pool，避免多 project 各起 pool 争抢 CPU。
       {
         extends: true,
         test: {
@@ -44,15 +46,12 @@ export default defineConfig({
           exclude: ['tests/skill-tests/**'],
         },
       },
-      // 技能测试：纯逻辑,node 环境。模块级状态已全部改为 state-bound(WeakMap),
-      // 无跨文件污染。关闭 isolate 让 124 个文件共享 worker context + 模块缓存,
-      // 显著减少重复 import 开销(core 含 UI 测试需保持默认隔离)。
+      // 技能测试：纯逻辑,node 环境,与 core 共享全局 isolate:false。
       {
         extends: true,
         test: {
           name: 'skills',
           include: ['tests/skill-tests/**/*.test.ts'],
-          isolate: false,
         },
       },
     ],
