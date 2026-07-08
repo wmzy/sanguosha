@@ -309,4 +309,38 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     // P1 判定区应为空(没真出)
     expect(harness.state.players[1].pendingTricks).toHaveLength(0);
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 7(独有,来自被合并文件):判定区无 乐不思蜀 → 钩子不触发,牌堆不动
+  // ─────────────────────────────────────────────────────────────
+  it('用例7:判定区无 乐不思蜀 → 钩子不触发,牌堆不动', async () => {
+    const judgeCard: Card = makeCard('jd-1', '杀', '♠', '7');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [],
+          skills: ['乐不思蜀'],
+          pendingTricks: [], // 无 乐不思蜀
+        }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: [] }),
+      ],
+      cardMap: { [judgeCard.id]: judgeCard },
+      currentPlayerIndex: 0,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+      zones: { deck: [judgeCard.id], discardPile: [], processing: [] },
+    });
+    await registerSkillsFromState(state);
+
+    // 触发 阶段开始 判定 → 钩子看到判定区无 乐不思蜀 → 跳过
+    await applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
+
+    // 牌堆未动(钩子没 apply 判定 atom)
+    expect(state.zones.deck).toContain(judgeCard.id);
+    expect(state.zones.discardPile).not.toContain(judgeCard.id);
+    expect(state.players[0].tags ?? []).not.toContain(SKIP_TAG);
+  });
 });

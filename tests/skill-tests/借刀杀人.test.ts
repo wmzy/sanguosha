@@ -247,6 +247,46 @@ describe('借刀杀人', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
+  // 2b. A 出杀 → B 出闪 → B 不扣血(来源: jiedao-full 用例3)
+  // ─────────────────────────────────────────────────────────────
+  it('P2 出杀 → P3 出闪 → P3 不扣血,P2 武器保留', async () => {
+    const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
+    const s2 = makeCard('p2s', '杀', '♥', '5', '基本牌');
+    const d3 = makeCard('p3d', '闪', '♥', '2', '基本牌');
+    const state = buildState({
+      p2Hand: ['p2s'],
+      p2Equipment: { 武器: 'wp1' },
+      p3Hand: ['p3d'],
+      p3Skills: ['闪'],
+      extraCards: { wp1: weapon, p2s: s2, p3d: d3 },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+    const P3 = harness.player('P3');
+
+    const p3HealthBefore = harness.state.players[2].health;
+
+    await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });
+    await P1.pass(); // 无懈窗口
+
+    // P2 选一张杀打出
+    P2.expectPending('请求回应');
+    await P2.respond('杀', { cardId: 'p2s' });
+
+    // P3 被询问闪 → 出闪
+    P3.expectPending('询问闪');
+    await P3.respond('闪', { cardId: 'p3d' });
+
+    // P3 不扣血
+    expect(harness.state.players[2].health).toBe(p3HealthBefore);
+    // P3 的闪进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('p3d');
+    // P2 武器保留(出杀分支不交武器)
+    expect(harness.state.players[1].equipment['武器']).toBe('wp1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
   // 3. validate 拒绝:A 无武器
   // ─────────────────────────────────────────────────────────────
   it('A(P2)无武器 → 被拒绝(targetHasWeapon=false)', async () => {

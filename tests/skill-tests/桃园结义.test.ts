@@ -263,4 +263,59 @@ describe('桃园结义', () => {
       params: { cardId: 's1' },
     });
   });
+
+  // ─────────────────────────────────────────────────────────
+  // 4 人局全员回 1 血(来源: integration/taoyuan 用例4)
+  // ─────────────────────────────────────────────────────────
+  it('4 人局:4 人均掉 1 血 → 桃园结义 → 全员回 1 血', async () => {
+    const state = buildState({
+      p1Health: 3,
+      p2Health: 2,
+      p3Health: 3,
+      playerCount: 4,
+    });
+    // P4 单独设血量(P3 和 P4 都用 p3Health,但手动修正 P4)
+    state.players[3].health = 2;
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCard('桃园结义', 'ty1');
+    // 4 人逐个无懈窗口 → 全 pass
+    await P1.pass();
+    await P1.pass();
+    await P1.pass();
+    await P1.pass();
+
+    expect(harness.state.players[0].health).toBe(4); // 3+1
+    expect(harness.state.players[1].health).toBe(3); // 2+1
+    expect(harness.state.players[2].health).toBe(4); // 3+1
+    expect(harness.state.players[3].health).toBe(3); // 2+1
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 死亡玩家跳过(来源: integration/taoyuan 用例5)
+  // ─────────────────────────────────────────────────────────
+  it('存在死亡玩家 → 跳过死亡玩家,仅存活者回血', async () => {
+    const state = buildState({
+      p1Health: 2,
+      p2Health: 1,
+      p3Health: 3,
+      playerCount: 3,
+    });
+    // P2 死亡
+    state.players[1].alive = false;
+    state.players[1].health = 0;
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCard('桃园结义', 'ty1');
+    // P1 和 P3 逐个无懈窗口 → 全 pass(P2 死亡,不产生窗口)
+    await P1.pass();
+    await P1.pass();
+
+    // P1 和 P3 回血,P2 不受影响
+    expect(harness.state.players[0].health).toBe(3); // 2+1
+    expect(harness.state.players[1].health).toBe(0); // 死亡,不变
+    expect(harness.state.players[2].health).toBe(4); // 3+1
+  });
 });

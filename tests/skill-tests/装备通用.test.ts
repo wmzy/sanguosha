@@ -17,6 +17,8 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
+import { slashMax } from '../../src/engine/slash-quota';
+import { findActionEntry } from '../../src/engine/skill';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeEquip(
@@ -254,13 +256,45 @@ describe('装备通用', () => {
     await P1.useCard('装备通用', 'c1');
     expect(harness.state.players[0].equipment['武器']).toBe('c1');
     expect(harness.state.players[0].skills).toContain('诸葛连弩');
+    // slashMax = ∞(诸葛连弩 onInit 注册上限提供者)
+    expect(slashMax(harness.state, 0)).toBe(Infinity);
 
     // 替换为青釭剑 → 诸葛连弩 应从 skills 列表移除并卸载
+    const skillsLenBefore = harness.state.players[0].skills.length;
     await P1.useCard('装备通用', 'w1');
     expect(harness.state.players[0].equipment['武器']).toBe('w1');
     expect(harness.state.players[0].skills).not.toContain('诸葛连弩');
     expect(harness.state.players[0].skills).toContain('青釭剑');
+    // skills 长度不变(移除诸葛连弩 + 添加青釭剑)(来源: 装备替换用例2)
+    expect(harness.state.players[0].skills.length).toBe(skillsLenBefore);
     // 旧装备卡已进弃牌堆
     expect(harness.state.zones.discardPile).toContain('c1');
+    // slashMax 回落到基础 1(上限提供者被取消注册)(来源: 装备替换用例1)
+    expect(slashMax(harness.state, 0)).toBe(1);
+  });
+
+  // ─── 替换后旧装备 action entry 已从全局表移除(来源: 装备替换用例4) ─────
+  it('Bug2:装备替换后旧装备同名 action entry 已从全局 actions 表移除', async () => {
+    const crossbow = makeEquip('c1', '诸葛连弩', '♣', '武器', 'A', 1);
+    const sword = makeEquip('w1', '青釭剑', '♠', '武器', 'A', 2);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'w1'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1: crossbow, w1: sword },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCard('装备通用', 'c1');
+    await P1.useCard('装备通用', 'w1');
+
+    // findActionEntry 应返回 undefined(action 表不被卸载的实例污染)
+    const entry = findActionEntry(harness.state, '诸葛连弩', 0, 'use');
+    expect(entry).toBeUndefined();
   });
 });

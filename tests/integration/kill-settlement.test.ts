@@ -93,6 +93,8 @@ describe('杀完整结算流程', () => {
     expect(harness.state.zones.discardPile).toContain('s0');
     expect(harness.state.zones.discardPile).toContain('d1');
     expect(frameCards(harness.state)).toEqual([]);
+    // P2 手牌减少(出了闪)
+    expect(harness.state.players[1].hand.length).toBe(0);
   });
 
   it('BUG验证:被询问闪时不能 respond 杀(P2有杀技能)', async () => {
@@ -118,6 +120,8 @@ describe('杀完整结算流程', () => {
     await P2.expectRejected({ skillId: '杀', actionType: 'respond', params: { cardId: 's2' } });
     // 处理区应该只有杀牌(没被污染)
     expect(frameCards(harness.state)).toEqual(['s0']);
+    // 询问闪仍在
+    P2.expectPending('询问闪');
   });
 
   it('出杀后处理区状态:只有杀牌(无其他泄漏)', async () => {
