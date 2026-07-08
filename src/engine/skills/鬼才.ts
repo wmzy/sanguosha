@@ -58,7 +58,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars['鬼才/replaceCard'] = null;
         return;
       }
-      st.localVars['鬼才/replaceCard'] = (params.cardId as string) ?? null;
+      st.localVars['鬼才/replaceCard'] = (params.cardId) ?? null;
     },
   );
 

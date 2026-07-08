@@ -176,7 +176,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (atom.requestType === CONFIRM_REQUEST) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (atom.requestType === PICK_REQUEST) {
-        st.localVars[PICK_KEY] = params.cardId as string;
+        st.localVars[PICK_KEY] = params.cardId;
       }
     },
   );

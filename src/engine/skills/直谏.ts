@@ -64,15 +64,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (typeof params.cardId !== 'string') return '需要选择一张装备牌';
       if (!self.hand.includes(params.cardId)) return '牌不在手牌中';
       const card = st.cardMap[params.cardId];
-      if (!card || card.type !== '装备牌') return '只能使用装备牌';
+      if (card?.type !== '装备牌') return '只能使用装备牌';
       const slot = slotOf(card);
       if (!slot) return '无效的装备牌';
 
       const target =
         Array.isArray(params.targets) && typeof params.targets[0] === 'number'
-          ? (params.targets[0] as number)
+          ? (params.targets[0])
           : typeof params.target === 'number'
-            ? (params.target as number)
+            ? (params.target)
             : undefined;
       if (target === undefined) return '需要指定一名目标';
       if (target === ownerId) return '不能对自己使用直谏';
@@ -88,7 +88,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const cardId = params.cardId as string;
       const target =
         Array.isArray(params.targets) && typeof params.targets[0] === 'number'
-          ? (params.targets[0] as number)
+          ? (params.targets[0])
           : (params.target as number);
       const card = st.cardMap[cardId];
 

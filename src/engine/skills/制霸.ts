@@ -273,7 +273,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           // choice===true → 接受;false → 拒绝
           st.localVars[REFUSE_KEY] = params.choice === true || params.confirmed === true;
         } else if (rt === LORD_CARD_RT) {
-          st.localVars[LORD_CARD_KEY] = params.cardId as string;
+          st.localVars[LORD_CARD_KEY] = params.cardId;
         } else if (rt === TAKE_RT) {
           st.localVars[TAKE_KEY] = params.choice === true || params.confirmed === true;
         }

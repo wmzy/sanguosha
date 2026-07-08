@@ -74,7 +74,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       } else if (rt === CHOOSE_TARGET_RT) {
         const t =
           (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target as number) : undefined);
+          (typeof params.target === 'number' ? (params.target) : undefined);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
       } else if (rt === GIVE_RT) {
         const ids = params.cardIds as string[] | undefined;

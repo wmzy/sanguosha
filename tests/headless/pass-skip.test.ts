@@ -13,10 +13,10 @@ function makeBroadcastPending(): PendingView {
       type: '请求回应',
       requestType: '无懈可击',
       target: -2,
-      prompt: { type: 'useCard', title: '是否打出无懈可击?' },
+      prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: () => true, min: 1, max: 1 } },
       timeout: 10,
     },
-    prompt: { type: 'useCard', title: '是否打出无懈可击?' },
+    prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { filter: () => true, min: 1, max: 1 } },
     target: -2,
     isBlocking: true,
     deadline: Date.now() + 10000,
@@ -31,9 +31,9 @@ function makeBlockingPending(target: number): PendingView {
       type: '请求回应',
       requestType: '闪',
       target,
-      prompt: { type: 'useCard', title: '是否打出闪?' },
+      prompt: { type: 'useCard', title: '是否打出闪?', cardFilter: { filter: () => true, min: 1, max: 1 } },
     },
-    prompt: { type: 'useCard', title: '是否打出闪?' },
+    prompt: { type: 'useCard', title: '是否打出闪?', cardFilter: { filter: () => true, min: 1, max: 1 } },
     target,
     isBlocking: true,
     deadline: Date.now() + 30000,
@@ -191,7 +191,7 @@ describe('HeadlessGameClient.getAvailableActions() — respond params 填充', (
     (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
       {
         type: 'awaits',
-        atom: { type: '询问杀', target: 1 },
+        atom: { type: '询问杀', target: 1, source: 0 },
         prompt: { type: 'confirm', title: '是否出杀？' },
         target: 1,
         isBlocking: true,
@@ -215,7 +215,7 @@ describe('HeadlessGameClient.getAvailableActions() — respond params 填充', (
     (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
       {
         type: 'awaits',
-        atom: { type: '请求回应', requestType: '突袭/trigger', target: 0 },
+        atom: { type: '请求回应', requestType: '突袭/trigger', target: 0, prompt: { type: 'useCard', title: '是否发动突袭?', cardFilter: { filter: () => true, min: 1, max: 1 } } },
         prompt: { type: 'confirm', title: '是否发动突袭?', confirmLabel: '发动', cancelLabel: '不发动' },
         target: 0,
         isBlocking: true,
@@ -240,7 +240,7 @@ describe('HeadlessGameClient.getAvailableActions() — respond params 填充', (
     (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
       {
         type: 'awaits',
-        atom: { type: '询问杀', target: 1 },
+        atom: { type: '询问杀', target: 1, source: 0 },
         prompt: { type: 'confirm', title: '是否出杀？' },
         target: 1,
         isBlocking: true,

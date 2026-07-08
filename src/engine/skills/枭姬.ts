@@ -33,7 +33,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 async function triggerXiaoji(state: GameState, ownerId: number, count: number): Promise<void> {
   for (let i = 0; i < count; i++) {
     const me = state.players[ownerId];
-    if (!me || !me.alive) return; // 死亡不再触发
+    if (!me?.alive) return; // 死亡不再触发
     delete state.localVars['枭姬/confirmed'];
     await applyAtom(state, {
       type: '请求回应',

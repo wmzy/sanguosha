@@ -168,7 +168,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === SWITCH_REQUEST) {
         st.localVars[SWITCH_CHOICE_KEY] = params.choice === true;
       } else if (rt === SKILL_REQUEST) {
-        st.localVars[SELECTED_KEY] = params.skill as string;
+        st.localVars[SELECTED_KEY] = params.skill;
         delete st.localVars[CANDIDATES_KEY(ownerId)];
       }
     },

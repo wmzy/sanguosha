@@ -15,7 +15,6 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
@@ -63,7 +62,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const target = atom.target;
     if (atom.cardId !== undefined) {
       const card = ctx.state.cardMap[atom.cardId];
-      if (!card || card.name !== '杀') return;
+      if (card?.name !== '杀') return;
     }
     const self = ctx.state.players[ownerId];
     const targetPlayer = ctx.state.players[target];

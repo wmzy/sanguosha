@@ -71,7 +71,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.from?.zone !== '处理区') return;
     if (atom.to?.zone !== '弃牌堆') return;
     const card = ctx.state.cardMap[atom.cardId];
-    if (!card || card.name !== '南蛮入侵') return;
+    if (card?.name !== '南蛮入侵') return;
     // 南蛮入侵结算帧:topFrame.from = 使用者;使用者≠祝融 才获得
     const frame = topFrame(ctx.state);
     if (frame?.skillId !== '南蛮入侵') return;

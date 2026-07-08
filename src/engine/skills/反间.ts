@@ -147,7 +147,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       },
       async (st: GameState, params: Record<string, Json>) => {
-        st.localVars[SUIT_KEY] = params.suit as string;
+        st.localVars[SUIT_KEY] = params.suit;
       },
     );
     unloaders.push(u);

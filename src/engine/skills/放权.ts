@@ -3,44 +3,77 @@
 //
 // 实现:
 //   - before hook 挂在「阶段开始」(出牌):询问是否发动;发动则跳过出牌阶段 +
-//     设 turn.vars['放权/active'] 标记(回合结束时消费)。
-//   - after hook 挂在「回合结束」:检查 放权/active → 请求弃一张手牌。
-//   - 额外回合部分:引擎当前不支持额外回合机制(需修改回合管理的座次推进逻辑,
-//     涉及嵌套回合+座次恢复,风险高)。标记 TODO,仅实现跳过出牌+弃牌部分。
+//     设 放权/active 标记(回合结束时消费)。
+//   - before hook 挂在「回合结束」:额外回合的核心机制,处理两种情况——
+//     情况1(刘禅回合结束 + active):弃一张手牌 → 选额外回合目标 → cancel 本回合结束
+//       (阻止 回合管理 的 findNextAlive 路径,避免双重启动)→ 手动清理 per-turn 状态
+//       → 亲自启动目标的额外回合(参考据守「亲自推进回合」先例)。
+//     情况2(额外目标回合结束):cancel 本回合结束 → 手动清理 → 亲自启动正常下家(刘禅的正常下家)的回合,
+//       恢复正常座次顺序。
+//
+//   额外回合机制完全在放权技能内部实现,不修改 回合管理.ts:
+//   cancel 掉 回合结束 atom 后其 apply 与 after-hook(回合管理的 findNextAlive)都不执行,
+//   故需手动复刻 回合结束 的 per-turn 清理(见 clearPerTurnState)。
 //
 // 跳过出牌阶段手法同神速/巧变:applyAtom(阶段结束, 出牌) 推进到弃牌,
 //   再 return {kind:'cancel'} 取消本次 阶段开始(出牌)。
 import type {
   AtomBeforeContext,
-  AtomAfterContext,
   FrontendAPI,
   GameState,
+  GameView,
   HookResult,
   Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../skill';
 
 const TRIGGER_RT = '放权/trigger';
 const DISCARD_RT = '放权/discard';
+const CHOOSE_TARGET_RT = '放权/chooseTarget';
 const TRIGGERED_KEY = '放权/triggered';
 const ACTIVE_KEY = '放权/active';
 const DISCARD_CARD_KEY = '放权/discardCard';
+const EXTRA_TARGET_KEY = '放权/extraTarget';
+const ORIGINAL_NEXT_KEY = '放权/originalNext';
+
+/** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
+ *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 /usedThisTurn|/healed|/givenCount vars。
+ *  marks 多数由 end action 的 清过期标记 已清(仅结束玩家),此处补全所有玩家以保持与 atom 一致。 */
+function clearPerTurnState(state: GameState): void {
+  state.turn.vars = {};
+  for (const p of state.players) {
+    p.marks = p.marks.filter((m) => m.duration !== 'turn');
+    p.vars = Object.fromEntries(
+      Object.entries(p.vars).filter(
+        ([k]) => !k.endsWith('/usedThisTurn') && !k.endsWith('/healed') && !k.endsWith('/givenCount'),
+      ),
+    );
+  }
+}
+
+/** 亲自启动 player 的一个完整回合:回合开始 → 准备阶段开始 → 准备阶段结束。
+ *  回合管理的阶段推进 after-hook 据此自动走完该玩家的判定/摸牌/出牌/弃牌/回合结束。 */
+async function startTurn(state: GameState, player: number): Promise<void> {
+  await applyAtom(state, { type: '回合开始', player });
+  await applyAtom(state, { type: '阶段开始', player, phase: '准备' });
+  await applyAtom(state, { type: '阶段结束', player, phase: '准备' });
+}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
     name: '放权',
-    description: '跳过出牌阶段,回合结束时弃一张手牌,令一名其他角色进行额外回合(额外回合待实现)',
+    description: '跳过出牌阶段,回合结束时弃一张手牌,令一名其他角色进行一个额外回合',
   };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // respond:处理 trigger(confirm) 与 discard(useCard) 两类询问
+  // respond:处理 trigger(confirm)、discard(useCard)、chooseTarget(choosePlayer) 三类询问
   registerAction(
     state,
     skill.id,
@@ -57,6 +90,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!s.players[ownerId].hand.includes(cardId)) return '牌不在手牌中';
         return null;
       }
+      if (rt === CHOOSE_TARGET_RT) {
+        const target = params.target as number | undefined;
+        if (typeof target !== 'number') return '请选择一名其他角色';
+        if (target === ownerId) return '不能选择自己';
+        if (!s.players[target]?.alive) return '目标已死亡';
+        return null;
+      }
       return '当前不是放权回应';
     },
     async (s: GameState, params: Record<string, Json>) => {
@@ -65,7 +105,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === TRIGGER_RT) {
         s.localVars[TRIGGERED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === DISCARD_RT) {
-        s.localVars[DISCARD_CARD_KEY] = params.cardId as string;
+        s.localVars[DISCARD_CARD_KEY] = params.cardId;
+      } else if (rt === CHOOSE_TARGET_RT) {
+        s.localVars[EXTRA_TARGET_KEY] = params.target;
       }
     },
   );
@@ -111,44 +153,112 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 回合结束 after:放权标记 → 弃一张手牌 ──
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
-    if (atom.type !== '回合结束') return;
-    if (atom.player !== ownerId) return;
-    if (ctx.state.localVars[ACTIVE_KEY] !== true) return;
-    delete ctx.state.localVars[ACTIVE_KEY];
+  // ── 回合结束 before:放权的额外回合机制 ──
+  // 比 回合管理 的 after-hook(按座次+注册序)更早(before 先于 after),cancel 后其 after-hook 不执行。
+  registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '回合结束',
+    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      const atom = ctx.atom as { type?: string; player?: number };
+      if (atom.type !== '回合结束') return;
+      const st = ctx.state;
+      const player = atom.player;
+      if (typeof player !== 'number') return;
 
-    const self = ctx.state.players[ownerId];
-    if (!self?.alive) return;
-    if (self.hand.length === 0) return; // 无手牌可弃 → 跳过
+      // ── 情况1:刘禅的回合结束 + 放权/active ──
+      if (player === ownerId && st.localVars[ACTIVE_KEY] === true) {
+        delete st.localVars[ACTIVE_KEY];
+        const self = st.players[ownerId];
+        if (!self?.alive) return; // 已死亡 → 不启动额外回合,放行正常回合结束
 
-    // 请求弃一张手牌
-    delete ctx.state.localVars[DISCARD_CARD_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: DISCARD_RT,
-      target: ownerId,
-      prompt: {
-        type: 'useCard',
-        title: '放权:弃置一张手牌',
-        cardFilter: { filter: () => true, min: 1, max: 1 },
-      },
-      timeout: 15,
-    });
+        // 请求弃一张手牌
+        if (self.hand.length > 0) {
+          delete st.localVars[DISCARD_CARD_KEY];
+          await applyAtom(st, {
+            type: '请求回应',
+            requestType: DISCARD_RT,
+            target: ownerId,
+            prompt: {
+              type: 'useCard',
+              title: '放权:弃置一张手牌',
+              cardFilter: { filter: () => true, min: 1, max: 1 },
+            },
+            timeout: 15,
+          });
+          const discardCardId = st.localVars[DISCARD_CARD_KEY] as string | undefined;
+          delete st.localVars[DISCARD_CARD_KEY];
+          if (discardCardId && self.hand.includes(discardCardId)) {
+            await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
+          }
+        }
 
-    const discardCardId = ctx.state.localVars[DISCARD_CARD_KEY] as string | undefined;
-    delete ctx.state.localVars[DISCARD_CARD_KEY];
-    if (discardCardId && self.hand.includes(discardCardId)) {
-      await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
-    }
+        // 请求选额外回合目标(排除自己、排除死亡)
+        delete st.localVars[EXTRA_TARGET_KEY];
+        await applyAtom(st, {
+          type: '请求回应',
+          requestType: CHOOSE_TARGET_RT,
+          target: ownerId,
+          prompt: {
+            type: 'choosePlayer',
+            title: '放权:选择一名其他角色进行一个额外回合',
+            min: 1,
+            max: 1,
+            filter: (view: GameView, target: number) =>
+              target !== ownerId && view.players[target]?.alive === true,
+          },
+          timeout: 15,
+        });
+        const extraTarget = st.localVars[EXTRA_TARGET_KEY] as number | undefined;
+        if (
+          typeof extraTarget !== 'number' ||
+          extraTarget === ownerId ||
+          !st.players[extraTarget]?.alive
+        ) {
+          // 无有效目标 → 不启动额外回合,放行正常回合结束
+          return;
+        }
 
-    // TODO: 额外回合机制——令一名其他角色进行一个额外回合。
-    // 引擎当前不支持额外回合(需修改回合管理的座次推进逻辑,涉及嵌套回合+座次恢复)。
-    // 理想实现:在 回合结束 after hook 中,设一个 extraTurnQueue,
-    // 回合管理的 回合结束 after hook 检测队列:有排队 → 启动额外回合(不走 findNextAlive),
-    // 额外回合结束后恢复原座次顺序。
-  });
+        // 记录正常下家(currentPlayerIndex 已被 end action 的 下一玩家 推进到正常下家)
+        const originalNext = st.currentPlayerIndex;
+        st.localVars[EXTRA_TARGET_KEY] = extraTarget;
+        st.localVars[ORIGINAL_NEXT_KEY] = originalNext;
+
+        // cancel 回合结束 → 手动清理 per-turn 状态(否则 apply 不执行,状态残留)
+        clearPerTurnState(st);
+
+        // 亲自启动额外目标的回合(嵌套:其 end action → 回合结束(extraTarget) → 触发情况2)
+        st.currentPlayerIndex = extraTarget;
+        await startTurn(st, extraTarget);
+
+        return { kind: 'cancel' };
+      }
+
+      // ── 情况2:额外目标的回合结束 ──
+      const extraTargetStored = st.localVars[EXTRA_TARGET_KEY];
+      if (player === extraTargetStored) {
+        const originalNext = st.localVars[ORIGINAL_NEXT_KEY] as number | undefined;
+        delete st.localVars[EXTRA_TARGET_KEY];
+        delete st.localVars[ORIGINAL_NEXT_KEY];
+
+        if (typeof originalNext !== 'number' || !st.players[originalNext]?.alive) {
+          return; // 异常:无正常下家,放行
+        }
+
+        // cancel 回合结束 → 手动清理 per-turn 状态
+        clearPerTurnState(st);
+
+        // 亲自启动正常下家的回合(恢复正常座次顺序)。
+        // originalNext 回合结束后,其 回合结束 before-hook 标记已清 → 放行 →
+        // 回合管理 的 after-hook 经 findNextAlive 正常推进后续座次。
+        st.currentPlayerIndex = originalNext;
+        await startTurn(st, originalNext);
+
+        return { kind: 'cancel' };
+      }
+    },
+  );
 
   return () => {};
 }

@@ -17,7 +17,6 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
@@ -67,7 +66,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 仅对杀触发(cardId 缺省时容错放过——避免误拦无牌事件)
     if (atom.cardId !== undefined) {
       const card = ctx.state.cardMap[atom.cardId];
-      if (!card || card.name !== '杀') return;
+      if (card?.name !== '杀') return;
     }
     const targetPlayer = ctx.state.players[target];
     if (!targetPlayer?.alive) return;

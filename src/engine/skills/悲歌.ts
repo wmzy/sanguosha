@@ -63,7 +63,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[DISCARD_CARD_KEY] = params.cardId as string;
+      st.localVars[DISCARD_CARD_KEY] = params.cardId;
     },
   );
 
@@ -97,7 +97,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const cardId = atom.cardId;
     if (!cardId) return;
     const dmgCard = ctx.state.cardMap[cardId];
-    if (!dmgCard || dmgCard.name !== '杀') return;
+    if (dmgCard?.name !== '杀') return;
 
     // 蔡文姬须存活且有手牌作代价
     const self = ctx.state.players[ownerId];

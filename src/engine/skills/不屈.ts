@@ -40,7 +40,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const atom = ctx.atom as { target?: number };
     if (atom.target !== ownerId) return;
     const self = ctx.state.players[ownerId];
-    if (!self || !self.alive) return;
+    if (!self?.alive) return;
     // 牌堆为空则无法置创牌(无法判定)——不屈失败,周泰进入正常求桃/死亡流程
     if (ctx.state.zones.deck.length === 0) return;
 

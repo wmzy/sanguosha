@@ -61,7 +61,7 @@ async function askTargetToDiscard(
   if (!tp) return;
   const equipment = Object.entries(tp.equipment)
     .filter(([, id]) => typeof id === 'string')
-    .map(([slot, id]) => ({ slot, cardId: id as string, cardName: state.cardMap[id]?.name ?? '?' }));
+    .map(([slot, id]) => ({ slot, cardId: id, cardName: state.cardMap[id]?.name ?? '?' }));
   const handCount = tp.hand.length;
   // 超时默认:明牌优先(装备首张),否则手牌[0]
   const defaultZone =
@@ -94,7 +94,7 @@ async function askTargetToDiscard(
   const zone = result?.zone ?? defaultZone.zone;
   let discardId: string | undefined;
   if (zone === 'equipment') {
-    discardId = (result?.cardId ?? (defaultZone as { cardId?: string }).cardId) as string;
+    discardId = (result?.cardId ?? (defaultZone as { cardId?: string }).cardId);
   } else {
     // 手牌盲选(目标自选,后端按 handIndex 取)
     const idx = result?.handIndex ?? 0;
@@ -183,7 +183,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const target = atom.target;
     if (atom.cardId === undefined) return; // 无牌事件容错放过
     const card = ctx.state.cardMap[atom.cardId];
-    if (!card || card.name !== '杀') return;
+    if (card?.name !== '杀') return;
     const targetPlayer = ctx.state.players[target];
     if (!targetPlayer?.alive) return;
     // 目标必须至少有一张牌可弃(手牌或装备)——无牌则不触发(FAQ)

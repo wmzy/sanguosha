@@ -357,7 +357,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     const isBroadcast = typeof atomTarget === 'number' && atomTarget < 0;
     if (isBroadcast) {
       // 广播型:记录该玩家已 skip,全员 skip 时提前触发超时
-      if (!slot.skippedPlayers) slot.skippedPlayers = new Set();
+      slot.skippedPlayers ??= new Set();
       slot.skippedPlayers.add(message.ownerId);
       const alivePlayers = state.players.filter((p) => p.alive).map((p) => p.index);
       if (alivePlayers.every((idx) => slot.skippedPlayers!.has(idx))) {

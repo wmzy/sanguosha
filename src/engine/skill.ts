@@ -247,7 +247,7 @@ function unregisterActionsForInstance(state: GameState, skillId: string, ownerId
   }
   // 同实例的改判钩子也需清理(按 ownerId 键)
   const jm = reg.judgeModifiers.get(ownerId);
-  if (jm && jm.skillId === skillId) reg.judgeModifiers.delete(ownerId);
+  if (jm?.skillId === skillId) reg.judgeModifiers.delete(ownerId);
 }
 
 export function getBeforeHooks(state: GameState, atomType: string): AtomHookEntry[] {

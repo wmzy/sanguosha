@@ -99,9 +99,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (reqType === CONFIRM_RT) {
           st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
         } else if (reqType === OWNER_PD_RT) {
-          st.localVars[OWNER_CARD_KEY] = params.cardId as string;
+          st.localVars[OWNER_CARD_KEY] = params.cardId;
         } else if (reqType === VICTIM_PD_RT) {
-          st.localVars[VICTIM_CARD_KEY] = params.cardId as string;
+          st.localVars[VICTIM_CARD_KEY] = params.cardId;
         }
       },
     );
@@ -123,7 +123,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const dmgCardId = atom.cardId;
     if (!dmgCardId) return;
     const dmgCard = ctx.state.cardMap[dmgCardId];
-    if (!dmgCard || dmgCard.name !== '杀') return;
+    if (dmgCard?.name !== '杀') return;
 
     const victim = atom.target;
     const victimPlayer = ctx.state.players[victim];

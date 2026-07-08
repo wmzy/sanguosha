@@ -14,7 +14,7 @@
 //   钩子:无(纯主动技)
 //   契约:读 localVars['挑衅/选牌']、['挑衅/弃牌目标'];写 player.vars['挑衅/usedThisTurn']
 //   距离:inAttackRange(state, 目标, 姜维)—— 目标的杀能攻击到姜维
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';
@@ -35,7 +35,7 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
   if (!vp) return;
   const equipment = Object.entries(vp.equipment)
     .filter(([, id]) => typeof id === 'string')
-    .map(([slot, id]) => ({ slot, cardId: id as string, cardName: state.cardMap[id]?.name ?? '?' }));
+    .map(([slot, id]) => ({ slot, cardId: id, cardName: state.cardMap[id]?.name ?? '?' }));
   const handCount = vp.hand.length;
   if (equipment.length === 0 && handCount === 0) return; // 无牌可弃
 
@@ -72,7 +72,7 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
   const zone = result?.zone ?? defaultZone.zone;
   let discardId: string | undefined;
   if (zone === 'equipment') {
-    discardId = (result?.cardId ?? defaultZone.cardId) as string;
+    discardId = (result?.cardId ?? defaultZone.cardId);
   } else {
     // 手牌盲选
     const idx = result?.handIndex ?? 0;

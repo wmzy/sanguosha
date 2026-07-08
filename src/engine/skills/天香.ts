@@ -85,8 +85,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === CHOOSE_RT) {
-        st.localVars[CARD_KEY] = (params.cardId as string) ?? null;
-        st.localVars[TARGET_KEY] = (params.target as number) ?? null;
+        st.localVars[CARD_KEY] = (params.cardId) ?? null;
+        st.localVars[TARGET_KEY] = (params.target) ?? null;
       }
     },
   );

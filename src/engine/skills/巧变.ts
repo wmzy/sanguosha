@@ -113,7 +113,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === MOVE_SOURCE_PLAYER_RT) {
         const t =
           (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target as number) : undefined);
+          (typeof params.target === 'number' ? (params.target) : undefined);
         if (typeof t === 'number') st.localVars[MOVE_SOURCE_PLAYER_KEY] = t;
         return;
       }
@@ -129,7 +129,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === MOVE_DEST_PLAYER_RT) {
         const t =
           (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target as number) : undefined);
+          (typeof params.target === 'number' ? (params.target) : undefined);
         if (typeof t === 'number') st.localVars[MOVE_DEST_PLAYER_KEY] = t;
         return;
       }

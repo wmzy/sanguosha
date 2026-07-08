@@ -18,7 +18,7 @@
 //   - rollback 恢复田标记 + 距离修正 + 删影子卡
 //   - 顺手牵羊的距离检查在 use.validate 中:此时田已消耗、距离修正已更新,
 //     若距离变远导致 use validate 失败,rollback 恢复一切(安全)
-import type { Card, FrontendAPI, GameState, Json, Skill, Mark } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction } from '../skill';
@@ -76,7 +76,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 该 mark 存在且是田
       const mark = self.marks.find((m) => m.id === markId);
-      if (!mark || !mark.id.startsWith(TIAN_PREFIX)) return '指定的田不存在';
+      if (!mark?.id.startsWith(TIAN_PREFIX)) return '指定的田不存在';
       const payload = mark.payload as { cardId?: string } | undefined;
       if (!payload?.cardId) return '田缺少卡牌信息';
 

@@ -14,7 +14,6 @@ import type {
   GameView,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
@@ -58,7 +57,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       } else if (rt === SELECT_RT) {
         // 兼容 targets(数组)与 target(单数)
         const targets = (params.targets as number[] | undefined) ??
-          (typeof params.target === 'number' ? [params.target as number] : undefined);
+          (typeof params.target === 'number' ? [params.target] : undefined);
         s.localVars[TARGETS_KEY] = targets ?? [];
       }
     },

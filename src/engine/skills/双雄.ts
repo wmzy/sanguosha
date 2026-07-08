@@ -71,7 +71,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const cardIds = params.cardIds as string[] | undefined;
         if (!Array.isArray(cardIds) || cardIds.length !== 1) return '需要选择一张牌';
         const revealed = s.localVars[REVEALED_KEY] as string[] | undefined;
-        if (!revealed || !revealed.includes(cardIds[0])) return '该牌不在可选范围';
+        if (!revealed?.includes(cardIds[0])) return '该牌不在可选范围';
       }
       return null;
     },
@@ -81,7 +81,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === CONFIRM_RT) {
         s.localVars[TRIGGERED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === SELECT_RT) {
-        s.localVars[SELECTED_KEY] = params.cardIds as string[];
+        s.localVars[SELECTED_KEY] = params.cardIds;
       }
     },
   );
@@ -145,7 +145,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const picked = ctx.state.localVars[SELECTED_KEY] as string[] | undefined;
       // 兜底:超时或非法回应时取牌堆顶第一张(必须选一张,不放弃发动效果)
       const chosenId =
-        picked && picked.length === 1 && top2.includes(picked[0]) ? picked[0] : top2[top2.length - 1];
+        picked?.length === 1 && top2.includes(picked[0]) ? picked[0] : top2[top2.length - 1];
       const chosenCard = ctx.state.cardMap[chosenId];
       const chosenSuit = chosenCard?.suit ?? '';
 

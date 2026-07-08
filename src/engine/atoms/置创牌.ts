@@ -54,7 +54,7 @@ export const 置创牌: AtomDefinition<{ player: number }> = {
     };
     return { ownerViews: new Map(), othersView: view };
   },
-  applyView(view: GameView, event) {
+  applyView(view: GameView, _event) {
     // 创牌来自牌堆顶:牌堆-1(与 buildView 的 deckCount=deck.length 对齐)
     if (view.zones) {
       view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);

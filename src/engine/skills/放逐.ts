@@ -72,7 +72,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       } else if (rt === TARGET_RT) {
         const t =
           (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target as number) : undefined);
+          (typeof params.target === 'number' ? (params.target) : undefined);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
       }
     },

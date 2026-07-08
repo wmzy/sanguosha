@@ -14,7 +14,7 @@ import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction } from '../skill';
-import { effectiveDistance, inAttackRange } from '../distance';
+import { inAttackRange } from '../distance';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
 function rankValue(rank: string): number {
@@ -228,9 +228,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const atom = slot.atom as unknown as Record<string, unknown>;
         const reqType = atom.requestType as string;
         if (reqType === '驱虎/拼点') {
-          st.localVars['驱虎/targetCard'] = params.cardId as string;
+          st.localVars['驱虎/targetCard'] = params.cardId;
         } else if (reqType === '驱虎/选目标') {
-          st.localVars['驱虎/victim'] = params.target as number;
+          st.localVars['驱虎/victim'] = params.target;
         }
       },
     );

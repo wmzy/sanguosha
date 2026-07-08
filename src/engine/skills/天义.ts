@@ -198,7 +198,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!slot) return;
         const atom = slot.atom as unknown as Record<string, unknown>;
         if (atom.type !== '请求回应' || (atom.requestType as string) !== PD_RT) return;
-        st.localVars[TARGET_CARD_KEY] = params.cardId as string;
+        st.localVars[TARGET_CARD_KEY] = params.cardId;
       },
     );
   }

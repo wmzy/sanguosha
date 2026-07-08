@@ -75,7 +75,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const from = atom.from;
     const to = atom.to;
     // 只关心 owner 从自己手牌打出(→ 处理区 或 → 弃牌堆)
-    if (!from || from.zone !== '手牌' || from.player !== ownerId) return;
+    if (from?.zone !== '手牌' || from.player !== ownerId) return;
     if (!to || (to.zone !== '处理区' && to.zone !== '弃牌堆')) return;
     const card = ctx.state.cardMap[atom.cardId];
     if (!card) return;

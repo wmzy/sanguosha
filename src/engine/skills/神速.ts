@@ -12,12 +12,10 @@
 //   - 跳过阶段手法同兵粮寸断/乐不思蜀:applyAtom(阶段结束, 当前阶段) 推进到下一阶段,再 cancel。
 import type {
   AtomBeforeContext,
-  Card,
   FrontendAPI,
   GameState,
   GameView,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
@@ -65,7 +63,7 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     type: '基本牌',
   };
 
-  const frame = await pushFrame(state, '神速', source, { virtualKillCardId: cardId });
+  await pushFrame(state, '神速', source, { virtualKillCardId: cardId });
   try {
     await applyAtom(state, { type: '指定目标', source, target, cardId });
     await applyAtom(state, { type: '成为目标', source, target, cardId });
@@ -124,7 +122,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       } else if (rt === OPT1_TARGET_RT || rt === OPT2_TARGET_RT) {
         const t =
           (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target as number) : undefined);
+          (typeof params.target === 'number' ? (params.target) : undefined);
         if (typeof t === 'number') s.localVars['神速/target'] = t;
       } else if (rt === OPT2_EQUIP_RT) {
         // 兼容 distribute/select 的 cardIds 数组与单 cardId
@@ -273,7 +271,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const equipCardId =
         (equipCardIdRaw && typeof equipCardIdRaw === 'object'
           ? equipCardIdRaw.cardIds?.[0]
-          : (equipCardIdRaw as string | undefined)) ?? undefined;
+          : (equipCardIdRaw)) ?? undefined;
       delete ctx.state.localVars['神速/equipCardId'];
       if (!equipCardId || !Object.values(self.equipment).includes(equipCardId)) {
         return; // 无效选择 → 出牌阶段正常进行

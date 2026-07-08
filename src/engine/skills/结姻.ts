@@ -28,7 +28,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 /** 校验某座次是否为合法结姻目标:存活 + 已受伤 + 男性。 */
 function isValidTarget(state: GameState, target: number): boolean {
   const p = state.players[target];
-  if (!p || !p.alive) return false;
+  if (!p?.alive) return false;
   if (p.health >= p.maxHealth) return false; // 已受伤 = health < maxHealth
   return getGender(p.character) === '男';
 }
@@ -65,7 +65,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     'use',
     (state: GameState, params: Record<string, Json>) => {
       const self = state.players[ownerId];
-      if (!self || !self.alive) return '角色不可用';
+      if (!self?.alive) return '角色不可用';
       // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending
       if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
       if (state.phase !== '出牌') return '不是出牌阶段';

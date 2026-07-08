@@ -18,7 +18,7 @@ const PROTOCOL_VERSION = '2024-11-05';
  *  当 raw 为空/true 且环境变量 SGS_ROOM_ID 存在时，自动用 multiplayer 模式 join
  *  （解决 AI agent 传空 startGame 导致进 debug 模式的问题）。 */
 export function normalizeStartGame(raw: unknown): StartGameOpts {
-  if (raw === true || raw === undefined || raw === {}) {
+  if (raw === true || raw === undefined || (typeof raw === 'object' && raw !== null && Object.keys(raw).length === 0)) {
     // 有 SGS_ROOM_ID 环境变量 → 自动 multiplayer join
     const envRoomId = typeof process !== 'undefined' ? process.env?.SGS_ROOM_ID : undefined;
     if (envRoomId) {
@@ -238,7 +238,7 @@ export async function handleMcpRequest(
           };
         }
         if (params.name === 'reportBug') {
-          const args = (params.arguments ?? {}) as Record<string, unknown>;
+          const args = (params.arguments ?? {});
           const description = typeof args.description === 'string' ? args.description : '';
           if (!description.trim()) {
             return {

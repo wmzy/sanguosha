@@ -108,7 +108,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             // ── 2) 请求使用者弃一张同花色手牌 ──
             // 使用者无同花色手牌 → 无法弃 → 无事发生(规则:"若你弃置..."条件不满足)
             const fromPlayer = state.players[from];
-            if (fromPlayer && fromPlayer.alive) {
+            if (fromPlayer?.alive) {
               const hasMatch = fromPlayer.hand.some(
                 (id) => state.cardMap[id]?.suit === revealedSuit,
               );
@@ -192,7 +192,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (reqType === '火攻/弃牌') {
         const revealedSuit = state.localVars['火攻/展示花色'] as string | undefined;
         const card = state.cardMap[cardId];
-        if (!revealedSuit || !card || card.suit !== revealedSuit)
+        if (!revealedSuit || card?.suit !== revealedSuit)
           return '必须弃置与展示牌相同花色的手牌';
       }
       return null;
@@ -226,7 +226,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
         min: 1,
         max: 1,
         // 目标须有手牌(前端 UI 提示用,后端 validate 独立校验)
-        filter: (_view, t) => true,
+        filter: (_view, _t) => true,
       },
     },
   });

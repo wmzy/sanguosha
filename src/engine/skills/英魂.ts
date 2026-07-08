@@ -84,7 +84,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           const t =
             (params.targets as number[] | undefined)?.[0] ??
             (typeof params.target === 'number'
-              ? (params.target as number)
+              ? (params.target)
               : undefined);
           if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         } else if (rt === OPTION_RT) {

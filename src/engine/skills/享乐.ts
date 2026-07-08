@@ -58,7 +58,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return null;
       },
       async (st: GameState, params: Record<string, Json>) => {
-        st.localVars['享乐/discardCard'] = params.cardId as string;
+        st.localVars['享乐/discardCard'] = params.cardId;
       },
     );
   }

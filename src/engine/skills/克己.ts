@@ -18,7 +18,6 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
   ZoneLoc,
 } from '../types';

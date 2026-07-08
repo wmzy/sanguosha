@@ -66,7 +66,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars[REPLACE_CARD_KEY] = null;
         return;
       }
-      st.localVars[REPLACE_CARD_KEY] = (params.cardId as string) ?? null;
+      st.localVars[REPLACE_CARD_KEY] = (params.cardId) ?? null;
     },
   );
 
