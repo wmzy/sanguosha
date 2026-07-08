@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 前端组件测试:EquipColumn 装备区在 distribute(制衡)激活时可点击选牌。
 //
 // 背景:此前装备区渲染为纯展示文本,distribute 激活时虽把装备列入候选集

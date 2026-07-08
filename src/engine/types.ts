@@ -728,6 +728,9 @@ export interface PendingSlot {
   pause: () => void;
   /** 内部:由引擎创建 pending 时挂上,供 fireTimeout 立即触发 onTimeout(绕过真实 setTimeout) */
   _fireTimeoutNow?: () => Promise<void>;
+  /** 广播型 pending 中已放弃回应的玩家集合(skip 机制)。
+  *  全员 skip 时提前触发超时,不必等真实定时器。仅广播型 slot 使用。 */
+  skippedPlayers?: Set<number>;
 }
 
 export interface ClientMessage {

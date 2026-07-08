@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 前端渲染测试:五谷丰登选牌面板(pickProcessingCard prompt)。
 // 验证 AwaitingPrompt 对 pickProcessingCard 的渲染:处理区明牌作为可点按钮,
 // 点击后 onAction 以 { cardId } 格式提交 respond。

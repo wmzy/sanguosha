@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GameLog } from '../../src/shared/log';
 import { saveLog, loadLog } from '../../src/client/utils/logFile';

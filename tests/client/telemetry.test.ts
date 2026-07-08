@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // tests/client/telemetry.test.ts
 // debugTelemetry 模块单元测试:验证 ring buffer / 全局异常捕获 / DOM 采集 / 安装卸载幂等。
 //

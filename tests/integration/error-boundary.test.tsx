@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { Component, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';

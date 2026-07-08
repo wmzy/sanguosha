@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // tests/client/useMultiplayerRoom.test.tsx
 // useMultiplayerRoom hook 单元测试:验证多人模式连接生命周期与「再来一局」状态流转。
 //

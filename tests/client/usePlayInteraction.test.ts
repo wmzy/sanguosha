@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // usePlayInteraction hook 行为测试。
 // 来源:debug 模式下制衡选牌状态在回合超时切换玩家后未清除的 bug 修复。
 // 归并建议:此文件是 client 出牌交互状态机 hook 的测试基座,

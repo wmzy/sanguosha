@@ -39,7 +39,7 @@ export interface AvailableAction {
   /** 合法目标座次列表（无目标操作为空）；cardFilter/targetFilter 已跑过 */
   validTargets: number[];
   /** 操作类别，便于 agent 分流：主动出牌 / 回应 / 弃牌 / 选将 / 转化 / 分配 */
-  category: 'play' | 'respond' | 'discard' | 'selectChar' | 'transform' | 'distribute';
+  category: 'play' | 'respond' | 'discard' | 'selectChar' | 'transform' | 'distribute' | 'skip';
 }
 
 /** AI 友好的 view 投影（MCP 层用，精简 token）。见 spec §4.4 */

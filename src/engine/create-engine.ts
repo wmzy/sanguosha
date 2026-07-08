@@ -343,6 +343,36 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       rollbacks.push({ entry: pEntry, params: p.params });
     }
   }
+  // skip action:玩家放弃当前 pending 的回应(不打出无懈可击等)
+  if (message.actionType === 'skip') {
+    // 优先查找广播型 slot(target<0,如无懈可击):出牌阶段 findPendingSlot 可能返回
+    // 当前玩家的出牌窗口 slot(target=0),导致 skip 误匹配非广播型 pending。
+    const broadcastSlot = [...state.pendingSlots.values()].find((s) => {
+      const t = (s.atom as { target?: unknown }).target;
+      return typeof t === 'number' && t < 0;
+    });
+    const slot = broadcastSlot ?? findPendingSlot(state, message.ownerId);
+    if (!slot || slot.isTimeout) return false;
+    const atomTarget = (slot.atom as { target?: number }).target;
+    const isBroadcast = typeof atomTarget === 'number' && atomTarget < 0;
+    if (isBroadcast) {
+      // 广播型:记录该玩家已 skip,全员 skip 时提前触发超时
+      if (!slot.skippedPlayers) slot.skippedPlayers = new Set();
+      slot.skippedPlayers.add(message.ownerId);
+      const alivePlayers = state.players.filter((p) => p.alive).map((p) => p.index);
+      if (alivePlayers.every((idx) => slot.skippedPlayers!.has(idx))) {
+        await slot._fireTimeoutNow?.();
+      }
+      return true;
+    }
+    // 非广播型阻塞 pending:触发超时(onTimeout 处理,如弃牌自动弃牌)
+    if (slot.isBlocking) {
+      await slot._fireTimeoutNow?.();
+      return true;
+    }
+    // 非阻塞型 pending(出牌窗口):不支持 skip,返回 false
+    return false;
+  }
   const entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
   if (entry?.validate(state, message.params) !== null) {
     rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));

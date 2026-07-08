@@ -49,7 +49,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      const target = params.target as number;
+      const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number;
       await pushFrame(state, '乐不思蜀', from, { ...params });
       // 移牌到处理区
       await applyAtom(state, {

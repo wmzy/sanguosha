@@ -83,6 +83,7 @@ export function registerSystemRespondActions(state: GameState, ownerId: number):
         if (atom.target !== ownerId) return '不是你的弃牌回合';
         const cardIds = params.cardIds;
         if (!Array.isArray(cardIds)) return 'cardIds required';
+        if (cardIds.length === 0) return '不能弃 0 张牌';
         const player = state.players[atom.target];
         if (!player) return 'target not found';
         for (const id of cardIds) {

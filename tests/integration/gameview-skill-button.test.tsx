@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 前端渲染测试:仁德/制衡等 distribute 主动技能在出牌阶段渲染为可点击按钮,
 // 点击后进入 distribute 模式:候选牌在手牌区选,提示在 handHeader,提交按钮在 actionBar。
 // (DistributeUI 分配面板已移除,目标选择统一到座位区点击)

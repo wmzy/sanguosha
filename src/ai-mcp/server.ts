@@ -17,6 +17,7 @@ import {
   type StartGameOpts,
 } from './mcpServer';
 import { joinAndReady, advanceToStart } from './lobby';
+import type { RoomConfig } from '../server/protocol';
 
 // 构建期注入的默认服务器 URL。
 // tsx 直跑源码时该符号未定义 → typeof 守卫避免 ReferenceError，兜底 localhost（本仓库开发用）。
@@ -52,12 +53,17 @@ async function main(): Promise<void> {
       // 触发 advanceToStart 推进开局。避免"阻塞等 ready 期间无法启动对方"的死锁。
       if (!started) {
         started = true;
+        const roomConfig: RoomConfig | undefined =
+          o.timeoutScale !== undefined
+            ? { name: o.name ?? '房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4 }
+            : undefined;
         const result = await joinAndReady(hgc, {
           mode: o.roomId ? 'join' : 'create',
           roomId: o.roomId ?? ROOM_ID ?? undefined,
           name: o.name,
           maxPlayers: o.maxPlayers ?? PLAYER_COUNT,
           playerId: o.playerId ?? PLAYER_ID ?? undefined,
+          config: roomConfig,
         });
         logErr(
           `multiplayer room joined: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`,
@@ -73,10 +79,14 @@ async function main(): Promise<void> {
     // debug 模式(旧路径)
     if (started) return;
     started = true;
+    const debugConfig: RoomConfig | undefined =
+      o.timeoutScale !== undefined
+        ? { name: '调试房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4 }
+        : undefined;
     if (o.roomId ?? ROOM_ID) {
       await hgc.connect(o.roomId ?? ROOM_ID!, SEAT);
     } else {
-      hgc.createDebugRoom(o.playerCount ?? PLAYER_COUNT);
+      hgc.createDebugRoom(o.playerCount ?? PLAYER_COUNT, debugConfig);
     }
     hgc.sendReady();
     if (!(o.roomId ?? ROOM_ID)) hgc.sendStartGame();

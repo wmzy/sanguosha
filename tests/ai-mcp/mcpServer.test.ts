@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {
   handleMcpRequest,
+  normalizeStartGame,
   PLAY_TOOL,
   SKILL_INFO_TOOL,
   REPORT_BUG_TOOL,
@@ -197,6 +198,46 @@ describe('handleMcpRequest', () => {
     });
   });
 
+  it('startGame={mode:multiplayer,timeoutScale} 解析并传给 ensureStarted', async () => {
+    const ensureStarted = vi.fn();
+    const ctx = makeCtx(makeFakeHgc(), ensureStarted);
+    await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: {
+          name: 'play',
+          arguments: { startGame: { mode: 'multiplayer', timeoutScale: 5 } },
+        },
+      },
+      ctx,
+    );
+    expect(ensureStarted).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'multiplayer', timeoutScale: 5 }),
+    );
+  });
+
+  it('startGame={mode:debug,timeoutScale} 解析并传给 ensureStarted', async () => {
+    const ensureStarted = vi.fn();
+    const ctx = makeCtx(makeFakeHgc(), ensureStarted);
+    await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'tools/call',
+        params: {
+          name: 'play',
+          arguments: { startGame: { mode: 'debug', timeoutScale: 2 } },
+        },
+      },
+      ctx,
+    );
+    expect(ensureStarted).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'debug', timeoutScale: 2 }),
+    );
+  });
+
   it('未知工具返回 error', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest(
@@ -273,6 +314,44 @@ describe('handleMcpRequest', () => {
     );
     expect(res!.error).toBeDefined();
     expect(res!.error!.code).toBe(-32602);
+  });
+
+  it('PLAY_TOOL schema 含 timeoutScale 字段', () => {
+    const props = (
+      PLAY_TOOL.inputSchema.properties.startGame as {
+        oneOf: { properties: Record<string, unknown> }[];
+      }
+    ).oneOf[1].properties;
+    expect(props).toHaveProperty('timeoutScale');
+    expect((props.timeoutScale as { type: string }).type).toBe('number');
+  });
+});
+
+describe('normalizeStartGame', () => {
+  it('debug 模式解析 timeoutScale', () => {
+    const opts = normalizeStartGame({ mode: 'debug', timeoutScale: 3 });
+    expect(opts).toMatchObject({ mode: 'debug', timeoutScale: 3 });
+  });
+
+  it('multiplayer 模式解析 timeoutScale', () => {
+    const opts = normalizeStartGame({ mode: 'multiplayer', timeoutScale: 5 });
+    expect(opts).toMatchObject({ mode: 'multiplayer', timeoutScale: 5 });
+  });
+
+  it('Infinity 作为 timeoutScale 合法', () => {
+    const opts = normalizeStartGame({ mode: 'multiplayer', timeoutScale: Infinity });
+    expect(opts).toMatchObject({ mode: 'multiplayer', timeoutScale: Infinity });
+  });
+
+  it('未提供 timeoutScale 时为 undefined(不干扰默认路径)', () => {
+    const opts = normalizeStartGame({ mode: 'multiplayer', roomId: 'X' });
+    expect(opts).toMatchObject({ mode: 'multiplayer', roomId: 'X' });
+    expect((opts as { timeoutScale?: number }).timeoutScale).toBeUndefined();
+  });
+
+  it('非数字 timeoutScale 被忽略为 undefined', () => {
+    const opts = normalizeStartGame({ mode: 'multiplayer', timeoutScale: 'fast' });
+    expect((opts as { timeoutScale?: number }).timeoutScale).toBeUndefined();
   });
 });
 function makeStubView() {

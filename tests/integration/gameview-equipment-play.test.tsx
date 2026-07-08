@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 前端渲染测试:装备牌(诸葛连弩/赤兔等)在出牌阶段选中后能正常出牌。
 //
 // 回归根因:GameView 此前用 card.name(具体装备名,如 '诸葛连弩')在 registry 里

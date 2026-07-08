@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 前端渲染测试:GameView 中待回应区(pending)相关 UI 的渲染时序与显示控制。
 //
 // 涵盖:

@@ -14,9 +14,16 @@ import type { ClientMessage as EngineClientMessage } from '../engine/types';
 
 const PROTOCOL_VERSION = '2024-11-05';
 
-/** 把 startGame 参数(boolean | object)归一化为 StartGameOpts。 */
+/** 把 startGame 参数(boolean | object)归一化为 StartGameOpts。
+ *  当 raw 为空/true 且环境变量 SGS_ROOM_ID 存在时，自动用 multiplayer 模式 join
+ *  （解决 AI agent 传空 startGame 导致进 debug 模式的问题）。 */
 export function normalizeStartGame(raw: unknown): StartGameOpts {
-  if (raw === true || raw === undefined) {
+  if (raw === true || raw === undefined || raw === {}) {
+    // 有 SGS_ROOM_ID 环境变量 → 自动 multiplayer join
+    const envRoomId = typeof process !== 'undefined' ? process.env?.SGS_ROOM_ID : undefined;
+    if (envRoomId) {
+      return { mode: 'multiplayer', roomId: envRoomId };
+    }
     // 旧 debug 默认
     return { mode: 'debug' };
   }
@@ -27,6 +34,7 @@ export function normalizeStartGame(raw: unknown): StartGameOpts {
       mode: 'debug',
       roomId: typeof o['roomId'] === 'string' ? o['roomId'] : undefined,
       playerCount: typeof o['playerCount'] === 'number' ? o['playerCount'] : undefined,
+      timeoutScale: typeof o['timeoutScale'] === 'number' ? o['timeoutScale'] : undefined,
     };
   }
   return {
@@ -36,6 +44,7 @@ export function normalizeStartGame(raw: unknown): StartGameOpts {
     maxPlayers: typeof o['maxPlayers'] === 'number' ? o['maxPlayers'] : undefined,
     playerId: typeof o['playerId'] === 'string' ? o['playerId'] : undefined,
     readyTimeoutMs: typeof o['readyTimeoutMs'] === 'number' ? o['readyTimeoutMs'] : undefined,
+    timeoutScale: typeof o['timeoutScale'] === 'number' ? o['timeoutScale'] : undefined,
   };
 }
 
@@ -80,6 +89,10 @@ export const PLAY_TOOL = {
               maxPlayers: { type: 'number', description: '最大人数,默认 2' },
               playerId: { type: 'string', description: '玩家 id,给定则采用,否则自动生成' },
               readyTimeoutMs: { type: 'number', description: '等待全员就绪超时(ms)' },
+              timeoutScale: {
+                type: 'number',
+                description: 'pending 超时倍率。1=默认; >1 更慢(应对慢 API); Infinity=无限等待',
+              },
             },
           },
         ],
@@ -174,7 +187,7 @@ export interface McpHandlerContext {
 }
 
 export type StartGameOpts =
-  | { mode: 'debug'; roomId?: string; playerCount?: number }
+  | { mode: 'debug'; roomId?: string; playerCount?: number; timeoutScale?: number }
   | {
       mode: 'multiplayer';
       roomId?: string;
@@ -182,6 +195,7 @@ export type StartGameOpts =
       maxPlayers?: number;
       playerId?: string;
       readyTimeoutMs?: number;
+      timeoutScale?: number;
     };
 
 /**

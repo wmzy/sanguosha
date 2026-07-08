@@ -10,8 +10,13 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetForTest, registerSkillsFromState, frameCards } from '../../src/engine/create-engine';
-import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
+import {
+  resetForTest,
+  registerSkillsFromState,
+  frameCards,
+  dispatch as engineDispatch,
+} from '../../src/engine/create-engine';
+import { fireTimeoutAndWait, dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
@@ -586,5 +591,203 @@ describe('无懈可击 dispatch 链路', () => {
     expect(state.zones.discardPile).toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(gqId);
     expect(state.pendingSlots.size).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// skip 机制:广播型 pending(无懈可击)的玩家放弃回应
+// 验证 dispatch 的 skip actionType 处理:
+//   1. 单人 skip 不 resolve slot(其他人可能想打无懈)
+//   2. 全员 skip → 提前 resolve(不等超时)→ 无懈循环退出 → 锦囊正常结算
+//   3. skip 被接受(return true),不被 reject
+// ─────────────────────────────────────────────────────────────
+describe('skip 机制:广播型 pending 放弃回应', () => {
+  let state: GameState;
+
+  beforeEach(async () => {
+    resetForTest();
+    state = createGameState({
+      players: [
+        {
+          index: 0,
+          name: 'P0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['回合管理', '过河拆桥', '无懈可击'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: ['d1'],
+          equipment: {},
+          skills: ['回合管理', '过河拆桥', '无懈可击'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+      ],
+      cardMap: {
+        d1: { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
+  });
+
+  it('单人 skip 不 resolve slot,全员 skip → 锦囊正常结算', async () => {
+    const gqId = 'gq-0';
+    state.cardMap[gqId] = {
+      id: gqId,
+      name: '过河拆桥',
+      suit: '♠',
+      color: '黑',
+      rank: '3',
+      type: '锦囊牌',
+    };
+    state.players[0].hand.push(gqId);
+
+    await dispatchAndWait(state, {
+      skillId: '过河拆桥',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: gqId, targets: [1] },
+      baseSeq: state.seq,
+    });
+
+    // 广播型无懈可击 pending 存在
+    expect(state.pendingSlots.size).toBe(1);
+    const slot = [...state.pendingSlots.values()][0];
+    const atomTarget = (slot.atom as { target?: number }).target;
+    expect(atomTarget).toBeLessThan(0); // 广播型
+
+    // P0 skip → 被接受(true),slot 仍存在(P1 还没 skip)
+    const accepted0 = await engineDispatch(state, {
+      skillId: '__skip',
+      actionType: 'skip',
+      ownerId: 0,
+      params: {},
+      baseSeq: 0,
+    });
+    expect(accepted0).toBe(true);
+    expect(state.pendingSlots.size).toBe(1); // slot 未 resolve
+    expect(slot.skippedPlayers?.has(0)).toBe(true);
+    expect(slot.skippedPlayers?.has(1)).toBe(false);
+
+    // P1 skip → 被接受(true),全员 skip → 触发超时 → slot resolve
+    const accepted1 = await engineDispatch(state, {
+      skillId: '__skip',
+      actionType: 'skip',
+      ownerId: 1,
+      params: {},
+      baseSeq: 0,
+    });
+    expect(accepted1).toBe(true);
+
+    // 等待父 execute resume(无瓣循环退出 → 过河拆桥继续结算 → 盲选窗口超时)
+    await waitForStable(state);
+    // 盲选窗口也超时
+    await fireTimeoutAndWait(state);
+
+    // 锦囊正常结算:P1 失去 d1,过河拆桥入弃牌堆
+    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.players[1].hand).not.toContain('d1');
+    expect(state.zones.discardPile).toContain('d1');
+    expect(state.zones.discardPile).toContain(gqId);
+    expect(state.pendingSlots.size).toBe(0);
+  });
+
+  it('skip 后仍可 respond(未全员 skip 时 slot 存在)', async () => {
+    const gqId = 'gq-0';
+    state.cardMap[gqId] = {
+      id: gqId,
+      name: '过河拆桥',
+      suit: '♠',
+      color: '黑',
+      rank: '3',
+      type: '锦囊牌',
+    };
+    state.players[0].hand.push(gqId);
+    // 给 P1 一张无懈可击
+    const nullifId = 'wx-0';
+    state.cardMap[nullifId] = {
+      id: nullifId,
+      name: '无懈可击',
+      suit: '♠',
+      color: '黑',
+      rank: 'J',
+      type: '锦囊牌',
+    };
+    state.players[1].hand.push(nullifId);
+
+    await dispatchAndWait(state, {
+      skillId: '过河拆桥',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: gqId, targets: [1] },
+      baseSeq: state.seq,
+    });
+
+    expect(state.pendingSlots.size).toBe(1);
+
+    // P0 skip → slot 仍存在
+    await engineDispatch(state, {
+      skillId: '__skip',
+      actionType: 'skip',
+      ownerId: 0,
+      params: {},
+      baseSeq: 0,
+    });
+    expect(state.pendingSlots.size).toBe(1);
+
+    // P1 仍可 respond 无懈可击(slot 未被 P0 的 skip resolve)
+    await dispatchAndWait(state, {
+      skillId: '无懈可击',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { cardId: nullifId },
+      baseSeq: state.seq,
+    });
+
+    // P1 打了无懈 → 锦囊被抵消
+    // 新窗口出现(其他人可反无瓣),也 skip 掉
+    if (state.pendingSlots.size > 0) {
+      await engineDispatch(state, {
+        skillId: '__skip',
+        actionType: 'skip',
+        ownerId: 0,
+        params: {},
+        baseSeq: 0,
+      });
+      await engineDispatch(state, {
+        skillId: '__skip',
+        actionType: 'skip',
+        ownerId: 1,
+        params: {},
+        baseSeq: 0,
+      });
+      await waitForStable(state);
+    }
+
+    // 锦囊被抵消 → P1 手牌中 d1 仍在(过河拆桥未生效)
+    expect(state.players[1].hand).toContain('d1');
+    // 无懈可击已出
+    expect(state.players[1].hand).not.toContain(nullifId);
   });
 });

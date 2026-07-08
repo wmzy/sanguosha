@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 回归测试:debug 模式自动跟随「第一个需操作的玩家」,且在问询场景下不震荡。
 //
 // 自动跟随原则(useDebugPerspective):

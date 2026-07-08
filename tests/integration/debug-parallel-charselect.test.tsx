@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 前端渲染测试:debug 模式并行选将的 single-view 渲染回归。
 //
 // 新模型(真 viewer 隔离 + 多 WS):

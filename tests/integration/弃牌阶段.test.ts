@@ -10,6 +10,7 @@
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetForTest, registerSkillsFromState } from '../../src/engine/create-engine';
+import { findActionEntry } from '../../src/engine/skill';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -248,5 +249,47 @@ describe('弃牌阶段', () => {
 
     const prompt = (discardSlot!.atom as { prompt?: { cardFilter?: { min?: number } } }).prompt;
     expect(prompt?.cardFilter?.min).toBe(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 5:弃牌阶段提交空 cardIds → 应被 validate 拒绝(不转发到 弃置 atom)
+  // 回归:AI 在弃牌阶段发送空 cardIds(handCount <= health 时误发)曾导致
+  //   applyAtom validate 失败抛错 → fire-and-forget execute 未捕获 → 进程崩溃。
+  // 修复:系统规则 respond validate 增加 cardIds.length === 0 检查,在 dispatch
+  //   层就 reject(返回 NAK),execute 不会运行,弃置 atom 不会被空数组调用。
+  // ─────────────────────────────────────────────────────────────
+  it('用例5:弃牌阶段提交空 cardIds → validate 拒绝,不崩溃', () => {
+    // 模拟弃牌 pending 挂起(P0 需弃 2 张)
+    state.pendingSlots.set(0, {
+      atom: {
+        type: '请求回应',
+        requestType: '__弃牌',
+        target: 0,
+        prompt: {
+          type: 'useCard',
+          title: '弃牌阶段:需弃 2 张牌',
+          cardFilter: { filter: () => true, min: 2, max: 2 },
+        },
+        timeout: 30,
+      },
+      resolve: () => {},
+      pause: () => {},
+      _fireTimeoutNow: undefined,
+      deadline: 99,
+      isTimeout: false,
+      isBlocking: true,
+    } as any);
+
+    const entry = findActionEntry(state, '系统规则', 0, 'respond')!;
+    expect(entry, '系统规则 respond action 应已注册').toBeDefined();
+
+    // 空 cardIds 应被拒绝(返回非 null 错误字符串)
+    const error = entry.validate(state, { cardIds: [] });
+    expect(error).not.toBeNull();
+    expect(error).toBe('不能弃 0 张牌');
+
+    // 非空但合法的 cardIds 仍应通过(回归不误伤正常弃牌)
+    const ok = entry.validate(state, { cardIds: ['c1', 'c2'] });
+    expect(ok).toBeNull();
   });
 });

@@ -237,6 +237,21 @@ export class HeadlessGameClient {
       }
       return;
     }
+    // 广播型 pending（无懈可击等）：添加跳过 action
+    if (pending.target < 0) {
+      out.push({
+        description: '跳过（不打出无懈可击）',
+        message: {
+          skillId: '__skip',
+          actionType: 'skip',
+          ownerId: this._seatIndex,
+          params: {},
+          baseSeq: 0,
+        },
+        validTargets: [],
+        category: 'skip',
+      });
+    }
     const reqType = getPendingRequestType(pending);
     // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
     // 此处给出一个“选择弃牌”占位 action，agent 须自行从手牌选足 discardMin 张填入 cardIds。
@@ -255,21 +270,87 @@ export class HeadlessGameClient {
       });
       return;
     }
-    // 通用回应（出闪/出杀等）：引擎按 pendingRespondInfo 推导 skillId，respond 携带 cardId 或空
+    // 通用回应（出闪/出杀/确认发动等）
     const info = resolvePendingRespond(pending, skillActions);
     if (info?.skillId) {
-      out.push({
-        description: `回应【${info.skillId}】`,
-        message: {
-          skillId: info.skillId,
-          actionType: 'respond',
-          ownerId: this._seatIndex,
-          params: {},
-          baseSeq: 0,
-        },
-        validTargets: [],
-        category: 'respond',
-      });
+      // confirm 类（突袭/trigger 等）优先于 cardFilter：
+      //   询问杀/闪 的 prompt 也是 confirm，但它们需要 cardId（atom.type 以「询问」开头）。
+      //   只有 请求回应 + confirm 才是纯确认操作（choice: true/false）。
+      const atomType = atom.type ?? '';
+      const isAskType = atomType.startsWith('询问');
+      if (!isAskType && pending.prompt?.type === 'confirm') {
+        const confirmLabel = pending.prompt.confirmLabel ?? '确认';
+        const cancelLabel = pending.prompt.cancelLabel ?? '取消';
+        out.push({
+          description: `${confirmLabel}【${info.skillId}】`,
+          message: {
+            skillId: info.skillId,
+            actionType: 'respond',
+            ownerId: this._seatIndex,
+            params: { choice: true },
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'respond',
+        });
+        out.push({
+          description: `${cancelLabel}`,
+          message: {
+            skillId: info.skillId,
+            actionType: 'respond',
+            ownerId: this._seatIndex,
+            params: { choice: false },
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'skip',
+        });
+      } else if (info.cardFilter) {
+        // 需要选牌（杀/闪等）：为每张可出的牌生成独立 respond action（带 cardId）
+        const me = view.players[this._seatIndex];
+        const candidates = me?.hand?.filter((c) => info.cardFilter!(c)) ?? [];
+        for (const card of candidates) {
+          out.push({
+            description: `回应【${info.skillId}】(${card.suit}${card.rank})`,
+            message: {
+              skillId: info.skillId,
+              actionType: 'respond',
+              ownerId: this._seatIndex,
+              params: { cardId: card.id },
+              baseSeq: 0,
+            },
+            validTargets: [],
+            category: 'respond',
+          });
+        }
+        // 没有可出的牌或策略性不出：提供 skip
+        out.push({
+          description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
+          message: {
+            skillId: '__skip',
+            actionType: 'skip',
+            ownerId: this._seatIndex,
+            params: {},
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'skip',
+        });
+      } else {
+        // 兜底（choosePlayer 等）：空 params，agent 需自行补全 targets
+        out.push({
+          description: `回应【${info.skillId}】`,
+          message: {
+            skillId: info.skillId,
+            actionType: 'respond',
+            ownerId: this._seatIndex,
+            params: {},
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'respond',
+        });
+      }
     }
   }
 
@@ -345,10 +426,32 @@ export class HeadlessGameClient {
     this.respond('系统规则', { cardIds });
   }
 
-  /** 放弃当前 pending（不回应）：空 respond。 */
+  /** 放弃当前 pending（不回应）：广播型/阻塞型发 skip 触发超时，出牌窗口发空 respond。 */
   pass(): void {
-    // 广播型 pending（无懈可击等）无特定 skillId，用当前 pending 推导的 skillId
     const pending = this._view?.pending;
+    // 广播型 pending（无懈可击等）：发 skip 而非 respond
+    if (pending && pending.target < 0) {
+      this.sendAction({
+        skillId: '__skip',
+        actionType: 'skip',
+        ownerId: this._seatIndex,
+        params: {},
+        baseSeq: 0,
+      });
+      return;
+    }
+    // 阻塞型 pending（询问闪/弃牌等）：也发 skip 触发超时
+    if (pending && pending.isBlocking !== false) {
+      this.sendAction({
+        skillId: '__skip',
+        actionType: 'skip',
+        ownerId: this._seatIndex,
+        params: {},
+        baseSeq: 0,
+      });
+      return;
+    }
+    // 非阻塞型 pending（出牌窗口）：旧逻辑保留（发 respond 会被 reject，但出牌窗口不应调 pass）
     const info = pending
       ? resolvePendingRespond(pending, getActionsForPlayer(this._seatIndex))
       : null;
