@@ -2,6 +2,7 @@
 // 游戏日志面板(底部 details)。
 // 正常功能(非 debug 专属):记录游戏中发生的事件,供玩家回顾。
 // 从 GameView 抽出的纯展示组件。
+import { memo } from 'react';
 import * as styles from './gameViewStyles';
 import type { GameView } from '../../engine/types';
 import { formatTime } from './gameViewConstants';
@@ -10,7 +11,7 @@ export interface GameLogProps {
   view: GameView;
 }
 
-export function GameLog({ view }: GameLogProps) {
+function GameLogImpl({ view }: GameLogProps) {
   return (
     <details className={styles.logPanel} open>
       <summary className={styles.logSummary}>📜 游戏日志 ({view.log.length})</summary>
@@ -39,3 +40,18 @@ export function GameLog({ view }: GameLogProps) {
     </details>
   );
 }
+
+/** memo: 日志只在条目数/末尾内容/viewer 变化时重渲染,避免每次 view 更新重绘全部日志条目 */
+function gameLogPropsEqual(prev: GameLogProps, next: GameLogProps): boolean {
+  const a = prev.view;
+  const b = next.view;
+  return (
+    a.viewer === b.viewer &&
+    a.log.length === b.log.length &&
+    (a.log.length === 0 ||
+      (a.log[a.log.length - 1].text === b.log[b.log.length - 1].text &&
+        a.log[a.log.length - 1].player === b.log[b.log.length - 1].player))
+  );
+}
+
+export const GameLog = memo(GameLogImpl, gameLogPropsEqual);

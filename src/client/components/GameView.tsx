@@ -14,7 +14,7 @@
 //   均在上层,本组件不可见。
 //
 // 布局: GameHeader → 提示区 → 座位弧形(其他玩家) → [左:角色大卡 | 右:倒计时+操作+目标+手牌] → 日志
-import { useState, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useCallback, useRef, memo, type ReactNode } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView as EngineGameView, Card, Json } from '../../engine/types';
@@ -23,6 +23,7 @@ import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
 import { PlayerCardLarge } from './PlayerCardLarge';
 import { GameLog } from './GameLog';
 import { EventBanner } from './EventBanner';
+import { DevProfiler } from './DevProfiler';
 
 // ─── 抽取的子组件 ───
 import { GameHeader } from './GameHeader';
@@ -71,7 +72,7 @@ interface Props {
 //   正式模式:上层直接传入当前玩家的 view。
 //   debug 模式:上层(DebugLobby)管理多连接和视角切换,把当前视角连接的 view 传入,
 //   并通过 headerSlot/overlaySlot 注入视角控制 UI。
-export function GameViewComponent({
+export function GameViewComponentImpl({
   view,
   onAction,
   onReorderHand,
@@ -84,6 +85,10 @@ export function GameViewComponent({
   const [showIdentityReveal, setShowIdentityReveal] = useState(
     () => !sessionStorage.getItem('sgs_identity_shown'),
   );
+
+  // view ref:供 stabilized callback 访问最新 view,避免 view.cardMap 进入 useCallback deps
+  const viewRef = useRef(view);
+  viewRef.current = view;
 
   // ─── 状态派生(hooks) ───
   const { skillActions } = useSkillActions(view, perspectiveIdx);
@@ -198,6 +203,22 @@ export function GameViewComponent({
   // 隐藏自己的倒计时和「不回应」按钮(广播型 pending 仍在,其他座次照常显示)。
   const broadcastSkipped = pendingTargetIdx < 0 && skippedBroadcast.has(broadcastKey);
 
+  // ─── stabilized callbacks（引用稳定，避免子组件 memo 失效） ───
+  // 身份确认:无依赖,引用永远稳定
+  const handleIdentityConfirm = useCallback(() => {
+    setShowIdentityReveal(false);
+    sessionStorage.setItem('sgs_identity_shown', '1');
+  }, []);
+  // 装备区点击 distribute 候选:用 viewRef 访问最新 cardMap,
+  // 仅依赖 handleCardClick（状态变化时才变），不依赖 view.cardMap
+  const handleEquipCardClick = useCallback(
+    (cardId: string) => {
+      const card = viewRef.current.cardMap[cardId];
+      if (card) handleCardClick(card);
+    },
+    [handleCardClick],
+  );
+
   // 判定翻牌动画(effect.animation='flip', blockUntilDone)期间,延迟询问类 pending 渲染。
   // 否则玩家会在判定结果(八卦阵/乐不思蜀等翻牌)还没看清时就被弹出「是否出闪」打断。
   // useEventPlayback 是非阻塞调度,这里据此实现 blockUntilDone 语义:翻牌动画播放完才显示 pending。
@@ -223,53 +244,54 @@ export function GameViewComponent({
         charSelect={charSelect}
         charSelectInProgress={charSelectInProgress}
         showIdentityReveal={showIdentityReveal}
-        onIdentityConfirm={() => {
-          setShowIdentityReveal(false);
-          sessionStorage.setItem('sgs_identity_shown', '1');
-        }}
+        onIdentityConfirm={handleIdentityConfirm}
         onAction={onAction}
         overlaySlot={overlaySlot}
       />
 
-      <GameHeader
-        view={view}
-        animTurnVersion={anim.turnVersion}
-        animPhaseVersion={anim.phaseVersion}
-        currentPlayerName={currentPlayerName}
-        headerSlot={headerSlot}
-      />
+      <DevProfiler id="GameHeader">
+        <GameHeader
+          view={view}
+          animTurnVersion={anim.turnVersion}
+          animPhaseVersion={anim.phaseVersion}
+          currentPlayerName={currentPlayerName}
+          headerSlot={headerSlot}
+        />
+      </DevProfiler>
 
       {/* ─── 事件横幅(延时展示,非阻塞) ─── */}
       <EventBanner current={currentEvent ?? null} view={view} />
 
       {/* ─── 座位布局(弧形) + 中央信息 ─── */}
       <div className={styles.seatingArea}>
-        <SeatArcLayout
-          view={view}
-          orderedPlayers={orderedPlayers}
-          perspectiveName={perspectiveName}
-          currentPlayerName={currentPlayerName}
-          selectedNeedsTarget={
-            (!!playRules && playRules.needsTarget) ||
-            (isDistributeActive && !!activeDistribute?.externalTargetSelection)
-          }
-          selectedTargetNames={
-            isDistributeActive && activeDistribute?.externalTargetSelection
-              ? distTargetName
-                ? [distTargetName]
-                : []
-              : playRules?.hasSlots
-                ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
-                : selectedTarget
-                  ? [selectedTarget]
+        <DevProfiler id="SeatArcLayout">
+          <SeatArcLayout
+            view={view}
+            orderedPlayers={orderedPlayers}
+            perspectiveName={perspectiveName}
+            currentPlayerName={currentPlayerName}
+            selectedNeedsTarget={
+              (!!playRules && playRules.needsTarget) ||
+              (isDistributeActive && !!activeDistribute?.externalTargetSelection)
+            }
+            selectedTargetNames={
+              isDistributeActive && activeDistribute?.externalTargetSelection
+                ? distTargetName
+                  ? [distTargetName]
                   : []
-          }
-          isTargetable={isTargetable}
-          onTargetClick={handleTargetClick}
-          onSeatDoubleClick={onSeatDoubleClick}
-          damageFlashIndices={anim.damageFlashIndices}
-          turnVersion={anim.turnVersion}
-        />
+                : playRules?.hasSlots
+                  ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
+                  : selectedTarget
+                    ? [selectedTarget]
+                    : []
+            }
+            isTargetable={isTargetable}
+            onTargetClick={handleTargetClick}
+            onSeatDoubleClick={onSeatDoubleClick}
+            damageFlashIndices={anim.damageFlashIndices}
+            turnVersion={anim.turnVersion}
+          />
+        </DevProfiler>
         <ZoneInfoBar view={view} />
       </div>
 
@@ -285,10 +307,7 @@ export function GameViewComponent({
           distCandidateEquipIds={activeDistribute ? new Set(activeDistribute.cardIds) : null}
           distSelectedEquipIds={distSelected}
           isDistributeActive={isDistributeActive}
-          onEquipCardClick={(cardId) => {
-            const card = view.cardMap[cardId];
-            if (card) handleCardClick(card);
-          }}
+          onEquipCardClick={handleEquipCardClick}
         />
 
         <div className={styles.handColumn}>
@@ -576,7 +595,7 @@ export function GameViewComponent({
                     isDistributeSelected={isDistSelected}
                     isDistributeAllocated={isDistAllocated}
                     isDistributeActive={isDistributeActive}
-                    onClick={() => handleCardClick(card)}
+                    onCardClick={handleCardClick}
                   />
                 </div>
               );
@@ -587,20 +606,31 @@ export function GameViewComponent({
 
         {/* ─── 右:自己的武将卡片(回合金色高亮边框) ─── */}
         <div className={cx(styles.playerCardLarge, isPerspectiveTurn && styles.playerCardTurn)}>
-          <PlayerCardLarge
-            perspectiveIdx={perspectiveIdx}
-            viewer={view.viewer}
-            view={view}
-            damageFlashIndices={anim.damageFlashIndices}
-            canOperate={canOperate}
-            isPerspectiveTurn={isPerspectiveTurn}
-            skillActions={skillActions}
-            onSkillAction={handleSkillAction}
-          />
+          <DevProfiler id="PlayerCardLarge">
+            <PlayerCardLarge
+              perspectiveIdx={perspectiveIdx}
+              viewer={view.viewer}
+              view={view}
+              damageFlashIndices={anim.damageFlashIndices}
+              canOperate={canOperate}
+              isPerspectiveTurn={isPerspectiveTurn}
+              skillActions={skillActions}
+              onSkillAction={handleSkillAction}
+            />
+          </DevProfiler>
         </div>
       </div>
 
-      <GameLog view={view} />
+      <DevProfiler id="GameLog">
+        <GameLog view={view} />
+      </DevProfiler>
     </div>
   );
 }
+
+/**
+ * React.memo:顶层组件在 view 未变时跳过重渲染。
+ * headerSlot/overlaySlot 是上层 JSX,引用每次变化——比较器中按引用比较,
+ * 实际拦截发生在子组件层(PlayerSeatView/HandCard 等的自定义 comparator)。
+ */
+export const GameViewComponent = memo(GameViewComponentImpl);

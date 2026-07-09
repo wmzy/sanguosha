@@ -6,12 +6,14 @@
 // 包含:装备槽位(武器/防具/马,纵向堆叠) + 装备技能按钮(可主动点击的装备技)。
 // distribute(制衡/仁德)激活时,候选装备可点击选中,与手牌候选高亮一致。
 
+import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON, EQUIP_SLOT_ORDER } from './gameViewConstants';
+import { shallowSetEqual } from '../utils/memo';
 
 export interface EquipColumnProps {
   /** 视角玩家在 view.players 中的下标 */
@@ -34,7 +36,7 @@ export interface EquipColumnProps {
   onEquipCardClick?: (cardId: string) => void;
 }
 
-export function EquipColumn({
+export function EquipColumnImpl({
   perspectiveIdx,
   view,
   canOperate,
@@ -110,3 +112,32 @@ export function EquipColumn({
     </div>
   );
 }
+
+/** memo: 装备区只在装备/技能可用性/distribute 状态变化时重渲染 */
+function equipColumnPropsEqual(prev: EquipColumnProps, next: EquipColumnProps): boolean {
+  const prevP = prev.view.players[prev.perspectiveIdx];
+  const nextP = next.view.players[next.perspectiveIdx];
+  if (!prevP || !nextP) return prevP === nextP;
+  // equipment cardIds 比较(cardMap 查找确定性)
+  const prevKeys = Object.keys(prevP.equipment);
+  const nextKeys = Object.keys(nextP.equipment);
+  if (prevKeys.length !== nextKeys.length) return false;
+  for (const k of prevKeys) {
+    if (prevP.equipment[k as keyof typeof prevP.equipment] !==
+        nextP.equipment[k as keyof typeof nextP.equipment]) return false;
+  }
+  return (
+    prev.perspectiveIdx === next.perspectiveIdx &&
+    prev.canOperate === next.canOperate &&
+    prev.skillActions === next.skillActions &&
+    prev.onSkillAction === next.onSkillAction &&
+    prev.onEquipCardClick === next.onEquipCardClick &&
+    prev.isDistributeActive === next.isDistributeActive &&
+    shallowSetEqual(prev.distCandidateEquipIds ?? new Set(), next.distCandidateEquipIds ?? new Set()) &&
+    shallowSetEqual(prev.distSelectedEquipIds ?? new Set(), next.distSelectedEquipIds ?? new Set()) &&
+    // 技能可用性依赖 phase
+    prev.view.phase === next.view.phase
+  );
+}
+
+export const EquipColumn = memo(EquipColumnImpl, equipColumnPropsEqual);

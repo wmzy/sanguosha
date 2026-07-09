@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
@@ -25,10 +26,11 @@ export interface HandCardProps {
   isDistributeAllocated?: boolean;
   /** distribute 上下文激活(控制禁用逻辑:非候选牌变灰) */
   isDistributeActive?: boolean;
-  onClick: () => void;
+  /** 点击手牌(传入 card 对象,稳定引用避免内联闭包破坏 memo) */
+  onCardClick: (card: Card) => void;
 }
 
-export function HandCard(props: HandCardProps) {
+export function HandCardImpl(props: HandCardProps) {
   const {
     card,
     index,
@@ -47,7 +49,7 @@ export function HandCard(props: HandCardProps) {
     isDistributeSelected = false,
     isDistributeAllocated = false,
     isDistributeActive = false,
-    onClick,
+    onCardClick,
   } = props;
 
   const canClick =
@@ -90,7 +92,7 @@ export function HandCard(props: HandCardProps) {
           '--suit-color': suitColor,
         } as React.CSSProperties
       }
-      onClick={() => canClick && !isTransformDisabled && !isDistributeDisabled && onClick()}
+      onClick={() => canClick && !isTransformDisabled && !isDistributeDisabled && onCardClick(card)}
       title={
         isTransformMatch && transformWrapperName
           ? `${displayName} ${card.suit}${card.rank}\n(原:${card.name}) ${card.description ?? ''}`.trim()
@@ -108,3 +110,34 @@ export function HandCard(props: HandCardProps) {
     </div>
   );
 }
+
+/**
+ * React.memo 自定义比较器:
+ * 手牌渲染 N 次(每张牌),每次 view 更新都会重新 map。
+ * card 对象引用每次变化,但 card 字段(name/suit/rank)不可变,用 card.id 比较即可。
+ * onCardClick 来自 usePlayInteraction 的 useCallback,状态不变时引用稳定。
+ */
+function handCardPropsEqual(prev: HandCardProps, next: HandCardProps): boolean {
+  return (
+    prev.card.id === next.card.id &&
+    prev.index === next.index &&
+    prev.totalHand === next.totalHand &&
+    prev.isSelected === next.isSelected &&
+    prev.isDiscardSelected === next.isDiscardSelected &&
+    prev.canPlay === next.canPlay &&
+    prev.isAwaiting === next.isAwaiting &&
+    prev.canDiscardClick === next.canDiscardClick &&
+    prev.isTransformMatch === next.isTransformMatch &&
+    prev.isTransformActive === next.isTransformActive &&
+    prev.isTransformDisabled === next.isTransformDisabled &&
+    prev.isNew === next.isNew &&
+    prev.transformWrapperName === next.transformWrapperName &&
+    prev.isDistributeCandidate === next.isDistributeCandidate &&
+    prev.isDistributeSelected === next.isDistributeSelected &&
+    prev.isDistributeAllocated === next.isDistributeAllocated &&
+    prev.isDistributeActive === next.isDistributeActive &&
+    prev.onCardClick === next.onCardClick
+  );
+}
+
+export const HandCard = memo(HandCardImpl, handCardPropsEqual);

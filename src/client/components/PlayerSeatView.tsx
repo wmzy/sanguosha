@@ -1,7 +1,9 @@
 // src/client/components/PlayerSeatView.tsx
 // 玩家座位视图(弧形座位上的每张武将卡) — 从 GameView.tsx 抽出
+import { memo } from 'react';
 import { css, cx } from '@linaria/core';
 import type { EquipSlot, GameView } from '../../engine/types';
+import { shallowArrayEqual, playerVisibleEqual } from '../utils/memo';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { getSkillDescription } from '../../engine/skill';
 import {
@@ -41,7 +43,7 @@ export interface PlayerSeatProps {
   skillActions?: SkillActionDef[];
 }
 
-export function PlayerSeatView({
+function PlayerSeatViewImpl({
   player,
   index,
   view,
@@ -214,6 +216,38 @@ export function PlayerSeatView({
     </div>
   );
 }
+
+/**
+ * React.memo 自定义比较器:
+ * WebSocket view 更新会创建全新的 view/player 对象引用,默认浅比较无法拦截。
+ * 本比较器逐字段检查影响渲染的 primitive props + player 可见字段,
+ * cardMap 查找(cardId → 不可变 Card)无需比较——cardId 不变则卡片显示不变。
+ * 函数 props(onTargetClick/onSeatDoubleClick)依赖父组件 useCallback 保持稳定引用。
+ */
+function playerSeatPropsEqual(prev: PlayerSeatProps, next: PlayerSeatProps): boolean {
+  return (
+    // primitive props
+    prev.index === next.index &&
+    prev.isCurrentPlayer === next.isCurrentPlayer &&
+    prev.isPerspective === next.isPerspective &&
+    prev.needsTarget === next.needsTarget &&
+    prev.isTargetable === next.isTargetable &&
+    prev.isDamaged === next.isDamaged &&
+    prev.damageVersion === next.damageVersion &&
+    prev.isTurnGlow === next.isTurnGlow &&
+    prev.turnGlowVersion === next.turnGlowVersion &&
+    prev.hideIdentity === next.hideIdentity &&
+    // 函数 props（引用相等，依赖父组件 useCallback）
+    prev.onTargetClick === next.onTargetClick &&
+    prev.onSeatDoubleClick === next.onSeatDoubleClick &&
+    // selectedTargetNames: string[]
+    shallowArrayEqual(prev.selectedTargetNames ?? [], next.selectedTargetNames ?? []) &&
+    // player 可见字段（view.cardMap 查找确定性，无需比较 view）
+    playerVisibleEqual(prev.player, next.player)
+  );
+}
+
+export const PlayerSeatView = memo(PlayerSeatViewImpl, playerSeatPropsEqual);
 
 // ─── Styles ───
 const seatCard = css`

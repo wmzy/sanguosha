@@ -1,6 +1,7 @@
 // src/client/components/PlayerCardLarge.tsx
 // 视角玩家角色大卡(势力/身份/体力/技能/装备/判定)。
 // 从 GameView.tsx 抽出的纯展示组件——内部无状态,所有数据/回调由父组件传入。
+import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView } from '../../engine/types';
@@ -10,6 +11,7 @@ import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstan
 import { getCharacterMeta } from '../../engine/character-meta';
 import { getSkillDescription } from '../../engine/skill';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
+import { shallowArrayEqual, playerVisibleEqual } from '../utils/memo';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
@@ -39,7 +41,7 @@ function skillBtnVariant(style: string | undefined): string {
   return '';
 }
 
-export function PlayerCardLarge({
+export function PlayerCardLargeImpl({
   perspectiveIdx,
   viewer,
   view,
@@ -169,3 +171,30 @@ export function PlayerCardLarge({
     </>
   );
 }
+
+/** memo: 角色大卡只在玩家可见字段/技能可用性/动画/操作权限变化时重渲染 */
+function playerCardLargePropsEqual(
+  prev: PlayerCardLargeProps,
+  next: PlayerCardLargeProps,
+): boolean {
+  const prevP = prev.view.players[prev.perspectiveIdx];
+  const nextP = next.view.players[next.perspectiveIdx];
+  if (!prevP || !nextP) return prevP === nextP;
+  return (
+    prev.perspectiveIdx === next.perspectiveIdx &&
+    prev.viewer === next.viewer &&
+    prev.canOperate === next.canOperate &&
+    prev.isPerspectiveTurn === next.isPerspectiveTurn &&
+    prev.damageFlashIndices.has(prev.perspectiveIdx) ===
+      next.damageFlashIndices.has(next.perspectiveIdx) &&
+    prev.onSkillAction === next.onSkillAction &&
+    // skillActions:引用比较(useSkillActions 已 useMemo)
+    prev.skillActions === next.skillActions &&
+    // 玩家可见字段
+    playerVisibleEqual(prevP, nextP) &&
+    // 技能可用性依赖 phase + turn vars
+    prev.view.phase === next.view.phase
+  );
+}
+
+export const PlayerCardLarge = memo(PlayerCardLargeImpl, playerCardLargePropsEqual);

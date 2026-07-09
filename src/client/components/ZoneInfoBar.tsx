@@ -1,5 +1,6 @@
 // src/client/components/ZoneInfoBar.tsx
 // 中央信息区:牌堆数 + 处理区 + 弃牌堆。纯展示,数据全部由 view 传入。
+import { memo } from 'react';
 import * as styles from './gameViewStyles';
 import type { GameView } from '../../engine/types';
 import { SUIT_COLOR } from './gameViewConstants';
@@ -8,7 +9,7 @@ export interface ZoneInfoBarProps {
   view: GameView;
 }
 
-export function ZoneInfoBar(props: ZoneInfoBarProps) {
+function ZoneInfoBarImpl(props: ZoneInfoBarProps) {
   const { view } = props;
 
   return (
@@ -53,3 +54,22 @@ export function ZoneInfoBar(props: ZoneInfoBarProps) {
     </div>
   );
 }
+
+/** memo: 只在牌堆数/弃牌堆/处理区变化时重渲染 */
+function zoneInfoBarPropsEqual(prev: ZoneInfoBarProps, next: ZoneInfoBarProps): boolean {
+  const az = prev.view.zones;
+  const bz = next.view.zones;
+  // 处理区:比较 cardId 集合 + 对应卡片名(cardMap 查找确定性)
+  const aProc = az?.processing ?? [];
+  const bProc = bz?.processing ?? [];
+  if (aProc.length !== bProc.length) return false;
+  for (let i = 0; i < aProc.length; i++) {
+    if (aProc[i] !== bProc[i]) return false;
+  }
+  return (
+    (az?.deckCount ?? 0) === (bz?.deckCount ?? 0) &&
+    (az?.discardPileCount ?? 0) === (bz?.discardPileCount ?? 0)
+  );
+}
+
+export const ZoneInfoBar = memo(ZoneInfoBarImpl, zoneInfoBarPropsEqual);

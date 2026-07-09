@@ -2,6 +2,7 @@
 // 纯展示组件:出牌/distribute/弃牌 5 个并列提示块,逐字迁移自 GameView.tsx 662-746 行。
 // 不持有任何业务状态,所有数据/回调由 props 传入。
 
+import { memo } from 'react';
 import * as styles from './gameViewStyles';
 import type { GameView, Card } from '../../engine/types';
 
@@ -23,7 +24,7 @@ export interface PlayPhasePromptProps {
   selectedForDiscard: Set<string>;
 }
 
-export function PlayPhasePrompt(props: PlayPhasePromptProps) {
+export function PlayPhasePromptImpl(props: PlayPhasePromptProps) {
   const {
     view,
     perspectiveName,
@@ -95,3 +96,26 @@ export function PlayPhasePrompt(props: PlayPhasePromptProps) {
     </>
   );
 }
+
+/** memo: 纯展示提示块,只在相关 primitive props / phase 变化时重渲染 */
+function playPhasePromptPropsEqual(
+  prev: PlayPhasePromptProps,
+  next: PlayPhasePromptProps,
+): boolean {
+  return (
+    prev.view.phase === next.view.phase &&
+    prev.perspectiveName === next.perspectiveName &&
+    prev.currentPlayerName === next.currentPlayerName &&
+    prev.isPerspectiveTurn === next.isPerspectiveTurn &&
+    prev.isPerspectiveAwaiting === next.isPerspectiveAwaiting &&
+    prev.isDiscardPhase === next.isDiscardPhase &&
+    prev.canOperate === next.canOperate &&
+    prev.selectedCardId === next.selectedCardId &&
+    prev.selectedTarget === next.selectedTarget &&
+    prev.discardMin === next.discardMin &&
+    prev.discardMax === next.discardMax &&
+    prev.selectedForDiscard.size === next.selectedForDiscard.size
+  );
+}
+
+export const PlayPhasePrompt = memo(PlayPhasePromptImpl, playPhasePromptPropsEqual);
