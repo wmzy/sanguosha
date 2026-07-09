@@ -69,12 +69,15 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   sendUpdateConfig: (config: import('../../server/protocol').RoomConfig) => void;
   /** 已连接座次数 */
   connectedCount: number;
+  /** 正在重连的座次数(0=全部已连接) */
+  reconnectingCount: number;
 } {
   const { roomId, playerCount, perspective } = params;
   // viewer index → HGC 实例
   const clientsRef = useRef<Map<number, HeadlessGameClient>>(new Map());
   const [views, setViews] = useState<Map<number, GameView>>(new Map());
   const [connectedCount, setConnectedCount] = useState(0);
+  const [reconnectingCount, setReconnectingCount] = useState(0);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   /** 游戏结束结果(winner=胜方座次号字符串,或 '无人')。收到 gameOver 消息后设置。 */
@@ -113,6 +116,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     setViews(new Map());
     playbackRef.current.reset(0);
     setConnectedCount(0);
+    setReconnectingCount(0);
     setGameOver(null);
     setSeatPlayerIds(new Map());
     firstViewFiredRef.current = false;
@@ -157,7 +161,15 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           setRoomState(state);
         },
         onError: () => {
-          /* 一期不重连 */
+          /* WS error 已由重连机制覆盖 */
+        },
+        onReconnectStateChange: (state) => {
+          if (cancelled) return;
+          setReconnectingCount((prev) => {
+            if (state === 'reconnecting') return prev + 1;
+            if (state === 'idle' && prev > 0) return prev - 1;
+            return prev;
+          });
         },
         onMessage: (msg: ServerMessage) => {
           if (cancelled) return;
@@ -316,6 +328,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     clientsRef.current.clear();
     setViews(new Map());
     setConnectedCount(0);
+    setReconnectingCount(0);
     setRoomState(null);
     setGameStarted(false);
     setSeatPlayerIds(new Map());
@@ -381,5 +394,6 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     sendRestart,
     sendUpdateConfig,
     connectedCount,
+    reconnectingCount,
   };
 }

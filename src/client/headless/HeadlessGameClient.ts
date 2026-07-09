@@ -12,7 +12,7 @@ import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
 import { enumerateAvailableActions } from './availableActions';
 import { resolvePendingRespond, getPendingRequestType } from '../utils/pendingRespond';
 import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistry';
-import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState } from './types';
+import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState, ReconnectState } from './types';
 
 export class HeadlessGameClient {
   private ws: WebSocket | null = null;
@@ -31,6 +31,24 @@ export class HeadlessGameClient {
   private _lastActionRejected = false;
   private readonly callbacks: HeadlessCallbacks;
   private readonly serverUrl: string;
+
+  // ── 重连机制 ──
+  /** 重连退避定时器 */
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 已尝试重连次数 */
+  private _reconnectAttempts = 0;
+  /** 最大重连尝试次数 */
+  private readonly maxReconnectAttempts = 10;
+  /** 主动断开标记:disconnect() 设为 true,onclose 不触发重连 */
+  private intentionalDisconnect = false;
+  /** 当前重连状态 */
+  private _reconnectState: ReconnectState = 'idle';
+  /** 是否为 debug 模式(影响重连消息类型) */
+  private _debugMode = false;
+  /** 已收到 room_joined,具备重连所需上下文(roomId/playerId) */
+  private canReconnect = false;
+  /** 重连 WS 已打开、已发 reconnect 消息、等待服务端响应。收到任意消息即标记成功。 */
+  private pendingReconnect = false;
 
   constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}) {
     this.serverUrl = serverUrl;
@@ -69,6 +87,16 @@ export class HeadlessGameClient {
     return this._gameOverWinner;
   }
 
+  /** 当前重连状态(idle/reconnecting/failed) */
+  get reconnectState(): ReconnectState {
+    return this._reconnectState;
+  }
+
+  /** 当前重连尝试次数(0=未在重连) */
+  get reconnectAttemptCount(): number {
+    return this._reconnectAttempts;
+  }
+
   private setPhase(p: ClientPhase) {
     if (this._phase !== p) {
       this._phase = p;
@@ -78,14 +106,18 @@ export class HeadlessGameClient {
 
   /** 创建 debug 房间并自动 join 0 号座 */
   createDebugRoom(playerCount: number, config?: RoomConfig): void {
+    this._debugMode = true;
+    this.intentionalDisconnect = false;
     this.openSocket();
     this.send({ type: 'create_debug_room', config, playerCount });
   }
 
   /** 连接并 join 指定房间 */
   connect(roomId: string, seatIndex?: number): void {
+    this._debugMode = true;
     this._roomId = roomId;
     this._seatIndex = seatIndex ?? this._seatIndex;
+    this.intentionalDisconnect = false;
     this.openSocket();
     this.send({ type: 'join_debug_room', roomId, lastSeq: 0 });
   }
@@ -99,6 +131,8 @@ export class HeadlessGameClient {
 
   /** 创建普通(多人)房间:本连接成为房主。 */
   createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string): void {
+    this._debugMode = false;
+    this.intentionalDisconnect = false;
     this.openSocket();
     this.setPlayerId(playerId);
     this.send({ type: 'create_room', name, maxPlayers, config });
@@ -106,16 +140,29 @@ export class HeadlessGameClient {
 
   /** 加入普通(多人)房间。 */
   joinRoom(roomId: string, playerId?: string): void {
+    this._debugMode = false;
     this._roomId = roomId;
+    this.intentionalDisconnect = false;
     this.openSocket();
     this.setPlayerId(playerId);
     this.send({ type: 'join_room', roomId });
   }
 
-  private openSocket() {
+  private openSocket(isReconnect = false) {
     this.ws = new WebSocket(this.serverUrl);
     this.ws.onopen = () => {
-      this.setPhase('lobby');
+      // 主动断开后迟到的新 WS:立即关闭,不处理
+      if (this.intentionalDisconnect) {
+        this.ws?.close();
+        return;
+      }
+      if (isReconnect) {
+        // 重连:发送 reconnect/join_debug_room 消息恢复座位
+        this.sendReconnectMessage();
+      } else {
+        // 正常首次连接
+        this.setPhase('lobby');
+      }
       // flush 连接前缓冲的待发消息
       for (const m of this._outbox) this.ws!.send(JSON.stringify(m));
       this._outbox = [];
@@ -126,8 +173,80 @@ export class HeadlessGameClient {
       this.callbacks.onError?.(new Error('WebSocket error'));
     };
     this.ws.onclose = () => {
-      /* 一期不重连 */
+      // 主动断开:不重连
+      if (this.intentionalDisconnect) return;
+      // 已具备重连上下文(room_joined 已收到):自动重连
+      if (this.canReconnect) {
+        this.scheduleReconnect();
+      }
     };
+  }
+
+  /** 重连 WS 打开后发送恢复消息。根据模式选择 join_debug_room 或 reconnect。 */
+  private sendReconnectMessage(): void {
+    if (this._debugMode && this._roomId) {
+      // debug 模式:通过 join_debug_room 恢复(服务端按 room.status 决定恢复视图)
+      this.pendingReconnect = true;
+      this.ws!.send(
+        JSON.stringify({ type: 'join_debug_room', roomId: this._roomId, lastSeq: this._lastSeq }),
+      );
+    } else if (this._playerId) {
+      // multiplayer 模式:通过 reconnect 消息携带旧 playerId 恢复座位
+      this.pendingReconnect = true;
+      this.ws!.send(
+        JSON.stringify({ type: 'reconnect', playerId: this._playerId, lastSeq: this._lastSeq }),
+      );
+    } else {
+      // 无重连上下文:放弃
+      this.setReconnectState('failed');
+    }
+  }
+
+  // ── 重连机制 ──
+
+  /** 指数退避延迟:1s→2s→4s→8s→16s,上限 30s */
+  private getReconnectDelay(attempt: number): number {
+    return Math.min(1000 * Math.pow(2, attempt), 30000);
+  }
+
+  /** 调度下一次重连。超过最大次数则标记失败。 */
+  private scheduleReconnect(): void {
+    if (this._reconnectAttempts >= this.maxReconnectAttempts) {
+      this.setReconnectState('failed');
+      return;
+    }
+    this._reconnectAttempts++; // 先递增(1-based),使回调报告当前尝试编号
+    this.setReconnectState('reconnecting');
+    const delay = this.getReconnectDelay(this._reconnectAttempts - 1); // 0-based for delay
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.openSocket(true);
+    }, delay);
+  }
+
+  private setReconnectState(state: ReconnectState): void {
+    if (this._reconnectState !== state) {
+      this._reconnectState = state;
+      this.callbacks.onReconnectStateChange?.(state, this._reconnectAttempts);
+    }
+  }
+
+  /** 用户手动取消重连。清除定时器、重置状态、关闭正在重连的 WS。 */
+  cancelReconnect(): void {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this._reconnectAttempts = 0;
+    this.pendingReconnect = false;
+    const wasReconnecting = this._reconnectState === 'reconnecting';
+    this.setReconnectState('idle');
+    // 正在重连的 WS:关闭它(不影响正常连接)
+    if (wasReconnecting && this.ws) {
+      this.intentionalDisconnect = true;
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   private handleRaw(raw: string) {
@@ -136,6 +255,12 @@ export class HeadlessGameClient {
       msg = JSON.parse(raw) as ServerMessage;
     } catch {
       return;
+    }
+    // 重连后收到任意消息:标记重连成功
+    if (this.pendingReconnect) {
+      this.pendingReconnect = false;
+      this._reconnectAttempts = 0;
+      this.setReconnectState('idle');
     }
     const r = applyServerMessage(this._view, this._lastSeq, msg);
     const viewChanged = this._view !== r.view;
@@ -156,6 +281,10 @@ export class HeadlessGameClient {
     if (r.playerId) this._playerId = r.playerId;
     if (r.roomId) this._roomId = r.roomId;
     if (r.seatIndex !== undefined) this._seatIndex = r.seatIndex;
+    // room_joined 表示已成功加入房间,具备重连上下文
+    if (msg.type === 'room_joined') {
+      this.canReconnect = true;
+    }
     if (r.roomState) {
       this._roomState = r.roomState;
       this.callbacks.onRoomState?.(r.roomState);
@@ -492,6 +621,9 @@ export class HeadlessGameClient {
   }
 
   disconnect() {
+    this.intentionalDisconnect = true;
+    this.cancelReconnect();
+    this.canReconnect = false;
     this.ws?.close();
     this.ws = null;
   }

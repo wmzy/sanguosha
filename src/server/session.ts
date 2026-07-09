@@ -61,7 +61,9 @@ function resolveCharPool(preset: string): Array<{ name: string; skills: string[]
   return CHARACTERS;
 }
 
-const RECONNECT_GRACE_MS = 30_000;
+/** 玩家断线后的保活宽限期(ms)。在此期间重连可恢复座位,超时后正常清理。
+ *  60s 足以覆盖常见网络抖动(路由切换/WiFi 重连/页面刷新)。 */
+export const RECONNECT_GRACE_MS = 60_000;
 export class GameSession {
   private state: GameState | null = null;
   private actionLog: ActionLogEntry[] = [];
@@ -459,10 +461,32 @@ export class GameSession {
     });
   }
 
-  reconnectPlayer(playerId: string, ws: import('hono/ws').WSContext, _lastSeq = 0): boolean {
+  /** 玩家重连:恢复座位并发送当前完整 state。
+   *  multiplayer 模式:新 WS 连接的 playerId 与断线前不同(服务端 onOpen 自动生成),
+   *  需通过 previousPlayerId 迁移座次映射(旧 playerId → 新 playerId)。
+   *  debug 模式:不传 previousPlayerId,assignDebugSeat 已完成座次分配。 */
+  reconnectPlayer(
+    playerId: string,
+    ws: import('hono/ws').WSContext,
+    _lastSeq = 0,
+    previousPlayerId?: string,
+  ): boolean {
     if (!this.state) return false;
-    this.disconnectedAt.delete(playerId);
+
+    // multiplayer 模式:迁移 playerId 映射
+    if (previousPlayerId && previousPlayerId !== playerId) {
+      const seatIndex = this.playerNames.get(previousPlayerId);
+      if (seatIndex === undefined) return false; // 旧 playerId 已不存在(可能已超时清理)
+      this.playerNames.delete(previousPlayerId);
+      this.playerNames.set(playerId, seatIndex);
+      this.baselineSent.delete(previousPlayerId);
+      this.lastSentDeadline.delete(previousPlayerId);
+      this.disconnectedAt.delete(previousPlayerId);
+      this.room.players.delete(previousPlayerId);
+    }
+
     this.clearGraceTimer();
+    this.disconnectedAt.delete(playerId);
     this.room.players.set(playerId, ws);
     this.sendInitialViewToPlayer(playerId);
     this.baselineSent.add(playerId);

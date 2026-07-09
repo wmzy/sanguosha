@@ -126,6 +126,46 @@ const returnHomeRow = css`
   margin-top: 8px;
 `;
 
+/** 重连提示覆盖层(非阻塞,固定顶部) */
+const reconnectOverlay = css`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  pointer-events: auto;
+  background-color: ${colors.accent.amber};
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+`;
+
+const reconnectFailedOverlay = css`
+  ${reconnectOverlay}
+  background-color: ${colors.accent.red};
+`;
+
+const reconnectSpinner = css`
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
 export function MultiplayerPage() {
   const navigate = useNavigate();
   const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
@@ -163,52 +203,100 @@ export function MultiplayerPage() {
 
   const handleAction = (action: ActionMsg) => mp.sendAction(action);
 
+  // 重连提示覆盖层(非阻塞:显示在内容之上,不阻止渲染)
+  const reconnectBanner =
+    mp.connectionState === 'reconnecting' ? (
+      <div className={reconnectOverlay}>
+        <span className={reconnectSpinner} />
+        <span>
+          正在重连… (第 {mp.reconnectAttempt} 次)
+        </span>
+        <button
+          className={btnStyle}
+          style={{
+            '--btn-bg': colors.accent.darkRed,
+            '--btn-padding': '4px 12px',
+            '--btn-font-size': '12px',
+          } as React.CSSProperties}
+          onClick={mp.cancelReconnect}
+        >
+          取消
+        </button>
+      </div>
+    ) : mp.connectionState === 'failed' ? (
+      <div className={reconnectFailedOverlay}>
+        <span>重连失败,请检查网络</span>
+        <button
+          className={btnStyle}
+          style={{
+            '--btn-bg': colors.accent.darkRed,
+            '--btn-padding': '4px 12px',
+            '--btn-font-size': '12px',
+          } as React.CSSProperties}
+          onClick={() => {
+            mp.leaveRoom();
+            navigate('/');
+          }}
+        >
+          返回大厅
+        </button>
+      </div>
+    ) : null;
+
   if (mp.stage === 'playing' && mp.view) {
     return (
-      <div className={gameWrap}>
-        <GameViewComponent view={mp.view} onAction={handleAction} onReorderHand={mp.reorderHand} />
-      </div>
+      <>
+        {reconnectBanner}
+        <div className={gameWrap}>
+          <GameViewComponent view={mp.view} onAction={handleAction} onReorderHand={mp.reorderHand} />
+        </div>
+      </>
     );
   }
 
   if (mp.stage === 'ended' || mp.gameOver) {
     return (
-      <div className={page}>
-        <h1 className={title}>游戏结束</h1>
-        <div className={gameOverBox}>
-          <p className={winnerText}>
-            {mp.gameOver?.winner === '无人' ? '平局' : `胜方：${mp.gameOver?.winner ?? '未知'}`}
-          </p>
-          <div className={buttonRow}>
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
-              onClick={mp.sendRestart}
-            >
-              再来一局
-            </button>
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-              onClick={() => {
-                mp.leaveRoom();
-                navigate('/');
-              }}
-            >
-              返回大厅
-            </button>
+      <>
+        {reconnectBanner}
+        <div className={page}>
+          <h1 className={title}>游戏结束</h1>
+          <div className={gameOverBox}>
+            <p className={winnerText}>
+              {mp.gameOver?.winner === '无人' ? '平局' : `胜方：${mp.gameOver?.winner ?? '未知'}`}
+            </p>
+            <div className={buttonRow}>
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
+                onClick={mp.sendRestart}
+              >
+                再来一局
+              </button>
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
+                onClick={() => {
+                  mp.leaveRoom();
+                  navigate('/');
+                }}
+              >
+                返回大厅
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (mp.stage === 'waiting') {
     return (
-      <div className={page}>
-        <h1 className={title}>等待大厅</h1>
-        <p className={subtitle}>等待玩家加入并准备</p>
-        <div className={card}>
+      <>
+        {reconnectBanner}
+        <div className={page}>
+          <h1 className={title}>等待大厅</h1>
+          <p className={subtitle}>等待玩家加入并准备</p>
+          <div className={card}>
           <div className={roomCodeBox}>
             <div className={roomCodeLabel}>房间码（分享给其他玩家）</div>
             <div className={roomCode}>{mp.roomId ?? '加载中…'}</div>
@@ -257,7 +345,8 @@ export function MultiplayerPage() {
           </div>
         </div>
         {mp.error && <div className={errorToastStyle}>{mp.error}</div>}
-      </div>
+        </div>
+      </>
     );
   }
 

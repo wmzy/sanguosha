@@ -398,8 +398,14 @@ function handleReconnect(
     return;
   }
 
-  if (session.reconnectPlayer(previousPlayerId, ws, lastSeq)) {
+  // currentPlayerId = 新 WS 连接的 playerId(onOpen 自动生成)
+  // previousPlayerId = 客户端断线前的 playerId(通过 reconnect 消息携带)
+  // reconnectPlayer 内部迁移旧→新 playerId 的座次映射
+  if (session.reconnectPlayer(currentPlayerId, ws, lastSeq, previousPlayerId)) {
+    playerRoomMap.delete(previousPlayerId);
     playerRoomMap.set(currentPlayerId, roomId);
+    // 通知客户端其新 playerId(WS onOpen 生成的新 id),供后续重连使用
+    ws.send(serialize({ type: 'room_joined', roomId, playerId: currentPlayerId }));
     log.info('玩家重连成功', { previousPlayerId, currentPlayerId, lastSeq });
   } else {
     ws.send(serialize({ type: 'error', message: '重连失败' }));

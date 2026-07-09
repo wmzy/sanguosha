@@ -7,7 +7,7 @@
 // cleanup 时 disconnect。StrictMode 安全(cleanup disconnect 后 effect 重跑完整重建)。
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { HeadlessGameClient } from '../headless/HeadlessGameClient';
-import type { ClientPhase, RoomState } from '../headless/types';
+import type { ClientPhase, RoomState, ReconnectState } from '../headless/types';
 import type { GameView } from '../../engine/types';
 import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import type { ActionMsg } from '../types';
@@ -16,6 +16,9 @@ import { createLogger } from '../utils/logger';
 const log = createLogger('useMultiplayerRoom');
 
 export type MultiplayerStage = 'lobby' | 'waiting' | 'playing' | 'ended';
+
+/** 连接状态(供 UI 显示连接/重连提示)。 */
+export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'failed';
 
 /** 连接命令:驱动主 effect 建立/重建 HGC 连接。 */
 type Command =
@@ -45,6 +48,12 @@ export interface MultiplayerRoom {
   leaveRoom: () => void;
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
+  /** 当前连接状态(供 UI 显示连接/重连提示) */
+  connectionState: ConnectionState;
+  /** 当前重连尝试次数(0=未在重连) */
+  reconnectAttempt: number;
+  /** 手动取消重连 */
+  cancelReconnect: () => void;
 }
 
 export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
@@ -56,6 +65,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   // 初始命令:有 initialRoomId 则自动 join(分享链接直达)
   const [command, setCommand] = useState<Command>(() =>
@@ -84,12 +95,19 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       },
       onRoomState: (rs) => setRoomState(rs),
       onPhaseChange: (phase: ClientPhase) => {
+        if (phase === 'lobby') setConnectionState('connected');
         if (phase === 'playing') setStage('playing');
         if (phase === 'ended') setStage('ended');
       },
       onGameOver: (winner) => setGameOver({ winner }),
       onError: () => {
-        /* 一期不重连 */
+        /* WS error 已由 onclose → 重连机制覆盖 */
+      },
+      onReconnectStateChange: (state: ReconnectState, attempt: number) => {
+        setReconnectAttempt(attempt);
+        if (state === 'idle') setConnectionState('connected');
+        else if (state === 'reconnecting') setConnectionState('reconnecting');
+        else if (state === 'failed') setConnectionState('failed');
       },
       onMessage: (msg: ServerMessage) => {
         // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
@@ -209,6 +227,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     hgc.reorderHand(order);
   }, []);
 
+  const cancelReconnect = useCallback(() => {
+    hgcRef.current?.cancelReconnect();
+  }, []);
+
   return {
     stage,
     roomId,
@@ -227,5 +249,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     leaveRoom,
     sendAction,
     reorderHand,
+    connectionState,
+    reconnectAttempt,
+    cancelReconnect,
   };
 }

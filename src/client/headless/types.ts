@@ -19,6 +19,12 @@ export interface RoomState {
 
 export type ClientPhase = 'connecting' | 'lobby' | 'playing' | 'ended';
 
+/** 重连状态(内部跟踪,供 hooks 映射为 ConnectionState)。
+ *  - idle: 正常连接(或未连接),未在重连
+ *  - reconnecting: 正在重连(等待退避或已发起重连 WS)
+ *  - failed: 达到最大重试次数,放弃重连 */
+export type ReconnectState = 'idle' | 'reconnecting' | 'failed';
+
 export interface HeadlessCallbacks {
   onView?: (view: GameView, newEvents: ViewEvent[]) => void;
   onRoomState?: (state: RoomState | null) => void;
@@ -28,6 +34,8 @@ export interface HeadlessCallbacks {
   onError?: (err: Error) => void;
   /** 每条原始 ServerMessage 到达后调用（供宿主做展示层增强：telemetry/判定牌延迟等）。在 view 更新之后。 */
   onMessage?: (msg: ServerMessage) => void;
+  /** 重连状态变化时调用。attempt = 当前已尝试次数(0=首次)。 */
+  onReconnectStateChange?: (state: ReconnectState, attempt: number) => void;
 }
 
 /** AI 决策的核心输入：一个可直接执行的操作。 */
