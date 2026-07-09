@@ -20,6 +20,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import {
   registerAction,
   registerBeforeHook,
@@ -32,7 +33,6 @@ const CHOOSE_TARGET_RT = '好施/target'; // 鲁肃:并列时选目标
 const GIVE_RT = '好施/give'; // 鲁肃:选牌给出
 const CONFIRMED_KEY = '好施/confirmed';
 const ACTIVE_KEY = '好施/active'; // before 设,after 读,确保仅对好施的摸牌生效
-const USED_KEY = '好施/usedThisTurn';
 const TARGET_KEY = '好施/chosenTarget';
 const GIVE_KEY = '好施/giveCards';
 
@@ -97,7 +97,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (ctx.state.phase !== '摸牌') return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
-      if (self.vars[USED_KEY]) return; // 本回合已发动
+      if (usedThisTurn(ctx.state, ownerId, '好施')) return; // 本回合已发动
 
       // 询问是否发动
       delete ctx.state.localVars[CONFIRMED_KEY];
@@ -116,14 +116,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       });
       if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
-      // 发动:设限一次标记 + ACTIVE 标记(防 dispatch 重入)
-      self.vars[USED_KEY] = true;
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: USED_KEY,
-        value: true,
-      });
+      // 发动:限一次标记 + ACTIVE 标记(防 dispatch 重入)
+      await markOncePerTurn(ctx.state, ownerId, '好施');
       ctx.state.localVars[ACTIVE_KEY] = true;
 
       const count = atom.count ?? 2;

@@ -21,6 +21,7 @@ import {
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { 询问无懈可击 } from '../无懈可击';
+import { skipPhase } from '../skip-phase';
 
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';
@@ -166,13 +167,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const self = ctx.state.players[ownerId];
     if (!self.tags.includes(SKIP_TAG)) return;
 
-    // 顺序很重要:
-    //   1) 先去标签(否则 阶段结束 摸牌 之后回合管理阶段链会再次命中本 hook)
-    //   2) 再触发 阶段结束 摸牌(让回合管理的 after hook 把阶段推进到 出牌)
-    //   3) 返回 cancel → 当前 阶段开始 摸牌 atom 不 apply,state.phase 已是 出牌
-    await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: SKIP_TAG });
-    await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '摸牌' });
-    return { kind: 'cancel' };
+    // 标签型跳过:去标签(SKIP_TAG)+ 阶段结束(摸牌)+ cancel
+    return skipPhase(ctx.state, atom, SKIP_TAG);
   });
 
   return () => {};

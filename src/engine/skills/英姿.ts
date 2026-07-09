@@ -14,10 +14,10 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, registerBeforeHook } from '../skill';
 
 const CONFIRM_REQUEST = '英姿/confirm';
-const USED_KEY = '英姿/usedThisTurn';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -64,7 +64,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.phase !== '摸牌') return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
-      if (self.vars[USED_KEY]) return; // 本回合已发动
+      if (usedThisTurn(ctx.state, ownerId, '英姿')) return; // 本回合已发动
 
       // 询问是否发动
       delete ctx.state.localVars['英姿/confirmed'];
@@ -83,14 +83,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       if (!ctx.state.localVars['英姿/confirmed']) return;
 
-      // 发动:同步设限一次标记(防 dispatch 重入),modify 额外摸一张
-      self.vars[USED_KEY] = true;
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: USED_KEY,
-        value: true,
-      });
+      // 发动:限一次标记(防 dispatch 重入),modify 额外摸一张
+      await markOncePerTurn(ctx.state, ownerId, '英姿');
       const count = atom.count ?? 2;
       return { kind: 'modify', atom: { ...ctx.atom, count: count + 1 } as typeof ctx.atom };
     },

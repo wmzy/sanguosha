@@ -30,6 +30,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
+import { skipPhase } from '../skip-phase';
 import { defaultPlayActive } from '../action-active';
 
 const CONFIRM_RT = '双雄/confirm';
@@ -173,9 +174,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       delete ctx.state.localVars[SELECTED_KEY];
       delete ctx.state.localVars[REVEALED_KEY];
 
-      // 跳过默认摸牌:推进到出牌阶段,并 cancel 本次摸牌阶段开始
-      await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '摸牌' });
-      return { kind: 'cancel' };
+      // 跳过默认摸牌(直接型):阶段结束(摸牌)+ cancel
+      return skipPhase(ctx.state, { player: ownerId, phase: '摸牌' });
     },
   );
 

@@ -118,6 +118,11 @@ export interface GameState {
    *  timeoutScale: pending 超时倍率。1=默认, <1 更快, >1 更慢, Infinity=无限。
    *  若未设置(旧测试 state)按默认 1 处理。 */
   config?: { timeoutScale: number };
+
+  /** 调试开关:置为 true 时,applyAtom 在每个「正常完成」路径调用
+   *  assertCardInvariants,护栏「同一张牌出现在多个区」的重复 bug。
+   *  默认关闭(undefined),不影响现有对局与全量测试性能。 */
+  assertInvariants?: boolean;
   seq: number;
   startedAt: number;
   actionLog: ActionLogEntry[];
@@ -577,6 +582,9 @@ export interface GameView {
     handCount: number;
     hand?: Card[];
     marks: Mark[];
+    /** 武将势力(魏蜀吴群),公开信息,与 character 一并由 分配武将 atom 下发。
+     *  影响激将/护驾/黄天/救援/暴虐/颂威/制霸等势力相关技能。 */
+    faction?: Faction;
     identity?: string;
     /** 该玩家的身份已分配但当前视角不可见。identity 为 undefined 时,
      *  若 identityHidden=true 则显示「暗」,否则不渲染身份徽章(尚未分配)。 */

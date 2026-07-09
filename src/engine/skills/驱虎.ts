@@ -12,7 +12,7 @@
 //   - 每回合限一次:用 player.vars['驱虎/usedThisTurn'] + 回合用量 atom 同步 view。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 import { inAttackRange } from '../distance';
 
@@ -47,7 +47,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
       if (state.phase !== '出牌') return '只能在出牌阶段发动';
-      if (state.players[ownerId].vars['驱虎/usedThisTurn']) return '本回合已使用过驱虎';
+      if (usedThisTurn(state, ownerId, '驱虎')) return '本回合已使用过驱虎';
       const self = state.players[ownerId];
       if (!self?.alive) return '玩家不存在或已死亡';
       const cardId = params.cardId as string;
@@ -66,14 +66,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const initiatorCardId = params.cardId as string;
       const target = params.target as number;
 
-      // 限一次标记:在第一个 await 前设置,防 dispatch 重入(参考制衡)
-      state.players[from].vars['驱虎/usedThisTurn'] = true;
-      await applyAtom(state, {
-        type: '回合用量',
-        player: from,
-        key: '驱虎/usedThisTurn',
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(state, from, '驱虎');
 
       await pushFrame(state, '驱虎', from, { ...params });
 
@@ -260,8 +254,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       },
     },
     activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['驱虎/usedThisTurn'] &&
+      activeUnlessUsedThisTurn('驱虎')(ctx) &&
       (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
   });
 

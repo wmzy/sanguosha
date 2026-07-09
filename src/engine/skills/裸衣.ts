@@ -17,6 +17,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const BONUS_TAG = '裸衣/bonus';
@@ -67,7 +68,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.phase !== '摸牌') return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
-      if (self.vars['裸衣/usedThisTurn']) return; // 本回合已发动
+      if (usedThisTurn(ctx.state, ownerId, '裸衣')) return; // 本回合已发动
 
       // 询问是否发动
       delete ctx.state.localVars['裸衣/confirmed'];
@@ -86,14 +87,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       if (!ctx.state.localVars['裸衣/confirmed']) return;
 
-      // 发动:同步设限一次标记(防 dispatch 重入),加增伤标签,modify 少摸一张
-      self.vars['裸衣/usedThisTurn'] = true;
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: '裸衣/usedThisTurn',
-        value: true,
-      });
+      // 发动:限一次标记(防 dispatch 重入),加增伤标签,modify 少摸一张
+      await markOncePerTurn(ctx.state, ownerId, '裸衣');
       await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: BONUS_TAG });
       const count = atom.count ?? 2;
       return { kind: 'modify', atom: { ...ctx.atom, count: Math.max(0, count - 1) } as typeof ctx.atom };

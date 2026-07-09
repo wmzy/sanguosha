@@ -7,7 +7,10 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { viewReducer } from '../../src/client/view/reducer';
 import { getAtomDef } from '../../src/engine/atom';
-import type { GameView, ViewEvent, Card } from '../../src/engine/types';
+import { applyAtom } from '../../src/engine/create-engine';
+import { buildView } from '../../src/engine/view/buildView';
+import { createGameState } from '../../src/engine/types';
+import type { GameView, ViewEvent, Card, GameState, PlayerState } from '../../src/engine/types';
 
 /** 构造一个最小化 mock GameView 用于直接调用 applyView */
 function mockView(overrides: Partial<GameView> = {}): GameView {
@@ -573,5 +576,116 @@ describe('请求回应 atom: deadline/totalMs 口径一致性', () => {
     def.applyView!(view, event);
     expect(view.pending).not.toBeNull();
     expect(view.pending!.totalMs).toBe(30_000);
+  });
+});
+
+// ── 分配武将 atom: faction 字段运行时赋值 ──
+// PlayerState.faction 已声明但历史上从不赋值——分配武将 atom 只设
+// character/name/skills,导致激将/护驾/黄天/救援/暴虐/颂威/制霸等读 player.faction
+// 的技能始终拿到 undefined。现有技能测试之所以没暴露,是因为它们在 makePlayer 里
+// 手动注入了 faction,绕过了 atom。这里直接走 分配武将 atom 验证 faction 真正被赋值,
+// 并贯穿到 view(toViewEvents 携带 + applyView 写入 + buildView 投影)。
+function makeBarePlayer(index: number): PlayerState {
+  return {
+    index,
+    name: `P${index}`,
+    character: '',
+    health: 4,
+    maxHealth: 4,
+    alive: true,
+    hand: [],
+    equipment: {},
+    skills: [],
+    vars: {},
+    marks: [],
+    pendingTricks: [],
+    tags: [],
+    judgeZone: [],
+    // 故意不设 faction/identity —— 应由 atom 赋值
+  };
+}
+
+function makeBareState(): GameState {
+  return createGameState({
+    players: [makeBarePlayer(0), makeBarePlayer(1)],
+    cardMap: {},
+  });
+}
+
+describe('分配武将 atom: faction 从角色配置赋值并投影到 view', () => {
+  it.each([
+    ['刘备', '蜀'],
+    ['关羽', '蜀'],
+    ['曹操', '魏'],
+    ['司马懿', '魏'],
+    ['孙权', '吴'],
+    ['周瑜', '吴'],
+    ['吕布', '群'],
+    ['貂蝉', '群'],
+  ])('apply 后 %s.faction === %s', async (character, faction) => {
+    const state = makeBareState();
+    await applyAtom(state, {
+      type: '分配武将',
+      target: 0,
+      character,
+      skills: [],
+    });
+    expect(state.players[0].character).toBe(character);
+    expect(state.players[0].faction).toBe(faction);
+  });
+
+  it('toViewEvents 携带 faction(公开信息,所有视角可见)', () => {
+    const def = getAtomDef('分配武将');
+    const split = def.toViewEvents!(makeBareState(), {
+      type: '分配武将',
+      target: 0,
+      character: '刘备',
+      skills: [],
+    });
+    expect(split).toBeDefined();
+    // othersView 携带 faction(ownerViews 为空 = owner 也看 othersView)
+    expect(split!.ownerViews.size).toBe(0);
+    expect(split!.othersView?.faction).toBe('蜀');
+  });
+
+  it('applyView 写入 view.players[].faction', () => {
+    const def = getAtomDef('分配武将');
+    const view = mockView();
+    def.applyView!(view, {
+      type: '分配武将',
+      target: 0,
+      character: '曹操',
+      skills: [],
+      faction: '魏',
+    } as ViewEvent);
+    expect(view.players[0].character).toBe('曹操');
+    expect(view.players[0].faction).toBe('魏');
+  });
+
+  it('端到端:applyAtom 后 buildView 投影 faction 到所有视角', async () => {
+    const state = makeBareState();
+    await applyAtom(state, {
+      type: '分配武将',
+      target: 1,
+      character: '孙权',
+      skills: [],
+    });
+    // 任意 viewer 都能看到目标玩家的公开势力
+    const v0 = buildView(state, 0);
+    const v1 = buildView(state, 1);
+    expect(v0.players[1].faction).toBe('吴');
+    expect(v1.players[1].faction).toBe('吴');
+  });
+
+  it('分配前 faction 为 undefined,分配后才被赋值', async () => {
+    const state = makeBareState();
+    expect(state.players[0].faction).toBeUndefined();
+    await applyAtom(state, {
+      type: '分配武将',
+      target: 0,
+      character: '张飞',
+      skills: [],
+    });
+    expect(state.players[0].faction).toBe('蜀');
   });
 });

@@ -19,7 +19,7 @@
 // 目标需 respond 选拼点牌——respond action 为所有玩家注册(validate 严格校验 pending requestType)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 import { registerSlashMaxProvider, registerSlashBlocker } from '../slash-quota';
 
@@ -33,7 +33,6 @@ function rankValue(rank: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-const USED_KEY = '天义/usedThisTurn';
 const TARGET_CARD_KEY = '天义/targetCard';
 const PD_RT = '天义/拼点';
 const WIN_VAR = '天义/win';
@@ -75,7 +74,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     (st: GameState, params: Record<string, Json>): string | null => {
       if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
       if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (st.players[ownerId].vars[USED_KEY]) return '本回合已使用过天义';
+      if (usedThisTurn(st, ownerId, '天义')) return '本回合已使用过天义';
       const self = st.players[ownerId];
       if (!self?.alive) return '玩家不存在或已死亡';
       const cardId = params.cardId as string;
@@ -94,9 +93,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const initiatorCardId = params.cardId as string;
       const target = params.target as number;
 
-      // 限一次标记:在第一个 await 前设置,防 dispatch 重入(参考制衡/驱虎)
-      st.players[from].vars[USED_KEY] = true;
-      await applyAtom(st, { type: '回合用量', player: from, key: USED_KEY, value: true });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(st, from, '天义');
 
       await pushFrame(st, '天义', from, { ...params });
 
@@ -231,8 +229,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       },
     },
     activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[USED_KEY] &&
+      activeUnlessUsedThisTurn('天义')(ctx) &&
       (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
   });
 

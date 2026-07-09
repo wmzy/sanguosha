@@ -27,6 +27,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
+import { skipPhase } from '../skip-phase';
 
 const CONFIRM_RT = '巧变/confirm';
 const DISCARD_RT = '巧变/discard';
@@ -325,13 +326,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         await popFrame(ctx.state);
       }
 
-      // 跳过当前阶段:推进到下一阶段 + cancel 当前 阶段开始
-      await applyAtom(ctx.state, {
-        type: '阶段结束',
-        player: ownerId,
-        phase,
-      });
-      return { kind: 'cancel' };
+      // 跳过当前阶段(直接型):阶段结束(phase)+ cancel
+      return skipPhase(ctx.state, { player: ownerId, phase });
     },
   );
 

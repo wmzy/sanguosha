@@ -16,12 +16,10 @@
 //     (无懈可击、无双双杀、轮流出杀、输者受 1 点伤害)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { getGender } from '../character-meta';
 import { runDuelResolution } from './决斗';
-
-const USED_KEY = '离间/usedThisTurn';
 
 /** 校验某座次是否为男性存活角色 */
 function isMaleAlive(state: GameState, target: number): boolean {
@@ -53,7 +51,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
       if (st.phase !== '出牌') return '只能在出牌阶段使用';
       if (hasBlockingPending(st)) return '当前有未完成的询问';
-      if (self.vars[USED_KEY]) return '本回合已使用过离间';
+      if (usedThisTurn(st, ownerId, '离间')) return '本回合已使用过离间';
 
       // cardId:被弃置的牌(手牌或装备)
       const cardId = params.cardId as string | undefined;
@@ -77,14 +75,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const cardId = params.cardId as string;
       const [A, B] = params.targets as [number, number];
 
-      // [时序修复] 限一次标记必须在第一个 await 之前设置,防 dispatch 重入(同制衡/结姻)
-      st.players[ownerId].vars[USED_KEY] = true;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: ownerId,
-        key: USED_KEY,
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(st, ownerId, '离间');
 
       await pushFrame(st, '离间', ownerId, { ...params });
 
@@ -119,9 +111,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
         },
       },
     },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[USED_KEY],
+    activeWhen: (ctx) => activeUnlessUsedThisTurn('离间')(ctx),
   });
 
   return () => {};

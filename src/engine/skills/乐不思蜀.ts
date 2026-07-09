@@ -16,6 +16,7 @@ import { registerAction, registerAfterHook, registerBeforeHook, validateUseCard 
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { 询问无懈可击 } from '../无懈可击';
+import { skipPhase } from '../skip-phase';
 
 /** 跳过出牌阶段的 tag 名(实现为 mark id='tag:乐不思蜀/跳过出牌') */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
@@ -153,13 +154,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 检查跳过标签(tags 数组)
     if (!self.tags.includes(SKIP_TAG)) return;
 
-    // 顺序很重要:
-    //   1) 先去标签(否则 阶段结束 出牌 之后回合管理阶段链会再次命中本 hook)
-    //   2) 再触发 阶段结束 出牌(让回合管理的 after hook 把阶段推进到 弃牌)
-    //   3) 返回 cancel → 当前 阶段开始 出牌 atom 不 apply,state.phase 已是 弃牌
-    await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: SKIP_TAG });
-    await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '出牌' });
-    return { kind: 'cancel' };
+    // 标签型跳过:去标签(SKIP_TAG)+ 阶段结束(出牌)+ cancel
+    return skipPhase(ctx.state, atom, SKIP_TAG);
   });
 
   return () => {};

@@ -12,7 +12,7 @@
 //   兼容简单格式 cardIds + target(测试/headless 直发)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { getGender } from '../character-meta';
 
@@ -71,7 +71,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (state.phase !== '出牌') return '不是出牌阶段';
       if (hasBlockingPending(state)) return '当前有未回应的询问';
       // 限一次/回合
-      if (self.vars['结姻/usedThisTurn']) return '本回合已使用过结姻';
+      if (usedThisTurn(state, ownerId, '结姻')) return '本回合已使用过结姻';
       // 手牌不少于 2
       if (self.hand.length < 2) return '手牌不足两张';
 
@@ -92,14 +92,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const resolved = resolveParams(params);
       if (!resolved) return; // validate 已保证非空,防御
       const { cardIds, target } = resolved;
-      // [时序修复] 限一次标记必须在第一个 await 之前设置,防 dispatch 重入(同制衡)
-      state.players[ownerId].vars['结姻/usedThisTurn'] = true;
-      await applyAtom(state, {
-        type: '回合用量',
-        player: ownerId,
-        key: '结姻/usedThisTurn',
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(state, ownerId, '结姻');
       await pushFrame(state, '结姻', ownerId, { cardIds, target });
       // 1. 弃置两张手牌
       await applyAtom(state, { type: '弃置', player: ownerId, cardIds });
@@ -132,9 +126,7 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
         return getGender(p.character) === '男';
       },
     },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['结姻/usedThisTurn'],
+    activeWhen: (ctx) => activeUnlessUsedThisTurn('结姻')(ctx),
   });
   return () => {};
 }

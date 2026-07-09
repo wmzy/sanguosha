@@ -26,6 +26,8 @@ describe('runPlay', () => {
     expect(res.needsAction).toBe(true);
     expect(res.phase).toBe('playing');
     expect(res.lastActionResult).toBe('not-applicable');
+    // view 为 null → recommendedAction 为 null（字段已透传）
+    expect(res.recommendedAction).toBeNull();
   });
 
   it('游戏结束时立即返回', async () => {

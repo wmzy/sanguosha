@@ -20,6 +20,7 @@ import type {
 } from '../types';
 import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
+import { skipPhase } from '../skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';
 const OPT1_TARGET_RT = '神速/opt1-target';
@@ -202,9 +203,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         await virtualKill(ctx.state, ownerId, target);
       }
 
-      // 跳过判定阶段:推进到下一阶段 + cancel 当前 阶段开始(判定)
-      await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '判定' });
-      return { kind: 'cancel' };
+      // 跳过判定阶段(直接型):阶段结束(判定)+ cancel
+      return skipPhase(ctx.state, atom);
     },
   );
 
@@ -308,9 +308,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         await virtualKill(ctx.state, ownerId, target);
       }
 
-      // 跳过出牌阶段:推进到下一阶段 + cancel 当前 阶段开始(出牌)
-      await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '出牌' });
-      return { kind: 'cancel' };
+      // 跳过出牌阶段(直接型):阶段结束(出牌)+ cancel
+      return skipPhase(ctx.state, atom);
     },
   );
 
@@ -328,9 +327,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const self = ctx.state.players[ownerId];
       if (!self?.tags.includes(SKIP_MO_TAG)) return;
 
-      await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: SKIP_MO_TAG });
-      await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '摸牌' });
-      return { kind: 'cancel' };
+      // 标签型跳过:去标签(SKIP_MO_TAG)+ 阶段结束(摸牌)+ cancel
+      return skipPhase(ctx.state, atom, SKIP_MO_TAG);
     },
   );
 
@@ -348,9 +346,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const self = ctx.state.players[ownerId];
       if (!self?.tags.includes(SKIP_PLAY_TAG)) return;
 
-      await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: SKIP_PLAY_TAG });
-      await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '出牌' });
-      return { kind: 'cancel' };
+      // 标签型跳过:去标签(SKIP_PLAY_TAG)+ 阶段结束(出牌)+ cancel
+      return skipPhase(ctx.state, atom, SKIP_PLAY_TAG);
     },
   );
 

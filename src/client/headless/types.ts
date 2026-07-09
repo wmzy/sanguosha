@@ -59,6 +59,7 @@ export interface AiViewSnapshot {
     hand?: Card[];
     equipment: GameView['players'][number]['equipment'];
     skills: string[];
+    faction?: string;
     identity?: string;
   }>;
   pending: {

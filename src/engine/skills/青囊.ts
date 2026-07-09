@@ -10,7 +10,7 @@
 //   - 限一次:players[ownerId].vars['青囊/usedThisTurn'](后端) + turnUsage(前端)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -34,7 +34,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 出牌阶段基本条件
       if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
       if (state.phase !== '出牌') return '不是出牌阶段';
-      if (state.players[ownerId].vars['青囊/usedThisTurn']) return '本回合已使用过青囊';
+      if (usedThisTurn(state, ownerId, '青囊')) return '本回合已使用过青囊';
       const self = state.players[ownerId];
       if (!self) return 'player not found';
       if (!self.alive) return '你已死亡';
@@ -58,15 +58,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const target = (
         (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined
       ) ?? ownerId;
-      // [时序修复] 限一次标记必须在第一个 await 之前设置(防 dispatch 重入,见制衡.ts 注释)
-      state.players[from].vars['青囊/usedThisTurn'] = true;
-      // 同步限一次标记到 view:前端据此立即禁用青囊按钮
-      await applyAtom(state, {
-        type: '回合用量',
-        player: from,
-        key: '青囊/usedThisTurn',
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(state, from, '青囊');
       await pushFrame(state, '青囊', from, { ...params });
       // 弃置一张手牌
       await applyAtom(state, { type: '弃置', player: from, cardIds: [cardId] });
@@ -98,9 +91,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
         },
       },
     },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['青囊/usedThisTurn'],
+    activeWhen: (ctx) => activeUnlessUsedThisTurn('青囊')(ctx),
   });
   return;
 }

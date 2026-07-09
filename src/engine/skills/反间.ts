@@ -17,12 +17,11 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { createRng } from '../../shared/rng';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
 const SUIT_REQUEST = '反间/选花色';
 const SUIT_KEY = '反间/suit';
-const USED_KEY = '反间/usedThisTurn';
 const SUITS = ['♠', '♥', '♣', '♦'] as const;
 const TIMEOUT_DEFAULT_SUIT = '♠';
 
@@ -51,7 +50,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
       if (st.phase !== '出牌') return '只能在出牌阶段使用';
       if (hasBlockingPending(st)) return '当前有未完成的询问';
-      if (self.vars[USED_KEY]) return '本回合已使用过反间';
+      if (usedThisTurn(st, ownerId, '反间')) return '本回合已使用过反间';
       if (self.hand.length === 0) return '需要有手牌才能发动反间';
       const targets = params.targets as number[] | undefined;
       if (!Array.isArray(targets) || targets.length !== 1) return '需要指定一名目标';
@@ -66,9 +65,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const target = (params.targets as number[])[0];
       await pushFrame(st, '反间', from, { ...params });
 
-      // 限一次标记:在第一个 await 前设置,防 dispatch 重入(参考制衡)
-      st.players[from].vars[USED_KEY] = true;
-      await applyAtom(st, { type: '回合用量', player: from, key: USED_KEY, value: true });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(st, from, '反间');
 
       // ── 目标选花色 ──
       delete st.localVars[SUIT_KEY];
@@ -168,9 +166,8 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       targetFilter: { min: 1, max: 1, filter: (_view, t) => t !== skill.ownerId },
     },
     activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0 &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[USED_KEY],
+      activeUnlessUsedThisTurn('反间')(ctx) &&
+      (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
   });
 
   api.defineAction('respond', {

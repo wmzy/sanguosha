@@ -13,7 +13,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange, effectiveDistance } from '../distance';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -42,7 +42,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (hasBlockingPending(st)) return '当前有未回应的询问';
       const self = st.players[ownerId];
       if (!self?.alive) return '已死亡';
-      if (self.vars['强袭/usedThisTurn']) return '本回合已使用过强袭';
+      if (usedThisTurn(st, ownerId, '强袭')) return '本回合已使用过强袭';
 
       const cost = params.cost;
       if (cost !== 'hp' && cost !== 'discard') return 'cost 必须为 hp 或 discard';
@@ -78,14 +78,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const target = params.target as number;
       const cost = params.cost as 'hp' | 'discard';
 
-      // 同步设限一次标记(防 dispatch 重入,见制衡.ts 注释),并投影到 view。
-      st.players[from].vars['强袭/usedThisTurn'] = true;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: from,
-        key: '强袭/usedThisTurn',
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(st, from, '强袭');
 
       await pushFrame(st, '强袭', from, { ...params });
 
@@ -131,9 +125,7 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
         },
       },
     },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['强袭/usedThisTurn'],
+    activeWhen: (ctx) => activeUnlessUsedThisTurn('强袭')(ctx),
   });
   return () => {};
 }

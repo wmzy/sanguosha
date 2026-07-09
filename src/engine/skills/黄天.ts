@@ -14,10 +14,8 @@
 // 限一次:player.vars['黄天/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
-
-const USED_KEY = '黄天/usedThisTurn';
 
 /** 判断一张牌是否为黄天可交的牌(闪或闪电) */
 function isGiveableCard(state: GameState, cardId: string): boolean {
@@ -63,7 +61,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!myTurn || !inActPhase || !free) return '现在不能使用黄天';
 
         // 每回合限一次
-        if (self.vars[USED_KEY]) return '本回合已使用过黄天';
+        if (usedThisTurn(st, allyIdx, '黄天')) return '本回合已使用过黄天';
 
         // 牌校验:闪或闪电,且在手牌中
         const cardId = params.cardId as string | undefined;
@@ -74,14 +72,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
         const cardId = params.cardId as string;
-        // 限一次标记:在第一个 await 前设置,防 dispatch 重入(参考制衡)
-        st.players[allyIdx].vars[USED_KEY] = true;
-        await applyAtom(st, {
-          type: '回合用量',
-          player: allyIdx,
-          key: USED_KEY,
-          value: true,
-        });
+        // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+        await markOncePerTurn(st, allyIdx, '黄天');
         // 移动牌:盟友手牌 → 张角手牌
         await applyAtom(st, {
           type: '移动牌',
@@ -112,8 +104,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       },
     },
     activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[USED_KEY] &&
+      activeUnlessUsedThisTurn('黄天')(ctx) &&
       // 手中有可交的牌时才渲染
       ctx.view.players[ctx.perspectiveIdx]?.hand?.some(
         (c) => c.name === '闪' || c.name === '闪电',

@@ -33,9 +33,9 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 
-const USED_KEY = '制霸/usedThisTurn';
 const AWAKENED_KEY = '魂姿/awakened';
 
 // respond requestTypes(孙策回应)
@@ -99,7 +99,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!myTurn || !inActPhase || !free) return '现在不能使用制霸';
 
         // 每回合限一次
-        if (self.vars[USED_KEY]) return '本回合已使用过制霸';
+        if (usedThisTurn(st, allyIdx, '制霸')) return '本回合已使用过制霸';
 
         // 牌校验:在手牌中
         const cardId = params.cardId as string | undefined;
@@ -110,14 +110,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
         const allyCardId = params.cardId as string;
 
-        // 限一次标记:在第一个 await 前设置,防 dispatch 重入(参考制衡/黄天)
-        st.players[allyIdx].vars[USED_KEY] = true;
-        await applyAtom(st, {
-          type: '回合用量',
-          player: allyIdx,
-          key: USED_KEY,
-          value: true,
-        });
+        // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+        await markOncePerTurn(st, allyIdx, '制霸');
 
         const lord = st.players[ownerId];
 

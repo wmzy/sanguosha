@@ -16,7 +16,7 @@
 //   距离:inAttackRange(state, 目标, 姜维)—— 目标的杀能攻击到姜维
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
 
@@ -96,7 +96,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
       if (state.phase !== '出牌') return '只能在出牌阶段发动';
       if (hasBlockingPending(state)) return '当前有未完成的询问';
-      if (state.players[ownerId]?.vars['挑衅/usedThisTurn']) return '本回合已使用过挑衅';
+      if (usedThisTurn(state, ownerId, '挑衅')) return '本回合已使用过挑衅';
       const self = state.players[ownerId];
       if (!self?.alive) return '玩家不存在或已死亡';
       const target = params.target as number;
@@ -112,14 +112,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const target = params.target as number;
 
-      // 限一次标记:在第一个 await 前设置,防 dispatch 重入(参考制衡)
-      state.players[from].vars['挑衅/usedThisTurn'] = true;
-      await applyAtom(state, {
-        type: '回合用量',
-        player: from,
-        key: '挑衅/usedThisTurn',
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(state, from, '挑衅');
 
       await pushFrame(state, '挑衅', from, { ...params });
 
@@ -246,9 +240,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
         },
       },
     },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['挑衅/usedThisTurn'],
+    activeWhen: (ctx) => activeUnlessUsedThisTurn('挑衅')(ctx),
   });
 
   api.defineAction('respond', {

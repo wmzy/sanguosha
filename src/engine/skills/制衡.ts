@@ -2,7 +2,7 @@
 //   出牌阶段限一次:弃任意数量的牌(手牌或装备),然后摸等量的牌。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -27,7 +27,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         (params.cardIds as string[] | undefined) ??
         (typeof params.cardId === 'string' ? [params.cardId] : undefined);
       if (!Array.isArray(cardIds) || cardIds.length === 0) return 'cardIds required (at least 1)';
-      if (state.players[ownerId].vars['制衡/usedThisTurn']) return '本回合已使用过制衡';
+      if (usedThisTurn(state, ownerId, '制衡')) return '本回合已使用过制衡';
       const self = state.players[ownerId];
       if (!self) return 'player not found';
       // 检查所有 cardId 在手牌或装备区中
@@ -39,19 +39,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      // [时序修复] 标记必须在第一个 await 之前设置:dispatch 是 fire-and-forget,
-      // session 不 await → execute 内的 await applyAtom 会让出事件循环,前端可能在此期间
-      // 再次点击技能按钮发 dispatch。若标记在 execute 末尾才设,第二次 validate 会通过 → 可重复发动。
-      // 移到开头后,dispatch 同步阶段(启动 execute 前)就完成标记,第二次 validate 必然拒绝。
-      state.players[ownerId].vars['制衡/usedThisTurn'] = true;
-      // 同步限一次标记到 view:前端据此立即禁用制衡按钮。紧跟标记设置投影,
-      // vars 已同步设(防 dispatch 重入),此处仅同步 view。
-      await applyAtom(state, {
-        type: '回合用量',
-        player: ownerId,
-        key: '制衡/usedThisTurn',
-        value: true,
-      });
+      // [时序修复] 限一次标记必须在第一个 await 之前设置:dispatch 是 fire-and-forget,
+      // session 不 await → execute 内的 await 会让出事件循环,前端可能在此期间
+      // 再次点击技能按钮发 dispatch。若标记在末尾才设,第二次 validate 会通过 → 可重复发动。
+      // markOncePerTurn 同步设 vars(防重入)+ 回合用量 atom 投影 view(前端据此禁用按钮)。
+      await markOncePerTurn(state, ownerId, '制衡');
       const from = ownerId;
       await pushFrame(state, '制衡', from, { ...params });
       // 兼容 cardId 单数和 cardIds 数组,与 validate 中的逻辑一致
@@ -82,9 +74,7 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
       minTotal: 1,
       maxTotal: 99,
     },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.['制衡/usedThisTurn'],
+    activeWhen: (ctx) => activeUnlessUsedThisTurn('制衡')(ctx),
   });
   return () => {};
 }

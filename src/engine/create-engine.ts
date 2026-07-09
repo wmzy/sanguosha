@@ -75,6 +75,7 @@ import type {
 } from './types';
 import { createGameState, TARGET_SYSTEM } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
+import { assertCardInvariants } from './invariants';
 import {
   findActionEntry,
   findPendingSlot,
@@ -684,6 +685,9 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     }
 
     state.atomStack.pop();
+    // 正常完成路径(等待型 atom):受 state.assertInvariants 开关保护,护栏牌重复 bug。
+    // cancel/validate 失败路径不检查(状态已回滚)。
+    if (state.assertInvariants) assertCardInvariants(state);
     return true;
   }
 
@@ -705,6 +709,9 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   }
 
   state.atomStack.pop();
+  // 正常完成路径(非等待型 atom):受 state.assertInvariants 开关保护,护栏牌重复 bug。
+  // cancel/validate 失败路径不检查(状态已回滚)。
+  if (state.assertInvariants) assertCardInvariants(state);
   return true;
 }
 

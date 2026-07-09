@@ -15,6 +15,7 @@
 // 这样做的副作用:本座次在据守触发回合的 phase-end 链不会消费任何摸牌/出牌/弃牌副作用。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
 
 const SKIP_TAG = '据守/翻面';
@@ -48,19 +49,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const selfAlive = self?.alive === true;
       // 已经翻面/已用过 → 不能再次发动
       const notSkipped = !self.tags.includes(SKIP_TAG);
-      const notUsed = !self.vars[USED_KEY];
+      const notUsed = !usedThisTurn(state, ownerId, '据守');
       const ok = myTurn && inEndPhase && free && selfAlive && notSkipped && notUsed;
       return ok ? null : '现在不能发动据守';
     },
     async (state: GameState, _params: Record<string, Json>) => {
-      // [时序修复] 同步标记必须在第一个 await 之前设置,防止 dispatch 重入
-      state.players[ownerId].vars[USED_KEY] = true;
-      await applyAtom(state, {
-        type: '回合用量',
-        player: ownerId,
-        key: USED_KEY,
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(state, ownerId, '据守');
       await pushFrame(state, '据守', ownerId, {});
       try {
         // 翻面:加标签(下一回合开始时被消费)

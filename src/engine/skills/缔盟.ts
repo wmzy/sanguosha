@@ -15,12 +15,11 @@
 //   - 限一次标记必须在第一个 await 前设置,防 dispatch 重入(同制衡/结姻)
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
 const TARGET_RT = '缔盟/target'; // 鲁肃:选两名目标
 const DISCARD_RT = '缔盟/discard'; // 鲁肃:选弃牌
-const USED_KEY = '缔盟/usedThisTurn';
 const TARGET_KEY = '缔盟/targets';
 const DISCARD_KEY = '缔盟/discardCards';
 
@@ -47,7 +46,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
       if (st.phase !== '出牌') return '只能在出牌阶段发动';
       if (hasBlockingPending(st)) return '当前有未完成的询问';
-      if (st.players[ownerId].vars[USED_KEY]) return '本回合已使用过缔盟';
+      if (usedThisTurn(st, ownerId, '缔盟')) return '本回合已使用过缔盟';
       const self = st.players[ownerId];
       if (!self?.alive) return '角色不可用';
       // 至少两名其他存活角色
@@ -56,14 +55,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, _params: Record<string, Json>): Promise<void> => {
-      // [时序修复] 限一次标记必须在第一个 await 之前设置,防 dispatch 重入(同制衡/结姻)
-      st.players[ownerId].vars[USED_KEY] = true;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: ownerId,
-        key: USED_KEY,
-        value: true,
-      });
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(st, ownerId, '缔盟');
 
       await pushFrame(st, '缔盟', ownerId, {});
 
@@ -187,9 +180,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       confirmLabel: '发动',
       cancelLabel: '取消',
     },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) &&
-      !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[USED_KEY],
+    activeWhen: (ctx) => activeUnlessUsedThisTurn('缔盟')(ctx),
   });
 
   api.defineAction('respond', {
