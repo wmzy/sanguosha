@@ -147,7 +147,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const middle = deck.slice(0, deck.length - drawCount);
     const newDeck = [...bottom, ...middle, ...[...top].reverse()];
 
-    await applyAtom(ctx.state, { type: '整理牌堆', cards: newDeck });
+    await applyAtom(ctx.state, { type: '整理牌堆', cards: newDeck, topCount: top.length, bottomCount: bottom.length });
   });
 
   return () => {};

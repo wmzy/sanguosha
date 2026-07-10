@@ -79,7 +79,7 @@ export type Atom =
   | { type: '卸下'; player: number; slot: EquipSlot }
   | { type: '洗牌' }
   | { type: '重洗' }
-  | { type: '整理牌堆'; cards: string[] }
+  | { type: '整理牌堆'; cards: string[]; topCount?: number; bottomCount?: number }
   // 角色状态
   | { type: '造成伤害'; target: number; amount: number; source: number; cardId?: string; damageType?: DamageType }
   | { type: '回复体力'; target: number; amount: number; source?: number }

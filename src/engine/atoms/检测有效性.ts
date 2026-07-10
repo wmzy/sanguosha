@@ -1,3 +1,4 @@
+// src/engine/atoms/检测有效性.ts
 // 检测有效性:使用结算开始时,检测此牌对目标是否有效。
 // 对应规则"使用结算开始时:须检测此牌对目标的有效性"。
 //
@@ -6,8 +7,12 @@
 //
 // 通用时机:适用所有牌(杀/普通锦囊)。未来防具穿透规则(藤甲①等)可挂此处。
 // 调用方约定:await applyAtom(检测有效性) 返回 false(被 cancel)=该目标无效,跳过。
+//
+// 噪声抑制:此 atom 是纯时机型(apply/applyView 均无副作用)。当没有任何技能注册
+// before hook 时,整个执行是 no-op——不发 ViewEvent,不写日志,避免前端噪声。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
+import { getBeforeHooks } from '../skill';
 
 export const 检测有效性: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '检测有效性',
@@ -18,7 +23,11 @@ export const 检测有效性: AtomDefinition<{ source: number; target: number; c
   apply() {
     // 纯时机型 atom:有效性由 before hook 判定(cancel=无效),apply 无副作用。
   },
-  toViewEvents(_state, atom): ViewEventSplit {
+  toViewEvents(state, atom): ViewEventSplit {
+    // 无 before hook 时抑制:整个 atom 是 no-op,不发事件给任何人
+    if (getBeforeHooks(state, '检测有效性').length === 0) {
+      return { ownerViews: new Map(), othersView: null };
+    }
     const view: ViewEvent = {
       type: '检测有效性',
       source: atom.source,
