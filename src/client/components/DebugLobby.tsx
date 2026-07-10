@@ -34,6 +34,8 @@ const connectingHint = css`
   margin-top: 40px;
 `;
 import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/debugTelemetry';
+import { saveReplay } from '../replay/replayFile';
+import type { ReplayMeta } from '../replay/types';
 import type { RoomInfo } from '../../server/protocol';
 
 interface DebugLobbyProps {
@@ -151,6 +153,23 @@ function DebugGameViewInner({
     }
   }, [snap.lastSnapshotPath, snap.error, clearSnapError]);
 
+  const handleDownloadReplay = useCallback(() => {
+    if (!conn.recorder.hasData()) return;
+    // 从当前 view 提取 meta(武将名按座次顺序)
+    const anyView = conn.views.values().next().value;
+    const characters = anyView
+      ? anyView.players.map((p) => p.character || '')
+      : [];
+    const meta: ReplayMeta = {
+      createdAt: Date.now(),
+      playerCount,
+      characters,
+      roomName: roomId,
+    };
+    const file = conn.recorder.finalize(meta);
+    saveReplay(file);
+  }, [conn, playerCount, roomId]);
+
   const currentView = conn.views.get(perspective) ?? null;
   const pctl = useDebugPerspective(conn.views, perspective, playerCount, handleSetPerspective);
 
@@ -242,6 +261,7 @@ function DebugGameViewInner({
           perspectiveIdx={perspective}
           onRestart={conn.sendRestart}
           onExit={onDeleteRoom}
+          onDownloadReplay={handleDownloadReplay}
         />
       )}
     </>

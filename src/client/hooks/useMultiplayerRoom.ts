@@ -12,6 +12,8 @@ import type { GameView } from '../../engine/types';
 import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import type { ActionMsg } from '../types';
 import { createLogger } from '../utils/logger';
+import { ReplayRecorder } from '../replay/recorder';
+import type { ReplayMeta } from '../replay/types';
 
 const log = createLogger('useMultiplayerRoom');
 
@@ -54,6 +56,11 @@ export interface MultiplayerRoom {
   reconnectAttempt: number;
   /** 手动取消重连 */
   cancelReconnect: () => void;
+  /** 录像录制器 */
+  recorder: {
+    finalize: (meta: ReplayMeta) => import('../replay/types').ReplayFile;
+    hasData: () => boolean;
+  };
 }
 
 export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
@@ -74,6 +81,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   );
 
   const hgcRef = useRef<HeadlessGameClient | null>(null);
+  const recorderRef = useRef<ReplayRecorder>(new ReplayRecorder());
 
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
@@ -89,7 +97,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     }
 
     const hgc = new HeadlessGameClient(wsUrl, {
-      onView: (v) => {
+      onView: (v, newEvents) => {
+        // 录制:单座次事件流
+        recorderRef.current.record(v.viewer, v, newEvents);
         setView(v);
         if (v.viewer >= 0) setStage('playing');
       },
@@ -117,6 +127,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           setView(null);
           setReady(false);
           setStage('waiting');
+          recorderRef.current.reset();
         }
         if (msg.type === 'error') {
           setError(msg.message);
@@ -252,5 +263,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     connectionState,
     reconnectAttempt,
     cancelReconnect,
+    recorder: {
+      finalize: (meta) => recorderRef.current.finalize(meta),
+      hasData: () => recorderRef.current.hasData(),
+    },
   };
 }

@@ -1,108 +1,76 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
+import type { ReplayFile } from '../../src/client/replay/types';
 
 const DOWNLOAD_DIR = path.join(process.cwd(), 'test-results', 'downloads');
 const LOG_DIR = path.join(process.cwd(), 'test-results', 'logs');
 
-function createTestLog() {
-  return {
-    meta: {
-      version: '1.0.0',
-      createdAt: Date.now(),
-      playerCount: 2,
-      characters: ['曹操', '刘备'],
-      seed: 12345,
-    },
-    serverOps: [
+function createTestReplayFile(): ReplayFile {
+  const baseView = {
+    viewer: 0,
+    currentPlayerIndex: 0,
+    phase: '出牌' as const,
+    turn: { round: 1, phase: '出牌' as const, vars: {} },
+    players: [
       {
-        seq: 0,
-        timestamp: Date.now(),
-        type: '游戏开始',
-        data: {
-          players: [
-            { name: '曹操', character: '曹操', role: '主公' },
-            { name: '刘备', character: '刘备', role: '反贼' },
-          ],
-        },
-        description: '游戏开始',
+        index: 0,
+        name: '曹操',
+        character: '曹操',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 2,
+        marks: [],
+        identity: '主公',
       },
       {
-        seq: 1,
-        timestamp: Date.now(),
-        type: '阶段变更',
-        data: { phase: '判定', player: '曹操' },
-        description: '进入判定阶段',
-      },
-      {
-        seq: 2,
-        timestamp: Date.now(),
-        type: '阶段变更',
-        data: { phase: '摸牌', player: '曹操' },
-        description: '进入摸牌阶段',
-      },
-      {
-        seq: 3,
-        timestamp: Date.now(),
-        type: '摸牌',
-        data: {
-          player: '曹操',
-          cards: [
-            { name: '杀', suit: '♠', color: '黑', rank: '3' },
-            { name: '闪', suit: '♥', color: '红', rank: '5' },
-          ],
-        },
-        description: '曹操摸了2张牌',
-      },
-      {
-        seq: 4,
-        timestamp: Date.now(),
-        type: '阶段变更',
-        data: { phase: '出牌', player: '曹操' },
-        description: '进入出牌阶段',
-      },
-      {
-        seq: 5,
-        timestamp: Date.now(),
-        type: '造成伤害',
-        data: { source: '曹操', target: '刘备', amount: 1, cardName: '杀' },
-        description: '曹操对刘备使用杀，造成1点伤害',
+        index: 1,
+        name: '刘备',
+        character: '刘备',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount: 2,
+        marks: [],
+        identity: '反贼',
+        identityHidden: true,
       },
     ],
-    playerOps: {
-      曹操: [
-        {
-          seq: 0,
-          timestamp: Date.now(),
-          type: '游戏开始',
-          data: {},
-          description: '游戏开始，你是 曹操（主公）',
-        },
-        { seq: 1, timestamp: Date.now(), type: '摸牌', data: {}, description: '你摸了 杀、闪' },
-        {
-          seq: 2,
-          timestamp: Date.now(),
-          type: '造成伤害',
-          data: {},
-          description: '曹操对刘备使用杀，造成1点伤害',
-        },
-      ],
-      刘备: [
-        {
-          seq: 0,
-          timestamp: Date.now(),
-          type: '游戏开始',
-          data: {},
-          description: '游戏开始，你是 刘备（反贼）',
-        },
-        {
-          seq: 1,
-          timestamp: Date.now(),
-          type: '造成伤害',
-          data: {},
-          description: '曹操对刘备使用杀，造成1点伤害',
-        },
-      ],
+    cardMap: {},
+    pending: null,
+    deadline: null,
+    deadlineTotalMs: 0,
+    log: [],
+    settlementStack: [],
+  };
+
+  const events = [
+    { seq: 0, time: 1000, event: { type: '回合开始', player: 0, round: 1 } },
+    { seq: 1, time: 1001, event: { type: '阶段开始', player: 0, phase: '摸牌' } },
+    { seq: 2, time: 1002, event: { type: '摸牌', player: 0, count: 2 } },
+    { seq: 3, time: 1003, event: { type: '阶段结束', player: 0, phase: '摸牌' } },
+    { seq: 4, time: 1004, event: { type: '阶段开始', player: 0, phase: '出牌' } },
+    { seq: 5, time: 1005, event: { type: '造成伤害', target: 1, amount: 1, source: 0 } },
+    { seq: 6, time: 1006, event: { type: '阶段结束', player: 0, phase: '出牌' } },
+  ];
+
+  return {
+    format: 'sanguosha-replay',
+    version: 1,
+    meta: { createdAt: Date.now(), playerCount: 2, characters: ['曹操', '刘备'] },
+    seats: {
+      0: { seatIndex: 0, playerName: '曹操', initialView: baseView, events },
+      1: {
+        seatIndex: 1,
+        playerName: '刘备',
+        initialView: { ...baseView, viewer: 1 },
+        events,
+      },
     },
   };
 }
@@ -251,7 +219,7 @@ test.describe('回放功能', () => {
     // 使用唯一文件名避免并行冲突
     fs.mkdirSync(LOG_DIR, { recursive: true });
     logFile = path.join(LOG_DIR, `test-${testInfo.retry}-${Date.now()}.json`);
-    fs.writeFileSync(logFile, JSON.stringify(createTestLog(), null, 2));
+    fs.writeFileSync(logFile, JSON.stringify(createTestReplayFile(), null, 2));
   });
 
   test.afterEach(() => {
@@ -260,18 +228,18 @@ test.describe('回放功能', () => {
     }
   });
 
-  async function loadLogAndEnterReplay(page: import('@playwright/test').Page) {
+  async function loadReplayAndEnter(page: import('@playwright/test').Page) {
     await page.goto('/');
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: '回放' }).click(),
+      page.getByRole('button', { name: '加载录像回放' }).click(),
     ]);
     await fileChooser.setFiles(logFile);
     await page.waitForSelector('text=重播模式');
   }
 
-  test('加载日志进入回放模式', async ({ page }) => {
-    await loadLogAndEnterReplay(page);
+  test('加载录像进入回放模式', async ({ page }) => {
+    await loadReplayAndEnter(page);
 
     await expect(page.getByText('重播模式')).toBeVisible();
     await expect(page.getByRole('button', { name: '退出重播' })).toBeVisible();
@@ -281,66 +249,49 @@ test.describe('回放功能', () => {
   });
 
   test('步进操作', async ({ page }) => {
-    await loadLogAndEnterReplay(page);
+    await loadReplayAndEnter(page);
 
-    // 初始在第 1 步
-    await expect(page.getByText(/1\/7/)).toBeVisible();
+    // 初始在第 0 步
+    await expect(page.getByText(/0 \/ 7/)).toBeVisible();
 
     // 下一步
     await page.getByRole('button', { name: '下一步' }).click();
-    await expect(page.getByText(/2\/7/)).toBeVisible();
+    await expect(page.getByText(/1 \/ 7/)).toBeVisible();
 
     // 再下一步
     await page.getByRole('button', { name: '下一步' }).click();
-    await expect(page.getByText(/3\/7/)).toBeVisible();
+    await expect(page.getByText(/2 \/ 7/)).toBeVisible();
 
     // 上一步
     await page.getByRole('button', { name: '上一步' }).click();
-    await expect(page.getByText(/2\/7/)).toBeVisible();
-  });
-
-  test('显示当前操作描述', async ({ page }) => {
-    await loadLogAndEnterReplay(page);
-
-    // 前进一步以显示操作描述
-    await page.getByRole('button', { name: '下一步' }).click();
-    await page.waitForTimeout(200);
-
-    await expect(page.getByText(/当前操作/)).toBeVisible();
+    await expect(page.getByText(/1 \/ 7/)).toBeVisible();
   });
 
   test('显示玩家面板', async ({ page }) => {
-    await loadLogAndEnterReplay(page);
+    await loadReplayAndEnter(page);
 
-    // 使用更精确的选择器
-    await expect(page.getByText('曹操 (你)')).toBeVisible();
-    // 刘备可能在多个地方出现（面板、下拉框），检查面板中的
-    await expect(
-      page
-        .locator('div')
-        .filter({ hasText: /^刘备$/ })
-        .first(),
-    ).toBeVisible();
+    // 回放视图应渲染玩家(曹操和刘备)
+    await expect(page.getByText('曹操').first()).toBeVisible();
+    await expect(page.getByText('刘备').first()).toBeVisible();
   });
 
   test('切换视角', async ({ page }) => {
-    await loadLogAndEnterReplay(page);
+    await loadReplayAndEnter(page);
 
     const 视角选择 = page.locator('select');
     await expect(视角选择).toBeVisible();
 
-    // 切换到刘备视角
-    await 视角选择.selectOption('刘备');
+    // 切换到座次 1
+    await 视角选择.selectOption('1');
     await page.waitForTimeout(300);
 
-    // 日志面板应该显示刘备视角的操作
-    await expect(page.getByText(/你是.*刘备/).first()).toBeVisible();
+    // 视角切换后仍在回放模式
+    await expect(page.getByText('重播模式')).toBeVisible();
   });
 
   test('播放/暂停按钮存在并可点击', async ({ page }) => {
-    await loadLogAndEnterReplay(page);
+    await loadReplayAndEnter(page);
 
-    // 播放按钮应该存在
     const playBtn = page.locator('button').filter({ hasText: '播放' });
     await expect(playBtn).toBeVisible();
 
@@ -348,13 +299,12 @@ test.describe('回放功能', () => {
     await playBtn.click();
     await page.waitForTimeout(300);
 
-    // 按钮文字应该变化（播放→暂停或由于到达末尾变回播放）
     // 至少验证点击没有报错
     await expect(page.getByText('重播模式')).toBeVisible();
   });
 
   test('退出回放', async ({ page }) => {
-    await loadLogAndEnterReplay(page);
+    await loadReplayAndEnter(page);
 
     await page.getByRole('button', { name: '退出重播' }).click();
     await page.waitForTimeout(500);

@@ -1,12 +1,14 @@
 // src/client/pages/MultiplayerPage.tsx
 // 多人游戏入口页。最小加入页：创建/加入房间 → 等待大厅 → 对局 → 结算。
 // 复用单视角 GameViewComponent 渲染玩家自己的座次。
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { css } from '@linaria/core';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
 import { GameViewComponent } from '../components/GameView';
 import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle } from '../theme';
+import { saveReplay } from '../replay/replayFile';
+import type { ReplayMeta } from '../replay/types';
 import type { ActionMsg } from '../types';
 
 const page = css`
@@ -171,6 +173,19 @@ export function MultiplayerPage() {
   const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
   const mp = useMultiplayerRoom(urlRoomId);
 
+  const handleDownloadReplay = useCallback(() => {
+    if (!mp.recorder.hasData() || !mp.view) return;
+    const characters = mp.view.players.map((p) => p.character || '');
+    const meta: ReplayMeta = {
+      createdAt: Date.now(),
+      playerCount: mp.view.players.length,
+      characters,
+      roomName: mp.roomId ?? undefined,
+    };
+    const file = mp.recorder.finalize(meta);
+    saveReplay(file);
+  }, [mp]);
+
   // lobby 阶段表单状态
   const [createName, setCreateName] = useState('');
   const [createMax, setCreateMax] = useState(2);
@@ -271,6 +286,13 @@ export function MultiplayerPage() {
                 onClick={mp.sendRestart}
               >
                 再来一局
+              </button>
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
+                onClick={handleDownloadReplay}
+              >
+                ⬇ 下载录像
               </button>
               <button
                 className={btnStyle}

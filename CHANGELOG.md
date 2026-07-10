@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — 2026-06-27
+## [Unreleased] — 2026-07-09
+
+### Added — 录像下载与回放功能
+
+实现纯前端录像录制、下载和回放。游戏运行中逐 atom 录制 per-viewer 事件流,游戏结束后可下载录像 JSON;首页可加载录像进入回放模式,支持步进、播放、进度拖拽、速度控制(0.5/1/2/4x)和视角切换(debug 模式多座次录像)。回放引擎从 initialView 起步逐步 applyView 重建任意时刻视图,与实时视图一致。
+
+#### Added
+- **录像格式与录制器**:新增 `src/client/replay/` 模块(`types.ts`/`recorder.ts`/`replayFile.ts`/`replayEngine.ts`)。录像格式为 per-seat 独立事件流 + initialView 起点,逐 atom 记录。`ReplayRecorder` 在首次非空 view 时深拷贝 initialView,后续累积 ViewEvent。
+- **录制接入连接层**:`useDebugMultiConnection`(debug 多座次)和 `useMultiplayerRoom`(多人单座次)在 HGC onView 回调中调用 recorder.record,暴露 finalize/hasData 方法。
+- **回放状态 hook**:`useReplay` 管理步进/自动播放/速度/视角切换。回放引擎 `getViewAt` 深拷贝 initialView 后逐步 applyView,兼容 notify(pendingResolved)事件处理。
+- **回放 UI**:`ReplayControls` 控制条(步数/进度/速度/视角/退出)、`ReplayPage` 回放页(路由 `/replay`,复用 GameViewComponent 只读渲染)、首页「加载录像回放」入口(文件选择)。
+- **下载录像入口**:`GameResultOverlay`(debug 模式)和 `MultiplayerPage`(多人模式)结算界面新增「下载录像」按钮。
+- **测试覆盖**:单元测试(31:recorder/file/engine)、集成测试(2:录制→finalize→回放重建与实时 processedView 一致)、E2E(game.spec.ts 回放功能组对齐新 UI)。
 
 ### Fixed — atom/技能设计原则违规修正
 

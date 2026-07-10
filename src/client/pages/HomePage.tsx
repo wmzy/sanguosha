@@ -1,6 +1,9 @@
 import { css } from '@linaria/core';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 import { colors } from '../theme';
+import { loadReplay } from '../replay/replayFile';
+import type { ReplayFile } from '../replay/types';
 
 const page = css`
   min-height: 100vh;
@@ -47,11 +50,35 @@ const linkOrange = css`
   background-color: ${colors.accent.orange};
 `;
 
+const linkGray = css`
+  background-color: ${colors.disabled};
+`;
+
 const linkBlue = css`
   background-color: ${colors.accent.blue};
 `;
 
 export function HomePage() {
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLoadReplay = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const replay: ReplayFile = await loadReplay(file);
+      navigate('/replay', { state: { file: replay } });
+    } catch (err) {
+      alert(`加载录像失败: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    // 清空 input,允许重复选同一文件
+    e.target.value = '';
+  };
+
   return (
     <div className={page}>
       <h1 className={title}>三国杀</h1>
@@ -63,6 +90,16 @@ export function HomePage() {
         <Link to="/debug" className={`${linkButtonBase} ${linkOrange}`}>
           调试游戏
         </Link>
+        <button className={`${linkButtonBase} ${linkGray}`} onClick={handleLoadReplay}>
+          📂 加载录像回放
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
       </div>
     </div>
   );

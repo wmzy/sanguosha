@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { HeadlessGameClient } from '../headless/HeadlessGameClient';
+import { ReplayRecorder } from '../replay/recorder';
 import type { ClientPhase } from '../headless/types';
 import { useEventPlayback } from './useEventPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './SubmittedCharSelectCtx';
@@ -71,6 +72,11 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   connectedCount: number;
   /** 正在重连的座次数(0=全部已连接) */
   reconnectingCount: number;
+  /** 录像录制器:finalize 导出录像文件,hasData 检查是否有数据 */
+  recorder: {
+    finalize: (meta: import('../replay/types').ReplayMeta) => import('../replay/types').ReplayFile;
+    hasData: () => boolean;
+  };
 } {
   const { roomId, playerCount, perspective } = params;
   // viewer index → HGC 实例
@@ -83,6 +89,8 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   /** 游戏结束结果(winner=胜方座次号字符串,或 '无人')。收到 gameOver 消息后设置。 */
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [seatPlayerIds, setSeatPlayerIds] = useState<Map<number, string>>(new Map());
+  /** 录像录制器:收集各座次 ViewEvent,游戏结束时导出 */
+  const recorderRef = useRef<ReplayRecorder>(new ReplayRecorder());
   const playback = useEventPlayback();
   const playbackRef = useRef(playback);
   useEffect(() => {
@@ -115,6 +123,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     clientsRef.current.clear();
     setViews(new Map());
     playbackRef.current.reset(0);
+    recorderRef.current.reset();
     setConnectedCount(0);
     setReconnectingCount(0);
     setGameOver(null);
@@ -131,8 +140,10 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     for (let i = 0; i < playerCount; i++) {
       const viewerIndex = i;
       const hgc = new HeadlessGameClient(wsUrl, {
-        onView: (view, _newEvents) => {
+        onView: (view, newEvents) => {
           if (cancelled) return;
+          // 录制:所有座次的事件流都记录
+          recorderRef.current.record(view.viewer, view, newEvents);
           setViews((prev) => {
             const next = new Map(prev);
             next.set(view.viewer, view);
@@ -214,6 +225,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
         case 'game_reset': {
           setGameOver(null);
           setGameStarted(false);
+          recorderRef.current.reset();
           for (const [, c] of clientsRef.current) {
             /* HGC 内部已重置 view */ void c;
           }
@@ -395,5 +407,9 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     sendUpdateConfig,
     connectedCount,
     reconnectingCount,
+    recorder: {
+      finalize: (meta) => recorderRef.current.finalize(meta),
+      hasData: () => recorderRef.current.hasData(),
+    },
   };
 }

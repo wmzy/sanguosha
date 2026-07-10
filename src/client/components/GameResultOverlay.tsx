@@ -21,6 +21,8 @@ export interface GameResultOverlayProps {
   onRestart: () => void;
   /** 退出房间(返回大厅) */
   onExit: () => void;
+  /** 下载录像(可选;调试/多人模式传入) */
+  onDownloadReplay?: () => void;
 }
 
 /** 根据胜方座次身份推断获胜阵营文案 */
@@ -48,6 +50,7 @@ export function GameResultOverlay({
   perspectiveIdx,
   onRestart,
   onExit,
+  onDownloadReplay,
 }: GameResultOverlayProps) {
   const camp = winningCamp(winner, players);
   const campColor =
@@ -93,6 +96,11 @@ export function GameResultOverlay({
           >
             再来一局
           </button>
+          {onDownloadReplay && (
+            <button className={replayBtn} onClick={onDownloadReplay}>
+              ⬇ 下载录像
+            </button>
+          )}
           <button className={exitBtn} onClick={onExit}>
             返回大厅
           </button>
@@ -241,5 +249,21 @@ const exitBtn = css`
 
   &:hover {
     background: rgba(255, 255, 255, 0.22);
+  }
+`;
+
+const replayBtn = css`
+  padding: 10px 32px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  background: ${'#3498db'};
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.2s;
+
+  &:hover {
+    filter: brightness(1.15);
   }
 `;
