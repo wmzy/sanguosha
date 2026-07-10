@@ -189,6 +189,8 @@ export const skillLoaders: Record<string, Loader> = {
   // 群雄·左慈
   化身: load(() => import('./化身')),
   新生: load(() => import('./新生')),
+  // 群雄·于吉
+  蛊惑: load(() => import('./蛊惑')),
 };
 
 // 设置解析器(打破循环依赖:技能文件 import skill.ts → skill.ts 通过 resolver 查表)
