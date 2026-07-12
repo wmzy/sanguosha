@@ -28,7 +28,6 @@ import {
 import '../engine/atoms';
 import '../engine/skills';
 import type { ServerMessage, DeadlineInfo } from './protocol';
-import { serialize } from './protocol';
 import type { Room } from './room';
 import { createLogger } from './logger';
 import { setRoomStatus } from './room';
@@ -467,7 +466,7 @@ export class GameSession {
    *  debug 模式:不传 previousPlayerId,assignDebugSeat 已完成座次分配。 */
   reconnectPlayer(
     playerId: string,
-    ws: import('hono/ws').WSContext,
+    sink: import('./connection').ConnectionSink,
     _lastSeq = 0,
     previousPlayerId?: string,
   ): boolean {
@@ -487,7 +486,7 @@ export class GameSession {
 
     this.clearGraceTimer();
     this.disconnectedAt.delete(playerId);
-    this.room.players.set(playerId, ws);
+    this.room.players.set(playerId, sink);
     this.sendInitialViewToPlayer(playerId);
     this.baselineSent.add(playerId);
     // initialView 已是全量状态，不需要补推差量。
@@ -568,10 +567,10 @@ export class GameSession {
   }
 
   private sendToPlayer(playerId: string, message: ServerMessage): void {
-    const ws = this.room.players.get(playerId);
-    if (!ws) return;
+    const sink = this.room.players.get(playerId);
+    if (!sink) return;
     try {
-      ws.send(serialize(message));
+      sink.send(message);
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       this.logger.error(`sendToPlayer failed for ${playerId}`, { error: e.stack ?? String(e) });
@@ -579,10 +578,9 @@ export class GameSession {
   }
 
   private broadcast(message: ServerMessage): void {
-    const data = serialize(message);
-    for (const [, ws] of this.room.players) {
+    for (const [, sink] of this.room.players) {
       try {
-        ws.send(data);
+        sink.send(message);
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err));
         this.logger.error('broadcast send failed', { error: e.stack ?? String(e) });

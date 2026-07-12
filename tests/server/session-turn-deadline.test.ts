@@ -18,13 +18,14 @@ import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import type { ServerMessage } from '../../src/server/protocol';
+import type { ConnectionSink } from '../../src/server/connection';
 
 function makeRoom(): Room {
   return {
     id: `test-room-${Math.random().toString(36).slice(2, 8)}`,
     name: '测试',
     maxPlayers: 4,
-    players: new Map([['fake-player', new FakeWS() as never]]),
+    players: new Map([['fake-player', new FakeSink()]]),
     isDebug: true,
     createdAt: Date.now(),
     status: '进行中',
@@ -41,16 +42,19 @@ function setState(session: GameSession, state: GameState): void {
   (session as unknown as { state: GameState }).state = state;
 }
 
-/** 伪 WebSocket,收集所有发给该 player 的消息 */
-class FakeWS {
+/** 伪 sink,收集所有发给该 player 的消息 */
+class FakeSink implements ConnectionSink {
   messages: ServerMessage[] = [];
-  readyState = 1; // OPEN
-  send(data: string): void {
-    this.messages.push(JSON.parse(data) as ServerMessage);
+  send(message: ServerMessage): void {
+    this.messages.push(message);
   }
 
   close(): void {
     /* noop */
+  }
+
+  get isAlive(): boolean {
+    return true;
   }
 }
 
@@ -149,11 +153,11 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
 
   it('event 消息携带 deadline(来自 pending slot)', () => {
     const state = getState(session);
-    // 接一个玩家 WS
-    const ws = new FakeWS();
+    // 接一个玩家 sink
+    const sink = new FakeSink();
     const playerId = 'p-test';
     const room = (session as unknown as { room: Room }).room;
-    room.players.set(playerId, ws as unknown as import('hono/ws').WSContext);
+    room.players.set(playerId, sink);
     (session as unknown as { playerNames: Map<string, number> }).playerNames.set(playerId, 0);
 
     // 模拟 出牌窗口 pending slot
@@ -178,7 +182,7 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
 
     // 应收到 initialView 且其 state.deadline 非空
-    const initialMsg = ws.messages.find((m) => m.type === 'initialView');
+    const initialMsg = sink.messages.find((m) => m.type === 'initialView');
     expect(initialMsg).toBeDefined();
     if (initialMsg!.type === 'initialView') {
       expect(initialMsg!.state.deadline).not.toBeNull();

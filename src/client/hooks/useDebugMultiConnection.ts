@@ -109,8 +109,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   /** HGC 首次收到 initialView 的座次集合，用于触发 onFirstView（仅 viewer=0 一次） */
   const firstViewFiredRef = useRef(false);
 
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+  const serverUrl = window.location.origin;
 
   /** 查找某 viewer 对应的 HGC（viewer 字段可能被 room_joined.seatIndex 覆盖，故按 viewer 遍历） */
   const clientByViewer = useCallback((viewer: number): HeadlessGameClient | undefined => {
@@ -139,7 +138,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     /* eslint-disable no-loop-func -- 回调安全捕获 effect 作用域的 cancelled/connectionOpenCount 标志,cleanup 后才置 true */
     for (let i = 0; i < playerCount; i++) {
       const viewerIndex = i;
-      const hgc = new HeadlessGameClient(wsUrl, {
+      const hgc = new HeadlessGameClient(serverUrl, {
         onView: (view, newEvents) => {
           if (cancelled) return;
           // 录制:所有座次的事件流都记录
@@ -206,7 +205,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
       clearSubmitted();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, playerCount, wsUrl]);
+  }, [roomId, playerCount, serverUrl]);
 
   /** 展示层消息增强：seatPlayerIds/game_reset/判定牌 processing 延迟/event playback。
    *  HGC 已维护 view；这里只做渲染相关的额外处理。 */

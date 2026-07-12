@@ -54,7 +54,7 @@ export async function joinAndReady(
   opts: LobbyOpts,
 ): Promise<{ roomId: string; playerId: string; isHost: boolean }> {
   if (opts.mode === 'create') {
-    hgc.createRoom(
+    await hgc.createRoom(
       opts.name ?? `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
       opts.maxPlayers ?? 2,
       opts.config,
@@ -62,7 +62,7 @@ export async function joinAndReady(
     );
   } else {
     if (!opts.roomId) throw new Error('join 模式需要 roomId');
-    hgc.joinRoom(opts.roomId, opts.playerId);
+    await hgc.joinRoom(opts.roomId, opts.playerId);
   }
   const joinDeadline = Date.now() + 10_000;
   await waitFor(() => hgc.playerId !== null, joinDeadline, '加入房间超时');
@@ -114,7 +114,7 @@ export async function joinAndStartRoom(
 ): Promise<LobbyResult> {
   // 1. 建/加入房间
   if (opts.mode === 'create') {
-    hgc.createRoom(
+    await hgc.createRoom(
       opts.name ?? `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
       opts.maxPlayers ?? 2,
       opts.config,
@@ -122,7 +122,7 @@ export async function joinAndStartRoom(
     );
   } else {
     if (!opts.roomId) throw new Error('join 模式需要 roomId');
-    hgc.joinRoom(opts.roomId, opts.playerId);
+    await hgc.joinRoom(opts.roomId, opts.playerId);
   }
 
   // 2. 等 room_joined（playerId 就绪）

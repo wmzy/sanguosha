@@ -11,6 +11,14 @@ import {
   getRoomList,
   deleteRoom,
   leaveRoom,
+  joinRoom,
+  joinDebugRoom,
+  setReady,
+  allReady,
+  findRoomByPlayerId,
+  broadcastMessage,
+  updateConfig,
+  type Room,
 } from './room';
 import { deletePersistedRoom } from './persistence';
 import {
@@ -19,11 +27,32 @@ import {
   type CreateSnapshotRequest,
 } from './snapshot';
 import { normalizeRoomConfig } from './protocol';
+import type { RoomConfig, ServerMessage } from './protocol';
 import { GameSession } from './session';
 import { gameSessions, playerRoomMap } from './registry';
 import { createLogger } from './logger';
+import type { ConnectionSink } from './connection';
+import { generatePlayerId } from './utils';
+import { sseStreamHandler } from './sse';
 
 const log = createLogger('rest');
+
+/** 广播 room_state 给房间内所有连接。 */
+function broadcastRoomState(room: Room): void {
+  broadcastMessage(room, {
+    type: 'room_state',
+    readyPlayers: [...room.readyPlayers],
+    playerIds: [...room.players.keys()],
+    hostId: room.hostId,
+    maxPlayers: room.maxPlayers,
+    config: room.config,
+  });
+}
+
+/** 创建 null sink（REST 入口无活跃连接时占位）。 */
+function nullSink(): ConnectionSink {
+  return { send: () => {}, close: () => {}, isAlive: false };
+}
 
 /** 将所有 REST 路由注册到指定 app 实例。 */
 export function applyRestRoutes(app: Hono): void {
@@ -89,24 +118,50 @@ export function applyRestRoutes(app: Hono): void {
     if (maxPlayers < 2 || maxPlayers > 8) {
       return c.json({ error: '最大玩家数须在2-8之间' }, 400);
     }
+    const config = raw.config ? normalizeRoomConfig(raw.config) : undefined;
 
     try {
-      const room = createRoom(name, maxPlayers, '', null as never);
-      return c.json({ roomId: room.id });
+      const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
+        ? raw.playerId.trim()
+        : generatePlayerId();
+      const room = createRoom(name, maxPlayers, playerId, nullSink(), config);
+      playerRoomMap.set(playerId, room.id);
+      return c.json({ roomId: room.id, playerId });
     } catch (err) {
       log.error('创建房间失败', { error: String(err) });
       return c.json({ error: `创建房间失败: ${String(err)}` }, 500);
     }
   });
 
-  app.post('/api/rooms/:id/join', (c) => {
+  app.post('/api/rooms/:id/join', async (c) => {
     const id = c.req.param('id');
     const room = getRoom(id);
     if (!room) return c.json({ error: '房间不存在' }, 404);
     if (room.isDebug) return c.json({ error: '调试房间请使用调试入口' }, 400);
     if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
     if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
-    return c.json({ roomId: room.id });
+
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
+      ? raw.playerId.trim()
+      : generatePlayerId();
+
+    // 清理旧房间关联
+    const existingRoom = findRoomByPlayerId(playerId);
+    if (existingRoom) {
+      leaveRoom(existingRoom.id, playerId);
+      playerRoomMap.delete(playerId);
+    }
+
+    // 加入房间（null sink 占位，SSE 连接时替换）
+    const joined = joinRoom(id, playerId, nullSink());
+    if (!joined) return c.json({ error: '加入失败' }, 400);
+    playerRoomMap.set(playerId, id);
+
+    broadcastMessage(room, { type: 'player_joined', playerId }, playerId);
+    broadcastRoomState(room);
+
+    return c.json({ roomId: id, playerId });
   });
 
   app.post('/api/debug-room', async (c) => {
@@ -120,16 +175,218 @@ export function applyRestRoutes(app: Hono): void {
       const config = normalizeRoomConfig(raw.config);
       const room = createDebugRoom(config.name || `调试${playerCount}人`, playerCount, config);
 
-      // 创建占位 session(不 startGame)。hasSession 检查需要它存在,房间才会出现在列表。
-      // 进入「配置+准备」阶段;所有座次就绪后由 start_game 触发 startGame。
+      // 创建占位 session(不 startGame)
       const session = new GameSession(room, true);
       gameSessions.set(room.id, session);
 
-      return c.json({ roomId: room.id });
+      // 可选:创建者自动加入第一个座次（默认 false，由 SSE/WS 连接负责加入）
+      let playerId: string | undefined;
+      let seatIndex: number | undefined;
+      if (raw.autoJoin === true) {
+        playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
+          ? raw.playerId.trim()
+          : generatePlayerId();
+        joinDebugRoom(room.id, playerId, nullSink());
+        playerRoomMap.set(playerId, room.id);
+        seatIndex = session.assignDebugSeat(playerId);
+      }
+
+      return c.json({
+        roomId: room.id,
+        ...(playerId ? { playerId, seatIndex } : {}),
+      });
     } catch (err) {
       log.error('创建调试房间失败', { error: String(err) });
       return c.json({ error: `创建调试房间失败: ${String(err)}` }, 500);
     }
+  });
+
+  // ── SSE 事件流 ──
+  // GET /api/rooms/:id/stream?playerId=xxx — 建立 SSE 连接接收推送
+  app.get('/api/rooms/:id/stream', (c) => sseStreamHandler(c));
+
+  // ── 游戏操作路由（替代 WS C→S 消息） ──
+
+  // POST /api/debug-room/:id/join — 加入调试房间
+  app.post('/api/debug-room/:id/join', async (c) => {
+    const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (!room?.isDebug) return c.json({ error: '房间不存在或不是调试房间' }, 404);
+
+    const session = gameSessions.get(roomId);
+    if (!session) return c.json({ error: '游戏会话不存在' }, 404);
+
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
+      ? raw.playerId.trim()
+      : generatePlayerId();
+    const lastSeq = typeof raw.lastSeq === 'number' ? raw.lastSeq : 0;
+
+    // 清理旧房间关联
+    const existingRoom = findRoomByPlayerId(playerId);
+    if (existingRoom) {
+      leaveRoom(existingRoom.id, playerId);
+      playerRoomMap.delete(playerId);
+    }
+
+    const joined = joinDebugRoom(roomId, playerId, nullSink());
+    if (!joined) return c.json({ error: '加入调试房间失败' }, 400);
+    playerRoomMap.set(playerId, roomId);
+
+    // 刷新重连复用座次
+    if (joined.replacedPlayerId) {
+      session.evictDebugPlayer(joined.replacedPlayerId);
+      playerRoomMap.delete(joined.replacedPlayerId);
+    }
+
+    const seatIndex = session.assignDebugSeat(playerId);
+
+    if (room.status === '进行中') {
+      // 游戏已开始(刷新重连):SSE 连接时由 sseStreamHandler 调 reconnectPlayer 恢复视图
+      // 此处仅返回 room_joined 信息
+    } else {
+      broadcastRoomState(room);
+    }
+
+    return c.json({ roomId, playerId, seatIndex });
+  });
+
+  // POST /api/rooms/:id/ready — 玩家准备
+  app.post('/api/rooms/:id/ready', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+
+    const ok = setReady(roomId, playerId);
+    if (!ok) return c.json({ error: '准备失败' }, 400);
+
+    const room = getRoom(roomId);
+    if (room) {
+      broadcastMessage(room, { type: 'player_ready', playerId });
+      broadcastRoomState(room);
+    }
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/start — 开始游戏
+  app.post('/api/rooms/:id/start', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+
+    // debug 房间任意座次可触发;普通房间仅房主
+    if (!room.isDebug && room.hostId !== playerId) {
+      return c.json({ error: '只有房主可以开始游戏' }, 403);
+    }
+    // debug 房间跳过 allReady 检查（单人控制所有座次）
+    if (!room.isDebug && !allReady(roomId)) {
+      return c.json({ error: '还有玩家未准备' }, 400);
+    }
+
+    let session = room.isDebug ? (gameSessions.get(roomId) ?? undefined) : undefined;
+    if (!session) {
+      session = new GameSession(room, room.isDebug === true);
+      gameSessions.set(roomId, session);
+    }
+
+    const count = room.isDebug ? room.maxPlayers : undefined;
+    if (await session.startGame(count)) {
+      broadcastMessage(room, { type: 'game_started' });
+    }
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/restart — 再来一局
+  app.post('/api/rooms/:id/restart', async (c) => {
+    const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const session = gameSessions.get(roomId);
+    if (!session) return c.json({ error: '游戏会话不存在' }, 404);
+
+    session.resetToLobby();
+    broadcastRoomState(room);
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/action — 提交玩家操作
+  app.post('/api/rooms/:id/action', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const action = raw.action;
+    if (!playerId || !action) return c.json({ error: '缺少 playerId 或 action' }, 400);
+
+    const session = gameSessions.get(roomId);
+    if (!session) return c.json({ error: '游戏会话不存在' }, 404);
+
+    // session.handleAction 内部处理 reject（通过 SSE 推 actionRejected）
+    await session.handleAction(playerId, action as never);
+    return c.json({ accepted: true });
+  });
+
+  // POST /api/rooms/:id/reorder — 重排手牌
+  app.post('/api/rooms/:id/reorder', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const order = raw.order;
+    if (!playerId || !Array.isArray(order)) return c.json({ error: '缺少参数' }, 400);
+
+    const session = gameSessions.get(roomId);
+    if (!session) return c.json({ error: '游戏会话不存在' }, 404);
+
+    await session.handleReorderHand(playerId, order as string[]);
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/leave — 离开房间
+  app.post('/api/rooms/:id/leave', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+
+    const leftRoom = leaveRoom(roomId, playerId);
+    playerRoomMap.delete(playerId);
+
+    if (leftRoom) {
+      broadcastMessage(leftRoom, { type: 'player_left', playerId });
+    }
+
+    const session = gameSessions.get(roomId);
+    if (session) {
+      void session.destroy().catch((err) => {
+        const e = err instanceof Error ? err : new Error(String(err));
+        log.error('session.destroy failed', { roomId, error: e.stack ?? String(e) });
+      });
+      gameSessions.delete(roomId);
+    }
+    void deletePersistedRoom(roomId).catch(() => {});
+    return c.json({ success: true });
+  });
+
+  // PUT /api/rooms/:id/config — 更新房间配置
+  app.put('/api/rooms/:id/config', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const config = raw.config as RoomConfig | undefined;
+    if (!playerId || !config) return c.json({ error: '缺少参数' }, 400);
+
+    const updated = updateConfig(roomId, config, playerId);
+    if (!updated) return c.json({ error: '无法更新配置' }, 400);
+
+    const room = getRoom(roomId);
+    if (room) {
+      broadcastMessage(room, { type: 'room_config', config: room.config });
+      broadcastRoomState(room);
+    }
+    return c.json({ config: updated });
   });
 
   // Debug 快照:保存前后端完整游戏状态到 data/snapshots/

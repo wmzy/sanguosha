@@ -1,7 +1,6 @@
 // server/app.ts — 组合根。
 // 从原 678 行文件拆分:共享状态→registry、REST 路由→rest、WS 处理→ws。
-// 本文件保留:Hono 实例 + 全局中间件 + 生命周期(闲置清理/启动恢复),
-// 并 re-export WS 入口,保持 `import app, { handleWs* } from './app'` 不变。
+// 本文件保留:Hono 实例 + 全局中间件 + 生命周期(闲置清理/启动恢复)。
 
 import { Hono } from 'hono';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
@@ -13,9 +12,6 @@ import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } fro
 import { normalizeRoomConfig } from './protocol';
 import { addRoom, type Room } from './room';
 import { cleanupIdleRooms } from './cleanup';
-
-// re-export WS 入口(index.ts / vite-plugin.ts 从 ./app 导入)
-export { handleWsMessage, handleWsOpen, handleWsClose } from './ws';
 
 const log = createLogger('ws');
 

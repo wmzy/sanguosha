@@ -83,8 +83,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const hgcRef = useRef<HeadlessGameClient | null>(null);
   const recorderRef = useRef<ReplayRecorder>(new ReplayRecorder());
 
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+  const serverUrl = window.location.origin;
 
   const isHost = roomState?.hostId === playerId && playerId !== null;
 
@@ -96,7 +95,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       return;
     }
 
-    const hgc = new HeadlessGameClient(wsUrl, {
+    const hgc = new HeadlessGameClient(serverUrl, {
       onView: (v, newEvents) => {
         // 录制:单座次事件流
         recorderRef.current.record(v.viewer, v, newEvents);
@@ -154,7 +153,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       }
       hgcRef.current = null;
     };
-  }, [command, wsUrl]);
+  }, [command, serverUrl]);
 
   // 从 HGC getter 同步 roomId/playerId(收到 room_joined 后更新,无独立回调)
   useEffect(() => {

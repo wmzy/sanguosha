@@ -4,7 +4,7 @@
       "command": "npx",
       "args": ["tsx", "src/ai-mcp/server.ts"],
       "env": {
-        "SGS_SERVER_URL": "ws://localhost:3930/ws"
+        "SGS_SERVER_URL": "http://localhost:3930"
       }
     }
   }

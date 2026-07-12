@@ -12,6 +12,7 @@ import { GameSession } from '../../src/server/session';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import type { ServerMessage } from '../../src/server/protocol';
+import type { ConnectionSink } from '../../src/server/connection';
 
 function makeRoom(): Room {
   return {
@@ -30,16 +31,19 @@ function getState(session: GameSession): GameState {
   return (session as unknown as { state: GameState }).state;
 }
 
-class FakeWS {
+class FakeSink implements ConnectionSink {
   messages: ServerMessage[] = [];
-  readyState = 1;
-  send(data: string) {
-    this.messages.push(JSON.parse(data));
+  send(message: ServerMessage): void {
+    this.messages.push(message);
+  }
+  close(): void {}
+  get isAlive(): boolean {
+    return true;
   }
 }
 
-function getLastEventWithDeadline(ws: FakeWS) {
-  const ev = [...ws.messages]
+function getLastEventWithDeadline(sink: FakeSink) {
+  const ev = [...sink.messages]
     .reverse()
     .find((m) => m.type === 'event' && m.deadline !== undefined) as
     | Extract<ServerMessage, { type: 'event' }>
@@ -50,17 +54,17 @@ function getLastEventWithDeadline(ws: FakeWS) {
 describe('选将倒计时独立性', () => {
   let session: GameSession;
   let state: GameState;
-  let wss: FakeWS[];
+  let sinks: FakeSink[];
 
   beforeEach(async () => {
     session = new GameSession(makeRoom(), true, 42);
-    wss = [];
+    sinks = [];
     // 预注册 5 个玩家 WS
     const room = (session as unknown as { room: Room }).room;
     for (let i = 0; i < 5; i++) {
-      const ws = new FakeWS();
-      wss.push(ws);
-      room.players.set(`p${i}`, ws as never);
+      const sink = new FakeSink();
+      sinks.push(sink);
+      room.players.set(`p${i}`, sink);
     }
     await session.startGame(5);
     state = getState(session);
@@ -74,7 +78,7 @@ describe('选将倒计时独立性', () => {
     expect(lordSlot).toBeDefined();
 
     // 清空消息,触发一次广播
-    for (const ws of wss) ws.messages = [];
+    for (const sink of sinks) sink.messages = [];
     (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
     (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline =
       new Map();
@@ -82,7 +86,7 @@ describe('选将倒计时独立性', () => {
     await sleep(50);
 
     // 主公(viewer 0)的 event 应携带 deadline(pending 的)
-    const lordEvent = getLastEventWithDeadline(wss[0]);
+    const lordEvent = getLastEventWithDeadline(sinks[0]);
     expect(lordEvent).toBeDefined();
     expect(lordEvent!.deadline).not.toBeNull();
     expect(lordEvent!.deadline!.totalMs).toBe(60_000);
@@ -93,7 +97,7 @@ describe('选将倒计时独立性', () => {
 
     // 其他玩家(viewer 1-4)不应收到主公的 pending deadline
     for (let i = 1; i < 5; i++) {
-      const ev = getLastEventWithDeadline(wss[i]);
+      const ev = getLastEventWithDeadline(sinks[i]);
       if (ev) {
         // 非选将玩家不应收到主公的 pending deadline
         expect(ev.deadline).toBeNull();
@@ -126,7 +130,7 @@ describe('选将倒计时独立性', () => {
     const _lordElapsed = afterLordRespond - beforeLordRespond;
 
     // 清空消息,广播
-    for (const ws of wss) ws.messages = [];
+    for (const sink of sinks) sink.messages = [];
     (session as unknown as { lastBroadcastSeq: number }).lastBroadcastSeq = 0;
     (session as unknown as { lastSentDeadline: Map<string, string | null> }).lastSentDeadline =
       new Map();
@@ -135,7 +139,7 @@ describe('选将倒计时独立性', () => {
 
     // 每个并行选将玩家应有独立的 deadline ≈ now + 60s
     for (let i = 1; i < 5; i++) {
-      const ev = getLastEventWithDeadline(wss[i]);
+      const ev = getLastEventWithDeadline(sinks[i]);
       expect(ev).toBeDefined();
       expect(ev!.deadline).not.toBeNull();
       expect(ev!.deadline!.totalMs).toBe(60_000);

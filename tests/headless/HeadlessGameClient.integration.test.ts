@@ -48,9 +48,7 @@ describe.skipIf(!serverUp)('HeadlessGameClient 集成', () => {
         got.push(`error: ${e.message}`);
       },
     });
-    hgc.createDebugRoom(2);
-
-    // 等待 room_joined（最多 6s）
+    await hgc.createDebugRoom(2);
     const deadline = Date.now() + 6000;
     while (Date.now() < deadline && hgc.playerId === null) {
       await new Promise((r) => setTimeout(r, 50));
@@ -65,7 +63,7 @@ describe.skipIf(!serverUp)('HeadlessGameClient 集成', () => {
   it('phase 从 connecting 推进到 lobby', async () => {
     const hgc = new HeadlessGameClient(SERVER);
     expect(hgc.phase).toBe('connecting');
-    hgc.createDebugRoom(2);
+    await hgc.createDebugRoom(2);
     const deadline = Date.now() + 4000;
     while (Date.now() < deadline && hgc.phase === 'connecting') {
       await new Promise((r) => setTimeout(r, 50));

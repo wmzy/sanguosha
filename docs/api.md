@@ -1,6 +1,16 @@
 # 三国杀 API 文档
 
-后端基于 Hono（REST）和 WebSocket。前端通过 `pnpm dev`（端口 3930）连接。
+后端基于 Hono：REST（C→S 命令）+ SSE（S→C 事件流）+ WebSocket（兼容 fallback）。前端通过 `pnpm dev`（端口 3930）连接。
+
+## 传输架构
+
+| 方向 | 协议 | 用途 |
+|------|------|------|
+| C→S | REST POST | 房间操作 + 游戏命令（fire-and-forget） |
+| S→C | SSE | 事件流推送（自动重连 + Last-Event-ID 断点续传） |
+| C→S ↔ S→C | WebSocket | 兼容 fallback（旧客户端） |
+
+客户端主要走 REST + SSE：`fetch(POST)` 发命令，`EventSource` 接收推送。
 
 ## REST 端点
 
@@ -38,10 +48,12 @@ Content-Type: application/json
 
 `maxPlayers` 须在 2-8 之间。
 
-**响应 200** — `{ "roomId": "ABC123" }`
+**响应 200** — `{ "roomId": "ABC123", "playerId": "pid-xxx" }`
 **响应 400** — `{ "error": "最大玩家数须在2-8之间" }`
 
-> 注：实际游戏流程走 WebSocket 的 `create_room` 消息；此 HTTP 入口仅做房间 ID 预生成。
+可选 `playerId` 参数：给定则采用该 playerId，否则服务端自动生成。
+
+> REST 入口直接创建房间并分配 playerId，客户端随后建立 SSE 连接接收推送。
 
 ### 加入房间（HTTP 入口）
 
@@ -49,9 +61,7 @@ Content-Type: application/json
 POST /api/rooms/:id/join
 ```
 
-**响应 200** — `{ "roomId": "ABC123" }`
-**响应 404** — `{ "error": "房间不存在" }`
-**响应 400** — `{ "error": "调试房间请使用调试入口" | "房间已满" | "游戏已开始" }`
+**响应 200** — `{ "roomId": "ABC123", "playerId": "pid-xxx" }`
 
 ### 创建调试房间
 
@@ -62,9 +72,9 @@ Content-Type: application/json
 { "playerCount": 5, "config": { ... } }
 ```
 
-`playerCount` 须在 2-8 之间。`config` 可选(见 `RoomConfig`)。创建房间后**不立即开局**——进入「配置+准备」阶段，玩家逐个准备后由 WS `start_game` 触发。
+`playerCount` 须在 2-8 之间。`config` 可选(见 `RoomConfig`)。`autoJoin` 可选（默认 false）：true 时创建者自动加入第一个座次并返回 `playerId`/`seatIndex`。
 
-**响应 200** — `{ "roomId": "ABC123" }`
+**响应 200** — `{ "roomId": "ABC123", "playerId": "pid-xxx", "seatIndex": 0 }`（autoJoin=true）或 `{ "roomId": "ABC123" }`（autoJoin=false）
 
 #### RoomConfig
 
@@ -86,7 +96,46 @@ DELETE /api/rooms/:id
 **响应 200** — `{ "success": true }`
 **响应 403** — `{ "error": "只能删除调试房间" }`
 
-## WebSocket 协议
+### 加入调试房间
+
+```
+POST /api/debug-room/:id/join
+Content-Type: application/json
+
+{ "playerId": "pid-xxx", "lastSeq": 0 }
+```
+
+**响应 200** — `{ "roomId": "ABC123", "playerId": "pid-xxx", "seatIndex": 0 }`
+
+### SSE 事件流
+
+```
+GET /api/rooms/:id/stream?playerId=pid-xxx
+```
+
+建立 SSE 连接接收服务端推送。浏览器 `EventSource` 自动处理重连和 `Last-Event-ID` 断点续传。
+
+连接后服务端立即推送 `room_joined` + `room_state`（配置阶段）或 `initialView`（重连到进行中的游戏）。
+
+### 游戏操作端点
+
+以下端点均为 fire-and-forget POST（服务端处理后通过 SSE 推送结果）：
+
+```
+POST /api/rooms/:id/ready     { "playerId": "pid-xxx" }
+POST /api/rooms/:id/start     { "playerId": "pid-xxx" }
+POST /api/rooms/:id/restart   { "playerId": "pid-xxx" }
+POST /api/rooms/:id/action    { "playerId": "pid-xxx", "action": GameAction }
+POST /api/rooms/:id/reorder   { "playerId": "pid-xxx", "order": ["card1", "card2"] }
+POST /api/rooms/:id/leave     { "playerId": "pid-xxx" }
+PUT  /api/rooms/:id/config    { "playerId": "pid-xxx", "config": RoomConfig }
+```
+
+所有端点返回 `{ "success": true }` 或错误 JSON。
+
+## WebSocket 协议（兼容 fallback）
+
+> 新客户端建议使用 REST + SSE。WS 端点保留用于兼容旧客户端和渐进迁移。
 
 连接 URL：`ws://<host>:3930/ws`
 

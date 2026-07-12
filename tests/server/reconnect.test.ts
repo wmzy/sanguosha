@@ -6,12 +6,13 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession, RECONNECT_GRACE_MS } from '../../src/server/session';
 import { addRoom, type Room } from '../../src/server/room';
+import type { ConnectionSink } from '../../src/server/connection';
 import type { ServerMessage } from '../../src/server/protocol';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function makeMultiplayerRoom(playerIds: string[]): { room: Room; wss: Map<string, FakeWS> } {
-  const wss = new Map<string, FakeWS>();
+function makeMultiplayerRoom(playerIds: string[]): { room: Room; sinks: Map<string, FakeSink> } {
+  const sinks = new Map<string, FakeSink>();
   const room: Room = {
     id: `mp-${Math.random().toString(36).slice(2, 8)}`,
     name: '多人重连测试',
@@ -23,21 +24,23 @@ function makeMultiplayerRoom(playerIds: string[]): { room: Room; wss: Map<string
     config: { name: '多人重连测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
   } as unknown as Room;
   for (const pid of playerIds) {
-    const ws = new FakeWS();
-    wss.set(pid, ws);
-    room.players.set(pid, ws as never);
+    const sink = new FakeSink();
+    sinks.set(pid, sink);
+    room.players.set(pid, sink);
   }
   addRoom(room);
-  return { room, wss };
+  return { room, sinks };
 }
 
-class FakeWS {
+class FakeSink implements ConnectionSink {
   messages: ServerMessage[] = [];
-  readyState = 1; // OPEN
-  send(data: string): void {
-    this.messages.push(JSON.parse(data));
+  send(message: ServerMessage): void {
+    this.messages.push(message);
   }
   close(): void {}
+  get isAlive(): boolean {
+    return true;
+  }
 }
 
 function getState(session: GameSession) {
@@ -66,12 +69,12 @@ describe('RECONNECT_GRACE_MS 常量', () => {
 describe('Session 断线保活 (multiplayer)', () => {
   let session: GameSession;
   let room: Room;
-  let wss: Map<string, FakeWS>;
+  let sinks: Map<string, FakeSink>;
 
   beforeEach(() => {
     const result = makeMultiplayerRoom(['p1', 'p2']);
     room = result.room;
-    wss = result.wss;
+    sinks = result.sinks;
     session = new GameSession(room, false, 42);
   });
 
@@ -82,8 +85,8 @@ describe('Session 断线保活 (multiplayer)', () => {
     await sleep(100);
 
     // 清除 startGame 期间的消息
-    wss.get('p1')!.messages = [];
-    wss.get('p2')!.messages = [];
+    sinks.get('p1')!.messages = [];
+    sinks.get('p2')!.messages = [];
 
     session.handleDisconnect('p1');
 
@@ -92,7 +95,7 @@ describe('Session 断线保活 (multiplayer)', () => {
     expect(disconnectedAt.has('p1')).toBe(true);
 
     // 广播 player_disconnected 给其他玩家
-    const p2msgs = wss.get('p2')!.messages;
+    const p2msgs = sinks.get('p2')!.messages;
     const discMsg = p2msgs.find((m) => m.type === 'player_disconnected');
     expect(discMsg).toBeDefined();
     expect((discMsg as { playerId: string }).playerId).toBe('p1');
@@ -131,12 +134,12 @@ describe('Session 断线保活 (multiplayer)', () => {
 describe('Session 重连 playerId 迁移 (multiplayer)', () => {
   let session: GameSession;
   let room: Room;
-  let wss: Map<string, FakeWS>;
+  let sinks: Map<string, FakeSink>;
 
   beforeEach(() => {
     const result = makeMultiplayerRoom(['p1', 'p2']);
     room = result.room;
-    wss = result.wss;
+    sinks = result.sinks;
     session = new GameSession(room, false, 42);
   });
 
@@ -154,8 +157,8 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     session.handleDisconnect('p1');
 
     // 用新 playerId 重连
-    const newWs = new FakeWS();
-    const result = session.reconnectPlayer('p1-new', newWs as never, 0, 'p1');
+    const newSink = new FakeSink();
+    const result = session.reconnectPlayer('p1-new', newSink, 0, 'p1');
 
     expect(result).toBe(true);
 
@@ -168,7 +171,7 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     expect(getBaselineSent(session).has('p1-new')).toBe(true);
 
     // 新 WS 收到 initialView
-    const initMsg = newWs.messages.find((m) => m.type === 'initialView');
+    const initMsg = newSink.messages.find((m) => m.type === 'initialView');
     expect(initMsg).toBeDefined();
   });
 
@@ -181,13 +184,13 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     session.handleDisconnect('p1');
 
     // 清除断线消息
-    wss.get('p2')!.messages = [];
+    sinks.get('p2')!.messages = [];
 
-    const newWs = new FakeWS();
-    session.reconnectPlayer('p1-new', newWs as never, 0, 'p1');
+    const newSink = new FakeSink();
+    session.reconnectPlayer('p1-new', newSink, 0, 'p1');
 
     // p2 应收到 player_reconnected
-    const p2msgs = wss.get('p2')!.messages;
+    const p2msgs = sinks.get('p2')!.messages;
     const reconnMsg = p2msgs.find((m) => m.type === 'player_reconnected');
     expect(reconnMsg).toBeDefined();
     expect((reconnMsg as { playerId: string }).playerId).toBe('p1-new');
@@ -207,8 +210,8 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     expect(playerNames.has('p1-new')).toBe(false);
 
     session.handleDisconnect('p1');
-    const newWs = new FakeWS();
-    session.reconnectPlayer('p1-new', newWs as never, 0, 'p1');
+    const newSink = new FakeSink();
+    session.reconnectPlayer('p1-new', newSink, 0, 'p1');
 
     // 重连后:p1 被迁移,p1-new 映射到同一座次
     expect(playerNames.has('p1')).toBe(false);
@@ -224,8 +227,8 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
     await sleep(100);
 
-    const newWs = new FakeWS();
-    const result = session.reconnectPlayer('unknown', newWs as never, 0, 'nonexistent');
+    const newSink = new FakeSink();
+    const result = session.reconnectPlayer('unknown', newSink, 0, 'nonexistent');
     expect(result).toBe(false);
   });
 
@@ -241,8 +244,8 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     expect((session as unknown as { graceTimer: unknown }).graceTimer).not.toBeNull();
 
     // p1 重连 → grace timer 清除
-    const newWs = new FakeWS();
-    session.reconnectPlayer('p1-new', newWs as never, 0, 'p1');
+    const newSink = new FakeSink();
+    session.reconnectPlayer('p1-new', newSink, 0, 'p1');
     expect((session as unknown as { graceTimer: unknown }).graceTimer).toBeNull();
   });
 });
@@ -251,7 +254,7 @@ describe('Session 断线 grace 超时', () => {
   it('grace 超时后广播 gameOver 并销毁 session', async () => {
     const result = makeMultiplayerRoom(['p1', 'p2']);
     const room = result.room;
-    const wss = result.wss;
+    const sinks = result.sinks;
     const session = new GameSession(room, false, 42);
 
     await session.startGame();
@@ -260,8 +263,8 @@ describe('Session 断线 grace 超时', () => {
     await sleep(100);
 
     // 所有玩家断线
-    wss.get('p1')!.messages = [];
-    wss.get('p2')!.messages = [];
+    sinks.get('p1')!.messages = [];
+    sinks.get('p2')!.messages = [];
     session.handleDisconnect('p1');
     session.handleDisconnect('p2');
 
@@ -272,7 +275,7 @@ describe('Session 断线 grace 超时', () => {
     (session as unknown as { endDueToDisconnect: () => void }).endDueToDisconnect();
 
     // 应广播 error + gameOver
-    const msgs = wss.get('p1')!.messages;
+    const msgs = sinks.get('p1')!.messages;
     const gameOverMsg = msgs.find((m) => m.type === 'gameOver');
     expect(gameOverMsg).toBeDefined();
     expect((gameOverMsg as { winner: string }).winner).toBe('无人');

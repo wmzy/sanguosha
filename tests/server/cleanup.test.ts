@@ -13,14 +13,17 @@ import { addRoom, getRoom, type Room } from '../../src/server/room';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { cleanupIdleRooms, IDLE_ROOM_TTL_MS } from '../../src/server/cleanup';
 import type { ServerMessage } from '../../src/server/protocol';
+import type { ConnectionSink } from '../../src/server/connection';
 
-class FakeWS {
+class FakeSink implements ConnectionSink {
   messages: ServerMessage[] = [];
-  readyState = 1;
-  send(data: string): void {
-    this.messages.push(JSON.parse(data) as ServerMessage);
+  send(message: ServerMessage): void {
+    this.messages.push(message);
   }
   close(): void {}
+  get isAlive(): boolean {
+    return true;
+  }
 }
 
 function makeRoom(playerIds: string[]): Room {
@@ -36,7 +39,7 @@ function makeRoom(playerIds: string[]): Room {
     config: { name: '清理测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
   } as unknown as Room;
   for (const pid of playerIds) {
-    room.players.set(pid, new FakeWS() as never);
+    room.players.set(pid, new FakeSink());
   }
   addRoom(room);
   return room;

@@ -14,6 +14,7 @@ import { GameSession } from '../../src/server/session';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import type { ServerMessage } from '../../src/server/protocol';
+import type { ConnectionSink } from '../../src/server/connection';
 
 function makeRoom(): Room {
   return {
@@ -32,18 +33,21 @@ function getState(session: GameSession): GameState {
   return (session as unknown as { state: GameState }).state;
 }
 
-class FakeWS {
+class FakeSink implements ConnectionSink {
   messages: ServerMessage[] = [];
-  readyState = 1; // OPEN
-  send(data: string) {
-    this.messages.push(JSON.parse(data));
+  send(message: ServerMessage): void {
+    this.messages.push(message);
+  }
+  close(): void {}
+  get isAlive(): boolean {
+    return true;
   }
 }
 
-/** 从 FakeWS 收到的消息中提取所有 event 的 view */
-function allViews(ws: FakeWS): { seq: number; view: import('../../src/engine/types').ViewEvent }[] {
+/** 从 FakeSink 收到的消息中提取所有 event 的 view */
+function allViews(sink: FakeSink): { seq: number; view: import('../../src/engine/types').ViewEvent }[] {
   const out: { seq: number; view: import('../../src/engine/types').ViewEvent }[] = [];
-  for (const msg of ws.messages) {
+  for (const msg of sink.messages) {
     if (msg.type === 'event' && msg.view) {
       out.push({ seq: msg.seq, view: msg.view });
     }
@@ -63,11 +67,11 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
     await session.startGame(2);
     state = getState(session);
 
-    // 挂两个 FakeWS 模拟两个玩家连接
-    const ws0 = new FakeWS();
-    const ws1 = new FakeWS();
-    (session as any).room.players.set('p0', ws0 as any);
-    (session as any).room.players.set('p1', ws1 as any);
+    // 挂两个 FakeSink 模拟两个玩家连接
+    const sink0 = new FakeSink();
+    const sink1 = new FakeSink();
+    (session as any).room.players.set('p0', sink0);
+    (session as any).room.players.set('p1', sink1);
     (session as any).playerNames.set('p0', 0);
     (session as any).playerNames.set('p1', 1);
 
@@ -104,7 +108,7 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
     expect(state.players[0].hand.length).toBeGreaterThanOrEqual(4);
 
     // 从 p0 收到的 event 中找发牌事件
-    const views0 = allViews(ws0);
+    const views0 = allViews(sink0);
     const dealEvents0 = views0.filter((e) => e.view?.type === '发牌');
     expect(dealEvents0.length).toBe(1);
     const dealCards0 = dealEvents0[0].view?.cards as unknown[] | undefined;
@@ -112,7 +116,7 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
     expect(dealCards0!.length).toBeGreaterThanOrEqual(4);
 
     // 从 p1 收到的 event 中找发牌事件
-    const views1 = allViews(ws1);
+    const views1 = allViews(sink1);
     const dealEvents1 = views1.filter((e) => e.view?.type === '发牌');
     expect(dealEvents1.length).toBe(1);
     const dealCards1 = dealEvents1[0].view?.cards as unknown[] | undefined;

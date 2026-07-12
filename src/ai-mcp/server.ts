@@ -26,7 +26,7 @@ declare const __SGS_DEFAULT_URL__: string | undefined;
 const DEFAULT_URL =
   typeof __SGS_DEFAULT_URL__ !== 'undefined' && __SGS_DEFAULT_URL__
     ? __SGS_DEFAULT_URL__
-    : 'ws://localhost:3930/ws';
+    : 'http://localhost:3930';
 const SERVER_URL = process.env.SGS_SERVER_URL ?? DEFAULT_URL;
 const ROOM_ID = process.env.SGS_ROOM_ID ?? null;
 const SEAT = Number(process.env.SGS_SEAT ?? '0');
@@ -85,10 +85,10 @@ async function main(): Promise<void> {
     if (o.roomId ?? ROOM_ID) {
       await hgc.connect(o.roomId ?? ROOM_ID!, SEAT);
     } else {
-      hgc.createDebugRoom(o.playerCount ?? PLAYER_COUNT, debugConfig);
+      await hgc.createDebugRoom(o.playerCount ?? PLAYER_COUNT, debugConfig);
     }
-    hgc.sendReady();
-    if (!(o.roomId ?? ROOM_ID)) hgc.sendStartGame();
+    await hgc.sendReady();
+    if (!(o.roomId ?? ROOM_ID)) await hgc.sendStartGame();
     started = true;
   };
 

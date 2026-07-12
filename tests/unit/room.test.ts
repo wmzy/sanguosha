@@ -1,6 +1,5 @@
 // tests/unit/room.test.ts
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { WSContext } from 'hono/ws';
 import {
   createRoom,
   createDebugRoom,
@@ -19,13 +18,15 @@ import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/proto
 import { resolveTimeoutMs } from '../../src/engine/create-engine';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
+import type { ConnectionSink } from '../../src/server/connection';
 
-// Mock WebSocket context
-function createMockWS(): WSContext {
+// Mock connection sink
+function createMockSink(): ConnectionSink {
   return {
     send: () => {},
     close: () => {},
-  } as unknown as WSContext;
+    isAlive: true,
+  };
 }
 
 describe('房间管理', () => {
@@ -34,8 +35,8 @@ describe('房间管理', () => {
   });
 
   it('应该创建房间', () => {
-    const ws = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', ws);
+    const sink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', sink);
 
     expect(room.id).toBeDefined();
     expect(room.name).toBe('测试房间');
@@ -47,42 +48,42 @@ describe('房间管理', () => {
   });
 
   it('应该加入房间', () => {
-    const hostWS = createMockWS();
-    const playerWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const playerSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
-    const result = joinRoom(room.id, 'player1', playerWS);
+    const result = joinRoom(room.id, 'player1', playerSink);
     expect(result).not.toBeNull();
     expect(result!.players.size).toBe(2);
     expect(result!.players.has('player1')).toBe(true);
   });
 
   it('不应该加入已满的房间', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 2, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 2, 'host1', hostSink);
 
-    joinRoom(room.id, 'player1', createMockWS());
-    const result = joinRoom(room.id, 'player2', createMockWS());
+    joinRoom(room.id, 'player1', createMockSink());
+    const result = joinRoom(room.id, 'player2', createMockSink());
 
     expect(result).toBeNull();
   });
 
   it('不应该加入进行中的房间', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
     // 手动设置房间状态为进行中
     room.status = '进行中';
 
-    const result = joinRoom(room.id, 'player1', createMockWS());
+    const result = joinRoom(room.id, 'player1', createMockSink());
     expect(result).toBeNull();
   });
 
   it('应该离开房间', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
-    joinRoom(room.id, 'player1', createMockWS());
+    joinRoom(room.id, 'player1', createMockSink());
     const result = leaveRoom(room.id, 'player1');
 
     expect(result).not.toBeNull();
@@ -91,10 +92,10 @@ describe('房间管理', () => {
   });
 
   it('房主离开时应该转移房主', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
-    joinRoom(room.id, 'player1', createMockWS());
+    joinRoom(room.id, 'player1', createMockSink());
     const result = leaveRoom(room.id, 'host1');
 
     expect(result).not.toBeNull();
@@ -102,16 +103,16 @@ describe('房间管理', () => {
   });
 
   it('所有人离开时应该删除房间', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
     const result = leaveRoom(room.id, 'host1');
     expect(result).toBeNull();
   });
 
   it('应该设置准备状态', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
     const result = setReady(room.id, 'host1');
     expect(result).toBe(true);
@@ -119,10 +120,10 @@ describe('房间管理', () => {
   });
 
   it('应该检查所有人是否准备', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
-    joinRoom(room.id, 'player1', createMockWS());
+    joinRoom(room.id, 'player1', createMockSink());
 
     // 只有一个人准备
     setReady(room.id, 'host1');
@@ -134,16 +135,16 @@ describe('房间管理', () => {
   });
 
   it('人数不足时不应该所有人准备', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
     setReady(room.id, 'host1');
     expect(allReady(room.id)).toBe(false);
   });
 
   it('应该获取房间', () => {
-    const hostWS = createMockWS();
-    const room = createRoom('测试房间', 4, 'host1', hostWS);
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
 
     const result = getRoom(room.id);
     expect(result).not.toBeNull();
@@ -151,17 +152,17 @@ describe('房间管理', () => {
   });
 
   it('应该获取房间列表', () => {
-    createRoom('房间1', 4, 'host1', createMockWS());
-    createRoom('房间2', 2, 'host2', createMockWS());
+    createRoom('房间1', 4, 'host1', createMockSink());
+    createRoom('房间2', 2, 'host2', createMockSink());
 
     const list = getRoomList();
     expect(list.length).toBeGreaterThanOrEqual(2);
   });
 
   it('应该根据玩家ID查找房间', () => {
-    const hostWS = createMockWS();
+    const hostSink = createMockSink();
     const uniqueId = `unique_host_${Date.now()}`;
-    const room = createRoom(`唯一房间_${Date.now()}`, 4, uniqueId, hostWS);
+    const room = createRoom(`唯一房间_${Date.now()}`, 4, uniqueId, hostSink);
 
     const result = findRoomByPlayerId(uniqueId);
     expect(result).not.toBeNull();
@@ -171,7 +172,7 @@ describe('房间管理', () => {
   it('等待中的多人房间无 session 仍可被发现(多人模式加入)', () => {
     // 注册一个返回 false 的 checker(模拟无 session)
     setSessionChecker(() => false);
-    const room = createRoom('多人房-待加入', 4, 'host-mp', createMockWS());
+    const room = createRoom('多人房-待加入', 4, 'host-mp', createMockSink());
 
     const list = getRoomList('multiplayer');
     const found = list.find((r) => r.id === room.id);
@@ -184,7 +185,7 @@ describe('房间管理', () => {
 
   it('进行中的房间无 session 不应可见', () => {
     setSessionChecker(() => false);
-    const room = createRoom('多人房-进行中', 4, 'host-mp2', createMockWS());
+    const room = createRoom('多人房-进行中', 4, 'host-mp2', createMockSink());
     setRoomStatus(room.id, '进行中');
 
     const list = getRoomList('multiplayer');
@@ -195,7 +196,7 @@ describe('房间管理', () => {
   });
 
   it('multiplayer 过滤排除 debug 房间', () => {
-    const mpRoom = createRoom('多人房', 4, 'host-mp3', createMockWS());
+    const mpRoom = createRoom('多人房', 4, 'host-mp3', createMockSink());
     createDebugRoom('调试房', 4);
 
     const list = getRoomList('multiplayer');
@@ -206,8 +207,8 @@ describe('房间管理', () => {
 
 describe('房间配置', () => {
   it('创建普通房间应携带默认 config', () => {
-    const ws = createMockWS();
-    const room = createRoom('测试', 4, 'host1', ws);
+    const sink = createMockSink();
+    const room = createRoom('测试', 4, 'host1', sink);
     expect(room.config).toBeDefined();
     expect(room.config.timeoutScale).toBe(1);
     expect(room.config.charPool).toBe('all');
@@ -223,22 +224,22 @@ describe('房间配置', () => {
   });
 
   it('创建房间可传入自定义 config', () => {
-    const ws = createMockWS();
+    const sink = createMockSink();
     const customConfig = {
       name: '自定义',
       timeoutScale: 0.6,
       charPool: 'standard' as const,
       handSize: 5,
     };
-    const room = createRoom('x', 4, 'h', ws, customConfig);
+    const room = createRoom('x', 4, 'h', sink, customConfig);
     expect(room.config.timeoutScale).toBe(0.6);
     expect(room.config.charPool).toBe('standard');
     expect(room.config.handSize).toBe(5);
   });
 
   it('updateConfig 应更新配置并同步房间名', () => {
-    const ws = createMockWS();
-    const room = createRoom('原名', 4, 'host1', ws);
+    const sink = createMockSink();
+    const room = createRoom('测试', 4, 'host1', sink);
     const updated = updateConfig(
       room.id,
       { name: '新名', timeoutScale: 2, charPool: 'standard', handSize: 3 },
@@ -252,8 +253,8 @@ describe('房间配置', () => {
   });
 
   it('updateConfig 普通房间仅房主可调用', () => {
-    const ws = createMockWS();
-    const room = createRoom('测试', 4, 'host1', ws);
+    const sink = createMockSink();
+    const room = createRoom('测试', 4, 'host1', sink);
     // 非房主应失败
     const result = updateConfig(
       room.id,

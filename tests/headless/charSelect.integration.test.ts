@@ -51,13 +51,13 @@ describe.skipIf(!serverUp)('选将流程集成', () => {
 
     const hgc = new HeadlessGameClient(SERVER);
     const hgc1 = new HeadlessGameClient(SERVER);
-    hgc.connect(created.roomId, 0);
-    hgc1.connect(created.roomId, 1);
+    await hgc.connect(created.roomId, 0);
+    await hgc1.connect(created.roomId, 1);
     await new Promise((r) => setTimeout(r, 500));
-    hgc.sendReady();
-    hgc1.sendReady();
+    await hgc.sendReady();
+    await hgc1.sendReady();
     await new Promise((r) => setTimeout(r, 3000));
-    hgc.sendStartGame();
+    await hgc.sendStartGame();
 
     // 等待选将 pending 到达本座次
     await waitFor(() => !!hgc.view?.pending && hgc.needsAction(), 10000, '选将 pending 未到达');
@@ -96,13 +96,13 @@ describe.skipIf(!serverUp)('选将流程集成', () => {
       },
     });
     const hgc1 = new HeadlessGameClient(SERVER);
-    hgc.connect(created.roomId, 0);
-    hgc1.connect(created.roomId, 1);
+    await hgc.connect(created.roomId, 0);
+    await hgc1.connect(created.roomId, 1);
     await new Promise((r) => setTimeout(r, 500));
-    hgc.sendReady();
-    hgc1.sendReady();
+    await hgc.sendReady();
+    await hgc1.sendReady();
     await new Promise((r) => setTimeout(r, 3000));
-    hgc.sendStartGame();
+    await hgc.sendStartGame();
 
     await waitFor(() => !!hgc.view?.pending && hgc.needsAction(), 10000, '选将 pending 未到达');
 

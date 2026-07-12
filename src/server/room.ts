@@ -1,6 +1,6 @@
 // server/room.ts
-import type { WSContext } from 'hono/ws';
-import type { RoomInfo, RoomConfig } from './protocol';
+import type { ConnectionSink } from './connection';
+import type { RoomInfo, RoomConfig, ServerMessage } from './protocol';
 import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../shared/rng';
 import { register } from './lifecycles';
@@ -11,7 +11,7 @@ const log = createLogger('room');
 export interface Room {
   id: string;
   name: string;
-  players: Map<string, WSContext>;
+  players: Map<string, ConnectionSink>;
   maxPlayers: number;
   status: '等待中' | '进行中' | '已结束';
   /** 房主;调试房间无房主(null) */
@@ -50,14 +50,14 @@ export function createRoom(
   name: string,
   maxPlayers: number,
   hostId: string,
-  ws: WSContext,
+  sink: ConnectionSink,
   config?: RoomConfig,
 ): Room {
   const id = generateRoomId();
   const room: Room = {
     id,
     name,
-    players: new Map([[hostId, ws]]),
+    players: new Map([[hostId, sink]]),
     maxPlayers: clampPlayers(maxPlayers),
     status: '等待中',
     hostId,
@@ -87,14 +87,14 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
   return room;
 }
 
-export function joinRoom(roomId: string, playerId: string, ws: WSContext): Room | null {
+export function joinRoom(roomId: string, playerId: string, sink: ConnectionSink): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
   if (room.status !== '等待中') return null;
   if (room.players.size >= room.maxPlayers) return null;
   if (room.players.has(playerId)) return null;
 
-  room.players.set(playerId, ws);
+  room.players.set(playerId, sink);
   return room;
 }
 
@@ -117,7 +117,7 @@ export interface JoinDebugResult {
 export function joinDebugRoom(
   roomId: string,
   playerId: string,
-  ws: WSContext,
+  sink: ConnectionSink,
 ): JoinDebugResult | null {
   const room = roomList.get(roomId);
   if (!room?.isDebug) return null;
@@ -128,16 +128,16 @@ export function joinDebugRoom(
     // 踢掉最早加入的连接,复用其座次
     replacedPlayerId = room.players.keys().next().value;
     if (replacedPlayerId === undefined) return null;
-    const oldWs = room.players.get(replacedPlayerId);
+    const oldSink = room.players.get(replacedPlayerId);
     room.players.delete(replacedPlayerId);
     try {
-      oldWs?.close();
+      oldSink?.close();
     } catch {
       /* */
     }
   }
 
-  room.players.set(playerId, ws);
+  room.players.set(playerId, sink);
   return { room, replacedPlayerId };
 }
 
@@ -230,11 +230,11 @@ export function findRoomByPlayerId(playerId: string): Room | null {
   return null;
 }
 
-export function broadcastMessage(room: Room, message: string, excludeId?: string): void {
-  for (const [id, ws] of room.players) {
+export function broadcastMessage(room: Room, message: ServerMessage, excludeId?: string): void {
+  for (const [id, sink] of room.players) {
     if (id !== excludeId) {
       try {
-        ws.send(message);
+        sink.send(message);
       } catch (err) {
         // 单点失败不影响其他玩家,但必须记录完整堆栈
         const e = err instanceof Error ? err : new Error(String(err));

@@ -2,54 +2,56 @@
 // tests/client/useMultiplayerRoom.test.tsx
 // useMultiplayerRoom hook 单元测试:验证多人模式连接生命周期与「再来一局」状态流转。
 //
-// 放置说明:useMultiplayerRoom 是多人模式核心 hook(非 skill、非 integration),现有无对应
-// hook 测试文件,故新建 tests/client/useMultiplayerRoom.test.tsx。聚焦多人模式特有逻辑
-// (createRoom/joinRoom/ready/startGame/restart/game_reset 状态清除),与 Debug 模式对称。
+// 传输层:HeadlessGameClient 使用 REST(fetch POST C→S 命令)+ SSE(EventSource S→C 事件流)。
+// 本文件用 MockEventSource + MockFetch 替代真实传输,测试驱动连接生命周期与状态流转。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useMultiplayerRoom } from '../../src/client/hooks/useMultiplayerRoom';
 import type { GameView } from '../../src/engine/types';
 import { DEFAULT_ROOM_CONFIG, type ServerMessage } from '../../src/server/protocol';
 
-/** 可控的 WebSocket mock:测试驱动 onopen/onmessage,捕获 send 调用。 */
-class MockWebSocket {
-  static readonly OPEN = 1;
+/** 可控的 EventSource mock:测试驱动 onopen/onmessage,捕获实例。 */
+class MockEventSource {
   static readonly CONNECTING = 0;
-  static readonly CLOSING = 2;
-  static readonly CLOSED = 3;
-  static last: MockWebSocket | null = null;
-  static instances: MockWebSocket[] = [];
+  static readonly OPEN = 1;
+  static readonly CLOSED = 2;
+  static last: MockEventSource | null = null;
+  static instances: MockEventSource[] = [];
+  readyState = MockEventSource.CONNECTING;
+  url: string;
   onopen: (() => void) | null = null;
   onmessage: ((ev: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
-  onclose: (() => void) | null = null;
-  readonly readyState = 1; // OPEN
-  sent: any[] = [];
-  closed = false;
 
-  constructor(public url: string) {
-    MockWebSocket.last = this;
-    MockWebSocket.instances.push(this);
-  }
-
-  send(data: string) {
-    this.sent.push(JSON.parse(data));
+  constructor(url: string) {
+    this.url = url;
+    MockEventSource.last = this;
+    MockEventSource.instances.push(this);
   }
 
   close() {
-    this.closed = true;
+    this.readyState = MockEventSource.CLOSED;
   }
 
-  /** 测试驱动:模拟服务端推送消息 */
+  /** 测试驱动:模拟 SSE 连接建立 */
+  fireOpen() {
+    this.readyState = MockEventSource.OPEN;
+    this.onopen?.();
+  }
+
+  /** 测试驱动:模拟服务端推送 ServerMessage */
   emit(msg: ServerMessage) {
     this.onmessage?.({ data: JSON.stringify(msg) });
   }
 
   static reset() {
-    MockWebSocket.last = null;
-    MockWebSocket.instances = [];
+    MockEventSource.last = null;
+    MockEventSource.instances = [];
   }
 }
+
+/** 捕获 fetch 调用(REST C→S 命令:create/join/ready/start/restart/action/reorder)。 */
+const fetchCalls: Array<{ url: string; method: string; body: any }> = [];
 
 function makeBaseline(viewer: number): GameView {
   return {
@@ -83,73 +85,96 @@ function makeBaseline(viewer: number): GameView {
 
 describe('useMultiplayerRoom', () => {
   beforeEach(() => {
-    MockWebSocket.reset();
-    (globalThis as any).WebSocket = MockWebSocket;
+    MockEventSource.reset();
+    fetchCalls.length = 0;
+    vi.stubGlobal('EventSource', MockEventSource);
+    vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: RequestInit) => {
+      const body = opts?.body ? JSON.parse(opts.body as string) : {};
+      fetchCalls.push({ url, method: opts?.method ?? 'GET', body });
+      // join 响应:POST /api/rooms/:id/join
+      if (url.includes('/api/rooms/') && url.includes('/join')) {
+        return new Response(JSON.stringify({ roomId: 'ROOM1', playerId: 'pid-0' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      // createRoom 响应:POST /api/rooms
+      if (url.includes('/api/rooms') && opts?.method === 'POST') {
+        return new Response(JSON.stringify({ roomId: 'ROOM1', playerId: 'pid-0' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      // ready/start/restart/action/reorder/config — 简单 OK
+      return new Response('{}', { status: 200 });
+    }));
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  /** 推送消息并推进轮询定时器(同步 hgc.roomId/playerId 到 React state)。 */
-  function emitAndSync(ws: MockWebSocket, msg: ServerMessage) {
-    act(() => ws.emit(msg));
+  /** 刷新 createRoom/joinRoom 的 async fetch+openStream 链,确保 EventSource 已创建。 */
+  async function flushConnect() {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  /** 推送 SSE 消息并推进轮询定时器(同步 hgc.roomId/playerId 到 React state)。 */
+  function emitAndSync(es: MockEventSource, msg: ServerMessage) {
+    act(() => es.emit(msg));
     act(() => {
       vi.advanceTimersByTime(250);
     });
   }
 
-  it('createRoom 后收到 room_joined 进入 waiting 阶段', async () => {
+  /** 创建房间并完成 SSE 连接握手,返回 EventSource 实例。 */
+  async function openRoom(name = '测试房', max = 2) {
     const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.createRoom(name, max));
+    await flushConnect();
+    const es = MockEventSource.last!;
+    act(() => es.fireOpen());
+    return { result, es };
+  }
 
-    act(() => {
-      result.current.createRoom('测试房', 2);
-    });
-    // openSocket 创建 MockWebSocket,但 onopen 在真实环境异步;手动触发
-    const ws = MockWebSocket.last!;
-    act(() => {
-      ws.onopen?.();
-    });
-    // flush outbox(create_room 消息)
-    emitAndSync(ws, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
+  it('createRoom 后收到 room_joined 进入 waiting 阶段', async () => {
+    const { result } = await openRoom();
+    const es = MockEventSource.last!;
+    emitAndSync(es, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
 
     expect(result.current.stage).toBe('waiting');
     expect(result.current.roomId).toBe('ROOM1');
     expect(result.current.playerId).toBe('pid-0');
   });
 
-  it('再来一局:sendRestart 发送 restart_game 消息', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
+  it('再来一局:sendRestart 发送 restart_game 消息', async () => {
+    const { result } = await openRoom();
 
     act(() => result.current.sendRestart());
 
-    expect(ws.sent.some((m) => m.type === 'restart_game')).toBe(true);
+    expect(fetchCalls.some((c) => c.url.includes('/restart'))).toBe(true);
   });
 
-  it('game_reset 后从 ended 回到 waiting,清除 gameOver/view,ready 复位', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
+  it('game_reset 后从 ended 回到 waiting,清除 gameOver/view,ready 复位', async () => {
+    const { result, es } = await openRoom();
     // 进入房间
-    emitAndSync(ws, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
+    emitAndSync(es, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
     // 开局进入对局
-    act(() => ws.emit({ type: 'game_started' }));
-    act(() => ws.emit({ type: 'initialView', state: makeBaseline(0), lastSeq: 3 }));
+    act(() => es.emit({ type: 'game_started' }));
+    act(() => es.emit({ type: 'initialView', state: makeBaseline(0), lastSeq: 3 }));
     expect(result.current.stage).toBe('playing');
     // 游戏结束
-    act(() => ws.emit({ type: 'gameOver', winner: '主公阵营' }));
+    act(() => es.emit({ type: 'gameOver', winner: '主公阵营' }));
     expect(result.current.stage).toBe('ended');
     expect(result.current.gameOver).toEqual({ winner: '主公阵营' });
 
     // 再来一局:服务端 resetToLobby 后广播 game_reset
-    act(() => ws.emit({ type: 'game_reset' }));
+    act(() => es.emit({ type: 'game_reset' }));
 
     expect(result.current.stage).toBe('waiting');
     expect(result.current.gameOver).toBeNull();
@@ -157,17 +182,14 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.ready).toBe(false);
   });
 
-  it('game_reset 后保留 roomId/playerId(未退出房间)', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
-    act(() => ws.emit({ type: 'game_started' }));
-    act(() => ws.emit({ type: 'initialView', state: makeBaseline(0), lastSeq: 1 }));
-    act(() => ws.emit({ type: 'gameOver', winner: '主公阵营' }));
+  it('game_reset 后保留 roomId/playerId(未退出房间)', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
+    act(() => es.emit({ type: 'game_started' }));
+    act(() => es.emit({ type: 'initialView', state: makeBaseline(0), lastSeq: 1 }));
+    act(() => es.emit({ type: 'gameOver', winner: '主公阵营' }));
 
-    act(() => ws.emit({ type: 'game_reset' }));
+    act(() => es.emit({ type: 'game_reset' }));
 
     // 回到准备阶段但仍在同一房间
     expect(result.current.roomId).toBe('ROOM1');
@@ -176,54 +198,50 @@ describe('useMultiplayerRoom', () => {
 
   // ─── 连接命令与入座路径 ───
 
-  it('joinRoom 显式加入房间后 open 发送 join_room', () => {
+  it('joinRoom 显式加入房间后 open 发送 join_room', async () => {
     const { result } = renderHook(() => useMultiplayerRoom());
     act(() => result.current.joinRoom('ROOM-JOIN'));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    expect(ws.sent.some((m) => m.type === 'join_room' && m.roomId === 'ROOM-JOIN')).toBe(true);
+    await flushConnect();
+    const es = MockEventSource.last!;
+    act(() => es.fireOpen());
+    expect(fetchCalls.some((c) => c.url.includes('/join') && c.url.includes('ROOM-JOIN'))).toBe(
+      true,
+    );
   });
 
-  it('initialRoomId 提供时自动 join(分享链接直达)', () => {
+  it('initialRoomId 提供时自动 join(分享链接直达)', async () => {
     renderHook(() => useMultiplayerRoom('ROOM-DEEPLINK'));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    expect(ws.sent.some((m) => m.type === 'join_room' && m.roomId === 'ROOM-DEEPLINK')).toBe(true);
+    await flushConnect();
+    expect(
+      fetchCalls.some((c) => c.url.includes('/join') && c.url.includes('ROOM-DEEPLINK')),
+    ).toBe(true);
   });
 
-  it('createRoom 空名时生成默认房间名', () => {
+  it('createRoom 空名时生成默认房间名', async () => {
     const { result } = renderHook(() => useMultiplayerRoom());
     act(() => result.current.createRoom('', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    const create = ws.sent.find((m) => m.type === 'create_room');
+    await flushConnect();
+    // createRoom 的 POST /api/rooms body 含 name 字段
+    const create = fetchCalls.find((c) => c.body && typeof c.body.name === 'string');
     expect(create).toBeTruthy();
     // 默认名形如 "房间XXXX"
-    expect((create as { name: string }).name).toMatch(/^房间[A-Z0-9]+$/);
+    expect(create!.body.name).toMatch(/^房间[A-Z0-9]+$/);
   });
 
-  it('createRoom 携带 config 时透传到 create_room 消息', () => {
+  it('createRoom 携带 config 时透传到 create_room 消息', async () => {
     const { result } = renderHook(() => useMultiplayerRoom());
-    act(() =>
-      result.current.createRoom('房', 2, { ...DEFAULT_ROOM_CONFIG, timeoutScale: 2 }),
-    );
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    const create = ws.sent.find((m) => m.type === 'create_room') as {
-      config?: { timeoutScale: number };
-    };
-    expect(create.config?.timeoutScale).toBe(2);
+    act(() => result.current.createRoom('房', 2, { ...DEFAULT_ROOM_CONFIG, timeoutScale: 2 }));
+    await flushConnect();
+    const create = fetchCalls.find((c) => c.body && typeof c.body.name === 'string')!;
+    expect(create.body.config?.timeoutScale).toBe(2);
   });
 
   // ─── 房间状态与准备/开局 ───
 
-  it('room_state 同步后 isHost 在房主本人座次为 true', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
-    emitAndSync(ws, {
+  it('room_state 同步后 isHost 在房主本人座次为 true', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
+    emitAndSync(es, {
       type: 'room_state',
       readyPlayers: [],
       playerIds: ['pid-0'],
@@ -235,36 +253,27 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.roomState?.hostId).toBe('pid-0');
   });
 
-  it('toggleReady 发送 ready 并置 ready=true', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
+  it('toggleReady 发送 ready 并置 ready=true', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
     act(() => result.current.toggleReady());
-    expect(ws.sent.some((m) => m.type === 'ready')).toBe(true);
+    expect(fetchCalls.some((c) => c.url.includes('/ready'))).toBe(true);
     expect(result.current.ready).toBe(true);
   });
 
-  it('startGame 发送 start_game', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
+  it('startGame 发送 start_game', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
     act(() => result.current.startGame());
-    expect(ws.sent.some((m) => m.type === 'start_game')).toBe(true);
+    expect(fetchCalls.some((c) => c.url.includes('/start'))).toBe(true);
   });
 
   // ─── 错误处理 ───
 
-  it('收到 error 消息后 setError,3 秒后自动清除', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
-    act(() => ws.emit({ type: 'error', message: '房间已满' }));
+  it('收到 error 消息后 setError,3 秒后自动清除', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
+    act(() => es.emit({ type: 'error', message: '房间已满' }));
     expect(result.current.error).toBe('房间已满');
     act(() => {
       vi.advanceTimersByTime(3000);
@@ -272,25 +281,19 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('gameOver 消息设置 gameOver.winner', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
-    act(() => ws.emit({ type: 'gameOver', winner: '反贼阵营' }));
+  it('gameOver 消息设置 gameOver.winner', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
+    act(() => es.emit({ type: 'gameOver', winner: '反贼阵营' }));
     expect(result.current.gameOver).toEqual({ winner: '反贼阵营' });
     expect(result.current.stage).toBe('ended');
   });
 
   // ─── 离开与无连接守卫 ───
 
-  it('leaveRoom 回到 lobby,清空全部房间状态,并断开连接', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
+  it('leaveRoom 回到 lobby,清空全部房间状态,并断开连接', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'ROOM1', playerId: 'pid-0', seatIndex: 0 });
     expect(result.current.stage).toBe('waiting');
 
     act(() => result.current.leaveRoom());
@@ -301,16 +304,15 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.roomState).toBeNull();
     expect(result.current.view).toBeNull();
     expect(result.current.ready).toBe(false);
-    // 原连接被断开
-    expect(ws.closed).toBe(true);
+    // 原连接被断开(EventSource.close)
+    expect(es.readyState).toBe(MockEventSource.CLOSED);
   });
 
-  it('leaveRoom 后(无连接)toggleReady/startGame/sendAction/reorderHand 均为 no-op', () => {
-    const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('测试房', 2));
-    const ws = MockWebSocket.last!;
-    act(() => ws.onopen?.());
-    emitAndSync(ws, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
+  it('leaveRoom 后(无连接)toggleReady/startGame/sendAction/reorderHand 均为 no-op', async () => {
+    const { result, es } = await openRoom();
+    emitAndSync(es, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
+    const callsBefore = fetchCalls.length;
+
     act(() => result.current.leaveRoom());
 
     expect(() => {
@@ -322,7 +324,7 @@ describe('useMultiplayerRoom', () => {
       );
       act(() => result.current.reorderHand(['a', 'b']));
     }).not.toThrow();
-    // 断开后无新消息发出
-    expect(ws.sent.some((m) => m.type === 'ready')).toBe(false);
+    // 断开后无新 fetch 发出
+    expect(fetchCalls.length).toBe(callsBefore);
   });
 });

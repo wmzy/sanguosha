@@ -1,13 +1,14 @@
 // src/client/headless/HeadlessGameClient.ts
-// 单座次无头 WS 玩家客户端。框架无关（零 React 依赖）。
-// 用全局 WebSocket（浏览器/Node22/Bun 都有），不 import 'ws'，避免污染浏览器 bundle。
+// 单座次无头玩家客户端。框架无关（零 React 依赖）。
+// 传输层：REST（C→S 命令）+ SSE（S→C 事件流）。
+// 浏览器用全局 EventSource；Node 环境（无全局 EventSource）惰性 import eventsource 包。
 import type {
   GameView,
   ViewEvent,
   Json,
   ClientMessage as EngineClientMessage,
 } from '../../engine/types';
-import type { ServerMessage, ClientMessage, RoomConfig } from '../../server/protocol';
+import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
 import { enumerateAvailableActions } from './availableActions';
 import { resolvePendingRespond, getPendingRequestType } from '../utils/pendingRespond';
@@ -15,7 +16,7 @@ import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistr
 import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState, ReconnectState } from './types';
 
 export class HeadlessGameClient {
-  private ws: WebSocket | null = null;
+  private eventSource: EventSource | null = null;
   private _view: GameView | null = null;
   private _lastSeq = 0;
   private _phase: ClientPhase = 'connecting';
@@ -25,33 +26,33 @@ export class HeadlessGameClient {
   private _roomState: RoomState | null = null;
   private _gameOverWinner: string | null = null;
   private _pendingNewEvents: ViewEvent[] = [];
-  /** 连接就绪前缓冲的待发消息（open 后 flush） */
-  private _outbox: ClientMessage[] = [];
   /** 最近一次 action 是否被服务端拒（供 runPlay 轮询）。每次 sendAction 重置。 */
   private _lastActionRejected = false;
   private readonly callbacks: HeadlessCallbacks;
-  private readonly serverUrl: string;
+  /** REST/SSE base URL，如 'http://localhost:3930'（无 /ws 后缀） */
+  private readonly baseUrl: string;
 
   // ── 重连机制 ──
-  /** 重连退避定时器 */
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  /** 已尝试重连次数 */
-  private _reconnectAttempts = 0;
-  /** 最大重连尝试次数 */
-  private readonly maxReconnectAttempts = 10;
-  /** 主动断开标记:disconnect() 设为 true,onclose 不触发重连 */
+  /** 主动断开标记:disconnect() 设为 true,不触发重连 */
   private intentionalDisconnect = false;
   /** 当前重连状态 */
   private _reconnectState: ReconnectState = 'idle';
-  /** 是否为 debug 模式(影响重连消息类型) */
+  /** 是否为 debug 模式(影响连接方式) */
   private _debugMode = false;
-  /** 已收到 room_joined,具备重连所需上下文(roomId/playerId) */
+  /** 已收到 room_joined,具备 SSE 连接上下文 */
   private canReconnect = false;
-  /** 重连 WS 已打开、已发 reconnect 消息、等待服务端响应。收到任意消息即标记成功。 */
-  private pendingReconnect = false;
+  /** 重连状态轮询定时器 */
+  private reconnectStateTimer: ReturnType<typeof setInterval> | null = null;
+  /** SSE onopen 回调已触发（用于状态映射） */
+  private sseConnected = false;
 
   constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}) {
-    this.serverUrl = serverUrl;
+    // 兼容旧 WS URL：ws://→http://, wss://→https://, 去掉 /ws 后缀
+    let url = serverUrl;
+    if (url.startsWith('ws://')) url = 'http://' + url.slice(5);
+    else if (url.startsWith('wss://')) url = 'https://' + url.slice(6);
+    if (url.endsWith('/ws')) url = url.slice(0, -3);
+    this.baseUrl = url;
     this.callbacks = callbacks;
   }
 
@@ -94,7 +95,8 @@ export class HeadlessGameClient {
 
   /** 当前重连尝试次数(0=未在重连) */
   get reconnectAttemptCount(): number {
-    return this._reconnectAttempts;
+    // EventSource 自动重连，不暴露尝试次数；返回 0/1 映射
+    return this._reconnectState === 'reconnecting' ? 1 : 0;
   }
 
   private setPhase(p: ClientPhase) {
@@ -105,148 +107,178 @@ export class HeadlessGameClient {
   }
 
   /** 创建 debug 房间并自动 join 0 号座 */
-  createDebugRoom(playerCount: number, config?: RoomConfig): void {
+  async createDebugRoom(playerCount: number, config?: RoomConfig): Promise<void> {
     this._debugMode = true;
     this.intentionalDisconnect = false;
-    this.openSocket();
-    this.send({ type: 'create_debug_room', config, playerCount });
+
+    const resp = await fetch(`${this.baseUrl}/api/debug-room`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerCount, config, autoJoin: true }),
+    });
+    const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
+    this._roomId = data.roomId;
+    this._playerId = data.playerId;
+    this._seatIndex = data.seatIndex;
+    this.canReconnect = true;
+
+    this.openStream();
+    this.setPhase('lobby');
   }
 
   /** 连接并 join 指定房间 */
-  connect(roomId: string, seatIndex?: number): void {
+  async connect(roomId: string, seatIndex?: number): Promise<void> {
     this._debugMode = true;
     this._roomId = roomId;
     this._seatIndex = seatIndex ?? this._seatIndex;
     this.intentionalDisconnect = false;
-    this.openSocket();
-    this.send({ type: 'join_debug_room', roomId, lastSeq: 0 });
-  }
 
-  /** 声明 playerId(连接初期调用)。给定则采用该值,否则服务端自动生成。 */
-  setPlayerId(playerId?: string): void {
-    if (playerId?.trim()) {
-      this.send({ type: 'set_player_id', playerId: playerId.trim() });
-    }
+    const resp = await fetch(`${this.baseUrl}/api/debug-room/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: this._playerId ?? undefined, lastSeq: this._lastSeq }),
+    });
+    const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
+    this._roomId = data.roomId;
+    this._playerId = data.playerId;
+    this._seatIndex = data.seatIndex;
+    this.canReconnect = true;
+
+    this.openStream();
   }
 
   /** 创建普通(多人)房间:本连接成为房主。 */
-  createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string): void {
+  async createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string): Promise<void> {
     this._debugMode = false;
     this.intentionalDisconnect = false;
-    this.openSocket();
-    this.setPlayerId(playerId);
-    this.send({ type: 'create_room', name, maxPlayers, config });
+
+    const resp = await fetch(`${this.baseUrl}/api/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, maxPlayers, config, playerId }),
+    });
+    const data = await resp.json() as { roomId: string; playerId: string };
+    this._roomId = data.roomId;
+    this._playerId = data.playerId;
+    this.canReconnect = true;
+
+    this.openStream();
+    this.setPhase('lobby');
   }
 
   /** 加入普通(多人)房间。 */
-  joinRoom(roomId: string, playerId?: string): void {
+  async joinRoom(roomId: string, playerId?: string): Promise<void> {
     this._debugMode = false;
     this._roomId = roomId;
     this.intentionalDisconnect = false;
-    this.openSocket();
-    this.setPlayerId(playerId);
-    this.send({ type: 'join_room', roomId });
+
+    const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId }),
+    });
+    const data = await resp.json() as { roomId: string; playerId: string };
+    this._roomId = data.roomId;
+    this._playerId = data.playerId;
+    this.canReconnect = true;
+
+    this.openStream();
   }
 
-  private openSocket(isReconnect = false) {
-    this.ws = new WebSocket(this.serverUrl);
-    this.ws.onopen = () => {
-      // 主动断开后迟到的新 WS:立即关闭,不处理
+  /** 建立 SSE 流接收服务端推送 */
+  private openStream() {
+    if (this.intentionalDisconnect) return;
+    void this.ensureEventSource().then((EventSourceImpl) => {
+      if (this.intentionalDisconnect || !this._roomId || !this._playerId) return;
+      const url = `${this.baseUrl}/api/rooms/${this._roomId}/stream?playerId=${this._playerId}`;
+      this.eventSource = new EventSourceImpl(url);
+      this.attachEventSourceHandlers();
+    });
+  }
+
+  /** 获取 EventSource 构造器：浏览器用全局，Node 动态 import eventsource 包 */
+  private async ensureEventSource(): Promise<typeof EventSource> {
+    if (typeof globalThis.EventSource !== 'undefined') {
+      return globalThis.EventSource;
+    }
+    // Node 环境无全局 EventSource，惰性 import
+    const mod = await import('eventsource');
+    return mod.EventSource;
+  }
+
+  private attachEventSourceHandlers(): void {
+    if (!this.eventSource) return;
+    this.sseConnected = false;
+
+    this.eventSource.onopen = () => {
+      this.sseConnected = true;
       if (this.intentionalDisconnect) {
-        this.ws?.close();
+        this.eventSource?.close();
         return;
       }
-      if (isReconnect) {
-        // 重连:发送 reconnect/join_debug_room 消息恢复座位
-        this.sendReconnectMessage();
-      } else {
-        // 正常首次连接
-        this.setPhase('lobby');
-      }
-      // flush 连接前缓冲的待发消息
-      for (const m of this._outbox) this.ws!.send(JSON.stringify(m));
-      this._outbox = [];
+      this.setReconnectState('idle');
     };
-    this.ws.onmessage = (ev) =>
-      this.handleRaw(typeof ev.data === 'string' ? ev.data : ev.data.toString());
-    this.ws.onerror = () => {
-      this.callbacks.onError?.(new Error('WebSocket error'));
+
+    this.eventSource.onmessage = (ev) => {
+      this.handleRaw(ev.data);
     };
-    this.ws.onclose = () => {
-      // 主动断开:不重连
+
+    this.eventSource.onerror = () => {
+      this.sseConnected = false;
       if (this.intentionalDisconnect) return;
-      // 已具备重连上下文(room_joined 已收到):自动重连
+      // EventSource 自动重连——映射为 reconnecting 状态
       if (this.canReconnect) {
-        this.scheduleReconnect();
+        this.setReconnectState('reconnecting');
+        // EventSource 自带重连，但我们无法知道具体尝试次数
+        // 通过轮询 readyState 来检测恢复
+        this.startReconnectStatePolling();
       }
     };
   }
 
-  /** 重连 WS 打开后发送恢复消息。根据模式选择 join_debug_room 或 reconnect。 */
-  private sendReconnectMessage(): void {
-    if (this._debugMode && this._roomId) {
-      // debug 模式:通过 join_debug_room 恢复(服务端按 room.status 决定恢复视图)
-      this.pendingReconnect = true;
-      this.ws!.send(
-        JSON.stringify({ type: 'join_debug_room', roomId: this._roomId, lastSeq: this._lastSeq }),
-      );
-    } else if (this._playerId) {
-      // multiplayer 模式:通过 reconnect 消息携带旧 playerId 恢复座位
-      this.pendingReconnect = true;
-      this.ws!.send(
-        JSON.stringify({ type: 'reconnect', playerId: this._playerId, lastSeq: this._lastSeq }),
-      );
-    } else {
-      // 无重连上下文:放弃
-      this.setReconnectState('failed');
-    }
+  /** 轮询 EventSource.readyState 检测重连恢复 */
+  private startReconnectStatePolling(): void {
+    if (this.reconnectStateTimer) return;
+    this.reconnectStateTimer = setInterval(() => {
+      if (!this.eventSource) {
+        this.stopReconnectStatePolling();
+        return;
+      }
+      // 0=connecting, 1=open, 2=closed
+      if (this.eventSource.readyState === 1) {
+        this.stopReconnectStatePolling();
+        this.setReconnectState('idle');
+      } else if (this.eventSource.readyState === 2) {
+        // closed — EventSource 放弃重连（达到浏览器内部限制）
+        this.stopReconnectStatePolling();
+        this.setReconnectState('failed');
+      }
+    }, 500);
   }
 
-  // ── 重连机制 ──
-
-  /** 指数退避延迟:1s→2s→4s→8s→16s,上限 30s */
-  private getReconnectDelay(attempt: number): number {
-    return Math.min(1000 * Math.pow(2, attempt), 30000);
-  }
-
-  /** 调度下一次重连。超过最大次数则标记失败。 */
-  private scheduleReconnect(): void {
-    if (this._reconnectAttempts >= this.maxReconnectAttempts) {
-      this.setReconnectState('failed');
-      return;
+  private stopReconnectStatePolling(): void {
+    if (this.reconnectStateTimer) {
+      clearInterval(this.reconnectStateTimer);
+      this.reconnectStateTimer = null;
     }
-    this._reconnectAttempts++; // 先递增(1-based),使回调报告当前尝试编号
-    this.setReconnectState('reconnecting');
-    const delay = this.getReconnectDelay(this._reconnectAttempts - 1); // 0-based for delay
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      this.openSocket(true);
-    }, delay);
   }
 
   private setReconnectState(state: ReconnectState): void {
     if (this._reconnectState !== state) {
       this._reconnectState = state;
-      this.callbacks.onReconnectStateChange?.(state, this._reconnectAttempts);
+      this.callbacks.onReconnectStateChange?.(state, this.reconnectAttemptCount);
     }
   }
 
-  /** 用户手动取消重连。清除定时器、重置状态、关闭正在重连的 WS。 */
+  /** 用户手动取消重连。关闭正在重连的 EventSource。 */
   cancelReconnect(): void {
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    this._reconnectAttempts = 0;
-    this.pendingReconnect = false;
-    const wasReconnecting = this._reconnectState === 'reconnecting';
-    this.setReconnectState('idle');
-    // 正在重连的 WS:关闭它(不影响正常连接)
-    if (wasReconnecting && this.ws) {
+    this.stopReconnectStatePolling();
+    if (this._reconnectState === 'reconnecting' && this.eventSource) {
       this.intentionalDisconnect = true;
-      this.ws.close();
-      this.ws = null;
+      this.eventSource.close();
+      this.eventSource = null;
     }
+    this.setReconnectState('idle');
   }
 
   private handleRaw(raw: string) {
@@ -257,9 +289,8 @@ export class HeadlessGameClient {
       return;
     }
     // 重连后收到任意消息:标记重连成功
-    if (this.pendingReconnect) {
-      this.pendingReconnect = false;
-      this._reconnectAttempts = 0;
+    if (this._reconnectState === 'reconnecting') {
+      this.stopReconnectStatePolling();
       this.setReconnectState('idle');
     }
     const r = applyServerMessage(this._view, this._lastSeq, msg);
@@ -393,7 +424,7 @@ export class HeadlessGameClient {
     }
     const reqType = getPendingRequestType(pending);
     // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
-    // 此处给出一个“选择弃牌”占位 action，agent 须自行从手牌选足 discardMin 张填入 cardIds。
+    // 此处给出一个"选择弃牌"占位 action，agent 须自行从手牌选足 discardMin 张填入 cardIds。
     if (reqType === '__弃牌') {
       out.push({
         description: '弃牌（需选弃牌张数后提交 cardIds）',
@@ -524,11 +555,22 @@ export class HeadlessGameClient {
     // 阻塞型 pending 期间 respond 携带 pendingSeq（当前窗口 seq），非阻塞（出牌窗口）不带
     const pending = this._view?.pending;
     const pendingSeq = pending?.isBlocking ? this._lastSeq : undefined;
-    this.send({
-      type: 'action',
-      action: { ...action, baseSeq: this._lastSeq, pendingSeq },
-      baseSeq: this._lastSeq,
-    });
+    const fullAction = { ...action, baseSeq: this._lastSeq, pendingSeq };
+    void this.postAction(fullAction);
+  }
+
+  /** POST action 到服务端 */
+  private async postAction(action: EngineClientMessage): Promise<void> {
+    if (!this._roomId || !this._playerId) return;
+    try {
+      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: this._playerId, action }),
+      });
+    } catch (err) {
+      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+    }
   }
 
   /** 返回并清除最近一次 action 是否被服务端拒（供 runPlay 轮询，已拒则报告 rejected）。 */
@@ -538,9 +580,18 @@ export class HeadlessGameClient {
     return r;
   }
 
-  /** 重排手牌（对应 reorder_hand 协议消息） */
-  reorderHand(order: string[]): void {
-    this.send({ type: 'reorder_hand', order });
+  /** 重排手牌 */
+  async reorderHand(order: string[]): Promise<void> {
+    if (!this._roomId || !this._playerId) return;
+    try {
+      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: this._playerId, order }),
+      });
+    } catch (err) {
+      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+    }
   }
 
   useCardAndTarget(skillId: string, cardId: string, targets: number[]): void {
@@ -630,36 +681,51 @@ export class HeadlessGameClient {
 
   // ── 大厅 ──
 
-  sendReady(): void {
-    this.send({ type: 'ready' });
+  async sendReady(): Promise<void> {
+    await this.postRoomOp('ready');
   }
 
-  sendStartGame(): void {
-    this.send({ type: 'start_game' });
+  async sendStartGame(): Promise<void> {
+    await this.postRoomOp('start');
   }
 
-  sendRestart(): void {
-    this.send({ type: 'restart_game' });
+  async sendRestart(): Promise<void> {
+    await this.postRoomOp('restart');
   }
 
-  sendUpdateConfig(config: RoomConfig): void {
-    this.send({ type: 'update_room_config', config });
+  async sendUpdateConfig(config: RoomConfig): Promise<void> {
+    if (!this._roomId || !this._playerId) return;
+    try {
+      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: this._playerId, config }),
+      });
+    } catch (err) {
+      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+    }
   }
 
-  private send(msg: ClientMessage) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(msg));
-    } else {
-      this._outbox.push(msg);
+  /** POST 通用房间操作（ready/start/restart） */
+  private async postRoomOp(op: string): Promise<void> {
+    if (!this._roomId || !this._playerId) return;
+    try {
+      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/${op}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: this._playerId }),
+      });
+    } catch (err) {
+      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   }
 
   disconnect() {
     this.intentionalDisconnect = true;
-    this.cancelReconnect();
+    this.stopReconnectStatePolling();
     this.canReconnect = false;
-    this.ws?.close();
-    this.ws = null;
+    this.eventSource?.close();
+    this.eventSource = null;
   }
 
   /** 角色确定后，为本座次注册技能 actions（供 getAvailableActions）。 */
