@@ -7,7 +7,7 @@
 //   —— 非主公玩家收不到并行选将事件,无法选将。
 //
 // 修复:每个 atomHistory.push 前递增 state.seq,保证事件 seq 唯一。
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';

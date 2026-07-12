@@ -120,7 +120,7 @@ describe('化身', () => {
     expect(pool!.includes('左慈')).toBe(false);
     expect(pool!.includes('曹操')).toBe(false);
     // 两张不重复
-    expect(new Set(pool!).size).toBe(2);
+    expect(new Set(pool).size).toBe(2);
 
     // 获得了一个技能
     const currentSkill = p.vars['化身/当前技能'] as string | undefined;

@@ -89,7 +89,7 @@ describe('直谏', () => {
         mkPlayer({ index: 0, name: '张昭张纮', hand: ['zgl'], skills: ['直谏'], health: 3, maxHealth: 3 }),
         mkPlayer({ index: 1, name: 'P1', skills: [] }),
       ],
-      cardMap: { zgl: zgl },
+      cardMap: { zgl },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

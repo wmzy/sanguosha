@@ -11,7 +11,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, PlayerState } from '../../src/engine/types';
 
 function mkCard(
   id: string,
@@ -102,7 +102,7 @@ describe('完杀', () => {
     // → 当前 pending 应是贾诩(idx 0),而非 P3(idx 2)
     const pendingSlot = [...harness.state.pendingSlots.values()][0];
     expect(pendingSlot).toBeTruthy();
-    expect((pendingSlot!.atom as { target: number }).target).toBe(0); // 问贾诩,P3 被跳过
+    expect((pendingSlot.atom as { target: number }).target).toBe(0); // 问贾诩,P3 被跳过
 
     // 贾诩也无桃,pass → 无人救援,P2 死亡
     await JX.pass();
@@ -251,12 +251,12 @@ describe('完杀', () => {
     await harness.waitForStable();
     // 接下来问 P3(当前 pending 应是 P3,idx 2——完杀未跳过任何角色)
     let slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot!.atom as { target: number }).target).toBe(2);
+    expect((slot.atom as { target: number }).target).toBe(2);
     await P3.pass(); // P3 无桃
     await harness.waitForStable();
     // 问贾诩(第三方)——完杀不生效,贾诩被正常问询
     slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot!.atom as { target: number }).target).toBe(0);
+    expect((slot.atom as { target: number }).target).toBe(0);
     await JX.respond('桃', { cardId: 'p4' }); // 贾诩 救 P2
     await harness.waitForStable();
 

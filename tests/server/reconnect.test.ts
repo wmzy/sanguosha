@@ -1,7 +1,7 @@
 // tests/server/reconnect.test.ts
 // 服务端 session 断线保活 + 重连座位恢复测试。
 // 验证:grace period、playerId 迁移、重连后 action 可用。
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession, RECONNECT_GRACE_MS } from '../../src/server/session';
@@ -37,6 +37,7 @@ class FakeSink implements ConnectionSink {
   send(message: ServerMessage): void {
     this.messages.push(message);
   }
+
   close(): void {}
   get isAlive(): boolean {
     return true;

@@ -15,7 +15,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, GameState, Mark, PlayerState } from '../../src/engine/types';
 
 function makeCard(
   id: string,
@@ -33,7 +33,7 @@ function makePlayer(opts: {
   skills?: string[];
   health?: number;
   maxHealth?: number;
-  marks?: Array<{ id: string; scope: number; payload?: Record<string, unknown> }>;
+  marks?: Mark[];
 }): PlayerState {
   return {
     index: opts.index,
@@ -85,9 +85,6 @@ describe('急袭', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-
-    const p0HandBefore = harness.state.players[0].hand.length;
-    const p1HandBefore = harness.state.players[1].hand.length;
 
     // 急袭转化:田 → 顺手牵羊,然后使用
     await P0.transformThenUse(

@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAnimationState } from '../../src/client/hooks/useAnimationState';
-import type { Card, GameView, Json } from '../../src/engine/types';
+import type { Card, GameView } from '../../src/engine/types';
 
 // ─── 测试夹具 ───
 

@@ -81,7 +81,6 @@ describe('空城', () => {
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
     const hpBefore = harness.state.players[1].health;
 
     await P1.useCardAndTarget('杀', 'k1', [1]);

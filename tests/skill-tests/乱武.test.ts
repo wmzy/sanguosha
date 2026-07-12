@@ -87,7 +87,7 @@ describe('乱武', () => {
     // P2 被问询(乱武/出杀);P2 无杀 → pass → 失去1体力
     expect(harness.state.players[1].health).toBe(4); // 尚未失血
     const slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot!.atom as { target: number }).target).toBe(1);
+    expect((slot.atom as { target: number }).target).toBe(1);
     await P2.pass();
     await harness.waitForStable();
 
@@ -128,8 +128,8 @@ describe('乱武', () => {
     await P2.respond('乱武', { cardId: 'sk1', target: 0 });
     await harness.waitForStable();
     // 贾诩被询问闪
-    let slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot!.atom as { type: string }).type).toBe('询问闪');
+    const slot = [...harness.state.pendingSlots.values()][0];
+    expect((slot.atom as { type: string }).type).toBe('询问闪');
     // 贾诩不闪 → 受伤
     await JX.pass();
     await harness.waitForStable();
@@ -207,18 +207,18 @@ describe('乱武', () => {
 
     // 先问 P2(贾诩下家);P2 的最近集合={贾诩,P3},选 P3
     let slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot!.atom as { target: number }).target).toBe(1);
+    expect((slot.atom as { target: number }).target).toBe(1);
     await P2.respond('乱武', { cardId: 'sk2', target: 2 });
     await harness.waitForStable();
     // P3 被询问闪(因 P2 对其出杀)
     slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot!.atom as { type: string }).type).toBe('询问闪');
+    expect((slot.atom as { type: string }).type).toBe('询问闪');
     await P3.pass(); // P3 不闪 → 受伤
     await harness.waitForStable();
 
     // P2 的杀结算完,继续问 P3(无杀)→ 失去1体力
     slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot!.atom as { target: number }).target).toBe(2);
+    expect((slot.atom as { target: number }).target).toBe(2);
     await P3.pass();
     await harness.waitForStable();
 

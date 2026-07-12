@@ -167,7 +167,7 @@ describe('铁索连环', () => {
   // ─── 连环传导 ─────────────────────────────
 
   /** 辅助:设 P1+P2 横置后,用指定杀攻击 P1,验证传导行为 */
-  async function runConductionTest(
+  async function useConductionTest(
     slashCard: Card,
     expectConduction: boolean,
   ): Promise<void> {
@@ -187,7 +187,6 @@ describe('铁索连环', () => {
     );
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
 
     // Step 1: 铁索连环横置 P1 P2
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chainC', targets: [1, 2] });
@@ -200,6 +199,7 @@ describe('铁索连环', () => {
     const p2HealthBefore = harness.state.players[2].health;
 
     // Step 2: 杀 P1
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await P0.useCardAndTarget('杀', slashCard.id, [1]);
     // P1 不出闪
     await P1.pass();
@@ -221,17 +221,17 @@ describe('铁索连环', () => {
 
   it('火焰伤害传导给所有横置角色', async () => {
     const fireSlash = mkCard('fire1', '杀', '♥', 'A', '基本牌', '火焰');
-    await runConductionTest(fireSlash, true);
+    await useConductionTest(fireSlash, true);
   });
 
   it('雷电伤害传导', async () => {
     const lightningSlash = mkCard('light1', '杀', '♠', '5', '基本牌', '雷电');
-    await runConductionTest(lightningSlash, true);
+    await useConductionTest(lightningSlash, true);
   });
 
   it('普通伤害不传导', async () => {
     const normalSlash = mkCard('plain1', '杀', '♠', '3', '基本牌');
-    await runConductionTest(normalSlash, false);
+    await useConductionTest(normalSlash, false);
   });
 
   it('未横置不传导', async () => {
@@ -253,7 +253,6 @@ describe('铁索连环', () => {
     );
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
 
     // 确认只有 P1 横置
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);

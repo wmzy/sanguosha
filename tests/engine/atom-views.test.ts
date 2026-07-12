@@ -119,7 +119,7 @@ describe('并行回应 atom', () => {
       requestType: '拼点',
       targets: [0, 1],
       prompt: { type: 'confirm', title: '请拼点' },
-    });
+    })!;
 
     // 两个 owner 各自看到带 prompt 的事件
     const owner0 = split.ownerViews.get(0)!;
@@ -264,7 +264,7 @@ describe('移除延时锦囊 atom', () => {
       type: '移除延时锦囊',
       player: 0,
       trickName: '乐不思蜀',
-    });
+    })!;
 
     expect(split.othersView).toBeTruthy();
     expect((split.othersView as { cardId?: string }).cardId).toBe('lebu-1');
@@ -281,7 +281,7 @@ describe('移除延时锦囊 atom', () => {
       type: '移除延时锦囊',
       player: 0,
       trickName: '乐不思蜀',
-    });
+    })!;
 
     expect((split.othersView as { cardId?: string }).cardId).toBeUndefined();
   });

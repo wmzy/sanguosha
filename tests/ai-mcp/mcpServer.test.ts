@@ -16,7 +16,6 @@ import type { HeadlessGameClient } from '../../src/client/headless/HeadlessGameC
 import {
   reportBugResult,
   resolveFeedbackDir,
-  type ReportBugInput,
 } from '../../src/ai-mcp/feedbackHandler';
 
 function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameClient {

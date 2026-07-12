@@ -27,7 +27,7 @@ import {
   type CreateSnapshotRequest,
 } from './snapshot';
 import { normalizeRoomConfig } from './protocol';
-import type { RoomConfig, ServerMessage } from './protocol';
+import type { RoomConfig } from './protocol';
 import { GameSession } from './session';
 import { gameSessions, playerRoomMap } from './registry';
 import { createLogger } from './logger';
@@ -220,8 +220,6 @@ export function applyRestRoutes(app: Hono): void {
     const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
       ? raw.playerId.trim()
       : generatePlayerId();
-    const lastSeq = typeof raw.lastSeq === 'number' ? raw.lastSeq : 0;
-
     // 清理旧房间关联
     const existingRoom = findRoomByPlayerId(playerId);
     if (existingRoom) {

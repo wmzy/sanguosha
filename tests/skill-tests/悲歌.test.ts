@@ -61,7 +61,7 @@ describe('悲歌', () => {
 
   // 公共开局:P1(攻击方,本回合)出杀打 P0(蔡文姬,悲歌+断肠)。
   // P0 不闪 → 受 1 点杀伤害 → 悲歌询问 P0 弃牌。
-  async function setupAndSlash(judgeCard: Card, extraDeck: Card[] = []) {
+  async function useSetupAndSlash(judgeCard: Card, extraDeck: Card[] = []) {
     const slash = makeCard('k1', '杀', '♠', '7');
     const cost = makeCard('d1', '闪', '♦', '3'); // 蔡文姬弃置代价
     const cardMap: Record<string, Card> = { k1: slash, d1: cost, [judgeCard.id]: judgeCard };
@@ -81,6 +81,7 @@ describe('悲歌', () => {
     const P0 = harness.player('蔡文姬');
     const P1 = harness.player('P1');
 
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await P1.useCardAndTarget('杀', 'k1', [0]);
     await P0.pass(); // 不出闪
     return { P0, P1 };
@@ -89,7 +90,7 @@ describe('悲歌', () => {
   // ─── ♠ 来源翻面 ────────────────────────────
   it('♠:伤害来源翻面(加标签)', async () => {
     const judge = makeCard('j1', '杀', '♠', '5');
-    const { P0 } = await setupAndSlash(judge);
+    const { P0 } = await useSetupAndSlash(judge);
 
     // 悲歌询问蔡文姬弃牌
     P0.expectPending('请求回应');
@@ -104,7 +105,7 @@ describe('悲歌', () => {
   // ─── ♥ 受伤角色回血 ────────────────────────────
   it('♥:受伤角色回复 1 点体力', async () => {
     const judge = makeCard('j1', '杀', '♥', '5');
-    const { P0 } = await setupAndSlash(judge);
+    const { P0 } = await useSetupAndSlash(judge);
 
     await P0.respond('悲歌', { cardId: 'd1' });
 
@@ -117,7 +118,7 @@ describe('悲歌', () => {
     const judge = makeCard('j1', '杀', '♦', '5');
     const m1 = makeCard('m1', '杀', '♣', '2');
     const m2 = makeCard('m2', '杀', '♣', '3');
-    const { P0 } = await setupAndSlash(judge, [m1, m2]);
+    const { P0 } = await useSetupAndSlash(judge, [m1, m2]);
 
     // P0 弃代价 d1 后摸 2 张 → 手牌为 2 张新牌(d1 已进弃牌堆)
     await P0.respond('悲歌', { cardId: 'd1' });
@@ -162,7 +163,7 @@ describe('悲歌', () => {
   // ─── 不弃牌 → 悲歌不发动 ────────────────────────────
   it('不弃牌:悲歌不发动,受伤角色保持受伤', async () => {
     const judge = makeCard('j1', '杀', '♠', '5');
-    const { P0 } = await setupAndSlash(judge);
+    const { P0 } = await useSetupAndSlash(judge);
 
     // 蔡文姬放弃(超时)
     await P0.pass();

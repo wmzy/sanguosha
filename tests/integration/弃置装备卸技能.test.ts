@@ -11,7 +11,7 @@
 //   1. player.skills 不再含装备技能名(移除技能 apply)
 //   2. 技能 hook 实例已卸载(卸载后 slashMax 提供者消失 / vars 清除)
 //   3. 弃牌堆含被弃装备(弃置 本身仍正常)
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait } from '../engine-harness';
 import { slashMax } from '../../src/engine/slash-quota';

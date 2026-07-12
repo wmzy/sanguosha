@@ -11,7 +11,7 @@
 //   - 交互流程:confirm(是否发动) → chooseTarget(选新目标) → 弃 1 张牌
 //   - 修改帧 params.resolvedTargets:把流离原目标替换为新目标
 //   - 杀.execute 下一轮 结算 读帧 resolvedTargets[i] 而非原始 targets[i]
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';

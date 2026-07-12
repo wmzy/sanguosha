@@ -105,6 +105,7 @@ describe('开局', () => {
   it('正面:完整开局(2人)→ 身份分配 + 选将 + 发牌', async () => {
     const config: GameConfig = {
       characters: CHARACTERS,
+      gameId: 'test',
       playerCount: 2,
       seed: 42,
       handSize: 4,
@@ -144,6 +145,7 @@ describe('开局', () => {
   it('正面:发牌 atom 的 lordBonus=1(主公多摸 1 张)', async () => {
     const config: GameConfig = {
       characters: CHARACTERS,
+      gameId: 'test',
       playerCount: 2,
       seed: 42,
       handSize: 4,
@@ -167,6 +169,7 @@ describe('开局', () => {
   it('正面:主公先选将 → 然后非主公选将', async () => {
     const config: GameConfig = {
       characters: CHARACTERS,
+      gameId: 'test',
       playerCount: 2,
       seed: 99,
       handSize: 4,
@@ -213,6 +216,7 @@ describe('开局', () => {
   it('负面:playerCount < 2 → validate 拒绝,state 不变', async () => {
     const config: GameConfig = {
       characters: CHARACTERS,
+      gameId: 'test',
       playerCount: 1,
       seed: 42,
     };
@@ -220,7 +224,7 @@ describe('开局', () => {
     await waitForStable(state);
 
     // validate 拒绝:无身份分配、无选将
-    expect(state.players.every((p) => !p.identity || p.identity === '')).toBe(true);
+    expect(state.players.every((p) => !p.identity)).toBe(true);
     expect(state.players.every((p) => !p.character || p.character === '')).toBe(true);
     // 无发牌
     expect(state.players.every((p) => p.hand.length === 0)).toBe(true);

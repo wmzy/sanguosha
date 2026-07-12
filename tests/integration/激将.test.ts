@@ -14,7 +14,7 @@
 //   - 杀牌进处理区 → 激将 execute 检查 zones.processing 是否有 杀
 //   - 出了杀 → 指定目标 + 询问闪 + 造成伤害
 //   - 不出(超时)→ 主公摸 1 张
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';

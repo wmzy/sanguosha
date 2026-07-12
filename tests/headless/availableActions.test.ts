@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { enumerateAvailableActions } from '../../src/client/headless/availableActions';
 import { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView, Card, PendingView } from '../../src/engine/types';
+import type { GameView, Card } from '../../src/engine/types';
 import type { SkillActionDef } from '../../src/client/skillActionRegistry';
 
 function makeView(
@@ -409,7 +409,7 @@ describe('enumerateAvailableActions', () => {
   });
 
   it('非当前玩家 → 不包含 end action', () => {
-    const view = makeView(1, '出牌', [killCard], /*currentPlayer*/ 0);
+    const view = makeView(1, '出牌', [killCard], /* currentPlayer */ 0);
     const actions = enumerateAvailableActions(view, 1, [killUseAction]);
     expect(actions.find((a) => a.message.actionType === 'end')).toBeUndefined();
   });
@@ -480,7 +480,7 @@ describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', ()
       },
       target: 0,
       isBlocking: true,
-    } as PendingView;
+    };
     (hgc as unknown as { _view: GameView | null })._view = view;
 
     const actions = hgc.getAvailableActions();
@@ -510,7 +510,7 @@ describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', ()
       },
       target: 0,
       isBlocking: true,
-    } as PendingView;
+    };
     (hgc as unknown as { _view: GameView | null })._view = view;
 
     const actions = hgc.getAvailableActions();
@@ -540,7 +540,7 @@ describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', ()
       },
       target: 0,
       isBlocking: true,
-    } as PendingView;
+    };
     (hgc as unknown as { _view: GameView | null })._view = view;
 
     const actions = hgc.getAvailableActions();

@@ -40,7 +40,7 @@ function makePlayer(opts: {
     maxHealth: opts.maxHealth ?? 4,
     alive: true,
     hand: opts.hand ?? [],
-    equipment: (opts.equipment ?? {}) as Record<string, string>,
+    equipment: (opts.equipment ?? {}),
     skills: opts.skills ?? ['神速'],
     vars: {},
     marks: [],
@@ -261,7 +261,6 @@ describe('神速', () => {
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P1 = harness.player('P1');
 
     await triggerPlayPhase(harness);
     // 无装备 → 不询问神速②(无 pending 由神速创建)

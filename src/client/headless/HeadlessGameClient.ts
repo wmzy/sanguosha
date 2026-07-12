@@ -49,8 +49,8 @@ export class HeadlessGameClient {
   constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}) {
     // 兼容旧 WS URL：ws://→http://, wss://→https://, 去掉 /ws 后缀
     let url = serverUrl;
-    if (url.startsWith('ws://')) url = 'http://' + url.slice(5);
-    else if (url.startsWith('wss://')) url = 'https://' + url.slice(6);
+    if (url.startsWith('ws://')) url = `http://${  url.slice(5)}`;
+    else if (url.startsWith('wss://')) url = `https://${  url.slice(6)}`;
     if (url.endsWith('/ws')) url = url.slice(0, -3);
     this.baseUrl = url;
     this.callbacks = callbacks;
@@ -397,7 +397,7 @@ export class HeadlessGameClient {
           message: {
             skillId: '系统规则',
             actionType: '选将',
-            ownerId: ownerId,
+            ownerId,
             params: { character: c.name },
             baseSeq: 0,
           },
@@ -414,7 +414,7 @@ export class HeadlessGameClient {
         message: {
           skillId: '__skip',
           actionType: 'skip',
-          ownerId: ownerId,
+          ownerId,
           params: {},
           baseSeq: 0,
         },
@@ -431,7 +431,7 @@ export class HeadlessGameClient {
         message: {
           skillId: '系统规则',
           actionType: 'respond',
-          ownerId: ownerId,
+          ownerId,
           params: { cardIds: [] },
           baseSeq: 0,
         },
@@ -458,7 +458,7 @@ export class HeadlessGameClient {
           message: {
             skillId: info.skillId,
             actionType: 'respond',
-            ownerId: ownerId,
+            ownerId,
             params: { targets: [] },
             baseSeq: 0,
           },
@@ -480,7 +480,7 @@ export class HeadlessGameClient {
           message: {
             skillId: info.skillId,
             actionType: 'respond',
-            ownerId: ownerId,
+            ownerId,
             params: { choice: true },
             baseSeq: 0,
           },
@@ -492,7 +492,7 @@ export class HeadlessGameClient {
           message: {
             skillId: info.skillId,
             actionType: 'respond',
-            ownerId: ownerId,
+            ownerId,
             params: { choice: false },
             baseSeq: 0,
           },
@@ -509,7 +509,7 @@ export class HeadlessGameClient {
             message: {
               skillId: info.skillId,
               actionType: 'respond',
-              ownerId: ownerId,
+              ownerId,
               params: { cardId: card.id },
               baseSeq: 0,
             },
@@ -523,7 +523,7 @@ export class HeadlessGameClient {
           message: {
             skillId: '__skip',
             actionType: 'skip',
-            ownerId: ownerId,
+            ownerId,
             params: {},
             baseSeq: 0,
           },
@@ -537,7 +537,7 @@ export class HeadlessGameClient {
           message: {
             skillId: info.skillId,
             actionType: 'respond',
-            ownerId: ownerId,
+            ownerId,
             params: {},
             baseSeq: 0,
           },

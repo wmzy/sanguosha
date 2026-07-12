@@ -92,7 +92,7 @@ describe('回放一致性:录制 → finalize → 重建', () => {
     // 模拟前端:初始 view + 后续增量事件
     // 用 harness 的 session 机制收集 per-player 事件流
     const viewers = [0, 1];
-    let initialViews: GameView[] = [];
+    const initialViews: GameView[] = [];
     for (const v of viewers) {
       const view = buildView(h.state, v);
       initialViews.push(view);

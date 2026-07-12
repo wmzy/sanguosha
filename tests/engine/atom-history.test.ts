@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/create-engine';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';

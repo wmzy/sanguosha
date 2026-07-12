@@ -10,7 +10,7 @@
 //   5. 判定区同时有 乐不思蜀 + 闪电 → 仅 乐不思蜀 触发判定(闪电无 skill 不触发)
 //
 // 关键机制:见 乐不思蜀.ts
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { SkillTestHarness } from '../engine-harness';

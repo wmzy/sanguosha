@@ -657,7 +657,7 @@ describe('分配武将 atom: faction 从角色配置赋值并投影到 view', ()
       character: '曹操',
       skills: [],
       faction: '魏',
-    } as ViewEvent);
+    });
     expect(view.players[0].character).toBe('曹操');
     expect(view.players[0].faction).toBe('魏');
   });

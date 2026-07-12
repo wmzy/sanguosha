@@ -20,6 +20,7 @@ class FakeSink implements ConnectionSink {
   send(message: ServerMessage): void {
     this.messages.push(message);
   }
+
   close(): void {}
   get isAlive(): boolean {
     return true;

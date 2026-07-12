@@ -11,7 +11,7 @@ import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstan
 import { getCharacterMeta } from '../../engine/character-meta';
 import { getSkillDescription } from '../../engine/skill';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
-import { shallowArrayEqual, playerVisibleEqual } from '../utils/memo';
+import { playerVisibleEqual } from '../utils/memo';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 

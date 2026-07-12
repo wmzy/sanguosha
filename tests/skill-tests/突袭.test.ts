@@ -149,7 +149,6 @@ describe('突袭', () => {
     });
     state.zones = { deck: ['d1', 'd2'], discardPile: [], processing: [] };
     await harness.setup(state);
-    const P0 = harness.player('P0');
 
     void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '判定' });
     await harness.waitForStable();

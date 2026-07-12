@@ -23,16 +23,6 @@ import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 
-/** 反复 fireTimeout 直到没有 pending 或超过 safety。返回跳过的 pending 数 */
-async function drainTimeouts(state: GameState, safety = 30): Promise<number> {
-  let n = 0;
-  while (state.pendingSlots.size > 0 && n < safety) {
-    await fireTimeoutAndWait(state);
-    n += 1;
-  }
-  return n;
-}
-
 /** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
 function firstPendingAtom(state: GameState): unknown | undefined {
   if (state.pendingSlots.size === 0) return undefined;

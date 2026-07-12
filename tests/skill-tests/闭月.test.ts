@@ -146,7 +146,6 @@ describe('闭月', () => {
       deck: [],
     });
     await harness.setup(state);
-    const P1 = harness.player('P1');
 
     // 出牌阶段:无闭月询问 pending(出牌窗口是非阻塞 pending,非请求回应)
     // 闭月 hook 不会在出牌阶段触发

@@ -12,7 +12,6 @@ import { Loading } from '../components/Loading';
 import { pageStyle } from '../theme';
 import type { ActionMsg } from '../types';
 import type { ReplayFile } from '../replay/types';
-import type { GameView as EngineGameView } from '../../engine/types';
 
 /** 从 router state 取 ReplayFile */
 function useReplayFileFromLocation(): ReplayFile | null {
@@ -70,7 +69,7 @@ function ReplayView({ file, onExit }: { file: ReplayFile; onExit: () => void }) 
         onSetSeat={r.setSeat}
         onExit={onExit}
       />
-      <GameViewComponent view={r.view as EngineGameView} onAction={noop} readOnly />
+      <GameViewComponent view={r.view} onAction={noop} readOnly />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 // tests/server/persistence.test.ts
 // 持久化层覆盖率补充:saveRoom/loadRoom 往返、sanitizeState、restoreFromLog、flushPendingWrites
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -240,7 +239,6 @@ describe('server/persistence', () => {
         {
           skillId: '测试',
           from: 0,
-          resolvedTargets: [],
           params: {},
           // @ts-expect-error 运行时挂载的函数引用
           _executor: () => {},

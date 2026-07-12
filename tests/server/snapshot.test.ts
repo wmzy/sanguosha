@@ -5,7 +5,7 @@
 // 3. 创建快照:只读——不改变 state 引用和 seq
 // 4. 追加描述:PATCH 后 description 更新
 // 5. 追加描述:不存在的 snapshotId → 404
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
