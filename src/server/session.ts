@@ -511,6 +511,13 @@ export class GameSession {
     return this.lastActivityAt;
   }
 
+  /** session 是否已销毁。闲置清理据此区分「活跃但 idle」与「已 destroy 的 zombie」:
+   *  全员断线 grace 超时(endDueToDisconnect)会 destroy 但不从 gameSessions 移除,
+   *  留给 cleanupIdleRooms 回收——此时必须无视 TTL 立即清理,避免泄漏。 */
+  isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
   getPlayerName(playerId: string): number | undefined {
     return this.playerNames.get(playerId);
   }

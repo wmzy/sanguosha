@@ -70,7 +70,7 @@ function ReplayView({ file, onExit }: { file: ReplayFile; onExit: () => void }) 
         onSetSeat={r.setSeat}
         onExit={onExit}
       />
-      <GameViewComponent view={r.view as EngineGameView} onAction={noop} />
+      <GameViewComponent view={r.view as EngineGameView} onAction={noop} readOnly />
     </div>
   );
 }

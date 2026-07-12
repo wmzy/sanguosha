@@ -5,13 +5,14 @@
 
 import { Hono } from 'hono';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
-import { gameSessions, playerRoomMap } from './registry';
+import { gameSessions } from './registry';
 import { applyRestRoutes } from './rest';
 import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
-import { getRoom, leaveRoom, addRoom, type Room } from './room';
+import { addRoom, type Room } from './room';
+import { cleanupIdleRooms } from './cleanup';
 
 // re-export WS 入口(index.ts / vite-plugin.ts 从 ./app 导入)
 export { handleWsMessage, handleWsOpen, handleWsClose } from './ws';
@@ -29,36 +30,11 @@ applyRestRoutes(app);
 
 // 新 ENGINE-DESIGN 不再需要 protocol-adapter(回应 action 走 ClientMessage 直接 dispatch)
 
-const IDLE_ROOM_TTL_MS = 60 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
-function cleanupIdleRooms(): void {
-  const now = Date.now();
-  const stale: string[] = [];
-  for (const [roomId, session] of gameSessions) {
-    if (now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS) {
-      stale.push(roomId);
-    }
-  }
-  for (const roomId of stale) {
-    log.info(`清理闲置房间 ${roomId}`);
-    const session = gameSessions.get(roomId);
-    session?.destroy();
-    gameSessions.delete(roomId);
-    const room = getRoom(roomId);
-    if (room) {
-      const playerIds = [...room.players.keys()];
-      for (const pid of playerIds) {
-        leaveRoom(roomId, pid);
-        playerRoomMap.delete(pid);
-      }
-    }
-    for (const [pid, rid] of playerRoomMap) {
-      if (rid === roomId) playerRoomMap.delete(pid);
-    }
-  }
-}
-
+// 闲置房间清理:每 5 分钟扫描一次,回收无玩家连接且超时(或已 destroy)的会话。
+// 清理逻辑见 cleanup.ts(无副作用,可单测)。仍有玩家连接的房间永不被清理——
+// 游戏结束后玩家留在房间内等待「再来一局」。
 setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
 
 async function restorePersistedRooms(): Promise<void> {

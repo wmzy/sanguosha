@@ -65,6 +65,9 @@ interface Props {
   /** 当前播放的事件(来自 useEventPlayback),用于 GameView 内部事件横幅展示。
    *  正式模式可不传(无事件播放队列)。 */
   currentEvent?: QueuedEvent | null;
+  /** 只读模式(回放):禁用选将/身份揭示等阻塞性遮罩,避免遮挡游戏画面。
+   *  正式/debug 模式不传(默认 false),保持原有选将流程。 */
+  readOnly?: boolean;
 }
 
 // ─── 主组件 ───
@@ -80,6 +83,7 @@ export function GameViewComponentImpl({
   headerSlot,
   overlaySlot,
   currentEvent,
+  readOnly = false,
 }: Props) {
   const perspectiveIdx = view.viewer;
   const [showIdentityReveal, setShowIdentityReveal] = useState(
@@ -180,6 +184,7 @@ export function GameViewComponentImpl({
     distTargetName,
     selectedActive,
     playButtonState,
+    altActions,
     playRules,
     handleCardClick,
     handlePlayCard,
@@ -247,6 +252,7 @@ export function GameViewComponentImpl({
         onIdentityConfirm={handleIdentityConfirm}
         onAction={onAction}
         overlaySlot={overlaySlot}
+        readOnly={readOnly}
       />
 
       <DevProfiler id="GameHeader">
@@ -446,6 +452,20 @@ export function GameViewComponentImpl({
                   出牌{playButtonState.targetLabel}
                 </button>
               )}
+            {/* 替代出牌方式(如铁索连环·重铸):选中牌后额外显示 */}
+            {canOperate &&
+              !transformMode &&
+              selectedCardId &&
+              altActions.length > 0 &&
+              altActions.map((a) => (
+                <button
+                  key={`${a.skillId}:${a.actionType}`}
+                  className={styles.playBtn}
+                  onClick={() => handleSkillAction(a)}
+                >
+                  {a.label}
+                </button>
+              ))}
             {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
               <button className={styles.endTurnBtn} onClick={handleEndTurn}>
                 结束回合

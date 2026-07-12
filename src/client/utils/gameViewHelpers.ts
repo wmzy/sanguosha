@@ -52,6 +52,24 @@ export function findUseActionForCard(
   });
 }
 
+/**
+ * 找出适用于指定卡牌的非 use 型替代动作(如铁索连环·重铸)。
+ * 这些 action 的 prompt.type 是 useCard,cardFilter 匹配,但 actionType !== 'use'。
+ * 与 findUseActionForCard 互补:use 是主出牌方式,替代动作是同一张牌的其他出法。
+ * @param actions 候选 action 集合
+ * @param card   当前选中的卡牌
+ */
+export function findAltActionsForCard(
+  actions: SkillActionDef[],
+  card: Card,
+): SkillActionDef[] {
+  return actions.filter((a) => {
+    if (a.actionType === 'use') return false;
+    const filter = extractCardFilter(a.prompt);
+    return filter ? filter(card) : false;
+  });
+}
+
 // ─── params 构造 ───
 
 /** 判断一个 action 在给定上下文下是否激活。

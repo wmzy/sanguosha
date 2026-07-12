@@ -125,4 +125,28 @@ describe('applyServerMessage', () => {
     expect(out.resetToLobby).toBe(true);
     expect(out.phaseChangedTo).toBe('lobby');
   });
+
+  it('event 的 view 增量为 zones 创建新引用(避免 ZoneInfoBar memo 永远判等)', () => {
+    // Bug 1 & Bug 2 回归:view={...view} 只浅拷贝顶层,zones 仍是同引用；
+    // applyView 原地突变 zones 后,prev/next 的 zones 指向同一对象,memo 比较器
+    // 读到的 deckCount/discardPileCount/processing 永远相同 → 永不重渲染。
+    const baseline = makeBaseline(0);
+    baseline.zones = { deckCount: 50, discardPileCount: 0, processing: [] };
+    const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 0 });
+    const prevZones = start.view!.zones!;
+    const evt = {
+      type: 'event',
+      seq: 1,
+      timestamp: 100,
+      view: { type: '加标签', player: 0, tag: 'test' },
+    } as ServerMessage;
+    const out = applyServerMessage(start.view, start.lastSeq, evt);
+    // zones 必须是新引用,否则 ZoneInfoBar memo 比较器判等跳过重渲染
+    expect(out.view!.zones).not.toBe(prevZones);
+    // processing 数组也必须是新引用(applyView 会 push/filter 它)
+    expect(out.view!.zones!.processing).not.toBe(prevZones.processing);
+    // 浅拷贝后值保持一致
+    expect(out.view!.zones!.deckCount).toBe(50);
+    expect(out.view!.zones!.discardPileCount).toBe(0);
+  });
 });

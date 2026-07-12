@@ -5,6 +5,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
+import { defaultPlayActive } from '../action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -109,6 +110,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
       // 自疗:前端无需选目标,自动以自己为目标提交
       selfTarget: true,
       targetFilter: { min: 1, max: 1 },
+    },
+    activeWhen: (ctx) => {
+      if (!defaultPlayActive(ctx)) return false;
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      return p ? p.health < p.maxHealth : false;
     },
   });
   api.defineAction('respond', {

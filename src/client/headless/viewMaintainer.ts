@@ -64,8 +64,16 @@ export function applyServerMessage(
         }
       }
       if (msg.view) {
-        // viewReducer 原地突变；复制一份避免污染外部引用
-        view = { ...view };
+        // viewReducer 原地突变；复制一份避免污染外部引用。
+        // zones 需单独浅拷贝（processing 数组亦需复制，因 applyView 会 push/filter 它），
+        // 否则 prev/next 的 zones 同引用，ZoneInfoBar 的 memo 比较器会读到已被原地
+        // 突变的同一值而永远判等，导致弃牌堆/处理区显示冻结（Bug 1 & Bug 2）。
+        view = {
+          ...view,
+          zones: view.zones
+            ? { ...view.zones, processing: [...(view.zones.processing ?? [])] }
+            : view.zones,
+        };
         viewReducer(view, msg.view, msg.timestamp);
         newEvents.push(msg.view);
       }

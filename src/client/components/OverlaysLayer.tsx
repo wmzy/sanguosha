@@ -30,6 +30,9 @@ export interface OverlaysLayerProps {
   }) => void;
   /** 遮罩角落插槽:上层渲染视角控制等 debug UI。 */
   overlaySlot?: ReactNode;
+  /** 只读模式(回放):为 true 时不渲染任何阻塞性遮罩(选将/身份揭示),
+   *  避免回放初始画面被选将遮罩遮挡。默认 false。 */
+  readOnly?: boolean;
 }
 
 export function OverlaysLayer(props: OverlaysLayerProps) {
@@ -43,11 +46,19 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
     onIdentityConfirm,
     onAction,
     overlaySlot,
+    readOnly = false,
   } = props;
 
   const charCandidates = charSelect?.candidates ?? [];
   const charSelectTarget = charSelect ? charSelect.target : -1;
   const charSelectPending = charSelect?.pending ?? null;
+
+  // 只读模式(回放):不渲染任何阻塞性遮罩,直接返回空片段。
+  // 回放从 initialView 开始,其 pending 可能是选将询问,会触发遮罩遮挡游戏画面;
+  // 回放中 onAction=noop,用户也无法交互关闭,故整体禁用。
+  if (readOnly) {
+    return <></>;
+  }
 
   return (
     <>

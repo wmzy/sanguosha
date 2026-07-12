@@ -1328,3 +1328,240 @@ describe('usePlayInteraction · 回合结束 / 选区清理', () => {
     expect(result.current.selectedTarget).toBeNull();
   });
 });
+
+// ─── Bug 3: 铁索连环重铸(替代出牌方式 altActions)───
+// 铁索连环有 use(横置/重置)和 recast(重铸)两个 action。
+// recast 的 prompt.type='useCard',actionType='recast',不属于 use action,
+// 需通过 altActions 渲染为额外按钮。
+
+describe('usePlayInteraction · altActions(替代出牌方式)', () => {
+  const CHAIN_CARD = makeCard({
+    id: 'c-chain',
+    name: '铁索连环',
+    type: '锦囊牌',
+    trickSubtype: '普通锦囊',
+  });
+
+  /** 铁索连环 use action:横置/重置 1-2 名角色(需目标) */
+  function chainUseAction(ownerId = 0): SkillActionDef {
+    return {
+      skillId: '铁索连环',
+      ownerId,
+      actionType: 'use',
+      label: '铁索连环',
+      style: 'primary',
+      prompt: {
+        type: 'useCardAndTarget',
+        title: '铁索连环',
+        cardFilter: { filter: (c) => c.name === '铁索连环', min: 1, max: 1 },
+        targetFilter: { min: 1, max: 2 },
+      },
+      activeWhen: (ctx) =>
+        defaultPlayActive(ctx) &&
+        (ctx.view.players[ctx.perspectiveIdx]?.hand?.some((c) => c.name === '铁索连环') ??
+          false),
+    };
+  }
+
+  /** 铁索连环 recast action:重铸(弃此牌,摸一张) */
+  function chainRecastAction(ownerId = 0): SkillActionDef {
+    return {
+      skillId: '铁索连环',
+      ownerId,
+      actionType: 'recast',
+      label: '铁索连环·重铸',
+      style: 'primary',
+      prompt: {
+        type: 'useCard',
+        title: '铁索连环:重铸(弃此牌,摸一张)',
+        cardFilter: { filter: (c) => c.name === '铁索连环', min: 1, max: 1 },
+      },
+      activeWhen: (ctx) =>
+        defaultPlayActive(ctx) &&
+        (ctx.view.players[ctx.perspectiveIdx]?.hand?.some((c) => c.name === '铁索连环') ??
+          false),
+    };
+  }
+
+  /** activeWhen 检查 view.players[0].hand,需在视图中设置手牌 */
+  function makeChainView(opts: { currentPlayerIndex?: number } = {}): GameView {
+    const view = makePlayView({ currentPlayerIndex: opts.currentPlayerIndex });
+    view.players[0].hand = [CHAIN_CARD];
+    return view;
+  }
+
+  it('选中铁索连环后 altActions 含 recast(替代出牌按钮可见)', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makeChainView(),
+        skillActions: [chainUseAction(), chainRecastAction()],
+        perspectiveHand: [CHAIN_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    expect(result.current.altActions).toHaveLength(1);
+    expect(result.current.altActions[0].actionType).toBe('recast');
+    expect(result.current.altActions[0].label).toBe('铁索连环·重铸');
+  });
+
+  it('未选牌时 altActions 为空', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [chainUseAction(), chainRecastAction()],
+        perspectiveHand: [CHAIN_CARD],
+      }),
+    );
+    expect(result.current.altActions).toEqual([]);
+  });
+
+  it('点击 recast 按钮发送 recast action(useCard 参数)', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makeChainView(),
+        skillActions: [chainUseAction(), chainRecastAction()],
+        perspectiveHand: [CHAIN_CARD],
+        send,
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    // 点击重铸按钮 → handleSkillAction(recastAction)
+    const recastAction = result.current.altActions[0];
+    expect(recastAction).toBeDefined();
+    act(() => result.current.handleSkillAction(recastAction));
+    expect(sentCalls(send)).toEqual([
+      {
+        skillId: '铁索连环',
+        actionType: 'recast',
+        params: { cardId: 'c-chain', cardIds: ['c-chain'] },
+      },
+    ]);
+  });
+
+  it('非自己回合时 recast 不 active,altActions 为空', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makeChainView({ currentPlayerIndex: 1 }),
+        skillActions: [chainUseAction(), chainRecastAction()],
+        perspectiveHand: [CHAIN_CARD],
+      }),
+      false,
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    expect(result.current.altActions).toEqual([]);
+  });
+
+  it('非铁索连环牌不产生 altActions', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [killUseAction(), chainRecastAction()],
+        perspectiveHand: [KILL_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(KILL_CARD));
+    expect(result.current.altActions).toEqual([]);
+  });
+});
+
+// ─── Bug 4: 桃满血时不可出 ───
+// 桃 use action 添加 activeWhen: 满血时返回 false,阻止出牌按钮渲染。
+
+describe('usePlayInteraction · 桃满血限制(activeWhen)', () => {
+  /** 与 engine/skills/桃.ts onMount 声明同源的 activeWhen */
+  function peachHealthActiveWhen(ctx: {
+    view: GameView;
+    perspectiveIdx: number;
+  }): boolean {
+    if (!defaultPlayActive(ctx)) return false;
+    const p = ctx.view.players[ctx.perspectiveIdx];
+    return p ? p.health < p.maxHealth : false;
+  }
+
+  /** 带满血限制的桃 use action */
+  function peachUseActionWithHealthCheck(ownerId = 0): SkillActionDef {
+    return {
+      skillId: '桃',
+      ownerId,
+      actionType: 'use',
+      label: '桃',
+      style: 'primary',
+      prompt: {
+        type: 'useCardAndTarget',
+        title: '使用桃',
+        cardFilter: { filter: (c) => c.name === '桃', min: 1, max: 1 },
+        selfTarget: true,
+        targetFilter: { min: 1, max: 1 },
+      },
+      activeWhen: peachHealthActiveWhen,
+    };
+  }
+
+  /** 可配置 P0 体力/体力的视图 */
+  function makePeachView(opts: { health?: number; maxHealth?: number } = {}): GameView {
+    const view = makePlayView();
+    view.players[0].health = opts.health ?? 4;
+    view.players[0].maxHealth = opts.maxHealth ?? 4;
+    return view;
+  }
+
+  it('满血时桃 use action 不 active,出牌按钮不渲染', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePeachView({ health: 4, maxHealth: 4 }),
+        skillActions: [peachUseActionWithHealthCheck()],
+        perspectiveHand: [PEACH_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(PEACH_CARD));
+    // selectedActive=false → 出牌按钮条件不满足(GameView 渲染需 selectedActive && playButtonState)
+    expect(result.current.selectedActive).toBe(false);
+  });
+
+  it('受伤时桃 use action 正常 active,可出牌', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePeachView({ health: 2, maxHealth: 4 }),
+        skillActions: [peachUseActionWithHealthCheck()],
+        perspectiveHand: [PEACH_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(PEACH_CARD));
+    expect(result.current.selectedActive).toBe(true);
+    expect(result.current.playButtonState).toEqual({ canPlay: true, targetLabel: '' });
+  });
+
+  it('满血时出桃后端不被调用(无 send 调用)', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePeachView({ health: 4, maxHealth: 4 }),
+        skillActions: [peachUseActionWithHealthCheck()],
+        perspectiveHand: [PEACH_CARD],
+        send,
+      }),
+    );
+    act(() => result.current.handleCardClick(PEACH_CARD));
+    // 满血时 selectedActive=false → handlePlayCard 早退(use action 不 active)
+    act(() => result.current.handlePlayCard());
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('受伤时出桃正常发送 use action', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePeachView({ health: 2, maxHealth: 4 }),
+        skillActions: [peachUseActionWithHealthCheck()],
+        perspectiveHand: [PEACH_CARD],
+        send,
+      }),
+    );
+    act(() => result.current.handleCardClick(PEACH_CARD));
+    act(() => result.current.handlePlayCard());
+    expect(sentCalls(send)).toEqual([
+      { skillId: '桃', actionType: 'use', params: { cardId: 'c-peach', targets: [0] } },
+    ]);
+  });
+});

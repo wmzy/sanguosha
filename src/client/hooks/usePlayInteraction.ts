@@ -21,6 +21,7 @@ import {
   buildPlayParams,
   derivePlayRules,
   findUseActionForCard,
+  findAltActionsForCard,
   isActiveAction,
   resolveDistributeCardIds,
 } from '../utils/gameViewHelpers';
@@ -104,6 +105,8 @@ export interface PlayInteractionResult {
   playRules: import('../utils/gameViewHelpers').PlayRules | null;
   selectedActive: boolean;
   playButtonState: { canPlay: boolean; targetLabel: string } | null;
+  /** 选中牌的可用替代动作(如铁索连环·重铸),均已 active */
+  altActions: SkillActionDef[];
   // ─── handlers ───
   handleCardClick: (card: Card) => void;
   handlePlayCard: () => void;
@@ -286,6 +289,16 @@ export function usePlayInteraction(
     ? isActiveAction(selectedUseAction, { view, perspectiveIdx })
     : false;
 
+  // ─── 派生:选中牌的替代动作(如铁索连环·重铸)───
+  // 非 use 型 useCard action,cardFilter 匹配选中牌且 active 时可点击。
+  const altActions = (() => {
+    if (!selectedCard) return [];
+    const ctx = { view, perspectiveIdx };
+    return findAltActionsForCard(skillActions, selectedCard).filter((a) =>
+      isActiveAction(a, ctx),
+    );
+  })();
+
   const playButtonState = (() => {
     if (!selectedCardId) return null;
     const card = perspectiveHand.find((c) => c.id === selectedCardId);
@@ -364,6 +377,8 @@ export function usePlayInteraction(
     if (!selectedCardId) return;
     const card = perspectiveHand.find((c) => c.id === selectedCardId);
     if (!card || !selectedUseAction) return;
+    // use action 不 active 时不出(如满血时桃、杀超上限)
+    if (!selectedActive) return;
     const rules = derivePlayRules(
       selectedTargetFilter,
       selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget,
@@ -387,6 +402,7 @@ export function usePlayInteraction(
     selectedCardId,
     perspectiveHand,
     selectedUseAction,
+    selectedActive,
     selectedTargetFilter,
     view.players,
     perspectiveIdx,
@@ -799,6 +815,7 @@ export function usePlayInteraction(
     playRules,
     selectedActive,
     playButtonState,
+    altActions,
     handleCardClick,
     handlePlayCard,
     handleTargetClick,
