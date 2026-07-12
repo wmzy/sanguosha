@@ -2,13 +2,14 @@
 // 动画 keyframes 见 src/client/animations.css(由 main.tsx 全局引入)。
 
 import { css } from '@linaria/core';
+import { colors } from '../../theme';
 
 // ─── 页面骨架 ───
 export const pageRoot = css`
   padding: 12px;
   font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
-  background: linear-gradient(180deg, #1a0f0a 0%, #2d1810 30%, #1e1008 70%, #0d0804 100%);
-  color: #e0e0e0;
+  background-color: ${colors.bg.page};
+  color: ${colors.text.primary};
   min-height: 100vh;
   overflow-x: hidden;
 `;

@@ -202,6 +202,7 @@ export function MultiplayerPage() {
   const [createName, setCreateName] = useState('');
   const [createMax, setCreateMax] = useState(2);
   const [joinCode, setJoinCode] = useState('');
+  const [spectateCode, setSpectateCode] = useState('');
 
   // lobby 阶段房间列表(参考 DebugLobby)
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
@@ -254,6 +255,12 @@ export function MultiplayerPage() {
     mp.joinRoom(code);
   };
 
+  const handleSpectate = () => {
+    const code = spectateCode.trim().toUpperCase();
+    if (code.length < 1) return;
+    mp.joinAsSpectator(code);
+  };
+
   const allReady =
     mp.roomState &&
     mp.roomState.readyPlayers.length === mp.roomState.playerIds.length &&
@@ -261,6 +268,8 @@ export function MultiplayerPage() {
   const readyCount = mp.roomState?.readyPlayers.length ?? 0;
   const playerCount = mp.roomState?.playerIds.length ?? 0;
   const maxPlayers = mp.roomState?.maxPlayers ?? createMax;
+  const spectatorCount = mp.roomState?.spectatorIds.length ?? 0;
+  const pendingRequests = mp.roomState?.pendingViewRequests ?? {};
 
   const handleAction = (action: ActionMsg) => mp.sendAction(action);
 
@@ -303,6 +312,100 @@ export function MultiplayerPage() {
         </button>
       </div>
     ) : null;
+
+  if (mp.stage === 'spectating' && mp.view) {
+    // 旁观者申请查看某玩家视角的下拉
+    const spectatorList = mp.roomState?.spectatorIds ?? [];
+    const viewGrants = mp.roomState?.viewGrants ?? {};
+    const pendingRequests = mp.roomState?.pendingViewRequests ?? {};
+    const myGrant = mp.playerId ? viewGrants[mp.playerId] : undefined;
+    // 构建玩家名称列表（座次序号 → playerId）
+    const playerIds = mp.roomState?.playerIds ?? [];
+    return (
+      <>
+        {reconnectBanner}
+        <div className={gameWrap}>
+          {/* 旁观者控制条 */}
+          <div style={{ padding: '8px 16px', background: colors.bg.panel, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ color: colors.accent.gold, fontWeight: 'bold' }}>👁 旁观中</span>
+            <span style={{ color: colors.text.muted, fontSize: '13px' }}>
+              {myGrant !== undefined ? `已授权查看 P${myGrant} 视角` : '公开视图'}
+            </span>
+            {/* 申请查看下拉 */}
+            {myGrant === undefined && (
+              <>
+                <select
+                  className={inputStyle}
+                  style={{ width: 'auto', fontSize: '13px' }}
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value && mp.playerId) {
+                      // 只发送申请，不直接切换
+                      const seat = Number(e.target.value);
+                      mp.requestView(seat);
+                      e.target.value = '';
+                    }
+                  }}
+                >
+                  <option value="" disabled>申请查看视角…</option>
+                  {playerIds.map((pid, i) => (
+                    <option key={pid} value={i}>P{i} {pid.slice(0, 6)}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            <button
+              className={btnStyle}
+              style={{ '--btn-bg': colors.disabled, '--btn-padding': '4px 12px', '--btn-font-size': '12px' } as React.CSSProperties}
+              onClick={() => {
+                mp.leaveRoom();
+                navigate('/');
+              }}
+            >
+              退出
+            </button>
+          </div>
+          {/* 玩家视角的审批提示（仅当该玩家也在页面上时可见——但旁观者只看自己，所以审批由 playing 阶段处理） */}
+          <GameViewComponent view={mp.view} onAction={() => {}} onReorderHand={() => {}} />
+        </div>
+      </>
+    );
+  }
+
+  // 旁观者在等待阶段（游戏未开始）
+  if (mp.stage === 'spectating') {
+    return (
+      <>
+        {reconnectBanner}
+        <div className={page}>
+          <h1 className={title}>旁观等待中</h1>
+          <p className={subtitle}>等待房主开始游戏</p>
+          <div className={card}>
+            <div className={roomCodeBox}>
+              <div className={roomCodeLabel}>房间码</div>
+              <div className={roomCode}>{mp.roomId ?? '加载中…'}</div>
+            </div>
+            <div className={readyInfo}>
+              玩家：{mp.roomState?.playerIds.length ?? 0} / {mp.roomState?.maxPlayers ?? 0}
+            </div>
+            <div className={buttonRow}>
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
+                onClick={() => {
+                  mp.leaveRoom();
+                  navigate('/');
+                }}
+              >
+                退出
+              </button>
+            </div>
+          </div>
+          {mp.error && <div className={errorToastStyle}>{mp.error}</div>}
+        </div>
+      </>
+    );
+  }
 
   if (mp.stage === 'playing' && mp.view) {
     return (
@@ -372,6 +475,28 @@ export function MultiplayerPage() {
           <div className={readyInfo}>
             已就绪：{readyCount} / {playerCount}（满 {maxPlayers} 人）
           </div>
+          {/* 旁观者列表 */}
+          {spectatorCount > 0 && (
+            <div className={readyInfo} style={{ fontSize: '13px', color: colors.text.muted }}>
+              👁 旁观者：{spectatorCount} 人
+            </div>
+          )}
+          {/* 待处理申请提示 */}
+          {Object.entries(pendingRequests).map(([sid, seat]) => (
+            <div key={sid} style={{ background: colors.bg.input, borderRadius: '8px', padding: '10px', marginBottom: '8px', fontSize: '13px' }}>
+              <span>{sid.slice(0, 8)} 申请查看 P{seat} 视角</span>
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.accent.green, '--btn-padding': '4px 12px', '--btn-font-size': '12px', marginLeft: '8px' } as React.CSSProperties}
+                onClick={() => mp.approveView(sid, seat)}
+              >同意</button>
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.accent.red, '--btn-padding': '4px 12px', '--btn-font-size': '12px', marginLeft: '4px' } as React.CSSProperties}
+                onClick={() => mp.rejectView(sid)}
+              >拒绝</button>
+            </div>
+          ))}
           <div className={buttonRow}>
             {!mp.ready && (
               <button
@@ -482,12 +607,35 @@ export function MultiplayerPage() {
               返回首页
             </button>
           </div>
+          <div className={divider} />
+          <div className={sectionTitle}>旁观房间</div>
+          <div className={formRow}>
+            <label className={label}>房间码（以旁观者身份加入）</label>
+            <input
+              className={inputStyle}
+              value={spectateCode}
+              onChange={(e) => setSpectateCode(e.target.value.toUpperCase())}
+              placeholder="输入6位房间码"
+              maxLength={8}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSpectate();
+              }}
+            />
+            <button
+              className={btnStyle}
+              style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
+              onClick={handleSpectate}
+            >
+              👁 旁观加入
+            </button>
+          </div>
         </div>
         <RoomListPanel
           rooms={rooms}
           onRefresh={fetchRooms}
           onJoin={mp.joinRoom}
           onDelete={handleDeleteRoom}
+          onSpectate={mp.joinAsSpectator}
           emptyText="暂无公开房间"
         />
       </div>

@@ -162,14 +162,13 @@ describe('handleMcpRequest', () => {
       ctx,
     );
     expect(ensureStarted).toHaveBeenCalledTimes(1);
-    expect(ensureStarted).toHaveBeenCalledWith({
-      mode: 'multiplayer',
-      roomId: 'ABC123',
-      name: undefined,
-      maxPlayers: undefined,
-      playerId: 'ai-1',
-      readyTimeoutMs: undefined,
-    });
+    expect(ensureStarted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'multiplayer',
+        roomId: 'ABC123',
+        playerId: 'ai-1',
+      }),
+    );
   });
 
   it('startGame={mode:multiplayer} 建房模式(无 roomId)', async () => {
@@ -187,14 +186,13 @@ describe('handleMcpRequest', () => {
       },
       ctx,
     );
-    expect(ensureStarted).toHaveBeenCalledWith({
-      mode: 'multiplayer',
-      roomId: undefined,
-      name: '测试房',
-      maxPlayers: 4,
-      playerId: undefined,
-      readyTimeoutMs: undefined,
-    });
+    expect(ensureStarted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'multiplayer',
+        name: '测试房',
+        maxPlayers: 4,
+      }),
+    );
   });
 
   it('startGame={mode:multiplayer,timeoutScale} 解析并传给 ensureStarted', async () => {

@@ -116,6 +116,9 @@ export function applyServerMessage(
           hostId: msg.hostId,
           maxPlayers: msg.maxPlayers,
           config: msg.config,
+          spectatorIds: msg.spectatorIds ?? [],
+          viewGrants: msg.viewGrants ?? {},
+          pendingViewRequests: msg.pendingViewRequests ?? {},
         },
       };
     case 'room_config':

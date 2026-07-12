@@ -52,14 +52,17 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
     const snapshot = (): PlayResult => {
       const view = hgc.view ? projectView(hgc.view) : null;
       const availableActions = hgc.getAvailableActions();
+      const phase: PlayResult['phase'] = hgc.isSpectator
+        ? (hgc.phase === 'ended' ? 'ended' : 'playing')
+        : (hgc.phase === 'connecting' ? 'lobby' : hgc.phase);
       return {
         roomId: hgc.roomId,
-        phase: hgc.phase === 'connecting' ? 'lobby' : hgc.phase,
+        phase,
         gameOver: hgc.gameOverWinner ? { winner: hgc.gameOverWinner } : null,
-        needsAction: hgc.needsAction(),
+        needsAction: hgc.isSpectator ? false : hgc.needsAction(),
         view,
-        availableActions,
-        recommendedAction: view ? pickBestAction(view, availableActions) : null,
+        availableActions: hgc.isSpectator ? [] : availableActions,
+        recommendedAction: !hgc.isSpectator && view ? pickBestAction(view, availableActions) : null,
         recentEvents: hgc.drainNewEvents(),
         lastActionResult,
       };

@@ -8,6 +8,7 @@ interface RoomListPanelProps {
   onRefresh: () => void;
   onJoin: (roomId: string) => void;
   onDelete?: (roomId: string) => void;
+  onSpectate?: (roomId: string) => void;
   emptyText?: string;
   /**
    * 调试房间专用:status 限制(等待中)不生效,join 按钮始终可点(除非已满)。
@@ -88,6 +89,7 @@ export const RoomListPanel = memo(
     onRefresh,
     onJoin,
     onDelete,
+    onSpectate,
     emptyText,
     allowJoinAlways = false,
   }: RoomListPanelProps) => {
@@ -128,6 +130,7 @@ export const RoomListPanel = memo(
                   <div className={roomIdMono}>{room.id}</div>
                   <div className={roomMeta}>
                     {room.playerCount}/{room.maxPlayers} 玩家 | {room.status}
+                    {room.spectatorCount ? ` | ${room.spectatorCount} 旁观` : ''}
                   </div>
                 </div>
                 <div className={roomActions}>
@@ -146,6 +149,21 @@ export const RoomListPanel = memo(
                   >
                     加入
                   </button>
+                  {onSpectate && (
+                    <button
+                      onClick={() => onSpectate(room.id)}
+                      className={btnStyle}
+                      style={
+                        {
+                          '--btn-bg': colors.accent.blue,
+                          '--btn-padding': '8px 16px',
+                          '--btn-font-size': '13px',
+                        } as React.CSSProperties
+                      }
+                    >
+                      旁观
+                    </button>
+                  )}
                   {onDelete && (
                     <button
                       onClick={() => onDelete(room.id)}

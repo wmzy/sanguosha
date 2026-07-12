@@ -14,10 +14,11 @@ import type { ActionMsg } from '../types';
 import { createLogger } from '../utils/logger';
 import { ReplayRecorder } from '../replay/recorder';
 import type { ReplayMeta } from '../replay/types';
+import { apiFetch } from '../api/client';
 
 const log = createLogger('useMultiplayerRoom');
 
-export type MultiplayerStage = 'lobby' | 'waiting' | 'playing' | 'ended';
+export type MultiplayerStage = 'lobby' | 'waiting' | 'playing' | 'ended' | 'spectating';
 
 /** 连接状态(供 UI 显示连接/重连提示)。 */
 export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'failed';
@@ -27,7 +28,8 @@ type Command =
   | { type: 'idle' }
   | { type: 'autoJoin'; roomId: string }
   | { type: 'create'; name: string; maxPlayers: number; config?: RoomConfig }
-  | { type: 'join'; roomId: string };
+  | { type: 'join'; roomId: string }
+  | { type: 'spectate'; roomId: string };
 
 export interface MultiplayerRoom {
   stage: MultiplayerStage;
@@ -39,10 +41,13 @@ export interface MultiplayerRoom {
   error: string | null;
   /** 是否房主 */
   isHost: boolean;
+  /** 是否为旁观者 */
+  isSpectator: boolean;
   /** 本人是否已准备 */
   ready: boolean;
   createRoom: (name: string, maxPlayers: number, config?: RoomConfig) => void;
   joinRoom: (roomId: string) => void;
+  joinAsSpectator: (roomId: string) => void;
   toggleReady: () => void;
   startGame: () => void;
   /** 游戏结束后再来一局:重置房间回「配置+准备」阶段(复用同一连接)。 */
@@ -50,6 +55,16 @@ export interface MultiplayerRoom {
   leaveRoom: () => void;
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
+  /** 切换身份（等待中） */
+  switchRole: (role: 'player' | 'spectator') => void;
+  /** 旁观者申请查看指定座次 */
+  requestView: (targetSeat: number) => void;
+  /** 玩家审批通过 */
+  approveView: (spectatorId: string, targetSeat: number) => void;
+  /** 玩家拒绝申请 */
+  rejectView: (spectatorId: string) => void;
+  /** 玩家撤销已授权 */
+  revokeView: (spectatorId: string) => void;
   /** 当前连接状态(供 UI 显示连接/重连提示) */
   connectionState: ConnectionState;
   /** 当前重连尝试次数(0=未在重连) */
@@ -86,6 +101,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const serverUrl = window.location.origin;
 
   const isHost = roomState?.hostId === playerId && playerId !== null;
+  const isSpectator = stage === 'spectating';
 
   // ── 主连接 effect:command 变化时创建 HGC + 执行命令 + cleanup disconnect ──
   // StrictMode 安全:cleanup 断开后,StrictMode 重跑 effect 会完整重建。
@@ -100,13 +116,14 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         // 录制:单座次事件流
         recorderRef.current.record(v.viewer, v, newEvents);
         setView(v);
-        if (v.viewer >= 0) setStage('playing');
+        // 旁观者始终留在 spectating stage，不因 viewer>=0 跳转
+        if (v.viewer >= 0 && !hgc.isSpectator) setStage('playing');
       },
       onRoomState: (rs) => setRoomState(rs),
       onPhaseChange: (phase: ClientPhase) => {
         if (phase === 'lobby') setConnectionState('connected');
-        if (phase === 'playing') setStage('playing');
-        if (phase === 'ended') setStage('ended');
+        if (phase === 'playing' && !hgc.isSpectator) setStage('playing');
+        if (phase === 'ended' && !hgc.isSpectator) setStage('ended');
       },
       onGameOver: (winner) => setGameOver({ winner }),
       onError: () => {
@@ -143,6 +160,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     } else if (command.type === 'join' || command.type === 'autoJoin') {
       hgc.joinRoom(command.roomId);
       setStage('waiting');
+    } else if (command.type === 'spectate') {
+      hgc.joinAsSpectator(command.roomId);
+      setStage('spectating');
     }
 
     return () => {
@@ -241,6 +261,68 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     hgcRef.current?.cancelReconnect();
   }, []);
 
+  // ── 旁观者方法 ──
+
+  const joinAsSpectator = useCallback((targetRoomId: string) => {
+    setError(null);
+    setGameOver(null);
+    setView(null);
+    setReady(false);
+    setRoomState(null);
+    setCommand({ type: 'spectate', roomId: targetRoomId });
+    log.info('joinAsSpectator', { roomId: targetRoomId });
+  }, []);
+
+  const switchRole = useCallback((role: 'player' | 'spectator') => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId || !hgc.playerId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/switch-role`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hgc.playerId, role }),
+    }).catch((err) => log.error('switchRole failed', { error: String(err) }));
+  }, []);
+
+  const requestView = useCallback((targetSeat: number) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId || !hgc.playerId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/request-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spectatorId: hgc.playerId, targetSeat }),
+    }).catch((err) => log.error('requestView failed', { error: String(err) }));
+  }, []);
+
+  const approveView = useCallback((spectatorId: string, targetSeat: number) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId || !hgc.playerId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/approve-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spectatorId, targetSeat }),
+    }).catch((err) => log.error('approveView failed', { error: String(err) }));
+  }, []);
+
+  const rejectView = useCallback((spectatorId: string) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/reject-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spectatorId }),
+    }).catch((err) => log.error('rejectView failed', { error: String(err) }));
+  }, []);
+
+  const revokeView = useCallback((spectatorId: string) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/revoke-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spectatorId }),
+    }).catch((err) => log.error('revokeView failed', { error: String(err) }));
+  }, []);
+
   return {
     stage,
     roomId,
@@ -250,15 +332,22 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     gameOver,
     error,
     isHost,
+    isSpectator,
     ready,
     createRoom,
     joinRoom,
+    joinAsSpectator,
     toggleReady,
     startGame,
     sendRestart,
     leaveRoom,
     sendAction,
     reorderHand,
+    switchRole,
+    requestView,
+    approveView,
+    rejectView,
+    revokeView,
     connectionState,
     reconnectAttempt,
     cancelReconnect,

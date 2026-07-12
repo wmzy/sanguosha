@@ -40,7 +40,7 @@ export function useCharSelect(view: GameView, perspectiveIdx: number): CharSelec
   const submittedCharSelects = useSubmittedCharSelects();
   const charSelectPending =
     view.pending?.atom?.type === '选将询问' &&
-    !view.players[view.pending.target].character &&
+    !view.players[view.pending.target]?.character &&
     !submittedCharSelects.has(view.pending.target)
       ? view.pending
       : null;
@@ -56,7 +56,7 @@ export function useCharSelect(view: GameView, perspectiveIdx: number): CharSelec
     : null;
 
   const charSelectInProgress = view.phase === '准备' && view.players.some((p) => !p.character);
-  const perspectiveCharSelected = !!view.players[perspectiveIdx].character;
+  const perspectiveCharSelected = !!view.players[perspectiveIdx]?.character;
 
   return { isCharSelectPending, charSelect, charSelectInProgress, perspectiveCharSelected };
 }

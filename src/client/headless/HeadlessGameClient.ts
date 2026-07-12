@@ -39,6 +39,8 @@ export class HeadlessGameClient {
   private _reconnectState: ReconnectState = 'idle';
   /** 是否为 debug 模式(影响连接方式) */
   private _debugMode = false;
+  /** 是否为旁观者 */
+  private _isSpectator = false;
   /** 已收到 room_joined,具备 SSE 连接上下文 */
   private canReconnect = false;
   /** 重连状态轮询定时器 */
@@ -86,6 +88,11 @@ export class HeadlessGameClient {
 
   get gameOverWinner(): string | null {
     return this._gameOverWinner;
+  }
+
+  /** 是否为旁观者 */
+  get isSpectator(): boolean {
+    return this._isSpectator;
   }
 
   /** 当前重连状态(idle/reconnecting/failed) */
@@ -183,6 +190,31 @@ export class HeadlessGameClient {
     this.canReconnect = true;
 
     this.openStream();
+  }
+
+  /** 以旁观者身份加入房间。不占座次，默认看公开视图。 */
+  async joinAsSpectator(roomId: string, playerId?: string): Promise<void> {
+    this._debugMode = false;
+    this._roomId = roomId;
+    this.intentionalDisconnect = false;
+
+    const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join-spectator`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId }),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error((body as { error?: string }).error ?? '加入旁观失败');
+    }
+    const data = await resp.json() as { roomId: string; playerId: string };
+    this._roomId = data.roomId;
+    this._playerId = data.playerId;
+    this._isSpectator = true;
+    this.canReconnect = true;
+
+    this.openStream();
+    this.setPhase('lobby');
   }
 
   /** 建立 SSE 流接收服务端推送 */

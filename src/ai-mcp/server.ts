@@ -48,6 +48,17 @@ async function main(): Promise<void> {
   const ensureStarted = async (opts?: StartGameOpts): Promise<void> => {
     const o = opts ?? normalizeStartGame(true);
     if (o.mode === 'multiplayer') {
+      // 旁观者模式：joinAsSpectator 后直接等待，不准备/不开局。
+      if (o.asSpectator) {
+        if (!started) {
+          const targetRoom = o.roomId ?? ROOM_ID;
+          if (!targetRoom) throw new Error('旁观模式需要 roomId');
+          await hgc.joinAsSpectator(targetRoom, o.playerId ?? PLAYER_ID ?? undefined);
+          started = true;
+          logErr(`spectator joined: ${targetRoom}`);
+        }
+        return;
+      }
       // 首次：建/加入 + ready，立即返回 lobby + roomId（不等全员就绪）。
       // 这样房主能把房间码分享给他人，他人在独立进程加入后，再由后续 play 调用
       // 触发 advanceToStart 推进开局。避免"阻塞等 ready 期间无法启动对方"的死锁。

@@ -20,6 +20,12 @@ export interface Room {
   isDebug?: boolean;
   /** 房间级游戏配置 */
   config: RoomConfig;
+  /** 旁观者连接（不占 maxPlayers 名额）。spectatorId → sink */
+  spectators: Map<string, ConnectionSink>;
+  /** 视图授权：spectatorId → 被授权查看的玩家座次下标 */
+  viewGrants: Map<string, number>;
+  /** 待处理申请：spectatorId → 申请查看的座次下标 */
+  pendingViewRequests: Map<string, number>;
 }
 
 const roomList = new Map<string, Room>();
@@ -63,6 +69,9 @@ export function createRoom(
     hostId,
     readyPlayers: new Set(),
     config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
   };
   roomList.set(id, room);
   return room;
@@ -82,6 +91,9 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
     readyPlayers: new Set(),
     isDebug: true,
     config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
   };
   roomList.set(id, room);
   return room;
@@ -218,6 +230,7 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
       status: room.status,
       isDebug: room.isDebug === true,
       config: room.config,
+      spectatorCount: room.spectators.size,
     });
   }
   return result;
@@ -225,7 +238,7 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
 
 export function findRoomByPlayerId(playerId: string): Room | null {
   for (const room of roomList.values()) {
-    if (room.players.has(playerId)) return room;
+    if (room.players.has(playerId) || room.spectators.has(playerId)) return room;
   }
   return null;
 }
@@ -236,9 +249,19 @@ export function broadcastMessage(room: Room, message: ServerMessage, excludeId?:
       try {
         sink.send(message);
       } catch (err) {
-        // 单点失败不影响其他玩家,但必须记录完整堆栈
         const e = err instanceof Error ? err : new Error(String(err));
         log.error(`ws.send failed for player ${id}`, { error: e.stack ?? String(e) });
+      }
+    }
+  }
+  // 旁观者也接收广播消息（room_state/game_started/gameOver 等）
+  for (const [id, sink] of room.spectators) {
+    if (id !== excludeId) {
+      try {
+        sink.send(message);
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        log.error(`ws.send failed for spectator ${id}`, { error: e.stack ?? String(e) });
       }
     }
   }
@@ -251,4 +274,90 @@ export function setSessionChecker(fn: ((roomId: string) => boolean) | null): voi
 }
 function hasSession(roomId: string): boolean {
   return sessionChecker ? sessionChecker(roomId) : true;
+}
+
+// ── 旁观者管理 ──
+
+/** 以旁观者身份加入房间。不占 maxPlayers 名额。 */
+export function joinAsSpectator(roomId: string, spectatorId: string, sink: ConnectionSink): Room | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  room.spectators.set(spectatorId, sink);
+  return room;
+}
+
+/** 旁观者离开/断线：清理连接、授权和待处理申请。 */
+export function removeSpectator(roomId: string, spectatorId: string): Room | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  room.spectators.delete(spectatorId);
+  room.viewGrants.delete(spectatorId);
+  room.pendingViewRequests.delete(spectatorId);
+  return room;
+}
+
+/** 切换玩家身份（仅等待中允许）。player↔spectator。 */
+export function switchRole(
+  roomId: string,
+  playerId: string,
+  newRole: 'player' | 'spectator',
+): { room: Room; success: boolean } {
+  const room = roomList.get(roomId);
+  if (!room) return { room: null as never, success: false };
+  if (room.status !== '等待中') return { room, success: false };
+
+  if (newRole === 'spectator') {
+    // player → spectator
+    const sink = room.players.get(playerId);
+    if (!sink) return { room, success: false };
+    room.players.delete(playerId);
+    room.readyPlayers.delete(playerId);
+    room.spectators.set(playerId, sink);
+    // 房主切旁观仍保留 hostId（管理权限不变）
+    return { room, success: true };
+  } else {
+    // spectator → player
+    const sink = room.spectators.get(playerId);
+    if (!sink) return { room, success: false };
+    if (room.players.size >= room.maxPlayers) return { room, success: false };
+    room.spectators.delete(playerId);
+    room.viewGrants.delete(playerId);
+    room.pendingViewRequests.delete(playerId);
+    room.players.set(playerId, sink);
+    return { room, success: true };
+  }
+}
+
+/** 旁观者申请查看指定座次的视图。 */
+export function requestView(roomId: string, spectatorId: string, targetSeat: number): Room | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  if (!room.spectators.has(spectatorId)) return null;
+  room.pendingViewRequests.set(spectatorId, targetSeat);
+  return room;
+}
+
+/** 玩家审批通过：设置 viewGrant。 */
+export function approveView(roomId: string, spectatorId: string, targetSeat: number): Room | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  room.viewGrants.set(spectatorId, targetSeat);
+  room.pendingViewRequests.delete(spectatorId);
+  return room;
+}
+
+/** 玩家拒绝申请。 */
+export function rejectView(roomId: string, spectatorId: string): Room | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  room.pendingViewRequests.delete(spectatorId);
+  return room;
+}
+
+/** 玩家撤销已授权。 */
+export function revokeView(roomId: string, spectatorId: string): Room | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  room.viewGrants.delete(spectatorId);
+  return room;
 }

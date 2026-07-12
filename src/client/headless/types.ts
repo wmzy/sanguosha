@@ -15,6 +15,9 @@ export interface RoomState {
   hostId: string | null;
   maxPlayers: number;
   config: RoomConfig;
+  spectatorIds: string[];
+  viewGrants: Record<string, number>;
+  pendingViewRequests: Record<string, number>;
 }
 
 export type ClientPhase = 'connecting' | 'lobby' | 'playing' | 'ended';

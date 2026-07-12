@@ -85,6 +85,9 @@ async function restorePersistedRooms(): Promise<void> {
         readyPlayers: new Set(),
         isDebug: persisted.debug,
         config: restoredConfig,
+        spectators: new Map(),
+        viewGrants: new Map(),
+        pendingViewRequests: new Map(),
       };
       addRoom(room);
       const session = new GameSession(room, persisted.debug);

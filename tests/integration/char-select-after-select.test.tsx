@@ -262,4 +262,28 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
     // onAction 仍然只被调用一次(锁定后重复点击不再提交)
     expect(onAction).toHaveBeenCalledTimes(1);
   });
+
+  it('旁观者(viewer=-1)渲染不崩溃:无授权公开视图 perspectiveIdx 回退到座次 0', () => {
+    // 旁观者无 viewGrant 时 viewer=-1,buildView 产出公开视图(所有 hand 为 undefined)。
+    // GameViewComponent 必须 clamp perspectiveIdx 到有效座次,否则 view.players[-1] 崩溃。
+    const view: GameView = {
+      viewer: -1, // 旁观者无授权
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+      players: [
+        makePlayer(0, '刘备', '主公', ['仁德']),
+        makePlayer(1, ''),
+        makePlayer(2, ''),
+      ],
+      cardMap: {},
+      pending: null,
+      deadline: null,
+      deadlineTotalMs: 0,
+      log: [],
+      settlementStack: [],
+    };
+    // 不应抛出 "Cannot read properties of undefined (reading 'character')"
+    expect(() => render(<GameViewComponent view={view} onAction={() => {}} />)).not.toThrow();
+  });
 });

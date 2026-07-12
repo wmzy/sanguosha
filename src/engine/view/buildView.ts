@@ -75,7 +75,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // 回退到 def.pending.timeout —— 与 createAndAwaitSlot 的实际定时器口径一致
       totalMs: ((slot.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 30) * 1000,
     };
-  } else if (viewer >= 0) {
+  } else {
     // 观察型 pending:当前 viewer 既无自己的 slot 也无广播 slot,但场上存在其他
     // 玩家的 pending slot(真实玩家 target>=0)。与事件流 applyView(询问闪/询问杀/
     // 请求回应 对非 target viewer 设观察型 pending)对齐:让初始视图/重连视图也能
@@ -83,6 +83,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     // 不渲染可操作 prompt(仅给 target 供跟随),避免"共用倒计时"误导。
     // 仅限游戏进行中的问询类 atom —— 选将询问/选将 等开局 atom 的 pending 是
     // 隔离的(只有被问询者见),不应观察型投影(charselect-pending-isolation 契约)。
+    // viewer<0(旁观者)也需 observer pending 以获知"当前在等谁操作"。
     const OBSERVER_PENDING_TYPES = new Set([
       '询问闪', '询问杀', '请求回应', '出牌窗口',
       ...(debug ? ['选将询问', '选将'] : []),

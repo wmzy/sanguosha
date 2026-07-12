@@ -85,7 +85,11 @@ export function GameViewComponentImpl({
   currentEvent,
   readOnly = false,
 }: Props) {
-  const perspectiveIdx = view.viewer;
+  // perspectiveIdx 必须是有效座次索引。旁观者(无授权 viewer=-1)或越界时回退到座次 0,
+  // 避免 view.players[perspectiveIdx] 为 undefined 导致渲染崩溃。
+  // 旁观者看不到任何手牌(buildView 按原始 viewer=-1 过滤 hand),仅借用座次 0 做展示视角。
+  const perspectiveIdx =
+    view.viewer >= 0 && view.viewer < view.players.length ? view.viewer : 0;
   const [showIdentityReveal, setShowIdentityReveal] = useState(
     () => !sessionStorage.getItem('sgs_identity_shown'),
   );

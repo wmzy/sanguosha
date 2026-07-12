@@ -13,6 +13,14 @@ import {
   updateConfig,
   setRoomStatus,
   setSessionChecker,
+  joinAsSpectator,
+  removeSpectator,
+  switchRole,
+  requestView,
+  approveView,
+  rejectView,
+  revokeView,
+  broadcastMessage,
 } from '../../src/server/room';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
 import { resolveTimeoutMs } from '../../src/engine/create-engine';
@@ -336,5 +344,152 @@ describe('resolveTimeoutMs', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
     state.config = { timeoutScale: 2 };
     expect(resolveTimeoutMs(state, 15, true)).toBe(30000);
+  });
+});
+
+describe('旁观者管理', () => {
+  it('房间创建时应初始化旁观者字段为空 Map', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    expect(room.spectators.size).toBe(0);
+    expect(room.viewGrants.size).toBe(0);
+    expect(room.pendingViewRequests.size).toBe(0);
+  });
+
+  it('joinAsSpectator 应添加旁观者且不占玩家名额', () => {
+    const room = createRoom('测试', 2, 'host1', createMockSink());
+    const result = joinAsSpectator(room.id, 'spec1', createMockSink());
+    expect(result).not.toBeNull();
+    expect(result!.spectators.size).toBe(1);
+    expect(result!.players.size).toBe(1); // 玩家数不变
+    expect(result!.spectators.has('spec1')).toBe(true);
+  });
+
+  it('removeSpectator 应清理旁观者连接、授权和申请', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+    approveView(room.id, 'spec1', 0);
+    requestView(room.id, 'spec1', 1);
+
+    const result = removeSpectator(room.id, 'spec1');
+    expect(result).not.toBeNull();
+    expect(result!.spectators.has('spec1')).toBe(false);
+    expect(result!.viewGrants.has('spec1')).toBe(false);
+    expect(result!.pendingViewRequests.has('spec1')).toBe(false);
+  });
+
+  it('switchRole player→spectator 应在等待中成功', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+
+    const result = switchRole(room.id, 'p2', 'spectator');
+    expect(result.success).toBe(true);
+    expect(result.room.players.has('p2')).toBe(false);
+    expect(result.room.spectators.has('p2')).toBe(true);
+    expect(result.room.readyPlayers.has('p2')).toBe(false);
+  });
+
+  it('switchRole spectator→player 应在等待中且未满时成功', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+
+    const result = switchRole(room.id, 'spec1', 'player');
+    expect(result.success).toBe(true);
+    expect(result.room.spectators.has('spec1')).toBe(false);
+    expect(result.room.players.has('spec1')).toBe(true);
+  });
+
+  it('switchRole 进行中不允许切换', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    room.status = '进行中';
+
+    const result = switchRole(room.id, 'p2', 'spectator');
+    expect(result.success).toBe(false);
+  });
+
+  it('switchRole spectator→player 房间满时失败', () => {
+    const room = createRoom('测试', 2, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+
+    const result = switchRole(room.id, 'spec1', 'player');
+    expect(result.success).toBe(false);
+  });
+
+  it('requestView 应设置待处理申请', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+
+    const result = requestView(room.id, 'spec1', 0);
+    expect(result).not.toBeNull();
+    expect(result!.pendingViewRequests.get('spec1')).toBe(0);
+  });
+
+  it('approveView 应设置授权并清除申请', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+    requestView(room.id, 'spec1', 0);
+
+    const result = approveView(room.id, 'spec1', 0);
+    expect(result).not.toBeNull();
+    expect(result!.viewGrants.get('spec1')).toBe(0);
+    expect(result!.pendingViewRequests.has('spec1')).toBe(false);
+  });
+
+  it('rejectView 应清除申请', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+    requestView(room.id, 'spec1', 0);
+
+    const result = rejectView(room.id, 'spec1');
+    expect(result).not.toBeNull();
+    expect(result!.pendingViewRequests.has('spec1')).toBe(false);
+  });
+
+  it('revokeView 应清除授权', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+    approveView(room.id, 'spec1', 0);
+
+    const result = revokeView(room.id, 'spec1');
+    expect(result).not.toBeNull();
+    expect(result!.viewGrants.has('spec1')).toBe(false);
+  });
+
+  it('findRoomByPlayerId 应能查找旁观者', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec-find', createMockSink());
+
+    const result = findRoomByPlayerId('spec-find');
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(room.id);
+  });
+
+  it('getRoomList 应包含旁观者数量', () => {
+    setSessionChecker(() => true);
+    const room = createRoom('旁观测试房', 4, 'host-spec-count', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+    joinAsSpectator(room.id, 'spec2', createMockSink());
+
+    const list = getRoomList('multiplayer');
+    const found = list.find((r) => r.id === room.id);
+    expect(found).toBeDefined();
+    expect(found!.spectatorCount).toBe(2);
+    setSessionChecker(null);
+  });
+
+  it('broadcastMessage 应向玩家和旁观者都发送', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+
+    const msgs: string[] = [];
+    // 替换 sink 以记录消息
+    room.players.get('p2')!.send = () => msgs.push('p2');
+    room.spectators.get('spec1')!.send = () => msgs.push('spec1');
+
+    broadcastMessage(room, { type: 'game_started' });
+    expect(msgs).toContain('p2');
+    expect(msgs).toContain('spec1');
   });
 });

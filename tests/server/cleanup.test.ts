@@ -38,6 +38,9 @@ function makeRoom(playerIds: string[]): Room {
     readyPlayers: new Set(playerIds),
     isDebug: true,
     config: { name: '清理测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
   } as unknown as Room;
   for (const pid of playerIds) {
     room.players.set(pid, new FakeSink());

@@ -12,6 +12,9 @@ const fullReady2p: RoomState = {
   hostId: 'p-host',
   maxPlayers: 2,
   config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+  spectatorIds: [],
+  viewGrants: {},
+  pendingViewRequests: {},
 };
 
 /**

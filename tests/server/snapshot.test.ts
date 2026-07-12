@@ -27,6 +27,9 @@ function makeRoom(isDebug = true): Room {
     createdAt: Date.now(),
     status: '进行中',
     config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
   } as unknown as Room;
 }
 

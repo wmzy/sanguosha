@@ -8,7 +8,8 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import type { ServerMessage, EventSeq } from './protocol';
 import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
-import { getRoom } from './room';
+import { getRoom, removeSpectator } from './room';
+import { broadcastMessage } from './room';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
 import { createLogger } from './logger';
@@ -81,36 +82,25 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
     const sink = new SseSink(stream);
     sink.setSeq(lastSeq);
 
-    // 注册 sink 到 room.players（替换 REST 入口时的 null sink）
-    room.players.set(playerId, sink);
-    playerRoomMap.set(playerId, roomId);
+    // 判断连接身份：先查 spectators（旁观者），再查 players（玩家）
+    const isSpectator = room.spectators.has(playerId);
 
-    log.info('SSE 连接建立', { roomId, playerId, lastSeq });
+    if (isSpectator) {
+      // 旁观者：注册 sink 到 spectators（替换 REST 入口时的 null sink）
+      room.spectators.set(playerId, sink);
+      playerRoomMap.set(playerId, roomId);
 
-    const session = gameSessions.get(roomId);
+      log.info('SSE 旁观者连接建立', { roomId, playerId });
 
-    // 发送 room_joined 消息（携带座次）
-    let seatIndex: number | undefined;
-    if (session) {
-      const existingSeat = session.getPlayerName(playerId);
-      if (existingSeat !== undefined) {
-        seatIndex = existingSeat;
-      } else if (room.isDebug) {
-        seatIndex = session.assignDebugSeat(playerId);
+      const session = gameSessions.get(roomId);
+
+      sink.send({ type: 'room_joined', roomId, playerId });
+
+      if (session && room.status === '进行中') {
+        session.sendSpectatorInitialView(playerId);
       }
-    }
-    sink.send({
-      type: 'room_joined',
-      roomId,
-      playerId,
-      ...(seatIndex !== undefined ? { seatIndex } : {}),
-    });
 
-    if (session && room.status === '进行中') {
-      // 游戏已开始（重连场景）：恢复视图
-      session.reconnectPlayer(playerId, sink, lastSeq);
-    } else {
-      // 配置阶段：发送 room_state
+      // 发送 room_state（含旁观者列表和授权）
       sink.send({
         type: 'room_state',
         readyPlayers: [...room.readyPlayers],
@@ -118,29 +108,83 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         hostId: room.hostId,
         maxPlayers: room.maxPlayers,
         config: room.config,
+        spectatorIds: [...room.spectators.keys()],
+        viewGrants: Object.fromEntries(room.viewGrants),
+        pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
+      });
+
+      stream.onAbort(() => {
+        log.info('SSE 旁观者连接断开', { roomId, playerId });
+        sink.close();
+        removeSpectator(roomId, playerId);
+        playerRoomMap.delete(playerId);
+        // 广播 spectator_left
+        const r = getRoom(roomId);
+        if (r) {
+          broadcastMessage(r, { type: 'spectator_left', spectatorId: playerId });
+        }
+      });
+
+      await new Promise<void>((resolve) => {
+        stream.onAbort(() => resolve());
+      });
+    } else {
+      // 玩家连接（现有逻辑）
+      room.players.set(playerId, sink);
+      playerRoomMap.set(playerId, roomId);
+
+      log.info('SSE 连接建立', { roomId, playerId, lastSeq });
+
+      const session = gameSessions.get(roomId);
+
+      let seatIndex: number | undefined;
+      if (session) {
+        const existingSeat = session.getPlayerName(playerId);
+        if (existingSeat !== undefined) {
+          seatIndex = existingSeat;
+        } else if (room.isDebug) {
+          seatIndex = session.assignDebugSeat(playerId);
+        }
+      }
+      sink.send({
+        type: 'room_joined',
+        roomId,
+        playerId,
+        ...(seatIndex !== undefined ? { seatIndex } : {}),
+      });
+
+      if (session && room.status === '进行中') {
+        session.reconnectPlayer(playerId, sink, lastSeq);
+      } else {
+        sink.send({
+          type: 'room_state',
+          readyPlayers: [...room.readyPlayers],
+          playerIds: [...room.players.keys()],
+          hostId: room.hostId,
+          maxPlayers: room.maxPlayers,
+          config: room.config,
+          spectatorIds: [...room.spectators.keys()],
+          viewGrants: Object.fromEntries(room.viewGrants),
+          pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
+        });
+      }
+
+      stream.onAbort(() => {
+        log.info('SSE 连接断开', { roomId, playerId });
+        sink.close();
+        room.players.delete(playerId);
+        if (session) {
+          session.handleDisconnect(playerId);
+        }
+        if (room.isDebug) {
+          playerRoomMap.delete(playerId);
+        }
+      });
+
+      await new Promise<void>((resolve) => {
+        stream.onAbort(() => resolve());
       });
     }
-
-    // 等待连接关闭（客户端断开或服务端关闭）
-    // streamSSE 的 callback 必须保持运行直到流结束
-    stream.onAbort(() => {
-      log.info('SSE 连接断开', { roomId, playerId });
-      sink.close();
-      room.players.delete(playerId);
-      // 触发断线处理（grace period 等）
-      if (session) {
-        session.handleDisconnect(playerId);
-      }
-      // debug 模式:playerId 一次性使用,清理映射防泄漏
-      if (room.isDebug) {
-        playerRoomMap.delete(playerId);
-      }
-    });
-
-    // 保持流打开：等待 abort
-    await new Promise<void>((resolve) => {
-      stream.onAbort(() => resolve());
-    });
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       log.error('SSE handler error', { error: e.stack ?? String(e) });

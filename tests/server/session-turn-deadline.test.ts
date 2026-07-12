@@ -31,6 +31,9 @@ function makeRoom(): Room {
     status: '进行中',
     readyPlayers: new Set<string>(),
     config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
   } as unknown as Room;
 }
 

@@ -18,6 +18,13 @@ import {
   findRoomByPlayerId,
   broadcastMessage,
   updateConfig,
+  joinAsSpectator,
+  removeSpectator,
+  switchRole,
+  requestView,
+  approveView,
+  rejectView,
+  revokeView,
   type Room,
 } from './room';
 import { deletePersistedRoom } from './persistence';
@@ -46,6 +53,9 @@ function broadcastRoomState(room: Room): void {
     hostId: room.hostId,
     maxPlayers: room.maxPlayers,
     config: room.config,
+    spectatorIds: [...room.spectators.keys()],
+    viewGrants: Object.fromEntries(room.viewGrants),
+    pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
   });
 }
 
@@ -418,5 +428,142 @@ export function applyRestRoutes(app: Hono): void {
     const result = await patchSnapshotDescription(snapshotId, body.description);
     if ('error' in result) return c.json({ error: result.error }, result.status);
     return c.json(result);
+  });
+
+  // ── 旁观者路由 ──
+
+  // POST /api/rooms/:id/join-spectator — 以旁观者身份加入房间
+  app.post('/api/rooms/:id/join-spectator', async (c) => {
+    const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const spectatorId =
+      typeof raw.playerId === 'string' && raw.playerId.trim()
+        ? raw.playerId.trim()
+        : generatePlayerId();
+
+    // 清理旧房间关联
+    const existingRoom = findRoomByPlayerId(spectatorId);
+    if (existingRoom) {
+      if (existingRoom.spectators.has(spectatorId)) {
+        removeSpectator(existingRoom.id, spectatorId);
+      } else {
+        leaveRoom(existingRoom.id, spectatorId);
+      }
+      playerRoomMap.delete(spectatorId);
+    }
+
+    const joined = joinAsSpectator(roomId, spectatorId, nullSink());
+    if (!joined) return c.json({ error: '加入失败' }, 400);
+    playerRoomMap.set(spectatorId, roomId);
+
+    broadcastMessage(room, { type: 'spectator_joined', spectatorId: spectatorId });
+    broadcastRoomState(room);
+
+    return c.json({ roomId, playerId: spectatorId });
+  });
+
+  // POST /api/rooms/:id/switch-role — 切换玩家身份（等待中）
+  app.post('/api/rooms/:id/switch-role', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const newRole = raw.role === 'spectator' ? 'spectator' : raw.role === 'player' ? 'player' : '';
+    if (!playerId || !newRole) return c.json({ error: '缺少 playerId 或 role' }, 400);
+
+    const result = switchRole(roomId, playerId, newRole);
+    if (!result.room) return c.json({ error: '房间不存在' }, 404);
+    if (!result.success) return c.json({ error: '切换失败（仅等待中允许，或房间已满）' }, 400);
+
+    broadcastMessage(result.room, { type: 'role_changed', playerId, newRole });
+    broadcastRoomState(result.room);
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/request-view — 旁观者申请查看指定座次
+  app.post('/api/rooms/:id/request-view', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
+    const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+    if (!spectatorId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+
+    const room = requestView(roomId, spectatorId, targetSeat);
+    if (!room) return c.json({ error: '申请失败' }, 400);
+
+    // 广播给所有连接（目标座次玩家会收到）
+    broadcastMessage(room, { type: 'view_request', spectatorId, targetSeat });
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/approve-view — 玩家审批通过
+  app.post('/api/rooms/:id/approve-view', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
+    const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+    if (!spectatorId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+
+    const room = approveView(roomId, spectatorId, targetSeat);
+    if (!room) return c.json({ error: '审批失败' }, 400);
+
+    // 清除旁观者 baseline，强制重发新 viewer 的 initialView
+    const session = gameSessions.get(roomId);
+    if (session) {
+      session.clearSpectatorBaseline(spectatorId);
+    }
+
+    broadcastMessage(room, { type: 'view_granted', spectatorId, seatIndex: targetSeat });
+    broadcastRoomState(room);
+
+    // 如果游戏进行中，立即发送新视图
+    if (session && room.status === '进行中') {
+      session.sendSpectatorInitialView(spectatorId);
+    }
+
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/reject-view — 玩家拒绝申请
+  app.post('/api/rooms/:id/reject-view', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
+    if (!spectatorId) return c.json({ error: '缺少 spectatorId' }, 400);
+
+    const room = rejectView(roomId, spectatorId);
+    if (!room) return c.json({ error: '操作失败' }, 400);
+
+    broadcastRoomState(room);
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/revoke-view — 玩家撤销已授权
+  app.post('/api/rooms/:id/revoke-view', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
+    if (!spectatorId) return c.json({ error: '缺少 spectatorId' }, 400);
+
+    const room = revokeView(roomId, spectatorId);
+    if (!room) return c.json({ error: '操作失败' }, 400);
+
+    // 清除旁观者 baseline，强制重发公开视图
+    const session = gameSessions.get(roomId);
+    if (session) {
+      session.clearSpectatorBaseline(spectatorId);
+    }
+
+    broadcastMessage(room, { type: 'view_revoked', spectatorId });
+    broadcastRoomState(room);
+
+    // 如果游戏进行中，立即发送公开视图
+    if (session && room.status === '进行中') {
+      session.sendSpectatorInitialView(spectatorId);
+    }
+
+    return c.json({ success: true });
   });
 }

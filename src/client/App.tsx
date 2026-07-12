@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loading } from './components/Loading';
+import { globalReset } from './theme';
 
 // 路由级代码分割：仅顶层页面组件做 lazy 加载，共享组件由页面 chunk 内部静态导入。
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
@@ -13,19 +14,21 @@ const ReplayPage = lazy(() => import('./pages/ReplayPage').then((m) => ({ defaul
 
 export function App() {
   return (
-    <ErrorBoundary context="root">
-      <BrowserRouter>
-        <Suspense fallback={<Loading />}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/play" element={<MultiplayerPage />} />
-            <Route path="/play/:roomId" element={<MultiplayerPage />} />
-            <Route path="/debug" element={<DebugPage />} />
-            <Route path="/debug/:roomId" element={<DebugPage />} />
-            <Route path="/replay" element={<ReplayPage />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </ErrorBoundary>
+    <div className={globalReset}>
+      <ErrorBoundary context="root">
+        <BrowserRouter>
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/play" element={<MultiplayerPage />} />
+              <Route path="/play/:roomId" element={<MultiplayerPage />} />
+              <Route path="/debug" element={<DebugPage />} />
+              <Route path="/debug/:roomId" element={<DebugPage />} />
+              <Route path="/replay" element={<ReplayPage />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </div>
   );
 }

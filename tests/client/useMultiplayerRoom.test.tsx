@@ -248,6 +248,9 @@ describe('useMultiplayerRoom', () => {
       hostId: 'pid-0',
       maxPlayers: 2,
       config: DEFAULT_ROOM_CONFIG,
+      spectatorIds: [],
+      viewGrants: {},
+      pendingViewRequests: {},
     });
     expect(result.current.isHost).toBe(true);
     expect(result.current.roomState?.hostId).toBe('pid-0');

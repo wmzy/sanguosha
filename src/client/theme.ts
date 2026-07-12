@@ -42,6 +42,14 @@ export const colors = {
   overlay: 'rgba(0,0,0,0.8)',
 } as const;
 
+// ─── 全局重置:body 默认 margin 和背景色 ───
+export const globalReset = css`
+  :global(body) {
+    margin: 0;
+    background-color: ${colors.bg.page};
+  }
+`;
+
 // ─── 页面/按钮/输入/提示通用样式(原 theme.ts styles 工厂,迁至 linaria css) ───
 // 动态值(padding/背景色等)通过 CSS 自定义属性传入,使用时:
 //   className={btnStyle} style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}

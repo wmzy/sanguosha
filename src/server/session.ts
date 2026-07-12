@@ -349,41 +349,47 @@ export class GameSession {
 
     for (const [playerId, viewer] of this.playerNames) {
       if (viewer < 0 || viewer >= state.players.length) continue;
-      if (!this.baselineSent.has(playerId)) {
-        const view = buildView(state, viewer);
-        this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
-        this.baselineSent.add(playerId);
-        // baseline 已含完整状态,初始化 deadline 缓存
-        this.lastSentDeadline.set(
-          playerId,
-          this.deadlineKey(this.effectiveDeadline(state, viewer)),
-        );
-      }
-      const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
-      if (envelopes.length > 0) {
-        // 计算 effective deadline:pending 优先,否则出牌/弃牌阶段的 idleDeadline
-        const dl = this.effectiveDeadline(state, viewer);
-        const dlKey = this.deadlineKey(dl);
-        const prevKey = this.lastSentDeadline.get(playerId) ?? undefined;
-        // deadline 仅在变化时附加在最后一条 event 上(减少冗余)
-        // 逐条发送 view + notify envelopes(view=atom 事件, notify=pendingResolved 等)
-        for (let i = 0; i < envelopes.length; i++) {
-          const env = envelopes[i];
-          const isLast = i === envelopes.length - 1;
-          const attachDeadline = isLast && dlKey !== prevKey;
-          this.sendToPlayer(playerId, {
-            type: 'event',
-            seq: env.seq,
-            timestamp: env.timestamp,
-            ...(env.view ? { view: env.view } : {}),
-            ...(env.notify ? { notify: env.notify } : {}),
-            ...(attachDeadline ? { deadline: dl } : {}),
-          });
-        }
-        this.lastSentDeadline.set(playerId, dlKey);
-      }
+      this.sendViewToConn(playerId, viewer, state);
     }
+
+    // 旁观者：viewer 来自 viewGrants（授权座次），无授权则为 -1（公开视图）
+    for (const [spectatorId] of this.room.spectators) {
+      const viewer = this.room.viewGrants.get(spectatorId) ?? -1;
+      if (viewer >= 0 && viewer >= state.players.length) continue;
+      this.sendViewToConn(spectatorId, viewer, state);
+    }
+
     this.lastBroadcastSeq = state.seq;
+  }
+
+  /** 向单个连接（玩家或旁观者）发送 baseline + 增量事件。 */
+  private sendViewToConn(connId: string, viewer: number, state: GameState): void {
+    if (!this.baselineSent.has(connId)) {
+      const view = buildView(state, viewer);
+      this.sendToPlayer(connId, { type: 'initialView', state: view, lastSeq: state.seq });
+      this.baselineSent.add(connId);
+      this.lastSentDeadline.set(connId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
+    }
+    const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
+    if (envelopes.length > 0) {
+      const dl = this.effectiveDeadline(state, viewer);
+      const dlKey = this.deadlineKey(dl);
+      const prevKey = this.lastSentDeadline.get(connId) ?? undefined;
+      for (let i = 0; i < envelopes.length; i++) {
+        const env = envelopes[i];
+        const isLast = i === envelopes.length - 1;
+        const attachDeadline = isLast && dlKey !== prevKey;
+        this.sendToPlayer(connId, {
+          type: 'event',
+          seq: env.seq,
+          timestamp: env.timestamp,
+          ...(env.view ? { view: env.view } : {}),
+          ...(env.notify ? { notify: env.notify } : {}),
+          ...(attachDeadline ? { deadline: dl } : {}),
+        });
+      }
+      this.lastSentDeadline.set(connId, dlKey);
+    }
   }
 
   /**
@@ -398,6 +404,25 @@ export class GameSession {
     const view = buildView(state, viewer);
     this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
     this.lastSentDeadline.set(playerId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
+  }
+
+  /** 旁观者连接 SSE：若游戏进行中则发送 initialView。 */
+  sendSpectatorInitialView(spectatorId: string): void {
+    if (!this.state) return;
+    const viewer = this.room.viewGrants.get(spectatorId) ?? -1;
+    if (viewer >= 0 && viewer >= this.state.players.length) return;
+    const state = this.state;
+    const view = buildView(state, viewer);
+    this.sendToPlayer(spectatorId, { type: 'initialView', state: view, lastSeq: state.seq });
+    this.baselineSent.add(spectatorId);
+    this.lastSentDeadline.set(spectatorId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
+  }
+
+  /** 清除旁观者 baseline，强制下次 broadcastNewState 重发 initialView。
+   *  在授权变更（approve/revoke）时调用，确保旁观者获得新 viewer 的完整视图。 */
+  clearSpectatorBaseline(spectatorId: string): void {
+    this.baselineSent.delete(spectatorId);
+    this.lastSentDeadline.delete(spectatorId);
   }
 
   handleDisconnect(playerId: string): void {
@@ -567,7 +592,7 @@ export class GameSession {
   }
 
   private sendToPlayer(playerId: string, message: ServerMessage): void {
-    const sink = this.room.players.get(playerId);
+    const sink = this.room.players.get(playerId) ?? this.room.spectators.get(playerId);
     if (!sink) return;
     try {
       sink.send(message);
@@ -584,6 +609,15 @@ export class GameSession {
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err));
         this.logger.error('broadcast send failed', { error: e.stack ?? String(e) });
+      }
+    }
+    // 旁观者也接收广播
+    for (const [, sink] of this.room.spectators) {
+      try {
+        sink.send(message);
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        this.logger.error('broadcast send to spectator failed', { error: e.stack ?? String(e) });
       }
     }
   }

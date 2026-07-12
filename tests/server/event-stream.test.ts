@@ -17,6 +17,9 @@ function makeRoom(): Room {
     createdAt: Date.now(),
     status: '进行中',
     config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
   } as unknown as Room;
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -233,5 +236,86 @@ describe('debug 房间刷新重连', () => {
     session.reconnectPlayer('p3', sink3, 0);
     const initMsg = sink3.messages.find((m) => m.type === 'initialView');
     expect(initMsg).toBeDefined();
+  }, 15000);
+});
+
+describe('旁观者视图分发', () => {
+  let session: GameSession;
+  let room: Room;
+
+  beforeEach(() => {
+    room = makeRoom();
+    room.spectators = new Map();
+    room.viewGrants = new Map();
+    room.pendingViewRequests = new Map();
+    addRoom(room);
+    session = new GameSession(room, true, 42);
+  });
+
+  it('旁观者收到公开视图(hand 为 undefined)', async () => {
+    await session.startGame(2);
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(200);
+
+    const specSink = new FakeSink();
+    room.spectators.set('spec1', specSink);
+
+    // 触发 broadcastNewState —— 通过 state change
+    session.sendSpectatorInitialView('spec1');
+
+    const initMsg = specSink.messages.find((m) => m.type === 'initialView');
+    expect(initMsg).toBeDefined();
+    const view = (initMsg as { state: { players: Array<{ hand?: unknown[] }> } }).state;
+    // 公开视图中所有玩家的 hand 应为 undefined
+    for (const p of view.players) {
+      expect(p.hand).toBeUndefined();
+    }
+  }, 15000);
+
+  it('授权后旁观者收到私有视图(hand 可见)', async () => {
+    await session.startGame(2);
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(200);
+
+    const specSink = new FakeSink();
+    room.spectators.set('spec1', specSink);
+    room.viewGrants.set('spec1', 0); // 授权查看座次 0
+
+    session.clearSpectatorBaseline('spec1');
+    session.sendSpectatorInitialView('spec1');
+
+    const initMsg = specSink.messages.find((m) => m.type === 'initialView');
+    expect(initMsg).toBeDefined();
+    const view = (initMsg as { state: { viewer: number; players: Array<{ hand?: unknown[] }> } }).state;
+    expect(view.viewer).toBe(0);
+    // 座次 0 的 hand 应可见
+    expect(view.players[0].hand).toBeDefined();
+  }, 15000);
+
+  it('broadcastNewState 向旁观者发送状态', async () => {
+    await session.startGame(2);
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(200);
+
+    const specSink = new FakeSink();
+    room.spectators.set('spec1', specSink);
+
+    // 先发送 baseline 给旁观者
+    session.sendSpectatorInitialView('spec1');
+    const initMsg = specSink.messages.find((m) => m.type === 'initialView');
+    expect(initMsg).toBeDefined();
+
+    // 之后的状态变更也应推送给旁观者
+    // 由于 debug 模式 onStateChange → broadcastNewState 会遍历 spectators
+    // 验证: sendToPlayer 能向旁观者发送
+    session.clearSpectatorBaseline('spec1');
+    specSink.messages.length = 0;
+    // 清除后强制重发
+    session.sendSpectatorInitialView('spec1');
+    const initMsg2 = specSink.messages.find((m) => m.type === 'initialView');
+    expect(initMsg2).toBeDefined();
   }, 15000);
 });

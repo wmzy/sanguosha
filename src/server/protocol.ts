@@ -107,8 +107,17 @@ export type ServerMessage =
       hostId: string | null;
       maxPlayers: number;
       config: RoomConfig;
+      spectatorIds: string[];
+      viewGrants: Record<string, number>;
+      pendingViewRequests: Record<string, number>;
     }
-  | { type: 'player_ready'; playerId: string };
+  | { type: 'player_ready'; playerId: string }
+  | { type: 'spectator_joined'; spectatorId: string }
+  | { type: 'spectator_left'; spectatorId: string }
+  | { type: 'view_request'; spectatorId: string; targetSeat: number }
+  | { type: 'view_granted'; spectatorId: string; seatIndex: number }
+  | { type: 'view_revoked'; spectatorId: string }
+  | { type: 'role_changed'; playerId: string; newRole: 'player' | 'spectator' }
 
 /**
  * 客户端发往服务端的消息。
@@ -138,6 +147,7 @@ export interface RoomInfo {
   status: string;
   isDebug?: boolean;
   config?: RoomConfig;
+  spectatorCount?: number;
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {

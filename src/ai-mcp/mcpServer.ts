@@ -45,6 +45,7 @@ export function normalizeStartGame(raw: unknown): StartGameOpts {
     playerId: typeof o['playerId'] === 'string' ? o['playerId'] : undefined,
     readyTimeoutMs: typeof o['readyTimeoutMs'] === 'number' ? o['readyTimeoutMs'] : undefined,
     timeoutScale: typeof o['timeoutScale'] === 'number' ? o['timeoutScale'] : undefined,
+    asSpectator: o['asSpectator'] === true,
   };
 }
 
@@ -91,7 +92,11 @@ export const PLAY_TOOL = {
               readyTimeoutMs: { type: 'number', description: '等待全员就绪超时(ms)' },
               timeoutScale: {
                 type: 'number',
-                description: 'pending 超时倍率。1=默认; >1 更慢(应对慢 API); Infinity=无限等待',
+                description: 'pending 超时倍率。1=默认; >1 更慢(应对慢API); Infinity=无限等待',
+              },
+              asSpectator: {
+                type: 'boolean',
+                description: 'true=以旁观者身份加入房间,不占座次。默认 false',
               },
             },
           },
@@ -196,6 +201,7 @@ export type StartGameOpts =
       playerId?: string;
       readyTimeoutMs?: number;
       timeoutScale?: number;
+      asSpectator?: boolean;
     };
 
 /**
