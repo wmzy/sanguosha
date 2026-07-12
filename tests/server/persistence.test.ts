@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { Hono } from 'hono';
 import {
   saveRoom,
   loadRoom,
@@ -15,6 +16,9 @@ import {
   _pendingWriteCount,
   type PersistedRoom,
 } from '../../src/server/persistence';
+import { applyRestRoutes } from '../../src/server/rest';
+import { getRoom } from '../../src/server/room';
+import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState, Card } from '../../src/engine/types';
 
@@ -356,6 +360,40 @@ describe('server/persistence', () => {
       const fileExists = existsSync(join(TEST_DATA_DIR, `${roomId}.json`));
       expect(fileExists).toBe(false);
       expect(_pendingWriteCount()).toBe(0);
+    });
+  });
+
+  describe('DELETE /api/rooms/:id 删除孤儿持久化文件', () => {
+    let app: Hono;
+
+    beforeEach(() => {
+      gameSessions.clear();
+      playerRoomMap.clear();
+      app = new Hono();
+      applyRestRoutes(app);
+    });
+
+    // bug:此前 getRoom(id) 返回 null 时 early return 404,跳过 deletePersistedRoom。
+    // 场景:服务端重启后内存丢失但磁盘文件残留 → 用户点删除 → 404 → 文件未删 → 再重启又恢复。
+    it('room 不在内存中时,DELETE 仍删除磁盘持久化文件', async () => {
+      const state = makeState();
+      await saveRoom(
+        roomId,
+        { roomName: '孤儿房', maxPlayers: 2, hostId: null, debug: false },
+        state,
+        [],
+        true,
+      );
+      expect(await loadRoom(roomId)).not.toBeNull();
+      expect(getRoom(roomId)).toBeNull();
+
+      const res = await app.fetch(
+        new Request(`http://localhost/api/rooms/${roomId}`, { method: 'DELETE' }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(await loadRoom(roomId)).toBeNull();
+      expect(existsSync(join(TEST_DATA_DIR, `${roomId}.json`))).toBe(false);
     });
   });
 });

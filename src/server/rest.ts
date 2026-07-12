@@ -58,19 +58,24 @@ export function applyRestRoutes(app: Hono): void {
   app.delete('/api/rooms/:id', async (c) => {
     const id = c.req.param('id');
     const room = getRoom(id);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
 
+    // 清理内存中的 session/room（如果存在）
     const session = gameSessions.get(id);
     if (session) {
       await session.destroy();
       gameSessions.delete(id);
     }
-    const playerIds = [...room.players.keys()];
-    for (const pid of playerIds) {
-      playerRoomMap.delete(pid);
-      leaveRoom(id, pid);
+    if (room) {
+      const playerIds = [...room.players.keys()];
+      for (const pid of playerIds) {
+        playerRoomMap.delete(pid);
+        leaveRoom(id, pid);
+      }
+      deleteRoom(id);
     }
-    deleteRoom(id);
+
+    // 无论 room 是否在内存中（如重启后内存丢失但磁盘还在），都必须删持久化文件。
+    // 此前 !room 时 early return 404 跳过此处，导致重启后房间复活。
     await deletePersistedRoom(id);
 
     return c.json({ success: true });

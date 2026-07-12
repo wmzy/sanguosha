@@ -5,8 +5,7 @@ import type { Plugin } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
 import type { Duplex } from 'stream';
 import { WebSocketServer, type WebSocket } from 'ws';
-import app from './app';
-import { handleWsOpen, handleWsClose, handleWsMessage } from './app';
+import app, { handleWsOpen, handleWsClose, handleWsMessage, startServerLifecycle } from './app';
 import { deserialize } from './protocol';
 import { generatePlayerId } from './utils';
 import { findRoomByPlayerId } from './room';
@@ -18,6 +17,10 @@ export function honoApiPlugin(): Plugin {
   return {
     name: 'hono-api',
     configureServer(server) {
+      // 启动服务器生命周期(闲置清理 + 持久化恢复)。
+      // configureServer 仅在 vite dev 模式调用,vite build 不会触发。)
+      startServerLifecycle();
+
       // 挂载 Hono REST API 到 /api
       server.middlewares.use('/api', async (req: IncomingMessage, res: ServerResponse) => {
         try {

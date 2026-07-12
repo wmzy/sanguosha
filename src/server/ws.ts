@@ -21,6 +21,7 @@ import {
 } from './room';
 import { GameSession } from './session';
 import { gameSessions, playerRoomMap } from './registry';
+import { deletePersistedRoom } from './persistence';
 import { createLogger } from './logger';
 
 const log = createLogger('ws');
@@ -312,6 +313,12 @@ function handleLeaveRoom(playerId: string): void {
     });
   }
   gameSessions.delete(roomId);
+  // 显式删持久化文件:session.destroy 是 fire-and-forget,进程可能在
+  // deletePersistedRoom 落盘前退出,导致重启后房间复活。
+  void deletePersistedRoom(roomId).catch((err) => {
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error('handleLeaveRoom: deletePersistedRoom failed', { roomId, error: e.stack ?? String(e) });
+  });
 }
 
 function handleDisconnect(playerId: string): void {

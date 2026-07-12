@@ -4,6 +4,7 @@
 
 import { gameSessions, playerRoomMap } from './registry';
 import { getRoom, leaveRoom, deleteRoom } from './room';
+import { deletePersistedRoom } from './persistence';
 import { createLogger } from './logger';
 
 const log = createLogger('cleanup');
@@ -57,6 +58,12 @@ export function cleanupIdleRooms(now: number = Date.now()): string[] {
     // 无玩家的空房间(启动恢复等)leaveRoom 不会被触发,显式删除避免 roomList 泄漏;
     // 有玩家的房间在上面的 leaveRoom 循环中已被清空删除,此处为幂等 no-op。
     deleteRoom(roomId);
+    // 显式删持久化文件:session.destroy 是 fire-and-forget,zombie session 会
+    // early-return 跳过 deletePersistedRoom,导致重启后房间复活。
+    void deletePersistedRoom(roomId).catch((err) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      log.error(`cleanup: deletePersistedRoom failed for ${roomId}`, { error: e.stack ?? String(e) });
+    });
     // 兜底:清理任何指向该房间的残留映射
     for (const [pid, rid] of playerRoomMap) {
       if (rid === roomId) playerRoomMap.delete(pid);

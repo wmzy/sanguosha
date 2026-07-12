@@ -1,7 +1,7 @@
 // server/index.ts — 独立运行模式（与 Vite 共享端口时不需要此文件）
 import { serve } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
-import app, { handleWsOpen, handleWsClose, handleWsMessage } from './app';
+import app, { handleWsOpen, handleWsClose, handleWsMessage, startServerLifecycle } from './app';
 import { deserialize, serialize } from './protocol';
 import { generatePlayerId } from './utils';
 import { findRoomByPlayerId } from './room';
@@ -66,6 +66,7 @@ const host = process.env.HOST ?? '0.0.0.0';
 const server = serve({ fetch: app.fetch, port, hostname: host });
 injectWebSocket(server);
 setupGracefulShutdown(server);
+startServerLifecycle();
 
 log.info(`服务器运行在 http://${host}:${port}`);
 log.info(`WebSocket端点: ws://${host}:${port}/ws`);

@@ -28,34 +28,38 @@ app.onError(errorHandler);
 // REST 路由注册到主 app 实例(中间件照常生效)
 applyRestRoutes(app);
 
-// 新 ENGINE-DESIGN 不再需要 protocol-adapter(回应 action 走 ClientMessage 直接 dispatch)
-
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
-// 闲置房间清理:每 5 分钟扫描一次,回收无玩家连接且超时(或已 destroy)的会话。
-// 清理逻辑见 cleanup.ts(无副作用,可单测)。仍有玩家连接的房间永不被清理——
-// 游戏结束后玩家留在房间内等待「再来一局」。
-setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
+/** 启动服务器生命周期副作用:闲置清理定时器 + 持久化房间恢复。
+ *  必须由运行时入口(index.ts 独立运行 / vite-plugin configureServer dev 模式)显式调用。
+ *  不能放在模块级: vite build 时加载 vite.config → import app 也会触发副作用,
+ *  导致 build 进程意外启动游戏 session 并反复写持久化文件。 */
+export function startServerLifecycle(): void {
+  setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
+  void restorePersistedRooms().catch((err) => {
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
+  });
+}
 
 async function restorePersistedRooms(): Promise<void> {
   const roomIds = await listPersistedRooms();
   log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
   // skill 注册表是 state-bound(WeakMap 外挂),每个房间的 state 自带独立注册表,
   // 无需启动时清理全局表。bootstrap 会为每个 state 注册各自的技能实例。
-  // 清理超过 1 小时没活动的房间(debug 房间不需要跨重启保留)
+  // 清理超过 1 小时的房间(所有类型都不跨重启长期保留)
   const ONE_HOUR = 60 * 60 * 1000;
   const now = Date.now();
   for (const roomId of roomIds) {
     try {
       const persisted = await loadRoom(roomId);
       if (!persisted) continue;
-      // 跳过超时的 debug 房间
-      if (
-        persisted.debug &&
-        persisted.state?.startedAt &&
-        now - persisted.state.startedAt > ONE_HOUR
-      ) {
-        log.info(`跳过过期 debug 房间 ${roomId}`);
+      // 用 startedAt(游戏开始时间)判定过期,不用文件 mtime:
+      // restoreState 后 pending slot 定时器会反复触发 saveRoom 刷新 mtime,
+      // 导致 mtime 永远是最近的,过期检查失效。
+      const startedAt = persisted.state?.startedAt;
+      if (startedAt && now - startedAt > ONE_HOUR) {
+        log.info(`跳过过期房间 ${roomId}（游戏开始: ${new Date(startedAt).toISOString()}）`);
         await deletePersistedRoom(roomId);
         continue;
       }
@@ -99,10 +103,5 @@ async function restorePersistedRooms(): Promise<void> {
     }
   }
 }
-
-void restorePersistedRooms().catch((err) => {
-  const e = err instanceof Error ? err : new Error(String(err));
-  log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
-});
 
 export default app;
