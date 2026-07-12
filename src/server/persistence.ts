@@ -13,6 +13,12 @@ const DEBOUNCE_MS = 1000;
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingWrappers = new Map<string, PersistedWrapper>();
 
+/** 进行中的磁盘写入(用于 deletePersistedRoom 等待竞态 writeNow 完成)。 */
+const inflightWrites = new Map<string, Promise<void>>();
+
+/** 墓碑:正在删除的 roomId。阻止 debounce 回调和 saveRoom 在删除后重新写盘。 */
+const deletedRoomIds = new Set<string>();
+
 registerLifecycle('pendingTimers', pendingTimers, () => {
   for (const timer of pendingTimers.values()) {
     clearTimeout(timer);
@@ -145,6 +151,8 @@ export async function saveRoom(
   actionLog: ActionLogEntry[],
   immediate = false,
 ): Promise<void> {
+  // 墓碑检查:正在删除的房间不再接受新写入
+  if (deletedRoomIds.has(roomId)) return;
   await ensureDir();
   const wrapper: PersistedWrapper = {
     roomName: meta.roomName,
@@ -169,7 +177,13 @@ export async function saveRoom(
       clearTimeout(existing);
       pendingTimers.delete(roomId);
     }
-    await writeNow(roomId, wrapper);
+    const p = writeNow(roomId, wrapper);
+    inflightWrites.set(roomId, p);
+    try {
+      await p;
+    } finally {
+      inflightWrites.delete(roomId);
+    }
     pendingWrappers.delete(roomId);
     return;
   }
@@ -179,10 +193,24 @@ export async function saveRoom(
   pendingTimers.set(
     roomId,
     setTimeout(async () => {
+      // 墓碑检查:删除后不再写盘
+      if (deletedRoomIds.has(roomId)) {
+        pendingTimers.delete(roomId);
+        pendingWrappers.delete(roomId);
+        return;
+      }
       const w = pendingWrappers.get(roomId);
-      if (w) await writeNow(roomId, w);
       pendingTimers.delete(roomId);
       pendingWrappers.delete(roomId);
+      if (w) {
+        const wp = writeNow(roomId, w);
+        inflightWrites.set(roomId, wp);
+        try {
+          await wp;
+        } finally {
+          inflightWrites.delete(roomId);
+        }
+      }
     }, DEBOUNCE_MS),
   );
 }
@@ -213,13 +241,19 @@ export async function loadRoom(roomId: string): Promise<PersistedRoom | null> {
 }
 
 export async function deletePersistedRoom(roomId: string): Promise<void> {
+  // 设置墓碑:阻止新的 saveRoom/debounce 回调在此期间写盘
+  deletedRoomIds.add(roomId);
   const pending = pendingTimers.get(roomId);
   if (pending) {
     clearTimeout(pending);
     pendingTimers.delete(roomId);
   }
   pendingWrappers.delete(roomId);
+  // 等待进行中的 writeNow 完成,确保删盘是最后一个写入操作
+  const inflight = inflightWrites.get(roomId);
+  if (inflight) await inflight;
   await deleteFile(roomId);
+  deletedRoomIds.delete(roomId);
 }
 
 export async function listPersistedRooms(): Promise<string[]> {
@@ -231,7 +265,9 @@ export async function listPersistedRooms(): Promise<string[]> {
 export async function flushPendingWrites(): Promise<void> {
   const writes: Promise<void>[] = [];
   for (const [roomId, wrapper] of pendingWrappers) {
-    writes.push(writeNow(roomId, wrapper));
+    const p = writeNow(roomId, wrapper);
+    inflightWrites.set(roomId, p);
+    writes.push(p.finally(() => inflightWrites.delete(roomId)));
   }
   for (const timer of pendingTimers.values()) {
     clearTimeout(timer);

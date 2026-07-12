@@ -59,7 +59,6 @@ export function applyRestRoutes(app: Hono): void {
     const id = c.req.param('id');
     const room = getRoom(id);
     if (!room) return c.json({ error: '房间不存在' }, 404);
-    if (!room.isDebug) return c.json({ error: '只能删除调试房间' }, 403);
 
     const session = gameSessions.get(id);
     if (session) {

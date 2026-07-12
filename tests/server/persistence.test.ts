@@ -1,6 +1,6 @@
 // tests/server/persistence.test.ts
 // 持久化层覆盖率补充:saveRoom/loadRoom 往返、sanitizeState、restoreFromLog、flushPendingWrites
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -324,6 +324,38 @@ describe('server/persistence', () => {
 
       const restored = restoreFromLog(persisted);
       expect(restored.pendingSlots).toBe(state.pendingSlots);
+    });
+  });
+
+  describe('删除竞态修复', () => {
+    it('debounce 回调写盘进行中时 deletePersistedRoom 等待写入完成后再删盘', async () => {
+      vi.useFakeTimers();
+      const state = makeState();
+      // 触发 debounce 写入(1s 后定时器触发)
+      await saveRoom(
+        roomId,
+        { roomName: '竞态测试', maxPlayers: 2, hostId: null, debug: false },
+        state,
+        [],
+        false,
+      );
+      expect(_pendingWriteCount()).toBe(1);
+
+      // 推进定时器 → debounce 回调开始执行 → writeNow 进入异步 I/O
+      // 回调在 await writeNow 处 yield,inflightWrites 已注册
+      vi.advanceTimersByTime(1000);
+
+      // 恢复真实定时器(I/O 操作不受影响)
+      vi.useRealTimers();
+
+      // deletePersistedRoom 应等待 inflight writeNow 完成后再删盘
+      // 如果不等待,deleteFile 和 writeNow 竞态 → 文件可能被重新写入
+      await deletePersistedRoom(roomId);
+
+      // 文件不应存在:writeNow 先完成(写入) → deleteFile 后完成(删除)
+      const fileExists = existsSync(join(TEST_DATA_DIR, `${roomId}.json`));
+      expect(fileExists).toBe(false);
+      expect(_pendingWriteCount()).toBe(0);
     });
   });
 });

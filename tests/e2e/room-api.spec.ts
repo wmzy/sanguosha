@@ -59,4 +59,16 @@ test.describe('多人房间 API', () => {
     expect(get.status()).toBe(404);
     await ctx.dispose();
   });
+
+  test('DELETE /api/rooms/:id 删除普通多人房间', async () => {
+    const ctx = await request.newContext({ baseURL: 'http://localhost:3930' });
+    const create = await ctx.post('/api/rooms', { data: { name: 'test-delete', maxPlayers: 2 } });
+    expect(create.status()).toBe(200);
+    const { roomId } = await create.json();
+    const del = await ctx.delete(`/api/rooms/${roomId}`);
+    expect(del.status()).toBe(200);
+    const get = await ctx.get(`/api/rooms/${roomId}`);
+    expect(get.status()).toBe(404);
+    await ctx.dispose();
+  });
 });
