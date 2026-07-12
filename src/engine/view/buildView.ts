@@ -83,7 +83,10 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     // 不渲染可操作 prompt(仅给 target 供跟随),避免"共用倒计时"误导。
     // 仅限游戏进行中的问询类 atom —— 选将询问/选将 等开局 atom 的 pending 是
     // 隔离的(只有被问询者见),不应观察型投影(charselect-pending-isolation 契约)。
-    const OBSERVER_PENDING_TYPES = new Set(['询问闪', '询问杀', '请求回应', '出牌窗口']);
+    const OBSERVER_PENDING_TYPES = new Set([
+      '询问闪', '询问杀', '请求回应', '出牌窗口',
+      ...(debug ? ['选将询问', '选将'] : []),
+    ]);
     const observerSlot = [...state.pendingSlots.values()].find((s) => {
       // target 字段优先;出牌窗口用 player
       const t =
@@ -117,7 +120,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   const deadline = pending?.deadline ?? null;
   const deadlineTotalMs = pending?.totalMs ?? 0;
 
-  void debug; // 保留参数签名兼容调用点,但不再影响隔离逻辑
+  // debug 参数已在 hand 可见性和 OBSERVER_PENDING_TYPES 中使用
 
   return {
     viewer,
@@ -135,7 +138,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       equipment: { ...p.equipment },
       skills: [...p.skills],
       handCount: p.hand.length,
-      hand: i === viewer ? p.hand.map((id) => state.cardMap[id]).filter(Boolean) : undefined,
+      hand: (i === viewer || debug) ? p.hand.map((id) => state.cardMap[id]).filter(Boolean) : undefined,
       marks: [...p.marks],
       // 距离修正 vars(只投影距离相关三个 key,不暴露身份等敏感 vars)
       distanceVars: {

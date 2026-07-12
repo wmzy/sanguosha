@@ -112,9 +112,13 @@ export interface GameConfig {
  *  scale=Infinity(无限)时返回一个极大值(约 24.8 天),定时器实际不会触发。
  *  slot 创建(createAndAwaitSlot)与 view deadline(applyView/toViewEvents)共用此函数,
  *  保证后端真实定时器与前端倒计时口径一致。 */
-export function resolveTimeoutMs(state: GameState, baseSeconds: number): number {
+export function resolveTimeoutMs(state: GameState, baseSeconds: number, isBroadcast = false): number {
   const scale = state.config?.timeoutScale ?? 1;
-  if (!Number.isFinite(scale)) return Number.MAX_SAFE_INTEGER;
+  if (!Number.isFinite(scale)) {
+    // 广播型 pending(如无懈可击)不受 Infinity 影响:使用 base timeout,避免单座次场景死锁
+    if (isBroadcast) return baseSeconds * 1000;
+    return Number.MAX_SAFE_INTEGER;
+  }
   const sec = baseSeconds * scale;
   return sec * 1000;
 }
@@ -727,8 +731,9 @@ function createAndAwaitSlot(
     const atomTimeout = (atom as Record<string, unknown>).timeout;
     const timeoutSec = typeof atomTimeout === 'number' ? atomTimeout : pending.timeout;
     // 应用房间配置的 timeoutScale(Infinity=无限)。
-    // resolveTimeoutMs 在 Infinity 时返回 MAX_SAFE_INTEGER,定时器实际不会触发。
-    const timeoutMs = resolveTimeoutMs(state, timeoutSec);
+    // 广播型 pending(target<0,如无懈可击)在 Infinity 时仍使用 base timeout,避免死锁。
+    const isBroadcast = target < 0;
+    const timeoutMs = resolveTimeoutMs(state, timeoutSec, isBroadcast);
     let resolveCalled = false;
     let timedOut = false;
     let paused = false;

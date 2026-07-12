@@ -52,7 +52,6 @@ async function main(): Promise<void> {
       // 这样房主能把房间码分享给他人，他人在独立进程加入后，再由后续 play 调用
       // 触发 advanceToStart 推进开局。避免"阻塞等 ready 期间无法启动对方"的死锁。
       if (!started) {
-        started = true;
         const roomConfig: RoomConfig | undefined =
           o.timeoutScale !== undefined
             ? { name: o.name ?? '房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4 }
@@ -65,6 +64,7 @@ async function main(): Promise<void> {
           playerId: o.playerId ?? PLAYER_ID ?? undefined,
           config: roomConfig,
         });
+        started = true;
         logErr(
           `multiplayer room joined: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`,
         );
@@ -78,7 +78,6 @@ async function main(): Promise<void> {
     }
     // debug 模式(旧路径)
     if (started) return;
-    started = true;
     const debugConfig: RoomConfig | undefined =
       o.timeoutScale !== undefined
         ? { name: '调试房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4 }
@@ -90,6 +89,7 @@ async function main(): Promise<void> {
     }
     hgc.sendReady();
     if (!(o.roomId ?? ROOM_ID)) hgc.sendStartGame();
+    started = true;
   };
 
   const ctx: McpHandlerContext = { hgc, ensureStarted, seat: SEAT };

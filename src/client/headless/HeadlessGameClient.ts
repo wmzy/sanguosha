@@ -318,7 +318,11 @@ export class HeadlessGameClient {
     if (!v?.pending) return false;
     const p = v.pending;
     if (p.target < 0) return true; // 广播型（无懈可击等）
-    if (p.target !== this._seatIndex) return false; // 别人的 pending
+    if (p.target !== this._seatIndex) {
+      // debug 模式:单人控制所有座次,其他座次的阻塞型 pending 也需要响应
+      if (this._debugMode && p.isBlocking !== false) return true;
+      return false; // 别人的 pending
+    }
     // 阻塞型 pending：必须回应
     if (p.isBlocking !== false) return true;
     // 非阻塞型 pending：出牌阶段的出牌窗口需要 AI 行动（可出牌或结束回合）
@@ -328,11 +332,15 @@ export class HeadlessGameClient {
   getAvailableActions(): AvailableAction[] {
     const v = this._view;
     if (!v) return [];
-    const skillActions = getActionsForPlayer(this._seatIndex);
-    const actions = enumerateAvailableActions(v, this._seatIndex, skillActions);
+    // debug 模式:pending 可能属于其他座次,用 pending.target 作为操作座次
+    const actionSeat = this._debugMode && v.pending && v.pending.target >= 0
+      ? v.pending.target
+      : this._seatIndex;
+    const skillActions = getActionsForPlayer(actionSeat);
+    const actions = enumerateAvailableActions(v, actionSeat, skillActions);
     // 追加 respond/discard 类（pending 驱动）
-    if (v.pending && (v.pending.target === this._seatIndex || v.pending.target < 0)) {
-      this.appendRespondActions(v, skillActions, actions);
+    if (v.pending && (v.pending.target === actionSeat || v.pending.target < 0)) {
+      this.appendRespondActions(v, skillActions, actions, actionSeat);
     }
     return actions;
   }
@@ -341,7 +349,9 @@ export class HeadlessGameClient {
     view: GameView,
     skillActions: import('../skillActionRegistry').SkillActionDef[],
     out: AvailableAction[],
+    actionSeat?: number,
   ) {
+    const ownerId = actionSeat ?? this._seatIndex;
     const pending = view.pending!;
     const atom = pending.atom as {
       type: string;
@@ -356,7 +366,7 @@ export class HeadlessGameClient {
           message: {
             skillId: '系统规则',
             actionType: '选将',
-            ownerId: this._seatIndex,
+            ownerId: ownerId,
             params: { character: c.name },
             baseSeq: 0,
           },
@@ -373,7 +383,7 @@ export class HeadlessGameClient {
         message: {
           skillId: '__skip',
           actionType: 'skip',
-          ownerId: this._seatIndex,
+          ownerId: ownerId,
           params: {},
           baseSeq: 0,
         },
@@ -390,7 +400,7 @@ export class HeadlessGameClient {
         message: {
           skillId: '系统规则',
           actionType: 'respond',
-          ownerId: this._seatIndex,
+          ownerId: ownerId,
           params: { cardIds: [] },
           baseSeq: 0,
         },
@@ -402,6 +412,30 @@ export class HeadlessGameClient {
     // 通用回应（出闪/出杀/确认发动等）
     const info = resolvePendingRespond(pending, skillActions);
     if (info?.skillId) {
+      // choosePlayer 类（突袭/select、激将、节命 等）：计算合法目标，agent 需填入 targets
+      if (pending.prompt?.type === 'choosePlayer') {
+        const choosePrompt = pending.prompt;
+        const filter = choosePrompt.filter;
+        const validTargets: number[] = [];
+        for (const p of view.players) {
+          if (!p.alive) continue;
+          if (filter && !filter(view, p.index)) continue;
+          validTargets.push(p.index);
+        }
+        out.push({
+          description: choosePrompt.title ?? info.skillId,
+          message: {
+            skillId: info.skillId,
+            actionType: 'respond',
+            ownerId: ownerId,
+            params: { targets: [] },
+            baseSeq: 0,
+          },
+          validTargets,
+          category: 'respond',
+        });
+        return;
+      }
       // confirm 类（突袭/trigger 等）优先于 cardFilter：
       //   询问杀/闪 的 prompt 也是 confirm，但它们需要 cardId（atom.type 以「询问」开头）。
       //   只有 请求回应 + confirm 才是纯确认操作（choice: true/false）。
@@ -415,7 +449,7 @@ export class HeadlessGameClient {
           message: {
             skillId: info.skillId,
             actionType: 'respond',
-            ownerId: this._seatIndex,
+            ownerId: ownerId,
             params: { choice: true },
             baseSeq: 0,
           },
@@ -427,7 +461,7 @@ export class HeadlessGameClient {
           message: {
             skillId: info.skillId,
             actionType: 'respond',
-            ownerId: this._seatIndex,
+            ownerId: ownerId,
             params: { choice: false },
             baseSeq: 0,
           },
@@ -436,7 +470,7 @@ export class HeadlessGameClient {
         });
       } else if (info.cardFilter) {
         // 需要选牌（杀/闪等）：为每张可出的牌生成独立 respond action（带 cardId）
-        const me = view.players[this._seatIndex];
+        const me = view.players[ownerId];
         const candidates = me?.hand?.filter((c) => info.cardFilter!(c)) ?? [];
         for (const card of candidates) {
           out.push({
@@ -444,7 +478,7 @@ export class HeadlessGameClient {
             message: {
               skillId: info.skillId,
               actionType: 'respond',
-              ownerId: this._seatIndex,
+              ownerId: ownerId,
               params: { cardId: card.id },
               baseSeq: 0,
             },
@@ -458,7 +492,7 @@ export class HeadlessGameClient {
           message: {
             skillId: '__skip',
             actionType: 'skip',
-            ownerId: this._seatIndex,
+            ownerId: ownerId,
             params: {},
             baseSeq: 0,
           },
@@ -472,7 +506,7 @@ export class HeadlessGameClient {
           message: {
             skillId: info.skillId,
             actionType: 'respond',
-            ownerId: this._seatIndex,
+            ownerId: ownerId,
             params: {},
             baseSeq: 0,
           },
@@ -629,7 +663,7 @@ export class HeadlessGameClient {
   }
 
   /** 角色确定后，为本座次注册技能 actions（供 getAvailableActions）。 */
-  async loadSkillActions(skillIds: string[]): Promise<void> {
-    await registerSkillActions(this._seatIndex, skillIds);
+  async loadSkillActions(skillIds: string[], seatIndex?: number): Promise<void> {
+    await registerSkillActions(seatIndex ?? this._seatIndex, skillIds);
   }
 }

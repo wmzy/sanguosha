@@ -51,7 +51,8 @@ export const 请求回应: AtomDefinition<{
     // 透传 timeoutMs 给 applyView,使其 deadline/totalMs 与后端真实定时器口径一致
     // (createAndAwaitSlot 同样走 resolveTimeoutMs)。
     const timeoutSec = atom.timeout ?? 请求回应.pending!.timeout;
-    const timeoutMs = resolveTimeoutMs(state, timeoutSec);
+    const isBroadcast = atom.target < 0;
+    const timeoutMs = resolveTimeoutMs(state, timeoutSec, isBroadcast);
     // target 看到带 prompt 的请求
     const targetView: ViewEvent = {
       type: '请求回应',

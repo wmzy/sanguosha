@@ -46,18 +46,22 @@ function enumeratePlayActions(
     const action = findUseActionForCard(skillActions, card);
     if (!action) continue;
     if (!isActiveAction(action, ctx)) continue;
-    const rules = derivePlayRules(getTargetFilter(action.prompt), getSelfTarget(action.prompt));
+    const targetFilter = getTargetFilter(action.prompt);
+    const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
     // 算合法目标
     const validTargets: number[] = [];
     if (rules.needsTarget && !rules.hasSlots && !rules.selfTarget) {
       for (const p of view.players) {
         if (p.index === seatIndex || !p.alive) continue;
+        if (targetFilter?.filter && !targetFilter.filter(view, p.index)) continue;
         const params = buildPlayParams(view.players, seatIndex, card, rules, p.name, null);
         if (params) validTargets.push(p.index);
       }
     } else if (rules.selfTarget) {
       validTargets.push(seatIndex);
     }
+    // 需要目标但无合法目标(如距离不够),跳过此牌
+    if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
     // 构造示例 message：无目标牌直接完整；有目标牌 targets 待 agent 补全
     const sampleParams = rules.selfTarget
       ? buildPlayParams(view.players, seatIndex, card, rules, null, null)
@@ -134,21 +138,25 @@ function enumerateTransformActions(
 
     // 单卡转化(武圣):每张匹配牌生成一个 action
     const matchingCards = me.hand.filter(filter);
-    const rules = derivePlayRules(getTargetFilter(action.prompt), getSelfTarget(action.prompt));
+    const targetFilter = getTargetFilter(action.prompt);
+    const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
     for (const card of matchingCards) {
       const wrapperName = action.transform ? action.transform(card).name : '杀';
       const shadowCardId = `${card.id}#${action.skillId}`;
 
-      // 算合法目标(与 enumeratePlayActions 同模式:存活非自己)
+      // 算合法目标(与 enumeratePlayActions 同模式:存活非自己+距离过滤)
       const validTargets: number[] = [];
       if (rules.needsTarget && !rules.hasSlots && !rules.selfTarget) {
         for (const p of view.players) {
           if (p.index === seatIndex || !p.alive) continue;
+          if (targetFilter?.filter && !targetFilter.filter(view, p.index)) continue;
           validTargets.push(p.index);
         }
       } else if (rules.selfTarget) {
         validTargets.push(seatIndex);
       }
+      // 需要目标但无合法目标(如距离不够),跳过此牌
+      if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
 
       const cardDesc = `${card.suit}${card.rank}`;
       result.push({
@@ -241,16 +249,36 @@ function enumerateDistributeActions(
   return result;
 }
 
-/** 主入口：枚举当前座次可执行的操作（出牌/转化/分配）。 */
+/** 主入口：枚举当前座次可执行的操作（出牌/转化/分配/结束出牌阶段）。 */
 export function enumerateAvailableActions(
   view: GameView,
   seatIndex: number,
   skillActions: SkillActionDef[],
 ): AvailableAction[] {
   if (!view) return [];
-  return [
+  const actions = [
     ...enumeratePlayActions(view, seatIndex, skillActions),
     ...enumerateTransformActions(view, seatIndex, skillActions),
     ...enumerateDistributeActions(view, seatIndex, skillActions),
   ];
+  // 出牌阶段:当前玩家可主动结束回合(无阻塞 pending 时)
+  if (
+    view.currentPlayerIndex === seatIndex &&
+    view.phase === '出牌' &&
+    (!view.pending || view.pending.isBlocking === false)
+  ) {
+    actions.push({
+      description: '结束出牌阶段',
+      message: {
+        skillId: '回合管理',
+        actionType: 'end',
+        ownerId: seatIndex,
+        params: {},
+        baseSeq: 0,
+      },
+      validTargets: [],
+      category: 'play',
+    });
+  }
+  return actions;
 }

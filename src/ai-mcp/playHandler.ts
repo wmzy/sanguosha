@@ -40,9 +40,10 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
   // 每次调 play 时检查并补注册（幂等：registerSkillActions 重复调用无害）。
   const v = hgc.view;
   if (v) {
-    const me = v.players[hgc.seatIndex];
-    if (me?.character && me.skills.length > 0) {
-      await hgc.loadSkillActions(me.skills);
+    for (const p of v.players) {
+      if (p.character && p.skills.length > 0) {
+        await hgc.loadSkillActions(p.skills, p.index);
+      }
     }
   }
   const timeoutMs = input.waitTimeoutMs ?? DEFAULT_WAIT_MS;

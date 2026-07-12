@@ -5,6 +5,8 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
+import { registerAfterHook } from '../../src/engine/skill';
+import { frameCards } from '../../src/engine/create-engine';
 
 function build(opts?: {
   p2Hand?: string[];
@@ -273,5 +275,70 @@ describe('南蛮入侵', () => {
     expect(harness.state.zones.discardPile).toContain('nm1');
     expect(harness.state.zones.discardPile).toContain('wx1');
     expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Bug#4 回归:南蛮入侵 respond 杀后仍受伤?
+  // 报告说 P1(目标)对南蛮入侵出了杀但仍扣血、手牌中杀未消耗。
+  // 但 snapshot.view=null / phase=lobby 指向 MCP/view 层快照时机错误,而非引擎结算。
+  // 此测试在引擎层逐项验证:respond 杀后不扣血、杀从手牌消耗、
+  // 杀和南蛮都进弃牌堆,并用 询问杀 afterHook 捕获 resolve 瞬间的 frame.cards
+  // 证明杀.respond 正确将杀移入处理区帧(供调用方检查)。
+  // (build() 中 P1=发起者 index0、P2=目标 index1,对应报告的 P0/P1 命名)
+  // ─────────────────────────────────────────────────────────────
+  it('Bug#4: respond 杀后不扣血、杀从手牌消耗、frame.cards 含杀', async () => {
+    await harness.setup(
+      build({
+        p2Hand: ['c0'],
+        extraCards: {
+          c0: { id: 'c0', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' },
+        },
+      }),
+    );
+
+    // 注册 询问杀 afterHook:在 pending resolve 后、南蛮入侵.execute 恢复前
+    // 捕获 frameCards(state)。此时 杀.respond 已把 c0 移入处理区帧,
+    // 但南蛮入侵尚未将 c0 移入弃牌堆。
+    const frameCardsAtResolve: string[][] = [];
+    const unregister = registerAfterHook(
+      harness.state,
+      '__test_bug4',
+      0,
+      '询问杀',
+      async (ctx) => {
+        frameCardsAtResolve.push([...frameCards(ctx.state)]);
+      },
+    );
+
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('南蛮入侵', 'nm1', []);
+    // 无懈可击广播窗口 → pass
+    const slot0 = [...harness.state.pendingSlots.values()][0];
+    if (slot0 && (slot0.atom as { type: string }).type === '请求回应') {
+      await P2.pass();
+    }
+    // P2 被询问杀 → respond 杀
+    P2.expectPending('询问杀');
+    await P2.respond('杀', { cardId: 'c0' });
+
+    unregister();
+
+    // 1. P2 不受伤害
+    expect(harness.state.players[1].health).toBe(4);
+    // 2. 杀从 P2 手牌消耗(P2 初始仅持 c0)
+    expect(harness.state.players[1].hand).not.toContain('c0');
+    expect(harness.state.players[1].hand).toHaveLength(0);
+    // 3. 杀和南蛮都在弃牌堆
+    expect(harness.state.zones.discardPile).toContain('c0');
+    expect(harness.state.zones.discardPile).toContain('nm1');
+    // 4. 询问杀 resolve 瞬间 frame.cards 包含杀(证明 杀.respond 正确移入处理区帧)
+    expect(frameCardsAtResolve).toHaveLength(1);
+    expect(frameCardsAtResolve[0]).toContain('c0');
+    expect(frameCardsAtResolve[0]).toContain('nm1');
+    // 5. 结算帧已弹出,处理区无残留
+    expect(harness.state.settlementStack).toHaveLength(0);
+    expect(harness.state.zones.processing).toHaveLength(0);
   });
 });
