@@ -15,6 +15,7 @@ import { createLogger } from '../utils/logger';
 import { ReplayRecorder } from '../replay/recorder';
 import type { ReplayMeta } from '../replay/types';
 import { apiFetch } from '../api/client';
+import { getPlayerId } from '../utils/playerIdentity';
 
 const log = createLogger('useMultiplayerRoom');
 
@@ -81,7 +82,8 @@ export interface MultiplayerRoom {
 export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [stage, setStage] = useState<MultiplayerStage>('lobby');
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [playerId, setPlayerId] = useState<string | null>(null);
+  // 门禁已确保身份设置;大厅阶段也需 playerId 供「我的」tab 过滤。
+  const [playerId, setPlayerId] = useState<string | null>(getPlayerId());
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [view, setView] = useState<GameView | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
@@ -154,14 +156,16 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     hgcRef.current = hgc;
 
     // 按命令执行(连接命令在 HGC 内部排队,open 后 flush)
+    // playerId 取自本地身份(门禁已确保设置);未设置时 undefined → 服务端自动生成
+    const pid = getPlayerId() ?? undefined;
     if (command.type === 'create') {
-      hgc.createRoom(command.name, command.maxPlayers, command.config);
+      hgc.createRoom(command.name, command.maxPlayers, command.config, pid);
       setStage('waiting');
     } else if (command.type === 'join' || command.type === 'autoJoin') {
-      hgc.joinRoom(command.roomId);
+      hgc.joinRoom(command.roomId, pid);
       setStage('waiting');
     } else if (command.type === 'spectate') {
-      hgc.joinAsSpectator(command.roomId);
+      hgc.joinAsSpectator(command.roomId, pid);
       setStage('spectating');
     }
 

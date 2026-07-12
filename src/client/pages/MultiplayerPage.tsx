@@ -637,6 +637,7 @@ export function MultiplayerPage() {
           onDelete={handleDeleteRoom}
           onSpectate={mp.joinAsSpectator}
           emptyText="暂无公开房间"
+          currentPlayerId={mp.playerId}
         />
       </div>
       {mp.error && <div className={errorToastStyle}>{mp.error}</div>}

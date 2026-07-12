@@ -228,6 +228,7 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
       playerCount: room.players.size,
       maxPlayers: room.maxPlayers,
       status: room.status,
+      hostId: room.hostId,
       isDebug: room.isDebug === true,
       config: room.config,
       spectatorCount: room.spectators.size,

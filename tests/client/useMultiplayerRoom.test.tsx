@@ -87,6 +87,7 @@ describe('useMultiplayerRoom', () => {
   beforeEach(() => {
     MockEventSource.reset();
     fetchCalls.length = 0;
+    localStorage.clear();
     vi.stubGlobal('EventSource', MockEventSource);
     vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: RequestInit) => {
       const body = opts?.body ? JSON.parse(opts.body as string) : {};
@@ -234,6 +235,32 @@ describe('useMultiplayerRoom', () => {
     await flushConnect();
     const create = fetchCalls.find((c) => c.body && typeof c.body.name === 'string')!;
     expect(create.body.config?.timeoutScale).toBe(2);
+  });
+
+  it('createRoom 把本地身份 playerId 透传到请求体', async () => {
+    localStorage.setItem('sgs:playerId', '赵子龙');
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.createRoom('房', 2));
+    await flushConnect();
+    const create = fetchCalls.find((c) => c.body && typeof c.body.name === 'string')!;
+    expect(create.body.playerId).toBe('赵子龙');
+  });
+
+  it('joinRoom 把本地身份 playerId 透传到请求体', async () => {
+    localStorage.setItem('sgs:playerId', '孔明');
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.joinRoom('ROOM-X'));
+    await flushConnect();
+    const join = fetchCalls.find((c) => c.url.includes('/join') && c.url.includes('ROOM-X'))!;
+    expect(join.body.playerId).toBe('孔明');
+  });
+
+  it('无本地身份时 createRoom 不传 playerId(服务端自动生成)', async () => {
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.createRoom('房', 2));
+    await flushConnect();
+    const create = fetchCalls.find((c) => c.body && typeof c.body.name === 'string')!;
+    expect(create.body.playerId).toBeUndefined();
   });
 
   // ─── 房间状态与准备/开局 ───

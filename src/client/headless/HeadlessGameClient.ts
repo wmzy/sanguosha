@@ -113,15 +113,16 @@ export class HeadlessGameClient {
     }
   }
 
-  /** 创建 debug 房间并自动 join 0 号座 */
-  async createDebugRoom(playerCount: number, config?: RoomConfig): Promise<void> {
+  /** 创建 debug 房间并自动 join 0 号座。
+   *  playerId 可选:指定则用作本座次身份,否则由服务端自动生成。 */
+  async createDebugRoom(playerCount: number, config?: RoomConfig, playerId?: string): Promise<void> {
     this._debugMode = true;
     this.intentionalDisconnect = false;
 
     const resp = await fetch(`${this.baseUrl}/api/debug-room`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerCount, config, autoJoin: true }),
+      body: JSON.stringify({ playerCount, config, autoJoin: true, playerId }),
     });
     const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
     this._roomId = data.roomId;
@@ -133,11 +134,13 @@ export class HeadlessGameClient {
     this.setPhase('lobby');
   }
 
-  /** 连接并 join 指定房间 */
-  async connect(roomId: string, seatIndex?: number): Promise<void> {
+  /** 连接并 join 指定房间。
+   *  playerId 可选:指定则预先设置本连接身份(透传到 join 请求体),否则复用已有或由服务端生成。 */
+  async connect(roomId: string, seatIndex?: number, playerId?: string): Promise<void> {
     this._debugMode = true;
     this._roomId = roomId;
     this._seatIndex = seatIndex ?? this._seatIndex;
+    if (playerId) this._playerId = playerId;
     this.intentionalDisconnect = false;
 
     const resp = await fetch(`${this.baseUrl}/api/debug-room/${roomId}/join`, {

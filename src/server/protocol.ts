@@ -145,6 +145,8 @@ export interface RoomInfo {
   playerCount: number;
   maxPlayers: number;
   status: string;
+  /** 房主 playerId;debug 房间无房主时为 null */
+  hostId?: string | null;
   isDebug?: boolean;
   config?: RoomConfig;
   spectatorCount?: number;

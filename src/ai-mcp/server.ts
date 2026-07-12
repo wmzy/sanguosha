@@ -7,6 +7,7 @@
 //   SGS_ROOM_ID（不提供则首次 play 用 startGame 创建 debug 房）
 //   SGS_SEAT（默认 0）
 //   SGS_PLAYER_COUNT（创建房时用，默认 2）
+//   SGS_PLAYER_ID（指定玩家身份；multiplayer 直接采用，debug 作为固定测试 id 默认 'debug-ai'）
 import * as readline from 'node:readline';
 import { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import {
@@ -88,15 +89,17 @@ async function main(): Promise<void> {
       return;
     }
     // debug 模式(旧路径)
+    // 使用固定测试 id(可由 SGS_PLAYER_ID 环境变量覆盖),保证重连/重开复用同一身份。
     if (started) return;
+    const debugPlayerId = PLAYER_ID ?? 'debug-ai';
     const debugConfig: RoomConfig | undefined =
       o.timeoutScale !== undefined
         ? { name: '调试房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4 }
         : undefined;
     if (o.roomId ?? ROOM_ID) {
-      await hgc.connect(o.roomId ?? ROOM_ID!, SEAT);
+      await hgc.connect(o.roomId ?? ROOM_ID!, SEAT, debugPlayerId);
     } else {
-      await hgc.createDebugRoom(o.playerCount ?? PLAYER_COUNT, debugConfig);
+      await hgc.createDebugRoom(o.playerCount ?? PLAYER_COUNT, debugConfig, debugPlayerId);
     }
     await hgc.sendReady();
     if (!(o.roomId ?? ROOM_ID)) await hgc.sendStartGame();

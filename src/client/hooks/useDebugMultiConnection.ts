@@ -17,6 +17,7 @@ import { useEventPlayback } from './useEventPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './SubmittedCharSelectCtx';
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
+import { getPlayerId } from '../utils/playerIdentity';
 import type { GameView } from '../../engine/types';
 import { suitColor, type Suit } from '../../shared/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
@@ -135,6 +136,9 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     // 只通过 onPhaseChange 递增（WS 真正 open 时），不在 effect 体中立即加，避免 StrictMode 翻倍
     let connectionOpenCount = 0;
 
+    // 各座次派生独立 playerId(身份#座次),保证服务端按不同玩家入座
+    const baseId = getPlayerId();
+
     /* eslint-disable no-loop-func -- 回调安全捕获 effect 作用域的 cancelled/connectionOpenCount 标志,cleanup 后才置 true */
     for (let i = 0; i < playerCount; i++) {
       const viewerIndex = i;
@@ -188,7 +192,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
         },
       });
       clientsRef.current.set(viewerIndex, hgc);
-      hgc.connect(roomId, viewerIndex);
+      hgc.connect(roomId, viewerIndex, baseId ? `${baseId}#${viewerIndex}` : undefined);
       cleanups.push(() => {
         try {
           hgc.disconnect();

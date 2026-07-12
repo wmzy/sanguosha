@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loading } from './components/Loading';
+import { RequirePlayerId } from './components/RequirePlayerId';
 import { globalReset } from './theme';
 
 // 路由级代码分割：仅顶层页面组件做 lazy 加载，共享组件由页面 chunk 内部静态导入。
@@ -20,10 +21,10 @@ export function App() {
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/play" element={<MultiplayerPage />} />
-              <Route path="/play/:roomId" element={<MultiplayerPage />} />
-              <Route path="/debug" element={<DebugPage />} />
-              <Route path="/debug/:roomId" element={<DebugPage />} />
+              <Route path="/play" element={<RequirePlayerId><MultiplayerPage /></RequirePlayerId>} />
+              <Route path="/play/:roomId" element={<RequirePlayerId><MultiplayerPage /></RequirePlayerId>} />
+              <Route path="/debug" element={<RequirePlayerId><DebugPage /></RequirePlayerId>} />
+              <Route path="/debug/:roomId" element={<RequirePlayerId><DebugPage /></RequirePlayerId>} />
               <Route path="/replay" element={<ReplayPage />} />
             </Routes>
           </Suspense>

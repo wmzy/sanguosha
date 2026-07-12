@@ -478,6 +478,17 @@ describe('旁观者管理', () => {
     setSessionChecker(null);
   });
 
+  it('getRoomList 应包含 hostId(普通房间返回房主,debug 房间返回 null)', () => {
+    setSessionChecker(() => true);
+    const room = createRoom('房主测试房', 4, 'zhao-zi-long', createMockSink());
+
+    const list = getRoomList('multiplayer');
+    const found = list.find((r) => r.id === room.id);
+    expect(found).toBeDefined();
+    expect(found!.hostId).toBe('zhao-zi-long');
+    setSessionChecker(null);
+  });
+
   it('broadcastMessage 应向玩家和旁观者都发送', () => {
     const room = createRoom('测试', 4, 'host1', createMockSink());
     joinRoom(room.id, 'p2', createMockSink());
