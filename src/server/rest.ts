@@ -162,15 +162,15 @@ export function applyRestRoutes(app: Hono): void {
       return c.json({ roomId: id, playerId });
     }
 
-    if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
-
-    // 如果玩家已在当前房间的 seats 中（SSE 断开重连），直接恢复连接
-    // 不检查人数上限（不新增座位），保留原有选座
+    // 断线重连：玩家已在 seats 中但 SSE 断开，允许在任何状态下重连（含游戏进行中）
+    // SSE handler 会直接设置 room.players 并调用 reconnectPlayer 恢复游戏视图
     if (room.seats.includes(playerId)) {
-      joinRoom(id, playerId, nullSink());
       playerRoomMap.set(playerId, id);
       return c.json({ roomId: id, playerId });
     }
+
+    // 新玩家加入：游戏进行中不允许
+    if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
 
     if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
 

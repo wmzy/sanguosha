@@ -398,6 +398,20 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('joinAsSpectator 后 roomId 同步到 React state(用于 URL 同步)', async () => {
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.joinAsSpectator('ROOM1'));
+    await flushConnect();
+    const es = MockEventSource.last!;
+    act(() => es.fireOpen());
+    // 推进轮询定时器,触发 roomId 同步(spectating 阶段也必须运行同步)
+    act(() => vi.advanceTimersByTime(250));
+
+    expect(result.current.stage).toBe('spectating');
+    expect(result.current.roomId).toBe('ROOM1');
+    expect(result.current.isSpectator).toBe(true);
+  });
+
   it('手动 joinRoom 房间不存在(404)时回到 lobby 并设置 error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({ error: '房间不存在' }), {

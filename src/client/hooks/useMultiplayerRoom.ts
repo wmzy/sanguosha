@@ -258,7 +258,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
   // 从 HGC getter 同步 roomId/playerId(收到 room_joined 后更新,无独立回调)
   useEffect(() => {
-    if (stage !== 'waiting' && stage !== 'playing') return;
+    if (stage !== 'waiting' && stage !== 'playing' && stage !== 'spectating') return;
     const hgc = hgcRef.current;
     if (!hgc) return;
     const id = setInterval(() => {

@@ -234,6 +234,8 @@ export interface RoomInfo {
   roomType?: 'normal' | 'quick';
   config?: RoomConfig;
   spectatorCount?: number;
+  /** 房间内所有玩家 playerId(用于前端判断当前玩家是否已在房间) */
+  playerIds?: string[];
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {

@@ -204,6 +204,8 @@ export const RoomListPanel = memo(
             visibleRooms.map((room) => {
               const isMyRoom =
                 room.hostId && currentPlayerId && room.hostId === currentPlayerId;
+              const isInRoom =
+                !!(currentPlayerId && room.playerIds?.includes(currentPlayerId));
               return (
                 <div key={room.id} className={roomItem}>
                   <div className={roomInfo}>
@@ -222,35 +224,53 @@ export const RoomListPanel = memo(
                     )}
                   </div>
                   <div className={roomActions}>
-                    <button
-                      onClick={() => onJoin(room.id)}
-                      disabled={!isJoinable(room)}
-                      className={btnStyle}
-                      style={
-                        {
-                          '--btn-bg': isJoinable(room) ? colors.accent.green : colors.text.dim,
-                          '--btn-padding': '8px 16px',
-                          '--btn-font-size': '13px',
-                          '--btn-cursor': isJoinable(room) ? 'pointer' : 'not-allowed',
-                        } as React.CSSProperties
-                      }
-                    >
-                      加入
-                    </button>
-                    {onSpectate && (
+                    {isInRoom ? (
                       <button
-                        onClick={() => onSpectate(room.id)}
+                        onClick={() => onJoin(room.id)}
                         className={btnStyle}
                         style={
                           {
-                            '--btn-bg': colors.accent.blue,
+                            '--btn-bg': colors.accent.green,
                             '--btn-padding': '8px 16px',
                             '--btn-font-size': '13px',
                           } as React.CSSProperties
                         }
                       >
-                        旁观
+                        进入
                       </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => onJoin(room.id)}
+                          disabled={!isJoinable(room)}
+                          className={btnStyle}
+                          style={
+                            {
+                              '--btn-bg': isJoinable(room) ? colors.accent.green : colors.text.dim,
+                              '--btn-padding': '8px 16px',
+                              '--btn-font-size': '13px',
+                              '--btn-cursor': isJoinable(room) ? 'pointer' : 'not-allowed',
+                            } as React.CSSProperties
+                          }
+                        >
+                          加入
+                        </button>
+                        {onSpectate && (
+                          <button
+                            onClick={() => onSpectate(room.id)}
+                            className={btnStyle}
+                            style={
+                              {
+                                '--btn-bg': colors.accent.blue,
+                                '--btn-padding': '8px 16px',
+                                '--btn-font-size': '13px',
+                              } as React.CSSProperties
+                            }
+                          >
+                            旁观
+                          </button>
+                        )}
+                      </>
                     )}
                     {onDelete && (
                       <button

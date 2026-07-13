@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // tests/client/RoomListPanel.test.tsx
 // RoomListPanel 组件测试:房主 id 展示、「我的」tab 过滤。
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { RoomListPanel } from '../../src/client/components/RoomListPanel';
 import type { RoomInfo } from '../../src/server/protocol';
@@ -91,5 +91,69 @@ describe('RoomListPanel — 「我的」tab 过滤', () => {
       <RoomListPanel rooms={rooms} onRefresh={noop} onJoin={noop} currentPlayerId="赵子龙" />,
     );
     expect(screen.getByText('我建的')).toBeInTheDocument();
+  });
+});
+
+describe('RoomListPanel — 已在房间时显示「进入」按钮', () => {
+  it('当前玩家已在房间时显示「进入」按钮，不显示「加入」和「旁观」', () => {
+    const rooms = [makeRoom({ playerIds: ['赵子龙', '孔明'] })];
+    render(
+      <RoomListPanel
+        rooms={rooms}
+        onRefresh={noop}
+        onJoin={noop}
+        onSpectate={noop}
+        currentPlayerId="赵子龙"
+      />,
+    );
+    expect(screen.getByText('进入')).toBeInTheDocument();
+    expect(screen.queryByText('加入')).not.toBeInTheDocument();
+    expect(screen.queryByText('旁观')).not.toBeInTheDocument();
+  });
+
+  it('当前玩家不在房间时显示「加入」和「旁观」按钮，不显示「进入」', () => {
+    const rooms = [makeRoom({ playerIds: ['孔明'] })];
+    render(
+      <RoomListPanel
+        rooms={rooms}
+        onRefresh={noop}
+        onJoin={noop}
+        onSpectate={noop}
+        currentPlayerId="赵子龙"
+      />,
+    );
+    expect(screen.queryByText('进入')).not.toBeInTheDocument();
+    expect(screen.getByText('加入')).toBeInTheDocument();
+    expect(screen.getByText('旁观')).toBeInTheDocument();
+  });
+
+  it('点击「进入」按钮调用 onJoin 并传入正确 roomId', () => {
+    const onJoin = vi.fn();
+    const rooms = [makeRoom({ id: 'ENTER1', playerIds: ['赵子龙'] })];
+    render(
+      <RoomListPanel
+        rooms={rooms}
+        onRefresh={noop}
+        onJoin={onJoin}
+        currentPlayerId="赵子龙"
+      />,
+    );
+    fireEvent.click(screen.getByText('进入'));
+    expect(onJoin).toHaveBeenCalledWith('ENTER1');
+  });
+
+  it('房间未携带 playerIds 时回退为「加入」按钮(兼容旧数据)', () => {
+    const rooms = [makeRoom()];
+    render(
+      <RoomListPanel
+        rooms={rooms}
+        onRefresh={noop}
+        onJoin={noop}
+        onSpectate={noop}
+        currentPlayerId="赵子龙"
+      />,
+    );
+    expect(screen.queryByText('进入')).not.toBeInTheDocument();
+    expect(screen.getByText('加入')).toBeInTheDocument();
   });
 });

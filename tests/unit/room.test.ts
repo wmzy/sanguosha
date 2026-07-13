@@ -584,6 +584,28 @@ describe('旁观者管理', () => {
     setSessionChecker(null);
   });
 
+  it('getRoomList 应包含 playerIds(基于 seats,SSE 断线后仍保留)', () => {
+    setSessionChecker(() => true);
+    const room = createRoom('玩家列表房', 4, 'host-pids', createMockSink());
+    joinRoom(room.id, 'guest1', createMockSink());
+    joinRoom(room.id, 'guest2', createMockSink());
+
+    const list = getRoomList('multiplayer');
+    const found = list.find((r) => r.id === room.id);
+    expect(found).toBeDefined();
+    expect(found!.playerIds).toEqual(expect.arrayContaining(['host-pids', 'guest1', 'guest2']));
+    expect(found!.playerIds).toHaveLength(3);
+
+    // 模拟 SSE 断线:room.players 清除但 seats 保留
+    room.players.clear();
+    const list2 = getRoomList('multiplayer');
+    const found2 = list2.find((r) => r.id === room.id);
+    expect(found2).toBeDefined();
+    // 断线后 playerIds 仍包含所有玩家(用于 lobby 判断"已在房间中")
+    expect(found2!.playerIds).toEqual(expect.arrayContaining(['host-pids', 'guest1', 'guest2']));
+    setSessionChecker(null);
+  });
+
   it('broadcastMessage 应向玩家和旁观者都发送', () => {
     const room = createRoom('测试', 4, 'host1', createMockSink());
     joinRoom(room.id, 'p2', createMockSink());

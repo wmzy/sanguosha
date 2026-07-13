@@ -380,6 +380,8 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
       roomType: room.roomType,
       config: room.config,
       spectatorCount: room.spectators.size,
+      // seats 在 SSE 断线后仍保留(仅 leaveRoom 清理),用于判断"玩家是否在房间中"
+      playerIds: room.seats.filter((s): s is string => s !== null),
     });
   }
   return result;
