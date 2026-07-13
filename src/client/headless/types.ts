@@ -18,6 +18,8 @@ export interface RoomState {
   spectatorIds: string[];
   viewGrants: Record<string, number>;
   pendingViewRequests: Record<string, number>;
+  /** 房间类型: normal=持久化; quick=纯内存 */
+  roomType?: 'normal' | 'quick';
 }
 
 export type ClientPhase = 'connecting' | 'lobby' | 'playing' | 'ended';

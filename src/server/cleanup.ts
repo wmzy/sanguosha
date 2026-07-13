@@ -35,6 +35,7 @@ export function cleanupIdleRooms(now: number = Date.now()): string[] {
     }
     // 2. 仍有玩家连接:游戏结束后玩家留在房间等「再来一局」,不清理
     const room = getRoom(roomId);
+    if (room && room.roomType === 'normal') continue; // 普通房间: 不自动销毁
     if (room && room.players.size > 0) continue;
     // 3. 无玩家连接 + 超过 TTL:闲置回收
     if (now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS) {

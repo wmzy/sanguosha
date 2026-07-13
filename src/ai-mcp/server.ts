@@ -17,7 +17,7 @@ import {
   type McpHandlerContext,
   type StartGameOpts,
 } from './mcpServer';
-import { joinAndReady, advanceToStart } from './lobby';
+import { joinAndReady, advanceToStart, applyConfigUpdate } from './lobby';
 import type { RoomConfig } from '../server/protocol';
 import { DEFAULT_CHAT_CONFIG } from '../server/protocol';
 
@@ -83,15 +83,23 @@ async function main(): Promise<void> {
         );
         return;
       }
-      // 后续：若仍在 lobby，等全员就绪并推进开局（房主 sendStartGame）。
+      // 后续：若仍在 lobby，先应用配置变更（timeoutScale/name），再推进开局。
+      // roomId/playerId/mode 等不可变字段保持首次值；只有 RoomConfig 字段会被更新。
       if (hgc.phase === 'lobby') {
+        await applyConfigUpdate(hgc, { timeoutScale: o.timeoutScale, name: o.name });
         await advanceToStart(hgc, o.readyTimeoutMs);
       }
       return;
     }
     // debug 模式(旧路径)
     // 使用固定测试 id(可由 SGS_PLAYER_ID 环境变量覆盖),保证重连/重开复用同一身份。
-    if (started) return;
+    if (started) {
+      // 仍在 lobby 时应用配置变更（如"再来一局"回到 lobby）
+      if (hgc.phase === 'lobby') {
+        await applyConfigUpdate(hgc, { timeoutScale: o.timeoutScale });
+      }
+      return;
+    }
     const debugPlayerId = PLAYER_ID ?? 'debug-ai';
     const debugConfig: RoomConfig | undefined =
       o.timeoutScale !== undefined

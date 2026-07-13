@@ -112,6 +112,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         spectatorIds: [...room.spectators.keys()],
         viewGrants: Object.fromEntries(room.viewGrants),
         pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
+        roomType: room.roomType,
       });
 
       // 发送聊天历史（如果有）
@@ -173,6 +174,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
           spectatorIds: [...room.spectators.keys()],
           viewGrants: Object.fromEntries(room.viewGrants),
           pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
+          roomType: room.roomType,
         });
       }
 

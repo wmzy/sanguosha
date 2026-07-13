@@ -29,7 +29,7 @@ export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'fai
 type Command =
   | { type: 'idle' }
   | { type: 'autoJoin'; roomId: string }
-  | { type: 'create'; name: string; maxPlayers: number; config?: RoomConfig }
+  | { type: 'create'; name: string; maxPlayers: number; config?: RoomConfig; roomType?: 'normal' | 'quick' }
   | { type: 'join'; roomId: string }
   | { type: 'spectate'; roomId: string };
 
@@ -49,7 +49,7 @@ export interface MultiplayerRoom {
   isSpectator: boolean;
   /** 本人是否已准备 */
   ready: boolean;
-  createRoom: (name: string, maxPlayers: number, config?: RoomConfig) => void;
+  createRoom: (name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick') => void;
   joinRoom: (roomId: string) => void;
   joinAsSpectator: (roomId: string) => void;
   toggleReady: () => void;
@@ -183,7 +183,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     // playerId 取自本地身份(门禁已确保设置);未设置时 undefined → 服务端自动生成
     const pid = getPlayerId() ?? undefined;
     if (command.type === 'create') {
-      hgc.createRoom(command.name, command.maxPlayers, command.config, pid).catch((err) => {
+      hgc.createRoom(command.name, command.maxPlayers, command.config, pid, command.roomType).catch((err) => {
         if (hgcRef.current !== hgc) return;
         const msg = err instanceof Error ? err.message : String(err);
         log.error('createRoom failed', { error: msg });
@@ -239,7 +239,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     return () => clearInterval(id);
   }, [stage, roomId, playerId]);
 
-  const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig) => {
+  const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick') => {
     setError(null);
     setGameOver(null);
     setView(null);
@@ -250,8 +250,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       name: name || `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
       maxPlayers,
       config,
+      roomType,
     });
-    log.info('createRoom', { name, maxPlayers });
+    log.info('createRoom', { name, maxPlayers, roomType });
   }, []);
 
   const joinRoom = useCallback((targetRoomId: string) => {

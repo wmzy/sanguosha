@@ -169,15 +169,15 @@ export class HeadlessGameClient {
     this.openStream();
   }
 
-  /** 创建普通(多人)房间:本连接成为房主。 */
-  async createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string): Promise<void> {
+  /** 创建普通(多人)房间:本连接成为房主。roomType: 'normal'=持久化, 'quick'=纯内存(默认)。 */
+  async createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string, roomType?: 'normal' | 'quick'): Promise<void> {
     this._debugMode = false;
     this.intentionalDisconnect = false;
 
     const resp = await fetch(`${this.baseUrl}/api/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, maxPlayers, config, playerId }),
+      body: JSON.stringify({ name, maxPlayers, config, playerId, roomType }),
     });
     await this.assertOk(resp, '创建房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };

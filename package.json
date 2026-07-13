@@ -26,13 +26,17 @@
     "build:plugin": "node scripts/build-plugin.mjs",
     "validate:plugin": "node scripts/validate-plugin.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@hono/node-server": "^2.0.2",
     "@linaria/core": "^7.0.0",
     "@linaria/react": "^7.0.1",
     "@wyw-in-js/shared": "^1.1.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.12.18",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -57,6 +61,7 @@
     "@vitest/coverage-v8": "^4.1.6",
     "@wyw-in-js/babel-preset": "^1.1.0",
     "@wyw-in-js/vite": "^1.1.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",

@@ -214,6 +214,7 @@ export const RoomListPanel = memo(
                     <div className={roomIdMono}>{room.id}</div>
                     <div className={roomMeta}>
                       {room.playerCount}/{room.maxPlayers} 玩家 | {room.status}
+                      {room.roomType === 'normal' ? ' | 普通' : ' | 快速'}
                       {room.spectatorCount ? ` | ${room.spectatorCount} 旁观` : ''}
                     </div>
                     {room.hostId && (

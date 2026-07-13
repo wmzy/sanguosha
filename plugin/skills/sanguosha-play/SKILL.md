@@ -15,7 +15,9 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__getSkillInfo, Read
 
 - **加入指定房间**（人类已建房）：`{ "startGame": { "mode": "multiplayer", "roomId": "ABC123" } }`
 - **自建房间等待**（你做房主，等人类加入）：`{ "startGame": { "mode": "multiplayer", "maxPlayers": 2 } }`
-- 可选字段：`playerId`（指定玩家 id，否则自动生成）、`name`（建房时房间名）、`readyTimeoutMs`（等待全员就绪超时，默认 300000ms）。
+- 可选字段：`playerId`（指定玩家 id，否则自动生成）、`name`（建房时房间名）、`readyTimeoutMs`（等待全员就绪超时，默认 300000ms）、`timeoutScale`（pending 超时倍率，1=默认，Infinity=无限等待）。
+
+> **后续调用可变更配置**：再次传 `startGame`（带 roomId 不变）时，`timeoutScale`、`name` 等会在 lobby 阶段通过 updateConfig 应用到房间。`roomId`/`playerId`/`mode` 等首次确定后不可变。
 
 返回的 `result` 中会包含 `roomId`（房间码）。如果你是房主，把房间码告诉人类，人类在浏览器 `/play` 页面输入即可加入。
 

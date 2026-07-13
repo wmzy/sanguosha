@@ -185,6 +185,7 @@ export type ServerMessage =
       spectatorIds: string[];
       viewGrants: Record<string, number>;
       pendingViewRequests: Record<string, number>;
+      roomType?: 'normal' | 'quick';
     }
   | { type: 'player_ready'; playerId: string }
   | { type: 'spectator_joined'; spectatorId: string }
@@ -225,6 +226,8 @@ export interface RoomInfo {
   /** 房主 playerId;debug 房间无房主时为 null */
   hostId?: string | null;
   isDebug?: boolean;
+  /** 房间类型: normal=持久化; quick=纯内存 */
+  roomType?: 'normal' | 'quick';
   config?: RoomConfig;
   spectatorCount?: number;
 }

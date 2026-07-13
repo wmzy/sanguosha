@@ -1,10 +1,11 @@
 // tests/ai-mcp/lobby.test.ts
 // 大厅编排单测：建房/加入/房主等待开局/非房主等待/超时。
 import { describe, it, expect, vi } from 'vitest';
-import { joinAndStartRoom } from '../../src/ai-mcp/lobby';
+import { joinAndStartRoom, applyConfigUpdate } from '../../src/ai-mcp/lobby';
 import type { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
 import type { ClientPhase } from '../../src/client/headless/types';
 import type { RoomState } from '../../src/client/headless/types';
+import type { RoomConfig } from '../../src/server/protocol';
 
 const fullReady2p: RoomState = {
   readyPlayers: ['p-host', 'p2'],
@@ -137,3 +138,83 @@ describe('joinAndStartRoom', () => {
     expect(args[0].length).toBeGreaterThan(0);
   });
 }, 20000);
+
+/** 专测 applyConfigUpdate 的 fake HGC：只需 roomState getter + sendUpdateConfig。 */
+function makeConfigTestHgc(config: RoomConfig | null): {
+  hgc: HeadlessGameClient;
+  sendUpdateConfig: ReturnType<typeof vi.fn>;
+} {
+  const sendUpdateConfig = vi.fn(async () => {});
+  const roomState: RoomState | null = config
+    ? {
+        readyPlayers: [],
+        playerIds: [],
+        hostId: null,
+        maxPlayers: 2,
+        config,
+        spectatorIds: [],
+        viewGrants: {},
+        pendingViewRequests: {},
+      }
+    : null;
+  return {
+    hgc: {
+      get roomState() {
+        return roomState;
+      },
+      sendUpdateConfig,
+    } as unknown as HeadlessGameClient,
+    sendUpdateConfig,
+  };
+}
+
+const BASE_CONFIG: RoomConfig = {
+  name: '测试房',
+  timeoutScale: 1,
+  charPool: 'all',
+  handSize: 4,
+  chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 },
+};
+
+describe('applyConfigUpdate', () => {
+  it('timeoutScale 变化时发送完整 RoomConfig（未变字段保留原值）', async () => {
+    const { hgc, sendUpdateConfig } = makeConfigTestHgc(BASE_CONFIG);
+    const changed = await applyConfigUpdate(hgc, { timeoutScale: 2 });
+    expect(changed).toBe(true);
+    expect(sendUpdateConfig).toHaveBeenCalledTimes(1);
+    const sent = sendUpdateConfig.mock.calls[0][0] as RoomConfig;
+    expect(sent.timeoutScale).toBe(2);
+    expect(sent.name).toBe('测试房');
+    expect(sent.charPool).toBe('all');
+    expect(sent.handSize).toBe(4);
+  });
+
+  it('name 变化时发送完整 RoomConfig', async () => {
+    const { hgc, sendUpdateConfig } = makeConfigTestHgc(BASE_CONFIG);
+    await applyConfigUpdate(hgc, { name: '新房间名' });
+    const sent = sendUpdateConfig.mock.calls[0][0] as RoomConfig;
+    expect(sent.name).toBe('新房间名');
+    expect(sent.timeoutScale).toBe(1);
+  });
+
+  it('配置未变化时不发送 updateConfig', async () => {
+    const { hgc, sendUpdateConfig } = makeConfigTestHgc(BASE_CONFIG);
+    const changed = await applyConfigUpdate(hgc, { timeoutScale: 1, name: '测试房' });
+    expect(changed).toBe(false);
+    expect(sendUpdateConfig).not.toHaveBeenCalled();
+  });
+
+  it('无 roomState 时返回 false 不发送', async () => {
+    const { hgc, sendUpdateConfig } = makeConfigTestHgc(null);
+    const changed = await applyConfigUpdate(hgc, { timeoutScale: 5 });
+    expect(changed).toBe(false);
+    expect(sendUpdateConfig).not.toHaveBeenCalled();
+  });
+
+  it('Infinity timeoutScale 正确触发更新', async () => {
+    const { hgc, sendUpdateConfig } = makeConfigTestHgc(BASE_CONFIG);
+    await applyConfigUpdate(hgc, { timeoutScale: Infinity });
+    const sent = sendUpdateConfig.mock.calls[0][0] as RoomConfig;
+    expect(sent.timeoutScale).toBe(Infinity);
+  });
+});

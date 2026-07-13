@@ -275,6 +275,7 @@ export function MultiplayerPage() {
   // lobby 阶段表单状态
   const [createName, setCreateName] = useState('');
   const [createMax, setCreateMax] = useState(2);
+  const [createRoomType, setCreateRoomType] = useState<'quick' | 'normal'>('quick');
   const [joinCode, setJoinCode] = useState('');
   const [spectateCode, setSpectateCode] = useState('');
 
@@ -320,7 +321,7 @@ export function MultiplayerPage() {
   }, [mp.roomId, urlRoomId, navigate]);
 
   const handleCreate = () => {
-    mp.createRoom(createName.trim(), createMax);
+    mp.createRoom(createName.trim(), createMax, undefined, createRoomType);
   };
 
   const handleJoin = () => {
@@ -759,6 +760,15 @@ export function MultiplayerPage() {
               value={createMax}
               onChange={(e) => setCreateMax(Math.min(Math.max(Number(e.target.value) || 2, 2), 8))}
             />
+            <label className={label}>房间类型</label>
+            <select
+              className={inputStyle}
+              value={createRoomType}
+              onChange={(e) => setCreateRoomType(e.target.value as 'quick' | 'normal')}
+            >
+              <option value="quick">快速房间（人走自动销毁）</option>
+              <option value="normal">普通房间（持久保留）</option>
+            </select>
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}

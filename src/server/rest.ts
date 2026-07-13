@@ -32,6 +32,7 @@ import {
   type Room,
 } from './room';
 import { deletePersistedRoom } from './persistence';
+import { deleteRoomFromDb } from './roomStore';
 import {
   createSnapshot,
   patchSnapshotDescription,
@@ -60,6 +61,7 @@ function broadcastRoomState(room: Room): void {
     spectatorIds: [...room.spectators.keys()],
     viewGrants: Object.fromEntries(room.viewGrants),
     pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
+    roomType: room.roomType,
   });
 }
 
@@ -120,6 +122,8 @@ export function applyRestRoutes(app: Hono): void {
     // 无论 room 是否在内存中（如重启后内存丢失但磁盘还在），都必须删持久化文件。
     // 此前 !room 时 early return 404 跳过此处，导致重启后房间复活。
     await deletePersistedRoom(id);
+    // 普通房间: 还需从 DB 删除元数据记录。
+    await deleteRoomFromDb(id);
 
     return c.json({ success: true });
   });
@@ -133,12 +137,14 @@ export function applyRestRoutes(app: Hono): void {
       return c.json({ error: '最大玩家数须在2-8之间' }, 400);
     }
     const config = raw.config ? normalizeRoomConfig(raw.config) : undefined;
+    const roomType: 'normal' | 'quick' =
+      raw.roomType === 'normal' ? 'normal' : 'quick';
 
     try {
       const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
         ? raw.playerId.trim()
         : generatePlayerId();
-      const room = createRoom(name, maxPlayers, playerId, nullSink(), config);
+      const room = createRoom(name, maxPlayers, playerId, nullSink(), config, roomType);
       playerRoomMap.set(playerId, room.id);
       return c.json({ roomId: room.id, playerId });
     } catch (err) {
@@ -418,6 +424,9 @@ export function applyRestRoutes(app: Hono): void {
     const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
 
+    const roomBefore = getRoom(roomId);
+    const isNormal = roomBefore?.roomType === 'normal';
+
     const leftRoom = leaveRoom(roomId, playerId);
     playerRoomMap.delete(playerId);
 
@@ -425,15 +434,19 @@ export function applyRestRoutes(app: Hono): void {
       broadcastMessage(leftRoom, { type: 'player_left', playerId });
     }
 
-    const session = gameSessions.get(roomId);
-    if (session) {
-      void session.destroy().catch((err) => {
-        const e = err instanceof Error ? err : new Error(String(err));
-        log.error('session.destroy failed', { roomId, error: e.stack ?? String(e) });
-      });
-      gameSessions.delete(roomId);
+    // 快速房间: leaveRoom 返回 null(全员离开+无游戏)时清理 session + 持久化;
+    // 普通房间: 不自动销毁, 保留 session 和游戏状态。
+    if (!isNormal && !leftRoom) {
+      const session = gameSessions.get(roomId);
+      if (session) {
+        void session.destroy().catch((err) => {
+          const e = err instanceof Error ? err : new Error(String(err));
+          log.error('session.destroy failed', { roomId, error: e.stack ?? String(e) });
+        });
+        gameSessions.delete(roomId);
+      }
+      void deletePersistedRoom(roomId).catch(() => {});
     }
-    void deletePersistedRoom(roomId).catch(() => {});
     return c.json({ success: true });
   });
 

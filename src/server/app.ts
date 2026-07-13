@@ -10,8 +10,9 @@ import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
-import { addRoom, type Room } from './room';
+import { addRoom, getRoom, type Room } from './room';
 import { cleanupIdleRooms } from './cleanup';
+import { initRoomStore, loadAllRoomsFromDb, deleteRoomFromDb } from './roomStore';
 
 const log = createLogger('ws');
 
@@ -32,10 +33,49 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
  *  导致 build 进程意外启动游戏 session 并反复写持久化文件。 */
 export function startServerLifecycle(): void {
   setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
-  void restorePersistedRooms().catch((err) => {
-    const e = err instanceof Error ? err : new Error(String(err));
-    log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
-  });
+  void (async () => {
+    await initRoomStore();
+    await restoreNormalRoomsFromDb();
+    await restorePersistedRooms().catch((err) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
+    });
+  })();
+}
+
+/** 从 DB 恢复普通房间元数据。快闪房间不入库,无需恢复。 */
+async function restoreNormalRoomsFromDb(): Promise<void> {
+  const rows = await loadAllRoomsFromDb();
+  log.info(`启动恢复：发现 ${rows.length} 个普通房间记录`);
+  const now = Date.now();
+  const ONE_HOUR = 60 * 60 * 1000;
+  for (const row of rows) {
+    // 超过 1 小时且非进行中的普通房间,清理
+    if (now - row.updatedAt > ONE_HOUR && row.status !== '进行中') {
+      log.info(`跳过过期普通房间 ${row.id}（最后更新: ${new Date(row.updatedAt).toISOString()}）`);
+      await deleteRoomFromDb(row.id);
+      continue;
+    }
+    const room: Room = {
+      id: row.id,
+      name: row.name,
+      players: new Map(),
+      maxPlayers: row.maxPlayers,
+      status: row.status as Room['status'],
+      hostId: row.hostId,
+      readyPlayers: new Set(),
+      roomType: 'normal',
+      isDebug: row.isDebug,
+      config: row.config,
+      spectators: new Map(),
+      viewGrants: new Map(),
+      pendingViewRequests: new Map(),
+      chatUsage: new Map(),
+      chatHistory: [],
+    };
+    addRoom(room);
+    log.info(`恢复普通房间 ${row.id}（${row.name}，状态: ${row.status}）`);
+  }
 }
 
 async function restorePersistedRooms(): Promise<void> {
@@ -75,7 +115,10 @@ async function restorePersistedRooms(): Promise<void> {
               name: persisted.roomName || `恢复-${roomId}`,
             }
           : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };
-      const room: Room = {
+      // 如果房间已从 DB 恢复(normal 房间), 复用已存在的 Room 对象;
+      // 否则新建 Room(quick 房间重启后丢失, 仅 JSON 游戏状态能恢复)
+      const existingRoom = getRoom(roomId);
+      const room: Room = existingRoom ?? {
         id: roomId,
         name: persisted.roomName || `恢复-${roomId}`,
         players: new Map(),
@@ -83,6 +126,7 @@ async function restorePersistedRooms(): Promise<void> {
         status: '进行中',
         hostId: persisted.hostId,
         readyPlayers: new Set(),
+        roomType: persisted.debug ? 'quick' : 'quick',
         isDebug: persisted.debug,
         config: restoredConfig,
         spectators: new Map(),
@@ -91,7 +135,7 @@ async function restorePersistedRooms(): Promise<void> {
         chatUsage: new Map(),
         chatHistory: [],
       };
-      addRoom(room);
+      if (!existingRoom) addRoom(room);
       const session = new GameSession(room, persisted.debug);
       await session.restoreState(state, persisted.actionLog);
       gameSessions.set(roomId, session);

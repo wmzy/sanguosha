@@ -27,7 +27,7 @@ class FakeSink implements ConnectionSink {
   }
 }
 
-function makeRoom(playerIds: string[]): Room {
+function makeRoom(playerIds: string[], roomType: 'normal' | 'quick' = 'quick'): Room {
   const room: Room = {
     id: `cleanup-${Math.random().toString(36).slice(2, 10)}`,
     name: '清理测试',
@@ -36,11 +36,14 @@ function makeRoom(playerIds: string[]): Room {
     status: '已结束',
     hostId: playerIds[0] ?? null,
     readyPlayers: new Set(playerIds),
+    roomType,
     isDebug: true,
     config: { name: '清理测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
+    chatUsage: new Map(),
+    chatHistory: [],
   } as unknown as Room;
   for (const pid of playerIds) {
     room.players.set(pid, new FakeSink());
@@ -124,5 +127,29 @@ describe('cleanupIdleRooms', () => {
     cleanupIdleRooms(futureNow());
 
     expect(playerRoomMap.has('lonely')).toBe(false);
+  });
+
+  it('普通房间(normal)不被闲置清理', () => {
+    const room = makeRoom([], 'normal');
+    const session = new GameSession(room, true, 42);
+    gameSessions.set(room.id, session);
+
+    const cleaned = cleanupIdleRooms(futureNow());
+
+    expect(cleaned).not.toContain(room.id);
+    expect(getRoom(room.id)).not.toBeNull();
+    expect(gameSessions.has(room.id)).toBe(true);
+  });
+
+  it('普通房间即使超 TTL 且无玩家也保留', () => {
+    const room = makeRoom([], 'normal');
+    const session = new GameSession(room, true, 42);
+    gameSessions.set(room.id, session);
+    playerRoomMap.set('normal-player', room.id);
+
+    cleanupIdleRooms(futureNow());
+
+    expect(getRoom(room.id)).not.toBeNull();
+    expect(playerRoomMap.has('normal-player')).toBe(true);
   });
 });

@@ -119,6 +119,7 @@ export function applyServerMessage(
           spectatorIds: msg.spectatorIds ?? [],
           viewGrants: msg.viewGrants ?? {},
           pendingViewRequests: msg.pendingViewRequests ?? {},
+          roomType: msg.roomType,
         },
       };
     case 'room_config':

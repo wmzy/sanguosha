@@ -35,6 +35,34 @@ export interface LobbyResult {
 const DEFAULT_READY_TIMEOUT_MS = 300_000;
 const TICK_MS = 50;
 
+/**
+ * 若 fields 中的 RoomConfig 字段与当前房间配置不同，发送 updateConfig 更新。
+ * 仅在 lobby 阶段有效（服务端 updateConfig 要求 status='等待中'）。
+ * 以 hgc.roomState?.config 为基线增量覆盖，未变化的字段保留原值。
+ * 返回 true 表示有变更并已发送。
+ */
+export async function applyConfigUpdate(
+  hgc: HeadlessGameClient,
+  fields: { timeoutScale?: number; name?: string },
+): Promise<boolean> {
+  const current = hgc.roomState?.config;
+  if (!current) return false;
+  const next: RoomConfig = { ...current };
+  let changed = false;
+  if (fields.timeoutScale !== undefined && fields.timeoutScale !== current.timeoutScale) {
+    next.timeoutScale = fields.timeoutScale;
+    changed = true;
+  }
+  if (fields.name !== undefined && fields.name !== current.name) {
+    next.name = fields.name;
+    changed = true;
+  }
+  if (changed) {
+    await hgc.sendUpdateConfig(next);
+  }
+  return changed;
+}
+
 /** 判定全员就绪：readyPlayers 集合 === playerIds 集合，且至少 2 人。 */
 function isAllReady(hgc: HeadlessGameClient): boolean {
   const rs = hgc.roomState;

@@ -17,6 +17,8 @@ export interface Room {
   /** 房主;调试房间无房主(null) */
   hostId: string | null;
   readyPlayers: Set<string>;
+  /** 房间类型: normal=持久化,不自动销毁不自动换主; quick=纯内存 */
+  roomType: 'normal' | 'quick';
   isDebug?: boolean;
   /** 房间级游戏配置 */
   config: RoomConfig;
@@ -55,13 +57,15 @@ function clampPlayers(n: number): number {
   return Math.min(Math.max(n, 2), 8);
 }
 
-/** 创建普通房间:需要 host 玩家立刻加入。 */
+/** 创建普通房间:需要 host 玩家立刻加入。
+ *  roomType: 'normal'=持久化到 DB, 不自动销毁不自动换主; 'quick'=纯内存(默认)。 */
 export function createRoom(
   name: string,
   maxPlayers: number,
   hostId: string,
   sink: ConnectionSink,
   config?: RoomConfig,
+  roomType: 'normal' | 'quick' = 'quick',
 ): Room {
   const id = generateRoomId();
   const room: Room = {
@@ -72,6 +76,7 @@ export function createRoom(
     status: '等待中',
     hostId,
     readyPlayers: new Set(),
+    roomType,
     config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
     spectators: new Map(),
     viewGrants: new Map(),
@@ -80,6 +85,7 @@ export function createRoom(
     chatHistory: [],
   };
   roomList.set(id, room);
+  roomChangeHandler?.(room, 'create');
   return room;
 }
 
@@ -95,6 +101,7 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
     status: '等待中',
     hostId: null,
     readyPlayers: new Set(),
+    roomType: 'quick',
     isDebug: true,
     config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
     spectators: new Map(),
@@ -168,11 +175,19 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
   room.players.delete(playerId);
   room.readyPlayers.delete(playerId);
 
-  if (room.players.size === 0) {
+  // 普通房间: 不自动销毁, 不自动换主。仅同步 DB。
+  if (room.roomType === 'normal') {
+    roomChangeHandler?.(room, 'update');
+    return room;
+  }
+
+  // 快速房间: 无进行中游戏且全员离开 → 自动销毁
+  if (room.players.size === 0 && room.status !== '进行中') {
     roomList.delete(roomId);
     return null;
   }
 
+  // 快速房间: 房主离开 → 自动选新房主
   if (room.hostId === playerId) {
     const newHost = room.players.keys().next().value;
     room.hostId = newHost ?? null;
@@ -191,6 +206,7 @@ export function updateConfig(roomId: string, config: unknown, playerId: string):
   const normalized = normalizeRoomConfig(config);
   room.config = normalized;
   room.name = normalized.name;
+  roomChangeHandler?.(room, 'update');
   return normalized;
 }
 
@@ -218,7 +234,10 @@ export function allReady(roomId: string): boolean {
 
 export function setRoomStatus(roomId: string, status: Room['status']): void {
   const room = roomList.get(roomId);
-  if (room) room.status = status;
+  if (room) {
+    room.status = status;
+    roomChangeHandler?.(room, 'update');
+  }
 }
 
 export function getRoom(roomId: string): Room | null {
@@ -226,7 +245,11 @@ export function getRoom(roomId: string): Room | null {
 }
 
 export function deleteRoom(roomId: string): boolean {
-  return roomList.delete(roomId);
+  const room = roomList.get(roomId);
+  if (!room) return false;
+  roomList.delete(roomId);
+  roomChangeHandler?.(room, 'delete');
+  return true;
 }
 
 export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
@@ -245,6 +268,7 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
       status: room.status,
       hostId: room.hostId,
       isDebug: room.isDebug === true,
+      roomType: room.roomType,
       config: room.config,
       spectatorCount: room.spectators.size,
     });
@@ -290,6 +314,14 @@ export function setSessionChecker(fn: ((roomId: string) => boolean) | null): voi
 }
 function hasSession(roomId: string): boolean {
   return sessionChecker ? sessionChecker(roomId) : true;
+}
+
+// 房间变更通知器:由 roomStore 注册,持久化普通房间元数据。
+let roomChangeHandler: ((room: Room, action: 'create' | 'update' | 'delete') => void) | null = null;
+export function setRoomChangeHandler(
+  fn: ((room: Room, action: 'create' | 'update' | 'delete') => void) | null,
+): void {
+  roomChangeHandler = fn;
 }
 
 // ── 旁观者管理 ──

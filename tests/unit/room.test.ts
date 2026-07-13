@@ -677,3 +677,75 @@ describe('聊天功能', () => {
     expect(result.error).toBe('不在房间中');
   });
 });
+
+describe('房间类型行为', () => {
+  it('创建普通房间默认为 quick 类型', () => {
+    const room = createRoom('快速房', 4, 'host', createMockSink());
+    expect(room.roomType).toBe('quick');
+  });
+
+  it('创建普通房间可指定 normal 类型', () => {
+    const room = createRoom('普通房', 4, 'host', createMockSink(), undefined, 'normal');
+    expect(room.roomType).toBe('normal');
+  });
+
+  it('快速房间: 所有人离开 + 无游戏 → 自动销毁', () => {
+    const room = createRoom('快速房', 4, 'host', createMockSink());
+    const result = leaveRoom(room.id, 'host');
+    expect(result).toBeNull();
+    expect(getRoom(room.id)).toBeNull();
+  });
+
+  it('快速房间: 所有人离开 + 游戏进行中 → 不销毁', () => {
+    const room = createRoom('快速房', 4, 'host', createMockSink());
+    room.status = '进行中';
+    const result = leaveRoom(room.id, 'host');
+    expect(result).not.toBeNull();
+    expect(getRoom(room.id)).not.toBeNull();
+  });
+
+  it('快速房间: 房主离开 → 自动选新房主', () => {
+    const room = createRoom('快速房', 4, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    const result = leaveRoom(room.id, 'host');
+    expect(result).not.toBeNull();
+    expect(result!.hostId).toBe('p2');
+  });
+
+  it('普通房间: 所有人离开 → 不销毁', () => {
+    const room = createRoom('普通房', 4, 'host', createMockSink(), undefined, 'normal');
+    const result = leaveRoom(room.id, 'host');
+    expect(result).not.toBeNull();
+    expect(getRoom(room.id)).not.toBeNull();
+  });
+
+  it('普通房间: 房主离开 → 不自动换主', () => {
+    const room = createRoom('普通房', 4, 'host', createMockSink(), undefined, 'normal');
+    joinRoom(room.id, 'p2', createMockSink());
+    const result = leaveRoom(room.id, 'host');
+    expect(result).not.toBeNull();
+    expect(result!.hostId).toBe('host'); // 房主保持不变
+    expect(result!.players.has('host')).toBe(false);
+  });
+
+  it('普通房间: 游戏进行中所有人离开 → 不销毁', () => {
+    const room = createRoom('普通房', 4, 'host', createMockSink(), undefined, 'normal');
+    joinRoom(room.id, 'p2', createMockSink());
+    room.status = '进行中';
+    leaveRoom(room.id, 'p2');
+    const result = leaveRoom(room.id, 'host');
+    expect(result).not.toBeNull();
+    expect(getRoom(room.id)).not.toBeNull();
+  });
+
+  it('RoomInfo 包含 roomType 字段', () => {
+    createRoom('快速房', 4, 'qhost', createMockSink());
+    createRoom('普通房', 4, 'nhost', createMockSink(), undefined, 'normal');
+
+    const list = getRoomList();
+    const quickRoom = list.find((r) => r.hostId === 'qhost');
+    const normalRoom = list.find((r) => r.hostId === 'nhost');
+    expect(quickRoom?.roomType).toBe('quick');
+    expect(normalRoom?.roomType).toBe('normal');
+  });
+});
