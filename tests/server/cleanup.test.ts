@@ -44,6 +44,8 @@ function makeRoom(playerIds: string[], roomType: 'normal' | 'quick' = 'quick'): 
     pendingViewRequests: new Map(),
     chatUsage: new Map(),
     chatHistory: [],
+    seats: Array(Math.max(playerIds.length, 2)).fill(null),
+    pendingSeatSwaps: new Map(),
   } as unknown as Room;
   for (const pid of playerIds) {
     room.players.set(pid, new FakeSink());

@@ -278,6 +278,8 @@ describe('useMultiplayerRoom', () => {
       spectatorIds: [],
       viewGrants: {},
       pendingViewRequests: {},
+      seats: ['pid-0', null],
+      pendingSeatSwaps: {},
     });
     expect(result.current.isHost).toBe(true);
     expect(result.current.roomState?.hostId).toBe('pid-0');
@@ -303,6 +305,8 @@ describe('useMultiplayerRoom', () => {
       spectatorIds: [],
       viewGrants: {},
       pendingViewRequests: {},
+      seats: ['pid-0', null],
+      pendingSeatSwaps: {},
     });
     expect(result.current.ready).toBe(true);
 

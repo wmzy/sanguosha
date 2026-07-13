@@ -20,6 +20,10 @@ export interface RoomState {
   pendingViewRequests: Record<string, number>;
   /** 房间类型: normal=持久化; quick=纯内存 */
   roomType?: 'normal' | 'quick';
+  /** 座位表: seats[i] = 座次 i 的 playerId, null=空座 */
+  seats?: (string | null)[];
+  /** 待处理座位交换: requesterId → { targetSeat, expiresAt } */
+  pendingSeatSwaps?: Record<string, { targetSeat: number; expiresAt: number }>;
 }
 
 export type ClientPhase = 'connecting' | 'lobby' | 'playing' | 'ended';

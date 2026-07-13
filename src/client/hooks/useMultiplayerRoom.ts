@@ -69,6 +69,14 @@ export interface MultiplayerRoom {
   rejectView: (spectatorId: string) => void;
   /** 玩家撤销已授权 */
   revokeView: (spectatorId: string) => void;
+  /** 移动到空座位（仅等待中） */
+  moveSeat: (targetSeat: number) => void;
+  /** 请求与目标座位的玩家交换座位 */
+  requestSeatSwap: (targetSeat: number) => void;
+  /** 响应座位交换请求 */
+  respondSeatSwap: (requesterId: string, accept: boolean) => void;
+  /** 当前收到的座位交换请求 (收到的请求者 id 和目标座次) */
+  incomingSeatSwap: { requesterId: string; requesterSeat: number; targetSeat: number; expiresAt: number } | null;
   /** 聊天消息列表 */
   chatMessages: ChatMessage[];
   /** 发送聊天消息 */
@@ -102,6 +110,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  /** 收到的座位交换请求 */
+  const [incomingSeatSwap, setIncomingSeatSwap] = useState<
+    { requesterId: string; requesterSeat: number; targetSeat: number; expiresAt: number } | null
+  >(null);
 
   // 初始命令:有 initialRoomId 则自动 join(分享链接直达)
   const [command, setCommand] = useState<Command>(() =>
@@ -178,6 +190,19 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         if (msg.type === 'error') {
           setError(msg.message);
           setTimeout(() => setError(null), 3000);
+        }
+        // 座位交换请求：仅当目标是当前玩家时显示通知
+        if (msg.type === 'seat_swap_request' && msg.targetPlayerId === hgc.playerId) {
+          setIncomingSeatSwap({
+            requesterId: msg.requesterId,
+            requesterSeat: msg.requesterSeat,
+            targetSeat: msg.targetSeat,
+            expiresAt: msg.expiresAt,
+          });
+        }
+        // 座位交换结果：清除通知
+        if (msg.type === 'seat_swap_result') {
+          setIncomingSeatSwap(null);
         }
       },
     });
@@ -304,6 +329,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     
     setPlayerId(null);
     setChatMessages([]);
+    setIncomingSeatSwap(null);
   }, []);
 
   const sendAction = useCallback((action: ActionMsg) => {
@@ -397,6 +423,39 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     }).catch((err) => log.error('revokeView failed', { error: String(err) }));
   }, []);
 
+  // ── 座位操作 ──
+
+  const moveSeat = useCallback((targetSeat: number) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId || !hgc.playerId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/seat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hgc.playerId, targetSeat }),
+    }).catch((err) => log.error('moveSeat failed', { error: String(err) }));
+  }, []);
+
+  const requestSeatSwap = useCallback((targetSeat: number) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId || !hgc.playerId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/seat-swap/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hgc.playerId, targetSeat }),
+    }).catch((err) => log.error('requestSeatSwap failed', { error: String(err) }));
+  }, []);
+
+  const respondSeatSwap = useCallback((requesterId: string, accept: boolean) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId || !hgc.playerId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/seat-swap/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hgc.playerId, requesterId, accept }),
+    }).catch((err) => log.error('respondSeatSwap failed', { error: String(err) }));
+    setIncomingSeatSwap(null);
+  }, []);
+
   return {
     stage,
     roomId,
@@ -423,6 +482,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     approveView,
     rejectView,
     revokeView,
+    moveSeat,
+    requestSeatSwap,
+    respondSeatSwap,
+    incomingSeatSwap,
     chatMessages,
     sendChat,
     updateConfig,

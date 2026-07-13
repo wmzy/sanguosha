@@ -32,6 +32,10 @@ export interface Room {
   chatUsage: Map<string, { total: number; timestamps: number[] }>;
   /** 聊天历史（最近 50 条，供重连获取） */
   chatHistory: Array<{ playerId: string; seatIndex: number; text: string; timestamp: number }>;
+  /** 座位表：seats[i] = 座次 i 的 playerId，null=空座。长度始终 = maxPlayers */
+  seats: (string | null)[];
+  /** 待处理座位交换请求：requesterId → { targetSeat, expiresAt, timer } */
+  pendingSeatSwaps: Map<string, { targetSeat: number; expiresAt: number; timer: ReturnType<typeof setTimeout> }>;
 }
 
 const roomList = new Map<string, Room>();
@@ -57,6 +61,37 @@ function clampPlayers(n: number): number {
   return Math.min(Math.max(n, 2), 8);
 }
 
+/** 座位交换请求超时(ms) */
+export const SEAT_SWAP_TIMEOUT_MS = 15_000;
+
+/** 构造 room_state ServerMessage（集中一处，避免 rest.ts/sse.ts 重复构造）。 */
+export function buildRoomState(room: Room): ServerMessage {
+  return {
+    type: 'room_state',
+    readyPlayers: [...room.readyPlayers],
+    playerIds: room.seats.filter((s): s is string => s !== null),
+    hostId: room.hostId,
+    maxPlayers: room.maxPlayers,
+    config: room.config,
+    spectatorIds: [...room.spectators.keys()],
+    viewGrants: Object.fromEntries(room.viewGrants),
+    pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
+    roomType: room.roomType,
+    seats: [...room.seats],
+    pendingSeatSwaps: Object.fromEntries(
+      [...room.pendingSeatSwaps.entries()].map(([id, v]) => [
+        id,
+        { targetSeat: v.targetSeat, expiresAt: v.expiresAt },
+      ]),
+    ),
+  };
+}
+
+/** 获取玩家当前座次下标（-1=不在座位表中）。 */
+export function getPlayerSeat(room: Room, playerId: string): number {
+  return room.seats.indexOf(playerId);
+}
+
 /** 创建普通房间:需要 host 玩家立刻加入。
  *  roomType: 'normal'=持久化到 DB, 不自动销毁不自动换主; 'quick'=纯内存(默认)。 */
 export function createRoom(
@@ -68,6 +103,8 @@ export function createRoom(
   roomType: 'normal' | 'quick' = 'quick',
 ): Room {
   const id = generateRoomId();
+  const seats: (string | null)[] = Array(clampPlayers(maxPlayers)).fill(null);
+  seats[0] = hostId;
   const room: Room = {
     id,
     name,
@@ -83,6 +120,8 @@ export function createRoom(
     pendingViewRequests: new Map(),
     chatUsage: new Map(),
     chatHistory: [],
+    seats,
+    pendingSeatSwaps: new Map(),
   };
   roomList.set(id, room);
   roomChangeHandler?.(room, 'create');
@@ -109,6 +148,8 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
     pendingViewRequests: new Map(),
     chatUsage: new Map(),
     chatHistory: [],
+    seats: Array(clampPlayers(maxPlayers)).fill(null),
+    pendingSeatSwaps: new Map(),
   };
   roomList.set(id, room);
   return room;
@@ -118,10 +159,27 @@ export function joinRoom(roomId: string, playerId: string, sink: ConnectionSink)
   const room = roomList.get(roomId);
   if (!room) return null;
   if (room.status !== '等待中') return null;
-  if (room.players.size >= room.maxPlayers) return null;
   if (room.players.has(playerId)) return null;
 
+  // 如果玩家已在 seats 中（SSE 断开重连时 seats 残留），复用已有座位
+  const existingSeat = room.seats.indexOf(playerId);
+  if (existingSeat >= 0) {
+    room.players.set(playerId, sink);
+    return room;
+  }
+
+  // 新玩家加入：检查人数上限
+  if (room.players.size >= room.maxPlayers) return null;
+
   room.players.set(playerId, sink);
+  // 分配首个空座位
+  const emptySeat = room.seats.indexOf(null);
+  if (emptySeat >= 0) {
+    room.seats[emptySeat] = playerId;
+  } else {
+    // seats 已满但 players 未满（异常状态）: 追加座位
+    room.seats.push(playerId);
+  }
   return room;
 }
 
@@ -157,6 +215,9 @@ export function joinDebugRoom(
     if (replacedPlayerId === undefined) return null;
     const oldSink = room.players.get(replacedPlayerId);
     room.players.delete(replacedPlayerId);
+    // 清理被踢玩家的座位
+    const replacedSeat = room.seats.indexOf(replacedPlayerId);
+    if (replacedSeat >= 0) room.seats[replacedSeat] = null;
     try {
       oldSink?.close();
     } catch {
@@ -165,6 +226,18 @@ export function joinDebugRoom(
   }
 
   room.players.set(playerId, sink);
+  // 复用已有座位或分配首个空座位（防止重复入座）
+  const existingDebugSeat = room.seats.indexOf(playerId);
+  if (existingDebugSeat >= 0) {
+    return { room, replacedPlayerId };
+  }
+  // 分配首个空座位
+  const emptySeat = room.seats.indexOf(null);
+  if (emptySeat >= 0) {
+    room.seats[emptySeat] = playerId;
+  } else {
+    room.seats.push(playerId);
+  }
   return { room, replacedPlayerId };
 }
 
@@ -174,6 +247,21 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
 
   room.players.delete(playerId);
   room.readyPlayers.delete(playerId);
+  // 清除座位 + 取消该玩家的交换请求
+  const seatIdx = room.seats.indexOf(playerId);
+  if (seatIdx >= 0) room.seats[seatIdx] = null;
+  const pendingSwap = room.pendingSeatSwaps.get(playerId);
+  if (pendingSwap) {
+    clearTimeout(pendingSwap.timer);
+    room.pendingSeatSwaps.delete(playerId);
+  }
+  // 如果有人请求与离开的玩家交换,也取消
+  for (const [reqId, swap] of room.pendingSeatSwaps) {
+    if (room.seats[swap.targetSeat] === null) {
+      clearTimeout(swap.timer);
+      room.pendingSeatSwaps.delete(reqId);
+    }
+  }
 
   // 普通房间: 不自动销毁, 不自动换主。仅同步 DB。
   if (room.roomType === 'normal') {
@@ -212,6 +300,17 @@ export function updateConfig(roomId: string, config: unknown, playerId: string, 
   if (maxPlayers !== undefined) {
     const clamped = clampPlayers(maxPlayers);
     if (clamped < room.players.size) return null;
+    // 调整 seats 数组大小
+    if (clamped > room.seats.length) {
+      // 扩展:追加空座位
+      room.seats.push(...Array(clamped - room.seats.length).fill(null));
+    } else if (clamped < room.seats.length) {
+      // 收缩:尾部空座位可安全移除(被占用则拒绝)
+      for (let i = clamped; i < room.seats.length; i++) {
+        if (room.seats[i] !== null) return null;
+      }
+      room.seats.length = clamped;
+    }
     room.maxPlayers = clamped;
   }
   // 配置变更 → 重置准备状态
@@ -334,6 +433,111 @@ export function setRoomChangeHandler(
   roomChangeHandler = fn;
 }
 
+// ── 座位管理 ──
+
+/** 清理玩家的待处理交换请求（内部）。 */
+function cancelSeatSwapInternal(room: Room, requesterId: string): void {
+  const pending = room.pendingSeatSwaps.get(requesterId);
+  if (pending) {
+    clearTimeout(pending.timer);
+    room.pendingSeatSwaps.delete(requesterId);
+  }
+}
+
+/** 移动到空座位。仅等待中允许。 */
+export function moveSeat(roomId: string, playerId: string, targetSeat: number): Room | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  if (room.status !== '等待中') return null;
+  if (!room.players.has(playerId)) return null;
+  if (targetSeat < 0 || targetSeat >= room.seats.length) return null;
+  if (room.seats[targetSeat] !== null) return null; // 目标座位已有人
+
+  const currentSeat = room.seats.indexOf(playerId);
+  if (currentSeat === targetSeat) return room; // no-op
+  if (currentSeat >= 0) room.seats[currentSeat] = null;
+  room.seats[targetSeat] = playerId;
+  // 移座后取消自己的交换请求
+  cancelSeatSwapInternal(room, playerId);
+  return room;
+}
+
+/** 请求座位交换。仅等待中、目标座位有人时允许。
+ *  返回 { room, targetPlayerId } 供调用方广播 seat_swap_request。 */
+export function requestSeatSwap(
+  roomId: string,
+  requesterId: string,
+  targetSeat: number,
+): { room: Room; targetPlayerId: string; requesterSeat: number; expiresAt: number } | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  if (room.status !== '等待中') return null;
+  if (!room.players.has(requesterId)) return null;
+  if (targetSeat < 0 || targetSeat >= room.seats.length) return null;
+
+  const targetPlayerId = room.seats[targetSeat];
+  if (!targetPlayerId || targetPlayerId === requesterId) return null;
+
+  const requesterSeat = room.seats.indexOf(requesterId);
+  if (requesterSeat < 0) return null;
+
+  // 清理已有请求（同一玩家只能有一个待处理交换）
+  cancelSeatSwapInternal(room, requesterId);
+
+  const expiresAt = Date.now() + SEAT_SWAP_TIMEOUT_MS;
+  const timer = setTimeout(() => {
+    expireSeatSwap(roomId, requesterId);
+  }, SEAT_SWAP_TIMEOUT_MS);
+
+  room.pendingSeatSwaps.set(requesterId, { targetSeat, expiresAt, timer });
+  return { room, targetPlayerId, requesterSeat, expiresAt };
+}
+
+/** 响应座位交换请求。responderId 是被请求方（目标座位当前玩家）。
+ *  accept=true 时执行交换，返回 { room, swapped: true }。
+ *  accept=false 时仅清理请求，返回 { room, swapped: false }。 */
+export function respondSeatSwap(
+  roomId: string,
+  responderId: string,
+  requesterId: string,
+  accept: boolean,
+): { room: Room; swapped: boolean } | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+
+  const pending = room.pendingSeatSwaps.get(requesterId);
+  if (!pending) return null;
+
+  // 验证 responder 是目标座位的当前玩家
+  if (room.seats[pending.targetSeat] !== responderId) return null;
+
+  clearTimeout(pending.timer);
+  room.pendingSeatSwaps.delete(requesterId);
+
+  if (accept) {
+    const requesterSeat = room.seats.indexOf(requesterId);
+    if (requesterSeat < 0) return null;
+    // 交换座位
+    room.seats[requesterSeat] = responderId;
+    room.seats[pending.targetSeat] = requesterId;
+    return { room, swapped: true };
+  }
+
+  return { room, swapped: false };
+}
+
+/** 超时自动拒绝交换请求（由 setTimeout 触发）。 */
+function expireSeatSwap(roomId: string, requesterId: string): void {
+  const room = roomList.get(roomId);
+  if (!room) return;
+  const pending = room.pendingSeatSwaps.get(requesterId);
+  if (!pending) return;
+  room.pendingSeatSwaps.delete(requesterId);
+  const responderId = room.seats[pending.targetSeat] ?? '';
+  broadcastMessage(room, { type: 'seat_swap_result', success: false, requesterId, responderId });
+  broadcastMessage(room, buildRoomState(room));
+}
+
 // ── 旁观者管理 ──
 
 /** 以旁观者身份加入房间。不占 maxPlayers 名额。 */
@@ -370,6 +574,11 @@ export function switchRole(
     if (!sink) return { room, success: false };
     room.players.delete(playerId);
     room.readyPlayers.delete(playerId);
+    // 清除座位
+    const seatIdx = room.seats.indexOf(playerId);
+    if (seatIdx >= 0) room.seats[seatIdx] = null;
+    // 取消交换请求
+    cancelSeatSwapInternal(room, playerId);
     room.spectators.set(playerId, sink);
     // 房主切旁观仍保留 hostId（管理权限不变）
     return { room, success: true };
@@ -382,6 +591,9 @@ export function switchRole(
     room.viewGrants.delete(playerId);
     room.pendingViewRequests.delete(playerId);
     room.players.set(playerId, sink);
+    // 分配首个空座位
+    const emptySeat = room.seats.indexOf(null);
+    if (emptySeat >= 0) room.seats[emptySeat] = playerId;
     return { room, success: true };
   }
 }
@@ -490,9 +702,8 @@ export function addChatMessage(
   usage.total++;
   usage.timestamps.push(now);
 
-  // 确定座次
-  const playerIds = [...room.players.keys()];
-  const seatIndex = playerIds.indexOf(playerId);
+  // 确定座次（从座位表派生，保证与座次顺序一致）
+  const seatIndex = room.seats.indexOf(playerId);
   if (seatIndex < 0) return { ok: false, error: '不在房间中' };
 
   // 存入历史

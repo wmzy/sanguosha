@@ -120,6 +120,8 @@ export function applyServerMessage(
           viewGrants: msg.viewGrants ?? {},
           pendingViewRequests: msg.pendingViewRequests ?? {},
           roomType: msg.roomType,
+          seats: msg.seats ?? [],
+          pendingSeatSwaps: msg.pendingSeatSwaps ?? {},
         },
       };
     case 'room_config':

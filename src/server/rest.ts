@@ -29,6 +29,10 @@ import {
   addChatMessage,
   resetChatUsage,
   getChatHistory,
+  buildRoomState,
+  moveSeat,
+  requestSeatSwap,
+  respondSeatSwap,
   type Room,
 } from './room';
 import { deletePersistedRoom } from './persistence';
@@ -51,18 +55,7 @@ const log = createLogger('rest');
 
 /** 广播 room_state 给房间内所有连接。 */
 function broadcastRoomState(room: Room): void {
-  broadcastMessage(room, {
-    type: 'room_state',
-    readyPlayers: [...room.readyPlayers],
-    playerIds: [...room.players.keys()],
-    hostId: room.hostId,
-    maxPlayers: room.maxPlayers,
-    config: room.config,
-    spectatorIds: [...room.spectators.keys()],
-    viewGrants: Object.fromEntries(room.viewGrants),
-    pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
-    roomType: room.roomType,
-  });
+  broadcastMessage(room, buildRoomState(room));
 }
 
 /** 创建 null sink（REST 入口无活跃连接时占位）。 */
@@ -169,12 +162,21 @@ export function applyRestRoutes(app: Hono): void {
       return c.json({ roomId: id, playerId });
     }
 
-    if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
     if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
 
-    // 清理旧房间关联
+    // 如果玩家已在当前房间的 seats 中（SSE 断开重连），直接恢复连接
+    // 不检查人数上限（不新增座位），保留原有选座
+    if (room.seats.includes(playerId)) {
+      joinRoom(id, playerId, nullSink());
+      playerRoomMap.set(playerId, id);
+      return c.json({ roomId: id, playerId });
+    }
+
+    if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
+
+    // 清理旧房间关联（跨房间切换时离开旧房间）
     const existingRoom = findRoomByPlayerId(playerId);
-    if (existingRoom) {
+    if (existingRoom && existingRoom.id !== id) {
       leaveRoom(existingRoom.id, playerId);
       playerRoomMap.delete(playerId);
     }
@@ -644,5 +646,67 @@ export function applyRestRoutes(app: Hono): void {
     }
 
     return c.json({ success: true });
+  });
+
+  // ── 座位管理路由 ──
+
+  // POST /api/rooms/:id/seat — 移动到空座位
+  app.post('/api/rooms/:id/seat', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+    if (!playerId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+
+    const room = moveSeat(roomId, playerId, targetSeat);
+    if (!room) return c.json({ error: '无法移动到此座位' }, 400);
+
+    broadcastRoomState(room);
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/seat-swap/request — 请求座位交换
+  app.post('/api/rooms/:id/seat-swap/request', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const requesterId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+    if (!requesterId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+
+    const result = requestSeatSwap(roomId, requesterId, targetSeat);
+    if (!result) return c.json({ error: '无法发起交换请求' }, 400);
+
+    broadcastMessage(result.room, {
+      type: 'seat_swap_request',
+      requesterId,
+      requesterSeat: result.requesterSeat,
+      targetSeat,
+      targetPlayerId: result.targetPlayerId,
+      expiresAt: result.expiresAt,
+    });
+    broadcastRoomState(result.room);
+    return c.json({ success: true, expiresAt: result.expiresAt });
+  });
+
+  // POST /api/rooms/:id/seat-swap/respond — 响应座位交换
+  app.post('/api/rooms/:id/seat-swap/respond', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const responderId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const requesterId = typeof raw.requesterId === 'string' ? raw.requesterId : '';
+    const accept = raw.accept === true;
+    if (!responderId || !requesterId) return c.json({ error: '缺少参数' }, 400);
+
+    const result = respondSeatSwap(roomId, responderId, requesterId, accept);
+    if (!result) return c.json({ error: '交换请求无效或已过期' }, 400);
+
+    broadcastMessage(result.room, {
+      type: 'seat_swap_result',
+      success: result.swapped,
+      requesterId,
+      responderId,
+    });
+    broadcastRoomState(result.room);
+    return c.json({ success: true, swapped: result.swapped });
   });
 }

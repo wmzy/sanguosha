@@ -777,6 +777,102 @@ export function MultiplayerPage() {
               >拒绝</button>
             </div>
           ))}
+          {/* 座位图 */}
+          {(() => {
+            const seats = mp.roomState?.seats ?? [];
+            const mySeat = seats.indexOf(mp.playerId ?? '');
+            const pendingSwaps = mp.roomState?.pendingSeatSwaps ?? {};
+            // 找出谁请求与我交换
+            const swapRequestForMe = mp.incomingSeatSwap;
+            // 是否有自己发出的交换请求
+            const hasMyRequest = Object.entries(pendingSwaps).find(
+              ([reqId]) => reqId === mp.playerId,
+            );
+            return (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ fontSize: '14px', color: colors.text.muted, marginBottom: '8px' }}>座位安排（点击空位移动，点击他人座位请求交换）</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {seats.map((seatPlayerId, i) => {
+                    const isEmpty = seatPlayerId === null;
+                    const isMe = seatPlayerId === mp.playerId;
+                    const isPending = Object.entries(pendingSwaps).find(
+                      ([, v]) => v.targetSeat === i,
+                    );
+                    return (
+                      <button
+                        key={i}
+                        className={btnStyle}
+                        disabled={isMe || i === mySeat}
+                        style={{
+                          '--btn-bg': isMe ? colors.accent.gold : isEmpty ? colors.bg.input : colors.accent.darkRed,
+                          '--btn-padding': '8px 14px',
+                          '--btn-font-size': '13px',
+                          cursor: isMe ? 'default' : 'pointer',
+                          opacity: isMe ? 0.8 : 1,
+                          border: isEmpty ? `1px dashed ${colors.text.muted}` : '1px solid #555',
+                          borderRadius: '8px',
+                          minWidth: '90px',
+                          textAlign: 'center',
+                        } as React.CSSProperties}
+                        onClick={() => {
+                          if (isEmpty) {
+                            mp.moveSeat(i);
+                          } else if (!isMe) {
+                            // 请求交换座位
+                            if (window.confirm(`要与 ${seatPlayerId!.slice(0, 8)} 交换座位吗？`)) {
+                              mp.requestSeatSwap(i);
+                            }
+                          }
+                        }}
+                        title={isEmpty ? '移动到此座位' : isMe ? '你的座位' : `请求交换座位`}
+                      >
+                        <div style={{ fontWeight: 'bold' }}>P{i + 1}</div>
+                        <div style={{ fontSize: '11px', opacity: 0.8 }}>
+                          {isMe ? '我' : isEmpty ? '空位' : seatPlayerId!.slice(0, 6)}
+                        </div>
+                        {isPending && !isMe && (
+                          <div style={{ fontSize: '10px', marginTop: '2px', color: colors.accent.gold }}>
+                            交换中...
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {hasMyRequest && (
+                  <div style={{ fontSize: '12px', color: colors.accent.gold, marginTop: '6px' }}>
+                    ⏳ 等待对方同意交换座位...
+                  </div>
+                )}
+                {/* 收到的交换请求 */}
+                {swapRequestForMe && (
+                  <div style={{
+                    background: colors.bg.input,
+                    borderRadius: '8px',
+                    padding: '12px',
+                    marginTop: '8px',
+                    fontSize: '13px',
+                    border: `1px solid ${colors.accent.orange}`,
+                  }}>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>{swapRequestForMe.requesterId.slice(0, 8)}</strong> 想与你交换座位
+                      （P{swapRequestForMe.requesterSeat + 1} ⇄ P{swapRequestForMe.targetSeat + 1}）
+                    </div>
+                    <button
+                      className={btnStyle}
+                      style={{ '--btn-bg': colors.accent.green, '--btn-padding': '4px 14px', '--btn-font-size': '12px' } as React.CSSProperties}
+                      onClick={() => mp.respondSeatSwap(swapRequestForMe.requesterId, true)}
+                    >同意</button>
+                    <button
+                      className={btnStyle}
+                      style={{ '--btn-bg': colors.accent.red, '--btn-padding': '4px 14px', '--btn-font-size': '12px', marginLeft: '6px' } as React.CSSProperties}
+                      onClick={() => mp.respondSeatSwap(swapRequestForMe.requesterId, false)}
+                    >拒绝</button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <div className={buttonRow}>
             {!mp.ready && (
               <button

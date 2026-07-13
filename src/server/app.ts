@@ -72,6 +72,8 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
       pendingViewRequests: new Map(),
       chatUsage: new Map(),
       chatHistory: [],
+      seats: Array(row.maxPlayers).fill(null),
+      pendingSeatSwaps: new Map(),
     };
     addRoom(room);
     log.info(`恢复普通房间 ${row.id}（${row.name}，状态: ${row.status}）`);
@@ -134,6 +136,8 @@ async function restorePersistedRooms(): Promise<void> {
         pendingViewRequests: new Map(),
         chatUsage: new Map(),
         chatHistory: [],
+        seats: Array(persisted.maxPlayers || state.players.length).fill(null),
+        pendingSeatSwaps: new Map(),
       };
       if (!existingRoom) addRoom(room);
       const session = new GameSession(room, persisted.debug);

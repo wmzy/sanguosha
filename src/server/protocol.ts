@@ -186,6 +186,8 @@ export type ServerMessage =
       viewGrants: Record<string, number>;
       pendingViewRequests: Record<string, number>;
       roomType?: 'normal' | 'quick';
+      seats: (string | null)[];
+      pendingSeatSwaps: Record<string, { targetSeat: number; expiresAt: number }>;
     }
   | { type: 'player_ready'; playerId: string }
   | { type: 'spectator_joined'; spectatorId: string }
@@ -196,6 +198,8 @@ export type ServerMessage =
   | { type: 'role_changed'; playerId: string; newRole: 'player' | 'spectator' }
   | { type: 'chat'; playerId: string; seatIndex: number; text: string; timestamp: number }
   | { type: 'chat_history'; messages: Array<{ playerId: string; seatIndex: number; text: string; timestamp: number }> }
+  | { type: 'seat_swap_request'; requesterId: string; requesterSeat: number; targetSeat: number; targetPlayerId: string; expiresAt: number }
+  | { type: 'seat_swap_result'; success: boolean; requesterId: string; responderId: string }
 
 /**
  * 客户端发往服务端的消息。

@@ -10,7 +10,7 @@ import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
 import { getRoom, removeSpectator } from './room';
 import { broadcastMessage } from './room';
-import { getChatHistory } from './room';
+import { getChatHistory, buildRoomState } from './room';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
 import { createLogger } from './logger';
@@ -102,18 +102,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       }
 
       // 发送 room_state（含旁观者列表和授权）
-      sink.send({
-        type: 'room_state',
-        readyPlayers: [...room.readyPlayers],
-        playerIds: [...room.players.keys()],
-        hostId: room.hostId,
-        maxPlayers: room.maxPlayers,
-        config: room.config,
-        spectatorIds: [...room.spectators.keys()],
-        viewGrants: Object.fromEntries(room.viewGrants),
-        pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
-        roomType: room.roomType,
-      });
+      sink.send(buildRoomState(room));
 
       // 发送聊天历史（如果有）
       const chatHist = getChatHistory(roomId);
@@ -164,18 +153,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       if (session && room.status === '进行中') {
         session.reconnectPlayer(playerId, sink, lastSeq);
       } else {
-        sink.send({
-          type: 'room_state',
-          readyPlayers: [...room.readyPlayers],
-          playerIds: [...room.players.keys()],
-          hostId: room.hostId,
-          maxPlayers: room.maxPlayers,
-          config: room.config,
-          spectatorIds: [...room.spectators.keys()],
-          viewGrants: Object.fromEntries(room.viewGrants),
-          pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
-          roomType: room.roomType,
-        });
+        sink.send(buildRoomState(room));
       }
 
       // 发送聊天历史（如果有）
@@ -187,12 +165,15 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       stream.onAbort(() => {
         log.info('SSE 连接断开', { roomId, playerId });
         sink.close();
-        room.players.delete(playerId);
-        if (session) {
-          session.handleDisconnect(playerId);
-        }
-        if (room.isDebug) {
-          playerRoomMap.delete(playerId);
+        // 只在自己仍是当前 sink 时删除（刷新重连后旧连接的 onAbort 可能晚于新连接触发）
+        if (room.players.get(playerId) === sink) {
+          room.players.delete(playerId);
+          if (session) {
+            session.handleDisconnect(playerId);
+          }
+          if (room.isDebug) {
+            playerRoomMap.delete(playerId);
+          }
         }
       });
 
