@@ -61,8 +61,8 @@ function resolveCharPool(preset: string): Array<{ name: string; skills: string[]
 }
 
 /** 玩家断线后的保活宽限期(ms)。在此期间重连可恢复座位,超时后正常清理。
- *  60s 足以覆盖常见网络抖动(路由切换/WiFi 重连/页面刷新)。 */
-export const RECONNECT_GRACE_MS = 60_000;
+ *  所有玩家离线超过此时长则自动终止游戏。30s 足以覆盖常见网络抖动(路由切换/WiFi 重连/页面刷新)。 */
+export const RECONNECT_GRACE_MS = 30_000;
 export class GameSession {
   private state: GameState | null = null;
   private actionLog: ActionLogEntry[] = [];

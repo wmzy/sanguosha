@@ -65,8 +65,8 @@ function getBaselineSent(session: GameSession): Set<string> {
 }
 
 describe('RECONNECT_GRACE_MS 常量', () => {
-  it('宽限期为 60 秒', () => {
-    expect(RECONNECT_GRACE_MS).toBe(60_000);
+  it('宽限期为 30 秒', () => {
+    expect(RECONNECT_GRACE_MS).toBe(30_000);
   });
 });
 
