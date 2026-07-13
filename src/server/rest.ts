@@ -158,13 +158,19 @@ export function applyRestRoutes(app: Hono): void {
     const room = getRoom(id);
     if (!room) return c.json({ error: '房间不存在' }, 404);
     if (room.isDebug) return c.json({ error: '调试房间请使用调试入口' }, 400);
-    if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
-    if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
 
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
       ? raw.playerId.trim()
       : generatePlayerId();
+
+    // 已在房间中的玩家重新加入（刷新页面/重连 SSE）:直接返回成功
+    if (room.players.has(playerId)) {
+      return c.json({ roomId: id, playerId });
+    }
+
+    if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
+    if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
 
     // 清理旧房间关联
     const existingRoom = findRoomByPlayerId(playerId);

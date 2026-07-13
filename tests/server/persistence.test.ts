@@ -16,7 +16,7 @@ import {
   type PersistedRoom,
 } from '../../src/server/persistence';
 import { applyRestRoutes } from '../../src/server/rest';
-import { getRoom } from '../../src/server/room';
+import { getRoom, createRoom } from '../../src/server/room';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState, Card } from '../../src/engine/types';
@@ -392,6 +392,69 @@ describe('server/persistence', () => {
       expect(res.status).toBe(200);
       expect(await loadRoom(roomId)).toBeNull();
       expect(existsSync(join(TEST_DATA_DIR, `${roomId}.json`))).toBe(false);
+    });
+  });
+
+  // join REST: 已在房间中的玩家重新加入（刷新页面）不应被“房间已满”拒绝
+  describe('POST /api/rooms/:id/join 已在房间中的玩家', () => {
+    let app: Hono;
+
+    beforeEach(() => {
+      gameSessions.clear();
+      playerRoomMap.clear();
+      app = new Hono();
+      applyRestRoutes(app);
+    });
+
+    it('满员时已有玩家重新 join 返回 200 而非 400', async () => {
+      const room = createRoom('测试', 2, 'host1', {
+        send() {},
+      } as any);
+      // 用 REST 加入第二个玩家使房间满员
+      const joinRes = await app.fetch(
+        new Request(`http://localhost/api/rooms/${room.id}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: 'guest1' }),
+        }),
+      );
+      expect(joinRes.status).toBe(200);
+
+      // host1 刷新页面重新 join → 应成功，不是“房间已满”
+      const rejoinRes = await app.fetch(
+        new Request(`http://localhost/api/rooms/${room.id}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: 'host1' }),
+        }),
+      );
+      expect(rejoinRes.status).toBe(200);
+      const body = await rejoinRes.json();
+      expect(body.playerId).toBe('host1');
+    });
+
+    it('满员时新玩家 join 仍返回 400 房间已满', async () => {
+      const room = createRoom('测试', 2, 'host1', {
+        send() {},
+      } as any);
+      await app.fetch(
+        new Request(`http://localhost/api/rooms/${room.id}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: 'guest1' }),
+        }),
+      );
+      // 第三个新玩家
+      const res = await app.fetch(
+        new Request(`http://localhost/api/rooms/${room.id}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: 'newbie' }),
+        }),
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('房间已满');
     });
   });
 });
