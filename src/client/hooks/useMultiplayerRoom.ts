@@ -163,6 +163,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       onMessage: (msg: ServerMessage) => {
         // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
         // HGC 内部已重置 view/gameOverWinner,这里同步 React state(roomId/playerId 保留)。
+        if (msg.type === 'game_started') {
+          // 每局游戏是独立的聊天会话:开局时清空上一局的消息
+          setChatMessages([]);
+        }
         if (msg.type === 'game_reset') {
           setGameOver(null);
           setView(null);

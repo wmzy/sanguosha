@@ -824,12 +824,6 @@ export function MultiplayerPage() {
           </div>
         </div>
         {mp.error && <div className={errorToastStyle}>{mp.error}</div>}
-        <ChatPanel
-          messages={mp.chatMessages}
-          config={mp.roomState?.config?.chat}
-          onSend={mp.sendChat}
-          mySeatIndex={-1}
-        />
         </div>
       </>
     );

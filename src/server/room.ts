@@ -450,6 +450,8 @@ export function addChatMessage(
 
   const chat = room.config.chat;
   if (!chat.enabled) return { ok: false, error: '聊天已关闭' };
+  // 聊天仅在游戏中可用(非大厅/结算阶段)
+  if (room.status !== '进行中') return { ok: false, error: '聊天仅在游戏中可用' };
 
   // 白名单校验
   const trimmed = text.trim();

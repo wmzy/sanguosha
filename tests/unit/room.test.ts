@@ -619,6 +619,8 @@ describe('聊天功能', () => {
         ...chatOverride,
       },
     });
+    // 聊天仅在游戏中可用(makeChatRoom 模拟游戏进行中的房间)
+    setRoomStatus(room.id, '进行中');
     return room;
   }
 
@@ -627,6 +629,23 @@ describe('聊天功能', () => {
     const result = addChatMessage(room.id, 'host1', '大家好');
     expect(result.ok).toBe(true);
     expect(result.remaining).toBeNull(); // maxPerGame=0 表示无限
+  });
+
+  it('非游戏中(大厅/结算)拒绝聊天', () => {
+    const room = makeChatRoom();
+    setRoomStatus(room.id, '等待中');
+    expect(addChatMessage(room.id, 'host1', '大家好')).toMatchObject({
+      ok: false,
+      error: '聊天仅在游戏中可用',
+    });
+    setRoomStatus(room.id, '已结束');
+    expect(addChatMessage(room.id, 'host1', '大家好')).toMatchObject({
+      ok: false,
+      error: '聊天仅在游戏中可用',
+    });
+    // 游戏中恢复正常
+    setRoomStatus(room.id, '进行中');
+    expect(addChatMessage(room.id, 'host1', '大家好').ok).toBe(true);
   });
 
   it('聊天关闭时拒绝发送', () => {
