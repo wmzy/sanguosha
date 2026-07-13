@@ -11,7 +11,7 @@ const fullReady2p: RoomState = {
   playerIds: ['p-host', 'p2'],
   hostId: 'p-host',
   maxPlayers: 2,
-  config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+  config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } },
   spectatorIds: [],
   viewGrants: {},
   pendingViewRequests: {},

@@ -19,6 +19,7 @@ import {
 } from './mcpServer';
 import { joinAndReady, advanceToStart } from './lobby';
 import type { RoomConfig } from '../server/protocol';
+import { DEFAULT_CHAT_CONFIG } from '../server/protocol';
 
 // 构建期注入的默认服务器 URL。
 // tsx 直跑源码时该符号未定义 → typeof 守卫避免 ReferenceError，兜底 localhost（本仓库开发用）。
@@ -66,7 +67,7 @@ async function main(): Promise<void> {
       if (!started) {
         const roomConfig: RoomConfig | undefined =
           o.timeoutScale !== undefined
-            ? { name: o.name ?? '房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4 }
+            ? { name: o.name ?? '房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4, chat: DEFAULT_CHAT_CONFIG }
             : undefined;
         const result = await joinAndReady(hgc, {
           mode: o.roomId ? 'join' : 'create',
@@ -94,7 +95,7 @@ async function main(): Promise<void> {
     const debugPlayerId = PLAYER_ID ?? 'debug-ai';
     const debugConfig: RoomConfig | undefined =
       o.timeoutScale !== undefined
-        ? { name: '调试房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4 }
+        ? { name: '调试房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4, chat: DEFAULT_CHAT_CONFIG }
         : undefined;
     if (o.roomId ?? ROOM_ID) {
       await hgc.connect(o.roomId ?? ROOM_ID!, SEAT, debugPlayerId);

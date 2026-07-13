@@ -370,6 +370,17 @@ export class HeadlessGameClient {
       this._lastActionRejected = true;
       this.callbacks.onActionRejected?.();
     }
+    // 聊天消息处理
+    if (msg.type === 'chat') {
+      this.callbacks.onChat?.([{
+        playerId: msg.playerId,
+        seatIndex: msg.seatIndex,
+        text: msg.text,
+        timestamp: msg.timestamp,
+      }]);
+    } else if (msg.type === 'chat_history') {
+      this.callbacks.onChat?.(msg.messages);
+    }
     this.callbacks.onMessage?.(msg);
   }
 
@@ -726,6 +737,28 @@ export class HeadlessGameClient {
 
   async sendRestart(): Promise<void> {
     await this.postRoomOp('restart');
+  }
+
+  /** 发送聊天消息 */
+  async sendChat(text: string): Promise<{ remaining?: number | null } | null> {
+    if (!this._roomId || !this._playerId) return null;
+    try {
+      const resp = await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: this._playerId, text }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        this.callbacks.onError?.(new Error(body.error ?? '发送失败'));
+        return null;
+      }
+      const data = await resp.json().catch(() => ({}));
+      return { remaining: data.remaining };
+    } catch (err) {
+      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+      return null;
+    }
   }
 
   async sendUpdateConfig(config: RoomConfig): Promise<void> {

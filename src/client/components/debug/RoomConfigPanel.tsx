@@ -9,6 +9,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { css, cx } from '@linaria/core';
 import type { RoomConfig, CharPoolPreset } from '../../../server/protocol';
 import { colors } from '../../theme';
+import { ChatConfigSection } from '../ChatConfigSection';
 
 interface RoomConfigPanelProps {
   /** 当前房间配置 */
@@ -341,6 +342,16 @@ export function RoomConfigPanel({
             />
           </div>
         </div>
+
+        {/* 聊天配置 */}
+        <ChatConfigSection
+          config={editConfig.chat}
+          onChange={(chat) => {
+            const updated = { ...editConfig, chat };
+            setEditConfig(updated);
+            onUpdateConfig(updated);
+          }}
+        />
 
         {/* 座次列表 */}
         <label className={label}>

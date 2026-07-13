@@ -1,6 +1,6 @@
 // server/room.ts
 import type { ConnectionSink } from './connection';
-import type { RoomInfo, RoomConfig, ServerMessage } from './protocol';
+import type { RoomInfo, RoomConfig, ServerMessage, ChatConfig } from './protocol';
 import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../shared/rng';
 import { register } from './lifecycles';
@@ -26,6 +26,10 @@ export interface Room {
   viewGrants: Map<string, number>;
   /** 待处理申请：spectatorId → 申请查看的座次下标 */
   pendingViewRequests: Map<string, number>;
+  /** 聊天用量跟踪：playerId → { total: number; timestamps: number[] } */
+  chatUsage: Map<string, { total: number; timestamps: number[] }>;
+  /** 聊天历史（最近 50 条，供重连获取） */
+  chatHistory: Array<{ playerId: string; seatIndex: number; text: string; timestamp: number }>;
 }
 
 const roomList = new Map<string, Room>();
@@ -72,6 +76,8 @@ export function createRoom(
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
+    chatUsage: new Map(),
+    chatHistory: [],
   };
   roomList.set(id, room);
   return room;
@@ -94,6 +100,8 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
+    chatUsage: new Map(),
+    chatHistory: [],
   };
   roomList.set(id, room);
   return room;
@@ -361,4 +369,108 @@ export function revokeView(roomId: string, spectatorId: string): Room | null {
   if (!room) return null;
   room.viewGrants.delete(spectatorId);
   return room;
+}
+
+// ── 聊天管理 ──
+
+/** 聊天验证结果。 */
+export interface ChatValidation {
+  ok: boolean;
+  error?: string;
+  /** 发送后本局剩余次数（null=无限） */
+  remaining?: number | null;
+}
+
+const CHAT_HISTORY_LIMIT = 50;
+const MINUTE_MS = 60_000;
+
+/** 清理过期的每分钟时间戳（滑动窗口）。 */
+function pruneTimestamps(timestamps: number[], now: number): number[] {
+  const cutoff = now - MINUTE_MS;
+  return timestamps.filter((t) => t >= cutoff);
+}
+
+/** 验证并记录一条聊天消息。 */
+export function addChatMessage(
+  roomId: string,
+  playerId: string,
+  text: string,
+): ChatValidation {
+  const room = roomList.get(roomId);
+  if (!room) return { ok: false, error: '房间不存在' };
+
+  const chat = room.config.chat;
+  if (!chat.enabled) return { ok: false, error: '聊天已关闭' };
+
+  // 白名单校验
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return { ok: false, error: '消息不能为空' };
+
+  if (chat.whitelistOnly && !chat.whitelist.includes(trimmed)) {
+    return { ok: false, error: '只能发送白名单内的消息' };
+  }
+
+  // 字数校验
+  if (chat.maxChars > 0 && trimmed.length > chat.maxChars) {
+    return { ok: false, error: `每条消息最多 ${chat.maxChars} 字` };
+  }
+
+  const now = Date.now();
+  let usage = room.chatUsage.get(playerId);
+  if (!usage) {
+    usage = { total: 0, timestamps: [] };
+    room.chatUsage.set(playerId, usage);
+  }
+
+  // 每局上限
+  if (chat.maxPerGame > 0 && usage.total >= chat.maxPerGame) {
+    return { ok: false, error: `本局消息上限 ${chat.maxPerGame} 条已用尽` };
+  }
+
+  // 每分钟上限（滑动窗口）
+  if (chat.maxPerMinute > 0) {
+    usage.timestamps = pruneTimestamps(usage.timestamps, now);
+    if (usage.timestamps.length >= chat.maxPerMinute) {
+      return { ok: false, error: `每分钟最多 ${chat.maxPerMinute} 条` };
+    }
+  }
+
+  // 记录用量
+  usage.total++;
+  usage.timestamps.push(now);
+
+  // 确定座次
+  const playerIds = [...room.players.keys()];
+  const seatIndex = playerIds.indexOf(playerId);
+  if (seatIndex < 0) return { ok: false, error: '不在房间中' };
+
+  // 存入历史
+  const entry = { playerId, seatIndex, text: trimmed, timestamp: now };
+  room.chatHistory.push(entry);
+  if (room.chatHistory.length > CHAT_HISTORY_LIMIT) {
+    room.chatHistory.shift();
+  }
+
+  const remaining = chat.maxPerGame > 0 ? chat.maxPerGame - usage.total : null;
+  return { ok: true, remaining };
+}
+
+/** 获取聊天历史（供重连）。 */
+export function getChatHistory(roomId: string): Array<{
+  playerId: string;
+  seatIndex: number;
+  text: string;
+  timestamp: number;
+}> {
+  const room = roomList.get(roomId);
+  return room ? [...room.chatHistory] : [];
+}
+
+/** 重置聊天用量（开局/重开时调用）。 */
+export function resetChatUsage(roomId: string): void {
+  const room = roomList.get(roomId);
+  if (room) {
+    room.chatUsage.clear();
+    room.chatHistory = [];
+  }
 }

@@ -88,6 +88,8 @@ async function restorePersistedRooms(): Promise<void> {
         spectators: new Map(),
         viewGrants: new Map(),
         pendingViewRequests: new Map(),
+        chatUsage: new Map(),
+        chatHistory: [],
       };
       addRoom(room);
       const session = new GameSession(room, persisted.debug);

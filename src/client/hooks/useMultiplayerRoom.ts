@@ -11,6 +11,7 @@ import type { ClientPhase, RoomState, ReconnectState } from '../headless/types';
 import type { GameView } from '../../engine/types';
 import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import type { ActionMsg } from '../types';
+import type { ChatMessage } from '../headless/types';
 import { createLogger } from '../utils/logger';
 import { ReplayRecorder } from '../replay/recorder';
 import type { ReplayMeta } from '../replay/types';
@@ -66,6 +67,12 @@ export interface MultiplayerRoom {
   rejectView: (spectatorId: string) => void;
   /** 玩家撤销已授权 */
   revokeView: (spectatorId: string) => void;
+  /** 聊天消息列表 */
+  chatMessages: ChatMessage[];
+  /** 发送聊天消息 */
+  sendChat: (text: string) => void;
+  /** 更新房间配置（房主） */
+  updateConfig: (config: RoomConfig) => void;
   /** 当前连接状态(供 UI 显示连接/重连提示) */
   connectionState: ConnectionState;
   /** 当前重连尝试次数(0=未在重连) */
@@ -91,6 +98,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [ready, setReady] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   // 初始命令:有 initialRoomId 则自动 join(分享链接直达)
   const [command, setCommand] = useState<Command>(() =>
@@ -137,6 +145,16 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         else if (state === 'reconnecting') setConnectionState('reconnecting');
         else if (state === 'failed') setConnectionState('failed');
       },
+      onChat: (messages: ChatMessage[]) => {
+        setChatMessages((prev) => {
+          // chat_history 是批量全量替换,chat 是增量追加
+          // 根据消息数量判断：如果收到的是单条,则追加；如果超过1条且第一条时间戳早于已有消息,说明是历史全量
+          if (messages.length === 1) {
+            return [...prev, ...messages];
+          }
+          return messages;
+        });
+      },
       onMessage: (msg: ServerMessage) => {
         // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
         // HGC 内部已重置 view/gameOverWinner,这里同步 React state(roomId/playerId 保留)。
@@ -145,6 +163,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           setView(null);
           setReady(false);
           setStage('waiting');
+          setChatMessages([]);
           recorderRef.current.reset();
         }
         if (msg.type === 'error') {
@@ -246,6 +265,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setGameOver(null);
     setReady(false);
     setPlayerId(null);
+    setChatMessages([]);
   }, []);
 
   const sendAction = useCallback((action: ActionMsg) => {
@@ -263,6 +283,18 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
   const cancelReconnect = useCallback(() => {
     hgcRef.current?.cancelReconnect();
+  }, []);
+
+  const sendChat = useCallback((text: string) => {
+    const hgc = hgcRef.current;
+    if (!hgc) return;
+    void hgc.sendChat(text);
+  }, []);
+
+  const updateConfig = useCallback((config: RoomConfig) => {
+    const hgc = hgcRef.current;
+    if (!hgc) return;
+    void hgc.sendUpdateConfig(config);
   }, []);
 
   // ── 旁观者方法 ──
@@ -352,6 +384,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     approveView,
     rejectView,
     revokeView,
+    chatMessages,
+    sendChat,
+    updateConfig,
     connectionState,
     reconnectAttempt,
     cancelReconnect,

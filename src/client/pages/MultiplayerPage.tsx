@@ -8,6 +8,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
 import { GameViewComponent } from '../components/GameView';
 import { RoomListPanel } from '../components/RoomListPanel';
+import { ChatPanel } from '../components/ChatPanel';
+import { ChatConfigSection } from '../components/ChatConfigSection';
 import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle } from '../theme';
 import { saveReplay } from '../replay/replayFile';
 import { apiFetch, ApiError } from '../api/client';
@@ -413,6 +415,12 @@ export function MultiplayerPage() {
         {reconnectBanner}
         <div className={gameWrap}>
           <GameViewComponent view={mp.view} onAction={handleAction} onReorderHand={mp.reorderHand} />
+          <ChatPanel
+            messages={mp.chatMessages}
+            config={mp.roomState?.config?.chat}
+            onSend={mp.sendChat}
+            mySeatIndex={mp.view.viewer}
+          />
         </div>
       </>
     );
@@ -481,6 +489,15 @@ export function MultiplayerPage() {
               👁 旁观者：{spectatorCount} 人
             </div>
           )}
+          {/* 房主聊天配置 */}
+          {mp.isHost && mp.roomState?.config?.chat && (
+            <ChatConfigSection
+              config={mp.roomState.config.chat}
+              onChange={(chatConfig) =>
+                mp.updateConfig({ ...mp.roomState!.config, chat: chatConfig })
+              }
+            />
+          )}
           {/* 待处理申请提示 */}
           {Object.entries(pendingRequests).map(([sid, seat]) => (
             <div key={sid} style={{ background: colors.bg.input, borderRadius: '8px', padding: '10px', marginBottom: '8px', fontSize: '13px' }}>
@@ -538,6 +555,12 @@ export function MultiplayerPage() {
           </div>
         </div>
         {mp.error && <div className={errorToastStyle}>{mp.error}</div>}
+        <ChatPanel
+          messages={mp.chatMessages}
+          config={mp.roomState?.config?.chat}
+          onSend={mp.sendChat}
+          mySeatIndex={-1}
+        />
         </div>
       </>
     );

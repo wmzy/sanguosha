@@ -25,6 +25,9 @@ import {
   approveView,
   rejectView,
   revokeView,
+  addChatMessage,
+  resetChatUsage,
+  getChatHistory,
   type Room,
 } from './room';
 import { deletePersistedRoom } from './persistence';
@@ -303,6 +306,7 @@ export function applyRestRoutes(app: Hono): void {
 
     const count = room.isDebug ? room.maxPlayers : undefined;
     if (await session.startGame(count)) {
+      resetChatUsage(room.id);
       broadcastMessage(room, { type: 'game_started' });
     }
     return c.json({ success: true });
@@ -317,6 +321,7 @@ export function applyRestRoutes(app: Hono): void {
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
 
     session.resetToLobby();
+    resetChatUsage(roomId);
     broadcastRoomState(room);
     return c.json({ success: true });
   });
@@ -350,6 +355,43 @@ export function applyRestRoutes(app: Hono): void {
 
     await session.handleReorderHand(playerId, order as string[]);
     return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/chat — 发送聊天消息
+  app.post('/api/rooms/:id/chat', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const text = typeof raw.text === 'string' ? raw.text : '';
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+    if (!room.players.has(playerId)) return c.json({ error: '不在房间中' }, 403);
+
+    const result = addChatMessage(roomId, playerId, text);
+    if (!result.ok) return c.json({ error: result.error }, 400);
+
+    // 广播给房间内所有连接
+    const playerIds = [...room.players.keys()];
+    const seatIndex = playerIds.indexOf(playerId);
+    broadcastMessage(room, {
+      type: 'chat',
+      playerId,
+      seatIndex,
+      text: text.trim(),
+      timestamp: Date.now(),
+    });
+
+    return c.json({ success: true, remaining: result.remaining });
+  });
+
+  // GET /api/rooms/:id/chat/history — 获取聊天历史（调试用）
+  app.get('/api/rooms/:id/chat/history', (c) => {
+    const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+    return c.json(getChatHistory(roomId));
   });
 
   // POST /api/rooms/:id/leave — 离开房间

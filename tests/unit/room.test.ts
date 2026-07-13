@@ -21,6 +21,9 @@ import {
   rejectView,
   revokeView,
   broadcastMessage,
+  addChatMessage,
+  getChatHistory,
+  resetChatUsage,
 } from '../../src/server/room';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
 import { resolveTimeoutMs } from '../../src/engine/create-engine';
@@ -238,6 +241,7 @@ describe('房间配置', () => {
       timeoutScale: 0.6,
       charPool: 'standard' as const,
       handSize: 5,
+      chat: { enabled: false, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 },
     };
     const room = createRoom('x', 4, 'h', sink, customConfig);
     expect(room.config.timeoutScale).toBe(0.6);
@@ -502,5 +506,143 @@ describe('旁观者管理', () => {
     broadcastMessage(room, { type: 'game_started' });
     expect(msgs).toContain('p2');
     expect(msgs).toContain('spec1');
+  });
+});
+
+// ─── 聊天功能 ───
+describe('聊天功能', () => {
+  function makeChatRoom(chatOverride?: Partial<{
+    enabled: boolean;
+    whitelistOnly: boolean;
+    whitelist: string[];
+    maxPerGame: number;
+    maxPerMinute: number;
+    maxChars: number;
+  }>) {
+    const room = createRoom('聊天测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    joinRoom(room.id, 'p3', createMockSink());
+    room.config = normalizeRoomConfig({
+      ...room.config,
+      chat: {
+        enabled: true,
+        whitelistOnly: false,
+        whitelist: ['我有杀', '集火他'],
+        maxPerGame: 0,
+        maxPerMinute: 5,
+        maxChars: 30,
+        ...chatOverride,
+      },
+    });
+    return room;
+  }
+
+  it('正常发送聊天消息成功', () => {
+    const room = makeChatRoom();
+    const result = addChatMessage(room.id, 'host1', '大家好');
+    expect(result.ok).toBe(true);
+    expect(result.remaining).toBeNull(); // maxPerGame=0 表示无限
+  });
+
+  it('聊天关闭时拒绝发送', () => {
+    const room = makeChatRoom({ enabled: false });
+    const result = addChatMessage(room.id, 'host1', '大家好');
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('聊天已关闭');
+  });
+
+  it('空消息被拒绝', () => {
+    const room = makeChatRoom();
+    const result = addChatMessage(room.id, 'host1', '   ');
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('消息不能为空');
+  });
+
+  it('白名单模式下非白名单消息被拒绝', () => {
+    const room = makeChatRoom({ whitelistOnly: true });
+    const result = addChatMessage(room.id, 'host1', '随便说的话');
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('只能发送白名单内的消息');
+  });
+
+  it('白名单模式下白名单消息成功', () => {
+    const room = makeChatRoom({ whitelistOnly: true });
+    const result = addChatMessage(room.id, 'host1', '我有杀');
+    expect(result.ok).toBe(true);
+  });
+
+  it('超过字数限制被拒绝', () => {
+    const room = makeChatRoom({ maxChars: 5 });
+    const result = addChatMessage(room.id, 'host1', '这是一句很长很长的话');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('5');
+  });
+
+  it('每局消息上限生效', () => {
+    const room = makeChatRoom({ maxPerGame: 2 });
+    expect(addChatMessage(room.id, 'host1', '消息1').ok).toBe(true);
+    expect(addChatMessage(room.id, 'host1', '消息2').ok).toBe(true);
+    const result = addChatMessage(room.id, 'host1', '消息3');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('上限');
+  });
+
+  it('remaining 正确反映每局剩余次数', () => {
+    const room = makeChatRoom({ maxPerGame: 3 });
+    let r = addChatMessage(room.id, 'host1', '消息1');
+    expect(r.remaining).toBe(2);
+    r = addChatMessage(room.id, 'host1', '消息2');
+    expect(r.remaining).toBe(1);
+  });
+
+  it('每分钟频率限制生效', () => {
+    const room = makeChatRoom({ maxPerMinute: 2 });
+    expect(addChatMessage(room.id, 'host1', '消息1').ok).toBe(true);
+    expect(addChatMessage(room.id, 'host1', '消息2').ok).toBe(true);
+    const result = addChatMessage(room.id, 'host1', '消息3');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('每分钟');
+  });
+
+  it('不同玩家独立计算频率限制', () => {
+    const room = makeChatRoom({ maxPerMinute: 1 });
+    expect(addChatMessage(room.id, 'host1', '消息1').ok).toBe(true);
+    expect(addChatMessage(room.id, 'host1', '消息2').ok).toBe(false);
+    // p2 有独立的配额
+    expect(addChatMessage(room.id, 'p2', '消息1').ok).toBe(true);
+  });
+
+  it('消息记录到历史', () => {
+    const room = makeChatRoom();
+    addChatMessage(room.id, 'host1', '消息A');
+    addChatMessage(room.id, 'p2', '消息B');
+    const history = getChatHistory(room.id);
+    expect(history).toHaveLength(2);
+    expect(history[0].text).toBe('消息A');
+    expect(history[0].seatIndex).toBe(0);
+    expect(history[1].text).toBe('消息B');
+    expect(history[1].seatIndex).toBe(1);
+  });
+
+  it('resetChatUsage 清除历史和用量', () => {
+    const room = makeChatRoom({ maxPerGame: 3 });
+    addChatMessage(room.id, 'host1', '消息1');
+    addChatMessage(room.id, 'p2', '消息2');
+    expect(getChatHistory(room.id)).toHaveLength(2);
+
+    resetChatUsage(room.id);
+
+    expect(getChatHistory(room.id)).toHaveLength(0);
+    // 重置后额度恢复
+    const r = addChatMessage(room.id, 'host1', '新消息');
+    expect(r.ok).toBe(true);
+    expect(r.remaining).toBe(2);
+  });
+
+  it('不在房间中的玩家被拒绝', () => {
+    const room = makeChatRoom();
+    const result = addChatMessage(room.id, 'outsider', '大家好');
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('不在房间中');
   });
 });

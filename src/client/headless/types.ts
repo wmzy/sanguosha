@@ -28,6 +28,13 @@ export type ClientPhase = 'connecting' | 'lobby' | 'playing' | 'ended';
  *  - failed: 达到最大重试次数,放弃重连 */
 export type ReconnectState = 'idle' | 'reconnecting' | 'failed';
 
+export interface ChatMessage {
+  playerId: string;
+  seatIndex: number;
+  text: string;
+  timestamp: number;
+}
+
 export interface HeadlessCallbacks {
   onView?: (view: GameView, newEvents: ViewEvent[]) => void;
   onRoomState?: (state: RoomState | null) => void;
@@ -39,6 +46,8 @@ export interface HeadlessCallbacks {
   onMessage?: (msg: ServerMessage) => void;
   /** 重连状态变化时调用。attempt = 当前已尝试次数(0=首次)。 */
   onReconnectStateChange?: (state: ReconnectState, attempt: number) => void;
+  /** 收到聊天消息（单条或历史批量）时调用 */
+  onChat?: (messages: ChatMessage[]) => void;
 }
 
 /** AI 决策的核心输入：一个可直接执行的操作。 */

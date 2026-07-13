@@ -37,6 +37,7 @@ import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/de
 import { saveReplay } from '../replay/replayFile';
 import type { ReplayMeta } from '../replay/types';
 import type { RoomInfo } from '../../server/protocol';
+import { DEFAULT_CHAT_CONFIG } from '../../server/protocol';
 
 interface DebugLobbyProps {
   onExit: () => void;
@@ -178,7 +179,7 @@ function DebugGameViewInner({
     return (
       <RoomConfigPanel
         config={
-          conn.roomState?.config ?? { name: '', timeoutScale: 1, charPool: 'all', handSize: 4 }
+          conn.roomState?.config ?? { name: '', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { ...DEFAULT_CHAT_CONFIG } }
         }
         readyPlayers={conn.roomState?.readyPlayers ?? []}
         playerIds={conn.roomState?.playerIds ?? []}

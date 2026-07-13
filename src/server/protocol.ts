@@ -16,6 +16,46 @@ export type EventSeq = number;
 /** 将池预设 */
 export type CharPoolPreset = 'standard' | 'extended' | 'all';
 
+/** 聊天配置。房主在等待大厅设置，增加游戏趣味性(暗示/欺骗等)。 */
+export interface ChatConfig {
+  /** 是否开启聊天 */
+  enabled: boolean;
+  /** 是否只能发送白名单内的消息(限制直白沟通，增加暗示/欺骗策略) */
+  whitelistOnly: boolean;
+  /** 白名单消息列表 */
+  whitelist: string[];
+  /** 每人每局最多消息数 (0=无限) */
+  maxPerGame: number;
+  /** 每人每分钟最多消息数 (0=无限) */
+  maxPerMinute: number;
+  /** 每条消息最大字数 (0=无限) */
+  maxChars: number;
+}
+
+/** 默认白名单短语(暗示/欺骗类，增加策略深度) */
+export const DEFAULT_CHAT_WHITELIST: string[] = [
+  '我有杀', '我没有杀',
+  '我有闪', '我没有闪',
+  '我有桃', '我没有桃',
+  '我手牌很多', '我手牌不多',
+  '集火他', '保护我',
+  '别打我', '小心',
+  '信任我', '别信他',
+  '快出牌', '再等等',
+  '注意他', '我帮不了',
+  '我来帮忙', '先杀他',
+];
+
+/** 默认聊天配置 */
+export const DEFAULT_CHAT_CONFIG: ChatConfig = {
+  enabled: true,
+  whitelistOnly: false,
+  whitelist: [...DEFAULT_CHAT_WHITELIST],
+  maxPerGame: 0,
+  maxPerMinute: 5,
+  maxChars: 30,
+};
+
 /** 房间级游戏配置(调试/普通房间通用)。在 startGame 时传给引擎。 */
 export interface RoomConfig {
   /** 房间名 */
@@ -26,6 +66,8 @@ export interface RoomConfig {
   charPool: CharPoolPreset;
   /** 每人初始手牌数(默认 4) */
   handSize: number;
+  /** 聊天配置 */
+  chat: ChatConfig;
 }
 
 /** 默认房间配置 */
@@ -34,7 +76,39 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
   timeoutScale: 1,
   charPool: 'all',
   handSize: 4,
+  chat: { ...DEFAULT_CHAT_CONFIG },
 };
+
+/** 校验并规范化 ChatConfig:修正非法字段为默认值。 */
+export function normalizeChatConfig(raw: unknown): ChatConfig {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const enabled =
+    typeof r['enabled'] === 'boolean' ? r['enabled'] : DEFAULT_CHAT_CONFIG.enabled;
+  const whitelistOnly =
+    typeof r['whitelistOnly'] === 'boolean'
+      ? r['whitelistOnly']
+      : DEFAULT_CHAT_CONFIG.whitelistOnly;
+  const whitelist =
+    Array.isArray(r['whitelist']) && r['whitelist'].every((s) => typeof s === 'string')
+      ? (r['whitelist'] as string[])
+          .map((s) => s.trim().slice(0, 50))
+          .filter((s) => s.length > 0)
+          .slice(0, 100)
+      : [...DEFAULT_CHAT_WHITELIST];
+  const maxPerGame =
+    typeof r['maxPerGame'] === 'number' && r['maxPerGame'] >= 0 && r['maxPerGame'] <= 999
+      ? Math.floor(r['maxPerGame'])
+      : DEFAULT_CHAT_CONFIG.maxPerGame;
+  const maxPerMinute =
+    typeof r['maxPerMinute'] === 'number' && r['maxPerMinute'] >= 0 && r['maxPerMinute'] <= 999
+      ? Math.floor(r['maxPerMinute'])
+      : DEFAULT_CHAT_CONFIG.maxPerMinute;
+  const maxChars =
+    typeof r['maxChars'] === 'number' && r['maxChars'] >= 0 && r['maxChars'] <= 200
+      ? Math.floor(r['maxChars'])
+      : DEFAULT_CHAT_CONFIG.maxChars;
+  return { enabled, whitelistOnly, whitelist, maxPerGame, maxPerMinute, maxChars };
+}
 
 /** 校验并规范化 RoomConfig:修正非法字段为默认值。 */
 export function normalizeRoomConfig(raw: unknown): RoomConfig {
@@ -56,7 +130,8 @@ export function normalizeRoomConfig(raw: unknown): RoomConfig {
     typeof r['handSize'] === 'number' && r['handSize'] >= 0 && r['handSize'] <= 20
       ? Math.floor(r['handSize'])
       : DEFAULT_ROOM_CONFIG.handSize;
-  return { name, timeoutScale, charPool, handSize };
+  const chat = r['chat'] !== undefined ? normalizeChatConfig(r['chat']) : { ...DEFAULT_CHAT_CONFIG };
+  return { name, timeoutScale, charPool, handSize, chat };
 }
 
 /** 倒计时信息(pending 优先,否则出牌/弃牌阶段的 idleDeadline)。
@@ -118,6 +193,8 @@ export type ServerMessage =
   | { type: 'view_granted'; spectatorId: string; seatIndex: number }
   | { type: 'view_revoked'; spectatorId: string }
   | { type: 'role_changed'; playerId: string; newRole: 'player' | 'spectator' }
+  | { type: 'chat'; playerId: string; seatIndex: number; text: string; timestamp: number }
+  | { type: 'chat_history'; messages: Array<{ playerId: string; seatIndex: number; text: string; timestamp: number }> }
 
 /**
  * 客户端发往服务端的消息。

@@ -10,6 +10,7 @@ import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
 import { getRoom, removeSpectator } from './room';
 import { broadcastMessage } from './room';
+import { getChatHistory } from './room';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
 import { createLogger } from './logger';
@@ -113,6 +114,12 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
       });
 
+      // 发送聊天历史（如果有）
+      const chatHist = getChatHistory(roomId);
+      if (chatHist.length > 0) {
+        sink.send({ type: 'chat_history', messages: chatHist });
+      }
+
       stream.onAbort(() => {
         log.info('SSE 旁观者连接断开', { roomId, playerId });
         sink.close();
@@ -167,6 +174,12 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
           viewGrants: Object.fromEntries(room.viewGrants),
           pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
         });
+      }
+
+      // 发送聊天历史（如果有）
+      const chatHist = getChatHistory(roomId);
+      if (chatHist.length > 0) {
+        sink.send({ type: 'chat_history', messages: chatHist });
       }
 
       stream.onAbort(() => {

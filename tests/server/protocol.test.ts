@@ -20,12 +20,12 @@ describe('normalizeRoomConfig', () => {
       charPool: 'standard',
       handSize: 6,
     });
-    expect(cfg).toEqual({
-      name: '测试房',
-      timeoutScale: 2,
-      charPool: 'standard',
-      handSize: 6,
-    });
+    expect(cfg.name).toBe('测试房');
+    expect(cfg.timeoutScale).toBe(2);
+    expect(cfg.charPool).toBe('standard');
+    expect(cfg.handSize).toBe(6);
+    expect(cfg.chat).toBeDefined();
+    expect(cfg.chat.enabled).toBe(true);
   });
 
   it('空对象回退默认值', () => {
