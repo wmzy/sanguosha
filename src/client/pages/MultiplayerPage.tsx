@@ -101,6 +101,45 @@ const readyInfo = css`
   color: ${colors.text.secondary};
 `;
 
+const configGrid = css`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 24px;
+  background-color: ${colors.bg.input};
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+`;
+
+const configItem = css`
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const configKey = css`
+  color: ${colors.text.muted};
+`;
+
+const configVal = css`
+  color: ${colors.text.primary};
+  font-weight: bold;
+`;
+
+const POOL_LABELS: Record<string, string> = {
+  standard: '标准池 (~32人)',
+  extended: '扩展池',
+  all: '全武将 (60人)',
+};
+
+function timeoutLabel(v: number): string {
+  if (!Number.isFinite(v)) return '无限';
+  if (v <= 0.7) return `快 (${v}×)`;
+  if (v === 1) return `标准 (${v}×)`;
+  return `慢 (${v}×)`;
+}
+
 const buttonRow = css`
   display: flex;
   gap: 12px;
@@ -122,11 +161,6 @@ const winnerText = css`
 const gameWrap = css`
   min-height: 100vh;
   background-color: ${colors.bg.page};
-`;
-
-const readyBadge = css`
-  color: ${colors.accent.green};
-  font-weight: bold;
 `;
 
 const lobbyRow = css`
@@ -180,6 +214,44 @@ const reconnectSpinner = css`
       transform: rotate(360deg);
     }
   }
+`;
+
+const notFoundPage = css`
+  ${pageStyle}
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  gap: 12px;
+`;
+
+const notFoundCode = css`
+  font-size: 96px;
+  font-weight: bold;
+  color: ${colors.accent.red};
+  line-height: 1;
+  letter-spacing: 4px;
+`;
+
+const notFoundTitle = css`
+  font-size: 24px;
+  font-weight: bold;
+  color: ${colors.text.primary};
+`;
+
+const notFoundDesc = css`
+  font-size: 15px;
+  color: ${colors.text.secondary};
+  max-width: 400px;
+`;
+
+const notFoundRoomId = css`
+  font-family: monospace;
+  color: ${colors.accent.gold};
+  font-weight: bold;
+  letter-spacing: 2px;
 `;
 
 export function MultiplayerPage() {
@@ -315,6 +387,38 @@ export function MultiplayerPage() {
       </div>
     ) : null;
 
+  // 房间不存在(URL 直达不存在的 roomId):显示 404 页面
+  if (mp.notFound) {
+    return (
+      <div className={notFoundPage}>
+        <div className={notFoundCode}>404</div>
+        <div className={notFoundTitle}>房间不存在</div>
+        <p className={notFoundDesc}>
+          房间码 <span className={notFoundRoomId}>{urlRoomId}</span> 对应的房间可能已被关闭或从未创建。
+        </p>
+        <div className={buttonRow}>
+          <button
+            className={btnStyle}
+            style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}
+            onClick={() => {
+              mp.leaveRoom();
+              navigate('/play');
+            }}
+          >
+            进入大厅
+          </button>
+          <button
+            className={btnStyle}
+            style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
+            onClick={() => navigate('/')}
+          >
+            返回首页
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (mp.stage === 'spectating' && mp.view) {
     // 旁观者申请查看某玩家视角的下拉
     const spectatorList = mp.roomState?.spectatorIds ?? [];
@@ -390,6 +494,31 @@ export function MultiplayerPage() {
             <div className={readyInfo}>
               玩家：{mp.roomState?.playerIds.length ?? 0} / {mp.roomState?.maxPlayers ?? 0}
             </div>
+            {/* 房间配置（旁观者可见） */}
+            {mp.roomState?.config && (
+              <div className={configGrid}>
+                <div className={configItem}>
+                  <span className={configKey}>房间名</span>
+                  <span className={configVal}>{mp.roomState.config.name}</span>
+                </div>
+                <div className={configItem}>
+                  <span className={configKey}>将池</span>
+                  <span className={configVal}>{POOL_LABELS[mp.roomState.config.charPool] ?? mp.roomState.config.charPool}</span>
+                </div>
+                <div className={configItem}>
+                  <span className={configKey}>操作倒计时</span>
+                  <span className={configVal}>{timeoutLabel(mp.roomState.config.timeoutScale)}</span>
+                </div>
+                <div className={configItem}>
+                  <span className={configKey}>初始手牌</span>
+                  <span className={configVal}>{mp.roomState.config.handSize} 张</span>
+                </div>
+                <div className={configItem}>
+                  <span className={configKey}>聊天</span>
+                  <span className={configVal}>{mp.roomState.config.chat?.enabled ? '开启' : '关闭'}</span>
+                </div>
+              </div>
+            )}
             <div className={buttonRow}>
               <button
                 className={btnStyle}
@@ -481,6 +610,39 @@ export function MultiplayerPage() {
             <div className={roomCode}>{mp.roomId ?? '加载中…'}</div>
           </div>
           <div className={readyInfo}>
+            当前用户：{mp.playerId ?? '未知'}{mp.isHost ? '（房主）' : ''}
+          </div>
+          {mp.roomState?.hostId && !mp.isHost && (
+            <div className={readyInfo} style={{ fontSize: '13px', color: colors.text.muted }}>
+              房主：{mp.roomState.hostId}
+            </div>
+          )}
+          {/* 房间配置（所有人可见） */}
+          {mp.roomState?.config && (
+            <div className={configGrid}>
+              <div className={configItem}>
+                <span className={configKey}>房间名</span>
+                <span className={configVal}>{mp.roomState.config.name}</span>
+              </div>
+              <div className={configItem}>
+                <span className={configKey}>将池</span>
+                <span className={configVal}>{POOL_LABELS[mp.roomState.config.charPool] ?? mp.roomState.config.charPool}</span>
+              </div>
+              <div className={configItem}>
+                <span className={configKey}>操作倒计时</span>
+                <span className={configVal}>{timeoutLabel(mp.roomState.config.timeoutScale)}</span>
+              </div>
+              <div className={configItem}>
+                <span className={configKey}>初始手牌</span>
+                <span className={configVal}>{mp.roomState.config.handSize} 张</span>
+              </div>
+              <div className={configItem}>
+                <span className={configKey}>聊天</span>
+                <span className={configVal}>{mp.roomState.config.chat?.enabled ? '开启' : '关闭'}</span>
+              </div>
+            </div>
+          )}
+          <div className={readyInfo}>
             已就绪：{readyCount} / {playerCount}（满 {maxPlayers} 人）
           </div>
           {/* 旁观者列表 */}
@@ -525,7 +687,13 @@ export function MultiplayerPage() {
               </button>
             )}
             {mp.ready && (
-              <span className={readyBadge}>已准备 ✓</span>
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
+                onClick={mp.toggleReady}
+              >
+                取消准备
+              </button>
             )}
             {mp.isHost && (
               <button

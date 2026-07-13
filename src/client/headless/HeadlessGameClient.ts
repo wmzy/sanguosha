@@ -113,6 +113,16 @@ export class HeadlessGameClient {
     }
   }
 
+  /** 检查 REST 响应是否成功，失败时抛出带 status 的错误 */
+  private async assertOk(resp: Response, fallbackMsg: string): Promise<void> {
+    if (resp.ok) return;
+    const body = await resp.json().catch(() => ({}));
+    const message = (body as { error?: string }).error ?? fallbackMsg;
+    const err = new Error(message) as Error & { status: number };
+    err.status = resp.status;
+    throw err;
+  }
+
   /** 创建 debug 房间并自动 join 0 号座。
    *  playerId 可选:指定则用作本座次身份,否则由服务端自动生成。 */
   async createDebugRoom(playerCount: number, config?: RoomConfig, playerId?: string): Promise<void> {
@@ -124,6 +134,7 @@ export class HeadlessGameClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerCount, config, autoJoin: true, playerId }),
     });
+    await this.assertOk(resp, '创建调试房间失败');
     const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
     this._roomId = data.roomId;
     this._playerId = data.playerId;
@@ -148,6 +159,7 @@ export class HeadlessGameClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId: this._playerId ?? undefined, lastSeq: this._lastSeq }),
     });
+    await this.assertOk(resp, '加入调试房间失败');
     const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
     this._roomId = data.roomId;
     this._playerId = data.playerId;
@@ -167,6 +179,7 @@ export class HeadlessGameClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, maxPlayers, config, playerId }),
     });
+    await this.assertOk(resp, '创建房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
     this._roomId = data.roomId;
     this._playerId = data.playerId;
@@ -187,6 +200,7 @@ export class HeadlessGameClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
     });
+    await this.assertOk(resp, '加入房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
     this._roomId = data.roomId;
     this._playerId = data.playerId;
@@ -206,10 +220,7 @@ export class HeadlessGameClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
     });
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
-      throw new Error((body as { error?: string }).error ?? '加入旁观失败');
-    }
+    await this.assertOk(resp, '加入旁观失败');
     const data = await resp.json() as { roomId: string; playerId: string };
     this._roomId = data.roomId;
     this._playerId = data.playerId;
@@ -729,6 +740,10 @@ export class HeadlessGameClient {
 
   async sendReady(): Promise<void> {
     await this.postRoomOp('ready');
+  }
+
+  async sendCancelReady(): Promise<void> {
+    await this.postRoomOp('cancel-ready');
   }
 
   async sendStartGame(): Promise<void> {

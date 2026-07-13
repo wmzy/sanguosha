@@ -14,6 +14,7 @@ import {
   joinRoom,
   joinDebugRoom,
   setReady,
+  unsetReady,
   allReady,
   findRoomByPlayerId,
   broadcastMessage,
@@ -275,6 +276,22 @@ export function applyRestRoutes(app: Hono): void {
     const room = getRoom(roomId);
     if (room) {
       broadcastMessage(room, { type: 'player_ready', playerId });
+      broadcastRoomState(room);
+    }
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/cancel-ready — 玩家取消准备
+  app.post('/api/rooms/:id/cancel-ready', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+
+    unsetReady(roomId, playerId);
+
+    const room = getRoom(roomId);
+    if (room) {
       broadcastRoomState(room);
     }
     return c.json({ success: true });

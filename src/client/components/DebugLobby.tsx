@@ -189,6 +189,7 @@ function DebugGameViewInner({
         perspective={perspective}
         onSwitchPerspective={handleSetPerspective}
         onReady={conn.sendReady}
+        onCancelReady={conn.sendCancelReady}
         onStart={conn.sendStartGame}
         onUpdateConfig={conn.sendUpdateConfig}
         onExit={onDeleteRoom}

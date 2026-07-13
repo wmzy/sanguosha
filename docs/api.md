@@ -122,7 +122,8 @@ GET /api/rooms/:id/stream?playerId=pid-xxx
 以下端点均为 fire-and-forget POST（服务端处理后通过 SSE 推送结果）：
 
 ```
-POST /api/rooms/:id/ready     { "playerId": "pid-xxx" }
+POST /api/rooms/:id/ready        { "playerId": "pid-xxx" }
+POST /api/rooms/:id/cancel-ready { "playerId": "pid-xxx" }
 POST /api/rooms/:id/start     { "playerId": "pid-xxx" }
 POST /api/rooms/:id/restart   { "playerId": "pid-xxx" }
 POST /api/rooms/:id/action    { "playerId": "pid-xxx", "action": GameAction }

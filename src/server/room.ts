@@ -202,6 +202,13 @@ export function setReady(roomId: string, playerId: string): boolean {
   return true;
 }
 
+export function unsetReady(roomId: string, playerId: string): boolean {
+  const room = roomList.get(roomId);
+  if (room?.status !== '等待中') return false;
+
+  return room.readyPlayers.delete(playerId);
+}
+
 export function allReady(roomId: string): boolean {
   const room = roomList.get(roomId);
   if (!room) return false;

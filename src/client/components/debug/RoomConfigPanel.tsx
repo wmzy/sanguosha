@@ -29,6 +29,8 @@ interface RoomConfigPanelProps {
   onSwitchPerspective: (seat: number) => void;
   /** 指定座次准备 */
   onReady: (seat: number) => void;
+  /** 指定座次取消准备 */
+  onCancelReady: (seat: number) => void;
   /** 开始游戏 */
   onStart: () => void;
   /** 更新配置 */
@@ -146,6 +148,19 @@ const readyBadge = css`
   color: ${colors.accent.green};
   font-size: 12px;
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const btnCancelReady = css`
+  padding: 2px 8px;
+  background-color: ${colors.disabled};
+  color: ${colors.text.secondary};
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
 `;
 
 const pendingBadge = css`
@@ -237,6 +252,7 @@ export function RoomConfigPanel({
   perspective,
   onSwitchPerspective,
   onReady,
+  onCancelReady,
   onStart,
   onUpdateConfig,
   onExit,
@@ -375,7 +391,20 @@ export function RoomConfigPanel({
                 onClick={() => onSwitchPerspective(i)}
               >
                 <div className={seatLabel}>座次 {i + 1}</div>
-                {isConnected && isReady && <div className={readyBadge}>✓ 已准备</div>}
+                {isConnected && isReady && (
+                  <div className={readyBadge}>
+                    ✓ 已准备
+                    <button
+                      className={btnCancelReady}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCancelReady(i);
+                      }}
+                    >
+                      取消
+                    </button>
+                  </div>
+                )}
                 {isConnected && !isReady && (
                   <button
                     className={btnReady}

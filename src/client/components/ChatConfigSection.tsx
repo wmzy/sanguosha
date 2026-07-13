@@ -4,7 +4,7 @@
 // 包括：开关、白名单模式、每局/每分钟/字数限制、白名单编辑。
 
 import { useState, useCallback } from 'react';
-import { css } from '@linaria/core';
+import { css, cx } from '@linaria/core';
 import type { ChatConfig } from '../../server/protocol';
 import { DEFAULT_CHAT_WHITELIST } from '../../server/protocol';
 import { colors } from '../theme';
@@ -70,7 +70,6 @@ const toggle = css`
 `;
 
 const toggleOn = css`
-  ${toggle}
   background-color: ${colors.accent.green};
 
   &::after {
@@ -218,7 +217,7 @@ export function ChatConfigSection({ config, onChange }: ChatConfigSectionProps) 
           <div className={configRow}>
             <span className={configLabel}>开启聊天</span>
             <span
-              className={config.enabled ? toggleOn : toggle}
+              className={cx(toggle, config.enabled && toggleOn)}
               onClick={() => update('enabled', !config.enabled)}
             />
           </div>
@@ -233,7 +232,7 @@ export function ChatConfigSection({ config, onChange }: ChatConfigSectionProps) 
                   </span>
                 </span>
                 <span
-                  className={config.whitelistOnly ? toggleOn : toggle}
+                  className={cx(toggle, config.whitelistOnly && toggleOn)}
                   onClick={() => update('whitelistOnly', !config.whitelistOnly)}
                 />
               </div>

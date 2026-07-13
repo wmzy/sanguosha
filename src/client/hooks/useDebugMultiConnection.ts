@@ -63,6 +63,8 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   seatPlayerIds: Map<number, string>;
   /** 配置阶段:指定座次发送准备 */
   sendReady: (seat: number) => void;
+  /** 配置阶段:指定座次取消准备 */
+  sendCancelReady: (seat: number) => void;
   /** 配置阶段:发送开始游戏(任意座次连接) */
   sendStartGame: () => void;
   /** 发送重新开始游戏(再来一局) */
@@ -366,6 +368,14 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     hgc.sendReady();
   }, []);
 
+  const sendCancelReady = useCallback((seat: number) => {
+    const hgc = clientsRef.current.get(seat);
+    if (!hgc) return;
+    logWsMessage(seat, 'out', { type: 'cancel-ready' });
+    logUserAction('cancel_ready', seat);
+    hgc.sendCancelReady();
+  }, []);
+
   const sendStartGame = useCallback(() => {
     const hgc = clientsRef.current.get(0);
     if (!hgc) return;
@@ -405,6 +415,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     gameOver,
     seatPlayerIds,
     sendReady,
+    sendCancelReady,
     sendStartGame,
     sendRestart,
     sendUpdateConfig,

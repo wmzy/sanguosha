@@ -6,6 +6,7 @@ import {
   joinRoom,
   leaveRoom,
   setReady,
+  unsetReady,
   allReady,
   getRoom,
   getRoomList,
@@ -151,6 +152,36 @@ describe('房间管理', () => {
 
     setReady(room.id, 'host1');
     expect(allReady(room.id)).toBe(false);
+  });
+
+  it('应该取消准备状态', () => {
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
+
+    joinRoom(room.id, 'player1', createMockSink());
+    setReady(room.id, 'host1');
+    setReady(room.id, 'player1');
+    expect(allReady(room.id)).toBe(true);
+
+    // 取消准备后不再是全员就绪
+    const deleted = unsetReady(room.id, 'player1');
+    expect(deleted).toBe(true);
+    expect(room.readyPlayers.has('player1')).toBe(false);
+    expect(allReady(room.id)).toBe(false);
+
+    // 再次取消已取消的玩家返回 false
+    const again = unsetReady(room.id, 'player1');
+    expect(again).toBe(false);
+  });
+
+  it('游戏进行中不应该取消准备', () => {
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
+    setReady(room.id, 'host1');
+
+    room.status = '进行中';
+    expect(unsetReady(room.id, 'host1')).toBe(false);
+    expect(room.readyPlayers.has('host1')).toBe(true);
   });
 
   it('应该获取房间', () => {

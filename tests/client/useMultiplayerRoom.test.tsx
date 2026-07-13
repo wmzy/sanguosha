@@ -283,12 +283,32 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.roomState?.hostId).toBe('pid-0');
   });
 
-  it('toggleReady 发送 ready 并置 ready=true', async () => {
+  it('toggleReady 发送 ready，ready 状态跟随 room_state', async () => {
     const { result, es } = await openRoom();
     emitAndSync(es, { type: 'room_joined', roomId: 'R', playerId: 'pid-0', seatIndex: 0 });
     act(() => result.current.toggleReady());
     expect(fetchCalls.some((c) => c.url.includes('/ready'))).toBe(true);
+
+    // ready 从服务端 room_state 派生，初始为 false
+    expect(result.current.ready).toBe(false);
+
+    // 服务端广播 room_state 更新 readyPlayers 后 ready 变 true
+    emitAndSync(es, {
+      type: 'room_state',
+      readyPlayers: ['pid-0'],
+      playerIds: ['pid-0'],
+      hostId: 'pid-0',
+      maxPlayers: 2,
+      config: DEFAULT_ROOM_CONFIG,
+      spectatorIds: [],
+      viewGrants: {},
+      pendingViewRequests: {},
+    });
     expect(result.current.ready).toBe(true);
+
+    // 再次 toggleReady 应发送 cancel-ready
+    act(() => result.current.toggleReady());
+    expect(fetchCalls.some((c) => c.url.includes('/cancel-ready'))).toBe(true);
   });
 
   it('startGame 发送 start_game', async () => {
@@ -356,5 +376,36 @@ describe('useMultiplayerRoom', () => {
     }).not.toThrow();
     // 断开后无新 fetch 发出
     expect(fetchCalls.length).toBe(callsBefore);
+  });
+
+  // ─── 房间不存在的 404 处理 ───
+
+  it('autoJoin 房间不存在(404)时设置 notFound', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ error: '房间不存在' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+    const { result } = renderHook(() => useMultiplayerRoom('GHOST-ROOM'));
+    await flushConnect();
+    expect(result.current.notFound).toBe(true);
+    // autoJoin 404 不设 error（由 404 页面接管 UI）
+    expect(result.current.error).toBeNull();
+  });
+
+  it('手动 joinRoom 房间不存在(404)时回到 lobby 并设置 error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ error: '房间不存在' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.joinRoom('GHOST-ROOM'));
+    await flushConnect();
+    expect(result.current.notFound).toBe(false);
+    expect(result.current.stage).toBe('lobby');
+    expect(result.current.error).toBe('房间不存在');
   });
 });

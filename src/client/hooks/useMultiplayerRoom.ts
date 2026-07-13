@@ -41,6 +41,8 @@ export interface MultiplayerRoom {
   view: GameView | null;
   gameOver: { winner: string } | null;
   error: string | null;
+  /** 房间不存在(URL 直达不存在的 roomId) */
+  notFound: boolean;
   /** 是否房主 */
   isHost: boolean;
   /** 是否为旁观者 */
@@ -95,7 +97,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [view, setView] = useState<GameView | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  /** 房间不存在(URL 直达 /play/:roomId 但房间已销毁) */
+  const [notFound, setNotFound] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -112,6 +115,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
   const isHost = roomState?.hostId === playerId && playerId !== null;
   const isSpectator = stage === 'spectating';
+  // ready 从服务端 room_state 派生，而非本地状态。这样服务端 reset 后自动同步。
+  const ready = !!playerId && !!(roomState?.readyPlayers.includes(playerId));
 
   // ── 主连接 effect:command 变化时创建 HGC + 执行命令 + cleanup disconnect ──
   // StrictMode 安全:cleanup 断开后,StrictMode 重跑 effect 会完整重建。
@@ -161,7 +166,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         if (msg.type === 'game_reset') {
           setGameOver(null);
           setView(null);
-          setReady(false);
+          
           setStage('waiting');
           setChatMessages([]);
           recorderRef.current.reset();
@@ -178,13 +183,37 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     // playerId 取自本地身份(门禁已确保设置);未设置时 undefined → 服务端自动生成
     const pid = getPlayerId() ?? undefined;
     if (command.type === 'create') {
-      hgc.createRoom(command.name, command.maxPlayers, command.config, pid);
+      hgc.createRoom(command.name, command.maxPlayers, command.config, pid).catch((err) => {
+        if (hgcRef.current !== hgc) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error('createRoom failed', { error: msg });
+        setError(msg);
+        setStage('lobby');
+      });
       setStage('waiting');
     } else if (command.type === 'join' || command.type === 'autoJoin') {
-      hgc.joinRoom(command.roomId, pid);
+      hgc.joinRoom(command.roomId, pid).catch((err) => {
+        if (hgcRef.current !== hgc) return;
+        const status = (err as { status?: number })?.status;
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error('joinRoom failed', { status, error: msg });
+        // URL 直达且房间不存在：显示 404 页面
+        if (command.type === 'autoJoin' && status === 404) {
+          setNotFound(true);
+        } else {
+          setError(msg);
+          setStage('lobby');
+        }
+      });
       setStage('waiting');
     } else if (command.type === 'spectate') {
-      hgc.joinAsSpectator(command.roomId, pid);
+      hgc.joinAsSpectator(command.roomId, pid).catch((err) => {
+        if (hgcRef.current !== hgc) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error('joinAsSpectator failed', { error: msg });
+        setError(msg);
+        setStage('lobby');
+      });
       setStage('spectating');
     }
 
@@ -214,7 +243,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setError(null);
     setGameOver(null);
     setView(null);
-    setReady(false);
+    
     setRoomState(null);
     setCommand({
       type: 'create',
@@ -229,7 +258,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setError(null);
     setGameOver(null);
     setView(null);
-    setReady(false);
+    
     setRoomState(null);
     setCommand({ type: 'join', roomId: targetRoomId });
     log.info('joinRoom', { roomId: targetRoomId });
@@ -238,9 +267,12 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const toggleReady = useCallback(() => {
     const hgc = hgcRef.current;
     if (!hgc) return;
-    hgc.sendReady();
-    setReady(true);
-  }, []);
+    if (ready) {
+      void hgc.sendCancelReady();
+    } else {
+      void hgc.sendReady();
+    }
+  }, [ready]);
 
   const startGame = useCallback(() => {
     const hgc = hgcRef.current;
@@ -259,11 +291,12 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const leaveRoom = useCallback(() => {
     setCommand({ type: 'idle' });
     setStage('lobby');
+    setNotFound(false);
     setRoomId(null);
     setRoomState(null);
     setView(null);
     setGameOver(null);
-    setReady(false);
+    
     setPlayerId(null);
     setChatMessages([]);
   }, []);
@@ -303,7 +336,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setError(null);
     setGameOver(null);
     setView(null);
-    setReady(false);
+    
     setRoomState(null);
     setCommand({ type: 'spectate', roomId: targetRoomId });
     log.info('joinAsSpectator', { roomId: targetRoomId });
@@ -367,6 +400,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     view,
     gameOver,
     error,
+    notFound,
     isHost,
     isSpectator,
     ready,

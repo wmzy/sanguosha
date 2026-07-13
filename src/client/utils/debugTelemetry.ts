@@ -37,6 +37,7 @@ export interface ActionEntry {
     | 'reorder'
     | 'perspective'
     | 'ready'
+    | 'cancel_ready'
     | 'start_game'
     | 'restart_game'
     | 'update_config';
@@ -158,6 +159,7 @@ export function logUserAction(
     | 'reorder'
     | 'perspective'
     | 'ready'
+    | 'cancel_ready'
     | 'start_game'
     | 'restart_game'
     | 'update_config',
