@@ -458,7 +458,8 @@ export function applyRestRoutes(app: Hono): void {
     const config = raw.config as RoomConfig | undefined;
     if (!playerId || !config) return c.json({ error: '缺少参数' }, 400);
 
-    const updated = updateConfig(roomId, config, playerId);
+    const maxPlayers = typeof raw.maxPlayers === 'number' ? raw.maxPlayers : undefined;
+    const updated = updateConfig(roomId, config, playerId, maxPlayers);
     if (!updated) return c.json({ error: '无法更新配置' }, 400);
 
     const room = getRoom(roomId);

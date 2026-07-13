@@ -2,7 +2,7 @@
 // 多人游戏入口页。最小加入页：创建/加入房间 → 等待大厅 → 对局 → 结算。
 // 复用单视角 GameViewComponent 渲染玩家自己的座次。
 // lobby 阶段展示房间列表(参考 DebugLobby 的 RoomListPanel)。
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { css } from '@linaria/core';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
@@ -15,7 +15,7 @@ import { saveReplay } from '../replay/replayFile';
 import { apiFetch, ApiError } from '../api/client';
 import type { ReplayMeta } from '../replay/types';
 import type { ActionMsg } from '../types';
-import type { RoomInfo } from '../../server/protocol';
+import type { RoomInfo, RoomConfig, CharPoolPreset } from '../../server/protocol';
 
 const page = css`
   ${pageStyle}
@@ -132,6 +132,13 @@ const POOL_LABELS: Record<string, string> = {
   extended: '扩展池',
   all: '全武将 (60人)',
 };
+
+const TIMEOUT_OPTIONS: Array<{ label: string; value: number }> = [
+  { label: '快 (0.6×)', value: 0.6 },
+  { label: '标准 (1×)', value: 1 },
+  { label: '慢 (1.8×)', value: 1.8 },
+  { label: '无限', value: Infinity },
+];
 
 function timeoutLabel(v: number): string {
   if (!Number.isFinite(v)) return '无限';
@@ -281,6 +288,19 @@ export function MultiplayerPage() {
 
   // lobby 阶段房间列表(参考 DebugLobby)
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
+
+  // waiting 阶段房主配置编辑状态（首次从服务端同步后由用户控制）
+  const [editConfig, setEditConfig] = useState<RoomConfig | null>(null);
+  const editConfigInitRef = useRef(false);
+  useEffect(() => {
+    if (!editConfigInitRef.current && mp.roomState?.config) {
+      setEditConfig(mp.roomState.config);
+      editConfigInitRef.current = true;
+    }
+  }, [mp.roomState?.config]);
+  const handleConfigField = useCallback(<K extends keyof RoomConfig>(key: K, value: RoomConfig[K]) => {
+    setEditConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
+  }, []);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -619,7 +639,85 @@ export function MultiplayerPage() {
             </div>
           )}
           {/* 房间配置（所有人可见） */}
-          {mp.roomState?.config && (
+          {/* 房间配置：房主可编辑，非房主只读 */}
+          {mp.isHost && editConfig ? (
+            <>
+              <div className={formRow} style={{ marginBottom: '14px' }}>
+                <label className={label}>房间名称</label>
+                <input
+                  className={inputStyle}
+                  type="text"
+                  value={editConfig.name}
+                  maxLength={40}
+                  onChange={(e) => handleConfigField('name', e.target.value)}
+                  onBlur={() => mp.updateConfig(editConfig)}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <label className={label}>将池</label>
+                  <select
+                    className={inputStyle}
+                    value={editConfig.charPool}
+                    onChange={(e) => {
+                      const v = e.target.value as CharPoolPreset;
+                      handleConfigField('charPool', v);
+                      mp.updateConfig({ ...editConfig, charPool: v });
+                    }}
+                  >
+                    <option value="standard">标准池 (~32人)</option>
+                    <option value="extended">扩展池</option>
+                    <option value="all">全武将 (60人)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={label}>操作倒计时</label>
+                  <select
+                    className={inputStyle}
+                    value={Number.isFinite(editConfig.timeoutScale) ? editConfig.timeoutScale : 'Infinity'}
+                    onChange={(e) => {
+                      const v = e.target.value === 'Infinity' ? Infinity : Number(e.target.value);
+                      handleConfigField('timeoutScale', v);
+                      mp.updateConfig({ ...editConfig, timeoutScale: v });
+                    }}
+                  >
+                    {TIMEOUT_OPTIONS.map((o) => (
+                      <option key={o.label} value={o.value === Infinity ? 'Infinity' : o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className={formRow} style={{ marginBottom: '14px' }}>
+                <label className={label}>初始手牌</label>
+                <input
+                  className={inputStyle}
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={editConfig.handSize}
+                  onChange={(e) => handleConfigField('handSize', Number(e.target.value))}
+                  onBlur={() => mp.updateConfig(editConfig)}
+                />
+              </div>
+              <div className={formRow} style={{ marginBottom: '14px' }}>
+                <label className={label}>玩家数量</label>
+                <select
+                  className={inputStyle}
+                  value={mp.roomState?.maxPlayers ?? 2}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    mp.updateConfig(editConfig, v);
+                  }}
+                >
+                  {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <option key={n} value={n}>{n} 人</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : mp.roomState?.config && (
             <div className={configGrid}>
               <div className={configItem}>
                 <span className={configKey}>房间名</span>
@@ -653,12 +751,14 @@ export function MultiplayerPage() {
             </div>
           )}
           {/* 房主聊天配置 */}
-          {mp.isHost && mp.roomState?.config?.chat && (
+          {mp.isHost && editConfig?.chat && (
             <ChatConfigSection
-              config={mp.roomState.config.chat}
-              onChange={(chatConfig) =>
-                mp.updateConfig({ ...mp.roomState!.config, chat: chatConfig })
-              }
+              config={editConfig.chat}
+              onChange={(chatConfig) => {
+                const updated = { ...editConfig, chat: chatConfig };
+                setEditConfig(updated);
+                mp.updateConfig(updated);
+              }}
             />
           )}
           {/* 待处理申请提示 */}

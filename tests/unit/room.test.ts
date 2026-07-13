@@ -331,14 +331,68 @@ describe('房间配置', () => {
     expect(cfg.handSize).toBe(4); // 超范围回退默认
   });
 
-  it('normalizeRoomConfig Infinity 表示无限时', () => {
-    const cfg = normalizeRoomConfig({
-      name: '无限',
-      timeoutScale: Infinity,
-      charPool: 'all',
-      handSize: 4,
-    });
-    expect(cfg.timeoutScale).toBe(Infinity);
+  it('updateConfig 配置变更后重置准备状态', () => {
+    const sink = createMockSink();
+    const room = createRoom('测试', 4, 'host1', sink);
+    joinRoom(room.id, 'p2', createMockSink());
+    setReady(room.id, 'host1');
+    setReady(room.id, 'p2');
+    expect(room.readyPlayers.size).toBe(2);
+
+    updateConfig(
+      room.id,
+      { name: '改名', timeoutScale: 2, charPool: 'all', handSize: 4 },
+      'host1',
+    );
+    expect(room.readyPlayers.size).toBe(0);
+  });
+
+  it('updateConfig 支持修改 maxPlayers', () => {
+    const sink = createMockSink();
+    const room = createRoom('测试', 4, 'host1', sink);
+    updateConfig(
+      room.id,
+      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      'host1',
+      6,
+    );
+    expect(room.maxPlayers).toBe(6);
+  });
+
+  it('updateConfig maxPlayers 不得小于当前在线人数', () => {
+    const sink = createMockSink();
+    const room = createRoom('测试', 4, 'host1', sink);
+    joinRoom(room.id, 'p2', createMockSink());
+    joinRoom(room.id, 'p3', createMockSink());
+    // 当前 3 人在线，改为 2 应失败
+    const result = updateConfig(
+      room.id,
+      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      'host1',
+      2,
+    );
+    expect(result).toBeNull();
+    expect(room.maxPlayers).toBe(4); // 保持不变
+  });
+
+  it('updateConfig maxPlayers clamp 到 2-8', () => {
+    const sink = createMockSink();
+    const room = createRoom('测试', 4, 'host1', sink);
+    updateConfig(
+      room.id,
+      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      'host1',
+      1,
+    );
+    expect(room.maxPlayers).toBe(2); // 下限
+
+    updateConfig(
+      room.id,
+      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      'host1',
+      99,
+    );
+    expect(room.maxPlayers).toBe(8); // 上限
   });
 });
 

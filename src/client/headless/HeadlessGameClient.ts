@@ -776,13 +776,15 @@ export class HeadlessGameClient {
     }
   }
 
-  async sendUpdateConfig(config: RoomConfig): Promise<void> {
+  async sendUpdateConfig(config: RoomConfig, maxPlayers?: number): Promise<void> {
     if (!this._roomId || !this._playerId) return;
     try {
+      const body: Record<string, unknown> = { playerId: this._playerId, config };
+      if (maxPlayers !== undefined) body.maxPlayers = maxPlayers;
       await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: this._playerId, config }),
+        body: JSON.stringify(body),
       });
     } catch (err) {
       this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));

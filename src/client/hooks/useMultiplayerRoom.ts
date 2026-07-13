@@ -74,7 +74,7 @@ export interface MultiplayerRoom {
   /** 发送聊天消息 */
   sendChat: (text: string) => void;
   /** 更新房间配置（房主） */
-  updateConfig: (config: RoomConfig) => void;
+  updateConfig: (config: RoomConfig, maxPlayers?: number) => void;
   /** 当前连接状态(供 UI 显示连接/重连提示) */
   connectionState: ConnectionState;
   /** 当前重连尝试次数(0=未在重连) */
@@ -325,10 +325,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     void hgc.sendChat(text);
   }, []);
 
-  const updateConfig = useCallback((config: RoomConfig) => {
+  const updateConfig = useCallback((config: RoomConfig, maxPlayers?: number) => {
     const hgc = hgcRef.current;
     if (!hgc) return;
-    void hgc.sendUpdateConfig(config);
+    void hgc.sendUpdateConfig(config, maxPlayers);
   }, []);
 
   // ── 旁观者方法 ──

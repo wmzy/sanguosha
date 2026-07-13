@@ -196,8 +196,10 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
   return room;
 }
 
-/** 更新房间配置。仅房主可调用(调试房间无房主时任意座次可调用)。返回更新后的配置。 */
-export function updateConfig(roomId: string, config: unknown, playerId: string): RoomConfig | null {
+/** 更新房间配置。仅房主可调用(调试房间无房主时任意座次可调用)。
+ *  可选 maxPlayers: 修改房间最大人数(须 >= 当前在线人数, 2-8)。
+ *  配置变更后重置所有玩家的准备状态。返回更新后的配置。 */
+export function updateConfig(roomId: string, config: unknown, playerId: string, maxPlayers?: number): RoomConfig | null {
   const room = roomList.get(roomId);
   if (!room) return null;
   if (room.status !== '等待中') return null;
@@ -206,6 +208,14 @@ export function updateConfig(roomId: string, config: unknown, playerId: string):
   const normalized = normalizeRoomConfig(config);
   room.config = normalized;
   room.name = normalized.name;
+  // 更新最大人数:不得少于当前在线人数
+  if (maxPlayers !== undefined) {
+    const clamped = clampPlayers(maxPlayers);
+    if (clamped < room.players.size) return null;
+    room.maxPlayers = clamped;
+  }
+  // 配置变更 → 重置准备状态
+  room.readyPlayers.clear();
   roomChangeHandler?.(room, 'update');
   return normalized;
 }
