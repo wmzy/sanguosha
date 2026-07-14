@@ -1,11 +1,12 @@
 // tests/server/reconnect.test.ts
 // 服务端 session 断线保活 + 重连座位恢复测试。
 // 验证:grace period、playerId 迁移、重连后 action 可用。
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession, RECONNECT_GRACE_MS } from '../../src/server/session';
 import { addRoom, type Room } from '../../src/server/room';
+import { gameSessions } from '../../src/server/registry';
 import type { ConnectionSink } from '../../src/server/connection';
 import type { ServerMessage } from '../../src/server/protocol';
 
@@ -129,6 +130,38 @@ describe('Session 断线保活 (multiplayer)', () => {
     // p1 断线后只有 p2 → 不触发
     expect((session as unknown as { graceTimer: unknown }).graceTimer).toBeNull();
 
+    session.handleDisconnect('p2');
+    // 所有玩家断线 → 触发 grace timer
+    expect((session as unknown as { graceTimer: unknown }).graceTimer).not.toBeNull();
+  });
+
+  it('真实 SSE 流程: 先删 room.players 再 handleDisconnect, 仅一人断线不误触发', async () => {
+    // sse.ts onAbort 实际调用顺序: room.players.delete(playerId) → session.handleDisconnect(playerId)
+    // 旧逻辑用 room.players.size 判断, 一人断线后 size 已减1 → 误判全员断线
+    await session.startGame();
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(100);
+
+    room.players.delete('p1');
+    session.handleDisconnect('p1');
+
+    // p2 仍在线 → 不应触发
+    expect((session as unknown as { graceTimer: unknown }).graceTimer).toBeNull();
+  });
+
+  it('真实 SSE 流程: 全员断线(room.players 清空)仍触发 grace timer', async () => {
+    // 旧 bug: 最后一人断线后 room.players.size=0, allPlayersDisconnected guard 直接 false
+    await session.startGame();
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(100);
+
+    room.players.delete('p1');
+    session.handleDisconnect('p1');
+    expect((session as unknown as { graceTimer: unknown }).graceTimer).toBeNull();
+
+    room.players.delete('p2');
     session.handleDisconnect('p2');
     // 所有玩家断线 → 触发 grace timer
     expect((session as unknown as { graceTimer: unknown }).graceTimer).not.toBeNull();
@@ -286,5 +319,90 @@ describe('Session 断线 grace 超时', () => {
 
     // session 应被标记为 destroyed
     expect((session as unknown as { destroyed: boolean }).destroyed).toBe(true);
+  }, 15000);
+});
+
+describe('Session 断线 grace 实际超时', () => {
+  it('全员断线后 30s grace timer 自动触发 endDueToDisconnect', async () => {
+    const result = makeMultiplayerRoom(['p1', 'p2']);
+    const room = result.room;
+    const sinks = result.sinks;
+    const session = new GameSession(room, false, 42);
+
+    await session.startGame();
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(100);
+
+    sinks.get('p1')!.messages = [];
+    sinks.get('p2')!.messages = [];
+
+    // 先删 room.players(模拟 SSE onAbort 顺序), 再切 fake timers, 再 handleDisconnect
+    room.players.delete('p1');
+    room.players.delete('p2');
+    vi.useFakeTimers();
+    session.handleDisconnect('p1');
+    session.handleDisconnect('p2');
+
+    // grace timer 已启动(fake timer)
+    expect((session as unknown as { graceTimer: unknown }).graceTimer).not.toBeNull();
+
+    // 推进 29s → 仍未触发
+    vi.advanceTimersByTime(29_000);
+    expect((session as unknown as { destroyed: boolean }).destroyed).toBe(false);
+
+    // 推进到 30s+ → 触发 endDueToDisconnect
+    vi.advanceTimersByTime(1_001);
+
+    // session 已销毁
+    expect((session as unknown as { destroyed: boolean }).destroyed).toBe(true);
+    expect((session as unknown as { graceTimer: unknown }).graceTimer).toBeNull();
+
+    vi.useRealTimers();
+  }, 15000);
+});
+
+describe('SSE onAbort session 查询时机', () => {
+  // 回归测试: sse.ts 的 onAbort 闭包曾在 SSE 连接建立时捕获 session 引用，
+  // 但多人房的 GameSession 在 POST /start 时才创建(大厅阶段 gameSessions 为空)。
+  // 导致玩家在大厅连接 SSE → 游戏开始 → 全员离线时, onAbort 中的 session 仍为
+  // undefined, handleDisconnect 永不调用, grace timer 永不启动。
+  // 修复: onAbort 时重新查询 gameSessions.get(roomId)。
+  it('session 在游戏开始后才注册到 gameSessions 时, 断线仍能触发 grace timer', async () => {
+    const result = makeMultiplayerRoom(['p1', 'p2']);
+    const room = result.room;
+    const sinks = result.sinks;
+    const session = new GameSession(room, false, 42);
+
+    // 模拟大厅阶段: SSE 已连接, 但 session 尚未注册
+    expect(gameSessions.get(room.id)).toBeUndefined();
+
+    await session.startGame();
+    const state = getState(session);
+    for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
+    await sleep(100);
+
+    // 模拟 POST /start: session 注册到 gameSessions
+    gameSessions.set(room.id, session);
+
+    sinks.get('p1')!.messages = [];
+    sinks.get('p2')!.messages = [];
+
+    // 模拟 SSE onAbort(修复后: 从 gameSessions 重新查询)
+    room.players.delete('p1');
+    room.players.delete('p2');
+    vi.useFakeTimers();
+    for (const pid of ['p1', 'p2']) {
+      const s = gameSessions.get(room.id);
+      s?.handleDisconnect(pid);
+    }
+
+    // grace timer 已启动
+    expect((session as unknown as { graceTimer: unknown }).graceTimer).not.toBeNull();
+
+    vi.advanceTimersByTime(RECONNECT_GRACE_MS + 1);
+    expect((session as unknown as { destroyed: boolean }).destroyed).toBe(true);
+    vi.useRealTimers();
+    gameSessions.delete(room.id);
   }, 15000);
 });

@@ -459,9 +459,13 @@ export class GameSession {
     }
   }
 
+/** 判断是否所有玩家都已断线。
+ *  用 playerNames.size(座次总数)而非 room.players.size:因为 sse.ts 的 onAbort
+ *  会先 room.players.delete(playerId) 再调 handleDisconnect,此时 room.players 已缩小,
+ *  最后一人断线时 room.players.size=0 会误判为「无玩家」而非「全员断线」。 */
   private allPlayersDisconnected(): boolean {
-    if (this.room.players.size === 0) return false;
-    return this.disconnectedAt.size >= this.room.players.size;
+    if (this.playerNames.size === 0) return false;
+    return this.disconnectedAt.size >= this.playerNames.size;
   }
 
   private endDueToDisconnect(): void {
