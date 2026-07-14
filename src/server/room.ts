@@ -369,9 +369,10 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
     // 进行中/已结束的房间必须有活跃 session 才可见;
     // 等待中的房间(新建未开局)无需 session 即可被发现和加入。
     if (room.status !== '等待中' && !hasSession(room.id)) continue;
-    // 死房间: 进行中/已结束但座次全空且无在线玩家(重启后 seats 丢失的恢复房间)。
+    // 死房间(仅快速房间): 进行中/已结束但座次全空且无在线玩家(重启后 seats 丢失的恢复房间)。
     // 无人可重连,不展示在列表中,避免用户看到无法进入的房间。
-    if (room.status !== '等待中' && room.players.size === 0 && room.seats.every((s) => s === null)) continue;
+    // 普通房间不自动清理,必须保持可见以便房主管理。
+    if (room.roomType !== 'normal' && room.status !== '等待中' && room.players.size === 0 && room.seats.every((s) => s === null)) continue;
     result.push({
       id: room.id,
       name: room.name,
