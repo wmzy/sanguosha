@@ -7,6 +7,7 @@ import {
   handleMcpRequest,
   normalizeStartGame,
   PLAY_TOOL,
+  GET_SNAPSHOT_TOOL,
   SKILL_INFO_TOOL,
   REPORT_BUG_TOOL,
   type McpHandlerContext,
@@ -20,6 +21,7 @@ import {
 
 function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameClient {
   return {
+    isSpectator: false,
     phase: 'playing',
     needsAction: () => true,
     gameOverWinner: null,
@@ -33,7 +35,7 @@ function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameC
 }
 
 function makeCtx(hgc: HeadlessGameClient, ensureStarted = vi.fn()): McpHandlerContext {
-  return { hgc, ensureStarted, seat: 0 };
+  return { hgc, ensureStarted, seat: 0, playState: { lastView: null } };
 }
 
 describe('handleMcpRequest', () => {
@@ -48,17 +50,19 @@ describe('handleMcpRequest', () => {
     expect((res!.result as { protocolVersion: string }).protocolVersion).toBeTruthy();
   });
 
-  it('tools/list 返回 play、getSkillInfo、reportBug 工具定义', async () => {
+  it('tools/list 返回 play、getSnapshot、getSkillInfo、reportBug 工具定义', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, ctx);
     const tools = (res!.result as { tools: (typeof PLAY_TOOL)[] }).tools;
-    expect(tools).toHaveLength(3);
-    expect(tools.map((t) => t.name)).toEqual(['play', 'getSkillInfo', 'reportBug']);
+    expect(tools).toHaveLength(4);
+    expect(tools.map((t) => t.name)).toEqual(['play', 'getSnapshot', 'getSkillInfo', 'reportBug']);
     expect(tools[0].inputSchema).toBeDefined();
     expect(tools[1].inputSchema).toBeDefined();
     expect(tools[2].inputSchema).toBeDefined();
+    expect(tools[3].inputSchema).toBeDefined();
     expect(SKILL_INFO_TOOL.inputSchema).toBeDefined();
     expect(REPORT_BUG_TOOL.inputSchema).toBeDefined();
+    expect(GET_SNAPSHOT_TOOL.inputSchema).toBeDefined();
   });
 
   it('tools/call play 执行 action 并返回结构化结果', async () => {
@@ -243,6 +247,48 @@ describe('handleMcpRequest', () => {
     );
     expect(res!.error).toBeDefined();
     expect(res!.error!.code).toBe(-32601);
+  });
+
+  it('tools/call getSnapshot 返回完整视图', async () => {
+    const stubView = {
+      viewer: 0,
+      currentPlayerIndex: 0,
+      phase: 'play',
+      turn: { round: 1, phase: 'play', vars: {} },
+      players: [
+        { index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4, alive: true, handCount: 4, hand: [], equipment: {}, skills: ['仁德'], marks: [], identity: '主公' },
+      ],
+      pending: null,
+      deadline: null,
+      deadlineTotalMs: 0,
+      cardMap: {},
+      settlementStack: [],
+      log: [],
+      zones: { deckCount: 120, discardPileCount: 0, processing: [] },
+    } as unknown as Parameters<typeof import('../../src/ai-mcp/viewProjector').projectView>[0];
+    const ctx = makeCtx(makeFakeHgc({ view: stubView }));
+    const res = await handleMcpRequest(
+      { jsonrpc: '2.0', id: 20, method: 'tools/call', params: { name: 'getSnapshot', arguments: {} } },
+      ctx,
+    );
+    const result = res!.result as {
+      content: { text: string }[];
+      structuredContent: { view: { viewer: number; players: unknown[] } | null };
+    };
+    expect(result.structuredContent.view).not.toBeNull();
+    expect(result.structuredContent.view!.viewer).toBe(0);
+    expect(result.structuredContent.view!.players).toHaveLength(1);
+    expect(result.content[0].text).toContain('刘备');
+  });
+
+  it('tools/call getSnapshot 在 view 为 null 时返回 { view: null }', async () => {
+    const ctx = makeCtx(makeFakeHgc({ view: null }));
+    const res = await handleMcpRequest(
+      { jsonrpc: '2.0', id: 21, method: 'tools/call', params: { name: 'getSnapshot', arguments: {} } },
+      ctx,
+    );
+    const result = res!.result as { structuredContent: { view: null } };
+    expect(result.structuredContent.view).toBeNull();
   });
 
   it('通知（无 id）返回 null', async () => {

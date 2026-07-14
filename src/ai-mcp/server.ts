@@ -115,7 +115,7 @@ async function main(): Promise<void> {
     started = true;
   };
 
-  const ctx: McpHandlerContext = { hgc, ensureStarted, seat: SEAT };
+  const ctx: McpHandlerContext = { hgc, ensureStarted, seat: SEAT, playState: { lastView: null } };
 
   const rl = readline.createInterface({ input: process.stdin, terminal: false });
 

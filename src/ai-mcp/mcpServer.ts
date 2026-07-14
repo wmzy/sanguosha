@@ -6,7 +6,8 @@
 //   initialize / notifications/initialized / tools/list / tools/call
 //
 // MCP stdio 传输：每行一条 JSON-RPC 消息（NDJSON）。响应写到 stdout，日志写到 stderr。
-import { runPlay } from './playHandler';
+import { runPlay, type PlayState } from './playHandler';
+import { projectView } from './viewProjector';
 import { reportBugResult, type ReportBugInput } from './feedbackHandler';
 import { getSkillDescriptionAsync } from '../engine/skill';
 import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
@@ -183,12 +184,27 @@ async function getSkillInfoResult(names: unknown): Promise<SkillInfoEntry[]> {
   );
 }
 
+/** getSnapshot 工具的输入 schema:按需获取完整游戏视图快照。无输入参数。 */
+export const GET_SNAPSHOT_TOOL = {
+  name: 'getSnapshot',
+  description:
+    '获取当前完整游戏视图快照（全部玩家状态、手牌数、装备、区域等）。' +
+    'play 工具返回增量状态(stateDiff)，当因上下文压缩丢失基线、' +
+    '或需要一次性查看全部信息时调用本工具校准。',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {},
+  },
+};
+
 export interface McpHandlerContext {
   hgc: HeadlessGameClient;
   /** 启动房间（创建/加入 + ready + 必要时 start）。幂等。 */
   ensureStarted: (opts?: StartGameOpts) => Promise<void>;
   /** 默认座次（baseSeq/ownerId 占位回填用） */
   seat: number;
+  /** play 工具跨调用状态（维护 lastView 用于增量 diff）。 */
+  playState: PlayState;
 }
 
 export type StartGameOpts =
@@ -231,9 +247,18 @@ export async function handleMcpRequest(
           },
         };
       case 'tools/list':
-        return { jsonrpc: '2.0', id, result: { tools: [PLAY_TOOL, SKILL_INFO_TOOL, REPORT_BUG_TOOL] } };
+        return { jsonrpc: '2.0', id, result: { tools: [PLAY_TOOL, GET_SNAPSHOT_TOOL, SKILL_INFO_TOOL, REPORT_BUG_TOOL] } };
       case 'tools/call': {
         const params = (req.params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
+        if (params.name === 'getSnapshot') {
+          const view = ctx.hgc.view ? projectView(ctx.hgc.view) : null;
+          const text = JSON.stringify({ view });
+          return {
+            jsonrpc: '2.0',
+            id,
+            result: { content: [{ type: 'text', text }], structuredContent: { view } },
+          };
+        }
         if (params.name === 'getSkillInfo') {
           const results = await getSkillInfoResult(params.arguments?.names);
           const text = JSON.stringify({ skills: results });
@@ -295,6 +320,7 @@ export async function handleMcpRequest(
               }
             : undefined,
           waitTimeoutMs: typeof args.waitTimeoutMs === 'number' ? args.waitTimeoutMs : undefined,
+          state: ctx.playState,
         });
         const text = JSON.stringify(result);
         return {
