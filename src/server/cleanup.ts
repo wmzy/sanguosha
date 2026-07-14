@@ -37,6 +37,12 @@ export function cleanupIdleRooms(now: number = Date.now()): string[] {
     const room = getRoom(roomId);
     if (room && room.roomType === 'normal') continue; // 普通房间: 不自动销毁
     if (room && room.players.size > 0) continue;
+    // 2b. 僵尸房间: 进行中/已结束但无玩家连接且座次全空(重启后 seats 丢失的恢复房间)。
+    //     无人可重连,grace timer 因 playerNames 为空也不启动,立即回收避免泄漏。
+    if (room && room.status !== '等待中' && room.seats.every((s) => s === null)) {
+      stale.push(roomId);
+      continue;
+    }
     // 3. 无玩家连接 + 超过 TTL:闲置回收
     if (now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS) {
       stale.push(roomId);

@@ -40,6 +40,8 @@ export function startServerLifecycle(): void {
       const e = err instanceof Error ? err : new Error(String(err));
       log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
     });
+    // 恢复后立即清理僵尸房间(无 seats 的进行中房间),避免它们出现在房间列表。
+    cleanupIdleRooms();
   })();
 }
 
@@ -119,6 +121,9 @@ async function restorePersistedRooms(): Promise<void> {
           : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };
       // 如果房间已从 DB 恢复(normal 房间), 复用已存在的 Room 对象;
       // 否则新建 Room(quick 房间重启后丢失, 仅 JSON 游戏状态能恢复)
+      // 从持久化数据恢复座次映射(playerId → seat index)。
+      // 旧数据无 seats 字段时退回全 null(玩家无法重连,依赖安全网清理)。
+      const restoredSeats = persisted.seats ?? Array(persisted.maxPlayers || state.players.length).fill(null);
       const existingRoom = getRoom(roomId);
       const room: Room = existingRoom ?? {
         id: roomId,
@@ -136,7 +141,7 @@ async function restorePersistedRooms(): Promise<void> {
         pendingViewRequests: new Map(),
         chatUsage: new Map(),
         chatHistory: [],
-        seats: Array(persisted.maxPlayers || state.players.length).fill(null),
+        seats: restoredSeats,
         pendingSeatSwaps: new Map(),
       };
       if (!existingRoom) addRoom(room);

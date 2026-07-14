@@ -41,6 +41,8 @@ interface PersistedWrapper {
   maxPlayers: number;
   hostId: string | null;
   debug: boolean;
+  /** 座次→playerId 映射,用于重启后恢复玩家重连。旧数据无此字段时为 undefined。 */
+  seats?: (string | null)[];
   players: PlayerConfig[];
   seed: number;
   actionLog: ActionLogEntry[];
@@ -114,6 +116,8 @@ export interface PersistedRoom {
   maxPlayers: number;
   hostId: string | null;
   debug: boolean;
+  /** 座次→playerId 映射,用于重启后恢复玩家重连。旧数据无此字段时为 undefined。 */
+  seats?: (string | null)[];
   players: PlayerConfig[];
   seed: number;
   actionLog: ActionLogEntry[];
@@ -146,6 +150,8 @@ export async function saveRoom(
     maxPlayers: number;
     hostId: string | null;
     debug: boolean;
+    /** 座次→playerId 映射,用于重启后恢复玩家重连 */
+    seats?: (string | null)[];
   },
   state: GameState,
   actionLog: ActionLogEntry[],
@@ -159,6 +165,7 @@ export async function saveRoom(
     maxPlayers: meta.maxPlayers,
     hostId: meta.hostId,
     debug: meta.debug,
+    seats: meta.seats,
     players: state.players.map((p) => ({
       name: p.name,
       characterId: p.character,
@@ -231,6 +238,7 @@ export async function loadRoom(roomId: string): Promise<PersistedRoom | null> {
     maxPlayers: wrapper.maxPlayers,
     hostId: wrapper.hostId,
     debug: wrapper.debug,
+    seats: wrapper.seats,
     players: wrapper.players,
     seed: wrapper.seed,
     actionLog: wrapper.actionLog,

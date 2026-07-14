@@ -113,6 +113,15 @@ export class GameSession {
     this.state = fresh;
     this.actionLog = fresh.actionLog;
     this.attachStateListener();
+
+    // 从 room.seats 恢复 playerId → 座次下标映射,使重启后玩家可重连。
+    // startGame 正常路径会在游戏开始时设置 playerNames;恢复路径需手动填充。
+    for (let i = 0; i < this.room.seats.length; i++) {
+      const pid = this.room.seats[i];
+      if (pid !== null) {
+        this.playerNames.set(pid, i);
+      }
+    }
   }
 
   async startGame(playerCount?: number): Promise<boolean> {
@@ -580,6 +589,7 @@ export class GameSession {
         maxPlayers: this.maxPlayers,
         hostId: this.room.hostId,
         debug: this.debug,
+        seats: this.room.seats,
       },
       state,
       this.actionLog,
