@@ -35,7 +35,7 @@ export function cleanupIdleRooms(now: number = Date.now()): string[] {
     }
     // 2. 仍有玩家连接:游戏结束后玩家留在房间等「再来一局」,不清理
     const room = getRoom(roomId);
-    if (room && room.roomType === 'normal') continue; // 普通房间: 不自动销毁
+    if (room?.roomType === 'normal') continue; // 普通房间: 不自动销毁
     if (room && room.players.size > 0) continue;
     // 2b. 僵尸房间: 进行中/已结束但无玩家连接且座次全空(重启后 seats 丢失的恢复房间)。
     //     无人可重连,grace timer 因 playerNames 为空也不启动,立即回收避免泄漏。

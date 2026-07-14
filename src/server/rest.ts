@@ -540,7 +540,7 @@ export function applyRestRoutes(app: Hono): void {
     if (!joined) return c.json({ error: '加入失败' }, 400);
     playerRoomMap.set(spectatorId, roomId);
 
-    broadcastMessage(room, { type: 'spectator_joined', spectatorId: spectatorId });
+    broadcastMessage(room, { type: 'spectator_joined', spectatorId });
     broadcastRoomState(room);
 
     return c.json({ roomId, playerId: spectatorId });

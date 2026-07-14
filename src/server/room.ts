@@ -1,6 +1,6 @@
 // server/room.ts
 import type { ConnectionSink } from './connection';
-import type { RoomInfo, RoomConfig, ServerMessage, ChatConfig } from './protocol';
+import type { RoomInfo, RoomConfig, ServerMessage } from './protocol';
 import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../shared/rng';
 import { register } from './lifecycles';

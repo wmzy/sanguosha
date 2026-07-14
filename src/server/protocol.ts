@@ -90,7 +90,7 @@ export function normalizeChatConfig(raw: unknown): ChatConfig {
       : DEFAULT_CHAT_CONFIG.whitelistOnly;
   const whitelist =
     Array.isArray(r['whitelist']) && r['whitelist'].every((s) => typeof s === 'string')
-      ? (r['whitelist'] as string[])
+      ? (r['whitelist'])
           .map((s) => s.trim().slice(0, 50))
           .filter((s) => s.length > 0)
           .slice(0, 100)

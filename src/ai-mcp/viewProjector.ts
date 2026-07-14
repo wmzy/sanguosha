@@ -122,7 +122,7 @@ export function projectDiff(prev: AiViewSnapshot | null, curr: AiViewSnapshot): 
   const result: ViewStateDiff = { players: playerDiffs };
   const pz = prev?.zones;
   const cz = curr.zones;
-  if (!pz || pz.deckCount !== cz.deckCount || pz.discardPileCount !== cz.discardPileCount) {
+  if (pz?.deckCount !== cz.deckCount || pz.discardPileCount !== cz.discardPileCount) {
     result.zones = cz;
   }
   return result;

@@ -442,9 +442,7 @@ export function MultiplayerPage() {
 
   if (mp.stage === 'spectating' && mp.view) {
     // 旁观者申请查看某玩家视角的下拉
-    const spectatorList = mp.roomState?.spectatorIds ?? [];
     const viewGrants = mp.roomState?.viewGrants ?? {};
-    const pendingRequests = mp.roomState?.pendingViewRequests ?? {};
     const myGrant = mp.playerId ? viewGrants[mp.playerId] : undefined;
     // 构建玩家名称列表（座次序号 → playerId）
     const playerIds = mp.roomState?.playerIds ?? [];
@@ -819,7 +817,7 @@ export function MultiplayerPage() {
                             mp.moveSeat(i);
                           } else if (!isMe) {
                             // 请求交换座位
-                            if (window.confirm(`要与 ${seatPlayerId!.slice(0, 8)} 交换座位吗？`)) {
+                            if (window.confirm(`要与 ${seatPlayerId.slice(0, 8)} 交换座位吗？`)) {
                               mp.requestSeatSwap(i);
                             }
                           }
@@ -828,7 +826,7 @@ export function MultiplayerPage() {
                       >
                         <div style={{ fontWeight: 'bold' }}>P{i + 1}</div>
                         <div style={{ fontSize: '11px', opacity: 0.8 }}>
-                          {isMe ? '我' : isEmpty ? '空位' : seatPlayerId!.slice(0, 6)}
+                          {isMe ? '我' : isEmpty ? '空位' : seatPlayerId.slice(0, 6)}
                         </div>
                         {isPending && !isMe && (
                           <div style={{ fontSize: '10px', marginTop: '2px', color: colors.accent.gold }}>
