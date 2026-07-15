@@ -75,9 +75,10 @@ async function main(): Promise<void> {
           o.timeoutScale !== undefined
             ? { name: o.name ?? '房间', timeoutScale: o.timeoutScale, charPool: 'all', handSize: 4, chat: DEFAULT_CHAT_CONFIG }
             : undefined;
+        const effectiveRoomId = o.roomId ?? ROOM_ID;
         const result = await joinAndReady(hgc, {
-          mode: o.roomId ? 'join' : 'create',
-          roomId: o.roomId ?? ROOM_ID ?? undefined,
+          mode: effectiveRoomId ? 'join' : 'create',
+          roomId: effectiveRoomId ?? undefined,
           name: o.name,
           maxPlayers: o.maxPlayers ?? PLAYER_COUNT,
           playerId: o.playerId ?? PLAYER_ID ?? undefined,

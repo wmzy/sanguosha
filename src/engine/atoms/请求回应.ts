@@ -36,7 +36,16 @@ export const 请求回应: AtomDefinition<{
         const p = state.players[target];
         if (!p || p.hand.length <= p.health) return;
         const excess = p.hand.length - p.health;
-        const toDiscard = p.hand.slice(-excess);
+        // 超时自动弃牌：保留高价值牌（桃/杀/闪/无懈可击），弃掉低优先级牌。
+        // 避免盲弃末尾导致关键牌丢失，与 AI 玩家弃牌策略一致。
+        const priority: Record<string, number> = { '桃': 0, '杀': 1, '闪': 2, '无懈可击': 3 };
+        // 降序排列：低价值牌（priority 值大）排在前面，优先被弃
+        const sorted = [...p.hand].sort((a, b) => {
+          const ca = state.cardMap[a];
+          const cb = state.cardMap[b];
+          return (priority[cb?.name ?? ''] ?? 9) - (priority[ca?.name ?? ''] ?? 9);
+        });
+        const toDiscard = sorted.slice(0, excess);
         await applyAtom(state, { type: '弃置', player: target, cardIds: toDiscard });
         return;
       }

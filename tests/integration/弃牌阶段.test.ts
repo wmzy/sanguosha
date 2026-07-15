@@ -291,4 +291,44 @@ describe('弃牌阶段', () => {
     const ok = entry.validate(state, { cardIds: ['c1', 'c2'] });
     expect(ok).toBeNull();
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 6:弃牌超时应保留高价值牌(桃/杀/闪),弃掉低优先级牌
+  // 回归:AI agent 报告弃牌超时后服务器弃了错误的牌。原实现盲弃手牌末尾
+  //   (slice(-excess)),可能弃掉桃/杀等关键牌。修复后按优先级排序保留高价值牌。
+  // ─────────────────────────────────────────────────────────────
+  it('用例6:弃牌超时保留高价值牌(桃>杀>闪>其他)', async () => {
+    const lord = state.players[0];
+    lord.health = 2;
+    lord.maxHealth = 2;
+    // 手牌: c1=杀, c2=闪, c3=桃, c4=杀, c5=杀 → 5张, 需弃3张
+    // 期望保留: 桃(c3) + 杀(c1或c4或c5) = 2张
+    // 期望弃掉: 闪(c2) + 2张杀 中的末位
+    expect(lord.hand.length).toBe(5);
+    expect(lord.health).toBe(2);
+
+    await dispatchAndWait(state, {
+      skillId: '回合管理',
+      actionType: 'end',
+      ownerId: 0,
+      params: {},
+      baseSeq: state.seq,
+    });
+
+    // 找到弃牌 pending 并触发超时
+    const discardSlot = [...state.pendingSlots.values()].find(
+      (s) => (s.atom as { requestType?: string }).requestType === '__弃牌',
+    );
+    expect(discardSlot, '应产生弃牌 pending').toBeDefined();
+    if (discardSlot) {
+      await discardSlot._fireTimeoutNow?.();
+      await waitForStable(state);
+    }
+
+    // 手牌数应等于体力值
+    expect(lord.hand.length).toBe(lord.health);
+
+    // 桃(c3)应被保留(高优先级)
+    expect(lord.hand).toContain('c3');
+  });
 });
