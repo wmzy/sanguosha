@@ -20,8 +20,13 @@ const PROTOCOL_VERSION = '2024-11-05';
  *  （解决 AI agent 传空 startGame 导致进 debug 模式的问题）。 */
 export function normalizeStartGame(raw: unknown): StartGameOpts {
   if (raw === true || raw === undefined || (typeof raw === 'object' && raw !== null && Object.keys(raw).length === 0)) {
-    // 有 SGS_ROOM_ID 环境变量 → 自动 multiplayer join
     const envRoomId = typeof process !== 'undefined' ? process.env?.SGS_ROOM_ID : undefined;
+    // SGS_MODE=debug 强制 debug 模式（用于多 AI 实例加入同一 debug 房间）
+    const envMode = typeof process !== 'undefined' ? process.env?.SGS_MODE : undefined;
+    if (envMode === 'debug') {
+      return { mode: 'debug', roomId: envRoomId };
+    }
+    // 有 SGS_ROOM_ID 环境变量 → 自动 multiplayer join
     if (envRoomId) {
       return { mode: 'multiplayer', roomId: envRoomId };
     }
@@ -301,7 +306,10 @@ export async function handleMcpRequest(
           };
         }
         const args = params.arguments ?? {};
+        // startGame 参数触发首次 join+ready；后续 play 调用（无 startGame）也需要推进开局
+        // （lobby→playing），否则全员 ready 后无人调 advanceToStart，游戏无法开始。
         if (args.startGame) await ctx.ensureStarted(normalizeStartGame(args.startGame));
+        else await ctx.ensureStarted(); // 幂等：已 started 且在 playing 时为 no-op；lobby 时推进 advanceToStart
         const action = args.action as
           | {
               skillId?: string;

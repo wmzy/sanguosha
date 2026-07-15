@@ -552,3 +552,112 @@ describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', ()
     expect(respondActions[0].validTargets).not.toContain(2);
   });
 });
+
+// 回归测试：pickTargetCard prompt（过河拆桥/顺手牵羊/挑衅 选牌）
+//   修复前：appendRespondActions 不认识 pickTargetCard，availableActions 只有 skip
+//   修复后：为每张装备/判定牌生成 respond 动作，手牌生成盲选动作
+describe('HeadlessGameClient.getAvailableActions() — pickTargetCard pending', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('pickTargetCard：装备+判定+手牌都生成可选动作', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    (hgc as unknown as { _debugMode: boolean })._debugMode = true;
+    const view = makeView3(0, '出牌', []);
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType: '过河拆桥_选牌', target: 0 } as never,
+      prompt: {
+        type: 'pickTargetCard',
+        title: '选择弃置的目标牌',
+        target: 1,
+        equipment: [
+          { slot: 'weapon', cardId: 'equip-1', cardName: '诸葛连弩' },
+          { slot: 'armor', cardId: 'equip-2', cardName: '八卦阵' },
+        ],
+        judge: [{ cardId: 'judge-1', cardName: '乐不思蜀' }],
+        handCount: 3,
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    const respondActions = actions.filter((a) => a.category === 'respond');
+    // 2 装备 + 1 判定 + 1 手牌盲选 = 4 个动作
+    expect(respondActions).toHaveLength(4);
+
+    // 装备动作：zone=equipment, cardId 正确
+    const equipActions = respondActions.filter((a) => a.message.params.zone === 'equipment');
+    expect(equipActions).toHaveLength(2);
+    expect(equipActions[0].message.params.cardId).toBe('equip-1');
+    expect(equipActions[1].message.params.cardId).toBe('equip-2');
+
+    // 判定区动作：zone=judge
+    const judgeActions = respondActions.filter((a) => a.message.params.zone === 'judge');
+    expect(judgeActions).toHaveLength(1);
+    expect(judgeActions[0].message.params.cardId).toBe('judge-1');
+
+    // 手牌盲选动作：zone=hand, handIndex=0
+    const handActions = respondActions.filter((a) => a.message.params.zone === 'hand');
+    expect(handActions).toHaveLength(1);
+    expect(handActions[0].message.params.handIndex).toBe(0);
+  });
+
+  it('pickTargetCard：只有手牌时生成手牌盲选动作', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    (hgc as unknown as { _debugMode: boolean })._debugMode = true;
+    const view = makeView3(0, '出牌', []);
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType: '顺手牵羊_选牌', target: 0 } as never,
+      prompt: {
+        type: 'pickTargetCard',
+        title: '选择获得的目标牌',
+        target: 1,
+        equipment: [],
+        judge: [],
+        handCount: 2,
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    const respondActions = actions.filter((a) => a.category === 'respond');
+    expect(respondActions).toHaveLength(1);
+    expect(respondActions[0].message.params.zone).toBe('hand');
+    expect(respondActions[0].message.params.handIndex).toBe(0);
+  });
+
+  it('pickTargetCard：无牌可选时不生成 respond 动作', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    (hgc as unknown as { _debugMode: boolean })._debugMode = true;
+    const view = makeView3(0, '出牌', []);
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType: '过河拆桥_选牌', target: 0 } as never,
+      prompt: {
+        type: 'pickTargetCard',
+        title: '选择弃置的目标牌',
+        target: 1,
+        equipment: [],
+        judge: [],
+        handCount: 0,
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    const respondActions = actions.filter((a) => a.category === 'respond');
+    expect(respondActions).toHaveLength(0);
+  });
+});

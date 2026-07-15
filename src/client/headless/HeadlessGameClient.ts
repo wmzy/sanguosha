@@ -407,9 +407,11 @@ export class HeadlessGameClient {
     const p = v.pending;
     if (p.target < 0) return true; // 广播型（无懈可击等）
     if (p.target !== this._seatIndex) {
-      // debug 模式:单人控制所有座次,其他座次的阻塞型 pending 也需要响应
-      if (this._debugMode && p.isBlocking !== false) return true;
-      return false; // 别人的 pending
+      // debug 模式下其他座次的阻塞型 pending：仅在无独立 AI 代理时由当前 viewer 代管。
+      // 多 AI 实例同进 debug 房时，各实例只应响应自己座次的 pending；
+      // 否则会为不可见手牌的座次生成无效弃牌/出牌动作，导致死锁。
+      // 保守策略：不代管其他座次的 pending，由该座次自身的 AI 实例响应。
+      return false;
     }
     // 阻塞型 pending：必须回应
     if (p.isBlocking !== false) return true;
@@ -480,6 +482,59 @@ export class HeadlessGameClient {
       });
     }
     const reqType = getPendingRequestType(pending);
+    // pickTargetCard 类型 prompt（过河拆桥/顺手牵羊 选牌）：生成可选牌动作
+    if (pending.prompt?.type === 'pickTargetCard') {
+      const pickPrompt = pending.prompt;
+      const targetIdx = pickPrompt.target;
+      const targetPlayer = view.players[targetIdx];
+      // 装备牌（明牌）：每张一个 action
+      for (const eq of (pickPrompt.equipment ?? [])) {
+        out.push({
+          description: `弃置【${eq.cardName}】(装备)`,
+          message: {
+            skillId: '过河拆桥',
+            actionType: 'respond',
+            ownerId,
+            params: { zone: 'equipment', cardId: eq.cardId },
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'respond',
+        });
+      }
+      // 判定区牌（明牌）
+      for (const j of (pickPrompt.judge ?? [])) {
+        out.push({
+          description: `弃置【${j.cardName}】(判定区)`,
+          message: {
+            skillId: '过河拆桥',
+            actionType: 'respond',
+            ownerId,
+            params: { zone: 'judge', cardId: j.cardId },
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'respond',
+        });
+      }
+      // 手牌（盲选：按位置选）
+      const handCount = pickPrompt.handCount ?? targetPlayer?.handCount ?? 0;
+      if (handCount > 0) {
+        out.push({
+          description: `弃置手牌（第1张）`,
+          message: {
+            skillId: '过河拆桥',
+            actionType: 'respond',
+            ownerId,
+            params: { zone: 'hand', handIndex: 0 },
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'respond',
+        });
+      }
+      return;
+    }
     // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
     // 此处给出一个"选择弃牌"占位 action，agent 须自行从手牌选足 discardMin 张填入 cardIds。
     if (reqType === '__弃牌') {

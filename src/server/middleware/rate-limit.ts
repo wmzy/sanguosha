@@ -2,7 +2,6 @@
 import type { MiddlewareHandler } from 'hono';
 
 const windowMs = 60_000;
-const maxRequests = 60;
 const clients = new Map<string, { count: number; resetAt: number }>();
 
 function cleanup(): void {
@@ -18,28 +17,38 @@ function cleanup(): void {
 const cleanupInterval = setInterval(cleanup, 5 * 60_000);
 cleanupInterval.unref();
 
-export const rateLimit: MiddlewareHandler = async (c, next) => {
-  const ip =
-    c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ??
-    c.req.header('X-Real-IP') ??
-    'unknown';
+/** 重置速率限制状态（测试用） */
+export function _resetRateLimitState(): void {
+  clients.clear();
+}
 
-  const now = Date.now();
-  let entry = clients.get(ip);
+export function createRateLimit(maxRequests = 6000): MiddlewareHandler {
+  return async (c, next) => {
+    const ip =
+      c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ??
+      c.req.header('X-Real-IP') ??
+      'unknown';
 
-  if (!entry || now > entry.resetAt) {
-    entry = { count: 0, resetAt: now + windowMs };
-    clients.set(ip, entry);
-  }
+    const now = Date.now();
+    let entry = clients.get(ip);
 
-  entry.count++;
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 0, resetAt: now + windowMs };
+      clients.set(ip, entry);
+    }
 
-  c.header('X-RateLimit-Limit', String(maxRequests));
-  c.header('X-RateLimit-Remaining', String(Math.max(0, maxRequests - entry.count)));
+    entry.count++;
 
-  if (entry.count > maxRequests) {
-    return c.json({ error: '请求过于频繁，请稍后再试' }, 429);
-  }
+    c.header('X-RateLimit-Limit', String(maxRequests));
+    c.header('X-RateLimit-Remaining', String(Math.max(0, maxRequests - entry.count)));
 
-  await next();
-};
+    if (entry.count > maxRequests) {
+      return c.json({ error: '请求过于频繁，请稍后再试' }, 429);
+    }
+
+    await next();
+  };
+}
+
+/** 默认速率限制：6000 req/min（支持 4 个 AI agent 并发） */
+export const rateLimit = createRateLimit(6000);

@@ -397,10 +397,13 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     // 出牌窗口是非阻塞 pending，主动出牌/用技不应校验 pendingSeq
     // pendingSeq 不匹配 = 客户端响应了过期窗口（已被 close-reopen 替换）→ 拒绝
     // pendingSeq 缺省跳过校验（向后兼容旧客户端；新客户端应始终传 pendingSeq）
+    // 放宽为 >= 而非 ===：并行询问(选将)场景下,多个 slot 同时存在,客户端 _lastSeq
+    // 是最后一个 atom 的 seq,可能大于当前 slot 的 createdSeq。只要 >= 就说明客户端
+    // 的状态不比 slot 创建时旧,可以安全接受。
     if (
       oldSlot.isBlocking &&
       message.pendingSeq !== undefined &&
-      oldSlot.createdSeq !== message.pendingSeq
+      message.pendingSeq < oldSlot.createdSeq
     ) {
       rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
       return false;
