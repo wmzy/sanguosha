@@ -51,7 +51,8 @@ export interface PlayResult {
   lastActionResult: 'accepted' | 'rejected' | 'timeout' | 'not-applicable';
 }
 
-const DEFAULT_WAIT_MS = 120000;
+// 25s: 低于 MCP 客户端默认 30s 超时，避免 play 调用在等待 needsAction 时被客户端截断。
+const DEFAULT_WAIT_MS = 25000;
 const TICK_MS = 20;
 
 export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promise<PlayResult> {
@@ -114,6 +115,9 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
         lastActionResult = 'rejected';
       }
       if (hgc.phase === 'ended' || hgc.gameOverWinner !== null) return settle();
+      // lobby/connecting 阶段立即返回，让调用方重新调 play 重试 advanceToStart。
+      // 否则 runPlay 会阻塞到 deadline（120s），超出 MCP 客户端 30s 超时。
+      if (hgc.phase === 'connecting' || hgc.phase === 'lobby') return settle();
       if (hgc.needsAction()) return settle();
       if (Date.now() >= deadline) {
         if (lastActionResult === 'accepted') lastActionResult = 'timeout';

@@ -416,10 +416,10 @@ describe('resolveTimeoutMs', () => {
     expect(resolveTimeoutMs(state, 15)).toBe(30000);
   });
 
-  it('Infinity 返回极大值(定时器实际不触发)', () => {
+  it('Infinity 返回 24 小时(定时器实际不触发)', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
     state.config = { timeoutScale: Infinity };
-    expect(resolveTimeoutMs(state, 30)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(resolveTimeoutMs(state, 30)).toBe(86_400_000);
   });
 
   // Bug #10: 广播型 pending(如无懈可击)在 Infinity 时不死锁,使用 base timeout
@@ -429,10 +429,10 @@ describe('resolveTimeoutMs', () => {
     expect(resolveTimeoutMs(state, 30, true)).toBe(30000);
   });
 
-  it('isBroadcast=false 时 Infinity 仍返回极大值', () => {
+  it('isBroadcast=false 时 Infinity 仍返回 24 小时', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
     state.config = { timeoutScale: Infinity };
-    expect(resolveTimeoutMs(state, 30, false)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(resolveTimeoutMs(state, 30, false)).toBe(86_400_000);
   });
 
   it('有限 scale 下 isBroadcast 不影响结果', () => {

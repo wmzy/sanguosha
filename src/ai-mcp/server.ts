@@ -46,9 +46,15 @@ async function main(): Promise<void> {
     onGameOver: (w) => logErr(`game over: ${w}`),
   });
   let started = false;
+  // 记录首次 startGame 的模式，后续无参 ensureStarted 时沿用，避免默认 fallback 到 debug。
+  let lastMode: 'multiplayer' | 'debug' | null = null;
   // 环境变量作为默认值,被 opts 覆盖
   const ensureStarted = async (opts?: StartGameOpts): Promise<void> => {
     const o = opts ?? normalizeStartGame(true);
+    // 无参调用时沿用首次模式，避免 multiplayer 房间误走 debug 路径
+    if (!opts && lastMode) {
+      (o as { mode: 'multiplayer' | 'debug' }).mode = lastMode;
+    }
     if (o.mode === 'multiplayer') {
       // 旁观者模式：joinAsSpectator 后直接等待，不准备/不开局。
       if (o.asSpectator) {
@@ -78,6 +84,7 @@ async function main(): Promise<void> {
           config: roomConfig,
         });
         started = true;
+        lastMode = 'multiplayer';
         logErr(
           `multiplayer room joined: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`,
         );
@@ -85,9 +92,11 @@ async function main(): Promise<void> {
       }
       // 后续：若仍在 lobby，先应用配置变更（timeoutScale/name），再推进开局。
       // roomId/playerId/mode 等不可变字段保持首次值；只有 RoomConfig 字段会被更新。
+      // 使用短超时(5s)使 advanceToStart 快速返回，避免 MCP 客户端 30s 超时。
+      // 调用方持续调 play({}) 即可重试，直到全员就绪开局。
       if (hgc.phase === 'lobby') {
         await applyConfigUpdate(hgc, { timeoutScale: o.timeoutScale, name: o.name });
-        await advanceToStart(hgc, o.readyTimeoutMs);
+        await advanceToStart(hgc, o.readyTimeoutMs ?? 5_000);
       }
       return;
     }

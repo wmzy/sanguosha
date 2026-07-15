@@ -630,18 +630,21 @@ export class HeadlessGameClient {
           });
         }
         // 没有可出的牌或策略性不出：提供 skip
-        out.push({
-          description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
-          message: {
-            skillId: '__skip',
-            actionType: 'skip',
-            ownerId,
-            params: {},
-            baseSeq: 0,
-          },
-          validTargets: [],
-          category: 'skip',
-        });
+        // 广播型 pending（target<0）已在上面添加过 skip，不重复
+        if (pending.target >= 0) {
+          out.push({
+            description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
+            message: {
+              skillId: '__skip',
+              actionType: 'skip',
+              ownerId,
+              params: {},
+              baseSeq: 0,
+            },
+            validTargets: [],
+            category: 'skip',
+          });
+        }
       } else {
         // 兜底（choosePlayer 等）：空 params，agent 需自行补全 targets
         out.push({
