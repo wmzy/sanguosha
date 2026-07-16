@@ -5,6 +5,8 @@ import type { Plugin } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
 import app, { startServerLifecycle } from './app';
 import { createLogger } from './logger';
+import { flushPendingWrites } from './persistence';
+import { shutdownAll } from './lifecycles';
 
 const log = createLogger('vite-plugin');
 
@@ -15,6 +17,32 @@ export function honoApiPlugin(): Plugin {
       // 启动服务器生命周期(闲置清理 + 持久化恢复)。
       // configureServer 仅在 vite dev 模式调用,vite build 不会触发。)
       startServerLifecycle();
+
+      // 优雅关闭:vite dev 仅在 SIGTERM/stdin-end 时调 server.close(),
+      // 而 Ctrl+C 发的是 SIGINT —— Node 默认直接终止进程,PGlite 来不及 close(),
+      // 留下 postmaster.pid + 未刷 WAL,下次启动 crash recovery 时 WASM abort。
+      const originalClose = server.close.bind(server);
+      server.close = async () => {
+        try {
+          await flushPendingWrites();
+          await shutdownAll();
+        } catch (err) {
+          log.error('关闭清理失败', { error: err });
+        }
+        return originalClose();
+      };
+      // Ctrl+C(SIGINT)vite 不处理:接管它,走完整关闭(含上面的清理)再退出。
+      let sigintHandled = false;
+      process.once('SIGINT', async () => {
+        if (sigintHandled) return;
+        sigintHandled = true;
+        try {
+          await server.close();
+        } catch (err) {
+          log.error('SIGINT 关闭失败', { error: err });
+        }
+        process.exit(0);
+      });
 
       // 挂载 Hono REST API 到 /api
       server.middlewares.use('/api', async (req: IncomingMessage, res: ServerResponse) => {
