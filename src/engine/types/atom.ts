@@ -126,7 +126,7 @@ export type Atom =
     }
   | { type: '分配武将'; target: number; character: string; skills: string[] }
   | { type: '初始化洗牌'; seed: number }
-  | { type: '发牌'; handSize: number; lordBonus?: number }
+  | { type: '发牌'; handSize: number }
   | { type: '判定'; player: number; judgeType: string }
   // 使用结算时机(通用:杀/锦囊等)
   | { type: '检测有效性'; source: number; target: number; cardId: string }

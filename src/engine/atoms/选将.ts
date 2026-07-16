@@ -148,12 +148,10 @@ export const 初始化洗牌: AtomDefinition<{
 
 // ── 发牌 ──────────────────────────────────────────────
 // 从牌堆顶给每个玩家发 handSize 张牌
-// 主公多摸 1 张(三国杀规则)
 
 export const 发牌: AtomDefinition<{
   type: '发牌';
   handSize: number;
-  lordBonus?: number; // 主公额外摸牌数(默认 1)
 }> = {
   type: '发牌',
   validate: (state) => {
@@ -162,59 +160,46 @@ export const 发牌: AtomDefinition<{
     return null;
   },
   apply(state, atom) {
-    const { handSize, lordBonus = 1 } = atom;
+    const { handSize } = atom;
     let cursor = 0;
     for (const p of state.players) {
-      const isLord = p.identity === '主公';
-      const bonus = isLord ? lordBonus : 0;
-      const drawCount = handSize + bonus;
-      const drawn = state.zones.deck.slice(cursor, cursor + drawCount);
+      const drawn = state.zones.deck.slice(cursor, cursor + handSize);
       p.hand.push(...drawn);
-      cursor += drawCount;
+      cursor += handSize;
     }
     state.zones.deck = state.zones.deck.slice(cursor);
   },
   toViewEvents(state, atom): ViewEventSplit {
-    const { handSize, lordBonus = 1 } = atom;
+    const { handSize } = atom;
     // 每个玩家收到自己分到的牌面(ownerView);其他人只看到数量信息(othersView)。
     const ownerViews = new Map<number, ViewEvent>();
     let cursor = 0;
     for (const p of state.players) {
-      const isLord = p.identity === '主公';
-      const bonus = isLord ? lordBonus : 0;
-      const drawCount = handSize + bonus;
       const cards = state.zones.deck
-        .slice(cursor, cursor + drawCount)
+        .slice(cursor, cursor + handSize)
         .map((id) => state.cardMap[id])
         .filter(Boolean);
-      cursor += drawCount;
+      cursor += handSize;
       ownerViews.set(p.index, {
         type: '发牌',
         handSize,
-        lordBonus,
         cards,
       });
     }
-    const othersView: ViewEvent = { type: '发牌', handSize, lordBonus };
+    const othersView: ViewEvent = { type: '发牌', handSize };
     return { ownerViews, othersView };
   },
   applyView(view, event) {
     const handSize = (event.handSize as number) ?? 4;
-    const lordBonus = (event.lordBonus as number) ?? 1;
     for (const p of view.players) {
-      const isLord = p.identity === '主公';
-      const bonus = isLord ? lordBonus : 0;
-      p.handCount += handSize + bonus;
+      p.handCount += handSize;
       // ownerView 携带自己分到的 cards,加入手牌;othersView 无 cards 字段
       if (event.cards && p.hand) {
         p.hand.push(...(event.cards as Card[]));
       }
     }
-    // 牌堆减少(粗略:减去总发牌数)
-    const total = view.players.reduce((sum, p) => {
-      const isLord = p.identity === '主公';
-      return sum + handSize + (isLord ? lordBonus : 0);
-    }, 0);
+    // 牌堆减少(减去总发牌数)
+    const total = view.players.length * handSize;
     if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - total);
   },
 };

@@ -1,9 +1,9 @@
 // 开局(系统级):开局流程。由 bootstrap() 在游戏开始时调用。
-//   start action:抽身份 → 选将 → 初始化洗牌 → 发牌(lordBonus=1) → 回合开始(主公)
+//   start action:抽身份 → 选将 → 初始化洗牌 → 发牌 → 回合开始(主公)
 //
 // 验证:
 //   1. 正面:完整开局流程(2人)→ 身份分配、选将完成、发牌完成
-//   2. 正面:发牌 atom 的 lordBonus=1
+//   2. 正面:发牌 atom 给所有玩家发 handSize 张(主公不加)
 //   3. 正面:主公先选(串行)
 //   4. 负面:playerCount < 2 → validate 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -140,9 +140,9 @@ describe('开局', () => {
     expect(state.zones.deck.length).toBeGreaterThan(0);
   }, 30000);
 
-  // ─── 正面:发牌 atom 的 lordBonus=1 ──────────────────────────
+  // ─── 正面:发牌 atom 给所有玩家发 handSize 张(主公不加) ────
 
-  it('正面:发牌 atom 的 lordBonus=1(主公多摸 1 张)', async () => {
+  it('正面:发牌 atom 给所有玩家发 handSize 张(主公不加)', async () => {
     const config: GameConfig = {
       characters: CHARACTERS,
       gameId: 'test',
@@ -155,13 +155,14 @@ describe('开局', () => {
     await resolveAllSelections(state);
     await waitForDealComplete(state);
 
-    // 验证发牌 atom 的 lordBonus 参数(不受后续摸牌阶段影响)
+    // 发牌 atom 不再区分主公:handSize=4 且无 lordBonus 字段(不受后续摸牌阶段影响)
     const dealEvent = state.atomHistory.find(
-      (e): e is typeof e & { atom: { type: string; lordBonus?: number } } =>
+      (e): e is typeof e & { atom: { type: string; handSize?: number } } =>
         e.kind === 'atom' && (e as { atom: { type: string } }).atom.type === '发牌',
     );
     expect(dealEvent).toBeDefined();
-    expect(dealEvent!.atom.lordBonus).toBe(1);
+    expect(dealEvent!.atom.handSize).toBe(4);
+    expect('lordBonus' in dealEvent!.atom).toBe(false);
   }, 30000);
 
   // ─── 正面:主公先选(串行)────────────────────────────────────

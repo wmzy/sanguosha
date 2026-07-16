@@ -1,5 +1,5 @@
 // 开局(系统级):开局流程。由 create-engine.bootstrap() 在游戏开始时调用。
-//   start action:抽身份 → 选将 → 初始化洗牌 → 发牌(lordBonus=1) → 回合开始(主公) → 阶段开始(主公,准备)
+//   start action:抽身份 → 选将 → 初始化洗牌 → 发牌 → 回合开始(主公) → 阶段开始(主公,准备)
 import type { ActionEntry, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { createRng } from '../../shared/rng';
@@ -175,8 +175,8 @@ export function onInit(_skill: Skill, state: GameState): () => void {
       // 3. 初始化洗牌(创建标准牌堆并洗混)
       await applyAtom(state, { type: '初始化洗牌', seed });
 
-      // 4. 发牌(主公多摸 1 张)
-      await applyAtom(state, { type: '发牌', handSize, lordBonus: 1 });
+      // 4. 发牌(所有玩家 handSize 张,主公不加)
+      await applyAtom(state, { type: '发牌', handSize });
 
       // 5. 启动第一回合(从主公开始)
       const lord = state.players.find((p) => p.identity === '主公');
