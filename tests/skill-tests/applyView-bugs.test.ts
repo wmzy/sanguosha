@@ -689,3 +689,34 @@ describe('分配武将 atom: faction 从角色配置赋值并投影到 view', ()
     expect(state.players[0].faction).toBe('蜀');
   });
 });
+
+describe('初始化洗牌 atom: deckCount 未同步到增量视图', () => {
+  // Bug: 初始化洗牌缺少 toViewEvents/applyView,选将完成后 bootstrap 重发 initialView
+  // 之前,前端增量视图的 deckCount 一直停留在 initialView 时的 0(牌堆还没洗)。
+  // 来源:用户报告"前端牌堆显示 0 张"。
+  it('toViewEvents 携带 deckCount,applyView 从 0 更新为标准牌堆总数', async () => {
+    const state = makeBareState();
+    expect(state.zones.deck.length).toBe(0);
+
+    await applyAtom(state, { type: '初始化洗牌', seed: 42 });
+    const realDeckCount = state.zones.deck.length;
+    expect(realDeckCount).toBeGreaterThan(0);
+
+    // buildView(权威全量)反映正确 deckCount
+    const built = buildView(state, 0);
+    expect(built.zones!.deckCount).toBe(realDeckCount);
+
+    // 模拟前端增量路径:从 initialView(deckCount=0) 收到初始化洗牌 event
+    const view = mockView({
+      zones: { deckCount: 0, discardPileCount: 0, processing: [] },
+    });
+    const def = getAtomDef('初始化洗牌');
+    expect(def.toViewEvents).toBeDefined();
+    expect(def.applyView).toBeDefined();
+
+    const split = def.toViewEvents!(state, { type: '初始化洗牌', seed: 42 } as never);
+    expect(split.othersView).toBeDefined();
+    def.applyView!(view, split.othersView!);
+    expect(view.zones!.deckCount).toBe(realDeckCount);
+  });
+});

@@ -130,6 +130,20 @@ export const 初始化洗牌: AtomDefinition<{
     for (const card of allCards) state.zones.deck.push(card.id);
     state.rngSeed = atom.seed;
   },
+  toViewEvents(): ViewEventSplit {
+    // 牌堆从空变为标准牌堆总数。cardMap 内容不变(createStandardDeck 确定性创建,
+    // apply 只是先删后加同样的卡),不需要增量更新 cardMap——只需同步 deckCount。
+    // 缺少 applyView 时,前端增量视图在选将阶段牌堆数停留在 initialView 时的 0。
+    return {
+      ownerViews: new Map(),
+      othersView: { type: '初始化洗牌', deckCount: createStandardDeck().length },
+    };
+  },
+  applyView(view, event) {
+    if (view.zones) {
+      view.zones.deckCount = (event.deckCount as number) ?? view.zones.deckCount;
+    }
+  },
 };
 
 // ── 发牌 ──────────────────────────────────────────────
