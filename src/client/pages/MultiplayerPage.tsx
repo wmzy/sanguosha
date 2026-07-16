@@ -7,6 +7,7 @@ import { css } from '@linaria/core';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
 import { GameViewComponent } from '../components/GameView';
+import { GameResultOverlay } from '../components/GameResultOverlay';
 import { RoomListPanel } from '../components/RoomListPanel';
 import { ChatPanel } from '../components/ChatPanel';
 import { ChatConfigSection } from '../components/ChatConfigSection';
@@ -575,6 +576,26 @@ export function MultiplayerPage() {
   }
 
   if (mp.stage === 'ended' || mp.gameOver) {
+    const winner = mp.gameOver?.winner ?? '无人';
+    // view 存在时用丰富的结算面板;缺失时回退到简洁文案。
+    if (mp.view) {
+      return (
+        <>
+          {reconnectBanner}
+          <GameResultOverlay
+            winner={winner}
+            players={mp.view.players}
+            perspectiveIdx={mp.view.viewer}
+            onRestart={mp.sendRestart}
+            onExit={() => {
+              mp.leaveRoom();
+              navigate('/');
+            }}
+            onDownloadReplay={handleDownloadReplay}
+          />
+        </>
+      );
+    }
     return (
       <>
         {reconnectBanner}
@@ -582,7 +603,7 @@ export function MultiplayerPage() {
           <h1 className={title}>游戏结束</h1>
           <div className={gameOverBox}>
             <p className={winnerText}>
-              {mp.gameOver?.winner === '无人' ? '平局' : `胜方：${mp.gameOver?.winner ?? '未知'}`}
+              {winner === '无人' ? '平局' : `胜方：${winner}`}
             </p>
             <div className={buttonRow}>
               <button
@@ -591,13 +612,6 @@ export function MultiplayerPage() {
                 onClick={mp.sendRestart}
               >
                 再来一局
-              </button>
-              <button
-                className={btnStyle}
-                style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-                onClick={handleDownloadReplay}
-              >
-                ⬇ 下载录像
               </button>
               <button
                 className={btnStyle}
