@@ -220,6 +220,104 @@ describe('系统规则', () => {
     restoreAutoCompare();
   });
 
+  // ─── Bug:求桃 prompt 从 confirm 改为 useCard ─────────────────
+  // 原求桃用 confirm prompt(confirmLabel='出桃'),点"出桃"传 {choice:true} 无 cardId,
+  // 桃.respond validate 不检查 cardId 可绕过,但 apply 不设救援标志 → 点了无法真正救援;
+  // 且 confirm 不校验手牌,没桃也能点。改为 useCard prompt + cardFilter(桃/酒/急救红牌),
+  // 没手牌则无可点高亮牌,手牌区只能点真实可救援的牌。
+
+  it('Bug:求桃 pending 为 useCard 类型,cardFilter 只匹配桃/酒/急救红牌', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['k1'],
+          skills: ['杀', '桃', '闪', '酒'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          skills: ['杀', '桃', '闪', '酒'],
+          health: 1,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { k1: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass(); // P1 HP=0 → 濒死 → 求桃 pending(P1 先被问)
+    expect(harness.state.players[1].health).toBe(0);
+
+    const slot = [...harness.state.pendingSlots.values()][0];
+    const prompt = (slot.atom as { prompt: { type: string; cardFilter?: { filter?: (c: Card) => boolean } } }).prompt;
+    // prompt 应为 useCard(原为 confirm)
+    expect(prompt.type).toBe('useCard');
+    // cardFilter 匹配桃、酒;不匹配杀/闪
+    const filter = prompt.cardFilter?.filter!;
+    expect(filter(makeCard('p', '桃', '♥'))).toBe(true);
+    expect(filter(makeCard('w', '酒', '♠'))).toBe(true);
+    expect(filter(makeCard('s', '杀', '♠'))).toBe(false);
+    expect(filter(makeCard('d', '闪', '♦'))).toBe(false);
+    restoreAutoCompare();
+  });
+
+  it('Bug:无手牌玩家被求桃时,confirm choice:true 不再误触发救援', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const peach = makeCard('p1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['k1', 'p1'],
+          skills: ['杀', '桃', '闪', '酒'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          skills: [],
+          health: 1,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { k1: slash, p1: peach },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass(); // P1 HP=0 → 濒死 → 求桃先问 P1(无手牌)
+    expect(harness.state.players[1].health).toBe(0);
+
+    // P1 无手牌:旧 confirm 下点"出桃"传 {choice:true} 会误设救援标志;
+    // 新 useCard 下 P1.respond 必须传 cardId,P1 无手牌无法响应 → pass 不救
+    await P1.pass();
+    // P0 有桃 → 出桃救 P1
+    await P0.respond('桃', { cardId: 'p1' });
+    expect(harness.state.players[1].health).toBe(1);
+    expect(harness.state.players[1].alive).toBe(true);
+    restoreAutoCompare();
+  });
+
   // ─── 负面:非弃牌窗口 respond 被拒绝 ──────────────────────────
 
   it('负面:无 pending 时弃牌 respond 被拒绝', async () => {

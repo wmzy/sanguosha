@@ -1463,6 +1463,36 @@ describe('usePlayInteraction · altActions(替代出牌方式)', () => {
     act(() => result.current.handleCardClick(KILL_CARD));
     expect(result.current.altActions).toEqual([]);
   });
+
+  // Bug:选中桃后多出"出桃"/"火攻"按钮。根因 findAltActionsForCard 未排除 respond 类 action,
+  // 将桃.respond(标签"出桃")、火攻.respond(标签"火攻", cardFilter 全匹配)误当替代出牌方式。
+  it('选中桃后 altActions 不含 respond 类 action(出桃/火攻按钮不再多出)', () => {
+    const peachRespond: SkillActionDef = {
+      skillId: '桃',
+      ownerId: 0,
+      actionType: 'respond',
+      label: '出桃',
+      prompt: { type: 'useCard', title: '出桃救援', cardFilter: { filter: (c) => c.name === '桃', min: 1, max: 1 } },
+    };
+    const fireRespond: SkillActionDef = {
+      skillId: '火攻',
+      ownerId: 0,
+      actionType: 'respond',
+      label: '火攻',
+      prompt: { type: 'useCard', title: '火攻', cardFilter: { filter: () => true, min: 1, max: 1 } },
+    };
+    const view = makePlayView();
+    view.players[0].hand = [PEACH_CARD];
+    const { result } = renderPlay(
+      makePlayParams({
+        view,
+        skillActions: [peachUseAction(), peachRespond, fireRespond],
+        perspectiveHand: [PEACH_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(PEACH_CARD));
+    expect(result.current.altActions).toEqual([]);
+  });
 });
 
 // ─── Bug 4: 桃满血时不可出 ───

@@ -23,6 +23,8 @@ export interface SkillActionDef {
   transform?: (card: Card) => CardWrapper;
   /** 激活谓词(undefined = 用前端默认出牌激活条件) */
   activeWhen?: ActionActiveWhen;
+  /** respond action 服务的 pending requestType(如 '桃/求桃'),来自 defineAction opts */
+  respondFor?: string;
 }
 
 // 全局注册表：key = "skillId:ownerId:actionType"
@@ -49,6 +51,7 @@ function makeFrontendAPI(skillId: string, ownerId: number): FrontendAPI {
         prompt: opts.prompt,
         transform: opts.transform,
         activeWhen: opts.activeWhen,
+        respondFor: opts.respondFor,
       });
     },
     playEffect() {},

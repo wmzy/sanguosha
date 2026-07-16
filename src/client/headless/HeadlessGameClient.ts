@@ -613,13 +613,15 @@ export class HeadlessGameClient {
         });
       } else if (info.cardFilter) {
         // 需要选牌（杀/闪等）：为每张可出的牌生成独立 respond action（带 cardId）
+        // 求桃救援（rescueSkillForCard）：桃/酒/急救红牌各自走对应技能 respond
         const me = view.players[ownerId];
         const candidates = me?.hand?.filter((c) => info.cardFilter!(c)) ?? [];
         for (const card of candidates) {
+          const rescueSkill = info.rescueSkillForCard?.(card);
           out.push({
-            description: `回应【${info.skillId}】(${card.suit}${card.rank})`,
+            description: `回应【${rescueSkill ?? info.skillId}】(${card.suit}${card.rank})`,
             message: {
-              skillId: info.skillId,
+              skillId: rescueSkill ?? info.skillId,
               actionType: 'respond',
               ownerId,
               params: { cardId: card.id },

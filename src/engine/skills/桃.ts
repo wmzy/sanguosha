@@ -120,6 +120,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '出桃',
     style: 'primary',
+    respondFor: '桃/求桃',
     prompt: {
       type: 'useCard',
       title: '出桃救援',

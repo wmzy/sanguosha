@@ -1,7 +1,7 @@
 // 系统规则(系统级):注册引擎级 after hooks——判定清理、技能生命周期、濒死流程。
 // 这些是三国杀全局规则,不是单个技能职责,通过 after hooks 统一处理。
 // applyAtom 只管通用管线(before → validate → apply → emit → after hooks → pending)。
-import type { GameState, Json, Skill } from '../types';
+import type { Card, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance } from '../skill';
 import { DEFAULT_SKILLS } from '../atoms/选将';
@@ -202,6 +202,18 @@ export function onInit(_skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
+/** 求桃救援牌判定:桃/酒(默认技能),急救红牌(华佗)。基于被问玩家技能动态判断。
+ *  engine 侧 cardFilter;前端通过 respondFor='桃/求桃' 的 respond action 重建同等语义。 */
+function canRescueWith(state: GameState, playerIdx: number): (card: Card) => boolean {
+  const skills = state.players[playerIdx]?.skills ?? [];
+  return (card) => {
+    if (card.name === '桃' && skills.includes('桃')) return true;
+    if (card.name === '酒' && skills.includes('酒')) return true;
+    if (card.color === '红' && skills.includes('急救')) return true;
+    return false;
+  };
+}
+
 /**
  * 濒死求桃流程:从濒死玩家开始,按座次依次询问每个存活玩家是否使用桃救援。
  */
@@ -227,10 +239,9 @@ async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> 
       requestType: '桃/求桃',
       target: playerIdx,
       prompt: {
-        type: 'confirm',
-        title: `${state.players[targetIdx].name} 濒死,是否使用桃救援?`,
-        confirmLabel: '出桃',
-        cancelLabel: '不救',
+        type: 'useCard',
+        title: `${state.players[targetIdx].name} 濒死,使用桃/酒救援`,
+        cardFilter: { filter: canRescueWith(state, playerIdx), min: 1, max: 1 },
       },
       timeout: 15,
     });

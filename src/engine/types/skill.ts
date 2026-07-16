@@ -168,6 +168,10 @@ export interface FrontendAPI {
        *  缺省(undefined)时的语义由前端集中实现:出牌类(use)缺省 = 出牌阶段+当前视角回合+无 pending。
        *  主动技(confirm/distribute/转化)按需声明更宽或更窄的条件。 */
       activeWhen?: ActionActiveWhen;
+      /** respond action 服务的 pending requestType(如 '桃/求桃')。
+       *  前端据此区分"同种回应的不同 rescue 路径":求桃时桃/酒/急救均可救援,
+       *  但各自的 respond action cardFilter 不同,需按此标记合并筛选并路由 skillId。 */
+      respondFor?: string;
     },
   ): void;
   playEffect(effect: AtomEffect): void;

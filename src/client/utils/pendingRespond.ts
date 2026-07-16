@@ -57,6 +57,8 @@ export function deriveCardFilterFromAtom(
   if (atomType === '请求回应' || atomType === '并行回应') {
     if (!reqType) return undefined;
     if (reqType === '__弃牌') return () => true;
+    // 求桃兜底(registry 未加载窗口期):桃或酒均可救援
+    if (reqType === '桃/求桃') return (c) => c.name === '桃' || c.name === '酒';
     const slashIdx = reqType.indexOf('/');
     const cardName = slashIdx >= 0 ? reqType.slice(0, slashIdx) : reqType;
     if (!cardName) return undefined;
@@ -81,6 +83,9 @@ export function findRespondAction(
 export interface PendingRespondInfo {
   skillId: string;
   cardFilter?: (c: Card) => boolean;
+  /** 求桃专用:按救援牌(桃/酒/急救红牌)找到对应的救援 skillId。
+   *  非 null 时 handleRespond 优先用它路由,而非默认 skillId('桃')。 */
+  rescueSkillForCard?: (c: Card) => string | undefined;
 }
 
 /**
@@ -110,6 +115,22 @@ export function resolvePendingRespond(
     skillId = sepIdx >= 0 ? reqType.slice(0, sepIdx) : reqType || null;
   }
   if (!skillId) return null;
+
+  // 求桃特判:合并所有 respondFor='桃/求桃' 的救援 action(桃/酒/急救),
+  // cardFilter 取并集(手牌区高亮所有可救援牌),rescueSkillForCard 按 cardId 路由。
+  // registry 异步加载窗口期(rescueActions 为空)走下方通用兜底。
+  const PEACH_RESCUE = '桃/求桃';
+  if (reqType === PEACH_RESCUE) {
+    const rescueActions = skillActions.filter((a) => a.respondFor === PEACH_RESCUE);
+    if (rescueActions.length > 0) {
+      return {
+        skillId,
+        cardFilter: (c: Card) => rescueActions.some((a) => extractCardFilterFromAction(a)?.(c)),
+        rescueSkillForCard: (c: Card) =>
+          rescueActions.find((a) => extractCardFilterFromAction(a)?.(c))?.skillId,
+      };
+    }
+  }
 
   // 1. 优先:从 registry 取 cardFilter(函数引用保留)
   const action = findRespondAction(skillId, skillActions);

@@ -600,7 +600,9 @@ export function usePlayInteraction(
         const card = perspectiveHand.find((c) => c.id === cardId);
         if (!card) return;
         if (info.cardFilter && !info.cardFilter(card)) return;
-        send(info.skillId, 'respond', { cardId });
+        // 求桃:按救援牌路由到对应技能(桃/酒/急救);其他回应用默认 skillId
+        const rescueSkill = info.rescueSkillForCard?.(card);
+        send(rescueSkill ?? info.skillId, 'respond', { cardId });
       } else if (pendingTargetIdx < 0) {
         markBroadcastSkipped(broadcastKey);
       } else {

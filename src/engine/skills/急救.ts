@@ -76,6 +76,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
     label: '急救',
     style: 'primary',
+    respondFor: '桃/求桃',
     prompt: {
       type: 'useCard',
       title: '急救：将一张红色手牌当桃使用',
