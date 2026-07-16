@@ -229,4 +229,67 @@ describe('开局', () => {
     // 无发牌
     expect(state.players.every((p) => p.hand.length === 0)).toBe(true);
   });
+
+  // ─── 正面:分配武将后体力值与武将卡牌一致 ─────────────────────
+
+  it('正面:分配武将后体力值=武将卡牌 maxHealth(2人局主公不+1)', async () => {
+    const config: GameConfig = {
+      characters: CHARACTERS,
+      gameId: 'test',
+      playerCount: 2,
+      seed: 42,
+      handSize: 4,
+    };
+    await bootstrap(state, config);
+    await waitForStable(state);
+    await resolveAllSelections(state);
+    await waitForDealComplete(state);
+
+    // 2 人局(人数≤4):主公不加成,体力=武将卡牌 maxHealth
+    for (const player of state.players) {
+      const charDef = allCharacters.find((c) => c.name === player.character);
+      expect(charDef).toBeDefined();
+      const expectedMax = charDef!.maxHealth;
+      expect(player.maxHealth).toBe(expectedMax);
+      // 初始体力 = 体力上限(满血开局)
+      expect(player.health).toBe(expectedMax);
+    }
+  }, 30000);
+
+  // ─── 正面:人数>4(5人局)主公体力 +1 ────────────────────────
+
+  it('正面:5人局分配武将后,主公体力上限=武将maxHealth+1,非主公不加', async () => {
+    // 5 人局需要重建 5 人 state(beforeEach 默认 2 人)
+    state = createGameState({
+      players: [0, 1, 2, 3, 4].map((i) => makePlayer({ index: i, name: `P${i}` })),
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 0, phase: '准备', vars: {} },
+    });
+    const config: GameConfig = {
+      characters: CHARACTERS,
+      gameId: 'test-lord-bonus',
+      playerCount: 5,
+      seed: 7,
+      handSize: 4,
+    };
+    await bootstrap(state, config);
+    await waitForStable(state);
+    await resolveAllSelections(state);
+    await waitForDealComplete(state);
+
+    expect(state.players.length).toBe(5);
+    for (const player of state.players) {
+      const charDef = allCharacters.find((c) => c.name === player.character);
+      expect(charDef).toBeDefined();
+      const isLord = player.identity === '主公';
+      // 人数>4:主公 +1,非主公不加
+      const expectedMax = isLord ? charDef!.maxHealth + 1 : charDef!.maxHealth;
+      expect(player.maxHealth).toBe(expectedMax);
+      expect(player.health).toBe(expectedMax);
+      // 确保只有1名主公
+      if (isLord) expect(state.players.filter((p) => p.identity === '主公').length).toBe(1);
+    }
+  }, 30000);
 });
