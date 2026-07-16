@@ -6,5 +6,5 @@
   "license": "MIT",
   "homepage": "https://github.com/wmzy/sanguosha",
   "repository": "https://github.com/wmzy/sanguosha",
-  "files": [".claude-plugin/", "mcp/", "skills/", "README.md"]
+  "files": [".claude-plugin/", ".mcp.json", "mcp/", "skills/", "README.md"]
 }
