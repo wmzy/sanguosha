@@ -10,6 +10,8 @@ import { isActiveAction } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { getSkillDescription } from '../../engine/skill';
+import { useSkillDescReady } from '../hooks/useSkillDescReady';
+import { SkillTag } from './SkillTooltip';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { playerVisibleEqual } from '../utils/memo';
 
@@ -51,6 +53,7 @@ export function PlayerCardLargeImpl({
   skillActions,
   onSkillAction,
 }: PlayerCardLargeProps) {
+  useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
   const p = view.players[perspectiveIdx];
   if (!p) return null;
 
@@ -123,22 +126,26 @@ export function PlayerCardLargeImpl({
         <div className={cx(styles.skillRow, styles.skillRowPad)}>
           {visibleSkills.map((s) => {
             const btn = triggerableActions.find((a) => a.skillId === s);
+            const desc = getSkillDescription(s) ?? btn?.prompt.title;
             if (btn && isSkillActive(btn)) {
               return (
-                <button
+                <SkillTag
                   key={s}
+                  as="button"
+                  name={s}
+                  description={desc}
                   className={cx(styles.skillBtn, skillBtnVariant(btn.style))}
                   onClick={() => onSkillAction(btn)}
-                  title={`${s}：${getSkillDescription(s) ?? btn.prompt.title}`}
-                >
-                  {s}
-                </button>
+                />
               );
             }
             return (
-              <span key={s} className={styles.skillTag} title={getSkillDescription(s)}>
-                {s}
-              </span>
+              <SkillTag
+                key={s}
+                name={s}
+                description={desc}
+                className={styles.skillTag}
+              />
             );
           })}
         </div>

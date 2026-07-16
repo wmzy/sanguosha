@@ -6,6 +6,8 @@ import type { EquipSlot, GameView } from '../../engine/types';
 import { shallowArrayEqual, playerVisibleEqual } from '../utils/memo';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { getSkillDescription } from '../../engine/skill';
+import { useSkillDescReady } from '../hooks/useSkillDescReady';
+import { SkillTag } from './SkillTooltip';
 import {
   FACTION_BG,
   SUIT_COLOR,
@@ -61,6 +63,7 @@ function PlayerSeatViewImpl({
   hideIdentity = true,
   skillActions: _skillActions, // 预留:未来用于在座位卡上显示可点使用的技能按钮
 }: PlayerSeatProps) {
+  useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
   void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
   const isDead = !player.alive;
   const isClickable = needsTarget && !isDead && isTargetable;
@@ -152,9 +155,7 @@ function PlayerSeatViewImpl({
             .filter((s) => !DEFAULT_SKILLS.has(s))
             .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
             .map((s) => (
-              <span key={s} className={skillTag} title={getSkillDescription(s)}>
-                {s}
-              </span>
+              <SkillTag key={s} name={s} description={getSkillDescription(s)} className={skillTag} />
             ))}
         </div>
       )}

@@ -13,6 +13,9 @@ import { CountdownBar } from './CountdownBar';
 import { FACTION_BG } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
+import { getSkillDescription } from '../../engine/skill';
+import { useSkillDescReady } from '../hooks/useSkillDescReady';
+import { SkillTag } from './SkillTooltip';
 import * as styles from './gameViewStyles';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
@@ -29,6 +32,7 @@ export function CharSelectWaitingOverlay({
   perspectiveIdx,
   overlaySlot,
 }: CharSelectWaitingOverlayProps) {
+  useSkillDescReady(); // 技能模块加载后重渲染,确保已选武将技能描述 title 命中
   // debug 多 WS 模型下,每个座次连接的 view.pending 直接就是该座次的选将询问;
   // 当前视角连接的 pending 是选将询问时,直接取其 deadline 用于倒计时。
   const isPendingCharSelect = view.pending?.atom?.type === '选将询问';
@@ -66,7 +70,13 @@ export function CharSelectWaitingOverlay({
             ))}
           </div>
           {charSkills.length > 0 && (
-            <div className={styles.selectedCharSkills}>{charSkills.join(' / ')}</div>
+            <div className={styles.selectedCharSkills}>
+              {charSkills.map((s, i) => (
+                <SkillTag key={s} name={s} description={getSkillDescription(s)}>
+                  {i > 0 ? ' / ' : ''}{s}
+                </SkillTag>
+              ))}
+            </div>
           )}
         </div>
       )}

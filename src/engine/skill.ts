@@ -54,6 +54,21 @@ export function setSkillModuleChecker(fn: (id: string) => boolean): void {
 /** 通过解析器查找技能模块(动态 import,按需加载)。加载后缓存,供 getCachedSkillModule 同步获取。 */
 const moduleCache = new Map<string, SkillModule>();
 
+// ─── moduleCache 变更订阅(供前端 useSyncExternalStore 在技能模块加载后触发重渲染) ───
+let moduleCacheVersion = 0;
+const moduleCacheListeners = new Set<() => void>();
+
+export function subscribeModuleCache(cb: () => void): () => void {
+  moduleCacheListeners.add(cb);
+  return () => {
+    moduleCacheListeners.delete(cb);
+  };
+}
+
+export function getModuleCacheVersion(): number {
+  return moduleCacheVersion;
+}
+
 export async function getSkillModule(id: string): Promise<SkillModule> {
   const cached = moduleCache.get(id);
   if (cached) return cached;
@@ -61,6 +76,8 @@ export async function getSkillModule(id: string): Promise<SkillModule> {
     throw new Error('skillModuleResolver not set (forgot to import skills/index?)');
   const mod = await skillModuleResolver(id);
   moduleCache.set(id, mod);
+  moduleCacheVersion++;
+  moduleCacheListeners.forEach((cb) => cb());
   return mod;
 }
 

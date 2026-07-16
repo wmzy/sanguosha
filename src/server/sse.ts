@@ -170,9 +170,11 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
 
       if (session && room.status === '进行中') {
         session.reconnectPlayer(playerId, sink, lastSeq);
-      } else {
-        sink.send(buildRoomState(room));
       }
+      // 始终发送 room_state：reconnectPlayer 只发 initialView（游戏视图），
+      // 不含 config/chat 等房间元数据。页面刷新/HMR 重连时客户端 roomState 为 null，
+      // 若不补发 room_state，ChatPanel 等依赖 roomState.config 的组件将不渲染。
+      sink.send(buildRoomState(room));
 
       // 发送聊天历史（如果有）
       const chatHist = getChatHistory(roomId);

@@ -14,6 +14,9 @@ import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON, EQUIP_SLOT_ORDER } from './gameViewConstants';
 import { shallowSetEqual } from '../utils/memo';
+import { getSkillDescription } from '../../engine/skill';
+import { useSkillDescReady } from '../hooks/useSkillDescReady';
+import { useHoverTooltip } from './SkillTooltip';
 
 export interface EquipColumnProps {
   /** 视角玩家在 view.players 中的下标 */
@@ -47,6 +50,7 @@ export function EquipColumnImpl({
   isDistributeActive,
   onEquipCardClick,
 }: EquipColumnProps) {
+  useSkillDescReady(); // 技能模块加载后重渲染,确保装备技能描述 title 命中
   const p = view.players[perspectiveIdx];
   if (!p) return null;
 
@@ -89,27 +93,70 @@ export function EquipColumnImpl({
               ? () => onEquipCardClick?.(id)
               : undefined;
           const stateHint = activeSkill ? ' · 可发动' : isDistCandidate ? ' · 可选中' : '';
+          // 装备自带技能(丈八蛇矛/青釭剑/八卦阵等)时,hover 展示技能描述
+          const equipDesc = EQUIPMENT_SKILL_NAMES.has(name) ? getSkillDescription(name) : undefined;
+          const head = `${name}(${slot})${stateHint}`;
+          const tooltipText = equipDesc ? `${head}\n${equipDesc}` : head;
           return (
-            <div
+            <EquipItem
               key={slot}
-              className={cx(
-                styles.equipColumnItem,
-                activeSkill && styles.equipSkillActive,
-                isDistCandidate && styles.equipDistCandidate,
-                isDistSelected && styles.equipSelected,
-              )}
-              role={clickable ? 'button' : undefined}
-              onClick={handleClick}
-              title={card ? `${name}(${slot})${stateHint}` : id}
-            >
-              <span className={styles.equipColumnIcon}>{icon}</span>
-              <span>{name}</span>
-              {activeSkill && <span className={styles.equipSkillBadge}>⚡</span>}
-            </div>
+              icon={icon}
+              name={name}
+              tooltipText={card ? tooltipText : id}
+              activeSkill={activeSkill}
+              isDistCandidate={isDistCandidate}
+              isDistSelected={isDistSelected}
+              clickable={clickable}
+              handleClick={handleClick}
+            />
           );
         })}
       </div>
     </div>
+  );
+}
+
+/** 单个装备卡片(含 hover tooltip)。提取为子组件以遵守 hooks 规则。 */
+function EquipItem({
+  icon,
+  name,
+  tooltipText,
+  activeSkill,
+  isDistCandidate,
+  isDistSelected,
+  clickable,
+  handleClick,
+}: {
+  icon: string;
+  name: string;
+  tooltipText: string;
+  activeSkill: SkillActionDef | undefined;
+  isDistCandidate: boolean;
+  isDistSelected: boolean;
+  clickable: boolean;
+  handleClick: (() => void) | undefined;
+}) {
+  const tip = useHoverTooltip(tooltipText);
+  return (
+    <>
+      <div
+        className={cx(
+          styles.equipColumnItem,
+          activeSkill && styles.equipSkillActive,
+          isDistCandidate && styles.equipDistCandidate,
+          isDistSelected && styles.equipSelected,
+        )}
+        role={clickable ? 'button' : undefined}
+        onClick={handleClick}
+        onMouseEnter={tip.onMouseEnter}
+        onMouseLeave={tip.onMouseLeave}
+      >
+        <span className={styles.equipColumnIcon}>{icon}</span>
+        <span>{name}</span>
+        {activeSkill && <span className={styles.equipSkillBadge}>⚡</span>}
+      </div>
+      {tip.tooltip}
+    </>
   );
 }
 

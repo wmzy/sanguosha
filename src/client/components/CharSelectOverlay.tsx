@@ -11,6 +11,9 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { css, cx } from '@linaria/core';
 import { FACTION_BG, IDENTITY_COLORS } from './gameViewConstants';
 import { CountdownBar } from './CountdownBar';
+import { getSkillDescription } from '../../engine/skill';
+import { useSkillDescReady } from '../hooks/useSkillDescReady';
+import { SkillTag } from './SkillTooltip';
 
 export interface CharSelectOverlayCandidate {
   name: string;
@@ -70,6 +73,7 @@ export function CharSelectOverlay({
   lordCharacter,
   overlaySlot,
 }: CharSelectOverlayProps) {
+  useSkillDescReady(); // 技能模块加载后重渲染,确保候选武将技能描述 title 命中
   const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
   // 已提交锁定态:点「确认选择」后记录选中的武将名,锁定候选区与按钮,
   // 直到引擎广播新 view(选将 slot resolve → pending 切换 → 本组件卸载或重置)。
@@ -153,8 +157,12 @@ export function CharSelectOverlay({
                   }}
                 >
                   <div className={candidateName}>{ch.name}</div>
-                  <div className={candidateFaction}>
-                    {faction} · {ch.skills.join(' / ')}
+                  <div className={cx(candidateFaction)}>
+                    {faction} · {ch.skills.map((s, si) => (
+                      <SkillTag key={s} name={s} description={getSkillDescription(s)}>
+                        {si > 0 ? ' / ' : ''}{s}
+                      </SkillTag>
+                    ))}
                   </div>
                   <div className={hpDots}>
                     {Array.from({ length: maxHealth }, (_, j) => (

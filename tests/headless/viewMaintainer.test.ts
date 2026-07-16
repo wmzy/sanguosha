@@ -149,4 +149,26 @@ describe('applyServerMessage', () => {
     expect(out.view!.zones!.deckCount).toBe(50);
     expect(out.view!.zones!.discardPileCount).toBe(0);
   });
+
+  it('event 的 view 增量为 log 创建新引用(避免 GameLog memo 永远判等)', () => {
+    // 回归:viewReducer 会 view.log.push() 原地突变。若浅拷贝不复制 log 数组,
+    // prev/next 共享同一引用 → prev.log.length === next.log.length 永远 true
+    // → GameLog 的 gameLogPropsEqual 判等 → 日志面板冻结。
+    const baseline = makeBaseline(0);
+    baseline.log = [{ time: 0, player: 0, text: '回合开始' }];
+    const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 0 });
+    const prevLog = start.view!.log;
+    const evt = {
+      type: 'event',
+      seq: 1,
+      timestamp: 100,
+      view: { type: '回合开始', player: 0 },
+    } as ServerMessage;
+    const out = applyServerMessage(start.view, start.lastSeq, evt);
+    // log 必须是新引用,否则 GameLog memo 比较器判等跳过重渲染
+    expect(out.view!.log).not.toBe(prevLog);
+    // 新条目已 push
+    expect(out.view!.log.length).toBe(2);
+    expect(prevLog.length).toBe(1); // prev 未被污染
+  });
 });
