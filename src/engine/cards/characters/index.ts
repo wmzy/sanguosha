@@ -16,6 +16,21 @@ export { 曹丕 } from './曹丕';
 export { 徐晃 } from './徐晃';
 export { 张郃 } from './张郃';
 export { 邓艾 } from './邓艾';
+export { 界曹操 } from './界曹操';
+export { 界司马懿 } from './界司马懿';
+export { 界夏侯惇 } from './界夏侯惇';
+export { 界张辽 } from './界张辽';
+export { 界许褚 } from './界许褚';
+export { 界郭嘉 } from './界郭嘉';
+export { 界甄姬 } from './界甄姬';
+export { 界夏侯渊 } from './界夏侯渊';
+export { 界曹仁 } from './界曹仁';
+export { 界荀彧 } from './界荀彧';
+export { 界典韦 } from './界典韦';
+export { 界曹丕 } from './界曹丕';
+export { 界徐晃 } from './界徐晃';
+export { 界张郃 } from './界张郃';
+export { 界邓艾 } from './界邓艾';
 
 // 蜀
 export { 刘备 } from './刘备';
@@ -96,6 +111,21 @@ import { 曹丕 } from './曹丕';
 import { 徐晃 } from './徐晃';
 import { 张郃 } from './张郃';
 import { 邓艾 } from './邓艾';
+import { 界曹操 } from './界曹操';
+import { 界司马懿 } from './界司马懿';
+import { 界夏侯惇 } from './界夏侯惇';
+import { 界张辽 } from './界张辽';
+import { 界许褚 } from './界许褚';
+import { 界郭嘉 } from './界郭嘉';
+import { 界甄姬 } from './界甄姬';
+import { 界夏侯渊 } from './界夏侯渊';
+import { 界曹仁 } from './界曹仁';
+import { 界荀彧 } from './界荀彧';
+import { 界典韦 } from './界典韦';
+import { 界曹丕 } from './界曹丕';
+import { 界徐晃 } from './界徐晃';
+import { 界张郃 } from './界张郃';
+import { 界邓艾 } from './界邓艾';
 import { 刘备 } from './刘备';
 import { 界刘备 } from './界刘备';
 import { 关羽 } from './关羽';
@@ -170,6 +200,21 @@ export const weiCharacters = [
   徐晃,
   张郃,
   邓艾,
+  界曹操,
+  界司马懿,
+  界夏侯惇,
+  界张辽,
+  界许褚,
+  界郭嘉,
+  界甄姬,
+  界夏侯渊,
+  界曹仁,
+  界荀彧,
+  界典韦,
+  界曹丕,
+  界徐晃,
+  界张郃,
+  界邓艾,
 ];
 export const shuCharacters = [
   刘备,
