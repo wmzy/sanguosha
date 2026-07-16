@@ -7,55 +7,15 @@
 //   使用者按区域选:装备/判定(明牌可见,直接选 cardId)或手牌(盲选第 K 张)。
 //   手牌盲选是博弈核心:目标可偷偷调整顺序,使用者凭牌背位置推测。
 //   重放确定性:盲选时在 actionLog 的当前条目前 splice "设置手牌顺序" 条目。
-import type { ActionLogEntry, FrontendAPI, GameState, Json, Skill } from '../types';
+//   选牌面板逻辑见 ./选牌面板.ts(与顺手牵羊/反馈共用)。
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
+import { runPickTargetCardPanel } from './选牌面板';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '过河拆桥', description: '锦囊:弃置目标一张牌' };
-}
-
-/** 在 actionLog 中当前(最后一条)条目之前插入一条"设置手牌顺序"条目。
- *  重放时该条目先执行 → 目标 hand 顺序恢复 → 后续盲选取 hand[K] 确定性正确。
- *  去重:若前一条已是同 target 的设置手牌顺序且 order 一致,跳过(避免重放二次插入)。 */
-function spliceHandOrderEntry(state: GameState, target: number): void {
-  const player = state.players[target];
-  if (!player) return;
-  const order = [...player.hand];
-  if (order.length === 0) return;
-  const log = state.actionLog;
-  const myIndex = log.length - 1; // 当前条目位置
-  if (myIndex > 0) {
-    const prev = log[myIndex - 1];
-    if (
-      prev.message.skillId === '系统规则' &&
-      prev.message.actionType === '设置手牌顺序' &&
-      (prev.message.params.target as number) === target
-    ) {
-      const prevOrder = prev.message.params.order as string[];
-      if (
-        Array.isArray(prevOrder) &&
-        prevOrder.length === order.length &&
-        prevOrder.every((id, i) => id === order[i])
-      ) {
-        return; // 顺序未变,跳过
-      }
-    }
-  }
-  const entry: ActionLogEntry = {
-    id: `order-${log.length}-${target}`,
-    timestamp: Date.now() - state.startedAt,
-    message: {
-      skillId: '系统规则',
-      actionType: '设置手牌顺序',
-      ownerId: log[myIndex].message.ownerId,
-      params: { target, order },
-      baseSeq: log[myIndex].baseSeq,
-    },
-    baseSeq: log[myIndex].baseSeq,
-  };
-  log.splice(myIndex, 0, entry);
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
@@ -109,8 +69,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!cancelled) {
           const targetPlayer = state.players[target];
           if (targetPlayer) {
-            // 弹选牌面板:使用者从目标区域选一张牌
-            await runPickTargetCard(state, from, target, targetPlayer, /* obtain= */ false);
+            // 弹选牌面板:使用者从目标区域选一张牌弃置
+            await runPickTargetCardPanel(state, from, target, targetPlayer, {
+              mode: 'discard',
+              requestType: '过河拆桥_选牌',
+              title: '选择弃置的目标牌',
+            });
           }
         }
         // 移锦囊到弃牌堆
@@ -166,83 +130,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   return () => {};
-}
-
-/** 选牌面板:弹 pickTargetCard pending,超时兜底(明牌优先,否则盲选 hand[0])。 */
-async function runPickTargetCard(
-  state: GameState,
-  from: number,
-  target: number,
-  targetPlayer: GameState['players'][number],
-  obtain: boolean,
-): Promise<void> {
-  // 奇才(界黄月英):防具不可被弃置,从可选装备列表中过滤
-  const hasArmorProtection = state.players[target]?.tags.includes('奇才/防具保护');
-  const equipment = Object.entries(targetPlayer.equipment)
-    .filter(([, id]) => typeof id === 'string')
-    .filter(([slot]) => !(hasArmorProtection && slot === '防具'))
-    .map(([slot, id]) => ({ slot, cardId: id, cardName: state.cardMap[id]?.name ?? '?' }));
-  const judge = targetPlayer.pendingTricks.map((t) => ({
-    cardId: t.card.id,
-    cardName: t.card.name,
-  }));
-  const handCount = targetPlayer.hand.length;
-
-  // 超时默认选择:明牌优先(装备第一张→判定第一张),否则手牌[0]
-  const defaultZone =
-    equipment.length > 0
-      ? { zone: 'equipment', cardId: equipment[0].cardId }
-      : judge.length > 0
-        ? { zone: 'judge', cardId: judge[0].cardId }
-        : { zone: 'hand', handIndex: 0 };
-
-  // 手牌存在时,splice 顺序快照(重放确定性)
-  if (handCount > 0) {
-    spliceHandOrderEntry(state, target);
-  }
-
-  const requestType = obtain ? '顺手牵羊_选牌' : '过河拆桥_选牌';
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType,
-    target: from,
-    prompt: {
-      type: 'pickTargetCard',
-      title: obtain ? '选择获得的目标牌' : '选择弃置的目标牌',
-      target,
-      equipment,
-      judge,
-      handCount,
-    },
-    defaultChoice: defaultZone as unknown as Json,
-    timeout: 20,
-  });
-
-  // 读取使用者选择
-  const result = state.localVars['选牌/结果'] as
-    | { zone: string; cardId: string | null; handIndex: number | null }
-    | undefined;
-  delete state.localVars['选牌/结果'];
-  const zone = result?.zone ?? (defaultZone as { zone: string }).zone;
-
-  if (zone === 'equipment') {
-    const cardId = (result?.cardId ?? defaultZone.cardId) as string;
-    await applyAtom(state, { type: '弃置', player: target, cardIds: [cardId] });
-  } else if (zone === 'judge') {
-    const cardId = (result?.cardId ?? defaultZone.cardId) as string;
-    const trick = targetPlayer.pendingTricks.find((t) => t.card.id === cardId);
-    if (trick) {
-      await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: trick.name });
-      await applyAtom(state, { type: '弃置', player: target, cardIds: [cardId] });
-    }
-  } else {
-    // hand:盲选
-    const handIndex = result?.handIndex ?? 0;
-    const cardToDiscard = targetPlayer.hand[handIndex] ?? targetPlayer.hand[0];
-    if (cardToDiscard) {
-      await applyAtom(state, { type: '弃置', player: target, cardIds: [cardToDiscard] });
-    }
-  }
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {

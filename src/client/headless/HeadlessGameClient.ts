@@ -482,17 +482,25 @@ export class HeadlessGameClient {
       });
     }
     const reqType = getPendingRequestType(pending);
-    // pickTargetCard 类型 prompt（过河拆桥/顺手牵羊 选牌）：生成可选牌动作
+    // pickTargetCard 类型 prompt（过河拆桥/顺手牵羊/反馈 选牌）：生成可选牌动作。
+    // skillId 按 requestType 的首段（'过河拆桥_选牌'→'过河拆桥'、'反馈/选牌'→'反馈'）
+    // 与前端 resolvePendingRespond 一致；动作文案按 obtain/discard 区分。
     if (pending.prompt?.type === 'pickTargetCard') {
       const pickPrompt = pending.prompt;
       const targetIdx = pickPrompt.target;
       const targetPlayer = view.players[targetIdx];
+      // requestType 形如 '过河拆桥_选牌' / '顺手牵羊_选牌' / '反馈/选牌'
+      const sep = reqType.search(/[/_]/);
+      const pickSkillId = sep >= 0 ? reqType.slice(0, sep) : reqType;
+      // obtain=获得（顺手牵羊/反馈）；discard=弃置（过河拆桥）
+      const obtain = reqType.startsWith('顺手牵羊') || reqType.startsWith('反馈');
+      const verb = obtain ? '获得' : '弃置';
       // 装备牌（明牌）：每张一个 action
       for (const eq of (pickPrompt.equipment ?? [])) {
         out.push({
-          description: `弃置【${eq.cardName}】(装备)`,
+          description: `${verb}【${eq.cardName}】(装备)`,
           message: {
-            skillId: '过河拆桥',
+            skillId: pickSkillId,
             actionType: 'respond',
             ownerId,
             params: { zone: 'equipment', cardId: eq.cardId },
@@ -505,9 +513,9 @@ export class HeadlessGameClient {
       // 判定区牌（明牌）
       for (const j of (pickPrompt.judge ?? [])) {
         out.push({
-          description: `弃置【${j.cardName}】(判定区)`,
+          description: `${verb}【${j.cardName}】(判定区)`,
           message: {
-            skillId: '过河拆桥',
+            skillId: pickSkillId,
             actionType: 'respond',
             ownerId,
             params: { zone: 'judge', cardId: j.cardId },
@@ -521,9 +529,9 @@ export class HeadlessGameClient {
       const handCount = pickPrompt.handCount ?? targetPlayer?.handCount ?? 0;
       if (handCount > 0) {
         out.push({
-          description: `弃置手牌（第1张）`,
+          description: `${verb}手牌（第1张）`,
           message: {
-            skillId: '过河拆桥',
+            skillId: pickSkillId,
             actionType: 'respond',
             ownerId,
             params: { zone: 'hand', handIndex: 0 },

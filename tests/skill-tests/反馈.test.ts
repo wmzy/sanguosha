@@ -168,7 +168,7 @@ describe('反馈', () => {
 
   // ─── 端到端:伤害→反馈→获得牌 ─────────────────────
   // 来源: tests/integration/obtain-atom.test.ts test 4
-  it('反馈 端到端:P0 杀 P1 → P1 confirm → P0 不再持有被拿牌,P1 持有该牌', async () => {
+  it('反馈 端到端:P0 杀 P1 → P1 confirm=true → 盲选手牌 → P1 持有该牌', async () => {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
     const stolen: Card = makeCard('s1', '闪', '♥', '5');
 
@@ -207,6 +207,16 @@ describe('反馈', () => {
     expect(slotAtom.target).toBe(1);
     // P1 confirm=true 发动反馈
     await P1.respond('反馈', { choice: true });
+
+    // confirm 后弹选牌面板(请求回应/反馈/选牌,pickTargetCard prompt)
+    P1.expectPending('请求回应');
+    const pickSlot = [...harness.state.pendingSlots.values()][0];
+    const pickAtom = pickSlot.atom as { type: string; requestType?: string; target?: number };
+    expect(pickAtom.requestType).toBe('反馈/选牌');
+    // pickTargetCard prompt: 手牌+装备明牌(此处来源仅剩 1 张手牌)
+    expect((pickSlot.atom as { prompt?: { type?: string } }).prompt?.type).toBe('pickTargetCard');
+    // P1 盲选来源手牌 hand[0] = stolen(剩 1 张)
+    await P1.respond('反馈', { zone: 'hand', handIndex: 0 });
 
     // 关键合约:P0 不再持有被拿的牌
     expect(harness.state.players[0].hand).not.toContain(stolen.id);
@@ -259,5 +269,49 @@ describe('反馈', () => {
 
     // P1 手牌数不变(没拿牌)
     expect(harness.state.players[1].hand.length).toBe(p1HandBefore);
+  });
+
+  // ─── 端到端:选装备(反馈不止可拿手牌,还可拿装备) ─────────────
+  // 来源: 本用例覆盖选牌面板装备明选路径(zone=equipment),与盲选手牌互为补充。
+  it('反馈 端到端:来源仅剩装备 → 选装备 → P1 获得该装备,P0 装备区清空', async () => {
+    const slash: Card = makeCard('k1', '杀', '♠', '7');
+    const weapon: Card = makeCard('wp1', '诸葛连弩', '♣', 'A', '装备牌');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['反馈', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { [slash.id]: slash, [weapon.id]: weapon },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // P0 装备区装上武器(模拟已装备)
+    state.players[0].equipment['武器'] = weapon.id;
+    await harness.setup(state);
+
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    // P0 杀 P1(P0 出杀后手牌为空,仅剩装备可被反馈拿取)
+    await P0.useCardAndTarget('杀', slash.id, [1]);
+    await P1.pass(); // 不出闪
+    // confirm 发动反馈
+    await P1.respond('反馈', { choice: true });
+    // 选牌面板:来源(P0)仅装备可选 → 选装备
+    await P1.respond('反馈', { zone: 'equipment', cardId: weapon.id });
+
+    // P1 获得该装备牌(入手牌)
+    expect(harness.state.players[1].hand).toContain(weapon.id);
+    // P0 装备区清空
+    expect(harness.state.players[0].equipment['武器']).toBeUndefined();
   });
 });

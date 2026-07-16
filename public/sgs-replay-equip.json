@@ -1,0 +1,863 @@
+{
+  "format": "sanguosha-replay",
+  "version": 1,
+  "meta": {
+    "createdAt": 1784222381177,
+    "playerCount": 2,
+    "characters": [
+      "P0",
+      "P1"
+    ]
+  },
+  "seats": {
+    "0": {
+      "seatIndex": 0,
+      "playerName": "P0",
+      "initialView": {
+        "viewer": 0,
+        "currentPlayerIndex": 0,
+        "phase": "出牌",
+        "turn": {
+          "round": 1,
+          "phase": "出牌",
+          "vars": {}
+        },
+        "players": [
+          {
+            "index": 0,
+            "name": "P0",
+            "character": "P0",
+            "health": 4,
+            "maxHealth": 4,
+            "alive": true,
+            "equipment": {},
+            "skills": [
+              "杀",
+              "装备通用"
+            ],
+            "handCount": 2,
+            "hand": [
+              {
+                "id": "wp-zg",
+                "name": "诸葛连弩",
+                "suit": "♣",
+                "color": "黑",
+                "rank": "A",
+                "type": "装备牌",
+                "subtype": "武器",
+                "range": 1
+              },
+              {
+                "id": "k1",
+                "name": "杀",
+                "suit": "♠",
+                "color": "黑",
+                "rank": "7",
+                "type": "基本牌"
+              }
+            ],
+            "marks": [],
+            "distanceVars": {},
+            "turnUsage": {},
+            "pendingTricks": [],
+            "identityHidden": false
+          },
+          {
+            "index": 1,
+            "name": "P1",
+            "character": "P1",
+            "health": 4,
+            "maxHealth": 4,
+            "alive": true,
+            "equipment": {},
+            "skills": [
+              "闪"
+            ],
+            "handCount": 0,
+            "marks": [],
+            "distanceVars": {},
+            "turnUsage": {},
+            "pendingTricks": [],
+            "identityHidden": false
+          }
+        ],
+        "cardMap": {
+          "wp-zg": {
+            "id": "wp-zg",
+            "name": "诸葛连弩",
+            "suit": "♣",
+            "color": "黑",
+            "rank": "A",
+            "type": "装备牌",
+            "subtype": "武器",
+            "range": 1
+          },
+          "k1": {
+            "id": "k1",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "7",
+            "type": "基本牌"
+          },
+          "__test_deck_0": {
+            "id": "__test_deck_0",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "2",
+            "type": "基本牌"
+          },
+          "__test_deck_1": {
+            "id": "__test_deck_1",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "3",
+            "type": "基本牌"
+          },
+          "__test_deck_2": {
+            "id": "__test_deck_2",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "4",
+            "type": "基本牌"
+          },
+          "__test_deck_3": {
+            "id": "__test_deck_3",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "5",
+            "type": "基本牌"
+          },
+          "__test_deck_4": {
+            "id": "__test_deck_4",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "6",
+            "type": "基本牌"
+          },
+          "__test_deck_5": {
+            "id": "__test_deck_5",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "7",
+            "type": "基本牌"
+          },
+          "__test_deck_6": {
+            "id": "__test_deck_6",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "8",
+            "type": "基本牌"
+          },
+          "__test_deck_7": {
+            "id": "__test_deck_7",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "9",
+            "type": "基本牌"
+          },
+          "__test_deck_8": {
+            "id": "__test_deck_8",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "10",
+            "type": "基本牌"
+          },
+          "__test_deck_9": {
+            "id": "__test_deck_9",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "11",
+            "type": "基本牌"
+          },
+          "__test_deck_10": {
+            "id": "__test_deck_10",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "12",
+            "type": "基本牌"
+          },
+          "__test_deck_11": {
+            "id": "__test_deck_11",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "13",
+            "type": "基本牌"
+          },
+          "__test_deck_12": {
+            "id": "__test_deck_12",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "14",
+            "type": "基本牌"
+          },
+          "__test_deck_13": {
+            "id": "__test_deck_13",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "15",
+            "type": "基本牌"
+          },
+          "__test_deck_14": {
+            "id": "__test_deck_14",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "16",
+            "type": "基本牌"
+          },
+          "__test_deck_15": {
+            "id": "__test_deck_15",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "17",
+            "type": "基本牌"
+          },
+          "__test_deck_16": {
+            "id": "__test_deck_16",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "18",
+            "type": "基本牌"
+          },
+          "__test_deck_17": {
+            "id": "__test_deck_17",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "19",
+            "type": "基本牌"
+          },
+          "__test_deck_18": {
+            "id": "__test_deck_18",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "20",
+            "type": "基本牌"
+          },
+          "__test_deck_19": {
+            "id": "__test_deck_19",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "21",
+            "type": "基本牌"
+          }
+        },
+        "pending": null,
+        "deadline": null,
+        "deadlineTotalMs": 0,
+        "log": [],
+        "zones": {
+          "deckCount": 20,
+          "discardPileCount": 0,
+          "processing": []
+        },
+        "settlementStack": []
+      },
+      "events": [
+        {
+          "seq": 0,
+          "time": 1784222381153,
+          "event": {
+            "type": "结算帧入栈",
+            "skillId": "装备通用",
+            "from": 0,
+            "params": {
+              "cardId": "wp-zg"
+            }
+          }
+        },
+        {
+          "seq": 1,
+          "time": 1784222381153,
+          "event": {
+            "type": "装备",
+            "player": 0,
+            "cardId": "wp-zg",
+            "cardName": "诸葛连弩",
+            "slot": "武器",
+            "range": 1
+          }
+        },
+        {
+          "seq": 2,
+          "time": 1784222381153,
+          "event": {
+            "type": "添加技能",
+            "player": 0,
+            "skillId": "诸葛连弩"
+          }
+        },
+        {
+          "seq": 3,
+          "time": 1784222381153,
+          "event": {
+            "type": "结算帧出栈"
+          }
+        },
+        {
+          "seq": 4,
+          "time": 1784222381155,
+          "event": {
+            "type": "结算帧入栈",
+            "skillId": "杀",
+            "from": 0,
+            "params": {
+              "cardId": "k1",
+              "targets": [
+                1
+              ],
+              "resolvedTargets": [
+                1
+              ]
+            }
+          }
+        },
+        {
+          "seq": 5,
+          "time": 1784222381155,
+          "event": {
+            "type": "打出",
+            "player": 0,
+            "card": {
+              "name": "杀",
+              "suit": "♠",
+              "rank": "7"
+            },
+            "cardId": "k1",
+            "effect": {
+              "sound": "play_card",
+              "animation": "flip",
+              "duration": 800
+            },
+            "atomType": "移动牌"
+          }
+        },
+        {
+          "seq": 6,
+          "time": 1784222381155,
+          "event": {
+            "type": "指定目标",
+            "source": 0,
+            "target": 1,
+            "cardId": "k1",
+            "cardName": "杀"
+          }
+        },
+        {
+          "seq": 7,
+          "time": 1784222381155,
+          "event": {
+            "type": "成为目标",
+            "source": 0,
+            "target": 1,
+            "cardId": "k1"
+          }
+        },
+        {
+          "seq": 8,
+          "time": 1784222381155,
+          "event": {
+            "type": "询问闪",
+            "target": 1,
+            "source": 0,
+            "timeoutMs": 15000
+          }
+        },
+        {
+          "seq": 9,
+          "time": 1784222381177,
+          "event": {
+            "type": "notify",
+            "skillId": "",
+            "eventType": "pendingResolved",
+            "data": {
+              "target": 1,
+              "atomType": "询问闪"
+            }
+          }
+        },
+        {
+          "seq": 10,
+          "time": 1784222381177,
+          "event": {
+            "type": "造成伤害",
+            "target": 1,
+            "amount": 1,
+            "source": 0,
+            "effect": {
+              "sound": "damage_physical",
+              "animation": "shake",
+              "particles": "blood",
+              "duration": 1000
+            }
+          }
+        },
+        {
+          "seq": 11,
+          "time": 1784222381177,
+          "event": {
+            "type": "移动牌",
+            "cardId": "k1",
+            "from": {
+              "zone": "处理区"
+            },
+            "to": {
+              "zone": "弃牌堆"
+            }
+          }
+        },
+        {
+          "seq": 12,
+          "time": 1784222381177,
+          "event": {
+            "type": "结算帧出栈"
+          }
+        },
+        {
+          "seq": 13,
+          "time": 1784222381177,
+          "event": {
+            "type": "回合用量",
+            "player": 0,
+            "key": "杀/usedCount",
+            "value": 1
+          }
+        }
+      ]
+    },
+    "1": {
+      "seatIndex": 1,
+      "playerName": "P1",
+      "initialView": {
+        "viewer": 1,
+        "currentPlayerIndex": 0,
+        "phase": "出牌",
+        "turn": {
+          "round": 1,
+          "phase": "出牌",
+          "vars": {}
+        },
+        "players": [
+          {
+            "index": 0,
+            "name": "P0",
+            "character": "P0",
+            "health": 4,
+            "maxHealth": 4,
+            "alive": true,
+            "equipment": {},
+            "skills": [
+              "杀",
+              "装备通用"
+            ],
+            "handCount": 2,
+            "marks": [],
+            "distanceVars": {},
+            "turnUsage": {},
+            "pendingTricks": [],
+            "identityHidden": false
+          },
+          {
+            "index": 1,
+            "name": "P1",
+            "character": "P1",
+            "health": 4,
+            "maxHealth": 4,
+            "alive": true,
+            "equipment": {},
+            "skills": [
+              "闪"
+            ],
+            "handCount": 0,
+            "hand": [],
+            "marks": [],
+            "distanceVars": {},
+            "turnUsage": {},
+            "pendingTricks": [],
+            "identityHidden": false
+          }
+        ],
+        "cardMap": {
+          "wp-zg": {
+            "id": "wp-zg",
+            "name": "诸葛连弩",
+            "suit": "♣",
+            "color": "黑",
+            "rank": "A",
+            "type": "装备牌",
+            "subtype": "武器",
+            "range": 1
+          },
+          "k1": {
+            "id": "k1",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "7",
+            "type": "基本牌"
+          },
+          "__test_deck_0": {
+            "id": "__test_deck_0",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "2",
+            "type": "基本牌"
+          },
+          "__test_deck_1": {
+            "id": "__test_deck_1",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "3",
+            "type": "基本牌"
+          },
+          "__test_deck_2": {
+            "id": "__test_deck_2",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "4",
+            "type": "基本牌"
+          },
+          "__test_deck_3": {
+            "id": "__test_deck_3",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "5",
+            "type": "基本牌"
+          },
+          "__test_deck_4": {
+            "id": "__test_deck_4",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "6",
+            "type": "基本牌"
+          },
+          "__test_deck_5": {
+            "id": "__test_deck_5",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "7",
+            "type": "基本牌"
+          },
+          "__test_deck_6": {
+            "id": "__test_deck_6",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "8",
+            "type": "基本牌"
+          },
+          "__test_deck_7": {
+            "id": "__test_deck_7",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "9",
+            "type": "基本牌"
+          },
+          "__test_deck_8": {
+            "id": "__test_deck_8",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "10",
+            "type": "基本牌"
+          },
+          "__test_deck_9": {
+            "id": "__test_deck_9",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "11",
+            "type": "基本牌"
+          },
+          "__test_deck_10": {
+            "id": "__test_deck_10",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "12",
+            "type": "基本牌"
+          },
+          "__test_deck_11": {
+            "id": "__test_deck_11",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "13",
+            "type": "基本牌"
+          },
+          "__test_deck_12": {
+            "id": "__test_deck_12",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "14",
+            "type": "基本牌"
+          },
+          "__test_deck_13": {
+            "id": "__test_deck_13",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "15",
+            "type": "基本牌"
+          },
+          "__test_deck_14": {
+            "id": "__test_deck_14",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "16",
+            "type": "基本牌"
+          },
+          "__test_deck_15": {
+            "id": "__test_deck_15",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "17",
+            "type": "基本牌"
+          },
+          "__test_deck_16": {
+            "id": "__test_deck_16",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "18",
+            "type": "基本牌"
+          },
+          "__test_deck_17": {
+            "id": "__test_deck_17",
+            "name": "桃",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "19",
+            "type": "基本牌"
+          },
+          "__test_deck_18": {
+            "id": "__test_deck_18",
+            "name": "杀",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "20",
+            "type": "基本牌"
+          },
+          "__test_deck_19": {
+            "id": "__test_deck_19",
+            "name": "闪",
+            "suit": "♠",
+            "color": "黑",
+            "rank": "21",
+            "type": "基本牌"
+          }
+        },
+        "pending": null,
+        "deadline": null,
+        "deadlineTotalMs": 0,
+        "log": [],
+        "zones": {
+          "deckCount": 20,
+          "discardPileCount": 0,
+          "processing": []
+        },
+        "settlementStack": []
+      },
+      "events": [
+        {
+          "seq": 0,
+          "time": 1784222381153,
+          "event": {
+            "type": "结算帧入栈",
+            "skillId": "装备通用",
+            "from": 0,
+            "params": {
+              "cardId": "wp-zg"
+            }
+          }
+        },
+        {
+          "seq": 1,
+          "time": 1784222381153,
+          "event": {
+            "type": "装备",
+            "player": 0,
+            "cardId": "wp-zg",
+            "cardName": "诸葛连弩",
+            "slot": "武器",
+            "range": 1
+          }
+        },
+        {
+          "seq": 2,
+          "time": 1784222381153,
+          "event": {
+            "type": "添加技能",
+            "player": 0,
+            "skillId": "诸葛连弩"
+          }
+        },
+        {
+          "seq": 3,
+          "time": 1784222381153,
+          "event": {
+            "type": "结算帧出栈"
+          }
+        },
+        {
+          "seq": 4,
+          "time": 1784222381155,
+          "event": {
+            "type": "结算帧入栈",
+            "skillId": "杀",
+            "from": 0,
+            "params": {
+              "cardId": "k1",
+              "targets": [
+                1
+              ],
+              "resolvedTargets": [
+                1
+              ]
+            }
+          }
+        },
+        {
+          "seq": 5,
+          "time": 1784222381155,
+          "event": {
+            "type": "打出",
+            "player": 0,
+            "card": {
+              "name": "杀",
+              "suit": "♠",
+              "rank": "7"
+            },
+            "cardId": "k1",
+            "effect": {
+              "sound": "play_card",
+              "animation": "flip",
+              "duration": 800
+            },
+            "atomType": "移动牌"
+          }
+        },
+        {
+          "seq": 6,
+          "time": 1784222381155,
+          "event": {
+            "type": "指定目标",
+            "source": 0,
+            "target": 1,
+            "cardId": "k1",
+            "cardName": "杀"
+          }
+        },
+        {
+          "seq": 7,
+          "time": 1784222381155,
+          "event": {
+            "type": "成为目标",
+            "source": 0,
+            "target": 1,
+            "cardId": "k1"
+          }
+        },
+        {
+          "seq": 8,
+          "time": 1784222381155,
+          "event": {
+            "type": "询问闪",
+            "target": 1,
+            "source": 0,
+            "timeoutMs": 15000
+          }
+        },
+        {
+          "seq": 9,
+          "time": 1784222381177,
+          "event": {
+            "type": "notify",
+            "skillId": "",
+            "eventType": "pendingResolved",
+            "data": {
+              "target": 1,
+              "atomType": "询问闪"
+            }
+          }
+        },
+        {
+          "seq": 10,
+          "time": 1784222381177,
+          "event": {
+            "type": "造成伤害",
+            "target": 1,
+            "amount": 1,
+            "source": 0,
+            "effect": {
+              "sound": "damage_physical",
+              "animation": "shake",
+              "particles": "blood",
+              "duration": 1000
+            }
+          }
+        },
+        {
+          "seq": 11,
+          "time": 1784222381177,
+          "event": {
+            "type": "移动牌",
+            "cardId": "k1",
+            "from": {
+              "zone": "处理区"
+            },
+            "to": {
+              "zone": "弃牌堆"
+            }
+          }
+        },
+        {
+          "seq": 12,
+          "time": 1784222381177,
+          "event": {
+            "type": "结算帧出栈"
+          }
+        },
+        {
+          "seq": 13,
+          "time": 1784222381177,
+          "event": {
+            "type": "回合用量",
+            "player": 0,
+            "key": "杀/usedCount",
+            "value": 1
+          }
+        }
+      ]
+    }
+  }
+}

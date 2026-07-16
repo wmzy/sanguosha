@@ -221,6 +221,8 @@ describe('用户报告问题回归', () => {
     // 反馈 pending
     expect(h.state.pendingSlots.size).toBeGreaterThan(0);
     await P1.respond('反馈', { choice: true });
+    // 选牌面板:P1 选 P0 手牌(hand[0]=ex1,P0 出杀后剩 ex1)
+    await P1.respond('反馈', { zone: 'hand', handIndex: 0 });
     // P1 应拿到 P0 的 ex1
     expect(h.state.players[1].hand).toContain('ex1');
     expect(h.state.players[0].hand).not.toContain('ex1');

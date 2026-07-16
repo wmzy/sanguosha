@@ -1,8 +1,22 @@
 // 反馈(司马懿·被动技):当你受到伤害后,你可以获得伤害来源的一张牌。
-// 反馈(司马懿·被动技):当你受到伤害后,你可以获得伤害来源的一张牌。
-import type { AtomAfterContext, FrontendAPI, Skill, GameState } from '../types';
+//
+// 实现(被动 after-hook + 两步 respond):
+//   造成伤害 after-hook(target===ownerId, source 存活):
+//     1. 询问是否发动(请求回应 requestType='反馈/confirm',confirm prompt)
+//     2. confirm 后弹选牌面板(请求回应 requestType='反馈/选牌',pickTargetCard prompt):
+//        使用者从来源区域选一张牌获得(手牌盲选 / 装备明选)。经典规则不含判定区。
+//
+// 关键点:
+//   - 一个技能实例仅能注册一个 respond action(actionKey 冲突),故 confirm 与选牌
+//     合并为单 respond 按 requestType 分支(同固政/双雄模式)。
+//   - requestType '反馈/选牌' 经 resolvePendingRespond 按 [/_] 分割得 skillId='反馈',
+//     前端 pickTargetCard 渲染与无头客户端 availableActions 自动路由(不再硬编码)。
+//   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ./选牌面板.ts);反馈为 obtain 模式,
+//     includeJudge=false(经典规则仅手牌+装备)。
+import type { AtomAfterContext, FrontendAPI, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { runPickTargetCardPanel } from './选牌面板';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -13,24 +27,52 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
+export function onInit(skill: Skill, state: import('../types').GameState): () => void {
   const ownerId = skill.ownerId;
-  // respond:被询问"是否发动反馈"时回应,设 localVars 标记结果
+  // respond:被询问时回应。按 requestType 分两步:
+  //   '反馈/confirm' → 设 localVars 标记是否发动
+  //   '反馈/选牌'    → 设 localVars['选牌/结果'](由 选牌面板.ts 读取)
   registerAction(
     state,
     skill.id,
     ownerId,
     'respond',
-    (state, _params) => {
-      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (
-        state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
-      ).requestType as string;
-      if (requestType !== '反馈/confirm') return '当前不是反馈确认';
-      return null;
+    (state, params) => {
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if (slot.atom.type !== '请求回应') return '当前不需要回应';
+      const requestType = (slot.atom as { requestType?: string }).requestType;
+      if (requestType === '反馈/confirm') {
+        // confirm:接受 choice/confirmed 布尔
+        return null;
+      }
+      if (requestType === '反馈/选牌') {
+        // 选牌面板:校验 zone + cardId/handIndex(同过河拆桥/顺手牵羊)
+        const zone = params.zone;
+        if (zone === 'equipment') {
+          if (typeof params.cardId !== 'string') return 'cardId required';
+        } else if (zone === 'hand') {
+          if (typeof params.handIndex !== 'number') return 'handIndex required';
+        } else {
+          return 'zone required (equipment|hand)';
+        }
+        return null;
+      }
+      return '当前不是反馈回应';
     },
     async (state, params) => {
-      state.localVars['反馈/confirmed'] = params.choice === true || params.confirmed === true;
+      const slot = state.pendingSlots.get(ownerId);
+      const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      if (requestType === '反馈/confirm') {
+        state.localVars['反馈/confirmed'] =
+          params.choice === true || params.confirmed === true;
+      } else if (requestType === '反馈/选牌') {
+        state.localVars['选牌/结果'] = {
+          zone: params.zone,
+          cardId: params.cardId ?? null,
+          handIndex: params.handIndex ?? null,
+        };
+      }
     },
   );
 
@@ -41,6 +83,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.source === undefined) return;
     const sourcePlayer = ctx.state.players[atom.source];
     if (!sourcePlayer?.alive) return;
+    // 反馈(经典):仅手牌+装备,不含判定区
     const hasCards = sourcePlayer.hand.length > 0 || Object.keys(sourcePlayer.equipment).length > 0;
     if (!hasCards) return;
 
@@ -61,22 +104,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
     if (!ctx.state.localVars['反馈/confirmed']) return;
 
-    // 获得来源的一张牌(优先手牌第一张,其次装备)
+    // 弹选牌面板:从来源区域选一张牌获得(手牌盲选 / 装备明选,不含判定区)
     const source = ctx.state.players[atom.source];
     if (!source) return;
-    let cardId: string | undefined;
-    if (source.hand.length > 0) {
-      cardId = source.hand[0];
-      await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: atom.source });
-    } else {
-      const equipSlot = Object.keys(source.equipment)[0] as keyof typeof source.equipment;
-      if (equipSlot) {
-        cardId = source.equipment[equipSlot];
-        if (cardId) {
-          await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: atom.source });
-        }
-      }
-    }
+    await runPickTargetCardPanel(ctx.state, ownerId, atom.source, source, {
+      mode: 'obtain',
+      requestType: '反馈/选牌',
+      title: '反馈:选择获得来源的一张牌',
+      includeJudge: false,
+    });
   });
   return () => {};
 }
