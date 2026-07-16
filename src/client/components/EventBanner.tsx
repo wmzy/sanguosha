@@ -19,18 +19,24 @@ import type { GameView, Card } from '../../engine/types';
 import { getAtomDef } from '../../engine/atom';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
+/** ViewEvent 自带的 effect 片段(移动牌等派生事件携带;静态 atom 走 getAtomDef) */
+type EventEffect = { animation?: string; duration?: number } | undefined;
+
 export interface EventBannerProps {
   /** 当前播放的事件(null = 空闲,不渲染) */
   current: QueuedEvent | null;
   view: GameView;
 }
 
-export function EventBanner({ current, view: _view }: EventBannerProps) {
+export function EventBanner({ current, view }: EventBannerProps) {
   if (!current) return null;
 
-  const type = current.event.atomType ?? current.event.type;
-  const def = getAtomDef(type);
-  const effect = def.effect;
+  const atomType = current.event.atomType ?? current.event.type;
+  const def = getAtomDef(atomType);
+  // 优先用 ViewEvent 自带 effect(移动牌派生的「打出」等事件),fallback 到 atom 静态 effect。
+  // 移动牌 是底层通用 atom 无静态 effect,其 toViewEvents 为各语义分支(打出/弃牌/摸牌)
+  // 单独构造 effect,必须从这里取,否则 animation/duration 查不到。
+  const effect = (current.event.effect as EventEffect) ?? def.effect;
 
   // 只处理 flip 动画类型(翻牌动效)
   if (effect?.animation !== 'flip') return null;
@@ -39,9 +45,20 @@ export function EventBanner({ current, view: _view }: EventBannerProps) {
   const card = current.event.card as Pick<Card, 'name' | 'suit' | 'rank'> | undefined;
   if (!card) return null;
 
+  const eventType = current.event.type;
+  const player = current.event.player as number | undefined;
+  // 自己出牌:usePlayInteraction 已触发 createCardFlyAnimation(手牌→中央),
+  // 跳过中央翻牌避免重复动画;仅为他人生成翻牌动效。
+  if (eventType === '打出' && player !== undefined && player === view.viewer) return null;
+
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
   // 判定事件额外显示 judgeType 标签
   const judgeType = current.event.judgeType as string | undefined;
+  // 打出事件:显示来源玩家名(让其它玩家看清谁出了什么牌)
+  const playerName =
+    eventType === '打出' && player !== undefined
+      ? view.players.find((p) => p.index === player)?.name
+      : undefined;
 
   return (
     <div className={styles.eventCardLayer}>
@@ -56,6 +73,8 @@ export function EventBanner({ current, view: _view }: EventBannerProps) {
       >
         {/* judgeType 小标签(判定事件) */}
         {judgeType && <div className={styles.eventCardLabel}>{judgeType}</div>}
+        {/* 来源玩家名(打出事件) */}
+        {playerName && <div className={styles.eventCardPlayer}>{playerName}</div>}
         {/* 卡牌主体 */}
         <div className={styles.eventCardBody}>
           <div className={styles.eventCardName}>{card.name}</div>

@@ -59,9 +59,12 @@ export function useEventPlayback() {
     }
     isPlayingRef.current = true;
     setCurrent(next);
-    // duration 从 AtomDefinition.effect 静态查表获取(ViewEvent 不再携带 effect)
+    // duration 优先取 ViewEvent 自带 effect(移动牌等派生事件携带),
+    // fallback 到 AtomDefinition.effect 静态查表(判定/展示等)。
     const type = next.event.atomType ?? next.event.type;
-    const duration = getAtomDef(type).effect?.duration ?? MIN_VISIBLE_MS;
+    const staticEffect = getAtomDef(type).effect;
+    const eventEffect = next.event.effect as { duration?: number } | undefined;
+    const duration = eventEffect?.duration ?? staticEffect?.duration ?? MIN_VISIBLE_MS;
     const wait = Math.max(duration, MIN_VISIBLE_MS);
     timerRef.current = setTimeout(() => {
       lastPlayedSeqRef.current = next.seq;

@@ -17,6 +17,7 @@ import { ReplayRecorder } from '../replay/recorder';
 import type { ReplayMeta } from '../replay/types';
 import { apiFetch } from '../api/client';
 import { getPlayerId } from '../utils/playerIdentity';
+import { useEventPlayback } from './useEventPlayback';
 
 const log = createLogger('useMultiplayerRoom');
 
@@ -85,6 +86,8 @@ export interface MultiplayerRoom {
   updateConfig: (config: RoomConfig, maxPlayers?: number) => void;
   /** 当前连接状态(供 UI 显示连接/重连提示) */
   connectionState: ConnectionState;
+  /** 当前播放的事件(供 GameViewComponent 中央动效展示:他人出牌/判定翻牌等) */
+  currentEvent: import('./useEventPlayback').QueuedEvent | null;
   /** 当前重连尝试次数(0=未在重连) */
   reconnectAttempt: number;
   /** 手动取消重连 */
@@ -122,6 +125,14 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
   const hgcRef = useRef<HeadlessGameClient | null>(null);
   const recorderRef = useRef<ReplayRecorder>(new ReplayRecorder());
+
+  // 事件播放队列:把后端 event 消息按 seq 入队,逐个暴露给 GameViewComponent 中央动效。
+  // 用 ref 在 onMessage 闭包中取最新 playback,避免闭包竞态。
+  const playback = useEventPlayback();
+  const playbackRef = useRef(playback);
+  useEffect(() => {
+    playbackRef.current = playback;
+  }, [playback]);
 
   const serverUrl = window.location.origin;
 
@@ -186,6 +197,11 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           setStage('waiting');
           setChatMessages([]);
           recorderRef.current.reset();
+          playbackRef.current.reset(0);
+        }
+        if (msg.type === 'event' && msg.view) {
+          // 事件播放:他人出牌/判定翻牌等中央动效(供 GameViewComponent 中央展示)
+          playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
         }
         if (msg.type === 'error') {
           setError(msg.message);
@@ -330,6 +346,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setPlayerId(null);
     setChatMessages([]);
     setIncomingSeatSwap(null);
+    playbackRef.current.reset(0);
   }, []);
 
   const sendAction = useCallback((action: ActionMsg) => {
@@ -492,6 +509,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     connectionState,
     reconnectAttempt,
     cancelReconnect,
+    currentEvent: playback.current,
     recorder: {
       finalize: (meta) => recorderRef.current.finalize(meta),
       hasData: () => recorderRef.current.hasData(),

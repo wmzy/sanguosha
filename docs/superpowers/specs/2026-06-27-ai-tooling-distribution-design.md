@@ -228,7 +228,7 @@ npx skills add wmzy/sanguosha
 - **不发布引擎为独立 npm 包**——MCP 单文件 bundle 已内含所需引擎/客户端代码。
 - **不迁移/改造现有 `.claude/skills/` 开发 skill 位置**——仅加 internal 标记。
 - **不做公开服务器部署**——服务器由用户维护，本设计只约定 `SGS_SERVER_URL` 契约。
-- **不引入 changeset/monorepo/额外打包工具**。
+- **不引入 changeset/额外打包工具**（项目是单包，不是 monorepo，不需要 changeset）。
 
 ## 八、风险与决策记录
 

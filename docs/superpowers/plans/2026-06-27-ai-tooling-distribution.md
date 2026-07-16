@@ -13,7 +13,7 @@
 **关键约束（来自 spec，实现时不可违背）:**
 - `npx skills` 只装 skill 不装 MCP——MCP 安装靠各 agent 配置 + 文档，不写自安装器。
 - 不引入新的打包工具（只用已有的 Vite）。
-- 不改 monorepo 结构。
+- 不改项目结构（当前是单包项目，不是 monorepo）。
 
 ---
 

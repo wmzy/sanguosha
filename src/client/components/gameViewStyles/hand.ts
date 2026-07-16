@@ -47,6 +47,15 @@ export const eventCardLabel = css`
   border-radius: 8px;
   border: 1px solid rgba(155, 89, 182, 0.4);
 `;
+export const eventCardPlayer = css`
+  font-size: 12px;
+  font-weight: bold;
+  color: #6fc3ff;
+  background: rgba(52, 152, 219, 0.18);
+  padding: 1px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(52, 152, 219, 0.4);
+`;
 export const eventCardBody = css`
   min-width: 60px;
   padding: 8px 12px;

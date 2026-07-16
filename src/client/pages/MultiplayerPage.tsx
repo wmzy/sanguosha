@@ -491,7 +491,7 @@ export function MultiplayerPage() {
             </button>
           </div>
           {/* 玩家视角的审批提示（仅当该玩家也在页面上时可见——但旁观者只看自己，所以审批由 playing 阶段处理） */}
-          <GameViewComponent view={mp.view} onAction={() => {}} onReorderHand={() => {}} />
+          <GameViewComponent view={mp.view} onAction={() => {}} onReorderHand={() => {}} currentEvent={mp.currentEvent} />
         </div>
       </>
     );
@@ -562,7 +562,7 @@ export function MultiplayerPage() {
       <>
         {reconnectBanner}
         <div className={gameWrap}>
-          <GameViewComponent view={mp.view} onAction={handleAction} onReorderHand={mp.reorderHand} />
+          <GameViewComponent view={mp.view} onAction={handleAction} onReorderHand={mp.reorderHand} currentEvent={mp.currentEvent} />
           <ChatPanel
             messages={mp.chatMessages}
             config={mp.roomState?.config?.chat}
