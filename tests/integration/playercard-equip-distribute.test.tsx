@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { EquipColumn } from '../../src/client/components/EquipColumn';
+import { EQUIP_SLOT_ICON } from '../../src/client/components/gameViewConstants';
 import * as styles from '../../src/client/components/gameViewStyles';
 import type { GameView } from '../../src/engine/types';
 
@@ -200,5 +201,16 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     for (const slot of ['防具', '进攻马', '防御马', '宝物']) {
       expect(screen.getByText(slot).className).toContain(styles.equipSlotEmptyLabel);
     }
+  });
+
+  // ── 装备槽图标符号契约(防 +/- 被改反)──
+  // 进攻马=-1马(赤兔/紫骍/大宛):你与其他角色距离-1,符号应为 '-'
+  // 防御马=+1马(的卢/绝影/爪黄飞电):其他角色与你距离+1,符号应为 '+'
+  // 历史 bug:EQUIP_SLOT_ICON 曾把 进攻马/防御马 的 +/- 符号写反。
+  it('装备槽图标符号正确:进攻马=🐎-(距离-1),防御马=🐎+(距离+1)', () => {
+    expect(EQUIP_SLOT_ICON['进攻马']).toContain('-');
+    expect(EQUIP_SLOT_ICON['进攻马']).not.toContain('+');
+    expect(EQUIP_SLOT_ICON['防御马']).toContain('+');
+    expect(EQUIP_SLOT_ICON['防御马']).not.toContain('-');
   });
 });

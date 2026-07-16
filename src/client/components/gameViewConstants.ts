@@ -24,8 +24,8 @@ export const EQUIPMENT_SKILL_NAMES: ReadonlySet<string> = getEquipmentSkillNames
 export const EQUIP_SLOT_ICON: Record<EquipSlot, string> = {
   武器: '⚔',
   防具: '🛡',
-  进攻马: '🐎+',
-  防御马: '🐎-',
+  进攻马: '🐎-', // 进攻马=-1马:你与其他角色距离-1
+  防御马: '🐎+', // 防御马=+1马:其他角色与你距离+1
   宝物: '💎',
 };
 
