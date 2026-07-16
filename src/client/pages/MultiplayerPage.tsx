@@ -946,7 +946,8 @@ export function MultiplayerPage() {
               min={2}
               max={8}
               value={createMax}
-              onChange={(e) => setCreateMax(Math.min(Math.max(Number(e.target.value) || 2, 2), 8))}
+              onChange={(e) => setCreateMax(Number(e.target.value) || 0)}
+              onBlur={() => setCreateMax(Math.min(Math.max(createMax || 2, 2), 8))}
             />
             <label className={label}>房间类型</label>
             <select
