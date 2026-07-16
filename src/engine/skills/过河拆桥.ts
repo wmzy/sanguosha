@@ -76,9 +76,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
             if (!state.players[t]?.alive) return '目标已死亡';
             const p = state.players[t];
             if (!p) return '目标不合法';
+            // 奇才(界黄月英):防具不可被弃置,排除后判断是否有可弃置的牌
+            const hasArmorProtection = p.tags.includes('奇才/防具保护');
+            const discardableEquip = Object.keys(p.equipment).filter(
+              (slot) => !(hasArmorProtection && slot === '防具'),
+            );
             const hasCards =
               p.hand.length > 0 ||
-              Object.keys(p.equipment).length > 0 ||
+              discardableEquip.length > 0 ||
               p.pendingTricks.length > 0;
             if (!hasCards) return '目标无可弃置的牌';
           }
@@ -171,8 +176,11 @@ async function runPickTargetCard(
   targetPlayer: GameState['players'][number],
   obtain: boolean,
 ): Promise<void> {
+  // 奇才(界黄月英):防具不可被弃置,从可选装备列表中过滤
+  const hasArmorProtection = state.players[target]?.tags.includes('奇才/防具保护');
   const equipment = Object.entries(targetPlayer.equipment)
     .filter(([, id]) => typeof id === 'string')
+    .filter(([slot]) => !(hasArmorProtection && slot === '防具'))
     .map(([slot, id]) => ({ slot, cardId: id, cardName: state.cardMap[id]?.name ?? '?' }));
   const judge = targetPlayer.pendingTricks.map((t) => ({
     cardId: t.card.id,

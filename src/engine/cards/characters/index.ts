@@ -19,20 +19,35 @@ export { 邓艾 } from './邓艾';
 
 // 蜀
 export { 刘备 } from './刘备';
+export { 界刘备 } from './界刘备';
 export { 关羽 } from './关羽';
+export { 界关羽 } from './界关羽';
 export { 张飞 } from './张飞';
+export { 界张飞 } from './界张飞';
 export { 赵云 } from './赵云';
+export { 界赵云 } from './界赵云';
 export { 诸葛亮 } from './诸葛亮';
+export { 界诸葛亮 } from './界诸葛亮';
 export { 黄月英 } from './黄月英';
+export { 界黄月英 } from './界黄月英';
 export { 马超 } from './马超';
+export { 界马超 } from './界马超';
 export { 黄忠 } from './黄忠';
+export { 界黄忠 } from './界黄忠';
 export { 魏延 } from './魏延';
+export { 界魏延 } from './界魏延';
 export { 卧龙诸葛 } from './卧龙诸葛';
+export { 界卧龙诸葛 } from './界卧龙诸葛';
 export { 庞统 } from './庞统';
+export { 界庞统 } from './界庞统';
 export { 孟获 } from './孟获';
+export { 界孟获 } from './界孟获';
 export { 祝融 } from './祝融';
+export { 界祝融 } from './界祝融';
 export { 姜维 } from './姜维';
+export { 界姜维 } from './界姜维';
 export { 刘禅 } from './刘禅';
+export { 界刘禅 } from './界刘禅';
 
 // 吴
 export { 孙权 } from './孙权';
@@ -82,20 +97,35 @@ import { 徐晃 } from './徐晃';
 import { 张郃 } from './张郃';
 import { 邓艾 } from './邓艾';
 import { 刘备 } from './刘备';
+import { 界刘备 } from './界刘备';
 import { 关羽 } from './关羽';
+import { 界关羽 } from './界关羽';
 import { 张飞 } from './张飞';
+import { 界张飞 } from './界张飞';
 import { 赵云 } from './赵云';
+import { 界赵云 } from './界赵云';
 import { 诸葛亮 } from './诸葛亮';
+import { 界诸葛亮 } from './界诸葛亮';
 import { 黄月英 } from './黄月英';
+import { 界黄月英 } from './界黄月英';
 import { 马超 } from './马超';
+import { 界马超 } from './界马超';
 import { 黄忠 } from './黄忠';
+import { 界黄忠 } from './界黄忠';
 import { 魏延 } from './魏延';
+import { 界魏延 } from './界魏延';
 import { 卧龙诸葛 } from './卧龙诸葛';
+import { 界卧龙诸葛 } from './界卧龙诸葛';
 import { 庞统 } from './庞统';
+import { 界庞统 } from './界庞统';
 import { 孟获 } from './孟获';
+import { 界孟获 } from './界孟获';
 import { 祝融 } from './祝融';
+import { 界祝融 } from './界祝融';
 import { 姜维 } from './姜维';
+import { 界姜维 } from './界姜维';
 import { 刘禅 } from './刘禅';
+import { 界刘禅 } from './界刘禅';
 import { 孙权 } from './孙权';
 import { 甘宁 } from './甘宁';
 import { 吕蒙 } from './吕蒙';
@@ -143,20 +173,34 @@ export const weiCharacters = [
 ];
 export const shuCharacters = [
   刘备,
+  界刘备,
   关羽,
+  界关羽,
   张飞,
+  界张飞,
   赵云,
-  诸葛亮,
+  界赵云,
   黄月英,
+  界黄月英,
   马超,
+  界马超,
   黄忠,
+  界黄忠,
   魏延,
+  界魏延,
   卧龙诸葛,
+  界卧龙诸葛,
+  界诸葛亮,
   庞统,
+  界庞统,
   孟获,
+  界孟获,
   祝融,
+  界祝融,
   姜维,
+  界姜维,
   刘禅,
+  界刘禅,
 ];
 export const wuCharacters = [
   孙权,

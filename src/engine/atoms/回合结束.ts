@@ -13,11 +13,14 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
     state.turn.vars = {};
     for (const p of state.players) {
       p.marks = p.marks.filter((m) => m.duration !== 'turn');
-      // 清理所有 per-turn 标记(约定后缀):/usedThisTurn(限一次)、/healed(已回血)、/givenCount(累计计数)
+      // 清理所有 per-turn 标记(约定后缀):/usedThisTurn(限一次)、/healed(已回血)、/givenCount(累计计数)、/givenTargets(界仁德已给目标)
       p.vars = Object.fromEntries(
         Object.entries(p.vars).filter(
           ([k]) =>
-            !k.endsWith('/usedThisTurn') && !k.endsWith('/healed') && !k.endsWith('/givenCount'),
+            !k.endsWith('/usedThisTurn') &&
+            !k.endsWith('/healed') &&
+            !k.endsWith('/givenCount') &&
+            !k.endsWith('/givenTargets'),
         ),
       );
     }
