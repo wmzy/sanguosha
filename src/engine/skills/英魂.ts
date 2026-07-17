@@ -1,11 +1,14 @@
-// 英魂(孙坚·主动技):回合开始阶段,若你已受伤,可令一名其他角色选择一项:
-//   1.摸X张牌再弃一张牌;2.摸一张牌再弃X张牌(X为你已损失体力值)。每回合限一次。
+// 英魂(孙坚·主动技):准备阶段,若你已受伤,你可以选择一名其他角色并选择
+//   一项令其执行之:1.摸X张牌并弃置一张牌;2.摸一张牌并弃置X张牌
+//   (X为你已损失的体力值)。
 //
-// 模式:阶段开始(准备) before-hook 触发("准备"阶段即"回合开始阶段")。
-//   准备阶段 → 已受伤(HP<上限) → 询问孙坚是否发动 → 选一名其他角色 →
-//   该角色二选一(摸X弃1 / 摸1弃X) → 执行摸牌 + 目标自选弃牌。
+// 模式:准备阶段 before-hook 触发("准备"阶段即"回合开始阶段")。
+//   准备阶段 → 已受伤(HP<上限) → 询问孙坚是否发动 → 孙坚选目标 →
+//   孙坚自己选方案(摸X弃1 / 摸1弃X)→ 目标摸牌 → 目标自选弃牌。
 //
-// 关键点:
+// 关键点(标版BUG修复,2026-07):
+//   - 原实现把"选择方案"的决策错给到目标(OPTION_RT 询问 target),与官方"孙坚自己选"
+//     不符。官方明确是孙坚选摸弃方案,目标只负责摸牌+自选弃牌。修正为询问 ownerId。
 //   - X = 孙坚体力上限 - 当前体力值(已损失体力值)。
 //   - 目标自己选弃哪些牌(标准规则:弃自己的牌由自己选)。
 //   - 弃牌数 clamp 到目标当前手牌数(手牌不足时弃光)。
@@ -26,7 +29,7 @@ import { registerAction, registerBeforeHook } from '../skill';
 
 const CONFIRM_RT = '英魂/confirm'; // 孙坚:是否发动
 const TARGET_RT = '英魂/target'; // 孙坚:选目标
-const OPTION_RT = '英魂/option'; // 目标:二选一
+const OPTION_RT = '英魂/option'; // 孙坚:选方案(摸X弃1 / 摸1弃X)
 const DISCARD_RT = '英魂/discard'; // 目标:选弃牌
 
 const CONFIRMED_KEY = '英魂/confirmed';
@@ -156,16 +159,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (typeof target !== 'number') return;
       if (!ctx.state.players[target]?.alive) return;
 
-      // 3) 目标二选一(超时默认选项1)
+      // 3) 孙坚自己选方案(超时默认选项1)。官方:"孙坚自己选择摸弃方案"。
       delete ctx.state.localVars[OPTION_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
         requestType: OPTION_RT,
-        target,
+        target: ownerId,
         prompt: {
           type: 'confirm',
-          title: `英魂:选择一项(孙坚已损失 ${x} 体力)`,
-          description: `选项1:摸${x}张牌再弃1张牌;选项2:摸1张牌再弃${x}张牌`,
+          title: `英魂:选择一项(你已损失 ${x} 体力)`,
+          description: `选项1:令其摸${x}张牌再弃1张牌;选项2:令其摸1张牌再弃${x}张牌`,
           confirmLabel: `摸${x}弃1`,
           cancelLabel: `摸1弃${x}`,
         },

@@ -166,13 +166,18 @@ export type Atom =
   | { type: '帧参数赋值'; key: string; value: Json }
   // 回合用量(view 同步):出杀计数/限一次标记同步到前端 turnUsage
   | { type: '回合用量'; player: number; key: string; value: Json }
-  // 周泰·不屈:牌堆顶一张牌作为"创"牌置于武将牌上
+  // 周泰·不屈:牌堆顶一张牌作为"创"牌置于武将牌上;点数重复则移去(进弃牌堆)
   | { type: '置创牌'; player: number }
   // 于吉·蛊惑:扣置一张手牌(面朝下移入弃牌堆暂存),声明为某基本牌。牌的真实身份对其他人隐藏。
   // apply:手牌→弃牌堆(面朝下)+ localVars['蛊惑/扣牌'] 记录 cardId 供后续揭示/给牌/生效。
   | { type: '扣牌'; player: number; cardId: string; declaredName: string }
   // 于吉·蛊惑:翻开(展示)已扣置的牌,向所有人公开其真实身份。纯视图事件,不改 state(牌仍在弃牌堆)。
-  | { type: '展示'; player: number; cardId: string };
+  | { type: '展示'; player: number; cardId: string }
+  // 界陆逊·界谦逊:将所有手牌移出游戏(暂存于 player.vars['界谦逊/移出']),回合结束归还。
+  // 与 置创牌 同构:移出的牌不进入任何标准 zone,仅存于 player.vars;applyView 同步 handCount 减少。
+  | { type: '移出游戏'; player: number; cardIds: string[] }
+  // 界陆逊·界谦逊:回合结束归还此前移出游戏的手牌(player.vars['界谦逊/移出'] → 手牌)。
+  | { type: '归还移出牌'; player: number };
 
 export interface AtomDefinition<A = unknown> {
   type: string;

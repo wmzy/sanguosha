@@ -195,8 +195,10 @@ describe('不屈', () => {
 
     // 周泰死亡
     expect(harness.state.players[0].alive).toBe(false);
-    // 失败的创牌仍被置于武将牌上(创牌列表含新翻的重复牌)
-    expect(harness.state.players[0].vars['不屈/创牌']).toEqual(['cB', 'd3']);
+    // 失败的创牌被移去(进弃牌堆,不入武将牌)——官方"否则移去此牌"
+    // (标版语义上"重复即死亡",武将牌上的创牌在死亡后无意义;atom 统一处理为移去)
+    expect(harness.state.players[0].vars['不屈/创牌']).toEqual(['cB']); // 仍只有原 cB
+    expect(harness.state.zones.discardPile).toContain('d3'); // d3 进弃牌堆
     void P2;
     void ZT;
   });

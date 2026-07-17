@@ -6,6 +6,7 @@ import type { ActionPrompt, AtomDefinition, Json, ViewEventSplit, ViewEvent } fr
 
 import { applyAtom, resolveTimeoutMs } from '../create-engine';
 import { registerAtom } from '../atom';
+import { handLimit } from '../hand-limit';
 
 export const 请求回应: AtomDefinition<{
   requestType: string;
@@ -34,8 +35,11 @@ export const 请求回应: AtomDefinition<{
       if (atom.requestType === '__弃牌') {
         const target = atom.target;
         const p = state.players[target];
-        if (!p || p.hand.length <= p.health) return;
-        const excess = p.hand.length - p.health;
+        if (!p) return;
+        // 手牌上限统一经 hand-limit 计算(支持覆盖型提供者,如界英姿「手牌上限=体力上限」)
+        const limit = handLimit(state, target);
+        if (p.hand.length <= limit) return;
+        const excess = p.hand.length - limit;
         // 超时自动弃牌：保留高价值牌（桃/杀/闪/无懈可击），弃掉低优先级牌。
         // 避免盲弃末尾导致关键牌丢失，与 AI 玩家弃牌策略一致。
         const priority: Record<string, number> = { '桃': 0, '杀': 1, '闪': 2, '无懈可击': 3 };

@@ -7,6 +7,7 @@
 import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../skill';
+import { handLimit } from '../hand-limit';
 
 const PHASE_ORDER = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'] as const;
 
@@ -56,13 +57,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '摸牌', player, count: 2 });
     }
 
-    // 弃牌阶段:手牌上限=当前体力值(受伤时低于体力上限,标准三国杀规则)
+    // 弃牌阶段:手牌上限统一经 hand-limit 计算(支持覆盖型提供者,如界英姿「手牌上限=体力上限」)
     if (next === '弃牌') {
       const playerState = ctx.state.players[player];
       const handCount = playerState.hand.length;
-      const health = playerState.health;
-      if (handCount > health) {
-        const excess = handCount - health;
+      const limit = handLimit(ctx.state, player);
+      if (handCount > limit) {
+        const excess = handCount - limit;
         // 创建弃牌 pending,等玩家选择弃哪些牌
         await applyAtom(ctx.state, {
           type: '请求回应',

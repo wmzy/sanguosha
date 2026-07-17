@@ -1,6 +1,6 @@
-// 英魂(孙坚·主动技)测试
-//   回合开始阶段(准备阶段),若已受伤,令一名其他角色二选一:
-//   选项1:摸X弃1;选项2:摸1弃X(X=已损失体力值)。
+// 英魂(孙坚·主动技)测试(标版BUG修复后,OL hero/458):
+//   准备阶段,若已受伤,孙坚选一名其他角色,孙坚自己选方案(摸X弃1/摸1弃X),
+//   目标摸牌后自选弃牌(X=孙坚已损失体力值)。
 //
 // 通过直接 dispatch 阶段开始(准备) 触发英魂 before-hook
 //   (准备阶段是回合一首个阶段,无法由更早阶段推进进入,故直接派发)。
@@ -64,8 +64,8 @@ describe('英魂', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 选项1:摸X弃1 ──────────────────────────────────────────
-  it('发动英魂 → 目标选选项1(摸X弃1):P1 摸2弃1,净+1', async () => {
+  // ─── 选项1:摸X弃1(孙坚选方案) ─────────────────────────────
+  it('发动英魂 → 孙坚选选项1(摸X弃1):P1 摸2弃1,净+1', async () => {
     // 孙坚 4血剩2血 → X=2
     const state: GameState = createGameState({
       players: [
@@ -110,9 +110,9 @@ describe('英魂', () => {
     await waitForStable(harness.state); // choosePlayer 询问
     await 孙坚.respond('英魂', { targets: [1] }); // 选 P1
 
-    await waitForStable(harness.state); // 目标 option 询问
-    P1.expectPending('请求回应');
-    await P1.respond('英魂', { choice: true }); // 选项1(摸2弃1)
+    await waitForStable(harness.state); // 孙坚 option 询问(标版BUG修复:决策方=孙坚)
+    孙坚.expectPending('请求回应');
+    await 孙坚.respond('英魂', { choice: true }); // 孙坚选选项1(摸2弃1)
 
     await waitForStable(harness.state); // 目标选弃牌
     await P1.respond('英魂', { cardIds: ['p1a'] }); // 弃 p1a
@@ -127,8 +127,8 @@ describe('英魂', () => {
     expect(harness.state.zones.discardPile).toContain('p1a');
   });
 
-  // ─── 选项2:摸1弃X ──────────────────────────────────────────
-  it('发动英魂 → 目标选选项2(摸1弃X):P1 摸1弃2,净-1', async () => {
+  // ─── 选项2:摸1弃X(孙坚选方案) ─────────────────────────────
+  it('发动英魂 → 孙坚选选项2(摸1弃X):P1 摸1弃2,净-1', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -167,7 +167,7 @@ describe('英魂', () => {
     await waitForStable(harness.state);
     await 孙坚.respond('英魂', { targets: [1] });
     await waitForStable(harness.state);
-    await P1.respond('英魂', { choice: false }); // 选项2(摸1弃2)
+    await 孙坚.respond('英魂', { choice: false }); // 孙坚选选项2(摸1弃2)
     await waitForStable(harness.state);
     // P1 手牌:p1a,p1b + 摸1(d1) = 3张,需弃2
     await P1.respond('英魂', { cardIds: ['p1a', 'p1b'] });
@@ -245,8 +245,8 @@ describe('英魂', () => {
     expect(harness.state.zones.deck.length).toBe(1); // 未摸牌
   });
 
-  // ─── 目标超时默认选项1 ───────────────────────────────────────
-  it('目标超时不选 → 默认选项1(摸X弃1)', async () => {
+  // ─── 孙坚选方案超时默认选项1 ───────────────────────────────
+  it('孙坚超时不选 → 默认选项1(摸X弃1)', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -286,10 +286,10 @@ describe('英魂', () => {
     await 孙坚.respond('英魂', { choice: true });
     await waitForStable(harness.state);
     await 孙坚.respond('英魂', { targets: [1] });
-    await waitForStable(harness.state); // 目标 option 询问
+    await waitForStable(harness.state); // 孙坚 option 询问
 
-    // 目标超时(pass)→ 默认选项1
-    await P1.pass();
+    // 孙坚超时(pass)→ 默认选项1
+    await 孙坚.pass();
     await waitForStable(harness.state); // 弃牌询问(选项1 弃1)
     P1.expectPending('请求回应');
     await P1.respond('英魂', { cardIds: ['p1a'] });

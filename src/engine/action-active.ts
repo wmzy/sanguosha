@@ -33,6 +33,8 @@ export function viewSlashMax(view: ActionContext['view'], player: number): numbe
   if (weapon?.name === '诸葛连弩') return Infinity;
   // 天义(太史慈):拼点赢后本回合 +1。turnUsage['天义/win'] 由回合用量 atom 同步。
   if (p.turnUsage?.['天义/win']) max += 1;
+  // 诈降(界黄盖):失去体力后本回合杀限制次数 +1(非无限,官方为额度叠加)。
+  if (p.turnUsage?.['诈降/active']) max += 1;
   return max;
 }
 

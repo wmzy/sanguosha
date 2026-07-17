@@ -34,22 +34,37 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      return (
-        validateUseCard(state, ownerId, params, { cardName: '杀', requireTarget: true }) ??
-        (Array.isArray(params.targets) &&
+      const baseErr = validateUseCard(state, ownerId, params, {
+        cardName: '杀',
+        requireTarget: true,
+      });
+      if (baseErr) return baseErr;
+      // 诈降(界黄盖)红色杀无距离限制:仅当诈降激活且此杀为红色时放行超距目标。
+      // 非红色杀/诈降未激活 → 走正常距离校验(official:仅红色杀无距离)。
+      const cardId = params.cardId as string | undefined;
+      const slashCard = cardId ? state.cardMap[cardId] : undefined;
+      const redSlashNoRange =
+        slashCard?.color === '红' && state.turn.vars['诈降/active'] === ownerId;
+      const targetsOk =
+        Array.isArray(params.targets) &&
         (params.targets as number[]).every(
-          (t) => state.players[t]?.alive === true && inAttackRange(state, ownerId, t),
-        )
-          ? null
-          : '目标不合法') ??
-        (canSlash(state, ownerId) ? null : '出杀次数已达上限')
-      );
+          (t) =>
+            state.players[t]?.alive === true &&
+            (redSlashNoRange || inAttackRange(state, ownerId, t)),
+        );
+      if (!targetsOk) return '目标不合法';
+      return canSlash(state, ownerId) ? null : '出杀次数已达上限';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       const targets = params.targets as number[];
       const damageType = state.cardMap[cardId]?.damageType;
+      // 诈降(界黄盖)红色杀不能被抵消:诈降激活且此杀为红色 → 跳过询问闪(目标不可出闪)。
+      // 官方"使用红色【杀】...不能被抵消"=目标不可出【闪】响应。
+      const slashCard = state.cardMap[cardId];
+      const redSlashUnblockable =
+        slashCard?.color === '红' && state.turn.vars['诈降/active'] === from;
       const frame = await pushFrame(state, '杀', from, {
         ...params,
         resolvedTargets: [...targets],
@@ -96,7 +111,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (!valid) continue;
 
           // 生效前:询问闪(等待目标回应;八卦阵判红放虚拟闪后 cancel)
-          await applyAtom(state, { type: '询问闪', target, source: from });
+          // 诈降红色杀不能被抵消 → 跳过询问闪(目标无法出闪,直接命中)。
+          if (!redSlashUnblockable) {
+            await applyAtom(state, { type: '询问闪', target, source: from });
+          }
 
           // 无双(吕布锁定技):目标需连续出两张闪。第一张闪打出后消耗,追加第二次询问。
           await enforceDualDodge(state, from, target);

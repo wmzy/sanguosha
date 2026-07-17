@@ -47,6 +47,8 @@ export function inAttackRange(state: GameState, from: number, to: number): boole
   if (from === to) return false;
   // 天义(太史慈):拼点赢后本回合攻击范围无限。turn.vars 存发起者座次,回合结束自动清空。
   if (state.turn.vars['天义/win'] === from) return true;
+  // 注:诈降(界黄盖)的红色杀无距离限制是红色杀专属增益,非全局放行——
+  // 由杀技能 validate 按卡色分支处理(此处通用距离函数不感知卡色)。
   const range = (state.players[from].vars['距离/出杀范围'] as number) ?? 1;
   return effectiveDistance(state, from, to) <= range;
 }

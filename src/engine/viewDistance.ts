@@ -54,6 +54,10 @@ export function viewCanAttack(
 ): boolean {
   void cardMap; // 签名与 client utils/distance 对齐,GameView 投影不需要 cardMap
   if (fromIdx === toIdx) return false;
+  // 诈降(界黄盖):失去体力后本回合【红色杀】无距离限制。turnUsage 由回合用量 atom 同步。
+  // 前端 filter 无法感知当前选中的卡色(签名只收 view/target),这里保持宽松——
+  // 诈降激活时一律放行(UI 提示);后端 杀.validate 按卡色严格校验(仅红杀放行)。
+  if (players[fromIdx]?.turnUsage?.['诈降/active']) return true;
   const range = players[fromIdx]?.distanceVars?.attackRange ?? 1;
   return viewEffectiveDistance(players, fromIdx, toIdx) <= range;
 }
