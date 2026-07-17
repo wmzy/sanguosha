@@ -1,0 +1,5466 @@
+[
+  {
+    "id": "151",
+    "name": "曹植",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "152",
+    "name": "高顺",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "153",
+    "name": "陈宫",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "155",
+    "name": "凌统",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "156",
+    "name": "马谡",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "157",
+    "name": "吴国太",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "158",
+    "name": "徐盛",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "160",
+    "name": "于禁",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "161",
+    "name": "张春华",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "162",
+    "name": "曹彰",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "164",
+    "name": "荀攸",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "166",
+    "name": "廖化",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "167",
+    "name": "马岱",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "168",
+    "name": "步练师",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "169",
+    "name": "程普",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "170",
+    "name": "韩当",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "171",
+    "name": "将华雄",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 6,
+    "level": "普通"
+  },
+  {
+    "id": "172",
+    "name": "刘表",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "173",
+    "name": "钟会",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "174",
+    "name": "曹冲",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "175",
+    "name": "郭淮",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "176",
+    "name": "满宠",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "177",
+    "name": "关平",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "178",
+    "name": "简雍",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "179",
+    "name": "刘封",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "180",
+    "name": "潘璋马忠",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "181",
+    "name": "虞翻",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "182",
+    "name": "朱然",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "183",
+    "name": "伏皇后",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "184",
+    "name": "李儒",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "185",
+    "name": "法正",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "186",
+    "name": "徐庶",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "187",
+    "name": "王异",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "188",
+    "name": "关兴张苞",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "321",
+    "name": "曹真",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "322",
+    "name": "韩浩史涣",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "323",
+    "name": "陈群",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "324",
+    "name": "吴懿",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "325",
+    "name": "周仓",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "326",
+    "name": "张松",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "327",
+    "name": "孙鲁班",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "328",
+    "name": "朱桓",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "329",
+    "name": "顾雍",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "330",
+    "name": "沮授",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "331",
+    "name": "蔡夫人",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "332",
+    "name": "曹叡",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "333",
+    "name": "曹休",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "334",
+    "name": "钟繇",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "335",
+    "name": "刘谌",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "336",
+    "name": "夏侯氏",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "337",
+    "name": "张嶷",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "338",
+    "name": "孙休",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "339",
+    "name": "朱治",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "340",
+    "name": "全琮",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "341",
+    "name": "公孙渊",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "342",
+    "name": "郭图逢纪",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "380",
+    "name": "郭皇后",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "381",
+    "name": "李严",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "382",
+    "name": "孙登",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "383",
+    "name": "刘虞",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "384",
+    "name": "岑昏",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "385",
+    "name": "孙资刘放",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "386",
+    "name": "黄皓",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "387",
+    "name": "张让",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "388",
+    "name": "辛宪英",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "389",
+    "name": "吴苋",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "390",
+    "name": "徐氏",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "391",
+    "name": "曹节",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "392",
+    "name": "嵇康",
+    "series": "一将成名",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "393",
+    "name": "秦宓",
+    "series": "一将成名",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "394",
+    "name": "薛综",
+    "series": "一将成名",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "395",
+    "name": "蔡邕",
+    "series": "一将成名",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "72",
+    "name": "伏完",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "73",
+    "name": "刘协",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "74",
+    "name": "灵雎",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "101",
+    "name": "公孙瓒",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "103",
+    "name": "SP孙尚香",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "104",
+    "name": "杨修",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "105",
+    "name": "SP庞德",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "106",
+    "name": "SP关羽",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "107",
+    "name": "SP马超",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "108",
+    "name": "SP赵云",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "109",
+    "name": "SP貂蝉",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "110",
+    "name": "SP贾诩",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "111",
+    "name": "SP曹仁",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "112",
+    "name": "SP蔡文姬",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "113",
+    "name": "陈琳",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "114",
+    "name": "曹洪",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "115",
+    "name": "关银屏",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "116",
+    "name": "夏侯霸",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "117",
+    "name": "大乔小乔",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "118",
+    "name": "诸葛恪",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "119",
+    "name": "张宝",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "121",
+    "name": "乐进",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "122",
+    "name": "曹昂",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "123",
+    "name": "诸葛瑾",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "124",
+    "name": "张星彩",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "125",
+    "name": "祖茂",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "126",
+    "name": "丁奉",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "127",
+    "name": "潘凤",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "128",
+    "name": "马良",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "129",
+    "name": "诸葛诞",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "130",
+    "name": "程昱",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "131",
+    "name": "何太后",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "135",
+    "name": "孙鲁育",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "136",
+    "name": "文聘",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "137",
+    "name": "孙皓",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 5,
+    "level": "传说"
+  },
+  {
+    "id": "139",
+    "name": "SP姜维",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "140",
+    "name": "兀突骨",
+    "series": "其他",
+    "faction": "群",
+    "strength": 15,
+    "level": "史诗"
+  },
+  {
+    "id": "343",
+    "name": "张鲁",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "344",
+    "name": "王荣",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "345",
+    "name": "士燮",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "346",
+    "name": "马云騄",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "347",
+    "name": "蹋顿",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "348",
+    "name": "严白虎",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "349",
+    "name": "关索",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "350",
+    "name": "王朗",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "351",
+    "name": "鲍三娘",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "352",
+    "name": "邓芝",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "353",
+    "name": "曹婴",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "354",
+    "name": "左棻",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "355",
+    "name": "董昭",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "356",
+    "name": "吾彦",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "357",
+    "name": "SP张郃",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "358",
+    "name": "宣公主",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "360",
+    "name": "司马朗",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "361",
+    "name": "SP黄月英",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "363",
+    "name": "步骘",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "364",
+    "name": "李通",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "365",
+    "name": "糜竺",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "366",
+    "name": "董白",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "367",
+    "name": "赵襄",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "368",
+    "name": "贺齐",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "369",
+    "name": "董允",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "370",
+    "name": "马忠",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "371",
+    "name": "阚泽",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "372",
+    "name": "王允",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "373",
+    "name": "诸葛果",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "374",
+    "name": "麹义",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "375",
+    "name": "戏志才",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "376",
+    "name": "孙乾",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "377",
+    "name": "卑弥呼",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "378",
+    "name": "刘琦",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "379",
+    "name": "鲁芝",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "416",
+    "name": "司马徽",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "417",
+    "name": "徐荣",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "418",
+    "name": "李傕",
+    "series": "其他",
+    "faction": "群",
+    "strength": 6,
+    "level": "传说"
+  },
+  {
+    "id": "419",
+    "name": "张济",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "420",
+    "name": "苏飞",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "421",
+    "name": "黄权",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "422",
+    "name": "唐咨",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "423",
+    "name": "樊稠",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "424",
+    "name": "郭汜",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "425",
+    "name": "张琪瑛",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "426",
+    "name": "曹纯",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "427",
+    "name": "许靖",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "428",
+    "name": "王粲",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "429",
+    "name": "SP庞统",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "430",
+    "name": "袁谭袁尚",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "431",
+    "name": "沙摩柯",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "432",
+    "name": "吕虔",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "433",
+    "name": "孙邵",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "434",
+    "name": "吕旷吕翔",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "435",
+    "name": "辛毗",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "436",
+    "name": "花鬘",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "437",
+    "name": "丁原",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "438",
+    "name": "曹嵩",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "439",
+    "name": "卞夫人",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "459",
+    "name": "审配",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "460",
+    "name": "荀谌",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "461",
+    "name": "高览",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "464",
+    "name": "张陵",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "465",
+    "name": "吕凯",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "466",
+    "name": "张昌蒲",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "467",
+    "name": "蒋干",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "468",
+    "name": "周鲂",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "469",
+    "name": "曹爽",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "472",
+    "name": "潘濬",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "473",
+    "name": "严畯",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "474",
+    "name": "SP张辽",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "475",
+    "name": "卧龙凤雏",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "476",
+    "name": "曹性",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "477",
+    "name": "黄祖",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "478",
+    "name": "潘淑",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "481",
+    "name": "黄承彦",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "482",
+    "name": "高干",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "483",
+    "name": "杜袭",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "487",
+    "name": "刘辩",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "488",
+    "name": "杨仪",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "489",
+    "name": "朱灵",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "490",
+    "name": "王双",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 8,
+    "level": "史诗"
+  },
+  {
+    "id": "491",
+    "name": "冯方女",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "493",
+    "name": "田豫",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "494",
+    "name": "范疆张达",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "495",
+    "name": "陈登",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "497",
+    "name": "羊祜",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "498",
+    "name": "清河公主",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "499",
+    "name": "杨婉",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "500",
+    "name": "滕芳兰",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "501",
+    "name": "卫兹",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "502",
+    "name": "芮姬",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "503",
+    "name": "伊籍",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "504",
+    "name": "唐姬",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "506",
+    "name": "SP孟获",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "507",
+    "name": "刘宏",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "508",
+    "name": "郭槐",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "509",
+    "name": "曹宪曹华",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "510",
+    "name": "蒲元",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "511",
+    "name": "赵俨",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "512",
+    "name": "邓忠",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "513",
+    "name": "霍峻",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "514",
+    "name": "梁兴",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "516",
+    "name": "张芝",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "517",
+    "name": "文鸯",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 5,
+    "level": "传说"
+  },
+  {
+    "id": "518",
+    "name": "周处",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "519",
+    "name": "夏侯玄",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "520",
+    "name": "马日磾",
+    "series": "其他",
+    "faction": "群",
+    "strength": 6,
+    "level": "稀有"
+  },
+  {
+    "id": "521",
+    "name": "阎柔",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "527",
+    "name": "朱儁",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "531",
+    "name": "阿会喃",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "532",
+    "name": "马承",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "533",
+    "name": "傅肜",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "534",
+    "name": "胡班",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "535",
+    "name": "屈晃",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "536",
+    "name": "刘巴",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "537",
+    "name": "孙弘",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "538",
+    "name": "马休马铁",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "539",
+    "name": "卢氏",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "540",
+    "name": "谯周",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "541",
+    "name": "张翼",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "542",
+    "name": "阎圃",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "543",
+    "name": "周群",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "544",
+    "name": "张华",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "545",
+    "name": "罗宪",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "551",
+    "name": "成济成倅",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 6,
+    "level": "史诗"
+  },
+  {
+    "id": "552",
+    "name": "曹羲",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "553",
+    "name": "王瓘",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "554",
+    "name": "杜夫人",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "557",
+    "name": "郝普",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "558",
+    "name": "孟达",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "559",
+    "name": "张世平",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "560",
+    "name": "段颎",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "561",
+    "name": "马玩",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "562",
+    "name": "陆郁生",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "568",
+    "name": "费祎",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "569",
+    "name": "丁尚涴",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "570",
+    "name": "文钦",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "572",
+    "name": "彭羕",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "576",
+    "name": "蒋琬",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "577",
+    "name": "李婉",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "578",
+    "name": "吕伯奢",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "579",
+    "name": "雅丹",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "580",
+    "name": "牵招",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "581",
+    "name": "张燕",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "583",
+    "name": "何进",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "584",
+    "name": "牛金",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "585",
+    "name": "韩遂",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "590",
+    "name": "陆凯",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "592",
+    "name": "田畴",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "594",
+    "name": "胡金定",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "596",
+    "name": "曹宇",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "598",
+    "name": "凌操",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "607",
+    "name": "李异",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "611",
+    "name": "刘磐",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "612",
+    "name": "刘辟",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "619",
+    "name": "曹腾",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "624",
+    "name": "郭图",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "631",
+    "name": "蔡瑁",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "632",
+    "name": "孙茹",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "633",
+    "name": "SP孙策",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "634",
+    "name": "刘焉",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "636",
+    "name": "王匡",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "637",
+    "name": "成公英",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "638",
+    "name": "轲比能",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "639",
+    "name": "秦朗",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "649",
+    "name": "陶谦",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "651",
+    "name": "韩馥",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "652",
+    "name": "袁姬",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "653",
+    "name": "薛灵芸",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "656",
+    "name": "董翓",
+    "series": "其他",
+    "faction": "群",
+    "strength": 5,
+    "level": "传说"
+  },
+  {
+    "id": "657",
+    "name": "阮慧",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "661",
+    "name": "SP曹操",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "664",
+    "name": "SP刘备",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "668",
+    "name": "吴景",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "669",
+    "name": "马元义",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "688",
+    "name": "闪赵云",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "689",
+    "name": "南华老仙",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "7000",
+    "name": "张虎乐綝",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "7001",
+    "name": "夏侯徽",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7002",
+    "name": "司马师",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "7003",
+    "name": "晋司马懿",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7004",
+    "name": "司马昭",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7005",
+    "name": "王元姬",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "7006",
+    "name": "杜预",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "7007",
+    "name": "晋张春华",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7008",
+    "name": "羊徽瑜",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7009",
+    "name": "石苞",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "7010",
+    "name": "李肃",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7011",
+    "name": "司马伷",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "7012",
+    "name": "彻里吉",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "7013",
+    "name": "卫瓘",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7014",
+    "name": "钟琰",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7015",
+    "name": "华歆",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7016",
+    "name": "杨艳",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "7017",
+    "name": "杨芷",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "7018",
+    "name": "辛敞",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "7019",
+    "name": "贾充",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "7020",
+    "name": "王祥",
+    "series": "其他",
+    "faction": "晋",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "591",
+    "name": "向宠",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "650",
+    "name": "武安国",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "662",
+    "name": "郭照",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "665",
+    "name": "袁涣",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "682",
+    "name": "裴元绍",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "655",
+    "name": "牛辅",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "666",
+    "name": "杨阜",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "709",
+    "name": "祢衡",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "654",
+    "name": "孔淑",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "698",
+    "name": "闪刘宏",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "701",
+    "name": "管亥",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "702",
+    "name": "赵忠",
+    "series": "其他",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "693",
+    "name": "李丰",
+    "series": "其他",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "728",
+    "name": "鲍信",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "732",
+    "name": "闪张辽",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "716",
+    "name": "吕玲绮",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "725",
+    "name": "闪孙坚",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "729",
+    "name": "环淑君",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "720",
+    "name": "闪朱儁",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "721",
+    "name": "乔国老",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "699",
+    "name": "张曼成",
+    "series": "其他",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "707",
+    "name": "孙鸢",
+    "series": "其他",
+    "faction": "吴",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "727",
+    "name": "阮瑀",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "675",
+    "name": "刘晔",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "739",
+    "name": "崔琰",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "606",
+    "name": "裴秀",
+    "series": "其他",
+    "faction": "魏",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "2000",
+    "name": "国战曹操",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2001",
+    "name": "国战司马懿",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2002",
+    "name": "国战夏侯惇",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2003",
+    "name": "国战张辽",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2004",
+    "name": "国战许褚",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2005",
+    "name": "国战郭嘉",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2006",
+    "name": "国战甄姬",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2007",
+    "name": "国战夏侯渊",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2008",
+    "name": "国战张郃",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2009",
+    "name": "国战徐晃",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2010",
+    "name": "国战曹仁",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2011",
+    "name": "国战典韦",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2012",
+    "name": "国战荀彧",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2013",
+    "name": "国战曹丕",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2014",
+    "name": "国战乐进",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2015",
+    "name": "国战刘备",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2016",
+    "name": "国战关羽",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2.5,
+    "level": "普通"
+  },
+  {
+    "id": "2017",
+    "name": "国战张飞",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2018",
+    "name": "国战诸葛亮",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2019",
+    "name": "国战赵云",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2020",
+    "name": "国战马超",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2021",
+    "name": "国战黄月英",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2022",
+    "name": "国战黄忠",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2023",
+    "name": "国战魏延",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2024",
+    "name": "国战庞统",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2025",
+    "name": "国战卧龙诸葛亮",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2026",
+    "name": "国战刘禅",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2027",
+    "name": "国战孟获",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2028",
+    "name": "国战祝融",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2029",
+    "name": "国战甘夫人",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2030",
+    "name": "国战孙权",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2031",
+    "name": "国战甘宁",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2032",
+    "name": "国战吕蒙",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2033",
+    "name": "国战黄盖",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2034",
+    "name": "国战周瑜",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2035",
+    "name": "国战大乔",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2036",
+    "name": "国战陆逊",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2037",
+    "name": "国战孙尚香",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2038",
+    "name": "国战孙坚",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2.5,
+    "level": "普通"
+  },
+  {
+    "id": "2039",
+    "name": "国战小乔",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2040",
+    "name": "国战太史慈",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2041",
+    "name": "国战周泰",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2042",
+    "name": "国战鲁肃",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2043",
+    "name": "国战张昭张纮",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2044",
+    "name": "国战丁奉",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2045",
+    "name": "国战华佗",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2046",
+    "name": "国战吕布",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2.5,
+    "level": "普通"
+  },
+  {
+    "id": "2047",
+    "name": "国战貂蝉",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2048",
+    "name": "国战袁绍",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2049",
+    "name": "国战颜良文丑",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2050",
+    "name": "国战贾诩",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2051",
+    "name": "国战庞德",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2052",
+    "name": "国战张角",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2053",
+    "name": "国战蔡文姬",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2054",
+    "name": "国战马腾",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2055",
+    "name": "国战孔融",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2056",
+    "name": "国战纪灵",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2057",
+    "name": "国战田丰",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2058",
+    "name": "国战潘凤",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2059",
+    "name": "国战邹氏",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2060",
+    "name": "国战何太后",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2061",
+    "name": "国战蒋琬费祎",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2062",
+    "name": "国战李典",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2063",
+    "name": "国战徐盛",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2064",
+    "name": "国战马岱",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2065",
+    "name": "国战邓艾",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2066",
+    "name": "国战孙策",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2067",
+    "name": "国战董卓",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2068",
+    "name": "国战于吉",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2069",
+    "name": "国战臧霸",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2070",
+    "name": "国战糜夫人",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2071",
+    "name": "国战陈武董袭",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2072",
+    "name": "国战张任",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2073",
+    "name": "国战曹洪",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2074",
+    "name": "国战蒋钦",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2075",
+    "name": "国战姜维",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2076",
+    "name": "国战李傕郭汜",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2077",
+    "name": "国战荀攸",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2078",
+    "name": "国战沙摩柯",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "传说"
+  },
+  {
+    "id": "2079",
+    "name": "国战吕范",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2080",
+    "name": "国战法正",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2081",
+    "name": "国战张绣",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "传说"
+  },
+  {
+    "id": "2082",
+    "name": "国战凌统",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2083",
+    "name": "国战张虎乐綝",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2084",
+    "name": "国战夏侯徽",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2085",
+    "name": "国战司马师",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2086",
+    "name": "国战晋司马懿",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2087",
+    "name": "国战司马昭",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2088",
+    "name": "国战王元姬",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 1.5,
+    "level": "史诗"
+  },
+  {
+    "id": "2089",
+    "name": "国战杜预",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 2,
+    "level": "史诗"
+  },
+  {
+    "id": "2090",
+    "name": "国战张春华",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2091",
+    "name": "国战羊徽瑜",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2092",
+    "name": "国战马谡",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2093",
+    "name": "国战陆抗",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "史诗"
+  },
+  {
+    "id": "2094",
+    "name": "国战左慈",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "史诗"
+  },
+  {
+    "id": "2095",
+    "name": "国战石苞",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2096",
+    "name": "国战司马伷",
+    "series": "国战",
+    "faction": "晋",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2097",
+    "name": "国战卞夫人",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2098",
+    "name": "国战吴国太",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 1.5,
+    "level": "普通"
+  },
+  {
+    "id": "2099",
+    "name": "国战王平",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2100",
+    "name": "国战于禁",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2101",
+    "name": "国战崔琰毛玠",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "2102",
+    "name": "国战袁术",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2,
+    "level": "普通"
+  },
+  {
+    "id": "2115",
+    "name": "国战王荣",
+    "series": "国战",
+    "faction": "群",
+    "strength": 1.5,
+    "level": "传说"
+  },
+  {
+    "id": "2116",
+    "name": "国战界徐盛",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "传说"
+  },
+  {
+    "id": "2117",
+    "name": "国战界吕布",
+    "series": "国战",
+    "faction": "群",
+    "strength": 2.5,
+    "level": "史诗"
+  },
+  {
+    "id": "2118",
+    "name": "国战界太史慈",
+    "series": "国战",
+    "faction": "吴",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2119",
+    "name": "国战马云騄",
+    "series": "国战",
+    "faction": "蜀",
+    "strength": 2,
+    "level": "稀有"
+  },
+  {
+    "id": "2120",
+    "name": "国战蒋干",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "史诗"
+  },
+  {
+    "id": "2121",
+    "name": "国战鲁芝",
+    "series": "国战",
+    "faction": "魏",
+    "strength": 1.5,
+    "level": "稀有"
+  },
+  {
+    "id": "1",
+    "name": "刘备",
+    "series": "标准",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "2",
+    "name": "关羽",
+    "series": "标准",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "3",
+    "name": "张飞",
+    "series": "标准",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "4",
+    "name": "诸葛亮",
+    "series": "标准",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "5",
+    "name": "赵云",
+    "series": "标准",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "6",
+    "name": "马超",
+    "series": "标准",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "7",
+    "name": "黄月英",
+    "series": "标准",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "8",
+    "name": "孙权",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "9",
+    "name": "甘宁",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "10",
+    "name": "吕蒙",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "11",
+    "name": "黄盖",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "12",
+    "name": "周瑜",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "13",
+    "name": "大乔",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "14",
+    "name": "陆逊",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "15",
+    "name": "曹操",
+    "series": "标准",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "16",
+    "name": "司马懿",
+    "series": "标准",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "17",
+    "name": "夏侯惇",
+    "series": "标准",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "18",
+    "name": "张辽",
+    "series": "标准",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "19",
+    "name": "许褚",
+    "series": "标准",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "20",
+    "name": "郭嘉",
+    "series": "标准",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "21",
+    "name": "甄姬",
+    "series": "标准",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "22",
+    "name": "华佗",
+    "series": "标准",
+    "faction": "群",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "23",
+    "name": "吕布",
+    "series": "标准",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "24",
+    "name": "貂蝉",
+    "series": "标准",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "25",
+    "name": "孙尚香",
+    "series": "标准",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "214",
+    "name": "华雄",
+    "series": "标准",
+    "faction": "群",
+    "strength": 6,
+    "level": "稀有"
+  },
+  {
+    "id": "215",
+    "name": "标袁术",
+    "series": "标准",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "26",
+    "name": "界黄忠",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "299",
+    "name": "界刘备",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "300",
+    "name": "界关羽",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "301",
+    "name": "界张飞",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "302",
+    "name": "界赵云",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "303",
+    "name": "界马超",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "304",
+    "name": "界徐庶",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "305",
+    "name": "界甘宁",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "306",
+    "name": "界吕蒙",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "307",
+    "name": "界黄盖",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "308",
+    "name": "界周瑜",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "309",
+    "name": "界大乔",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "310",
+    "name": "界陆逊",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "311",
+    "name": "界曹操",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "312",
+    "name": "界司马懿",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "313",
+    "name": "界夏侯惇",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "314",
+    "name": "界张辽",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "315",
+    "name": "界许褚",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "316",
+    "name": "界郭嘉",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "317",
+    "name": "界李典",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "318",
+    "name": "界华佗",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "319",
+    "name": "界吕布",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 5,
+    "level": "史诗"
+  },
+  {
+    "id": "320",
+    "name": "界公孙瓒",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "440",
+    "name": "界诸葛亮",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "441",
+    "name": "界黄月英",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "442",
+    "name": "界孙权",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "443",
+    "name": "界孙尚香",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "444",
+    "name": "界甄姬",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "445",
+    "name": "界貂蝉",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "446",
+    "name": "界华雄",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 6,
+    "level": "稀有"
+  },
+  {
+    "id": "447",
+    "name": "界左慈",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "448",
+    "name": "界张角",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "449",
+    "name": "界于吉",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "450",
+    "name": "界袁绍",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "451",
+    "name": "界刘禅",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "452",
+    "name": "界孙策",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "453",
+    "name": "界夏侯渊",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "454",
+    "name": "界卧龙诸葛亮",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "455",
+    "name": "界庞统",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "456",
+    "name": "界魏延",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "457",
+    "name": "界小乔",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "458",
+    "name": "界孙坚",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 5,
+    "level": "稀有"
+  },
+  {
+    "id": "462",
+    "name": "界庞德",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "463",
+    "name": "界太史慈",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "470",
+    "name": "界董卓",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 8,
+    "level": "稀有"
+  },
+  {
+    "id": "471",
+    "name": "界邓艾",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "479",
+    "name": "界祝融",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "480",
+    "name": "界姜维",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "484",
+    "name": "界贾诩",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "485",
+    "name": "界鲁肃",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "486",
+    "name": "界张郃",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "492",
+    "name": "界孟获",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "496",
+    "name": "界徐晃",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "505",
+    "name": "界蔡文姬",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "515",
+    "name": "界荀彧",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "526",
+    "name": "界典韦",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "550",
+    "name": "界颜良文丑",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "563",
+    "name": "界张昭张纮",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "587",
+    "name": "界徐盛",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "588",
+    "name": "界凌统",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "597",
+    "name": "界陈宫",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "599",
+    "name": "界曹彰",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "600",
+    "name": "界简雍",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "603",
+    "name": "界虞翻",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "604",
+    "name": "界高顺",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "610",
+    "name": "界法正",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "620",
+    "name": "界程普",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "625",
+    "name": "界张春华",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "627",
+    "name": "界蔡夫人",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "628",
+    "name": "界曹冲",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "640",
+    "name": "界吴国太",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "642",
+    "name": "界李儒",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "671",
+    "name": "界伏皇后",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "676",
+    "name": "界韩当",
+    "series": "界限突破",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "626",
+    "name": "界刘表",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "629",
+    "name": "界曹植",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "641",
+    "name": "界廖化",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "621",
+    "name": "界王异",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "658",
+    "name": "界郭淮",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "690",
+    "name": "界关兴张苞",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "696",
+    "name": "界马岱",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "749",
+    "name": "界沮授",
+    "series": "界限突破",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "756",
+    "name": "界于禁",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "752",
+    "name": "界夏侯氏",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "726",
+    "name": "界郭皇后",
+    "series": "界限突破",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "753",
+    "name": "界张松",
+    "series": "界限突破",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "201",
+    "name": "神关羽",
+    "series": "神将",
+    "faction": "神",
+    "strength": 5,
+    "level": "传说"
+  },
+  {
+    "id": "202",
+    "name": "神吕蒙",
+    "series": "神将",
+    "faction": "神",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "203",
+    "name": "神周瑜",
+    "series": "神将",
+    "faction": "神",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "204",
+    "name": "神诸葛亮",
+    "series": "神将",
+    "faction": "神",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "205",
+    "name": "神曹操",
+    "series": "神将",
+    "faction": "神",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "206",
+    "name": "神吕布",
+    "series": "神将",
+    "faction": "神",
+    "strength": 5,
+    "level": "史诗"
+  },
+  {
+    "id": "207",
+    "name": "神赵云",
+    "series": "神将",
+    "faction": "神",
+    "strength": 2,
+    "level": "传说"
+  },
+  {
+    "id": "208",
+    "name": "神司马懿",
+    "series": "神将",
+    "faction": "神",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "220",
+    "name": "神刘备",
+    "series": "神将",
+    "faction": "神",
+    "strength": 6,
+    "level": "史诗"
+  },
+  {
+    "id": "221",
+    "name": "神陆逊",
+    "series": "神将",
+    "faction": "神",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "224",
+    "name": "神甘宁",
+    "series": "神将",
+    "faction": "神",
+    "strength": 6,
+    "level": "传说"
+  },
+  {
+    "id": "225",
+    "name": "神张辽",
+    "series": "神将",
+    "faction": "神",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "226",
+    "name": "神孙权",
+    "series": "神将",
+    "faction": "神",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "227",
+    "name": "神张角",
+    "series": "神将",
+    "faction": "神",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "229",
+    "name": "神典韦",
+    "series": "神将",
+    "faction": "神",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "586",
+    "name": "谋姜维",
+    "series": "谋",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "593",
+    "name": "谋关羽",
+    "series": "谋",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "602",
+    "name": "谋太史慈",
+    "series": "谋",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "605",
+    "name": "谋董卓",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "609",
+    "name": "谋孙坚",
+    "series": "谋",
+    "faction": "吴",
+    "strength": 5,
+    "level": "传说"
+  },
+  {
+    "id": "623",
+    "name": "谋袁绍",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "635",
+    "name": "谋庞统",
+    "series": "谋",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "643",
+    "name": "谋孔融",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "644",
+    "name": "谋华雄",
+    "series": "谋",
+    "faction": "群",
+    "strength": 6,
+    "level": "传说"
+  },
+  {
+    "id": "646",
+    "name": "谋袁术",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "687",
+    "name": "谋张绣",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "681",
+    "name": "谋文丑",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "601",
+    "name": "谋邓艾",
+    "series": "谋",
+    "faction": "魏",
+    "strength": 5,
+    "level": "传说"
+  },
+  {
+    "id": "705",
+    "name": "谋小乔",
+    "series": "谋",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "717",
+    "name": "谋诸葛亮",
+    "series": "谋",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "718",
+    "name": "谋鲁肃",
+    "series": "谋",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "719",
+    "name": "谋许攸",
+    "series": "谋",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "622",
+    "name": "谋黄月英",
+    "series": "谋",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "723",
+    "name": "谋戏志才",
+    "series": "谋",
+    "faction": "魏",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "648",
+    "name": "谋公孙瓒",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "692",
+    "name": "谋卢植",
+    "series": "谋",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "697",
+    "name": "谋张让",
+    "series": "谋",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "735",
+    "name": "谋董昭",
+    "series": "谋",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "663",
+    "name": "谋贾诩",
+    "series": "谋",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "522",
+    "name": "族荀淑",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "523",
+    "name": "族荀谌",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "524",
+    "name": "族荀采",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "525",
+    "name": "族荀粲",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "528",
+    "name": "族吴苋",
+    "series": "门阀士族",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "529",
+    "name": "族吴班",
+    "series": "门阀士族",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "546",
+    "name": "族韩韶",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "547",
+    "name": "族韩融",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "548",
+    "name": "族钟琰",
+    "series": "门阀士族",
+    "faction": "晋",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "549",
+    "name": "族吴匡",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "555",
+    "name": "族王允",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "556",
+    "name": "族王凌",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "564",
+    "name": "族王昶",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "566",
+    "name": "族钟毓",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "567",
+    "name": "族钟会",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "573",
+    "name": "族荀攸",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "574",
+    "name": "族王浑",
+    "series": "门阀士族",
+    "faction": "晋",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "575",
+    "name": "族王沦",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "582",
+    "name": "族吴乔",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "630",
+    "name": "族钟繇",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "647",
+    "name": "族王沈",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "691",
+    "name": "族杨赐",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "694",
+    "name": "族杨修",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "700",
+    "name": "族杨彪",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "704",
+    "name": "族陆绩",
+    "series": "门阀士族",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "595",
+    "name": "族王广",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "608",
+    "name": "族王明山",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "703",
+    "name": "族杨众",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "706",
+    "name": "族陆景",
+    "series": "门阀士族",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "712",
+    "name": "族荀彧",
+    "series": "门阀士族",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "737",
+    "name": "族陈群",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "738",
+    "name": "族荀莳",
+    "series": "门阀士族",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "751",
+    "name": "族陆郁生",
+    "series": "门阀士族",
+    "faction": "吴",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "27",
+    "name": "魏延",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "28",
+    "name": "夏侯渊",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "29",
+    "name": "曹仁",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "30",
+    "name": "小乔",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "34",
+    "name": "典韦",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "35",
+    "name": "荀彧",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "36",
+    "name": "庞统",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "37",
+    "name": "卧龙诸葛亮",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "38",
+    "name": "太史慈",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "39",
+    "name": "庞德",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "40",
+    "name": "颜良文丑",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "41",
+    "name": "袁绍",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "42",
+    "name": "徐晃",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "43",
+    "name": "曹丕",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "44",
+    "name": "孙坚",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "45",
+    "name": "董卓",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 8,
+    "level": "普通"
+  },
+  {
+    "id": "46",
+    "name": "祝融",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "47",
+    "name": "孟获",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "48",
+    "name": "贾诩",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "49",
+    "name": "鲁肃",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "50",
+    "name": "张郃",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "51",
+    "name": "邓艾",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "52",
+    "name": "姜维",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "53",
+    "name": "刘禅",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "54",
+    "name": "孙策",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "55",
+    "name": "张昭张弘",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "56",
+    "name": "左慈",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "57",
+    "name": "蔡文姬",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "61",
+    "name": "黄忠",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "100",
+    "name": "袁术",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 4,
+    "level": "普通"
+  },
+  {
+    "id": "210",
+    "name": "周泰",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "211",
+    "name": "于吉",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "212",
+    "name": "张角",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "362",
+    "name": "王基",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 3,
+    "level": "稀有"
+  },
+  {
+    "id": "400",
+    "name": "严颜",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "401",
+    "name": "王平",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "402",
+    "name": "陆绩",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "403",
+    "name": "孙亮",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 3,
+    "level": "普通"
+  },
+  {
+    "id": "404",
+    "name": "蒯越蒯良",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "406",
+    "name": "许攸",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "407",
+    "name": "卢植",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "408",
+    "name": "郝昭",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "409",
+    "name": "陈到",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 4,
+    "level": "稀有"
+  },
+  {
+    "id": "410",
+    "name": "诸葛瞻",
+    "series": "风林火山",
+    "faction": "蜀",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "411",
+    "name": "周妃",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 3,
+    "level": "史诗"
+  },
+  {
+    "id": "413",
+    "name": "毌丘俭",
+    "series": "风林火山",
+    "faction": "魏",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "414",
+    "name": "陆抗",
+    "series": "风林火山",
+    "faction": "吴",
+    "strength": 4,
+    "level": "史诗"
+  },
+  {
+    "id": "415",
+    "name": "张绣",
+    "series": "风林火山",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "710",
+    "name": "魔司马懿",
+    "series": "魔",
+    "faction": "魏",
+    "strength": 3,
+    "level": "传说"
+  },
+  {
+    "id": "714",
+    "name": "魔吕布",
+    "series": "魔",
+    "faction": "群",
+    "strength": 4,
+    "level": "传说"
+  },
+  {
+    "id": "715",
+    "name": "魔貂蝉",
+    "series": "魔",
+    "faction": "群",
+    "strength": 3,
+    "level": "限定"
+  },
+  {
+    "id": "713",
+    "name": "魔曹操",
+    "series": "魔",
+    "faction": "魏",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "711",
+    "name": "魔孙权",
+    "series": "魔",
+    "faction": "吴",
+    "strength": 4,
+    "level": "限定"
+  },
+  {
+    "id": "750",
+    "name": "魔张飞",
+    "series": "魔",
+    "faction": "蜀",
+    "strength": 5,
+    "level": "传说"
+  }
+]
