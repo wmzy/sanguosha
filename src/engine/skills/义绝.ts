@@ -1,33 +1,76 @@
-// 义绝(界关羽·蜀·主动技):出牌阶段，你可以弃置一张牌，然后令一名其他角色展示所有手牌，
-// 你选择其中一张，其弃置此牌，然后若其弃置的牌不为♥，你摸一张牌。(每回合限一次)
+// 义绝(界关羽·蜀·主动技,OL 界限突破官方逐字):
+//   出牌阶段限一次,你可以弃置一张牌,然后令一名其他角色展示一张手牌。若此牌为:
+//     黑色,其本回合非锁定技失效且不能使用或打出手牌,你本回合对其使用的红桃【杀】伤害+1;
+//     红色,你获得之,然后你可以令其回复1点体力。
 //
 // 流程(主动技):
 //   1. use action:出牌阶段弃置一张手牌(代价) + 指定一名其他有手牌的角色(限一次/回合)
-//   2. 目标展示所有手牌(通过 pickProcessingCard prompt 列出目标手牌明牌给发起者)
-//   3. 发起者(义绝owner)选一张 → 请求回应 target=ownerId
-//   4. 目标弃置选中牌(弃置 atom)
-//   5. 若弃置牌花色≠♥ → 发起者摸一张牌(摸牌 atom)
+//   2. 目标 respond:从自己手牌中选一张展示(pickProcessingCard 列明目标自己的手牌)
+//   3. 引擎 用 展示 atom 公开所选牌(全员可见其牌面)
+//   4. 按展示牌颜色分支:
+//        黑色(♠/♣):目标加三标签——
+//          '义绝/非锁定技失效'(create-engine hook 过滤器读取,跳过目标非锁定技 hook)
+//          '义绝/禁出牌'(本技能 before-hook on '请求回应' 读取,cancel 任何要求该目标
+//                       使用/打出牌的 prompt;纯选择型 prompt 如 confirm/chooseSuit 不受影响)
+//          '义绝/红桃杀加伤'(本技能 before-hook on '造成伤害' 读取,owner 红桃杀+1 伤)
+//        红色(♥/♦):发起者获得此牌(移动牌 target→owner),然后询问发起者是否令其回 1 体力
+//   5. 回合结束 after-hook:清除所有玩家的义绝标签(本回合生效,回合结束失效)
 //
 // 关键点:
 //   - 每回合限一次:义绝/usedThisTurn(once-per-turn 工具)
-//   - "展示所有手牌":目标的全部手牌通过 pickProcessingCard prompt 明牌列出,发起者可见
-//   - 选牌请求 target=ownerId(发起者选择),respond 注册在 ownerId 座次
-//   - 超时兜底:选目标手牌第一张(不放弃拆牌机会)
-//   - ♥检查:suit !== '♥' 才摸牌(♥不摸,非♥摸)
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+//   - "展示一张手牌":目标自己选一张,引擎再通过 展示 atom 公开给全员
+//   - 选牌 prompt 注册到每个座次:目标可能是任意玩家(参考反间/界反间模式)
+//   - 超时兜底:目标选第一张(不放弃展示机会)
+//   - "其本回合...":标签挂目标,owner 回合结束清;owner 的红桃杀+1 伤只对该目标生效
+import type {
+  AtomAfterContext,
+  AtomBeforeContext,
+  Card,
+  FrontendAPI,
+  GameState,
+  HookResult,
+  Json,
+  Skill,
+} from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill';
 
-const PICK_REQUEST = '义绝/选牌';
-const PICK_KEY = '义绝/cardId';
+/** 请求类型:目标展示一张手牌。 */
+const REVEAL_REQUEST = '义绝/reveal';
+/** 请求类型:发起者选择是否令目标回复 1 点体力。 */
+const HEAL_REQUEST = '义绝/heal';
+/** localVars:目标展示的 cardId。 */
+const REVEAL_KEY = '义绝/revealedCardId';
+/** localVars:发起者是否选择回血(choice=true/false)。 */
+const HEAL_KEY = '义绝/healChoice';
+
+/** 标签:目标本回合非锁定技失效(create-engine isHookSuppressed 读取)。 */
+const SUPPRESSION_TAG = '义绝/非锁定技失效';
+/** 标签:目标本回合不能使用或打出手牌(本技能 before-hook on '请求回应' 读取)。 */
+const BAN_TAG = '义绝/禁出牌';
+/** 标签:owner 本回合对该目标使用的红桃【杀】伤害+1(before-hook on '造成伤害' 读取)。 */
+const HEART_BONUS_TAG = '义绝/红桃杀加伤';
+
+/** 义绝打出的所有标签(回合结束统一清理)。 */
+const ALL_TAGS = [SUPPRESSION_TAG, BAN_TAG, HEART_BONUS_TAG];
+
+/** 需要打出/使用手牌的 prompt 类型(纯选择型如 confirm/chooseSuit 不在此列)。 */
+const CARD_PLAY_PROMPTS = new Set([
+  'useCard',
+  'useCardAndTarget',
+  'pickProcessingCard',
+  'pickTargetCard',
+  'distribute',
+]);
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
     name: '义绝',
-    description: '出牌阶段弃置一张牌,令一名其他角色展示手牌,你选一张其弃之,非♥你摸一张',
+    description:
+      '出牌阶段限一次,弃置一张牌并令一名其他角色展示一张手牌;黑色则其本回合非锁定技失效且不能使用或打出手牌,你对其红桃杀伤害+1;红色则你获得之,然后可令其回1点体力',
   };
 }
 
@@ -74,7 +117,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // ── 弃置代价牌 ──
       await applyAtom(st, { type: '弃置', player: from, cardIds: [costCardId] });
 
-      // ── 目标展示所有手牌 + 发起者选一张 ──
+      // ── 令目标展示一张手牌(目标自选) ──
       const targetPlayer = st.players[target];
       if (!targetPlayer?.alive || targetPlayer.hand.length === 0) {
         await popFrame(st);
@@ -92,71 +135,205 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             c !== null,
         );
 
-      delete st.localVars[PICK_KEY];
+      delete st.localVars[REVEAL_KEY];
       await applyAtom(st, {
         type: '请求回应',
-        requestType: PICK_REQUEST,
-        target: from,
+        requestType: REVEAL_REQUEST,
+        target,
         prompt: {
           type: 'pickProcessingCard',
-          title: '义绝:选择目标一张手牌弃置(♥则不摸牌,非♥则你摸一张)',
+          title: '义绝:选择一张手牌展示',
           cards,
         },
         timeout: 30,
       });
 
-      // 读取发起者的选择(超时兜底:选目标手牌第一张,不放弃拆牌机会)
-      let pickedId = st.localVars[PICK_KEY] as string | undefined;
+      // 读取目标的选择(超时兜底:选目标手牌第一张,不放弃展示机会)
+      let revealedId = st.localVars[REVEAL_KEY] as string | undefined;
       const targetHand = st.players[target]?.hand ?? [];
-      if (!pickedId || !targetHand.includes(pickedId)) {
-        pickedId = targetHand[0];
+      if (!revealedId || !targetHand.includes(revealedId)) {
+        revealedId = targetHand[0];
       }
-      delete st.localVars[PICK_KEY];
+      delete st.localVars[REVEAL_KEY];
 
-      // ── 目标弃置选中牌 ──
-      if (pickedId && targetHand.includes(pickedId)) {
-        await applyAtom(st, { type: '弃置', player: target, cardIds: [pickedId] });
+      const revealedCard = revealedId ? st.cardMap[revealedId] : undefined;
+      if (!revealedCard) {
+        await popFrame(st);
+        return;
+      }
 
-        // ── 若弃置牌花色≠♥,发起者摸一张 ──
-        const card = st.cardMap[pickedId];
-        if (card && card.suit !== '♥' && st.players[from]?.alive) {
-          await applyAtom(st, { type: '摸牌', player: from, count: 1 });
+      // ── 公开展示的牌(全员可见其牌面)──
+      await applyAtom(st, { type: '展示', player: target, cardId: revealedId });
+
+      // ── 按颜色分支 ──
+      if (revealedCard.color === '黑') {
+        // 黑色:封非锁定技 + 禁出牌 + 红桃杀加伤(标签回合结束统一清)
+        await applyAtom(st, { type: '加标签', player: target, tag: SUPPRESSION_TAG });
+        await applyAtom(st, { type: '加标签', player: target, tag: BAN_TAG });
+        await applyAtom(st, { type: '加标签', player: target, tag: HEART_BONUS_TAG });
+      } else {
+        // 红色:发起者获得此牌(移动牌 target→owner)
+        await applyAtom(st, {
+          type: '移动牌',
+          cardId: revealedId,
+          from: { zone: '手牌', player: target },
+          to: { zone: '手牌', player: from },
+        });
+
+        // 询问发起者是否令其回复 1 点体力
+        delete st.localVars[HEAL_KEY];
+        await applyAtom(st, {
+          type: '请求回应',
+          requestType: HEAL_REQUEST,
+          target: from,
+          prompt: {
+            type: 'confirm',
+            title: `义绝:是否令 ${st.players[target]?.name ?? '目标'} 回复1点体力?`,
+            confirmLabel: '回复',
+            cancelLabel: '不回复',
+          },
+          defaultChoice: false,
+          timeout: 15,
+        });
+
+        if (st.localVars[HEAL_KEY] === true) {
+          const tp = st.players[target];
+          // 仅存活且未满血时回血(回复体力 atom 自带上限校验,这里跳过满血情况避免无意义结算)
+          if (tp?.alive && tp.health < tp.maxHealth) {
+            await applyAtom(st, { type: '回复体力', target, amount: 1, source: from });
+          }
         }
+        delete st.localVars[HEAL_KEY];
       }
 
       await popFrame(st);
     },
   );
 
-  // ── respond:发起者选一张牌(注册在 ownerId 座次) ──
-  registerAction(
+  // ── respond:处理两种 requestType(reveal 由目标座次回应,heal 由发起者座次回应)
+  //    为每个座次注册独立闭包,以 skillId='义绝' 隔离,不与其他技能 respond 冲突。
+  const unloaders: Array<() => void> = [];
+  for (const p of state.players) {
+    const seatId = p.index;
+    const u = registerAction(
+      state,
+      skill.id,
+      seatId,
+      'respond',
+      (st: GameState, params: Record<string, Json>) => {
+        const slot = st.pendingSlots.get(seatId);
+        if (!slot) return '当前不需要回应';
+        const atom = slot.atom as Record<string, unknown>;
+        if (atom['type'] !== '请求回应') return '当前不需要回应';
+        const reqType = atom['requestType'] as string | undefined;
+        if (reqType === REVEAL_REQUEST) {
+          // 目标展示一张手牌:cardId 必须在自己的手牌中
+          const cardId = params.cardId as string | undefined;
+          if (!cardId) return '请选择一张手牌展示';
+          if (!st.players[seatId].hand.includes(cardId)) return '牌不在手牌中';
+          return null;
+        }
+        if (reqType === HEAL_REQUEST) {
+          // 发起者选择是否回血:choice 必须是布尔
+          if (typeof params.choice !== 'boolean') return '需要选择一项';
+          return null;
+        }
+        return '当前不是义绝回应';
+      },
+      async (st: GameState, params: Record<string, Json>) => {
+        const slot = st.pendingSlots.get(seatId);
+        const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        if (reqType === REVEAL_REQUEST) {
+          st.localVars[REVEAL_KEY] = params.cardId as string;
+        } else if (reqType === HEAL_REQUEST) {
+          st.localVars[HEAL_KEY] = params.choice === true;
+        }
+      },
+    );
+    unloaders.push(u);
+  }
+
+  // ── before-hook:禁出牌目标不能使用/打出手牌 ──
+  //    覆盖三种出牌 prompt atom:'请求回应'(无瓣/拼点选牌等)、'询问闪'、'询问杀'。
+  //    命中条件:atom.target 是有 BAN_TAG 的玩家 + prompt 需要打牌(useCard/pick* 等);
+  //    纯选择型 prompt(confirm/chooseSuit/selectTarget/choosePlayer/chooseCharacter)不拦,
+  //    以保证目标仍可处理非出牌选择。cancel 后该 atom 不再创建 pending,等同于目标不出牌。
+  const banHandler = async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+    const atom = ctx.atom as {
+      target?: number;
+      prompt?: { type?: string };
+    };
+    const target = atom.target;
+    if (typeof target !== 'number' || target < 0) return; // 广播型(无瓣等)不在此处理
+    if (target === ownerId) return; // 发起者自己不受禁出牌影响
+    const player = ctx.state.players[target];
+    if (!player?.tags.includes(BAN_TAG)) return;
+    // 询问闪 / 询问杀 是独立 atom 类型,其 prompt 内置于 atom 定义(useCard型)——按类型判定即可。
+    const atomType = (ctx.atom as { type?: string }).type;
+    if (atomType === '询问闪' || atomType === '询问杀') {
+      return { kind: 'cancel' };
+    }
+    // 请求回应:看 prompt.type 是否要求出牌
+    const promptType = atom.prompt?.type;
+    if (promptType && CARD_PLAY_PROMPTS.has(promptType)) {
+      return { kind: 'cancel' };
+    }
+    return;
+  };
+  registerBeforeHook(state, skill.id, ownerId, '请求回应', banHandler);
+  registerBeforeHook(state, skill.id, ownerId, '询问闪', banHandler);
+  registerBeforeHook(state, skill.id, ownerId, '询问杀', banHandler);
+
+  // ── before-hook on '造成伤害':owner 红桃杀对该目标伤害+1 ──
+  //    命中条件:atom.source === ownerId + 目标有 HEART_BONUS_TAG + 牌为红桃杀;
+  //    单次消费(去标签),保证同一杀只+1,且只对该义绝生效。
+  registerBeforeHook(
     state,
     skill.id,
     ownerId,
-    'respond',
-    (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== PICK_REQUEST) return '当前不是义绝选牌';
-      const cardId = params.cardId as string | undefined;
-      if (!cardId) return '请选择一张牌';
-      // 从帧参数获取目标座次,校验 cardId 在目标当前手牌中
-      const frame = st.settlementStack[st.settlementStack.length - 1];
-      const targets = frame?.params['targets'] as number[] | undefined;
-      const target = targets?.[0];
-      if (target === undefined || !st.players[target]?.hand.includes(cardId)) {
-        return '该牌不在可选范围';
-      }
-      return null;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[PICK_KEY] = params.cardId;
+    '造成伤害',
+    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      const atom = ctx.atom as {
+        source?: number;
+        target?: number;
+        amount?: number;
+        cardId?: string;
+      };
+      if (atom.source !== ownerId) return;
+      if ((atom.amount ?? 0) <= 0) return;
+      const target = atom.target;
+      if (target === undefined) return;
+      const cardId = atom.cardId;
+      if (typeof cardId !== 'string') return;
+      const card = ctx.state.cardMap[cardId];
+      if (!card || card.name !== '杀' || card.suit !== '♥') return;
+      const player = ctx.state.players[target];
+      if (!player?.tags.includes(HEART_BONUS_TAG)) return;
+      await applyAtom(ctx.state, { type: '去标签', player: target, tag: HEART_BONUS_TAG });
+      return {
+        kind: 'modify',
+        atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,
+      };
     },
   );
 
-  return () => {};
+  // ── after-hook on '回合结束':清除所有玩家的义绝标签 ──
+  //    仅 owner 自己的回合结束触发(义绝在 owner 回合使用,效果绑本回合)。
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { player?: number };
+    if (atom.player !== ownerId) return;
+    for (const p of ctx.state.players) {
+      for (const tag of ALL_TAGS) {
+        if (p.tags.includes(tag)) {
+          await applyAtom(ctx.state, { type: '去标签', player: p.index, tag });
+        }
+      }
+    }
+  });
+
+  return () => {
+    unloaders.forEach((u) => u());
+  };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
@@ -165,7 +342,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     style: 'danger',
     prompt: {
       type: 'useCardAndTarget',
-      title: '义绝:弃置一张牌,令一名其他角色展示手牌',
+      title: '义绝:弃置一张牌,令一名其他角色展示一张手牌',
       cardFilter: { min: 1, max: 1 },
       targetFilter: {
         min: 1,
@@ -192,7 +369,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     style: 'danger',
     prompt: {
       type: 'pickProcessingCard',
-      title: '义绝:选择目标一张手牌弃置',
+      title: '义绝:选择一张手牌展示',
       cards: [],
     },
   });

@@ -1,38 +1,55 @@
-// 界再起(界孟获·主动技):摸牌阶段,若你已受伤,你可以放弃摸牌并展示牌堆顶X张牌
-// (X为你已损失体力值),每有一张红桃回复1点体力,然后弃掉这些红桃牌,
-// 将其余的牌收入手牌。
+// 界再起(界孟获·蜀·主动技,OL hero/492 现行版):
+//   "结束阶段,你可以令至多 X 名角色各选择一项
+//    (X 为本回合置入弃牌堆的红色牌数量):
+//      1.摸一张牌;
+//      2.令你回复 1 点体力。"
 //
-// 界孟获增强:红桃牌每张回复1点体力不变,结算后从弃牌堆中回收任意张红桃牌(入手),
-// 未选择的红桃牌留在弃牌堆,非红桃牌入手。
-// 实现:先走原版结算(红桃回血+弃置,非红桃入手),再弹出 select 询问回收哪些红桃。
+// 与标版再起(src/engine/skills/再起.ts)完全不同:
+//   - 标版:摸牌阶段,放弃摸牌,展示牌堆顶 X 张(X=已损失体力),
+//     红桃回血+弃置,非红桃入手。
+//   - 界版:结束阶段,基于"本回合置入弃牌堆的红色牌数量"X,
+//     令至多 X 名角色各选一项(目标摸一张 / 孟获回 1 血)。
 //
-// 模式:摸牌阶段开始时(阶段开始 before hook)询问是否发动;
-//   发动 → 取牌堆顶X张到处理区(展示) → 红桃牌:每张回复1点+弃置;非红桃:入手
-//        → 询问回收哪些红桃(从弃牌堆移回手牌) → 跳过默认摸牌;
-//   不发动 / 未受伤 → 走默认摸牌(摸2张)。
+// 机制:
+//   1. 红色牌计数:回合开始 after-hook 记录弃牌堆基线长度 turn.vars['界再起/base']。
+//      结束阶段扫描 discardPile.slice(base),取红色(♥/♦)牌数量 = X。
+//      (用快照而非逐 atom hook:能覆盖所有置入弃牌堆的路径——弃置/拼点/移动牌/判定/
+//       使用结算等;基线随「回合结束」atom 自动随 turn.vars 清空重置。)
+//   2. 多目标选择:阶段开始(回合结束) after-hook 询问孟获是否发动,
+//      确认后令其选 0..X 名目标(choosePlayer,可含自己,存活即可)。
+//   3. 逐目标选项:对每个目标发 请求回应(confirm),目标选 1(摸牌)或 2(孟获回 1 血);
+//      选项权在目标手里(孟获只决定"令谁选")。
 //
-// 跳过默认摸牌的手法同突袭/兵粮寸断:applyAtom(阶段结束, 摸牌) 推进到出牌,
-//   再 return {kind:'cancel'} 取消本次 阶段开始(摸牌)。
-//
-// 展示机制:把X张牌从牌堆顶移到处理区(公开可见),结算后:
-//   - 红桃牌:弃置(处理区→弃牌堆)+ 回复体力,然后可选择从弃牌堆回收入手
-//   - 非红桃牌:获得(处理区→手牌)
+// 关键点:
+//   - 「至多 X 名角色」:X=0 时不发动;目标数 clamp 到存活角色数;可含孟获自己。
+//   - 「各选择一项」:逐目标串行询问(避免并发 pending 干扰);目标必须选一项,
+//     无"跳过"选项;超时默认选项 1(摸一张)。
+//   - 时序:结束阶段 = 阶段开始(回合结束) after-hook,孟获存活才发动。
+//   - respond 路由:dispatch 按 (skillId, ownerId=seatId, 'respond') 查 action。
+//     故 respond 注册到每个座次(反间同构),以 skillId='界再起' 隔离。
+//     ownerId 座次的 handler 额外处理 trigger/chooseTargets 两类孟获本人询问;
+//     其他座次仅处理 option 询问。同一 (skill,seat,'respond') 只能注册一条,
+//     故合并为一个 handler,内部按 requestType 分支。
+//   - 重洗可能令弃牌堆变短;此时基线失效,保守视为 X=0(本回合不发动)。
 import type {
-  AtomBeforeContext,
+  AtomAfterContext,
   FrontendAPI,
+  GameView,
   GameState,
-  HookResult,
   Json,
   Skill,
 } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
-import { registerAction, registerBeforeHook } from '../skill';
+import { applyAtom } from '../create-engine';
+import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-const TRIGGER_RT = '再起/trigger';
-const TRIGGERED_KEY = '再起/triggered';
-const SELECT_RT = '再起/select'; // 界孟获:选择获得的红桃牌
-const SELECTED_KEY = '再起/selected'; // 界孟获:选中的红桃牌
-const REVEALED_HEARTS_KEY = '再起/revealedHearts'; // 界孟获:展示的红桃牌(校验可选范围)
+const BASE_VAR = '界再起/base'; // turn.vars:本回合弃牌堆基线长度
+const X_VAR = '界再起/x'; // localVars:本次最大目标数(供 chooseTargets validate 校验)
+const TRIGGER_RT = '界再起/trigger'; // 孟获确认是否发动
+const CHOOSE_TARGETS_RT = '界再起/chooseTargets'; // 孟获选目标(多选)
+const OPTION_RT_PREFIX = '界再起/option/'; // +targetIdx → 目标选选项(独立 requestType)
+const TRIGGER_CONFIRMED_KEY = '界再起/confirmed';
+const TARGETS_KEY = '界再起/targets';
+const OPTION_RESULTS_KEY = '界再起/optionResults'; // { [seatId]: 1|2 }
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -40,198 +57,217 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界再起',
     description:
-      '摸牌阶段,若已受伤,可放弃摸牌,展示牌堆顶X张(X=已损失体力),红桃回血弃置后可选回收入手,其余入手',
+      '结束阶段,你可以令至多X名角色各选一项(X=本回合置入弃牌堆的红色牌数):1.摸一张牌;2.令你回复1点体力',
   };
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
+export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  // respond:处理 trigger(confirm) 与 select(回收红桃) 两种询问
-  registerAction(
+  // ── 回合开始 after-hook:记录本回合弃牌堆基线长度 ──
+  const unloadTurnStartHook = registerAfterHook(
     state,
     skill.id,
     ownerId,
-    'respond',
-    (s: GameState, params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== TRIGGER_RT && rt !== SELECT_RT) return '当前不是再起回应';
-      if (rt === SELECT_RT) {
-        const cardIds = params.cardIds as string[] | undefined;
-        if (!Array.isArray(cardIds)) return '需要选择红桃牌(可为空)';
-        const hearts = s.localVars[REVEALED_HEARTS_KEY] as string[] | undefined;
-        for (const id of cardIds) {
-          if (!hearts?.includes(id)) return '该牌不在可选红桃范围';
-        }
-      }
-      return null;
-    },
-    async (s: GameState, params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
-      if (rt === SELECT_RT) {
-        s.localVars[SELECTED_KEY] = params.cardIds ?? [];
-      } else {
-        s.localVars[TRIGGERED_KEY] = params.choice === true || params.confirmed === true;
-      }
+    '回合开始',
+    async (ctx: AtomAfterContext) => {
+      const atom = ctx.atom as { type?: string; player?: number };
+      if (atom.type !== '回合开始') return;
+      if (atom.player !== ownerId) return;
+      ctx.state.turn.vars[BASE_VAR] = ctx.state.zones.discardPile.length;
     },
   );
 
-  // 阶段开始(摸牌) before:询问是否再起,发动则展示+结算+回收红桃+跳过默认摸牌
-  registerBeforeHook(
+  // ── respond:注册到每个座次(以 skillId='界再起' 隔离)──
+  //   ownerId 座次额外处理 trigger/chooseTargets;所有座次都处理 option。
+  //   (dispatch 按 (skillId, seatId, 'respond') 查 action,故每座次独立闭包绑定 seatId。)
+  const unloaders: Array<() => void> = [];
+  for (const p of state.players) {
+    const seatId = p.index;
+    const u = registerAction(
+      state,
+      skill.id,
+      seatId,
+      'respond',
+      (st: GameState, params: Record<string, Json>): string | null => {
+        const slot = st.pendingSlots.get(seatId);
+        if (!slot) return '当前不需要回应';
+        const atom = slot.atom as Record<string, unknown>;
+        if (atom['type'] !== '请求回应') return '当前不需要回应';
+        const rt = atom['requestType'] as string;
+
+        // 孟获本人询问:仅 ownerId 座次回应
+        if (rt === TRIGGER_RT || rt === CHOOSE_TARGETS_RT) {
+          if (seatId !== ownerId) return '当前不是你的询问';
+          if (rt === CHOOSE_TARGETS_RT) {
+            const x = st.localVars[X_VAR] as number | undefined;
+            const targets = params.targets as Json[] | undefined;
+            if (!Array.isArray(targets)) return '需选择目标(可为空)';
+            const maxN = typeof x === 'number' ? x : 0;
+            if (targets.length > maxN) return `至多选择 ${maxN} 名角色`;
+            for (const t of targets) {
+              if (typeof t !== 'number') return '目标不合法';
+              if (!st.players[t]?.alive) return '目标不合法';
+            }
+          }
+          return null;
+        }
+
+        // 选项询问:任何座次(以 OPTION_RT_PREFIX+seatId 命名,确保是问自己的)
+        if (typeof rt === 'string' && rt === OPTION_RT_PREFIX + seatId) {
+          return null; // confirm 二选一,choice/confirmed 即答案
+        }
+
+        return '当前不是界再起询问';
+      },
+      async (st: GameState, params: Record<string, Json>): Promise<void> => {
+        const slot = st.pendingSlots.get(seatId);
+        const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        if (rt === TRIGGER_RT) {
+          st.localVars[TRIGGER_CONFIRMED_KEY] =
+            params.choice === true || params.confirmed === true;
+        } else if (rt === CHOOSE_TARGETS_RT) {
+          const targets = params.targets as Json[] | undefined;
+          st.localVars[TARGETS_KEY] = Array.isArray(targets)
+            ? (targets.filter((t): t is number => typeof t === 'number') as number[])
+            : [];
+        } else if (rt === OPTION_RT_PREFIX + seatId) {
+          // choice=true / confirmed=true → 选项 1(摸一张牌);否则 → 选项 2(孟获回 1 血)
+          const choice = params.choice === true || params.confirmed === true;
+          const option: 1 | 2 = choice ? 1 : 2;
+          const results =
+            (st.localVars[OPTION_RESULTS_KEY] as Record<string, Json> | undefined) ?? {};
+          results[String(seatId)] = option;
+          st.localVars[OPTION_RESULTS_KEY] = results;
+        }
+      },
+    );
+    unloaders.push(u);
+  }
+
+  // ── 阶段开始(回合结束) after-hook:界再起主逻辑 ──
+  const unloadEndHook = registerAfterHook(
     state,
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+    async (ctx: AtomAfterContext): Promise<void> => {
       const atom = ctx.atom as { type?: string; player?: number; phase?: string };
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
-      if (atom.phase !== '摸牌') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      const self = ctx.state.players[ownerId];
+      if (atom.phase !== '回合结束') return;
+      const st = ctx.state;
+      const self = st.players[ownerId];
       if (!self?.alive) return;
 
-      // 发动条件:已受伤(当前体力 < 体力上限)
-      const lostHealth = self.maxHealth - self.health;
-      if (lostHealth <= 0) return; // 未受伤 → 默认摸牌
+      // 计算 X = 本回合置入弃牌堆的红色牌数量
+      const base = st.turn.vars[BASE_VAR] as number | undefined;
+      if (typeof base !== 'number') return;
+      // 重洗可能令弃牌堆变短;基线失效则 X=0(本回合不发动)
+      if (st.zones.discardPile.length < base) return;
+      const newCardIds = st.zones.discardPile.slice(base);
+      const x = newCardIds.filter((id) => st.cardMap[id]?.color === '红').length;
+      if (x <= 0) return; // X=0 → 不发动
 
-      // 牌堆不足 → 无法展示 → 默认摸牌
-      if (ctx.state.zones.deck.length === 0) return;
+      const aliveCount = st.players.filter((p) => p.alive).length;
+      if (aliveCount === 0) return;
+      const maxTargets = Math.min(x, aliveCount);
 
-      // 询问是否发动再起
-      delete ctx.state.localVars[TRIGGERED_KEY];
-      await applyAtom(ctx.state, {
+      // 1) 询问孟获是否发动(描述"你可以"= 可选)
+      delete st.localVars[TRIGGER_CONFIRMED_KEY];
+      await applyAtom(st, {
         type: '请求回应',
         requestType: TRIGGER_RT,
         target: ownerId,
         prompt: {
           type: 'confirm',
-          title: `是否发动再起?(放弃摸牌,展示牌堆顶${lostHealth}张,红桃回血,其余入手)`,
+          title: `界再起:本回合置入弃牌堆 ${x} 张红色牌。是否令至多 ${maxTargets} 名角色各选一项?`,
+          description: '选项:1.摸一张牌;2.令孟获回复1点体力',
           confirmLabel: '发动',
           cancelLabel: '不发动',
         },
         defaultChoice: false,
-        timeout: 10,
+        timeout: 20,
       });
-      if (ctx.state.localVars[TRIGGERED_KEY] !== true) return; // 不发动 → 默认摸牌
+      const confirmed = st.localVars[TRIGGER_CONFIRMED_KEY] === true;
+      delete st.localVars[TRIGGER_CONFIRMED_KEY];
+      if (!confirmed) return; // 不发动 / 超时
 
-      // 取牌堆顶X张到处理区(展示)——X = 已损失体力值,但不超过牌堆数
-      const x = Math.min(lostHealth, ctx.state.zones.deck.length);
-      const shownCardIds: string[] = [];
-      for (let i = 0; i < x; i++) {
-        const topCardId = ctx.state.zones.deck[ctx.state.zones.deck.length - 1];
-        if (!topCardId) break;
-        // 移到处理区(展示)
-        await applyAtom(ctx.state, {
-          type: '移动牌',
-          cardId: topCardId,
-          from: { zone: '牌堆' },
-          to: { zone: '处理区' },
-        });
-        shownCardIds.push(topCardId);
-      }
+      // 2) 选 0..maxTargets 名目标(可含自己;存活即可)
+      st.localVars[X_VAR] = maxTargets;
+      delete st.localVars[TARGETS_KEY];
+      await applyAtom(st, {
+        type: '请求回应',
+        requestType: CHOOSE_TARGETS_RT,
+        target: ownerId,
+        prompt: {
+          type: 'choosePlayer',
+          title: `界再起:选择至多 ${maxTargets} 名角色(各选一项:摸一张牌 或 令你回复1点体力)`,
+          min: 0,
+          max: maxTargets,
+          filter: (_view: GameView, t: number) => st.players[t]?.alive === true,
+        },
+        timeout: 30,
+      });
+      delete st.localVars[X_VAR];
+      const rawTargets = st.localVars[TARGETS_KEY] as number[] | undefined;
+      delete st.localVars[TARGETS_KEY];
+      const targets = Array.isArray(rawTargets)
+        ? rawTargets
+            .filter((t, i, arr) => st.players[t]?.alive && arr.indexOf(t) === i) // 去重 + 存活
+            .slice(0, maxTargets)
+        : [];
+      if (targets.length === 0) return; // 未选目标 → 不结算
 
-      if (shownCardIds.length === 0) {
-        // 无牌可展示 → 回退默认摸牌(不 cancel)
-        return;
-      }
-
-      // ── 界孟获结算:红桃回血+弃置,非红桃入手;然后回收红桃 ──
-      // 先走原版结算(红桃 → 回复1点+弃置;非红桃 → 入手)
-      const heartIds: string[] = [];
-      for (const cardId of shownCardIds) {
-        const card = ctx.state.cardMap[cardId];
-        if (!card) continue;
-        if (card.suit === '♥') {
-          heartIds.push(cardId);
-          const self2 = ctx.state.players[ownerId];
-          if (self2.health < self2.maxHealth) {
-            await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
-          }
-          await applyAtom(ctx.state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        } else {
-          await applyAtom(ctx.state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '手牌', player: ownerId },
-          });
-        }
-      }
-
-      // 界孟获增强:询问是否获得任意张红桃牌(从弃牌堆移回手牌)
-      if (heartIds.length > 0) {
-        ctx.state.localVars[REVEALED_HEARTS_KEY] = heartIds;
-        delete ctx.state.localVars[SELECTED_KEY];
-        await applyAtom(ctx.state, {
+      // 3) 逐目标询问选项 1/2,逐个结算(串行避免并发 pending 干扰)
+      for (const t of targets) {
+        if (!st.players[t]?.alive) continue; // 中途死亡则跳过
+        delete st.localVars[OPTION_RESULTS_KEY];
+        await applyAtom(st, {
           type: '请求回应',
-          requestType: SELECT_RT,
-          target: ownerId,
+          requestType: OPTION_RT_PREFIX + t,
+          target: t,
           prompt: {
-            type: 'distribute',
-            mode: 'select',
-            title: '再起:选择要获得的红桃牌(每张已回血,不选则留在弃牌堆)',
-            cardIds: heartIds,
-            minTotal: 0,
-            maxTotal: heartIds.length,
+            type: 'confirm',
+            title: '界再起(孟获):选择一项——1.摸一张牌;2.令孟获回复1点体力',
+            confirmLabel: '1·摸一张牌',
+            cancelLabel: '2·令孟获回复1点体力',
           },
-          timeout: 15,
+          defaultChoice: true, // 超时默认选项 1(摸一张牌)
+          timeout: 20,
         });
-        const picked = ctx.state.localVars[SELECTED_KEY] as string[] | undefined;
-        const gainedHeartIds = Array.isArray(picked)
-          ? picked.filter((id) => heartIds.includes(id))
-          : [];
+        const results = st.localVars[OPTION_RESULTS_KEY] as Record<string, Json> | undefined;
+        const optionRaw = results?.[String(t)];
+        // choice=true/超时 → 1;choice=false → 2
+        const option: 1 | 2 = optionRaw === 2 ? 2 : 1;
 
-        // 将选中的红桃从弃牌堆移回手牌
-        for (const cardId of gainedHeartIds) {
-          await applyAtom(ctx.state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '弃牌堆' },
-            to: { zone: '手牌', player: ownerId },
-          });
+        if (option === 1) {
+          // 选项 1:目标摸一张牌
+          await applyAtom(st, { type: '摸牌', player: t, count: 1 });
+        } else {
+          // 选项 2:孟获回复 1 点体力(孟获仍存活且未满血才回)
+          const mh = st.players[ownerId];
+          if (mh?.alive && mh.health < mh.maxHealth) {
+            await applyAtom(st, { type: '回复体力', target: ownerId, amount: 1 });
+          }
         }
       }
-
-      // 清理处理区残留(安全兜底)
-      const remaining = frameCards(ctx.state).filter((id) => shownCardIds.includes(id));
-      for (const id of remaining) {
-        await applyAtom(ctx.state, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-
-      // 跳过默认摸牌:推进到出牌阶段,并 cancel 本次摸牌阶段开始
-      await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '摸牌' });
-      return { kind: 'cancel' };
+      delete st.localVars[OPTION_RESULTS_KEY];
     },
   );
 
-  return () => {};
+  return () => {
+    unloadTurnStartHook();
+    unloaders.forEach((u) => u());
+    unloadEndHook();
+  };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: '再起',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动再起?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
+  // 被动触发(结束阶段 after-hook),无主动 action 按钮;无前端 prompt 注册。
+  // respond 询问由 engine 通用 confirm UI 渲染(prompt 随请求回应 atom 下发)。
+  return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+const _skillModule: SkillModule = { createSkill, onInit, onMount };
+export default _skillModule;

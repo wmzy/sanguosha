@@ -5,23 +5,23 @@
 //   (移出手牌+回合结束归还),不免疫任何锦囊。二者机制完全不同,故新建本文件,标版保留不动。
 //
 // 实现(模式 A 触发型):
-//   ① 触发钩点(两条路径):
-//      - 「添加延时锦囊」after:延时锦囊(乐不思蜀/兵粮寸断/闪电)放置到陆逊判定区时触发。
+//   ① 触发钩点(两条路径,覆盖官方描述中"延时锦囊"与"普通锦囊"两类):
+//      路径 1「添加延时锦囊」after:延时锦囊(乐不思蜀/兵粮寸断/闪电)放置到陆逊判定区时触发。
 //        延时锦囊天然单目标,无需额外唯一目标判定。
-//      - 「成为目标」after:他人使用的普通锦囊以陆逊为唯一目标时触发。
-//        判定:顶帧 from≠自己、顶帧处理区有「普通锦囊」牌(type==='锦囊牌' 且非延时/响应) 、
-//        frame.params.targets 恰好 1 且为自己。(排除杀/多目标锦囊/自己使用的锦囊。)
+//      路径 2「请求回应」after(无懈窗口收敛点):所有普通锦囊(决斗/顺手牵羊/过河拆桥/火攻/
+//        借刀杀人 等)在生效前都调用 询问无懈可击(state, target);该 helper 内部循环开
+//        请求回应 atom(requestType='无懈可击', cancelTarget=本次抵消目标)。本 hook 监听该 atom:
+//          - 本窗口无人打出无懈(localVars[`无懈/已回应/${target}`]===false)→ 最后一个窗口
+//          - 累计未被抵消(localVars[`无懈/被抵消/${target}`]===false,即 0 或偶数次无懈)
+//          - frame.from≠陆逊(他人使用)+ 帧处理区有普通锦囊 + 陆逊是该锦囊唯一目标
+//        满足以上 = 该普通锦囊确定对陆逊生效,触发谦逊。
+//        该路径统一覆盖"经成为目标"(决斗)与"直接生效型"(顺手牵羊/过河拆桥/火攻/借刀杀人 等)
+//        两类普通锦囊——前者也会经过 询问无懈可击,故无需再加 成为目标 钩子。
 //   ② 询问 confirm;确认后用「移出游戏」atom 把全部手牌暂存到 player.vars['界谦逊/移出']。
 //   ③ 「回合结束」after-hook:检测到移出区非空 → 用「归还移出牌」atom 归还手牌。
 //
 // 联动:移出全部手牌会使手牌归零 → 触发「界连营」,X = 失去的手牌数 = 移出张数。
 //   这是界陆逊的核心combo(谦逊搬空手牌 → 连营令多名角色摸牌)。
-//
-// 已知覆盖边界(诚实记录):
-//   - 顺手牵羊/过河拆桥/火攻 等直接生效型普通锦囊不走「成为目标」atom,本实现未覆盖。
-//     引擎无统一「锦囊生效」钩点,逐牌挂获得/弃置 before-hook 会破坏这些锦囊的选牌/结算流程,
-//     风险高于收益,留作后续工作。当前覆盖:全部延时锦囊 + 经「成为目标」的单目标普通锦囊
-//     (决斗,及未来任何走 成为目标 流程的单目标普通锦囊)。
 import type {
   AtomAfterContext,
   FrontendAPI,
@@ -57,6 +57,28 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!card) return false;
     if (card.type !== '锦囊牌') return false;
     return card.trickSubtype !== '延时锦囊' && card.trickSubtype !== '响应锦囊';
+  }
+
+  // 提取普通锦囊的目标集合(唯一目标的判定基础)。
+  // 借刀杀人特殊:targets=[目标, killTarget] 或 target+killTarget,仅"目标"是锦囊的目标,
+  //   killTarget 是其内嵌杀的目标(由借刀杀人响应阶段处理),不计入锦囊目标集合。
+  function getScrollTargets(frame: {
+    skillId?: string;
+    params?: Record<string, Json>;
+  }): number[] {
+    const params = frame.params ?? {};
+    if (frame.skillId === '借刀杀人') {
+      const t =
+        typeof params.target === 'number'
+          ? params.target
+          : Array.isArray(params.targets)
+            ? (params.targets[0] as number)
+            : undefined;
+      return typeof t === 'number' ? [t] : [];
+    }
+    if (Array.isArray(params.targets)) return params.targets as number[];
+    if (typeof params.target === 'number') return [params.target];
+    return [];
   }
 
   // 触发:询问是否发动谦逊;确认则把全部手牌移出游戏。
@@ -116,22 +138,34 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await maybeOfferExile(ctx, `延时锦囊${atom.trick?.name ? '「' + atom.trick.name + '」' : ''}对你生效`);
   });
 
-  // ── 普通锦囊(他人使用,陆逊为唯一目标):成为目标 after ──
-  registerAfterHook(state, skill.id, ownerId, '成为目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; target?: number };
-    if (atom.type !== '成为目标') return;
-    if (atom.target !== ownerId) return;
+  // ── 普通锦囊(他人使用,陆逊为唯一目标):无懈窗口收敛点触发 ──
+  //    覆盖所有走 询问无懈可击 的普通锦囊:决斗 / 顺手牵羊 / 过河拆桥 / 火攻 / 借刀杀人 等。
+  registerAfterHook(state, skill.id, ownerId, '请求回应', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as {
+      type?: string;
+      requestType?: string;
+      cancelTarget?: number;
+    };
+    if (atom.type !== '请求回应') return;
+    if (atom.requestType !== '无懈可击') return; // 仅无懈窗口(谦逊自身 prompt 走 CONFIRM_RT,被此过滤排除)
+    if (atom.cancelTarget !== ownerId) return; // 本次抵消目标不是陆逊
+    // 本窗口无人打出无懈 = 这是 询问无懈可击 的最后一个窗口
+    const respondedKey = `无懈/已回应/${ownerId}`;
+    if (ctx.state.localVars[respondedKey] === true) return;
+    // 累计未被抵消(0 或偶数次无懈)→ 锦囊将生效
+    const cancelKey = `无懈/被抵消/${ownerId}`;
+    if (ctx.state.localVars[cancelKey] === true) return;
     const frame = topFrame(ctx.state);
     if (!frame) return;
-    if (frame.from === ownerId) return; // 自己使用的普通锦囊不触发
-    // 顶帧处理区须有「普通锦囊」牌(排除杀等基本牌/延时锦囊/响应锦囊)
+    if (frame.from === ownerId) return; // 自己使用的锦囊不触发
+    // 帧处理区须有「普通锦囊」牌(排除杀等基本牌/延时锦囊/响应锦囊)
     const scrollCardId = frame.cards.find((id) =>
       isNormalTrick(ctx.state.cardMap[id] as { type?: string; trickSubtype?: string } | undefined),
     );
     if (!scrollCardId) return;
-    // 唯一目标:frame.params.targets 恰好 1 且为自己
-    const targets = frame.params.targets;
-    if (!Array.isArray(targets) || targets.length !== 1 || targets[0] !== ownerId) return;
+    // 唯一目标:锦囊目标集合恰好 [陆逊]
+    const targets = getScrollTargets(frame);
+    if (targets.length !== 1 || targets[0] !== ownerId) return;
     const scrollName = ctx.state.cardMap[scrollCardId]?.name ?? '普通锦囊';
     await maybeOfferExile(ctx, `「${scrollName}」对你生效`);
   });

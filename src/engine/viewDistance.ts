@@ -58,6 +58,9 @@ export function viewCanAttack(
   // 前端 filter 无法感知当前选中的卡色(签名只收 view/target),这里保持宽松——
   // 诈降激活时一律放行(UI 提示);后端 杀.validate 按卡色严格校验(仅红杀放行)。
   if (players[fromIdx]?.turnUsage?.['诈降/active']) return true;
+  // 界武圣(界关羽):你使用的方片【杀】无距离限制。前端 filter 无法感知选中卡色,
+  // 保持宽松(所有目标可点);后端 杀.validate 按花色严格校验(仅方片杀放行)。
+  if (players[fromIdx]?.skills?.includes('界武圣')) return true;
   const range = players[fromIdx]?.distanceVars?.attackRange ?? 1;
   return viewEffectiveDistance(players, fromIdx, toIdx) <= range;
 }

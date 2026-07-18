@@ -1,12 +1,20 @@
 // 界洛神(界甄姬·被动技):准备阶段,你可以进行判定,若结果为黑色,
-// 你可以获得此判定牌,并重复此流程。若结果为红色,你也可以获得此判定牌,
-// 但结束此流程。
+// 你可以获得此判定牌,并重复此流程。以此法获得的牌本回合不计入手牌上限。
+//
+// 官方来源(逐字):"准备阶段,你可以判定,若结果为黑色,你获得此牌,
+//   然后你可以重复此流程。以此法获得的牌本回合不计入手牌上限。"
+//
+// 界版相对标版洛神的变化:
+//   - 手牌上限豁免:以此法(洛神判定获得)获得的牌,本回合不计入手牌上限。
+//     实现方式:每张获得的判定牌 id 记入 turn.vars['界洛神/豁免牌'](随「回合结束」atom
+//     自动随 turn.vars 清空,天然"本回合"语义);并注册 hand-limit 覆盖型提供者,
+//     在弃牌阶段/弃牌超时统一读取点把仍在手牌中的豁免牌数加进手牌上限。
 //
 // 流程:
 //   阶段开始(准备) after-hook → 询问是否发动 → 循环:
 //     判定 → 判定 after-hook 读判定牌花色并存 localVars →
-//     黑色:把判定牌从弃牌堆移到手牌(获得)→ 询问是否继续 → 继续:重复 / 停止:退出
-//     红色:把判定牌从弃牌堆移到手牌(获得)→ 退出循环(界版:红色也获得)
+//     黑色:把判定牌从弃牌堆移到手牌(获得,记入豁免牌)→ 询问是否继续 → 继续:重复 / 停止:退出
+//     红色:退出循环(官方仅明示黑色获得,红色不获得)
 //
 // 判定牌时序:判定 atom 的 skill after-hooks 在 def.afterHooks(把判定牌移入弃牌堆)之前跑。
 // 因此洛神的 判定 after-hook 读 frameCards(此时判定牌还在处理区);随后 def.afterHooks 把
@@ -14,19 +22,30 @@
 import type { AtomAfterContext, FrontendAPI, Skill, GameState, Card } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { registerHandLimitProvider } from '../hand-limit';
+
+/** turn.vars key:本回合经洛神获得的判定牌 id 列表(随「回合结束」自动清空) */
+const EXEMPT_VAR = '界洛神/豁免牌';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
     name: '界洛神',
-    description: '准备阶段判定:黑色获得判定牌并重复,红色也获得但结束流程',
+    description:
+      '准备阶段判定:黑色获得判定牌并重复;以此法获得的牌本回合不计入手牌上限',
   };
 }
 
 /** 判定牌是否为黑色(黑桃 ♠ 或梅花 ♣) */
 function isBlack(card: Card | undefined): boolean {
   return !!card && (card.suit === '♠' || card.suit === '♣');
+}
+
+/** 读本回合洛神豁免牌列表(可能为空) */
+function readExemptList(state: GameState): string[] {
+  const v = state.turn.vars[EXEMPT_VAR];
+  return Array.isArray(v) ? (v as string[]) : [];
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
@@ -73,6 +92,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.localVars['洛神/lastResult'] = isBlack(judgeCard) ? 'black' : 'red';
   });
 
+  // ── 手牌上限豁免:以此法获得的牌本回合不计入手牌上限 ──
+  // 覆盖型提供者:返回 默认公式(体力+加成) + 仍在手牌中的豁免牌数。
+  // 无豁免牌时返回 undefined,交回默认公式/其他提供者(取最宽松)。
+  // 弃牌阶段(回合管理.ts)与弃牌超时(请求回应.ts)统一经 handLimit() 读取,自动生效。
+  const unloadProvider = registerHandLimitProvider(state, ownerId, (st, player) => {
+    if (player !== ownerId) return undefined;
+    const exempt = readExemptList(st);
+    if (exempt.length === 0) return undefined;
+    const hand = st.players[player]?.hand ?? [];
+    const inHand = exempt.filter((id) => hand.includes(id)).length;
+    if (inHand === 0) return undefined;
+    const bonus = (st.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
+    const health = st.players[player]?.health ?? 0;
+    return health + bonus + inHand;
+  });
+
   // 阶段开始(准备) after-hook:洛神主循环
   registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { type: string; player: number; phase?: string };
@@ -99,7 +134,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
     if (!ctx.state.localVars['洛神/confirmed']) return;
 
-    // 主循环:判定 → 获得判定牌 → 黑色可继续 / 红色结束流程
+    // 主循环:判定 → 黑色获得(记入豁免牌)→ 询问继续 → 重复;红色不获得直接停止
     let keepGoing = true;
     while (keepGoing) {
       if (ctx.state.zones.deck.length === 0) break;
@@ -112,9 +147,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars['洛神/lastResult'];
       delete ctx.state.localVars['洛神/lastJudgeCardId'];
 
-      if (!judgeCardId) break; // 异常:退出
+      // 官方仅明示黑色获得;红色停止且不获得
+      if (result !== 'black' || !judgeCardId) break;
 
-      // 界洛神:无论黑色还是红色,都获得判定牌。
       // 获得判定牌:判定牌此刻已在弃牌堆顶(def.afterHooks 已运行)。
       // 用 移动牌 把判定牌从弃牌堆移到手牌。
       await applyAtom(ctx.state, {
@@ -124,8 +159,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         to: { zone: '手牌', player: ownerId },
       });
 
-      // 黑色:可以继续判定;红色:结束流程
-      if (result !== 'black') break;
+      // 记入豁免牌:本回合不计入手牌上限
+      const list = readExemptList(ctx.state);
+      if (!list.includes(judgeCardId)) {
+        list.push(judgeCardId);
+        ctx.state.turn.vars[EXEMPT_VAR] = list;
+      }
 
       // 询问是否继续
       delete ctx.state.localVars['洛神/confirmed'];
@@ -147,7 +186,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars['洛神/confirmed'];
   });
 
-  return () => {};
+  return () => {
+    unloadProvider();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {

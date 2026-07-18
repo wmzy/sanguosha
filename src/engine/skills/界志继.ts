@@ -1,12 +1,13 @@
-// 界志继(界姜维·觉醒技):准备阶段,若你没有手牌,你须回复1点体力或摸两张牌,
+// 界志继(界姜维·觉醒技,OL 界限突破官方逐字):
+//   觉醒技,准备阶段或结束阶段,若你没有手牌,你须回复1点体力或摸两张牌,
 //   然后减1点体力上限,并永久获得技能"观星"。
 //
 // 与原版志继唯一差异:触发时机。
 //   原版姜维:回合开始阶段(「回合开始」atom 的 after-hook)
-//   界姜维:准备阶段(「阶段开始」atom,phase='准备' 的 after-hook)
+//   界姜维:准备阶段 **或结束阶段**(「阶段开始」atom,phase='准备' 或 '回合结束' 的 after-hook)
 //
 // 分析(步骤1):
-//   类型:觉醒技 | 时机:准备阶段(「阶段开始」atom,phase='准备' 的 after-hook)
+//   类型:觉醒技 | 时机:准备阶段 / 结束阶段(两个时机均可)
 //   触发条件:ownerId 无手牌 + 未觉醒过(player.vars['志继/awakened'])
 //   流程(强制二选一,然后减上限 + 加技能):
 //     1. 请求回应(二选一:回复1点体力 / 摸两张牌)— 强制选择
@@ -15,6 +16,7 @@
 //     3. 设上限(player=owner, amount=maxHealth-1)— 减1点体力上限
 //     4. 添加技能(player=owner, skillId='观星')
 //   觉醒标记:player.vars['志继/awakened'](后缀不含 usedThisTurn,不被「回合结束」清理)
+//   防重入:AWAKENED_KEY 在 awaken() 入口即设,准备阶段触发后即使结束阶段无手牌也不会再触发。
 import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
@@ -28,7 +30,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界志继',
-    description: '觉醒技:准备阶段且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得"观星"',
+    description: '觉醒技:准备阶段或结束阶段且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得"观星"',
   };
 }
 
@@ -107,11 +109,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 准备阶段 after-hook:界志继主逻辑(界姜维在准备阶段触发,而非回合开始)──
+  // ── 准备阶段 / 结束阶段 after-hook:界志继主逻辑(界姜维在这两个时机均可触发)──
   registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { type?: string; player?: number; phase?: string };
     if (atom.type !== '阶段开始') return;
-    if (atom.phase !== '准备') return;
+    // 官方:"准备阶段或结束阶段" —— 两个时机均可触发。引擎中"结束阶段"=phase='回合结束'。
+    if (atom.phase !== '准备' && atom.phase !== '回合结束') return;
     if (atom.player !== ownerId) return;
     await awaken(ctx.state, ownerId);
   });

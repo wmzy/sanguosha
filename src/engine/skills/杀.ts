@@ -14,12 +14,22 @@
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
-import { inAttackRange } from '../distance';
+import { inAttackRange, effectiveDistance } from '../distance';
 import { viewCanAttack } from '../viewDistance';
 import { enforceDualDodge } from './无双';
 import { enforceRoulinDodge } from './肉林';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
+
+/** 牌点数:A=1, 2-10=面值, J=11, Q=12, K=13(与天义/驱虎等 rankValue 同语义,杀内联) */
+function rankValue(rank: string): number {
+  if (rank === 'A') return 1;
+  if (rank === 'J') return 11;
+  if (rank === 'Q') return 12;
+  if (rank === 'K') return 13;
+  const n = parseInt(rank, 10);
+  return Number.isFinite(n) ? n : 0;
+}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
@@ -45,13 +55,28 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const slashCard = cardId ? state.cardMap[cardId] : undefined;
       const redSlashNoRange =
         slashCard?.color === '红' && state.turn.vars['诈降/active'] === ownerId;
+      // 界武圣(界关羽):你使用的方片【杀】无距离限制(被动增益,任何方片杀均生效,
+      // 含物理方片杀与武圣/丈八转化出的方片杀)。仅持有界武圣技能的玩家享受此豁免。
+      const hasJieWusheng = state.players[ownerId].skills.includes('界武圣');
+      const diamondSlashNoRange = hasJieWusheng && slashCard?.suit === '♦';
+      // 界烈弓(界黄忠):你【杀】的攻击范围为此【杀】点数。按 FAQ,武器范围 > 杀点数时
+      // 仍以武器为准,即 effectiveRange = max(武器范围, 杀点数)。仅在使用者为界黄忠时生效。
+      const hasJieLiegong = state.players[ownerId].skills.includes('界烈弓');
+      const jieLiegongRank =
+        hasJieLiegong && slashCard ? rankValue(slashCard.rank) : 0;
       const targetsOk =
         Array.isArray(params.targets) &&
-        (params.targets as number[]).every(
-          (t) =>
-            state.players[t]?.alive === true &&
-            (redSlashNoRange || inAttackRange(state, ownerId, t)),
-        );
+        (params.targets as number[]).every((t) => {
+          if (state.players[t]?.alive !== true) return false;
+          if (redSlashNoRange || diamondSlashNoRange) return true;
+          if (jieLiegongRank > 0) {
+            const baseRange =
+              (state.players[ownerId].vars['距离/出杀范围'] as number) ?? 1;
+            const effRange = Math.max(baseRange, jieLiegongRank);
+            return effectiveDistance(state, ownerId, t) <= effRange;
+          }
+          return inAttackRange(state, ownerId, t);
+        });
       if (!targetsOk) return '目标不合法';
       return canSlash(state, ownerId) ? null : '出杀次数已达上限';
     },

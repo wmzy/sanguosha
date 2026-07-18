@@ -1,17 +1,29 @@
-// 界铁骑(界马超·被动技):当你使用【杀】指定一名角色为目标后,你可以进行一次判定,
-// 若结果为红色或黑色,该角色不能使用【闪】抵消此【杀】;若为黑色,你额外摸一张牌。
+// 界铁骑(界马超·被动技,OL 界限突破官方逐字):
+//   当你使用【杀】指定目标后,你可以令其本回合非锁定技失效,然后你判定,
+//   除非其弃置一张与判定结果花色相同的牌,否则其不能抵消此【杀】。
 //
-// 实现(三段式,禁闪横切机制):
+// 与标铁骑 src/engine/skills/铁骑.ts 差异(官方对齐):
+//   1. 新增「本回合非锁定技失效」:发动后给目标加 SUPPRESSION_TAG,
+//      create-engine.runBeforeHooks/runAfterHooks 据此跳过目标的非锁定技 hook
+//      (锁定技与装备技描述含「锁定技/防具:/武器:」标记,不受压制)。
+//   2. 「判定后弃同花色牌免闪」:旧版直接 cancel 询问闪强制命中,且只看红/黑色;
+//      官方为判定后令目标选弃一张与判定结果同花色(♠/♥/♣/♦)的牌,
+//      弃了 → 可正常出闪抵消;没弃/弃不出 → cancel 询问闪强制命中。
+//   3. 移除旧版「黑色判定额外摸一张牌」——官方无此增益(实现臆造)。
+//
+// 三段式实现(禁闪横切 + 标签压制):
 //   1. 指定目标 after hook(source===ownerId, card 是杀):
-//        询问"是否发动铁骑" → 若发动 → applyAtom(判定)。
+//        询问「是否发动铁骑」→ 若发动 →
+//          a. 给目标加标签 SUPPRESSION_TAG(本回合非锁定技失效,回合结束清)
+//          b. applyAtom(判定),judgeType='铁骑'
 //   2. 判定 after hook(judgeType==='铁骑', player===ownerId):
-//        读判定牌(结算帧最后一张),红色或黑色 → 给目标加标签 '铁骑/禁闪';
-//        黑色额外摸一张牌。
-//   3. 询问闪 before hook(source===ownerId 且 target 有 '铁骑/禁闪' 标签):
-//        去标签 + cancel(跳过询问闪 → 处理区无闪 → 杀.execute 造成伤害,强制命中)。
+//        读判定牌花色 → 写 localVars[SUIT_VAR]=花色,供阶段3消费。
+//   3. 询问闪 before hook(source===ownerId 且 localVars 有花色):
+//        请求目标弃一张同花色手牌 → 弃了 → pass(询问闪正常,目标可出闪);
+//        没弃/超时/无同花色牌 → cancel(强制命中)。
 //
-// 标签生命周期:在阶段1(指定目标)产出,阶段2(询问闪)消费并清除——天然按单次杀结算。
-// 杀技能零感知铁骑:它只看处理区有没有闪牌;取消询问闪等价于目标不出闪。
+// SUPPRESSION_TAG 生命周期:发动时加,界马超回合结束 after hook 清。
+//   标签由 create-engine 的 hook 过滤器读取,实现「目标非锁定技失效」。
 import type {
   AtomAfterContext,
   AtomBeforeContext,
@@ -23,48 +35,77 @@ import type {
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
-const TAG = '铁骑/禁闪';
+/** 标签:目标本回合非锁定技失效(create-engine.runBeforeHooks/runAfterHooks 读取) */
+export const SUPPRESSION_TAG = '界铁骑/非锁定技失效';
 const CONFIRM = '铁骑/confirmed';
 const TARGET_VAR = '铁骑/target';
+const SUIT_VAR = '铁骑/suit';
+const DISCARD_CARD = '铁骑/discardCard';
+const DISCARD_REQUEST = '铁骑/discard';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
     name: '界铁骑',
-    description: '使用杀指定目标后可判定,红色或黑色则目标不能出闪抵消,黑色额外摸一张牌',
+    description:
+      '使用杀指定目标后,可令其本回合非锁定技失效并判定;除非其弃一张与判定结果同花色的牌,否则不能抵消此杀',
   };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // respond:被询问"是否发动铁骑"时回应,设 localVars 标记结果
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state, _params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是请求回应';
-      if (atom.requestType !== '铁骑/confirm') return '当前不是铁骑确认';
-      return null;
-    },
-    async (state, params) => {
-      state.localVars[CONFIRM] = params.choice === true || params.confirmed === true;
-    },
-  );
+  // respond:同一 action 处理两种 requestType ——
+  //   '铁骑/confirm':ownerId 确认是否发动
+  //   '铁骑/discard':目标玩家弃同花色手牌的免闪代价
+  // 为所有玩家注册:同一玩家可能在不同时机收到不同 requestType(参考界烈弓模式)。
+  for (const p of state.players) {
+    const pid = p.index;
+    registerAction(
+      state,
+      skill.id,
+      pid,
+      'respond',
+      (st: GameState, params: Record<string, unknown>): string | null => {
+        const slot = st.pendingSlots.get(pid);
+        if (!slot) return '当前不需要回应';
+        const atom = slot.atom as { type?: string; requestType?: string };
+        if (atom.type !== '请求回应') return '当前不是请求回应';
+        if (atom.requestType === '铁骑/confirm') {
+          return null; // 确认型:无需额外校验
+        }
+        if (atom.requestType === DISCARD_REQUEST) {
+          const cardId = params.cardId as string | undefined;
+          if (typeof cardId !== 'string') return '请选择一张手牌弃置';
+          if (!st.players[pid].hand.includes(cardId)) return '牌不在手牌中';
+          // 花色校验:必须与判定花色相同(后端兜底)
+          const suit = st.localVars[SUIT_VAR] as string | undefined;
+          const card = st.cardMap[cardId];
+          if (!suit || !card) return '无法校验花色';
+          if (card.suit !== suit) return '花色与判定结果不符';
+          return null;
+        }
+        return '当前不是铁骑回应';
+      },
+      async (st: GameState, params: Record<string, unknown>) => {
+        const slot = st.pendingSlots.get(pid);
+        const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        if (reqType === '铁骑/confirm') {
+          st.localVars[CONFIRM] = params.choice === true || params.confirmed === true;
+        } else if (reqType === DISCARD_REQUEST) {
+          st.localVars[DISCARD_CARD] = params.cardId as string;
+        }
+      },
+    );
+  }
 
-  // ── 指定目标 after:自己出杀指定目标 → 询问是否发动 → 判定 ──
+  // ── 指定目标 after:自己出杀指定目标 → 询问 → 发动:加压制标签 + 判定 ──
   registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
     if (atom.source !== ownerId) return;
     if (atom.target === undefined) return;
     const target = atom.target;
-    // 仅对杀触发(cardId 缺省时容错放过——避免误拦无牌事件)
     if (atom.cardId !== undefined) {
       const card = ctx.state.cardMap[atom.cardId];
       if (card?.name !== '杀') return;
@@ -73,7 +114,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!targetPlayer?.alive) return;
     if (ctx.state.zones.deck.length === 0) return; // 无牌可判
 
-    // 询问是否发动铁骑("你可以进行一次判定"——可选)
+    // 询问是否发动铁骑("你可以..."——可选)
     delete ctx.state.localVars[CONFIRM];
     await applyAtom(ctx.state, {
       type: '请求回应',
@@ -81,7 +122,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       target: ownerId,
       prompt: {
         type: 'confirm',
-        title: '是否发动铁骑判定?',
+        title: '是否发动铁骑(令目标本回合非锁定技失效并判定)?',
         confirmLabel: '发动',
         cancelLabel: '不发动',
       },
@@ -90,12 +131,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
     if (!ctx.state.localVars[CONFIRM]) return;
 
-    // 记录当前目标,供 判定 after hook 读取
+    // a. 非锁定技失效:给目标加压制标签(回合结束清)
+    if (!targetPlayer.tags.includes(SUPPRESSION_TAG)) {
+      await applyAtom(ctx.state, { type: '加标签', player: target, tag: SUPPRESSION_TAG });
+    }
+    // b. 记录目标 + 判定
     ctx.state.localVars[TARGET_VAR] = target;
     await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '铁骑' });
   });
 
-  // ── 判定 after:judgeType==='铁骑' → 读花色,红色或黑色 → 给目标加禁闪标签;黑色额外摸牌 ──
+  // ── 判定 after:judgeType==='铁骑' → 读花色,存 localVars 供询问闪阶段消费 ──
   registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
     const atom = ctx.atom as { judgeType?: string; player?: number };
     if (atom.judgeType !== '铁骑') return;
@@ -106,22 +151,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const targetPlayer = ctx.state.players[target];
     if (!targetPlayer?.alive) return;
 
-    // 读判定牌(判定 atom 的内置 afterHooks 会把它移入弃牌堆,技能 hook 先于其执行)
+    // 读判定牌(判定 atom 内置 afterHooks 会把它移入弃牌堆,技能 hook 先于其执行)
     const cards = frameCards(ctx.state);
     if (cards.length === 0) return;
     const judgeCardId = cards[cards.length - 1];
     const judgeCard = ctx.state.cardMap[judgeCardId];
     if (!judgeCard) return;
-    // 界马超:红色和黑色都禁闪,黑色额外摸一张牌
-    if (judgeCard.color === '红') {
-      await applyAtom(ctx.state, { type: '加标签', player: target, tag: TAG });
-    } else if (judgeCard.color === '黑') {
-      await applyAtom(ctx.state, { type: '加标签', player: target, tag: TAG });
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-    }
+
+    // 记录花色(空花色=转化合成卡,目标无同花色牌可弃→强制命中)
+    const suit = judgeCard.suit || '';
+    ctx.state.localVars[SUIT_VAR] = suit;
+    ctx.state.localVars[TARGET_VAR] = target;
   });
 
-  // ── 询问闪 before:目标有禁闪标签 → 去标签 + cancel(强制命中) ──
+  // ── 询问闪 before:令目标弃一张同花色手牌,否则 cancel 询问闪(强制命中) ──
   registerBeforeHook(
     state,
     skill.id,
@@ -132,18 +175,71 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;
+
+      // 仅对由阶段2(判定)写入的目标 + 花色生效,且与当前询问闪目标一致
+      const suit = ctx.state.localVars[SUIT_VAR] as string | undefined;
+      const recordedTarget = ctx.state.localVars[TARGET_VAR] as number | undefined;
+      if (suit === undefined || recordedTarget !== target) return;
+
       const player = ctx.state.players[target];
-      if (!player?.tags.includes(TAG)) return;
-      // 清标签(仅本次杀有效)+ cancel 询问闪 → 处理区无闪 → 造成伤害
-      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG });
+      if (!player?.alive) return;
+
+      // 无手牌 / 无同花色牌 → 直接 cancel(强制命中)
+      const hasMatching = player.hand.some((id) => ctx.state.cardMap[id]?.suit === suit);
+      if (!hasMatching) {
+        // 清费本次杀的 localVars
+        delete ctx.state.localVars[SUIT_VAR];
+        delete ctx.state.localVars[TARGET_VAR];
+        return { kind: 'cancel' };
+      }
+
+      // 请求目标弃一张同花色手牌(SUIT_VAR 仍需保留供 respond validate 校验)
+      delete ctx.state.localVars[DISCARD_CARD];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: DISCARD_REQUEST,
+        target,
+        prompt: {
+          type: 'useCard',
+          title: `界铁骑:弃置一张${suit}花色手牌,否则不能出闪抵消此杀`,
+          cardFilter: { filter: (c) => c.suit === suit, min: 1, max: 1 },
+        },
+        timeout: 15,
+      });
+
+      // 弃牌询问结束后才清 Localvars(下次杀不再复用)
+      delete ctx.state.localVars[SUIT_VAR];
+      delete ctx.state.localVars[TARGET_VAR];
+
+      const discardCardId = ctx.state.localVars[DISCARD_CARD] as string | undefined;
+      delete ctx.state.localVars[DISCARD_CARD];
+
+      if (discardCardId && player.hand.includes(discardCardId)) {
+        // 弃了同花色牌 → 正常询问闪(目标仍可出闪抵消)
+        await applyAtom(ctx.state, { type: '弃置', player: target, cardIds: [discardCardId] });
+        return; // pass → 询问闪正常执行
+      }
+      // 没弃/超时 → 强制命中
       return { kind: 'cancel' };
     },
   );
+
+  // ── 回合结束 after:界马超回合结束时清除目标的非锁定技失效标签 ──
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { player?: number };
+    if (atom.player !== ownerId) return; // 仅自己回合结束
+    for (const p of ctx.state.players) {
+      if (p.tags.includes(SUPPRESSION_TAG)) {
+        await applyAtom(ctx.state, { type: '去标签', player: p.index, tag: SUPPRESSION_TAG });
+      }
+    }
+  });
 
   return () => {};
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
+  // 主回应:是否发动铁骑
   api.defineAction('respond', {
     label: '铁骑',
     style: 'default',

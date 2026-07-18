@@ -4,7 +4,7 @@ export const 界庞统 = {
   gender: '男',
   faction: '蜀',
   skills: [
-    { name: '连环', path: '../skills/连环' },
-    { name: '涅槃', path: '../skills/涅槃' },
+    { name: '界连环', path: '../skills/界连环' },
+    { name: '界涅槃', path: '../skills/界涅槃' },
   ],
 };

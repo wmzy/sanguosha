@@ -53,6 +53,8 @@ export const skillLoaders: Record<string, Loader> = {
   据守: load(() => import('./据守')),
   裸衣: load(() => import('./裸衣')),
   强袭: load(() => import('./强袭')),
+  // 界限突破·魏国·界典韦(独立技能文件,不修改标技能)
+  界强袭: load(() => import('./界强袭')),
   驱虎: load(() => import('./驱虎')),
   节命: load(() => import('./节命')),
   断粮: load(() => import('./断粮')),
@@ -66,11 +68,14 @@ export const skillLoaders: Record<string, Loader> = {
   急袭: load(() => import('./急袭')),
   // 蜀国武将技
   挑衅: load(() => import('./挑衅')),
+  // 界限突破·蜀国·界姜维(独立技能文件,不修改标技能;界志继单独注册)
+  界挑衅: load(() => import('./界挑衅')),
   享乐: load(() => import('./享乐')),
   祸首: load(() => import('./祸首')),
   咆哮: load(() => import('./咆哮')),
   马术: load(() => import('./马术')),
   龙胆: load(() => import('./龙胆')),
+  界龙胆: load(() => import('./界龙胆')),
   涯角: load(() => import('./涯角')),
   铁骑: load(() => import('./铁骑')),
   观星: load(() => import('./观星')),
@@ -81,6 +86,8 @@ export const skillLoaders: Record<string, Loader> = {
   若愚: load(() => import('./若愚')),
   连环: load(() => import('./连环')),
   涅槃: load(() => import('./涅槃')),
+  界连环: load(() => import('./界连环')),
+  界涅槃: load(() => import('./界涅槃')),
   烈弓: load(() => import('./烈弓')),
   狂骨: load(() => import('./狂骨')),
   集智: load(() => import('./集智')),
@@ -92,10 +99,17 @@ export const skillLoaders: Record<string, Loader> = {
   界集智: load(() => import('./界集智')),
   界奇才: load(() => import('./界奇才')),
   界武圣: load(() => import('./界武圣')),
+  界火计: load(() => import('./界火计')),
+  界看破: load(() => import('./界看破')),
   界仁德: load(() => import('./界仁德')),
+  // 界限突破·蜀国·界刘备(独立技能文件,不修改标技能;激将原复用标版,现独立界版)
+  界激将: load(() => import('./界激将')),
+  // 界限突破·蜀国·界刘禅(独立技能文件,若愚原复用标版,现独立界版)
   界放权: load(() => import('./界放权')),
+  界若愚: load(() => import('./界若愚')),
   界志继: load(() => import('./界志继')),
   界空城: load(() => import('./界空城')),
+  界观星: load(() => import('./界观星')),
   界烈弓: load(() => import('./界烈弓')),
   界再起: load(() => import('./界再起')),
   // 界限突破·魏国武将技(独立技能文件)
@@ -103,6 +117,8 @@ export const skillLoaders: Record<string, Loader> = {
   界刚烈: load(() => import('./界刚烈')),
   界突袭: load(() => import('./界突袭')),
   界奸雄: load(() => import('./界奸雄')),
+  // 界限突破·魏国·界曹操(护驾原复用标版,现独立界版)
+  界护驾: load(() => import('./界护驾')),
   界裸衣: load(() => import('./界裸衣')),
   界遗计: load(() => import('./界遗计')),
   界节命: load(() => import('./界节命')),
@@ -163,7 +179,8 @@ export const skillLoaders: Record<string, Loader> = {
   奋威: load(() => import('./奋威')),
   // 吴国·吕蒙
   克己: load(() => import('./克己')),
-  // 界限突破·吴国·界吕蒙(克己复用标版;勤学/博图/攻心为界版新增)
+  // 界限突破·吴国·界吕蒙(独立界版技能文件,不修改标技能;勤学/博图/攻心为界版新增)
+  界克己: load(() => import('./界克己')),
   勤学: load(() => import('./勤学')),
   博图: load(() => import('./博图')),
   攻心: load(() => import('./攻心')),

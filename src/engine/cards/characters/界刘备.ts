@@ -5,6 +5,6 @@ export const 界刘备 = {
   faction: '蜀',
   skills: [
     { name: '界仁德', path: '../skills/界仁德' },
-    { name: '激将', path: '../skills/激将' },
+    { name: '界激将', path: '../skills/界激将' },
   ],
 };

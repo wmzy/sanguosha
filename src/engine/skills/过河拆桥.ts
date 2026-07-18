@@ -13,6 +13,7 @@ import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 import { runPickTargetCardPanel } from './选牌面板';
+import { QICAI_PROTECTED_SLOTS } from './界奇才';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '过河拆桥', description: '锦囊:弃置目标一张牌' };
@@ -36,11 +37,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
             if (!state.players[t]?.alive) return '目标已死亡';
             const p = state.players[t];
             if (!p) return '目标不合法';
-            // 奇才(界黄月英):防具不可被弃置,排除后判断是否有可弃置的牌
-            const hasArmorProtection = p.tags.includes('奇才/防具保护');
-            const discardableEquip = Object.keys(p.equipment).filter(
-              (slot) => !(hasArmorProtection && slot === '防具'),
-            );
+            // 奇才(界黄月英):防具/宝物均不可被弃置,按槽位过滤后判断是否有可弃置的牌
+            const discardableEquip = Object.keys(p.equipment).filter((slot) => {
+              const protectTag = QICAI_PROTECTED_SLOTS[slot];
+              return !protectTag || !p.tags.includes(protectTag);
+            });
             const hasCards =
               p.hand.length > 0 ||
               discardableEquip.length > 0 ||
@@ -108,7 +109,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
-      const atom = slot.atom as { requestType?: string };
+      const atom = slot.atom as { requestType?: string; prompt?: { target?: number } };
       if (atom.requestType !== '过河拆桥_选牌') return '当前不是选牌窗口';
       const zone = params.zone;
       if (zone === 'equipment' || zone === 'judge') {
@@ -117,6 +118,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (typeof params.handIndex !== 'number') return 'handIndex required';
       } else {
         return 'zone required (equipment|judge|hand)';
+      }
+      // 防御性检查:装备区选牌时,拒绝要选受奇才保护的防具/宝物
+      // (前端选牌面板已过滤,此为 server-side trust boundary 校验)
+      if (zone === 'equipment' && typeof params.cardId === 'string') {
+        const targetIdx = atom.prompt?.target;
+        if (typeof targetIdx === 'number') {
+          const targetPlayer = state.players[targetIdx];
+          if (targetPlayer) {
+            const slotEntry = Object.entries(targetPlayer.equipment).find(
+              ([, id]) => id === params.cardId,
+            );
+            if (slotEntry) {
+              const protectTag = QICAI_PROTECTED_SLOTS[slotEntry[0]];
+              if (protectTag && targetPlayer.tags.includes(protectTag))
+                return '该装备受奇才保护,不可弃置';
+            }
+          }
+        }
       }
       return null;
     },

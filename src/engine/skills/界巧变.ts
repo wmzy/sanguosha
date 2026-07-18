@@ -1,24 +1,36 @@
-// 界巧变(界张郃·主动技):你可以弃置一张手牌跳过自己的一个阶段(开始和结束阶段除外)。
-//   - 跳过摸牌阶段:从至多两名其他角色处各获得一张手牌
-//   - 跳过出牌阶段:将场上的一张牌移动到另一个合理的位置
-//   - 跳过弃牌阶段:你摸一张牌(界版新增,原版无此效果)
+// 界巧变(界张郃·主动技):
+//   游戏开始时,你获得 2 枚"变"标记。
+//   你可以弃置一张牌或移除 1 枚"变",跳过你的一个阶段(准备阶段和结束阶段除外):
+//     - 跳过摸牌阶段:你可以获得至多两名角色各一张手牌
+//     - 跳过出牌阶段:你可以移动场上的一张牌
+//   结束阶段,若你的手牌数与之前你每回合结束阶段的手牌数均不相等,你获得 1 枚"变"。
 //
 // 与标版巧变的区别:
-//   - 标版:判定/弃牌 阶段仅弃牌跳过,无附加效果。
-//   - 界版:跳过弃牌阶段后,你摸一张牌。其他阶段效果与标版完全一致。
+//   - 标版:每阶段必须弃一张手牌才能跳过,无"变"标记系统。
+//   - 界版:引入"变"标记(开局 2 枚)。跳阶段的方式 = 弃一张手牌 **或** 移除 1 枚"变"。
+//     结束阶段手牌数"独一无二"时再得 1 枚"变",标记可持续累积。
+//   - 跳过弃牌阶段无附加效果(标版/界版一致)——旧实现曾错误添加"摸一张牌",已删除。
 //
-// 实现(基于标版 src/engine/skills/巧变.ts):
-//   - before hook 挂在「阶段开始」:判定/摸牌/出牌/弃牌 阶段开始时询问是否发动。
-//     发动则选弃牌 + 跳过当前阶段(阶段结束 推进 + cancel)。
-//   - 跳过摸牌:发动后询问选择 1-2 名有手牌的其他角色,各获得其一张手牌(取手牌第 0 张)。
-//   - 跳过出牌:发动后询问源玩家+源牌+目标玩家,通过 移动牌 atom 完成场上牌移动。
-//   - 跳过判定:仅弃牌 + 跳过,无附加效果。
-//   - 跳过弃牌:弃牌 + 跳过 + 摸一张牌(界版新增)。
-//   - 内部标签/localVars/requestType 键名保持原前缀 '巧变/xxx'(不改为 '界巧变/xxx')。
+// 实现:
+//   - "变"标记存储:每枚 = 一个 mark,id 形如 `界巧变/变:N`(N=seq,参考 屯田 的"田")。
+//     count = marks.filter(m => m.id.startsWith('界巧变/变:')).length。
+//     加/减经 加标记/去标记 atom(view 自动同步)。
+//   - 历史手牌数:player.vars['界巧变/历史手牌数'](number[],跨回合持久;
+//     无 /usedThisTurn 等被 回合结束 atom 清理的后缀,故自动保留)。
+//   - 游戏开始初始化(化身先例):'回合开始' after-hook,首次触发时给本玩家加 2 枚变。
+//     主公首回合开始 ≈ 游戏开始,此时所有玩家实例同步初始化。
+//   - before hook 挂在「阶段开始」(判定/摸牌/出牌/弃牌):
+//       1) 询问是否发动。
+//       2) 选择方式(弃牌 / 移除变)——只有一种可用时跳过此询问。
+//       3) 按方式扣资源 + 按阶段附加效果(摸牌偷牌/出牌移动)。
+//       4) 跳过当前阶段(直接型:阶段结束 推进 + cancel)。
+//   - after hook 挂在「阶段开始」(phase='回合结束',即"结束阶段"):
+//       检查手牌数是否与历史均不相等,是则 +1 变 + 记录历史。
 //
-// 跳过阶段手法(同神速/兵粮寸断):applyAtom(阶段结束, 当前阶段) 推进到下一阶段,
+// 跳过阶段手法(同神速/兵粮寸断/skipPhase):applyAtom(阶段结束, 当前阶段) 推进到下一阶段,
 // 然后 cancel 当前 阶段开始 atom。
 import type {
+  AtomAfterContext,
   AtomBeforeContext,
   FrontendAPI,
   GameState,
@@ -28,21 +40,34 @@ import type {
   GameView,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
+import { registerAction, registerBeforeHook, registerAfterHook, hasBlockingPending } from '../skill';
 import { skipPhase } from '../skip-phase';
 
-const CONFIRM_RT = '巧变/confirm';
-const DISCARD_RT = '巧变/discard';
-const STEAL_TARGETS_RT = '巧变/steal-targets';
-const MOVE_SOURCE_PLAYER_RT = '巧变/move-source-player';
-const MOVE_SOURCE_CARD_RT = '巧变/move-source-card';
-const MOVE_DEST_PLAYER_RT = '巧变/move-dest-player';
-const CONFIRMED_KEY = '巧变/confirmed';
-const DISCARD_KEY = '巧变/discardCardId';
-const STEAL_TARGETS_KEY = '巧变/stealTargets';
-const MOVE_SOURCE_PLAYER_KEY = '巧变/moveSourcePlayer';
-const MOVE_SOURCE_CARD_KEY = '巧变/moveSourceCardId';
-const MOVE_DEST_PLAYER_KEY = '巧变/moveDestPlayer';
+// ── requestType 常量(用于 请求回应 atom 的 requestType 字段) ──
+const CONFIRM_RT = '界巧变/confirm';
+const MODE_RT = '界巧变/mode'; // 选择发动方式:弃牌 or 移除变
+const DISCARD_RT = '界巧变/discard';
+const STEAL_TARGETS_RT = '界巧变/steal-targets';
+const MOVE_SOURCE_PLAYER_RT = '界巧变/move-source-player';
+const MOVE_SOURCE_CARD_RT = '界巧变/move-source-card';
+const MOVE_DEST_PLAYER_RT = '界巧变/move-dest-player';
+
+// ── 跨 atom 通信(localVars,执行内瞬时) ──
+const CONFIRMED_KEY = '界巧变/confirmed';
+const MODE_KEY = '界巧变/mode'; // '变' | 'discard'
+const DISCARD_KEY = '界巧变/discardCardId';
+const STEAL_TARGETS_KEY = '界巧变/stealTargets';
+const MOVE_SOURCE_PLAYER_KEY = '界巧变/moveSourcePlayer';
+const MOVE_SOURCE_CARD_KEY = '界巧变/moveSourceCardId';
+const MOVE_DEST_PLAYER_KEY = '界巧变/moveDestPlayer';
+
+// ── 持久状态(player.vars / marks) ──
+/** 历史结束阶段手牌数:number[],跨回合持久(无 /usedThisTurn 等清理后缀) */
+const HISTORY_KEY = '界巧变/历史手牌数';
+/** 每枚"变"= 一个 mark,id 形如 `${BIAN_PREFIX}${seq}` */
+const BIAN_PREFIX = '界巧变/变:';
+/** 游戏开始初始化标记(localVars,per-owner,首次触发后置 true) */
+const INIT_KEY = (ownerId: number) => `界巧变/init/${ownerId}`;
 
 const SKIPPABLE_PHASES = ['判定', '摸牌', '出牌', '弃牌'] as const;
 
@@ -52,8 +77,41 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界巧变',
     description:
-      '弃一张手牌跳过阶段:摸牌阶段可从至多两名其他角色各获得一张手牌;出牌阶段可移动场上的一张牌;跳过弃牌阶段后摸一张牌',
+      '游戏开始获得2枚"变"标记;弃一张牌或移除1枚"变"跳过阶段(摸牌:至多两名角色各获得一张手牌;出牌:移动场上的一张牌);结束阶段手牌数与历史均不相等则获得1枚"变"',
   };
+}
+
+// ── "变"标记读写辅助 ──
+
+function bianCount(state: GameState, player: number): number {
+  return state.players[player].marks.filter((m) => m.id.startsWith(BIAN_PREFIX)).length;
+}
+
+async function addBian(state: GameState, player: number): Promise<void> {
+  await applyAtom(state, {
+    type: '加标记',
+    player,
+    mark: { id: `${BIAN_PREFIX}${state.seq}`, scope: player },
+  });
+}
+
+async function removeBian(state: GameState, player: number): Promise<void> {
+  const marks = state.players[player].marks;
+  const target = marks.find((m) => m.id.startsWith(BIAN_PREFIX));
+  if (!target) return;
+  await applyAtom(state, { type: '去标记', player, markId: target.id });
+}
+
+// ── 历史手牌数读写 ──
+
+function getHistory(state: GameState, player: number): number[] {
+  const v = state.players[player].vars[HISTORY_KEY];
+  return Array.isArray(v) ? (v as number[]).filter((n): n is number => typeof n === 'number') : [];
+}
+
+function appendHistory(state: GameState, player: number, handCount: number): void {
+  const history = getHistory(state, player);
+  state.players[player].vars[HISTORY_KEY] = [...history, handCount];
 }
 
 /** 取玩家"场上"的牌(手牌+装备+判定区)——用于出牌阶段移动的源牌选择 */
@@ -69,7 +127,7 @@ function fieldCardIds(state: GameState, player: number): string[] {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // ── respond:界张郃本人对巧变各询问的回应 ──
+  // ── respond:界张郃本人对界巧变各询问的回应 ──
   registerAction(
     state,
     skill.id,
@@ -83,13 +141,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const rt = atom['requestType'] as string;
       const valid = [
         CONFIRM_RT,
+        MODE_RT,
         DISCARD_RT,
         STEAL_TARGETS_RT,
         MOVE_SOURCE_PLAYER_RT,
         MOVE_SOURCE_CARD_RT,
         MOVE_DEST_PLAYER_RT,
       ];
-      if (!valid.includes(rt)) return '当前不是巧变询问';
+      if (!valid.includes(rt)) return '当前不是界巧变询问';
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -97,6 +156,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true;
+        return;
+      }
+      if (rt === MODE_RT) {
+        // params.choice === true → 移除 1 枚"变";否则弃一张手牌
+        st.localVars[MODE_KEY] = params.choice === true ? '变' : 'discard';
         return;
       }
       if (rt === DISCARD_RT) {
@@ -116,7 +180,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === MOVE_SOURCE_PLAYER_RT) {
         const t =
           (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target) : undefined);
+          (typeof params.target === 'number' ? params.target : undefined);
         if (typeof t === 'number') st.localVars[MOVE_SOURCE_PLAYER_KEY] = t;
         return;
       }
@@ -132,12 +196,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === MOVE_DEST_PLAYER_RT) {
         const t =
           (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target) : undefined);
+          (typeof params.target === 'number' ? params.target : undefined);
         if (typeof t === 'number') st.localVars[MOVE_DEST_PLAYER_KEY] = t;
         return;
       }
     },
   );
+
+  // ── 游戏开始初始化(化身先例):'回合开始' after-hook,首次触发加 2 枚"变" ──
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
+    const st = ctx.state;
+    if (!st.players[ownerId]?.alive) return;
+    if (st.localVars[INIT_KEY(ownerId)]) return;
+    st.localVars[INIT_KEY(ownerId)] = true;
+    await addBian(st, ownerId);
+    await addBian(st, ownerId);
+  });
 
   // ── 阶段开始 before hook:可跳过阶段的主逻辑 ──
   registerBeforeHook(
@@ -155,10 +229,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
-      if (self.hand.length === 0) return; // 无手牌可弃,无法发动
       if (hasBlockingPending(ctx.state)) return;
 
-      // 询问是否发动巧变跳过此阶段
+      // 可用方式:弃手牌 / 移除变
+      const canDiscard = self.hand.length > 0;
+      const canUseBian = bianCount(ctx.state, ownerId) > 0;
+      if (!canDiscard && !canUseBian) return; // 两种方式都不可 → 无法发动
+
+      // 询问是否发动
       delete ctx.state.localVars[CONFIRMED_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
@@ -166,7 +244,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target: ownerId,
         prompt: {
           type: 'confirm',
-          title: `是否发动巧变?(弃一张手牌跳过${phase}阶段)`,
+          title: `是否发动界巧变?(跳过${phase}阶段)`,
           confirmLabel: '发动',
           cancelLabel: '不发动',
         },
@@ -175,36 +253,75 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       if (!ctx.state.localVars[CONFIRMED_KEY]) return; // 不发动 → 阶段正常进行
 
-      // 选要弃的手牌
-      delete ctx.state.localVars[DISCARD_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: DISCARD_RT,
-        target: ownerId,
-        prompt: {
-          type: 'distribute',
-          mode: 'select',
-          title: `巧变:选择一张手牌弃置以跳过${phase}阶段`,
-          source: 'hand',
-          minTotal: 1,
-          maxTotal: 1,
-        },
-        timeout: 15,
-      });
-      const discardCardId = ctx.state.localVars[DISCARD_KEY] as string | undefined;
-      delete ctx.state.localVars[DISCARD_KEY];
-      if (!discardCardId || !self.hand.includes(discardCardId)) {
-        return; // 无效选择 → 阶段正常进行
+      // 选择发动方式:两者都有时询问,只有一种时直接采用
+      let mode: '变' | 'discard';
+      if (canDiscard && canUseBian) {
+        delete ctx.state.localVars[MODE_KEY];
+        await applyAtom(ctx.state, {
+          type: '请求回应',
+          requestType: MODE_RT,
+          target: ownerId,
+          prompt: {
+            type: 'confirm',
+            title: `界巧变:以何种方式跳过${phase}阶段?`,
+            description: '确认 = 移除1枚"变"标记;取消 = 弃置一张手牌',
+            confirmLabel: '移除1枚变',
+            cancelLabel: '弃置手牌',
+          },
+          defaultChoice: false,
+          timeout: 10,
+        });
+        const chosen = ctx.state.localVars[MODE_KEY] as '变' | 'discard' | undefined;
+        mode = chosen === '变' ? '变' : 'discard';
+        delete ctx.state.localVars[MODE_KEY];
+      } else if (canUseBian) {
+        mode = '变'; // 无手牌只能用变
+      } else {
+        mode = 'discard'; // 无变只能弃牌
       }
 
-      await pushFrame(ctx.state, '巧变', ownerId, { phase, discardCardId });
-      try {
-        // 弃置手牌
+      // 弃牌方式:必须能选到合法手牌;否则阶段正常进行
+      let discardCardId: string | undefined;
+      if (mode === 'discard') {
+        delete ctx.state.localVars[DISCARD_KEY];
         await applyAtom(ctx.state, {
-          type: '弃置',
-          player: ownerId,
-          cardIds: [discardCardId],
+          type: '请求回应',
+          requestType: DISCARD_RT,
+          target: ownerId,
+          prompt: {
+            type: 'distribute',
+            mode: 'select',
+            title: `界巧变:选择一张手牌弃置以跳过${phase}阶段`,
+            source: 'hand',
+            minTotal: 1,
+            maxTotal: 1,
+          },
+          timeout: 15,
         });
+        discardCardId = ctx.state.localVars[DISCARD_KEY] as string | undefined;
+        delete ctx.state.localVars[DISCARD_KEY];
+        if (!discardCardId || !self.hand.includes(discardCardId)) {
+          return; // 无效选择 → 阶段正常进行
+        }
+      }
+
+      await pushFrame(ctx.state, '界巧变', ownerId, {
+        phase,
+        mode,
+        discardCardId: discardCardId ?? null,
+      });
+      try {
+        // 扣资源
+        if (mode === 'discard' && discardCardId) {
+          await applyAtom(ctx.state, {
+            type: '弃置',
+            player: ownerId,
+            cardIds: [discardCardId],
+          });
+        } else {
+          // mode === '变':移除 1 枚变标记
+          await removeBian(ctx.state, ownerId);
+        }
 
         // 按阶段附加效果
         if (phase === '摸牌') {
@@ -220,7 +337,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               target: ownerId,
               prompt: {
                 type: 'choosePlayer',
-                title: '巧变:选择至多两名其他角色(各获得其一张手牌)',
+                title: '界巧变:选择至多两名其他角色(各获得其一张手牌)',
                 min: 0,
                 max: Math.min(2, candidates.length),
                 filter: (_view: GameView, t: number) =>
@@ -258,7 +375,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               target: ownerId,
               prompt: {
                 type: 'choosePlayer',
-                title: '巧变:选择源玩家(从其场上选一张牌移动)',
+                title: '界巧变:选择源玩家(从其场上选一张牌移动)',
                 min: 1,
                 max: 1,
                 filter: (_view: GameView, t: number) =>
@@ -267,12 +384,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
               },
               timeout: 15,
             });
-            const srcPlayer = ctx.state.localVars[MOVE_SOURCE_PLAYER_KEY] as
-              | number
-              | undefined;
+            const srcPlayer = ctx.state.localVars[MOVE_SOURCE_PLAYER_KEY] as number | undefined;
             delete ctx.state.localVars[MOVE_SOURCE_PLAYER_KEY];
             if (typeof srcPlayer !== 'number') {
-              // 无选择 → 跳过附加效果,但仍跳过出牌阶段(已弃牌)
+              // 无选择 → 跳过附加效果,但仍跳过出牌阶段(已扣资源)
             } else {
               // 步骤 2:选源牌
               const srcCards = fieldCardIds(ctx.state, srcPlayer);
@@ -284,16 +399,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 prompt: {
                   type: 'distribute',
                   mode: 'select',
-                  title: `巧变:选择 P${srcPlayer} 场上的一张牌移动`,
+                  title: `界巧变:选择 P${srcPlayer} 场上的一张牌移动`,
                   source: 'handAndEquip',
                   minTotal: 1,
                   maxTotal: 1,
                 },
                 timeout: 15,
               });
-              const srcCardId = ctx.state.localVars[MOVE_SOURCE_CARD_KEY] as
-                | string
-                | undefined;
+              const srcCardId = ctx.state.localVars[MOVE_SOURCE_CARD_KEY] as string | undefined;
               delete ctx.state.localVars[MOVE_SOURCE_CARD_KEY];
               if (typeof srcCardId === 'string' && srcCards.includes(srcCardId)) {
                 // 步骤 3:选目标玩家
@@ -304,7 +417,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                   target: ownerId,
                   prompt: {
                     type: 'choosePlayer',
-                    title: '巧变:选择目标玩家(将牌移到其场上)',
+                    title: '界巧变:选择目标玩家(将牌移到其场上)',
                     min: 1,
                     max: 1,
                     filter: (_view: GameView, t: number) =>
@@ -312,9 +425,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                   },
                   timeout: 15,
                 });
-                const destPlayer = ctx.state.localVars[MOVE_DEST_PLAYER_KEY] as
-                  | number
-                  | undefined;
+                const destPlayer = ctx.state.localVars[MOVE_DEST_PLAYER_KEY] as number | undefined;
                 delete ctx.state.localVars[MOVE_DEST_PLAYER_KEY];
                 if (typeof destPlayer === 'number') {
                   await moveFieldCard(ctx.state, srcPlayer, srcCardId, destPlayer);
@@ -322,11 +433,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
               }
             }
           }
-        } else if (phase === '弃牌') {
-          // 界版新增:跳过弃牌阶段后,摸一张牌(标版无此效果)
-          await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
         }
-        // 判定 阶段:仅弃牌跳过,无附加效果
+        // 弃牌阶段:无附加效果(官方未提供收益)
+        // 判定阶段:无附加效果
       } finally {
         await popFrame(ctx.state);
       }
@@ -335,6 +444,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return skipPhase(ctx.state, { player: ownerId, phase });
     },
   );
+
+  // ── 阶段开始 after hook:结束阶段手牌数检查,符合条件 +1 "变" ──
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    if (atom.type !== '阶段开始') return;
+    if (atom.player !== ownerId) return;
+    if (atom.phase !== '回合结束') return; // "结束阶段" = phase '回合结束'
+    const st = ctx.state;
+    const self = st.players[ownerId];
+    if (!self?.alive) return;
+
+    const current = self.hand.length;
+    const history = getHistory(st, ownerId);
+    // "均不相等" = 与历史所有项都不相等(空历史为真空真)
+    if (history.includes(current)) return;
+    await addBian(st, ownerId);
+    appendHistory(st, ownerId, current);
+  });
 
   return () => {};
 }
@@ -388,11 +515,11 @@ async function moveFieldCard(
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
-    label: '巧变',
+    label: '界巧变',
     style: 'primary',
     prompt: {
       type: 'confirm',
-      title: '是否发动巧变?',
+      title: '是否发动界巧变?',
       confirmLabel: '发动',
       cancelLabel: '不发动',
     },

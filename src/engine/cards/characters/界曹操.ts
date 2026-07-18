@@ -5,6 +5,6 @@ export const 界曹操 = {
   faction: '魏',
   skills: [
     { name: '界奸雄', path: '../skills/界奸雄' },
-    { name: '护驾', path: '../skills/护驾' },
+    { name: '界护驾', path: '../skills/界护驾' },
   ],
 };

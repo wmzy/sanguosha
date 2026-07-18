@@ -1,28 +1,22 @@
 // src/engine/skills/界神速.ts
 // 界神速(界夏侯渊·主动技):你可以选择至多三项:
-//   1. 跳过判定阶段和摸牌阶段;视为对一名其他角色使用一张无距离限制的【杀】。
-//   2. 跳过出牌阶段并弃置一张装备牌;视为对一名其他角色使用一张无距离限制的【杀】。
-//   3. 跳过弃牌阶段并失去1点体力;视为对一名其他角色使用一张无距离限制的【杀】。
-//   每选择一项 → 一次虚拟杀。
-//   界版新增:当你发动神速时,你可以移动场上一张装备牌。
+//   1. 跳过判定阶段和摸牌阶段;
+//   2. 跳过出牌阶段并弃置一张装备牌;
+//   3. 跳过弃牌阶段并翻面。
+//   你每选择一项,你视为使用一张无距离限制的【杀】。
 //
-// 与标版区别:
-//   - 标版仅 2 选项,且各选项在对应阶段(判定/出牌)单独触发。
-//   - 界版 3 选项,统一在判定阶段开始时询问发动 + 逐项确认 + 集中结算。
-//   - 界版新增"移动场上装备"效果(可选,发动神速时一次)。
-//
-// 实现要点:
+// 实现:
 //   - 在判定阶段 before-hook 统一询问各选项,集中结算。
-//   - 选项1:加 跳过摸牌 标签 + 虚拟杀 + 跳过判定阶段(skipPhase)。
+//   - 选项1:加 跳过摸牌 标签 + 虚拟杀 + 当场跳过判定阶段(skipPhase)。
 //   - 选项2:弃装备 + 加 跳过出牌 标签 + 虚拟杀。
-//   - 选项3:失去1点体力 + 加 跳过弃牌 标签 + 虚拟杀。
-//   - 界版新增:发动后询问是否移动场上装备(卸下→移动牌→装备 序列)。
+//   - 选项3:加 跳过弃牌 标签 + 加 翻面 标签 + 虚拟杀。
 //   - usedThisTurn 后缀由 回合结束 atom 自动清理。
 //   - 虚拟杀同标版:无实体卡,走 指定目标→成为目标→检测有效性→询问闪→伤害/抵消,
 //     不消耗手牌、不计入 杀/quota、无距离限制。
+//   - 翻面实现(同据守/放逐):加 '/翻面' 后缀标签,下一回合 阶段开始(准备) before-hook
+//     消费标签、设 skipAll 标志并 cancel 阶段;阶段结束(准备) before-hook 亲自推进回合。
 import type {
   AtomBeforeContext,
-  EquipSlot,
   FrontendAPI,
   GameState,
   GameView,
@@ -32,7 +26,6 @@ import type {
 import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 import { skipPhase } from '../skip-phase';
-import { skillLoaders } from './index';
 
 // 请求类型(requestType)——保持 神速/ 前缀(界版键名约定)
 const OPT1_RT = '神速/opt1'; // 选项1 confirm
@@ -40,38 +33,23 @@ const OPT2_RT = '神速/opt2'; // 选项2 confirm
 const OPT3_RT = '神速/opt3'; // 选项3 confirm
 const TARGET_RT = '神速/target'; // 虚拟杀目标
 const EQUIP_RT = '神速/equip'; // 选项2 选弃装备
-const MOVE_CONFIRM_RT = '神速/move-confirm'; // 界:移动装备 confirm
-const MOVE_SRC_PLAYER_RT = '神速/move-src-player';
-const MOVE_SRC_CARD_RT = '神速/move-src-card';
-const MOVE_DEST_PLAYER_RT = '神速/move-dest-player';
 
 // 标签
 const SKIP_MO_TAG = '神速/跳过摸牌';
 const SKIP_PLAY_TAG = '神速/跳过出牌';
 const SKIP_DISCARD_TAG = '神速/跳过弃牌';
+const FLIP_TAG = '神速/翻面'; // 翻面标签(下一回合被消费,跳过整回合)
+const SKIP_FLAG = '神速/skipAll'; // 翻面生效时跳过整回合的标志(localVars)
 
 // localVars 键
 const CONFIRMED_KEY = '神速/confirmed';
 const TARGET_KEY = '神速/target';
 const EQUIP_KEY = '神速/equipCardId';
-const MOVE_SRC_PLAYER_KEY = '神速/moveSrcPlayer';
-const MOVE_SRC_CARD_KEY = '神速/moveSrcCardId';
-const MOVE_DEST_PLAYER_KEY = '神速/moveDestPlayer';
 
 // per-turn 标记(后缀 /usedThisTurn 由 回合结束 atom 自动清理)
 const USED_KEY = '神速/usedThisTurn';
 
-const ALL_RTS = [
-  OPT1_RT,
-  OPT2_RT,
-  OPT3_RT,
-  TARGET_RT,
-  EQUIP_RT,
-  MOVE_CONFIRM_RT,
-  MOVE_SRC_PLAYER_RT,
-  MOVE_SRC_CARD_RT,
-  MOVE_DEST_PLAYER_RT,
-];
+const ALL_RTS = [OPT1_RT, OPT2_RT, OPT3_RT, TARGET_RT, EQUIP_RT];
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -79,7 +57,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界神速',
     description:
-      '选择至多三项:①跳过判定+摸牌;②弃装备+跳过出牌;③失1血+跳过弃牌。每项视为出杀。发动时可移动场上装备',
+      '选择至多三项:①跳过判定+摸牌;②弃装备+跳过出牌;③翻面+跳过弃牌。每项视为出杀',
   };
 }
 
@@ -137,62 +115,12 @@ function equipCardIds(state: GameState, player: number): string[] {
   return Object.values(p.equipment).filter((id): id is string => !!id);
 }
 
-/** 查 cardId 所在的装备槽 */
-function slotOfEquip(state: GameState, player: number, cardId: string): EquipSlot | null {
-  const p = state.players[player];
-  if (!p) return null;
-  for (const [slot, id] of Object.entries(p.equipment)) {
-    if (id === cardId) return slot as EquipSlot;
-  }
-  return null;
-}
-
-/**
- * 把 srcPlayer 的装备牌 srcCardId 移动到 destPlayer 的对应空装备槽。
- * 使用 卸下→移动牌→装备→添加技能 序列(与 直谏 给他人装备的模式一致)。
- */
-async function moveEquipmentCard(
-  state: GameState,
-  srcPlayer: number,
-  srcCardId: string,
-  destPlayer: number,
-): Promise<boolean> {
-  if (srcPlayer === destPlayer) return false;
-  const srcP = state.players[srcPlayer];
-  const destP = state.players[destPlayer];
-  if (!srcP || !destP) return false;
-  const srcSlot = slotOfEquip(state, srcPlayer, srcCardId);
-  if (!srcSlot) return false;
-  // 目标对应槽位必须为空(不得替换)
-  if (destP.equipment[srcSlot]) return false;
-  const card = state.cardMap[srcCardId];
-  if (!card) return false;
-
-  await pushFrame(state, '界神速/move', srcPlayer, { srcCardId, destPlayer });
-  try {
-    // 1. 卸下(装备→源玩家手牌)
-    await applyAtom(state, { type: '卸下', player: srcPlayer, slot: srcSlot });
-    // 2. 移动牌(源手牌→目标手牌)
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId: srcCardId,
-      from: { zone: '手牌', player: srcPlayer },
-      to: { zone: '手牌', player: destPlayer },
-    });
-    // 3. 装备(目标手牌→目标装备区)
-    await applyAtom(state, { type: '装备', player: destPlayer, cardId: srcCardId });
-    // 4. 若装备自带技能(以 card.name 作 skillId),动态挂载
-    if (card.name && skillLoaders[card.name]) {
-      await applyAtom(state, { type: '添加技能', player: destPlayer, skillId: card.name });
-    }
-  } finally {
-    await popFrame(state);
-  }
-  return true;
-}
-
 /** 询问选择一个虚拟杀目标(其他存活角色) */
-async function askKillTarget(state: GameState, ownerId: number, label: string): Promise<number | undefined> {
+async function askKillTarget(
+  state: GameState,
+  ownerId: number,
+  label: string,
+): Promise<number | undefined> {
   delete state.localVars[TARGET_KEY];
   await applyAtom(state, {
     type: '请求回应',
@@ -216,7 +144,7 @@ async function askKillTarget(state: GameState, ownerId: number, label: string): 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // respond:处理所有 神速 相关的 confirm/target/equip/move 询问
+  // respond:处理所有 神速 相关的 confirm/target/equip 询问
   registerAction(
     state,
     skill.id,
@@ -231,8 +159,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (s, params) => {
       const slot = s.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType ?? '';
-      if (rt === OPT1_RT || rt === OPT2_RT || rt === OPT3_RT || rt === MOVE_CONFIRM_RT) {
+      const rt =
+        (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType ?? '';
+      if (rt === OPT1_RT || rt === OPT2_RT || rt === OPT3_RT) {
         s.localVars[CONFIRMED_KEY] = params.choice === true;
       } else if (rt === TARGET_RT) {
         const t =
@@ -246,20 +175,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
           (Array.isArray(cardIds) && cardIds.length > 0 ? cardIds[0] : undefined) ??
           (typeof single === 'string' ? single : undefined);
         if (id) s.localVars[EQUIP_KEY] = id;
-      } else if (rt === MOVE_SRC_PLAYER_RT || rt === MOVE_DEST_PLAYER_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
-        if (typeof t === 'number') {
-          s.localVars[rt === MOVE_SRC_PLAYER_RT ? MOVE_SRC_PLAYER_KEY : MOVE_DEST_PLAYER_KEY] = t;
-        }
-      } else if (rt === MOVE_SRC_CARD_RT) {
-        const cardIds = params.cardIds as string[] | undefined;
-        const single = params.cardId as string | undefined;
-        const id =
-          (Array.isArray(cardIds) && cardIds.length > 0 ? cardIds[0] : undefined) ??
-          (typeof single === 'string' ? single : undefined);
-        if (id) s.localVars[MOVE_SRC_CARD_KEY] = id;
       }
     },
   );
@@ -323,7 +238,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         opt2 = ctx.state.localVars[CONFIRMED_KEY] === true;
       }
 
-      // 选项3:失1血+跳过弃牌
+      // 选项3:翻面+跳过弃牌
       let opt3 = false;
       delete ctx.state.localVars[CONFIRMED_KEY];
       await applyAtom(ctx.state, {
@@ -332,7 +247,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target: ownerId,
         prompt: {
           type: 'confirm',
-          title: '是否发动界神速③?(失去1点体力,跳过弃牌,视为出杀)',
+          title: '是否发动界神速③?(翻面,跳过弃牌,视为出杀)',
           confirmLabel: '发动',
           cancelLabel: '不发动',
         },
@@ -351,108 +266,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       await pushFrame(ctx.state, '界神速', ownerId, { opt1, opt2, opt3 });
       try {
-        // ── 界版新增:移动场上装备(发动神速时一次) ──
-        // 条件:场上存在至少一张装备牌
-        const anyEquipOnField = ctx.state.players.some(
-          (p) => p.alive && equipCardIds(ctx.state, p.index).length > 0,
-        );
-        if (anyEquipOnField) {
-          delete ctx.state.localVars[CONFIRMED_KEY];
-          await applyAtom(ctx.state, {
-            type: '请求回应',
-            requestType: MOVE_CONFIRM_RT,
-            target: ownerId,
-            prompt: {
-              type: 'confirm',
-              title: '界神速:是否移动场上一张装备牌?',
-              confirmLabel: '移动',
-              cancelLabel: '不移动',
-            },
-            defaultChoice: false,
-            timeout: 10,
-          });
-          if (ctx.state.localVars[CONFIRMED_KEY] === true) {
-            // 选源玩家
-            delete ctx.state.localVars[MOVE_SRC_PLAYER_KEY];
-            await applyAtom(ctx.state, {
-              type: '请求回应',
-              requestType: MOVE_SRC_PLAYER_RT,
-              target: ownerId,
-              prompt: {
-                type: 'choosePlayer',
-                title: '界神速:选择装备所在的玩家',
-                min: 1,
-                max: 1,
-                filter: (_view: GameView, t: number) =>
-                  ctx.state.players[t]?.alive === true &&
-                  equipCardIds(ctx.state, t).length > 0,
-              },
-              timeout: 15,
-            });
-            const srcPlayer = ctx.state.localVars[MOVE_SRC_PLAYER_KEY] as
-              | number
-              | undefined;
-            delete ctx.state.localVars[MOVE_SRC_PLAYER_KEY];
-
-            if (typeof srcPlayer === 'number') {
-              // 选源装备牌
-              delete ctx.state.localVars[MOVE_SRC_CARD_KEY];
-              await applyAtom(ctx.state, {
-                type: '请求回应',
-                requestType: MOVE_SRC_CARD_RT,
-                target: ownerId,
-                prompt: {
-                  type: 'distribute',
-                  mode: 'select',
-                  title: `界神速:选择 P${srcPlayer} 的一张装备牌移动`,
-                  source: 'handAndEquip',
-                  minTotal: 1,
-                  maxTotal: 1,
-                },
-                timeout: 15,
-              });
-              const srcCardId = ctx.state.localVars[MOVE_SRC_CARD_KEY] as
-                | string
-                | undefined;
-              delete ctx.state.localVars[MOVE_SRC_CARD_KEY];
-
-              if (typeof srcCardId === 'string') {
-                const srcSlot = slotOfEquip(ctx.state, srcPlayer, srcCardId);
-                if (srcSlot) {
-                  // 选目标玩家(对应槽位为空,且非源玩家)
-                  delete ctx.state.localVars[MOVE_DEST_PLAYER_KEY];
-                  await applyAtom(ctx.state, {
-                    type: '请求回应',
-                    requestType: MOVE_DEST_PLAYER_RT,
-                    target: ownerId,
-                    prompt: {
-                      type: 'choosePlayer',
-                      title: `界神速:选择目标玩家(将装备移到其空${srcSlot}槽)`,
-                      min: 1,
-                      max: 1,
-                      filter: (_view: GameView, t: number) =>
-                        t !== srcPlayer &&
-                        ctx.state.players[t]?.alive === true &&
-                        !ctx.state.players[t]?.equipment[srcSlot],
-                    },
-                    timeout: 15,
-                  });
-                  const destPlayer = ctx.state.localVars[MOVE_DEST_PLAYER_KEY] as
-                    | number
-                    | undefined;
-                  delete ctx.state.localVars[MOVE_DEST_PLAYER_KEY];
-
-                  if (typeof destPlayer === 'number') {
-                    await moveEquipmentCard(ctx.state, srcPlayer, srcCardId, destPlayer);
-                  }
-                }
-              }
-            }
-          }
-        }
-
         // ── 逐项结算:付代价 → 虚拟杀(顺序①→②→③) ──
-        // 每项独立付代价+出杀;若玩家中途死亡(opt③失血),后续项不再执行。
 
         // 选项1:加跳过摸牌标签 → 虚拟杀
         if (opt1 && self.alive) {
@@ -497,16 +311,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
           // 无效选择 → 选项2未生效(不弃牌、不跳过出牌、不虚拟杀)
         }
 
-        // 选项3:加跳过弃牌标签 + 失去1点体力 → 虚拟杀(若仍存活)
+        // 选项3:加跳过弃牌标签 + 翻面(加翻面标签) → 虚拟杀
         if (opt3 && self.alive) {
           await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_DISCARD_TAG });
-          await applyAtom(ctx.state, { type: '失去体力', target: ownerId, amount: 1 });
-          // 失去体力可能导致濒死;若玩家仍存活才执行虚拟杀
-          if (self.alive) {
-            const target = await askKillTarget(ctx.state, ownerId, '界神速③');
-            if (typeof target === 'number' && ctx.state.players[target]?.alive) {
-              await virtualKill(ctx.state, ownerId, target);
-            }
+          await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
+          const target = await askKillTarget(ctx.state, ownerId, '界神速③');
+          if (typeof target === 'number' && ctx.state.players[target]?.alive) {
+            await virtualKill(ctx.state, ownerId, target);
           }
         }
       } finally {
@@ -555,7 +366,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 跳过弃牌阶段:有标签 → skip(界版新增) ───────────────────
+  // ── 跳过弃牌阶段:有标签 → skip ────────────────────
   registerBeforeHook(
     state,
     skill.id,
@@ -569,6 +380,59 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const self = ctx.state.players[ownerId];
       if (!self?.tags.includes(SKIP_DISCARD_TAG)) return;
       return skipPhase(ctx.state, atom, SKIP_DISCARD_TAG);
+    },
+  );
+
+  // ── 翻面:下一回合跳过(机制同据守/放逐) ────────────────────
+  // 检测翻面标签 → 移除标签 + 设 skipAll 标志 + cancel(不进入准备阶段)
+  registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '阶段开始',
+    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      const atom = ctx.atom as { type: string; player: number; phase: string };
+      if (atom.type !== '阶段开始') return;
+      if (atom.player !== ownerId) return;
+      const self = ctx.state.players[ownerId];
+
+      // 入口:准备阶段开始 + 翻面标签 → 启动跳过
+      if (atom.phase === '准备' && self?.tags.includes(FLIP_TAG)) {
+        await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: FLIP_TAG });
+        ctx.state.localVars[SKIP_FLAG] = ownerId;
+        return { kind: 'cancel' };
+      }
+
+      // skipAll 标志存在时,取消所有其他阶段(防止 phase-end after-hook 推进产生副作用)
+      if (ctx.state.localVars[SKIP_FLAG] === ownerId) {
+        return { kind: 'cancel' };
+      }
+    },
+  );
+
+  // ── 翻面:阶段结束(准备) before-hook,主动推进回合 ────────
+  // skipAll 标志存在时:清除标志 + 亲自执行 end-turn 序列把回合交给下家。
+  // (与据守一致:cancel 阶段结束原子以防 phase-end after-hook 推进产生幻影阶段链)
+  registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '阶段结束',
+    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      const atom = ctx.atom as { type: string; player: number; phase: string };
+      if (atom.type !== '阶段结束') return;
+      if (atom.player !== ownerId) return;
+      if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;
+
+      // 清除 skipAll 标志(后续不再 skip)
+      delete ctx.state.localVars[SKIP_FLAG];
+
+      // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束
+      await applyAtom(ctx.state, { type: '清过期标记', player: ownerId });
+      await applyAtom(ctx.state, { type: '下一玩家' });
+      await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
+
+      return { kind: 'cancel' };
     },
   );
 

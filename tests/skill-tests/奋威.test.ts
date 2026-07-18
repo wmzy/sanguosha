@@ -6,6 +6,8 @@
 //   1. 正面:南蛮入侵多目标 → 奋威触发 → 选目标令其无效 → 该目标跳过结算
 //   2. 限定技:整局一次,第二次多目标锦囊不再触发
 //   3. 不发动:奋威确认面板选"不发动" → 无效果,限定技未消耗
+//   4. 铁索连环(整卡一次无懈):奋威触发 → 逐目标无效(设横置 hook 拦截)
+//   5. 铁索连环单目标:不触发奋威(非多目标)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -197,6 +199,136 @@ describe('奋威', () => {
     // P3 和 P1 都受伤害(奋威未发动)
     expect(harness.state.players[2].health).toBe(3);
     expect(harness.state.players[0].health).toBe(3);
+    // 限定技未消耗
+    expect(harness.state.players[0].vars['奋威/used']).toBeUndefined();
+  });
+
+  // ─── 铁索连环(整卡一次无懈)逐目标无效 ────────────────────────
+
+  it('铁索连环多目标 → 奋威令P3无效 → P3不横置,P2横置', async () => {
+    const chain = makeCard('chain', '铁索连环', '♣', '3', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', character: '界甘宁', hand: [], skills: ['奇袭', '奋威'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          character: '庞统',
+          hand: ['chain'],
+          skills: ['铁索连环'],
+        }),
+        makePlayer({ index: 2, name: 'P3', character: '刘备', hand: [], skills: [] }),
+        makePlayer({ index: 3, name: 'P4', character: '曹操', hand: [], skills: [] }),
+      ],
+      cardMap: { chain },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P2 使用铁索连环,目标 [P3, P4](座次 2, 3)
+    await P2.triggerAction('铁索连环', 'use', { cardId: 'chain', targets: [2, 3] });
+
+    // 奋威确认面板弹出(给 P1)
+    P1.processEvents();
+    // P1 确认发动奋威
+    await P1.respond('奋威', { choice: true });
+
+    // 奋威多选面板:选择 P3(座次2)令其无效
+    await P1.respond('奋威', { targets: [2] });
+
+    // 无懈可击窗口(broadcast)→ pass(无人打无懈)
+    await P1.pass();
+
+    // 验证:P3(座次2)未被横置(被奋威无效),P4(座次3)被横置
+    expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);
+    expect(harness.state.players[3].marks.some((m) => m.id === 'chained')).toBe(true);
+    // 奋威标记为已使用(限定技)
+    expect(harness.state.players[0].vars['奋威/used']).toBe(true);
+    // 铁索连环牌进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('chain');
+  });
+
+  // ─── 铁索连环:奋威令全部目标无效 ─────────────────────────────
+
+  it('铁索连环多目标 → 奋威令全部目标无效 → 无人横置', async () => {
+    const chain = makeCard('chain2', '铁索连环', '♣', '4', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', character: '界甘宁', hand: [], skills: ['奇袭', '奋威'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          character: '庞统',
+          hand: ['chain2'],
+          skills: ['铁索连环'],
+        }),
+        makePlayer({ index: 2, name: 'P3', character: '刘备', hand: [], skills: [] }),
+        makePlayer({ index: 3, name: 'P4', character: '曹操', hand: [], skills: [] }),
+      ],
+      cardMap: { chain2: chain },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P2 使用铁索连环,目标 [P3, P4]
+    await P2.triggerAction('铁索连环', 'use', { cardId: 'chain2', targets: [2, 3] });
+
+    // P1 发动奋威,令全部目标无效
+    P1.processEvents();
+    await P1.respond('奋威', { choice: true });
+    await P1.respond('奋威', { targets: [2, 3] });
+
+    // 无懈窗口 → pass
+    await P1.pass();
+
+    // P3 和 P4 都未被横置(都被奋威无效)
+    expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);
+    expect(harness.state.players[3].marks.some((m) => m.id === 'chained')).toBe(false);
+    expect(harness.state.players[0].vars['奋威/used']).toBe(true);
+    expect(harness.state.zones.discardPile).toContain('chain2');
+  });
+
+  // ─── 铁索连环单目标:不触发奋威(非多目标)─────────────────────
+
+  it('铁索红单目标 → 奋威不触发(非多目标)', async () => {
+    const chain = makeCard('chain3', '铁索连环', '♣', '5', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', character: '界甘宁', hand: [], skills: ['奇袭', '奋威'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          character: '庞统',
+          hand: ['chain3'],
+          skills: ['铁索连环'],
+        }),
+        makePlayer({ index: 2, name: 'P3', character: '刘备', hand: [], skills: [] }),
+      ],
+      cardMap: { chain3: chain },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P2 使用铁索连环,仅 1 个目标 [P3]
+    await P2.triggerAction('铁索连环', 'use', { cardId: 'chain3', targets: [2] });
+
+    // 奋威不应触发(单目标)→ 直接进入无懈窗口
+    await P1.pass();
+
+    // P3 被横置(奋威未介入)
+    expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(true);
     // 限定技未消耗
     expect(harness.state.players[0].vars['奋威/used']).toBeUndefined();
   });

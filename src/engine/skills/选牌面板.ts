@@ -5,10 +5,11 @@
 //   - 装备/判定:明牌可见,直接选 cardId
 //   - 手牌:盲选第 K 张(牌背位置博弈),splice 手牌顺序保证重放确定性
 // 差异通过 mode(requestType/title) 参数化:
-//   - discard: 弃置选定牌(过河拆桥);奇才(界黄月英)防具保护 → 防具不可被弃置
+//   - discard: 弃置选定牌(过河拆桥);奇才(界黄月英)防具/宝物保护 → 不可被弃置
 //   - obtain:  获得选定牌(顺手牵羊/反馈)
 import type { ActionLogEntry, GameState, Json } from '../types';
 import { applyAtom } from '../create-engine';
+import { QICAI_PROTECTED_SLOTS } from './界奇才';
 
 /** 在 actionLog 中当前(最后一条)条目之前插入一条"设置手牌顺序"条目。
  *  重放时该条目先执行 → 目标 hand 顺序恢复 → 后续盲选取 hand[K] 确定性正确。
@@ -67,7 +68,7 @@ export interface PickTargetCardOptions {
 }
 
 /** 弹 pickTargetCard 选牌面板,使用者(from)从目标区域选一张牌(弃置或获得)。
- *  - discard: 弃置选定牌(过河拆桥);奇才(界黄月英)防具保护 → 防具过滤
+ *  - discard: 弃置选定牌(过河拆桥);奇才(界黄月英)防具/宝物保护 → 过滤
  *  - obtain:  获得选定牌(顺手牵羊/反馈)
  *  手牌盲选时 splice 手牌顺序(重放确定性);超时默认明牌优先(装备→判定)否则 hand[0]。 */
 export async function runPickTargetCardPanel(
@@ -79,11 +80,15 @@ export async function runPickTargetCardPanel(
 ): Promise<void> {
   const obtain = opts.mode === 'obtain';
 
-  // discard 模式:奇才(界黄月英)防具不可被弃置,从可选装备列表过滤
-  const hasArmorProtection = !obtain && state.players[target]?.tags.includes('奇才/防具保护');
+  // discard 模式:奇才(界黄月英)防具/宝物均不可被弃置,按槽位过滤
+  const targetTags = state.players[target]?.tags ?? [];
   const equipment = Object.entries(targetPlayer.equipment)
     .filter(([, id]) => typeof id === 'string')
-    .filter(([slot]) => !(hasArmorProtection && slot === '防具'))
+    .filter(([slot]) => {
+      if (obtain) return true;
+      const protectTag = QICAI_PROTECTED_SLOTS[slot];
+      return !protectTag || !targetTags.includes(protectTag);
+    })
     .map(([slot, id]) => ({ slot, cardId: id, cardName: state.cardMap[id]?.name ?? '?' }));
   // 反馈(经典规则)仅可选手牌+装备,不含判定区;过河拆桥/顺手牵羊含判定区
   const judge =
