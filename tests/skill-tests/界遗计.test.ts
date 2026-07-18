@@ -79,6 +79,7 @@ function injectPending(state: GameState, idx: number, requestType: string, promp
     isBlocking: true,
     resolve: () => {},
     isTimeout: false,
+      isPaused: false,
     pause() {},
     _fireTimeoutNow: undefined,
   });

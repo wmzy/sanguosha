@@ -1,10 +1,15 @@
-// 烈弓(黄忠·被动技):当你使用【杀】指定目标时,若目标的体力值或手牌数不小于你,
-// 你可以令其不能使用【闪】抵消此【杀】。
+// 烈弓(黄忠·被动技,OL 标版官方逐字):
+//   当你于出牌阶段使用【杀】指定目标后,若其手牌数不小于你的体力值
+//   或不大于你的攻击范围,你可以令其不能抵消此【杀】。
 //
-// 实现(与铁骑同构的禁闪横切机制,但无条件判定):
+// 发动条件(两分支均基于目标手牌数):
+//   分支1: target.hand.length >= owner.health   (目标手牌数 ≥ 自己体力值)
+//   分支2: target.hand.length <= owner.attackRange (目标手牌数 ≤ 自己攻击范围)
+//   攻击范围取 owner.vars['距离/出杀范围'],默认 1(徒手)。
+//
+// 实现(与铁骑同构的禁闪横切机制):
 //   1. 指定目标 after hook(source===ownerId, card 是杀):
-//        若 target.health>=owner.health || target.hand.length>=owner.hand.length:
-//          询问"是否发动烈弓" → 若发动 → 给目标加标签 '烈弓/禁闪'。
+//        若上述条件满足 → 询问"是否发动烈弓" → 若发动 → 给目标加标签 '烈弓/禁闪'。
 //   2. 询问闪 before hook(source===ownerId 且 target 有 '烈弓/禁闪' 标签):
 //        去标签 + cancel(跳过询问闪 → 处理区无闪 → 杀.execute 造成伤害,强制命中)。
 //
@@ -28,7 +33,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '烈弓',
-    description: '使用杀指定目标时,若目标体力或手牌不小于你,可令其不能出闪',
+    description:
+      '使用杀指定目标后,若其手牌数不小于你的体力值或不大于你的攻击范围,可令其不能抵消此杀',
   };
 }
 
@@ -68,9 +74,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const targetPlayer = ctx.state.players[target];
     if (!self?.alive || !targetPlayer?.alive) return;
 
-    // 发动条件:目标体力值 ≥ 自己,或 目标手牌数 ≥ 自己
+    // 发动条件(官方):目标手牌数 ≥ 自己体力值,或 目标手牌数 ≤ 自己攻击范围
+    const attackRange = (self.vars['距离/出杀范围'] as number) ?? 1;
     const condMet =
-      targetPlayer.health >= self.health || targetPlayer.hand.length >= self.hand.length;
+      targetPlayer.hand.length >= self.health || targetPlayer.hand.length <= attackRange;
     if (!condMet) return;
 
     // 询问是否发动烈弓("你可以令其不能出闪"——可选)

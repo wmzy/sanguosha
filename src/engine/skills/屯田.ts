@@ -8,8 +8,8 @@
 //   count = player.marks.filter(m => m.id.startsWith('屯田/田:')).length
 //
 // 距离修正:每张田使 距离/进攻修正 +1(更新 vars,后端 effectiveDistance 据此生效)。
-//   注:此 vars 变更不经 atom,view.distanceVars 不实时同步(已知引擎限制——
-//   距离修正的 view 同步通道仅装备/卸下 atom 提供;此效果后端正确,前端展示需额外通道)。
+//   view 同步:加田时通过「加标记」atom 的 distanceVars 通道同步 view.distanceVars
+//   (与 装备/添加技能 的 distanceVars 通道一致),前后端一致。
 //
 // 关键点:
 //   - "回合外"判定:currentPlayerIndex !== ownerId(非自己回合)
@@ -114,7 +114,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       );
     }
 
-    // 加田标记(唯一 id,seq 单调递增避免冲突)
+    // 预计算加田后的田数量(atom apply 前尚无新田,故 +1)
+    const newCount = tianCount(ctx.state, ownerId) + 1;
+
+    // 加田标记 + 同步距离修正 view(distanceVars 通道)
     const tianId = `${TIAN_PREFIX}${ctx.state.seq}`;
     await applyAtom(ctx.state, {
       type: '加标记',
@@ -124,9 +127,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
         scope: ownerId,
         payload: { cardId: judgeCardId },
       },
+      distanceVars: { attackMod: newCount },
     });
 
-    // 更新距离修正(每张田 -1 距离 = 进攻修正 +1)
+    // 后端 vars 同步(effectiveDistance 读取)
     syncDistanceMod(ctx.state, ownerId);
   });
 

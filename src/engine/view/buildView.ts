@@ -37,13 +37,20 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   // 不使用 findPendingSlot 的 size===1 fallback —— 那会让主公选将期间(单 slot)
   // 的其他 viewer 错误匹配到主公 slot,导致"共用倒计时":其他角色看到主公的
   // 选将 atom/deadline/target,前端据此渲染主公的选将界面和倒计时。
-  const ownOrBroadcastSlot =
+  let ownOrBroadcastSlot =
     viewer >= 0
       ? (state.pendingSlots.get(viewer) ??
         [...state.pendingSlots.values()].find(
-          (s) => (s.atom as { target?: number }).target === TARGET_BROADCAST,
+          (s) =>
+            (s.atom as { target?: number }).target === TARGET_BROADCAST &&
+            !s.isPaused,
         ))
       : undefined;
+  // viewer 专属 slot 若已 pause(respond execute 内部创建了新 pending),
+  // 不应再返回它——交给 observer 逻辑接管,与增量视图对齐。
+  if (ownOrBroadcastSlot?.isPaused) {
+    ownOrBroadcastSlot = undefined;
+  }
   if (ownOrBroadcastSlot) {
     const slot = ownOrBroadcastSlot;
     const def = slot.definition;

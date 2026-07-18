@@ -1,11 +1,13 @@
 // 裸衣(许褚·主动技)测试
-//   摸牌阶段少摸一张,杀/决斗伤害 +1,直到下一回合开始。
+//   摸牌阶段少摸一张,本回合杀/决斗伤害 +1。
 //
 // 验证:
 //   1. 增伤效果:有裸衣标签时,杀造成 2 点伤害
 //   2. 无标签:杀造成 1 点伤害(对照)
 //   3. 摸牌阶段发动裸衣 → 少摸一张(摸 1 而非 2)
 //   4. 决斗伤害 +1
+//   5. 许褚回合结束清标签(本回合语义)
+//   6. 其他玩家回合结束不清许褚标签
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -167,5 +169,81 @@ describe('裸衣', () => {
     expect(harness.state.players[0].hand.length).toBe(2);
     expect(harness.state.zones.deck.length).toBe(1);
     expect(harness.state.players[0].tags).not.toContain('裸衣/bonus');
+  });
+
+  // ─── 决斗增伤(隔离测试:直接挂标签)────────────────────
+  it('有裸衣增伤标签:决斗造成 2 点伤害', async () => {
+    const duel = makeCard('jd1', '决斗', '♠', 'A', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        // P0(许褚)带裸衣增伤标签
+        makePlayer({ index: 0, name: 'P0', hand: ['jd1'], skills: ['决斗', '裸衣'], tags: ['裸衣/bonus'] }),
+        makePlayer({ index: 1, name: 'P1', skills: ['杀'] }),
+      ],
+      cardMap: { jd1: duel },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('决斗', 'jd1', [1]);
+    await P1.pass(); // 无懈可击窗口
+    await P1.pass(); // 询问杀 → 不出杀 → 输
+
+    // 裸衣增伤:基础 1 + 1 = 2
+    expect(harness.state.players[1].health).toBe(2);
+  });
+
+  // ─── 许褚回合结束清除增伤标签(本回合语义)────────────────
+  it('许褚回合结束时清除增伤标签', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['裸衣'], tags: ['裸衣/bonus'] }),
+        makePlayer({ index: 1, name: 'P1', skills: ['杀'] }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    expect(harness.state.players[0].tags).toContain('裸衣/bonus');
+
+    // 推进到许褚自己回合结束
+    const { applyAtom } = await import('../../src/engine/create-engine');
+    await applyAtom(harness.state, { type: '回合结束', player: 0 });
+    harness.processAllEvents();
+
+    // 标签已清除(本回合结束)
+    expect(harness.state.players[0].tags).not.toContain('裸衣/bonus');
+  });
+
+  // ─── 其他玩家回合结束不清许褚标签 ────────────────────
+  it('其他玩家回合结束不清除许褚的增伤标签', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['裸衣'], tags: ['裸衣/bonus'] }),
+        makePlayer({ index: 1, name: 'P1', skills: ['杀'] }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    expect(harness.state.players[0].tags).toContain('裸衣/bonus');
+
+    // P1 回合结束 → 不应清除许褚(P0)的标签
+    const { applyAtom } = await import('../../src/engine/create-engine');
+    await applyAtom(harness.state, { type: '回合结束', player: 1 });
+    harness.processAllEvents();
+
+    // 标签仍在(仅许褚自己回合结束才清)
+    expect(harness.state.players[0].tags).toContain('裸衣/bonus');
   });
 });

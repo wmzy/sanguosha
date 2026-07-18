@@ -1,5 +1,6 @@
 // 强袭(典韦·主动技)测试
-//   出牌阶段:自减 1 体力或弃一张武器牌,对攻击范围内一名角色造成 1 点伤害。每回合限一次。
+//   出牌阶段限两次:失去1点体力或弃一张武器牌,
+//   对一名本回合内未以此法指定过的其他角色造成1点伤害。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -56,6 +57,16 @@ function makePlayer(opts: {
   };
 }
 
+function buildCount(state: GameState, ownerId: number): number {
+  const v = state.players[ownerId]?.vars['强袭/usedThisTurn'];
+  return typeof v === 'number' ? v : 0;
+}
+
+function buildTargets(state: GameState, ownerId: number): number[] {
+  const v = state.players[ownerId]?.vars['强袭/targets/usedThisTurn'];
+  return Array.isArray(v) ? (v as number[]) : [];
+}
+
 describe('强袭', () => {
   let harness: SkillTestHarness;
 
@@ -63,7 +74,7 @@ describe('强袭', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 自减体力造成伤害 ────────────────────────────
+  // ─── 自减体力造成伤害 ────────────────────────
   it('cost=hp:自减 1 体力,对目标造成 1 点伤害', async () => {
     const state: GameState = createGameState({
       players: [
@@ -82,6 +93,8 @@ describe('强袭', () => {
 
     expect(harness.state.players[0].health).toBe(3); // 自减 1
     expect(harness.state.players[1].health).toBe(3); // 受 1 伤
+    expect(buildCount(harness.state, 0)).toBe(1);
+    expect(buildTargets(harness.state, 0)).toEqual([1]);
   });
 
   // ─── 弃手牌武器造成伤害 ────────────────────────────
@@ -106,6 +119,8 @@ describe('强袭', () => {
     expect(harness.state.players[1].health).toBe(3); // 受 1 伤
     expect(harness.state.players[0].hand).not.toContain('w1');
     expect(harness.state.zones.discardPile).toContain('w1');
+    expect(buildCount(harness.state, 0)).toBe(1);
+    expect(buildTargets(harness.state, 0)).toEqual([1]);
   });
 
   // ─── 弃装备区武器造成伤害 ────────────────────────────
@@ -133,12 +148,14 @@ describe('强袭', () => {
     expect(harness.state.zones.discardPile).toContain('w1');
   });
 
-  // ─── 每回合限一次 ────────────────────────────
-  it('每回合限一次:第二次发动被拒绝', async () => {
+  // ─── 限两次:第二次对不同目标可执行,第三次被拒绝 ──────────────
+  it('限两次:第二次对不同目标可执行,第三次被拒绝', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', skills: ['强袭'] }),
         makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+        makePlayer({ index: 2, name: 'P2', character: '刘备' }),
+        makePlayer({ index: 3, name: 'P3', character: '孙权' }),
       ],
       cardMap: {},
       currentPlayerIndex: 0,
@@ -148,13 +165,61 @@ describe('强袭', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
+    // 第一次:P1
     await P0.triggerAction('强袭', 'use', { cost: 'hp', target: 1 });
-    // 第二次:应被拒绝
+    expect(harness.state.players[1].health).toBe(3);
+    expect(buildCount(harness.state, 0)).toBe(1);
+    expect(buildTargets(harness.state, 0)).toEqual([1]);
+
+    // 第二次:P2(不同目标)— 应允许
+    await P0.triggerAction('强袭', 'use', { cost: 'hp', target: 2 });
+    expect(harness.state.players[2].health).toBe(3);
+    expect(buildCount(harness.state, 0)).toBe(2);
+    expect(buildTargets(harness.state, 0)).toEqual([1, 2]);
+
+    // 第三次:已达上限 2 → 拒绝(即便有未指定目标 P3)
+    await P0.expectRejected({
+      skillId: '强袭',
+      actionType: 'use',
+      params: { cost: 'hp', target: 3 },
+    });
+    expect(buildCount(harness.state, 0)).toBe(2);
+  });
+
+  // ─── 目标去重:同一目标本回合第二次发动被拒绝 ──────────────
+  it('目标去重:同一目标本回合第二次发动被拒绝', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['强袭'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+        makePlayer({ index: 2, name: 'P2', character: '刘备' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 第一次:P1 — 允许
+    await P0.triggerAction('强袭', 'use', { cost: 'hp', target: 1 });
+    expect(harness.state.players[1].health).toBe(3);
+
+    // 第二次:再次对 P1 — 应被拒绝(去重)
     await P0.expectRejected({
       skillId: '强袭',
       actionType: 'use',
       params: { cost: 'hp', target: 1 },
     });
+    expect(harness.state.players[1].health).toBe(3); // 未再次受伤
+    expect(buildCount(harness.state, 0)).toBe(1); // 计数未增加
+    expect(buildTargets(harness.state, 0)).toEqual([1]);
+
+    // 第二次:对 P2(不同目标)— 应允许(去重不影响其他目标)
+    await P0.triggerAction('强袭', 'use', { cost: 'hp', target: 2 });
+    expect(harness.state.players[2].health).toBe(3);
+    expect(buildCount(harness.state, 0)).toBe(2);
   });
 
   // ─── 非出牌阶段/非自己回合 → 拒绝 ────────────────────
@@ -179,8 +244,8 @@ describe('强袭', () => {
     });
   });
 
-  // ─── 攻击范围外 → 拒绝 ────────────────────────────
-  it('攻击范围外(无武器,目标距离 2):拒绝', async () => {
+  // ─── 官方无距离限制:远距离目标仍可指定 ────────────────
+  it('官方无距离限制:徒手时目标距离 2 仍可指定', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', skills: ['强袭'] }),
@@ -196,12 +261,10 @@ describe('强袭', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    // 4 人环座:P0 与 P2 距离 2,徒手范围 1 → 超出
-    await P0.expectRejected({
-      skillId: '强袭',
-      actionType: 'use',
-      params: { cost: 'hp', target: 2 },
-    });
+    // 4 人环座:P0 与 P2 距离 2,徒手范围 1,但官方无距离限制 → 允许
+    await P0.triggerAction('强袭', 'use', { cost: 'hp', target: 2 });
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[2].health).toBe(3);
   });
 
   // ─── cost=discard 但非武器牌 → 拒绝 ────────────────────

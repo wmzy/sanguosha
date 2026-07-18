@@ -65,6 +65,10 @@ export interface PendingSlot {
   resolve: () => void;
   /** 超时定时器是否已触发(已被 fireTimeout 接管)。dispatch 据 this 丢弃竞态中的用户 action */
   isTimeout: boolean;
+  /** 是否已 pause(dispatch 启动 respond execute 前调用)。
+ *  buildView 跳过 paused slot——因 respond execute 内部可能创建新 pending slot,
+ *  旧 slot 仍在 pendingSlots 但已不再代表当前问询。 */
+  isPaused: boolean;
   /** 取消超时定时器(不触发)。dispatch 走用户 action 路径前调用,让 respond execute 独占推进 */
   pause: () => void;
   /** 内部:由引擎创建 pending 时挂上,供 fireTimeout 立即触发 onTimeout(绕过真实 setTimeout) */

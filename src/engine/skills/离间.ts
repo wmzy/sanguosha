@@ -6,14 +6,16 @@
 //   2. 弃置牌(弃置 atom)
 //   3. A 视为对 B 使用决斗(runDuelResolution,复用 决斗.ts 提取的结算核心)
 //      - A 是决斗发起者(出杀后手),B 是目标(出杀先手)
-//      - 无实体决斗牌(cardId 省略),但可被无懈可击抵消
+//      - 无实体决斗牌(cardId 省略)
+//      - 官方明确"不能被【无懈可击】抵消",跳过无懈询问
 //
 // 关键点:
 //   - 限一次/回合:离间/usedThisTurn(后缀约定,回合结束 atom 自动清空)。
 //   - 性别检查用 getGender(character):A、B 必须是男性;貂蝉本人为女性,天然不可选。
 //   - 弃置的牌可以是手牌或装备牌(弃置 atom 同时处理两区)。
-//   - 决斗结算复用 决斗.ts 的 runDuelResolution,保证与正常决斗行为一致
-//     (无懈可击、无双双杀、轮流出杀、输者受 1 点伤害)。
+//   - 决斗结算复用 决斗.ts 的 runDuelResolution(传 skipNullification=true),
+//     保证与正常决斗行为一致(无双双杀、轮流出杀、输者受 1 点伤害),
+//     但按官方跳过无懈可击询问。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
@@ -83,8 +85,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 1. 弃置一张牌(手牌或装备)
       await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [cardId] });
 
-      // 2. A 视为对 B 使用决斗(无实体牌,cardId 省略)
-      await runDuelResolution(st, A, B);
+      // 2. A 视为对 B 使用决斗(无实体牌,cardId 省略,跳过无懈可击——官方明确不可被无懈)
+      await runDuelResolution(st, A, B, undefined, true);
 
       await popFrame(st);
     },

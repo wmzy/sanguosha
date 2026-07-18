@@ -117,6 +117,7 @@ describe('反馈', () => {
       isBlocking: true,
       resolve: fakeResolve,
       isTimeout: false,
+      isPaused: false,
       pause() {},
       _fireTimeoutNow: undefined,
     });
@@ -157,6 +158,7 @@ describe('反馈', () => {
       isBlocking: true,
       resolve: () => {},
       isTimeout: false,
+      isPaused: false,
       pause() {},
       _fireTimeoutNow: undefined,
     });

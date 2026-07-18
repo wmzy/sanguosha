@@ -158,6 +158,41 @@ describe('突袭', () => {
     expect(new Set(harness.state.players[0].hand)).toEqual(new Set(['d1', 'd2']));
   });
 
+  // ─── “至多两名”可只选 1 名 ───────────────────────────────────────────
+  it('发动突袭只选 1 名角色 → 获得其一张手牌,默认摸牌被跳过', async () => {
+    const c1 = makeCard('a1', '杀', '♠', '7');
+    const c2 = makeCard('a2', '闪', '♥', '5');
+    const c3 = makeCard('a3', '桃', '♦', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [], skills: ['突袭', '回合管理'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['a1', 'a2'], skills: ['回合管理'] }),
+        makePlayer({ index: 2, name: 'P2', hand: ['a3'], skills: ['回合管理'] }),
+      ],
+      cardMap: { a1: c1, a2: c2, a3: c3 },
+      currentPlayerIndex: 0,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '判定' });
+    await waitForStable(harness.state); // 突袭/trigger 询问
+    P0.expectPending('请求回应');
+    await P0.respond('突袭', { choice: true }); // 发动
+    await waitForStable(harness.state); // 突袭/select 询问
+    await P0.respond('突袭', { targets: [1] }); // 只选 1 名(P1)
+    await harness.waitForStable();
+
+    // P0 从 P1 获得 1 张手牌,P2 未受影响
+    expect(harness.state.players[0].hand.length).toBe(1);
+    expect(['a1', 'a2']).toContain(harness.state.players[0].hand[0]);
+    expect(harness.state.players[1].hand.length).toBe(1);
+    expect(harness.state.players[2].hand).toEqual(['a3']); // P2 手牌未偷
+  });
+
   // ─── respond validate:无 pending 拒绝 ─────────────────────────────
   it('respond:无 pending → 拒绝', async () => {
     const state: GameState = createGameState({

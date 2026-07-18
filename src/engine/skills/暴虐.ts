@@ -10,9 +10,6 @@
 //   - 系统伤害(source<0,如闪电)不触发
 //   - 黑桃 = ♠
 //   - 判定牌在 frame.cards 末尾(判定 atom 自身 afterHooks 移入弃牌堆之前读取)
-//
-// 待澄清:详细规则提到"并获得该判定牌",但主描述(表格)只说"回复1点体力"。
-//   以主描述(唯一事实来源)为准,仅实现回复体力,不实现获得判定牌。
 import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';

@@ -64,14 +64,16 @@ function mkPlayer(opts: {
   };
 }
 
-/** 若当前存在化身的"选技能"询问,自动选第一个候选技能并 respond。 */
-async function autoRespond化身Skill(harness: SkillTestHarness): Promise<void> {
-  const ZUO = harness.player(0);
-  const slot = harness.state.pendingSlots.get(0);
+/** 若当前存在化身的"选技能"询问,自动选第一个候选技能并 respond。
+ *  playerIndex 指定左慈所在座次(默认 0)。 */
+async function autoRespond化身Skill(harness: SkillTestHarness, playerIndex = 0): Promise<void> {
+  const ZUO = harness.player(playerIndex);
+  const slot = harness.state.pendingSlots.get(playerIndex);
   if (!slot) return;
   const rt = (slot.atom as Record<string, unknown>).requestType as string | undefined;
   if (rt !== '化身/选技能') return;
-  const candidates = (harness.state.localVars['化身/candidates/0'] as string[] | undefined) ?? [];
+  const candidates =
+    (harness.state.localVars[`化身/candidates/${playerIndex}`] as string[] | undefined) ?? [];
   if (candidates.length === 0) return;
   await ZUO.respond('化身', { skill: candidates[0] });
   await harness.waitForStable();
@@ -282,5 +284,48 @@ describe('化身', () => {
       expect(harness.state.players[0].skills).toContain(newSkill);
       expect(EXCLUDED.has(newSkill)).toBe(false);
     }
+  });
+
+  // ─── 6. 简化①:左慈非主公时,主公首回合开始即初始化 ─────
+  // 官方"游戏开始时"由"首次回合开始"近似:任意玩家的首个回合开始即触发初始化。
+  // 此用例验证左慈不在座次 0 时,座次 0(主公)回合开始也能让左慈同步初始化。
+  it('简化①:左慈非首位时,主公首回合开始即触发化身初始化', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '曹操', character: '曹操', skills: [] }),
+          mkPlayer({ index: 1, name: '左慈', character: '左慈', skills: ['化身', '新生'] }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+        rngSeed: 999,
+      }),
+    );
+
+    // 主公(曹操/座次0)回合开始 → 左慈(座次1)的化身应同步初始化
+    void applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    // 左慈(座次1)若有选技能询问,自动选第一个
+    await autoRespond化身Skill(harness, 1);
+
+    const p = harness.state.players[1];
+    const pool = p.vars['化身/牌池'] as string[] | undefined;
+    expect(pool).toBeDefined();
+    expect(pool!.length).toBe(2);
+    // 化身牌池排除本局已登场武将(左慈/曹操)
+    expect(pool!.includes('左慈')).toBe(false);
+    expect(pool!.includes('曹操')).toBe(false);
+
+    // 获得了一个技能
+    const currentSkill = p.vars['化身/当前技能'] as string | undefined;
+    expect(currentSkill).toBeDefined();
+    expect(p.skills).toContain(currentSkill);
+    expect(EXCLUDED.has(currentSkill!)).toBe(false);
+
+    // 座次 0(曹操)不应有化身相关 vars
+    expect(harness.state.players[0].vars['化身/牌池']).toBeUndefined();
   });
 });

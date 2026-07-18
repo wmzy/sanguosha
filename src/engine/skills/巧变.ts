@@ -5,7 +5,7 @@
 // 实现:
 //   - before hook 挂在「阶段开始」:判定/摸牌/出牌/弃牌 阶段开始时询问是否发动。
 //     发动则选弃牌 + 跳过当前阶段(阶段结束 推进 + cancel)。
-//   - 跳过摸牌:发动后询问选择 1-2 名有手牌的其他角色,各获得其一张手牌(取手牌第 0 张)。
+//   - 跳过摸牌:发动后询问选择 1-2 名有手牌的其他角色,各获得其一张随机手牌(不展示,与突袭一致)。
 //   - 跳过出牌:发动后询问源玩家+源牌+目标玩家,通过 移动牌 atom 完成场上牌移动。
 //   - 跳过判定/弃牌:仅弃牌 + 跳过,无附加效果。
 //
@@ -233,7 +233,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
             for (const t of targets.slice(0, 2)) {
               const target = ctx.state.players[t];
               if (!target?.alive || target.hand.length === 0) continue;
-              const cardId = target.hand[0]; // 取手牌第 0 张
+              // 手牌不公开:盲取一张随机手牌(与突袭一致,不展示)
+              const idx = Math.floor(Math.random() * target.hand.length);
+              const cardId = target.hand[idx];
               await applyAtom(ctx.state, {
                 type: '获得',
                 player: ownerId,

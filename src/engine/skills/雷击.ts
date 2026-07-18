@@ -1,12 +1,14 @@
-// 雷击(张角·被动触发):当你使用或打出【闪】时,可令任意一名角色判定,
-// 若结果为黑桃,你对该角色造成2点雷电伤害。每张【闪】限一次。
+// 雷击(张角·被动触发):当你使用或打出【闪】时,可令一名其他角色判定,
+// 若结果为黑桃,你对其造成2点雷电伤害;若结果为梅花,你回复1点体力,
+// 然后对其造成1点雷电伤害。每张【闪】限一次。
 //
 // 触发时机:「询问闪」atom 的 after hook —— 仅当张角(target=ownerId)被询问闪
 //   且实际打出了闪(手牌中的闪移入处理区)。
 //   - 询问闪 pending resolve 后,技能 after hook 执行(此时询问闪 slot 已清理,
 //     可安全为张角创建新的 请求回应 slot,无嵌套同座次 pending 冲突)
 //   - 检查 frameCards 中是否有张角打出的闪
-//   - 有闪 → 询问张角选择判定目标(或放弃)→ 判定(目标)→ 读结果 → 黑桃则造成2点雷电伤害
+//   - 有闪 → 询问张角选择判定目标(或放弃)→ 判定(目标)→ 读结果:
+//     黑桃 → 造成2点雷电伤害;梅花 → 回复1点体力,然后造成1点雷电伤害
 //
 // 判定结果读取:判定 atom 的 afterHooks(含鬼道替换)与 atom 自身 afterHooks 都把
 //   判定牌移入弃牌堆后,从弃牌堆顶读取最终判定牌(经鬼道替换即为替换牌,未替换即原牌)。
@@ -26,7 +28,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '雷击',
-    description: '当你使用或打出【闪】时,可令任意一名角色判定,若为黑桃则造成2点雷电伤害',
+    description: '当你使用或打出【闪】时,可令一名其他角色判定,黑桃则造成2点雷电伤害;梅花则你回复1点体力并对其造成1点雷电伤害',
   };
 }
 
@@ -115,6 +117,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
         type: '造成伤害',
         target,
         amount: 2,
+        source: ownerId,
+        damageType: '雷电',
+      });
+    } else if (judgeCard.suit === '♣') {
+      // 梅花 → 张角回复1点体力(满血不浪费),然后对其造成1点雷电伤害
+      if (me.health < me.maxHealth) {
+        await applyAtom(ctx.state, {
+          type: '回复体力',
+          target: ownerId,
+          amount: 1,
+        });
+      }
+      await applyAtom(ctx.state, {
+        type: '造成伤害',
+        target,
+        amount: 1,
         source: ownerId,
         damageType: '雷电',
       });

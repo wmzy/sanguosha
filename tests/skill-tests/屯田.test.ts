@@ -15,7 +15,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, GameState, Mark, PlayerState } from '../../src/engine/types';
 
 function makeCard(
   id: string,
@@ -63,9 +63,11 @@ describe('屯田', () => {
 
   // ─── 端到端:非红桃 → 加田 + 距离修正 ────────────────────
   it('回合外被获得牌 → 判定非红桃 → 加田标记 + 距离修正', async () => {
-    // 注:屯田直接更新 距离/进攻修正 vars(无 atom 通道),processedView 的
-    // distanceVars 不会实时同步。这是已知引擎限制(需新增 atom 才能完整 view 同步)。
-    // 关闭自动对比以聚焦于 state 层面的行为正确性。
+    // 注:auto-compare 仍关闭,但原因已变(本任务修复的 distanceVars desync 已解决,见下方
+    // expectView 断言)。仍关闭是因为一个独立的、不在本 diffText 范围内的预存 desync:
+    // 「判定」atom 的 applyView 假设判定牌必然进弃牌堆(discardPileCount+1),但屯田会把
+    // 判定牌拿作"田"(不经 atom),导致 processedView.discardPileCount 比 buildView 多 1。
+    // 该 discardPile desync 属判定 atom 与屯田拿牌机制的交互问题,非本任务(distanceVars)范围。
     const restoreAutoCompare = disableAutoCompare();
 
     const p0card = makeCard('p0c', '杀', '♠', '5');
@@ -107,10 +109,16 @@ describe('屯田', () => {
       m.id.startsWith('屯田/田:'),
     );
     expect(tianMarks.length).toBe(1);
-    // 距离修正 vars 更新
+    // 距离修正 vars 更新(后端 effectiveDistance)
     expect(harness.state.players[0].vars['距离/进攻修正']).toBe(1);
     // 判定牌不在弃牌堆(被拿出作为田)
     expect(harness.state.zones.discardPile).not.toContain('j1');
+
+    // ── 关键(本任务修复点):processedView 的 distanceVars 现在实时同步(经「加标记」
+    //    atom 的 distanceVars 通道)——修复了「vars 变更不经 atom、view 不同步」的限制。
+    P0.expectView((v) => {
+      expect(v.players[0].distanceVars?.attackMod).toBe(1);
+    });
 
     restoreAutoCompare();
   });
@@ -272,6 +280,52 @@ describe('屯田', () => {
     ).toBe(2);
     expect(harness.state.players[0].vars['距离/进攻修正']).toBe(2);
 
+    // ── 关键(本任务修复点):processedView 的 distanceVars 同步叠加到 2
+    P0.expectView((v) => {
+      expect(v.players[0].distanceVars?.attackMod).toBe(2);
+    });
+
     restoreAutoCompare();
+  });
+
+  // ─── 隔离验证:加标记 atom 的 distanceVars 通道(auto-compare 开启)─────
+  // 屯田端到端流程中存在一个独立的、不在本 diffText 范围内的预存 desync:
+  // 「判定」atom 的 applyView 假设判定牌必然进弃牌堆,但屯田把判定牌拿作"田",
+  // 导致 discardPileCount 不一致——故端到端用例必须关闭 auto-compare。
+  // 此用例绕开判定流程,直接走「加标记」atom + distanceVars 通道,auto-compare 全开,
+  // 证明 distanceVars 通道本身使 buildView 与 processedView 收敛(前后端一致)。
+  it('加标记 atom 的 distanceVars 通道:前后端 view 收敛(隔离验证)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: [] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: {},
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 后端 vars(模拟屯田的 syncDistanceMod):buildView 据此投影 attackMod
+    harness.state.players[0].vars['距离/进攻修正'] = 3;
+    // 加田标记 + 经 distanceVars 通道同步 view(auto-compare 开启)
+    const mark: Mark = { id: '屯田/田:iso', scope: 0, payload: { cardId: 'x' } };
+    void applyAtom(harness.state, {
+      type: '加标记',
+      player: 0,
+      mark,
+      distanceVars: { attackMod: 3 },
+    });
+    await harness.waitForStable();
+    harness.processAllEvents(); // auto-compare 开启:buildView 权威 vs processedView 增量
+
+    expect(harness.state.players[0].marks.length).toBe(1);
+    P0.expectView((v) => {
+      expect(v.players[0].marks.length).toBe(1);
+      expect(v.players[0].distanceVars?.attackMod).toBe(3);
+    });
   });
 });

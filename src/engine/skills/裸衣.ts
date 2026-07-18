@@ -1,11 +1,11 @@
 // 裸衣(许褚·主动技):摸牌阶段,你可以少摸一张牌,若如此做,
-// 你使用【杀】或【决斗】造成的伤害 +1,直到下一回合开始。
+// 你本回合使用【杀】或【决斗】造成的伤害 +1。
 //
 // 机制:
 //   - before hook 挂在「摸牌」:仅在自己摸牌阶段的摸牌(区分无中生有/遗计等)
 //     询问是否发动。发动则 modify(count-1)并加增伤标签。
 //   - before hook 挂在「造成伤害」:source=自己 + 增伤标签 + 牌为杀/决斗 → modify(amount+1)。
-//   - after hook 挂在「回合开始」:下一回合开始时清除增伤标签(直到下一回合开始)。
+//   - after hook 挂在「回合结束」:许褚自己回合结束时清除增伤标签(官方"本回合"语义)。
 //   - 每回合限一次:裸衣/usedThisTurn(后缀约定,回合结束 atom 自动清空)。
 import type {
   AtomAfterContext,
@@ -28,7 +28,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '裸衣',
-    description: '摸牌阶段少摸一张,本回合杀/决斗伤害 +1,直到下一回合开始',
+    description: '摸牌阶段少摸一张牌,本回合使用【杀】或【决斗】造成的伤害+1',
   };
 }
 
@@ -116,9 +116,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 回合开始 after hook:下一回合开始时清除增伤标签 ──
-  // 许褚摸牌阶段设标签 → 持续到下一个回合开始(任意玩家的回合开始)清除。
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
+  // ── 回合结束 after hook:许褚自己回合结束时清除增伤标签(官方"本回合"语义)──
+  // 许褚摸牌阶段设标签 → 持续到许褚自己回合结束清除(本回合内生效)。
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { player?: number };
+    if (atom.player !== ownerId) return; // 仅自己回合结束清标签
     const self = ctx.state.players[ownerId];
     if (self?.tags.includes(BONUS_TAG)) {
       await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: BONUS_TAG });

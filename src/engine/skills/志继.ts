@@ -1,8 +1,8 @@
-// 志继(姜维·觉醒技):回合开始阶段,若你没有手牌,你须回复1点体力或摸两张牌,
+// 志继(姜维·觉醒技):准备阶段,若你没有手牌,你须回复1点体力或摸两张牌,
 // 然后减1点体力上限,并永久获得技能"观星"。
 //
 // 分析(步骤1):
-//   类型:觉醒技 | 时机:回合开始阶段(「回合开始」atom 的 after-hook)
+//   类型:觉醒技 | 时机:准备阶段(「阶段开始」atom,phase='准备' 的 after-hook)
 //   触发条件:ownerId 无手牌 + 未觉醒过(player.vars['志继/awakened'])
 //   流程(强制二选一,然后减上限 + 加技能):
 //     1. 请求回应(二选一:回复1点体力 / 摸两张牌)— 强制选择
@@ -12,8 +12,7 @@
 //     4. 添加技能(player=owner, skillId='观星')
 //   觉醒标记:player.vars['志继/awakened'](后缀不含 usedThisTurn,不被「回合结束」清理)
 //
-//   钩子:「回合开始」after-hook(atom.player===ownerId)→ 条件满足 → 二选一 → 执行。
-//   注意:回合开始阶段对应 '回合开始' atom(player===ownerId),不是 '阶段开始'。
+//   钩子:「阶段开始」(phase='准备')after-hook(atom.player===ownerId)→ 条件满足 → 二选一 → 执行。
 import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
@@ -27,7 +26,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '志继',
-    description: '觉醒技:回合开始且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得"观星"',
+    description: '觉醒技:准备阶段且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得"观星"',
   };
 }
 
@@ -54,9 +53,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 回合开始 after-hook:志继主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  // ── 准备阶段(阶段开始,phase='准备')after-hook:志继主逻辑 ──
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    if (atom.type !== '阶段开始') return;
+    if (atom.phase !== '准备') return;
     if (atom.player !== ownerId) return;
     // 觉醒技:整局一次
     if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return;

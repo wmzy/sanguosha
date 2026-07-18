@@ -142,4 +142,34 @@ describe('集智', () => {
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
   });
+
+  // 验证 diffText 核心断言:集智覆盖「非延时」锦囊 → 延时锦囊(乐不思蜀)不触发
+  it('负面:使用延时锦囊(乐不思蜀)不触发集智(非延时过滤)', async () => {
+    const card = makeCard('l1', '乐不思蜀', '♠');
+    const deckCard = makeCard('d1', '杀', '♠', '5', '基本牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['l1'], skills: ['集智', '乐不思蜀'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [] }),
+      ],
+      cardMap: { l1: card, d1: deckCard },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('乐不思蜀', 'use', { cardId: 'l1', target: 1 });
+
+    // 乐不思蜀放置成功(延时锦囊生效)
+    expect(harness.state.players[1].pendingTricks.length).toBe(1);
+    expect(harness.state.players[1].pendingTricks[0].name).toBe('乐不思蜀');
+    // 集智未触发:牌堆未被摸(P1 手牌从 1→0,无额外摸牌)
+    expect(harness.state.players[0].hand.length).toBe(0);
+    expect(harness.state.zones.deck).toEqual(['d1']);
+    // 无集智 confirm 窗口
+    expect(harness.state.pendingSlots.get(0)).toBeUndefined();
+  });
 });

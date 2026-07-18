@@ -1,12 +1,14 @@
-// 雷击(张角·被动):当你使用或打出【闪】时,可令任意一名角色判定,
-// 若结果为黑桃,你对该角色造成2点雷电伤害。
+// 雷击(张角·被动):当你使用或打出【闪】时,可令一名其他角色判定,
+// 黑桃则造成2点雷电伤害;梅花则你回复1点体力并对其造成1点雷电伤害。
 //
 // 覆盖:
 //   1. 打闪→雷击→选目标→判定黑桃→造成2点雷电伤害(happy path)
-//   2. 打闪→雷击→判定非黑桃→无伤害
+//   2. 打闪→雷击→判定非黑桃/非梅花(♥)→无伤害无回血
 //   3. 打闪→雷击→放弃发动→无判定无伤害
 //   4. 被询问闪但未出闪→雷击不触发
-//   5. 组合:打闪→雷击→鬼道改判为黑桃→命中(雷击+鬼道联动)
+//   5. 打闪→雷击→判定梅花→张角回复1点体力+目标受1点雷电伤害
+//   6. 打闪→雷击→判定梅花(张角满血)→跳过回血,仍造成1点雷电伤害
+//   7. 组合:打闪→雷击→鬼道改判为黑桃→命中(雷击+鬼道联动)
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   SkillTestHarness,
@@ -263,7 +265,103 @@ describe('雷击', () => {
     expect(harness.state.players[1].health).toBe(4);
   });
 
-  // ─── 5. 组合:雷击+鬼道 改判为黑桃命中 ────────────────────
+  // ─── 5. 判定梅花→张角回复1点体力+目标受1点雷电伤害 ────────
+  it('张角打闪触发雷击,判定梅花→张角回复1点体力且目标受1点雷电伤害', async () => {
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const judge = makeCard('j1', '杀', '♣', '5'); // ♣5 梅花 → 回血+1伤害
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '张角',
+          character: '张角',
+          faction: '群',
+          hand: ['d1'],
+          skills: ['雷击', '闪', '回合管理'],
+          health: 2, // 不满血(可回血)
+        }),
+        makePlayer({
+          index: 1,
+          name: '攻击者',
+          hand: ['k1'],
+          skills: ['杀', '回合管理'],
+          health: 4,
+        }),
+      ],
+      cardMap: { d1: dodge, k1: kill, j1: judge },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 张角不满血:手动拔高上限(maxHealth 默认=health,这里需 3 以便回血)
+    state.players[0].maxHealth = 3;
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('张角');
+    const P1 = harness.player('攻击者');
+
+    await P1.useCardAndTarget('杀', 'k1', [0]);
+    await waitForStable(harness.state);
+    await P0.respond('闪', { cardId: 'd1' });
+    await waitForStable(harness.state);
+    P0.expectPending('请求回应'); // 雷击询问
+    await P0.respond('雷击', { target: 1 });
+    await waitForStable(harness.state);
+
+    // ♣5 梅花 → 张角回复1点体力(2→3),目标受1点雷电伤害(4→3)
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[1].health).toBe(3);
+  });
+
+  // ─── 6. 判定梅花但张角满血→跳过回血,仍造成1点雷电伤害 ───────
+  it('张角满血打闪触发雷击,判定梅花→不回血但目标仍受1点雷电伤害', async () => {
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const judge = makeCard('j1', '杀', '♣', '5'); // ♣5 梅花
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '张角',
+          character: '张角',
+          faction: '群',
+          hand: ['d1'],
+          skills: ['雷击', '闪', '回合管理'],
+          health: 3, // 满血(health==maxHealth)
+        }),
+        makePlayer({
+          index: 1,
+          name: '攻击者',
+          hand: ['k1'],
+          skills: ['杀', '回合管理'],
+          health: 4,
+        }),
+      ],
+      cardMap: { d1: dodge, k1: kill, j1: judge },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('张角');
+    const P1 = harness.player('攻击者');
+
+    await P1.useCardAndTarget('杀', 'k1', [0]);
+    await waitForStable(harness.state);
+    await P0.respond('闪', { cardId: 'd1' });
+    await waitForStable(harness.state);
+    P0.expectPending('请求回应'); // 雷击询问
+    await P0.respond('雷击', { target: 1 });
+    await waitForStable(harness.state);
+
+    // ♣5 梅花但满血 → 跳过回血(仍3),目标受1点雷电伤害(4→3)
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[1].health).toBe(3);
+  });
+
+  // ─── 7. 组合:雷击+鬼道 改判为黑桃命中 ────────────────────
   it('张角打闪→雷击→鬼道把判定牌改为黑桃→命中2点雷电伤害', async () => {
     const dodge = makeCard('d1', '闪', '♥', '2');
     const kill = makeCard('k1', '杀', '♠', '7');

@@ -11,6 +11,7 @@
 //   3. 负面:黑色牌当桃 → 拒绝
 //   4. 负面:无求桃 pending → 拒绝
 //   5. 负面:不在手牌的红色牌 → 拒绝
+//   6. 负面:装备区红色牌 → 拒绝(当前范围仅支持红色手牌)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -293,6 +294,53 @@ describe('急救', () => {
       skillId: '急救',
       actionType: 'respond',
       params: { cardId: 'rX' },
+    });
+  });
+
+  // ─── 负面:装备区红色牌(当前范围仅支持手牌) ────
+
+  it('respond:装备区红色牌当桃 → 拒绝(当前范围仅支持红色手牌)', async () => {
+    const slash = makeCard('c1', '杀', '♠', 'A');
+    const redEquip = makeCard('re', '赤兔', '♥', 'Q', '装备牌'); // 红色装备
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['c1'],
+          skills: ['杀'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: '华佗',
+          hand: [],
+          skills: ['急救', '桃', '闪'],
+          health: 1,
+          maxHealth: 3,
+        }),
+      ],
+      cardMap: { c1: slash, re: redEquip },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 手动将红色牌放入华佗装备区(模拟已装备)
+    (state.players[1].equipment as Record<string, string>)['-1马'] = 're';
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const HuaTuo = harness.player('华佗');
+
+    await P0.useCardAndTarget('杀', 'c1', [1]);
+    await HuaTuo.pass();
+    expect(harness.state.players[1].health).toBe(0);
+
+    // 装备区红色牌不被接受(当前范围仅支持红色手牌)
+    await HuaTuo.expectRejected({
+      skillId: '急救',
+      actionType: 'respond',
+      params: { cardId: 're' },
     });
   });
 });

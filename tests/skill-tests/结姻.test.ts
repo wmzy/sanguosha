@@ -1,15 +1,17 @@
 // 结姻(孙尚香·主动技)测试:
-//   出牌阶段限一次,你可以弃置两张手牌,然后令一名已受伤的男性角色回复1点体力。
+//   出牌阶段限一次,你可以弃置两张手牌,令你与一名已受伤的男性角色各回复1点体力。
 //
 // 验证:
-//   1. 正面:发动→弃两张手牌,目标(已受伤男性)回复1点体力
+//   1. 正面:发动→弃两张手牌,孙尚香与目标(已受伤男性)各回复1点体力
 //   2. 限一次:同回合第二次发动被拒绝
 //   3. 目标为女性(已受伤)→ 拒绝
 //   4. 目标未受伤(满血男性)→ 拒绝
 //   5. 手牌不足两张 → 拒绝
 //   6. 非自己回合 → 拒绝
 //   7. allocation 格式(distribute/allocate UI 提交)同样生效
-//   8. 回复不超过上限(满血附近)
+//   8. 弃牌张数不等于 2 → 拒绝
+//   9. 孙尚香满血时发动 → 自身不额外回血,但目标仍回血
+//  10. 孙尚香已受伤时发动 → 自身与目标各回 1 点
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -114,15 +116,20 @@ describe('结姻', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 1. 正面:发动 → 弃两张手牌,目标回复1点体力 ────────────
-  it('发动:弃 h1,h2 → P1(曹操·已受伤男性) health 3→4,孙尚香手牌减2', async () => {
+  // ─── 1. 正面:发动 → 弃两张手牌,孙尚香与目标各回复1点体力 ─────
+  it('发动(孙尚香受伤):弃 h1,h2 → P0 2→3 与 P1 3→4 各回 1 点,手牌减2', async () => {
     const state = buildState({});
+    // buildState 中孙尚香 health=3/maxHealth=3 为满血;改为受伤
+    state.players[0].health = 2;
+    state.players[0].maxHealth = 3;
     await harness.setup(state);
     const P0 = harness.player('孙尚香');
 
     await P0.triggerAction('结姻', 'use', { cardIds: ['h1', 'h2'], target: 1 });
 
-    // P1 回复 1 点
+    // P0(孙尚香)回复 1 点:2→3
+    expect(harness.state.players[0].health).toBe(3);
+    // P1 回复 1 点:3→4
     expect(harness.state.players[1].health).toBe(4);
     // 孙尚香弃了两张手牌,剩余 h3
     expect(harness.state.players[0].hand).toEqual(['h3']);
@@ -208,8 +215,11 @@ describe('结姻', () => {
   });
 
   // ─── 7. allocation 格式(distribute/allocate UI)同样生效 ─
-  it('allocation 格式提交:同样弃两张+目标回复', async () => {
+  it('allocation 格式提交:同样弃两张+双方各回 1 点', async () => {
     const state = buildState({});
+    // 令孙尚香受伤以验证自身回血
+    state.players[0].health = 1;
+    state.players[0].maxHealth = 3;
     await harness.setup(state);
     const P0 = harness.player('孙尚香');
 
@@ -217,6 +227,8 @@ describe('结姻', () => {
       allocation: [{ target: 1, cardIds: ['h1', 'h2'] }],
     });
 
+    // 双方各回 1 点
+    expect(harness.state.players[0].health).toBe(2);
     expect(harness.state.players[1].health).toBe(4);
     expect(harness.state.players[0].hand).toEqual(['h3']);
   });
@@ -232,5 +244,34 @@ describe('结姻', () => {
       actionType: 'use',
       params: { cardIds: ['h1', 'h2', 'h3'], target: 1 },
     });
+  });
+
+  // ─── 9. 孙尚香满血时发动 → 自身不额外回血(不超过上限),目标仍回血
+  it('孙尚香满血:发动 → 自身保持满血,P1 仍回 1 点', async () => {
+    const state = buildState({});
+    // buildState 默认孙尚香 health=3/maxHealth=3,即满血
+    await harness.setup(state);
+    const P0 = harness.player('孙尚香');
+
+    await P0.triggerAction('结姻', 'use', { cardIds: ['h1', 'h2'], target: 1 });
+
+    // 孙尚香满血不超出上限
+    expect(harness.state.players[0].health).toBe(3);
+    // P1 仍正常回血
+    expect(harness.state.players[1].health).toBe(4);
+  });
+
+  // ─── 10. 孙尚香已受伤(2/3)发动 → 自身与目标各回 1 点 ────────
+  it('孙尚香 2/3 受伤:发动 → 自身 2→3,目标 P1 3→4', async () => {
+    const state = buildState({});
+    state.players[0].health = 2;
+    state.players[0].maxHealth = 3;
+    await harness.setup(state);
+    const P0 = harness.player('孙尚香');
+
+    await P0.triggerAction('结姻', 'use', { cardIds: ['h1', 'h2'], target: 1 });
+
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[1].health).toBe(4);
   });
 });

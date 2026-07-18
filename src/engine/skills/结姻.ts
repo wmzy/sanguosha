@@ -1,11 +1,13 @@
 // 结姻(孙尚香·主动技):
-//   出牌阶段限一次,你可以弃置两张手牌,然后令一名已受伤的男性角色回复1点体力。
+//   出牌阶段限一次,你可以弃置两张手牌,令你与一名已受伤的男性角色各回复1点体力。
 //
 // 规则要点(描述备注 + FAQ):
 //   - 限一次/回合:用 player.vars['结姻/usedThisTurn'] 标记,回合用量 atom 同步到 view。
 //   - 只能弃手牌(描述明确"两张手牌");装备区牌不可。
 //   - 目标必须是「已受伤的男性角色」:受伤(health<maxHealth)+ 男性(gender==='男')+ 存活。
 //     孙尚香本人为女性,自身不可能成为合法目标(性别检查天然排除)。
+//   - 双方各回 1 点:孙尚香本人与目标「各」回复1点体力;孙尚香若满血,回复体力 atom
+//     会按 Math.min 限制不超上限,无需技能处理。"已受伤"仅约束男性目标,不约束孙尚香。
 //   - 回复体力不能超过体力上限:回复体力 atom.apply 已 Math.min 限制,无需技能处理。
 //
 // 前端交互:select 2 张手牌 + 选 1 名已受伤男性目标 → distribute/allocate 提交 allocation。
@@ -21,7 +23,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '结姻',
-    description: '出牌阶段限一次,弃两张手牌,令一名已受伤的男性角色回复1点体力',
+    description: '出牌阶段限一次,弃两张手牌,令你与一名已受伤的男性角色各回复1点体力',
   };
 }
 
@@ -97,7 +99,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await pushFrame(state, '结姻', ownerId, { cardIds, target });
       // 1. 弃置两张手牌
       await applyAtom(state, { type: '弃置', player: ownerId, cardIds });
-      // 2. 令目标回复 1 点体力(回复体力 atom 限制不超过上限)
+      // 2. 令「你与目标」各回复 1 点体力(描述:你 与 一名已受伤男性角色 各 回复1点)
+      //    先孙尚香后目标;回复体力 atom 限制不超过上限,满血则无效。
+      await applyAtom(state, { type: '回复体力', target: ownerId, amount: 1, source: ownerId });
       await applyAtom(state, { type: '回复体力', target, amount: 1, source: ownerId });
       await popFrame(state);
     },
@@ -112,7 +116,7 @@ export function onMount(skill: Skill, api: FrontendAPI): () => void {
     prompt: {
       type: 'distribute',
       mode: 'allocate',
-      title: '结姻：弃两张手牌,令一名已受伤的男性角色回复1点体力',
+      title: '结姻：弃两张手牌,令你与一名已受伤的男性角色各回复1点体力',
       source: 'hand',
       minTotal: 2,
       maxTotal: 2,

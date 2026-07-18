@@ -1,8 +1,8 @@
 // 不屈(周泰·锁定技)行为测试:
-//   1. 濒死翻创牌(点数全新)→ 以0体力存活,创牌1张
-//   2. 已有创牌时再濒死,新创牌点数不同 → 存活,创牌累积至2张
+//   1. 濒死翻创牌(点数全新)→ 回复至1体力,创牌1张
+//   2. 已有创牌时再濒死,新创牌点数不同 → 回复至1体力,创牌累积至2张
 //   3. 新创牌点数与已有创牌重复 → 不屈失败,求桃无人救 → 死亡
-//   4. 不屈状态下再次受伤 → 再次触发不屈(不屈状态循环)
+//   4. 不屈存活后再次受伤 → 再次触发不屈(不屈状态循环)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -55,7 +55,7 @@ describe('不屈', () => {
     harness = new SkillTestHarness();
   });
 
-  it('濒死翻创牌(点数全新)→ 以0体力存活,创牌1张', async () => {
+  it('濒死翻创牌(点数全新)→ 回复至1体力,创牌1张', async () => {
     const slash = mkCard('s1', '杀', '♠', '7');
     const deck1 = mkCard('d1', '闪', '♥', '7'); // 牌堆顶,将作为创牌(点数7)
 
@@ -92,15 +92,15 @@ describe('不屈', () => {
     await ZT.pass(); // 不出闪 → 受伤濒死
     await harness.waitForStable();
 
-    // 不屈自动触发(锁定技):翻创牌,点数全新 → 以0体力存活
+    // 不屈自动触发(锁定技):翻创牌,点数全新 → 回复至1体力(官方:"你回复至1点体力")
     expect(harness.state.players[0].alive).toBe(true);
-    expect(harness.state.players[0].health).toBe(0);
+    expect(harness.state.players[0].health).toBe(1);
     // 创牌列表 = [d1]
     expect(harness.state.players[0].vars['不屈/创牌']).toEqual(['d1']);
     void ZT;
   });
 
-  it('已有创牌时再濒死,新创牌点数不同 → 存活,创牌累积至2张', async () => {
+  it('已有创牌时再濒死,新创牌点数不同 → 回复至1体力,创牌累积至2张', async () => {
     const slash = mkCard('s2', '杀', '♠', '5');
     const exist = mkCard('cA', '杀', '♠', '7'); // 已有创牌(点数7)
     const deck1 = mkCard('d2', '闪', '♥', '8'); // 牌堆顶新创牌(点数8,不同于7)
@@ -139,9 +139,9 @@ describe('不屈', () => {
     await ZT.pass();
     await harness.waitForStable();
 
-    // 新创牌点数8 ≠ 已有7 → 存活,创牌累积
+    // 新创牌点数8 ≠ 已有7 → 回复至1体力,创牌累积
     expect(harness.state.players[0].alive).toBe(true);
-    expect(harness.state.players[0].health).toBe(0);
+    expect(harness.state.players[0].health).toBe(1);
     expect(harness.state.players[0].vars['不屈/创牌']).toEqual(['cA', 'd2']);
     void ZT;
   });
@@ -203,7 +203,7 @@ describe('不屈', () => {
     void ZT;
   });
 
-  it('不屈状态下再次受伤 → 再次触发不屈(不屈状态循环)', async () => {
+  it('不屈存活后再次受伤 → 再次触发不屈(不屈状态循环)', async () => {
     const slash1 = mkCard('s4', '杀', '♠', '4');
     const slash2 = mkCard('s5', '杀', '♠', '6');
     const deck1 = mkCard('d4', '闪', '♥', '7'); // 第一次不屈创牌(点数7)
@@ -239,20 +239,20 @@ describe('不屈', () => {
     const P2 = harness.player('P2');
     const ZT = harness.player('周泰');
 
-    // 第一次杀 → 濒死 → 不屈#1(点数7,全新)→ 存活
+    // 第一次杀 → 濒死(1→0)→ 不屈#1(点数7,全新)→ 回复至1体力
     await P2.useCardAndTarget('杀', 's4', [0]);
     await ZT.pass();
     await harness.waitForStable();
     expect(harness.state.players[0].alive).toBe(true);
-    expect(harness.state.players[0].health).toBe(0);
+    expect(harness.state.players[0].health).toBe(1);
     expect(harness.state.players[0].vars['不屈/创牌']).toEqual(['d4']);
 
-    // 第二次杀(不屈状态下体力仍0,受伤不降)→ 再次濒死 → 不屈#2(点数8≠7)→ 存活
+    // 第二次杀(不屈存活后体力为1,受伤1→0)→ 再次濒死 → 不屈#2(点数8≠7)→ 回复至1体力
     await P2.useCardAndTarget('杀', 's5', [0]);
     await ZT.pass();
     await harness.waitForStable();
     expect(harness.state.players[0].alive).toBe(true);
-    expect(harness.state.players[0].health).toBe(0);
+    expect(harness.state.players[0].health).toBe(1);
     expect(harness.state.players[0].vars['不屈/创牌']).toEqual(['d4', 'd5']);
     void ZT;
   });

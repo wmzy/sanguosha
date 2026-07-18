@@ -1,5 +1,6 @@
 // 离间(貂蝉·群·主动技)测试
 //   出牌阶段限一次,弃一张牌,令一名男性角色视为对另一名男性角色使用决斗。
+//   官方明确"不能被【无懈可击】抵消"。
 //
 // 验证:
 //   1. 正面:P1 离间 → P2(A)决斗 P3(B)→ P3 不出杀 → P3 扣 1 血
@@ -8,6 +9,7 @@
 //   4. 不能选女性角色(貂蝉本人)
 //   5. A 和 B 不能相同
 //   6. 手牌不足(无牌可弃)被拒
+//   7. 不能被无懈可击抵消(官方规则)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -101,7 +103,7 @@ describe('离间', () => {
   });
 
   // ─── 1. 正面:P3(B/目标)不出杀 → P3 扣 1 血 ─────────────
-  it('P1 离间 [P2→P3] → 无懈 pass → P3 不出杀 → P3 扣 1 血,P1 弃牌', async () => {
+  it('P1 离间 [P2→P3] → 无无懈窗口 → P3 不出杀 → P3 扣 1 血,P1 弃牌', async () => {
     const discard = makeCard('d1', '闪', '♥', '2', '基本牌');
     const state = buildState({
       p1Hand: ['d1'],
@@ -117,11 +119,9 @@ describe('离间', () => {
     // 发动离间:弃 d1,P2(A)对 P3(B)决斗
     await P1.triggerAction('离间', 'use', { cardId: 'd1', targets: [1, 2] });
 
-    // 窗口 1:无懈可击(broadcast)→ pass
-    P1.expectPending('请求回应');
-    await P1.pass();
+    // 离间按官方不可被无懈可击抵消:直接进入询问杀(无无懈广播窗口)
 
-    // 窗口 2:P3(B/目标)被询问出杀 → pass(不出)
+    // 窗口:P3(B/目标)被询问出杀 → pass(不出)
     const P3 = harness.player('P3');
     P3.expectPending('询问杀');
     await P3.pass();
@@ -157,8 +157,7 @@ describe('离间', () => {
 
     await P1.triggerAction('离间', 'use', { cardId: 'd1', targets: [1, 2] });
 
-    // 无懈可击 → pass
-    await P1.pass();
+    // 离间不可被无懈:直接进入 P3 询问杀
 
     // P3(B)出杀
     P3.expectPending('询问杀');
@@ -195,7 +194,7 @@ describe('离间', () => {
 
     await P1.triggerAction('离间', 'use', { cardId: 'd1', targets: [1, 2] });
 
-    await P1.pass(); // 无懈
+    // 离间不可被无懈:直接进入 P3 询问杀
 
     P3.expectPending('询问杀');
     await P3.pass();
@@ -219,7 +218,7 @@ describe('离间', () => {
 
     // 第一次离间
     await P1.triggerAction('离间', 'use', { cardId: 'd1', targets: [1, 2] });
-    await P1.pass(); // 无懈
+    // 离间不可被无懈:直接进入询问杀
     await P3.pass(); // P3 不出杀
 
     // 第二次离间 → 被拒
@@ -320,11 +319,44 @@ describe('离间', () => {
     const P3 = harness.player('P3');
 
     await P1.triggerAction('离间', 'use', { cardId: 'wp1', targets: [1, 2] });
-    await P1.pass(); // 无懈
+    // 离间不可被无懈:直接进入 P3 询问杀
     await P3.pass(); // P3 不出杀
 
     // 武器进弃牌堆
     expect(harness.state.zones.discardPile).toContain('wp1');
     expect(harness.state.players[0].equipment['武器']).toBeUndefined();
+  });
+
+  // ─── 10. 不能被无懈可击抵消(官方规则) ─────────────────────
+  // 即使某角色手中有无懈可击,离间决斗也不开无懈窗口,决斗直接结算。
+  it('P2 持无懈可击 → 离间决斗仍直接结算(不可被无懈抵消)', async () => {
+    const discard = makeCard('d1', '闪', '♥', '2', '基本牌');
+    const wx = makeCard('wx1', '无懈可击', '♣', 'J', '锦囊牌');
+    const state = buildState({
+      p1Hand: ['d1'],
+      p2Hand: ['wx1'],
+      p3Hand: [],
+      extraCards: { d1: discard, wx1: wx },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P3 = harness.player('P3');
+
+    const p3HealthBefore = harness.state.players[2].health;
+
+    await P1.triggerAction('离间', 'use', { cardId: 'd1', targets: [1, 2] });
+
+    // 无无懈窗口:P3 直接被询问出杀
+    P3.expectPending('询问杀');
+    await P3.pass();
+
+    // P3 输 → 扣 1 血(无懈未能抵消)
+    expect(harness.state.players[2].health).toBe(p3HealthBefore - 1);
+    // P2 的无懈可击仍在手(未被消耗)
+    expect(harness.state.players[1].hand).toContain('wx1');
+    // d1 进弃牌堆(被弃的代价牌)
+    expect(harness.state.zones.discardPile).toContain('d1');
+    // 无懈可击未进弃牌堆
+    expect(harness.state.zones.discardPile).not.toContain('wx1');
   });
 });

@@ -1,7 +1,8 @@
 // 再起(孟获·主动技)行为测试:
-//   1. 受伤时摸牌阶段:发动再起 → 展示牌堆顶X张,红桃回血+弃置,非红桃入手
+//   1. 受伤时摸牌阶段:发动再起 → 展示牌堆顶X张(X=已损失体力+1),红桃回血+弃置,非红桃入手
 //   2. 未受伤时摸牌阶段:不触发(默认摸牌)
 //   3. 发动再起后跳过默认摸牌(手牌数=X-红桃数,非2)
+//   4. X 公式:X = 已损失体力值 + 1(仅损 1 点体力也应亮 2 张)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -55,10 +56,12 @@ describe('再起', () => {
   });
 
   it('受伤时摸牌阶段:发动再起 → 红桃回血弃置,非红桃入手,跳过默认摸牌', async () => {
-    // 孟获 maxHealth=4, health=2 → 已损失2 → X=2
-    // 牌堆顶2张:♥5(红桃→回血+弃置), ♠3(非红桃→入手)
+    // 孟获 maxHealth=4, health=2 → 已损失2 → X=3(已损失+1)
+    // 牌堆顶 3 张:♥5(红桃→回血+弃置), ♠3(非红桃→入手), ♦7(非红桃→入手)
+    // deck 末尾为牌堆顶,故 deck = [底 ... 顶]
     const h5 = mkCard('h5', '杀', '♥', '5');
     const s3 = mkCard('s3', '杀', '♠', '3');
+    const d7 = mkCard('d7', '杀', '♦', '7');
     await harness.setup(
       createGameState({
         players: [
@@ -73,9 +76,9 @@ describe('再起', () => {
           }),
           mkPlayer({ index: 1, name: 'P1', skills: [] }),
         ],
-        cardMap: { h5, s3 },
+        cardMap: { h5, s3, d7 },
         // deck: 末尾为牌堆顶(与 摸牌 atom 一致)
-        zones: { deck: ['h5', 's3'], discardPile: [], processing: [] },
+        zones: { deck: ['d7', 's3', 'h5'], discardPile: [], processing: [] },
         currentPlayerIndex: 0,
         phase: '摸牌',
         turn: { round: 1, phase: '摸牌', vars: {} },
@@ -92,11 +95,56 @@ describe('再起', () => {
     await MH.respond('再起', { choice: true });
     await harness.waitForStable();
 
-    // 红桃♥5:回血1(2→3)+弃置;非红桃♠3:入手
+    // 红桃♥5:回血1(2→3)+弃置;非红桃♠3、♦7:入手
     expect(harness.state.players[0].health).toBe(3); // 回复1点
-    expect(harness.state.players[0].hand).toEqual(['s3']); // 非红桃入手
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['s3', 'd7'])); // 非红桃入手
+    expect(harness.state.players[0].hand).toHaveLength(2); // X=3,红桃1张 → 2张入手
     expect(harness.state.zones.discardPile).toContain('h5'); // 红桃弃置
     expect(harness.state.zones.discardPile).not.toContain('s3'); // 非红桃不弃
+  });
+
+  it('X 公式:仅损失 1 点体力 → 亮出 2 张(已损失+1)', async () => {
+    // 孟获 maxHealth=4, health=3 → 已损失1 → X=2(官方公式)
+    // 旧实现错误地 X=已损失=1,只亮 1 张。修复后应亮 2 张。
+    // deck = [extra(底), ♠3, ♥5(顶)]:亮 2 张 = ♥5 + ♠3,extra 留在牌堆
+    const h5 = mkCard('h5', '杀', '♥', '5');
+    const s3 = mkCard('s3', '杀', '♠', '3');
+    const extra = mkCard('extra', '杀', '♣', '9');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '孟获',
+            character: '孟获',
+            hand: [],
+            skills: ['再起'],
+            health: 3, // 已损失 1
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', skills: [] }),
+        ],
+        cardMap: { h5, s3, extra },
+        zones: { deck: ['extra', 's3', 'h5'], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '摸牌',
+        turn: { round: 1, phase: '摸牌', vars: {} },
+      }),
+    );
+    const MH = harness.player('孟获');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    MH.expectPending('请求回应');
+
+    await MH.respond('再起', { choice: true });
+    await harness.waitForStable();
+
+    // X=2:亮出 ♥5、♠3,extra 仍留在牌堆(未被亮出)
+    expect(harness.state.zones.deck).toContain('extra'); // 第3张未被亮出
+    expect(harness.state.players[0].health).toBe(4); // 回复1点(3→4)
+    expect(harness.state.players[0].hand).toEqual(['s3']); // 仅♠3入手
+    expect(harness.state.zones.discardPile).toContain('h5'); // 红桃弃置
   });
 
   it('未受伤时摸牌阶段:不触发再起(默认摸牌)', async () => {

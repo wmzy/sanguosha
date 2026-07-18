@@ -218,6 +218,40 @@ describe('天义', () => {
     await P0.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: 's1', targets: [1] } });
   });
 
+  // ─── 4b. 没赢 + 连弩 → 仍不能用杀(阻断器覆盖连弩的 ∞ 上限)──
+  //  官方"不能使用杀"含连弩场景:slashBlocker 优先于 slashMax,canSlash 恒 false。
+  it('拼点没赢 + 装备诸葛连弩 → 仍然不能使用杀(官方:含连弩也不能用)', async () => {
+    const pdLow = makeCard('c1', '闪', '♠', '2');
+    const pdHigh = makeCard('c2', '杀', '♥', 'K');
+    const slash = makeCard('s1', '杀', '♣', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '太史慈', hand: ['c1', 's1'], skills: ['天义', '杀', '诸葛连弩'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['c2'], skills: ['回合管理'] }),
+      ],
+      cardMap: { c1: pdLow, c2: pdHigh, s1: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('太史慈');
+    const P1 = harness.player('P1');
+
+    await P0.triggerAction('天义', 'use', { cardId: 'c1', target: 1 });
+    await waitForStable(harness.state);
+    await P1.respond('天义', { cardId: 'c2' });
+    await waitForStable(harness.state);
+
+    // 连弩使 slashMax = ∞,但天义阻断器优先 → canSlash 仍为 false
+    expect(slashMax(harness.state, 0)).toBe(Infinity);
+    expect(isSlashBlocked(harness.state, 0)).toBe(true);
+    expect(canSlash(harness.state, 0)).toBe(false);
+
+    // 出杀被拒(即使连弩在身)
+    await P0.expectRejected({ skillId: '杀', actionType: 'use', params: { cardId: 's1', targets: [1] } });
+  });
+
   // ─── 5. 平局算没赢 → 禁杀 ────────────────────────────────
   it('拼点平局(点数相等)→ 算没赢,本回合不能使用杀', async () => {
     const pdA = makeCard('c1', '闪', '♠', 'K');

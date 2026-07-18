@@ -90,25 +90,24 @@ describe('遗计:端到端(harness)', () => {
 
     // 应有遗计/distribute pending
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
-    const slot = [...harness.state.pendingSlots.values()][0];
-    const slotAtom = slot.atom as { type: string; requestType?: string };
+    const slot = [...harness.state.pendingSlots.values()].find(s => !s.isPaused) ?? [...harness.state.pendingSlots.values()][0];
+    const slotAtom = slot.atom as { type: string; requestType?: string; prompt?: { cardIds?: string[] } };
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('遗计/distribute');
 
-    // P1 摸了 2 张牌(来自自动填充牌堆)
-    const p1Cards = harness.state.players[1].hand.slice();
-    expect(p1Cards.length).toBe(2);
+    // 官方语义:牌不入手 P1,而是从 pending.prompt.cardIds 可见牌堆顶两张
+    const top2 = slotAtom.prompt?.cardIds ?? [];
+    expect(top2.length).toBe(2);
+    expect(harness.state.players[1].hand.length).toBe(0);
 
-    // 全部分配给 P2
-    await P1.respond('遗计', { allocation: [{ target: 2, cardIds: p1Cards }] });
+    // 全部分配给 P2(传 top2 的 cardId)
+    await P1.respond('遗计', { allocation: [{ target: 2, cardIds: top2 }] });
 
     // P2 获得两张牌
-    expect(harness.state.players[2].hand).toEqual(expect.arrayContaining(p1Cards));
+    expect(harness.state.players[2].hand).toEqual(expect.arrayContaining(top2));
     expect(harness.state.players[2].hand.length).toBe(2);
-    // P1 不再持有这2张牌
-    for (const cid of p1Cards) {
-      expect(harness.state.players[1].hand).not.toContain(cid);
-    }
+    // P1 全程未入手牌
+    expect(harness.state.players[1].hand.length).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -143,24 +142,26 @@ describe('遗计:端到端(harness)', () => {
     await P0.useCardAndTarget('杀', 's1', [1]);
     await P1.pass();
 
-    // P1 摸了 2 张牌
-    const p1Cards = harness.state.players[1].hand.slice();
-    expect(p1Cards.length).toBe(2);
+    // 官方语义:牌不入手 P1
+    const slot = [...harness.state.pendingSlots.values()].find(s => !s.isPaused) ?? [...harness.state.pendingSlots.values()][0];
+    const top2 = ((slot.atom as { prompt?: { cardIds?: string[] } }).prompt?.cardIds) ?? [];
+    expect(top2.length).toBe(2);
+    expect(harness.state.players[1].hand.length).toBe(0);
 
     // 各分一张:第1张给 P0,第2张给 P2
     await P1.respond('遗计', {
       allocation: [
-        { target: 0, cardIds: [p1Cards[0]] },
-        { target: 2, cardIds: [p1Cards[1]] },
+        { target: 0, cardIds: [top2[0]] },
+        { target: 2, cardIds: [top2[1]] },
       ],
     });
 
-    // P0 获得一张(之前只有杀,被杀用掉后手牌为空,现在得到一张)
+    // P0 获得一张
     expect(harness.state.players[0].hand.length).toBe(1);
-    expect(harness.state.players[0].hand[0]).toBe(p1Cards[0]);
+    expect(harness.state.players[0].hand[0]).toBe(top2[0]);
     // P2 获得一张
     expect(harness.state.players[2].hand.length).toBe(1);
-    expect(harness.state.players[2].hand[0]).toBe(p1Cards[1]);
+    expect(harness.state.players[2].hand[0]).toBe(top2[1]);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -195,17 +196,19 @@ describe('遗计:端到端(harness)', () => {
     await P0.useCardAndTarget('杀', 's1', [1]);
     await P1.pass();
 
-    // P1 摸了 2 张牌
-    const p1Cards = harness.state.players[1].hand.slice();
-    expect(p1Cards.length).toBe(2);
+    // 官方语义:牌不入手 P1
+    const slot = [...harness.state.pendingSlots.values()].find(s => !s.isPaused) ?? [...harness.state.pendingSlots.values()][0];
+    const top2 = ((slot.atom as { prompt?: { cardIds?: string[] } }).prompt?.cardIds) ?? [];
+    expect(top2.length).toBe(2);
+    expect(harness.state.players[1].hand.length).toBe(0);
 
-    // 全分配给自己
+    // 全分配给自己(P1)
     await P1.respond('遗计', {
-      allocation: [{ target: 1, cardIds: p1Cards }],
+      allocation: [{ target: 1, cardIds: top2 }],
     });
 
-    // P1 仍然持有这2张牌
-    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(p1Cards));
+    // P1 获得这2张牌(从牌堆顶直接摸入)
+    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(top2));
     expect(harness.state.players[1].hand.length).toBe(2);
   });
 });

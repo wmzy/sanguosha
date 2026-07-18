@@ -96,6 +96,7 @@ describe('系统规则', () => {
       resolve: () => {},
       pause: () => {},
       isTimeout: false,
+      isPaused: false,
     });
 
     // P0 弃 c1 和 c2
@@ -377,6 +378,7 @@ describe('系统规则', () => {
       resolve: () => {},
       pause: () => {},
       isTimeout: false,
+      isPaused: false,
     });
 
     // 直接调 validate 检查空 cardIds 被拒

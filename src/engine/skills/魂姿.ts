@@ -1,8 +1,8 @@
-// 魂姿(孙策·觉醒技):回合开始阶段,若你的体力为1,
+// 魂姿(孙策·觉醒技):准备阶段,若你的体力值为1,
 //   你须减1点体力上限,并永久获得技能"英姿"和"英魂"。
 //
-// 模式(觉醒技,强制):after hook 挂在「回合开始」。
-//   回合开始(player===ownerId) → 体力为1 且未觉醒 → 强制结算:
+// 模式(觉醒技,强制):after hook 挂在「阶段开始」(phase='准备')。
+//   准备阶段(player===ownerId) → 体力为1 且未觉醒 → 强制结算:
 //     1. 减1点体力上限(设上限 amount=maxHealth-1;设上限会 clamp 体力,
 //        当前体力1 ≤ 新上限3,体力保持1)
 //     2. 永久获得"英姿"(添加技能 skillId='英姿')
@@ -12,8 +12,8 @@
 //
 // 关键点:
 //   - 觉醒技:整局一次,强制发动(无询问)
-//   - 体力条件:文档「体力为1」;存活玩家体力≥1,故 health<=1 与 ===1 对存活玩家等价,
-//     采用 <=1 同时满足文档与"≤1"两种表述
+//   - 触发时机:文档「准备阶段」,挂在「阶段开始」phase='准备'
+//   - 体力条件:文档「体力为1」,严格判断 health===1
 //   - 技能实例归属:添加技能 atom 触发 系统规则 after-hook → instantiateSkill,
 //     英姿/英魂 以 ownerId=孙策座次 实例化,内部用 skill.ownerId 工作,归属正确
 //   - 英姿/英魂 已实现(周瑜·英姿、孙坚·英魂),直接挂载
@@ -28,22 +28,25 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '魂姿',
-    description: '觉醒技:回合开始且体力为1时,减1体力上限并永久获得"英姿"和"英魂"',
+    description: '觉醒技:准备阶段且体力为1时,减1体力上限并永久获得"英姿"和"英魂"',
   };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
+    // 仅准备阶段触发(文档「准备阶段」)
+    if (atom.phase !== '准备') return;
     // 觉醒技:整局一次
     if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
-    // 体力条件:为1(存活玩家 health<=1 ⟺ ===1)
-    if (self.health > 1) return;
+    // 体力条件:文档「体力为1」
+    if (self.health !== 1) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
     ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;

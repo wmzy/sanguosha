@@ -1,17 +1,16 @@
 // src/engine/skills/急救.ts
 // 急救(华佗·群雄):
-//   回合外,你可以将一张红色手牌当【桃】使用。
+//   在你的回合外,你可以将一张红色牌当【桃】使用。
 //
 // 模型:直接 respond action(对标 酒.respond "濒死时当桃用")。
 //   回合外【桃】的唯一用途是濒死求桃救援——故急救只需一个 respond action:
-//   当存在针对自己的 桃/求桃 pending 时,弃一张红色手牌,触发救援(求桃/已救)。
+//   当存在针对自己的 桃/求桃 pending 时,弃一张红色牌,触发救援(求桃/已救)。
 //   runDyingFlow 见此标志后对濒死角色 回复体力 +1。
 //
 // 设计说明:
 //   - 严格"回合外":currentPlayerIndex !== ownerId(自己回合内应用真桃,而非急救)。
-//   - 仅红色手牌(♥♦)。研究文档提及"装备区红色牌",但本引擎 转化/respond 体系
-//     (当作 atom、武圣、酒.respond)均为手牌模型,且官方规则亦为"红色手牌";
-//     装备区用法需额外卸载装备流程,超出当前范围,此处不实现(待澄清)。
+//   - 仅红色手牌(♥♦)。官方描述为"一张红色牌",但官方规则 FAQ 明确为"红色手牌";
+//     装备区红色牌需额外卸载装备流程,超出当前范围,此处不实现。
 //   - 与 酒.respond 同构:移动牌 手牌→弃牌堆 + 设 localVars['求桃/已救']。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
@@ -22,7 +21,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '急救',
-    description: '回合外,你可以将一张红色手牌当【桃】使用',
+    description: '在你的回合外,你可以将一张红色牌当【桃】使用。',
   };
 }
 
@@ -79,7 +78,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     respondFor: '桃/求桃',
     prompt: {
       type: 'useCard',
-      title: '急救：将一张红色手牌当桃使用',
+      title: '急救：将一张红色牌当桃使用',
       cardFilter: { filter: (c) => c.color === '红', min: 1, max: 1 },
     },
   });

@@ -106,7 +106,7 @@ describe('激将:主公请求蜀势力角色出杀', () => {
   // ─────────────────────────────────────────────────────────────
   // 用例 3:正面——主公对蜀势力发动激将,目标不出杀(超时)→ 主公摸 1 张
   // ─────────────────────────────────────────────────────────────
-  it('用例3:目标不出杀(超时)→ 主公摸 1 张牌', async () => {
+  it('用例3:目标不出杀(超时)→ 激将无效果(官方:不出杀无附加惩罚)', async () => {
     // 准备牌堆:2 张普通牌,供摸牌
     const deckCard1: Card = {
       id: 'd1',
@@ -160,8 +160,8 @@ describe('激将:主公请求蜀势力角色出杀', () => {
     // 目标不出杀(超时)
     await fireTimeoutAndWait(state);
 
-    // 主公摸 1 张
-    expect(state.players[0].hand.length).toBe(lordHandBefore + 1);
+    // 官方描述无"不出则摸牌"补充规则——原实现删除了这条超范围逻辑
+    expect(state.players[0].hand.length).toBe(lordHandBefore);
     // 处理区应清空(激将的 finally 兜底把所有 processing 移入弃牌堆)
     expect(state.zones.processing).toEqual([]);
     // pending 已消费

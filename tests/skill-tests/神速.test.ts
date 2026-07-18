@@ -64,6 +64,13 @@ async function triggerPlayPhase(harness: SkillTestHarness, player = 0): Promise<
   harness.processAllEvents();
 }
 
+/** 触发弃牌阶段:applyAtom(阶段开始, ownerId, 弃牌) → 神速③ before-hook 询问 */
+async function triggerDiscardPhase(harness: SkillTestHarness, player = 0): Promise<void> {
+  void applyAtom(harness.state, { type: '阶段开始', player, phase: '弃牌' });
+  await harness.waitForStable();
+  harness.processAllEvents();
+}
+
 describe('神速', () => {
   let harness: SkillTestHarness;
 
@@ -273,5 +280,114 @@ describe('神速', () => {
     expect(shensuSlot).toBeUndefined();
     // P2 未受伤
     expect(harness.state.players[1].health).toBe(4);
+  });
+
+  // ── 选项3:跳过弃牌阶段 + 翻面 ──
+
+  it('选项3:发动 → 选目标 → 目标受 1 点伤害 + 加翻面标签', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['神速'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await triggerDiscardPhase(harness);
+    // 询问是否发动神速③
+    P1.expectPending('请求回应');
+
+    await P1.respond('神速', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 询问目标
+    P1.expectPending('请求回应');
+    await P1.respond('神速', { target: 1 });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // virtualKill 会询问 P2 出闪 → P2 不闪
+    const P2 = harness.player('P2');
+    await P2.pass();
+
+    // P2 受 1 点伤害(无闪可出)
+    expect(harness.state.players[1].health).toBe(3);
+    // 神速③ 标记已用
+    expect(harness.state.players[0].vars['神速/opt3Used']).toBe(true);
+    // 翻面标签存在(下一回合被消费)
+    expect(harness.state.players[0].tags).toContain('神速/翻面');
+  });
+
+  it('负面(选项3):不发动 → 无伤害,无翻面标签', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['神速'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await triggerDiscardPhase(harness);
+    P1.expectPending('请求回应');
+
+    await P1.respond('神速', { choice: false });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 不发动 → 无伤害,无翻面标签
+    expect(harness.state.players[1].health).toBe(4);
+    expect(harness.state.players[0].vars['神速/opt3Used']).toBeUndefined();
+    expect(harness.state.players[0].tags).not.toContain('神速/翻面');
+  });
+
+  it('翻面:下一回合准备阶段 → 翻面标签消费 + cPI 推进到下家', async () => {
+    // 预设翻面标签(模拟上一回合已发动神速③)
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['dk0', 'dk1'],
+          skills: ['神速'],
+        }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 2, phase: '准备', vars: {} },
+    });
+    // 预设翻面标签
+    state.players[0].tags = ['神速/翻面'];
+    await harness.setup(state);
+
+    const handBefore = harness.state.players[0].hand.length;
+
+    // 模拟回合启动序列:回合开始 → 阶段开始(准备) → 阶段结束(准备)
+    // 神速翻面 hook 在 阶段开始(准备) cancel + 设 skipAll;
+    // 阶段结束(准备) before-hook 检测 skipAll → 主动推进回合(下一玩家 + 回合结束)
+    await applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 翻面标签已被消费
+    expect(harness.state.players[0].tags).not.toContain('神速/翻面');
+    // cPI 已推进到下家(跳过自己回合)
+    expect(harness.state.currentPlayerIndex).toBe(1);
+    // P1 未摸牌(整回合被跳过)
+    expect(harness.state.players[0].hand.length).toBe(handBefore);
   });
 });

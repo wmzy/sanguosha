@@ -158,6 +158,8 @@ describe('暴虐', () => {
 
     // 红桃 → 不回复
     expect(harness.state.players[0].health).toBe(hpBefore);
+    // 判定牌进入弃牌堆
+    expect(harness.state.zones.discardPile).toContain('j1');
   });
 
   // ─── 负面:拒绝判定 → 不判定 ─────────────────────────────

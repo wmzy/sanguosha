@@ -1,5 +1,7 @@
 // 奸雄(曹操·被动技)测试
-//   ① 摸一张牌  ② 获得造成此伤害的牌(延迟拿取,避免父结算重复入弃牌堆)
+//   官方效果:当你受到伤害后,你可以获得造成此伤害的牌。
+//   无来源伤害(闪电等)无牌可获得,技能不发动。
+//   获得伤害牌采用延迟拿取,避免父结算重复入弃牌堆。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
@@ -54,7 +56,7 @@ describe('奸雄', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 选项②:获得伤害牌(杀) ─────────────────────────────
+  // ─── 获得伤害牌(杀) ─────────────────────────────
   it('P0 杀 P1(曹操) → P1 不闪 → 奸雄选获得 → 杀牌进 P1 手牌(弃牌堆不重复)', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const state: GameState = createGameState({
@@ -74,7 +76,7 @@ describe('奸雄', () => {
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass(); // 不出闪 → 扣血 → 奸雄询问
     P1.expectPending('请求回应');
-    // 选获得伤害牌(hasCard=true → choice=true 即 ②)
+    // 选获得伤害牌(choice=true)
     await P1.respond('奸雄', { choice: true });
     await harness.waitForStable();
 
@@ -86,21 +88,19 @@ describe('奸雄', () => {
     expect(harness.state.players[1].health).toBe(3);
   });
 
-  // ─── 选项①:摸一张牌 ─────────────────────────────
-  it('P0 杀 P1(曹操) → P1 不闪 → 奸雄选摸牌 → P1 手牌+1(不拿杀牌)', async () => {
+  // ─── 不发动:choice=false → 杀牌正常入弃牌堆,P1 不获得 ─────
+  it('P0 杀 P1(曹操) → P1 不闪 → 奸雄选不发动 → 杀牌正常入弃牌堆,P1 不获得', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
-    const drawCard = makeCard('top1', '桃', '♥', '3');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
         makePlayer({ index: 1, name: 'P1', hand: [], skills: ['奸雄', '闪'], health: 4 }),
       ],
-      cardMap: { k1: slash, top1: drawCard },
+      cardMap: { k1: slash },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    state.zones = { deck: ['top1'], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
@@ -108,31 +108,31 @@ describe('奸雄', () => {
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass();
     P1.expectPending('请求回应');
-    // 选摸一张牌(hasCard=true → choice=false 即 ①)
+    // 选不发动(choice=false)
     await P1.respond('奸雄', { choice: false });
     await harness.waitForStable();
 
-    // P1 摸了一张(top1),未拿杀牌
-    expect(harness.state.players[1].hand).toContain('top1');
+    // P1 未获得杀牌
     expect(harness.state.players[1].hand).not.toContain('k1');
     // 杀牌正常入弃牌堆
     expect(harness.state.zones.discardPile).toContain('k1');
+    // P1 受了 1 点伤害
+    expect(harness.state.players[1].health).toBe(3);
   });
 
-  // ─── 无来源伤害:只能摸牌 ─────────────────────────────
-  it('无来源伤害(无 cardId)→ 奸雄仅可摸牌 → 确认后摸1张', async () => {
-    const drawCard = makeCard('top1', '桃', '♥', '3');
+  // ─── 无来源伤害:技能不发动(无可获得之物) ─────────────────────
+  it('无来源伤害(无 cardId)→ 奸雄不发动 → 无询问、无额外效果', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [], skills: ['奸雄'], health: 4 }),
         makePlayer({ index: 1, name: 'P1', skills: [] }),
       ],
-      cardMap: { top1: drawCard },
+      cardMap: {},
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    state.zones = { deck: ['top1'], discardPile: [], processing: [] };
+    state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
 
@@ -144,12 +144,11 @@ describe('奸雄', () => {
       source: TARGET_SYSTEM,
     });
     await waitForStable(harness.state);
-    P0.expectPending('请求回应');
-    await P0.respond('奸雄', { choice: true }); // hasCard=false → 摸牌
-    await harness.waitForStable();
+    // 无伤害牌 → 技能不发动,无询问 pending
+    P0.expectNoPending();
 
     expect(harness.state.players[0].health).toBe(3);
-    expect(harness.state.players[0].hand).toContain('top1');
+    expect(harness.state.players[0].hand).toHaveLength(0);
   });
 
   // ─── respond validate:无 pending 拒绝 ─────────────────────────────

@@ -30,7 +30,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '反间',
-    description: '出牌阶段，令一名其他角色猜一种花色，获得你的一张手牌并展示，猜错则受1点伤害',
+    description:
+      '出牌阶段限一次，你可以令一名其他角色选择一种花色，令其获得并展示你的一张手牌，若此牌花色与其选择的花色不同，你对其造成1点伤害',
   };
 }
 

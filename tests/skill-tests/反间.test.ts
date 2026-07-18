@@ -220,4 +220,52 @@ describe('反间', () => {
     // P2 受伤
     expect(harness.state.players[1].health).toBe(2);
   });
+
+  // ─── 8. 伤害来源是周瑜(官方:"你对其造成1点伤害") ─────────
+  it('猜错造成的伤害来源是周瑜(用于反馈/狂骨等受到伤害时技能)', async () => {
+    const heart = makeCard('h1', '桃', '♥', '5');
+    const state = buildState({ p1Hand: ['h1'], cards: { h1: heart } });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.triggerAction('反间', 'use', { targets: [1] });
+    P2.expectPending('请求回应');
+    await P2.respond('反间', { suit: '♠' }); // 猜错
+
+    // 从 atomHistory 找出造成伤害 atom,验证 source = 周瑜(0)
+    const damageEntries = harness.state.atomHistory.filter(
+      (e) => e.kind === 'atom' && (e.atom as { type: string }).type === '造成伤害',
+    );
+    expect(damageEntries.length).toBe(1);
+    const damageAtom = (damageEntries[0] as {
+      atom: { type: string; target: number; source: number; amount: number };
+    }).atom;
+    expect(damageAtom.source).toBe(0); // 周瑜(座次 0)是伤害来源
+    expect(damageAtom.target).toBe(1);
+    expect(damageAtom.amount).toBe(1);
+  });
+
+  // ─── 9. 顺序:目标先选花色,后获得牌(官方:"...选择花色,令其获得...") ──
+  it('执行顺序:目标选花色 → 周瑜随机一张手牌转移 → 比对伤害', async () => {
+    const heart = makeCard('h1', '桃', '♥', '5');
+    const state = buildState({ p1Hand: ['h1'], cards: { h1: heart } });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.triggerAction('反间', 'use', { targets: [1] });
+    P2.expectPending('请求回应');
+
+    // 选花色之前,周瑜的牌未转移
+    expect(harness.state.players[0].hand).toContain('h1');
+    expect(harness.state.players[1].hand).not.toContain('h1');
+
+    await P2.respond('反间', { suit: '♠' });
+
+    // 选花色后,牌才转移
+    expect(harness.state.players[0].hand).not.toContain('h1');
+    expect(harness.state.players[1].hand).toContain('h1');
+    expect(harness.state.players[1].health).toBe(2);
+  });
 });

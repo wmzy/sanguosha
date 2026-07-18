@@ -1,8 +1,8 @@
 // 志继(姜维·觉醒技)行为测试:
-//   1. 无手牌回合开始 → 选摸两张牌:摸2牌 + 减1上限 + 永久获得观星
-//   2. 无手牌回合开始 → 选回复1点体力:回复1 + 减1上限 + 永久获得观星
+//   1. 无手牌准备阶段 → 选摸两张牌:摸2牌 + 减1上限 + 永久获得观星
+//   2. 无手牌准备阶段 → 选回复1点体力:回复1 + 减1上限 + 永久获得观星
 //   3. 有手牌时不触发
-//   4. 觉醒后再次回合开始不再触发(整局一次)
+//   4. 觉醒后再次准备阶段不再触发(整局一次)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -55,7 +55,7 @@ describe('志继', () => {
     harness = new SkillTestHarness();
   });
 
-  it('无手牌回合开始:选择摸两张牌 → 摸2牌 + 减1上限 + 获得观星', async () => {
+  it('无手牌准备阶段:选择摸两张牌 → 摸2牌 + 减1上限 + 获得观星', async () => {
     await harness.setup(
       createGameState({
         players: [
@@ -78,8 +78,8 @@ describe('志继', () => {
     );
     const JW = harness.player('姜维');
 
-    // 触发回合开始(志继 after-hook 询问二选一)
-    void applyAtom(harness.state, { type: '回合开始', player: 0 });
+    // 触发准备阶段(志继 after-hook 询问二选一)
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
     await harness.waitForStable();
     JW.expectPending('请求回应');
 
@@ -94,7 +94,7 @@ describe('志继', () => {
     expect(harness.state.players[0].vars['志继/awakened']).toBe(true); // 觉醒标记
   });
 
-  it('无手牌回合开始:选择回复1点体力 → 回复1 + 减1上限 + 获得观星', async () => {
+  it('无手牌准备阶段:选择回复1点体力 → 回复1 + 减1上限 + 获得观星', async () => {
     await harness.setup(
       createGameState({
         players: [
@@ -117,7 +117,7 @@ describe('志继', () => {
     );
     const JW = harness.player('姜维');
 
-    void applyAtom(harness.state, { type: '回合开始', player: 0 });
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
     await harness.waitForStable();
     JW.expectPending('请求回应');
 
@@ -132,7 +132,7 @@ describe('志继', () => {
     expect(harness.state.players[0].vars['志继/awakened']).toBe(true);
   });
 
-  it('有手牌时回合开始不触发志继', async () => {
+  it('有手牌时准备阶段不触发志继', async () => {
     const c = mkCard('h1', '闪', '♥', '5');
     await harness.setup(
       createGameState({
@@ -155,8 +155,8 @@ describe('志继', () => {
       }),
     );
 
-    // 回合开始:有手牌,志继不触发,无 pending
-    await applyAtom(harness.state, { type: '回合开始', player: 0 });
+    // 准备阶段:有手牌,志继不触发,无 pending
+    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
     await harness.waitForStable();
 
     expect(harness.state.pendingSlots.size).toBe(0);
@@ -165,46 +165,36 @@ describe('志继', () => {
     expect(harness.state.players[0].skills).not.toContain('观星');
   });
 
-  it('觉醒后再次回合开始不再触发(整局一次)', async () => {
-    await harness.setup(
-      createGameState({
-        players: [
-          mkPlayer({
-            index: 0,
-            name: '姜维',
-            character: '姜维',
-            hand: [],
-            skills: ['志继'],
-            health: 2,
-            maxHealth: 4,
-          }),
-          mkPlayer({ index: 1, name: 'P1', skills: [] }),
-        ],
-        cardMap: {},
-        currentPlayerIndex: 0,
-        phase: '准备',
-        turn: { round: 1, phase: '准备', vars: {} },
-      }),
-    );
-    const JW = harness.player('姜维');
+  it('觉醒后再次准备阶段不再触发(整局一次)', async () => {
+    // 预设已觉醒状态(参考 凿险 已觉醒测试手法):awakened=true + 上限已减,
+    // 不含 观星(本用例只验证志继防重入,不验证观星)。
+    const state = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '姜维',
+          character: '姜维',
+          hand: [],
+          skills: ['志继'],
+          health: 2,
+          maxHealth: 3, // 已觉醒(上限已减)
+        }),
+        mkPlayer({ index: 1, name: 'P1', skills: [] }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 2, phase: '准备', vars: {} },
+    });
+    state.players[0].vars['志继/awakened'] = true;
+    await harness.setup(state);
 
-    // 第一次回合开始:触发觉醒,选摸牌
-    void applyAtom(harness.state, { type: '回合开始', player: 0 });
-    await harness.waitForStable();
-    await JW.respond('志继', { choice: true });
-    await harness.waitForStable();
-    expect(harness.state.players[0].vars['志继/awakened']).toBe(true);
-    const maxAfterAwaken = harness.state.players[0].maxHealth; // 3
-
-    // 清空手牌模拟下一回合开始前的状态
-    harness.state.players[0].hand = [];
-
-    // 第二次回合开始:已觉醒,不再触发
-    await applyAtom(harness.state, { type: '回合开始', player: 0 });
+    // 再次准备阶段:已觉醒,不再触发志继
+    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
     await harness.waitForStable();
 
-    expect(harness.state.pendingSlots.size).toBe(0); // 无询问
-    expect(harness.state.players[0].maxHealth).toBe(maxAfterAwaken); // 上限不再减
+    expect(harness.state.pendingSlots.size).toBe(0); // 无志继询问
+    expect(harness.state.players[0].maxHealth).toBe(3); // 上限不再减
     expect(harness.state.players[0].hand.length).toBe(0); // 没有再摸牌
   });
 });

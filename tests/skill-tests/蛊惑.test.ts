@@ -31,6 +31,7 @@ function mkPlayer(opts: {
   skills?: string[];
   health?: number;
   maxHealth?: number;
+  equipment?: GameState['players'][number]['equipment'];
 }): GameState['players'][number] {
   return {
     index: opts.index,
@@ -40,7 +41,7 @@ function mkPlayer(opts: {
     maxHealth: opts.maxHealth ?? 4,
     alive: true,
     hand: opts.hand ?? [],
-    equipment: {},
+    equipment: opts.equipment ?? {},
     skills: opts.skills ?? [],
     vars: {},
     marks: [],
@@ -50,9 +51,10 @@ function mkPlayer(opts: {
   };
 }
 
-/** 当前唯一阻塞型 pending 的 target(请求回应/询问闪 等) */
+/** 当前唯一阻塞型 pending 的 target(请求回应/询问闪 等)。
+ *  跳过 isPaused slot(respond execute 内部创建新 pending 时,旧 slot 仍留但已 pause)。 */
 function pendingTarget(state: GameState): number | undefined {
-  const slots = [...state.pendingSlots.values()];
+  const slots = [...state.pendingSlots.values()].filter((s) => !s.isPaused);
   if (slots.length === 0) return undefined;
   const atom = slots[0].atom as { target?: number; player?: number };
   return atom.target ?? atom.player;
@@ -60,7 +62,7 @@ function pendingTarget(state: GameState): number | undefined {
 
 /** 当前 pending 的 atom type */
 function pendingType(state: GameState): string | undefined {
-  const slots = [...state.pendingSlots.values()];
+  const slots = [...state.pendingSlots.values()].filter((s) => !s.isPaused);
   if (slots.length === 0) return undefined;
   return (slots[0].atom as { type: string }).type;
 }
@@ -261,5 +263,194 @@ describe('蛊惑', () => {
     const marks = harness.state.players[0].marks;
     expect(marks.some((m) => m.id === '酒/nextKillDamageBonus')).toBe(true);
     expect(harness.state.zones.discardPile).toContain('j1');
+  });
+
+  // ─── fix①:响应路径(dodge/rescue)──
+
+  it('use 拒绝声明闪(闪仅经 dodge 响应路径打出)', async () => {
+    const f1 = mkCard('f1', '闪', '♥', '7');
+    await harness.setup(baseState({ yujiHand: ['f1'], cardMap: { f1 } }));
+    const YJ = harness.player('于吉');
+    await YJ.expectRejected({
+      skillId: '蛊惑',
+      actionType: 'use',
+      params: { cardId: 'f1', declaredName: '闪' },
+    });
+  });
+
+  it('dodge:被杀时扣假牌(杀)声明为闪,无人质疑 → 抵消杀(于吉不掉血)', async () => {
+    const atk = mkCard('atk', '杀', '♠', '7');
+    const fake = mkCard('fake', '杀', '♠', '8'); // 真身是杀,蛊惑声明为闪(假牌)
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '于吉',
+          character: '于吉',
+          skills: ['蛊惑', '闪'],
+          hand: ['fake'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        mkPlayer({ index: 1, name: 'P0', character: '反', hand: ['atk'], skills: ['杀'] }),
+      ],
+      cardMap: { atk, fake },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 1, // P0 回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const YJ = harness.player('于吉');
+    const P0 = harness.player('P0');
+
+    // P0 出杀指定于吉 → 于吉被询问闪
+    await P0.useCardAndTarget('杀', 'atk', [0]);
+    expect(pendingType(harness.state)).toBe('询问闪');
+    expect(pendingTarget(harness.state)).toBe(0);
+
+    // 于吉以蛊惑扣假牌(杀)声明为闪打出
+    await YJ.triggerAction('蛊惑', 'dodge', { cardId: 'fake' });
+    // 质疑循环:问 P0(唯一其他角色)
+    expect(pendingType(harness.state)).toBe('请求回应');
+    expect(pendingTarget(harness.state)).toBe(1);
+    await P0.pass(); // P0 不质疑
+    await harness.waitForStable();
+
+    // 无人质疑 → 假牌当闪生效 → 杀被抵消,于吉不掉血
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[0].hand).not.toContain('fake');
+  });
+
+  it('dodge:被质疑且为假 → 作废,于吉受伤(未抵消杀)', async () => {
+    const atk = mkCard('atk', '杀', '♠', '7');
+    const fake = mkCard('fake', '杀', '♠', '8'); // 真身杀,声明闪(假)
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '于吉',
+          character: '于吉',
+          skills: ['蛊惑', '闪'],
+          hand: ['fake'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        mkPlayer({ index: 1, name: 'P0', character: '反', hand: ['atk'], skills: ['杀'] }),
+      ],
+      cardMap: { atk, fake },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const YJ = harness.player('于吉');
+    const P0 = harness.player('P0');
+
+    await P0.useCardAndTarget('杀', 'atk', [0]);
+    await YJ.triggerAction('蛊惑', 'dodge', { cardId: 'fake' });
+    await P0.respond('蛊惑', {}); // P0 质疑 → 翻牌(杀≠闪,假)→ 作废
+    await harness.waitForStable();
+
+    // 假牌被质疑作废 → 未提供闪 → 于吉受杀伤害
+    expect(harness.state.players[0].health).toBe(2);
+    // 质疑者 P0 获得此假牌
+    expect(harness.state.players[1].hand).toContain('fake');
+  });
+
+  it('rescue:濒死求桃时扣牌声明为桃,无人质疑 → 自救回血', async () => {
+    const atk = mkCard('atk', '杀', '♠', '7');
+    const fake = mkCard('fake', '杀', '♠', '8'); // 真身杀,声明桃(假)
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '于吉',
+          character: '于吉',
+          skills: ['蛊惑', '桃', '闪'],
+          hand: ['fake'],
+          health: 1,
+          maxHealth: 3,
+        }),
+        mkPlayer({ index: 1, name: 'P0', character: '反', hand: ['atk'], skills: ['杀'] }),
+      ],
+      cardMap: { atk, fake },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 1, // P0 回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const YJ = harness.player('于吉');
+    const P0 = harness.player('P0');
+
+    // P0 出杀 → 于吉不闪 → HP=0 → 濒死 → 求桃(先问濒死者于吉自己)
+    await P0.useCardAndTarget('杀', 'atk', [0]);
+    await YJ.pass(); // 不闪,受伤害进濒死
+    expect(harness.state.players[0].health).toBe(0);
+    const slot = [...harness.state.pendingSlots.values()][0].atom as {
+      type?: string;
+      requestType?: string;
+      target?: number;
+    };
+    expect(slot.requestType).toBe('桃/求桃');
+    expect(slot.target).toBe(0);
+
+    // 于吉以蛊惑扣假牌(杀)声明为桃自救
+    await YJ.triggerAction('蛊惑', 'rescue', { cardId: 'fake' });
+    // 质疑循环:问 P0
+    expect(pendingType(harness.state)).toBe('请求回应');
+    await P0.pass(); // 不质疑
+    await harness.waitForStable();
+
+    // 无人质疑 → 假牌当桃生效 → 自救,血量回升到 1
+    expect(harness.state.players[0].health).toBe(1);
+    expect(harness.state.players[0].hand).not.toContain('fake');
+  });
+
+  // ─── fix②:蛊惑-杀 经处理区判定(仁王盾对假牌当杀生效)──
+
+  it('蛊惑-杀(黑假牌)对仁王盾无效:不询问闪、不扣血', async () => {
+    const fake = mkCard('fake', '闪', '♠', '8'); // 真身黑闪,蛊惑声明为杀(黑色假杀)
+    const rw: Card = { id: 'rw', name: '仁王盾', suit: '♣', color: '黑', rank: '2', type: '装备牌', subtype: '防具' };
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '于吉',
+          character: '于吉',
+          skills: ['蛊惑'],
+          hand: ['fake'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        mkPlayer({
+          index: 1,
+          name: 'P1',
+          character: '反',
+          skills: ['闪', '仁王盾'],
+          equipment: { 防具: 'rw' },
+        }),
+      ],
+      cardMap: { rw, fake },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const YJ = harness.player('于吉');
+    const P1 = harness.player('P1');
+
+    // 于吉扣黑假牌(闪)声明为杀,目标 P1(仁王盾)
+    await YJ.triggerAction('蛊惑', 'use', { cardId: 'fake', declaredName: '杀', target: 1 });
+    await P1.pass(); // P1 不质疑(目标本身也可质疑)
+    await harness.waitForStable();
+
+    // 黑色假杀被仁王盾判定无效:不询问闪、不扣血
+    expect(harness.state.players[1].health).toBe(4);
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.zones.discardPile).toContain('fake');
   });
 });

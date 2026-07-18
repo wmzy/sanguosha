@@ -1,13 +1,14 @@
 // 救援(孙权·主公技)测试
-//   其他吴势力角色对濒死状态的你使用【桃】时,该角色额外回复1点体力。
+//   主公技,锁定技,其他吴势力角色对你使用【桃】的回复值+1。
+//   (官方裁定:"你"=孙权=桃的目标,即孙权本人多回1点体力)
 //
 // 验证:
-//   1. happy path:吴角色出桃救濒死主公孙权 → 救援触发,该吴角色额外 +1 体力
-//   2. 非吴势力:蜀角色出桃救孙权 → 救援不触发
+//   1. happy path:吴角色出桃救濒死主公孙权 → 救援触发,孙权额外 +1 体力(0→2)
+//   2. 非吴势力:蜀角色出桃救孙权 → 救援不触发(孙权仅回 1 点)
 //   3. 非主公:孙权不在主公位(座次≠0) → 救援不触发
 //   4. 自救:孙权自己出桃自救 → 救援不触发("其他角色"限制)
 //
-// 备注:事实来源为 docs/research/武将技能/吴国/孙权.md(任务描述与此冲突,以文档为准)。
+// 备注:官方描述为准(docs/research/武将技能/吴国/孙权.md)。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -65,8 +66,8 @@ describe('救援', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── happy path ────────────────────────────────────────────
-  it('吴角色出桃救濒死主公孙权 → 救援触发,该吴角色额外 +1 体力', async () => {
+  // ─── happy path ───────────────────────────────
+  it('吴角色出桃救濒死主公孙权 → 救援触发,孙权额外 +1 体力(0→2)', async () => {
     const peach = makeCard('peach', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
@@ -115,10 +116,10 @@ describe('救援', () => {
     P1.expectPending('请求回应');
     await P1.respond('桃', { cardId: 'peach' });
 
-    // 孙权被救回 0 → 1
-    expect(harness.state.players[0].health).toBe(1);
-    // 救援触发:甘宁额外回复1点 3 → 4
-    expect(harness.state.players[1].health).toBe(4);
+    // 孙权被救回:桃 1 点 + 救援加成 1 点 = 0 → 2
+    expect(harness.state.players[0].health).toBe(2);
+    // 救援加成作用于孙权(桃的目标),救援者不额外回复:甘宁仍为 3
+    expect(harness.state.players[1].health).toBe(3);
     // 桃已用掉,进弃牌堆
     expect(harness.state.zones.discardPile).toContain('peach');
   });
@@ -169,7 +170,7 @@ describe('救援', () => {
 
     // 孙权被救回 0 → 1
     expect(harness.state.players[0].health).toBe(1);
-    // 救援不触发:张飞是蜀势力,不额外回复
+    // 救援不触发:张飞是蜀势力,孙权不获额外加成;张飞本身出桃也不回血 → 仍为 3
     expect(harness.state.players[1].health).toBe(3);
   });
 
@@ -221,7 +222,7 @@ describe('救援', () => {
 
     // 孙权被救回 0 → 1
     expect(harness.state.players[1].health).toBe(1);
-    // 救援不触发:孙权不在主公位(ownerId!==0),甘宁不额外回复
+    // 救援不触发:孙权不在主公位(ownerId!==0),孙权不获额外加成;甘宁仍为 3
     expect(harness.state.players[0].health).toBe(3);
   });
 

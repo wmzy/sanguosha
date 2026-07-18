@@ -1,5 +1,5 @@
 // 再起(孟获·主动技):摸牌阶段,若你已受伤,你可以放弃摸牌并展示牌堆顶X张牌
-// (X为你已损失体力值),每有一张红桃回复1点体力,然后弃掉这些红桃牌,
+// (X为你已损失体力值+1),每有一张红桃回复1点体力,然后弃掉这些红桃牌,
 // 将其余的牌收入手牌。
 //
 // 模式:摸牌阶段开始时(阶段开始 before hook)询问是否发动;
@@ -31,7 +31,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '再起',
-    description: '摸牌阶段,若已受伤,可放弃摸牌,展示牌堆顶X张(X=已损失体力),红桃回血弃置,其余入手',
+    description: '摸牌阶段,若已受伤,可放弃摸牌,展示牌堆顶X张(X=已损失体力+1),红桃回血弃置,其余入门',
   };
 }
 
@@ -78,6 +78,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 牌堆不足 → 无法展示 → 默认摸牌
       if (ctx.state.zones.deck.length === 0) return;
 
+      // 官方:X 为你已损失体力值 + 1
+      const x = Math.min(lostHealth + 1, ctx.state.zones.deck.length);
+
       // 询问是否发动再起
       delete ctx.state.localVars[TRIGGERED_KEY];
       await applyAtom(ctx.state, {
@@ -86,7 +89,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target: ownerId,
         prompt: {
           type: 'confirm',
-          title: `是否发动再起?(放弃摸牌,展示牌堆顶${lostHealth}张,红桃回血,其余入手)`,
+          title: `是否发动再起?(放弃摸牌,展示牌堆顶${x}张,红桃回血,其余入手)`,
           confirmLabel: '发动',
           cancelLabel: '不发动',
         },
@@ -94,9 +97,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
         timeout: 10,
       });
       if (ctx.state.localVars[TRIGGERED_KEY] !== true) return; // 不发动 → 默认摸牌
-
-      // 取牌堆顶X张到处理区(展示)——X = 已损失体力值,但不超过牌堆数
-      const x = Math.min(lostHealth, ctx.state.zones.deck.length);
       const shownCardIds: string[] = [];
       for (let i = 0; i < x; i++) {
         const topCardId = ctx.state.zones.deck[ctx.state.zones.deck.length - 1];

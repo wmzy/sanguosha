@@ -246,4 +246,55 @@ describe('巧变', () => {
     // 无询问(巧变 hook 检查 hand.length === 0 直接 return)
     expect(harness.state.pendingSlots.size).toBe(0);
   });
+
+  // ─── 跳过摸牌阶段:多张手牌时盲取一张(不固定首位) ────────────────────
+  // 官方 FAQ:手牌不公开,获得一张手牌为盲取(与突袭一致)。
+  // 目标有多张手牌时,获得的牌应来自其手牌集合中的某一张(不要求是 hand[0])。
+  it('跳过摸牌阶段:目标多张手牌时盲取其中一张', async () => {
+    const discard = makeCard('d1', '杀', '♠', '5');
+    const p1a = makeCard('p1a', '闪', '♥', '3');
+    const p1b = makeCard('p1b', '杀', '♣', '7');
+    const p1c = makeCard('p1c', '桃', '♦', '2');
+    const cardMap: Record<string, Card> = { d1: discard, p1a, p1b, p1c };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['d1'], skills: ['巧变'] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: ['p1a', 'p1b', 'p1c'],
+          character: '曹操',
+        }),
+      ],
+      cardMap,
+      currentPlayerIndex: 0,
+      phase: '摸牌',
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    P0.expectPending('请求回应');
+    await P0.respond('巧变', { choice: true });
+    P0.expectPending('请求回应');
+    await P0.respond('巧变', { cardIds: ['d1'] });
+    P0.expectPending('请求回应');
+    await P0.respond('巧变', { targets: [1] });
+
+    // P0 弃 d1
+    expect(harness.state.zones.discardPile).toContain('d1');
+    // P0 恰好获得 P1 原手牌中的一张(盲取,来源限定为 {p1a,p1b,p1c})
+    const obtained = harness.state.players[0].hand.filter((id) =>
+      ['p1a', 'p1b', 'p1c'].includes(id),
+    );
+    expect(obtained).toHaveLength(1);
+    // P1 剩余手牌 = 原手牌扣除被获得的那张
+    const remaining = harness.state.players[1].hand;
+    expect(remaining).toHaveLength(2);
+    expect(remaining).toEqual(
+      ['p1a', 'p1b', 'p1c'].filter((id) => id !== obtained[0]),
+    );
+  });
 });

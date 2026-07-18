@@ -14,16 +14,18 @@ import { enforceDualKill } from './无双';
  * 不处理决斗牌本身的移动(进出处理区)——由调用方负责。
  * 离间(貂蝉)调用此函数时无需 cardId(视为使用,无实体牌)。
  *
- * @param state    游戏状态
- * @param from     决斗发起者(出杀顺序中后手)
- * @param target   决斗目标(出杀顺序中先手)
- * @param cardId   决斗牌 id(用于 成为目标/造成伤害 归因);离间调用时可省略
+ * @param state              游戏状态
+ * @param from               决斗发起者(出杀顺序中后手)
+ * @param target             决斗目标(出杀顺序中先手)
+ * @param cardId             决斗牌 id(用于 成为目标/造成伤害 归因);离间调用时可省略
+ * @param skipNullification  跳过无懈可击询问(离间:官方明确不能被无懈可击抵消)
  */
 export async function runDuelResolution(
   state: GameState,
   from: number,
   target: number,
   cardId?: string,
+  skipNullification: boolean = false,
 ): Promise<void> {
   // 成为目标:空城等"不能成为目标"技能可在此 cancel(决斗不结算)。
   const becameTarget = await applyAtom(state, {
@@ -35,8 +37,11 @@ export async function runDuelResolution(
   if (!becameTarget) return;
 
   // 询问无懈可击(单目标锦囊:抵消整个锦囊)
-  const cancelled = await 询问无懈可击(state, target);
-  if (cancelled) return;
+  // 离间(貂蝉)按官方"不能被【无懈可击】抵消",跳过此步。
+  if (!skipNullification) {
+    const cancelled = await 询问无懈可击(state, target);
+    if (cancelled) return;
+  }
 
   // 决斗循环:目标先出杀,之后发起者出杀,轮流。
   // 上限保护:极端情况下(武圣/丈八 把任意牌当杀)可能无限循环;

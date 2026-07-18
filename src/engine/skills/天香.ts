@@ -1,18 +1,26 @@
-// 天香(小乔·被动触发):当你受到伤害时,你可以弃置一张红桃手牌,
-// 将此伤害转移给任意一名其他角色,然后该角色摸X张牌(X为其已损失体力值)。
+// 天香(小乔·被动触发):当你受到伤害时，你可以弃置一张红桃手牌，防止此伤害并
+// 选择一名其他角色，你选择令其：
+//   1. 受到伤害来源的1点伤害并摸X张牌（X为其已损失体力值且至多为5）
+//   2. 失去1点体力并获得你弃置的牌。
 //
 // 时机:造成伤害 before hook(伤害结算前)。target=自己 + amount>0 时触发。
 // 流程(确认发动后):
-//   1. 弃置一张红桃手牌(红颜锁定技下黑桃也视为红桃)
-//   2. cancel 原伤害 atom(小乔不再受伤)
-//   3. 对新目标 applyAtom(造成伤害),保留原 source/amount/damageType(转移伤害本身)
-//      —— 新伤害走完整管线(含濒死/反馈等 after hook)
-//   4. 新目标(若存活)摸 X 张牌,X = maxHealth - health(伤害结算后的已损失体力值)
+//   1. 弃一张红桃手牌(红颜锁定技下黑桃也视为红桃)
+//   2. 选一名其他角色
+//   3. 询问选择一项(confirm):① 该角色受来源1点伤害+摸X ② 该角色失去1点体力+获弃牌
+//   4. 执行所选选项,然后 cancel 原伤害 atom(小乔不再受伤 —— "防止此伤害")
+//
+// 选项细节:
+//   ① 造成伤害{target=所选角色, source=原伤害来源, amount=1};
+//      然后 摸X张牌(X = maxHealth - health,至多 5;伤害结算后计算)
+//   ② 失去体力{target=所选角色, amount=1}(非伤害,不触发反馈/奸雄);
+//      然后 移动牌(弃牌堆→该角色手牌),获得本次弃置的红桃牌
 //
 // 关键点:
-//   - 不能转移给自己(target !== ownerId)
-//   - 转移的是伤害本身(不是攻击),保留原伤害来源(奖励归属不变,见 FAQ)
-//   - 属性伤害转移后,连环传导由 造成伤害 的既有机能处理,本技能不特殊编码
+//   - "防止此伤害" = cancel 原伤害,小乔不受伤
+//   - 目标不能是小乔自己(官方:"选择一名其他角色")
+//   - 选项①的"伤害来源" = 原伤害的来源(保留奖励归属)
+//   - 标版仅支持红桃**手牌**(与界版"手牌或装备区"不同)
 //   - 红颜联动:小乔拥有「红颜」技能时,黑桃手牌也作为合法弃牌
 import type {
   AtomBeforeContext,
@@ -27,9 +35,11 @@ import { registerAction, registerBeforeHook } from '../skill';
 
 const CONFIRM_RT = '天香/confirm';
 const CHOOSE_RT = '天香/choose';
+const OPTION_RT = '天香/option';
 const CONFIRMED_KEY = '天香/confirmed';
 const CARD_KEY = '天香/cardId';
 const TARGET_KEY = '天香/target';
+const OPTION_KEY = '天香/option'; // 'damage' | 'lose'
 
 /** 判定一张手牌对天香是否合法:红桃;若拥有红颜,黑桃也视为红桃。 */
 function isTianxiangCard(state: GameState, ownerId: number, cardId: string): boolean {
@@ -40,32 +50,37 @@ function isTianxiangCard(state: GameState, ownerId: number, cardId: string): boo
   return false;
 }
 
+function currentRequestType(state: GameState, ownerId: number): string | undefined {
+  const slot = state.pendingSlots.get(ownerId);
+  if (!slot) return undefined;
+  return (slot.atom as unknown as Record<string, unknown>).requestType as string | undefined;
+}
+
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
     name: '天香',
-    description: '受到伤害时,弃一张红桃手牌将伤害转移给其他角色,其摸X张牌(X为已损失体力值)',
+    description:
+      '受到伤害时,弃一张红桃手牌防止之,令一名其他角色二选一:①受来源1伤害并摸X(X为已损失体力至多5);②失去1体力并获得弃置的牌',
   };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // ── respond:回应天香的确认 + 选牌选目标 ──
+  // ── respond:回应天香的各询问 ──
   registerAction(
     state,
     skill.id,
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== CHOOSE_RT) return '当前不是天香询问';
-      if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可(含放弃)
+      const rt = currentRequestType(st, ownerId);
+      if (rt !== CONFIRM_RT && rt !== CHOOSE_RT && rt !== OPTION_RT) {
+        return '当前不是天香询问';
+      }
+      if (rt === CONFIRM_RT || rt === OPTION_RT) return null; // confirm 类:任意 choice 均可
 
       // choose:校验 cardId + target
       const cardId = params.cardId as string | undefined;
@@ -80,18 +95,21 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
+      const confirmed = params.choice === true || params.confirmed === true;
       if (rt === CONFIRM_RT) {
-        st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
+        st.localVars[CONFIRMED_KEY] = confirmed;
       } else if (rt === CHOOSE_RT) {
-        st.localVars[CARD_KEY] = (params.cardId) ?? null;
-        st.localVars[TARGET_KEY] = (params.target) ?? null;
+        st.localVars[CARD_KEY] = params.cardId ?? null;
+        st.localVars[TARGET_KEY] = params.target ?? null;
+      } else if (rt === OPTION_RT) {
+        // confirm prompt:确认=①damage,取消/超时=②lose
+        st.localVars[OPTION_KEY] = confirmed ? 'damage' : 'lose';
       }
     },
   );
 
-  // ── 造成伤害 before:小乔受伤前询问是否转移 ──
+  // ── 造成伤害 before:小乔受伤前询问是否发动 ──
   registerBeforeHook(
     state,
     skill.id,
@@ -145,7 +163,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target: ownerId,
         prompt: {
           type: 'useCardAndTarget',
-          title: '天香:弃一张红桃手牌,将伤害转移给一名其他角色',
+          title: '天香:弃一张红桃手牌,选择一名其他角色',
           cardFilter: {
             filter: (c) => c.suit === '♥' || (hasHongyan && c.suit === '♠'),
             min: 1,
@@ -173,28 +191,62 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self.hand.includes(cardId)) return;
       if (!isTianxiangCard(ctx.state, ownerId, cardId)) return;
 
-      // 3) 弃置红桃手牌
+      // 3) 询问选择一项(confirm):确认=①damage,取消=②lose
+      delete ctx.state.localVars[OPTION_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: OPTION_RT,
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: `天香:令 ${targetPlayer.name} ①受来源1点伤害并摸X张牌?(确认=①,取消=②失去1体力并获得弃牌)`,
+          confirmLabel: '①受伤害+摸牌',
+          cancelLabel: '②失去体力+获牌',
+        },
+        defaultChoice: false,
+        timeout: 15,
+      });
+      const chosenOption = ctx.state.localVars[OPTION_KEY] as string | null;
+      delete ctx.state.localVars[OPTION_KEY];
+      const isDamage = chosenOption === 'damage';
+
+      // 4) 弃置红桃手牌
       await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [cardId] });
 
-      // 4) 转移伤害:对新目标造成等量同属性伤害(保留来源)
-      //    原伤害 atom 将被 cancel,小乔不受伤。新伤害走完整管线(含濒死结算)。
-      await applyAtom(ctx.state, {
-        type: '造成伤害',
-        target: newTarget,
-        amount,
-        source: atom.source ?? ownerId,
-        cardId: atom.cardId,
-        damageType: atom.damageType,
-      });
-
-      // 5) 转移目标摸 X 张牌(X = 已损失体力值,伤害结算后)
-      if (targetPlayer.alive) {
-        const lostHealth = targetPlayer.maxHealth - targetPlayer.health;
-        if (lostHealth > 0) {
-          await applyAtom(ctx.state, { type: '摸牌', player: newTarget, count: lostHealth });
+      // 5) 执行所选选项
+      if (isDamage) {
+        // 选项①:该角色受到伤害来源的1点伤害(保留原来源)
+        const source = atom.source ?? ownerId;
+        await applyAtom(ctx.state, {
+          type: '造成伤害',
+          target: newTarget,
+          amount: 1,
+          source,
+          damageType: '普通',
+        });
+        // 摸 X 张牌(X = 已损失体力值,至多 5;伤害结算后)
+        if (targetPlayer.alive) {
+          const lostHealth = targetPlayer.maxHealth - targetPlayer.health;
+          const x = Math.min(lostHealth, 5);
+          if (x > 0) {
+            await applyAtom(ctx.state, { type: '摸牌', player: newTarget, count: x });
+          }
+        }
+      } else {
+        // 选项②:该角色失去1点体力 + 获得弃置的牌
+        await applyAtom(ctx.state, { type: '失去体力', target: newTarget, amount: 1 });
+        // 获得本次弃置的红桃牌(此刻在弃牌堆中)
+        if (targetPlayer.alive && ctx.state.zones.discardPile.includes(cardId)) {
+          await applyAtom(ctx.state, {
+            type: '移动牌',
+            cardId,
+            from: { zone: '弃牌堆' },
+            to: { zone: '手牌', player: newTarget },
+          });
         }
       }
 
+      // 6) cancel 原伤害(防止此伤害)
       return { kind: 'cancel' };
     },
   );

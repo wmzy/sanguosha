@@ -784,6 +784,9 @@ function createAndAwaitSlot(
       get isTimeout() {
         return timedOut;
       },
+      get isPaused() {
+        return paused;
+      },
       pause() {
         if (timedOut) return;
         paused = true;
