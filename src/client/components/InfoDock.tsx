@@ -37,8 +37,6 @@ type TabKey = 'log' | 'chat';
 
 const dockRoot = css`
   position: fixed;
-  bottom: 16px;
-  right: 16px;
   z-index: 9000;
   width: 340px;
   max-height: 60vh;
@@ -51,10 +49,16 @@ const dockRoot = css`
   overflow: hidden;
   font-size: 13px;
   color: ${colors.text.primary};
+  /* 默认贴右上角,展开后不遮挡操作区(操作区在下方) */
+  top: 56px;
+  right: 8px;
 `;
 const dockRootCollapsed = css`
   ${dockRoot}
-  max-height: 40px;
+  width: auto;
+  max-height: 36px;
+  border-radius: 18px;
+  /* 折叠后只保留一个小药丸标签,貼右上角不占底部空间 */
 `;
 
 const tabBar = css`
@@ -351,44 +355,40 @@ export const InfoDock = memo(function InfoDock({
 }: InfoDockProps) {
   const hasChat = !!chatMessages;
   const [tab, setTab] = useState<TabKey>(hasChat ? 'chat' : 'log');
-  const [collapsed, setCollapsed] = useState(false);
-  // 聊天有新消息时切到 chat tab(若当前是 log tab,不切换;只在 collapsed 时展开)
-  const prevMsgCountRef = useRef(chatMessages?.length ?? 0);
-  useEffect(() => {
-    const cur = chatMessages?.length ?? 0;
-    if (cur > prevMsgCountRef.current && collapsed) {
-      setCollapsed(false);
-    }
-    prevMsgCountRef.current = cur;
-  }, [chatMessages, collapsed]);
+  // 默认折叠:避免初始就遮挡操作区;玩家有新聊天/日志时自动展开。
+  const [collapsed, setCollapsed] = useState(true);
+  // 不自动展开:折叠态下有新消息只更新药丸计数(徽标颜色),不干扰操作区。
+  // 玩家主动点击药丸展开查看。
 
   return (
     <div className={collapsed ? dockRootCollapsed : dockRoot}>
-      <div className={tabBar}>
-        <button
-          className={cx(tabBtn, tab === 'log' && tabBtnActive)}
-          onClick={() => {
-            setTab('log');
-            setCollapsed(false);
-          }}
-        >
-          📜 日志 ({view.log.length})
-        </button>
-        {hasChat && (
+      {!collapsed && (
+        <div className={tabBar}>
           <button
-            className={cx(tabBtn, tab === 'chat' && tabBtnActive)}
+            className={cx(tabBtn, tab === 'log' && tabBtnActive)}
             onClick={() => {
-              setTab('chat');
+              setTab('log');
               setCollapsed(false);
             }}
           >
-            💬 聊天 {chatMessages && chatMessages.length > 0 ? `(${chatMessages.length})` : ''}
+            📜 日志 ({view.log.length})
           </button>
-        )}
-        <button className={collapseBtn} onClick={() => setCollapsed((c) => !c)}>
-          {collapsed ? '⤢' : '⤢'}
-        </button>
-      </div>
+          {hasChat && (
+            <button
+              className={cx(tabBtn, tab === 'chat' && tabBtnActive)}
+              onClick={() => {
+                setTab('chat');
+                setCollapsed(false);
+              }}
+            >
+              💬 聊天 {chatMessages && chatMessages.length > 0 ? `(${chatMessages.length})` : ''}
+            </button>
+          )}
+          <button className={collapseBtn} onClick={() => setCollapsed(true)} title="折叠">
+            ⤓
+          </button>
+        </div>
+      )}
       {!collapsed && (
         <div className={body}>
           {tab === 'log' ? (
@@ -402,6 +402,16 @@ export const InfoDock = memo(function InfoDock({
             />
           )}
         </div>
+      )}
+      {collapsed && (
+        <button
+          className={cx(tabBtn, tabBtnActive)}
+          onClick={() => setCollapsed(false)}
+          title="展开信息浮窗"
+          style={{ borderRadius: '18px', padding: '6px 14px' }}
+        >
+          {tab === 'log' ? '📜' : '💬'} {tab === 'log' ? view.log.length : (chatMessages?.length ?? 0)}
+        </button>
       )}
     </div>
   );

@@ -11,6 +11,9 @@ export const pageRoot = css`
   background-color: ${colors.bg.page};
   color: ${colors.text.primary};
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   overflow-x: hidden;
 `;
 
@@ -82,14 +85,18 @@ export const goToBtn = css`
 
 // ─── 下方主布局 ───
 // 左:装备区纵向列 / 中:手牌列 (flex 1) / 右:角色大卡 (320px)
+// margin-top: auto 让操作区贴底,flex: 0 0 auto 保持内容高度(不被拉伸),
+// 中央剩余空间留给上方的 seatingArea(弧形座位 + 处理区)。
 export const bottomLayout = css`
   display: flex;
   gap: 12px;
-  align-items: stretch;
+  align-items: flex-end;
   padding: 0 8px;
-  margin-top: 12px;
+  margin-top: auto;
+  flex: 0 0 auto;
   @media (max-width: 900px) {
     flex-direction: column;
+    align-items: stretch;
   }
 `;
 export const handColumn = css`

@@ -5,8 +5,9 @@ import { css } from '@linaria/core';
 // ─── Seating — arc layout ───
 export const seatingArea = css`
   position: relative;
-  margin-bottom: 16px;
-  min-height: 320px;
+  margin-bottom: 8px;
+  min-height: 240px;
+  flex: 0 0 auto;
 `;
 // 弧形排列容器:其他玩家沿上半部分弧线分布
 export const seatArcContainer = css`
