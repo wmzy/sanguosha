@@ -133,6 +133,24 @@ export const selectedCharLabel = css`
   color: rgba(255, 255, 255, 0.7);
   letter-spacing: 2px;
 `;
+// 已选武将立绘:位于「你的选择」与武将名之间,展示明确的视觉反馈
+export const selectedCharPortrait = css`
+  position: relative;
+  width: 180px;
+  height: 240px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+`;
+export const selectedCharPortraitImg = css`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+`;
 export const selectedCharName = css`
   font-size: 28px;
   font-weight: bold;

@@ -9,6 +9,7 @@ import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
+import { getCharacterImage } from '../assets/imageAssets';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
@@ -61,6 +62,7 @@ export function PlayerCardLargeImpl({
   const charInfo = p.character ? getCharacterMeta(p.character) : undefined;
   const faction = charInfo?.faction ?? '群';
   const factionColor = FACTION_BG[faction] || '#8e44ad';
+  const charImg = p.character ? getCharacterImage(p.character) : null;
   const identity = p.identity;
   // 技能列表(过滤默认技能与装备技能)
   const visibleSkills = p.skills.filter(
@@ -108,6 +110,21 @@ export function PlayerCardLargeImpl({
         </div>
         <div className={styles.playerCardChar}>{p.character || '未知'}</div>
       </div>
+      {/* 武将立绘:大卡上半区域,无素材时略过 */}
+      {charImg && (
+        <div className={styles.playerCardPortrait} aria-hidden>
+          <img
+            className={cx(styles.playerCardPortraitImg, isDead && styles.playerCardPortraitDead)}
+            src={charImg}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
       {/* 体力红心 */}
       <div className={styles.seatHpRow}>
         {Array.from({ length: p.maxHealth }, (_, i) => (

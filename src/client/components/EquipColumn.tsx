@@ -10,6 +10,7 @@ import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
+import { getCardImage } from '../assets/imageAssets';
 import { shallowSetEqual } from '../utils/memo';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
@@ -146,6 +147,7 @@ function EquipItem({
   handleClick: (() => void) | undefined;
 }) {
   const tip = useHoverTooltip(tooltipText);
+  const cardImg = getCardImage(name);
   return (
     <>
       <div
@@ -160,7 +162,20 @@ function EquipItem({
         onMouseEnter={tip.onMouseEnter}
         onMouseLeave={tip.onMouseLeave}
       >
-        <span className={styles.equipColumnIcon}>{icon}</span>
+        {cardImg ? (
+          <img
+            className={styles.equipCardArt}
+            src={cardImg}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        ) : (
+          <span className={styles.equipColumnIcon}>{icon}</span>
+        )}
         <span className={styles.equipItemName}>{name}</span>
         {activeSkill && <span className={styles.equipSkillBadge}>⚡</span>}
       </div>

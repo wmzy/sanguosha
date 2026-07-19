@@ -15,6 +15,7 @@ import {
   EQUIP_SLOT_ICON,
 } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
+import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
@@ -74,6 +75,12 @@ function PlayerSeatViewImpl({
   const charInfo = displayChar ? getCharacterMeta(displayChar) : undefined;
   const faction = charInfo?.faction ?? '群';
   const factionColor = FACTION_BG[faction] ?? '#8e44ad';
+  const charImg = displayChar ? getCharacterImage(displayChar) : null;
+  // onerror 时清除 src 隐藏 <img>,让卡牌保留文字回退;
+  // 避免每张座位卡挂独立的 state hook(座次很多,会拖慢重渲染)
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.style.display = 'none';
+  };
 
   // 身份
   const identity = player.identity;
@@ -135,6 +142,19 @@ function PlayerSeatViewImpl({
         </div>
         <div className={seatCharName}>{displayChar || '未知'}</div>
       </div>
+      {/* 武将立绘:无素材时不渲染,保留文字回退 */}
+      {charImg && (
+        <div className={seatCharImgWrap} aria-hidden>
+          <img
+            className={cx(seatCharImg, isDead && seatCharImgDead)}
+            src={charImg}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={handleImgError}
+          />
+        </div>
+      )}
       {/* 体力红心 */}
       <div className={seatHpRow}>
         {Array.from({ length: player.maxHealth }, (_, i) => (
@@ -279,6 +299,25 @@ const seatCharName = css`
   font-size: 15px;
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+`;
+// 武将立绘填满座位卡中间区域:object-cover 让立绘按区域裁切不变形
+const seatCharImgWrap = css`
+  position: relative;
+  width: 100%;
+  height: 88px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+`;
+const seatCharImg = css`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+`;
+const seatCharImgDead = css`
+  filter: grayscale(1) brightness(0.7);
 `;
 // 体力行:红心表示 HP
 const seatHpRow = css`

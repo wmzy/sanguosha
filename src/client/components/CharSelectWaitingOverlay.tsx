@@ -12,6 +12,7 @@ import type { GameView } from '../../engine/types';
 import { CountdownBar } from './CountdownBar';
 import { FACTION_BG } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/character-meta';
+import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
@@ -50,6 +51,7 @@ export function CharSelectWaitingOverlay({
   const faction = charInfo?.faction ?? '群';
   const factionColor = FACTION_BG[faction] ?? '#8e44ad';
   const maxHealth = charInfo?.maxHealth ?? 4;
+  const charImg = selectedChar ? getCharacterImage(selectedChar) : null;
   // player.skills 包含默认技能,只展示武将自身技能(过滤掉默认技能)
   const charSkills = (me?.skills ?? []).filter((s) => !DEFAULT_SKILLS.has(s));
 
@@ -62,6 +64,20 @@ export function CharSelectWaitingOverlay({
           style={{ '--faction-color': factionColor } as React.CSSProperties}
         >
           <div className={styles.selectedCharLabel}>你的选择</div>
+          {charImg && (
+            <div className={styles.selectedCharPortrait} aria-hidden>
+              <img
+                className={styles.selectedCharPortraitImg}
+                src={charImg}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
           <div className={styles.selectedCharName}>{selectedChar}</div>
           <div className={styles.selectedCharFaction}>{faction}</div>
           <div className={styles.selectedCharHpRow}>

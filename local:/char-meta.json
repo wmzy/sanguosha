@@ -1,0 +1,512 @@
+{
+  "曹操": {
+    "file": "曹操.png",
+    "series": "标准",
+    "faction": "魏"
+  },
+  "司马懿": {
+    "file": "司马懿.png",
+    "series": "标准",
+    "faction": "魏"
+  },
+  "夏侯惇": {
+    "file": "夏侯惇.png",
+    "series": "标准",
+    "faction": "魏"
+  },
+  "张辽": {
+    "file": "张辽.png",
+    "series": "标准",
+    "faction": "魏"
+  },
+  "许褚": {
+    "file": "许褚.png",
+    "series": "标准",
+    "faction": "魏"
+  },
+  "郭嘉": {
+    "file": "郭嘉.png",
+    "series": "标准",
+    "faction": "魏"
+  },
+  "甄姬": {
+    "file": "甄姬.png",
+    "series": "标准",
+    "faction": "魏"
+  },
+  "夏侯渊": {
+    "file": "夏侯渊.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "曹仁": {
+    "file": "曹仁.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "荀彧": {
+    "file": "荀彧.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "典韦": {
+    "file": "典韦.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "曹丕": {
+    "file": "曹丕.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "徐晃": {
+    "file": "徐晃.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "张郃": {
+    "file": "张郃.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "邓艾": {
+    "file": "邓艾.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "界曹操": {
+    "file": "界曹操.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界司马懿": {
+    "file": "界司马懿.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界夏侯惇": {
+    "file": "界夏侯惇.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界张辽": {
+    "file": "界张辽.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界许褚": {
+    "file": "界许褚.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界郭嘉": {
+    "file": "界郭嘉.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界甄姬": {
+    "file": "界甄姬.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界夏侯渊": {
+    "file": "界夏侯渊.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界荀彧": {
+    "file": "界荀彧.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界典韦": {
+    "file": "界典韦.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界徐晃": {
+    "file": "界徐晃.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界张郃": {
+    "file": "界张郃.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "界邓艾": {
+    "file": "界邓艾.png",
+    "series": "界限突破",
+    "faction": "魏"
+  },
+  "刘备": {
+    "file": "刘备.png",
+    "series": "标准",
+    "faction": "蜀"
+  },
+  "界刘备": {
+    "file": "界刘备.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "关羽": {
+    "file": "关羽.png",
+    "series": "标准",
+    "faction": "蜀"
+  },
+  "界关羽": {
+    "file": "界关羽.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "张飞": {
+    "file": "张飞.png",
+    "series": "标准",
+    "faction": "蜀"
+  },
+  "界张飞": {
+    "file": "界张飞.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "赵云": {
+    "file": "赵云.png",
+    "series": "标准",
+    "faction": "蜀"
+  },
+  "界赵云": {
+    "file": "界赵云.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "诸葛亮": {
+    "file": "诸葛亮.png",
+    "series": "标准",
+    "faction": "蜀"
+  },
+  "界诸葛亮": {
+    "file": "界诸葛亮.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "黄月英": {
+    "file": "黄月英.png",
+    "series": "标准",
+    "faction": "蜀"
+  },
+  "界黄月英": {
+    "file": "界黄月英.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "马超": {
+    "file": "马超.png",
+    "series": "标准",
+    "faction": "蜀"
+  },
+  "界马超": {
+    "file": "界马超.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "黄忠": {
+    "file": "黄忠.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界黄忠": {
+    "file": "界黄忠.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "魏延": {
+    "file": "魏延.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界魏延": {
+    "file": "界魏延.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "庞统": {
+    "file": "庞统.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界庞统": {
+    "file": "界庞统.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "孟获": {
+    "file": "孟获.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界孟获": {
+    "file": "界孟获.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "祝融": {
+    "file": "祝融.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界祝融": {
+    "file": "界祝融.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "姜维": {
+    "file": "姜维.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界姜维": {
+    "file": "界姜维.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "刘禅": {
+    "file": "刘禅.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界刘禅": {
+    "file": "界刘禅.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "孙权": {
+    "file": "孙权.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界孙权": {
+    "file": "界孙权.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "甘宁": {
+    "file": "甘宁.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界甘宁": {
+    "file": "界甘宁.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "吕蒙": {
+    "file": "吕蒙.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界吕蒙": {
+    "file": "界吕蒙.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "黄盖": {
+    "file": "黄盖.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界黄盖": {
+    "file": "界黄盖.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "周瑜": {
+    "file": "周瑜.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界周瑜": {
+    "file": "界周瑜.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "大乔": {
+    "file": "大乔.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界大乔": {
+    "file": "界大乔.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "陆逊": {
+    "file": "陆逊.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界陆逊": {
+    "file": "界陆逊.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "孙尚香": {
+    "file": "孙尚香.png",
+    "series": "标准",
+    "faction": "吴"
+  },
+  "界孙尚香": {
+    "file": "界孙尚香.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "小乔": {
+    "file": "小乔.png",
+    "series": "风林火山",
+    "faction": "吴"
+  },
+  "界小乔": {
+    "file": "界小乔.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "周泰": {
+    "file": "周泰.png",
+    "series": "风林火山",
+    "faction": "吴"
+  },
+  "太史慈": {
+    "file": "太史慈.png",
+    "series": "风林火山",
+    "faction": "吴"
+  },
+  "界太史慈": {
+    "file": "界太史慈.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "鲁肃": {
+    "file": "鲁肃.png",
+    "series": "风林火山",
+    "faction": "吴"
+  },
+  "界鲁肃": {
+    "file": "界鲁肃.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "孙坚": {
+    "file": "孙坚.png",
+    "series": "风林火山",
+    "faction": "吴"
+  },
+  "界孙坚": {
+    "file": "界孙坚.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "孙策": {
+    "file": "孙策.png",
+    "series": "风林火山",
+    "faction": "吴"
+  },
+  "界孙策": {
+    "file": "界孙策.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "界张昭张纮": {
+    "file": "界张昭张纮.png",
+    "series": "界限突破",
+    "faction": "吴"
+  },
+  "华佗": {
+    "file": "华佗.png",
+    "series": "标准",
+    "faction": "群"
+  },
+  "吕布": {
+    "file": "吕布.png",
+    "series": "标准",
+    "faction": "群"
+  },
+  "貂蝉": {
+    "file": "貂蝉.png",
+    "series": "标准",
+    "faction": "群"
+  },
+  "张角": {
+    "file": "张角.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "于吉": {
+    "file": "于吉.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "袁绍": {
+    "file": "袁绍.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "庞德": {
+    "file": "庞德.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "颜良文丑": {
+    "file": "颜良文丑.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "董卓": {
+    "file": "董卓.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "贾诩": {
+    "file": "贾诩.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "左慈": {
+    "file": "左慈.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "蔡文姬": {
+    "file": "蔡文姬.png",
+    "series": "风林火山",
+    "faction": "群"
+  },
+  "界曹仁": {
+    "file": "界曹仁.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "界曹丕": {
+    "file": "界曹丕.png",
+    "series": "风林火山",
+    "faction": "魏"
+  },
+  "卧龙诸葛": {
+    "file": "卧龙诸葛.png",
+    "series": "风林火山",
+    "faction": "蜀"
+  },
+  "界卧龙诸葛": {
+    "file": "界卧龙诸葛.png",
+    "series": "界限突破",
+    "faction": "蜀"
+  },
+  "界周泰": {
+    "file": "界周泰.png",
+    "series": "风林火山",
+    "faction": "吴"
+  },
+  "张昭张纮": {
+    "file": "张昭张纮.png",
+    "series": "界限突破",
+    "faction": "吴"
+  }
+}

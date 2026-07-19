@@ -15,6 +15,7 @@
 
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
+import { getCardImage } from '../assets/imageAssets';
 import type { GameView, Card } from '../../engine/types';
 import { getAtomDef } from '../../engine/atom';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
@@ -51,6 +52,7 @@ export function EventBanner({ current }: EventBannerProps) {
 
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
   const judgeType = current.event.judgeType as string | undefined;
+  const cardImg = getCardImage(card.name);
 
   return (
     <div className={styles.eventCardLayer}>
@@ -65,6 +67,18 @@ export function EventBanner({ current }: EventBannerProps) {
       >
         {judgeType && <div className={styles.eventCardLabel}>{judgeType}</div>}
         <div className={styles.eventCardBody}>
+          {cardImg && (
+            <img
+              className={styles.eventCardArt}
+              src={cardImg}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          )}
           <div className={styles.eventCardName}>{card.name}</div>
           <div className={styles.eventCardSuit}>
             {card.suit}

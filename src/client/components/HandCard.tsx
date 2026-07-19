@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
+import { getCardImage } from '../assets/imageAssets';
 import type { Card } from '../../engine/types';
 
 export interface HandCardProps {
@@ -62,6 +63,7 @@ export function HandCardImpl(props: HandCardProps) {
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
   const displayName = isTransformMatch && transformWrapperName ? transformWrapperName : card.name;
   const fanAngle = totalHand > 1 ? -10 + 20 * (index / (totalHand - 1)) : 0;
+  const cardImg = getCardImage(card.name);
 
   return (
     <div
@@ -100,6 +102,18 @@ export function HandCardImpl(props: HandCardProps) {
       }
     >
       <div className={styles.cardName}>{displayName}</div>
+      {cardImg && (
+        <img
+          className={styles.handCardArt}
+          src={cardImg}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      )}
       {isTransformMatch && transformWrapperName && (
         <div className={styles.cardOrigin}>(原: {card.name})</div>
       )}

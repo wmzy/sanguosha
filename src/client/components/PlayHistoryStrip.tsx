@@ -4,6 +4,7 @@
 import { memo } from 'react';
 import { css } from '@linaria/core';
 import { SUIT_COLOR } from './gameViewConstants';
+import { getCardImage } from '../assets/imageAssets';
 import type { PlayHistoryItem } from '../utils/playHistoryQueue';
 
 export type PlayHistoryStripProps = {
@@ -15,9 +16,22 @@ function PlayHistoryStripImpl({ items }: PlayHistoryStripProps) {
     <div className={strip} aria-label="出牌展示" data-play-history-count={items.length}>
       {items.map((it) => {
         const suitColor = SUIT_COLOR[it.card.suit ?? ''] ?? '#ccc';
+        const cardImg = getCardImage(it.card.name);
         return (
           <div key={it.id} className={slot}>
             <div className={cardFace} style={{ borderColor: suitColor }}>
+              {cardImg && (
+                <img
+                  className={cardArt}
+                  src={cardImg}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
               <div className={cardName} style={{ color: suitColor }}>
                 {it.card.name}
               </div>
@@ -79,12 +93,23 @@ const slot = css`
 
 const cardFace = css`
   min-width: 52px;
-  padding: 8px 10px;
+  padding: 0;
   border-radius: 6px;
   background: linear-gradient(135deg, #3a3048 0%, #1e1a28 100%);
   border: 2px solid #c9a227;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
   text-align: center;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+`;
+const cardArt = css`
+  width: 100%;
+  height: 56px;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 `;
 
 const cardName = css`
@@ -92,12 +117,13 @@ const cardName = css`
   font-weight: bold;
   line-height: 1.2;
   white-space: nowrap;
+  padding: 4px 6px 0;
 `;
 
 const cardSuit = css`
   font-size: 10px;
   opacity: 0.9;
-  margin-top: 1px;
+  margin: 1px 0 4px;
 `;
 
 const caption = css`

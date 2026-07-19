@@ -1,0 +1,617 @@
+{
+  "mapping": [
+    {
+      "name": "曹操",
+      "id": "15",
+      "series": "标准",
+      "faction": "魏"
+    },
+    {
+      "name": "司马懿",
+      "id": "16",
+      "series": "标准",
+      "faction": "魏"
+    },
+    {
+      "name": "夏侯惇",
+      "id": "17",
+      "series": "标准",
+      "faction": "魏"
+    },
+    {
+      "name": "张辽",
+      "id": "18",
+      "series": "标准",
+      "faction": "魏"
+    },
+    {
+      "name": "许褚",
+      "id": "19",
+      "series": "标准",
+      "faction": "魏"
+    },
+    {
+      "name": "郭嘉",
+      "id": "20",
+      "series": "标准",
+      "faction": "魏"
+    },
+    {
+      "name": "甄姬",
+      "id": "21",
+      "series": "标准",
+      "faction": "魏"
+    },
+    {
+      "name": "夏侯渊",
+      "id": "28",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "曹仁",
+      "id": "29",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "荀彧",
+      "id": "35",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "典韦",
+      "id": "34",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "曹丕",
+      "id": "43",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "徐晃",
+      "id": "42",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "张郃",
+      "id": "50",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "邓艾",
+      "id": "51",
+      "series": "风林火山",
+      "faction": "魏"
+    },
+    {
+      "name": "界曹操",
+      "id": "311",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界司马懿",
+      "id": "312",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界夏侯惇",
+      "id": "313",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界张辽",
+      "id": "314",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界许褚",
+      "id": "315",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界郭嘉",
+      "id": "316",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界甄姬",
+      "id": "444",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界夏侯渊",
+      "id": "453",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界荀彧",
+      "id": "515",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界典韦",
+      "id": "526",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界徐晃",
+      "id": "496",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界张郃",
+      "id": "486",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "界邓艾",
+      "id": "471",
+      "series": "界限突破",
+      "faction": "魏"
+    },
+    {
+      "name": "刘备",
+      "id": "1",
+      "series": "标准",
+      "faction": "蜀"
+    },
+    {
+      "name": "界刘备",
+      "id": "299",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "关羽",
+      "id": "2",
+      "series": "标准",
+      "faction": "蜀"
+    },
+    {
+      "name": "界关羽",
+      "id": "300",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "张飞",
+      "id": "3",
+      "series": "标准",
+      "faction": "蜀"
+    },
+    {
+      "name": "界张飞",
+      "id": "301",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "赵云",
+      "id": "5",
+      "series": "标准",
+      "faction": "蜀"
+    },
+    {
+      "name": "界赵云",
+      "id": "302",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "诸葛亮",
+      "id": "4",
+      "series": "标准",
+      "faction": "蜀"
+    },
+    {
+      "name": "界诸葛亮",
+      "id": "440",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "黄月英",
+      "id": "7",
+      "series": "标准",
+      "faction": "蜀"
+    },
+    {
+      "name": "界黄月英",
+      "id": "441",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "马超",
+      "id": "6",
+      "series": "标准",
+      "faction": "蜀"
+    },
+    {
+      "name": "界马超",
+      "id": "303",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "黄忠",
+      "id": "61",
+      "series": "风林火山",
+      "faction": "蜀"
+    },
+    {
+      "name": "界黄忠",
+      "id": "26",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "魏延",
+      "id": "27",
+      "series": "风林火山",
+      "faction": "蜀"
+    },
+    {
+      "name": "界魏延",
+      "id": "456",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "庞统",
+      "id": "36",
+      "series": "风林火山",
+      "faction": "蜀"
+    },
+    {
+      "name": "界庞统",
+      "id": "455",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "孟获",
+      "id": "47",
+      "series": "风林火山",
+      "faction": "蜀"
+    },
+    {
+      "name": "界孟获",
+      "id": "492",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "祝融",
+      "id": "46",
+      "series": "风林火山",
+      "faction": "蜀"
+    },
+    {
+      "name": "界祝融",
+      "id": "479",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "姜维",
+      "id": "52",
+      "series": "风林火山",
+      "faction": "蜀"
+    },
+    {
+      "name": "界姜维",
+      "id": "480",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "刘禅",
+      "id": "53",
+      "series": "风林火山",
+      "faction": "蜀"
+    },
+    {
+      "name": "界刘禅",
+      "id": "451",
+      "series": "界限突破",
+      "faction": "蜀"
+    },
+    {
+      "name": "孙权",
+      "id": "8",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界孙权",
+      "id": "442",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "甘宁",
+      "id": "9",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界甘宁",
+      "id": "305",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "吕蒙",
+      "id": "10",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界吕蒙",
+      "id": "306",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "黄盖",
+      "id": "11",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界黄盖",
+      "id": "307",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "周瑜",
+      "id": "12",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界周瑜",
+      "id": "308",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "大乔",
+      "id": "13",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界大乔",
+      "id": "309",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "陆逊",
+      "id": "14",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界陆逊",
+      "id": "310",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "孙尚香",
+      "id": "25",
+      "series": "标准",
+      "faction": "吴"
+    },
+    {
+      "name": "界孙尚香",
+      "id": "443",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "小乔",
+      "id": "30",
+      "series": "风林火山",
+      "faction": "吴"
+    },
+    {
+      "name": "界小乔",
+      "id": "457",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "周泰",
+      "id": "210",
+      "series": "风林火山",
+      "faction": "吴"
+    },
+    {
+      "name": "太史慈",
+      "id": "38",
+      "series": "风林火山",
+      "faction": "吴"
+    },
+    {
+      "name": "界太史慈",
+      "id": "463",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "鲁肃",
+      "id": "49",
+      "series": "风林火山",
+      "faction": "吴"
+    },
+    {
+      "name": "界鲁肃",
+      "id": "485",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "孙坚",
+      "id": "44",
+      "series": "风林火山",
+      "faction": "吴"
+    },
+    {
+      "name": "界孙坚",
+      "id": "458",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "孙策",
+      "id": "54",
+      "series": "风林火山",
+      "faction": "吴"
+    },
+    {
+      "name": "界孙策",
+      "id": "452",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "界张昭张纮",
+      "id": "563",
+      "series": "界限突破",
+      "faction": "吴"
+    },
+    {
+      "name": "华佗",
+      "id": "22",
+      "series": "标准",
+      "faction": "群"
+    },
+    {
+      "name": "吕布",
+      "id": "23",
+      "series": "标准",
+      "faction": "群"
+    },
+    {
+      "name": "貂蝉",
+      "id": "24",
+      "series": "标准",
+      "faction": "群"
+    },
+    {
+      "name": "张角",
+      "id": "212",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "于吉",
+      "id": "211",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "袁绍",
+      "id": "41",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "庞德",
+      "id": "39",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "颜良文丑",
+      "id": "40",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "董卓",
+      "id": "45",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "贾诩",
+      "id": "48",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "左慈",
+      "id": "56",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "蔡文姬",
+      "id": "57",
+      "series": "风林火山",
+      "faction": "群"
+    },
+    {
+      "name": "界曹仁",
+      "id": "29",
+      "series": "风林火山",
+      "fallbackFor": "曹仁"
+    },
+    {
+      "name": "界曹丕",
+      "id": "43",
+      "series": "风林火山",
+      "fallbackFor": "曹丕"
+    },
+    {
+      "name": "卧龙诸葛",
+      "id": "37",
+      "series": "风林火山",
+      "fallbackFor": "卧龙诸葛亮"
+    },
+    {
+      "name": "界卧龙诸葛",
+      "id": "454",
+      "series": "界限突破",
+      "fallbackFor": "界卧龙诸葛亮"
+    },
+    {
+      "name": "界周泰",
+      "id": "210",
+      "series": "风林火山",
+      "fallbackFor": "周泰"
+    },
+    {
+      "name": "张昭张纮",
+      "id": "563",
+      "series": "界限突破",
+      "fallbackFor": "界张昭张纮"
+    }
+  ],
+  "missing": []
+}

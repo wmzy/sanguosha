@@ -58,25 +58,35 @@ export const eventCardPlayer = css`
   border: 1px solid rgba(52, 152, 219, 0.4);
 `;
 export const eventCardBody = css`
-  min-width: 60px;
-  padding: 8px 12px;
+  min-width: 90px;
+  padding: 0;
   border-radius: 8px;
   background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
   border: 2px solid #c9a227;
   box-shadow: 0 4px 20px rgba(201, 162, 39, 0.4);
   text-align: center;
   transform-style: preserve-3d;
+  overflow: hidden;
+`;
+// 翻牌动效卡牌主体插画:失败隐藏,保留文字回退
+export const eventCardArt = css`
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
 `;
 export const eventCardName = css`
   font-size: 16px;
   font-weight: bold;
   line-height: 1.3;
+  padding: 6px 12px 0;
   color: var(--suit-color, #ccc);
 `;
 export const eventCardSuit = css`
   font-size: 13px;
   font-weight: bold;
-  margin-top: 2px;
+  margin: 2px 0 8px;
   color: var(--suit-color, #ccc);
 `;
 export const cancelBtn = css`
@@ -100,10 +110,10 @@ export const handList = css`
 export const handCard = css`
   border: 2px solid #555;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 0;
   cursor: pointer;
   background: linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%);
-  min-width: 72px;
+  min-width: 80px;
   width: 80px;
   text-align: center;
   transition: all 0.2s;
@@ -112,6 +122,9 @@ export const handCard = css`
   z-index: var(--card-z, 0);
   box-shadow: -1px 2px 6px rgba(0, 0, 0, 0.3);
   margin-left: -16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   &:first-of-type {
     margin-left: 0;
   }
@@ -121,6 +134,15 @@ export const handCard = css`
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
     border-color: #888;
   }
+`;
+// 手牌牌面插画:填满卡牌主体,失败则隐藏,保留文字回退
+export const handCardArt = css`
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 `;
 export const handCardSelected = css`
   border: 2px solid #3498db;
@@ -183,19 +205,19 @@ export const discardCardSelected = css`
 export const cardName = css`
   font-weight: bold;
   font-size: 16px;
-  margin-bottom: 2px;
+  margin: 4px 4px 2px;
   letter-spacing: 1px;
   color: var(--suit-color, #ccc);
 `;
 export const cardSuit = css`
   font-size: 13px;
-  margin-top: 2px;
+  margin: 2px 4px 4px;
   color: var(--suit-color, #ccc);
 `;
 export const cardOrigin = css`
   font-size: 10px;
   opacity: 0.7;
-  margin-bottom: 2px;
+  margin: 0 4px 2px;
   font-style: italic;
   color: var(--suit-color, #ccc);
 `;

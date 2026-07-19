@@ -14,6 +14,7 @@ import { CountdownBar } from './CountdownBar';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
+import { getCharacterImage } from '../assets/imageAssets';
 
 export interface CharSelectOverlayCandidate {
   name: string;
@@ -139,6 +140,7 @@ export function CharSelectOverlay({
               const meta = getCharacterMeta(ch.name);
               const faction = meta?.faction ?? '群';
               const maxHealth = meta?.maxHealth ?? 4;
+              const charImg = getCharacterImage(ch.name);
               return (
                 <div
                   key={ch.name}
@@ -156,6 +158,20 @@ export function CharSelectOverlay({
                     setSelectedCharIdx(i);
                   }}
                 >
+                  {charImg && (
+                    <div className={candidatePortrait} aria-hidden>
+                      <img
+                        className={candidatePortraitImg}
+                        src={charImg}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className={candidateName}>{ch.name}</div>
                   <div className={cx(candidateFaction)}>
                     {faction} · {ch.skills.map((s, si) => (
@@ -308,7 +324,7 @@ const candidateGrid = css`
 const candidateCard = css`
   background: var(--faction-color);
   border-radius: 12px;
-  padding: 24px 12px;
+  padding: 12px 12px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -325,6 +341,24 @@ const candidateCard = css`
     transform: translateY(-6px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   }
+`;
+
+// 候选武将卡顶部的立绘区:按比例裁切,不拉伸变形
+const candidatePortrait = css`
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+`;
+const candidatePortraitImg = css`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
 `;
 
 const candidateCardSelected = css`

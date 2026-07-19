@@ -140,7 +140,7 @@ export const equipColumnItem = css`
   gap: 4px;
   font-size: 12px;
   color: #f39c12;
-  padding: 4px 6px;
+  padding: 2px 4px;
   border-radius: 4px;
   background: rgba(243, 156, 18, 0.06);
   border: 1px solid rgba(243, 156, 18, 0.15);
@@ -149,6 +149,16 @@ export const equipColumnItem = css`
 export const equipColumnIcon = css`
   font-size: 13px;
   flex-shrink: 0;
+`;
+// 装备区卡牌牌面小图:填满左侧,失败时隐藏显示 icon 回退
+export const equipCardArt = css`
+  width: 32px;
+  height: 44px;
+  object-fit: cover;
+  object-position: center top;
+  flex-shrink: 0;
+  border-radius: 3px;
+  display: block;
 `;
 // 空装备槽占位卡框:与 equipColumnItem 同尺寸,虚线边框 + 半透明,保证 5 槽布局固定
 export const equipSlotEmpty = css`
@@ -215,6 +225,27 @@ export const playerCardChar = css`
   font-size: 14px;
   color: rgba(255, 255, 255, 0.85);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+`;
+// 武将大卡立绘:在头部下方、体力上方,占住卡的上半区域
+export const playerCardPortrait = css`
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.45);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.4);
+`;
+export const playerCardPortraitImg = css`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transition: filter 0.3s;
+`;
+export const playerCardPortraitDead = css`
+  filter: grayscale(1) brightness(0.6);
 `;
 export const playerCardEquip = css`
   padding: 6px 12px 8px;
