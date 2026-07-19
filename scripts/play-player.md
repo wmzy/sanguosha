@@ -4,7 +4,7 @@
 
 立即调用 play 加入房间，然后持续循环调用 play 直到游戏结束。每次收到 play 结果后立即再次调用 play，不要输出文字。
 
-play({ startGame: { mode: "multiplayer", roomId: "GWX8QH" } })
+joinRoom({ roomId: "GWX8QH" })
 
 决策规则:
 - needsAction=true 时从 availableActions 选一条执行

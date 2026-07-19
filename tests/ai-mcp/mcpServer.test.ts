@@ -5,12 +5,17 @@ import path from 'node:path';
 import os from 'node:os';
 import {
   handleMcpRequest,
-  normalizeStartGame,
   PLAY_TOOL,
+  CREATE_ROOM_TOOL,
+  JOIN_ROOM_TOOL,
+  SPECTATE_ROOM_TOOL,
   GET_SNAPSHOT_TOOL,
   SKILL_INFO_TOOL,
   REPORT_BUG_TOOL,
   type McpHandlerContext,
+  type CreateRoomOpts,
+  type JoinRoomOpts,
+  type SpectateRoomOpts,
 } from '../../src/ai-mcp/mcpServer';
 import '../../src/engine/skills';
 import type { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
@@ -23,6 +28,10 @@ function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameC
   return {
     isSpectator: false,
     phase: 'playing',
+    seatIndex: 0,
+    playerId: 'p1',
+    roomId: 'ROOM1',
+    roomState: { hostId: 'p1', readyPlayers: ['p1'], playerIds: ['p1'], maxPlayers: 2, config: { name: 'r', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
     needsAction: () => true,
     gameOverWinner: null,
     view: null,
@@ -34,8 +43,26 @@ function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameC
   } as unknown as HeadlessGameClient;
 }
 
-function makeCtx(hgc: HeadlessGameClient, ensureStarted = vi.fn()): McpHandlerContext {
-  return { hgc, ensureStarted, seat: 0, playState: { lastView: null } };
+function makeCtx(
+  hgc: HeadlessGameClient,
+  handlers: Partial<{
+    doCreateRoom: (o: CreateRoomOpts) => Promise<void>;
+    doJoinRoom: (o: JoinRoomOpts) => Promise<void>;
+    doSpectateRoom: (o: SpectateRoomOpts) => Promise<void>;
+    advanceLobby: () => Promise<void>;
+    isStarted: () => boolean;
+  }> = {},
+): McpHandlerContext {
+  return {
+    hgc,
+    doCreateRoom: handlers.doCreateRoom ?? (vi.fn(async () => {}) as never),
+    doJoinRoom: handlers.doJoinRoom ?? (vi.fn(async () => {}) as never),
+    doSpectateRoom: handlers.doSpectateRoom ?? (vi.fn(async () => {}) as never),
+    advanceLobby: handlers.advanceLobby ?? vi.fn(async () => {}),
+    isStarted: handlers.isStarted ?? (() => true),
+    seat: 0,
+    playState: { lastView: null },
+  };
 }
 
 describe('handleMcpRequest', () => {
@@ -50,19 +77,44 @@ describe('handleMcpRequest', () => {
     expect((res!.result as { protocolVersion: string }).protocolVersion).toBeTruthy();
   });
 
-  it('tools/list 返回 play、getSnapshot、getSkillInfo、reportBug 工具定义', async () => {
+  it('tools/list 返回全部 7 个工具', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, ctx);
-    const tools = (res!.result as { tools: (typeof PLAY_TOOL)[] }).tools;
-    expect(tools).toHaveLength(4);
-    expect(tools.map((t) => t.name)).toEqual(['play', 'getSnapshot', 'getSkillInfo', 'reportBug']);
-    expect(tools[0].inputSchema).toBeDefined();
-    expect(tools[1].inputSchema).toBeDefined();
-    expect(tools[2].inputSchema).toBeDefined();
-    expect(tools[3].inputSchema).toBeDefined();
+    const tools = (res!.result as { tools: { name: string }[] }).tools;
+    expect(tools.map((t) => t.name)).toEqual([
+      'play',
+      'createRoom',
+      'joinRoom',
+      'spectateRoom',
+      'getSnapshot',
+      'getSkillInfo',
+      'reportBug',
+    ]);
     expect(SKILL_INFO_TOOL.inputSchema).toBeDefined();
     expect(REPORT_BUG_TOOL.inputSchema).toBeDefined();
     expect(GET_SNAPSHOT_TOOL.inputSchema).toBeDefined();
+    expect(CREATE_ROOM_TOOL.inputSchema).toBeDefined();
+    expect(JOIN_ROOM_TOOL.inputSchema).toBeDefined();
+    expect(SPECTATE_ROOM_TOOL.inputSchema).toBeDefined();
+  });
+
+  it('JOIN_ROOM_TOOL schema 中 roomId 为 required', () => {
+    expect((JOIN_ROOM_TOOL.inputSchema as { required?: string[] }).required).toEqual(['roomId']);
+  });
+
+  it('SPECTATE_ROOM_TOOL schema 中 roomId 为 required', () => {
+    expect((SPECTATE_ROOM_TOOL.inputSchema as { required?: string[] }).required).toEqual(['roomId']);
+  });
+
+  it('CREATE_ROOM_TOOL schema 无 required（roomId 不必填）', () => {
+    expect((CREATE_ROOM_TOOL.inputSchema as { required?: string[] }).required).toBeUndefined();
+  });
+
+  it('PLAY_TOOL schema 不再含 startGame 字段', () => {
+    const props = (PLAY_TOOL.inputSchema as { properties: Record<string, unknown> }).properties;
+    expect(props).not.toHaveProperty('startGame');
+    expect(props).toHaveProperty('action');
+    expect(props).toHaveProperty('waitTimeoutMs');
   });
 
   it('tools/call play 执行 action 并返回结构化结果', async () => {
@@ -91,6 +143,102 @@ describe('handleMcpRequest', () => {
     };
     expect(result.content[0].text).toBeTypeOf('string');
     expect(result.structuredContent.lastActionResult).toBe('accepted');
+  });
+
+  it('tools/call play 未启动时返回 -32602 引导用启动工具', async () => {
+    const ctx = makeCtx(makeFakeHgc(), { isStarted: () => false });
+    const res = await handleMcpRequest(
+      { jsonrpc: '2.0', id: 30, method: 'tools/call', params: { name: 'play', arguments: {} } },
+      ctx,
+    );
+    expect(res!.error).toBeDefined();
+    expect(res!.error!.code).toBe(-32602);
+    expect(res!.error!.message).toMatch(/createRoom|joinRoom|spectateRoom/);
+  });
+
+  it('tools/call createRoom 调用 ctx.doCreateRoom 并返回 host 结果', async () => {
+    const doCreateRoom = vi.fn(async () => {});
+    const hgc = makeFakeHgc(); // hostId === playerId → isHost true
+    const ctx = makeCtx(hgc, { doCreateRoom });
+    const res = await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: { name: 'createRoom', arguments: { name: '测试房', maxPlayers: 4, timeoutScale: 5 } },
+      },
+      ctx,
+    );
+    expect(doCreateRoom).toHaveBeenCalledWith({
+      name: '测试房',
+      maxPlayers: 4,
+      playerId: undefined,
+      timeoutScale: 5,
+    });
+    const sc = (res!.result as { structuredContent: { joinedAs: string; isHost: boolean; roomId: string } })
+      .structuredContent;
+    expect(sc.joinedAs).toBe('host');
+    expect(sc.isHost).toBe(true);
+    expect(sc.roomId).toBe('ROOM1');
+  });
+
+  it('tools/call joinRoom 把 roomId 传给 ctx.doJoinRoom，返回 guest 结果', async () => {
+    const doJoinRoom = vi.fn(async () => {});
+    // hostId 与 playerId 不同 → guest
+    const hgc = makeFakeHgc({
+      playerId: 'p2',
+      roomState: { ...makeFakeHgc().roomState!, hostId: 'someone-else' } as never,
+    });
+    const ctx = makeCtx(hgc, { doJoinRoom });
+    const res = await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: { name: 'joinRoom', arguments: { roomId: 'ABC123', playerId: 'ai-1' } },
+      },
+      ctx,
+    );
+    expect(doJoinRoom).toHaveBeenCalledWith({ roomId: 'ABC123', playerId: 'ai-1', timeoutScale: undefined });
+    const sc = (res!.result as { structuredContent: { joinedAs: string; isHost: boolean } }).structuredContent;
+    expect(sc.joinedAs).toBe('guest');
+    expect(sc.isHost).toBe(false);
+  });
+
+  it('tools/call joinRoom 缺 roomId 返回 -32602 且错误信息引导改用 createRoom', async () => {
+    const ctx = makeCtx(makeFakeHgc());
+    const res = await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'tools/call',
+        params: { name: 'joinRoom', arguments: {} },
+      },
+      ctx,
+    );
+    expect(res!.error).toBeDefined();
+    expect(res!.error!.code).toBe(-32603);
+    expect(res!.error!.message).toContain('roomId');
+    expect(res!.error!.message).toContain('createRoom');
+  });
+
+  it('tools/call spectateRoom 调用 ctx.doSpectateRoom 并返回 spectator 结果', async () => {
+    const doSpectateRoom = vi.fn(async () => {});
+    const hgc = makeFakeHgc({ isSpectator: true });
+    const ctx = makeCtx(hgc, { doSpectateRoom });
+    const res = await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 14,
+        method: 'tools/call',
+        params: { name: 'spectateRoom', arguments: { roomId: 'SP1' } },
+      },
+      ctx,
+    );
+    expect(doSpectateRoom).toHaveBeenCalledWith({ roomId: 'SP1', playerId: undefined });
+    const sc = (res!.result as { structuredContent: { joinedAs: string; isHost: boolean } }).structuredContent;
+    expect(sc.joinedAs).toBe('spectator');
+    expect(sc.isHost).toBe(false);
   });
 
   it('tools/call getSkillInfo 返回技能描述(结构化 + text)', async () => {
@@ -134,112 +282,7 @@ describe('handleMcpRequest', () => {
     expect(result.structuredContent.skills).toEqual([{ name: '__无此技能__', description: null }]);
   });
 
-  it('startGame=true 规范为 debug 模式 opts 传给 ensureStarted', async () => {
-    const ensureStarted = vi.fn();
-    const ctx = makeCtx(makeFakeHgc(), ensureStarted);
-    await handleMcpRequest(
-      {
-        jsonrpc: '2.0',
-        id: 4,
-        method: 'tools/call',
-        params: { name: 'play', arguments: { startGame: true } },
-      },
-      ctx,
-    );
-    expect(ensureStarted).toHaveBeenCalledTimes(1);
-    expect(ensureStarted).toHaveBeenCalledWith({ mode: 'debug' });
-  });
-
-  it('startGame={mode:multiplayer,roomId} 规范后传给 ensureStarted', async () => {
-    const ensureStarted = vi.fn();
-    const ctx = makeCtx(makeFakeHgc(), ensureStarted);
-    await handleMcpRequest(
-      {
-        jsonrpc: '2.0',
-        id: 10,
-        method: 'tools/call',
-        params: {
-          name: 'play',
-          arguments: { startGame: { mode: 'multiplayer', roomId: 'ABC123', playerId: 'ai-1' } },
-        },
-      },
-      ctx,
-    );
-    expect(ensureStarted).toHaveBeenCalledTimes(1);
-    expect(ensureStarted).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mode: 'multiplayer',
-        roomId: 'ABC123',
-        playerId: 'ai-1',
-      }),
-    );
-  });
-
-  it('startGame={mode:multiplayer} 建房模式(无 roomId)', async () => {
-    const ensureStarted = vi.fn();
-    const ctx = makeCtx(makeFakeHgc(), ensureStarted);
-    await handleMcpRequest(
-      {
-        jsonrpc: '2.0',
-        id: 11,
-        method: 'tools/call',
-        params: {
-          name: 'play',
-          arguments: { startGame: { mode: 'multiplayer', name: '测试房', maxPlayers: 4 } },
-        },
-      },
-      ctx,
-    );
-    expect(ensureStarted).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mode: 'multiplayer',
-        name: '测试房',
-        maxPlayers: 4,
-      }),
-    );
-  });
-
-  it('startGame={mode:multiplayer,timeoutScale} 解析并传给 ensureStarted', async () => {
-    const ensureStarted = vi.fn();
-    const ctx = makeCtx(makeFakeHgc(), ensureStarted);
-    await handleMcpRequest(
-      {
-        jsonrpc: '2.0',
-        id: 12,
-        method: 'tools/call',
-        params: {
-          name: 'play',
-          arguments: { startGame: { mode: 'multiplayer', timeoutScale: 5 } },
-        },
-      },
-      ctx,
-    );
-    expect(ensureStarted).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'multiplayer', timeoutScale: 5 }),
-    );
-  });
-
-  it('startGame={mode:debug,timeoutScale} 解析并传给 ensureStarted', async () => {
-    const ensureStarted = vi.fn();
-    const ctx = makeCtx(makeFakeHgc(), ensureStarted);
-    await handleMcpRequest(
-      {
-        jsonrpc: '2.0',
-        id: 13,
-        method: 'tools/call',
-        params: {
-          name: 'play',
-          arguments: { startGame: { mode: 'debug', timeoutScale: 2 } },
-        },
-      },
-      ctx,
-    );
-    expect(ensureStarted).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'debug', timeoutScale: 2 }),
-    );
-  });
-
-  it('未知工具返回 error', async () => {
+  it('未知工具返回 -32601', async () => {
     const ctx = makeCtx(makeFakeHgc());
     const res = await handleMcpRequest(
       { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'nope' } },
@@ -357,44 +400,6 @@ describe('handleMcpRequest', () => {
     );
     expect(res!.error).toBeDefined();
     expect(res!.error!.code).toBe(-32602);
-  });
-
-  it('PLAY_TOOL schema 含 timeoutScale 字段', () => {
-    const props = (
-      PLAY_TOOL.inputSchema.properties.startGame as {
-        oneOf: { properties: Record<string, unknown> }[];
-      }
-    ).oneOf[1].properties;
-    expect(props).toHaveProperty('timeoutScale');
-    expect((props.timeoutScale as { type: string }).type).toBe('number');
-  });
-});
-
-describe('normalizeStartGame', () => {
-  it('debug 模式解析 timeoutScale', () => {
-    const opts = normalizeStartGame({ mode: 'debug', timeoutScale: 3 });
-    expect(opts).toMatchObject({ mode: 'debug', timeoutScale: 3 });
-  });
-
-  it('multiplayer 模式解析 timeoutScale', () => {
-    const opts = normalizeStartGame({ mode: 'multiplayer', timeoutScale: 5 });
-    expect(opts).toMatchObject({ mode: 'multiplayer', timeoutScale: 5 });
-  });
-
-  it('Infinity 作为 timeoutScale 合法', () => {
-    const opts = normalizeStartGame({ mode: 'multiplayer', timeoutScale: Infinity });
-    expect(opts).toMatchObject({ mode: 'multiplayer', timeoutScale: Infinity });
-  });
-
-  it('未提供 timeoutScale 时为 undefined(不干扰默认路径)', () => {
-    const opts = normalizeStartGame({ mode: 'multiplayer', roomId: 'X' });
-    expect(opts).toMatchObject({ mode: 'multiplayer', roomId: 'X' });
-    expect((opts as { timeoutScale?: number }).timeoutScale).toBeUndefined();
-  });
-
-  it('非数字 timeoutScale 被忽略为 undefined', () => {
-    const opts = normalizeStartGame({ mode: 'multiplayer', timeoutScale: 'fast' });
-    expect((opts as { timeoutScale?: number }).timeoutScale).toBeUndefined();
   });
 });
 function makeStubView() {

@@ -4,7 +4,7 @@
 
 立即执行以下操作，不要询问确认：
 
-1. 调用 play 加入房间: play({ startGame: { mode: "multiplayer", roomId: "QONAPX" } })
+1. 调用 joinRoom 加入房间: joinRoom({ roomId: "QONAPX" })
 2. 持续循环调用 play 直到 gameOver 不为 null:
    - 如果 needsAction=true，从 availableActions 选一条执行
    - 选将: 从候选武将中选一个

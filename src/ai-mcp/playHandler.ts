@@ -29,6 +29,10 @@ export interface PlayResult {
   phase: 'lobby' | 'playing' | 'ended';
   gameOver: { winner: string } | null;
   needsAction: boolean;
+  /** 当前是否房主（让 LLM 能自检：本该加入却变房主时主动重试） */
+  isHost: boolean;
+  /** 实际生效的身份（host=建房房主 / guest=加入 / spectator=旁观 / null=未启动） */
+  joinedAs: 'host' | 'guest' | 'spectator' | null;
 
   // ── 决策必需（每次全量） ──
   turn: { round: number } | null;
@@ -81,6 +85,16 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
         ? (hgc.phase === 'ended' ? 'ended' : 'playing')
         : (hgc.phase === 'connecting' ? 'lobby' : hgc.phase);
 
+      // 派生身份：旁观者→spectator；否则按 roomState.hostId 判 host/guest；
+      // playerId 未就绪（未启动或连接中）→null。供 LLM 自检“选错工具”。
+      const rs = hgc.roomState;
+      const joinedAs: PlayResult['joinedAs'] = hgc.isSpectator
+        ? 'spectator'
+        : hgc.playerId
+          ? (rs?.hostId && rs.hostId === hgc.playerId ? 'host' : 'guest')
+          : null;
+      const isHost = joinedAs === 'host';
+
       // 计算 diff
       let stateDiff: ViewStateDiff | null = null;
       let myHand: Card[] | null = null;
@@ -97,6 +111,8 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
         phase,
         gameOver: hgc.gameOverWinner ? { winner: hgc.gameOverWinner } : null,
         needsAction: hgc.isSpectator ? false : hgc.needsAction(),
+        isHost,
+        joinedAs,
         turn: fullView ? fullView.turn : null,
         currentPlayerIndex: fullView ? fullView.currentPlayerIndex : null,
         pending: fullView ? fullView.pending : null,

@@ -17,6 +17,10 @@ function makeFake(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameClie
     consumeActionRejected: () => false,
     loadSkillActions: vi.fn().mockResolvedValue(undefined),
     isSpectator: false,
+    seatIndex: 0,
+    playerId: 'p1',
+    roomId: 'ROOM1',
+    roomState: { hostId: 'p1', readyPlayers: ['p1'], playerIds: ['p1'], maxPlayers: 2, config: { name: 'r', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
     ...overrides,
   } as unknown as HeadlessGameClient;
 }
@@ -34,6 +38,9 @@ describe('runPlay', () => {
     expect(res.stateDiff).toBeNull();
     expect(res.myHand).toBeNull();
     expect(res.newLog).toEqual([]);
+    // 身份派生：hostId === playerId → host
+    expect(res.isHost).toBe(true);
+    expect(res.joinedAs).toBe('host');
   });
 
   it('游戏结束时立即返回', async () => {
@@ -74,6 +81,30 @@ describe('runPlay', () => {
     const res = await runPlay(fake, { action: { message: action }, waitTimeoutMs: 80 });
     expect(res.lastActionResult).toBe('rejected');
     expect(res.stateDiff).toBeNull();
+  });
+
+  it('joinedAs 为 guest 当 hostId 不等于 playerId', async () => {
+    const fake = makeFake({
+      playerId: 'p2',
+      roomState: { ...makeFake().roomState!, hostId: 'someone-else' } as never,
+    });
+    const res = await runPlay(fake, { waitTimeoutMs: 50 });
+    expect(res.joinedAs).toBe('guest');
+    expect(res.isHost).toBe(false);
+  });
+
+  it('joinedAs 为 spectator 当 hgc.isSpectator', async () => {
+    const fake = makeFake({ isSpectator: true, phase: 'playing' });
+    const res = await runPlay(fake, { waitTimeoutMs: 50 });
+    expect(res.joinedAs).toBe('spectator');
+    expect(res.isHost).toBe(false);
+  });
+
+  it('joinedAs 为 null 当 playerId 未就绪', async () => {
+    const fake = makeFake({ playerId: null, roomState: null });
+    const res = await runPlay(fake, { waitTimeoutMs: 50 });
+    expect(res.joinedAs).toBeNull();
+    expect(res.isHost).toBe(false);
   });
 });
 

@@ -2,7 +2,7 @@
 name: sanguosha-play
 description: 三国杀（Sanguosha）对局 AI 技能。通过 MCP play 工具驱动一个座次：加入房间、开局、出牌决策、回应询问。适用于人机对局或机机对局。当用户想和 AI 一起打三国杀、或让 AI 参与房间游戏时使用。
 argument-hint: [房间码 或 留空建房]
-allowed-tools: mcp__sanguosha__play, mcp__sanguosha__getSkillInfo, Read
+allowed-tools: mcp__sanguosha__play, mcp__sanguosha__createRoom, mcp__sanguosha__joinRoom, mcp__sanguosha__getSkillInfo, Read
 ---
 
 # 三国杀对局技能（sanguosha-play）
@@ -11,17 +11,28 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__getSkillInfo, Read
 
 ## 一、启动流程
 
-首次调用 `play` 时传 `startGame` 参数开局：
+首次调用必须先用一个启动工具建/加入房间（三选一，同一 MCP 连接只能调一次）：
 
-- **加入指定房间**（人类已建房）：`{ "startGame": { "mode": "multiplayer", "roomId": "ABC123" } }`
-- **自建房间等待**（你做房主，等人类加入）：`{ "startGame": { "mode": "multiplayer", "maxPlayers": 2 } }`
-- 可选字段：`playerId`（指定玩家 id，否则自动生成）、`name`（建房时房间名）、`readyTimeoutMs`（等待全员就绪超时，默认 300000ms）、`timeoutScale`（pending 超时倍率，1=默认，Infinity=无限等待）。
+- **加入指定房间**（人类已建房，或另一个 AI 已建房）：
+  ```
+  joinRoom({ roomId: "ABC123" })   // roomId 必填——从对话、/play 命令参数或房主分享获取
+  ```
+- **建房做房主**（你建房、发准备、等他人加入；房间码会返回在 result.roomId 里）：
+  ```
+  createRoom({ maxPlayers: 2 })
+  ```
+- **旁观**（不占座次）：`spectateRoom({ roomId: "ABC123" })`
 
-> **后续调用可变更配置**：再次传 `startGame`（带 roomId 不变）时，`timeoutScale`、`name` 等会在 lobby 阶段通过 updateConfig 应用到房间。`roomId`/`playerId`/`mode` 等首次确定后不可变。
+可选字段：`playerId`（指定玩家 id，否则服务端自动生成）、`name`（建房时房间名）、`timeoutScale`（pending 超时倍率，1=默认，Infinity=无限等待）。
 
-返回的 `result` 中会包含 `roomId`（房间码）。如果你是房主，把房间码告诉人类，人类在浏览器 `/play` 页面输入即可加入。
+返回结构：`{ ok, roomId, playerId, isHost, joinedAs: "host"|"guest"|"spectator", phase }`。**如果 `joinedAs` 与你本意不符（比如本该加入却变 host），说明选错工具——下次启动前重启 MCP 连接重试。**
 
-**循环决策**：开局后持续调用 `play`（不带 `action` = 纯等待，直到 `needsAction=true` 或 `gameOver`）。
+你是房主时，把 `result.roomId` 告诉人类，人类在浏览器 `/play` 页面输入即可加入。
+
+**循环决策**：启动后持续调用 `play`（不带 `action` = 纯等待 / 推进 lobby→playing，直到 `needsAction=true` 或 `gameOver`）。
+
+> ⚠️ **不要**直接调用 `play` 而不先启动——会返回 `-32602` 错误。
+> ⚠️ **不要**在 `joinRoom` 里漏 `roomId`——schema 层 required，MCP client 会拦下。
 
 > **查询技能/卡牌效果**：随时可调用 `getSkillInfo` 工具查询某个技能或卡牌的描述。
 > 入参 `{ "names": ["杀", "制衡", "顺手牵羊"] }`，返回每个名称的效果文案（查无则 description 为 null）。
@@ -34,6 +45,8 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__getSkillInfo, Read
   "phase": "lobby" | "playing" | "ended",
   "gameOver": { "winner": "主公阵营" } | null,   // 非 null 表示游戏结束
   "needsAction": true,                            // true=轮到你决策
+  "isHost": true,                                 // 是否房主（选错工具时自检用）
+  "joinedAs": "host" | "guest" | "spectator" | null,  // 实际生效身份
   "view": {                                       // 当前局面投影（仅自己可见信息）
     "viewer": 0,                                  // 你的座次
     "currentPlayerIndex": 0,                      // 当前出牌玩家
@@ -133,10 +146,10 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__getSkillInfo, Read
 ## 六、示例：完整一次决策循环
 
 ```
-1. play({ startGame: { mode: "multiplayer", roomId: "X7K2M9" } })
-   → 返回 phase=lobby，等待开局（人类加入并准备）
+1. joinRoom({ roomId: "X7K2M9" })
+   → 返回 { ok:true, roomId:"X7K2M9", joinedAs:"guest", phase:"lobby" }
 
-2. play({})  // 纯等待
+2. play({})  // 纯等待 / 推进 lobby→playing
    → 返回 needsAction=true, availableActions=[选将候选], pending.candidates=[刘备,张飞...]
 
 3. play({ action: { skillId:"系统规则", actionType:"选将", ownerId:0, params:{character:"张飞"}, baseSeq:0 } })
@@ -148,3 +161,5 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__getSkillInfo, Read
 5. play({ action: { skillId:"杀", actionType:"use", ownerId:0, params:{cardId:"c3", targets:[1]}, baseSeq:0 } })
    → 攻击 1 号座次
 ```
+
+建房做房主时改用 `createRoom({ maxPlayers: 2 })`，房间码在返回的 `roomId` 字段里，告诉人类加入。

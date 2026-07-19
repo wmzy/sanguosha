@@ -5,7 +5,13 @@
 // 不可达，属发布缺陷）。手写 JSON-RPC 分发，覆盖 MCP stdio 协议必需方法：
 //   initialize / notifications/initialized / tools/list / tools/call
 //
-// MCP stdio 传输：每行一条 JSON-RPC 消息（NDJSON）。响应写到 stdout，日志写到 stderr。
+// 工具集：
+//   - createRoom / joinRoom / spectateRoom：启动工具（建/加入/旁观房间 + ready）
+//   - play：决策 + 等待（lobby→playing 推进、action 执行）
+//   - getSnapshot / getSkillInfo / reportBug：只读辅助
+//
+// 启动工具的 roomId 在 schema 层面 required（joinRoom/spectateRoom），
+// 避免过去 LLM 漏传 roomId 时静默回退为建房的问题。
 import { runPlay, type PlayState } from './playHandler';
 import { projectView } from './viewProjector';
 import { reportBugResult, type ReportBugInput } from './feedbackHandler';
@@ -14,46 +20,6 @@ import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import type { ClientMessage as EngineClientMessage } from '../engine/types';
 
 const PROTOCOL_VERSION = '2024-11-05';
-
-/** 把 startGame 参数(boolean | object)归一化为 StartGameOpts。
- *  当 raw 为空/true 且环境变量 SGS_ROOM_ID 存在时，自动用 multiplayer 模式 join
- *  （解决 AI agent 传空 startGame 导致进 debug 模式的问题）。 */
-export function normalizeStartGame(raw: unknown): StartGameOpts {
-  if (raw === true || raw === undefined || (typeof raw === 'object' && raw !== null && Object.keys(raw).length === 0)) {
-    const envRoomId = typeof process !== 'undefined' ? process.env?.SGS_ROOM_ID : undefined;
-    // SGS_MODE=debug 强制 debug 模式（用于多 AI 实例加入同一 debug 房间）
-    const envMode = typeof process !== 'undefined' ? process.env?.SGS_MODE : undefined;
-    if (envMode === 'debug') {
-      return { mode: 'debug', roomId: envRoomId };
-    }
-    // 有 SGS_ROOM_ID 环境变量 → 自动 multiplayer join
-    if (envRoomId) {
-      return { mode: 'multiplayer', roomId: envRoomId };
-    }
-    // 旧 debug 默认
-    return { mode: 'debug' };
-  }
-  const o = (raw ?? {}) as Record<string, unknown>;
-  const mode = o['mode'] === 'multiplayer' ? 'multiplayer' : 'debug';
-  if (mode === 'debug') {
-    return {
-      mode: 'debug',
-      roomId: typeof o['roomId'] === 'string' ? o['roomId'] : undefined,
-      playerCount: typeof o['playerCount'] === 'number' ? o['playerCount'] : undefined,
-      timeoutScale: typeof o['timeoutScale'] === 'number' ? o['timeoutScale'] : undefined,
-    };
-  }
-  return {
-    mode: 'multiplayer',
-    roomId: typeof o['roomId'] === 'string' ? o['roomId'] : undefined,
-    name: typeof o['name'] === 'string' ? o['name'] : undefined,
-    maxPlayers: typeof o['maxPlayers'] === 'number' ? o['maxPlayers'] : undefined,
-    playerId: typeof o['playerId'] === 'string' ? o['playerId'] : undefined,
-    readyTimeoutMs: typeof o['readyTimeoutMs'] === 'number' ? o['readyTimeoutMs'] : undefined,
-    timeoutScale: typeof o['timeoutScale'] === 'number' ? o['timeoutScale'] : undefined,
-    asSpectator: o['asSpectator'] === true,
-  };
-}
 
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -69,46 +35,78 @@ export interface JsonRpcResponse {
   error?: { code: number; message: string };
 }
 
-/** play 工具的输入 schema（MCP tool inputSchema 用 JSON Schema 表达）。 */
-export const PLAY_TOOL = {
-  name: 'play',
+// ──────────────────────────────────────────────────────────────────────────
+// 工具 schema
+// ──────────────────────────────────────────────────────────────────────────
+
+/** createRoom 工具：建房做房主，进入 lobby 等待他人加入。 */
+export const CREATE_ROOM_TOOL = {
+  name: 'createRoom',
   description:
-    '驱动一个三国杀座次：执行一个操作并阻塞等待直到轮到本座次决策或游戏结束。' +
-    '首次调用传 startGame 创建/加入房间并开始游戏。' +
-    'action 从上次返回的 availableActions 取一条；省略 action 表示纯等待。',
+    '建房做房主并发起准备，进入 lobby 等待其他玩家加入。返回 roomId（房间码）——你是房主，' +
+    '请把它告诉人类或其他 AI 让他们用 joinRoom 加入。后续持续调用 play 推进开局（lobby→playing）。' +
+    '同一 MCP 连接只能调用一次启动工具（createRoom / joinRoom / spectateRoom 三选一）。',
   inputSchema: {
     type: 'object' as const,
     properties: {
-      startGame: {
-        oneOf: [
-          { type: 'boolean', description: 'true=旧 debug 模式(创建 debug 房)' },
-          {
-            type: 'object',
-            description: '多人模式开局控制',
-            properties: {
-              mode: {
-                type: 'string',
-                enum: ['multiplayer', 'debug'],
-                description: 'multiplayer=普通多人房(默认); debug=调试房',
-              },
-              roomId: { type: 'string', description: 'join 指定房间;省略则建房(房主)' },
-              name: { type: 'string', description: '建房时的房间名' },
-              maxPlayers: { type: 'number', description: '最大人数,默认 2' },
-              playerId: { type: 'string', description: '玩家 id,给定则采用,否则自动生成' },
-              readyTimeoutMs: { type: 'number', description: '等待全员就绪超时(ms)' },
-              timeoutScale: {
-                type: 'number',
-                description: 'pending 超时倍率。1=默认; >1 更慢(应对慢API); Infinity=无限等待',
-              },
-              asSpectator: {
-                type: 'boolean',
-                description: 'true=以旁观者身份加入房间,不占座次。默认 false',
-              },
-            },
-          },
-        ],
-        description: '首次调用：创建/加入房间并开始游戏。',
+      name: { type: 'string', description: '房间名（可选，默认随机生成）' },
+      maxPlayers: { type: 'number', description: '最大人数，默认 2' },
+      playerId: { type: 'string', description: '指定玩家 id，否则服务端自动生成' },
+      timeoutScale: {
+        type: 'number',
+        description: 'pending 超时倍率。1=默认；>1 更慢（应对慢 API）； Infinity=无限等待',
       },
+    },
+  },
+};
+
+/** joinRoom 工具：加入指定房间。roomId 在 schema 层 required，MCP client 会强制 LLM 传入。 */
+export const JOIN_ROOM_TOOL = {
+  name: 'joinRoom',
+  description:
+    '加入指定房间并发起准备。roomId 必填——从对话历史、/play 命令参数或房主分享获取。' +
+    '加入后用 play 工具推进开局。同一 MCP 连接只能调用一次启动工具。',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      roomId: { type: 'string', description: '要加入的房间码（必填）' },
+      playerId: { type: 'string', description: '指定玩家 id，否则服务端自动生成' },
+      timeoutScale: {
+        type: 'number',
+        description: 'pending 超时倍率。1=默认；>1 更慢（应对慢 API）； Infinity=无限等待',
+      },
+    },
+    required: ['roomId'],
+  },
+};
+
+/** spectateRoom 工具：以旁观者身份加入，不占座次。 */
+export const SPECTATE_ROOM_TOOL = {
+  name: 'spectateRoom',
+  description:
+    '以旁观者身份加入房间，不占座次。roomId 必填。旁观者不准备、不开局，仅观察。' +
+    '后续用 play 工具获取视图。同一 MCP 连接只能调用一次启动工具。',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      roomId: { type: 'string', description: '要旁观的房间码（必填）' },
+      playerId: { type: 'string', description: '指定玩家 id，否则服务端自动生成' },
+    },
+    required: ['roomId'],
+  },
+};
+
+/** play 工具：决策 + 等待。无 startGame 参数——首次调用前必须先调 createRoom/joinRoom/spectateRoom。 */
+export const PLAY_TOOL = {
+  name: 'play',
+  description:
+    '执行一个操作并阻塞等待直到轮到本座次决策或游戏结束。' +
+    '首次调用前必须先用 createRoom / joinRoom / spectateRoom 启动；' +
+    '启动后持续调用 play（不带 action = 纯等待 / 推进 lobby→playing）。' +
+    'action 从上次返回的 availableActions 取一条。',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
       action: {
         type: 'object',
         description: '要执行的操作（从上次返回的 availableActions 取）',
@@ -120,8 +118,21 @@ export const PLAY_TOOL = {
           baseSeq: { type: 'number' },
         },
       },
-      waitTimeoutMs: { type: 'number', description: '本次等待总超时(ms)，默认 120000' },
+      waitTimeoutMs: { type: 'number', description: '本次等待总超时(ms)，默认 25000' },
     },
+  },
+};
+
+/** getSnapshot 工具的输入 schema:按需获取完整游戏视图快照。无输入参数。 */
+export const GET_SNAPSHOT_TOOL = {
+  name: 'getSnapshot',
+  description:
+    '获取当前完整游戏视图快照（全部玩家状态、手牌数、装备、区域等）。' +
+    'play 工具返回增量状态(stateDiff)，当因上下文压缩丢失基线、' +
+    '或需要一次性查看全部信息时调用本工具校准。',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {},
   },
 };
 
@@ -172,6 +183,108 @@ export const REPORT_BUG_TOOL = {
   },
 };
 
+// ──────────────────────────────────────────────────────────────────────────
+// 启动 opts 类型
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface CreateRoomOpts {
+  name?: string;
+  maxPlayers?: number;
+  playerId?: string;
+  timeoutScale?: number;
+}
+
+export interface JoinRoomOpts {
+  roomId: string;
+  playerId?: string;
+  timeoutScale?: number;
+}
+
+export interface SpectateRoomOpts {
+  roomId: string;
+  playerId?: string;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// ctx 接口
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface McpHandlerContext {
+  hgc: HeadlessGameClient;
+  /** 建房做房主（幂等：重复调用且角色相同为 no-op；角色不同抛错） */
+  doCreateRoom: (opts: CreateRoomOpts) => Promise<void>;
+  /** 加入指定房间（幂等） */
+  doJoinRoom: (opts: JoinRoomOpts) => Promise<void>;
+  /** 以旁观者身份加入（幂等） */
+  doSpectateRoom: (opts: SpectateRoomOpts) => Promise<void>;
+  /** 推进 lobby→playing（5s 短超时；play 工具内部调用）。旁观者 no-op。 */
+  advanceLobby: () => Promise<void>;
+  /** 是否已调用过任一启动工具 */
+  isStarted: () => boolean;
+  /** 默认座次（baseSeq/ownerId 占位回填用） */
+  seat: number;
+  /** play 工具跨调用状态（维护 lastView 用于增量 diff） */
+  playState: PlayState;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 参数解析
+// ──────────────────────────────────────────────────────────────────────────
+
+function asRecord(v: unknown): Record<string, unknown> {
+  return (v ?? {}) as Record<string, unknown>;
+}
+
+function optString(o: Record<string, unknown>, key: string): string | undefined {
+  return typeof o[key] === 'string' ? (o[key] as string) : undefined;
+}
+
+function optNumber(o: Record<string, unknown>, key: string): number | undefined {
+  return typeof o[key] === 'number' ? (o[key] as number) : undefined;
+}
+
+function parseCreateRoomOpts(args: unknown): CreateRoomOpts {
+  const o = asRecord(args);
+  return {
+    name: optString(o, 'name'),
+    maxPlayers: optNumber(o, 'maxPlayers'),
+    playerId: optString(o, 'playerId'),
+    timeoutScale: optNumber(o, 'timeoutScale'),
+  };
+}
+
+function parseJoinRoomOpts(args: unknown): JoinRoomOpts {
+  const o = asRecord(args);
+  const roomId = optString(o, 'roomId');
+  if (!roomId) {
+    throw new Error(
+      'joinRoom 需要 roomId。如果你是要建房做房主，请改用 createRoom 工具；' +
+        '如果是要加入人类已建好的房间，请从对话历史或 /play 命令取出房间码后重试。',
+    );
+  }
+  return {
+    roomId,
+    playerId: optString(o, 'playerId'),
+    timeoutScale: optNumber(o, 'timeoutScale'),
+  };
+}
+
+function parseSpectateRoomOpts(args: unknown): SpectateRoomOpts {
+  const o = asRecord(args);
+  const roomId = optString(o, 'roomId');
+  if (!roomId) {
+    throw new Error('spectateRoom 需要 roomId。');
+  }
+  return {
+    roomId,
+    playerId: optString(o, 'playerId'),
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// getSkillInfo 辅助
+// ──────────────────────────────────────────────────────────────────────────
+
 /** getSkillInfo 工具的结果项:name 恒返回,description 缺失为 null(供 AI 区分"查无"与"无描述")。 */
 export interface SkillInfoEntry {
   name: string;
@@ -189,41 +302,58 @@ async function getSkillInfoResult(names: unknown): Promise<SkillInfoEntry[]> {
   );
 }
 
-/** getSnapshot 工具的输入 schema:按需获取完整游戏视图快照。无输入参数。 */
-export const GET_SNAPSHOT_TOOL = {
-  name: 'getSnapshot',
-  description:
-    '获取当前完整游戏视图快照（全部玩家状态、手牌数、装备、区域等）。' +
-    'play 工具返回增量状态(stateDiff)，当因上下文压缩丢失基线、' +
-    '或需要一次性查看全部信息时调用本工具校准。',
-  inputSchema: {
-    type: 'object' as const,
-    properties: {},
-  },
-};
+// ──────────────────────────────────────────────────────────────────────────
+// 启动工具响应构造
+// ──────────────────────────────────────────────────────────────────────────
 
-export interface McpHandlerContext {
-  hgc: HeadlessGameClient;
-  /** 启动房间（创建/加入 + ready + 必要时 start）。幂等。 */
-  ensureStarted: (opts?: StartGameOpts) => Promise<void>;
-  /** 默认座次（baseSeq/ownerId 占位回填用） */
-  seat: number;
-  /** play 工具跨调用状态（维护 lastView 用于增量 diff）。 */
-  playState: PlayState;
+interface StartupResult {
+  ok: true;
+  roomId: string | null;
+  playerId: string | null;
+  isHost: boolean;
+  joinedAs: 'host' | 'guest' | 'spectator';
+  phase: 'lobby' | 'playing' | 'ended';
 }
 
-export type StartGameOpts =
-  | { mode: 'debug'; roomId?: string; playerCount?: number; timeoutScale?: number }
-  | {
-      mode: 'multiplayer';
-      roomId?: string;
-      name?: string;
-      maxPlayers?: number;
-      playerId?: string;
-      readyTimeoutMs?: number;
-      timeoutScale?: number;
-      asSpectator?: boolean;
-    };
+function startupResult(hgc: HeadlessGameClient, role: 'host' | 'guest' | 'spectator'): StartupResult {
+  const phase: StartupResult['phase'] =
+    hgc.phase === 'ended' ? 'ended' : hgc.phase === 'playing' ? 'playing' : 'lobby';
+  return {
+    ok: true,
+    roomId: hgc.roomId,
+    playerId: hgc.playerId,
+    isHost: role === 'host',
+    joinedAs: role,
+    phase,
+  };
+}
+
+function okResponse(id: string | number | null, result: unknown): JsonRpcResponse {
+  const text = JSON.stringify(result);
+  return {
+    jsonrpc: '2.0',
+    id,
+    result: { content: [{ type: 'text', text }], structuredContent: result },
+  };
+}
+
+function errorResponse(id: string | number | null, code: number, message: string): JsonRpcResponse {
+  return { jsonrpc: '2.0', id, error: { code, message } };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 分发
+// ──────────────────────────────────────────────────────────────────────────
+
+const TOOLS = [
+  PLAY_TOOL,
+  CREATE_ROOM_TOOL,
+  JOIN_ROOM_TOOL,
+  SPECTATE_ROOM_TOOL,
+  GET_SNAPSHOT_TOOL,
+  SKILL_INFO_TOOL,
+  REPORT_BUG_TOOL,
+];
 
 /**
  * 处理一条 JSON-RPC 请求，返回响应（通知无 id 时返回 null）。
@@ -252,65 +382,66 @@ export async function handleMcpRequest(
           },
         };
       case 'tools/list':
-        return { jsonrpc: '2.0', id, result: { tools: [PLAY_TOOL, GET_SNAPSHOT_TOOL, SKILL_INFO_TOOL, REPORT_BUG_TOOL] } };
+        return { jsonrpc: '2.0', id, result: { tools: TOOLS } };
       case 'tools/call': {
         const params = (req.params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
-        if (params.name === 'getSnapshot') {
+        const toolName = params.name;
+
+        // ── 启动工具 ──
+        if (toolName === 'createRoom') {
+          await ctx.doCreateRoom(parseCreateRoomOpts(params.arguments));
+          return okResponse(id, startupResult(ctx.hgc, 'host'));
+        }
+        if (toolName === 'joinRoom') {
+          await ctx.doJoinRoom(parseJoinRoomOpts(params.arguments));
+          return okResponse(id, startupResult(ctx.hgc, 'guest'));
+        }
+        if (toolName === 'spectateRoom') {
+          await ctx.doSpectateRoom(parseSpectateRoomOpts(params.arguments));
+          return okResponse(id, startupResult(ctx.hgc, 'spectator'));
+        }
+
+        // ── 只读辅助工具 ──
+        if (toolName === 'getSnapshot') {
           const view = ctx.hgc.view ? projectView(ctx.hgc.view) : null;
-          const text = JSON.stringify({ view });
-          return {
-            jsonrpc: '2.0',
-            id,
-            result: { content: [{ type: 'text', text }], structuredContent: { view } },
-          };
+          return okResponse(id, { view });
         }
-        if (params.name === 'getSkillInfo') {
+        if (toolName === 'getSkillInfo') {
           const results = await getSkillInfoResult(params.arguments?.names);
-          const text = JSON.stringify({ skills: results });
-          return {
-            jsonrpc: '2.0',
-            id,
-            result: { content: [{ type: 'text', text }], structuredContent: { skills: results } },
-          };
+          return okResponse(id, { skills: results });
         }
-        if (params.name === 'reportBug') {
-          const args = (params.arguments ?? {});
-          const description = typeof args.description === 'string' ? args.description : '';
+        if (toolName === 'reportBug') {
+          const args = asRecord(params.arguments);
+          const description = typeof args['description'] === 'string' ? args['description'] : '';
           if (!description.trim()) {
-            return {
-              jsonrpc: '2.0',
-              id,
-              error: { code: -32602, message: 'description is required' },
-            };
+            return errorResponse(id, -32602, 'description is required');
           }
           const input: ReportBugInput = {
             description,
-            severity: args.severity as ReportBugInput['severity'],
-            category: args.category as ReportBugInput['category'],
-            expected: typeof args.expected === 'string' ? args.expected : undefined,
-            actual: typeof args.actual === 'string' ? args.actual : undefined,
+            severity: args['severity'] as ReportBugInput['severity'],
+            category: args['category'] as ReportBugInput['category'],
+            expected: optString(args, 'expected'),
+            actual: optString(args, 'actual'),
           };
           const result = await reportBugResult(input, ctx.hgc);
-          const text = JSON.stringify(result);
-          return {
-            jsonrpc: '2.0',
-            id,
-            result: { content: [{ type: 'text', text }], structuredContent: result },
-          };
+          return okResponse(id, result);
         }
-        if (params.name !== 'play') {
-          return {
-            jsonrpc: '2.0',
-            id,
-            error: { code: -32601, message: `unknown tool: ${params.name}` },
-          };
+
+        // ── play 工具 ──
+        if (toolName !== 'play') {
+          return errorResponse(id, -32601, `unknown tool: ${toolName}`);
         }
-        const args = params.arguments ?? {};
-        // startGame 参数触发首次 join+ready；后续 play 调用（无 startGame）也需要推进开局
-        // （lobby→playing），否则全员 ready 后无人调 advanceToStart，游戏无法开始。
-        if (args.startGame) await ctx.ensureStarted(normalizeStartGame(args.startGame));
-        else await ctx.ensureStarted(); // 幂等：已 started 且在 playing 时为 no-op；lobby 时推进 advanceToStart
-        const action = args.action as
+        if (!ctx.isStarted()) {
+          return errorResponse(
+            id,
+            -32602,
+            'play 工具需要先调用 createRoom / joinRoom / spectateRoom 启动。' +
+              '建房做房主用 createRoom；加入已有房间用 joinRoom（roomId 必填）；旁观用 spectateRoom。',
+          );
+        }
+        await ctx.advanceLobby();
+        const args = asRecord(params.arguments);
+        const action = args['action'] as
           | {
               skillId?: string;
               actionType?: string;
@@ -323,29 +454,20 @@ export async function handleMcpRequest(
             ? {
                 message: {
                   ...(action as EngineClientMessage),
-                  ownerId: action.ownerId ?? ctx.seat,
+                  ownerId: action.ownerId ?? ctx.hgc.seatIndex,
                 },
               }
             : undefined,
-          waitTimeoutMs: typeof args.waitTimeoutMs === 'number' ? args.waitTimeoutMs : undefined,
+          waitTimeoutMs: optNumber(args, 'waitTimeoutMs'),
           state: ctx.playState,
         });
-        const text = JSON.stringify(result);
-        return {
-          jsonrpc: '2.0',
-          id,
-          result: { content: [{ type: 'text', text }], structuredContent: result },
-        };
+        return okResponse(id, result);
       }
       default:
-        return {
-          jsonrpc: '2.0',
-          id,
-          error: { code: -32601, message: `method not found: ${req.method}` },
-        };
+        return errorResponse(id, -32601, `method not found: ${req.method}`);
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { jsonrpc: '2.0', id, error: { code: -32603, message: msg } };
+    return errorResponse(id, -32603, msg);
   }
 }

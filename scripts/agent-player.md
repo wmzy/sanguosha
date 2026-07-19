@@ -6,11 +6,11 @@
 
 ## 启动流程
 
-首次调用 play 工具时传 startGame 参数加入房间:
+首次调用必须先用 joinRoom 工具加入房间:
 
-play({ startGame: { mode: "multiplayer", roomId: "LEW3IB" } })
+joinRoom({ roomId: "LEW3IB" })
 
-加入后持续调用 play (不带 action = 纯等待)，直到 needsAction=true 或 gameOver。
+加入后持续调用 play (不带 action = 纯等待 / 推进 lobby→playing)，直到 needsAction=true 或 gameOver。
 
 ## 决策策略
 
