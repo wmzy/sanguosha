@@ -3,21 +3,18 @@
 import { css } from '@linaria/core';
 
 // ─── Seating — arc layout ───
+// 占满 battleField,座位环绕中央,中央留出处理区位置
 export const seatingArea = css`
-  position: relative;
-  margin-bottom: 8px;
-  min-height: 240px;
-  flex: 0 0 auto;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
 `;
 // 弧形排列容器:其他玩家沿上半部分弧线分布
 export const seatArcContainer = css`
   position: relative;
   width: 100%;
-  height: 200px;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  margin-bottom: 8px;
+  height: 100%;
   overflow: visible;
 `;
 // 弧形中每个座位槽位:用 absolute 精确定位
@@ -33,14 +30,17 @@ export const seatArcSlot = css`
   gap: 4px;
 `;
 export const centerMeta = css`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   text-align: center;
-  margin: 12px auto 4px;
   max-width: 560px;
-  min-height: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  z-index: 5;
 `;
 export const metaText = css`
   font-size: 12px;

@@ -280,42 +280,59 @@ export function GameViewComponentImpl({
         />
       </DevProfiler>
 
-      {/* ─── 事件横幅(延时展示,非阻塞) ─── */}
-      <EventBanner current={currentEvent ?? null} view={view} />
-      {/* ─── 动作浮层+箭头(谁对谁用什么牌) ─── */}
-      <ActionOverlay current={currentEvent ?? null} view={view} />
+      {/* ─── 主内容:战场区 + 右侧边栏 ─── */}
+      <div className={styles.mainContent}>
+        <div className={styles.battleField}>
+          {/* ─── 事件横幅(延时展示,非阻塞) ─── */}
+          <EventBanner current={currentEvent ?? null} view={view} />
+          {/* ─── 动作浮层+箭头(谁对谁用什么牌) ─── */}
+          <ActionOverlay current={currentEvent ?? null} view={view} />
 
-      {/* ─── 座位布局(弧形) + 中央信息 ─── */}
-      <div className={styles.seatingArea}>
-        <DevProfiler id="SeatArcLayout">
-          <SeatArcLayout
+          {/* ─── 座位布局(弧形) + 中央信息 ─── */}
+          <div className={styles.seatingArea}>
+            <DevProfiler id="SeatArcLayout">
+              <SeatArcLayout
+                view={view}
+                orderedPlayers={orderedPlayers}
+                perspectiveName={perspectiveName}
+                currentPlayerName={currentPlayerName}
+                selectedNeedsTarget={
+                  (!!playRules && playRules.needsTarget) ||
+                  (isDistributeActive && !!activeDistribute?.externalTargetSelection)
+                }
+                selectedTargetNames={
+                  isDistributeActive && activeDistribute?.externalTargetSelection
+                    ? distTargetName
+                      ? [distTargetName]
+                      : []
+                    : playRules?.hasSlots
+                      ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
+                      : selectedTarget
+                        ? [selectedTarget]
+                        : []
+                }
+                isTargetable={isTargetable}
+                onTargetClick={handleTargetClick}
+                onSeatDoubleClick={onSeatDoubleClick}
+                damageFlashIndices={anim.damageFlashIndices}
+                turnVersion={anim.turnVersion}
+              />
+            </DevProfiler>
+            <ZoneInfoBar view={view} />
+          </div>
+        </div>
+
+        {/* 右侧边栏:日志/聊天(原 InfoDock 浮窗,现嵌入侧边栏) */}
+        <div className={styles.rightSidebar}>
+          <InfoDock
             view={view}
-            orderedPlayers={orderedPlayers}
-            perspectiveName={perspectiveName}
-            currentPlayerName={currentPlayerName}
-            selectedNeedsTarget={
-              (!!playRules && playRules.needsTarget) ||
-              (isDistributeActive && !!activeDistribute?.externalTargetSelection)
-            }
-            selectedTargetNames={
-              isDistributeActive && activeDistribute?.externalTargetSelection
-                ? distTargetName
-                  ? [distTargetName]
-                  : []
-                : playRules?.hasSlots
-                  ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
-                  : selectedTarget
-                    ? [selectedTarget]
-                    : []
-            }
-            isTargetable={isTargetable}
-            onTargetClick={handleTargetClick}
-            onSeatDoubleClick={onSeatDoubleClick}
-            damageFlashIndices={anim.damageFlashIndices}
-            turnVersion={anim.turnVersion}
+            chatMessages={chatMessages}
+            chatConfig={chatConfig}
+            onSendChat={onSendChat}
+            mySeatIndex={view.viewer}
+            embedded
           />
-        </DevProfiler>
-        <ZoneInfoBar view={view} />
+        </div>
       </div>
 
       {/* ─── 下方主区域:左 角色大卡 / 右 手牌+操作 ─── */}
@@ -666,16 +683,6 @@ export function GameViewComponentImpl({
           </DevProfiler>
         </div>
       </div>
-
-      {/* 信息浮窗:右下角多 tab(日志/聊天),不占底层布局空间。
-          上层不传 chatMessages 时仅显示日志 tab,DebugLobby 同样适用。 */}
-      <InfoDock
-        view={view}
-        chatMessages={chatMessages}
-        chatConfig={chatConfig}
-        onSendChat={onSendChat}
-        mySeatIndex={view.viewer}
-      />
     </div>
   );
 }

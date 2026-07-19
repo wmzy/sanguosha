@@ -31,6 +31,8 @@ interface InfoDockProps {
   onSendChat?: (text: string) => void;
   /** 当前玩家座次(用于高亮自己消息) */
   mySeatIndex?: number;
+  /** 嵌入侧边栏模式:true = 不再是 fixed 浮窗,而是 100% 高度貼满右侧边栏。 */
+  embedded?: boolean;
 }
 
 type TabKey = 'log' | 'chat';
@@ -59,6 +61,25 @@ const dockRootCollapsed = css`
   max-height: 36px;
   border-radius: 18px;
   /* 折叠后只保留一个小药丸标签,貼右上角不占底部空间 */
+`;
+// 嵌入侧边栏模式:不用 fixed/阴影,貼满父容器(flex: 1)。
+const dockRootEmbedded = css`
+  position: relative;
+  width: 100%;
+  max-height: none;
+  height: 100%;
+  flex: 1 1 auto;
+  background-color: rgba(28, 38, 56, 0.96);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: ${colors.text.primary};
+  top: auto;
+  right: auto;
 `;
 
 const tabBar = css`
@@ -352,16 +373,25 @@ export const InfoDock = memo(function InfoDock({
   chatConfig,
   onSendChat,
   mySeatIndex,
+  embedded = false,
 }: InfoDockProps) {
   const hasChat = !!chatMessages;
   const [tab, setTab] = useState<TabKey>(hasChat ? 'chat' : 'log');
   // 默认折叠:避免初始就遮挡操作区;玩家有新聊天/日志时自动展开。
-  const [collapsed, setCollapsed] = useState(true);
+  // 嵌入侧边栏时不折叠(占满侧边栏,反而是主要功能区)。
+  const [collapsed, setCollapsed] = useState(embedded ? false : true);
   // 不自动展开:折叠态下有新消息只更新药丸计数(徽标颜色),不干扰操作区。
   // 玩家主动点击药丸展开查看。
 
+  // 嵌入模式下使用 dockRootEmbedded,浮窗模式根据 collapsed 选择 dockRootCollapsed/dockRoot
+  const rootClass = embedded
+    ? dockRootEmbedded
+    : collapsed
+      ? dockRootCollapsed
+      : dockRoot;
+
   return (
-    <div className={collapsed ? dockRootCollapsed : dockRoot}>
+    <div className={rootClass}>
       {!collapsed && (
         <div className={tabBar}>
           <button
@@ -384,9 +414,11 @@ export const InfoDock = memo(function InfoDock({
               💬 聊天 {chatMessages && chatMessages.length > 0 ? `(${chatMessages.length})` : ''}
             </button>
           )}
-          <button className={collapseBtn} onClick={() => setCollapsed(true)} title="折叠">
-            ⤓
-          </button>
+          {!embedded && (
+            <button className={collapseBtn} onClick={() => setCollapsed(true)} title="折叠">
+              ⤓
+            </button>
+          )}
         </div>
       )}
       {!collapsed && (
@@ -403,7 +435,7 @@ export const InfoDock = memo(function InfoDock({
           )}
         </div>
       )}
-      {collapsed && (
+      {!embedded && collapsed && (
         <button
           className={cx(tabBtn, tabBtnActive)}
           onClick={() => setCollapsed(false)}
@@ -416,3 +448,4 @@ export const InfoDock = memo(function InfoDock({
     </div>
   );
 });
+

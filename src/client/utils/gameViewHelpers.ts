@@ -202,7 +202,9 @@ export function resolveDistributeCardIds(
 export function arcLayout(totalOthers: number, i: number): { leftPct: number; topPct: number } {
   const t = totalOthers <= 1 ? 0.5 : i / (totalOthers - 1);
   const leftPct = 5 + 90 * t;
+  // 弧度 0→1→0 表示中间高、两端低
   const arcH = 1 - Math.cos(Math.PI * t); // 0→1→0
-  const topPct = 55 - 52 * arcH * 0.5;
+  // topPct 范围 4% ~ 38%:让弧线在屏幕上半部分,留出中央给处理区
+  const topPct = 38 - 34 * arcH * 0.5;
   return { leftPct, topPct };
 }
