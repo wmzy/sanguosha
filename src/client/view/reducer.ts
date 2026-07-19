@@ -14,6 +14,7 @@
 import '../engine-imports';
 import { getAtomDef } from '../../engine/atom';
 import type { GameView, ViewEvent } from '../../engine/types';
+import type { PlayerNameResolver } from '../../engine/types';
 
 /**
  * 按 ViewEvent 增量更新 GameView。
@@ -29,7 +30,14 @@ export function viewReducer(view: GameView, event: ViewEvent, time = 0): void {
   const type = event.atomType ?? event.type;
   const def = getAtomDef(type);
   def.applyView?.(view, event);
-  const logEntry = def.toViewLog?.(event, view.viewer);
+  // 注入玩家名解析器:把座次号映射为角色名,供日志展示如「对 张角 造成了 1 点伤害」。
+  // name 来自 分配武将 后的 player.name(即武将名),调用方仅负责传 view。查不到时回退 `P${n}`。
+  const resolveName: PlayerNameResolver = (idx) => {
+    if (idx < 0) return undefined;
+    const p = view.players.find((q) => q.index === idx);
+    return p?.name;
+  };
+  const logEntry = def.toViewLog?.(event, view.viewer, resolveName);
   if (logEntry) {
     view.log.push({ time, player: logEntry.player, text: logEntry.text });
   }

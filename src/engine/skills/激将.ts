@@ -187,7 +187,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           target: allyIdx,
           prompt: {
             type: 'useCard',
-            title: `激将:主公(P${ownerId})需要杀,是否打出一张杀?`,
+            title: `激将:主公(${st.players[ownerId]?.name ?? `P${ownerId}`})需要杀,是否打出一张杀?`,
             cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
           },
           timeout: 15,

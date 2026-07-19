@@ -4,7 +4,7 @@
 // 纯展示,所有数据与回调通过 props 传入。
 // pendingRespondInfo 由 usePendingState memo 后从父组件传入,不再在此重复 resolve。
 import * as styles from './gameViewStyles';
-import type { Card, Json, PendingView } from '../../engine/types';
+import type { Card, GameView, Json, PendingView } from '../../engine/types';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
@@ -26,6 +26,8 @@ export interface AwaitingPromptProps {
   processingPicks?: ProcessingPickState | null;
   /** 发送动作(无 preceding,本组件不涉及前置 action) */
   onSend: (skillId: string, actionType: string, params: Record<string, Json>) => void;
+  /** 当前 GameView —— 用于查玩家名/处理区锦囊,补充无懈可击 prompt 文案。 */
+  view?: GameView;
 }
 
 export function AwaitingPrompt(props: AwaitingPromptProps) {
@@ -41,18 +43,44 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
     canOperate,
     processingPicks,
     onSend,
+    view,
   } = props;
 
   // 广播型 pending 且已本地跳过:显示已跳过提示
   const isBroadcast = pendingTargetIdx < 0;
   const isSkipped = isBroadcast && skippedBroadcast.has(broadcastKey);
 
+  // ── 无懈可击 prompt 上下文文案 ──
+  // 引擎构造的 prompt.title 是固定「是否打出无懈可击?」;前端补充
+  // 「抵消 <对 P_n 的 锦囊名>」,让玩家清楚抵消的是谁的什么牌。
+  // cancelTarget 来自 atom(广播型 请求回应 requestType='无懈可击');
+  // 锦囊名从处理区查 card.name;名取自 view.players[cancelTarget].name。
+  const wuxieHint = (() => {
+    if (!view) return undefined;
+    const atom = pending.atom as { type?: string; requestType?: string; cancelTarget?: number };
+    if (atom.type !== '请求回应' || atom.requestType !== '无懈可击') return undefined;
+    const cancelTarget = atom.cancelTarget;
+    if (typeof cancelTarget !== 'number' || cancelTarget < 0) return undefined;
+    const targetName = view.players.find((p) => p.index === cancelTarget)?.name ?? `P${cancelTarget}`;
+    // 处理区锦囊名(排除闪等响牌):取第一张非闪、非杀、非无懈可击的牌当作锦囊。
+    const procIds = view.zones?.processing ?? [];
+    const candidate = procIds
+      .map((id) => view.cardMap[id])
+      .filter((c): c is Card => !!c)
+      .find((c) => c.name !== '闪' && c.name !== '杀' && c.name !== '无懈可击');
+    const trickName = candidate?.name ?? '锦囊';
+    return `抵消 对 ${targetName} 的 ${trickName}`;
+  })();
+
   return (
     <div className={styles.promptBoxAwaiting}>
       <div className={styles.promptTitle}>⚡ 需要回应 — {perspectiveName}</div>
       <div className={styles.promptDesc}>
         {pending.prompt.title}
-        {pending.prompt.description && <span> — {pending.prompt.description}</span>}
+        {wuxieHint && <span> — {wuxieHint}</span>}
+        {!wuxieHint && pending.prompt.description && (
+          <span> — {pending.prompt.description}</span>
+        )}
       </div>
       {isSkipped ? (
         <div className={styles.waitingHint}>已跳过，等待其他玩家回应...</div>

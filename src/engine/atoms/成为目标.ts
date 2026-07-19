@@ -17,12 +17,14 @@ export const 成为目标: AtomDefinition<{ source: number; cardId?: string; tar
     // 事件标记——before hook cancel = 此目标无效,跳过结算
   },
   effect: { sound: 'target', animation: 'highlight', duration: 400 },
-  toViewEvents(_state, atom): ViewEventSplit {
+  toViewEvents(state, atom): ViewEventSplit {
+    const cardName = atom.cardId ? (state.cardMap[atom.cardId]?.name ?? atom.cardId) : undefined;
     const view: ViewEvent = {
       type: '成为目标',
       source: atom.source,
       target: atom.target,
       ...(atom.cardId !== undefined ? { cardId: atom.cardId } : {}),
+      ...(cardName !== undefined ? { cardName } : {}),
     };
     return { ownerViews: new Map(), othersView: view };
   },

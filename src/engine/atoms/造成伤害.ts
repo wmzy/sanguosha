@@ -53,13 +53,19 @@ export const 造成伤害: AtomDefinition<{
       // alive 由 击杀 atom 的 applyView 更新,这里不提前设
     }
   },
-  toViewLog(event) {
+  toViewLog(event, _viewer, resolveName) {
     const target = event.target as number;
     const source = event.source as number;
     const amount = event.amount ?? 0;
     const dt = event.damageType as string | undefined;
     const attr = dt && dt !== '普通' ? `[${dt}]` : '';
-    return { player: source, text: `对 P${target} 造成了 ${amount} 点${attr}伤害` };
+    const targetName = resolveName?.(target) ?? `P${target}`;
+    const sourceName = resolveName?.(source);
+    const prefix = sourceName ? `${sourceName} ` : '';
+    return {
+      player: source,
+      text: `${prefix}对 ${targetName} 造成了 ${amount} 点${attr}伤害`,
+    };
   },
 };
 

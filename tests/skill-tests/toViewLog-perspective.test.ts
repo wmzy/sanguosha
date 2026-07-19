@@ -152,7 +152,7 @@ describe('toViewLog 视角区分', () => {
   describe('造成伤害', () => {
     const def = getAtomDef('造成伤害');
 
-    it('日志包含伤害目标', () => {
+    it('日志包含伤害目标(未注入 resolveName 时回退 P{idx})', () => {
       const event: ViewEvent = {
         type: '造成伤害',
         target: 1,
@@ -163,6 +163,23 @@ describe('toViewLog 视角区分', () => {
       expect(log.player).toBe(0);
       expect(log.text).toContain('P1');
       expect(log.text).toContain('2');
+    });
+
+    it('注入 resolveName 后日志使用玩家名(代替 P{idx})', () => {
+      const event: ViewEvent = {
+        type: '造成伤害',
+        target: 1,
+        amount: 1,
+        source: 0,
+      };
+      const names = new Map<number, string>([
+        [0, '刘备'],
+        [1, '张角'],
+      ]);
+      const log = def.toViewLog!(event, 0, (i) => names.get(i))!;
+      expect(log.text).toContain('张角');
+      expect(log.text).toContain('刘备');
+      expect(log.text).not.toContain('P1');
     });
   });
 

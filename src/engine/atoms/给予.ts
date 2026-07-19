@@ -65,16 +65,17 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
       }
     }
   },
-  toViewLog(event, viewer) {
+  toViewLog(event, viewer, resolveName) {
     const from = event.from as number;
     const to = event.to as number;
     const cardName = event.cardName as string | undefined;
+    const toName = resolveName?.(to) ?? `P${to}`;
     // owner 视角(from+to)能看到具体牌面
     const isOwner = from === viewer || to === viewer;
     if (isOwner && cardName) {
-      return { player: from, text: `将 ${cardName} 给予了 P${to}` };
+      return { player: from, text: `将 ${cardName} 给予了 ${toName}` };
     }
-    return { player: from, text: `给 P${to} 一张牌` };
+    return { player: from, text: `给 ${toName} 一张牌` };
   },
 };
 

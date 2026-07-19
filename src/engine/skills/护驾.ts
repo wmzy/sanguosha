@@ -82,7 +82,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           target: allyIdx,
           prompt: {
             type: 'useCard',
-            title: `护驾:曹操(P${ownerId})需要闪,是否打出一张闪?`,
+            title: `护驾:曹操(${st.players[ownerId]?.name ?? `P${ownerId}`})需要闪,是否打出一张闪?`,
             cardFilter: { filter: (c) => c.name === '闪', min: 1, max: 1 },
           },
           timeout: 15,

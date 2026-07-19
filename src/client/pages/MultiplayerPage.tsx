@@ -563,12 +563,14 @@ export function MultiplayerPage() {
       <>
         {reconnectBanner}
         <div className={gameWrap}>
-          <GameViewComponent view={mp.view} onAction={handleAction} onReorderHand={mp.reorderHand} currentEvent={mp.currentEvent} />
-          <ChatPanel
-            messages={mp.chatMessages}
-            config={mp.roomState?.config?.chat}
-            onSend={mp.sendChat}
-            mySeatIndex={mp.view.viewer}
+          <GameViewComponent
+            view={mp.view}
+            onAction={handleAction}
+            onReorderHand={mp.reorderHand}
+            currentEvent={mp.currentEvent}
+            chatMessages={mp.chatMessages}
+            chatConfig={mp.roomState?.config?.chat}
+            onSendChat={mp.sendChat}
           />
         </div>
       </>

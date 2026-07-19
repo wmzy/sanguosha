@@ -24,9 +24,11 @@ function GameLogImpl({ view }: GameLogProps) {
             // player 是玩家座次下标(数字);映射为名字,系统(-1/负数)显示为「系统」
             // 当前视角玩家加「（我）」标志
             const isMe = entry.player === view.viewer;
+            // player 在 view.players 内按 index 查找;不够时回退为 P{idx}
+            const playerView = view.players.find((p) => p.index === entry.player);
             const playerName =
               entry.player >= 0
-                ? `${view.players[entry.player]?.name ?? `P${entry.player}`}${isMe ? '（我）' : ''}`
+                ? `${playerView?.name ?? `P${entry.player}`}${isMe ? '（我）' : ''}`
                 : '系统';
             return (
               <div key={i} className={styles.logEntry}>
@@ -45,13 +47,19 @@ function GameLogImpl({ view }: GameLogProps) {
 function gameLogPropsEqual(prev: GameLogProps, next: GameLogProps): boolean {
   const a = prev.view;
   const b = next.view;
-  return (
-    a.viewer === b.viewer &&
-    a.log.length === b.log.length &&
-    (a.log.length === 0 ||
-      (a.log[a.log.length - 1].text === b.log[b.log.length - 1].text &&
-        a.log[a.log.length - 1].player === b.log[b.log.length - 1].player))
-  );
+  // 视角变化后需要重渲染(需要重算「我」标志)
+  if (a.viewer !== b.viewer) return false;
+  // 玩家名变化后(如选将完成、分配武将事件到达后)也需要重渲染,
+  // 避免日志里的 P{idx} 兑换不更新为角色名
+  if (a.players.length !== b.players.length) return false;
+  for (let i = 0; i < a.players.length; i++) {
+    if (a.players[i].name !== b.players[i].name) return false;
+  }
+  if (a.log.length !== b.log.length) return false;
+  if (a.log.length === 0) return true;
+  const aLast = a.log[a.log.length - 1];
+  const bLast = b.log[b.log.length - 1];
+  return aLast.text === bLast.text && aLast.player === bLast.player;
 }
 
 export const GameLog = memo(GameLogImpl, gameLogPropsEqual);

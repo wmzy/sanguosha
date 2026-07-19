@@ -284,7 +284,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 prompt: {
                   type: 'distribute',
                   mode: 'select',
-                  title: `巧变:选择 P${srcPlayer} 场上的一张牌移动`,
+                  title: `巧变:选择 ${ctx.state.players[srcPlayer]?.name ?? `P${srcPlayer}`} 场上的一张牌移动`,
                   source: 'handAndEquip',
                   minTotal: 1,
                   maxTotal: 1,

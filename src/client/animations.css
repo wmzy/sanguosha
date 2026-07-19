@@ -187,3 +187,29 @@
     transform: translateY(-20px) scale(0.95) rotateY(0deg);
   }
 }
+
+/* ─── 动作浮层入场:从上方弹出 ─── */
+@keyframes bannerIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-16px) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(2px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* ─── 箭头闪烁脉冲 ─── */
+@keyframes arrowPulse {
+  0%, 100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}

@@ -253,7 +253,12 @@ export class PlayerSession {
         }
         // 与真实前端 src/client/view/reducer.ts:viewReducer 对齐:
         // applyView 后调 toViewLog 生成日志条目。time 取事件 seq 近似(测试不需要真实时间)。
-        const logEntry = def.toViewLog?.(evt, this.processedView.viewer);
+        // resolveName 把座次号映射为角色名(与 viewReducer 一致),让测试断言能读到角色名。
+        const resolveName = (idx: number) =>
+          idx < 0
+            ? undefined
+            : this.processedView.players.find((q) => q.index === idx)?.name;
+        const logEntry = def.toViewLog?.(evt, this.processedView.viewer, resolveName);
         if (logEntry) {
           this.processedView.log.push({
             time: ((evt as Record<string, unknown>).seq as number) ?? 0,

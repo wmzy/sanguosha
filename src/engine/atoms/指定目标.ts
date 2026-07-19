@@ -29,14 +29,21 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
     // 事件标记——目标关系在事件流中记录,前端 highlight 通过 effect 动画展示。
     // 无 GameView 字段需要直接更新(高亮态由前端处理 effect 期间临时绘制)。
   },
-  toViewLog(event) {
+  toViewLog(event, _viewer, resolveName) {
     const target = event.target as number;
-    return event.cardId
-      ? {
-          player: event.source as number,
-          text: `使用 ${event.cardName ?? event.cardId} 指定 P${target} 为目标`,
-        }
-      : { player: event.source as number, text: `指定 P${target} 为目标` };
+    const targetName = resolveName?.(target) ?? `P${target}`;
+    const source = event.source as number;
+    const sourceName = resolveName?.(source) ?? `P${source}`;
+    const cardName = event.cardName ?? event.cardId;
+    const cardPart = cardName ? `使用 ${cardName} ` : '';
+    return {
+      player: source,
+      text: `${cardPart}指定 ${targetName} 为目标`,
+    };
+    // 原先走以下路径但未使用,保留未使用文案以防回归——
+    // return event.cardId
+    //   ? { player: event.source as number, text: `使用 ${event.cardName ?? event.cardId} 指定 P${target} 为目标` }
+    //   : { player: event.source as number, text: `指定 P${target} 为目标` };
   },
 };
 

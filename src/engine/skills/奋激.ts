@@ -83,7 +83,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       target: ownerId,
       prompt: {
         type: 'confirm',
-        title: `是否发动奋激?(失去1点体力令 P${target} 摸两张牌)`,
+        title: `是否发动奋激?(失去1点体力令 ${st.players[target]?.name ?? `P${target}`} 摸两张牌)`,
         confirmLabel: '发动',
         cancelLabel: '不发动',
       },

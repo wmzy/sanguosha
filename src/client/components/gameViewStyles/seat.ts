@@ -33,8 +33,13 @@ export const seatArcSlot = css`
 `;
 export const centerMeta = css`
   text-align: center;
-  margin: 8px auto;
-  max-width: 300px;
+  margin: 12px auto 4px;
+  max-width: 560px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 `;
 export const metaText = css`
   font-size: 12px;
@@ -249,15 +254,16 @@ export const processingRow = css`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   margin: 6px auto;
-  padding: 4px 8px;
-  background: rgba(231, 126, 34, 0.12);
+  padding: 6px 12px;
+  background: rgba(231, 126, 34, 0.14);
   border: 1px dashed #e67e22;
-  border-radius: 6px;
-  max-width: 240px;
-  font-size: 11px;
+  border-radius: 8px;
+  max-width: 480px;
+  font-size: 12px;
   justify-content: center;
+  box-shadow: 0 2px 12px rgba(230, 126, 34, 0.2);
 `;
 export const processingLabel = css`
   color: #e67e22;
@@ -271,6 +277,20 @@ export const processingTag = css`
   color: var(--suit-color, #ccc);
   background: rgba(230, 126, 34, 0.08);
   font-weight: bold;
+`;
+// 处理区牌上的使用者名(小号白字,前面带·分隔)
+export const processingOwner = css`
+  color: #f1c40f;
+  font-size: 10px;
+  margin-right: 4px;
+  font-weight: normal;
+`;
+export const processingCardName = css`
+  margin-right: 2px;
+`;
+export const processingSuit = css`
+  font-size: 10px;
+  opacity: 0.85;
 `;
 // 弃牌堆:小图标 + 计数
 export const discardPileRow = css`

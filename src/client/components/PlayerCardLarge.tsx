@@ -95,6 +95,7 @@ export function PlayerCardLargeImpl({
       <div
         className={styles.playerCardHeader}
         style={{ '--faction-color': factionColor } as React.CSSProperties}
+        data-player-name={p.name}
       >
         <div className={styles.playerCardHeaderTop}>
           <span className={styles.playerCardName}>{p.name}</span>

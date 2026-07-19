@@ -53,11 +53,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
-      // 移无懈牌到弃牌堆
+      // 无懈可击牌先进处理区(与杀/闪一致),让处理区临时展示锦囊+无懈可击的完整结算画面。
+      // 移动牌 from=手牌 to=处理区 会生成「打出」ViewEvent,前端能看到无懈牌出现在处理区。
       await applyAtom(state, {
         type: '移动牌',
         cardId,
         from: { zone: '手牌', player: ownerId },
+        to: { zone: '处理区' },
+      });
+      // 随后移入弃牌堆。留出一个 tick 让处理区完成渲染(后端串行 apply,前端走事件序列同样保留)。
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '处理区' },
         to: { zone: '弃牌堆' },
       });
 

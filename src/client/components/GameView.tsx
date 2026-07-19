@@ -21,8 +21,8 @@ import type { GameView as EngineGameView, Card, Json } from '../../engine/types'
 import { getAtomDef } from '../../engine/atom';
 import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
 import { PlayerCardLarge } from './PlayerCardLarge';
-import { GameLog } from './GameLog';
 import { EventBanner } from './EventBanner';
+import { ActionOverlay } from './ActionOverlay';
 import { DevProfiler } from './DevProfiler';
 
 // ─── 抽取的子组件 ───
@@ -35,6 +35,7 @@ import { ZoneInfoBar } from './ZoneInfoBar';
 import { HandCard } from './HandCard';
 import { CancelButton } from './CancelButton';
 import { EquipColumn } from './EquipColumn';
+import { InfoDock } from './InfoDock';
 import { findUseActionForCard, isActiveAction } from '../utils/gameViewHelpers';
 
 // ─── 抽取的 hooks ───
@@ -68,6 +69,13 @@ interface Props {
   /** 只读模式(回放):禁用选将/身份揭示等阻塞性遮罩,避免遮挡游戏画面。
    *  正式/debug 模式不传(默认 false),保持原有选将流程。 */
   readOnly?: boolean;
+  /** 聊天消息(可选)。传入后会在右下角 InfoDock 多 tab 浮窗显示「聊天」tab。
+   *  不传 → InfoDock 仅显示「日志」tab。DebugLobby 不传。 */
+  chatMessages?: import('../headless/types').ChatMessage[];
+  /** 聊天配置(可选)。 */
+  chatConfig?: import('../../server/protocol').ChatConfig;
+  /** 发送聊天(可选)。 */
+  onSendChat?: (text: string) => void;
 }
 
 // ─── 主组件 ───
@@ -84,6 +92,9 @@ export function GameViewComponentImpl({
   overlaySlot,
   currentEvent,
   readOnly = false,
+  chatMessages,
+  chatConfig,
+  onSendChat,
 }: Props) {
   // perspectiveIdx 必须是有效座次索引。旁观者(无授权 viewer=-1)或越界时回退到座次 0,
   // 避免 view.players[perspectiveIdx] 为 undefined 导致渲染崩溃。
@@ -271,6 +282,8 @@ export function GameViewComponentImpl({
 
       {/* ─── 事件横幅(延时展示,非阻塞) ─── */}
       <EventBanner current={currentEvent ?? null} view={view} />
+      {/* ─── 动作浮层+箭头(谁对谁用什么牌) ─── */}
+      <ActionOverlay current={currentEvent ?? null} view={view} />
 
       {/* ─── 座位布局(弧形) + 中央信息 ─── */}
       <div className={styles.seatingArea}>
@@ -342,6 +355,7 @@ export function GameViewComponentImpl({
                 canOperate={canOperate}
                 processingPicks={processingPicks}
                 onSend={send}
+                view={view}
               />
             )}
           <PlayPhasePrompt
@@ -629,7 +643,15 @@ export function GameViewComponentImpl({
         </div>
 
         {/* ─── 右:自己的武将卡片(回合金色高亮边框) ─── */}
-        <div className={cx(styles.playerCardLarge, isPerspectiveTurn && styles.playerCardTurn)}>
+        <div
+          className={cx(
+            styles.playerCardLarge,
+            isPerspectiveTurn && styles.playerCardTurn,
+            // 伤害动画:与座位卡一致,震动+红光覆盖,让自己看清「被攻击」。
+            anim.damageFlashIndices.has(perspectiveIdx) && styles.seatShaking,
+            anim.damageFlashIndices.has(perspectiveIdx) && styles.seatDamageOverlay,
+          )}
+        >
           <DevProfiler id="PlayerCardLarge">
             <PlayerCardLarge
               perspectiveIdx={perspectiveIdx}
@@ -645,9 +667,15 @@ export function GameViewComponentImpl({
         </div>
       </div>
 
-      <DevProfiler id="GameLog">
-        <GameLog view={view} />
-      </DevProfiler>
+      {/* 信息浮窗:右下角多 tab(日志/聊天),不占底层布局空间。
+          上层不传 chatMessages 时仅显示日志 tab,DebugLobby 同样适用。 */}
+      <InfoDock
+        view={view}
+        chatMessages={chatMessages}
+        chatConfig={chatConfig}
+        onSendChat={onSendChat}
+        mySeatIndex={view.viewer}
+      />
     </div>
   );
 }

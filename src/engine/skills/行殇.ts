@@ -92,7 +92,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target: ownerId,
         prompt: {
           type: 'confirm',
-          title: `是否发动行殇?(从 P${deadIdx} 获得 ${total} 张牌)`,
+          title: `是否发动行殇?(从 ${ctx.state.players[deadIdx]?.name ?? `P${deadIdx}`} 获得 ${total} 张牌)`,
           confirmLabel: '发动',
           cancelLabel: '不发动',
         },

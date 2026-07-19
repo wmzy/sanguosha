@@ -238,10 +238,20 @@ export interface AtomDefinition<A = unknown> {
    *
    * event 已经过 toViewEvents 分叉:当前视角能看到的字段（如 owner 的摸牌 cards）
    * 已包含在 event 中。viewer 为当前视角座次，便于进一步判断「我」相关文案。
+   * resolveName 把座次映射为玩家名，便于把日志里的目标/来源写成角色名而不是 `P1`。
    * 返回 null 表示该事件不写日志。
    */
-  toViewLog?(event: ViewEvent, viewer: number): { player: number; text: string } | null;
+  toViewLog?(
+    event: ViewEvent,
+    viewer: number,
+    resolveName?: PlayerNameResolver,
+  ): { player: number; text: string } | null;
 }
+
+/** 玩家名查询函数:把座次 index 映射为人类可读的名字(如 '刘备' / 'P1' 兜底)。
+ *  由 viewReducer/engine-harness 调用方注入,避免 atom 各自在 text 中拼 `P${n}` 等座次号。
+ *  返回 undefined 表示名字未知(可回退为 `P${n}`),实现方应容错。 */
+export type PlayerNameResolver = (idx: number) => string | undefined;
 
 /**
  * 引擎原子操作管线说明:
