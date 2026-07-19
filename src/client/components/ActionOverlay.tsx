@@ -34,12 +34,16 @@ interface ActionInfo {
   source: number;
   /** 目标玩家座次(undefined 表示无目标,只显示文本浮层) */
   target?: number;
-  /** 卡牌名(杀/南蛮入侵/...)
-   *  指定目标/成为目标 atom 携带 cardName;造成伤害/失去体力 无 cardName,
-   *  但其前驱事件(成为目标/打出)已在队列中给过名字,前端依赖 current 序列即可。*/
+  /** 卡牌名(杀/南蛮入侵/...) */
   cardName?: string;
   /** 事件类型,用于区分文案 */
   eventType: string;
+  /** 判定事件专用:判定类型(乐不思蜀/闪电/八卦阵等) */
+  judgeType?: string;
+  /** 判定事件专用:判定牌花色 */
+  suit?: string;
+  /** 判定事件专用:判定牌点数 */
+  rank?: string;
 }
 
 /** 从 ViewEvent 提取 ActionInfo。
@@ -69,6 +73,22 @@ function extractAction(event: ViewEventLike): ActionInfo | null {
     if (p === undefined) return null;
     return { source: p, cardName: str((event.card as { name?: unknown } | undefined)?.name), eventType: t };
   }
+  if (t === '判定') {
+    // 判定事件:player=判定者,judgeType=判定类型(乐不思蜀/闪电/八卦阵等),
+    // card=判定牌(花色点数+牌名)。浮层显示「张角 判定(乐不思蜀):翻出 ♥3 桃」。
+    // 判定无目标 → 不画箭头,只有浮层。
+    const p = num(event.player);
+    if (p === undefined) return null;
+    const card = event.card;
+    return {
+      source: p,
+      cardName: str(card?.name),
+      eventType: t,
+      judgeType: str(event.judgeType),
+      suit: str(card?.suit),
+      rank: str(card?.rank),
+    };
+  }
   return null;
 }
 
@@ -79,7 +99,8 @@ type ViewEventLike = {
   target?: unknown;
   player?: unknown;
   cardName?: unknown;
-  card?: { name?: unknown } | undefined;
+  card?: { name?: unknown; suit?: unknown; rank?: unknown } | undefined;
+  judgeType?: unknown;
 };
 
 function num(v: unknown): number | undefined {
@@ -184,10 +205,16 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
       setArrow(null);
     }
 
-    // 浮层持续时间:群锦囊+目标命中时拉长;否则默认
+    // 浮层持续时间:群锦囊+目标命中时拉长;判定事件与 effect.duration(1800ms)对齐;
+    // 否则默认
     const isBroadcast =
       action.cardName !== undefined && BROADCAST_TRICKS.has(action.cardName);
-    const dur = isBroadcast ? BROADCAST_DURATION_MS : DEFAULT_DURATION_MS;
+    const isJudge = action.eventType === '判定';
+    const dur = isBroadcast
+      ? BROADCAST_DURATION_MS
+      : isJudge
+        ? 1800
+        : DEFAULT_DURATION_MS;
     timerRef.current = setTimeout(() => {
       setInfo(null);
       setArrow(null);
@@ -220,6 +247,16 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
     text = `${sourceName} → ${targetName ?? ''} 伤害`;
   } else if (info.eventType === '失去体力') {
     text = `${sourceName} 失去体力`;
+  } else if (info.eventType === '判定') {
+    // 判定浮层:展示判定者 + 判定类型 + 翻出的判定牌花色点数+牌名
+    // 如:张角 判定(乐不思蜀):翻出 ♥3 桃
+    const jt = info.judgeType ? `判定(${info.judgeType})` : '判定';
+    const suit = info.suit ?? '';
+    const rank = info.rank ?? '';
+    const cardName = info.cardName ?? '';
+    const cardPart =
+      suit || rank || cardName ? `:翻出 ${suit}${rank} ${cardName}`.trim() : '';
+    text = `${sourceName} ${jt}${cardPart}`;
   } else {
     // 打出
     const tail = targetName ? ` → ${targetName}` : '';
