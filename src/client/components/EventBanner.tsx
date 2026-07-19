@@ -28,7 +28,7 @@ export interface EventBannerProps {
   view: GameView;
 }
 
-export function EventBanner({ current, view }: EventBannerProps) {
+export function EventBanner({ current }: EventBannerProps) {
   if (!current) return null;
 
   const atomType = current.event.atomType ?? current.event.type;
@@ -46,19 +46,11 @@ export function EventBanner({ current, view }: EventBannerProps) {
   if (!card) return null;
 
   const eventType = current.event.type;
-  const player = current.event.player as number | undefined;
-  // 自己出牌:usePlayInteraction 已触发 createCardFlyAnimation(手牌→中央),
-  // 跳过中央翻牌避免重复动画;仅为他人生成翻牌动效。
-  if (eventType === '打出' && player !== undefined && player === view.viewer) return null;
+  // 打出由中央 PlayHistoryStrip 展示,不再翻牌;仅判定等保留 flip。
+  if (eventType === '打出') return null;
 
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
-  // 判定事件额外显示 judgeType 标签
   const judgeType = current.event.judgeType as string | undefined;
-  // 打出事件:显示来源玩家名(让其它玩家看清谁出了什么牌)
-  const playerName =
-    eventType === '打出' && player !== undefined
-      ? view.players.find((p) => p.index === player)?.name
-      : undefined;
 
   return (
     <div className={styles.eventCardLayer}>
@@ -71,11 +63,7 @@ export function EventBanner({ current, view }: EventBannerProps) {
           } as React.CSSProperties
         }
       >
-        {/* judgeType 小标签(判定事件) */}
         {judgeType && <div className={styles.eventCardLabel}>{judgeType}</div>}
-        {/* 来源玩家名(打出事件) */}
-        {playerName && <div className={styles.eventCardPlayer}>{playerName}</div>}
-        {/* 卡牌主体 */}
         <div className={styles.eventCardBody}>
           <div className={styles.eventCardName}>{card.name}</div>
           <div className={styles.eventCardSuit}>

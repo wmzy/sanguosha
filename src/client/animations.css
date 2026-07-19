@@ -160,11 +160,11 @@
 @keyframes cardFlipIn {
   0% {
     opacity: 0;
-    transform: translateY(-60px) scale(0.6) rotateY(180deg);
+    transform: translateY(-24px) scale(0.6) rotateY(180deg);
   }
   15% {
     opacity: 1;
-    transform: translateY(-15px) scale(0.85) rotateY(130deg);
+    transform: translateY(-8px) scale(0.85) rotateY(130deg);
   }
   30% {
     opacity: 1;
@@ -192,15 +192,27 @@
 @keyframes bannerIn {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-16px) scale(0.9);
+    transform: translate(-50%, calc(-50% - 16px)) scale(0.9);
   }
   60% {
     opacity: 1;
-    transform: translateX(-50%) translateY(2px) scale(1.04);
+    transform: translate(-50%, calc(-50% + 2px)) scale(1.04);
   }
   100% {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ─── 出牌历史条入场 ─── */
+@keyframes playHistoryIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

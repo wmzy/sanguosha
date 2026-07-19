@@ -22,6 +22,7 @@ import type { GameView } from '../../engine/types';
 import { suitColor, type Suit } from '../../shared/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
 import type { ActionMsg } from '../types';
+import { appendIngestedEvents } from '../utils/appendIngestedEvents';
 
 const log = createLogger('useDebugMultiConnection');
 
@@ -49,6 +50,8 @@ export interface RoomState {
 export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): {
   views: Map<number, GameView>;
   currentEvent: import('./useEventPlayback').QueuedEvent | null;
+  /** 刚入队的事件批次:出牌历史条立即消费(不等播放队列) */
+  ingestedEvents: import('./useEventPlayback').QueuedEvent[];
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
   disconnectAll: () => void;
@@ -99,6 +102,11 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   useEffect(() => {
     playbackRef.current = playback;
   }, [playback]);
+  /** 出牌历史:由 onView.newEvents 驱动(与播放队列解耦,使用时立即入条) */
+  const [ingestedEvents, setIngestedEvents] = useState<
+    import('./useEventPlayback').QueuedEvent[]
+  >([]);
+  const historySeqRef = useRef(0);
   const perspectiveRef = useRef(perspective);
   useEffect(() => {
     perspectiveRef.current = perspective;
@@ -154,6 +162,12 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
             next.set(view.viewer, view);
             return next;
           });
+          // 出牌历史:追加批次(不可替换——WS 连发时 React 会合并 setState 丢掉中间的打出)
+          if (newEvents.length > 0 && view.viewer === perspectiveRef.current) {
+            setIngestedEvents((prev) =>
+              appendIngestedEvents(prev, newEvents, () => ++historySeqRef.current),
+            );
+          }
           if (!firstViewFiredRef.current && view.viewer === 0) {
             firstViewFiredRef.current = true;
             onFirstViewRef.current?.(view.viewer);
@@ -239,8 +253,8 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           break;
         }
         case 'event': {
-          // event playback：仅当前 perspective 的事件入队
-          if (msg.view) {
+          // event playback / 出牌历史:仅当前视角连接的事件入队,避免 N 座次重复入队
+          if (msg.view && viewerIndex === perspectiveRef.current) {
             playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
           }
           // 判定牌 processing 延迟展示：判定牌加入 processing 几秒后移除
@@ -406,6 +420,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   return {
     views,
     currentEvent: playback.current,
+    ingestedEvents,
     sendAction,
     reorderHand,
     disconnectAll,

@@ -6,7 +6,7 @@
 //      触发事件:成为目标 / 造成伤害 / 失去体力 / 指定目标。
 //      其中 指定目标/成为目标 携带 cardId+cardName+source+target,
 //      能完整还原「杀指定张角」这种语义。
-//   2. 浮层小窗:在屏幕中央上方展示一句话「刘备 杀 张角」。
+//   2. 浮层小窗:在屏幕中央展示一句话「刘备 杀 张角」。
 //      名字取自 view.players[index].name(分配武将后即武将名,如刘备/张角);
 //      未来可改用武将缩略图替代纯文字。
 //   3. 群锦囊(五谷丰登/南蛮入侵/万箭齐发/桃园结义)无固定目标,
@@ -128,9 +128,9 @@ export interface ActionOverlayProps {
   view: GameView;
 }
 
-/** 浮层显示时长(ms):与 effect.duration 对齐,默认 1500ms。 */
-const DEFAULT_DURATION_MS = 1500;
-/** 群锦囊持续展示时长(ms):给玩家更多时间看清「轮到谁」。 */
+/** 箭头显示时长(ms) */
+const DEFAULT_DURATION_MS = 3500;
+/** 群锦囊箭头持续展示时长(ms) */
 const BROADCAST_DURATION_MS = 2200;
 
 /** 群锦囊卡名(无固定目标,通过 pending 指示当前结算角色) */
@@ -150,27 +150,19 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
     null,
   );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   // view 以 ref 形式持有:effect 只依赖 current,避免每次 view 变化重算箭头。
   const viewRef = useRef(view);
   viewRef.current = view;
 
+  // 浮层展示与事件队列解耦:指定目标等 atom 的 effect.duration 仅 400ms,
+  // 若跟 current 切走就清掉,用户几乎看不清。有新动作才刷新;无动作/队列空时让计时器跑完。
   useEffect(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (!current) {
-      setInfo(null);
-      setArrow(null);
-      return;
-    }
+    if (!current) return;
     const event = current.event as ViewEventLike;
     let action = extractAction(event);
-    if (!action) {
-      setInfo(null);
-      setArrow(null);
-      return;
-    }
+    if (!action) return;
+
     // 群锦囊场景:打出事件 + 当前 pending 命中某座次 → 把目标设为该座次,
     // 浮层展示「X 使用 群锦囊」+ 箭头指向当前轮到结算的角色。
     const pendingTarget = viewRef.current.pending?.target;
@@ -183,30 +175,36 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
     ) {
       action = { ...action, target: pendingTarget };
     }
-    setInfo(action);
 
-    // 计算箭头坐标:起点=source 座位中央,终点=target 座位中央
-    if (action.target !== undefined && action.target !== action.source) {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    // 仅在有目标时保留箭头;无目标动作不占浮层
+    if (action.target === undefined || action.target === action.source) {
+      setArrow(null);
+      // 仍记录 info 以便计时清理,但不强制显示
+      setInfo(action);
+    } else {
+      setInfo(action);
       const srcEl = findSeatEl(viewRef.current, action.source);
       const dstEl = findSeatEl(viewRef.current, action.target);
-      if (srcEl && dstEl) {
+      const rootEl = rootRef.current;
+      if (srcEl && dstEl && rootEl) {
+        const origin = rootEl.getBoundingClientRect();
         const r1 = srcEl.getBoundingClientRect();
         const r2 = dstEl.getBoundingClientRect();
         setArrow({
-          x1: r1.left + r1.width / 2,
-          y1: r1.top + r1.height / 2,
-          x2: r2.left + r2.width / 2,
-          y2: r2.top + r2.height / 2,
+          x1: r1.left + r1.width / 2 - origin.left,
+          y1: r1.top + r1.height / 2 - origin.top,
+          x2: r2.left + r2.width / 2 - origin.left,
+          y2: r2.top + r2.height / 2 - origin.top,
         });
       } else {
         setArrow(null);
       }
-    } else {
-      setArrow(null);
     }
 
-    // 浮层持续时间:群锦囊+目标命中时拉长;判定事件与 effect.duration(1800ms)对齐;
-    // 否则默认
     const isBroadcast =
       action.cardName !== undefined && BROADCAST_TRICKS.has(action.cardName);
     const isJudge = action.eventType === '判定';
@@ -218,54 +216,24 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
     timerRef.current = setTimeout(() => {
       setInfo(null);
       setArrow(null);
+      timerRef.current = null;
     }, dur);
+  }, [current]);
+
+  useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
     };
-  }, [current]);
+  }, []);
 
-  if (!info) return null;
-
-  const sourceName = view.players.find((p) => p.index === info.source)?.name ?? `P${info.source}`;
-  const targetName =
-    info.target !== undefined
-      ? view.players.find((p) => p.index === info.target)?.name ?? `P${info.target}`
-      : undefined;
-
-  // 文案:
-  //   指定目标/成为目标:刘备 杀 张角
-  //   造成伤害:刘备 → 张角 (伤害)
-  //   失去体力:张角 失去 1 点体力
-  //   打出:刘备 使用 南蛮入侵 [→ 当前轮到 张角]
-  let text: string;
-  if (info.eventType === '指定目标' || info.eventType === '成为目标') {
-    text = `${sourceName}${info.cardName ? ` ${info.cardName} ` : ' → '}${targetName ?? ''}`;
-  } else if (info.eventType === '造成伤害') {
-    text = `${sourceName} → ${targetName ?? ''} 伤害`;
-  } else if (info.eventType === '失去体力') {
-    text = `${sourceName} 失去体力`;
-  } else if (info.eventType === '判定') {
-    // 判定浮层:展示判定者 + 判定类型 + 翻出的判定牌花色点数+牌名
-    // 如:张角 判定(乐不思蜀):翻出 ♥3 桃
-    const jt = info.judgeType ? `判定(${info.judgeType})` : '判定';
-    const suit = info.suit ?? '';
-    const rank = info.rank ?? '';
-    const cardName = info.cardName ?? '';
-    const cardPart =
-      suit || rank || cardName ? `:翻出 ${suit}${rank} ${cardName}`.trim() : '';
-    text = `${sourceName} ${jt}${cardPart}`;
-  } else {
-    // 打出
-    const tail = targetName ? ` → ${targetName}` : '';
-    text = `${sourceName} 使用 ${info.cardName ?? '牌'}${tail}`;
-  }
-
+  // 始终挂载 root(保证 rootRef 可用于箭头坐标换算);无箭头时不画内容
+  // 文字浮层已由中央 PlayHistoryStrip 替代,此处只保留座位间箭头。
   return (
-    <div className={overlayRoot} style={{ pointerEvents: 'none' } as CSSProperties}>
-      {arrow && (
+    <div ref={rootRef} className={overlayRoot} style={{ pointerEvents: 'none' } as CSSProperties}>
+      {info && arrow && (
         <svg className={arrowSvg} style={{ pointerEvents: 'none' }}>
           <defs>
             <marker
@@ -292,16 +260,14 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
           />
         </svg>
       )}
-      <div className={banner}>
-        <span className={bannerText}>{text}</span>
-      </div>
     </div>
   );
 }
 
 // ─── Styles ───
+/** 相对 battleField 铺满,箭头坐标相对战场 */
 const overlayRoot = css`
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 9998;
   pointer-events: none;
@@ -318,28 +284,4 @@ const arrowSvg = css`
 const arrowLine = css`
   animation: arrowPulse 1s ease-in-out infinite;
   filter: drop-shadow(0 0 6px rgba(255, 85, 85, 0.5));
-`;
-
-const banner = css`
-  position: absolute;
-  top: 14%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, rgba(40, 12, 12, 0.92), rgba(60, 18, 18, 0.92));
-  border: 2px solid #ffd700;
-  border-radius: 12px;
-  padding: 10px 28px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 215, 0, 0.3);
-  color: #fff;
-  font-size: 18px;
-  font-weight: bold;
-  letter-spacing: 2px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
-  animation: bannerIn 0.35s ease-out both;
-  pointer-events: none;
-  max-width: 80vw;
-`;
-
-const bannerText = css`
-  display: inline-block;
 `;

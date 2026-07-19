@@ -6,27 +6,29 @@ import { css } from '@linaria/core';
 export const promptBox = css`
   border: 2px solid #e67e22;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 8px 14px;
   background: rgba(230, 126, 34, 0.15);
-  margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
 `;
 export const promptBoxAwaiting = css`
   border: 2px solid #e74c3c;
   border-left: 4px solid #e74c3c;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 8px 14px;
   background: rgba(231, 76, 60, 0.1);
-  margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
 `;
 export const promptTitle = css`
   color: #e67e22;
   font-weight: bold;
-  font-size: 15px;
-  margin-bottom: 4px;
+  font-size: 14px;
+  margin-bottom: 2px;
 `;
 export const promptDesc = css`
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
 `;
 export const promptActions = css`
   display: flex;

@@ -1,22 +1,28 @@
 // src/client/components/EquipColumn.tsx
 // 装备区独立纵向列(布局最左侧)。
-// 从 PlayerCardLarge.tsx 抽出装备区渲染,改为纵向排列。
-// 纯展示组件,所有数据/回调由父组件(GameView)传入。
-//
-// 包含:装备槽位(武器/防具/马,纵向堆叠) + 装备技能按钮(可主动点击的装备技)。
+// 布局:武器 → 防具 → [进攻马|防御马] 并排 → 宝物。
 // distribute(制衡/仁德)激活时,候选装备可点击选中,与手牌候选高亮一致。
 
 import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
-import type { GameView } from '../../engine/types';
+import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
-import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON, EQUIP_SLOT_ORDER } from './gameViewConstants';
+import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
 import { shallowSetEqual } from '../utils/memo';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { useHoverTooltip } from './SkillTooltip';
+
+/** 空槽短标签(马槽并排时用短名) */
+const EMPTY_SLOT_LABEL: Record<EquipSlot, string> = {
+  武器: '武器',
+  防具: '防具',
+  进攻马: '进攻',
+  防御马: '防御',
+  宝物: '宝物',
+};
 
 export interface EquipColumnProps {
   /** 视角玩家在 view.players 中的下标 */
@@ -50,12 +56,10 @@ export function EquipColumnImpl({
   isDistributeActive,
   onEquipCardClick,
 }: EquipColumnProps) {
-  useSkillDescReady(); // 技能模块加载后重渲染,确保装备技能描述 title 命中
+  useSkillDescReady();
   const p = view.players[perspectiveIdx];
   if (!p) return null;
 
-  // 装备技能:动态装备的技能可主动发动。skillId === 装备牌名(见 card-meta.ts)。
-  // 将可发动的技能融合到对应装备卡片,不再在底部单独列出技能按钮。
   const equipSkillActions = skillActions.filter((a) => EQUIPMENT_SKILL_NAMES.has(a.skillId));
   const actionCtx = { view, perspectiveIdx };
   const activeSkillByEquipName = new Map<string, SkillActionDef>();
@@ -63,54 +67,59 @@ export function EquipColumnImpl({
     if (canOperate && isActiveAction(a, actionCtx)) activeSkillByEquipName.set(a.skillId, a);
   }
 
+  const renderSlot = (slot: EquipSlot) => {
+    const cardId = p.equipment[slot];
+    const icon = EQUIP_SLOT_ICON[slot] ?? '💎';
+    if (!cardId) {
+      return (
+        <div key={slot} className={cx(styles.equipColumnItem, styles.equipSlotEmpty)}>
+          <span className={styles.equipColumnIcon}>{icon}</span>
+          <span className={styles.equipSlotEmptyLabel}>{EMPTY_SLOT_LABEL[slot]}</span>
+        </div>
+      );
+    }
+    const id = cardId;
+    const card = view.cardMap[id];
+    const name = card?.name ?? id;
+    const activeSkill = activeSkillByEquipName.get(name);
+    const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
+    const isDistSelected = !!distSelectedEquipIds?.has(id);
+    const clickable = !!activeSkill || isDistCandidate;
+    const handleClick = activeSkill
+      ? () => onSkillAction(activeSkill)
+      : isDistCandidate
+        ? () => onEquipCardClick?.(id)
+        : undefined;
+    const stateHint = activeSkill ? ' · 可发动' : isDistCandidate ? ' · 可选中' : '';
+    const equipDesc = EQUIPMENT_SKILL_NAMES.has(name) ? getSkillDescription(name) : undefined;
+    const head = `${name}(${slot})${stateHint}`;
+    const tooltipText = equipDesc ? `${head}\n${equipDesc}` : head;
+    return (
+      <EquipItem
+        key={slot}
+        icon={icon}
+        name={name}
+        tooltipText={card ? tooltipText : id}
+        activeSkill={activeSkill}
+        isDistCandidate={isDistCandidate}
+        isDistSelected={isDistSelected}
+        clickable={clickable}
+        handleClick={handleClick}
+      />
+    );
+  };
+
   return (
     <div className={styles.equipColumn}>
       <div className={styles.equipColumnTitle}>装备区</div>
       <div className={styles.equipColumnList}>
-        {EQUIP_SLOT_ORDER.map((slot) => {
-          const cardId = p.equipment[slot];
-          const icon = EQUIP_SLOT_ICON[slot] ?? '💎';
-          // 空槽:固定占位卡框(布局稳定,不因装备数变化而抖动)
-          if (!cardId) {
-            return (
-              <div key={slot} className={cx(styles.equipColumnItem, styles.equipSlotEmpty)}>
-                <span className={styles.equipColumnIcon}>{icon}</span>
-                <span className={styles.equipSlotEmptyLabel}>{slot}</span>
-              </div>
-            );
-          }
-          const id = cardId;
-          const card = view.cardMap[id];
-          const name = card?.name ?? id;
-          // 三态:技能可发动 / distribute 候选 / 选中(向右偏移)
-          const activeSkill = activeSkillByEquipName.get(name);
-          const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
-          const isDistSelected = !!distSelectedEquipIds?.has(id);
-          const clickable = !!activeSkill || isDistCandidate;
-          const handleClick = activeSkill
-            ? () => onSkillAction(activeSkill)
-            : isDistCandidate
-              ? () => onEquipCardClick?.(id)
-              : undefined;
-          const stateHint = activeSkill ? ' · 可发动' : isDistCandidate ? ' · 可选中' : '';
-          // 装备自带技能(丈八蛇矛/青釭剑/八卦阵等)时,hover 展示技能描述
-          const equipDesc = EQUIPMENT_SKILL_NAMES.has(name) ? getSkillDescription(name) : undefined;
-          const head = `${name}(${slot})${stateHint}`;
-          const tooltipText = equipDesc ? `${head}\n${equipDesc}` : head;
-          return (
-            <EquipItem
-              key={slot}
-              icon={icon}
-              name={name}
-              tooltipText={card ? tooltipText : id}
-              activeSkill={activeSkill}
-              isDistCandidate={isDistCandidate}
-              isDistSelected={isDistSelected}
-              clickable={clickable}
-              handleClick={handleClick}
-            />
-          );
-        })}
+        {renderSlot('武器')}
+        {renderSlot('防具')}
+        <div className={styles.equipHorseRow}>
+          {renderSlot('进攻马')}
+          {renderSlot('防御马')}
+        </div>
+        {renderSlot('宝物')}
       </div>
     </div>
   );
@@ -152,7 +161,7 @@ function EquipItem({
         onMouseLeave={tip.onMouseLeave}
       >
         <span className={styles.equipColumnIcon}>{icon}</span>
-        <span>{name}</span>
+        <span className={styles.equipItemName}>{name}</span>
         {activeSkill && <span className={styles.equipSkillBadge}>⚡</span>}
       </div>
       {tip.tooltip}
@@ -165,13 +174,15 @@ function equipColumnPropsEqual(prev: EquipColumnProps, next: EquipColumnProps): 
   const prevP = prev.view.players[prev.perspectiveIdx];
   const nextP = next.view.players[next.perspectiveIdx];
   if (!prevP || !nextP) return prevP === nextP;
-  // equipment cardIds 比较(cardMap 查找确定性)
   const prevKeys = Object.keys(prevP.equipment);
   const nextKeys = Object.keys(nextP.equipment);
   if (prevKeys.length !== nextKeys.length) return false;
   for (const k of prevKeys) {
-    if (prevP.equipment[k as keyof typeof prevP.equipment] !==
-        nextP.equipment[k as keyof typeof nextP.equipment]) return false;
+    if (
+      prevP.equipment[k as keyof typeof prevP.equipment] !==
+      nextP.equipment[k as keyof typeof nextP.equipment]
+    )
+      return false;
   }
   return (
     prev.perspectiveIdx === next.perspectiveIdx &&
@@ -182,7 +193,6 @@ function equipColumnPropsEqual(prev: EquipColumnProps, next: EquipColumnProps): 
     prev.isDistributeActive === next.isDistributeActive &&
     shallowSetEqual(prev.distCandidateEquipIds ?? new Set(), next.distCandidateEquipIds ?? new Set()) &&
     shallowSetEqual(prev.distSelectedEquipIds ?? new Set(), next.distSelectedEquipIds ?? new Set()) &&
-    // 技能可用性依赖 phase
     prev.view.phase === next.view.phase
   );
 }

@@ -23,6 +23,7 @@ import {
   findUseActionForCard,
   findAltActionsForCard,
   isActiveAction,
+  isFreePlayWindow,
   resolveDistributeCardIds,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
@@ -251,6 +252,13 @@ export function usePlayInteraction(
       setDistTargetName(null);
     }
   }, [distributeMode, view, perspectiveIdx, skillActions]);
+
+  // 普通选牌:离开自由出牌窗口(回合结束/弃牌/阻塞询问)时清空,避免「取消选择」残留。
+  useEffect(() => {
+    if (isFreePlayWindow({ isMyTurn, phase: view.phase, pending })) return;
+    setSelectedCardId(null);
+    setSelectedTarget(null);
+  }, [isMyTurn, view.phase, pending]);
 
   // ─── 派生:选中的牌 + use action ───
   const selectedCard = selectedCardId

@@ -21,14 +21,15 @@ export const debugHint = css`
 `;
 
 // ─── Event card flip(翻牌动效,非阻塞) ───
-// 中央浮动卡牌:从上方弹出 + 3D 翻转揭示花色点数
+// 铺满 battleField,卡片落在几何中心(与 centerTable / ActionOverlay 对齐)
 export const eventCardLayer = css`
+  position: absolute;
+  inset: 0;
+  z-index: 7;
   pointer-events: none;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  min-height: 0;
-  margin: 0;
+  align-items: center;
 `;
 export const eventCardFlip = css`
   display: flex;

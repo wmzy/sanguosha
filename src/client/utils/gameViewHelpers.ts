@@ -190,21 +190,69 @@ export function resolveDistributeCardIds(
   return hand.map((c) => c.id);
 }
 
+// ─── 出牌操作按钮可见性 ───
+// 与 availableActions 结束回合条件、引擎 hasBlockingPending 对齐:
+// 仅「自己回合 + 出牌阶段 + 无阻塞 pending」可自由出牌/结束回合。
+
+type PendingBlocking = { isBlocking?: boolean } | null;
+
+export type FreePlayWindowInput = {
+  isMyTurn: boolean;
+  phase: string;
+  pending: PendingBlocking;
+};
+
+/** 是否处于可自由出牌窗口(非回应/弃牌等阻塞询问)。 */
+export function isFreePlayWindow({ isMyTurn, phase, pending }: FreePlayWindowInput): boolean {
+  if (!isMyTurn || phase !== '出牌') return false;
+  if (pending && pending.isBlocking !== false) return false;
+  return true;
+}
+
+/** 「结束回合」按钮:可操作且处于自由出牌窗口。 */
+export function canShowEndTurnButton(
+  opts: FreePlayWindowInput & { canOperate: boolean },
+): boolean {
+  return opts.canOperate && isFreePlayWindow(opts);
+}
+
+/** 「取消选择」按钮:已选手牌且处于自由出牌窗口。 */
+export function canShowCancelSelectionButton(
+  opts: FreePlayWindowInput & { selectedCardId: string | null },
+): boolean {
+  return !!opts.selectedCardId && isFreePlayWindow(opts);
+}
+
 // ─── 弧形布局 ───
 
 /**
- * 弧形座位坐标计算。
- * 沿 180° 弧形分布:左端 5%,右端 95%;Y 轴弧线中间高两端低。
+ * 座位环坐标:自己在底栏,其余玩家沿上半椭圆环绕,中央留给 CenterTable。
+ * - 1 人:正上方
+ * - 2–3 人:上半弧(不落侧翼过低)
+ * - 4+ 人:椭圆环,左右也可落座
  * @param totalOthers 其他玩家人数(不含自己)
  * @param i 当前玩家在"其他玩家"序列中的下标(0-based)
- * @returns { leftPct, topPct } 百分比坐标
+ * @returns { leftPct, topPct } 百分比坐标(相对 battleField)
  */
 export function arcLayout(totalOthers: number, i: number): { leftPct: number; topPct: number } {
-  const t = totalOthers <= 1 ? 0.5 : i / (totalOthers - 1);
-  const leftPct = 5 + 90 * t;
-  // 弧度 0→1→0 表示中间高、两端低
-  const arcH = 1 - Math.cos(Math.PI * t); // 0→1→0
-  // topPct 范围 4% ~ 38%:让弧线在屏幕上半部分,留出中央给处理区
-  const topPct = 38 - 34 * arcH * 0.5;
-  return { leftPct, topPct };
+  if (totalOthers <= 0) return { leftPct: 50, topPct: 20 };
+  if (totalOthers === 1) return { leftPct: 50, topPct: 6 };
+
+  const t = i / (totalOthers - 1);
+  // 标准极角:0=右, π/2=上, π=左。人数多时两端更靠侧下,腾出顶部中央。
+  const startAngle = totalOthers <= 3 ? Math.PI * 0.88 : Math.PI * 1.12;
+  const endAngle = totalOthers <= 3 ? Math.PI * 0.12 : Math.PI * -0.12;
+  const angle = startAngle + (endAngle - startAngle) * t;
+
+  const rx = totalOthers <= 3 ? 38 : 44;
+  const ry = totalOthers <= 3 ? 26 : 34;
+  const cx = 50;
+  const cy = totalOthers <= 3 ? 20 : 26;
+
+  const leftPct = cx + rx * Math.cos(angle);
+  const topPct = cy - ry * Math.sin(angle);
+  return {
+    leftPct: Math.min(94, Math.max(6, leftPct)),
+    topPct: Math.min(52, Math.max(2, topPct)),
+  };
 }

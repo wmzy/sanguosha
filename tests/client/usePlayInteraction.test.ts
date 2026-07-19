@@ -701,6 +701,70 @@ describe('usePlayInteraction · handleCardClick 选牌与切换', () => {
     expect(result.current.selectedCardId).toBeNull();
   });
 
+  it('阻塞 pending 出现后自动清除选牌(避免取消选择残留)', () => {
+    const freeParams = makePlayParams({
+      view: makePlayView(),
+      skillActions: [killUseAction()],
+      perspectiveHand: [KILL_CARD],
+      pending: {
+        type: 'awaits',
+        atom: { type: '出牌窗口', player: 0 },
+        target: 0,
+        prompt: { type: 'confirm', title: '出牌阶段' },
+        isBlocking: false,
+      },
+    });
+    const { result, rerender } = renderHook(
+      ({ params, isMyTurn }: { params: PlayInteractionParams; isMyTurn: boolean }) =>
+        usePlayInteraction(isMyTurn, true, params),
+      { initialProps: { params: freeParams, isMyTurn: true } },
+    );
+    act(() => result.current.handleCardClick(KILL_CARD));
+    expect(result.current.selectedCardId).toBe('c-kill');
+
+    const blocked = makePlayParams({
+      view: makePlayView(),
+      skillActions: [killUseAction()],
+      perspectiveHand: [KILL_CARD],
+      pending: {
+        type: 'awaits',
+        atom: { type: '造成伤害', source: 0, target: 1, amount: 1 },
+        target: 1,
+        prompt: {
+          type: 'useCard',
+          title: '请出闪',
+          cardFilter: { filter: () => true, min: 1, max: 1 },
+        },
+        isBlocking: true,
+      },
+    });
+    rerender({ params: blocked, isMyTurn: true });
+    expect(result.current.selectedCardId).toBeNull();
+  });
+
+  it('进入弃牌阶段后自动清除选牌', () => {
+    const playParams = makePlayParams({
+      view: makePlayView({ phase: '出牌' }),
+      skillActions: [killUseAction()],
+      perspectiveHand: [KILL_CARD],
+    });
+    const { result, rerender } = renderHook(
+      ({ params }: { params: PlayInteractionParams }) => usePlayInteraction(true, true, params),
+      { initialProps: { params: playParams } },
+    );
+    act(() => result.current.handleCardClick(KILL_CARD));
+    expect(result.current.selectedCardId).toBe('c-kill');
+
+    rerender({
+      params: makePlayParams({
+        view: makePlayView({ phase: '弃牌' }),
+        skillActions: [killUseAction()],
+        perspectiveHand: [KILL_CARD],
+      }),
+    });
+    expect(result.current.selectedCardId).toBeNull();
+  });
+
   it('出牌模式:切换选中另一张牌', () => {
     const { result } = renderPlay(
       makePlayParams({

@@ -2,12 +2,20 @@
 
 import { css } from '@linaria/core';
 
-// ─── Action bar ───
+// ─── Action bar(中央操作台内) ───
 export const actionBar = css`
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
-  margin-bottom: 12px;
+  justify-content: center;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  border: 1px solid rgba(83, 70, 41, 0.6);
+  &:empty {
+    display: none;
+  }
 `;
 export const playBtn = css`
   border: none;
@@ -28,11 +36,12 @@ export const endTurnBtn = css`
   color: #fff;
   font-weight: bold;
   font-size: 14px;
-  margin-left: auto;
 `;
 export const targetHint = css`
   font-size: 13px;
   color: #ffd700;
+  width: 100%;
+  text-align: center;
 `;
 
 // Skill buttons (技能在角色卡上显示，这里只保留按钮本体样式)
@@ -86,9 +95,9 @@ export const equipSkillBadge = css`
 
 // ─── 装备区纵向列(最左侧) ───
 export const equipColumn = css`
-  flex: 0 0 168px;
+  flex: 0 0 156px;
   border: 1px solid #444;
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.45);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -111,21 +120,34 @@ export const equipColumnList = css`
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 8px 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+`;
+/** 进攻马 + 防御马并排一行 */
+export const equipHorseRow = css`
+  display: flex;
+  gap: 4px;
+  & > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 `;
 export const equipColumnItem = css`
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: 12px;
   color: #f39c12;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border-radius: 4px;
   background: rgba(243, 156, 18, 0.06);
   border: 1px solid rgba(243, 156, 18, 0.15);
+  overflow: hidden;
 `;
 export const equipColumnIcon = css`
-  font-size: 14px;
+  font-size: 13px;
   flex-shrink: 0;
 `;
 // 空装备槽占位卡框:与 equipColumnItem 同尺寸,虚线边框 + 半透明,保证 5 槽布局固定
@@ -136,18 +158,28 @@ export const equipSlotEmpty = css`
 `;
 export const equipSlotEmptyLabel = css`
   color: #777;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+export const equipItemName = css`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 `;
 
 // ─── 角色大卡 (右侧) ───
 export const playerCardLarge = css`
-  flex: 0 0 300px;
+  flex: 0 0 260px;
   border: 1px solid #444;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.55);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
+  align-self: stretch;
   @media (max-width: 900px) {
     flex: 1 1 auto;
   }

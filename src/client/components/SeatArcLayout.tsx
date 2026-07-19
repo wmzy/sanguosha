@@ -2,8 +2,9 @@
 // 弧形座位布局 — 从 GameView.tsx 抽出
 //
 // 职责:把 orderedPlayers.slice(1) 沿弧形排列,每个渲染一个 <PlayerSeatView>。
-// 纯展示,所有数据和回调由 props 传入。
+// 纯展示,所有数据和回调由 props 传入。底部可插入操作坞(prompt/倒计时/按钮)。
 
+import type { ReactNode } from 'react';
 import type { GameView } from '../../engine/types';
 import * as styles from './gameViewStyles';
 import { arcLayout } from '../utils/gameViewHelpers';
@@ -42,6 +43,8 @@ export interface SeatArcLayoutProps {
   /** 动画 */
   damageFlashIndices: Map<number, number>;
   turnVersion: number;
+  /** 贴在座位区底部的操作坞(提示/倒计时/主按钮) */
+  bottomSlot?: ReactNode;
 }
 
 export function SeatArcLayout(props: SeatArcLayoutProps) {
@@ -57,6 +60,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
     onSeatDoubleClick,
     damageFlashIndices,
     turnVersion,
+    bottomSlot,
   } = props;
 
   return (
@@ -65,7 +69,6 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
         orderedPlayers.slice(1).map((player, i) => {
           const totalOthers = orderedPlayers.length - 1;
           const realIdx = view.players.findIndex((p) => p.name === player.name);
-          // 沿 180° 弧形分布: 左端5% 右端95%, Y轴弧线中间高两端低
           const { leftPct, topPct } = arcLayout(totalOthers, i);
           const seatDeadline = deadlineForSeat(view, realIdx);
           const seatTotalMs = view.pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS;
@@ -93,13 +96,13 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
                 isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
                 turnGlowVersion={turnVersion}
               />
-              {/* 其他角色等待进度条:仅当该座次正在等待回应时显示 */}
               {seatDeadline !== null && (
                 <CountdownBar deadline={seatDeadline} totalMs={seatTotalMs} />
               )}
             </div>
           );
         })}
+      {bottomSlot != null && <div className={styles.seatBottomDock}>{bottomSlot}</div>}
     </div>
   );
 }

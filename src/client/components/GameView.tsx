@@ -13,7 +13,7 @@
 //   并通过 headerSlot/overlaySlot 注入视角控制 UI。切换视图、自动跟随、代打等逻辑
 //   均在上层,本组件不可见。
 //
-// 布局: GameHeader → 提示区 → 座位弧形(其他玩家) → [左:角色大卡 | 右:倒计时+操作+目标+手牌] → 日志
+// 布局: GameHeader → [Battlefield: SeatRing + CenterTable | SideDock] → BottomBar(装备|手牌|武将)
 import { useState, useCallback, useRef, memo, type ReactNode } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
@@ -36,7 +36,13 @@ import { HandCard } from './HandCard';
 import { CancelButton } from './CancelButton';
 import { EquipColumn } from './EquipColumn';
 import { InfoDock } from './InfoDock';
-import { findUseActionForCard, isActiveAction } from '../utils/gameViewHelpers';
+import { PlayHistoryStrip } from './PlayHistoryStrip';
+import {
+  canShowCancelSelectionButton,
+  canShowEndTurnButton,
+  findUseActionForCard,
+  isActiveAction,
+} from '../utils/gameViewHelpers';
 
 // ─── 抽取的 hooks ───
 import { useAnimationState } from '../hooks/useAnimationState';
@@ -47,6 +53,7 @@ import { useSeatOrder } from '../hooks/useSeatOrder';
 import { useHandReorder } from '../hooks/useHandReorder';
 import { usePlayInteraction } from '../hooks/usePlayInteraction';
 import { useProcessingPicks } from '../hooks/useProcessingPicks';
+import { usePlayHistory } from '../hooks/usePlayHistory';
 
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
@@ -66,6 +73,8 @@ interface Props {
   /** 当前播放的事件(来自 useEventPlayback),用于 GameView 内部事件横幅展示。
    *  正式模式可不传(无事件播放队列)。 */
   currentEvent?: QueuedEvent | null;
+  /** 刚入队的事件批次:出牌历史在「使用时」立即入条,不等播放队列延时。 */
+  ingestedEvents?: QueuedEvent[];
   /** 只读模式(回放):禁用选将/身份揭示等阻塞性遮罩,避免遮挡游戏画面。
    *  正式/debug 模式不传(默认 false),保持原有选将流程。 */
   readOnly?: boolean;
@@ -91,6 +100,7 @@ export function GameViewComponentImpl({
   headerSlot,
   overlaySlot,
   currentEvent,
+  ingestedEvents,
   readOnly = false,
   chatMessages,
   chatConfig,
@@ -132,6 +142,7 @@ export function GameViewComponentImpl({
   );
   const orderedPlayers = useSeatOrder(view, perspectiveIdx);
   const anim = useAnimationState(view, perspectiveIdx);
+  const playHistoryItems = usePlayHistory(ingestedEvents, view);
 
   const handListRef = useRef<HTMLDivElement>(null);
 
@@ -255,6 +266,28 @@ export function GameViewComponentImpl({
       }
     })();
 
+  const showEndTurn = canShowEndTurnButton({
+    canOperate,
+    isMyTurn,
+    phase: view.phase,
+    pending,
+  });
+  const showCancelSelection = canShowCancelSelectionButton({
+    selectedCardId,
+    isMyTurn,
+    phase: view.phase,
+    pending,
+  });
+  const showCenterActionBar =
+    (isMyAwaiting && !isDiscardPhase && pending?.prompt?.type === 'useCard' && !broadcastSkipped) ||
+    (canOperate && !!selectedActive && !!transformMode) ||
+    (canOperate && !!selectedActive && !transformMode && !!selectedCardId && !!playButtonState) ||
+    (canOperate && !transformMode && !!selectedCardId && altActions.length > 0) ||
+    showEndTurn ||
+    (canOperate && isDiscardPhase && isPerspectiveAwaiting) ||
+    (canOperate && isDistributeActive && !!activeDistribute) ||
+    (!!selectedCardId && !!selectedTarget && canOperate && isMyTurn);
+
   return (
     <div className={styles.pageRoot}>
       <OverlaysLayer
@@ -288,7 +321,7 @@ export function GameViewComponentImpl({
           {/* ─── 动作浮层+箭头(谁对谁用什么牌) ─── */}
           <ActionOverlay current={currentEvent ?? null} view={view} />
 
-          {/* ─── 座位布局(弧形) + 中央信息 ─── */}
+          {/* ─── 座位环 + 中央牌堆 + 底部操作坞 ─── */}
           <div className={styles.seatingArea}>
             <DevProfiler id="SeatArcLayout">
               <SeatArcLayout
@@ -316,13 +349,260 @@ export function GameViewComponentImpl({
                 onSeatDoubleClick={onSeatDoubleClick}
                 damageFlashIndices={anim.damageFlashIndices}
                 turnVersion={anim.turnVersion}
+                bottomSlot={
+                  <>
+                    {isPerspectiveAwaiting &&
+                      pending &&
+                      !isDiscardPhase &&
+                      !isPlayingFlipAnim &&
+                      pending?.atom?.type !== '选将询问' &&
+                      pending.prompt.type !== 'distribute' && (
+                        <AwaitingPrompt
+                          pending={pending}
+                          pendingTargetIdx={pendingTargetIdx}
+                          perspectiveName={perspectiveName}
+                          perspectiveHand={perspectiveHand}
+                          pendingRespondInfo={pendingRespondInfo}
+                          broadcastKey={broadcastKey}
+                          skillActions={skillActions}
+                          skippedBroadcast={skippedBroadcast}
+                          canOperate={canOperate}
+                          processingPicks={processingPicks}
+                          onSend={send}
+                          view={view}
+                        />
+                      )}
+                    <PlayPhasePrompt
+                      view={view}
+                      perspectiveName={perspectiveName}
+                      currentPlayerName={currentPlayerName}
+                      perspectiveIdx={perspectiveIdx}
+                      perspectiveHand={perspectiveHand}
+                      isPerspectiveTurn={isPerspectiveTurn}
+                      isPerspectiveAwaiting={isPerspectiveAwaiting}
+                      isDiscardPhase={isDiscardPhase}
+                      isMyTurn={isMyTurn}
+                      canOperate={canOperate}
+                      selectedCardId={selectedCardId}
+                      selectedTarget={selectedTarget}
+                      discardMin={discardMin}
+                      discardMax={discardMax}
+                      selectedForDiscard={selectedForDiscard}
+                    />
+
+                    {(isPerspectiveAwaiting || (isMyTurn && view.phase === '出牌')) &&
+                      !broadcastSkipped && (
+                        <CountdownBar
+                          deadline={deadline}
+                          totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS}
+                        />
+                      )}
+
+                    {(transformMode || showCancelSelection) && (
+                      <div className={styles.handHeader}>
+                        {transformMode && (
+                          <span className={cx(styles.debugHint, styles.transformHint)}>
+                            ⚡ 转化模式:选
+                            {transformMode.minCards > 1 ? `${transformMode.minCards}张` : '1张'}
+                            {transformMode.wrapperName}
+                            {transformMode.minCards > 1
+                              ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})`
+                              : ''}{' '}
+                            · 源技能 {transformMode.skillId}
+                          </span>
+                        )}
+                        {transformMode && (
+                          <CancelButton label="取消转化" onClick={cancelTransform} />
+                        )}
+                        {!transformMode && showCancelSelection && (
+                          <CancelButton label="取消选择" onClick={cancelSelection} />
+                        )}
+                      </div>
+                    )}
+
+                    {showCenterActionBar && (
+                      <div className={styles.actionBar}>
+                        {isMyAwaiting &&
+                          !isDiscardPhase &&
+                          pending?.prompt?.type === 'useCard' &&
+                          !broadcastSkipped && (
+                            <button className={styles.promptBtn} onClick={() => handleRespond()}>
+                              不回应
+                            </button>
+                          )}
+                        {canOperate &&
+                          selectedActive &&
+                          transformMode &&
+                          transformMode.minCards > 1 &&
+                          (() => {
+                            const ids = transformMode.selectedCardIds;
+                            const enough =
+                              ids.length >= transformMode.minCards &&
+                              ids.length <= transformMode.maxCards;
+                            return (
+                              <button
+                                className={cx(
+                                  styles.playBtn,
+                                  (!enough || !selectedTarget) && styles.btnDisabled,
+                                )}
+                                onClick={() =>
+                                  selectedTarget && enough && handleTransformPlay(selectedTarget)
+                                }
+                                disabled={!enough || !selectedTarget}
+                              >
+                                使用{transformMode.wrapperName}
+                                {selectedTarget
+                                  ? ` → ${selectedTarget}`
+                                  : enough
+                                    ? ' (请选目标)'
+                                    : ` (还需选 ${transformMode.minCards - ids.length} 张)`}
+                              </button>
+                            );
+                          })()}
+                        {canOperate &&
+                          selectedActive &&
+                          transformMode?.minCards === 1 &&
+                          selectedCardId && (
+                            <button
+                              className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)}
+                              onClick={() => selectedTarget && handleTransformPlay(selectedTarget)}
+                              disabled={!selectedTarget}
+                            >
+                              使用{transformMode.wrapperName}
+                              {selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
+                            </button>
+                          )}
+                        {canOperate &&
+                          selectedActive &&
+                          !transformMode &&
+                          selectedCardId &&
+                          playButtonState && (
+                            <button
+                              className={cx(
+                                styles.playBtn,
+                                !playButtonState.canPlay && styles.btnDisabled,
+                              )}
+                              onClick={handlePlayCard}
+                              disabled={!playButtonState.canPlay}
+                            >
+                              出牌{playButtonState.targetLabel}
+                            </button>
+                          )}
+                        {canOperate &&
+                          !transformMode &&
+                          selectedCardId &&
+                          altActions.length > 0 &&
+                          altActions.map((a) => (
+                            <button
+                              key={`${a.skillId}:${a.actionType}`}
+                              className={styles.playBtn}
+                              onClick={() => handleSkillAction(a)}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        {showEndTurn && (
+                          <button className={styles.endTurnBtn} onClick={handleEndTurn}>
+                            结束回合
+                          </button>
+                        )}
+                        {canOperate && isDiscardPhase && isPerspectiveAwaiting && (
+                          <>
+                            <button
+                              className={cx(
+                                styles.promptBtnPrimary,
+                                (selectedForDiscard.size < discardMin ||
+                                  selectedForDiscard.size > discardMax) &&
+                                  styles.btnDisabled,
+                              )}
+                              disabled={
+                                selectedForDiscard.size < discardMin ||
+                                selectedForDiscard.size > discardMax
+                              }
+                              onClick={handleConfirmDiscard}
+                            >
+                              确认弃牌 ({selectedForDiscard.size}/{discardMin})
+                            </button>
+                            {selectedForDiscard.size > 0 && (
+                              <button className={styles.promptBtn} onClick={clearDiscard}>
+                                清空选择
+                              </button>
+                            )}
+                          </>
+                        )}
+                        {canOperate &&
+                          isDistributeActive &&
+                          activeDistribute &&
+                          (() => {
+                            const mode = activeDistribute.prompt.mode ?? 'allocate';
+                            const minTotal = activeDistribute.prompt.minTotal ?? 1;
+                            const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
+                            let canSubmit: boolean;
+                            let label: string;
+                            if (mode === 'select') {
+                              canSubmit =
+                                distSelected.size >= minTotal && distSelected.size <= maxTotal;
+                              label = `确认(${distSelected.size})`;
+                            } else if (activeDistribute.externalTargetSelection) {
+                              canSubmit =
+                                distSelected.size >= minTotal &&
+                                distSelected.size <= maxTotal &&
+                                !!distTargetName;
+                              label = `确定(${distSelected.size})${distTargetName ? ` → ${distTargetName}` : ''}`;
+                            } else {
+                              const total = distAllocations.flatMap((a) => a.cardIds).length;
+                              canSubmit = total >= minTotal;
+                              label = `提交分配(${total})`;
+                            }
+                            return (
+                              <>
+                                <button
+                                  className={styles.promptBtn}
+                                  onClick={handleDistClear}
+                                  disabled={
+                                    distSelected.size === 0 && distAllocations.length === 0
+                                  }
+                                >
+                                  清空
+                                </button>
+                                <button
+                                  className={cx(
+                                    styles.promptBtnPrimary,
+                                    !canSubmit && styles.btnDisabled,
+                                  )}
+                                  onClick={handleDistSubmit}
+                                  disabled={!canSubmit}
+                                >
+                                  {label}
+                                </button>
+                                {distributeMode && (
+                                  <CancelButton
+                                    label="取消"
+                                    onClick={() => setDistributeMode(null)}
+                                  />
+                                )}
+                              </>
+                            );
+                          })()}
+                        {selectedCardId && selectedTarget && canOperate && isMyTurn && (
+                          <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                }
               />
             </DevProfiler>
-            <ZoneInfoBar view={view} />
+
+            {/* 中央:牌堆/处理区 + 出牌历史条 */}
+            <div className={styles.centerTable}>
+              <ZoneInfoBar view={view} />
+              <PlayHistoryStrip items={playHistoryItems} />
+            </div>
           </div>
         </div>
 
-        {/* 右侧边栏:日志/聊天(原 InfoDock 浮窗,现嵌入侧边栏) */}
+        {/* 右侧边栏:日志/聊天 */}
         <div className={styles.rightSidebar}>
           <InfoDock
             view={view}
@@ -335,9 +615,8 @@ export function GameViewComponentImpl({
         </div>
       </div>
 
-      {/* ─── 下方主区域:左 角色大卡 / 右 手牌+操作 ─── */}
+      {/* ─── 底栏:装备 | 手牌 | 我方武将 ─── */}
       <div className={styles.bottomLayout}>
-        {/* ─── 左:装备区纵向列 ─── */}
         <EquipColumn
           perspectiveIdx={perspectiveIdx}
           view={view}
@@ -351,239 +630,21 @@ export function GameViewComponentImpl({
         />
 
         <div className={styles.handColumn}>
-          {/* ─── 待回应区(pending 回应,非弃牌/非选将/非 distribute)─── */}
-          {/* distribute pending(遗计)由下方统一分配面板处理 */}
-          {/* 翻牌动画(blockUntilDone)期间延迟:让玩家先看清判定结果再弹出询问 */}
-          {isPerspectiveAwaiting &&
-            pending &&
-            !isDiscardPhase &&
-            !isPlayingFlipAnim &&
-            pending?.atom?.type !== '选将询问' &&
-            pending.prompt.type !== 'distribute' && (
-              <AwaitingPrompt
-                pending={pending}
-                pendingTargetIdx={pendingTargetIdx}
-                perspectiveName={perspectiveName}
-                perspectiveHand={perspectiveHand}
-                pendingRespondInfo={pendingRespondInfo}
-                broadcastKey={broadcastKey}
-                skillActions={skillActions}
-                skippedBroadcast={skippedBroadcast}
-                canOperate={canOperate}
-                processingPicks={processingPicks}
-                onSend={send}
-                view={view}
-              />
-            )}
-          <PlayPhasePrompt
-            view={view}
-            perspectiveName={perspectiveName}
-            currentPlayerName={currentPlayerName}
-            perspectiveIdx={perspectiveIdx}
-            perspectiveHand={perspectiveHand}
-            isPerspectiveTurn={isPerspectiveTurn}
-            isPerspectiveAwaiting={isPerspectiveAwaiting}
-            isDiscardPhase={isDiscardPhase}
-            isMyTurn={isMyTurn}
-            canOperate={canOperate}
-            selectedCardId={selectedCardId}
-            selectedTarget={selectedTarget}
-            discardMin={discardMin}
-            discardMax={discardMax}
-            selectedForDiscard={selectedForDiscard}
-          />
-          {/* 自己的进度条:自己需要操作时显示 ——
-              1) 被询问(isPerspectiveAwaiting:阻塞型 pending 命中自己)
-              2) 自己出牌阶段(出牌窗口是非阻塞 pending,不计入 awaiting,但同样需要倒计时) */}
-          {(isPerspectiveAwaiting || (isMyTurn && view.phase === '出牌')) && !broadcastSkipped && (
-            <CountdownBar
-              deadline={deadline}
-              totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS}
-            />
-          )}
-          {/* 转化模式提示 + 取消选择 */}
           <div className={styles.handHeader}>
-            <span className={styles.handTitle}>
-              {perspectiveName} 的手牌 ({perspectiveHand.length})
-              {isDistributeActive && activeDistribute && (
-                <span className={cx(styles.debugHint, styles.distHint)}>
-                  🤝 {activeDistribute.prompt.title} · 已选 {distSelected.size}
-                </span>
-              )}
-              {transformMode && (
-                <span className={cx(styles.debugHint, styles.transformHint)}>
-                  ⚡ 转化模式:选{transformMode.minCards > 1 ? `${transformMode.minCards}张` : '1张'}
-                  {transformMode.wrapperName}
-                  {transformMode.minCards > 1
-                    ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})`
-                    : ''}{' '}
-                  · 源技能 {transformMode.skillId}
-                </span>
-              )}
-            </span>
-            {transformMode && <CancelButton label="取消转化" onClick={cancelTransform} />}
-            {!transformMode && selectedCardId && (
-              <CancelButton label="取消选择" onClick={cancelSelection} />
-            )}
-          </div>
-          {/* 操作面板:出牌/不回应/结束回合 */}
-          <div className={styles.actionBar}>
-            {/* useCard 待回应:不回应按钮(从 AwaitingPrompt 移至统一操作区)。 */}
-            {/* 排除弃牌阶段:弃牌 pending 复用 useCard prompt,由「确认弃牌」处理。 */}
-            {isMyAwaiting &&
-              !isDiscardPhase &&
-              pending?.prompt?.type === 'useCard' &&
-              !broadcastSkipped && (
-                <button className={styles.promptBtn} onClick={() => handleRespond()}>
-                  不回应
-                </button>
-              )}
-            {canOperate &&
-              selectedActive &&
-              transformMode &&
-              transformMode.minCards > 1 &&
-              (() => {
-                const ids = transformMode.selectedCardIds;
-                const enough =
-                  ids.length >= transformMode.minCards && ids.length <= transformMode.maxCards;
-                return (
-                  <button
-                    className={cx(
-                      styles.playBtn,
-                      (!enough || !selectedTarget) && styles.btnDisabled,
-                    )}
-                    onClick={() => selectedTarget && enough && handleTransformPlay(selectedTarget)}
-                    disabled={!enough || !selectedTarget}
-                  >
-                    使用{transformMode.wrapperName}
-                    {selectedTarget
-                      ? ` → ${selectedTarget}`
-                      : enough
-                        ? ' (请选目标)'
-                        : ` (还需选 ${transformMode.minCards - ids.length} 张)`}
-                  </button>
-                );
-              })()}
-            {canOperate && selectedActive && transformMode?.minCards === 1 && selectedCardId && (
-              <button
-                className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)}
-                onClick={() => selectedTarget && handleTransformPlay(selectedTarget)}
-                disabled={!selectedTarget}
-              >
-                使用{transformMode.wrapperName}
-                {selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
-              </button>
-            )}
-            {canOperate &&
-              selectedActive &&
-              !transformMode &&
-              selectedCardId &&
-              playButtonState && (
-                <button
-                  className={cx(styles.playBtn, !playButtonState.canPlay && styles.btnDisabled)}
-                  onClick={handlePlayCard}
-                  disabled={!playButtonState.canPlay}
-                >
-                  出牌{playButtonState.targetLabel}
-                </button>
-              )}
-            {/* 替代出牌方式(如铁索连环·重铸):选中牌后额外显示 */}
-            {canOperate &&
-              !transformMode &&
-              selectedCardId &&
-              altActions.length > 0 &&
-              altActions.map((a) => (
-                <button
-                  key={`${a.skillId}:${a.actionType}`}
-                  className={styles.playBtn}
-                  onClick={() => handleSkillAction(a)}
-                >
-                  {a.label}
-                </button>
-              ))}
-            {canOperate && isMyTurn && (view.phase === '出牌' || view.phase === '弃牌') && (
-              <button className={styles.endTurnBtn} onClick={handleEndTurn}>
-                结束回合
-              </button>
-            )}
-            {/* 弃牌阶段:确认弃牌 / 清空选择(与结束回合并排) */}
-            {canOperate && isDiscardPhase && isPerspectiveAwaiting && (
-              <>
-                <button
-                  className={cx(
-                    styles.promptBtnPrimary,
-                    (selectedForDiscard.size < discardMin ||
-                      selectedForDiscard.size > discardMax) &&
-                      styles.btnDisabled,
-                  )}
-                  disabled={
-                    selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax
-                  }
-                  onClick={handleConfirmDiscard}
-                >
-                  确认弃牌 ({selectedForDiscard.size}/{discardMin})
-                </button>
-                {selectedForDiscard.size > 0 && (
-                  <button className={styles.promptBtn} onClick={clearDiscard}>
-                    清空选择
-                  </button>
+            <div className={styles.phaseStrip}>
+              <span className={styles.phaseStripBadge}>{view.phase}</span>
+              <span className={styles.handTitle}>
+                手牌 ({perspectiveHand.length})
+                {isDistributeActive && activeDistribute && (
+                  <span className={cx(styles.debugHint, styles.distHint)}>
+                    {' '}
+                    · {activeDistribute.prompt.title} · 已选 {distSelected.size}
+                  </span>
                 )}
-              </>
-            )}
-            {/* distribute(制衡/仁德/遗计):提交/清空按钮。候选牌在手牌区+装备区卡片选,目标在座位区选 */}
-            {canOperate &&
-              isDistributeActive &&
-              activeDistribute &&
-              (() => {
-                const mode = activeDistribute.prompt.mode ?? 'allocate';
-                const minTotal = activeDistribute.prompt.minTotal ?? 1;
-                const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
-                let canSubmit: boolean;
-                let label: string;
-                if (mode === 'select') {
-                  canSubmit = distSelected.size >= minTotal && distSelected.size <= maxTotal;
-                  label = `确认(${distSelected.size})`;
-                } else if (activeDistribute.externalTargetSelection) {
-                  canSubmit =
-                    distSelected.size >= minTotal &&
-                    distSelected.size <= maxTotal &&
-                    !!distTargetName;
-                  label = `确定(${distSelected.size})${distTargetName ? ` → ${distTargetName}` : ''}`;
-                } else {
-                  const total = distAllocations.flatMap((a) => a.cardIds).length;
-                  canSubmit = total >= minTotal;
-                  label = `提交分配(${total})`;
-                }
-                return (
-                  <>
-                    <button
-                      className={styles.promptBtn}
-                      onClick={handleDistClear}
-                      disabled={distSelected.size === 0 && distAllocations.length === 0}
-                    >
-                      清空
-                    </button>
-                    <button
-                      className={cx(styles.promptBtnPrimary, !canSubmit && styles.btnDisabled)}
-                      onClick={handleDistSubmit}
-                      disabled={!canSubmit}
-                    >
-                      {label}
-                    </button>
-                    {distributeMode && (
-                      <CancelButton label="取消" onClick={() => setDistributeMode(null)} />
-                    )}
-                  </>
-                );
-              })()}
-            {selectedCardId && selectedTarget && canOperate && isMyTurn && (
-              <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
-            )}
+              </span>
+            </div>
           </div>
-          {/* 手牌区 */}
           <div className={styles.handList} ref={handListRef}>
-            {/* respond cardFilter 提取到 map 外部(memo 后的 pendingRespondInfo),
-                避免原先在每张牌的 map 回调里重复 resolve。 */}
             {orderedHand.map((card, i) => {
               const isSelected =
                 selectedCardId === card.id ||
@@ -593,8 +654,6 @@ export function GameViewComponentImpl({
                   transformMode.selectedCardIds.includes(card.id)
                 );
               const isDiscardSelected = selectedForDiscard.has(card.id);
-              // 出牌阶段该牌是否仍可玩:有 use action 但不 active(如杀超上限)时不可选中。
-              // 无 use action 的牌(闪,出牌阶段本就不可主动出)不受此限,保持原行为。
               const useAction = findUseActionForCard(skillActions, card);
               const playBlocked =
                 isMyTurn &&
@@ -602,20 +661,16 @@ export function GameViewComponentImpl({
                 !!useAction &&
                 !isActiveAction(useAction, { view, perspectiveIdx });
               const canPlay = isMyTurn && canOperate && !playBlocked;
-              // distribute 激活时不走 useCard 回应高亮(避免遗计 pending 双高亮)
               const respondFilter = pendingRespondInfo?.cardFilter;
               const isAwaiting = !isDistributeActive && isMyAwaiting && !!respondFilter?.(card);
               const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
               const isTransformCandidate = !!transformMode?.cardFilter(card);
               const isTransformActive = transformMode !== null && isMyTurn && canOperate;
-              // 显示转化后牌名:单卡转化(武圣)= 所有候选牌;多卡转化(丈八蛇矛)= 仅已选中牌
               const isTransformMatch =
                 isTransformCandidate &&
                 (transformMode?.minCards === 1 ||
                   !!transformMode?.selectedCardIds.includes(card.id));
-              // 置灰/不可点:转化激活但非候选牌(丈八蛇矛任意牌都是候选,故不置灰)
               const isTransformDisabled = isTransformActive && !isTransformCandidate;
-              // distribute(仁德/制衡/遗计):候选/选中/已分配
               const distCandidateIds = activeDistribute ? new Set(activeDistribute.cardIds) : null;
               const isDistCandidate = isDistributeActive && !!distCandidateIds?.has(card.id);
               const isDistSelected = isDistributeActive && distSelected.has(card.id);
@@ -659,12 +714,10 @@ export function GameViewComponentImpl({
           </div>
         </div>
 
-        {/* ─── 右:自己的武将卡片(回合金色高亮边框) ─── */}
         <div
           className={cx(
             styles.playerCardLarge,
             isPerspectiveTurn && styles.playerCardTurn,
-            // 伤害动画:与座位卡一致,震动+红光覆盖,让自己看清「被攻击」。
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatShaking,
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatDamageOverlay,
           )}

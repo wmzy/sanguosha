@@ -23,56 +23,54 @@ export const seatArcSlot = css`
   left: var(--seat-left, 0);
   top: var(--seat-top, 0);
   transform: translateX(-50%);
-  /* 给定宽度,使内部 CountdownBar 等子元素宽度与卡片对齐 */
-  width: 180px;
+  /* 竖向座位卡宽度;内部 CountdownBar 与卡对齐 */
+  width: 148px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  z-index: 2;
 `;
+/** @deprecated 定位已迁至 layout.centerTable;保留别名以免外部引用断裂 */
 export const centerMeta = css`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   text-align: center;
   max-width: 560px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  z-index: 5;
 `;
 export const metaText = css`
   font-size: 12px;
   color: #888;
 `;
 
-// ─── Seat card — 武将卡风格:势力色 header + 体力红心 + 技能标签 ───
+// ─── Seat card — 竖向信息卡(无立绘):势力色 header + HP + 技能 ───
 export const seatCard = css`
   border: 1px solid #444;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.55);
   transition: all 0.25s;
-  min-width: 170px;
-  max-width: 200px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  width: 148px;
+  min-height: 168px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 `;
 // 势力色顶部条:武将名 + 身份
 export const seatCardHeader = css`
-  padding: 6px 10px;
+  padding: 5px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 `;
 export const seatCardHeaderTop = css`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 4px;
 `;
 export const seatCharName = css`
   font-weight: bold;
-  font-size: 15px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 `;

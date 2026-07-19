@@ -106,13 +106,59 @@ export const mainContent = css`
   overflow: hidden;
 `;
 
-// 战场区:座位环绕中央(处理区/牌堆/弃牌堆),操作 prompt 浮在底部
+// 战场区:座位环绕中央(处理区/牌堆/弃牌堆 + CenterTable 操作区)
 export const battleField = css`
   flex: 1 1 auto;
   position: relative;
   background: radial-gradient(circle at center, rgba(60, 45, 30, 0.3), transparent);
   min-width: 0;
   overflow: hidden;
+`;
+
+/** 中央牌堆/处理区 + 出牌历史条(须高于 ActionOverlay 9998,否则被盖住) */
+export const centerTable = css`
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  width: min(560px, 92%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  & > * {
+    pointer-events: auto;
+  }
+`;
+
+/** CenterTable 内的牌堆/处理区信息(非绝对定位) */
+export const centerZoneInfo = css`
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+`;
+
+/** 座位区底部操作坞:提示 / 倒计时 / 主按钮(贴 seatArcContainer 底边) */
+export const seatBottomDock = css`
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  z-index: 6;
+  width: min(560px, 92%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  & > * {
+    pointer-events: auto;
+  }
 `;
 
 // 右侧边栏:固定宽 250px,承载日志+聊天(InfoDock 内嵌于此而非浮窗)
@@ -126,15 +172,14 @@ export const rightSidebar = css`
   overflow: hidden;
 `;
 
-// ─── 底部手牌区(固定高度) ───
-// 装备区在左、手牌区在中、我方武将卡在右
+// ─── 底部手牌区(固定高度):装备 | 手牌 | 我方武将 ───
 export const bottomLayout = css`
   flex: 0 0 auto;
-  height: 180px;
+  height: 200px;
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 10px 12px;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 12px 10px;
   border-top: 1px solid #534629;
   background: rgba(0, 0, 0, 0.5);
   position: relative;
@@ -150,7 +195,25 @@ export const handColumn = css`
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   justify-content: flex-end;
   height: 100%;
+`;
+
+/** 手牌区左侧阶段条(出牌/弃牌等) */
+export const phaseStrip = css`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+`;
+export const phaseStripBadge = css`
+  background: #c0392b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 2px 8px 8px 2px;
+  letter-spacing: 1px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 `;

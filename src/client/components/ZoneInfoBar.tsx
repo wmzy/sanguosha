@@ -44,7 +44,7 @@ function ZoneInfoBarImpl(props: ZoneInfoBarProps) {
   }
 
   return (
-    <div className={styles.centerMeta}>
+    <div className={styles.centerZoneInfo}>
       <div className={styles.metaText}>
         牌堆: {view.zones?.deckCount ?? Object.keys(view.cardMap).length} 张
       </div>

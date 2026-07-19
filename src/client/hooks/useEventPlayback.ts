@@ -33,14 +33,14 @@ export interface EventPlaybackState {
 /**
  * 事件播放队列。
  *
- * @param incoming 新收到的事件批次(已按 seq 升序)。每收到一批调用一次。
- * @returns 当前播放状态 { current }
- *
- * 用法:useEventPlayback 在收到 events 消息时调用 enqueue,
- * 返回的 current 传给 GameView 的 currentEvent prop(EventBanner 渲染)。
+ * @returns { current, ingested, enqueue, reset }
+ *   - current: 当前延时播放中的事件(箭头/判定翻牌等)
+ *   - ingested: 最近一次入队的新鲜事件批次(出牌历史条应立即消费,不等播放队列)
  */
 export function useEventPlayback() {
   const [current, setCurrent] = useState<QueuedEvent | null>(null);
+  /** 最近入队批次;每次 enqueue 新鲜事件时更新,供 PlayHistory 立即入条 */
+  const [ingested, setIngested] = useState<QueuedEvent[]>([]);
   const queueRef = useRef<QueuedEvent[]>([]);
   const lastPlayedSeqRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,12 +59,17 @@ export function useEventPlayback() {
     }
     isPlayingRef.current = true;
     setCurrent(next);
-    // duration 优先取 ViewEvent 自带 effect(移动牌等派生事件携带),
-    // fallback 到 AtomDefinition.effect 静态查表(判定/展示等)。
+    // duration:ViewEvent 自带 effect → atom 静态 effect(atomType 优先)→ 下限
+    // 注意:打出/弃牌 等 ViewEvent.type 不是 atom 名,必须用 atomType,且查表失败时不能抛。
     const type = next.event.atomType ?? next.event.type;
-    const staticEffect = getAtomDef(type).effect;
+    let staticDuration: number | undefined;
+    try {
+      staticDuration = getAtomDef(type).effect?.duration;
+    } catch {
+      staticDuration = undefined;
+    }
     const eventEffect = next.event.effect as { duration?: number } | undefined;
-    const duration = eventEffect?.duration ?? staticEffect?.duration ?? MIN_VISIBLE_MS;
+    const duration = eventEffect?.duration ?? staticDuration ?? MIN_VISIBLE_MS;
     const wait = Math.max(duration, MIN_VISIBLE_MS);
     timerRef.current = setTimeout(() => {
       lastPlayedSeqRef.current = next.seq;
@@ -75,6 +80,7 @@ export function useEventPlayback() {
   /**
    * 入队一批事件并开始播放(若空闲)。
    * 过时事件(seq <= lastPlayedSeq)被丢弃。
+   * 新鲜事件同时写入 ingested,供出牌历史「使用时立即展示」。
    */
   const enqueue = useCallback(
     (events: QueuedEvent[]) => {
@@ -83,6 +89,8 @@ export function useEventPlayback() {
       const fresh = events.filter((e) => e.seq > lastPlayedSeqRef.current);
       if (fresh.length === 0) return;
       queueRef.current.push(...fresh);
+      // 每次入队用新数组引用,确保下游 useEffect 能触发
+      setIngested(fresh.map((e) => e));
       // 若空闲,立即开始播放(用 ref 判断,避免闭包竞态)
       if (!isPlayingRef.current) {
         playNext();
@@ -100,6 +108,7 @@ export function useEventPlayback() {
     queueRef.current = [];
     isPlayingRef.current = false;
     setCurrent(null);
+    setIngested([]);
     lastPlayedSeqRef.current = baselineSeq;
   }, []);
 
@@ -112,5 +121,5 @@ export function useEventPlayback() {
     };
   }, []);
 
-  return { current, enqueue, reset };
+  return { current, ingested, enqueue, reset };
 }

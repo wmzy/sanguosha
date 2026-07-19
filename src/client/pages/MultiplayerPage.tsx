@@ -492,7 +492,13 @@ export function MultiplayerPage() {
             </button>
           </div>
           {/* 玩家视角的审批提示（仅当该玩家也在页面上时可见——但旁观者只看自己，所以审批由 playing 阶段处理） */}
-          <GameViewComponent view={mp.view} onAction={() => {}} onReorderHand={() => {}} currentEvent={mp.currentEvent} />
+          <GameViewComponent
+            view={mp.view}
+            onAction={() => {}}
+            onReorderHand={() => {}}
+            currentEvent={mp.currentEvent}
+            ingestedEvents={mp.ingestedEvents}
+          />
         </div>
       </>
     );
@@ -568,6 +574,7 @@ export function MultiplayerPage() {
             onAction={handleAction}
             onReorderHand={mp.reorderHand}
             currentEvent={mp.currentEvent}
+            ingestedEvents={mp.ingestedEvents}
             chatMessages={mp.chatMessages}
             chatConfig={mp.roomState?.config?.chat}
             onSendChat={mp.sendChat}

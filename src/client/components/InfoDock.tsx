@@ -176,14 +176,13 @@ const logText = css`
 
 // ── 聊天 tab 内容(直接复用 ChatPanel 的列表+输入样式) ──
 const chatList = css`
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 120px;
-  max-height: 260px;
+  min-height: 0;
 
   &::-webkit-scrollbar {
     width: 4px;
@@ -213,11 +212,23 @@ const chatEmpty = css`
   text-align: center;
   padding: 20px 0;
 `;
+/** 聊天 tab 根:撑满父 body,消息区伸缩、输入钉底 */
+const chatTabRoot = css`
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+`;
+/** 输入区 + 限制提示,钉在聊天 tab 底部 */
+const chatFooter = css`
+  flex: 0 0 auto;
+  border-top: 1px solid #334;
+  background: rgba(0, 0, 0, 0.2);
+`;
 const chatInputRow = css`
   display: flex;
   gap: 6px;
   padding: 8px;
-  border-top: 1px solid #334;
 `;
 const chatInput = css`
   flex: 1;
@@ -248,7 +259,7 @@ const chatSendBtn = css`
 const chatLimitHint = css`
   font-size: 10px;
   color: ${colors.text.muted};
-  padding: 0 8px 4px;
+  padding: 0 8px 6px;
   text-align: right;
 `;
 
@@ -324,7 +335,7 @@ function ChatTab({
   const disabled = !chatEnabled || !onSend;
 
   return (
-    <div className={body} style={{ display: 'flex' }}>
+    <div className={chatTabRoot}>
       <div className={chatList} ref={listRef}>
         {messages.length === 0 && (
           <div className={chatEmpty}>{chatEnabled ? '暂无消息' : '聊天未开启'}</div>
@@ -344,25 +355,27 @@ function ChatTab({
           );
         })}
       </div>
-      <div className={chatInputRow}>
-        <input
-          className={chatInput}
-          placeholder={disabled ? '聊天未开启' : '输入消息...'}
-          disabled={disabled}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        <button className={chatSendBtn} disabled={disabled || !input.trim()} onClick={handleSend}>
-          发送
-        </button>
-      </div>
-      {config && (
-        <div className={chatLimitHint}>
-          {config.maxChars !== undefined ? `≤ ${config.maxChars} 字 / 条` : ''}
-          {config.maxPerMinute !== undefined ? ` · ${config.maxPerMinute} 条 / 分` : ''}
+      <div className={chatFooter}>
+        <div className={chatInputRow}>
+          <input
+            className={chatInput}
+            placeholder={disabled ? '聊天未开启' : '输入消息...'}
+            disabled={disabled}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <button className={chatSendBtn} disabled={disabled || !input.trim()} onClick={handleSend}>
+            发送
+          </button>
         </div>
-      )}
+        {config && (
+          <div className={chatLimitHint}>
+            {config.maxChars !== undefined ? `≤ ${config.maxChars} 字 / 条` : ''}
+            {config.maxPerMinute !== undefined ? ` · ${config.maxPerMinute} 条 / 分` : ''}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
