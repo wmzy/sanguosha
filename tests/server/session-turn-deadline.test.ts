@@ -8,11 +8,12 @@
 // 验证点:
 // 1. buildView 在有 __出牌 pending 时返回非空 deadline
 // 2. event 消息携带 deadline(仅在变化时),前端据此同步倒计时
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { checkGameOver } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
+import { deletePersistedRoom } from '../../src/server/persistence';
 import { buildView } from '../../src/engine/view/buildView';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
@@ -20,8 +21,17 @@ import { createGameState } from '../../src/engine/types';
 import type { ServerMessage } from '../../src/server/protocol';
 import type { ConnectionSink } from '../../src/server/connection';
 
+// 跟踪本文件创建的房间 id,afterEach 清理持久化文件,避免 data/rooms/ 残留
+// 被下次 dev server 启动恢复成僵尸 session。
+const trackedRoomIds: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    trackedRoomIds.splice(0).map((id) => deletePersistedRoom(id).catch(() => {})),
+  );
+});
+
 function makeRoom(): Room {
-  return {
+  const room: Room = {
     id: `test-room-${Math.random().toString(36).slice(2, 8)}`,
     name: '测试',
     maxPlayers: 4,
@@ -35,6 +45,8 @@ function makeRoom(): Room {
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
   } as unknown as Room;
+  trackedRoomIds.push(room.id);
+  return room;
 }
 
 /** 通过 reflection 取/设 session.state(私有字段) */

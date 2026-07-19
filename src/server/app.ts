@@ -10,7 +10,7 @@ import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
-import { addRoom, getRoom, type Room } from './room';
+import { addRoom, getRoom, setRoomStatus, type Room } from './room';
 import { cleanupIdleRooms } from './cleanup';
 import { initRoomStore, loadAllRoomsFromDb, deleteRoomFromDb } from './roomStore';
 
@@ -40,6 +40,10 @@ export function startServerLifecycle(): void {
       const e = err instanceof Error ? err : new Error(String(err));
       log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
     });
+    // 普通房间“进行中”但无 session(无 .json 持久化可恢复)时降级为“等待中”,
+    // 让房主可在房间列表看到房间并重新开局;否则 getRoomList 的 hasSession 过滤
+    // 会让它从列表中永久消失,房主无法管理。
+    downgradeStaleNormalRooms();
     // 恢复后立即清理僵尸房间(无 seats 的进行中房间),避免它们出现在房间列表。
     cleanupIdleRooms();
   })();
@@ -82,6 +86,25 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
   }
 }
 
+/** 将“进行中”但无法恢复 session 的普通房间降级为“等待中”。
+ *  触发场景:房间在游戏中进程被 kill,DB 记录状态仍是“进行中”,但 data/rooms 下
+ *  无对应 .json(或 .json 已被过期清理)→ restorePersistedRooms 不会创建 GameSession。
+ *  不降级的话 getRoomList 的 hasSession 过滤会让它从房间列表消失,房主无法看到房间。 */
+async function downgradeStaleNormalRooms(): Promise<void> {
+  const { getRoomList } = await import('./room');
+  const normalRoomIds = getRoomList().filter((r) => r.roomType === 'normal').map((r) => r.id);
+  for (const roomId of normalRoomIds) {
+    if (gameSessions.has(roomId)) continue;
+    const room = getRoom(roomId);
+    if (!room || room.roomType !== 'normal' || room.status !== '进行中') continue;
+    // 清理局内状态:准备记录、座次。状态变更通过 setRoomStatus 同步 DB。
+    room.readyPlayers = new Set();
+    room.seats = room.seats.map(() => null);
+    setRoomStatus(roomId, '等待中');
+    log.info(`降级普通房间 ${roomId}（无持久化 state,由进行中→等待中）`);
+  }
+}
+
 async function restorePersistedRooms(): Promise<void> {
   const roomIds = await listPersistedRooms();
   log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
@@ -97,9 +120,13 @@ async function restorePersistedRooms(): Promise<void> {
       // 用 startedAt(游戏开始时间)判定过期,不用文件 mtime:
       // restoreState 后 pending slot 定时器会反复触发 saveRoom 刷新 mtime,
       // 导致 mtime 永远是最近的,过期检查失效。
-      const startedAt = persisted.state?.startedAt;
-      if (startedAt && now - startedAt > ONE_HOUR) {
-        log.info(`跳过过期房间 ${roomId}（游戏开始: ${new Date(startedAt).toISOString()}）`);
+      // 旧数据/未开局测试房间 startedAt 可能为 0(默认值),回退用 savedAt
+      // 判过期——否则这类房间永不过期,每次启动都被恢复成僵尸 session。
+      const startedAt = persisted.state?.startedAt ?? 0;
+      const refTime = startedAt || persisted.savedAt;
+      if (refTime && now - refTime > ONE_HOUR) {
+        const when = new Date(refTime).toISOString();
+        log.info(`跳过过期房间 ${roomId}（${startedAt ? '游戏开始' : '保存'}: ${when}）`);
         await deletePersistedRoom(roomId);
         continue;
       }

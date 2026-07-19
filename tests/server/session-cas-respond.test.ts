@@ -7,15 +7,25 @@
 // 后发的 respond 基于旧 lastSeq 仍能被引擎 validate 接受。
 //
 // 测试通过 reflection 访问 session.state(私有),用真实 dispatch 路径验证。
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
+import { deletePersistedRoom } from '../../src/server/persistence';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 
+// 跟踪本文件创建的房间 id,afterEach 清理持久化文件,避免 data/rooms/ 残留
+// 被下次 dev server 启动恢复成僵尸 session。
+const trackedRoomIds: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    trackedRoomIds.splice(0).map((id) => deletePersistedRoom(id).catch(() => {})),
+  );
+});
+
 function makeRoom(): Room {
-  return {
+  const room: Room = {
     id: `test-room-${Math.random().toString(36).slice(2, 8)}`,
     name: '测试',
     maxPlayers: 4,
@@ -28,6 +38,8 @@ function makeRoom(): Room {
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
   } as unknown as Room;
+  trackedRoomIds.push(room.id);
+  return room;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

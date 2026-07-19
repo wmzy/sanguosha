@@ -1,14 +1,24 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
+import { deletePersistedRoom } from '../../src/server/persistence';
 import { joinDebugRoom, createDebugRoom, addRoom, type Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import type { ServerMessage } from '../../src/server/protocol';
 import type { ConnectionSink } from '../../src/server/connection';
 
+// 跟踪本文件创建的房间 id,afterEach 清理持久化文件,避免 data/rooms/ 残留
+// 被下次 dev server 启动恢复成僵尸 session。
+const trackedRoomIds: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    trackedRoomIds.splice(0).map((id) => deletePersistedRoom(id).catch(() => {})),
+  );
+});
+
 function makeRoom(): Room {
-  return {
+  const room: Room = {
     id: `test-${Math.random().toString(36).slice(2, 8)}`,
     name: '测试',
     maxPlayers: 4,
@@ -21,6 +31,8 @@ function makeRoom(): Room {
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
   } as unknown as Room;
+  trackedRoomIds.push(room.id);
+  return room;
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function getState(session: GameSession): GameState {

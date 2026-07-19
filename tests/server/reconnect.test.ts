@@ -1,16 +1,26 @@
 // tests/server/reconnect.test.ts
 // 服务端 session 断线保活 + 重连座位恢复测试。
 // 验证:grace period、playerId 迁移、重连后 action 可用。
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession, RECONNECT_GRACE_MS } from '../../src/server/session';
+import { deletePersistedRoom } from '../../src/server/persistence';
 import { addRoom, type Room } from '../../src/server/room';
 import { gameSessions } from '../../src/server/registry';
 import type { ConnectionSink } from '../../src/server/connection';
 import type { ServerMessage } from '../../src/server/protocol';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// 跟踪本文件创建的房间 id,afterEach 清理持久化文件,避免 data/rooms/ 残留
+// 被下次 dev server 启动恢复成僵尸 session。
+const trackedRoomIds: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    trackedRoomIds.splice(0).map((id) => deletePersistedRoom(id).catch(() => {})),
+  );
+});
 
 function makeMultiplayerRoom(playerIds: string[]): { room: Room; sinks: Map<string, FakeSink> } {
   const sinks = new Map<string, FakeSink>();
@@ -33,6 +43,7 @@ function makeMultiplayerRoom(playerIds: string[]): { room: Room; sinks: Map<stri
     room.players.set(pid, sink);
   }
   addRoom(room);
+  trackedRoomIds.push(room.id);
   return { room, sinks };
 }
 
