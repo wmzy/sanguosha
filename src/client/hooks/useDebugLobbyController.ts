@@ -90,7 +90,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
         body: JSON.stringify({ playerCount }),
       });
       storeSession(data.roomId, `debug-${data.roomId}-lobby`);
-      window.history.replaceState(null, '', `/debug/${data.roomId}`);
+      navigate(`/debug/${data.roomId}`, { replace: true });
       setActiveRoomId(data.roomId);
     } catch (err) {
       showErrorFor(err, '创建失败', setError);
@@ -107,8 +107,8 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
 
   const handleJoinDebugRoom = useCallback((roomId: string) => {
     setActiveRoomId(roomId);
-    window.history.replaceState(null, '', `/debug/${roomId}`);
-  }, []);
+    navigate(`/debug/${roomId}`, { replace: true });
+  }, [navigate]);
 
   const handleDeleteDebugRoom = useCallback(
     (roomId: string) => {
