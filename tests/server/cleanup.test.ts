@@ -154,4 +154,30 @@ describe('cleanupIdleRooms', () => {
     expect(getRoom(room.id)).not.toBeNull();
     expect(playerRoomMap.has('normal-player')).toBe(true);
   });
+
+  it('普通房间 zombie session 仅移除 session,保留 room/玩家映射(回归)', async () => {
+    // 回归:普通房间 session 被 destroy(如全员断线 grace 超时)后,zombie
+    // session 不能触发 deleteRoom/deletePersistedRoom/deleteRoomFromDb,
+    // 否则普通房间「持久保留」契约被破坏。
+    const room = makeRoom(['p1', 'p2'], 'normal');
+    const session = new GameSession(room, true, 42);
+    gameSessions.set(room.id, session);
+    playerRoomMap.set('p1', room.id);
+    playerRoomMap.set('p2', room.id);
+    await session.destroy();
+    // 模拟 endDueToDisconnect 遗留:room.players 仍有(已断线的)记录
+    expect(room.players.size).toBe(2);
+
+    const cleaned = cleanupIdleRooms(); // 即使 now=现在(未超 TTL)
+
+    // 普通房间不在「被清理」结果中(结果专用于快速房间的完整回收)
+    expect(cleaned).not.toContain(room.id);
+    // session 对象从 gameSessions 移除,避免泄漏
+    expect(gameSessions.has(room.id)).toBe(false);
+    // room / playerRoomMap 必须完整保留,房主可重连或显式删房间
+    expect(getRoom(room.id)).not.toBeNull();
+    expect(getRoom(room.id)!.players.size).toBe(2);
+    expect(playerRoomMap.has('p1')).toBe(true);
+    expect(playerRoomMap.has('p2')).toBe(true);
+  });
 });
