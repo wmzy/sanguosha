@@ -31,6 +31,8 @@ describe('getCharacterImage', () => {
 });
 
 describe('getCardImage', () => {
+  // 卡牌图统一走 /cards/<...>;本地覆盖(public/cards-local/)由 Vite 中间件服务端处理,
+  // 前端永远只请求 /cards/<name>。
   it('routes basic cards to /cards/basic/ with .jpg', () => {
     expect(getCardImage('杀')).toBe('/cards/basic/杀.jpg');
     expect(getCardImage('闪')).toBe('/cards/basic/闪.jpg');
@@ -53,7 +55,7 @@ describe('getCardImage', () => {
     expect(getCardImage('闪电')).toBe('/cards/trick/闪电.png');
   });
 
-  it('returns null for unknown cards (engine 未实现的扩展卡)', () => {
+  it('returns null for unknown cards (引擎未实现的扩展卡)', () => {
     expect(getCardImage('')).toBeNull();
     expect(getCardImage('不存在')).toBeNull();
   });

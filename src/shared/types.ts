@@ -22,6 +22,7 @@ export type CardSubType =
   | '杀'
   | '闪'
   | '桃'
+  | '酒'
   | '锦囊'
   | '武器'
   | '防具'
@@ -128,7 +129,7 @@ export interface WeaponEffect {
 }
 
 export interface ArmorEffect {
-  type: '八卦阵' | '仁王盾';
+  type: '八卦阵' | '仁王盾' | '藤甲' | '白银狮子';
 }
 
 export interface Condition {

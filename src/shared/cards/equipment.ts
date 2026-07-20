@@ -105,6 +105,57 @@ export const 仁王盾: CardDef = {
   armorEffect: { type: '仁王盾' },
 };
 
+// ─── 军争篇装备牌 ──────────────────────────────────────────
+// 藤甲 / 白银狮子 的防具技已在 engine/skills/ 中实现(按 card.name 动态挂载),
+// 这里仅补 CardDef 声明,使牌堆能生成这两张牌。
+// 古锭刀 / 朱雀羽扇 / 骅骝 的特殊技尚未实现,暂作为仅提供射程/槽位的占位装备
+// (与 丈八蛇矛 / 方天画戟 现状一致:有 range,无 weaponEffect)。
+// 将来实现其技能时,在 engine/skills/ 新增同名模块即可自动挂载(见 card-meta.ts)。
+
+export const 藤甲: CardDef = {
+  name: '藤甲',
+  type: '装备牌',
+  subtype: '防具',
+  targetFilter: { type: 'none' },
+  effect: { type: 'sequence', steps: [] },
+  armorEffect: { type: '藤甲' },
+};
+
+export const 白银狮子: CardDef = {
+  name: '白银狮子',
+  type: '装备牌',
+  subtype: '防具',
+  targetFilter: { type: 'none' },
+  effect: { type: 'sequence', steps: [] },
+  armorEffect: { type: '白银狮子' },
+};
+
+export const 古锭刀: CardDef = {
+  name: '古锭刀',
+  type: '装备牌',
+  subtype: '武器',
+  targetFilter: { type: 'none' },
+  effect: { type: 'sequence', steps: [] },
+  range: 2,
+};
+
+export const 朱雀羽扇: CardDef = {
+  name: '朱雀羽扇',
+  type: '装备牌',
+  subtype: '武器',
+  targetFilter: { type: 'none' },
+  effect: { type: 'sequence', steps: [] },
+  range: 4,
+};
+
+export const 骅骝: CardDef = {
+  name: '骅骝',
+  type: '装备牌',
+  subtype: '防御马',
+  targetFilter: { type: 'none' },
+  effect: { type: 'sequence', steps: [] },
+};
+
 export const 赤兔: CardDef = {
   name: '赤兔',
   type: '装备牌',
@@ -158,7 +209,9 @@ export const 武器列表 = [
   丈八蛇矛,
   方天画戟,
   麒麟弓,
+  古锭刀,
+  朱雀羽扇,
 ];
-export const 防具列表 = [八卦阵, 仁王盾];
-export const 马列表 = [赤兔, 紫骍, 大宛, 的卢, 绝影, 爪黄飞电];
+export const 防具列表 = [八卦阵, 仁王盾, 藤甲, 白银狮子];
+export const 马列表 = [赤兔, 紫骍, 大宛, 的卢, 绝影, 爪黄飞电, 骅骝];
 export const 装备牌列表 = [...武器列表, ...防具列表, ...马列表];

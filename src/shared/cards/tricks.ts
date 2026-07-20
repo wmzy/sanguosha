@@ -122,6 +122,17 @@ export const 火攻: CardDef = {
   responseWindow: 'trick_response',
 };
 
+// 借刀杀人(标准包普通锦囊)。引擎技能见 engine/skills/借刀杀人.ts。
+// CardDef 仅声明类型;多槽位目标(持武器者 + 被杀者)由借刀杀人.ts 的 onMount defineAction 驱动。
+export const 借刀杀人: CardDef = {
+  name: '借刀杀人',
+  type: '锦囊牌',
+  subtype: '锦囊',
+  targetFilter: { type: 'other' },
+  effect: { type: 'sequence', steps: [] },
+  responseWindow: 'trick_response',
+};
+
 export const 锦囊牌列表: CardDef[] = [
   过河拆桥,
   顺手牵羊,
@@ -137,4 +148,5 @@ export const 锦囊牌列表: CardDef[] = [
   无懈可击,
   铁索连环,
   火攻,
+  借刀杀人,
 ];
