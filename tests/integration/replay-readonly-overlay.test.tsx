@@ -108,4 +108,61 @@ describe('GameView:回放只读模式(readOnly)禁用阻塞性遮罩', () => {
     // 选将遮罩照常渲染
     expect(screen.getByText('主公选将')).toBeDefined();
   });
+
+  it('readOnly=true:出牌阶段的「结束回合」按钮不渲染(禁止游戏操作)', () => {
+    // 出牌阶段、手牌 2 张、当前玩家=viewer(主公) —— 正式模式下必显示「结束回合」
+    const view: GameView = {
+      viewer: 0,
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+      players: [
+        {
+          index: 0,
+          name: '主公',
+          character: '刘备',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          equipment: {},
+          skills: ['仁德'],
+          handCount: 2,
+          hand: [
+            { id: 'sha1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌', subtype: '杀' },
+            { id: 'shan1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌', subtype: '闪' },
+          ],
+          marks: [],
+        },
+        {
+          index: 1,
+          name: '反贼',
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          equipment: {},
+          skills: ['护甲'],
+          handCount: 2,
+          marks: [],
+        },
+      ],
+      cardMap: {},
+      pending: null,
+      deadline: null,
+      deadlineTotalMs: 0,
+      log: [],
+      settlementStack: [],
+    };
+    sessionStorage.setItem('sgs_identity_shown', '1');
+    render(<GameViewComponent view={view} onAction={() => {}} readOnly />);
+
+    // 「结束回合」按钮不存在
+    const endTurn = screen
+      .queryAllByRole('button')
+      .find((b) => b.textContent === '结束回合');
+    expect(endTurn).toBeUndefined();
+    // 提示文本是「正在思考...」而非「选择一张手牌出牌」
+    expect(screen.queryAllByText(/选择一张手牌出牌/)).toHaveLength(0);
+    expect(screen.queryAllByText(/正在思考\.\.\./)).not.toHaveLength(0);
+  });
 });

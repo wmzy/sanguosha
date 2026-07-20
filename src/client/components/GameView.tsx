@@ -160,7 +160,9 @@ export function GameViewComponentImpl({
     onReorderHand,
   );
 
-  const canOperate = true;
+  // 回放(只读)模式下禁用一切游戏操作:出牌/技能/弃牌/分配/结束回合等
+  // 按钮均通过 canOperate 传导自动隐藏或 disabled。
+  const canOperate = !readOnly;
 
   // 发送 action(出牌交互状态机共享的底层函数)
   const send = useCallback(
@@ -391,7 +393,8 @@ export function GameViewComponentImpl({
                     />
 
                     {(isPerspectiveAwaiting || (isMyTurn && view.phase === '出牌')) &&
-                      !broadcastSkipped && (
+                      !broadcastSkipped &&
+                      !readOnly && (
                         <CountdownBar
                           deadline={deadline}
                           totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS}
