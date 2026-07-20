@@ -53,10 +53,13 @@ export const logContent = css`
   color: #aaa;
   max-height: 200px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
 `;
 export const logEmpty = css`
   color: #555;
   font-style: italic;
+  text-align: center;
 `;
 export const logEntry = css`
   display: flex;

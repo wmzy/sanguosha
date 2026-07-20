@@ -133,7 +133,7 @@ const logContent = css`
   overflow-y: auto;
   padding: 8px 12px;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 4px;
   max-height: 50vh;
 
