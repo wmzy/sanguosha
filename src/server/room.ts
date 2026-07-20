@@ -361,6 +361,13 @@ export function deleteRoom(roomId: string): boolean {
   return true;
 }
 
+/** 返回所有房间原始对象(不过滤)。
+ *  供启动恢复/清理逻辑使用:getRoomList 会过滤掉"进行中无 session"的房间,
+ *  但 downgradeStaleNormalRooms 正需要降级这些被过滤的房间。 */
+export function getAllRooms(): Room[] {
+  return [...roomList.values()];
+}
+
 export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
   const result: RoomInfo[] = [];
   for (const room of roomList.values()) {

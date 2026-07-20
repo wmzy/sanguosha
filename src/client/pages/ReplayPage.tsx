@@ -69,7 +69,13 @@ function ReplayView({ file, onExit }: { file: ReplayFile; onExit: () => void }) 
         onSetSeat={r.setSeat}
         onExit={onExit}
       />
-      <GameViewComponent view={r.view} onAction={noop} readOnly />
+      <GameViewComponent
+        view={r.view}
+        onAction={noop}
+        readOnly
+        currentEvent={r.currentEvent}
+        ingestedEvents={r.ingestedEvents}
+      />
     </div>
   );
 }

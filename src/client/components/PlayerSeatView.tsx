@@ -106,6 +106,21 @@ function PlayerSeatViewImpl({
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onSeatDoubleClick?.(index)}
     >
+      {/* 武将立绘作座位卡背景:无素材时略过,内容浮在其上 */}
+      {charImg && (
+        <div className={seatCharImgWrap} aria-hidden>
+          <img
+            className={cx(seatCharImg, isDead && seatCharImgDead)}
+            src={charImg}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={handleImgError}
+          />
+        </div>
+      )}
+      {/* 内容层:浮在立绘上,底部渐变蒙版保证文字可读 */}
+      <div className={seatCardContent}>
       {/* 势力色顶部条:武将名 + 座号 + 身份 */}
       <div
         className={seatCardHeader}
@@ -142,19 +157,6 @@ function PlayerSeatViewImpl({
         </div>
         <div className={seatCharName}>{displayChar || '未知'}</div>
       </div>
-      {/* 武将立绘:无素材时不渲染,保留文字回退 */}
-      {charImg && (
-        <div className={seatCharImgWrap} aria-hidden>
-          <img
-            className={cx(seatCharImg, isDead && seatCharImgDead)}
-            src={charImg}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onError={handleImgError}
-          />
-        </div>
-      )}
       {/* 体力红心 */}
       <div className={seatHpRow}>
         {Array.from({ length: player.maxHealth }, (_, i) => (
@@ -234,6 +236,7 @@ function PlayerSeatViewImpl({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -272,6 +275,8 @@ export const PlayerSeatView = memo(PlayerSeatViewImpl, playerSeatPropsEqual);
 
 // ─── Styles ───
 const seatCard = css`
+  position: relative;
+  box-sizing: border-box;
   border: 1px solid #444;
   border-radius: 10px;
   overflow: hidden;
@@ -300,11 +305,11 @@ const seatCharName = css`
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 `;
-// 武将立绘填满座位卡中间区域:object-cover 让立绘按区域裁切不变形
+// 武将立绘作座位卡背景:绝对定位填满整张卡,文字内容浮在其上
 const seatCharImgWrap = css`
-  position: relative;
-  width: 100%;
-  height: 88px;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.4);
 `;
@@ -318,6 +323,21 @@ const seatCharImg = css`
 `;
 const seatCharImgDead = css`
   filter: grayscale(1) brightness(0.7);
+`;
+// 座位卡内容层:浮在立绘上,底部渐变蒙版保证文字可读
+const seatCardContent = css`
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.45) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
 `;
 // 体力行:红心表示 HP
 const seatHpRow = css`

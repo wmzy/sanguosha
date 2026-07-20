@@ -93,6 +93,23 @@ export function PlayerCardLargeImpl({
 
   return (
     <>
+      {/* 武将立绘作大卡背景:无素材时略过,文字内容浮在其上 */}
+      {charImg && (
+        <div className={styles.playerCardPortrait} aria-hidden>
+          <img
+            className={cx(styles.playerCardPortraitImg, isDead && styles.playerCardPortraitDead)}
+            src={charImg}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+      {/* 文字内容层:浮在立绘上 */}
+      <div className={styles.playerCardContent}>
       {/* 势力色顶部条 */}
       <div
         className={styles.playerCardHeader}
@@ -110,21 +127,6 @@ export function PlayerCardLargeImpl({
         </div>
         <div className={styles.playerCardChar}>{p.character || '未知'}</div>
       </div>
-      {/* 武将立绘:大卡上半区域,无素材时略过 */}
-      {charImg && (
-        <div className={styles.playerCardPortrait} aria-hidden>
-          <img
-            className={cx(styles.playerCardPortraitImg, isDead && styles.playerCardPortraitDead)}
-            src={charImg}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        </div>
-      )}
       {/* 体力红心 */}
       <div className={styles.seatHpRow}>
         {Array.from({ length: p.maxHealth }, (_, i) => (
@@ -192,6 +194,7 @@ export function PlayerCardLargeImpl({
       {/* 手牌数 */}
       <div className={styles.infoRow}>
         <span>手牌: {p.handCount}</span>
+      </div>
       </div>
     </>
   );

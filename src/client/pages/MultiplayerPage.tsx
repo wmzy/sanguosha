@@ -441,6 +441,53 @@ export function MultiplayerPage() {
     );
   }
 
+  // URL 直达(/play/:roomId)但房间存在且无法直接加入(如游戏进行中且玩家不在座次)。
+  // 不回退到 lobby:lobby 会渲染创建/加入表单 + 房间列表,与直达特定房间的意图相悖。
+  // 提供旁观入口,让用户仍能进入房间观战;不提供"进入房间"因为服务端已拒绝加入。
+  if (mp.joinFailed) {
+    return (
+      <div className={notFoundPage}>
+        <div className={notFoundCode}>!</div>
+        <div className={notFoundTitle}>无法进入房间</div>
+        <p className={notFoundDesc}>
+          房间码 <span className={notFoundRoomId}>{urlRoomId}</span> 无法加入:{mp.joinFailed}
+        </p>
+        <div className={buttonRow}>
+          {urlRoomId && (
+            <button
+              className={btnStyle}
+              style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
+              onClick={() => {
+                // 旁观加入:绕过 join 路由,直接以 spectator 身份进入
+                mp.leaveRoom();
+                setTimeout(() => mp.joinAsSpectator(urlRoomId), 0);
+              }}
+            >
+              👁 旁观加入
+            </button>
+          )}
+          <button
+            className={btnStyle}
+            style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}
+            onClick={() => {
+              mp.leaveRoom();
+              navigate('/play');
+            }}
+          >
+            进入大厅
+          </button>
+          <button
+            className={btnStyle}
+            style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
+            onClick={() => navigate('/')}
+          >
+            返回首页
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (mp.stage === 'spectating' && mp.view) {
     // 旁观者申请查看某玩家视角的下拉
     const viewGrants = mp.roomState?.viewGrants ?? {};

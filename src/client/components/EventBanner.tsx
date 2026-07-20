@@ -79,10 +79,12 @@ export function EventBanner({ current }: EventBannerProps) {
               }}
             />
           )}
-          <div className={styles.eventCardName}>{card.name}</div>
-          <div className={styles.eventCardSuit}>
-            {card.suit}
-            {card.rank}
+          <div className={styles.eventCardMeta}>
+            <div className={styles.eventCardName}>{card.name}</div>
+            <div className={styles.eventCardSuit}>
+              {card.suit}
+              {card.rank}
+            </div>
           </div>
         </div>
       </div>

@@ -63,7 +63,7 @@ export function CharSelectWaitingOverlay({
           className={styles.selectedCharCard}
           style={{ '--faction-color': factionColor } as React.CSSProperties}
         >
-          <div className={styles.selectedCharLabel}>你的选择</div>
+          {/* 立绘作卡片背景 */}
           {charImg && (
             <div className={styles.selectedCharPortrait} aria-hidden>
               <img
@@ -78,22 +78,26 @@ export function CharSelectWaitingOverlay({
               />
             </div>
           )}
-          <div className={styles.selectedCharName}>{selectedChar}</div>
-          <div className={styles.selectedCharFaction}>{faction}</div>
-          <div className={styles.selectedCharHpRow}>
-            {Array.from({ length: maxHealth }, (_, i) => (
-              <span key={i} className={styles.selectedCharHpDot} />
-            ))}
-          </div>
-          {charSkills.length > 0 && (
-            <div className={styles.selectedCharSkills}>
-              {charSkills.map((s, i) => (
-                <SkillTag key={s} name={s} description={getSkillDescription(s)}>
-                  {i > 0 ? ' / ' : ''}{s}
-                </SkillTag>
+          {/* 文字内容浮在立绘上 */}
+          <div className={styles.selectedCharMeta}>
+            <div className={styles.selectedCharLabel}>你的选择</div>
+            <div className={styles.selectedCharName}>{selectedChar}</div>
+            <div className={styles.selectedCharFaction}>{faction}</div>
+            <div className={styles.selectedCharHpRow}>
+              {Array.from({ length: maxHealth }, (_, i) => (
+                <span key={i} className={styles.selectedCharHpDot} />
               ))}
             </div>
-          )}
+            {charSkills.length > 0 && (
+              <div className={styles.selectedCharSkills}>
+                {charSkills.map((s, i) => (
+                  <SkillTag key={s} name={s} description={getSkillDescription(s)}>
+                    {i > 0 ? ' / ' : ''}{s}
+                  </SkillTag>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
       <div>{selectedChar ? '✅ 已选择武将,等待其他玩家选将...' : '⏳ 等待其他玩家选将...'}</div>

@@ -101,7 +101,7 @@ export function HandCardImpl(props: HandCardProps) {
           : `${card.name} ${card.suit}${card.rank}\n${card.description ?? ''}`
       }
     >
-      <div className={styles.cardName}>{displayName}</div>
+      {/* 卡牌插画作背景:绝对定位填满卡牌,文字浮于上方 */}
       {cardImg && (
         <img
           className={styles.handCardArt}
@@ -114,12 +114,16 @@ export function HandCardImpl(props: HandCardProps) {
           }}
         />
       )}
-      {isTransformMatch && transformWrapperName && (
-        <div className={styles.cardOrigin}>(原: {card.name})</div>
-      )}
-      <div className={styles.cardSuit}>
-        {card.suit}
-        {card.rank}
+      {/* 文字层:底部渐变蒙版覆盖,不撑高卡牌 */}
+      <div className={styles.handCardMeta}>
+        <div className={styles.cardName}>{displayName}</div>
+        {isTransformMatch && transformWrapperName && (
+          <div className={styles.cardOrigin}>(原: {card.name})</div>
+        )}
+        <div className={styles.cardSuit}>
+          {card.suit}
+          {card.rank}
+        </div>
       </div>
     </div>
   );

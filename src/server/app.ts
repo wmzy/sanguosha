@@ -91,12 +91,14 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
  *  无对应 .json(或 .json 已被过期清理)→ restorePersistedRooms 不会创建 GameSession。
  *  不降级的话 getRoomList 的 hasSession 过滤会让它从房间列表消失,房主无法看到房间。 */
 async function downgradeStaleNormalRooms(): Promise<void> {
-  const { getRoomList } = await import('./room');
-  const normalRoomIds = getRoomList().filter((r) => r.roomType === 'normal').map((r) => r.id);
-  for (const roomId of normalRoomIds) {
+  const { getAllRooms } = await import('./room');
+  // 用 getAllRooms(不过滤)而非 getRoomList:getRoomList 会过滤"进行中无 session"的房间,
+  // 但本函数正是要降级这些房间。用 getRoomList 会跳过它们,导致死锁。
+  const normalRooms = getAllRooms().filter((r) => r.roomType === 'normal');
+  for (const room of normalRooms) {
+    const roomId = room.id;
     if (gameSessions.has(roomId)) continue;
-    const room = getRoom(roomId);
-    if (!room || room.roomType !== 'normal' || room.status !== '进行中') continue;
+    if (room.status !== '进行中') continue;
     // 清理局内状态:准备记录、座次。状态变更通过 setRoomStatus 同步 DB。
     room.readyPlayers = new Set();
     room.seats = room.seats.map(() => null);
@@ -171,6 +173,14 @@ async function restorePersistedRooms(): Promise<void> {
         seats: restoredSeats,
         pendingSeatSwaps: new Map(),
       };
+      // 复用 existingRoom(normal 房间从 DB 恢复)时,DB schema 不存 seats,
+      // existingRoom.seats 是恢复时初始化的全 null 数组。必须用 .json 的 seats 覆盖,
+      // 否则 GameSession 构造时从 room.seats 填充 playerNames 会得到空映射,
+      // 玩家无法重连(session 存在但认不出任何 playerId)。
+      if (existingRoom) {
+        existingRoom.seats = restoredSeats;
+        if (persisted.hostId !== undefined) existingRoom.hostId = persisted.hostId;
+      }
       if (!existingRoom) addRoom(room);
       const session = new GameSession(room, persisted.debug);
       await session.restoreState(state, persisted.actionLog);

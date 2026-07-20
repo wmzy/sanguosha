@@ -58,7 +58,11 @@ export const eventCardPlayer = css`
   border: 1px solid rgba(52, 152, 219, 0.4);
 `;
 export const eventCardBody = css`
+  position: relative;
+  box-sizing: border-box;
   min-width: 90px;
+  width: 120px;
+  height: 160px;
   padding: 0;
   border-radius: 8px;
   background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
@@ -68,25 +72,44 @@ export const eventCardBody = css`
   transform-style: preserve-3d;
   overflow: hidden;
 `;
-// 翻牌动效卡牌主体插画:失败隐藏,保留文字回退
+// 翻牌动效卡牌插画作背景:失败隐藏,保留文字回退
 export const eventCardArt = css`
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 120px;
+  height: 100%;
   object-fit: cover;
   object-position: center top;
-  display: block;
+  z-index: 0;
+`;
+// 文字内容层:底部渐变蒙版
+export const eventCardMeta = css`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px 8px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.55) 60%,
+    rgba(0, 0, 0, 0) 100%
+  );
 `;
 export const eventCardName = css`
   font-size: 16px;
   font-weight: bold;
   line-height: 1.3;
-  padding: 6px 12px 0;
   color: var(--suit-color, #ccc);
 `;
 export const eventCardSuit = css`
   font-size: 13px;
   font-weight: bold;
-  margin: 2px 0 8px;
+  margin-top: 2px;
   color: var(--suit-color, #ccc);
 `;
 export const cancelBtn = css`
@@ -108,6 +131,8 @@ export const handList = css`
   padding: 8px 0 0;
 `;
 export const handCard = css`
+  position: relative;
+  box-sizing: border-box;
   border: 2px solid #555;
   border-radius: 8px;
   padding: 0;
@@ -115,6 +140,8 @@ export const handCard = css`
   background: linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%);
   min-width: 80px;
   width: 80px;
+  /* 固定高度:文字层绝对定位,不再被插画撑高 */
+  height: 120px;
   text-align: center;
   transition: all 0.2s;
   transform: rotate(var(--fan-angle, 0deg));
@@ -123,8 +150,6 @@ export const handCard = css`
   box-shadow: -1px 2px 6px rgba(0, 0, 0, 0.3);
   margin-left: -16px;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
   &:first-of-type {
     margin-left: 0;
   }
@@ -135,14 +160,33 @@ export const handCard = css`
     border-color: #888;
   }
 `;
-// 手牌牌面插画:填满卡牌主体,失败则隐藏,保留文字回退
+// 手牌牌面插画作背景:绝对定位填满卡牌,失败隐藏保留文字回退
 export const handCardArt = css`
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 96px;
+  height: 100%;
   object-fit: cover;
   object-position: center top;
-  display: block;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  z-index: 0;
+`;
+// 手牌文字层:底部渐变蒙版覆盖,不撑高卡牌
+export const handCardMeta = css`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 14px 4px 6px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.82) 0%,
+    rgba(0, 0, 0, 0.55) 60%,
+    rgba(0, 0, 0, 0) 100%
+  );
 `;
 export const handCardSelected = css`
   border: 2px solid #3498db;
@@ -205,19 +249,16 @@ export const discardCardSelected = css`
 export const cardName = css`
   font-weight: bold;
   font-size: 16px;
-  margin: 4px 4px 2px;
   letter-spacing: 1px;
   color: var(--suit-color, #ccc);
 `;
 export const cardSuit = css`
   font-size: 13px;
-  margin: 2px 4px 4px;
   color: var(--suit-color, #ccc);
 `;
 export const cardOrigin = css`
   font-size: 10px;
   opacity: 0.7;
-  margin: 0 4px 2px;
   font-style: italic;
   color: var(--suit-color, #ccc);
 `;

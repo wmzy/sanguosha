@@ -3,7 +3,7 @@
 // 便于单元测试。app.ts 仅负责定时调度(setInterval 调用 cleanupIdleRooms)。
 
 import { gameSessions, playerRoomMap } from './registry';
-import { getRoom, leaveRoom, deleteRoom } from './room';
+import { getRoom, leaveRoom, deleteRoom, setRoomStatus } from './room';
 import { deletePersistedRoom } from './persistence';
 import { createLogger } from './logger';
 
@@ -38,11 +38,26 @@ export function cleanupIdleRooms(now: number = Date.now()): string[] {
   // 保留 room / 持久化文件 / DB 元数据,让房主可在房间列表看到房间并重新开局或显式删除。
   // 普通房间永不进入 stale(不自动销毁任何持久化状态)。
   const normalZombieSessions: string[] = [];
+  // 普通房间孤儿状态:进行中但座次全空(玩家全部 leaveRoom/seats 清空),session 认不出任何 playerId,
+  // 无法重连。降级为等待中让房主重新开局,而非销毁房间。
+  const normalOrphanRooms: string[] = [];
   for (const [roomId, session] of gameSessions) {
     const room = getRoom(roomId);
-    // 普通房间: 不自动销毁。zombie session 单独清理,避免 session 对象泄漏。
+    // 普通房间: 不自动销毁。但检测孤儿状态:进行中但座次全空且无在线玩家
+    // (session 存在但认不出任何 playerId,玩家无法重连)。
+    // 此时降级为等待中:销毁 session,清空 readyPlayers,让房主可重新开局。
+    // 触发场景:所有玩家主动 leaveRoom 后 seats 被清空,但 session 未销毁(normal 不自动销毁)。
     if (room?.roomType === 'normal') {
-      if (session.isDestroyed()) normalZombieSessions.push(roomId);
+      if (session.isDestroyed()) {
+        normalZombieSessions.push(roomId);
+      } else if (
+        room.status === '进行中' &&
+        room.players.size === 0 &&
+        room.seats.every((s) => s === null)
+      ) {
+        // 孤儿房间:降级为等待中,销毁 session,保留 room/DB 元数据
+        normalOrphanRooms.push(roomId);
+      }
       continue;
     }
     // 1. 已销毁的 zombie:立即回收(grace 超时/全员断线后遗留,room.players 可能仍非空)
@@ -98,6 +113,26 @@ export function cleanupIdleRooms(now: number = Date.now()): string[] {
   for (const roomId of normalZombieSessions) {
     log.info(`移除普通房间 zombie session ${roomId}(保留 room/持久化/DB)`);
     gameSessions.delete(roomId);
+  }
+
+  // 普通房间孤儿状态:session 存在但座次全空(无人可重连),降级为等待中。
+  // 销毁 session + 删 .json(避免下次启动恢复出无 seats 的空壳 session),
+  // 保留 room + DB 元数据(房主可在列表看到房间重新开局)。
+  for (const roomId of normalOrphanRooms) {
+    log.info(`降级孤儿普通房间 ${roomId}(座次全空,进行中→等待中)`);
+    const session = gameSessions.get(roomId);
+    void session?.destroy();
+    gameSessions.delete(roomId);
+    const room = getRoom(roomId);
+    if (room) {
+      room.readyPlayers = new Set();
+      room.pendingSeatSwaps.clear();
+      setRoomStatus(roomId, '等待中');
+    }
+    void deletePersistedRoom(roomId).catch((err) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      log.error(`cleanup: deletePersistedRoom failed for orphan ${roomId}`, { error: e.stack ?? String(e) });
+    });
   }
   return stale;
 }

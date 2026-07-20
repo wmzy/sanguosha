@@ -20,6 +20,7 @@ function PlayHistoryStripImpl({ items }: PlayHistoryStripProps) {
         return (
           <div key={it.id} className={slot}>
             <div className={cardFace} style={{ borderColor: suitColor }}>
+              {/* 插画作背景:文字浮于下方 */}
               {cardImg && (
                 <img
                   className={cardArt}
@@ -32,15 +33,17 @@ function PlayHistoryStripImpl({ items }: PlayHistoryStripProps) {
                   }}
                 />
               )}
-              <div className={cardName} style={{ color: suitColor }}>
-                {it.card.name}
-              </div>
-              {(it.card.suit || it.card.rank) && (
-                <div className={cardSuit} style={{ color: suitColor }}>
-                  {it.card.suit}
-                  {it.card.rank}
+              <div className={cardMeta}>
+                <div className={cardName} style={{ color: suitColor }}>
+                  {it.card.name}
                 </div>
-              )}
+                {(it.card.suit || it.card.rank) && (
+                  <div className={cardSuit} style={{ color: suitColor }}>
+                    {it.card.suit}
+                    {it.card.rank}
+                  </div>
+                )}
+              </div>
             </div>
             <div className={caption} title={it.caption}>
               {it.caption}
@@ -92,7 +95,11 @@ const slot = css`
 `;
 
 const cardFace = css`
+  position: relative;
+  box-sizing: border-box;
   min-width: 52px;
+  width: 60px;
+  height: 80px;
   padding: 0;
   border-radius: 6px;
   background: linear-gradient(135deg, #3a3048 0%, #1e1a28 100%);
@@ -100,16 +107,34 @@ const cardFace = css`
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
   text-align: center;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
 `;
+// 插画作背景:绝对定位填满卡牌
 const cardArt = css`
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 56px;
+  height: 100%;
   object-fit: cover;
   object-position: center top;
-  display: block;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 0;
+`;
+// 文字内容层:底部渐变蒙版
+const cardMeta = css`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 4px 4px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.82) 0%,
+    rgba(0, 0, 0, 0.55) 60%,
+    rgba(0, 0, 0, 0) 100%
+  );
 `;
 
 const cardName = css`
@@ -117,13 +142,12 @@ const cardName = css`
   font-weight: bold;
   line-height: 1.2;
   white-space: nowrap;
-  padding: 4px 6px 0;
 `;
 
 const cardSuit = css`
   font-size: 10px;
   opacity: 0.9;
-  margin: 1px 0 4px;
+  margin-top: 1px;
 `;
 
 const caption = css`

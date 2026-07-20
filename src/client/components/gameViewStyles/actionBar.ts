@@ -145,6 +145,9 @@ export const equipColumnItem = css`
   background: rgba(243, 156, 18, 0.06);
   border: 1px solid rgba(243, 156, 18, 0.15);
   overflow: hidden;
+  /* 固定槽位高度:小图作为缩略图不撑高 */
+  height: 48px;
+  box-sizing: border-box;
 `;
 export const equipColumnIcon = css`
   font-size: 13px;
@@ -180,7 +183,10 @@ export const equipItemName = css`
 `;
 
 // ─── 角色大卡 (右侧) ───
+// 立绘作背景:整个大卡位置 relative,文字内容浮在上层
 export const playerCardLarge = css`
+  position: relative;
+  box-sizing: border-box;
   flex: 0 0 260px;
   border: 1px solid #444;
   border-radius: 10px;
@@ -226,14 +232,13 @@ export const playerCardChar = css`
   color: rgba(255, 255, 255, 0.85);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 `;
-// 武将大卡立绘:在头部下方、体力上方,占住卡的上半区域
+// 武将大卡立绘:整个卡牌的背景层,文字内容在其上
 export const playerCardPortrait = css`
-  position: relative;
-  width: 100%;
-  height: 200px;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.45);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.4);
 `;
 export const playerCardPortraitImg = css`
   position: absolute;
@@ -246,6 +251,20 @@ export const playerCardPortraitImg = css`
 `;
 export const playerCardPortraitDead = css`
   filter: grayscale(1) brightness(0.6);
+`;
+// 大卡文字内容层:浮在立绘上,头部背景半透明保证文字可读
+export const playerCardContent = css`
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
 `;
 export const playerCardEquip = css`
   padding: 6px 12px 8px;

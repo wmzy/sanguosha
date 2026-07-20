@@ -114,31 +114,31 @@ export const charSelectWaitingSwitchBtn = css`
 `;
 
 // ─── 已选武将卡(选将完成后展示在等待遮罩中,明确反馈选择结果)───
+// 立绘作整张卡背景,文字内容浮在其上
 export const selectedCharCard = css`
+  position: relative;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 18px 36px;
+  padding: 0;
   border-radius: 12px;
   box-shadow:
     0 4px 24px rgba(255, 215, 0, 0.25),
     0 4px 16px rgba(0, 0, 0, 0.4);
   border: 2px solid rgba(255, 215, 0, 0.6);
-  min-width: 200px;
+  min-width: 220px;
+  width: 220px;
+  height: 300px;
+  overflow: hidden;
   background: var(--faction-color, #8e44ad);
 `;
-export const selectedCharLabel = css`
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
-  letter-spacing: 2px;
-`;
-// 已选武将立绘:位于「你的选择」与武将名之间,展示明确的视觉反馈
+// 立绘背景:绝对填满卡牌
 export const selectedCharPortrait = css`
-  position: relative;
-  width: 180px;
-  height: 240px;
-  border-radius: 10px;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.35);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
@@ -150,6 +150,29 @@ export const selectedCharPortraitImg = css`
   height: 100%;
   object-fit: cover;
   object-position: center top;
+`;
+// 文字内容层:底部渐变蒙版覆盖在立绘上
+export const selectedCharMeta = css`
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 18px 18px;
+  margin-top: auto;
+  width: 100%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.55) 60%,
+    rgba(0, 0, 0, 0) 100%
+  );
+`;
+export const selectedCharLabel = css`
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 2px;
 `;
 export const selectedCharName = css`
   font-size: 28px;

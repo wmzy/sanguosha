@@ -45,6 +45,9 @@ export interface MultiplayerRoom {
   error: string | null;
   /** 房间不存在(URL 直达不存在的 roomId) */
   notFound: boolean;
+  /** autoJoin 失败原因(非 404):房间存在但无法加入(如"游戏已开始""房间已满")。
+   *  非空时 UI 应展示错误页,不回退到 lobby。null=无失败。 */
+  joinFailed: string | null;
   /** 是否房主 */
   isHost: boolean;
   /** 是否为旁观者 */
@@ -113,6 +116,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [error, setError] = useState<string | null>(null);
   /** 房间不存在(URL 直达 /play/:roomId 但房间已销毁) */
   const [notFound, setNotFound] = useState(false);
+  /** autoJoin 失败(非 404):房间存在但无法加入(如游戏进行中且玩家不在座次)。
+   *  区别于 notFound:房间还在,用户可旁观/删除/返回大厅,但不能直接进入。 */
+  const [joinFailed, setJoinFailed] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -258,9 +264,13 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         const status = (err as { status?: number })?.status;
         const msg = err instanceof Error ? err.message : String(err);
         log.error('joinRoom failed', { status, error: msg });
-        // URL 直达且房间不存在：显示 404 页面
-        if (command.type === 'autoJoin' && status === 404) {
-          setNotFound(true);
+        // URL 直达(/play/:roomId)时,任何失败都应留在错误页,不回退到 lobby:
+        // 404 → notFound(房间已销毁);其他 → joinFailed(房间存在但无法加入,
+        // 如"游戏已开始""房间已满")。回退到 lobby 会让 /play/:roomId URL 上
+        // 错误地展示创建/加入表单 + 房间列表,与用户直达特定房间的意图相悖。
+        if (command.type === 'autoJoin') {
+          if (status === 404) setNotFound(true);
+          else setJoinFailed(msg);
         } else {
           setError(msg);
           setStage('lobby');
@@ -354,6 +364,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setCommand({ type: 'idle' });
     setStage('lobby');
     setNotFound(false);
+    setJoinFailed(null);
     setRoomId(null);
     setRoomState(null);
     setView(null);
@@ -498,6 +509,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     gameOver,
     error,
     notFound,
+    joinFailed,
     isHost,
     isSpectator,
     ready,

@@ -158,32 +158,34 @@ export function CharSelectOverlay({
                     setSelectedCharIdx(i);
                   }}
                 >
+                  {/* 立绘作卡片背景:无素材时留势力色填充,文字浮于上方 */}
                   {charImg && (
-                    <div className={candidatePortrait} aria-hidden>
-                      <img
-                        className={candidatePortraitImg}
-                        src={charImg}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
+                    <img
+                      className={candidatePortraitImg}
+                      src={charImg}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                   )}
-                  <div className={candidateName}>{ch.name}</div>
-                  <div className={cx(candidateFaction)}>
-                    {faction} · {ch.skills.map((s, si) => (
-                      <SkillTag key={s} name={s} description={getSkillDescription(s)}>
-                        {si > 0 ? ' / ' : ''}{s}
-                      </SkillTag>
-                    ))}
-                  </div>
-                  <div className={hpDots}>
-                    {Array.from({ length: maxHealth }, (_, j) => (
-                      <div key={j} className={hpDot} />
-                    ))}
+                  {/* 底部渐变蒙版 + 文字内容:覆盖在背景上,不被立绘压缩高度 */}
+                  <div className={candidateMeta}>
+                    <div className={candidateName}>{ch.name}</div>
+                    <div className={cx(candidateFaction)}>
+                      {faction} · {ch.skills.map((s, si) => (
+                        <SkillTag key={s} name={s} description={getSkillDescription(s)}>
+                          {si > 0 ? ' / ' : ''}{s}
+                        </SkillTag>
+                      ))}
+                    </div>
+                    <div className={hpDots}>
+                      {Array.from({ length: maxHealth }, (_, j) => (
+                        <div key={j} className={hpDot} />
+                      ))}
+                    </div>
                   </div>
                 </div>
               );
@@ -316,19 +318,25 @@ const badgeValue = css`
 const candidateGrid = css`
   display: grid;
   grid-template-columns: repeat(var(--cols), 1fr);
+  grid-auto-rows: 280px;
   gap: 16px;
-  max-width: 800px;
+  max-width: 880px;
   width: 90%;
+  /* 固定高度 + 滚动:多行候选时不挤压顶部提示/确认按钮 */
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  scrollbar-width: thin;
 `;
 
 const candidateCard = css`
+  position: relative;
+  box-sizing: border-box;
   background: var(--faction-color);
   border-radius: 12px;
-  padding: 12px 12px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  /* 顶部留背景区,底部留渐变区;避免内部空隙推动布局 */
+  padding: 0;
+  display: block;
   cursor: pointer;
   border: 3px solid transparent;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
@@ -336,6 +344,7 @@ const candidateCard = css`
   transition: all 0.25s cubic-bezier(0.23, 1, 0.32, 1);
   opacity: 1;
   filter: none;
+  overflow: hidden;
 
   &:hover {
     transform: translateY(-6px);
@@ -343,15 +352,7 @@ const candidateCard = css`
   }
 `;
 
-// 候选武将卡顶部的立绘区:按比例裁切,不拉伸变形
-const candidatePortrait = css`
-  position: relative;
-  width: 100%;
-  height: 220px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.3);
-`;
+// 候选武将立绘作背景:绝对定位填满卡片顶部,不占文档流高度
 const candidatePortraitImg = css`
   position: absolute;
   inset: 0;
@@ -359,6 +360,27 @@ const candidatePortraitImg = css`
   height: 100%;
   object-fit: cover;
   object-position: center top;
+  z-index: 0;
+`;
+
+// 底部信息区覆盖在立绘上:渐变蒙版 + 居中文字
+const candidateMeta = css`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 12px 14px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.55) 55%,
+    rgba(0, 0, 0, 0) 100%
+  );
 `;
 
 const candidateCardSelected = css`
