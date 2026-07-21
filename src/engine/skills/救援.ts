@@ -29,6 +29,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '救援',
     description: '主公技,锁定技:其他吴势力角色对你使用【桃】的回复值+1',
+    isLocked: true,
   };
 }
 

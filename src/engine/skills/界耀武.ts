@@ -35,6 +35,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: DISPLAY_NAME,
     description: '锁定技,当你受到伤害时,若造成伤害的牌为红色,来源摸一张牌;否则你摸一张牌',
+    isLocked: true,
   };
 }
 

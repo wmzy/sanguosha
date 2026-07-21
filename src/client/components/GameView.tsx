@@ -36,6 +36,7 @@ import { HandCard } from './HandCard';
 import { CancelButton } from './CancelButton';
 import { EquipColumn } from './EquipColumn';
 import { findUseActionForCard, isActiveAction } from '../utils/gameViewHelpers';
+import { SUIT_COLOR } from './gameViewConstants';
 
 // ─── 抽取的 hooks ───
 import { useAnimationState } from '../hooks/useAnimationState';
@@ -186,6 +187,7 @@ export function GameViewComponentImpl({
     distSelected,
     distAllocations,
     distTargetName,
+    distExternalCandidates,
     selectedActive,
     playButtonState,
     altActions,
@@ -549,6 +551,47 @@ export function GameViewComponentImpl({
               <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
             )}
           </div>
+          {/* distribute 外部候选区:候选牌不在手牌/装备区时(观星/界破军等),单独渲染。
+              点点击触发同一 handleCardClick → handleDistToggle(复用主流程候选选择逻辑)。n                手牌区/装备区的候选高亮仍由原逻辑处理,本区只补充"不在那些区域"的牌。 */}
+          {isDistributeActive && distExternalCandidates.length > 0 && (
+            <div className={styles.distExternalWrap}>
+              <span className={styles.distExternalLabel}>
+                {activeDistribute?.prompt.title ?? '候选牌'} · 已选 {distSelected.size}
+              </span>
+              <div className={styles.distExternalList}>
+                {distExternalCandidates.map((card) => {
+                  const isCandidate = true; // 本区的牌都是候选
+                  const isSelected = distSelected.has(card.id);
+                  const isAllocated = distAllocations.some((a) =>
+                    a.cardIds.includes(card.id),
+                  );
+                  return (
+                    <div
+                      key={card.id}
+                      data-card-id={card.id}
+                      className={cx(
+                        styles.distExternalCard,
+                        isSelected && styles.handCardDistributeSelected,
+                        isAllocated && styles.handCardDistributeAllocated,
+                        !isSelected && !isAllocated && styles.handCardDistributeCandidate,
+                      )}
+                      style={
+                        { '--suit-color': SUIT_COLOR[card.suit] ?? '#ccc' } as React.CSSProperties
+                      }
+                      onClick={() => handleCardClick(card)}
+                      title={`${card.name} ${card.suit}${card.rank}`}
+                    >
+                      <div className={styles.cardName}>{card.name}</div>
+                      <div className={styles.cardSuit}>
+                        {card.suit}
+                        {card.rank}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {/* 手牌区 */}
           <div className={styles.handList} ref={handListRef}>
             {/* respond cardFilter 提取到 map 外部(memo 后的 pendingRespondInfo),

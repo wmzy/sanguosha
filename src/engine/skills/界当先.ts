@@ -70,6 +70,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: DISPLAY_NAME,
     description:
       '锁定技:回合开始时执行一个额外的出牌阶段;此阶段开始时可获得一张无距离限制的杀;若未于此阶段造成过伤害,阶段结束时受1点伤害',
+    isLocked: true,
   };
 }
 

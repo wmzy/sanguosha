@@ -33,6 +33,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: DISPLAY_NAME,
     description:
       '锁定技,你不能成为黑色锦囊牌的目标;你防止回合内受到的伤害并摸所防止伤害值两倍数量的牌',
+    isLocked: true,
   };
 }
 

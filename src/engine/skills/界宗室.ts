@@ -44,6 +44,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: DISPLAY_NAME,
     description:
       '锁定技:手牌上限+X(X为全场势力数);其他角色对你造成伤害时,防止此伤害改为令其摸一张牌,每种势力限一次',
+    isLocked: true,
   };
 }
 

@@ -50,6 +50,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: DISPLAY_NAME,
     description:
       '锁定技:你的【酒】视为点数K的【杀】;其他角色不能于你的回合使用【酒】',
+    isLocked: true,
   };
 }
 

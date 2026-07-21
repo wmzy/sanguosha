@@ -87,6 +87,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: DISPLAY_NAME,
     description: '锁定技:回合外受到伤害后,本回合【杀】和普通锦囊牌对你无效',
+    isLocked: true,
   };
 }
 

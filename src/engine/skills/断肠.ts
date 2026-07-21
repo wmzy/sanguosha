@@ -29,6 +29,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '断肠',
     description: '杀死你的角色立即失去所有技能直到游戏结束(装备仍生效)',
+    isLocked: true,
   };
 }
 

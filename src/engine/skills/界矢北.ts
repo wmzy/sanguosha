@@ -53,6 +53,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: DISPLAY_NAME,
     description:
       '锁定技:游戏开始时获得3点护甲;每回合首次受到伤害后回1血,本回合再受到伤害后失1血',
+    isLocked: true,
   };
 }
 

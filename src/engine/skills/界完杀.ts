@@ -46,6 +46,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: DISPLAY_NAME,
     description:
       '锁定技,在你的回合内,只有你和处于濒死状态的角色才能使用【桃】;任意濒死结算中,除你和濒死者外其他角色的非锁定技失效',
+    isLocked: true,
   };
 }
 

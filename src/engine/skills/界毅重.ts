@@ -40,6 +40,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: DISPLAY_NAME,
     description:
       '锁定技,体力值大于等于你的角色的黑色【杀】对你无效;手牌数小于等于你的角色无法响应你的黑色【杀】',
+    isLocked: true,
   };
 }
 
