@@ -56,7 +56,7 @@
 //     atom + 视图事件传播才能保持 buildView/processedView 一致。此处**未实现**性别/势力
 //     覆盖(待新增"设置化身身份" atom + 视图事件 + 6 个消费者更新)。
 //     影响:结姻/界结姻/离间/肉林/界燕语/界荐言 等性别相关技能仍按界左慈原角色判定。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { AtomAfterContext, Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { createRng } from '../../shared/rng';
 import { registerAction, registerAfterHook } from '../skill';
@@ -78,6 +78,8 @@ const ACTION_REQUEST = '界化身/选择行动';
 const SWAP_COUNT_REQUEST = '界化身/移除数量';
 // 选技能询问时,把候选技能列表暂存到 localVars(供 respond validate 校验)
 const CANDIDATES_KEY = (ownerId: number) => `界化身/candidates/${ownerId}`;
+const CHARACTER_REQUEST = '界化身/选化身牌';
+const CHARACTER_CHOICE_KEY = '界化身/characterChoice';
 
 /** 初始化身牌数量:界版为 3(标版为 2)。 */
 const INITIAL_POOL_SIZE = 3;
@@ -175,9 +177,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const rt = atom['requestType'] as string;
       if (rt === ACTION_REQUEST) {
         // 选择行动:1=替换 2=移去 3=不操作
-        const action = params.action;
-        if (typeof action !== 'number' || ![ACTION_REPLACE, ACTION_SWAP, ACTION_SKIP].includes(action)) {
-          return '需要 action(1=替换, 2=移去, 3=不操作)';
+        const action = Number(params.option);
+        if (!Number.isInteger(action) || ![ACTION_REPLACE, ACTION_SWAP, ACTION_SKIP].includes(action)) {
+          return '需要 option(1=替换, 2=移去, 3=不操作)';
         }
         const pool = (st.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
         if (action === ACTION_REPLACE && pool.length < 2) {
@@ -189,9 +191,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return null;
       }
       if (rt === SWAP_COUNT_REQUEST) {
-        const count = params.count;
-        if (typeof count !== 'number' || ![1, 2].includes(count)) {
-          return '需要 count(1 或 2)';
+        const count = Number(params.option);
+        if (!Number.isInteger(count) || ![1, 2].includes(count)) {
+          return '需要 option(1 或 2)';
         }
         const pool = (st.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
         // 保留展示牌:最多移去 pool.length - 1 张
@@ -201,9 +203,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       if (rt === SKILL_REQUEST) {
         const candidates = (st.localVars[CANDIDATES_KEY(ownerId)] as string[] | undefined) ?? [];
-        const selected = params.skill;
-        if (typeof selected !== 'string') return '需要 skill(技能名)';
+        const selected = params.option;
+        if (typeof selected !== 'string') return '需要 option(技能名)';
         if (candidates.length > 0 && !candidates.includes(selected)) return '该技能不在候选中';
+        return null;
+      }
+      if (rt === CHARACTER_REQUEST) {
+        const pool = (st.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+        const charName = params.option as string | undefined;
+        if (typeof charName !== 'string') return '需要 option(武将名)';
+        if (!pool.includes(charName)) return '该武将不在化身牌池中';
         return null;
       }
       return '当前不是界化身询问';
@@ -212,11 +221,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const slot = st.pendingSlots.get(ownerId)!;
       const rt = (slot.atom as Record<string, unknown>).requestType as string;
       if (rt === ACTION_REQUEST) {
-        st.localVars[ACTION_CHOICE_KEY] = params.action;
+        st.localVars[ACTION_CHOICE_KEY] = Number(params.option);
       } else if (rt === SWAP_COUNT_REQUEST) {
-        st.localVars[SWAP_COUNT_KEY] = params.count;
+        st.localVars[SWAP_COUNT_KEY] = Number(params.option);
+      } else if (rt === CHARACTER_REQUEST) {
+        st.localVars[CHARACTER_CHOICE_KEY] = params.option;
       } else if (rt === SKILL_REQUEST) {
-        st.localVars[SELECTED_KEY] = params.skill;
+        st.localVars[SELECTED_KEY] = params.option;
         delete st.localVars[CANDIDATES_KEY(ownerId)];
       }
     },
@@ -271,22 +282,27 @@ async function lightAndGainSkill(
   state: GameState,
   ownerId: number,
   litIdx: number,
+  excludeIdx?: number,
 ): Promise<void> {
   const player = state.players[ownerId];
   if (!player) return;
   const pool = player.vars[POOL_KEY] as string[] | undefined;
   if (!pool || pool.length === 0) return;
 
-  // 选择一张有可选技能的化身牌:优先 litIdx,无技能则尝试其他
-  let chosenIdx = -1;
-  const order = [litIdx, ...pool.map((_, i) => i).filter((i) => i !== litIdx)];
-  for (const i of order) {
-    if (getUsableSkills(pool[i]).length > 0) {
-      chosenIdx = i;
-      break;
-    }
+  // 找出所有有可选技能的武将牌(排除指定索引,如替换时排除当前展示)
+  const usableIndices = pool
+    .map((_, i) => i)
+    .filter((i) => getUsableSkills(pool[i]).length > 0)
+    .filter((i) => i !== excludeIdx);
+  if (usableIndices.length === 0) return; // 整个池无可选技能
+  // 多张可选 → 询问玩家选化身牌;单张 → 自动选
+  let chosenIdx: number;
+  if (usableIndices.length === 1) {
+    chosenIdx = usableIndices[0];
+  } else {
+    chosenIdx = await askSelectCharacter(state, ownerId, pool, usableIndices);
+    if (chosenIdx < 0) chosenIdx = usableIndices[0]; // 超时兜底
   }
-  if (chosenIdx < 0) return; // 整个池无可选技能
   player.vars[LIT_KEY] = chosenIdx;
 
   const litChar = pool[chosenIdx];
@@ -313,13 +329,15 @@ async function offerTurnAction(state: GameState, ownerId: number): Promise<void>
     requestType: ACTION_REQUEST,
     target: ownerId,
     prompt: {
-      type: 'confirm',
-      title:
-        '化身:选择行动 — 1=替换展示的化身牌及技能 2=移去至多两张化身牌并获得等量新的 3=不操作',
-      confirmLabel: '确定',
-      cancelLabel: '取消',
+      type: 'chooseOption',
+      title: '化身:选择行动',
+      options: [
+        { value: String(ACTION_REPLACE), label: '替换展示的化身牌及技能' },
+        { value: String(ACTION_SWAP), label: '移去化身牌并获得等量新的' },
+        { value: String(ACTION_SKIP), label: '不操作' },
+      ],
     },
-    defaultChoice: ACTION_SKIP,
+    defaultChoice: String(ACTION_SKIP) as unknown as Json,
     timeout: 30,
   });
   const action = state.localVars[ACTION_CHOICE_KEY];
@@ -352,7 +370,7 @@ async function doReplace(state: GameState, ownerId: number): Promise<void> {
   // 亮出另一张(切换到不同索引)
   const curLit = (player.vars[LIT_KEY] as number | undefined) ?? 0;
   const newLit = (curLit + 1) % pool.length;
-  await lightAndGainSkill(state, ownerId, newLit);
+  await lightAndGainSkill(state, ownerId, newLit, curLit);
 }
 
 /**
@@ -375,12 +393,14 @@ async function doSwap(state: GameState, ownerId: number): Promise<void> {
     requestType: SWAP_COUNT_REQUEST,
     target: ownerId,
     prompt: {
-      type: 'confirm',
-      title: `化身:移去几张化身牌并获得等量新的?(1-${maxRemovable}张,展示牌保留)`,
-      confirmLabel: '确定',
-      cancelLabel: '取消',
+      type: 'chooseOption',
+      title: '化身:移去几张化身牌并获得等量新的?',
+      options: Array.from({ length: maxRemovable }, (_, i) => ({
+        value: String(i + 1),
+        label: `移去 ${i + 1} 张并获得 ${i + 1} 张新的（展示牌保留）`,
+      })),
     },
-    defaultChoice: 1,
+    defaultChoice: '1' as unknown as Json,
     timeout: 30,
   });
   const rawCount = state.localVars[SWAP_COUNT_KEY];
@@ -413,6 +433,43 @@ async function doSwap(state: GameState, ownerId: number): Promise<void> {
 }
 
 /**
+ * 请求玩家从牌池中选择一张化身牌(多张有可选技能时)。
+ * 返回选中的 pool 索引,或 -1(超时/未选)。
+ */
+async function askSelectCharacter(
+  state: GameState,
+  ownerId: number,
+  pool: string[],
+  usableIndices: number[],
+): Promise<number> {
+  delete state.localVars[CHARACTER_CHOICE_KEY];
+  const characterCards: Record<string, { faction: Faction; skills: string[] }> = {};
+  for (const i of usableIndices) {
+    const meta = getCharacterMeta(pool[i]);
+    characterCards[pool[i]] = {
+      faction: meta?.faction ?? '群',
+      skills: getUsableSkills(pool[i]),
+    };
+  }
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType: CHARACTER_REQUEST,
+    target: ownerId,
+    prompt: {
+      type: 'chooseOption',
+      title: '化身:选择一张化身牌',
+      options: usableIndices.map((i) => ({ value: pool[i], label: pool[i] })),
+      characterCards,
+    },
+    defaultChoice: pool[usableIndices[0]] as unknown as Json,
+    timeout: 30,
+  });
+  const chosen = state.localVars[CHARACTER_CHOICE_KEY] as string | undefined;
+  delete state.localVars[CHARACTER_CHOICE_KEY];
+  return chosen ? pool.indexOf(chosen) : -1;
+}
+
+/**
  * 请求玩家从 litChar 的 usable 技能中选一个。
  * 只有一个可选技能时自动选取(简化);超时/未选 → 第一个。
  * 返回选中的技能名,或 undefined(无可选)。
@@ -433,12 +490,10 @@ async function askSelectSkill(
     requestType: SKILL_REQUEST,
     target: ownerId,
     prompt: {
-      type: 'confirm',
-      title: `化身:从「${litChar}」选择一个技能(${usable.join(' / ')})`,
-      confirmLabel: '确定',
-      cancelLabel: '取消',
+      type: 'chooseOption',
+      title: `化身:从「${litChar}」选择一个技能`,
+      options: usable.map((s) => ({ value: s, label: s })),
     },
-    // 超时默认第一个可用技能(不放弃获得技能的机会)
     defaultChoice: usable[0] as unknown as Json,
     timeout: 30,
   });

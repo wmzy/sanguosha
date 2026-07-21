@@ -103,6 +103,31 @@ export const pickedByTag = css`
   text-decoration: line-through;
 `;
 
+// chooseOption 武将牌面板按钮(化身:势力色底+武将名+技能列表)
+export const chooseOptionCard = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 2px solid #888;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: transform 0.1s;
+  &:hover {
+    transform: scale(1.03);
+  }
+`;
+export const chooseOptionCardName = css`
+  font-weight: bold;
+  font-size: 15px;
+`;
+export const chooseOptionCardSkills = css`
+  font-size: 12px;
+  color: #888;
+`;
+
 export const waitingHint = css`
   text-align: center;
   color: #888;

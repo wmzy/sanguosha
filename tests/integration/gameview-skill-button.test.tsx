@@ -263,3 +263,104 @@ describe('GameView:distribute 外部候选区(观星类场景)', () => {
     expect(labelOf(0)).toBeDefined();
   });
 });
+
+// ─── chooseOption 选项选择(化身:选技能/选化身牌)───
+// 覆盖技能:化身/界化身 的所有多选一交互。
+// 修复前:化身用 confirm hack,候选技能名拼进 title,前端只渲染确定/取消两个按钮,无法选具体技能。
+// 修复后:chooseOption prompt 渲染选项按钮列表,有 characterCards 时渲染武将牌面板(势力色+武将名+技能)。
+describe('GameView:chooseOption 选项选择(化身场景)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('选技能:渲染选项按钮,点击提交 { option }', async () => {
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '化身/选技能', target: 0 } as any,
+        prompt: {
+          type: 'chooseOption',
+          title: '化身:从「司马懿」选择一个技能',
+          options: [
+            { value: '反馈', label: '反馈' },
+            { value: '鬼才', label: '鬼才' },
+          ],
+        },
+        target: 0,
+        isBlocking: true,
+      },
+    });
+
+    const onAction = vi.fn();
+    render(<GameViewComponent view={view} onAction={onAction} />);
+
+    // 等待 prompt 标题出现
+    await waitFor(() => {
+      expect(screen.getAllByText(/选择一个技能/).length).toBeGreaterThan(0);
+    });
+
+    // 点击 「反馈」 按钮
+    const feedbackBtn = screen.getByRole('button', { name: '反馈' });
+    fireEvent.click(feedbackBtn);
+
+    // 验证 onAction 以 { option: '反馈' } 提交
+    await waitFor(() => {
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionType: 'respond',
+          params: expect.objectContaining({ option: '反馈' }),
+        }),
+      );
+    });
+  });
+
+  it('选化身牌:渲染武将牌面板(势力色+武将名+技能)', async () => {
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '化身/选化身牌', target: 0 } as any,
+        prompt: {
+          type: 'chooseOption',
+          title: '化身:选择一张化身牌',
+          options: [
+            { value: '司马懿', label: '司马懿' },
+            { value: '郭嘉', label: '郭嘉' },
+          ],
+          characterCards: {
+            司马懿: { faction: '魏', skills: ['反馈', '鬼才'] },
+            郭嘉: { faction: '魏', skills: ['天妒', '遗计'] },
+          },
+        },
+        target: 0,
+        isBlocking: true,
+      },
+    });
+
+    const onAction = vi.fn();
+    render(<GameViewComponent view={view} onAction={onAction} />);
+
+    // 等待武将牌面板出现
+    await waitFor(() => {
+      expect(screen.getAllByText(/选择一张化身牌/).length).toBeGreaterThan(0);
+    });
+
+    // 武将名和技能应被渲染
+    expect(screen.getByText('司马懿')).toBeDefined();
+    expect(screen.getByText('反馈 · 鬼才')).toBeDefined();
+    expect(screen.getByText('郭嘉')).toBeDefined();
+    expect(screen.getByText('天妒 · 遗计')).toBeDefined();
+
+    // 点击 「司马懿」 提交 { option: '司马懿' }
+    const simaBtn = screen.getByRole('button', { name: /司马懿/ });
+    fireEvent.click(simaBtn);
+
+    await waitFor(() => {
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionType: 'respond',
+          params: expect.objectContaining({ option: '司马懿' }),
+        }),
+      );
+    });
+  });
+});

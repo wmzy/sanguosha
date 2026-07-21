@@ -44,15 +44,31 @@ function mkPlayer(opts: {
   };
 }
 
-/** 若存在化身的"选技能"询问,自动选第一个候选并 respond。 */
+/** 若存在化身的询问(选化身牌/选技能),自动选第一个并 respond。 */
 async function autoRespond化身Skill(harness: SkillTestHarness): Promise<void> {
-  const slot = harness.state.pendingSlots.get(0);
+  // 选化身牌(多张有技能时):自动选 prompt 第一个选项
+  let slot = harness.state.pendingSlots.get(0);
+  if (slot) {
+    const rt0 = (slot.atom as Record<string, unknown>).requestType as string | undefined;
+    if (rt0 === '化身/选化身牌') {
+      const opts =
+        (slot.atom as { prompt?: { options?: Array<{ value: string }> } }).prompt?.options ??
+        [];
+      if (opts.length > 0) {
+        await harness.player(0).respond('化身', { option: opts[0].value });
+        await harness.waitForStable();
+        harness.processAllEvents();
+      }
+    }
+  }
+  // 选技能:自动选第一个候选
+  slot = harness.state.pendingSlots.get(0);
   if (!slot) return;
   const rt = (slot.atom as Record<string, unknown>).requestType as string | undefined;
   if (rt !== '化身/选技能') return;
   const candidates = (harness.state.localVars['化身/candidates/0'] as string[] | undefined) ?? [];
   if (candidates.length === 0) return;
-  await harness.player(0).respond('化身', { skill: candidates[0] });
+  await harness.player(0).respond('化身', { option: candidates[0] });
   await harness.waitForStable();
   harness.processAllEvents();
 }

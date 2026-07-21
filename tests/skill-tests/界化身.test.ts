@@ -67,18 +67,34 @@ function mkPlayer(opts: {
   };
 }
 
-/** 若当前存在界化身的"选技能"询问,自动选第一个候选技能并 respond。
+/** 若当前存在界化身的询问(选化身牌/选技能),自动选第一个并 respond。
  *  playerIndex 指定界左慈所在座次(默认 0)。 */
 async function autoRespond化身Skill(harness: SkillTestHarness, playerIndex = 0): Promise<void> {
   const ZUO = harness.player(playerIndex);
-  const slot = harness.state.pendingSlots.get(playerIndex);
+  // 选化身牌(多张有技能时):自动选 prompt 第一个选项
+  let slot = harness.state.pendingSlots.get(playerIndex);
+  if (slot) {
+    const rt0 = (slot.atom as Record<string, unknown>).requestType as string | undefined;
+    if (rt0 === '界化身/选化身牌') {
+      const opts =
+        (slot.atom as { prompt?: { options?: Array<{ value: string }> } }).prompt?.options ??
+        [];
+      if (opts.length > 0) {
+        await ZUO.respond('界化身', { option: opts[0].value });
+        await harness.waitForStable();
+        harness.processAllEvents();
+      }
+    }
+  }
+  // 选技能:自动选第一个候选
+  slot = harness.state.pendingSlots.get(playerIndex);
   if (!slot) return;
   const rt = (slot.atom as Record<string, unknown>).requestType as string | undefined;
   if (rt !== '界化身/选技能') return;
   const candidates =
     (harness.state.localVars[`界化身/candidates/${playerIndex}`] as string[] | undefined) ?? [];
   if (candidates.length === 0) return;
-  await ZUO.respond('界化身', { skill: candidates[0] });
+  await ZUO.respond('界化身', { option: candidates[0] });
   await harness.waitForStable();
   harness.processAllEvents();
 }
@@ -194,7 +210,7 @@ describe('界化身', () => {
     expect((slot!.atom as Record<string, unknown>).requestType).toBe('界化身/选择行动');
 
     // 选择不操作(3)
-    await ZUO.respond('界化身', { action: 3 });
+    await ZUO.respond('界化身', { option: '3' });
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -273,7 +289,7 @@ describe('界化身', () => {
     ZUO.expectPending('请求回应');
 
     // 选 1(替换)
-    await ZUO.respond('界化身', { action: 1 });
+    await ZUO.respond('界化身', { option: '1' });
     await harness.waitForStable();
     harness.processAllEvents();
     // 替换后亮出另一张,若其有多个可选技能会再次询问 → 自动选第一个
@@ -332,7 +348,7 @@ describe('界化身', () => {
     ZUO.expectPending('请求回应');
 
     // 选 2(移去)
-    await ZUO.respond('界化身', { action: 2 });
+    await ZUO.respond('界化身', { option: '2' });
     await harness.waitForStable();
     harness.processAllEvents();
     // 紧接着询问移除数量
@@ -341,7 +357,7 @@ describe('界化身', () => {
     expect((slot!.atom as Record<string, unknown>).requestType).toBe('界化身/移除数量');
 
     // 选移除 1 张
-    await ZUO.respond('界化身', { count: 1 });
+    await ZUO.respond('界化身', { option: '1' });
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -393,13 +409,13 @@ describe('界化身', () => {
     ZUO.expectPending('请求回应');
 
     // 选 2(移去)
-    await ZUO.respond('界化身', { action: 2 });
+    await ZUO.respond('界化身', { option: '2' });
     await harness.waitForStable();
     harness.processAllEvents();
     ZUO.expectPending('请求回应');
 
     // 选移除 2 张
-    await ZUO.respond('界化身', { count: 2 });
+    await ZUO.respond('界化身', { option: '2' });
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -502,7 +518,7 @@ describe('界化身', () => {
     ZUO.expectPending('请求回应');
 
     // 选 2(移去)
-    await ZUO.respond('界化身', { action: 2 });
+    await ZUO.respond('界化身', { option: '2' });
     await harness.waitForStable();
     harness.processAllEvents();
     ZUO.expectPending('请求回应');
@@ -511,7 +527,7 @@ describe('界化身', () => {
     await ZUO.expectRejected({
       skillId: '界化身',
       actionType: 'respond',
-      params: { count: 2 },
+      params: { option: '2' },
     });
   });
 });
