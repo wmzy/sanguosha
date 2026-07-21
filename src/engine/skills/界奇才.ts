@@ -38,8 +38,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界奇才',
-    description:
-      '锁定技:你使用任何锦囊牌无距离限制;其他角色不能弃置你装备区的防具或宝物',
+    description: '锁定技:你使用任何锦囊牌无距离限制;其他角色不能弃置你装备区的防具或宝物',
+    isLocked: true,
   };
 }
 

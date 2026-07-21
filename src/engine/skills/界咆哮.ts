@@ -20,6 +20,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界咆哮',
     description: '锁定技:出牌阶段使用【杀】无次数限制;杀被【闪】抵消时摸一张牌',
+    isLocked: true,
   };
 }
 

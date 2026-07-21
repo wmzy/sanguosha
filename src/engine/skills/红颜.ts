@@ -21,6 +21,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '红颜',
     description: '锁定技:你的黑桃牌均视为红桃牌',
+    isLocked: true,
   };
 }
 

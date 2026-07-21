@@ -20,6 +20,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '帷幕',
     description: '锁定技:你不能成为黑色锦囊的目标',
+    isLocked: true,
   };
 }
 

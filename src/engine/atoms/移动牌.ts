@@ -88,13 +88,14 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     }
 
     // 牌堆→手牌 = 摸牌（信息分级）
-    if (atom.from.zone === '牌堆' && toPlayer !== undefined && cardInfo) {
+    if (atom.from.zone === '牌堆' && toPlayer !== undefined && card) {
       const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
+      // 使用完整 card 对象(同 摸牌 atom),保证 applyView 后 hand 各字段与 buildView 一致
       const ownerView: ViewEvent = {
         type: '摸牌',
         player: toPlayer,
         count: 1,
-        cards: [cardInfo],
+        cards: [card],
         effect,
       };
       const othersView: ViewEvent = { type: '摸牌', player: toPlayer, count: 1, effect };

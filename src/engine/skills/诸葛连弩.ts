@@ -13,7 +13,7 @@ import type { Skill, GameState } from '../types';
 import { registerSlashMaxProvider } from '../slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '诸葛连弩', description: '武器:出牌阶段使用【杀】无次数限制' };
+  return { id, ownerId, name: '诸葛连弩', description: '武器:出牌阶段使用【杀】无次数限制', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

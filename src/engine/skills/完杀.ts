@@ -25,6 +25,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '完杀',
     description: '锁定技:在你的回合,除你以外,只有处于濒死状态的角色才能使用【桃】',
+    isLocked: true,
   };
 }
 

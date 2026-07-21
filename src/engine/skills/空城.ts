@@ -18,6 +18,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '空城',
     description: '锁定技:若你没有手牌,你不是杀和决斗的合法目标',
+    isLocked: true,
   };
 }
 

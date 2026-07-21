@@ -218,18 +218,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await maybeTriggerLianYing(ctx, lost);
   });
 
-  // ── 移出游戏 before+after:界谦逊把整手牌移出(联动核心) ──
-  //   移出游戏.validate 保证所有 cardIds 在 owner 手牌;一次移走 N 张 → X=N
-  registerBeforeHook(state, skill.id, ownerId, '移出游戏', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
-    if (atom.type !== '移出游戏') return;
-    if (atom.player !== ownerId) return;
+  // ── 移出至暂存区 before+after:界谦逊把整手牌移出(联动核心) ──
+  //   通用 atom,亦服务破军等技能;hook 过滤 target=陆逊 才算陆逊失去手牌。
+  //   (破军打别人 target≠陆逊,自然不触发。谦逊 source=target=陆逊,触发。)
+  registerBeforeHook(state, skill.id, ownerId, '移出至暂存区', async (ctx: AtomBeforeContext) => {
+    const atom = ctx.atom as { type?: string; target?: number };
+    if (atom.type !== '移出至暂存区') return;
+    if (atom.target !== ownerId) return;
     ctx.state.localVars[HAND_BEFORE_KEY] = ctx.state.players[ownerId]?.hand.length ?? 0;
   });
-  registerAfterHook(state, skill.id, ownerId, '移出游戏', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
-    if (atom.type !== '移出游戏') return;
-    if (atom.player !== ownerId) return;
+  registerAfterHook(state, skill.id, ownerId, '移出至暂存区', async (ctx: AtomAfterContext) => {
+    const atom = ctx.atom as { type?: string; target?: number };
+    if (atom.type !== '移出至暂存区') return;
+    if (atom.target !== ownerId) return;
     const lost = consumeLostCount(ctx.state);
     if (lost === undefined) return;
     await maybeTriggerLianYing(ctx, lost);

@@ -14,22 +14,12 @@
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
-import { inAttackRange, effectiveDistance } from '../distance';
+import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
 import { enforceDualDodge } from './无双';
 import { enforceRoulinDodge } from './肉林';
-import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
+import { canSlash, incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
-
-/** 牌点数:A=1, 2-10=面值, J=11, Q=12, K=13(与天义/驱虎等 rankValue 同语义,杀内联) */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
@@ -49,47 +39,23 @@ export function onInit(skill: Skill, state: GameState): () => void {
         requireTarget: true,
       });
       if (baseErr) return baseErr;
-      // 诈降(界黄盖)红色杀无距离限制:仅当诈降激活且此杀为红色时放行超距目标。
-      // 非红色杀/诈降未激活 → 走正常距离校验(official:仅红色杀无距离)。
       const cardId = params.cardId as string | undefined;
-      const slashCard = cardId ? state.cardMap[cardId] : undefined;
-      const redSlashNoRange =
-        slashCard?.color === '红' && state.turn.vars['诈降/active'] === ownerId;
-      // 界武圣(界关羽):你使用的方片【杀】无距离限制(被动增益,任何方片杀均生效,
-      // 含物理方片杀与武圣/丈八转化出的方片杀)。仅持有界武圣技能的玩家享受此豁免。
-      const hasJieWusheng = state.players[ownerId].skills.includes('界武圣');
-      const diamondSlashNoRange = hasJieWusheng && slashCard?.suit === '♦';
-      // 界烈弓(界黄忠):你【杀】的攻击范围为此【杀】点数。按 FAQ,武器范围 > 杀点数时
-      // 仍以武器为准,即 effectiveRange = max(武器范围, 杀点数)。仅在使用者为界黄忠时生效。
-      const hasJieLiegong = state.players[ownerId].skills.includes('界烈弓');
-      const jieLiegongRank =
-        hasJieLiegong && slashCard ? rankValue(slashCard.rank) : 0;
+      // 距离 / 次数 豁免均由各技能自行注册 provider(distance.registerAttackRangeExemptor /
+      // slash-quota.registerSlashExemptor),本文件不感知具体技能。
       const targetsOk =
         Array.isArray(params.targets) &&
         (params.targets as number[]).every((t) => {
           if (state.players[t]?.alive !== true) return false;
-          if (redSlashNoRange || diamondSlashNoRange) return true;
-          if (jieLiegongRank > 0) {
-            const baseRange =
-              (state.players[ownerId].vars['距离/出杀范围'] as number) ?? 1;
-            const effRange = Math.max(baseRange, jieLiegongRank);
-            return effectiveDistance(state, ownerId, t) <= effRange;
-          }
-          return inAttackRange(state, ownerId, t);
+          return inAttackRange(state, ownerId, t, cardId);
         });
       if (!targetsOk) return '目标不合法';
-      return canSlash(state, ownerId) ? null : '出杀次数已达上限';
+      return canSlash(state, ownerId, cardId) ? null : '出杀次数已达上限';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
       const targets = params.targets as number[];
       const damageType = state.cardMap[cardId]?.damageType;
-      // 诈降(界黄盖)红色杀不能被抵消:诈降激活且此杀为红色 → 跳过询问闪(目标不可出闪)。
-      // 官方"使用红色【杀】...不能被抵消"=目标不可出【闪】响应。
-      const slashCard = state.cardMap[cardId];
-      const redSlashUnblockable =
-        slashCard?.color === '红' && state.turn.vars['诈降/active'] === from;
       const frame = await pushFrame(state, '杀', from, {
         ...params,
         resolvedTargets: [...targets],
@@ -136,10 +102,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (!valid) continue;
 
           // 生效前:询问闪(等待目标回应;八卦阵判红放虚拟闪后 cancel)
-          // 诈降红色杀不能被抵消 → 跳过询问闪(目标无法出闪,直接命中)。
-          if (!redSlashUnblockable) {
-            await applyAtom(state, { type: '询问闪', target, source: from });
-          }
+          // 诈降/烈弓/界鞬出 等"强制命中"效果由各自技能挂 before-hook cancel 询问闪实现,
+          // 杀技能完全不感知这些技能。
+          await applyAtom(state, { type: '询问闪', target, source: from });
 
           // 无双(吕布锁定技):目标需连续出两张闪。第一张闪打出后消耗,追加第二次询问。
           await enforceDualDodge(state, from, target);
@@ -200,16 +165,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
         await popFrame(state);
         // 记录一次出杀(已用次数 +1;上限由 slashMax 计算,连弩的 ∞ 由标签体现)
-        incSlashUsed(state);
-        // 同步出杀计数到 view:processedView 不增量维护 turn.vars,需经 atom
-        // event 让前端 turnUsage 实时更新(杀超上限时禁用)。紧跟 incSlashUsed
-        // 投影最新计数。
-        await applyAtom(state, {
-          type: '回合用量',
-          player: ownerId,
-          key: '杀/usedCount',
-          value: slashUsed(state),
-        });
+        // 豁免该张杀的技能(如界弓骑同花色杀)已通过 slash-quota.registerSlashExemptor
+        // 注册,isSlashExempted 返回 true 时跳过计数累加。
+        if (!isSlashExempted(state, ownerId, cardId)) {
+          incSlashUsed(state);
+          // 同步出杀计数到 view:processedView 不增量维护 turn.vars,需经 atom
+          // event 让前端 turnUsage 实时更新(杀超上限时禁用)。紧跟 incSlashUsed
+          // 投影最新计数。
+          await applyAtom(state, {
+            type: '回合用量',
+            player: ownerId,
+            key: '杀/usedCount',
+            value: slashUsed(state),
+          });
+        }
       }
     },
   );

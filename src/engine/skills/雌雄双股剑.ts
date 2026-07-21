@@ -6,7 +6,7 @@ import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '雌雄双股剑', description: '武器:出杀后,你摸1张牌,目标弃1张牌' };
+  return { id, ownerId, name: '雌雄双股剑', description: '武器:出杀后,你摸1张牌,目标弃1张牌', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

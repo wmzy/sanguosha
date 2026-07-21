@@ -5,7 +5,7 @@ import { applyAtom } from '../create-engine';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '白银狮子', description: '防具:每次受伤最多1点' };
+  return { id, ownerId, name: '白银狮子', description: '防具:每次受伤最多1点', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

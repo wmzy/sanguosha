@@ -90,7 +90,7 @@ export type Atom =
   // distanceVars: 可选的距离修正 view 同步通道(技能如屯田加田时携带,
   //   applyView 据此同步 view.distanceVars——后端 vars 由技能自行维护)。
   | { type: '加标记'; player: number; mark: Mark; distanceVars?: { attackMod?: number; defenseMod?: number; attackRange?: number } }
-  | { type: '去标记'; player: number; markId: string }
+  | { type: '去标记'; player: number; markId: string; distanceVars?: { attackMod?: number; defenseMod?: number; attackRange?: number } }
   | { type: '清过期标记'; player: number }
   | { type: '设横置'; player: number; chained: boolean }
   | { type: '设上限'; player: number; amount: number }
@@ -160,7 +160,7 @@ export type Atom =
   // 玩家每次操作都 resolve 它(重建),超时则结束回合。不计入 hasBlockingPending。
   | { type: '出牌窗口'; player: number; timeout?: number }
   // 转化包装:将 N 张手牌当【杀】使用(武圣/丈八蛇矛等通用)
-  | { type: '当作'; player: number; cardIds: string[]; shadowId: string; outputName: string }
+  | { type: '当作'; player: number; cardIds: string[]; shadowId: string; outputName: string; outputDamageType?: '普通' | '火焰' | '雷电' }
   // 结算帧管理(走 atom 管线,保证前后端 settlementStack 同步)
   | { type: '结算帧入栈'; skillId: string; from: number; params?: Record<string, Json> }
   | { type: '结算帧出栈' }
@@ -175,11 +175,13 @@ export type Atom =
   | { type: '扣牌'; player: number; cardId: string; declaredName: string }
   // 于吉·蛊惑:翻开(展示)已扣置的牌,向所有人公开其真实身份。纯视图事件,不改 state(牌仍在弃牌堆)。
   | { type: '展示'; player: number; cardId: string }
-  // 界陆逊·界谦逊:将所有手牌移出游戏(暂存于 player.vars['界谦逊/移出']),回合结束归还。
-  // 与 置创牌 同构:移出的牌不进入任何标准 zone,仅存于 player.vars;applyView 同步 handCount 减少。
-  | { type: '移出游戏'; player: number; cardIds: string[] }
-  // 界陆逊·界谦逊:回合结束归还此前移出游戏的手牌(player.vars['界谦逊/移出'] → 手牌)。
-  | { type: '归还移出牌'; player: number };
+  // 移出至暂存区:把指定玩家的若干牌(手牌/装备)移出游戏,暂存于 target.vars[varsKey]。
+  // 通用操作,服务于所有「暂时移出→到时归还」型技能:界谦逊(自身手牌) / 界破军(他人手牌+装备) / 未来的攻心·权计·隐识等。
+  // source=操作者(谦逊=自己,破军=徐盛);target=牌主;varsKey=暂存键名(由调用方技能自定义)。
+  | { type: '移出至暂存区'; source: number; target: number; cardIds: string[]; varsKey: string }
+  // 归还暂存牌:把此前 移出至暂存区 暂存的牌(player.vars[varsKey])归还手牌。
+  // 与 移出至暂存区 配对;player 已死亡时牌进弃牌堆。
+  | { type: '归还暂存牌'; player: number; varsKey: string };
 
 export interface AtomDefinition<A = unknown> {
   type: string;

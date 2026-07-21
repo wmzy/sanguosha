@@ -37,6 +37,17 @@ import type {
 } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAttackRangeExemptor, effectiveDistance } from '../distance';
+
+/** 杀点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
+function rankValue(rank: string): number {
+  if (rank === 'A') return 1;
+  if (rank === 'J') return 11;
+  if (rank === 'Q') return 12;
+  if (rank === 'K') return 13;
+  const n = parseInt(rank, 10);
+  return Number.isFinite(n) ? n : 0;
+}
 
 const TAG_BLOCK = '界烈弓/禁闪';
 const TAG_BONUS = '界烈弓/加伤';
@@ -54,6 +65,23 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
+
+  // ── 距离豁免器:你【杀】的攻击范围为此【杀】点数 ──────────────────
+  //   官方语义:effectiveRange = max(武器范围, 杀点数)。
+  //   predicate 自行计算 effectiveDistance 与 点数比较,命中则放行(返回 true)。
+  //   通过 distance provider 实现,避免污染 杀.ts/distance.ts。
+  const unloadRangeExemptor = registerAttackRangeExemptor(
+    state,
+    ownerId,
+    (st, from, to, cardId) => {
+      if (!cardId) return false;
+      const card = st.cardMap[cardId];
+      if (!card) return false;
+      const rank = rankValue(card.rank);
+      if (rank <= 0) return false;
+      return effectiveDistance(st, from, to) <= rank;
+    },
+  );
 
   // respond:界黄忠本人回应「是否发动烈弓」的 confirm 询问,结果写入 localVars。
   registerAction(
@@ -169,7 +197,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  return () => {};
+  return () => {
+    unloadRangeExemptor();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {

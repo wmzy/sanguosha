@@ -1,9 +1,15 @@
 // 闪(基本牌):当你成为【杀】的目标时,可以打出【闪】抵消伤害。
 // 闪只有 respond action(没有 use),因为闪不能主动使用。
 // respond:把闪牌从手牌移到处理区(不是直接进弃牌堆),供杀的结算流程检查。
+//
+// 颜色限制(通用机制):state.localVars['闪/色限制'] 由其他技能(如界父魂转化杀)
+// 在 询问闪 before-hook 设置。设置时目标只能打出同色的闪。未设置则无限制(默认)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Color } from '../../shared/types';
 import { applyAtom } from '../create-engine';
 import { registerAction } from '../skill';
+
+const COLOR_LIMIT_VAR = '闪/色限制';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '闪', description: '需要打出闪时,打出一张闪' };
@@ -28,6 +34,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!self.hand.includes(cardId)) return '牌不在手牌中';
         const card = state.cardMap[cardId];
         if (card?.name !== '闪') return '只能打出闪';
+        // 颜色限制(界父魂等):若 localVars 设置了限制色,闪必须同色
+        const limit = state.localVars[COLOR_LIMIT_VAR] as Color | undefined;
+        if (limit && card.color !== limit) return `只能打出${limit}色的闪`;
       }
       return null;
     },

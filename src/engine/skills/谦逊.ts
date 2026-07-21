@@ -24,6 +24,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '谦逊',
     description: '锁定技:你不能成为顺手牵羊和乐不思蜀的目标',
+    isLocked: true,
   };
 }
 

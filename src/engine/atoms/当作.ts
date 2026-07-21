@@ -31,6 +31,8 @@ export const 当作: AtomDefinition<{
   cardIds: string[];
   shadowId: string;
   outputName: string;
+  /** 可选:转化后牌的伤害属性(用于疠火等需要转化出火杀的场景)。不传则不设。 */
+  outputDamageType?: '普通' | '火焰' | '雷电';
 }> = {
   type: '当作',
   validate(state, atom) {
@@ -56,6 +58,7 @@ export const 当作: AtomDefinition<{
       type: '基本牌',
       shadowOf: single ? atom.cardIds[0] : undefined,
     };
+    if (atom.outputDamageType) shadow.damageType = atom.outputDamageType;
     state.cardMap[atom.shadowId] = shadow;
     self.hand = self.hand.filter((c) => !atom.cardIds.includes(c));
     self.hand.push(atom.shadowId);
@@ -69,6 +72,7 @@ export const 当作: AtomDefinition<{
       cardIds: atom.cardIds,
       shadowId: atom.shadowId,
       outputName: atom.outputName,
+      outputDamageType: atom.outputDamageType,
       effect,
     };
     const othersView: ViewEvent = {
@@ -100,6 +104,7 @@ export const 当作: AtomDefinition<{
       if (!shadowCard) {
         const origCard = view.cardMap[cardIds[0]];
         const single = count === 1;
+        const outputDamageType = ev.outputDamageType as '普通' | '火焰' | '雷电' | undefined;
         shadowCard = {
           id: shadowId,
           name: outputName,
@@ -109,6 +114,7 @@ export const 当作: AtomDefinition<{
           type: '基本牌',
           shadowOf: single ? cardIds[0] : undefined,
         };
+        if (outputDamageType) shadowCard.damageType = outputDamageType;
         view.cardMap[shadowId] = shadowCard;
       }
       const idSet = new Set(cardIds);

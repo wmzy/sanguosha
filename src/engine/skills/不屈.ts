@@ -31,6 +31,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '不屈',
     description: '锁定技:濒死时将牌堆顶一张牌作"创"牌置于武将牌上,点数与已有创牌均不同则回复至1体力,相同则移去此牌',
+    isLocked: true,
   };
 }
 

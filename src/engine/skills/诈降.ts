@@ -19,10 +19,11 @@
 //
 // turn-scoped:turn.vars / turnUsage 在回合结束 atom 自动清空,效果仅本回合。
 // provider 随技能实例生命周期注册/卸载(返回的 unload 由 setSkillInstanceUnload 清理)。
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { AtomBeforeContext, AtomAfterContext, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAfterHook, type SkillModule } from '../skill';
+import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
 import { registerSlashMaxProvider } from '../slash-quota';
+import { registerAttackRangeExemptor, effectiveDistance } from '../distance';
 
 /** 本回合诈降杀增益是否激活的 turn.vars key(值为激活者座次 number)。
  *  仅在 owner 出牌阶段失去体力后设置;杀技能/action-active/distance 据此分支红色杀增益。 */
@@ -38,8 +39,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '诈降',
-    description:
-      '锁定技：当你失去1点体力后，你摸三张牌，若在你的出牌阶段，你本回合使用【杀】的限制次数+1、使用红色【杀】无距离限制且不能被抵消。',
+    description: '锁定技：当你失去1点体力后，你摸三张牌，若在你的出牌阶段，你本回合使用【杀】的限制次数+1、使用红色【杀】无距离限制且不能被抵消。',
+    isLocked: true,
   };
 }
 
@@ -47,11 +48,45 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ─── 出杀上限提供者:诈降激活后本回合杀次数 +1(base 1 + 1 = 2) ─────────
-  //   官方"限制次数+1"是额度叠加,非"无限"(诸葛连弩/咆哮式 ∞ 由 provider 返回 Infinity)。
+  //   官方"限制次数+1"是额度叠加,非"无限"(诸葛连弩/呕哮式 ∞ 由 provider 返回 Infinity)。
   const unloadProvider = registerSlashMaxProvider(
     state,
     ownerId,
     (st: GameState, player: number) => (st.turn.vars[ACTIVE_VAR] === player ? 1 : 0),
+  );
+
+  // ─── 距离豁免器:诈降激活后,红色杀无距离限制 ──────────────────────
+  //   通过 distance provider 实现,避免污染 杀.ts/distance.ts。
+  const unloadRangeExemptor = registerAttackRangeExemptor(
+    state,
+    ownerId,
+    (st, from, to, cardId) => {
+      if (st.turn.vars[ACTIVE_VAR] !== from) return false;
+      if (!cardId) return false;
+      const card = st.cardMap[cardId];
+      return card?.color === '红';
+    },
+  );
+
+  // ─── before-hook on '询问闪':诈降激活时,红色杀不能被抵消 ───────────
+  //    owner 发起的红色杀 → cancel 询问闪 → 杀.execute 检测处理区无闪 → 直接造成伤害
+  //    (同 烈弓/界鞬出 的 cancel 询问闪 强制命中模式)。
+  const unloadBanDodge = registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '询问闪',
+    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      const atom = ctx.atom as { source?: number; target?: number };
+      if (atom.source !== ownerId) return;
+      if (ctx.state.turn.vars[ACTIVE_VAR] !== ownerId) return;
+      // 从帧 params 读当前杀的 cardId(杀.execute pushFrame 时传入)
+      const cardId = ctx.params?.cardId as string | undefined;
+      if (!cardId) return;
+      const card = ctx.state.cardMap[cardId];
+      if (card?.color !== '红') return;
+      return { kind: 'cancel' };
+    },
   );
 
   // ─── 失去体力 after-hook:摸3张 + (若出牌阶段)激活红色杀增益 ──────────
@@ -77,15 +112,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     }
   });
 
-  // provider 是 WeakMap 注册表,需显式卸载;actions/hooks 随 state-bound 注册表自动清理。
+  // provider/exemptor/hook 是 WeakMap 注册表,需显式卸载;hooks 随 state-bound 注册表自动清理。
   return () => {
     unloadProvider();
+    unloadRangeExemptor();
+    unloadBanDodge();
   };
 }
 
 export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
-  // 锁定技无主动 action。红色杀增益(无距离/不可抵消/+1次)由杀技能自身读取
-  // turn.vars['诈降/active'] 并按卡色分支实现(详见 杀.ts validate/execute)。
+  // 锁定技无主动 action。红色杀增益(无距离/不可抵消/+1次)均由本技能自行注册的
+  // provider/exemptor/before-hook 实现,杀技能完全不感知诈降。
   return () => {};
 }
 

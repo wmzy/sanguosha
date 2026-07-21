@@ -34,7 +34,7 @@ function getTempUnloadMap(state: GameState): Map<number, Array<{ target: number;
 }
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '青釭剑', description: '武器:杀无视目标防具' };
+  return { id, ownerId, name: '青釭剑', description: '武器:杀无视目标防具', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

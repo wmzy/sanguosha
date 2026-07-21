@@ -17,8 +17,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '肉林',
-    description:
-      '锁定技:你对女性角色/女性角色对你使用【杀】时,目标需连续出两张闪才能抵消',
+    description: '锁定技:你对女性角色/女性角色对你使用【杀】时,目标需连续出两张闪才能抵消',
+    isLocked: true,
   };
 }
 

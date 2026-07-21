@@ -35,6 +35,9 @@ export function viewSlashMax(view: ActionContext['view'], player: number): numbe
   if (p.turnUsage?.['天义/win']) max += 1;
   // 诈降(界黄盖):失去体力后本回合杀限制次数 +1(非无限,官方为额度叠加)。
   if (p.turnUsage?.['诈降/active']) max += 1;
+  // 父魂(界关兴张苞):出牌阶段杀造成伤害后本回合获得咆哮→无限出杀。
+  // turnUsage['父魂/granted'] 由回合用量 atom 实时同步。
+  if (p.turnUsage?.['父魂/granted']) return Infinity;
   return max;
 }
 
@@ -48,5 +51,20 @@ export function viewSlashUsed(view: ActionContext['view'], player: number): numb
 /** 前端视角下某玩家本回合是否还能出杀(已用 < 上限,且未被天义拼点输阻断)。 */
 export function viewCanSlash(view: ActionContext['view'], player: number): boolean {
   if (view.players[player]?.turnUsage?.['天义/lost']) return false;
+  // 界弓骑(界韩当):与弃置牌花色相同的杀无次数限制。当前视角=player 时,
+  // 只要手中有同花色杀,杀按钮就启用(后端 杀.validate 严格校验同花色);
+  // 当前视角≠player 时无法看手牌,turnUsage 有 '界弓骑/suit' 时宽松放行(UI 提示)。
+  const gongqiSuit = view.players[player]?.turnUsage?.['界弓骑/suit'];
+  if (typeof gongqiSuit === 'string' && gongqiSuit !== '') {
+    if (view.viewer === player) {
+      const hand = view.players[player]?.hand;
+      if (hand && hand.some((c) => c.name === '杀' && c.suit === gongqiSuit)) {
+        return true;
+      }
+    } else {
+      // 他人视角无法看手牌,保守允许(只影响 UI 渲染,后端权威校验)
+      return true;
+    }
+  }
   return viewSlashUsed(view, player) < viewSlashMax(view, player);
 }

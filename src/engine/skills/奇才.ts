@@ -13,7 +13,7 @@ import type { Skill, GameState } from '../types';
 export const QICAI_TAG = '奇才/无距离限制';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '奇才', description: '锁定技:你使用任何锦囊牌无距离限制' };
+  return { id, ownerId, name: '奇才', description: '锁定技:你使用任何锦囊牌无距离限制', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

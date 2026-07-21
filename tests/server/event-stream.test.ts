@@ -66,13 +66,29 @@ describe('全局 CAS 删除', () => {
     for (let i = 0; i < 200 && state.pendingSlots.size > 0; i++) await sleep(10);
 
     // 等待进入 player 0 的出牌阶段(bootstrap 完成后回合管理自动推进到出牌)
+    // 注:某些角色(如刘禅·放权)在进入出牌阶段前会触发 confirm 询问——
+    // 自动拒绝以推进阶段切换。
     for (
       let i = 0;
       i < 300 &&
       (state.currentPlayerIndex !== 0 || state.phase !== '出牌' || state.pendingSlots.size > 0);
       i++
-    )
+    ) {
+      for (const [t, slot] of state.pendingSlots) {
+        if (!slot.isBlocking) continue;
+        const atom = slot.atom as { type?: string; requestType?: string; target?: number };
+        if (atom.type === '请求回应' && atom.target === t) {
+          await session.handleAction(`p${t}`, {
+            skillId: atom.requestType?.split('/')[0] ?? '系统规则',
+            actionType: 'respond',
+            ownerId: t,
+            params: { choice: false },
+            baseSeq: state.seq,
+          });
+        }
+      }
       await sleep(10);
+    }
 
     // 用陈旧 baseSeq 发主动 action——不应被 CAS 拒(CAS 已删)
     const veryStaleSeq = state.seq - 10;

@@ -297,7 +297,56 @@ describe('applyView 一致性 bug', () => {
   });
 
   describe('获得/给予 atom: 信息分级泄露', () => {
-    it('获得 toViewEvents 用 othersView 公开 cardId → 第三方知道顺手牵羊拿了什么牌', () => {
+    it('获得 toViewEvents 手牌→手牌: othersView 不携带 cardId（第三方不知道顺手牵羊拿了哪张手牌）', () => {
+      const def = getAtomDef('获得');
+      const split = def.toViewEvents!(
+        {
+          players: [
+            {
+              index: 0,
+              name: 'P0',
+              character: '',
+              health: 4,
+              maxHealth: 4,
+              alive: true,
+              hand: [],
+              equipment: {},
+              skills: [],
+              vars: {},
+              marks: [],
+              pendingTricks: [],
+              tags: [],
+              judgeZone: [],
+            },
+            {
+              index: 1,
+              name: 'P1',
+              character: '',
+              health: 4,
+              maxHealth: 4,
+              alive: true,
+              hand: ['c2'],
+              equipment: {},
+              skills: [],
+              vars: {},
+              marks: [],
+              pendingTricks: [],
+              tags: [],
+              judgeZone: [],
+            },
+          ],
+          cardMap: {
+            c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' },
+          },
+          zones: { deck: [], discardPile: [], processing: [] },
+        } as any,
+        { type: '获得', player: 0, cardId: 'c2', from: 1 },
+      );
+      // othersView 不应携带 cardId（第三方不应知道获得了哪张手牌）
+      expect((split?.othersView as any)?.cardId).toBeUndefined();
+    });
+
+    it('获得 toViewEvents 装备→手牌: othersView 携带 cardId（装备为公开信息，需 cardId 才能同步第三方视角装备槽清空）', () => {
       const def = getAtomDef('获得');
       const split = def.toViewEvents!(
         {
@@ -336,14 +385,16 @@ describe('applyView 一致性 bug', () => {
             },
           ],
           cardMap: {
-            c2: { id: 'c2', name: '杀', suit: '♥', color: '红', rank: '3', type: '基本牌' },
+            c2: { id: 'c2', name: '仁王盾', suit: '♣', color: '黑', rank: '2', type: '装备牌', subtype: '防具' },
           },
           zones: { deck: [], discardPile: [], processing: [] },
         } as any,
         { type: '获得', player: 0, cardId: 'c2', from: 1 },
       );
-      // othersView 不应携带 cardId（第三方不应知道获得了什么牌）
-      expect((split?.othersView as any)?.cardId).toBeUndefined();
+      // 装备牌为公开信息：othersView 须带 cardId 以便第三方 applyView 能正确清空装备槽
+      // 否则第三方视角装备槽残留，与权威 buildView 不一致（界利驭紫 ben 测试发现）
+      expect((split?.othersView as any)?.cardId).toBe('c2');
+      expect((split?.othersView as any)?.fromZone).toBe('equipment');
     });
   });
 

@@ -8,6 +8,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '护甲',
     description: '锁定技:受到【杀】造成的伤害时,若此牌为黑色,伤害 -1',
+    isLocked: true,
   };
 }
 

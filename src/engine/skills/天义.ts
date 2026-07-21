@@ -22,6 +22,7 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 import { registerSlashMaxProvider, registerSlashBlocker } from '../slash-quota';
+import { registerAttackRangeExemptor } from '../distance';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
 function rankValue(rank: string): number {
@@ -63,6 +64,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     ownerId,
     (st: GameState, player: number) => st.turn.vars[LOST_VAR] === player,
+  );
+
+  // ─── 距离豁免器:拼点赢后本回合攻击范围无限 ──────────────────────
+  //   通过 distance provider 实现,避免污染 杀.ts/distance.ts。
+  const unloadRangeExemptor = registerAttackRangeExemptor(
+    state,
+    ownerId,
+    (st, from, _to, _cardId) => st.turn.vars[WIN_VAR] === from,
   );
 
   // ─── use action:太史慈主动发动天义 ────────────────────────
@@ -205,6 +214,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => {
     unloadProvider();
     unloadBlocker();
+    unloadRangeExemptor();
   };
 }
 
