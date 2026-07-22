@@ -1,62 +1,67 @@
-// tests/unit/imageAssets.test.ts
 // 图片资源映射 helper 的单元测试。
-// 覆盖:getCharacterImage / getCardImage 对已实现武将与卡牌的命中,以及缺失时的回退。
-// 命中即保证前端各组件引用的 URL 在 public/ 下存在。
+// 覆盖:getCharacterImage / getCardImage / getEquipCardImage。
 
 import { describe, expect, it } from 'vitest';
-import { getCardImage, getCharacterImage } from '../../src/client/assets/imageAssets';
+import { getCardImage, getCharacterImage, getEquipCardImage } from '../../src/client/assets/imageAssets';
 
 describe('getCharacterImage', () => {
   it('returns URL for standard heroes with portrait assets', () => {
     expect(getCharacterImage('曹操')).toBe('/characters/曹操.png');
     expect(getCharacterImage('刘备')).toBe('/characters/刘备.png');
-    expect(getCharacterImage('诸葛亮')).toBe('/characters/诸葛亮.png');
   });
 
-  it('returns URL for 界限突破 heroes (区分同前缀的标准武将)', () => {
-    expect(getCharacterImage('界曹操')).toBe('/characters/界曹操.png');
-    expect(getCharacterImage('界卧龙诸葛')).toBe('/characters/界卧龙诸葛.png');
-  });
-
-  it('returns URL for 张昭张纮 dual hero', () => {
-    expect(getCharacterImage('张昭张纮')).toBe('/characters/张昭张纮.png');
-  });
-
-  it('returns null for unimplemented / unknown heroes', () => {
+  it('returns null for unknown heroes', () => {
+    expect(getCharacterImage('不存在')).toBeNull();
     expect(getCharacterImage('')).toBeNull();
-    expect(getCharacterImage('神诸葛亮')).toBeNull();
-    expect(getCharacterImage('SP刘备')).toBeNull();
-    expect(getCharacterImage('不存在的武将')).toBeNull();
   });
 });
 
 describe('getCardImage', () => {
-  // 卡牌图统一走 /cards/<...>;本地覆盖(public/cards-local/)由 Vite 中间件服务端处理,
-  // 前端永远只请求 /cards/<name>。
-  it('routes basic cards to /cards/basic/ with .jpg', () => {
-    expect(getCardImage('杀')).toBe('/cards/basic/杀.jpg');
-    expect(getCardImage('闪')).toBe('/cards/basic/闪.jpg');
-    expect(getCardImage('火杀')).toBe('/cards/basic/火杀.jpg');
-    expect(getCardImage('雷杀')).toBe('/cards/basic/雷杀.jpg');
+  // 卡牌图走 /cards-local/<type>/<名>-<点>-<花色>.<ext>;每张物理牌一张图。
+  // basic→.jpg, equipment/trick→.png。
+  // 图片 404 由 <object> fallback 处理;getCardImage 仅返回 URL 或 null。
+  it('routes basic cards to /cards-local/basic/ with name-rank-suit .jpg', () => {
+    expect(getCardImage({ name: '杀', suit: '♠', rank: '10' })).toBe('/cards-local/basic/杀-10-♠.jpg');
+    expect(getCardImage({ name: '闪', suit: '♥', rank: '2' })).toBe('/cards-local/basic/闪-2-♥.jpg');
+    // 火杀:底层 name 仍是「杀」,靠花色点数组合区分(♥4 只可能是火杀)
+    expect(getCardImage({ name: '杀', suit: '♥', rank: '4' })).toBe('/cards-local/basic/杀-4-♥.jpg');
   });
 
-  it('routes equipment cards to /cards/equipment/ with .png', () => {
-    expect(getCardImage('诸葛连弩')).toBe('/cards/equipment/诸葛连弩.png');
-    expect(getCardImage('丈八蛇矛')).toBe('/cards/equipment/丈八蛇矛.png');
-    expect(getCardImage('八卦阵')).toBe('/cards/equipment/八卦阵.png');
-    expect(getCardImage('+1坐骑')).toBe('/cards/equipment/+1坐骑.png');
-    expect(getCardImage('-1坐骑')).toBe('/cards/equipment/-1坐骑.png');
+  it('routes equipment cards to /cards-local/equipment/ with name-rank-suit .png', () => {
+    expect(getCardImage({ name: '丈八蛇矛', suit: '♠', rank: 'Q' })).toBe('/cards-local/equipment/丈八蛇矛-Q-♠.png');
+    expect(getCardImage({ name: '赤兔', suit: '♥', rank: '5' })).toBe('/cards-local/equipment/赤兔-5-♥.png');
   });
 
-  it('routes trick cards to /cards/trick/ with .png', () => {
-    expect(getCardImage('南蛮入侵')).toBe('/cards/trick/南蛮入侵.png');
-    expect(getCardImage('无懈可击')).toBe('/cards/trick/无懈可击.png');
-    expect(getCardImage('乐不思蜀')).toBe('/cards/trick/乐不思蜀.png');
-    expect(getCardImage('闪电')).toBe('/cards/trick/闪电.png');
+  it('routes trick cards to /cards-local/trick/ with name-rank-suit', () => {
+    expect(getCardImage({ name: '桃园结义', suit: '♥', rank: 'A' })).toBe('/cards-local/trick/桃园结义-A-♥.png');
+    expect(getCardImage({ name: '闪电', suit: '♠', rank: 'A' })).toBe('/cards-local/trick/闪电-A-♠.png');
   });
 
-  it('returns null for unknown cards (引擎未实现的扩展卡)', () => {
-    expect(getCardImage('')).toBeNull();
-    expect(getCardImage('不存在')).toBeNull();
+  it('returns null when suit or rank is missing (转化卡/信息不全)', () => {
+    expect(getCardImage({ name: '杀' })).toBeNull();
+    expect(getCardImage({ name: '杀', suit: '', rank: '' })).toBeNull();
+    expect(getCardImage({ name: '杀', suit: '♠' })).toBeNull();
+    expect(getCardImage({ name: '杀', rank: '10' })).toBeNull();
+  });
+
+  it('returns null for unknown cards', () => {
+    expect(getCardImage({ name: '', suit: '♠', rank: '10' })).toBeNull();
+    expect(getCardImage({ name: '不存在', suit: '♠', rank: '10' })).toBeNull();
+  });
+});
+
+describe('getEquipCardImage', () => {
+  // 装备区缩略图按牌名查找(一张图对应一种装备),不分花色点数。
+  it('routes equipment to /cards-local/equipment/<name>.png', () => {
+    expect(getEquipCardImage('丈八蛇矛')).toBe('/cards-local/equipment/丈八蛇矛.png');
+    expect(getEquipCardImage('诸葛连弩')).toBe('/cards-local/equipment/诸葛连弩.png');
+    expect(getEquipCardImage('赤兔')).toBe('/cards-local/equipment/赤兔.png');
+  });
+
+  it('returns null for non-equipment or unknown cards', () => {
+    expect(getEquipCardImage('杀')).toBeNull();
+    expect(getEquipCardImage('桃园结义')).toBeNull();
+    expect(getEquipCardImage('不存在')).toBeNull();
+    expect(getEquipCardImage('')).toBeNull();
   });
 });

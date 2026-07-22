@@ -4,7 +4,7 @@
 import { memo } from 'react';
 import { css } from '@linaria/core';
 import { SUIT_COLOR } from './gameViewConstants';
-import { getCardImage } from '../assets/imageAssets';
+import { CardFace } from './CardFace';
 import type { PlayHistoryItem } from '../utils/playHistoryQueue';
 
 export type PlayHistoryStripProps = {
@@ -15,35 +15,10 @@ function PlayHistoryStripImpl({ items }: PlayHistoryStripProps) {
   return (
     <div className={strip} aria-label="出牌展示" data-play-history-count={items.length}>
       {items.map((it) => {
-        const suitColor = SUIT_COLOR[it.card.suit ?? ''] ?? '#ccc';
-        const cardImg = getCardImage(it.card.name);
         return (
           <div key={it.id} className={slot}>
-            <div className={cardFace} style={{ borderColor: suitColor }}>
-              {/* 插画作背景:文字浮于下方 */}
-              {cardImg && (
-                <img
-                  className={cardArt}
-                  src={cardImg}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              )}
-              <div className={cardMeta}>
-                <div className={cardName} style={{ color: suitColor }}>
-                  {it.card.name}
-                </div>
-                {(it.card.suit || it.card.rank) && (
-                  <div className={cardSuit} style={{ color: suitColor }}>
-                    {it.card.suit}
-                    {it.card.rank}
-                  </div>
-                )}
-              </div>
+            <div className={cardFace} style={{ borderColor: SUIT_COLOR[it.card.suit ?? ''] ?? '#ccc' }}>
+              <CardFace name={it.card.name} suit={it.card.suit} rank={it.card.rank} size="small" />
             </div>
             <div className={caption} title={it.caption}>
               {it.caption}
@@ -107,47 +82,6 @@ const cardFace = css`
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
   text-align: center;
   overflow: hidden;
-`;
-// 插画作背景:绝对定位填满卡牌
-const cardArt = css`
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
-  z-index: 0;
-`;
-// 文字内容层:底部渐变蒙版
-const cardMeta = css`
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 14px 4px 4px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.82) 0%,
-    rgba(0, 0, 0, 0.55) 60%,
-    rgba(0, 0, 0, 0) 100%
-  );
-`;
-
-const cardName = css`
-  font-size: 13px;
-  font-weight: bold;
-  line-height: 1.2;
-  white-space: nowrap;
-`;
-
-const cardSuit = css`
-  font-size: 10px;
-  opacity: 0.9;
-  margin-top: 1px;
 `;
 
 const caption = css`

@@ -10,7 +10,7 @@ import type { EquipSlot, GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
-import { getCardImage } from '../assets/imageAssets';
+import { getEquipCardImage } from '../assets/imageAssets';
 import { shallowSetEqual } from '../utils/memo';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
@@ -147,7 +147,8 @@ function EquipItem({
   handleClick: (() => void) | undefined;
 }) {
   const tip = useHoverTooltip(tooltipText);
-  const cardImg = getCardImage(name);
+  // 装备区小缩略图:cards-local 图片(<object> fallback)或 emoji 图标。
+  const cardUrl = getEquipCardImage(name);
   return (
     <>
       <div
@@ -162,17 +163,15 @@ function EquipItem({
         onMouseEnter={tip.onMouseEnter}
         onMouseLeave={tip.onMouseLeave}
       >
-        {cardImg ? (
-          <img
+        {cardUrl ? (
+          <object
             className={styles.equipCardArt}
-            src={cardImg}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+            data={cardUrl}
+            aria-label={name}
+          >
+            {/* object 加载失败时渲染 emoji 图标 fallback */}
+            <span className={styles.equipColumnIcon}>{icon}</span>
+          </object>
         ) : (
           <span className={styles.equipColumnIcon}>{icon}</span>
         )}

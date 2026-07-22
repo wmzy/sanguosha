@@ -19,3 +19,10 @@ test-results
 # 运行时优先加载,不入 git(规避版权风险)。
 # 结构镜像 public/cards/:如 public/cards-local/basic/杀.jpg、equipment/朱雀羽扇.png
 public/cards-local/
+
+# AI 生成卡牌图目录(gen-card.ts 产出,不入 git)
+# 含: <name>.png(成品) / <name>.base.png(LLM 中间底图) / <name>.md(提示词档案)
+public/cards-ai/
+
+# 官方卡牌参考图目录(用于 --verify 对比,不入 git)
+docs/card-refs/

@@ -12,13 +12,12 @@
 // 缺失图片(无对应素材)返回 null,调用方自行回退到文字/默认样式。
 // 只暴露 URL 字符串,组件直接放进 <img src=...>,缺失图片用 onError 兜底。
 //
-// ─── 本地卡面覆盖(规避版权风险) ──────────────────────────────
-// 开发者可在 public/cards-local/ 下放置官方/同人卡面图,运行时优先加载。
-// 该目录已加入 .gitignore,不入 git(规避版权风险)。
-// 结构镜像 public/cards/:如 public/cards-local/basic/杀.jpg、equipment/朱雀羽扇.png。
-// 加载策略:getCardImage 优先返回本地路径,若本地无对应文件,<img onError>
-// 兜底到 bundled 路径(bundled 若也无则隐藏 img,显示文字)。
-// 本地存在性无法在构建期同步探测(浏览器无 fs 访问),故用 onError 运行时回退。
+// ─── 卡牌图来源 ──────────────────────────────────────────────
+// 卡牌图来自 public/cards-local/<type>/<名>-<点>-<花色>.png(本地卡图,gitignored)。
+// 命名格式:[名称]-[点数]-[花色].png —— 每张物理牌一张独立图。
+// 火杀/雷杀 name 仍是「杀」,靠花色点数组合唯一区分(♥4 只可能是火杀)。
+// 缺失图片(无对应文件或 card 无 suit/rank)返回 null,调用方用 <object> fallback
+// 到 HTML 绘制的牌面;图片 404 由 <object> 自动回退其内部内容。
 
 // ─── 武将立绘 ───────────────────────────────────────────────
 // 命名 → 文件名映射。若名字相同(同前缀、同后缀)而 series 不同,以前缀区分(界/谋/SP 等)。
@@ -45,54 +44,41 @@ export function getCharacterImage(name: string): string | null {
 }
 
 // ─── 卡牌图 ─────────────────────────────────────────────────
-// 卡牌按 card.name 命名,文件后缀取决于原始素材(.jpg=基本牌扫描,.png=其他)。
-// 列出所有 public/cards 下存在的文件名(含后缀),供查表。
+// 牌名 → cards-local 子目录(basic/equipment/trick),从 CardDef 实时派生。
+// 不手动维护牌名 Set —— 直接复用 shared/cards 的权威 CardDef 注册表,
+// 新增牌时自动覆盖,杜绝漏牌(如赤兔/的卢等坐骑名)。
+import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../../shared/cards';
+import type { CardType } from '../../shared/types';
 
-// 基本牌(.jpg)
-const BASIC_CARDS: ReadonlySet<string> = new Set(['杀', '闪', '桃', '酒', '火杀', '雷杀']);
-// 装备牌(.png)——引擎已实现 + 卡牌库收录
-const EQUIPMENT_CARDS: ReadonlySet<string> = new Set([
-  '诸葛连弩', '青釭剑', '寒冰剑', '雌雄双股剑', '贯石斧', '丈八蛇矛', '麒麟弓', '八卦阵', '仁王盾',
-  // 军争篇装备(牌库已收录;藤甲/白银狮子引擎已实现,古锭刀/朱雀羽扇/骅骝 暂为占位装备)
-  '白银狮子', '朱雀羽扇', '藤甲', '古锭刀', '骅骝',
-  // 以下为牌库已收录但引擎暂未实现的装备(保留素材,将来接入时直接命中)
-  '三尖两刃刀', '吴六剑', '+1坐骑', '-1坐骑',
-]);
-// 锦囊牌(.png)
-const TRICK_CARDS: ReadonlySet<string> = new Set([
-  '决斗', '无中生有', '借刀杀人', '顺手牵羊', '过河拆桥', '无懈可击', '无懈可击·国',
-  '铁索连环', '火攻', '桃园结义', '以逸待劳', '远交近攻', '南蛮入侵', '知己知彼',
-  '万箭齐发', '闪电', '五谷丰登', '乐不思蜀', '兵粮寸断',
-]);
-// 其他(野心家等扩展素材,.jpg/.png 混合,直接以无后缀图名命名)
-const OTHER_CARDS: ReadonlySet<string> = new Set(['野心家']);
-
-const CARD_EXT: Record<string, 'png' | 'jpg'> = (() => {
-  const table: Record<string, 'png' | 'jpg'> = {};
-  for (const n of BASIC_CARDS) table[n] = 'jpg';
-  for (const n of EQUIPMENT_CARDS) table[n] = 'png';
-  for (const n of TRICK_CARDS) table[n] = 'png';
-  for (const n of OTHER_CARDS) table[n] = 'jpg';
-  return table;
+const NAME_TO_SUB: ReadonlyMap<string, 'basic' | 'equipment' | 'trick'> = (() => {
+  const m = new Map<string, 'basic' | 'equipment' | 'trick'>();
+  const subOf = (t: CardType): 'basic' | 'equipment' | 'trick' =>
+    t === '基本牌' ? 'basic' : t === '装备牌' ? 'equipment' : 'trick';
+  for (const def of 基本牌列表) m.set(def.name, subOf(def.type));
+  for (const def of 锦囊牌列表) m.set(def.name, subOf(def.type));
+  for (const def of 装备牌列表) m.set(def.name, subOf(def.type));
+  return m;
 })();
 
-function cardCategory(name: string): 'basic' | 'equipment' | 'trick' | 'other' | null {
-  if (BASIC_CARDS.has(name)) return 'basic';
-  if (EQUIPMENT_CARDS.has(name)) return 'equipment';
-  if (TRICK_CARDS.has(name)) return 'trick';
-  if (OTHER_CARDS.has(name)) return 'other';
-  return null;
+/** 卡牌图 URL(来自 public/cards-local/<type>/<名>-<点>-<花色>.png)。
+ *
+ * 需 card 同时具备 name + suit + rank 才能定位精确图片;缺任一返回 null
+ * (转化卡 suit 为空串、或 card 信息不全时直接渲染 HTML 牌面)。
+ * 图片 404(cards-local 中无该文件)由 <object> fallback 处理:自动渲染
+ * 内部的 HTML 绘制牌面。 */
+export function getCardImage(card: { name: string; suit?: string; rank?: string }): string | null {
+  const sub = NAME_TO_SUB.get(card.name);
+  if (!sub || !card.suit || !card.rank) return null;
+  // basic 用 .jpg(官方扫描图),equipment/trick 用 .png
+  const ext = sub === 'basic' ? 'jpg' : 'png';
+  return `/cards-local/${sub}/${card.name}-${card.rank}-${card.suit}.${ext}`;
 }
 
-/** 卡牌图 URL(来自 public/cards/,自制默认卡图)。缺失返回 null。
+/** 装备区缩略图 URL(按牌名查找,一张图对应一种装备)。
  *
- * 本地官方卡图覆盖(public/cards-local/,gitignored)由 Vite 中间件在服务端处理:
- * 请求 /cards/<name> 时若 cards-local/ 有同名文件则优先返回,否则落到 public/cards/。
- * 前端永远只请求 /cards/<name>,无需 JS onError 交换 src。 */
-export function getCardImage(name: string): string | null {
-  const cat = cardCategory(name);
-  if (!cat) return null;
-  const ext = CARD_EXT[name];
-  const prefix = cat === 'other' ? '' : `${cat}/`;
-  return `/cards/${prefix}${name}.${ext}`;
+ * 装备区是小缩略图列表,不需要区分花色点数;cards-local/equipment/<名>.png。
+ * 图片 404 由 <object> fallback 到 emoji 图标。 */
+export function getEquipCardImage(name: string): string | null {
+  if (NAME_TO_SUB.get(name) !== 'equipment') return null;
+  return `/cards-local/equipment/${name}.png`;
 }

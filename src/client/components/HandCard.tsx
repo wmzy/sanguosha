@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
-import { getCardImage } from '../assets/imageAssets';
+import { CardFace } from './CardFace';
 import type { Card } from '../../engine/types';
 
 export interface HandCardProps {
@@ -63,7 +63,6 @@ export function HandCardImpl(props: HandCardProps) {
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
   const displayName = isTransformMatch && transformWrapperName ? transformWrapperName : card.name;
   const fanAngle = totalHand > 1 ? -10 + 20 * (index / (totalHand - 1)) : 0;
-  const cardImg = getCardImage(card.name);
 
   return (
     <div
@@ -101,30 +100,15 @@ export function HandCardImpl(props: HandCardProps) {
           : `${card.name} ${card.suit}${card.rank}\n${card.description ?? ''}`
       }
     >
-      {/* 卡牌插画作背景:绝对定位填满卡牌,文字浮于上方 */}
-      {cardImg && (
-        <img
-          className={styles.handCardArt}
-          src={cardImg}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-      )}
-      {/* 文字层:底部渐变蒙版覆盖,不撑高卡牌 */}
-      <div className={styles.handCardMeta}>
-        <div className={styles.cardName}>{displayName}</div>
-        {isTransformMatch && transformWrapperName && (
+      {/* 卡牌牌面:cards-local 图片(object fallback)或 HTML 绘制牌面 */}
+      <CardFace name={card.name} suit={card.suit} rank={card.rank} size="normal" />
+      {/* 转化模式标注层:仅在武圣等转化牌时叠加显示转化后牌名 + 原牌名 */}
+      {isTransformMatch && transformWrapperName && (
+        <div className={styles.handCardMeta}>
+          <div className={styles.cardName}>{displayName}</div>
           <div className={styles.cardOrigin}>(原: {card.name})</div>
-        )}
-        <div className={styles.cardSuit}>
-          {card.suit}
-          {card.rank}
         </div>
-      </div>
+      )}
     </div>
   );
 }
