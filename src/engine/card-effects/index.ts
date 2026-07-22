@@ -7,3 +7,5 @@ import './杀';
 import './桃';
 import './无中生有';
 import './决斗';
+import './顺手牵羊';
+import './过河拆桥';

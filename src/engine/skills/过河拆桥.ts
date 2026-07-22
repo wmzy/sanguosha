@@ -9,10 +9,8 @@
 //   重放确定性:盲选时在 actionLog 的当前条目前 splice "设置手牌顺序" 条目。
 //   选牌面板逻辑见 ./选牌面板.ts(与顺手牵羊/反馈共用)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
-import { 询问无懈可击 } from '../无懈可击';
-import { runPickTargetCardPanel } from './选牌面板';
+import { runUseFlow } from '../card-effect/use-card';
 import { QICAI_PROTECTED_SLOTS } from './界奇才';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -53,49 +51,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       );
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      await pushFrame(state, '过河拆桥', from, { ...params });
       const cardId = params.cardId as string;
       const target = (params.targets as number[])?.[0] ?? (params.target as number);
-      // 移锦囊到处理区
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      // 询问无懈可击(单目标锦囊:抵消整个锦囊)
-      try {
-        const cancelled = await 询问无懈可击(state, target);
-        if (!cancelled) {
-          const targetPlayer = state.players[target];
-          if (targetPlayer) {
-            // 弹选牌面板:使用者从目标区域选一张牌弃置
-            await runPickTargetCardPanel(state, from, target, targetPlayer, {
-              mode: 'discard',
-              requestType: '过河拆桥_选牌',
-              title: '选择弃置的目标牌',
-            });
-          }
-        }
-        // 移锦囊到弃牌堆
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
+      // 结算逻辑委托 runUseFlow → CardEffect['过河拆桥'].resolve
+      await runUseFlow(state, ownerId, cardId, [target], '过河拆桥');
     },
   );
 

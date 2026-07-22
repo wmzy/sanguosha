@@ -16,6 +16,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { topFrame } from '../../src/engine/create-engine';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
@@ -248,6 +249,17 @@ describe('界贞烈', () => {
     // P1 用顺手牵羊 → 贞烈在无懈窗口打开前触发
     await P1.triggerAction('顺手牵羊', 'use', { cardId: 't1', target: 0 });
     await harness.waitForStable();
+
+    // DEBUG: 查看 P1.triggerAction 之后的状态
+    console.log('=== DEBUG after P1.triggerAction(顺手牵羊) ===');
+    console.log('pendingSlots:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: (v as any).isBlocking }))));
+    console.log('atomStack types:', harness.state.atomStack.map(a => a.type));
+    const 贞烈Vars = Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('贞烈/')));
+    console.log('localVars 贞烈/*:', 贞烈Vars);
+    const tf = topFrame(harness.state);
+    console.log('topFrame:', tf ? { skillId: tf.skillId, from: tf.from, params: tf.params } : 'undefined');
+    console.log('======================');
+
     P0.expectPending('请求回应'); // 贞烈发动确认
 
     await P0.respond('界贞烈', { choice: true });
@@ -260,8 +272,34 @@ describe('界贞烈', () => {
     await harness.waitForStable();
 
     // 无懈窗口(广播)超时
+    console.log('=== DEBUG BEFORE pass ===');
+    console.log('pendingSlots BEFORE pass:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: v.isBlocking }))));
+    console.log('atomStack BEFORE pass:', harness.state.atomStack.map(a => ({ type: a.type, requestType: (a as any).requestType })));
+    console.log('settlementStack BEFORE pass:', harness.state.settlementStack.length);
+
     await P0.pass();
+
+    console.log('=== DEBUG AFTER pass (before waitForStable) ===');
+    console.log('pendingSlots AFTER pass:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: v.isBlocking }))));
+    console.log('atomStack AFTER pass:', harness.state.atomStack.map(a => ({ type: a.type, requestType: (a as any).requestType })));
+    console.log('settlementStack AFTER pass:', harness.state.settlementStack.length);
+
     await harness.waitForStable();
+
+    console.log('=== DEBUG AFTER waitForStable ===');
+    console.log('pendingSlots AFTER waitForStable:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: v.isBlocking }))));
+    console.log('atomStack AFTER waitForStable:', harness.state.atomStack.map(a => ({ type: a.type, requestType: (a as any).requestType })));
+    console.log('settlementStack AFTER waitForStable:', harness.state.settlementStack.length);
+    const tf2 = topFrame(harness.state);
+    console.log('topFrame AFTER waitForStable:', tf2 ? { skillId: tf2.skillId, from: tf2.from, params: tf2.params } : 'undefined');
+    console.log('localVars 贞烈/*:', Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('贞烈/'))));
+    console.log('localVars 无懈/*:', Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('无懈/'))));
+    console.log('localVars 选牌/*:', Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('选牌/'))));
+    console.log('P0 hand:', harness.state.players[0].hand);
+    console.log('P1 hand:', harness.state.players[1].hand);
+    console.log('discardPile:', harness.state.zones.discardPile);
+    console.log('processing:', harness.state.zones.processing);
+    console.log('======================');
 
     // P1 顺手牵羊选牌面板(即使贞烈已令锦囊无效,仍弹面板 — 获得 atom 会被 cancel)
     P1.expectPending('请求回应');

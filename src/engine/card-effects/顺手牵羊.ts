@@ -1,0 +1,76 @@
+// 顺手牵羊 CardEffect — 普通锦囊·顺手牵羊的使用结算。
+//
+// resolve: 询问无懈可击 →（若未被抵消）弹选牌面板获得目标一张牌。
+// target.kind='distance' dist=1: 距离 1 内的其他角色（奇才无距离限制）。
+
+import type { Card } from '../types';
+import type { ActionPrompt, GameView } from '../types';
+import { effectiveDistance } from '../distance';
+import { viewEffectiveDistance } from '../viewDistance';
+import { 询问无懈可击 } from '../无懈可击';
+import { runPickTargetCardPanel } from '../skills/选牌面板';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+
+/** 顺手牵羊牌特有校验：距离 <= 1（奇才例外）、目标有牌、非自己 */
+function canUseSnatch(
+  state: import('../types').GameState,
+  ownerId: number,
+  params: Record<string, import('../types').Json>,
+): string | null {
+  const target =
+    (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
+  if (target === undefined) return '目标不合法';
+  if (target === ownerId) return '不能对自己使用';
+  if (!state.players[target]?.alive) return '目标已死亡';
+  const ignoreDistance = !!state.players[ownerId]?.tags.includes('奇才/无距离限制');
+  if (!ignoreDistance && effectiveDistance(state, ownerId, target) > 1) return '距离太远';
+  const p = state.players[target];
+  if (!p) return '目标不合法';
+  const hasCards =
+    p.hand.length > 0 || Object.keys(p.equipment).length > 0 || p.pendingTricks.length > 0;
+  if (!hasCards) return '目标无可获取的牌';
+  return null;
+}
+
+/** 顺手牵羊的结算：无懈 → 选牌面板(获得) */
+async function resolveSnatch(ctx: ResolveCtx): Promise<void> {
+  const { state, source, target } = ctx;
+  console.log('=== resolveSnatch ===', { source, target, cardId: ctx.cardId });
+  const cancelled = await 询问无懈可击(state, target);
+  console.log('=== resolveSnatch: cancelled =', cancelled, '===');
+  if (!cancelled) {
+    const targetPlayer = state.players[target];
+    console.log('=== resolveSnatch: targetPlayer exists =', !!targetPlayer, 'hand=', targetPlayer?.hand, '===');
+    if (targetPlayer) {
+      console.log('=== resolveSnatch: calling runPickTargetCardPanel ===');
+      await runPickTargetCardPanel(state, source, target, targetPlayer, {
+        mode: 'obtain',
+        requestType: '顺手牵羊_选牌',
+        title: '选择获得的目标牌',
+      });
+      console.log('=== resolveSnatch: runPickTargetCardPanel DONE ===');
+    }
+  }
+}
+
+const snatchEffect: CardEffect = {
+  timing: '出牌阶段',
+  target: { kind: 'distance', dist: 1, min: 1, max: 1 },
+  canUse: canUseSnatch,
+  resolve: resolveSnatch,
+  prompt: {
+    type: 'useCardAndTarget',
+    title: '顺手牵羊',
+    cardFilter: { filter: (c: Card) => c.name === '顺手牵羊', min: 1, max: 1 },
+    targetFilter: {
+      min: 1,
+      max: 1,
+      filter: (view: GameView, t: number) =>
+        viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
+    },
+  } as ActionPrompt,
+  label: '顺手牵羊',
+  style: 'primary',
+};
+
+registerCardEffect('顺手牵羊', snatchEffect);

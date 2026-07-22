@@ -5,12 +5,10 @@
 // 区别:获得(而非弃置)目标牌。判定区延时锦囊也可被获得。
 // 选牌面板逻辑见 ./选牌面板.ts(与过河拆桥/反馈共用)。
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
-import { 询问无懈可击 } from '../无懈可击';
-import { runPickTargetCardPanel } from './选牌面板';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '顺手牵羊', description: '锦囊:获得目标一张牌' };
@@ -48,52 +46,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       );
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      await pushFrame(state, '顺手牵羊', from, { ...params });
       const cardId = params.cardId as string;
-      // validate 闭包已保证 target 存在;此处断言必要,eslint 对 ?? 链有误报
-
-      const target = ((params.target as number | undefined) ??
-        (params.targets as number[] | undefined)?.[0]) as number;
-      // 移锦囊到处理区
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      // 询问无懈可击(单目标锦囊:抵消整个锦囊)
-      try {
-        const cancelled = await 询问无懈可击(state, target);
-        if (!cancelled) {
-          const targetPlayer = state.players[target];
-          if (targetPlayer) {
-            // 弹选牌面板:使用者从目标区域选一张牌获得
-            await runPickTargetCardPanel(state, from, target, targetPlayer, {
-              mode: 'obtain',
-              requestType: '顺手牵羊_选牌',
-              title: '选择获得的目标牌',
-            });
-          }
-        }
-        // 移锦囊到弃牌堆
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
+      const target =
+        ((params.target as number | undefined) ??
+          (params.targets as number[] | undefined)?.[0]) as number;
+      // 结算逻辑委托 runUseFlow → CardEffect['顺手牵羊'].resolve
+      await runUseFlow(state, ownerId, cardId, [target], '顺手牵羊');
     },
   );
 

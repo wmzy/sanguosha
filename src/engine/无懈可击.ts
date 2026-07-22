@@ -39,6 +39,7 @@ export async function 询问无懈可击(state: GameState, cancelTarget: number)
   const key = `无懈/被抵消/${cancelTarget}`;
   const respondedKey = `无懈/已回应/${cancelTarget}`;
   state.localVars[key] = false;
+  console.log('=== 询问无懈可击 START ===', { cancelTarget, key });
   try {
     while (true) {
       state.localVars[respondedKey] = false;
@@ -56,10 +57,14 @@ export async function 询问无懈可击(state: GameState, cancelTarget: number)
       });
       // applyAtom 返回 = 窗口超时(无人 respond)或被 respond resolve。
       // 本次窗口是否有人 respond? (await 期间可能被 respond execute 修改)
-      if ((state.localVars[respondedKey] as Json) !== true) break; // 无人 respond → 结束
+      const responded = (state.localVars[respondedKey] as Json) === true;
+      console.log('=== 询问无懈可击 loop: responded =', responded, '===', { respondedKey, value: state.localVars[respondedKey] });
+      if (!responded) break;
       // 有人打了无懈 → 循环开新窗口(新 createdSeq),让其他人反无懈
     }
-    return (state.localVars[key] as Json) === true;
+    const result = (state.localVars[key] as Json) === true;
+    console.log('=== 询问无懈可击 END: result =', result, '===');
+    return result;
   } finally {
     delete state.localVars[key];
     delete state.localVars[respondedKey];

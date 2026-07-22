@@ -265,6 +265,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!cardId) return;
     const card = ctx.state.cardMap[cardId];
     if (!isKillOrNormalTrick(card)) return;
+    // 成为目标 hook 只处理杀/决斗——普通锦囊(顺手牵羊/过河拆桥等)通过请求回应(无懈窗口)触发
+    // (旧代码中普通锦囊不走 成为目标 atom;迁移后 runUseFlow 统一发出该 atom,但普通锦囊的
+    // 贞烈触发仍由 请求回应 before-hook 处理,以保持 "锦囊无效但仍弹选牌面板" 的语义)
+    if (card.name !== '杀' && card.name !== '决斗') return;
     if (!ctx.state.players[ownerId]?.alive) return;
     // 防重入:同一张牌只触发一次(可能 multiple hooks fire)
     if (isProcessedFor(ctx.state, cardId, ownerId)) return;
