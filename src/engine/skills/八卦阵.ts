@@ -10,7 +10,7 @@
 // cancel 询问闪不会跳过杀.execute 的后续逻辑:杀.execute 在 applyAtom(询问闪)
 // 返回后自己检查处理区,与询问闪是否被 cancel 无关。武器技挂在独立的"被抵消"
 // atom after(非询问闪 after),故不受询问闪 cancel 影响。
-import type { AtomBeforeContext, Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
@@ -49,8 +49,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      if ((ctx.atom as { target?: number }).target !== ownerId) return;
+    async (ctx): Promise<HookResult | void> => {
+      if ((ctx.atom).target !== ownerId) return;
       if (ctx.state.zones.deck.length === 0) return;
 
       // 询问是否发动八卦阵

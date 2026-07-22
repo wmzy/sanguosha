@@ -26,8 +26,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界矢北'(避开标版冲突);
 //   内部 Skill.name = '矢北'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -88,7 +86,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── 游戏开始初始化(化身/界巧变先例):'回合开始' after-hook,首次触发加 3 点护甲 ──
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
     const st = ctx.state;
     if (!st.players[ownerId]?.alive) return;
     if (st.localVars[INIT_KEY(ownerId)]) return;
@@ -104,13 +102,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        target?: number;
-        amount?: number;
-        source?: number;
-        type: string;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const amount = atom.amount ?? 0;
       if (amount <= 0) return;
@@ -128,8 +121,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // 仅当最终 amount > 0 触发(护甲全吸收则未"受到伤害")。
   // 在引擎濒死检查(系统规则 after-hook,ownerId=-1,最后执行)之前运行,
   // 故"首伤回 1 血"可避免 owner 因本次伤害进入濒死。
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const finalAmount = atom.amount ?? 0;
     if (finalAmount <= 0) return; // 全吸收 → 不计

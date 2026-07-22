@@ -9,7 +9,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界鬼道';
 //   内部 Skill.name = '鬼道'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerJudgeModifier } from '../skill';
 
@@ -88,8 +88,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 判定改判钩子:翻开判定牌后询问是否用黑色牌替换 ────────────
-  registerJudgeModifier(state, skill.id, ownerId, async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerJudgeModifier(state, skill.id, ownerId, async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
 
     const me = ctx.state.players[ownerId];

@@ -10,7 +10,7 @@
 //     因此把 'respond' action 注册到每个座次(以 skillId='刚烈' 隔离,不与他技冲突)。
 //   - 判定结果通过「判定」after hook 在判定牌进弃牌堆前捕获花色,存 localVars。
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -68,8 +68,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // ── 判定 after hook:捕获判定牌花色(判定牌进弃牌堆前)──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; judgeType?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '刚烈') return;
     if (atom.player !== ownerId) return;
@@ -82,8 +82,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after hook:刚烈主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (atom.source === undefined || atom.source === ownerId) return;

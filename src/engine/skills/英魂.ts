@@ -17,7 +17,6 @@
 //   - 目标可能是任意座次,故 respond action 注册到每个座次
 //     (dispatch 按 skillId+ownerId+actionType 精确路由,以 skillId='英魂' 隔离)。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -108,8 +107,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '准备') return;

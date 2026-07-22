@@ -7,7 +7,7 @@
 // 仍会无条件 push 该 cardId → 牌同时出现在手牌与弃牌堆(状态损坏)。
 // 故采用"延迟拿取":造成伤害后记录 wantCard=cardId,挂 移动牌 after hook,
 // 在该伤害牌被移入弃牌堆的瞬间再 移动牌(弃牌堆→手牌)。此时父收尾已完成、无重复。
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -46,13 +46,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // 造成伤害 after:曹操受伤后,若有伤害牌则询问是否获得
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      target?: number;
-      amount?: number;
-      source?: number;
-      cardId?: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
 
@@ -84,13 +79,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // 移动牌 after:延迟拿取伤害牌——当 wantCard 指定的牌被移入弃牌堆时,转为曹操手牌
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
     const wantCard = ctx.state.localVars[WANTCARD_KEY];
     if (!wantCard) return;
-    const atom = ctx.atom as {
-      cardId?: string;
-      to?: { zone?: string };
-    };
+    const atom = ctx.atom;
     if (atom.cardId !== wantCard) return;
     if (atom.to?.zone !== '弃牌堆') return;
     // 该伤害牌刚被父结算移入弃牌堆——转给曹操

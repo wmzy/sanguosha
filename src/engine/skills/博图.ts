@@ -20,8 +20,6 @@
 //   - clearPerTurnState 复刻「回合结束」atom 的 per-turn 清理(cancel 后 apply 不执行)。
 //   - 「置入弃牌堆」=本回合新进弃牌堆的牌,含使用/打出/弃置/拼点/被拆等所有路径。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -102,8 +100,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 回合开始 after-hook:记录本回合弃牌堆基线长度 ──
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '回合开始') return;
     if (atom.player !== ownerId) return;
     ctx.state.turn.vars[BASE_VAR] = ctx.state.zones.discardPile.length;
@@ -115,8 +113,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '回合结束',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '回合结束') return;
       if (atom.player !== ownerId) return;
       const st = ctx.state;

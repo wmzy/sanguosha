@@ -16,7 +16,6 @@
 //   - 翻面实现(同据守/放逐):加 '/翻面' 后缀标签,下一回合 阶段开始(准备) before-hook
 //     消费标签、设 skipAll 标志并 cancel 阶段;阶段结束(准备) before-hook 亲自推进回合。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   GameView,
@@ -185,8 +184,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '判定') return;
@@ -338,8 +337,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '摸牌') return;
@@ -355,8 +354,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '出牌') return;
@@ -372,8 +371,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '弃牌') return;
@@ -390,8 +389,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       const self = ctx.state.players[ownerId];
@@ -418,8 +417,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段结束',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段结束') return;
       if (atom.player !== ownerId) return;
       if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;

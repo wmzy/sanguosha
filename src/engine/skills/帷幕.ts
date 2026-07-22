@@ -10,7 +10,7 @@
 //
 //   锦囊卡 id 来源:成为目标/造成伤害 由 atom.cardId 直接给出;获得/弃置/设横置 由
 //   顶帧 frame.params.cardId 给出(各锦囊 use execute pushFrame 时把 cardId 带入 params)。
-import type { AtomBeforeContext, HookResult, Skill, GameState, Card } from '../types';
+import type { HookResult, Skill, GameState, Card } from '../types';
 import { topFrame } from '../create-engine';
 import { registerBeforeHook } from '../skill';
 
@@ -50,8 +50,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '成为目标',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       if (!atom.cardId) return; // 无 cardId(如离间虚拟决斗)不拦截
       if (!isBlackTrick(ctx.state.cardMap[atom.cardId])) return;
@@ -65,8 +65,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '获得',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { from?: number; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.from !== ownerId) return; // 别人从贾诩处获得
       if (atom.player === ownerId) return; // 自己获得自己不算
       if (!frameIsBlackTrick(ctx.state)) return; // 只拦截黑色锦囊结算帧
@@ -80,8 +80,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '弃置',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       if (!frameIsBlackTrick(ctx.state)) return; // 只拦截黑色锦囊结算帧
       return { kind: 'cancel' };
@@ -94,8 +94,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '设横置',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       if (!frameIsBlackTrick(ctx.state)) return; // 只拦截黑色锦囊结算帧
       return { kind: 'cancel' };
@@ -108,8 +108,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       if (!atom.cardId) return; // 无来源卡的伤害不拦截
       if (!isBlackTrick(ctx.state.cardMap[atom.cardId])) return; // 普通【杀】等非锦囊不拦截

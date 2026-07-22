@@ -11,7 +11,7 @@
 //   - **顺序处理**:由于摸牌 atom 总从牌堆顶抽,必须按 top→secondFromTop
 //     顺序逐张摸给目标;validate 已强制两张牌全部分配,顺序处理必精确命中。
 //   - **可选**:玩家可 pass(空 allocation)放弃发动,牌留在牌堆顶。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -68,9 +68,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    if ((ctx.atom as { target?: number }).target !== ownerId) return;
-    const amount = (ctx.atom as { amount?: number }).amount ?? 0;
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    if ((ctx.atom).target !== ownerId) return;
+    const amount = (ctx.atom).amount ?? 0;
     if (amount <= 0) return;
 
     // 每 1 点伤害触发一次遗计

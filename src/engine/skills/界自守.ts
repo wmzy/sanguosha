@@ -21,8 +21,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界自守'(避开标自守冲突);
 //   内部 Skill.name = '自守'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -123,8 +121,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '摸牌',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number; count?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉等其他摸牌)
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;
@@ -161,8 +159,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── 造成伤害 after-hook:owner 对其他角色造成过伤害 → 标记 ──
   //    target≠ownerId(对其他角色)、amount>0(被抵消的 0 伤害不算)
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if (atom.target === undefined || atom.target === ownerId) return; // 仅对其他角色
     if ((atom.amount ?? 0) <= 0) return;
@@ -175,8 +173,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.phase !== '回合结束') return;
       if (atom.player !== ownerId) return;

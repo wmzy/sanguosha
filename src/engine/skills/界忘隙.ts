@@ -23,7 +23,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界忘隙'(避开未来标版 '忘隙' 冲突);
 //   内部 Skill.name = '忘隙'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -115,8 +115,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // 造成伤害 after:每点伤害触发一次
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     const amount = atom.amount ?? 0;
     if (amount <= 0) return;
 

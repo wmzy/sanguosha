@@ -10,7 +10,7 @@
 //
 // 模式参考:志继/若愚(觉醒技 after-hook + 二选一 + 设上限 + 添加技能)。
 //   志继挂在「回合开始」,本技挂在「阶段开始」(因触发点是"阶段"而非"回合开始")。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -52,8 +52,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 阶段开始 after-hook:勤学主逻辑(准备 或 回合结束)──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '准备' && atom.phase !== '回合结束') return;

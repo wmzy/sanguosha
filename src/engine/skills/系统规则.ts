@@ -140,13 +140,13 @@ export function registerSystemRespondActions(state: GameState, ownerId: number):
 export function onInit(_skill: Skill, state: GameState): () => void {
   // ── 添加技能 after hook:实例化技能(注册 action/hook) ──
   registerAfterHook(state, '系统规则', -1, '添加技能', async (ctx) => {
-    const atom = ctx.atom as { skillId: string; player: number };
+    const atom = ctx.atom;
     await instantiateSkill(ctx.state, atom.skillId, atom.player);
   });
 
   // ── 移除技能 after hook:卸载技能实例 ──
   registerAfterHook(state, '系统规则', -1, '移除技能', async (ctx) => {
-    const atom = ctx.atom as { skillId: string; player: number };
+    const atom = ctx.atom;
     unloadSkillInstance(ctx.state, atom.skillId, atom.player);
   });
 
@@ -157,7 +157,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
   // 弃置 apply 后,被弃的牌若原属装备区且其 name 是已挂载的装备技能,触发 移除技能 卸载。
   // apply 后 equipment 已不含该牌,用 skillLoaders(name 判据)+ player.skills(是否挂载)双判。
   registerAfterHook(state, '系统规则', -1, '弃置', async (ctx) => {
-    const atom = ctx.atom as { player: number; cardIds: string[] };
+    const atom = ctx.atom;
     const player = ctx.state.players[atom.player];
     if (!player) return;
     for (const cardId of atom.cardIds) {
@@ -179,7 +179,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
 
   // ── 造成伤害 after hook:濒死检查(最后执行,确保遗计等技能先触发) ──
   registerAfterHook(state, '系统规则', -1, '造成伤害', async (ctx) => {
-    const atom = ctx.atom as { target?: number; source?: number };
+    const atom = ctx.atom;
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];
     if (target && target.alive && target.health <= 0) {
@@ -191,7 +191,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
 
   // ── 失去体力 after hook:濒死检查(最后执行) ──
   registerAfterHook(state, '系统规则', -1, '失去体力', async (ctx) => {
-    const atom = ctx.atom as { target?: number };
+    const atom = ctx.atom;
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];
     if (target && target.alive && target.health <= 0) {
@@ -204,7 +204,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
   // ── 击杀 after hook:死亡奖惩(杀死反贼→摸3张,主公杀忠臣→弃所有牌) ──
   // 来源由 造成伤害 after hook 记入 localVars;体力致死无来源→无奖惩。
   registerAfterHook(state, '系统规则', -1, '击杀', async (ctx) => {
-    const deadIdx = (ctx.atom as { player?: number }).player;
+    const deadIdx = (ctx.atom).player;
     if (typeof deadIdx !== 'number') return;
     const dead = ctx.state.players[deadIdx];
     const killer = ctx.state.localVars['死亡/killer'] as number | undefined;

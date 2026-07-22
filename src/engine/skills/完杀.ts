@@ -16,7 +16,7 @@
 //
 //   适用范围:桃/酒.respond/急救.respond 等"用桃救援"均通过 桃/求桃 pending 触发,
 //   被 cancel 的请求直接跳过该角色,这些 respond action 无从对该角色发起 → 完杀生效。
-import type { AtomBeforeContext, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -36,8 +36,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '请求回应',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { requestType?: string; target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.requestType !== '桃/求桃') return; // 仅干预濒死求桃
       // 仅在贾诩回合内生效
       if (ctx.state.currentPlayerIndex !== ownerId) return;

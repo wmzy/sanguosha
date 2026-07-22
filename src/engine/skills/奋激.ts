@@ -109,8 +109,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '弃置',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.type !== '弃置') return;
       if (typeof atom.player !== 'number') return;
       await tryFenji(ctx, atom.player);
@@ -123,8 +123,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '获得',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.type !== '获得') return;
       if (typeof atom.player !== 'number') return;
       await tryFenji(ctx, atom.player);

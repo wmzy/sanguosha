@@ -38,7 +38,7 @@
 //   - 技能选择 UI(从亮出武将挑一个技能):用 confirm prompt + respond{skill} 实现,
 //     完整的武将牌+技能选择面板 UI 为"待澄清/后续"。
 //   - 只有一个可选技能时自动选取(无需询问)。
-import type { AtomAfterContext, Faction, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { createRng } from '../../shared/rng';
 import { registerAction, registerAfterHook } from '../skill';
@@ -187,7 +187,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 回合开始 after-hook:初始化(首次)/ 询问切换(自己回合) ──
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
     const st = ctx.state;
     if (!st.players[ownerId]?.alive) return;
     // 首次触发(任意玩家的首个回合开始 ≈ 游戏开始):初始化化身
@@ -197,14 +197,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return;
     }
     // 后续:自己的回合开始 → 询问是否更换
-    const atom = ctx.atom as { player?: number };
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     await offerSwitch(st, ownerId);
   });
 
   // ── 回合结束 after-hook:自己回合结束 → 询问是否更换 ──
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     if (!ctx.state.players[ownerId]?.alive) return;
     await offerSwitch(ctx.state, ownerId);

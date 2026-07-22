@@ -4,7 +4,7 @@
 // 流离(大乔·被动技):当你成为【杀】的目标时,可以弃一张牌,
 // 将此杀转移给攻击范围内的一名其他角色。
 // 时机:成为目标 after hook(结算阶段),修改杀帧的 resolvedTargets。
-import type { AtomAfterContext, FrontendAPI, Skill, GameState } from '../types';
+import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { inAttackRange } from '../distance';
@@ -47,8 +47,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '成为目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '成为目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const selfPlayer = ctx.state.players[ownerId];
     if (!selfPlayer || selfPlayer.hand.length === 0) return;

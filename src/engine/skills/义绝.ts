@@ -23,8 +23,8 @@
 //   - 超时兜底:目标选第一张(不放弃展示机会)
 //   - "其本回合...":标签挂目标,owner 回合结束清;owner 的红桃杀+1 伤只对该目标生效
 import type {
-  AtomAfterContext,
   AtomBeforeContext,
+  AtomOfName,
   Card,
   FrontendAPI,
   GameState,
@@ -267,19 +267,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   //    命中条件:atom.target 是有 BAN_TAG 的玩家 + prompt 需要打牌(useCard/pick* 等);
   //    纯选择型 prompt(confirm/chooseSuit/selectTarget/choosePlayer/chooseCharacter)不拦,
   //    以保证目标仍可处理非出牌选择。cancel 后该 atom 不再创建 pending,等同于目标不出牌。
-  const banHandler = async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-    const atom = ctx.atom as {
-      target?: number;
-      prompt?: { type?: string };
-    };
+  const banHandler = async (ctx: AtomBeforeContext<AtomOfName<'请求回应' | '询问闪' | '询问杀'>>): Promise<HookResult | void> => {
+    const atom = ctx.atom;
     const target = atom.target;
     if (typeof target !== 'number' || target < 0) return; // 广播型(无瓣等)不在此处理
     if (target === ownerId) return; // 发起者自己不受禁出牌影响
     const player = ctx.state.players[target];
     if (!player?.tags.includes(BAN_TAG)) return;
     // 询问闪 / 询问杀 是独立 atom 类型,其 prompt 内置于 atom 定义(useCard型)——按类型判定即可。
-    const atomType = (ctx.atom as { type?: string }).type;
-    if (atomType === '询问闪' || atomType === '询问杀') {
+    if (atom.type === '询问闪' || atom.type === '询问杀') {
       return { kind: 'cancel' };
     }
     // 请求回应:看 prompt.type 是否要求出牌
@@ -301,13 +297,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        source?: number;
-        target?: number;
-        amount?: number;
-        cardId?: string;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
       const target = atom.target;
@@ -328,8 +319,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── after-hook on '回合结束':清除所有玩家的义绝标签 ──
   //    仅 owner 自己的回合结束触发(义绝在 owner 回合使用,效果绑本回合)。
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     for (const p of ctx.state.players) {
       for (const tag of ALL_TAGS) {

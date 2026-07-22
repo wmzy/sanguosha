@@ -24,7 +24,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界窃听'(避开与未来标版冲突);
 //   内部 Skill.name = '窃听'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, AtomBeforeContext, FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 import { skillLoaders } from './index';
@@ -207,8 +207,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 跟踪:造成伤害 after-hook(本回合 currentPlayer 是否对其他角色造过伤害)──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     const cur = ctx.state.currentPlayerIndex;
     if (atom.source !== cur) return;
     if (atom.target === cur) return;
@@ -217,8 +217,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 跟踪:指定目标 after-hook(单点目标牌:杀/顺/过/借/决/火 等)──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number };
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    const atom = ctx.atom;
     const cur = ctx.state.currentPlayerIndex;
     if (atom.source !== cur) return;
     if (atom.target === cur) return;
@@ -226,8 +226,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 跟踪:询问闪 after-hook(AoE:万箭齐发;以及杀的隐式目标)──
-  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number };
+  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx) => {
+    const atom = ctx.atom;
     const cur = ctx.state.currentPlayerIndex;
     if (atom.source !== cur) return;
     if (atom.target === cur) return;
@@ -235,8 +235,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 跟踪:询问杀 after-hook(AoE:南蛮入侵;以及决斗)──
-  registerAfterHook(state, skill.id, ownerId, '询问杀', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number };
+  registerAfterHook(state, skill.id, ownerId, '询问杀', async (ctx) => {
+    const atom = ctx.atom;
     const cur = ctx.state.currentPlayerIndex;
     if (atom.source !== cur) return;
     if (atom.target === cur) return;
@@ -244,8 +244,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 触发:回合结束 before-hook(在 apply 清空 turn.vars 之前读取跟踪值)──
-  registerBeforeHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-    const atom = ctx.atom as { player?: number };
+  registerBeforeHook(state, skill.id, ownerId, '回合结束', async (ctx): Promise<HookResult | void> => {
+    const atom = ctx.atom;
     const turnPlayer = atom.player;
     if (typeof turnPlayer !== 'number') return { kind: 'pass' };
     if (turnPlayer === ownerId) return { kind: 'pass' }; // 仅其他角色的回合

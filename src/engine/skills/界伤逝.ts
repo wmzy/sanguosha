@@ -20,7 +20,7 @@
 //   - 摸牌产生的 移动牌(牌堆→手牌)不会触发本技:from.zone='牌堆'≠'手牌',
 //     故无重入。
 //   - 春华在自己的回合内反复触发是合法的(例如连出两张牌,每张都触发一次)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -101,35 +101,32 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 造成伤害 after:春华受伤 → X 增加 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     await checkTrigger(ctx.state, ownerId);
   });
 
   // ── 失去体力 after:春华失去体力 → X 增加 ──
-  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     await checkTrigger(ctx.state, ownerId);
   });
 
   // ── 弃置 after:春华被弃牌(含手牌) → 手牌数减少 ──
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number; cardIds?: string[] };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     if ((atom.cardIds ?? []).length === 0) return;
     await checkTrigger(ctx.state, ownerId);
   });
 
   // ── 移动牌 after:春华手牌被移走 → 手牌数减少 ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      from?: { zone?: string; player?: number };
-      to?: { zone?: string; player?: number };
-    };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     // 仅当"从春华的手牌区移出"才可能减少手牌(摸牌 from=牌堆 不触发)
     if (atom.from?.zone !== '手牌') return;
     if (atom.from?.player !== ownerId) return;

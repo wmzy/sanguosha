@@ -10,7 +10,6 @@
 //   - 目标可选任意存活角色,包括自己
 //   - 按一次伤害一次触发(与遗计/反馈/放逐一致)
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   GameView,
@@ -67,8 +66,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:荀彧受伤后,选目标 + 摸牌至上限 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players[ownerId];

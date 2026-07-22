@@ -5,8 +5,6 @@
 //   传递规则:按座次顺序找到下一个判定区没有 闪电 的存活玩家。
 // 无来源伤害用 source: TARGET_SYSTEM 约定(系统惯例,见 造成伤害 atom)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameState,
@@ -123,7 +121,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 判定阶段:有 闪电 → 先问无懈可击,未被抵消才触发判定 ────
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
@@ -152,7 +150,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 判定 after:读判定牌花色+点数,执行效果 ──────────────
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== TRICK_NAME) return;

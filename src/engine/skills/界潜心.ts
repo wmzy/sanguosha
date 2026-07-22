@@ -17,7 +17,7 @@
 //
 //   注意:这是三国杀首个"回合外"可发动的觉醒技——诛害在他人回合造成的伤害同样触发。
 //   此处实现不依赖"是否在 ownerId 回合",只要满足 source === ownerId 即可。
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook, type SkillModule } from '../skill';
 
@@ -40,8 +40,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── 造成伤害 after-hook:潜心觉醒主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return; // 仅在自己造成伤害时触发
     if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players[ownerId];

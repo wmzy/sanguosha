@@ -13,7 +13,7 @@
 //   觉醒标记:player.vars['志继/awakened'](后缀不含 usedThisTurn,不被「回合结束」清理)
 //
 //   钩子:「阶段开始」(phase='准备')after-hook(atom.player===ownerId)→ 条件满足 → 二选一 → 执行。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -54,8 +54,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 准备阶段(阶段开始,phase='准备')after-hook:志继主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '准备') return;
     if (atom.player !== ownerId) return;

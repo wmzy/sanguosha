@@ -27,7 +27,7 @@
 //     而趫猛需要"按选中牌类型动态决定 obtain 还是 discard",故独立实现。
 //   - 一个技能实例只能注册一个 respond action(actionKey 冲突),
 //     故 confirm 与选牌合并为单 respond 按 requestType 分支(同狂骨/反馈/制霸模式)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -149,13 +149,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 造成伤害 after hook:趫猛主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      source?: number;
-      target?: number;
-      amount?: number;
-      cardId?: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return; // 必须是自己造成的伤害
     if ((atom.amount ?? 0) <= 0) return; // 0 伤害不触发
     if (atom.target === undefined) return;

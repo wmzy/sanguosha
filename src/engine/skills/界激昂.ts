@@ -21,7 +21,6 @@
 // 命名:文件/loader key/character skill name = '界激昂'(避开标激昂冲突);
 //   内部 Skill.name = '激昂'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -102,8 +101,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '成为目标',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       const involved = atom.source === ownerId || atom.target === ownerId;
       if (!involved) return;
       const self = ctx.state.players[ownerId];
@@ -146,8 +145,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '弃置',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { player?: number; cardIds?: string[] };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
       // 每回合限一次(任意玩家弃置都算,不按 atom.player 过滤)

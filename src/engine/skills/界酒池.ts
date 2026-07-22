@@ -19,7 +19,7 @@
 //   - 影子卡 id:${原id}#界酒池(与标版酒池隔离,不互相干扰)
 //   - "酒杀造成伤害"= 酒/nextKillDamageBonus mark 被消耗(由 酒.ts before-hook on 造成伤害 触发)
 //   - turn.vars['崩坏/disabled'] 随「回合结束」atom 自动清空(语义贴合"本回合")
-import type { AtomAfterContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../skill';
 import { applyAtom } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
@@ -92,8 +92,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   //    → 设 turn.vars['崩坏/disabled']=true,本回合崩坏失效。
   //    去标记 的发生时机:酒.ts before-hook on '造成伤害' 在增伤时调用 applyAtom(去标记)
   //    消费 mark。此 hook 据此判定"酒杀伤害已造成",贴合官方"造成伤害后"语义。
-  registerAfterHook(state, skill.id, ownerId, '去标记', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; markId?: string };
+  registerAfterHook(state, skill.id, ownerId, '去标记', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '去标记') return;
     if (atom.player !== ownerId) return;
     if (atom.markId !== '酒/nextKillDamageBonus') return;

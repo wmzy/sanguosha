@@ -9,7 +9,7 @@
 //      检测自己使用的杀被闪抵消 → 摸一张牌。
 //      挂载点与贯石斧/青龙偃月刀相同(被抵消 after),通过 ctx.frame.skillId==='杀'
 //      + atom.source===ownerId 精准定位"自己主动使用的杀被闪抵消"。
-import type { AtomAfterContext, Skill, GameState } from '../types';
+import type { Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 import { registerSlashMaxProvider } from '../slash-quota';
@@ -36,10 +36,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '被抵消',
-    async (ctx: AtomAfterContext) => {
+    async (ctx) => {
       // 只对杀生效:万箭齐发等锦囊被闪抵消不触发(贯石斧/青龙同款判断)
       if (ctx.frame.skillId !== '杀') return;
-      const atom = ctx.atom as { source?: number; target?: number };
+      const atom = ctx.atom;
       // 只在"自己使用的杀"被抵消时触发
       if (atom.source !== ownerId) return;
       await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });

@@ -19,7 +19,7 @@
 // newDeck 构造:[...bottom, ...middle, ...top.reverse()]
 //   - bottom 放最底;middle 是观察范围之外的牌(原 deck 去掉顶 X 张);
 //   - top 倒序后追加到末尾,使 top[0] 落到 deck[len-1]=最先摸。
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -175,8 +175,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // 阶段开始 after-hook:按 phase 分支(准备=主入口,回合结束=再次发动)
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; player: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (!ctx.state.players[ownerId]?.alive) return;

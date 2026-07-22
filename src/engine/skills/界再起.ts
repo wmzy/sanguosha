@@ -32,7 +32,6 @@
 //     故合并为一个 handler,内部按 requestType 分支。
 //   - 重洗可能令弃牌堆变短;此时基线失效,保守视为 X=0(本回合不发动)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -70,8 +69,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '回合开始',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.type !== '回合开始') return;
       if (atom.player !== ownerId) return;
       ctx.state.turn.vars[BASE_VAR] = ctx.state.zones.discardPile.length;
@@ -151,8 +150,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '回合结束') return;

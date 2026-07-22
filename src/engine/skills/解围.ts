@@ -14,7 +14,6 @@
 //   移动场上牌(获得 atom,与巧变 moveFieldCard 一致)。
 //   触发时机:据守消费翻面标签时(下一回合准备阶段)或被其他技能(界放逐)翻回正面时。
 import type {
-  AtomAfterContext,
   Card,
   EquipSlot,
   FrontendAPI,
@@ -297,8 +296,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ════════════════════════════════════════════════════════════
   // 效果②:去标签 after-hook — 翻回正面触发
   // ════════════════════════════════════════════════════════════
-  registerAfterHook(state, skill.id, ownerId, '去标签', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; tag?: string };
+  registerAfterHook(state, skill.id, ownerId, '去标签', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '去标签') return;
     if (atom.player !== ownerId) return;
     // 只在 '/翻面' 后缀标签被移除时触发(= 翻回正面)

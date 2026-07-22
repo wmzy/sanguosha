@@ -11,7 +11,7 @@
 //
 //   2. after-hook 挂「被抵消」:检测自己使用的杀被闪抵消 → 摸一张牌。
 //      实现模式与界张飞咆哮(界咆哮.ts)完全一致。
-import type { AtomAfterContext, AtomBeforeContext, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState } from '../types';
 import { applyAtom, topFrame } from '../create-engine';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
@@ -34,8 +34,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '成为目标',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       // 只有无手牌时生效
       if (ctx.state.players[ownerId]?.hand.length !== 0) return;
@@ -63,10 +63,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '被抵消',
-    async (ctx: AtomAfterContext) => {
+    async (ctx) => {
       // 只对杀生效:万箭齐发等锦囊被闪抵消不触发(贯石斧/青龙/咆哮同款判断)
       if (ctx.frame.skillId !== '杀') return;
-      const atom = ctx.atom as { source?: number; target?: number };
+      const atom = ctx.atom;
       // 只在"自己使用的杀"被抵消时触发
       if (atom.source !== ownerId) return;
       await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });

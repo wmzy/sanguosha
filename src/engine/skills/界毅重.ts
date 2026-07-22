@@ -27,7 +27,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界毅重'(避开标版毅重冲突);
 //   内部 Skill.name = '毅重'(OL 官方技能名,玩家可见)。
-import type { AtomBeforeContext, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界毅重';
@@ -70,8 +70,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '检测有效性',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const source = atom.source;
       if (source === undefined) return;
@@ -90,8 +90,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;

@@ -24,7 +24,7 @@
 //
 // 命名:文件名/loader key 为 '界称象'(避免与未来标版 '称象' 冲突);
 //   内部 Skill.name = '称象'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -118,8 +118,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:每点伤害触发一次 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const amount = atom.amount ?? 0;
     if (amount <= 0) return;

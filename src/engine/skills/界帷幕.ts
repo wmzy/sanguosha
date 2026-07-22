@@ -19,7 +19,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界帷幕'(避开标帷幕冲突);
 //   内部 Skill.name = '帷幕'(OL 官方技能名,玩家可见)。
-import type { AtomBeforeContext, Card, HookResult, Skill, GameState } from '../types';
+import type { Card, HookResult, Skill, GameState } from '../types';
 import { applyAtom, topFrame } from '../create-engine';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
@@ -65,8 +65,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '造成伤害',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { target?: number; amount?: number };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         // 仅在贾诩自己回合内生效
         if (ctx.state.currentPlayerIndex !== ownerId) return;
@@ -90,8 +90,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '成为目标',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { target?: number; cardId?: string };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         if (!atom.cardId) return; // 无 cardId(如离间虚拟决斗)不拦截
         if (!isBlackTrick(ctx.state.cardMap[atom.cardId])) return;
@@ -107,8 +107,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '获得',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { from?: number; player?: number };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.from !== ownerId) return; // 别人从贾诩处获得
         if (atom.player === ownerId) return; // 自己获得自己不算
         if (!frameIsBlackTrick(ctx.state)) return; // 只拦截黑色锦囊结算帧
@@ -124,8 +124,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '弃置',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { player?: number };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.player !== ownerId) return;
         if (!frameIsBlackTrick(ctx.state)) return;
         return { kind: 'cancel' };
@@ -140,8 +140,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '设横置',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { player?: number };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.player !== ownerId) return;
         if (!frameIsBlackTrick(ctx.state)) return;
         return { kind: 'cancel' };
@@ -157,8 +157,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '造成伤害',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { target?: number; cardId?: string };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         if (!atom.cardId) return; // 无来源卡的伤害不拦截
         if (!isBlackTrick(ctx.state.cardMap[atom.cardId])) return; // 非 black-trick 不拦截

@@ -2,8 +2,6 @@
 //   判定阶段:判定不为♣(梅花) → 跳过摸牌阶段;♣ → 无效弃置。
 //   结构与乐不思蜀对称——差异:判定花色(♣ vs ♥),跳过阶段(摸牌 vs 出牌)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameView,
@@ -104,7 +102,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 判定阶段:有 兵粮寸断 → 先问无懈可击,未被抵消才触发判定 ───
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
@@ -132,7 +130,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '兵粮寸断') return;
@@ -159,7 +157,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 摸牌阶段:有跳过标签 → 跳过摸牌阶段 ────────────────────
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;

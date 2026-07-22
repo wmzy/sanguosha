@@ -13,7 +13,6 @@
 //   - 可选发动:描述明确"你可以摸一张牌",需询问玩家(confirm)。
 //   - respond action 注册在貂蝉本人座次(ownerId),因询问目标是自己。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -62,8 +61,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.phase !== '回合结束') return;
       if (atom.player !== ownerId) return;

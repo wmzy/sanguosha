@@ -19,7 +19,7 @@
 // 判定牌时序:判定 atom 的 skill after-hooks 在 def.afterHooks(把判定牌移入弃牌堆)之前跑。
 // 因此洛神的 判定 after-hook 读 frameCards(此时判定牌还在处理区);随后 def.afterHooks 把
 // 判定牌移入弃牌堆。洛神主循环在 applyAtom(判定) 返回后,从弃牌堆顶读判定牌。
-import type { AtomAfterContext, FrontendAPI, Skill, GameState, Card } from '../types';
+import type { FrontendAPI, Skill, GameState, Card } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { registerHandLimitProvider } from '../hand-limit';
@@ -75,8 +75,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // 判定 after-hook:读判定牌花色,把结果存 localVars(供主循环消费)
   // 注意:此 hook 在 判定 def.afterHooks(判定牌→弃牌堆)之前运行,判定牌仍在 frameCards
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; player: number; judgeType?: string };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.player !== ownerId) return;
     if (atom.judgeType !== '洛神') return;
@@ -109,8 +109,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // 阶段开始(准备) after-hook:洛神主循环
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; player: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '准备') return;

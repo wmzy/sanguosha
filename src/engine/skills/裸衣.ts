@@ -8,8 +8,6 @@
 //   - after hook 挂在「回合结束」:许褚自己回合结束时清除增伤标签(官方"本回合"语义)。
 //   - 每回合限一次:裸衣/usedThisTurn(后缀约定,回合结束 atom 自动清空)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -60,8 +58,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '摸牌',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number; count?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 仅自己回合的摸牌阶段(排除无中生有/遗计/激将等其他摸牌)
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;
@@ -101,8 +99,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; amount?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
       const self = ctx.state.players[ownerId];
@@ -118,8 +116,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 回合结束 after hook:许褚自己回合结束时清除增伤标签(官方"本回合"语义)──
   // 许褚摸牌阶段设标签 → 持续到许褚自己回合结束清除(本回合内生效)。
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return; // 仅自己回合结束清标签
     const self = ctx.state.players[ownerId];
     if (self?.tags.includes(BONUS_TAG)) {

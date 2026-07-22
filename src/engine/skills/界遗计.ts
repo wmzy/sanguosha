@@ -6,7 +6,7 @@
 //   - 界版:摸两张牌,然后可以将【至多两张任意手牌】交给【至多两名其他角色】(可选、
 //     可从任意手牌中选,总数至多 2 张、目标至多 2 人)。
 //   交牌是可选的:confirm 询问;无其他存活角色或自己无手牌时跳过交牌环节。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -80,8 +80,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:每 1 点伤害触发一次 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const amount = atom.amount ?? 0;
     if (amount <= 0) return;

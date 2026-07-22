@@ -24,8 +24,6 @@
 //
 // 模式参考:闭月(结束阶段 after-hook)、天香(造成伤害 before-hook cancel)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -108,8 +106,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '回合结束') return;
@@ -209,8 +207,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; target?: number; amount?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '造成伤害') return;
       if (typeof atom.target !== 'number') return;
       if ((atom.amount ?? 0) <= 0) return;

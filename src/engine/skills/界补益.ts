@@ -21,7 +21,6 @@
 //
 // 命名:文件名/loader key 为 '界补益';内部 Skill.name = '补益'(OL 官方技能名)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -129,8 +128,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 陷入濒死 after:任一角色濒死,询问是否发动补益 ──
-  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
+    const atom = ctx.atom;
     if (typeof atom.target !== 'number') return;
     const target = atom.target;
     const targetPlayer = ctx.state.players[target];

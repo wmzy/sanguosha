@@ -27,7 +27,7 @@
 //   - 技能实例归属:添加技能 atom 触发 系统规则 after-hook → instantiateSkill,
 //     英姿/英魂 以 ownerId=孙策座次 实例化,内部用 skill.ownerId 工作,归属正确
 //   - 英姿/英魂 已实现(周瑜·英姿、孙坚·英魂),直接挂载
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -140,8 +140,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 准备阶段 after-hook:界魂姿觉醒主逻辑(界孙策在准备阶段触发,而非回合开始)──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase === '准备') {

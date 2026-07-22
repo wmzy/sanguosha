@@ -11,7 +11,6 @@
 //   再 return {kind:'cancel'} 取消本次 阶段开始(摸牌),使 回合管理 的 after hook
 //   (自动摸2张)不再执行。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -71,8 +70,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '摸牌') return;

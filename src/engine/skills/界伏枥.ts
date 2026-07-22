@@ -24,8 +24,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界伏枥'(避开标伏枥冲突);
 //   内部 Skill.name = '伏枥'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -100,8 +98,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 陷入濒死 after-hook:伏枥主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     // 限定技:整局一次
     if (ctx.state.players[ownerId]?.vars[USED_KEY]) return;
@@ -165,8 +163,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after-hook:累计 owner 造成的伤害数 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const cur = (ctx.state.players[ownerId].vars[DMG_DEALT_KEY] as number | undefined) ?? 0;
@@ -180,8 +178,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       const self = ctx.state.players[ownerId];
@@ -209,8 +207,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段结束',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段结束') return;
       if (atom.player !== ownerId) return;
       if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;

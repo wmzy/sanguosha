@@ -2,8 +2,6 @@
 //   判定阶段:判定不为♥ → 跳过出牌阶段;♥ → 无效弃置。
 //   判定牌走处理区,after hook 从处理区读花色,判定后进弃牌堆。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameView,
@@ -86,7 +84,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 判定阶段:有 乐不思蜀 → 先问无懈可击,未被抵消才触发判定 ───
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
@@ -117,7 +115,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '乐不思蜀') return;
@@ -145,7 +143,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 出牌阶段:有跳过标签 → 跳过出牌阶段 ────────────────────
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;

@@ -41,7 +41,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界利驭'(避开标版未实现的"利驭");
 //   内部 Skill.name = '利驭'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
@@ -132,13 +132,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   }
 
   offs.push(
-    registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as {
-        target?: number;
-        source?: number;
-        amount?: number;
-        cardId?: string;
-      };
+    registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if (atom.target === undefined || atom.target === ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;

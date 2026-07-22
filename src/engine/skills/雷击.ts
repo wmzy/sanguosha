@@ -16,7 +16,7 @@
 //
 // 已知限制:配合八卦阵判定出的虚拟闪不触发雷击(八卦阵在询问闪 before hook 中 cancel,
 //   故询问闪 after hook 不执行)。同鬼才 hook 顺序限制,属引擎判定/取消机制固有局限。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -63,8 +63,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 询问闪 after hook:张角打出闪后触发雷击 ────────────────────
-  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; target?: number };
+  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '询问闪') return;
     if (atom.target !== ownerId) return; // 仅张角被询问闪时触发
 

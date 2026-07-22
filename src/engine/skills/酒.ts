@@ -3,7 +3,7 @@
 //   方法Ⅱ(respond):濒死时使用,回复 1 点体力(等同桃)。
 //
 // 方法Ⅱ的增伤效果通过 before hook(造成伤害)消费 mark 实现。
-import type { AtomBeforeContext, FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook, validateUseCard } from '../skill';
 
@@ -90,8 +90,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; amount?: number; type: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
       const self = ctx.state.players[ownerId];

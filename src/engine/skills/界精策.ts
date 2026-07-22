@@ -32,12 +32,10 @@
 // 命名:文件名/loader key/character skill name 均为 '界精策'(避开标精策冲突);
 //   内部 Skill.name = '精策'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
   Skill,
-  ZoneLoc,
 } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
@@ -142,8 +140,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 移动牌 after:自己手牌 → 处理区 = 使用了一张非装备牌 ──
   // 覆盖主动使用(杀.use 等)与被动打出(闪.respond、杀.respond 决斗等)
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { cardId: string; from: ZoneLoc; to: ZoneLoc };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from.zone !== '手牌' || atom.from.player !== ownerId) return;
     if (atom.to.zone !== '处理区') return;
     // 仅在自己回合内累积("回合内"指自己回合)
@@ -154,8 +152,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 装备 after:自己手牌 → 装备区 = 使用了一张装备牌 ──
-  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player: number; cardId: string };
+  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     if (ctx.state.currentPlayerIndex !== ownerId) return;
     const card = ctx.state.cardMap[atom.cardId];
@@ -164,8 +162,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 阶段结束 after:出牌阶段结束时询问摸 X 张 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; player: number; phase: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;

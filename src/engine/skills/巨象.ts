@@ -14,7 +14,7 @@
 //   "其他角色":南蛮入侵结算帧 topFrame.from = 使用者;from≠owner 才触发获得。
 //   注:不用「获得」atom——它不清理弃牌堆(apply 仅过滤来源玩家手牌/装备)。
 //       改用「移动牌」(弃牌堆→手牌),其 default applyView 正确同步 discardPileCount-1 与 handCount+1。
-import type { AtomAfterContext, AtomBeforeContext, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom, topFrame } from '../create-engine';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
@@ -37,8 +37,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问杀',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       // 仅南蛮入侵结算中(决斗等也用 询问杀,需区分)
       if (topFrame(ctx.state)?.skillId !== '南蛮入侵') return;
@@ -52,8 +52,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       if (!atom.cardId) return;
       if (ctx.state.cardMap[atom.cardId]?.name !== '南蛮入侵') return;
@@ -62,12 +62,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 效果B:其他角色使用的南蛮入侵结算后进弃牌堆时,祝融获得它 ───
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      cardId?: string;
-      from?: { zone?: string };
-      to?: { zone?: string };
-    };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (!atom.cardId) return;
     if (atom.from?.zone !== '处理区') return;
     if (atom.to?.zone !== '弃牌堆') return;

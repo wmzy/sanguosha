@@ -738,7 +738,7 @@ import { registerBeforeHook } from '../skill';
 
 export function onInit(skill: Skill, ownerId: number): () => void {
   registerBeforeHook(skill.id, ownerId, '询问闪', async (ctx) => {
-    if ((ctx.atom as { target?: number }).target !== ownerId) return;
+    if (ctx.atom.target !== ownerId) return;
     if (ctx.state.zones.deck.length === 0) return;
 
     await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '八卦阵' });
@@ -763,22 +763,21 @@ export function onInit(skill: Skill, ownerId: number): () => void {
 // ── 酒.ts（增伤走 造成伤害 before hook） ──
 // use action:为下一张杀加 mark（'酒/nextKillDamageBonus', duration='turn'）。
 // 增伤效果通过 造成伤害 before hook 实现——杀不需要知道酒的存在。
-import type { AtomBeforeContext, HookResult } from '../types';
+import type { HookResult } from '../types';
 import { registerBeforeHook } from '../skill';
 
 export function onInit(skill: Skill, ownerId: number): () => void {
   // ... use action 推 '酒/nextKillDamageBonus' mark ...
 
   // 造成伤害 before hook:自己是伤害来源 且 持有 mark → 消费 mark 并 modify atom.amount += 1
-  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-    const atom = ctx.atom as { source?: number; amount?: number };
-    if (atom.source !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
+  registerBeforeHook(skill.id, ownerId, '造成伤害', async (ctx): Promise<HookResult | void> => {
+    if (ctx.atom.source !== ownerId) return;
+    if (ctx.atom.amount <= 0) return;
     const self = ctx.state.players[ownerId];
     const hasMark = self?.marks.some(m => m.id === '酒/nextKillDamageBonus');
     if (!hasMark) return;
     await applyAtom(ctx.state, { type: '去标记', player: ownerId, markId: '酒/nextKillDamageBonus' });
-    return { kind: 'modify', atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom };
+    return { kind: 'modify', atom: { ...ctx.atom, amount: ctx.atom.amount + 1 } };
   });
   return () => {};
 }
@@ -798,8 +797,8 @@ export function onInit(skill: Skill, ownerId: number): () => void {
   });
 
   registerAfterHook(skill.id, ownerId, '造成伤害', async (ctx) => {
-    if ((ctx.atom as { target?: number }).target !== ownerId) return;
-    const amount = (ctx.atom as { amount?: number }).amount ?? 0;
+    if (ctx.atom.target !== ownerId) return;
+    const amount = ctx.atom.amount;
 
     for (let i = 0; i < amount; i++) {
       const handBefore = ctx.state.players[ownerId]?.hand.length ?? 0;

@@ -19,7 +19,6 @@
 //   - "可以摸一张牌":可选,询问 confirm;不发动则不摸
 //   - 无次数限制(FAQ 明确)
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -83,8 +82,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '成为目标',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       const involved = atom.source === ownerId || atom.target === ownerId;
       if (!involved) return;
       const self = ctx.state.players[ownerId];

@@ -22,7 +22,6 @@
 //     否则其 dispatch 找不到 action(同标护驾 跨座次注册模式)。
 //   - 独立界版文件,注册键 '界护驾'(与标护驾键隔离,不修改标护驾)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -132,14 +131,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '移动牌',
-      async (ctx: AtomAfterContext): Promise<void> => {
+      async (ctx): Promise<void> => {
         // 主公技:仅曹操为主公(座次 0)时生效
         if (ownerId !== 0) return;
-        const atom = ctx.atom as {
-          cardId: string;
-          from: { zone: string; player?: number };
-          to: { zone: string; player?: number };
-        };
+        const atom = ctx.atom;
         // 必须 手牌→处理区(打出/使用闪的通用路径)
         if (atom.from.zone !== '手牌') return;
         if (atom.to.zone !== '处理区') return;

@@ -56,7 +56,7 @@
 //     atom + 视图事件传播才能保持 buildView/processedView 一致。此处**未实现**性别/势力
 //     覆盖(待新增"设置化身身份" atom + 视图事件 + 6 个消费者更新)。
 //     影响:结姻/界结姻/离间/肉林/界燕语/界荐言 等性别相关技能仍按界左慈原角色判定。
-import type { AtomAfterContext, Faction, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { createRng } from '../../shared/rng';
 import { registerAction, registerAfterHook } from '../skill';
@@ -234,7 +234,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 回合开始 after-hook:初始化(首次)/ 询问行动(自己回合) ──
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
     const st = ctx.state;
     if (!st.players[ownerId]?.alive) return;
     // 首次触发(任意玩家的首个回合开始 ≈ 游戏开始):初始化化身
@@ -244,14 +244,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return;
     }
     // 后续:自己的回合开始 → 询问行动
-    const atom = ctx.atom as { player?: number };
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     await offerTurnAction(st, ownerId);
   });
 
   // ── 回合结束 after-hook:自己回合结束 → 询问行动 ──
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     if (!ctx.state.players[ownerId]?.alive) return;
     await offerTurnAction(ctx.state, ownerId);

@@ -26,7 +26,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界疠火'(避开标疠火冲突);
 //   内部 Skill.name = '疠火'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   Card,
   FrontendAPI,
   GameState,
@@ -150,12 +149,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 造成伤害 after:记录疠火转化杀是否造成伤害 ──────────────────
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      source?: number;
-      amount?: number;
-      cardId?: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const cardId = atom.cardId;
@@ -166,12 +161,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── 移动牌 after:杀收尾时(处理区→弃牌堆)触发疠火代价 ─────────
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      cardId?: string;
-      from?: { zone?: string };
-      to?: { zone?: string };
-    };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from?.zone !== '处理区') return;
     if (atom.to?.zone !== '弃牌堆') return;
     const cardId = atom.cardId;

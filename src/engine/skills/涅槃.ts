@@ -15,7 +15,7 @@
 //   关键:濒死时 alive 仍 true(击杀 atom 才设 false),故 回复体力 validate 通过;
 //        runDyingFlow 在 陷入濒死 after-hook 后进入求桃循环,首项 health>0 即 return,
 //        涅槃把 health 拉回 3,循环立即退出,庞统不死亡。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -56,8 +56,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 陷入濒死 after-hook:涅槃主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     // 限定技:整局一次
     if (ctx.state.players[ownerId]?.vars[USED_KEY]) return;

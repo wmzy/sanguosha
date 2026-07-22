@@ -15,7 +15,7 @@
 //   - amount 透传:伤害值 = 失去体力值。
 //   -damageType/cardId 等伤害专属字段在失去体力中无意义,自然丢弃。
 //   - 系统规则的濒死检查同时挂在 造成伤害 与 失去体力 上,故目标体力归零仍走求桃流程。
-import type { AtomBeforeContext, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -35,13 +35,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        type: string;
-        target?: number;
-        source?: number;
-        amount?: number;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '造成伤害') return;
       if (atom.source !== ownerId) return;
       if (typeof atom.target !== 'number') return;

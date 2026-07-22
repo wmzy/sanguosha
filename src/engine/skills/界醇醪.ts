@@ -82,7 +82,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ─── 弃置 after-hook:拦截 owner / 相邻角色弃置的杀,加为醇 ──────
   registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
-    const atom = ctx.atom as { player: number; cardIds: string[] };
+    const atom = ctx.atom;
     const discardPlayer = atom.player;
     if (discardPlayer === ownerId) {
       // owner 自己弃置:符合

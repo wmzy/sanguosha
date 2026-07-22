@@ -8,7 +8,7 @@
 //   传导完毕后重置所有因此传导的角色的连环状态。
 //   hook 在 DEFAULT_SKILLS 实例化时注册,晚于系统规则的濒死 hook → LIFO 保证先于濒死执行。
 //   localVars[CONDUCTING_VAR] 防止传导伤害递归触发。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, validateUseCard } from '../skill';
@@ -115,13 +115,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 连环传导 hook(全局唯一,首个实例注册)──
   if (!state.localVars[HOOK_REGISTERED_VAR]) {
     state.localVars[HOOK_REGISTERED_VAR] = true;
-    registerAfterHook(state, '铁索连环', -1, '造成伤害', async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as {
-        target?: number;
-        amount?: number;
-        source?: number;
-        damageType?: DamageType;
-      };
+    registerAfterHook(state, '铁索连环', -1, '造成伤害', async (ctx) => {
+      const atom = ctx.atom;
       const dt = atom.damageType;
       if (dt !== '火焰' && dt !== '雷电') return;
       const target = atom.target;

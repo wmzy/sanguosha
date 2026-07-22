@@ -22,7 +22,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界宗室'(避开标宗室冲突);
 //   内部 Skill.name = '宗室'(OL 官方技能名,玩家可见)。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -90,12 +89,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        target?: number;
-        source?: number;
-        amount?: number;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const amount = atom.amount ?? 0;
       if (amount <= 0) return;

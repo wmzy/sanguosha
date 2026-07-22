@@ -17,7 +17,7 @@
 //     dispatch 按 (skillId, ownerId, actionType) 查。
 //   - 来源无任何可弃置的牌时跳过(规则:无法弃置则无事发生)。
 //   - judgeType='界刚烈' 与标版 '刚烈' 区分(日志/调试用,不影响机制)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
@@ -85,8 +85,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 判定 after hook:捕获判定牌颜色(判定牌进弃牌堆前)──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; judgeType?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '界刚烈') return;
     if (atom.player !== ownerId) return;
@@ -101,8 +101,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 造成伤害 after hook:界刚烈主逻辑 ──
   // 规则:"当一名角色对你造成1点伤害后" —— 受到 N 点伤害时触发 N 次,
   // 每次独立询问是否发动 + 独立判定。来源中途死亡则停止后续触发。
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const times = atom.amount ?? 0;
     if (times <= 0) return;

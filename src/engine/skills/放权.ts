@@ -18,7 +18,6 @@
 // 跳过出牌阶段手法同神速/巧变:applyAtom(阶段结束, 出牌) 推进到弃牌,
 //   再 return {kind:'cancel'} 取消本次 阶段开始(出牌)。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   GameView,
@@ -118,8 +117,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '出牌') return;
@@ -160,8 +159,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '回合结束',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '回合结束') return;
       const st = ctx.state;
       const player = atom.player;

@@ -4,7 +4,7 @@
 //   之前运行——判定牌此刻仍在 frameCards 末尾)。
 // 实现:询问是否获得 → 移动牌(处理区→手牌)。判定阶段 frame 通常仅含判定牌,
 //   拿走后 frame 空,判定 atom 的 afterHooks splice 末尾为 no-op。
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -42,8 +42,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // 判定 after:自己的判定 → 询问是否获得判定牌
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.player !== ownerId) return;
 

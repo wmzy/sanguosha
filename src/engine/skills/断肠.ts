@@ -10,8 +10,6 @@
 //     当前装备自带技能(FAQ:装备效果仍生效)。
 //   - 锁定技,自动触发,无需询问。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   HookResult,
   Skill,
   GameState,
@@ -38,8 +36,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 造成伤害 after:记录伤害来源(蔡文姬为受伤目标时)──
   // 非系统 hook 先于系统规则濒死检查执行,确保 killer 在击杀前已记录。
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (atom.source === undefined) return;
@@ -48,8 +46,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 失去体力 after:清除来源记录(体力致死无来源,避免误伤)──
-  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     delete ctx.state.localVars[KILLER_KEY];
   });
@@ -60,8 +58,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '击杀',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '击杀') return;
       if (atom.player !== ownerId) return; // 仅蔡文姬本人死亡时触发
 

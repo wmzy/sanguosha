@@ -19,7 +19,7 @@
 //
 // turn-scoped:turn.vars / turnUsage 在回合结束 atom 自动清空,效果仅本回合。
 // provider 随技能实例生命周期注册/卸载(返回的 unload 由 setSkillInstanceUnload 清理)。
-import type { AtomBeforeContext, AtomAfterContext, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
 import { registerSlashMaxProvider } from '../slash-quota';
@@ -76,8 +76,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if (ctx.state.turn.vars[ACTIVE_VAR] !== ownerId) return;
       // 从帧 params 读当前杀的 cardId(杀.execute pushFrame 时传入)
@@ -91,8 +91,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ─── 失去体力 after-hook:摸3张 + (若出牌阶段)激活红色杀增益 ──────────
   //    挂在'失去体力'而非'造成伤害'(诈降只对失去体力触发,不对伤害触发)。
-  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
 

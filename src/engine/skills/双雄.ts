@@ -23,8 +23,6 @@
 // validate 读)。view 侧经「回合用量」atom 同步到 players[me].turnUsage['双雄/color'],
 // 供前端 transform 的 activeWhen/cardFilter 读取(processedView 不增量维护 turn.vars)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameState,
@@ -91,8 +89,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '摸牌') return;
@@ -137,8 +135,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // 判定 after(judgeType='双雄'):判定牌生效后,玩家获得判定牌 + 记颜色
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; judgeType?: string };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.player !== ownerId) return;
     if (atom.judgeType !== '双雄') return;

@@ -173,7 +173,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── 「结算帧入栈」after hook: 任何玩家 push 任何 frame(skillId 为基本/普通锦囊)时
   //    自动追加到本轮已用牌名集合。同一 frame 多次触发(Set 语义)不会重复。
   registerAfterHook(state, skill.id, ownerId, '结算帧入栈', async (ctx) => {
-    const atom = ctx.atom as { skillId?: string };
+    const atom = ctx.atom;
     const name = atom.skillId;
     if (typeof name !== 'string') return;
     if (!ALLOWED_NAMES.has(name)) return;

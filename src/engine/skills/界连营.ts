@@ -25,7 +25,6 @@
 //   - 牌堆+弃牌堆皆空 → 无法摸牌,跳过询问
 import type {
   AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -156,44 +155,36 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 移动牌 before+after:从自己手牌区移走牌(打出/使用/被拆等) ──
-  registerBeforeHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as {
-      type?: string;
-      from?: { zone?: string; player?: number };
-      to?: { zone?: string; player?: number };
-    };
+  registerBeforeHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '移动牌') return;
-    if (atom.from?.zone !== '手牌') return;
-    if (atom.from?.player !== ownerId) return;
+    if (atom.from.zone !== '手牌') return;
+    if (atom.from.player !== ownerId) return;
     // 移到自己手牌不算失去
-    if (atom.to?.player === ownerId && atom.to?.zone === '手牌') return;
+    if (atom.to.zone === '手牌' && atom.to.player === ownerId) return;
     ctx.state.localVars[HAND_BEFORE_KEY] = ctx.state.players[ownerId]?.hand.length ?? 0;
   });
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      type?: string;
-      from?: { zone?: string; player?: number };
-      to?: { zone?: string; player?: number };
-    };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '移动牌') return;
-    if (atom.from?.zone !== '手牌') return;
-    if (atom.from?.player !== ownerId) return;
-    if (atom.to?.player === ownerId && atom.to?.zone === '手牌') return;
+    if (atom.from.zone !== '手牌') return;
+    if (atom.from.player !== ownerId) return;
+    if (atom.to.zone === '手牌' && atom.to.player === ownerId) return;
     const lost = consumeLostCount(ctx.state);
     if (lost === undefined) return;
     await maybeTriggerLianYing(ctx, lost);
   });
 
   // ── 给予 before+after:从自己手牌给他人(给予.validate 保证 cardId 在 from 手牌) ──
-  registerBeforeHook(state, skill.id, ownerId, '给予', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { type?: string; from?: number; to?: number };
+  registerBeforeHook(state, skill.id, ownerId, '给予', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '给予') return;
     if (atom.from !== ownerId) return;
     if (atom.to === ownerId) return; // 给自己不算失去
     ctx.state.localVars[HAND_BEFORE_KEY] = ctx.state.players[ownerId]?.hand.length ?? 0;
   });
-  registerAfterHook(state, skill.id, ownerId, '给予', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; from?: number; to?: number };
+  registerAfterHook(state, skill.id, ownerId, '给予', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '给予') return;
     if (atom.from !== ownerId) return;
     if (atom.to === ownerId) return; // 给自己不算失去
@@ -203,14 +194,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 装备 before+after:从手牌装备(装备.validate 保证 cardId 在手牌) ──
-  registerBeforeHook(state, skill.id, ownerId, '装备', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerBeforeHook(state, skill.id, ownerId, '装备', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '装备') return;
     if (atom.player !== ownerId) return;
     ctx.state.localVars[HAND_BEFORE_KEY] = ctx.state.players[ownerId]?.hand.length ?? 0;
   });
-  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '装备') return;
     if (atom.player !== ownerId) return;
     const lost = consumeLostCount(ctx.state);
@@ -221,14 +212,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 移出至暂存区 before+after:界谦逊把整手牌移出(联动核心) ──
   //   通用 atom,亦服务破军等技能;hook 过滤 target=陆逊 才算陆逊失去手牌。
   //   (破军打别人 target≠陆逊,自然不触发。谦逊 source=target=陆逊,触发。)
-  registerBeforeHook(state, skill.id, ownerId, '移出至暂存区', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { type?: string; target?: number };
+  registerBeforeHook(state, skill.id, ownerId, '移出至暂存区', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '移出至暂存区') return;
     if (atom.target !== ownerId) return;
     ctx.state.localVars[HAND_BEFORE_KEY] = ctx.state.players[ownerId]?.hand.length ?? 0;
   });
-  registerAfterHook(state, skill.id, ownerId, '移出至暂存区', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; target?: number };
+  registerAfterHook(state, skill.id, ownerId, '移出至暂存区', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '移出至暂存区') return;
     if (atom.target !== ownerId) return;
     const lost = consumeLostCount(ctx.state);
@@ -238,13 +229,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 获得 before+after:有人从界陆逊获得牌 ──
   //   获得 可能作用于装备区(非手牌),before-hook 仅在涉及手牌时记录标记
-  registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as {
-      type?: string;
-      from?: number;
-      player?: number;
-      cardId?: string;
-    };
+  registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '获得') return;
     if (atom.from !== ownerId) return;
     if (atom.player === ownerId) return;
@@ -253,8 +239,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       ctx.state.localVars[HAND_BEFORE_KEY] = hand.length;
     }
   });
-  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; from?: number; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '获得') return;
     if (atom.from !== ownerId) return;
     if (atom.player === ownerId) return;
@@ -265,8 +251,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 弃置 before+after:界陆逊被弃牌 ──
   //   弃置 可能作用于装备/判定区(非手牌),before-hook 仅在涉及手牌时记录标记
-  registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; cardIds?: string[] };
+  registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '弃置') return;
     if (atom.player !== ownerId) return;
     const hand = ctx.state.players[ownerId]?.hand ?? [];
@@ -274,8 +260,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       ctx.state.localVars[HAND_BEFORE_KEY] = hand.length;
     }
   });
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '弃置') return;
     if (atom.player !== ownerId) return;
     const lost = consumeLostCount(ctx.state);

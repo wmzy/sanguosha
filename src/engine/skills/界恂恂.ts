@@ -17,7 +17,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界恂恂'(避开未来标版 '恂恂' 冲突);
 //   内部 Skill.name = '恂恂'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -94,8 +94,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // 阶段开始(摸牌) after-hook:恂恂主流程
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; player: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '摸牌') return;

@@ -24,8 +24,6 @@
 // 命名:文件名/loader key/character name = '界好施'(避标版冲突);
 //   内部 Skill.name = '好施'(OL 官方技能名)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -148,8 +146,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '摸牌',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { player?: number; count?: number };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.player !== ownerId) return;
         if (ctx.state.currentPlayerIndex !== ownerId) return;
         if (ctx.state.phase !== '摸牌') return;
@@ -189,8 +187,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '摸牌',
-      async (ctx: AtomAfterContext): Promise<void> => {
-        const atom = ctx.atom as { player?: number };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.player !== ownerId) return;
         if (!ctx.state.localVars[ACTIVE_KEY]) return;
         delete ctx.state.localVars[ACTIVE_KEY];
@@ -274,8 +272,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '回合开始',
-      async (ctx: AtomAfterContext): Promise<void> => {
-        const atom = ctx.atom as { player?: number };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.player !== ownerId) return;
         delete ctx.state.localVars[PASSIVE_ACTIVE_KEY];
         delete ctx.state.localVars[RECIPIENT_KEY];
@@ -290,8 +288,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '成为目标',
-      async (ctx: AtomAfterContext): Promise<void> => {
-        const atom = ctx.atom as { target?: number; cardId?: string };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         const st = ctx.state;
         if (!st.localVars[PASSIVE_ACTIVE_KEY]) return;
@@ -325,8 +323,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '请求回应',
-      async (ctx: AtomBeforeContext): Promise<void> => {
-        const atom = ctx.atom as { requestType?: string; cancelTarget?: number };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.requestType !== '无懈可击') return;
         if (atom.cancelTarget !== ownerId) return;
 

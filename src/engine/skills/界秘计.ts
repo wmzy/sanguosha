@@ -23,7 +23,6 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界秘计';内部 Skill.name='秘计'。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -135,8 +134,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '回合结束') return;

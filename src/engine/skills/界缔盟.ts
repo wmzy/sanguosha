@@ -17,7 +17,6 @@
 //
 // 命名:文件名/loader key/character name = '界缔盟';内部 Skill.name = '缔盟'。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -194,8 +193,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '阶段结束',
-      async (ctx: AtomAfterContext): Promise<void> => {
-        const atom = ctx.atom as { player?: number; phase?: string };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.phase !== '出牌') return;
         if (atom.player !== ownerId) return;
 

@@ -23,7 +23,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界雷击';
 //   内部 Skill.name = '雷击'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -186,8 +186,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 触发 A:询问闪 after hook(界张角打出闪后触发) ───────────
-  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; target?: number };
+  registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '询问闪') return;
     if (atom.target !== ownerId) return;
 
@@ -208,12 +208,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '添加延时锦囊',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as {
-        type?: string;
-        player?: number;
-        trick?: { name?: string; source?: number };
-      };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.type !== '添加延时锦囊') return;
       // 仅当界张角对自己使用闪电(自己判定区放置闪电,且 source 是自己)
       if (atom.player !== ownerId) return;

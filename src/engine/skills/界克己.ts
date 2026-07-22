@@ -18,13 +18,10 @@
 //      确认 → 触发「阶段结束」(弃牌) 推进到回合结束,并 cancel 当前「阶段开始」(弃牌)。
 //   3) respond action:玩家确认/取消 → 写 localVars['界克己/confirmed']。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
   Skill,
-  ZoneLoc,
 } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
@@ -68,8 +65,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 移动牌 after hook:检测自己在「出牌」阶段使用/打出的杀(手牌→处理区) ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { cardId: string; from: ZoneLoc; to: ZoneLoc };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from.zone !== '手牌' || atom.from.player !== ownerId) return;
     if (atom.to.zone !== '处理区') return;
     // 严格按官方"出牌阶段内"判定:仅在「出牌」阶段(自己回合)出杀才计数。
@@ -88,8 +85,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '弃牌') return;

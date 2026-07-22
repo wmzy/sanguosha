@@ -25,7 +25,7 @@
 //     判定阶段、独立判定技能)。若 frame 还有其他牌(如杀结算中八卦阵判定),
 //     抽取判定牌会破坏判定.afterHooks 的 splice——本实现加 frame.cards.length === 1
 //     防御:多牌场景下跳过获取(让判定牌正常入弃牌堆),避免状态损坏。
-import type { AtomAfterContext, AtomBeforeContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import {
   registerAction,
@@ -199,8 +199,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 弃置 after hook:其他玩家弃置的梅花牌入弃牌堆后 ──
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; cardIds?: string[] };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '弃置') return;
     if (atom.player === ownerId) return; // 自己弃置不触发
     if (!atom.cardIds || atom.cardIds.length === 0) return;
@@ -217,8 +217,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   //   判定牌在 frame.cards 末尾;若获取,需从 frame.cards 拿走。
   //   安全前提:frame.cards 仅含判定牌(典型场景:判定阶段/独立判定)。
   //   多牌场景(如杀结算中八卦阵)跳过获取,避免破坏 判定.afterHooks splice。
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; judgeType?: string };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.player === ownerId) return; // 自己的判定不触发
 
@@ -240,8 +240,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext) => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '准备') return;

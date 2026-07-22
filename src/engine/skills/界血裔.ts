@@ -23,7 +23,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界血裔'(标版无血裔,直接用 界 前缀);
 //   内部 Skill.name = '血裔'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -109,7 +108,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '回合开始',
-    async (ctx: AtomAfterContext) => {
+    async (ctx) => {
       if (ownerId !== 0) return; // 主公技:仅主公
       const st = ctx.state;
       const me = st.players[ownerId];
@@ -133,9 +132,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomAfterContext) => {
+    async (ctx) => {
       if (ownerId !== 0) return; // 主公技:仅主公
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '出牌') return;

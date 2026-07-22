@@ -15,6 +15,8 @@ import type {
   AtomAfterContext,
   AtomBeforeContext,
   AtomHookEntry,
+  AtomName,
+  AtomOfName,
   FrontendAPI,
   GameState,
   HookResult,
@@ -317,14 +319,19 @@ export function registerAction(
  * 注册一个 before atom 钩子。ownerId 在注册时绑定,handler 通过 ctx.ownerId 拿(无需闭包)。
  * before 钩子可返回 HookResult(pass/modify/cancel),after 钩子返回 void。
  */
-export function registerBeforeHook(
+export function registerBeforeHook<T extends AtomName>(
   state: GameState,
   skillId: string,
   ownerId: number,
-  atomType: string,
-  handler: (ctx: AtomBeforeContext) => Promise<HookResult | void>,
+  atomType: T,
+  handler: (ctx: AtomBeforeContext<AtomOfName<T>>) => Promise<HookResult | void>,
 ): () => void {
-  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'before', handler };
+  // handler 收窄到 AtomBeforeContext<T>(按 atomType);存储擦除为宽类型——
+  // 注册表按 atomType 分发,运行时 ctx.atom 必然匹配 T,擦除安全。
+  const entry: AtomHookEntry = {
+    skillId, ownerId, atomType, phase: 'before',
+    handler: handler as AtomHookEntry['handler'],
+  };
   const reg = getRegistry(state);
   const list = reg.beforeHooks.get(atomType) ?? [];
   list.push(entry);
@@ -340,14 +347,17 @@ export function registerBeforeHook(
 /**
  * 注册一个 after atom 钩子。ownerId 在注册时绑定。
  */
-export function registerAfterHook(
+export function registerAfterHook<T extends AtomName>(
   state: GameState,
   skillId: string,
   ownerId: number,
-  atomType: string,
-  handler: (ctx: AtomAfterContext) => Promise<void>,
+  atomType: T,
+  handler: (ctx: AtomAfterContext<AtomOfName<T>>) => Promise<void>,
 ): () => void {
-  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase: 'after', handler };
+  const entry: AtomHookEntry = {
+    skillId, ownerId, atomType, phase: 'after',
+    handler: handler as AtomHookEntry['handler'],
+  };
   const reg = getRegistry(state);
   const list = reg.afterHooks.get(atomType) ?? [];
   list.push(entry);
@@ -374,9 +384,12 @@ export function registerJudgeModifier(
   state: GameState,
   skillId: string,
   ownerId: number,
-  handler: (ctx: AtomAfterContext) => Promise<void>,
+  handler: (ctx: AtomAfterContext<AtomOfName<'判定'>>) => Promise<void>,
 ): () => void {
-  const entry: AtomHookEntry = { skillId, ownerId, atomType: '判定', phase: 'after', handler };
+  const entry: AtomHookEntry = {
+    skillId, ownerId, atomType: '判定', phase: 'after',
+    handler: handler as AtomHookEntry['handler'],
+  };
   const reg = getRegistry(state);
   reg.judgeModifiers.set(ownerId, entry);
   return () => {

@@ -14,7 +14,7 @@
 //
 // 命名: 文件名/loader key/character skill name 均为 '界殚心'(避开标殚心冲突);
 //   内部 Skill.name = '殚心'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -66,8 +66,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 造成伤害 after:受伤后询问是否发动殚心
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const amount = atom.amount ?? 0;
     if (amount <= 0) return;

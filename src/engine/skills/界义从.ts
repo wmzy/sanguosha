@@ -25,7 +25,7 @@
 // 已知限制(沿用引擎既有约定,与马术+进攻马、屯田+进攻马 同构):
 //   vars['距离/防御修正'] 是单一 number 槽位,不累加。若同时拥有 义从 + 防御马,
 //   两者写入同一 key,后写覆盖前写。这是 engine 距离修正的既有约定,本技能不单独解决。
-import type { AtomAfterContext, Skill, GameState } from '../types';
+import type { Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 
@@ -91,16 +91,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   }
 
   // 体力变化 after hook:重新同步防御修正(走 atom 同步 view)
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target === ownerId) await syncDefenseMod(ctx.state, ownerId);
   });
-  registerAfterHook(state, skill.id, ownerId, '回复体力', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '回复体力', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target === ownerId) await syncDefenseMod(ctx.state, ownerId);
   });
-  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target === ownerId) await syncDefenseMod(ctx.state, ownerId);
   });
 

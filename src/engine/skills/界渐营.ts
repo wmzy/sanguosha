@@ -24,7 +24,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界渐营'(避开标版冲突);
 //   内部 Skill.name = '渐营'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   Card,
   FrontendAPI,
   GameState,
@@ -197,8 +196,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(出牌) after-hook:owner 出牌阶段开始 → 重置"上一张牌" ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;
@@ -206,14 +205,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 移动牌 after-hook:owner 出牌阶段内 hand→处理区 = 主动使用/打出 ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
     const st = ctx.state;
     if (!inMyPlayPhase(st, ownerId)) return;
-    const atom = ctx.atom as {
-      cardId?: string;
-      from?: { zone?: string; player?: number };
-      to?: { zone?: string };
-    };
+    const atom = ctx.atom;
     if (atom.from?.zone !== '手牌') return;
     if (atom.from.player !== ownerId) return;
     if (atom.to?.zone !== '处理区') return;
@@ -226,10 +221,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 装备 after-hook:owner 出牌阶段内装备牌 = 使用牌 ──
-  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx) => {
     const st = ctx.state;
     if (!inMyPlayPhase(st, ownerId)) return;
-    const atom = ctx.atom as { player?: number; cardId?: string };
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const cardId = atom.cardId;
     if (typeof cardId !== 'string') return;

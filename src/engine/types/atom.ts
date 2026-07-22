@@ -274,10 +274,19 @@ export type PlayerNameResolver = (idx: number) => string | undefined;
  */
 export type HookResult = { kind: 'pass' } | { kind: 'modify'; atom: Atom } | { kind: 'cancel' };
 
-/** before 钩子上下文:atom 执行前调用 */
-export interface AtomBeforeContext {
+/** 所有 atom 类型名的联合(Atom 各成员的 type 字面量)。
+ *  供 hook 注册泛型收窄:registerBeforeHook<'造成伤害'> 让 ctx.atom 收窄到对应形状。 */
+export type AtomName = Atom['type'];
+
+/** 按类型名提取对应的 atom 形状。AtomOfName<AtomName> 退化为完整 Atom(默认值,向后兼容)。 */
+export type AtomOfName<T extends AtomName> = Extract<Atom, { type: T }>;
+
+/** before 钩子上下文:atom 执行前调用。
+ *  泛型 A 收窄 atom 到指定形状;默认 Atom(全联合),向后兼容。
+ *  registerBeforeHook 内部用 AtomOfName<T> 把类型名映射为 atom 形状传入。 */
+export interface AtomBeforeContext<A extends Atom = Atom> {
   state: GameState;
-  atom: Atom;
+  atom: A;
   /** 钩子注册时的 ownerId(skill 实例的所属玩家,座次下标) */
   ownerId: number;
   /** 当前结算帧(只读) */
@@ -286,9 +295,9 @@ export interface AtomBeforeContext {
   readonly params: Record<string, Json>;
 }
 
-export interface AtomAfterContext {
+export interface AtomAfterContext<A extends Atom = Atom> {
   state: GameState;
-  atom: Atom;
+  atom: A;
   /** 钩子注册时的 ownerId(skill 实例的所属玩家,座次下标) */
   ownerId: number;
   /** 当前结算帧(只读) */

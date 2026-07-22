@@ -83,8 +83,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 判定 after hook:在 判定.afterHooks(将判定牌移入弃牌堆)之前运行 ──
   //   捕获花色,非红桃时把判定牌从 frame.cards 拿出(作为田)+ 加标记 + 更新距离修正
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; judgeType?: string };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.player !== ownerId) return;
     if (atom.judgeType !== '屯田') return;
@@ -170,8 +170,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // ── 获得 after:有人从邓艾处获得牌(被顺/被借/反馈等) ──
-  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; from?: number; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '获得') return;
     if (atom.from !== ownerId) return; // 来自邓艾的牌才算"失去"
     if (atom.player === ownerId) return; // 自己获得自己不算失去
@@ -179,25 +179,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 移动牌 after:邓艾的牌被移走(过河拆桥/拼点/打出等) ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      type?: string;
-      cardId?: string;
-      from?: { zone?: string; player?: number };
-      to?: { zone?: string; player?: number };
-    };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '移动牌') return;
     // from 是邓艾的手牌区
-    if (atom.from?.zone !== '手牌') return;
-    if (atom.from?.player !== ownerId) return;
+    if (atom.from.zone !== '手牌') return;
+    if (atom.from.player !== ownerId) return;
     // 移到自己手牌不算失去(理论上 from===to 同一玩家不可能)
-    if (atom.to?.player === ownerId && atom.to?.zone === '手牌') return;
+    if (atom.to.zone === '手牌' && atom.to.player === ownerId) return;
     await maybeTriggerTunTian(ctx, '移动牌');
   });
 
   // ── 弃置 after:邓艾被弃牌(借刀杀人等回合外弃置路径) ──
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '弃置') return;
     if (atom.player !== ownerId) return;
     await maybeTriggerTunTian(ctx, '弃置');

@@ -17,7 +17,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界樵拾'(避开标版冲突);
 //   内部 Skill.name = '樵拾'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -69,8 +69,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(回合结束 = 结束阶段) after-hook:任意玩家的结束阶段都触发 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '回合结束') return; // 结束阶段 = engine phase '回合结束'
     const currentPlayer = atom.player;

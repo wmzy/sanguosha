@@ -26,7 +26,7 @@
 //   - 嵌套安全:改对孙权的 回复体力 target=孙权(=ownerId),本 hook 条件 target≠ownerId → 不重入。
 //   - 与濒死求桃无关:濒死求桃时 target=孙权(被救者),本 hook 要求 target≠孙权,
 //     故天然不与濒死求桃场景冲突,无需检查 求桃/已救 标志。
-import type { AtomBeforeContext, GameState, HookResult, Json, Skill } from '../types';
+import type { GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
@@ -54,8 +54,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '回复体力',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; amount?: number; source?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 主公技:仅孙权为主公(座次 0)时生效
       if (ownerId !== 0) return;
       const target = atom.target;

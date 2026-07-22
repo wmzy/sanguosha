@@ -6,7 +6,7 @@
 //   - 一旦装备了真实防具(仁王盾/藤甲/八卦阵等),八阵失效;卸下防具后自动恢复。
 //
 // 无防具检查:防具 slot 名为 '防具',equipment['防具'] 为空即无防具。
-import type { AtomBeforeContext, Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
@@ -54,8 +54,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      if ((ctx.atom as { target?: number }).target !== ownerId) return;
+    async (ctx): Promise<HookResult | void> => {
+      if ((ctx.atom).target !== ownerId) return;
       // 装备了防具 → 八阵失效,不干预
       if (!noArmor(ctx.state, ownerId)) return;
       if (ctx.state.zones.deck.length === 0) return;

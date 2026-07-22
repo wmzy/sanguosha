@@ -18,8 +18,6 @@
 //   - 内部 localVars/requestType 键名沿用 '裸衣/xxx' 前缀(界版规范)。
 //   - 镜像先例:再起/突袭/双雄的「阶段开始(摸牌) before-hook + 询问 + skipPhase」模式。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -96,8 +94,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '摸牌') return;
@@ -223,8 +221,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; amount?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
       const self = ctx.state.players[ownerId];
@@ -244,8 +242,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── 回合开始 after hook:owner 自己的下回合开始时清增伤标签 ──
   // 严格匹配官方"直到你的下回合开始":仅 owner 自己的回合开始时清,
   // 中间其他玩家回合内 owner 仍可对他人出杀/决斗(响应决斗等)享受增伤。
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const self = ctx.state.players[ownerId];
     if (self?.tags.includes(BONUS_TAG)) {

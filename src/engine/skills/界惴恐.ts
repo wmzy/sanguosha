@@ -31,8 +31,6 @@
 // 命名:文件名/loader key/character skill name = '界惴恐'(避标版冲突);
 //   内部 Skill.name = '惴恐'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -204,8 +202,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '指定目标',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { source?: number; target?: number };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         const source = atom.source;
         const target = atom.target;
         if (typeof source !== 'number' || typeof target !== 'number') return;
@@ -223,9 +221,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '回合开始',
-      async (ctx: AtomAfterContext): Promise<void> => {
+      async (ctx): Promise<void> => {
         const st = ctx.state;
-        const atom = ctx.atom as { player?: number };
+        const atom = ctx.atom;
         const turnPlayer = atom.player;
         if (typeof turnPlayer !== 'number') return;
         if (turnPlayer === ownerId) return; // 自己回合不触发

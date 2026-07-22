@@ -23,7 +23,6 @@
 //   - 选项①的"伤害来源" = 原伤害的来源(保留奖励归属)
 //   - 红颜联动:拥有「红颜」或「界红颜」时,黑桃手牌/装备也作为合法弃牌
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -137,14 +136,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        target?: number;
-        source?: number;
-        amount?: number;
-        cardId?: string;
-        damageType?: '普通' | '火焰' | '雷电';
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const amount = atom.amount ?? 0;
       if (amount <= 0) return;

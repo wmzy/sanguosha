@@ -16,7 +16,7 @@
 //   - 距离1以内:effectiveDistance 最小为 1(座位相邻或自己),<= 1 即满足。
 //     装备 -1 马(进攻修正)通过 player.vars['距离/进攻修正'] 进一步缩短距离——自动支持。
 //   - 官方无体力条件:即使满血也可选择摸牌(回复体力则被上限截断,无溢出)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { effectiveDistance } from '../distance';
@@ -71,8 +71,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after hook:狂骨主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (atom.target === undefined) return;

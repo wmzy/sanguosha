@@ -222,7 +222,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // 巧说自身的拼点牌打出在 winNext 设置之前 → 不会误清。后续任一张牌打出 → 清除标记。
   // 注意:本 hook 注册到 SKILL_ID + ownerId,仅在 owner 持有 巧说 实例时生效。
   registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
-    const atom = ctx.atom as { type: '移动牌'; from: ZoneLoc; to: ZoneLoc };
+    const atom = ctx.atom;
     if (atom.type !== '移动牌') return;
     if (atom.from.zone !== '手牌') return;
     if (atom.from.player !== ownerId) return;

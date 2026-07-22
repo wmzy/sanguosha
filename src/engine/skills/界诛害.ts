@@ -17,7 +17,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界诛害'(避开与未来标版冲突);
 //   内部 Skill.name = '诛害'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -165,8 +165,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after-hook:在 turn.vars 记录本回合造成过伤害的玩家 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     const source = atom.source;
     if (typeof source !== 'number') return;
     if ((atom.amount ?? 0) <= 0) return;
@@ -179,8 +179,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.phase !== '回合结束') return;
       const player = atom.player;

@@ -23,7 +23,6 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界献图';内部 Skill.name='献图'。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -116,8 +115,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(出牌) after-hook:其他角色出牌阶段开始 → 询问发动 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '出牌') return;
     const currentPlayer = atom.player;
@@ -265,10 +264,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 造成伤害 after-hook:统计 currentPlayer 出牌阶段造成的伤害 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
     const st = ctx.state;
     if (st.phase !== '出牌') return;
-    const atom = ctx.atom as { source?: number; amount?: number };
+    const atom = ctx.atom;
     if (typeof atom.source !== 'number') return;
     if ((atom.amount ?? 0) <= 0) return;
     // 必须是当前回合角色造成的伤害
@@ -281,8 +280,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 阶段结束(出牌) after-hook:失血检查 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '出牌') return;
     const currentPlayer = atom.player;

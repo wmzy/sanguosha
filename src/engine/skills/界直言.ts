@@ -27,7 +27,6 @@
 //   - 装备自带技能加载:applyAtom(装备) 不会自动加载技能——需要手动 添加技能,
 //     与「装备通用」一致(装备通用 是 use action 的实现,绕过它直接 applyAtom(装备) 时需手动管理)。
 import type {
-  AtomAfterContext,
   EquipSlot,
   FrontendAPI,
   GameState,
@@ -93,8 +92,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── 阶段开始(回合结束) after-hook:phasePlayer 是自己或上家 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '回合结束') return;
     const st = ctx.state;

@@ -19,7 +19,7 @@
 //
 // 与界不屈的差异:界版额外有手牌上限规则(有创牌时手牌上限=创牌数量);标版无此规则。
 //   二者共用 置创牌 atom(重复时移去此牌——对两版本语义一致)。
-import type { AtomAfterContext, GameState, Skill } from '../types';
+import type { GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 
@@ -39,8 +39,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── 陷入濒死 after-hook:不屈主逻辑(锁定技,每次濒死自动触发) ──
-  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;

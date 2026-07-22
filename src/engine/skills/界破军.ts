@@ -35,8 +35,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界破军'(避开标破军冲突,标破军尚未实现);
 //   内部 Skill.name = '破军'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   EquipSlot,
   FrontendAPI,
@@ -162,8 +160,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 主效果:指定目标 after-hook ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '指定目标') return;
     if (atom.source !== ownerId) return; // 徐盛使用的杀
     if (!isSlashCard(ctx.state, atom.cardId)) return; // 仅杀触发
@@ -250,14 +248,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        type?: string;
-        source?: number;
-        target?: number;
-        cardId?: string;
-        amount?: number;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '造成伤害') return;
       if (atom.source !== ownerId) return; // 徐盛造成的伤害
       if (!isSlashCard(ctx.state, atom.cardId)) return; // 仅杀伤害
@@ -280,8 +272,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 回合结束 after-hook:归还所有破军移出的牌 ──
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '回合结束') return;
     if (atom.player !== ownerId) return; // 仅徐盛回合结束(破军只在徐盛回合触发)
     // 遍历所有玩家,归还其 vars 中破军移出的牌

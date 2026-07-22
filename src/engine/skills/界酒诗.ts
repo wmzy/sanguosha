@@ -27,7 +27,6 @@
 //   - 受到伤害"后":after-hook 挂 造成伤害(target=自己)。
 //   - 翻回询问:prompt.type='confirm',默认 false(玩家可选)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -150,12 +149,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:曹植受伤后,若背面朝上 → 询问是否翻回正面 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      type?: string;
-      target?: number;
-      amount?: number;
-    };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '造成伤害') return;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

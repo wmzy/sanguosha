@@ -25,8 +25,6 @@
 // SUPPRESSION_TAG 生命周期:发动时加,界马超回合结束 after hook 清。
 //   标签由 create-engine 的 hook 过滤器读取,实现「目标非锁定技失效」。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -110,8 +108,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // ── 指定目标 after:自己出杀指定目标 → 询问 → 发动:加压制标签 + 判定 ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if (atom.target === undefined) return;
     const target = atom.target;
@@ -150,8 +148,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 判定 after:judgeType==='铁骑' → 读花色,存 localVars 供询问闪阶段消费 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { judgeType?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.judgeType !== '铁骑') return;
     if (atom.player !== ownerId) return;
     const target = ctx.state.localVars[TARGET_VAR] as number | undefined;
@@ -179,8 +177,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; source?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;
@@ -234,8 +232,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 回合结束 after:界马超回合结束时清除目标的非锁定技失效标签 ──
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return; // 仅自己回合结束
     for (const p of ctx.state.players) {
       if (p.tags.includes(SUPPRESSION_TAG)) {

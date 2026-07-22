@@ -20,7 +20,7 @@
 //   - 受害者可能是任意玩家,需为所有玩家注册 respond(confirm/选牌)
 //   - 拼点点数:A=1, 2-10=面值, J=11, Q=12, K=13;大者赢,相等算没赢
 //   - 拼点流程参考驱虎.ts;获得牌参考反馈.ts
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -109,13 +109,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // ── 造成伤害 after-hook:烈刃主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      source?: number;
-      target?: number;
-      amount?: number;
-      cardId?: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (atom.target === undefined || atom.target === ownerId) return;

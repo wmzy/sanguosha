@@ -13,13 +13,10 @@
 //      (与兵粮寸断/乐不思蜀「跳过阶段」同构,差异:克己条件由自身检测,非延时锦囊判定标签。)
 //   3) respond action:玩家确认/取消 → 写 localVars['克己/confirmed']。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
   Skill,
-  ZoneLoc,
 } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
@@ -63,8 +60,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 移动牌 after hook:检测自己使用/打出的杀(手牌→处理区) ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { cardId: string; from: ZoneLoc; to: ZoneLoc };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from.zone !== '手牌' || atom.from.player !== ownerId) return;
     if (atom.to.zone !== '处理区') return;
     const card = ctx.state.cardMap[atom.cardId];
@@ -79,8 +76,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type: string; player: number; phase: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '弃牌') return;

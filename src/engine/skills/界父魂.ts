@@ -40,8 +40,6 @@ import type {
   Json,
   Skill,
   FrontendAPI,
-  AtomBeforeContext,
-  AtomAfterContext,
   HookResult,
 } from '../types';
 import type { Color } from '../../shared/types';
@@ -227,8 +225,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { source?: number; target?: number; amount?: number; cardId?: string };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
       // 限定出牌阶段(描述明确:"你于出牌阶段使用【杀】造成伤害后")
@@ -257,8 +255,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; source?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 仅 source 是 owner 时:owner 使用的转化杀
       if (atom.source !== ownerId) return;
       // 读 杀 帧 cardId(topFrame.params.cardId)
@@ -284,7 +282,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomAfterContext) => {
+    async (ctx) => {
       delete ctx.state.localVars[COLOR_LIMIT_VAR];
     },
   );

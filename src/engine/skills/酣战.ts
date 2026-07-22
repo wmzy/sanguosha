@@ -21,8 +21,6 @@
 //   - 点数:A=1,2-10=面值,J=11,Q=12,K=13。
 //   - 随机手牌用 state.rngSeed 的 createRng,保证可复现。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameState,
@@ -94,8 +92,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '请求回应',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; requestType?: string; target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '请求回应') return;
       if (atom.requestType !== TIAN_YI_PD_RT) return;
       // 仅太史慈(酣战 owner)的回合发起的拼点
@@ -139,14 +137,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 拼点后·获最大点杀:after-hook 挂「拼点」──
-  registerAfterHook(state, skill.id, ownerId, '拼点', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      type?: string;
-      initiator?: number;
-      target?: number;
-      initiatorCard?: string;
-      targetCard?: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '拼点', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '拼点') return;
     if (atom.initiator !== ownerId) return; // 仅太史慈发起的拼点
     const st = ctx.state;

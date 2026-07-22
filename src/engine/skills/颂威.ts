@@ -8,7 +8,7 @@
 //   - 黑色 = ♠ 或 ♣
 //   - faction 从 player.faction 读取
 //   - 仅主公曹丕可用(isLord 判定),非主公时 hook 注册但不触发(主公技限制)
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -47,8 +47,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 判定 after hook:其他魏势力角色黑色判定牌 → 询问曹丕摸牌 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; judgeType?: string };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.player === ownerId) return; // 自己的判定不触发
     const judgePlayer = ctx.state.players[atom.player ?? -1];

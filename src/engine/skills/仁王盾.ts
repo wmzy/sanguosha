@@ -6,7 +6,7 @@
 // 与八卦阵的区别:仁王盾是"杀无效"(在生效前终止,不触发武器技);
 // 八卦阵是"视为出闪"(杀被抵消,触发武器技)。两者由时机 atom 天然区分,
 // 不再共用 询问闪 的 cancel。
-import type { AtomBeforeContext, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -20,8 +20,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '检测有效性',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const killCardId = atom.cardId;
       if (!killCardId) return;

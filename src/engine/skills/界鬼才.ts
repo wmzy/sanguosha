@@ -20,7 +20,6 @@
 // 交换判定牌通过直接 mutate frameCards(与武圣影子卡同样的直接-mutate 先例:
 //   无现成 atom 承载"替换判定牌"操作)。
 import type {
-  AtomAfterContext,
   EquipSlot,
   FrontendAPI,
   GameState,
@@ -93,8 +92,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── 判定改判钩子:翻开判定牌后询问是否替换 ────────────────
-  registerJudgeModifier(state, skill.id, ownerId, async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number };
+  registerJudgeModifier(state, skill.id, ownerId, async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     // 界司马懿须存活且有手牌或装备
     const me = ctx.state.players[ownerId];

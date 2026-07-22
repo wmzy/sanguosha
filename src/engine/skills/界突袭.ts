@@ -21,7 +21,6 @@
 // 内部 localVars/requestType 键名保持原前缀 '突袭/xxx'(不改为 '界突袭/xxx'):
 //   界版与标版互斥不共存(同一武将只会实例化其一),键名沿用便于对照。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -81,8 +80,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '摸牌',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number; count?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉/激将等其他摸牌)
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;

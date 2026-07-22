@@ -30,8 +30,6 @@
 // 命名:文件名/loader key/character skill name = '界求援'(避标版冲突);
 //   内部 Skill.name = '求援'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameState,
@@ -329,8 +327,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '成为目标',
-      async (ctx: AtomAfterContext): Promise<void> => {
-        const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         const st = ctx.state;
         const cardId = atom.cardId;
@@ -360,8 +358,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '请求回应',
-      async (ctx: AtomBeforeContext): Promise<void> => {
-        const atom = ctx.atom as { requestType?: string; cancelTarget?: number };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.requestType !== '无懈可击') return;
         if (atom.cancelTarget !== ownerId) return;
         const st = ctx.state;

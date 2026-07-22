@@ -29,8 +29,6 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界智迟';内部 Skill.name='智迟'(OL 官方名)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   GameState,
   HookResult,
@@ -97,8 +95,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── 触发:回合外受到伤害后,激活智迟(本回合剩余时间生效)──
   unloaders.push(
-    registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { target?: number };
+    registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       // 回合外 = 不是 owner 自己的回合
       if (ctx.state.currentPlayerIndex === ownerId) return;
@@ -115,9 +113,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '成为目标',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom as { target?: number; cardId?: string };
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         const card = relevantCard(ctx.state, atom.cardId);
         if (!isAffectingCard(card)) return;
@@ -133,9 +131,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '检测有效性',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom as { target?: number; cardId?: string };
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         const card = relevantCard(ctx.state, atom.cardId);
         if (!isAffectingCard(card)) return;
@@ -151,9 +149,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '询问杀',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom as { target?: number };
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         // 顶帧 cardId 应为普通锦囊(南蛮);非普通锦囊不拦截
         const card = relevantCard(ctx.state, undefined);
@@ -170,9 +168,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '造成伤害',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom as { target?: number; cardId?: string };
+        const atom = ctx.atom;
         if (atom.target !== ownerId) return;
         const card = relevantCard(ctx.state, atom.cardId);
         if (!isAffectingCard(card)) return;
@@ -188,9 +186,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '获得',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom as { from?: number; player?: number };
+        const atom = ctx.atom;
         if (atom.from !== ownerId) return; // 别人从 owner 处获得
         if (atom.player === ownerId) return; // 自己获得自己不算
         const card = relevantCard(ctx.state, undefined);
@@ -207,9 +205,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '弃置',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom as { player?: number };
+        const atom = ctx.atom;
         if (atom.player !== ownerId) return;
         const card = relevantCard(ctx.state, undefined);
         if (!isNormalTrick(card)) return;
@@ -225,9 +223,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '设横置',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom as { player?: number };
+        const atom = ctx.atom;
         if (atom.player !== ownerId) return;
         const card = relevantCard(ctx.state, undefined);
         if (!isNormalTrick(card)) return;

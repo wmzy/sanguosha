@@ -33,7 +33,7 @@
 //   - "1点伤害":atom.amount === 1(字面解读)
 //   - 黑桃 = ♠
 //   - 获得判定牌:在 await applyAtom(判定) 完成后,从 discardPile 末尾拿
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -72,8 +72,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:其他群雄角色造成 1 点伤害 → 询问 → 判定 → 黑桃则回复+获牌 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '造成伤害') return;
 
     // 仅主公董卓可用

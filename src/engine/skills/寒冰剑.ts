@@ -2,7 +2,7 @@
 //   每当你使用【杀】对目标造成伤害时,你可以防止此伤害,改为弃置其两张牌。
 // 寒冰剑(武器,攻击范围 2):
 //   每当你使用【杀】对目标造成伤害时,你可以防止此伤害,改为弃置其两张牌。
-import type { AtomBeforeContext, FrontendAPI, HookResult, Skill, GameState } from '../types';
+import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
@@ -35,8 +35,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self) return;

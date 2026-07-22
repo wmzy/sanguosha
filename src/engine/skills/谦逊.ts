@@ -14,7 +14,7 @@
 //
 //   被 cancel 后:锦囊本身仍按各自 execute 正常进弃牌堆(牌已消耗),陆逊不受影响——
 //   与空城"杀牌仍进弃牌堆、诸葛亮不受伤害"行为一致。
-import type { AtomBeforeContext, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState } from '../types';
 import { topFrame } from '../create-engine';
 import { registerBeforeHook } from '../skill';
 
@@ -37,8 +37,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '添加延时锦囊',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number; trick?: { name?: string } };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       if (atom.trick?.name !== '乐不思蜀') return;
       // 陆逊不能成为乐不思蜀的目标 → 不放置延时锦囊
@@ -52,8 +52,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '获得',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { from?: number; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.from !== ownerId) return; // 别人从陆逊处获得
       if (atom.player === ownerId) return; // 自己获得自己不算
       // 仅拦截顺手牵羊发起的获得(精确区分反馈/突袭等)

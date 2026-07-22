@@ -29,8 +29,6 @@
 //   - 死亡触发在 before-击杀:此时自己的手牌/装备仍在(尚未被 apply 清空)
 //   - 受伤触发按一次伤害一次;死亡触发整局一次(死亡后技能失效)
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   GameView,
@@ -202,8 +200,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // 致死伤害(health<=0)跳过——由 击杀 before-hook 接管,避免双重触发
   // (造成伤害 after-hooks 在 系统规则 濒死检查 before 执行:此时 alive 仍 true,
   //  若不按 health 过滤会先于此处触发一次,濒死求桃失败击杀时再触发一次)
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players[ownerId];
@@ -218,8 +216,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '击杀',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '击杀') return;
       if (atom.player !== ownerId) return; // 仅荀彧本人死亡时触发
       // 荀彧 即将死亡(alive 仍为 true,击杀 apply 随后置 false)

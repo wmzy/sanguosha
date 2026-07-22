@@ -27,8 +27,6 @@
 // 标签生命周期:由 指定目标 after 产出,由对应 before hook 消费清除——天然按单次杀结算,
 // 多目标杀时各目标的标签互不干扰(标签挂在目标身上)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -103,8 +101,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 指定目标 after:条件满足 → 询问 → 按条件加标签 ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if (atom.target === undefined) return;
     const target = atom.target;
@@ -153,8 +151,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; source?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;
@@ -171,13 +169,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        source?: number;
-        target?: number;
-        amount?: number;
-        cardId?: string;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
       const target = atom.target;

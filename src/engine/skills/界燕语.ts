@@ -25,7 +25,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界燕语';
 //   内部 Skill.name = '燕语'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import {
   registerAction,
@@ -152,8 +152,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(出牌) after-hook:owner 出牌阶段开始 → 重置 lostSha 计数 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;
@@ -163,12 +163,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 移动牌 after-hook:owner 手牌中的【杀】移出 → lostSha +1 ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
     if (!inMyPlayPhase(ctx.state, ownerId)) return;
-    const atom = ctx.atom as {
-      cardId?: string;
-      from?: { zone?: string; player?: number };
-    };
+    const atom = ctx.atom;
     if (atom.from?.zone !== '手牌') return;
     if (atom.from.player !== ownerId) return;
     const cardId = atom.cardId;
@@ -179,9 +176,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 弃置 after-hook:owner 弃置的【杀】计入 lostSha ──
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
     if (!inMyPlayPhase(ctx.state, ownerId)) return;
-    const atom = ctx.atom as { player?: number; cardIds?: string[] };
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const ids = Array.isArray(atom.cardIds) ? atom.cardIds : [];
     const shaCount = ids.filter((id) => ctx.state.cardMap[id]?.name === '杀').length;
@@ -189,8 +186,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 阶段结束(出牌) after-hook:owner 出牌阶段结束 → 若 lostSha≥2 触发 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;

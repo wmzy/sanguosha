@@ -26,7 +26,7 @@
 //
 // 与贯石斧的差异:贯石斧弃 2 张牌让原杀强命(原杀还在处理区);
 // 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
-import type { AtomAfterContext, FrontendAPI, Skill, GameState } from '../types';
+import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -79,10 +79,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '被抵消', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '被抵消', async (ctx) => {
     // 只对杀生效:万箭齐发等锦囊被闪抵消不触发武器技(规则:青龙腰月刀是"你使用的杀被闪抵消")
     if (ctx.frame.skillId !== '杀') return;
-    const atom = ctx.atom as { source?: number; target?: number };
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     const self = ctx.state.players[ownerId];
     if (!self) return;

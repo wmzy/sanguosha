@@ -13,7 +13,7 @@
 //
 // 注意:移除技能 只卸载 hook 实例,不触发 卸下(装备仍在装备区)。
 // 白银狮子的"失去装备回血"监听 卸下 atom,不会被 移除技能 触发——正确。
-import type { AtomAfterContext, Skill, GameState } from '../types';
+import type { Skill, GameState } from '../types';
 
 import { registerAfterHook, unloadSkillInstance, instantiateSkill } from '../skill';
 
@@ -40,8 +40,8 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // 指定目标 after hook:杀指定目标后,临时卸载目标的防具技能
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    if ((ctx.atom as { source?: number }).source !== ownerId) return;
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    if ((ctx.atom).source !== ownerId) return;
 
     const me = ctx.state.players[ownerId];
     if (!me) return;
@@ -50,7 +50,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const weaponCard = ctx.state.cardMap[weaponId];
     if (weaponCard?.name !== '青釭剑') return;
 
-    const target = (ctx.atom as { target: number }).target;
+    const target = (ctx.atom).target;
     const targetPlayer = ctx.state.players[target];
     if (!targetPlayer) return;
 
@@ -73,8 +73,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // 造成伤害 after hook:杀结算完毕后,恢复被临时卸载的防具技能
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    if ((ctx.atom as { source?: number }).source !== ownerId) return;
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    if ((ctx.atom).source !== ownerId) return;
     const unloaded = getTempUnloadMap(ctx.state).get(ownerId);
     if (!unloaded || unloaded.length === 0) return;
     for (const { target, skillId } of unloaded) {

@@ -23,7 +23,6 @@
 //   - 标版仅支持红桃**手牌**(与界版"手牌或装备区"不同)
 //   - 红颜联动:小乔拥有「红颜」技能时,黑桃手牌也作为合法弃牌
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -115,14 +114,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        target?: number;
-        source?: number;
-        amount?: number;
-        cardId?: string;
-        damageType?: '普通' | '火焰' | '雷电';
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const amount = atom.amount ?? 0;
       if (amount <= 0) return;

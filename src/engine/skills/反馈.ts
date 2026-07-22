@@ -13,7 +13,7 @@
 //     前端 pickTargetCard 渲染与无头客户端 availableActions 自动路由(不再硬编码)。
 //   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ./选牌面板.ts);反馈为 obtain 模式,
 //     includeJudge=false(经典规则仅手牌+装备)。
-import type { AtomAfterContext, FrontendAPI, Skill } from '../types';
+import type { FrontendAPI, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
@@ -76,8 +76,8 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (atom.source === undefined) return;

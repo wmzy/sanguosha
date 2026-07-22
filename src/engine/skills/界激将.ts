@@ -22,7 +22,6 @@
 //     否则其 dispatch 找不到 action(同护驾/界救援 跨座次注册模式)。
 //   - 独立界版文件,注册键 '界激将'(与标激将键隔离,不修改标激将)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -166,10 +165,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '指定目标',
-      async (ctx: AtomAfterContext): Promise<void> => {
+      async (ctx): Promise<void> => {
         // 主公技:仅刘备为主公(座次 0)时生效
         if (ownerId !== 0) return;
-        const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+        const atom = ctx.atom;
         const sourceIdx = atom.source;
         if (typeof sourceIdx !== 'number') return;
         // 必须是其他蜀势力角色(非主公刘备本人)

@@ -25,8 +25,6 @@
 //
 // 命名:文件名/loader key 为 '界仁心';内部 Skill.name = '仁心'(OL 官方技能名)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -114,8 +112,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 陷入濒死 after:其他角色濒死,询问是否发动仁心 ──
-  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number };
+  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
+    const atom = ctx.atom;
     if (typeof atom.target !== 'number') return;
     const target = atom.target;
     if (target === ownerId) return; // 自己濒死不触发
@@ -201,8 +199,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 翻面:下一回合跳过(机制同据守/放逐/神速) ────────────────
   // 检测翻面标签 → 移除标签 + 设 skipAll 标志 + cancel(不进入准备阶段)
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { type: string; player: number; phase: string };
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     const self = ctx.state.players[ownerId];
@@ -225,8 +223,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 翻面:阶段结束(准备) before-hook,主动推进回合 ────────
   // skipAll 标志存在时:清除标志 + 亲自执行 end-turn 序列把回合交给下家。
   // (与据守/神速一致:cancel 阶段结束原子以防 phase-end after-hook 推进产生幻影阶段链)
-  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { type: string; player: number; phase: string };
+  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.player !== ownerId) return;
     if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;

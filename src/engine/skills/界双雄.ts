@@ -36,7 +36,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界双雄'(避开标双雄冲突);
 //   内部 Skill.name = '双雄'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   Card,
   FrontendAPI,
   GameState,
@@ -124,8 +123,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── 阶段开始(摸牌) after-hook:标记正常开始的摸牌阶段 ──
   //   skipPhase 在 before-hook cancel 阶段开始 → 本 after-hook 不执行 → 标记不设置
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; phase: string; player: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '摸牌') return;
     if (atom.player !== ownerId) return;
@@ -133,8 +132,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 阶段结束(摸牌) after-hook:核心触发 A —— 询问发动 → 弃牌 → 记色 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; phase: string; player: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '摸牌') return;
     if (atom.player !== ownerId) return;
@@ -200,13 +199,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 造成伤害 after-hook:target=ownerId 且 amount>0 → 记伤害牌 id ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      target?: number;
-      amount?: number;
-      source?: number;
-      cardId?: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const cardId = atom.cardId;
@@ -225,8 +219,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 阶段开始(回合结束) after-hook:核心触发 D —— 获得本回合伤害牌 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; phase: string; player: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '回合结束') return;
     if (atom.player !== ownerId) return;

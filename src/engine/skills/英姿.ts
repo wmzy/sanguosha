@@ -6,7 +6,6 @@
 //   - 每回合限一次:摸牌阶段天然一次;英姿/usedThisTurn 防重入,
 //     后缀 /usedThisTurn 由「回合结束」atom 自动清空。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -56,8 +55,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '摸牌',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number; count?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉等其他摸牌)
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;

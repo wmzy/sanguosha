@@ -37,7 +37,6 @@
 //
 // 非锁定技:描述以"当...你可以"开头,非"锁定技",故 hooks 受 界铁骑/义绝 压制影响。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   GameView,
@@ -120,16 +119,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 阶段开始(摸牌) after-hook:标记正常开始的摸牌阶段 ──
   //   skipPhase 在 before-hook cancel 阶段开始 → 本 after-hook 不执行 → 标记不设置
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; phase: string; player: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '摸牌') return;
     ctx.state.localVars[NORMAL_KEY] = atom.player;
   });
 
   // ── 阶段结束(摸牌) after-hook:两个分支 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; phase: string; player: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '摸牌') return;
 

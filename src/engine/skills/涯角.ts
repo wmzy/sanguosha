@@ -16,7 +16,7 @@
 //
 // 类别判断:cardMap 的 type 字段(基本牌/锦囊牌/装备牌)。
 // "交给一名角色"含自己(FAQ 明确)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill, ZoneLoc } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -75,8 +75,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── after hook:回合外使用/打出手牌后 ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { cardId: string; from: ZoneLoc; to: ZoneLoc };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     // 仅手牌→处理区 = 使用/打出手牌
     if (atom.from.zone !== '手牌' || atom.from.player !== ownerId) return;
     if (atom.to.zone !== '处理区') return;

@@ -17,7 +17,6 @@
 //   - 出牌阶段移动的牌支持:手牌/装备/判定区 → 手牌/装备
 //     (装备→装备 需 slot 不冲突;判定区→手牌 视为"移回手牌")
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -143,8 +142,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;

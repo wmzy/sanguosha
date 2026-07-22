@@ -137,8 +137,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 延时锦囊:放置到陆逊判定区 → 触发(天然唯一目标) ──
-  registerAfterHook(state, skill.id, ownerId, '添加延时锦囊', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; trick?: { name?: string } };
+  registerAfterHook(state, skill.id, ownerId, '添加延时锦囊', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '添加延时锦囊') return;
     if (atom.player !== ownerId) return;
     await maybeOfferExile(ctx, `延时锦囊${atom.trick?.name ? '「' + atom.trick.name + '」' : ''}对你生效`);
@@ -146,12 +146,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 普通锦囊(他人使用,陆逊为唯一目标):无懈窗口收敛点触发 ──
   //    覆盖所有走 询问无懈可击 的普通锦囊:决斗 / 顺手牵羊 / 过河拆桥 / 火攻 / 借刀杀人 等。
-  registerAfterHook(state, skill.id, ownerId, '请求回应', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      type?: string;
-      requestType?: string;
-      cancelTarget?: number;
-    };
+  registerAfterHook(state, skill.id, ownerId, '请求回应', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '请求回应') return;
     if (atom.requestType !== '无懈可击') return; // 仅无懈窗口(谦逊自身 prompt 走 CONFIRM_RT,被此过滤排除)
     if (atom.cancelTarget !== ownerId) return; // 本次抵消目标不是陆逊
@@ -177,8 +173,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 回合结束:归还此前移出游戏的手牌 ──
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '回合结束') return;
     const self = ctx.state.players[ownerId];
     if (!self) return;

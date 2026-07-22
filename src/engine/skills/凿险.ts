@@ -9,7 +9,7 @@
 //   - 田数量 = marks 中 `屯田/田:` 前缀的 mark 数量
 //   - 减上限后若体力>新上限,设上限 atom 自动 clamp(参考 types.ts 设上限定义)
 //   - 急袭技能模块需在 skills/index.ts 注册
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 
@@ -29,8 +29,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── 阶段开始(准备) after hook:检查觉醒条件 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '准备') return;
     if (atom.player !== ownerId) return;

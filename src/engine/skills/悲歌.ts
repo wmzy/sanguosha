@@ -16,8 +16,6 @@
 //   - 悲歌的非系统 after-hook 先于系统规则濒死检查执行:♥ 回血可在求桃前救活濒死角色。
 //   - 无次数限制。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameState,
@@ -68,8 +66,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 判定 after hook:捕获判定牌花色(判定牌进弃牌堆前)──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; judgeType?: string };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '悲歌') return;
     const processing = frameCards(ctx.state);
@@ -81,13 +79,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after hook:悲歌主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      target?: number;
-      source?: number;
-      amount?: number;
-      cardId?: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if ((atom.amount ?? 0) <= 0) return;
     const targetIdx = atom.target;
     if (targetIdx === undefined) return;
@@ -166,8 +159,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       const player = atom.player;
       if (player === undefined) return;
@@ -194,8 +187,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段结束',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段结束') return;
       const player = atom.player;
       if (player === undefined) return;

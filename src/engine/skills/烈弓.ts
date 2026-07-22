@@ -15,8 +15,6 @@
 //
 // 标签生命周期:阶段1(指定目标)产出,阶段2(询问闪)消费并清除——天然按单次杀结算。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -61,8 +59,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 指定目标 after:条件满足 → 询问 → 加禁闪标签 ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if (atom.target === undefined) return;
     const target = atom.target;
@@ -106,8 +104,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; source?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;

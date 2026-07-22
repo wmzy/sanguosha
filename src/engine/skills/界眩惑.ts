@@ -24,7 +24,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界眩惑'(避开与未来标版冲突);
 //   内部 Skill.name = '眩惑'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -307,8 +306,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段结束',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { player: number; phase: string };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.phase !== '摸牌') return;
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;

@@ -18,7 +18,7 @@
 //
 //   关键:增上限必须在回复前(先增加上限,再回复),否则回复被旧上限 clamp。
 //   独立界版文件,注册键 '界若愚'(与标版若愚键隔离,不修改标版)。
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 
@@ -38,8 +38,8 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     // 觉醒技:整局一次
     if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return;

@@ -17,7 +17,7 @@
 // 多张牌时:玩家逐张选择,每次 push 到 deck 末尾——最后选的牌成为新的最顶(最先被摸)。
 //
 // "任意张":玩家可选 0..N 张(任意子集)。实现用循环 pickProcessingCard(单选)+ 询问是否继续。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -64,8 +64,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── 弃置 after-hook:自己弃置(任意次)或上家弃置(每回合首次)──
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player: number; cardIds: string[] };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     const st = ctx.state;
     const discarder = atom.player;
 

@@ -13,7 +13,7 @@
 //
 // 非延时锦囊(10):过河拆桥/顺手牵羊/无中生有/无懈可击/借刀杀人/桃园结义/
 //                 五谷丰登/南蛮入侵/万箭齐发/决斗
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -65,12 +65,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 移动牌 after hook:打出非延时锦囊时询问摸牌 ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      cardId?: string;
-      from?: { zone?: string; player?: number };
-      to?: { zone?: string };
-    };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     if (!atom.cardId) return;
     const from = atom.from;
     const to = atom.to;

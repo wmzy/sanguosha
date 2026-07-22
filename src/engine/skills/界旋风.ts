@@ -36,8 +36,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界旋风'(避开标旋风冲突);
 //   内部 Skill.name = '旋风'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   Json,
@@ -235,16 +233,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 路径 1:卸下(自己替换装备) ── 必失 1 件装备
-  registerAfterHook(state, skill.id, ownerId, '卸下', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '卸下', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     await triggerXuanfeng(ctx.state, ownerId);
   });
 
   // ── 路径 2:弃置(被拆装备 / 一次性弃≥2) ──
   // before 快照:apply 前记录装备流失数与总流失数
-  registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { player?: number; cardIds?: string[] };
+  registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const myEquip = new Set(
       Object.values(ctx.state.players[ownerId].equipment).filter(
@@ -258,8 +256,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ctx.state.localVars[DISCARD_TOTAL_KEY] = cardIds.length;
   });
   // after 触发:失装备 OR 一次性≥2
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const equipLoss = ctx.state.localVars[DISCARD_EQUIP_KEY] as number | undefined;
     const totalLoss = ctx.state.localVars[DISCARD_TOTAL_KEY] as number | undefined;
@@ -272,8 +270,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 路径 3:获得(他人顺装备) ── before 快照,after 触发
-  registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { from?: number; cardId?: string };
+  registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from !== ownerId) return;
     const myEquip = new Set(
       Object.values(ctx.state.players[ownerId].equipment).filter(
@@ -284,8 +282,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ctx.state.localVars[OBTAIN_EQUIP_KEY] = 1;
     }
   });
-  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { from?: number };
+  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from !== ownerId) return;
     const lost = ctx.state.localVars[OBTAIN_EQUIP_KEY] as number | undefined;
     delete ctx.state.localVars[OBTAIN_EQUIP_KEY];

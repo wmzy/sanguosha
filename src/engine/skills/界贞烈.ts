@@ -38,8 +38,6 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界贞烈';内部 Skill.name='贞烈'(OL 官方名)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameState,
@@ -258,8 +256,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 成为目标 after:杀/决斗 触发点 ─────────────────────────
-  registerAfterHook(state, skill.id, ownerId, '成为目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '成为目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const sourceId = atom.source;
     if (sourceId === undefined || sourceId === ownerId) return; // "其他角色"
@@ -280,11 +278,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '请求回应',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        requestType?: string;
-        cancelTarget?: number;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.requestType !== '无懈可击') return;
       if (atom.cancelTarget !== ownerId) return;
       const frame = topFrame(ctx.state);
@@ -311,8 +306,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '检测有效性',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       if (isInvalidFor(ctx.state, atom.cardId, ownerId)) return { kind: 'cancel' };
     },
@@ -324,8 +319,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       if (isInvalidFor(ctx.state, atom.cardId, ownerId)) return { kind: 'cancel' };
     },
@@ -337,8 +332,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '询问杀',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const frame = topFrame(ctx.state);
       const cardId = frame?.params?.cardId as string | undefined;
@@ -352,8 +347,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '获得',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { from?: number; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.from !== ownerId) return; // 别人从王异处获得
       if (atom.player === ownerId) return; // 自己获得自己不算
       const frame = topFrame(ctx.state);
@@ -368,8 +363,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '弃置',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       const frame = topFrame(ctx.state);
       const cardId = frame?.params?.cardId as string | undefined;
@@ -385,8 +380,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '设横置',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       const frame = topFrame(ctx.state);
       if (!frame || frame.skillId !== '铁索连环') return;

@@ -21,7 +21,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界纵适'(避开标版潜在冲突);
 //   内部 Skill.name = '纵适'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   Card,
   FrontendAPI,
   GameState,
@@ -87,14 +86,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── after-hook:拼点 atom 后,owner 可获得指定拼点牌 ──
-  registerAfterHook(state, skill.id, ownerId, '拼点', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as {
-      type: '拼点';
-      initiator: number;
-      target: number;
-      initiatorCard: string;
-      targetCard: string;
-    };
+  registerAfterHook(state, skill.id, ownerId, '拼点', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '拼点') return;
 
     // owner 须为拼点参与方

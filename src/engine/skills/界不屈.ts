@@ -29,7 +29,7 @@
 //     | localVars['不屈/存活']   | 写 | 系统规则.ts runDyingFlow(读) | ✅ 已实现 |
 //     | localVars['不屈/重复']   | 读 | 置创牌 atom(写)              | ✅ 已实现 |
 //     | player.vars['不屈/创牌'] | 读 | 置创牌 atom(写)              | ✅ 已实现 |
-import type { AtomAfterContext, GameState, Skill } from '../types';
+import type { GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 import { registerHandLimitProvider } from '../hand-limit';
@@ -56,8 +56,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '陷入濒死',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { target?: number };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;

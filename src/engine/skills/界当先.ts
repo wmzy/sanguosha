@@ -30,8 +30,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界当先'(避开标当先冲突);
 //   内部 Skill.name = '当先'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -139,8 +137,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 回合开始 after-hook:额外出牌阶段主逻辑(锁定技,自动触发) ──
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
@@ -244,8 +242,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after-hook:统计额外出牌阶段内 owner 造成的伤害 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (ctx.state.turn.vars[ACTIVE_KEY] !== true) return;
@@ -254,8 +252,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 移动牌 after-hook:无距离杀离开手牌时清除标记(仅对该张杀生效) ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { cardId?: string; from?: { zone?: string } };
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+    const atom = ctx.atom;
     const tracked = ctx.state.turn.vars[NORANGE_KILL_KEY];
     if (typeof tracked !== 'string') return;
     if (atom.cardId !== tracked) return;
@@ -272,8 +270,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段结束',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       // 已在退出中:cancel 后续所有 阶段结束
       if (ctx.state.turn.vars[EXITING_KEY] === true) {
@@ -293,8 +291,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '清过期标记',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       if (ctx.state.turn.vars[EXITING_KEY] !== true) return;
       return { kind: 'cancel' };
@@ -306,7 +304,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '下一玩家',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+    async (ctx): Promise<HookResult | void> => {
       if (ctx.state.turn.vars[EXITING_KEY] !== true) return;
       // 不带 player 检查:下一玩家 atom 没有 player 字段;仅 exiting 时 cancel
       return { kind: 'cancel' };
@@ -318,8 +316,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '回合结束',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       if (ctx.state.turn.vars[EXITING_KEY] !== true) return;
       // 清除 exiting 标志(避免影响后续正常 回合结束)

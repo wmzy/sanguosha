@@ -27,6 +27,7 @@
 //   内部 Skill.name = '恩怨'(OL 官方技能名,玩家可见)。
 import type {
   AtomAfterContext,
+  AtomOfName,
   Card,
   FrontendAPI,
   GameState,
@@ -184,7 +185,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // ── effect A: 获得牌后 hook(获得/给予/移动牌) ──
-  const gainHook = async (ctx: AtomAfterContext): Promise<void> => {
+  const gainHook = async (ctx: AtomAfterContext<AtomOfName<'获得' | '给予' | '移动牌'>>): Promise<void> => {
     // effect A 不限制回合——任何时候获得牌都触发
     const ev = extractGainEvent(ctx.atom, ownerId);
     if (!ev) return;
@@ -219,8 +220,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAfterHook(state, skill.id, ownerId, '移动牌', gainHook);
 
   // ── effect B: 受到伤害后 hook ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     if (atom.source === undefined || atom.source === ownerId) return;

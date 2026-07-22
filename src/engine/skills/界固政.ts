@@ -25,7 +25,7 @@
 //   - 「交给该角色」用 移动牌(弃牌堆→该角色手牌)实现,与标版固政一致。
 //   - 仅在仍位于弃牌堆的牌中选取(防御性:理论上不会有牌被中途移走)。
 //   - 自己不存活则不触发;目标(弃牌者)死亡仍可正常结算(牌已入弃牌堆)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -65,8 +65,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── 弃置 afterHook:累计弃牌 + 达门槛时触发 ──
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player: number; cardIds: string[] };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player === ownerId) return; // 仅其他角色
     const st = ctx.state;
     if (!st.players[ownerId]?.alive) return; // 自己须存活
@@ -187,7 +187,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 阶段结束 afterHook:清空本阶段 localVars,为下一阶段重置 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
     clearPhaseVars(ctx.state);
   });
 

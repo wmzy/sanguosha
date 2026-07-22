@@ -21,7 +21,6 @@
 //
 // 限定技:player.vars['奋威/used'](整局一次,不被 回合结束 清理)。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   Json,
@@ -155,8 +154,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '请求回应',
-    async (ctx: AtomBeforeContext): Promise<{ kind: 'cancel' } | void> => {
-      const atom = ctx.atom as { requestType?: string; cancelTarget?: number };
+    async (ctx): Promise<{ kind: 'cancel' } | void> => {
+      const atom = ctx.atom;
       if (atom.requestType !== '无懈可击') return;
 
       const cancelTarget = atom.cancelTarget;
@@ -226,12 +225,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '设横置',
-    async (ctx: AtomBeforeContext): Promise<{ kind: 'cancel' } | void> => {
+    async (ctx): Promise<{ kind: 'cancel' } | void> => {
       const st = ctx.state;
       const frame = topFrame(st);
       if (!frame || frame.skillId !== '铁索连环') return;
 
-      const atom = ctx.atom as { player?: number };
+      const atom = ctx.atom;
       if (typeof atom.player !== 'number') return;
 
       const cardId = frame.params?.cardId as string | undefined;

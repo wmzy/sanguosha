@@ -17,7 +17,6 @@
 //   - 界版不添加翻面标签,因此无需阶段跳过 before-hook(与标版放逐的主要区别)。
 //   - 清除目标已有的 '/翻面' 标签(来自据守/放逐/悲歌/刚烈等),实现"翻回正面"。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -79,8 +78,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:曹丕受伤后,选目标 + 摸 X 张 + 翻回正面 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players[ownerId];

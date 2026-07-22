@@ -15,7 +15,7 @@
 //   基本牌:type==='基本牌'(杀/闪/桃)
 //   说明:与仁王盾同 atom(检测有效性)天然互斥——cancel 后后续 hook 与 杀结算跳过。
 //        source 是其他玩家,故 respond 需为所有玩家注册(参考驱虎)。
-import type { AtomBeforeContext, FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
@@ -70,8 +70,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '检测有效性',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; source?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       const source = atom.source;
       if (source === undefined || source === ownerId) return; // 仅其他角色

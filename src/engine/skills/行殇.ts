@@ -11,7 +11,6 @@
 //     再 push 到获得者手牌;判定区牌的 pendingTricks 维护通过「移除延时锦囊」atom 完成。
 //   - FAQ:行殇是主动发动,可选择不获得(请求回应 confirm)。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -61,8 +60,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '击杀',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '击杀') return;
       const deadIdx = atom.player;
       if (deadIdx === undefined) return;

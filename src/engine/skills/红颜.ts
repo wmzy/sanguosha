@@ -12,7 +12,7 @@
 //
 // 联动:天香发动条件("弃一张红桃手牌")由天香自身检查玩家是否拥有红颜来判定
 //   黑桃手牌是否合法,不依赖本文件。本文件负责判定牌的花色转换。
-import type { AtomBeforeContext, Card, FrontendAPI, HookResult, Skill } from '../types';
+import type { Card, FrontendAPI, HookResult, Skill } from '../types';
 import { registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -34,8 +34,8 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
     skill.id,
     ownerId,
     '判定',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 仅小乔自己的判定:判定牌归小乔所有,红颜才生效
       if (atom.player !== ownerId) return;
       const topId = ctx.state.zones.deck[0];

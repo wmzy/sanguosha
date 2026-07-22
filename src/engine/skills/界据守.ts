@@ -167,7 +167,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 下一回合跳过:阶段开始(准备) before-hook ────────────
   // 检测翻面标签 → 移除标签 + 设 skipAll 标志 + cancel(不进入准备阶段)
   registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
-    const atom = ctx.atom as { type: string; player: number; phase: string };
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     const self = ctx.state.players[ownerId];
@@ -187,7 +187,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 阶段结束(准备) before-hook:skipAll 标志 → 主动推进回合 ──
   registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
-    const atom = ctx.atom as { type: string; player: number; phase: string };
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.player !== ownerId) return;
     if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;

@@ -30,8 +30,6 @@
 // 跳过阶段手法(同神速/兵粮寸断/skipPhase):applyAtom(阶段结束, 当前阶段) 推进到下一阶段,
 // 然后 cancel 当前 阶段开始 atom。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -204,7 +202,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 游戏开始初始化(化身先例):'回合开始' after-hook,首次触发加 2 枚"变" ──
-  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
     const st = ctx.state;
     if (!st.players[ownerId]?.alive) return;
     if (st.localVars[INIT_KEY(ownerId)]) return;
@@ -219,8 +217,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '阶段开始',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;
@@ -446,8 +444,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 阶段开始 after hook:结束阶段手牌数检查,符合条件 +1 "变" ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '回合结束') return; // "结束阶段" = phase '回合结束'

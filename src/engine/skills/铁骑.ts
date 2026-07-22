@@ -12,8 +12,6 @@
 // 标签生命周期:在阶段1(指定目标)产出,阶段2(询问闪)消费并清除——天然按单次杀结算。
 // 杀技能零感知铁骑:它只看处理区有没有闪牌;取消询问闪等价于目标不出闪。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -58,8 +56,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 指定目标 after:自己出杀指定目标 → 询问是否发动 → 判定 ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if (atom.target === undefined) return;
     const target = atom.target;
@@ -95,8 +93,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 判定 after:judgeType==='铁骑' → 读花色,红色 → 给目标加禁闪标签 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { judgeType?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.judgeType !== '铁骑') return;
     if (atom.player !== ownerId) return;
     const target = ctx.state.localVars[TARGET_VAR] as number | undefined;
@@ -122,8 +120,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; source?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;

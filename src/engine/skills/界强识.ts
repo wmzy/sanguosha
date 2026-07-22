@@ -22,7 +22,6 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界强识';内部 Skill.name='强识'。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -115,8 +114,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(出牌) after-hook:owner 出牌阶段开始 → 询问发动 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;
@@ -234,7 +233,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 移动牌 after-hook:owner 出牌阶段内打出同类别的牌 → 询问摸一张 ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
     const st = ctx.state;
     // 仅在 owner 自己的出牌阶段
     if (st.currentPlayerIndex !== ownerId) return;
@@ -242,11 +241,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const category = st.players[ownerId]?.vars[CATEGORY_KEY];
     if (typeof category !== 'string') return;
 
-    const atom = ctx.atom as {
-      cardId?: string;
-      from?: { zone?: string; player?: number };
-      to?: { zone?: string };
-    };
+    const atom = ctx.atom;
     if (!atom.cardId) return;
     if (atom.from?.zone !== '手牌') return;
     if (atom.from.player !== ownerId) return;
@@ -282,8 +277,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 阶段结束(出牌) after-hook:清除本阶段类别记录 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;

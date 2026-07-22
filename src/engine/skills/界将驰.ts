@@ -36,7 +36,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界将驰'(避开标版未实现的 将驰);
 //   内部 Skill.name = '将驰'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { registerSlashMaxProvider, registerSlashBlocker } from '../slash-quota';
@@ -151,8 +151,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── 阶段开始(摸牌) after-hook:标记正常开始的摸牌阶段 ──
   //   被跳过的摸牌阶段(兵粮寸断/神速/巧变/再起)在 before-hook cancel 阶段开始,
   //   本 after-hook 不执行 → 标记不设置 → 阶段结束 hook 见标记缺失 → 不触发
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; phase: string; player: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '摸牌') return;
     if (atom.player !== ownerId) return;
@@ -160,8 +160,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 阶段结束(摸牌) after-hook:核心触发,询问并执行选择 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type: string; phase: string; player: number };
+  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '摸牌') return;
     if (atom.player !== ownerId) return;

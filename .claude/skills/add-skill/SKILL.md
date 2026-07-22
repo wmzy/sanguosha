@@ -29,6 +29,8 @@ metadata:
 
 **引擎规范**:文件 `src/engine/skills/${技能名}.ts`;ownerId 是座次下标(number);状态变更通过 applyAtom;跨 atom 通信通过 localVars/turn.vars/marks(tags),不用 frame.params;before hook 返回 HookResult;在 skills/index.ts 注册。
 
+**钩子类型收窄**:`registerBeforeHook/AfterHook` 已泛型化——`atomType` 参数自动收窄 `ctx.atom` 到对应形状,无需 `ctx.atom as {…}` 强转。复用多 atomType 的 handler 需标注联合类型:`ctx: AtomBeforeContext<AtomOfName<'询问闪' | '询问杀'>>`。
+
 **通用机制(优先复用,不要自造)**:
 - 出杀次数限制/突破:读写 `state.turn.vars['杀/quota']`(详见 docs/guides/添加技能.md §1.6.1)
 - 装备技能加载/卸载:装备通用已处理,不要重复

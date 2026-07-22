@@ -15,7 +15,7 @@
 //      故用 before hook 在 apply 前快照被弃装备牌数,after hook 读取并触发。
 //   3. 获得(顺手牵羊顺装备):获得 atom,from===自己,cardId 来自装备区 → 装备→他人手牌。
 //      同理用 before hook 快照(after 时已无法判断来自手牌还是装备)。
-import type { AtomAfterContext, AtomBeforeContext, FrontendAPI, Skill, GameState } from '../types';
+import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
 
@@ -77,16 +77,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 路径 1:卸下(替换装备) ──
-  registerAfterHook(state, skill.id, ownerId, '卸下', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '卸下', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     await triggerXiaoji(ctx.state, ownerId, 1);
   });
 
   // ── 路径 2:弃置(过河拆桥拆装备 / 其他弃置装备) ──
   // before 快照:apply 前记录被弃的装备牌件数
-  registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { player?: number; cardIds?: string[] };
+  registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const myEquip = new Set(
       Object.values(ctx.state.players[ownerId].equipment).filter((id): id is string => typeof id === 'string'),
@@ -96,8 +96,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       ctx.state.localVars['枭姬/弃置loss'] = lost;
     }
   });
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     const count = ctx.state.localVars['枭姬/弃置loss'] as number | undefined;
     if (!count) return;
@@ -107,8 +107,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 路径 3:获得(顺手牵羊顺装备 / 其他获得装备) ──
   // before 快照:apply 前判断 cardId 是否来自我的装备区
-  registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx: AtomBeforeContext) => {
-    const atom = ctx.atom as { from?: number; cardId?: string };
+  registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from !== ownerId) return;
     const myEquip = new Set(
       Object.values(ctx.state.players[ownerId].equipment).filter((id): id is string => typeof id === 'string'),
@@ -117,8 +117,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       ctx.state.localVars['枭姬/获得loss'] = 1;
     }
   });
-  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { from?: number };
+  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.from !== ownerId) return;
     const count = ctx.state.localVars['枭姬/获得loss'] as number | undefined;
     if (!count) return;

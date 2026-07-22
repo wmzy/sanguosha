@@ -19,7 +19,7 @@
 //   - 描述无"可以",故为锁定触发,无询问、无次数限制。
 //   - 嵌套安全:bonus 回复体力不携带 source 字段,故 hook 内 `typeof source !== 'number'`
 //     早退条件会阻止再次触发(桃/救援加成的区分依据)。
-import type { AtomAfterContext, Skill, GameState } from '../types';
+import type { Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 
@@ -36,8 +36,8 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  registerAfterHook(state, skill.id, ownerId, '回复体力', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; source?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '回复体力', async (ctx) => {
+    const atom = ctx.atom;
     // 仅当被回复者是孙权本人(被救援)
     if (atom.target !== ownerId) return;
     // 主公技:仅孙权为主公(座次 0)时生效

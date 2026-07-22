@@ -10,7 +10,7 @@
 //   - 系统伤害(source<0,如闪电)不触发
 //   - 黑桃 = ♠
 //   - 判定牌在 frame.cards 末尾(判定 atom 自身 afterHooks 移入弃牌堆之前读取)
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -48,8 +48,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:其他群雄角色造成伤害 → 询问董卓是否判定 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; source?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '造成伤害') return;
 
     // 仅主公董卓可用
@@ -89,8 +89,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 判定 after:暴虐判定 → 黑桃 → 回复1点体力 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; judgeType?: string; player?: number };
+  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '判定') return;
     if (atom.judgeType !== '暴虐') return;
     if (atom.player !== ownerId) return;

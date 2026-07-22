@@ -10,7 +10,7 @@
 //
 // 选择:减1点体力上限(设上限) 或 减1点体力(失去体力)。
 //   体力上限最低降至 1(设上限 atom.validate 要求 amount>0)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -50,8 +50,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 结束阶段开始:检查体力并询问 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '回合结束') return; // 结束阶段 = phase '回合结束'

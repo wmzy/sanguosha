@@ -30,7 +30,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界镇军'(避开标镇军冲突);
 //   内部 Skill.name = '镇军'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   GameView,
@@ -229,8 +228,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 准备阶段 after-hook:界镇军主流程 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '准备') return;
     if (atom.player !== ownerId) return;
@@ -416,8 +415,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 回合结束阶段 after-hook:消费延迟摸牌 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '回合结束') return;
     if (atom.player !== ownerId) return;

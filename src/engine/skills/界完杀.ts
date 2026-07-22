@@ -29,7 +29,7 @@
 //   - 标版完杀的桃 cancel 沿用,行为不变。
 //
 // 命名:文件名/loader key/character skill name 均为 '界完杀';内部 Skill.name='完杀'。
-import type { AtomBeforeContext, AtomAfterContext, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
 import { registerSuppressionProvider } from '../skill-suppression';
 
@@ -90,8 +90,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '请求回应',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-        const atom = ctx.atom as { requestType?: string; target?: number };
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
         if (atom.requestType !== '桃/求桃') return; // 仅干预濒死求桃
         // 仅在贾诩回合内生效
         if (ctx.state.currentPlayerIndex !== ownerId) return;
@@ -115,10 +115,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '陷入濒死',
-      async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
+      async (ctx): Promise<HookResult | void> => {
         // 仅在贾诩回合内生效
         if (ctx.state.currentPlayerIndex !== ownerId) return;
-        const atom = ctx.atom as { target?: number };
+        const atom = ctx.atom;
         const dyingIdx = atom.target;
         if (typeof dyingIdx !== 'number') return;
         // 为"非贾诩且非濒死者"的存活玩家加 tag(若未持有)
@@ -136,14 +136,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── ③ cleanup:击杀 after-hook(目标死亡 → 濒死结束)──
   unloaders.push(
-    registerAfterHook(state, skill.id, ownerId, '击杀', async (_ctx: AtomAfterContext) => {
+    registerAfterHook(state, skill.id, ownerId, '击杀', async (_ctx) => {
       cleanupIfNoDying(state);
     }),
   );
 
   // ── ④ cleanup:回复体力 after-hook(救援成功 / 不屈救活 → 濒死结束)──
   unloaders.push(
-    registerAfterHook(state, skill.id, ownerId, '回复体力', async (_ctx: AtomAfterContext) => {
+    registerAfterHook(state, skill.id, ownerId, '回复体力', async (_ctx) => {
       cleanupIfNoDying(state);
     }),
   );

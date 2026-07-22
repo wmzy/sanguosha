@@ -8,7 +8,7 @@
 // 判定"杀/决斗":优先看 atom.cardId 对应卡牌名;无 cardId(虚拟杀等)时回退看栈顶帧 skillId。
 // 备注(规则):已被杀指定为目标后再失去手牌,不影响该杀的结算——本实现因挂在"成为目标"
 //   (结算阶段入口)天然满足:此时手牌状态即结算时状态。
-import type { AtomBeforeContext, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState } from '../types';
 import { topFrame } from '../create-engine';
 import { registerBeforeHook } from '../skill';
 
@@ -29,8 +29,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '成为目标',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       // 只有无手牌时生效
       if (ctx.state.players[ownerId]?.hand.length !== 0) return;

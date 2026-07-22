@@ -21,7 +21,7 @@
 //   | localVars['新生/choice'] | localVars   | 写/读 | 本文件      | ✅     |
 //
 // 通用机制:不涉及出杀次数/装备/横切规则。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { allCharacters } from '../cards/characters';
@@ -90,8 +90,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after-hook:ownerId 受伤 → 询问 → 抽牌 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { target?: number; amount?: number };
+  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const amount = atom.amount ?? 0;
     if (amount <= 0) return;

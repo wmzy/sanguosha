@@ -16,7 +16,7 @@
 //   - 每回合限一次:每个其他角色的弃牌阶段只有一个,自然满足。
 //   - 仅弃牌阶段弃置的牌计入("该角色弃置的牌");非弃牌阶段的弃置(制衡/寒冰剑等)被
 //     state.phase!=='弃牌' 过滤。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -42,9 +42,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── 弃置 afterHook:记录弃牌阶段弃置的牌 ──
-  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
     if (ctx.state.phase !== '弃牌') return;
-    const atom = ctx.atom as { player: number; cardIds: string[] };
+    const atom = ctx.atom;
     const key = discardKey(atom.player);
     const existing = ctx.state.localVars[key] as string[] | undefined;
     ctx.state.localVars[key] = [...(existing ?? []), ...atom.cardIds];
@@ -56,8 +56,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '阶段结束',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { player: number; phase: string };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.phase !== '弃牌') return;
       const player = atom.player;
       // 仅对其他角色

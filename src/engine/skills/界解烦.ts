@@ -27,7 +27,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界解烦'(避开标版冲突);
 //   内部 Skill.name = '解烦'(OL 官方技能名,玩家可见)。
 import type {
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   Json,
@@ -238,8 +237,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       skill.id,
       ownerId,
       '回合结束',
-      async (ctx: AtomBeforeContext): Promise<void> => {
-        const atom = ctx.atom as { type?: string; player?: number };
+      async (ctx): Promise<void> => {
+        const atom = ctx.atom;
         if (atom.type !== '回合结束') return;
         if (atom.player !== ownerId) return;
         if (ctx.state.turn.vars[RESET_ON_END_VAR] !== ownerId) return;

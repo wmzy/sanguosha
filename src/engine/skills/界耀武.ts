@@ -22,7 +22,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界耀武'(避开标耀武冲突);
 //   内部 Skill.name = '耀武'(OL 官方技能名,玩家可见)。
-import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook, type SkillModule } from '../skill';
 
@@ -47,13 +47,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as {
-        target?: number;
-        amount?: number;
-        source?: number;
-        cardId?: string;
-      };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
 

@@ -17,7 +17,7 @@
 //     4. 添加技能(player=owner, skillId='观星')
 //   觉醒标记:player.vars['志继/awakened'](后缀不含 usedThisTurn,不被「回合结束」清理)
 //   防重入:AWAKENED_KEY 在 awaken() 入口即设,准备阶段触发后即使结束阶段无手牌也不会再触发。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -110,8 +110,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 准备阶段 / 结束阶段 after-hook:界志继主逻辑(界姜维在这两个时机均可触发)──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     // 官方:"准备阶段或结束阶段" —— 两个时机均可触发。引擎中"结束阶段"=phase='回合结束'。
     if (atom.phase !== '准备' && atom.phase !== '回合结束') return;

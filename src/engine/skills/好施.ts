@@ -10,8 +10,6 @@
 //     询问鲁肃选择 floor(handCount/2) 张牌给予该角色(给予 atom)。
 //   - 每回合限一次:好施/usedThisTurn 防重入,由「回合结束」atom 自动清空。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameView,
   GameState,
@@ -89,8 +87,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '摸牌',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { player?: number; count?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉等其他摸牌)
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;
@@ -131,8 +129,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '摸牌',
-    async (ctx: AtomAfterContext): Promise<void> => {
-      const atom = ctx.atom as { player?: number };
+    async (ctx): Promise<void> => {
+      const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       if (!ctx.state.localVars[ACTIVE_KEY]) return;
       delete ctx.state.localVars[ACTIVE_KEY];

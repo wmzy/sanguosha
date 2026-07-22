@@ -13,7 +13,7 @@
 //   契约:无 localVars/vars(纯锁定技)。造成伤害的 cardId 指向南蛮入侵牌(结算期间仍在处理区)。
 //   说明:不修改 南蛮入侵.ts——用 hook 解耦,且不破坏现有测试。A 与 B 在同一 造成伤害 hook 中
 //        分支处理(target=孟获→cancel;否则→modify source)。
-import type { AtomBeforeContext, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { topFrame } from '../create-engine';
 import { registerBeforeHook } from '../skill';
 
@@ -36,8 +36,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '询问杀',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       // 仅南蛮入侵结算中(决斗等也用 询问杀,需区分)
       if (topFrame(ctx.state)?.skillId !== '南蛮入侵') return;
@@ -51,13 +51,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        target?: number;
-        source?: number;
-        cardId?: string;
-        amount?: number;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (!atom.cardId) return;
       if (ctx.state.cardMap[atom.cardId]?.name !== '南蛮入侵') return;
 

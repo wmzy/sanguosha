@@ -30,8 +30,8 @@
 //   内部 Skill.name = '潜袭'(OL 官方技能名,玩家可见)。
 import type {
   ActionPrompt,
-  AtomAfterContext,
   AtomBeforeContext,
+  AtomOfName,
   Card,
   FrontendAPI,
   GameState,
@@ -155,8 +155,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(准备) after-hook:潜袭主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '准备') return;
@@ -268,11 +268,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '请求回应',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        target?: number;
-        prompt?: ActionPrompt;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       const target = atom.target;
       if (typeof target !== 'number' || target < 0) return;
       if (target === ownerId) return; // owner 自己不受禁色影响
@@ -326,9 +323,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── 禁色 before-hook:询问闪 / 询问杀(目标手中无非禁色所需牌时 cancel) ──
   const askHandler = (cardName: string) => async (
-    ctx: AtomBeforeContext,
+    ctx: AtomBeforeContext<AtomOfName<'询问闪' | '询问杀'>>,
   ): Promise<HookResult | void> => {
-    const atom = ctx.atom as { target?: number };
+    const atom = ctx.atom;
     const target = atom.target;
     if (typeof target !== 'number') return;
     if (target === ownerId) return;
@@ -350,13 +347,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as {
-        source?: number;
-        target?: number;
-        amount?: number;
-        cardId?: string;
-      };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
       const cardId = atom.cardId;
@@ -374,8 +366,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── 回合结束 after-hook:清所有玩家的界潜袭禁色标签 ──
   //    仅 owner 自己的回合结束触发(禁色标签绑本回合,潜袭在 owner 回合准备阶段加)。
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { player?: number };
+  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     for (const p of ctx.state.players) {
       for (const tag of ALL_TAGS) {

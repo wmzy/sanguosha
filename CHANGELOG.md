@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-07-22
 
+### Changed — hook 注册表泛型化:atomType→ctx.atom 类型收窄
+
+`registerBeforeHook` / `registerAfterHook` 此前用 `atomType: string` + `ctx.atom: Atom`(全联合),技能层无法获得类型收窄,导致 397 处 `ctx.atom as { target?: number; … }` 手动强转。现已建立 `atomType → atom 形状` 的泛型关联:register 函数泛型化为 `registerAfterHook<T extends AtomName>`,context 泛型化为 `AtomAfterContext<A extends Atom = Atom>`,通过 `AtomOfName<T>` 映射把类型名转为对应 atom 形状,handler 的 `ctx.atom` 自动收窄。
+
+#### Changed
+- **类型基础设施**:新增 `AtomName`（Atom 联合的 type 字面量集）和 `AtomOfName<T>`（类型名→atom 形状映射）到 `src/engine/types/atom.ts`。`AtomBeforeContext` / `AtomAfterContext` 泛型参数从类型名改为 atom 形状（默认 `Atom`，向后兼容）。
+- **register 函数泛型化**:`registerBeforeHook` / `registerAfterHook` / `registerJudgeModifier` 签名泛型化,handler 参数由 `AtomOfName<T>` 收窄;存储层集中在 register 内部擦除为宽类型（运行时按 atomType 分发保证安全）。(`src/engine/skill.ts`)
+- **消除 397 处强转**:全量删除 skills 目录的 `ctx.atom as {…}` 强转。修正 5 处 ZoneLoc 可选链导致的类型遮蔽（`atom.from?.player` → `atom.from.zone !== '手牌'` 判别后安全访问）。(`src/engine/skills/*.ts`)
+- **文档更新**:`ENGINE-DESIGN.md` 和 `添加技能.md` 示例代码更新为无强转模式。
+
 ### Fixed — 无懈可击全员不回应仍等待超时
 
 广播型无懈可击询问窗口中,玩家点击「不回应」时前端仅做了本地标记(`markBroadcastSkipped`),**未向服务端发送 `skip` action**。导致服务端 `skippedPlayers` 集合永远填不满,全员选择不回应后仍需等待 10 秒超时才结束窗口。服务端的 skip 累计 + 全员提前触发逻辑(`dispatch` skip handler)早已就绪并经测试覆盖,问题纯在前端漏发。

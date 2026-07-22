@@ -16,7 +16,6 @@
 //               若目标==自己 → 弃一张手牌(useCard)
 //        不确认 → 移动牌(弃牌堆→牌堆顶)
 import type {
-  AtomAfterContext,
   FrontendAPI,
   GameState,
   Json,
@@ -99,8 +98,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(回合结束 = 结束阶段) after-hook:飘零主流程 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { type?: string; player?: number; phase?: string };
+  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '回合结束') return; // 结束阶段 = engine phase '回合结束'

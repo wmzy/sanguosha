@@ -39,8 +39,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界陷阵'(避开标版潜在冲突);
 //   内部 Skill.name = '陷阵'(OL 官方技能名,玩家可见)。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   Card,
   FrontendAPI,
   GameState,
@@ -289,8 +287,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '指定目标',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const winTarget = ctx.state.turn.vars[WIN_VAR];
       if (typeof winTarget !== 'number') return;
@@ -317,8 +315,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '造成伤害',
-    async (ctx: AtomAfterContext) => {
-      const atom = ctx.atom as { source?: number; target?: number };
+    async (ctx) => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const winTarget = ctx.state.turn.vars[WIN_VAR];
       if (typeof winTarget !== 'number') return;
@@ -338,8 +336,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '成为目标',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const lostTarget = ctx.state.turn.vars[LOST_VAR];
       if (typeof lostTarget !== 'number') return;

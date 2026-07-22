@@ -38,8 +38,6 @@
 // 目标自选弃牌:官方 FAQ 与标版鞬出同理——目标决定弃基本牌(此杀不命中且目标获得杀)
 //   还是非基本牌(强制命中且本回合+1 杀次数)。界庞德仅决定是否发动。
 import type {
-  AtomAfterContext,
-  AtomBeforeContext,
   FrontendAPI,
   GameState,
   HookResult,
@@ -204,8 +202,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   }
 
   // ── 指定目标 after:自己出杀指定目标 → 询问是否发动 → 目标选牌弃置 ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx: AtomAfterContext) => {
-    const atom = ctx.atom as { source?: number; target?: number; cardId?: string };
+  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+    const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if (atom.target === undefined) return;
     const target = atom.target;
@@ -248,8 +246,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '成为目标',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;
@@ -261,10 +259,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 移动牌 after:杀牌被收尾移入弃牌堆时,转给获得杀的目标(延迟拿取)──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx: AtomAfterContext) => {
+  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
     const gainMap = ctx.state.localVars[GAIN] as Record<number, string> | undefined;
     if (!gainMap) return;
-    const atom = ctx.atom as { cardId?: string; to?: { zone?: string } };
+    const atom = ctx.atom;
     if (atom.to?.zone !== '弃牌堆') return;
     // 找到等着获得此杀牌的目标
     const targetEntry = Object.entries(gainMap).find(([, cid]) => cid === atom.cardId);
@@ -288,8 +286,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     '询问闪',
-    async (ctx: AtomBeforeContext): Promise<HookResult | void> => {
-      const atom = ctx.atom as { source?: number; target?: number };
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       const target = atom.target;
       if (target === undefined) return;
