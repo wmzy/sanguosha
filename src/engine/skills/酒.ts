@@ -4,8 +4,9 @@
 //
 // 方法Ⅱ的增伤效果通过 before hook(造成伤害)消费 mark 实现。
 import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook, validateUseCard } from '../skill';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '酒', description: '出牌阶段对自己使用,本回合下一张杀的伤害+1' };
@@ -28,27 +29,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       );
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
-      await pushFrame(state, '酒', from, { ...params });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      await applyAtom(state, {
-        type: '加标记',
-        player: from,
-        mark: { id: '酒/nextKillDamageBonus', scope: -1, payload: 1, duration: 'turn' },
-      });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-      await popFrame(state);
+      // 结算逻辑委托 runUseFlow → CardEffect['酒'].resolve
+      await runUseFlow(state, ownerId, cardId, [], '酒');
     },
   );
 
