@@ -410,6 +410,8 @@ export const skillLoaders: Record<string, Loader> = {
   界禁酒: load(() => import('./界禁酒')),
   // 使用牌:统一的卡牌使用入口技能(配合 CardEffect 注册表路由)
   使用牌: load(() => import('../card-effect/use-card')),
+  // 打出牌:统一的卡牌打出入口技能(无目标选择/无效果结算,仅声明+置入处理区)
+  打出牌: load(() => import('../card-effect/play-card')),
 };
 
 // 设置解析器(打破循环依赖:技能文件 import skill.ts → skill.ts 通过 resolver 查表)
