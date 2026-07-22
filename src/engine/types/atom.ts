@@ -109,6 +109,14 @@ export type Atom =
   // 目标
   | { type: '指定目标'; source: number; cardId?: string; target: number }
   | { type: '成为目标'; source: number; cardId?: string; target: number }
+  // 使用结算前时机(文档 use.md):事件标记型,apply 无副作用,只提供 hook 注册点
+  | { type: '选择目标时'; source: number; cardId: string; targets: number[] }
+  | { type: '使用时'; source: number; cardId: string }
+  | { type: '指定目标后'; source: number; cardId?: string; target: number }
+  | { type: '成为目标后'; source: number; cardId?: string; target: number }
+  // 打出结算时机(文档 play.md):事件标记型,apply 无副作用,只提供 hook 注册点
+  | { type: '声明打出时'; player: number; cardId: string }
+  | { type: '打出牌时'; player: number; cardId: string }
   // 判定
   | { type: '添加延时锦囊'; player: number; trick: PendingTrick }
   | { type: '移除延时锦囊'; player: number; trickName: string }
