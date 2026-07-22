@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import { findActionEntry } from '../../src/engine/skill';
+import { applyAtom } from '../../src/engine/create-engine';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -32,9 +33,12 @@ function makePlayer(opts: {
   index: number;
   name: string;
   hand?: string[];
+  equipment?: PlayerState['equipment'];
   skills?: string[];
   health?: number;
   maxHealth?: number;
+  identity?: PlayerState['identity'];
+  faction?: PlayerState['faction'];
 }): PlayerState {
   return {
     index: opts.index,
@@ -44,13 +48,15 @@ function makePlayer(opts: {
     maxHealth: opts.maxHealth ?? 4,
     alive: true,
     hand: opts.hand ?? [],
-    equipment: {},
+    equipment: opts.equipment ?? {},
     skills: opts.skills ?? [],
     vars: {},
     marks: [],
     pendingTricks: [],
     tags: [],
     judgeZone: [],
+    identity: opts.identity,
+    faction: opts.faction,
   };
 }
 
@@ -391,5 +397,222 @@ describe('系统规则', () => {
     // 合法的 cardIds 仍应通过
     const ok = entry.validate(harness.state, { cardIds: ['c1'] });
     expect(ok).toBeNull();
+  });
+
+  // ─── 死亡奖惩:杀死反贼摸 3 张 ──────────────────────────────
+
+  it('死亡奖惩:杀死反贼 → 击杀者摸3张', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const d1 = makeCard('d1', '杀', '♠', '2');
+    const d2 = makeCard('d2', '闪', '♥', '3');
+    const d3 = makeCard('d3', '桃', '♦', '4');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'], identity: '主公', faction: '蜀' }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 1, identity: '反贼', faction: '群' }),
+      ],
+      cardMap: { k1: slash, d1, d2, d3 },
+      zones: { deck: ['d1', 'd2', 'd3'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass(); // 不出闪 → HP=0 → 濒死
+
+    // 求桃循环:无人救
+    await P1.pass();
+    await P0.pass();
+
+    // P1(反贼)死亡
+    expect(harness.state.players[1].alive).toBe(false);
+    // P0(击杀者)摸3张奖励(牌堆顶倒序:d3 先)
+    expect(harness.state.players[0].hand).toEqual(['d3', 'd2', 'd1']);
+    restoreAutoCompare();
+  });
+
+  // ─── 死亡奖惩:任何身份杀反贼都摸3张 ────────────────────────
+
+  it('死亡奖惩:反贼杀死反贼 → 击杀者(反贼)也摸3张', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const d1 = makeCard('d1', '杀', '♠', '2');
+    const d2 = makeCard('d2', '闪', '♥', '3');
+    const d3 = makeCard('d3', '桃', '♦', '4');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'], identity: '反贼', faction: '群' }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 1, identity: '反贼', faction: '群' }),
+      ],
+      cardMap: { k1: slash, d1, d2, d3 },
+      zones: { deck: ['d1', 'd2', 'd3'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass();
+    await P1.pass();
+    await P0.pass();
+
+    expect(harness.state.players[1].alive).toBe(false);
+    expect(harness.state.players[0].hand).toEqual(['d3', 'd2', 'd1']);
+    restoreAutoCompare();
+  });
+
+  // ─── 死亡奖惩:主公杀忠臣弃所有牌 ───────────────────────────
+
+  it('死亡奖惩:主公杀死忠臣 → 主公弃所有牌(手牌+装备)', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const keep = makeCard('h1', '闪', '♥', '5');
+    const weapon = makeCard('w1', '普通武器', '♣', 'A', '装备牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['k1', 'h1'],
+          skills: ['杀'],
+          equipment: { 武器: 'w1' },
+          identity: '主公',
+          faction: '蜀',
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 1, identity: '忠臣', faction: '蜀' }),
+      ],
+      cardMap: { k1: slash, h1: keep, w1: weapon },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass();
+    await P1.pass();
+    await P0.pass();
+
+    // P1(忠臣)死亡
+    expect(harness.state.players[1].alive).toBe(false);
+    // 主公弃所有牌:手牌 h1 + 装备 w1
+    expect(harness.state.players[0].hand).toEqual([]);
+    expect(harness.state.players[0].equipment).toEqual({});
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['h1', 'w1']));
+    restoreAutoCompare();
+  });
+
+  // ─── 死亡奖惩:非主公杀忠臣不弃牌 ───────────────────────────
+
+  it('死亡奖惩:反贼杀死忠臣 → 无惩罚(非主公杀忠臣)', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const keep = makeCard('h1', '闪', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1', 'h1'], skills: ['杀'], identity: '反贼', faction: '群' }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 1, identity: '忠臣', faction: '蜀' }),
+      ],
+      cardMap: { k1: slash, h1: keep },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass();
+    await P1.pass();
+    await P0.pass();
+
+    expect(harness.state.players[1].alive).toBe(false);
+    // 非主公杀忠臣:无惩罚,h1 保留
+    expect(harness.state.players[0].hand).toEqual(['h1']);
+    restoreAutoCompare();
+  });
+
+  // ─── 死亡奖惩:体力致死无来源 → 无奖励 ──────────────────────
+
+  it('死亡奖惩:失去体力致死反贼 → 无奖励(无伤害来源)', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const hand = makeCard('h1', '杀', '♠', '2');
+    const d1 = makeCard('d1', '闪', '♥', '3');
+    const d2 = makeCard('d2', '桃', '♦', '4');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['h1'], skills: [], identity: '主公', faction: '蜀' }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 1, identity: '反贼', faction: '群' }),
+      ],
+      cardMap: { h1: hand, d1, d2 },
+      zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    // P1 失去体力致死(无来源,如苦肉等体力扣除)
+    void applyAtom(harness.state, { type: '失去体力', target: 1, amount: 1 });
+    await harness.waitForStable();
+
+    // 求桃循环:无人救
+    await P1.pass();
+    await P0.pass();
+
+    expect(harness.state.players[1].alive).toBe(false);
+    // 无奖励:P0 手牌不变,牌堆未动
+    expect(harness.state.players[0].hand).toEqual(['h1']);
+    expect(harness.state.zones.deck.length).toBe(2);
+    restoreAutoCompare();
+  });
+
+  // ─── 死亡奖惩:杀死内奸/主公无奖励 ──────────────────────────
+
+  it('死亡奖惩:杀死内奸 → 无奖励(仅反贼死亡摸牌)', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const keep = makeCard('h1', '闪', '♥', '5');
+    const d1 = makeCard('d1', '杀', '♠', '2');
+    const d2 = makeCard('d2', '闪', '♥', '3');
+    const d3 = makeCard('d3', '桃', '♦', '4');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1', 'h1'], skills: ['杀'], identity: '主公', faction: '蜀' }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 1, identity: '内奸', faction: '群' }),
+      ],
+      cardMap: { k1: slash, h1: keep, d1, d2, d3 },
+      zones: { deck: ['d1', 'd2', 'd3'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass();
+    await P1.pass();
+    await P0.pass();
+
+    expect(harness.state.players[1].alive).toBe(false);
+    // 内奸死亡无奖励:P0 仅剩 h1(未摸牌)
+    expect(harness.state.players[0].hand).toEqual(['h1']);
+    expect(harness.state.zones.deck.length).toBe(3);
+    restoreAutoCompare();
   });
 });

@@ -179,10 +179,12 @@ export function onInit(_skill: Skill, state: GameState): () => void {
 
   // ── 造成伤害 after hook:濒死检查(最后执行,确保遗计等技能先触发) ──
   registerAfterHook(state, '系统规则', -1, '造成伤害', async (ctx) => {
-    const atom = ctx.atom as { target?: number };
+    const atom = ctx.atom as { target?: number; source?: number };
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];
     if (target && target.alive && target.health <= 0) {
+      // 记录致死来源供死亡奖惩使用(伤害致死才有来源)
+      ctx.state.localVars['死亡/killer'] = atom.source;
       await runDyingFlow(ctx.state, atom.target);
     }
   });
@@ -193,7 +195,35 @@ export function onInit(_skill: Skill, state: GameState): () => void {
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];
     if (target && target.alive && target.health <= 0) {
+      // 体力致死无来源——清除可能残留的来源记录
+      delete ctx.state.localVars['死亡/killer'];
       await runDyingFlow(ctx.state, atom.target);
+    }
+  });
+
+  // ── 击杀 after hook:死亡奖惩(杀死反贼→摸3张,主公杀忠臣→弃所有牌) ──
+  // 来源由 造成伤害 after hook 记入 localVars;体力致死无来源→无奖惩。
+  registerAfterHook(state, '系统规则', -1, '击杀', async (ctx) => {
+    const deadIdx = (ctx.atom as { player?: number }).player;
+    if (typeof deadIdx !== 'number') return;
+    const dead = ctx.state.players[deadIdx];
+    const killer = ctx.state.localVars['死亡/killer'] as number | undefined;
+    delete ctx.state.localVars['死亡/killer'];
+    if (killer === undefined) return; // 体力致死等无来源——无奖惩
+    if (killer === deadIdx) return; // 自杀——无奖惩
+    const killerPlayer = ctx.state.players[killer];
+    if (!killerPlayer?.alive) return; // 凶手已亡——无奖惩
+
+    if (dead.identity === '反贼') {
+      await applyAtom(ctx.state, { type: '摸牌', player: killer, count: 3 });
+    } else if (dead.identity === '忠臣' && killerPlayer.identity === '主公') {
+      const allCards = [
+        ...killerPlayer.hand,
+        ...(Object.values(killerPlayer.equipment).filter(Boolean) as string[]),
+      ];
+      if (allCards.length > 0) {
+        await applyAtom(ctx.state, { type: '弃置', player: killer, cardIds: allCards });
+      }
     }
   });
 
