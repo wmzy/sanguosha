@@ -140,6 +140,11 @@ export type Atom =
   | { type: '判定'; player: number; judgeType: string }
   // 使用结算时机(通用:杀/锦囊等)
   | { type: '检测有效性'; source: number; target: number; cardId: string }
+  // 使用结算中时机(use.md):生效前(闪 hook)/生效时(谦逊)/生效后(resolve)/使用结算结束时
+  | { type: '生效前'; source: number; target: number; cardId: string }
+  | { type: '生效时'; source: number; target: number; cardId: string }
+  | { type: '生效后'; source: number; target: number; cardId: string }
+  | { type: '使用结算结束时'; source: number; target: number; cardId: string }
   | { type: '被抵消'; source: number; target: number; cardId: string }
   // 等待回应
   | { type: '询问闪'; target: number; source: number }

@@ -1,24 +1,23 @@
 // 杀 CardEffect — 基本牌·杀的使用结算。
 //
-// 将杀的单目标结算逻辑从 skills/杀.ts 的 execute 内联代码提取为 CardEffect.resolve。
-// 解耦无双/肉林：通过 PostDodgeAskHook 机制，杀不再直接 import 无双/肉林。
+// 作用效果（use.md 生效后）：对目标角色造成 1 点伤害。
 //
-// resolve 职责（runUseFlow 在逐目标循环中调用）：
-//   询问闪 → postDodgeAskHooks(无双/肉林消耗闪并追加第二轮) → 检查处理区 → 被抵消/伤害
+// 闪的抵消逻辑不在杀的 resolve 中——由闪 skill 在「生效前」时机挂 before-hook 驱动：
+//   询问闪 → PostDodgeAskHooks(无双①/肉林① 追加第二次) → 被抵消 → cancel 生效前 → 跳过 生效后。
+//   详见 skills/闪.ts 的 生效前 before-hook。
 //
 // onSettle 职责（runUseFlow 在结算完成后、popFrame 前调用）：
 //   出杀次数累加（slash-quota）+ 回合用量 view 同步。
 
 import type { Card } from '../types';
 import type { ActionPrompt, GameView } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
 import { canSlash, incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 import {
   registerCardEffect,
-  runPostDodgeAskHooks,
   type CardEffect,
   type ResolveCtx,
 } from '../card-effect/registry';
@@ -41,55 +40,18 @@ function canUseSlash(
   return canSlash(state, ownerId, cardId) ? null : '出杀次数已达上限';
 }
 
-/** 杀的单目标结算（询问闪 → 双闪hook → 检查处理区 → 被抵消/伤害） */
+/** 杀的生效后效果：对目标角色造成 1 点伤害 */
 async function resolveSlash(ctx: ResolveCtx): Promise<void> {
   const { state, source, target, cardId } = ctx;
   const damageType = state.cardMap[cardId]?.damageType;
-
-  // 生效前：询问闪（等待目标回应；八卦阵判红放虚拟闪后 cancel 由 before-hook 处理）
-  await applyAtom(state, { type: '询问闪', target, source });
-
-  // 无双/肉林：消耗已有闪并追加第二次询问（通过 PostDodgeAskHook 解耦）
-  await runPostDodgeAskHooks(state, source, target);
-
-  // 检查处理区：有没有闪牌（目标出闪 / 八卦阵虚拟闪）
-  const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-  if (dodgeIds.length > 0) {
-    // 被抵消：触发武器技（贯石斧强命 / 青龙追杀）
-    await applyAtom(state, { type: '被抵消', source, target, cardId });
-    const remaining = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (remaining.length > 0) {
-      // 仍被抵消：drain 所有闪
-      for (const dodgeCardId of remaining) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dodgeCardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    } else {
-      // 武器技逆转（贯石斧强命 / 青龙追杀命中）：处理区无闪 → 造成伤害
-      await applyAtom(state, {
-        type: '造成伤害',
-        target,
-        amount: 1,
-        source,
-        cardId,
-        damageType,
-      });
-    }
-  } else {
-    // 没闪：造成伤害
-    await applyAtom(state, {
-      type: '造成伤害',
-      target,
-      amount: 1,
-      source,
-      cardId,
-      damageType,
-    });
-  }
+  await applyAtom(state, {
+    type: '造成伤害',
+    target,
+    amount: 1,
+    source,
+    cardId,
+    damageType,
+  });
 }
 
 /** 杀的结算后回调：出杀次数累加 + view 同步 */

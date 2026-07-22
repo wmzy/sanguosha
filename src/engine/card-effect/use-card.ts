@@ -5,9 +5,10 @@
 //     选择目标时 → 置入处理区 → 使用时
 //     → 逐目标：指定目标
 //   使用结算中（逐目标完整结算）：
-//     成为目标 → 指定目标后 → 成为目标后 → 检测有效性 → [cardEffect.resolve]
+//     逐目标：成为目标 → 指定目标后 → 成为目标后
+//       → 检测有效性 → 生效前 → 生效时 → 生效后[effect.resolve] → 使用结算结束时
 //   使用结算后：
-//     移出处理区
+//     移出处理区 → onSettle
 //
 // 本技能注册 use action，validate 查 CardEffect 注册表做合法性检测，
 // execute 调 runUseFlow 编排完整流程。
@@ -20,7 +21,7 @@ import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
 import { registerAction } from '../skill';
 import { validateCardUse } from './validate';
 import { getCardEffect, requireCardEffect } from './registry';
-import type { ResolveCtx } from './registry';
+import type { CardEffect, ResolveCtx } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -29,6 +30,42 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: '使用牌',
     description: '统一的卡牌使用入口',
   };
+}
+
+/**
+ * 使用结算中：逐目标执行 5 个时机 atom（use.md 使用结算中）。
+ *
+ *   检测有效性 → 生效前 → 生效时 → 生效后[resolve] → 使用结算结束时
+ *
+ * - 检测有效性 / 生效前 返回 false（before-hook cancel）时跳过后续时机。
+ * - 生效后 时机 atom 之后调用 CardEffect.resolve——即牌的实际效果。
+ *   杀: 造成伤害; 桃: 回复体力; 锦囊: 各自效果。
+ */
+async function runSettlementPhase(
+  state: GameState,
+  effect: CardEffect,
+  source: number,
+  target: number,
+  cardId: string,
+  targetIndex: number,
+): Promise<void> {
+  // (1) 使用结算开始时：检测有效性（仁王器/享乐 before-hook 可 cancel → 跳过）
+  const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
+  if (!valid) return;
+
+  // (2) 生效前：可以对此牌进行响应（闪 hook 询间出闪；无双①/肉林① 追加询间）
+  const notCancelled = await applyAtom(state, { type: '生效前', source, target, cardId });
+  if (!notCancelled) return; // 被抵消，跳过 生效时/生效后
+
+  // (3) 生效时：若此牌未被抵消，确定将会生效（谦逊等）
+  await applyAtom(state, { type: '生效时', source, target, cardId });
+
+  // (4) 生效后：执行此牌的效果
+  await applyAtom(state, { type: '生效后', source, target, cardId });
+  await effect.resolve({ state, source, target, cardId, targetIndex });
+
+  // (5) 使用结算结束时
+  await applyAtom(state, { type: '使用结算结束时', source, target, cardId });
 }
 
 /**
@@ -80,10 +117,9 @@ export async function runUseFlow(
     }
 
     // ── 使用结算中：逐目标完整结算 ──
-    // 无目标牌（无中生有/酒等 target.kind='none'/'self'）：resolve 一次，target=source
+    // 无目标牌（无中生有/酒等 target.kind='none'/'self'）：以 source 为目标走结算阶段
     if (targets.length === 0) {
-      const ctx: ResolveCtx = { state, source, target: source, cardId, targetIndex: 0 };
-      await effect.resolve(ctx);
+      await runSettlementPhase(state, effect, source, source, cardId, 0);
     }
 
     for (let i = 0; i < targets.length; i++) {
@@ -107,18 +143,8 @@ export async function runUseFlow(
       // 时机6：成为目标后（贞烈/啖酪/无双②/肉林② after-hook）
       await applyAtom(state, { type: '成为目标后', source, target, cardId });
 
-      // 使用结算开始时：检测有效性（仁王盾/享乐 before-hook 可 cancel → false = 跳过）
-      const valid = await applyAtom(state, {
-        type: '检测有效性',
-        source,
-        target,
-        cardId,
-      });
-      if (!valid) continue;
-
-      // 生效前响应 + 生效后效果（cardEffect.resolve）
-      const ctx: ResolveCtx = { state, source, target, cardId, targetIndex: i };
-      await effect.resolve(ctx);
+      // 使用结算中：检测有效性 → 生效前 → 生效时 → 生效后 → 使用结算结束时
+      await runSettlementPhase(state, effect, source, target, cardId, i);
     }
 
     // ── 使用结算后：移出处理区 ──

@@ -1,9 +1,10 @@
 // 系统规则(系统级):注册引擎级 after hooks——判定清理、技能生命周期、濒死流程。
 // 这些是三国杀全局规则,不是单个技能职责,通过 after hooks 统一处理。
 // applyAtom 只管通用管线(before → validate → apply → emit → after hooks → pending)。
-import type { Card, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance } from '../skill';
+import type { Card, GameState, HookResult, Json, Skill } from '../types';
+import { applyAtom, frameCards } from '../create-engine';
+import { registerAction, registerAfterHook, registerBeforeHook, instantiateSkill, unloadSkillInstance } from '../skill';
+import { runPostDodgeAskHooks } from '../card-effect/registry';
 import { DEFAULT_SKILLS } from '../atoms/选将';
 import { skillLoaders } from './index';
 
@@ -175,6 +176,65 @@ export function onInit(_skill: Skill, state: GameState): () => void {
         await applyAtom(ctx.state, { type: '移除技能', player: atom.player, skillId: card.name });
       }
     }
+  });
+
+  // ── 生效前 before hook:闪抵消杀(基础规则,适用于所有玩家) ──
+  // 闪是基本牌,任何玩家成为杀的目标时都可在「生效前」使用闪。
+  // 此 hook 不依赖玩家是否拥有 '闪' 技能——闪是牌面能力,非角色技能。
+  // 闪 skill 仅为拥有该技能的玩家注册 respond action;此 hook 为所有目标全局注册。
+  //
+  // 流程(use.md 使用结算中 时机2「生效前:可以对此牌进行响应」):
+  //   询问闪 → PostDodgeAskHooks(无双①/肉林① 追加第二次) → 检查处理区
+  //   → 若有闪: 被抵消 atom(武器技介入) → 重检 → 仍被抵消则 cancel 生效前(跳过伤害)
+  //   → 若无闪: 不 cancel,继续到 生效后(杀造成伤害)
+  registerBeforeHook(state, '系统规则', -1, '生效前', async (ctx): Promise<HookResult | void> => {
+    const atom = ctx.atom as { target: number; cardId: string; source: number };
+    if (typeof atom.target !== 'number') return;
+    const card = ctx.state.cardMap[atom.cardId];
+    if (!card || card.name !== '杀') return;
+    const target = ctx.state.players[atom.target];
+    if (!target?.alive) return;
+
+    const source = atom.source;
+
+    // 询问闪:等待目标回应(出闪/超时)
+    await applyAtom(ctx.state, { type: '询问闪', target: atom.target, source });
+
+    // 无双①/肉林①:消耗已有闪并追加第二次询间(PostDodgeAskHook 机制)
+    await runPostDodgeAskHooks(ctx.state, source, atom.target);
+
+    // 检查处理区:有没有闪牌(目标出闪 / 八卦阵虚拟闪)
+    const dodgeIds = frameCards(ctx.state).filter(
+      (id) => ctx.state.cardMap[id]?.name === '闪',
+    );
+    if (dodgeIds.length === 0) return; // 无闪:不 cancel,继续到 生效后(伤害)
+
+    // 被抵消:触发武器技(贯石斧强命 / 青龙追杀)
+    await applyAtom(ctx.state, {
+      type: '被抵消',
+      source,
+      target: atom.target,
+      cardId: atom.cardId,
+    });
+
+    // 武器技后重检处理区(贯石斧可能弃牌移走闪)
+    const remaining = frameCards(ctx.state).filter(
+      (id) => ctx.state.cardMap[id]?.name === '闪',
+    );
+    if (remaining.length > 0) {
+      // 仍被抵消:drain 所有闪
+      for (const dodgeCardId of remaining) {
+        await applyAtom(ctx.state, {
+          type: '移动牌',
+          cardId: dodgeCardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
+      }
+      // cancel 生效前 → 跳过 生效时/生效后(伤害)
+      return { kind: 'cancel' };
+    }
+    // 武器技逆转(贯石斧强命):处理区无闪 → 不抵消,继续到 生效后(伤害)
   });
 
   // ── 造成伤害 after hook:濒死检查(最后执行,确保遗计等技能先触发) ──
