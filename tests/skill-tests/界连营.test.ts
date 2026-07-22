@@ -365,9 +365,11 @@ describe('界连营', () => {
 
     // 界谦逊把整手牌移出游戏(直接调用 atom,模拟谦逊确认后的效果)
     void applyAtom(harness.state, {
-      type: '移出游戏',
-      player: 0,
+      type: '移出至暂存区',
+      source: 0,
+      target: 0,
       cardIds: ['c1', 'c2', 'c3'],
+      varsKey: '界谦逊/移出',
     });
     await harness.waitForStable();
 

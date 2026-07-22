@@ -24,6 +24,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '巨象',
     description: '锁定技:南蛮入侵对你无效;其他角色使用的南蛮入侵结算后进入弃牌堆时,你获得它',
+    isLocked: true,
   };
 }
 

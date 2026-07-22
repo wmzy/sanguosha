@@ -252,6 +252,50 @@ describe('界铁骑', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 
+  // ─── 锁定技不受压制:目标的锁定技(界毅重)在非锁定技失效下仍生效 ──
+  // 防守 isLocked 契约:isHookSuppressed 对 isLocked=true 的技能返回 false。
+  // 界毅重①是锁定技(检测有效性 before-hook:来源体力≥自己→黑杀无效)。
+  // 若 isLocked 缺失,界铁骑压制会误吞界毅重→杀命中;修复后→杀被无效。
+  it('锁定技不受非锁定技失效压制:界毅重黑杀无效仍生效', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7'); // 黑杀
+    const judge = makeCard('j1', '桃', '♣', '5'); // 判定梅花
+    // P1(界马超)HP4 ≥ P2(界于禁)HP3 → 界毅重①条件满足;P2 无手牌→铁骑强制命中路径
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1'],
+          skills: ['界铁骑', '杀'],
+          health: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: ['界毅重'],
+          health: 3,
+        }),
+      ],
+      cardMap: { k1: kill, j1: judge },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    P1.expectPending('请求回应'); // 界铁骑 confirm
+    await P1.respond('界铁骑', { choice: true });
+
+    // 界铁骑压制标签已设置(非锁定技失效对 P2 生效)
+    expect(harness.state.players[1].tags).toContain('界铁骑/非锁定技失效');
+    // 界毅重①是锁定技→不受压制→检测有效性 cancel 黑杀→P2 不扣血
+    expect(harness.state.players[1].health).toBe(3);
+  });
+
   // ─── 回合结束清标签:下回合目标非锁定技恢复 ─────────────────────────────
   it('回合结束后 SUPPRESSION_TAG 被清除', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');

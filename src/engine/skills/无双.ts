@@ -19,8 +19,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '无双',
-    description:
-      '锁定技:你使用【杀】的目标需连续出两张【闪】才能抵消;与你【决斗】的角色每次需连续打出两张【杀】',
+    description: '锁定技:你使用【杀】的目标需连续出两张【闪】才能抵消;与你【决斗】的角色每次需连续打出两张【杀】',
+    isLocked: true,
   };
 }
 

@@ -17,8 +17,8 @@
 //        满足以上 = 该普通锦囊确定对陆逊生效,触发谦逊。
 //        该路径统一覆盖"经成为目标"(决斗)与"直接生效型"(顺手牵羊/过河拆桥/火攻/借刀杀人 等)
 //        两类普通锦囊——前者也会经过 询问无懈可击,故无需再加 成为目标 钩子。
-//   ② 询问 confirm;确认后用「移出游戏」atom 把全部手牌暂存到 player.vars['界谦逊/移出']。
-//   ③ 「回合结束」after-hook:检测到移出区非空 → 用「归还移出牌」atom 归还手牌。
+//   ② 询问 confirm;确认后用「移出至暂存区」atom 把全部手牌暂存到 player.vars['界谦逊/移出']。
+//   ③ 「回合结束」after-hook:检测到移出区非空 → 用「归还暂存牌」atom 归还手牌。
 //
 // 联动:移出全部手牌会使手牌归零 → 触发「界连营」,X = 失去的手牌数 = 移出张数。
 //   这是界陆逊的核心combo(谦逊搬空手牌 → 连营令多名角色摸牌)。
@@ -34,7 +34,7 @@ import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '界谦逊/trigger';
 const CONFIRMED_KEY = '界谦逊/confirmed';
-// 移出区 vars 键名(与 atoms/移出游戏.ts 的 EXILE_VARS_KEY 保持一致)
+// 移出区 vars 键名(调用 移出至暂存区/归还暂存牌 atom 时传入)
 const EXILE_VARS_KEY = '界谦逊/移出';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -108,7 +108,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const player = ctx.state.players[ownerId];
     if (!player || player.hand.length === 0) return;
     const handIds = [...player.hand];
-    await applyAtom(ctx.state, { type: '移出游戏', player: ownerId, cardIds: handIds });
+    await applyAtom(ctx.state, {
+      type: '移出至暂存区',
+      source: ownerId,
+      target: ownerId,
+      cardIds: handIds,
+      varsKey: EXILE_VARS_KEY,
+    });
   }
 
   // respond:回答谦逊确认
@@ -178,7 +184,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self) return;
     const exiled = self.vars[EXILE_VARS_KEY];
     if (!Array.isArray(exiled) || exiled.length === 0) return;
-    await applyAtom(ctx.state, { type: '归还移出牌', player: ownerId });
+    await applyAtom(ctx.state, { type: '归还暂存牌', player: ownerId, varsKey: EXILE_VARS_KEY });
   });
 
   return () => {};

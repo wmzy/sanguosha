@@ -35,6 +35,7 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill';
+import { registerSuppressionProvider } from '../skill-suppression';
 
 /** 请求类型:目标展示一张手牌。 */
 const REVEAL_REQUEST = '义绝/reveal';
@@ -76,6 +77,14 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
+
+  // ── 非锁定技失效 provider:目标持有 SUPPRESSION_TAG 时,其非锁定技 hook 被压制 ──
+  //   通过 skill-suppression 扩展点注册,避免引擎核心(create-engine.ts)硬编码技能名/标签。
+  const unloadSuppression = registerSuppressionProvider(
+    state,
+    (st, targetOwnerId, _skillId) =>
+      st.players[targetOwnerId]?.tags.includes(SUPPRESSION_TAG) === true,
+  );
 
   // ── use action:出牌阶段弃牌(代价) + 指定目标 ──────────────
   registerAction(
@@ -333,6 +342,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   return () => {
     unloaders.forEach((u) => u());
+    unloadSuppression();
   };
 }
 

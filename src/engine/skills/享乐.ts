@@ -30,6 +30,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '享乐',
     description: '锁定技:其他角色用杀指定你为目标时,需额外弃一张基本牌,否则杀对你无效',
+    isLocked: true,
   };
 }
 

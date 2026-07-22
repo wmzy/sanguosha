@@ -587,6 +587,25 @@ export class HeadlessGameClient {
         });
         return;
       }
+      // chooseOption 类（化身:选技能/选化身牌/选行动等）：每个选项一个 action。
+      if (pending.prompt?.type === 'chooseOption') {
+        const p = pending.prompt;
+        for (const opt of p.options) {
+          out.push({
+            description: opt.label,
+            message: {
+              skillId: info.skillId,
+              actionType: 'respond',
+              ownerId,
+              params: { option: opt.value },
+              baseSeq: 0,
+            },
+            validTargets: [],
+            category: 'respond',
+          });
+        }
+        return;
+      }
       // confirm 类（突袭/trigger 等）优先于 cardFilter：
       //   询问杀/闪 的 prompt 也是 confirm，但它们需要 cardId（atom.type 以「询问」开头）。
       //   只有 请求回应 + confirm 才是纯确认操作（choice: true/false）。

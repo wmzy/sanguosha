@@ -7,7 +7,7 @@ import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为弃目标2张牌' };
+  return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为弃目标2张牌', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

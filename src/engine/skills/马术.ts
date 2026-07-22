@@ -9,7 +9,7 @@ import type { Skill, GameState } from '../types';
 const VAR_KEY = '距离/进攻修正';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '马术', description: '锁定技:你与其他角色的距离-1' };
+  return { id, ownerId, name: '马术', description: '锁定技:你与其他角色的距离-1', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

@@ -82,12 +82,12 @@ import {
   getAfterHooks,
   getBeforeHooks,
   getJudgeModifierMap,
-  getSkillDescription,
   setSkillInstanceUnload,
   unloadSkillInstance,
 } from './skill';
 import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
 import { createStandardDeck } from '../shared/deck';
+import { isHookSuppressed } from './skill-suppression';
 
 // slash-quota 已改为 state-bound(WeakMap 外挂),无模块级状态,无需在此清理。
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
@@ -540,23 +540,8 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
 
 // ─── Atom apply 管线 ────────────────────────────────────────
 
-/** 非锁定技失效标签集合:玩家本回合被界铁骑 / 义绝压制时,其非锁定技 hook
- *  不触发(锁定技与装备技仍生效)。
- *
- *  判定"锁定技"依据:技能描述以 "锁定技" / "防具:" / "武器:" 开头(全工程统一约定)。
- *  用 startsWith 而非 includes,避免描述中提及"非锁定技"的技能(如界铁骑自身)被误判。
- *  无法解析技能模块时保守不压制(避免误吞未知技能)。 */
-const SUPPRESSION_TAGS = ['界铁骑/非锁定技失效', '义绝/非锁定技失效'];
-const LOCKING_MARKERS = ['锁定技', '防具:', '武器:'];
-
-function isHookSuppressed(state: GameState, ownerId: number, skillId: string): boolean {
-  if (ownerId === TARGET_SYSTEM) return false;
-  const player = state.players[ownerId];
-  if (!player?.tags.some((t) => SUPPRESSION_TAGS.includes(t))) return false;
-  const desc = getSkillDescription(skillId);
-  if (desc === undefined) return false; // 模块未加载,保守不压制
-  return !LOCKING_MARKERS.some((m) => desc.startsWith(m));
-}
+// 非锁定技失效扩展点(skill-suppression.ts)提供,引擎核心不感知具体技能/标签。
+// 提供者由各技能自行注册(义绝/界铁骑/界完杀 等),predicate 内部读自己的 tag/vars。
 
 /** 运行 after hooks:系统级 hooks(ownerId===TARGET_SYSTEM)最后执行,
  *  确保遗计/反馈等“受伤害后”技能先于濒死检查触发。 */

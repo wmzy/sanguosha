@@ -7,7 +7,7 @@
 import type { Skill, GameState } from '../types';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '方天画戟', description: '武器:最后一张手牌为杀时可指定最多3个目标' };
+  return { id, ownerId, name: '方天画戟', description: '武器:最后一张手牌为杀时可指定最多3个目标', isLocked: true };
 }
 
 export function onInit(_skill: Skill, _state: GameState): () => void {

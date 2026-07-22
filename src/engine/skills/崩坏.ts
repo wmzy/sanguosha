@@ -23,6 +23,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '崩坏',
     description: '锁定技:回合结束阶段,若你的体力不是全场最少的,须减1点体力或1点体力上限',
+    isLocked: true,
   };
 }
 

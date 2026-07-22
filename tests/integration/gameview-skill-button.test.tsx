@@ -164,3 +164,203 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
     });
   });
 });
+
+// ─── distribute 外部候选区(牌堆顶/目标牌等不在手牌区的候选)───
+// 覆盖技能:观星/界观星/界恂恂/界称象(牌堆顶牌)、界破军/界镇军(目标的牌)。
+// 这些技能的 prompt.cardIds 包含不在操作者手牌/装备区的 id,前端需单独渲染为
+// 独立候选排,否则人类玩家无法在 UI 上选牌(AI 玩家通过 respond 直接提交不受影响)。
+describe('GameView:distribute 外部候选区(观星类场景)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('distribute pending 候选牌不在手牌区时,渲染独立候选排 + 牌内容', async () => {
+    // 模拟观星:pending cardIds 是牌堆顶 3 张牌(d1/d2/d3),不在 P1 手牌(c1/c2)里
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '观星/arrange', target: 0 } as any,
+        prompt: {
+          type: 'distribute',
+          mode: 'select',
+          title: '观星：排列牌堆顶牌',
+          cardIds: ['d1', 'd2', 'd3'],
+          minTotal: 0,
+          maxTotal: 3,
+        },
+        target: 0,
+        isBlocking: true,
+      },
+      cardMap: {
+        c1: makeCard('c1', '杀'),
+        c2: makeCard('c2', '桃'),
+        d1: { id: 'd1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
+        d2: { id: 'd2', name: '闪', suit: '♥', color: '红', rank: 'J', type: '基本牌' },
+        d3: { id: 'd3', name: '桃', suit: '♦', color: '红', rank: '3', type: '基本牌' },
+      },
+    });
+
+    const { container } = render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    // 等待外部候选区出现(标题包含 '观星')
+    await waitFor(() => {
+      expect(screen.getAllByText(/观星：排列牌堆顶牌/).length).toBeGreaterThan(0);
+    });
+
+    // 3 张外部候选牌都应被渲染为独立卡片(data-card-id 来自原 HandCard 语义)
+    // 这里用牌内容文本 '闪'(只在外部候选区出现,手牌里是杀/桃)验证
+    expect(screen.getByText('闪')).toBeDefined();
+    expect(screen.getAllByText('杀').length).toBeGreaterThanOrEqual(2); // 手牌 c1 + 外部 d1
+
+    // P1 自己的手牌(c1/c2)不应出现在外部候选区
+    // (间接验证:外部候选区的牌张数 = 3,手牌区 = 2)
+  });
+
+  it('点击外部候选牌 → 进入选中态(类名变化),再点 → 回退', async () => {
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '观星/arrange', target: 0 } as any,
+        prompt: {
+          type: 'distribute',
+          mode: 'select',
+          title: '观星',
+          cardIds: ['d1', 'd2'],
+          minTotal: 0,
+          maxTotal: 2,
+        },
+        target: 0,
+        isBlocking: true,
+      },
+      cardMap: {
+        c1: makeCard('c1', '杀'),
+        c2: makeCard('c2', '桃'),
+        d1: { id: 'd1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
+        d2: { id: 'd2', name: '闪', suit: '♥', color: '红', rank: 'J', type: '基本牌' },
+      },
+    });
+
+    const { container } = render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    // 等待候选区出现
+    await waitFor(() => {
+      expect(screen.getAllByText(/观星/).length).toBeGreaterThan(0);
+    });
+
+    // 找到外部候选区中 d2 的卡片元素(通过 data-card-id)
+    const externalD2 = container.querySelector('[data-card-id="d2"]');
+    expect(externalD2).not.toBeNull();
+
+    // 用更精确的 label 文本(prompt.title · 已选 N),避免「已选」匹配 ActionBar 里其他文本
+    const labelOf = (n: number) => screen.getByText(`观星 · 已选 ${n}`);
+    // 初始:已选 0
+    expect(labelOf(0)).toBeDefined();
+    // 点击 d2 选中 → 已选 1
+    fireEvent.click(externalD2!);
+    expect(labelOf(1)).toBeDefined();
+    // 再点回退 → 已选 0
+    fireEvent.click(externalD2!);
+    expect(labelOf(0)).toBeDefined();
+  });
+});
+
+// ─── chooseOption 选项选择(化身:选技能/选化身牌)───
+// 覆盖技能:化身/界化身 的所有多选一交互。
+// 修复前:化身用 confirm hack,候选技能名拼进 title,前端只渲染确定/取消两个按钮,无法选具体技能。
+// 修复后:chooseOption prompt 渲染选项按钮列表,有 characterCards 时渲染武将牌面板(势力色+武将名+技能)。
+describe('GameView:chooseOption 选项选择(化身场景)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('选技能:渲染选项按钮,点击提交 { option }', async () => {
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '化身/选技能', target: 0 } as any,
+        prompt: {
+          type: 'chooseOption',
+          title: '化身:从「司马懿」选择一个技能',
+          options: [
+            { value: '反馈', label: '反馈' },
+            { value: '鬼才', label: '鬼才' },
+          ],
+        },
+        target: 0,
+        isBlocking: true,
+      },
+    });
+
+    const onAction = vi.fn();
+    render(<GameViewComponent view={view} onAction={onAction} />);
+
+    // 等待 prompt 标题出现
+    await waitFor(() => {
+      expect(screen.getAllByText(/选择一个技能/).length).toBeGreaterThan(0);
+    });
+
+    // 点击 「反馈」 按钮
+    const feedbackBtn = screen.getByRole('button', { name: '反馈' });
+    fireEvent.click(feedbackBtn);
+
+    // 验证 onAction 以 { option: '反馈' } 提交
+    await waitFor(() => {
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionType: 'respond',
+          params: expect.objectContaining({ option: '反馈' }),
+        }),
+      );
+    });
+  });
+
+  it('选化身牌:渲染武将牌面板(势力色+武将名+技能)', async () => {
+    const view = makeView({
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '化身/选化身牌', target: 0 } as any,
+        prompt: {
+          type: 'chooseOption',
+          title: '化身:选择一张化身牌',
+          options: [
+            { value: '司马懿', label: '司马懿' },
+            { value: '郭嘉', label: '郭嘉' },
+          ],
+          characterCards: {
+            司马懿: { faction: '魏', skills: ['反馈', '鬼才'] },
+            郭嘉: { faction: '魏', skills: ['天妒', '遗计'] },
+          },
+        },
+        target: 0,
+        isBlocking: true,
+      },
+    });
+
+    const onAction = vi.fn();
+    render(<GameViewComponent view={view} onAction={onAction} />);
+
+    // 等待武将牌面板出现
+    await waitFor(() => {
+      expect(screen.getAllByText(/选择一张化身牌/).length).toBeGreaterThan(0);
+    });
+
+    // 武将名和技能应被渲染
+    expect(screen.getByText('司马懿')).toBeDefined();
+    expect(screen.getByText('反馈 · 鬼才')).toBeDefined();
+    expect(screen.getByText('郭嘉')).toBeDefined();
+    expect(screen.getByText('天妒 · 遗计')).toBeDefined();
+
+    // 点击 「司马懿」 提交 { option: '司马懿' }
+    const simaBtn = screen.getByRole('button', { name: /司马懿/ });
+    fireEvent.click(simaBtn);
+
+    await waitFor(() => {
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionType: 'respond',
+          params: expect.objectContaining({ option: '司马懿' }),
+        }),
+      );
+    });
+  });
+});

@@ -38,7 +38,7 @@
 //   - 技能选择 UI(从亮出武将挑一个技能):用 confirm prompt + respond{skill} 实现,
 //     完整的武将牌+技能选择面板 UI 为"待澄清/后续"。
 //   - 只有一个可选技能时自动选取(无需询问)。
-import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { AtomAfterContext, Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { createRng } from '../../shared/rng';
 import { registerAction, registerAfterHook } from '../skill';
@@ -56,8 +56,10 @@ const SWITCH_CHOICE_KEY = '化身/switchChoice';
 // ── 请求回应 requestType ──
 const SKILL_REQUEST = '化身/选技能';
 const SWITCH_REQUEST = '化身/是否切换';
+const CHARACTER_REQUEST = '化身/选化身牌';
 // 选技能询问时,把候选技能列表暂存到 localVars(供 respond validate 校验)
 const CANDIDATES_KEY = (ownerId: number) => `化身/candidates/${ownerId}`;
+const CHARACTER_CHOICE_KEY = '化身/characterChoice';
 
 /**
  * 不可作为化身技能的技能集合:限定技、觉醒技、主公技。
@@ -152,11 +154,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (typeof params.choice !== 'boolean') return '需要 choice(布尔)';
         return null;
       }
+      if (rt === CHARACTER_REQUEST) {
+        // 选化身牌:option = 武将名,必须在牌池中
+        const pool = (st.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+        const charName = params.option as string | undefined;
+        if (typeof charName !== 'string') return '需要 option(武将名)';
+        if (!pool.includes(charName)) return '该武将不在化身牌池中';
+        return null;
+      }
       if (rt === SKILL_REQUEST) {
-        // 选技能:skill 必须在候选列表中(候选暂存于 localVars)
+        // 选技能:option 必须在候选列表中(候选暂存于 localVars)
         const candidates = (st.localVars[CANDIDATES_KEY(ownerId)] as string[] | undefined) ?? [];
-        const skill = params.skill as string | undefined;
-        if (typeof skill !== 'string') return '需要 skill(技能名)';
+        const skill = params.option as string | undefined;
+        if (typeof skill !== 'string') return '需要 option(技能名)';
         if (candidates.length > 0 && !candidates.includes(skill)) return '该技能不在候选中';
         return null;
       }
@@ -167,8 +177,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const rt = (slot.atom as Record<string, unknown>).requestType as string;
       if (rt === SWITCH_REQUEST) {
         st.localVars[SWITCH_CHOICE_KEY] = params.choice === true;
+      } else if (rt === CHARACTER_REQUEST) {
+        st.localVars[CHARACTER_CHOICE_KEY] = params.option;
       } else if (rt === SKILL_REQUEST) {
-        st.localVars[SELECTED_KEY] = params.skill;
+        st.localVars[SELECTED_KEY] = params.option;
         delete st.localVars[CANDIDATES_KEY(ownerId)];
       }
     },
@@ -223,22 +235,27 @@ async function lightAndGainSkill(
   state: GameState,
   ownerId: number,
   litIdx: number,
+  excludeIdx?: number,
 ): Promise<void> {
   const player = state.players[ownerId];
   if (!player) return;
   const pool = player.vars[POOL_KEY] as string[] | undefined;
   if (!pool || pool.length === 0) return;
 
-  // 选择一张有可选技能的化身牌:优先 litIdx,无技能则尝试其他
-  let chosenIdx = -1;
-  const order = [litIdx, ...pool.map((_, i) => i).filter((i) => i !== litIdx)];
-  for (const i of order) {
-    if (getUsableSkills(pool[i]).length > 0) {
-      chosenIdx = i;
-      break;
-    }
+  // 找出所有有可选技能的武将牌(排除指定索引,如替换时排除当前展示)
+  const usableIndices = pool
+    .map((_, i) => i)
+    .filter((i) => getUsableSkills(pool[i]).length > 0)
+    .filter((i) => i !== excludeIdx);
+  if (usableIndices.length === 0) return; // 整个池无可选技能
+  // 多张可选 → 询问玩家选化身牌;单张 → 自动选
+  let chosenIdx: number;
+  if (usableIndices.length === 1) {
+    chosenIdx = usableIndices[0];
+  } else {
+    chosenIdx = await askSelectCharacter(state, ownerId, pool, usableIndices);
+    if (chosenIdx < 0) chosenIdx = usableIndices[0]; // 超时兜底
   }
-  if (chosenIdx < 0) return; // 整个池无可选技能
   player.vars[LIT_KEY] = chosenIdx;
 
   const litChar = pool[chosenIdx];
@@ -287,7 +304,44 @@ async function offerSwitch(state: GameState, ownerId: number): Promise<void> {
   // 亮出另一张(切换到不同索引)
   const curLit = (player.vars[LIT_KEY] as number | undefined) ?? 0;
   const newLit = curLit === 0 ? 1 : 0;
-  await lightAndGainSkill(state, ownerId, newLit);
+  await lightAndGainSkill(state, ownerId, newLit, curLit);
+}
+
+/**
+ * 请求玩家从牌池中选择一张化身牌(多张有可选技能时)。
+ * 返回选中的 pool 索引,或 -1(超时/未选)。
+ */
+async function askSelectCharacter(
+  state: GameState,
+  ownerId: number,
+  pool: string[],
+  usableIndices: number[],
+): Promise<number> {
+  delete state.localVars[CHARACTER_CHOICE_KEY];
+  const characterCards: Record<string, { faction: Faction; skills: string[] }> = {};
+  for (const i of usableIndices) {
+    const meta = getCharacterMeta(pool[i]);
+    characterCards[pool[i]] = {
+      faction: meta?.faction ?? '群',
+      skills: getUsableSkills(pool[i]),
+    };
+  }
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType: CHARACTER_REQUEST,
+    target: ownerId,
+    prompt: {
+      type: 'chooseOption',
+      title: '化身:选择一张化身牌',
+      options: usableIndices.map((i) => ({ value: pool[i], label: pool[i] })),
+      characterCards,
+    },
+    defaultChoice: pool[usableIndices[0]] as unknown as Json,
+    timeout: 30,
+  });
+  const chosen = state.localVars[CHARACTER_CHOICE_KEY] as string | undefined;
+  delete state.localVars[CHARACTER_CHOICE_KEY];
+  return chosen ? pool.indexOf(chosen) : -1;
 }
 
 /**
@@ -311,12 +365,10 @@ async function askSelectSkill(
     requestType: SKILL_REQUEST,
     target: ownerId,
     prompt: {
-      type: 'confirm',
-      title: `化身:从「${litChar}」选择一个技能(${usable.join(' / ')})`,
-      confirmLabel: '确定',
-      cancelLabel: '取消',
+      type: 'chooseOption',
+      title: `化身:从「${litChar}」选择一个技能`,
+      options: usable.map((s) => ({ value: s, label: s })),
     },
-    // 超时默认第一个可用技能(不放弃获得技能的机会)
     defaultChoice: usable[0] as unknown as Json,
     timeout: 30,
   });

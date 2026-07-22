@@ -246,10 +246,18 @@ describe('开局', () => {
     await resolveAllSelections(state);
     await waitForDealComplete(state);
 
-    // 2 人局(人数≤4):主公不加成,体力=武将卡牌 maxHealth
+    // 2 人局(人数≤4):主公不加成,体力=武将卡牌 maxHealth。
+    // 注:某些觉醒技(如刘禅·若愚、邓艾·凿险)在主公开局启动第一回合时会修改体力上限。
+    // 测试仅在未觉醒时验证原始 maxHealth;觉醒后上限变化由各自技能负责。
     for (const player of state.players) {
       const charDef = allCharacters.find((c) => c.name === player.character);
       expect(charDef).toBeDefined();
+      const awakened =
+        player.vars['若愚/awakened'] === true ||
+        player.vars['界若愚/awakened'] === true ||
+        player.vars['凿险/awakened'] === true ||
+        player.vars['界凿险/awakened'] === true;
+      if (awakened) continue; // 觉醒后上限被技能修改,不在本测试范围
       const expectedMax = charDef!.maxHealth;
       expect(player.maxHealth).toBe(expectedMax);
       // 初始体力 = 体力上限(满血开局)
@@ -284,6 +292,14 @@ describe('开局', () => {
     for (const player of state.players) {
       const charDef = allCharacters.find((c) => c.name === player.character);
       expect(charDef).toBeDefined();
+      // 某些觉醒技(界若愚/界凿险等)在主公开局启动第一回合时会修改体力上限。
+      // 测试仅在未觉醒时验证原始 maxHealth;觉醒后上限变化由各自技能负责。
+      const awakened =
+        player.vars['若愚/awakened'] === true ||
+        player.vars['界若愚/awakened'] === true ||
+        player.vars['凿险/awakened'] === true ||
+        player.vars['界凿险/awakened'] === true;
+      if (awakened) continue;
       const isLord = player.identity === '主公';
       // 人数>4:主公 +1,非主公不加
       const expectedMax = isLord ? charDef!.maxHealth + 1 : charDef!.maxHealth;

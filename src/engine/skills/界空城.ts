@@ -21,6 +21,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界空城',
     description: '锁定技:若你没有手牌,你不是杀和决斗的合法目标;你使用的杀被闪抵消后摸一张牌',
+    isLocked: true,
   };
 }
 

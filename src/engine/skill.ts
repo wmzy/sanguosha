@@ -23,6 +23,7 @@ import type {
   Skill,
 } from './types';
 import { TARGET_SYSTEM } from './types';
+import { isTrickBlocked } from './trick-quota';
 
 export interface SkillModule {
   createSkill: (id: string, ownerId: number) => Skill;
@@ -215,6 +216,18 @@ export function validateUseCard(
   if (!self.hand.includes(cardId)) return '牌不在手牌中';
   if (opts?.cardName && state.cardMap[cardId]?.name !== opts.cardName)
     return `不是${opts.cardName}`;
+  // 普通锦囊牌阻断器(界简雍·巧说没赢后本回合禁用锦囊)。
+  // 仅对普通锦囊牌生效(延时锦囊走 乐不思蜀/兵粮寸断 等独立技能,响应锦囊=无懈可击
+  // 由 respond 路径出,不走 use)。普通锦囊牌 = type='锦囊牌' 且 trickSubtype !== '延时锦囊'/'响应锦囊'。
+  const card = state.cardMap[cardId];
+  if (
+    card?.type === '锦囊牌' &&
+    card.trickSubtype !== '延时锦囊' &&
+    card.trickSubtype !== '响应锦囊' &&
+    isTrickBlocked(state, ownerId)
+  ) {
+    return '本回合不能使用锦囊牌';
+  }
   if (opts?.requireTarget) {
     const targets = params.targets as number[] | undefined;
     if (!Array.isArray(targets) || targets.length === 0) return 'target required';

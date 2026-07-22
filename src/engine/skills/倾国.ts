@@ -78,7 +78,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     style: 'passive',
     prompt: {
       type: 'useCard',
-      title: '选择一张黑色牌当闪打出',
+      title: '选择一张黑色手牌当闪打出',
       cardFilter: { filter: (c: Card) => c.color === '黑', min: 1, max: 1 },
     },
     transform: (card: Card) => ({ name: '闪', sourceCardId: card.id, fromSkill: skill.id }),
@@ -97,3 +97,5 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   });
   return;
 }
+
+export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

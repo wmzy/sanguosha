@@ -12,7 +12,7 @@
 //
 // 不管理:手牌拖拽重排(useHandReorder)、视角切换、WS 连接。
 
-import { useState, useCallback, useEffect, type RefObject } from 'react';
+import { useState, useCallback, useEffect, useMemo, type RefObject } from 'react';
 import type { Card, GameView, Json, DistributePrompt, PendingView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
@@ -99,6 +99,13 @@ export interface PlayInteractionResult {
   distSelected: Set<string>;
   distAllocations: Array<{ target: number; cardIds: string[] }>;
   distTargetName: string | null;
+  /**
+   * distribute 外部候选牌:候选 id 中不在当前视角手牌/装备区里的牌。
+   * 这些牌(牌堆顶/目标手牌/目标装备)必须单独渲染,因为手牌区/装备区的
+   * 候选高亮逻辑无法覆盖它们(观星/界观星/界恂恂/界称象/界破军/界镇军)。
+   * 牌内容通过 view.cardMap[id] 查得(全量标准牌已预填充)。
+   */
+  distExternalCandidates: Card[];
   // ─── 派生量 ───
   selectedCard: Card | null;
   selectedUseAction: SkillActionDef | undefined;
@@ -202,6 +209,25 @@ export function usePlayInteraction(
     return null;
   })();
   const isDistributeActive = activeDistribute !== null;
+
+  // ─── distribute 外部候选:cardIds 中不在手牌/装备区的牌(单独渲染)───
+  // 计算这些牌的 Card 对象(通过 view.cardMap 查得),供 GameView 渲染独立候选区。
+  // 用例:观星/界观星/界恂恂/界称象(牌堆顶牌)、界破军/界镇军(目标的牌)。
+  const distExternalCandidates = useMemo(() => {
+    if (!activeDistribute) return [];
+    const handAndEquipIds = new Set<string>();
+    for (const c of perspectiveHand) handAndEquipIds.add(c.id);
+    for (const id of Object.values(perspectiveEquipment)) {
+      if (typeof id === 'string') handAndEquipIds.add(id);
+    }
+    const out: Card[] = [];
+    for (const id of activeDistribute.cardIds) {
+      if (handAndEquipIds.has(id)) continue;
+      const card = view.cardMap[id];
+      if (card) out.push(card);
+    }
+    return out;
+  }, [activeDistribute, perspectiveHand, perspectiveEquipment, view.cardMap]);
 
   // ─── state 重置 effects ───
   useEffect(() => {
@@ -819,6 +845,7 @@ export function usePlayInteraction(
     distSelected,
     distAllocations,
     distTargetName,
+    distExternalCandidates,
     selectedCard,
     selectedUseAction,
     selectedTargetFilter,

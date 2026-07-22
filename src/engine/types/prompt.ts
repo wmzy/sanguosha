@@ -1,7 +1,7 @@
 // ActionPrompt 类型:前端交互契约(出牌/选目标/分配/选将/选牌/选花色等 prompt)。
 // 原 src/engine/types.ts 的 `==================== ActionPrompt ====================` 段。
 
-import type { Card } from './state';
+import type { Card, Faction } from './state';
 import type { GameView } from './view';
 
 /** action 激活上下文:传给 activeWhen 谓词,供 action 声明"我什么时候该被激活"。
@@ -29,7 +29,8 @@ export type ActionPrompt =
   | ChooseCharacterPrompt
   | PickProcessingCardPrompt
   | PickTargetCardPrompt
-  | ChooseSuitPrompt;
+  | ChooseSuitPrompt
+  | ChooseOptionPrompt;
 
 export interface CardFilter {
   filter?: (card: Card) => boolean;
@@ -144,6 +145,22 @@ export interface ChooseSuitPrompt {
   type: 'chooseSuit';
   title: string;
   description?: string;
+}
+
+/** 选项选择(化身:从多个结构化选项中选一个)。
+ *  respond params: { option: value }
+ *  超时默认:由各技能的兜底逻辑处理(如 askSelectSkill 的 usable[0])。
+ *
+ *  武将牌面板:characterCards 附带每张武将牌的可视化数据(势力色+技能列表),
+ *  key = option.value(武将名),供前端渲染武将牌选择面板。无 characterCards 时
+ *  前端只渲染普通选项按钮列表。 */
+export interface ChooseOptionPrompt {
+  type: 'chooseOption';
+  title: string;
+  description?: string;
+  options: Array<{ value: string; label: string; description?: string }>;
+  /** 武将牌可视化数据。key = option.value(武将名) */
+  characterCards?: Record<string, { faction: Faction; skills: string[] }>;
 }
 
 /** 选牌面板(过河拆桥/顺手牵羊生效后,使用者从目标区域选一张牌)。

@@ -32,6 +32,18 @@ export type SlashMaxProvider = (state: GameState, player: number) => number;
  */
 export type SlashBlocker = (state: GameState, player: number) => boolean;
 
+/**
+ * 出杀豁免器:返回 true 表示该张【杀】不占用出杀次数(仍受阻断器约束)。
+ * 携带 cardId 让 provider 能基于卡牌属性(如花色/点数/转化来源)做 per-card 决策。
+ * 用于"同花色杀无次数限制"(界弓骑)等效果。与上限提供者互补:
+ * 上限提供者放宽"还能出几张",豁免器直接令"这张不计"。
+ */
+export type SlashExemptor = (
+  state: GameState,
+  player: number,
+  cardId: string | undefined,
+) => boolean;
+
 // ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC) ───
 
 interface SlashRegistry {
@@ -39,6 +51,8 @@ interface SlashRegistry {
   providers: Map<number, Set<SlashMaxProvider>>;
   /** player 索引 → 该玩家当前注册的阻断器集合 */
   blockers: Map<number, Set<SlashBlocker>>;
+  /** player 索引 → 该玩家当前注册的豁免器集合 */
+  exemptors: Map<number, Set<SlashExemptor>>;
 }
 
 const slashRegistries = new WeakMap<GameState, SlashRegistry>();
@@ -46,7 +60,7 @@ const slashRegistries = new WeakMap<GameState, SlashRegistry>();
 function getSlashRegistry(state: GameState): SlashRegistry {
   let reg = slashRegistries.get(state);
   if (!reg) {
-    reg = { providers: new Map(), blockers: new Map() };
+    reg = { providers: new Map(), blockers: new Map(), exemptors: new Map() };
     slashRegistries.set(state, reg);
   }
   return reg;
@@ -136,9 +150,56 @@ export function isSlashBlocked(state: GameState, player: number): boolean {
   return false;
 }
 
-/** 当前玩家是否还能出杀(未被阻断 且 已用次数 < 上限) */
-export function canSlash(state: GameState, player: number): boolean {
+/**
+ * 注册一个出杀豁免器(技能 onInit 时调用,与 registerSlashBlocker 同构)。
+ * 返回的取消注册函数应并入 onInit 返回的 unload。
+ */
+export function registerSlashExemptor(
+  state: GameState,
+  ownerId: number,
+  exemptor: SlashExemptor,
+): () => void {
+  const reg = getSlashRegistry(state);
+  let set = reg.exemptors.get(ownerId);
+  if (!set) {
+    set = new Set();
+    reg.exemptors.set(ownerId, set);
+  }
+  set.add(exemptor);
+  return () => {
+    const s = reg.exemptors.get(ownerId);
+    if (s) {
+      s.delete(exemptor);
+      if (s.size === 0) reg.exemptors.delete(ownerId);
+    }
+  };
+}
+
+/** 该玩家当前使用的这张【杀】是否豁免出杀次数(任一豁免器返回 true 即豁免)。
+ *  cardId 缺省时只问"无卡牌上下文"的豁免器(目前无此用例,恒返回 false)。 */
+export function isSlashExempted(
+  state: GameState,
+  player: number,
+  cardId: string | undefined,
+): boolean {
+  if (cardId === undefined) return false;
+  const set = getSlashRegistry(state).exemptors.get(player);
+  if (!set) return false;
+  for (const fn of set) {
+    if (fn(state, player, cardId)) return true;
+  }
+  return false;
+}
+
+/** 当前玩家是否还能出杀(未被阻断 且 已用次数 < 上限)。
+ *  cardId 可选:若提供且该卡被任一豁免器命中,则绕过次数上限检查。 */
+export function canSlash(
+  state: GameState,
+  player: number,
+  cardId?: string,
+): boolean {
   if (isSlashBlocked(state, player)) return false;
+  if (cardId !== undefined && isSlashExempted(state, player, cardId)) return true;
   return slashUsed(state) < slashMax(state, player);
 }
 

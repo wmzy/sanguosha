@@ -23,6 +23,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '祸首',
     description: '锁定技:南蛮入侵对你无效;你是任何南蛮入侵造成伤害的来源',
+    isLocked: true,
   };
 }
 

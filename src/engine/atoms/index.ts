@@ -54,5 +54,5 @@ import './回合用量';
 import './置创牌';
 import './扣牌';
 import './展示';
-import './移出游戏';
-import './归还移出牌';
+import './移出至暂存区';
+import './归还暂存牌';

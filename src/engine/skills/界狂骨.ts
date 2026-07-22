@@ -25,6 +25,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界狂骨',
     description: '对距离1以内的角色造成伤害时,回复1点体力或摸一张牌',
+    isLocked: true,
   };
 }
 

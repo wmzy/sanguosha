@@ -35,6 +35,11 @@ export function viewEffectiveDistance(
   fromIdx: number,
   toIdx: number,
 ): number {
+  // 界陷阵(界高顺):拼点赢后对其用牌无距离限制。
+  // turnUsage 由 回合用量 atom 同步;winTarget 存目标座次。
+  // 注:GameView 不携带 currentPlayerIndex 区分发起方,这里宽松返回 1(可被所有距离检查放行)。
+  // 后端 distance.ts effectiveDistance 严格按 turn.vars 校验(仅对持有界陷阵技能的发起方生效)。
+  if (players.some((p) => p.turnUsage?.['陷阵/winTarget'] === toIdx)) return 1;
   let dist = viewSeatDistance(players, fromIdx, toIdx);
   const fromP = players[fromIdx];
   const toP = players[toIdx];
@@ -54,6 +59,9 @@ export function viewCanAttack(
 ): boolean {
   void cardMap; // 签名与 client utils/distance 对齐,GameView 投影不需要 cardMap
   if (fromIdx === toIdx) return false;
+  // 界陷阵(界高顺):拼点赢后本回合对 winTarget 使用牌无距离限制。
+  // turnUsage 由 回合用量 atom 同步;winTarget 存目标座次。
+  if (players.some((p) => p.turnUsage?.['陷阵/winTarget'] === toIdx)) return true;
   // 诈降(界黄盖):失去体力后本回合【红色杀】无距离限制。turnUsage 由回合用量 atom 同步。
   // 前端 filter 无法感知当前选中的卡色(签名只收 view/target),这里保持宽松——
   // 诈降激活时一律放行(UI 提示);后端 杀.validate 按卡色严格校验(仅红杀放行)。
@@ -61,6 +69,14 @@ export function viewCanAttack(
   // 界武圣(界关羽):你使用的方片【杀】无距离限制。前端 filter 无法感知选中卡色,
   // 保持宽松(所有目标可点);后端 杀.validate 按花色严格校验(仅方片杀放行)。
   if (players[fromIdx]?.skills?.includes('界武圣')) return true;
+  // 界将驰(界曹彰)选项②:本回合使用【杀】无距离限制。
+  // turnUsage 由回合用量 atom 同步;激活时前端宽松放行(UI 提示),
+  // 后端 杀.validate 严格校验。
+  if (players[fromIdx]?.turnUsage?.['将驰/choice2']) return true;
+  // 界弓骑(界韩当):弃牌后本回合攻击范围无限。
+  // turnUsage 由回合用量 atom 同步;激活时前端宽松放行(UI 提示),
+  // 后端 distance.ts inAttackRange 严格校验。
+  if (players[fromIdx]?.turnUsage?.['界弓骑/active']) return true;
   const range = players[fromIdx]?.distanceVars?.attackRange ?? 1;
   return viewEffectiveDistance(players, fromIdx, toIdx) <= range;
 }

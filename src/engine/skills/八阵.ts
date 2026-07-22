@@ -16,6 +16,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '八阵',
     description: '锁定技:没有装备防具时,视为装备着八卦阵',
+    isLocked: true,
   };
 }
 

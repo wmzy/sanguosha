@@ -21,8 +21,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界红颜',
-    description:
-      '锁定技:你的黑桃牌和黑桃判定牌视为红桃牌;装备区有红桃牌时手牌上限等于体力上限',
+    description: '锁定技:你的黑桃牌和黑桃判定牌视为红桃牌;装备区有红桃牌时手牌上限等于体力上限',
+    isLocked: true,
   };
 }
 

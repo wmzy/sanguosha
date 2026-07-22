@@ -42,8 +42,8 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界不屈',
-    description:
-      '锁定技:濒死时翻牌堆顶作"创"牌置于武将牌上,点数与已有创均不同则回复至1体力,相同则移去此牌;武将牌上有"创"时手牌上限为"创"的数量',
+    description: '锁定技:濒死时翻牌堆顶作"创"牌置于武将牌上,点数与已有创均不同则回复至1体力,相同则移去此牌;武将牌上有"创"时手牌上限为"创"的数量',
+    isLocked: true,
   };
 }
 

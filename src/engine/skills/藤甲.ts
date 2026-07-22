@@ -3,7 +3,7 @@ import type { AtomBeforeContext, HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '藤甲', description: '防具:普通杀伤害-1,火焰伤害+1' };
+  return { id, ownerId, name: '藤甲', description: '防具:普通杀伤害-1,火焰伤害+1', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

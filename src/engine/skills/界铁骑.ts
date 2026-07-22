@@ -34,6 +34,7 @@ import type {
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerSuppressionProvider } from '../skill-suppression';
 
 /** 标签:目标本回合非锁定技失效(create-engine.runBeforeHooks/runAfterHooks 读取) */
 export const SUPPRESSION_TAG = '界铁骑/非锁定技失效';
@@ -55,6 +56,14 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
+
+  // ── 非锁定技失效 provider:目标持有 SUPPRESSION_TAG 时,其非锁定技 hook 被压制 ──
+  //   通过 skill-suppression 扩展点注册,避免引擎核心硬编码技能名/标签。
+  const unloadSuppression = registerSuppressionProvider(
+    state,
+    (st, targetOwnerId, _skillId) =>
+      st.players[targetOwnerId]?.tags.includes(SUPPRESSION_TAG) === true,
+  );
 
   // respond:同一 action 处理两种 requestType ——
   //   '铁骑/confirm':ownerId 确认是否发动
@@ -235,7 +244,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
-  return () => {};
+  return () => {
+    unloadSuppression();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {

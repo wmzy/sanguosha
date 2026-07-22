@@ -4,10 +4,11 @@
 // 纯展示,所有数据与回调通过 props 传入。
 // pendingRespondInfo 由 usePendingState memo 后从父组件传入,不再在此重复 resolve。
 import * as styles from './gameViewStyles';
-import type { Card, GameView, Json, PendingView } from '../../engine/types';
+import type { Card, Faction, GameView, Json, PendingView } from '../../engine/types';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
+import { FACTION_BG } from './gameViewConstants';
 
 export interface AwaitingPromptProps {
   pending: PendingView;
@@ -183,6 +184,52 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                 >
                   {cancelLabel}
                 </button>
+              </div>
+            );
+          }
+          // chooseOption 类 pending(化身:从多个选项中选一个)
+          if (pending.prompt.type === 'chooseOption') {
+            const p = pending.prompt;
+            const characterCards = p.characterCards;
+            return (
+              <div className={styles.promptActionsWrap}>
+                {characterCards
+                  ? // 武将牌面板:每张武将牌显示势力色底+武将名+技能列表
+                    p.options.map((opt) => {
+                      const cardData = characterCards[opt.value];
+                      const faction: Faction = cardData?.faction ?? '群';
+                      const factionColor = FACTION_BG[faction] || '#8e44ad';
+                      return (
+                        <button
+                          key={opt.value}
+                          className={styles.chooseOptionCard}
+                          style={{
+                            background: factionColor + '20',
+                            borderColor: factionColor,
+                          }}
+                          onClick={() => onSend(skillId, 'respond', { option: opt.value })}
+                        >
+                          <span className={styles.chooseOptionCardName}>
+                            {opt.label}
+                          </span>
+                          {cardData && (
+                            <span className={styles.chooseOptionCardSkills}>
+                              {cardData.skills.join(' · ')}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  : // 普通选项按钮
+                    p.options.map((opt) => (
+                      <button
+                        key={opt.value}
+                        className={styles.promptBtnPrimary}
+                        onClick={() => onSend(skillId, 'respond', { option: opt.value })}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
               </div>
             );
           }

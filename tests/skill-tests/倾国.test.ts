@@ -20,14 +20,16 @@ function makeCard(
   name: string,
   suit: '♠' | '♥' | '♣' | '♦',
   rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makePlayer(opts: {
   index: number;
   name: string;
   hand?: string[];
+  equipment?: Record<string, string>;
   skills?: string[];
   health?: number;
   maxHealth?: number;
@@ -41,7 +43,7 @@ function makePlayer(opts: {
     maxHealth: opts.maxHealth ?? 4,
     alive: true,
     hand: opts.hand ?? [],
-    equipment: {},
+    equipment: opts.equipment ?? {},
     skills: opts.skills ?? ['倾国', '闪'],
     vars: {},
     marks: [],
@@ -245,5 +247,41 @@ describe('倾国', () => {
     expect(actions.length).toBeGreaterThan(0);
     const transformAction = actions.find((a) => a.actionType === 'transform');
     expect(transformAction).toBeDefined();
+  });
+
+  // ─── 负面:黑色装备区牌 transform 被拒(官方仅限手牌) ─────────────
+  // 用例来源:原 tests/skill-tests/界倾国.test.ts。界倾国已于 2026-07 合并入标版倾国
+  // (两文件实现等价,界版仅有 prompt 措辞与 satisfies 守卫两处微优化,已 backport),
+  // 该独有用例一并迁入此处。
+
+  it('transform:黑色装备区牌 → 拒绝(倾国仅限手牌)', async () => {
+    const blackEquip = makeCard('e1', '仁王盾', '♠', '2', '装备牌'); // 黑色装备
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          equipment: { 防具: 'e1' },
+          skills: ['倾国'],
+        }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap: { e1: blackEquip },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 装备区黑色牌不在手牌 → transform 被拒(官方限定"手牌")
+    await P1.expectRejected({
+      skillId: '倾国',
+      actionType: 'transform',
+      params: { cardId: 'e1' },
+    });
+    // 装备未被卸下
+    expect(harness.state.players[0].equipment.防具).toBe('e1');
   });
 });

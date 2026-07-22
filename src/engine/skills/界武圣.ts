@@ -11,6 +11,7 @@ import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom } from '../create-engine';
 import { viewCanAttack } from '../viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
+import { registerAttackRangeExemptor } from '../distance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -93,7 +94,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
     },
   );
-  return () => {};
+
+  // ─── 距离豁免器:界武圣转化的方片杀无距离限制 ─────────────────────
+  //   官方"你使用的方片【杀】无距离限制"(被动增益,任何方片杀生效,
+  //   含物理方片杀与武圣/丈八转化出的方片杀)。
+  //   通过 distance provider 实现,避免污染 杀.ts。
+  const unloadRangeExemptor = registerAttackRangeExemptor(
+    state,
+    ownerId,
+    (_st, _from, _to, cardId) => {
+      if (!cardId) return false;
+      const card = _st.cardMap[cardId];
+      return card?.suit === '♦';
+    },
+  );
+
+  return () => {
+    unloadRangeExemptor();
+  };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {

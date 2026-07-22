@@ -43,10 +43,13 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
       effect,
     };
     // othersView:第三方只看到「谁从谁那里获得了一张牌」不暴露 cardId
+    // 例外:from 为装备区时须带 cardId —— 装备牌为公开信息,且 applyView 需 cardId
+    // 才能在第三方视角正确清空装备槽(否则第三方视图装备槽残留,与权威 buildView 不一致)
     const othersView: ViewEvent = {
       type: '获得',
       player: atom.player,
       ...(atom.from !== undefined ? { from: atom.from, fromZone } : {}),
+      ...(fromZone === 'equipment' ? { cardId: atom.cardId } : {}),
       effect,
     };
     // 给予者也需要看到 cardId 以同步手牌移除(applyView 需要 cardId 做 filter)

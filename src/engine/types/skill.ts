@@ -22,6 +22,10 @@ export interface Skill {
   ownerId: number;
   name: string;
   description: string;
+  /** 是否为锁定技/装备技(防具/武器等)——此属性为引擎扩展点提供输入。
+   *  用于"非锁定技失效"类效果(suppression provider):为 true 的技能 hook 不被压制。
+   *  技能自行声明,引擎不解析描述字符串,避免引擎核心感知技能描述。 */
+  isLocked?: boolean;
 }
 
 /**

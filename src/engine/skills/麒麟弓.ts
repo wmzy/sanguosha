@@ -9,7 +9,7 @@ import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马' };
+  return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马', isLocked: true };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

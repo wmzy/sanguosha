@@ -26,6 +26,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界英姿',
     description: '锁定技:摸牌阶段你多摸一张牌;你的手牌上限为你的体力上限',
+    isLocked: true,
   };
 }
 

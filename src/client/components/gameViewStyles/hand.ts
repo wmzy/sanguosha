@@ -267,3 +267,48 @@ export const emptyHand = css`
   font-size: 13px;
   padding: 12px;
 `;
+
+// ─── distribute 外部候选区(牌堆顶/目标牌等不在手牌区的候选)───
+// 触发场景:观星/界观星/界恂恂/界称象(牌堆顶牌)、界破军/界镇军(目标的牌)。
+// 这些牌不在操作者手牌/装备区,手牌区的 distribute 候选高亮逻辑无法覆盖,
+// 故单独渲染为独立候选排。牌内容通过 view.cardMap 查得。
+export const distExternalWrap = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 4px;
+  padding: 6px 8px;
+  border: 1px dashed rgba(241, 196, 15, 0.3);
+  border-radius: 6px;
+  background: rgba(241, 196, 15, 0.04);
+`;
+export const distExternalLabel = css`
+  color: #f1c40f;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+`;
+export const distExternalList = css`
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 80px;
+`;
+// 外部候选卡片:基于 handCard 样式,但去掉扇形旋转和负 margin(独立横排)
+export const distExternalCard = css`
+  border: 2px solid #555;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  background: linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%);
+  min-width: 64px;
+  width: 72px;
+  text-align: center;
+  transition: all 0.2s;
+  &:hover {
+    border-color: #888;
+    transform: translateY(-2px);
+  }
+`;
