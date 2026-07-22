@@ -13,8 +13,9 @@
 //   2. 玩家选发动 → select prompt 让玩家选 2 张牌弃置(requestType=贯石斧/select)
 //   3. 弃完后把处理区的闪移到弃牌堆,杀.execute 检测处理区无闪 → 自行造成伤害
 import type { FrontendAPI, Skill, GameState } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { isCancelled, clearCancelled } from '../card-effect/registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -80,12 +81,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const weapon = ctx.state.cardMap[weaponId];
     if (weapon?.name !== '贯石斧') return;
 
-    // 检查处理区是否有闪(目标出了闪)
-    const dodgeCardId = frameCards(ctx.state).find((id) => {
-      const c = ctx.state.cardMap[id];
-      return c?.name === '闪';
-    });
-    if (!dodgeCardId) return; // 没出闪,不需要强命
+    // 检查是否被抵消（闪已设置标记,但闪已被 drain 到弃牌堆）
+    if (!isCancelled(ctx.state, atom.cardId, atom.target)) return;
 
     // 可弃牌数不足 2 张时无法强命(手牌 + 装备区)
     const equipIds = Object.values(self.equipment).filter(
@@ -136,14 +133,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 弃置选中的 2 张牌(手牌+装备区均可,用弃置 atom 统一处理)
     await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: selectedIds });
 
-    // 把闪移出处理区。杀.execute 发现处理区无闪后自行结算伤害,
-    // 避免 after hook 和 execute 双重扣血。
-    await applyAtom(ctx.state, {
-      type: '移动牌',
-      cardId: dodgeCardId,
-      from: { zone: '处理区' },
-      to: { zone: '弃牌堆' },
-    });
+    // 清除已抵消标记:杀不再被抵消,将正常造成伤害(runSettlementPhase 检测标记被清除后继续 resolve)
+    clearCancelled(ctx.state, atom.cardId, atom.target);
   });
 
   return () => {};

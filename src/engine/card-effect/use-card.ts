@@ -22,6 +22,7 @@ import { registerAction } from '../skill';
 import { validateCardUse } from './validate';
 import { getCardEffect, requireCardEffect } from './registry';
 import type { CardEffect, ResolveCtx } from './registry';
+import { isCancelled } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -35,11 +36,11 @@ export function createSkill(id: string, ownerId: number): Skill {
 /**
  * 使用结算中：逐目标执行 5 个时机 atom（use.md 使用结算中）。
  *
- *   检测有效性 → 生效前 → 生效时 → 生效后[resolve] → 使用结算结束时
+ *   检测有效性 → 生效前 → 检查标记 → 生效时 → 生效后[resolve] → 使用结算结束时
  *
- * - 检测有效性 返回 false（before-hook cancel）时跳过后续时机。
- * - 生效后 时机 atom 之后调用 CardEffect.resolve——即牌的实际效果。
- *   杀: 造成伤害; 桃: 回复体力; 锦囊: 各自效果。
+ * 完全通用，不区分牌类型。闪/无藉的抵消通过「已抵消」标记实现：
+ *   响应牌在「生效前」时机的 after-hook 中设置标记（见闪/无藉 skill）。
+ *   此处只检查标记 → 已抵消则发出被抵消 atom（武器技介入）→ 跳过 resolve。
  */
 async function runSettlementPhase(
   state: GameState,
@@ -49,23 +50,19 @@ async function runSettlementPhase(
   cardId: string,
   targetIndex: number,
 ): Promise<void> {
-  // (1) 使用结算开始时：检测有效性（仁王器/享乐 before-hook 可 cancel → 跳过）
+  // (1) 使用结算开始时：检测有效性（仁器/享乐 before-hook 可 cancel → 跳过）
   const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
   if (!valid) return;
 
-  // (2) 生效前：可以对此牌进行响应
-  const cardName = state.cardMap[cardId]?.name;
+  // (2) 生效前：发出时机 atom（闪/无藉的 after-hook 在此处理响应并设置标记）
+  await applyAtom(state, { type: '生效前', source, target, cardId });
 
-  if (cardName === '杀') {
-    // 杀的生效前：先发出杀的「生效前」时机 atom（供其他技能 hook），再处理闪响应
-    await applyAtom(state, { type: '生效前', source, target, cardId });
-    // 闪响应：循环询问使用闪（无双/肉林可要求多次），发出闪的「生效前」atom
-    const cancelled = await handleSlashDodge(state, source, target, cardId);
-    if (cancelled) return; // 被闪抵消
-  } else {
-    // 非杀牌：正常发出「生效前」atom（before-hook 可 cancel → 跳过）
-    const notCancelled = await applyAtom(state, { type: '生效前', source, target, cardId });
-    if (!notCancelled) return;
+  // 检查是否被抵消（闪/无藉的 respond 已在 after-hook 中设置标记）
+  if (isCancelled(state, cardId, target)) {
+    // 被抵消 atom：触发武器技（贯石斧强命 / 青龙追杀）
+    await applyAtom(state, { type: '被抵消', source, target, cardId });
+    // 武器技可能逆转（贯石斧弃牌强命 → 清除标记）→ 重新检查
+    if (isCancelled(state, cardId, target)) return; // 仍被抵消，跳过 resolve
   }
 
   // (3) 生效时：若此牌未被抵消，确定将会生效（谦逊等）
@@ -77,83 +74,6 @@ async function runSettlementPhase(
 
   // (5) 使用结算结束时
   await applyAtom(state, { type: '使用结算结束时', source, target, cardId });
-}
-
-/**
- * 杀的「生效前」闪响应处理（使用牌技能的核心逻辑,不在系统规则中）。
- *
- * 循环流程（支持无双/肉林要求多次闪）：
- *   1. 询问目标是否使用闪（询问闪 pending）
- *   2. 检查处理区有无闪牌（respond action 移入 / 八卦阵虚拟闪）
- *   3. 无闪 → 杀继续生效（return false）
- *   4. 有闪 → 发出闪的「生效前」atom（无双/肉林 before-hook 可 cancel 第一次闪）
- *   5. 闪被 cancel（无双/肉林拦截）→ drain闪 → 回到步骤1（再次询问）
- *   6. 闪通过 → 被抵消 atom（武器技介入）→ 重检 → drain / 逆转
- *
- * @returns true=杀被抵消（跳过生效后），false=杀继续生效
- */
-async function handleSlashDodge(
-  state: GameState,
-  source: number,
-  target: number,
-  cardId: string,
-): Promise<boolean> {
-  while (state.players[target]?.alive) {
-    // 询问是否使用闪
-    await applyAtom(state, { type: '询问闪', target, source });
-
-    // 检查处理区：有没有闪牌（目标出闪 / 八卦阵虚拟闪）
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length === 0) {
-      // 没使用闪，杀继续生效
-      return false;
-    }
-
-    // 使用了闪：发出闪的「生效前」atom
-    // 无双/肉林在此 before-hook 中拦截第一次闪（cancel）
-    const dodgeId = dodgeIds[0];
-    const dodgePassed = await applyAtom(state, {
-      type: '生效前',
-      source: target, // 闪的使用者
-      target: target, // 闪没有额外目标
-      cardId: dodgeId,
-    });
-
-    if (!dodgePassed) {
-      // 闪被无双/肉林 cancel → drain 闪 → 再次询问（无双要求第二张闪）
-      for (const id of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-      continue; // 回到循环顶部，再次询问
-    }
-
-    // 闪正常生效，抵消了杀
-    // 被抵消 atom：触发武器技（贯石斧强命 / 青龙追杀）
-    await applyAtom(state, { type: '被抵消', source, target, cardId });
-
-    // 武器技后重检处理区（贯石斧可能弃牌移走闪）
-    const remaining = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (remaining.length > 0) {
-      // 仍被抵消：drain 所有闪
-      for (const dodgeCardId of remaining) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dodgeCardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-      return true; // 被抵消
-    }
-    // 武器技逆转（贯石斧强命）：处理区无闪 → 杀命中
-    return false;
-  }
-  return false;
 }
 
 /**

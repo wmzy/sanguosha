@@ -249,6 +249,9 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   for (const player of state.players) {
     系统规则mod.registerSystemRespondActions(state, player.index);
   }
+  // 注册闪的全局「生效前」after-hook(基本牌面能力,不限闪技能持有者)
+  const { registerDodgeHook } = await import('./card-effects/闪');
+  registerDodgeHook(state);
   await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
@@ -285,6 +288,9 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   for (const player of state.players) {
     系统规则mod.registerSystemRespondActions(state, player.index);
   }
+  // 注册闪的全局「生效前」after-hook(基本牌面能力,不限闪技能持有者)
+  const { registerDodgeHook } = await import('./card-effects/闪');
+  registerDodgeHook(state);
 }
 
 /**

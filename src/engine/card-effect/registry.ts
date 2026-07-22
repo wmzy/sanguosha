@@ -65,3 +65,26 @@ export function requireCardEffect(cardName: string): CardEffect {
 export function hasCardEffect(cardName: string): boolean {
   return registry.has(cardName);
 }
+
+// ── 「已抵消」标记机制 ──
+// 通用机制：闪抵消杀、无懈可击抵消锦囊,都通过设置此标记实现。
+// runSettlementPhase 在「生效前」后检查标记：已抵消 → 发出被抵消 atom → 跳过 resolve。
+// 响应牌（闪/无懈）的 respond action 设置标记；无双/肉林在 after-hook 中清除标记。
+
+const CANCELLED_PREFIX = '生效前/已抵消/';
+
+export function cancelledKey(cardId: string, target: number): string {
+  return `${CANCELLED_PREFIX}${cardId}/${target}`;
+}
+
+export function setCancelled(state: GameState, cardId: string, target: number): void {
+  state.localVars[cancelledKey(cardId, target)] = true;
+}
+
+export function clearCancelled(state: GameState, cardId: string, target: number): void {
+  delete state.localVars[cancelledKey(cardId, target)];
+}
+
+export function isCancelled(state: GameState, cardId: string, target: number): boolean {
+  return state.localVars[cancelledKey(cardId, target)] === true;
+}

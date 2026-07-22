@@ -109,6 +109,14 @@ describe('无双', () => {
     P2.expectPending('询问闪');
     await P2.respond('闪', { cardId: 'd1' });
 
+    // DEBUG: 检查 P2.respond 后的状态
+    process.stdout.write('=== DEBUG 无双 ===\n');
+    process.stdout.write('pendingSlots: ' + JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, atomType: (v.atom as { type: string }).type, atomTarget: (v.atom as { target?: number }).target }))) + '\n');
+    process.stdout.write('atomStack: ' + JSON.stringify(harness.state.atomStack.map((a: any) => ({ type: a.type, pos: a.pos, status: (a as any).status }))) + '\n');
+    const wushuangKeys = Object.keys(harness.state.localVars).filter(k => k.startsWith('无双/') || k.startsWith('生效前/'));
+    process.stdout.write('localVars(无双/生效前): ' + JSON.stringify(Object.fromEntries(wushuangKeys.map(k => [k, harness.state.localVars[k]]))) + '\n');
+    process.stdout.write('=== END DEBUG ===\n');
+
     // 无双:第二轮询问闪
     P2.expectPending('询问闪');
     await P2.respond('闪', { cardId: 'd2' });

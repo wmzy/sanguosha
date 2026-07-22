@@ -29,6 +29,7 @@
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { isCancelled, clearCancelled, setCancelled } from '../card-effect/registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -91,12 +92,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const weapon = ctx.state.cardMap[weaponId];
     if (weapon?.name !== '青龙偃月刀') return;
 
-    // 检查处理区是否有闪(目标出了闪)
-    const dodgeCardId = frameCards(ctx.state).find((id) => {
-      const c = ctx.state.cardMap[id];
-      return c?.name === '闪';
-    });
-    if (!dodgeCardId) return; // 没出闪,不需要追杀
+    // 检查是否被抵消（闪已设置标记,但闪已被 drain 到弃牌堆）
+    if (!isCancelled(ctx.state, atom.cardId, atom.target!)) return;
 
     // owner 手牌中没有杀 → 无法追杀,直接放弃
     const hasKill = self.hand.some((id) => ctx.state.cardMap[id]?.name === '杀');
@@ -146,33 +143,44 @@ export function onInit(skill: Skill, state: GameState): () => void {
       to: { zone: '处理区' },
     });
 
-    // 把刚才的闪移出处理区。
-    await applyAtom(ctx.state, {
-      type: '移动牌',
-      cardId: dodgeCardId,
-      from: { zone: '处理区' },
-      to: { zone: '弃牌堆' },
-    });
+    // 原杀的抵消标记保持(原杀被闪,不再造成伤害)。
+    // 追杀的杀是新的使用事件,由本 hook 内联处理伤害。
 
     // 再次询问闪:询问目标对追杀的杀是否出闪
     await applyAtom(ctx.state, { type: '询问闪', target: atom.target!, source: ownerId });
 
     // 递归检测:追杀的杀若被闪,applyAtom(被抵消) 再次触发本 hook(连续追杀)。
-    // 青龙已迁至"被抵消"after,故询问闪不再自动递归,需在此显式 apply。
     const 追杀Dodge = frameCards(ctx.state).find((id) => ctx.state.cardMap[id]?.name === '闪');
     if (追杀Dodge) {
+      // drain 追杀的闪
+      for (const id of frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪')) {
+        await applyAtom(ctx.state, {
+          type: '移动牌',
+          cardId: id,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
+      }
+      // 设置追杀的杀的抵消标记
+      setCancelled(ctx.state, killCardId, atom.target!);
       await applyAtom(ctx.state, {
         type: '被抵消',
         source: ownerId,
         target: atom.target!,
         cardId: killCardId,
       });
+    } else {
+      // 追杀命中:造成伤害
+      await applyAtom(ctx.state, {
+        type: '造成伤害',
+        target: atom.target!,
+        amount: 1,
+        source: ownerId,
+        cardId: killCardId,
+      });
     }
 
-    // 清理追杀的杀牌:杀.execute 的收尾只移走原始杀(cardId),不认识追杀的杀牌。
-    // 若不移走,追杀的杀会滞留处理区导致视图不一致。
-    //   - 命中时(无闪):杀.execute 自行造成伤害,此处仅清理杀牌
-    //   - 被闪时(有闪):杀.execute drain 所有闪后 miss,此处仅清理杀牌
+    // 清理追杀的杀牌
     if (frameCards(ctx.state).includes(killCardId)) {
       await applyAtom(ctx.state, {
         type: '移动牌',

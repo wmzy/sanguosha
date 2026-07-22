@@ -4,33 +4,49 @@
 // 使用目标：以你为目标的【杀】。
 // 作用效果：抵消此【杀】。
 //
-// 闪的使用入口：在杀的"生效前"时机,由 use-card.ts 的 handleSlashDodge 询问目标
-// 是否使用闪。目标通过闪.respond action 把闪牌移入处理区后,handleSlashDodge 发出
-// 闪的"生效前" atom——无双/肉林在此 before-hook 中拦截第一次闪。
+// 闪是基本牌,任何玩家成为杀的目标时都可使用闪——不依赖玩家技能列表中是否有'闪'。
+// 故闪的「生效前」after-hook 全局注册(ownerId=-1),在模块加载时由 index.ts → use-card.ts
+// 的 onInit 或系统规则触发。
 //
-// 闪的 resolve 不在此文件实现——抵消逻辑由 handleSlashDodge 直接处理
-// （applyAtom(被抵消) + 武器技 + drain闪）。
-// 此文件仅注册闪的牌面元数据（timing/target/prompt）。
+// 流程:杀的「生效前」→ 闪的 after-hook 询问闪 → respond action 移牌+设置标记 →
+// drain闪 → 无双/肉林在「询问闪」after-hook 中拦截第一次。
 
-import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
-import { registerCardEffect, type CardEffect } from '../card-effect/registry';
+import type { GameState } from '../types';
+import { applyAtom, frameCards, topFrame } from '../create-engine';
+import { registerAfterHook } from '../skill';
+import { setCancelled } from '../card-effect/registry';
 
-const dodgeEffect: CardEffect = {
-  timing: '杀生效前',
-  target: { kind: 'none' },
-  resolve: async () => {
-    // 闪的抵消效果由 handleSlashDodge 直接处理（检查处理区+被抵消atom+武器技）。
-    // 闪不走 runUseFlow——它的"使用"是杀的"生效前"时机的响应交互,
-    // 由 handleSlashDodge 编排（询问闪 → 闪.respond移牌 → 闪的生效前atom → 被抵消）。
-  },
-  prompt: {
-    type: 'useCard',
-    title: '出闪',
-    cardFilter: { filter: (c: Card) => c.name === '闪', min: 1, max: 1 },
-  } as ActionPrompt,
-  label: '闪',
-  style: 'default',
-};
+/**
+ * 注册闪的「生效前」全局 after-hook。
+ * 在杀的「生效前」时机询问目标是否使用闪,设置已抵消标记,drain闪。
+ *
+ * 全局注册(ownerId=-1)——闪是基本牌面能力,适用于所有玩家,不限闪技能持有者。
+ * 标记来源:respond action（玩家出闪时设置）或此处检测处理区（八卦阵虚拟闪等 cancel 询问闪的场景）。
+ */
+export function registerDodgeHook(state: GameState): void {
+  registerAfterHook(state, '闪', -1, '生效前', async (ctx) => {
+    const atom = ctx.atom as { source: number; target: number; cardId: string };
+    const card = ctx.state.cardMap[atom.cardId];
+    if (!card || card.name !== '杀') return;
+    if (!ctx.state.players[atom.target]?.alive) return;
 
-registerCardEffect('闪', dodgeEffect);
+    // 询问是否使用闪
+    await applyAtom(ctx.state, { type: '询问闪', target: atom.target, source: atom.source });
+
+    // 检查处理区:有没有闪牌(玩家出闪 / 八卦阵虚拟闪)
+    const dodgeIds = frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪');
+    if (dodgeIds.length > 0) {
+      // 设置已抵消标记（补保 respond action 未设置的场景,如八卦阵虚拟闪）
+      setCancelled(ctx.state, atom.cardId, atom.target);
+      // drain 闪到弃牌堆
+      for (const id of dodgeIds) {
+        await applyAtom(ctx.state, {
+          type: '移动牌',
+          cardId: id,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
+      }
+    }
+  });
+}
