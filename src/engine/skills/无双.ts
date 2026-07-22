@@ -12,6 +12,7 @@
 // 虚拟闪 → 消耗 → 追加第二次询问闪 → 八卦阵再判一次。
 import type { GameState, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { registerPostDodgeAskHook } from '../card-effect/registry';
 import type { SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -74,5 +75,8 @@ export async function enforceDualKill(
   }
   await applyAtom(state, { type: '询问杀', target: current, source: otherParty });
 }
+
+// 模块加载时注册 post-dodge-ask hook（杀 CardEffect.resolve 调用，无需杀.ts 直接 import 无双）
+registerPostDodgeAskHook(enforceDualDodge);
 
 export default { createSkill } satisfies SkillModule;

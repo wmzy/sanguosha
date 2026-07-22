@@ -2,24 +2,19 @@
 //   use:出牌阶段对攻击范围内一名角色使用,目标须出闪抵消,否则受 1 点伤害。
 //   respond:决斗/南蛮入侵等场景,目标"出杀抵消"——杀牌移到处理区供调用方结算。
 //
-// 多目标结算顺序(三阶段):
-//   1. 声明:逐个 指定目标(触发"指定目标时"hook)
-//   2. 结算:逐个 成为目标(触发"成为目标后"hook,如流离转移)
-//      → 询问闪(防具如仁王盾/八卦阵在此 cancel 或放虚拟闪)
-//      → 检查处理区有闪则 miss,无闪则造成伤害
-//   3. 收尾:杀牌移出处理区→弃牌堆
+// use 的结算逻辑已迁移到 card-effects/杀.ts (CardEffect.resolve + onSettle)。
+// execute 委托 runUseFlow 编排完整使用结算流程（文档 use.md）。
+// 无双/肉林通过 PostDodgeAskHook 解耦，不再直接 import。
 //
-// 流离/转移类技能:在 成为目标 after hook 修改帧 params.currentTarget,
-// 杀在下轮结算时读帧上的 currentTarget 而非原始 targets[i]。
+// respond 保留在杀.ts（打出杀进处理区供决斗/南蛮入侵检查）。
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
-import { enforceDualDodge } from './无双';
-import { enforceRoulinDodge } from './肉林';
-import { canSlash, incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
+import { canSlash } from '../slash-quota';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '杀', description: '出牌阶段对攻击范围内一名角色使用' };
@@ -52,134 +47,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return canSlash(state, ownerId, cardId) ? null : '出杀次数已达上限';
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
       const targets = params.targets as number[];
-      const damageType = state.cardMap[cardId]?.damageType;
-      const frame = await pushFrame(state, '杀', from, {
-        ...params,
-        resolvedTargets: [...targets],
-      });
-
-      try {
-        // 杀牌进处理区
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '手牌', player: from },
-          to: { zone: '处理区' },
-        });
-
-        // 第一阶段:逐个指定所有目标(触发"指定目标时"hook)
-        for (const target of targets) {
-          await applyAtom(state, { type: '指定目标', source: from, target, cardId });
-        }
-
-        // 第二阶段:逐个结算(成为目标 → 检测有效性 → 询问闪 → 被抵消 → 检查处理区 → 伤害)
-        // resolvedTargets 从帧上读取:流离等技能可能修改帧上的 resolvedTargets
-        for (let i = 0; i < targets.length; i++) {
-          // 从帧上读当前目标(可能被流离等技能修改)
-          const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
-          const target = resolved[i];
-
-          // 成为目标:触发"成为目标后"hook(如流离转移),可被 cancel(空城等)
-          const becameTarget = await applyAtom(state, {
-            type: '成为目标',
-            source: from,
-            target,
-            cardId,
-          });
-          if (!becameTarget) continue; // 空城等:目标不合法,跳过该目标结算
-
-          // 使用结算开始时:检测有效性(仁王盾黑杀无效在此 cancel)。
-          // cancel=false 表示目标无效,跳过该目标(不询问闪、不伤害、不触发被抵消)。
-          const valid = await applyAtom(state, {
-            type: '检测有效性',
-            source: from,
-            target,
-            cardId,
-          });
-          if (!valid) continue;
-
-          // 生效前:询问闪(等待目标回应;八卦阵判红放虚拟闪后 cancel)
-          // 诈降/烈弓/界鞬出 等"强制命中"效果由各自技能挂 before-hook cancel 询问闪实现,
-          // 杀技能完全不感知这些技能。
-          await applyAtom(state, { type: '询问闪', target, source: from });
-
-          // 无双(吕布锁定技):目标需连续出两张闪。第一张闪打出后消耗,追加第二次询问。
-          await enforceDualDodge(state, from, target);
-          // 肉林(董卓锁定技):异性间杀,目标需连续出两张闪。同上机制。
-          await enforceRoulinDodge(state, from, target);
-
-          // 检查处理区:有没有闪牌(目标出闪 / 八卦阵虚拟闪)
-          const dodgeIds = frameCards(state).filter((id) => {
-            const c = state.cardMap[id];
-            return c?.name === '闪';
-          });
-          if (dodgeIds.length > 0) {
-            // 被抵消:触发武器技(贯石斧强命移闪 / 青龙追杀)。
-            // 武器技在 after hook 可能改变处理区状态,故 apply 后重新检查。
-            await applyAtom(state, { type: '被抵消', source: from, target, cardId });
-            const remaining = frameCards(state).filter((id) => {
-              const c = state.cardMap[id];
-              return c?.name === '闪';
-            });
-            if (remaining.length > 0) {
-              // 仍被抵消:drain 所有闪
-              for (const dodgeCardId of remaining) {
-                await applyAtom(state, {
-                  type: '移动牌',
-                  cardId: dodgeCardId,
-                  from: { zone: '处理区' },
-                  to: { zone: '弃牌堆' },
-                });
-              }
-            } else {
-              // 武器技逆转(贯石斧强命 / 青龙追杀命中):处理区无闪 → 造成伤害
-              await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId, damageType });
-            }
-          } else {
-            // 没闪:造成伤害(触发藤甲/白银狮子/遗计/反馈等,濒死由引擎核心处理)
-            await applyAtom(state, { type: '造成伤害', target, amount: 1, source: from, cardId, damageType });
-          }
-        }
-
-        // 第三阶段:收尾——杀牌移出处理区→弃牌堆
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        // 异常安全:保证帧弹出 + 杀牌不滞留处理区(即使上面 await 抛错)。
-        // 不吞错——如果清理用的 移动牌 也抛,说明状态已损坏,应让异常传播暴露问题。
-        const stillInProc = frameCards(state).includes(cardId);
-        if (stillInProc) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-        // 记录一次出杀(已用次数 +1;上限由 slashMax 计算,连弩的 ∞ 由标签体现)
-        // 豁免该张杀的技能(如界弓骑同花色杀)已通过 slash-quota.registerSlashExemptor
-        // 注册,isSlashExempted 返回 true 时跳过计数累加。
-        if (!isSlashExempted(state, ownerId, cardId)) {
-          incSlashUsed(state);
-          // 同步出杀计数到 view:processedView 不增量维护 turn.vars,需经 atom
-          // event 让前端 turnUsage 实时更新(杀超上限时禁用)。紧跟 incSlashUsed
-          // 投影最新计数。
-          await applyAtom(state, {
-            type: '回合用量',
-            player: ownerId,
-            key: '杀/usedCount',
-            value: slashUsed(state),
-          });
-        }
-      }
+      // 结算逻辑委托 runUseFlow → CardEffect['杀'].resolve + onSettle
+      await runUseFlow(state, ownerId, cardId, targets, '杀');
     },
   );
 

@@ -11,6 +11,7 @@
 import type { GameState, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { getGender } from '../character-meta';
+import { registerPostDodgeAskHook } from '../card-effect/registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -66,9 +67,13 @@ export async function enforceRoulinDodge(
 }
 
 export function onInit(_skill: Skill, _state: GameState): () => void {
-  // 肉林逻辑通过 enforceRoulinDodge 嵌入 杀.execute,无独立 hook/action。
+  // 肉林逻辑通过 PostDodgeAskHook 解耦：杀 CardEffect.resolve 调 runPostDodgeAskHooks
+  // 时触发 enforceRoulinDodge（运行时检查肉林条件决定是否生效）。
   // 仍需 createSkill 实例化,使 player.skills.includes('肉林') 判定成立。
   return () => {};
 }
+
+// 模块加载时注册 post-dodge-ask hook（杀不再直接 import 肉林）
+registerPostDodgeAskHook(enforceRoulinDodge);
 
 export default { createSkill, onInit } satisfies import('../types').SkillModule;

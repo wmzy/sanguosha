@@ -123,6 +123,11 @@ export async function runUseFlow(
         to: { zone: '弃牌堆' },
       });
     }
+
+    // 牌特有结算后回调（popFrame 前）——杀的出杀次数累加等
+    if (effect.onSettle) {
+      await effect.onSettle(state, source, cardId);
+    }
   } finally {
     // 异常安全：保证牌不滞留处理区 + 帧弹出
     if (frameCards(state).includes(cardId)) {

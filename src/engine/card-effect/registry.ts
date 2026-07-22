@@ -38,6 +38,8 @@ export interface CardEffect {
   target: CardTargetSpec;
   canUse?: (state: GameState, ownerId: number, params: Record<string, Json>) => string | null;
   resolve: (ctx: ResolveCtx) => Promise<void>;
+  /** 使用结算完成后回调（popFrame 前）。用于 post-use 清理，如杀的出杀次数累加。 */
+  onSettle?: (state: GameState, source: number, cardId: string) => Promise<void>;
   prompt: ActionPrompt;
   label: string;
   style: 'danger' | 'primary' | 'default';
@@ -62,4 +64,31 @@ export function requireCardEffect(cardName: string): CardEffect {
 
 export function hasCardEffect(cardName: string): boolean {
   return registry.has(cardName);
+}
+
+// ── Post-dodge-ask hook 机制 ──
+// 解决 无双/肉林 的「需出两张闪」硬编码问题。
+// 这些技能在 询问闪 返回后需要消耗已有闪并追加第二次询问。
+// 通过此 registry 注册 hook，杀的 resolve 函数调 runPostDodgeAskHooks 即可，
+// 无需直接 import 无双/肉林（依赖反转）。
+// hook 内部自行检查 skills.includes('无双')/性别条件，不匹配则 no-op。
+
+type PostDodgeAskHook = (state: GameState, source: number, target: number) => Promise<void>;
+
+const postDodgeAskHooks: PostDodgeAskHook[] = [];
+
+/** 注册一个 post-dodge-ask hook（模块级，运行时检查 skills 决定是否生效）。 */
+export function registerPostDodgeAskHook(fn: PostDodgeAskHook): void {
+  postDodgeAskHooks.push(fn);
+}
+
+/** 执行所有已注册的 post-dodge-ask hooks（杀的 resolve 在 询问闪 后调用）。 */
+export async function runPostDodgeAskHooks(
+  state: GameState,
+  source: number,
+  target: number,
+): Promise<void> {
+  for (const fn of postDodgeAskHooks) {
+    await fn(state, source, target);
+  }
 }

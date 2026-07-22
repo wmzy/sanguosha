@@ -4,6 +4,9 @@
 import type { SkillModule } from '../skill';
 import { setSkillModuleResolver, setSkillModuleChecker } from '../skill';
 
+// Eager load：注册所有 CardEffect（杀/闪/桃 等），副作用 import
+import '../card-effects';
+
 // 注意:系统规则的全局 hooks 不再在模块加载时注册(state-bound 注册表要求绑定到具体 state)。
 // 改由 create-engine 的 bootstrap / registerSkillsFromState 对每个真实 state 调用 系统规则.onInit 注册。
 
