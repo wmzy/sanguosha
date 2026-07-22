@@ -100,7 +100,8 @@ function isPersistedWrapper(value: unknown): value is PersistedWrapper {
   const v = value as Record<string, unknown>;
   if (typeof v['roomName'] !== 'string') return false;
   if (typeof v['maxPlayers'] !== 'number') return false;
-  if (v['hostId'] !== null && typeof v['hostId'] !== 'string') return false;
+  // hostId 是后加字段,旧数据可能缺失(undefined)→视为 null
+  if (v['hostId'] !== undefined && v['hostId'] !== null && typeof v['hostId'] !== 'string') return false;
   if (typeof v['debug'] !== 'boolean') return false;
   if (!Array.isArray(v['players'])) return false;
   if (typeof v['seed'] !== 'number') return false;
@@ -236,7 +237,7 @@ export async function loadRoom(roomId: string): Promise<PersistedRoom | null> {
     roomId,
     roomName: wrapper.roomName,
     maxPlayers: wrapper.maxPlayers,
-    hostId: wrapper.hostId,
+    hostId: wrapper.hostId ?? null,
     debug: wrapper.debug,
     seats: wrapper.seats,
     players: wrapper.players,

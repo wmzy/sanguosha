@@ -12,6 +12,7 @@ import { GameSession } from '../../src/server/session';
 import { addRoom, getRoom, type Room } from '../../src/server/room';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { cleanupIdleRooms, IDLE_ROOM_TTL_MS } from '../../src/server/cleanup';
+import { downgradeStaleNormalRooms } from '../../src/server/app';
 import type { ServerMessage } from '../../src/server/protocol';
 import type { ConnectionSink } from '../../src/server/connection';
 
@@ -179,5 +180,66 @@ describe('cleanupIdleRooms', () => {
     expect(getRoom(room.id)!.players.size).toBe(2);
     expect(playerRoomMap.has('p1')).toBe(true);
     expect(playerRoomMap.has('p2')).toBe(true);
+  });
+});
+
+// 回归:普通房间「不自动销毁」契约。
+// 原Bug: restoreNormalRoomsFromDb 启动恢复时按 1 小时过期删除非「进行中」的普通房间,
+// 导致等待中/已结束的普通房间在服务器重启后被销毁。修复后普通房间无论多旧都从 DB 恢复。
+// downgradeStaleNormalRooms 负责将无 session 的普通房间降级为等待中(含已结束状态),
+// 确保房主始终能在房间列表看到房间。
+describe('downgradeStaleNormalRooms — 普通房间不自动销毁', () => {
+  beforeEach(() => {
+    gameSessions.clear();
+    playerRoomMap.clear();
+  });
+
+  it('已结束且无 session 的普通房间降级为等待中', async () => {
+    const room = makeRoom([], 'normal');
+    room.status = '已结束';
+
+    await downgradeStaleNormalRooms();
+
+    expect(getRoom(room.id)).not.toBeNull();
+    expect(getRoom(room.id)!.status).toBe('等待中');
+    expect(getRoom(room.id)!.seats.every((s) => s === null)).toBe(true);
+  });
+
+  it('进行中且无 session 的普通房间降级为等待中', async () => {
+    const room = makeRoom([], 'normal');
+    room.status = '进行中';
+
+    await downgradeStaleNormalRooms();
+
+    expect(getRoom(room.id)!.status).toBe('等待中');
+  });
+
+  it('等待中的普通房间保持不变', async () => {
+    const room = makeRoom([], 'normal');
+    room.status = '等待中';
+
+    await downgradeStaleNormalRooms();
+
+    expect(getRoom(room.id)!.status).toBe('等待中');
+  });
+
+  it('有活跃 session 的进行中普通房间不降级', async () => {
+    const room = makeRoom(['p1', 'p2'], 'normal');
+    room.status = '进行中';
+    const session = new GameSession(room, true, 42);
+    gameSessions.set(room.id, session);
+
+    await downgradeStaleNormalRooms();
+
+    expect(getRoom(room.id)!.status).toBe('进行中');
+  });
+
+  it('快速房间不受降级影响', async () => {
+    const room = makeRoom([], 'quick');
+    room.status = '已结束';
+
+    await downgradeStaleNormalRooms();
+
+    expect(getRoom(room.id)!.status).toBe('已结束');
   });
 });

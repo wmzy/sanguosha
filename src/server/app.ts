@@ -12,7 +12,7 @@ import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } fro
 import { normalizeRoomConfig } from './protocol';
 import { addRoom, getRoom, setRoomStatus, type Room } from './room';
 import { cleanupIdleRooms } from './cleanup';
-import { initRoomStore, loadAllRoomsFromDb, deleteRoomFromDb } from './roomStore';
+import { initRoomStore, loadAllRoomsFromDb } from './roomStore';
 
 const log = createLogger('ws');
 
@@ -49,19 +49,12 @@ export function startServerLifecycle(): void {
   })();
 }
 
-/** 从 DB 恢复普通房间元数据。快闪房间不入库,无需恢复。 */
+/** 从 DB 恢复普通房间元数据。快闪房间不入库,无需恢复。
+ *  普通房间(normal)的契约是「不自动销毁」:无论多旧都应恢复,仅在房主显式删除时移除。 */
 async function restoreNormalRoomsFromDb(): Promise<void> {
   const rows = await loadAllRoomsFromDb();
   log.info(`启动恢复：发现 ${rows.length} 个普通房间记录`);
-  const now = Date.now();
-  const ONE_HOUR = 60 * 60 * 1000;
   for (const row of rows) {
-    // 超过 1 小时且非进行中的普通房间,清理
-    if (now - row.updatedAt > ONE_HOUR && row.status !== '进行中') {
-      log.info(`跳过过期普通房间 ${row.id}（最后更新: ${new Date(row.updatedAt).toISOString()}）`);
-      await deleteRoomFromDb(row.id);
-      continue;
-    }
     const room: Room = {
       id: row.id,
       name: row.name,
@@ -86,24 +79,27 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
   }
 }
 
-/** 将“进行中”但无法恢复 session 的普通房间降级为“等待中”。
- *  触发场景:房间在游戏中进程被 kill,DB 记录状态仍是“进行中”,但 data/rooms 下
+/** 将无活跃 session 的普通房间降级为"等待中"。
+ *  导出供单元测试调用。
+ *  涵盖「进行中」和「已结束」两种状态:房间在游戏中进程被 kill,或游戏结束后
+ *  玩家未点击「再来一局」即重启 → DB 记录状态仍是进行中/已结束,但 data/rooms 下
  *  无对应 .json(或 .json 已被过期清理)→ restorePersistedRooms 不会创建 GameSession。
  *  不降级的话 getRoomList 的 hasSession 过滤会让它从房间列表消失,房主无法看到房间。 */
-async function downgradeStaleNormalRooms(): Promise<void> {
+export async function downgradeStaleNormalRooms(): Promise<void> {
   const { getAllRooms } = await import('./room');
-  // 用 getAllRooms(不过滤)而非 getRoomList:getRoomList 会过滤"进行中无 session"的房间,
+  // 用 getAllRooms(不过滤)而非 getRoomList:getRoomList 会过滤"非等待中且无 session"的房间,
   // 但本函数正是要降级这些房间。用 getRoomList 会跳过它们,导致死锁。
   const normalRooms = getAllRooms().filter((r) => r.roomType === 'normal');
   for (const room of normalRooms) {
     const roomId = room.id;
     if (gameSessions.has(roomId)) continue;
-    if (room.status !== '进行中') continue;
+    if (room.status === '等待中') continue;
     // 清理局内状态:准备记录、座次。状态变更通过 setRoomStatus 同步 DB。
+    const oldStatus = room.status;
     room.readyPlayers = new Set();
     room.seats = room.seats.map(() => null);
     setRoomStatus(roomId, '等待中');
-    log.info(`降级普通房间 ${roomId}（无持久化 state,由进行中→等待中）`);
+    log.info(`降级普通房间 ${roomId}（无活跃 session,${oldStatus}→等待中）`);
   }
 }
 
@@ -112,13 +108,19 @@ async function restorePersistedRooms(): Promise<void> {
   log.info(`启动恢复：发现 ${roomIds.length} 个持久化房间`);
   // skill 注册表是 state-bound(WeakMap 外挂),每个房间的 state 自带独立注册表,
   // 无需启动时清理全局表。bootstrap 会为每个 state 注册各自的技能实例。
-  // 清理超过 1 小时的房间(所有类型都不跨重启长期保留)
+  // 清理超过 1 小时的游戏状态 .json(快速房间整体回收;普通房间仅删局内状态,
+  // 房间元数据由 restoreNormalRoomsFromDb 从 DB 恢复,不受此影响)
   const ONE_HOUR = 60 * 60 * 1000;
   const now = Date.now();
   for (const roomId of roomIds) {
     try {
       const persisted = await loadRoom(roomId);
-      if (!persisted) continue;
+      if (!persisted) {
+        // 文件损坏/格式不兼容:删除避免每次启动重复尝试
+        log.info(`房间 ${roomId} 持久化文件无法解析,删除`);
+        await deletePersistedRoom(roomId);
+        continue;
+      }
       // 用 startedAt(游戏开始时间)判定过期,不用文件 mtime:
       // restoreState 后 pending slot 定时器会反复触发 saveRoom 刷新 mtime,
       // 导致 mtime 永远是最近的,过期检查失效。
