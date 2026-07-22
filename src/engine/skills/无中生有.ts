@@ -1,8 +1,7 @@
 // 无中生有(普通锦囊):出牌阶段对自己使用,摸两张牌。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
-import { 询问无懈可击 } from '../无懈可击';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '无中生有', description: '锦囊:摸两张牌' };
@@ -19,38 +18,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return validateUseCard(state, ownerId, params, { cardName: '无中生有' });
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      await pushFrame(state, '无中生有', from, { ...params });
       const cardId = params.cardId as string;
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      // 询问无懈可击(close-reopen:询问无懈可击 循环管理窗口)
-      try {
-        const cancelled = await 询问无懈可击(state, from);
-        if (!cancelled) {
-          await applyAtom(state, { type: '摸牌', player: from, count: 2 });
-        }
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
+      // 结算逻辑委托 runUseFlow → CardEffect['无中生有'].resolve
+      // 无中生有无目标（kind='none'），targets=[]
+      await runUseFlow(state, ownerId, cardId, [], '无中生有');
     },
   );
   return () => {};

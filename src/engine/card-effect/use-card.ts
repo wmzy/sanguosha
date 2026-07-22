@@ -55,6 +55,7 @@ export async function runUseFlow(
   // ── 使用结算前（声明阶段）──
   const frame = await pushFrame(state, cardName, source, {
     cardId,
+    targets: [...targets], // 保持与旧 pushFrame({ ...params }) 的兼容性（界谦逊等读 frame.params.targets）
     resolvedTargets: [...targets],
   });
 
@@ -79,6 +80,12 @@ export async function runUseFlow(
     }
 
     // ── 使用结算中：逐目标完整结算 ──
+    // 无目标牌（无中生有/酒等 target.kind='none'/'self'）：resolve 一次，target=source
+    if (targets.length === 0) {
+      const ctx: ResolveCtx = { state, source, target: source, cardId, targetIndex: 0 };
+      await effect.resolve(ctx);
+    }
+
     for (let i = 0; i < targets.length; i++) {
       // 从帧上读当前目标（流离等技能可能修改 resolvedTargets）
       const resolved = (frame.params.resolvedTargets as number[]) ?? targets;

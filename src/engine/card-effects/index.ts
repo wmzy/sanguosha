@@ -4,3 +4,6 @@
 // 此文件被 skills/index.ts eager import（游戏启动时技能加载即注册所有卡牌效果）。
 
 import './杀';
+import './桃';
+import './无中生有';
+import './决斗';

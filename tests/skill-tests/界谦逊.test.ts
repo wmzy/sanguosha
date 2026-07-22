@@ -18,7 +18,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom, topFrame } from '../../src/engine/create-engine';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -271,8 +271,37 @@ describe('界谦逊', () => {
     // P1 对陆逊出决斗
     await P1.triggerAction('决斗', 'use', { cardId: 'dd', targets: [0] });
 
+    // ── DEBUG: 打印当前状态 ──
+    console.log('=== pendingSlots ===');
+    for (const [key, slot] of harness.state.pendingSlots) {
+      console.log(`  key=${key}, type=${(slot.atom as any).type}, target=${(slot.atom as any).target}, requestType=${(slot.atom as any).requestType}`);
+    }
+    console.log('=== atomStack ===');
+    for (const a of harness.state.atomStack) {
+      console.log(`  type=${(a as any).type}, target=${(a as any).target}, requestType=${(a as any).requestType}`);
+    }
+    const tf = topFrame(harness.state);
+    if (tf) {
+      console.log('=== topFrame ===');
+      console.log(`  skillId=${tf.skillId}, params=${JSON.stringify(tf.params)}`);
+    } else {
+      console.log('=== topFrame === undefined');
+    }
+    // ── END DEBUG ──
+
     // 无懈窗口(broadcast)
+    console.log('=== BEFORE expectPending ===');
+    for (const [key, slot] of harness.state.pendingSlots) {
+      console.log(`  key=${key}, type=${(slot.atom as any).type}, target=${(slot.atom as any).target}, requestType=${(slot.atom as any).requestType}`);
+    }
+    console.log('=== atomStack BEFORE expectPending ===');
+    for (const a of harness.state.atomStack) {
+      console.log(`  type=${(a as any).type}, target=${(a as any).target}, requestType=${(a as any).requestType}`);
+    }
+    console.log('=== About to call expectPending ===');
+    process.stdout.write('FLUSH_MARKER\n');
     P1.expectPending('请求回应');
+    console.log('=== After expectPending ===');
     await P1.pass(); // 无人打出无懈 → 我的 hook 触发 → 谦逊 prompt
 
     // 谦逊 prompt(经 请求回应 无懈窗口路径触发)

@@ -2,10 +2,11 @@
 //   use:出牌阶段对已受伤角色使用,回复 1 体力。
 //   respond:濒死求桃时出桃救援——设 state.localVars['求桃/已救'] = true,
 //   runDyingFlow 检查此标志判断是否有人救援。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
+import { applyAtom } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
 import { defaultPlayActive } from '../action-active';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -39,24 +40,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       );
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
-      const target = (params.target ?? (params.targets as number[] | undefined)?.[0]) as number;
-      await pushFrame(state, '桃', from, { ...params });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      await applyAtom(state, { type: '回复体力', target, amount: 1, source: from });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-      await popFrame(state);
+      const target =
+        ((params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined) ??
+        ownerId;
+      // 结算逻辑委托 runUseFlow → CardEffect['桃'].resolve
+      await runUseFlow(state, ownerId, cardId, [target], '桃');
     },
   );
 

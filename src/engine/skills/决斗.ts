@@ -3,10 +3,11 @@
 //
 // 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 没出(输)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 import { enforceDualKill } from './无双';
+import { runUseFlow } from '../card-effect/use-card';
 
 /**
  * 决斗结算核心(可复用):A 视为对 B 使用决斗,双方轮流出杀,输者受 1 点伤害。
@@ -123,33 +124,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
       const target = (params.targets as number[])[0];
-      await pushFrame(state, '决斗', from, { ...params });
-
-      // 决斗锦囊进处理区
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-
-      try {
-        await runDuelResolution(state, from, target, cardId);
-      } finally {
-        // 决斗牌移出处理区→弃牌堆(无论是否被无懈/空城取消)
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
+      // 结算逻辑委托 runUseFlow → CardEffect['决斗'].resolve
+      // 成为由 runUseFlow 处理，resolve 内 runDuelLoop 不再重复
+      await runUseFlow(state, ownerId, cardId, [target], '决斗');
     },
   );
   return () => {};
