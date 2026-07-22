@@ -5,13 +5,16 @@ import { describe, expect, it } from 'vitest';
 import { getCardImage, getCharacterImage, getEquipCardImage } from '../../src/client/assets/imageAssets';
 
 describe('getCharacterImage', () => {
-  it('returns URL for standard heroes with portrait assets', () => {
-    expect(getCharacterImage('曹操')).toBe('/characters/曹操.png');
-    expect(getCharacterImage('刘备')).toBe('/characters/刘备.png');
+  // 武将立绘走 /cards-local/characters/<name>.png;任意武将都返回 URL,
+  // 文件 404 由 <img onError> 回退到势力色背景(见各武将卡组件)。
+  it('routes any character to /cards-local/characters/<name>.png', () => {
+    expect(getCharacterImage('曹操')).toBe('/cards-local/characters/曹操.png');
+    expect(getCharacterImage('刘备')).toBe('/cards-local/characters/刘备.png');
+    // 不维护武将名白名单——任意武将都尝试加载,缺失素材回退势力色背景
+    expect(getCharacterImage('不存在')).toBe('/cards-local/characters/不存在.png');
   });
 
-  it('returns null for unknown heroes', () => {
-    expect(getCharacterImage('不存在')).toBeNull();
+  it('returns null only for empty name', () => {
     expect(getCharacterImage('')).toBeNull();
   });
 });

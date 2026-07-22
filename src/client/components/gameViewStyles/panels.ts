@@ -143,7 +143,7 @@ export const selectedCharPortrait = css`
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--faction-color, rgba(0, 0, 0, 0.35));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 `;
 export const selectedCharPortraitImg = css`

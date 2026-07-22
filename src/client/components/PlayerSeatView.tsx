@@ -103,12 +103,13 @@ function PlayerSeatViewImpl({
       )}
       data-player-name={player.name}
       key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
+      style={{ '--faction-color': factionColor } as React.CSSProperties}
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onSeatDoubleClick?.(index)}
     >
-      {/* 武将立绘作座位卡背景:无素材时略过,内容浮在其上 */}
-      {charImg && (
-        <div className={seatCharImgWrap} aria-hidden>
+      {/* 武将立绘作座位卡背景:始终渲染一层势力色,无素材/404 时回退势力色背景 */}
+      <div className={seatCharImgWrap} aria-hidden>
+        {charImg && (
           <img
             className={cx(seatCharImg, isDead && seatCharImgDead)}
             src={charImg}
@@ -117,15 +118,12 @@ function PlayerSeatViewImpl({
             decoding="async"
             onError={handleImgError}
           />
-        </div>
-      )}
+        )}
+      </div>
       {/* 内容层:浮在立绘上,底部渐变蒙版保证文字可读 */}
       <div className={seatCardContent}>
-      {/* 势力色顶部条:武将名 + 座号 + 身份 */}
-      <div
-        className={seatCardHeader}
-        style={{ '--faction-color': factionColor } as React.CSSProperties}
-      >
+      {/* 势力色顶部条:武将名 + 座号 + 身份(--faction-color 由根节点注入) */}
+      <div className={seatCardHeader}>
         <div className={seatCardHeaderTop}>
           <span className={seatIndexBadge}>#{index + 1}</span>
           <span className={seatName}>{player.name.slice(0, 6)}</span>
@@ -311,7 +309,7 @@ const seatCharImgWrap = css`
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--faction-color, rgba(0, 0, 0, 0.5));
 `;
 const seatCharImg = css`
   position: absolute;

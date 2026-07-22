@@ -238,7 +238,7 @@ export const playerCardPortrait = css`
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--faction-color, rgba(0, 0, 0, 0.45));
 `;
 export const playerCardPortraitImg = css`
   position: absolute;

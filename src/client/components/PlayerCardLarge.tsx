@@ -93,9 +93,13 @@ export function PlayerCardLargeImpl({
 
   return (
     <>
-      {/* 武将立绘作大卡背景:无素材时略过,文字内容浮在其上 */}
-      {charImg && (
-        <div className={styles.playerCardPortrait} aria-hidden>
+      {/* 武将立绘作大卡背景:始终渲染一层势力色,无素材/404 时回退势力色背景 */}
+      <div
+        className={styles.playerCardPortrait}
+        style={{ '--faction-color': factionColor } as React.CSSProperties}
+        aria-hidden
+      >
+        {charImg && (
           <img
             className={cx(styles.playerCardPortraitImg, isDead && styles.playerCardPortraitDead)}
             src={charImg}
@@ -106,8 +110,8 @@ export function PlayerCardLargeImpl({
               e.currentTarget.style.display = 'none';
             }}
           />
-        </div>
-      )}
+        )}
+      </div>
       {/* 文字内容层:浮在立绘上 */}
       <div className={styles.playerCardContent}>
       {/* 势力色顶部条 */}
