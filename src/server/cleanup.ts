@@ -1,138 +1,107 @@
 // server/cleanup.ts — 闲置房间清理逻辑。
-// 从 app.ts 抽离为独立模块:本模块无导入副作用(无 setInterval / 磁盘恢复),
+// 从 app.ts 抽离为独立模块:无导入副作用(无 setInterval / 磁盘恢复),
 // 便于单元测试。app.ts 仅负责定时调度(setInterval 调用 cleanupIdleRooms)。
+//
+// 重构要点:判定逻辑和执行逻辑分离。
+// classifyRoom 返回策略枚举,cleanupIdleRooms 按策略分发到 teardown 模块。
 
-import { gameSessions, playerRoomMap } from './registry';
-import { getRoom, leaveRoom, deleteRoom, setRoomStatus } from './room';
-import { deletePersistedRoom } from './persistence';
+import { gameSessions } from './registry';
+import { getRoom } from './room';
+import { destroyRoomCompletely, downgradeRoomToLobby } from './teardown';
 import { createLogger } from './logger';
+import type { GameSession } from './session';
 
 const log = createLogger('cleanup');
 
 /** 闲置房间存活时间:无玩家连接且超过此时长未活动的会话将被回收。 */
 export const IDLE_ROOM_TTL_MS = 60 * 60 * 1000;
 
+type CleanupDecision =
+  | { action: 'keep' }
+  | { action: 'destroy' } // 完全销毁(快速房间)
+  | { action: 'remove-session' } // 仅移除 session 对象(普通房间 zombie)
+  | { action: 'downgrade' }; // 降级到等待中(普通房间孤儿)
+
+/** 分类单个房间的清理决策。 */
+function classifyRoom(roomId: string, session: GameSession, now: number): CleanupDecision {
+  const room = getRoom(roomId);
+
+  // ── 普通房间:永不自动销毁 ──
+  if (room?.roomType === 'normal') {
+    // zombie session:仅移除 session,保留 room/持久化/DB
+    if (session.isDestroyed()) return { action: 'remove-session' };
+    // 孤儿状态:进行中但座次全空(玩家全部离开,session 认不出任何 playerId)
+    if (
+      room.status === '进行中' &&
+      room.players.size === 0 &&
+      room.seats.every((s) => s === null)
+    ) {
+      return { action: 'downgrade' };
+    }
+    return { action: 'keep' };
+  }
+
+  // ── 快速房间 ──
+  // 1. zombie session(全员断线 grace 超时后遗留):立即回收
+  if (session.isDestroyed()) return { action: 'destroy' };
+  // 2. 有玩家连接:保留(游戏结束后玩家留在房间等「再来一局」)
+  if (room && room.players.size > 0) return { action: 'keep' };
+  // 3. 僵尸房间:进行中/已结束但座次全空(重启后 seats 丢失),无人可重连
+  if (room && room.status !== '等待中' && room.seats.every((s) => s === null)) {
+    return { action: 'destroy' };
+  }
+  // 4. 无玩家 + 超过 TTL:闲置回收
+  if (now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS) {
+    return { action: 'destroy' };
+  }
+  return { action: 'keep' };
+}
+
 /**
- * 清理闲置房间,返回本次被清理(从 gameSessions 移除)的 roomId 列表。
+ * 清理闲置房间,返回本次完全销毁(从 gameSessions 移除并删除持久化)的 roomId 列表。
  *
- * 判定顺序(按优先级):
- * 0. **普通房间(roomType='normal')**:永不自动销毁。
- *    - zombie session(isDestroyed):仅从 gameSessions 移除 session 对象本身,
- *      保留 room/持久化文件/DB 元数据,让房主可在房间列表重新开局或显式删除。
- *    - 非 zombie session:完整保留。
- * 1. **已 destroy 的 zombie session**(快速房间,全员断线 grace 超时后遗留):
- *    无视 TTL 立即回收,否则会因 room.players 仍有(已断线的)记录而永久泄漏。
- * 2. **仍有玩家连接的房间**:游戏结束后玩家留在房间内等待「再来一局」,此时
- *    lastActivityAt 因 gameOverHandled 不再更新(onStateChange 提前返回),但只要
- *    room.players 非空,session 必须保留——绝不能把连着的玩家踢出房间。
- * 3. **无玩家连接 + 超过 TTL**:真正闲置的空房间,回收。
- *
- * 返回值包含快速房间的所有回收(zombie/闲置/僵尸),不包含普通房间的 zombie 清理
- * (普通房间仅从 gameSessions 移除 session 对象,不返回在结果中)。
+ * 普通房间永不进入返回值(仅移除 zombie session 或降级,不销毁)。
+ * 返回值专用于快速房间的完整回收,供调用方/测试断言。
  *
  * @param now 当前时间戳(测试注入),默认 Date.now()
  */
 export function cleanupIdleRooms(now: number = Date.now()): string[] {
   const stale: string[] = [];
-  // 普通房间的 zombie session:仅从 gameSessions 移除 session 对象本身,
-  // 保留 room / 持久化文件 / DB 元数据,让房主可在房间列表看到房间并重新开局或显式删除。
-  // 普通房间永不进入 stale(不自动销毁任何持久化状态)。
-  const normalZombieSessions: string[] = [];
-  // 普通房间孤儿状态:进行中但座次全空(玩家全部 leaveRoom/seats 清空),session 认不出任何 playerId,
-  // 无法重连。降级为等待中让房主重新开局,而非销毁房间。
-  const normalOrphanRooms: string[] = [];
+  const removeSessionOnly: string[] = [];
+  const downgrade: string[] = [];
+
   for (const [roomId, session] of gameSessions) {
-    const room = getRoom(roomId);
-    // 普通房间: 不自动销毁。但检测孤儿状态:进行中但座次全空且无在线玩家
-    // (session 存在但认不出任何 playerId,玩家无法重连)。
-    // 此时降级为等待中:销毁 session,清空 readyPlayers,让房主可重新开局。
-    // 触发场景:所有玩家主动 leaveRoom 后 seats 被清空,但 session 未销毁(normal 不自动销毁)。
-    if (room?.roomType === 'normal') {
-      if (session.isDestroyed()) {
-        normalZombieSessions.push(roomId);
-      } else if (
-        room.status === '进行中' &&
-        room.players.size === 0 &&
-        room.seats.every((s) => s === null)
-      ) {
-        // 孤儿房间:降级为等待中,销毁 session,保留 room/DB 元数据
-        normalOrphanRooms.push(roomId);
-      }
-      continue;
-    }
-    // 1. 已销毁的 zombie:立即回收(grace 超时/全员断线后遗留,room.players 可能仍非空)
-    if (session.isDestroyed()) {
-      stale.push(roomId);
-      continue;
-    }
-    // 2. 仍有玩家连接:游戏结束后玩家留在房间等「再来一局」,不清理
-    if (room && room.players.size > 0) continue;
-    // 2b. 僵尸房间: 进行中/已结束但无玩家连接且座次全空(重启后 seats 丢失的恢复房间)。
-    //     无人可重连,grace timer 因 playerNames 为空也不启动,立即回收避免泄漏。
-    if (room && room.status !== '等待中' && room.seats.every((s) => s === null)) {
-      stale.push(roomId);
-      continue;
-    }
-    // 3. 无玩家连接 + 超过 TTL:闲置回收
-    if (now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS) {
-      stale.push(roomId);
+    const decision = classifyRoom(roomId, session, now);
+    switch (decision.action) {
+      case 'destroy':
+        stale.push(roomId);
+        break;
+      case 'remove-session':
+        removeSessionOnly.push(roomId);
+        break;
+      case 'downgrade':
+        downgrade.push(roomId);
+        break;
     }
   }
 
+  // 快速房间:完全销毁
   for (const roomId of stale) {
     log.info(`清理闲置房间 ${roomId}`);
-    const session = gameSessions.get(roomId);
-    void session?.destroy();
-    gameSessions.delete(roomId);
-    const room = getRoom(roomId);
-    if (room) {
-      const playerIds = [...room.players.keys()];
-      for (const pid of playerIds) {
-        leaveRoom(roomId, pid);
-        playerRoomMap.delete(pid);
-      }
-    }
-    // 无玩家的空房间(启动恢复等)leaveRoom 不会被触发,显式删除避免 roomList 泄漏;
-    // 有玩家的房间在上面的 leaveRoom 循环中已被清空删除,此处为幂等 no-op。
-    deleteRoom(roomId);
-    // 显式删持久化文件:session.destroy 是 fire-and-forget,zombie session 会
-    // early-return 跳过 deletePersistedRoom,导致重启后房间复活。
-    void deletePersistedRoom(roomId).catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
-      log.error(`cleanup: deletePersistedRoom failed for ${roomId}`, { error: e.stack ?? String(e) });
-    });
-    // 兜底:清理任何指向该房间的残留映射
-    for (const [pid, rid] of playerRoomMap) {
-      if (rid === roomId) playerRoomMap.delete(pid);
-    }
+    void destroyRoomCompletely(roomId);
   }
 
-  // 普通房间 zombie session: 仅移除 session 对象,保留 room/持久化文件/DB 元数据。
-  // room 状态若仍为「进行中」,后续 startup 的 downgradeStaleNormalRooms 会降级为
-  // 「等待中」,房主可在房间列表重新开局或显式删除房间。
-  for (const roomId of normalZombieSessions) {
+  // 普通房间 zombie session:仅移除 session 对象,保留 room/持久化/DB
+  for (const roomId of removeSessionOnly) {
     log.info(`移除普通房间 zombie session ${roomId}(保留 room/持久化/DB)`);
     gameSessions.delete(roomId);
   }
 
-  // 普通房间孤儿状态:session 存在但座次全空(无人可重连),降级为等待中。
-  // 销毁 session + 删 .json(避免下次启动恢复出无 seats 的空壳 session),
-  // 保留 room + DB 元数据(房主可在列表看到房间重新开局)。
-  for (const roomId of normalOrphanRooms) {
+  // 普通房间孤儿状态:降级为等待中
+  for (const roomId of downgrade) {
     log.info(`降级孤儿普通房间 ${roomId}(座次全空,进行中→等待中)`);
-    const session = gameSessions.get(roomId);
-    void session?.destroy();
-    gameSessions.delete(roomId);
-    const room = getRoom(roomId);
-    if (room) {
-      room.readyPlayers = new Set();
-      room.pendingSeatSwaps.clear();
-      setRoomStatus(roomId, '等待中');
-    }
-    void deletePersistedRoom(roomId).catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
-      log.error(`cleanup: deletePersistedRoom failed for orphan ${roomId}`, { error: e.stack ?? String(e) });
-    });
+    void downgradeRoomToLobby(roomId);
   }
+
   return stale;
 }

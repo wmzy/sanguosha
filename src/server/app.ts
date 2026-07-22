@@ -10,9 +10,10 @@ import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
-import { addRoom, getRoom, setRoomStatus, type Room } from './room';
+import { addRoom, getRoom, type Room } from './room';
 import { cleanupIdleRooms } from './cleanup';
 import { initRoomStore, loadAllRoomsFromDb } from './roomStore';
+import { resetRoomToLobby } from './teardown';
 
 const log = createLogger('ws');
 
@@ -94,11 +95,8 @@ export async function downgradeStaleNormalRooms(): Promise<void> {
     const roomId = room.id;
     if (gameSessions.has(roomId)) continue;
     if (room.status === '等待中') continue;
-    // 清理局内状态:准备记录、座次。状态变更通过 setRoomStatus 同步 DB。
     const oldStatus = room.status;
-    room.readyPlayers = new Set();
-    room.seats = room.seats.map(() => null);
-    setRoomStatus(roomId, '等待中');
+    resetRoomToLobby(roomId);
     log.info(`降级普通房间 ${roomId}（无活跃 session,${oldStatus}→等待中）`);
   }
 }
@@ -164,7 +162,7 @@ async function restorePersistedRooms(): Promise<void> {
         status: '进行中',
         hostId: persisted.hostId,
         readyPlayers: new Set(),
-        roomType: persisted.debug ? 'quick' : 'quick',
+        roomType: 'quick',
         isDebug: persisted.debug,
         config: restoredConfig,
         spectators: new Map(),

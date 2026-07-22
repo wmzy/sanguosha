@@ -269,9 +269,9 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
     return room;
   }
 
-  // 快速房间: 无进行中游戏且全员离开 → 自动销毁
+  // 快速房间: 无进行中游戏且全员离开 → 自动销毁(统一走 deleteRoom)
   if (room.players.size === 0 && room.status !== '进行中') {
-    roomList.delete(roomId);
+    deleteRoom(roomId);
     return null;
   }
 

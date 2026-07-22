@@ -9,7 +9,6 @@ import {
   createDebugRoom,
   getRoom,
   getRoomList,
-  deleteRoom,
   leaveRoom,
   joinRoom,
   joinDebugRoom,
@@ -35,8 +34,7 @@ import {
   respondSeatSwap,
   type Room,
 } from './room';
-import { deletePersistedRoom } from './persistence';
-import { deleteRoomFromDb } from './roomStore';
+import { destroyRoomCompletely } from './teardown';
 import {
   createSnapshot,
   patchSnapshotDescription,
@@ -95,29 +93,9 @@ export function applyRestRoutes(app: Hono): void {
 
   app.delete('/api/rooms/:id', async (c) => {
     const id = c.req.param('id');
-    const room = getRoom(id);
-
-    // 清理内存中的 session/room（如果存在）
-    const session = gameSessions.get(id);
-    if (session) {
-      await session.destroy();
-      gameSessions.delete(id);
-    }
-    if (room) {
-      const playerIds = [...room.players.keys()];
-      for (const pid of playerIds) {
-        playerRoomMap.delete(pid);
-        leaveRoom(id, pid);
-      }
-      deleteRoom(id);
-    }
-
-    // 无论 room 是否在内存中（如重启后内存丢失但磁盘还在），都必须删持久化文件。
-    // 此前 !room 时 early return 404 跳过此处，导致重启后房间复活。
-    await deletePersistedRoom(id);
-    // 普通房间: 还需从 DB 删除元数据记录。
-    await deleteRoomFromDb(id);
-
+    // 统一走 destroyRoomCompletely:幂等清理 session + room + .json + DB,
+    // 无论 room 是否在内存中(如重启后内存丢失但磁盘/DB 还在)。
+    await destroyRoomCompletely(id);
     return c.json({ success: true });
   });
 
@@ -445,15 +423,7 @@ export function applyRestRoutes(app: Hono): void {
     // 快速房间: leaveRoom 返回 null(全员离开+无游戏)时清理 session + 持久化;
     // 普通房间: 不自动销毁, 保留 session 和游戏状态。
     if (!isNormal && !leftRoom) {
-      const session = gameSessions.get(roomId);
-      if (session) {
-        void session.destroy().catch((err) => {
-          const e = err instanceof Error ? err : new Error(String(err));
-          log.error('session.destroy failed', { roomId, error: e.stack ?? String(e) });
-        });
-        gameSessions.delete(roomId);
-      }
-      void deletePersistedRoom(roomId).catch(() => {});
+      void destroyRoomCompletely(roomId);
     }
     return c.json({ success: true });
   });
