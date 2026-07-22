@@ -6,7 +6,7 @@
 //   className={styles.pageRoot}
 //   className={cx(styles.seatCard, isActive && styles.seatCardActive)}
 //
-// 动画 keyframes (drawCardIn / damageFlash / damageShake / phaseIn / newTurnGlow / damageOverlay)
+// 动画 keyframes (flyCardMove / damageFlash / damageShake / phaseIn / newTurnGlow / damageOverlay)
 // 定义在 src/client/animations.css,由 main.tsx 全局引入。
 
 export * from './layout';

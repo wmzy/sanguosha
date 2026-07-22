@@ -3,22 +3,6 @@
    轻量级,纯 CSS,零依赖
    ═══════════════════════════════════════════════════════════ */
 
-/* ─── 摸牌:从上方滑入 + 淡入 ─── */
-@keyframes drawCardIn {
-  0% {
-    opacity: 0;
-    transform: translateY(-30px) scale(0.8);
-  }
-  60% {
-    opacity: 1;
-    transform: translateY(2px) scale(1.02);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 /* ─── 出牌飞行动画:浮动卡片从手牌位置飞向中央 ─── */
 @keyframes flyToCenter {
   0% {
@@ -235,6 +219,30 @@
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── 卡牌移动:容器携带 N 张牌从起点飞向终点 ───
+   起点位置由 JS 设为浮动元素的 left/top(源 rect 中心),
+   飞行位移由 --fly-dx/--fly-dy CSS 变量驱动(目标 rect - 源 rect)。
+   多张牌在同一容器内横排,一起移动。
+   入场(0~12%):淡入+放大到原尺寸;飞行(12~82%):平移;退场(82~100%):淡出+微缩。 */
+@keyframes flyCardMove {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(var(--fly-dx, 0), var(--fly-dy, 0)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--fly-dx, 0), var(--fly-dy, 0)) scale(0.8);
   }
 }
 

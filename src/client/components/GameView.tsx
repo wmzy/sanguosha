@@ -47,6 +47,7 @@ import { SUIT_COLOR } from './gameViewConstants';
 
 // ─── 抽取的 hooks ───
 import { useAnimationState } from '../hooks/useAnimationState';
+import { useCardMoveAnimation } from '../hooks/useCardMoveAnimation';
 import { useSkillActions } from '../hooks/useSkillActions';
 import { usePendingState } from '../hooks/usePendingState';
 import { useCharSelect } from '../hooks/useCharSelect';
@@ -143,6 +144,7 @@ export function GameViewComponentImpl({
   );
   const orderedPlayers = useSeatOrder(view, perspectiveIdx);
   const anim = useAnimationState(view, perspectiveIdx);
+  useCardMoveAnimation(ingestedEvents ?? [], view);
   const playHistoryItems = usePlayHistory(ingestedEvents, view);
 
   const handListRef = useRef<HTMLDivElement>(null);
@@ -723,7 +725,6 @@ export function GameViewComponentImpl({
               const isDistSelected = isDistributeActive && distSelected.has(card.id);
               const isDistAllocated =
                 isDistributeActive && distAllocations.some((a) => a.cardIds.includes(card.id));
-              const isNew = anim.newCardIds.has(card.id);
               return (
                 <div
                   key={card.id}
@@ -746,7 +747,6 @@ export function GameViewComponentImpl({
                     isTransformMatch={isTransformMatch}
                     isTransformActive={isTransformActive}
                     isTransformDisabled={isTransformDisabled}
-                    isNew={isNew}
                     transformWrapperName={transformMode?.wrapperName}
                     isDistributeCandidate={isDistCandidate}
                     isDistributeSelected={isDistSelected}
@@ -768,6 +768,7 @@ export function GameViewComponentImpl({
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatShaking,
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatDamageOverlay,
           )}
+          data-seat-index={perspectiveIdx}
         >
           <DevProfiler id="PlayerCardLarge">
             <PlayerCardLarge

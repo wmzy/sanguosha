@@ -17,7 +17,6 @@ export interface HandCardProps {
   isTransformMatch: boolean;
   isTransformActive: boolean;
   isTransformDisabled: boolean;
-  isNew: boolean;
   transformWrapperName?: string;
   /** distribute(仁德/制衡/遗计):该牌是候选可分配牌 */
   isDistributeCandidate?: boolean;
@@ -44,7 +43,6 @@ export function HandCardImpl(props: HandCardProps) {
     isTransformMatch,
     isTransformActive,
     isTransformDisabled,
-    isNew,
     transformWrapperName,
     isDistributeCandidate = false,
     isDistributeSelected = false,
@@ -78,7 +76,6 @@ export function HandCardImpl(props: HandCardProps) {
           styles.handCardDisabled,
         isAwaiting && styles.handCardRespondable,
         isDiscardSelected && styles.discardCardSelected,
-        isNew && styles.handCardNew,
         isTransformMatch && styles.handCardTransform,
         isTransformDisabled && styles.handCardTransformDisabled,
         isDistributeCandidate && styles.handCardDistributeCandidate,
@@ -132,7 +129,6 @@ function handCardPropsEqual(prev: HandCardProps, next: HandCardProps): boolean {
     prev.isTransformMatch === next.isTransformMatch &&
     prev.isTransformActive === next.isTransformActive &&
     prev.isTransformDisabled === next.isTransformDisabled &&
-    prev.isNew === next.isNew &&
     prev.transformWrapperName === next.transformWrapperName &&
     prev.isDistributeCandidate === next.isDistributeCandidate &&
     prev.isDistributeSelected === next.isDistributeSelected &&

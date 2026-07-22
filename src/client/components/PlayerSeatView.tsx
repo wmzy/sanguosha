@@ -102,6 +102,7 @@ function PlayerSeatViewImpl({
         isTurnGlow && turnGlowing,
       )}
       data-player-name={player.name}
+      data-seat-index={index}
       key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
       style={{ '--faction-color': factionColor } as React.CSSProperties}
       onClick={() => isClickable && onTargetClick(player.name)}

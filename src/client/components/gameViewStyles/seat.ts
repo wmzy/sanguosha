@@ -346,9 +346,6 @@ export const markTag = css`
 `;
 
 // ─── 动画状态样式 ───
-export const handCardNew = css`
-  animation: drawCardIn 0.45s cubic-bezier(0.23, 1, 0.32, 1) both;
-`;
 export const hpFlash = css`
   animation: damageFlash 0.6s ease-out both;
 `;
