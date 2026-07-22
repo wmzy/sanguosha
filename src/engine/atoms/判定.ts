@@ -6,14 +6,6 @@
 // 判定牌在处理区“停留几秒”的视觉效果由前端 useDebugMultiConnection hook 负责
 // (在收到判定事件后临时把判定牌加入 view.zones.processing 展示,几秒后移除),
 // 不在 applyView 中处理——保持 applyView 与 buildView 一致。
-// 判定:从牌堆顶翻一张到处理区(亮出判定牌)。
-// 技能 after hooks(八卦阵/乐不思蜀等)从处理区读判定牌花色。
-// atom.afterHooks 结束后把判定牌从处理区移入弃牌堆。
-//
-// 前端展示:判定牌是公开信息,toViewEvents 携带 card+cardId。
-// 判定牌在处理区“停留几秒”的视觉效果由前端 useDebugMultiConnection hook 负责
-// (在收到判定事件后临时把判定牌加入 view.zones.processing 展示,几秒后移除),
-// 不在 applyView 中处理——保持 applyView 与 buildView 一致。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 import { runJudgeModifiers } from '../create-engine';

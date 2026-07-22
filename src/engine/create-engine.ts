@@ -28,35 +28,6 @@
 // 引擎内部不 try/catch——除 bug 外不应抛错。
 // actionLog 由引擎自动记录,session 不直接 mutate state。
 
-// src/engine/create-engine.ts
-// 引擎主入口(顶层函数,无闭包)。
-//
-// 主要导出:
-//   - create(gameConfig): 同步建 state(预创建 playerCount 个空玩家槽位),返回骨架 state
-//   - bootstrap(state, gameConfig): 异步 —— 加载 开局 skill → onInit → dispatch 开局 start → registerSkillsFromState
-//   - dispatch(state, msg): 接受 state,执行 client message
-//   - buildView(state, viewer): 接受 state,返回 view
-//   - fireTimeout(state): 触发 pending slot 的 onTimeout
-//
-// create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
-// 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
-// 完成了开局,不需要再 dispatch 开局 start。
-//
-// dispatch 路径(Promise<boolean>):
-//   同步跑 preceding/validate;通过则启动 fire-and-forget execute 并返回 true,
-//   拒绝则 rollback 并返回 false。execute 内 await pending slot 可能阻塞,但 dispatch 本身立即返回。
-//   1) 主动 action(无 pending slot):execute 跑到 applyAtom 建 pending 时自然挂起。
-//   2) 回应 action(有 pending slot):slot.pause() 取消定时器 → respond execute 跑完
-//      → .then(resolve) 恢复父 execute。递归 pending(如无纶递归)下 respond execute
-//      会挂在新 pending 上,旧 slot 待整条链 resolve 后才恢复。
-//
-// session 不 await dispatch;state 变化通过 applyAtom 末尾的 onStateChange 回调驱动广播。
-// 旧 _pendingSignal / _waitForStable / Promise.race 机制已全部移除。
-//
-// 帧由技能在 execute 中显式创建(api.pushFrame)和弹出(api.popFrame);dispatch 不管理帧。
-// atomStack / pendingSlot 是 GameState 属性,不是 frame 属性。
-// 引擎内部不 try/catch——除 bug 外不应抛错。
-// actionLog 由引擎自动记录,session 不直接 mutate state。
 import type {
   ActionEntry,
   ActionLogEntry,
@@ -520,7 +491,7 @@ export function frameCards(state: GameState): string[] {
   return frame ? frame.cards : state.zones.processing;
 }
 
-/** 兑底空帧 */
+/** 兜底空帧 */
 function emptyFrame(): SettlementFrame {
   return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}), cards: [] };
 }
@@ -578,7 +549,6 @@ export async function runJudgeModifiers(state: GameState): Promise<void> {
   const atom = state.atomStack[state.atomStack.length - 1];
   if (!atom) return;
   const player = (atom as { player?: number }).player;
-  if (typeof player !== 'number') return;
   if (typeof player !== 'number') return;
   const modifiers = getJudgeModifierMap(state);
   if (modifiers.size === 0) return;
@@ -695,7 +665,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     await Promise.all(slotPromises);
 
     // 等待型 atom:技能 after hooks 和 def.afterHooks 都在 pending resolve 之后跑
-    // ——这样贯石斧/青龙妙月刀等技能能在看到 P2 出完闪/不出后再做决策。
+    // ——这样贯石斧/青龙偃月刀等技能能在看到 P2 出完闪/不出后再做决策。
     if (def.afterApply) await def.afterApply(state, current);
     await runAfterHooks(state, current);
 

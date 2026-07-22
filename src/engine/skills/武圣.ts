@@ -4,14 +4,7 @@
 // 模型(组合 action):前端两步 UI(点武圣给红牌加"杀"显示 → 点出杀选目标),
 // 提交时一个 ClientMessage:preceding=[武圣.transform] + 主 action=杀.use。
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
-// 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
-// src/engine/skills/武圣.ts
-// 武圣(关羽·转化技):将一张红色牌当【杀】使用或打出。
-//
-// 模型(组合 action):前端两步 UI(点武圣给红牌加"杀"显示 → 点出杀选目标),
-// 提交时一个 ClientMessage:preceding=[武圣.transform] + 主 action=杀.use。
-// 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
-// 杀技能零感知武圣——它看到的永远是 cardMap 里的一张"杀"。
+// 杀技能零感知武圣——它看到的永远是 cardMap 里的一张“杀”。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom } from '../create-engine';
