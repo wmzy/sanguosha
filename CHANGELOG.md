@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-07-22
+
+### Fixed — 无懈可击全员不回应仍等待超时
+
+广播型无懈可击询问窗口中,玩家点击「不回应」时前端仅做了本地标记(`markBroadcastSkipped`),**未向服务端发送 `skip` action**。导致服务端 `skippedPlayers` 集合永远填不满,全员选择不回应后仍需等待 10 秒超时才结束窗口。服务端的 skip 累计 + 全员提前触发逻辑(`dispatch` skip handler)早已就绪并经测试覆盖,问题纯在前端漏发。
+
+#### Fixed
+- **广播 pending 不回应补发 skip**:`usePlayInteraction.ts` 的 `handleRespond` 在广播型 pending(`pendingTargetIdx < 0`)分支中,`markBroadcastSkipped` 之前补发 `send('__skip', 'skip', {})`,与 `HeadlessGameClient.pass()` 对广播型 pending 的行为一致。(`src/client/hooks/usePlayInteraction.ts`)
+
 ## [Unreleased] — 2026-07-09
 
 ### Added — 录像下载与回放功能

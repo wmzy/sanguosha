@@ -638,6 +638,8 @@ export function usePlayInteraction(
         const rescueSkill = info.rescueSkillForCard?.(card);
         send(rescueSkill ?? info.skillId, 'respond', { cardId });
       } else if (pendingTargetIdx < 0) {
+        // 广播型 pending(无懈可击):发 skip 让服务端累计,全员 skip 时提前结束窗口
+        send('__skip', 'skip', {});
         markBroadcastSkipped(broadcastKey);
       } else {
         send(info.skillId, 'respond', {});
