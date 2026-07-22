@@ -52,23 +52,51 @@ export function EventBanner({ current }: EventBannerProps) {
 
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
   const judgeType = current.event.judgeType as string | undefined;
+  // 待判定牌:判定区同名延时锦囊(乐不思蜀/闪电/兵粮寸断)的牌面,由判定 atom
+  // toViewEvents 在 apply 前从 pendingTricks 携带。技能判定(八卦阵/铁骑等)无此字段。
+  const pendingCard = current.event.pendingCard as
+    | { name: string; suit: string; rank: string }
+    | undefined;
+
+  // 判定结果翻牌卡(翻牌动画只作用于判定结果,待判定牌不翻转)
+  const resultFlip = (
+    <div
+      className={styles.eventCardFlip}
+      style={
+        {
+          '--flip-duration': `${effect?.duration ?? 1800}ms`,
+          '--suit-color': suitColor,
+        } as React.CSSProperties
+      }
+    >
+      {judgeType && <div className={styles.eventCardLabel}>{judgeType}</div>}
+      <div className={styles.eventCardBody}>
+        <CardFace name={card.name} suit={card.suit} rank={card.rank} size="large" />
+      </div>
+    </div>
+  );
 
   return (
     <div className={styles.eventCardLayer}>
-      <div
-        className={styles.eventCardFlip}
-        style={
-          {
-            '--flip-duration': `${effect?.duration ?? 1800}ms`,
-            '--suit-color': suitColor,
-          } as React.CSSProperties
-        }
-      >
-        {judgeType && <div className={styles.eventCardLabel}>{judgeType}</div>}
-        <div className={styles.eventCardBody}>
-          <CardFace name={card.name} suit={card.suit} rank={card.rank} size="large" />
+      {pendingCard ? (
+        <div className={styles.judgeGroup}>
+          <div className={styles.judgePendingWrap}>
+            <div className={styles.eventCardLabel}>待判定</div>
+            <div className={styles.judgePendingBody}>
+              <CardFace
+                name={pendingCard.name}
+                suit={pendingCard.suit}
+                rank={pendingCard.rank}
+                size="normal"
+              />
+            </div>
+          </div>
+          <div className={styles.judgeConnector}>判定为</div>
+          {resultFlip}
         </div>
-      </div>
+      ) : (
+        resultFlip
+      )}
     </div>
   );
 }

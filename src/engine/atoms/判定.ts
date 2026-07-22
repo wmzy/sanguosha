@@ -45,6 +45,12 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     // 判定牌是公开信息:所有玩家都能看到花色点数+牌名
     const topCardId = state.zones.deck[0];
     const card = topCardId ? state.cardMap[topCardId] : undefined;
+    // 待判定牌:判定区同名延时锦囊(乐不思蜀/闪电/兵粮寸断)。
+    // toViewEvents 在 apply 之前调用,判定区牌尚未被 after-hook 移除。
+    // 技能判定(八卦阵/铁骑等)判定区无同名牌 → 不携带 pendingCard。
+    const pendingTrick = state.players[atom.player]?.pendingTricks.find(
+      (t) => t.name === atom.judgeType,
+    );
     const view: ViewEvent = {
       type: '判定',
       player: atom.player,
@@ -52,6 +58,16 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
       // 携带判定牌信息:cardId 供前端 processing 区追踪,card 供日志/overlay 展示
       ...(card
         ? { cardId: topCardId, card: { name: card.name, suit: card.suit, rank: card.rank } }
+        : {}),
+      // 待判定牌(延时锦囊)牌面:供前端浮窗与判定结果并排展示
+      ...(pendingTrick
+        ? {
+            pendingCard: {
+              name: pendingTrick.card.name,
+              suit: pendingTrick.card.suit,
+              rank: pendingTrick.card.rank,
+            },
+          }
         : {}),
     };
     return { ownerViews: new Map(), othersView: view };

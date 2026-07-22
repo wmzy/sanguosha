@@ -112,6 +112,41 @@ export const eventCardSuit = css`
   margin-top: 2px;
   color: var(--suit-color, #ccc);
 `;
+// ─── 判定组合:待判定牌(延时锦囊)+判定结果并排 ───
+// 判定区的延时锦囊为明牌(不翻转),判定结果走 eventCardFlip 翻牌动画。
+// 待判定牌走轻量淡入(cardJudgePendingIn),与判定结果翻牌同步出现/消失。
+export const judgeGroup = css`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  perspective: 800px;
+`;
+export const judgePendingWrap = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: cardJudgePendingIn var(--flip-duration, 1800ms) ease-out both;
+`;
+export const judgePendingBody = css`
+  position: relative;
+  box-sizing: border-box;
+  width: 80px;
+  height: 120px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+  border: 2px solid #b78bff;
+  box-shadow: 0 2px 12px rgba(155, 89, 182, 0.4);
+  overflow: hidden;
+`;
+export const judgeConnector = css`
+  font-size: 13px;
+  font-weight: bold;
+  color: #c9a227;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+`;
 export const cancelBtn = css`
   border: 1px solid #555;
   border-radius: 4px;

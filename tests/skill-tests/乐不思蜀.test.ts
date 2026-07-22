@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
+import { 判定 as 判定Atom } from '../../src/engine/atoms/判定';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -177,5 +178,52 @@ describe('乐不思蜀', () => {
     // 标签应已清除
     const hasSkipTagAfter = harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌');
     expect(hasSkipTagAfter).toBe(false);
+  });
+
+  it('判定事件携带待判定牌牌面(延时锦囊判定)', () => {
+    const card = makeCard('l1', '乐不思蜀', '♠');
+    const judgeCard = makeCard('j1', '判定牌', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['回合管理'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['回合管理'],
+          pendingTricks: [{ name: '乐不思蜀', source: 0, card }],
+        }),
+      ],
+      cardMap: { l1: card, j1: judgeCard },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+
+    // toViewEvents 在 apply 之前调用:牌堆顶为判定结果,判定区延时锦囊为待判定牌
+    const split = 判定Atom.toViewEvents(state, { player: 1, judgeType: '乐不思蜀' })!;
+    const view = split.othersView!;
+    expect(view.card).toMatchObject({ name: '判定牌', suit: '♥', rank: '5' });
+    expect(view.pendingCard).toMatchObject({ name: '乐不思蜀', suit: '♠', rank: 'A' });
+  });
+
+  it('技能判定(判定区无同名牌)不携带待判定牌', () => {
+    const judgeCard = makeCard('j1', '判定牌', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['回合管理'] }),
+        makePlayer({ index: 1, name: 'P2', skills: ['回合管理'] }),
+      ],
+      cardMap: { j1: judgeCard },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+
+    const split = 判定Atom.toViewEvents(state, { player: 1, judgeType: '八卦阵' })!;
+    const view = split.othersView!;
+    expect(view.card).toMatchObject({ name: '判定牌', suit: '♥', rank: '5' });
+    expect(view.pendingCard).toBeUndefined();
   });
 });

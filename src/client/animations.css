@@ -152,6 +152,28 @@
   to { opacity: 0; }
 }
 
+/* ─── 待判定牌淡入(与判定结果翻牌同寿命,不翻转)───
+   待判定牌是明牌(本就在判定区),只需淡入显出 + 停留 + 淡出,不翻转。
+   时长与 cardFlipIn 一致(var(--flip-duration)),同步进退。 */
+@keyframes cardJudgePendingIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.85);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+
 /* ─── 事件卡牌翻入:从牌堆弹出 + 3D 翻转揭示 + 停留 + 淡出 ───
    三阶段动画(总时长 = effect.duration,默认 1800ms):
      入场(0~30%): 从上方弹出 + 180°→0° 翻转揭示
