@@ -1,11 +1,13 @@
 // 刚烈(夏侯惇·被动技)测试
 //   受到伤害后判定,非红桃则来源弃两张手牌或受 1 点伤害。
+//   不是锁定技,可选择是否发动。
 //
 // 验证:
-//   1. 非红桃 + 来源选择受伤 → 来源扣 1 血
-//   2. 非红桃 + 来源选择弃牌 → 来源弃两张手牌
-//   3. 红桃 → 无事发生
-//   4. 来源手牌不足两张 → 强制受到伤害
+//   1. 发动 + 非红桃 + 来源选择受伤 → 来源扣 1 血
+//   2. 发动 + 非红桃 + 来源选择弃牌 → 来源弃两张手牌
+//   3. 发动 + 红桃 → 无事发生
+//   4. 发动 + 来源手牌不足两张 → 强制受到伤害
+//   5. 不发动 → 无事发生
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -81,6 +83,9 @@ describe('刚烈', () => {
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass(); // P1 不出闪
+    // 询问夏侯惇是否发动刚烈
+    P1.expectPending('请求回应');
+    await P1.respond('刚烈', { choice: true }); // 发动
     // 刚烈判定(非红桃)后,询问来源 P0 二选一
     P0.expectPending('请求回应');
     await P0.respond('刚烈', { choice: false }); // 选择受到伤害
@@ -114,6 +119,9 @@ describe('刚烈', () => {
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass();
+    // 询问夏侯惇是否发动刚烈
+    P1.expectPending('请求回应');
+    await P1.respond('刚烈', { choice: true }); // 发动
     P0.expectPending('请求回应');
     await P0.respond('刚烈', { choice: true }); // 选择弃两张手牌
 
@@ -126,7 +134,7 @@ describe('刚烈', () => {
   });
 
   // ─── 红桃 → 无事 ────────────────────────────
-  it('红桃:刚烈不触发效果', async () => {
+  it('红桃:刚烈判定后无事发生', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const judge = makeCard('j1', '杀', '♥', '5'); // 判定牌:红桃
     const state: GameState = createGameState({
@@ -146,6 +154,9 @@ describe('刚烈', () => {
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass(); // 不出闪
+    // 询问夏侯惇是否发动刚烈
+    P1.expectPending('请求回应');
+    await P1.respond('刚烈', { choice: true }); // 发动
 
     // 红桃:刚烈判定后无事,无 pending(杀结算完毕)
     expect(harness.state.players[1].health).toBe(3); // P1 受杀 1 伤
@@ -174,10 +185,46 @@ describe('刚烈', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // 不出闪 → 刚烈判定非红桃 → 手牌不足 → 直接受伤
+    await P1.pass(); // 不出闪
+    // 询问夏侯惇是否发动刚烈
+    P1.expectPending('请求回应');
+    await P1.respond('刚烈', { choice: true }); // 发动 → 判定非红桃 → 手牌不足 → 直接受伤
 
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.players[0].health).toBe(3); // 强制受伤
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─── 不发动 → 无事 ────────────────────────────
+  it('不发动刚烈:无事发生', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const judge = makeCard('j1', '杀', '♠', '5'); // 非红桃(若发动会有效果)
+    const extra1 = makeCard('e1', '闪', '♦', '3');
+    const extra2 = makeCard('e2', '桃', '♦', '4');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1', 'e1', 'e2'], skills: ['杀'] }),
+        makePlayer({ index: 1, name: 'P1', skills: ['刚烈', '闪'] }),
+      ],
+      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2 },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass(); // 不出闪
+    // 询问夏侯惇是否发动刚烈
+    P1.expectPending('请求回应');
+    await P1.respond('刚烈', { choice: false }); // 不发动
+
+    // 不发动:无判定,无二选一,P0 未受伤
+    expect(harness.state.players[1].health).toBe(3); // P1 受杀 1 伤
+    expect(harness.state.players[0].health).toBe(4); // P0 无伤
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 });

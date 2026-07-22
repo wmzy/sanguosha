@@ -14,6 +14,7 @@ import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../t
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
+const CONFIRM_REQUEST = '刚烈/confirm';
 const CHOOSE_REQUEST = '刚烈/choose';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -34,6 +35,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const unloaders: Array<() => void> = [];
   for (const p of state.players) {
     const seatId = p.index;
+    const isOwner = seatId === ownerId;
     const u = registerAction(
       state,
       skill.id,
@@ -44,12 +46,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!slot) return '当前不需要回应';
         const atom = slot.atom as Record<string, unknown>;
         if (atom['type'] !== '请求回应') return '当前不需要回应';
-        if (atom['requestType'] !== CHOOSE_REQUEST) return '当前不是刚烈选择';
-        return null;
+        const requestType = atom['requestType'] as string;
+        if (requestType === CHOOSE_REQUEST) return null; // 来源二选一
+        if (isOwner && requestType === CONFIRM_REQUEST) return null; // 是否发动
+        return '当前不是刚烈回应';
       },
       async (st: GameState, params: Record<string, Json>) => {
-        // choice=true → 弃两张手牌;choice=false/缺省 → 受 1 点伤害
-        st.localVars['刚烈/choice'] = params.choice === true ? 'discard' : 'damage';
+        const slot = st.pendingSlots.get(seatId);
+        const requestType = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'] as
+          | string
+          | undefined;
+        if (requestType === CONFIRM_REQUEST) {
+          st.localVars['刚烈/confirmed'] = params.choice === true;
+        } else {
+          // CHOOSE_REQUEST: choice=true → 弃两张手牌;choice=false/缺省 → 受 1 点伤害
+          st.localVars['刚烈/choice'] = params.choice === true ? 'discard' : 'damage';
+        }
       },
     );
     unloaders.push(u);
@@ -81,6 +93,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 判定(牌堆空则跳过——无法判定则刚烈不触发)
     if (ctx.state.zones.deck.length === 0) return;
+
+    // 询问是否发动刚烈(不是锁定技,可选择不发动)
+    delete ctx.state.localVars['刚烈/confirmed'];
+    await applyAtom(ctx.state, {
+      type: '请求回应',
+      requestType: CONFIRM_REQUEST,
+      target: ownerId,
+      prompt: {
+        type: 'confirm',
+        title: '是否发动刚烈?',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
+      },
+      defaultChoice: false,
+      timeout: 10,
+    });
+    if (!ctx.state.localVars['刚烈/confirmed']) return; // 不发动
+
     delete ctx.state.localVars['刚烈/judgeSuit'];
     await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '刚烈' });
     const suit = ctx.state.localVars['刚烈/judgeSuit'] as string | undefined;
