@@ -408,6 +408,8 @@ export const skillLoaders: Record<string, Loader> = {
   // 界限突破·群国·界高顺(独立技能文件,不修改标技能;标版陷阵/禁酒未实现)
   界陷阵: load(() => import('./界陷阵')),
   界禁酒: load(() => import('./界禁酒')),
+  // 使用牌:统一的卡牌使用入口技能(配合 CardEffect 注册表路由)
+  使用牌: load(() => import('../card-effect/use-card')),
 };
 
 // 设置解析器(打破循环依赖:技能文件 import skill.ts → skill.ts 通过 resolver 查表)
