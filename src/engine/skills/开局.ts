@@ -5,7 +5,7 @@ import { applyAtom } from '../create-engine';
 import { createRng } from '../../shared/rng';
 import { registerActionEntry, unregisterActionEntry, instantiateSkill } from '../skill';
 
-import { isLord } from '../character-meta';
+import { getCharacterBaseId, LORD_CANDIDATES } from '../character-meta';
 
 /**
  * system 命名空间占位 ownerId(座次下标 -1,不对应任何玩家槽位)。
@@ -30,33 +30,61 @@ const CANDIDATES_PER_IDENTITY: Record<string, number> = {
 const CANDIDATES_LORD = 5;
 const CANDIDATES_NON_LORD = 2;
 
-/** 从已打乱的 charPool 中拆分主公候选:常备 5 + 非常备 2(总 7)。
- *  - charPool 需为 seed 打乱后的顺序,取前 N 即随机抽取。
- *  - isLord 判断走 character-meta.isLord,适用于任何数据来源的武将名。
+/** 武将组:同一武将(baseId)的多个版本(标/界/SP)归为一组。
+ *  选将时作为一个候选位置展示,玩家 hover 展开后选择具体版本。 */
+interface CharGroup {
+  baseId: string;
+  versions: Array<{ name: string; skills: string[] }>;
+}
+
+/** 把扁平武将列表按 baseId 分组。
+ *  打乱后的顺序保留——组内版本按打乱顺序排列,组间顺序由首次出现决定。 */
+function groupByBaseId(pool: Array<{ name: string; skills: string[] }>): CharGroup[] {
+  const map = new Map<string, CharGroup>();
+  for (const c of pool) {
+    const baseId = getCharacterBaseId(c.name);
+    let g = map.get(baseId);
+    if (!g) {
+      g = { baseId, versions: [] };
+      map.set(baseId, g);
+    }
+    g.versions.push(c);
+  }
+  return [...map.values()];
+}
+
+/** 把武将组列表展开为扁平候选列表(带 baseId 字段供前端分组)。 */
+function flattenGroups(
+  groups: CharGroup[],
+): Array<{ name: string; skills: string[]; baseId: string }> {
+  return groups.flatMap((g) => g.versions.map((v) => ({ ...v, baseId: g.baseId })));
+}
+
+/** 从已分组的 charGroups 中拆分主公候选组:常备 5 + 非常备 2(总 7 组)。
+ *  - charGroups 需为 seed 打乱后的顺序,取前 N 即随机抽取。
+ *  - 常备判断基于 baseId(界版主公也正确识别)。
  *  - 兑底:常备 < 5 时,用非常备补足到 7;总数仍不足则给现有全部。 */
-function pickLordCandidates(
-  charPool: Array<{ name: string; skills: string[] }>,
-): Array<{ name: string; skills: string[] }> {
+function pickLordCandidateGroups(groups: CharGroup[]): CharGroup[] {
   const target = CANDIDATES_PER_IDENTITY['主公']; // 7
-  const lordPicked: Array<{ name: string; skills: string[] }> = [];
-  const nonLordPicked: Array<{ name: string; skills: string[] }> = [];
-  for (const c of charPool) {
+  const lordPicked: CharGroup[] = [];
+  const nonLordPicked: CharGroup[] = [];
+  for (const g of groups) {
     if (lordPicked.length >= CANDIDATES_LORD && nonLordPicked.length >= CANDIDATES_NON_LORD) break;
-    if (isLord(c.name)) {
-      if (lordPicked.length < CANDIDATES_LORD) lordPicked.push(c);
+    if (LORD_CANDIDATES.includes(g.baseId)) {
+      if (lordPicked.length < CANDIDATES_LORD) lordPicked.push(g);
     } else {
-      if (nonLordPicked.length < CANDIDATES_NON_LORD) nonLordPicked.push(c);
+      if (nonLordPicked.length < CANDIDATES_NON_LORD) nonLordPicked.push(g);
     }
   }
   const result = [...lordPicked, ...nonLordPicked];
   // 兑底:常备不足 5 时,用非常备补足
   if (result.length < target) {
-    const used = new Set(result.map((c) => c.name));
-    for (const c of charPool) {
+    const used = new Set(result.map((g) => g.baseId));
+    for (const g of groups) {
       if (result.length >= target) break;
-      if (used.has(c.name)) continue;
-      used.add(c.name);
-      result.push(c);
+      if (used.has(g.baseId)) continue;
+      used.add(g.baseId);
+      result.push(g);
     }
   }
   return result;
@@ -104,26 +132,32 @@ export function onInit(_skill: Skill, state: GameState): () => void {
       //    候选人按身份发放数量(见 CANDIDATES_PER_IDENTITY)。
       const charRng = createRng(seed + 1);
       const charPool = [...characters].filter((c) => c.name !== '主公');
-      // 打乱武将池(主公选将与此后候选池抽取都从这个打乱后的序列里取)
+      // 打乱武将池(打乱扁平列表后分组,等价于随机分配各版本到各组)
       for (let i = charPool.length - 1; i > 0; i--) {
         const j = charRng.nextInt(i + 1);
         const tmp = charPool[i];
         charPool[i] = charPool[j];
         charPool[j] = tmp;
       }
+      // 按版本分组:同一武将的标/界/SP 版本归为一组(整组互斥)
+      const charGroups = groupByBaseId(charPool);
       const lordIdx = state.players.findIndex((p) => p.identity === '主公');
 
       // 2a. 主公先选(串行):从池中按 isLord 拆成常备/非常备两组,合并为 7 张候选人。
       //     拆分:常备主公随机 5 + 非常备随机 2(charPool 已 seed 打乱,取前 N 即随机)。
       //     池不足时:常备不足用非常备补足,总数仍不足则给现有全部。
       //     主公选完后,池中【未被选中】的武将全部进入候选池,供其他身份玩家分配。
-      const used = new Set<string>();
+      const used = new Set<string>(); // 追踪 baseId(整组互斥)
       if (lordIdx >= 0) {
-        const lordAvail = pickLordCandidates(charPool);
+        const lordAvail = pickLordCandidateGroups(charGroups);
         if (lordAvail.length > 0) {
-          await applyAtom(state, { type: '选将询问', target: lordIdx, candidates: lordAvail });
+          await applyAtom(state, {
+            type: '选将询问',
+            target: lordIdx,
+            candidates: flattenGroups(lordAvail),
+          });
           const lordChosen = state.players[lordIdx].character;
-          if (lordChosen) used.add(lordChosen);
+          if (lordChosen) used.add(getCharacterBaseId(lordChosen));
         }
       }
 
@@ -131,8 +165,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
       //     候选池必须覆盖所有人的需求——池不足时报错（不允许共享候选以避免 data race）。
       const others = state.players.map((_, i) => i).filter((i) => i !== lordIdx);
       if (others.length > 0) {
-        // 候选池:主公未选的全部武将(顺序即打乱后顺序,等价于随机)
-        const candidatePool = charPool.filter((c) => !used.has(c.name));
+        const candidatePool = charGroups.filter((g) => !used.has(g.baseId));
         const wantByPlayer = others.map((idx) => {
           const identity = state.players[idx].identity;
           return CANDIDATES_PER_IDENTITY[identity ?? ''] ?? CANDIDATES_PER_IDENTITY['反贼'];
@@ -140,7 +173,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
         const totalWant = wantByPlayer.reduce((a, b) => a + b, 0);
         if (candidatePool.length < totalWant) {
           throw new Error(
-            `武将池不足: 需要 ${totalWant} 个候选提供给非主公玩家，当前池中只有 ${candidatePool.length} 个`,
+            `武将池不足: 需要 ${totalWant} 个候选组提供给非主公玩家，当前池中只有 ${candidatePool.length} 个`,
           );
         }
 
@@ -148,18 +181,18 @@ export function onInit(_skill: Skill, state: GameState): () => void {
           target: number;
           candidates: Array<{ name: string; skills: string[] }>;
         }> = [];
-        const allocated = new Set<string>(used);
+        let cursor = 0;
         for (let k = 0; k < others.length; k++) {
           const want = wantByPlayer[k];
-          const cand = candidatePool.filter((c) => !allocated.has(c.name)).slice(0, want);
-          for (const c of cand) allocated.add(c.name);
-          selections.push({ target: others[k], candidates: cand });
+          const playerGroups = candidatePool.slice(cursor, cursor + want);
+          cursor += want;
+          selections.push({ target: others[k], candidates: flattenGroups(playerGroups) });
         }
         if (selections.length > 0) {
           await applyAtom(state, { type: '并行选将', selections });
           for (const idx of others) {
             const chosen = state.players[idx]?.character;
-            if (chosen) used.add(chosen);
+            if (chosen) used.add(getCharacterBaseId(chosen));
           }
         }
       }

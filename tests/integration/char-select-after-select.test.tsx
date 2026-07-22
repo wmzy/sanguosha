@@ -11,7 +11,7 @@
 //      本文件不再覆盖跨连接「代打选将」场景(已迁出,见 debug-parallel-charselect)。
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import type { ActionMsg } from '../../src/client/types';
 import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
@@ -261,6 +261,66 @@ describe('GameView:选将完成后禁止重新选将,展示已选武将', () => 
     expect(screen.queryByRole('button', { name: /^确认选择$/ })).toBeNull();
     // onAction 仍然只被调用一次(锁定后重复点击不再提交)
     expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('多版本武将组:标/界按 baseId 归组,折叠态显示基础名+版本徽章,hover 展开后选择具体版本', async () => {
+    // candidates 含标/界版本对(刘备+界刘备 同 baseId)+ 单版本(孙权)
+    const view: GameView = {
+      viewer: 0,
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+      players: [makePlayer(0, '', '主公'), makePlayer(1, ''), makePlayer(2, '')],
+      cardMap: {},
+      pending: {
+        type: 'awaits',
+        atom: {
+          type: '选将询问',
+          target: 0,
+          candidates: [
+            { name: '刘备', skills: ['仁德'], baseId: '刘备' },
+            { name: '界刘备', skills: ['界仁德'], baseId: '刘备' },
+            { name: '孙权', skills: ['制衡'], baseId: '孙权' },
+          ],
+        },
+        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: [] },
+        target: 0,
+        deadline: Date.now() + 60000,
+        totalMs: 60000,
+      },
+      deadline: null,
+      deadlineTotalMs: 0,
+      log: [],
+      settlementStack: [],
+    };
+    const onAction = vi.fn();
+    render(<GameViewComponent view={view} onAction={onAction} />);
+
+    // 单版本组(孙权)直接显示为候选卡
+    expect(screen.getByText('孙权')).toBeDefined();
+    // 多版本组折叠态:显示基础名"刘备",不直接显示"界刘备"
+    expect(screen.getByText('刘备')).toBeDefined();
+    expect(screen.queryByText('界刘备')).toBeNull();
+
+    // hover 展开:mouseEnter 多版本组 → 显示具体版本候选卡
+    const multiCard = document.querySelector('[data-multi-group="刘备"]');
+    expect(multiCard).not.toBeNull();
+    await act(async () => {
+      fireEvent.mouseEnter(multiCard!);
+    });
+
+    // 展开后"界刘备"候选卡出现
+    expect(screen.getByText('界刘备')).toBeDefined();
+
+    // 选择界刘备 → 点确认 → onAction 收到 character='界刘备'
+    fireEvent.click(screen.getByText('界刘备'));
+    fireEvent.click(screen.getByRole('button', { name: /确认选择/ }));
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: '选将',
+        params: { character: '界刘备' },
+      }),
+    );
   });
 
   it('旁观者(viewer=-1)渲染不崩溃:无授权公开视图 perspectiveIdx 回退到座次 0', () => {

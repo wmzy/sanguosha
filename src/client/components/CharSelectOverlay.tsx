@@ -19,6 +19,9 @@ import { getCharacterImage } from '../assets/imageAssets';
 export interface CharSelectOverlayCandidate {
   name: string;
   skills: string[];
+  /** 武将基础身份(去版本前缀)。同一武将的标/界/SP 版本共享 baseId,
+   *  选将时归为一组。缺失时回退到 name(单版本武将)。 */
+  baseId?: string;
 }
 
 export interface CharacterMeta {
@@ -75,18 +78,91 @@ export function CharSelectOverlay({
   overlaySlot,
 }: CharSelectOverlayProps) {
   useSkillDescReady(); // 技能模块加载后重渲染,确保候选武将技能描述 title 命中
-  const [selectedCharIdx, setSelectedCharIdx] = useState<number | null>(null);
+  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
   // 已提交锁定态:点「确认选择」后记录选中的武将名,锁定候选区与按钮,
   // 直到引擎广播新 view(选将 slot resolve → pending 切换 → 本组件卸载或重置)。
   // 此前遮罩仍在渲染,必须禁止重复点击其他武将 + 再次提交。
   const [submittedChar, setSubmittedChar] = useState<string | null>(null);
+  // 多版本组 hover 展开态:记录当前 hover 的组 baseId,null 表示无展开。
+  const [hoveredGroupBaseId, setHoveredGroupBaseId] = useState<string | null>(null);
   // pending/target 变化时清空选中态与锁定态(新选将窗口开启)
   useEffect(() => {
-    setSelectedCharIdx(null);
+    setSelectedCharName(null);
     setSubmittedChar(null);
+    setHoveredGroupBaseId(null);
   }, [isSelfSelecting, charSelectTarget]);
 
   const viewerColor = viewerIdentity ? IDENTITY_COLORS[viewerIdentity] || '#888' : null;
+
+  // 按 baseId 分组候选武将:同一武将的标/界/SP 版本归为一组
+  const groups: CharSelectOverlayCandidate[][] = (() => {
+    const map = new Map<string, CharSelectOverlayCandidate[]>();
+    for (const ch of candidates) {
+      const bid = ch.baseId ?? ch.name;
+      let arr = map.get(bid);
+      if (!arr) {
+        arr = [];
+        map.set(bid, arr);
+      }
+      arr.push(ch);
+    }
+    return [...map.values()];
+  })();
+
+  /** 渲染单张候选卡(单版本 / 多版本组展开态共用) */
+  const renderCard = (
+    ch: CharSelectOverlayCandidate,
+    isSelected: boolean,
+    isLockedOut: boolean,
+    isSubmittedPick: boolean,
+    onClick: () => void,
+  ) => {
+    const meta = getCharacterMeta(ch.name);
+    const faction = meta?.faction ?? '群';
+    const maxHealth = meta?.maxHealth ?? 4;
+    const charImg = getCharacterImage(ch.name);
+    return (
+      <div
+        key={ch.name}
+        className={cx(
+          candidateCard,
+          (isSelected || isSubmittedPick) && candidateCardSelected,
+          isLockedOut && candidateCardLockedOut,
+          submittedChar !== null && candidateCardFrozen,
+        )}
+        style={{ '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties}
+        onClick={onClick}
+      >
+        {charImg && (
+          <img
+            className={candidatePortraitImg}
+            src={charImg}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        )}
+        <div className={candidateMeta}>
+          <div className={candidateName}>{ch.name}</div>
+          <div className={cx(candidateFaction)}>
+            {faction} · {ch.skills.map((s, si) => (
+              <SkillTag key={s} name={s} description={getSkillDescription(s)}>
+                {si > 0 ? ' / ' : ''}{s}
+              </SkillTag>
+            ))}
+          </div>
+          <div className={hpDots}>
+            {Array.from({ length: maxHealth }, (_, j) => (
+              <div key={j} className={hpDot} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={overlayRoot}>
@@ -127,67 +203,109 @@ export function CharSelectOverlay({
 
       {isSelfSelecting ? (
         <>
-          {/* 候选网格(最多 5 列) */}
+          {/* 候选网格:按 baseId 分组,多版本组 hover 原地水平展开 */}
           <div
             className={candidateGrid}
-            style={{ '--cols': Math.min(candidates.length, 5) } as React.CSSProperties}
+            style={{ '--cols': Math.min(groups.length, 5) } as React.CSSProperties}
           >
-            {candidates.map((ch, i) => {
-              const isSelected = selectedCharIdx === i;
-              // 已提交后:选中的武将高亮锁定,其他候选变灰不可点
-              const isLockedOut = submittedChar !== null && submittedChar !== ch.name;
-              const isSubmittedPick = submittedChar === ch.name;
-              const meta = getCharacterMeta(ch.name);
-              const faction = meta?.faction ?? '群';
-              const maxHealth = meta?.maxHealth ?? 4;
-              const charImg = getCharacterImage(ch.name);
-              return (
-                <div
-                  key={ch.name}
-                  className={cx(
-                    candidateCard,
-                    (isSelected || isSubmittedPick) && candidateCardSelected,
-                    isLockedOut && candidateCardLockedOut,
-                    submittedChar !== null && candidateCardFrozen,
-                  )}
-                  style={
-                    { '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties
-                  }
-                  onClick={() => {
-                    if (submittedChar !== null) return; // 已提交,禁止重选
-                    setSelectedCharIdx(i);
-                  }}
-                >
-                  {/* 立绘作卡片背景:无素材时留势力色填充,文字浮于上方 */}
-                  {charImg && (
-                    <img
-                      className={candidatePortraitImg}
-                      src={charImg}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  )}
-                  {/* 底部渐变蒙版 + 文字内容:覆盖在背景上,不被立绘压缩高度 */}
-                  <div className={candidateMeta}>
-                    <div className={candidateName}>{ch.name}</div>
-                    <div className={cx(candidateFaction)}>
-                      {faction} · {ch.skills.map((s, si) => (
-                        <SkillTag key={s} name={s} description={getSkillDescription(s)}>
-                          {si > 0 ? ' / ' : ''}{s}
-                        </SkillTag>
+            {groups.map((versions) => {
+              const baseId = versions[0].baseId ?? versions[0].name;
+              const isMulti = versions.length > 1;
+              const isExpanded = isMulti && hoveredGroupBaseId === baseId;
+
+              if (isMulti && isExpanded) {
+                // 多版本组展开态:水平排列各版本候选卡
+                return (
+                  <div
+                    key={baseId}
+                    className={candidateGroupExpanded}
+                    onMouseLeave={() => setHoveredGroupBaseId(null)}
+                  >
+                    {versions.map((ch) =>
+                      renderCard(
+                        ch,
+                        selectedCharName === ch.name,
+                        submittedChar !== null && submittedChar !== ch.name,
+                        submittedChar === ch.name,
+                        () => {
+                          if (submittedChar !== null) return;
+                          setSelectedCharName(ch.name);
+                        },
+                      ),
+                    )}
+                  </div>
+                );
+              }
+
+              if (isMulti) {
+                // 多版本组折叠态:显示基础名 + 版本徽章,hover 展开
+                const isSelected = versions.some((v) => selectedCharName === v.name);
+                const isSubmittedPick =
+                  submittedChar !== null && versions.some((v) => v.name === submittedChar);
+                const meta = getCharacterMeta(versions[0].name);
+                const faction = meta?.faction ?? '群';
+                const charImg = getCharacterImage(versions[0].name);
+                return (
+                  <div
+                    key={baseId}
+                    data-multi-group={baseId}
+                    className={cx(
+                      candidateCard,
+                      (isSelected || isSubmittedPick) && candidateCardSelected,
+                      submittedChar !== null && !isSubmittedPick && candidateCardLockedOut,
+                      submittedChar !== null && candidateCardFrozen,
+                    )}
+                    style={
+                      { '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties
+                    }
+                    onMouseEnter={() => {
+                      if (submittedChar === null) setHoveredGroupBaseId(baseId);
+                    }}
+                  >
+                    {charImg && (
+                      <img
+                        className={candidatePortraitImg}
+                        src={charImg}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className={variantBadge}>
+                      {versions.map((v) => (
+                        <span
+                          key={v.name}
+                          className={cx(
+                            variantTag,
+                            v.name === selectedCharName && variantTagActive,
+                          )}
+                        >
+                          {v.name.startsWith('界') ? '界' : '标'}
+                        </span>
                       ))}
                     </div>
-                    <div className={hpDots}>
-                      {Array.from({ length: maxHealth }, (_, j) => (
-                        <div key={j} className={hpDot} />
-                      ))}
+                    <div className={candidateMeta}>
+                      <div className={candidateName}>{baseId}</div>
+                      <div className={cx(candidateFaction)}>{faction} · hover 展开选版本</div>
                     </div>
                   </div>
-                </div>
+                );
+              }
+
+              // 单版本:正常候选卡
+              const ch = versions[0];
+              return renderCard(
+                ch,
+                selectedCharName === ch.name,
+                submittedChar !== null && submittedChar !== ch.name,
+                submittedChar === ch.name,
+                () => {
+                  if (submittedChar !== null) return;
+                  setSelectedCharName(ch.name);
+                },
               );
             })}
           </div>
@@ -198,18 +316,17 @@ export function CharSelectOverlay({
               confirmBtn,
               submittedChar !== null
                 ? confirmBtnSubmitted
-                : selectedCharIdx !== null
+                : selectedCharName !== null
                   ? confirmBtnReady
                   : confirmBtnIdle,
             )}
-            disabled={submittedChar !== null || selectedCharIdx === null}
+            disabled={submittedChar !== null || selectedCharName === null}
             onClick={() => {
               if (submittedChar !== null) return;
-              if (selectedCharIdx !== null && candidates[selectedCharIdx]) {
-                const picked = candidates[selectedCharIdx].name;
-                setSubmittedChar(picked); // 锁定,禁止重选
-                setSelectedCharIdx(null);
-                onSelect(picked);
+              if (selectedCharName) {
+                setSubmittedChar(selectedCharName); // 锁定,禁止重选
+                setSelectedCharName(null);
+                onSelect(selectedCharName);
               }
             }}
           >
@@ -329,6 +446,19 @@ const candidateGrid = css`
   scrollbar-width: thin;
 `;
 
+const candidateGroupExpanded = css`
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+
+  & > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+`;
+
 const candidateCard = css`
   position: relative;
   box-sizing: border-box;
@@ -426,6 +556,30 @@ const candidateFaction = css`
   background: rgba(0, 0, 0, 0.2);
   border-radius: 6px;
   padding: 2px 8px;
+`;
+
+const variantBadge = css`
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+`;
+
+const variantTag = css`
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+`;
+
+const variantTagActive = css`
+  background: rgba(255, 215, 0, 0.4);
+  border-color: #ffd700;
 `;
 
 const hpDots = css`

@@ -17,6 +17,20 @@ export const LORD_CANDIDATES: readonly string[] = [
   '刘禅',
 ] as const;
 
+/** 武将版本前缀。去掉前缀后的名字即为"基础身份"(baseId),
+ *  同一 baseId 的多个版本(标/界/SP)在选将时归为一组候选。
+ *  例: '界刘备'→'刘备', 'SP赵云'→'赵云', '刘备'→'刘备'。 */
+const VARIANT_PREFIXES = ['界', 'SP'] as const;
+
+/** 获取武将的基础身份(baseId):去掉版本前缀后的名字。
+ *  同一武将的不同版本共享 baseId,用于选将分组。 */
+export function getCharacterBaseId(name: string): string {
+  for (const prefix of VARIANT_PREFIXES) {
+    if (name.startsWith(prefix)) return name.slice(prefix.length);
+  }
+  return name;
+}
+
 export interface CharacterMeta {
   name: string;
   faction: Faction;
@@ -53,7 +67,7 @@ const META: ReadonlyMap<string, CharacterMeta> = new Map(
         maxHealth: src.maxHealth,
         gender: src.gender,
         skills: src.skills.map((s) => s.name),
-        isLord: src.isLord === true || LORD_CANDIDATES.includes(src.name),
+        isLord: src.isLord === true || LORD_CANDIDATES.includes(getCharacterBaseId(src.name)),
       } satisfies CharacterMeta,
     ];
   }),
