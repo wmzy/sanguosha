@@ -2,6 +2,7 @@
 // src/engine/view/buildView.ts
 import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
+import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -54,7 +55,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
   if (ownOrBroadcastSlot) {
     const slot = ownOrBroadcastSlot;
     const def = slot.definition;
-    const prompt =
+    const rawPrompt =
       (slot.atom as { prompt?: ActionPrompt }).prompt ??
       def.pending?.prompt ??
       (slot.atom.type === '询问闪'
@@ -62,6 +63,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         : slot.atom.type === '询问杀'
           ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
           : { type: 'confirm' as const, title: '请回应' });
+    // choosePlayer 注入可序列化 candidates(filter 无法跨进程序列化)
+    const prompt = resolveChoosePlayerCandidates(rawPrompt, state);
     // target 提取:'target' 字段优先;出牌窗口 用 'player';都无则 TARGET_SYSTEM
     const target =
       'target' in slot.atom && typeof slot.atom.target === 'number'

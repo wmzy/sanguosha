@@ -113,6 +113,9 @@ export interface ChoosePlayerPrompt {
   description?: string;
   min: number;
   max: number;
+  /** 可序列化的候选目标座次列表(权威,跨进程);filter 为本地冗余,序列化时丢失。
+   *  投影层(toViewEvents/buildView)对未显式提供的 prompt 自动跑 filter 计算。 */
+  candidates?: number[];
   filter?: (view: GameView, target: number) => boolean;
 }
 

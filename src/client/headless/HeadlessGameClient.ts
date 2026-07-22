@@ -563,28 +563,70 @@ export class HeadlessGameClient {
     // 通用回应（出闪/出杀/确认发动等）
     const info = resolvePendingRespond(pending, skillActions);
     if (info?.skillId) {
-      // choosePlayer 类（突袭/select、激将、节命 等）：计算合法目标，agent 需填入 targets
+      // choosePlayer 类（突袭/激将/奋威 等）：用引擎注入的可序列化 candidates
+      // （filter 跨进程序列化丢失，不能依赖）。单选逐候选生成独立 action；
+      // 多选生成一个描述性 action，agent 需填 targets。
       if (pending.prompt?.type === 'choosePlayer') {
         const choosePrompt = pending.prompt;
         const filter = choosePrompt.filter;
-        const validTargets: number[] = [];
-        for (const p of view.players) {
-          if (!p.alive) continue;
-          if (filter && !filter(view, p.index)) continue;
-          validTargets.push(p.index);
+        const validTargets: number[] = choosePrompt.candidates
+          ? choosePrompt.candidates
+          : (() => {
+              const arr: number[] = [];
+              for (const p of view.players) {
+                if (!p.alive) continue;
+                if (filter && !filter(view, p.index)) continue;
+                arr.push(p.index);
+              }
+              return arr;
+            })();
+        const max = choosePrompt.max ?? 1;
+        const min = choosePrompt.min ?? 1;
+        if (max <= 1) {
+          // 单选：每个候选一个独立 action（与其他 respond 一致，agent 直接选）
+          for (const t of validTargets) {
+            out.push({
+              description: `${choosePrompt.title ?? info.skillId} → ${view.players[t]?.name ?? `P${t}`}`,
+              message: {
+                skillId: info.skillId,
+                actionType: 'respond',
+                ownerId,
+                params: { target: t, targets: [t] },
+                baseSeq: 0,
+              },
+              validTargets: [t],
+              category: 'respond',
+            });
+          }
+          if (min === 0) {
+            out.push({
+              description: `${choosePrompt.title ?? info.skillId} → 不选择`,
+              message: {
+                skillId: info.skillId,
+                actionType: 'respond',
+                ownerId,
+                params: { targets: [] },
+                baseSeq: 0,
+              },
+              validTargets: [],
+              category: 'skip',
+            });
+          }
+        } else {
+          // 多选：描述性 action，agent 需从 validTargets 填 targets
+          out.push({
+            description: `${choosePrompt.title ?? info.skillId}（选 ${min}-${max} 个目标）`,
+            message: {
+              skillId: info.skillId,
+              actionType: 'respond',
+              ownerId,
+              params: { targets: [] },
+              baseSeq: 0,
+            },
+            validTargets,
+            category: 'respond',
+          });
         }
-        out.push({
-          description: choosePrompt.title ?? info.skillId,
-          message: {
-            skillId: info.skillId,
-            actionType: 'respond',
-            ownerId,
-            params: { targets: [] },
-            baseSeq: 0,
-          },
-          validTargets,
-          category: 'respond',
-        });
         return;
       }
       // chooseOption 类（化身:选技能/选化身牌/选行动等）：每个选项一个 action。

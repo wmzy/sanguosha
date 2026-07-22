@@ -1,8 +1,9 @@
 // src/client/components/AwaitingPrompt.tsx
-// 等待回应区:渲染 pending prompt 的回应面板(confirm / useCard 两分支)。
+// 等待回应区:渲染 pending prompt 的回应面板(confirm / useCard / choosePlayer 三分支)。
 // distribute 类 pending(遗计分配)不在本组件渲染——由 GameView 统一分配面板处理(选牌在手牌区)。
 // 纯展示,所有数据与回调通过 props 传入。
 // pendingRespondInfo 由 usePendingState memo 后从父组件传入,不再在此重复 resolve。
+import { useState, useEffect } from 'react';
 import * as styles from './gameViewStyles';
 import type { Card, Faction, GameView, Json, PendingView } from '../../engine/types';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
@@ -50,6 +51,12 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
   // 广播型 pending 且已本地跳过:显示已跳过提示
   const isBroadcast = pendingTargetIdx < 0;
   const isSkipped = isBroadcast && skippedBroadcast.has(broadcastKey);
+
+  // choosePlayer 多选累积状态(pending 变化时重置)
+  const [multiSelect, setMultiSelect] = useState<number[]>([]);
+  useEffect(() => {
+    setMultiSelect([]);
+  }, [pending]);
 
   // ── 无懈可击 prompt 上下文文案 ──
   // 引擎构造的 prompt.title 是固定「是否打出无懈可击?」;前端补充
@@ -230,6 +237,85 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                         {opt.label}
                       </button>
                     ))}
+              </div>
+            );
+          }
+          // choosePlayer 类 pending(流离/奋威/突袭/激将 等):渲染候选目标按钮。
+          // 单选(max===1)点击即发;多选(max>1)累积后确认。candidates 由引擎投影层注入。
+          // 同时发 target(首个)与 targets(数组)以兼容各技能 respond 的 param 读取契约。
+          if (pending.prompt.type === 'choosePlayer') {
+            const p = pending.prompt;
+            const candidates = p.candidates ?? [];
+            const names = view?.players ?? [];
+            const max = p.max ?? 1;
+            const min = p.min ?? 1;
+            if (max <= 1) {
+              return (
+                <div className={styles.promptActionsWrap}>
+                  {candidates.length === 0 && (
+                    <span className={styles.promptDescInline}>无可选目标</span>
+                  )}
+                  {candidates.map((t) => (
+                    <button
+                      key={t}
+                      className={styles.promptBtn}
+                      onClick={() => onSend(skillId, 'respond', { target: t, targets: [t] })}
+                    >
+                      {names[t]?.name ?? `P${t}`}
+                    </button>
+                  ))}
+                  {min === 0 && (
+                    <button
+                      className={styles.promptBtn}
+                      onClick={() => onSend(skillId, 'respond', { targets: [] })}
+                    >
+                      不选择
+                    </button>
+                  )}
+                </div>
+              );
+            }
+            const toggle = (t: number) =>
+              setMultiSelect((prev) =>
+                prev.includes(t)
+                  ? prev.filter((x) => x !== t)
+                  : prev.length < max
+                    ? [...prev, t]
+                    : prev,
+              );
+            const canConfirm = multiSelect.length >= min && multiSelect.length <= max;
+            return (
+              <div className={styles.promptActionsWrap}>
+                {candidates.length === 0 && (
+                  <span className={styles.promptDescInline}>无可选目标</span>
+                )}
+                {candidates.map((t) => {
+                  const selected = multiSelect.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      className={selected ? styles.promptBtnPrimary : styles.promptBtn}
+                      onClick={() => toggle(t)}
+                    >
+                      {names[t]?.name ?? `P${t}`}
+                    </button>
+                  );
+                })}
+                <button
+                  className={canConfirm ? styles.promptBtnPrimary : styles.promptBtnDisabled}
+                  disabled={!canConfirm}
+                  onClick={() => canConfirm && onSend(skillId, 'respond', { targets: multiSelect })}
+                >
+                  确认({multiSelect.length}/{max})
+                </button>
+                {min === 0 && (
+                  <button
+                    className={styles.promptBtn}
+                    onClick={() => onSend(skillId, 'respond', { targets: [] })}
+                  >
+                    不选择
+                  </button>
+                )}
               </div>
             );
           }

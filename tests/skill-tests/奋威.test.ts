@@ -93,6 +93,18 @@ describe('奋威', () => {
     // P1 确认发动奋威
     await P1.respond('奋威', { choice: true });
 
+    // 验证:多选面板 pending 含引擎注入的 candidates(跨进程序列化安全)
+    // 南蛮目标 = allOthers from P2 = [P1(0), P3(2)]
+    const cpPrompt = P1.processedView.pending?.prompt as {
+      type?: string;
+      candidates?: number[];
+      min?: number;
+      max?: number;
+    };
+    expect(cpPrompt.type).toBe('choosePlayer');
+    expect(cpPrompt.candidates).toEqual([0, 2]);
+    expect(cpPrompt.max).toBe(2);
+
     // 奋威多选面板:选择 P3(座次2)令其无效
     await P1.respond('奋威', { targets: [2] });
 

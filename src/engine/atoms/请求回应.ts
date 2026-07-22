@@ -7,6 +7,7 @@ import type { ActionPrompt, AtomDefinition, Json, ViewEventSplit, ViewEvent } fr
 import { applyAtom, resolveTimeoutMs } from '../create-engine';
 import { registerAtom } from '../atom';
 import { handLimit } from '../hand-limit';
+import { resolveChoosePlayerCandidates } from '../view/choosePlayerCandidates';
 
 export const 请求回应: AtomDefinition<{
   requestType: string;
@@ -66,12 +67,12 @@ export const 请求回应: AtomDefinition<{
     const timeoutSec = atom.timeout ?? 请求回应.pending!.timeout;
     const isBroadcast = atom.target < 0;
     const timeoutMs = resolveTimeoutMs(state, timeoutSec, isBroadcast);
-    // target 看到带 prompt 的请求
+    // target 看到带 prompt 的请求(choosePlayer 注入可序列化 candidates)
     const targetView: ViewEvent = {
       type: '请求回应',
       requestType: atom.requestType,
       target: atom.target,
-      prompt: atom.prompt,
+      prompt: resolveChoosePlayerCandidates(atom.prompt, state),
       timeoutMs,
     };
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有存活玩家都可回应,

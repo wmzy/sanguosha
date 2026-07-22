@@ -456,15 +456,16 @@ describe('enumerateAvailableActions', () => {
   });
 });
 
-// 回归测试：choosePlayer prompt（突袭/select、激将、节命 等）
+// 回归测试：choosePlayer prompt（突袭/select、激将、节命、奋威 等）
 //   修复前：兜底分支生成空 params:{} 和空 validTargets:[]，LLM 不知道合法目标
-//   修复后：choosePlayer 分支计算合法目标，params.targets 为空数组待 agent 填入
+//   修复后：单选逐候选生成独立 respond action；多选生成描述性 action 待 agent 填 targets。
+//   candidates（引擎投影层注入，跨进程序列化安全）优先于 filter（跨进程丢失）。
 describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', () => {
   beforeEach(() => {
     clearRegistry();
   });
 
-  it('choosePlayer + filter 排除自己:validTargets 正确、params.targets 为空数组', () => {
+  it('choosePlayer + filter 排除自己:每个候选生成独立 respond action', () => {
     const hgc = new HeadlessGameClient('ws://localhost:0');
     (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
     const view = makeView3(0, '出牌', []);
@@ -485,14 +486,16 @@ describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', ()
 
     const actions = hgc.getAvailableActions();
     const respondActions = actions.filter((a) => a.category === 'respond');
-    expect(respondActions).toHaveLength(1);
-    expect(respondActions[0].message.params).toEqual({ targets: [] });
-    expect(respondActions[0].validTargets).toContain(1);
-    expect(respondActions[0].validTargets).toContain(2);
-    expect(respondActions[0].validTargets).not.toContain(0);
-    expect(respondActions[0].validTargets).toHaveLength(2);
-    // description 使用 prompt.title
-    expect(respondActions[0].description).toBe('选择突袭目标');
+    // 单选(max===1):每个候选生成独立 respond action
+    expect(respondActions).toHaveLength(2);
+    const targets = respondActions.map((a) => a.message.params.target as number).sort((x, y) => x - y);
+    expect(targets).toEqual([1, 2]); // filter 排除自己(0)
+    for (const a of respondActions) {
+      const t = a.message.params.target as number;
+      expect(a.message.params.targets).toEqual([t]);
+      expect(a.validTargets).toEqual([t]);
+      expect(a.description).toBe(`选择突袭目标 → P${t}`);
+    }
   });
 
   it('choosePlayer 无 filter:所有存活玩家为合法目标', () => {
@@ -515,13 +518,10 @@ describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', ()
 
     const actions = hgc.getAvailableActions();
     const respondActions = actions.filter((a) => a.category === 'respond');
-    expect(respondActions).toHaveLength(1);
-    expect(respondActions[0].message.params).toEqual({ targets: [] });
-    // 无 filter → 所有存活玩家（含自己）
-    expect(respondActions[0].validTargets).toHaveLength(3);
-    expect(respondActions[0].validTargets).toContain(0);
-    expect(respondActions[0].validTargets).toContain(1);
-    expect(respondActions[0].validTargets).toContain(2);
+    // 单选:每个存活玩家(含自己)一个 respond action
+    expect(respondActions).toHaveLength(3);
+    const targets = respondActions.map((a) => a.message.params.target as number).sort((x, y) => x - y);
+    expect(targets).toEqual([0, 1, 2]);
   });
 
   it('choosePlayer:死亡玩家不在 validTargets 中', () => {
@@ -545,11 +545,39 @@ describe('HeadlessGameClient.getAvailableActions() — choosePlayer pending', ()
 
     const actions = hgc.getAvailableActions();
     const respondActions = actions.filter((a) => a.category === 'respond');
+    // 死亡玩家(2)不在候选:只有 0,1 两个 action
+    expect(respondActions).toHaveLength(2);
+    const targets = respondActions.map((a) => a.message.params.target as number).sort((x, y) => x - y);
+    expect(targets).toEqual([0, 1]);
+  });
+
+  it('choosePlayer + candidates(引擎注入):多选优先用 candidates 而非 filter', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const view = makeView3(0, '出牌', []);
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType: '奋威/choose', target: 0 } as never,
+      prompt: {
+        type: 'choosePlayer',
+        title: '奋威:选择要令其无效的目标(可多选)',
+        min: 1,
+        max: 2,
+        // candidates 由引擎投影层注入(filter 跨进程序列化丢失,真实对局拿不到)
+        candidates: [1, 2],
+        filter: (_v: GameView, target: number) => target !== 0,
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    const respondActions = actions.filter((a) => a.category === 'respond');
+    // 多选(max>1):1 个描述性 action,validTargets=candidates,agent 填 targets
     expect(respondActions).toHaveLength(1);
-    expect(respondActions[0].validTargets).toHaveLength(2);
-    expect(respondActions[0].validTargets).toContain(0);
-    expect(respondActions[0].validTargets).toContain(1);
-    expect(respondActions[0].validTargets).not.toContain(2);
+    expect(respondActions[0].validTargets).toEqual([1, 2]);
+    expect(respondActions[0].message.params).toEqual({ targets: [] });
   });
 });
 

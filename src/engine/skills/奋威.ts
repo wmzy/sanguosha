@@ -95,6 +95,7 @@ async function runFenweiPanel(
       title: '奋威:选择要令其无效的目标(可多选)',
       min: 1,
       max: targets.length,
+      candidates: targets,
       filter: (_view: unknown, t: number) => targets.includes(t),
     },
     timeout: 30,
