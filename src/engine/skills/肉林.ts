@@ -1,17 +1,19 @@
 // 肉林(董卓·锁定技):你对女性角色/女性角色对你使用【杀】时,目标需连续出两张闪才能抵消。
 //
-// 实现方式(镜像无双):辅助函数 enforceRoulinDodge 嵌入「杀」的 execute。
-// 原因同无双:等待型 atom(询问闪)被 before-hook cancel(如八卦阵判红放虚拟闪)后
-// after-hook 不触发,无法用 hook 拦截追加第二轮询问。故在 execute 内 applyAtom(询问闪)
-// 返回后,由杀.execute 主动调用 enforceRoulinDodge 检查肉林条件并追加第二次询问。
+// 实现方式:在「生效前」before-hook 中拦截闪（镜像无双）。
+//   当闪的「生效前」atom 触发时(cardId 对应的牌为闪):
+//   - 找到外层杀帧,检查肉林条件（source/target 拥有肉林+异性）
+//   - 第一次闪:cancel(闪不生效)
+//   - 第二次闪:pass(闪正常生效)
 //
 // 触发条件(任一):
 //   - 肉林拥有者(董卓)作为杀的 source,且 target 为女性 → target 需双闪
 //   - 肉林拥有者(董卓)作为杀的 target,且 source 为女性 → target(董卓)需双闪
-import type { GameState, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+
+import type { GameState, HookResult, Skill } from '../types';
+import { registerBeforeHook } from '../skill';
+import { topFrame } from '../create-engine';
 import { getGender } from '../character-meta';
-import { registerPostDodgeAskHook } from '../card-effect/registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -36,44 +38,52 @@ function roulinApplies(state: GameState, source: number, target: number): boolea
   return (srcRoulin && tgtFemale) || (tgtRoulin && srcFemale);
 }
 
-/**
- * 肉林·杀:若肉林条件成立,消耗处理区已有的全部闪牌(移入弃牌堆),
- * 再追加一次 applyAtom(询问闪)。
- *
- * 在 杀.execute 的 applyAtom(询问闪) 之后调用(紧随 enforceDualDodge)。
- * 肉林条件不成立或处理区无闪则 no-op。
- *
- * 注意:与无双互斥——无双检查 source 拥有无双,肉林检查 source/target 拥有肉林+异性。
- * 一个玩家不会同时拥有无双和肉林,且性别条件独立,故两者叠加时各自独立判断,
- * 第二次调用(若都触发)会因处理区无闪而 no-op,安全。
- */
-export async function enforceRoulinDodge(
-  state: GameState,
-  source: number,
-  target: number,
-): Promise<void> {
-  if (!roulinApplies(state, source, target)) return;
-  const firstDodges = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-  if (firstDodges.length === 0) return;
-  for (const id of firstDodges) {
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId: id,
-      from: { zone: '处理区' },
-      to: { zone: '弃牌堆' },
-    });
-  }
-  await applyAtom(state, { type: '询问闪', target, source });
+/** localVars key:肉林闪计数器（杀cardId/目标座次） */
+function dodgeCountKey(killCardId: string, target: number): string {
+  return `肉林/dodgeCount/${killCardId}/${target}`;
 }
 
-export function onInit(_skill: Skill, _state: GameState): () => void {
-  // 肉林逻辑通过 PostDodgeAskHook 解耦：杀 CardEffect.resolve 调 runPostDodgeAskHooks
-  // 时触发 enforceRoulinDodge（运行时检查肉林条件决定是否生效）。
-  // 仍需 createSkill 实例化,使 player.skills.includes('肉林') 判定成立。
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+
+  registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '生效前',
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom as { target: number; cardId: string; source: number };
+      // 只处理闪的生效前
+      const card = ctx.state.cardMap[atom.cardId];
+      if (!card || card.name !== '闪') return;
+
+      // 从结算帧栈找到外层杀帧
+      const killFrame = topFrame(ctx.state);
+      if (!killFrame) return;
+      const killCardId = killFrame.params.cardId as string | undefined;
+      if (!killCardId) return;
+      const killCard = ctx.state.cardMap[killCardId];
+      if (!killCard || killCard.name !== '杀') return;
+
+      const killSource = killFrame.from;
+      const killTarget = atom.target; // 闪的使用者 = 杀的目标
+
+      // 检查肉林条件
+      if (!roulinApplies(ctx.state, killSource, killTarget)) return;
+
+      // 计数器：第一次 cancel，第二次放行
+      const countKey = dodgeCountKey(killCardId, killTarget);
+      const count = (ctx.state.localVars[countKey] as number) ?? 0;
+      if (count < 1) {
+        ctx.state.localVars[countKey] = count + 1;
+        return { kind: 'cancel' }; // 第一次闪被拦截
+      }
+      // 第二次闪放行
+      delete ctx.state.localVars[countKey];
+    },
+  );
+
   return () => {};
 }
-
-// 模块加载时注册 post-dodge-ask hook（杀不再直接 import 肉林）
-registerPostDodgeAskHook(enforceRoulinDodge);
 
 export default { createSkill, onInit } satisfies import('../types').SkillModule;

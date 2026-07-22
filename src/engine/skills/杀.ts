@@ -4,7 +4,7 @@
 //
 // use 的结算逻辑已迁移到 card-effects/杀.ts (CardEffect.resolve + onSettle)。
 // execute 委托 runUseFlow 编排完整使用结算流程（文档 use.md）。
-// 无双/肉林通过 PostDodgeAskHook 解耦，不再直接 import。
+// 无双/肉林通过「生效前」before-hook 解耦，不再直接 import。
 //
 // respond 保留在杀.ts（打出杀进处理区供决斗/南蛮入侵检查）。
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';

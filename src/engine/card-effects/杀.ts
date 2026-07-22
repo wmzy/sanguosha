@@ -2,9 +2,9 @@
 //
 // 作用效果（use.md 生效后）：对目标角色造成 1 点伤害。
 //
-// 闪的抵消逻辑不在杀的 resolve 中——由闪 skill 在「生效前」时机挂 before-hook 驱动：
-//   询问闪 → PostDodgeAskHooks(无双①/肉林① 追加第二次) → 被抵消 → cancel 生效前 → 跳过 生效后。
-//   详见 skills/闪.ts 的 生效前 before-hook。
+// 闪的抵消逻辑不在杀的 resolve 中——由 use-card.ts 的 handleSlashDodge 在「生效前」
+// 时机循环询间使用闪，发出闪的「生效前」atom。无双/肉林在该 atom 的 before-hook 中
+// cancel 第一次闪，实现"需两张闪"。
 //
 // onSettle 职责（runUseFlow 在结算完成后、popFrame 前调用）：
 //   出杀次数累加（slash-quota）+ 回合用量 view 同步。

@@ -2,17 +2,23 @@
 //   1. 你使用【杀】指定一名角色为目标时,该角色需连续使用两张【闪】才能抵消
 //   2. 与你进行【决斗】的角色每次需连续打出两张【杀】
 //
-// 实现方式:结算逻辑通过辅助函数 enforceDualDodge / enforceDualKill 嵌入「杀」「决斗」
-// 的 execute。原因:等待型 atom(询问闪)被 before-hook cancel(如八卦阵判红放虚拟闪)后
-// after-hook 不触发,无法用 hook 拦截追加第二轮询问。故在 execute 内 applyAtom(询问闪/杀)
-// 返回后,由调用方主动检查 source 是否拥有无双,如是则消耗第一张牌并追加一次询问。
+// 实现方式(杀部分):在「生效前」before-hook 中拦截闪。
+//   当闪的「生效前」atom 触发时(cardId 对应的牌为闪):
+//   - 找到外层杀帧,检查杀的 source 是否拥有无双
+//   - 第一次闪:cancel(闪不生效,不抵消杀)
+//   - 第二次闪:pass(闪正常生效,抵消杀)
+//   handleSlashDodge 收到 cancel 后会 drain 闪并再次询问,实现"需两张闪"。
 //
-// 八卦阵 FAQ 正确支持:八卦阵判定出的闪只算一张,无双下需判两次。
-// 第一轮八卦阵判红 → cancel 询问闪 → 杀.execute 仍继续到 enforceDualDodge → 发现处理区有
-// 虚拟闪 → 消耗 → 追加第二次询问闪 → 八卦阵再判一次。
-import type { GameState, Skill } from '../types';
+// 实现方式(决斗部分):enforceDualKill 辅助函数,由决斗 CardEffect.resolve 调用
+//   (决斗不走"生效前"闪机制,无双的决斗效果保留为函数调用)。
+//
+// 八卦阵 FAQ:八卦阵判红放虚拟闪到处理区后,handleSlashDodge 发出闪的「生效前」atom,
+// 无双 hook 同样拦截第一次(虚拟闪被 cancel),第二次八卦阵再判一次。
+
+import type { GameState, HookResult, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { registerPostDodgeAskHook } from '../card-effect/registry';
+import { registerBeforeHook } from '../skill';
+import { topFrame } from '../create-engine';
 import type { SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -20,41 +26,67 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '无双',
-    description: '锁定技:你使用【杀】的目标需连续出两张【闪】才能抵消;与你【决斗】的角色每次需连续打出两张【杀】',
+    description: '锁定技:你使用【杀】的目标需连续出两张【闪】才能抵消;与你【决斗】的角色每次需连续打出两张【杀」',
     isLocked: true,
   };
 }
 
-/**
- * 无双·杀:若 source 拥有无双,消耗处理区已有的全部闪牌(移入弃牌堆),
- * 再追加一次 applyAtom(询问闪)。
- *
- * 在 杀.execute 的 applyAtom(询问闪) 之后调用。source 无无双或处理区无闪则 no-op。
- */
-export async function enforceDualDodge(
-  state: GameState,
-  source: number,
-  target: number,
-): Promise<void> {
-  if (!state.players[source]?.skills.includes('无双')) return;
-  const firstDodges = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-  if (firstDodges.length === 0) return;
-  for (const id of firstDodges) {
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId: id,
-      from: { zone: '处理区' },
-      to: { zone: '弃牌堆' },
-    });
-  }
-  await applyAtom(state, { type: '询问闪', target, source });
+/** localVars key:无双闪计数器（杀cardId/目标座次） */
+function dodgeCountKey(killCardId: string, target: number): string {
+  return `无双/dodgeCount/${killCardId}/${target}`;
+}
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+
+  // ── 生效前 before-hook：拦截无双杀的第一次闪 ──
+  // 只处理闪的「生效前」（cardId 对应的牌为闪）。
+  // 通过外层杀帧判断：杀的 source 是否拥有无双。
+  registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '生效前',
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom as { target: number; cardId: string; source: number };
+      // 只处理闪的生效前
+      const card = ctx.state.cardMap[atom.cardId];
+      if (!card || card.name !== '闪') return;
+
+      // 从结算帧栈找到外层杀帧（闪的生效前由 handleSlashDodge 发出，
+      // 此时栈顶是杀帧——闪没有自己的帧）
+      const killFrame = topFrame(ctx.state);
+      if (!killFrame) return;
+      const killCardId = killFrame.params.cardId as string | undefined;
+      if (!killCardId) return;
+      const killCard = ctx.state.cardMap[killCardId];
+      if (!killCard || killCard.name !== '杀') return;
+
+      // 检查杀的 source 是否拥有无双（ownerId）
+      const killSource = killFrame.from;
+      if (killSource !== ownerId) return; // 不是我的杀
+      if (!ctx.state.players[ownerId]?.skills.includes('无双')) return;
+
+      // 计数器：第一次 cancel，第二次放行
+      const countKey = dodgeCountKey(killCardId, atom.target);
+      const count = (ctx.state.localVars[countKey] as number) ?? 0;
+      if (count < 1) {
+        ctx.state.localVars[countKey] = count + 1;
+        return { kind: 'cancel' }; // 第一次闪被拦截
+      }
+      // 第二次闪放行
+      delete ctx.state.localVars[countKey];
+    },
+  );
+
+  return () => {};
 }
 
 /**
  * 无双·决斗:若 otherParty(决斗中拥有无双的一方)有无双,消耗处理区已有的全部杀牌,
  * 再追加一次 applyAtom(询问杀)。
  *
- * 在 决斗.execute 的 applyAtom(询问杀) 之后调用。
+ * 在 决斗 CardEffect.resolve 的 applyAtom(询问杀) 之后调用。
  * otherParty 是被询问者(current)的对手 —— 即 询问杀 的 source。
  */
 export async function enforceDualKill(
@@ -76,7 +108,4 @@ export async function enforceDualKill(
   await applyAtom(state, { type: '询问杀', target: current, source: otherParty });
 }
 
-// 模块加载时注册 post-dodge-ask hook（杀 CardEffect.resolve 调用，无需杀.ts 直接 import 无双）
-registerPostDodgeAskHook(enforceDualDodge);
-
-export default { createSkill } satisfies SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;
