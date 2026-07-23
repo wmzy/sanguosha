@@ -2,6 +2,12 @@
 //   use:出牌阶段,横置或重置一至两名角色的连环状态(可被无懈可击)。
 //   recast(重铸):弃此牌,摸一张牌。
 //
+// use 结算逻辑已迁移到 card-effects/铁索连环.ts (CardEffect.resolve)。
+// execute 委托 runUseFlow 编排完整使用结算流程（文档 use.md）。
+//
+// recast 不走 runUseFlow（重铸无目标/无结算），保留独立 action。
+// 连环传导 hook（全局唯一）仍在此注册。
+//
 // 连环状态(铁索传导):全局 after-hook(造成伤害)。
 //   处于连环状态的角色受到属性伤害(火焰/雷电)时,从该角色开始,
 //   依次传导至其他所有处于连环状态的角色(同等同属性伤害);
@@ -10,10 +16,10 @@
 //   localVars[CONDUCTING_VAR] 防止传导伤害递归触发。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { TARGET_SYSTEM } from '../types';
-import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, validateUseCard } from '../skill';
-import { 询问无懈可击 } from '../无懈可击';
 import { defaultPlayActive } from '../action-active';
+import { runUseFlow } from '../card-effect/use-card';
 
 const CHAIN_MARK = 'chained';
 const CONDUCTING_VAR = '铁索连环/传导中';
@@ -21,7 +27,7 @@ const HOOK_REGISTERED_VAR = '铁索连环/传导hook已注册';
 
 type DamageType = '普通' | '火焰' | '雷电';
 
-function isChained(state: GameState, idx: number): boolean {
+export function isChained(state: GameState, idx: number): boolean {
   return state.players[idx]?.marks.some((m) => m.id === CHAIN_MARK) ?? false;
 }
 
@@ -37,7 +43,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // ── use:横置/重置 1-2 名角色(toggle 模式:已横置→重置,未横置→横置)──
+  // ── use:横置/重置 1-2 名角色 —— 委托 runUseFlow ──
   registerAction(
     state,
     skill.id,
@@ -55,41 +61,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
       const targets = params.targets as number[];
-      await pushFrame(state, '铁索连环', from, { ...params });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      try {
-        const cancelled = await 询问无懈可击(state, from);
-        if (!cancelled) {
-          for (const t of targets) {
-            const chained = isChained(state, t);
-            await applyAtom(state, { type: '设横置', player: t, chained: !chained });
-          }
-        }
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
+      await runUseFlow(state, ownerId, cardId, targets, '铁索连环');
     },
   );
 
@@ -103,11 +77,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return validateUseCard(state, ownerId, params, { cardName: '铁索连环' });
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
-      await pushFrame(state, '铁索连环', from, { ...params });
-      await applyAtom(state, { type: '弃置', player: from, cardIds: [cardId] });
-      await applyAtom(state, { type: '摸牌', player: from, count: 1 });
+      await pushFrame(state, '铁索连环', ownerId, { ...params });
+      await applyAtom(state, { type: '弃置', player: ownerId, cardIds: [cardId] });
+      await applyAtom(state, { type: '摸牌', player: ownerId, count: 1 });
       await popFrame(state);
     },
   );
@@ -117,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     state.localVars[HOOK_REGISTERED_VAR] = true;
     registerAfterHook(state, '铁索连环', -1, '造成伤害', async (ctx) => {
       const atom = ctx.atom;
-      const dt = atom.damageType;
+      const dt = atom.damageType as DamageType | undefined;
       if (dt !== '火焰' && dt !== '雷电') return;
       const target = atom.target;
       if (typeof target !== 'number') return;
@@ -158,7 +131,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(skill: Skill, api: FrontendAPI): void {
+export function onMount(_skill: Skill, api: FrontendAPI): void {
   api.defineAction('use', {
     label: '铁索连环',
     style: 'primary',

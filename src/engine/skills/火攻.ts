@@ -2,30 +2,16 @@
 // 目标展示一张手牌,然后若你弃置一张与所展示牌相同花色的手牌,
 // 则对其造成 1 点火焰伤害。
 //
-// 流程(单目标锦囊模式):
-//   1. 移火攻牌到处理区
-//   2. 询问无懈可击(单目标,抵消整个锦囊)
-//   3. 未被抵消 → 请求目标展示一张手牌(请求回应 requestType='火攻/展示')
-//   4. 读展示牌花色 → 请求使用者弃一张同花色手牌(请求回应 requestType='火攻/弃牌')
-//   5. 使用者弃了 → 造成 1 点火焰伤害(damageType:'火焰');没弃 → 无事发生
-//   6. 火攻牌移出处理区 → 弃牌堆
+// 结算逻辑已迁移到 card-effects/火攻.ts (CardEffect.resolve)。
+// execute 委托 runUseFlow 编排完整使用结算流程（文档 use.md）。
 //
-// 跨玩家 respond:火攻在 DEFAULT_SKILLS 中,每个玩家都有火攻技能实例。
-// 目标 B 的 respond 处理'火攻/展示'(B 是 target);使用者 A 的 respond 处理
-// '火攻/弃牌'(A 是 target)。requestType 前缀 '火攻' 路由到本技能。
-// 展示的牌不进弃牌堆(仅读取花色);使用者弃的牌进弃牌堆。
+// respond action 保留在本技能：按 requestType 分流 '火攻/展示' 和 '火攻/弃牌'。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { registerAction, validateUseCard } from '../skill';
-import { 询问无懈可击 } from '../无懈可击';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '火攻',
-    description: '锦囊:目标展示一张手牌,弃同花色手牌则造成1点火焰伤害',
-  };
+  return { id, ownerId, name: '火攻', description: '锦囊:弃同花色牌造成火焰伤害' };
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
@@ -53,118 +39,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
       const target = (params.targets as number[])[0];
-      await pushFrame(state, '火攻', from, { ...params });
-
-      // 火攻锦囊进处理区
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-
-      try {
-        // 询问无懈可击(单目标锦囊:抵消整个锦囊)
-        const cancelled = await 询问无懈可击(state, target);
-        if (!cancelled) {
-          const targetPlayer = state.players[target];
-          // 目标必须有手牌(展示需要)。理论上 validate 已保证,中途手牌被无懈等移走则跳过。
-          if (targetPlayer && targetPlayer.hand.length > 0) {
-            // 清理上轮残留
-            delete state.localVars['火攻/展示'];
-            delete state.localVars['火攻/展示花色'];
-            delete state.localVars['火攻/弃牌'];
-
-            // ── 1) 请求目标展示一张手牌 ──
-            // 超时兜底牌:目标未选 → 自动展示 hand[0](规则:目标必须展示)
-            const revealFallback = targetPlayer.hand[0];
-            await applyAtom(state, {
-              type: '请求回应',
-              requestType: '火攻/展示',
-              target,
-              prompt: {
-                type: 'useCard',
-                title: '火攻:展示一张手牌',
-                cardFilter: { filter: () => true, min: 1, max: 1 },
-              },
-              timeout: 15,
-            });
-
-            let revealed = state.localVars['火攻/展示'] as
-              | { cardId: string; suit: string }
-              | undefined;
-            if (!revealed) {
-              // 超时:自动展示 hand[0]
-              const rc = state.cardMap[revealFallback];
-              revealed = { cardId: revealFallback, suit: rc?.suit ?? '' };
-              state.localVars['火攻/展示'] = revealed;
-              state.localVars['火攻/展示花色'] = revealed.suit;
-            }
-            const revealedSuit = revealed.suit;
-
-            // ── 2) 请求使用者弃一张同花色手牌 ──
-            // 使用者无同花色手牌 → 无法弃 → 无事发生(规则:"若你弃置..."条件不满足)
-            const fromPlayer = state.players[from];
-            if (fromPlayer?.alive) {
-              const hasMatch = fromPlayer.hand.some(
-                (id) => state.cardMap[id]?.suit === revealedSuit,
-              );
-              if (hasMatch) {
-                delete state.localVars['火攻/弃牌'];
-                await applyAtom(state, {
-                  type: '请求回应',
-                  requestType: '火攻/弃牌',
-                  target: from,
-                  prompt: {
-                    type: 'useCard',
-                    title: `火攻:弃置一张 ${revealedSuit} 手牌对其造成1点火焰伤害(不弃则无效)`,
-                    cardFilter: {
-                      filter: (c) => c.suit === revealedSuit,
-                      min: 1,
-                      max: 1,
-                    },
-                  },
-                  timeout: 15,
-                });
-
-                const discardId = state.localVars['火攻/弃牌'] as string | undefined;
-                // 使用者弃了 → 造成 1 点火焰伤害;没弃(超时)→ 无事发生
-                if (discardId && state.players[target]?.alive) {
-                  await applyAtom(state, { type: '弃置', player: from, cardIds: [discardId] });
-                  await applyAtom(state, {
-                    type: '造成伤害',
-                    target,
-                    amount: 1,
-                    source: from,
-                    cardId,
-                    damageType: '火焰',
-                  });
-                }
-              }
-            }
-          }
-        }
-        // 火攻锦囊移出处理区 → 弃牌堆
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
+      await runUseFlow(state, ownerId, cardId, [target], '火攻');
     },
   );
 
