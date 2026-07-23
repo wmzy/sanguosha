@@ -38,6 +38,10 @@ export interface CardEffect {
   target: CardTargetSpec;
   canUse?: (state: GameState, ownerId: number, params: Record<string, Json>) => string | null;
   resolve: (ctx: ResolveCtx) => Promise<void>;
+  /** 延迟类锦囊：置入判定区（而非处理区），使用结算中延迟到判定阶段恢复。
+   *  runUseFlow 在 delayed=true 时走完使用结算前（成为目标后）即暂停，
+   *  由技能的判定阶段 before-hook 调用 resumeDelayedSettlement 恢复使用结算中。 */
+  delayed?: boolean;
   /** 使用结算完成后回调（popFrame 前）。用于 post-use 清理，如杀的出杀次数累加。 */
   onSettle?: (state: GameState, source: number, cardId: string) => Promise<void>;
   prompt: ActionPrompt;

@@ -11,3 +11,6 @@ import './无中生有';
 import './决斗';
 import './顺手牵羊';
 import './过河拆桥';
+import './乐不思蜀';
+import './兵粮寸断';
+import './闪电';

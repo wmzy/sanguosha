@@ -25,12 +25,16 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     else state.zones.processing.push(topCardId);
   },
   afterHooks(state) {
-    // 所有技能 after hooks 读完判定牌后,把判定牌从结算帧移入弃牌堆
+    // 所有技能 after hooks（闪电/兵粮寸断等消费方，鬼才/鬼道改判在更早的 afterApply）
+    // 读完判定牌后，记录最终判定牌（可能被改判）到 localVars，再把判定牌从结算帧移入弃牌堆。
+    // localVars 供 resolve（延迟类锦囊）在 applyAtom(判定) 返回后读取判定结果。
     const frame = state.settlementStack[state.settlementStack.length - 1];
     const cards = frame ? frame.cards : state.zones.processing;
     const idx = cards.length - 1;
     if (idx < 0) return;
-    const cardId = cards.splice(idx, 1)[0];
+    const cardId = cards[idx];
+    state.localVars['判定/finalJudgeCardId'] = cardId;
+    cards.splice(idx, 1)[0];
     state.zones.discardPile.push(cardId);
   },
   toViewEvents(state, atom): ViewEventSplit {

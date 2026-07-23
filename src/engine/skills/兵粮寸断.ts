@@ -1,25 +1,19 @@
 // 兵粮寸断(延时锦囊):出牌阶段对距离 1 以内的一名其他角色使用。
-//   判定阶段:判定不为♣(梅花) → 跳过摸牌阶段;♣ → 无效弃置。
-//   结构与乐不思蜀对称——差异:判定花色(♣ vs ♥),跳过阶段(摸牌 vs 出牌)。
-import type {
-  Card,
-  FrontendAPI,
-  GameView,
-  GameState,
-  Json,
-  Skill,
-} from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import {
-  registerAction,
-  registerAfterHook,
-  registerBeforeHook,
-  hasBlockingPending,
-} from '../skill';
+//
+// 两段式结算（use.md 延迟类锦囊），与乐不思蜀对称——差异：判定花色（♣ vs ♥），跳过阶段（摸牌 vs 出牌）。
+//   第一段（出牌阶段，runUseFlow delayed=true）：声明目标 → 置入判定区 → 使用结算前 → 暂停
+//   第二段（判定阶段，本 hook 恢复）：询问无懈 → resumeDelayedSettlement → resolve(判定+效果)
+//
+// 判定结果：非♣ → 跳过摸牌阶段；♣ → 无效弃置。
+
+import type { FrontendAPI, GameState, GameView, Json, Skill } from '../types';
+import { applyAtom } from '../create-engine';
+import { registerAction, registerBeforeHook, validateUseCard } from '../skill';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { 询问无懈可击 } from '../无懈可击';
 import { skipPhase } from '../skip-phase';
+import { runUseFlow, resumeDelayedSettlement } from '../card-effect/use-card';
 
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';
@@ -30,78 +24,35 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  // ─── use action:对目标放置延时锦囊 ────────────────────────
+
+  // ─── use action:委托 runUseFlow（delayed=true 置入判定区） ────
   registerAction(
     state,
     skill.id,
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      if (typeof params.cardId !== 'string') return 'cardId required';
-      if (typeof params.target !== 'number') return 'target required';
-      const cardInHand = !!self.hand.includes(params.cardId);
-      const cardNameOk = state.cardMap[params.cardId]?.name === '兵粮寸断';
-      const target = state.players[params.target];
-      const targetAlive = target?.alive === true;
-      const notSelf = params.target !== ownerId;
-      // 兵粮寸断对距离 1 以内一名其他角色使用(与乐不思蜀一致)
-      const inRange = effectiveDistance(state, ownerId, params.target) <= 1;
-      const ok =
-        myTurn &&
-        inActPhase &&
-        free &&
-        selfAlive &&
-        cardInHand &&
-        cardNameOk &&
-        targetAlive &&
-        notSelf &&
-        inRange;
-      return ok ? null : '兵粮寸断使用条件不满足';
+      return (
+        validateUseCard(state, ownerId, params, { cardName: '兵粮寸断' }) ??
+        (() => {
+          const t = params.target ?? (params.targets as number[] | undefined)?.[0];
+          return typeof t === 'number' &&
+            t !== ownerId &&
+            state.players[t]?.alive &&
+            effectiveDistance(state, ownerId, t) <= 1
+            ? null
+            : '目标不合法';
+        })()
+      );
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
       const cardId = params.cardId as string;
-      const target = params.target as number;
-      await pushFrame(state, '兵粮寸断', from, { ...params });
-      // 移牌到处理区
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      // 延时锦囊:使用时仅放置到判定区,无懈可击问询延迟到判定阶段判定前
-      const trickCard = state.cardMap[cardId];
-      const pendingCard: Card = trickCard ?? {
-        id: cardId,
-        name: '兵粮寸断',
-        suit: '♣',
-        color: '黑',
-        rank: 'A',
-        type: '锦囊牌',
-      };
-      await applyAtom(state, {
-        type: '添加延时锦囊',
-        player: target,
-        trick: { name: '兵粮寸断', source: from, card: pendingCard },
-      });
-      // 移牌到弃牌堆(原使用卡)
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-      await popFrame(state);
+      const target = (params.target ?? (params.targets as number[])[0]) as number;
+      await runUseFlow(state, ownerId, cardId, [target], '兵粮寸断');
     },
   );
 
-  // ─── 判定阶段:有 兵粮寸断 → 先问无懈可击,未被抵消才触发判定 ───
+  // ─── 判定阶段:有 兵粮寸断 → 询问无懈 → 恢复使用结算中 ───────
   registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
@@ -111,49 +62,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self.pendingTricks.some((t) => t.name === '兵粮寸断')) return;
     if (ctx.state.zones.deck.length === 0) return;
 
-    // 无懈可击问询(延时锦囊的生效时机是判定前,故在此询问;抵消整个延时锦囊)
-    try {
-      const cancelled = await 询问无懈可击(ctx.state, ownerId);
-      if (cancelled) {
-        // 被无懈抵消:移除延时锦囊,跳过判定
-        await applyAtom(ctx.state, {
-          type: '移除延时锦囊',
-          player: ownerId,
-          trickName: '兵粮寸断',
-        });
-        return;
-      }
-      await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '兵粮寸断' });
-    } finally {
-      // 询问无懈可击 内部已清理 localVars
-    }
-  });
-
-  // ─── 判定 after:读判定牌花色,执行效果 ──────────────────────
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '判定') return;
-    if (atom.judgeType !== '兵粮寸断') return;
-    if (atom.player !== ownerId) return;
-
-    const self = ctx.state.players[ownerId];
-    if (!self.pendingTricks.some((t) => t.name === '兵粮寸断')) return;
-
-    // 读判定牌:判定牌在处理区(afterHooks 才移到弃牌堆)
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    const judgeCardId = processing[processing.length - 1];
-    const judgeCard = ctx.state.cardMap[judgeCardId];
-    if (!judgeCard) return;
-
-    if (judgeCard.suit === '♣') {
-      // 梅花:无效,只移除延时锦囊
+    const cancelled = await 询问无懈可击(ctx.state, ownerId);
+    if (cancelled) {
       await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '兵粮寸断' });
-    } else {
-      // 其它花色:加跳过摸牌标签,移除延时锦囊
-      await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_TAG });
-      await applyAtom(ctx.state, { type: '移除延时锦囊', player: ownerId, trickName: '兵粮寸断' });
+      return;
     }
+
+    const trick = self.pendingTricks.find((t) => t.name === '兵粮寸断');
+    if (!trick) return;
+    await resumeDelayedSettlement(ctx.state, trick.source, ownerId, '兵粮寸断', trick.card.id);
   });
 
   // ─── 摸牌阶段:有跳过标签 → 跳过摸牌阶段 ────────────────────
@@ -165,7 +82,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const self = ctx.state.players[ownerId];
     if (!self.tags.includes(SKIP_TAG)) return;
 
-    // 标签型跳过:去标签(SKIP_TAG)+ 阶段结束(摸牌)+ cancel
     return skipPhase(ctx.state, atom, SKIP_TAG);
   });
 
@@ -189,3 +105,5 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
   });
 }
+
+export default { createSkill, onInit, onMount };

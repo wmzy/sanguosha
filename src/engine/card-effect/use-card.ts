@@ -108,13 +108,37 @@ export async function runUseFlow(
     // 时机1：选择目标时（转化技 before-hook 可替换牌）
     await applyAtom(state, { type: '选择目标时', source, cardId, targets });
 
-    // 置入处理区（手牌 → 处理区）
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId,
-      from: { zone: '手牌', player: source },
-      to: { zone: '处理区' },
-    });
+    if (effect.delayed) {
+      // 延迟类锦囊：展示后置入目标判定区（处理区→判定区→弃牌堆）
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: source },
+        to: { zone: '处理区' },
+      });
+      for (const target of targets) {
+        const trickCard = state.cardMap[cardId];
+        await applyAtom(state, {
+          type: '添加延时锦囊',
+          player: target,
+          trick: { name: cardName, source, card: trickCard },
+        });
+      }
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '处理区' },
+        to: { zone: '弃牌堆' },
+      });
+    } else {
+      // 基本/普通锦囊/装备：置入处理区（手牌 → 处理区）
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: source },
+        to: { zone: '处理区' },
+      });
+    }
 
     // 时机2：使用时（集智/强识 after-hook 摸牌）
     await applyAtom(state, { type: '使用时', source, cardId });
@@ -126,7 +150,7 @@ export async function runUseFlow(
 
     // ── 使用结算中：逐目标完整结算 ──
     // 无目标牌（无中生有/酒等 target.kind='none'/'self'）：以 source 为目标走结算阶段
-    if (targets.length === 0) {
+    if (!effect.delayed && targets.length === 0) {
       await runSettlementPhase(state, effect, source, source, cardId, 0);
     }
 
@@ -151,6 +175,9 @@ export async function runUseFlow(
       // 时机6：成为目标后（贞烈/啖酪/无双②/肉林② after-hook）
       await applyAtom(state, { type: '成为目标后', source, target, cardId });
 
+      // 延迟类锦囊：使用结算中延迟到判定阶段恢复（resumeDelayedSettlement）
+      if (effect.delayed) continue;
+
       // 使用结算中：检测有效性 → 生效前 → 生效时 → 生效后 → 使用结算结束时
       await runSettlementPhase(state, effect, source, target, cardId, i);
     }
@@ -166,7 +193,8 @@ export async function runUseFlow(
     }
 
     // 牌特有结算后回调（popFrame 前）——杀的出杀次数累加等
-    if (effect.onSettle) {
+    // 延迟类锦囊：结算未完成（延迟到判定阶段），不执行 onSettle
+    if (!effect.delayed && effect.onSettle) {
       await effect.onSettle(state, source, cardId);
     }
   } finally {
@@ -179,6 +207,36 @@ export async function runUseFlow(
         to: { zone: '弃牌堆' },
       });
     }
+    await popFrame(state);
+  }
+}
+
+/**
+ * 恢复延迟类锦囊的使用结算中（判定阶段触发）。
+ *
+ * 延迟类锦囊的 runUseFlow 在使用结算前（成为目标后）暂停，
+ * 牌已置入判定区。判定阶段恢复时调用此函数走完使用结算中：
+ *   检测有效性 → 生效前 → 生效时 → 生效后[resolve:判定+效果] → 使用结算结束时
+ *
+ * 无懈可击抵消由调用方（技能判定阶段 before-hook）在调用前处理：
+ *   被抵消 → 移除延时锦囊 → 不调用本函数。
+ */
+export async function resumeDelayedSettlement(
+  state: GameState,
+  source: number,
+  target: number,
+  cardName: string,
+  cardId: string,
+): Promise<void> {
+  const effect = requireCardEffect(cardName);
+  const frame = await pushFrame(state, cardName, source, {
+    cardId,
+    targets: [target],
+    resolvedTargets: [target],
+  });
+  try {
+    await runSettlementPhase(state, effect, source, target, cardId, 0);
+  } finally {
     await popFrame(state);
   }
 }
