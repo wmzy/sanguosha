@@ -222,7 +222,9 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
 
     // 其他人随便选
     const taken = new Set<string>([skilled.name]);
-    for (const t of state.pendingSlots.keys()) {
+    // 快照 keys 避免迭代中 pendingSlots 变更导致迭代器异常
+    const otherTargets = [...state.pendingSlots.keys()];
+    for (const t of otherTargets) {
       const slot = state.pendingSlots.get(t)!;
       const cand = slotCandidates(slot);
       const choice = cand.find((c) => !taken.has(c))!;

@@ -100,9 +100,9 @@ describe('断肠', () => {
     await drainPendings(harness);
 
     expect(harness.state.players[0].alive).toBe(false);
-    // 杀手失去武将技「武圣」,保留默认技能「杀」
+    // 杀手失去武将技「武圣」,保留默认技能「使用牌」「打出牌」
     expect(harness.state.players[1].skills).not.toContain('武圣');
-    expect(harness.state.players[1].skills).toContain('杀');
+    expect(harness.state.players[1].skills).toContain('使用牌');
   });
 
   // ─── 装备技能保留 ────────────────────────────
@@ -139,9 +139,9 @@ describe('断肠', () => {
     expect(harness.state.players[0].alive).toBe(false);
     // 武将技「武圣」被移除
     expect(harness.state.players[1].skills).not.toContain('武圣');
-    // 装备技能「诸葛连弩」与默认技能「杀」保留
+    // 装备技能「诸葛连弩」与默认技能「使用牌」「打出牌」保留
     expect(harness.state.players[1].skills).toContain('诸葛连弩');
-    expect(harness.state.players[1].skills).toContain('杀');
+    expect(harness.state.players[1].skills).toContain('使用牌');
   });
 
   // ─── 未死亡:断肠不触发 ────────────────────────────

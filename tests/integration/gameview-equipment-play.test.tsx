@@ -158,9 +158,9 @@ describe('findUseActionForCard:filter-based 匹配(声明即真相)', () => {
     expect(matched?.skillId).toBe('装备通用');
   });
 
-  it('基本牌(杀)被对应牌名技能的 cardFilter 匹配', async () => {
+  it('基本牌(杀)被使用牌按卡名注册的 cardFilter 匹配', async () => {
     const slash: Card = { id: 's1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
-    await registerSkillActions(0, ['杀', '装备通用']);
+    await registerSkillActions(0, ['使用牌', '装备通用']);
     const actions = getActionsForPlayer(0);
     const matched = findUseActionForCard(actions, slash);
     expect(matched?.skillId).toBe('杀');
@@ -265,7 +265,7 @@ describe('GameView:丈八蛇矛多卡转化(显示 + 目标选择回归)', () =>
           maxHealth: 4,
           alive: true,
           equipment: { 武器: 'zb' },
-          skills: ['丈八蛇矛', '杀'],
+          skills: ['丈八蛇矛', '使用牌'],
           handCount: 3,
           hand: [c1, c2, c3],
           marks: [],

@@ -181,6 +181,10 @@ export interface FrontendAPI {
        *  但各自的 respond action cardFilter 不同,需按此标记合并筛选并路由 skillId。 */
       respondFor?: string;
     },
+    /** 可选 skillId 覆盖:默认用 FrontendAPI 实例的 skillId。
+     *  使用牌/打出牌 技能按卡名批量注册 UI 时用它指定每张牌的卡名为 skillId,
+     *  与 engine 层按卡名注册的 action 对齐。 */
+    skillIdOverride?: string,
   ): void;
   playEffect(effect: AtomEffect): void;
 }

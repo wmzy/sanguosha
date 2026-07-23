@@ -149,6 +149,25 @@ const bountifulHarvestEffect: CardEffect = {
   target: { kind: 'allPlayers' },
   resolve: resolveBountifulHarvest,
   onSettle: onSettleBountifulHarvest,
+  // respond：玩家从处理区亮的牌中选 1 张（requestType='五谷丰登/select'）。
+  // 原逻辑来自 src/engine/skills/五谷丰登.ts 的 respond registerAction。
+  respond: {
+    validate: (state, ownerId, params) => {
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if (slot.atom.type !== '请求回应') return '当前不是五谷丰登选牌窗口';
+      const atom = slot.atom as { requestType?: string };
+      if (atom.requestType !== '五谷丰登/select') return '当前不是五谷丰登选牌窗口';
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return 'cardId required';
+      if (!frameCards(state).includes(cardId)) return '该牌不在可选范围';
+      return null;
+    },
+    execute: async (state, _ownerId, params) => {
+      const cardId = params.cardId as string;
+      state.localVars['五谷丰登/选择'] = cardId;
+    },
+  },
   prompt: {
     type: 'useCard',
     title: '五谷丰登',

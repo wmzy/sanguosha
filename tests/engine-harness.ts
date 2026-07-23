@@ -42,7 +42,7 @@ import {
 } from '../src/engine/create-engine';
 
 import { getAtomDef } from '../src/engine/atom';
-import { getSkillModule } from '../src/engine/skill';
+import { getSkillModule, isSkillModuleRegistered } from '../src/engine/skill';
 
 // ─── 引擎异常收集器(消灭盲区 2)──────────────────────────────
 // dispatch 的 execute 是 fire-and-forget:其 .catch 调 state.onError?.(e) 后 throw,
@@ -112,9 +112,10 @@ class FakeFrontendAPI implements FrontendAPI {
       transform?: (card: Card) => CardWrapper;
       activeWhen?: (ctx: { view: GameView; perspectiveIdx: number }) => boolean;
     },
+    skillIdOverride?: string,
   ): void {
     this.actions.push({
-      skillId: this.skillId,
+      skillId: skillIdOverride ?? this.skillId,
       ownerId: this.viewer,
       actionType,
       label: opts.label,
@@ -594,6 +595,9 @@ export class PlayerSession {
     if (!player) return;
     this.frontend.clearActions();
     for (const skillId of player.skills) {
+      // 跳过未注册的技能模块（已删除的 per-card 技能，逻辑已迁入 CardEffect 注册表）。
+      // 使用与 instantiateSkill 相同的 checker，避免 getSkillModule 拑错。
+      if (!isSkillModuleRegistered(skillId)) continue;
       const module = await getSkillModule(skillId);
       this.frontend.setCurrentSkill(skillId);
       if (module.onMount) {
@@ -645,6 +649,14 @@ export class SkillTestHarness {
       if (!p.tags) p.tags = [];
     }
     this._state = state;
+    // 注入统一卡牌入口技能（使用牌/打出牌）到每个玩家的 skills 数组开头。
+    for (const p of state.players) {
+      p.skills = [
+        ...(p.skills.includes('使用牌') ? [] : ['使用牌']),
+        ...(p.skills.includes('打出牌') ? [] : ['打出牌']),
+        ...p.skills,
+      ];
+    }
     // 注入引擎异常收集器(幂等):setup 后 state.onError 被接管,
     // 所有 fire-and-forget execute 抛错都被收集到 WeakMap,在断言点暴露。
     trackEngineErrorsIfNotTracked(state);

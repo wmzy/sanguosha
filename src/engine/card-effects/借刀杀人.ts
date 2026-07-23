@@ -127,6 +127,27 @@ const borrowedSwordEffect: CardEffect = {
   target: { kind: 'other', min: 1, max: 1 },
   canUse: canUseBorrowedSword,
   resolve: resolveBorrowedSword,
+  // 双目标预处理：targets=[A,B] 或 target=A+killTarget=B。
+  // 提取 killTarget 存入 localVars，返回 [A] 作为锦囊真实目标传给 runUseFlow。
+  preUse: (state, _ownerId, params) => {
+    let targetIdx: number;
+    let killTargetIdx: number;
+    if (
+      Array.isArray(params.targets) &&
+      (params.targets as unknown[]).length >= 2 &&
+      typeof (params.targets as unknown[])[0] === 'number' &&
+      typeof (params.targets as unknown[])[1] === 'number'
+    ) {
+      const arr = params.targets as number[];
+      targetIdx = arr[0];
+      killTargetIdx = arr[1];
+    } else {
+      targetIdx = params.target as number;
+      killTargetIdx = params.killTarget as number;
+    }
+    state.localVars['借刀杀人/killTarget'] = killTargetIdx;
+    return [targetIdx];
+  },
   prompt: {
     type: 'useCardAndTarget',
     title: '借刀杀人',

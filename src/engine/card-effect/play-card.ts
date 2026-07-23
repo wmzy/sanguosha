@@ -18,6 +18,7 @@
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction } from '../skill';
+import { getAllCardEffects } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -62,32 +63,48 @@ export async function runPlayFlow(
   await applyAtom(state, { type: '打出牌时', player, cardId });
 }
 
-/** 注册 respond action：validate 检查 pending slot 与手牌，execute 调 runPlayFlow。 */
+/** 注册 respond action：逐卡名注册（skillId=卡名），路由到 CardEffect.respond。
+ *  有 respond 字段的卡牌（闪/桃/酒/无懈可击 等）按卡名注册 respond action。
+ *  无 respond 字段的牌（如杀）不注册 respond——南蛮/决斗 的杀由 询问杀 atom
+ *  的默认 resolver 处理。 */
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
+  const unloads: Array<() => void> = [];
 
-  return registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state: GameState, params: Record<string, Json>) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const cardId = params.cardId as string | undefined;
-      if (!cardId) return 'cardId required';
-      const self = state.players[ownerId];
-      if (!self?.hand.includes(cardId)) return '牌不在手牌中';
-      return null;
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      await runPlayFlow(state, ownerId, cardId);
-    },
-  );
+  for (const [cardName, effect] of getAllCardEffects()) {
+    if (!effect.respond) continue;
+    const u = registerAction(
+      state,
+      cardName,
+      ownerId,
+      'respond',
+      // CardEffect.respond.validate 签名是 (state, ownerId, params)；
+      // registerAction validate 签名是 (state, params)。包装补 ownerId。
+      (s: GameState, p: Record<string, Json>) => effect.respond!.validate(s, ownerId, p),
+      (s: GameState, p: Record<string, Json>) => effect.respond!.execute(s, ownerId, p),
+    );
+    if (u) unloads.push(u);
+  }
+
+  return () => unloads.forEach((u) => u());
 }
 
-/** 打出牌的 UI 由前端按 pending prompt 渲染。本阶段为空。 */
-export function onMount(_skill: Skill, _api: FrontendAPI): void {}
+/** 打出牌的 UI：按卡名注册 respond action 的 UI 配置（从 CardEffect.respond 驱动）。
+ *  有 respond 字段的牌（闪/桃/酒/无懈可击 等）注册一个 respond action。
+ *  skillIdOverride=卡名（与 onInit 按卡名注册的 engine action 对齐）。 */
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  for (const [cardName, effect] of getAllCardEffects()) {
+    if (!effect.respond) continue;
+    api.defineAction(
+      'respond',
+      {
+        label: effect.label,
+        style: effect.style,
+        prompt: effect.respondPrompt ?? effect.prompt,
+      },
+      cardName,
+    );
+  }
+}
 
 export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -23,10 +23,10 @@ function load(importer: () => Promise<Record<string, unknown>>): Loader {
 export const skillLoaders: Record<string, Loader> = {
   // 基础
   开局: load(() => import('./开局')),
-  杀: load(() => import('./杀')),
-  闪: load(() => import('./闪')),
-  桃: load(() => import('./桃')),
-  酒: load(() => import('./酒')),
+  // 使用牌:统一的卡牌使用入口技能(配合 CardEffect 注册表路由)
+  使用牌: load(() => import('../card-effect/use-card')),
+  // 打出牌:统一的卡牌打出入口技能(无目标选择/无效果结算,仅声明+置入处理区)
+  打出牌: load(() => import('../card-effect/play-card')),
   仁德: load(() => import('./仁德')),
   激将: load(() => import('./激将')),
   护甲: load(() => import('./护甲')),
@@ -45,9 +45,6 @@ export const skillLoaders: Record<string, Loader> = {
   回合管理: load(() => import('./回合管理')),
   八卦阵: load(() => import('./八卦阵')),
   流离: load(() => import('./流离')),
-  南蛮入侵: load(() => import('./南蛮入侵')),
-  万箭齐发: load(() => import('./万箭齐发')),
-  决斗: load(() => import('./决斗')),
   反馈: load(() => import('./反馈')),
   刚烈: load(() => import('./刚烈')),
   倾国: load(() => import('./倾国')),
@@ -198,9 +195,6 @@ export const skillLoaders: Record<string, Loader> = {
   仁王盾: load(() => import('./仁王盾')),
   藤甲: load(() => import('./藤甲')),
   白银狮子: load(() => import('./白银狮子')),
-  乐不思蜀: load(() => import('./乐不思蜀')),
-  兵粮寸断: load(() => import('./兵粮寸断')),
-  闪电: load(() => import('./闪电')),
   // 马匹(进攻马/防御马):效果=距离修正,与马术等技能统一走 vars
   赤兔: () => import('./马匹技能').then((m) => m.赤兔),
   紫骍: () => import('./马匹技能').then((m) => m.紫骍),
@@ -208,16 +202,8 @@ export const skillLoaders: Record<string, Loader> = {
   的卢: () => import('./马匹技能').then((m) => m.的卢),
   绝影: () => import('./马匹技能').then((m) => m.绝影),
   爪黄飞电: () => import('./马匹技能').then((m) => m.爪黄飞电),
-  // 即时锦囊
-  过河拆桥: load(() => import('./过河拆桥')),
-  顺手牵羊: load(() => import('./顺手牵羊')),
-  无中生有: load(() => import('./无中生有')),
-  桃园结义: load(() => import('./桃园结义')),
-  五谷丰登: load(() => import('./五谷丰登')),
-  借刀杀人: load(() => import('./借刀杀人')),
-  无懈可击: load(() => import('./无懈可击')),
+  // 铁索连环:保留技能文件(recast action + 连环传导 hook);use 已迁移到 card-effects
   铁索连环: load(() => import('./铁索连环')),
-  火攻: load(() => import('./火攻')),
   再起: load(() => import('./再起')),
   苦肉: load(() => import('./苦肉')),
   // 界限突破·吴国·界黄盖(独立技能文件,不修改标技能)
@@ -411,10 +397,6 @@ export const skillLoaders: Record<string, Loader> = {
   // 界限突破·群国·界高顺(独立技能文件,不修改标技能;标版陷阵/禁酒未实现)
   界陷阵: load(() => import('./界陷阵')),
   界禁酒: load(() => import('./界禁酒')),
-  // 使用牌:统一的卡牌使用入口技能(配合 CardEffect 注册表路由)
-  使用牌: load(() => import('../card-effect/use-card')),
-  // 打出牌:统一的卡牌打出入口技能(无目标选择/无效果结算,仅声明+置入处理区)
-  打出牌: load(() => import('../card-effect/play-card')),
 };
 
 // 设置解析器(打破循环依赖:技能文件 import skill.ts → skill.ts 通过 resolver 查表)

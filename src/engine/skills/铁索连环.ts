@@ -3,27 +3,25 @@
 //   recast(重铸):弃此牌,摸一张牌。
 //
 // use 结算逻辑已迁移到 card-effects/铁索连环.ts (CardEffect.resolve)。
-// execute 委托 runUseFlow 编排完整使用结算流程（文档 use.md）。
+// 使用牌技能按卡名注册 use action,execute 调 runUseFlow 编排完整使用结算流程。
 //
-// recast 不走 runUseFlow（重铸无目标/无结算），保留独立 action。
-// 连环传导 hook（全局唯一）仍在此注册。
+// 本文件仅保留:
+//   1. recast action(重铸:弃牌+摸1张)——自定义 actionType,不走标准使用流程
+//   2. 连环传导 hook(全局唯一)——属性伤害传导给所有横置角色
 //
 // 连环状态(铁索传导):全局 after-hook(造成伤害)。
 //   处于连环状态的角色受到属性伤害(火焰/雷电)时,从该角色开始,
 //   依次传导至其他所有处于连环状态的角色(同等同属性伤害);
 //   传导完毕后重置所有因此传导的角色的连环状态。
-//   hook 在 DEFAULT_SKILLS 实例化时注册,晚于系统规则的濒死 hook → LIFO 保证先于濒死执行。
+//   hook 在 DEFAULT_SKILLS 实例化时注册(使用牌先于本技能),晚于系统规则的濒死 hook → LIFO 保证先于濒死执行。
 //   localVars[CONDUCTING_VAR] 防止传导伤害递归触发。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, registerAfterHook, validateUseCard } from '../skill';
-import { defaultPlayActive } from '../action-active';
-import { runUseFlow } from '../card-effect/use-card';
+import { registerAction, registerAfterHook, validateUseCard, type SkillModule } from '../skill';
 
 const CHAIN_MARK = 'chained';
 const CONDUCTING_VAR = '铁索连环/传导中';
-const HOOK_REGISTERED_VAR = '铁索连环/传导hook已注册';
 
 type DamageType = '普通' | '火焰' | '雷电';
 
@@ -42,33 +40,10 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-
-  // ── use:横置/重置 1-2 名角色 —— 委托 runUseFlow ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (state: GameState, params: Record<string, Json>) => {
-      const base = validateUseCard(state, ownerId, params, { cardName: '铁索连环' });
-      if (base) return base;
-      const targets = params.targets as number[] | undefined;
-      if (!Array.isArray(targets) || targets.length < 1 || targets.length > 2)
-        return '需选择一至两名角色';
-      for (const t of targets) {
-        if (!state.players[t]?.alive) return '目标不合法';
-      }
-      return null;
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const targets = params.targets as number[];
-      await runUseFlow(state, ownerId, cardId, targets, '铁索连环');
-    },
-  );
+  const unloads: Array<() => void> = [];
 
   // ── recast:重铸(弃此牌,摸一张)──
-  registerAction(
+  const recastUnload = registerAction(
     state,
     skill.id,
     ownerId,
@@ -84,10 +59,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await popFrame(state);
     },
   );
+  unloads.push(recastUnload);
 
   // ── 连环传导 hook(全局唯一,首个实例注册)──
-  if (!state.localVars[HOOK_REGISTERED_VAR]) {
-    state.localVars[HOOK_REGISTERED_VAR] = true;
+  if (!state.localVars[CONDUCTING_VAR + 'hook已注册']) {
+    state.localVars[CONDUCTING_VAR + 'hook已注册'] = true;
     registerAfterHook(state, '铁索连环', -1, '造成伤害', async (ctx) => {
       const atom = ctx.atom;
       const dt = atom.damageType as DamageType | undefined;
@@ -128,24 +104,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
   }
 
-  return () => {};
+  return () => unloads.forEach((u) => u());
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('use', {
-    label: '铁索连环',
-    style: 'primary',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '铁索连环',
-      cardFilter: { filter: (c) => c.name === '铁索连环', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 2 },
-    },
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      return ctx.view.players[ctx.perspectiveIdx]?.hand?.some((c) => c.name === '铁索连环') ?? false;
-    },
-  });
   api.defineAction('recast', {
     label: '铁索连环·重铸',
     style: 'primary',
@@ -154,11 +116,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
       title: '铁索连环:重铸(弃此牌,摸一张)',
       cardFilter: { filter: (c) => c.name === '铁索连环', min: 1, max: 1 },
     },
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      return ctx.view.players[ctx.perspectiveIdx]?.hand?.some((c) => c.name === '铁索连环') ?? false;
-    },
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

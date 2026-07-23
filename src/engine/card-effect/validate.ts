@@ -85,6 +85,31 @@ export function isLegalTarget(
   }
 }
 
+/** 为 AOE 类锦囊（target.kind=allOthers/allPlayers）自动计算目标。
+ *  从使用者下家开始按座次顺时针排列所有存活角色（allOthers 排除使用者）。
+ *  调用方（使用牌 execute）在 params.targets 为空且 target.kind 是 AOE 型时调用。 */
+export function computeAutoTargets(
+  state: GameState,
+  ownerId: number,
+  cardName: string,
+): number[] {
+  const effect = getCardEffect(cardName);
+  if (!effect) return [];
+  const spec = effect.target;
+  if (spec.kind !== 'allOthers' && spec.kind !== 'allPlayers') return [];
+  const alive = state.players.filter((p) => p.alive);
+  const n = alive.length;
+  if (n === 0) return [];
+  const fromPos = alive.findIndex((p) => p.index === ownerId);
+  if (fromPos < 0) return alive.map((p) => p.index);
+  const result: number[] = [];
+  const start = spec.kind === 'allOthers' ? 1 : 0;
+  for (let i = start; i < n; i++) {
+    result.push(alive[(fromPos + i) % n].index);
+  }
+  return result;
+}
+
 /** 遍历全场，找到所有合法的额定目标（condition.md 条件3）。
  *  用于检查"额定目标数 > 0"。 */
 export function findLegalTargets(

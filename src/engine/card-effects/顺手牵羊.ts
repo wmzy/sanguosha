@@ -58,6 +58,33 @@ const snatchEffect: CardEffect = {
   target: { kind: 'distance', dist: 1, min: 1, max: 1 },
   canUse: canUseSnatch,
   resolve: resolveSnatch,
+  // 选牌 respond：使用者从目标区域选一张牌（requestType='顺手牵羊_选牌'）。
+  // 原逻辑来自 src/engine/skills/顺手牵羊.ts 的 respond registerAction。
+  respond: {
+    validate: (state, ownerId, params) => {
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
+      const atom = slot.atom as { requestType?: string };
+      if (atom.requestType !== '顺手牵羊_选牌') return '当前不是选牌窗口';
+      const zone = params.zone;
+      if (zone === 'equipment' || zone === 'judge') {
+        if (typeof params.cardId !== 'string') return 'cardId required';
+      } else if (zone === 'hand') {
+        if (typeof params.handIndex !== 'number') return 'handIndex required';
+      } else {
+        return 'zone required (equipment|judge|hand)';
+      }
+      return null;
+    },
+    execute: async (state, _ownerId, params) => {
+      state.localVars['选牌/结果'] = {
+        zone: params.zone,
+        cardId: params.cardId ?? null,
+        handIndex: params.handIndex ?? null,
+      };
+    },
+  },
   prompt: {
     type: 'useCardAndTarget',
     title: '顺手牵羊',

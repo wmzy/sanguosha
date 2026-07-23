@@ -35,11 +35,48 @@ const peachEffect: CardEffect = {
   target: { kind: 'wounded', min: 0, max: 1 },
   canUse: canUsePeach,
   resolve: resolvePeach,
+  // respond:濒死求桃时出桃救援——移动牌到弃牌堆并置 localVars['求桃/已救']=true,
+  // runDyingFlow 据此判断是否有人救援。
+  respond: {
+    validate: (state, ownerId, params) => {
+      // pending 必须是 请求回应 且 requestType='求桃'
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
+      if (slot.atom.type !== '请求回应') return '当前不是求桃';
+      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
+      if (requestType !== '桃/求桃') return '当前不是求桃';
+      const cardId = params.cardId as string | undefined;
+      if (cardId) {
+        const self = state.players[ownerId];
+        if (!self.hand.includes(cardId)) return '牌不在手牌中';
+        const card = state.cardMap[cardId];
+        if (card.name !== '桃') return '只能用桃救援';
+      }
+      return null;
+    },
+    execute: async (state, ownerId, params) => {
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return;
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: ownerId },
+        to: { zone: '弃牌堆' },
+      });
+      state.localVars['求桃/已救'] = true;
+    },
+  },
   prompt: {
     type: 'useCardAndTarget',
     title: '出桃',
     cardFilter: { filter: (c: Card) => c.name === '桃', min: 1, max: 1 },
     targetFilter: { min: 0, max: 1 },
+  } as ActionPrompt,
+  respondPrompt: {
+    type: 'useCard',
+    title: '打出桃',
+    cardFilter: { filter: (c: Card) => c.name === '桃', min: 1, max: 1 },
   } as ActionPrompt,
   label: '桃',
   style: 'primary',

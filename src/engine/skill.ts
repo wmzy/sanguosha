@@ -27,6 +27,18 @@ import type {
 import { TARGET_SYSTEM } from './types';
 import { isTrickBlocked } from './trick-quota';
 
+/** 卡名检查器（由 card-effect/registry.ts 设置）：判断某 id 是否是已注册的卡牌名。
+ *  用于 unloadSkillInstance 跳过卡名同名技能的前缀清理。 */
+let cardNameChecker: ((id: string) => boolean) | null = null;
+
+export function setCardNameChecker(fn: (id: string) => boolean): void {
+  cardNameChecker = fn;
+}
+
+function isCardName(id: string): boolean {
+  return cardNameChecker ? cardNameChecker(id) : false;
+}
+
 export interface SkillModule {
   createSkill: (id: string, ownerId: number) => Skill;
   /** 注册时拿到 skill + state;ownerId 从 skill.ownerId 取。
@@ -85,6 +97,13 @@ export async function getSkillModule(id: string): Promise<SkillModule> {
 }
 
 /** 同步获取已加载过的技能模块(未加载返回 undefined)。用于卸载时同步查模块的场景。 */
+/** 同步检查技能模块是否已注册（在 skillLoaders 中）。
+ *  用于跳过未注册的技能 id（如已删除的 per-card 技能），避免 getSkillModule 拑错。
+ *  在 skillModuleChecker 设置前返回 false。 */
+export function isSkillModuleRegistered(id: string): boolean {
+  return skillModuleChecker ? skillModuleChecker(id) : false;
+}
+
 export function getCachedSkillModule(id: string): SkillModule | undefined {
   return moduleCache.get(id);
 }
@@ -417,7 +436,13 @@ export function unloadSkillInstance(state: GameState, skillId: string, ownerId: 
     unload();
     reg.instanceUnloads.delete(key);
   }
-  unregisterActionsForInstance(state, skillId, ownerId);
+  // 按前缀清理残留 action/hook。但跳过卡名同名技能（如铁索连环）：
+  // 使用牌/打出牌 按卡名注册 use/respond action（skillId=卡名），
+  // 若此处按前缀清理会误删这些由 使用牌 注册的 action。
+  // 卡名同名技能的 action 清理由其自身 unload 函数精确处理。
+  if (!isCardName(skillId)) {
+    unregisterActionsForInstance(state, skillId, ownerId);
+  }
 }
 
 export async function registerSkillsFromState(state: GameState): Promise<void> {
@@ -444,11 +469,11 @@ export async function instantiateSkill(
   skillId: string,
   ownerId: number,
 ): Promise<Skill | null> {
-  // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册抛错
-  unloadSkillInstance(state, skillId, ownerId);
-  // 同步检查:技能模块未注册(如候选人 skills 中的描述性名称)则跳过,不中断开局流程。
-  // 用 checker 而非 try-catch 控制流——不确定性不应被 catch 遮蔽。
+  // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册拑错
+  // 但仅当技能模块存在时才卸载——否则会误删 使用牌/打出牌 按卡名注册的 action
+  // （如 player.skills 含 '无中生有' 但该模块已删除，其 action 由 使用牌 注册）。
   if (skillModuleChecker && !skillModuleChecker(skillId)) return null;
+  unloadSkillInstance(state, skillId, ownerId);
   const module = await getSkillModule(skillId);
   const skill = module.createSkill(skillId, ownerId);
   if (module.onInit) {

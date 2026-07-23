@@ -259,9 +259,10 @@ describe('handleMcpRequest', () => {
     const sc = result.structuredContent;
     expect(sc.skills).toHaveLength(2);
     expect(sc.skills[0]).toMatchObject({ name: '杀' });
-    expect(sc.skills[0].description).toBeTypeOf('string');
-    expect(sc.skills[0].description!.length).toBeGreaterThan(0);
+    // 杀已迁移为 CardEffect（非技能模块），description 可能为 null
     expect(sc.skills[1].name).toBe('制衡');
+    expect(sc.skills[1].description).toBeTypeOf('string');
+    expect(sc.skills[1].description!.length).toBeGreaterThan(0);
     expect(result.content[0].text).toContain('杀');
   });
 

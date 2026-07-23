@@ -108,11 +108,53 @@ const fireAttackEffect: CardEffect = {
   target: { kind: 'other', min: 1, max: 1 },
   canUse: canUseFireAttack,
   resolve: resolveFireAttack,
+  // respond：按 requestType 分流 '火攻/展示'（目标展示手牌）和 '火攻/弃牌'（使用者弃同花色）。
+  // 原逻辑来自 src/engine/skills/火攻.ts 的 respond registerAction。
+  respond: {
+    validate: (state, ownerId, params) => {
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if (slot.atom.type !== '请求回应') return '当前不是火攻窗口';
+      const reqType = (slot.atom as { requestType?: string }).requestType;
+      if (reqType !== '火攻/展示' && reqType !== '火攻/弃牌')
+        return '当前不是火攻窗口';
+      const cardId = params.cardId as string;
+      if (typeof cardId !== 'string') return 'cardId required';
+      const self = state.players[ownerId];
+      if (!self?.alive) return '你已死亡';
+      if (!self.hand.includes(cardId)) return '牌不在手牌中';
+      if (reqType === '火攻/弃牌') {
+        const revealedSuit = state.localVars['火攻/展示花色'] as string | undefined;
+        const card = state.cardMap[cardId];
+        if (!revealedSuit || card?.suit !== revealedSuit)
+          return '必须弃置与展示牌相同花色的手牌';
+      }
+      return null;
+    },
+    execute: async (state, ownerId, params) => {
+      const slot = state.pendingSlots.get(ownerId)!;
+      const reqType = (slot.atom as { requestType: string }).requestType;
+      const cardId = params.cardId as string;
+      const card = state.cardMap[cardId];
+      if (reqType === '火攻/展示') {
+        state.localVars['火攻/展示'] = { cardId, suit: card?.suit ?? '' };
+        state.localVars['火攻/展示花色'] = card?.suit ?? '';
+      } else {
+        state.localVars['火攻/弃牌'] = cardId;
+      }
+    },
+  },
   prompt: {
     type: 'useCardAndTarget',
     title: '火攻',
     cardFilter: { filter: (c: Card) => c.name === '火攻', min: 1, max: 1 },
     targetFilter: { min: 1, max: 1 },
+  } as ActionPrompt,
+  // respond 入口 UI：展示/弃牌窗口可选任意手牌（后端 validate 严格校验花色）
+  respondPrompt: {
+    type: 'useCard',
+    title: '火攻',
+    cardFilter: { filter: () => true, min: 1, max: 1 },
   } as ActionPrompt,
   label: '火攻',
   style: 'danger',

@@ -9,8 +9,8 @@
 // onSettle 职责（runUseFlow 在结算完成后、popFrame 前调用）：
 //   出杀次数累加（slash-quota）+ 回合用量 view 同步。
 
-import type { Card } from '../types';
-import type { ActionPrompt, GameView } from '../types';
+import type { Card, GameView, GameState, Json } from '../types';
+import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
@@ -77,6 +77,40 @@ const slashEffect: CardEffect = {
   canUse: canUseSlash,
   resolve: resolveSlash,
   onSettle: onSettleSlash,
+  // ── respond:被询问出杀(决斗/南蛮入侵等)——杀牌进处理区供调用方结算 ──
+  respond: {
+    validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
+      // pending 必须是 询问杀 或 请求回应(借刀杀人/激将)
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
+      const atomType = slot.atom.type;
+      const reqType = (slot.atom as { requestType?: string }).requestType;
+      const pendingMatches =
+        atomType === '询问杀' ||
+        (atomType === '请求回应' && (reqType === '杀/forceKill' || reqType === '杀/respondKill'));
+      if (!pendingMatches) return '当前不是出杀的窗口';
+      const cardId = params.cardId as string | undefined;
+      if (cardId) {
+        const self = state.players[ownerId];
+        if (!self.hand.includes(cardId)) return '牌不在手牌中';
+        const card = state.cardMap[cardId];
+        if (card?.name !== '杀') return '只能打出杀';
+      }
+      return null;
+    },
+    execute: async (state: GameState, ownerId: number, params: Record<string, Json>) => {
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return;
+      // 杀牌进处理区,供调用方(决斗/南蛮入侵)检查处理区判断是否出了杀
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: ownerId },
+        to: { zone: '处理区' },
+      });
+    },
+  },
   prompt: {
     type: 'useCardAndTarget',
     title: '出杀',
@@ -87,6 +121,11 @@ const slashEffect: CardEffect = {
       filter: (view: GameView, t: number) =>
         viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
     },
+  } as ActionPrompt,
+  respondPrompt: {
+    type: 'useCard',
+    title: '打出杀',
+    cardFilter: { filter: (c: Card) => c.name === '杀', min: 1, max: 1 },
   } as ActionPrompt,
   label: '杀',
   style: 'danger',

@@ -252,6 +252,12 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   // 注册闪的全局「生效前」after-hook(基本牌面能力,不限闪技能持有者)
   const { registerDodgeHook } = await import('./card-effects/闪');
   registerDodgeHook(state);
+  // 注册酒的全局「造成伤害」before-hook(消费增伤标记)
+  const { registerWineHook } = await import('./card-effects/酒');
+  registerWineHook(state);
+  // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
+  const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
+  registerDelayedTrickHooks(state);
   await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
@@ -280,6 +286,17 @@ export async function restore(
 
 /** 测试/工具用:给预构造 state(未走 bootstrap)注册所有 player.skills 实例 + 选将/弃牌 respond action */
 export async function registerSkillsFromState(state: GameState): Promise<void> {
+  // 注入统一卡牌入口技能（使用牌/打出牌）到每个玩家的 skills 数组开头（若缺失）。
+  // 放开头保证先于角色技能实例化，让 界乱击/界火计 等覆盖能生效（后注册覆盖先注册）。
+  // unloadSkillInstance 已通过 cardNameChecker 跳过卡名同名技能的前缀清理，
+  // 不会误删使用牌按卡名注册的 use action。
+  for (const p of state.players) {
+    p.skills = [
+      ...(p.skills.includes('使用牌') ? [] : ['使用牌']),
+      ...(p.skills.includes('打出牌') ? [] : ['打出牌']),
+      ...p.skills,
+    ];
+  }
   const { registerSkillsFromState: registerSkills } = await import('./skill');
   await registerSkills(state);
   // 注册系统规则全局 hooks + 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)
@@ -291,6 +308,12 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   // 注册闪的全局「生效前」after-hook(基本牌面能力,不限闪技能持有者)
   const { registerDodgeHook } = await import('./card-effects/闪');
   registerDodgeHook(state);
+  // 注册酒的全局「造成伤害」before-hook(消费增伤标记)
+  const { registerWineHook } = await import('./card-effects/酒');
+  registerWineHook(state);
+  // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
+  const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
+  registerDelayedTrickHooks(state);
 }
 
 /**

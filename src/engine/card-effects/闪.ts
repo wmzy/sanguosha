@@ -11,10 +11,16 @@
 // 流程:杀的「生效前」→ 闪的 after-hook 询问闪 → respond action 移牌+设置标记 →
 // drain闪 → 无双/肉林在「询问闪」after-hook 中拦截第一次。
 
-import type { GameState } from '../types';
+import type { Card, GameState, Json } from '../types';
+import type { ActionPrompt } from '../types';
 import { applyAtom, frameCards, topFrame } from '../create-engine';
 import { registerAfterHook } from '../skill';
-import { setCancelled } from '../card-effect/registry';
+import {
+  registerCardEffect,
+  type CardEffect,
+  setCancelled,
+} from '../card-effect/registry';
+import type { Color } from '../../shared/types';
 
 /**
  * 注册闪的「生效前」全局 after-hook。
@@ -50,3 +56,64 @@ export function registerDodgeHook(state: GameState): void {
     }
   });
 }
+
+const COLOR_LIMIT_VAR = '闪/色限制';
+
+/** 闪 CardEffect — respond-only：成为杀的目标时打出闪抵消。
+ *  无 use resolve（闪的使用效果 = respond 中设置的已抵消标记）。 */
+const dodgeEffect: CardEffect = {
+  timing: '杀生效前',
+  target: { kind: 'none' },
+  resolve: async () => {},
+  respond: {
+    validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
+      if (slot.atom.type !== '询问闪') return '当前不是出闪的窗口';
+      const cardId = params.cardId as string | undefined;
+      if (cardId) {
+        const self = state.players[ownerId];
+        if (!self.hand.includes(cardId)) return '牌不在手牌中';
+        const card = state.cardMap[cardId];
+        if (card?.name !== '闪') return '只能打出闪';
+        const limit = state.localVars[COLOR_LIMIT_VAR] as Color | undefined;
+        if (limit && card.color !== limit) return `只能打出${limit}色的闪`;
+      }
+      return null;
+    },
+    execute: async (state: GameState, ownerId: number, params: Record<string, Json>) => {
+      const cardId = params.cardId as string | undefined;
+      if (!cardId) return; // 不出闪
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: ownerId },
+        to: { zone: '处理区' },
+      });
+      // 设置已抵消标记：闪的效果 = 抵消目标杀
+      // 从结算帧栈顶部找到杀帧,设置标记
+      const frame = topFrame(state);
+      if (frame) {
+        const killCardId = frame.params.cardId as string | undefined;
+        if (killCardId && state.cardMap[killCardId]?.name === '杀') {
+          setCancelled(state, killCardId, ownerId);
+        }
+      }
+    },
+  },
+  prompt: {
+    type: 'useCard',
+    title: '打出闪',
+    cardFilter: { filter: (c: Card) => c.name === '闪', min: 1, max: 1 },
+  } as ActionPrompt,
+  respondPrompt: {
+    type: 'useCard',
+    title: '打出闪',
+    cardFilter: { filter: (c: Card) => c.name === '闪', min: 1, max: 1 },
+  } as ActionPrompt,
+  label: '闪',
+  style: 'default',
+};
+
+registerCardEffect('闪', dodgeEffect);

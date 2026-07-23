@@ -18,9 +18,10 @@
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
-import { registerAction } from '../skill';
-import { validateCardUse } from './validate';
-import { getCardEffect, requireCardEffect } from './registry';
+import { registerAction, registerBeforeHook } from '../skill';
+import { 询问无懈可击 } from '../无懈可击';
+import { validateCardUse, computeAutoTargets } from './validate';
+import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
 import type { CardEffect, ResolveCtx } from './registry';
 import { isCancelled } from './registry';
 
@@ -241,35 +242,135 @@ export async function resumeDelayedSettlement(
   }
 }
 
-/** 注册 use action：validate 查 CardEffect 注册表，execute 调 runUseFlow。 */
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
+/** 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的全局判定阶段 before-hook + 跳过阶段 hook。
+ *  在 create-engine bootstrap / registerSkillsFromState 中调用。
+ *  全局注册(ownerId=-1)：判定阶段 hook 检查 atom.player 的判定区有无延时锦囊。 */
+export function registerDelayedTrickHooks(state: GameState): void {
+  // 判定阶段 before-hook：有延时锦囊 → 询问无懈 → resumeDelayedSettlement
+  registerBeforeHook(state, '延时锦囊', -1, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段开始' || atom.phase !== '判定') return;
+    const player = atom.player;
+    const self = ctx.state.players[player];
+    if (!self) return;
+    if (ctx.state.zones.deck.length === 0) return;
+    // 查找判定区第一个延时锦囊（乐不思蜀/兵粮寸断/闪电）
+    const DELAYED_TRICKS = ['乐不思蜀', '兵粮寸断', '闪电'];
+    const trick = self.pendingTricks.find((t) => DELAYED_TRICKS.includes(t.name));
+    if (!trick) return;
 
-  return registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string | undefined;
-      if (!cardId) return 'cardId required';
-      const card = state.cardMap[cardId];
-      if (!card) return '牌不存在';
-      if (!getCardEffect(card.name)) return `${card.name} 尚未支持使用牌入口`;
-      return validateCardUse(state, ownerId, params, card.name);
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const card = state.cardMap[cardId];
-      const targets = (params.targets as number[]) ?? [];
-      await runUseFlow(state, ownerId, cardId, targets, card.name);
-    },
-  );
+    const cancelled = await 询问无懈可击(ctx.state, player);
+    if (cancelled) {
+      await applyAtom(ctx.state, {
+        type: '移除延时锦囊',
+        player,
+        trickName: trick.name,
+      });
+      return;
+    }
+    await resumeDelayedSettlement(ctx.state, trick.source, player, trick.name, trick.card.id);
+  });
+
+  // 跳过阶段 before-hook：乐不思蜀跳过出牌、兵粮寸断跳过摸牌
+  const SKIP_MAP: Record<string, string> = {
+    乐不思蜀: '乐不思蜀/跳过出牌',
+    兵粮寸断: '兵粮寸断/跳过摸牌',
+  };
+  registerBeforeHook(state, '延时锦囊', -1, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段开始') return;
+    const player = atom.player;
+    const self = ctx.state.players[player];
+    if (!self) return;
+    for (const [trickName, tag] of Object.entries(SKIP_MAP)) {
+      if (self.tags.includes(tag)) {
+        const skipPhase = atom.phase === '出牌' || atom.phase === '摸牌';
+        if (!skipPhase) continue;
+        if (
+          (trickName === '乐不思蜀' && atom.phase === '出牌') ||
+          (trickName === '兵粮寸断' && atom.phase === '摸牌')
+        ) {
+          const { skipPhase: doSkip } = await import('../skip-phase');
+          return doSkip(ctx.state, atom, tag);
+        }
+      }
+    }
+  });
 }
 
-/** 使用牌的 UI 由前端 CardEffect 注册表（prompt/label/style/activeWhen）驱动。本阶段为空。 */
-export function onMount(_skill: Skill, _api: FrontendAPI): void {
-  // 使用牌的 UI 由 CardEffect 注册表驱动，前端迁移后通过 cardEffectRegistry 获取数据。
+/** 注册 use action：逐卡名注册（skillId=卡名），validate 查 CardEffect 注册表，execute 调 runUseFlow。
+ *  按卡名注册而非统一 '使用牌' skillId，是为了：
+ *  1. 保持 triggerAction('杀','use',...) 等调用向后兼容
+ *  2. 让 界火计/界乱击 等 registerAction('万箭齐发',...) 覆盖机制仍然生效
+ *  3. 前端 transform.name='万箭齐发' → skillId='万箭齐发' 路由不变 */
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  const unloads: Array<() => void> = [];
+
+  for (const [cardName, effect] of getAllCardEffects()) {
+    const u = registerAction(
+      state,
+      cardName,
+      ownerId,
+      'use',
+      (state: GameState, params: Record<string, Json>) => {
+        const cardId = params.cardId as string | undefined;
+        if (!cardId) return 'cardId required';
+        const card = state.cardMap[cardId];
+        if (!card) return '牌不存在';
+        if (card.name !== cardName) return `不是${cardName}`;
+        // 兼容 target(单数) → targets(数组)
+        if (!Array.isArray(params.targets) && typeof params.target === 'number') {
+          params.targets = [params.target];
+        }
+        return validateCardUse(state, ownerId, params, cardName);
+      },
+      async (state: GameState, params: Record<string, Json>) => {
+        const cardId = params.cardId as string;
+        // 兼容 target(单数) → targets(数组)
+        if (!Array.isArray(params.targets) && typeof params.target === 'number') {
+          params.targets = [params.target];
+        }
+        // preUse 钩子：双目标牌（借刀杀人）提取 killTarget 存入 localVars，返回真实 targets。
+        let targets = effect.preUse
+          ? effect.preUse(state, ownerId, params)
+          : ((params.targets as number[]) ?? []);
+        // 自动计算目标：self → [ownerId]；AOE(allOthers/allPlayers) → 全场
+        if (targets.length === 0) {
+          if (effect.target.kind === 'self' || effect.target.kind === 'none') {
+            targets = [ownerId];
+          } else {
+            targets = computeAutoTargets(state, ownerId, cardName);
+          }
+        }
+        await runUseFlow(state, ownerId, cardId, targets, cardName);
+      },
+    );
+    if (u) unloads.push(u);
+  }
+
+  return () => unloads.forEach((u) => u());
+}
+
+/** 使用牌的 UI：按卡名注册 use action 的 UI 配置（从 CardEffect 注册表驱动）。
+ *  每张 CardEffect 的 prompt/label/style/activeWhen 成为一个 use action 定义。
+ *  skillIdOverride=卡名（与 onInit 按卡名注册的 engine action 对齐）。 */
+export function onMount(_skill: Skill, api: FrontendAPI): void {
+  for (const [cardName, effect] of getAllCardEffects()) {
+    // 跳过纯 respond 牌（闪/无懈可击）：它们无 use 入口，不注册 use UI。
+    // 闪 timing='杀生效前' 且无 canUse；无懈可击 resolve 为空且 timing='杀生效前'。
+    if (effect.timing === '杀生效前' && !effect.canUse) continue;
+    api.defineAction(
+      'use',
+      {
+        label: effect.label,
+        style: effect.style,
+        prompt: effect.prompt,
+        ...(effect.activeWhen ? { activeWhen: effect.activeWhen } : {}),
+      },
+      cardName,
+    );
+  }
 }
 
 export default { createSkill, onInit, onMount } satisfies SkillModule;

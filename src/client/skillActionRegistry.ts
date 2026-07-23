@@ -41,9 +41,10 @@ function makeFrontendAPI(skillId: string, ownerId: number): FrontendAPI {
     onEvent() {
       return () => {};
     },
-    defineAction(actionType, opts) {
-      registry.set(actionKey(skillId, ownerId, actionType), {
-        skillId,
+    defineAction(actionType, opts, skillIdOverride) {
+      const sid = skillIdOverride ?? skillId;
+      registry.set(actionKey(sid, ownerId, actionType), {
+        skillId: sid,
         ownerId,
         actionType,
         label: opts.label,

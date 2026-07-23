@@ -62,27 +62,27 @@ describe('动态技能生命周期(添加技能/移除技能 atom)', () => {
   });
 
   it('添加技能 atom → 实例化,后端 action 已注册', async () => {
-    // 初始:P1 无 杀 skill → 无 registerAction
-    expect(findActionEntry(state, '杀', 0, 'use')).toBeUndefined();
+    // 初始:P1 无 仁德 skill → 无 registerAction
+    expect(findActionEntry(state, '仁德', 0, 'use')).toBeUndefined();
 
-    await applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' });
+    await applyAtom(state, { type: '添加技能', player: 0, skillId: '仁德' });
 
     // player.skills 列表更新
-    expect(state.players[0].skills).toContain('杀');
-    // 引擎已实例化:杀:use action 已注册
-    expect(findActionEntry(state, '杀', 0, 'use')).toBeDefined();
+    expect(state.players[0].skills).toContain('仁德');
+    // 引擎已实例化:仁德:use action 已注册
+    expect(findActionEntry(state, '仁德', 0, 'use')).toBeDefined();
   });
 
   it('移除技能 atom → 卸载,后端 action 已注销', async () => {
     // 先添加
-    await applyAtom(state, { type: '添加技能', player: 0, skillId: '杀' });
-    expect(findActionEntry(state, '杀', 0, 'use')).toBeDefined();
+    await applyAtom(state, { type: '添加技能', player: 0, skillId: '仁德' });
+    expect(findActionEntry(state, '仁德', 0, 'use')).toBeDefined();
 
     // 再移除
-    await applyAtom(state, { type: '移除技能', player: 0, skillId: '杀' });
+    await applyAtom(state, { type: '移除技能', player: 0, skillId: '仁德' });
 
-    expect(state.players[0].skills).not.toContain('杀');
-    expect(findActionEntry(state, '杀', 0, 'use')).toBeUndefined();
+    expect(state.players[0].skills).not.toContain('仁德');
+    expect(findActionEntry(state, '仁德', 0, 'use')).toBeUndefined();
   });
 
   it('添加技能 幂等:重复添加同一 skill 不抛错', async () => {

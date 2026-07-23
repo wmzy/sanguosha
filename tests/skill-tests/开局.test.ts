@@ -131,8 +131,8 @@ describe('开局', () => {
 
     // 验证:技能已注册(默认技能)
     for (const player of state.players) {
-      expect(player.skills).toContain('杀');
-      expect(player.skills).toContain('闪');
+      expect(player.skills).toContain('使用牌');
+      expect(player.skills).toContain('打出牌');
       expect(player.skills).toContain('回合管理');
     }
 

@@ -1,13 +1,12 @@
-// 决斗(普通锦囊):出牌阶段,对一名其他角色使用。
-// 目标先开始,与使用者轮流出杀,首先不出杀的一方受到对方造成的 1 点伤害。
+// 决斗:结算核心 helper（被 离间/界利驭/界势斩/界翦灭 等视为使用决斗的技能复用）。
 //
-// 询问杀 后检查处理区:有杀牌 = 出了杀;没有 = 没出(输)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+// 决斗牌本身的使用（use action + resolve）已迁移到 card-effects/决斗.ts。
+// 本文件仅保留 runDuelResolution——它包含"成为目标"+"无懈"+"决斗循环"，
+// 供"视为使用决斗"（无实体牌）的技能调用。正常使用决斗牌走 CardEffect.resolve（不含成为目标）。
+import type { GameState } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { registerAction, validateUseCard } from '../skill';
 import { 询问无懈可击 } from '../无懈可击';
 import { enforceDualKill } from './无双';
-import { runUseFlow } from '../card-effect/use-card';
 
 /**
  * 决斗结算核心(可复用):A 视为对 B 使用决斗,双方轮流出杀,输者受 1 点伤害。
@@ -89,60 +88,5 @@ export async function runDuelResolution(
     amount: 1,
     source: winner,
     cardId,
-  });
-}
-
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '决斗',
-    description: '对一名角色使用,双方轮流出杀,先不出者受 1 点伤害',
-  };
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件(对齐杀):自己回合 + 出牌阶段 + 无阻塞 pending + 存活 + 手牌 + 牌名 + 非空 targets
-      const base = validateUseCard(state, ownerId, params, {
-        cardName: '决斗',
-        requireTarget: true,
-      });
-      if (base) return base;
-      // 决斗是单目标锦囊:targets 必须恰好 1 个
-      const targets = params.targets as number[];
-      if (targets.length !== 1) return '决斗只能指定一名目标';
-      const target = targets[0];
-      if (target === ownerId) return '不能对自己使用决斗';
-      if (!state.players[target]?.alive) return '目标不合法';
-      return null;
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const target = (params.targets as number[])[0];
-      // 结算逻辑委托 runUseFlow → CardEffect['决斗'].resolve
-      // 成为由 runUseFlow 处理，resolve 内 runDuelLoop 不再重复
-      await runUseFlow(state, ownerId, cardId, [target], '决斗');
-    },
-  );
-  return () => {};
-}
-
-export function onMount(skill: Skill, api: FrontendAPI): void {
-  api.defineAction('use', {
-    label: '决斗',
-    style: 'danger',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '决斗',
-      cardFilter: { filter: (c) => c.name === '决斗', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 1 },
-    },
   });
 }

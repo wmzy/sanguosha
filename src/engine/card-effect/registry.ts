@@ -5,6 +5,7 @@
 //   3. 使用结算:resolve(生效后效果)
 
 import type { ActionContext, ActionPrompt, GameState, Json } from '../types';
+import { setCardNameChecker } from '../skill';
 
 // 使用时机
 export type CardTiming =
@@ -44,7 +45,24 @@ export interface CardEffect {
   delayed?: boolean;
   /** 使用结算完成后回调（popFrame 前）。用于 post-use 清理，如杀的出杀次数累加。 */
   onSettle?: (state: GameState, source: number, cardId: string) => Promise<void>;
+  /** respond action 逻辑（打出/响应型卡牌：闪/桃(救)/酒/无懈可击 等）。
+   *  若声明则使用牌技能按卡名 skillId 注册 respond action，路由到此逻辑。
+   *  validate 检查 pending slot + 牌名；execute 执行牌特有响应效果。
+   *  未声明 respond 的牌不注册 respond action（如杀只有 use 入口）。 */
+  respond?: {
+    /** 校验：返回 null=合法，字符串=拒绝理由 */
+    validate: (state: GameState, ownerId: number, params: Record<string, Json>) => string | null;
+    /** 执行响应效果 */
+    execute: (state: GameState, ownerId: number, params: Record<string, Json>) => Promise<void>;
+  };
+  /** use 执行前的预处理钩子（runUseFlow 调用前）。
+   *  用于双目标牌（借刀杀人）：从 params 提取 killTarget 存入 localVars，
+   *  返回传给 runUseFlow 的真实 targets（可能少于 params.targets）。
+   *  未声明时 targets = params.targets 原样传入。 */
+  preUse?: (state: GameState, ownerId: number, params: Record<string, Json>) => number[];
   prompt: ActionPrompt;
+  /** respond 入口的 UI prompt（若有 respond 字段）。未提供则复用 prompt。 */
+  respondPrompt?: ActionPrompt;
   label: string;
   style: 'danger' | 'primary' | 'default';
   activeWhen?: (ctx: ActionContext) => boolean;
@@ -68,6 +86,14 @@ export function requireCardEffect(cardName: string): CardEffect {
 
 export function hasCardEffect(cardName: string): boolean {
   return registry.has(cardName);
+}
+
+// 设置卡名检查器（供 skill.ts 的 unloadSkillInstance 跳过卡名同名技能的前缀清理）
+setCardNameChecker((id: string) => registry.has(id));
+
+/** 返回所有已注册的 CardEffect（卡名 → effect）。用于使用牌技能按卡名批量注册 action。 */
+export function getAllCardEffects(): Map<string, CardEffect> {
+  return registry;
 }
 
 // ── 「已抵消」标记机制 ──

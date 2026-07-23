@@ -13,10 +13,9 @@ import {
 
 describe('getSkillDescription', () => {
   it('模块加载后同步返回技能描述', async () => {
-    await getSkillModule('杀');
-    const desc = getSkillDescription('杀');
+    await getSkillModule('使用牌');
+    const desc = getSkillDescription('使用牌');
     expect(typeof desc).toBe('string');
-    expect(desc).toContain('角色');
   });
 
   it('马匹技能(工厂模块)描述可查', async () => {
@@ -39,7 +38,7 @@ describe('getSkillDescription', () => {
 
 describe('getSkillDescriptionAsync', () => {
   it('自动加载未缓存模块并返回描述', async () => {
-    const desc = await getSkillDescriptionAsync('决斗');
+    const desc = await getSkillDescriptionAsync('仁德');
     expect(typeof desc).toBe('string');
     expect(desc!.length).toBeGreaterThan(0);
   });
