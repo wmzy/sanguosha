@@ -35,7 +35,8 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../skill';
 import { defaultPlayActive } from '../action-active';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../once-per-turn';
@@ -97,37 +98,11 @@ async function virtualKill(
     type: '基本牌',
   };
 
-  await pushFrame(state, SKILL_ID, source, { virtualKillCardId: cardId });
-  try {
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    const becameTarget = await applyAtom(state, { type: '成为目标', source, target, cardId });
-    if (!becameTarget) return false;
-    const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-    if (!valid) return false;
-    await applyAtom(state, { type: '询问闪', target, source });
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-      // drain 闪
-      for (const dId of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-      return false; // 被抵消,未造成伤害
-    }
-    if (!state.players[target]?.alive) return false;
-    await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
-    // 通过体力差判定是否真的造成伤害(防具/反馈/奸雄等可能改伤)
-    return state.players[target].health < targetHealthBefore;
-  } finally {
-    // 清理虚拟杀卡(无实体,不入弃牌堆)
-    delete state.cardMap[cardId];
-    await popFrame(state);
-  }
+  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  // 清理虚拟杀卡(无实体,不入弃牌堆)
+  delete state.cardMap[cardId];
+  // 通过体力差判定是否真的造成伤害(防具/反馈/奸雄等可能改伤)
+  return state.players[target].health < targetHealthBefore;
 }
 
 /** 选项 2:owner 与 target 各摸一张牌 */

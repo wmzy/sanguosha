@@ -9,6 +9,21 @@ import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import type { Color } from '../../shared/types';
 import { registerAtom } from '../atom';
 
+/** 根据转化后的牌名推断卡牌类型。
+ *  基本牌(杀/闪/桃/酒)→ '基本牌';其余按已知锦囊名 → '锦囊牌'。
+ *  未知名字默认 '基本牌'(武圣转化杀)。 */
+const BASIC_CARD_NAMES = new Set(['杀', '闪', '桃', '酒']);
+const TRICK_CARD_NAMES = new Set([
+  '决斗', '过河拆桥', '顺手牵羊', '无中生有', '借刀杀人', '无懈可击',
+  '桃园结义', '南蛮入侵', '万箭齐发', '五谷丰登', '火攻', '铁索连环',
+  '乐不思蜀', '兵粮寸断', '闪电',
+]);
+function inferCardType(name: string): Card['type'] {
+  if (BASIC_CARD_NAMES.has(name)) return '基本牌';
+  if (TRICK_CARD_NAMES.has(name)) return '锦囊牌';
+  return '基本牌';
+}
+
 /**
  * 转化后牌的颜色:
  * - 单张:继承原卡颜色
@@ -55,7 +70,7 @@ export const 当作: AtomDefinition<{
       suit: single ? firstCard.suit : '',
       color: transformColor(atom.cardIds, state.cardMap),
       rank: firstCard.rank,
-      type: '基本牌',
+      type: inferCardType(atom.outputName),
       shadowOf: single ? atom.cardIds[0] : undefined,
     };
     if (atom.outputDamageType) shadow.damageType = atom.outputDamageType;

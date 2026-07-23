@@ -60,6 +60,10 @@ export interface CardEffect {
    *  返回传给 runUseFlow 的真实 targets（可能少于 params.targets）。
    *  未声明时 targets = params.targets 原样传入。 */
   preUse?: (state: GameState, ownerId: number, params: Record<string, Json>) => number[];
+  /** 无效效果目标检查：返回 false 表示此锦囊对该 target 无可抵消的效果（不询问无懈，不结算）。
+   *  典型场景：桃园结义对满血角色无回血效果 → 满血目标不询问无懈、不结算。
+   *  未声明时视为所有目标均有效果。 */
+  hasEffect?: (state: GameState, target: number) => boolean;
   prompt: ActionPrompt;
   /** respond 入口的 UI prompt（若有 respond 字段）。未提供则复用 prompt。 */
   respondPrompt?: ActionPrompt;

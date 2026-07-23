@@ -10,14 +10,12 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 借刀杀人的结算：无懈 → 请求出杀 → 检查处理区 → 杀效果/获得武器 */
+/** 借刀杀人的结算：请求出杀 → 检查处理区 → 杀效果/获得武器 */
 async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
   const { state, source, target } = ctx;
-  const cancelled = await 询问无懈可击(state, target);
-  if (cancelled) return;
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
 
   // 请求目标选择：出杀 或 交出武器
   await applyAtom(state, {

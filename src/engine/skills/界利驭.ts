@@ -27,7 +27,7 @@
 //   - 视为决斗:吕布是决斗发起者(出杀后手),所选角色是目标(出杀先手);
 //     无实体牌;按惯例(与离间/界势斩一致)跳过无懈可击。
 //   - 决斗结算前 pushFrame 隔离处理区:造成伤害 after-hook 触发时,父杀帧的
-//     frameCards 仍含原杀牌;若直接 runDuelResolution,决斗循环的
+//     frameCards 仍含原杀牌;若直接走 runUseFlow virtual 模式,决斗循环的
 //     frameCards.filter(杀) 会误判"已出杀",导致秒结束。push 新帧后 topFrame.cards
 //     为空,决斗循环正常。
 //   - requestType 一律以 '界利驭/' 为前缀:resolvePendingRespond 按 [/_] 取首段为
@@ -45,7 +45,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
-import { runDuelResolution } from './决斗';
+import { runUseFlow } from '../card-effect/use-card';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -223,15 +223,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (duelTarget === ownerId || duelTarget === target) return;
       if (!ctx.state.players[duelTarget]?.alive) return;
 
-      // 4. 利驭主(吕布)视为对所选角色使用决斗:
-      //    - 必须新帧隔离处理区:此时父杀帧 frameCards 仍含原杀牌,直接 runDuelResolution
-      //      会被 决斗 frameCards.filter(杀) 误判"已出杀"秒结束。
+      // 4. 利驭主(吕布)视为对所选角色使用决斗(虚拟使用模式):
+      //    - 必须新帧隔离处理区:此时父杀帧 frameCards 仍含原杀牌,
+      //      直接走 runUseFlow 会被 决斗 frameCards.filter(杀) 误判"已出杀"秒结束。
       //    - 吕布是决斗发起者(from,出杀后手);所选角色是目标(target,出杀先手)。
-      //    - 无实体牌(视为使用);按惯例(离间/界势斩)跳过无懈可击。
+      //    - 虚拟牌不在处理区 → 无懈不询问。
       await pushFrame(ctx.state, SKILL_ID, ownerId, { duelTarget, source: target });
       try {
         if (ctx.state.players[ownerId]?.alive && ctx.state.players[duelTarget]?.alive) {
-          await runDuelResolution(ctx.state, ownerId, duelTarget, undefined, true);
+          const vId = `${SKILL_ID}:决斗:${ownerId}:${duelTarget}:${ctx.state.seq}`;
+          ctx.state.cardMap[vId] = { id: vId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
+          await runUseFlow(ctx.state, ownerId, vId, [duelTarget], '决斗', { virtual: true });
+          delete ctx.state.cardMap[vId];
         }
       } finally {
         await popFrame(ctx.state);

@@ -9,7 +9,6 @@
 import type { Card, GameState } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 const CHAIN_MARK = 'chained';
@@ -18,16 +17,10 @@ function isChained(state: GameState, idx: number): boolean {
   return state.players[idx]?.marks.some((m) => m.id === CHAIN_MARK) ?? false;
 }
 
-/** 铁索连环的逐目标结算：首个目标问一次无懈（抵消整个锦囊），然后 toggle 横置 */
+/** 铁索连环的逐目标结算：toggle 横置 */
 async function resolveChain(ctx: ResolveCtx): Promise<void> {
-  const { state, source, target, targetIndex } = ctx;
-
-  // 铁索连环的无懈抵消整个锦囊（仅问一次，在首个目标时）
-  if (targetIndex === 0) {
-    const cancelled = await 询问无懈可击(state, source);
-    state.localVars['铁索连环/被抵消'] = cancelled;
-  }
-  if (state.localVars['铁索连环/被抵消']) return;
+  const { state, target } = ctx;
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理（per-target 抵消）。
 
   const chained = isChained(state, target);
   await applyAtom(state, { type: '设横置', player: target, chained: !chained });

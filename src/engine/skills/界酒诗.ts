@@ -39,6 +39,7 @@ import {
   hasBlockingPending,
   type SkillModule,
 } from '../skill';
+import { runUseFlow } from '../card-effect/use-card';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
@@ -76,13 +77,12 @@ async function flipBackToFaceUp(state: GameState, ownerId: number): Promise<void
   }
 }
 
-/** 视为使用一张【酒】:加 '酒/nextKillDamageBonus' mark,本回合下一张杀伤害+1 */
+/** 视为使用一张【酒】:走 runUseFlow virtual（resolve=加增伤标记） */
 async function virtualWine(state: GameState, source: number): Promise<void> {
-  await applyAtom(state, {
-    type: '加标记',
-    player: source,
-    mark: { id: '酒/nextKillDamageBonus', scope: -1, payload: 1, duration: 'turn' },
-  });
+  const cardId = `${SKILL_ID}:酒:${source}:${state.seq}`;
+  state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
+  await runUseFlow(state, source, cardId, [], '酒', { virtual: true });
+  delete state.cardMap[cardId];
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

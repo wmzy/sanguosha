@@ -21,8 +21,9 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
+import { runUseFlow } from '../card-effect/use-card';
 import { skipPhase } from '../skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';
@@ -56,13 +57,13 @@ function makeVirtualKillCard(source: number, target: number, seq: number): strin
 }
 
 /**
- * 执行一次"视为出杀"的完整结算(指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
+ * 执行一次"视为出杀"的完整结算（runUseFlow virtual 模式）。
  * 不消耗手牌、不计入出杀次数;无距离限制。
+ * 走完整时机 atom 序列,保证激昂/集智等技能事件一致。
  */
 async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
   if (!state.players[target]?.alive) return;
   const cardId = makeVirtualKillCard(source, target, state.seq);
-  // 直接写 cardMap:虚拟杀无实体,但结算流程中 atoms/toViewEvents 需要 cardMap[id] 存在
   state.cardMap[cardId] = {
     id: cardId,
     name: '杀',
@@ -71,32 +72,8 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-
-  await pushFrame(state, '神速', source, { virtualKillCardId: cardId });
-  try {
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    await applyAtom(state, { type: '成为目标', source, target, cardId });
-    const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-    if (!valid) return;
-    await applyAtom(state, { type: '询问闪', target, source });
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-      // drain 闪
-      for (const dId of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    } else {
-      await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
-    }
-  } finally {
-    await popFrame(state);
-  }
+  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  delete state.cardMap[cardId];
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

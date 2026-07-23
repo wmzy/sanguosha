@@ -193,8 +193,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (mode) {
         targets = computeScrollTargets(st, mode, frame.from);
       } else {
-        // 铁索连环:仅使用者的唯一无懈窗口触发(cancelTarget === from)
-        if (cancelTarget !== frame.from) return;
+        // 铁索连环:逐目标无絮模式下,任一目标的无絮窗口均可触发奋威
+        // (首次触发后由 PROCESSED_PREFIX 保证只触发一次)
         const t = (frame.params?.targets as number[] | undefined) ?? [];
         targets = t;
       }

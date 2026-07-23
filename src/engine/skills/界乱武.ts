@@ -20,6 +20,7 @@
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
+import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
@@ -131,31 +132,8 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     type: '基本牌',
   };
 
-  await pushFrame(state, '界乱武', source, { virtualKillCardId: cardId });
-  try {
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    await applyAtom(state, { type: '成为目标', source, target, cardId });
-    const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-    if (!valid) return;
-    await applyAtom(state, { type: '询问闪', target, source });
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-      for (const dId of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    } else {
-      await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
-    }
-  } finally {
-    delete state.cardMap[cardId];
-    await popFrame(state);
-  }
+  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  delete state.cardMap[cardId];
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

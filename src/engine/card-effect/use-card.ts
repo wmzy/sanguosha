@@ -23,7 +23,7 @@ import { 询问无懈可击 } from '../无懈可击';
 import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
 import type { CardEffect, ResolveCtx } from './registry';
-import { isCancelled } from './registry';
+import { isCancelled, setCancelled } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -50,15 +50,31 @@ async function runSettlementPhase(
   target: number,
   cardId: string,
   targetIndex: number,
+  skipWuxie = false,
 ): Promise<void> {
   // (1) 使用结算开始时：检测有效性（仁器/享乐 before-hook 可 cancel → 跳过）
   const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
   if (!valid) return;
 
-  // (2) 生效前：发出时机 atom（闪/无藉的 after-hook 在此处理响应并设置标记）
+  // 无效效果目标（如桃园结义对满血角色）：不询问无懈，不结算
+  if (effect.hasEffect && !effect.hasEffect(state, target)) return;
+
+  // (2) 生效前：发出时机 atom（闪的 after-hook 在此处理响应并设置标记）
   await applyAtom(state, { type: '生效前', source, target, cardId });
 
-  // 检查是否被抵消（闪/无藉的 respond 已在 after-hook 中设置标记）
+  // 无懈可击：对非延时锦囊牌在「生效前」时机询问（目标锦囊对目标角色生效前）。
+  // 延时锦囊（effect.delayed）的无懈由判定阶段 hook 统一处理 → skipWuxie=true。
+  // 虚拟使用（视为使用，无实体牌）不是合法无懈目标 → skipWuxie=true。
+  // 被抵消 → setCancelled → 下方 isCancelled 检查跳过 resolve。
+  const card = state.cardMap[cardId];
+  if (!skipWuxie && card?.type === '锦囊牌') {
+    const wuxieCancelled = await 询问无懈可击(state, target);
+    if (wuxieCancelled) {
+      setCancelled(state, cardId, target);
+    }
+  }
+
+  // 检查是否被抵消（闪/无藉的 respond 已在 after-hook 中设置标记，或无懈设置标记）
   if (isCancelled(state, cardId, target)) {
     // 被抵消 atom：触发武器技（贯石斧强命 / 青龙追杀）
     await applyAtom(state, { type: '被抵消', source, target, cardId });
@@ -77,6 +93,16 @@ async function runSettlementPhase(
   await applyAtom(state, { type: '使用结算结束时', source, target, cardId });
 }
 
+/** runUseFlow 的选项。 */
+export interface RunUseFlowOpts {
+  /** 虚拟使用（视为使用，无实体牌）：
+   *  跳过"手牌→处理区"和"处理区→弃牌堆"的牌移动，
+   *  跳过 onSettle（杀次数累加等不适用于虚拟牌）。
+   *  其余时机 atom（选择目标时/使用时/指定目标/成为目标/...）全部正常触发，
+   *  保证事件一致。调用方负责创建/清理虚拟卡 cardMap 条目。 */
+  virtual?: boolean;
+}
+
 /**
  * runUseFlow：编排使用事件的完整结算流程（文档 use.md）。
  *
@@ -85,9 +111,10 @@ async function runSettlementPhase(
  *
  * @param state     游戏状态
  * @param source    使用者
- * @param cardId    实体牌 id（须在手牌中）
+ * @param cardId    实体牌 id（须在手牌中）；虚拟使用时为虚拟卡 id（须已写入 cardMap）
  * @param targets   目标列表
  * @param cardName  牌名（查 CardEffect 注册表）
+ * @param opts      可选：virtual=true 虚拟使用模式
  */
 export async function runUseFlow(
   state: GameState,
@@ -95,6 +122,7 @@ export async function runUseFlow(
   cardId: string,
   targets: number[],
   cardName: string,
+  opts?: RunUseFlowOpts,
 ): Promise<void> {
   const effect = requireCardEffect(cardName);
 
@@ -111,12 +139,15 @@ export async function runUseFlow(
 
     if (effect.delayed) {
       // 延迟类锦囊：展示后置入目标判定区（处理区→判定区→弃牌堆）
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: source },
-        to: { zone: '处理区' },
-      });
+      // 虚拟使用无实体牌，跳过牌移动
+      if (!opts?.virtual) {
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '手牌', player: source },
+          to: { zone: '处理区' },
+        });
+      }
       for (const target of targets) {
         const trickCard = state.cardMap[cardId];
         await applyAtom(state, {
@@ -125,14 +156,17 @@ export async function runUseFlow(
           trick: { name: cardName, source, card: trickCard },
         });
       }
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    } else {
+      if (!opts?.virtual) {
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
+      }
+    } else if (!opts?.virtual) {
       // 基本/普通锦囊/装备：置入处理区（手牌 → 处理区）
+      // 虚拟使用无实体牌，跳过
       await applyAtom(state, {
         type: '移动牌',
         cardId,
@@ -152,7 +186,7 @@ export async function runUseFlow(
     // ── 使用结算中：逐目标完整结算 ──
     // 无目标牌（无中生有/酒等 target.kind='none'/'self'）：以 source 为目标走结算阶段
     if (!effect.delayed && targets.length === 0) {
-      await runSettlementPhase(state, effect, source, source, cardId, 0);
+      await runSettlementPhase(state, effect, source, source, cardId, 0, opts?.virtual);
     }
 
     for (let i = 0; i < targets.length; i++) {
@@ -180,11 +214,12 @@ export async function runUseFlow(
       if (effect.delayed) continue;
 
       // 使用结算中：检测有效性 → 生效前 → 生效时 → 生效后 → 使用结算结束时
-      await runSettlementPhase(state, effect, source, target, cardId, i);
+      await runSettlementPhase(state, effect, source, target, cardId, i, opts?.virtual);
     }
 
     // ── 使用结算后：移出处理区 ──
-    if (frameCards(state).includes(cardId)) {
+    // 虚拟使用无实体牌，跳过
+    if (!opts?.virtual && frameCards(state).includes(cardId)) {
       await applyAtom(state, {
         type: '移动牌',
         cardId,
@@ -195,11 +230,12 @@ export async function runUseFlow(
 
     // 牌特有结算后回调（popFrame 前）——杀的出杀次数累加等
     // 延迟类锦囊：结算未完成（延迟到判定阶段），不执行 onSettle
-    if (!effect.delayed && effect.onSettle) {
+    // 虚拟使用：不执行 onSettle（杀次数累加等不适用于虚拟牌）
+    if (!effect.delayed && !opts?.virtual && effect.onSettle) {
       await effect.onSettle(state, source, cardId);
     }
   } finally {
-    // 异常安全：保证牌不滞留处理区 + 帧弹出
+    // 异常安全：保证牌不滞留处理区 + 帧弹出（虚拟牌不在处理区，includes 为 false 自动跳过）
     if (frameCards(state).includes(cardId)) {
       await applyAtom(state, {
         type: '移动牌',
@@ -236,7 +272,7 @@ export async function resumeDelayedSettlement(
     resolvedTargets: [target],
   });
   try {
-    await runSettlementPhase(state, effect, source, target, cardId, 0);
+    await runSettlementPhase(state, effect, source, target, cardId, 0, true);
   } finally {
     await popFrame(state);
   }

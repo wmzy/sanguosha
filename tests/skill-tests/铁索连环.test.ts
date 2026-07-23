@@ -75,7 +75,8 @@ describe('铁索连环', () => {
     const P0 = harness.player('P0');
 
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chain1', targets: [1, 2] });
-    // 无懈可击:pass(超时 = 无人打无懈)
+    // 无懈可击:逐目标 pass(超时 = 无人打无懈)
+    await P0.pass();
     await P0.pass();
 
     // P1 和 P2 都被横置
@@ -190,7 +191,8 @@ describe('铁索连环', () => {
 
     // Step 1: 铁索连环横置 P1 P2
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chainC', targets: [1, 2] });
-    await P0.pass(); // 无懈可击 pass
+    await P0.pass(); // 无懈可击 pass (目标1)
+    await P0.pass(); // 无懈可击 pass (目标2)
 
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
     expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(true);

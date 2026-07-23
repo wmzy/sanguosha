@@ -10,7 +10,6 @@
 import type { Card, SettlementFrame } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 从使用者开始,按座次旋转的所有存活玩家 */
@@ -108,9 +107,7 @@ async function resolveBountifulHarvest(ctx: ResolveCtx): Promise<void> {
   const revealedIds = state.localVars['五谷丰登/亮牌'] as string[] | undefined;
   if (!revealedIds) return;
   if (!revealedIds.some((id) => frameCards(state).includes(id))) return;
-
-  const cancelled = await 询问无懈可击(state, target);
-  if (cancelled) return;
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
 
   // 取当前帧（五谷丰登结算帧）记录 pickedBy
   const frame = state.settlementStack[state.settlementStack.length - 1];

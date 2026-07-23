@@ -6,19 +6,16 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 桃园结义的逐目标结算：满血跳过 → 无懈 → 回复体力 */
+/** 桃园结义的逐目标结算：满血跳过 → 回复体力 */
 async function resolvePeachGarden(ctx: ResolveCtx): Promise<void> {
   const { state, target } = ctx;
   const p = state.players[target];
   if (!p?.alive) return;
-  // 满血目标：桃园结义对其无效果（无可抵消的效果），不询问无懈也不回血
+  // 满血目标：桃园结义对其无效果，不回血
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
   if (p.health >= p.maxHealth) return;
-
-  const cancelled = await 询问无懈可击(state, target);
-  if (cancelled) return;
 
   await applyAtom(state, { type: '回复体力', target, amount: 1 });
 }
@@ -26,6 +23,11 @@ async function resolvePeachGarden(ctx: ResolveCtx): Promise<void> {
 const peachGardenEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'allPlayers' },
+  /** 满血目标无回血效果 → 不询问无懈、不结算 */
+  hasEffect: (state, target) => {
+    const p = state.players[target];
+    return !!p?.alive && p.health < p.maxHealth;
+  },
   resolve: resolvePeachGarden,
   prompt: {
     type: 'useCard',

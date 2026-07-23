@@ -22,10 +22,11 @@
 //   · 酒:仅对自己,标记下一张杀伤害+1。
 //   - 转化卡:用 `仁德:杀:${source}:${target}:${seq}` 等虚拟卡 id,无实体;不入弃牌堆。
 import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
+import { runUseFlow } from '../card-effect/use-card';
 
 // localVars keys(界刘备视为使用基本牌流程)
 const BASIC_CHOICE_VAR = '仁德/basicChoice';
@@ -50,13 +51,13 @@ function makeVirtualCard(kind: '杀' | '桃' | '酒', source: number, target: nu
 }
 
 /**
- * 执行一次"视为出杀"的完整结算(指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
- * 不消耗手牌;模型参考神速的 virtualKill。
+ * 执行一次"视为出杀"的完整结算（runUseFlow virtual 模式）。
+ * 不消耗手牌；走完整时机 atom 序列（选择目标时/使用时/指定目标/成为目标/...），
+ * 保证激昂/集智/界求援等技能事件一致。不计入出杀次数（onSettle 被 virtual 跳过）。
  */
 async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
   if (!state.players[target]?.alive) return;
   const cardId = makeVirtualCard('杀', source, target, state.seq);
-  // 直接写 cardMap:虚拟杀无实体,但结算流程中 atoms/toViewEvents 需要 cardMap[id] 存在
   state.cardMap[cardId] = {
     id: cardId,
     name: '杀',
@@ -65,81 +66,27 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-
-  await pushFrame(state, '仁德', source, { virtualKillCardId: cardId });
-  try {
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    await applyAtom(state, { type: '成为目标', source, target, cardId });
-    const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-    if (!valid) return;
-    await applyAtom(state, { type: '询问闪', target, source });
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-      // drain 闪
-      for (const dId of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    } else {
-      await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
-    }
-  } finally {
-    // 清理虚拟杀卡(无实体,不入弃牌堆)
-    delete state.cardMap[cardId];
-    await popFrame(state);
-  }
+  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  delete state.cardMap[cardId];
 }
 
-/** 视为使用一张【桃】:对已受伤角色回复1点体力 */
+/** 视为使用一张【桃】:走 runUseFlow virtual（resolve=回复体力） */
 async function virtualPeach(state: GameState, source: number, target: number): Promise<void> {
   const t = state.players[target];
   if (!t?.alive) return;
   if (t.health >= t.maxHealth) return;
   const cardId = makeVirtualCard('桃', source, target, state.seq);
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '桃',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-  await pushFrame(state, '仁德', source, { virtualPeachCardId: cardId });
-  try {
-    await applyAtom(state, { type: '回复体力', target, amount: 1, source });
-  } finally {
-    delete state.cardMap[cardId];
-    await popFrame(state);
-  }
+  state.cardMap[cardId] = { id: cardId, name: '桃', suit: '', color: '无色', rank: 'A', type: '基本牌' };
+  await runUseFlow(state, source, cardId, [target], '桃', { virtual: true });
+  delete state.cardMap[cardId];
 }
 
-/** 视为使用一张【酒】:对自己使用,本回合下一张杀伤害+1(通过 mark 实现,同酒.ts) */
+/** 视为使用一张【酒】:走 runUseFlow virtual（resolve=加增伤标记） */
 async function virtualWine(state: GameState, source: number): Promise<void> {
   const cardId = makeVirtualCard('酒', source, source, state.seq);
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '酒',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-  await pushFrame(state, '仁德', source, { virtualWineCardId: cardId });
-  try {
-    await applyAtom(state, {
-      type: '加标记',
-      player: source,
-      mark: { id: '酒/nextKillDamageBonus', scope: -1, payload: 1, duration: 'turn' },
-    });
-  } finally {
-    delete state.cardMap[cardId];
-    await popFrame(state);
-  }
+  state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
+  await runUseFlow(state, source, cardId, [], '酒', { virtual: true });
+  delete state.cardMap[cardId];
 }
 
 /** 规范化分配格式(兼容 allocation / targets 分配数组 / 简单格式) */

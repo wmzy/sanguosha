@@ -29,6 +29,10 @@ import { applyAtom } from './create-engine';
 /**
  * 询问无懈可击并返回指定目标是否被抵消。
  *
+ * 调用方负责判断是否需要询问：
+ *   - 虚拟使用（视为使用，无实体牌）不调用本函数；
+ *   - 延时锦囊在判定阶段 before-hook 中调用（非 runSettlementPhase）。
+ *
  * @param state 游戏状态
  * @param cancelTarget 本次无懈抵消的目标座次:
  *   - 全体锦囊:传具体目标 index(N),每个目标独立询问
@@ -39,7 +43,6 @@ export async function 询问无懈可击(state: GameState, cancelTarget: number)
   const key = `无懈/被抵消/${cancelTarget}`;
   const respondedKey = `无懈/已回应/${cancelTarget}`;
   state.localVars[key] = false;
-  console.log('=== 询问无懈可击 START ===', { cancelTarget, key });
   try {
     while (true) {
       state.localVars[respondedKey] = false;
@@ -58,13 +61,10 @@ export async function 询问无懈可击(state: GameState, cancelTarget: number)
       // applyAtom 返回 = 窗口超时(无人 respond)或被 respond resolve。
       // 本次窗口是否有人 respond? (await 期间可能被 respond execute 修改)
       const responded = (state.localVars[respondedKey] as Json) === true;
-      console.log('=== 询问无懈可击 loop: responded =', responded, '===', { respondedKey, value: state.localVars[respondedKey] });
       if (!responded) break;
       // 有人打了无懈 → 循环开新窗口(新 createdSeq),让其他人反无懈
     }
-    const result = (state.localVars[key] as Json) === true;
-    console.log('=== 询问无懈可击 END: result =', result, '===');
-    return result;
+    return (state.localVars[key] as Json) === true;
   } finally {
     delete state.localVars[key];
     delete state.localVars[respondedKey];

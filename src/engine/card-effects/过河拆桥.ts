@@ -5,7 +5,6 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
-import { 询问无懈可击 } from '../无懈可击';
 import { runPickTargetCardPanel } from '../skills/选牌面板';
 import { QICAI_PROTECTED_SLOTS } from '../skills/界奇才';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -34,19 +33,17 @@ function canUseDismantle(
   return null;
 }
 
-/** 过河拆桥的结算：无懈 → 选牌面板(弃置) */
+/** 过河拆桥的结算：选牌面板(弃置) */
 async function resolveDismantle(ctx: ResolveCtx): Promise<void> {
   const { state, source, target } = ctx;
-  const cancelled = await 询问无懈可击(state, target);
-  if (!cancelled) {
-    const targetPlayer = state.players[target];
-    if (targetPlayer) {
-      await runPickTargetCardPanel(state, source, target, targetPlayer, {
-        mode: 'discard',
-        requestType: '过河拆桥_选牌',
-        title: '选择弃置的目标牌',
-      });
-    }
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
+  const targetPlayer = state.players[target];
+  if (targetPlayer) {
+    await runPickTargetCardPanel(state, source, target, targetPlayer, {
+      mode: 'discard',
+      requestType: '过河拆桥_选牌',
+      title: '选择弃置的目标牌',
+    });
   }
 }
 

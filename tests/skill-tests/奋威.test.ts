@@ -252,7 +252,8 @@ describe('奋威', () => {
     // 奋威多选面板:选择 P3(座次2)令其无效
     await P1.respond('奋威', { targets: [2] });
 
-    // 无懈可击窗口(broadcast)→ pass(无人打无懈)
+    // 无懈可击窗口(broadcast,逐目标)→ pass(无人打无懈)
+    await P1.pass();
     await P1.pass();
 
     // 验证:P3(座次2)未被横置(被奋威无效),P4(座次3)被横置
@@ -298,7 +299,8 @@ describe('奋威', () => {
     await P1.respond('奋威', { choice: true });
     await P1.respond('奋威', { targets: [2, 3] });
 
-    // 无懈窗口 → pass
+    // 无懈窗口(逐目标)→ pass ×2
+    await P1.pass();
     await P1.pass();
 
     // P3 和 P4 都未被横置(都被奋威无效)

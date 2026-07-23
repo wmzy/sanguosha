@@ -3,7 +3,7 @@
 //
 // 模式 A(被动触发):after hook 挂在「成为目标」。
 //   杀 的结算流程:声明阶段逐个 指定目标 → 结算阶段逐个 成为目标。
-//   决斗(及离间)的结算在 runDuelResolution 中也发 成为目标(source=发起者,target=目标)。
+//   决斗(及离间)的结算在 runUseFlow virtual 模式中也发 成为目标(source=发起者,target=目标)。
 //   因此挂「成为目标」after-hook 一处即可覆盖全部 4 种情形:
 //     - 孙策使用红杀(atom.source===ownerId)
 //     - 孙策被使用红杀(atom.target===ownerId)

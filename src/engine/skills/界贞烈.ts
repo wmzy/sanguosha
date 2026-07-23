@@ -9,7 +9,7 @@
 //          ② 本回合结束阶段发动一次"秘计"(挂起增益,界秘计.ts 消费)
 //
 // 触发时机(两类,覆盖"杀或普通锦囊"):
-//   A. 杀/决斗(走「成为目标」atom 的流程,杀.ts / 决斗.runDuelResolution 均先发):
+//   A. 杀/决斗(走「成为目标」atom 的流程,杀.ts / 决斗 runUseFlow 均先发):
 //      「成为目标」after-hook(atom.target=ownerId && atom.source≠ownerId && 卡为杀/决斗)
 //   B. 普通锦囊(无「成为目标」atom,但都开无懈窗口):
 //      「请求回应」before-hook(requestType='无懈可击' && cancelTarget=ownerId && 顶帧=普通锦囊)

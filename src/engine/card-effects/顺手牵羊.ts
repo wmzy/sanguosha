@@ -7,7 +7,6 @@ import type { Card } from '../types';
 import type { ActionPrompt, GameView } from '../types';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
-import { 询问无懈可击 } from '../无懈可击';
 import { runPickTargetCardPanel } from '../skills/选牌面板';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
@@ -32,24 +31,17 @@ function canUseSnatch(
   return null;
 }
 
-/** 顺手牵羊的结算：无懈 → 选牌面板(获得) */
+/** 顺手牵羊的结算：选牌面板(获得) */
 async function resolveSnatch(ctx: ResolveCtx): Promise<void> {
   const { state, source, target } = ctx;
-  console.log('=== resolveSnatch ===', { source, target, cardId: ctx.cardId });
-  const cancelled = await 询问无懈可击(state, target);
-  console.log('=== resolveSnatch: cancelled =', cancelled, '===');
-  if (!cancelled) {
-    const targetPlayer = state.players[target];
-    console.log('=== resolveSnatch: targetPlayer exists =', !!targetPlayer, 'hand=', targetPlayer?.hand, '===');
-    if (targetPlayer) {
-      console.log('=== resolveSnatch: calling runPickTargetCardPanel ===');
-      await runPickTargetCardPanel(state, source, target, targetPlayer, {
-        mode: 'obtain',
-        requestType: '顺手牵羊_选牌',
-        title: '选择获得的目标牌',
-      });
-      console.log('=== resolveSnatch: runPickTargetCardPanel DONE ===');
-    }
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
+  const targetPlayer = state.players[target];
+  if (targetPlayer) {
+    await runPickTargetCardPanel(state, source, target, targetPlayer, {
+      mode: 'obtain',
+      requestType: '顺手牵羊_选牌',
+      title: '选择获得的目标牌',
+    });
   }
 }
 

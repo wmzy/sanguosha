@@ -6,16 +6,13 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 无中生有的结算：无懈可击 → 摸牌(2) */
+/** 无中生有的结算：摸牌(2) */
 async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {
   const { state, source } = ctx;
-  const cancelled = await 询问无懈可击(state, source);
-  if (!cancelled) {
-    await applyAtom(state, { type: '摸牌', player: source, count: 2 });
-  }
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
+  await applyAtom(state, { type: '摸牌', player: source, count: 2 });
 }
 
 const exNihiloEffect: CardEffect = {

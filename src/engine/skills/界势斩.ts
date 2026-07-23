@@ -6,9 +6,9 @@
 //   2. execute:
 //      a) 计数 +1(同步设 vars + 回合用量 atom 投影 view,防 dispatch 重入)
 //      b) pushFrame
-//      c) runDuelResolution(state, from=target, target=ownerId, undefined, true)
-//         —— 目标(其他角色)是决斗发起者(出杀后手),华雄是决斗目标(出杀先手)
-//         —— 无实体牌(视为使用),按惯例(与离间/界翦灭一致)跳过无懈可击
+//      c) runUseFlow({virtual:true})：目标(其他角色)是决斗发起者(出杀后手),
+//         华雄是决斗目标(出杀先手);无实体牌(视为使用),按惯例(与离间/界翦灭一致)
+//         跳过无懈可击
 //      d) popFrame
 //
 // 关键点:
@@ -17,7 +17,7 @@
 //   - 决斗发起者=目标(其他角色),目标=华雄自己:华雄是出杀先手(先被询问杀),
 //     若华雄不出杀则直接输并受1伤,符合"令其他角色对你使用决斗"的语义。
 //   - 虚拟决斗跳过无懈:与离间/翦灭一致("视为使用"通常不可被无懈可击抵消)
-//   - 决斗结算复用 决斗.ts 的 runDuelResolution,与正常决斗行为一致(无双双杀、
+//   - 决斗结算走 runUseFlow virtual 模式,与正常决斗行为一致(无双双杀、
 //     轮流出杀、输者受 1 点伤害)
 //   - 与界耀武共存:决斗输者受 1 伤,若输者为华雄则触发界耀武(决斗无实体牌 → "非红色"
 //     → 华雄摸一张);若输者为另一角色,该伤害来源为华雄 → 因无 cardId → 不触发红摸分支
@@ -28,7 +28,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { runDuelResolution } from './决斗';
+import { runUseFlow } from '../card-effect/use-card';
 
 const SKILL_ID = '界势斩';
 const DISPLAY_NAME = '势斩';
@@ -87,9 +87,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       try {
         // 目标(其他角色)视为对华雄使用决斗:from=目标(发起者/出杀后手),
-        // target=华雄(目标/出杀先手)。无实体牌;跳过无懈可击(与离间/翦灭一致)。
+        // target=华雄(目标/出杀先手)。虚拟使用模式(无实体牌)。
         if (st.players[from]?.alive && st.players[target]?.alive) {
-          await runDuelResolution(st, target, from, undefined, true);
+          const virtualCardId = `${SKILL_ID}:决斗:${target}:${from}:${st.seq}`;
+          st.cardMap[virtualCardId] = { id: virtualCardId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
+          await runUseFlow(st, target, virtualCardId, [from], '决斗', { virtual: true });
+          delete st.cardMap[virtualCardId];
         }
       } finally {
         await popFrame(st);

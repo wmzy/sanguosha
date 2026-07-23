@@ -8,15 +8,12 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 火攻的结算：无懈 → 展示手牌 → 弃同花色 → 火焰伤害 */
+/** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
 async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
   const { state, source, target, cardId } = ctx;
-  const cancelled = await 询问无懈可击(state, target);
-  if (cancelled) return;
-
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
   const targetPlayer = state.players[target];
   if (!targetPlayer || targetPlayer.hand.length === 0) return;
 

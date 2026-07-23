@@ -14,13 +14,13 @@
 //   5. 比较:count(春华) > count(目标) → 春华 视为对 目标 使用决斗;
 //           count(目标) > count(春华) → 目标 视为对 春华 使用决斗;
 //           相等(含双方都为 0)→ 无事发生
-//   6. 调用 runDuelResolution(winner, loser, undefined, true)(无实体牌,跳过无懈——
+//   6. 走 runUseFlow({virtual:true})(winner→loser,无实体牌,跳过无懈——
 //      "视为使用决斗"通常不可被无懈,与离间一致)
 //
 // 关键点:
 //   - 限一次/回合:用 界翦灭/usedThisTurn(once-per-turn helpers)
 //   - 目标 respond 需为所有玩家注册 respond action(validate 严格检查 pending requestType)
-//   - 决斗由 runDuelResolution 复用(无双/轮流出杀/输者受伤)
+//   - 决斗走 runUseFlow virtual 模式(无双/轮流出杀/输者受伤)
 //   - 若 春华是决斗发起者(source),其造成的伤害会被 界绝情 before-hook 自动转为"失去体力"
 //   - 颜色映射:choice=true → '红';choice=false/超时 → '黑'
 //   - 春华 / 目标 须有手牌(否则选色无意义且可能死锁)。validate 强制 hand>0
@@ -33,7 +33,7 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { runDuelResolution } from './决斗';
+import { runUseFlow } from '../card-effect/use-card';
 
 const SKILL_ID = '界翦灭';
 const DISPLAY_NAME = '翦灭';
@@ -139,16 +139,23 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           await applyAtom(st, { type: '弃置', player: target, cardIds: targetCards });
         }
 
-        // 4) 比较:多者视为对少者使用决斗
+        // 4) 比较:多者视为对少者使用决斗(虚拟使用模式)
+        const SKILL = SKILL_ID;
         if (ownerCards.length > targetCards.length) {
           // 春华弃得多 → 春华 视为对 目标 使用决斗
           if (st.players[from]?.alive && st.players[target]?.alive) {
-            await runDuelResolution(st, from, target, undefined, true);
+            const vId = `${SKILL}:决斗:${from}:${target}:${st.seq}`;
+            st.cardMap[vId] = { id: vId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
+            await runUseFlow(st, from, vId, [target], '决斗', { virtual: true });
+            delete st.cardMap[vId];
           }
         } else if (targetCards.length > ownerCards.length) {
           // 目标弃得多 → 目标 视为对 春华 使用决斗
           if (st.players[from]?.alive && st.players[target]?.alive) {
-            await runDuelResolution(st, target, from, undefined, true);
+            const vId = `${SKILL}:决斗:${target}:${from}:${st.seq}`;
+            st.cardMap[vId] = { id: vId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
+            await runUseFlow(st, target, vId, [from], '决斗', { virtual: true });
+            delete st.cardMap[vId];
           }
         }
         // 相等(含均 0):无事发生

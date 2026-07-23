@@ -3,13 +3,12 @@
 // resolve: 询问无懈可击 → 决斗循环（双方轮流出杀，先不出者受 1 点伤害）。
 // 成为目标由 runUseFlow 处理，resolve 不再重复。
 //
-// 注意：runDuelResolution（被 离间 等复用）包含 成为目标，决斗 CardEffect.resolve
+// 注意：虚拟决斗（离间 等走 runUseFlow({virtual:true})）包含 成为目标，决斗 CardEffect.resolve
 // 调用的是不含 成为目标 的 runDuelLoop。
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { enforceDualKill } from '../skills/无双';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
@@ -25,23 +24,14 @@ function canUseDuel(
   return null;
 }
 
-/**
- * 决斗循环（不含 成为目标）：目标先出杀，之后发起者出杀，轮流。
- * 先不出杀的一方受到对方造成的 1 点伤害。
- *
- * @param from     决斗发起者（出杀顺序中后手）
- * @param target   决斗目标（出杀顺序中先手）
- * @param cardId   决斗牌 id（用于造成伤害归因）
- */
+/** 决斗循环（不含无懈）：目标先出杀，之后发起者出杀，轮流。 */
 async function runDuelLoop(
   state: import('../types').GameState,
   from: number,
   target: number,
   cardId: string,
 ): Promise<void> {
-  // 询问无懈可击（单目标锦囊）
-  const cancelled = await 询问无懈可击(state, target);
-  if (cancelled) return;
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理，此处不再询问
 
   const MAX_ROUNDS = 100;
   let turn = 0; // 0=目标, 1=发起者

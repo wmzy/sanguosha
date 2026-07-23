@@ -11,7 +11,7 @@
 //
 // 实现要点:
 //   - 触发: 成为目标 after-hook(atom.target === ownerId 且卡为杀/决斗)
-//     —— 杀 与 决斗(runDuelResolution)都走 成为目标 atom,挂此一处即可覆盖。
+//     —— 杀 与 决斗(runUseFlow virtual 模式)都走 成为目标 atom,挂此一处即可覆盖。
 //     AOE(南蛮/万箭)与火攻不走 成为目标,需挂 请求回应 before-hook(无懈可击窗口)。
 //     本实现同时挂两处 hook,完整覆盖杀/决斗/AOE/火攻。
 //   - 防重入:同一张卡只触发一次(PROCESSED_PREFIX + cardId)。
@@ -36,7 +36,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../create-engine';
+import { runUseFlow } from '../card-effect/use-card';
 import {
   registerAction,
   registerAfterHook,
@@ -95,32 +96,8 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-  await pushFrame(state, SKILL_ID, source, { virtualKillCardId: cardId });
-  try {
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    const became = await applyAtom(state, { type: '成为目标', source, target, cardId });
-    if (!became) return;
-    const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-    if (!valid) return;
-    await applyAtom(state, { type: '询问闪', target, source });
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-      for (const dId of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    } else if (state.players[target]?.alive) {
-      await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
-    }
-  } finally {
-    delete state.cardMap[cardId];
-    await popFrame(state);
-  }
+  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  delete state.cardMap[cardId];
 }
 
 /**

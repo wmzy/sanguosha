@@ -6,14 +6,12 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 南蛮入侵的逐目标结算：无懈 → 询问杀 → 检查处理区 → 伤害 */
+/** 南蛮入侵的逐目标结算：询问杀 → 检查处理区 → 伤害 */
 async function resolveBarbarianInvasion(ctx: ResolveCtx): Promise<void> {
   const { state, source, target, cardId } = ctx;
-  const cancelled = await 询问无懈可击(state, target);
-  if (cancelled) return;
+  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
 
   await applyAtom(state, { type: '询问杀', target, source });
   // 检查处理区：有杀牌 = 出了杀
