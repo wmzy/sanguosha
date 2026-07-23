@@ -67,7 +67,7 @@ export function isLegalTarget(
   if (!targetPlayer?.alive) return false;
 
   switch (spec.kind) {
-    case 'none':
+    case 'effect':
     case 'self':
       return false;
     case 'inAttackRange':
@@ -149,7 +149,7 @@ export function validateCardUse(
   // 条件3：合法目标数 > 0（有目标要求的牌）
   const effect = getCardEffect(cardName);
   if (!effect) return `${cardName} 尚未注册 CardEffect`;
-  if (effect.target.kind !== 'none' && effect.target.kind !== 'self') {
+  if (effect.target.kind !== 'self' && effect.target.kind !== 'effect') {
     const legalTargets = findLegalTargets(state, ownerId, cardName);
     if (legalTargets.length === 0) return '没有合法目标';
   }

@@ -15,14 +15,14 @@ export type CardTiming =
 
 // 使用目标规范
 export type CardTargetSpec =
-  | { kind: 'none' } // 无目标（无中生有）
-  | { kind: 'self' } // 自己（酒Ⅰ）
+  | { kind: 'self' } // 自己（酒Ⅰ、无中生有）
   | { kind: 'inAttackRange'; min: 1; max: number } // 攻击范围内（杀）
   | { kind: 'distance'; dist: number; min: 1; max: 1 } // 距离N内（顺手牵羊=1）
   | { kind: 'allOthers' } // 所有其他角色（万箭/南蛮）
   | { kind: 'allPlayers' } // 所有角色（桃园/五谷）
   | { kind: 'other'; min: 1; max: number } // 任意其他角色（决斗）
-  | { kind: 'wounded'; min: 0; max: 1 }; // 已受伤角色（桃）
+  | { kind: 'wounded'; min: 0; max: 1 } // 已受伤角色（桃）
+  | { kind: 'effect' }; // 目标是当前生效中的效果（杀/锦囊），由 respond 上下文隐式指定（闪/无懈可击）
 
 // resolve 上下文
 export interface ResolveCtx {

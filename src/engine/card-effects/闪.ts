@@ -63,7 +63,7 @@ const COLOR_LIMIT_VAR = '闪/色限制';
  *  无 use resolve（闪的使用效果 = respond 中设置的已抵消标记）。 */
 const dodgeEffect: CardEffect = {
   timing: '杀生效前',
-  target: { kind: 'none' },
+  target: { kind: 'effect' },
   resolve: async () => {},
   respond: {
     validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {

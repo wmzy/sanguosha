@@ -24,7 +24,7 @@ const CARD_NAME = '无懈可击';
 const nullificationEffect: CardEffect = {
   // 无懈可击不走 use 流程；timing/target/resolve 为占位。
   timing: '杀生效前',
-  target: { kind: 'none' },
+  target: { kind: 'effect' },
   resolve: async () => {},
   respond: {
     validate: (state, ownerId, params) => {

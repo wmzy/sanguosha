@@ -85,7 +85,7 @@ async function virtualPeach(state: GameState, source: number, target: number): P
 async function virtualWine(state: GameState, source: number): Promise<void> {
   const cardId = makeVirtualCard('酒', source, source, state.seq);
   state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
-  await runUseFlow(state, source, cardId, [], '酒', { virtual: true });
+  await runUseFlow(state, source, cardId, [source], '酒', { virtual: true });
   delete state.cardMap[cardId];
 }
 

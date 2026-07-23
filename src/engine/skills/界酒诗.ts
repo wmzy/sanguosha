@@ -81,7 +81,7 @@ async function flipBackToFaceUp(state: GameState, ownerId: number): Promise<void
 async function virtualWine(state: GameState, source: number): Promise<void> {
   const cardId = `${SKILL_ID}:酒:${source}:${state.seq}`;
   state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
-  await runUseFlow(state, source, cardId, [], '酒', { virtual: true });
+  await runUseFlow(state, source, cardId, [source], '酒', { virtual: true });
   delete state.cardMap[cardId];
 }
 

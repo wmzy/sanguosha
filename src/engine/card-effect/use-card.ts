@@ -184,11 +184,6 @@ export async function runUseFlow(
     }
 
     // ── 使用结算中：逐目标完整结算 ──
-    // 无目标牌（无中生有/酒等 target.kind='none'/'self'）：以 source 为目标走结算阶段
-    if (!effect.delayed && targets.length === 0) {
-      await runSettlementPhase(state, effect, source, source, cardId, 0, opts?.virtual);
-    }
-
     for (let i = 0; i < targets.length; i++) {
       // 从帧上读当前目标（流离等技能可能修改 resolvedTargets）
       const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
@@ -373,7 +368,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           : ((params.targets as number[]) ?? []);
         // 自动计算目标：self → [ownerId]；AOE(allOthers/allPlayers) → 全场
         if (targets.length === 0) {
-          if (effect.target.kind === 'self' || effect.target.kind === 'none') {
+          if (effect.target.kind === 'self') {
             targets = [ownerId];
           } else {
             targets = computeAutoTargets(state, ownerId, cardName);

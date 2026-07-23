@@ -1,7 +1,7 @@
 // 无中生有 CardEffect — 普通锦囊·无中生有的使用结算。
 //
-// resolve: 询问无懈可击 →（若未被抵消）摸两张牌。
-// target.kind='none': 对自己使用，无目标。
+// resolve: 摸两张牌（无懈可击由 runSettlementPhase 的「生效前」时机统一处理）。
+// target.kind='self': 目标是使用者自己。
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
@@ -17,7 +17,7 @@ async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {
 
 const exNihiloEffect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'none' },
+  target: { kind: 'self' },
   resolve: resolveExNihilo,
   prompt: {
     type: 'useCard',

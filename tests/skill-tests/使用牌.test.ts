@@ -88,13 +88,23 @@ const 测试自Effect: CardEffect = {
   style: 'default',
 };
 
-// none：无目标
+// self：目标是自己（如无中生有）
 const 测试无Effect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'none' },
+  target: { kind: 'self' },
   resolve: async () => {},
   prompt: { type: 'useCard', title: '测试无', cardFilter: { min: 1, max: 1 } },
   label: '测试无',
+  style: 'default',
+};
+
+// effect：目标是效果而非玩家（如闪/无懈可击）
+const 测试效Effect: CardEffect = {
+  timing: '出牌阶段',
+  target: { kind: 'effect' },
+  resolve: async () => {},
+  prompt: { type: 'useCard', title: '测试效', cardFilter: { min: 1, max: 1 } },
+  label: '测试效',
   style: 'default',
 };
 
@@ -118,6 +128,7 @@ registerCardEffect('测试顺', 测试顺Effect);
 registerCardEffect('测试近', 测试近Effect);
 registerCardEffect('测试自', 测试自Effect);
 registerCardEffect('测试无', 测试无Effect);
+registerCardEffect('测试效', 测试效Effect);
 registerCardEffect('测试伤', 测试伤Effect);
 
 // ─── helpers ───────────────────────────────────────────────
@@ -227,10 +238,10 @@ describe('合法性检测 isLegalTarget', () => {
     expect(isLegalTarget(state, 0, '测试近', 1)).toBe(false);
   });
 
-  it('none：不能指定任何目标（含自己）', () => {
+  it('effect：不能指定任何玩家目标（含自己）', () => {
     const state = buildState();
-    expect(isLegalTarget(state, 0, '测试无', 1)).toBe(false);
-    expect(isLegalTarget(state, 0, '测试无', 0)).toBe(false);
+    expect(isLegalTarget(state, 0, '测试效', 1)).toBe(false);
+    expect(isLegalTarget(state, 0, '测试效', 0)).toBe(false);
   });
 
   it('self：只能指定自己，不能指定他人', () => {
@@ -257,7 +268,7 @@ describe('findLegalTargets', () => {
   it('返回全部合法目标', () => {
     const state = buildState();
     expect(findLegalTargets(state, 0, '测试杀')).toEqual([1]);
-    expect(findLegalTargets(state, 0, '测试无')).toEqual([]);
+    expect(findLegalTargets(state, 0, '测试效')).toEqual([]);
     expect(findLegalTargets(state, 0, '测试自')).toEqual([0]);
   });
 
