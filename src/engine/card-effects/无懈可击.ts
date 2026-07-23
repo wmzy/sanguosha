@@ -22,8 +22,8 @@ import {
 const CARD_NAME = '无懈可击';
 
 const nullificationEffect: CardEffect = {
-  // 无懈可击不走 use 流程；timing/target/resolve 为占位。
-  timing: '杀生效前',
+  // 无懈可击不走 use 流程；timing='生效前' 表示它在锦囊生效前作为回应打出。
+  timing: '生效前',
   target: { kind: 'effect' },
   resolve: async () => {},
   respond: {

@@ -10,8 +10,7 @@ import { setCardNameChecker } from '../skill';
 // 使用时机
 export type CardTiming =
   | '出牌阶段' // 杀/锦囊/装备/桃Ⅰ/酒Ⅰ
-  | '濒死时' // 桃Ⅱ/酒Ⅱ
-  | '杀生效前'; // 闪
+  | '生效前'; // 纯回应牌：在某效果生效前打出（闪=杀生效前，无懈可击=锦囊生效前）
 
 // 使用目标规范
 export type CardTargetSpec =

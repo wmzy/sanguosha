@@ -388,9 +388,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
  *  skillIdOverride=卡名（与 onInit 按卡名注册的 engine action 对齐）。 */
 export function onMount(_skill: Skill, api: FrontendAPI): void {
   for (const [cardName, effect] of getAllCardEffects()) {
-    // 跳过纯 respond 牌（闪/无懈可击）：它们无 use 入口，不注册 use UI。
-    // 闪 timing='杀生效前' 且无 canUse；无懈可击 resolve 为空且 timing='杀生效前'。
-    if (effect.timing === '杀生效前' && !effect.canUse) continue;
+    // '生效前' 牌为纯回应牌（闪/无懈可击）：在效果生效前作为回应打出，无主动 use 入口。
+    if (effect.timing === '生效前') continue;
     api.defineAction(
       'use',
       {
