@@ -30,6 +30,7 @@
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, findPendingSlot } from '../skill';
 import { applyAtom } from '../create-engine';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -143,8 +144,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ─── respond override:覆盖标版无懈可击.respond,本座次走界版规则 ──
-  // 界看破转化的无懈:不可被响应(不设 已回应=true → 询问无懈可击 循环不再开新窗口)。
-  // 普通(实际)无懈:走标版行为(设 已回应=true → 循环开新窗口允许反无懈)。
+  // 界看破转化的无懈:不可被响应（runUseFlow + skipCancelQuery=true）。
+  // 普通(实际)无懈:走标版行为（runUseFlow 正常询问反无懈）。
   registerAction(
     state,
     '无懈可击',
@@ -168,34 +169,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
-      // 移无懈牌到弃牌堆(与标版一致)
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: ownerId },
-        to: { zone: '弃牌堆' },
-      });
-
-      // 确定本次抵消的目标:从当前 broadcast slot 的 atom.cancelTarget 读取。
-      const slot = findPendingSlot(state, ownerId);
-      const cancelAtom = slot?.atom as { cancelTarget?: number } | undefined;
-      const cancelTarget =
-        typeof cancelAtom?.cancelTarget === 'number' ? cancelAtom.cancelTarget : -1;
-      const cancelKey = `无懈/被抵消/${cancelTarget}`;
-
-      // 翻转抵消状态(与标版一致):打出一张无懈 = 翻转当前锦囊对 cancelTarget 是否被抵消
-      const cancelled = state.localVars[cancelKey] as boolean | undefined;
-      state.localVars[cancelKey] = !cancelled;
+      // 标记本次询问已 respond（询问抵消 循环据此决定是否开新窗口）
+      state.localVars['抵消/已回应'] = true;
 
       // 区分:界看破转化的无懈 vs 普通(实际)无懈。
-      // 界看破转化:不设 已回应 → 询问无懈可击 循环 break(无新窗口 = 不可被响应)。
-      // 普通无懈:设 已回应=true → 循环开新窗口允许反无懈(标版行为)。
+      // 界看破转化:skipCancelQuery=true → runSettlementPhase 不询问反无懈（不可被响应）。
+      // 普通无懈:正常 runUseFlow（允许反无懈）。
       const isJieKanPo = state.localVars[shadowMarkKey(cardId)] === true;
-      if (!isJieKanPo) {
-        state.localVars[`无懈/已回应/${cancelTarget}`] = true;
-      }
-      // 清理标记(影子牌已入弃牌堆,标记无用)
       delete state.localVars[shadowMarkKey(cardId)];
+      await runUseFlow(state, ownerId, cardId, [ownerId], '无懈可击',
+        isJieKanPo ? { skipCancelQuery: true } : undefined);
     },
   );
 

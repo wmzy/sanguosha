@@ -15,7 +15,7 @@
 import type { GameState, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAfterHook } from '../skill';
-import { isCancelled, clearCancelled, setCancelled } from '../card-effect/registry';
+import { isCancelled, clearCancelled } from '../card-effect/registry';
 import type { SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -36,6 +36,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── 询问闪 after-hook:无双杀的目标出闪后,拦截第一次 ──
+  // 新模型:闪走 runUseFlow,闪牌自动移入弃牌堆;闪 resolve 设杀帧 cancelled=true。
+  // 无双只需清除 cancelled + 追加第二次询问闪;第二次闪 resolve 自动重设 cancelled。
   registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx) => {
     const atom = ctx.atom as { target: number; source: number };
     // 检查杀的 source 是否拥有无双(ownerId)
@@ -43,7 +45,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!ctx.state.players[ownerId]?.skills.includes('无双')) return;
 
     const target = atom.target;
-    // 闪的 respond action 已设置标记(如果有闪被使用)
+    // 闪的 resolve 已设杀帧 cancelled=true;未出闪则不拦截
     if (!isCancelled(ctx.state, getKillCardId(ctx.state), target)) return;
 
     // 计数器
@@ -51,40 +53,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const countKey = dodgeCountKey(killCardId, target);
     const count = (ctx.state.localVars[countKey] as number) ?? 0;
     if (count >= 1) {
-      // 第二次闪:放行(标记保持设置)
+      // 第二次闪:放行(cancelled 保持 true)
       delete ctx.state.localVars[countKey];
       return;
     }
 
-    // 第一次闪:清除标记 + drain + 追加第二次询问
+    // 第一次闪:清除 cancelled + 追加第二次询问
+    // 闪牌已由 runUseFlow 自动移入弃牌堆,无需手动 drain
     clearCancelled(ctx.state, killCardId, target);
     ctx.state.localVars[countKey] = count + 1;
 
-    // drain 第一张闪
-    const firstDodges = frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪');
-    for (const id of firstDodges) {
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: id,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    }
-
-    // 追加第二次询问闪
+    // 追加第二次询问闪:玩家出第二张闪 → resolve 自动设 cancelled;超时 → cancelled 保持 false
     await applyAtom(ctx.state, { type: '询问闪', target, source: ownerId });
-    const secondDodges = frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪');
-    if (secondDodges.length > 0) {
-      setCancelled(ctx.state, killCardId, target);
-      for (const id of secondDodges) {
-        await applyAtom(ctx.state, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    }
     delete ctx.state.localVars[countKey];
   });
 

@@ -178,7 +178,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // Path A(全体锦囊):当前目标已被奋威标记无效 → 设抵消标记 + 取消无懈窗口
       // 铁索连环不做目标级无懈取消(整卡一次无懈),无效由 设横置 hook 处理。
       if (mode && invalidSet && invalidSet.includes(cancelTarget)) {
-        st.localVars[`无懈/被抵消/${cancelTarget}`] = true;
+        frame.cancelled = true;
         return { kind: 'cancel' };
       }
 
@@ -210,7 +210,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // Path A(全体锦囊):当前目标若被选中 → 设抵消标记 + 取消无懈窗口
       if (mode && chosen.includes(cancelTarget)) {
-        st.localVars[`无懈/被抵消/${cancelTarget}`] = true;
+        frame.cancelled = true;
         return { kind: 'cancel' };
       }
       // 铁索连环:不取消无懈窗口,无效由 设横置 hook 处理

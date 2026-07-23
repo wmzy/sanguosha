@@ -10,7 +10,7 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../card-effect/registry';
 
 /** 借刀杀人的结算：请求出杀 → 检查处理区 → 杀效果/获得武器 */
 async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
@@ -51,15 +51,8 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
         cardId: killCardId,
       });
       await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
-      const dodgeCardId = frameCards(state).find((id) => state.cardMap[id]?.name === '闪');
-      if (dodgeCardId) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dodgeCardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } else {
+      // 闪走 runUseFlow → resolve 设本帧（借刀杀人帧）cancelled=true；runUseFlow finally 自动移牌。
+      if (!isCancelled(state, killCardId, killTarget)) {
         await applyAtom(state, {
           type: '造成伤害',
           target: killTarget,

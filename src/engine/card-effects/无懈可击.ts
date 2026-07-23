@@ -1,18 +1,16 @@
-// 无懈可击 CardEffect — 响应锦囊·无懈可击的 respond action。
+// 无懈可击 CardEffect — 即时锦囊·无懈可击。
 //
-// 无懈可击是 respond-only 即时锦囊：任何角色可在锦囊生效前打出，抵消其效果。
-// 不走标准使用流程（无 use action / 无 runUseFlow）——只注册 respond action。
+// 无懈可击走 runUseFlow（与杀/锦囊一致），流程：
+//   锦囊的 runSettlementPhase「生效前」→ 询问抵消（广播）→
+//   任意玩家 respond 出无懈 → play-card respond 包装调 runUseFlow(无懈) →
+//   无懈帧压栈 → runSettlementPhase(无懈)（无懈本身是锦囊，递归询问反无懈）→
+//   resolve 设下层帧（被抵消锦囊帧）cancelled=true → 无懈帧弹栈 →
+//   询问抵消循环检测 cancelled=true → 退出。
 //
-// respond validate/execute 镜像原 src/engine/skills/无懈可击.ts 的逻辑：
-//   validate: pending 必须是 请求回应 + requestType='无懈可击' + 牌名='无懈可击'
-//   execute: 牌进处理区→弃牌堆；翻转 localVars[`无懈/被抵消/${cancelTarget}`]；
-//            标记 localVars[`无懈/已回应/${cancelTarget}`]=true（询问无懈可击 循环据此开新窗口）
-//
-// 抵消机制（close-reopen）见 src/engine/无懈可击.ts 的 询问无懈可击 helper。
+// 无懈可击本身可被无懈可击抵消（递归嵌套），由 runSettlementPhase 自动推导 cancelledBy 处理。
 
-import type { Card } from '../types';
+import type { Card, GameState, Json } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
 import { findPendingSlot } from '../skill';
 import {
   registerCardEffect,
@@ -22,19 +20,23 @@ import {
 const CARD_NAME = '无懈可击';
 
 const nullificationEffect: CardEffect = {
-  // 无懈可击不走 use 流程；timing='生效前' 表示它在锦囊生效前作为回应打出。
   timing: '生效前',
   target: { kind: 'effect' },
-  resolve: async () => {},
+  // resolve = 无懈可击的使用效果 = 设下层帧（被抵消锦囊帧）的 cancelled 字段为 true。
+  resolve: async (ctx) => {
+    const { state } = ctx;
+    const targetFrame = state.settlementStack[state.settlementStack.length - 2];
+    if (targetFrame) targetFrame.cancelled = true;
+  },
   respond: {
-    validate: (state, ownerId, params) => {
+    validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
       // 无懈可击是广播型(target=TARGET_BROADCAST):先按 ownerId 查(并行询问场景下 ownerId 也可能命中),
       // 未命中时查找广播型 slot(findPendingSlot 统一 fallback)。
       const slot = findPendingSlot(state, ownerId);
       if (!slot) return '当前不需要回应';
       if (slot.atom.type !== '请求回应') return '当前不是无懈可击窗口';
       const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== '无懈可击') return '当前不是无懈可击窗口';
+      if (atom.requestType !== CARD_NAME) return '当前不是无懈可击窗口';
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
       const self = state.players[ownerId];
@@ -44,36 +46,8 @@ const nullificationEffect: CardEffect = {
       if (card.name !== CARD_NAME) return '只能打出无懈可击';
       return null;
     },
-    execute: async (state, ownerId, params) => {
-      const cardId = params.cardId as string;
-      // 无懈可击牌先进处理区(与杀/闪一致),让处理区临时展示锦囊+无懈可击的完整结算画面。
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: ownerId },
-        to: { zone: '处理区' },
-      });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-
-      // 确定本次抵消的目标:从当前 broadcast slot 的 atom.cancelTarget 读取。
-      const slot = findPendingSlot(state, ownerId);
-      const cancelAtom = slot?.atom as { cancelTarget?: number } | undefined;
-      const cancelTarget =
-        typeof cancelAtom?.cancelTarget === 'number' ? cancelAtom.cancelTarget : -1;
-      const cancelKey = `无懈/被抵消/${cancelTarget}`;
-
-      // 翻转抵消状态:打出一张无懈 = 翻转当前锦囊对 cancelTarget 是否被抵消
-      const cancelled = state.localVars[cancelKey] as boolean | undefined;
-      state.localVars[cancelKey] = !cancelled;
-
-      // 标记本次窗口有人 respond，询问无懈可击 循环据此决定是否开新窗口。
-      state.localVars[`无懈/已回应/${cancelTarget}`] = true;
-    },
+    // execute 已由 play-card.ts 的 effect kind 包装统一接管：runUseFlow(无懈可击)。
+    execute: async () => {},
   },
   prompt: {
     type: 'useCard',

@@ -91,18 +91,9 @@ async function runSlashResolution(
     // 询问闪
     await applyAtom(state, { type: '询问闪', target, source });
 
-    // 检查处理区有无闪
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
+    // 闪走 runUseFlow → resolve 设本帧 cancelled=true；闪牌已自动入弃牌堆。
+    if (frame.cancelled) {
       await applyAtom(state, { type: '被抵消', source, target, cardId });
-      for (const dId of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
     } else if (state.players[target]?.alive) {
       await applyAtom(state, {
         type: '造成伤害',

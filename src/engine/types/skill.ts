@@ -52,6 +52,11 @@ export interface SettlementFrame {
   /** 本帧的牌区(替代全局 zones.processing)。牌的进出通过 移动牌 atom({ zone: '处理区' }) 隐式操作栈顶帧的此字段。
    *  嵌套结算时各帧各自独立——天然隔离,无需 find(name) 脆弱区分。 */
   cards: string[];
+  /** 本帧对应的牌是否被抵消（闪抵消杀 / 无懈可击抵消锦囊）。
+   *  抵消牌（闪/无懈）走 runUseFlow → resolve 时设下层帧(stack[length-2]).cancelled=true。
+   *  runSettlementPhase 在「生效前」后检查此字段：cancelled → 发被抵消 atom → 跳过 resolve。
+   *  多目标锦囊每个目标结算开始时重置为 false（per-target 独立抵消）。 */
+  cancelled: boolean;
 }
 
 /** Pending 区——等待玩家操作的 slot */

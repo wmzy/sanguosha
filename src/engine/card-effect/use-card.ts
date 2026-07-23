@@ -17,12 +17,12 @@
 // 迁移后，卡牌只需 registerCardEffect，不再注册 action。
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
-import { applyAtom, frameCards, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
-import { 询问无懈可击 } from '../无懈可击';
+import { 询问抵消 } from '../无懈可击';
 import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
-import type { CardEffect, ResolveCtx } from './registry';
+import type { CardEffect, CancellableBy, ResolveCtx } from './registry';
 import { isCancelled, setCancelled } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -56,29 +56,36 @@ async function runSettlementPhase(
   const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
   if (!valid) return;
 
-  // 无效效果目标（如桃园结义对满血角色）：不询问无懈，不结算
+  // 无效效果目标（如桃园结义对满血角色）：不询问抵消，不结算
   if (effect.hasEffect && !effect.hasEffect(state, target)) return;
 
-  // (2) 生效前：发出时机 atom（闪的 after-hook 在此处理响应并设置标记）
+  // 重置栈顶帧的抵消状态（多目标锦囊每个目标独立结算）
+  const settleFrame = topFrame(state);
+  if (settleFrame) settleFrame.cancelled = false;
+
+  // (2) 生效前：发出时机 atom（before/after hook 可介入）
   await applyAtom(state, { type: '生效前', source, target, cardId });
 
-  // 无懈可击：对非延时锦囊牌在「生效前」时机询问（目标锦囊对目标角色生效前）。
-  // 延时锦囊（effect.delayed）的无懈由判定阶段 hook 统一处理 → skipWuxie=true。
-  // 虚拟使用（视为使用，无实体牌）不是合法无懈目标 → skipWuxie=true。
-  // 被抵消 → setCancelled → 下方 isCancelled 检查跳过 resolve。
-  const card = state.cardMap[cardId];
-  if (!skipWuxie && card?.type === '锦囊牌') {
-    const wuxieCancelled = await 询问无懈可击(state, target);
-    if (wuxieCancelled) {
-      setCancelled(state, cardId, target);
+  // 统一询问抵消（闪/无懈可击）。
+  // cancelledBy 声明始终生效（杀={闪}, 延时锦囊={无懈}）；
+  // 未声明时锦囊牌自动推导为 { 无懈可击, broadcast }，但虚拟使用（virtual）跳过（无实体牌）。
+  {
+    const card = state.cardMap[cardId];
+    const autoCancellable: CancellableBy | undefined =
+      !skipWuxie && card?.type === '锦囊牌'
+        ? { cardName: '无懈可击', broadcast: true }
+        : undefined;
+    const cancellable = effect.cancelledBy ?? autoCancellable;
+    if (cancellable) {
+      await 询问抵消(state, cancellable, source, target);
     }
   }
 
-  // 检查是否被抵消（闪/无藉的 respond 已在 after-hook 中设置标记，或无懈设置标记）
+  // 检查栈顶帧是否被抵消
   if (isCancelled(state, cardId, target)) {
     // 被抵消 atom：触发武器技（贯石斧强命 / 青龙追杀）
     await applyAtom(state, { type: '被抵消', source, target, cardId });
-    // 武器技可能逆转（贯石斧弃牌强命 → 清除标记）→ 重新检查
+    // 武器技可能逆转（贯石斧弃牌强命 → 清除帧 cancelled）→ 重新检查
     if (isCancelled(state, cardId, target)) return; // 仍被抵消，跳过 resolve
   }
 
@@ -101,6 +108,8 @@ export interface RunUseFlowOpts {
    *  其余时机 atom（选择目标时/使用时/指定目标/成为目标/...）全部正常触发，
    *  保证事件一致。调用方负责创建/清理虚拟卡 cardMap 条目。 */
   virtual?: boolean;
+  /** 跳过抵消询问（如界看破转化的无懈不可被响应）。 */
+  skipCancelQuery?: boolean;
 }
 
 /**
@@ -136,6 +145,31 @@ export async function runUseFlow(
   try {
     // 时机1：选择目标时（转化技 before-hook 可替换牌）
     await applyAtom(state, { type: '选择目标时', source, cardId, targets });
+
+    // effect kind（闪/无懈）：目标是当前生效中的效果，无玩家目标。
+    // 跳过目标声明循环，但保留牌移动（手牌→处理区→弃牌堆）和完整 settlement phase。
+    // resolve 中设下层帧 cancelled=true。skipWuxie=opts.virtual（虚拟使用不询问抵消）。
+    if (effect.target.kind === 'effect') {
+      if (!opts?.virtual) {
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '手牌', player: source },
+          to: { zone: '处理区' },
+        });
+      }
+      await applyAtom(state, { type: '使用时', source, cardId });
+      await runSettlementPhase(state, effect, source, source, cardId, 0, opts?.virtual || opts?.skipCancelQuery);
+      if (!opts?.virtual && frameCards(state).includes(cardId)) {
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
+      }
+      return;
+    }
 
     if (effect.delayed) {
       // 延迟类锦囊：展示后置入目标判定区（处理区→判定区→弃牌堆）
@@ -248,10 +282,9 @@ export async function runUseFlow(
  *
  * 延迟类锦囊的 runUseFlow 在使用结算前（成为目标后）暂停，
  * 牌已置入判定区。判定阶段恢复时调用此函数走完使用结算中：
- *   检测有效性 → 生效前 → 生效时 → 生效后[resolve:判定+效果] → 使用结算结束时
+ *   检测有效性 → 生效前 → 询问抵消（无懈）→ 生效时 → 生效后[resolve:判定+效果] → 使用结算结束时
  *
- * 无懈可击抵消由调用方（技能判定阶段 before-hook）在调用前处理：
- *   被抵消 → 移除延时锦囊 → 不调用本函数。
+ * 被无懈抵消 → frame.cancelled=true → 跳过 resolve → 调用方移除延时锦囊。
  */
 export async function resumeDelayedSettlement(
   state: GameState,
@@ -259,7 +292,7 @@ export async function resumeDelayedSettlement(
   target: number,
   cardName: string,
   cardId: string,
-): Promise<void> {
+): Promise<boolean> {
   const effect = requireCardEffect(cardName);
   const frame = await pushFrame(state, cardName, source, {
     cardId,
@@ -267,7 +300,9 @@ export async function resumeDelayedSettlement(
     resolvedTargets: [target],
   });
   try {
-    await runSettlementPhase(state, effect, source, target, cardId, 0, true);
+    // skipWuxie=false：延时锦囊是锦囊牌，runSettlementPhase 自动推导 cancelledBy={无懈可击}
+    await runSettlementPhase(state, effect, source, target, cardId, 0, false);
+    return frame.cancelled;
   } finally {
     await popFrame(state);
   }
@@ -277,7 +312,7 @@ export async function resumeDelayedSettlement(
  *  在 create-engine bootstrap / registerSkillsFromState 中调用。
  *  全局注册(ownerId=-1)：判定阶段 hook 检查 atom.player 的判定区有无延时锦囊。 */
 export function registerDelayedTrickHooks(state: GameState): void {
-  // 判定阶段 before-hook：有延时锦囊 → 询问无懈 → resumeDelayedSettlement
+  // 判定阶段 before-hook：有延时锦囊 → resumeDelayedSettlement（内部询问无懈）
   registerBeforeHook(state, '延时锦囊', -1, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始' || atom.phase !== '判定') return;
@@ -290,16 +325,20 @@ export function registerDelayedTrickHooks(state: GameState): void {
     const trick = self.pendingTricks.find((t) => DELAYED_TRICKS.includes(t.name));
     if (!trick) return;
 
-    const cancelled = await 询问无懈可击(ctx.state, player);
+    const cancelled = await resumeDelayedSettlement(
+      ctx.state,
+      trick.source,
+      player,
+      trick.name,
+      trick.card.id,
+    );
     if (cancelled) {
       await applyAtom(ctx.state, {
         type: '移除延时锦囊',
         player,
         trickName: trick.name,
       });
-      return;
     }
-    await resumeDelayedSettlement(ctx.state, trick.source, player, trick.name, trick.card.id);
   });
 
   // 跳过阶段 before-hook：乐不思蜀跳过出牌、兵粮寸断跳过摸牌

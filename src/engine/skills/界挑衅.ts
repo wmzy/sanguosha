@@ -186,14 +186,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
           cardId: killCardId,
         });
         await applyAtom(state, { type: '询问闪', target: from, source: target });
-        const dodgeCardId = frameCards(state).find((id) => state.cardMap[id]?.name === '闪');
-        if (dodgeCardId) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId: dodgeCardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
+        // 闪走 runUseFlow → resolve 设本帧 cancelled=true；闪牌已自动入弃牌堆。
+        const slashFrame = state.settlementStack[state.settlementStack.length - 1];
+        if (slashFrame?.cancelled) {
+          // 闪抵消，不造成伤害
         } else if (state.players[from]?.alive) {
           await applyAtom(state, {
             type: '造成伤害',

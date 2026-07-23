@@ -249,9 +249,6 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   for (const player of state.players) {
     系统规则mod.registerSystemRespondActions(state, player.index);
   }
-  // 注册闪的全局「生效前」after-hook(基本牌面能力,不限闪技能持有者)
-  const { registerDodgeHook } = await import('./card-effects/闪');
-  registerDodgeHook(state);
   // 注册酒的全局「造成伤害」before-hook(消费增伤标记)
   const { registerWineHook } = await import('./card-effects/酒');
   registerWineHook(state);
@@ -305,9 +302,6 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   for (const player of state.players) {
     系统规则mod.registerSystemRespondActions(state, player.index);
   }
-  // 注册闪的全局「生效前」after-hook(基本牌面能力,不限闪技能持有者)
-  const { registerDodgeHook } = await import('./card-effects/闪');
-  registerDodgeHook(state);
   // 注册酒的全局「造成伤害」before-hook(消费增伤标记)
   const { registerWineHook } = await import('./card-effects/酒');
   registerWineHook(state);
@@ -522,7 +516,7 @@ export function frameCards(state: GameState): string[] {
 
 /** 兜底空帧 */
 function emptyFrame(): SettlementFrame {
-  return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}), cards: [] };
+  return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}), cards: [], cancelled: false };
 }
 
 // ─── Notify 事件 ────────────────────────────────────────────

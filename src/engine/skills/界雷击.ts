@@ -24,8 +24,9 @@
 // 命名:文件名/loader key/character skill name 均为 '界雷击';
 //   内部 Skill.name = '雷击'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { isCancelled } from '../card-effect/registry';
 
 const SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';
@@ -194,10 +195,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const me = ctx.state.players[ownerId];
     if (!me?.alive) return;
 
-    // 检查界张角是否实际打出了闪(手牌→处理区/结算帧)
-    const cards = frameCards(ctx.state);
-    const playedDodge = cards.some((id) => ctx.state.cardMap[id]?.name === '闪');
-    if (!playedDodge) return; // 未出闪,不触发
+    // 检查界张角是否实际打出了闪（闪走 runUseFlow 已入弃牌堆，杀帧 cancelled=true 表示出了闪）
+    if (!isCancelled(ctx.state, (ctx.frame.params.cardId as string) ?? '', ownerId)) return;
 
     await run雷击Flow(ctx.state, ownerId, '已使用/打出闪');
   });

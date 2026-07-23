@@ -70,7 +70,7 @@ describe('assertCardInvariants —— 直接调用', () => {
   it('处理区与结算帧重复 → 抛错', () => {
     const s = makeState();
     s.zones.processing.push('c1');
-    s.settlementStack.push({ skillId: '测试技能', from: -1, params: {}, cards: ['c1'] });
+    s.settlementStack.push({ skillId: '测试技能', from: -1, params: {}, cards: ['c1'], cancelled: false });
     expect(() => assertCardInvariants(s)).toThrowError(/c1/);
   });
 

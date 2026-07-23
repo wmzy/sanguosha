@@ -199,6 +199,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       from: f.from,
       params: { ...f.params },
       cards: [...f.cards],
+      cancelled: f.cancelled,
     })),
   };
 }

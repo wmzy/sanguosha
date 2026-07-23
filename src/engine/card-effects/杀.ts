@@ -77,6 +77,7 @@ const slashEffect: CardEffect = {
   canUse: canUseSlash,
   resolve: resolveSlash,
   onSettle: onSettleSlash,
+  cancelledBy: { cardName: '闪', broadcast: false },
   // ── respond:被询问出杀(决斗/南蛮入侵等)——杀牌进处理区供调用方结算 ──
   respond: {
     validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {

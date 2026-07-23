@@ -27,9 +27,10 @@
 // 与贯石斧的差异:贯石斧弃 2 张牌让原杀强命(原杀还在处理区);
 // 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
 import type { FrontendAPI, Skill, GameState } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
-import { isCancelled, clearCancelled, setCancelled } from '../card-effect/registry';
+import { isCancelled } from '../card-effect/registry';
+import { runUseFlow } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -135,60 +136,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars['青龙偃月刀/killCardId'];
     if (!killCardId) return; // 超时未选 → 放弃追杀
 
-    // 追杀:杀牌从手牌移入处理区
-    await applyAtom(ctx.state, {
-      type: '移动牌',
-      cardId: killCardId,
-      from: { zone: '手牌', player: ownerId },
-      to: { zone: '处理区' },
-    });
-
-    // 原杀的抵消标记保持(原杀被闪,不再造成伤害)。
-    // 追杀的杀是新的使用事件,由本 hook 内联处理伤害。
-
-    // 再次询问闪:询问目标对追杀的杀是否出闪
-    await applyAtom(ctx.state, { type: '询问闪', target: atom.target!, source: ownerId });
-
-    // 递归检测:追杀的杀若被闪,applyAtom(被抵消) 再次触发本 hook(连续追杀)。
-    const 追杀Dodge = frameCards(ctx.state).find((id) => ctx.state.cardMap[id]?.name === '闪');
-    if (追杀Dodge) {
-      // drain 追杀的闪
-      for (const id of frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪')) {
-        await applyAtom(ctx.state, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-      // 设置追杀的杀的抵消标记
-      setCancelled(ctx.state, killCardId, atom.target!);
-      await applyAtom(ctx.state, {
-        type: '被抵消',
-        source: ownerId,
-        target: atom.target!,
-        cardId: killCardId,
-      });
-    } else {
-      // 追杀命中:造成伤害
-      await applyAtom(ctx.state, {
-        type: '造成伤害',
-        target: atom.target!,
-        amount: 1,
-        source: ownerId,
-        cardId: killCardId,
-      });
-    }
-
-    // 清理追杀的杀牌
-    if (frameCards(ctx.state).includes(killCardId)) {
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: killCardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    }
+    // 追杀:走 runUseFlow（与普通杀一致）。
+    // runUseFlow 内部：手牌→处理区 → 询问闪（cancelledBy={闪}）→
+    //   被闪 → 杀帧 cancelled → 被抵消 atom → 本 hook 递归追杀
+    //   未被闪 → 杀.resolve 造成伤害
+    //   处理区→弃牌堆（finally 自动清理）
+    await runUseFlow(ctx.state, ownerId, killCardId, [atom.target!], '杀');
   });
 
   return () => {};

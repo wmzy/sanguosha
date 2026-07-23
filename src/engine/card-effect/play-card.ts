@@ -19,6 +19,7 @@ import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types'
 import { applyAtom } from '../create-engine';
 import { registerAction } from '../skill';
 import { getAllCardEffects } from './registry';
+import { runUseFlow } from './use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -66,24 +67,48 @@ export async function runPlayFlow(
 /** 注册 respond action：逐卡名注册（skillId=卡名），路由到 CardEffect.respond。
  *  有 respond 字段的卡牌（闪/桃/酒/无懈可击 等）按卡名注册 respond action。
  *  无 respond 字段的牌（如杀）不注册 respond——南蛮/决斗 的杀由 询问杀 atom
- *  的默认 resolver 处理。 */
+ *  的默认 resolver 处理。
+ *
+ *  effect kind（闪/无懈）：respond execute 走 runUseFlow（与普通牌一致）。
+ *  牌移动（手牌→处理区→弃牌堆）由 runUseFlow 内部完成。
+ *  resolve 中设下层帧（被抵消牌的帧）cancelled=true。
+ *  其他 kind：按原样走 effect.respond.execute。 */
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   const unloads: Array<() => void> = [];
 
   for (const [cardName, effect] of getAllCardEffects()) {
     if (!effect.respond) continue;
-    const u = registerAction(
-      state,
-      cardName,
-      ownerId,
-      'respond',
-      // CardEffect.respond.validate 签名是 (state, ownerId, params)；
-      // registerAction validate 签名是 (state, params)。包装补 ownerId。
-      (s: GameState, p: Record<string, Json>) => effect.respond!.validate(s, ownerId, p),
-      (s: GameState, p: Record<string, Json>) => effect.respond!.execute(s, ownerId, p),
-    );
-    if (u) unloads.push(u);
+    if (effect.target.kind === 'effect') {
+      // effect kind（闪/无懈）：走 runUseFlow + 询问抵消标记 RESPONDED_KEY
+      const u = registerAction(
+        state,
+        cardName,
+        ownerId,
+        'respond',
+        (s: GameState, p: Record<string, Json>) => effect.respond!.validate(s, ownerId, p),
+        async (s: GameState, p: Record<string, Json>) => {
+          const cardId = p.cardId as string;
+          // 无 cardId = 玩家选择不回应（pass），不触发 runUseFlow；
+          // pending slot 由 dispatch resolve，询问抵消 循环检测 RESPONDED_KEY=false → 退出
+          if (!cardId) return;
+          // 标记本次询问已 respond（询问抵消 循环据此决定是否开新窗口）
+          s.localVars['抵消/已回应'] = true;
+          await runUseFlow(s, ownerId, cardId, [ownerId], cardName);
+        },
+      );
+      if (u) unloads.push(u);
+    } else {
+      const u = registerAction(
+        state,
+        cardName,
+        ownerId,
+        'respond',
+        (s: GameState, p: Record<string, Json>) => effect.respond!.validate(s, ownerId, p),
+        (s: GameState, p: Record<string, Json>) => effect.respond!.execute(s, ownerId, p),
+      );
+      if (u) unloads.push(u);
+    }
   }
 
   return () => unloads.forEach((u) => u());

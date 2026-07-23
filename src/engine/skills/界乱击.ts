@@ -36,8 +36,9 @@
 //   内部 Skill.name = '乱击'(OL 官方技能名,玩家可见)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
+import { applyAtom, popFrame, pushFrame, frameCards, topFrame } from '../create-engine';
+import { 询问抵消 } from '../无懈可击';
+import { isCancelled } from '../card-effect/registry';
 import { defaultPlayActive } from '../action-active';
 
 const SKILL_ID = '界乱击';
@@ -201,23 +202,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       try {
         for (const target of targets) {
           if (!state.players[target]?.alive) continue;
-          const cancelled = await 询问无懈可击(state, target);
+          // 重置帧 cancelled（多目标独立抵消）
+          const f = state.settlementStack[state.settlementStack.length - 1];
+          if (f) f.cancelled = false;
+          const cancelled = await 询问抵消(state, { cardName: '无懈可击', broadcast: true }, from, target);
           if (cancelled) continue;
 
           await applyAtom(state, { type: '询问闪', target, source: from });
-          // 检查处理区
-          const dodgeCardId = frameCards(state).find((id) => {
-            const c = state.cardMap[id];
-            return c?.name === '闪';
-          });
-          if (dodgeCardId) {
+          // 闪走 runUseFlow → resolve 设本帧 cancelled=true；runUseFlow finally 自动移牌。
+          if (isCancelled(state, cardId, target)) {
             await applyAtom(state, { type: '被抵消', source: from, target, cardId });
-            await applyAtom(state, {
-              type: '移动牌',
-              cardId: dodgeCardId,
-              from: { zone: '处理区' },
-              to: { zone: '弃牌堆' },
-            });
           } else {
             if (!state.players[target]?.alive) continue;
             await applyAtom(state, {

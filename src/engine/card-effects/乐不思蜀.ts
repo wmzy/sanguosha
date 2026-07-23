@@ -54,6 +54,7 @@ const indulgenceEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'distance', dist: 1, min: 1, max: 1 },
   delayed: true,
+  cancelledBy: { cardName: '无懈可击', broadcast: true },
   canUse: canUseIndulgence,
   resolve: resolveIndulgence,
   prompt: {

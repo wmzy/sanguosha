@@ -22,6 +22,7 @@ export const 结算帧入栈: AtomDefinition<{
       from: atom.from,
       params: { ...(atom.params ?? {}) },
       cards: [],
+      cancelled: false,
     };
     state.settlementStack.push(frame);
   },
@@ -45,6 +46,7 @@ export const 结算帧入栈: AtomDefinition<{
       from: event.from as number,
       params: { ...((event.params as Record<string, import('../types').Json>) ?? {}) },
       cards: [],
+      cancelled: false,
     });
   },
 };

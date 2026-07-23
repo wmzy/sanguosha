@@ -1,76 +1,53 @@
 // 闪 CardEffect — 基本牌·闪的使用结算。
 //
 // 使用时机：以你为目标的【杀】生效前。
-// 使用目标：以你为目标的【杀】。
+// 使用目标：以你为目标的【杀】（kind='effect'，非玩家）。
 // 作用效果：抵消此【杀】。
 //
-// 闪是基本牌,任何玩家成为杀的目标时都可使用闪——不依赖玩家技能列表中是否有'闪'。
-// 故闪的「生效前」after-hook 全局注册(ownerId=-1),在模块加载时由 index.ts → use-card.ts
-// 的 onInit 或系统规则触发。
+// 闪走 runUseFlow（与杀/锦囊一致），流程：
+//   杀的 runSettlementPhase「生效前」→ 询问抵消（定向询问杀目标）→
+//   目标 respond 出闪 → play-card respond 包装调 runUseFlow(闪) →
+//   闪帧压栈 → runSettlementPhase(闪) → resolve 设下层帧（杀帧）cancelled=true →
+//   闪帧弹栈 → 询问抵消循环检测到 cancelled=true → 退出。
 //
-// 流程:杀的「生效前」→ 闪的 after-hook 询问闪 → respond action 移牌+设置标记 →
-// drain闪 → 无双/肉林在「询问闪」after-hook 中拦截第一次。
+// 无双/肉林在「被抵消」after-hook 中拦截（清除杀帧 cancelled + 要求第二张闪）。
+//
+// 闪的色限制（诸葛连弩等）由 effect.respond.validate 校验。
 
 import type { Card, GameState, Json } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom, frameCards, topFrame } from '../create-engine';
-import { registerAfterHook } from '../skill';
 import {
   registerCardEffect,
   type CardEffect,
-  setCancelled,
 } from '../card-effect/registry';
 import type { Color } from '../../shared/types';
-
-/**
- * 注册闪的「生效前」全局 after-hook。
- * 在杀的「生效前」时机询问目标是否使用闪,设置已抵消标记,drain闪。
- *
- * 全局注册(ownerId=-1)——闪是基本牌面能力,适用于所有玩家,不限闪技能持有者。
- * 标记来源:respond action（玩家出闪时设置）或此处检测处理区（八卦阵虚拟闪等 cancel 询问闪的场景）。
- */
-export function registerDodgeHook(state: GameState): void {
-  registerAfterHook(state, '闪', -1, '生效前', async (ctx) => {
-    const atom = ctx.atom as { source: number; target: number; cardId: string };
-    const card = ctx.state.cardMap[atom.cardId];
-    if (!card || card.name !== '杀') return;
-    if (!ctx.state.players[atom.target]?.alive) return;
-
-    // 询问是否使用闪
-    await applyAtom(ctx.state, { type: '询问闪', target: atom.target, source: atom.source });
-
-    // 检查处理区:有没有闪牌(玩家出闪 / 八卦阵虚拟闪)
-    const dodgeIds = frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
-      // 设置已抵消标记（补保 respond action 未设置的场景,如八卦阵虚拟闪）
-      setCancelled(ctx.state, atom.cardId, atom.target);
-      // drain 闪到弃牌堆
-      for (const id of dodgeIds) {
-        await applyAtom(ctx.state, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    }
-  });
-}
 
 const COLOR_LIMIT_VAR = '闪/色限制';
 
 /** 闪 CardEffect — respond-only：成为杀的目标时打出闪抵消。
- *  无 use resolve（闪的使用效果 = respond 中设置的已抵消标记）。 */
+ *  resolve = 闪的使用效果 = 设下层帧（杀帧）的 cancelled 字段为 true。 */
 const dodgeEffect: CardEffect = {
   timing: '生效前',
   target: { kind: 'effect' },
-  resolve: async () => {},
+  resolve: async (ctx) => {
+    // 下层帧（stack[length-2]）= 被抵消的牌的帧（杀/万箭齐发等）。
+    // 闪帧（stack[length-1]）是本帧，resolve 时它正在生效。
+    const { state } = ctx;
+    const targetFrame = state.settlementStack[state.settlementStack.length - 2];
+    if (targetFrame) targetFrame.cancelled = true;
+  },
   respond: {
     validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
+      // 闪通过 询问抵消 的定向模式（询问闪 atom）触发；
+      // 也兼容旧的 询问闪 slot（无双第二次询问、借刀杀人等仍用 询问闪 atom）。
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
-      if (slot.atom.type !== '询问闪') return '当前不是出闪的窗口';
+      const isDodgeWindow =
+        slot.atom.type === '询问闪' ||
+        (slot.atom.type === '请求回应' &&
+          (slot.atom as { requestType?: string }).requestType === '闪');
+      if (!isDodgeWindow) return '当前不是出闪的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {
         const self = state.players[ownerId];
@@ -82,25 +59,8 @@ const dodgeEffect: CardEffect = {
       }
       return null;
     },
-    execute: async (state: GameState, ownerId: number, params: Record<string, Json>) => {
-      const cardId = params.cardId as string | undefined;
-      if (!cardId) return; // 不出闪
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: ownerId },
-        to: { zone: '处理区' },
-      });
-      // 设置已抵消标记：闪的效果 = 抵消目标杀
-      // 从结算帧栈顶部找到杀帧,设置标记
-      const frame = topFrame(state);
-      if (frame) {
-        const killCardId = frame.params.cardId as string | undefined;
-        if (killCardId && state.cardMap[killCardId]?.name === '杀') {
-          setCancelled(state, killCardId, ownerId);
-        }
-      }
-    },
+    // execute 已由 play-card.ts 的 effect kind 包装统一接管：runUseFlow(闪)。
+    execute: async () => {},
   },
   prompt: {
     type: 'useCard',

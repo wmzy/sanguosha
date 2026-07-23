@@ -4,9 +4,9 @@
 //   询问闪 resolve 后,肉林检测到标记被设置 → 第一次: 清除标记+drain+追加第二次询问。
 
 import type { GameState, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
-import { isCancelled, clearCancelled, setCancelled } from '../card-effect/registry';
+import { isCancelled, clearCancelled } from '../card-effect/registry';
 import { getGender } from '../character-meta';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -42,6 +42,8 @@ function getKillCardId(state: GameState): string {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
+  // 新模型:闪走 runUseFlow,闪牌自动移入弃牌堆;闪 resolve 设杀帧 cancelled=true。
+  // 肉林只需清除 cancelled + 追加第二次询问闪;第二次闪 resolve 自动重设 cancelled。
   registerAfterHook(state, skill.id, ownerId, '询问闪', async (ctx) => {
     const atom = ctx.atom as { target: number; source: number };
     // 检查肉林条件
@@ -58,33 +60,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return;
     }
 
-    // 第一次闪:清除标记 + drain + 追加第二次询问
+    // 第一次闪:清除 cancelled + 追加第二次询问
+    // 闪牌已由 runUseFlow 自动移入弃牌堆,无需手动 drain
     clearCancelled(ctx.state, killCardId, target);
     ctx.state.localVars[countKey] = count + 1;
 
-    const firstDodges = frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪');
-    for (const id of firstDodges) {
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: id,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    }
-
     await applyAtom(ctx.state, { type: '询问闪', target, source: atom.source });
-    const secondDodges = frameCards(ctx.state).filter((id) => ctx.state.cardMap[id]?.name === '闪');
-    if (secondDodges.length > 0) {
-      setCancelled(ctx.state, killCardId, target);
-      for (const id of secondDodges) {
-        await applyAtom(ctx.state, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    }
     delete ctx.state.localVars[countKey];
   });
 

@@ -106,6 +106,7 @@ function makeViewWithWuguPendingForP2(
     from: 0,
     params: { revealedIds, pickedBy },
     cards: available,
+    cancelled: false,
   };
   return {
     viewer: 1,

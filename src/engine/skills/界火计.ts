@@ -38,7 +38,7 @@
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { 询问无懈可击 } from '../无懈可击';
+import { 询问抵消 } from '../无懈可击';
 import { defaultPlayActive } from '../action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -169,8 +169,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
 
       try {
-        // 询问无懈可击(单目标锦囊:抵消整个锦囊)
-        const cancelled = await 询问无懈可击(state, target);
+        // 询问抵消(单目标锦囊:抵消整个锦囊)
+        const cancelled = await 询问抵消(state, { cardName: '无懈可击', broadcast: true }, from, target);
         if (!cancelled) {
           const targetPlayer = state.players[target];
           // 目标必须有手牌(随机展示需要)

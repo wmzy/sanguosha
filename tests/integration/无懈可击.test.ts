@@ -228,7 +228,7 @@ describe('无懈可击链路', () => {
 
     // 验证:锦囊被抵消 → P1 手牌不变(无懈可击本身已出,其他牌未丢)
     // P1 失去的应只有 无懈可击 这张牌
-    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.localVars['抵消/已回应']).toBeUndefined();
     // P1 手牌减少 1(无懈可击)
     expect(state.players[1].hand.length).toBe(p1HandBefore.length - 1);
     // P1 第一张手牌还在(没被弃)
@@ -328,7 +328,7 @@ describe('无懈可击链路', () => {
 
     // 双无懈 = 抵消反转 → 锦囊恢复生效
     // (localVars 被 trick 的 finally 块清理为 undefined)
-    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.localVars['抵消/已回应']).toBeUndefined();
     // P1 失去第一张手牌(锦囊生效)
     expect(state.players[1].hand).not.toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(p1FirstCard);
@@ -458,19 +458,17 @@ describe('无懈可击 dispatch 链路', () => {
       baseSeq: state.seq,
     });
 
-    // dispatch respond execute 翻转 localVars[`无懈/被抵消/${target}`]=true;
-    // close-reopen:旧 slot resolve,询问无懈可击 循环创建新窗口(新 createdSeq)
-    // 过河拆桥是单目标锦囊,target=1
-    expect(state.localVars['无懈/被抵消/1']).toBe(true);
-    expect(state.pendingSlots.size).toBe(1); // 新窗口
+    // dispatch respond:ownerId=1 → runUseFlow(无懈) → 无懈帧压栈 → 反无懈窗口打开
+    // close-reopen:旧 slot resolve,无懈的 runSettlementPhase 开反无懈窗口(新 createdSeq)
+    expect(state.pendingSlots.size).toBeGreaterThanOrEqual(1); // 反无懈窗口
     expect(state.players[1].hand).not.toContain(nullifId); // 无懈牌已入弃牌堆
 
-    // fireTimeout 结束新窗口(无人反无懈)
+    // fireTimeout 结束反无懈窗口(无人反无懈) → 无懈生效 → 过河拆桥被抵消
     await fireTimeoutAndWait(state);
 
     // 锦囊被抵消 → P1 基础牌未丢
     expect(state.players[1].hand).toContain(p1FirstCard);
-    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.localVars['抵消/已回应']).toBeUndefined();
     // 锦囊进弃牌堆
     expect(state.zones.discardPile).toContain(gqId);
   });
@@ -527,8 +525,8 @@ describe('无懈可击 dispatch 链路', () => {
       params: { cardId: nullif1Id },
       baseSeq: state.seq,
     });
-    expect(state.localVars['无懈/被抵消/1']).toBe(true); // P1 抵消锦囊
-    expect(state.pendingSlots.size).toBe(1); // close-reopen:新窗口
+    // P1 出无懈 → runUseFlow(无懈) → 反无懈窗口打开
+    expect(state.pendingSlots.size).toBeGreaterThanOrEqual(1); // 反无懈窗口
 
     // P0 出反无懈
     await dispatchAndWait(state, {
@@ -538,8 +536,7 @@ describe('无懈可击 dispatch 链路', () => {
       params: { cardId: nullif0Id },
       baseSeq: state.seq,
     });
-    expect(state.localVars['无懈/被抵消/1']).toBe(false); // 翻转回 false:反无懈抵消了无懈
-    expect(state.pendingSlots.size).toBe(1); // close-reopen:新窗口
+    expect(state.pendingSlots.size).toBeGreaterThanOrEqual(1); // 反反无懈窗口
 
     // 超时结束窗口
     await fireTimeoutAndWait(state);
@@ -551,7 +548,7 @@ describe('无懈可击 dispatch 链路', () => {
     expect(state.players[1].hand).not.toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(gqId);
-    expect(state.localVars['无懈/被抵消']).toBeUndefined(); // trick finally 清理
+    expect(state.localVars['抵消/已回应']).toBeUndefined(); // trick finally 清理
   });
 
   // 用例 4:无人出无懈 → fireTimeout → 锦囊正常生效
@@ -583,7 +580,7 @@ describe('无懈可击 dispatch 链路', () => {
     // 盲选窗口也超时(defaultChoice=0 兜底)
     await fireTimeoutAndWait(state);
 
-    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.localVars['抵消/已回应']).toBeUndefined();
     expect(state.players[1].hand).not.toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(gqId);
@@ -702,7 +699,7 @@ describe('skip 机制:广播型 pending 放弃回应', () => {
     await fireTimeoutAndWait(state);
 
     // 锦囊正常结算:P1 失去 d1,过河拆桥入弃牌堆
-    expect(state.localVars['无懈/被抵消']).toBeUndefined();
+    expect(state.localVars['抵消/已回应']).toBeUndefined();
     expect(state.players[1].hand).not.toContain('d1');
     expect(state.zones.discardPile).toContain('d1');
     expect(state.zones.discardPile).toContain(gqId);

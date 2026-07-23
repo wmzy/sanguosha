@@ -82,6 +82,7 @@ const lightningEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'self' },
   delayed: true,
+  cancelledBy: { cardName: '无懈可击', broadcast: true },
   resolve: resolveLightning,
   prompt: {
     type: 'useCard',

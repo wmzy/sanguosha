@@ -17,8 +17,9 @@
 // 已知限制:配合八卦阵判定出的虚拟闪不触发雷击(八卦阵在询问闪 before hook 中 cancel,
 //   故询问闪 after hook 不执行)。同鬼才 hook 顺序限制,属引擎判定/取消机制固有局限。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { isCancelled } from '../card-effect/registry';
 
 const CHOOSE_RT = '雷击/chooseTarget';
 const TARGET_KEY = '雷击/target';
@@ -71,11 +72,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const me = ctx.state.players[ownerId];
     if (!me?.alive) return;
 
-    // 检查张角是否实际打出了闪(手牌→处理区)。frameCards 含本结算帧所有牌;
-    // 杀牌也在其中,但只匹配 name==='闪'。
-    const cards = frameCards(ctx.state);
-    const playedDodge = cards.some((id) => ctx.state.cardMap[id]?.name === '闪');
-    if (!playedDodge) return; // 未出闪,不触发
+    // 检查张角是否实际打出了闪（闪走 runUseFlow 已入弃牌堆，但杀帧 cancelled=true 表示出了闪）。
+    // 八卦阵虚拟闪也设杀帧 cancelled=true。
+    if (!isCancelled(ctx.state, (ctx.frame.params.cardId as string) ?? '', ownerId)) return;
 
     // 询问张角:是否发动雷击 + 选择判定目标
     delete ctx.state.localVars[TARGET_KEY];
