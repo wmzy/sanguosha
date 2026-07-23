@@ -176,7 +176,8 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
         onSkillAction={() => {}}
       />,
     );
-    for (const slot of ['武器', '防具', '进攻马', '防御马', '宝物']) {
+    // 马槽并排(equipHorseRow)用短标签「进攻」「防御」,其余用槽位全名。见 EquipColumn EMPTY_SLOT_LABEL。
+    for (const slot of ['武器', '防具', '进攻', '防御', '宝物']) {
       const label = screen.getByText(slot);
       expect(label.className).toContain(styles.equipSlotEmptyLabel);
       expect(label.parentElement?.className).toContain(styles.equipSlotEmpty);
@@ -197,8 +198,8 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     // 武器槽显示装备名(非占位) → 不显示“武器”占位文本
     expect(screen.queryByText('武器')).toBeNull();
     expect(screen.getByText(/诸葛连弩/).tagName).toBe('SPAN');
-    // 其余 4 槽为空占位
-    for (const slot of ['防具', '进攻马', '防御马', '宝物']) {
+    // 其余 4 槽为空占位(马槽并排用短标签「进攻」「防御」)
+    for (const slot of ['防具', '进攻', '防御', '宝物']) {
       expect(screen.getByText(slot).className).toContain(styles.equipSlotEmptyLabel);
     }
   });

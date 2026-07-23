@@ -908,13 +908,15 @@ describe('usePlayInteraction · handleRespond(回应询问)', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it('广播型 pending(pendingTargetIdx<0):respond 调用 markBroadcastSkipped', () => {
+  it('广播型 pending(pendingTargetIdx<0):respond 发送 skip 并调用 markBroadcastSkipped', () => {
     const send = vi.fn();
     const markSkip = vi.fn();
     const { result } = renderPlay(respondParams(send, { pendingTargetIdx: -1, markSkip }));
     act(() => result.current.handleRespond()); // 无 cardId
+    // 广播型 pending「不回应」:发 __skip 让服务端累计(全员 skip 提前结束窗口)
+    // + 本地 markBroadcastSkipped 标记避免重复弹窗。详见 commit 3c37a003。
     expect(markSkip).toHaveBeenCalledTimes(1);
-    expect(send).not.toHaveBeenCalled();
+    expect(sentCalls(send)).toEqual([{ skillId: '__skip', actionType: 'skip', params: {} }]);
   });
 
   it('非广播、无 cardId 的 respond 发送空 params', () => {
