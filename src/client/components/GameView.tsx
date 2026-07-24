@@ -294,6 +294,17 @@ export function GameViewComponentImpl({
     (canOperate && isDistributeActive && !!activeDistribute) ||
     (!!selectedCardId && !!selectedTarget && canOperate && isMyTurn);
 
+  // 底栏自己的大卡是否可作为目标（铁索连环含自己）。与 SeatArcLayout 的
+  // selectedNeedsTarget 同源：选目标阶段 + 自己可被选（allowSelf/selfTarget）。
+  const selfInTargetMode =
+    (!!playRules && playRules.needsTarget) ||
+    (isDistributeActive && !!activeDistribute?.externalTargetSelection);
+  const selfTargetable = canOperate && selfInTargetMode && isTargetable(perspectiveIdx);
+  const selfSelectedAsTarget =
+    (isDistributeActive && activeDistribute?.externalTargetSelection
+      ? distTargetName === perspectiveName
+      : selectedTarget === perspectiveName);
+
   return (
     <div className={styles.pageRoot}>
       <OverlaysLayer
@@ -767,8 +778,15 @@ export function GameViewComponentImpl({
             isPerspectiveTurn && styles.playerCardTurn,
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatShaking,
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatDamageOverlay,
+            // 可选自己为目标(铁索连环含自己):高亮可点
+            selfTargetable && styles.seatCardClickable,
+            // 已选自己为目标:高亮选中
+            selfSelectedAsTarget && styles.seatCardTargeted,
           )}
           data-seat-index={perspectiveIdx}
+          onClick={() =>
+            selfTargetable && handleTargetClick(perspectiveName)
+          }
         >
           <DevProfiler id="PlayerCardLarge">
             <PlayerCardLarge

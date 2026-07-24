@@ -215,7 +215,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       title: '界连环:将一张梅花手牌当铁索连环使用(至多3名目标)',
       cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
       // 界版目标上限 3(标版铁索连环 2)
-      targetFilter: { min: 1, max: MAX_TARGETS },
+      targetFilter: { min: 1, max: MAX_TARGETS, allowSelf: true },
     },
     activeWhen: (ctx) => {
       if (!defaultPlayActive(ctx)) return false;

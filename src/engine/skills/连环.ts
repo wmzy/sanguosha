@@ -128,7 +128,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       type: 'useCardAndTarget',
       title: '连环:将一张梅花手牌当铁索连环使用',
       cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 2 },
+      targetFilter: { min: 1, max: 2, allowSelf: true },
     },
     activeWhen: (ctx) => {
       if (!defaultPlayActive(ctx)) return false;

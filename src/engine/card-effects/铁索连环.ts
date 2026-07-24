@@ -43,14 +43,14 @@ function canUseChain(
 
 const chainEffect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'other', min: 1, max: 2 },
+  target: { kind: 'any', min: 1, max: 2 },
   canUse: canUseChain,
   resolve: resolveChain,
   prompt: {
     type: 'useCardAndTarget',
     title: '铁索连环',
     cardFilter: { filter: (c: Card) => c.name === '铁索连环', min: 1, max: 1 },
-    targetFilter: { min: 1, max: 2 },
+    targetFilter: { min: 1, max: 2, allowSelf: true },
   } as ActionPrompt,
   label: '铁索连环',
   style: 'primary',

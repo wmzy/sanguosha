@@ -42,6 +42,9 @@ export interface TargetFilter {
   min: number;
   max: number;
   filter?: (view: GameView, target: number) => boolean;
+  /** 是否允许以自己为目标（铁索连环：一至两名角色含自己）。
+   *  无 filter 的目标选择默认排除自己；设此 flag 后前端/无头枚举将自己纳入可选目标。 */
+  allowSelf?: boolean;
   /** 多槽位目标(语义不同的多个目标,如借刀杀人 A 持武器 + B 在 A 攻击范围)。
    *  有 slots 时 min/max 忽略,前端按槽位顺序渲染,每个槽位独立选择。
    *  ctx.selected 包含已选座次(前序槽位),供后续槽位依赖前序选择。

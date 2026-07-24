@@ -135,6 +135,58 @@ describe('铁索连环', () => {
     await P0.expectRejected({ skillId: '铁索连环', actionType: 'use', params: { cardId: 'chain3', targets: [1, 2, 0] } });
   });
 
+  // ─── use:可选自己为目标 ─────────────────────────
+  // bug:铁索连环原 target.kind='other',校验拒绝以自己为目标。
+  // 官方「一至两名角色」含自己。改为 kind='any' + allowSelf 后应允许。
+
+  it('use:可以以自己为目标横置', async () => {
+    const chain = mkCard('chainSelf', '铁索连环', '♣', '3', '锦囊牌');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', hand: ['chainSelf'], skills: ['铁索连环'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+        ],
+        cardMap: { chainSelf: chain },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    // 以自己为目标
+    await P0.triggerAction('铁索连环', 'use', { cardId: 'chainSelf', targets: [0] });
+    await P0.pass(); // 无懈可击 pass
+
+    // 自己被横置
+    expect(harness.state.players[0].marks.some((m) => m.id === 'chained')).toBe(true);
+  });
+
+  it('use:可以同时横置自己与另一名角色', async () => {
+    const chain = mkCard('chainSelf2', '铁索连环', '♠', 'Q', '锦囊牌');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', hand: ['chainSelf2'], skills: ['铁索连环'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+        ],
+        cardMap: { chainSelf2: chain },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    await P0.triggerAction('铁索连环', 'use', { cardId: 'chainSelf2', targets: [0, 1] });
+    await P0.pass(); // 无懈对 P0
+    await P0.pass(); // 无懈对 P1
+
+    expect(harness.state.players[0].marks.some((m) => m.id === 'chained')).toBe(true);
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+  });
+
   // ─── recast:重铸 ─────────────────────────────
 
   it('recast:弃此牌摸一张', async () => {

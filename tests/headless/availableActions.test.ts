@@ -454,6 +454,72 @@ describe('enumerateAvailableActions', () => {
     const tf = actions.find((x) => x.category === 'transform');
     expect(tf).toBeUndefined();
   });
+
+  // ─── 铁索连环：可选自己为目标 + 重铸替代出牌 ───
+  // bug:此前 headless 枚举硬编码排除自己、且不枚举 recast 类替代动作。
+
+  const chainCard: Card = {
+    id: 'c-chain',
+    name: '铁索连环',
+    suit: '♣',
+    color: '黑',
+    rank: '3',
+    type: '锦囊牌',
+  };
+  // 铁索连环 use action：targetFilter.allowSelf=true（一至两名角色含自己）
+  const chainUseAction: SkillActionDef = {
+    skillId: '铁索连环',
+    ownerId: 0,
+    actionType: 'use',
+    label: '铁索连环',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '铁索连环',
+      cardFilter: { filter: (c: Card) => c.name === '铁索连环', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 2, allowSelf: true },
+    },
+  };
+  // 铁索连环·重铸 recast action：useCard 型，无目标
+  const chainRecastAction: SkillActionDef = {
+    skillId: '铁索连环',
+    ownerId: 0,
+    actionType: 'recast',
+    label: '铁索连环·重铸',
+    prompt: {
+      type: 'useCard',
+      title: '铁索连环:重铸',
+      cardFilter: { filter: (c: Card) => c.name === '铁索连环', min: 1, max: 1 },
+    },
+  };
+
+  it('铁索连环 validTargets 含自己（allowSelf）', () => {
+    const view = makeView(0, '出牌', [chainCard]);
+    const actions = enumerateAvailableActions(view, 0, [chainUseAction]);
+    const play = actions.find((x) => x.category === 'play' && x.message.skillId === '铁索连环');
+    expect(play).toBeDefined();
+    expect(play!.validTargets).toContain(0); // 自己
+    expect(play!.validTargets).toContain(1); // 其他玩家
+  });
+
+  it('铁索连环·重铸作为替代动作被枚举（actionType=recast）', () => {
+    const view = makeView(0, '出牌', [chainCard]);
+    const actions = enumerateAvailableActions(view, 0, [chainUseAction, chainRecastAction]);
+    const recast = actions.find(
+      (x) => x.category === 'play' && x.message.actionType === 'recast',
+    );
+    expect(recast).toBeDefined();
+    expect(recast!.message.skillId).toBe('铁索连环');
+    expect(recast!.message.params.cardId).toBe('c-chain');
+    expect(recast!.validTargets).toEqual([]); // 重铸无目标
+  });
+
+  it('铁索连环·重铸在非出牌阶段不出现', () => {
+    const view = makeView(0, '摸牌', [chainCard]);
+    const actions = enumerateAvailableActions(view, 0, [chainUseAction, chainRecastAction]);
+    expect(
+      actions.find((x) => x.message.actionType === 'recast'),
+    ).toBeUndefined();
+  });
 });
 
 // 回归测试：choosePlayer prompt（突袭/select、激将、节命、奋威 等）

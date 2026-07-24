@@ -1,9 +1,6 @@
 // src/client/headless/availableActions.ts
 // 枚举当前座次可执行操作。纯函数，零副作用。
 // 复用 gameViewHelpers 的 isActiveAction / findUseActionForCard / derivePlayRules / buildPlayParams。
-// src/client/headless/availableActions.ts
-// 枚举当前座次可执行操作。纯函数，零副作用。
-// 复用 gameViewHelpers 的 isActiveAction / findUseActionForCard / derivePlayRules / buildPlayParams。
 import type {
   GameView,
   ActionContext,
@@ -15,9 +12,11 @@ import type { AvailableAction } from './types';
 import {
   isActiveAction,
   findUseActionForCard,
+  findAltActionsForCard,
   derivePlayRules,
   buildPlayParams,
   extractCardFilter,
+  type PlayRules,
 } from '../utils/gameViewHelpers';
 
 /** 从 use action 的 prompt 取 targetFilter（useCardAndTarget/selectTarget 才有）。 */
@@ -30,6 +29,30 @@ function getTargetFilter(prompt: SkillActionDef['prompt']): TargetFilter | null 
 
 function getSelfTarget(prompt: SkillActionDef['prompt']): boolean {
   return prompt.type === 'useCardAndTarget' ? !!prompt.selfTarget : false;
+}
+
+/** 计算 useCardAndTarget 的合法目标列表。
+ *  默认排除自己；targetFilter.allowSelf=true（铁索连环含自己）时纳入自己。
+ *  与 engine/card-effect/validate.ts isLegalTarget 语义对齐（allowSelf ⟷ kind='any'）。 */
+function computeValidTargets(
+  view: GameView,
+  seatIndex: number,
+  targetFilter: TargetFilter | null,
+  rules: PlayRules,
+): number[] {
+  const validTargets: number[] = [];
+  if (rules.needsTarget && !rules.hasSlots && !rules.selfTarget) {
+    const allowSelf = !!targetFilter?.allowSelf;
+    for (const p of view.players) {
+      if (!p.alive) continue;
+      if (p.index === seatIndex && !allowSelf) continue;
+      if (targetFilter?.filter && !targetFilter.filter(view, p.index)) continue;
+      validTargets.push(p.index);
+    }
+  } else if (rules.selfTarget) {
+    validTargets.push(seatIndex);
+  }
+  return validTargets;
 }
 
 /** 出牌阶段枚举主动可出的牌。 */
@@ -48,18 +71,8 @@ function enumeratePlayActions(
     if (!isActiveAction(action, ctx)) continue;
     const targetFilter = getTargetFilter(action.prompt);
     const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
-    // 算合法目标
-    const validTargets: number[] = [];
-    if (rules.needsTarget && !rules.hasSlots && !rules.selfTarget) {
-      for (const p of view.players) {
-        if (p.index === seatIndex || !p.alive) continue;
-        if (targetFilter?.filter && !targetFilter.filter(view, p.index)) continue;
-        const params = buildPlayParams(view.players, seatIndex, card, rules, p.name, null);
-        if (params) validTargets.push(p.index);
-      }
-    } else if (rules.selfTarget) {
-      validTargets.push(seatIndex);
-    }
+    // 算合法目标（allowSelf 时含自己）
+    const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
     // 需要目标但无合法目标(如距离不够),跳过此牌
     if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
     // 构造示例 message：无目标牌直接完整；有目标牌 targets 待 agent 补全
@@ -144,17 +157,8 @@ function enumerateTransformActions(
       const wrapperName = action.transform ? action.transform(card).name : '杀';
       const shadowCardId = `${card.id}#${action.skillId}`;
 
-      // 算合法目标(与 enumeratePlayActions 同模式:存活非自己+距离过滤)
-      const validTargets: number[] = [];
-      if (rules.needsTarget && !rules.hasSlots && !rules.selfTarget) {
-        for (const p of view.players) {
-          if (p.index === seatIndex || !p.alive) continue;
-          if (targetFilter?.filter && !targetFilter.filter(view, p.index)) continue;
-          validTargets.push(p.index);
-        }
-      } else if (rules.selfTarget) {
-        validTargets.push(seatIndex);
-      }
+      // 算合法目标（allowSelf 时含自己，与 enumeratePlayActions 同模式）
+      const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
       // 需要目标但无合法目标(如距离不够),跳过此牌
       if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
 
@@ -249,7 +253,42 @@ function enumerateDistributeActions(
   return result;
 }
 
-/** 主入口：枚举当前座次可执行的操作（出牌/转化/分配/结束出牌阶段）。 */
+/** 枚举替代出牌动作（同一张牌的其他出法，如铁索连环·重铸、连环·重铸）。
+ *  这些 action 不属于 use/respond/transform/distribute（各有独立入口），
+ *  通过 findAltActionsForCard 匹配手牌，生成无目标的 play action（params={cardId}）。
+ *  无头客户端此前缺这一类枚举 → AI 无法重铸铁索连环。 */
+function enumerateAltActions(
+  view: GameView,
+  seatIndex: number,
+  skillActions: SkillActionDef[],
+): AvailableAction[] {
+  const ctx: ActionContext = { view, perspectiveIdx: seatIndex };
+  const me = view.players[seatIndex];
+  if (!me?.hand) return [];
+  const result: AvailableAction[] = [];
+  for (const card of me.hand) {
+    const alts = findAltActionsForCard(skillActions, card);
+    for (const action of alts) {
+      if (!isActiveAction(action, ctx)) continue;
+      const cardDesc = `${card.suit}${card.rank}`;
+      result.push({
+        description: `${action.label}(${cardDesc})`,
+        message: {
+          skillId: action.skillId,
+          actionType: action.actionType,
+          ownerId: seatIndex,
+          params: { cardId: card.id },
+          baseSeq: 0,
+        },
+        validTargets: [],
+        category: 'play',
+      });
+    }
+  }
+  return result;
+}
+
+/** 主入口：枚举当前座次可执行的操作（出牌/转化/替代出牌/分配/结束出牌阶段）。 */
 export function enumerateAvailableActions(
   view: GameView,
   seatIndex: number,
@@ -259,6 +298,7 @@ export function enumerateAvailableActions(
   const actions = [
     ...enumeratePlayActions(view, seatIndex, skillActions),
     ...enumerateTransformActions(view, seatIndex, skillActions),
+    ...enumerateAltActions(view, seatIndex, skillActions),
     ...enumerateDistributeActions(view, seatIndex, skillActions),
   ];
   // 出牌阶段:当前玩家可主动结束回合(无阻塞 pending 时)

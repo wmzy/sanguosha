@@ -53,9 +53,9 @@ export function isLegalTarget(
   const spec: CardTargetSpec = effect.target;
 
   if (target === ownerId) {
-    // 自己作为目标：只有 target.kind='self' 或 'allPlayers' 时合法；
+    // 自己作为目标：只有 target.kind='self'/'allPlayers'/'any' 时合法；
     // kind='wounded' 时需自己已受伤。
-    if (spec.kind === 'self' || spec.kind === 'allPlayers') return true;
+    if (spec.kind === 'self' || spec.kind === 'allPlayers' || spec.kind === 'any') return true;
     if (spec.kind === 'wounded') {
       const p = state.players[ownerId];
       return !!p && p.health < p.maxHealth;
@@ -77,6 +77,7 @@ export function isLegalTarget(
     case 'allOthers':
     case 'allPlayers':
     case 'other':
+    case 'any':
       return true;
     case 'wounded':
       return targetPlayer.health < targetPlayer.maxHealth;

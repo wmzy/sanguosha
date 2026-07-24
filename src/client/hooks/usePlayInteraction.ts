@@ -383,7 +383,8 @@ export function usePlayInteraction(
         return view.players[i]?.alive === true;
       }
       const tf = selectedTargetFilter;
-      // 多槽位目标(借刀杀人 A+B):按当前选择进度取对应槽位 filter 判断可选性
+      // 多槽位目标(借刀杀人 A+B):按当前选择进度取对应槽位 filter 判断可选性。
+      // 槽位自身决定可选性（含是否允许自己作为 killTarget），不应用 self 排除。
       if (tf?.slots && tf.slots.length > 1) {
         const slotIdx = selectedTarget ? 1 : 0;
         // 后续槽位不能重复选已选座次
@@ -392,6 +393,14 @@ export function usePlayInteraction(
         const ctxSelected =
           slotIdx === 1 ? [view.players.findIndex((p) => p.name === selectedTarget)] : [];
         return slot?.filter ? slot.filter(view, i, { selected: ctxSelected }) : true;
+      }
+      // 单目标路径：自己仅当卡牌允许时可选（selfTarget=桃/酒自动目标；
+      // allowSelf=铁索连环含自己）。避免决斗/火攻等无 filter 卡误选自己。
+      if (i === perspectiveIdx) {
+        const allowSelf =
+          selectedUseAction?.prompt.type === 'useCardAndTarget' &&
+          (!!selectedUseAction.prompt.selfTarget || !!tf?.allowSelf);
+        if (!allowSelf) return false;
       }
       const filter = tf?.filter;
       if (!filter) return true;
@@ -403,6 +412,7 @@ export function usePlayInteraction(
       perspectiveIdx,
       view,
       selectedTargetFilter,
+      selectedUseAction,
       selectedTarget,
     ],
   );
