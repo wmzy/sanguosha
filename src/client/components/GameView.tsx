@@ -205,6 +205,7 @@ export function GameViewComponentImpl({
     selectedCardId,
     selectedTarget,
     selectedKillTarget,
+    selectedMultiTargets,
     selectedForDiscard,
     transformMode,
     distributeMode,
@@ -301,9 +302,11 @@ export function GameViewComponentImpl({
     (isDistributeActive && !!activeDistribute?.externalTargetSelection);
   const selfTargetable = canOperate && selfInTargetMode && isTargetable(perspectiveIdx);
   const selfSelectedAsTarget =
-    (isDistributeActive && activeDistribute?.externalTargetSelection
+    isDistributeActive && activeDistribute?.externalTargetSelection
       ? distTargetName === perspectiveName
-      : selectedTarget === perspectiveName);
+      : playRules?.multiTarget
+        ? selectedMultiTargets.includes(perspectiveName)
+        : selectedTarget === perspectiveName;
 
   return (
     <div className={styles.pageRoot}>
@@ -357,9 +360,11 @@ export function GameViewComponentImpl({
                       : []
                     : playRules?.hasSlots
                       ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
-                      : selectedTarget
-                        ? [selectedTarget]
-                        : []
+                      : playRules?.multiTarget
+                        ? selectedMultiTargets
+                        : selectedTarget
+                          ? [selectedTarget]
+                          : []
                 }
                 isTargetable={isTargetable}
                 onTargetClick={handleTargetClick}
@@ -602,8 +607,18 @@ export function GameViewComponentImpl({
                               </>
                             );
                           })()}
-                        {selectedCardId && selectedTarget && canOperate && isMyTurn && (
-                          <div className={styles.targetHint}>已选择目标: {selectedTarget}</div>
+                        {selectedCardId &&
+                          canOperate &&
+                          isMyTurn &&
+                          (playRules?.multiTarget
+                            ? selectedMultiTargets.length > 0
+                            : !!selectedTarget) && (
+                          <div className={styles.targetHint}>
+                            已选择目标:{' '}
+                            {playRules?.multiTarget
+                              ? selectedMultiTargets.join('、')
+                              : selectedTarget}
+                          </div>
                         )}
                       </div>
                     )}

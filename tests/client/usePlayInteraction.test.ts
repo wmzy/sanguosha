@@ -247,6 +247,12 @@ const BORROW_CARD = makeCard({
   type: '锦囊牌',
   trickSubtype: '普通锦囊',
 });
+const CHAIN_CARD = makeCard({
+  id: 'c-chain',
+  name: '铁索连环',
+  type: '锦囊牌',
+  trickSubtype: '普通锦囊',
+});
 const RED_CARD_A = makeCard({ id: 'c-red-a', name: '闪', color: '红' });
 const RED_CARD_B = makeCard({ id: 'c-red-b', name: '火杀', color: '红', subtype: '杀' });
 
@@ -333,6 +339,22 @@ function borrowSwordAction(ownerId = 0): SkillActionDef {
           { label: 'B', filter: () => true },
         ],
       },
+    },
+  };
+}
+
+/** 铁索连环 use action:多目标(min1/max2,含自己),点击累加为集合 */
+function chainUseAction(ownerId = 0): SkillActionDef {
+  return {
+    skillId: '铁索连环',
+    ownerId,
+    actionType: 'use',
+    label: '铁索连环',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '铁索连环',
+      cardFilter: { filter: (c) => c.name === '铁索连环', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 2, allowSelf: true },
     },
   };
 }
@@ -683,6 +705,106 @@ describe('usePlayInteraction · handleTargetClick(多槽位目标选择)', () =>
     expect(result.current.selectedTarget).toBe('P1');
     act(() => result.current.handleTargetClick('P1'));
     expect(result.current.selectedTarget).toBeNull();
+  });
+});
+
+// ─── Bug: 铁索连环多目标选择(选第二个时第一个丢失)───
+// 铁索连环 targetFilter={min:1,max:2,allowSelf:true},无 slots。
+// 原实现在非槽位路径用单个 selectedTarget,选第二个会覆盖第一个。
+// 修复:非槽位 max>=2 走多目标集合,点击累加/取消。
+describe('usePlayInteraction · handleTargetClick(铁索连环多目标)', () => {
+  it('选第二个目标时保留第一个(不覆盖)', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [chainUseAction()],
+        perspectiveHand: [CHAIN_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    expect(result.current.playRules?.multiTarget).toBe(true);
+    act(() => result.current.handleTargetClick('P1'));
+    expect(result.current.selectedMultiTargets).toEqual(['P1']);
+    // 关键回归:选第二个时第一个仍在
+    act(() => result.current.handleTargetClick('P0'));
+    expect(result.current.selectedMultiTargets).toEqual(['P1', 'P0']);
+  });
+
+  it('达 max(2)后点第三个目标被忽略', () => {
+    const view: GameView = {
+      ...makePlayView(),
+      players: [
+        makePlayView().players[0],
+        makePlayView().players[1],
+        { index: 2, name: 'P2', character: 'Y', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 0, hand: [], marks: [] },
+      ],
+    };
+    const { result } = renderPlay(
+      makePlayParams({
+        view,
+        skillActions: [chainUseAction()],
+        perspectiveHand: [CHAIN_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    act(() => result.current.handleTargetClick('P1'));
+    act(() => result.current.handleTargetClick('P2'));
+    expect(result.current.selectedMultiTargets).toEqual(['P1', 'P2']);
+    // 已达 max=2,P0 不可选
+    expect(result.current.isTargetable(0)).toBe(false);
+    act(() => result.current.handleTargetClick('P0'));
+    expect(result.current.selectedMultiTargets).toEqual(['P1', 'P2']);
+  });
+
+  it('点击已选目标将其取消(toggle)', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [chainUseAction()],
+        perspectiveHand: [CHAIN_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    act(() => result.current.handleTargetClick('P1'));
+    act(() => result.current.handleTargetClick('P0'));
+    act(() => result.current.handleTargetClick('P1')); // 取消 P1
+    expect(result.current.selectedMultiTargets).toEqual(['P0']);
+  });
+
+  it('allowSelf: P0(自己) 可作为目标', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [chainUseAction()],
+        perspectiveHand: [CHAIN_CARD],
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    expect(result.current.isTargetable(0)).toBe(true); // 含自己
+  });
+
+  it('playButtonState: 选 1 个即可出牌;出牌发送 targets 数组', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [chainUseAction()],
+        perspectiveHand: [CHAIN_CARD],
+        send,
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    // 未选目标:不可出牌
+    expect(result.current.playButtonState?.canPlay).toBe(false);
+    act(() => result.current.handleTargetClick('P1'));
+    expect(result.current.playButtonState?.canPlay).toBe(true);
+    act(() => result.current.handleTargetClick('P0'));
+    expect(result.current.playButtonState?.targetLabel).toBe(' → P1、P0');
+    act(() => result.current.handlePlayCard());
+    const calls = sentCalls(send);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].skillId).toBe('铁索连环');
+    expect(calls[0].params).toEqual({ cardId: 'c-chain', targets: [1, 0] });
   });
 });
 

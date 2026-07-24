@@ -89,6 +89,8 @@ export interface PlayInteractionResult {
   selectedCardId: string | null;
   selectedTarget: string | null;
   selectedKillTarget: string | null;
+  /** 多目标(铁索连环 1-2 人)已选目标 name 集合;单/槽位路径为空 */
+  selectedMultiTargets: string[];
   selectedForDiscard: Set<string>;
   // ─── 转化模式 ───
   transformMode: TransformMode | null;
@@ -169,6 +171,8 @@ export function usePlayInteraction(
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedKillTarget, setSelectedKillTarget] = useState<string | null>(null);
+  // 多目标(铁索连环 max>=2):点击目标累加为集合,与单选/槽位路径互斥
+  const [selectedMultiTargets, setSelectedMultiTargets] = useState<string[]>([]);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformMode | null>(null);
   const [distributeMode, setDistributeMode] = useState<{
@@ -243,6 +247,10 @@ export function usePlayInteraction(
   }, [distKey]);
   useEffect(() => {
     setSelectedKillTarget(null);
+  }, [selectedCardId]);
+  // 换牌时清空多目标集合(与 selectedKillTarget 同源,覆盖所有选牌/重置路径)
+  useEffect(() => {
+    setSelectedMultiTargets([]);
   }, [selectedCardId]);
 
   // 转化模式自动取消:转化条件(回合/装备/手牌)随 view 变化可能不再满足
@@ -352,6 +360,13 @@ export function usePlayInteraction(
     } else if (rules.selfTarget) {
       canPlay = true;
       targetLabel = '';
+    } else if (rules.multiTarget) {
+      const min = rules.targetFilter?.min ?? 1;
+      canPlay = selectedMultiTargets.length >= min;
+      targetLabel =
+        selectedMultiTargets.length > 0
+          ? ` → ${selectedMultiTargets.join('、')}`
+          : ' (请选目标)';
     } else {
       canPlay = !rules.needsTarget || !!selectedTarget;
       targetLabel = selectedTarget
@@ -394,6 +409,15 @@ export function usePlayInteraction(
           slotIdx === 1 ? [view.players.findIndex((p) => p.name === selectedTarget)] : [];
         return slot?.filter ? slot.filter(view, i, { selected: ctxSelected }) : true;
       }
+      // 多目标(铁索连环 max>=2):点击累加为集合。已选目标仍可点(用于取消);
+      // 未达上限且通过 filter(含 allowSelf)才可选。与 playRules.multiTarget 对齐。
+      if (playRules?.multiTarget && tf) {
+        const name = view.players[i]?.name;
+        if (name && selectedMultiTargets.includes(name)) return true;
+        if (selectedMultiTargets.length >= tf.max) return false;
+        if (i === perspectiveIdx && !tf.allowSelf) return false;
+        return tf.filter ? tf.filter(view, i) : true;
+      }
       // 单目标路径：自己仅当卡牌允许时可选（selfTarget=桃/酒自动目标；
       // allowSelf=铁索连环含自己）。避免决斗/火攻等无 filter 卡误选自己。
       if (i === perspectiveIdx) {
@@ -414,6 +438,8 @@ export function usePlayInteraction(
       selectedTargetFilter,
       selectedUseAction,
       selectedTarget,
+      playRules,
+      selectedMultiTargets,
     ],
   );
 
@@ -434,6 +460,7 @@ export function usePlayInteraction(
       rules,
       selectedTarget,
       selectedKillTarget,
+      selectedMultiTargets,
     );
     if (params === null) return;
     // 出牌飞行动画:在 card 消失前捕获位置
@@ -452,6 +479,7 @@ export function usePlayInteraction(
     perspectiveIdx,
     selectedTarget,
     selectedKillTarget,
+    selectedMultiTargets,
     handListRef,
     send,
   ]);
@@ -498,6 +526,16 @@ export function usePlayInteraction(
         } else {
           setSelectedKillTarget(selectedKillTarget === name ? null : name);
         }
+        return;
+      }
+      // 多目标(铁索连环 max>=2):点击目标 toggle 进/出集合
+      if (playRules?.multiTarget) {
+        setSelectedMultiTargets((prev) => {
+          if (prev.includes(name)) return prev.filter((n) => n !== name);
+          const max = playRules.targetFilter?.max ?? prev.length;
+          if (prev.length >= max) return prev;
+          return [...prev, name];
+        });
         return;
       }
       setSelectedTarget(selectedTarget === name ? null : name);
@@ -849,6 +887,7 @@ export function usePlayInteraction(
     selectedCardId,
     selectedTarget,
     selectedKillTarget,
+    selectedMultiTargets,
     selectedForDiscard,
     transformMode,
     distributeMode,

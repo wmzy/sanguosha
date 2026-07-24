@@ -98,6 +98,8 @@ export interface PlayRules {
   slotCount: number;
   /** 是否自动以自己为目标(桃/酒) */
   selfTarget: boolean;
+  /** 是否多目标(非槽位、max>=2,如铁索连环 1-2 人、杀 max 3):点击多目标累加为一个集合 */
+  multiTarget: boolean;
   /** 原始 targetFilter */
   targetFilter: TargetFilter | null;
 }
@@ -110,14 +112,19 @@ export function derivePlayRules(
   const slots = targetFilter?.slots;
   const hasSlots = !!slots && slots.length > 1;
   const slotCount = slots?.length ?? 0;
-  const needsTarget = selfTarget
+  const isSelf = !!selfTarget;
+  const needsTarget = isSelf
     ? false
     : hasSlots || (targetFilter ? targetFilter.max >= 1 : false);
+  // 多目标:非槽位、非自动自身、targetFilter.max>=2(铁索连环/可多目标的杀)。
+  // 这类卡牌点击目标为「累加到一个集合」而非单选/分槽位。
+  const multiTarget = !hasSlots && !isSelf && (targetFilter?.max ?? 0) >= 2;
   return {
     needsTarget,
     hasSlots,
     slotCount,
-    selfTarget: !!selfTarget,
+    selfTarget: isSelf,
+    multiTarget,
     targetFilter: targetFilter ?? null,
   };
 }
@@ -140,6 +147,8 @@ export function buildPlayParams(
   rules: PlayRules,
   selectedTarget: string | null,
   selectedKillTarget: string | null,
+  /** 多目标(铁索连环等)已选目标 name 集合;单/槽位路径忽略 */
+  selectedMultiTargets: string[] = [],
 ): Record<string, Json> | null {
   const selfName = players[perspectiveIdx]?.name ?? '';
   if (rules.hasSlots) {
@@ -154,6 +163,16 @@ export function buildPlayParams(
     // 桃/酒:自动以自己为目标
     const selfIdx = players.findIndex((p) => p.name === selfName);
     return { cardId: card.id, targets: [selfIdx >= 0 ? selfIdx : perspectiveIdx] };
+  }
+  if (rules.multiTarget) {
+    // 铁索连环等:1..max 个同质目标,产出 targets 数组
+    const min = rules.targetFilter?.min ?? 1;
+    if (selectedMultiTargets.length < min) return null;
+    const idxs = selectedMultiTargets
+      .map((n) => players.findIndex((p) => p.name === n))
+      .filter((i): i is number => i >= 0);
+    if (idxs.length < min) return null;
+    return { cardId: card.id, targets: idxs };
   }
   if (rules.needsTarget) {
     if (!selectedTarget) return null;
