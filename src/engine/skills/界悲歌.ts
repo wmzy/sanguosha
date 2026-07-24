@@ -35,6 +35,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const START_RT = '界悲歌/chooseStart';
@@ -109,7 +110,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after hook:界悲歌主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if ((atom.amount ?? 0) <= 0) return;
     const targetIdx = atom.target;
@@ -151,7 +152,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars[JUDGE_SUIT_KEY];
     delete ctx.state.localVars[JUDGE_RANK_KEY];
     delete ctx.state.localVars[JUDGE_CARD_KEY];
-    await applyAtom(ctx.state, { type: '判定', player: targetIdx, judgeType: '界悲歌' });
+    await runJudgeFlow(ctx.state, targetIdx, '界悲歌');
     const suit = ctx.state.localVars[JUDGE_SUIT_KEY] as string | undefined;
     const rank = ctx.state.localVars[JUDGE_RANK_KEY] as string | undefined;
     const judgeCardId = ctx.state.localVars[JUDGE_CARD_KEY] as string | undefined;

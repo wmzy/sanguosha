@@ -6,6 +6,7 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../card-effect/registry';
 
 /** 万箭齐发的逐目标结算：询问闪 → 检查帧 cancelled → 伤害/抵消。
@@ -22,7 +23,7 @@ async function resolveArrowVolley(ctx: ResolveCtx): Promise<void> {
   } else {
     // 没闪：受伤害
     if (!state.players[target]?.alive) return;
-    await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
+    await runDamageFlow(state, source, target, 1, cardId);
   }
 }
 

@@ -160,7 +160,7 @@ describe('杀', () => {
     const damageEvents = harness.state.atomHistory.filter(
       (e): e is typeof e & { kind: 'atom'; atom: Record<string, unknown> } =>
         e.kind === 'atom' &&
-        (e as { atom: Record<string, unknown> }).atom.type === '造成伤害',
+        (e as { atom: Record<string, unknown> }).atom.type === '受到伤害时',
     );
     expect(damageEvents.length).toBeGreaterThanOrEqual(1);
     const lastDamage = damageEvents[damageEvents.length - 1].atom;
@@ -189,7 +189,7 @@ describe('杀', () => {
     const damageEvents = harness.state.atomHistory.filter(
       (e): e is typeof e & { kind: 'atom'; atom: Record<string, unknown> } =>
         e.kind === 'atom' &&
-        (e as { atom: Record<string, unknown> }).atom.type === '造成伤害',
+        (e as { atom: Record<string, unknown> }).atom.type === '受到伤害时',
     );
     expect(damageEvents.length).toBeGreaterThanOrEqual(1);
     const lastDamage = damageEvents[damageEvents.length - 1].atom;

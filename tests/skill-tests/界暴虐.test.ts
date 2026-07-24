@@ -20,6 +20,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -112,12 +113,7 @@ describe('界暴虐', () => {
     const p0HandBefore = harness.state.players[0].hand.length;
 
     // P1 对 P2 造成 1 点伤害(void fire-and-forget:after-hook 会创建 pending)
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 2,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 2, 1);
     await harness.waitForStable();
 
     // 询问 P0(董卓)是否发动暴虐
@@ -174,12 +170,7 @@ describe('界暴虐', () => {
 
     const p0HandBefore = harness.state.players[0].hand.length;
 
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 2,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 2, 1);
     await harness.waitForStable();
     P0.expectPending('请求回应');
 
@@ -228,12 +219,7 @@ describe('界暴虐', () => {
     const p0HandBefore = harness.state.players[0].hand.length;
     const deckBefore = harness.state.zones.deck.length;
 
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 2,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 2, 1);
     await harness.waitForStable();
     P0.expectPending('请求回应');
 
@@ -277,12 +263,7 @@ describe('界暴虐', () => {
     await harness.setup(state);
 
     // P1 造成 2 点伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 2,
-      amount: 2,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 2, 2);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -315,12 +296,7 @@ describe('界暴虐', () => {
     await harness.setup(state);
 
     // P0(董卓自己)造成伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -357,12 +333,7 @@ describe('界暴虐', () => {
     });
     await harness.setup(state);
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 2,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 2, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -399,12 +370,7 @@ describe('界暴虐', () => {
     });
     await harness.setup(state);
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 2,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 2, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -440,12 +406,7 @@ describe('界暴虐', () => {
     await harness.setup(state);
 
     // 系统伤害(source=-1)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: -1,
-    });
+    await runDamageFlow(harness.state, -1, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 

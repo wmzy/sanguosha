@@ -101,7 +101,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 造成伤害 after:春华受伤 → X 增加 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '扣减体力后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

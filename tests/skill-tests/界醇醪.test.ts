@@ -23,6 +23,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -239,11 +240,9 @@ describe('界醇醪', () => {
     await P0.useCardAndTarget('杀', 'sd', [1]);
     // P1 不闪
     await P1.pass();
-    // P1 HP=0 → 触发濒死 → 求桃询问轮到 P0
+    // P1 HP=0 → 触发濒死 → 求桃
     expect(harness.state.players[1].health).toBe(0);
-    // 求桃循环按座次从濒死者开始:P1 先被问(P1 无桃→超时),然后 P0 被问
-    await P1.pass(); // P1 无桃/醇,放弃
-    // 现在 P0 被问(P0 有醇醪)
+    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问(P0 有醇醪)
     P0.expectPending('请求回应');
     // P0 用醇醪
     await P0.respond('界醇醪', {});
@@ -288,27 +287,17 @@ describe('界醇醪', () => {
     harness.rebuildViews();
 
     // 第一次濒死:X=1,用 1 醇
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    void runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
-    await P1.pass();
+    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问
     await P0.respond('界醇醪', {});
     expect(harness.state.players[1].health).toBe(1);
     expect(醇列表(harness.state, 0)).toEqual(['sc2', 'sc3']); // 移去 1 张
 
     // 第二次濒死:X=2,用 2 醇
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    void runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
-    await P1.pass();
+    // 模块 C:P0 先被问
     await P0.respond('界醇醪', {}); // X=2 需 2 醇,P0 有 2 醇 → 成功
     expect(harness.state.players[1].health).toBe(1);
     expect(醇列表(harness.state, 0)).toEqual([]); // 移去 2 张
@@ -350,32 +339,20 @@ describe('界醇醪', () => {
     harness.rebuildViews();
 
     // 第一次濒死:直接造成伤害(P1 1血 → 0 → 濒死)→ 用 1 醇救回
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    void runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     expect(harness.state.players[1].health).toBe(0);
-    // 求桃循环:P1 先被问
-    await P1.pass();
+    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问
     await P0.respond('界醇醪', {}); // 用 1 醇救(X=1)
     expect(harness.state.players[1].health).toBe(1);
     expect(醇列表(harness.state, 0)).toEqual([]);
     expect(harness.state.players[0].vars['醇醪/usedThisRound']).toBe(1);
 
     // 第二次濒死:再造成伤害
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    void runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     expect(harness.state.players[1].health).toBe(0);
-    await P1.pass();
-    // P0 被问 → 但 X=2 需要 2 醇,P0 有 0 醇 → reject
+    // 模块 C:P0 先被问 → 但 X=2 需要 2 醇,P0 有 0 醇 → reject
     await P0.expectRejected({
       skillId: '界醇醪',
       actionType: 'respond',
@@ -459,14 +436,9 @@ describe('界醇醪', () => {
     harness.rebuildViews();
 
     // 濒死:P0 用醇 · computeX 发现 lastRound(1) ≠ currentRound(2) → 重置 → X=1
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    void runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
-    await P1.pass();
+    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问
     await P0.respond('界醇醪', {}); // 若 X=2 需 2 醇,但 X 重置为 1 → 只需 1 醇 → 成功
     expect(harness.state.players[1].health).toBe(1);
     expect(醇列表(harness.state, 0)).toEqual(['sc2', 'sc3']); // 只移去 1 张(X=1)

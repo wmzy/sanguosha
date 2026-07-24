@@ -17,6 +17,7 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom, frameCards, pushFrame, popFrame } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import {
   registerCardEffect,
   getCardEffect,
@@ -43,7 +44,7 @@ const 测试杀Effect: CardEffect = {
     await applyAtom(state, { type: '询问闪', target, source });
     const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
     if (dodgeIds.length === 0) {
-      await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
+      await runDamageFlow(state, source, target, 1, cardId);
     }
   },
   prompt: {

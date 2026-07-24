@@ -19,6 +19,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -98,13 +99,7 @@ describe('界耀武', () => {
     const p1HandBefore = harness.state.players[1].hand.length;
 
     // P1 用红色杀对华雄造成 1 点伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'rs1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'rs1');
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -141,13 +136,7 @@ describe('界耀武', () => {
     const p0HandBefore = harness.state.players[0].hand.length;
     const p1HandBefore = harness.state.players[1].hand.length;
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'bs1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'bs1');
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -183,12 +172,7 @@ describe('界耀武', () => {
     const p0HandBefore = harness.state.players[0].hand.length;
 
     // 不带 cardId 的伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -225,13 +209,7 @@ describe('界耀武', () => {
     const p1HandBefore = harness.state.players[1].hand.length;
 
     // P0 用红色杀对 P1 造成伤害(P1 不是华雄,不触发界耀武)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-      cardId: 'rs1',
-    });
+    await runDamageFlow(harness.state, 0, 1, 1, 'rs1');
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -267,13 +245,7 @@ describe('界耀武', () => {
     const p0HandBefore = harness.state.players[0].hand.length;
     const p1HandBefore = harness.state.players[1].hand.length;
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 0,
-      source: 1,
-      cardId: 'rs1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 0, 'rs1');
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -309,13 +281,7 @@ describe('界耀武', () => {
     const p0HandBefore = harness.state.players[0].hand.length;
     const p1HandBefore = harness.state.players[1].hand.length;
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'rd1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'rd1');
     await harness.waitForStable();
     harness.processAllEvents();
 

@@ -317,12 +317,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ── 造成伤害 before:AOE/决斗/火攻 无效化 ──────────────────
+  // ── 受到伤害时 before:AOE/决斗/火攻 无效化 ──────────────────
   registerBeforeHook(
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '受到伤害时',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.target !== ownerId) return;

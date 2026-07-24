@@ -68,7 +68,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     if ((ctx.atom).target !== ownerId) return;
     const amount = (ctx.atom).amount ?? 0;
     if (amount <= 0) return;

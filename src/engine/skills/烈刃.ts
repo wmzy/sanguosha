@@ -8,10 +8,7 @@
 //     2. 发动 → 双方各选一张手牌拼点:
 //        a. 请求回应(useCard):owner 选自己的拼点牌
 //        b. 请求回应(useCard):受害者选拼点牌
-//        c. 移动牌:owner 拼点牌 → 处理区
-//        d. 移动牌:受害者拼点牌 → 处理区
-//        e. 拼点 atom(事件标记)
-//        f. 清理处理区:两张拼点牌进弃牌堆
+//        c. runRankCompareFlow(扣置→亮出→后→弃牌堆,两张牌面朝下同时扣置)
 //     3. 拼点赢(owner 点数 > 受害者)→ 获得 受害者一张牌(优先手牌第一张,其次装备)
 //     4. 没赢(输或平)→ 无事发生
 //   限制:无次数限制;拼点需双方都有手牌,任一方无手牌则不发动
@@ -22,6 +19,7 @@
 //   - 拼点流程参考驱虎.ts;获得牌参考反馈.ts
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runRankCompareFlow } from '../rank-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '烈刃/confirm';
@@ -109,7 +107,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // ── 造成伤害 after-hook:烈刃主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
@@ -182,47 +180,37 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const victimCardId = ctx.state.localVars[VICTIM_CARD_KEY] as string | undefined;
     delete ctx.state.localVars[VICTIM_CARD_KEY];
 
-    // 2c-f. 拼点流程(参考驱虎):进处理区 → 拼点事件 → 清理 → 弃牌堆
+    // 2c-f. 拼点两步化(扣置→亮出→后→弃牌堆):runRankCompareFlow 内部由
+    //   拼点扣置 统一同时扣置两张牌(面朝下),不再预先移入处理区。
     await pushFrame(ctx.state, '烈刃', ownerId, { victim });
     const ownerCard = ctx.state.cardMap[ownerCardId];
     const ownerValue = ownerCard ? rankValue(ownerCard.rank) : 0;
 
-    // owner 拼点牌进处理区
-    await applyAtom(ctx.state, {
-      type: '移动牌',
-      cardId: ownerCardId,
-      from: { zone: '手牌', player: ownerId },
-      to: { zone: '处理区' },
-    });
-
-    // 受害者拼点牌进处理区(若出了)
-    let victimValue = 0;
+    // 受害者拼点牌(若出了)——拼点两步化。未出牌(超时)走兜底。
+    let win: boolean;
     if (victimCardId && ctx.state.players[victim].hand.includes(victimCardId)) {
-      const vc = ctx.state.cardMap[victimCardId];
-      victimValue = vc ? rankValue(vc.rank) : 0;
+      const result = await runRankCompareFlow(
+        ctx.state,
+        ownerId,
+        victim,
+        ownerCardId,
+        victimCardId,
+      );
+      win = result === '赢';
+    } else {
+      // 受害者未出牌(超时):清理 owner 拼点牌(手牌→弃牌堆),按 owner 默认胜出(保留旧行为)。
       await applyAtom(ctx.state, {
         type: '移动牌',
-        cardId: victimCardId,
-        from: { zone: '手牌', player: victim },
-        to: { zone: '处理区' },
+        cardId: ownerCardId,
+        from: { zone: '手牌', player: ownerId },
+        to: { zone: '弃牌堆' },
       });
+      win = ownerValue > 0;
     }
-
-    // 拼点事件(前端动画/音效;applyView 把两张牌从处理区移入弃牌堆视图)
-    await applyAtom(ctx.state, {
-      type: '拼点',
-      initiator: ownerId,
-      target: victim,
-      initiatorCard: ownerCardId,
-      targetCard: victimCardId ?? '',
-    });
-
-    // 拼点 atom 的 apply 已把两张牌从处理区移入弃牌堆(后端 + 视图对称),无需手动清理。
 
     await popFrame(ctx.state);
 
     // 3. 结算输赢:owner 赢 → 获得 受害者一张牌(优先手牌第一张,其次装备)
-    const win = ownerValue > victimValue;
     if (!win) return;
     const target = ctx.state.players[victim];
     if (!target) return;

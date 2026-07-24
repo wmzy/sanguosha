@@ -16,6 +16,7 @@
 //   距离:inAttackRange(state, 目标, 姜维)—— 目标的杀能攻击到姜维
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
@@ -159,13 +160,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               to: { zone: '弃牌堆' },
             });
           } else if (state.players[from]?.alive) {
-            await applyAtom(state, {
-              type: '造成伤害',
-              target: from,
-              source: target,
-              amount: 1,
-              cardId: killCardId,
-            });
+            await runDamageFlow(state, target, from, 1, killCardId);
           }
         } else {
           // 3) 目标没出杀:姜维弃其一张牌

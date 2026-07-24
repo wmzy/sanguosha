@@ -1,7 +1,7 @@
 // 界咆哮(界张飞·锁定技):出牌阶段,你使用【杀】无次数限制;你使用的【杀】被【闪】抵消时,摸一张牌。
 //
 // 实现机制:
-//   1. 无次数限制:onInit 注册一个出杀上限提供者,返回 Infinity → slashMax 返回 ∞ → 可无限出杀。
+//   1. 无次数限制:onInit 注册一个无限出杀提供者,返回 true → slashMax 返回 ∞ → 可无限出杀。
 //      提供者随技能实例生命周期注册/卸载:武将技能开局即实例化(注册),整局常驻。
 //      (与诸葛连弩完全一致,出杀上限模型见 slash-quota.ts)
 //
@@ -12,7 +12,7 @@
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
-import { registerSlashMaxProvider } from '../slash-quota';
+import { registerSlashUnlimitedProvider } from '../slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -27,8 +27,8 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // 注册出杀上限提供者:返回 Infinity → slashMax = ∞ → 可无限出杀。
-  const unregMax = registerSlashMaxProvider(state, ownerId, () => Infinity);
+  // 注册无限出杀提供者:返回 true → slashMax = ∞ → 可无限出杀。
+  const unregMax = registerSlashUnlimitedProvider(state, ownerId, () => true);
 
   // 杀被闪抵消后摸一张牌(无次数限制,每次被闪都摸)。
   const unregHook = registerAfterHook(

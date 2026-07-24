@@ -9,8 +9,8 @@
 //   界版与标版机制略有不同(可选装备牌),必须独立界版文件。
 //
 // 实现要点:
-//   - 触发时机:陷入濒死 after-hook(任意角色,含自己)。
-//     陷入濒死 atom 由系统规则 runDyingFlow 在 造成伤害/失去体力 后触发;
+//   - 触发时机:进入濒死状态时 after-hook(模块 C 迁移自 陷入濒死;任意角色,含自己)。
+//     进入濒死状态时 atom 由系统规则 runDyingFlow 在 陷入濒死 + 不屈检查 之后触发;
 //     本 hook 在 runDyingFlow 进入求桃循环前运行,救活后 health>0 → 循环退出。
 //   - 重入保护:hook 入口检查 target.health ≤ 0(若已被不屈/涅槃先救活,跳过)。
 //   - 选牌:pickTargetCard 同构 UI(装备区明选 + 手牌盲选)。owner 选择目标一张牌。
@@ -127,8 +127,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ── 陷入濒死 after:任一角色濒死,询问是否发动补益 ──
-  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
+  // ── 进入濒死状态时 after:任一角色濒死,询问是否发动补益(模块 C 迁移自 陷入濒死) ──
+  registerAfterHook(state, skill.id, ownerId, '进入濒死状态时', async (ctx) => {
     const atom = ctx.atom;
     if (typeof atom.target !== 'number') return;
     const target = atom.target;

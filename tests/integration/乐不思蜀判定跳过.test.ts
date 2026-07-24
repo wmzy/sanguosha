@@ -7,7 +7,7 @@
 //   2. 多个 乐不思蜀 堆叠(罕见但合规)→ 一次判定只解一个,仍能跳过一次出牌
 //   3. SKIP_TAG 跨回合不应残留(被去标签后才进弃牌,验证不残留)
 //   4. 判定♥ → SKIP_TAG 不加,后续 阶段开始 出牌 不被 cancel(出牌阶段正常进入)
-//   5. 判定区同时有 乐不思蜀 + 闪电 → 仅 乐不思蜀 触发判定(闪电无 skill 不触发)
+//   5. 判定区同时有 乐不思蜀 + 闪电 → 两者都被结算(最后置入的闪电先结算，对齐 game.md)
 //
 // 关键机制:见 乐不思蜀.ts
 import { describe, it, expect } from 'vitest';
@@ -235,45 +235,62 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 5:判定区同时有 乐不思蜀 + 闪电 → 只 乐不思蜀 触发判定,闪电无 skill 不响应
+  // 用例 5:判定区同时有 乐不思蜀 + 闪电 → 两个延时锦囊都被结算（最后置入的闪电先结算）
+  //   对齐 game.md：判定阶段逐个结算最后置入的延时锦囊，直到判定区清空。
+  //   回归：旧实现只 find 第一个 + 单次结算，闪电不会被结算。
   // ─────────────────────────────────────────────────────────────
-  it('用例5:判定区有 乐不思蜀 + 闪电 → 只触发乐不思蜀的判定,闪电不动', async () => {
+  it('用例5:判定区有 乐不思蜀 + 闪电 → 两者都被结算,最后置入的闪电先结算', async () => {
     const lb: Card = makeCard('lb1', '乐不思蜀', '♠', '3');
     const sd: Card = makeCard('sd1', '闪电', '♠', 'A');
-    const judgeCard: Card = makeCard('jd1', '杀', '♠', '7', '基本牌');
+    // 牌堆顶 jd1 → 闪电（最后置入先结算）→ ♠K 非命中 → 闪电传给 P1
+    const judgeForLightning: Card = makeCard('jd1', '杀', '♠', 'K', '基本牌');
+    // jd2 → 乐不思蜀 → ♠5 非♥ → 加跳过出牌标签
+    const judgeForIndulgence: Card = makeCard('jd2', '杀', '♠', '5', '基本牌');
 
     const state: GameState = createGameState({
       players: [
         makePlayer({
           index: 0,
           name: 'P0',
+          // pendingTricks 按置入顺序：乐不思蜀先，闪电最后置入
           pendingTricks: [
             { name: '乐不思蜀', source: 1, card: lb },
             { name: '闪电', source: 1, card: sd },
           ],
           skills: ['乐不思蜀'],
         }),
+        makePlayer({ index: 1, name: 'P1', skills: [] }),
       ],
-      cardMap: { [lb.id]: lb, [sd.id]: sd, [judgeCard.id]: judgeCard },
+      cardMap: {
+        [lb.id]: lb,
+        [sd.id]: sd,
+        [judgeForLightning.id]: judgeForLightning,
+        [judgeForIndulgence.id]: judgeForIndulgence,
+      },
       currentPlayerIndex: 0,
       phase: '判定',
       turn: { round: 1, phase: '判定', vars: {} },
-      zones: { deck: [judgeCard.id], discardPile: [], processing: [] },
+      zones: { deck: [judgeForLightning.id, judgeForIndulgence.id], discardPile: [], processing: [] },
     });
     await registerSkillsFromState(state);
 
     void applyAtom(state, { type: '阶段开始', player: 0, phase: '判定' });
-    await waitForStable(state); // 等到无懈 pending
-    await fireTimeoutAndWait(state); // 消耗无懈窗口
+    // 两个延时锦囊各开一个无懈窗口 → 逐个消耗
+    await waitForStable(state);
+    await fireTimeoutAndWait(state); // 闪电的无懈窗口
+    await waitForStable(state);
+    await fireTimeoutAndWait(state); // 乐不思蜀的无懈窗口
 
-    // 乐不思蜀 被解(判定 ♠ 非♥)
+    // 两者都被结算：P0 判定区清空
     expect(state.players[0].pendingTricks.find((t) => t.name === '乐不思蜀')).toBeUndefined();
-    // 闪电 仍在判定区(无 skill 处理 → 不动)
-    expect(state.players[0].pendingTricks.find((t) => t.name === '闪电')).toBeDefined();
-    // SKIP_TAG 加(因 乐不思蜀 命中)
+    expect(state.players[0].pendingTricks.find((t) => t.name === '闪电')).toBeUndefined();
+    // 闪电（最后置入）先结算 → ♠K 非命中 → 传给 P1
+    expect(state.players[1].pendingTricks.find((t) => t.name === '闪电')).toBeDefined();
+    // 乐不思蜀后结算 → ♠5 非♥ → 加 SKIP_TAG
     expect(state.players[0].tags ?? []).toContain(SKIP_TAG);
-    // 判定牌进弃牌堆
-    expect(state.zones.discardPile).toContain(judgeCard.id);
+    // 两张判定牌均进弃牌堆
+    expect(state.zones.discardPile).toContain(judgeForLightning.id);
+    expect(state.zones.discardPile).toContain(judgeForIndulgence.id);
   });
 
   // ─────────────────────────────────────────────────────────────

@@ -168,21 +168,21 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '造成伤害时',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.source !== ownerId) return;
       if ((atom.amount ?? 0) <= 0) return;
-      const target = atom.target;
-      if (target === undefined) return;
+      const targetIdx = atom.target;
+      if (targetIdx === undefined) return;
       const cardId = atom.cardId;
       if (typeof cardId === 'string') {
         const card = ctx.state.cardMap[cardId];
         if (card?.name !== '杀') return;
       }
-      const player = ctx.state.players[target];
+      const player = ctx.state.players[targetIdx];
       if (!player?.tags.includes(TAG_BONUS)) return;
-      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG_BONUS });
+      await applyAtom(ctx.state, { type: '去标签', player: targetIdx, tag: TAG_BONUS });
       return {
         kind: 'modify',
         atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,

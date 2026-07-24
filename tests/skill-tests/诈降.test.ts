@@ -19,6 +19,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { createGameState } from '../../src/engine/types';
 import type { Card, Faction, Json } from '../../src/engine/types';
 
@@ -396,7 +397,7 @@ describe('诈降', () => {
     seedDeckCards(state);
     await harness.setup(state);
 
-    await applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    await runDamageFlow(harness.state, 1, 0, 1);
     expect(harness.state.players[0].health).toBe(3);
 
     // 诈降挂在'失去体力',不应被'造成伤害'触发

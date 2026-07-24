@@ -385,10 +385,14 @@ describe('蛊惑', () => {
     const YJ = harness.player('于吉');
     const P0 = harness.player('P0');
 
-    // P0 出杀 → 于吉不闪 → HP=0 → 濒死 → 求桃(先问濒死者于吉自己)
+    // P0 出杀 → 于吉不闪 → HP=0 → 濒死 → 求桃
+    // 模块 C:逆时针从当前回合 P0(idx1)起 → P0 先被问(无桃)→ pass
     await P0.useCardAndTarget('杀', 'atk', [0]);
     await YJ.pass(); // 不闪,受伤害进濒死
     expect(harness.state.players[0].health).toBe(0);
+    await P0.pass(); // P0 无桃跳过
+
+    // 第二问 于吉(idx0,濒死者)
     const slot = [...harness.state.pendingSlots.values()][0].atom as {
       type?: string;
       requestType?: string;

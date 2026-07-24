@@ -25,6 +25,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -263,7 +264,7 @@ describe('界窃听', () => {
     await harness.setup(state);
 
     // P1 对 P0 造伤
-    void applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 

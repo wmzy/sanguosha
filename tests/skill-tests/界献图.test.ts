@@ -21,6 +21,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, Json, TurnPhase } from '../../src/engine/types';
@@ -310,12 +311,7 @@ describe('界献图(OL 界限突破版)', () => {
     await harness.waitForStable();
 
     // P1 对 P0 造成 1 点伤害
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      source: 1,
-      amount: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
 
     const healthBefore = harness.state.players[0].health;
@@ -348,12 +344,7 @@ describe('界献图(OL 界限突破版)', () => {
     await harness.waitForStable();
 
     // P1 对 P0 造成 2 点伤害
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      source: 1,
-      amount: 2,
-    });
+    void runDamageFlow(harness.state, 1, 0, 2);
     await harness.waitForStable();
 
     const healthBefore = harness.state.players[0].health;
@@ -386,12 +377,7 @@ describe('界献图(OL 界限突破版)', () => {
     await harness.waitForStable();
 
     // P1 对 P0 造成 3 点伤害(超过给牌数 2)
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      source: 1,
-      amount: 3,
-    });
+    void runDamageFlow(harness.state, 1, 0, 3);
     await harness.waitForStable();
 
     const healthBefore = harness.state.players[0].health;
@@ -497,12 +483,7 @@ describe('界献图(OL 界限突破版)', () => {
     await harness.setup(state);
 
     // P1 造成 1 点伤害(在准备阶段,不计入献图统计)
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      source: 1,
-      amount: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
 
     // 进入出牌阶段:此时献图统计应是 0

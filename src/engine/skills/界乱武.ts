@@ -19,6 +19,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界乱武';内部 Skill.name='乱武'。
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
 import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
@@ -98,7 +99,7 @@ async function resolveForcedSlash(
             });
           }
         } else if (state.players[target]?.alive) {
-          await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
+          await runDamageFlow(state, source, target, 1, cardId);
         }
       }
     }

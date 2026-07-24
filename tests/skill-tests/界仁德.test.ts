@@ -144,7 +144,7 @@ describe('界仁德', () => {
     // 视为杀命中 P2 → 扣血
     expect(harness.state.players[1].health).toBe(3);
     // 出杀次数已用 1
-    expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
     restoreAutoCompare();
   });
 
@@ -272,7 +272,7 @@ describe('界仁德', () => {
       cardMap: { c1, c2 },
       currentPlayerIndex: 0,
       phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: { '杀/usedCount': 1 } }, // 已用 1 次(达上限)
+      turn: { round: 1, phase: '出牌', vars: { '杀/quotaUsed': 1 } }, // 已用 1 次(达上限)
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -291,7 +291,7 @@ describe('界仁德', () => {
     expect(harness.state.players[0].health).toBe(4);
     expect(harness.state.players[1].health).toBe(4);
     // 出杀次数未增加
-    expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
     restoreAutoCompare();
   });
 

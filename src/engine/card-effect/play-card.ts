@@ -16,7 +16,7 @@
 // 与使用牌（use-card）并存：使用牌走 runUseFlow 编排完整目标结算，打出牌仅声明+置入。
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom, frameCards } from '../create-engine';
 import { registerAction } from '../skill';
 import { getAllCardEffects } from './registry';
 import { runUseFlow } from './use-card';
@@ -62,6 +62,32 @@ export async function runPlayFlow(
 
   // 时机2：打出牌时（雷击/涯角/银月枪 after-hook）
   await applyAtom(state, { type: '打出牌时', player, cardId });
+}
+
+/** 打出牌的统一清理：消耗当前结算帧处理区中的全部【杀】牌（移入弃牌堆），
+ *  返回被消耗的牌 id 列表（按帧内顺序）。
+ *
+ *  使用场景：询问出杀（`询问杀` atom 或 `请求回应` 杀/forceKill）后，调用方据返回值
+ *  判断目标是否出了杀（长度 > 0 = 出了杀），并把杀牌统一移入弃牌堆。
+ *  替代此前散落在 南蛮入侵/决斗/借刀杀人/无双 各自手写的 `处理区→弃牌堆` 清理。
+ *
+ *  设计要点：
+ *  - 清理必须在 `applyAtom(询问杀)` 返回之后进行——询问期间杀牌须留在处理区供检测
+ *    （决斗循环的下一轮还会复用处理区检测，故每轮询问后即清理）。
+ *  - 闪/无懈走 runUseFlow，内部已自洽清理（手牌→处理区→弃牌堆），不经过本函数。
+ *  - runPlayFlow 本身不含清理（打出牌的清理时机取决于调用方逻辑）。
+ */
+export async function consumePlayedSlashes(state: GameState): Promise<string[]> {
+  const kills = frameCards(state).filter((id) => state.cardMap[id]?.name === '杀');
+  for (const id of kills) {
+    await applyAtom(state, {
+      type: '移动牌',
+      cardId: id,
+      from: { zone: '处理区' },
+      to: { zone: '弃牌堆' },
+    });
+  }
+  return kills;
 }
 
 /** 注册 respond action：逐卡名注册（skillId=卡名），路由到 CardEffect.respond。

@@ -1,7 +1,12 @@
 // src/engine/atoms/给予.ts
 // 给予:从 from 玩家手牌将 cardId 给予 to 玩家
+//
+// 模块 F 迁移(flow-redesign.md):afterApply 发出「移动到目标区域后」时机标记(reason='给予')。
+// 给予.validate 保证 cardId 在 from 手牌,from/to 均为手牌区域(ZoneLoc 可表达),标记 from/to 准确。
+// 本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
+import { applyAtom } from '../create-engine';
 
 export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }> = {
   type: '给予',
@@ -20,6 +25,16 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
     state.players[toIdx].hand.push(atom.cardId);
   },
   effect: { sound: 'give', animation: 'slide', duration: 600 },
+  /** 模块 F:发出「移动到目标区域后」时机标记(reason='给予',手牌→手牌)。 */
+  async afterApply(state, atom) {
+    await applyAtom(state, {
+      type: '移动到目标区域后',
+      cardId: atom.cardId,
+      from: { zone: '手牌', player: atom.from },
+      to: { zone: '手牌', player: atom.to },
+      reason: '给予',
+    });
+  },
   toViewEvents(_state, atom): ViewEventSplit {
     const effect = { sound: 'give' as const, animation: 'slide' as const, duration: 600 };
     // toViewEvents 在 apply 之前调用,此时 cardId 还在 from 手牌里。

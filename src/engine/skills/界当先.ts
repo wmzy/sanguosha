@@ -37,6 +37,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
 import { registerAttackRangeExemptor } from '../distance';
 
@@ -226,12 +227,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       (ctx.state.turn.vars[DMG_IN_PHASE_KEY] as number | undefined) === 0 &&
       ctx.state.players[ownerId]?.alive === true
     ) {
-      await applyAtom(ctx.state, {
-        type: '造成伤害',
-        target: ownerId,
-        source: ownerId,
-        amount: 1,
-      });
+      await runDamageFlow(ctx.state, ownerId, ownerId, 1);
     }
 
     // 7) 清理(turn.vars 会在 回合结束 atom 整体重置;这里显式清以保 hook 重入安全)
@@ -242,7 +238,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after-hook:统计额外出牌阶段内 owner 造成的伤害 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

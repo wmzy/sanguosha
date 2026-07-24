@@ -127,10 +127,11 @@ describe('祸首', () => {
     // 孟获未受伤
     expect(harness.state.players[0].health).toBe(4);
     // 关键契约:伤害来源 = 孟获(0),而非使用者 P1(1)
+    // 新流程:伤害走 runDamageFlow,不再有 造成伤害 atom。检查 受到伤害后 时机 atom 的 source。
     const damageAtom = harness.state.atomHistory.find(
       (e) =>
         e.kind === 'atom' &&
-        (e as { atom?: { type?: string; target?: number } }).atom?.type === '造成伤害' &&
+        (e as { atom?: { type?: string; target?: number } }).atom?.type === '受到伤害后' &&
         (e as { atom?: { target?: number } }).atom?.target === 2,
     );
     expect(damageAtom).toBeTruthy();

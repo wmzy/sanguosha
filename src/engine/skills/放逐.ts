@@ -26,6 +26,7 @@ import type {
   GameView,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const CONFIRM_RT = '放逐/confirm';
@@ -77,7 +78,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:曹丕受伤后,选目标 + 摸 X 张 + 翻面 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
@@ -135,7 +136,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 摸 X 张牌
     await applyAtom(ctx.state, { type: '摸牌', player: target, count: lostHealth });
     // 翻面:加标签(下一回合开始时消费)
-    await applyAtom(ctx.state, { type: '加标签', player: target, tag: SKIP_TAG });
+    await flipFaceDown(ctx.state, target, '放逐');
   });
 
   // ── 阶段开始 before hook:检测翻面标签 → 启动跳过 ──
@@ -155,7 +156,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
       if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
-        await applyAtom(ctx.state, { type: '去标签', player, tag: SKIP_TAG });
+        await flipFaceUp(ctx.state, player, '放逐');
         ctx.state.localVars[SKIP_FLAG] = player;
         return { kind: 'cancel' };
       }
@@ -184,9 +185,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[SKIP_FLAG];
 
       // 亲自执行 end-turn 序列(与 回合管理.end action 一致,但跳过了被 cancel 的阶段)
-      await applyAtom(ctx.state, { type: '清过期标记', player });
-      await applyAtom(ctx.state, { type: '下一玩家' });
-      await applyAtom(ctx.state, { type: '回合结束', player });
+      await performSkipTurn(ctx.state, player);
 
       return { kind: 'cancel' };
     },

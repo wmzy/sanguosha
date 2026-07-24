@@ -25,12 +25,12 @@
 //      after-hook on 造成伤害:source=ownerId + amount>0 + 自己回合出牌阶段
 //        → state.turn.vars['父魂/granted'] = ownerId
 //        + applyAtom(回合用量) 投影到 view.players[ownerId].turnUsage
-//      咆哮效果:slashMaxProvider 读 turn.vars,granted 时返回 Infinity
+//      咆哮效果:无限出杀提供者读 turn.vars,granted 时返回 true → slashMax=∞
 //      武圣效果:transform action(1 红色手牌 → 杀),activeWhen 读 turnUsage
 //      回合结束 atom 自动清空 turn.vars → grant 自然失效
 //
 // 契约:
-//   - turn.vars['父魂/granted']:生产=造成伤害 after hook,消费=slashMaxProvider+武圣 transform
+//   - turn.vars['父魂/granted']:生产=造成伤害 after hook,消费=无限出杀提供者+武圣 transform
 //   - localVars['闪/色限制']:生产=询问闪 before hook,消费=闪.respond validate,清=询问闪 after hook
 import type {
   Card,
@@ -45,7 +45,7 @@ import type {
 import type { Color } from '../../shared/types';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
 import { applyAtom, topFrame } from '../create-engine';
-import { registerSlashMaxProvider } from '../slash-quota';
+import { registerSlashUnlimitedProvider } from '../slash-quota';
 import { viewCanAttack } from '../viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 
@@ -214,9 +214,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── C. granted 咆哮:slashMaxProvider 读 turn.vars,granted 时 Infinity ──
-  const unregMax = registerSlashMaxProvider(state, ownerId, (s, p) =>
-    isGranted(s, p) ? Infinity : 0,
+  // ── C. granted 咆哮:无限出杀提供者读 turn.vars,granted 时 true → slashMax=∞ ──
+  const unregMax = registerSlashUnlimitedProvider(state, ownerId, (s, p) =>
+    isGranted(s, p),
   );
 
   // ── D. 造成伤害 after:owner 出牌阶段杀造成伤害 → granted 标记 ──
@@ -224,7 +224,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '造成伤害后',
     async (ctx) => {
       const atom = ctx.atom;
       if (atom.source !== ownerId) return;

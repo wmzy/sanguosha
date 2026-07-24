@@ -293,16 +293,24 @@ describe('桃', () => {
     expect(harness.state.players[1].health).toBe(0);
     // 验证 pending 存在
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+
+    // 模块 C:逆时针从当前回合 P1(idx0)起 → P1 先被问(打出杀后无手牌)→ pass
+    let slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
       type?: string;
       requestType?: string;
       target?: number;
     };
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('桃/求桃');
+    expect(slotAtom.target).toBe(0);
+    await P1.pass();
 
-    // 求桃 pending 目标应该是濒死者(P1,index=1)或下一个活人
-    // P1 自己的桃:dispatch 桃 respond,ownerId=1
+    // 第二问 P2(idx1,濒死者)→ 有桃自救
+    slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+      type?: string;
+      requestType?: string;
+      target?: number;
+    };
     const dyingTarget = slotAtom.target!;
     await P2.respond('桃', { cardId: 'p1' });
     // 救回(由濒死者或被询问者出桃)

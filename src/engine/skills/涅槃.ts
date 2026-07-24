@@ -17,6 +17,7 @@
 //        涅槃把 health 拉回 3,循环立即退出,庞统不死亡。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
+import { setChain } from '../face-down';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '涅槃/confirm';
@@ -112,7 +113,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 2. 重置武将牌:解除连环状态
     const chained = ctx.state.players[ownerId].marks.some((m) => m.id === 'chained');
     if (chained) {
-      await applyAtom(ctx.state, { type: '设横置', player: ownerId, chained: false });
+      await setChain(ctx.state, ownerId, false);
     }
 
     // 3. 摸三张牌

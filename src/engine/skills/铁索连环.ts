@@ -18,6 +18,8 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { setChain } from '../face-down';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, validateUseCard, type SkillModule } from '../skill';
 
 const CHAIN_MARK = 'chained';
@@ -64,7 +66,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 连环传导 hook(全局唯一,首个实例注册)──
   if (!state.localVars[CONDUCTING_VAR + 'hook已注册']) {
     state.localVars[CONDUCTING_VAR + 'hook已注册'] = true;
-    registerAfterHook(state, '铁索连环', -1, '造成伤害', async (ctx) => {
+    registerAfterHook(state, '铁索连环', -1, '伤害结算结束后', async (ctx) => {
       const atom = ctx.atom;
       const dt = atom.damageType as DamageType | undefined;
       if (dt !== '火焰' && dt !== '雷电') return;
@@ -83,20 +85,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
         );
         for (const p of others) {
           if (!ctx.state.players[p.index]?.alive) continue; // 传导链中可能死亡
-          await applyAtom(ctx.state, {
-            type: '造成伤害',
-            target: p.index,
-            amount,
-            source,
-            damageType: dt,
-          });
+          await runDamageFlow(ctx.state, source, p.index, amount, undefined, dt);
         }
         // 重置所有处于连环状态的角色(含原始目标)
         const allChained = ctx.state.players.filter((p) =>
           p.marks.some((m) => m.id === CHAIN_MARK),
         );
         for (const p of allChained) {
-          await applyAtom(ctx.state, { type: '设横置', player: p.index, chained: false });
+          await setChain(ctx.state, p.index, false);
         }
       } finally {
         delete ctx.state.localVars[CONDUCTING_VAR];

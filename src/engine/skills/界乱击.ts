@@ -37,6 +37,7 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom, popFrame, pushFrame, frameCards, topFrame } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { 询问抵消 } from '../无懈可击';
 import { isCancelled } from '../card-effect/registry';
 import { defaultPlayActive } from '../action-active';
@@ -214,13 +215,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             await applyAtom(state, { type: '被抵消', source: from, target, cardId });
           } else {
             if (!state.players[target]?.alive) continue;
-            await applyAtom(state, {
-              type: '造成伤害',
-              target,
-              amount: 1,
-              source: from,
-              cardId,
-            });
+            await runDamageFlow(state, from, target, 1, cardId);
           }
         }
         // 锦囊移出处理区→弃牌堆

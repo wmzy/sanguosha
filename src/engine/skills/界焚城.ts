@@ -38,6 +38,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
@@ -189,25 +190,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               } else {
                 // 超时/放弃/校验失败 → 受伤
                 if (st.players[p]?.alive) {
-                  await applyAtom(st, {
-                    type: '造成伤害',
-                    target: p,
-                    amount: 2,
-                    source: from,
-                    damageType: '火焰',
-                  });
+                  await runDamageFlow(st, from, p, 2, undefined, '火焰');
                 }
               }
             } else {
               // 选 2 → 受伤
               if (st.players[p]?.alive) {
-                await applyAtom(st, {
-                  type: '造成伤害',
-                  target: p,
-                  amount: 2,
-                  source: from,
-                  damageType: '火焰',
-                });
+                await runDamageFlow(st, from, p, 2, undefined, '火焰');
               }
             }
           }

@@ -85,10 +85,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ── after-hook:拼点 atom 后,owner 可获得指定拼点牌 ──
-  registerAfterHook(state, skill.id, ownerId, '拼点', async (ctx) => {
+  // ── after-hook:拼点后 atom 后,owner 可获得指定拼点牌 ──
+  //   挂「拼点后」(拼点两步化的统一钩子点):驱虎/界惴恐/天义/烈刃/界巧说/界陷阵 等
+  //   所有拼点技均经 runRankCompareFlow 发出 拼点后,本钩子统一消费。
+  registerAfterHook(state, skill.id, ownerId, '拼点后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '拼点') return;
+    if (atom.type !== '拼点后') return;
 
     // owner 须为拼点参与方
     const isInitiator = atom.initiator === ownerId;

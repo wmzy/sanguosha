@@ -28,6 +28,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, hasBlockingPending, type SkillModule } from '../skill';
 
 // localVars keys(界激将新增被动触发)
@@ -140,13 +141,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
                 to: { zone: '弃牌堆' },
               });
             } else {
-              await applyAtom(state, {
-                type: '造成伤害',
-                target: killTarget,
-                amount: 1,
-                source: target,
-                cardId: killCardId,
-              });
+              await runDamageFlow(state, target, killTarget, 1, killCardId);
             }
           }
         } else {

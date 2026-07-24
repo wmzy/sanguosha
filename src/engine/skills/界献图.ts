@@ -264,7 +264,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 造成伤害 after-hook:统计 currentPlayer 出牌阶段造成的伤害 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const st = ctx.state;
     if (st.phase !== '出牌') return;
     const atom = ctx.atom;

@@ -19,6 +19,7 @@
 //   内部 Skill.name = '挑衅'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
@@ -191,13 +192,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (slashFrame?.cancelled) {
           // 闪抵消，不造成伤害
         } else if (state.players[from]?.alive) {
-          await applyAtom(state, {
-            type: '造成伤害',
-            target: from,
-            source: target,
-            amount: 1,
-            cardId: killCardId,
-          });
+          await runDamageFlow(state, target, from, 1, killCardId);
         }
 
         // 3) 关键差异(界):仅当杀对姜维造成伤害才免于弃牌;否则仍弃其一张牌

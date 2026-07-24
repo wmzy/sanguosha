@@ -18,6 +18,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const TAG = '铁骑/禁闪';
@@ -89,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 记录当前目标,供 判定 after hook 读取
     ctx.state.localVars[TARGET_VAR] = target;
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '铁骑' });
+    await runJudgeFlow(ctx.state, ownerId, '铁骑');
   });
 
   // ── 判定 after:judgeType==='铁骑' → 读花色,红色 → 给目标加禁闪标签 ──

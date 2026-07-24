@@ -9,7 +9,7 @@
 // 效果拆分:
 //   1. 摸3张牌:无条件(任何阶段失去体力都摸)。
 //   2. 杀增益(仅当失去体力时处于 owner 的出牌阶段才激活,turn-scoped):
-//      a) 杀次数+1:registerSlashMaxProvider 返回 1(base 1 + 1 = 2),非"无限"。
+//      a) 杀次数+1:registerSlashExtraProvider 返回 1(额定 1 + 额外 1 = 2),非"无限"。
 //      b) 红色杀无距离:杀技能自身 validate 读 turn.vars[ACTIVE_VAR] 且卡色为红时放行
 //         (distance.ts 不再做全局放行——红色专属,非所有杀)。
 //      c) 红色杀不能被抵消:杀技能自身 execute 在询问闪前检查 turn.vars[ACTIVE_VAR]
@@ -22,7 +22,7 @@
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
-import { registerSlashMaxProvider } from '../slash-quota';
+import { registerSlashExtraProvider } from '../slash-quota';
 import { registerAttackRangeExemptor, effectiveDistance } from '../distance';
 
 /** 本回合诈降杀增益是否激活的 turn.vars key(值为激活者座次 number)。
@@ -47,9 +47,9 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  // ─── 出杀上限提供者:诈降激活后本回合杀次数 +1(base 1 + 1 = 2) ─────────
-  //   官方"限制次数+1"是额度叠加,非"无限"(诸葛连弩/呕哮式 ∞ 由 provider 返回 Infinity)。
-  const unloadProvider = registerSlashMaxProvider(
+  // ─── 额外出杀提供者:诈降激活后本回合杀次数 +1(额度叠加,额定 1 + 额外 1 = 2) ───
+  //   官方"限制次数+1"是额度叠加,非"无限"(诸葛连弩/呕哮式 ∞ 由无限提供者返回 true)。
+  const unloadProvider = registerSlashExtraProvider(
     state,
     ownerId,
     (st: GameState, player: number) => (st.turn.vars[ACTIVE_VAR] === player ? 1 : 0),

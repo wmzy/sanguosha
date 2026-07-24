@@ -31,6 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const DISPLAY_NAME = '伏枥';
@@ -68,11 +69,6 @@ function countFactions(state: GameState): number {
     if (p.faction) factions.add(p.faction);
   }
   return factions.size;
-}
-
-/** 武将牌是否已翻面(存在任意 '/翻面' 后缀标签)。 */
-function isFlipped(tags: string[]): boolean {
-  return tags.some((t) => t.endsWith('/翻面'));
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
@@ -155,15 +151,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const damageDealt = (ctx.state.players[ownerId].vars[DMG_DEALT_KEY] as number | undefined) ?? 0;
     if (x > damageDealt) {
       // 已翻面则不重复(理论上罕见——限定技只触发一次)
-      const flipped = isFlipped(ctx.state.players[ownerId].tags);
+      const flipped = isFaceDown(ctx.state, ownerId);
       if (!flipped) {
-        await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
+        await flipFaceDown(ctx.state, ownerId, '伏枥');
       }
     }
   });
 
   // ── 造成伤害 after-hook:累计 owner 造成的伤害数 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
@@ -187,7 +183,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 入口:准备阶段开始 + 翻面标签 → 启动跳过
       if (atom.phase === '准备' && self.tags.includes(FLIP_TAG)) {
-        await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: FLIP_TAG });
+        await flipFaceUp(ctx.state, ownerId, '伏枥');
         ctx.state.localVars[SKIP_FLAG] = ownerId;
         return { kind: 'cancel' };
       }
@@ -217,9 +213,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[SKIP_FLAG];
 
       // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束
-      await applyAtom(ctx.state, { type: '清过期标记', player: ownerId });
-      await applyAtom(ctx.state, { type: '下一玩家' });
-      await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
+      await performSkipTurn(ctx.state, ownerId);
 
       return { kind: 'cancel' };
     },

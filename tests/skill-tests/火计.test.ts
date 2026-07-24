@@ -121,7 +121,7 @@ describe('火计', () => {
     // 火焰伤害
     const damageEvents = harness.state.atomHistory.filter(
       (e): e is typeof e & { kind: 'atom'; atom: Record<string, unknown> } =>
-        e.kind === 'atom' && (e.atom as Record<string, unknown>).type === '造成伤害',
+        e.kind === 'atom' && (e.atom as Record<string, unknown>).type === '受到伤害时',
     );
     expect(damageEvents[damageEvents.length - 1].atom.damageType).toBe('火焰');
     // 原卡 c1(转化源)最终进弃牌堆

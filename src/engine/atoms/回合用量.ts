@@ -1,6 +1,6 @@
 // 回合用量:view 侧同步"本回合用量计数/限一次标记",供前端禁用超限/已用操作。
 //
-// 为什么需要它:后端用 state.turn.vars['杀/usedCount'](出杀计数)与
+// 为什么需要它:后端用 state.turn.vars['杀/quotaUsed'+'杀/extraUsed'](出杀计数,合计=slashUsed())与
 // state.players[i].vars['制衡/usedThisTurn'](限一次)判断操作合法性。
 // 但这两个 vars 的变化不经 atom(技能 execute 直接 mutate),processedView
 // (事件流增量)无法感知 → 前端读 view.turn.vars 永远是 baseline 旧值,

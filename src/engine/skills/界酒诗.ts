@@ -149,9 +149,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:曹植受伤后,若背面朝上 → 询问是否翻回正面 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '造成伤害') return;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
 

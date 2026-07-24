@@ -13,7 +13,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import { applyAtom } from '../../src/engine/create-engine';
+import { runDeathFlow } from '../../src/engine/death-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -84,10 +84,9 @@ describe('行殇', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    // P1 即将死亡(模拟过河拆桥等致死场景:直接 applyAtom 击杀)
-    // 但 击杀 atom 有 before hook:行殇先询问
-    // 直接 applyAtom 走完整管线(before hook 触发)
-    void applyAtom(harness.state, { type: '击杀', player: 1 });
+    // P1 即将死亡(模拟过河拆桥等致死场景:直接走死亡流程 runDeathFlow)
+    // runDeathFlow 在 死亡时 时机询问行殇,随后 系统处理牌 清理手牌/装备
+    void runDeathFlow(harness.state, 1);
     await harness.waitForStable();
     P0.expectPending('请求回应');
     await P0.respond('行殇', { choice: true });
@@ -124,7 +123,7 @@ describe('行殇', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    void applyAtom(harness.state, { type: '击杀', player: 1 });
+    void runDeathFlow(harness.state, 1);
     await harness.waitForStable();
     P0.expectPending('请求回应');
     await P0.respond('行殇', { choice: true });
@@ -158,14 +157,14 @@ describe('行殇', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    void applyAtom(harness.state, { type: '击杀', player: 1 });
+    void runDeathFlow(harness.state, 1);
     await harness.waitForStable();
     P0.expectPending('请求回应');
     await P0.respond('行殇', { choice: false }); // 不发动
 
     // P0 未获得牌
     expect(harness.state.players[0].hand).toEqual([]);
-    // 牌进入弃牌堆(击杀 自身行为)
+    // 牌进入弃牌堆(系统处理牌 自身行为)
     expect(harness.state.zones.discardPile).toContain('c1');
     // P1 死亡
     expect(harness.state.players[1].alive).toBe(false);
@@ -191,9 +190,9 @@ describe('行殇', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, { type: '击杀', player: 1 });
+    void runDeathFlow(harness.state, 1);
     await harness.waitForStable();
-    // 无 pending(没询问行殇)
+    // 无 pending(没询问行殞)
     expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.players[1].alive).toBe(false);
   });
@@ -213,7 +212,7 @@ describe('行殇', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, { type: '击杀', player: 0 });
+    void runDeathFlow(harness.state, 0);
     await harness.waitForStable();
     expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.players[0].alive).toBe(false);

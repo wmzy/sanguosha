@@ -16,6 +16,7 @@
 //   -damageType/cardId 等伤害专属字段在失去体力中无意义,自然丢弃。
 //   - 系统规则的濒死检查同时挂在 造成伤害 与 失去体力 上,故目标体力归零仍走求桃流程。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
+import { applyAtom } from '../create-engine';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -34,23 +35,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '伤害结算开始时',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
-      if (atom.type !== '造成伤害') return;
       if (atom.source !== ownerId) return;
       if (typeof atom.target !== 'number') return;
       const amount = atom.amount ?? 0;
       if (amount <= 0) return;
-      // 将"造成的伤害"改为"失去体力":modify 让管线改走 失去体力 atom
-      return {
-        kind: 'modify',
-        atom: {
-          type: '失去体力',
-          target: atom.target,
-          amount,
-        },
-      };
+      // 将「造成的伤害」改为「失去体力」:直接 applyAtom 失去体力,然后 cancel 本次伤害流程
+      await applyAtom(ctx.state, { type: '失去体力', target: atom.target, amount });
+      return { kind: 'cancel' };
     },
   );
   return () => {};

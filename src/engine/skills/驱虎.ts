@@ -10,8 +10,10 @@
 //     目标(其他玩家)无法 dispatch。因此本技能在 onInit 时为所有玩家注册 respond action,
 //     validate 严格检查 pending requestType,非驱虎 pending 时拒绝(无副作用)。
 //   - 每回合限一次:用 player.vars['驱虎/usedThisTurn'] + 回合用量 atom 同步 view。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
+import { runRankCompareFlow } from '../rank-flow';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 import { inAttackRange } from '../distance';
@@ -74,15 +76,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const initiatorCard = state.cardMap[initiatorCardId];
       const initiatorValue = initiatorCard ? rankValue(initiatorCard.rank) : 0;
 
-      // 1) 荀彧的拼点牌进处理区
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId: initiatorCardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-
-      // 2) 询问目标出拼点牌
+      // 1) 询问目标出拼点牌。拼点牌暂不移入处理区——由 runRankCompareFlow 的
+      //    拼点扣置 统一同时扣置(面朝下),对齐 rankcompare.md。
       delete state.localVars['驱虎/targetCard'];
       await applyAtom(state, {
         type: '请求回应',
@@ -99,34 +94,30 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const targetCardId = state.localVars['驱虎/targetCard'] as string | undefined;
       delete state.localVars['驱虎/targetCard'];
 
-      // 目标未出牌(超时等):视为没赢,荀彧受伤。但仍需清理处理区。
-      let targetValue = 0;
-      let targetCardObj: Card | undefined;
+      // 2) 拼点两步化(扣置→亮出→后→弃牌堆)。目标未出牌(超时)走兜底。
+      let win: boolean;
       if (targetCardId && state.players[target].hand.includes(targetCardId)) {
-        targetCardObj = state.cardMap[targetCardId];
-        targetValue = targetCardObj ? rankValue(targetCardObj.rank) : 0;
+        const result = await runRankCompareFlow(
+          state,
+          from,
+          target,
+          initiatorCardId,
+          targetCardId,
+        );
+        win = result === '赢';
+      } else {
+        // 目标未出牌(超时):无有效拼点牌,runRankCompareFlow 无法执行(需要 targetCard 在手)。
+        // 清理发起方拼点牌(手牌→弃牌堆),按发起方默认胜出处理(保留旧行为)。
         await applyAtom(state, {
           type: '移动牌',
-          cardId: targetCardId,
-          from: { zone: '手牌', player: target },
-          to: { zone: '处理区' },
+          cardId: initiatorCardId,
+          from: { zone: '手牌', player: from },
+          to: { zone: '弃牌堆' },
         });
+        win = initiatorValue > 0;
       }
 
-      // 3) 拼点事件标记(前端动画/音效;applyView 把两张牌从处理区移入弃牌堆视图)
-      await applyAtom(state, {
-        type: '拼点',
-        initiator: from,
-        target,
-        initiatorCard: initiatorCardId,
-        targetCard: targetCardId ?? '',
-      });
-
-      // 4) 拼点 atom 的 apply 已把两张牌从处理区移入弃牌堆(后端 + 视图对称)。
-      //    此处不再手动 splice/push,避免与 apply 重复操作。
-
-      // 5) 结算输赢
-      const win = initiatorValue > targetValue;
+      // 3) 结算输赢
       if (win) {
         // 荀彧赢:目标对其攻击范围内另一名角色造成 1 点伤害(荀彧选目标)
         // 检查目标的攻击范围内是否有可选角色
@@ -161,22 +152,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         delete state.localVars['驱虎/victim'];
         if (typeof victim === 'number' && state.players[victim]?.alive && victim !== target) {
           if (inAttackRange(state, target, victim)) {
-            await applyAtom(state, {
-              type: '造成伤害',
-              target: victim,
-              source: target,
-              amount: 1,
-            });
+            await runDamageFlow(state, target, victim, 1);
           }
         }
       } else {
         // 荀彧没赢(输或平):目标对荀彧造成 1 点伤害
-        await applyAtom(state, {
-          type: '造成伤害',
-          target: from,
-          source: target,
-          amount: 1,
-        });
+        await runDamageFlow(state, target, from, 1);
       }
 
       await popFrame(state);

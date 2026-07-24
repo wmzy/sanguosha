@@ -537,14 +537,33 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
 // 非锁定技失效扩展点(skill-suppression.ts)提供,引擎核心不感知具体技能/标签。
 // 提供者由各技能自行注册(义绝/界铁骑/界完杀 等),predicate 内部读自己的 tag/vars。
 
-/** 运行 after hooks:系统级 hooks(ownerId===TARGET_SYSTEM)最后执行,
- *  确保遗计/反馈等“受伤害后”技能先于濒死检查触发。 */
+/** 运行 after hooks。
+ *  默认:系统级 hooks(ownerId===TARGET_SYSTEM)最后执行,确保遗计/反馈等
+ *  “受伤害后”技能先于濒死检查触发。
+ *  模块 P:伤害结算结束后(连环传导时机)改为按 ownerId 逆时针排列
+ *  (当前回合角色起,系统级 hook ownerId<0 排最前)。 */
 async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
-  const sortedHooks = [...getAfterHooks(state, atom.type)].sort((a, b) => {
-    if (a.ownerId === TARGET_SYSTEM && b.ownerId !== TARGET_SYSTEM) return 1;
-    if (a.ownerId !== TARGET_SYSTEM && b.ownerId === TARGET_SYSTEM) return -1;
-    return 0;
-  });
+  const sortedHooks = [...getAfterHooks(state, atom.type)];
+
+  // 模块 P:伤害结算结束后(连环传导时机)的 after-hook 按 ownerId 逆时针排列——
+  // 当前回合角色起逆时针,系统级 hook(ownerId<0,如连环传导)排最前。
+  // 其他 atom 维持原有"系统级 hook 排最后"顺序,确保遗计/反馈等"受伤害后"
+  // 技能先于濒死检查触发(与 runBeforeHooks 模块 L 摸牌修正写法一致)。
+  if (atom.type === '伤害结算结束后' && sortedHooks.length > 1) {
+    const cur = state.currentPlayerIndex;
+    const n = state.players.length;
+    sortedHooks.sort((a, b) => {
+      const distA = a.ownerId < 0 ? -1 : (a.ownerId - cur + n) % n;
+      const distB = b.ownerId < 0 ? -1 : (b.ownerId - cur + n) % n;
+      return distA - distB;
+    });
+  } else {
+    sortedHooks.sort((a, b) => {
+      if (a.ownerId === TARGET_SYSTEM && b.ownerId !== TARGET_SYSTEM) return 1;
+      if (a.ownerId !== TARGET_SYSTEM && b.ownerId === TARGET_SYSTEM) return -1;
+      return 0;
+    });
+  }
   for (const h of sortedHooks) {
     // 界铁骑:目标本回合非锁定技失效 → 跳过非锁定技 hook
     if (isHookSuppressed(state, h.ownerId, h.skillId)) continue;
@@ -607,7 +626,20 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   // cancel 终止(仁王盾/检测有效性 cancel 后后续 hook 不跑,atom 不进入 validate/apply/after)。
   let current = atom;
   let cancelled = false;
-  for (const h of [...getBeforeHooks(state, atom.type)]) {
+  // 摸牌修正类 before-hook 按 ownerId 逆时针排列(当前回合角色起),
+  // 近似规则的"修正后任意顺序叠加"(模块 L)。其他 atom 维持注册序+座次序不变。
+  // 系统级 hook(ownerId<0,如酒的全局增伤)排最前。
+  const hooks = [...getBeforeHooks(state, atom.type)];
+  if (atom.type === '摸牌' && hooks.length > 1) {
+    const cur = state.currentPlayerIndex;
+    const n = state.players.length;
+    hooks.sort((a, b) => {
+      const distA = a.ownerId < 0 ? -1 : (a.ownerId - cur + n) % n;
+      const distB = b.ownerId < 0 ? -1 : (b.ownerId - cur + n) % n;
+      return distA - distB;
+    });
+  }
+  for (const h of hooks) {
     // 界铁骑:目标本回合非锁定技失效 → 跳过非锁定技 hook
     if (isHookSuppressed(state, h.ownerId, h.skillId)) continue;
     const frame = topFrame(state) ?? emptyFrame();

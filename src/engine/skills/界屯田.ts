@@ -32,6 +32,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '屯田/confirm';
@@ -163,7 +164,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 判定(判定 after hook 会读取 CONFIRMED_KEY 并完成拿牌/加田)
     delete ctx.state.localVars[JUDGE_SUIT_KEY];
     delete ctx.state.localVars[JUDGE_CARD_KEY];
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '屯田' });
+    await runJudgeFlow(ctx.state, ownerId, '屯田');
     delete ctx.state.localVars[JUDGE_SUIT_KEY];
     delete ctx.state.localVars[JUDGE_CARD_KEY];
   }

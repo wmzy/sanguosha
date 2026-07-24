@@ -8,7 +8,7 @@
 
 import type { Card, GameState } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
+import { setChain } from '../face-down';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 const CHAIN_MARK = 'chained';
@@ -23,7 +23,7 @@ async function resolveChain(ctx: ResolveCtx): Promise<void> {
   // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理（per-target 抵消）。
 
   const chained = isChained(state, target);
-  await applyAtom(state, { type: '设横置', player: target, chained: !chained });
+  await setChain(state, target, !chained);
 }
 
 /** 铁索连环牌特有校验：1-2 名存活角色（含自己） */

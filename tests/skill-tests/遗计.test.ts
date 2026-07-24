@@ -24,6 +24,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, Json } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -243,11 +244,10 @@ describe('遗计', () => {
     await harness.setup(state);
     const P2 = harness.player('P2');
 
-    // 直接 applyAtom 造成 2 点伤害给 P2(绕过杀/闪链路,聚焦遗计循环)
-    const { applyAtom } = await import('../../src/engine/create-engine');
-    // 触发但不 await 完成 —— applyAtom(造成伤害) 会进入遗计 pending 后挂起
+    // 直接造成 2 点伤害给 P2(绕过杀/闪链路,聚焦遗计循环)
+    // 触发但不 await 完成 —— runDamageFlow(造成伤害) 会进入遗计 pending 后挂起
     // 故改用 promise + 等待 pending
-    const damagePromise = applyAtom(state, { type: '造成伤害', target: 1, amount: 2, source: 0 });
+    const damagePromise = runDamageFlow(state, 0, 1, 2);
     await harness.waitForStable();
 
     // 第一次遗计 pending(牌堆顶 d4(top)、d3)

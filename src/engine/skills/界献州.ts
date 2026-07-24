@@ -23,6 +23,7 @@
 //   内部 Skill.name = '献州'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import {
   registerAction,
   hasBlockingPending,
@@ -184,7 +185,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (!st.players[t]?.alive) continue;
           // 后端权威校验:必须在 target 攻击范围内
           if (!inAttackRange(st, target, t)) continue;
-          await applyAtom(st, { type: '造成伤害', target: t, amount: 1, source: target });
+          await runDamageFlow(st, target, t, 1);
         }
       }
 

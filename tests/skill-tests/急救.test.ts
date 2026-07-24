@@ -96,18 +96,29 @@ describe('急救', () => {
     const P0 = harness.player('P0');
     const HuaTuo = harness.player('华佗');
 
-    // P0 出杀 → 华佗不闪 → HP=0 → 濒死 → 求桃(从濒死者开始,先问华佗自己)
+    // P0 出杀 → 华佗不闪 → HP=0 → 濒死 → 求桃
+    // 模块 C:逆时针从当前回合 P0 起:P0 → 华佗(濒死者)
     await P0.useCardAndTarget('杀', 'c1', [1]);
     await HuaTuo.pass();
     expect(harness.state.players[1].health).toBe(0);
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+    // 第一问 P0(target=0)→ 无桃 pass
+    let slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
       type?: string;
       requestType?: string;
       target?: number;
     };
     expect(slotAtom.requestType).toBe('桃/求桃');
-    expect(slotAtom.target).toBe(1); // 先问华佗自己
+    expect(slotAtom.target).toBe(0);
+    await P0.pass();
+
+    // 第二问 华佗(target=1)→ 急救自救
+    slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+      type?: string;
+      requestType?: string;
+      target?: number;
+    };
+    expect(slotAtom.target).toBe(1);
 
     // 华佗用急救:红色手牌当桃自救
     await HuaTuo.respond('急救', { cardId: 'r1' });

@@ -13,16 +13,14 @@
 // 实现要点:
 //   - 限一次:player.vars['界陷阵/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 //   - 拼点流程(参考 天义.ts):
-//       1) owner 拼点牌 → 处理区
-//       2) 请求回应(target 选拼点牌)
-//       3) target 拼点牌 → 处理区
-//       4) 拼点 atom(事件标记;apply 把两张牌移入弃牌堆)
-//       5) 结算输赢 → 设对应 turn.vars
+//       1) 请求回应(target 选拼点牌)
+//       2) runRankCompareFlow(扣置→亮出→后→弃牌堆,两张牌面朝下同时扣置)
+//       3) 结算输赢 → 设对应 turn.vars
 //   - 赢效果:
 //       turn.vars['陷阵/winTarget'] = target(座次下标,回合结束自动清空)。
 //       · 无距离:distance.ts 的 inAttackRange/effectiveDistance 据此对 target 放行(横切)。
 //         覆盖【杀】(inAttackRange)与所有 distance-based 锦囊(effectiveDistance,如顺手牵羊)。
-//       · 无次数:registerSlashMaxProvider 返回 Infinity(owner 本回合出杀无上限)。
+//       · 无次数:registerSlashUnlimitedProvider 返回 true(owner 本回合出杀无上限)。
 //         严格规则下"仅对此目标无次数",但引擎 slash-quota 不感知 target,简化为全局无限。
 //       · 无视防具:青釭剑模式——指定目标 after-hook 临时卸载 target 防具技能实例,
 //         造成伤害 after-hook 恢复。仅对 winTarget 触发,其他 target 不受影响。
@@ -39,7 +37,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界陷阵'(避开标版潜在冲突);
 //   内部 Skill.name = '陷阵'(OL 官方技能名,玩家可见)。
 import type {
-  Card,
   FrontendAPI,
   GameState,
   HookResult,
@@ -47,6 +44,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runRankCompareFlow } from '../rank-flow';
 import {
   registerAction,
   registerAfterHook,
@@ -56,7 +54,7 @@ import {
   type SkillModule,
 } from '../skill';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
-import { registerSlashMaxProvider } from '../slash-quota';
+import { registerSlashUnlimitedProvider } from '../slash-quota';
 import { registerHandLimitProvider } from '../hand-limit';
 import { registerDistanceExemptor, registerAttackRangeExemptor } from '../distance';
 import { defaultPlayActive } from '../action-active';
@@ -112,13 +110,13 @@ function getTempUnloadMap(
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  // ─── 出杀上限提供者:拼点赢后本回合 ∞(对其使用牌无次数限制)──
+  // ─── 无限出杀提供者:拼点赢后本回合 ∞(对其使用牌无次数限制)──
   //   严格规则下"仅对 winTarget 无次数",slash-quota 不感知 target,简化为全局 ∞。
-  const unloadProvider = registerSlashMaxProvider(
+  const unloadProvider = registerSlashUnlimitedProvider(
     state,
     ownerId,
     (st: GameState, player: number) =>
-      typeof st.turn.vars[WIN_VAR] === 'number' && player === ownerId ? Infinity : 0,
+      typeof st.turn.vars[WIN_VAR] === 'number' && player === ownerId,
   );
 
   // ─── 通用距离豁免器:拼点赢后对其用牌无距离(覆盖杀 + distance-based 锦囊) ──
@@ -185,15 +183,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const initiatorCard = st.cardMap[initiatorCardId];
       const initiatorValue = initiatorCard ? rankValue(initiatorCard.rank) : 0;
 
-      // 1) owner 的拼点牌进处理区
-      await applyAtom(st, {
-        type: '移动牌',
-        cardId: initiatorCardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-
-      // 2) 询问 target 出拼点牌
+      // 1) 询问 target 出拼点牌。拼点牌暂不移入处理区——由 runRankCompareFlow 的
+      //    拼点扣置 统一同时扣置(面朝下),对齐 rankcompare.md。
       delete st.localVars[TARGET_CARD_KEY];
       await applyAtom(st, {
         type: '请求回应',
@@ -210,32 +201,23 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const targetCardId = st.localVars[TARGET_CARD_KEY] as string | undefined;
       delete st.localVars[TARGET_CARD_KEY];
 
-      // target 未出牌(超时等):视为没赢。但仍需清理处理区。
-      let targetValue = 0;
+      // 2) 拼点两步化(扣置→亮出→后→弃牌堆)。target 未出牌(超时)走兜底。
+      let win: boolean;
       if (targetCardId && st.players[target].hand.includes(targetCardId)) {
-        const targetCardObj: Card | undefined = st.cardMap[targetCardId];
-        targetValue = targetCardObj ? rankValue(targetCardObj.rank) : 0;
+        const result = await runRankCompareFlow(st, from, target, initiatorCardId, targetCardId);
+        win = result === '赢';
+      } else {
+        // target 未出牌(超时):清理发起方拼点牌(手牌→弃牌堆),按发起方默认胜出(保留旧行为)。
         await applyAtom(st, {
           type: '移动牌',
-          cardId: targetCardId,
-          from: { zone: '手牌', player: target },
-          to: { zone: '处理区' },
+          cardId: initiatorCardId,
+          from: { zone: '手牌', player: from },
+          to: { zone: '弃牌堆' },
         });
+        win = initiatorValue > 0;
       }
 
-      // 3) 拼点事件标记(前端动画/音效;apply 把两张牌从处理区移入弃牌堆视图)
-      await applyAtom(st, {
-        type: '拼点',
-        initiator: from,
-        target,
-        initiatorCard: initiatorCardId,
-        targetCard: targetCardId ?? '',
-      });
-
-      // 4) 拼点 atom 的 apply 已把两张牌从处理区移入弃牌堆(后端 + 视图对称)。
-
-      // 5) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
-      const win = initiatorValue > targetValue;
+      // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
       if (win) {
         st.turn.vars[WIN_VAR] = target;
         await applyAtom(st, { type: '回合用量', player: from, key: WIN_VAR, value: target });
@@ -314,7 +296,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '造成伤害后',
     async (ctx) => {
       const atom = ctx.atom;
       if (atom.source !== ownerId) return;

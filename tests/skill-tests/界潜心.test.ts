@@ -23,6 +23,7 @@ skillLoaders['界荐言'] = async () => 界荐言Module as unknown as SkillModul
 
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -60,7 +61,7 @@ async function dealDamage(
   target: number,
   amount = 1,
 ): Promise<void> {
-  await applyAtom(harness.state, { type: '造成伤害', target, amount, source });
+  await runDamageFlow(harness.state, source, target, amount);
   await harness.waitForStable();
   harness.processAllEvents();
 }
@@ -243,7 +244,7 @@ describe('界潜心', () => {
 
     // amount=0,理论上不应造成伤害事件,这里直接验证潜心未触发
     // 由于 造成伤害 atom validate 不允许 amount<0,但允许 0,测试 0 伤害
-    await applyAtom(harness.state, { type: '造成伤害', target: 1, amount: 0, source: 0 });
+    await runDamageFlow(harness.state, 0, 1, 0);
     await harness.waitForStable();
     harness.processAllEvents();
 

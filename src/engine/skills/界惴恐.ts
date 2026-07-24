@@ -15,7 +15,7 @@
 //       1) confirm: 是否发动惴恐?(owner)
 //       2) useCard: owner 选一张拼点牌
 //       3) useCard: 目标 选一张拼点牌(超时兜底 hand[0])
-//   - 拼点: 移动两张拼点牌到处理区 → 拼点 atom(把两张牌移入弃牌堆)。
+//   - 拼点: 经 runRankCompareFlow(扣置→亮出→后→弃牌堆),两张牌面朝下同时扣置。
 //   - 结算:
 //       owner 赢 → 在目标 vars 上写 '惴恐/restricted/usedThisTurn'(后缀约定,回合结束自动清)
 //                  + 回合用量 atom 同步 view(虽非 owner 主动技,但便于审计/调试)。
@@ -38,6 +38,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { runRankCompareFlow } from '../rank-flow';
 import { runUseFlow } from '../card-effect/use-card';
 import {
   registerAction,
@@ -66,15 +67,6 @@ const TARGET_CARD_KEY = `${SKILL_ID}/targetCardId`;
 /** 限制 key:写在被限制玩家 vars 上,'/usedThisTurn' 后缀由「回合结束」atom 自动清空。 */
 const RESTRICTED_KEY = `${SKILL_ID}/restricted/usedThisTurn`;
 
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -275,33 +267,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         if (!targetCardId || !target.hand.includes(targetCardId)) return;
 
-        // 4) 移动两张拼点牌到处理区
-        await applyAtom(st, {
-          type: '移动牌',
-          cardId: ownerCardId,
-          from: { zone: '手牌', player: ownerId },
-          to: { zone: '处理区' },
-        });
-        await applyAtom(st, {
-          type: '移动牌',
-          cardId: targetCardId,
-          from: { zone: '手牌', player: turnPlayer },
-          to: { zone: '处理区' },
-        });
+        // 4) 拼点两步化(扣置→亮出→后→弃牌堆)。两张拼点牌由 runRankCompareFlow
+        //    的 拼点扣置 统一同时扣置(面朝下),不再预先移入处理区。
+        const result = await runRankCompareFlow(
+          st,
+          ownerId,
+          turnPlayer,
+          ownerCardId,
+          targetCardId,
+        );
 
-        // 5) 拼点 atom(apply 会把两张牌移入弃牌堆)
-        const ownerRank = rankValue(st.cardMap[ownerCardId]?.rank ?? '');
-        const targetRank = rankValue(st.cardMap[targetCardId]?.rank ?? '');
-        await applyAtom(st, {
-          type: '拼点',
-          initiator: ownerId,
-          target: turnPlayer,
-          initiatorCard: ownerCardId,
-          targetCard: targetCardId,
-        });
-
-        // 6) 结算
-        const ownerWins = ownerRank > targetRank;
+        // 5) 结算
+        const ownerWins = result === '赢';
         if (ownerWins) {
           // owner 赢:目标本回合不能对除其以外角色用牌
           st.players[turnPlayer].vars[RESTRICTED_KEY] = true;
@@ -313,6 +290,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           });
         } else {
           // owner 没赢:获得其拼点牌(从弃牌堆移到 owner 手牌)
+          //   runRankCompareFlow 已把两张牌移入弃牌堆,此处从弃牌堆取回 targetCardId。
           await applyAtom(st, {
             type: '移动牌',
             cardId: targetCardId,

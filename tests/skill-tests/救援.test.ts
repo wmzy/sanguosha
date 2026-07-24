@@ -15,6 +15,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, Faction, GameState, Json, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -104,7 +105,7 @@ describe('救援', () => {
     const P1 = harness.player('甘宁');
 
     // 造成1点伤害:孙权 1 → 0,进入濒死求桃流程
-    void applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(0);
 
@@ -160,7 +161,7 @@ describe('救援', () => {
     const P0 = harness.player('孙权');
     const P1 = harness.player('张飞');
 
-    void applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(0);
 
@@ -211,13 +212,12 @@ describe('救援', () => {
     const P1 = harness.player('孙权');
     const P0 = harness.player('甘宁');
 
-    // 孙权(座次1)受伤 → 濒死;求桃从濒死者(P1)开始问
-    void applyAtom(harness.state, { type: '造成伤害', target: 1, amount: 1, source: 0 });
+    // 孙权(座次1)受伤 → 濒死;求桃(模块 C:逆时针从当前回合 P0(甘宁)起)
+    void runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     expect(harness.state.players[1].health).toBe(0);
 
-    // 先问孙权(P1,无桃) → pass;再问甘宁(P0) → 出桃救援
-    await P1.pass();
+    // 第一问甘宁(P0)→ 出桃救援(甘宁有桃)
     await P0.respond('桃', { cardId: 'peach' });
 
     // 孙权被救回 0 → 1
@@ -261,7 +261,7 @@ describe('救援', () => {
     const P0 = harness.player('孙权');
 
     // 孙权 1 → 0,濒死;求桃先问孙权自己
-    void applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(0);
 

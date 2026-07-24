@@ -15,6 +15,7 @@
 //     触发)把杀牌移入处理区,无需为蜀角色额外注册激将 respond(同挑衅/借刀杀人 复用模式)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, hasBlockingPending } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -119,13 +120,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               to: { zone: '弃牌堆' },
             });
           } else {
-            await applyAtom(state, {
-              type: '造成伤害',
-              target: killTarget,
-              amount: 1,
-              source: target,
-              cardId: killCardId,
-            });
+            await runDamageFlow(state, target, killTarget, 1, killCardId);
           }
         }
       }

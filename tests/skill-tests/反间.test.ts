@@ -235,7 +235,7 @@ describe('反间', () => {
 
     // 从 atomHistory 找出造成伤害 atom,验证 source = 周瑜(0)
     const damageEntries = harness.state.atomHistory.filter(
-      (e) => e.kind === 'atom' && (e.atom as { type: string }).type === '造成伤害',
+      (e) => e.kind === 'atom' && (e.atom as { type: string }).type === '受到伤害时',
     );
     expect(damageEntries.length).toBe(1);
     const damageAtom = (damageEntries[0] as {

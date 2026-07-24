@@ -15,6 +15,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
@@ -84,12 +85,7 @@ describe('白银狮子', () => {
     await harness.setup(state);
 
     // 直接造成 2 点伤害 → 白银狮子 before hook 减为 1
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 2,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 2);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -117,12 +113,7 @@ describe('白银狮子', () => {
     });
     await harness.setup(state);
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 

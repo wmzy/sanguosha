@@ -58,6 +58,7 @@
 //   - 多质疑者结算顺序:按座次顺序逐个处理(保证视图可预测)。
 import type { ActionContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
@@ -128,7 +129,7 @@ async function resolveGuSlash(
         });
       }
     } else if (state.players[target]?.alive) {
-      await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId, damageType });
+      await runDamageFlow(state, source, target, 1, cardId, damageType);
     }
   } finally {
     // 异常安全:弹帧 + 清理滞留处理区的闪 + 还原 cardMap.name

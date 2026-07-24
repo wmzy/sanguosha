@@ -1,12 +1,14 @@
 // 使用牌：统一的卡牌使用入口技能。
 //
 // 对齐文档 use.md 使用事件的结算流程：
-//   使用结算前（声明阶段，对所有目标逐时机处理）：
+//   使用结算前（声明阶段，逐时机跨所有目标）：
 //     选择目标时 → 置入处理区 → 使用时
 //     → 逐目标：指定目标
+//     → 逐目标：成为目标
+//     → 逐目标：指定目标后
+//     → 逐目标：成为目标后
 //   使用结算中（逐目标完整结算）：
-//     逐目标：成为目标 → 指定目标后 → 成为目标后
-//       → 检测有效性 → 生效前[handleSlashDodge for 杀] → 生效时 → 生效后[resolve] → 使用结算结束时
+//     逐目标：检测有效性 → 生效前[handleSlashDodge for 杀] → 生效时 → 生效后[resolve] → 使用结算结束时
 //   使用结算后：
 //     移出处理区 → onSettle
 //
@@ -136,10 +138,14 @@ export async function runUseFlow(
   const effect = requireCardEffect(cardName);
 
   // ── 使用结算前（声明阶段）──
+  // skippedTargets：声明阶段「成为目标」被 cancel（空城/帷幕）的目标集合。
+  // 浅拷贝保留数组引用，后续循环 push/includes 即可读写。结算阶段据此跳过被取消的目标。
+  const skippedTargets: number[] = [];
   const frame = await pushFrame(state, cardName, source, {
     cardId,
     targets: [...targets], // 保持与旧 pushFrame({ ...params }) 的兼容性（界谦逊等读 frame.params.targets）
     resolvedTargets: [...targets],
+    skippedTargets,
   });
 
   try {
@@ -217,31 +223,52 @@ export async function runUseFlow(
       await applyAtom(state, { type: '指定目标', source, target, cardId });
     }
 
-    // ── 使用结算中：逐目标完整结算 ──
+    // 声明阶段：逐目标 成为目标（空城/帷幕 before-hook 可 cancel → false = 标记跳过该目标）
+    //   cancel 的目标记录到 frame.params.skippedTargets，后续 指定目标后/成为目标后/结算 循环统一跳过。
+    //   逐时机跨所有目标：所有目标的「成为目标」先全部完成，再进入下一时机。
     for (let i = 0; i < targets.length; i++) {
-      // 从帧上读当前目标（流离等技能可能修改 resolvedTargets）
       const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
       const target = resolved[i];
       if (!state.players[target]?.alive) continue;
-
-      // 时机4：成为目标（空城/帷幕 before-hook 可 cancel → false = 跳过此目标）
       const becameTarget = await applyAtom(state, {
         type: '成为目标',
         source,
         target,
         cardId,
       });
-      if (!becameTarget) continue;
+      if (!becameTarget) {
+        (frame.params.skippedTargets as number[]).push(target);
+      }
+    }
 
-      // 时机5：指定目标后（铁骑/烈弓/无双①/肉林① after-hook）
+    // 声明阶段：逐目标 指定目标后（铁骑/烈弓/无双①/肉林① after-hook）
+    for (let i = 0; i < targets.length; i++) {
+      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
+      const target = resolved[i];
+      if (!state.players[target]?.alive) continue;
+      if ((frame.params.skippedTargets as number[]).includes(target)) continue;
       await applyAtom(state, { type: '指定目标后', source, target, cardId });
+    }
 
-      // 时机6：成为目标后（贞烈/啖酪/无双②/肉林② after-hook）
+    // 声明阶段：逐目标 成为目标后（贞烈/啖酪/无双②/肉林② after-hook）
+    for (let i = 0; i < targets.length; i++) {
+      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
+      const target = resolved[i];
+      if (!state.players[target]?.alive) continue;
+      if ((frame.params.skippedTargets as number[]).includes(target)) continue;
       await applyAtom(state, { type: '成为目标后', source, target, cardId });
+    }
 
-      // 延迟类锦囊：使用结算中延迟到判定阶段恢复（resumeDelayedSettlement）
+    // ── 使用结算中：逐目标完整结算 ──
+    //   延迟类锦囊不走结算循环（延迟到判定阶段 resumeDelayedSettlement 恢复），
+    //   但上方声明阶段的 4 个时机已对延时锦囊执行（对齐 use.md 声明阶段）。
+    //   被取消的目标（skippedTargets）跳过结算。
+    for (let i = 0; i < targets.length; i++) {
+      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
+      const target = resolved[i];
+      if (!state.players[target]?.alive) continue;
       if (effect.delayed) continue;
-
+      if ((frame.params.skippedTargets as number[]).includes(target)) continue;
       // 使用结算中：检测有效性 → 生效前 → 生效时 → 生效后 → 使用结算结束时
       await runSettlementPhase(state, effect, source, target, cardId, i, opts?.virtual);
     }
@@ -312,32 +339,45 @@ export async function resumeDelayedSettlement(
  *  在 create-engine bootstrap / registerSkillsFromState 中调用。
  *  全局注册(ownerId=-1)：判定阶段 hook 检查 atom.player 的判定区有无延时锦囊。 */
 export function registerDelayedTrickHooks(state: GameState): void {
-  // 判定阶段 before-hook：有延时锦囊 → resumeDelayedSettlement（内部询问无懈）
+  // 判定阶段 before-hook：判定区有延时锦囊 → 逐个结算最后置入的，循环直到清空（对齐 game.md）
   registerBeforeHook(state, '延时锦囊', -1, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始' || atom.phase !== '判定') return;
     const player = atom.player;
     const self = ctx.state.players[player];
     if (!self) return;
-    if (ctx.state.zones.deck.length === 0) return;
-    // 查找判定区第一个延时锦囊（乐不思蜀/兵粮寸断/闪电）
-    const DELAYED_TRICKS = ['乐不思蜀', '兵粮寸断', '闪电'];
-    const trick = self.pendingTricks.find((t) => DELAYED_TRICKS.includes(t.name));
-    if (!trick) return;
 
-    const cancelled = await resumeDelayedSettlement(
-      ctx.state,
-      trick.source,
-      player,
-      trick.name,
-      trick.card.id,
-    );
-    if (cancelled) {
-      await applyAtom(ctx.state, {
-        type: '移除延时锦囊',
+    const DELAYED_TRICKS = ['乐不思蜀', '兵粮寸断', '闪电'];
+
+    // 循环：逐个结算最后置入的延时锦囊，直到判定区无延时锦囊。
+    //   规则：判定阶段检测判定区有延时锦囊 → 结算最后置入的 → 重复直到判定区清空。
+    //   每次 resumeDelayedSettlement 内部 resolve 都会移除当前玩家的该延时锦囊
+    //   （乐不思蜀/兵粮寸断 resolve 移除自身；闪电 resolve 移除当前玩家闪电后移给下家），
+    //   故 while 循环每次回到顶部重新查找时数量递减，不会死循环。
+    while (true) {
+      // 牌堆耗尽则无法判定，直接结束
+      if (ctx.state.zones.deck.length === 0) return;
+
+      // 取最后置入的延时锦囊（规则：结算最后置入的）
+      const trick = [...self.pendingTricks]
+        .reverse()
+        .find((t) => DELAYED_TRICKS.includes(t.name));
+      if (!trick) break;
+
+      const cancelled = await resumeDelayedSettlement(
+        ctx.state,
+        trick.source,
         player,
-        trickName: trick.name,
-      });
+        trick.name,
+        trick.card.id,
+      );
+      if (cancelled) {
+        await applyAtom(ctx.state, {
+          type: '移除延时锦囊',
+          player,
+          trickName: trick.name,
+        });
+      }
     }
   });
 

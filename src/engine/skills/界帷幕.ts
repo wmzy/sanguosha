@@ -64,7 +64,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       state,
       skill.id,
       ownerId,
-      '造成伤害',
+      '受到伤害时',
       async (ctx): Promise<HookResult | void> => {
         const atom = ctx.atom;
         if (atom.target !== ownerId) return;
@@ -156,7 +156,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       state,
       skill.id,
       ownerId,
-      '造成伤害',
+      '受到伤害时',
       async (ctx): Promise<HookResult | void> => {
         const atom = ctx.atom;
         if (atom.target !== ownerId) return;

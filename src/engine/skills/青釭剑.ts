@@ -73,7 +73,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // 造成伤害 after hook:杀结算完毕后,恢复被临时卸载的防具技能
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     if ((ctx.atom).source !== ownerId) return;
     const unloaded = getTempUnloadMap(ctx.state).get(ownerId);
     if (!unloaded || unloaded.length === 0) return;

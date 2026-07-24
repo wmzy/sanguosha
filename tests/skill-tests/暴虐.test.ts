@@ -14,6 +14,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { suitColor } from '../../src/shared/types';
 import type { Card, Faction, GameState, Identity, PlayerState } from '../../src/engine/types';
 
@@ -106,12 +107,7 @@ function buildState(opts: {
 
 /** 直接触发 P1→P2 造成伤害,等稳定 */
 async function dealDamage(harness: SkillTestHarness, source = 1): Promise<void> {
-  void applyAtom(harness.state, {
-    type: '造成伤害',
-    target: 2,
-    amount: 1,
-    source,
-  });
+  void runDamageFlow(harness.state, source, 2, 1);
   await harness.waitForStable();
   harness.processAllEvents();
 }

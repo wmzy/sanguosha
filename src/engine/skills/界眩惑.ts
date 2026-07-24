@@ -31,6 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界眩惑';
@@ -133,14 +134,7 @@ async function runSlashResolution(
         });
       }
     } else if (state.players[target]?.alive) {
-      await applyAtom(state, {
-        type: '造成伤害',
-        target,
-        amount: 1,
-        source,
-        cardId,
-        damageType,
-      });
+      await runDamageFlow(state, source, target, 1, cardId, damageType);
     }
   } finally {
     if (frameCards(state).includes(cardId)) {

@@ -10,6 +10,7 @@
 import type { Card } from '../types';
 import type { ActionPrompt, GameView } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -38,7 +39,7 @@ function canUseIndulgence(
 async function resolveIndulgence(ctx: ResolveCtx): Promise<void> {
   const { state, target } = ctx;
   // 判定结算：翻牌堆顶 → 改判 → 判定牌进弃牌堆（最终判定牌 ID 记录在 localVars）
-  await applyAtom(state, { type: '判定', player: target, judgeType: '乐不思蜀' });
+  await runJudgeFlow(state, target, '乐不思蜀');
   const judgeCardId = state.localVars['判定/finalJudgeCardId'] as string | undefined;
   delete state.localVars['判定/finalJudgeCardId'];
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;

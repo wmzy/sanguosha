@@ -15,6 +15,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom, pushFrame, popFrame } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function mkCard(
@@ -187,12 +188,7 @@ describe('界帷幕', () => {
     const handBefore = harness.state.players[0].hand.length;
 
     // 贾诩回合内受到 2 点伤害(无来源,无 cardId)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 2,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 2);
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(healthBefore); // 防止:体力不变
@@ -228,13 +224,7 @@ describe('界帷幕', () => {
     const handBefore = harness.state.players[0].hand.length;
 
     // 模拟黑色锦囊(南蛮入侵)伤害落到贾诩头上,cardId 是黑色锦囊
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'nm1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'nm1');
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(3); // 防止
@@ -267,25 +257,13 @@ describe('界帷幕', () => {
 
     // (a) 黑色锦囊伤害 → 走标版 cancel(无摸牌)
     const handBeforeBlack = harness.state.players[0].hand.length;
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'nm2',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'nm2');
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(3); // cancel → 体力不变
     expect(harness.state.players[0].hand.length).toBe(handBeforeBlack); // 标版 cancel 无摸牌
 
     // (b) 非锦囊伤害 → 界版不拦截(标版也不拦截),正常受伤
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'sk1', // 杀,非黑色锦囊
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'sk1');
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(2); // 非贾诩回合 → 正常受伤
   });
@@ -312,7 +290,7 @@ describe('界帷幕', () => {
     await harness.setup(state);
 
     const handBefore = harness.state.players[0].hand.length;
-    await applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 0, source: 1 });
+    await runDamageFlow(harness.state, 1, 0, 0);
     await harness.waitForStable();
 
     expect(harness.state.players[0].hand.length).toBe(handBefore); // 无摸牌

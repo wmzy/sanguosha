@@ -14,6 +14,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
@@ -359,8 +360,7 @@ describe('界智迟', () => {
     await harness.setup(state);
 
     // 直接 applyAtom 一次伤害(target=P0,在 P0 自己回合)
-    const { applyAtom } = await import('../../src/engine/create-engine');
-    await applyAtom(state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    await runDamageFlow(state, 1, 0, 1);
     await harness.waitForStable();
 
     // 智迟未激活(currentPlayerIndex===owner,视为"回合内")

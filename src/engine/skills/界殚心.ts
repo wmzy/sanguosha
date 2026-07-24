@@ -66,7 +66,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 造成伤害 after:受伤后询问是否发动殚心
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const amount = atom.amount ?? 0;

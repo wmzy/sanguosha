@@ -21,6 +21,7 @@
 // 判定牌移入弃牌堆。洛神主循环在 applyAtom(判定) 返回后,从弃牌堆顶读判定牌。
 import type { FrontendAPI, Skill, GameState, Card } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 import { registerHandLimitProvider } from '../hand-limit';
 
@@ -140,7 +141,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.zones.deck.length === 0) break;
       // 判定:判定 atom 把判定牌移入处理区,after-hook 读花色存 localVars,
       // def.afterHooks 把判定牌移入弃牌堆。
-      await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '洛神' });
+      await runJudgeFlow(ctx.state, ownerId, '洛神');
 
       const result = ctx.state.localVars['洛神/lastResult'];
       const judgeCardId = ctx.state.localVars['洛神/lastJudgeCardId'] as string | undefined;

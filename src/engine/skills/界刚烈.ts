@@ -19,6 +19,8 @@
 //   - judgeType='界刚烈' 与标版 '刚烈' 区分(日志/调试用,不影响机制)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
 
@@ -101,7 +103,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 造成伤害 after hook:界刚烈主逻辑 ──
   // 规则:"当一名角色对你造成1点伤害后" —— 受到 N 点伤害时触发 N 次,
   // 每次独立询问是否发动 + 独立判定。来源中途死亡则停止后续触发。
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const times = atom.amount ?? 0;
@@ -133,19 +135,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!ctx.state.localVars['界刚烈/confirmed']) continue; // 本次不发动,继续下一次
 
       delete ctx.state.localVars[JUDGE_COLOR_KEY];
-      await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '界刚烈' });
+      await runJudgeFlow(ctx.state, ownerId, '界刚烈');
       const color = ctx.state.localVars[JUDGE_COLOR_KEY] as string | undefined;
       delete ctx.state.localVars[JUDGE_COLOR_KEY];
       if (color === undefined) continue; // 判定未产出牌
 
       if (color === '红') {
         // 红色:对来源造成 1 点伤害(来源为界夏侯惇本人)
-        await applyAtom(ctx.state, {
-          type: '造成伤害',
-          target: sourceIdx,
-          amount: 1,
-          source: ownerId,
-        });
+        await runDamageFlow(ctx.state, ownerId, sourceIdx, 1);
         continue;
       }
 

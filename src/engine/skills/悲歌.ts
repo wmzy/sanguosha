@@ -24,6 +24,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const DISCARD_RT = '悲歌/discard';
@@ -79,7 +81,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after hook:悲歌主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if ((atom.amount ?? 0) <= 0) return;
     const targetIdx = atom.target;
@@ -120,7 +122,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 判定(受伤角色);牌堆空则无法判定,悲歌效果不触发
     if (ctx.state.zones.deck.length === 0) return;
     delete ctx.state.localVars[JUDGE_SUIT_KEY];
-    await applyAtom(ctx.state, { type: '判定', player: targetIdx, judgeType: '悲歌' });
+    await runJudgeFlow(ctx.state, targetIdx, '悲歌');
     const suit = ctx.state.localVars[JUDGE_SUIT_KEY] as string | undefined;
     delete ctx.state.localVars[JUDGE_SUIT_KEY];
     if (suit === undefined) return;
@@ -149,7 +151,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (sourceIdx === undefined) return;
       const source = ctx.state.players[sourceIdx];
       if (!source?.alive) return;
-      await applyAtom(ctx.state, { type: '加标签', player: sourceIdx, tag: SKIP_TAG });
+      await flipFaceDown(ctx.state, sourceIdx, '悲歌');
     }
   });
 
@@ -169,7 +171,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
       if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
-        await applyAtom(ctx.state, { type: '去标签', player, tag: SKIP_TAG });
+        await flipFaceUp(ctx.state, player, '悲歌');
         ctx.state.localVars[SKIP_FLAG] = player;
         return { kind: 'cancel' };
       }
@@ -195,9 +197,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.localVars[SKIP_FLAG] !== player) return;
 
       delete ctx.state.localVars[SKIP_FLAG];
-      await applyAtom(ctx.state, { type: '清过期标记', player });
-      await applyAtom(ctx.state, { type: '下一玩家' });
-      await applyAtom(ctx.state, { type: '回合结束', player });
+      await performSkipTurn(ctx.state, player);
       return { kind: 'cancel' };
     },
   );

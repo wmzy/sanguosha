@@ -22,6 +22,7 @@
 //   内部 Skill.name = '强袭'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange, effectiveDistance } from '../distance';
@@ -133,7 +134,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 代价
       if (cost === 'damage') {
         // 界版官方:"受到1点伤害"——真实伤害事件(触发反馈/奸雄/防具等)
-        await applyAtom(st, { type: '造成伤害', target: from, amount: 1, source: from });
+        await runDamageFlow(st, from, from, 1);
       } else {
         const cardId = params.cardId as string;
         // 装备区武器先卸下(清距离 vars + 回手),再弃置;手牌武器直接弃置。
@@ -144,7 +145,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
 
       // 对 target 造成 1 点伤害(来源为典韦,强制伤害,不可被闪抵消)
-      await applyAtom(st, { type: '造成伤害', target, amount: 1, source: from });
+      await runDamageFlow(st, from, target, 1);
       await popFrame(st);
     },
   );

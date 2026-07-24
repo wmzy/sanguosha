@@ -15,6 +15,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
@@ -314,7 +315,7 @@ describe('界趫猛', () => {
   // 5. 非杀伤害(直接造成伤害 atom)→ 不触发趫猛
   // ─────────────────────────────────────────────────────────────
   it('用例5:非杀伤害(无 cardId)→ 不触发趫猛', async () => {
-    const { registerSkillsFromState, applyAtom } = await import(
+    const { registerSkillsFromState } = await import(
       '../../src/engine/create-engine'
     );
     const state: GameState = createGameState({
@@ -339,12 +340,7 @@ describe('界趫猛', () => {
     await registerSkillsFromState(state);
 
     // 直接造成伤害(无 cardId,模拟非杀伤害)
-    await applyAtom(state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(state, 0, 1, 1);
 
     expect(state.players[1].health).toBe(3);
     expect(state.pendingSlots.size).toBe(0); // 无趫猛询问
@@ -352,7 +348,7 @@ describe('界趫猛', () => {
   });
 
   it('用例5b:伤害 cardId 是万箭齐发(非杀)→ 不触发趫猛', async () => {
-    const { registerSkillsFromState, applyAtom } = await import(
+    const { registerSkillsFromState } = await import(
       '../../src/engine/create-engine'
     );
     const state: GameState = createGameState({
@@ -379,13 +375,7 @@ describe('界趫猛', () => {
     });
     await registerSkillsFromState(state);
 
-    await applyAtom(state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-      cardId: 'aoe',
-    });
+    await runDamageFlow(state, 0, 1, 1, 'aoe');
 
     expect(state.players[1].health).toBe(3);
     expect(state.pendingSlots.size).toBe(0); // 无趫猛询问

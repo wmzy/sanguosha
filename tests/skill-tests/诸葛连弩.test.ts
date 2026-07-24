@@ -297,7 +297,7 @@ describe('诸葛连弩', () => {
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
     // 出杀后 usedCount = 1
-    expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
+    expect(slashUsed(harness.state)).toBe(1);
 
     // 第二张杀:usedCount=1 >= 上限 1 → 被拒
     await P1.expectRejected({
@@ -448,7 +448,7 @@ describe('诸葛连弩', () => {
     await P1.useCardAndTarget('杀', 's1', [1]);
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
-    expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
+    expect(slashUsed(harness.state)).toBe(1);
 
     // 装诸葛连弩 → 注册上限提供者 → slashMax=∞ → usedCount(1) < ∞ 可继续出
     await P1.useCard('装备通用', 'c1');
@@ -458,7 +458,7 @@ describe('诸葛连弩', () => {
     await P1.useCardAndTarget('杀', 's2', [1]);
     await P2.pass();
     expect(harness.state.players[1].health).toBe(2);
-    expect(harness.state.turn.vars['杀/usedCount']).toBe(2);
+    expect(slashUsed(harness.state)).toBe(2);
 
     // 换装青釭剑 → 取消注册诸葛连弩提供者 → slashMax 回到 1;usedCount 仍为 2
     await P1.useCard('装备通用', 'w1');

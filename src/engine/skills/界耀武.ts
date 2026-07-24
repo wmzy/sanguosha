@@ -46,7 +46,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '受到伤害后',
     async (ctx) => {
       const atom = ctx.atom;
       if (atom.target !== ownerId) return;

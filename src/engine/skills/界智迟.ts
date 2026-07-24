@@ -95,7 +95,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── 触发:回合外受到伤害后,激活智迟(本回合剩余时间生效)──
   unloaders.push(
-    registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+    registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
       const atom = ctx.atom;
       if (atom.target !== ownerId) return;
       // 回合外 = 不是 owner 自己的回合
@@ -167,7 +167,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       state,
       skill.id,
       ownerId,
-      '造成伤害',
+      '造成伤害时',
       async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
         const atom = ctx.atom;

@@ -1,24 +1,23 @@
 // 行殇(曹丕·被动技):当其他角色死亡时,你可以立即获得其所有牌(手牌、装备牌、判定区牌)。
 //
-// 模式 A(被动触发):before hook 挂在「击杀」。
-//   击杀 before(死亡角色≠曹丕自己且曹丕存活) → 询问是否发动 →
-//   获得手牌/装备/判定区的所有牌 → 击杀 apply 继续执行(hand/equip 已空,no-op)。
+// 模式 A(被动触发):after hook 挂在「死亡时」(模块 B:系统处理牌之前)。
+//   死亡时(player≠曹丕自己且曹丕存活) → 询问是否发动 →
+//   获得手牌/装备/判定区的所有牌 → 随后 系统处理牌 apply 执行(hand/equip 已空,no-op)。
 //
 // 关键点:
-//   - 击杀 atom 自身会把死亡角色的手牌/装备移入弃牌堆,但不会处理判定区(pendingTricks)。
-//     行殇在 before hook 中先把所有牌拿走,使后续 击杀 apply 的 card-loop 成为 no-op。
+//   - 系统处理牌 atom 会把死亡角色的手牌/装备移入弃牌堆,但不会处理判定区(pendingTricks)。
+//     行殇在 死亡时 after-hook 中先把所有牌拿走,使后续 系统处理牌 apply 的 card-loop 成为 no-op。
 //   - 卡牌转移统一走「获得」atom:它对 hand/equipment 做 filter 移除(no-op 若不存在),
 //     再 push 到获得者手牌;判定区牌的 pendingTricks 维护通过「移除延时锦囊」atom 完成。
 //   - FAQ:行殇是主动发动,可选择不获得(请求回应 confirm)。
 import type {
   FrontendAPI,
   GameState,
-  HookResult,
   Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '行殇/confirm';
 const CONFIRMED_KEY = '行殇/confirmed';
@@ -54,22 +53,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 击杀 before hook:死亡角色所有牌转移给曹丕 ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '击杀',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '击杀') return;
-      const deadIdx = atom.player;
-      if (deadIdx === undefined) return;
-      if (deadIdx === ownerId) return; // 自己死亡不触发
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return; // 曹丕需存活
-      const dead = ctx.state.players[deadIdx];
-      if (!dead) return;
+  // ── 死亡时 after hook:死亡角色所有牌转移给曹丕(系统处理牌之前)──
+  registerAfterHook(state, skill.id, ownerId, '死亡时', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '死亡时') return;
+    const deadIdx = atom.player;
+    if (deadIdx === undefined) return;
+    if (deadIdx === ownerId) return; // 自己死亡不触发
+    const self = ctx.state.players[ownerId];
+    if (!self?.alive) return; // 曹丕需存活
+    const dead = ctx.state.players[deadIdx];
+    if (!dead) return;
 
       // 收集死亡角色的所有牌(快照,避免转移过程中数组变动)
       const handCards = [...dead.hand];
@@ -135,9 +129,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         });
       }
 
-      // 不 cancel:让击杀 apply 正常执行(alive=false + hand/equip 已空,no-op card loop)
-    },
-  );
+      // 不 cancel:让 系统处理牌 apply 正常执行(alive=false + hand/equip 已空,no-op card loop)
+  });
 
   return () => {};
 }

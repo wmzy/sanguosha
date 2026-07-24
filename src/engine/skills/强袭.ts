@@ -17,6 +17,7 @@
 //   - 官方未提距离限制,故不再校验目标是否在攻击范围内。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
@@ -127,7 +128,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
 
       // 对 target 造成 1 点伤害(来源为典韦,强制伤害,不可被闪抵消)
-      await applyAtom(st, { type: '造成伤害', target, amount: 1, source: from });
+      await runDamageFlow(st, from, target, 1);
       await popFrame(st);
     },
   );

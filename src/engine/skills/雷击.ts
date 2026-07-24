@@ -18,6 +18,8 @@
 //   故询问闪 after hook 不执行)。同鬼才 hook 顺序限制,属引擎判定/取消机制固有局限。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook } from '../skill';
 import { isCancelled } from '../card-effect/registry';
 
@@ -100,7 +102,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!ctx.state.players[target]?.alive) return;
 
     // 判定目标(鬼道可在判定 after hook 内替换判定牌)
-    await applyAtom(ctx.state, { type: '判定', player: target, judgeType: '雷击' });
+    await runJudgeFlow(ctx.state, target, '雷击');
 
     // 读判定结果:判定 atom 的 afterHooks(含鬼道替换)与自身 afterHooks 已把
     // 最终判定牌移入弃牌堆顶。
@@ -112,13 +114,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 黑桃 → 造成2点雷电伤害(来源=张角本人)
     if (judgeCard.suit === '♠') {
-      await applyAtom(ctx.state, {
-        type: '造成伤害',
-        target,
-        amount: 2,
-        source: ownerId,
-        damageType: '雷电',
-      });
+      await runDamageFlow(ctx.state, ownerId, target, 2, undefined, '雷电');
     } else if (judgeCard.suit === '♣') {
       // 梅花 → 张角回复1点体力(满血不浪费),然后对其造成1点雷电伤害
       if (me.health < me.maxHealth) {
@@ -128,13 +124,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           amount: 1,
         });
       }
-      await applyAtom(ctx.state, {
-        type: '造成伤害',
-        target,
-        amount: 1,
-        source: ownerId,
-        damageType: '雷电',
-      });
+      await runDamageFlow(ctx.state, ownerId, target, 1, undefined, '雷电');
     }
   });
 

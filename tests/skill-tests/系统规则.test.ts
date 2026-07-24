@@ -167,7 +167,10 @@ describe('系统规则', () => {
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('桃/求桃');
 
-    // P1 出桃救援
+    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问(打出杀后无手牌)→ pass
+    await P0.pass();
+
+    // 第二问 P1(濒死者)→ 出桃自救
     await P1.respond('桃', { cardId: 'p1' });
 
     // P1 回复 1 点体力
@@ -312,13 +315,10 @@ describe('系统规则', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // P1 HP=0 → 濒死 → 求桃先问 P1(无手牌)
+    await P1.pass(); // P1 HP=0 → 濒死
     expect(harness.state.players[1].health).toBe(0);
 
-    // P1 无手牌:旧 confirm 下点"出桃"传 {choice:true} 会误设救援标志;
-    // 新 useCard 下 P1.respond 必须传 cardId,P1 无手牌无法响应 → pass 不救
-    await P1.pass();
-    // P0 有桃 → 出桃救 P1
+    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问(打出杀后仍有桃)→ 出桃救 P1
     await P0.respond('桃', { cardId: 'p1' });
     expect(harness.state.players[1].health).toBe(1);
     expect(harness.state.players[1].alive).toBe(true);

@@ -30,6 +30,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerBeforeHook } from '../skill';
 
 const CONFIRM_RT = '界天香/confirm';
@@ -135,7 +136,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '受到伤害时',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.target !== ownerId) return;
@@ -234,13 +235,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (isDamage) {
         // 选项①:该角色受到伤害来源的1点伤害(保留原来源)
         const source = atom.source ?? ownerId;
-        await applyAtom(ctx.state, {
-          type: '造成伤害',
-          target: newTarget,
-          amount: 1,
-          source,
-          damageType: '普通',
-        });
+        await runDamageFlow(ctx.state, source, newTarget, 1, undefined, '普通');
         // 摸 X 张牌(X = 已损失体力值,至多 5;伤害结算后)
         if (targetPlayer.alive) {
           const lostHealth = targetPlayer.maxHealth - targetPlayer.health;

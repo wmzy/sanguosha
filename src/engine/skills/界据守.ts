@@ -13,6 +13,7 @@
 //   - 内部标签/localVars/requestType 键名保持原前缀 '据守/xxx'(不改为 '界据守/xxx')。
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
 import { skillLoaders } from './index';
@@ -77,7 +78,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await pushFrame(state, '界据守', ownerId, {});
       try {
         // 翻面:加标签(下一回合开始时被消费)
-        await applyAtom(state, { type: '加标签', player: ownerId, tag: SKIP_TAG });
+        await flipFaceDown(state, ownerId, '据守');
         // 摸四张牌(界版变化:标版 3 → 界版 4)
         await applyAtom(state, { type: '摸牌', player: ownerId, count: 4 });
 
@@ -174,7 +175,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 入口:准备阶段开始 + 翻面标签 → 启动跳过
     if (atom.phase === '准备' && self?.tags.includes(SKIP_TAG)) {
-      await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: SKIP_TAG });
+      await flipFaceUp(ctx.state, ownerId, '据守');
       ctx.state.localVars[SKIP_FLAG] = ownerId;
       return { kind: 'cancel' };
     }
@@ -196,9 +197,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars[SKIP_FLAG];
 
     // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束
-    await applyAtom(ctx.state, { type: '清过期标记', player: ownerId });
-    await applyAtom(ctx.state, { type: '下一玩家' });
-    await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
+    await performSkipTurn(ctx.state, ownerId);
 
     return { kind: 'cancel' };
   });

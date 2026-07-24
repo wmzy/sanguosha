@@ -93,19 +93,19 @@ describe('完杀', () => {
     await P2.pass();
     await harness.waitForStable();
 
-    // 求桃顺序:P2(濒死者本人)→ P3 → 贾诩。
-    // P2 先被问 → P2 无桃 pass
-    await P2.pass();
+    // 求桃顺序(模块 C:逆时针从当前回合贾诩起):贾诩 → P3(完杀跳过)→ P2(濒死者)。
+    // 贾诩先被问(当前回合角色)→ 无桃 pass
+    await JX.pass();
     await harness.waitForStable();
 
-    // 完杀:P3 的求桃问询被 cancel(不创建 pending),流程直接跳到贾诩
-    // → 当前 pending 应是贾诩(idx 0),而非 P3(idx 2)
+    // 完杀:P3 的求桃问询被 cancel(不创建 pending),流程直接跳到 P2(濒死者)
+    // → 当前 pending 应是 P2(idx 1),而非 P3(idx 2)或贾诩(idx 0)
     const pendingSlot = [...harness.state.pendingSlots.values()][0];
     expect(pendingSlot).toBeTruthy();
-    expect((pendingSlot.atom as { target: number }).target).toBe(0); // 问贾诩,P3 被跳过
+    expect((pendingSlot.atom as { target: number }).target).toBe(1); // 问 P2(濒死者)
 
-    // 贾诩也无桃,pass → 无人救援,P2 死亡
-    await JX.pass();
+    // P2 也无桃,pass → 无人救援,P2 死亡
+    await P2.pass();
     await harness.waitForStable();
 
     expect(harness.state.players[1].alive).toBe(false);
@@ -144,11 +144,8 @@ describe('完杀', () => {
     await P2.pass(); // 不闪 → 濒死
     await harness.waitForStable();
 
-    // P2(濒死者)先被问,无桃 pass
-    await P2.pass();
-    await harness.waitForStable();
-
-    // P3 被完杀跳过,直接问贾诩 → 贾诩出桃救援
+    // 求桃顺序(模块 C:逆时针从当前回合贾诩起):贾诩先被问
+    // 贾诩本人可出桃救援(完杀允许"你")
     await JX.respond('桃', { cardId: 'p2' });
     await harness.waitForStable();
 
@@ -197,7 +194,12 @@ describe('完杀', () => {
     await P2.pass(); // 不闪 → 濒死
     await harness.waitForStable();
 
-    // P2(濒死者)先被问 → 对自己出桃
+    // 求桃顺序(模块 C:逆时针从当前回合贾诩起):贾诩 → P3(完杀跳过)→ P2(濒死者)。
+    // 贾诩先被问 → 无桃 pass
+    await JX.pass();
+    await harness.waitForStable();
+
+    // 完杀跳过 P3 → 问 P2(濒死者,可自救)→ 对自己出桃
     await P2.respond('桃', { cardId: 'p3' });
     await harness.waitForStable();
 
@@ -246,13 +248,14 @@ describe('完杀', () => {
     await P2.pass();
     await harness.waitForStable();
 
-    // 求桃顺序(从濒死者 P2 起):P2 → P3 → 贾诩
-    await P2.pass(); // P2 无桃
+    // 求桃顺序(模块 C:逆时针从当前回合 P3 起):P3 → P2(濒死)→ 贾诩
+    // P3 先被问(当前回合角色)→ 无桃 pass
+    await P3.pass();
     await harness.waitForStable();
-    // 接下来问 P3(当前 pending 应是 P3,idx 2——完杀未跳过任何角色)
+    // 接下来问 P2(濒死者,idx 1——完杀未跳过任何角色)
     let slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot.atom as { target: number }).target).toBe(2);
-    await P3.pass(); // P3 无桃
+    expect((slot.atom as { target: number }).target).toBe(1);
+    await P2.pass(); // P2 无桃
     await harness.waitForStable();
     // 问贾诩(第三方)——完杀不生效,贾诩被正常问询
     slot = [...harness.state.pendingSlots.values()][0];

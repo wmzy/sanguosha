@@ -31,6 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 import { registerSuppressionProvider } from '../skill-suppression';
 
@@ -144,7 +145,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
     // b. 记录目标 + 判定
     ctx.state.localVars[TARGET_VAR] = target;
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '铁骑' });
+    await runJudgeFlow(ctx.state, ownerId, '铁骑');
   });
 
   // ── 判定 after:judgeType==='铁骑' → 读花色,存 localVars 供询问闪阶段消费 ──

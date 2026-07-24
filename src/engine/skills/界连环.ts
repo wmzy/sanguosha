@@ -25,6 +25,7 @@
 // 模式参考:标连环.ts(转化/重铸)、界火计.ts(覆盖 DEFAULT_SKILLS 中 card skill 的 use)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { setChain } from '../face-down';
 import { registerAction, hasBlockingPending, validateUseCard } from '../skill';
 import { 询问抵消 } from '../无懈可击';
 import { defaultPlayActive } from '../action-active';
@@ -163,7 +164,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!cancelled) {
           for (const t of targets) {
             const chained = isChained(state, t);
-            await applyAtom(state, { type: '设横置', player: t, chained: !chained });
+            await setChain(state, t, !chained);
           }
         }
         await applyAtom(state, {

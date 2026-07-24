@@ -232,7 +232,7 @@ describe('界弓骑', () => {
 
     expect(harness.state.players[1].health).toBe(3); // 杀生效
     // 同花色杀不增计杀/usedCount
-    expect(harness.state.turn.vars['杀/usedCount']).toBeUndefined();
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBeUndefined();
   });
 
   // ─── 不同花色杀仍占次数 ────────────────────
@@ -269,7 +269,7 @@ describe('界弓骑', () => {
     await P1.pass();
 
     expect(harness.state.players[1].health).toBe(3);
-    expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
   });
 
   // ─── 攻击范围无限:远距离目标可被杀 ────────────

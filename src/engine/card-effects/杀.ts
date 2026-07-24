@@ -12,6 +12,7 @@
 import type { Card, GameView, GameState, Json } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
 import { canSlash, incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
@@ -44,14 +45,7 @@ function canUseSlash(
 async function resolveSlash(ctx: ResolveCtx): Promise<void> {
   const { state, source, target, cardId } = ctx;
   const damageType = state.cardMap[cardId]?.damageType;
-  await applyAtom(state, {
-    type: '造成伤害',
-    target,
-    amount: 1,
-    source,
-    cardId,
-    damageType,
-  });
+  await runDamageFlow(state, source, target, 1, cardId, damageType);
 }
 
 /** 杀的结算后回调：出杀次数累加 + view 同步 */

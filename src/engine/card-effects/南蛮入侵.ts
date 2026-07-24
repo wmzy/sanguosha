@@ -5,29 +5,23 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
+import { consumePlayedSlashes } from '../card-effect/play-card';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 南蛮入侵的逐目标结算：询问杀 → 检查处理区 → 伤害 */
+/** 南蛮入侵的逐目标结算：询问杀 → 统一清理打出杀 → 伤害 */
 async function resolveBarbarianInvasion(ctx: ResolveCtx): Promise<void> {
   const { state, source, target, cardId } = ctx;
   // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
 
   await applyAtom(state, { type: '询问杀', target, source });
-  // 检查处理区：有杀牌 = 出了杀
-  const killCardId = frameCards(state).find((id) => state.cardMap[id]?.name === '杀');
-  if (killCardId) {
-    // 出了杀：移到弃牌堆
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId: killCardId,
-      from: { zone: '处理区' },
-      to: { zone: '弃牌堆' },
-    });
-  } else {
+  // 统一清理：处理区内打出的杀移入弃牌堆；返回空 = 目标未出杀
+  const kills = await consumePlayedSlashes(state);
+  if (kills.length === 0) {
     // 没出杀：受伤害
     if (!state.players[target]?.alive) return;
-    await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
+    await runDamageFlow(state, source, target, 1, cardId);
   }
 }
 

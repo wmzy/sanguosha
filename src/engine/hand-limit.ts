@@ -1,4 +1,4 @@
-// 手牌上限计算——覆盖型提供者模式(镜像 slash-quota.ts 的 registerSlashMaxProvider)。
+// 手牌上限计算——覆盖型提供者模式(镜像 slash-quota.ts 的 registerSlashQuotaProvider)。
 //
 // 默认手牌上限 = 当前体力值 + 本回合加成(turn.vars['手牌上限/bonus:<player>'])。
 // 技能(如界英姿「你的手牌上限为你的体力上限」)可注册"覆盖型提供者",
@@ -36,7 +36,7 @@ function getHandLimitRegistry(state: GameState): HandLimitRegistry {
 }
 
 /**
- * 注册一个手牌上限覆盖提供者(技能 onInit 时调用,与 registerAction/registerSlashMaxProvider 同构)。
+ * 注册一个手牌上限覆盖提供者(技能 onInit 时调用,与 registerAction/registerSlashQuotaProvider 同构)。
  * 返回取消注册函数——技能 onInit 应将其并入返回的 unload,由 setSkillInstanceUnload
  * 统一管理,卸载技能实例时自动清理。
  */

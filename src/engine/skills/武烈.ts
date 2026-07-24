@@ -206,10 +206,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '受到伤害时',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
-      if (atom.type !== '造成伤害') return;
       if (typeof atom.target !== 'number') return;
       if ((atom.amount ?? 0) <= 0) return;
       const st = ctx.state;

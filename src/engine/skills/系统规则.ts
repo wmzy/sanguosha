@@ -6,6 +6,7 @@ import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance } from '../skill';
 import { DEFAULT_SKILLS } from '../atoms/选将';
 import { skillLoaders } from './index';
+import { runDeathFlow } from '../death-flow';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '系统规则', description: '引擎级规则(判定清理/技能生命周期/濒死)' };
@@ -177,14 +178,31 @@ export function onInit(_skill: Skill, state: GameState): () => void {
     }
   });
 
-  // ── 造成伤害 after hook:濒死检查(最后执行,确保遗计等技能先触发) ──
-  registerAfterHook(state, '系统规则', -1, '造成伤害', async (ctx) => {
+  // ── 造成伤害 after hook 已删除:伤害走 runDamageFlow → 扣减体力,
+  // 濒死检查由 扣减体力 after-hook 负责,killer 由 runDecreaseLifeFlow 写入。
+
+  // ── 扣减体力 after hook:濒死检查 ──
+  // 仅处理非伤害路径(失去体力 → runDecreaseLifeFlow → 扣减体力)。
+  // 伤害路径(runDamageFlow)设置 __inDamageFlow 标志,濒死检查延迟到 伤害结算结束时
+  // (确保 放逐/断肠 等受伤后技能先于濒死检查执行)。
+  registerAfterHook(state, '系统规则', -1, '扣减体力', async (ctx) => {
+    if (ctx.state.localVars['__inDamageFlow']) return; // 伤害路径:延迟到 伤害结算结束时
     const atom = ctx.atom;
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];
     if (target && target.alive && target.health <= 0) {
-      // 记录致死来源供死亡奖惩使用(伤害致死才有来源)
-      ctx.state.localVars['死亡/killer'] = atom.source;
+      await runDyingFlow(ctx.state, atom.target);
+    }
+  });
+
+  // ── 伤害结算结束时:濒死检查(伤害路径专用)──
+  // 扣减体力 在 造成伤害后/受到伤害后 之前执行,但濒死检查延迟到此时机
+  // (在所有受伤后技能执行完毕后),与旧 造成伤害 after-hook 的系统规则最后执行语义一致。
+  registerAfterHook(state, '系统规则', -1, '伤害结算结束时', async (ctx) => {
+    const atom = ctx.atom;
+    if (typeof atom.target !== 'number') return;
+    const target = ctx.state.players[atom.target];
+    if (target && target.alive && target.health <= 0) {
       await runDyingFlow(ctx.state, atom.target);
     }
   });
@@ -201,31 +219,8 @@ export function onInit(_skill: Skill, state: GameState): () => void {
     }
   });
 
-  // ── 击杀 after hook:死亡奖惩(杀死反贼→摸3张,主公杀忠臣→弃所有牌) ──
-  // 来源由 造成伤害 after hook 记入 localVars;体力致死无来源→无奖惩。
-  registerAfterHook(state, '系统规则', -1, '击杀', async (ctx) => {
-    const deadIdx = (ctx.atom).player;
-    if (typeof deadIdx !== 'number') return;
-    const dead = ctx.state.players[deadIdx];
-    const killer = ctx.state.localVars['死亡/killer'] as number | undefined;
-    delete ctx.state.localVars['死亡/killer'];
-    if (killer === undefined) return; // 体力致死等无来源——无奖惩
-    if (killer === deadIdx) return; // 自杀——无奖惩
-    const killerPlayer = ctx.state.players[killer];
-    if (!killerPlayer?.alive) return; // 凶手已亡——无奖惩
-
-    if (dead.identity === '反贼') {
-      await applyAtom(ctx.state, { type: '摸牌', player: killer, count: 3 });
-    } else if (dead.identity === '忠臣' && killerPlayer.identity === '主公') {
-      const allCards = [
-        ...killerPlayer.hand,
-        ...(Object.values(killerPlayer.equipment).filter(Boolean) as string[]),
-      ];
-      if (allCards.length > 0) {
-        await applyAtom(ctx.state, { type: '弃置', player: killer, cardIds: allCards });
-      }
-    }
-  });
+  // ── 击杀 after hook(死亡奖惩)已删除:奖惩搬入 runDeathFlow(death-flow.ts)。
+  // runDyingFlow 末尾改调 runDeathFlow,由其内联 applyDeathPenalty 处理奖惩。
 
   // ── 选将/弃牌 respond 已移到 registerSystemRespondActions,注册到每个玩家座次 ──
 
@@ -245,7 +240,18 @@ function canRescueWith(state: GameState, playerIdx: number): (card: Card) => boo
 }
 
 /**
- * 濒死求桃流程:从濒死玩家开始,按座次依次询问每个存活玩家是否使用桃救援。
+ * 濒死求桃流程(模块 C 修正,对齐 neardeath.md):
+ *   1. applyAtom(陷入濒死)——系统通知,触发不屈/涅槃/伏枥/仁心等救援技 after-hook。
+ *   2. 不屈存活检查——命中则濒死已化解,跳过求桃与死亡。
+ *   3. applyAtom(进入濒死状态时)——补益/随势① 独立时机(先于求桃,可能直接回血化解)。
+ *   4. 求桃循环:从当前回合角色起,逆时针询问每个存活玩家;被救仍濒死则发
+ *      新的濒死状态时 并从当前响应者重新逆时针。
+ *   5. 仍濒死 → runDeathFlow(target, killer)。
+ *
+ * 关键修正(对比旧实现):
+ *   - 起点:从濒死玩家 → 当前回合角色(state.currentPlayerIndex)。
+ *   - 方向:顺时针(targetIdx+i) → 逆时针(startIdx-i+n)。
+ *   - 新增时机:进入濒死状态时(补益/随势①)、新的濒死状态时(被救仍濒死重置)。
  */
 async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> {
   await applyAtom(state, { type: '陷入濒死', target: targetIdx });
@@ -257,34 +263,65 @@ async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> 
     return;
   }
 
+  // 新增时机:进入濒死状态时(补益/随势①)。先于求桃,补益等技能可能直接回血化解。
+  await applyAtom(state, { type: '进入濒死状态时', target: targetIdx });
+  // 进入濒死状态时 的 after-hook(如补益)可能已把 target 救活——检查后提前退出。
+  if (state.players[targetIdx].health > 0) return;
+
   const n = state.players.length;
-  for (let i = 0; i < n; i++) {
-    const playerIdx = (targetIdx + i) % n;
-    const player = state.players[playerIdx];
-    if (!player.alive) continue;
-    if (state.players[targetIdx].health > 0) return;
+  // 起点:当前回合角色(规则要求)。逆时针方向:(startIdx - i + n) % n。
+  let startIdx = state.currentPlayerIndex;
+  // 已问过的玩家集合(防止无限循环:一轮内每个存活玩家最多问一次)。
+  let asked = new Set<number>();
 
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: '桃/求桃',
-      target: playerIdx,
-      prompt: {
-        type: 'useCard',
-        title: `${state.players[targetIdx].name} 濒死,使用桃/酒救援`,
-        cardFilter: { filter: canRescueWith(state, playerIdx), min: 1, max: 1 },
-      },
-      timeout: 15,
-    });
+  while (state.players[targetIdx].health <= 0) {
+    let found = false; // 本轮是否询问了任意玩家(无 → 全员问过,退出)
+    for (let i = 0; i < n; i++) {
+      const playerIdx = (startIdx - i + n) % n; // 逆时针
+      if (asked.has(playerIdx)) continue;
+      if (!state.players[playerIdx].alive) continue;
 
-    const rescuedByPeach = state.localVars['求桃/已救'] as boolean | undefined;
-    if (rescuedByPeach) {
-      await applyAtom(state, { type: '回复体力', target: targetIdx, amount: 1, source: playerIdx });
-      delete state.localVars['求桃/已救'];
-      if (state.players[targetIdx].health > 0) return;
+      asked.add(playerIdx);
+      found = true;
+
+      await applyAtom(state, {
+        type: '请求回应',
+        requestType: '桃/求桃',
+        target: playerIdx,
+        prompt: {
+          type: 'useCard',
+          title: `${state.players[targetIdx].name} 濒死,使用桃/酒救援`,
+          cardFilter: { filter: canRescueWith(state, playerIdx), min: 1, max: 1 },
+        },
+        timeout: 15,
+      });
+
+      const rescuedByPeach = state.localVars['求桃/已救'] as boolean | undefined;
+      if (rescuedByPeach) {
+        await applyAtom(state, { type: '回复体力', target: targetIdx, amount: 1, source: playerIdx });
+        delete state.localVars['求桃/已救'];
+
+        if (state.players[targetIdx].health > 0) return; // 救活了
+
+        // 仍濒死 → 新的濒死状态时 → 重置起点为当前响应者,重新逆时针。
+        // 当前响应者本轮已问过(加入 asked),下一轮从其逆时针下一位开始。
+        await applyAtom(state, { type: '新的濒死状态时', target: targetIdx });
+        startIdx = playerIdx;
+        asked = new Set<number>();
+        asked.add(playerIdx);
+        break; // 重新进入 while 循环
+      }
+      break; // 未救:退出 for,while 重新扫描(跳过已问玩家)找下一位
     }
+    if (!found) break; // 所有存活玩家都问过了
   }
 
   if (state.players[targetIdx].health <= 0) {
-    await applyAtom(state, { type: '击杀', player: targetIdx });
+    // 死亡流程拆分(模块 B):runDeathFlow 编排 5 时机(亮身份牌前/亮身份牌/死亡时/
+    // 系统处理牌/死亡后),奖惩内联其中。killer 来自 runDecreaseLifeFlow 写入的
+    // localVars(伤害有来源;体力致死无来源→undefined),消费后清除避免残留。
+    const killer = state.localVars['死亡/killer'] as number | undefined;
+    delete state.localVars['死亡/killer'];
+    await runDeathFlow(state, targetIdx, killer);
   }
 }

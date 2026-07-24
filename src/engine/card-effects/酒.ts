@@ -17,7 +17,7 @@ import type { HookResult } from '../types';
  *  全局注册(ownerId=-1)——酒是基本牌面能力，不限技能持有者。
  *  在 create-engine bootstrap 中调用。 */
 export function registerWineHook(state: import('../types').GameState): void {
-  registerBeforeHook(state, '酒', -1, '造成伤害', async (ctx): Promise<HookResult | void> => {
+  registerBeforeHook(state, '酒', -1, '造成伤害时', async (ctx): Promise<HookResult | void> => {
     const atom = ctx.atom;
     if (atom.source === undefined) return;
     if ((atom.amount ?? 0) <= 0) return;

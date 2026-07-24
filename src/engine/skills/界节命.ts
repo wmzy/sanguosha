@@ -11,8 +11,8 @@
 // 模式 A(被动触发·受伤):after hook 挂在「造成伤害」。
 //   造成伤害(target=自己 + amount>0 + 自己存活) → runJieMing()
 //
-// 模式 B(被动触发·死亡):before hook 挂在「击杀」。
-//   击杀(player=自己) → runJieMing()(不 cancel,击杀 apply 随后正常执行,
+// 模式 B(被动触发·死亡):after hook 挂在「死亡时」(模块 B:系统处理牌之前)。
+//   死亡时(player=自己) → runJieMing()(不 cancel,系统处理牌随后正常执行,
 //   自己仍死亡,技能只发挥一次最后作用)。
 //
 // runJieMing 主体:
@@ -26,18 +26,17 @@
 //   - 「将手牌弃至 X 张」:摸完后 hand > X 才需弃,弃 (hand - X) 张
 //   - 目标可选任意存活角色,包括自己(死亡触发时选自己无实际收益)
 //   - 跨座次 respond:目标座次需 respond 选拓牌,故 respond 须为所有座次注册
-//   - 死亡触发在 before-击杀:此时自己的手牌/装备仍在(尚未被 apply 清空)
+//   - 死亡触发在 死亡时 after-hook:此时自己的手牌/装备仍在(系统处理牌尚未清空)
 //   - 受伤触发按一次伤害一次;死亡触发整局一次(死亡后技能失效)
 import type {
   FrontendAPI,
   GameState,
   GameView,
-  HookResult,
   Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook } from '../skill';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」
 const CONFIRM_RT = '节命/confirm';
@@ -197,34 +196,28 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   }
 
   // ── 造成伤害 after:荀彧受伤后触发(非致死伤害)──
-  // 致死伤害(health<=0)跳过——由 击杀 before-hook 接管,避免双重触发
+  // 致死伤害(health<=0)跳过——由 死亡时 after-hook 接管,避免双重触发
   // (造成伤害 after-hooks 在 系统规则 濒死检查 before 执行:此时 alive 仍 true,
-  //  若不按 health 过滤会先于此处触发一次,濒死求桃失败击杀时再触发一次)
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  //  若不按 health 过滤会先于此处触发一次,濒死求桃失败死亡时再触发一次)
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
-    if (self.health <= 0) return; // 致死伤害由死亡触发(击杀 before-hook)接管
+    if (self.health <= 0) return; // 致死伤害由死亡触发(死亡时 after-hook)接管
     await runJieMing(ctx.state, ownerId);
   });
 
-  // ── 击杀 before:荀彧死亡时触发 ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '击杀',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '击杀') return;
-      if (atom.player !== ownerId) return; // 仅荀彧本人死亡时触发
-      // 荀彧 即将死亡(alive 仍为 true,击杀 apply 随后置 false)
-      // 不 cancel:让 击杀 apply 正常执行(荀彧仍死亡,技能只发挥一次最后作用)
-      await runJieMing(ctx.state, ownerId);
-    },
-  );
+  // ── 死亡时 after:荀彧死亡时触发(系统处理牌之前)──
+  registerAfterHook(state, skill.id, ownerId, '死亡时', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '死亡时') return;
+    if (atom.player !== ownerId) return; // 仅荀彧本人死亡时触发
+    // 荀彧 即将死亡(alive 仍为 true,系统处理牌随后置 false)
+    // 不 cancel:让 系统处理牌 正常执行(荀彧仍死亡,技能只发挥一次最后作用)
+    await runJieMing(ctx.state, ownerId);
+  });
 
   return () => {
     for (const off of unloaders) off();

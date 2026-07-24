@@ -13,9 +13,10 @@
 //   询问闪 after-hook 在 询问闪 resolve 时触发,此时闪的 respond action 已设置标记。
 
 import type { GameState, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
 import { isCancelled, clearCancelled } from '../card-effect/registry';
+import { consumePlayedSlashes } from '../card-effect/play-card';
 import type { SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -87,16 +88,8 @@ export async function enforceDualKill(
   current: number,
 ): Promise<void> {
   if (!state.players[otherParty]?.skills.includes('无双')) return;
-  const firstKills = frameCards(state).filter((id) => state.cardMap[id]?.name === '杀');
+  const firstKills = await consumePlayedSlashes(state);
   if (firstKills.length === 0) return;
-  for (const id of firstKills) {
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId: id,
-      from: { zone: '处理区' },
-      to: { zone: '弃牌堆' },
-    });
-  }
   await applyAtom(state, { type: '询问杀', target: current, source: otherParty });
 }
 

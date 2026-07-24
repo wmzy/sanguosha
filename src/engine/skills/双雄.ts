@@ -31,6 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import {
   registerAction,
   registerAfterHook,
@@ -120,11 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // 进行一次判定(judgeType='双雄'):从牌堆翻一张,鬼才/鬼道可在 afterApply 阶段改判,
       // 本技能的 after hook 在判定牌生效后获得判定牌并记颜色
-      await applyAtom(ctx.state, {
-        type: '判定',
-        player: ownerId,
-        judgeType: '双雄',
-      });
+      await runJudgeFlow(ctx.state, ownerId, '双雄');
 
       // 清理询问期 localVars
       delete ctx.state.localVars[TRIGGERED_KEY];

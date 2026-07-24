@@ -12,6 +12,7 @@
 // atom after(非询问闪 after),故不受询问闪 cancel 影响。
 import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -71,7 +72,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!ctx.state.localVars['八卦阵/confirmed']) return;
 
       // 判定:牌堆顶→处理区→技能 after hooks 读取→afterHooks 清理(处理区→弃牌堆)
-      await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '八卦阵' });
+      await runJudgeFlow(ctx.state, ownerId, '八卦阵');
 
       // 判定完成后判定牌已进弃牌堆,读弃牌堆顶
       const discardPile = ctx.state.zones.discardPile;

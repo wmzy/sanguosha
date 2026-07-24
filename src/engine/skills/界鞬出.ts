@@ -15,7 +15,7 @@
 //            (成为目标 before hook + 移动牌 after hook 消费:目标获得此杀,此杀不生效)。
 //          · 非基本牌(装备/锦囊):加 '界鞬出/禁闪' 标签(询问闪 before hook 消费,强制命中)
 //            + 本回合出杀上限 +1(turn.vars['界鞬出/quotaBonus'] 累计 +
-//            registerSlashMaxProvider 返回该值)。
+//            registerSlashExtraProvider 返回该值)。
 //   2. 成为目标 before hook(target 在获得杀名单):
 //        cancel(此杀对该目标不生效,跳过询问闪/造成伤害)。**不在此移动杀牌**——
 //        杀.execute 收尾(第三阶段)会无条件 移动牌(杀 处理区→弃牌堆),
@@ -26,11 +26,11 @@
 //   4. 询问闪 before hook(source===ownerId 且 target 有 '界鞬出/禁闪' 标签):
 //        去标签 + cancel(跳过询问闪 → 处理区无闪 → 造成伤害,强制命中)。
 //
-// 出杀次数+1 实现策略:用 registerSlashMaxProvider 注册一个 provider,返回值 =
+// 出杀次数+1 实现策略:用 registerSlashExtraProvider 注册一个 provider,返回值 =
 //   state.turn.vars['界鞬出/quotaBonus'](number,本回合内累计的非基本牌加成次数)。
 //   回合结束 turn.vars 自动清空 → 加成自动失效,符合"本回合"语义。
-//   杀.execute 末尾仍调用 incSlashUsed(已用次数 +1),配合 slashMax = 基础1+Σ提供者,
-//   自然得到"剩余次数 = 上限 - 已用"。
+//   杀.execute 末尾仍调用 incSlashUsed(已用次数 +1,优先扣额定),配合
+//   slashMax = 额定(quota)+ 额外(extra),自然得到"剩余次数 = 上限 - 已用"。
 //
 // 标签/localVars 生命周期:阶段1(指定目标)产出,阶段2(成为目标/询问闪/收尾)消费并清除——
 //   天然按单次杀结算。杀技能零感知界鞬出。
@@ -46,7 +46,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
-import { registerSlashMaxProvider } from '../slash-quota';
+import { registerSlashExtraProvider } from '../slash-quota';
 
 const TAG = '界鞬出/禁闪';
 const CONFIRM = '界鞬出/confirmed';
@@ -137,10 +137,10 @@ async function askTargetToDiscard(
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  // ── 出杀上限提供者:返回本回合已累计的"非基本→+1"加成次数 ──
+  // ── 额外出杀提供者:返回本回合已累计的"非基本→+1"加成次数(叠加型) ──
   // 与 registerAction/registerBeforeHook 同构:state-bound 注册,随 unload 清理。
   // 加成值存于 turn.vars,回合结束自动清零(天然满足"本回合"语义)。
-  const unloadProvider = registerSlashMaxProvider(state, ownerId, (st, player) => {
+  const unloadProvider = registerSlashExtraProvider(state, ownerId, (st, player) => {
     if (player !== ownerId) return 0;
     const bonus = st.turn.vars[QUOTA_BONUS];
     return typeof bonus === 'number' ? bonus : 0;

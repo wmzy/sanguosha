@@ -1,7 +1,15 @@
 // src/engine/atoms/获得.ts
 // 获得:玩家获得一张牌(可选从指定玩家处)
+//
+// 模块 F 迁移(flow-redesign.md):afterApply 为「从他人手牌获得」发出「移动到目标区域后」
+// 时机标记(reason='获得'),为失去牌类技能提供统一 hook 点。ZoneLoc 不含「装备」区域,
+// 从装备区获得不发标记。本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
+import { applyAtom } from '../create-engine';
+
+/** localVars key:本次获得是否来自 from 玩家的手牌(afterApply 发时机标记用) */
+const FROM_HAND_KEY = '__获得/来自手牌';
 
 export const 获得: AtomDefinition<{ player: number; cardId: string; from?: number }> = {
   type: '获得',
@@ -12,8 +20,10 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
     return null;
   },
   apply(state, atom) {
+    let fromWasHand = false;
     if (atom.from !== undefined) {
       const fromP = state.players[atom.from];
+      fromWasHand = fromP.hand.includes(atom.cardId);
       fromP.hand = fromP.hand.filter((id) => id !== atom.cardId);
       const equipment: Record<string, string> = {};
       for (const [slot, id] of Object.entries(fromP.equipment)) {
@@ -21,9 +31,24 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
       }
       fromP.equipment = equipment;
     }
+    state.localVars[FROM_HAND_KEY] = fromWasHand;
     state.players[atom.player].hand.push(atom.cardId);
   },
   effect: { sound: 'obtain', animation: 'slide', duration: 600 },
+  /** 模块 F:为「从他人手牌获得」发出「移动到目标区域后」时机标记(reason='获得')。
+   *  从装备区获得(ZoneLoc 不含装备)或无 from(牌凭空产生,如仁德/再起)不发标记。 */
+  async afterApply(state, atom) {
+    const fromWasHand = state.localVars[FROM_HAND_KEY];
+    delete state.localVars[FROM_HAND_KEY];
+    if (!fromWasHand || atom.from === undefined) return;
+    await applyAtom(state, {
+      type: '移动到目标区域后',
+      cardId: atom.cardId,
+      from: { zone: '手牌', player: atom.from },
+      to: { zone: '手牌', player: atom.player },
+      reason: '获得',
+    });
+  },
   toViewEvents(state, atom): ViewEventSplit {
     const effect = { sound: 'obtain' as const, animation: 'slide' as const, duration: 600 };
     // 判断牌来自哪个区域(供 applyView 精确更新)

@@ -239,21 +239,20 @@ describe('濒死求桃', () => {
     expect(state.pendingSlots.size).toBeGreaterThan(0);
 
     // P1 不出闪 → 扣血 → HP=0 → 触发 runDyingFlow
-    // P1(濒死)被问求桃 → fireTimeout 后 P1 没救(无桃) → P2 被问求桃
+    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问求桃(target=0)→ P0 无桃,fireTimeout
     await fireTimeoutAndWait(state);
-    // 继续 fireTimeout 消耗求桃 — 第一次 fire timeout(P1 不救)
     if (state.pendingSlots.size > 0) {
       const slot = [...state.pendingSlots.values()][0];
       const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
       if (
         slotAtom.type === '请求回应' &&
         slotAtom.requestType === '桃/求桃' &&
-        slotAtom.target === 1
+        slotAtom.target === 0
       ) {
         await fireTimeoutAndWait(state);
       }
     }
-    // 现在应该是 P2 的求桃 pending
+    // 现在应该是 P2 的求桃 pending(target=2)
     if (state.pendingSlots.size > 0) {
       const slot = [...state.pendingSlots.values()][0];
       const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
@@ -376,16 +375,15 @@ describe('濒死求桃链:端到端(harness)', () => {
     // P1 不出闪 → 扣血 → runDyingFlow
     await P1.pass();
 
-    // 第一个 求桃 应该问 P1(target=1)
+    // 模块 C:逆时针从当前回合 P0 起。第一问 P0(target=0)→ 无桃 pass
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slot1 = [...harness.state.pendingSlots.values()][0];
     const slotAtom1 = slot1.atom as { type: string; requestType?: string; target?: number };
     expect(slotAtom1.requestType).toBe('桃/求桃');
-    expect(slotAtom1.target).toBe(1);
-    // P1 不救
-    await P1.pass();
+    expect(slotAtom1.target).toBe(0);
+    await P0.pass();
 
-    // 第二个 求桃 应该问 P2(target=2)
+    // 第二问 P2(target=2)
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slot2 = [...harness.state.pendingSlots.values()][0];
     const slotAtom2 = slot2.atom as { type: string; requestType?: string; target?: number };
@@ -409,9 +407,9 @@ describe('濒死求桃链:端到端(harness)', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 2:4 人局求桃顺序 = target → +1 → +2(P3 未被问到,因为 P2 救回)
+  // 用例 2:4 人局求桃顺序(模块 C:逆时针从当前回合 P0 起):P0 → P3 → P2(P1 未被问到,因为 P2 救回)
   // ─────────────────────────────────────────────────────────────
-  it('用例2:4 人局求桃顺序 = target → +1 → +2(P3 未被问到,因为 P2 救回)', async () => {
+  it('用例2:4 人局求桃顺序 = P0 → P3 → P2(P1 未被问到,因为 P2 救回)', async () => {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
     const peach: Card = makeCard('p1', '桃', '♥', '5');
 
@@ -439,24 +437,32 @@ describe('濒死求桃链:端到端(harness)', () => {
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
+    const P3 = harness.player('P3');
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', slash.id, [1]);
     // P1 不出闪
     await P1.pass();
 
-    // 第一问 P1(target=1)
+    // 模块 C:逆时针从当前回合 P0 起。第一问 P0(target=0)
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slot1 = [...harness.state.pendingSlots.values()][0];
     const slotAtom1 = slot1.atom as { type: string; requestType?: string; target?: number };
-    expect(slotAtom1.target).toBe(1);
-    await P1.pass();
+    expect(slotAtom1.target).toBe(0);
+    await P0.pass();
 
-    // 第二问 P2(target=2)
+    // 第二问 P3(target=3)
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     const slot2 = [...harness.state.pendingSlots.values()][0];
     const slotAtom2 = slot2.atom as { type: string; requestType?: string; target?: number };
-    expect(slotAtom2.target).toBe(2);
+    expect(slotAtom2.target).toBe(3);
+    await P3.pass();
+
+    // 第三问 P2(target=2)
+    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
+    const slot3 = [...harness.state.pendingSlots.values()][0];
+    const slotAtom3 = slot3.atom as { type: string; requestType?: string; target?: number };
+    expect(slotAtom3.target).toBe(2);
 
     // P2 出桃
     await P2.respond('桃', { cardId: peach.id });
@@ -466,14 +472,14 @@ describe('濒死求桃链:端到端(harness)', () => {
     expect(harness.state.players[1].health).toBe(1);
     // 桃进弃牌堆
     expect(harness.state.zones.discardPile).toContain(peach.id);
-    // P3 未被问(链在 P2 处停下)
+    // P1(濒死者)未被问(链在 P2 处停下)
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 3:濒死玩家自救(优先级最高)→ 不会问下家
+  // 用例 3:P1 自己有桃 → 被问到时自救(模块 C:逆时针顺序中 P1 最后被问)
   // ─────────────────────────────────────────────────────────────
-  it('用例3:P1 自己有桃 → 濒死链第一问即救,不会问 P2', async () => {
+  it('用例3:P1 自己有桃 → 求桃链问到 P1 时自救', async () => {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
     const peach: Card = makeCard('p1', '桃', '♥', '5');
     const decoy: Card = makeCard('d1', '杀', '♣', '5');
@@ -500,18 +506,32 @@ describe('濒死求桃链:端到端(harness)', () => {
 
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', slash.id, [1]);
     // P1 不出闪
     await P1.pass();
 
-    // 第一问 P1(target=1)
+    // 模块 C:逆时针从当前回合 P0 起:P0 → P2 → P1(濒死者)
+    // 第一问 P0(target=0)→ 无桃 pass
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
-    const slot = [...harness.state.pendingSlots.values()][0];
-    const slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
+    let slot = [...harness.state.pendingSlots.values()][0];
+    let slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('桃/求桃');
+    expect(slotAtom.target).toBe(0);
+    await P0.pass();
+
+    // 第二问 P2(target=2)→ decoy 不是桃 pass
+    slot = [...harness.state.pendingSlots.values()][0];
+    slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
+    expect(slotAtom.target).toBe(2);
+    await P2.pass();
+
+    // 第三问 P1(target=1,濒死者)→ 自救
+    slot = [...harness.state.pendingSlots.values()][0];
+    slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
     expect(slotAtom.target).toBe(1);
 
     // P1 用桃救自己
@@ -570,15 +590,15 @@ describe('濒死求桃链:端到端(harness)', () => {
     await P0.useCardAndTarget('杀', slash.id, [1]);
     await P1.pass();
 
-    // 链顺序:1 → 2 → 3 → 0 → 全超时 → 死
-    expect(readAskTarget(harness.state)).toBe(1);
-    await P1.pass();
-    expect(readAskTarget(harness.state)).toBe(2);
-    await P2.pass();
-    expect(readAskTarget(harness.state)).toBe(3);
-    await P3.pass();
+    // 链顺序(模块 C:逆时针从当前回合 P0 起):0 → 3 → 2 → 1 → 全超时 → 死
     expect(readAskTarget(harness.state)).toBe(0);
     await P0.pass();
+    expect(readAskTarget(harness.state)).toBe(3);
+    await P3.pass();
+    expect(readAskTarget(harness.state)).toBe(2);
+    await P2.pass();
+    expect(readAskTarget(harness.state)).toBe(1);
+    await P1.pass();
 
     // P1 死亡
     expect(harness.state.players[1].alive).toBe(false);
@@ -641,12 +661,15 @@ describe('濒死求桃链:端到端(harness)', () => {
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
+    const P3 = harness.player('P3');
 
-    // 链 1: target=1 (P1) → P2 桃救回
+    // 链 1: target=1 (P1)。逆时针从当前回合 P0 起:P0 → P3 → P2 → P1
     await P0.useCardAndTarget('杀', slash1.id, [1]);
     await P1.pass();
-    expect(readAskTarget(harness.state)).toBe(1);
-    await P1.pass();
+    expect(readAskTarget(harness.state)).toBe(0);
+    await P0.pass();
+    expect(readAskTarget(harness.state)).toBe(3);
+    await P3.pass();
     expect(readAskTarget(harness.state)).toBe(2);
     await P2.respond('桃', { cardId: peach1.id });
 

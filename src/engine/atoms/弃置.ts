@@ -1,7 +1,17 @@
 // src/engine/atoms/弃置.ts
 // 弃置:从玩家手牌/装备区将 cardIds 移至弃牌堆
+//
+// 模块 F 迁移(flow-redesign.md):afterApply 为来自手牌的弃牌发出「移动到目标区域后」
+// 时机标记(reason='弃置',to='弃牌堆'),为连营/落英/屯田等「失去牌」技能提供统一 hook 点。
+// ZoneLoc 不含「装备」区域,装备/判定区弃置不发标记——失去牌类技能主要关心手牌。
+// 本 atom 的 apply + view 事件保持不变(含信息分级),时机标记仅为额外 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
+import { applyAtom } from '../create-engine';
+
+/** localVars key:本次弃置中来自手牌的 cardId(afterApply 发时机标记用)。
+ *  apply→afterApply 之间无其他 atom 运行,单键安全。 */
+const MOVED_HAND_KEY = '__弃置/手牌卡';
 
 export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
   type: '弃置',
@@ -14,6 +24,8 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
   apply(state, atom) {
     const player = state.players[atom.player];
     const discardSet = new Set(atom.cardIds);
+    // 捕获本次弃置中来自手牌的 cardId(供 afterApply 发「移动到目标区域后」时机标记)
+    state.localVars[MOVED_HAND_KEY] = atom.cardIds.filter((id) => player.hand.includes(id));
     player.hand = player.hand.filter((id) => !discardSet.has(id));
     const equipment: Record<string, string> = {};
     for (const [slot, id] of Object.entries(player.equipment)) {
@@ -21,6 +33,22 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
     }
     player.equipment = equipment;
     state.zones.discardPile.push(...atom.cardIds);
+  },
+  /** 模块 F:为来自手牌的弃牌逐张发出「移动到目标区域后」时机标记(reason='弃置')。
+   *  标记为事件型(无副作用、无 view),不改变本 atom 的视图/状态语义。 */
+  async afterApply(state, atom) {
+    const handCardIds = state.localVars[MOVED_HAND_KEY] as string[] | undefined;
+    delete state.localVars[MOVED_HAND_KEY];
+    if (!handCardIds || handCardIds.length === 0) return;
+    for (const cardId of handCardIds) {
+      await applyAtom(state, {
+        type: '移动到目标区域后',
+        cardId,
+        from: { zone: '手牌', player: atom.player },
+        to: { zone: '弃牌堆' },
+        reason: '弃置',
+      });
+    }
   },
   effect: { sound: 'discard', animation: 'flip', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {

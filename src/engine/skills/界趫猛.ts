@@ -149,7 +149,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 造成伤害 after hook:趫猛主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return; // 必须是自己造成的伤害
     if ((atom.amount ?? 0) <= 0) return; // 0 伤害不触发

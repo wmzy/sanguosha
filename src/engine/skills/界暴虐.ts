@@ -35,6 +35,7 @@
 //   - 获得判定牌:在 await applyAtom(判定) 完成后,从 discardPile 末尾拿
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '暴虐/confirm';
@@ -72,9 +73,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:其他群雄角色造成 1 点伤害 → 询问 → 判定 → 黑桃则回复+获牌 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '造成伤害') return;
 
     // 仅主公董卓可用
     const self = ctx.state.players[ownerId];
@@ -115,7 +115,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const discardLenBefore = ctx.state.zones.discardPile.length;
 
     // 进行判定(await 完成后,判定牌已入 discardPile 末尾,视图一致)
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '暴虐' });
+    await runJudgeFlow(ctx.state, ownerId, '暴虐');
 
     // 读判定结果:判定 atom 的 def.afterHooks 把判定牌 push 到 discardPile 末尾
     const discard = ctx.state.zones.discardPile;

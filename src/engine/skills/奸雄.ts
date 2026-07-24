@@ -46,7 +46,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // 造成伤害 after:曹操受伤后,若有伤害牌则询问是否获得
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

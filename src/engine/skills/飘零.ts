@@ -22,6 +22,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '飘零/confirm';
@@ -124,7 +125,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
     // 2. 判定
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '飘零' });
+    await runJudgeFlow(ctx.state, ownerId, '飘零');
 
     // 3. 判定完成后,判定牌已在弃牌堆顶(判定 atom 的 def.afterHooks 已运行)
     const dp = ctx.state.zones.discardPile;

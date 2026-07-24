@@ -16,6 +16,7 @@
 //   - "展示之":牌移动到目标手牌(目标可见其牌面);花色比对在引擎内完成。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { createRng } from '../../shared/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
@@ -110,12 +111,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const card = st.cardMap[cardId];
       const targetPlayer = st.players[target];
       if (card && card.suit !== chosenSuit && targetPlayer?.alive) {
-        await applyAtom(st, {
-          type: '造成伤害',
-          target,
-          amount: 1,
-          source: from,
-        });
+        await runDamageFlow(st, from, target, 1);
       }
 
       await popFrame(st);

@@ -1,6 +1,6 @@
 // 解围(界曹仁·主动技):
 //   ① 你可以将装备区的一张牌当【无懈可击】使用。
-//   ② 当你的武将牌从背面翻至正面时,你可以弃置一张牌移动场上的一张牌。
+//   ② 当你的武将牌翻面时(翻成背面朝上),你可以弃置一张牌移动场上的一张牌。
 //
 // 效果①实现(转化技,镜像看破/奇袭):
 //   transform action:装备区的装备牌 → 卸下(装备区→手牌)+ 移除装备技能 →
@@ -9,10 +9,11 @@
 //   不受自己回合限制(无懈可击任意时机可打)。activeWhen 检测无懈可击广播窗口且有装备。
 //
 // 效果②实现(被动触发,镜像巧变移动):
-//   after hook 挂在「去标签」:检测 owner 的 '/翻面' 后缀标签被移除(=翻回正面)。
+//   after hook 挂在「翻面后」(模块 E 状态变更时机):faceDown===true(翻成背面)时触发。
+//   (旧实现挂在「去标签」=翻回正面,方向反——模块 E 修正。)
 //   询问 → 选弃牌(手牌)→ 选源玩家 → 选源牌(pickTargetCard)→ 选目标玩家 →
 //   移动场上牌(获得 atom,与巧变 moveFieldCard 一致)。
-//   触发时机:据守消费翻面标签时(下一回合准备阶段)或被其他技能(界放逐)翻回正面时。
+//   触发时机:据守/放逐/悲歌/界仁心/界伏枥/界酒诗 等技能 flipFaceDown 时。
 import type {
   Card,
   EquipSlot,
@@ -136,7 +137,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '解围',
     description:
-      '装备区的一张牌当无懈可击使用;翻回正面时可弃置一张牌移动场上的一张牌',
+      '装备区的一张牌当无懈可击使用;武将牌翻面(翻成背面)时可弃置一张牌移动场上的一张牌',
   };
 }
 
@@ -293,15 +294,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ════════════════════════════════════════════════════════════
-  // 效果②:去标签 after-hook — 翻回正面触发
-  // ════════════════════════════════════════════════════════════
-  registerAfterHook(state, skill.id, ownerId, '去标签', async (ctx) => {
+  // ═════════════════════════════════════════════════════════════
+  // 效果②:翻面后 after-hook — 翻成背面触发(模块 E 方向修正)
+  // ═════════════════════════════════════════════════════════════
+  registerAfterHook(state, skill.id, ownerId, '翻面后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '去标签') return;
+    if (atom.type !== '翻面后') return;
     if (atom.player !== ownerId) return;
-    // 只在 '/翻面' 后缀标签被移除时触发(= 翻回正面)
-    if (!atom.tag?.endsWith('/翻面')) return;
+    // 只在翻成背面(faceDown===true)时触发(旧实现听 去标签=翻回正面,方向反)
+    if (atom.faceDown !== true) return;
 
     // 重入保护
     if (ctx.state.localVars[MOVING_FLAG]) return;

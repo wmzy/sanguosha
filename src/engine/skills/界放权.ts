@@ -31,6 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { startTurn } from '../turn-flow';
 import { registerAction, registerBeforeHook } from '../skill';
 
 const TRIGGER_RT = '放权/trigger';
@@ -64,14 +65,6 @@ function clearPerTurnState(state: GameState): void {
       ),
     );
   }
-}
-
-/** 亲自启动 player 的一个完整回合:回合开始 → 准备阶段开始 → 准备阶段结束。
- *  回合管理的阶段推进 after-hook 据此自动走完该玩家的判定/摸牌/出牌/弃牌/回合结束。 */
-async function startTurn(state: GameState, player: number): Promise<void> {
-  await applyAtom(state, { type: '回合开始', player });
-  await applyAtom(state, { type: '阶段开始', player, phase: '准备' });
-  await applyAtom(state, { type: '阶段结束', player, phase: '准备' });
 }
 
 export function createSkill(id: string, ownerId: number): Skill {

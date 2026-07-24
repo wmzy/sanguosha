@@ -44,36 +44,6 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/**
- * 从一次造成伤害 atom 判定忘隙的"该角色"(另一方向)。
- * 返回 undefined 表示不触发(自伤 / 无来源 / "该角色"已死)。
- */
-function findOther(
-  state: GameState,
-  ownerId: number,
-  atom: { source?: number; target?: number; amount?: number },
-): number | undefined {
-  const amount = atom.amount ?? 0;
-  if (amount <= 0) return undefined;
-  const source = atom.source;
-  const target = atom.target;
-  // 情形 A:owner 造成伤害给其他角色
-  if (source === ownerId && target !== undefined && target !== ownerId) {
-    return state.players[target]?.alive ? target : undefined;
-  }
-  // 情形 B:owner 受到其他角色伤害(source 须为有效角色座次)
-  if (
-    target === ownerId &&
-    source !== undefined &&
-    source !== ownerId &&
-    source >= 0 &&
-    source < state.players.length
-  ) {
-    return state.players[source]?.alive ? source : undefined;
-  }
-  return undefined;
-}
-
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
@@ -114,97 +84,96 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // 造成伤害 after:每点伤害触发一次
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  // ── 忘隙主逻辑:摸 2 张 + 选 1 张交给 other(每点伤害一次)──
+  async function forgetGapOnce(state: GameState, other: number): Promise<void> {
+    if (!state.players[ownerId]?.alive) return;
+    if (!state.players[other]?.alive) return;
+
+    delete state.localVars[CONFIRMED_KEY];
+    await applyAtom(state, {
+      type: '请求回应',
+      requestType: CONFIRM_RT,
+      target: ownerId,
+      prompt: {
+        type: 'confirm',
+        title: `忘隙:是否摸两张牌并交给 P${other} 一张?`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
+      },
+      defaultChoice: false,
+      timeout: 10,
+    });
+    if (!state.localVars[CONFIRMED_KEY]) {
+      delete state.localVars[CONFIRMED_KEY];
+      return;
+    }
+    delete state.localVars[CONFIRMED_KEY];
+
+    const totalAvail = state.zones.deck.length + state.zones.discardPile.length;
+    if (totalAvail === 0) return;
+
+    const handBefore = new Set(state.players[ownerId].hand);
+    const drawCount = Math.min(2, totalAvail);
+    await applyAtom(state, { type: '摸牌', player: ownerId, count: drawCount });
+    const handAfter = state.players[ownerId].hand;
+    const drawn = handAfter.filter((id) => !handBefore.has(id));
+
+    if (drawn.length === 0) return;
+    if (!state.players[other]?.alive) return;
+
+    if (drawn.length === 1) {
+      await applyAtom(state, { type: '给予', cardId: drawn[0], from: ownerId, to: other });
+      return;
+    }
+
+    delete state.localVars[PICK_KEY];
+    await applyAtom(state, {
+      type: '请求回应',
+      requestType: PICK_RT,
+      target: ownerId,
+      prompt: {
+        type: 'distribute',
+        mode: 'select',
+        title: `忘隙:选择 1 张牌交给 P${other}`,
+        cardIds: drawn,
+        minTotal: 1,
+        maxTotal: 1,
+      },
+      defaultChoice: false,
+      timeout: 15,
+    });
+
+    const chosen = state.localVars[PICK_KEY] as string | null;
+    delete state.localVars[PICK_KEY];
+    if (typeof chosen === 'string' && state.players[other]?.alive) {
+      await applyAtom(state, { type: '给予', cardId: chosen, from: ownerId, to: other });
+    }
+  }
+
+  // 造成伤害后:owner 是来源 → other = target
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
+    if (atom.source !== ownerId) return;
+    if (atom.target === undefined || atom.target === ownerId) return;
     const amount = atom.amount ?? 0;
     if (amount <= 0) return;
-
     for (let i = 0; i < amount; i++) {
-      if (!ctx.state.players[ownerId]?.alive) break;
+      if (!ctx.state.players[atom.target]?.alive) break;
+      await forgetGapOnce(ctx.state, atom.target);
+    }
+  });
 
-      // 每点伤害单独判定"该角色"(上一点可能击杀对方)
-      const other = findOther(ctx.state, ownerId, atom);
-      if (other === undefined) break;
-
-      // 询问是否发动
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `忘隙:是否摸两张牌并交给 P${other} 一张?`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 10,
-      });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) {
-        delete ctx.state.localVars[CONFIRMED_KEY];
-        continue;
-      }
-      delete ctx.state.localVars[CONFIRMED_KEY];
-
-      // 牌堆+弃牌堆=0 时无牌可摸,跳过
-      const totalAvail =
-        ctx.state.zones.deck.length + ctx.state.zones.discardPile.length;
-      if (totalAvail === 0) break;
-
-      // 摸前手牌快照(精确识别"刚摸到的 2 张")
-      const handBefore = new Set(ctx.state.players[ownerId].hand);
-      const drawCount = Math.min(2, totalAvail);
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: drawCount });
-      const handAfter = ctx.state.players[ownerId].hand;
-      const drawn = handAfter.filter((id) => !handBefore.has(id));
-
-      // 没摸到牌(牌堆+弃牌堆不足以摸):跳过交牌
-      if (drawn.length === 0) continue;
-
-      // 若"该角色"在询问/摸牌期间死亡:跳过给予
-      if (!ctx.state.players[other]?.alive) continue;
-
-      // 只摸到 1 张:直接交出(不再询问)
-      if (drawn.length === 1) {
-        await applyAtom(ctx.state, {
-          type: '给予',
-          cardId: drawn[0],
-          from: ownerId,
-          to: other,
-        });
-        continue;
-      }
-
-      // 摸到 2 张:询问选 1 张交给"该角色"
-      delete ctx.state.localVars[PICK_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: PICK_RT,
-        target: ownerId,
-        prompt: {
-          type: 'distribute',
-          mode: 'select',
-          title: `忘隙:选择 1 张牌交给 P${other}`,
-          cardIds: drawn,
-          minTotal: 1,
-          maxTotal: 1,
-        },
-        defaultChoice: false,
-        timeout: 15,
-      });
-
-      const chosen = ctx.state.localVars[PICK_KEY] as string | null;
-      delete ctx.state.localVars[PICK_KEY];
-      if (typeof chosen === 'string' && ctx.state.players[other]?.alive) {
-        await applyAtom(ctx.state, {
-          type: '给予',
-          cardId: chosen,
-          from: ownerId,
-          to: other,
-        });
-      }
+  // 受到伤害后:owner 是目标 → other = source
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.target !== ownerId) return;
+    const source = atom.source;
+    if (typeof source !== 'number' || source === ownerId || source < 0) return;
+    const amount = atom.amount ?? 0;
+    if (amount <= 0) return;
+    for (let i = 0; i < amount; i++) {
+      if (!ctx.state.players[source]?.alive) break;
+      await forgetGapOnce(ctx.state, source);
     }
   });
 

@@ -136,10 +136,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ── 拼点后·获最大点杀:after-hook 挂「拼点」──
-  registerAfterHook(state, skill.id, ownerId, '拼点', async (ctx) => {
+  // ── 拼点后·获最大点杀:after-hook 挂「拼点后」──
+  //   天义 经 runRankCompareFlow 发出 拼点后(两张拼点牌已入弃牌堆),本钩子统一消费。
+  registerAfterHook(state, skill.id, ownerId, '拼点后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '拼点') return;
+    if (atom.type !== '拼点后') return;
     if (atom.initiator !== ownerId) return; // 仅太史慈发起的拼点
     const st = ctx.state;
     const self = st.players[ownerId];

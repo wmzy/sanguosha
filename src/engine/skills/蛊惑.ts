@@ -43,6 +43,7 @@
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
 import type { ActionContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
@@ -102,7 +103,7 @@ async function resolveGuSlash(
         });
       }
     } else if (state.players[target]?.alive) {
-      await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId, damageType });
+      await runDamageFlow(state, source, target, 1, cardId, damageType);
     }
   } finally {
     // 异常安全:弹帧 + 清理滞留处理区的闪 + 还原 cardMap.name

@@ -159,7 +159,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── 造成伤害 after-hook:owner 对其他角色造成过伤害 → 标记 ──
   //    target≠ownerId(对其他角色)、amount>0(被抵消的 0 伤害不算)
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if (atom.target === undefined || atom.target === ownerId) return; // 仅对其他角色

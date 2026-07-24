@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable, disableAutoCompare } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -162,12 +163,7 @@ describe('界断粮', () => {
     const P0 = harness.player('徐晃');
 
     // 手动模拟"本回合造成过伤害":直接 applyAtom 一个来源为 0 的伤害 atom
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await waitForStable(harness.state);
 
     await P0.expectRejected({
@@ -193,12 +189,7 @@ describe('界断粮', () => {
     await harness.setup(state);
     const P0 = harness.player('徐晃');
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await waitForStable(harness.state);
 
     await P0.triggerAction('界断粮', 'use', { cardId: 'c1', target: 1 });

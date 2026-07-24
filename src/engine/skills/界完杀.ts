@@ -16,9 +16,10 @@
 //       存活玩家加 tag '完杀/非锁定技失效'(若未持有)。before-hook 保证在陷入濒死的
 //       after-hooks(如界曹冲仁心、界吴国太补益等救援技)运行前 tag 已就位 → 这些
 //       非锁定技的 after-hook 被 isHookSuppressed 过滤,不触发。
-//     - after-hook 挂 击杀 / 回复体力:cleanup 时点。每次都重新扫描"是否仍有人濒死",
+//     - after-hook 挂 死亡后 / 回复体力:cleanup 时点。每次都重新扫描"是否仍有人濒死",
 //       若无人濒死则移除所有完杀 tag。回复体力也覆盖不屈(陷入濒死后由其他 hook
-//       直接 回复体力 救活,无 击杀)的退出路径。
+//       直接 回复体力 救活,无 死亡流程)的退出路径。
+//       (模块 B:击杀 拆分为 runDeathFlow,cleanup 时点从 击杀 after-hook 迁至 死亡后 after-hook)
 //   ③ SUPPRESSION_TAGS(create-engine.ts)新增 '完杀/非锁定技失效',引擎在
 //     runBeforeHooks/runAfterHooks 中据 player.tags 自动过滤被压制技能的非锁定技 hook。
 //
@@ -134,9 +135,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ),
   );
 
-  // ── ③ cleanup:击杀 after-hook(目标死亡 → 濒死结束)──
+  // ── ③ cleanup:死亡后 after-hook(目标死亡 → 濒死结束)──
+  // 模块 B:击杀拆分为 runDeathFlow,濒死退出时点改为「死亡后」(系统处理牌+奖惩之后)。
   unloaders.push(
-    registerAfterHook(state, skill.id, ownerId, '击杀', async (_ctx) => {
+    registerAfterHook(state, skill.id, ownerId, '死亡后', async (_ctx) => {
       cleanupIfNoDying(state);
     }),
   );

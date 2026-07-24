@@ -283,7 +283,7 @@ describe('界燕语(OL 界限突破版)', () => {
     await harness.waitForStable();
     // 出第二张杀(连弩效果跳过 - 这里需要绕过 quota,改用 respond 路径)
     // 默认 quota=1,第二张会被拒绝。改用直接 dispatch + 把 quota 设大
-    harness.state.turn.vars['杀/usedCount'] = 0; // 重置 quota
+    harness.state.turn.vars['杀/quotaUsed'] = 0; // 重置 quota
     await P0.useCardAndTarget('杀', 's2', [1]);
     await harness.waitForStable();
     await P1.pass();

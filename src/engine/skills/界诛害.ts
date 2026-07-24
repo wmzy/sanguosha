@@ -19,6 +19,7 @@
 //   内部 Skill.name = '诛害'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界诛害';
@@ -95,14 +96,7 @@ async function runSlashResolution(
     if (frame.cancelled) {
       await applyAtom(state, { type: '被抵消', source, target, cardId });
     } else if (state.players[target]?.alive) {
-      await applyAtom(state, {
-        type: '造成伤害',
-        target,
-        amount: 1,
-        source,
-        cardId,
-        damageType,
-      });
+      await runDamageFlow(state, source, target, 1, cardId, damageType);
     }
   } finally {
     // 收尾:杀牌入弃牌堆(若仍滞留处理区)
@@ -156,7 +150,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after-hook:在 turn.vars 记录本回合造成过伤害的玩家 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     const source = atom.source;
     if (typeof source !== 'number') return;

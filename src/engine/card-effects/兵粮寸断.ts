@@ -7,6 +7,7 @@
 import type { Card } from '../types';
 import type { ActionPrompt, GameView } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -34,7 +35,7 @@ function canUseSupplyShortage(
 /** 兵粮寸断的生效后效果：判定 → 非♣加跳过标签 → 移除延时锦囊 */
 async function resolveSupplyShortage(ctx: ResolveCtx): Promise<void> {
   const { state, target } = ctx;
-  await applyAtom(state, { type: '判定', player: target, judgeType: '兵粮寸断' });
+  await runJudgeFlow(state, target, '兵粮寸断');
   const judgeCardId = state.localVars['判定/finalJudgeCardId'] as string | undefined;
   delete state.localVars['判定/finalJudgeCardId'];
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;

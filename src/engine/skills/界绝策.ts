@@ -27,6 +27,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界绝策';
@@ -156,7 +157,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!st.players[chosen]?.alive) return;
 
       // 3) 造成 1 点伤害(来源为李儒)
-      await applyAtom(st, { type: '造成伤害', target: chosen, amount: 1, source: ownerId });
+      await runDamageFlow(st, ownerId, chosen, 1);
     },
   );
 

@@ -136,7 +136,7 @@ describe('界绝情', () => {
 
     expect(harness.state.players[0].health).toBe(2); // 3 - 1
     const types = atomTypes();
-    expect(types).toContain('造成伤害');
+    expect(types).toContain('扣减体力');
   });
 
   // ─── 3. 反馈不触发(因伤害转为失去体力) ────────────────────

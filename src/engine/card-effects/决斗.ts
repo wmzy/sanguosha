@@ -8,8 +8,10 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { enforceDualKill } from '../skills/无双';
+import { consumePlayedSlashes } from '../card-effect/play-card';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 决斗牌特有校验：不能对自己使用 */
@@ -50,28 +52,16 @@ async function runDuelLoop(
     });
     // 无双(吕布锁定技)：与你决斗的角色每次需连续打出两张杀
     await enforceDualKill(state, turn === 0 ? from : target, current);
-    // 检查处理区：有杀牌 = 出了杀，移走它；没有 = 没出，输
-    const killCardId = frameCards(state).find((id) => state.cardMap[id]?.name === '杀');
-    if (killCardId) {
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId: killCardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
+    // 统一清理：处理区内打出的杀移入弃牌堆；返回空 = 没出杀（输）
+    const kills = await consumePlayedSlashes(state);
+    if (kills.length > 0) {
       turn = turn === 0 ? 1 : 0;
     } else {
       loser = current;
     }
   }
   const winner = loser === target ? from : target;
-  await applyAtom(state, {
-    type: '造成伤害',
-    target: loser,
-    amount: 1,
-    source: winner,
-    cardId,
-  });
+  await runDamageFlow(state, winner, loser, 1, cardId);
 }
 
 /** 决斗的结算：无懈 → 决斗循环 */

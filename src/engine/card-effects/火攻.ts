@@ -8,6 +8,7 @@
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
@@ -73,14 +74,7 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
   const discardId = state.localVars['火攻/弃牌'] as string | undefined;
   if (discardId && state.players[target]?.alive) {
     await applyAtom(state, { type: '弃置', player: source, cardIds: [discardId] });
-    await applyAtom(state, {
-      type: '造成伤害',
-      target,
-      amount: 1,
-      source,
-      cardId,
-      damageType: '火焰',
-    });
+    await runDamageFlow(state, source, target, 1, cardId, '火焰');
   }
 }
 

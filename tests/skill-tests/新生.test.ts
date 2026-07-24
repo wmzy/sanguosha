@@ -12,6 +12,7 @@ import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 
 // 已知引擎局限:化身动态添加武将技能时,其 onInit 设置的距离 vars(如马术)
 // 不会被「添加技能」atom 的 toViewEvents 同步,导致 buildView 与 processedView 不收敛。
@@ -118,7 +119,7 @@ describe('新生', () => {
 
     const ZUO = harness.player(0);
     // 受到 1 点伤害 → 新生询问
-    void applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -170,7 +171,7 @@ describe('新生', () => {
     const poolBefore = (harness.state.players[0].vars['化身/牌池'] as string[]).slice();
 
     const ZUO = harness.player(0);
-    void applyAtom(harness.state, { type: '造成伤害', target: 0, amount: 1, source: 1 });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
     ZUO.expectPending('请求回应');
@@ -213,7 +214,7 @@ describe('新生', () => {
     await autoRespond化身Skill(harness);
 
     // 曹操受伤(非左慈)→ 不触发新生
-    await applyAtom(harness.state, { type: '造成伤害', target: 1, amount: 1, source: 0 });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 

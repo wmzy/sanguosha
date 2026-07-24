@@ -19,6 +19,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { GameState, PlayerState } from '../../src/engine/types';
 
 const ARMOR_PREFIX = '界矢北/护甲:';
@@ -145,12 +146,7 @@ describe('界矢北', () => {
     await harness.setup(state);
 
     const healthBefore = harness.state.players[0].health;
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(healthBefore); // 全吸收
@@ -178,12 +174,7 @@ describe('界矢北', () => {
     await harness.setup(state);
 
     const healthBefore = harness.state.players[0].health;
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 3,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 3);
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(healthBefore); // 全吸收
@@ -210,12 +201,7 @@ describe('界矢北', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 5,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 5);
     await harness.waitForStable();
 
     // 3 护甲吸收 3,实际受伤 2,首伤回 1 血 → 净失血 1 (3 → 2)
@@ -238,12 +224,7 @@ describe('界矢北', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(3); // 净 0
@@ -269,12 +250,7 @@ describe('界矢北', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
 
     // 扣 1 (伤害) + 失 1 (锁定技) → 3-2=1
@@ -307,12 +283,7 @@ describe('界矢北', () => {
     expect(damageCount(harness.state.players[0])).toBe(0);
 
     // 新回合首次受伤 → 回血(净 0)
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(2); // 净 0
@@ -339,24 +310,14 @@ describe('界矢北', () => {
     await harness.setup(state);
 
     // 1 点伤害被护甲全吸收
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(3);
     expect(armorCount(harness.state.players[0])).toBe(0);
     expect(damageCount(harness.state.players[0])).toBe(0);
 
     // 再受 1 点伤害(护甲已耗尽)→ 首次实伤 → 回血(净 0)
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    void runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(3); // 净 0
     expect(damageCount(harness.state.players[0])).toBe(1);

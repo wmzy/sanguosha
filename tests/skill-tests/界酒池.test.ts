@@ -19,7 +19,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -205,12 +205,7 @@ describe('界酒池', () => {
     expect(harness.state.turn.vars['崩坏/disabled']).toBeUndefined();
 
     // 步骤2:P0 造成 1 点伤害(模拟杀命中)。酒 before-hook 会消费 mark + 增伤 +1
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -245,12 +240,7 @@ describe('界酒池', () => {
     await harness.setup(state);
 
     // 无 mark,直接造成伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -291,12 +281,7 @@ describe('界酒池', () => {
     );
 
     // P2 造成伤害给 P1(P0 不是 source,酒 mark 不会被消费)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 2,
-    });
+    await runDamageFlow(harness.state, 2, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 

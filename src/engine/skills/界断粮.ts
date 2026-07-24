@@ -63,7 +63,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 造成伤害 after-hook:owner 本回合造成过伤害 → 标记 ──
   //    amount>0 才算"造成过伤害"(0 伤害=被抵消,不算)。
   //    同时同步到 view 侧 turnUsage,供前端 targetFilter 读取。
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

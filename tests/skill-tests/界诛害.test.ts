@@ -22,6 +22,7 @@ skillLoaders['界诛害'] = async () => 界诛害Module as unknown as SkillModul
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -101,13 +102,8 @@ describe('界诛害', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    // P1 在自己回合造成伤害(直接 applyAtom 模拟)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    // P1 在自己回合造成伤害(直接 runDamageFlow 模拟)
+    await runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -158,12 +154,7 @@ describe('界诛害', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -232,12 +223,7 @@ describe('界诛害', () => {
     await harness.setup(state);
 
     // P0 自己造成过伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 1, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -271,12 +257,7 @@ describe('界诛害', () => {
     });
     await harness.setup(state);
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -311,12 +292,7 @@ describe('界诛害', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 1);
     await harness.waitForStable();
     harness.processAllEvents();
 

@@ -3,6 +3,7 @@
 import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
+import { slashUsed } from '../slash-quota';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -159,10 +160,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       },
       // 本回合用量(出杀计数 + 限一次标记)的 view 投影。
       // baseline/重连时从此处初值;运行期由「回合用量」atom applyView 增量维护。
+      // 出杀计数后端拆为 杀/quotaUsed + 杀/extraUsed(模块 K),view 仍投影为合计 '杀/usedCount'。
       turnUsage: {
-        ...(typeof state.turn.vars['杀/usedCount'] === 'number'
-          ? { '杀/usedCount': state.turn.vars['杀/usedCount'] }
-          : {}),
+        ...(slashUsed(state) > 0 ? { '杀/usedCount': slashUsed(state) } : {}),
         ...Object.fromEntries(
           Object.entries(p.vars).filter(([k, v]) => k.endsWith('/usedThisTurn') && v),
         ),

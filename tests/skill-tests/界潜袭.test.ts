@@ -22,6 +22,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -257,26 +258,14 @@ describe('界潜袭', () => {
     await harness.setup(state);
 
     // 第一次造伤:source=owner, cardId=s1 → 应 +1(2 点)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-      cardId: 's1',
-    });
+    await runDamageFlow(harness.state, 0, 1, 1, 's1');
     expect(harness.state.players[1].health).toBe(2);
 
     // turn.vars 中的 cardId 已被消费
     expect(harness.state.turn.vars['界潜袭/cardId']).toBeUndefined();
 
     // 第二次造伤:不再 +1(1 点)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-      cardId: 's1',
-    });
+    await runDamageFlow(harness.state, 0, 1, 1, 's1');
     expect(harness.state.players[1].health).toBe(1);
   });
 

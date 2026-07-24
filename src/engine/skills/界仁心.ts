@@ -32,6 +32,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界仁心';
@@ -189,7 +190,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [chosenId] });
 
     // 2) 翻面:加标签(下一回合开始时消费)
-    await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
+    await flipFaceDown(ctx.state, ownerId, '仁心');
 
     // 3) 令 target 回复至 1 体力(此时 health ≤ 0,amount = 1 - health ≥ 1)
     const cur = ctx.state.players[target]?.health ?? 0;
@@ -207,7 +208,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 入口:准备阶段开始 + 翻面标签 → 启动跳过
     if (atom.phase === '准备' && self?.tags.includes(FLIP_TAG)) {
-      await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: FLIP_TAG });
+      await flipFaceUp(ctx.state, ownerId, '仁心');
       ctx.state.localVars[SKIP_FLAG] = ownerId;
       const result: HookResult = { kind: 'cancel' };
       return result;
@@ -233,9 +234,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars[SKIP_FLAG];
 
     // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束
-    await applyAtom(ctx.state, { type: '清过期标记', player: ownerId });
-    await applyAtom(ctx.state, { type: '下一玩家' });
-    await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
+    await performSkipTurn(ctx.state, ownerId);
 
     const result: HookResult = { kind: 'cancel' };
     return result;

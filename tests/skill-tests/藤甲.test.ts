@@ -13,6 +13,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
@@ -149,13 +150,7 @@ describe('藤甲', () => {
     await harness.setup(state);
 
     // 直接造成 1 点火焰伤害 → 藤甲 +1 → 2 点
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 1,
-      amount: 1,
-      source: 0,
-      damageType: '火焰',
-    });
+    await runDamageFlow(harness.state, 0, 1, 1, undefined, '火焰');
     await harness.waitForStable();
     harness.processAllEvents();
 

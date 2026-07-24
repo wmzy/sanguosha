@@ -18,12 +18,10 @@ export function defaultPlayActive(ctx: ActionContext): boolean {
   return view.currentPlayerIndex === perspectiveIdx && view.phase === '出牌' && !blocked;
 }
 
-/** 前端可计算的出杀次数上限(基于 view 装备推断)。
- *  基础 1;装备诸葛连弩 → Infinity(无限制)。
- *  与后端 slashMax(slash-quota.ts)同源——连弩是目前唯一的上限提供者。
- *  后端通过 registerSlashMaxProvider 注册提供者(动态、可叠加),前端无法访问
- *  提供者集合,故用装备推断近似。未来若新增非装备类上限提供者(武将技等),
- *  需在此同步补充推断规则。 */
+/** 前端可计算的出杀次数上限(基于 view 装备/turnUsage 推断)。
+ *  后端采用三层模型(slash-quota.ts):额定(覆盖 max)+ 额外(叠加 Σ)+ 无限(任一 true→∞)。
+ *  前端无法访问提供者集合,故用装备/turnUsage 推断近似,与后端 slashMax 同源。
+ *  未来若新增非装备类提供者(武将技等),需在此同步补充推断规则。 */
 export function viewSlashMax(view: ActionContext['view'], player: number): number {
   const p = view.players[player];
   if (!p) return 1;
@@ -42,7 +40,7 @@ export function viewSlashMax(view: ActionContext['view'], player: number): numbe
 }
 
 /** 前端视角下某玩家本回合已出杀次数(从 view.turnUsage 投影读)。
- *  turnUsage 由「回合用量」atom 实时同步,与后端 turn.vars['杀/usedCount'] 一致。 */
+ *  turnUsage 由「回合用量」atom 实时同步,与后端 slashUsed()(额定+额外 合计)一致。 */
 export function viewSlashUsed(view: ActionContext['view'], player: number): number {
   const used = view.players[player]?.turnUsage?.['杀/usedCount'];
   return typeof used === 'number' ? used : 0;

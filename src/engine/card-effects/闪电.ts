@@ -8,6 +8,8 @@
 import type { Card, ActionPrompt, GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
+import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 const TRICK_NAME = '闪电';
@@ -45,7 +47,7 @@ function findNextRecipient(state: GameState, current: number): number | null {
 /** 闪电的生效后效果：判定 → 命中则伤害+移除，否则传递下家 */
 async function resolveLightning(ctx: ResolveCtx): Promise<void> {
   const { state, target, cardId } = ctx;
-  await applyAtom(state, { type: '判定', player: target, judgeType: TRICK_NAME });
+  await runJudgeFlow(state, target, TRICK_NAME);
   const judgeCardId = state.localVars['判定/finalJudgeCardId'] as string | undefined;
   delete state.localVars['判定/finalJudgeCardId'];
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;
@@ -56,13 +58,7 @@ async function resolveLightning(ctx: ResolveCtx): Promise<void> {
 
   if (judgeCard && isLightningHit(judgeCard)) {
     // 黑桃 2-9：受到 3 点无来源雷电伤害 + 移除闪电（进弃牌堆）
-    await applyAtom(state, {
-      type: '造成伤害',
-      target,
-      amount: 3,
-      source: TARGET_SYSTEM,
-      damageType: '雷电',
-    });
+    await runDamageFlow(state, TARGET_SYSTEM, target, 3, undefined, '雷电');
     await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: TRICK_NAME });
   } else {
     // 其他：移除当前玩家闪电，传递给下家

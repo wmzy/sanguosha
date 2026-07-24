@@ -15,14 +15,14 @@
 //     仿 截辎.ts:阶段开始(摸牌) after-hook 设 normalDrawPhase 标记(被跳过的
 //     摸牌阶段 cancel 阶段开始,after-hook 不执行,标记缺失)。阶段结束 after-hook
 //     校验标记存在才触发,确保兵粮寸断/神速/巧变/再起跳过时不误触发。
-//   - 选项1 杀次数-1:slash-quota.ts 的 slashMax 基础 1,provider 仅可加不可减。
+//   - 选项1 杀次数-1:slash-quota.ts 的 slashMax 额定默认 1,仅可覆盖不可减。
 //     用 registerSlashBlocker 直接阻断出杀(canSlash=false),等效"次数变 0"。
-//     默认基础 1→0;若同时有连弩等∞增益,严格规则下 -1 vs ∞ 模糊,这里取更严
+//     默认额定 1→0;若同时有连弩等∞增益,严格规则下 -1 vs ∞ 模糊,这里取更严
 //     (阻断优先,与 isSlashBlocked 短路语义一致)。
 //   - 选项1 杀不计入手牌上限:registerHandLimitProvider 返回"默认公式+手牌中
 //     【杀】牌数量"。把杀牌占用的"名额"加回上限,等价于杀牌不占上限。
 //     (镜像 界洛神 EXEMPT_VAR 思路,但界洛神只豁免特定判定牌,本技豁免全部杀牌)
-//   - 选项2 杀次数+1:registerSlashMaxProvider 返回 1(base 1+1=2)。
+//   - 选项2 杀次数+1(额定=2):registerSlashQuotaProvider 返回 2(max(基础1,2)=2)。
 //   - 选项2 杀无距离限制:基础牌 杀.ts 的 use.validate 横切新增 turn.vars
 //     检查(仿 诈降/界武圣 的红色/方片杀放行模式,但本技对所有杀放行);
 //     viewDistance.ts viewCanAttack 同步前端 filter。
@@ -39,7 +39,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
-import { registerSlashMaxProvider, registerSlashBlocker } from '../slash-quota';
+import { registerSlashQuotaProvider, registerSlashBlocker } from '../slash-quota';
 import { registerHandLimitProvider } from '../hand-limit';
 import { registerAttackRangeExemptor } from '../distance';
 
@@ -91,11 +91,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     (st: GameState, player: number) => st.turn.vars[CHOICE1_VAR] === player,
   );
 
-  // ── 选项2:杀次数+1(provider 返回 1,base 1+1=2) ──
-  const unloadProvider = registerSlashMaxProvider(
+  // ── 选项2:杀额定=2(quotaProvider 返回 2,覆盖型 max(基础1,2)=2) ──
+  const unloadProvider = registerSlashQuotaProvider(
     state,
     ownerId,
-    (st: GameState, player: number) => (st.turn.vars[CHOICE2_VAR] === player ? 1 : 0),
+    (st: GameState, player: number) => (st.turn.vars[CHOICE2_VAR] === player ? 2 : 0),
   );
 
   // ── 选项2:杀无距离限制(本回合全局,所有杀生效) ──

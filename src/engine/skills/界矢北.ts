@@ -101,7 +101,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '受到伤害时',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.target !== ownerId) return;
@@ -121,7 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // 仅当最终 amount > 0 触发(护甲全吸收则未"受到伤害")。
   // 在引擎濒死检查(系统规则 after-hook,ownerId=-1,最后执行)之前运行,
   // 故"首伤回 1 血"可避免 owner 因本次伤害进入濒死。
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const finalAmount = atom.amount ?? 0;

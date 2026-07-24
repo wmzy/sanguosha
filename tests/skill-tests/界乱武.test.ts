@@ -210,7 +210,7 @@ describe('界乱武', () => {
     expect(harness.state.players[1].health).toBe(2); // 失血1(乱武) + 受杀1 = 2
     expect(harness.state.players[1].alive).toBe(true);
     // 视为出杀占出杀次数
-    expect(harness.state.turn.vars['杀/usedCount']).toBe(1);
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
   });
 
   // ─── 5. 界版新增:贾诩 pass 最终杀询问 → 不视为使用 ──
@@ -247,7 +247,7 @@ describe('界乱武', () => {
     await harness.waitForStable();
 
     expect(harness.state.players[1].health).toBe(3); // 只失血1(乱武)
-    expect(harness.state.turn.vars['杀/usedCount']).toBeUndefined(); // 未消耗出杀次数
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBeUndefined(); // 未消耗出杀次数
   });
 
   // ─── 6. 界版新增:贾诩出杀次数已满 → 跳过最终杀询问 ──
@@ -268,7 +268,7 @@ describe('界乱武', () => {
         cardMap: {},
         currentPlayerIndex: 0,
         phase: '出牌',
-        turn: { round: 1, phase: '出牌', vars: { '杀/usedCount': 1 } }, // 已出1次杀(达上限)
+        turn: { round: 1, phase: '出牌', vars: { '杀/quotaUsed': 1 } }, // 已出1次杀(达上限)
       }),
     );
     const JX = harness.player('界贾诩');

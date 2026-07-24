@@ -25,6 +25,8 @@
 //   内部 Skill.name = '雷击'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook } from '../skill';
 import { isCancelled } from '../card-effect/registry';
 
@@ -95,7 +97,7 @@ async function run雷击Flow(state: GameState, ownerId: number, triggerDesc: str
   if (judgeChoice !== true) return; // 放弃发动
 
   // ── 步骤 2:判定自己(界鬼道可在判定改判阶段替换判定牌) ──
-  await applyAtom(state, { type: '判定', player: ownerId, judgeType: DISPLAY_NAME });
+  await runJudgeFlow(state, ownerId, DISPLAY_NAME);
 
   // ── 步骤 3:读判定结果(弃牌堆顶=最终判定牌,经界鬼道替换即为替换牌) ──
   const dp = state.zones.discardPile;
@@ -111,13 +113,7 @@ async function run雷击Flow(state: GameState, ownerId: number, triggerDesc: str
     if (target === null) return; // 放弃造伤
     // 二次校验
     if (!state.players[target]?.alive) return;
-    await applyAtom(state, {
-      type: '造成伤害',
-      target,
-      amount: 2,
-      source: ownerId,
-      damageType: '雷电',
-    });
+    await runDamageFlow(state, ownerId, target, 2, undefined, '雷电');
   } else if (judgeCard.suit === '♣') {
     // 梅花 → 回复1点体力(满血不浪费),然后可对一名角色造成1点雷电伤害
     const self = state.players[ownerId];
@@ -131,13 +127,7 @@ async function run雷击Flow(state: GameState, ownerId: number, triggerDesc: str
     const target = await chooseDamageTarget(state, ownerId);
     if (target === null) return; // 放弃造伤(回血已生效)
     if (!state.players[target]?.alive) return;
-    await applyAtom(state, {
-      type: '造成伤害',
-      target,
-      amount: 1,
-      source: ownerId,
-      damageType: '雷电',
-    });
+    await runDamageFlow(state, ownerId, target, 1, undefined, '雷电');
   }
   // 其他花色 → 无效果
 }

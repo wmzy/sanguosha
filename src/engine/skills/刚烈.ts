@@ -12,6 +12,8 @@
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
+import { runJudgeFlow } from '../judge-flow';
+import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_REQUEST = '刚烈/confirm';
@@ -82,7 +84,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 造成伤害 after hook:刚烈主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
@@ -112,7 +114,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!ctx.state.localVars['刚烈/confirmed']) return; // 不发动
 
     delete ctx.state.localVars['刚烈/judgeSuit'];
-    await applyAtom(ctx.state, { type: '判定', player: ownerId, judgeType: '刚烈' });
+    await runJudgeFlow(ctx.state, ownerId, '刚烈');
     const suit = ctx.state.localVars['刚烈/judgeSuit'] as string | undefined;
     if (suit === undefined) return; // 判定未产出牌
     if (suit === '♥') return; // 红桃:无事发生
@@ -142,12 +144,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
     }
     // 受到 1 点伤害(来源为夏侯惇本人)
-    await applyAtom(ctx.state, {
-      type: '造成伤害',
-      target: sourceIdx,
-      amount: 1,
-      source: ownerId,
-    });
+    await runDamageFlow(ctx.state, ownerId, sourceIdx, 1);
   });
 
   return () => {

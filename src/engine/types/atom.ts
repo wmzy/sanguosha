@@ -68,11 +68,36 @@ export type ZoneLoc =
   | { zone: '手牌'; player: number }
   | { zone: '处理区' };
 
+/** 牌移动的原因(失去原因字段,对齐 flow-redesign.md 模块 F)。
+ *  由 runMoveCardFlow 透传到 移动到目标区域前/后 时机 atom,供连营/落英/屯田等
+ *  「失去牌」类技能区分触发场景(如 reason='弃置' && to='弃牌堆')。
+ *  仅在有「失去原因」语义的关键路径(弃置/获得/给予,经 runMoveCardFlow 迁移)
+ *  传递 reason;其余移动(手牌→处理区等)reason 为 undefined。 */
+export type MoveReason =
+  | '使用'
+  | '打出'
+  | '弃置'
+  | '获得'
+  | '给予'
+  | '拼点'
+  | '交换'
+  | '判定'
+  | '系统处理';
+
 export type Atom =
   // 卡牌/资源
   | { type: '摸牌'; player: number; count: number }
   | { type: '弃置'; player: number; cardIds: string[] }
   | { type: '移动牌'; cardId: string; from: ZoneLoc; to: ZoneLoc }
+  // 移动牌编排时机标记(对齐 flow-redesign.md 模块 F / move.md):事件标记型,
+  // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 move-flow.ts 的
+  // runMoveCardFlow 在实质移动牌前后依次发出。
+  //   移动到目标区域前:纵玄/章武② 可改变目标区域(before-hook modify to)。
+  //   移动到目标区域后:连营/伤逝/落英/屯田 等「失去牌」技能(after-hook,按 reason 区分)。
+  // reason 为失去原因(弃置/获得/给予 等迁移路径透传;其余移动为 undefined)。
+  // 与 移动牌(底层搬运 atom)区分——后者保留为底层操作,无 hook 时机。
+  | { type: '移动到目标区域前'; cardId: string; from: ZoneLoc; to: ZoneLoc; reason?: MoveReason }
+  | { type: '移动到目标区域后'; cardId: string; from: ZoneLoc; to: ZoneLoc; reason?: MoveReason }
   | { type: '获得'; player: number; cardId: string; from?: number }
   | { type: '给予'; cardId: string; from: number; to: number }
   | { type: '装备'; player: number; cardId: string }
@@ -82,10 +107,53 @@ export type Atom =
   | { type: '整理牌堆'; cards: string[]; topCount?: number; bottomCount?: number }
   // 角色状态
   | { type: '造成伤害'; target: number; amount: number; source: number; cardId?: string; damageType?: DamageType }
+  // 伤害编排时机标记(对齐 flow-redesign.md 模块 A / damage.md 8 时机):事件标记型,
+  // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 damage-flow.ts 的
+  // runDamageFlow 编排函数依次发出。与 造成伤害(单 atom 旧入口)区分——后者保留不动,
+  // 由 runDamageFlow 在扣减体力前补发这 7 个时机。
+  // 伤害结算开始时/造成伤害时/受到伤害时 三者的 before-hook 可 modify amount(加伤/减伤),
+  // 其 afterApply 把折叠后的最终 amount 回写 state.localVars[DAMAGE_AMOUNT_KEY] 供编排函数读取。
+  | { type: '伤害结算开始时'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
+  | { type: '造成伤害时'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
+  | { type: '受到伤害时'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
+  | { type: '造成伤害后'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
+  | { type: '受到伤害后'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
+  | { type: '伤害结算结束时'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
+  | { type: '伤害结算结束后'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
   | { type: '回复体力'; target: number; amount: number; source?: number }
   | { type: '失去体力'; target: number; amount: number }
+  // 扣减体力:编排函数 runDecreaseLifeFlow/runDamageFlow 的底层体力扣减 atom(只扣 health,无伤害 hook)。
+  // 与 造成伤害 区分:后者是单 atom + before/after hook 的旧伤害入口,A 模块重构时迁移调用方。
+  | { type: '扣减体力'; target: number; amount: number }
+  // 体力编排时机标记(对齐 decreaselife.md/recoverlife.md/loselife.md):事件标记型,
+  // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 life-flow.ts 的编排函数发出。
+  | { type: '确定回复数值时'; target: number; amount: number; source?: number }
+  | { type: '回复体力后'; target: number; amount: number; source?: number }
+  | { type: '失去体力时'; target: number; amount: number }
+  | { type: '失去体力后'; target: number; amount: number }
+  | { type: '扣减体力前'; target: number; amount: number }
+  | { type: '扣减体力时'; target: number; amount: number }
+  | { type: '扣减体力后'; target: number; amount: number }
   | { type: '陷入濒死'; target: number }
+  // 濒死编排时机标记(对齐 flow-redesign.md 模块 C / neardeath.md):事件标记型,
+  // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由系统规则.runDyingFlow
+  // 在濒死流程中发出。陷入濒死 atom 保留为濒死开始的系统通知(不屈/涅槃/伏枥/仁心等 after-hook);
+  // 进入濒死状态时 为补益/随势①独立时机(先于求桃,补益可能直接回血化解);
+  // 新的濒死状态时 在被救仍濒死时触发(重置响应起点为当前响应者,重新逆时针)。
+  | { type: '进入濒死状态时'; target: number }
+  | { type: '新的濒死状态时'; target: number }
   | { type: '击杀'; player: number }
+  // 死亡编排时机标记(对齐 flow-redesign.md 模块 B / death.md 5 时机):由 death-flow.ts 的
+  // 编排函数 runDeathFlow 在角色死亡时依次发出。亮身份牌前/死亡时/死亡后 为事件标记型
+  // (apply 无副作用,只提供 before/after hook 注册点);亮身份牌 apply 揭示身份(view 层);
+  // 系统处理牌 为实质 atom——搬原 击杀.apply 的弃牌+alive=false 逻辑(弃手牌/装备入弃牌堆)。
+  // killer 为致死来源(伤害路径透传;体力致死/自杀为 undefined),供 死亡时/死亡后 的技能读取
+  // (断肠移除凶手技能、行殇/界节命等死亡时技)。击杀 atom 保留为兼容别名(主流程改走 系统处理牌)。
+  | { type: '亮身份牌前'; player: number }
+  | { type: '亮身份牌'; player: number }
+  | { type: '死亡时'; player: number; killer?: number }
+  | { type: '系统处理牌'; player: number }
+  | { type: '死亡后'; player: number; killer?: number }
   // 标记/状态
   // distanceVars: 可选的距离修正 view 同步通道(技能如屯田加田时携带,
   //   applyView 据此同步 view.distanceVars——后端 vars 由技能自行维护)。
@@ -94,6 +162,20 @@ export type Atom =
   | { type: '清过期标记'; player: number }
   | { type: '设横置'; player: number; chained: boolean }
   | { type: '设上限'; player: number; amount: number }
+  // 体力上限编排时机标记(由 runSetMaxHealthFlow 在 设上限 后发出):事件标记型,apply 无副作用。
+  | { type: '减上限后'; player: number }
+  | { type: '加上限后'; player: number }
+  // 状态变更编排时机标记(对齐 flow-redesign.md 模块 E):事件标记型,validate 恒通过,
+  // apply 无副作用,只提供 before/after hook 注册点。由各状态变更编排路径在实质操作后发出。
+  //   翻面后:flipFaceDown/flipFaceUp 在 加标签/去标签 后发出(faceDown=true=翻成背面,false=翻回正面)。
+  //   横置后:setChain 在 设横置 后发出(chained 携带新状态)。
+  //   武将牌明置后/武将牌移除后:暗将机制未引入,暂仅定义(闺秀①②未来消费)。
+  //   游戏牌亮出后:牌面公开时机(鹰扬未来消费),暂仅定义。
+  | { type: '翻面后'; player: number; faceDown: boolean }
+  | { type: '横置后'; player: number; chained: boolean }
+  | { type: '武将牌明置后'; player: number }
+  | { type: '武将牌移除后'; player: number }
+  | { type: '游戏牌亮出后'; player: number; cardId: string }
   | { type: '加标签'; player: number; tag: string }
   | { type: '去标签'; player: number; tag: string }
   // 技能管理
@@ -104,6 +186,11 @@ export type Atom =
   | { type: '回合结束'; player: number }
   | { type: '阶段开始'; player: number; phase: string }
   | { type: '阶段结束'; player: number; phase: string }
+  // 阶段间时机标记(对齐 flow-redesign.md 模块 J / game.md「X阶段与Y阶段间」时机):事件标记型,
+  // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 回合管理.ts 的阶段结束
+  // after-hook 在 阶段结束 与 阶段开始(next) 之间发出。from/to 为相邻阶段名。
+  // before-hook cancel → 不 apply 阶段开始(next),跳过下一阶段(等价于 skipPhase)。
+  | { type: '阶段间'; player: number; from: string; to: string }
   | { type: '设阶段'; phase: TurnPhase }
   | { type: '下一玩家' }
   // 目标
@@ -122,6 +209,18 @@ export type Atom =
   | { type: '移除延时锦囊'; player: number; trickName: string }
   // 拼点
   | { type: '拼点'; initiator: number; target: number; initiatorCard: string; targetCard: string }
+  // 拼点两步化(对齐 flow-redesign.md 模块 G / rankcompare.md):由 rank-flow.ts 的
+  // runRankCompareFlow 编排函数依次发出,与旧「拼点」atom 并存(后者保留为兼容——
+  // 天义/烈刃/界巧说/界陷阵 等未迁移调用方仍用)。
+  //   拼点扣置:apply 把两张拼点牌从手牌移入处理区(面朝下);toViewEvents 对非扣置者隐藏牌面
+  //     (发起方只看到自己的牌,目标方只看到自己的牌,其他人两张都看不到)。
+  //   拼点亮出:纯视图事件(apply 无副作用),向全员公开两张拼点牌的牌面。
+  //   拼点后:纯标记,after-hook 触发拼点后效果(酣战获杀/纵适获牌 等未来迁移至此)。
+  | { type: '拼点扣置'; initiator: number; target: number; initiatorCard: string; targetCard: string }
+  | { type: '拼点亮出'; initiator: number; target: number; initiatorCard: string; targetCard: string }
+  // 拼点后 携带两张拼点牌 cardId + 结果——在两张牌已入弃牌堆之后发出(与旧「拼点」atom 的
+  // after-hook 时机一致:钩子读 discardPile 取牌)。供 酣战获杀/纵适获牌 等拼点后效果 hook 读取。
+  | { type: '拼点后'; initiator: number; target: number; initiatorCard: string; targetCard: string; result: '赢' | '没赢' }
   // 初始化
   | { type: '抽身份'; playerCount: number; seed: number }
   | {
@@ -138,6 +237,16 @@ export type Atom =
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number }
   | { type: '判定'; player: number; judgeType: string }
+  // 判定编排时机标记(对齐 flow-redesign.md 模块 H / judge.md):事件标记型,
+  // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 judge-flow.ts 的
+  // runJudgeFlow 在判定流程中依次发出。与 判定(底层翻牌 atom)区分——后者保留为底层操作,
+  // 其 apply(翻牌)+ afterApply(runJudgeModifiers 改判)+ afterHooks(消费+移弃牌堆)不变。
+  //   判定时:判定开始前(咒缚可替换判定牌来源)——已接入 runJudgeFlow。
+  //   判定牌生效前/判定牌生效后:判定牌翻开后、生效前后的时机(鬼才/鬼道改判 / 天妒洛神屯田获得)。
+  //     当前仅定义,暂不接入编排(与 statechange-timing 的 武将牌明置后 同构——待 hook 迁移再接入)。
+  | { type: '判定时'; player: number; judgeType: string }
+  | { type: '判定牌生效前'; player: number; judgeType: string; cardId: string }
+  | { type: '判定牌生效后'; player: number; judgeType: string; cardId: string }
   // 使用结算时机(通用:杀/锦囊等)
   | { type: '检测有效性'; source: number; target: number; cardId: string }
   // 使用结算中时机(use.md):生效前(闪 hook)/生效时(谦逊)/生效后(resolve)/使用结算结束时

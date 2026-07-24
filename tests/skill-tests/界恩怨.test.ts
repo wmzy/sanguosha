@@ -29,6 +29,7 @@ skillLoaders['界恩怨'] = async () => 界恩怨Module as unknown as SkillModul
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -91,7 +92,7 @@ async function dealDamageToOwner(
   source: number,
   amount = 1,
 ): Promise<void> {
-  void applyAtom(harness.state, { type: '造成伤害', target: 0, amount, source });
+  void runDamageFlow(harness.state, source, 0, amount);
   await harness.waitForStable();
   harness.processAllEvents();
 }

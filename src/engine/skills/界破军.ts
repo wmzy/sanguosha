@@ -247,10 +247,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     ownerId,
-    '造成伤害',
+    '造成伤害时',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
-      if (atom.type !== '造成伤害') return;
       if (atom.source !== ownerId) return; // 徐盛造成的伤害
       if (!isSlashCard(ctx.state, atom.cardId)) return; // 仅杀伤害
       const target = atom.target;

@@ -38,6 +38,7 @@
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { 询问抵消 } from '../无懈可击';
 import { defaultPlayActive } from '../action-active';
 
@@ -226,14 +227,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 // 使用者弃了 → 造成 1 点火焰伤害;没弃(超时)→ 无事发生
                 if (discardId && state.players[target]?.alive) {
                   await applyAtom(state, { type: '弃置', player: from, cardIds: [discardId] });
-                  await applyAtom(state, {
-                    type: '造成伤害',
-                    target,
-                    amount: 1,
-                    source: from,
-                    cardId,
-                    damageType: '火焰',
-                  });
+                  await runDamageFlow(state, from, target, 1, cardId, '火焰');
                 }
               }
             }

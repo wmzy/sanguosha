@@ -40,7 +40,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── 造成伤害 after-hook:潜心觉醒主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '造成伤害', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return; // 仅在自己造成伤害时触发
     if ((atom.amount ?? 0) <= 0) return;

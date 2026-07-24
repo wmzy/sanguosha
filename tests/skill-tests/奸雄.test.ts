@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -137,12 +138,7 @@ describe('奸雄', () => {
     const P0 = harness.player('P0');
 
     // 无来源、无 cardId 的伤害(如闪电)
-    void applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: TARGET_SYSTEM,
-    });
+    void runDamageFlow(harness.state, TARGET_SYSTEM, 0, 1);
     await waitForStable(harness.state);
     // 无伤害牌 → 技能不发动,无询问 pending
     P0.expectNoPending();

@@ -31,6 +31,7 @@ import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
@@ -418,13 +419,7 @@ describe('界双雄', () => {
     );
 
     // 模拟:P2 对界颜良文丑造成 1 点伤害(用 s1 杀)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 's1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 's1');
 
     // damageCards 含 s1
     expect(harness.state.turn.vars['界双雄/damageCards']).toEqual(['s1']);
@@ -457,29 +452,11 @@ describe('界双雄', () => {
     );
 
     // s1 杀造成伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 's1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 's1');
     // j1 决斗造成伤害
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'j1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'j1');
     // s1 再次伤害(理论上同一张牌可能多次造伤,如多次结算)→ 去重
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 's1',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 's1');
 
     expect(harness.state.turn.vars['界双雄/damageCards']).toEqual(['s1', 'j1']);
   });
@@ -628,13 +605,7 @@ describe('界双雄', () => {
     );
 
     // 先模拟伤害事件(cardId = 影子卡 id ws#武圣)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-      cardId: 'ws#武圣',
-    });
+    await runDamageFlow(harness.state, 1, 0, 1, 'ws#武圣');
     // hook 应记录 effectiveId = shadowOf = 'ws'(原卡 id)
     expect(harness.state.turn.vars['界双雄/damageCards']).toEqual(['ws']);
 

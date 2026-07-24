@@ -15,6 +15,7 @@ import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
@@ -285,22 +286,12 @@ describe('界宗室', () => {
     const restoreAutoCompare = disableAutoCompare();
 
     // 第一次魏来源伤害:防止
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 1);
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.players[0].vars['宗室/防伤/魏']).toBe(true);
 
     // 第二次魏来源伤害:魏已用过 → 照常受伤
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 1);
     expect(harness.state.players[0].health).toBe(2);
 
     restoreAutoCompare();
@@ -338,12 +329,7 @@ describe('界宗室', () => {
     const restoreAutoCompare = disableAutoCompare();
 
     // 直接 applyAtom 造成自伤(source=target=0)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 0,
-    });
+    await runDamageFlow(harness.state, 0, 0, 1);
 
     // 自伤照常生效(体力 -1)
     expect(harness.state.players[0].health).toBe(2);
@@ -392,22 +378,12 @@ describe('界宗室', () => {
     const restoreAutoCompare = disableAutoCompare();
 
     // 魏来源伤害:防止
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 1,
-    });
+    await runDamageFlow(harness.state, 1, 0, 1);
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.players[0].vars['宗室/防伤/魏']).toBe(true);
 
     // 蜀来源伤害:防止(不同势力,各自一次)
-    await applyAtom(harness.state, {
-      type: '造成伤害',
-      target: 0,
-      amount: 1,
-      source: 2,
-    });
+    await runDamageFlow(harness.state, 2, 0, 1);
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.players[0].vars['宗室/防伤/蜀']).toBe(true);
 

@@ -23,6 +23,7 @@
 //   - 限定技标记用 player.vars(整局永久),非 turn.vars。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';
 import { effectiveDistance } from '../distance';
@@ -92,7 +93,7 @@ async function resolveForcedSlash(
             });
           }
         } else if (state.players[target]?.alive) {
-          await applyAtom(state, { type: '造成伤害', target, amount: 1, source, cardId });
+          await runDamageFlow(state, source, target, 1, cardId);
         }
       }
     }
