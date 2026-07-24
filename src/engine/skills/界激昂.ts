@@ -16,7 +16,7 @@
 //     无论是否发动都消耗本回合额度(player.vars['界激昂/recycle/usedThisTurn'],
 //     后缀 /usedThisTurn 由「回合结束」atom 自动清空)。
 //   - 任意玩家弃置的此类牌都触发(官方未限定弃置者),不按 atom.player 过滤。
-//   - 同时弃置多张此类牌:只取首张(每回合限一次)。
+//   - 同时弃置多张此类牌:全部获得之(每回合限一次,失1体力获得全部符合条件的牌)。
 //
 // 命名:文件/loader key/character skill name = '界激昂'(避开标激昂冲突);
 //   内部 Skill.name = '激昂'(OL 官方技能名,玩家可见)。
@@ -153,9 +153,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.players[ownerId].vars[RECYCLE_USED_KEY]) return;
 
       const cardIds = atom.cardIds ?? [];
-      // 取首张符合条件的牌(同时弃多张只触发一次)
-      const target = cardIds.find((id) => isJiangTrigger(ctx.state, id));
-      if (!target) return;
+      // 取全部符合条件的牌(同时弃多张决斗/红杀应全部获得之;每回合限一次)
+      const targets = cardIds.filter((id) => isJiangTrigger(ctx.state, id));
+      if (targets.length === 0) return;
 
       // 标记本回合已用(每回合首次,无论是否发动都消耗额度)
       ctx.state.players[ownerId].vars[RECYCLE_USED_KEY] = true;
@@ -179,13 +179,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 发动:失去1点体力(非伤害,不触发伤害技;体力归零由系统规则进入濒死)
       await applyAtom(ctx.state, { type: '失去体力', target: ownerId, amount: 1 });
-      // 获得该牌:弃牌堆 → 手牌
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: target,
-        from: { zone: '弃牌堆' },
-        to: { zone: '手牌', player: ownerId },
-      });
+      // 获得全部符合条件的牌:弃牌堆 → 手牌(移动牌 atom 一次一张,逐张移动)
+      for (const cid of targets) {
+        await applyAtom(ctx.state, {
+          type: '移动牌',
+          cardId: cid,
+          from: { zone: '弃牌堆' },
+          to: { zone: '手牌', player: ownerId },
+        });
+      }
     },
   );
 

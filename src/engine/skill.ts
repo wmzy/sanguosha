@@ -184,25 +184,31 @@ function instanceKey(skillId: string, ownerId: number): string {
 // ─── pending slot / validateUseCard 等只读 helper(state 参数已有,无需改注册表) ───
 
 /** 查找某玩家的活跃 pending slot。
- *  查找顺序:ownerId 精确匹配 → 广播型(target<TARGET_SYSTEM) → 唯一活跃 slot(兜底)。
- *  无匹配返回 undefined。 */
+ *  查找顺序:ownerId 阻塞型精确匹配 → 广播型(target<TARGET_SYSTEM) → 唯一活跃 slot(兜底)。
+ *  无匹配返回 undefined。
+ *
+ *  ownerId 精确匹配仅接受阻塞型 slot:出牌窗口是非阻塞 pending(key=出牌者座次),
+ *  若不排除,出牌者 respond 广播型无懈可击时第一步 get(ownerId) 会误命中出牌窗口
+ *  而非无懈广播 slot(key=-2),导致无懈 validate 误判「当前不是无懈窗口」→ 出牌者本人
+ *  无法 respond 无懈(含反无懈)。无懈是广播型,目标是锦囊牌本身,不应与使用者玩家绑定。 */
 export function findPendingSlot(state: GameState, ownerId: number): PendingSlot | undefined {
-  return (
-    state.pendingSlots.get(ownerId) ??
-    [...state.pendingSlots.values()].find((s) => {
-      const t = (s.atom as { target?: unknown }).target;
-      return typeof t === 'number' && t < TARGET_SYSTEM;
-    }) ??
-    (state.pendingSlots.size === 1
-      ? (() => {
-          const slot = [...state.pendingSlots.values()][0];
-          // size===1 fallback:只返回属于请求者的 slot,不能误匹配其他玩家的出牌窗口等非阻塞 pending
-          const target =
-            (slot.atom as { target?: number }).target ?? (slot.atom as { player?: number }).player;
-          return typeof target === 'number' && target === ownerId ? slot : undefined;
-        })()
-      : undefined)
-  );
+  // 1. ownerId 精确匹配,仅限阻塞型 slot(排除出牌窗口等非阻塞 pending)。
+  const direct = state.pendingSlots.get(ownerId);
+  if (direct?.isBlocking) return direct;
+  // 2. 广播型 slot(target<TARGET_SYSTEM,如无懈可击):所有玩家共用一个 slot。
+  const broadcast = [...state.pendingSlots.values()].find((s) => {
+    const t = (s.atom as { target?: unknown }).target;
+    return typeof t === 'number' && t < TARGET_SYSTEM;
+  });
+  if (broadcast) return broadcast;
+  // 3. 唯一活跃 slot 兜底:仅当只剩一个且属于请求者(不误匹配其他玩家的出牌窗口等)。
+  if (state.pendingSlots.size === 1) {
+    const slot = [...state.pendingSlots.values()][0];
+    const target =
+      (slot.atom as { target?: number }).target ?? (slot.atom as { player?: number }).player;
+    return typeof target === 'number' && target === ownerId ? slot : undefined;
+  }
+  return undefined;
 }
 
 /** 是否存在阻塞型 pending——即需要玩家先回应的询问(询问闪/杀/无瓣/弃牌等)。

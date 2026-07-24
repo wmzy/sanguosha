@@ -14,6 +14,7 @@ import {
   registerSkillsFromState,
   frameCards,
   dispatch as engineDispatch,
+  applyAtom,
 } from '../../src/engine/create-engine';
 import { fireTimeoutAndWait, dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -171,7 +172,7 @@ describe('无懈可击链路', () => {
   // 用例 3:抵消场景:P1 持有无懈可击 → respond 打无懈 → 锦囊被抵消
   // ─────────────────────────────────────────────────────────────
   // close-reopen:旧 slot resolve,询问无懈可击 循环创建新窗口(新 createdSeq)
-  it('用例3:P1 出无纶可击 → 锦囊被抵消(目标牌未被弃)', async () => {
+  it('用例3:P1 出无懈可击 → 锦囊被抵消(目标牌未被弃)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
     state.cardMap[gqId] = {
@@ -243,7 +244,7 @@ describe('无懈可击链路', () => {
   // ─────────────────────────────────────────────────────────────
   // 用例 4:双无懈:出无懈抵消 → 再出无懈抵消无懈 → 锦囊恢复生效
   // ─────────────────────────────────────────────────────────────
-  it('用例4:双无纶抵消 → 锦囊恢复生效(目标失去手牌)', async () => {
+  it('用例4:双无懈抵消 → 锦囊恢复生效(目标失去手牌)', async () => {
     // 给 P0 一张过河拆桥
     const gqId = `gq-${state.players[0].hand.length}`;
     state.cardMap[gqId] = {
@@ -332,6 +333,154 @@ describe('无懈可击链路', () => {
     // P1 失去第一张手牌(锦囊生效)
     expect(state.players[1].hand).not.toContain(p1FirstCard);
     expect(state.zones.discardPile).toContain(p1FirstCard);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 5/6:出牌窗口非阻塞 slot 常驻时,出牌者本人也能 respond 无懈
+  //
+  // 真实游戏中 P0 出牌时「出牌窗口」slot(key=0)常驻;无懈广播窗口打开时
+  // pendingSlots 同时存在 {0: 出牌窗口, -2: 无懈广播}。旧 findPendingSlot 第一步
+  // get(ownerId=0) 命中出牌窗口非阻塞 slot → validate 误判「当前不是无懈窗口」→
+  // 出牌者本人无法 respond 无懈(也无法打反无懈)。无懈是广播型,目标是锦囊牌本身,
+  // 不应与使用者玩家绑定。
+  // ─────────────────────────────────────────────────────────────
+
+  // 用例5:出牌者本人抵消自己的锦囊(出牌窗口 slot 存在)
+  it('用例5:出牌者本人也能 respond 无懈抵消自己的锦囊(出牌窗口 slot 常驻)', async () => {
+    // 模拟真实出牌阶段:先创建出牌窗口非阻塞 slot(key=0=出牌者座次)
+    // createGameState 不会自动创建它,须手动 applyAtom 复现真实场景
+    void applyAtom(state, { type: '出牌窗口', player: 0 });
+    await waitForStable(state);
+    expect(state.pendingSlots.get(0)?.atom.type).toBe('出牌窗口');
+
+    const gqId = `gq-${state.players[0].hand.length}`;
+    state.cardMap[gqId] = {
+      id: gqId,
+      name: '过河拆桥',
+      suit: '♠',
+      color: '黑',
+      rank: '3',
+      type: '锦囊牌',
+    };
+    state.players[0].hand.push(gqId);
+    // 给 P0(出牌者本人)一张无懈可击
+    const nullif0Id = `nullif-0-${state.players[0].hand.length}`;
+    state.cardMap[nullif0Id] = {
+      id: nullif0Id,
+      name: '无懈可击',
+      suit: '♠',
+      color: '黑',
+      rank: 'J',
+      type: '锦囊牌',
+    };
+    state.players[0].hand.push(nullif0Id);
+
+    const p1FirstCard = state.players[1].hand[0];
+
+    // P0 出过河拆桥 → P1:此时 pendingSlots 应同时含出牌窗口(0)与无懈广播(-2)
+    await dispatchAndWait(state, {
+      skillId: '过河拆桥',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: gqId, targets: [1] },
+      baseSeq: state.seq,
+    });
+    const wuxieSlot = [...state.pendingSlots.values()].find(
+      (s) => (s.atom as { target?: number }).target === -2,
+    );
+    expect(wuxieSlot).toBeDefined();
+    expect(state.pendingSlots.get(0)?.atom.type).toBe('出牌窗口');
+
+    // P0(出牌者本人)respond 无懈抵消自己的锦囊。
+    // 修复前:findPendingSlot 第一步 get(0) 命中出牌窗口非阻塞 slot → validate 误判
+    //         「当前不是无懈窗口」→ dispatch 返回 false(拒绝),无懈未打出。
+    // 修复后:findPendingSlot 跳过非阻塞出牌窗口 → 命中广播无懈 slot → 接受。
+    const accepted = await engineDispatch(state, {
+      skillId: '无懈可击',
+      actionType: 'respond',
+      ownerId: 0,
+      params: { cardId: nullif0Id },
+      baseSeq: state.seq,
+    });
+    expect(accepted).toBe(true);
+    await waitForStable(state);
+    // P0 的无懈已打出(离开手牌)= execute 已执行 runUseFlow
+    expect(state.players[0].hand).not.toContain(nullif0Id);
+  });
+
+  // 用例6:对方出无懈后,出牌者本人出反无懈(出牌窗口 slot 存在)——用户场景2
+  it('用例6:对方出无懈后,出牌者本人能出反无懈(出牌窗口 slot 常驻)', async () => {
+    void applyAtom(state, { type: '出牌窗口', player: 0 });
+    await waitForStable(state);
+
+    const gqId = `gq-${state.players[0].hand.length}`;
+    state.cardMap[gqId] = {
+      id: gqId,
+      name: '过河拆桥',
+      suit: '♠',
+      color: '黑',
+      rank: '3',
+      type: '锦囊牌',
+    };
+    state.players[0].hand.push(gqId);
+    // P1 持无懈(抵消锦囊)
+    const nullif1Id = `nullif-1-${state.players[1].hand.length}`;
+    state.cardMap[nullif1Id] = {
+      id: nullif1Id,
+      name: '无懈可击',
+      suit: '♠',
+      color: '黑',
+      rank: 'J',
+      type: '锦囊牌',
+    };
+    state.players[1].hand.push(nullif1Id);
+    // P0(出牌者)持无懈(反无懈)
+    const nullif0Id = `nullif-0-${state.players[0].hand.length}`;
+    state.cardMap[nullif0Id] = {
+      id: nullif0Id,
+      name: '无懈可击',
+      suit: '♠',
+      color: '黑',
+      rank: 'J',
+      type: '锦囊牌',
+    };
+    state.players[0].hand.push(nullif0Id);
+
+    const p1FirstCard = state.players[1].hand[0];
+
+    // P0 出锦囊
+    await dispatchAndWait(state, {
+      skillId: '过河拆桥',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: gqId, targets: [1] },
+      baseSeq: state.seq,
+    });
+    // P1 出无懈抵消锦囊 → close-reopen 打开反无懈广播窗口
+    await dispatchAndWait(state, {
+      skillId: '无懈可击',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { cardId: nullif1Id },
+      baseSeq: state.seq,
+    });
+    // 反无懈窗口应为广播请求回应
+    const counterSlot = [...state.pendingSlots.values()].find(
+      (s) => (s.atom as { requestType?: string }).requestType === '无懈可击',
+    );
+    expect(counterSlot).toBeDefined();
+
+    // P0(出牌者本人)出反无懈。修复前同样被 validate 拒绝,修复后被接受。
+    const accepted = await engineDispatch(state, {
+      skillId: '无懈可击',
+      actionType: 'respond',
+      ownerId: 0,
+      params: { cardId: nullif0Id },
+      baseSeq: state.seq,
+    });
+    expect(accepted).toBe(true);
+    await waitForStable(state);
+    expect(state.players[0].hand).not.toContain(nullif0Id);
   });
 });
 

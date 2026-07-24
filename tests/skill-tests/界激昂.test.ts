@@ -9,6 +9,7 @@
 //     6. 弃置黑色杀不触发
 //     7. 每回合限一次:首次弃置后(不发动),再次弃置不再触发
 //     8. 其他玩家弃置决斗也触发(不限定弃置者)
+//     9. 同时弃置多张决斗/红杀 → 全部获得之(非仅首张)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -216,6 +217,54 @@ describe('界孙策·界激昂', () => {
 
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.players[0].hand).toContain('rk');
+  });
+
+  it('第二段:同时弃置多张决斗/红色杀 → 发动 → 全部获得之(非仅首张)', async () => {
+    const duel = mkCard('jd', '决斗', '♠', 'A', '锦囊牌');
+    const redKill = mkCard('rk', '杀', '♥', '7');
+    const blackKill = mkCard('bk', '杀', '♠', '3'); // 非触发牌,不获得
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界孙策',
+            skills: ['界激昂'],
+            hand: ['jd', 'rk', 'bk'],
+            health: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P2', skills: [], hand: [] }),
+        ],
+        cardMap: { jd: duel, rk: redKill, bk: blackKill },
+        currentPlayerIndex: 0,
+        phase: '弃牌',
+        turn: { round: 1, phase: '弃牌', vars: {} },
+      }),
+    );
+    const SC = harness.player('界孙策');
+
+    // 同时弃置决斗 + 红杀 + 黑杀
+    void applyAtom(harness.state, {
+      type: '弃置',
+      player: 0,
+      cardIds: ['jd', 'rk', 'bk'],
+    });
+    await harness.waitForStable();
+    SC.expectPending('请求回应');
+    await SC.respond('界激昂', { choice: true });
+    await harness.waitForStable();
+
+    // 失去1体力:4→3(仅失1点,不论获得几张)
+    expect(harness.state.players[0].health).toBe(3);
+    // 决斗与红杀均获得
+    expect(harness.state.players[0].hand).toContain('jd');
+    expect(harness.state.players[0].hand).toContain('rk');
+    // 黑色杀不在获得范围,仍在弃牌堆
+    expect(harness.state.players[0].hand).not.toContain('bk');
+    expect(harness.state.zones.discardPile).toContain('bk');
+    // 决斗与红杀已从弃牌堆取出
+    expect(harness.state.zones.discardPile).not.toContain('jd');
+    expect(harness.state.zones.discardPile).not.toContain('rk');
   });
 
   it('第二段:弃置黑色杀不触发(无询问)', async () => {
