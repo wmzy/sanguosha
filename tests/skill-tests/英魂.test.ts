@@ -300,4 +300,57 @@ describe('英魂', () => {
     expect(harness.state.players[1].hand).toContain('d1');
     expect(harness.state.zones.discardPile).toContain('p1a');
   });
+
+  // ─── 弃牌询问 mandatory:目标超时仍自动弃牌(不放弃弃牌义务) ──
+  // bug:原实现弃牌询问为普通 useCard respond,目标可"不回应"跳过或超时静默放弃弃牌,
+  // 且前端只支持单牌点击(发 cardId),无法选弃多张。修复:弃牌询问标 mandatory=true,
+  // 前端走多牌选择 UI + 无"不回应"按钮;超时由技能自身 auto-discard 补齐。
+  it('目标弃牌超时 → 自动从手牌补弃(mandatory,不跳过)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '孙坚',
+          health: 2,
+          maxHealth: 4,
+          hand: [],
+          skills: ['英魂', '回合管理'],
+        }),
+        makePlayer({
+          index: 1, name: 'P1', hand: ['p1a', 'p1b'], skills: ['回合管理'], faction: '魏' }),
+      ],
+      cardMap: {
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        d1: makeCard('d1', '桃', '♥'),
+        d2: makeCard('d2', '酒', '♣'),
+      },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    // X = 4-2 = 2:选项2 摸1弃2
+    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const 孙坚 = harness.player('孙坚');
+    const P1 = harness.player('P1');
+
+    triggerReadyPhase(harness);
+    await waitForStable(harness.state);
+    await 孙坚.respond('英魂', { choice: true });
+    await waitForStable(harness.state);
+    await 孙坚.respond('英魂', { targets: [1] });
+    await waitForStable(harness.state);
+    await 孙坚.respond('英魂', { choice: false }); // 选项2:摸1弃2
+    await waitForStable(harness.state); // 弃牌询问(弃2)
+    P1.expectPending('请求回应');
+
+    // 目标超时(pass)不弃 → 技能 auto-discard 补齐(不放弃弃牌义务)
+    await P1.pass();
+    await harness.waitForStable();
+
+    // P1 原2张 +摸1(d1) -自动弃2 = 1张,弃牌堆含2张
+    expect(harness.state.players[1].hand.length).toBe(1);
+    expect(harness.state.zones.discardPile.length).toBe(2);
+  });
 });

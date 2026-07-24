@@ -268,6 +268,9 @@ export type Atom =
       /** 仅用于 requestType='无懈可击':本次无懈抵消的目标座次(-1=整体抵消/单目标锦囊,N=全体锦囊的某个目标)。
        * 无懈 respond execute 据此翻转 localVars[`无懈/被抵消/${cancelTarget}`]。 */
       cancelTarget?: number;
+      /** 强制型回应(如英魂弃牌):前端隐藏"不回应"按钮 + 走多牌选择 UI,headless 不生成 skip。
+       *  超时后由调用方(技能自身)负责 auto-discard。 */
+      mandatory?: boolean;
     }
   // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
   | {

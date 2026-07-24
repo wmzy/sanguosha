@@ -76,9 +76,18 @@ export function usePendingState(
 
   const atom = readAtom(pending);
   const reqType = atom?.requestType;
-  const isDiscardPhase = pending !== null && reqType === '__弃牌';
-  const discardMin = isDiscardPhase ? (atom?.prompt?.cardFilter?.min ?? 0) : 0;
-  const discardMax = isDiscardPhase ? (atom?.prompt?.cardFilter?.max ?? discardMin) : 0;
+  // 弃牌窗口:系统弃牌阶段(__弃牌) 或 强制型 useCard 弃牌(mandatory=true,如英魂弃牌)。
+  // 两者都走多牌选择 UI(selectedForDiscard 累加 + 确认弃牌按钮),无"不回应"按钮。
+  const isMandatoryDiscard =
+    pending?.mandatory === true && pending?.prompt?.type === 'useCard';
+  const isDiscardPhase =
+    (pending !== null && reqType === '__弃牌') || isMandatoryDiscard;
+  const discardMin = isDiscardPhase
+    ? (atom?.prompt?.cardFilter?.min ?? 0)
+    : 0;
+  const discardMax = isDiscardPhase
+    ? (atom?.prompt?.cardFilter?.max ?? discardMin)
+    : 0;
 
   // pending 变化时清空广播跳过标记
   const pendingKey = pending ? `${pending.atom?.type}:${reqType}` : '';

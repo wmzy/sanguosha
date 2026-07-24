@@ -671,7 +671,8 @@ export function usePlayInteraction(
         } else {
           const hand = perspectiveHand;
           const fallback = hand.slice(-discardMin).map((c) => c.id);
-          send('系统规则', 'respond', { cardIds: fallback });
+          const skillId = pendingRespondInfo?.skillId ?? '系统规则';
+          send(skillId, 'respond', { cardIds: fallback });
           setSelectedForDiscard(new Set());
         }
         return;
@@ -800,9 +801,11 @@ export function usePlayInteraction(
     if (!pending || !isDiscardPhase) return;
     if (selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax) return;
     const cardIds = Array.from(selectedForDiscard);
-    send('系统规则', 'respond', { cardIds });
+    // 系统弃牌阶段 → '系统规则';强制型技能弃牌(英魂) → pendingRespondInfo.skillId
+    const skillId = pendingRespondInfo?.skillId ?? '系统规则';
+    send(skillId, 'respond', { cardIds });
     setSelectedForDiscard(new Set());
-  }, [pending, isDiscardPhase, selectedForDiscard, discardMin, discardMax, send]);
+  }, [pending, isDiscardPhase, selectedForDiscard, discardMin, discardMax, send, pendingRespondInfo]);
 
   // distribute handlers
   const handleDistToggle = useCallback(

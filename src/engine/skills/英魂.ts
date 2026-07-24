@@ -200,10 +200,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
           title: `英魂:弃 ${actual} 张牌`,
           cardFilter: { filter: () => true, min: actual, max: actual },
         },
+        // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI;headless 不生成 skip
+        mandatory: true,
         timeout: 20,
       });
-      const discardCards = ctx.state.localVars[DISCARD_KEY] as string[] | undefined;
+      let discardCards = ctx.state.localVars[DISCARD_KEY] as string[] | undefined;
       delete ctx.state.localVars[DISCARD_KEY];
+      // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
+      if ((!discardCards || discardCards.length === 0) && actual > 0) {
+        discardCards = ctx.state.players[target]?.hand.slice(0, actual) ?? [];
+      }
       if (discardCards && discardCards.length > 0) {
         await applyAtom(ctx.state, {
           type: '弃置',

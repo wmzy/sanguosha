@@ -19,6 +19,9 @@ export const 请求回应: AtomDefinition<{
   timeout?: number;
   /** 无懈可击抵消目标座次(仅 requestType='无懈可击' 时存在) */
   cancelTarget?: number;
+  /** 强制型回应(如英魂弃牌):前端隐藏"不回应"按钮 + 走多牌选择 UI,headless 不生成 skip。
+   *  超时后由调用方(技能自身)负责 auto-discard——请求回应.onTimeout 对 mandatory 不做处理。 */
+  mandatory?: boolean;
 }> = {
   type: '请求回应',
   validate(state, atom) {
@@ -80,6 +83,7 @@ export const 请求回应: AtomDefinition<{
       target: atom.target,
       prompt: resolvedPrompt,
       timeoutMs,
+      mandatory: atom.mandatory === true ? true : undefined,
     };
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有存活玩家都可回应,
     // 故 ownerViews 无人命中(Map key=target<0 不匹配真实 viewer),
@@ -93,6 +97,7 @@ export const 请求回应: AtomDefinition<{
       requestType: atom.requestType,
       target: atom.target,
       timeoutMs,
+      mandatory: atom.mandatory === true ? true : undefined,
     };
     return {
       ownerViews: new Map([[atom.target, targetView]]),
@@ -106,6 +111,7 @@ export const 请求回应: AtomDefinition<{
     // 超时:优先 event.timeoutMs(由 toViewEvents 经 resolveTimeoutMs 计算并透传),
     // 回退到默认 30s。与后端 createAndAwaitSlot 口径一致。
     const timeoutMs = (event.timeoutMs as number | undefined) ?? 30 * 1000;
+    const mandatory = event.mandatory === true;
     // 广播型(target=TARGET_BROADCAST,如无懈可击):所有 viewer 都设置 pending
     if (target < 0) {
       if (!prompt) return;
@@ -121,6 +127,7 @@ export const 请求回应: AtomDefinition<{
         target,
         deadline: Date.now() + timeoutMs,
         totalMs: timeoutMs,
+        mandatory,
       };
       return;
     }
@@ -139,6 +146,7 @@ export const 请求回应: AtomDefinition<{
         target,
         deadline: Date.now() + timeoutMs,
         totalMs: timeoutMs,
+        mandatory,
       };
     } else {
       // 其他 viewer:观察型 pending（不可操作,但 target 供视角自动跟随）
@@ -149,6 +157,7 @@ export const 请求回应: AtomDefinition<{
         target,
         deadline: Date.now() + timeoutMs,
         totalMs: timeoutMs,
+        mandatory,
       };
     }
   },

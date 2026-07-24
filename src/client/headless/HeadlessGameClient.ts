@@ -560,6 +560,26 @@ export class HeadlessGameClient {
       });
       return;
     }
+    // 强制型弃牌(英魂等):mandatory=true + useCard prompt。与 __弃牌 同构,
+    // 但 skillId 由 resolvePendingRespond 推导(英魂/discard → '英魂'),不硬编码 系统规则。
+    // 不生成 skip(弃牌是义务)。agent 须从手牌选足 min 张填入 cardIds。
+    if (pending.mandatory === true && pending.prompt?.type === 'useCard') {
+      const minfo = resolvePendingRespond(pending, skillActions);
+      const minCount = pending.prompt.cardFilter.min;
+      out.push({
+        description: `强制弃牌（需选 ${minCount} 张后提交 cardIds）`,
+        message: {
+          skillId: minfo?.skillId ?? '系统规则',
+          actionType: 'respond',
+          ownerId,
+          params: { cardIds: [] },
+          baseSeq: 0,
+        },
+        validTargets: [],
+        category: 'discard',
+      });
+      return;
+    }
     // 通用回应（出闪/出杀/确认发动等）
     const info = resolvePendingRespond(pending, skillActions);
     if (info?.skillId) {

@@ -75,6 +75,8 @@ export interface PendingView {
   target: number;
   /** 是否为阻塞型 pending(需玩家回应)。非阻塞型(如出牌阶段的出牌窗口)在前端不计入 awaiting 判断。 */
   isBlocking?: boolean;
+  /** 强制型回应(如英魂弃牌):前端隐藏"不回应"按钮 + 走多牌选择 UI。 */
+  mandatory?: boolean;
   /** 由 events 消息权威下发;applyView 不再硬编码 */
   deadline?: number;
   /** 倒计时总时长(ms),前端进度条用 deadline-totalMs..deadline 映射;由 events 消息权威下发 */
