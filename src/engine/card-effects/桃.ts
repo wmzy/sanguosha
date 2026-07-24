@@ -30,6 +30,13 @@ async function resolvePeach(ctx: ResolveCtx): Promise<void> {
   await applyAtom(state, { type: '回复体力', target, amount: 1, source });
 }
 
+/** 桃使用阶段激活条件：默认出牌条件 + 自己已受伤（满血不可出桃）。 */
+function peachActiveWhen(ctx: import('../types').ActionContext): boolean {
+  if (!defaultPlayActive(ctx)) return false;
+  const p = ctx.view.players[ctx.perspectiveIdx];
+  return p ? p.health < p.maxHealth : false;
+}
+
 const peachEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'wounded', min: 0, max: 1 },
@@ -71,7 +78,18 @@ const peachEffect: CardEffect = {
     type: 'useCardAndTarget',
     title: '出桃',
     cardFilter: { filter: (c: Card) => c.name === '桃', min: 1, max: 1 },
-    targetFilter: { min: 0, max: 1 },
+    targetFilter: {
+      min: 0,
+      max: 1,
+      // 仅受伤角色可选（含自己），防止选满血目标后被后端拒绝
+      filter: (view, target) => {
+        const p = view.players[target];
+        return p?.alive === true && p.health < p.maxHealth;
+      },
+    },
+    // 出牌阶段默认自疗：前端无需手动选目标，自动以自己为目标提交。
+    // 后端 canUsePeach 仍校验目标受伤；满血时 activeWhen 阻止出牌。
+    selfTarget: true,
   } as ActionPrompt,
   respondPrompt: {
     type: 'useCard',
@@ -80,7 +98,7 @@ const peachEffect: CardEffect = {
   } as ActionPrompt,
   label: '桃',
   style: 'primary',
-  activeWhen: (ctx) => defaultPlayActive(ctx),
+  activeWhen: peachActiveWhen,
 };
 
 registerCardEffect('桃', peachEffect);

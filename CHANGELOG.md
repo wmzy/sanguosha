@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-07-24
+
+### Fixed — 桃选中后无法出牌：前端目标选择缺失自动选自己
+
+选中桃后出牌按钮不可点击。根因：桃的 prompt 声明为 `useCardAndTarget` + `targetFilter: { min: 0, max: 1 }`，既无 `selfTarget` 也无 `filter`，导致前端 `derivePlayRules` 算出 `needsTarget=true`，`playButtonState` 要求手动选目标才可出牌。同时 `activeWhen` 仅用 `defaultPlayActive` 未检查自己是否受伤——满血时桃也 active 但后端 `canUsePeach` 会拒绝。前端测试 mock 里用了 `selfTarget: true` + 满血 `activeWhen`，但引擎实际从未实现，测试与引擎不一致。
+
+按三国杀规则，出牌阶段用桃可对包括自己在内的已受伤角色使用，自疗是压倒性常见场景。修复后前端默认自动以自己为目标提交，无需手动点座位；满血时桃不 active（阻止无效操作）。对他人用桃的能力保留在后端/API 层（AI、harness 测试），前端 UI 限定自疗。濒死求桃走 respond 路径不受影响。
+
+#### Fixed
+- **桃 prompt 加 `selfTarget: true`**:前端无需手动选目标，选中桃即可出牌，`buildPlayParams` 自动以自己座次为 target 提交。(`src/engine/card-effects/桃.ts`)
+- **桃 targetFilter 加 `filter`**:仅受伤角色（含自己）可选为目标，防止选满血目标后被后端拒绝。(`src/engine/card-effects/桃.ts`)
+- **桃 `activeWhen` 加满血检查**:新增 `peachActiveWhen`，在 `defaultPlayActive` 基础上要求 `health < maxHealth`，满血时桃 use action 不 active。(`src/engine/card-effects/桃.ts`)
+
 ## [Unreleased] — 2026-07-22
 
 ### Changed — hook 注册表泛型化:atomType→ctx.atom 类型收窄
