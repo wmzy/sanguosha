@@ -67,6 +67,8 @@ function PlayerSeatViewImpl({
   useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
   void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
   const isDead = !player.alive;
+  // 横置(铁索连环):marks 含 'chained' —— 座位卡给出铁链光泽 + 连环徽章,代表武将牌横置状态
+  const isChained = player.marks.some((m) => m.id === 'chained');
   const isClickable = needsTarget && !isDead && isTargetable;
   // 选目标阶段:不可选的活座位置灰(距离外/不满足槽位条件),与可选座位形成对比
   const isUntargetable = needsTarget && !isDead && !isTargetable;
@@ -100,6 +102,7 @@ function PlayerSeatViewImpl({
         isDamaged && seatShaking,
         isDamaged && seatDamageOverlay,
         isTurnGlow && turnGlowing,
+        isChained && seatCardChained,
       )}
       data-player-name={player.name}
       data-seat-index={index}
@@ -131,6 +134,11 @@ function PlayerSeatViewImpl({
           <div>
             {isPerspective && <span className={youBadge}>我</span>}
             {isCurrentPlayer && <span className={turnBadge}>回合</span>}
+            {isChained && (
+              <span className={chainBadge} title="横置·铁索连环">
+                ⛓
+              </span>
+            )}
             {isDead && <span className={deadBadgeText}>亡</span>}
             {showIdentity && identity && (
               <span
@@ -225,16 +233,21 @@ function PlayerSeatViewImpl({
           </div>
         );
       })()}
-      {player.marks.length > 0 && (
-        <div className={markRow}>
-          {player.marks.map((m) => (
-            <span key={m.id} className={markTag}>
-              {m.id}
-              {m.payload ? `(${JSON.stringify(m.payload)})` : ''}
-            </span>
-          ))}
-        </div>
-      )}
+      {(() => {
+        // 'chained' 已由座位卡铁链光泽 + ⛓ 徽章代表,这里不重复显示原始标记名
+        const visibleMarks = player.marks.filter((m) => m.id !== 'chained');
+        if (visibleMarks.length === 0) return null;
+        return (
+          <div className={markRow}>
+            {visibleMarks.map((m) => (
+              <span key={m.id} className={markTag}>
+                {m.id}
+                {m.payload ? `(${JSON.stringify(m.payload)})` : ''}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
       </div>
     </div>
   );
@@ -384,6 +397,11 @@ const seatCardTargeted = css`
   outline: 3px solid #e74c3c;
   box-shadow: 0 0 12px rgba(231, 76, 60, 0.4);
 `;
+// 横置(铁索连环):铁灰光泽脉冲边框,代表武将牌横置状态(与回合金边/选中红边区分)
+const seatCardChained = css`
+  border-color: #8aa6b8;
+  animation: chainPulse 1.8s ease-in-out infinite;
+`;
 const seatName = css`
   font-weight: bold;
   font-size: 12px;
@@ -417,6 +435,19 @@ const turnBadge = css`
   color: #000;
   margin-left: 4px;
   font-weight: bold;
+`;
+// 连环徽章:铁灰底 + 铁链图标,标示横置(铁索连环)状态
+const chainBadge = css`
+  display: inline-block;
+  background: linear-gradient(135deg, #6b8294, #9bb3c4);
+  border: 1px solid #b9cdd9;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 `;
 const lordBadge = css`
   background: #ffd700;

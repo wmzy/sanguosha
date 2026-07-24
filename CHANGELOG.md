@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-07-24
 
+### Added — 铁索连环(横置)状态前端展示
+
+处于连环(横置)状态的武将此前仅在 marks 行以原始字符串 `chained` 显示，无辨识度。现座位卡与视角大卡均给出清晰的铁链视觉：铁灰光泽脉冲边框 + header 连环徽章(⛓)，并从 marks 行过滤掉原始 `chained` 文本。
+
+#### Added
+- **座位卡(PlayerSeatView)**:检测 `marks` 含 `chained` → 应用 `seatCardChained`(铁灰 `chainPulse` 脉冲边框) + header 显示 ⛓ 徽章(`title="横置·铁索连环"`)；marks 行过滤 `chained`，不再泄漏原始标记名。(`src/client/components/PlayerSeatView.tsx`)
+- **视角大卡(PlayerCardLarge)**:自己被横置时同样显示 ⛓ 徽章 + `playerCardChained` 脉冲光泽，与座位卡一致。(`src/client/components/PlayerCardLarge.tsx`)
+- **动画与样式**:新增 `chainPulse` keyframe(`src/client/animations.css`)；gameViewStyles 新增共享 `chainBadge`/`playerCardChained`(`seat.ts`/`actionBar.ts`)。
+
 ### Fixed — 桃选中后无法出牌：前端目标选择缺失自动选自己
 
 选中桃后出牌按钮不可点击。根因：桃的 prompt 声明为 `useCardAndTarget` + `targetFilter: { min: 0, max: 1 }`，既无 `selfTarget` 也无 `filter`，导致前端 `derivePlayRules` 算出 `needsTarget=true`，`playButtonState` 要求手动选目标才可出牌。同时 `activeWhen` 仅用 `defaultPlayActive` 未检查自己是否受伤——满血时桃也 active 但后端 `canUsePeach` 会拒绝。前端测试 mock 里用了 `selfTarget: true` + 满血 `activeWhen`，但引擎实际从未实现，测试与引擎不一致。

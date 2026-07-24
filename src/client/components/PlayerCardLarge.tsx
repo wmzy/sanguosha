@@ -59,6 +59,8 @@ export function PlayerCardLargeImpl({
   if (!p) return null;
 
   const isDead = !p.alive;
+  // 横置(铁索连环):marks 含 'chained' —— 大卡给出铁链光泽 + 连环徽章
+  const isChained = p.marks.some((m) => m.id === 'chained');
   const charInfo = p.character ? getCharacterMeta(p.character) : undefined;
   const faction = charInfo?.faction ?? '群';
   const factionColor = FACTION_BG[faction] || '#8e44ad';
@@ -113,7 +115,7 @@ export function PlayerCardLargeImpl({
         )}
       </div>
       {/* 文字内容层:浮在立绘上 */}
-      <div className={styles.playerCardContent}>
+      <div className={cx(styles.playerCardContent, isChained && styles.playerCardChained)}>
       {/* 势力色顶部条 */}
       <div
         className={styles.playerCardHeader}
@@ -125,6 +127,11 @@ export function PlayerCardLargeImpl({
           <div>
             {perspectiveIdx === viewer && <span className={styles.youBadge}>我</span>}
             {isPerspectiveTurn && <span className={styles.turnBadge}>回合</span>}
+            {isChained && (
+              <span className={styles.chainBadge} title="横置·铁索连环">
+                ⛓
+              </span>
+            )}
             {isDead && <span className={cx(styles.youBadge, styles.deadBadge)}>亡</span>}
             {identity && <span className={identityBadgeClass}>{identity}</span>}
           </div>

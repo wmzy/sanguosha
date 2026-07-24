@@ -68,3 +68,59 @@ describe('回放 UI 渲染:装备随 step 变化', () => {
     expect(titles).not.toContain('诸葛连弩(武器)');
   });
 });
+
+// 横置(铁索连环)前端展示:chained mark → 座位卡/大卡显示 ⛓ 徽章,
+// 且原始标记名 'chained' 不再以纯文本泄漏到 marks 行。
+function makeChainView(chainedSeats: number[]): GameView {
+  return {
+    viewer: 0,
+    currentPlayerIndex: 0,
+    phase: '出牌',
+    turn: { round: 1, phase: '出牌', vars: {} },
+    players: [
+      {
+        index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4, alive: true,
+        equipment: {}, skills: [], handCount: 0,
+        marks: chainedSeats.includes(0) ? [{ id: 'chained', scope: 0 }] : [],
+      },
+      {
+        index: 1, name: 'P1', character: '曹操', health: 4, maxHealth: 4, alive: true,
+        equipment: {}, skills: [], handCount: 0,
+        marks: chainedSeats.includes(1) ? [{ id: 'chained', scope: 1 }] : [],
+      },
+    ],
+    cardMap: {},
+    pending: null, deadline: null, deadlineTotalMs: 0, log: [], settlementStack: [],
+  };
+}
+
+describe('横置(铁索连环)前端展示', () => {
+  beforeEach(() => { clearRegistry(); });
+
+  it('P1 座位卡被横置:显示 ⛓ 徽章,且不泄漏原始 chained 文本', () => {
+    const { container } = render(
+      <GameViewComponent view={makeChainView([1])} onAction={() => {}} readOnly />,
+    );
+    const badge = container.querySelector('[title="横置·铁索连环"]');
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toContain('⛓');
+    // 原始标记名 'chained' 不应作为纯文本出现在 marks 行
+    expect(screen.queryByText('chained')).toBeNull();
+  });
+
+  it('未横置时不显示连环徽章', () => {
+    const { container } = render(
+      <GameViewComponent view={makeChainView([])} onAction={() => {}} readOnly />,
+    );
+    expect(container.querySelector('[title="横置·铁索连环"]')).toBeNull();
+  });
+
+  it('P0 视角大卡(自己)被横置:大卡也显示 ⛓ 徽章', () => {
+    const { container } = render(
+      <GameViewComponent view={makeChainView([0])} onAction={() => {}} readOnly />,
+    );
+    const badges = container.querySelectorAll('[title="横置·铁索连环"]');
+    // 视角玩家自身为大卡,至少一个徽章
+    expect(badges.length).toBeGreaterThanOrEqual(1);
+  });
+});

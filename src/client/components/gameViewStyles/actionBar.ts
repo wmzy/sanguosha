@@ -252,6 +252,10 @@ export const playerCardPortraitImg = css`
 export const playerCardPortraitDead = css`
   filter: grayscale(1) brightness(0.6);
 `;
+// 横置(铁索连环):大卡铁链光泽脉冲,代表武将牌横置状态(chainPulse 定义在 animations.css)
+export const playerCardChained = css`
+  animation: chainPulse 1.8s ease-in-out infinite;
+`;
 // 大卡文字内容层:浮在立绘上,头部背景半透明保证文字可读
 export const playerCardContent = css`
   position: relative;

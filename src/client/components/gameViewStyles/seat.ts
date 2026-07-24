@@ -158,6 +158,19 @@ export const turnBadge = css`
   margin-left: 4px;
   font-weight: bold;
 `;
+// 连环徽章:铁灰底 + 铁链图标,标示横置(铁索连环)状态。与 PlayerSeatView 本地 chainBadge 视觉一致
+export const chainBadge = css`
+  display: inline-block;
+  background: linear-gradient(135deg, #6b8294, #9bb3c4);
+  border: 1px solid #b9cdd9;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: #fff;
+  margin-left: 4px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+`;
 export const lordBadge = css`
   background: #ffd700;
   border-radius: 3px;
