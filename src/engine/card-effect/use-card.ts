@@ -372,11 +372,18 @@ export function registerDelayedTrickHooks(state: GameState): void {
         trick.card.id,
       );
       if (cancelled) {
-        await applyAtom(ctx.state, {
-          type: '移除延时锦囊',
-          player,
-          trickName: trick.name,
-        });
+        const effect = getCardEffect(trick.name);
+        if (effect?.onCancelled) {
+          // 牌特有抵消善后（如闪电传递下家，不弃置）；自行负责延时锦囊移除
+          await effect.onCancelled(ctx.state, player, trick.card.id);
+        } else {
+          // 默认：移除延时锦囊（弃置）——乐不思蜀/兵粮寸断
+          await applyAtom(ctx.state, {
+            type: '移除延时锦囊',
+            player,
+            trickName: trick.name,
+          });
+        }
       }
     }
   });

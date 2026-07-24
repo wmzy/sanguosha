@@ -275,10 +275,11 @@ describe('闪电', () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  // 7. 判定前打出无懈可击 → 闪电被抵消:移除延时锦囊,不判定、不受伤、不传递
+  // 7. 判定前打出无懈可击 → 闪电被抵消:不判定、不受伤,传给下家(不弃置)
+  //    官方规则:无懈可击抵消闪电后,闪电不弃置,继续传递给下家判定区。
   //    (延时锦囊的无懈问询时机是判定阶段判定前,而非使用时)
   // ────────────────────────────────────────────────────────────
-  it('判定前打出无懈可击 → 闪电被抵消,不判定不受伤不传递', async () => {
+  it('判定前打出无懈可击 → 闪电被抵消,不判定不受伤,传给下家', async () => {
     const card = makeCard('sd1', '闪电', '♠');
     // 判定牌为黑桃5(命中)——若未被无懈抵消将造成 3 点伤害
     const judgeCard = makeCard('j1', '判定牌', '♠', '5');
@@ -327,7 +328,8 @@ describe('闪电', () => {
     expect(harness.state.players[0].pendingTricks.length).toBe(0);
     // 无懈牌进弃牌堆
     expect(harness.state.zones.discardPile).toContain('wx1');
-    // 无传递给 P2
-    expect(harness.state.players[1].pendingTricks.length).toBe(0);
+    // 闪电传递给下家 P2(被无懈抵消不弃置,继续传递)
+    expect(harness.state.players[1].pendingTricks.length).toBe(1);
+    expect(harness.state.players[1].pendingTricks[0].name).toBe('闪电');
   });
 });

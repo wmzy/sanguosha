@@ -235,4 +235,52 @@ describe('乐不思蜀', () => {
     expect(view.card).toMatchObject({ name: '判定牌', suit: '♥', rank: '5' });
     expect(view.pendingCard).toBeUndefined();
   });
+
+  // 与闪电对照：乐不思蜀被无懈可击抵消 → 弃置（移除），不传递给下家、不判定、不加跳过标签。
+  // 延时锦囊默认无 onCancelled，钩子走「移除延时锦囊」分支；仅闪电声明 onCancelled 以传递。
+  it('判定前打出无懈可击 → 乐不思蜀被抵消,移除不传递不判定', async () => {
+    const card = makeCard('l1', '乐不思蜀', '♠');
+    const judgeCard = makeCard('j1', '判定牌', '♠', '5'); // 若判定将生效（跳过出牌）
+    const nullifCard = makeCard('wx1', '无懈可击', '♠', 'J');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['wx1'],
+          skills: ['无懈可击', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['乐不思蜀', '回合管理'],
+          pendingTricks: [{ name: '乐不思蜀', source: 0, card }],
+        }),
+      ],
+      cardMap: { l1: card, j1: judgeCard, wx1: nullifCard },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 pending
+    await harness.player('P1').respond('无懈可击', { cardId: 'wx1' });
+    await waitForStable(harness.state); // 反无懈窗口
+    if (harness.state.pendingSlots.size > 0) {
+      await fireTimeoutAndWait(harness.state); // 消耗反无懈窗口
+    }
+
+    // 乐不思蜀被抵消：从判定区移除（弃置），未判定、未加跳过标签
+    expect(harness.state.players[1].pendingTricks.length).toBe(0);
+    expect(harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌')).toBe(false);
+    // 判定牌未被翻动（仍在牌堆）
+    expect(harness.state.zones.deck).toContain('j1');
+    // 无传递给 P1（默认行为是弃置，非闪电式传递）
+    expect(harness.state.players[0].pendingTricks.length).toBe(0);
+    // 无懈牌进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('wx1');
+  });
 });

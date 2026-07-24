@@ -55,6 +55,10 @@ export interface CardEffect {
   delayed?: boolean;
   /** 使用结算完成后回调（popFrame 前）。用于 post-use 清理，如杀的出杀次数累加。 */
   onSettle?: (state: GameState, source: number, cardId: string) => Promise<void>;
+  /** 延时锦囊被无懈可击抵消时的善后（仅 delayed 牌生效，判定阶段钩子调用）。
+   *  默认（未声明）由调用方移除弃置——适用于乐不思蜀/兵粮寸断。
+   *  闪电声明此项：被抵消时不弃置，而是传递给下家（官方规则：无懈抵消闪电后不弃置，继续传递）。 */
+  onCancelled?: (state: GameState, target: number, cardId: string) => Promise<void>;
   /** respond action 逻辑（打出/响应型卡牌：闪/桃(救)/酒/无懈可击 等）。
    *  若声明则使用牌技能按卡名 skillId 注册 respond action，路由到此逻辑。
    *  validate 检查 pending slot + 牌名；execute 执行牌特有响应效果。
