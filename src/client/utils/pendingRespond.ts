@@ -26,6 +26,20 @@ export function getBroadcastKey(pending: PendingView): string {
   return `${atomType}:${getPendingRequestType(pending)}`;
 }
 
+/** 从 pending 读取引擎投影层下发的 cardFilter.candidates(合法手牌 id 列表)。
+ *  pending.prompt 与 pending.atom.prompt 两处均可能携带(applyView 同时写入),取非空者。 */
+function readCardFilterCandidates(pending: PendingView): string[] | undefined {
+  const prompts = [
+    pending.prompt as { cardFilter?: { candidates?: string[] } } | undefined,
+    (pending.atom as { prompt?: { cardFilter?: { candidates?: string[] } } } | undefined)?.prompt,
+  ];
+  for (const p of prompts) {
+    const c = p?.cardFilter?.candidates;
+    if (Array.isArray(c)) return c;
+  }
+  return undefined;
+}
+
 /** 从 SkillActionDef 的 prompt 提取 cardFilter 函数(不走 JSON 序列化,函数引用保留) */
 export function extractCardFilterFromAction(
   action: SkillActionDef,
@@ -130,6 +144,16 @@ export function resolvePendingRespond(
           rescueActions.find((a) => extractCardFilterFromAction(a)?.(c))?.skillId,
       };
     }
+  }
+
+  // 引擎投影层下发的可序列化 candidates(权威):cardFilter.filter 是函数,跨进程丢失,
+  // 投影层已跑 filter 算出合法手牌 id 列表。优先用它重建成员判断 filter,覆盖下方
+  // registry/derive 猜测——解决技能代价弃牌(界放权/放权/据守 等 requestType 前缀为技能名)
+  // 时 derive 误推 c.name===技能名 匹配 0 张、玩家无法弃牌的问题。
+  const candidates = readCardFilterCandidates(pending);
+  if (candidates) {
+    const set = new Set(candidates);
+    return { skillId, cardFilter: (c: Card) => set.has(c.id) };
   }
 
   // 1. 优先:从 registry 取 cardFilter(函数引用保留)

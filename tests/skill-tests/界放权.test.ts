@@ -403,4 +403,102 @@ describe('界放权', () => {
     expect(harness.state.localVars['放权/extraActive']).toBeFalsy();
     expect(harness.state.localVars['放权/originalNext']).toBeFalsy();
   });
+
+  // bug: 界放权弃牌代价窗口(useCard prompt, requestType='界放权/discard')的 cardFilter.filter
+  // 是函数,无法跨进程序列化。前端 resolvePendingRespond 拿不到 filter 时按 requestType
+  // 前缀猜 cardName='界放权' → 匹配 0 张 → 玩家无法弃牌、被迫超时,且超时后竟仍放权成功。
+  // 修复:投影层注入可序列化 cardFilter.candidates;且代价必须支付,未支付则不发动。
+  it('弃牌代价窗口:prompt 投影携带 cardFilter.candidates(前端可据此弃牌)', async () => {
+    const c1 = mkCard('c1', '杀', '♠', '5');
+    const c2 = mkCard('c2', '闪', '♥', '3');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界刘禅',
+            character: '界刘禅',
+            hand: ['c1', 'c2'],
+            skills: ['回合管理', '界放权'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          mkPlayer({ index: 1, name: 'P1' }),
+        ],
+        cardMap: { c1, c2 },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const LC = harness.player('界刘禅');
+
+    // 1. 发动放权(跳过出牌)→ 链式触发 弃牌阶段开始
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    await LC.respond('界放权', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 2. 弃牌代价窗口出现
+    LC.expectPending('请求回应');
+    // 关键:candidates 已投影(前端据此重建 cardFilter,不再靠 requestType 猜 cardName)
+    const prompt = LC.view.pending?.prompt as
+      | { cardFilter?: { candidates?: string[] } }
+      | undefined;
+    expect(prompt?.cardFilter?.candidates).toEqual(['c1', 'c2']);
+
+    // 消费 pending,避免泄漏到后续用例
+    await LC.respond('界放权', { cardId: 'c1' });
+    await harness.waitForStable();
+    harness.processAllEvents();
+  });
+
+  it('弃牌代价:超时/不回应 → 未支付代价 → 不发动额外回合(放行正常回合)', async () => {
+    const c1 = mkCard('c1', '杀', '♠', '5');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界刘禅',
+            character: '界刘禅',
+            hand: ['c1'],
+            skills: ['回合管理', '界放权'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          mkPlayer({ index: 1, name: 'P1' }),
+        ],
+        cardMap: { c1 },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const LC = harness.player('界刘禅');
+
+    // 1. 发动放权(跳过出牌)→ 链式触发 弃牌阶段开始
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    await LC.respond('界放权', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 2. 弃牌代价窗口 → 不回应(超时)
+    LC.expectPending('请求回应');
+    await LC.pass();
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 关键:未支付代价 → 不发动额外回合
+    //   - 未记录 extraTarget
+    //   - 手牌未被弃置(c1 仍在手)
+    expect(harness.state.localVars['放权/extraTarget']).toBeFalsy();
+    expect(harness.state.players[0].hand).toContain('c1');
+    //   - 回合正常推进到下家 P1(而非某目标的额外回合)
+    expect(harness.state.currentPlayerIndex).toBe(1);
+  });
 });

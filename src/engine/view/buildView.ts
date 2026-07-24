@@ -3,6 +3,7 @@
 import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
+import { resolveCardFilterCandidates } from './cardFilterCandidates';
 import { slashUsed } from '../slash-quota';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
@@ -64,15 +65,20 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         : slot.atom.type === '询问杀'
           ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
           : { type: 'confirm' as const, title: '请回应' });
-    // choosePlayer 注入可序列化 candidates(filter 无法跨进程序列化)
-    const prompt = resolveChoosePlayerCandidates(rawPrompt, state);
-    // target 提取:'target' 字段优先;出牌窗口 用 'player';都无则 TARGET_SYSTEM
-    const target =
+    // choosePlayer/cardFilter 注入可序列化 candidates(filter 无法跨进程序列化)
+    const targetForResolve =
       'target' in slot.atom && typeof slot.atom.target === 'number'
         ? slot.atom.target
         : 'player' in slot.atom && typeof slot.atom.player === 'number'
           ? (slot.atom as { player: number }).player
           : TARGET_SYSTEM;
+    const prompt = resolveCardFilterCandidates(
+      resolveChoosePlayerCandidates(rawPrompt, state),
+      state,
+      targetForResolve,
+    );
+    // target 提取:'target' 字段优先;出牌窗口 用 'player';都无则 TARGET_SYSTEM
+    const target = targetForResolve;
     pending = {
       type: 'awaits',
       atom: slot.atom,

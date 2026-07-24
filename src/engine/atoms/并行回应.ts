@@ -15,6 +15,8 @@
 import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { resolveTimeoutMs } from '../create-engine';
 import { registerAtom } from '../atom';
+import { resolveChoosePlayerCandidates } from '../view/choosePlayerCandidates';
+import { resolveCardFilterCandidates } from '../view/cardFilterCandidates';
 
 const DEFAULT_TIMEOUT_SEC = 30;
 
@@ -58,7 +60,11 @@ export const 并行回应: AtomDefinition<{
         type: '请求回应',
         requestType: atom.requestType,
         target,
-        prompt: atom.prompt,
+        prompt: resolveCardFilterCandidates(
+          resolveChoosePlayerCandidates(atom.prompt, state),
+          state,
+          target,
+        ),
         timeoutMs,
       });
     }

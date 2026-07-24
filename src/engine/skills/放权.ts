@@ -165,26 +165,26 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const self = st.players[ownerId];
         if (!self?.alive) return; // 已死亡 → 不启动额外回合,放行正常回合结束
 
-        // 请求弃一张手牌
-        if (self.hand.length > 0) {
-          delete st.localVars[DISCARD_CARD_KEY];
-          await applyAtom(st, {
-            type: '请求回应',
-            requestType: DISCARD_RT,
-            target: ownerId,
-            prompt: {
-              type: 'useCard',
-              title: '放权:弃置一张手牌',
-              cardFilter: { filter: () => true, min: 1, max: 1 },
-            },
-            timeout: 15,
-          });
-          const discardCardId = st.localVars[DISCARD_CARD_KEY] as string | undefined;
-          delete st.localVars[DISCARD_CARD_KEY];
-          if (discardCardId && self.hand.includes(discardCardId)) {
-            await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
-          }
+        // 请求弃一张手牌:必须支付,未支付(无手牌/超时/不回应)则不发动额外回合
+        if (self.hand.length === 0) return; // 无手牌无法支付代价 → 不发动,放行正常回合结束
+        delete st.localVars[DISCARD_CARD_KEY];
+        await applyAtom(st, {
+          type: '请求回应',
+          requestType: DISCARD_RT,
+          target: ownerId,
+          prompt: {
+            type: 'useCard',
+            title: '放权:弃置一张手牌',
+            cardFilter: { filter: () => true, min: 1, max: 1 },
+          },
+          timeout: 15,
+        });
+        const discardCardId = st.localVars[DISCARD_CARD_KEY] as string | undefined;
+        delete st.localVars[DISCARD_CARD_KEY];
+        if (!discardCardId || !self.hand.includes(discardCardId)) {
+          return; // 超时/不回应 → 未支付代价,不发动额外回合,放行正常回合结束
         }
+        await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
 
         // 请求选额外回合目标(排除自己、排除死亡)
         delete st.localVars[EXTRA_TARGET_KEY];

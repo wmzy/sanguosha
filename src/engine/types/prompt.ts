@@ -34,6 +34,11 @@ export type ActionPrompt =
 
 export interface CardFilter {
   filter?: (card: Card) => boolean;
+  /** 可序列化的合法手牌 id 列表(权威,跨进程);filter 为本地冗余,序列化时丢失。
+   *  投影层(toViewEvents/buildView)对未显式提供的 prompt 自动跑 filter 计算。
+   *  与 ChoosePlayerPrompt.candidates 同构——前端据此重建 cardFilter(成员判断),
+   *  解决技能代价弃牌(如 界放权/放权/据守)等 filter 无法跨进程传递的问题。 */
+  candidates?: string[];
   min: number;
   max: number;
 }
