@@ -63,6 +63,53 @@ describe('界放权', () => {
     harness = new SkillTestHarness();
   });
 
+  it('回归: 放权询问 requestType 前缀须等于技能 id(前端路由契约)', async () => {
+    // bug: 界放权曾复用放权的 requestType 常量值('放权/trigger'),
+    //   前端按 requestType 前缀解析 skillId 得 '放权' ≠ 技能 id '界放权',
+    //   dispatch 找不到 respond handler → 发动/不发动按钮都不可点击。
+    const c1 = mkCard('c1', '杀', '♠', '5');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界刘禅',
+            character: '界刘禅',
+            hand: ['c1'],
+            skills: ['回合管理', '界放权'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          mkPlayer({ index: 1, name: 'P1' }),
+        ],
+        cardMap: { c1 },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const LC = harness.player('界刘禅');
+
+    // 触发出牌阶段开始(界放权 before-hook 询问)
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    LC.expectPending('请求回应');
+
+    // respondInfo() 等价前端 resolvePendingRespond: 从 requestType 前缀推导 skillId。
+    // 前缀必须等于技能 id,否则前端提交 respond 时引擎 dispatch 找不到 handler。
+    const info = LC.respondInfo();
+    expect(info).not.toBeNull();
+    expect(info!.skillId).toBe('界放权');
+
+    // 端到端:用推导出的 skillId 提交 respond,须成功消费 pending
+    await LC.respond(info!.skillId, { choice: false });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    // 不发动 → 出牌阶段正常进行
+    expect(harness.state.phase).toBe('出牌');
+  });
+
   it('发动放权 → 跳过出牌阶段 → 弃牌阶段出现弃牌询问', async () => {
     const c1 = mkCard('c1', '杀', '♠', '5');
     const c2 = mkCard('c2', '闪', '♥', '3');

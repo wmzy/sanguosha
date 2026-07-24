@@ -34,9 +34,13 @@ import { applyAtom } from '../create-engine';
 import { startTurn } from '../turn-flow';
 import { registerAction, registerBeforeHook } from '../skill';
 
-const TRIGGER_RT = '放权/trigger';
-const DISCARD_RT = '放权/discard';
-const CHOOSE_TARGET_RT = '放权/chooseTarget';
+// requestType 前缀必须等于技能 id('界放权'):前端 resolvePendingRespond 按
+// requestType 前缀解析 skillId 后提交 respond,前缀≠技能 id 则 dispatch 找不到
+// respond handler(按钮不可点击)。早期从放权.ts 复制常量时误用 '放权' 前缀。
+// 注:localVars key 仍用 '放权/' 前缀(内部状态,不参与前端路由,保持与测试断言一致)。
+const TRIGGER_RT = '界放权/trigger';
+const DISCARD_RT = '界放权/discard';
+const CHOOSE_TARGET_RT = '界放权/chooseTarget';
 const TRIGGERED_KEY = '放权/triggered';
 const ACTIVE_KEY = '放权/active';
 const DISCARD_CARD_KEY = '放权/discardCard';
