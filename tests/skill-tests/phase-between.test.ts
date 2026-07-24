@@ -44,14 +44,21 @@ function makePlayer(opts: {
 }
 
 /** 构建初始 state:player0 有 回合管理(驱动阶段推进)。
- *  startPhase 决定初始阶段(默认 准备)。 */
+ *  startPhase 决定初始阶段(默认 准备)。
+ *  P0 手牌 5 张 > 体力 4:出牌→弃牌 级联时弃牌阶段产生 discard pending 阻塞
+ *  (弃牌完成后才自动推进到回合结束),便于在弃牌阶段断言中间状态。 */
 function makeState(startPhase: '准备' | '判定' | '摸牌' | '出牌' | '弃牌' = '准备'): GameState {
+  const handCards = ['m1', 'm2', 'm3', 'm4', 'm5'];
+  const cardMap: GameState['cardMap'] = {};
+  for (const id of handCards) {
+    cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: '5', type: '基本牌' };
+  }
   return createGameState({
     players: [
-      makePlayer({ index: 0, name: 'P0', skills: ['回合管理'] }),
+      makePlayer({ index: 0, name: 'P0', skills: ['回合管理'], hand: handCards }),
       makePlayer({ index: 1, name: 'P1' }),
     ],
-    cardMap: {},
+    cardMap,
     currentPlayerIndex: 0,
     phase: startPhase,
     turn: { round: 1, phase: startPhase, vars: {} },

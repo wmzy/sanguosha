@@ -356,4 +356,62 @@ describe('乐不思蜀判定跳过:端到端 + 边角', () => {
     expect(state.zones.discardPile).not.toContain(judgeCard.id);
     expect(state.players[0].tags ?? []).not.toContain(SKIP_TAG);
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 8:出牌被乐不思蜀跳过 → 弃牌阶段完成后应推进到下家回合(不死锁)
+  // 回归 bug:弃牌阶段不自动推进到 回合结束,完全依赖 end action / 出牌窗口超时
+  // 显式调用 阶段结束(弃牌)。出牌被乐不思蜀跳过时无出牌窗口、无人点 end →
+  // 弃牌完成后回合卡死在弃牌阶段(无 pending, currentPlayerIndex 不推进)。
+  // ─────────────────────────────────────────────────────────────
+  it('用例8:出牌被乐不思蜀跳过 → 弃牌完成后推进到下家回合(不死锁)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', '5', '基本牌');
+    const c2 = makeCard('c2', '闪', '♥', '6', '基本牌');
+    const c3 = makeCard('c3', '桃', '♥', '7', '基本牌');
+    // 牌堆补充:下家摸牌阶段需抽 2 张
+    const d1 = makeCard('d1', '杀', '♠', '8', '基本牌');
+    const d2 = makeCard('d2', '闪', '♥', '9', '基本牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          health: 2,
+          maxHealth: 2,
+          hand: [c1.id, c2.id, c3.id],
+          skills: ['回合管理'],
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: ['回合管理'] }),
+      ],
+      cardMap: { [c1.id]: c1, [c2.id]: c2, [c3.id]: c3, [d1.id]: d1, [d2.id]: d2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+      zones: { deck: [d1.id, d2.id], discardPile: [], processing: [] },
+    });
+    // P0 已被乐不思蜀判定(非♥),带跳过出牌标签
+    state.players[0].tags = [SKIP_TAG];
+
+    const harness = new SkillTestHarness();
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 触发出牌阶段开始 → 乐不思蜀标签命中 → 跳过出牌 → 进入弃牌阶段
+    // (skipPhase 内 await 阶段结束(出牌) → 回合管理 hook 创建 __弃牌 pending 会阻塞,
+    //  故 fire-and-forget + waitForStable 等到 __弃牌 pending)
+    void applyAtom(state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await waitForStable(state);
+
+    // 弃牌 pending 应已产生:手牌 3 > 体力 2,需弃 1 张
+    const discardSlot = [...state.pendingSlots.values()].find(
+      (s) => (s.atom as { requestType?: string }).requestType === '__弃牌',
+    );
+    expect(discardSlot, '出牌被跳过后应进入弃牌阶段产生 __弃牌 pending').toBeDefined();
+
+    // P0 弃 1 张
+    await P0.respond('系统规则', { cardIds: [c1.id] });
+    await waitForStable(state);
+
+    // 回归断言:弃牌完成后回合应推进到下家(P1),不死锁在弃牌阶段
+    expect(state.currentPlayerIndex, '弃牌后应推进到下家回合').toBe(1);
+  });
 });

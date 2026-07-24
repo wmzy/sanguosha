@@ -145,17 +145,25 @@ describe('乐不思蜀', () => {
   it('判定后 + 出牌阶段开始 → cancel 出牌阶段,标签清除', async () => {
     const card = makeCard('l1', '乐不思蜀', '♠');
     const judgeCard = makeCard('j1', '判定牌', '♠', '5');
+    // P2 手牌 5 张 > 体力 4:出牌被跳过后弃牌阶段产生 discard pending(阻塞级联),
+    // 便于在弃牌阶段断言中间状态(弃牌完成后才自动推进到回合结束)
+    const d1 = makeCard('d1', '杀', '♠', '8', '基本牌');
+    const d2 = makeCard('d2', '杀', '♠', '9', '基本牌');
+    const d3 = makeCard('d3', '杀', '♠', '2', '基本牌');
+    const d4 = makeCard('d4', '杀', '♣', '3', '基本牌');
+    const d5 = makeCard('d5', '杀', '♣', '4', '基本牌');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', skills: ['回合管理'] }),
         makePlayer({
           index: 1,
           name: 'P2',
+          hand: [d1.id, d2.id, d3.id, d4.id, d5.id],
           skills: ['乐不思蜀', '回合管理'],
           pendingTricks: [{ name: '乐不思蜀', source: 0, card }],
         }),
       ],
-      cardMap: { l1: card, j1: judgeCard },
+      cardMap: { l1: card, j1: judgeCard, d1, d2, d3, d4, d5 },
       currentPlayerIndex: 1,
       phase: '判定',
       turn: { round: 1, phase: '判定', vars: {} },
@@ -170,8 +178,9 @@ describe('乐不思蜀', () => {
     const hasSkipTagBefore = harness.state.players[1].tags?.includes('乐不思蜀/跳过出牌');
     expect(hasSkipTagBefore).toBe(true);
 
-    // 模拟进入出牌阶段(跳过摸牌/弃牌流程,直接发 阶段开始 出牌)
-    await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '出牌' });
+    // 进入出牌阶段 → SKIP_TAG 命中 → 出牌被 cancel → 弃牌阶段(discard pending 阻塞)
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '出牌' });
+    await waitForStable(harness.state);
 
     // 出牌阶段被 cancel:state.phase 应已推进到 弃牌(因内部触发了 阶段结束 出牌)
     expect(harness.state.phase).toBe('弃牌');

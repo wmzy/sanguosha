@@ -68,8 +68,8 @@ describe('放权', () => {
             character: '刘禅',
             hand: ['c1', 'c2'],
             skills: ['回合管理', '放权'],
-            health: 3,
-            maxHealth: 3,
+            health: 1,
+            maxHealth: 1,
           }),
           mkPlayer({ index: 1, name: 'P1' }),
         ],
@@ -176,13 +176,11 @@ describe('放权', () => {
     await harness.waitForStable();
     harness.processAllEvents();
     await LC.respond('放权', { choice: true });
+    // 发动放权 → 跳过出牌 → 弃牌(无弃牌)→ 回合结束 → 放权情况1:弃牌代价 + 选目标
+    // (回合收尾已集中到 回合管理 hook:跳过出牌后自动级联到 回合结束 atom,无需手动 end)
     await harness.waitForStable();
     harness.processAllEvents();
-    expect(harness.state.localVars['放权/active']).toBe(true);
-
-    // 2. 刘禅结束回合 → end action → 回合结束(刘禅) → 情况1:弃牌 + 选目标
-    await LC.triggerAction('回合管理', 'end', {});
-    // hand=1 ≤ hp=3 无弃牌阶段 pending,直接到 回合结束(刘禅) 的放权弃牌询问
+    // 情况1:弃一张手牌(放权代价)
     LC.expectPending('请求回应');
     await LC.respond('放权', { cardId: 'c1' }); // 放权弃一张手牌
     await harness.waitForStable();

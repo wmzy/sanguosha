@@ -19,14 +19,10 @@ export const 出牌窗口: AtomDefinition<{ player: number; timeout?: number }> 
     // 等待型 atom——apply 不修改 state
   },
   pending: {
-    // 超时:自动结束回合(与玩家点 end 走相同路径)
+    // 超时:放弃出牌 → 结束出牌阶段 → hook 自动链到 弃牌→回合结束→回合结束 atom
+    //   (回合收尾已集中在 回合管理 hook 的「回合结束阶段」处理)
     async onTimeout(state, atom) {
-      const player = atom.player;
-      await applyAtom(state, { type: '阶段结束', player, phase: '出牌' });
-      await applyAtom(state, { type: '阶段结束', player, phase: '弃牌' });
-      await applyAtom(state, { type: '清过期标记', player });
-      await applyAtom(state, { type: '下一玩家' });
-      await applyAtom(state, { type: '回合结束', player });
+      await applyAtom(state, { type: '阶段结束', player: atom.player, phase: '出牌' });
     },
     prompt: { type: 'confirm', title: '出牌阶段', cancelLabel: '结束回合' },
     timeout: DEFAULT_TIMEOUT_SEC,

@@ -149,7 +149,13 @@ describe('界放权', () => {
 
   it('弃牌阶段开始时弃牌+选目标(对齐官方时机,非回合结束)', async () => {
     // 关键验证:弃牌+选目标发生在「弃牌阶段」,而非「回合结束」
+    // 界刘禅手牌 5 张:放权代价弃 1 张后剩 4 > 体力 3 → 弃牌阶段产生 discard pending
+    // (阻塞级联),便于断言 phase=弃牌 的中间状态
     const c1 = mkCard('c1', '杀', '♠', '5');
+    const c2 = mkCard('c2', '杀', '♠', '6');
+    const c3 = mkCard('c3', '杀', '♠', '7');
+    const c4 = mkCard('c4', '杀', '♠', '8');
+    const c5 = mkCard('c5', '杀', '♠', '9');
     await harness.setup(
       createGameState({
         players: [
@@ -157,14 +163,14 @@ describe('界放权', () => {
             index: 0,
             name: '界刘禅',
             character: '界刘禅',
-            hand: ['c1'],
+            hand: ['c1', 'c2', 'c3', 'c4', 'c5'],
             skills: ['回合管理', '界放权'],
             health: 3,
             maxHealth: 3,
           }),
           mkPlayer({ index: 1, name: 'P1' }),
         ],
-        cardMap: { c1 },
+        cardMap: { c1, c2, c3, c4, c5 },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

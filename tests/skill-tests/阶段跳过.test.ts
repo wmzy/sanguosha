@@ -197,17 +197,25 @@ describe('阶段跳过 skipPhase 集成', () => {
   //    期望:摸牌被兵粮寸断跳过、出牌被乐不思蜀跳过、阶段直达弃牌,两个标签均清除。
   // ─────────────────────────────────────────────────────────────
   it('叠加:兵粮寸断(跳过摸牌)+ 乐不思蜀(跳过出牌)同时生效', async () => {
+    // P2 手牌 5 张 > 体力 4:两个跳过都生效后弃牌阶段产生 discard pending(阻塞级联),
+    // 便于断言未 soft-lock 且停在弃牌阶段
+    const d1 = makeCard('d1', '杀', '♠', '8', '基本牌');
+    const d2 = makeCard('d2', '杀', '♠', '9', '基本牌');
+    const d3 = makeCard('d3', '杀', '♠', '2', '基本牌');
+    const d4 = makeCard('d4', '杀', '♣', '3', '基本牌');
+    const d5 = makeCard('d5', '杀', '♣', '4', '基本牌');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', skills: ['回合管理'] }),
         makePlayer({
           index: 1,
           name: 'P2',
+          hand: [d1.id, d2.id, d3.id, d4.id, d5.id],
           skills: ['兵粮寸断', '乐不思蜀', '回合管理'],
           tags: ['兵粮寸断/跳过摸牌', '乐不思蜀/跳过出牌'],
         }),
       ],
-      cardMap: {},
+      cardMap: { d1, d2, d3, d4, d5 },
       currentPlayerIndex: 1,
       phase: '判定',
       turn: { round: 1, phase: '判定', vars: {} },

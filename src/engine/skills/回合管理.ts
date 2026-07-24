@@ -111,8 +111,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return;
     }
 
-    // 自动阶段(准备/判定/摸牌)立即结束,推进到下一阶段
-    if (next === '准备' || next === '判定' || next === '摸牌') {
+    // 回合结束阶段:执行回合收尾(清过期标记 + 下一玩家 + 回合结束 atom)。
+    // 集中在此:无论经 end action / 出牌窗口超时 / 跳过出牌(乐不思蜀·放权·巧变 等)
+    // 哪种路径到达回合结束阶段,都统一触发回合切换。此前 turn-end 只由 end/超时
+    // 显式调用,出牌被跳过时无人结束回合 → 弃牌后死锁。
+    if (next === '回合结束') {
+      await applyAtom(ctx.state, { type: '清过期标记', player });
+      await applyAtom(ctx.state, { type: '下一玩家' });
+      await applyAtom(ctx.state, { type: '回合结束', player });
+      return;
+    }
+
+    // 自动阶段(准备/判定/摸牌/弃牌)立即结束,推进到下一阶段。
+    // 弃牌:弃牌逻辑(弃牌 pending 或手牌未超限)完成后自动推进到回合结束阶段;
+    //   此前依赖 end/超时显式调 阶段结束(弃牌),但出牌被跳过时无出牌窗口、
+    //   无人点 end → 弃牌后回合卡死。
+    if (next === '准备' || next === '判定' || next === '摸牌' || next === '弃牌') {
       await applyAtom(ctx.state, { type: '阶段结束', player, phase: next });
     }
   });
@@ -148,17 +162,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return '现在不能结束回合';
     },
     async (state: GameState, _params: Record<string, Json>) => {
-      const player = ownerId;
-
-      await applyAtom(state, { type: '阶段结束', player, phase: '出牌' });
-      await applyAtom(state, { type: '阶段结束', player, phase: '弃牌' });
-      // 清理回合级标记(如 杀/killsPlayed)
-      await applyAtom(state, { type: '清过期标记', player });
-      // 推进 currentPlayerIndex 到下一家(必须在 回合结束 hook 之前:hook 会启动下家回合,
-      // 进入 __出牌 循环并挂起;如果 下一玩家 在后面,currentPlayerIndex 永远不会被推进)
-      await applyAtom(state, { type: '下一玩家' });
-      // 触发所有 onAtomAfter('回合结束') 钩子——下家实例发现自己接手,启动回合
-      await applyAtom(state, { type: '回合结束', player });
+      // 结束当前阶段(出牌/弃牌)→ 回合管理 hook 自动链到 弃牌→回合结束→回合结束 atom。
+      // 回合收尾(清过期标记/下一玩家/回合结束 atom)已集中在 hook 的「回合结束阶段」处理,
+      // 这里只需推进当前阶段即可触发整条链。
+      await applyAtom(state, { type: '阶段结束', player: ownerId, phase: state.phase });
     },
   );
 
