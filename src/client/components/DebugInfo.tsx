@@ -5,6 +5,7 @@
 import * as styles from './gameViewStyles';
 import type { GameView, PendingView } from '../../engine/types';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
+import { displaySkillName } from '../utils/skillDisplay';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
@@ -48,7 +49,7 @@ export function DebugInfo({ view, perspectiveName, pending }: DebugInfoProps) {
               </span>
             ))}
             {p.skills.filter((s) => !DEFAULT_SKILLS.has(s)).length > 0 && (
-              <span> 技能:{p.skills.filter((s) => !DEFAULT_SKILLS.has(s)).join(',')}</span>
+              <span> 技能:{p.skills.filter((s) => !DEFAULT_SKILLS.has(s)).map(displaySkillName).join(',')}</span>
             )}
           </div>
         ))}

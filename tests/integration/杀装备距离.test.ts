@@ -166,13 +166,16 @@ describe('杀 + 装备 + 距离', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例3:出杀 → P1 不出闪(超时)→ P1 扣 1 血', async () => {
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    // 适配 skip/silent/normal:P1 0 手牌会致 询问闪 skip(无 slot)。给一张闪走 normal,
+    // 保留 询问闪 pending → 超时 → 扣血 的原流程;P1 仍不出闪。
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♦', color: '红', rank: '6', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [dodge.id], skills: ['闪'] }),
       ],
-      cardMap: { [slash.id]: slash },
+      cardMap: { [slash.id]: slash, [dodge.id]: dodge },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -235,6 +238,8 @@ describe('杀 + 装备 + 距离', () => {
       rank: '8',
       type: '基本牌',
     };
+    // 适配 skip/silent/normal:P1 0 手牌会致 询问闪 skip。给一张闪走 normal,保留两次 杀→询问闪→超时→扣血 流程。
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♦', color: '红', rank: '6', type: '基本牌' };
 
     const state: GameState = createGameState({
       players: [
@@ -244,9 +249,9 @@ describe('杀 + 装备 + 距离', () => {
           hand: [zhuge.id, slash1.id, slash2.id],
           skills: ['杀', '装备通用'],
         }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [dodge.id], skills: ['闪'] }),
       ],
-      cardMap: { [zhuge.id]: zhuge, [slash1.id]: slash1, [slash2.id]: slash2 },
+      cardMap: { [zhuge.id]: zhuge, [slash1.id]: slash1, [slash2.id]: slash2, [dodge.id]: dodge },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -372,6 +377,9 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
       rank: '3',
       type: '基本牌',
     };
+    // 适配 skip/silent/normal:孙权(被杀目标)0 手牌会致 询问闪 skip(无 slot),
+    // 无法验证“正常 询问闪 pending 出现”。给一张闪走 normal 保留该断言。
+    const dodgeB: Card = { id: 'db1', name: '闪', suit: '♦', color: '红', rank: '6', type: '基本牌' };
     const stateB = createGameState({
       players: [
         {
@@ -381,7 +389,7 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
           health: 4,
           maxHealth: 4,
           alive: true,
-          hand: [],
+          hand: [dodgeB.id],
           equipment: {},
           skills: ['制衡', '闪', '装备通用'],
           vars: {},
@@ -455,7 +463,7 @@ describe('skill 注册表 state 隔离(流离泄漏回归)', () => {
           judgeZone: [],
         },
       ],
-      cardMap: { c2: slashB },
+      cardMap: { c2: slashB, db1: dodgeB },
       currentPlayerIndex: 4,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

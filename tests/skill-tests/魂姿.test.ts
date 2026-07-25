@@ -55,9 +55,15 @@ describe('魂姿', () => {
         turn: { round: 1, phase: '准备', vars: {} },
       }),
     );
+    const SC = harness.player('孙策');
 
-    // 触发准备阶段(觉醒技,被动,无询问,自动结算)
-    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    // 触发准备阶段:魂姿强制觉醒(无询问)。
+    // 觉醒当回合英魂会立即在同一个准备阶段发动(confirm 询问阻塞 applyAtom),
+    // 故用 fire-and-forget 触发,等询问出现后回应以推进。
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    SC.expectPending('请求回应'); // 英魂 confirm(觉醒当回合立即发动)
+    await SC.respond('英魂', { choice: false }); // 本测试聚焦觉醒,不发动英魂排除干扰
     await harness.waitForStable();
 
     expect(harness.state.players[0].maxHealth).toBe(3); // 4→3 减1上限
@@ -130,8 +136,13 @@ describe('魂姿', () => {
     );
     const SC = harness.player('孙策');
 
-    // 第一次准备阶段:触发觉醒
-    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    // 第一次准备阶段:触发觉醒。
+    // 觉醒当回合英魂会立即在同一个准备阶段发动(confirm 询问阻塞 applyAtom),
+    // 故用 fire-and-forget 触发,等询问出现后回应以推进。
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    SC.expectPending('请求回应'); // 英魂 confirm(觉醒当回合立即发动)
+    await SC.respond('英魂', { choice: false }); // 本测试聚焦觉醒,不发动英魂排除干扰
     await harness.waitForStable();
     expect(harness.state.players[0].vars['魂姿/awakened']).toBe(true);
     expect(harness.state.players[0].maxHealth).toBe(3);

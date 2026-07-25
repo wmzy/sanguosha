@@ -167,10 +167,8 @@ describe('系统规则', () => {
     expect(slotAtom.type).toBe('请求回应');
     expect(slotAtom.requestType).toBe('桃/求桃');
 
-    // 模块 C:逆时针从当前回合 P0 起 → P0 先被问(打出杀后无手牌)→ pass
-    await P0.pass();
-
-    // 第二问 P1(濒死者)→ 出桃自救
+    // 模块 C:逆时针从当前回合 P0 起 → P0 无手牌被 skip,直接问 P1(濒死者)
+    // → 出桃自救
     await P1.respond('桃', { cardId: 'p1' });
 
     // P1 回复 1 点体力
@@ -239,6 +237,7 @@ describe('系统规则', () => {
   it('Bug:求桃 pending 为 useCard 类型,cardFilter 只匹配桃/酒/急救红牌', async () => {
     const restoreAutoCompare = disableAutoCompare();
     const slash = makeCard('k1', '杀', '♠', '7');
+    const peach = makeCard('p1', '桃', '♥', '5');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -249,15 +248,17 @@ describe('系统规则', () => {
           health: 4,
           maxHealth: 4,
         }),
+        // P1 带一张桃:询问闪走 silent(P1 无闪),P1.pass() 推进;濒死后求桃问 P1(有桃)→ 创建 slot 供检查
         makePlayer({
           index: 1,
           name: 'P1',
+          hand: ['p1'],
           skills: ['杀', '桃', '闪', '酒'],
           health: 1,
           maxHealth: 4,
         }),
       ],
-      cardMap: { k1: slash },
+      cardMap: { k1: slash, p1: peach },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -315,7 +316,7 @@ describe('系统规则', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // P1 HP=0 → 濒死
+    // P1 无手牌:询问闪走 skip(无 slot),直接扣血濒死;P0(有桃)被求桃
     expect(harness.state.players[1].health).toBe(0);
 
     // 模块 C:逆时针从当前回合 P0 起 → P0 先被问(打出杀后仍有桃)→ 出桃救 P1

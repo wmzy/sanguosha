@@ -202,9 +202,7 @@ describe('界贞烈', () => {
 
     // 不发动
     await P0.respond('界贞烈', { choice: false });
-    P0.expectPending('询问闪'); // 正常进入询问闪
-
-    await P0.pass(); // 不出闪
+    // P0 0 手牌 → 询问闪 skip → 直接扣血
     await harness.waitForStable();
 
     // 断言:P0 扣 1 血(3→2);杀入弃牌堆

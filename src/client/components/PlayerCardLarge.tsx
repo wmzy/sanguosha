@@ -15,6 +15,7 @@ import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { playerVisibleEqual } from '../utils/memo';
+import { displaySkillName } from '../utils/skillDisplay';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
@@ -157,13 +158,15 @@ export function PlayerCardLargeImpl({
         <div className={cx(styles.skillRow, styles.skillRowPad)}>
           {visibleSkills.map((s) => {
             const btn = triggerableActions.find((a) => a.skillId === s);
+            // 描述/资源按原 id(s)查询;展示名去前导"界"
             const desc = getSkillDescription(s) ?? btn?.prompt.title;
+            const display = displaySkillName(s);
             if (btn && isSkillActive(btn)) {
               return (
                 <SkillTag
                   key={s}
                   as="button"
-                  name={s}
+                  name={display}
                   description={desc}
                   className={cx(styles.skillBtn, skillBtnVariant(btn.style))}
                   onClick={() => onSkillAction(btn)}
@@ -173,7 +176,7 @@ export function PlayerCardLargeImpl({
             return (
               <SkillTag
                 key={s}
-                name={s}
+                name={display}
                 description={desc}
                 className={styles.skillTag}
               />

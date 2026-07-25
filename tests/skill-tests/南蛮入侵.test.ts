@@ -90,7 +90,7 @@ describe('南蛮入侵', () => {
     harness = new SkillTestHarness();
   });
 
-  it('P2 无杀 → P2 扣 1 血, 南蛮进弃牌堆', async () => {
+  it('P2 无手牌 → 询问杀 skip(不创建 slot 无延时),直接扣 1 血, 南蛮进弃牌堆', async () => {
     await harness.setup(build());
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -101,9 +101,8 @@ describe('南蛮入侵', () => {
     if (slot0 && (slot0.atom as { type: string }).type === '请求回应') {
       await P2.pass();
     }
-    // P2 被询问杀
-    P2.expectPending('询问杀');
-    await P2.pass(); // P2 不出杀
+    // P2 手牌为 0(公开可见):询问杀 走 skip 模式——不创建 slot、无延时,直接进入伤害。
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('nm1');
@@ -152,16 +151,16 @@ describe('南蛮入侵', () => {
     if (slot0 && (slot0.atom as { type: string }).type === '请求回应') {
       await P2.pass();
     }
-    // P2 先被询问
+    // P2 先被询问(有杀 → normal)
     P2.expectPending('询问杀');
     await P2.respond('杀', { cardId: 'c2' });
-    // P3 被询问
+    // 目标间无懈窗口
     const slot1 = [...harness.state.pendingSlots.values()][0];
     if (slot1 && (slot1.atom as { type: string }).type === '请求回应') {
       await P2.pass();
     }
-    P3.expectPending('询问杀');
-    await P3.pass();
+    // P3 手牌为 0 → 询问杀 skip:不创建 slot、无延时,直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     expect(harness.state.players[1].health).toBe(4); // P2 出杀不扣血
     expect(harness.state.players[2].health).toBe(3); // P3 无杀扣血
@@ -197,6 +196,11 @@ describe('南蛮入侵', () => {
     const state = build({ p3: true });
     // 改 currentPlayerIndex 为 2(P3 为发起者)
     state.currentPlayerIndex = 2;
+    // 给两个目标各一张杀(使其走 normal 询问,顺序可通过 slot 顺序观察)
+    state.cardMap['sk0'] = { id: 'sk0', name: '杀', suit: '♠', color: '黑', rank: '3', type: '基本牌' };
+    state.cardMap['sk1'] = { id: 'sk1', name: '杀', suit: '♠', color: '黑', rank: '4', type: '基本牌' };
+    state.players[0].hand = ['sk0'];
+    state.players[1].hand = ['sk1'];
     // 让 P3 持有南蛮
     state.players[2].hand = ['nm1'];
     state.players[2].skills = ['南蛮入侵', '杀'];

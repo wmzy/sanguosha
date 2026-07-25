@@ -100,7 +100,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // 不出闪
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     // 受伤后:荀彧被询问是否发动节命
     P1.expectPending('请求回应');
@@ -156,7 +156,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });
@@ -209,7 +209,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });
@@ -262,7 +262,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: false });
@@ -305,7 +305,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });
@@ -352,12 +352,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // 不出闪 → 濒死
-
-    // 濒死求桃:P0 无桃可出,跳过
-    await P0.pass();
-    // P1 自己也无桃
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤濒死;求桃目标皆 0 手牌 → 也 skip → 节命/confirm(死亡时)
 
     // 击杀前:界节命触发
     P1.expectPending('请求回应');
@@ -411,7 +406,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });
@@ -465,7 +460,7 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });

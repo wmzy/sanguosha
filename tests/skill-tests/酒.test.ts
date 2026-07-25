@@ -255,22 +255,16 @@ describe('酒', () => {
     expect(harness.state.players[1].health).toBe(0);
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
 
-    // 模块 C:逆时针从当前回合 P1(idx0)起 → P1 先被问(打出杀后无手牌)→ pass
-    let slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+    // 模块 C:逆时针从当前回合 P1(idx0)起 → P1 无手牌被 skip,直接问 P2(濒死者,idx1)
+    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
       type?: string;
       requestType?: string;
       target?: number;
     };
     expect(slotAtom.requestType).toBe('桃/求桃');
-    expect(slotAtom.target).toBe(0);
-    await P1.pass();
+    expect(slotAtom.target).toBe(1);
 
-    // 第二问 P2(idx1,濒死者)→ 酒当桃自救
-    slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
-      type?: string;
-      requestType?: string;
-      target?: number;
-    };
+    // P2(濒死者)→ 酒当桃自救
     const dyingTarget = slotAtom.target!;
     await P2.respond('酒', { cardId: 'w1' });
     // 血量 +1(如果救回)

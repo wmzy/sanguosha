@@ -87,7 +87,9 @@ describe('青釭剑:杀无视防具', () => {
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: [],
+          // 适配 skip/silent/normal:P1 0 手牌会致 询问闪 skip(无 slot)。给一张闪走 normal,
+          // 保留 询问闪 pending → 超时 → 扣血 流程;P1 仍不出闪。
+          hand: ['d1'],
           equipment: { 防具: renwang.id },
           skills: ['闪', '仁王盾'],
         }),
@@ -96,6 +98,7 @@ describe('青釭剑:杀无视防具', () => {
         [qinggang.id]: qinggang,
         [renwang.id]: renwang,
         [blackSlash.id]: blackSlash,
+        d1: { id: 'd1', name: '闪', suit: '♦', color: '红', rank: '6', type: '基本牌' },
       },
       currentPlayerIndex: 0,
       phase: '出牌',

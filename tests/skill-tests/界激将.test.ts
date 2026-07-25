@@ -80,13 +80,14 @@ describe('界激将', () => {
   it('主动技:主公激将 → 蜀势力角色出杀 → killTarget 扣血', async () => {
     const restoreAutoCompare = disableAutoCompare();
     const slash = makeCard('k1', '杀', '♠', '7');
+    const jink = makeCard('j1', '闪', '♥', '2');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', skills: ['界激将'], faction: '蜀' }),
         makePlayer({ index: 1, name: 'P1', hand: ['k1'], skills: ['杀'], faction: '蜀' }),
-        makePlayer({ index: 2, name: 'P2', skills: ['闪'], faction: '群' }),
+        makePlayer({ index: 2, name: 'P2', hand: ['j1'], skills: ['闪'], faction: '群' }),
       ],
-      cardMap: { k1: slash },
+      cardMap: { k1: slash, j1: jink },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

@@ -98,9 +98,11 @@ describe('乱击', () => {
   it('transformThenUse:两张♥当万箭齐发 → 创建影子万箭齐发 → P2 不闪扣血', async () => {
     const c1 = makeCard('c1', '闪', '♥', '2');
     const c2 = makeCard('c2', '桃', '♥', '3');
+    const d1 = makeCard('d1', '闪', '♠', '5');
     const state = buildState({
       p1Hand: ['c1', 'c2'],
-      extraCards: { c1, c2 },
+      p2Hand: ['d1'],
+      extraCards: { c1, c2, d1 },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -143,9 +145,11 @@ describe('乱击', () => {
   it('transformThenUse:两张♠当万箭齐发 → P2 扣血', async () => {
     const c1 = makeCard('c1', '杀', '♠', '2');
     const c2 = makeCard('c2', '闪', '♠', '3');
+    const d1 = makeCard('d1', '闪', '♥', '5');
     const state = buildState({
       p1Hand: ['c1', 'c2'],
-      extraCards: { c1, c2 },
+      p2Hand: ['d1'],
+      extraCards: { c1, c2, d1 },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');

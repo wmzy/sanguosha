@@ -242,12 +242,13 @@ describe('界集智', () => {
   // ─── 6. 负面:使用基本牌(杀)不触发 ────────────────────────
   it('使用基本牌(杀)不触发界集智', async () => {
     const slash = makeCard('s1', '杀', '♠', '7', '基本牌');
+    const jink = makeCard('j1', '闪', '♥', '2', '基本牌');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['s1'], skills: ['界集智', '杀'] }),
-        makePlayer({ index: 1, name: 'P2', skills: [] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['j1'], skills: [] }),
       ],
-      cardMap: { s1: slash },
+      cardMap: { s1: slash, j1: jink },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

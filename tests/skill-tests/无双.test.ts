@@ -109,14 +109,6 @@ describe('无双', () => {
     P2.expectPending('询问闪');
     await P2.respond('闪', { cardId: 'd1' });
 
-    // DEBUG: 检查 P2.respond 后的状态
-    process.stdout.write('=== DEBUG 无双 ===\n');
-    process.stdout.write('pendingSlots: ' + JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, atomType: (v.atom as { type: string }).type, atomTarget: (v.atom as { target?: number }).target }))) + '\n');
-    process.stdout.write('atomStack: ' + JSON.stringify(harness.state.atomStack.map((a: any) => ({ type: a.type, pos: a.pos, status: (a as any).status }))) + '\n');
-    const wushuangKeys = Object.keys(harness.state.localVars).filter(k => k.startsWith('无双/') || k.startsWith('生效前/'));
-    process.stdout.write('localVars(无双/生效前): ' + JSON.stringify(Object.fromEntries(wushuangKeys.map(k => [k, harness.state.localVars[k]]))) + '\n');
-    process.stdout.write('=== END DEBUG ===\n');
-
     // 无双:第二轮询问闪
     P2.expectPending('询问闪');
     await P2.respond('闪', { cardId: 'd2' });
@@ -129,9 +121,10 @@ describe('无双', () => {
 
   it('吕布出杀 → 目标只有一张闪 → 第二轮 pass → 受伤', async () => {
     const d1 = makeCard('d1', '闪', '♥', '2');
+    const x1 = makeCard('x1', '杀', '♠', '9'); // 非闪:使第二轮询问闪走 silent 可 pass
     const state = buildSlashState({
-      p2Hand: ['d1'],
-      extraCards: { d1 },
+      p2Hand: ['d1', 'x1'],
+      extraCards: { d1, x1 },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -156,7 +149,8 @@ describe('无双', () => {
   });
 
   it('吕布出杀 → 目标无闪 → 直接受伤(无双不追加第二轮)', async () => {
-    const state = buildSlashState({ p2Hand: [] });
+    const x1 = makeCard('x1', '杀', '♠', '9'); // 非闪:使第一轮询问闪走 silent 可 pass
+    const state = buildSlashState({ p2Hand: ['x1'], extraCards: { x1 } });
     await harness.setup(state);
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -223,11 +217,11 @@ describe('无双', () => {
         makePlayer({
           index: 1,
           name: 'P2',
-          hand: ['p2s'],
+          hand: ['p2s', 'x1'],
           skills: ['杀', '无懈可击'],
         }),
       ],
-      cardMap: { jd1, p1s, p2s },
+      cardMap: { jd1, p1s, p2s, x1: makeCard('x1', '闪', '♥', '9') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -275,11 +269,11 @@ describe('无双', () => {
         makePlayer({
           index: 1,
           name: 'P2',
-          hand: ['p2s1', 'p2s2', 'p2s3'],
+          hand: ['p2s1', 'p2s2', 'p2s3', 'x1'],
           skills: ['杀', '无懈可击'],
         }),
       ],
-      cardMap: { jd1, p1s, p2s1, p2s2, p2s3 },
+      cardMap: { jd1, p1s, p2s1, p2s2, p2s3, x1: makeCard('x1', '闪', '♥', '9') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -334,7 +328,7 @@ describe('无双', () => {
           index: 0,
           name: 'P1',
           character: '吕布',
-          hand: ['lbs'],
+          hand: ['lbs', 'x1'],
           skills: ['杀', '决斗', '无双'],
         }),
         makePlayer({
@@ -344,7 +338,7 @@ describe('无双', () => {
           skills: ['杀', '决斗', '无懈可击'],
         }),
       ],
-      cardMap: { jd1, lbs, p2s1, p2s2 },
+      cardMap: { jd1, lbs, p2s1, p2s2, x1: makeCard('x1', '闪', '♥', '9') },
       currentPlayerIndex: 1, // P2 的回合
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

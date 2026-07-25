@@ -198,8 +198,7 @@ describe('反馈', () => {
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', slash.id, [1]);
-    // P1 不出闪 → 扣血 → 反馈 询问发动
-    await P1.pass();
+    // P1 手牌为 0 → 询问闪自动 skip → 扣血 → 反馈 询问发动
     P1.expectPending('请求回应');
     // 验证 dispatch 产生的 pending 结构(来源: fankui-steal 用例1)
     const slot = [...harness.state.pendingSlots.values()][0];
@@ -257,7 +256,7 @@ describe('反馈', () => {
     const p1HandBefore = harness.state.players[1].hand.length;
 
     await P0.useCardAndTarget('杀', slash.id, [1]);
-    await P1.pass();
+    // P1 手牌为 0 → 询问闪自动 skip → 扣血 → 反馈 confirm pending
 
     // 反馈 confirm pending 应有
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
@@ -305,7 +304,7 @@ describe('反馈', () => {
 
     // P0 杀 P1(P0 出杀后手牌为空,仅剩装备可被反馈拿取)
     await P0.useCardAndTarget('杀', slash.id, [1]);
-    await P1.pass(); // 不出闪
+    // P1 手牌为 0 → 询问闪自动 skip → 扣血 → 反馈触发
     // confirm 发动反馈
     await P1.respond('反馈', { choice: true });
     // 选牌面板:来源(P0)仅装备可选 → 选装备

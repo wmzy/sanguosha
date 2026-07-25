@@ -297,8 +297,7 @@ describe('界忘隙', () => {
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 不闪
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤 → 忘隙询问(无需 pass)
 
     // 询问是否发动忘隙
     P1.expectPending('请求回应');
@@ -365,8 +364,7 @@ describe('界忘隙', () => {
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 不闪
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤 → 忘隙询问(无需 pass)
 
     // 询问 P0 是否发动忘隙(情形 A:P0 是伤害来源,该角色=P1)
     P0.expectPending('请求回应');
@@ -424,7 +422,7 @@ describe('界忘隙', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤(无需 pass)
 
     // 询问忘隙 → 选择不发动
     P1.expectPending('请求回应');
@@ -541,8 +539,7 @@ describe('界忘隙', () => {
 
     // P0 出杀(酒加成,伤害=2)
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 不闪
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤(无需 pass)
     await harness.waitForStable();
     harness.processAllEvents();
 

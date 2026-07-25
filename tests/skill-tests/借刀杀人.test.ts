@@ -111,10 +111,12 @@ describe('借刀杀人', () => {
   // ────────────────────────────────────────────────────────────
   it('P1 对 P2(有武器)借刀杀人,killTarget=P3 → expectPending(请求回应)无懈 → pass → expectPending(请求回应)杀/forceKill → P2 pass → P1 获得武器', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
+    const p2shan = makeCard('p2s', '闪', '♥', '4', '基本牌');
     const state = buildState({
+      p2Hand: ['p2s'],
       p2Equipment: { 武器: 'wp1' },
       p2Skills: ['杀', '无懈可击'], // 加 无懈可击 让 P2 respondInfo 推导 cardFilter
-      extraCards: { wp1: weapon },
+      extraCards: { wp1: weapon, p2s: p2shan },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -199,11 +201,13 @@ describe('借刀杀人', () => {
   it('P2 出杀 → expectPending(询问闪)P3 → pass → P3 扣 1 血,P2 武器保留', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
     const s2 = makeCard('p2s', '杀', '♥', '5', '基本牌');
+    const p3kill = makeCard('p3k', '杀', '♠', '9', '基本牌');
     const state = buildState({
       p2Hand: ['p2s'],
       p2Equipment: { 武器: 'wp1' },
+      p3Hand: ['p3k'],
       p3Skills: ['闪'], // P3 有 闪 技能,respondInfo 能推导 cardFilter
-      extraCards: { wp1: weapon, p2s: s2 },
+      extraCards: { wp1: weapon, p2s: s2, p3k: p3kill },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');

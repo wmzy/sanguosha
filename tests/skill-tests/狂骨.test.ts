@@ -57,12 +57,13 @@ describe('狂骨', () => {
   // ─── 距离1 → 造成伤害后发动 → 选回复体力 ─────────────────────────────
   it('对距离1的P2造成伤害 → 发动狂骨选回复体力 → 魏延回复1点', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['狂骨', '杀'], health: 3 }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, sh1: p2shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -91,12 +92,13 @@ describe('狂骨', () => {
   // ─── 距离1 → 造成伤害后发动 → 选摸一张牌 ─────────────────────────────
   it('对距离1的P2造成伤害 → 发动狂骨选摸牌 → 魏延摸1张(体力不变)', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['狂骨', '杀'], health: 3 }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, sh1: p2shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -123,12 +125,13 @@ describe('狂骨', () => {
   // ─── 可选触发:不发动 → 无效果 ─────────────────────────────
   it('狂骨询问时选不发动 → 魏延不回复也不摸牌', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['狂骨', '杀'], health: 3 }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, sh1: p2shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -155,12 +158,13 @@ describe('狂骨', () => {
   // ─── 满血 → 仍可发动;选回复体力被上限截断(无溢出)──────────────────────
   it('魏延满血 → 发动选回复体力 → 体力不溢出(仍为4)', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['狂骨', '杀'], health: 4 }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, sh1: p2shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -185,12 +189,13 @@ describe('狂骨', () => {
   // ─── 满血 → 发动选摸牌 → 仍摸1张(官方无体力条件)──────────────────────
   it('魏延满血 → 发动选摸牌 → 摸1张', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['狂骨', '杀'], health: 4 }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, sh1: p2shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -213,6 +218,7 @@ describe('狂骨', () => {
   // ─── 距离>1 → 不触发(4人局,P0→P2 距离2)─────────────────────
   it('对距离2的P2造成伤害 → 狂骨不触发', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
         // P0=魏延,出杀范围设为3以能打到 P2(环形距离2)
@@ -225,10 +231,10 @@ describe('狂骨', () => {
           vars: { '距离/出杀范围': 3 },
         }),
         makePlayer({ index: 1, name: 'P1', skills: ['闪'], health: 4 }),
-        makePlayer({ index: 2, name: 'P2', skills: ['闪'], health: 4 }),
+        makePlayer({ index: 2, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
         makePlayer({ index: 3, name: 'P3', skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, sh1: p2shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -249,12 +255,13 @@ describe('狂骨', () => {
   // ─── 非魏延造成伤害 → 不触发 ─────────────────────────────
   it('他人(P2)造成伤害 → 魏延(P1)狂骨不触发', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const p0shan = makeCard('sh1', '闪', '♥', '2'); // P0 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', skills: ['闪'], health: 4 }),
+        makePlayer({ index: 0, name: 'P0', hand: ['sh1'], skills: ['闪'], health: 4 }),
         makePlayer({ index: 1, name: 'P1', hand: ['k1'], skills: ['狂骨', '杀'], health: 3 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, sh1: p0shan },
       currentPlayerIndex: 1,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

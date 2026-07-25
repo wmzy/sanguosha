@@ -238,6 +238,13 @@ export const handCardRespondable = css`
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
   background: rgba(255, 215, 0, 0.08);
 `;
+// useCard 类回应:已选中牌(待点「打出」出牌)绿色加粗高亮,区别于金色「可回应」
+export const handCardRespondSelected = css`
+  border: 3px solid #2ecc71;
+  box-shadow: 0 0 14px rgba(46, 204, 113, 0.6);
+  background: rgba(46, 204, 113, 0.22);
+  margin-bottom: 8px;
+`;
 // 转化模式:匹配卡牌用金色高亮表示可作为“转化后的牌”点选
 export const handCardTransform = css`
   border: 2px solid #f1c40f;

@@ -63,9 +63,9 @@ describe('奸雄', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['奸雄', '闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P1', hand: ['s1'], skills: ['奸雄', '闪'], health: 4 }),
       ],
-      cardMap: { k1: slash },
+      cardMap: { k1: slash, s1: makeCard('s1', '闪', '♥', '2') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -95,9 +95,9 @@ describe('奸雄', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['奸雄', '闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P1', hand: ['s1'], skills: ['奸雄', '闪'], health: 4 }),
       ],
-      cardMap: { k1: slash },
+      cardMap: { k1: slash, s1: makeCard('s1', '闪', '♥', '2') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

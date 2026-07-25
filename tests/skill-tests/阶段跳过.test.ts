@@ -163,11 +163,7 @@ describe('阶段跳过 skipPhase 集成', () => {
     await P1.respond('神速', { target: 1 });
     await harness.waitForStable();
     harness.processAllEvents();
-    // 虚拟杀:P2 被询问闪 → 不闪
-    P2.expectPending('询问闪');
-    await P2.pass();
-    await harness.waitForStable();
-    harness.processAllEvents();
+    // 虚拟杀:P2 无手牌 → 询问闪 skip(无 slot),直接扣血
 
     // 神速①虚拟杀:P2 受 1 点伤害
     expect(harness.state.players[1].health).toBe(3);
@@ -183,7 +179,7 @@ describe('阶段跳过 skipPhase 集成', () => {
     const restoreCompare = disableAutoCompare();
     try {
       await P1.useCardAndTarget('杀', 's1', [1]);
-      await P2.pass();
+      // P2 无手牌:询问闪 skip,直接扣血(useCardAndTarget 已推进到稳定)
     } finally {
       restoreCompare();
     }

@@ -106,9 +106,8 @@ describe('激将', () => {
     // P1 出杀
     await P1.respond('杀', { cardId: 'k1' });
 
-    // P2 被询问闪
-    P2.expectPending('询问闪');
-    await P2.pass(); // 不出闪
+    // P2 手牌为 0 → 询问闪 skip(无 slot、无延时),直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     // P2 扣1血
     expect(harness.state.players[2].health).toBe(3);
@@ -217,9 +216,8 @@ describe('激将', () => {
     await harness.waitForStable();
 
     // 决斗结算:P0 出了杀(经激将),轮到 P2 出杀
-    // P2 被询问杀
-    P2.expectPending('询问杀');
-    await P2.pass(); // P2 无杀,放弃
+    // P2 手牌已空 → 询问杀 skip(无 slot、无延时),P2 输决斗直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
     await harness.waitForStable();
 
     // 决斗结算:P2 输,扣 1 血;P0(主公)未受伤

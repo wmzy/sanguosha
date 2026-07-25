@@ -9,6 +9,21 @@ import { getPendingRequestType } from '../client/utils/pendingRespond';
 
 const MAX_LOG = 20;
 
+/** 从 GameView.pending 读取 choosePlayer 候选,映射成可读 {index,name} 列表。
+ *  仅当 prompt.type==='choosePlayer' 且 prompt.candidates(number[]) 存在时返回。
+ *  engine 投影层已确保 candidates 注入(跑 filter 或技能显式提供),故此处只做读取+映射。 */
+function readPlayerCandidates(
+  view: GameView,
+): Array<{ index: number; name: string }> | undefined {
+  const prompt = view.pending?.prompt as
+    | { type?: string; candidates?: number[] }
+    | undefined;
+  if (!prompt || prompt.type !== 'choosePlayer') return undefined;
+  const ids = prompt.candidates;
+  if (!Array.isArray(ids)) return undefined;
+  return ids.map((i) => ({ index: i, name: view.players[i]?.name ?? `P${i}` }));
+}
+
 /** 完整视图投影。getSnapshot 工具调用。 */
 export function projectView(view: GameView): AiViewSnapshot {
   return {
@@ -27,6 +42,9 @@ export function projectView(view: GameView): AiViewSnapshot {
       hand: p.hand,
       equipment: p.equipment,
       skills: p.skills,
+      // marks(横置/连环等):AI 据此判断铁索连环应横置还是重置。
+      // 只投影 id+scope(丢弃 payload,降低 token)。
+      marks: (p.marks ?? []).map((m) => ({ id: m.id, scope: m.scope })),
       identity: p.identity,
     })),
     pending: view.pending
@@ -46,6 +64,12 @@ export function projectView(view: GameView): AiViewSnapshot {
               ? (view.pending.atom as { candidates: Array<{ name: string; skills: string[] }> })
                   .candidates
               : undefined,
+          // choosePlayer 类(界放权/突袭/激将/奋威 等):投影合法目标 index+name 列表。
+          // 引擎投影层(请求回应.toViewEvents/buildView)已跑 filter 把结果注入
+          // prompt.candidates(number[],含自己),filter 本身无法跨进程序列化。
+          // bug 回归:此前此处只透传 选将询问 的 candidates,choosePlayer 候选丢失 →
+          // AI 经 MCP 看不到可选目标(界放权不能选自己)。与 marks 丢失 bug 同类。
+          playerCandidates: readPlayerCandidates(view),
         }
       : null,
     zones: view.zones
@@ -71,6 +95,8 @@ export interface PlayerStateDiff {
   skills?: string[];
   faction?: string;
   identity?: string;
+  /** 标记(横置/连环等)变化。 */
+  marks?: Array<{ id: string; scope: number }>;
 }
 
 /** 状态增量：只含变化的玩家和区域。 */
@@ -101,6 +127,7 @@ function diffPlayer(
   if (!jsonEq(prev.hand, curr.hand)) { d.hand = curr.hand; changed = true; }
   if (!jsonEq(prev.equipment, curr.equipment)) { d.equipment = curr.equipment; changed = true; }
   if (!jsonEq(prev.skills, curr.skills)) { d.skills = curr.skills; changed = true; }
+  if (!jsonEq(prev.marks, curr.marks)) { d.marks = curr.marks; changed = true; }
   if (prev.faction !== curr.faction) { d.faction = curr.faction; changed = true; }
   if (prev.identity !== curr.identity) { d.identity = curr.identity; changed = true; }
   return changed ? d : null;

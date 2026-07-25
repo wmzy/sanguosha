@@ -270,8 +270,7 @@ describe('界称象', () => {
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 不出闪
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     // 询问是否发动称象
     P1.expectPending('请求回应');
@@ -336,7 +335,7 @@ describe('界称象', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     // 询问是否发动称象 → 选择不发动
     P1.expectPending('请求回应');
@@ -380,7 +379,7 @@ describe('界称象', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     await P1.respond('界称象', { choice: true });
 
@@ -427,7 +426,7 @@ describe('界称象', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     // 询问是否发动 → 确认
     P1.expectPending('请求回应');
@@ -505,7 +504,7 @@ describe('界称象', () => {
 
     // P0 出杀(伤害+1=2点)
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // P1 不闪
+    // P1 0 手牌 → 询问闪 skip → 直接受伤
 
     // 期望 P1 受 2 点伤害 → health=2,称象触发两次
     expect(harness.state.players[1].health).toBe(2);

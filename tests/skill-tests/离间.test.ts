@@ -105,11 +105,13 @@ describe('离间', () => {
   // ─── 1. 正面:P3(B/目标)不出杀 → P3 扣 1 血 ─────────────
   it('P1 离间 [P2→P3] → 无无懈窗口 → P3 不出杀 → P3 扣 1 血,P1 弃牌', async () => {
     const discard = makeCard('d1', '闪', '♥', '2', '基本牌');
+    const p3d = makeCard('p3d', '闪', '♣', '4');
     const state = buildState({
       p1Hand: ['d1'],
       p2Hand: [],
-      p3Hand: [],
-      extraCards: { d1: discard },
+      // P3 带一张非杀牌:询问杀走 silent(slot 保留、pass 可推进)
+      p3Hand: ['p3d'],
+      extraCards: { d1: discard, p3d },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -141,11 +143,13 @@ describe('离间', () => {
     const discard = makeCard('d1', '闪', '♥', '2');
     const s2 = makeCard('s2', '杀', '♠', '5');
     const s3 = makeCard('s3', '杀', '♥', '7');
+    const p3d = makeCard('p3d', '闪', '♣', '4');
     const state = buildState({
       p1Hand: ['d1'],
       p2Hand: ['s2'],
-      p3Hand: ['s3'],
-      extraCards: { d1: discard, s2, s3 },
+      // P3 另带一张非杀牌:出杀后再被询问时走 silent(slot 保留、pass 可推进)
+      p3Hand: ['s3', 'p3d'],
+      extraCards: { d1: discard, s2, s3, p3d },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -182,11 +186,13 @@ describe('离间', () => {
   // ─── 3. A 出杀后 B 直接不出 → B 扣血(A 赢) ────────────────
   it('P3 不出杀 → P3 扣血,P2 不受伤(无需 A 出杀即可定胜负)', async () => {
     const discard = makeCard('d1', '闪', '♥', '2');
+    const p3d = makeCard('p3d', '闪', '♣', '4');
     const state = buildState({
       p1Hand: ['d1'],
       p2Hand: [],
-      p3Hand: [],
-      extraCards: { d1: discard },
+      // P3 带一张非杀牌:询问杀走 silent(slot 保留、pass 可推进)
+      p3Hand: ['p3d'],
+      extraCards: { d1: discard, p3d },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -332,11 +338,13 @@ describe('离间', () => {
   it('P2 持无懈可击 → 离间决斗仍直接结算(不可被无懈抵消)', async () => {
     const discard = makeCard('d1', '闪', '♥', '2', '基本牌');
     const wx = makeCard('wx1', '无懈可击', '♣', 'J', '锦囊牌');
+    const p3d = makeCard('p3d', '闪', '♦', '4');
     const state = buildState({
       p1Hand: ['d1'],
       p2Hand: ['wx1'],
-      p3Hand: [],
-      extraCards: { d1: discard, wx1: wx },
+      // P3 带一张非杀牌:询问杀走 silent(slot 保留、pass 可推进)
+      p3Hand: ['p3d'],
+      extraCards: { d1: discard, wx1: wx, p3d },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');

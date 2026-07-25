@@ -59,13 +59,14 @@ describe('激昂', () => {
 
   it('孙策使用红色杀 → 发动激昂 → 摸1张', async () => {
     const redKill = mkCard('rk', '杀', '♥', '7');
+    const p2shan = mkCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
           mkPlayer({ index: 0, name: '孙策', skills: ['杀', '激昂'], hand: ['rk'] }),
-          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: [] }),
+          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: ['sh1'] }),
         ],
-        cardMap: { rk: redKill },
+        cardMap: { rk: redKill, sh1: p2shan },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -128,13 +129,14 @@ describe('激昂', () => {
 
   it('孙策使用决斗 → 发动激昂 → 摸1张', async () => {
     const duel = mkCard('jd', '决斗', '♠', 'A', '锦囊牌');
+    const p2kill = mkCard('p2k', '杀', '♠', '4'); // P2 含杀:走 normal 询问杀
     await harness.setup(
       createGameState({
         players: [
           mkPlayer({ index: 0, name: '孙策', skills: ['决斗', '激昂'], hand: ['jd'] }),
-          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: [] }),
+          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: ['p2k'] }),
         ],
-        cardMap: { jd: duel },
+        cardMap: { jd: duel, p2k: p2kill },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -164,13 +166,14 @@ describe('激昂', () => {
 
   it('黑色杀不触发激昂(无询问)', async () => {
     const blackKill = mkCard('bk', '杀', '♠', '3');
+    const p2shan = mkCard('sh2', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
           mkPlayer({ index: 0, name: '孙策', skills: ['杀', '激昂'], hand: ['bk'] }),
-          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: [] }),
+          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: ['sh2'] }),
         ],
-        cardMap: { bk: blackKill },
+        cardMap: { bk: blackKill, sh2: p2shan },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -190,13 +193,14 @@ describe('激昂', () => {
 
   it('不发动激昂则不摸牌', async () => {
     const redKill = mkCard('rk', '杀', '♥', '7');
+    const p2shan = mkCard('sh3', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
           mkPlayer({ index: 0, name: '孙策', skills: ['杀', '激昂'], hand: ['rk'] }),
-          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: [] }),
+          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: ['sh3'] }),
         ],
-        cardMap: { rk: redKill },
+        cardMap: { rk: redKill, sh3: p2shan },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

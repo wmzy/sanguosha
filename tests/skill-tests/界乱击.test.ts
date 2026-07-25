@@ -122,9 +122,13 @@ describe('界乱击', () => {
   it('transformThenUse:两张♥当万箭齐发 → 不排除 → P2/P3 都扣血', async () => {
     const c1 = makeCard('c1', '闪', '♥', '2');
     const c2 = makeCard('c2', '桃', '♥', '3');
+    const p2shan = makeCard('sh2', '闪', '♠', '5'); // P2 含闪:走 normal 询问闪
+    const p3shan = makeCard('sh3', '闪', '♠', '6'); // P3 含闪:走 normal 询问闪
     const state = buildState({
       p1Hand: ['c1', 'c2'],
-      extraCards: { c1, c2 },
+      p2Hand: ['sh2'],
+      p3Hand: ['sh3'],
+      extraCards: { c1, c2, sh2: p2shan, sh3: p3shan },
     });
     await harness.setup(state);
     const P1 = harness.player('界袁绍');
@@ -177,9 +181,11 @@ describe('界乱击', () => {
   it('少选目标:排除 P2 → 仅 P3 扣血,P2 不扣', async () => {
     const c1 = makeCard('c1', '闪', '♥', '2');
     const c2 = makeCard('c2', '桃', '♥', '3');
+    const p3shan = makeCard('sh3', '闪', '♠', '6'); // P3 含闪:走 normal 询问闪
     const state = buildState({
       p1Hand: ['c1', 'c2'],
-      extraCards: { c1, c2 },
+      p3Hand: ['sh3'],
+      extraCards: { c1, c2, sh3: p3shan },
     });
     await harness.setup(state);
     const P1 = harness.player('界袁绍');

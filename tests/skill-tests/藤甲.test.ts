@@ -74,17 +74,20 @@ describe('藤甲', () => {
 
   it('正面:普通杀(1 点)→ 减为 0,不受伤害', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const dodge = makeCard('d1', '闪', '♥', '2');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
+        // P2 带一张闪:询问闪走 normal(P2 选择不出闪),藤甲将普通杀减为 0
         makePlayer({
           index: 1,
           name: 'P2',
+          hand: ['d1'],
           skills: ['闪', '藤甲'],
           equipment: { 防具: 'tj' },
         }),
       ],
-      cardMap: { tj: TENGJIA, k1: kill },
+      cardMap: { tj: TENGJIA, k1: kill, d1: dodge },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

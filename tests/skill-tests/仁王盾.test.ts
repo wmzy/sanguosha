@@ -100,17 +100,19 @@ describe('仁王盾', () => {
 
   it('负面:红杀(红桃)→ 不被仁王盾挡,不出闪则扣血', async () => {
     const redKill = makeCard('k2', '杀', '♥', '8'); // 红桃=红色
+    const shan = makeCard('s1', '闪', '♦', '5');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k2'], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P2',
+          hand: ['s1'],
           skills: ['闪', '仁王盾'],
           equipment: { 防具: 'rw' },
         }),
       ],
-      cardMap: { rw: RENWANG, k2: redKill },
+      cardMap: { rw: RENWANG, k2: redKill, s1: shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -131,12 +133,13 @@ describe('仁王盾', () => {
 
   it('负面:无仁王盾 → 黑杀正常询问闪,不出闪则扣血', async () => {
     const blackKill = makeCard('k1', '杀', '♣', '7'); // 梅花=黑色
+    const shan = makeCard('s1', '闪', '♦', '5');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪'] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['闪'] }),
       ],
-      cardMap: { k1: blackKill },
+      cardMap: { k1: blackKill, s1: shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

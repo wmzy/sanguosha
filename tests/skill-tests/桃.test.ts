@@ -262,7 +262,7 @@ describe('桃', () => {
         makePlayer({
           index: 0,
           name: 'P1',
-          hand: ['c1'],
+          hand: ['c1', 'x1'],
           skills: ['杀', '桃', '闪', '酒'],
           health: 4,
           maxHealth: 4,
@@ -276,7 +276,7 @@ describe('桃', () => {
           maxHealth: 4,
         }),
       ],
-      cardMap: { c1: slash, p1: peach },
+      cardMap: { c1: slash, p1: peach, x1: makeCard('x1', '闪', '♥', '2') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

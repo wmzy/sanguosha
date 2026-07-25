@@ -271,38 +271,9 @@ describe('界谦逊', () => {
     // P1 对陆逊出决斗
     await P1.triggerAction('决斗', 'use', { cardId: 'dd', targets: [0] });
 
-    // ── DEBUG: 打印当前状态 ──
-    console.log('=== pendingSlots ===');
-    for (const [key, slot] of harness.state.pendingSlots) {
-      console.log(`  key=${key}, type=${(slot.atom as any).type}, target=${(slot.atom as any).target}, requestType=${(slot.atom as any).requestType}`);
-    }
-    console.log('=== atomStack ===');
-    for (const a of harness.state.atomStack) {
-      console.log(`  type=${(a as any).type}, target=${(a as any).target}, requestType=${(a as any).requestType}`);
-    }
-    const tf = topFrame(harness.state);
-    if (tf) {
-      console.log('=== topFrame ===');
-      console.log(`  skillId=${tf.skillId}, params=${JSON.stringify(tf.params)}`);
-    } else {
-      console.log('=== topFrame === undefined');
-    }
-    // ── END DEBUG ──
-
     // 无懈窗口(broadcast)
-    console.log('=== BEFORE expectPending ===');
-    for (const [key, slot] of harness.state.pendingSlots) {
-      console.log(`  key=${key}, type=${(slot.atom as any).type}, target=${(slot.atom as any).target}, requestType=${(slot.atom as any).requestType}`);
-    }
-    console.log('=== atomStack BEFORE expectPending ===');
-    for (const a of harness.state.atomStack) {
-      console.log(`  type=${(a as any).type}, target=${(a as any).target}, requestType=${(a as any).requestType}`);
-    }
-    console.log('=== About to call expectPending ===');
-    process.stdout.write('FLUSH_MARKER\n');
     P1.expectPending('请求回应');
-    console.log('=== After expectPending ===');
-    await P1.pass(); // 无人打出无懈 → 我的 hook 触发 → 谦逊 prompt
+    await P1.pass(); // 无人打出无懈 → 谦逊 hook 触发 → 谦逊 prompt
 
     // 谦逊 prompt(经 请求回应 无懈窗口路径触发)
     P0.expectPending('请求回应');
@@ -313,9 +284,7 @@ describe('界谦逊', () => {
     expect(harness.state.players[0].hand).toEqual([]);
     expect(harness.state.players[0].vars['界谦逊/移出']).toEqual(['c2']);
 
-    // 决斗循环:陆逊(目标,先手)被询问出杀 → 无手牌 → pass → 输 → 扣 1 血
-    P0.expectPending('询问杀');
-    await P0.pass();
+    // 决斗循环:陆逊(目标,先手)被询问出杀 → 0 手牌 → 询问杀 skip → 输 → 扣 1 血
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(p0HealthBefore - 1);
@@ -381,6 +350,9 @@ describe('界谦逊', () => {
 
     // 第一个无懈窗口(对陆逊)→ pass
     P1.expectPending('请求回应');
+    await P1.pass();
+    await harness.waitForStable();
+    // P1/P2 0手牌→无无懈 skip;P0 有手牌无无懈→silent slot,需额外 pass
     await P1.pass();
     await harness.waitForStable();
 

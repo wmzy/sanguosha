@@ -185,6 +185,7 @@ describe('界鞬出', () => {
     const k3 = makeCard('k3', '杀', '♠', '9');
     const t1 = makeCard('t1', '无中生有', '♥', '7', '锦囊牌');
     const t2 = makeCard('t2', '无中生有', '♥', '8', '锦囊牌');
+    const d1 = makeCard('d1', '闪', '♥', '2');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -193,9 +194,9 @@ describe('界鞬出', () => {
           hand: ['k1', 'k2', 'k3'],
           skills: ['杀', '界鞬出'],
         }),
-        makePlayer({ index: 1, name: 'P2', hand: ['t1', 't2'], skills: [] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['t1', 't2', 'd1'], skills: ['闪'] }),
       ],
-      cardMap: { k1, k2, k3, t1, t2 },
+      cardMap: { k1, k2, k3, t1, t2, d1 },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -227,6 +228,8 @@ describe('界鞬出', () => {
     await P2.pass();
     // 第三次杀命中(累计扣 3 血)
     expect(harness.state.players[1].health).toBe(1);
+    // 第三杀后 P2 仅剩未出的闪
+    expect(harness.state.players[1].hand).toEqual(['d1']);
   });
 
   // ─── 不发动鞬出 → 正常询问闪 ─────────────────────────────
@@ -277,9 +280,8 @@ describe('界鞬出', () => {
     const P2 = harness.player('P2');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // 目标无牌 → 鞬出不询问,直接进入询问闪
-    P2.expectPending('询问闪');
-    await P2.pass();
+    // 目标无牌 → 鞬出不询问;P2 手牌为空 → 走 skip 模式,无 pending slot,直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.turn.vars['界鞬出/quotaBonus']).toBeUndefined();

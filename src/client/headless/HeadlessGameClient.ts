@@ -413,6 +413,9 @@ export class HeadlessGameClient {
       // 保守策略：不代管其他座次的 pending，由该座次自身的 AI 实例响应。
       return false;
     }
+    // 卡牌回应 silent 模式(target 有手牌但无匹配牌):不被询问,不生成 skip/respond action,
+    // 让短延时 slot 自然超时(避免 AI 提前 skip 绕过延时)。
+    if (p.responseMode === 'silent') return false;
     // 阻塞型 pending：必须回应
     if (p.isBlocking !== false) return true;
     // 非阻塞型 pending：出牌阶段的出牌窗口需要 AI 行动（可出牌或结束回合）
@@ -443,6 +446,10 @@ export class HeadlessGameClient {
   ) {
     const ownerId = actionSeat ?? this._seatIndex;
     const pending = view.pending!;
+    // 卡牌回应 silent 模式(target 有手牌但无匹配牌):target 不被询问。
+    // 不为该 pending 生成任何 skip/respond action,让短延时 slot 自然超时
+    // (否则 AI 会提前 skip 绕过延时,暴露"无匹配牌"信息)。广播型(target<0)永不为 silent。
+    if (pending.responseMode === 'silent' && pending.target === ownerId) return;
     const atom = pending.atom as {
       type: string;
       candidates?: Array<{ name: string; skills: string[] }>;

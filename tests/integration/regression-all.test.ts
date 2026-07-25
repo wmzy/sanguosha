@@ -88,7 +88,9 @@ describe('用户报告问题回归', () => {
 
   // 1. 杀的结算:处理区卡杀,没询问闪
   it('杀→询问闪→不出闪→扣血→处理区清空', async () => {
-    await h.setup(build2p({ p1Skills: ['闪'] }));
+    // 适配 skip/silent/normal:P1 0 手牌会致 询问闪 skip(无 pending)。给一张闪走 normal。
+    const d1: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
+    await h.setup(build2p({ p1Hand: ['d1'], p1Skills: ['闪'], extraCards: { d1 } }));
     const P0 = h.player('P0');
     const P1 = h.player('P1');
     await P0.useCardAndTarget('杀', 's0', [1]);
@@ -205,12 +207,16 @@ describe('用户报告问题回归', () => {
       rank: '7',
       type: '基本牌',
     };
+    // 适配 skip/silent/normal:P1 0 手牌会致 询问闪 skip→P1.pass() 误超时 反馈 confirm。
+    // 给一张闪走 normal,保留 询问闪→pass→反馈 流程。
+    const d1: Card = { id: 'd1', name: '闪', suit: '♦', color: '红', rank: '2', type: '基本牌' };
     await h.setup(
       build2p({
         p0Hand: ['s0', 'ex1'],
+        p1Hand: ['d1'],
         p0Skills: ['杀'],
         p1Skills: ['反馈', '闪'],
-        extraCards: { ex1: extra },
+        extraCards: { ex1: extra, d1 },
       }),
     );
     const P0 = h.player('P0');
@@ -272,6 +278,9 @@ describe('用户报告问题回归', () => {
       rank: '5',
       type: '基本牌',
     };
+    // 适配 skip/silent/normal:P2(被杀目标)0 手牌会致 询问闪 skip(无 pending),
+    // 无法验证“P2 被询问闪”。给一张闪走 normal 保留该断言。
+    const dodge2: Card = { id: 'd2', name: '闪', suit: '♦', color: '红', rank: '6', type: '基本牌' };
     const state3 = createGameState({
       players: [
         {
@@ -313,7 +322,7 @@ describe('用户报告问题回归', () => {
           health: 4,
           maxHealth: 4,
           alive: true,
-          hand: [],
+          hand: ['d2'],
           equipment: {},
           skills: ['闪'],
           vars: {},
@@ -323,7 +332,7 @@ describe('用户报告问题回归', () => {
           judgeZone: [],
         },
       ],
-      cardMap: { jdsr, wp1: weapon, s2: slash2 },
+      cardMap: { jdsr, wp1: weapon, s2: slash2, d2: dodge2 },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

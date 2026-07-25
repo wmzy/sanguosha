@@ -11,6 +11,8 @@ export interface HandCardProps {
   totalHand: number;
   isSelected: boolean;
   isDiscardSelected: boolean;
+  /** useCard 类回应:该牌已被选中(待点「打出」出牌) */
+  isRespondSelected: boolean;
   canPlay: boolean;
   isAwaiting: boolean;
   canDiscardClick: boolean;
@@ -37,6 +39,7 @@ export function HandCardImpl(props: HandCardProps) {
     totalHand,
     isSelected,
     isDiscardSelected,
+    isRespondSelected,
     canPlay,
     isAwaiting,
     canDiscardClick,
@@ -76,6 +79,7 @@ export function HandCardImpl(props: HandCardProps) {
           styles.handCardDisabled,
         isAwaiting && styles.handCardRespondable,
         isDiscardSelected && styles.discardCardSelected,
+        isRespondSelected && styles.handCardRespondSelected,
         isTransformMatch && styles.handCardTransform,
         isTransformDisabled && styles.handCardTransformDisabled,
         isDistributeCandidate && styles.handCardDistributeCandidate,
@@ -123,6 +127,7 @@ function handCardPropsEqual(prev: HandCardProps, next: HandCardProps): boolean {
     prev.totalHand === next.totalHand &&
     prev.isSelected === next.isSelected &&
     prev.isDiscardSelected === next.isDiscardSelected &&
+    prev.isRespondSelected === next.isRespondSelected &&
     prev.canPlay === next.canPlay &&
     prev.isAwaiting === next.isAwaiting &&
     prev.canDiscardClick === next.canDiscardClick &&

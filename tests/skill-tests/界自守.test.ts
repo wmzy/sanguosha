@@ -221,6 +221,7 @@ describe('界自守', () => {
       makeCard('h4', '酒', '♣', '5'),
       makeCard('h5', '杀', '♠', '7'),
     ];
+    const p1Jink = makeCard('pj1', '闪', '♥', '8');
     const deck = [
       makeCard('d1', '杀', '♠', '8'),
       makeCard('d2', '闪', '♥', '9'),
@@ -228,7 +229,7 @@ describe('界自守', () => {
       makeCard('d4', '酒', '♣', 'J'),
     ];
     const cardMap: Record<string, Card> = {};
-    for (const c of [...hand, ...deck]) cardMap[c.id] = c;
+    for (const c of [...hand, ...deck, p1Jink]) cardMap[c.id] = c;
 
     await harness.setup(
       createGameState({
@@ -246,6 +247,7 @@ describe('界自守', () => {
             index: 1,
             name: 'P1',
             faction: '魏',
+            hand: ['pj1'],
             skills: ['回合管理', '闪'],
             health: 3,
             maxHealth: 3,

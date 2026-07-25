@@ -174,7 +174,7 @@ describe('界趫猛', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm
     await P0.respond('界趫猛', { choice: true });
 
     // 选牌面板:选装备(武器)
@@ -219,7 +219,7 @@ describe('界趫猛', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm
     await P0.respond('界趫猛', { choice: true });
 
     // 选牌面板:选坐骑(进攻马)
@@ -261,7 +261,7 @@ describe('界趫猛', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm
     await P0.respond('界趫猛', { choice: true });
     await P0.respond('界趫猛', { zone: 'equipment', cardId: 'm2' });
 
@@ -452,7 +452,7 @@ describe('界趫猛', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm
     await P0.respond('界趫猛', { choice: true });
 
     // 选牌面板:选判定区

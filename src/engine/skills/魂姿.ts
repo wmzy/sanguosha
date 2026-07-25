@@ -20,6 +20,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAfterHook } from '../skill';
+import { performYinghunPrepare } from './英魂';
 
 const AWAKENED_KEY = '魂姿/awakened';
 
@@ -63,6 +64,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 3. 永久获得"英魂"
     await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: '英魂' });
+
+    // 4. 觉醒当回合:英魂需在同一个准备阶段立即发动。
+    //    英魂 before-hook 在本准备阶段 applyAtom 入口即被快照收集(此时英魂尚未添加,
+    //    不在快照),错过时机,故在此显式调用英魂主逻辑。performYinghunPrepare 内有
+    //    currentPlayer/health 门控,觉醒后孙策 health=1 < 新 maxHealth,条件满足会正常询问发动。
+    await performYinghunPrepare(ctx.state, ownerId);
   });
 
   return () => {};

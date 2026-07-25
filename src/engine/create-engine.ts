@@ -709,15 +709,34 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
       slotAtoms = [current];
     }
 
-    const slotPromises: Promise<void>[] = [];
-    for (let i = 0; i < slotAtoms.length; i++) {
-      const slotAtom = slotAtoms[i];
-      const slotTarget = targets[i];
-      // 每个 slot 用自己 atom type 对应的 def(并行回应→请求回应,并行选将→选将询问)
-      const slotDef = slotAtom.type !== current.type ? getAtomDef(slotAtom.type) : def;
-      slotPromises.push(createAndAwaitSlot(state, slotAtom, slotDef, slotTarget));
+    // 卡牌回应型 atom 的响应可用性预检(skip/silent/normal)。
+    //   skip   —— target 手牌为 0:不创建任何 slot、无延时,Promise.all([]) 立即继续。
+    //             父流程(如杀的结算)看到处理区无响应牌 → 正常结算。
+    //   silent —— target 有手牌但无匹配牌:创建短延时 slot(silentDelayMs,不走 timeoutScale),
+    //             target 不被询问(toViewEvents/applyView 给 target 观察型 pending)。
+    //   null   —— 正常询问。
+    // 预检在 apply→emit event→after hooks 之后、创建 slot 之前,与 toViewEvents 看到同一份 state。
+    const pre = def.pending.preResolve?.(state, current) ?? null;
+    const isSkip = pre === 'skip';
+    const silentDelayMs =
+      !isSkip && pre && typeof pre === 'object' ? pre.delayMs : undefined;
+
+    if (isSkip) {
+      // 不创建 slot:仍需广播已 emit 的 event(skip 模式 applyView 不设置 pending)。
+      notifyStateChange(state);
+    } else {
+      const slotPromises: Promise<void>[] = [];
+      for (let i = 0; i < slotAtoms.length; i++) {
+        const slotAtom = slotAtoms[i];
+        const slotTarget = targets[i];
+        // 每个 slot 用自己 atom type 对应的 def(并行回应→请求回应,并行选将→选将询问)
+        const slotDef = slotAtom.type !== current.type ? getAtomDef(slotAtom.type) : def;
+        slotPromises.push(
+          createAndAwaitSlot(state, slotAtom, slotDef, slotTarget, silentDelayMs),
+        );
+      }
+      await Promise.all(slotPromises);
     }
-    await Promise.all(slotPromises);
 
     // 等待型 atom:技能 after hooks 和 def.afterHooks 都在 pending resolve 之后跑
     // ——这样贯石斧/青龙偃月刀等技能能在看到 P2 出完闪/不出后再做决策。
@@ -759,12 +778,15 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   return true;
 }
 
-/** 为单个 target 创建 PendingSlot 并 await 到它 resolve。 */
+/** 为单个 target 创建 PendingSlot 并 await 到它 resolve。
+ *  silentDelayMs:卡牌回应 silent 模式下的固定短延时(不走 timeoutScale 缩放)。
+ *  undefined = 正常(走 resolveTimeoutMs)。 */
 function createAndAwaitSlot(
   state: GameState,
   atom: Atom,
   def: AtomDefinition,
   target: number,
+  silentDelayMs?: number,
 ): Promise<void> {
   return new Promise<void>((resolve) => {
     const pending = def.pending!;
@@ -772,8 +794,10 @@ function createAndAwaitSlot(
     const timeoutSec = typeof atomTimeout === 'number' ? atomTimeout : pending.timeout;
     // 应用房间配置的 timeoutScale(Infinity=无限)。
     // 广播型 pending(target<0,如无懈可击)在 Infinity 时仍使用 base timeout,避免死锁。
+    // silent 模式直接用 silentDelayMs(固定短延时,不走缩放),与其他人看到的短暂停顿一致。
     const isBroadcast = target < 0;
-    const timeoutMs = resolveTimeoutMs(state, timeoutSec, isBroadcast);
+    const timeoutMs =
+      silentDelayMs ?? resolveTimeoutMs(state, timeoutSec, isBroadcast);
     let resolveCalled = false;
     let timedOut = false;
     let paused = false;
@@ -788,6 +812,7 @@ function createAndAwaitSlot(
       definition: def,
       startTime: Date.now() - state.startedAt,
       deadline: Date.now() - state.startedAt + timeoutMs,
+      resolvedTimeoutMs: timeoutMs,
       createdSeq: state.seq,
       isBlocking: pending.isBlocking !== false,
       resolve: safeResolve,

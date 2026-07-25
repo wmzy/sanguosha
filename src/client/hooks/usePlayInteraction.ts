@@ -115,6 +115,8 @@ export interface PlayInteractionResult {
   playRules: import('../utils/gameViewHelpers').PlayRules | null;
   selectedActive: boolean;
   playButtonState: { canPlay: boolean; targetLabel: string } | null;
+  /** useCard 类回应选中的牌 id(点牌选中,再点「打出」出牌);非回应窗口为 null */
+  selectedRespondCardId: string | null;
   /** 选中牌的可用替代动作(如铁索连环·重铸),均已 active */
   altActions: SkillActionDef[];
   // ─── handlers ───
@@ -124,6 +126,8 @@ export interface PlayInteractionResult {
   handleSkillAction: (action: SkillActionDef) => void;
   handleTransformPlay: (targetName: string) => void;
   handleRespond: (cardId?: string) => void;
+  /** useCard 类回应「打出」按钮:用选中的回应牌出牌 */
+  handlePlayRespond: () => void;
   handleEndTurn: () => void;
   handleConfirmDiscard: () => void;
   isTargetable: (i: number) => boolean;
@@ -174,6 +178,9 @@ export function usePlayInteraction(
   // 多目标(铁索连环 max>=2):点击目标累加为集合,与单选/槽位路径互斥
   const [selectedMultiTargets, setSelectedMultiTargets] = useState<string[]>([]);
   const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
+  // useCard 类回应(被杀出闪/求桃/无懈可击等):先选牌(高亮)再点「打出」确认,避免误触直接出牌。
+  // 与弃牌阶段 selectedForDiscard 同为「选+确认」两步式,但只选一张。
+  const [selectedRespondCardId, setSelectedRespondCardId] = useState<string | null>(null);
   const [transformMode, setTransformMode] = useState<TransformMode | null>(null);
   const [distributeMode, setDistributeMode] = useState<{
     skillId: string;
@@ -236,6 +243,10 @@ export function usePlayInteraction(
   // ─── state 重置 effects ───
   useEffect(() => {
     setSelectedForDiscard(new Set());
+  }, [pending]);
+  // 询问窗口切换/打出后/不回应后:pending 变化驱动清空回应选牌,与 selectedForDiscard 同源。
+  useEffect(() => {
+    setSelectedRespondCardId(null);
   }, [pending]);
   const distKey = activeDistribute
     ? `${activeDistribute.skillId}:${activeDistribute.actionType}:${activeDistribute.prompt.mode ?? 'allocate'}`
@@ -713,6 +724,15 @@ export function usePlayInteraction(
     send('回合管理', 'end', {});
   }, [isMyTurn, send]);
 
+  // useCard 类回应「打出」按钮:用当前选中的回应牌发起 respond(走 handleRespond 的 cardId 分支,
+  // 含求桃按救援牌路由/无懈可击默认 skillId),打出后立即清空选中(pending 变化也会清,这里即时反馈)。
+  const handlePlayRespond = useCallback(() => {
+    if (!selectedRespondCardId) return;
+    const cardId = selectedRespondCardId;
+    setSelectedRespondCardId(null);
+    handleRespond(cardId);
+  }, [selectedRespondCardId, handleRespond]);
+
   const handleCardClick = useCallback(
     (card: Card) => {
       // distribute 选牌
@@ -736,10 +756,13 @@ export function usePlayInteraction(
         });
         return;
       }
-      // 回应模式
+      // 回应模式:点牌只选中(高亮),不直接出牌;再点同一张取消选中。
+      // 真正出牌由「打出」按钮(handlePlayRespond)触发,避免误触。求桃/无懈可击同此路径。
       if (isMyAwaiting) {
         if (pendingRespondInfo?.cardFilter) {
-          if (pendingRespondInfo.cardFilter(card)) handleRespond(card.id);
+          if (pendingRespondInfo.cardFilter(card)) {
+            setSelectedRespondCardId((prev) => (prev === card.id ? null : card.id));
+          }
         }
         return;
       }
@@ -790,7 +813,6 @@ export function usePlayInteraction(
       discardMax,
       isMyAwaiting,
       pendingRespondInfo,
-      handleRespond,
       transformMode,
       isMyTurn,
       selectedCardId,
@@ -906,6 +928,7 @@ export function usePlayInteraction(
     playRules,
     selectedActive,
     playButtonState,
+    selectedRespondCardId,
     altActions,
     handleCardClick,
     handlePlayCard,
@@ -913,6 +936,7 @@ export function usePlayInteraction(
     handleSkillAction,
     handleTransformPlay,
     handleRespond,
+    handlePlayRespond,
     handleEndTurn,
     handleConfirmDiscard,
     isTargetable,

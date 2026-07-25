@@ -220,19 +220,12 @@ describe('流离:成为杀的目标时转移', () => {
       baseSeq: state.seq,
     });
 
-    // 关键断言:流离的 after hook 因 P1.hand.length === 0 直接 return,
-    // 所以 pending 应该是 询问闪,不是 流离/confirm
-    expect(state.pendingSlots.size).toBeGreaterThan(0);
-    const slotAtom = [...state.pendingSlots.values()][0].atom as {
-      type: string;
-      requestType?: string;
-    };
-    expect(slotAtom.type).toBe('询问闪');
-    expect(slotAtom.requestType).toBeUndefined();
+    // 关键断言:P1 无手牌 → 流离 after hook 直接 return(不弹 流离/confirm);
+    // 且 询问闪 因 P1 0 手牌走 skip(无 slot、无延时),P1 直接扣血。
+    // 两条路径都不弹 pending:pendingSlots 为空,且 P1 受伤(未被流离转嫁)。
+    expect(state.pendingSlots.size).toBe(0);
 
-    // P1 不出闪 → 扣血
-    await fireTimeoutAndWait(state);
-
+    // P1 不出闪(已 skip)→ 直接扣血
     expect(state.players[1].health).toBe(p1HealthBefore - 1);
     // 杀进弃牌堆
     expect(state.zones.discardPile).toContain(slash.id);

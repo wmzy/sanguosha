@@ -10,8 +10,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import type { GameState } from '../../src/engine/types';
+import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
+import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
 
 function mkPlayer(opts: {
@@ -39,6 +40,16 @@ function mkPlayer(opts: {
     tags: [],
     judgeZone: [],
   };
+}
+
+function makeCard(
+  id: string,
+  name: string,
+  suit: '♠' | '♥' | '♣' | '♦',
+  rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
+): Card {
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 describe('界孙策·界魂姿', () => {
@@ -69,17 +80,79 @@ describe('界孙策·界魂姿', () => {
       }),
     );
 
-    // 触发准备阶段:界魂姿强制觉醒(无询问)
-    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    const SC = harness.player('界孙策');
+
+    // 触发准备阶段:界魂姿强制觉醒(无询问)。
+    // 觉醒当回合英魂会立即在同一个准备阶段发动(confirm 询问阻塞 applyAtom),
+    // 故用 fire-and-forget 触发,等询问出现后回应以推进。
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    SC.expectPending('请求回应'); // 英魂 confirm(觉醒当回合立即发动)
+    await SC.respond('英魂', { choice: false }); // 本测试聚焦觉醒,不发动英魂排除干扰
     await harness.waitForStable();
 
-    expect(harness.state.pendingSlots.size).toBe(0); // 强制觉醒,无询问
+    expect(harness.state.pendingSlots.size).toBe(0); // 觉醒+英魂均处理完毕,无残留询问
     expect(harness.state.players[0].maxHealth).toBe(3); // 减1上限(4→3)
     expect(harness.state.players[0].health).toBe(1); // 体力保持1
-    expect(harness.state.players[0].skills).toContain('英姿'); // 永久获得英姿(普通版)
+    expect(harness.state.players[0].skills).toContain('界英姿'); // 永久获得界英姿(锁定技)
     expect(harness.state.players[0].skills).toContain('英魂'); // 永久获得英魂
-    expect(harness.state.players[0].skills).not.toContain('界英姿'); // 不是界英姿
+    expect(harness.state.players[0].skills).not.toContain('英姿'); // 不是标版英姿
     expect(harness.state.players[0].vars['魂姿/awakened']).toBe(true); // 觉醒标记
+  });
+
+  // ─── 觉醒获得的界英姿是锁定技:摸牌阶段自动多摸1张,不询问(任务核心验证)───
+  it('觉醒后获界英姿(锁定技):摸牌阶段自动多摸1张,不询问玩家', async () => {
+    const d1 = makeCard('d1', '杀', '♠', '2');
+    const d2 = makeCard('d2', '闪', '♥', '3');
+    const d3 = makeCard('d3', '桃', '♦', '4');
+    const d4 = makeCard('d4', '酒', '♣', '5');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界孙策',
+            character: '界孙策',
+            hand: ['h1'],
+            skills: ['界魂姿'],
+            health: 1,
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', skills: [] }),
+        ],
+        cardMap: { d1, d2, d3, d4 },
+        zones: { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+      }),
+    );
+    const SC = harness.player('界孙策');
+
+    // 准备阶段触发觉醒(觉醒当回合英魂会立即 confirm 询问,先回应不发动以聚焦摸牌验证)
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    SC.expectPending('请求回应'); // 英魂 confirm(觉醒当回合立即发动)
+    await SC.respond('英魂', { choice: false }); // 不发动英魂
+    await harness.waitForStable();
+
+    // 觉醒后获得的是界英姿(锁定技),而非标版英姿
+    expect(harness.state.players[0].skills).toContain('界英姿');
+    expect(harness.state.players[0].skills).not.toContain('英姿');
+
+    // 推进到摸牌阶段:界英姿锁定技应强制多摸1(本应摸2→实际摸3),且不产生询问 pending
+    harness.state.phase = '摸牌';
+    const handBefore = harness.state.players[0].hand.length;
+    await applyAtom(harness.state, { type: '摸牌', player: 0, count: 2 });
+    await harness.waitForStable();
+
+    expect(harness.state.players[0].hand.length).toBe(handBefore + 3); // 2+1(界英姿锁定技)
+    // 锁定技不询问:无 英姿/confirm pending
+    const hasYingziConfirm = [...harness.state.pendingSlots.values()].some((s) => {
+      const rt = (s.atom as { requestType?: string }).requestType;
+      return rt === '英姿/confirm';
+    });
+    expect(hasYingziConfirm).toBe(false);
   });
 
   it('回合开始时不触发(界版差异:仅准备阶段触发)', async () => {
@@ -169,8 +242,13 @@ describe('界孙策·界魂姿', () => {
     );
     const SC = harness.player('界孙策');
 
-    // 第一次准备阶段:触发觉醒
-    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    // 第一次准备阶段:触发觉醒。
+    // 觉醒当回合英魂会立即在同一个准备阶段发动(confirm 询问阻塞 applyAtom),
+    // 故用 fire-and-forget 触发,等询问出现后回应以推进。
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    SC.expectPending('请求回应'); // 英魂 confirm(觉醒当回合立即发动)
+    await SC.respond('英魂', { choice: false }); // 本测试聚焦觉醒,不发动英魂排除干扰
     await harness.waitForStable();
     expect(harness.state.players[0].vars['魂姿/awakened']).toBe(true);
     const maxAfterAwaken = harness.state.players[0].maxHealth; // 3
@@ -218,8 +296,11 @@ describe('界孙策·界魂姿', () => {
     );
     const SC = harness.player('界孙策');
 
-    // 准备阶段觉醒
-    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    // 准备阶段觉醒(觉醒当回合英魂会立即发动 confirm 询问,先回应不发动以聚焦结束阶段收益)
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    SC.expectPending('请求回应'); // 英魂 confirm
+    await SC.respond('英魂', { choice: false }); // 不发动英魂
     await harness.waitForStable();
     expect(harness.state.players[0].vars['魂姿/awakened']).toBe(true);
     expect(harness.state.players[0].vars['界魂姿/endBonus']).toBe(true); // 收益标记已置
@@ -260,7 +341,11 @@ describe('界孙策·界魂姿', () => {
     );
     const SC = harness.player('界孙策');
 
-    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    // 觉醒当回合英魂会立即发动(confirm 询问),先回应不发动以聚焦结束阶段收益
+    SC.expectPending('请求回应');
+    await SC.respond('英魂', { choice: false });
     await harness.waitForStable();
     // 觉醒后体力为1(保持),上限3
     expect(harness.state.players[0].health).toBe(1);

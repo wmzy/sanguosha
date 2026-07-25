@@ -218,15 +218,16 @@ describe('双雄', () => {
   it('transformThenUse:发动双雄后(判定黑色),红色手牌当决斗 → P2 不出杀扣1血', async () => {
     // 模拟双雄已发动:turn.vars['双雄/color']='black'(判定牌为黑色)
     // P1 手牌:c1(♥闪,红色,异色可转化)
-    // P2 无杀 → 决斗中 P2 先被询问杀 → pass → P2 输 → 扣1血
+    // P2 有杀但不打出 → 决斗中 P2 先被询问杀 → pass → P2 输 → 扣1血
     const c1 = makeCard('c1', '闪', '♥', '2');
+    const p2k = makeCard('p2k', '杀', '♠', '3');
     await harness.setup(
       createGameState({
         players: [
           makePlayer({ index: 0, name: '颜良文丑', hand: ['c1'], skills: ['双雄', '决斗'] }),
-          makePlayer({ index: 1, name: 'P2', hand: [], skills: ['杀'] }),
+          makePlayer({ index: 1, name: 'P2', hand: ['p2k'], skills: ['杀'] }),
         ],
-        cardMap: { c1 },
+        cardMap: { c1, p2k },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: { '双雄/color': '黑' } },

@@ -18,6 +18,7 @@ import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import * as styles from './gameViewStyles';
+import { displaySkillName } from '../utils/skillDisplay';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
@@ -91,8 +92,9 @@ export function CharSelectWaitingOverlay({
             {charSkills.length > 0 && (
               <div className={styles.selectedCharSkills}>
                 {charSkills.map((s, i) => (
-                  <SkillTag key={s} name={s} description={getSkillDescription(s)}>
-                    {i > 0 ? ' / ' : ''}{s}
+                  // 描述按原 id(s)查询;展示名(name/子节点)去前导"界"
+                  <SkillTag key={s} name={displaySkillName(s)} description={getSkillDescription(s)}>
+                    {i > 0 ? ' / ' : ''}{displaySkillName(s)}
                   </SkillTag>
                 ))}
               </div>

@@ -123,8 +123,7 @@ describe('遗计', () => {
     const P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
-    P2.expectPending('询问闪');
-    await P2.pass();
+    // P2 无手牌:询问闪走 skip(无 slot),直接扣血 → 进入遗计分配 pending
 
     // P2 扣血 4 → 3
     expect(harness.state.players.find((p) => p.name === 'P2')!.health).toBe(3);
@@ -146,7 +145,7 @@ describe('遗计', () => {
     const P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
-    await P2.pass();
+    // P2 无手牌:询问闪走 skip(无 slot),直接扣血 → 遗计 pending
 
     // 遗计分配:d1 给 P3(=idx 2),d2 给 P1(=idx 0)
     P2.expectPending('请求回应');
@@ -172,7 +171,7 @@ describe('遗计', () => {
     const P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
-    await P2.pass();
+    // P2 无手牌:询问闪走 skip(无 slot),直接扣血 → 遗计 pending
 
     await P2.respond('遗计', {
       allocation: [{ target: 2, cardIds: ['d1', 'd2'] }],
@@ -192,7 +191,7 @@ describe('遗计', () => {
     const P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
-    await P2.pass();
+    // P2 无手牌:询问闪走 skip(无 slot),直接扣血 → 遗计 pending
 
     await P2.respond('遗计', {
       allocation: [{ target: 1, cardIds: ['d1', 'd2'] }],
@@ -210,7 +209,7 @@ describe('遗计', () => {
     const P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
-    await P2.pass();
+    // P2 无手牌:询问闪走 skip(无 slot),直接扣血 → 遗计 pending
     P2.expectPending('请求回应');
     // pass 当前遗计 pending = 不发动
     await P2.pass();
@@ -383,13 +382,15 @@ describe('confirm / distribute API', () => {
 
   it('confirm(false) 等同 pass()', async () => {
     const slash: Card = makeCard('c1', '杀', '♠', 'A');
+    const dodge: Card = makeCard('d1', '闪', '♥', '2');
     await harness.setup(
       createGameState({
         players: [
           makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),
-          makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
+          // P2 带一张闪:询问闪走 normal,验证 confirm(false) 等同不出闪
+          makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
         ],
-        cardMap: { c1: slash },
+        cardMap: { c1: slash, d1: dodge },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

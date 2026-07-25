@@ -15,6 +15,7 @@ import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import { getCharacterImage } from '../assets/imageAssets';
+import { displaySkillName } from '../utils/skillDisplay';
 
 export interface CharSelectOverlayCandidate {
   name: string;
@@ -149,8 +150,9 @@ export function CharSelectOverlay({
           <div className={candidateName}>{ch.name}</div>
           <div className={cx(candidateFaction)}>
             {faction} · {ch.skills.map((s, si) => (
-              <SkillTag key={s} name={s} description={getSkillDescription(s)}>
-                {si > 0 ? ' / ' : ''}{s}
+              // 描述按原 id(s)查询;展示名(name/子节点)去前导"界"
+              <SkillTag key={s} name={displaySkillName(s)} description={getSkillDescription(s)}>
+                {si > 0 ? ' / ' : ''}{displaySkillName(s)}
               </SkillTag>
             ))}
           </div>

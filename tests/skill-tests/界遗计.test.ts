@@ -320,8 +320,7 @@ describe('界遗计', () => {
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 不出闪
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤 → 遗计摸2张 + giveConfirm
 
     // 询问是否交牌
     P1.expectPending('请求回应');
@@ -393,7 +392,7 @@ describe('界遗计', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤 → 遗计摸2张 + giveConfirm
     await P1.respond('界遗计', { choice: true });
 
     // 只交 1 张给 P2
@@ -483,7 +482,7 @@ describe('界遗计', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤 → 遗计摸2张 + giveConfirm
     await P1.respond('界遗计', { choice: true });
 
     // 骨重提示应包含关键约束:最多 2 张 / 2 人 / 不能给自己 / 手牌

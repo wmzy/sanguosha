@@ -133,8 +133,9 @@ describe('界蛊惑', () => {
   it('同时质疑·真牌 → 质疑者获缠怨标记 + 选择弃牌,声明杀仍生效', async () => {
     const s1 = mkCard('s1', '杀', '♠', '7'); // 真杀
     const p1x = mkCard('p1x', '闪', '♥', '2');
+    const p2x = mkCard('p2x', '闪', '♦', '3');
     await harness.setup(
-      baseState({ yujiHand: ['s1'], p1Hand: ['p1x'], cardMap: { s1, p1x } }),
+      baseState({ yujiHand: ['s1'], p1Hand: ['p1x'], p2Hand: ['p2x'], cardMap: { s1, p1x, p2x } }),
     );
     const YJ = harness.player('界于吉');
     const P1 = harness.player('P1');
@@ -462,10 +463,10 @@ describe('界蛊惑', () => {
     // P0 出杀 → 于吉不闪 → HP=0 → 濒死 → 求桃
     // 模块 C:逆时针从当前回合 P0(idx1)起 → P0 先被问(无桃)→ pass
     await P0.useCardAndTarget('杀', 'atk', [0]);
-    await YJ.pass(); // 不闪,受伤害进濒死
+    await YJ.pass(); // 不闪(silent slot),受伤害进濒死
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(0);
-    await P0.pass(); // P0 无桃跳过
+    // 求桃先问濒死者于吉(idx0)
     await harness.waitForStable();
 
     // 第二问 于吉(idx0,濒死者)

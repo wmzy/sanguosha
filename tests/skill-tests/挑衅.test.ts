@@ -78,7 +78,10 @@ describe('挑衅', () => {
 
   it('目标出杀 + 姜维不出闪 → 姜维受 1 点伤害', async () => {
     const kill = mkCard('k1', '杀', '♠', '7');
-    await harness.setup(build({ p1Hand: [kill.id], extraCards: { k1: kill } }));
+    const jwShan = mkCard('s0', '闪', '♥', '4');
+    await harness.setup(
+      build({ p0Hand: [jwShan.id], p1Hand: [kill.id], extraCards: { k1: kill, s0: jwShan } }),
+    );
     const P0 = harness.player('姜维');
     const P1 = harness.player('P1');
 

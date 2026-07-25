@@ -99,6 +99,7 @@ describe('乱武', () => {
   // ─── 2. 有杀角色 → 对距离最近者出杀并结算 ─────────────────
   it('有杀角色 → 对距离最近者(贾诩)出杀并造成伤害', async () => {
     const slash = mkCard('sk1', '杀', '♠', '7');
+    const shan = mkCard('sh1', '闪', '♥', '4');
     await harness.setup(
       createGameState({
         players: [
@@ -109,10 +110,11 @@ describe('乱武', () => {
             skills: ['乱武'],
             health: 3,
             maxHealth: 3,
+            hand: [shan.id],
           }),
           mkPlayer({ index: 1, name: 'P2', hand: [slash.id], skills: [], health: 4 }),
         ],
-        cardMap: { sk1: slash },
+        cardMap: { sk1: slash, sh1: shan },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -178,6 +180,7 @@ describe('乱武', () => {
   // ─── 4. 多人:按座次依次处理,最近目标可自选 ─────────────────
   it('三人:依次处理,有杀者选择最近目标,无杀者失血', async () => {
     const slash = mkCard('sk2', '杀', '♣', '8');
+    const shan = mkCard('sh2', '闪', '♥', '4');
     await harness.setup(
       createGameState({
         players: [
@@ -190,9 +193,9 @@ describe('乱武', () => {
             maxHealth: 3,
           }),
           mkPlayer({ index: 1, name: 'P2', hand: [slash.id], skills: [], health: 4 }),
-          mkPlayer({ index: 2, name: 'P3', hand: [], skills: [], health: 4 }),
+          mkPlayer({ index: 2, name: 'P3', hand: [shan.id], skills: [], health: 4 }),
         ],
-        cardMap: { sk2: slash },
+        cardMap: { sk2: slash, sh2: shan },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

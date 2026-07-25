@@ -353,4 +353,126 @@ describe('英魂', () => {
     expect(harness.state.players[1].hand.length).toBe(1);
     expect(harness.state.zones.discardPile.length).toBe(2);
   });
+
+  // ─── 回归:魂姿觉醒当回合,英魂在同一个准备阶段立即发动 ────────
+  // bug:魂姿(标/界)准备阶段觉醒获得英魂后,英魂 before-hook 已错过本准备阶段的
+  //   快照收集时机(before-hook 在 applyAtom 入口即快照,此时英魂尚未添加),本回合不发动,
+  //   要等下回合。修复:魂姿觉醒 after-hook 在 applyAtom(添加技能,'英魂') 之后显式调用
+  //   英魂.performYinghunPrepare,让英魂在觉醒当回合的准备阶段立即发动。
+  //   关键断言:仅一次 阶段开始(准备) dispatch 后,英魂 confirm 询问即出现(同阶段生效)。
+  it('标孙策准备阶段觉醒 → 英魂在同一个准备阶段立即发动(询问+效果)', async () => {
+    // 孙策 4血剩1血 → 魂姿觉醒(减1上限 4→3)+获得英魂;此时仍 health=1 < 新上限3 → 英魂 X=2 发动
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '孙策',
+          character: '孙策',
+          health: 1,
+          maxHealth: 4,
+          hand: [],
+          skills: ['魂姿'],
+        }),
+        makePlayer({
+          index: 1, name: 'P1', hand: ['p1a', 'p1b'], faction: '魏' }),
+      ],
+      cardMap: {
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        d1: makeCard('d1', '桃', '♥'),
+        d2: makeCard('d2', '酒', '♣'),
+      },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    state.zones = { deck: ['d1', 'd2'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const 孙策 = harness.player('孙策');
+    const P1 = harness.player('P1');
+
+    // 一次阶段开始(准备):魂姿觉醒 + 英魂同阶段立即发动
+    triggerReadyPhase(harness);
+    await waitForStable(harness.state); // 英魂 confirm(觉醒当回合立即发动,非下回合)
+    孙策.expectPending('请求回应');
+    await 孙策.respond('英魂', { choice: true }); // 发动
+
+    await waitForStable(harness.state); // 选目标
+    await 孙策.respond('英魂', { targets: [1] });
+
+    await waitForStable(harness.state); // 选方案
+    await 孙策.respond('英魂', { choice: true }); // 选项1:摸2弃1
+
+    await waitForStable(harness.state); // 目标选弃牌
+    await P1.respond('英魂', { cardIds: ['p1a'] });
+    await harness.waitForStable();
+
+    // 觉醒:上限 4→3,获得英魂/英姿
+    expect(harness.state.players[0].maxHealth).toBe(3);
+    expect(harness.state.players[0].skills).toContain('英魂');
+    expect(harness.state.players[0].vars['魂姿/awakened']).toBe(true);
+    // 英魂效果(同阶段生效):P1 原2张 +摸2(d1,d2) -弃1(p1a) = 3张
+    expect(harness.state.players[1].hand.length).toBe(3);
+    expect(harness.state.players[1].hand).not.toContain('p1a');
+    expect(harness.state.zones.deck.length).toBe(0); // 摸2消耗2张
+    expect(harness.state.zones.discardPile).toContain('p1a');
+  });
+
+  it('界孙策准备阶段觉醒 → 英魂在同一个准备阶段立即发动(询问+效果)', async () => {
+    // 界孙策 4血剩1血 → 界魂姿觉醒(减1上限 4→3)+获得英魂;此时仍 health=1 < 新上限3 → 英魂 X=2 发动
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '界孙策',
+          character: '界孙策',
+          health: 1,
+          maxHealth: 4,
+          hand: [],
+          skills: ['界魂姿'],
+        }),
+        makePlayer({
+          index: 1, name: 'P1', hand: ['p1a', 'p1b'], faction: '魏' }),
+      ],
+      cardMap: {
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        d1: makeCard('d1', '桃', '♥'),
+        d2: makeCard('d2', '酒', '♣'),
+      },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    state.zones = { deck: ['d1', 'd2'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const 界孙策 = harness.player('界孙策');
+    const P1 = harness.player('P1');
+
+    // 一次阶段开始(准备):界魂姿觉醒 + 英魂同阶段立即发动
+    triggerReadyPhase(harness);
+    await waitForStable(harness.state); // 英魂 confirm(觉醒当回合立即发动,非下回合)
+    界孙策.expectPending('请求回应');
+    await 界孙策.respond('英魂', { choice: true }); // 发动
+
+    await waitForStable(harness.state); // 选目标
+    await 界孙策.respond('英魂', { targets: [1] });
+
+    await waitForStable(harness.state); // 选方案
+    await 界孙策.respond('英魂', { choice: true }); // 选项1:摸2弃1
+
+    await waitForStable(harness.state); // 目标选弃牌
+    await P1.respond('英魂', { cardIds: ['p1a'] });
+    await harness.waitForStable();
+
+    // 觉醒:上限 4→3,获得英魂/英姿
+    expect(harness.state.players[0].maxHealth).toBe(3);
+    expect(harness.state.players[0].skills).toContain('英魂');
+    expect(harness.state.players[0].vars['魂姿/awakened']).toBe(true);
+    // 英魂效果(同阶段生效):P1 原2张 +摸2(d1,d2) -弃1(p1a) = 3张
+    expect(harness.state.players[1].hand.length).toBe(3);
+    expect(harness.state.players[1].hand).not.toContain('p1a');
+    expect(harness.state.zones.deck.length).toBe(0);
+    expect(harness.state.zones.discardPile).toContain('p1a');
+  });
 });

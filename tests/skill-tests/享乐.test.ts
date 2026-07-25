@@ -78,8 +78,13 @@ describe('享乐', () => {
   it('来源弃基本牌 → 杀有效 → 刘禅受伤', async () => {
     const kill = mkCard('k1', '杀', '♠', '7');
     const shan = mkCard('s1', '闪', '♥', '5');
+    const lcShan = mkCard('s2', '闪', '♣', '6');
     await harness.setup(
-      build({ p1Hand: [kill.id, shan.id], extraCards: { k1: kill, s1: shan } }),
+      build({
+        p0Hand: [lcShan.id],
+        p1Hand: [kill.id, shan.id],
+        extraCards: { k1: kill, s1: shan, s2: lcShan },
+      }),
     );
     const P0 = harness.player('刘禅');
     const P1 = harness.player('P1');

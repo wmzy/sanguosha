@@ -69,9 +69,9 @@ describe('刚烈', () => {
       players: [
         // P0 带 2 张额外手牌,出杀后仍有 2 张 → 刚烈提供二选一
         makePlayer({ index: 0, name: 'P0', hand: ['k1', 'e1', 'e2'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1s'], skills: ['刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2 },
+      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2, p1s: makeCard('p1s', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -105,9 +105,9 @@ describe('刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1', 'e1', 'e2'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1s'], skills: ['刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2 },
+      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2, p1s: makeCard('p1s', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -140,9 +140,9 @@ describe('刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1s'], skills: ['刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge },
+      cardMap: { k1: slash, j1: judge, p1s: makeCard('p1s', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -172,9 +172,9 @@ describe('刚烈', () => {
       players: [
         // P0 只有杀,出杀后手牌为空(< 2)→ 只能受伤
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1s'], skills: ['刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge },
+      cardMap: { k1: slash, j1: judge, p1s: makeCard('p1s', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -204,9 +204,9 @@ describe('刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1', 'e1', 'e2'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1s'], skills: ['刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2 },
+      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2, p1s: makeCard('p1s', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',

@@ -195,17 +195,13 @@ describe('界神速', () => {
     await P1.respond('界神速', { target: 1 });
     await harness.waitForStable();
     harness.processAllEvents();
-    // ① P2 被杀 → 不闪
-    const P2a = harness.player('P2');
-    await P2a.pass();
+    // ① P2 被杀 → P2 0 手牌 → 询问闪 skip → 直接扣血
 
     // ③目标
     await P1.respond('界神速', { target: 1 });
     await harness.waitForStable();
     harness.processAllEvents();
-    // ③ P2 被杀 → 不闪
-    const P2b = harness.player('P2');
-    await P2b.pass();
+    // ③ P2 被杀 → P2 0 手牌 → 询问闪 skip → 直接扣血
 
     expect(harness.state.players[1].health).toBe(2); // 2 次虚拟杀
     expect(harness.state.players[0].health).toBe(4); // 不失体力(代价是翻面)

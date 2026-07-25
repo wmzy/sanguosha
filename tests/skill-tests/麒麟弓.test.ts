@@ -103,8 +103,7 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     const p1HealthBefore = harness.state.players[1].health;
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
-    await P1.pass(); // 不出闪
+    // P1 无手牌:询问闪走 skip(无 slot),直接扣血;麒麟弓(造成伤害后)询问 P0
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     await P0.respond('麒麟弓', { choice: true });
 

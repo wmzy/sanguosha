@@ -191,6 +191,7 @@ describe('界仁心', () => {
     P2: ReturnType<SkillTestHarness['player']>;
   }> {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
+    const p1shan: Card = makeCard('p1sh', '闪', '♥', '2'); // P1 含闪:走 normal 询问闪,pass 跳过闪而非仁心
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -204,8 +205,8 @@ describe('界仁心', () => {
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: [],
-          skills: [],
+          hand: ['p1sh'],
+          skills: ['闪'],
           health: 1,
           maxHealth: 4,
         }),
@@ -221,6 +222,7 @@ describe('界仁心', () => {
       ],
       cardMap: {
         k1: slash,
+        p1sh: p1shan,
         w1: makeCard('w1', '丈八蛇矛', '♥', 'A', '装备牌', '武器'),
         w2: makeCard('w2', '青釭剑', '♠', '6', '装备牌', '武器'),
         a: makeCard('a', '杀', '♠', '7'),

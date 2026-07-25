@@ -73,9 +73,9 @@ describe('界刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge },
+      cardMap: { k1: slash, j1: judge, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -103,9 +103,9 @@ describe('界刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge },
+      cardMap: { k1: slash, j1: judge, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -132,9 +132,9 @@ describe('界刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1', 'e1', 'e2'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2 },
+      cardMap: { k1: slash, j1: judge, e1: extra1, e2: extra2, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -171,9 +171,9 @@ describe('界刚烈', () => {
           ...makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
           equipment: { 武器: 'w1' },
         },
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge, w1: weapon },
+      cardMap: { k1: slash, j1: judge, w1: weapon, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -202,9 +202,9 @@ describe('界刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge },
+      cardMap: { k1: slash, j1: judge, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -232,9 +232,9 @@ describe('界刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1', 'e1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, j1: judge, e1: extra1 },
+      cardMap: { k1: slash, j1: judge, e1: extra1, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -266,9 +266,9 @@ describe('界刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['w1', 'k1'], skills: ['酒', '杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, w1: wine, j1: judge1, j2: judge2 },
+      cardMap: { k1: slash, w1: wine, j1: judge1, j2: judge2, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1', 'j2'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -308,9 +308,9 @@ describe('界刚烈', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['w1', 'k1'], skills: ['酒', '杀'] }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, w1: wine, j1: judge1, j2: judge2 },
+      cardMap: { k1: slash, w1: wine, j1: judge1, j2: judge2, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1', 'j2'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -349,9 +349,9 @@ describe('界刚烈', () => {
       players: [
         // P0 初始 1 血:第一次红色造伤即死 → 第二次不再触发
         makePlayer({ index: 0, name: 'P0', hand: ['w1', 'k1'], skills: ['酒', '杀'], health: 1 }),
-        makePlayer({ index: 1, name: 'P1', skills: ['界刚烈', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
-      cardMap: { k1: slash, w1: wine, j1: judge1, j2: judge2 },
+      cardMap: { k1: slash, w1: wine, j1: judge1, j2: judge2, p1sh: makeCard('p1sh', '闪', '♥', '2') },
       zones: { deck: ['j1', 'j2'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',

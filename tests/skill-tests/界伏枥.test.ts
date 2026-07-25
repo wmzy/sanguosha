@@ -69,6 +69,7 @@ describe('界伏枥', () => {
   // ─── 1. 濒死发动伏枥:回血至X + 摸至X + 翻面 ───────────
   it('濒死发动伏枥:回血至X + 摸至X张 + 翻面(X > 你造成的伤害数)', async () => {
     const slash = mkCard('s1', '杀', '♠', '7');
+    const lhShan = mkCard('sh1', '闪', '♥', '2'); // 廖化含闪:走 normal 询问闪
     // 牌堆顶 4 张供摸(廖化需摸至 X 张手牌)
     const deckCards = [
       mkCard('d1', '杀', '♠', '2'),
@@ -76,7 +77,7 @@ describe('界伏枥', () => {
       mkCard('d3', '桃', '♦', '4'),
       mkCard('d4', '酒', '♣', '5'),
     ];
-    const cardMap: Record<string, Card> = { s1: slash };
+    const cardMap: Record<string, Card> = { s1: slash, sh1: lhShan };
     for (const c of deckCards) cardMap[c.id] = c;
 
     // 4 势力:蜀(廖化)/魏(P1)/吴(P2)/群(P3)→ X = 4
@@ -87,7 +88,7 @@ describe('界伏枥', () => {
             index: 0,
             name: '界廖化',
             faction: '蜀',
-            hand: [],
+            hand: ['sh1'],
             skills: ['界伏枥', '闪', '杀', '回合管理'],
             health: 1,
             maxHealth: 4,
@@ -158,6 +159,7 @@ describe('界伏枥', () => {
   // ─── 2. 不发动 → 求桃无人救 → 死亡 ───────────
   it('不发动伏枥 → 求桃无人救 → 死亡', async () => {
     const slash = mkCard('s2', '杀', '♠', '8');
+    const lhShan = mkCard('sh1', '闪', '♥', '2'); // 廖化含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
@@ -165,7 +167,7 @@ describe('界伏枥', () => {
             index: 0,
             name: '界廖化',
             faction: '蜀',
-            hand: [],
+            hand: ['sh1'],
             skills: ['界伏枥', '闪', '回合管理'],
             health: 1,
             maxHealth: 4,
@@ -178,7 +180,7 @@ describe('界伏枥', () => {
             skills: ['杀', '闪', '回合管理'],
           }),
         ],
-        cardMap: { s2: slash },
+        cardMap: { s2: slash, sh1: lhShan },
         currentPlayerIndex: 1,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -219,6 +221,7 @@ describe('界伏枥', () => {
     const slash1 = mkCard('s3', '杀', '♠', '4');
     const slash2 = mkCard('s4', '杀', '♠', '5');
     const crossbow = mkCard('cb', '诸葛连弩', '♣', 'A', '装备牌');
+    const lhShan = mkCard('sh1', '闪', '♥', '2'); // 廖化含闪:首杀走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
@@ -226,7 +229,7 @@ describe('界伏枥', () => {
             index: 0,
             name: '界廖化',
             faction: '蜀',
-            hand: [],
+            hand: ['sh1'],
             skills: ['界伏枥', '闪', '回合管理'],
             health: 1,
             maxHealth: 1, // 便于二次濒死
@@ -239,7 +242,7 @@ describe('界伏枥', () => {
             skills: ['杀', '诸葛连弩', '闪', '回合管理'],
           }),
         ],
-        cardMap: { s3: slash1, s4: slash2, cb: crossbow },
+        cardMap: { s3: slash1, s4: slash2, cb: crossbow, sh1: lhShan },
         currentPlayerIndex: 1,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

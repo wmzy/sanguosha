@@ -46,6 +46,135 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
+/**
+ * 英魂准备阶段主逻辑:询问发动 → 选目标 → 选方案 → 目标摸牌 → 目标自选弃牌。
+ *
+ * 抽成独立导出函数,供两处复用:
+ *   1. 英魂自身 before-hook 调用(原行为不变)。
+ *   2. 魂姿/界魂姿觉醒 after-hook 在 applyAtom(添加技能,'英魂') 之后显式调用——
+ *      觉醒当回合英魂刚被添加,其 before-hook 已错过本准备阶段的快照收集时机
+ *      (before-hook 在 applyAtom 入口即快照,此时英魂尚未添加),
+ *      故需手动触发,使英魂在觉醒当回合的同一个准备阶段立即发动。
+ *
+ * 内在门控(防误触,不依赖调用方约定):
+ *   - 当前回合角色 === ownerId(英魂只在自己回合的准备阶段发动)
+ *   - ownerId 存活
+ *   - 已受伤(health < maxHealth);满血不发动
+ *
+ * 幂等性:本准备阶段调用方保证仅一次。英魂 before-hook 每回合由「阶段开始」派发一次;
+ *   魂姿觉醒仅觉醒当回合调一次(后续回合 AWAKENED_KEY 早返回)。故无重入、无重复触发。
+ */
+export async function performYinghunPrepare(
+  state: GameState,
+  ownerId: number,
+): Promise<void> {
+  if (state.currentPlayerIndex !== ownerId) return;
+  const self = state.players[ownerId];
+  if (!self?.alive) return;
+  // 发动条件:已受伤(当前体力 < 体力上限)
+  if (self.health >= self.maxHealth) return;
+  // X = 已损失体力值
+  const x = self.maxHealth - self.health;
+
+  // 1) 询问是否发动
+  delete state.localVars[CONFIRMED_KEY];
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType: CONFIRM_RT,
+    target: ownerId,
+    prompt: {
+      type: 'confirm',
+      title: `是否发动英魂?(令一名其他角色摸弃,X=${x})`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
+    },
+    defaultChoice: false,
+    timeout: 10,
+  });
+  if (!state.localVars[CONFIRMED_KEY]) return;
+
+  // 2) 选一名其他角色(存活且非自己)
+  delete state.localVars[TARGET_KEY];
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType: TARGET_RT,
+    target: ownerId,
+    prompt: {
+      type: 'choosePlayer',
+      title: '英魂:选择一名其他角色',
+      min: 1,
+      max: 1,
+      filter: (_view: GameView, t: number) =>
+        t !== ownerId && state.players[t]?.alive === true,
+    },
+    timeout: 15,
+  });
+  const target = state.localVars[TARGET_KEY] as number | undefined;
+  delete state.localVars[TARGET_KEY];
+  if (typeof target !== 'number') return;
+  if (!state.players[target]?.alive) return;
+
+  // 3) 孙坚自己选方案(超时默认选项1)。官方:"孙坚自己选择摸弃方案"。
+  delete state.localVars[OPTION_KEY];
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType: OPTION_RT,
+    target: ownerId,
+    prompt: {
+      type: 'confirm',
+      title: `英魂:选择一项(你已损失 ${x} 体力)`,
+      description: `选项1:令其摸${x}张牌再弃1张牌;选项2:令其摸1张牌再弃${x}张牌`,
+      confirmLabel: `摸${x}弃1`,
+      cancelLabel: `摸1弃${x}`,
+    },
+    defaultChoice: true,
+    timeout: 15,
+  });
+  const option =
+    (state.localVars[OPTION_KEY] as 'opt1' | 'opt2' | undefined) ?? 'opt1';
+  delete state.localVars[OPTION_KEY];
+
+  // 4) 执行:先摸后弃
+  const drawCount = option === 'opt1' ? x : 1;
+  const discardCount = option === 'opt1' ? 1 : x;
+  if (drawCount > 0) {
+    await applyAtom(state, { type: '摸牌', player: target, count: drawCount });
+  }
+  if (!state.players[target]?.alive) return; // 极端:摸牌触发死亡(无懈链等)
+
+  // 弃牌:目标自选弃哪些牌,数量 clamp 到当前手牌
+  const hand = state.players[target].hand;
+  const actual = Math.min(discardCount, hand.length);
+  if (actual <= 0) return;
+  delete state.localVars[DISCARD_KEY];
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType: DISCARD_RT,
+    target,
+    prompt: {
+      type: 'useCard',
+      title: `英魂:弃 ${actual} 张牌`,
+      cardFilter: { filter: () => true, min: actual, max: actual },
+    },
+    // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI;headless 不生成 skip
+    mandatory: true,
+    timeout: 20,
+  });
+  let discardCards = state.localVars[DISCARD_KEY] as string[] | undefined;
+  delete state.localVars[DISCARD_KEY];
+  // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
+  if ((!discardCards || discardCards.length === 0) && actual > 0) {
+    discardCards = state.players[target]?.hand.slice(0, actual) ?? [];
+  }
+  if (discardCards && discardCards.length > 0) {
+    await applyAtom(state, {
+      type: '弃置',
+      player: target,
+      cardIds: discardCards,
+    });
+  }
+}
+
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
@@ -101,7 +230,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     unloaders.push(u);
   }
 
-  // 阶段开始(准备) before:英魂主逻辑
+  // 阶段开始(准备) before:英魂主逻辑(委托给 performYinghunPrepare,便于魂姿觉醒复用)
   registerBeforeHook(
     state,
     skill.id,
@@ -112,111 +241,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (atom.phase !== '准备') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
-      // 发动条件:已受伤(当前体力 < 体力上限)
-      if (self.health >= self.maxHealth) return;
-      // X = 已损失体力值
-      const x = self.maxHealth - self.health;
-
-      // 1) 询问是否发动
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动英魂?(令一名其他角色摸弃,X=${x})`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 10,
-      });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) return;
-
-      // 2) 选一名其他角色(存活且非自己)
-      delete ctx.state.localVars[TARGET_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: TARGET_RT,
-        target: ownerId,
-        prompt: {
-          type: 'choosePlayer',
-          title: '英魂:选择一名其他角色',
-          min: 1,
-          max: 1,
-          filter: (_view: GameView, t: number) =>
-            t !== ownerId && ctx.state.players[t]?.alive === true,
-        },
-        timeout: 15,
-      });
-      const target = ctx.state.localVars[TARGET_KEY] as number | undefined;
-      delete ctx.state.localVars[TARGET_KEY];
-      if (typeof target !== 'number') return;
-      if (!ctx.state.players[target]?.alive) return;
-
-      // 3) 孙坚自己选方案(超时默认选项1)。官方:"孙坚自己选择摸弃方案"。
-      delete ctx.state.localVars[OPTION_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPTION_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `英魂:选择一项(你已损失 ${x} 体力)`,
-          description: `选项1:令其摸${x}张牌再弃1张牌;选项2:令其摸1张牌再弃${x}张牌`,
-          confirmLabel: `摸${x}弃1`,
-          cancelLabel: `摸1弃${x}`,
-        },
-        defaultChoice: true,
-        timeout: 15,
-      });
-      const option =
-        (ctx.state.localVars[OPTION_KEY] as 'opt1' | 'opt2' | undefined) ?? 'opt1';
-      delete ctx.state.localVars[OPTION_KEY];
-
-      // 4) 执行:先摸后弃
-      const drawCount = option === 'opt1' ? x : 1;
-      const discardCount = option === 'opt1' ? 1 : x;
-      if (drawCount > 0) {
-        await applyAtom(ctx.state, { type: '摸牌', player: target, count: drawCount });
-      }
-      if (!ctx.state.players[target]?.alive) return; // 极端:摸牌触发死亡(无懈链等)
-
-      // 弃牌:目标自选弃哪些牌,数量 clamp 到当前手牌
-      const hand = ctx.state.players[target].hand;
-      const actual = Math.min(discardCount, hand.length);
-      if (actual <= 0) return;
-      delete ctx.state.localVars[DISCARD_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: DISCARD_RT,
-        target,
-        prompt: {
-          type: 'useCard',
-          title: `英魂:弃 ${actual} 张牌`,
-          cardFilter: { filter: () => true, min: actual, max: actual },
-        },
-        // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI;headless 不生成 skip
-        mandatory: true,
-        timeout: 20,
-      });
-      let discardCards = ctx.state.localVars[DISCARD_KEY] as string[] | undefined;
-      delete ctx.state.localVars[DISCARD_KEY];
-      // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
-      if ((!discardCards || discardCards.length === 0) && actual > 0) {
-        discardCards = ctx.state.players[target]?.hand.slice(0, actual) ?? [];
-      }
-      if (discardCards && discardCards.length > 0) {
-        await applyAtom(ctx.state, {
-          type: '弃置',
-          player: target,
-          cardIds: discardCards,
-        });
-      }
+      await performYinghunPrepare(ctx.state, ownerId);
     },
   );
 

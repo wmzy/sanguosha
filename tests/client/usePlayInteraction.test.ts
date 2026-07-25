@@ -806,6 +806,40 @@ describe('usePlayInteraction · handleTargetClick(铁索连环多目标)', () =>
     expect(calls[0].skillId).toBe('铁索连环');
     expect(calls[0].params).toEqual({ cardId: 'c-chain', targets: [1, 0] });
   });
+
+  // ─── Bug 回归:铁索连环重置(对已横置角色使用以解除连环)───
+  // 已横置角色(P1 带 chained mark)必须仍可选为铁索连环目标,
+  // 且出牌发送的 targets 指向该已横置角色(引擎据此 toggle 重置)。
+  it('重置:已横置角色(P1 带 chained mark)仍可选为目标并发送', () => {
+    const send = vi.fn();
+    // P1 已横置(marks 含 chained)
+    const view = makePlayView();
+    view.players[1] = {
+      ...view.players[1],
+      marks: [{ id: 'chained', scope: 1 }],
+    };
+    const { result } = renderPlay(
+      makePlayParams({
+        view,
+        skillActions: [chainUseAction()],
+        perspectiveHand: [CHAIN_CARD],
+        send,
+      }),
+    );
+    act(() => result.current.handleCardClick(CHAIN_CARD));
+    // 已横置的 P1 仍可作为目标(不因 chained mark 被排除)
+    expect(result.current.isTargetable(1)).toBe(true);
+    // 点击 P1 选中
+    act(() => result.current.handleTargetClick('P1'));
+    expect(result.current.selectedMultiTargets).toEqual(['P1']);
+    expect(result.current.playButtonState?.canPlay).toBe(true);
+    // 出牌:targets 指向已横置的 P1(座次 1),引擎据此重置
+    act(() => result.current.handlePlayCard());
+    const calls = sentCalls(send);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].skillId).toBe('铁索连环');
+    expect(calls[0].params).toEqual({ cardId: 'c-chain', targets: [1] });
+  });
 });
 
 describe('usePlayInteraction · handleCardClick 选牌与切换', () => {
@@ -1012,22 +1046,41 @@ describe('usePlayInteraction · handleRespond(回应询问)', () => {
     });
   }
 
-  it('点击符合 cardFilter 的牌触发 send respond {cardId}', () => {
+  it('点击符合 cardFilter 的牌只选中(不立即出牌),再点同一张取消选中', () => {
     const send = vi.fn();
     const { result } = renderPlay(respondParams(send, { cardFilter: (c) => c.name === '杀' }));
-    // 点杀(符合)→ 发送
+    // 点杀(符合)→ 仅选中,不发送
     act(() => result.current.handleCardClick(KILL_CARD));
+    expect(send).not.toHaveBeenCalled();
+    expect(result.current.selectedRespondCardId).toBe('c-kill');
+    // 再点同一张 → 取消选中,仍不发送
+    act(() => result.current.handleCardClick(KILL_CARD));
+    expect(send).not.toHaveBeenCalled();
+    expect(result.current.selectedRespondCardId).toBeNull();
+  });
+
+  it('选中后点「打出」(handlePlayRespond)才用选中牌 respond,并清空选中', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(respondParams(send, { cardFilter: (c) => c.name === '杀' }));
+    // 未选中时打出 → 不发送
+    act(() => result.current.handlePlayRespond());
+    expect(send).not.toHaveBeenCalled();
+    // 选中杀 → 打出 → 发送 respond {cardId} 并清空选中
+    act(() => result.current.handleCardClick(KILL_CARD));
+    act(() => result.current.handlePlayRespond());
     expect(sentCalls(send)).toEqual([
       { skillId: '闪', actionType: 'respond', params: { cardId: 'c-kill' } },
     ]);
+    expect(result.current.selectedRespondCardId).toBeNull();
   });
 
-  it('点击不符合 cardFilter 的牌不发送', () => {
+  it('点击不符合 cardFilter 的牌不选中也不发送', () => {
     const send = vi.fn();
     const { result } = renderPlay(respondParams(send, { cardFilter: (c) => c.name === '杀' }));
-    // 点桃(不符合 filter)→ 不发送
+    // 点桃(不符合 filter)→ 不选中、不发送
     act(() => result.current.handleCardClick(PEACH_CARD));
     expect(send).not.toHaveBeenCalled();
+    expect(result.current.selectedRespondCardId).toBeNull();
   });
 
   it('广播型 pending(pendingTargetIdx<0):respond 发送 skip 并调用 markBroadcastSkipped', () => {

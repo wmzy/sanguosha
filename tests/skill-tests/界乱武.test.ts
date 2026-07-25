@@ -168,6 +168,7 @@ describe('界乱武', () => {
 
   // ─── 4. 界版新增:主循环结束后,贾诩可视为使用无距离限制的【杀】 ──
   it('界版:贾诩视为使用无距离限制【杀】(主循环 P2 失血后,贾诩选择 P2 为最终杀目标)', async () => {
+    const p2shan = mkCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
@@ -179,9 +180,9 @@ describe('界乱武', () => {
             health: 3,
             maxHealth: 3,
           }),
-          mkPlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4 }),
+          mkPlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
         ],
-        cardMap: {},
+        cardMap: { sh1: p2shan },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -288,6 +289,7 @@ describe('界乱武', () => {
   it('界版:贾诩视为出杀无距离限制(可指定攻击范围外的目标)', async () => {
     // 4 人局:贾诩 idx 0,P4 idx 3。贾诩无进攻马,默认攻击范围 1,P4 在距离 1(座位邻接)。
     // 用 6 人局确保 P6(idx 5)在攻击范围外(距离 > 1),验证无距离限制。
+    const p3shan = mkCard('sh1', '闪', '♥', '2'); // P3 含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
@@ -300,12 +302,12 @@ describe('界乱武', () => {
             maxHealth: 3,
           }),
           mkPlayer({ index: 1, name: 'P2', hand: [], skills: [], health: 4 }),
-          mkPlayer({ index: 2, name: 'P3', hand: [], skills: [], health: 4 }),
+          mkPlayer({ index: 2, name: 'P3', hand: ['sh1'], skills: ['闪'], health: 4 }),
           mkPlayer({ index: 3, name: 'P4', hand: [], skills: [], health: 4 }),
           mkPlayer({ index: 4, name: 'P5', hand: [], skills: [], health: 4 }),
           mkPlayer({ index: 5, name: 'P6', hand: [], skills: ['闪'], health: 4 }),
         ],
-        cardMap: {},
+        cardMap: { sh1: p3shan },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

@@ -195,8 +195,7 @@ describe('界酒诗', () => {
 
     // P1 杀 P0
     await P1.useCardAndTarget('杀', 'k1', [0]);
-    // P0 不出闪
-    await P0.pass();
+    // P0 0 手牌 → 询问闪 skip → 直接受伤 → 酒诗/damageFlip
     await harness.waitForStable();
 
     // 询问 P0 是否翻回正面
@@ -240,7 +239,7 @@ describe('界酒诗', () => {
     const P1 = harness.player('P1');
 
     await P1.useCardAndTarget('杀', 'k1', [0]);
-    await P0.pass();
+    // P0 0 手牌 → 询问闪 skip → 直接受伤 → 酒诗/damageFlip
     await harness.waitForStable();
 
     P0.expectPending('请求回应');

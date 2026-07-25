@@ -105,8 +105,9 @@ describe('蛊惑', () => {
 
   it('无人质疑 → 声明杀生效(目标受伤,扣牌入弃牌堆)', async () => {
     const s1 = mkCard('s1', '杀', '♠', '7');
+    const d1 = mkCard('d1', '闪', '♥', '2');
     await harness.setup(
-      baseState({ yujiHand: ['s1'], cardMap: { s1 } }),
+      baseState({ yujiHand: ['s1'], p1Hand: ['d1'], cardMap: { s1, d1 } }),
     );
     const YJ = harness.player('于吉');
     const P1 = harness.player('P1');
@@ -136,7 +137,8 @@ describe('蛊惑', () => {
 
   it('质疑真牌 → 质疑者失1体力,声明杀仍生效', async () => {
     const s1 = mkCard('s1', '杀', '♠', '7'); // 真杀
-    await harness.setup(baseState({ yujiHand: ['s1'], cardMap: { s1 } }));
+    const d1 = mkCard('d1', '闪', '♥', '2');
+    await harness.setup(baseState({ yujiHand: ['s1'], p2Hand: ['d1'], cardMap: { s1, d1 } }));
     const YJ = harness.player('于吉');
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -386,11 +388,10 @@ describe('蛊惑', () => {
     const P0 = harness.player('P0');
 
     // P0 出杀 → 于吉不闪 → HP=0 → 濒死 → 求桃
-    // 模块 C:逆时针从当前回合 P0(idx1)起 → P0 先被问(无桃)→ pass
+    // 模块 C:逆时针从当前回合 P0(idx1)起 → P0 无桃被 skip,直接问 于吉(濒死者)
     await P0.useCardAndTarget('杀', 'atk', [0]);
     await YJ.pass(); // 不闪,受伤害进濒死
     expect(harness.state.players[0].health).toBe(0);
-    await P0.pass(); // P0 无桃跳过
 
     // 第二问 于吉(idx0,濒死者)
     const slot = [...harness.state.pendingSlots.values()][0].atom as {

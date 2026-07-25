@@ -66,13 +66,14 @@ describe('界孙策·界激昂', () => {
 
   it('第一段:孙策使用红色杀 → 发动 → 摸1张', async () => {
     const redKill = mkCard('rk', '杀', '♥', '7');
+    const jink = mkCard('j1', '闪', '♥', '2');
     await harness.setup(
       createGameState({
         players: [
           mkPlayer({ index: 0, name: '界孙策', skills: ['杀', '界激昂'], hand: ['rk'] }),
-          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: [] }),
+          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: ['j1'] }),
         ],
-        cardMap: { rk: redKill },
+        cardMap: { rk: redKill, j1: jink },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -99,13 +100,14 @@ describe('界孙策·界激昂', () => {
 
   it('第一段:孙策使用决斗 → 发动 → 摸1张', async () => {
     const duel = mkCard('jd', '决斗', '♠', 'A', '锦囊牌');
+    const kill = mkCard('k1', '杀', '♠', '5');
     await harness.setup(
       createGameState({
         players: [
           mkPlayer({ index: 0, name: '界孙策', skills: ['决斗', '界激昂'], hand: ['jd'] }),
-          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: [] }),
+          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: ['k1'] }),
         ],
-        cardMap: { jd: duel },
+        cardMap: { jd: duel, k1: kill },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -132,13 +134,14 @@ describe('界孙策·界激昂', () => {
 
   it('第一段:黑色杀不触发界激昂(无询问)', async () => {
     const blackKill = mkCard('bk', '杀', '♠', '3');
+    const jink = mkCard('j1', '闪', '♥', '2');
     await harness.setup(
       createGameState({
         players: [
           mkPlayer({ index: 0, name: '界孙策', skills: ['杀', '界激昂'], hand: ['bk'] }),
-          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: [] }),
+          mkPlayer({ index: 1, name: 'P2', skills: ['杀'], hand: ['j1'] }),
         ],
-        cardMap: { bk: blackKill },
+        cardMap: { bk: blackKill, j1: jink },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

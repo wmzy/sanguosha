@@ -85,7 +85,15 @@ describe('界挑衅', () => {
   it('目标出杀 + 姜维不出闪 → 姜维受伤,免于被弃(同标版行为)', async () => {
     const kill = mkCard('k1', '杀', '♠', '7');
     const extra = mkCard('e1', '闪', '♥', '3'); // 目标另有一张闪(不被弃,因免于被弃)
-    await harness.setup(build({ p1Hand: [kill.id, extra.id], extraCards: { k1: kill, e1: extra } }));
+    const jwShan = mkCard('jws', '闪', '♦', '2'); // 姜维含闪:走 normal 询问闪(pass=不出闪)
+    await harness.setup(
+      build({
+        p0Skills: ['界挑衅', '闪'],
+        p0Hand: [jwShan.id],
+        p1Hand: [kill.id, extra.id],
+        extraCards: { k1: kill, e1: extra, jws: jwShan },
+      }),
+    );
     const P0 = harness.player('界姜维');
     const P1 = harness.player('P1');
     const handBefore = harness.state.players[1].hand.length; // 2

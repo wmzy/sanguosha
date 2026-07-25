@@ -157,7 +157,7 @@ describe('界涅槃', () => {
     const PT = harness.player('界庞统');
 
     await P1.useCardAndTarget('杀', 's1', [0]);
-    await PT.pass();
+    // 庞统 0 手牌 → 询问闪 skip → 直接受伤濒死 → 界涅槃 confirm pending
     await harness.waitForStable();
     await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();
@@ -201,7 +201,7 @@ describe('界涅槃', () => {
     const PT = harness.player('界庞统');
 
     await P1.useCardAndTarget('杀', 's1', [0]);
-    await PT.pass();
+    // 庞统 0 手牌 → 询问闪 skip → 直接受伤濒死 → 界涅槃 confirm pending
     await harness.waitForStable();
     await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();
@@ -299,7 +299,7 @@ describe('界涅槃', () => {
 
     // 第一次濒死:发动界涅槃(回复至 maxHealth=1)
     await P1.useCardAndTarget('杀', 's3', [0]);
-    await PT.pass(); // 不出闪
+    // 庞统 0 手牌 → 询问闪 skip → 直接受伤濒死 → 界涅槃 confirm pending
     await harness.waitForStable();
     await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();

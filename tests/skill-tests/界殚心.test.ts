@@ -90,9 +90,8 @@ describe('界殚心', () => {
     const P1 = harness.player('P1');
     const P0 = harness.player('P0');
 
-    // P1 出杀,P0 不闪
+    // P1 出杀,P0 0 手牌 → 询问闪 skip → 直接受伤(无需 pass)
     await P1.triggerAction('杀', 'use', { cardId: 'c1', targets: [0] });
-    await P0.pass(); // 不闪
 
     // P0 受 1 伤,触发殚心询问
     expect(harness.state.players[0].health).toBe(2);
@@ -132,15 +131,13 @@ describe('界殚心', () => {
     const P1 = harness.player('P1');
     const P0 = harness.player('P0');
 
-    // 第一次受伤
+    // 第一次受伤(P0 0 手牌 → 询问闪 skip → 直接受伤)
     await P1.triggerAction('杀', 'use', { cardId: 'c1', targets: [0] });
-    await P0.pass();
     await P0.respond('界殚心', { choice: true }); // 发动殚心,X=0
     expect(modCount(harness.state, 0)).toBe(1);
 
     // 第二次受伤
     await P1.triggerAction('杀', 'use', { cardId: 'c2', targets: [0] });
-    await P0.pass();
 
     // 发动殚心,X=1
     P0.expectPending('请求回应');
@@ -179,10 +176,14 @@ describe('界殚心', () => {
     const P1 = harness.player('P1');
     const P0 = harness.player('P0');
 
-    // 三次受伤,三次发动
+    // 三次受伤,三次发动。P0 初始 0 手牌 → 首两次询问闪 skip;
+    // 第二次殚心摸 1 张后,第三次会被询问闪 → 需 pass 跳过
     for (let i = 0; i < 3; i++) {
       await P1.triggerAction('杀', 'use', { cardId: `c${i + 1}`, targets: [0] });
-      await P0.pass();
+      const hasShanAsk = [...harness.state.pendingSlots.values()].some(
+        (s) => (s.atom as { type: string }).type === '询问闪',
+      );
+      if (hasShanAsk) await P0.pass();
       await P0.respond('界殚心', { choice: true });
     }
 
@@ -216,7 +217,7 @@ describe('界殚心', () => {
     const P0 = harness.player('P0');
 
     await P1.triggerAction('杀', 'use', { cardId: 'c1', targets: [0] });
-    await P0.pass(); // 不闪
+    // P0 0 手牌 → 询问闪 skip → 直接受伤(无需 pass)
 
     // 触发殚心询问
     P0.expectPending('请求回应');

@@ -40,6 +40,7 @@ function makePlayer(
     handCount: 1,
     equipment: {},
     skills: [],
+    marks: [],
     ...over,
   };
 }

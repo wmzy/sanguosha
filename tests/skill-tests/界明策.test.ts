@@ -77,6 +77,7 @@ describe('界明策', () => {
 
   it('①:给杀 + target 选①出杀 + 命中 → killTarget 受伤,owner/target 各摸 1', async () => {
     const give = makeCard('g1', '杀', '♠', '7');
+    const p2shan = makeCard('p2sh', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
         // P0 = 界陈宫(明策 owner)
@@ -101,13 +102,13 @@ describe('界明策', () => {
         makePlayer({
           index: 2,
           name: 'P2',
-          hand: [],
-          skills: [],
+          hand: ['p2sh'],
+          skills: ['闪'],
           health: 4,
           maxHealth: 4,
         }),
       ],
-      cardMap: { g1: give },
+      cardMap: { g1: give, p2sh: p2shan },
       currentPlayerIndex: 0, // P0 自己回合
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

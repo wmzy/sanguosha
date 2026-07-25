@@ -283,9 +283,7 @@ describe('界破军', () => {
     expect(harness.state.players[1].equipment['武器']).toBeUndefined();
     expect(harness.state.players[1].vars['界破军/移出']).toEqual(['p1w']);
 
-    // 杀结算
-    P1.expectPending('询问闪');
-    await P1.pass();
+    // 杀结算:P1 0 手牌 → 询问闪 skip → 直接扣血
     await harness.waitForStable();
     // 破军移出装备后 P1 装备数 0 ≤ P0 装备数 0 → 增伤+1
     expect(harness.state.players[1].health).toBe(2); // 4 - 2 = 2
@@ -360,9 +358,7 @@ describe('界破军', () => {
 
     await P0.useCardAndTarget('杀', 's1', [1]);
 
-    // P1 无牌 → 破军不触发;直接进入杀结算
-    P1.expectPending('询问闪');
-    await P1.pass();
+    // P1 无牌 → 破军不触发;直接进入杀结算(0 手牌 → 询问闪 skip → 直接扣血)
     await harness.waitForStable();
     // P0 出杀后手牌 0,装备 0;P1 手牌 0,装备 0 → 增伤条件满足(P1 牌区皆 ≤ P0)
     expect(harness.state.players[1].health).toBe(2); // 4 - (1+1) = 2
@@ -447,8 +443,7 @@ describe('界破军', () => {
     await P0.respond('界破军', { choice: false });
     await harness.waitForStable();
 
-    P1.expectPending('询问闪');
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接扣血
     await harness.waitForStable();
 
     // P1 装备 2 > P0 装备 0 → 不增伤,只受 1 点
@@ -568,12 +563,7 @@ describe('界破军', () => {
     await harness.waitForStable();
     expect(harness.state.players[2].vars['界破军/移出']).toBeUndefined();
 
-    // 杀结算:P1 询问闪
-    const P1 = harness.player('P1');
-    P1.expectPending('询问闪');
-    await P1.pass();
-    await harness.waitForStable();
-
+    // 杀结算:P1 手牌被破军移空 → 0 手牌 → 询问闪 skip → 直接扣血
     // P2 询问闪
     const P2 = harness.player('P2');
     P2.expectPending('询问闪');
@@ -616,9 +606,7 @@ describe('界破军', () => {
     await harness.waitForStable();
     expect(harness.state.players[1].vars['界破军/移出']).toEqual(['t1']);
 
-    // 杀结算
-    P1.expectPending('询问闪');
-    await P1.pass();
+    // 杀结算:P1 手牌被破军移空 → 0 手牌 → 询问闪 skip → 直接扣血
     await harness.waitForStable();
 
     // 模拟 P1 回合结束(他人回合)— 不应归还
@@ -680,10 +668,8 @@ describe('界破军', () => {
     await harness.waitForStable();
     expect(harness.state.players[1].equipment['武器']).toBeUndefined();
 
-    // 杀结算 → P1 不闪 → 受伤
+    // 杀结算 → P1 0 手牌 → 询问闪 skip → 直接受伤
     // 增伤条件:P1.hand 0 ≤ P0.hand 0(出杀后),P1.equipCount 0 ≤ P0.equipCount 1 → 满足,+1
-    P1.expectPending('询问闪');
-    await P1.pass();
     await harness.waitForStable();
 
     expect(harness.state.players[1].health).toBe(2); // 4 - 2 = 2

@@ -5,6 +5,7 @@ import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
 import { resolveCardFilterCandidates } from './cardFilterCandidates';
 import { slashUsed } from '../slash-quota';
+import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../card-response-availability';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -72,25 +73,33 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         : 'player' in slot.atom && typeof slot.atom.player === 'number'
           ? (slot.atom as { player: number }).player
           : TARGET_SYSTEM;
-    const prompt = resolveCardFilterCandidates(
-      resolveChoosePlayerCandidates(rawPrompt, state),
-      state,
-      targetForResolve,
-    );
     // target 提取:'target' 字段优先;出牌窗口 用 'player';都无则 TARGET_SYSTEM
     const target = targetForResolve;
+    // 卡牌回应型 silent 模式:target 也不被询问——给观察型 prompt(与 applyView 一致)。
+    // 非卡牌回应型/广播/有匹配牌 → normal(用原始可操作 prompt)。
+    const isSilent = getCardResponseMode(state, slot.atom) === 'silent';
+    const prompt = isSilent
+      ? SILENT_RESPONSE_PROMPT
+      : resolveCardFilterCandidates(
+          resolveChoosePlayerCandidates(rawPrompt, state),
+          state,
+          targetForResolve,
+        );
     pending = {
       type: 'awaits',
       atom: slot.atom,
       prompt,
       target,
       isBlocking: slot.isBlocking,
+      // silent 模式标记:前端/headless 不当作可操作询问
+      ...(isSilent ? { responseMode: 'silent' as const } : {}),
       // slot.deadline 是相对开局时间 (Date.now() - state.startedAt + timeoutMs),
       // 前端用 (deadline - Date.now()) / 1000 算剩余秒数,需要绝对时间戳。
       deadline: state.startedAt + slot.deadline,
-      // totalMs = slot 的 timeout 秒数 * 1000, 前端进度条用
-      // 回退到 def.pending.timeout —— 与 createAndAwaitSlot 的实际定时器口径一致
-      totalMs: ((slot.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 30) * 1000,
+      // totalMs = slot 实际生效超时(silent=SHORT_DELAY_MS);回退到 def.pending.timeout。
+      totalMs:
+        slot.resolvedTimeoutMs ??
+        ((slot.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 30) * 1000,
     };
   } else {
     // 观察型 pending:当前 viewer 既无自己的 slot 也无广播 slot,但场上存在其他
@@ -127,6 +136,7 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         isBlocking: slot.isBlocking,
         deadline: state.startedAt + slot.deadline,
         totalMs:
+          slot.resolvedTimeoutMs ??
           ((slot.atom as { timeout?: number }).timeout ?? slot.definition.pending?.timeout ?? 30) *
           1000,
       };

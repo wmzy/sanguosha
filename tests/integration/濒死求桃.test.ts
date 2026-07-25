@@ -107,6 +107,9 @@ describe('濒死求桃', () => {
     const killId = giveCard(state, 0, '杀', 'kill', '♥', '基本牌');
     state.players[1].health = 1;
     state.players[1].maxHealth = 1;
+    // 给 P1 一张闪:使 询问闪 走 normal(skip/silent/normal 行为适配)。
+    // P1 仍不出闪(pass/超时),原 pending + fireTimeout 流程与死亡断言不变。
+    giveCard(state, 1, '闪', 'dodge', '♦', '基本牌');
     // 给 P1 一张装备(看后续是否会被弃掉)
     const equipId = giveCard(state, 1, '诸葛连弩', 'wp');
     state.cardMap[equipId] = {
@@ -203,6 +206,8 @@ describe('濒死求桃', () => {
   it('用例3:P1(HP=1)被 P0 杀 → 自身无桃 → P2 出桃救回 P1(HP=2)', async () => {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
     const peach: Card = makeCard('p1', '桃', '♥', '5');
+    // 给 P1 一张闪:使 询问闪 走 normal(适配 skip/silent/normal);P1 自身仍无桃。
+    const dodge: Card = makeCard('d1', '闪', '♦', '6');
 
     const state: GameState = createGameState({
       players: [
@@ -210,14 +215,14 @@ describe('濒死求桃', () => {
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: [],
+          hand: [dodge.id],
           skills: ['桃', '闪'],
           health: 1,
           maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
       ],
-      cardMap: { [slash.id]: slash, [peach.id]: peach },
+      cardMap: { [slash.id]: slash, [peach.id]: peach, [dodge.id]: dodge },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -345,21 +350,30 @@ describe('濒死求桃链:端到端(harness)', () => {
   it('用例1:P1 HP=1 → P0 杀 → P1 不救 → P2 出桃 → P1 救回(HP=1)', async () => {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
     const peach: Card = makeCard('p1', '桃', '♥', '5');
+    // 适配 skip/silent/normal:给 P1 一张闪(询问闪 走 normal)、P0 一张非桃牌(求桃(0) 走 silent),
+    // 保留原 expectPending + pass 步进与断言。
+    const dodge: Card = makeCard('d1', '闪', '♦', '6');
+    const decoy0: Card = makeCard('dc0', '杀', '♣', '3');
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, decoy0.id], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: [],
+          hand: [dodge.id],
           skills: ['桃', '闪'],
           health: 1,
           maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
       ],
-      cardMap: { [slash.id]: slash, [peach.id]: peach },
+      cardMap: {
+        [slash.id]: slash,
+        [peach.id]: peach,
+        [dodge.id]: dodge,
+        [decoy0.id]: decoy0,
+      },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -412,22 +426,32 @@ describe('濒死求桃链:端到端(harness)', () => {
   it('用例2:4 人局求桃顺序 = P0 → P3 → P2(P1 未被问到,因为 P2 救回)', async () => {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
     const peach: Card = makeCard('p1', '桃', '♥', '5');
+    // 适配 skip/silent/normal:P1 加闪(询问闪 normal)、P0/P3 各加非桃牌(求桃 silent),保留链顺序步进。
+    const dodge: Card = makeCard('d1', '闪', '♦', '6');
+    const decoy0: Card = makeCard('dc0', '杀', '♣', '3');
+    const decoy3: Card = makeCard('dc3', '杀', '♣', '4');
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, decoy0.id], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: [],
+          hand: [dodge.id],
           skills: ['桃', '闪'],
           health: 1,
           maxHealth: 4,
         }),
         makePlayer({ index: 2, name: 'P2', hand: [peach.id], skills: ['桃', '闪'] }),
-        makePlayer({ index: 3, name: 'P3', hand: [], skills: ['桃', '闪'] }),
+        makePlayer({ index: 3, name: 'P3', hand: [decoy3.id], skills: ['桃', '闪'] }),
       ],
-      cardMap: { [slash.id]: slash, [peach.id]: peach },
+      cardMap: {
+        [slash.id]: slash,
+        [peach.id]: peach,
+        [dodge.id]: dodge,
+        [decoy0.id]: decoy0,
+        [decoy3.id]: decoy3,
+      },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -483,10 +507,13 @@ describe('濒死求桃链:端到端(harness)', () => {
     const slash: Card = makeCard('k1', '杀', '♠', '7');
     const peach: Card = makeCard('p1', '桃', '♥', '5');
     const decoy: Card = makeCard('d1', '杀', '♣', '5');
+    // 适配 skip/silent/normal:P0 出杀后 0 手牌会致 求桃(0) skip,链顺序错位。
+    // 给 P0 一张非桃牌使 求桃(0) 走 silent(slot 仍在,pass 可推进)。
+    const decoy0: Card = makeCard('dc0', '杀', '♣', '3');
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, decoy0.id], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P1',
@@ -497,7 +524,12 @@ describe('濒死求桃链:端到端(harness)', () => {
         }),
         makePlayer({ index: 2, name: 'P2', hand: [decoy.id], skills: ['桃', '闪'] }),
       ],
-      cardMap: { [slash.id]: slash, [peach.id]: peach, [decoy.id]: decoy },
+      cardMap: {
+        [slash.id]: slash,
+        [peach.id]: peach,
+        [decoy.id]: decoy,
+        [decoy0.id]: decoy0,
+      },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -558,10 +590,15 @@ describe('濒死求桃链:端到端(harness)', () => {
     const wp: Card = makeCard('wp1', '诸葛连弩', '♣', 'A', '装备牌');
     (wp as Card & { subtype?: string; range?: number }).subtype = '武器';
     (wp as Card & { subtype?: string; range?: number }).range = 1;
+    // 适配 skip/silent/normal:P2/P3 0 手牌会致 求桃 slot skip、链顺序错位(跳到 P1)。
+    // 给 P0/P2/P3 各一张非桃牌使各自 求桃 走 silent(slot 仍在,pass 可推进),保留 0→3→2→1 步进。
+    const decoy0: Card = makeCard('dc0', '杀', '♣', '3');
+    const decoy2: Card = makeCard('dc2', '杀', '♣', '4');
+    const decoy3: Card = makeCard('dc3', '杀', '♣', '5');
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, decoy0.id], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P1',
@@ -571,10 +608,17 @@ describe('濒死求桃链:端到端(harness)', () => {
           health: 1,
           maxHealth: 4,
         }),
-        makePlayer({ index: 2, name: 'P2', hand: [], skills: ['桃', '闪'] }),
-        makePlayer({ index: 3, name: 'P3', hand: [], skills: ['桃', '闪'] }),
+        makePlayer({ index: 2, name: 'P2', hand: [decoy2.id], skills: ['桃', '闪'] }),
+        makePlayer({ index: 3, name: 'P3', hand: [decoy3.id], skills: ['桃', '闪'] }),
       ],
-      cardMap: { [slash.id]: slash, [decoyHand.id]: decoyHand, [wp.id]: wp },
+      cardMap: {
+        [slash.id]: slash,
+        [decoyHand.id]: decoyHand,
+        [wp.id]: wp,
+        [decoy0.id]: decoy0,
+        [decoy2.id]: decoy2,
+        [decoy3.id]: decoy3,
+      },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -625,6 +669,10 @@ describe('濒死求桃链:端到端(harness)', () => {
     const slash1: Card = makeCard('k1', '杀', '♠', '7');
     const slash2: Card = makeCard('k2', '杀', '♣', '8');
     const peach1: Card = makeCard('p1', '桃', '♥', '5');
+    // 适配 skip/silent/normal:链1 中 P1 0 手牌→询问闪 skip→P1.pass() 误触下游;
+    // P3 0 手牌→求桃(3) skip→链顺序错位。给 P1 一张闪、P3 一张非桃牌走 normal/silent。
+    const dodge1: Card = makeCard('dg1', '闪', '♦', '6');
+    const decoy3: Card = makeCard('dc3', '杀', '♣', '3');
 
     const state: GameState = createGameState({
       players: [
@@ -632,7 +680,7 @@ describe('濒死求桃链:端到端(harness)', () => {
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: [],
+          hand: [dodge1.id],
           skills: ['桃', '闪'],
           health: 1,
           maxHealth: 4,
@@ -641,7 +689,7 @@ describe('濒死求桃链:端到端(harness)', () => {
         makePlayer({
           index: 3,
           name: 'P3',
-          hand: [],
+          hand: [decoy3.id],
           skills: ['桃', '闪'],
           health: 1,
           maxHealth: 4,
@@ -651,6 +699,8 @@ describe('濒死求桃链:端到端(harness)', () => {
         [slash1.id]: slash1,
         [slash2.id]: slash2,
         [peach1.id]: peach1,
+        [dodge1.id]: dodge1,
+        [decoy3.id]: decoy3,
       },
       currentPlayerIndex: 0,
       phase: '出牌',

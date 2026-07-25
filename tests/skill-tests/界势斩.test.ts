@@ -104,7 +104,8 @@ describe('界势斩', () => {
 
   // ─── 1. 华雄不出杀 → 华雄输扣血 ──────────────────────────
   it('华雄不出杀 → 华雄扣 1 血', async () => {
-    const state = buildState();
+    const hxk = makeCard('hxk', '杀', '♠', '5'); // 华雄含杀:走 normal 询问杀
+    const state = buildState({ p0Hand: ['hxk'], extraCards: { hxk } });
     await harness.setup(state);
     const P0 = harness.player('P0');
 
@@ -127,10 +128,11 @@ describe('界势斩', () => {
   it('华雄出杀→P1 出杀→华雄再被询问→pass→华雄扣 1 血', async () => {
     const s0 = makeCard('s0', '杀', '♠', '5');
     const s1 = makeCard('s1', '杀', '♣', '7');
+    const s2 = makeCard('s2', '杀', '♥', '8'); // 华雄第二次询问时仍含杀:走 normal 询问杀
     const state = buildState({
-      p0Hand: ['s0'],
+      p0Hand: ['s0', 's2'],
       p1Hand: ['s1'],
-      extraCards: { s0, s1 },
+      extraCards: { s0, s1, s2 },
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
@@ -163,10 +165,11 @@ describe('界势斩', () => {
   // ─── 3. 目标(P1)不出杀 → P1 输扣血 ─────────────────────────
   it('华雄出杀→P1 不出 → P1 扣 1 血', async () => {
     const s0 = makeCard('s0', '杀', '♠', '5');
+    const p1k = makeCard('p1k', '杀', '♣', '7'); // P1 含杀:走 normal 询问杀
     const state = buildState({
       p0Hand: ['s0'],
-      p1Hand: [],
-      extraCards: { s0 },
+      p1Hand: ['p1k'],
+      extraCards: { s0, p1k },
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
@@ -193,7 +196,8 @@ describe('界势斩', () => {
 
   // ─── 4. 限两次:第三次被拒 ─────────────────────────────
   it('限两次:第三次被拒', async () => {
-    const state = buildState();
+    const hxk = makeCard('hxk', '杀', '♠', '5'); // 华雄含杀:走 normal 询问杀
+    const state = buildState({ p0Hand: ['hxk'], extraCards: { hxk } });
     await harness.setup(state);
     const P0 = harness.player('P0');
 
@@ -261,9 +265,11 @@ describe('界势斩', () => {
   // ─── 8. 跳过无懈可击:持无懈也不能抵消 ─────────────────────
   it('P1 持无懈可击 → 势斩决斗仍直接结算(不可被无懈抵消)', async () => {
     const wx = makeCard('wx1', '无懈可击', '♣', 'J', '锦囊牌');
+    const hxk = makeCard('hxk', '杀', '♠', '5'); // 华雄含杀:走 normal 询问杀
     const state = buildState({
+      p0Hand: ['hxk'],
       p1Hand: ['wx1'],
-      extraCards: { wx1: wx },
+      extraCards: { wx1: wx, hxk },
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
@@ -285,10 +291,12 @@ describe('界势斩', () => {
   // ─── 9. 与界耀武协同:决斗中华雄受伤 → 触发耀武摸牌(无 cardId→华雄摸)───
   it('协同:决斗华雄受伤 → 界耀武触发,华雄摸 1 张', async () => {
     const topCard = makeCard('top1', '闪', '♠', '2');
+    const hxk = makeCard('hxk', '杀', '♠', '5'); // 华雄含杀:走 normal 询问杀
     const state = buildState();
     // 把界耀武也加给华雄
     state.players[0].skills = ['界势斩', '界耀武', '杀'];
-    state.cardMap = { top1: topCard };
+    state.players[0].hand = ['hxk'];
+    state.cardMap = { top1: topCard, hxk };
     state.zones.deck = ['top1'];
     await harness.setup(state);
     const P0 = harness.player('P0');

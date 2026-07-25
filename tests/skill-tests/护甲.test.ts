@@ -60,12 +60,13 @@ describe('护甲', () => {
 
   it('正面:黑色杀(黑桃)→ 伤害 -1,不扣血', async () => {
     const blackSlash = makeCard('k1', '杀', '♠', '7'); // 黑桃=黑色
+    const shan = makeCard('s1', '闪', '♥', '4');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪', '护甲'] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['闪', '护甲'] }),
       ],
-      cardMap: { k1: blackSlash },
+      cardMap: { k1: blackSlash, s1: shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

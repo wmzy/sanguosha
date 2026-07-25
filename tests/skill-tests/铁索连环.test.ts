@@ -112,6 +112,39 @@ describe('铁索连环', () => {
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);
   });
 
+  // ─── use:混合目标(一个横置 + 一个重置)───
+  // bug 回归:对 [未横置A, 已横置B] 同时使用,期望 A 横置、B 重置(toggle 各自独立)。
+  // 此前仅测了纯横置 / 单目标重置,未覆盖「同一张牌内混合 toggle」。
+  it('use:混合目标[未横置A, 已横置B] → A横置, B重置', async () => {
+    const chain = mkCard('chainMix', '铁索连环', '♣', '3', '锦囊牌');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', hand: ['chainMix'], skills: ['铁索连环'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+          mkPlayer({ index: 2, name: 'P2', character: '反', marks: [{ id: 'chained', scope: 2 }] }),
+        ],
+        cardMap: { chainMix: chain },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    // P1 未横置, P2 已横置
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);
+    expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(true);
+
+    await P0.triggerAction('铁索连环', 'use', { cardId: 'chainMix', targets: [1, 2] });
+    await P0.pass(); // 无懈 target 1
+    await P0.pass(); // 无懈 target 2
+
+    // P1 被横置, P2 被重置(各自独立 toggle)
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+    expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);
+  });
+
   it('use:目标数不合法拒绝', async () => {
     const chain = mkCard('chain3', '铁索连环', '♣', 'K', '锦囊牌');
     await harness.setup(

@@ -136,6 +136,7 @@ describe('界补益', () => {
         trick1: makeCard('trick1', '过河拆桥', '♠', '3', '锦囊牌'),
         equip1: makeCard('equip1', '青釭剑', '♠', '6', '装备牌', '武器'),
         sha1: makeCard('sha1', '杀', '♠', '7'),
+        tao1: makeCard('tao1', '桃', '♥', '5'),
       },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -147,7 +148,11 @@ describe('界补益', () => {
     const P2 = harness.player('P2');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // P1 不闪 → 进入濒死(1→0 血)
+    if ((opts.p1Hand ?? []).length > 0) {
+      // P1 有手牌但无闪 → silent 询问闪 slot,pass 推进至濒死
+      await P1.pass();
+    }
+    // P1 0 手牌 → 询问闪 skip → 直接进入濒死(1→0 血)
 
     return { harness, P0, P1, P2 };
   }
@@ -332,6 +337,7 @@ describe('界补益', () => {
     const { harness, P2 } = await setupDyingScenario({
       p1Hand: [],
       p1Equipment: {},
+      p0Hand: ['k1', 'tao1'],
     });
 
     // P2 不应收到补益 confirm;系统直接进入求桃

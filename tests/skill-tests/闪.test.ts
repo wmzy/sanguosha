@@ -109,9 +109,7 @@ describe('闪', () => {
     const P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
-    P2.expectPending('询问闪');
-    await P2.pass(); // 不出闪
-
+    // P2 无手牌:询问闪走 skip(无 slot),直接扣血
     expect(harness.state.players[1].health).toBe(3);
   });
 
@@ -162,13 +160,15 @@ describe('闪', () => {
 
   it('负面:不在手牌的卡被拒绝', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
+    const dodgeInHand = makeCard('s1', '闪', '♥', '2');
     const dodgeElsewhere = makeCard('sX', '闪', '♥', '9');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪'] }),
+        // P2 带一张闪:询问闪走 normal,验证用不在手牌的闪被拒
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['闪'] }),
       ],
-      cardMap: { k1: slash, sX: dodgeElsewhere },
+      cardMap: { k1: slash, s1: dodgeInHand, sX: dodgeElsewhere },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

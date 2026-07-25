@@ -136,13 +136,8 @@ describe('决斗', () => {
     expect(P1.respondableCards().map((c) => c.id)).toEqual(['p1s']);
     await P1.respond('杀', { cardId: 'p1s' });
 
-    // 窗口 4:再轮转 → P2 被询问(手中已无杀)
-    P2.expectPending('询问杀');
-    const info4 = P2.respondInfo();
-    expect(info4?.skillId).toBe('杀');
-    // P2 手中无牌 → respondableCards 空
-    expect(P2.respondableCards()).toEqual([]);
-    await P2.pass();
+    // 窗口 4:再轮转 → P2 手牌已空 → 询问杀 skip(不创建 slot、无延时),P2 直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     // P2 扣 1 血
     expect(harness.state.players[1].health).toBe(p2HealthBefore - 1);
@@ -175,13 +170,8 @@ describe('决斗', () => {
     await P1.triggerAction('决斗', 'use', { cardId: 'jd1', targets: [1] });
     await P1.pass(); // 消耗无懈窗口
 
-    P2.expectPending('询问杀');
-    const info = P2.respondInfo();
-    expect(info?.skillId).toBe('杀');
-    expect(info?.cardFilter).toBeDefined();
-    // P2 无手牌 → respondableCards 空
-    expect(P2.respondableCards()).toEqual([]);
-    await P2.pass();
+    // P2 无手牌 → 询问杀 skip:不创建 slot、无延时,直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     expect(harness.state.players[1].health).toBe(p2HealthBefore - 1);
     expect(harness.state.zones.discardPile).toContain('jd1');

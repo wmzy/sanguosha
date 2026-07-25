@@ -76,6 +76,7 @@ describe('界疠火', () => {
 
   it('transformThenUse:普通杀当火杀 → 影子卡 damageType=火焰 + 扣血', async () => {
     const slash = makeCard('s1', '杀', '♠', '7'); // 普通杀
+    const jink = makeCard('j1', '闪', '♥', '3');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -84,9 +85,9 @@ describe('界疠火', () => {
           hand: ['s1', 'c0'],
           skills: ['界疠火', '杀', '闪'],
         }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['j1'], skills: ['闪'] }),
       ],
-      cardMap: { s1: slash, c0: makeCard('c0', '闪', '♣', '2') },
+      cardMap: { s1: slash, c0: makeCard('c0', '闪', '♣', '2'), j1: jink },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -354,6 +355,8 @@ describe('界疠火', () => {
 
   it('多目标:转化火杀选 2 目标 → 两目标都扣血(代价仅 1 次)', async () => {
     const slash = makeCard('s1', '杀', '♠', '7');
+    const jink1 = makeCard('j1', '闪', '♥', '3');
+    const jink2 = makeCard('j2', '闪', '♥', '4');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -362,10 +365,10 @@ describe('界疠火', () => {
           hand: ['s1', 'c0'],
           skills: ['界疠火', '杀', '闪'],
         }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
-        makePlayer({ index: 2, name: 'P2', hand: [], skills: ['闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['j1'], skills: ['闪'] }),
+        makePlayer({ index: 2, name: 'P2', hand: ['j2'], skills: ['闪'] }),
       ],
-      cardMap: { s1: slash, c0: makeCard('c0', '闪', '♣', '2') },
+      cardMap: { s1: slash, c0: makeCard('c0', '闪', '♣', '2'), j1: jink1, j2: jink2 },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

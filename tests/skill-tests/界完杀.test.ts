@@ -76,10 +76,10 @@ describe('界完杀', () => {
             health: 3,
             maxHealth: 3,
           }),
-          mkPlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 1, maxHealth: 4 }),
+          mkPlayer({ index: 1, name: 'P2', hand: ['p2sh'], skills: ['闪'], health: 1, maxHealth: 4 }),
           mkPlayer({ index: 2, name: 'P3', hand: [peach.id], skills: ['桃'], health: 4 }),
         ],
-        cardMap: { s1: slash, p1: peach },
+        cardMap: { s1: slash, p1: peach, p2sh: mkCard('p2sh', '闪', '♥', '2') },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -123,10 +123,10 @@ describe('界完杀', () => {
             health: 3,
             maxHealth: 3,
           }),
-          mkPlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 1, maxHealth: 4 }),
+          mkPlayer({ index: 1, name: 'P2', hand: ['p2sh'], skills: ['闪'], health: 1, maxHealth: 4 }),
           mkPlayer({ index: 2, name: 'P3', hand: [], skills: [], health: 4 }),
         ],
-        cardMap: { s2: slash, p2: peach },
+        cardMap: { s2: slash, p2: peach, p2sh: mkCard('p2sh', '闪', '♥', '2') },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -163,7 +163,7 @@ describe('界完杀', () => {
             health: 3,
             maxHealth: 3,
           }),
-          mkPlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 1, maxHealth: 4 }),
+          mkPlayer({ index: 1, name: 'P2', hand: ['p2sh'], skills: ['闪'], health: 1, maxHealth: 4 }),
           mkPlayer({
             index: 2,
             name: 'P3',
@@ -173,7 +173,7 @@ describe('界完杀', () => {
             health: 4,
           }),
         ],
-        cardMap: { s4: slash, p4: peach },
+        cardMap: { s4: slash, p4: peach, p2sh: mkCard('p2sh', '闪', '♥', '2') },
         currentPlayerIndex: 2, // P3 回合
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -187,12 +187,9 @@ describe('界完杀', () => {
     await P2.pass();
     await harness.waitForStable();
 
-    // P2 濒死 → 求桃顺序(模块 C:逆时针从当前回合 P3 起):P3 → P2(濒死)→ 贾诩
-    // 非贾诩回合 → 完杀不生效
-    await P3.pass(); // P3 无桃 pass
-    await harness.waitForStable();
-    // 接下来问 P2(濒死者)→ P2 也无桃 pass
-    await P2.pass();
+    // P2 濒死 → 求桃(P2 含闪走 normal 询问闪,pass 跳过后进入求桃)
+    // 非贾诩回合 → 完杀不生效;P2 无桃 pass 后问贾诩 → 贾诩出桃救援
+    await P2.pass(); // 跳过 P2(濒死者)的求桃
     await harness.waitForStable();
     // 现在问贾诩 → 贾诩出桃救援
     await JX.respond('桃', { cardId: 'p4' });
@@ -221,7 +218,7 @@ describe('界完杀', () => {
             health: 3,
             maxHealth: 3,
           }),
-          mkPlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 1, maxHealth: 4 }),
+          mkPlayer({ index: 1, name: 'P2', hand: ['p2sh'], skills: ['闪'], health: 1, maxHealth: 4 }),
           // P3 = 华佗,有红色牌可急救,但被完杀压制
           mkPlayer({
             index: 2,
@@ -232,7 +229,7 @@ describe('界完杀', () => {
             health: 4,
           }),
         ],
-        cardMap: { s5: slash, r1: redCard },
+        cardMap: { s5: slash, r1: redCard, p2sh: mkCard('p2sh', '闪', '♥', '2') },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -284,10 +281,10 @@ describe('界完杀', () => {
             health: 3,
             maxHealth: 3,
           }),
-          mkPlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 1, maxHealth: 4 }),
+          mkPlayer({ index: 1, name: 'P2', hand: ['p2sh'], skills: ['闪'], health: 1, maxHealth: 4 }),
           mkPlayer({ index: 2, name: 'P3', hand: [], skills: [], health: 4 }),
         ],
-        cardMap: { s6: slash, p6: peach },
+        cardMap: { s6: slash, p6: peach, p2sh: mkCard('p2sh', '闪', '♥', '2') },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

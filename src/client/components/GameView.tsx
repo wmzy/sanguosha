@@ -44,6 +44,7 @@ import {
   isActiveAction,
 } from '../utils/gameViewHelpers';
 import { SUIT_COLOR } from './gameViewConstants';
+import { displaySkillName } from '../utils/skillDisplay';
 
 // ─── 抽取的 hooks ───
 import { useAnimationState } from '../hooks/useAnimationState';
@@ -217,6 +218,7 @@ export function GameViewComponentImpl({
     distExternalCandidates,
     selectedActive,
     playButtonState,
+    selectedRespondCardId,
     altActions,
     playRules,
     handleCardClick,
@@ -225,6 +227,7 @@ export function GameViewComponentImpl({
     handleSkillAction,
     handleTransformPlay,
     handleRespond,
+    handlePlayRespond,
     handleEndTurn,
     handleConfirmDiscard,
     isTargetable,
@@ -431,7 +434,7 @@ export function GameViewComponentImpl({
                             {transformMode.minCards > 1
                               ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})`
                               : ''}{' '}
-                            · 源技能 {transformMode.skillId}
+                            · 源技能 {displaySkillName(transformMode.skillId)}
                           </span>
                         )}
                         {transformMode && (
@@ -449,9 +452,21 @@ export function GameViewComponentImpl({
                           !isDiscardPhase &&
                           pending?.prompt?.type === 'useCard' &&
                           !broadcastSkipped && (
-                            <button className={styles.promptBtn} onClick={() => handleRespond()}>
-                              不回应
-                            </button>
+                            <>
+                              <button
+                                className={cx(
+                                  styles.playBtn,
+                                  !selectedRespondCardId && styles.btnDisabled,
+                                )}
+                                onClick={handlePlayRespond}
+                                disabled={!selectedRespondCardId}
+                              >
+                                打出
+                              </button>
+                              <button className={styles.promptBtn} onClick={() => handleRespond()}>
+                                不回应
+                              </button>
+                            </>
                           )}
                         {canOperate &&
                           selectedActive &&
@@ -485,16 +500,19 @@ export function GameViewComponentImpl({
                         {canOperate &&
                           selectedActive &&
                           transformMode?.minCards === 1 &&
-                          selectedCardId && (
-                            <button
-                              className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)}
-                              onClick={() => selectedTarget && handleTransformPlay(selectedTarget)}
-                              disabled={!selectedTarget}
-                            >
-                              使用{transformMode.wrapperName}
-                              {selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
-                            </button>
-                          )}
+                          selectedCardId &&
+                          (() => {
+                            return (
+                              <button
+                                className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)}
+                                onClick={() => selectedTarget && handleTransformPlay(selectedTarget)}
+                                disabled={!selectedTarget}
+                              >
+                                使用{transformMode.wrapperName}
+                                {selectedTarget ? ` → ${selectedTarget}` : ' (请选目标)'}
+                              </button>
+                            );
+                          })()}
                         {canOperate &&
                           selectedActive &&
                           !transformMode &&
@@ -521,7 +539,7 @@ export function GameViewComponentImpl({
                               className={styles.playBtn}
                               onClick={() => handleSkillAction(a)}
                             >
-                              {a.label}
+                              {displaySkillName(a.label)}
                             </button>
                           ))}
                         {showEndTurn && (
@@ -729,6 +747,9 @@ export function GameViewComponentImpl({
                   transformMode.selectedCardIds.includes(card.id)
                 );
               const isDiscardSelected = selectedForDiscard.has(card.id);
+              // useCard 类回应:选中牌高亮(仅回应窗口生效,与弃牌/出牌阶段互斥)
+              const isRespondSelected =
+                isMyAwaiting && !isDistributeActive && selectedRespondCardId === card.id;
               const useAction = findUseActionForCard(skillActions, card);
               const playBlocked =
                 isMyTurn &&
@@ -767,6 +788,7 @@ export function GameViewComponentImpl({
                     totalHand={orderedHand.length}
                     isSelected={isSelected}
                     isDiscardSelected={isDiscardSelected}
+                    isRespondSelected={isRespondSelected}
                     canPlay={canPlay}
                     isAwaiting={isAwaiting}
                     canDiscardClick={canDiscardClick}

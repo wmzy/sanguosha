@@ -77,6 +77,12 @@ export interface PendingView {
   isBlocking?: boolean;
   /** 强制型回应(如英魂弃牌):前端隐藏"不回应"按钮 + 走多牌选择 UI。 */
   mandatory?: boolean;
+  /** 卡牌回应型 atom 的模式(询问闪/询问杀/请求回应-useCard-cardFilter):
+   *  - 'normal' = target 有匹配响应牌,正常可操作询问(useCard prompt);
+   *  - 'silent' = target 有手牌但无匹配牌,target 不被询问(观察型 confirm prompt),
+   *               仅展示短倒计时;headless/AI 座次不为该 pending 生成 skip/respond action。
+   *  无值(undefined)= 非卡牌回应型或 skip(skip 不设置 pending)。 */
+  responseMode?: 'normal' | 'silent';
   /** 由 events 消息权威下发;applyView 不再硬编码 */
   deadline?: number;
   /** 倒计时总时长(ms),前端进度条用 deadline-totalMs..deadline 映射;由 events 消息权威下发 */

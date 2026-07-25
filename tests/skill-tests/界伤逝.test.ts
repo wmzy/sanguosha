@@ -92,9 +92,9 @@ describe('界伤逝', () => {
     const P1 = harness.player('攻');
     const P0 = harness.player('春华');
 
-    // 攻杀春华 → 春华不闪 → 受1伤(health=2,X=1) → hand=0 < 1 → 伤逝触发
+    // 攻杀春华 → 春华 0 手牌 → 询问闪 skip(不创建 slot)→ 直接扣血(health=2,X=1)
+    // → hand=0 < 1 → 伤逝触发(无需 pass 推进闪询问)
     await P1.useCardAndTarget('杀', 'k1', [0]);
-    await P0.pass();
     await waitForStable(harness.state);
 
     // 应有伤逝 confirm pending

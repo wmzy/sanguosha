@@ -249,7 +249,9 @@ describe('界双雄', () => {
     // 模拟双雄已发动:turn.vars['界双雄/color']='黑'
     // P1 手牌:c1(♥闪,红色,异色可转化)
     // P2 无杀 → 决斗中 P2 先被询问杀 → pass → P2 输 → 扣1血
+    // P2 含杀(走 normal 询问杀,pass 表示不出杀→输→扣血)
     const c1 = makeCard('c1', '闪', '♥', '2');
+    const p2k = makeCard('p2k', '杀', '♠', '5');
     await harness.setup(
       createGameState({
         players: [
@@ -259,9 +261,9 @@ describe('界双雄', () => {
             hand: ['c1'],
             skills: ['界双雄', '决斗'],
           }),
-          makePlayer({ index: 1, name: 'P2', hand: [], skills: ['杀'] }),
+          makePlayer({ index: 1, name: 'P2', hand: ['p2k'], skills: ['杀'] }),
         ],
-        cardMap: { c1 },
+        cardMap: { c1, p2k },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: { '界双雄/color': '黑' } },

@@ -250,13 +250,8 @@ describe('雷击', () => {
 
     await P1.useCardAndTarget('杀', 'k1', [0]);
     await waitForStable(harness.state);
-    P0.expectPending('询问闪');
 
-    // 张角不出闪
-    await P0.pass();
-    await waitForStable(harness.state);
-
-    // 雷击未触发:无 请求回应 pending;判定牌未被消耗
+    // 张角手牌为空 → 走 skip 模式,无 pending slot,直接扣血
     expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.zones.deck).toContain('j1');
     // 杀命中:张角受 1 点伤害(无闪)

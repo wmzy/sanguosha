@@ -172,6 +172,7 @@ describe('涅槃', () => {
   it('限定技:用过一次后再次濒死不再触发涅槃', async () => {
     const slash1 = mkCard('s3', '杀', '♠', '4');
     const slash2 = mkCard('s4', '杀', '♠', '5');
+    const shan = mkCard('pt3', '闪', '♣', '2'); // 手牌含闪:首杀走 normal 询问闪,pass 跳过闪而非涅槃
 
     await harness.setup(
       createGameState({
@@ -180,7 +181,7 @@ describe('涅槃', () => {
             index: 0,
             name: '庞统',
             character: '庞统',
-            hand: [],
+            hand: [shan.id],
             skills: ['涅槃'],
             health: 1,
             maxHealth: 1, // 便于二次濒死
@@ -193,7 +194,7 @@ describe('涅槃', () => {
             skills: ['杀', '诸葛连弩'], // 连弩:无限出杀
           }),
         ],
-        cardMap: { s3: slash1, s4: slash2 },
+        cardMap: { s3: slash1, s4: slash2, pt3: shan },
         currentPlayerIndex: 1,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

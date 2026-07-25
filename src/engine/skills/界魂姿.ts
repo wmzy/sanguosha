@@ -11,7 +11,7 @@
 //   准备阶段(「阶段开始」phase='准备' after-hook):ownerId 体力为1 + 未觉醒过 →
 //     1. 设上限(player=owner, amount=maxHealth-1)— 减1点体力上限(设上限会 clamp 体力,
 //        当前1 ≤ 新上限,体力保持1)
-//     2. 添加技能(player=owner, skillId='英姿')— 普通版,以文档为准(非界英姿)
+//     2. 添加技能(player=owner, skillId='界英姿')— 界限突破版(锁定技,界孙策觉醒获界英姿)
 //     3. 添加技能(player=owner, skillId='英魂')
 //     4. 置 END_BONUS_KEY=true,标记本回合结束阶段需执行收益
 //   结束阶段(「阶段开始」phase='回合结束' after-hook):若 END_BONUS_KEY →
@@ -30,6 +30,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { performYinghunPrepare } from './英魂';
 
 // 觉醒标记:沿用标版键名 '魂姿/awakened',供复用的标 制霸/界制霸 读取觉醒状态。
 const AWAKENED_KEY = '魂姿/awakened';
@@ -46,7 +47,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界魂姿',
     description:
-      '觉醒技:准备阶段且体力为1时,减1体力上限并永久获得"英姿""英魂";本回合结束阶段摸2牌或回复1体力',
+      '觉醒技:准备阶段且体力为1时,减1体力上限并永久获得"界英姿""英魂";本回合结束阶段摸2牌或回复1体力',
   };
 }
 
@@ -71,11 +72,17 @@ async function awaken(state: GameState, ownerId: number): Promise<void> {
     amount: self.maxHealth - 1,
   });
 
-  // 2. 永久获得"英姿"(普通版,以文档为准)
-  await applyAtom(state, { type: '添加技能', player: ownerId, skillId: '英姿' });
+  // 2. 永久获得"界英姿"(锁定技:摸牌阶段强制多摸1 + 手牌上限=体力上限)
+  //    界孙策为界限突破武将,觉醒获界英姿(而非标版普通版英姿)。
+  await applyAtom(state, { type: '添加技能', player: ownerId, skillId: '界英姿' });
 
   // 3. 永久获得"英魂"
   await applyAtom(state, { type: '添加技能', player: ownerId, skillId: '英魂' });
+
+  // 4. 觉醒当回合:英魂需在同一个准备阶段立即发动。
+  //    (英魂 before-hook 在本准备阶段 applyAtom 入口即被快照收集,此时英魂尚未添加,
+  //     不在快照,错过时机;详见 英魂.performYinghunPrepare 注释)
+  await performYinghunPrepare(state, ownerId);
 }
 
 /** 界魂姿觉醒当回合结束阶段收益:摸两张牌 或 回复1点体力(强制二选一)。 */

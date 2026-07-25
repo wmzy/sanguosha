@@ -269,6 +269,7 @@ describe('涯角', () => {
   it('自己回合出杀 → 涯角不触发', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const deckTop = makeCard('d1', '桃', '♦', '3');
+    const p1shan = makeCard('sh1', '闪', '♥', '2'); // P1 手牌含闪:走 normal 询问闪
 
     const state: GameState = createGameState({
       players: [
@@ -281,9 +282,9 @@ describe('涯角', () => {
           health: 4,
           maxHealth: 4,
         }),
-        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [p1shan.id], skills: ['闪'] }),
       ],
-      cardMap: { [slash.id]: slash, [deckTop.id]: deckTop },
+      cardMap: { [slash.id]: slash, [deckTop.id]: deckTop, [p1shan.id]: p1shan },
       zones: { deck: [deckTop.id], discardPile: [], processing: [] },
       currentPlayerIndex: 0, // P0 自己的回合
       phase: '出牌',

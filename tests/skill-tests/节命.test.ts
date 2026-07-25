@@ -95,7 +95,7 @@ describe('节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // 不出闪
+    // P1 无手牌:询问闪走 skip(无 slot),直接扣血 → 受伤后触发节命
 
     // 受伤后:荀彧被询问是否发动节命
     P1.expectPending('请求回应');
@@ -151,7 +151,7 @@ describe('节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 无手牌:询问闪走 skip(无 slot),直接扣血 → 受伤后触发节命
 
     P1.expectPending('请求回应');
     await P1.respond('节命', { choice: true });
@@ -203,7 +203,7 @@ describe('节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 无手牌:询问闪走 skip(无 slot),直接扣血 → 受伤后触发节命
 
     P1.expectPending('请求回应');
     await P1.respond('节命', { choice: true });
@@ -241,7 +241,7 @@ describe('节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 无手牌:询问闪走 skip(无 slot),直接扣血 → 受伤后触发节命
 
     P1.expectPending('请求回应');
     await P1.respond('节命', { choice: false });
@@ -284,7 +284,7 @@ describe('节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 无手牌:询问闪走 skip(无 slot),直接扣血 → 受伤后触发节命
 
     P1.expectPending('请求回应');
     await P1.respond('节命', { choice: true });

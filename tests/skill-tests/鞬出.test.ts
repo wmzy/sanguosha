@@ -184,9 +184,8 @@ describe('鞬出', () => {
     const P2 = harness.player('P2');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // 目标无牌 → 鞬出不询问,直接进入询问闪
-    P2.expectPending('询问闪');
-    await P2.pass();
+    // 目标无牌 → 鞬出不询问;P2 手牌为空 → 走 skip 模式,无 pending slot,直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     expect(harness.state.players[1].health).toBe(3);
   });

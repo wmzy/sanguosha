@@ -71,6 +71,7 @@ describe('丈八蛇矛', () => {
   it('transformThenUse:2 张手牌当杀 → 创建影子杀,P2 扣血', async () => {
     const c1 = makeCard('c1', '闪', '♠', '2');
     const c2 = makeCard('c2', '桃', '♣', '3');
+    const d1 = makeCard('d1', '闪', '♥', '4');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -80,9 +81,9 @@ describe('丈八蛇矛', () => {
           skills: ['丈八蛇矛', '杀', '闪'],
           equipment: { 武器: 'zb' },
         }),
-        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
-      cardMap: { zb: ZHANGBA, c1, c2 },
+      cardMap: { zb: ZHANGBA, c1, c2, d1 },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

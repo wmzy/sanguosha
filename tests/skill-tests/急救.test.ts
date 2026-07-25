@@ -73,7 +73,7 @@ describe('急救', () => {
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: ['c1'],
+          hand: ['c1', 'p0s'],
           skills: ['杀'],
           health: 4,
           maxHealth: 4,
@@ -87,7 +87,7 @@ describe('急救', () => {
           maxHealth: 3,
         }),
       ],
-      cardMap: { c1: slash, r1: redCard },
+      cardMap: { c1: slash, r1: redCard, p0s: makeCard('p0s', '闪', '♣', '3') },
       currentPlayerIndex: 0, // P0 回合 → 华佗处于"回合外"
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -139,7 +139,7 @@ describe('急救', () => {
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: ['c1'],
+          hand: ['c1', 'p0s'],
           skills: ['杀'],
           health: 4,
           maxHealth: 4,
@@ -155,12 +155,13 @@ describe('急救', () => {
         makePlayer({
           index: 2,
           name: 'P2',
+          hand: ['p2s'],
           skills: ['闪'],
           health: 1,
           maxHealth: 4,
         }),
       ],
-      cardMap: { c1: slash, r1: redCard },
+      cardMap: { c1: slash, r1: redCard, p0s: makeCard('p0s', '闪', '♣', '3'), p2s: makeCard('p2s', '闪', '♦', '6') },
       currentPlayerIndex: 0, // P0 回合 → 华佗处于"回合外"
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

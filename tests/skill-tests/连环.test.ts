@@ -26,6 +26,7 @@ function mkPlayer(opts: {
   hand?: string[];
   skills?: string[];
   health?: number;
+  marks?: Array<{ id: string; scope: number }>;
 }): GameState['players'][number] {
   return {
     index: opts.index,
@@ -38,7 +39,7 @@ function mkPlayer(opts: {
     equipment: {},
     skills: opts.skills ?? [],
     vars: {},
-    marks: [],
+    marks: opts.marks ?? [],
     pendingTricks: [],
     tags: [],
     judgeZone: [],
@@ -179,6 +180,48 @@ describe('连环·重铸', () => {
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
     // 梅花手牌被转化消耗(不在手牌)
     expect(harness.state.players[0].hand).not.toContain('c1');
+  });
+
+  // ─── transform:重置已横置角色(庞统梅花牌→铁索连环 toggle 重置)───
+  // bug 回归:庞统用连环将梅花牌当铁索连环,对「已横置」角色使用应重置(解除连环)。
+  // 此前仅测了 transform→横置,未覆盖 transform→重置路径。
+  it('transform:梅花牌当铁索连环,重置已横置角色', async () => {
+    const club = mkCard('c2', '杀', '♣', '7'); // 梅花杀
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '庞统',
+            character: '庞统',
+            hand: [club.id],
+            skills: ['连环', '铁索连环'],
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', marks: [{ id: 'chained', scope: 1 }] }),
+        ],
+        cardMap: { c2: club },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const PT = harness.player('庞统');
+
+    // 确认 P1 初始已横置
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+
+    await PT.transformThenUse(
+      '连环',
+      { cardId: 'c2' },
+      '铁索连环',
+      { cardId: 'c2#连环', targets: [1] },
+    );
+    await PT.pass(); // 无懈可击 pass
+
+    // P1 被重置(不再横置)
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);
+    // 梅花手牌被转化消耗
+    expect(harness.state.players[0].hand).not.toContain('c2');
   });
 
   it('transform:非梅花牌拒绝', async () => {

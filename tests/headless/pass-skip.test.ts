@@ -257,3 +257,62 @@ describe('HeadlessGameClient.getAvailableActions() — respond params 填充', (
     expect(skipAction).toBeDefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// 卡牌回应 silent 模式:target 有手牌但无匹配响应牌 → 不被询问。
+// headless 不应为该 pending 生成 skip/respond action(否则 AI 提前 skip 绕过短延时,
+// 暴露"无匹配牌"信息)。needsAction 也应为 false。
+// ─────────────────────────────────────────────────────────────
+describe('HeadlessGameClient — 卡牌回应 silent 模式不生成 action', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('询问杀 silent(target 无杀但有手牌):getAvailableActions 无 skip/respond,needsAction=false', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 1;
+    const flashCard: Card = { id: 'f1', name: '闪', suit: '♥', color: '红', rank: '5', type: '基本牌' };
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
+      {
+        type: 'awaits',
+        atom: { type: '询问杀', target: 1, source: 0 },
+        prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
+        target: 1,
+        isBlocking: true,
+        responseMode: 'silent',
+      },
+      1,
+      [flashCard],
+    );
+
+    // needsAction=false:silent 模式下该座次不应被提示行动(让短延时自然超时)
+    expect(hgc.needsAction()).toBe(false);
+    const actions = hgc.getAvailableActions();
+    // 不生成 skip/respond(避免 AI 提前 skip 绕过延时)
+    expect(actions.filter((a) => a.category === 'respond')).toHaveLength(0);
+    expect(actions.filter((a) => a.category === 'skip')).toHaveLength(0);
+  });
+
+  it('询问杀 normal(target 有杀):维持现状——生成 respond + skip', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 1;
+    const killCard: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
+      {
+        type: 'awaits',
+        atom: { type: '询问杀', target: 1, source: 0 },
+        prompt: { type: 'useCard', title: '是否出杀', cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 } },
+        target: 1,
+        isBlocking: true,
+        responseMode: 'normal',
+      },
+      1,
+      [killCard],
+    );
+
+    expect(hgc.needsAction()).toBe(true);
+    const actions = hgc.getAvailableActions();
+    expect(actions.filter((a) => a.category === 'respond').length).toBeGreaterThan(0);
+    expect(actions.find((a) => a.category === 'skip')).toBeDefined();
+  });
+});

@@ -93,8 +93,8 @@ describe('万箭齐发', () => {
     await harness.player('P1').useCardAndTarget('万箭齐发', 'wj1', []);
     await consumeNullWindow();
 
-    P2.expectPending('询问闪');
-    await P2.pass(); // 不出闪
+    // P2 手牌为 0 → 询问闪 skip(无 slot、无延时),直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
 
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('wj1');

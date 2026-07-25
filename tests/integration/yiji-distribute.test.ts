@@ -82,8 +82,7 @@ describe('遗计:端到端(harness)', () => {
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', 's1', [1]);
-    // P1 不出闪 → 扣血 → 遗计 after hook → 摸2牌 → distribute pending
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip(无 slot、无延时),直接扣血 → 遗计 after hook → 摸2牌 → distribute pending
 
     // P1 已扣血
     expect(harness.state.players[1].health).toBe(3);
@@ -140,7 +139,7 @@ describe('遗计:端到端(harness)', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip,直接进遗计 distribute pending(无需 pass)
 
     // 官方语义:牌不入手 P1
     const slot = [...harness.state.pendingSlots.values()].find(s => !s.isPaused) ?? [...harness.state.pendingSlots.values()][0];
@@ -194,7 +193,7 @@ describe('遗计:端到端(harness)', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip,直接进遗计 distribute pending(无需 pass)
 
     // 官方语义:牌不入手 P1
     const slot = [...harness.state.pendingSlots.values()].find(s => !s.isPaused) ?? [...harness.state.pendingSlots.values()][0];

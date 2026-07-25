@@ -77,14 +77,21 @@ describe('模块 C:濒死流程修正', () => {
   // ─────────────────────────────────────────────────────────────
   it('从当前回合角色起逆时针询问:P1 回合 P2 濒死 → P1 → P0 → P3 → P2', async () => {
     const slash = makeCard('s1', '杀', '♠', '7');
+    // 适配 skip/silent/normal:各座次 0 手牌会致 求桃 slot skip,askOrder 收集不到。
+    // 给 P0/P1/P2/P3 各一张非桃牌(杀)使 求桃 走 silent(slot 仍在,fireTimeout 可推进),
+    // P2 持牌同时使 询问闪 走 silent(被首轮 fireTimeout 消耗,不计入 桃/求桃 顺序)。
+    const dc0 = makeCard('dc0', '杀', '♣', '3');
+    const dc1 = makeCard('dc1', '杀', '♣', '4');
+    const dc2 = makeCard('dc2', '杀', '♣', '5');
+    const dc3 = makeCard('dc3', '杀', '♣', '6');
     const state: GameState = createGameState({
       players: [
-        mkPlayer({ index: 0, name: 'P0', skills: ['桃', '闪'] }),
-        mkPlayer({ index: 1, name: 'P1', hand: [slash.id], skills: ['杀', '桃', '闪'] }),
-        mkPlayer({ index: 2, name: 'P2', skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
-        mkPlayer({ index: 3, name: 'P3', skills: ['桃', '闪'] }),
+        mkPlayer({ index: 0, name: 'P0', hand: [dc0.id], skills: ['桃', '闪'] }),
+        mkPlayer({ index: 1, name: 'P1', hand: [slash.id, dc1.id], skills: ['杀', '桃', '闪'] }),
+        mkPlayer({ index: 2, name: 'P2', hand: [dc2.id], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        mkPlayer({ index: 3, name: 'P3', hand: [dc3.id], skills: ['桃', '闪'] }),
       ],
-      cardMap: { s1: slash },
+      cardMap: { s1: slash, [dc0.id]: dc0, [dc1.id]: dc1, [dc2.id]: dc2, [dc3.id]: dc3 },
       currentPlayerIndex: 1, // P1 回合
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -131,14 +138,19 @@ describe('模块 C:濒死流程修正', () => {
   it('被救但仍濒死 → 从救者重新逆时针(新的濒死状态时 → 重置)', async () => {
     const slash = makeCard('s1', '杀', '♠', '7');
     const peach = makeCard('p1', '桃', '♥', '5');
+    // 适配 skip/silent/normal:P0/P2/P3 0 手牌会致 求桃 slot skip,askOrder 收集不到。
+    // 给 P0/P2/P3 各一张非桃牌(杀)使 求桃 走 silent;P1 仍持桃负责首轮救援。
+    const dc0 = makeCard('dc0', '杀', '♣', '3');
+    const dc2 = makeCard('dc2', '杀', '♣', '5');
+    const dc3 = makeCard('dc3', '杀', '♣', '6');
     const state: GameState = createGameState({
       players: [
-        mkPlayer({ index: 0, name: 'P0', skills: ['桃', '闪'] }),
+        mkPlayer({ index: 0, name: 'P0', hand: [dc0.id], skills: ['桃', '闪'] }),
         mkPlayer({ index: 1, name: 'P1', hand: [slash.id, peach.id], skills: ['杀', '桃', '闪'] }),
-        mkPlayer({ index: 2, name: 'P2', skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
-        mkPlayer({ index: 3, name: 'P3', skills: ['桃', '闪'] }),
+        mkPlayer({ index: 2, name: 'P2', hand: [dc2.id], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        mkPlayer({ index: 3, name: 'P3', hand: [dc3.id], skills: ['桃', '闪'] }),
       ],
-      cardMap: { s1: slash, p1: peach },
+      cardMap: { s1: slash, p1: peach, [dc0.id]: dc0, [dc2.id]: dc2, [dc3.id]: dc3 },
       currentPlayerIndex: 1, // P1 回合
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

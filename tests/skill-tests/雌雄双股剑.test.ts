@@ -134,11 +134,9 @@ describe('雌雄双股剑', () => {
 
     await harness.player('P1').useCardAndTarget('杀', 'k1', [1]);
 
-    // 无手牌 → 不弃牌,但自己仍摸 1(k1 已用,摸 1 后手牌数 1)
+    // P2 无手牌:询问闪走 skip(无 slot),杀直接结算;
+    // 雌雄双股剑 → P1 摸 1,P2 无牌不弃
     expect(harness.state.players[0].hand).toHaveLength(1);
-    expect(harness.state.zones.discardPile).not.toContain('k1');
-
-    await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
   });
 

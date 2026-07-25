@@ -72,7 +72,7 @@ describe('放逐', () => {
   // ─── 端到端:发动放逐 ────────────────────
   it('P1(曹丕)被杀受伤 → 选 P0 摸 X 张 + 翻面标签', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { k1: slash };
+    const cardMap: Record<string, Card> = { k1: slash, p1s: makeCard('p1s', '闪', '♥', '2') };
     const deck = buildDeck(cardMap, 5);
     const state: GameState = createGameState({
       players: [
@@ -81,6 +81,7 @@ describe('放逐', () => {
         makePlayer({
           index: 1,
           name: 'P1',
+          hand: ['p1s'],
           skills: ['放逐', '闪'],
           health: 3,
           maxHealth: 3,
@@ -124,12 +125,13 @@ describe('放逐', () => {
         makePlayer({
           index: 1,
           name: 'P1',
+          hand: ['p1s'],
           skills: ['放逐', '闪'],
           health: 3,
           maxHealth: 3,
         }),
       ],
-      cardMap: { k1: slash },
+      cardMap: { k1: slash, p1s: makeCard('p1s', '闪', '♥', '2') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -152,7 +154,7 @@ describe('放逐', () => {
   // ─── X 随已损失体力变化 ────────────────────
   it('X = 已损失体力值:P1 残 1 血时受伤,X=2 摸 2 张', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { k1: slash };
+    const cardMap: Record<string, Card> = { k1: slash, p1s: makeCard('p1s', '闪', '♥', '2') };
     const deck = buildDeck(cardMap, 5);
     const state: GameState = createGameState({
       players: [
@@ -161,6 +163,7 @@ describe('放逐', () => {
         makePlayer({
           index: 1,
           name: 'P1',
+          hand: ['p1s'],
           skills: ['放逐', '闪'],
           health: 1,
           maxHealth: 3,

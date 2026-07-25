@@ -122,12 +122,14 @@ describe('集智', () => {
 
   it('负面:使用基本牌(杀)不触发集智', async () => {
     const slash = makeCard('s1', '杀', '♠', '7', '基本牌');
+    const dodge = makeCard('d1', '闪', '♥', '2');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['s1'], skills: ['集智', '杀'] }),
-        makePlayer({ index: 1, name: 'P2', skills: [] }),
+        // P2 带一张闪:询问闪走 normal(验证是询问闪而非集智 confirm)
+        makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
-      cardMap: { s1: slash },
+      cardMap: { s1: slash, d1: dodge },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

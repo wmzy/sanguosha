@@ -99,9 +99,10 @@ describe('祸首', () => {
         players: [
           mkPlayer({ index: 0, name: '孟获', character: '孟获', hand: [], skills: ['祸首', '杀'] }),
           mkPlayer({ index: 1, name: 'P1', character: '反', hand: [NANMAN.id], skills: ['南蛮入侵'] }),
-          mkPlayer({ index: 2, name: 'P2', character: '反', hand: [], skills: ['杀'] }),
+          // P2 带一张非杀牌(闪):询问杀走 silent(P2 无杀),slot 保留、pass 可推进
+          mkPlayer({ index: 2, name: 'P2', character: '反', hand: ['d1'], skills: ['闪'] }),
         ],
-        cardMap: { nm1: NANMAN },
+        cardMap: { nm1: NANMAN, d1: mkCard('d1', '闪', '♥', '2') },
         currentPlayerIndex: 1,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

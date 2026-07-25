@@ -85,6 +85,9 @@ export interface AiViewSnapshot {
     hand?: Card[];
     equipment: GameView['players'][number]['equipment'];
     skills: string[];
+    /** 玩家标记(横置/连环等)。横置状态以 'chained' 标记代表,
+     *  AI 据此判断铁索连环应横置还是重置(toggle)。 */
+    marks: Array<{ id: string; scope: number }>;
     faction?: string;
     identity?: string;
   }>;
@@ -95,6 +98,12 @@ export interface AiViewSnapshot {
     requestType: string;
     /** 选将询问时的候选武将列表（仅选将 pending 非空） */
     candidates?: Array<{ name: string; skills: string[] }>;
+    /** choosePlayer 类(界放权/突袭/激将/奋威 等)的合法目标列表(含自己)。
+     *  引擎投影层(请求回应.toViewEvents/buildView)已把 filter 结果注入
+     *  prompt.candidates(number[]),filter 本身无法跨进程序列化,故此处映射成
+     *  index+name 供 AI 可读。bug 回归:此前只透传 选将询问 的 candidates,
+     *  choosePlayer 候选丢失 → AI 经 MCP 看不到可选目标(界放权不能选自己)。 */
+    playerCandidates?: Array<{ index: number; name: string }>;
   } | null;
   zones: { deckCount: number; discardPileCount: number };
   log: { time: number; player: number; text: string }[];

@@ -10,6 +10,7 @@ import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
 import { FACTION_BG } from './gameViewConstants';
+import { displaySkillName } from '../utils/skillDisplay';
 
 export interface AwaitingPromptProps {
   pending: PendingView;
@@ -221,7 +222,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                           </span>
                           {cardData && (
                             <span className={styles.chooseOptionCardSkills}>
-                              {cardData.skills.join(' · ')}
+                              {cardData.skills.map(displaySkillName).join(' · ')}
                             </span>
                           )}
                         </button>
@@ -319,14 +320,14 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
               </div>
             );
           }
-          // useCard 类 pending:手牌区已对可回应的牌(杀/闪/桃/酒)高亮,直接在手牌区点击出牌。
-          // 「不回应」按钮已移至下方统一操作区(actionBar),此处仅显示文案提示。
+          // useCard 类 pending:手牌区对可回应的牌(杀/闪/桃/酒)高亮。改为「先选牌再点打出」两步式
+          // (避免误触直接出牌),出牌/不回应按钮在下方统一操作区(actionBar),此处仅显示文案提示。
           const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
           return (
             <div className={styles.promptActions}>
               <span className={styles.promptDescInline}>
                 {respondableCount > 0
-                  ? `点击下方手牌区高亮的牌出牌回应（共 ${respondableCount} 张可选），或点「不回应」跳过`
+                  ? `选择高亮的牌（共 ${respondableCount} 张可选），再点「打出」确认，或点「不回应」跳过`
                   : '当前没有可出的牌回应，点「不回应」跳过'}
               </span>
             </div>

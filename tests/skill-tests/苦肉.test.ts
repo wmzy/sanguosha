@@ -127,9 +127,23 @@ describe('苦肉', () => {
   });
 
   it('边界: 体力为1时发动→体力归0,进入濒死(求桃),此时未摸牌', async () => {
-    await setup(1);
+    const peach = makeCard('peach', '桃', '♥', '5');
+    const state = createGameState({
+      players: [
+        // P1(黄盖)体力 1、无手牌
+        makePlayer({ index: 0, name: 'P1', character: '黄盖', health: 1, skills: ['苦肉'] }),
+        // P2 持一张桃:濒死求桃问到 P2 时创建 slot(P1 无手牌被 skip)
+        makePlayer({ index: 1, name: 'P2', character: '曹操', health: 4, hand: ['peach'], skills: ['桃'] }),
+      ],
+      zones: { deck: [...DECK_IDS], discardPile: [], processing: [] },
+      cardMap: { peach },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    seedDeckCards(state);
+    await harness.setup(state);
     const P1 = harness.player('P1');
-    const state = harness.state;
 
     const beforeHandLen = state.players[0].hand.length;
 

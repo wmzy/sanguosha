@@ -205,12 +205,13 @@ describe('界醇醪', () => {
   it('用醇 X=1:首次使用移去 1 张醇 → 视为酒 → 救回濒死者', async () => {
     const slashForDamage = makeCard('sd', '杀', '♠', 'A'); // P0 用于出杀造成伤害
     const slashFor醇 = makeCard('sc', '杀', '♠', '2'); // 用于弃置作醇
+    const tao = makeCard('t1', '桃', '♥', '5'); // 让求桃询问 P0(normal),P0 选 用醇醪
     const state: GameState = createGameState({
       players: [
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: [slashForDamage.id],
+          hand: [slashForDamage.id, 't1'],
           skills: ['界醇醪', '杀', '闪'],
         }),
         makePlayer({
@@ -221,7 +222,7 @@ describe('界醇醪', () => {
           health: 1, // 1 血,中杀即濒死
         }),
       ],
-      cardMap: { sd: slashForDamage, sc: slashFor醇 },
+      cardMap: { sd: slashForDamage, sc: slashFor醇, t1: tao },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -238,8 +239,7 @@ describe('界醇醪', () => {
 
     // P0 出杀打 P1(1血) → 濒死
     await P0.useCardAndTarget('杀', 'sd', [1]);
-    // P1 不闪
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤濒死 → 求桃(P0 有桃→normal)
     // P1 HP=0 → 触发濒死 → 求桃
     expect(harness.state.players[1].health).toBe(0);
     // 模块 C:逆时针从当前回合 P0 起 → P0 先被问(P0 有醇醪)
@@ -256,12 +256,13 @@ describe('界醇醪', () => {
   // ─── 7. 用醇 X=2:同轮第二次使用,需 2 张醇 ────────────────────
 
   it('用醇 X=2:同轮第二次使用需 2 张醇 → 成功', async () => {
+    const tao = makeCard('t1', '桃', '♥', '5'); // 让求桃询问 P0
     const state: GameState = createGameState({
       players: [
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: [],
+          hand: ['t1'],
           skills: ['界醇醪', '杀', '闪'],
         }),
         makePlayer({
@@ -272,7 +273,7 @@ describe('界醇醪', () => {
           health: 1,
         }),
       ],
-      cardMap: {},
+      cardMap: { t1: tao },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -308,12 +309,13 @@ describe('界醇醪', () => {
 
   it('用醇 reject:醇数不足 X → 拒绝', async () => {
     // 制造 X=2 但只有 1 醇的场景:先成功用 1 次(X=1 用 1 醇),然后再次濒死但只剩 0 醇
+    const tao = makeCard('t1', '桃', '♥', '5'); // 让求桃询问 P0
     const state: GameState = createGameState({
       players: [
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: [],
+          hand: ['t1'],
           skills: ['界醇醪', '杀', '闪'],
         }),
         makePlayer({
@@ -324,7 +326,7 @@ describe('界醇醪', () => {
           health: 1,
         }),
       ],
-      cardMap: {},
+      cardMap: { t1: tao },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -398,12 +400,13 @@ describe('界醇醪', () => {
   // ─── 8. 用醇:轮次切换后 X 重置为 1 ────────────────────
 
   it('用醇:轮次切换后 X 重置为 1', async () => {
+    const tao = makeCard('t1', '桃', '♥', '5'); // 让求桃询问 P0
     const state: GameState = createGameState({
       players: [
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: [],
+          hand: ['t1'],
           skills: ['界醇醪', '杀', '闪'],
         }),
         makePlayer({
@@ -414,7 +417,7 @@ describe('界醇醪', () => {
           health: 1,
         }),
       ],
-      cardMap: {},
+      cardMap: { t1: tao },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

@@ -128,10 +128,7 @@ describe('肉林', () => {
     P1.expectPending('询问闪');
     await P1.respond('闪', { cardId: 'd1' });
 
-    // 肉林:第二轮 → pass
-    P1.expectPending('询问闪');
-    await P1.pass();
-
+    // 肉林:第二轮 → P1 手牌为空(无闪)走 skip 模式,无 slot,直接扣血
     // 只一张闪,未完全抵消 → 受伤
     expect(harness.state.players[1].health).toBe(hpBefore - 1);
   });
