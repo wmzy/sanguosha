@@ -591,6 +591,13 @@ export function usePlayInteraction(
         }
         return;
       }
+      // 转化模式(丈八蛇矛/武圣):永远只提交单目标(handleTransformPlay 取 targets:[idx]),
+      // 不走多目标累加——否则杀的 targetFilter.max=3 会让 multiTarget=true,
+      // 点击目标写入 selectedMultiTargets 而按钮只认 selectedTarget → 按钮卡住 disabled。
+      if (transformMode) {
+        setSelectedTarget(selectedTarget === name ? null : name);
+        return;
+      }
       // 多槽位目标(借刀杀人):首次点选 A(slot 0),再点选 B(slot 1)
       if (playRules?.hasSlots) {
         const slotIdx = selectedTarget ? 1 : 0;
@@ -630,6 +637,7 @@ export function usePlayInteraction(
       selectedKillTarget,
       distSelected,
       playRules,
+      transformMode,
     ],
   );
 
