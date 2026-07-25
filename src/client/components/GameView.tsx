@@ -210,6 +210,7 @@ export function GameViewComponentImpl({
     selectedForDiscard,
     transformMode,
     distributeMode,
+    pendingConfirm,
     activeDistribute,
     isDistributeActive,
     distSelected,
@@ -230,6 +231,10 @@ export function GameViewComponentImpl({
     handlePlayRespond,
     handleEndTurn,
     handleConfirmDiscard,
+    handleDiscardSelectAll,
+    handleDiscardInvert,
+    handleTransformSelectAll,
+    handleTransformInvert,
     isTargetable,
     handleDistSubmit,
     handleDistClear,
@@ -237,6 +242,8 @@ export function GameViewComponentImpl({
     cancelSelection,
     clearDiscard,
     setDistributeMode,
+    handleConfirmYes,
+    handleConfirmNo,
   } = play;
 
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
@@ -293,6 +300,7 @@ export function GameViewComponentImpl({
     (canOperate && !!selectedActive && !!transformMode) ||
     (canOperate && !!selectedActive && !transformMode && !!selectedCardId && !!playButtonState) ||
     (canOperate && !transformMode && !!selectedCardId && altActions.length > 0) ||
+    (!transformMode && showCancelSelection) ||
     showEndTurn ||
     (canOperate && isDiscardPhase && isPerspectiveAwaiting) ||
     (canOperate && isDistributeActive && !!activeDistribute) ||
@@ -424,25 +432,20 @@ export function GameViewComponentImpl({
                         />
                       )}
 
-                    {(transformMode || showCancelSelection) && (
+                    {/* 转化模式(丈八蛇矛等多选转化)提示行:转化模式是另一套交互,
+                        「取消选择」已移至 actionBar 与出牌按钮同行,这里只保留转化提示 */}
+                    {transformMode && (
                       <div className={styles.handHeader}>
-                        {transformMode && (
-                          <span className={cx(styles.debugHint, styles.transformHint)}>
-                            ⚡ 转化模式:选
-                            {transformMode.minCards > 1 ? `${transformMode.minCards}张` : '1张'}
-                            {transformMode.wrapperName}
-                            {transformMode.minCards > 1
-                              ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})`
-                              : ''}{' '}
-                            · 源技能 {displaySkillName(transformMode.skillId)}
-                          </span>
-                        )}
-                        {transformMode && (
-                          <CancelButton label="取消转化" onClick={cancelTransform} />
-                        )}
-                        {!transformMode && showCancelSelection && (
-                          <CancelButton label="取消选择" onClick={cancelSelection} />
-                        )}
+                        <span className={cx(styles.debugHint, styles.transformHint)}>
+                          ⚡ 转化模式:选
+                          {transformMode.minCards > 1 ? `${transformMode.minCards}张` : '1张'}
+                          {transformMode.wrapperName}
+                          {transformMode.minCards > 1
+                            ? `(${transformMode.selectedCardIds.length}/${transformMode.maxCards})`
+                            : ''}{' '}
+                          · 源技能 {displaySkillName(transformMode.skillId)}
+                        </span>
+                        <CancelButton label="取消转化" onClick={cancelTransform} />
                       </div>
                     )}
 
@@ -468,6 +471,30 @@ export function GameViewComponentImpl({
                               </button>
                             </>
                           )}
+                        {canOperate &&
+                          transformMode &&
+                          transformMode.minCards > 1 &&
+                          (() => {
+                            const ids = transformMode.selectedCardIds;
+                            return (
+                              <>
+                                <button
+                                  className={styles.promptBtn}
+                                  onClick={handleTransformSelectAll}
+                                  disabled={ids.length >= transformMode.maxCards}
+                                >
+                                  全选
+                                </button>
+                                <button
+                                  className={styles.promptBtn}
+                                  onClick={handleTransformInvert}
+                                  disabled={ids.length === 0}
+                                >
+                                  反选
+                                </button>
+                              </>
+                            );
+                          })()}
                         {canOperate &&
                           selectedActive &&
                           transformMode &&
@@ -542,6 +569,10 @@ export function GameViewComponentImpl({
                               {displaySkillName(a.label)}
                             </button>
                           ))}
+                        {/* 取消选择:与出牌/alt 按钮同一行(actionBar),仅已选且处自由出牌窗口时显示 */}
+                        {!transformMode && showCancelSelection && (
+                          <CancelButton label="取消选择" onClick={cancelSelection} />
+                        )}
                         {showEndTurn && (
                           <button className={styles.endTurnBtn} onClick={handleEndTurn}>
                             结束回合
@@ -552,19 +583,33 @@ export function GameViewComponentImpl({
                             <button
                               className={cx(
                                 styles.promptBtnPrimary,
-                                (selectedForDiscard.size < discardMin ||
-                                  selectedForDiscard.size > discardMax) &&
+                                (selectedForDiscard.length < discardMin ||
+                                  selectedForDiscard.length > discardMax) &&
                                   styles.btnDisabled,
                               )}
                               disabled={
-                                selectedForDiscard.size < discardMin ||
-                                selectedForDiscard.size > discardMax
+                                selectedForDiscard.length < discardMin ||
+                                selectedForDiscard.length > discardMax
                               }
                               onClick={handleConfirmDiscard}
                             >
-                              确认弃牌 ({selectedForDiscard.size}/{discardMin})
+                              确认弃牌 ({selectedForDiscard.length}/{discardMin})
                             </button>
-                            {selectedForDiscard.size > 0 && (
+                            <button
+                              className={styles.promptBtn}
+                              onClick={handleDiscardSelectAll}
+                              disabled={selectedForDiscard.length >= discardMax}
+                            >
+                              全选
+                            </button>
+                            <button
+                              className={styles.promptBtn}
+                              onClick={handleDiscardInvert}
+                              disabled={selectedForDiscard.length === 0}
+                            >
+                              反选
+                            </button>
+                            {selectedForDiscard.length > 0 && (
                               <button className={styles.promptBtn} onClick={clearDiscard}>
                                 清空选择
                               </button>
@@ -746,7 +791,7 @@ export function GameViewComponentImpl({
                   transformMode.minCards > 1 &&
                   transformMode.selectedCardIds.includes(card.id)
                 );
-              const isDiscardSelected = selectedForDiscard.has(card.id);
+              const isDiscardSelected = selectedForDiscard.includes(card.id);
               // useCard 类回应:选中牌高亮(仅回应窗口生效,与弃牌/出牌阶段互斥)
               const isRespondSelected =
                 isMyAwaiting && !isDistributeActive && selectedRespondCardId === card.id;
@@ -839,6 +884,23 @@ export function GameViewComponentImpl({
           </DevProfiler>
         </div>
       </div>
+
+      {/* ─── confirm 型主动技确认弹窗(据守等:点技能按钮后的二次确认)─── */}
+      {pendingConfirm && (
+        <div className={styles.confirmOverlay}>
+          <div className={styles.confirmDialog}>
+            <div className={styles.confirmDialogTitle}>{pendingConfirm.prompt.title}</div>
+            <div className={styles.confirmDialogActions}>
+              <button className={styles.promptBtnPrimary} onClick={handleConfirmYes}>
+                {pendingConfirm.prompt.confirmLabel ?? '发动'}
+              </button>
+              <button className={styles.promptBtn} onClick={handleConfirmNo}>
+                {pendingConfirm.prompt.cancelLabel ?? '不发动'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ export interface PlayPhasePromptProps {
   selectedTarget: string | null;
   discardMin: number;
   discardMax: number;
-  selectedForDiscard: Set<string>;
+  selectedForDiscard: string[];
 }
 
 export function PlayPhasePromptImpl(props: PlayPhasePromptProps) {
@@ -82,7 +82,7 @@ export function PlayPhasePromptImpl(props: PlayPhasePromptProps) {
       {isDiscardPhase && isPerspectiveAwaiting && (
         <div className={styles.promptBoxAwaiting}>
           <div className={styles.promptTitle}>
-            🗑️ 弃牌阶段:需弃 {discardMin} 张牌（已选 {selectedForDiscard.size}/{discardMin}）
+            🗑️ 弃牌阶段:需弃 {discardMin} 张牌（已选 {selectedForDiscard.length}/{discardMin}）
           </div>
           <div className={styles.promptDesc}>
             {canOperate
@@ -114,7 +114,7 @@ function playPhasePromptPropsEqual(
     prev.selectedTarget === next.selectedTarget &&
     prev.discardMin === next.discardMin &&
     prev.discardMax === next.discardMax &&
-    prev.selectedForDiscard.size === next.selectedForDiscard.size
+    prev.selectedForDiscard.length === next.selectedForDiscard.length
   );
 }
 

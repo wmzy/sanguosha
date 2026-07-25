@@ -13,7 +13,14 @@
 // 不管理:手牌拖拽重排(useHandReorder)、视角切换、WS 连接。
 
 import { useState, useCallback, useEffect, useMemo, type RefObject } from 'react';
-import type { Card, GameView, Json, DistributePrompt, PendingView } from '../../engine/types';
+import type {
+  Card,
+  GameView,
+  Json,
+  DistributePrompt,
+  ConfirmPrompt,
+  PendingView,
+} from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 
@@ -27,6 +34,39 @@ import {
   resolveDistributeCardIds,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
+
+/**
+ * 有序选择 + FIFO 淘汰:点击一张牌 toggle 其选中状态。
+ * - 已选 → 移除。
+ * - 未选且未达上限(max>0)→ 追加到末尾,保持插入顺序。
+ * - 未选且已达 max → 淘汰"最早选中的"(数组首位),再把新牌追加到末尾
+ *   (而不是禁止选择),实现"选满后继续选自动取消最早那张"。
+ * max 为 undefined/<=0 视为无上限,直接追加。
+ * 用于弃牌阶段多选(按 discardMax)与多卡转化(按 transformMode.maxCards)。
+ */
+function toggleOrderedFifo(selected: string[], id: string, max?: number): string[] {
+  if (selected.includes(id)) return selected.filter((x) => x !== id);
+  if (max === undefined || max <= 0) return [...selected, id];
+  if (selected.length < max) return [...selected, id];
+  return [...selected.slice(1), id];
+}
+
+/** 全选:候选按序选中,超 max 时取前 max(自然阅读顺序,左→右)。max<=0/undefined=无上限。 */
+function selectAllOrdered(candidates: string[], max?: number): string[] {
+  if (max === undefined || max <= 0) return [...candidates];
+  return candidates.slice(0, max);
+}
+
+/**
+ * 反选:取候选中当前未选的;结果超 max 时按 FIFO 保留较晚选的(取尾部)。
+ * max<=0/undefined=无上限。
+ */
+function invertOrdered(candidates: string[], selected: string[], max?: number): string[] {
+  const sel = new Set(selected);
+  const complement = candidates.filter((c) => !sel.has(c));
+  if (max === undefined || max <= 0) return complement;
+  return complement.length > max ? complement.slice(-max) : complement;
+}
 
 /** 转化模式:点转化技能(武圣/丈八蛇矛)后进入此模式,匹配卡牌显示为转化后的牌 */
 export interface TransformMode {
@@ -91,11 +131,19 @@ export interface PlayInteractionResult {
   selectedKillTarget: string | null;
   /** 多目标(铁索连环 1-2 人)已选目标 name 集合;单/槽位路径为空 */
   selectedMultiTargets: string[];
-  selectedForDiscard: Set<string>;
+  /** 弃牌阶段多选(有序数组,插入顺序;FIFO 淘汰依赖此顺序) */
+  selectedForDiscard: string[];
   // ─── 转化模式 ───
   transformMode: TransformMode | null;
   // ─── distribute ───
   distributeMode: { skillId: string; actionType: string; prompt: DistributePrompt } | null;
+  // ─── confirm 型主动技确认弹窗(据守等 prompt.type==='confirm' 的 action) ───
+  /** 待确认的 confirm 型 action;非 null 时 GameView 应渲染确认弹窗 */
+  pendingConfirm: {
+    skillId: string;
+    actionType: string;
+    prompt: ConfirmPrompt;
+  } | null;
   activeDistribute: ActiveDistribute | null;
   isDistributeActive: boolean;
   distSelected: Set<string>;
@@ -130,6 +178,14 @@ export interface PlayInteractionResult {
   handlePlayRespond: () => void;
   handleEndTurn: () => void;
   handleConfirmDiscard: () => void;
+  /** 弃牌阶段:全选(截断到 discardMax) */
+  handleDiscardSelectAll: () => void;
+  /** 弃牌阶段:反选(超 discardMax 时按 FIFO 取尾部) */
+  handleDiscardInvert: () => void;
+  /** 多卡转化:全选(截断到 maxCards) */
+  handleTransformSelectAll: () => void;
+  /** 多卡转化:反选(超 maxCards 时按 FIFO 取尾部) */
+  handleTransformInvert: () => void;
   isTargetable: (i: number) => boolean;
   // distribute handlers
   handleDistToggle: (id: string) => void;
@@ -143,6 +199,11 @@ export interface PlayInteractionResult {
   setDistributeMode: (
     mode: { skillId: string; actionType: string; prompt: DistributePrompt } | null,
   ) => void;
+  // ─── confirm 型确认弹窗 handlers ───
+  /** 确认发动:send 后关闭弹窗 */
+  handleConfirmYes: () => void;
+  /** 不发动:仅关闭弹窗 */
+  handleConfirmNo: () => void;
 }
 
 /**
@@ -177,7 +238,8 @@ export function usePlayInteraction(
   const [selectedKillTarget, setSelectedKillTarget] = useState<string | null>(null);
   // 多目标(铁索连环 max>=2):点击目标累加为集合,与单选/槽位路径互斥
   const [selectedMultiTargets, setSelectedMultiTargets] = useState<string[]>([]);
-  const [selectedForDiscard, setSelectedForDiscard] = useState<Set<string>>(new Set());
+  // 弃牌阶段多选:有序数组(插入顺序),用于 FIFO 淘汰(选满 max 后再选自动取消最早那张)。
+  const [selectedForDiscard, setSelectedForDiscard] = useState<string[]>([]);
   // useCard 类回应(被杀出闪/求桃/无懈可击等):先选牌(高亮)再点「打出」确认,避免误触直接出牌。
   // 与弃牌阶段 selectedForDiscard 同为「选+确认」两步式,但只选一张。
   const [selectedRespondCardId, setSelectedRespondCardId] = useState<string | null>(null);
@@ -186,6 +248,12 @@ export function usePlayInteraction(
     skillId: string;
     actionType: string;
     prompt: DistributePrompt;
+  } | null>(null);
+  // confirm 型主动技(据守)确认弹窗状态:点按钮后先弹确认,确认才真正 send。
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    skillId: string;
+    actionType: string;
+    prompt: ConfirmPrompt;
   } | null>(null);
   const [distSelected, setDistSelected] = useState<Set<string>>(new Set());
   const [distAllocations, setDistAllocations] = useState<
@@ -242,7 +310,7 @@ export function usePlayInteraction(
 
   // ─── state 重置 effects ───
   useEffect(() => {
-    setSelectedForDiscard(new Set());
+    setSelectedForDiscard([]);
   }, [pending]);
   // 询问窗口切换/打出后/不回应后:pending 变化驱动清空回应选牌,与 selectedForDiscard 同源。
   useEffect(() => {
@@ -615,7 +683,9 @@ export function usePlayInteraction(
           }
           break;
         case 'confirm':
-          break;
+          // 不直接 send:先弹确认框,点「发动」才真正 send。
+          setPendingConfirm({ skillId, actionType, prompt });
+          return;
         case 'choosePlayer':
           if (!selectedTarget) return;
           params.target = nameToIndex(selectedTarget);
@@ -677,14 +747,14 @@ export function usePlayInteraction(
     (cardId?: string) => {
       if (!pending) return;
       if (isDiscardPhase) {
-        if (selectedForDiscard.size >= discardMin) {
+        if (selectedForDiscard.length >= discardMin) {
           handleConfirmDiscard();
         } else {
           const hand = perspectiveHand;
           const fallback = hand.slice(-discardMin).map((c) => c.id);
           const skillId = pendingRespondInfo?.skillId ?? '系统规则';
           send(skillId, 'respond', { cardIds: fallback });
-          setSelectedForDiscard(new Set());
+          setSelectedForDiscard([]);
         }
         return;
       }
@@ -744,16 +814,7 @@ export function usePlayInteraction(
       }
       // 弃牌窗口
       if (isDiscardPhase && isPerspectiveAwaiting && canOperate) {
-        setSelectedForDiscard((prev) => {
-          const next = new Set(prev);
-          if (next.has(card.id)) {
-            next.delete(card.id);
-            return next;
-          }
-          if (next.size >= discardMax) return prev;
-          next.add(card.id);
-          return next;
-        });
+        setSelectedForDiscard((prev) => toggleOrderedFifo(prev, card.id, discardMax));
         return;
       }
       // 回应模式:点牌只选中(高亮),不直接出牌;再点同一张取消选中。
@@ -775,11 +836,11 @@ export function usePlayInteraction(
             (prev) =>
               prev && {
                 ...prev,
-                selectedCardIds: prev.selectedCardIds.includes(card.id)
-                  ? prev.selectedCardIds.filter((id) => id !== card.id)
-                  : prev.selectedCardIds.length < prev.maxCards
-                    ? [...prev.selectedCardIds, card.id]
-                    : prev.selectedCardIds,
+                selectedCardIds: toggleOrderedFifo(
+                  prev.selectedCardIds,
+                  card.id,
+                  prev.maxCards,
+                ),
               },
           );
           setSelectedTarget(null);
@@ -821,13 +882,46 @@ export function usePlayInteraction(
 
   const handleConfirmDiscard = useCallback(() => {
     if (!pending || !isDiscardPhase) return;
-    if (selectedForDiscard.size < discardMin || selectedForDiscard.size > discardMax) return;
-    const cardIds = Array.from(selectedForDiscard);
+    if (selectedForDiscard.length < discardMin || selectedForDiscard.length > discardMax) return;
+    const cardIds = selectedForDiscard;
     // 系统弃牌阶段 → '系统规则';强制型技能弃牌(英魂) → pendingRespondInfo.skillId
     const skillId = pendingRespondInfo?.skillId ?? '系统规则';
     send(skillId, 'respond', { cardIds });
-    setSelectedForDiscard(new Set());
+    setSelectedForDiscard([]);
   }, [pending, isDiscardPhase, selectedForDiscard, discardMin, discardMax, send, pendingRespondInfo]);
+
+  // ─── 多选快捷:全选 / 反选(弃牌阶段 + 多卡转化) ───
+  // 弃牌阶段候选=整手牌;转化候选=cardFilter 命中的牌。两者均受各自 max 截断。
+  const handleDiscardSelectAll = useCallback(() => {
+    setSelectedForDiscard(selectAllOrdered(perspectiveHand.map((c) => c.id), discardMax));
+  }, [perspectiveHand, discardMax]);
+
+  const handleDiscardInvert = useCallback(() => {
+    setSelectedForDiscard((prev) =>
+      invertOrdered(perspectiveHand.map((c) => c.id), prev, discardMax),
+    );
+  }, [perspectiveHand, discardMax]);
+
+  const handleTransformSelectAll = useCallback(() => {
+    setTransformMode(
+      (prev) =>
+        prev && {
+          ...prev,
+          selectedCardIds: selectAllOrdered(
+            perspectiveHand.filter(prev.cardFilter).map((c) => c.id),
+            prev.maxCards,
+          ),
+        },
+    );
+  }, [perspectiveHand]);
+
+  const handleTransformInvert = useCallback(() => {
+    setTransformMode((prev) => {
+      if (!prev) return prev;
+      const candidates = perspectiveHand.filter(prev.cardFilter).map((c) => c.id);
+      return { ...prev, selectedCardIds: invertOrdered(candidates, prev.selectedCardIds, prev.maxCards) };
+    });
+  }, [perspectiveHand]);
 
   // distribute handlers
   const handleDistToggle = useCallback(
@@ -906,7 +1000,20 @@ export function usePlayInteraction(
     setSelectedTarget(null);
   }, []);
 
-  const clearDiscard = useCallback(() => setSelectedForDiscard(new Set()), []);
+  // ─── confirm 型确认弹窗 handlers ───
+  const handleConfirmYes = useCallback(() => {
+    setPendingConfirm((prev) => {
+      if (!prev) return null;
+      send(prev.skillId, prev.actionType, {});
+      return null;
+    });
+  }, [send]);
+
+  const handleConfirmNo = useCallback(() => {
+    setPendingConfirm(null);
+  }, []);
+
+  const clearDiscard = useCallback(() => setSelectedForDiscard([]), []);
 
   return {
     selectedCardId,
@@ -916,6 +1023,7 @@ export function usePlayInteraction(
     selectedForDiscard,
     transformMode,
     distributeMode,
+    pendingConfirm,
     activeDistribute,
     isDistributeActive,
     distSelected,
@@ -939,6 +1047,10 @@ export function usePlayInteraction(
     handlePlayRespond,
     handleEndTurn,
     handleConfirmDiscard,
+    handleDiscardSelectAll,
+    handleDiscardInvert,
+    handleTransformSelectAll,
+    handleTransformInvert,
     isTargetable,
     handleDistToggle,
     handleDistAllocate,
@@ -948,5 +1060,7 @@ export function usePlayInteraction(
     cancelSelection,
     clearDiscard,
     setDistributeMode,
+    handleConfirmYes,
+    handleConfirmNo,
   };
 }

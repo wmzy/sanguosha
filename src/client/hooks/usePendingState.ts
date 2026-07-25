@@ -90,7 +90,9 @@ export function usePendingState(
     : 0;
 
   // pending 变化时清空广播跳过标记
-  const pendingKey = pending ? `${pending.atom?.type}:${reqType}` : '';
+  // 复用 getBroadcastKey:纳入 target/cancelTarget,使铁索连环等"同一 atomType+requestType、
+  // 不同目标"的多目标询问被区分;同时与 markBroadcastSkipped/skippedBroadcast 使用同一套 key 逻辑,避免漂移。
+  const pendingKey = pending ? getBroadcastKey(pending) : '';
   const [skippedBroadcast, setSkippedBroadcast] = useState<Set<string>>(new Set());
   useEffect(() => {
     setSkippedBroadcast(new Set());

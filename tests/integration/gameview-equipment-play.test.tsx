@@ -129,6 +129,41 @@ describe('GameView:装备牌出牌(回归 selectedUseAction 查找)', () => {
       );
     });
   });
+
+  // 回归:「取消选择」按钮显示条件与位置
+  //   1) 未选牌时不显示(仅已选中至少一张手牌时才显示)
+  //   2) 选牌后出现在 actionBar(与「出牌」按钮同一行),而非单独占一行
+  //   3) 点击后清空选择
+  it('取消选择:未选牌不显示;选牌后在 actionBar 与出牌同行;点击清空选择', async () => {
+    const view = makeView();
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    // 用 data-card-id 定位手牌(避免前一个测试的飞牌动画残留 div 干扰 findByText)
+    await waitFor(() => {
+      expect(document.querySelector('[data-card-id="wp1"]')).toBeTruthy();
+    });
+    // 未选牌:不应有「取消选择」按钮
+    expect(screen.queryByRole('button', { name: '取消选择' })).toBeNull();
+
+    // 选中装备牌 → actionBar 出现「出牌」与「取消选择」(同一行)
+    fireEvent.click(document.querySelector('[data-card-id="wp1"]')!);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^出牌/ })).toBeDefined();
+    });
+    const cancelBtn = screen.getByRole('button', { name: '取消选择' });
+    expect(cancelBtn).toBeDefined();
+    // 两者位于同一 actionBar 容器(同一行)
+    expect(cancelBtn.closest('div')).toContainElement(
+      screen.getByRole('button', { name: /^出牌/ }),
+    );
+
+    // 点击「取消选择」→ 清空选择,「出牌」与「取消选择」均消失
+    fireEvent.click(cancelBtn);
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^出牌/ })).toBeNull();
+    });
+    expect(screen.queryByRole('button', { name: '取消选择' })).toBeNull();
+  });
 });
 
 // ─── filter-based 查找的纯函数单测 ───

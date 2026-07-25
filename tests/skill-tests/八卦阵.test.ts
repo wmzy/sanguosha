@@ -20,6 +20,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
+import { findActionEntry, getBeforeHooks } from '../../src/engine/skill';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeEquip(
@@ -403,6 +404,103 @@ describe('八卦阵', () => {
     expect(harness.state.players[0].health).toBe(3);
     // 判定牌仍未翻动(未进弃牌堆)
     expect(harness.state.zones.discardPile).not.toContain('j1');
+  });
+
+  // ─── Bug:装备藤甲替换八卦阵后,被杀不应再询问八卦阵 ────────────
+  // 场景:玩家先装【八卦阵】,再用【藤甲】同槽替换 → 被杀时不应再弹
+  // 「是否发动八卦阵?」(八卦阵是旧防具,藤甲才是当前防具)。
+  //
+  // 根因(候选 A):替换防具时若不 移除技能(旧防具名),八卦阵的
+  // 「询问闪」before-hook 与 respond action 会残留在注册表,被杀时仍询问。
+  // 本用例直接校验注册表:替换后旧防具(八卦阵)的 hook/action 必须消失。
+  it('Bug:装备藤甲替换八卦阵 → 旧防具 八卦阵 的 hook/action 被卸载', async () => {
+    const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
+    const tengjia = makeEquip('tj', '藤甲', '♠', '防具', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['tj'], // 手里只有藤甲
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' }, // 初始八卦阵
+        }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { b1: bagua, tj: tengjia },
+      currentPlayerIndex: 0, // P1 的回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 前置:初始装着八卦阵 → 其 询问闪 before-hook 与 respond action 已注册
+    expect(getBeforeHooks(harness.state, '询问闪').some((h) => h.skillId === '八卦阵' && h.ownerId === 0)).toBe(true);
+    expect(findActionEntry(harness.state, '八卦阵', 0, 'respond')).toBeDefined();
+
+    // P1 装藤甲替换八卦阵
+    await P1.useCard('装备通用', 'tj');
+    expect(harness.state.players[0].equipment['防具']).toBe('tj');
+    expect(harness.state.players[0].skills).toContain('藤甲');
+    expect(harness.state.players[0].skills).not.toContain('八卦阵');
+
+    // 关键:八卦阵的「询问闪」before-hook 必须被卸载(不再残留)
+    expect(
+      getBeforeHooks(harness.state, '询问闪').some(
+        (h) => h.skillId === '八卦阵' && h.ownerId === 0,
+      ),
+    ).toBe(false);
+    // 八卦阵的 respond action 也必须从全局表移除
+    expect(findActionEntry(harness.state, '八卦阵', 0, 'respond')).toBeUndefined();
+  });
+
+  // ─── 候选 B:八阵(卧龙诸葛)+ 藤甲 → 被杀不询问八阵 ────────────
+  // 卧龙诸葛锁定技「八阵」:无防具时视为八卦阵。装备藤甲后应失效(有防具)。
+  // 验证 noArmor 检查:装备藤甲后 equipment['防具']=藤甲 cardId → 八阵不触发。
+  it('候选B:卧龙诸葛(八阵)装备藤甲后被杀 → 不询问八阵,走藤甲减伤', async () => {
+    const tengjia = makeEquip('tj', '藤甲', '♠', '防具', '2');
+    const slash = makeCard('s1', '杀', '♠', '7'); // 普通黑杀
+    const state: GameState = createGameState({
+      players: [
+        // P1 = 卧龙诸葛:八阵锁定技 + 已装备藤甲
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '藤甲', '八阵'],
+          equipment: { 防具: 'tj' },
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
+      ],
+      cardMap: { tj: tengjia, s1: slash },
+      currentPlayerIndex: 1, // P2 的回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // 前置:藤甲在身,equipment['防具'] 正确为藤甲 cardId
+    expect(harness.state.players[0].equipment['防具']).toBe('tj');
+
+    // P2 出杀对 P1
+    await P2.useCardAndTarget('杀', 's1', [0]);
+
+    // 不应出现「是否发动八阵?」询问 —— 藤甲已是当前防具,八阵应失效
+    const slot = [...harness.state.pendingSlots.values()][0];
+    const slotAtom = slot?.atom as { type: string; requestType?: string } | undefined;
+    const isBazhenPrompt =
+      slotAtom?.type === '请求回应' && slotAtom?.requestType === '八阵/confirm';
+    expect(isBazhenPrompt).toBe(false);
+
+    // 应直接进入 询问闪
+    P1.expectPending('询问闪');
+
+    // 藤甲生效:P1 不出闪 → 普通杀被藤甲减为 0 → 不扣血
+    await P1.pass();
+    expect(harness.state.players[0].health).toBe(4);
   });
 
   // ─── 正面:询问超时 → 等同不发动 → 不判定 ────────────

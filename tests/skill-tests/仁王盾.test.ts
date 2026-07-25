@@ -127,6 +127,16 @@ describe('仁王盾', () => {
     await P2.pass(); // 不出闪 → 扣血
 
     expect(harness.state.players[1].health).toBe(3);
+
+    // 日志抑制回归:红杀时仁王盾 before-hook 注册但未 cancel(pass)→ 检测有效性 事件
+    // 正常发出(atomHistory 含该 atom,证明场景有效),但其 toViewLog 返回 null → 不污染玩家日志。
+    // "检测有效性"是引擎内部时机名(使用结算开始时检测有效性),对玩家无意义。
+    expect(
+      harness.state.atomHistory.some((e) => e.kind === 'atom' && e.atom.type === '检测有效性'),
+    ).toBe(true);
+    expect(harness.player('P1').processedView.log.map((e) => e.text)).not.toContain(
+      '检测有效性',
+    );
   });
 
   // ─── 负面:无仁王盾时黑杀正常扣血 ─────────────────────────

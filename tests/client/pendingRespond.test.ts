@@ -5,7 +5,10 @@
 //
 // 归并建议:若未来出现更多 client/utils 纯函数单测,可并入 tests/client/utils.test.ts。
 import { describe, it, expect } from 'vitest';
-import { resolvePendingRespond } from '../../src/client/utils/pendingRespond';
+import {
+  resolvePendingRespond,
+  getBroadcastKey,
+} from '../../src/client/utils/pendingRespond';
 import type { Card, PendingView } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 
@@ -32,6 +35,59 @@ function mkUseCardPending(
     isBlocking: true,
   };
 }
+
+/** 构造无懈可击广播型 pending(请求回应 + requestType='无懈可击' + cancelTarget) */
+function mkWuxiePending(target: number, cancelTarget: number): PendingView {
+  const prompt = {
+    type: 'useCard' as const,
+    title: '是否打出无懈可击?',
+    cardFilter: { min: 1, max: 1 },
+  };
+  return {
+    type: 'awaits',
+    atom: {
+      type: '请求回应',
+      requestType: '无懈可击',
+      target,
+      cancelTarget,
+      prompt,
+    } as unknown as PendingView['atom'],
+    prompt,
+    target,
+    isBlocking: true,
+  };
+}
+
+describe('getBroadcastKey: target/cancelTarget 区分多目标询问', () => {
+  it('铁索连环两个目标:仅 cancelTarget 不同 → 返回不同 key(第二个目标不再被误判已跳过)', () => {
+    // 回归:旧实现只用 atomType+requestType,两次「无懈可击」广播 key 完全相同,
+    // 玩家对目标1点「不回应」后,目标2的询问被误判为已跳过而隐藏。
+    const p1 = mkWuxiePending(-1, 2); // 广播 target<0,cancelTarget=目标1
+    const p2 = mkWuxiePending(-1, 3); // 同样广播,cancelTarget=目标2
+    expect(getBroadcastKey(p1)).not.toBe(getBroadcastKey(p2));
+  });
+
+  it('同一目标 close-reopen 循环:cancelTarget 相同 → key 不变(保持去重语义,不重复弹窗)', () => {
+    // 玩家对该目标说过不回应就不再被反复弹窗——这是正确行为,必须保留。
+    const a = mkWuxiePending(-1, 2);
+    const b = mkWuxiePending(-1, 2);
+    expect(getBroadcastKey(a)).toBe(getBroadcastKey(b));
+  });
+
+  it('仅 target 不同(非广播型) → 返回不同 key', () => {
+    const p1 = mkUseCardPending('杀', undefined, 1);
+    const p2 = mkUseCardPending('杀', undefined, 2);
+    expect(getBroadcastKey(p1)).not.toBe(getBroadcastKey(p2));
+  });
+
+  it('key 包含 atomType 与 requestType(可读性与调试性)', () => {
+    const p = mkWuxiePending(-1, 2);
+    const key = getBroadcastKey(p);
+    expect(key).toContain('请求回应');
+    expect(key).toContain('无懈可击');
+    expect(key).toContain('c=2');
+  });
+});
 
 describe('resolvePendingRespond: cardFilter.candidates 优先', () => {
   it('requestType 前缀为技能名(界放权/discard)+ candidates → cardFilter 按候选 id 成员判断', () => {

@@ -976,17 +976,44 @@ describe('usePlayInteraction · 弃牌窗口(selectedForDiscard)', () => {
     });
   }
 
-  it('选牌增删,达到 discardMax 后不再增加', () => {
+  it('选牌增删:点已选取消,点未选追加(保持插入顺序)', () => {
     const { result } = renderPlay(discardParams(vi.fn(), [KILL_CARD, PEACH_CARD, TRICK_CARD], 1, 2));
     act(() => result.current.handleCardClick(KILL_CARD));
     act(() => result.current.handleCardClick(PEACH_CARD));
-    expect(result.current.selectedForDiscard.size).toBe(2);
-    // 达到上限 2,第三张不加入
-    act(() => result.current.handleCardClick(TRICK_CARD));
-    expect(result.current.selectedForDiscard.size).toBe(2);
+    expect(result.current.selectedForDiscard).toEqual(['c-kill', 'c-peach']);
     // 再点已选的牌取消
     act(() => result.current.handleCardClick(KILL_CARD));
-    expect(result.current.selectedForDiscard.size).toBe(1);
+    expect(result.current.selectedForDiscard).toEqual(['c-peach']);
+  });
+
+  it('FIFO 淘汰:选满 discardMax 后再选新牌→自动取消最早选中的那张', () => {
+    const { result } = renderPlay(discardParams(vi.fn(), [KILL_CARD, PEACH_CARD, TRICK_CARD], 1, 2));
+    act(() => result.current.handleCardClick(KILL_CARD)); // [c-kill]
+    act(() => result.current.handleCardClick(PEACH_CARD)); // [c-kill, c-peach] 已满 max=2
+    // 再选第三张 → 淘汰最早选中的 c-kill,把 c-trick 追加到末尾
+    act(() => result.current.handleCardClick(TRICK_CARD));
+    expect(result.current.selectedForDiscard).toEqual(['c-peach', 'c-trick']);
+    // 数量仍为 max,最早那张(c-kill)已被移出
+    expect(result.current.selectedForDiscard).not.toContain('c-kill');
+  });
+
+  it('handleDiscardSelectAll 全选截断到 discardMax', () => {
+    const { result } = renderPlay(
+      discardParams(vi.fn(), [KILL_CARD, PEACH_CARD, TRICK_CARD], 1, 2),
+    );
+    act(() => result.current.handleDiscardSelectAll());
+    // 候选 3 张,截断到 max=2,取前两张
+    expect(result.current.selectedForDiscard).toEqual(['c-kill', 'c-peach']);
+  });
+
+  it('handleDiscardInvert 反转当前选择,超 max 时按 FIFO 保留较晚选的', () => {
+    const { result } = renderPlay(
+      discardParams(vi.fn(), [KILL_CARD, PEACH_CARD, TRICK_CARD], 1, 2),
+    );
+    // 先选第一张,再反选 → 互补集 [c-peach, c-trick],未超 max=2
+    act(() => result.current.handleCardClick(KILL_CARD));
+    act(() => result.current.handleDiscardInvert());
+    expect(result.current.selectedForDiscard).toEqual(['c-peach', 'c-trick']);
   });
 
   it('选够后 respond 触发 confirmDiscard 发送 cardIds', () => {
@@ -998,7 +1025,7 @@ describe('usePlayInteraction · 弃牌窗口(selectedForDiscard)', () => {
       { skillId: '系统规则', actionType: 'respond', params: { cardIds: ['c-kill'] } },
     ]);
     // 提交后清空
-    expect(result.current.selectedForDiscard.size).toBe(0);
+    expect(result.current.selectedForDiscard).toHaveLength(0);
   });
 
   it('未选够(discardMin)时 respond fallback 取手牌末尾 discardMin 张', () => {
@@ -1015,9 +1042,9 @@ describe('usePlayInteraction · 弃牌窗口(selectedForDiscard)', () => {
     const { result } = renderPlay(discardParams(vi.fn(), [KILL_CARD, PEACH_CARD], 1, 2));
     act(() => result.current.handleCardClick(KILL_CARD));
     act(() => result.current.handleCardClick(PEACH_CARD));
-    expect(result.current.selectedForDiscard.size).toBe(2);
+    expect(result.current.selectedForDiscard).toHaveLength(2);
     act(() => result.current.clearDiscard());
-    expect(result.current.selectedForDiscard.size).toBe(0);
+    expect(result.current.selectedForDiscard).toHaveLength(0);
   });
 });
 
@@ -1191,6 +1218,40 @@ describe('usePlayInteraction · 转化模式(transformMode)', () => {
     act(() => result.current.handleCardClick(RED_CARD_A)); // 只选 1 张
     act(() => result.current.handleTransformPlay('P1'));
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('多卡转化 FIFO 淘汰:选满 maxCards 后再选新牌→取消最早选中的', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [zhangbaAction(), killUseAction()],
+        // zhangba cardFilter=()=>true,maxCards=2;三张牌均可选
+        perspectiveHand: [RED_CARD_A, RED_CARD_B, KILL_CARD],
+      }),
+    );
+    act(() => result.current.handleSkillAction(zhangbaAction()));
+    act(() => result.current.handleCardClick(RED_CARD_A)); // [c-red-a]
+    act(() => result.current.handleCardClick(RED_CARD_B)); // [c-red-a, c-red-b] 已满
+    // 再选第三张 → 淘汰最早选中的 c-red-a,追加 c-kill
+    act(() => result.current.handleCardClick(KILL_CARD));
+    expect(result.current.transformMode?.selectedCardIds).toEqual(['c-red-b', 'c-kill']);
+  });
+
+  it('handleTransformSelectAll 全选截断到 maxCards;handleTransformInvert 反选', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [zhangbaAction(), killUseAction()],
+        perspectiveHand: [RED_CARD_A, RED_CARD_B, KILL_CARD],
+      }),
+    );
+    act(() => result.current.handleSkillAction(zhangbaAction()));
+    // 全选:候选 3 张,截断到 max=2,取前两张
+    act(() => result.current.handleTransformSelectAll());
+    expect(result.current.transformMode?.selectedCardIds).toEqual(['c-red-a', 'c-red-b']);
+    // 反选:互补集 [c-kill],未超 max
+    act(() => result.current.handleTransformInvert());
+    expect(result.current.transformMode?.selectedCardIds).toEqual(['c-kill']);
   });
 
   it('转化条件失活(回合结束)时自动退出转化模式', () => {
@@ -1834,5 +1895,97 @@ describe('usePlayInteraction · 桃满血限制(activeWhen)', () => {
     expect(sentCalls(send)).toEqual([
       { skillId: '桃', actionType: 'use', params: { cardId: 'c-peach', targets: [0] } },
     ]);
+  });
+});
+
+// ─── Bug: confirm 型主动技(据守等)发动前缺少确认弹窗 ───
+// prompt.type==='confirm' 的 use action 点击后不应直接 send,
+// 而应进入 pendingConfirm 确认状态,点「发动」才真正 send,点「不发动」取消。
+describe('usePlayInteraction · confirm 型主动技确认门控(据守)', () => {
+  /** 据守 use action(与 engine/skills/据守.ts onMount 声明同源):prompt.type==='confirm' */
+  function jushouAction(ownerId = 0): SkillActionDef {
+    return {
+      skillId: '据守',
+      ownerId,
+      actionType: 'use',
+      label: '据守',
+      style: 'primary',
+      prompt: {
+        type: 'confirm',
+        title: '是否发动据守?(翻面摸四张,然后弃置一张手牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
+      },
+    };
+  }
+
+  it('点 confirm 型 action 按钮:不直接 send,改为进入 pendingConfirm 状态', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [jushouAction()],
+        send,
+      }),
+    );
+    expect(result.current.pendingConfirm).toBeNull();
+    act(() => result.current.handleSkillAction(jushouAction()));
+    // 进入确认状态,但未发送
+    expect(result.current.pendingConfirm).not.toBeNull();
+    expect(result.current.pendingConfirm?.skillId).toBe('据守');
+    expect(result.current.pendingConfirm?.actionType).toBe('use');
+    expect(result.current.pendingConfirm?.prompt.title).toContain('据守');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('点「发动」(handleConfirmYes):发送 use action 且关闭弹窗', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [jushouAction()],
+        send,
+      }),
+    );
+    act(() => result.current.handleSkillAction(jushouAction()));
+    act(() => result.current.handleConfirmYes());
+    // 发送 use action(confirm 型无额外参数)
+    expect(sentCalls(send)).toEqual([
+      { skillId: '据守', actionType: 'use', params: {} },
+    ]);
+    // 弹窗关闭
+    expect(result.current.pendingConfirm).toBeNull();
+  });
+
+  it('点「不发动」(handleConfirmNo):不发送且关闭弹窗', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [jushouAction()],
+        send,
+      }),
+    );
+    act(() => result.current.handleSkillAction(jushouAction()));
+    act(() => result.current.handleConfirmNo());
+    expect(send).not.toHaveBeenCalled();
+    expect(result.current.pendingConfirm).toBeNull();
+  });
+
+  it('未进入确认状态时 handleConfirmYes/handleConfirmNo 为空操作(不抛错)', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [],
+        send,
+      }),
+    );
+    expect(() => {
+      act(() => result.current.handleConfirmYes());
+      act(() => result.current.handleConfirmNo());
+    }).not.toThrow();
+    expect(send).not.toHaveBeenCalled();
+    expect(result.current.pendingConfirm).toBeNull();
   });
 });

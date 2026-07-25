@@ -39,8 +39,11 @@ export const 检测有效性: AtomDefinition<{ source: number; target: number; c
   applyView() {
     // 无视图状态变更:有效性结果由后续 atom(询问闪/造成伤害)的 applyView 体现。
   },
-  toViewLog(event) {
-    return { player: event.target as number, text: `检测有效性` };
+  toViewLog() {
+    // 内部时机名,对玩家无意义:不写日志条目。
+    // 事件本身(toViewEvents)仍正常下发,供前端浮层/处理区展示;
+    // 仅抑制 view.log 这一条噪声(抑制契约:toViewLog 返回 null = 不写日志)。
+    return null;
   },
 };
 

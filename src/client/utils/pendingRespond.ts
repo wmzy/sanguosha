@@ -19,11 +19,24 @@ export function getPendingRequestType(pending: PendingView): string {
   return typeof v === 'string' ? v : '';
 }
 
-/** 构造广播型 pending 的去重 key("<atomType>:<requestType>")。
- *  用于 markBroadcastSkipped / skippedBroadcast 判重,避免同一 pending 重复弹窗。 */
+/** 构造广播型 pending 的去重 key("<atomType>:<requestType>:t=<target>:c=<cancelTarget>")。
+ *  用于 markBroadcastSkipped / skippedBroadcast 判重,避免同一 pending 重复弹窗。
+ *
+ *  target/cancelTarget 必须纳入 key:铁索连环等多目标询问会广播多次「无懈可击」,
+ *  两次的 atomType='请求回应' + requestType='无懈可击' 完全相同,只有 cancelTarget 不同。
+ *  若不区分,玩家对目标1点「不回应」会把该 key 加入 skippedBroadcast,
+ *  目标2的广播到达时 key 不变 → 重置 effect 不触发 → 目标2被误判为「已跳过」而隐藏。
+ *  对同一目标的 close-reopen 循环(闪的连续询问 / 同一目标的反复无懈),cancelTarget 不变
+ *  → key 不变 → skippedBroadcast 不重置,保持「玩家对该目标说过不回应就不再弹窗」的去重语义。 */
 export function getBroadcastKey(pending: PendingView): string {
   const atomType = pending.atom?.type ?? '';
-  return `${atomType}:${getPendingRequestType(pending)}`;
+  const reqType = getPendingRequestType(pending);
+  const atom = pending.atom as Record<string, unknown> | null;
+  const target = atom?.['target'];
+  const cancelTarget = atom?.['cancelTarget'];
+  const targetStr = typeof target === 'number' ? String(target) : '';
+  const cancelStr = typeof cancelTarget === 'number' ? String(cancelTarget) : '';
+  return `${atomType}:${reqType}:t=${targetStr}:c=${cancelStr}`;
 }
 
 /** 从 pending 读取引擎投影层下发的 cardFilter.candidates(合法手牌 id 列表)。
