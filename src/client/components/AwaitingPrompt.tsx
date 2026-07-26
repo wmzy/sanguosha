@@ -174,15 +174,17 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
               </div>
             );
           }
-          // confirm 类 pending(反馈/遗计确认/八卦阵):渲染 发动/不发动 按钮
+          // confirm 类 pending(反馈/遗计确认/八卦阵/界狂骨二选一):渲染 发动/不发动 按钮
           if (pending.prompt.type === 'confirm') {
             const confirmLabel = pending.prompt.confirmLabel ?? '确认';
             const cancelLabel = pending.prompt.cancelLabel ?? '取消';
+            const confirmDisabled = pending.prompt.confirmDisabled === true;
             return (
               <div className={styles.promptActions}>
                 <button
-                  className={styles.promptBtnPrimary}
-                  onClick={() => onSend(skillId, 'respond', { choice: true })}
+                  className={confirmDisabled ? styles.promptBtnDisabled : styles.promptBtnPrimary}
+                  disabled={confirmDisabled}
+                  onClick={() => !confirmDisabled && onSend(skillId, 'respond', { choice: true })}
                 >
                   {confirmLabel}
                 </button>

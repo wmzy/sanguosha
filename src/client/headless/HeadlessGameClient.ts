@@ -683,18 +683,21 @@ export class HeadlessGameClient {
       if (!isAskType && pending.prompt?.type === 'confirm') {
         const confirmLabel = pending.prompt.confirmLabel ?? '确认';
         const cancelLabel = pending.prompt.cancelLabel ?? '取消';
-        out.push({
-          description: `${confirmLabel}【${info.skillId}】`,
-          message: {
-            skillId: info.skillId,
-            actionType: 'respond',
-            ownerId,
-            params: { choice: true },
-            baseSeq: 0,
-          },
-          validTargets: [],
-          category: 'respond',
-        });
+        // confirmDisabled(如界狂骨满血):不生成 confirm(choice=true) action,AI 只能选 cancel
+        if (pending.prompt.confirmDisabled !== true) {
+          out.push({
+            description: `${confirmLabel}【${info.skillId}】`,
+            message: {
+              skillId: info.skillId,
+              actionType: 'respond',
+              ownerId,
+              params: { choice: true },
+              baseSeq: 0,
+            },
+            validTargets: [],
+            category: 'respond',
+          });
+        }
         out.push({
           description: `${cancelLabel}`,
           message: {

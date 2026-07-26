@@ -29,11 +29,12 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
   vars?: Record<string, Json>;
+  character?: string;
 }): PlayerState {
   return {
     index: opts.index,
     name: opts.name,
-    character: '魏延',
+    character: opts.character ?? '魏延',
     health: opts.health ?? 4,
     maxHealth: opts.maxHealth ?? 4,
     alive: true,
@@ -280,5 +281,187 @@ describe('狂骨', () => {
     await P1.respond('狂骨', { choice: true }); // 发动
     await P1.respond('狂骨', { choice: true }); // 回复体力:3→4
     expect(harness.state.players[1].health).toBe(4);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// 界狂骨(界魏延·锁定技):对距离1以内的角色造成伤害时,回复1点体力或摸一张牌(二选一)。
+//   与狂骨差异:锁定技 → 无"是否发动"询问,直接二选一。
+//   bug 背景:requestType 原为 '狂骨/choose',前端 resolvePendingRespond 据其
+//   前缀推导 skillId='狂骨',但实例注册 skillId='界狂骨' → dispatch 路由失败(点击无效)。
+//   修复:requestType 改为 '界狂骨/choose';满血时 prompt.confirmDisabled=true 禁用回复体力。
+// ════════════════════════════════════════════════════════════════════════
+describe('界狂骨', () => {
+  let harness: SkillTestHarness;
+  beforeEach(() => {
+    harness = new SkillTestHarness();
+  });
+
+  // 模拟前端 resolvePendingRespond:从 pending requestType 按 [/_] 取前缀作 skillId。
+  // 与 src/client/utils/pendingRespond.ts 的推导口径一致,验证路由契约。
+  function deriveSkillIdFromPending(state: GameState): string | null {
+    const slot = [...state.pendingSlots.values()][0];
+    if (!slot) return null;
+    const atom = slot.atom as { type?: string; requestType?: string };
+    if (atom.type !== '请求回应' || !atom.requestType) return null;
+    const sepIdx = atom.requestType.search(/[/_]/);
+    return sepIdx >= 0 ? atom.requestType.slice(0, sepIdx) : atom.requestType;
+  }
+
+  /** 读取当前 pending 的 prompt(验证 confirmDisabled 等字段) */
+  function pendingPrompt(): Record<string, unknown> | null {
+    const slot = [...harness.state.pendingSlots.values()][0];
+    if (!slot) return null;
+    return (slot.atom as { prompt?: Record<string, unknown> }).prompt ?? null;
+  }
+
+  // ─── 不满血:二选一选回复体力 ─────────────────────────────
+  it('对距离1造成伤害 → 二选一选回复体力 → 界魏延回复1点', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1'],
+          skills: ['界狂骨', '杀'],
+          health: 3,
+          character: '界魏延',
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
+      ],
+      cardMap: { k1: kill, sh1: p2shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    await P2.pass();
+
+    expect(harness.state.players[1].health).toBe(3);
+    // 锁定技:直接二选一(无"是否发动"询问)
+    P1.expectPending('请求回应');
+    // 路由契约:前端按 requestType 推导出的 skillId 必须能路由到界狂骨实例
+    const skillId = deriveSkillIdFromPending(harness.state);
+    expect(skillId).toBe('界狂骨');
+    await P1.respond(skillId!, { choice: true }); // 回复1点体力
+
+    expect(harness.state.players[0].health).toBe(4);
+  });
+
+  // ─── 不满血:二选一选摸牌 ─────────────────────────────
+  it('对距离1造成伤害 → 二选一选摸牌 → 界魏延摸1张(体力不变)', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1'],
+          skills: ['界狂骨', '杀'],
+          health: 3,
+          character: '界魏延',
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
+      ],
+      cardMap: { k1: kill, sh1: p2shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    await P2.pass();
+
+    expect(harness.state.players[1].health).toBe(3);
+    P1.expectPending('请求回应');
+    await P1.respond('界狂骨', { choice: false }); // 摸一张牌
+
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[0].hand.length).toBe(1);
+  });
+
+  // ─── 满血:confirmDisabled=true,选摸牌 ─────────────────────────────
+  it('满血造成伤害 → prompt.confirmDisabled=true → 选摸牌 → 摸1张', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1'],
+          skills: ['界狂骨', '杀'],
+          health: 4,
+          character: '界魏延',
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
+      ],
+      cardMap: { k1: kill, sh1: p2shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    await P2.pass();
+
+    expect(harness.state.players[1].health).toBe(3);
+    P1.expectPending('请求回应');
+    // 满血:回复体力按钮应禁用
+    expect(pendingPrompt()?.confirmDisabled).toBe(true);
+    // 选摸牌
+    await P1.respond('界狂骨', { choice: false });
+
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].hand.length).toBe(1);
+  });
+
+  // ─── 满血:选回复体力 → 体力不溢出(被上限截断)──────────────────────
+  it('满血选回复体力 → 体力不溢出(仍为4)', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const p2shan = makeCard('sh1', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1'],
+          skills: ['界狂骨', '杀'],
+          health: 4,
+          character: '界魏延',
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['sh1'], skills: ['闪'], health: 4 }),
+      ],
+      cardMap: { k1: kill, sh1: p2shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    await P2.pass();
+
+    P1.expectPending('请求回应');
+    // 即使前端禁用按钮,引擎层仍接受 choice=true(防客户端绕过),仅被上限截断
+    await P1.respond('界狂骨', { choice: true }); // 回复体力(被截断)
+
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].hand.length).toBe(0);
   });
 });

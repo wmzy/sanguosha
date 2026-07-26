@@ -87,6 +87,9 @@ export interface ConfirmPrompt {
   description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** 禁用 confirm 按钮(如界狂骨满血时回复体力无意义)。引擎设置,前端据此 disabled。
+   *  引擎层仍接受 choice=true 以防客户端绕过(效果由业务上限截断,无害)。 */
+  confirmDisabled?: boolean;
 }
 export interface DistributePrompt {
   type: 'distribute';

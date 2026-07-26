@@ -16,8 +16,12 @@ import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { effectiveDistance } from '../distance';
 
-/** 界魏延二选一问询的 requestType(隔离 respond 路由) */
-const CHOOSE_REQUEST = '狂骨/choose';
+/** 界魏延二选一问询的 requestType(隔离 respond 路由)。
+ *  前缀必须等于 skillId('界狂骨'):前端 resolvePendingRespond 按 requestType
+ *  前缀推导 skillId 后路由,前缀错(如 '狂骨')会查不到 '界狂骨' 实例 → 点击无效。 */
+const CHOOSE_REQUEST = '界狂骨/choose';
+/** localVars key:二选一结果 'heal' | 'draw'(respond 写,hook 读) */
+const CHOICE_KEY = '界狂骨/choice';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -49,7 +53,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (st: GameState, params: Record<string, Json>) => {
       // choice=true(确认)→ 回复体力;choice=false(取消)/缺省 → 摸牌
-      st.localVars['狂骨/choice'] = params.choice === true ? 'heal' : 'draw';
+      st.localVars[CHOICE_KEY] = params.choice === true ? 'heal' : 'draw';
     },
   );
 
@@ -68,22 +72,26 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
 
+    // 满血时回复体力无效:禁用「回复体力」按钮(confirmDisabled),玩家只能摸牌。
+    const fullHealth = self.health >= self.maxHealth;
+
     // 界魏延:询问二选一(回复 1 点体力 / 摸 1 张牌)
-    delete ctx.state.localVars['狂骨/choice'];
+    delete ctx.state.localVars[CHOICE_KEY];
     await applyAtom(ctx.state, {
       type: '请求回应',
       requestType: CHOOSE_REQUEST,
       target: ownerId,
       prompt: {
         type: 'confirm',
-        title: '狂骨:回复1点体力,或摸一张牌?',
+        title: '界狂骨:回复1点体力,或摸一张牌?',
         confirmLabel: '回复1点体力',
         cancelLabel: '摸一张牌',
+        confirmDisabled: fullHealth ? true : undefined,
       },
       defaultChoice: false,
       timeout: 30,
     });
-    const choice = ctx.state.localVars['狂骨/choice'] as string | undefined;
+    const choice = ctx.state.localVars[CHOICE_KEY] as string | undefined;
     if (choice === 'heal') {
       await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
     } else if (choice === 'draw') {
