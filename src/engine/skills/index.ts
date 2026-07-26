@@ -334,6 +334,8 @@ export const skillLoaders: Record<string, Loader> = {
   断肠: load(() => import('./断肠')),
   // 界限突破·群国·界蔡文姬(独立技能文件,不修改标技能;断肠复用标版)
   界悲歌: load(() => import('./界悲歌')),
+  // 锦囊牌·借刀杀人:被借刀时的回应入口(出杀/交武器),card-effects 注册使用结算
+  借刀杀人: load(() => import('./借刀杀人')),
   // 群雄·贾诩
   完杀: load(() => import('./完杀')),
   乱武: load(() => import('./乱武')),

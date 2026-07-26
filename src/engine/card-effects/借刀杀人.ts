@@ -1,62 +1,59 @@
 // 借刀杀人 CardEffect — 普通锦囊·借刀杀人的使用结算。
 //
-// resolve（单目标 A）：询问无懈可击 → 请求目标出杀 → 检查处理区。
-//   目标出杀 → 对 killTarget 执行杀的效果（询问闪 → 伤害）。
-//   目标不出杀 → 使用者获得目标的武器。
+// resolve（单目标 A）：询问无懈可击 → 请求 A 出杀(useCardAndTarget) → 检查 A 的选择。
+//   A 出杀 → useCard(quotaPolicy='none', mandatedTargets:[B]) 走完整杀结算
+//           （询问闪 → 伤害,damageType 自动传导,火杀/雷杀不再丢失属性）。
+//   A 不出杀 → 使用者获得 A 的武器。
 //
 // 双目标特殊处理：targets=[A]（武器持有者），killTarget=B 存入 localVars。
 // resolve 通过 ctx.state.localVars['借刀杀人/killTarget'] 读取 B。
+// A 的「出杀」选择由 skills/借刀杀人.ts 的 respond action 写入
+// localVars['借刀杀人/出杀选择'] = { cardId, targets }。
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
-import { runDamageFlow } from '../damage-flow';
-import { consumePlayedSlashes } from '../card-effect/play-card';
-import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../card-effect/registry';
+import { useCard } from '../card-effect/use-card';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 借刀杀人的结算：请求出杀 → 检查处理区 → 杀效果/获得武器 */
+/** 借刀杀人的结算：请求出杀 → 读取选择 → useCard 杀结算/获得武器 */
 async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
   const { state, source, target } = ctx;
   // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
+  const killTarget = state.localVars['借刀杀人/killTarget'] as number;
+  const killTargetName = state.players[killTarget]?.name ?? '?';
 
-  // 请求目标选择：出杀 或 交出武器
+  // 请求 A 选择：出杀(含 B/方天画戟多目标) 或 交出武器
   await applyAtom(state, {
     type: '请求回应',
-    requestType: '杀/forceKill',
+    requestType: '借刀杀人/出杀',
     target,
     prompt: {
-      type: 'useCard',
-      title: '借刀杀人:请打出一张杀',
+      type: 'useCardAndTarget',
+      title: `借刀杀人:对 ${killTargetName} 使用一张杀,或交出武器`,
       cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+      // 方天画戟等允许多目标;距离/必含 B 由后端 canUse + mandatedTargets 校验
+      targetFilter: { min: 1, max: 3, filter: () => true },
     },
-    timeout: 15,
+    timeout: 20,
   });
 
-  // 检查处理区：统一清理打出的杀；返回空 = 未出杀
-  const kills = await consumePlayedSlashes(state);
+  const choice = state.localVars['借刀杀人/出杀选择'] as
+    | { cardId: string; targets: number[] }
+    | undefined;
+  delete state.localVars['借刀杀人/出杀选择'];
 
-  if (kills.length > 0) {
-    // 目标出了杀：对 killTarget 执行杀的效果
-    const killCardId = kills[0];
-
-    const killTarget = state.localVars['借刀杀人/killTarget'] as number;
-    if (typeof killTarget === 'number' && state.players[killTarget]?.alive) {
-      await applyAtom(state, {
-        type: '指定目标',
-        source: target,
-        target: killTarget,
-        cardId: killCardId,
-      });
-      await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
-      // 闪走 runUseFlow → resolve 设本帧（借刀杀人帧）cancelled=true；runUseFlow finally 自动移牌。
-      if (!isCancelled(state, killCardId, killTarget)) {
-        await runDamageFlow(state, target, killTarget, 1, killCardId);
-      }
-    }
+  if (choice && choice.targets.includes(killTarget)) {
+    // A 出杀:useCard(none) 走完整杀结算(damageType 传导,询问闪,伤害)。
+    // quotaPolicy='none' → 不计出杀次数(技能效果逼杀,非主动出杀)。
+    // mandatedTargets=[B] → 强制必含发起者指定的 killTarget。
+    await useCard(state, target, choice.cardId, choice.targets, {
+      quotaPolicy: 'none',
+      mandatedTargets: [killTarget],
+    });
   } else {
-    // 不出杀：获得目标的武器
-    const targetPlayer = state.players[target];
-    const weaponId = targetPlayer?.equipment['武器'];
+    // 不出杀 / 未选 B:获得 A 的武器
+    const weaponId = state.players[target]?.equipment['武器'];
     if (weaponId) {
       await applyAtom(state, { type: '卸下', player: target, slot: '武器' });
       await applyAtom(state, {

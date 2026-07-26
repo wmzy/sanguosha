@@ -75,7 +75,7 @@ const slashEffect: CardEffect = {
   // ── respond:被询问出杀(决斗/南蛮入侵等)——杀牌进处理区供调用方结算 ──
   respond: {
     validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
-      // pending 必须是 询问杀 或 请求回应(借刀杀人/激将)
+      // pending 必须是 询问杀 或 请求回应(挑衅/激将 等委托杀/respondKill)
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
@@ -83,7 +83,7 @@ const slashEffect: CardEffect = {
       const reqType = (slot.atom as { requestType?: string }).requestType;
       const pendingMatches =
         atomType === '询问杀' ||
-        (atomType === '请求回应' && (reqType === '杀/forceKill' || reqType === '杀/respondKill'));
+        (atomType === '请求回应' && reqType === '杀/respondKill');
       if (!pendingMatches) return '当前不是出杀的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {

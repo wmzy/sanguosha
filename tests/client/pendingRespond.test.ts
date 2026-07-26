@@ -114,7 +114,7 @@ describe('resolvePendingRespond: cardFilter.candidates 优先', () => {
 
   it('无 candidates → 回退到 derive 兜底(按 requestType 前缀推 cardName)', () => {
     // 无 candidates 时行为不变:derive 推 cardName='杀' → 仅匹配 name==='杀'
-    const pending = mkUseCardPending('杀/forceKill', undefined);
+    const pending = mkUseCardPending('杀/respondKill', undefined);
     const info = resolvePendingRespond(pending, []);
     expect(info).not.toBeNull();
     expect(info!.skillId).toBe('杀');
