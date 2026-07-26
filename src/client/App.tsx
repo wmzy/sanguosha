@@ -4,6 +4,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loading } from './components/Loading';
 import { RequirePlayerId } from './components/RequirePlayerId';
 import { globalReset } from './theme';
+import { useAudioUnlock } from './hooks/useAudioUnlock';
 
 // 路由级代码分割：仅顶层页面组件做 lazy 加载，共享组件由页面 chunk 内部静态导入。
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
@@ -14,6 +15,8 @@ const MultiplayerPage = lazy(() =>
 const ReplayPage = lazy(() => import('./pages/ReplayPage').then((m) => ({ default: m.ReplayPage })));
 
 export function App() {
+  // 首次用户交互后解锁 AudioContext(浏览器自动播放策略要求)
+  useAudioUnlock();
   return (
     <div className={globalReset}>
       <ErrorBoundary context="root">
