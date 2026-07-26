@@ -373,6 +373,15 @@ export function usePlayInteraction(
     setSelectedTarget(null);
   }, [isMyTurn, view.phase, pending]);
 
+  // 选中牌已不在手牌(被打出/被偷/视图更新移除,或误点装备区装备)时清空,
+  // 避免 selectedCardId 指向已不存在的牌 → 「取消选择」按钮残留却无牌高亮。
+  useEffect(() => {
+    if (selectedCardId && !perspectiveHand.some((c) => c.id === selectedCardId)) {
+      setSelectedCardId(null);
+      setSelectedTarget(null);
+    }
+  }, [selectedCardId, perspectiveHand]);
+
   // ─── 派生:选中的牌 + use action ───
   const selectedCard = selectedCardId
     ? (perspectiveHand.find((c) => c.id === selectedCardId) ?? null)
@@ -548,6 +557,10 @@ export function usePlayInteraction(
     ) as HTMLElement | null;
     if (cardEl) createCardFlyAnimation(cardEl, card);
     send(selectedUseAction.skillId, 'use', params);
+    // 与 handleSkillAction/handleTransformPlay 一致:提交后清空选中,
+    // 否则牌飞走、离开手牌后 selectedCardId 仍指向它 → 「取消选择」残留却无牌高亮。
+    setSelectedCardId(null);
+    setSelectedTarget(null);
   }, [
     selectedCardId,
     perspectiveHand,

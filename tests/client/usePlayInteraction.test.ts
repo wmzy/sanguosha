@@ -921,6 +921,54 @@ describe('usePlayInteraction · handleCardClick 选牌与切换', () => {
     expect(result.current.selectedCardId).toBeNull();
   });
 
+  // 回归:点「出牌」提交后必须立即清空选中。此前 handlePlayCard 漏了清空
+  // (handleSkillAction/handleTransformPlay 都清),导致牌飞走、离开手牌后
+  // selectedCardId 仍指向它 → 「取消选择」按钮残留却无牌高亮。
+  it('出牌后自动清空选中(handlePlayCard 提交后重置)', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [trickNoTargetAction()],
+        perspectiveHand: [TRICK_CARD],
+        send,
+      }),
+    );
+    act(() => result.current.handleCardClick(TRICK_CARD));
+    expect(result.current.selectedCardId).toBe('c-trick');
+    act(() => result.current.handlePlayCard());
+    expect(sentCalls(send)).toEqual([
+      { skillId: '无中生有', actionType: 'use', params: { cardId: 'c-trick' } },
+    ]);
+    expect(result.current.selectedCardId).toBeNull();
+    expect(result.current.selectedTarget).toBeNull();
+  });
+
+  // 回归:选中牌离开手牌(被打出/被偷/视图更新移除)时,selection 失效,
+  // effect 兜底清空,避免「取消选择」指向已不存在的牌。
+  it('选中牌离开手牌时自动清空(视图更新移除该牌)', () => {
+    const playParams = makePlayParams({
+      view: makePlayView(),
+      skillActions: [killUseAction()],
+      perspectiveHand: [KILL_CARD],
+    });
+    const { result, rerender } = renderHook(
+      ({ params }: { params: PlayInteractionParams }) => usePlayInteraction(true, true, params),
+      { initialProps: { params: playParams } },
+    );
+    act(() => result.current.handleCardClick(KILL_CARD));
+    expect(result.current.selectedCardId).toBe('c-kill');
+
+    rerender({
+      params: makePlayParams({
+        view: makePlayView(),
+        skillActions: [killUseAction()],
+        perspectiveHand: [],
+      }),
+    });
+    expect(result.current.selectedCardId).toBeNull();
+  });
+
   it('出牌模式:切换选中另一张牌', () => {
     const { result } = renderPlay(
       makePlayParams({
