@@ -536,4 +536,71 @@ describe('借刀杀人', () => {
     expect(harness.state.zones.discardPile).toContain('jd1');
     expect(harness.state.zones.processing).toEqual([]);
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 回归(Phase 2):P1 先出自己的杀(用满本回合出杀次数)再借刀杀人逼 P2 出杀——
+  // 逼杀不应被「回合内出杀次数」误挡。
+  //
+  // 背景:Phase 2 借刀杀人逼杀走 useCard(quotaPolicy='none')→ validateCardUse
+  // (mode='forced')。forced 模式正确跳过 checkUsageLimit,但 effect.canUse(=杀.canUse
+  // → canUseSlash)仍会执行,而 canUseSlash 内调用 canSlash 读取 turn 级
+  // quotaUsed(=P1 已用次数)→ 误拒 P2 的逼杀。
+  // 修复:移除 canUseSlash 中冗余的 canSlash(quota 唯一由 checkUsageLimit 负责)。
+  //
+  // 注:buildState 初始装备不走 装备 atom,诸葛连弩的无限 provider 未注册,
+  // 故 slashMax(P2)=1(基础);P1 已用 1 次 → 修复前 canSlash(P2)=false → 逼杀被挡。
+  // P3 须有手牌:空手会触发「询问闪」skip 模式(不创建 pending),无法观察逼杀成功。
+  // ─────────────────────────────────────────────────────────────
+  it('P1 先出杀(用满次数)再借刀杀人 → P2 的逼杀仍能成功', async () => {
+    const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
+    const s1 = makeCard('s1', '杀', '♠', '7', '基本牌');
+    const p2s = makeCard('p2s', '杀', '♥', '5', '基本牌');
+    // P3 填充牌(非闪):避免空手 skip 模式跳过询问闪,使逼杀成功可观察
+    const p3filler = makeCard('p3x', '杀', '♠', '9', '基本牌');
+    const state = buildState({
+      p1Hand: ['jd1', 's1'], // 借刀杀人 + P1 自己的杀
+      p2Hand: ['p2s'],
+      p2Equipment: { 武器: 'wp1' },
+      p3Hand: ['p3x'],
+      p3Skills: ['闪'],
+      extraCards: { wp1: weapon, s1, p2s, p3x: p3filler },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+    const P3 = harness.player('P3');
+
+    const p2HealthBefore = harness.state.players[1].health;
+    const p3HealthBefore = harness.state.players[2].health;
+
+    // P1 先用自己的杀打 P2(消耗本回合唯一的出杀次数)
+    await P1.triggerAction('杀', 'use', { cardId: 's1', targets: [1] });
+    await P2.pass(); // P2 不闪 → 受 1 点伤害
+    expect(harness.state.players[1].health).toBe(p2HealthBefore - 1);
+    // 关键前提:P1 的出杀次数已达上限
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
+
+    // P1 发动借刀杀人逼 P2 对 P3 出杀
+    await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });
+    await P1.pass(); // 无懈窗口
+
+    // P2 被问询出杀 → 出杀。关键:不应被 P1 的出杀次数挡
+    P2.expectPending('请求回应');
+    await P2.respond('借刀杀人', { cardId: 'p2s', targets: [2] });
+
+    // P3 被询问闪 → 证明 P2 的杀未被挡(逼杀成功)
+    P3.expectPending('询问闪');
+    await P3.pass();
+
+    // P2 的杀已用(进弃牌堆)。修复前:逼杀被静默拒绝,p2s 仍在 P2 手中
+    expect(harness.state.zones.discardPile).toContain('p2s');
+    expect(harness.state.players[1].hand).not.toContain('p2s');
+    // P3 受 1 点伤害(杀生效)→ 进一步证明逼杀成功且走完结算
+    expect(harness.state.players[2].health).toBe(p3HealthBefore - 1);
+    // P2 出杀分支不交武器
+    expect(harness.state.players[1].equipment['武器']).toBe('wp1');
+    // 借刀杀人进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('jd1');
+    expect(harness.state.zones.processing).toEqual([]);
+  });
 });

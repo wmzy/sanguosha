@@ -15,7 +15,7 @@ import { applyAtom } from '../create-engine';
 import { runDamageFlow } from '../damage-flow';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
-import { canSlash, incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
+import { incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 import {
   registerCardEffect,
@@ -38,7 +38,7 @@ function canUseSlash(
       return inAttackRange(state, ownerId, t, cardId);
     });
   if (!targetsOk) return '目标不合法';
-  return canSlash(state, ownerId, cardId) ? null : '出杀次数已达上限';
+  return null;
 }
 
 /** 杀的生效后效果：对目标角色造成 1 点伤害 */
