@@ -58,8 +58,10 @@ import { usePlayInteraction } from '../hooks/usePlayInteraction';
 import { useProcessingPicks } from '../hooks/useProcessingPicks';
 import { usePlayHistory } from '../hooks/usePlayHistory';
 import { useSoundPlayback } from '../hooks/useSoundPlayback';
+import { useVfxPlayback } from '../hooks/useVfxPlayback';
 
 import { SoundControl } from './SoundControl';
+import { VfxLayer } from './VfxLayer';
 
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
@@ -152,6 +154,8 @@ export function GameViewComponentImpl({
   const playHistoryItems = usePlayHistory(ingestedEvents, view);
   // 音效播放:监听 ingested 批次,按 effect.sound 立即响(不等延时播放队列)
   useSoundPlayback(ingestedEvents);
+  // Lottie 特效:同样监听 ingested 批次,按 effect.vfx 查 ResourceManager 播放 anim/{id}
+  const vfxItems = useVfxPlayback(ingestedEvents);
 
   const handListRef = useRef<HTMLDivElement>(null);
 
@@ -892,6 +896,9 @@ export function GameViewComponentImpl({
 
       {/* ─── 音效控制(右上角固定,低调)─── */}
       <SoundControl />
+
+      {/* ─── Lottie 特效层(顶层 fixed,不拦截交互)─── */}
+      <VfxLayer items={vfxItems} />
 
       {/* ─── confirm 型主动技确认弹窗(据守等:点技能按钮后的二次确认)─── */}
       {pendingConfirm && (
