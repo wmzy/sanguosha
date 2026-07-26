@@ -99,13 +99,13 @@ describe('界激将', () => {
     // P0(主公）发动激将，请求 P1（蜀）出杀指定 P2
     await P0.triggerAction('界激将', 'use', { target: 1, killTarget: 2 });
 
-    // P1 被询问是否出杀
+    // P1 被询问(界激将/出杀)
     const slot = harness.state.pendingSlots.get(1);
     expect(slot?.atom.type).toBe('请求回应');
-    expect((slot?.atom as { requestType?: string }).requestType).toBe('杀/respondKill');
+    expect((slot?.atom as { requestType?: string }).requestType).toBe('界激将/出杀');
 
-    // P1 出杀
-    await harness.player('P1').respond('杀', { cardId: 'k1' });
+    // P1 出杀(经 界激将/出杀 respond,targets 必含 killTarget=2)
+    await harness.player('P1').respond('界激将', { cardId: 'k1', targets: [2] });
 
     // 出杀后触发界激将被动（P1 回合外用杀）→ 询问 P1 是否令主公摸1张
     const drawSlot = harness.state.pendingSlots.get(1);
@@ -118,9 +118,135 @@ describe('界激将', () => {
     P2.expectPending('询问闪');
     await P2.pass(); // 不出闪
 
-    // P2 扣1血
+    // P2 扠1血
     expect(harness.state.players[2].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('k1');
+    restoreAutoCompare();
+  });
+
+  // ─── use 火杀:主公界激将 → 蜀角色用火杀 → killTarget(藤甲)受 2 点火焰伤害 ──
+  //    回归:修复前 use execute 手写杀结算(runDamageFlow 未传 damageType),
+  //    火杀属性丢失,藤甲按普通伤害 -1 → 0 伤害。修复后走 useCard(none)
+  //    → runUseFlow → 杀.resolveSlash 读 cardMap.damageType 传导。
+  it('use 火杀:主公界激将 → 蜀角色用火杀 → P2(藤甲)受 2 点火焰伤害', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const fireSlash = { ...makeCard('k1', '杀', '♥', '5'), damageType: '火焰' as const };
+    const armor: Card = { id: 'ar1', name: '藤甲', suit: '♠', color: '黑', rank: '2', type: '装备牌' };
+    // P2 非闪填充牌(使询问闪可观察,空手会 skip)
+    const p2Filler = makeCard('f2', '杀', '♠', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['界激将'], faction: '蜀' }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [fireSlash.id],
+          skills: ['杀'],
+          faction: '蜀',
+        }),
+        makePlayer({ index: 2, name: 'P2', hand: [p2Filler.id], skills: ['闪', '藤甲'], faction: '群' }),
+      ],
+      cardMap: { k1: fireSlash, ar1: armor, f2: p2Filler },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // P2 装备藤甲(火焰伤害 +1,普通伤害 -1)
+    state.players[2].equipment = { 防具: 'ar1' };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    const before = harness.state.players[2].health;
+
+    await P0.triggerAction('界激将', 'use', { target: 1, killTarget: 2 });
+    // P1 用火杀响应(经 界激将/出杀 respond,targets 必含 killTarget=2)
+    P1.expectPending('请求回应');
+    await P1.respond('界激将', { cardId: 'k1', targets: [2] });
+    // 出杀后触发界激将被动(P1 回合外用杀)→ 询问 P1 是否令主公摸1张
+    await P1.respond('界激将', { choice: false });
+    // P2 被询问闪 → 不闪
+    P2.expectPending('询问闪');
+    await P2.pass();
+
+    // 藤甲对火焰伤害 +1 → P2 受 2 点火焰伤害(修复前 damageType 丢失 → 藤甲按普通伤害 -1 → 0 伤害)
+    expect(harness.state.players[2].health).toBe(before - 2);
+    expect(harness.state.zones.discardPile).toContain('k1');
+    restoreAutoCompare();
+  });
+
+  // ─── respond 正面:主公被决斗 → 界激将 → 蜀角色代打杀 → 主公不受伤害 ──
+  //    验证界激将代打出(询问杀)模式:杀牌进处理区供决斗检查,主公视为已出杀。
+  //    修复后代打出逻辑镜像标激将(完全不变),仍走 杀/respondKill + 逐个询问。
+  it('respond:主公被决斗 → 界激将 → 蜀角色代打杀 → 主公不受伤害', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const duel: Card = {
+      id: 'jd1',
+      name: '决斗',
+      suit: '♠',
+      color: '黑',
+      rank: 'A',
+      type: '锦囊牌',
+    };
+    const slash = makeCard('k1', '杀', '♠', '5');
+    const state: GameState = createGameState({
+      players: [
+        // P0 = 主公界刘备(有界激将,无杀)
+        makePlayer({ index: 0, name: 'P0', skills: ['界激将'], faction: '蜀' }),
+        // P1 = 蜀势力角色(有杀)
+        makePlayer({ index: 1, name: 'P1', hand: ['k1'], skills: ['杀'], faction: '蜀' }),
+        // P2 = 决斗发起者(无杀,会输掉决斗)
+        makePlayer({ index: 2, name: 'P2', hand: ['jd1'], skills: ['决斗'], faction: '魏' }),
+      ],
+      cardMap: { jd1: duel, k1: slash },
+      currentPlayerIndex: 2, // P2 回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P2 对 P0 出决斗(P0 是目标,先手出杀)
+    await P2.useCardAndTarget('决斗', 'jd1', [0]);
+    await harness.waitForStable();
+
+    // 无懈可击窗口(broadcast)→ pass
+    const slot0 = [...harness.state.pendingSlots.values()][0];
+    expect(slot0?.atom.type).toBe('请求回应');
+    await P0.pass();
+    await harness.waitForStable();
+
+    // P0 被询问杀(决斗目标先手)
+    P0.expectPending('询问杀');
+
+    // P0 发动界激将 respond(代打出分支)
+    await P0.respond('界激将', {});
+    await harness.waitForStable();
+
+    // P1(蜀势力)被询问是否代打杀
+    const p1Slot = harness.state.pendingSlots.get(1);
+    expect(p1Slot?.atom.type).toBe('请求回应');
+    expect((p1Slot?.atom as { requestType?: string }).requestType).toBe('杀/respondKill');
+
+    // P1 代打杀(杀牌移入处理区,视为主公打出)
+    await P1.respond('杀', { cardId: 'k1' });
+    await harness.waitForStable();
+
+    // 决斗结算:P0 出了杀(经界激将),轮到 P2 出杀
+    // P2 手牌已空 → 询问杀 skip,P2 输决斗直接扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
+    await harness.waitForStable();
+
+    // 决斗结算:P2 输,扣 1 血;P0(主公)未受伤
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[2].health).toBe(3);
+    // 杀进弃牌堆(决斗消耗)
+    expect(harness.state.zones.discardPile).toContain('k1');
+    // P1 的杀已消耗
+    expect(harness.state.players[1].hand).not.toContain('k1');
     restoreAutoCompare();
   });
 
