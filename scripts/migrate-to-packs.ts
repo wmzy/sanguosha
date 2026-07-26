@@ -58,7 +58,11 @@ function scanMoves(): Move[] {
             resourceId: `character/${stem}`, type: 'image',
           });
         } else if (s === 'equipment') {
-          if (f.includes('-')) {
+          // 区分缩略图（<名>.png，如 -1坐骑）和大图（<名>-<点>-<花色>.png）
+          // 用花色后缀判定，避免 -1坐骑 的名称中含 - 被误判
+          const SUITS = ['♥', '♠', '♣', '♦'];
+          const isLarge = SUITS.some((su) => stem.endsWith(su));
+          if (isLarge) {
             moves.push({
               from: srcPath, to: join(NEW_BASE, 'card', f),
               resourceId: `card/${stem}`, type: 'image',
