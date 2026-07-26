@@ -89,13 +89,50 @@ describe('挑衅', () => {
     await P0.triggerAction('挑衅', 'use', { target: 1 });
     // P1 被请求对姜维出杀
     P1.expectPending('请求回应');
-    await P1.respond('杀', { cardId: 'k1' });
+    await P1.respond('挑衅', { cardId: 'k1', target: 0 });
     // 杀结算:姜维被询问闪 → 不出闪
     P0.expectPending('询问闪');
     await P0.pass();
 
     expect(harness.state.players[0].health).toBe(3);
     // 杀进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('k1');
+  });
+
+  // ─── 火杀响应挑衅 → 姜维(藤甲)受 2 点火焰伤害(damageType 不丢失) ────
+  //    回归:修复前 use execute 手写杀结算(runDamageFlow 未传 damageType),
+  //    火杀属性丢失,藤甲按普通伤害 -1 → 0 伤害。修复后走 useCard(none)
+  //    → runUseFlow → 杀.resolveSlash 读 cardMap.damageType 传导。
+  it('目标用火杀响应挑衅 → 姜维(藤甲)受 2 点火焰伤害', async () => {
+    const fireSlash = { ...mkCard('k1', '杀', '♥', '5'), damageType: '火焰' as const };
+    // 姜维非闪填充牌(使询问闪可观察,空手会 skip)
+    const jwFiller = mkCard('jf', '杀', '♠', '2');
+    const armor = mkCard('ar1', '藤甲', '♠', '2', '装备牌');
+    const state = build({
+      p0Hand: [jwFiller.id],
+      p1Hand: [fireSlash.id],
+      extraCards: { k1: fireSlash, jf: jwFiller, ar1: armor },
+    });
+    // 姜维装备藤甲 + 注册藤甲技能(火焰伤害 +1,普通伤害 -1)
+    state.players[0].skills = ['挑衅', '藤甲'];
+    state.players[0].equipment = { 防具: 'ar1' };
+    await harness.setup(state);
+    const P0 = harness.player('姜维');
+    const P1 = harness.player('P1');
+
+    const before = harness.state.players[0].health;
+
+    await P0.triggerAction('挑衅', 'use', { target: 1 });
+    // P1 用火杀响应(目标固定=姜维=0),经 挑衅/出杀 respond
+    P1.expectPending('请求回应');
+    await P1.respond('挑衅', { cardId: 'k1', target: 0 });
+    // 姜维被询问闪 → 不闪
+    P0.expectPending('询问闪');
+    await P0.pass();
+
+    // 藤甲对火焰伤害 +1 → 姜维受 2 点火焰伤害(修复前 damageType 丢失 → 藤甲按普通伤害 -1 → 0 伤害)
+    expect(harness.state.players[0].health).toBe(before - 2);
+    // 火杀进弃牌堆
     expect(harness.state.zones.discardPile).toContain('k1');
   });
 
@@ -146,7 +183,7 @@ describe('挑衅', () => {
     const P1 = harness.player('P1');
 
     await P0.triggerAction('挑衅', 'use', { target: 1 });
-    await P1.respond('杀', { cardId: 'k1' });
+    await P1.respond('挑衅', { cardId: 'k1', target: 0 });
     await P0.pass(); // 不出闪
 
     // 再次发动 → 被拒绝
