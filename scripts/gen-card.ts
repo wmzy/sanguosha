@@ -27,6 +27,7 @@
 //     --verify         生成后用 flash-lite 视觉验证
 //     --dry-run        只打印 prompt,不调用 API
 //     --out-name <名>  覆盖成品文件名(默认 <名>[_属性].png);插画缓存仍按 牌名+属性
+//     --install        成品直接进 public/packs/base/card/ 并更新 manifest.json(而非 cards-ai/)
 //
 //   批量模式:
 //   tsx scripts/gen-card.ts --all [--limit N] [--skip-existing]
@@ -45,7 +46,7 @@
 //   <type>/<牌名>.md        提示词档案
 
 import { mkdirSync, writeFileSync, existsSync, readFileSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
@@ -112,7 +113,7 @@ function cardLayoutKind(def: CardDef): LayoutKind {
 }
 
 // ─── 参数解析 ───────────────────────────────────────────────
-const BOOL_FLAGS = new Set(['verify', 'dry-run', 'gen-border', 'gen-back', 'all']);
+const BOOL_FLAGS = new Set(['verify', 'dry-run', 'gen-border', 'gen-back', 'all', 'install']);
 const args = { _: [] as string[] } as Record<string, any>;
 for (let i = 0; i < process.argv.slice(2).length; i++) {
   const a = process.argv.slice(2)[i];
@@ -126,6 +127,9 @@ for (let i = 0; i < process.argv.slice(2).length; i++) {
 const apiKey = args['api-key'] || process.env.SENSENOVA_API_KEY;
 const size = args.size || DEFAULT_SIZE;
 const dryRun = args['dry-run'] === true;
+// --install:成品不进 public/cards-ai/,而是直接进 public/packs/base/card/ 并更新 manifest.json
+const installMode = args['install'] === true;
+const INSTALL_DIR = join(ROOT, 'public', 'packs', 'base', 'card');
 
 // API key 仅在实际调用 LLM 时检查(gen-border 和 art 复用不需要)
 if (!SUPPORTED_SIZES.has(size)) { console.error(`错误:size 不支持。支持值:${[...SUPPORTED_SIZES].join(', ')}`); process.exit(1); }
@@ -746,7 +750,10 @@ const suffix = damageType ? `_${damageType}` : '';
 const artFile = join(outDir, `${name}${suffix}.art.png`);
 // 成品文件名:默认 <名><suffix>,可用 --out-name 覆盖(批量生成时用 [名]-[点]-[花色].png)
 const outNameArg = args['out-name'];
-const outFile = outNameArg ? join(outDir, outNameArg) : join(outDir, `${name}${suffix}.png`);
+// --install 时成品进 packs/base/card/,否则进 cards-ai/<sub>/
+const targetDir = installMode ? INSTALL_DIR : outDir;
+if (installMode) mkdirSync(INSTALL_DIR, { recursive: true });
+const outFile = outNameArg ? join(targetDir, outNameArg) : join(targetDir, `${name}${suffix}.png`);
 // 标题与点数艺术字 PNG 的缓存目录(按点数×颜色复用)
 const TITLE_DIR = join(AI_DIR, '_titles');
 const RANK_DIR = join(AI_DIR, '_ranks');
@@ -835,6 +842,28 @@ try {
 
   savePromptMd(outDir, `${name}${suffix}`, artPrompt, meta);
   console.log(`提示词已保存: ${join(outDir, `${name}.md`)}`);
+
+  // --install: 把成品登记到 packs/base/manifest.json
+  if (installMode) {
+    const manifestPath = join(ROOT, 'public', 'packs', 'base', 'manifest.json');
+    let manifest: { manifestVersion?: number; id?: string; name?: string; version?: string; author?: string; description?: string; priority?: number; resources: { id: string; type: string; file?: string }[] } = {
+      manifestVersion: 1, id: 'base', name: '基础资源包', version: '1.0.0',
+      author: 'gen-card', priority: 0, resources: [],
+    };
+    if (existsSync(manifestPath)) {
+      try { manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')); } catch { /* 损坏则用默认 */ }
+    }
+    const base = basename(outFile, '.png');
+    const newId = `card/${base}`;
+    const relFile = `card/${base}.png`;
+    if (!manifest.resources.some((r) => r.id === newId)) {
+      manifest.resources.push({ id: newId, type: 'image', file: relFile });
+      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+      console.log(`已更新 manifest.json（+1 资源:${newId}）`);
+    } else {
+      console.log(`manifest.json 已含 ${newId}，跳过更新`);
+    }
+  }
 
   if (args.verify === true) {
     console.log('\n=== flash-lite 视觉验证 ===');
