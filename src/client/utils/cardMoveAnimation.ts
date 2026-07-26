@@ -18,7 +18,7 @@ const CARD_W = 46;
 const CARD_H = 64;
 /** 多张牌横排时的重叠步进(每张右移这么多的可见宽度) */
 const CARD_STEP = 22;
-const FLY_DURATION_MS = 420;
+const FLY_DURATION_MS = 840;
 const FLY_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 // 明牌配色

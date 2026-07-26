@@ -11,7 +11,7 @@ const FLY_BORDER = '#3498db';
 const FLY_BG = 'rgba(22,33,62,0.95)';
 const FLY_TEXT = '#e0e0e0';
 const FLY_SHADOW = '0 0 16px rgba(52,152,219,0.6)';
-const FLY_ANIMATION = 'flyToCenter 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards';
+const FLY_ANIMATION = 'flyToCenter 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards';
 // 中央落点偏移(略高于屏幕正中)
 const CENTER_Y_OFFSET = 40;
 

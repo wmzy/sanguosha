@@ -4,8 +4,9 @@ import { ReplayRecorder } from '../../src/client/replay/recorder';
 import type { GameView, ViewEvent } from '../../src/engine/types';
 import type { ReplayMeta } from '../../src/client/replay/types';
 
-/** 造最小 GameView(只含回放引擎需要的字段) */
-function makeView(viewer: number, playerName: string, character = ''): GameView {
+/** 造最小 GameView(只含回放引擎需要的字段)。
+ *  character 默认 = playerName(选将完成后的真实状态);传 '' 模拟选将未完成。 */
+function makeView(viewer: number, playerName: string, character = playerName): GameView {
   return {
     viewer,
     currentPlayerIndex: 0,
@@ -70,6 +71,26 @@ describe('ReplayRecorder', () => {
     expect(r.hasData()).toBe(false);
     const file = r.finalize(META);
     expect(file.seats[0]).toBeUndefined();
+  });
+
+  it('选将未完成(存在 character 为空的玩家)时跳过捕获与记录', () => {
+    // Bug: initialView 捕获于抽身份/选将询问阶段时,所有 character 为空,
+    // 回放初始帧(step=0)全部武将名显示「未知」。
+    // 修复:recorder 等所有玩家 character 非空(选将完成)后才捕获 baseline。
+    const r = new ReplayRecorder();
+    // 选将阶段:character 空 → 不捕获、不记录
+    r.record(0, makeView(0, 'player-0', ''), [makeEvent('分配武将')]);
+    expect(r.hasData()).toBe(false);
+    // 选将完成后:character 满 → 捕获 initialView,开始记录
+    r.record(0, makeView(0, '刘备'), [makeEvent('回合开始')]);
+    expect(r.hasData()).toBe(true);
+    const file = r.finalize(META);
+    expect(file.seats[0]).toBeDefined();
+    // initialView 捕获于选将完成后,武将名非空
+    expect(file.seats[0].initialView.players[0].character).toBe('刘备');
+    // 选将阶段的「分配武将」事件被丢弃,只记录选将完成后的「回合开始」
+    expect(file.seats[0].events).toHaveLength(1);
+    expect(file.seats[0].events[0].event.type).toBe('回合开始');
   });
 
   it('多座次独立录制', () => {

@@ -30,8 +30,16 @@ export class ReplayRecorder {
    * @param events 本次新事件
    */
   record(seat: number, view: GameView | null, events: ViewEvent[], now: number = Date.now()): void {
-    // 首次产生非空 view 时捕获 initialView
+    // 首次产生「选将已完成」的 view 时才捕获 initialView。
+    // 选将阶段(存在 character 为空的玩家)的 view 不捕获、事件也不记录——
+    // 否则 initialView 会捕获于抽身份/选将询问阶段(所有 character 为空),
+    // 回放初始帧(step=0)全部武将名显示「未知」。选将完成后的第一个 view
+    // 已包含所有玩家的武将名/势力/体力,作为录像起点语义完整;
+    // 选将阶段事件(抽身份/发牌/分配武将)的结果均已体现在此 baseline。
     if (view && !this.initialized.has(seat)) {
+      if (view.players.length === 0 || !view.players.every((p) => p.character)) {
+        return;
+      }
       this.seats.set(seat, {
         seatIndex: seat,
         playerName: view.players[seat]?.name ?? `P${seat}`,

@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-07-24
 
+### Fixed — 回放初始帧武将名显示「未知」
+
+游戏录像回放打开时(step=0 = initialView)全部武将名显示「未知」。根因:`ReplayRecorder` 在座次首次收到非空 view 时即捕获 baseline,而首个 view 来源于开局第一个 atom(抽身份)广播——此时所有玩家 `character` 仍为初始空串(`create-engine.ts:185`),尚未经 `分配武将` atom 填充(`replay-readonly-overlay` 测试注释曾记录「initialView 的 pending 是选将询问」,即此症状)。修复:recorder 推迟 baseline 捕获——选将未完成(存在 `character` 为空的玩家)时跳过捕获与事件累积,等所有玩家武将分配完成后的第一个 view 才作为录像起点。选将阶段事件(抽身份/发牌/分配武将)的结果均已体现于该 baseline,无回放价值,一并丢弃。修复后回放初始帧武将名/势力/体力均已就绪。
+
+#### Fixed
+- **recorder 推迟 initialView 捕获到选将完成**: `record()` 增加判断——`view.players.every(p => p.character)` 为假(选将未完成)时直接 return,不捕获 baseline、不累积事件。(`src/client/replay/recorder.ts`)
+
+#### Added
+- **recorder 选将未完成跳过测试**: 覆盖「选将阶段(character 空)view 被丢弃、选将完成后 view 触发捕获且 initialView 武将名非空、选将阶段事件不计入 events」契约;`makeView` 默认 `character=playerName` 反映选将完成后的真实状态。(`tests/unit/replay-recorder.test.ts`)
+
 ### Added — 铁索连环(横置)状态前端展示
 
 处于连环(横置)状态的武将此前仅在 marks 行以原始字符串 `chained` 显示，无辨识度。现座位卡与视角大卡均给出清晰的铁链视觉：铁灰光泽脉冲边框 + header 连环徽章(⛓)，并从 marks 行过滤掉原始 `chained` 文本。
