@@ -23,7 +23,10 @@ import {
   type ResolveCtx,
 } from '../card-effect/registry';
 
-/** 杀的合法性追加检测（condition.md 牌特有校验） */
+/** 杀的合法性追加检测：仅校验目标在攻击范围内。
+ *  出杀次数限制（slash-quota）不由此处检查——由 validateCardUse.checkUsageLimit
+ *  统一负责（mode='play' 强制，mode='forced' 跳过）。此处若重复检查 canSlash，
+ *  会导致 forced 模式（借刀杀人/激将/挑衅/乱武 逼杀）被回合内出杀次数误挡。 */
 function canUseSlash(
   state: import('../types').GameState,
   ownerId: number,

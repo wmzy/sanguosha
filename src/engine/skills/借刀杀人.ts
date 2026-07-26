@@ -6,6 +6,7 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction } from '../skill';
 import type { SkillModule } from '../skill';
+import { inAttackRange } from '../distance';
 
 const REQUEST_TYPE = '借刀杀人/出杀';
 const CHOICE_VAR = '借刀杀人/出杀选择';
@@ -48,8 +49,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (st.cardMap[cardId]?.name !== '杀') return '只能使用杀';
           // 必含发起者指定的 killTarget(权威校验,前端 targetFilter 仅提示)
           const killTarget = st.localVars[KILL_TARGET_VAR] as number | undefined;
-          if (typeof killTarget === 'number' && !targets.includes(killTarget))
-            return '必须对指定角色使用杀';
+          if (killTarget !== undefined && !targets.includes(killTarget))
+            return '必须包含借刀杀人指定的目标';
+          // 每个目标须在 A 的攻击范围内(镜像 杀.canUse/canUseSlash 的距离校验)。
+          // 在 respond 阶段即拒绝非法选择,避免进入结算后 useCard 静默失败 → 白费整张借刀杀人
+          // (与 乱武 在 respond 校验 nearestOthers 同理:把约束前移到问询阶段)。
+          for (const t of targets) {
+            if (!inAttackRange(st, seat, t, cardId)) return '目标不在攻击范围内';
+          }
           return null;
         },
         async (st: GameState, params: Record<string, Json>) => {

@@ -10,11 +10,19 @@
 // A 的「出杀」选择由 skills/借刀杀人.ts 的 respond action 写入
 // localVars['借刀杀人/出杀选择'] = { cardId, targets }。
 
-import type { Card } from '../types';
+import type { Card, GameState } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
 import { useCard } from '../card-effect/use-card';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+
+/** 从 target 处卸下武器并交给 source(借刀杀人“不出杀/交武器”分支) */
+async function acquireWeapon(state: GameState, source: number, target: number): Promise<void> {
+  const weaponId = state.players[target]?.equipment['武器'];
+  if (!weaponId) return;
+  await applyAtom(state, { type: '卸下', player: target, slot: '武器' });
+  await applyAtom(state, { type: '获得', player: source, cardId: weaponId, from: target });
+}
 
 /** 借刀杀人的结算：请求出杀 → 读取选择 → useCard 杀结算/获得武器 */
 async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
@@ -43,26 +51,20 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
     | undefined;
   delete state.localVars['借刀杀人/出杀选择'];
 
-  if (choice && choice.targets.includes(killTarget)) {
-    // A 出杀:useCard(none) 走完整杀结算(damageType 传导,询问闪,伤害)。
-    // quotaPolicy='none' → 不计出杀次数(技能效果逼杀,非主动出杀)。
-    // mandatedTargets=[B] → 强制必含发起者指定的 killTarget。
-    await useCard(state, target, choice.cardId, choice.targets, {
+  if (choice) {
+    // respond validate 已保证 killTarget ∈ targets + 全部在攻击范围;useCard 正常应成功
+    // (quotaPolicy='none' → 不计出杀次数;mandatedTargets=[B] → 强制必含发起者指定的 killTarget)
+    const err = await useCard(state, target, choice.cardId, choice.targets, {
       quotaPolicy: 'none',
       mandatedTargets: [killTarget],
     });
-  } else {
-    // 不出杀 / 未选 B:获得 A 的武器
-    const weaponId = state.players[target]?.equipment['武器'];
-    if (weaponId) {
-      await applyAtom(state, { type: '卸下', player: target, slot: '武器' });
-      await applyAtom(state, {
-        type: '获得',
-        player: source,
-        cardId: weaponId,
-        from: target,
-      });
+    if (err) {
+      // 防御兜底:理论上不会发生(respond 已校验),但避免 useCard 静默白费——回落到交武器
+      await acquireWeapon(state, source, target);
     }
+  } else {
+    // 未选(pass/超时)= 交出武器
+    await acquireWeapon(state, source, target);
   }
 }
 

@@ -486,26 +486,37 @@ describe('借刀杀人', () => {
   // 5. 方天画戟多目标：A 装方天画戟且手牌仅剩此杀 → 借刀杀人逼杀可追加目标
   //    方天画戟的「最后一张手牌为杀可指定最多 3 目标」由杀 CardEffect target.max=3
   //    自然支持（见 skills/方天画戟.ts 注释），useCard(none) 走 runUseFlow 对每目标结算。
+  //    断言三目标均实际扣 1 血（而非仅“不报错”）：每个目标发一张非闪填充牌，
+  //    使「询问闪」真正创建 pending 可观察，全部不闪 → 各扣 1 血。
   // ─────────────────────────────────────────────────────────────
-  it('P2(方天画戟, 仅 1 张杀) 被借刀 → 可对 B+C+D 多目标出杀', async () => {
+  it('P2(方天画戟, 仅 1 张杀) 被借刀 → 可对 B+C+D 多目标出杀,三目标均扣 1 血', async () => {
     const weapon = makeCard('wp1', '方天画戟', '♣', '5', '装备牌');
     const s2 = makeCard('p2s', '杀', '♥', '5', '基本牌');
+    // 每个被杀目标各发一张非闪填充牌,使「询问闪」真正可观察(空手会触发 skip,不创建 pending)
+    const f1 = makeCard('f1', '杀', '♠', '2', '基本牌'); // P1 填充
+    const f3 = makeCard('f3', '杀', '♠', '3', '基本牌'); // P3 填充
+    const f4 = makeCard('f4', '杀', '♠', '4', '基本牌'); // P4 填充
     const state = buildState({
       playerCount: 4,
+      p1Hand: ['jd1', 'f1'], // 借刀杀人 + P1 自己的填充牌(使被杀时有手牌可观察询问闪)
       p2Hand: ['p2s'], // 仅 1 张杀（方天画戟多目标条件）
       p2Equipment: { 武器: 'wp1' },
       p3Hand: [],
       p3Skills: ['闪'],
-      extraCards: { wp1: weapon, p2s: s2 },
+      extraCards: { wp1: weapon, p2s: s2, f1, f3, f4 },
     });
+    // buildState 用同一 p3Hand 给 index≥2 的玩家,这里单独给 P3/P4 不同手牌
+    state.players[2].hand = ['f3'];
+    state.players[3].hand = ['f4'];
     // 方天画戟攻击范围 4：初始装备不走 装备 atom，手动补齐 vars（与现有装备测试一致）
     state.players[1].vars['距离/出杀范围'] = 4;
     await harness.setup(state);
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    const p2Before = harness.state.players[1].hand.length;
-    expect(p2Before).toBe(1);
+    const p1HealthBefore = harness.state.players[0].health;
+    const p3HealthBefore = harness.state.players[2].health;
+    const p4HealthBefore = harness.state.players[3].health;
 
     // P1 借 P2 的刀，killTarget=P3(=2)。P2 响应对 P3/P4/P1 三目标出杀。
     await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });
@@ -515,23 +526,76 @@ describe('借刀杀人', () => {
     // targets 必含 killTarget=2；方天画戟追加 P4(3) 与 P1(0)
     await P2.respond('借刀杀人', { cardId: 'p2s', targets: [2, 3, 0] });
 
-    // 三目标依次询问闪（P3/P4/P1）。逐一 pass，简化断言：杀进弃牌堆、流程无引擎异常。
-    // harness.processAllEvents 自动检查 view 一致性 + 引擎异常。
+    // 三目标依次被询问闪（P3/P4/P1，按目标座次顺序）。各有手牌 → 询问闪 pending 真实创建。
+    // 全部选择不闪 → 各扣 1 血(证明三目标均真正进入杀结算,而非只“不报错”)。
     for (let i = 0; i < 3; i++) {
-      // 每个目标被询问闪（按目标座次顺序），全部不闪
       const slots = harness.state.pendingSlots;
       if (slots.size === 0) break;
       const seat = [...slots.keys()][0];
-      const targetPlayer = harness.player(seat);
-      await targetPlayer.pass();
+      await harness.player(seat).pass();
     }
 
+    // 关键:三个被杀目标都实际扣了 1 血(走完伤害结算)
+    expect(harness.state.players[2].health).toBe(p3HealthBefore - 1); // P3
+    expect(harness.state.players[3].health).toBe(p4HealthBefore - 1); // P4
+    expect(harness.state.players[0].health).toBe(p1HealthBefore - 1); // P1
     // 杀进弃牌堆
     expect(harness.state.zones.discardPile).toContain('p2s');
     // P2 手牌已空（唯一的杀已用）
     expect(harness.state.players[1].hand).toEqual([]);
     // P2 武器保留（出杀分支不交武器）
     expect(harness.state.players[1].equipment['武器']).toBe('wp1');
+    // 借刀杀人进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('jd1');
+    expect(harness.state.zones.processing).toEqual([]);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 5b. respond 阶段拒绝超距目标(defect 修复证明):
+  //     A 装诸葛连弩(攻击范围 1)被借刀,选 [P3(2), P4(3)] 出杀,但 P4 距 P2 为 2 > 1,
+  //     超出攻击范围。修复前:respond 不校验距离 → 进 resolve 后 useCard(canUseSlash)
+  //     拒绝 → 整张借刀杀人静默白费(既不杀也不交武器)。
+  //     修复后:respond validate 校验 inAttackRange → A 的非法选择被拒(pending 仍留在 A),
+  //     A 重选或 pass → pass 后正常交武器,不再静默白费。
+  // ─────────────────────────────────────────────────────────────
+  it('A 选超距目标出杀 → respond 被拒(pending 仍在 A),A pass 后正常交武器', async () => {
+    const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
+    const s2 = makeCard('p2s', '杀', '♥', '5', '基本牌');
+    const state = buildState({
+      playerCount: 4,
+      p2Hand: ['p2s'],
+      p2Equipment: { 武器: 'wp1' },
+      p3Hand: [],
+      p3Skills: ['闪'],
+      extraCards: { wp1: weapon, p2s: s2 },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });
+    await P1.pass(); // 无懈窗口
+
+    P2.expectPending('请求回应');
+    // P4(3) 距 P2(1) 为 2,超出诸葛连弩攻击范围(1)→ respond 被拒,pending 不消费
+    await P2.expectRejected({
+      skillId: '借刀杀人',
+      actionType: 'respond',
+      params: { cardId: 'p2s', targets: [2, 3] },
+    });
+
+    // pending 仍在 P2(未被消费):仍是 借刀杀人/出杀 询问
+    P2.expectPending('请求回应');
+    expect(P2.respondInfo()?.skillId).toBe('借刀杀人');
+
+    // A 放弃出杀 → 交武器
+    await P2.pass();
+
+    // P2 武器被卸下,P1 拿到——证明借刀杀人正常结算,未静默白费
+    expect(harness.state.players[1].equipment['武器']).toBeUndefined();
+    expect(harness.state.players[0].hand).toContain('wp1');
+    // P2 的杀未被使用(仍在手)
+    expect(harness.state.players[1].hand).toContain('p2s');
     // 借刀杀人进弃牌堆
     expect(harness.state.zones.discardPile).toContain('jd1');
     expect(harness.state.zones.processing).toEqual([]);
