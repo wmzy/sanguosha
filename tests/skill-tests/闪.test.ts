@@ -8,6 +8,7 @@
 //   3. 负面:非出闪窗口(无 pending)respond 被拒绝
 //   4. 负面:牌名不是闪(用杀当闪)被拒绝
 //   5. 负面:不在手牌的卡被拒绝
+//   6. 负面:被询问闪时走杀的 respond 入口被拒(询问闪只接受闪 respond)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -182,5 +183,30 @@ describe('闪', () => {
 
     // P2 试图用不在手牌的闪 → 被拒绝
     await P2.expectRejected({ skillId: '闪', actionType: 'respond', params: { cardId: 'sX' } });
+  });
+
+  // 迁移自 regression-all「被询问闪时出杀被拒绝」:询问闪窗口走杀的 respond 入口被拒
+  it('负面:被询问闪时走杀的 respond 入口被拒(询问闪只接受闪 respond)', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const kill2 = makeCard('k2', '杀', '♣', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['k2'], skills: ['闪', '杀'] }),
+      ],
+      cardMap: { k1: slash, k2: kill2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    P2.expectPending('询问闪');
+
+    // P2 走杀的 respond 入口(而非闪)→ 询问闪窗口拒绝非闪 respond
+    await P2.expectRejected({ skillId: '杀', actionType: 'respond', params: { cardId: 'k2' } });
   });
 });
