@@ -64,11 +64,11 @@ export function projectView(view: GameView): AiViewSnapshot {
               ? (view.pending.atom as { candidates: Array<{ name: string; skills: string[] }> })
                   .candidates
               : undefined,
-          // choosePlayer 类(界放权/突袭/激将/奋威 等):投影合法目标 index+name 列表。
+          // choosePlayer 类(突袭/激将/奋威/界再起 等):投影合法目标 index+name 列表。
           // 引擎投影层(请求回应.toViewEvents/buildView)已跑 filter 把结果注入
-          // prompt.candidates(number[],含自己),filter 本身无法跨进程序列化。
+          // prompt.candidates(number[],可能含自己),filter 本身无法跨进程序列化。
           // bug 回归:此前此处只透传 选将询问 的 candidates,choosePlayer 候选丢失 →
-          // AI 经 MCP 看不到可选目标(界放权不能选自己)。与 marks 丢失 bug 同类。
+          // AI 经 MCP 看不到可选目标。与 marks 丢失 bug 同类。
           playerCandidates: readPlayerCandidates(view),
         }
       : null,

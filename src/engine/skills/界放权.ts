@@ -1,5 +1,5 @@
 // 界放权(界刘禅·主动技):你可以跳过出牌阶段,然后弃牌阶段开始时,
-// 你可以弃置一张手牌并令一名角色(可为自己)进行一个额外回合。
+// 你可以弃置一张手牌并令一名其他角色进行一个额外回合。
 //
 // 实现:
 //   - before hook 挂在「阶段开始」(出牌):询问是否发动;发动则跳过出牌阶段 +
@@ -21,7 +21,7 @@
 // 跳过出牌阶段手法同神速/巧变:applyAtom(阶段结束, 出牌) 推进到弃牌,
 //   再 return {kind:'cancel'} 取消本次 阶段开始(出牌)。
 //
-// 界限突破:额外回合目标可选择自己(原版仅限其他角色)。
+// 注:额外回合目标仅限其他角色(本实现不采用官方界限突破的"可为自己"设定)。
 import type {
   FrontendAPI,
   GameState,
@@ -46,10 +46,6 @@ const ACTIVE_KEY = '放权/active';
 const DISCARD_CARD_KEY = '放权/discardCard';
 const EXTRA_TARGET_KEY = '放权/extraTarget';
 const ORIGINAL_NEXT_KEY = '放权/originalNext';
-// 额外回合进行中标记:Case 1 启动额外回合时置 true,Case 2 恢复正常座次时清除。
-// 必需:界放权可令自己进行额外回合,此时 刘禅主回合结束 与 刘禅额外回合结束 的 player 都是 ownerId,
-// 须靠此标记区分(主回合结束→启动额外;额外回合结束→恢复正常下家),否则 Case 1 死循环。
-const EXTRA_ACTIVE_KEY = '放权/extraActive';
 
 /** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
  *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 /usedThisTurn|/healed|/givenCount|/givenTargets vars。
@@ -76,7 +72,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界放权',
-    description: '跳过出牌阶段,弃牌阶段开始时弃一张手牌,令一名角色(可为自己)进行一个额外回合',
+    description: '跳过出牌阶段,弃牌阶段开始时弃一张手牌,令一名其他角色进行一个额外回合',
   };
 }
 
@@ -102,8 +98,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       if (rt === CHOOSE_TARGET_RT) {
         const target = params.target as number | undefined;
-        if (typeof target !== 'number') return '请选择一名角色';
-        // 界刘禅放权可令自己进行额外回合
+        if (typeof target !== 'number') return '请选择一名其他角色';
+        if (target === ownerId) return '不能选择自己';
         if (!s.players[target]?.alive) return '目标已死亡';
         return null;
       }
@@ -202,7 +198,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
 
-      // 请求选额外回合目标(界刘禅可令自己进行额外回合)
+      // 请求选额外回合目标(排除自己、排除死亡)
       delete st.localVars[EXTRA_TARGET_KEY];
       await applyAtom(st, {
         type: '请求回应',
@@ -210,10 +206,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
         target: ownerId,
         prompt: {
           type: 'choosePlayer',
-          title: '放权:选择一名角色进行一个额外回合',
+          title: '放权:选择一名其他角色进行一个额外回合',
           min: 1,
           max: 1,
-          filter: (view: GameView, target: number) => view.players[target]?.alive === true,
+          filter: (view: GameView, target: number) =>
+            target !== ownerId && view.players[target]?.alive === true,
         },
         timeout: 15,
       });
@@ -240,10 +237,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const player = atom.player;
       if (typeof player !== 'number') return;
 
-      const extraActive = st.localVars[EXTRA_ACTIVE_KEY] === true;
-
-      // ── 情况1:刘禅主回合结束 + 弃牌阶段已选定 extraTarget(且未在额外回合流程中)──
-      if (player === ownerId && !extraActive) {
+      // ── 情况1:刘禅主回合结束 + 弃牌阶段已选定 extraTarget ──
+      // (extraTarget≠ownerId 由 validate 保证,故 player===ownerId 仅可能是主回合结束)
+      if (player === ownerId) {
         const extraTarget = st.localVars[EXTRA_TARGET_KEY] as number | undefined;
         if (typeof extraTarget !== 'number' || !st.players[extraTarget]?.alive) {
           return; // 弃牌阶段未选定有效目标 → 放行正常回合结束
@@ -256,7 +252,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 记录正常下家(currentPlayerIndex 已被 end action 的 下一玩家 推进到正常下家)
         const originalNext = st.currentPlayerIndex;
         st.localVars[ORIGINAL_NEXT_KEY] = originalNext;
-        st.localVars[EXTRA_ACTIVE_KEY] = true; // 标记额外回合进行中(防自选时 Case 1 死循环)
 
         // cancel 回合结束 → 手动清理 per-turn 状态(否则 apply 不执行,状态残留)
         clearPerTurnState(st);
@@ -268,13 +263,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return { kind: 'cancel' };
       }
 
-      // ── 情况2:额外目标的回合结束(自选时 player===ownerId,靠 extraActive 区分)──
+      // ── 情况2:额外目标的回合结束(extraTarget≠ownerId,与情况1天然互斥)──
       const extraTargetStored = st.localVars[EXTRA_TARGET_KEY];
-      if (extraActive && player === extraTargetStored) {
+      if (player === extraTargetStored) {
         const originalNext = st.localVars[ORIGINAL_NEXT_KEY] as number | undefined;
         delete st.localVars[EXTRA_TARGET_KEY];
         delete st.localVars[ORIGINAL_NEXT_KEY];
-        delete st.localVars[EXTRA_ACTIVE_KEY];
 
         if (typeof originalNext !== 'number' || !st.players[originalNext]?.alive) {
           return; // 异常:无正常下家,放行

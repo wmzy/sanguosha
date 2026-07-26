@@ -100,9 +100,9 @@ describe('projectView', () => {
 
   // ─── Bug 回归:choosePlayer 候选(含自己)必须投影到 AI 视图 ───
   // bug:viewProjector 此前只透传 选将询问 的 candidates,choosePlayer 类 pending
-  // (界放权/突袭/激将/奋威 等)的合法目标列表丢失。引擎投影层已把 filter 结果注入
-  // prompt.candidates(number[],含自己),但 MCP 视图未透传 → AI 看不到可选目标,
-  // 界放权选额外回合目标时不能选自己。修复:projectView 把 prompt.candidates 映射成
+  // (突袭/激将/奋威/界再起 等)的合法目标列表丢失。引擎投影层已把 filter 结果注入
+  // prompt.candidates(number[],可能含自己,如界再起/涯角),但 MCP 视图未透传 →
+  // AI 看不到可选目标。修复:projectView 把 prompt.candidates 映射成
   // playerCandidates(index+name)下发。
   it('投影 playerCandidates:choosePlayer 候选(含自己)可见', () => {
     const view = makeFullView();
@@ -121,7 +121,7 @@ describe('projectView', () => {
       marks: [],
       distanceVars: { attackMod: 0, defenseMod: 0, attackRange: 1 },
     });
-    // 界放权 chooseTarget:filter=(view,t)=>alive → candidates 含自己(0)
+    // mock:手写 choosePlayer pending,candidates 故意含自己(0)以验证投影透传
     view.pending = {
       type: 'awaits',
       atom: {
