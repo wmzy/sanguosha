@@ -11,7 +11,7 @@
 //
 // 实现要点:
 //   - 触发: 成为目标 after-hook(atom.target === ownerId 且卡为杀/决斗)
-//     —— 杀 与 决斗(runUseFlow virtual 模式)都走 成为目标 atom,挂此一处即可覆盖。
+//     —— 杀 与 决斗(useCard virtual 模式)都走 成为目标 atom,挂此一处即可覆盖。
 //     AOE(南蛮/万箭)与火攻不走 成为目标,需挂 请求回应 before-hook(无懈可击窗口)。
 //     本实现同时挂两处 hook,完整覆盖杀/决斗/AOE/火攻。
 //   - 防重入:同一张卡只触发一次(PROCESSED_PREFIX + cardId)。
@@ -37,7 +37,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, topFrame } from '../create-engine';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 import {
   registerAction,
   registerAfterHook,
@@ -96,7 +96,12 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  // forced 模式 quotaPolicy='none':不计入出杀次数(虚拟杀,无 onSettle)
+  await useCard(state, source, cardId, [target], {
+    quotaPolicy: 'none',
+    virtual: true,
+    skipValidate: true,
+  });
   delete state.cardMap[cardId];
 }
 
