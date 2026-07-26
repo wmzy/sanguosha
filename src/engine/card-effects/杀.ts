@@ -15,7 +15,7 @@ import { applyAtom } from '../create-engine';
 import { runDamageFlow } from '../damage-flow';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
-import { canSlash, incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
+import { incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 import {
   registerCardEffect,
@@ -23,7 +23,10 @@ import {
   type ResolveCtx,
 } from '../card-effect/registry';
 
-/** 杀的合法性追加检测（condition.md 牌特有校验） */
+/** 杀的合法性追加检测：仅校验目标在攻击范围内。
+ *  出杀次数限制（slash-quota）不由此处检查——由 validateCardUse.checkUsageLimit
+ *  统一负责（mode='play' 强制，mode='forced' 跳过）。此处若重复检查 canSlash，
+ *  会导致 forced 模式（借刀杀人/激将/挑衅/乱武 逼杀）被回合内出杀次数误挡。 */
 function canUseSlash(
   state: import('../types').GameState,
   ownerId: number,
@@ -38,7 +41,7 @@ function canUseSlash(
       return inAttackRange(state, ownerId, t, cardId);
     });
   if (!targetsOk) return '目标不合法';
-  return canSlash(state, ownerId, cardId) ? null : '出杀次数已达上限';
+  return null;
 }
 
 /** 杀的生效后效果：对目标角色造成 1 点伤害 */
@@ -75,7 +78,7 @@ const slashEffect: CardEffect = {
   // ── respond:被询问出杀(决斗/南蛮入侵等)——杀牌进处理区供调用方结算 ──
   respond: {
     validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
-      // pending 必须是 询问杀 或 请求回应(借刀杀人/激将)
+      // pending 必须是 询问杀 或 请求回应(挑衅/激将 等委托杀/respondKill)
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
@@ -83,7 +86,7 @@ const slashEffect: CardEffect = {
       const reqType = (slot.atom as { requestType?: string }).requestType;
       const pendingMatches =
         atomType === '询问杀' ||
-        (atomType === '请求回应' && (reqType === '杀/forceKill' || reqType === '杀/respondKill'));
+        (atomType === '请求回应' && reqType === '杀/respondKill');
       if (!pendingMatches) return '当前不是出杀的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {

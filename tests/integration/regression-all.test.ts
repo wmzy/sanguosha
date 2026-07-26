@@ -344,11 +344,11 @@ describe('用户报告问题回归', () => {
     await P0.triggerAction('借刀杀人', 'use', { cardId: 'jdsr', target: 1, killTarget: 2 });
     // 无懈 pass
     if (h.state.pendingSlots.size > 0) await P0.pass();
-    // 借刀杀人 forceKill 询问 P1
+    // 借刀杀人/出杀 询问 P1（经 skills/借刀杀人.ts respond 入口）
     if (h.state.pendingSlots.size > 0) {
       const info = P1.respondInfo();
-      expect(info?.skillId).toBe('杀');
-      await P1.respond('杀', { cardId: 's2' });
+      expect(info?.skillId).toBe('借刀杀人');
+      await P1.respond('借刀杀人', { cardId: 's2', targets: [2] });
       await tick(); // 等 dispatch resolve + 借刀杀人 execute resume
     }
     // P2 被询问闪

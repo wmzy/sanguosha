@@ -22,8 +22,8 @@
 //   - "无法如此做"按 pass/超时 = 失去 1 体力(描述语义:无杀或不出即失血)。
 //   - 限定技标记用 player.vars(整局永久),非 turn.vars。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { runDamageFlow } from '../damage-flow';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { useCard } from '../card-effect/use-card';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';
 import { effectiveDistance } from '../distance';
@@ -57,58 +57,6 @@ function nearestOthers(state: GameState, p: number): number[] {
     if (d === min) result.push(i);
   }
   return result;
-}
-
-/** 以 source 对 target 走一次完整杀结算(实体杀牌),不计入出杀次数 */
-async function resolveForcedSlash(
-  state: GameState,
-  source: number,
-  target: number,
-  cardId: string,
-): Promise<void> {
-  await pushFrame(state, '乱武', source, { forcedSlashCardId: cardId, forcedTarget: target });
-  try {
-    // 杀牌进处理区
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId,
-      from: { zone: '手牌', player: source },
-      to: { zone: '处理区' },
-    });
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    const became = await applyAtom(state, { type: '成为目标', source, target, cardId });
-    if (became) {
-      const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-      if (valid) {
-        await applyAtom(state, { type: '询问闪', target, source });
-        const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-        if (dodgeIds.length > 0) {
-          await applyAtom(state, { type: '被抵消', source, target, cardId });
-          for (const dId of dodgeIds) {
-            await applyAtom(state, {
-              type: '移动牌',
-              cardId: dId,
-              from: { zone: '处理区' },
-              to: { zone: '弃牌堆' },
-            });
-          }
-        } else if (state.players[target]?.alive) {
-          await runDamageFlow(state, source, target, 1, cardId);
-        }
-      }
-    }
-    // 杀牌移出处理区→弃牌堆
-    if (frameCards(state).includes(cardId)) {
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    }
-  } finally {
-    await popFrame(state);
-  }
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -178,7 +126,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               nearestOthers(st, p).includes(choice.target) &&
               st.players[choice.target]?.alive
             ) {
-              await resolveForcedSlash(st, p, choice.target, choice.cardId);
+              // 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),不计出杀次数;
+              // mandatedTargets 强制目标;damageType 由 cardMap 自动传导(火杀/雷杀不再丢失)。
+              const err = await useCard(st, p, choice.cardId, [choice.target], {
+                quotaPolicy: 'none',
+                mandatedTargets: [choice.target],
+                skipValidate: true,
+              });
+              if (err) {
+                // 防御兜底(respond 已校验 nearest,不应触发)→ 失去 1 体力
+                await applyAtom(st, { type: '失去体力', target: p, amount: 1 });
+              }
             } else {
               await applyAtom(st, { type: '失去体力', target: p, amount: 1 });
             }

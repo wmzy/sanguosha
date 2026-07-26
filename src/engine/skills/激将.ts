@@ -8,15 +8,23 @@
 //      第一个出杀的蜀角色:杀牌进处理区 → 调用方(决斗/南蛮入侵)检查处理区有杀 = 已出。
 //      全部拒绝:处理区无杀 = 未出(主公承受原结算)。
 //
-// 模式 B(主动技变体):
-//   - use:主公在出牌阶段注册(主动激将)。
-//   - respond:主公在询问杀 pending 时注册(响应激将)。
-//   - 蜀角色回应出杀时,复用自身 '杀' 技能的 respond action(requestType='杀/respondKill'
-//     触发)把杀牌移入处理区,无需为蜀角色额外注册激将 respond(同挑衅/借刀杀人 复用模式)。
+// respond 注册(全座次,按 pending 内容分支,一个座次仅一个 respond):
+//   - 代打出(atom.type==='询问杀', 主公 seat):主公被询问杀时,逐个请求蜀角色经
+//     '杀/respondKill'(复用 杀.respond)把杀牌移入处理区,调用方(决斗/南蛮)检查
+//     处理区判断已出。全部拒绝 → 主公承受原结算。
+//   - 代使用(requestType==='激将/出杀', 蜀角色 seat):主动激将时,蜀角色选杀+
+//     指定 killTarget,use execute 读 localVars['激将/出杀选择'] → useCard(none)
+//     走完整杀结算,damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { runDamageFlow } from '../damage-flow';
+import { useCard } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../skill';
+import { inAttackRange } from '../distance';
+
+// use(代使用)路径的 localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)
+const REQUEST_TYPE = '激将/出杀';
+const CHOICE_VAR = '激将/出杀选择';
+const KILL_TARGET_VAR = '激将/killTarget';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -77,130 +85,173 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const killTarget = params.killTarget as number | undefined;
       await pushFrame(state, '激将', from, { ...params });
 
-      // 请求回应:目标选择出杀
+      // 存 killTarget 供 respond(出杀分支)权威校验必含目标;结算后清理
+      if (typeof killTarget === 'number') {
+        state.localVars[KILL_TARGET_VAR] = killTarget;
+      }
+
+      // 请求回应:蜀角色选一张杀 + 指定目标(固定=killTarget),经 激将/出杀 respond
+      const killTargetName =
+        typeof killTarget === 'number' ? state.players[killTarget]?.name ?? '?' : '?';
       await applyAtom(state, {
         type: '请求回应',
-        requestType: '杀/respondKill',
+        requestType: REQUEST_TYPE,
         target,
-        prompt: { type: 'confirm', title: '主公激将:是否出杀?' },
+        prompt: {
+          type: 'useCardAndTarget',
+          title: `激将:对 ${killTargetName} 使用一张杀`,
+          cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+          // killTarget 已知时固定该目标;未知时(退化场景)允许任一非自己目标
+          targetFilter: {
+            min: 1,
+            max: 1,
+            filter: (_v, t: number) =>
+              typeof killTarget === 'number' ? t === killTarget : t !== target,
+          },
+        },
         timeout: 15,
       });
 
-      // 检查处理区:有杀 = 出了杀
-      const killCardId = frameCards(state).find((id) => {
-        const c = state.cardMap[id];
-        return c?.name === '杀';
-      });
+      const choice = state.localVars[CHOICE_VAR] as
+        | { cardId: string; targets: number[] }
+        | undefined;
+      delete state.localVars[CHOICE_VAR];
+      delete state.localVars[KILL_TARGET_VAR];
 
-      if (killCardId) {
-        // 出了杀:杀进弃牌堆,执行杀效果
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: killCardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
+      // 官方:出杀 → 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),
+      //      damageType 由 cardMap 自动传导(火杀/雷杀不再丢失);
+      //      不出杀无效果。useCard 失败=无效果(与官方语义一致,激将未定义失败兑底)。
+      if (choice?.cardId && Array.isArray(choice.targets) && choice.targets.length > 0) {
+        const err = await useCard(state, target, choice.cardId, choice.targets, {
+          quotaPolicy: 'none',
+          mandatedTargets: typeof killTarget === 'number' ? [killTarget] : [],
+          skipValidate: true,
         });
-        if (typeof killTarget === 'number') {
-          await applyAtom(state, {
-            type: '指定目标',
-            source: target,
-            target: killTarget,
-            cardId: killCardId,
-          });
-          await applyAtom(state, { type: '询问闪', target: killTarget, source: target });
-          const dodgeCardId = frameCards(state).find((id) => {
-            const c = state.cardMap[id];
-            return c?.name === '闪';
-          });
-          if (dodgeCardId) {
-            await applyAtom(state, {
-              type: '移动牌',
-              cardId: dodgeCardId,
-              from: { zone: '处理区' },
-              to: { zone: '弃牌堆' },
-            });
-          } else {
-            await runDamageFlow(state, target, killTarget, 1, killCardId);
-          }
+        if (err) {
+          /* 激将未定义失败兑底:useCard 失败=无效果(skipValidate + respond 预校验保证正常不出错) */
         }
       }
-      // 官方:不出杀时无效果(原引擎补充规则"主公摸1张"已移除)
+
       await popFrame(state);
     },
   );
 
-  // ── respond:响应型激将(主公被询问杀时,请求蜀角色代打出) ──
-  // 当前 pending 是询问杀 + target=主公 → 激将.respond → 逐个询问蜀势力角色出杀。
-  // 流程同护驾(respond 模式),但复用 '杀/respondKill' requestType:
-  //   1. 主公被询问杀(询问杀 atom,pending slot target=主公)
-  //   2. 主公 dispatch 激将.respond(dispatch 找到询问杀 slot,pause 它)
-  //   3. 激将.respond execute:
-  //      a. 按座次顺序逐个询问其他蜀势力角色是否打出杀(请求回应 requestType='杀/respondKill')
-  //      b. 第一个出杀的角色:杀牌移入处理区(视为主公打出)
-  //      c. 全部拒绝:处理区无杀(主公承受原结算)
-  //   4. execute 完成 → dispatch 自动 resolve 询问杀 slot → 调用方检查处理区
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>): string | null => {
-      // 必须有询问杀 pending,target 是主公
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '询问杀') return '当前不是出杀窗口';
-      const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
-      // 主公技:仅主公位可用
-      if (ownerId !== 0) return '仅主公可用';
-      // 必须有其他蜀势力存活角色(有手牌)
-      const hasShuAllies = st.players.some(
-        (p) =>
-          p.alive &&
-          p.index !== ownerId &&
-          p.faction === '蜀' &&
-          p.hand.length > 0,
-      );
-      if (!hasShuAllies) return '没有可出杀的蜀势力角色';
-      return null;
-    },
-    async (st: GameState, _params: Record<string, Json>): Promise<void> => {
-      // 按座次顺序逐个询问蜀势力角色
-      const numPlayers = st.players.length;
-      for (let offset = 1; offset < numPlayers; offset++) {
-        const allyIdx = (ownerId + offset) % numPlayers;
-        const ally = st.players[allyIdx];
-        if (!ally?.alive) continue;
-        if (ally.faction !== '蜀') continue;
-        if (ally.hand.length === 0) continue;
+  // ── respond:注册到全座次,按 pending 内容分支 ────────────────
+  //   atom.type==='询问杀'(主公 seat):响应型激将——逐个请求蜀角色代打出杀
+  //     (代打出:杀牌进处理区供调用方(决斗/南蛮)检查,复用 杀/respondKill)
+  //   requestType==='激将/出杀'(蜀角色 seat):主动激将——选杀+指定 killTarget(代使用)
+  //     (代使用:走 useCard 完整杀结算,damageType 自动传导)
+  //   一个座次仅能有一个 respond action(registerAction 按座次去重),故合并到同一注册。
+  const unloaders: Array<() => void> = [];
+  for (const pl of state.players) {
+    const seat = pl.index;
+    unloaders.push(
+      registerAction(
+        state,
+        skill.id,
+        seat,
+        'respond',
+        (st: GameState, params: Record<string, Json>): string | null => {
+          const slot = st.pendingSlots.get(seat);
+          if (!slot) return '当前不需要回应';
+          const atom = slot.atom as { type: string; requestType?: string };
 
-        // 询问该蜀势力角色是否打出杀(复用 '杀/respondKill' requestType,
-        // 蜀角色通过自身 '杀' 技能 respond 把杀牌移入处理区,视为主公打出)
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: '杀/respondKill',
-          target: allyIdx,
-          prompt: {
-            type: 'useCard',
-            title: `激将:主公(${st.players[ownerId]?.name ?? `P${ownerId}`})需要杀,是否打出一张杀?`,
-            cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
-          },
-          timeout: 15,
-        });
+          // ── 响应型(代打出):主公被询问杀 → 逐个请求蜀角色出杀 ──
+          if (atom.type === '询问杀') {
+            const self = st.players[seat];
+            if (!self?.alive) return '玩家不存在或已死亡';
+            // 主公技:仅主公位可用
+            if (seat !== 0) return '仅主公可用';
+            // 必须有其他蜀势力存活角色(有手牌)
+            const hasShuAllies = st.players.some(
+              (p) =>
+                p.alive &&
+                p.index !== seat &&
+                p.faction === '蜀' &&
+                p.hand.length > 0,
+            );
+            if (!hasShuAllies) return '没有可出杀的蜀势力角色';
+            return null;
+          }
 
-        // 检查处理区:有杀 = 已出,激将结束(杀牌留在处理区供调用方检查)
-        const killCardId = frameCards(st).find((id) => {
-          const c = st.cardMap[id];
-          return c?.name === '杀';
-        });
-        if (killCardId) return;
-        // 该角色拒绝/无杀,继续询问下一个
-      }
-      // 全部拒绝:处理区无杀,execute 结束,主公承受原结算
-    },
-  );
+          // ── 主动型(代使用):蜀角色选杀 + 指定 killTarget ──
+          if (atom.requestType === REQUEST_TYPE) {
+            const cardId = params.cardId as string | undefined;
+            const targets = params.targets as number[] | undefined;
+            if (typeof cardId !== 'string') return '请选择一张杀';
+            if (!Array.isArray(targets) || targets.length === 0) return '请选择目标';
+            const self = st.players[seat];
+            if (!self?.hand.includes(cardId)) return '牌不在手牌中';
+            if (st.cardMap[cardId]?.name !== '杀') return '只能使用杀';
+            // 必含主公指定的 killTarget(权威,前端 targetFilter 仅提示)
+            const killTarget = st.localVars[KILL_TARGET_VAR] as number | undefined;
+            if (typeof killTarget === 'number' && !targets.includes(killTarget))
+              return '必须包含激将指定的目标';
+            // 每个目标须在蜀角色攻击范围内(镜像 杀.canUse 距离校验)
+            for (const t of targets) {
+              if (!inAttackRange(st, seat, t, cardId)) return '目标不在攻击范围内';
+            }
+            return null;
+          }
 
-  return () => {};
+          return '当前不是激将询问';
+        },
+        async (st: GameState, params: Record<string, Json>): Promise<void> => {
+          const slot = st.pendingSlots.get(seat);
+          const atom = slot?.atom as { type: string; requestType?: string } | undefined;
+
+          // ── 响应型(代打出):逐个请求蜀角色出杀,第一个出杀即止 ──
+          if (atom?.type === '询问杀') {
+            // 按座次顺序逐个询问蜀势力角色
+            const numPlayers = st.players.length;
+            for (let offset = 1; offset < numPlayers; offset++) {
+              const allyIdx = (seat + offset) % numPlayers;
+              const ally = st.players[allyIdx];
+              if (!ally?.alive) continue;
+              if (ally.faction !== '蜀') continue;
+              if (ally.hand.length === 0) continue;
+
+              // 询问该蜀势力角色是否打出杀(复用 '杀/respondKill' requestType,
+              // 蜀角色通过自身 '杀' 技能 respond 把杀牌移入处理区,视为主公打出)
+              await applyAtom(st, {
+                type: '请求回应',
+                requestType: '杀/respondKill',
+                target: allyIdx,
+                prompt: {
+                  type: 'useCard',
+                  title: `激将:主公(${st.players[seat]?.name ?? `P${seat}`})需要杀,是否打出一张杀?`,
+                  cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+                },
+                timeout: 15,
+              });
+
+              // 检查处理区:有杀 = 已出,激将结束(杀牌留在处理区供调用方检查)
+              const killCardId = frameCards(st).find((id) => {
+                const c = st.cardMap[id];
+                return c?.name === '杀';
+              });
+              if (killCardId) return;
+              // 该角色拒绝/无杀,继续询问下一个
+            }
+            // 全部拒绝:处理区无杀,execute 结束,主公承受原结算
+            return;
+          }
+
+          // ── 主动型(代使用):记录蜀角色的出杀选择 ──
+          if (atom?.requestType === REQUEST_TYPE) {
+            st.localVars[CHOICE_VAR] = {
+              cardId: params.cardId as string,
+              targets: params.targets as number[],
+            };
+          }
+        },
+      ),
+    );
+  }
+
+  return () => {
+    for (const u of unloaders) u();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
@@ -228,10 +279,14 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     activeWhen: (ctx) => {
       const slot = ctx.view.pending;
       if (!slot) return false;
-      if ((slot.atom as { type: string }).type !== '询问杀') return false;
       if (slot.target !== ctx.perspectiveIdx) return false;
+      const atom = slot.atom as { type: string; requestType?: string };
+      // 响应型(代打出):主公被询问杀
+      if (atom.type === '询问杀') return true;
+      // 主动型(代使用):蜀角色被请求 激将/出杀
+      if (atom.requestType === REQUEST_TYPE) return true;
       // 势力检查由后端 validate 处理(GameView 不暴露 faction)
-      return true;
+      return false;
     },
   });
   return () => {};

@@ -1,19 +1,19 @@
 // tests/integration/激将.test.ts
-// 集成测试:激将(主公技,刘备)——主公请求蜀势力角色出杀
+// 集成测试:激将(主公技,刘备)——主公请求蜀势力角色代为使用杀(use/代使用 路径)
 //
 // 覆盖:
 //   1. validate 拒绝:非主公(ownerId !== 0)使用激将
 //   2. validate 拒绝:目标不是蜀势力
-//   3. validate 拒绝:目标是自己
-//   4. 目标不出杀(超时)→ 主公摸 1 张牌
-//   5. 目标出杀(杀.respond)→ 杀进入处理区,被 激将 检测到,杀结算(目标若不出闪则受伤)
+//   3. 目标不出杀(超时)→ 激将无效果(官方:不出杀无附加惩罚)
+//   4. 目标出杀 → useCard 走完整杀结算(目标若不出闪则受伤)
 //
-// 关键机制(激将.ts):
+// 关键机制(激将.ts use execute,代使用路径):
 //   - ownerId === 0 视为"主公位"硬约束(validate 拒绝非主公)
-//   - requestType='杀/respondKill' 供 杀.respond 匹配(详见 杀.ts 回应 validate)
-//   - 杀牌进处理区 → 激将 execute 检查 zones.processing 是否有 杀
-//   - 出了杀 → 指定目标 + 询问闪 + 造成伤害
-//   - 不出(超时)→ 主公摸 1 张
+//   - requestType='激将/出杀':蜀角色经 useCardAndTarget 选一张杀 + 指定 killTarget
+//   - use execute 读 localVars['激将/出杀选择'] → useCard(quotaPolicy='none',
+//     mandatedTargets=[killTarget], skipValidate) 走完整杀结算(runUseFlow→杀.resolveSlash),
+//     damageType 由 cardMap 自动传导(火杀/雷杀不丢)
+//   - 不出杀(超时)无效果(无"主公摸牌"补充规则)
 import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/create-engine';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
@@ -104,10 +104,10 @@ describe('激将:主公请求蜀势力角色出杀', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 3:正面——主公对蜀势力发动激将,目标不出杀(超时)→ 主公摸 1 张
+  // 用例 3:正面——主公对蜀势力发动激将,目标不出杀(超时)→ 激将无效果
   // ─────────────────────────────────────────────────────────────
   it('用例3:目标不出杀(超时)→ 激将无效果(官方:不出杀无附加惩罚)', async () => {
-    // 准备牌堆:2 张普通牌,供摸牌
+    // 准备牌堆(本用例不摸牌,仅为完整状态)
     const deckCard1: Card = {
       id: 'd1',
       name: '杀',
@@ -149,12 +149,12 @@ describe('激将:主公请求蜀势力角色出杀', () => {
       params: { target: 1, killTarget: 2 },
       baseSeq: state.seq,
     });
-    // 应有 请求回应(激将/respondKill) pending,target=1(P1)
+    // 应有 请求回应(激将/出杀) pending,target=1(P1)
     expect(state.pendingSlots.size).toBeGreaterThan(0);
     const slot = [...state.pendingSlots.values()][0];
     const slotAtom = slot.atom as { type: string; requestType?: string; target: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('杀/respondKill');
+    expect(slotAtom.requestType).toBe('激将/出杀');
     expect(slotAtom.target).toBe(1);
 
     // 目标不出杀(超时)
@@ -162,14 +162,14 @@ describe('激将:主公请求蜀势力角色出杀', () => {
 
     // 官方描述无"不出则摸牌"补充规则——原实现删除了这条超范围逻辑
     expect(state.players[0].hand.length).toBe(lordHandBefore);
-    // 处理区应清空(激将的 finally 兜底把所有 processing 移入弃牌堆)
+    // 处理区应清空(本用例未出杀,无牌进入处理区)
     expect(state.zones.processing).toEqual([]);
     // pending 已消费
     expect(state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 4:正面——目标出杀 → 杀进入处理区 → 激将检测到 → 杀结算
+  // 用例 4:正面——目标出杀 → useCard 走完整杀结算(指定目标→询问闪→伤害)
   // ─────────────────────────────────────────────────────────────
   it('用例4:目标(P1)出杀 → 杀进处理区 → 激将触发杀 → P2 不出闪 → P2 扣血', async () => {
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
@@ -198,16 +198,16 @@ describe('激将:主公请求蜀势力角色出杀', () => {
     // 应有 请求回应 pending,target=1
     expect(state.pendingSlots.size).toBeGreaterThan(0);
 
-    // P1 响应:出杀
+    // P1 响应:出杀(经 激将/出杀 respond,targets 必含 killTarget=2)
     await dispatchAndWait(state, {
-      skillId: '杀',
+      skillId: '激将',
       actionType: 'respond',
       ownerId: 1,
-      params: { cardId: slash.id },
+      params: { cardId: slash.id, targets: [2] },
       baseSeq: state.seq,
     });
 
-    // 此时杀已进处理区,激将 execute 检测到杀后应继续走杀流程:
+    // 出杀后激将 use execute 调用 useCard 走完整杀结算:
     // 指定目标 → 询问闪 → P2 不出闪 → 造成伤害
     // 询问闪 pending 应该是 target=2
     // (也可能在 dispatch respond 完后还没进 pending;再 fireTimeout 推进)

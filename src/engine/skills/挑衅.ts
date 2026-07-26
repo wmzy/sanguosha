@@ -5,21 +5,30 @@
 //   类型:主动技 | 时机:出牌阶段 | 限制:每回合限一次
 //   原子操作分解:
 //     1. 回合用量(设 usedThisTurn,防重入 + 同步 view)
-//     2. 请求回应(requestType='杀/respondKill',target=被挑衅者)
-//        —— 复用 杀.respond 的 requestType('杀/respondKill'),目标出杀后杀牌进处理区
-//     3a. 目标出杀:移动牌(杀→弃牌堆)→ 指定目标 → 询问闪 → 检查处理区有闪则 miss,
-//         否则 造成伤害(target=姜维, source=目标)。即复用 借刀杀人 的简化杀结算。
+//     2. 请求回应(requestType='挑衅/出杀',target=被挑衅者,useCardAndTarget)
+//        —— respond 注册到全座次,被问询者(被挑衅者座次)走 出杀 分支:
+//           选一张【杀】+ 指定目标(固定=姜维),权威校验 inAttackRange。
+//     3a. 目标出杀:useCard(quotaPolicy='none', mandatedTargets=[姜维]) 走完整杀结算
+//         (runUseFlow→杀.resolveSlash),damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 //     3b. 目标不出杀:请求回应(requestType='挑衅/选牌',target=姜维)让姜维选弃哪张牌
 //         (pickTargetCard:装备明选 cardId / 手牌盲选 handIndex)→ 弃置该牌
 //   钩子:无(纯主动技)
-//   契约:读 localVars['挑衅/选牌']、['挑衅/弃牌目标'];写 player.vars['挑衅/usedThisTurn']
+//   契约:读 localVars['挑衅/选牌']、['挑衅/弃牌目标']、['挑衅/出杀选择'];
+//        写 player.vars['挑衅/usedThisTurn']
 //   距离:inAttackRange(state, 目标, 姜维)—— 目标的杀能攻击到姜维
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { runDamageFlow } from '../damage-flow';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { useCard } from '../card-effect/use-card';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
+
+// localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)
+const REQUEST_TYPE = '挑衅/出杀';      // 出杀询问的 requestType
+const CHOICE_VAR = '挑衅/出杀选择';     // 出杀选择写入的 localVars key
+const PICK_REQUEST_TYPE = '挑衅/选牌'; // 选牌询问的 requestType
+const PICK_VAR = '挑衅/选牌';          // 选牌结果写入的 localVars key(与 requestType 同名)
+const DISCARD_TARGET_VAR = '挑衅/弃牌目标';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -46,11 +55,11 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
       ? { zone: 'equipment', cardId: equipment[0].cardId }
       : { zone: 'hand', handIndex: 0 };
 
-  state.localVars['挑衅/弃牌目标'] = victim;
-  delete state.localVars['挑衅/选牌'];
+  state.localVars[DISCARD_TARGET_VAR] = victim;
+  delete state.localVars[PICK_VAR];
   await applyAtom(state, {
     type: '请求回应',
-    requestType: '挑衅/选牌',
+    requestType: PICK_REQUEST_TYPE,
     target: picker,
     prompt: {
       type: 'pickTargetCard',
@@ -64,11 +73,11 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
     timeout: 20,
   });
 
-  const result = state.localVars['挑衅/选牌'] as
+  const result = state.localVars[PICK_VAR] as
     | { zone: string; cardId: string | null; handIndex: number | null }
     | undefined;
-  delete state.localVars['挑衅/选牌'];
-  delete state.localVars['挑衅/弃牌目标'];
+  delete state.localVars[PICK_VAR];
+  delete state.localVars[DISCARD_TARGET_VAR];
 
   const zone = result?.zone ?? defaultZone.zone;
   let discardId: string | undefined;
@@ -119,51 +128,40 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await pushFrame(state, '挑衅', from, { ...params });
 
       try {
-        // 1) 请求目标对姜维使用一张杀(复用 杀.respond 的 requestType='杀/respondKill',
-        //    目标出杀后杀牌进处理区)
+        // 1) 请求目标对姜维使用一张杀(经 挑衅/出杀 respond:选杀 + 指定目标=姜维)。
+        //    respond 注册到全座次,被问询方(target 座次)走 出杀 分支。
         await applyAtom(state, {
           type: '请求回应',
-          requestType: '杀/respondKill',
+          requestType: REQUEST_TYPE,
           target,
           prompt: {
-            type: 'useCard',
+            type: 'useCardAndTarget',
             title: `挑衅:对 ${state.players[from].name} 使用一张杀,否则其弃你一张牌`,
             cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+            targetFilter: { min: 1, max: 1, filter: (_v, t) => t === from },
           },
           timeout: 15,
         });
 
-        // 2) 检查处理区:有杀 = 出了杀
-        const killCardId = frameCards(state).find((id) => state.cardMap[id]?.name === '杀');
+        const choice = state.localVars[CHOICE_VAR] as
+          | { cardId: string; target: number }
+          | undefined;
+        delete state.localVars[CHOICE_VAR];
 
-        if (killCardId) {
-          // 目标出了杀:正常结算(target→姜维)。复用 借刀杀人 的简化杀结算路径。
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId: killCardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
+        if (choice?.cardId) {
+          // 目标出了杀:走完整杀结算(useCard→runUseFlow→杀.resolveSlash),
+          // 目标固定=姜维,mandatedTargets=[from] 强制;damageType 由 cardMap 自动传导。
+          const err = await useCard(state, target, choice.cardId, [choice.target], {
+            quotaPolicy: 'none',
+            mandatedTargets: [from],
+            skipValidate: true,
           });
-          await applyAtom(state, {
-            type: '指定目标',
-            source: target,
-            target: from,
-            cardId: killCardId,
-          });
-          await applyAtom(state, { type: '询问闪', target: from, source: target });
-          const dodgeCardId = frameCards(state).find((id) => state.cardMap[id]?.name === '闪');
-          if (dodgeCardId) {
-            await applyAtom(state, {
-              type: '移动牌',
-              cardId: dodgeCardId,
-              from: { zone: '处理区' },
-              to: { zone: '弃牌堆' },
-            });
-          } else if (state.players[from]?.alive) {
-            await runDamageFlow(state, target, from, 1, killCardId);
+          if (err) {
+            // 防御兜底:目标选了杀但无效 → 走弃牌
+            await pickAndDiscard(state, from, target);
           }
         } else {
-          // 3) 目标没出杀:姜维弃其一张牌
+          // 2) 目标没出杀:姜维弃其一张牌
           await pickAndDiscard(state, from, target);
         }
       } finally {
@@ -172,45 +170,89 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ─── respond action:姜维选要弃的目标牌 ────────────────────
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state: GameState, params: Record<string, Json>) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
-      if ((slot.atom as { requestType?: string }).requestType !== '挑衅/选牌')
-        return '当前不是选牌窗口';
-      const victim = state.localVars['挑衅/弃牌目标'] as number | undefined;
-      if (typeof victim !== 'number') return '无弃牌目标';
-      const vp = state.players[victim];
-      if (!vp) return '弃牌目标不存在';
-      const zone = params.zone;
-      if (zone === 'equipment') {
-        if (typeof params.cardId !== 'string') return 'cardId required';
-        if (!Object.values(vp.equipment).includes(params.cardId)) return '该牌不在目标装备区';
-        return null;
-      }
-      if (zone === 'hand') {
-        if (typeof params.handIndex !== 'number') return 'handIndex required';
-        if (params.handIndex < 0 || params.handIndex >= vp.hand.length) return 'handIndex 越界';
-        return null;
-      }
-      return 'zone required (equipment|hand)';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      state.localVars['挑衅/选牌'] = {
-        zone: params.zone,
-        cardId: params.cardId ?? null,
-        handIndex: params.handIndex ?? null,
-      };
-    },
-  );
+  // ─── respond action:注册到全座次,按 requestType 分支 ────────────
+  //   '挑衅/出杀'(被挑衅者座次 ≠ ownerId):选一张杀 + 指定目标(固定=姜维)
+  //   '挑衅/选牌'(姜维座次 = ownerId):选弃哪张牌(装备明选/手牌盲选)
+  //   参照 乱武/借刀杀人:被问询者可能任意座次,须逐座次注册 respond 才能被 dispatch 路由。
+  const unloaders: Array<() => void> = [];
+  for (const pl of state.players) {
+    const seat = pl.index;
+    unloaders.push(
+      registerAction(
+        state,
+        skill.id,
+        seat,
+        'respond',
+        (st: GameState, params: Record<string, Json>): string | null => {
+          const slot = st.pendingSlots.get(seat);
+          if (!slot) return '当前不需要回应';
+          if (slot.atom.type !== '请求回应') return '当前不是挑衅询问';
+          const requestType = (slot.atom as { requestType?: string }).requestType;
 
-  return () => {};
+          if (requestType === REQUEST_TYPE) {
+            // 被挑衅者出杀:目标固定=姜维(ownerId),且须在攻击范围内
+            const cardId = params.cardId as string | undefined;
+            const targetIdx = params.target as number | undefined;
+            if (typeof cardId !== 'string') return '请选择一张杀';
+            if (typeof targetIdx !== 'number') return '请选择目标';
+            const self = st.players[seat];
+            if (!self?.hand.includes(cardId)) return '牌不在手牌中';
+            if (st.cardMap[cardId]?.name !== '杀') return '只能使用杀';
+            if (targetIdx !== ownerId) return '只能对姜维使用杀';
+            // 距离校验(权威,镜像 use validate):目标的杀能攻击到姜维
+            if (!inAttackRange(st, seat, ownerId, cardId)) return '目标不在攻击范围内';
+            return null;
+          }
+
+          if (requestType === PICK_REQUEST_TYPE) {
+            // 姜维选弃哪张牌
+            const victim = st.localVars[DISCARD_TARGET_VAR] as number | undefined;
+            if (typeof victim !== 'number') return '无弃牌目标';
+            const vp = st.players[victim];
+            if (!vp) return '弃牌目标不存在';
+            const zone = params.zone;
+            if (zone === 'equipment') {
+              if (typeof params.cardId !== 'string') return 'cardId required';
+              if (!Object.values(vp.equipment).includes(params.cardId))
+                return '该牌不在目标装备区';
+              return null;
+            }
+            if (zone === 'hand') {
+              if (typeof params.handIndex !== 'number') return 'handIndex required';
+              if (params.handIndex < 0 || params.handIndex >= vp.hand.length)
+                return 'handIndex 越界';
+              return null;
+            }
+            return 'zone required (equipment|hand)';
+          }
+
+          return '当前不是挑衅询问';
+        },
+        async (st: GameState, params: Record<string, Json>) => {
+          const slot = st.pendingSlots.get(seat);
+          const requestType = (
+            slot?.atom as { requestType?: string } | undefined
+          )?.requestType;
+          if (requestType === REQUEST_TYPE) {
+            st.localVars[CHOICE_VAR] = {
+              cardId: params.cardId as string,
+              target: params.target as number,
+            };
+          } else if (requestType === PICK_REQUEST_TYPE) {
+            st.localVars[PICK_VAR] = {
+              zone: params.zone,
+              cardId: params.cardId ?? null,
+              handIndex: params.handIndex ?? null,
+            };
+          }
+        },
+      ),
+    );
+  }
+
+  return () => {
+    for (const u of unloaders) u();
+  };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {

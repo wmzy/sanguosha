@@ -30,7 +30,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 import { isCancelled } from '../card-effect/registry';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -136,12 +136,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars['青龙偃月刀/killCardId'];
     if (!killCardId) return; // 超时未选 → 放弃追杀
 
-    // 追杀:走 runUseFlow（与普通杀一致）。
-    // runUseFlow 内部：手牌→处理区 → 询问闪（cancelledBy={闪}）→
+    // 追杀:走 useCard（与普通杀一致，charge 保证出杀次数累加）。
+    // useCard → runUseFlow 内部：手牌→处理区 → 询问闪（cancelledBy={闪}）→
     //   被闪 → 杀帧 cancelled → 被抵消 atom → 本 hook 递归追杀
     //   未被闪 → 杀.resolve 造成伤害
     //   处理区→弃牌堆（finally 自动清理）
-    await runUseFlow(ctx.state, ownerId, killCardId, [atom.target!], '杀');
+    await useCard(ctx.state, ownerId, killCardId, [atom.target!], {
+      quotaPolicy: 'charge',
+      skipValidate: true,
+    });
   });
 
   return () => {};

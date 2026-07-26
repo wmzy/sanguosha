@@ -232,6 +232,62 @@ describe('乱武', () => {
     void slot;
   });
 
+  // ─── 4b. 火杀经乱武对藤甲目标造成火焰伤害(damageType 不丢失) ────
+  //    回归:修复前 resolveForcedSlash 手写 runDamageFlow 未传 damageType,
+  //    藤甲 +1 失效。修复后走 useCard(none) → runUseFlow → 杀.resolveSlash
+  //    读 cardMap.damageType 传导。
+  // ─────────────────────────────────────────────────
+  it('被乱武者用火杀对最近目标(藤甲)→ 贾诩受 2 点火焰伤害', async () => {
+    // 火杀:name='杀' + damageType='火焰'(DamageType = 普通|火焰|雷电)
+    const fireSlash = { ...mkCard('sk1', '杀', '♥', '5'), damageType: '火焰' as const };
+    // 贾诩非闪填充牌(使询问闪可观察,空手会 skip)
+    const jwFiller = mkCard('jf1', '杀', '♠', '2');
+    const armor = mkCard('ar1', '藤甲', '♠', '2', '装备牌');
+    const state = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '贾诩',
+          character: '贾诩',
+          skills: ['乱武', '藤甲'],
+          health: 3,
+          maxHealth: 3,
+          hand: [jwFiller.id],
+        }),
+        mkPlayer({ index: 1, name: 'P2', hand: [fireSlash.id], skills: [], health: 4 }),
+      ],
+      cardMap: { sk1: fireSlash, jf1: jwFiller, ar1: armor },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 贾诩装备藤甲
+    state.players[0].equipment = { 防具: 'ar1' };
+    await harness.setup(state);
+    const JX = harness.player('贾诩');
+    const P2 = harness.player('P2');
+
+    const before = harness.state.players[0].health;
+
+    await JX.triggerAction('乱武', 'use');
+    await harness.waitForStable();
+
+    // P2 被问询 → 用火杀对唯一最近者(贾诩)出杀
+    await P2.respond('乱武', { cardId: 'sk1', target: 0 });
+    await harness.waitForStable();
+
+    // 贾诩被询问闪 → 不闪
+    const slot = [...harness.state.pendingSlots.values()][0];
+    expect((slot.atom as { type: string }).type).toBe('询问闪');
+    await JX.pass();
+    await harness.waitForStable();
+
+    // 藤甲对火焰伤害 +1 → 贾诩受 2 点火焰伤害(修复前 damageType 丢失 → 仅 1 点普通伤害)
+    expect(harness.state.players[0].health).toBe(before - 2);
+    // 火杀进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('sk1');
+  });
+
   // ─── 5. 负面对照:非出牌阶段 / 非自己回合 → 拒绝 ─────────────────
   it('负面:非出牌阶段发动乱武被拒绝', async () => {
     await harness.setup(

@@ -128,24 +128,42 @@ export function findLegalTargets(
 /** 统一合法性检测（condition.md 三条件）。
  *  返回 null=通过，字符串=拒绝理由。
  *
+ *  mode：
+ *    'play'（默认）= 主动使用：走 validateUseCard 基线（自己回合+出牌阶段+无阻塞 pending+存活+
+ *      手牌中有牌+牌名匹配）+ checkUsageLimit（仅杀次数上限）。
+ *    'forced' = 逼杀/虚拟使用：使用者未必在自己出牌阶段，跳过基线与次数检查；
+ *      仍手动校验牌存在 + 牌名匹配、禁用检测、合法目标数、effect.canUse。
+ *
  *  检查顺序：
- *    基础 → 禁用 → 次数 → 合法目标数 → 牌特有校验 */
+ *    基础（play）/ 牌存在+牌名（forced） → 禁用 → 次数（play）→ 合法目标数 → 牌特有校验 */
 export function validateCardUse(
   state: GameState,
   ownerId: number,
   params: Record<string, Json>,
   cardName: string,
+  mode: 'play' | 'forced' = 'play',
 ): string | null {
-  // 基础检查：自己回合、出牌阶段、无阻塞 pending、存活、手牌中有牌、牌名匹配
-  const base = validateUseCard(state, ownerId, params, { cardName });
-  if (base) return base;
+  if (mode === 'play') {
+    // 基础检查：自己回合、出牌阶段、无阻塞 pending、存活、手牌中有牌、牌名匹配
+    const base = validateUseCard(state, ownerId, params, { cardName });
+    if (base) return base;
+  } else {
+    // forced 模式：手动校验牌存在 + 牌名匹配（逼杀/虚拟使用跳过出牌阶段基线）
+    const cardId = params.cardId as string | undefined;
+    if (!cardId) return 'cardId required';
+    const card = state.cardMap[cardId];
+    if (!card) return '牌不存在';
+    if (card.name !== cardName) return `不是${cardName}`;
+  }
 
   // 条件1：禁用检测
   if (isCardBanned(state, ownerId, cardName)) return '你不能使用此牌';
 
-  // 条件2：次数限制（仅杀）
-  const limit = checkUsageLimit(state, ownerId, cardName, params);
-  if (limit) return limit;
+  if (mode === 'play') {
+    // 条件2：次数限制（仅杀）
+    const limit = checkUsageLimit(state, ownerId, cardName, params);
+    if (limit) return limit;
+  }
 
   // 条件3：合法目标数 > 0（有目标要求的牌）
   const effect = getCardEffect(cardName);
