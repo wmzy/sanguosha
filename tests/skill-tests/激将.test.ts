@@ -98,13 +98,13 @@ describe('激将', () => {
     // P0(主公)发动激将,请求 P1(蜀)出杀指定 P2
     await P0.triggerAction('激将', 'use', { target: 1, killTarget: 2 });
 
-    // P1 被询问是否出杀
+    // P1 被询问(激将/出杀)
     const slot = harness.state.pendingSlots.get(1);
     expect(slot?.atom.type).toBe('请求回应');
-    expect((slot?.atom as { requestType?: string }).requestType).toBe('杀/respondKill');
+    expect((slot?.atom as { requestType?: string }).requestType).toBe('激将/出杀');
 
-    // P1 出杀
-    await P1.respond('杀', { cardId: 'k1' });
+    // P1 出杀(经 激将/出杀 respond,targets 必含 killTarget=2)
+    await P1.respond('激将', { cardId: 'k1', targets: [2] });
 
     // P2 手牌为 0 → 询问闪 skip(无 slot、无延时),直接扣血
     expect(harness.state.pendingSlots.size).toBe(0);
@@ -112,6 +112,56 @@ describe('激将', () => {
     // P2 扣1血
     expect(harness.state.players[2].health).toBe(3);
     // 杀进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('k1');
+    restoreAutoCompare();
+  });
+
+  // ─── use 火杀:主公激将 → 蜀角色用火杀 → killTarget(藤甲)受 2 点火焰伤害 ──
+  //    回归:修复前 use execute 手写杀结算(runDamageFlow 未传 damageType),
+  //    火杀属性丢失,藤甲按普通伤害 -1 → 0 伤害。修复后走 useCard(none)
+  //    → runUseFlow → 杀.resolveSlash 读 cardMap.damageType 传导。
+  it('use 火杀:主公激将 → 蜀角色用火杀 → P2(藤甲)受 2 点火焰伤害', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const fireSlash = { ...makeCard('k1', '杀', '♥', '5'), damageType: '火焰' as const };
+    const armor: Card = { id: 'ar1', name: '藤甲', suit: '♠', color: '黑', rank: '2', type: '装备牌' };
+    // P2 非闪填充牌(使询问闪可观察,空手会 skip)
+    const p2Filler = makeCard('f2', '杀', '♠', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['激将'], faction: '蜀' }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [fireSlash.id],
+          skills: ['杀'],
+          faction: '蜀',
+        }),
+        makePlayer({ index: 2, name: 'P2', hand: [p2Filler.id], skills: ['闪', '藤甲'] }),
+      ],
+      cardMap: { k1: fireSlash, ar1: armor, f2: p2Filler },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // P2 装备藤甲(火焰伤害 +1,普通伤害 -1)
+    state.players[2].equipment = { 防具: 'ar1' };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    const before = harness.state.players[2].health;
+
+    await P0.triggerAction('激将', 'use', { target: 1, killTarget: 2 });
+    // P1 用火杀响应(经 激将/出杀 respond,targets 必含 killTarget=2)
+    P1.expectPending('请求回应');
+    await P1.respond('激将', { cardId: 'k1', targets: [2] });
+    // P2 被询问闪 → 不闪
+    P2.expectPending('询问闪');
+    await P2.pass();
+
+    // 藤甲对火焰伤害 +1 → P2 受 2 点火焰伤害(修复前 damageType 丢失 → 藤甲按普通伤害 -1 → 0 伤害)
+    expect(harness.state.players[2].health).toBe(before - 2);
     expect(harness.state.zones.discardPile).toContain('k1');
     restoreAutoCompare();
   });

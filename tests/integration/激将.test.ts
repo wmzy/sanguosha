@@ -154,7 +154,7 @@ describe('激将:主公请求蜀势力角色出杀', () => {
     const slot = [...state.pendingSlots.values()][0];
     const slotAtom = slot.atom as { type: string; requestType?: string; target: number };
     expect(slotAtom.type).toBe('请求回应');
-    expect(slotAtom.requestType).toBe('杀/respondKill');
+    expect(slotAtom.requestType).toBe('激将/出杀');
     expect(slotAtom.target).toBe(1);
 
     // 目标不出杀(超时)
@@ -198,12 +198,12 @@ describe('激将:主公请求蜀势力角色出杀', () => {
     // 应有 请求回应 pending,target=1
     expect(state.pendingSlots.size).toBeGreaterThan(0);
 
-    // P1 响应:出杀
+    // P1 响应:出杀(经 激将/出杀 respond,targets 必含 killTarget=2)
     await dispatchAndWait(state, {
-      skillId: '杀',
+      skillId: '激将',
       actionType: 'respond',
       ownerId: 1,
-      params: { cardId: slash.id },
+      params: { cardId: slash.id, targets: [2] },
       baseSeq: state.seq,
     });
 
