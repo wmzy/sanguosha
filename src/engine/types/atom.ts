@@ -35,6 +35,7 @@ export interface AtomPending<A = Atom> {
 export interface AtomEffect {
   sound?: string;
   animation?: string;
+  vfx?: string; // Lottie 特效资源 ID，指向 anim/{id}，可打包替换
   screenEffect?: string;
   particles?: string;
   duration?: number;
