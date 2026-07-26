@@ -121,11 +121,11 @@ describe('阶段跳过 skipPhase 集成', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 2. 神速选项1:跳过判定 + 摸牌 → 出牌阶段正常可用
+  // 2. 神速选项1:跳过判定 + 摸牌 → 出牌阶段再出真杀被拒(虚拟杀占出杀次数)
   //    从判定阶段开始触发神速①,验证:判定被直接跳过、摸牌被标签跳过、
-  //    出牌阶段可达且仍可正常出杀(神速的虚拟杀不消耗手牌/不占出杀次数)。
+  //    出牌阶段可达;但神速虚拟杀计入出杀次数(charge),出杀次数达上限→再出真杀被拒。
   // ─────────────────────────────────────────────────────────────
-  it('神速①:跳过判定+摸牌,出牌阶段正常可出杀', async () => {
+  it('神速①:跳过判定+摸牌,出牌阶段再出杀被拒(虚拟杀占出杀次数)', async () => {
     const sha = makeCard('s1', '杀', '♠', '7');
     const state: GameState = createGameState({
       players: [
@@ -174,17 +174,23 @@ describe('阶段跳过 skipPhase 集成', () => {
     // 阶段推进到出牌(未 soft-lock)
     expect(harness.state.phase).toBe('出牌');
 
-    // 出牌阶段正常可用:P1 仍可出杀(神速虚拟杀不占次数、不消耗手牌)
+    // 神速①虚拟杀计入出杀次数(charge)→ quotaUsed=1 已达基础上限
+    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
+    // 出牌阶段再出真杀 → 被次数上限拒绝(validate 失败,静默丢弃)
     // (关闭视图自检:出牌窗口 IIFE 与增量视图存在已知时序竞争,非引擎 bug)
     const restoreCompare = disableAutoCompare();
     try {
-      await P1.useCardAndTarget('杀', 's1', [1]);
-      // P2 无手牌:询问闪 skip,直接扣血(useCardAndTarget 已推进到稳定)
+      await P1.expectRejected({
+        skillId: '杀',
+        actionType: 'use',
+        params: { cardId: 's1', targets: [1] },
+      });
     } finally {
       restoreCompare();
     }
-    // P2 再次受 1 点伤害 → 出牌阶段功能正常
-    expect(harness.state.players[1].health).toBe(2);
+    // P2 未再受伤(真杀被拒),s1 仍在 P1 手中
+    expect(harness.state.players[1].health).toBe(3);
+    expect(harness.state.players[0].hand).toContain('s1');
   });
 
   // ─────────────────────────────────────────────────────────────

@@ -16,6 +16,8 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { useCard } from '../../src/engine/card-effect/use-card';
+import { slashUsed } from '../../src/engine/slash-quota';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A'): Card {
@@ -389,5 +391,49 @@ describe('神速', () => {
     expect(harness.state.currentPlayerIndex).toBe(1);
     // P1 未摸牌(整回合被跳过)
     expect(harness.state.players[0].hand.length).toBe(handBefore);
+  });
+
+  // ── Phase 4 回归:神速虚拟杀统一 useCard(charge,virtual),计入出杀次数 ──
+  it('神速①虚拟杀计入出杀次数(charge)→ 再出真杀被拒(出杀次数达上限)', async () => {
+    const realSlash = makeCard('rs1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['rs1'], skills: ['神速'] }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: [], character: '曹操' }),
+      ],
+      cardMap: { rs1: realSlash },
+      currentPlayerIndex: 0,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await triggerJudgePhase(harness);
+    // 发动神速①
+    await P1.respond('神速', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    // 选目标 P2
+    await P1.respond('神速', { target: 1 });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // virtualKill 询问 P2 出闪 → P2 不闪
+    const P2 = harness.player('P2');
+    await P2.pass();
+
+    // 神速①虚拟杀生效:P2 受 1 点伤害
+    expect(harness.state.players[1].health).toBe(3);
+    // 关键:charge 生效 → 出杀次数已用 1(达基础上限 1)
+    expect(slashUsed(harness.state)).toBe(1);
+
+    // 出牌阶段再用真杀 → useCard(charge) 走 play 模式校验 → 次数上限拒绝
+    const err = await useCard(harness.state, 0, 'rs1', [1], { quotaPolicy: 'charge' });
+    expect(typeof err).toBe('string'); // 被拒(null=成功,string=拒绝理由)
+    // P2 未再受伤,真杀仍在 P1 手中,出杀次数未因被拒而增加
+    expect(harness.state.players[1].health).toBe(3);
+    expect(harness.state.players[0].hand).toContain('rs1');
+    expect(slashUsed(harness.state)).toBe(1);
   });
 });

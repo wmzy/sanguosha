@@ -11,8 +11,8 @@
 //   - 选项2:弃装备 + 加 跳过出牌 标签 + 虚拟杀。
 //   - 选项3:加 跳过弃牌 标签 + 加 翻面 标签 + 虚拟杀。
 //   - usedThisTurn 后缀由 回合结束 atom 自动清理。
-//   - 虚拟杀同标版:无实体卡,走 指定目标→成为目标→检测有效性→询问闪→伤害/抵消,
-//     不消耗手牌、不计入 杀/quota、无距离限制。
+//   - 虚拟杀同标版:无实体卡,走 useCard(charge, virtual)→ 指定目标→成为目标→检测有效性→
+//     询问闪→伤害/抵消,不消耗手牌、计入出杀次数(由 useCard(charge) 的 onSettle 计数)、无距离限制。
 //   - 翻面实现(同据守/放逐):加 '/翻面' 后缀标签,下一回合 阶段开始(准备) before-hook
 //     消费标签、设 skipAll 标志并 cancel 阶段;阶段结束(准备) before-hook 亲自推进回合。
 import type {
@@ -25,7 +25,7 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 import { skipPhase } from '../skip-phase';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 
 // 请求类型(requestType)——保持 神速/ 前缀(界版键名约定)
 const OPT1_RT = '神速/opt1'; // 选项1 confirm
@@ -67,8 +67,8 @@ function makeVirtualKillCard(source: number, target: number, seq: number): strin
 }
 
 /**
- * 执行一次"视为出杀"的完整结算(指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
- * 不消耗手牌、不计入出杀次数;无距离限制。同标版 virtualKill。
+ * 执行一次"视为出杀"的完整结算(useCard charge+virtual:指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
+ * 不消耗手牌、计入出杀次数(由 useCard(charge) 的 onSettle 计数);无距离限制。同标版 virtualKill。
  */
 async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
   if (!state.players[target]?.alive) return;
@@ -82,7 +82,11 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     type: '基本牌',
   };
 
-  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  await useCard(state, source, cardId, [target], {
+    quotaPolicy: 'charge',
+    virtual: true,
+    skipValidate: true,
+  });
   delete state.cardMap[cardId];
 }
 
