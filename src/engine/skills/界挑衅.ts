@@ -18,8 +18,8 @@
 // 命名:文件名/loader key/character skill name 均为 '界挑衅'(避开标挑衅冲突);
 //   内部 Skill.name = '挑衅'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { runDamageFlow } from '../damage-flow';
+import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { useCard } from '../card-effect/use-card';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
@@ -28,6 +28,10 @@ const SKILL_ID = '界挑衅';
 const DISPLAY_NAME = '挑衅';
 /** 数字计数(1/2);沿用 /usedThisTurn 后缀由「回合结束」atom 自动清空。 */
 const COUNT_KEY = `${SKILL_ID}/usedThisTurn`;
+/** 被挑衅者出杀询问的 requestType(经 界挑衅/出杀 respond:选杀 + 指定目标=姜维)。 */
+const SLASH_REQUEST = `${SKILL_ID}/出杀`;
+/** 被挑衅者出杀选择写入的 localVars key。 */
+const SLASH_CHOICE_VAR = `${SKILL_ID}/出杀选择`;
 const PICK_REQUEST = `${SKILL_ID}/选牌`;
 const PICK_VICTIM_KEY = `${SKILL_ID}/弃牌目标`;
 const PICK_RESULT_KEY = `${SKILL_ID}/选牌结果`;
@@ -149,58 +153,46 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await pushFrame(state, SKILL_ID, from, { ...params });
 
       try {
-        // 1) 请求目标对姜维使用一张杀(复用 杀.respond 的 requestType='杀/respondKill',
-        //    目标出杀后杀牌进处理区)
+        // 1) 请求目标对姜维使用一张杀(经 界挑衅/出杀 respond:选杀 + 指定目标=姜维)。
+        //    respond 注册到全座次,被问询方(target 座次)走 出杀 分支。
         await applyAtom(state, {
           type: '请求回应',
-          requestType: '杀/respondKill',
+          requestType: SLASH_REQUEST,
           target,
           prompt: {
-            type: 'useCard',
+            type: 'useCardAndTarget',
             title: `挑衅:对 ${state.players[from].name} 使用一张杀(需造成伤害,否则其弃你一张牌)`,
             cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+            targetFilter: { min: 1, max: 1, filter: (_v, t) => t === from },
           },
           timeout: 15,
         });
 
-        // 2) 检查处理区:有杀 = 出了杀
-        const killCardId = frameCards(state).find((id) => state.cardMap[id]?.name === '杀');
+        const choice = state.localVars[SLASH_CHOICE_VAR] as
+          | { cardId: string; target: number }
+          | undefined;
+        delete state.localVars[SLASH_CHOICE_VAR];
 
-        // 没出杀 → 直接弃牌
-        if (!killCardId) {
-          await pickAndDiscard(state, from, target);
-          return;
-        }
-
-        // 出了杀:跑完整杀结算,捕获姜维 hp 快照以判定"是否造成伤害"
+        // 界版特殊:出杀 + 造成伤害才免于被弃。用 hp 快照判定(参考 界明策.virtualKill)。
         const hpBefore = state.players[from]?.health ?? 0;
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: killCardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-        await applyAtom(state, {
-          type: '指定目标',
-          source: target,
-          target: from,
-          cardId: killCardId,
-        });
-        await applyAtom(state, { type: '询问闪', target: from, source: target });
-        // 闪走 runUseFlow → resolve 设本帧 cancelled=true；闪牌已自动入弃牌堆。
-        const slashFrame = state.settlementStack[state.settlementStack.length - 1];
-        if (slashFrame?.cancelled) {
-          // 闪抵消，不造成伤害
-        } else if (state.players[from]?.alive) {
-          await runDamageFlow(state, target, from, 1, killCardId);
+        let slashed = false;
+        if (choice?.cardId) {
+          // 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),目标固定=姜维;
+          // damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
+          const err = await useCard(state, target, choice.cardId, [choice.target], {
+            quotaPolicy: 'none',
+            mandatedTargets: [from],
+            skipValidate: true,
+          });
+          slashed = !err;
         }
 
-        // 3) 关键差异(界):仅当杀对姜维造成伤害才免于弃牌;否则仍弃其一张牌
-        //    (含:目标出杀但被闪抵消 / 姜维濒死被救活 hp 仍下降 / 防具抵消等情况,
+        // 2) 关键差异(界):仅当杀对姜维造成伤害才免于被弃;否则仍弃其一张牌
+        //    (含:未出杀 / 出杀被闪抵消 / 防具抵消 / useCard 失败等情况,
         //     一律以 hp 净减少为准)
         const hpAfter = state.players[from]?.health ?? hpBefore;
         const damaged = hpAfter < hpBefore;
-        if (!damaged && state.players[target]?.alive) {
+        if (!(slashed && damaged) && state.players[target]?.alive) {
           await pickAndDiscard(state, from, target);
         }
       } finally {
@@ -209,45 +201,85 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ─── respond action:姜维选要弃的目标牌 ────────────────────
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state: GameState, params: Record<string, Json>) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
-      if ((slot.atom as { requestType?: string }).requestType !== PICK_REQUEST)
-        return '当前不是选牌窗口';
-      const victim = state.localVars[PICK_VICTIM_KEY] as number | undefined;
-      if (typeof victim !== 'number') return '无弃牌目标';
-      const vp = state.players[victim];
-      if (!vp) return '弃牌目标不存在';
-      const zone = params.zone;
-      if (zone === 'equipment') {
-        if (typeof params.cardId !== 'string') return 'cardId required';
-        if (!Object.values(vp.equipment).includes(params.cardId)) return '该牌不在目标装备区';
-        return null;
-      }
-      if (zone === 'hand') {
-        if (typeof params.handIndex !== 'number') return 'handIndex required';
-        if (params.handIndex < 0 || params.handIndex >= vp.hand.length) return 'handIndex 越界';
-        return null;
-      }
-      return 'zone required (equipment|hand)';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      state.localVars[PICK_RESULT_KEY] = {
-        zone: params.zone,
-        cardId: params.cardId ?? null,
-        handIndex: params.handIndex ?? null,
-      };
-    },
-  );
+  // ─── respond action:注册到全座次,按 requestType 分支 ────────────
+  //   '界挑衅/出杀'(被挑衅者座次 ≠ ownerId):选一张杀 + 指定目标(固定=姜维)
+  //   '界挑衅/选牌'(姜维座次 = ownerId):选弃哪张牌(装备明选/手牌盲选)
+  //   参照 标挑衅/乱武:被问询者可能任意座次,须逐座次注册 respond 才能被 dispatch 路由。
+  const unloaders: Array<() => void> = [];
+  for (const pl of state.players) {
+    const seat = pl.index;
+    unloaders.push(
+      registerAction(
+        state,
+        skill.id,
+        seat,
+        'respond',
+        (st: GameState, params: Record<string, Json>): string | null => {
+          const slot = st.pendingSlots.get(seat);
+          if (!slot) return '当前不需要回应';
+          if (slot.atom.type !== '请求回应') return '当前不是挑衅询问';
+          const requestType = (slot.atom as { requestType?: string }).requestType;
 
-  return () => {};
+          if (requestType === SLASH_REQUEST) {
+            // 被挑衅者出杀:目标固定=姜维(ownerId),且须在攻击范围内
+            const cardId = params.cardId as string | undefined;
+            const targetIdx = params.target as number | undefined;
+            if (typeof cardId !== 'string') return '请选择一张杀';
+            if (typeof targetIdx !== 'number') return '请选择目标';
+            const self = st.players[seat];
+            if (!self?.hand.includes(cardId)) return '牌不在手牌中';
+            if (st.cardMap[cardId]?.name !== '杀') return '只能使用杀';
+            if (targetIdx !== ownerId) return '只能对姜维使用杀';
+            // 距离校验(权威,镜像 use validate):目标的杀能攻击到姜维
+            if (!inAttackRange(st, seat, ownerId, cardId)) return '目标不在攻击范围内';
+            return null;
+          }
+
+          if (requestType === PICK_REQUEST) {
+            // 姜维选弃哪张牌
+            const victim = st.localVars[PICK_VICTIM_KEY] as number | undefined;
+            if (typeof victim !== 'number') return '无弃牌目标';
+            const vp = st.players[victim];
+            if (!vp) return '弃牌目标不存在';
+            const zone = params.zone;
+            if (zone === 'equipment') {
+              if (typeof params.cardId !== 'string') return 'cardId required';
+              if (!Object.values(vp.equipment).includes(params.cardId)) return '该牌不在目标装备区';
+              return null;
+            }
+            if (zone === 'hand') {
+              if (typeof params.handIndex !== 'number') return 'handIndex required';
+              if (params.handIndex < 0 || params.handIndex >= vp.hand.length) return 'handIndex 越界';
+              return null;
+            }
+            return 'zone required (equipment|hand)';
+          }
+
+          return '当前不是挑衅询问';
+        },
+        async (st: GameState, params: Record<string, Json>) => {
+          const slot = st.pendingSlots.get(seat);
+          const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+          if (requestType === SLASH_REQUEST) {
+            st.localVars[SLASH_CHOICE_VAR] = {
+              cardId: params.cardId as string,
+              target: params.target as number,
+            };
+          } else if (requestType === PICK_REQUEST) {
+            st.localVars[PICK_RESULT_KEY] = {
+              zone: params.zone,
+              cardId: params.cardId ?? null,
+              handIndex: params.handIndex ?? null,
+            };
+          }
+        },
+      ),
+    );
+  }
+
+  return () => {
+    for (const u of unloaders) u();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
