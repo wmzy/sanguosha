@@ -59,6 +59,9 @@
  * | phase_end       | 阶段结束                               | 阶段结束                                           |
  * | dying          | 陷入濒死                               | 陷入濒死                                           |
  */
+
+import { resourceManager } from '../resources';
+
 export const SOUND_MAP: Readonly<Record<string, string>> = {
   // ─── 卡牌操作 ───
   play_card: '/sounds/play_card.mp3',
@@ -105,5 +108,5 @@ export const SOUND_MAP: Readonly<Record<string, string>> = {
  * 未在映射表中登记的标识符返回 null(调用方应跳过)。
  */
 export function resolveSoundUrl(soundId: string): string | null {
-  return SOUND_MAP[soundId] ?? null;
+  return resourceManager.get(`sound/${soundId}`);
 }
