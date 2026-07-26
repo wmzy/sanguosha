@@ -1,13 +1,13 @@
 // 选将防提前结束测试:验证部分玩家选完后游戏不进入下一阶段。
 // 引擎层保证 Promise.all(slotPromises) 在所有 slot resolve 前不会 resolve。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../engine-harness';
-import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { bootstrap, dispatch } from '../../src/engine/create-engine';
-import { createGameState } from '../../src/engine/types';
-import type { GameState } from '../../src/engine/types';
-import { allCharacters } from '../../src/engine/cards/characters';
+import { waitForStable } from '../../engine-harness';
+import '../../../src/engine/atoms';
+import '../../../src/engine/skills';
+import { bootstrap, dispatch } from '../../../src/engine/create-engine';
+import { createGameState } from '../../../src/engine/types';
+import type { GameState } from '../../../src/engine/types';
+import { allCharacters } from '../../../src/engine/cards/characters';
 
 const CHARACTERS = allCharacters.map((c) => ({
   name: c.name,

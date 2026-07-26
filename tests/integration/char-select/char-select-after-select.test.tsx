@@ -12,12 +12,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { GameViewComponent } from '../../src/client/components/GameView';
-import type { ActionMsg } from '../../src/client/types';
-import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
-import { DebugPerspectiveBar } from '../../src/client/components/DebugPerspectiveBar';
-import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView } from '../../src/engine/types';
+import { GameViewComponent } from '../../../src/client/components/GameView';
+import type { ActionMsg } from '../../../src/client/types';
+import { useDebugPerspective } from '../../../src/client/hooks/useDebugPerspective';
+import { DebugPerspectiveBar } from '../../../src/client/components/DebugPerspectiveBar';
+import { clearRegistry } from '../../../src/client/skillActionRegistry';
+import type { GameView } from '../../../src/engine/types';
 
 /** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角) */
 function TestGameView({ view, onAction }: { view: GameView; onAction: (a: ActionMsg) => void }) {

@@ -5,13 +5,13 @@
 //   2. 主公选完后,其余 3 人同时出现选将 pending(3 个并行 slot)
 //   3. 其余人各自独立选,全部选完后进入游戏(发牌 + 回合开始)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../engine-harness';
-import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { bootstrap, dispatch } from '../../src/engine/create-engine';
-import { createGameState } from '../../src/engine/types';
-import type { GameState } from '../../src/engine/types';
-import { hasBlockingPending } from '../../src/engine/skill';
+import { waitForStable } from '../../engine-harness';
+import '../../../src/engine/atoms';
+import '../../../src/engine/skills';
+import { bootstrap, dispatch } from '../../../src/engine/create-engine';
+import { createGameState } from '../../../src/engine/types';
+import type { GameState } from '../../../src/engine/types';
+import { hasBlockingPending } from '../../../src/engine/skill';
 
 // 复刻 session.ts 的默认武将列表(测试独立,避免 import server)
 const CHARACTERS: Array<{ name: string; skills: string[] }> = [

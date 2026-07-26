@@ -2,14 +2,14 @@
 // 复现测试2:装备后卸下,验证回放各 step 的 equipment 正确性。
 // 场景:P0 装备诸葛连弩(step A) → P0 卸下(step B) → 回放验证各 step
 import { describe, it, expect } from 'vitest';
-import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../engine-harness';
-import { registerSkillsFromState, applyAtom, buildView } from '../../src/engine/create-engine';
-import { ReplayRecorder } from '../../src/client/replay/recorder';
-import { getViewAt } from '../../src/client/replay/replayEngine';
-import type { Card, GameState } from '../../src/engine/types';
-import { createGameState } from '../../src/engine/types';
-import '../../src/engine/atoms';
-import '../../src/engine/skills';
+import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../../engine-harness';
+import { registerSkillsFromState, applyAtom, buildView } from '../../../src/engine/create-engine';
+import { ReplayRecorder } from '../../../src/client/replay/recorder';
+import { getViewAt } from '../../../src/client/replay/replayEngine';
+import type { Card, GameState } from '../../../src/engine/types';
+import { createGameState } from '../../../src/engine/types';
+import '../../../src/engine/atoms';
+import '../../../src/engine/skills';
 import * as fs from 'node:fs';
 
 function makePlayer(index: number, name: string, hand: string[], skills: string[]) {

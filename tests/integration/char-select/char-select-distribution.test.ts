@@ -5,14 +5,14 @@
 //   2. 非主公按身份分配候选数(忠臣5/反贼4/内奸5);候选人跨玩家不重复。
 //   3. 选将完成后只实例化引擎默认技能,武将自身技能不进入 player.skills。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../engine-harness';
-import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { bootstrap, dispatch } from '../../src/engine/create-engine';
-import { createGameState } from '../../src/engine/types';
-import type { GameState } from '../../src/engine/types';
-import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
-import { isLord, LORD_CANDIDATES } from '../../src/engine/character-meta';
+import { waitForStable } from '../../engine-harness';
+import '../../../src/engine/atoms';
+import '../../../src/engine/skills';
+import { bootstrap, dispatch } from '../../../src/engine/create-engine';
+import { createGameState } from '../../../src/engine/types';
+import type { GameState } from '../../../src/engine/types';
+import { DEFAULT_SKILLS } from '../../../src/engine/atoms/选将';
+import { isLord, LORD_CANDIDATES } from '../../../src/engine/character-meta';
 
 /** 造一个足够大的武将池(>= 7+5+4+5=21,覆盖 4 人局独占模式总需求) */
 function makeBigCharPool(n: number): Array<{ name: string; skills: string[] }> {
@@ -280,7 +280,7 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     }
 
     // 不 respond,直接触发超时(模拟玩家超时未选)
-    const { fireTimeoutAndWait } = await import('../engine-harness');
+    const { fireTimeoutAndWait } = await import('../../engine-harness');
     await fireTimeoutAndWait(state);
 
     // 超时后:所有玩家都应被分配武将(从各自候选随机选),无空武将

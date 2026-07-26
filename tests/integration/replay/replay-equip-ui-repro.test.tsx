@@ -3,9 +3,9 @@
 // 是否随 view 变化更新。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { GameViewComponent } from '../../src/client/components/GameView';
-import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView, Card } from '../../src/engine/types';
+import { GameViewComponent } from '../../../src/client/components/GameView';
+import { clearRegistry } from '../../../src/client/skillActionRegistry';
+import type { GameView, Card } from '../../../src/engine/types';
 
 function makeEquipCard(id: string, name: string, subtype: string): Card {
   return { id, name, suit: '♠', color: '黑', rank: 'A', type: '装备牌', subtype };

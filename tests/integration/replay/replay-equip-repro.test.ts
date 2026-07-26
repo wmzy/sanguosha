@@ -11,15 +11,15 @@
 // 归并建议:确认 bug 后,合并到 replay-consistency.test.ts(若 bug 在录制/回放引擎)
 //   或 playercard-equip-distribute.test.tsx(若 bug 在 UI 渲染)。
 import { describe, it, expect } from 'vitest';
-import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../engine-harness';
-import { registerSkillsFromState } from '../../src/engine/create-engine';
-import { ReplayRecorder } from '../../src/client/replay/recorder';
-import { getViewAt } from '../../src/client/replay/replayEngine';
-import { buildView } from '../../src/engine/create-engine';
-import type { Card, GameState } from '../../src/engine/types';
-import { createGameState } from '../../src/engine/types';
-import '../../src/engine/atoms';
-import '../../src/engine/skills';
+import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../../engine-harness';
+import { registerSkillsFromState } from '../../../src/engine/create-engine';
+import { ReplayRecorder } from '../../../src/client/replay/recorder';
+import { getViewAt } from '../../../src/client/replay/replayEngine';
+import { buildView } from '../../../src/engine/create-engine';
+import type { Card, GameState } from '../../../src/engine/types';
+import { createGameState } from '../../../src/engine/types';
+import '../../../src/engine/atoms';
+import '../../../src/engine/skills';
 
 function makePlayer(index: number, name: string, hand: string[], skills: string[]) {
   return {

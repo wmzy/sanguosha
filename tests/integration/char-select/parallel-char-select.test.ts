@@ -7,12 +7,12 @@
 //   3. 每个 target 拿到各自的候选人(不混淆)
 //   4. respond 前 pendingSlots.size === selections.length;respond 后逐个减少
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
-import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { applyAtom } from '../../src/engine/create-engine';
-import { createGameState } from '../../src/engine/types';
-import type { GameState } from '../../src/engine/types';
+import { SkillTestHarness, waitForStable } from '../../engine-harness';
+import '../../../src/engine/atoms';
+import '../../../src/engine/skills';
+import { applyAtom } from '../../../src/engine/create-engine';
+import { createGameState } from '../../../src/engine/types';
+import type { GameState } from '../../../src/engine/types';
 
 function makePlayer(opts: { index: number; name: string }) {
   return {

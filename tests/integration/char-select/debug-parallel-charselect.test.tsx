@@ -18,13 +18,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useState, useEffect } from 'react';
 import { render, screen } from '@testing-library/react';
-import { GameViewComponent } from '../../src/client/components/GameView';
-import type { ActionMsg } from '../../src/client/types';
-import { useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
-import { SubmittedCharSelectProvider } from '../../src/client/hooks/SubmittedCharSelectCtx';
-import { DebugPerspectiveBar } from '../../src/client/components/DebugPerspectiveBar';
-import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView } from '../../src/engine/types';
+import { GameViewComponent } from '../../../src/client/components/GameView';
+import type { ActionMsg } from '../../../src/client/types';
+import { useDebugPerspective } from '../../../src/client/hooks/useDebugPerspective';
+import { SubmittedCharSelectProvider } from '../../../src/client/hooks/SubmittedCharSelectCtx';
+import { DebugPerspectiveBar } from '../../../src/client/components/DebugPerspectiveBar';
+import { clearRegistry } from '../../../src/client/skillActionRegistry';
+import type { GameView } from '../../../src/engine/types';
 
 /** 测试 wrapper:模拟 DebugLobby 的 DebugGameView(用 useDebugPerspective 驱动视角)。
  *  注:在 single-view 测试中 currentView 固定为 viewer 连接,模拟一个 WS 连接的画面。
@@ -144,7 +144,7 @@ describe('GameView:debug 模式 viewer 已选完 — single-view 等待遮罩渲
 // 复现:P0/P1 已选,P2 是最后一个待选者(P2 连接有 选将询问 pending)。
 // 期望:无论起始视角在哪,自动跟随都收敛到 P2,且稳定不震荡。
 import { act } from '@testing-library/react';
-import { useDebugPerspective as _useDebugPerspective } from '../../src/client/hooks/useDebugPerspective';
+import { useDebugPerspective as _useDebugPerspective } from '../../../src/client/hooks/useDebugPerspective';
 
 function makeLastPendingViews(): Map<number, GameView> {
   const players = [
@@ -267,7 +267,7 @@ describe('useDebugPerspective:选将阶段自动跟随最后一个待选者', ()
     const views = makeLastPendingViews();
     let finalPerspective = -1;
     const { useMarkCharSelectSubmitted } =
-      await import('../../src/client/hooks/SubmittedCharSelectCtx');
+      await import('../../../src/client/hooks/SubmittedCharSelectCtx');
     function Tracker() {
       const [perspective, setPerspective] = useState(2);
       finalPerspective = perspective;

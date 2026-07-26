@@ -4,9 +4,9 @@
 // 场景:bootstrap 先抽身份再选将,身份分配后立即弹出身份牌,确认后进入选将。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { GameViewComponent } from '../../src/client/components/GameView';
-import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView } from '../../src/engine/types';
+import { GameViewComponent } from '../../../src/client/components/GameView';
+import { clearRegistry } from '../../../src/client/skillActionRegistry';
+import type { GameView } from '../../../src/engine/types';
 
 function makePlayer(index: number, character: string, identity?: string) {
   return {

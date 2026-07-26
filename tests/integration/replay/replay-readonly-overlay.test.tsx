@@ -4,9 +4,9 @@
 // Bug 6: 游戏重播时卡在选将界面。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { GameViewComponent } from '../../src/client/components/GameView';
-import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView } from '../../src/engine/types';
+import { GameViewComponent } from '../../../src/client/components/GameView';
+import { clearRegistry } from '../../../src/client/skillActionRegistry';
+import type { GameView } from '../../../src/engine/types';
 
 function makePlayer(index: number, character: string, identity?: string) {
   return {
