@@ -25,8 +25,8 @@ import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
-import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
-import { runUseFlow } from '../card-effect/use-card';
+import { canSlash } from '../slash-quota';
+import { runUseFlow, useCard } from '../card-effect/use-card';
 
 // localVars keys(界刘备视为使用基本牌流程)
 const BASIC_CHOICE_VAR = '仁德/basicChoice';
@@ -66,7 +66,11 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  await useCard(state, source, cardId, [target], {
+    quotaPolicy: 'charge',
+    virtual: true,
+    skipValidate: true,
+  });
   delete state.cardMap[cardId];
 }
 
@@ -277,14 +281,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             delete state.localVars[BASIC_TARGET_VAR];
             if (typeof slashTarget === 'number' && state.players[slashTarget]?.alive) {
               await virtualKill(state, from, slashTarget);
-              // 视为出杀占出杀次数(incSlashUsed + 回合用量投影 view)
-              incSlashUsed(state);
-              await applyAtom(state, {
-                type: '回合用量',
-                player: from,
-                key: '杀/usedCount',
-                value: slashUsed(state),
-              });
+              // 出杀次数累加已由 virtualKill 内 useCard(charge) 的 onSettle 负责
             }
           }
         } else if (choice === '桃') {

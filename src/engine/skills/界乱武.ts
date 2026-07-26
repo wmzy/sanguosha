@@ -21,10 +21,10 @@ import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../typ
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
 import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
-import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
+import { canSlash } from '../slash-quota';
 
 const SKILL_ID = '界乱武';
 const DISPLAY_NAME = '乱武';
@@ -133,7 +133,11 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     type: '基本牌',
   };
 
-  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
+  await useCard(state, source, cardId, [target], {
+    quotaPolicy: 'charge',
+    virtual: true,
+    skipValidate: true,
+  });
   delete state.cardMap[cardId];
 }
 
@@ -231,14 +235,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               delete st.localVars[FINAL_TARGET_VAR];
               if (typeof finalTarget === 'number' && st.players[finalTarget]?.alive) {
                 await virtualKill(st, from, finalTarget);
-                // 视为出杀占出杀次数(incSlashUsed + 回合用量投影 view)
-                incSlashUsed(st);
-                await applyAtom(st, {
-                  type: '回合用量',
-                  player: from,
-                  key: '杀/usedCount',
-                  value: slashUsed(st),
-                });
+                // 出杀次数累加已由 virtualKill 内 useCard(charge) 的 onSettle 负责
               }
             }
           }
