@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import wyw from '@wyw-in-js/vite';
 import { honoApiPlugin } from './src/server/vite-plugin';
-import { cardLocalPlugin } from './src/server/vite-card-local-plugin';
+import { resourcePlugin } from './src/server/vite-resource-plugin';
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/',
   plugins: [
@@ -17,7 +17,7 @@ export default defineConfig({
       },
     }),
     honoApiPlugin(),
-    cardLocalPlugin(),
+    resourcePlugin(),
   ],
   build: {
     outDir: './dist',
