@@ -45,7 +45,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -233,7 +233,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (ctx.state.players[ownerId]?.alive && ctx.state.players[duelTarget]?.alive) {
           const vId = `${SKILL_ID}:决斗:${ownerId}:${duelTarget}:${ctx.state.seq}`;
           ctx.state.cardMap[vId] = { id: vId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
-          await runUseFlow(ctx.state, ownerId, vId, [duelTarget], '决斗', { virtual: true });
+          await useCard(ctx.state, ownerId, vId, [duelTarget], { quotaPolicy: 'none', virtual: true, skipValidate: true });
           delete ctx.state.cardMap[vId];
         }
       } finally {

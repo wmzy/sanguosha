@@ -39,7 +39,7 @@ import {
   hasBlockingPending,
   type SkillModule,
 } from '../skill';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
@@ -81,7 +81,7 @@ async function flipBackToFaceUp(state: GameState, ownerId: number): Promise<void
 async function virtualWine(state: GameState, source: number): Promise<void> {
   const cardId = `${SKILL_ID}:酒:${source}:${state.seq}`;
   state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
-  await runUseFlow(state, source, cardId, [source], '酒', { virtual: true });
+  await useCard(state, source, cardId, [source], { quotaPolicy: 'none', virtual: true, skipValidate: true });
   delete state.cardMap[cardId];
 }
 

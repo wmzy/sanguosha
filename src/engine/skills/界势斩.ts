@@ -28,7 +28,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 
 const SKILL_ID = '界势斩';
 const DISPLAY_NAME = '势斩';
@@ -91,7 +91,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (st.players[from]?.alive && st.players[target]?.alive) {
           const virtualCardId = `${SKILL_ID}:决斗:${target}:${from}:${st.seq}`;
           st.cardMap[virtualCardId] = { id: virtualCardId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
-          await runUseFlow(st, target, virtualCardId, [from], '决斗', { virtual: true });
+          await useCard(st, target, virtualCardId, [from], { quotaPolicy: 'none', virtual: true, skipValidate: true });
           delete st.cardMap[virtualCardId];
         }
       } finally {

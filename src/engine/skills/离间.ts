@@ -20,7 +20,7 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { getGender } from '../character-meta';
-import { runUseFlow } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 
 /** 校验某座次是否为男性存活角色 */
 function isMaleAlive(state: GameState, target: number): boolean {
@@ -94,7 +94,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         rank: 'A',
         type: '锦囊牌',
       };
-      await runUseFlow(st, A, virtualCardId, [B], '决斗', { virtual: true });
+      await useCard(st, A, virtualCardId, [B], { quotaPolicy: 'none', virtual: true, skipValidate: true });
       delete st.cardMap[virtualCardId];
 
       await popFrame(st);

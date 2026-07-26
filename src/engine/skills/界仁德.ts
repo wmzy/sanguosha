@@ -26,7 +26,7 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
 import { canSlash } from '../slash-quota';
-import { runUseFlow, useCard } from '../card-effect/use-card';
+import { useCard } from '../card-effect/use-card';
 
 // localVars keys(界刘备视为使用基本牌流程)
 const BASIC_CHOICE_VAR = '仁德/basicChoice';
@@ -82,7 +82,7 @@ async function virtualPeach(state: GameState, source: number, target: number): P
   if (t.health >= t.maxHealth) return;
   const cardId = makeVirtualCard('桃', source, target, state.seq);
   state.cardMap[cardId] = { id: cardId, name: '桃', suit: '', color: '无色', rank: 'A', type: '基本牌' };
-  await runUseFlow(state, source, cardId, [target], '桃', { virtual: true });
+  await useCard(state, source, cardId, [target], { quotaPolicy: 'none', virtual: true, skipValidate: true });
   delete state.cardMap[cardId];
 }
 
@@ -90,7 +90,7 @@ async function virtualPeach(state: GameState, source: number, target: number): P
 async function virtualWine(state: GameState, source: number): Promise<void> {
   const cardId = makeVirtualCard('酒', source, source, state.seq);
   state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
-  await runUseFlow(state, source, cardId, [source], '酒', { virtual: true });
+  await useCard(state, source, cardId, [source], { quotaPolicy: 'none', virtual: true, skipValidate: true });
   delete state.cardMap[cardId];
 }
 
