@@ -62,6 +62,8 @@ import { useVfxPlayback } from '../hooks/useVfxPlayback';
 
 import { SoundControl } from './SoundControl';
 import { VfxLayer } from './VfxLayer';
+import { PackManagerPanel } from './PackManagerPanel';
+import { useResourcePacks } from '../hooks/useResourcePacks';
 
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
@@ -156,6 +158,9 @@ export function GameViewComponentImpl({
   useSoundPlayback(ingestedEvents);
   // Lottie 特效:同样监听 ingested 批次,按 effect.vfx 查 ResourceManager 播放 anim/{id}
   const vfxItems = useVfxPlayback(ingestedEvents);
+  // 资源包管理:发现 + 启停(localStorage 持久化),供顶部「📦」浮层调用
+  const { packs, refresh, togglePack } = useResourcePacks();
+  const [showPacks, setShowPacks] = useState(false);
 
   const handListRef = useRef<HTMLDivElement>(null);
 
@@ -896,6 +901,19 @@ export function GameViewComponentImpl({
 
       {/* ─── 音效控制(右上角固定,低调)─── */}
       <SoundControl />
+
+      {/* ─── 资源包管理入口(📦 按钮 + 浮层面板)─── */}
+      <button
+        onClick={() => setShowPacks((v) => !v)}
+        style={{ position: 'fixed', top: 44, right: 120, zIndex: 100 }}
+      >
+        📦
+      </button>
+      {showPacks && (
+        <div style={{ position: 'fixed', top: 80, right: 10, zIndex: 1000 }}>
+          <PackManagerPanel packs={packs} onToggle={togglePack} onRefresh={refresh} />
+        </div>
+      )}
 
       {/* ─── Lottie 特效层(顶层 fixed,不拦截交互)─── */}
       <VfxLayer items={vfxItems} />
