@@ -23,6 +23,13 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
 
+// localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)
+const REQUEST_TYPE = '挑衅/出杀';      // 出杀询问的 requestType
+const CHOICE_VAR = '挑衅/出杀选择';     // 出杀选择写入的 localVars key
+const PICK_REQUEST_TYPE = '挑衅/选牌'; // 选牌询问的 requestType
+const PICK_VAR = '挑衅/选牌';          // 选牌结果写入的 localVars key(与 requestType 同名)
+const DISCARD_TARGET_VAR = '挑衅/弃牌目标';
+
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
@@ -48,11 +55,11 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
       ? { zone: 'equipment', cardId: equipment[0].cardId }
       : { zone: 'hand', handIndex: 0 };
 
-  state.localVars['挑衅/弃牌目标'] = victim;
-  delete state.localVars['挑衅/选牌'];
+  state.localVars[DISCARD_TARGET_VAR] = victim;
+  delete state.localVars[PICK_VAR];
   await applyAtom(state, {
     type: '请求回应',
-    requestType: '挑衅/选牌',
+    requestType: PICK_REQUEST_TYPE,
     target: picker,
     prompt: {
       type: 'pickTargetCard',
@@ -66,11 +73,11 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
     timeout: 20,
   });
 
-  const result = state.localVars['挑衅/选牌'] as
+  const result = state.localVars[PICK_VAR] as
     | { zone: string; cardId: string | null; handIndex: number | null }
     | undefined;
-  delete state.localVars['挑衅/选牌'];
-  delete state.localVars['挑衅/弃牌目标'];
+  delete state.localVars[PICK_VAR];
+  delete state.localVars[DISCARD_TARGET_VAR];
 
   const zone = result?.zone ?? defaultZone.zone;
   let discardId: string | undefined;
@@ -125,7 +132,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         //    respond 注册到全座次,被问询方(target 座次)走 出杀 分支。
         await applyAtom(state, {
           type: '请求回应',
-          requestType: '挑衅/出杀',
+          requestType: REQUEST_TYPE,
           target,
           prompt: {
             type: 'useCardAndTarget',
@@ -136,10 +143,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
           timeout: 15,
         });
 
-        const choice = state.localVars['挑衅/出杀选择'] as
+        const choice = state.localVars[CHOICE_VAR] as
           | { cardId: string; target: number }
           | undefined;
-        delete state.localVars['挑衅/出杀选择'];
+        delete state.localVars[CHOICE_VAR];
 
         if (choice?.cardId) {
           // 目标出了杀:走完整杀结算(useCard→runUseFlow→杀.resolveSlash),
@@ -182,7 +189,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (slot.atom.type !== '请求回应') return '当前不是挑衅询问';
           const requestType = (slot.atom as { requestType?: string }).requestType;
 
-          if (requestType === '挑衅/出杀') {
+          if (requestType === REQUEST_TYPE) {
             // 被挑衅者出杀:目标固定=姜维(ownerId),且须在攻击范围内
             const cardId = params.cardId as string | undefined;
             const targetIdx = params.target as number | undefined;
@@ -197,9 +204,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
             return null;
           }
 
-          if (requestType === '挑衅/选牌') {
+          if (requestType === PICK_REQUEST_TYPE) {
             // 姜维选弃哪张牌
-            const victim = st.localVars['挑衅/弃牌目标'] as number | undefined;
+            const victim = st.localVars[DISCARD_TARGET_VAR] as number | undefined;
             if (typeof victim !== 'number') return '无弃牌目标';
             const vp = st.players[victim];
             if (!vp) return '弃牌目标不存在';
@@ -226,13 +233,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
           const requestType = (
             slot?.atom as { requestType?: string } | undefined
           )?.requestType;
-          if (requestType === '挑衅/出杀') {
-            st.localVars['挑衅/出杀选择'] = {
+          if (requestType === REQUEST_TYPE) {
+            st.localVars[CHOICE_VAR] = {
               cardId: params.cardId as string,
               target: params.target as number,
             };
-          } else if (requestType === '挑衅/选牌') {
-            st.localVars['挑衅/选牌'] = {
+          } else if (requestType === PICK_REQUEST_TYPE) {
+            st.localVars[PICK_VAR] = {
               zone: params.zone,
               cardId: params.cardId ?? null,
               handIndex: params.handIndex ?? null,

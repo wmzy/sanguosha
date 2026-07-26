@@ -21,6 +21,11 @@ import { useCard } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
 
+// use(代使用)路径的 localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)
+const REQUEST_TYPE = '激将/出杀';
+const CHOICE_VAR = '激将/出杀选择';
+const KILL_TARGET_VAR = '激将/killTarget';
+
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
@@ -82,7 +87,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 存 killTarget 供 respond(出杀分支)权威校验必含目标;结算后清理
       if (typeof killTarget === 'number') {
-        state.localVars['激将/killTarget'] = killTarget;
+        state.localVars[KILL_TARGET_VAR] = killTarget;
       }
 
       // 请求回应:蜀角色选一张杀 + 指定目标(固定=killTarget),经 激将/出杀 respond
@@ -90,7 +95,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         typeof killTarget === 'number' ? state.players[killTarget]?.name ?? '?' : '?';
       await applyAtom(state, {
         type: '请求回应',
-        requestType: '激将/出杀',
+        requestType: REQUEST_TYPE,
         target,
         prompt: {
           type: 'useCardAndTarget',
@@ -107,21 +112,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
         timeout: 15,
       });
 
-      const choice = state.localVars['激将/出杀选择'] as
+      const choice = state.localVars[CHOICE_VAR] as
         | { cardId: string; targets: number[] }
         | undefined;
-      delete state.localVars['激将/出杀选择'];
-      delete state.localVars['激将/killTarget'];
+      delete state.localVars[CHOICE_VAR];
+      delete state.localVars[KILL_TARGET_VAR];
 
       // 官方:出杀 → 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),
       //      damageType 由 cardMap 自动传导(火杀/雷杀不再丢失);
-      //      不出杀无效果。useCard 失败也无效果(防御)。
+      //      不出杀无效果。useCard 失败=无效果(与官方语义一致,激将未定义失败兑底)。
       if (choice?.cardId && Array.isArray(choice.targets) && choice.targets.length > 0) {
-        await useCard(state, target, choice.cardId, choice.targets, {
+        const err = await useCard(state, target, choice.cardId, choice.targets, {
           quotaPolicy: 'none',
           mandatedTargets: typeof killTarget === 'number' ? [killTarget] : [],
           skipValidate: true,
         });
+        if (err) {
+          /* 激将未定义失败兑底:useCard 失败=无效果(skipValidate + respond 预校验保证正常不出错) */
+        }
       }
 
       await popFrame(state);
@@ -167,7 +175,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           }
 
           // ── 主动型(代使用):蜀角色选杀 + 指定 killTarget ──
-          if (atom.requestType === '激将/出杀') {
+          if (atom.requestType === REQUEST_TYPE) {
             const cardId = params.cardId as string | undefined;
             const targets = params.targets as number[] | undefined;
             if (typeof cardId !== 'string') return '请选择一张杀';
@@ -176,7 +184,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             if (!self?.hand.includes(cardId)) return '牌不在手牌中';
             if (st.cardMap[cardId]?.name !== '杀') return '只能使用杀';
             // 必含主公指定的 killTarget(权威,前端 targetFilter 仅提示)
-            const killTarget = st.localVars['激将/killTarget'] as number | undefined;
+            const killTarget = st.localVars[KILL_TARGET_VAR] as number | undefined;
             if (typeof killTarget === 'number' && !targets.includes(killTarget))
               return '必须包含激将指定的目标';
             // 每个目标须在蜀角色攻击范围内(镜像 杀.canUse 距离校验)
@@ -230,8 +238,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           }
 
           // ── 主动型(代使用):记录蜀角色的出杀选择 ──
-          if (atom?.requestType === '激将/出杀') {
-            st.localVars['激将/出杀选择'] = {
+          if (atom?.requestType === REQUEST_TYPE) {
+            st.localVars[CHOICE_VAR] = {
               cardId: params.cardId as string,
               targets: params.targets as number[],
             };
@@ -276,7 +284,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       // 响应型(代打出):主公被询问杀
       if (atom.type === '询问杀') return true;
       // 主动型(代使用):蜀角色被请求 激将/出杀
-      if (atom.requestType === '激将/出杀') return true;
+      if (atom.requestType === REQUEST_TYPE) return true;
       // 势力检查由后端 validate 处理(GameView 不暴露 faction)
       return false;
     },
