@@ -39,8 +39,9 @@ export function EventBanner({ current }: EventBannerProps) {
   // 单独构造 effect,必须从这里取,否则 animation/duration 查不到。
   const effect = (current.event.effect as EventEffect) ?? def.effect;
 
-  // 只处理 flip 动画类型(翻牌动效)
-  if (effect?.animation !== 'flip') return null;
+  // 取动画名;flip 走原 3D 翻牌逻辑,fade/shake/pulse/slide/highlight/flash 走通用分支。
+  const animName = effect?.animation;
+  if (!animName) return null;
 
   // 必须有 card 字段(判定牌 / 打出的牌等)
   const card = current.event.card as Pick<Card, 'name' | 'suit' | 'rank'> | undefined;
@@ -49,6 +50,19 @@ export function EventBanner({ current }: EventBannerProps) {
   const eventType = current.event.type;
   // 打出由中央 PlayHistoryStrip 展示,不再翻牌;仅判定等保留 flip。
   if (eventType === '打出') return null;
+
+  // 非 flip 系统动效：渲染中央浮动卡牌 + CSS animation(全局 animations.css 的 keyframes)。
+  // duration 默认 400ms(flip 默认 1800ms 由下方原逻辑保留)。
+  if (animName !== 'flip') {
+    const duration = effect?.duration ?? 400;
+    return (
+      <div className={styles.eventCardLayer}>
+        <div style={{ animation: `${animName} ${duration}ms ease-in-out` }}>
+          <CardFace name={card.name} suit={card.suit} rank={card.rank} size="large" />
+        </div>
+      </div>
+    );
+  }
 
   const suitColor = SUIT_COLOR[card.suit] ?? '#ccc';
   const judgeType = current.event.judgeType as string | undefined;

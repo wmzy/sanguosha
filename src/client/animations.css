@@ -269,3 +269,36 @@
     opacity: 1;
   }
 }
+
+/* ─── 系统动效（effect.animation 字段消费，不可打包）───
+   与 AtomEffect.animation 约定的 7 种动效对应：
+   flip（现有 cardFlipIn）+ 以下 6 种（fade/shake/pulse/slide/highlight/flash）。
+   名字刻意区别于 fadeIn/damageShake 等业务动画，避免冲突。 */
+@keyframes fade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@keyframes slide {
+  0% { transform: translateY(-20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes highlight {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 200, 0, 0); }
+  50% { box-shadow: 0 0 12px 4px rgba(255, 200, 0, 0.7); }
+}
+@keyframes flash {
+  0% { opacity: 0; }
+  30% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
