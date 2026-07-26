@@ -134,4 +134,34 @@ describe('useCard 原语', () => {
     });
     expect(err).toBe('必须包含目标 2');
   });
+
+  // ─── quotaPolicy='charge' + virtual：虚拟杀仍计入出杀次数（反转旧的 !virtual 跳过语义）───
+  // 这是 界仁德.virtualKill / 界乱武.virtualKill 实际调用的契约：
+  // 旧 runUseFlow 语义下 !virtual 才走 onSettle；迁移后 charge+virtual 仍经 onSettle 计次数。
+  it('charge + virtual：虚拟杀仍计入出杀次数（反转旧的 !virtual 跳过语义）', async () => {
+    // 虚拟杀卡（无实体，仅写 cardMap）；用后删除（与界虚拟杀约定一致）
+    const state = buildState([]);
+    const cardId = '仁德:杀:0:1:1';
+    state.cardMap[cardId] = {
+      id: cardId,
+      name: '杀',
+      suit: '',
+      color: '无色',
+      rank: 'A',
+      type: '基本牌',
+    };
+    await harness.setup(state);
+
+    expect(slashUsed(harness.state)).toBe(0);
+    // virtual:true 跳过牌移动；charge 触发 onSettle→incSlashUsed；skipValidate 跳过 forced 校验
+    const r = await runSlashToCompletion(harness.state, 0, cardId, 1, {
+      quotaPolicy: 'charge',
+      virtual: true,
+      skipValidate: true,
+    });
+    expect(r).toBeNull();
+    expect(slashUsed(harness.state)).toBe(1); // onSettle→incSlashUsed 触发
+
+    delete state.cardMap[cardId]; // 虚拟卡用后删除（与界虚拟杀约定一致）
+  });
 });

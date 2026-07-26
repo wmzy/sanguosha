@@ -14,7 +14,7 @@
 //     目标为任意存活其他角色(targetFilter 不校验距离 → 无距离限制)。
 //     贾诩选目标 → 走 virtualKill(虚拟杀结算,模型参考 界仁德.virtualKill);
 //     贾诩 pass / 超时 → 不视为使用杀。
-//   - 视为使用杀占出杀次数:incSlashUsed + 回合用量投影 view。
+//   - 视为使用杀占出杀次数(由 virtualKill 内 useCard(charge) 的 onSettle 负责)。
 //
 // 命名:文件名/loader key/character skill name 均为 '界乱武';内部 Skill.name='乱武'。
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
