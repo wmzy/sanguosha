@@ -7,7 +7,7 @@
 // 设计与 EventBanner 一致：非阻塞、纯展示、固定层。
 
 import { useEffect, useRef, useState } from 'react';
-import lottie, { type AnimationItem } from 'lottie-web';
+import type { AnimationItem } from 'lottie-web';
 import type { VfxPlaybackItem } from '../hooks/useVfxPlayback';
 
 /** 单个特效的最大存活时长（ms），到期无论动画状态都从 DOM 移除 */
@@ -77,8 +77,11 @@ function LottiePlayer({ url }: LottiePlayerProps) {
 
     fetch(url)
       .then((r) => r.json())
-      .then((data) => {
+      .then(async (data) => {
         // 卸载后异步 resolve 到达：忽略，避免写入已脱离 DOM 的容器
+        if (cancelled || !ref.current) return;
+        // 动态 import：避免 lottie-web 模块加载时的 canvas 副作用（jsdom 环境崩溃）
+        const { default: lottie } = await import('lottie-web');
         if (cancelled || !ref.current) return;
         anim = lottie.loadAnimation({
           container: ref.current,
