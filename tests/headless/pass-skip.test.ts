@@ -316,3 +316,129 @@ describe('HeadlessGameClient — 卡牌回应 silent 模式不生成 action', ()
     expect(actions.find((a) => a.category === 'skip')).toBeDefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// 广播无懈可击自动跳过:本座次无 respond/transform 能力(仅 skip action)时,
+// handleRaw 收到新 view 后自动发 skip,省去 LLM 决策往返。以 deadline 去重同一窗口。
+// ─────────────────────────────────────────────────────────────
+describe('HeadlessGameClient — 自动跳过决策(通用)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('空手牌 + 无法响应 → act-now(立即同步发 skip)', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    // P0 空手牌(handCount=0),无转化技 → 公开无法响应 → 立即跳过
+    (hgc as unknown as { _view: GameView | null })._view = makeView(makeBroadcastPending(), 0);
+    const spy = vi.spyOn(hgc, 'sendAction');
+    (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ skillId: '__skip', actionType: 'skip', ownerId: 0 }),
+    );
+  });
+
+  it('有手牌但无法响应 → act-delayed(延迟发 skip,防泄露)', () => {
+    vi.useFakeTimers();
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    // P0 有闪(无无懈) → 私有无法响应 → 延迟跳过
+    const flashCard: Card = { id: 'f1', name: '闪', suit: '♥', color: '红', rank: '5', type: '基本牌' };
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
+      makeBroadcastPending(), 0, [flashCard],
+    );
+    const spy = vi.spyOn(hgc, 'sendAction');
+    (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast();
+    expect(spy).not.toHaveBeenCalled(); // 尚未触发(延迟中)
+    vi.advanceTimersByTime(2000); // 超过最大延迟 2000ms
+    expect(spy).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('持无懈可击 → 不自动跳过(有 respond action,canRespond=true)', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const wuxieCard: Card = { id: 'w1', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
+      makeBroadcastPending(), 0, [wuxieCard],
+    );
+    const spy = vi.spyOn(hgc, 'sendAction');
+    (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('同一窗口(deadline)去重 → 不重复发 skip', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    // 空手牌 → act-now(同步),便于测去重
+    (hgc as unknown as { _view: GameView | null })._view = makeView(makeBroadcastPending(), 0);
+    const spy = vi.spyOn(hgc, 'sendAction');
+    const maybe = (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast.bind(hgc);
+    maybe();
+    maybe(); // 同一 deadline 不重复
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('新窗口(deadline 变化)→ 再次自动跳过', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const pending1 = makeBroadcastPending();
+    (hgc as unknown as { _view: GameView | null })._view = makeView(pending1, 0);
+    const spy = vi.spyOn(hgc, 'sendAction');
+    const maybe = (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast.bind(hgc);
+    maybe();
+    // 新窗口(deadline 不同)
+    const pending2 = makeBroadcastPending();
+    pending2.deadline = (pending1.deadline ?? 0) + 5000;
+    pending2.totalMs = 10000;
+    (hgc as unknown as { _view: GameView | null })._view = makeView(pending2, 0);
+    maybe();
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('出牌窗口(isBlocking===false)→ 不自动跳过', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const pending: PendingView = {
+      type: 'awaits',
+      atom: { type: '出牌窗口', player: 0 } as PendingView['atom'],
+      prompt: { type: 'confirm', title: '出牌阶段' } as PendingView['prompt'],
+      target: 0,
+      isBlocking: false,
+      deadline: Date.now() + 30000,
+      totalMs: 30000,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = makeView(pending, 0);
+    const spy = vi.spyOn(hgc, 'sendAction');
+    (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('旁观者 → 不自动跳过', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    (hgc as unknown as { _isSpectator: boolean })._isSpectator = true;
+    (hgc as unknown as { _view: GameView | null })._view = makeView(makeBroadcastPending(), 0);
+    const spy = vi.spyOn(hgc, 'sendAction');
+    (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('策略跳过(optInSkip)→ 即使能响应也延迟跳过', () => {
+    vi.useFakeTimers();
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    (hgc as unknown as { _autoSkipPrefs: unknown })._autoSkipPrefs = { optInSkip: { '无懈可击': true } };
+    const wuxieCard: Card = { id: 'w1', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' };
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(
+      makeBroadcastPending(), 0, [wuxieCard],
+    );
+    const spy = vi.spyOn(hgc, 'sendAction');
+    (hgc as unknown as { maybeAutoSkipBroadcast: () => void }).maybeAutoSkipBroadcast();
+    expect(spy).not.toHaveBeenCalled(); // 延迟中
+    vi.advanceTimersByTime(2000);
+    expect(spy).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+});

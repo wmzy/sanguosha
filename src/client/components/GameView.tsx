@@ -64,6 +64,8 @@ import { SoundControl } from './SoundControl';
 import { VfxLayer } from './VfxLayer';
 import { PackManagerPanel } from './PackManagerPanel';
 import { useResourcePacks } from '../hooks/useResourcePacks';
+import { useAutoSkipPrefs } from '../hooks/useAutoSkipPrefs';
+import { useAutoSkip } from '../hooks/useAutoSkip';
 
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
@@ -146,6 +148,8 @@ export function GameViewComponentImpl({
     pendingRespondInfo,
     broadcastKey,
   } = pendingState;
+  // 自动跳过偏好(策略跳过开关)
+  const { prefs: autoSkipPrefs, toggleOptIn: toggleAutoSkip } = useAutoSkipPrefs();
   const { isCharSelectPending, charSelect, charSelectInProgress } = useCharSelect(
     view,
     perspectiveIdx,
@@ -198,6 +202,12 @@ export function GameViewComponentImpl({
   // ─── 出牌交互状态机(已抽出到 usePlayInteraction) ───
   // 五谷丰登选牌展示增强:通过对 view 快照的 diff 推导被选走的牌,标注选牌者
   const processingPicks = useProcessingPicks(view);
+
+  // 自动跳过决策(无法响应/策略跳过时代发 skip)。需在 send 定义后调用。
+  useAutoSkip({
+    view, perspectiveIdx, skillActions, pendingRespondInfo, prefs: autoSkipPrefs,
+    canOperate, isPerspectiveAwaiting, markBroadcastSkipped, broadcastKey, send,
+  });
 
   const play = usePlayInteraction(isMyTurn, canOperate, {
     view,
@@ -417,6 +427,8 @@ export function GameViewComponentImpl({
                           processingPicks={processingPicks}
                           onSend={send}
                           view={view}
+                          autoSkipPrefs={autoSkipPrefs}
+                          onToggleAutoSkip={toggleAutoSkip}
                         />
                       )}
                     <PlayPhasePrompt

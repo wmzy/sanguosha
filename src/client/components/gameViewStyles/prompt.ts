@@ -137,6 +137,21 @@ export const waitingHint = css`
   margin-bottom: 12px;
 `;
 
+// 自动跳过此类开关:小字 checkbox,低调显示在 prompt 描述下方
+export const autoSkipToggle = css`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #aaa;
+  cursor: pointer;
+  margin-bottom: 8px;
+  user-select: none;
+  & input {
+    cursor: pointer;
+  }
+`;
+
 // ─── confirm 型主动技确认弹窗(据守等:点按钮后二次确认)───
 // 固定居中遮罩 + 标题 + 发动/不发动 按钮。按钮文案取自 prompt.confirmLabel/cancelLabel,
 // 按钮样式复用 promptBtnPrimary / promptBtn。

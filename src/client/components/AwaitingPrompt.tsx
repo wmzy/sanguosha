@@ -9,6 +9,8 @@ import type { Card, Faction, GameView, Json, PendingView } from '../../engine/ty
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
+import type { AutoSkipPrefs } from '../utils/autoSkip';
+import { getPendingRequestType } from '../utils/pendingRespond';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
 
@@ -31,6 +33,10 @@ export interface AwaitingPromptProps {
   onSend: (skillId: string, actionType: string, params: Record<string, Json>) => void;
   /** 当前 GameView —— 用于查玩家名/处理区锦囊,补充无懈可击 prompt 文案。 */
   view?: GameView;
+  /** 自动跳过用户偏好(策略跳过开关状态) */
+  autoSkipPrefs?: AutoSkipPrefs;
+  /** 切换策略跳过开关(requestType) */
+  onToggleAutoSkip?: (requestType: string) => void;
 }
 
 export function AwaitingPrompt(props: AwaitingPromptProps) {
@@ -47,6 +53,8 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
     processingPicks,
     onSend,
     view,
+    autoSkipPrefs,
+    onToggleAutoSkip,
   } = props;
 
   // 广播型 pending 且已本地跳过:显示已跳过提示
@@ -91,6 +99,22 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           <span> — {pending.prompt.description}</span>
         )}
       </div>
+      {/* 自动跳过此类开关:仅可操作 + 有 requestType 时显示 */}
+      {canOperate && onToggleAutoSkip && (() => {
+        const reqType = getPendingRequestType(pending);
+        if (!reqType) return null;
+        const checked = !!autoSkipPrefs?.optInSkip[reqType];
+        return (
+          <label className={styles.autoSkipToggle}>
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => onToggleAutoSkip(reqType)}
+            />
+            <span>以后自动跳过此类询问</span>
+          </label>
+        );
+      })()}
       {isSkipped ? (
         <div className={styles.waitingHint}>已跳过，等待其他玩家回应...</div>
       ) : canOperate ? (

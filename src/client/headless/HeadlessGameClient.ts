@@ -12,6 +12,7 @@ import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
 import { enumerateAvailableActions } from './availableActions';
 import { resolvePendingRespond, getPendingRequestType } from '../utils/pendingRespond';
+import { decideAutoSkip, DEFAULT_PREFS, type AutoSkipPrefs } from '../utils/autoSkip';
 import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistry';
 import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState, ReconnectState } from './types';
 
@@ -47,6 +48,10 @@ export class HeadlessGameClient {
   private reconnectStateTimer: ReturnType<typeof setInterval> | null = null;
   /** SSE onopen 回调已触发（用于状态映射） */
   private sseConnected = false;
+  /** 已自动跳过的 pending deadline(去重,避免对同一窗口重复发 skip) */
+  private _autoSkippedDeadline: number | null = null;
+  /** 自动跳过用户偏好(策略跳过开关)。AI 座次默认空(仅维度1强制生效)。 */
+  private _autoSkipPrefs: AutoSkipPrefs = DEFAULT_PREFS;
 
   constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}) {
     // 兼容旧 WS URL：ws://→http://, wss://→https://, 去掉 /ws 后缀
@@ -376,6 +381,11 @@ export class HeadlessGameClient {
       this._lastSeq = 0;
       this._gameOverWinner = null;
       this._pendingNewEvents = [];
+      this._autoSkippedDeadline = null;
+    }
+    // 自动跳过决策(无法响应/策略跳过时代发 skip)
+    if (viewChanged && this._view) {
+      this.maybeAutoSkipBroadcast();
     }
     if (r.actionRejected) {
       this._lastActionRejected = true;
@@ -893,6 +903,43 @@ export class HeadlessGameClient {
       params: {},
       baseSeq: 0,
     });
+  }
+
+  /** 自动跳过决策:本座次无法响应 pending(或用户开启策略跳过)时代发 skip。
+   *  维度1(强制):无法响应时自动跳过,防恶意拖延。空手牌立即,有手牌随机延迟防泄露。
+   *  维度2(可选):用户开启策略跳过时,无论能否响应都延迟跳过。
+   *  以 pending.deadline 去重,同一窗口只跳一次。仅在非旁观者座次生效。 */
+  private maybeAutoSkipBroadcast(): void {
+    if (this._isSpectator) return;
+    const view = this._view;
+    const pending = view?.pending;
+    if (!pending) return;
+    // 去重:同一窗口(deadline)只决策一次
+    const deadline = pending.deadline ?? 0;
+    if (deadline === this._autoSkippedDeadline) return;
+    // canRespond:是否有非 skip 的可操作 action(含转化技)
+    const actions = this.getAvailableActions();
+    const canRespond = actions.some((a) => a.category !== 'skip');
+    const handCount = view!.players[this._seatIndex]?.handCount ?? 0;
+    const decision = decideAutoSkip({
+      pending,
+      canRespond,
+      handCount,
+      prefs: this._autoSkipPrefs,
+    });
+    if (decision.kind === 'wait') return;
+    this._autoSkippedDeadline = deadline;
+    if (decision.kind === 'act-now') {
+      this.pass();
+    } else {
+      // act-delayed:随机延迟后发 skip(防手牌信息泄露)
+      setTimeout(() => this.pass(), decision.ms);
+    }
+  }
+
+  /** 设置自动跳过用户偏好(策略跳过开关)。 */
+  setAutoSkipPrefs(prefs: AutoSkipPrefs): void {
+    this._autoSkipPrefs = prefs;
   }
 
   // ── 大厅 ──

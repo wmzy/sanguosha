@@ -2,7 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — 2026-07-24
+## [Unreleased] — 2026-08-01
+
+### 判定流程重构（模块 H 完成）
+
+- 判定.ts 瘦身为纯翻牌 atom，改判/消费/清理逻辑全部迁出至 runJudgeFlow 编排
+- judge-timing.ts 判定牌生效前/后从占位定义变为实际接入，生效前 afterApply 调 runJudgeModifiers
+- judge-flow.ts 新增 cleanupJudgeCard/topFrameCardId 辅助函数，收尾记录 finalJudgeCardId 并入弃牌堆
+- 所有技能判定钩子从 '判定' 改为 '判定牌生效后'；鬼才/鬼道改判 guard 从 '判定' 改为 '判定牌生效前'
+- 测试全部改用 runJudgeFlow，时序测试覆盖四时机，独立判定验证瘦身行为
 
 ### Fixed — 回放初始帧武将名显示「未知」
 
@@ -33,6 +41,20 @@ All notable changes to this project will be documented in this file.
 - **桃 prompt 加 `selfTarget: true`**:前端无需手动选目标，选中桃即可出牌，`buildPlayParams` 自动以自己座次为 target 提交。(`src/engine/card-effects/桃.ts`)
 - **桃 targetFilter 加 `filter`**:仅受伤角色（含自己）可选为目标，防止选满血目标后被后端拒绝。(`src/engine/card-effects/桃.ts`)
 - **桃 `activeWhen` 加满血检查**:新增 `peachActiveWhen`，在 `defaultPlayActive` 基础上要求 `health < maxHealth`，满血时桃 use action 不 active。(`src/engine/card-effects/桃.ts`)
+
+### Added — 自动跳过决策(通用):无法响应时自动发 skip
+
+在需要玩家回应的 pending 上,当玩家无法响应(或主动选择跳过)时代发 skip,省去无意义等待。两层行为:维度1(强制)无法响应时自动跳过,空手牌立即、有手牌随机延迟防手牌信息泄露;维度2(可选)用户可勾选「自动跳过此类询问」(如无懈可击),无论能否响应都延迟跳过。
+
+#### Added
+- **autoSkip 核心决策模块**:`decideAutoSkip` 纯函数,输入 handCount/canRespond/optInSkip 等,输出 act-now/act-delayed/wait 决策;`decideAutoSkipForView` 前端便捷包装,从 view 计算 canRespond(含转化技)再决策;`computeCanRespondForView` 独立性函数。(`src/client/utils/autoSkip.ts`)
+- **前端 useAutoSkip hook**:监听 pending 变化,按决策结果 act-now 立即发 skip、act-delayed 用 setTimeout 延迟发 skip;以 pending.deadline 去重同一窗口;广播型 skip 后调 markBroadcastSkipped 隐藏本地弹窗。(`src/client/hooks/useAutoSkip.ts`)
+- **useAutoSkipPrefs 偏好持久化 hook**:读写 localStorage(`sgs:auto-skip`),支持跨 tab 同步;暴露 toggleOptIn/isOptedIn。(`src/client/hooks/useAutoSkipPrefs.ts`)
+- **AwaitingPrompt 跳过开关 UI**:pending 描述下方低调显示 checkbox「自动跳过此类询问」,仅可操作 + 有 requestType 时显示。(`src/client/components/AwaitingPrompt.tsx`)
+- **GameView 接入**:挂载 useAutoSkip/useAutoSkipPrefs,透传 props 到 AwaitingPrompt。(`src/client/components/GameView.tsx`)
+- **HeadlessGameClient 自动跳过**:handCount===0 立即发 skip,handCount>0 但无匹配牌随机延迟(500-2000ms);以 pending.deadline 去重,同一窗口只跳一次;仅在非旁观者座次生效。(`src/client/headless/HeadlessGameClient.ts`)
+- **autoSkip 单元测试**:覆盖 headless 自动跳过(空手牌立即/有手牌延迟/去重/旁观者不跳)、前端决策(act-now/act-delayed/wait)、偏好持久化、canRespond 计算含转化技等场景。(`tests/client/autoSkip.test.ts`、`tests/headless/pass-skip.test.ts`)
+- **判定翻牌延迟测试适配**:给 P0 手牌加一张无懈可击,避免自动跳过干扰手动「不回应」验证。(`tests/integration/gameview-judge-flip-delay.test.tsx`)
 
 ## [Unreleased] — 2026-07-22
 
