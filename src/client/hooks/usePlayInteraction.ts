@@ -189,6 +189,10 @@ export interface PlayInteractionResult {
   isTargetable: (i: number) => boolean;
   // distribute handlers
   handleDistToggle: (id: string) => void;
+  /** distribute select 模式(制衡):全选所有候选,截断到 maxTotal */
+  handleDistSelectAll: () => void;
+  /** distribute select 模式(制衡):反选,取候选中未选的,超 maxTotal 取尾部 */
+  handleDistInvert: () => void;
   handleDistAllocate: (targetIdx: number) => void;
   handleDistSubmit: () => void;
   handleDistClear: () => void;
@@ -963,6 +967,23 @@ export function usePlayInteraction(
     [activeDistribute],
   );
 
+  // distribute select 模式(制衡)全选:候选=activeDistribute.cardIds(手牌+装备+外部候选),
+  // 按 maxTotal 截断(制衡 maxTotal=99 基本等同全选)。
+  const handleDistSelectAll = useCallback(() => {
+    if (!activeDistribute) return;
+    const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
+    setDistSelected(new Set(selectAllOrdered(activeDistribute.cardIds, maxTotal)));
+  }, [activeDistribute]);
+
+  // distribute select 模式(制衡)反选:取候选中未选的,超 maxTotal 取尾部(与弃牌/转化反选同构)。
+  const handleDistInvert = useCallback(() => {
+    if (!activeDistribute) return;
+    const maxTotal = activeDistribute.prompt.maxTotal ?? 99;
+    setDistSelected(
+      new Set(invertOrdered(activeDistribute.cardIds, [...distSelected], maxTotal)),
+    );
+  }, [activeDistribute, distSelected]);
+
   const handleDistAllocate = useCallback(
     (targetIdx: number) => {
       if (!activeDistribute) return;
@@ -1074,6 +1095,8 @@ export function usePlayInteraction(
     handleTransformInvert,
     isTargetable,
     handleDistToggle,
+    handleDistSelectAll,
+    handleDistInvert,
     handleDistAllocate,
     handleDistSubmit,
     handleDistClear,

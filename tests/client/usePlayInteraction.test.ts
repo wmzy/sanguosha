@@ -1417,6 +1417,100 @@ describe('usePlayInteraction · distribute 选牌与提交', () => {
     expect(result.current.distSelected.size).toBe(0);
     expect(result.current.distAllocations).toEqual([]);
   });
+
+  it('handleDistSelectAll(select 模式)全选所有候选牌', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [makeZhihengAction()],
+        perspectiveHand: [KILL_CARD, PEACH_CARD, TRICK_CARD],
+      }),
+    );
+    act(() =>
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: ZHIHENG_PROMPT,
+      }),
+    );
+    // 候选 = perspectiveHand(手牌),cardIds 顺序与手牌一致
+    expect(result.current.activeDistribute?.cardIds).toEqual([
+      KILL_CARD.id,
+      PEACH_CARD.id,
+      TRICK_CARD.id,
+    ]);
+    act(() => result.current.handleDistSelectAll());
+    expect([...result.current.distSelected]).toEqual([
+      KILL_CARD.id,
+      PEACH_CARD.id,
+      TRICK_CARD.id,
+    ]);
+  });
+
+  it('handleDistSelectAll(select 模式)受 maxTotal 截断,取前 maxTotal 张', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [makeZhihengAction()],
+        perspectiveHand: [KILL_CARD, PEACH_CARD, TRICK_CARD],
+      }),
+    );
+    act(() =>
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: { ...ZHIHENG_PROMPT, maxTotal: 2 },
+      }),
+    );
+    act(() => result.current.handleDistSelectAll());
+    // 候选 3 张,截断到 max=2,取前两张(阅读顺序)
+    expect([...result.current.distSelected]).toEqual([KILL_CARD.id, PEACH_CARD.id]);
+  });
+
+  it('handleDistInvert(select 模式)反选取候选中未选的', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [makeZhihengAction()],
+        perspectiveHand: [KILL_CARD, PEACH_CARD, TRICK_CARD],
+      }),
+    );
+    act(() =>
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: ZHIHENG_PROMPT,
+      }),
+    );
+    act(() => result.current.handleDistToggle(KILL_CARD.id));
+    act(() => result.current.handleDistInvert());
+    // 候选 3 张,选中1张(KILL),反选=未选的另两张
+    expect([...result.current.distSelected]).toEqual([PEACH_CARD.id, TRICK_CARD.id]);
+  });
+
+  it('handleDistInvert(select 模式)超 maxTotal 取尾部', () => {
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [makeZhihengAction()],
+        perspectiveHand: [KILL_CARD, PEACH_CARD, TRICK_CARD],
+      }),
+    );
+    act(() =>
+      result.current.setDistributeMode({
+        skillId: '制衡',
+        actionType: 'use',
+        prompt: { ...ZHIHENG_PROMPT, maxTotal: 2 },
+      }),
+    );
+    // 选 KILL,反选 → 未选[PEACH,TRICK] 共 2 张,不超 max=2 全保留
+    act(() => result.current.handleDistToggle(KILL_CARD.id));
+    act(() => result.current.handleDistInvert());
+    expect([...result.current.distSelected]).toEqual([PEACH_CARD.id, TRICK_CARD.id]);
+    // 现在选了 2 张,再反选 → 未选[KILL] 共 1 张 ≤ max=2,全保留
+    act(() => result.current.handleDistInvert());
+    expect([...result.current.distSelected]).toEqual([KILL_CARD.id]);
+  });
 });
 
 // ─── 遗计/仁德(allocate / externalTargetSelection)distribute 路径 ───

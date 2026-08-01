@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-01
 
+### Fixed — 制衡选牌缺少「全选 / 反选」按钮
+
+孙权发动制衡进入选牌面板后，操作栏只有「清空 / 确认 / 取消」，没有「全选 / 反选」按钮——而弃牌阶段与多卡转化（丈八蛇矛）模式均有这对快捷键。根因：distribute 的 `select` 模式（制衡）UI 分支只渲染了清空与提交按钮，遗漏了对称的全选/反选入口；`usePlayInteraction` 也没有 distribute 全选/反选 handler。
+
+#### Fixed
+- **新增 `handleDistSelectAll` / `handleDistInvert`**：distribute `select` 模式全选/反选 handler，复用 `selectAllOrdered`/`invertOrdered` 按 `maxTotal` 截断候选（`activeDistribute.cardIds`，制衡 `maxTotal=99` 基本等同全选）。与 `handleDiscardSelectAll`/`handleTransformSelectAll` 同构。(`src/client/hooks/usePlayInteraction.ts`)
+- **select 模式渲染「全选 / 反选」按钮**：distribute 操作栏在 `mode === 'select'` 时于「清空」前插入全选/反选按钮；全选在全部候选已选时禁用，反选在选中为 0 时禁用（与弃牌/转化模式约定一致）。仁德/遗计等 allocate / externalTargetSelection 模式不受影响。(`src/client/components/GameView.tsx`)
+
+#### Added
+- **全选/反选回归测试**：覆盖全选选中所有候选、`maxTotal` 截断取前 N、反选取未选、反选超 max 取尾部。(`tests/client/usePlayInteraction.test.ts`)
+
 ### Refactored — 删除 useCard 原语,使用牌统一走 runUseFlow + chargeOnSettle
 
 `useCard(state, src, cardId, targets, opts)` 是 `runUseFlow` 之上的封装,但在实践中是坏味道的集中点:`UseCardOpts` 的五个选项(`quotaPolicy`/`virtual`/`skipCancelQuery`/`mandatedTargets`/`skipValidate`)把校验、计费、抵消询问、必含目标四件不相干的事焊在一起,且 `quotaPolicy` 同时耦合了「是否计费」和「校验 mode(play/forced)」两个语义。实证:21 处调用方里 20 处传 `skipValidate:true`(校验路径形同虚设),每处 `mandatedTargets` 都与各自 `respond.validate` 冗余,`skipCancelQuery` 零使用(唯一使用者界看破直接调 `runUseFlow`),借刀杀人/乱武/挑衅/激将 等 `逼杀` 里的 `if (err) {...}` 兑底分支全是死代码(各自 respond 已权威校验攻击范围/必含目标)。

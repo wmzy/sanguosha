@@ -264,6 +264,8 @@ export function GameViewComponentImpl({
     isTargetable,
     handleDistSubmit,
     handleDistClear,
+    handleDistSelectAll,
+    handleDistInvert,
     cancelTransform,
     cancelSelection,
     clearDiscard,
@@ -690,6 +692,26 @@ export function GameViewComponentImpl({
                             }
                             return (
                               <>
+                                {mode === 'select' && (
+                                  <button
+                                    className={styles.promptBtn}
+                                    onClick={handleDistSelectAll}
+                                    disabled={
+                                      distSelected.size >= activeDistribute.cardIds.length
+                                    }
+                                  >
+                                    全选
+                                  </button>
+                                )}
+                                {mode === 'select' && (
+                                  <button
+                                    className={styles.promptBtn}
+                                    onClick={handleDistInvert}
+                                    disabled={distSelected.size === 0}
+                                  >
+                                    反选
+                                  </button>
+                                )}
                                 <button
                                   className={styles.promptBtn}
                                   onClick={handleDistClear}
