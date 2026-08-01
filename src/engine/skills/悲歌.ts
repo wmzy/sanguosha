@@ -11,7 +11,7 @@
 //
 // 关键点:
 //   - 触发对象是「任一角色」受杀伤害(不限于蔡文姬本人);蔡文姬须存活且有手牌作代价。
-//   - 判定牌花色经 判定 after-hook(judgeType='悲歌')捕获,存 localVars。
+//   - 判定牌花色经 判定牌生效后 after-hook(judgeType='悲歌')捕获,存 localVars.
 //   - ♠ 翻面复用据守/放逐的标签+阶段 hook 机制(tag 名独立为 '悲歌/翻面')。
 //   - 悲歌的非系统 after-hook 先于系统规则濒死检查执行:♥ 回血可在求桃前救活濒死角色。
 //   - 无次数限制。
@@ -67,10 +67,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 判定 after hook:捕获判定牌花色(判定牌进弃牌堆前)──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后 after hook:捕获判定牌花色(仍在结算帧牌区顶,尚未入弃牌堆)──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.judgeType !== '悲歌') return;
     const processing = frameCards(ctx.state);
     if (processing.length === 0) return;

@@ -10,6 +10,7 @@
 //   4. 重复添加去重、重新装备、validate 校验
 import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
+import { runJudgeFlow } from '../../src/engine/judge-flow';
 import { SkillTestHarness } from '../engine-harness';
 import { getAtomDef } from '../../src/engine/atom';
 import '../../src/engine/atoms';
@@ -197,7 +198,7 @@ describe('闪电:延时锦囊判定(plumbing & 端到端)', () => {
     await harness.setup(state);
 
     // 触发判定 atom
-    await applyAtom(harness.state, { type: '判定', player: 0, judgeType: '闪电' });
+    await runJudgeFlow(harness.state, 0, '闪电');
 
     // 判定牌已被翻到处理区后转入弃牌堆(atom 的 afterHooks 收尾)
     expect(harness.state.zones.deck).not.toContain(judgeCard.id);
@@ -281,12 +282,12 @@ describe('闪电:延时锦囊判定(plumbing & 端到端)', () => {
     await harness.setup(state);
 
     // 第一张判定牌:用于 闪电
-    await applyAtom(harness.state, { type: '判定', player: 0, judgeType: '闪电' });
+    await runJudgeFlow(harness.state, 0, '闪电');
     expect(harness.state.zones.discardPile).toContain(jd1.id);
     expect(harness.state.zones.processing).not.toContain(jd1.id);
 
     // 第二张判定牌:用于 乐不思蜀
-    await applyAtom(harness.state, { type: '判定', player: 0, judgeType: '乐不思蜀' });
+    await runJudgeFlow(harness.state, 0, '乐不思蜀');
     expect(harness.state.zones.discardPile).toContain(jd2.id);
     expect(harness.state.zones.processing).not.toContain(jd2.id);
 
@@ -431,7 +432,7 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
     await harness.setup(state);
 
     // 触发判定 atom
-    await applyAtom(state, { type: '判定', player: 0, judgeType: '闪电' });
+    await runJudgeFlow(state, 0, '闪电');
 
     // 判定牌已从牌堆翻到处理区,after hooks 收尾后入弃
     expect(harness.state.zones.deck).not.toContain(judgeCard.id);
@@ -479,7 +480,7 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
     });
     await harness.setup(state);
 
-    await applyAtom(state, { type: '判定', player: 0, judgeType: '闪电' });
+    await runJudgeFlow(state, 0, '闪电');
 
     // 期望: 判定 ♠5 → 闪电触发 → P0 扣 3 血(4 → 1)
     expect(harness.state.players[0].health).toBe(1);

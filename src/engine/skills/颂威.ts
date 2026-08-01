@@ -1,10 +1,10 @@
 // 颂威(曹丕·主公技):其他魏势力角色的判定牌结果为黑色且生效后,可以让你摸一张牌。
 //
-// 模式 A(被动触发):after hook 挂在「判定」。
+// 模式 A(被动触发):after hook 挂在「判定牌生效后」。
 //   判定(player≠曹丕 + faction=魏 + 判定牌黑色) → 询问曹丕是否摸牌 → 摸牌(1)
 //
 // 关键点:
-//   - 判定牌在 frame.cards 末尾(在判定.afterHooks 移入弃牌堆之前)
+//   - 判定牌在 frame.cards 末尾(在 runJudgeFlow 收尾移入弃牌堆之前)
 //   - 黑色 = ♠ 或 ♣
 //   - faction 从 player.faction 读取
 //   - 仅主公曹丕可用(isLord 判定),非主公时 hook 注册但不触发(主公技限制)
@@ -46,10 +46,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 判定 after hook:其他魏势力角色黑色判定牌 → 询问曹丕摸牌 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后 hook:其他魏势力角色黑色判定牌 → 询问曹丕摸牌 ──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.player === ownerId) return; // 自己的判定不触发
     const judgePlayer = ctx.state.players[atom.player ?? -1];
     if (!judgePlayer?.alive) return;

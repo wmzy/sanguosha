@@ -1,6 +1,8 @@
-// 判定:从牌堆顶翻一张到处理区(亮出判定牌)。
-// 技能 after hooks(八卦阵/乐不思蜀等)从处理区读判定牌花色。
-// atom.afterHooks 结束后把判定牌从处理区移入弃牌堆。
+// 判定:从牌堆顶翻一张到结算帧牌区(亮出判定牌)。纯翻牌操作,无改判/消费/清理逻辑。
+// 改判(鬼才/鬼道)→ 判定牌生效前.afterApply(runJudgeModifiers);
+// 消费(天妒/洛神/屯田/闪电/乐不思蜀 等)→ 判定牌生效后 after-hook;
+// 清理(判定牌入弃牌堆 + 记 finalJudgeCardId)→ runJudgeFlow 末尾。
+// 上述时机由 judge-flow.ts 的 runJudgeFlow 编排,本 atom 仅做翻牌。
 //
 // 前端展示:判定牌是公开信息,toViewEvents 携带 card+cardId。
 // 判定牌在处理区“停留几秒”的视觉效果由前端 useDebugMultiConnection hook 负责
@@ -8,7 +10,6 @@
 // 不在 applyView 中处理——保持 applyView 与 buildView 一致。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
-import { runJudgeModifiers } from '../create-engine';
 
 export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   type: '判定',
@@ -23,19 +24,6 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     const frame = state.settlementStack[state.settlementStack.length - 1];
     if (frame) frame.cards.push(topCardId);
     else state.zones.processing.push(topCardId);
-  },
-  afterHooks(state) {
-    // 所有技能 after hooks（闪电/兵粮寸断等消费方，鬼才/鬼道改判在更早的 afterApply）
-    // 读完判定牌后，记录最终判定牌（可能被改判）到 localVars，再把判定牌从结算帧移入弃牌堆。
-    // localVars 供 resolve（延迟类锦囊）在 applyAtom(判定) 返回后读取判定结果。
-    const frame = state.settlementStack[state.settlementStack.length - 1];
-    const cards = frame ? frame.cards : state.zones.processing;
-    const idx = cards.length - 1;
-    if (idx < 0) return;
-    const cardId = cards[idx];
-    state.localVars['判定/finalJudgeCardId'] = cardId;
-    cards.splice(idx, 1)[0];
-    state.zones.discardPile.push(cardId);
   },
   toViewEvents(state, atom): ViewEventSplit {
     // 判定牌是公开信息:所有玩家都能看到花色点数+牌名
@@ -69,12 +57,6 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 1800 },
-  /** 改判阶段:apply(翻判定牌)+广播之后、技能 after hooks(闪电/兵粮寸断等消费方)
-   *  读取判定牌之前。逆时针从判定目标起逐个询问鬼才/鬼道是否替换判定牌。
-   *  改判直接 mutate 结算帧顶牌(代替/换走),改判完成后消费方读到的是最终牌。 */
-  async afterApply(state) {
-    await runJudgeModifiers(state);
-  },
   applyView(view: GameView, _event: ViewEvent) {
     // 后端 apply+afterHooks 净效果: deck -1, processing 不变(进后出), discardPile +1。
     // applyView 对应净效果: deckCount -1, discardPileCount +1, processing 不变。

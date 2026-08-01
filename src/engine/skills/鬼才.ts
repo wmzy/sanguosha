@@ -1,15 +1,15 @@
 // 鬼才(司马懿·被动触发):在任意角色的判定牌生效前,你可以打出一张手牌代替之。
 //
 // 触发时机:判定牌翻开(判定 atom.apply 完成)后、判定效果(闪电/兵粮寸断/乐不思蜀等
-//   消费技能的 afterHook 读取判定牌)生效前。本技能注册为判定改判钩子(registerJudgeModifier),
-//   由 判定 atom 的 afterApply 阶段触发:
+//   消费技能在 判定牌生效后 读判定牌)生效前。本技能注册为判定改判钩子(registerJudgeModifier),
+//   由 判定牌生效前 atom 的 afterApply 阶段(runJudgeModifiers)触发:
 //   - 判定 atom.apply 已把判定牌推入 frameCards(top)
-//   - afterApply 阶段:runJudgeModifiers 从判定目标起逆时针逐个询问改判能力
+//   - 判定牌生效前.afterApply:runJudgeModifiers 从判定目标起逆时针逐个询问改判能力
 //   - 本钩子询问司马懿是否替换:是 → 把 frameCards 顶的判定牌移入弃牌堆,手牌压入帧顶
-//   - 之后技能 after hooks(闪电等消费方)读 frameCards 顶 → 看到替换后的牌
-//   - 判定 atom 自身的 afterHooks(在所有技能 hook 之后)把 frameCards 顶移入弃牌堆
+//   - 之后 判定牌生效后 的技能 after hooks(闪电等消费方)读 frameCards 顶 → 看到替换后的牌
+//   - runJudgeFlow 末尾把 frameCards 顶移入弃牌堆
 //
-// 顺序保证:改判在 afterApply 阶段、消费方在 runAfterHooks 阶段,前者严格先于后者。
+// 顺序保证:改判在 判定牌生效前.afterApply、消费方在 判定牌生效后 after-hook,前者严格先于后者。
 //   故司马懿任意座次都能生效(不再依赖“座次靠前于消费方”)。鬼才与鬼道同场时,
 //   runJudgeModifiers 按判定目标逆时针依次询问,顺序符合官方规则。
 //
@@ -65,7 +65,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ─── 判定改判钩子:翻开判定牌后询问是否替换 ────────────────
   registerJudgeModifier(state, skill.id, ownerId, async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
+    if (atom.type !== '判定牌生效前') return;
     // 司马懿须存活且有手牌
     const me = ctx.state.players[ownerId];
     if (!me?.alive) return;

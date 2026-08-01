@@ -2,14 +2,14 @@
 //
 // 模式 A(被动触发):两个 after hook。
 //   1. 造成伤害 after:其他群雄角色(source≠董卓 + faction=群)造成伤害 → 询问董卓是否判定
-//   2. 判定 after:暴虐判定(judgeType='暴虐')→ 黑桃 → 回复1点体力
+//   2. 判定牌生效后:暴虐判定(judgeType='暴虐')→ 黑桃 → 回复1点体力
 //
 // 关键点:
 //   - 仅主公董卓可用(identity==='主公');非主公时 hook 注册但不触发
 //   - "其他群雄角色":source≠自己 + source.faction==='群'
 //   - 系统伤害(source<0,如闪电)不触发
 //   - 黑桃 = ♠
-//   - 判定牌在 frame.cards 末尾(判定 atom 自身 afterHooks 移入弃牌堆之前读取)
+//   - 判定牌在 frame.cards 末尾(判定牌生效后时仍在结算帧牌区顶,runJudgeFlow 收尾后才入弃牌堆)
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { runJudgeFlow } from '../judge-flow';
@@ -88,14 +88,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await runJudgeFlow(ctx.state, ownerId, '暴虐');
   });
 
-  // ── 判定 after:暴虐判定 → 黑桃 → 回复1点体力 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后:暴虐判定 → 黑桃 → 回复1点体力 ──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.judgeType !== '暴虐') return;
     if (atom.player !== ownerId) return;
 
-    // 读判定牌(在判定 atom.afterHooks 把它移入弃牌堆之前)
+    // 读判定牌(判定牌生效后,仍在结算帧牌区顶,runJudgeFlow 收尾才入弃牌堆)
     const processing = frameCards(ctx.state);
     if (processing.length === 0) return;
     const judgeCardId = processing[processing.length - 1];

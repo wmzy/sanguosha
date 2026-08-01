@@ -16,7 +16,7 @@
 //        询问「是否发动铁骑」→ 若发动 →
 //          a. 给目标加标签 SUPPRESSION_TAG(本回合非锁定技失效,回合结束清)
 //          b. applyAtom(判定),judgeType='铁骑'
-//   2. 判定 after hook(judgeType==='铁骑', player===ownerId):
+//   2. 判定牌生效后 after hook(judgeType==='铁骑', player===ownerId):
 //        读判定牌花色 → 写 localVars[SUIT_VAR]=花色,供阶段3消费。
 //   3. 询问闪 before hook(source===ownerId 且 localVars 有花色):
 //        请求目标弃一张同花色手牌 → 弃了 → pass(询问闪正常,目标可出闪);
@@ -148,8 +148,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await runJudgeFlow(ctx.state, ownerId, '铁骑');
   });
 
-  // ── 判定 after:judgeType==='铁骑' → 读花色,存 localVars 供询问闪阶段消费 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后:judgeType==='铁骑' → 读花色,存 localVars 供询问闪阶段消费 ──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.judgeType !== '铁骑') return;
     if (atom.player !== ownerId) return;
@@ -159,7 +159,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const targetPlayer = ctx.state.players[target];
     if (!targetPlayer?.alive) return;
 
-    // 读判定牌(判定 atom 内置 afterHooks 会把它移入弃牌堆,技能 hook 先于其执行)
+    // 读判定牌(判定牌生效后,仍在结算帧牌区顶,runJudgeFlow 收尾才入弃牌堆)
     const cards = frameCards(ctx.state);
     if (cards.length === 0) return;
     const judgeCardId = cards[cards.length - 1];

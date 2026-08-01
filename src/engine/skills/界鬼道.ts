@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ─── 判定改判钩子:翻开判定牌后询问是否用黑色牌替换 ────────────
   registerJudgeModifier(state, skill.id, ownerId, async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
+    if (atom.type !== '判定牌生效前') return;
 
     const me = ctx.state.players[ownerId];
     if (!me?.alive) return;

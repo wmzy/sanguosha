@@ -580,14 +580,14 @@ async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
 }
 
 /** 运行判定改判钩子(鬼才/鬼道):从当前判定角色起,逆时针依次询问每个
- *  存活玩家的改判能力。在 判定 atom 的 afterApply 阶段调用。
+ *  存活玩家的改判能力。在 判定牌生效前 atom 的 afterApply 阶段调用。
  *
- *  与 runAfterHooks 的区别:遍历顺序不依赖 hook 注册序,而由判定目标座次
+ *  与普通 after-hook 的区别:遍历顺序不依赖 hook 注册序,而由判定目标座次
  *  逆时针推导,确保「改判方座次靠后于消费方也能生效」——旧实现挂在判定
  *  after-hook 靠注册序混排,改判方须座次靠前才能生效,此处彻底修正。
  */
 export async function runJudgeModifiers(state: GameState): Promise<void> {
-  // 从 atomStack 栈顶取当前判定 atom(afterApply 在 push 之后、pop 之前调用)
+  // 从 atomStack 栈顶取当前 判定牌生效前 atom(afterApply 在 push 之后、pop 之前调用)
   const atom = state.atomStack[state.atomStack.length - 1];
   if (!atom) return;
   const player = (atom as { player?: number }).player;

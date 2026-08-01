@@ -1,9 +1,9 @@
 // 天妒(郭嘉·被动技):当你的判定牌生效后,你可以获得此判定牌。
 //
-// 时机:判定 atom 的 after hook(技能 hook 在 判定 atom 自身 afterHooks 清理
-//   之前运行——判定牌此刻仍在 frameCards 末尾)。
+// 时机:判定牌生效后 hook(runJudgeFlow 在判定牌生效后、收尾将其入弃牌堆之前触发——
+//   判定牌此刻仍在 frameCards 末尾)。
 // 实现:询问是否获得 → 移动牌(处理区→手牌)。判定阶段 frame 通常仅含判定牌,
-//   拿走后 frame 空,判定 atom 的 afterHooks splice 末尾为 no-op。
+//   拿走后 frame 空,runJudgeFlow 收尾 splice 末尾为 no-op。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
@@ -41,13 +41,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // 判定 after:自己的判定 → 询问是否获得判定牌
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // 判定牌生效后:自己的判定 → 询问是否获得判定牌
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.player !== ownerId) return;
 
-    // 判定牌在 frameCards 末尾(判定 atom afterHooks 清理前)
+    // 判定牌生效后,判定牌仍在 frameCards 末尾(尚未入弃牌堆)
     const processing = frameCards(ctx.state);
     if (processing.length === 0) return;
     const judgeCardId = processing[processing.length - 1];

@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import { applyAtom, pushFrame, popFrame } from '../../src/engine/create-engine';
+import { runJudgeFlow } from '../../src/engine/judge-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -79,7 +80,7 @@ describe('界红颜', () => {
     await harness.setup(state);
 
     await pushFrame(harness.state, 'test', 0, {});
-    await applyAtom(harness.state, { type: '判定', player: 0, judgeType: '界红颜测试' });
+    await runJudgeFlow(harness.state, 0, '界红颜测试');
     await popFrame(harness.state);
     await harness.waitForStable();
     harness.player('界小乔').processEvents();

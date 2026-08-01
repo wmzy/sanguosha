@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { applyAtom, pushFrame, popFrame } from '../../src/engine/create-engine';
+import { runJudgeFlow } from '../../src/engine/judge-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -77,7 +78,7 @@ describe('红颜', () => {
 
     // 直接驱动判定 atom(在结算帧内)
     await pushFrame(harness.state, 'test', 0, {});
-    await applyAtom(harness.state, { type: '判定', player: 0, judgeType: '红颜测试' });
+    await runJudgeFlow(harness.state, 0, '红颜测试');
     await popFrame(harness.state);
     await waitForStable(harness.state);
     harness.player('小乔').processEvents();
@@ -148,7 +149,7 @@ describe('红颜', () => {
 
     // P2(非小乔)判定 → 红颜不应改花色
     await pushFrame(harness.state, 'test', 1, {});
-    await applyAtom(harness.state, { type: '判定', player: 1, judgeType: '测试' });
+    await runJudgeFlow(harness.state, 1, '测试');
     await popFrame(harness.state);
     await waitForStable(harness.state);
     harness.player('P2').processEvents();
@@ -174,7 +175,7 @@ describe('红颜', () => {
     await harness.setup(state);
 
     await pushFrame(harness.state, 'test', 0, {});
-    await applyAtom(harness.state, { type: '判定', player: 0, judgeType: '测试' });
+    await runJudgeFlow(harness.state, 0, '测试');
     await popFrame(harness.state);
     await waitForStable(harness.state);
     harness.player('小乔').processEvents();

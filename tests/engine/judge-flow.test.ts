@@ -7,8 +7,8 @@
 //   1. 判定时 atom 在判定之前发出
 //   2. 翻出的判定牌最终入弃牌堆,返回该 cardId
 //   3. 牌堆空时判定 atom apply 早退(不翻牌),runJudgeFlow 返回 undefined
-//   4. 现有 判定 atom 未被修改,仍可独立 apply
-//   5. 判定牌生效前/判定牌生效后 atom 已定义且可独立 apply(仅定义,暂不接入编排)
+//   4. 判定 atom 已瘦身:仅翻牌,不做改判/消费/清理(独立 apply 不入弃牌堆)
+//   5. 判定牌生效前/判定牌生效后 atom 已接入编排且可独立 apply(纯标记无副作用)
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms'; // 注册所有 atom(含 judge-timing)
 import { createGameState } from '../../src/engine/types';
@@ -93,10 +93,9 @@ describe('模块 H:判定编排函数 runJudgeFlow', () => {
     expect(types.indexOf('判定时')).toBeLessThan(types.indexOf('判定'));
   });
 
-  it('完整时序:判定时 → 判定', async () => {
+  it('完整时序:判定时 → 判定 → 判定牌生效前 → 判定牌生效后', async () => {
     await runJudgeFlow(state, 0, '闪电');
-    // 判定牌生效前/生效后 暂不接入编排(仅定义)——故时序只含 判定时 + 判定
-    expect(atomTypes(state)).toEqual(['判定时', '判定']);
+    expect(atomTypes(state)).toEqual(['判定时', '判定', '判定牌生效前', '判定牌生效后']);
   });
 
   // ── 判定牌翻出 / 入弃牌堆 / 返回值 ─────────────────────────
@@ -123,17 +122,18 @@ describe('模块 H:判定编排函数 runJudgeFlow', () => {
     expect(types).toContain('判定时');
   });
 
-  // ── 不重构 判定 atom:仍可独立 apply ────────────────────────
-  it('现有 判定 atom 未被修改,仍可独立 apply', async () => {
+  // ── 判定 atom 已瘦身:仅翻牌,不再做改判/消费/清理 ──────────
+  it('判定 atom 独立 apply 仅翻牌,不经 判定时 且不清理判定牌入弃牌堆', async () => {
     await applyAtom(state, { type: '判定', player: 0, judgeType: '乐不思蜀' });
-    // 直接 apply 判定 不经过 判定时(编排函数才发 判定时)
+    // 直接 apply 判定 不经过 判定时(编排函数才发 判定时),也不发 生效前/生效后/清理
     expect(atomTypes(state)).toEqual(['判定']);
-    expect(state.zones.discardPile).toEqual(['j1']);
+    // 判定牌被翻到结算帧牌区顶(frame),未入弃牌堆(清理由 runJudgeFlow 末尾完成)
+    expect(state.zones.discardPile).toEqual([]);
   });
 
-  // ── 判定牌生效前/生效后 atom 已定义,可独立 apply ──────────
+  // ── 判定牌生效前/生效后 atom 已接入编排 ──────────────────
   it('判定牌生效前 / 判定牌生效后 atom 已定义且可独立 apply', async () => {
-    // 这两个 atom 仅定义,暂不接入 runJudgeFlow 编排;验证其可独立 apply(纯标记无副作用)
+    // 这两个 atom 现已接入 runJudgeFlow 编排;此处验证其可独立 apply(纯标记无副作用)
     await applyAtom(state, { type: '判定牌生效前', player: 0, judgeType: '八卦阵', cardId: 'j1' });
     await applyAtom(state, { type: '判定牌生效后', player: 0, judgeType: '八卦阵', cardId: 'j1' });
     const types = atomTypes(state);

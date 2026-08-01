@@ -7,13 +7,13 @@
 //
 // 模式 A(被动触发):
 //   - after hook 挂「弃置」:其他玩家弃置的梅花牌入弃牌堆后 → 询问曹植是否获得。
-//   - after hook 挂「判定」:其他玩家判定的梅花牌入弃牌堆前 → 询问曹植。
+//   - after hook 挂「判定牌生效后」:其他玩家判定的梅花牌生效后 → 询问曹植。
 //     (判定牌在 frame.cards 末尾;若曹植获取,需从 frame.cards 拿走以防
-//      判定.afterHooks 把它误移入弃牌堆——参考 屯田/天妒 的手法)
+//      runJudgeFlow 收尾把它误移入弃牌堆——参考 屯田/天妒 的手法)
 //
 // 选择任意张:由于引擎 UI 限制(useCard cardFilter 仅呈现手牌),简化为"全得/全不得"
 //   的 confirm 询问。这偏离严格"任意张"语义,但满足"你可以获得"的触发选择;
-//   未触发的牌保持原位(弃置路径:已入弃牌堆;判定路径:由判定.afterHooks 入弃)。
+//   未触发的牌保持原位(弃置路径:已入弃牌堆;判定路径:由 runJudgeFlow 收尾入弃)。
 //
 // 关键点:
 //   - "其他角色": atom.player !== ownerId(判定/弃置的归属玩家不是曹植自己)
@@ -23,7 +23,7 @@
 //   - 计数在曹植回合开始(准备阶段开始)时清零。
 //   - 判定路径安全前提:判定触发时 frame.cards 末尾就是判定牌(典型场景:
 //     判定阶段、独立判定技能)。若 frame 还有其他牌(如杀结算中八卦阵判定),
-//     抽取判定牌会破坏判定.afterHooks 的 splice——本实现加 frame.cards.length === 1
+//     抽取判定牌会破坏 runJudgeFlow 收尾 splice——本实现加 frame.cards.length === 1
 //     防御:多牌场景下跳过获取(让判定牌正常入弃牌堆),避免状态损坏。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
@@ -213,13 +213,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await recordGainAndMaybeFlipBack(ctx.state, ownerId, gained);
   });
 
-  // ── 判定 after hook:其他玩家判定的梅花牌入弃牌堆前 ──
+  // ── 判定牌生效后 hook:其他玩家判定的梅花牌生效后 ──
   //   判定牌在 frame.cards 末尾;若获取,需从 frame.cards 拿走。
   //   安全前提:frame.cards 仅含判定牌(典型场景:判定阶段/独立判定)。
-  //   多牌场景(如杀结算中八卦阵)跳过获取,避免破坏 判定.afterHooks splice。
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  //   多牌场景(如杀结算中八卦阵)跳过获取,避免破坏 runJudgeFlow 收尾 splice。
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.player === ownerId) return; // 自己的判定不触发
 
     const processing = frameCards(ctx.state);

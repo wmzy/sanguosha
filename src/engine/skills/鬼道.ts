@@ -1,8 +1,8 @@
 // 鬼道(张角·被动触发):当一名角色的判定牌生效前,你可以用一张黑色牌替换之。
 //
-// 与鬼才(司马懿)同构:注册为判定改判钩子(registerJudgeModifier),由 判定 atom 的
-// afterApply 阶段触发——在判定牌翻开(判定.apply 完成)后、判定效果(闪电/乐不思蜀/
-// 雷击等消费方)读取判定牌前询问张角是否替换。
+// 与鬼才(司马懿)同构:注册为判定改判钩子(registerJudgeModifier),由 判定牌生效前
+// atom 的 afterApply 阶段(runJudgeModifiers)触发——在判定牌翻开(判定.apply 完成)后、
+// 判定效果(闪电/乐不思蜀/雷击等消费方在 判定牌生效后 读判定牌)前询问张角是否替换。
 //
 // 与鬼才的差异:**仅限黑色牌**(♠或♣,即 color==='黑')替换;鬼才为任意手牌。
 //
@@ -73,7 +73,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ─── 判定改判钩子:翻开判定牌后询问是否用黑色牌替换 ────────────
   registerJudgeModifier(state, skill.id, ownerId, async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
+    if (atom.type !== '判定牌生效前') return;
 
     const me = ctx.state.players[ownerId];
     if (!me?.alive) return;

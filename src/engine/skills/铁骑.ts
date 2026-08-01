@@ -4,7 +4,7 @@
 // 实现(三段式,禁闪横切机制):
 //   1. 指定目标 after hook(source===ownerId, card 是杀):
 //        询问"是否发动铁骑" → 若发动 → applyAtom(判定)。
-//   2. 判定 after hook(judgeType==='铁骑', player===ownerId):
+//   2. 判定牌生效后 after hook(judgeType==='铁骑', player===ownerId):
 //        读判定牌(结算帧最后一张),红色 → 给目标加标签 '铁骑/禁闪'。
 //   3. 询问闪 before hook(source===ownerId 且 target 有 '铁骑/禁闪' 标签):
 //        去标签 + cancel(跳过询问闪 → 处理区无闪 → 杀.execute 造成伤害,强制命中)。
@@ -88,13 +88,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
     if (!ctx.state.localVars[CONFIRM]) return;
 
-    // 记录当前目标,供 判定 after hook 读取
+    // 记录当前目标,供 判定牌生效后 hook 读取
     ctx.state.localVars[TARGET_VAR] = target;
     await runJudgeFlow(ctx.state, ownerId, '铁骑');
   });
 
-  // ── 判定 after:judgeType==='铁骑' → 读花色,红色 → 给目标加禁闪标签 ──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后:judgeType==='铁骑' → 读花色,红色 → 给目标加禁闪标签 ──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.judgeType !== '铁骑') return;
     if (atom.player !== ownerId) return;
@@ -104,7 +104,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const targetPlayer = ctx.state.players[target];
     if (!targetPlayer?.alive) return;
 
-    // 读判定牌(判定 atom 的内置 afterHooks 会把它移入弃牌堆,技能 hook 先于其执行)
+    // 读判定牌(判定牌生效后,仍在结算帧牌区顶,runJudgeFlow 收尾才入弃牌堆)
     const cards = frameCards(ctx.state);
     if (cards.length === 0) return;
     const judgeCardId = cards[cards.length - 1];

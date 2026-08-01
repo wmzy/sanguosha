@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runJudgeFlow } from '../../src/engine/judge-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -262,7 +263,7 @@ describe('界落英', () => {
     const P0 = harness.player('P0');
 
     try {
-      void applyAtom(harness.state, { type: '判定', player: 1, judgeType: '测试' });
+      void runJudgeFlow(harness.state, 1, '测试');
       await harness.waitForStable();
 
       P0.expectPending('请求回应');
@@ -291,7 +292,7 @@ describe('界落英', () => {
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
 
-    void applyAtom(harness.state, { type: '判定', player: 1, judgeType: '测试' });
+    void runJudgeFlow(harness.state, 1, '测试');
     await harness.waitForStable();
 
     // 非梅花,不触发

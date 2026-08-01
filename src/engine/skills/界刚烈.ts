@@ -10,7 +10,7 @@
 //
 // 关键点:
 //   - 颜色分支用 card.color(红/黑);红色=♥/♦,黑色=♠/♣。与判定花色无关,只看颜色。
-//   - 判定结果通过「判定」after hook 在判定牌进弃牌堆前捕获颜色,存 localVars。
+//   - 判定结果通过「判定牌生效后」after hook 在判定牌生效后捕获颜色,存 localVars.
 //   - 黑色分支:界夏侯惇从来源区域选一张牌弃置,复用 runPickTargetCardPanel
 //     (mode='discard',与过河拆桥同款;含判定区)。
 //   - 选牌 respond 注册在界夏侯惇座次(ownerId):弃牌发起方是界夏侯惇,
@@ -86,10 +86,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 判定 after hook:捕获判定牌颜色(判定牌进弃牌堆前)──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后 after hook:捕获判定牌颜色(仍在结算帧牌区顶,尚未入弃牌堆)──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.judgeType !== '界刚烈') return;
     if (atom.player !== ownerId) return;
     const processing = frameCards(ctx.state);

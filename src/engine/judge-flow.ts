@@ -5,27 +5,29 @@
 // 与 runUseFlow / runDamageFlow / runDeathFlow / runMoveCardFlow 一致的
 // 「编排函数 + 时机标记 atom」模式。
 //
-// 当前接入范围(模块 H 最小改动):
-//   - 只在 判定 atom 之前发出 判定时 时机(咒缚 before-hook 可替换判定牌来源)。
-//   - 不重构 判定 atom 内部:apply(翻牌)+ afterApply(runJudgeModifiers 改判)+
-//     afterHooks(消费+移弃牌堆)保持不变。
-//   - 不迁移现有技能 hook:鬼才/鬼道仍用 runJudgeModifiers,天妒/洛神/屯田仍用 判定 after-hook。
-//   - 判定牌生效前/判定牌生效后 atom 已定义(judge-timing.ts),暂不在此发出——
-//     避免与现有 判定.afterApply/afterHooks 的改判/消费逻辑重复触发。
-//     待 hook 迁移完成后再接入(届时 判定 atom 的 afterApply/afterHooks 改判/消费逻辑一并迁出)。
+// 模块 H 已完成接入:
+//   - 判定时:咒缚 before-hook 可替换判定牌来源。
+//   - 判定牌生效前:鬼才/鬼道 改判(本 atom afterApply 调 runJudgeModifiers)。
+//   - 判定牌生效后:天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方 after-hook 读牌。
+//   - 判定 atom 已瘦身为纯翻牌(apply),改判/消费/清理逻辑均迁出至本编排函数。
 //
-// 判定结果回传:判定 atom 的 afterHooks 把最终判定牌 cardId 写入
+// 判定结果回传:收尾步骤把最终判定牌 cardId 写入
 // state.localVars['判定/finalJudgeCardId'],调用方据此读取判定结果。runJudgeFlow 返回该 cardId。
 import type { GameState } from './types';
 import { applyAtom } from './create-engine';
 
-/** 判定 atom 的 afterHooks 回写最终判定牌 cardId 的 localVars 键(与 判定.ts 保持一致)。 */
+/** runJudgeFlow 收尾回写最终判定牌 cardId 的 localVars 键(与 cleanupJudgeCard 一致)。 */
 const JUDGE_FINAL_CARD_KEY = '判定/finalJudgeCardId';
 
-/** 判定结算编排函数——对齐 judge.md 时机。
+/** 判定结算编排函数——对齐 judge.md / flow-redesign.md 模块 H 四时机。
  *
- *  在 判定 atom(翻牌 + 改判 + 消费)之前发出 判定时 时机标记,供「判定开始前」类
- *  技能(咒缚替换判定牌来源)挂 before-hook。判定 atom 内部的翻牌/改判/消费逻辑保持不变。
+ *  时机1 判定时:咒缚 before-hook 可替换判定牌来源。
+ *  时机2 判定(翻牌):底层操作,牌堆顶→结算帧牌区。
+ *  时机3 判定牌生效前:鬼才/鬼道 改判(afterApply 调 runJudgeModifiers,逆时针从目标起,
+ *    直接 mutate 结算帧顶牌)。
+ *  时机4 判定牌生效后:天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方 after-hook 读牌。
+ *  收尾:记录最终判定牌 cardId 到 localVars,再把判定牌从结算帧移入弃牌堆
+ *    (天妒/屯田 可能已在 生效后 拿走 → splice 为 no-op,但仍记录 cardId)。
  *
  *  返回最终判定牌 cardId(可能被改判替换),供调用方读取判定结果。
  *  牌堆为空(判定 atom apply 早退,未翻牌)时返回 undefined。
@@ -42,9 +44,42 @@ export async function runJudgeFlow(
   // 时机1:判定时(咒缚可替换判定牌来源)
   await applyAtom(state, { type: '判定时', player, judgeType });
 
-  // 翻牌 + 改判(判定.afterApply 的 runJudgeModifiers)+ 消费+移弃牌堆(判定.afterHooks)
+  // 时机2:翻牌(判定 atom 仅翻牌:牌堆顶→结算帧牌区,无改判/消费/清理)
   await applyAtom(state, { type: '判定', player, judgeType });
 
-  // 读判定 atom afterHooks 回写的最终判定牌 cardId(可能被改判替换)
+  // 读当前判定牌 cardId(结算帧牌区顶;牌堆空时判定.apply 早退,可能无牌)。
+  // 注意:此刻改判尚未发生(生效前 在其后);atom.cardId 字段仅供 validate/视图,
+  // 消费方读的是结算帧顶牌(改判后),不读此字段。
+  const judgeCardId = topFrameCardId(state);
+
+  // 时机3:判定牌生效前(鬼才/鬼道 改判——afterApply 调 runJudgeModifiers)
+  await applyAtom(state, { type: '判定牌生效前', player, judgeType, cardId: judgeCardId });
+
+  // 时机4:判定牌生效后(天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方读牌)
+  await applyAtom(state, { type: '判定牌生效后', player, judgeType, cardId: judgeCardId });
+
+  // 收尾:记录最终判定牌(可能被改判替换),再把判定牌从结算帧移入弃牌堆。
+  cleanupJudgeCard(state);
+
   return state.localVars[JUDGE_FINAL_CARD_KEY] as string | undefined;
+}
+
+/** 结算帧牌区顶的牌 id(frame 优先,否则 processing);空则 undefined。 */
+function topFrameCardId(state: GameState): string | undefined {
+  const frame = state.settlementStack[state.settlementStack.length - 1];
+  const cards = frame ? frame.cards : state.zones.processing;
+  return cards.length > 0 ? cards[cards.length - 1] : undefined;
+}
+
+/** 记录最终判定牌到 localVars,并把判定牌从结算帧移入弃牌堆。
+ *  天妒/屯田 可能已在 判定牌生效后 把判定牌拿走(结算帧空)→ splice 为 no-op,但仍记录 cardId。 */
+function cleanupJudgeCard(state: GameState): void {
+  const frame = state.settlementStack[state.settlementStack.length - 1];
+  const cards = frame ? frame.cards : state.zones.processing;
+  const idx = cards.length - 1;
+  if (idx < 0) return;
+  const cardId = cards[idx];
+  state.localVars[JUDGE_FINAL_CARD_KEY] = cardId;
+  cards.splice(idx, 1)[0];
+  state.zones.discardPile.push(cardId);
 }

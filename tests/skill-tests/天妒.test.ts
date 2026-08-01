@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable, disableAutoCompare } from '../engine-harness';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runJudgeFlow } from '../../src/engine/judge-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -76,7 +77,7 @@ describe('天妒', () => {
     const P0 = harness.player('P0');
 
     try {
-      void applyAtom(harness.state, { type: '判定', player: 0, judgeType: '测试' });
+      void runJudgeFlow(harness.state, 0, '测试');
       await waitForStable(harness.state); // 天妒/choose 询问
       P0.expectPending('请求回应');
       await P0.respond('天妒', { choice: true });
@@ -108,7 +109,7 @@ describe('天妒', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    void applyAtom(harness.state, { type: '判定', player: 0, judgeType: '测试' });
+    void runJudgeFlow(harness.state, 0, '测试');
     await waitForStable(harness.state);
     P0.expectPending('请求回应');
     await P0.respond('天妒', { choice: false });
@@ -135,7 +136,7 @@ describe('天妒', () => {
     await harness.setup(state);
 
     // P1 的判定 → 天妒只对 owner=P0 的实例,atom.player=1 ≠ 0 → 不触发
-    void applyAtom(harness.state, { type: '判定', player: 1, judgeType: '测试' });
+    void runJudgeFlow(harness.state, 1, '测试');
     await waitForStable(harness.state);
 
     // 无询问 pending(天妒没触发),判定牌直接进弃牌堆

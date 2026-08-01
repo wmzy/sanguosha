@@ -19,10 +19,10 @@
 // 关键点:
 //   - 触发对象是「任一角色」受杀伤害(不限于界蔡文姬本人);界蔡文姬须存活且有手牌
 //     ("若你有牌"=有手牌,与标版一致;后续弃牌步骤本身要求手牌)。
-//   - 判定牌花色+点数+cardId 经 判定 after-hook(judgeType='界悲歌')捕获,存 localVars。
+//   - 判定牌花色+点数+cardId 经 判定牌生效后 after-hook(judgeType='界悲歌')捕获,存 localVars.
 //   - 判定牌和弃置牌都进弃牌堆后,通过 移动牌(弃牌堆→手牌) 获得(无需延迟拿取——
-//     判定 atom 的 def.afterHooks 在技能 after hook 之后才把判定牌入弃牌堆,
-//     而本技能的比较/拿取发生在造成伤害 after hook 内,那时判定 atom 早已完整结算)。
+//     runJudgeFlow 收尾在判定牌生效后 hook 之后才把判定牌入弃牌堆,
+//     而本技能的比较/拿取发生在造成伤害 after hook 内,那时判定流程早已完整结算)。
 //   - ♠ 翻面复用据守/放逐/悲歌的标签+阶段 hook 机制(tag 名独立为 '界悲歌/翻面')。
 //   - 界悲歌的非系统 after-hook 先于系统规则濒死检查执行:♥ 回血可在求桃前救活濒死角色。
 //   - 无次数限制。
@@ -94,10 +94,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 判定 after hook:捕获判定牌花色+点数+cardId(判定牌进弃牌堆前)──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后 after hook:捕获判定牌花色+点数+cardId(仍在结算帧牌区顶,尚未入弃牌堆)──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.judgeType !== '界悲歌') return;
     const processing = frameCards(ctx.state);
     if (processing.length === 0) return;

@@ -14,6 +14,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
+import { runJudgeFlow } from '../../src/engine/judge-flow';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -97,7 +98,7 @@ describe('颂威', () => {
     const P0 = harness.player('P0');
 
     // 直接触发判定:P1 的判定,黑色牌
-    void applyAtom(harness.state, { type: '判定', player: 1, judgeType: '乐不思蜀' });
+    void runJudgeFlow(harness.state, 1, '乐不思蜀');
     await harness.waitForStable();
 
     // 颂威触发:P0 被询问是否摸牌
@@ -128,7 +129,7 @@ describe('颂威', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, { type: '判定', player: 1, judgeType: '乐不思蜀' });
+    void runJudgeFlow(harness.state, 1, '乐不思蜀');
     await harness.waitForStable();
 
     // 颂威不触发:无 pending
@@ -156,7 +157,7 @@ describe('颂威', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, { type: '判定', player: 1, judgeType: '乐不思蜀' });
+    void runJudgeFlow(harness.state, 1, '乐不思蜀');
     await harness.waitForStable();
 
     expect(harness.state.pendingSlots.size).toBe(0);
@@ -183,7 +184,7 @@ describe('颂威', () => {
     });
     await harness.setup(state);
 
-    void applyAtom(harness.state, { type: '判定', player: 0, judgeType: '乐不思蜀' });
+    void runJudgeFlow(harness.state, 0, '乐不思蜀');
     await harness.waitForStable();
 
     expect(harness.state.pendingSlots.size).toBe(0);
@@ -211,7 +212,7 @@ describe('颂威', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    void applyAtom(harness.state, { type: '判定', player: 1, judgeType: '乐不思蜀' });
+    void runJudgeFlow(harness.state, 1, '乐不思蜀');
     await harness.waitForStable();
 
     P0.expectPending('请求回应');

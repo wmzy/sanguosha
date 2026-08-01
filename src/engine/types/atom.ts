@@ -244,8 +244,8 @@ export type Atom =
   //   判定牌生效前/判定牌生效后:判定牌翻开后、生效前后的时机(鬼才/鬼道改判 / 天妒洛神屯田获得)。
   //     当前仅定义,暂不接入编排(与 statechange-timing 的 武将牌明置后 同构——待 hook 迁移再接入)。
   | { type: '判定时'; player: number; judgeType: string }
-  | { type: '判定牌生效前'; player: number; judgeType: string; cardId: string }
-  | { type: '判定牌生效后'; player: number; judgeType: string; cardId: string }
+  | { type: '判定牌生效前'; player: number; judgeType: string; cardId?: string }
+  | { type: '判定牌生效后'; player: number; judgeType: string; cardId?: string }
   // 使用结算时机(通用:杀/锦囊等)
   | { type: '检测有效性'; source: number; target: number; cardId: string }
   // 使用结算中时机(use.md):生效前(闪 hook)/生效时(谦逊)/生效后(resolve)/使用结算结束时

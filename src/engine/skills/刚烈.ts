@@ -8,7 +8,7 @@
 //   - 来源选择需要来源玩家 respond,而刚烈只注册在夏侯惇座次。
 //     引擎 dispatch 按 (skillId, message.ownerId, actionType) 精确查 action,
 //     因此把 'respond' action 注册到每个座次(以 skillId='刚烈' 隔离,不与他技冲突)。
-//   - 判定结果通过「判定」after hook 在判定牌进弃牌堆前捕获花色,存 localVars。
+//   - 判定结果通过「判定牌生效后」after hook 在判定牌生效后捕获花色,存 localVars.
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
@@ -69,10 +69,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     unloaders.push(u);
   }
 
-  // ── 判定 after hook:捕获判定牌花色(判定牌进弃牌堆前)──
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // ── 判定牌生效后 after hook:捕获判定牌花色(仍在结算帧牌区顶,尚未入弃牌堆)──
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.judgeType !== '刚烈') return;
     if (atom.player !== ownerId) return;
     const processing = frameCards(ctx.state);

@@ -5,7 +5,7 @@
 //   A) 摸牌阶段触发(before-hook on 阶段开始,镜像再起/突袭):
 //        询问发动 → 进行一次判定(判定 atom, judgeType='双雄')
 //        → 跳过默认摸牌(applyAtom(阶段结束, 摸牌) + return {kind:'cancel'})
-//   B) 判定 after hook(judgeType='双雄'):判定牌生效后(可能经鬼才/鬼道改判),
+//   B) 判定牌生效后 hook(judgeType='双雄'):判定牌生效后(可能经鬼才/鬼道改判),
 //        玩家获得判定牌(进手牌) + 记 turn.vars['双雄/color']=判定牌颜色
 //   C) 转化 action(transform,preceding 决斗.use,镜像武圣单卡转化):
 //        把一张与判定牌颜色不同的手牌当【决斗】(影子卡 outputName='决斗')
@@ -14,10 +14,10 @@
 // 推进到出牌,再 return {kind:'cancel'} 取消本次 阶段开始(摸牌),使 回合管理
 // 的 after-hook(自动摸2张)不再执行。
 //
-// 判定机制:applyAtom(判定 atom, judgeType='双雄') 从牌堆顶翻一张到 frameCards 顶,
-// 经 鬼才/鬼道 改判后,本技能的 after hook 在技能 hook 阶段(判定 atom 自身 afterHooks
-// 清理之前)读到最终判定牌。直接读 frameCards 顶并 移动牌 到手牌(同天妒/八卦阵模式),
-// 拿走后 frame 空,判定 atom 自身 afterHooks 的 splice 变 no-op。
+// 判定机制:runJudgeFlow 从牌堆顶翻一张到 frameCards 顶,经 鬼才/鬼道 改判后,
+// 本技能的 判定牌生效后 hook 读到最终判定牌(仍在 frameCards 顶,runJudgeFlow 收尾
+// 入弃牌堆之前)。直接读 frameCards 顶并 移动牌 到手牌(同天妒/八卦阵模式),
+// 拿走后 frame 空,runJudgeFlow 收尾 splice 变 no-op。
 //
 // 颜色状态同步:turn.vars['双雄/color'] 由 after-hook 写入 state(后端 transform
 // validate 读)。view 侧经「回合用量」atom 同步到 players[me].turnUsage['双雄/color'],
@@ -131,14 +131,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // 判定 after(judgeType='双雄'):判定牌生效后,玩家获得判定牌 + 记颜色
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  // 判定牌生效后 hook(judgeType='双雄'):玩家获得判定牌 + 记颜色
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.player !== ownerId) return;
     if (atom.judgeType !== '双雄') return;
 
-    // 判定牌在 frameCards 末尾(判定 atom afterHooks 清理前),可能是改判后的最终牌
+    // 判定牌生效后,判定牌仍在 frameCards 末尾(尚未入弃牌堆),可能是改判后的最终牌
     const processing = frameCards(ctx.state);
     if (processing.length === 0) return;
     const judgeCardId = processing[processing.length - 1];

@@ -20,10 +20,10 @@
 //   - "回合内弃置杀"判定:currentPlayerIndex === ownerId 且 弃置 atom.cardIds 含 杀
 //   - 失去牌 = 卡牌从自己 hand/equipment/pendingTricks 转移到其他位置
 //   - 一次失去事件触发一次判定(不按卡牌数量重复)
-//   - 判定结果在「判定」after hook 中捕获花色(判定牌在 frameCards 末尾,
-//     在判定 atom 自身 afterHooks 把它移入弃牌堆之前)
+//   - 判定结果在「判定牌生效后」hook 中捕获花色(判定牌在 frameCards 末尾,
+//     在 runJudgeFlow 收尾把它移入弃牌堆之前)
 //   - 非红桃时:把判定牌从 frame.cards 拿出(直接 mutate——无 atom 支持"置于武将牌上"),
-//     再加田标记。判定 atom 后续 afterHooks splice 末尾时,frame 已空,no-op。
+//     再加田标记。runJudgeFlow 收尾 splice 末尾时,frame 已空,no-op。
 import type {
   AtomAfterContext,
   FrontendAPI,
@@ -88,11 +88,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 判定 after hook:在 判定.afterHooks(将判定牌移入弃牌堆)之前运行 ──
+  // ── 判定牌生效后 hook:在 runJudgeFlow 收尾(将判定牌移入弃牌堆)之前运行 ──
   //   捕获花色,非红桃时把判定牌从 frame.cards 拿出(作为田)+ 加标记 + 更新距离修正
-  registerAfterHook(state, skill.id, ownerId, '判定', async (ctx) => {
+  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '判定') return;
     if (atom.player !== ownerId) return;
     if (atom.judgeType !== '屯田') return;
     // 必须由 maybeTriggerTunTian 预设 CONFIRMED_KEY(玩家已选择发动)
