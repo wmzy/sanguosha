@@ -8,12 +8,21 @@ All notable changes to this project will be documented in this file.
 
 出牌阶段选中【铁索连环】时不出现「重铸」按钮，点击更无从谈起；【借刀杀人】对装备武器者使用后，被借刀者也无法回应（出杀/交武器）。根因：重构 `f7536790`（「用使用牌/打出牌统一技能替换 per-card 技能」）把全部卡牌技能从 `DEFAULT_SKILLS` 移除，将 use/respond 统一交由「使用牌/打出牌」+ CardEffect 注册表按卡名路由。但【铁索连环】与【借刀杀人】各有一段当时未并入 CardEffect 的逻辑仍留在 skill 文件里：铁索连环的 `recast`（重铸替代出牌）action + 连环传导全局 after-hook；借刀杀人的「借刀杀人/出杀」跨座次 respond action。这些逻辑只有在 skill 实例化时才注册，而二者已不在 `DEFAULT_SKILLS`，真实选将路径（`skills = [...DEFAULT_SKILLS, ...武将技]`）不再实例化它们 → action/hook 全部丢失。既有测试因手动注入 `skills: ['铁索连环']`/`['借刀杀人']` 而一直绿灯，掩盖了回归。
 
+修复分为三部分，分别纠正两张锦囊的归属问题，并抽取两个被它们暴露的通用机制。
+
 #### Fixed
-- **铁索连环恢复进 `DEFAULT_SKILLS`**:其 `recast`（替代出牌 action）与连环传导全局 after-hook 都进不了 CardEffect.respond/resolve，必须实例化独立 skill 才能注册。(`src/engine/atoms/选将.ts`)
-- **借刀杀人 respond 并入 `CardEffect.respond`（与火攻/顺手牵羊对齐），删除独立 skill 文件**:把原 `skills/借刀杀人.ts` 的 validate/execute 搬进 `card-effects/借刀杀人.ts` 的 `respond` 字段 + 新增 `respondPrompt`。被借刀者 A 的回应入口现由 play-card（使用牌）按卡名 `skillId='借刀杀人'` 注册到每个座次，跨座次回应不变。同步从 `skills/index.ts` 删除 loader、清理 `shared/cards/tricks.ts` 与测试中的过时引用。(`src/engine/card-effects/借刀杀人.ts`、`src/engine/skills/index.ts`、`src/engine/atoms/选将.ts`)
+- **借刀杀人 respond 并入 `CardEffect.respond`（与火攻/顺手牵羊对齐），删除独立 skill 文件**:把原 `skills/借刀杀人.ts` 的 validate/execute 搬进 `card-effects/借刀杀人.ts` 的 `respond` 字段 + 新增 `respondPrompt`。被借刀者 A 的回应入口现由 play-card（使用牌）按卡名 `skillId='借刀杀人'` 注册到每个座次，跨座次回应不变。同步从 `skills/index.ts` 删除 loader、清理 `shared/cards/tricks.ts` 与测试中的过时引用。(`src/engine/card-effects/借刀杀人.ts`、`src/engine/skills/index.ts`)
+- **铁索连环 `recast` 保留独立 skill（仍留 `DEFAULT_SKILLS`）**:recast 是「替代出牌 action」（自定义 actionType，不走标准使用流程），进不了 CardEffect.respond，必须实例化 skill 才能注册。(`src/engine/atoms/选将.ts`、`src/engine/skills/铁索连环.ts`)
+
+#### Refactored — 重铸通用化
+重铸不是铁索连环的专利：连环/界连环（梅花当铁索连环）、界燕语（重铸杀）、界将驰（重铸一张手牌）都各自手写了相同的 `applyAtom(弃置)+applyAtom(摸牌)`。抽取通用 `recastCard(state, player, cardId)` helper（`src/engine/recast.ts`），5 处重铸点统一调用；action 注册、frame 包装、合法性校验仍由调用方负责。(`src/engine/recast.ts`、`skills/{铁索连环,连环,界连环,界燕语,界将驰}.ts`)
+
+#### Refactored — 连环传导迁为伤害结算基础设施
+传导逻辑（属性伤害联动横置状态）本是「连环状态 × 属性伤害」的联动行为，语义上属于伤害结算，与铁索连环牌解耦：任何途径置入连环状态（铁索连环牌、涅槃/界连环等武将技能调 `setChain`）都应受传导管辖。此前传导全局 after-hook 由 `skills/铁索连环.ts` 注册，是铁索连环必须留在 `DEFAULT_SKILLS` 的唯一原因。现将 `CHAIN_MARK`/`isChained`/`registerChainConductionHook` 迁入横置原语所在的 `face-down.ts`，由 `create-engine` 的 `bootstrap`/`registerSkillsFromState` 作为伤害结算基础设施注册（同 `registerWineHook`/`registerDelayedTrickHooks` 模式）。`skills/铁索连环.ts` 删除传导逻辑，瘦身为仅 recast。(`src/engine/face-down.ts`、`src/engine/skills/铁索连环.ts`、`src/engine/card-effects/铁索连环.ts`、`src/engine/create-engine.ts`)
 
 #### Added
 - **真实选将路径回归测试**:不手动注入卡牌技能，仅以 `DEFAULT_SKILLS` 构建 state，断言「铁索连环 recast 可执行」「借刀杀人 respond action 已注册」「铁索连环 recast action 已注册」——锁定这两张锦囊的非 use 逻辑必须随默认技能实例化。回退任一修复即失败。(`tests/skill-tests/铁索连环.test.ts`、`tests/skill-tests/借刀杀人.test.ts`)
+- **传导架构解耦回归测试**:无人持「铁索连环」技能时（仅使用牌/打出牌），横置状态仍联动属性伤害——证明传导来自伤害结算基础设施，不再依赖技能实例化。去掉 `registerChainConductionHook` 注册即失败。(`tests/skill-tests/铁索连环.test.ts`)
 
 ### Fixed — 音效叠音:一次操作同时播放多个音效
 

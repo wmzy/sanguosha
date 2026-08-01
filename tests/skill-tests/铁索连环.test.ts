@@ -383,4 +383,42 @@ describe('铁索连环', () => {
     // P1 被重置(传导到 0 个其他角色后仍重置)
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);
   });
+
+  // ─── 回归(传导架构解耦):传导 hook 现作为伤害结算基础设施由
+  //     bootstrap/registerSkillsFromState 注册,不再依赖铁索连环技能实例化。
+  //     即便没有玩家持有「铁索连环」技能,只要角色处于连环状态,属性伤害仍传导。
+  //     验证 setChain/武将技能直接置入连环状态也受传导管辖。
+  it('传导不依赖铁索连环技能实例化:无人持该技能,横置状态仍联动属性伤害', async () => {
+    const fireSlash = mkCard('fireD', '杀', '♥', '2', '基本牌', '火焰');
+    // 仅使用牌/打出牌(注册杀 use),不含「铁索连环」→ 传导只能来自基础设施注册的 hook
+    const noChain = ['使用牌', '打出牌'];
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', hand: [fireSlash.id], skills: [...noChain] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', health: 3, maxHealth: 3, marks: [{ id: 'chained', scope: 1 }], skills: [...noChain] }),
+          mkPlayer({ index: 2, name: 'P2', character: '反', health: 3, maxHealth: 3, marks: [{ id: 'chained', scope: 2 }], skills: [...noChain] }),
+        ],
+        cardMap: { fireD: fireSlash },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    // 无玩家持有「铁索连环」技能 → 传导只能来自基础设施注册的 hook
+    expect(harness.state.players.every((p) => !p.skills.includes('铁索连环'))).toBe(true);
+
+    await P0.useCardAndTarget('杀', fireSlash.id, [1]);
+    await P1.pass();
+
+    // P1 受火焰伤害 → 传导给横置的 P2
+    expect(harness.state.players[1].health).toBe(2);
+    expect(harness.state.players[2].health).toBe(2);
+    // 传导后重置
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);
+    expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);
+  });
 });

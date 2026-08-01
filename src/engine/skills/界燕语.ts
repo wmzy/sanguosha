@@ -27,6 +27,7 @@
 //   内部 Skill.name = '燕语'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { recastCard } from '../recast';
 import {
   registerAction,
   registerAfterHook,
@@ -119,8 +120,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const from = ownerId;
       const cardId = params.cardId as string;
       await pushFrame(st, SKILL_ID, from, { ...params, recycle: true });
-      await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId] });
-      await applyAtom(st, { type: '摸牌', player: from, count: 1 });
+      await recastCard(st, from, cardId);
       await popFrame(st);
     },
   );

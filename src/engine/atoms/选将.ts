@@ -27,8 +27,10 @@ export const DEFAULT_SKILLS = [
   '使用牌',
   '打出牌',
   // 铁索连环的部分逻辑无法纳入 CardEffect 注册表，仍以独立 skill 文件存在，
-  // 必须在此实例化才能注册其 action/hook（仅注册非 use 逻辑，use 仍由使用牌路由）:
-  //   重铸(recast)替代出牌 action + 连环传导全局 after-hook
+  // 必须在此实例化才能注册其 action（仅注册非 use 逻辑，use 仍由使用牌路由）:
+  //   重铸(recast)替代出牌 action（实质效果复用通用 recastCard helper）
+  // 连环传导（属性伤害联动）已迁至 face-down.ts，由 bootstrap/registerSkillsFromState
+  //   作为伤害结算基础设施注册，不再依赖本技能实例。
   // 借刀杀人的 respond 已并入 CardEffect.respond（同火攻/顺手牵羊），无需独立 skill。
   '铁索连环',
 ];

@@ -10,6 +10,7 @@
 //     模式参考 龙胆.ts / 武圣.ts。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { recastCard } from '../recast';
 import { registerAction, hasBlockingPending } from '../skill';
 import { defaultPlayActive } from '../action-active';
 
@@ -54,8 +55,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       await pushFrame(state, '连环', from, { ...params });
-      await applyAtom(state, { type: '弃置', player: from, cardIds: [cardId] });
-      await applyAtom(state, { type: '摸牌', player: from, count: 1 });
+      await recastCard(state, from, cardId);
       await popFrame(state);
     },
   );

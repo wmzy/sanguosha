@@ -3,19 +3,14 @@
 // resolve（逐目标）：询问无懈可击 → 横置/重置连环状态。
 // 可对一至两名角色使用（含自己）。
 //
-// 注意：重铸(recast)不走 runUseFlow，仍在 skill 中保留独立 action。
-// 连环传导 after-hook（全局唯一）也仍在 skill 中注册。
+// 重铸(recast)不走 runUseFlow，由 skills/铁索连环.ts 的 recast action 处理。
+// 连环传导(属性伤害联动)在 face-down.ts 的 registerChainConductionHook，
+//   由 create-engine 作为伤害结算基础设施注册。
 
 import type { Card, GameState } from '../types';
 import type { ActionPrompt } from '../types';
-import { setChain } from '../face-down';
+import { setChain, isChained } from '../face-down';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
-
-const CHAIN_MARK = 'chained';
-
-function isChained(state: GameState, idx: number): boolean {
-  return state.players[idx]?.marks.some((m) => m.id === CHAIN_MARK) ?? false;
-}
 
 /** 铁索连环的逐目标结算：toggle 横置 */
 async function resolveChain(ctx: ResolveCtx): Promise<void> {

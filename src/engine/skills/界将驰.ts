@@ -38,6 +38,7 @@
 //   内部 Skill.name = '将驰'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
+import { recastCard } from '../recast';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { registerSlashQuotaProvider, registerSlashBlocker } from '../slash-quota';
 import { registerHandLimitProvider } from '../hand-limit';
@@ -250,8 +251,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return;
     }
     // 重铸:弃置 + 摸一张
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [cardId] });
-    await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+    await recastCard(ctx.state, ownerId, cardId);
     ctx.state.turn.vars[CHOICE2_VAR] = ownerId;
     // 投影到 view.turnUsage
     await applyAtom(ctx.state, {

@@ -25,6 +25,7 @@
 // 模式参考:标连环.ts(转化/重铸)、界火计.ts(覆盖 DEFAULT_SKILLS 中 card skill 的 use)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { recastCard } from '../recast';
 import { setChain } from '../face-down';
 import { registerAction, hasBlockingPending, validateUseCard } from '../skill';
 import { 询问抵消 } from '../无懈可击';
@@ -81,8 +82,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
       await pushFrame(state, '界连环', from, { ...params });
-      await applyAtom(state, { type: '弃置', player: from, cardIds: [cardId] });
-      await applyAtom(state, { type: '摸牌', player: from, count: 1 });
+      await recastCard(state, from, cardId);
       await popFrame(state);
     },
   );

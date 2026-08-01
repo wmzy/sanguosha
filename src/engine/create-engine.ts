@@ -255,6 +255,9 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
   const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
   registerDelayedTrickHooks(state);
+  // 注册连环传导全局 after-hook（属性伤害联动横置状态）
+  const { registerChainConductionHook } = await import('./face-down');
+  registerChainConductionHook(state);
   await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
@@ -308,6 +311,9 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
   const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
   registerDelayedTrickHooks(state);
+  // 注册连环传导全局 after-hook（属性伤害联动横置状态）
+  const { registerChainConductionHook } = await import('./face-down');
+  registerChainConductionHook(state);
 }
 
 /**
