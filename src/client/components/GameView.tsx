@@ -366,7 +366,27 @@ export function GameViewComponentImpl({
           animTurnVersion={anim.turnVersion}
           animPhaseVersion={anim.phaseVersion}
           currentPlayerName={currentPlayerName}
-          headerSlot={headerSlot}
+          headerSlot={
+            <div className={styles.headerRight}>
+              {headerSlot}
+              <div className={styles.toolbarGroup}>
+                <SoundControl />
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={() => setShowPacks((v) => !v)}
+                  title="资源包管理"
+                  aria-label="资源包管理"
+                >
+                  📦
+                </button>
+                {showPacks && (
+                  <div className={styles.packDropdown}>
+                    <PackManagerPanel packs={packs} onToggle={togglePack} onRefresh={refresh} />
+                  </div>
+                )}
+              </div>
+            </div>
+          }
         />
       </DevProfiler>
 
@@ -912,22 +932,6 @@ export function GameViewComponentImpl({
           </DevProfiler>
         </div>
       </div>
-
-      {/* ─── 音效控制(右上角固定,低调)─── */}
-      <SoundControl />
-
-      {/* ─── 资源包管理入口(📦 按钮 + 浮层面板)─── */}
-      <button
-        onClick={() => setShowPacks((v) => !v)}
-        style={{ position: 'fixed', top: 44, right: 120, zIndex: 100 }}
-      >
-        📦
-      </button>
-      {showPacks && (
-        <div style={{ position: 'fixed', top: 80, right: 10, zIndex: 1000 }}>
-          <PackManagerPanel packs={packs} onToggle={togglePack} onRefresh={refresh} />
-        </div>
-      )}
 
       {/* ─── Lottie 特效层(顶层 fixed,不拦截交互)─── */}
       <VfxLayer items={vfxItems} />

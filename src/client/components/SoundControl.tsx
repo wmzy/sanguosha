@@ -1,13 +1,13 @@
 // src/client/components/SoundControl.tsx
 // 音效控制面板:静音开关 + 音量滑块。
 //
-// 放置在 GameView 右上角(固定定位,低调半透明),不干扰游戏布局。
+// 内嵌于 GameHeader 右侧工具组(与资源包按钮并排,位于顶部栏右上角)。
 // 状态由 useSoundSettings 管理(localStorage 持久化 + audioEngine 同步)。
 //
 // 设计:
-//   - 默认收起为一个小喇叭图标按钮(🔊/🔇),hover/点击展开滑块
+//   - 默认收起为一个小喇叭图标按钮(🔊/🔇),双击展开音量滑块
 //   - 展开后显示音量滑块 + 静音切换
-//   - 半透明背景,pointer-events 仅在控件区域生效
+//   - 无独立背景,继承 headerBar 的半透明底色
 
 import { useState, useCallback } from 'react';
 import { css } from '@linaria/core';
@@ -15,20 +15,11 @@ import { useSoundSettings } from '../hooks/useSoundSettings';
 
 // ─── 样式 ───
 const controlWrap = css`
-  position: fixed;
-  top: 44px; /* 避开 headerBar */
-  right: 10px;
-  z-index: 100;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #534629;
-  border-radius: 6px;
   font-size: 12px;
   color: #ddd;
-  backdrop-filter: blur(4px);
   user-select: none;
 `;
 

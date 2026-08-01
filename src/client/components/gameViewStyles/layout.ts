@@ -97,6 +97,39 @@ export const goToBtn = css`
   font-size: 12px;
 `;
 
+/** 顶部栏右侧工具组:资源包/音效等常驻游戏工具按钮(内嵌 headerBar 右上角) */
+export const toolbarGroup = css`
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`;
+
+/** 工具组内的图标按钮(📦 等),风格与 headerBar 其他按钮一致 */
+export const toolbarBtn = css`
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  background: transparent;
+  color: #e0e0e0;
+  font-size: 14px;
+  line-height: 1;
+  &:hover {
+    border-color: #ffd700;
+    color: #ffd700;
+  }
+`;
+
+/** 资源包管理下拉浮层(相对 toolbarGroup,从按钮下方弹出) */
+export const packDropdown = css`
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+`;
+
 // ─── 主内容:左侧战场区 + 右侧边栏 ───
 export const mainContent = css`
   flex: 1 1 auto;

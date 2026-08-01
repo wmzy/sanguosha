@@ -159,3 +159,45 @@ describe('GameView:广播型 pending(无懈可击)点击不回应后隐藏当前
     expect(screen.getAllByText(/⏱/)).toHaveLength(1);
   });
 });
+
+// 顶部栏工具组:资源包📦 + 音效🔊 按钮应内嵌于 headerBar 右上角(非 fixed 浮层)。
+// 来源:将原本 position:fixed 悬浮的两个控件整合进 GameHeader 的 headerSlot,真正落到右上角。
+describe('GameView:资源包/音效按钮内嵌于顶部栏右上角', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('📦 资源包按钮和 🔊 音效按钮都渲染,且位于 headerBar 内(与轮次徽章同级容器)', () => {
+    const view = makeView(null);
+    render(
+      <GameViewComponent
+        view={view}
+        onAction={() => {}}
+        currentEvent={null}
+        headerSlot={<button>视角</button>}
+      />,
+    );
+    const packBtn = screen.getByRole('button', { name: '资源包管理' });
+    // 默认未静音 → aria-label 为「静音」
+    const soundBtn = screen.getByRole('button', { name: '静音' });
+    // headerBar = 包含「第 1 轮」徽章的顶部栏容器(轮次徽章的祖父级)
+    const roundBadge = screen.getByText('第 1 轮');
+    const headerBar = roundBadge.parentElement?.parentElement;
+    expect(headerBar).toBeTruthy();
+    // 两个工具按钮必须是 headerBar 的后代(整合进顶部栏,而非 fixed 浮层)
+    expect(headerBar!).toContainElement(packBtn);
+    expect(headerBar!).toContainElement(soundBtn);
+  });
+
+  it('点击 📦 按钮展开资源包管理浮层', () => {
+    const view = makeView(null);
+    render(
+      <GameViewComponent view={view} onAction={() => {}} currentEvent={null} />,
+    );
+    // 初始:浮层不可见
+    expect(screen.queryByText('资源包管理')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '资源包管理' }));
+    // 展开后:浮层标题「资源包管理」出现
+    expect(screen.getByText('资源包管理')).toBeDefined();
+  });
+});
