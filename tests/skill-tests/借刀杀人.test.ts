@@ -19,6 +19,8 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
+import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
+import { findActionEntry } from '../../src/engine/skill';
 
 function makePlayer(opts: {
   index: number;
@@ -132,8 +134,8 @@ describe('借刀杀人', () => {
     await P1.pass(); // 消耗无懈窗口
 
     // 窗口 2:借刀杀人/出杀(target=P2)
-    // 注:此窗口由 skills/借刀杀人.ts 注册的 respond action 响应(requestType='借刀杀人/出杀'),
-    //    respondInfo 推导 skillId='借刀杀人'(strip /出杀)。
+    // 注:此窗口的 respond action 由 play-card(使用牌) 按卡名 skillId='借刀杀人' 注册到每个座次
+    //    (CardEffect.respond 字段),respondInfo 推导 skillId='借刀杀人'(strip /出杀)。
     //    验证委托链路:从 slot.atom.prompt 提取实际的 cardFilter(仅接受杀)。
     P2.expectPending('请求回应');
     const info2 = P2.respondInfo();
@@ -166,7 +168,7 @@ describe('借刀杀人', () => {
 
   // ────────────────────────────────────────────────────────────
   // 1b. 正面:cardFilter 过滤正确 — P2 手中只有杀时,借刀杀人/出杀 窗口接受杀
-  //    (借刀杀人/出杀 由 skills/借刀杀人.ts respond 响应;从 slot.atom.prompt 取 cardFilter 验证)
+  //    (借刀杀人/出杀 由 play-card(使用牌) 按卡名注册的 respond 响应;从 slot.atom.prompt 取 cardFilter 验证)
   // ────────────────────────────────────────────────────────────
   it('P2 有杀时,借刀杀人/出杀 窗口的 slot.atom.prompt.cardFilter 接受 P2 手里的杀', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
@@ -666,5 +668,24 @@ describe('借刀杀人', () => {
     // 借刀杀人进弃牌堆
     expect(harness.state.zones.discardPile).toContain('jd1');
     expect(harness.state.zones.processing).toEqual([]);
+  });
+
+  // ─── 回归:f7536790 把借刀杀人从 DEFAULT_SKILLS 移除后,真实选将路径
+  //     (skills=DEFAULT_SKILLS,不手动注入 '借刀杀人') 不再实例化借刀杀人技能 →
+  //     「借刀杀人/出杀」respond action 未注册 → 被借刀者无法回应。
+  //     此用例不手动注入,仅靠 DEFAULT_SKILLS。
+  it('经 DEFAULT_SKILLS 实例化(真实选将路径)后 借刀杀人/出杀 respond action 已注册', async () => {
+    const state = buildState({
+      p1Skills: [...DEFAULT_SKILLS],
+      p2Skills: [...DEFAULT_SKILLS],
+      p2Equipment: { 武器: 'wp1' },
+      extraCards: { wp1: makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌') },
+    });
+    await harness.setup(state);
+
+    // 借刀杀人 skill 为每个座次注册 respond action(借刀杀人/出杀);P2 座次应已注册。
+    expect(findActionEntry(harness.state, '借刀杀人', 1, 'respond')).toBeDefined();
+    // 同理铁索连环 recast 也应随 DEFAULT_SKILLS 实例化
+    expect(findActionEntry(harness.state, '铁索连环', 0, 'recast')).toBeDefined();
   });
 });

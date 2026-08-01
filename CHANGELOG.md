@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-01
 
+### Fixed — 铁索连环无法重铸 / 借刀杀人无法回应（卡牌技能被重构孤立）
+
+出牌阶段选中【铁索连环】时不出现「重铸」按钮，点击更无从谈起；【借刀杀人】对装备武器者使用后，被借刀者也无法回应（出杀/交武器）。根因：重构 `f7536790`（「用使用牌/打出牌统一技能替换 per-card 技能」）把全部卡牌技能从 `DEFAULT_SKILLS` 移除，将 use/respond 统一交由「使用牌/打出牌」+ CardEffect 注册表按卡名路由。但【铁索连环】与【借刀杀人】各有一段当时未并入 CardEffect 的逻辑仍留在 skill 文件里：铁索连环的 `recast`（重铸替代出牌）action + 连环传导全局 after-hook；借刀杀人的「借刀杀人/出杀」跨座次 respond action。这些逻辑只有在 skill 实例化时才注册，而二者已不在 `DEFAULT_SKILLS`，真实选将路径（`skills = [...DEFAULT_SKILLS, ...武将技]`）不再实例化它们 → action/hook 全部丢失。既有测试因手动注入 `skills: ['铁索连环']`/`['借刀杀人']` 而一直绿灯，掩盖了回归。
+
+#### Fixed
+- **铁索连环恢复进 `DEFAULT_SKILLS`**:其 `recast`（替代出牌 action）与连环传导全局 after-hook 都进不了 CardEffect.respond/resolve，必须实例化独立 skill 才能注册。(`src/engine/atoms/选将.ts`)
+- **借刀杀人 respond 并入 `CardEffect.respond`（与火攻/顺手牵羊对齐），删除独立 skill 文件**:把原 `skills/借刀杀人.ts` 的 validate/execute 搬进 `card-effects/借刀杀人.ts` 的 `respond` 字段 + 新增 `respondPrompt`。被借刀者 A 的回应入口现由 play-card（使用牌）按卡名 `skillId='借刀杀人'` 注册到每个座次，跨座次回应不变。同步从 `skills/index.ts` 删除 loader、清理 `shared/cards/tricks.ts` 与测试中的过时引用。(`src/engine/card-effects/借刀杀人.ts`、`src/engine/skills/index.ts`、`src/engine/atoms/选将.ts`)
+
+#### Added
+- **真实选将路径回归测试**:不手动注入卡牌技能，仅以 `DEFAULT_SKILLS` 构建 state，断言「铁索连环 recast 可执行」「借刀杀人 respond action 已注册」「铁索连环 recast action 已注册」——锁定这两张锦囊的非 use 逻辑必须随默认技能实例化。回退任一修复即失败。(`tests/skill-tests/铁索连环.test.ts`、`tests/skill-tests/借刀杀人.test.ts`)
+
 ### Fixed — 音效叠音:一次操作同时播放多个音效
 
 实时对局中一次操作(如出杀)会接连推送多个 ViewEvent(打出/使用/伤害/扣血…),多条 SSE 消息常落在 React 同一渲染批次,`setIngestedEvents` 被合并。`useSoundPlayback` 监听 `ingested` 批次的 `useEffect` 在一次执行里同步播放整批事件的音效,导致「一个操作同时响多个音效」。而播放队列 `current`(`useEventPlayback`)由 `playNext` 逐个出队(每事件等待其 `effect.duration`),天然串行。修复:音效改跟随 `current` 单事件逐个播放,与视觉横幅同帧、不叠音。

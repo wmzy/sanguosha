@@ -6,6 +6,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
+import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
 
 function mkCard(
   id: string,
@@ -248,6 +249,31 @@ describe('铁索连环', () => {
     // 摸一张:手牌数 1(原 1 弃 0 摸 1)
     expect(harness.state.players[0].hand.length).toBe(1);
     expect(harness.state.zones.deck.length).toBe(deckBefore - 1);
+  });
+
+  // ─── 回归:f7536790 把铁索连环从 DEFAULT_SKILLS 移除后,真实选将路径
+  //     (skills=DEFAULT_SKILLS,不手动注入 '铁索连环') 不再实例化铁索连环技能 →
+  //     recast action 未注册 → 出牌阶段无法重铸。此用例不手动注入,仅靠 DEFAULT_SKILLS。
+  it('recast:经 DEFAULT_SKILLS 实例化(真实选将路径)后仍可重铸', async () => {
+    const chain = mkCard('chainD', '铁索连环', '♦', '7', '锦囊牌');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', hand: ['chainD'], skills: [...DEFAULT_SKILLS] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [...DEFAULT_SKILLS] }),
+        ],
+        cardMap: { chainD: chain },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    await P0.triggerAction('铁索连环', 'recast', { cardId: 'chainD' });
+
+    expect(harness.state.players[0].hand).not.toContain('chainD');
+    expect(harness.state.zones.discardPile).toContain('chainD');
   });
 
   // ─── 连环传导 ─────────────────────────────

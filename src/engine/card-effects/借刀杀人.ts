@@ -1,4 +1,4 @@
-// 借刀杀人 CardEffect — 普通锦囊·借刀杀人的使用结算。
+// 借刀杀人 CardEffect — 普通锦囊·借刀杀人的使用结算 + 被借刀回应入口。
 //
 // resolve（单目标 A）：询问无懈可击 → 请求 A 出杀(useCardAndTarget) → 检查 A 的选择。
 //   A 出杀 → useCard(quotaPolicy='none', mandatedTargets:[B]) 走完整杀结算
@@ -6,15 +6,23 @@
 //   A 不出杀 → 使用者获得 A 的武器。
 //
 // 双目标特殊处理：targets=[A]（武器持有者），killTarget=B 存入 localVars。
-// resolve 通过 ctx.state.localVars['借刀杀人/killTarget'] 读取 B。
-// A 的「出杀」选择由 skills/借刀杀人.ts 的 respond action 写入
-// localVars['借刀杀人/出杀选择'] = { cardId, targets }。
+// resolve 通过 localVars[KILL_TARGET_VAR] 读取 B。
+// A 的「出杀」选择由本文件的 respond 字段(被 play-card 按卡名注册到每个座次)写入
+// localVars[CHOICE_VAR] = { cardId, targets }。
 
-import type { Card, GameState } from '../types';
+import type { Card, GameState, Json } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
 import { useCard } from '../card-effect/use-card';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { inAttackRange } from '../distance';
+
+/** 请求 A 出杀问询的 requestType */
+const REQUEST_TYPE = '借刀杀人/出杀';
+/** localVars key:A 的出杀选择(cardId+targets);不设 = 交出武器 */
+const CHOICE_VAR = '借刀杀人/出杀选择';
+/** localVars key:发起者指定的杀目标 B */
+const KILL_TARGET_VAR = '借刀杀人/killTarget';
 
 /** 从 target 处卸下武器并交给 source(借刀杀人“不出杀/交武器”分支) */
 async function acquireWeapon(state: GameState, source: number, target: number): Promise<void> {
@@ -28,13 +36,13 @@ async function acquireWeapon(state: GameState, source: number, target: number): 
 async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
   const { state, source, target } = ctx;
   // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
-  const killTarget = state.localVars['借刀杀人/killTarget'] as number;
+  const killTarget = state.localVars[KILL_TARGET_VAR] as number;
   const killTargetName = state.players[killTarget]?.name ?? '?';
 
   // 请求 A 选择：出杀(含 B/方天画戟多目标) 或 交出武器
   await applyAtom(state, {
     type: '请求回应',
-    requestType: '借刀杀人/出杀',
+    requestType: REQUEST_TYPE,
     target,
     prompt: {
       type: 'useCardAndTarget',
@@ -46,10 +54,10 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
     timeout: 20,
   });
 
-  const choice = state.localVars['借刀杀人/出杀选择'] as
+  const choice = state.localVars[CHOICE_VAR] as
     | { cardId: string; targets: number[] }
     | undefined;
-  delete state.localVars['借刀杀人/出杀选择'];
+  delete state.localVars[CHOICE_VAR];
 
   if (choice) {
     // respond validate 已保证 killTarget ∈ targets + 全部在攻击范围;useCard 正常应成功
@@ -126,14 +134,60 @@ const borrowedSwordEffect: CardEffect = {
       targetIdx = params.target as number;
       killTargetIdx = params.killTarget as number;
     }
-    state.localVars['借刀杀人/killTarget'] = killTargetIdx;
+    state.localVars[KILL_TARGET_VAR] = killTargetIdx;
     return [targetIdx];
+  },
+  // respond：被借刀者 A 对「借刀杀人/出杀」问询的回应入口。
+  // 由 play-card(使用牌) 按卡名 skillId 注册到每个座次——A 可能是任意玩家，跨座次回应。
+  // validate 不传 cardId = 选择交出武器(pass)，由 resolve 兑底走交武器分支。
+  // 逻辑原驻 skills/借刀杀人.ts，重构 f7536790 后并入 CardEffect.respond（镜像火攻/顺手牵羊）。
+  respond: {
+    validate: (state, ownerId, params) => {
+      const slot = state.pendingSlots.get(ownerId);
+      if (!slot) return '当前不需要回应';
+      if ((slot.atom as { target?: number }).target !== ownerId) return '不是问你的';
+      const atom = slot.atom as { requestType?: string };
+      if (atom.requestType !== REQUEST_TYPE) return '当前不是借刀杀人询问';
+      // 不传 cardId = 选择交出武器(pass),由 resolve 兑底走交武器分支
+      const cardId = params.cardId as string | undefined;
+      if (cardId === undefined) return null;
+      const targets = params.targets as number[] | undefined;
+      if (!Array.isArray(targets) || targets.length === 0) return '请选择杀的目标';
+      const self = state.players[ownerId];
+      if (!self?.hand.includes(cardId)) return '牌不在手牌中';
+      if (state.cardMap[cardId]?.name !== '杀') return '只能使用杀';
+      // 必含发起者指定的 killTarget(权威校验,前端 targetFilter 仅提示)
+      const killTarget = state.localVars[KILL_TARGET_VAR] as number | undefined;
+      if (killTarget !== undefined && !targets.includes(killTarget))
+        return '必须包含借刀杀人指定的目标';
+      // 每个目标须在 A 的攻击范围内(镜像 杀.canUse 的距离校验)。
+      // 在 respond 阶段即拒绝非法选择,避免进入结算后 useCard 静默白费整张借刀杀人
+      for (const t of targets) {
+        if (!inAttackRange(state, ownerId, t, cardId)) return '目标不在攻击范围内';
+      }
+      return null;
+    },
+    execute: async (state, ownerId, params) => {
+      const cardId = params.cardId as string | undefined;
+      const targets = params.targets as number[] | undefined;
+      // 不传 = 交武器,localVars 不设选择 → resolve 走交武器分支
+      if (typeof cardId === 'string' && Array.isArray(targets)) {
+        state.localVars[CHOICE_VAR] = { cardId, targets };
+      }
+    },
   },
   prompt: {
     type: 'useCardAndTarget',
     title: '借刀杀人',
     cardFilter: { filter: (c: Card) => c.name === '借刀杀人', min: 1, max: 1 },
     targetFilter: { min: 1, max: 1 },
+  } as ActionPrompt,
+  // respond 入口 UI：选一张杀 + 杀的目标(方天画戟等多目标)；后端 validate 权威校验距离/必含
+  respondPrompt: {
+    type: 'useCardAndTarget',
+    title: '借刀杀人:对指定角色使用一张杀,或交出武器',
+    cardFilter: { filter: (c: Card) => c.name === '杀', min: 1, max: 1 },
+    targetFilter: { min: 1, max: 3, filter: () => true },
   } as ActionPrompt,
   label: '借刀杀人',
   style: 'danger',

@@ -23,9 +23,14 @@ export const DEFAULT_SKILLS = [
   '回合管理',
   '装备通用',
   // 卡牌使用/打出统一入口（配合 CardEffect 注册表路由）。
-  // 所有基本牌/锦囊牌的 use 与 respond action 由这两个技能按卡名注册。
+  // 绝大多数基本牌/锦囊牌的 use 与 respond action 由这两个技能按卡名注册。
   '使用牌',
   '打出牌',
+  // 铁索连环的部分逻辑无法纳入 CardEffect 注册表，仍以独立 skill 文件存在，
+  // 必须在此实例化才能注册其 action/hook（仅注册非 use 逻辑，use 仍由使用牌路由）:
+  //   重铸(recast)替代出牌 action + 连环传导全局 after-hook
+  // 借刀杀人的 respond 已并入 CardEffect.respond（同火攻/顺手牵羊），无需独立 skill。
+  '铁索连环',
 ];
 
 /** 身份牌配置 */
