@@ -33,8 +33,8 @@
 //            · 真 → 扣牌按声明生效;每个质疑者:加缠怨标记 → 选弃一张牌或失去1点体力。
 //            · 假 → 扣牌作废(留弃牌堆);每个质疑者:摸一张牌。
 //
-// 注:"同时质疑"在引擎中用顺序询问+全面收集实现(不走 并行回应 atom):
-//   1) 并行回应的 toViewEvents.othersView 用 targets[0] 作为 target 标识,导致非 target
+// 注:"同时质疑"在引擎中用顺序询问+全面收集实现(不走多目标并行 slot):
+//   1) 多目标并行 slot 的 toViewEvents.othersView 用 targets[0] 作为 target 标识,导致非 target
 //      viewer 的 view.pending 跟踪 targets[0];当 targets[0] 的 slot resolve 时,
 //      harness 的 pendingResolved 处理会误清所有非 target viewer 的 pending
 //      (即使其他 slot 仍存活)——与 buildView 不一致。改用 请求回应 逐个问询避免此问题。
@@ -46,7 +46,7 @@
 //   pushFrame('杀') + 检测有效性期间临时改 cardMap[name]='杀',使武器技/仁王盾生效。
 //
 // respond 注册到每个座次(被问询者非于吉),onInit 返回合并卸载函数。
-//   respond 既处理"质疑"(并行回应 slot),也处理"弃牌/失体力"(后续请求回应 slot),
+//   respond 既处理"质疑"(逐个 请求回应 slot),也处理"弃牌/失体力"(后续请求回应 slot),
 //   按 slot.atom.requestType 分支。
 //
 // 实现差异/边界(相对官方描述):
@@ -255,8 +255,8 @@ async function applyTruthConsequence(state: GameState, questioner: number, yuji:
 /** 界蛊惑质疑流程(各入口共用):扣牌 → 质疑循环 → (有人质疑)翻牌结算。
  *  返回 { voided: 是否作废(假牌被质疑), downCard: 扣牌 id, questioners: 质疑者列表 }。
  *
- *  "同时质疑"在引擎中用顺序询问+全面收集实现(不走 并行回应 atom):
- *    1) 并行回应的 toViewEvents.othersView 用 targets[0] 作为 target 标识,导致非 target
+ *  "同时质疑"在引擎中用顺序询问+全面收集实现(不走多目标并行 slot):
+ *    1) 多目标并行 slot 的 toViewEvents.othersView 用 targets[0] 作为 target 标识,导致非 target
  *       viewer 的 view.pending 跟踪 targets[0];当 targets[0] 的 slot resolve 时,
  *       harness 的 pendingResolved 处理会误清所有非 target viewer 的 pending
  *       (即使其他 slot 仍存活)——与 buildView 不一致。改用 请求回应 逐个问询避免此问题。
@@ -476,7 +476,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── respond(注册到每个座次:被蛊惑问询的角色,含 ownerId 本人)──
-  //   1. 同时质疑窗口(并行回应 slot,requestType='界蛊惑/质疑'):choice=true 加入质疑者列表。
+  //   1. 同时质疑窗口(请求回应 slot,requestType='界蛊惑/质疑'):choice=true 加入质疑者列表。
   //   2. 真牌后续选择窗口(请求回应 slot,requestType='界蛊惑/choose'):choice=true 弃牌,false 失体力。
   //  注:与 ownerId 上的 use/dodge/rescue 共存,各 actionType 独立不冲突。
   for (const pl of state.players) {

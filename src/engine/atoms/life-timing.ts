@@ -1,7 +1,6 @@
 // src/engine/atoms/life-timing.ts
 // 体力编排时机 atom 定义(对齐 flow-redesign.md 模块 M):
 //   - 扣减体力:runDecreaseLifeFlow/runDamageFlow 的底层体力扣减 atom(实质副作用:扣 health)。
-//     与 造成伤害 区分——后者保留为旧伤害入口,A 模块重构时由 runDamageFlow 取代。
 //   - 时机标记型 atom(确定回复数值时/回复体力后/失去体力时/失去体力后/
 //     扣减体力前/扣减体力时/扣减体力后/减上限后/加上限后):
 //     validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
@@ -17,7 +16,7 @@ import { getBeforeHooks } from '../skill';
 
 // ── 扣减体力:底层实质 atom ──────────────────────────────────
 // 仅扣减体力值(下限 0),不在此处触发濒死/死亡——由编排函数或系统规则现有 after-hook 决定。
-// 注意:这是"扣减"语义,不做 alive 清理(与 造成伤害/失去体力 一致)。
+// 注意:这是"扣减"语义,不做 alive 清理(由 death-flow 的 系统处理牌 负责)。
 export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = {
   type: '扣减体力',
   validate(state, atom) {
@@ -30,7 +29,7 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
   apply(state, atom) {
     const target = state.players[atom.target];
     target.health = Math.max(0, target.health - atom.amount);
-    // 不在此处置 alive——由 击杀 atom / 系统规则濒死流程负责。
+    // 不在此处置 alive——由 death-flow 的 系统处理牌 atom 负责清理。
   },
   effect: { sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 800 },
   toViewEvents(_state, atom): ViewEventSplit {
@@ -46,7 +45,7 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
     if (pi < 0) return;
     const p = view.players[pi];
     p.health = Math.max(0, p.health - (event.amount as number));
-    // alive 由 击杀 atom 的 applyView 更新,这里不提前设。
+    // alive 由 death-flow 的 系统处理牌 atom applyView 更新,这里不提前设。
   },
   toViewLog(event) {
     return { player: event.target as number, text: `扣减 ${event.amount ?? 0} 点体力` };

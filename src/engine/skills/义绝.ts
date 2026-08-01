@@ -12,7 +12,7 @@
 //          '义绝/非锁定技失效'(create-engine hook 过滤器读取,跳过目标非锁定技 hook)
 //          '义绝/禁出牌'(本技能 before-hook on '请求回应' 读取,cancel 任何要求该目标
 //                       使用/打出牌的 prompt;纯选择型 prompt 如 confirm/chooseSuit 不受影响)
-//          '义绝/红桃杀加伤'(本技能 before-hook on '造成伤害' 读取,owner 红桃杀+1 伤)
+//          '义绝/红桃杀加伤'(本技能 before-hook on '造成伤害时' 读取,owner 红桃杀+1 伤)
 //        红色(♥/♦):发起者获得此牌(移动牌 target→owner),然后询问发起者是否令其回 1 体力
 //   5. 回合结束 after-hook:清除所有玩家的义绝标签(本回合生效,回合结束失效)
 //
@@ -50,7 +50,7 @@ const HEAL_KEY = '义绝/healChoice';
 const SUPPRESSION_TAG = '义绝/非锁定技失效';
 /** 标签:目标本回合不能使用或打出手牌(本技能 before-hook on '请求回应' 读取)。 */
 const BAN_TAG = '义绝/禁出牌';
-/** 标签:owner 本回合对该目标使用的红桃【杀】伤害+1(before-hook on '造成伤害' 读取)。 */
+/** 标签:owner 本回合对该目标使用的红桃【杀】伤害+1(before-hook on '造成伤害时' 读取)。 */
 const HEART_BONUS_TAG = '义绝/红桃杀加伤';
 
 /** 义绝打出的所有标签(回合结束统一清理)。 */
@@ -289,7 +289,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   registerBeforeHook(state, skill.id, ownerId, '询问闪', banHandler);
   registerBeforeHook(state, skill.id, ownerId, '询问杀', banHandler);
 
-  // ── before-hook on '造成伤害':owner 红桃杀对该目标伤害+1 ──
+  // ── before-hook on '造成伤害时':owner 红桃杀对该目标伤害+1 ──
   //    命中条件:atom.source === ownerId + 目标有 HEART_BONUS_TAG + 牌为红桃杀;
   //    单次消费(去标签),保证同一杀只+1,且只对该义绝生效。
   registerBeforeHook(

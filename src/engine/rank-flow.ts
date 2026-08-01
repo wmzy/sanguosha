@@ -7,11 +7,10 @@
 //
 // 关键约束(模块 G 范围):
 //   - 新增编排函数 runRankCompareFlow + 三时机 atom 定义(拼点扣置/拼点亮出/拼点后)。
-//   - 不修改旧「拼点」atom 定义——保留为兼容(未来若有未迁移调用方仍可用)。
 //   - 全部拼点主路径(驱虎/界惴恐/天义/烈刃/界巧说/界陷阵)迁移至 runRankCompareFlow;
 //     调用方原来自行移动两张牌到处理区,改为不移动——runRankCompareFlow 内部通过
 //     拼点扣置 atom 处理移动,实现同时扣置、面朝下。
-//   - 酣战/纵适 的拼点后效果 hook 从旧「拼点」atom 迁移至「拼点后」时机。
+//   - 酣战/纵适 的拼点后效果 hook 迁移至「拼点后」时机。
 //
 // 面朝下语义:
 //   拼点扣置 的 toViewEvents 对非扣置者隐藏牌面(发起方只看到自己的牌,目标方只看到自己的,
@@ -77,8 +76,7 @@ export async function runRankCompareFlow(
   const targetVal = getCardValue(state.cardMap[targetCard]);
   const result: '赢' | '没赢' = initVal > targetVal ? '赢' : '没赢';
 
-  // 牌入弃牌堆(在 拼点后 之前发出——与旧「拼点」atom 的 after-hook 时机一致:
-  // 酣战获杀/纵适获牌 等钩子读 discardPile 取牌,须先入弃牌堆)
+  // 牌入弃牌堆(在 拼点后 之前发出——酣战获杀/纵适获牌 等钩子读 discardPile 取牌,须先入弃牌堆)
   await applyAtom(state, {
     type: '移动牌',
     cardId: initiatorCard,

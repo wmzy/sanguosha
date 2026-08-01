@@ -79,9 +79,9 @@ export function deriveCardFilterFromAtom(
     if (!cardName) return undefined;
     return (c) => c.name === cardName;
   }
-  // 请求回应 / 并行回应:
+  // 请求回应:
   //   'R/Y' → R 是 cardName;'R' → R 是 cardName;'__弃牌' → ()=>true
-  if (atomType === '请求回应' || atomType === '并行回应') {
+  if (atomType === '请求回应') {
     if (!reqType) return undefined;
     if (reqType === '__弃牌') return () => true;
     // 求桃兜底(registry 未加载窗口期):桃或酒均可救援
@@ -135,7 +135,7 @@ export function resolvePendingRespond(
     skillId = atomType.slice(2); // 询问闪→闪
   } else if (reqType === '__弃牌') {
     skillId = '系统规则';
-  } else if (atomType === '请求回应' || atomType === '并行回应') {
+  } else if (atomType === '请求回应') {
     if (!reqType) return null;
     // 'R/Y' → R 是 skillId;'R' → R 是 skillId;'R_盲选' → R 是 skillId
     const sepIdx = reqType.search(/[/_]/);

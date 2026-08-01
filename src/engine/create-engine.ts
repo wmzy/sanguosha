@@ -694,7 +694,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   });
 
   if (def.pending) {
-    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行回应/并行选将多 target)。
+    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行选将多 target)。
     // parallelSplit 声明在 atom 定义上,引擎不再硬编码 type 偏序。
     let targets: number[];
     let slotAtoms: Atom[];
@@ -729,7 +729,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
       for (let i = 0; i < slotAtoms.length; i++) {
         const slotAtom = slotAtoms[i];
         const slotTarget = targets[i];
-        // 每个 slot 用自己 atom type 对应的 def(并行回应→请求回应,并行选将→选将询问)
+        // 每个 slot 用自己 atom type 对应的 def(并行选将→选将询问)
         const slotDef = slotAtom.type !== current.type ? getAtomDef(slotAtom.type) : def;
         slotPromises.push(
           createAndAwaitSlot(state, slotAtom, slotDef, slotTarget, silentDelayMs),

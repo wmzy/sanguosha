@@ -100,7 +100,7 @@ describe('getViewAt', () => {
         {
           seq: 0,
           time: 0,
-          event: { type: '造成伤害', target: 0, amount: 1, source: 1 },
+          event: { type: '扣减体力', target: 0, amount: 1 },
         },
       ]),
     });
@@ -117,7 +117,7 @@ describe('getViewAt', () => {
 
   it('step 超出范围 clamp 到 totalSteps', () => {
     const file = makeReplay({
-      0: makeSeat([{ seq: 0, time: 0, event: { type: '造成伤害', target: 0, amount: 1, source: 1 } }]),
+      0: makeSeat([{ seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } }]),
     });
     // step=100 远超 events.length=1,应 clamp 到 1
     const view = getViewAt(file, 0, 100)!;
@@ -133,8 +133,8 @@ describe('getViewAt', () => {
   it('多步累积:连续两次伤害血量 -2', () => {
     const file = makeReplay({
       0: makeSeat([
-        { seq: 0, time: 0, event: { type: '造成伤害', target: 0, amount: 1, source: 1 } },
-        { seq: 1, time: 0, event: { type: '造成伤害', target: 0, amount: 1, source: 1 } },
+        { seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
+        { seq: 1, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
       ]),
     });
     expect(getViewAt(file, 0, 0)!.players[0].health).toBe(4);
@@ -144,7 +144,7 @@ describe('getViewAt', () => {
 
   it('不污染录像原始数据(initialView 保持初始值)', () => {
     const seat = makeSeat([
-      { seq: 0, time: 0, event: { type: '造成伤害', target: 0, amount: 3, source: 1 } },
+      { seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 3 } },
     ]);
     const file = makeReplay({ 0: seat });
     getViewAt(file, 0, 1);
@@ -155,10 +155,10 @@ describe('getViewAt', () => {
   it('不同座次独立重建', () => {
     const file = makeReplay({
       0: makeSeat([
-        { seq: 0, time: 0, event: { type: '造成伤害', target: 0, amount: 1, source: 1 } },
+        { seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
       ]),
       1: makeSeat([
-        { seq: 0, time: 0, event: { type: '造成伤害', target: 1, amount: 2, source: 0 } },
+        { seq: 0, time: 0, event: { type: '扣减体力', target: 1, amount: 2 } },
       ]),
     });
     expect(getViewAt(file, 0, 1)!.players[0].health).toBe(3);

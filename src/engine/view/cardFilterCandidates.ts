@@ -11,7 +11,7 @@
 // 调用点(与 resolveChoosePlayerCandidates 并列):
 //   - 请求回应.toViewEvents(增量 event 主路径)
 //   - buildView(全量快照/重连路径)
-//   - 并行回应.toViewEvents
+//   - 请求回应.toViewEvents
 import type { ActionPrompt, GameState } from '../types';
 import type { UseCardAndTargetPrompt, UseCardPrompt } from '../types';
 

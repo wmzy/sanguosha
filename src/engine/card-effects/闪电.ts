@@ -3,7 +3,7 @@
 // 闪电的特殊逻辑（移动到下家）在此实现（用户要求在使用牌技能/card-effect 层实现）：
 //   判定♠2-9 → 受到 3 点无来源雷电伤害 + 闪电进弃牌堆
 //   其他结果 → 闪电传递给下家（下家的判定区）
-// 无来源伤害用 source: TARGET_SYSTEM（系统惯例，见 造成伤害 atom）。
+// 无来源伤害用 source: TARGET_SYSTEM（系统惯例，见 扣减体力 atom）。
 
 import type { Card, ActionPrompt, GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';

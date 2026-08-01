@@ -143,18 +143,18 @@ describe('模块 L:摸牌 before-hook 逆时针排序', () => {
 
 describe('模块 L:非摸牌 atom 不受排序影响', () => {
   // ─── 7. 其他 atom 维持注册序(回归保护)──────────────────
-  it('非摸牌 atom(设阶段)before-hook 维持注册顺序', async () => {
+  it('非摸牌 atom(下一玩家)before-hook 维持注册顺序', async () => {
     const s = makeState(4, 0);
-    // 在 设阶段 上注册观察 hook(故意乱序)
+    // 在 下一玩家 上注册观察 hook(故意乱序)
     for (const oid of [2, 0, 3]) {
-      registerBeforeHook(s, `阶段观察${oid}`, oid, '设阶段', async (ctx) => {
-        const arr = (ctx.state.localVars['__phaseOrder'] as number[] | undefined) ?? [];
+      registerBeforeHook(s, `下一玩家观察${oid}`, oid, '下一玩家', async (ctx) => {
+        const arr = (ctx.state.localVars['__nextOrder'] as number[] | undefined) ?? [];
         arr.push(oid);
-        ctx.state.localVars['__phaseOrder'] = arr;
+        ctx.state.localVars['__nextOrder'] = arr;
       });
     }
-    await applyAtom(s, { type: '设阶段', phase: '摸牌' });
-    // 设阶段 不排序 → 维持注册序 [2,0,3]
-    expect(s.localVars['__phaseOrder']).toEqual([2, 0, 3]);
+    await applyAtom(s, { type: '下一玩家' });
+    // 下一玩家 不排序 → 维持注册序 [2,0,3]
+    expect(s.localVars['__nextOrder']).toEqual([2, 0, 3]);
   });
 });

@@ -201,9 +201,9 @@ describe('applyView 一致性 bug', () => {
     });
   });
 
-  describe('击杀 atom: discardPileCount 未增加', () => {
-    it('apply 把手牌+装备进弃牌堆, applyView 不增加 discardPileCount', () => {
-      const def = getAtomDef('击杀');
+  describe('系统处理牌 atom: discardPileCount 一致性', () => {
+    it('apply 把手牌+装备进弃牌堆, applyView 同步增加 discardPileCount', () => {
+      const def = getAtomDef('系统处理牌');
       const view = mockView({
         players: [
           {
@@ -238,14 +238,14 @@ describe('applyView 一致性 bug', () => {
       });
 
       const before = view.zones!.discardPileCount;
-      def.applyView!(view, { type: '击杀', player: 0 });
+      def.applyView!(view, { type: '系统处理牌', player: 0 });
 
       // apply: 2 手牌 + 1 装备 = 3 张进弃牌堆
-      expect(view.zones!.discardPileCount).toBe(before + 3); // ❌ BUG: 实际仍为 0
+      expect(view.zones!.discardPileCount).toBe(before + 3);
     });
 
-    it('阵亡身份对所有视角揭示(toViewEvents 携带 identity, applyView 揭示)', () => {
-      const def = getAtomDef('击杀');
+    it('阵亡身份对所有视角揭示(亮身份牌 toViewEvents 携带 identity, applyView 揭示)', () => {
+      const def = getAtomDef('亮身份牌');
       // mock state: P1 是反贼(真实身份)
       const mockState = {
         players: [{ identity: '主公' }, { identity: '反贼' }],
@@ -286,7 +286,7 @@ describe('applyView 一致性 bug', () => {
       });
 
       // toViewEvents 应携带阵亡者身份(死亡即公开)
-      const split = def.toViewEvents!(mockState, { type: '击杀', player: 1 });
+      const split = def.toViewEvents!(mockState, { type: '亮身份牌', player: 1 });
       expect((split!.othersView as any).identity).toBe('反贼');
 
       // applyView 揭示身份:前端走事件流时能看到阵亡者的真实身份
@@ -627,6 +627,37 @@ describe('请求回应 atom: deadline/totalMs 口径一致性', () => {
     def.applyView!(view, event);
     expect(view.pending).not.toBeNull();
     expect(view.pending!.totalMs).toBe(30_000);
+  });
+
+  it('非 target viewer: applyView 设置观察型 pending(不可操作)', () => {
+    const def = getAtomDef('请求回应');
+    const view = mockView({ viewer: 2 }); // viewer 2 ≠ target 0
+    const event = {
+      type: '请求回应',
+      requestType: '询问杀',
+      target: 0,
+      prompt: { type: 'useCard', title: '请出杀' },
+      timeoutMs: 30_000,
+    } as unknown as ViewEvent;
+    def.applyView!(view, event);
+    expect(view.pending).not.toBeNull();
+    // 观察型:prompt 被替换为 "等待回应"
+    const prompt = view.pending!.prompt as { title: string };
+    expect(prompt.title).toBe('等待回应');
+  });
+
+  it('target viewer 但无 prompt 字段: applyView 不设置 pending', () => {
+    const def = getAtomDef('请求回应');
+    const view = mockView({ viewer: 0 });
+    const event = {
+      type: '请求回应',
+      requestType: '询问杀',
+      target: 0,
+      // 无 prompt 字段
+      timeoutMs: 30_000,
+    } as unknown as ViewEvent;
+    def.applyView!(view, event);
+    expect(view.pending).toBeNull();
   });
 });
 

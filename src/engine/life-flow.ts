@@ -6,7 +6,7 @@
 //
 // 关键约束(模块 M 范围):
 //   - 只新增编排函数 + atom 定义,不迁移调用方(A/B/C 模块负责)。
-//   - 不修改 造成伤害.ts 的现有 apply 逻辑、不修改 系统规则.ts 的 runDyingFlow、不迁移技能 hook。
+//   - 不迁移技能 hook——现有 伤害结算时机 atom 的 before/after hook 保持不动(A3 步骤负责迁移)。
 //   - 回复体力/失去体力 的现有 atom 保留不动,编排函数在调用它们前后补发时机 atom。
 //   - 编排函数不直接触发濒死/死亡——保持 系统规则.ts 的 after-hook 触发逻辑
 //     (失去体力 after-hook 检查 health<=0 → runDyingFlow)。
@@ -39,7 +39,7 @@ export async function runDecreaseLifeFlow(
   source?: number,
 ): Promise<void> {
   // 记录致死来源供死亡奖惩:伤害有来源(runDamageFlow 透传),失去体力/减上限无来源。
-  // 扣减体力 after-hook(系统规则)据此触发濒死——与 造成伤害/失去体力 after-hook 语义一致。
+  // 扣减体力 after-hook(系统规则)据此触发濒死——与 扣减体力/失去体力 after-hook 语义一致。
   if (source === undefined) {
     delete state.localVars['死亡/killer'];
   } else {

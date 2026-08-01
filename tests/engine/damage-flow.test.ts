@@ -203,11 +203,5 @@ describe('模块 A1:伤害编排函数 runDamageFlow', () => {
     expect(state.players[0].health).toBe(4);
   });
 
-  // ── 不迁移调用方:现有 造成伤害 atom 仍独立可用 ──────────────
-  it('现有 造成伤害 atom 未被修改,仍可独立 apply', async () => {
-    await applyAtom(state, { type: '造成伤害', source: 1, target: 0, amount: 3 });
-    expect(state.players[0].health).toBe(1);
-    // runDamageFlow 与旧 atom 并存:旧 atom 走自身 before/after hook,不经新时机
-    expect(atomTypes(state)).toEqual(['造成伤害']);
-  });
+  // ── runDamageFlow 与旧 atom 已统一(旧 造成伤害 atom 已删除)─────────
 });

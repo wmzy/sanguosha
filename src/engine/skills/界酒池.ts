@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── after-hook on '去标记':酒/nextKillDamageBonus 被消耗(酒增伤生效)
   //    → 设 turn.vars['崩坏/disabled']=true,本回合崩坏失效。
-  //    去标记 的发生时机:酒.ts before-hook on '造成伤害' 在增伤时调用 applyAtom(去标记)
+  //    去标记 的发生时机:酒.ts before-hook on '造成伤害时' 在增伤时调用 applyAtom(去标记)
   //    消费 mark。此 hook 据此判定"酒杀伤害已造成",贴合官方"造成伤害后"语义。
   registerAfterHook(state, skill.id, ownerId, '去标记', async (ctx) => {
     const atom = ctx.atom;

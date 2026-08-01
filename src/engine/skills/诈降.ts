@@ -3,8 +3,8 @@
 //   使用红色【杀】无距离限制且不能被抵消。
 //
 // 触发:'失去体力' atom 的 after-hook(target===owner 且 amount>0)。
-//   ⚠ 关键区分:挂在'失去体力'而非'造成伤害'——失去体力不是受到伤害,
-//   二者必须严格区分(苦肉走失去体力,普攻/南蛮走造成伤害)。
+//   ⚠ 关键区分:挂在'失去体力'而非'受到伤害'——失去体力不是受到伤害,
+//   二者必须严格区分(苦肉走失去体力,普攻/南蛮走伤害结算)。
 //
 // 效果拆分:
 //   1. 摸3张牌:无条件(任何阶段失去体力都摸)。
@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ─── 失去体力 after-hook:摸3张 + (若出牌阶段)激活红色杀增益 ──────────
-  //    挂在'失去体力'而非'造成伤害'(诈降只对失去体力触发,不对伤害触发)。
+  //    挂在'失去体力'而非'受到伤害'(诈降只对失去体力触发,不对伤害触发)。
   registerAfterHook(state, skill.id, ownerId, '失去体力', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;

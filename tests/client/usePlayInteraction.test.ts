@@ -884,7 +884,7 @@ describe('usePlayInteraction · handleCardClick 选牌与切换', () => {
       perspectiveHand: [KILL_CARD],
       pending: {
         type: 'awaits',
-        atom: { type: '造成伤害', source: 0, target: 1, amount: 1 },
+        atom: { type: '扣减体力', target: 1, amount: 1 },
         target: 1,
         prompt: {
           type: 'useCard',

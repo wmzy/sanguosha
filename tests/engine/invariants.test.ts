@@ -3,7 +3,7 @@
 //   1. 直接调用:同一 cardId 出现在多个区 → 抛错;无重复 → 不抛错;孤儿牌(边界)不抛错。
 //   2. applyAtom 集成:开关开启时,正常完成路径触发断言;默认关闭时不触发。
 import { describe, it, expect } from 'vitest';
-import '../../src/engine/atoms'; // 注册 atom 定义(设阶段 等)
+import '../../src/engine/atoms'; // 注册 atom 定义(阶段结束 等)
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/create-engine';
 import { assertCardInvariants } from '../../src/engine/invariants';
@@ -93,8 +93,8 @@ describe('assertCardInvariants —— applyAtom 集成(开关保护)', () => {
     const s = makeState({ assertInvariants: true });
     s.zones.deck.push('c1');
     s.zones.discardPile.push('c1'); // 重复
-    // 设阶段 是无 pending 的简单 atom,走非等待型正常完成路径
-    await expect(applyAtom(s, { type: '设阶段', phase: '准备' })).rejects.toThrowError(
+    // 阶段结束 是无 pending 的简单 atom,走非等待型正常完成路径
+    await expect(applyAtom(s, { type: '阶段结束', player: 0, phase: '准备' })).rejects.toThrowError(
       /牌唯一归属不变量/,
     );
   });
@@ -103,20 +103,20 @@ describe('assertCardInvariants —— applyAtom 集成(开关保护)', () => {
     const s = makeState({ assertInvariants: true });
     s.zones.deck.push('c1');
     s.zones.discardPile.push('c2');
-    await expect(applyAtom(s, { type: '设阶段', phase: '准备' })).resolves.toBe(true);
+    await expect(applyAtom(s, { type: '阶段结束', player: 0, phase: '准备' })).resolves.toBe(true);
   });
 
   it('默认关闭(未设 assertInvariants)+ 存在重复 → 不抛错,正常返回 true', async () => {
     const s = makeState(); // assertInvariants 未设置
     s.zones.deck.push('c1');
     s.zones.discardPile.push('c1'); // 重复但开关关闭
-    await expect(applyAtom(s, { type: '设阶段', phase: '准备' })).resolves.toBe(true);
+    await expect(applyAtom(s, { type: '阶段结束', player: 0, phase: '准备' })).resolves.toBe(true);
   });
 
   it('显式关闭(assertInvariants=false)+ 存在重复 → 不抛错', async () => {
     const s = makeState({ assertInvariants: false });
     s.zones.deck.push('c1');
     s.zones.discardPile.push('c1');
-    await expect(applyAtom(s, { type: '设阶段', phase: '准备' })).resolves.toBe(true);
+    await expect(applyAtom(s, { type: '阶段结束', player: 0, phase: '准备' })).resolves.toBe(true);
   });
 });

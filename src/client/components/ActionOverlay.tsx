@@ -3,7 +3,7 @@
 //
 // 设计目标:增强玩家对「谁在用什么牌对谁做什么」的可感知性。
 //   1. 箭头:在「使用者」与「目标」之间画一条持续数秒的箭头。
-//      触发事件:成为目标 / 造成伤害 / 失去体力 / 指定目标。
+//      触发事件:成为目标 / 扣减体力 / 失去体力 / 指定目标。
 //      其中 指定目标/成为目标 携带 cardId+cardName+source+target,
 //      能完整还原「杀指定张角」这种语义。
 //   2. 浮层小窗:在屏幕中央展示一句话「刘备 杀 张角」。
@@ -47,7 +47,7 @@ interface ActionInfo {
 }
 
 /** 从 ViewEvent 提取 ActionInfo。
- *  支持的事件:指定目标/成为目标/造成伤害/失去体力/打出。
+ *  支持的事件:指定目标/成为目标/扣减体力/失去体力/打出。
  *  其他事件返回 null。 */
 function extractAction(event: ViewEventLike): ActionInfo | null {
   const t = event.type;
@@ -58,12 +58,9 @@ function extractAction(event: ViewEventLike): ActionInfo | null {
     const cardName = str(event.cardName);
     return { source, target, cardName, eventType: t };
   }
-  if (t === '造成伤害' || t === '失去体力') {
+  if (t === '扣减体力' || t === '失去体力') {
     if (target === undefined) return null;
-    // 造成伤害带 source;失去体力没有 source,无箭头(只有浮层)
-    if (t === '造成伤害' && source !== undefined) {
-      return { source, target, eventType: t };
-    }
+    // 扣减体力/失去体力 无 source,无箭头(只有浮层)
     return { source: source ?? target, target, eventType: t };
   }
   if (t === '打出') {

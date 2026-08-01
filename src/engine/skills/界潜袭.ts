@@ -22,7 +22,7 @@
 //     注:询问闪/询问杀 的 prompt 写在 atom def(全局共享),无法 per-atom 替换 cardFilter;
 //     当目标手中同时持有禁色与非禁色闪/杀时,引擎层不强制过滤,依赖前端 UI 不让玩家点禁色牌。
 //     这是已知边界,与义绝 BAN_TAG 的"全 cancel"语义不同(义绝禁所有色,本技仅禁一色)。
-//   - 增伤 before-hook on '造成伤害':source===ownerId + cardId===turn.vars['界潜袭/cardId']
+//   - 增伤 before-hook on '造成伤害时':source===ownerId + cardId===turn.vars['界潜袭/cardId']
 //     + amount>0 → amount+1(单次消费,清掉 turn.vars['界潜袭/cardId'] 防重入)。
 //   - 回合结束 after-hook:清所有玩家的界潜袭禁色标签(本回合生效,回合结束失效)。
 //
@@ -341,7 +341,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   registerBeforeHook(state, skill.id, ownerId, '询问闪', askHandler('闪'));
   registerBeforeHook(state, skill.id, ownerId, '询问杀', askHandler('杀'));
 
-  // ── 增伤 before-hook on '造成伤害':owner 用潜袭牌造伤 +1(单次消费) ──
+  // ── 增伤 before-hook on '造成伤害时':owner 用潜袭牌造伤 +1(单次消费) ──
   registerBeforeHook(
     state,
     skill.id,

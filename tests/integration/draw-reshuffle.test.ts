@@ -223,7 +223,7 @@ describe('摸牌:牌堆不足时重洗弃牌堆补充', () => {
   });
 });
 
-describe('重洗 / 洗牌 atom 单元', () => {
+describe('重洗 atom 单元', () => {
   let harness: SkillTestHarness;
   beforeEach(() => {
     harness = new SkillTestHarness();
@@ -268,26 +268,28 @@ describe('重洗 / 洗牌 atom 单元', () => {
     await expect(applyAtom(state, { type: '重洗' })).rejects.toThrow('discardPile is empty');
   });
 
-  it('洗牌:deck 牌序被打乱(确定性)', async () => {
+  it('重洗:合并后 deck 牌序被打乱(确定性)', async () => {
     const cards = Array.from({ length: 10 }, (_, i) => makeCard(`c${i}`, '杀'));
     const cardMap: Record<string, Card> = {};
     for (const c of cards) cardMap[c.id] = c;
     const state: GameState = createGameState({
       players: [makePlayer({ index: 0, name: 'P1' }), makePlayer({ index: 1, name: 'P2' })],
       cardMap,
-      zones: { deck: cards.map((c) => c.id), discardPile: [], processing: [] },
+      // 7 张在牌堆 + 3 张在弃牌堆,重洗后合并为 10 张
+      zones: { deck: cards.slice(0, 7).map((c) => c.id), discardPile: cards.slice(7).map((c) => c.id), processing: [] },
       currentPlayerIndex: 0,
       phase: '摸牌',
       turn: { round: 1, phase: '摸牌', vars: {} },
       rngSeed: 42,
     });
     await harness.setup(state);
-    const before = [...state.zones.deck];
+    const before = [...state.zones.deck, ...state.zones.discardPile];
 
-    await applyAtom(state, { type: '洗牌' });
+    await applyAtom(state, { type: '重洗' });
 
     // 牌数守恒
     expect(state.zones.deck.length).toBe(10);
+    expect(state.zones.discardPile).toEqual([]);
     // 牌集合不变
     expect(state.zones.deck).toEqual(expect.arrayContaining(before));
     // 顺序大概率改变(10! 排列,相同概率极低)

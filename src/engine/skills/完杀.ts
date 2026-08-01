@@ -10,8 +10,8 @@
 //   钩子注册在贾诩座次(ownerId),但 请求回应 atom 的 target 是被问询者(随座次变化),
 //   before-hook 对该 atomType 的所有实例触发,handler 内按 atom.target 与"濒死者"判断。
 //
-//   濒死者定位:runDyingFlow 执行期间,濒死者 alive=true 且 health<=0(造成伤害/失去体力
-//   已扣血,击杀 atom 尚未执行)。扫描存活且 health<=0 的玩家即当前濒死者。
+//   濒死者定位:runDyingFlow 执行期间,濒死者 alive=true 且 health<=0(扣减体力/失去体力
+//   已扣血,系统处理牌 尚未执行)。扫描存活且 health<=0 的玩家即当前濒死者。
 //   (runDyingFlow 同步串行,同时只有一个濒死者。)
 //
 //   适用范围:桃/酒.respond/急救.respond 等"用桃救援"均通过 桃/求桃 pending 触发,

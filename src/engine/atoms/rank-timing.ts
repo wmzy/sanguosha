@@ -2,7 +2,6 @@
 // 拼点两步化编排时机 atom 定义(对齐 flow-redesign.md 模块 G / rankcompare.md):
 //   - 拼点扣置 / 拼点亮出 / 拼点后
 //   由 src/engine/rank-flow.ts 的编排函数 runRankCompareFlow 在拼点流程中依次发出。
-//   与旧「拼点」atom 并存——后者保留为兼容(天义/烈刃/界巧说/界陷阵 等未迁移调用方仍用)。
 //
 // 三时机职责:
 //   拼点扣置(实质 atom):apply 把两张拼点牌从手牌移入处理区(面朝下)。

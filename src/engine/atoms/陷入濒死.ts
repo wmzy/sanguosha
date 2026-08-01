@@ -10,7 +10,7 @@ export const 陷入濒死: AtomDefinition<{ target: number }> = {
     return null;
   },
   apply() {
-    // 纯事件标记——体力扣减由 造成伤害/失去体力 负责,alive 由 击杀 负责
+    // 纯事件标记——体力扣减由 扣减体力/失去体力 负责,alive 由 death-flow 的 系统处理牌 负责
   },
   effect: { sound: 'dying', animation: 'flash_red', duration: 600 },
   toViewEvents(_state, atom): ViewEventSplit {
@@ -21,8 +21,8 @@ export const 陷入濒死: AtomDefinition<{ target: number }> = {
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view: GameView, event) {
-    // 陷入濒死:体力归零(造成伤害/失去体力 已把 health 扣过,这里强制兜底为 0),
-    // alive 由 击杀 atom 的 applyView 更新,这里不提前设
+    // 陷入濒死:体力归零(扣减体力/失去体力 已把 health 扣过,这里强制兜底为 0),
+    // alive 由 death-flow 的 系统处理牌 applyView 更新,这里不提前设
     const pi = view.players.findIndex((p) => p.index === (event.target as number));
     if (pi >= 0) {
       view.players[pi].health = 0;

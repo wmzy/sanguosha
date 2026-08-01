@@ -223,27 +223,7 @@ describe('模块 G:拼点两步化 runRankCompareFlow', () => {
     expect(getCardValue(undefined)).toBe(0);
   });
 
-  // ── 旧 拼点 atom 仍兼容(未迁移调用方)──────────────────────
-  it('旧 拼点 atom 未被修改,仍可独立 apply(把处理区牌移入弃牌堆)', async () => {
-    const c1 = makeCard('c1', '杀', '♠', 'K');
-    const c2 = makeCard('c2', '闪', '♥', '2');
-    // 旧 拼点 atom 约定:两张牌已在处理区(frame.cards / processing)
-    state.zones.processing = ['c1', 'c2'];
-    state.cardMap = { c1, c2 };
-
-    await applyAtom(state, {
-      type: '拼点',
-      initiator: 0,
-      target: 1,
-      initiatorCard: 'c1',
-      targetCard: 'c2',
-    });
-
-    // 旧 atom 把两张牌移入弃牌堆
-    expect(state.zones.processing).toEqual([]);
-    expect(state.zones.discardPile).toContain('c1');
-    expect(state.zones.discardPile).toContain('c2');
-  });
+  // ── 旧 拼点 atom 已删除(全部迁移至 runRankCompareFlow)─────────
 
   // ── 拼点后 atom 携带正确 result ────────────────────────────
   it('拼点后 atom 携带 result 字段(赢/没赢)', async () => {

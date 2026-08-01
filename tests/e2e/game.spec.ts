@@ -55,7 +55,7 @@ function createTestReplayFile(): ReplayFile {
     { seq: 2, time: 1002, event: { type: '摸牌', player: 0, count: 2 } },
     { seq: 3, time: 1003, event: { type: '阶段结束', player: 0, phase: '摸牌' } },
     { seq: 4, time: 1004, event: { type: '阶段开始', player: 0, phase: '出牌' } },
-    { seq: 5, time: 1005, event: { type: '造成伤害', target: 1, amount: 1, source: 0 } },
+    { seq: 5, time: 1005, event: { type: '扣减体力', target: 1, amount: 1 } },
     { seq: 6, time: 1006, event: { type: '阶段结束', player: 0, phase: '出牌' } },
   ];
 

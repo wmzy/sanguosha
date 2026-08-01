@@ -6,9 +6,7 @@
 //
 // 关键约束(模块 A1 范围·仅建基础设施):
 //   - 只新增编排函数 + 时机 atom 定义,不迁移调用方(A2 步骤负责)。
-//   - 不修改 造成伤害.ts 的现有 apply 逻辑、不改任何 applyAtom({ type: '造成伤害', ... }) 调用点。
-//   - 不迁移技能 hook——现有 造成伤害 的 before/after hook 保持不动(A3 步骤负责迁移)。
-//   - runDamageFlow 用新的 7 个时机 atom + 模块 M 的 runDecreaseLifeFlow,与旧 造成伤害 并存。
+//   - runDamageFlow 用 7 个时机 atom + 模块 M 的 runDecreaseLifeFlow 完成伤害结算。
 //
 // before-hook modify amount 的传递:
 //   伤害结算开始时/造成伤害时/受到伤害时 三者 afterApply 把折叠后的最终 amount 回写
@@ -80,7 +78,7 @@ export async function runDamageFlow(
   amount = state.localVars[DAMAGE_AMOUNT_KEY] as number;
 
   // 时机4:扣减体力(模块 M 的子流程,含扣减前/时/扣减/后四时机)
-  // 必须在 造成伤害后/受到伤害后 之前:旧 造成伤害 atom 先扣血再触发 after-hook,
+  // 必须在 造成伤害后/受到伤害后 之前:扣减体力 先扣血再触发 after-hook,
   // 新流程同样保证 after-hook 看到扣血后的体力值。
   // 濒死检查延迟到 时机7(伤害结算结束时):避免濒死 pending 在 受到伤害后 的技能之前阻塞。
   if (amount > 0) {

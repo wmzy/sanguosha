@@ -14,9 +14,6 @@
 // 噪声抑制:无 before hook 时标记型 atom 的 toViewEvents 返回 null(整个 atom 视图上 no-op),
 // 与 damage-timing / life-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
-//
-// 兼容:击杀 atom(src/engine/atoms/击杀.ts)保留不动作为「raw kill」兼容别名;
-// 主流程(系统规则.runDyingFlow)改走 runDeathFlow → 系统处理牌,不再 apply 击杀。
 import type { AtomDefinition, GameState, GameView, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 import { getBeforeHooks } from '../skill';
@@ -105,8 +102,8 @@ export const 死亡时: AtomDefinition<DeathTimingAtom> = {
 registerAtom(死亡时);
 
 // ── 时机4:系统处理牌(弃手牌+装备入弃牌堆 + alive=false) ──────
-// 实质 atom:搬原 击杀.apply 的弃牌+alive=false 逻辑。
-// toViewEvents/applyView 参考原 击杀.ts(弃牌堆计数 + alive=false + hand 清空),不含身份揭示
+// 实质 atom:弃手牌+装备入弃牌堆 + alive=false。
+// toViewEvents/applyView 负责弃牌堆计数 + alive=false + hand 清空,不含身份揭示
 // (身份揭示由 亮身份牌 时机负责)。
 export const 系统处理牌: AtomDefinition<{ player: number }> = {
   type: '系统处理牌',

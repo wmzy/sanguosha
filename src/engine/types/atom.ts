@@ -87,7 +87,6 @@ export type MoveReason =
   | '弃置'
   | '获得'
   | '给予'
-  | '拼点'
   | '交换'
   | '判定'
   | '系统处理';
@@ -110,15 +109,12 @@ export type Atom =
   | { type: '给予'; cardId: string; from: number; to: number }
   | { type: '装备'; player: number; cardId: string }
   | { type: '卸下'; player: number; slot: EquipSlot }
-  | { type: '洗牌' }
   | { type: '重洗' }
   | { type: '整理牌堆'; cards: string[]; topCount?: number; bottomCount?: number }
   // 角色状态
-  | { type: '造成伤害'; target: number; amount: number; source: number; cardId?: string; damageType?: DamageType }
   // 伤害编排时机标记(对齐 flow-redesign.md 模块 A / damage.md 8 时机):事件标记型,
   // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 damage-flow.ts 的
-  // runDamageFlow 编排函数依次发出。与 造成伤害(单 atom 旧入口)区分——后者保留不动,
-  // 由 runDamageFlow 在扣减体力前补发这 7 个时机。
+  // runDamageFlow 编排函数依次发出(在扣减体力前补发这 7 个时机)。
   // 伤害结算开始时/造成伤害时/受到伤害时 三者的 before-hook 可 modify amount(加伤/减伤),
   // 其 afterApply 把折叠后的最终 amount 回写 state.localVars[DAMAGE_AMOUNT_KEY] 供编排函数读取。
   | { type: '伤害结算开始时'; source: number; target: number; amount: number; cardId?: string; damageType?: DamageType }
@@ -150,13 +146,12 @@ export type Atom =
   // 新的濒死状态时 在被救仍濒死时触发(重置响应起点为当前响应者,重新逆时针)。
   | { type: '进入濒死状态时'; target: number }
   | { type: '新的濒死状态时'; target: number }
-  | { type: '击杀'; player: number }
   // 死亡编排时机标记(对齐 flow-redesign.md 模块 B / death.md 5 时机):由 death-flow.ts 的
   // 编排函数 runDeathFlow 在角色死亡时依次发出。亮身份牌前/死亡时/死亡后 为事件标记型
   // (apply 无副作用,只提供 before/after hook 注册点);亮身份牌 apply 揭示身份(view 层);
-  // 系统处理牌 为实质 atom——搬原 击杀.apply 的弃牌+alive=false 逻辑(弃手牌/装备入弃牌堆)。
+  // 系统处理牌 为实质 atom——弃手牌/装备入弃牌堆 + alive=false。
   // killer 为致死来源(伤害路径透传;体力致死/自杀为 undefined),供 死亡时/死亡后 的技能读取
-  // (断肠移除凶手技能、行殇/界节命等死亡时技)。击杀 atom 保留为兼容别名(主流程改走 系统处理牌)。
+  // (断肠移除凶手技能、行殇/界节命等死亡时技)。
   | { type: '亮身份牌前'; player: number }
   | { type: '亮身份牌'; player: number }
   | { type: '死亡时'; player: number; killer?: number }
@@ -199,7 +194,6 @@ export type Atom =
   // after-hook 在 阶段结束 与 阶段开始(next) 之间发出。from/to 为相邻阶段名。
   // before-hook cancel → 不 apply 阶段开始(next),跳过下一阶段(等价于 skipPhase)。
   | { type: '阶段间'; player: number; from: string; to: string }
-  | { type: '设阶段'; phase: TurnPhase }
   | { type: '下一玩家' }
   // 目标
   | { type: '指定目标'; source: number; cardId?: string; target: number }
@@ -215,19 +209,16 @@ export type Atom =
   // 判定
   | { type: '添加延时锦囊'; player: number; trick: PendingTrick }
   | { type: '移除延时锦囊'; player: number; trickName: string }
-  // 拼点
-  | { type: '拼点'; initiator: number; target: number; initiatorCard: string; targetCard: string }
   // 拼点两步化(对齐 flow-redesign.md 模块 G / rankcompare.md):由 rank-flow.ts 的
-  // runRankCompareFlow 编排函数依次发出,与旧「拼点」atom 并存(后者保留为兼容——
-  // 天义/烈刃/界巧说/界陷阵 等未迁移调用方仍用)。
+  // runRankCompareFlow 编排函数依次发出。
   //   拼点扣置:apply 把两张拼点牌从手牌移入处理区(面朝下);toViewEvents 对非扣置者隐藏牌面
   //     (发起方只看到自己的牌,目标方只看到自己的牌,其他人两张都看不到)。
   //   拼点亮出:纯视图事件(apply 无副作用),向全员公开两张拼点牌的牌面。
   //   拼点后:纯标记,after-hook 触发拼点后效果(酣战获杀/纵适获牌 等未来迁移至此)。
   | { type: '拼点扣置'; initiator: number; target: number; initiatorCard: string; targetCard: string }
   | { type: '拼点亮出'; initiator: number; target: number; initiatorCard: string; targetCard: string }
-  // 拼点后 携带两张拼点牌 cardId + 结果——在两张牌已入弃牌堆之后发出(与旧「拼点」atom 的
-  // after-hook 时机一致:钩子读 discardPile 取牌)。供 酣战获杀/纵适获牌 等拼点后效果 hook 读取。
+  // 拼点后 携带两张拼点牌 cardId + 结果——在两张牌已入弃牌堆之后发出
+  // (钩子读 discardPile 取牌)。供 酣战获杀/纵适获牌 等拼点后效果 hook 读取。
   | { type: '拼点后'; initiator: number; target: number; initiatorCard: string; targetCard: string; result: '赢' | '没赢' }
   // 初始化
   | { type: '抽身份'; playerCount: number; seed: number }
@@ -279,15 +270,6 @@ export type Atom =
       /** 强制型回应(如英魂弃牌):前端隐藏"不回应"按钮 + 走多牌选择 UI,headless 不生成 skip。
        *  超时后由调用方(技能自身)负责 auto-discard。 */
       mandatory?: boolean;
-    }
-  // 多目标并行盲选(拼点/选将):为每个 target 创建独立 slot,各独立 resolve
-  | {
-      type: '并行回应';
-      requestType: string;
-      targets: number[];
-      prompt: ActionPrompt;
-      defaultChoice?: Json;
-      timeout?: number;
     }
   // 出牌阶段的控制权 token——非阻塞型 pending,表示"当前玩家可自由出牌/用技"。
   // 玩家每次操作都 resolve 它(重建),超时则结束回合。不计入 hasBlockingPending。
@@ -345,7 +327,7 @@ export interface AtomDefinition<A = unknown> {
   /** 并行等待型 atom:声明如何拆分为多个单-target slot。
    *  引擎据此自动拆分,无需硬编码偏序判断。未实现 = 单 target。
    *  返回值中的 slotAtom 作为子 slot 的 atom,会使用自身 type 对应的 def 做 pending。
-   *  典型场景:并行回应(拆成 请求回应)、并行选将(拆成 选将询问)。 */
+   *  典型场景:并行选将(拆成 选将询问)。 */
   parallelSplit?: (atom: A) => Array<{ target: number; slotAtom: Atom }>;
   /**
    * 将后端 atom 转换为前端可消费的视图事件。
@@ -408,7 +390,7 @@ export type PlayerNameResolver = (idx: number) => string | undefined;
 export type HookResult = { kind: 'pass' } | { kind: 'modify'; atom: Atom } | { kind: 'cancel' };
 
 /** 所有 atom 类型名的联合(Atom 各成员的 type 字面量)。
- *  供 hook 注册泛型收窄:registerBeforeHook<'造成伤害'> 让 ctx.atom 收窄到对应形状。 */
+ *  供 hook 注册泛型收窄:registerBeforeHook<'造成伤害时'> 让 ctx.atom 收窄到对应形状。 */
 export type AtomName = Atom['type'];
 
 /** 按类型名提取对应的 atom 形状。AtomOfName<AtomName> 退化为完整 Atom(默认值,向后兼容)。 */
