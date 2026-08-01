@@ -36,7 +36,7 @@ import type {
   SkillModule,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../skill';
 import { defaultPlayActive } from '../action-active';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../once-per-turn';
@@ -98,12 +98,8 @@ async function virtualKill(
     type: '基本牌',
   };
 
-  // forced 模式 quotaPolicy='none':不计入出杀次数(虚拟杀,无 onSettle)
-  await useCard(state, source, cardId, [target], {
-    quotaPolicy: 'none',
-    virtual: true,
-    skipValidate: true,
-  });
+  // 虚拟杀不计入出杀次数(无 onSettle 计费)
+  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
   // 清理虚拟杀卡(无实体,不入弃牌堆)
   delete state.cardMap[cardId];
   // 通过体力差判定是否真的造成伤害(防具/反馈/奸雄等可能改伤)

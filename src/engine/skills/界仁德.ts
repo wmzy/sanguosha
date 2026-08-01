@@ -17,7 +17,7 @@
 //   - 累计给牌数 self.vars['仁德/givenCount'](回合结束清空)。
 //   - 跨过第二张时触发"视为使用基本牌"询问:用 self.vars['仁德/basicUsed'] 防重入(每阶段一次)。
 //   - 基本牌范围:杀/桃/酒(闪无主动使用场景,故不提供)。
-//   · 杀:须尊重出杀次数限制(canSlash 预检;计数由 useCard(charge) 的 onSettle 负责)。
+//   · 杀:须尊重出杀次数限制(canSlash 预检;计数由 chargeOnSettle 的 onSettle 负责)。
 //   · 桃:目标须已受伤(health<maxHealth),存活。
 //   · 酒:仅对自己,标记下一张杀伤害+1。
 //   - 转化卡:用 `仁德:杀:${source}:${target}:${seq}` 等虚拟卡 id,无实体;不入弃牌堆。
@@ -26,7 +26,7 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
 import { canSlash } from '../slash-quota';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 
 // localVars keys(界刘备视为使用基本牌流程)
 const BASIC_CHOICE_VAR = '仁德/basicChoice';
@@ -53,8 +53,8 @@ function makeVirtualCard(kind: '杀' | '桃' | '酒', source: number, target: nu
 /**
  * 执行一次"视为出杀"的完整结算（runUseFlow virtual 模式）。
  * 不消耗手牌；走完整时机 atom 序列（选择目标时/使用时/指定目标/成为目标/...），
- * 保证激昂/集智/界求援等技能事件一致。计入出杀次数：virtual+charge 下 useCard 的
- * onSettle 回调触发 杀.onSettle→incSlashUsed（与下方第 284 行内联注释一致）。
+ * 保证激昂/集智/界求援等技能事件一致。计入出杀次数：virtual+charge 下 runUseFlow 的
+ * onSettle 回调(由 chargeOnSettle 传入)触发 杀.onSettle→incSlashUsed（与下方第 284 行内联注释一致）。
  */
 async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
   if (!state.players[target]?.alive) return;
@@ -67,10 +67,9 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-  await useCard(state, source, cardId, [target], {
-    quotaPolicy: 'charge',
+  await runUseFlow(state, source, cardId, [target], '杀', {
     virtual: true,
-    skipValidate: true,
+    onSettle: chargeOnSettle(state, source, cardId),
   });
   delete state.cardMap[cardId];
 }
@@ -82,7 +81,7 @@ async function virtualPeach(state: GameState, source: number, target: number): P
   if (t.health >= t.maxHealth) return;
   const cardId = makeVirtualCard('桃', source, target, state.seq);
   state.cardMap[cardId] = { id: cardId, name: '桃', suit: '', color: '无色', rank: 'A', type: '基本牌' };
-  await useCard(state, source, cardId, [target], { quotaPolicy: 'none', virtual: true, skipValidate: true });
+  await runUseFlow(state, source, cardId, [target], '桃', { virtual: true });
   delete state.cardMap[cardId];
 }
 
@@ -90,7 +89,7 @@ async function virtualPeach(state: GameState, source: number, target: number): P
 async function virtualWine(state: GameState, source: number): Promise<void> {
   const cardId = makeVirtualCard('酒', source, source, state.seq);
   state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
-  await useCard(state, source, cardId, [source], { quotaPolicy: 'none', virtual: true, skipValidate: true });
+  await runUseFlow(state, source, cardId, [source], '酒', { virtual: true });
   delete state.cardMap[cardId];
 }
 
@@ -282,7 +281,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             delete state.localVars[BASIC_TARGET_VAR];
             if (typeof slashTarget === 'number' && state.players[slashTarget]?.alive) {
               await virtualKill(state, from, slashTarget);
-              // 出杀次数累加已由 virtualKill 内 useCard(charge) 的 onSettle 负责
+              // 出杀次数累加已由 virtualKill 内 chargeOnSettle 的 onSettle 负责
             }
           }
         } else if (choice === '桃') {

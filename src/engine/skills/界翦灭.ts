@@ -33,7 +33,7 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 
 const SKILL_ID = '界翦灭';
 const DISPLAY_NAME = '翦灭';
@@ -146,7 +146,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (st.players[from]?.alive && st.players[target]?.alive) {
             const vId = `${SKILL}:决斗:${from}:${target}:${st.seq}`;
             st.cardMap[vId] = { id: vId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
-            await useCard(st, from, vId, [target], { quotaPolicy: 'none', virtual: true, skipValidate: true });
+            await runUseFlow(st, from, vId, [target], '决斗', { virtual: true });
             delete st.cardMap[vId];
           }
         } else if (targetCards.length > ownerCards.length) {
@@ -154,7 +154,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (st.players[from]?.alive && st.players[target]?.alive) {
             const vId = `${SKILL}:决斗:${target}:${from}:${st.seq}`;
             st.cardMap[vId] = { id: vId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };
-            await useCard(st, target, vId, [from], { quotaPolicy: 'none', virtual: true, skipValidate: true });
+            await runUseFlow(st, target, vId, [from], '决斗', { virtual: true });
             delete st.cardMap[vId];
           }
         }

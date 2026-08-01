@@ -1,7 +1,7 @@
 // 借刀杀人 CardEffect — 普通锦囊·借刀杀人的使用结算 + 被借刀回应入口。
 //
 // resolve（单目标 A）：询问无懈可击 → 请求 A 出杀(useCardAndTarget) → 检查 A 的选择。
-//   A 出杀 → useCard(quotaPolicy='none', mandatedTargets:[B]) 走完整杀结算
+//   A 出杀 → runUseFlow('杀') 走完整杀结算
 //           （询问闪 → 伤害,damageType 自动传导,火杀/雷杀不再丢失属性）。
 //   A 不出杀 → 使用者获得 A 的武器。
 //
@@ -13,7 +13,8 @@
 import type { Card, GameState, Json } from '../types';
 import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
+import { isCardBanned } from '../card-effect/validate';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 import { inAttackRange } from '../distance';
 
@@ -32,7 +33,7 @@ async function acquireWeapon(state: GameState, source: number, target: number): 
   await applyAtom(state, { type: '获得', player: source, cardId: weaponId, from: target });
 }
 
-/** 借刀杀人的结算：请求出杀 → 读取选择 → useCard 杀结算/获得武器 */
+/** 借刀杀人的结算：请求出杀 → 读取选择 → runUseFlow 杀结算/获得武器 */
 async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
   const { state, source, target } = ctx;
   // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
@@ -60,16 +61,9 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
   delete state.localVars[CHOICE_VAR];
 
   if (choice) {
-    // respond validate 已保证 killTarget ∈ targets + 全部在攻击范围;useCard 正常应成功
-    // (quotaPolicy='none' → 不计出杀次数;mandatedTargets=[B] → 强制必含发起者指定的 killTarget)
-    const err = await useCard(state, target, choice.cardId, choice.targets, {
-      quotaPolicy: 'none',
-      mandatedTargets: [killTarget],
-    });
-    if (err) {
-      // 防御兜底:理论上不会发生(respond 已校验),但避免 useCard 静默白费——回落到交武器
-      await acquireWeapon(state, source, target);
-    }
+    // respond.validate 已保证:杀在手、killTarget ∈ targets、全部在攻击范围、A 未被禁出牌。
+    // 合法性闸门在 respond,resolve 直接走完整杀结算(询问闪→伤害),不计出杀次数。
+    await runUseFlow(state, target, choice.cardId, choice.targets, '杀');
   } else {
     // 未选(pass/超时)= 交出武器
     await acquireWeapon(state, source, target);
@@ -156,6 +150,8 @@ const borrowedSwordEffect: CardEffect = {
       const self = state.players[ownerId];
       if (!self?.hand.includes(cardId)) return '牌不在手牌中';
       if (state.cardMap[cardId]?.name !== '杀') return '只能使用杀';
+      // 被借刀者若被禁出牌(义绝),不得选择出杀 → 只能交出武器
+      if (isCardBanned(state, ownerId, '杀')) return '你不能使用杀';
       // 必含发起者指定的 killTarget(权威校验,前端 targetFilter 仅提示)
       const killTarget = state.localVars[KILL_TARGET_VAR] as number | undefined;
       if (killTarget !== undefined && !targets.includes(killTarget))

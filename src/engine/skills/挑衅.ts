@@ -8,7 +8,7 @@
 //     2. 请求回应(requestType='挑衅/出杀',target=被挑衅者,useCardAndTarget)
 //        —— respond 注册到全座次,被问询者(被挑衅者座次)走 出杀 分支:
 //           选一张【杀】+ 指定目标(固定=姜维),权威校验 inAttackRange。
-//     3a. 目标出杀:useCard(quotaPolicy='none', mandatedTargets=[姜维]) 走完整杀结算
+//     3a. 目标出杀:runUseFlow(none) 走完整杀结算
 //         (runUseFlow→杀.resolveSlash),damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 //     3b. 目标不出杀:请求回应(requestType='挑衅/选牌',target=姜维)让姜维选弃哪张牌
 //         (pickTargetCard:装备明选 cardId / 手牌盲选 handIndex)→ 弃置该牌
@@ -18,7 +18,7 @@
 //   距离:inAttackRange(state, 目标, 姜维)—— 目标的杀能攻击到姜维
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
@@ -149,17 +149,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         delete state.localVars[CHOICE_VAR];
 
         if (choice?.cardId) {
-          // 目标出了杀:走完整杀结算(useCard→runUseFlow→杀.resolveSlash),
-          // 目标固定=姜维,mandatedTargets=[from] 强制;damageType 由 cardMap 自动传导。
-          const err = await useCard(state, target, choice.cardId, [choice.target], {
-            quotaPolicy: 'none',
-            mandatedTargets: [from],
-            skipValidate: true,
-          });
-          if (err) {
-            // 防御兜底:目标选了杀但无效 → 走弃牌
-            await pickAndDiscard(state, from, target);
-          }
+          // 目标出了杀:走完整杀结算(runUseFlow→杀.resolveSlash),
+          // 目标固定=姜维;damageType 由 cardMap 自动传导。
+          await runUseFlow(state, target, choice.cardId, [choice.target], '杀');
         } else {
           // 2) 目标没出杀:姜维弃其一张牌
           await pickAndDiscard(state, from, target);

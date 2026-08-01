@@ -16,8 +16,9 @@ import { getCardEffect } from './registry';
 
 /** 检查 ownerId 是否被禁止使用此牌（condition.md 条件1）。
  *  当前通过 player.tags 检查通用禁用标记。
- *  义绝的 '义绝/禁出牌' 标记已覆盖此路径。 */
-function isCardBanned(state: GameState, ownerId: number, _cardName: string): boolean {
+ *  义绝的 '义绝/禁出牌' 标记已覆盖此路径。
+ *  导出供 逼杀 respond.validate 复用（useCard 删除后，禁出牌检查归位调用方）。 */
+export function isCardBanned(state: GameState, ownerId: number, _cardName: string): boolean {
   const player = state.players[ownerId];
   if (!player) return false;
   // 义绝：禁出牌标记阻止使用/打出任何需要出牌的 prompt

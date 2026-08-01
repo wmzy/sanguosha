@@ -16,7 +16,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/create-engine';
-import { useCard } from '../../src/engine/card-effect/use-card';
+import { validateCardUse } from '../../src/engine/card-effect/validate';
 import { slashUsed } from '../../src/engine/slash-quota';
 import type { Card, GameState } from '../../src/engine/types';
 
@@ -428,9 +428,9 @@ describe('神速', () => {
     // 关键:charge 生效 → 出杀次数已用 1(达基础上限 1)
     expect(slashUsed(harness.state)).toBe(1);
 
-    // 出牌阶段再用真杀 → useCard(charge) 走 play 模式校验 → 次数上限拒绝
-    const err = await useCard(harness.state, 0, 'rs1', [1], { quotaPolicy: 'charge' });
-    expect(typeof err).toBe('string'); // 被拒(null=成功,string=拒绝理由)
+    // 出牌阶段再用真杀 → play 模式校验(checkUsageLimit)→ 次数上限拒绝
+    const err = validateCardUse(harness.state, 0, { cardId: 'rs1', targets: [1] }, '杀', 'play');
+    expect(typeof err).toBe('string'); // 被拒(null=通过,string=拒绝理由)
     // P2 未再受伤,真杀仍在 P1 手中,出杀次数未因被拒而增加
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.players[0].hand).toContain('rs1');

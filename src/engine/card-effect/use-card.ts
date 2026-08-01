@@ -112,8 +112,7 @@ export interface RunUseFlowOpts {
   /** 跳过抵消询问（如界看破转化的无懈不可被响应）。 */
   skipCancelQuery?: boolean;
   /** 结算后、popFrame 前的回调（保持帧作用域，五谷丰登.onSettle 的清理依赖 frameCards）。
-   *  runUseFlow 自身不再调用 effect.onSettle；是否调用及调用什么由调用方（useCard）
-   *  通过本回调决定（useCard 按 quotaPolicy='charge' 传入 effect.onSettle 包装）。 */
+   *  调用方按需传入：需计费时用 chargeOnSettle 构造。 */
   onSettle?: () => Promise<void>;
 }
 
@@ -462,9 +461,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
             targets = computeAutoTargets(state, ownerId, cardName);
           }
         }
-        await useCard(state, ownerId, cardId, targets, {
-          quotaPolicy: 'charge',
-          skipValidate: true,
+        // 合法性已由本 action 的 validate 完成;此处直接走使用结算流程 + 计费(onSettle)
+        await runUseFlow(state, ownerId, cardId, targets, cardName, {
+          onSettle: chargeOnSettle(state, ownerId, cardId),
         });
       },
     );
@@ -494,81 +493,23 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   }
 }
 
-/** useCard 的使用策略：决定是否在结算完成后调用 effect.onSettle（如杀的出杀次数累加）。
- *  - 'charge'：调用 onSettle（含 virtual——界虚拟杀需计出杀次数，杀.onSettle 内 incSlashUsed 不依赖牌移动）。
- *  - 'none'：不调用 onSettle（逼杀/不计次数的虚拟杀等）。 */
-export type QuotaPolicy = 'charge' | 'none';
-
-/** useCard 原语选项。 */
-export interface UseCardOpts {
-  /** 是否在结算后调用 onSettle（杀次数累加等）。默认 'none'。 */
-  quotaPolicy?: QuotaPolicy;
-  /** 虚拟使用（无实体牌）：传给 runUseFlow，跳过牌移动。 */
-  virtual?: boolean;
-  /** 跳过抵消询问（传给 runUseFlow）。 */
-  skipCancelQuery?: boolean;
-  /** 必须包含的目标；targets 缺少任一即返回错误字符串。 */
-  mandatedTargets?: number[];
-  /** 跳过 validateCardUse（调用方已自行校验时使用，避免双重校验）。 */
-  skipValidate?: boolean;
-}
-
-/** useCard：使用一张牌的统一原语。
- *  在 runUseFlow 之上封装：可选校验（validateCardUse）+ 必含目标检查 +
- *  按 quotaPolicy 决定是否调用 effect.onSettle。
+/** 构造 runUseFlow 的 onSettle 回调：使用结算完成后计费（杀的出杀次数累加等）。
+ *  仅当 CardEffect 声明了 onSettle 且非延时锦囊时才计费；无可计费项时返回 undefined。
  *
- *  quotaPolicy='charge' 时，play 模式（默认）会跑完整 validateCardUse（含出杀次数上限）；
- *  调用方若已自行校验，应传 skipValidate:true 仅保留 onSettle 计数。
- *
- *  @returns null=成功；字符串=拒绝理由（校验失败/必含目标缺失/牌不存在） */
-export async function useCard(
+ *  合法性校验不在本助手职责内——由各调用方自行负责：
+ *    - 主动使用：use action 的 validate（validateCardUse mode='play'）
+ *    - 逼杀/代杀：各 skill 的 respond.validate（攻击范围/必含目标/禁出牌等）
+ *  调用方校验通过后直接调 runUseFlow，需要计费时传入本助手构造的回调。 */
+export function chargeOnSettle(
   state: GameState,
   source: number,
   cardId: string,
-  targets: number[],
-  opts: UseCardOpts = {},
-): Promise<string | null> {
-  const quotaPolicy: QuotaPolicy = opts.quotaPolicy ?? 'none';
-  const virtual = opts.virtual ?? false;
+): (() => Promise<void>) | undefined {
   const cardName = state.cardMap[cardId]?.name;
-  if (!cardName) return '牌不存在';
-
-  if (!opts.skipValidate) {
-    const mode = quotaPolicy === 'charge' ? 'play' : 'forced';
-    const params: Record<string, Json> = {
-      cardId,
-      targets,
-      ...(virtual ? { virtual: true } : {}),
-    };
-    const err = validateCardUse(state, source, params, cardName, mode);
-    if (err) return err;
-  }
-
-  if (opts.mandatedTargets && opts.mandatedTargets.length > 0) {
-    for (const mt of opts.mandatedTargets) {
-      if (!targets.includes(mt)) return `必须包含目标 ${mt}`;
-    }
-  }
-
-  // onSettle：charge 策略下调用（含 virtual——界虚拟杀需计出杀次数，
-  // 杀.onSettle 内 incSlashUsed 不依赖牌移动）。通过回调传给 runUseFlow，
-  // 在 popFrame 前、帧作用域内执行（五谷丰登.onSettle 的清理依赖 frameCards）。
-  const runOnSettle =
-    quotaPolicy === 'charge'
-      ? async () => {
-          const eff = getCardEffect(cardName);
-          if (eff?.onSettle && !eff.delayed) {
-            await eff.onSettle(state, source, cardId);
-          }
-        }
-      : undefined;
-
-  await runUseFlow(state, source, cardId, targets, cardName, {
-    ...(virtual ? { virtual: true } : {}),
-    ...(opts.skipCancelQuery ? { skipCancelQuery: true } : {}),
-    ...(runOnSettle ? { onSettle: runOnSettle } : {}),
-  });
-  return null;
+  if (!cardName) return undefined;
+  const eff = getCardEffect(cardName);
+  if (!eff?.onSettle || eff.delayed) return undefined;
+  return () => eff.onSettle!(state, source, cardId);
 }
 
 export default { createSkill, onInit, onMount } satisfies SkillModule;

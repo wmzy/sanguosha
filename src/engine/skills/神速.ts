@@ -8,9 +8,9 @@
 //   - 选项1 在 阶段开始(判定) before-hook 询问发动;发动则加 跳过摸牌 标签 + 虚拟杀 + cancel 判定。
 //   - 选项2 在 阶段开始(出牌) before-hook 询问发动;发动则弃装备 + 虚拟杀 + cancel 出牌。
 //   - 选项3 在 阶段开始(弃牌) before-hook 询问发动;发动则加 翻面 标签 + 虚拟杀 + cancel 弃牌。
-//   - 虚拟杀:无实体卡,走 useCard(charge, virtual)→ 指定目标→成为目标→检测有效性→询问闪→
+//   - 虚拟杀:无实体卡,走 runUseFlow(virtual) + chargeOnSettle→ 指定目标→成为目标→检测有效性→询问闪→
 //     (被抵消|造成伤害) 流程,与 杀.use 的结算段一致。不消耗手牌、计入出杀次数(视为使用杀,
-//     由 useCard(charge) 的 onSettle 计数;与界仁德/界乱武 自用虚拟杀一致)。
+//     由 chargeOnSettle 的 onSettle 计数;与界仁德/界乱武 自用虚拟杀一致)。
 //   - 跳过阶段手法同兵粮寸断/乐不思蜀:applyAtom(阶段结束, 当前阶段) 推进到下一阶段,再 cancel。
 //   - 翻面实现(同据守/放逐/界神速):加 '/翻面' 后缀标签,下一回合 阶段开始(准备) before-hook
 //     消费标签、设 skipAll 标志并 cancel 阶段;阶段结束(准备) before-hook 亲自推进回合。
@@ -23,7 +23,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 import { skipPhase } from '../skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';
@@ -57,8 +57,8 @@ function makeVirtualKillCard(source: number, target: number, seq: number): strin
 }
 
 /**
- * 执行一次"视为出杀"的完整结算（useCard charge+virtual 模式）。
- * 不消耗手牌、计入出杀次数(由 useCard(charge) 的 onSettle 计数);无距离限制。
+ * 执行一次"视为出杀"的完整结算（runUseFlow virtual + chargeOnSettle 模式）。
+ * 不消耗手牌、计入出杀次数(由 chargeOnSettle 的 onSettle 计数);无距离限制。
  * 走完整时机 atom 序列,保证激昂/集智等技能事件一致。
  */
 async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
@@ -72,10 +72,9 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-  await useCard(state, source, cardId, [target], {
-    quotaPolicy: 'charge',
+  await runUseFlow(state, source, cardId, [target], '杀', {
     virtual: true,
-    skipValidate: true,
+    onSettle: chargeOnSettle(state, source, cardId),
   });
   delete state.cardMap[cardId];
 }

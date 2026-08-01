@@ -39,7 +39,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../create-engine';
 import { runRankCompareFlow } from '../rank-flow';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 import {
   registerAction,
   registerAfterHook,
@@ -91,12 +91,8 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     rank: 'A',
     type: '基本牌',
   };
-  // forced 模式 quotaPolicy='none':不计入出杀次数(虚拟杀,无 onSettle)
-  await useCard(state, source, cardId, [target], {
-    quotaPolicy: 'none',
-    virtual: true,
-    skipValidate: true,
-  });
+  // 虚拟杀不计入出杀次数(无 onSettle 计费)
+  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
   // 清理虚拟杀卡(无实体,不入弃牌堆)
   delete state.cardMap[cardId];
 }

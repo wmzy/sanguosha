@@ -19,7 +19,7 @@
 //   内部 Skill.name = '挑衅'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
@@ -177,18 +177,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const hpBefore = state.players[from]?.health ?? 0;
         let slashed = false;
         if (choice?.cardId) {
-          // 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),目标固定=姜维;
+          // 走完整杀结算(runUseFlow→杀.resolveSlash),目标固定=姜维;
           // damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
-          const err = await useCard(state, target, choice.cardId, [choice.target], {
-            quotaPolicy: 'none',
-            mandatedTargets: [from],
-            skipValidate: true,
-          });
-          slashed = !err;
+          await runUseFlow(state, target, choice.cardId, [choice.target], '杀');
+          slashed = true;
         }
 
         // 2) 关键差异(界):仅当杀对姜维造成伤害才免于被弃;否则仍弃其一张牌
-        //    (含:未出杀 / 出杀被闪抵消 / 防具抵消 / useCard 失败等情况,
+        //    (含:未出杀 / 出杀被闪抵消 / 防具抵消 等情况,
         //     一律以 hp 净减少为准)
         const hpAfter = state.players[from]?.health ?? hpBefore;
         const damaged = hpAfter < hpBefore;

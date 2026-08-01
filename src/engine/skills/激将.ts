@@ -13,11 +13,11 @@
 //     '杀/respondKill'(复用 杀.respond)把杀牌移入处理区,调用方(决斗/南蛮)检查
 //     处理区判断已出。全部拒绝 → 主公承受原结算。
 //   - 代使用(requestType==='激将/出杀', 蜀角色 seat):主动激将时,蜀角色选杀+
-//     指定 killTarget,use execute 读 localVars['激将/出杀选择'] → useCard(none)
+//     指定 killTarget,use execute 读 localVars['激将/出杀选择'] → runUseFlow(none)
 //     走完整杀结算,damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';
 
@@ -118,18 +118,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete state.localVars[CHOICE_VAR];
       delete state.localVars[KILL_TARGET_VAR];
 
-      // 官方:出杀 → 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),
+      // 官方:出杀 → 走完整杀结算(runUseFlow→杀.resolveSlash),
       //      damageType 由 cardMap 自动传导(火杀/雷杀不再丢失);
-      //      不出杀无效果。useCard 失败=无效果(与官方语义一致,激将未定义失败兑底)。
+      //      不出杀无效果。
       if (choice?.cardId && Array.isArray(choice.targets) && choice.targets.length > 0) {
-        const err = await useCard(state, target, choice.cardId, choice.targets, {
-          quotaPolicy: 'none',
-          mandatedTargets: typeof killTarget === 'number' ? [killTarget] : [],
-          skipValidate: true,
-        });
-        if (err) {
-          /* 激将未定义失败兑底:useCard 失败=无效果(skipValidate + respond 预校验保证正常不出错) */
-        }
+        await runUseFlow(state, target, choice.cardId, choice.targets, '杀');
       }
 
       await popFrame(state);
@@ -140,7 +133,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   //   atom.type==='询问杀'(主公 seat):响应型激将——逐个请求蜀角色代打出杀
   //     (代打出:杀牌进处理区供调用方(决斗/南蛮)检查,复用 杀/respondKill)
   //   requestType==='激将/出杀'(蜀角色 seat):主动激将——选杀+指定 killTarget(代使用)
-  //     (代使用:走 useCard 完整杀结算,damageType 自动传导)
+  //     (代使用:走 runUseFlow 完整杀结算,damageType 自动传导)
   //   一个座次仅能有一个 respond action(registerAction 按座次去重),故合并到同一注册。
   const unloaders: Array<() => void> = [];
   for (const pl of state.players) {

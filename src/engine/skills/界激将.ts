@@ -14,7 +14,7 @@
 //     (使用/打出/替你使用),其可令主公摸1张(每回合限一次,选择权在该蜀角色)。
 //
 // 实现要点:
-//   - 主动技 'use' 部分:镜像标激将机制(useCardAndTarget '界激将/出杀' + useCard(none)),
+//   - 主动技 'use' 部分:镜像标激将机制(useCardAndTarget '界激将/出杀' + runUseFlow(none)),
 //     ownerId===0(主公固定0号位)门槛不变;damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 //   - 新增 after-hook(指定目标):蜀角色 source 回合外用杀指定目标 → 询问是否令主公摸1。
 //     · "使用/替你使用杀" 均会触发 指定目标 atom(杀 use 流程必经),覆盖主路径。
@@ -31,7 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, registerAfterHook, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
 
@@ -139,17 +139,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         delete state.localVars[USE_KILL_TARGET_VAR];
 
         if (choice?.cardId && Array.isArray(choice.targets) && choice.targets.length > 0) {
-          // 出杀 → 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),
+          // 出杀 → 走完整杀结算(runUseFlow→杀.resolveSlash),
           // damageType 由 cardMap 自动传导(火杀/雷杀不再丢失);
-          // 不出杀无效果。useCard 失败=无效果(与标激将一致)。
-          const err = await useCard(state, target, choice.cardId, choice.targets, {
-            quotaPolicy: 'none',
-            mandatedTargets: typeof killTarget === 'number' ? [killTarget] : [],
-            skipValidate: true,
-          });
-          if (err) {
-            /* 界激将未定义失败兑底:useCard 失败=无效果(skipValidate + respond 预校验保证正常不出错) */
-          }
+          // 不出杀无效果。
+          await runUseFlow(state, target, choice.cardId, choice.targets, '杀');
         } else {
           // 不出:主公摸 1 张(界激将补充规则,沿用原行为)
           await applyAtom(state, { type: '摸牌', player: from, count: 1 });
@@ -227,7 +220,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   //   atom.type==='询问杀'(主公 seat):响应型激将——逐个请求蜀角色代打出杀
   //     (代打出:杀牌进处理区供调用方(决斗/南蛮)检查,复用 杀/respondKill)
   //   atom.requestType==='界激将/出杀'(蜀角色 seat):主动激将——选杀+指定 killTarget(代使用)
-  //     (代使用:走 useCard 完整杀结算,damageType 自动传导)
+  //     (代使用:走 runUseFlow 完整杀结算,damageType 自动传导)
   //   atom.requestType==='界激将/drawChoice'(蜀角色 seat):被动触发——是否令主公摸1张
   //   一个座次仅能有一个 respond action(registerAction 按座次去重),故合并到同一注册。
   for (const pl of state.players) {

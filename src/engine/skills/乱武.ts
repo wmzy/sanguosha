@@ -23,7 +23,7 @@
 //   - 限定技标记用 player.vars(整局永久),非 turn.vars。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow } from '../card-effect/use-card';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';
 import { effectiveDistance } from '../distance';
@@ -126,17 +126,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               nearestOthers(st, p).includes(choice.target) &&
               st.players[choice.target]?.alive
             ) {
-              // 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),不计出杀次数;
-              // mandatedTargets 强制目标;damageType 由 cardMap 自动传导(火杀/雷杀不再丢失)。
-              const err = await useCard(st, p, choice.cardId, [choice.target], {
-                quotaPolicy: 'none',
-                mandatedTargets: [choice.target],
-                skipValidate: true,
-              });
-              if (err) {
-                // 防御兜底(respond 已校验 nearest,不应触发)→ 失去 1 体力
-                await applyAtom(st, { type: '失去体力', target: p, amount: 1 });
-              }
+              // 走完整杀结算(runUseFlow→杀.resolveSlash),不计出杀次数;
+              // 目标由 respond 权威校验;damageType 由 cardMap 自动传导(火杀/雷杀不再丢失)。
+              await runUseFlow(st, p, choice.cardId, [choice.target], '杀');
             } else {
               await applyAtom(st, { type: '失去体力', target: p, amount: 1 });
             }

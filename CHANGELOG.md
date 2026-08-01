@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-01
 
+### Refactored — 删除 useCard 原语,使用牌统一走 runUseFlow + chargeOnSettle
+
+`useCard(state, src, cardId, targets, opts)` 是 `runUseFlow` 之上的封装,但在实践中是坏味道的集中点:`UseCardOpts` 的五个选项(`quotaPolicy`/`virtual`/`skipCancelQuery`/`mandatedTargets`/`skipValidate`)把校验、计费、抵消询问、必含目标四件不相干的事焊在一起,且 `quotaPolicy` 同时耦合了「是否计费」和「校验 mode(play/forced)」两个语义。实证:21 处调用方里 20 处传 `skipValidate:true`(校验路径形同虚设),每处 `mandatedTargets` 都与各自 `respond.validate` 冗余,`skipCancelQuery` 零使用(唯一使用者界看破直接调 `runUseFlow`),借刀杀人/乱武/挑衅/激将 等 `逼杀` 里的 `if (err) {...}` 兑底分支全是死代码(各自 respond 已权威校验攻击范围/必含目标)。
+
+删除 `useCard`/`UseCardOpts`/`QuotaPolicy`,使用牌统一入口收敛为「调用方自行校验 + 直调 `runUseFlow`」:需要计费(杀的出杀次数累加)的调用方传 `{ onSettle: chargeOnSettle(state, src, cardId) }`,虚拟使用传 `{ virtual: true }`,两者可叠加。校验职责归位:主动使用由 use action 的 `validate(validateCardUse mode='play')` 负责;逼杀/代杀由各 skill 的 `respond.validate` 负责——借刀杀人/乱武/挑衅/激将/界挑衅/界激将/界乱武 的 respond 均已含权威校验,死兑底分支一并删除。
+
+#### Changed
+- **删除 `useCard`/`UseCardOpts`/`QuotaPolicy`**,新增 `chargeOnSettle(state, src, cardId)` 助手(查 CardEffect,仅当声明 onSettle 且非延时锦囊时返回计费回调)。使用牌 use action 的 execute 直调 `runUseFlow` + `chargeOnSettle`。(`src/engine/card-effect/use-card.ts`)
+- **`isCardBanned` 导出**(原 validate.ts 内部 helper),供逼杀 `respond.validate` 复用——useCard 删除后,禁出牌(义绝)检查归位调用方。(`src/engine/card-effect/validate.ts`)
+- **借刀杀人 resolve 直调 `runUseFlow('杀')`**,删除 `useCard` 封装与 `if (err) acquireWeapon` 死兑底;respond.validate 补 `isCardBanned` 闸门(A 被禁出牌时只交武器)。(`src/engine/card-effects/借刀杀人.ts`)
+- **19 个调用方迁移**(借刀杀人 card-effect + 18 个 skill:逼杀分支 删 `if(err)` 死兑底,计费分支 配 `chargeOnSettle`,虚拟使用 配 `{virtual:true}`),全部改为 `runUseFlow`;删除所有 `mandatedTargets`/`skipValidate` 冗余。(`src/engine/card-effects/借刀杀人.ts`、`src/engine/skills/{乱武,挑衅,激将,界乱武,界仁德,界神速,神速,界求援,界利驭,界势斩,界惴恐,界明策,界翦灭,界酒诗,界挑衅,界激将,离间,青龙偃月刀}.ts`)
+
+#### Removed
+- **删除 `tests/engine/use-card-primitive.test.ts`**:该文件仅测 useCard 原语的 `quotaPolicy`/`mandatedTargets`/`skipValidate` 契约,原语已删;虚拟杀计费语义由 `tests/skill-tests/{神速,界乱武,阶段跳过}.test.ts` 覆盖。
+- **`tests/skill-tests/神速.test.ts`** 原用 `useCard({charge})` 断言 play 模式次数上限拒绝,改为等价的 `validateCardUse(...,'play')`。
+
 ### Fixed — 铁索连环无法重铸 / 借刀杀人无法回应（卡牌技能被重构孤立）
 
 出牌阶段选中【铁索连环】时不出现「重铸」按钮，点击更无从谈起；【借刀杀人】对装备武器者使用后，被借刀者也无法回应（出杀/交武器）。根因：重构 `f7536790`（「用使用牌/打出牌统一技能替换 per-card 技能」）把全部卡牌技能从 `DEFAULT_SKILLS` 移除，将 use/respond 统一交由「使用牌/打出牌」+ CardEffect 注册表按卡名路由。但【铁索连环】与【借刀杀人】各有一段当时未并入 CardEffect 的逻辑仍留在 skill 文件里：铁索连环的 `recast`（重铸替代出牌）action + 连环传导全局 after-hook；借刀杀人的「借刀杀人/出杀」跨座次 respond action。这些逻辑只有在 skill 实例化时才注册，而二者已不在 `DEFAULT_SKILLS`，真实选将路径（`skills = [...DEFAULT_SKILLS, ...武将技]`）不再实例化它们 → action/hook 全部丢失。既有测试因手动注入 `skills: ['铁索连环']`/`['借刀杀人']` 而一直绿灯，掩盖了回归。

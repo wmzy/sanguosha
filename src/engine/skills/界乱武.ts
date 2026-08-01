@@ -10,18 +10,18 @@
 //
 // 实现要点:
 //   - 主循环(令他人选杀最近者或失1体力)沿用标版乱武的 nearestOthers,
-//     逼杀统一走 useCard(none)(damageType 由 cardMap 自动传导)。
+//     逼杀统一走 runUseFlow(damageType 由 cardMap 自动传导)。
 //   - 主循环结束后,若贾诩仍存活且有出杀次数剩余(canSlash),发起 choosePlayer 询问:
 //     目标为任意存活其他角色(targetFilter 不校验距离 → 无距离限制)。
 //     贾诩选目标 → 走 virtualKill(虚拟杀结算,模型参考 界仁德.virtualKill);
 //     贾诩 pass / 超时 → 不视为使用杀。
-//   - 视为使用杀占出杀次数(由 virtualKill 内 useCard(charge) 的 onSettle 负责)。
+//   - 视为使用杀占出杀次数(由 virtualKill 内 chargeOnSettle 的 onSettle 负责)。
 //
 // 命名:文件名/loader key/character skill name 均为 '界乱武';内部 Skill.name='乱武'。
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
-import { useCard } from '../card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
 import { canSlash } from '../slash-quota';
@@ -83,10 +83,9 @@ async function virtualKill(state: GameState, source: number, target: number): Pr
     type: '基本牌',
   };
 
-  await useCard(state, source, cardId, [target], {
-    quotaPolicy: 'charge',
+  await runUseFlow(state, source, cardId, [target], '杀', {
     virtual: true,
-    skipValidate: true,
+    onSettle: chargeOnSettle(state, source, cardId),
   });
   delete state.cardMap[cardId];
 }
@@ -155,17 +154,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               nearestOthers(st, p).includes(choice.target) &&
               st.players[choice.target]?.alive
             ) {
-              // 走完整杀结算(useCard→runUseFlow→杀.resolveSlash),不计出杀次数;
-              // mandatedTargets 强制目标;damageType 由 cardMap 自动传导(火杀/雷杀不再丢失)。
-              const err = await useCard(st, p, choice.cardId, [choice.target], {
-                quotaPolicy: 'none',
-                mandatedTargets: [choice.target],
-                skipValidate: true,
-              });
-              if (err) {
-                // 防御兜底(respond 已校验 nearest,不应触发)→ 失去 1 体力
-                await applyAtom(st, { type: '失去体力', target: p, amount: 1 });
-              }
+              // 走完整杀结算(runUseFlow→杀.resolveSlash),不计出杀次数;
+              // 目标由上方 choose 强制;damageType 由 cardMap 自动传导(火杀/雷杀不再丢失)。
+              await runUseFlow(st, p, choice.cardId, [choice.target], '杀');
             } else {
               await applyAtom(st, { type: '失去体力', target: p, amount: 1 });
             }
@@ -195,7 +186,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               delete st.localVars[FINAL_TARGET_VAR];
               if (typeof finalTarget === 'number' && st.players[finalTarget]?.alive) {
                 await virtualKill(st, from, finalTarget);
-                // 出杀次数累加已由 virtualKill 内 useCard(charge) 的 onSettle 负责
+                // 出杀次数累加已由 virtualKill 内 chargeOnSettle 的 onSettle 负责
               }
             }
           }
