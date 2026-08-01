@@ -1,13 +1,13 @@
 // src/client/hooks/useSoundPlayback.ts
-// 音效播放 hook:监听 useEventPlayback 的 ingested 事件批次,
-// 按 AtomEffect.sound 标识符查表播放对应音效。
+// 音效播放 hook:跟随 useEventPlayback 的 current(正在播放的事件),
+// 在事件"成为当前项"时响,与视觉横幅/动效同步、逐个串行。
 //
-// 挂载时机说明:
-//   音效应在事件"到达"时立即响,而非"延时展示时"。
-//   useEventPlayback 暴露:
-//     - current:延时播放中的事件(逐个出队,翻牌声会在牌翻完才响,违和)
-//     - ingested:最近入队的新鲜事件批次(立即触发,每个事件播一次)
-//   因此本 hook 监听 ingested,而非 current。
+// 为什么不用 ingested 批次:
+//   实时对局中,服务端一次操作(如出杀)会接连推送多个 ViewEvent(打出/使用/伤害/扣血…)。
+//   多条 SSE 消息常落在 React 同一渲染批次,setIngestedEvents 被合并,监听 ingested 的
+//   useEffect 会在一次执行里同步播放整批音效 → 叠音("一个操作同时响多个音效")。
+//   current 由 useEventPlayback 逐个出队(每事件等待其 effect.duration),天然串行,
+//   音效跟随它即可做到"一个事件一声、不叠",且与视觉横幅同帧出现。
 //
 // effect 取值范式(与 EventBanner.tsx 一致):
 //   const atomType = event.atomType ?? event.type;
@@ -45,28 +45,24 @@ function extractSound(event: ViewEvent): { sound: string; volume?: number } | nu
 }
 
 /**
- * 音效播放 hook。
+ * 音效播放 hook。跟随播放队列的 current 事件逐个发声。
  *
- * @param ingested  useEventPlayback 的 ingested(每批新鲜事件)。
- *                  为 undefined/null/空数组时无副作用。
+ * @param current  useEventPlayback 的 current(正在展示的事件)。
+ *                 null/undefined 时无副作用。
  *
- * 每个 seq 只播一次:用 ref 记录已处理的最大 seq,过滤重复(与 usePlayHistory 同构)。
+ * 同一 seq 只响一次:lastPlayedSeqRef 记录最近播放的 seq,防止 React 重渲染或
+ * StrictMode 双触发导致重复发声。回放 prev(回退)后再次 next 前进时仍会重放,
+ * 因为 seq 与上次不同。
  */
-export function useSoundPlayback(ingested: readonly QueuedEvent[] | null | undefined): void {
-  const lastSeqRef = useRef(0);
+export function useSoundPlayback(current: QueuedEvent | null | undefined): void {
+  const lastPlayedSeqRef = useRef<number>(-1);
 
   useEffect(() => {
-    if (!ingested || ingested.length === 0) return;
-    // 过滤已处理的 seq(seq 单调递增,只需跟踪最大值)
-    const fresh = ingested.filter((e) => e.seq > lastSeqRef.current);
-    if (fresh.length === 0) return;
-    lastSeqRef.current = Math.max(...fresh.map((e) => e.seq));
-
-    for (const { event } of fresh) {
-      const sound = extractSound(event);
-      if (sound) {
-        audioEngine.play(sound.sound, sound.volume);
-      }
-    }
-  }, [ingested]);
+    if (!current) return;
+    const sound = extractSound(current.event);
+    if (!sound) return;
+    if (current.seq === lastPlayedSeqRef.current) return;
+    lastPlayedSeqRef.current = current.seq;
+    audioEngine.play(sound.sound, sound.volume);
+  }, [current]);
 }

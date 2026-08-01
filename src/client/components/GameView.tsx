@@ -158,8 +158,10 @@ export function GameViewComponentImpl({
   const anim = useAnimationState(view, perspectiveIdx);
   useCardMoveAnimation(ingestedEvents ?? [], view);
   const playHistoryItems = usePlayHistory(ingestedEvents, view);
-  // 音效播放:监听 ingested 批次,按 effect.sound 立即响(不等延时播放队列)
-  useSoundPlayback(ingestedEvents);
+  // 音效播放:跟随播放队列的 current 事件逐个发声(串行,不叠音)。
+  // 不用 ingested 批次:实时对局中一次操作的多个事件常被 React 合并到同一渲染,
+  // 监听 ingested 会同步播放整批音效导致叠音;current 由 useEventPlayback 逐个出队。
+  useSoundPlayback(currentEvent);
   // Lottie 特效:同样监听 ingested 批次,按 effect.vfx 查 ResourceManager 播放 anim/{id}
   const vfxItems = useVfxPlayback(ingestedEvents);
   // 资源包管理:发现 + 启停(localStorage 持久化),供顶部「📦」浮层调用

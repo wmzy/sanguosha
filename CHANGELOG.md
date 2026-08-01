@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-01
 
+### Fixed — 音效叠音:一次操作同时播放多个音效
+
+实时对局中一次操作(如出杀)会接连推送多个 ViewEvent(打出/使用/伤害/扣血…),多条 SSE 消息常落在 React 同一渲染批次,`setIngestedEvents` 被合并。`useSoundPlayback` 监听 `ingested` 批次的 `useEffect` 在一次执行里同步播放整批事件的音效,导致「一个操作同时响多个音效」。而播放队列 `current`(`useEventPlayback`)由 `playNext` 逐个出队(每事件等待其 `effect.duration`),天然串行。修复:音效改跟随 `current` 单事件逐个播放,与视觉横幅同帧、不叠音。
+
+#### Fixed
+- **音效改跟随 current 事件逐个播放**:`useSoundPlayback` 入参由 `ingested`(批次) 改为 `current`(单事件),在事件成为当前播放项时响一声,串行不再叠音;同 seq 去重防 StrictMode/重渲染重复发声,seq 回退(回放 prev)后再次前进仍重放。(`src/client/hooks/useSoundPlayback.ts`、`src/client/components/GameView.tsx`)
+- **串行播放契约测试**:锁定「跟随 current 逐个播放、同 seq 不重复、null/无声不播放、volume 透传、回放 prev→next 重放」契约,防止回归到「监听 ingested 批次同步全播」。(`tests/client/useSoundPlayback.test.tsx`)
+
 ### 判定流程重构（模块 H 完成）
 
 - 判定.ts 瘦身为纯翻牌 atom，改判/消费/清理逻辑全部迁出至 runJudgeFlow 编排
