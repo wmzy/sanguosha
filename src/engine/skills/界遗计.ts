@@ -79,10 +79,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 造成伤害 after:每 1 点伤害触发一次 ──
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
+  // ── 遗计在濒死被救后才发动:挂在「伤害结算结束后」(时机8),濒死检查在时机7完成。 ──
+  // 若郭嘉因伤害死亡(无人救),此处 alive=false → 不触发。
+  registerAfterHook(state, skill.id, ownerId, '伤害结算结束后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
+    if (!ctx.state.players[ownerId]?.alive) return; // 死亡则不触发
     const amount = atom.amount ?? 0;
     if (amount <= 0) return;
 
