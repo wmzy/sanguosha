@@ -11,9 +11,11 @@
 //
 // 设计与 EventBanner 一致：非阻塞、纯展示、固定层。
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { AnimationItem } from 'lottie-web';
+import type { GameView } from '../../engine/types';
 import type { VfxPlaybackItem } from '../hooks/useVfxPlayback';
+import { findSeatCenter } from '../utils/gameViewHelpers';
 
 /** 单个特效的最大存活时长（ms），到期无论动画状态都从 DOM 移除。
  *  APNG 动效帧数较多(如 fire_slash 24帧@12fps=2s)，给足余量。 */
@@ -25,9 +27,11 @@ interface ActiveVfx extends VfxPlaybackItem {
 
 interface VfxLayerProps {
   items: VfxPlaybackItem[];
+  /** 当前视图:用于查询座次 DOM,把有目标的动效定位到对应武将卡。 */
+  view: GameView;
 }
 
-export function VfxLayer({ items }: VfxLayerProps) {
+export function VfxLayer({ items, view }: VfxLayerProps) {
   const [active, setActive] = useState<ActiveVfx[]>([]);
   // 已入活动列表的 item key 集合。
   // useVfxPlayback 的 items 是累积式（每批新 vfx 追加，从不缩减），
@@ -64,17 +68,38 @@ export function VfxLayer({ items }: VfxLayerProps) {
         inset: 0,
         pointerEvents: 'none',
         zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
       }}
     >
-      {active.map((v) =>
-        v.url.endsWith('.apng') ? (
-          <ApngPlayer key={v.key} url={v.url} />
-        ) : (
-          <LottiePlayer key={v.key} url={v.url} />
-        ),
+      {active.map((v) => (
+        <VfxSlot key={v.key} item={v} view={view} />
+      ))}
+    </div>
+  );
+}
+
+/** 单个特效定位槽:有目标 → 定位到对应座次中心;无目标/找不到 → 屏幕居中。 */
+function VfxSlot({ item, view }: { item: ActiveVfx; view: GameView }) {
+  const center =
+    item.target !== undefined ? findSeatCenter(view, item.target) : null;
+  const style: CSSProperties = center
+    ? {
+        position: 'absolute',
+        left: center.left,
+        top: center.top,
+        transform: 'translate(-50%, -50%)',
+      }
+    : {
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+      };
+  return (
+    <div style={style}>
+      {item.url.endsWith('.apng') ? (
+        <ApngPlayer url={item.url} />
+      ) : (
+        <LottiePlayer url={item.url} />
       )}
     </div>
   );

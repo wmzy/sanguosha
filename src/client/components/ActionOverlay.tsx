@@ -25,8 +25,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { css } from '@linaria/core';
 import type { GameView } from '../../engine/types';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
+import { findSeatEl } from '../utils/gameViewHelpers';
 
-type Player = GameView['players'][number];
 
 /** 箭头浮层显示的「动作」信息。 */
 interface ActionInfo {
@@ -105,19 +105,6 @@ function num(v: unknown): number | undefined {
 }
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined;
-}
-
-/** 查询座次对应 DOM 元素:优先 data-player-name 精确匹配,回退座次序号。
- *  PlayerSeatView 与 PlayerCardLarge 都已加 data-player-name=player.name。 */
-function findSeatEl(view: GameView, idx: number): HTMLElement | null {
-  const p: Player | undefined = view.players.find((q) => q.index === idx);
-  if (!p) return null;
-  return document.querySelector<HTMLElement>(`[data-player-name="${cssEscape(p.name)}"]`);
-}
-
-/** 简单 CSS escape:仅处理常见特殊字符,避免引入 full CSS.escape polyfill。 */
-function cssEscape(s: string): string {
-  return s.replace(/["\\\]\[]/g, '\\$&');
 }
 
 export interface ActionOverlayProps {

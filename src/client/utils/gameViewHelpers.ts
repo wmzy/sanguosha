@@ -242,6 +242,29 @@ export function canShowCancelSelectionButton(
   return !!opts.selectedCardId && isFreePlayWindow(opts);
 }
 
+// ─── 座位 DOM 查询 ───
+
+/** 简单 CSS escape:仅处理常见特殊字符,避免引入 full CSS.escape polyfill。 */
+function cssEscape(s: string): string {
+  return s.replace(/["\\\]\[]/g, '\\$&');
+}
+
+/** 查询座次对应 DOM 元素:优先 data-player-name 精确匹配。
+ *  PlayerSeatView 与 PlayerCardLarge 都已加 data-player-name=player.name。 */
+export function findSeatEl(view: GameView, idx: number): HTMLElement | null {
+  const p = view.players.find((q) => q.index === idx);
+  if (!p) return null;
+  return document.querySelector<HTMLElement>(`[data-player-name="${cssEscape(p.name)}"]`);
+}
+
+/** 查询座次中心点(viewport 坐标),供定位型浮层/特效使用。找不到返回 null。 */
+export function findSeatCenter(view: GameView, idx: number): { left: number; top: number } | null {
+  const el = findSeatEl(view, idx);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return { left: r.left + r.width / 2, top: r.top + r.height / 2 };
+}
+
 // ─── 弧形布局 ───
 
 /**

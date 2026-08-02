@@ -42,6 +42,8 @@ export interface VfxPlaybackItem {
   key: string;
   /** Lottie JSON 的 URL（resourceManager.get 返回） */
   url: string;
+  /** 目标玩家座次。有目标动效(如伤害)定位到对应武将卡上播放;undefined=居中。 */
+  target?: number;
 }
 
 /**
@@ -70,7 +72,15 @@ export function useVfxPlayback(
       if (!vfxId) continue;
       const url = resourceManager.get(`anim/${vfxId}`);
       if (!url) continue;
-      newItems.push({ key: `${seq}-${vfxId}`, url });
+      // 提取目标座次:伤害等动效携带 target;自效型(无 target)回退 player。
+      const ev = event as { target?: unknown; player?: unknown };
+      const target =
+        typeof ev.target === 'number' && Number.isFinite(ev.target)
+          ? ev.target
+          : typeof ev.player === 'number' && Number.isFinite(ev.player)
+            ? ev.player
+            : undefined;
+      newItems.push({ key: `${seq}-${vfxId}`, url, target });
     }
     if (newItems.length > 0) {
       setItems((prev) => [...prev, ...newItems]);

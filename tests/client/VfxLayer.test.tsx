@@ -4,11 +4,17 @@
 // （每批新 vfx 追加,从不缩减),而 VfxLayer 每次 items 变化都把整个数组并入 active,
 // 导致历史特效被重复播放(出杀后吃桃,杀的特效再次触发)。
 // 归并建议:此文件是特效渲染层(VfxLayer + useVfxPlayback)的测试基座,
-//   后续特效播放/回收/格式选择相关回归均应追加到此处,勿再为单个 bug 新建孤岛文件。
+//   后续特效播放/回收/格式选择/目标定位相关回归均应追加到此处,勿再为单个 bug 新建孤岛文件。
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { VfxLayer } from '@/components/VfxLayer';
 import type { VfxPlaybackItem } from '@/hooks/useVfxPlayback';
+import type { GameView } from '../../src/engine/types';
+
+/** 最小化 view:VfxLayer 仅用 view.players 查座次 DOM。无目标动效不查 DOM。 */
+function makeView(players: { index: number; name: string }[] = []): GameView {
+  return { players } as unknown as GameView;
+}
 
 afterEach(cleanup);
 
@@ -16,14 +22,15 @@ describe('VfxLayer', () => {
   it('items 累积时不重复播放已处理的特效(出杀后吃桃,杀不再次触发)', () => {
     const slash: VfxPlaybackItem = { key: '1-card/slash_red', url: '/slash.apng' };
     const peach: VfxPlaybackItem = { key: '2-card/peach', url: '/peach.apng' };
+    const view = makeView();
 
-    const { rerender, container } = render(<VfxLayer items={[slash]} />);
+    const { rerender, container } = render(<VfxLayer items={[slash]} view={view} />);
     // 首批:1 个特效 → 1 个 APNG <img>
     expect(container.querySelectorAll('img')).toHaveLength(1);
 
     // 第二批:useVfxPlayback 累积式返回 [slash, peach],仅 peach 是新增。
     // 修复前会把整个数组并入 active,导致杀的特效重复(3 个 img);修复后只新增 peach(2 个 img)。
-    rerender(<VfxLayer items={[slash, peach]} />);
+    rerender(<VfxLayer items={[slash, peach]} view={view} />);
     expect(container.querySelectorAll('img')).toHaveLength(2);
   });
 
@@ -32,7 +39,37 @@ describe('VfxLayer', () => {
       { key: '1-card/slash_red', url: '/slash.apng' },
       { key: '2-card/peach', url: '/peach.apng' },
     ];
-    const { container } = render(<VfxLayer items={items} />);
+    const { container } = render(<VfxLayer items={items} view={makeView()} />);
     expect(container.querySelectorAll('img')).toHaveLength(2);
+  });
+
+  it('有目标的动效定位到对应座次中心(伤害特效落在受伤武将卡上)', () => {
+    const view = makeView([{ index: 1, name: '张角' }]);
+    // 模拟座次 DOM:findSeatEl 查 [data-player-name="张角"]。
+    const seat = document.createElement('div');
+    seat.setAttribute('data-player-name', '张角');
+    seat.getBoundingClientRect = () =>
+      ({ left: 100, top: 200, width: 120, height: 160, right: 220, bottom: 360, x: 100, y: 200, toJSON: () => ({}) }) as DOMRect;
+    document.body.appendChild(seat);
+
+    const item: VfxPlaybackItem = { key: '1-card/damage', url: '/damage.apng', target: 1 };
+    const { container, unmount } = render(<VfxLayer items={[item]} view={view} />);
+
+    // APNG <img> 的父级是 VfxSlot 定位槽,应落在座次中心(160, 280)。
+    const slot = container.querySelector('img')?.parentElement;
+    expect(slot?.style.position).toBe('absolute');
+    expect(slot?.style.left).toBe('160px');
+    expect(slot?.style.top).toBe('280px');
+
+    unmount();
+    seat.remove();
+  });
+
+  it('无目标的动效居中播放(left/top = 50%)', () => {
+    const item: VfxPlaybackItem = { key: '1-misc/turn', url: '/turn.apng' };
+    const { container } = render(<VfxLayer items={[item]} view={makeView()} />);
+    const slot = container.querySelector('img')?.parentElement;
+    expect(slot?.style.left).toBe('50%');
+    expect(slot?.style.top).toBe('50%');
   });
 });

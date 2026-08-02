@@ -955,7 +955,7 @@ export function GameViewComponentImpl({
       </div>
 
       {/* ─── Lottie 特效层(顶层 fixed,不拦截交互)─── */}
-      <VfxLayer items={vfxItems} />
+      <VfxLayer items={vfxItems} view={view} />
 
       {/* ─── confirm 型主动技确认弹窗(据守等:点技能按钮后的二次确认)─── */}
       {pendingConfirm && (

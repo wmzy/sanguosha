@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 有目标的动效在对应武将卡上播放
+
+伤害等带目标的 Lottie/APNG 特效此前一律居屏幕中央播放,与「谁在受伤」脱节。`扣减体力` atom 的 ViewEvent 携带 `target` 与 `vfx:'card/damage'`,但 `useVfxPlayback` 只提取了 vfx 资源 ID、丢弃了 target,`VfxLayer` 也只做居中布局。观感即「张角受伤,伤害特效却盖在战场正中」。现把有目标的动效定位到目标座次的武将卡中心播放,无目标的动效仍居中。
+
+#### Changed
+- **座位 DOM 查询共享化**(根因前置):`findSeatEl`/`cssEscape` 从 `ActionOverlay` 提取到 `gameViewHelpers`,新增 `findSeatCenter`(返回座次中心 viewport 坐标)。`ActionOverlay` 改用共享工具,消除重复。(`src/client/utils/gameViewHelpers.ts`、`src/client/components/ActionOverlay.tsx`)
+- **useVfxPlayback 透传 target**:`VfxPlaybackItem` 新增可选 `target`(优先取 ViewEvent.target,回退 player),供 `VfxLayer` 定位。(`src/client/hooks/useVfxPlayback.ts`)
+- **VfxLayer 按目标定位**(根因):`VfxLayer` 新增 `view` prop,有目标的动效定位到对应座次中心(`translate(-50%,-50%)`),无目标/座次 DOM 缺失时回退居中。`GameView` 传入 `view`。(`src/client/components/VfxLayer.tsx`、`src/client/components/GameView.tsx`)
+- **回归测试**:`tests/client/VfxLayer.test.tsx` 新增「有目标动效定位到座次中心」与「无目标动效居中」,mock 座次 DOM 校验定位坐标;原有去重/多特效用例同步补 `view` prop。
+
 ### Fixed — 使用杀未造成伤害仍播放受伤特效(座位卡 HP 冻结)
 
 出杀命中后,目标座位 HP 数字不更新(仍显示受伤前的值),但 card/damage 受伤动画与 injure 惨叫音效照常播放——观感即「没造成伤害却播放了受伤特效」。根因与 8099973b(「zones 浅拷贝」)同类:`viewMaintainer` 的 event 分支浅拷贝 view 时复制了 zones/log(避免 ZoneInfoBar/GameLog memo 冻结),却遗漏了 players 数组。viewReducer 原地突变 player 字段(扣减体力改 health 等),prev/next 的 player 元素同引用 → `playerVisibleEqual` 比较同一对象永远判等 → 座位卡(PlayerSeatView/PlayerCardLarge)memo 跳过重渲染,HP 不更新;同时 `useAnimationState` 的 `[view.players]` 依赖不变 → 伤害闪烁/震动动画失效。
