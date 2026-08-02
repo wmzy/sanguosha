@@ -290,25 +290,28 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ─── 造成伤害 after hook:win 效果——恢复被临时卸载的 winTarget 防具 ──
-  //   杀对 winTarget 造成伤害后立即恢复(无论命中/被闪;只要造成伤害 atom 跑过)。
-  registerAfterHook(
-    state,
-    skill.id,
-    ownerId,
-    '造成伤害后',
-    async (ctx) => {
-      const atom = ctx.atom;
-      if (atom.source !== ownerId) return;
-      const winTarget = ctx.state.turn.vars[WIN_VAR];
-      if (typeof winTarget !== 'number') return;
-      if (atom.target !== winTarget) return;
-      const unloaded = getTempUnloadMap(ctx.state).get(winTarget);
-      if (!unloaded) return;
-      await instantiateSkill(ctx.state, unloaded.skillId, winTarget);
-      getTempUnloadMap(ctx.state).delete(winTarget);
-    },
-  );
+  // ─── 恢复被临时卸载的 winTarget 防具(两个时机:造成伤害后 / 被抵消) ──
+  //   杀命中 winTarget 造成伤害后恢复;杀被闪抵消时(不造成伤害)同样需恢复。
+  //   原实现仅挂 造成伤害后 hook,被闪抵消时防具永久消失——现已补充 被抵消 hook。
+  for (const atomType of ['造成伤害后', '被抵消'] as const) {
+    registerAfterHook(
+      state,
+      skill.id,
+      ownerId,
+      atomType,
+      async (ctx) => {
+        const atom = ctx.atom;
+        if (atom.source !== ownerId) return;
+        const winTarget = ctx.state.turn.vars[WIN_VAR];
+        if (typeof winTarget !== 'number') return;
+        if (atom.target !== winTarget) return;
+        const unloaded = getTempUnloadMap(ctx.state).get(winTarget);
+        if (!unloaded) return;
+        await instantiateSkill(ctx.state, unloaded.skillId, winTarget);
+        getTempUnloadMap(ctx.state).delete(winTarget);
+      },
+    );
+  }
 
   // ─── 成为目标 before hook:lost 效果——owner 不能对 lostTarget 使用杀 ──
   //   杀.execute 检测 becameTarget=false → 跳过该目标结算(不询问闪、不伤害)。
