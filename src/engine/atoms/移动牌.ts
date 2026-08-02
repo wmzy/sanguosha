@@ -62,7 +62,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       const shownCard = origCard
         ? { name: origCard.name, suit: origCard.suit, rank: origCard.rank }
         : cardInfo;
-      const effect = { sound: 'discard' as const, duration: 600 };
+      const effect = { sound: 'flip' as const, duration: 600 };
       const view: ViewEvent = {
         type: '弃牌',
         player: fromPlayer,
@@ -76,7 +76,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     // 手牌→处理区 = 打出(他人出牌时由 EventBanner 中央翻牌展示;
     // 自己出牌时 EventBanner 跳过——已有 createCardFlyAnimation 手牌飞行动画)
     if (atom.to.zone === '处理区' && fromPlayer !== undefined && cardInfo) {
-      const effect = { sound: 'play_card' as const, animation: 'flip' as const, duration: 800 };
+      const effect = { sound: 'flip' as const, animation: 'flip' as const, duration: 800 };
       const view: ViewEvent = {
         type: '打出',
         player: fromPlayer,
@@ -89,7 +89,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
 
     // 牌堆→手牌 = 摸牌（信息分级）
     if (atom.from.zone === '牌堆' && toPlayer !== undefined && card) {
-      const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
+      const effect = { sound: 'flip' as const, animation: 'slide' as const, duration: 600 };
       // 使用完整 card 对象(同 摸牌 atom),保证 applyView 后 hand 各字段与 buildView 一致
       const ownerView: ViewEvent = {
         type: '摸牌',

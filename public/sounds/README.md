@@ -1,77 +1,66 @@
 # 音效资源目录
 
-本目录存放游戏音效文件。文件由用户后续放入,前端 `audioEngine` 会按需加载。
+本目录(已迁移至 `public/packs/base/sound/`)存放游戏音效文件。
 
-## 文件命名约定
-
-文件名 = 音效标识符 + `.mp3`,例如:
+## 目录结构
 
 ```
-public/sounds/
-  play_card.mp3
-  flip.mp3
-  damage_physical.mp3
-  ...
+public/packs/base/sound/
+  flip.mp3              ← 通用卡牌操作拟声(摸牌/弃牌/打出/判定…)
+  shuffle.mp3           ← 重洗
+  card_place.mp3        ← 整理牌堆
+  heal.mp3              ← 回复体力
+  lose_health.mp3       ← 失去体力
+  death.mp3             ← 角色死亡
+  equip.mp3             ← 装备
+  unequip.mp3           ← 卸下装备
+  chain.mp3             ← 铁索连环/加标记/去标记
+  turn_start.mp3        ← 回合开始
+  turn_end.mp3          ← 回合结束
+  phase_start.mp3       ← 阶段开始
+  phase_end.mp3         ← 阶段结束
+  card/                 ← 牌名语音(使用时按牌名播报)
+    杀.mp3  闪.mp3  桃.mp3  酒.mp3
+    无中生有.mp3  过河拆桥.mp3  顺手牵羊.mp3
+    无懈可击.mp3  乐不思蜀.mp3  闪电.mp3  兵粮寸断
+    决斗.mp3  南蛮入侵.mp3  万箭齐发.mp3
+    桃园结义.mp3  五谷丰登.mp3  借刀杀人.mp3
+    铁索连环.mp3  火攻.mp3  知己知彼.mp3
 ```
+标准牌堆所有基本牌+锦囊牌(共 20 张)均有语音。
 
-完整的标识符 → 资源映射表见 `src/client/sounds/soundMap.ts`。
+## 设计原则
 
-## 标识符语义对照
+- **使用时**(打出锦囊/延时锦囊):按牌名播报语音(`sound/card/{牌名}`)
+- **底层操作**(摸牌/弃牌/获得…):统一用 `flip` 短促拟声
+- **目标/技能添加/移除/询问**:无音效(UI 视觉反馈即可)
+- 无对应语音文件的牌(如桃/南蛮入侵)→ audioEngine 静默跳过,后续可补音频
 
-| 标识符           | 语义                                   | 触发场景                                         |
-|-----------------|----------------------------------------|--------------------------------------------------|
-| play_card       | 打出/拼点扣置(牌扣到桌面)              | 声明打出时 / 拼点扣置 / 扣牌 / 移动牌→打出        |
-| flip            | 翻牌(拼点亮出/蛊惑展示)                | 拼点亮出 / 展示                                    |
-| target          | 指定/成为目标(高亮提示)               | 使用时 / 指定目标 / 成为目标 / 选择目标时 等        |
-| damage_physical | 扣减体力(受物理伤害)                  | 扣减体力 / 造成伤害                                |
-| heal            | 回复体力                               | 回复体力                                           |
-| lose_health     | 失去体力(非伤害型)                    | 失去体力                                           |
-| judge           | 判定翻牌                               | 判定                                               |
-| death           | 角色死亡                               | 死亡时 / 系统处理牌 / 击杀                         |
-| discard         | 弃牌                                   | 弃置 / 移动牌→弃牌 / 移出至暂存区                   |
-| draw            | 摸牌                                   | 摸牌 / 移动牌→摸牌 / 归还暂存牌 / 置创牌            |
-| unequip         | 卸下装备                               | 卸下                                               |
-| mark            | 加/去标记                              | 加标记 / 去标记                                    |
-| turn_start      | 回合开始                               | 回合开始                                           |
-| turn_end        | 回合结束                               | 回合结束                                           |
-| transform       | 转化(丈八蛇矛/武圣当杀)              | 当作                                               |
-| pindian         | 拼点(旧 atom)                        | 拼点                                               |
-| card_place      | 整理牌堆                               | 整理牌堆                                           |
-| shuffle         | 洗牌/重洗                              | 洗牌 / 重洗                                        |
-| judge_attach    | 添加延时锦囊(乐不思蜀/闪电等)        | 添加延时锦囊                                       |
-| judge_remove    | 移除延时锦囊                           | 移除延时锦囊                                       |
-| skill_add       | 添加技能                               | 添加技能                                           |
-| skill_remove    | 移除技能                               | 移除技能                                           |
-| give            | 给予(给牌)                           | 给予                                               |
-| obtain          | 获得(从他人/牌堆获得牌)              | 获得                                               |
-| equip           | 装备                                   | 装备                                               |
-| chain           | 铁索连环(横置)                       | 设横置                                             |
-| slash_request   | 询问杀(被要求出杀)                   | 询问杀                                             |
-| dodge_request   | 询问闪(被要求出闪)                   | 询问闪                                             |
-| phase_start     | 阶段开始                               | 阶段开始                                           |
-| phase_end       | 阶段结束                               | 阶段结束                                           |
-| dying           | 陷入濒死                               | 陷入濒死                                           |
+## 添加新牌名语音
 
-## 资源来源建议
+1. 将音频文件放入 `public/packs/base/sound/card/{牌名}.mp3`（可用 QSanguosha `audio/card/male|female/{en}.ogg` 经 ffmpeg 转 mp3）
+2. 在 `public/packs/base/manifest.json` 的 resources 数组中添加:
+   ```json
+   { "id": "sound/card/{牌名}", "type": "audio" }
+   ```
+3. 使用时 atom 会自动按牌名播放,无需改代码
 
-音效文件可从以下渠道获取(注意版权许可):
+## 添加新通用音效
 
-- **开源游戏音效包**:freesound.org(CC0/CC-BY)、kenney.nl(CC0,推荐:8-bit/卡片游戏音效包)
-- **三国杀官方资源**:原版客户端音效文件(仅供个人/学习使用)
-- **自制/合成**:使用 Audacity / FFmpeg 从现有素材裁剪、变调、降噪
+1. 将音频文件放入 `public/packs/base/sound/{标识符}.mp3`
+2. 在 manifest.json 中声明 `sound/{标识符}`
+3. 在对应 atom 的 `effect.sound` 中引用标识符
 
 ## 格式建议
 
-- **推荐 mp3**:浏览器兼容性最佳(Chrome/Firefox/Safari/Edge 全支持)
-- **备选 ogg**:体积更小(约小 30%),但 Safari 旧版不支持;若无需兼容 Safari 可用
-- **采样率**:22050Hz 或 44100Hz(游戏音效无需更高)
-- **时长**:单个音效建议 ≤ 2 秒(回合开始/死亡等氛围音可稍长)
-- **声道**:单声道即可(不做空间音效)
+- **推荐 mp3**:浏览器兼容性最佳
+- **采样率**:22050Hz 或 44100Hz
+- **时长**:通用拟声 ≤ 1s;牌名语音 ≤ 2s;回合/死亡等氛围音可稍长
+- **声道**:单声道
 
 ## 缺失时的行为
 
 文件未放入时,`audioEngine` 会:
-
 1. 首次请求该标识符时 `fetch` 对应 URL
 2. 收到 404 后缓存"missing"状态
 3. 后续不再重试(避免重复请求)

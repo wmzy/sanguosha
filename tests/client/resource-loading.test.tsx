@@ -20,7 +20,8 @@ describe('加载层委托 ResourceManager', () => {
             { id: 'character/曹操', type: 'image' },
             { id: 'card/杀-7-♠', type: 'image', file: 'card/杀-7-♠.jpg' },
             { id: 'card/equipment/丈八蛇矛', type: 'image' },
-            { id: 'sound/play_card', type: 'audio' },
+            { id: 'sound/flip', type: 'audio' },
+            { id: 'sound/card/杀', type: 'audio' },
           ],
         },
       }],
@@ -51,7 +52,8 @@ describe('加载层委托 ResourceManager', () => {
   });
 
   it('resolveSoundUrl 委托 ResourceManager', () => {
-    expect(resolveSoundUrl('play_card')).toBe('/packs/base/sound/play_card.mp3');
+    expect(resolveSoundUrl('flip')).toBe('/packs/base/sound/flip.mp3');
+    expect(resolveSoundUrl('card/杀')).toBe('/packs/base/sound/card/杀.mp3');
     expect(resolveSoundUrl('unknown_id')).toBeNull();
   });
 });

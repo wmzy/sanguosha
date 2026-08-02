@@ -22,7 +22,7 @@ export const 去标记: AtomDefinition<{
     if (idx < 0) return;
     player.marks.splice(idx, 1);
   },
-  effect: { sound: 'mark', animation: 'pulse', duration: 300 },
+  effect: { sound: 'chain', animation: 'pulse', duration: 300 },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = {
       type: '去标记',

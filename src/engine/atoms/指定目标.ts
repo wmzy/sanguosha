@@ -13,7 +13,7 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
   apply(_state) {
     // 事件标记——目标关系在事件流中记录
   },
-  effect: { sound: 'target', animation: 'highlight', duration: 400 },
+  effect: { animation: 'highlight', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const cardName = atom.cardId ? (state.cardMap[atom.cardId]?.name ?? atom.cardId) : undefined;
     const view: ViewEvent = {

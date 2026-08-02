@@ -69,12 +69,14 @@ export const 陷入濒死: AtomDefinition<{ target: number }> = {
     state.players[atom.target].health = 0;
     // 注意:alive 不在此设置——濒死是"可能被救"的中间态
   },
-  effect: { sound: 'dying', animation: 'flash_red', duration: 600 },
-  toViewEvents(_state, atom): ViewEventSplit {
+  effect: { animation: 'flash_red', duration: 600 },
+  toViewEvents(state, atom): ViewEventSplit {
+    const target = state.players[atom.target];
+    const sound = FEMALE_CHARACTERS.has(target?.character ?? '') ? 'sos_female' : 'sos_male';
     const view: ViewEvent = {
       type: '陷入濒死',
       target: atom.target,
-      effect: { sound: 'dying', animation: 'flash_red', duration: 600 },
+      effect: { sound, animation: 'flash_red', duration: 600 },
     };
     return {
       ownerViews: new Map(),

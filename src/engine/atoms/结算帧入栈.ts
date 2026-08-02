@@ -27,11 +27,14 @@ export const 结算帧入栈: AtomDefinition<{
     state.settlementStack.push(frame);
   },
   toViewEvents(_state, atom): ViewEventSplit {
+    // 技能台词:按 skillId 播报。随机选 1 或 2 号语音(无对应文件时静默跳过)。
+    const variant = Math.random() < 0.5 ? '1' : '2';
     const view: ViewEvent = {
       type: '结算帧入栈',
       skillId: atom.skillId,
       from: atom.from,
       params: { ...(atom.params ?? {}) },
+      effect: { sound: `skill/${atom.skillId}/${variant}` } as const,
     };
     // 结算帧是公开信息:所有玩家看到相同的栈(包括 params)。
     // params 由技能负责只放公开数据(如 resolvedTargets/revealedIds/pickedBy)。

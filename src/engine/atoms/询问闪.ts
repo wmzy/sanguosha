@@ -36,7 +36,7 @@ export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
     preResolve: (state, atom) =>
       cardResponsePreResolveForTarget(state, '询问闪', atom.target, (c) => c.name === '闪'),
   },
-  effect: { sound: 'dodge_request', blockUntilDone: true, duration: 200 },
+  effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(state, atom): ViewEventSplit {
     const mode = evaluateCardResponseModeForTarget(state, '询问闪', atom.target, (c) => c.name === '闪');
     // silent 用固定短延时(不走 timeoutScale);normal 用缩放后的正常超时;

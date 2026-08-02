@@ -14,7 +14,7 @@ export const 移除延时锦囊: AtomDefinition<{ player: number; trickName: str
       (t) => t.name !== atom.trickName,
     );
   },
-  effect: { sound: 'judge_remove', animation: 'fade', duration: 600 },
+  effect: { sound: 'flip', animation: 'fade', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {
     // 把匹配 trickName 的 PendingTrick 一并打包,便于前端匹配 cardId
     const trick = state.players[atom.player].pendingTricks.find((t) => t.name === atom.trickName);

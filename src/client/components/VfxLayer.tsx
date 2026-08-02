@@ -1,8 +1,13 @@
 // src/client/components/VfxLayer.tsx
-// Lottie 特效渲染层。独立 z-index（顶层），pointer-events:none（不拦截交互）。
+// 特效渲染层。独立 z-index（顶层），pointer-events:none（不拦截交互）。
 //
 // 接收 useVfxPlayback 产出的 items，每条 item 入「活动列表」播放；
-// 播放 2s 后自动回收（Lottie 动画通常 < 2s，超时兜底防泄漏）。
+// 播放后自动回收（Lottie/APNG 动画通常 < 2.5s，超时兜底防泄漏）。
+//
+// 支持两种特效格式：
+//   - Lottie JSON（.json）：通过 lottie-web 渲染矢量动画
+//   - APNG（.apng）：通过 <img> 标签渲染逐帧动画（浏览器原生支持）
+// url 后缀决定播放器选择。
 //
 // 设计与 EventBanner 一致：非阻塞、纯展示、固定层。
 
@@ -10,8 +15,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { AnimationItem } from 'lottie-web';
 import type { VfxPlaybackItem } from '../hooks/useVfxPlayback';
 
-/** 单个特效的最大存活时长（ms），到期无论动画状态都从 DOM 移除 */
-const VFX_TTL_MS = 2000;
+/** 单个特效的最大存活时长（ms），到期无论动画状态都从 DOM 移除。
+ *  APNG 动效帧数较多(如 fire_slash 24帧@12fps=2s)，给足余量。 */
+const VFX_TTL_MS = 2500;
 
 interface ActiveVfx extends VfxPlaybackItem {
   startedAt: number;
@@ -28,7 +34,8 @@ export function VfxLayer({ items }: VfxLayerProps) {
   useEffect(() => {
     if (items.length === 0) return;
     const now = Date.now();
-    setActive((prev) => [...prev, ...items.map((i) => ({ ...i, startedAt: now }))]);
+    const newActive = items.map((item) => ({ ...item, startedAt: now }));
+    setActive((prev) => [...prev, ...newActive]);
   }, [items]);
 
   // 活动列表非空时：设一个兜底定时器，到点剔除过期项
@@ -55,10 +62,26 @@ export function VfxLayer({ items }: VfxLayerProps) {
         justifyContent: 'center',
       }}
     >
-      {active.map((v) => (
-        <LottiePlayer key={v.key} url={v.url} />
-      ))}
+      {active.map((v) =>
+        v.url.endsWith('.apng') ? (
+          <ApngPlayer key={v.key} url={v.url} />
+        ) : (
+          <LottiePlayer key={v.key} url={v.url} />
+        ),
+      )}
     </div>
+  );
+}
+
+/** APNG 播放器：浏览器原生支持 APNG 动画，直接用 <img> 渲染。 */
+function ApngPlayer({ url }: { url: string }) {
+  return (
+    <img
+      src={url}
+      style={{ width: 400, height: 400, objectFit: 'contain' }}
+      alt=""
+      draggable={false}
+    />
   );
 }
 

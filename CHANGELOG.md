@@ -2,7 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — 2026-08-01
+## [Unreleased] — 2026-08-02
+
+### Fixed — 旁观等待界面不显示房间里都有谁
+
+旁观者以 spectator 身份进入「等待中」房间时，界面只显示玩家数量（2/3），看不到具体是谁在房间、谁已准备。
+
+- **旁观等待界面加玩家列表**：按座位展示每个玩家的 id + 准备状态（`P1 alpha（已准备）`），空位显示 `空位`，并补旁观者列表（`👁 旁观者：gamma`）。（`src/client/pages/MultiplayerPage.tsx`）
+
+### Fixed — 「准备」按钮无响应:操作失败被静默吞掉
+
+用户报告「房间点击准备无响应」:房间已开局(状态非「等待中」)时点准备,服务端返回 400「准备失败」,但 `HeadlessGameClient.postRoomOp` 不检查响应状态,400 被静默吞掉,前端毫无反馈。
+
+- **`postRoomOp` 检查响应**:非 2xx 时解析服务端 `error` 消息并触发 `onError`,不再静默。(`src/client/headless/HeadlessGameClient.ts`)
+- **`sendUpdateConfig` 同样处理**:(`src/client/headless/HeadlessGameClient.ts`)
+- **`useMultiplayerRoom` 的 `onError` 上报错误**:与 `onMessage error` 相同的 setError + 3s toast 模式,等待大厅/游戏中均可见。(`src/client/hooks/useMultiplayerRoom.ts`)
+- **服务端错误消息明确化**:`setReady` 失败按原因区分「房间不存在/房间已开局,无需准备/准备失败」,而非笼统「准备失败」。(`src/server/rest.ts`)
+- **回归测试**:`tests/headless/HeadlessGameClient.integration.test.ts` 新增「已开局房间 sendReady → onError 收到明确错误」。
+
+### Added — 从 QSanguosha 全面补充音效与动效资源
+
+资源来源:`QSanguosha For MP`(CC BY-NC-ND 4.0),ogg→mp3 转 128kbps,PNG 序列→APNG。
+
+#### 音效(349 个音频文件)
+
+- **P0 系统音效(8)**:受伤惨叫 `injure_1/2/3`(按伤害点数 1/2/≥3 选,中性不区分性别,对齐 QSanguosha `roomscene.cpp:2874`)、濒死求救 `sos_male`/`sos_female`(按武将性别,对齐 `roomscene.cpp:410`)、胜利 `win`、失败 `lose`、开场 `prelude`。扣减体力 atom toViewEvents 按伤害点数选受伤惨叫;陷入濒死 atom toViewEvents 按性别选 SOS 求救;GameResultOverlay 组件挂载时按本人胜负播放 win/lose。
+- **P1 装备音效(14)**:诸葛连弩/青龙偃月刀/贯石斧/麒麟弓等 14 种装备各配专属音效。装备 atom toViewEvents 按 `equip/${装备名}` 动态选音效。
+- **P2 死亡台词(68)**:曹操/周瑜/诸葛亮等 68 个武将专属死亡语音。死亡 atom(系统处理牌)toViewEvents 按 `death/${武将名}` 动态选音效。
+- **P3 技能台词(227)**:制衡/奸雄/反馈/苦肉等 114 个技能共 227 个台词文件(每个技能 2 个变体随机选)。技能触发时通过「结算帧入栈」atom toViewEvents 按 `skill/${技能名}/${随机1或2}` 播报——这是技能台词的统一架构入口(pushFrame 是所有主动技能 execute 的入口)。
+
+#### 动效(18 个 APNG)
+
+- **VfxLayer 扩展支持 APNG**:新增 `ApngPlayer` 组件,按 url 后缀(.apng/.json)自动选择 APNG `<img>` 或 Lottie 渲染。(`src/client/components/VfxLayer.tsx`)
+- **出牌动效(9)**:杀(红/黑/火/雷 4 种)、闪/桃/酒/决斗/铁索连环 的逐帧 PNG 序列合成 APNG(12fps)。使用时 atom toViewEvents 按牌名映射 vfx(杀额外区分火/雷属性 damageType)。(`src/engine/atoms/使用时.ts`)
+- **伤害/判定/状态动效(9)**:伤害 `damage`、判定成功/失败 `success`/`no_success`、无懈可击 `skill_nullify`、击杀 `killer`、复活 `revive`、移除 `remove`。扣减体力 atom 加 `card/damage` vfx。(`src/engine/atoms/life-timing.ts`)
+
+#### Manifest
+
+- `manifest.json` 新增 349 个 audio 条目 + 18 个 APNG image 条目,资源 ID 按 `sound/{类别}/{名称}` 和 `anim/card/{名称}` 组织。
+- 试听页 `sound-test.html` 重写:7 个分组(通用/系统/牌名/装备/死亡/技能/APNG动效),动态加载 manifest 验证。
+
+### Fixed — 音效与操作系统性错位:牌名语音错挂到底层操作
+
+11 个通用操作音效文件(play_card/draw/discard/give/obtain/pindian/judge/judge_attach/judge_remove/slash_request/dodge_request)实际内容是具体牌名语音(杀/无中生有/过河拆桥/知己知彼/顺手牵羊/火攻/闪电/乐不思蜀/无懈可击/决斗/万箭齐发),被错挂到摸牌/弃牌/获得等底层操作上。同时 target 音效不适用、mark 音效是大乔台词、skill_add/skill_remove 是角色台词。
+
+修复核心:牌名语音移到「使用时」atom 按牌名动态播报(`sound/card/{牌名}`),底层操作统一用 `flip` 短促拟声,不需音效的操作去音效。
+
+#### Changed
+- **牌名语音迁移到 `sound/card/`**:11 个音频文件从 `sound/{oldId}.mp3` 重命名为 `sound/card/{牌名}.mp3`(如 `draw.mp3`→`card/无中生有.mp3`),manifest.json 更新资源 ID。(`public/packs/base/`)
+- **使用时 atom 动态牌名语音**:toViewEvents 按 `cardName` 设置 `effect.sound = 'card/${cardName}'`,打出无中生有响"无中生有!";无语音文件的牌(如桃)audioEngine 404 负缓存静默跳过。(`src/engine/atoms/使用时.ts`)
+- **底层操作统一用 flip 拟声**:摸牌/弃置/获得/给予/声明打出时/打出牌时/扣牌/判定/添加延时锦囊/移除延时锦囊/移动牌(3 派生分支)/归还暂存牌/置创牌/移出至暂存区/当作/拼点扣置 的 `effect.sound` 从各自旧标识符改为 `'flip'`。
+- **去音效**:target(成为目标/指定目标/选择目标时/使用时静态effect)、询问杀、询问闪、添加技能、移除技能 移除 `effect.sound`。
+- **mark 改用 chain**:加标记/去标记 的 `effect.sound` 从 `'mark'` 改为 `'chain'`。
+- **删除 5 个错误音频文件**:target/mark/skill_add/skill_remove/transform(内容为角色台词,不适用)。
+
+#### Added
+- **音效试听页** `public/sound-test.html`:按新结构分组(牌名语音/通用拟声/体力伤害/装备标记/回合阶段),可逐个试听验证。
 
 ### Fixed — 制衡选牌缺少「全选 / 反选」按钮
 

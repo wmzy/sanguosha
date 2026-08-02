@@ -15,7 +15,7 @@ export const 添加技能: AtomDefinition<{ player: number; skillId: string }> =
     if (player.skills.includes(atom.skillId)) return;
     player.skills.push(atom.skillId);
   },
-  effect: { sound: 'skill_add', animation: 'glow', duration: 500 },
+  effect: { animation: 'glow', duration: 500 },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = {
       type: '添加技能',

@@ -15,7 +15,7 @@ export const 声明打出时: AtomDefinition<{ player: number; cardId: string }>
   apply() {
     // 事件标记——转化技可经 before hook modify 替换打出的牌
   },
-  effect: { sound: 'play_card', animation: 'highlight', duration: 400 },
+  effect: { sound: 'flip', animation: 'highlight', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const cardName = state.cardMap[atom.cardId]?.name ?? atom.cardId;
     const view: ViewEvent = {

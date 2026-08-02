@@ -34,7 +34,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
     state.localVars[FROM_HAND_KEY] = fromWasHand;
     state.players[atom.player].hand.push(atom.cardId);
   },
-  effect: { sound: 'obtain', animation: 'slide', duration: 600 },
+  effect: { sound: 'flip', animation: 'slide', duration: 600 },
   /** 模块 F:为「从他人手牌获得」发出「移动到目标区域后」时机标记(reason='获得')。
    *  从装备区获得(ZoneLoc 不含装备)或无 from(牌凭空产生,如仁德/再起)不发标记。 */
   async afterApply(state, atom) {
@@ -50,7 +50,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
     });
   },
   toViewEvents(state, atom): ViewEventSplit {
-    const effect = { sound: 'obtain' as const, animation: 'slide' as const, duration: 600 };
+    const effect = { sound: 'flip' as const, animation: 'slide' as const, duration: 600 };
     // 判断牌来自哪个区域(供 applyView 精确更新)
     const fromZone =
       atom.from !== undefined

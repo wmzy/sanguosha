@@ -78,7 +78,7 @@ export const 移出至暂存区: AtomDefinition<{
     }
     target.vars[atom.varsKey] = list;
   },
-  effect: { sound: 'discard', animation: 'slide', duration: 600 },
+  effect: { sound: 'flip', animation: 'slide', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {
     const target = state.players[atom.target];
     const cards: Card[] = atom.cardIds

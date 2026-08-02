@@ -13,7 +13,7 @@ export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = 
   apply() {
     // 事件标记——after hook 触发雷击/涯角等"打出牌时"时机技能
   },
-  effect: { sound: 'play_card', animation: 'highlight', duration: 400 },
+  effect: { sound: 'flip', animation: 'highlight', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const cardName = state.cardMap[atom.cardId]?.name ?? atom.cardId;
     const view: ViewEvent = {

@@ -24,7 +24,7 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
     state.players[fromIdx].hand = state.players[fromIdx].hand.filter((id) => id !== atom.cardId);
     state.players[toIdx].hand.push(atom.cardId);
   },
-  effect: { sound: 'give', animation: 'slide', duration: 600 },
+  effect: { sound: 'flip', animation: 'slide', duration: 600 },
   /** 模块 F:发出「移动到目标区域后」时机标记(reason='给予',手牌→手牌)。 */
   async afterApply(state, atom) {
     await applyAtom(state, {
@@ -36,7 +36,7 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
     });
   },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { sound: 'give' as const, animation: 'slide' as const, duration: 600 };
+    const effect = { sound: 'flip' as const, animation: 'slide' as const, duration: 600 };
     // toViewEvents 在 apply 之前调用,此时 cardId 还在 from 手牌里。
     // ownerView (from+to):都应看到 cardId 和牌名(从谁给到谁,什么牌)
     const ownerView: ViewEvent = {

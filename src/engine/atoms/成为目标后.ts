@@ -16,7 +16,7 @@ export const 成为目标后: AtomDefinition<{ source: number; cardId?: string; 
   apply() {
     // 事件标记——after hook 触发贞烈/无双②等"成为目标后"时机技能
   },
-  effect: { sound: 'target', animation: 'highlight', duration: 400 },
+  effect: { animation: 'highlight', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const cardName = atom.cardId ? (state.cardMap[atom.cardId]?.name ?? atom.cardId) : undefined;
     const view: ViewEvent = {

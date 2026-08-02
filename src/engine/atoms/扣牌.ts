@@ -37,11 +37,11 @@ export const 扣牌: AtomDefinition<{
     state.localVars['蛊惑/扣牌'] = atom.cardId;
     state.localVars['蛊惑/声明'] = atom.declaredName;
   },
-  effect: { sound: 'play_card', animation: 'flip', duration: 800 },
+  effect: { sound: 'flip', animation: 'flip', duration: 800 },
   toViewEvents(state, atom): ViewEventSplit {
     const card: Card | undefined = state.cardMap[atom.cardId];
     const cardInfo = card ? { name: card.name, suit: card.suit, rank: card.rank } : null;
-    const effect = { sound: 'play_card' as const, animation: 'flip' as const, duration: 800 };
+    const effect = { sound: 'flip' as const, animation: 'flip' as const, duration: 800 };
     // 扣牌者:看到完整牌面(知道自己扣了什么)+ 声明
     const ownerView: ViewEvent = {
       type: '扣牌',

@@ -18,7 +18,7 @@ export const 选择目标时: AtomDefinition<{ source: number; cardId: string; t
   apply() {
     // 事件标记——转化技可经 before hook modify 替换目标集合
   },
-  effect: { sound: 'target', animation: 'highlight', duration: 400 },
+  effect: { animation: 'highlight', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const cardName = state.cardMap[atom.cardId]?.name ?? atom.cardId;
     const view: ViewEvent = {

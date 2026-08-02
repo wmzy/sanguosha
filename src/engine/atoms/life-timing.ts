@@ -31,12 +31,15 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
     target.health = Math.max(0, target.health - atom.amount);
     // 不在此处置 alive——由 death-flow 的 系统处理牌 atom 负责清理。
   },
-  effect: { sound: 'damage_physical', animation: 'shake', particles: 'blood', duration: 800 },
-  toViewEvents(_state, atom): ViewEventSplit {
+  effect: { sound: 'injure_1', animation: 'shake', particles: 'blood', duration: 800 },
+  toViewEvents(state, atom): ViewEventSplit {
+    // 受伤惨叫:按伤害点数选音效(对齐 QSanguosha roomscene.cpp:2874)。
+    // 1点→injure_1, 2点→injure_2, 3点及以上→injure_3。
     const view: ViewEvent = {
       type: '扣减体力',
       target: atom.target,
       amount: atom.amount,
+      effect: { sound: `injure_${Math.min(Math.max(atom.amount, 1), 3)}`, vfx: 'card/damage' } as const,
     };
     return { ownerViews: new Map(), othersView: view };
   },

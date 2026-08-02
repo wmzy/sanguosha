@@ -14,7 +14,7 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
     if (player.pendingTricks.some((t) => t.name === atom.trick.name)) return;
     player.pendingTricks.push(atom.trick);
   },
-  effect: { sound: 'judge_attach', animation: 'glow', duration: 800 },
+  effect: { sound: 'flip', animation: 'glow', duration: 800 },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = {
       type: '添加延时锦囊',

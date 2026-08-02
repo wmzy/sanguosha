@@ -567,6 +567,52 @@ export function MultiplayerPage() {
             <div className={readyInfo}>
               玩家：{mp.roomState?.playerIds.length ?? 0} / {mp.roomState?.maxPlayers ?? 0}
             </div>
+            {/* 玩家列表（旁观者可见谁在房间里） */}
+            {(() => {
+              const seats = mp.roomState?.seats ?? [];
+              const readyPlayers = mp.roomState?.readyPlayers ?? [];
+              if (seats.length === 0) return null;
+              return (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '14px', color: colors.text.muted, marginBottom: '8px' }}>当前玩家</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {seats.map((seatPlayerId, i) => {
+                      const isEmpty = seatPlayerId === null;
+                      const isReady = seatPlayerId !== null && readyPlayers.includes(seatPlayerId);
+                      return (
+                        <div
+                          key={i}
+                          className={btnStyle}
+                          style={{
+                            cursor: 'default',
+                            '--btn-bg': isEmpty
+                              ? colors.bg.input
+                              : isReady
+                                ? colors.accent.green
+                                : colors.accent.darkRed,
+                          } as React.CSSProperties}
+                        >
+                          {isEmpty ? (
+                            <span style={{ color: colors.text.muted }}>P{i + 1} 空位</span>
+                          ) : (
+                            <span>
+                              P{i + 1} {seatPlayerId}
+                              {isReady ? '（已准备）' : '（未准备）'}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            {/* 旁观者列表 */}
+            {(mp.roomState?.spectatorIds.length ?? 0) > 0 && (
+              <div className={readyInfo} style={{ fontSize: '13px', color: colors.text.muted }}>
+                👁 旁观者：{mp.roomState?.spectatorIds.join('、')}
+              </div>
+            )}
             {/* 房间配置（旁观者可见） */}
             {mp.roomState?.config && (
               <div className={configGrid}>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音效试听 · 三国杀</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; line-height: 1.5; color: #e0e0e0; background: #1a1a1a; }
+  h1 { font-size: 19px; margin-bottom: 4px; }
+  .sub { color: #888; font-size: 13px; margin-bottom: 14px; }
+  .group { margin-bottom: 18px; }
+  .group h2 { font-size: 13px; border-bottom: 1px solid #444; color: #60a5fa; margin-bottom: 6px; padding-bottom: 4px; }
+  .row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 5px; border-bottom: 1px solid #222; }
+  .row:hover { background: #ffffff0a; }
+  .row.playing { background: #60a5fa33; }
+  button.play { cursor: pointer; border: 1px solid #555; background: #333; color: #ddd; border-radius: 5px; padding: 4px 10px; font-size: 13px; white-space: nowrap; }
+  .use { font-size: 12px; color: #999; }
+  .dur { font-size: 11px; color: #555; font-family: ui-monospace, monospace; }
+  .anim-preview { max-width: 120px; max-height: 120px; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<h1>🔊 音效 · ✨ 动效 试听</h1>
+<div class="sub">音效点击 ▶ 试听。APNG 动效点击 ▶ 预览动画。资源来自 QSanguosha (CC BY-NC-ND 4.0)。</div>
+<div id="app"></div>
+<script>
+const BASE = "packs/base/";
+const SOUND = BASE + "sound/";
+const ANIM = BASE + "anim/";
+
+const GROUPS = [
+  // ── 通用音效 (path 不含 sound/ 前缀, playSnd 会自动拼上 SOUND) ──
+  ["通用音效", [
+    ["flip", "flip", "摸牌/弃牌/打出/判定", "0.99s"],
+    ["card_place", "card_place", "整理牌堆", "2.72s"],
+    ["shuffle", "shuffle", "重洗", "0.53s"],
+    ["heal", "heal", "回复体力", "2.12s"],
+    ["lose_health", "lose_health", "失去体力", "0.84s"],
+    ["death", "death", "角色死亡(通用)", "4.02s"],
+    ["equip", "equip", "装备(通用)", "0.34s"],
+    ["unequip", "unequip", "卸下装备", "0.39s"],
+    ["chain", "chain", "铁索连环/标记", "1.65s"],
+    ["turn_start", "turn_start", "回合开始", "2.30s"],
+    ["turn_end", "turn_end", "回合结束", "2.27s"],
+    ["phase_start", "phase_start", "阶段开始", "1.46s"],
+    ["phase_end", "phase_end", "阶段结束", "0.71s"],
+  ]],
+  ["系统音效 (P0)", [
+    ["injure_1", "受伤惨叫(1点)", "受1点伤害惨叫", "4.49s"],
+    ["injure_2", "受伤惨叫(2点)", "受2点伤害惨叫", "1.10s"],
+    ["injure_3", "受伤惨叫(3点+)", "受3点及以上伤害惨叫", "2.51s"],
+    ["sos_male", "濒死求救(男)", "男性濒死求桃", "0.81s"],
+    ["sos_female", "濒死求救(女)", "女性濒死求桃", "1.36s"],
+    ["win", "胜利", "胜利", "2.22s"],
+    ["lose", "失败", "失败", "2.27s"],
+    ["prelude", "开场前奏", "开场前奏", "2.30s"],
+  ]],
+];
+
+let cur = null;
+function playSnd(path, row) {
+  if (cur) { cur.pause(); document.querySelectorAll('.playing').forEach(r=>r.classList.remove('playing')); }
+  cur = new Audio(SOUND + path + ".mp3");
+  row.classList.add('playing');
+  cur.play().catch(()=>{ row.classList.remove('playing'); });
+  cur.onended = () => { row.classList.remove('playing'); cur = null; };
+}
+
+const app = document.getElementById('app');
+for (const [gname, items] of GROUPS) {
+  const g = document.createElement('div'); g.className = 'group';
+  g.innerHTML = '<h2>' + gname + '</h2>';
+  for (const [path, label, use, dur] of items) {
+    const row = document.createElement('div'); row.className = 'row';
+    const pb = document.createElement('button'); pb.className = 'play'; pb.textContent = '▶ ' + label;
+    pb.onclick = () => playSnd(path, row);
+    row.append(pb, Object.assign(document.createElement('span'),{className:'use',textContent:use}), Object.assign(document.createElement('span'),{className:'dur',textContent:dur}));
+    g.append(row);
+  }
+  app.append(g);
+}
+
+// 牌名语音 + 装备 + 死亡 + 技能 从目录动态加载
+async function loadDynamic() {
+  // 牌名语音
+  const cardNames = ['杀','闪','桃','酒','无中生有','过河拆桥','顺手牵羊','知己知彼','无懈可击','决斗','南蛮入侵','万箭齐发','桃园结义','五谷丰登','借刀杀人','铁索连环','火攻','兵粮寸断','闪电','乐不思蜀'];
+  addGroup('牌名语音 (使用时播报)', cardNames.map(n => ['card/'+n, n, '打出时播报']));
+
+  // 装备音效
+  try {
+    const resp = await fetch(BASE + 'manifest.json');
+    const manifest = await resp.json();
+    const equipIds = manifest.resources.filter(r => r.id.startsWith('sound/equip/')).map(r => r.id.replace('sound/equip/',''));
+    const deathIds = manifest.resources.filter(r => r.id.startsWith('sound/death/')).map(r => r.id.replace('sound/death/',''));
+    addGroup('装备音效 (' + equipIds.length + ')', equipIds.sort().map(n => ['equip/'+n, n, '装备时播报']));
+    addGroup('死亡台词 (' + deathIds.length + ')', deathIds.sort().map(n => ['death/'+n, n, '阵亡时播报']));
+
+    // 技能台词(按技能名分组)
+    const skillDirs = {};
+    for (const r of manifest.resources) {
+      if (r.id.startsWith('sound/skill/')) {
+        const parts = r.id.replace('sound/skill/','').split('/');
+        const name = parts[0];
+        if (!skillDirs[name]) skillDirs[name] = [];
+        skillDirs[name].push(parts[1]);
+      }
+    }
+    const skillNames = Object.keys(skillDirs).sort();
+    const skillItems = skillNames.flatMap(n => skillDirs[n].sort().map(v => ['skill/'+n+'/'+v, n+' #'+v, '发动时播报']));
+    addGroup('技能台词 (' + skillNames.length + '技能 / ' + skillItems.length + '文件)', skillItems);
+  } catch(e) { console.warn('manifest加载失败', e); }
+}
+function addGroup(name, items) {
+  const g = document.createElement('div'); g.className = 'group';
+  g.innerHTML = '<h2>' + name + '</h2>';
+  for (const [path, label, use] of items) {
+    const row = document.createElement('div'); row.className = 'row';
+    const pb = document.createElement('button'); pb.className = 'play'; pb.textContent = '▶ ' + label;
+    pb.onclick = () => playSnd(path, row);
+    row.append(pb, Object.assign(document.createElement('span'),{className:'use',textContent:use}), Object.assign(document.createElement('span'),{className:'dur',textContent:''}));
+    g.append(row);
+  }
+  app.append(g);
+}
+
+// APNG 动效预览
+function addAnimGroup() {
+  const anims = [
+    ['anim/card/slash_red', '杀(红)', '杀的逐帧动效'],
+    ['anim/card/slash_black', '杀(黑)', '杀的逐帧动效'],
+    ['anim/card/fire_slash', '火杀', '火属性杀动效'],
+    ['anim/card/thunder_slash', '雷杀', '雷属性杀动效'],
+    ['anim/card/jink', '闪', '闪的逐帧动效'],
+    ['anim/card/peach', '桃', '桃的逐帧动效'],
+    ['anim/card/analeptic', '酒', '酒的逐帧动效'],
+    ['anim/card/duel', '决斗', '决斗逐帧动效'],
+    ['anim/card/chain', '铁索连环', '连环动效'],
+    ['anim/card/damage', '伤害', '伤害动效'],
+    ['anim/card/success', '判定成功', '判定成功动效'],
+    ['anim/card/no_success', '判定失败', '判定失败动效'],
+    ['anim/card/skill_nullify', '无懈可击', '无懈动效'],
+    ['anim/card/killer', '击杀', '击杀动效'],
+    ['anim/card/revive', '复活', '复活动效'],
+  ];
+  const g = document.createElement('div'); g.className = 'group';
+  g.innerHTML = '<h2>✨ APNG 动效 (' + anims.length + ')</h2>';
+  for (const [path, label, use] of anims) {
+    const row = document.createElement('div'); row.className = 'row';
+    const pb = document.createElement('button'); pb.className = 'play'; pb.textContent = '▶ ' + label;
+    pb.onclick = () => {
+      // 切换预览
+      row.querySelectorAll('.anim-preview').forEach(e => e.remove());
+      const img = document.createElement('img');
+      img.className = 'anim-preview';
+      img.src = ANIM + path.replace('anim/','') + '.apng';
+      row.append(img);
+    };
+    row.append(pb, Object.assign(document.createElement('span'),{className:'use',textContent:use}));
+    g.append(row);
+  }
+  app.append(g);
+}
+
+loadDynamic().then(addAnimGroup);
+</script>
+</body>
+</html>

@@ -78,9 +78,9 @@ export const 当作: AtomDefinition<{
     self.hand = self.hand.filter((c) => !atom.cardIds.includes(c));
     self.hand.push(atom.shadowId);
   },
-  effect: { sound: 'transform', animation: 'flash', duration: 400 },
+  effect: { sound: 'flip', animation: 'flash', duration: 400 },
   toViewEvents(_state, atom): ViewEventSplit {
-    const effect = { sound: 'transform' as const, animation: 'flash' as const, duration: 400 };
+    const effect = { sound: 'flip' as const, animation: 'flash' as const, duration: 400 };
     const ownerView: ViewEvent = {
       type: '当作',
       player: atom.player,

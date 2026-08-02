@@ -15,7 +15,7 @@ export const 移除技能: AtomDefinition<{ player: number; skillId: string }> =
       (id) => id !== atom.skillId,
     );
   },
-  effect: { sound: 'skill_remove', animation: 'fade', duration: 400 },
+  effect: { animation: 'fade', duration: 400 },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = {
       type: '移除技能',

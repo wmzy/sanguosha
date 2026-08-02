@@ -263,7 +263,15 @@ export function applyRestRoutes(app: Hono): void {
     if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
 
     const ok = setReady(roomId, playerId);
-    if (!ok) return c.json({ error: '准备失败' }, 400);
+    if (!ok) {
+      const room = getRoom(roomId);
+      const reason = !room
+        ? '房间不存在'
+        : room.status !== '等待中'
+          ? '房间已开局,无需准备'
+          : '准备失败';
+      return c.json({ error: reason }, 400);
+    }
 
     const room = getRoom(roomId);
     if (room) {

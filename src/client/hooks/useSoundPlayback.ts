@@ -1,23 +1,25 @@
 // src/client/hooks/useSoundPlayback.ts
-// 音效播放 hook:跟随 useEventPlayback 的 current(正在播放的事件),
-// 在事件"成为当前项"时响,与视觉横幅/动效同步、逐个串行。
+// 音效播放 hook:监听 ingested 立即批次,与视觉动作(stateDiff 驱动的手牌±/飞牌动画)同帧响应,
+// 而非跟随延时横幅队列(useEventPlayback.current)。
 //
-// 为什么不用 ingested 批次:
-//   实时对局中,服务端一次操作(如出杀)会接连推送多个 ViewEvent(打出/使用/伤害/扣血…)。
-//   多条 SSE 消息常落在 React 同一渲染批次,setIngestedEvents 被合并,监听 ingested 的
-//   useEffect 会在一次执行里同步播放整批音效 → 叠音("一个操作同时响多个音效")。
-//   current 由 useEventPlayback 逐个出队(每事件等待其 effect.duration),天然串行,
-//   音效跟随它即可做到"一个事件一声、不叠",且与视觉横幅同帧出现。
+// 为什么不用 current(横幅队列):
+//   横幅队列逐个出队、每事件等 max(duration, 400ms)。回合切换时结构事件(回合开始 1500ms
+//   + 阶段开始 1000ms …)累计占用队列,后面的摸牌音效要等数秒才响,而手牌早在 T=0 就增加了
+//   → 音效与动作严重错位。音效应跟随"事件到达"(ingested),与视觉同帧。
 //
-// effect 取值范式(与 EventBanner.tsx 一致):
-//   const atomType = event.atomType ?? event.type;
-//   const def = getAtomDef(atomType);             // 可能抛(派生事件 type 不在注册表),需 try/catch
-//   const effect = (event.effect as EventEffect) ?? def.effect;
-//   const soundId = effect?.sound;
+// 叠音处理——双轨:
+//   1. 氛围音效(turn_start/end, phase_start/end):fire-and-forget 立即响,不串行。
+//      回合切换本就该"氛围连响",轻微重叠符合直觉,且绝不阻塞牌操作音效。
+//   2. 动作音效(flip / card/* / injure_* / equip …):进串行队列,间隔基于音频实际时长
+//      (留 ~30% 尾部重叠做过渡)。避免一次操作的多事件(出杀 → 伤害 → 惨叫)叠成一声。
 //
-// per-event 音量:effect.volume(0..1)与全局音量在 audioEngine 内部相乘。
+// StrictMode 安全:
+//   不用独立的 playingRef 控制串行——StrictMode 的 mount→cleanup→remount 循环中 cleanup
+//   清了 timer 但 playingRef 会卡在 true,导致后续 drain 永远 return。改用 timerRef.current
+//   !== null 判断是否在播放;cleanup 清 timer 即同时解锁 drain。effect 末尾总调 drain(),
+//   remount 时 fresh 虽空但队列可能有余项,timer 已被 cleanup 清除 → 可正常出队。
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import type { ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/atom';
 import { audioEngine } from '../sounds/audioEngine';
@@ -25,6 +27,14 @@ import type { QueuedEvent } from './useEventPlayback';
 
 /** ViewEvent 自带的 effect 片段(移动牌等派生事件携带;静态 atom 走 getAtomDef) */
 type EventEffect = { sound?: string; volume?: number } | undefined;
+
+/** 氛围音效:回合/阶段切换,fire-and-forget 不串行(不阻塞牌操作) */
+const AMBIENT_SOUNDS = new Set(['turn_start', 'turn_end', 'phase_start', 'phase_end']);
+/** 动作音效串行间隔(ms):基于音频时长 *0.7,夹在此区间内 */
+const MIN_ACTION_GAP_MS = 200;
+const MAX_ACTION_GAP_MS = 700;
+/** 音频时长未知时的默认间隔(首次播放 buffer 尚未加载) */
+const DEFAULT_ACTION_GAP_MS = 350;
 
 /**
  * 从 ViewEvent 提取 effect.sound / effect.volume。
@@ -44,25 +54,72 @@ function extractSound(event: ViewEvent): { sound: string; volume?: number } | nu
   return { sound: effect.sound, volume: effect.volume };
 }
 
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
+
 /**
- * 音效播放 hook。跟随播放队列的 current 事件逐个发声。
+ * 音效播放 hook。监听 ingested 立即批次,与视觉动作同帧响应。
  *
- * @param current  useEventPlayback 的 current(正在展示的事件)。
- *                 null/undefined 时无副作用。
+ * 双轨:氛围音效立即响(fire-and-forget),动作音效串行(间隔基于音频时长,避免叠音)。
  *
- * 同一 seq 只响一次:lastPlayedSeqRef 记录最近播放的 seq,防止 React 重渲染或
- * StrictMode 双触发导致重复发声。回放 prev(回退)后再次 next 前进时仍会重放,
- * 因为 seq 与上次不同。
+ * @param ingested  事件批次(来自 useEventPlayback.ingested 或 connection hook 的 ingestedEvents)。
+ *                  null/undefined/空数组时无副作用。
  */
-export function useSoundPlayback(current: QueuedEvent | null | undefined): void {
-  const lastPlayedSeqRef = useRef<number>(-1);
+export function useSoundPlayback(ingested: readonly QueuedEvent[] | null | undefined): void {
+  const lastSeqRef = useRef(0);
+  const actionQueueRef = useRef<{ sound: string; volume?: number }[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** 串行出队:逐个播放动作音效,间隔基于音频实际时长(留尾部重叠做过渡)。
+   *  用 timerRef.current !== null 判断是否在播放(StrictMode 安全:cleanup 清 timer 即解锁)。 */
+  const drain = useCallback(() => {
+    if (timerRef.current !== null) return;
+    const item = actionQueueRef.current.shift();
+    if (!item) return;
+    audioEngine.play(item.sound, item.volume);
+    const dur = audioEngine.getDuration(item.sound);
+    const gap = clamp(
+      dur != null ? dur * 0.7 : DEFAULT_ACTION_GAP_MS,
+      MIN_ACTION_GAP_MS,
+      MAX_ACTION_GAP_MS,
+    );
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      drain();
+    }, gap);
+  }, []);
 
   useEffect(() => {
-    if (!current) return;
-    const sound = extractSound(current.event);
-    if (!sound) return;
-    if (current.seq === lastPlayedSeqRef.current) return;
-    lastPlayedSeqRef.current = current.seq;
-    audioEngine.play(sound.sound, sound.volume);
-  }, [current]);
+    if (ingested && ingested.length > 0) {
+      const fresh = ingested.filter((e) => e.seq > lastSeqRef.current);
+      if (fresh.length > 0) {
+        lastSeqRef.current = Math.max(...fresh.map((e) => e.seq));
+        for (const { event } of fresh) {
+          const s = extractSound(event);
+          if (!s) continue;
+          if (AMBIENT_SOUNDS.has(s.sound)) {
+            // 氛围音效:立即响,不进串行队列
+            audioEngine.play(s.sound, s.volume);
+          } else {
+            // 动作音效:入串行队列
+            actionQueueRef.current.push(s);
+          }
+        }
+      }
+    }
+    // 总是尝试出队:StrictMode remount 时 fresh 为空但队列可能有余项,
+    // timer 已被 cleanup 清除(null)→ 可正常出队。
+    drain();
+  }, [ingested, drain]);
+
+  // 卸载/StrictMode cleanup:清 timer 即同时解锁 drain(timerRef=null)
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
 }

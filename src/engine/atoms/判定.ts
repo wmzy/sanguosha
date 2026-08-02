@@ -56,7 +56,7 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     };
     return { ownerViews: new Map(), othersView: view };
   },
-  effect: { sound: 'judge', animation: 'flip', blockUntilDone: true, duration: 1800 },
+  effect: { sound: 'flip', animation: 'flip', blockUntilDone: true, duration: 1800 },
   applyView(view: GameView, _event: ViewEvent) {
     // 后端 apply+afterHooks 净效果: deck -1, processing 不变(进后出), discardPile +1。
     // applyView 对应净效果: deckCount -1, discardPileCount +1, processing 不变。

@@ -41,7 +41,7 @@ export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }
       if (!player.hand.includes(id)) player.hand.push(id);
     }
   },
-  effect: { sound: 'draw', animation: 'slide', duration: 600 },
+  effect: { sound: 'flip', animation: 'slide', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {
     const list =
       (state.players[atom.player].vars[atom.varsKey] as string[] | undefined) ?? [];

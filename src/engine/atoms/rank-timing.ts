@@ -56,11 +56,11 @@ export const 拼点扣置: AtomDefinition<RankCompareAtom> = {
       dest.push(cardId);
     }
   },
-  effect: { sound: 'play_card', animation: 'flip', duration: 800 },
+  effect: { sound: 'flip', animation: 'flip', duration: 800 },
   toViewEvents(state, atom): ViewEventSplit {
     const initFace = cardFace(state.cardMap[atom.initiatorCard]);
     const tgtFace = cardFace(state.cardMap[atom.targetCard]);
-    const effect = { sound: 'play_card' as const, animation: 'flip' as const, duration: 800 };
+    const effect = { sound: 'flip' as const, animation: 'flip' as const, duration: 800 };
     const base = {
       type: '拼点扣置',
       initiator: atom.initiator,

@@ -1738,7 +1738,7 @@ interface ActionLogEntry {
 
 { type: '造成伤害',           all: { type: '造成伤害', target: 'P2', amount: 1,
   target: 'P2', amount: 1,       source: 'P1',
-  source: 'P1' }                 effect: { sound: 'damage_physical', animation: 'shake' } }
+  source: 'P1' }                 effect: { sound: 'injure_1', animation: 'shake' } }
 
 { type: '移动牌',             owner(P1): { type: '弃牌', player: 'P1',
   from: 手牌(P1),                 card: { name: '闪', suit: '♥', rank: 3 },

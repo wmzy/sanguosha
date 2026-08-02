@@ -36,7 +36,7 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
     preResolve: (state, atom) =>
       cardResponsePreResolveForTarget(state, '询问杀', atom.target, (c) => c.name === '杀'),
   },
-  effect: { sound: 'slash_request', blockUntilDone: true, duration: 200 },
+  effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(state, atom): ViewEventSplit {
     const mode = evaluateCardResponseModeForTarget(state, '询问杀', atom.target, (c) => c.name === '杀');
     const timeoutMs =

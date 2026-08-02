@@ -50,7 +50,7 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
       });
     }
   },
-  effect: { sound: 'discard', animation: 'flip', duration: 600 },
+  effect: { sound: 'flip', animation: 'flip', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {
     // toViewEvents 在 apply 之前调用,此时 state 尚未变更。
     // 记录每张牌所在区域(zone),供 applyView 精确扣减 handCount/equipment。

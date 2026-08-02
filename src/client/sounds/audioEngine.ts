@@ -199,6 +199,15 @@ class AudioEngine {
     }
   }
 
+  /**
+   * 查询已缓存音频的实际时长(秒)。未加载/缺失时返回 undefined。
+   * 供 useSoundPlayback 计算串行间隔,避免动作音效叠音。
+   */
+  getDuration(soundId: string): number | undefined {
+    const entry = this.bufferCache.get(soundId);
+    return entry?.status === 'ok' ? entry.buffer.duration : undefined;
+  }
+
   /** 清理缓存最早条目(FIFO 淘汰) */
   private evictOldest(): void {
     const firstKey = this.bufferCache.keys().next().value;
@@ -217,6 +226,6 @@ class AudioEngine {
  * 全局单例。整个应用共享一个 AudioContext + buffer 缓存。
  * 使用方式:
  *   import { audioEngine } from '../sounds/audioEngine';
- *   audioEngine.play('damage_physical', 0.8);
+ *   audioEngine.play('injure_1', 0.8);
  */
 export const audioEngine = new AudioEngine();

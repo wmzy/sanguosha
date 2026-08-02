@@ -184,8 +184,13 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         if (phase === 'ended' && !hgc.isSpectator) setStage('ended');
       },
       onGameOver: (winner) => setGameOver({ winner }),
-      onError: () => {
-        /* WS error 已由 onclose → 重连机制覆盖 */
+      onError: (err) => {
+        // 操作类失败（ready/start/chat/config 等服务端 4xx）——显示错误提示。
+        // WS 断连走 onReconnectStateChange，不会进入这里。
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error('room op failed', { error: msg });
+        setError(msg);
+        setTimeout(() => setError(null), 3000);
       },
       onReconnectStateChange: (state: ReconnectState, attempt: number) => {
         setReconnectAttempt(attempt);

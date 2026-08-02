@@ -987,11 +987,15 @@ export class HeadlessGameClient {
     try {
       const body: Record<string, unknown> = { playerId: this._playerId, config };
       if (maxPlayers !== undefined) body.maxPlayers = maxPlayers;
-      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/config`, {
+      const resp = await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (!resp.ok) {
+        const body = (await resp.json().catch(() => ({}))) as { error?: string };
+        this.callbacks.onError?.(new Error(body.error ?? '更新配置失败'));
+      }
     } catch (err) {
       this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
     }
@@ -1001,11 +1005,17 @@ export class HeadlessGameClient {
   private async postRoomOp(op: string): Promise<void> {
     if (!this._roomId || !this._playerId) return;
     try {
-      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/${op}`, {
+      const resp = await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/${op}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerId: this._playerId }),
       });
+      // 服务端 4xx/5xx（如房间已开局、非房主、未全员准备）必须上报,
+      // 否则前端静默吞掉表现为「点击无响应」。
+      if (!resp.ok) {
+        const body = (await resp.json().catch(() => ({}))) as { error?: string };
+        this.callbacks.onError?.(new Error(body.error ?? `${op} 失败(${resp.status})`));
+      }
     } catch (err) {
       this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
     }

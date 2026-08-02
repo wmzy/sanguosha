@@ -16,7 +16,7 @@ export const 加标记: AtomDefinition<{
   apply(state, atom) {
     state.players[atom.player].marks.push(atom.mark);
   },
-  effect: { sound: 'mark', animation: 'pulse', duration: 400 },
+  effect: { sound: 'chain', animation: 'pulse', duration: 400 },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = {
       type: '加标记',

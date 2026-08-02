@@ -1,111 +1,96 @@
 // src/client/sounds/soundMap.ts
-// 音效标识符 → 资源路径映射表。
+// 音效标识符 → 资源路径映射。
 //
-// 引擎各 atom 通过 `AtomEffect.sound` 声明音效标识符(字符串),前端在此查表得到
-// 实际音频资源 URL。资源约定放在 `public/sounds/{soundId}.mp3`,由 Vite 静态服务。
+// 音效分两类:
+//   1. 通用拟声(底层操作):摸牌/弃牌/获得/打出/判定等统一用 flip 短促拟声。
+//   2. 牌名语音(使用时):打出锦囊/延时锦囊时按牌名播报,标识符为 `card/{牌名}`。
+//      由 使用时 atom 的 toViewEvents 动态设置 effect.sound。
 //
-// 取 effect 的统一范式(与 EventBanner 一致):
-//   const atomType = event.atomType ?? event.type;
-//   const def = getAtomDef(atomType);             // 可能抛,需 try/catch
-//   const effect = (event.effect as EventEffect) ?? def.effect;
-//   const soundId = effect?.sound;
-//
-// 注意:派生事件(移动牌派生的"打出/弃牌/摸牌")的 type ≠ atom 名,必须用
-// event.atomType ?? event.type 查 def。部分派生事件在 toViewEvents 里直接把 effect
-// 挂到 event.effect 上(优先于静态查表)。
+// 解析路径:resolveSoundUrl(id) → resourceManager.get(`sound/${id}`)
+//   - flip           → sound/flip.mp3
+//   - card/杀        → sound/card/杀.mp3
+//   - card/无中生有  → sound/card/无中生有.mp3
+//   无对应音频文件的标识符 → audioEngine 404 负缓存静默跳过。
 //
 // ─── 资源放置说明 ───
-// 真实音频文件由用户后续放入 public/sounds/。文件缺失时 audioEngine 会静默跳过
-// (负缓存:首次 404 后不再重试),不报错、不刷屏 console。
-// 文件格式建议 mp3(兼容性最佳)或 ogg(体积更小)。详见 public/sounds/README.md。
+// 音频文件在 public/packs/base/sound/ 下,由 manifest.json 声明,ResourceManager 解析。
+// 文件缺失时静默跳过(负缓存)。格式建议 mp3。
 
 /**
- * 音效标识符 → 资源 URL 映射。
+ * 通用音效标识符 → 资源 URL 映射(文档参考,实际解析走 ResourceManager)。
  *
- * 下表列出引擎中已配置(或未来会配置)的所有 sound 标识符。
- * 每个标识符指向约定路径 `/sounds/{id}.mp3`(Vite 会把 public/ 下的文件映射到根路径)。
+ * | 标识符           | 语义                           | 触发 atom / 派生事件                              |
+ * |-----------------|--------------------------------|---------------------------------------------------|
+ * | flip            | 通用卡牌操作拟声(短促)        | 摸牌/弃牌/获得/给予/打出/扣牌/判定/展示/拼点 等    |
+ * | card_place      | 整理牌堆                       | 整理牌堆                                           |
+ * | shuffle         | 重洗                           | 重洗                                               |
+ * | heal            | 回复体力                       | 回复体力                                           |
+ * | lose_health     | 失去体力(非伤害型)            | 失去体力                                           |
+ * | sos_male/female | 濒死求救(按武将性别)          | 陷入濒死(toViewEvents 动态选)                     |
+ * | death           | 角色死亡                       | 亮身份牌 / 系统处理牌                              |
+ * | equip           | 装备                           | 装备                                               |
+ * | unequip         | 卸下装备                       | 卸下                                               |
+ * | chain           | 铁索连环 / 加标记 / 去标记     | 设横置 / 加标记 / 去标记                            |
+ * | turn_start      | 回合开始                       | 回合开始                                           |
+ * | turn_end        | 回合结束                       | 回合结束                                           |
+ * | phase_start     | 阶段开始                       | 阶段开始                                           |
+ * | phase_end       | 阶段结束                       | 阶段结束                                           |
  *
- * | 标识符           | 语义                                   | 触发 atom / 派生事件                              |
- * |-----------------|----------------------------------------|---------------------------------------------------|
- * | play_card       | 打出/拼点扣置(牌扣到桌面)              | 声明打出时 / 拼点扣置 / 扣牌 / 移动牌→打出          |
- * | flip            | 翻牌(拼点亮出/蛊惑展示)                | 拼点亮出 / 展示                                    |
- * | target          | 指定/成为目标(高亮提示)               | 使用时 / 指定目标 / 成为目标 / 选择目标时 等        |
- * | damage_physical | 扣减体力(受物理伤害)                  | 扣减体力                                           |
- * | heal            | 回复体力                               | 回复体力                                           |
- * | lose_health     | 失去体力(非伤害型)                    | 失去体力                                           |
- * | judge           | 判定翻牌                               | 判定                                               |
- * | death           | 角色死亡                               | 死亡时 / 系统处理牌                                |
- * | discard         | 弃牌                                   | 弃置 / 移动牌→弃牌 / 移出至暂存区                   |
- * | draw            | 摸牌                                   | 摸牌 / 移动牌→摸牌 / 归还暂存牌 / 置创牌            |
- * | unequip         | 卸下装备                               | 卸下                                               |
- * | mark            | 加/去标记                              | 加标记 / 去标记                                    |
- * | turn_start      | 回合开始                               | 回合开始                                           |
- * | turn_end        | 回合结束                               | 回合结束                                           |
- * | transform       | 转化(丈八蛇矛/武圣当杀)              | 当作                                               |
- * | pindian         | 拼点(音效保留,拼点扣置/亮出走 play_card/flip) | (未用,保留音效文件)                       |
- * | card_place      | 整理牌堆                               | 整理牌堆                                           |
- * | shuffle         | 重洗                                   | 重洗                                               |
- * | judge_attach    | 添加延时锦囊(乐不思蜀/闪电等)        | 添加延时锦囊                                       |
- * | judge_remove    | 移除延时锦囊                           | 移除延时锦囊                                       |
- * | skill_add       | 添加技能                               | 添加技能                                           |
- * | skill_remove    | 移除技能                               | 移除技能                                           |
- * | give            | 给予(给牌)                           | 给予                                               |
- * | obtain          | 获得(从他人/牌堆获得牌)              | 获得                                               |
- * | equip           | 装备                                   | 装备                                               |
- * | chain          | 铁索连环(横置)                       | 设横置                                             |
- * | slash_request   | 询问杀(被要求出杀)                   | 询问杀                                             |
- * | dodge_request   | 询问闪(被要求出闪)                   | 询问闪                                             |
- * | phase_start     | 阶段开始                               | 阶段开始                                           |
- * | phase_end       | 阶段结束                               | 阶段结束                                           |
- * | dying          | 陷入濒死                               | 陷入濒死                                           |
+ * 牌名语音(动态标识符,不在下表中):
+ * | card/杀         | 杀                             | 使用时(出杀)                                     |
+ * | card/无中生有   | 无中生有                       | 使用时                                             |
+ * | card/过河拆桥   | 过河拆桥                       | 使用时                                             |
+ * | card/知己知彼   | 知己知彼                       | 使用时                                             |
+ * | card/顺手牵羊   | 顺手牵羊                       | 使用时                                             |
+ * | card/火攻       | 火攻                           | 使用时                                             |
+ * | card/闪电       | 闪电                           | 使用时                                             |
+ * | card/乐不思蜀   | 乐不思蜀                       | 使用时                                             |
+ * | card/无懈可击   | 无懈可击                       | 使用时                                             |
+ * | card/桃         | 桃                             | 使用时                                             |
+ * | card/酒         | 酒                             | 使用时                                             |
+ * | card/闪         | 闪                             | 使用时                                             |
+ * | card/南蛮入侵   | 南蛮入侵                       | 使用时                                             |
+ * | card/桃园结义   | 桃园结义                       | 使用时                                             |
+ * | card/五谷丰登   | 五谷丰登                       | 使用时                                             |
+ * | card/借刀杀人   | 借刀杀人                       | 使用时                                             |
+ * | card/铁索连环   | 铁索连环                       | 使用时                                             |
+ * | card/兵粮寸断   | 兵粮寸断                       | 使用时                                             |
+ * | card/决斗       | 决斗                           | 使用时                                             |
+ * | card/万箭齐发   | 万箭齐发                       | 使用时                                             |
+ * 标准牌堆中所有基本牌+锦囊牌均有语音(共 20 张),装备牌走「装备」atom 通用 equip 音效。
  */
 
 import { resourceManager } from '../resources';
 
+/** 通用音效标识符 → 资源 URL(文档参考,resolveSoundUrl 实际走 ResourceManager)。 */
 export const SOUND_MAP: Readonly<Record<string, string>> = {
-  // ─── 卡牌操作 ───
-  play_card: '/sounds/play_card.mp3',
+  // ─── 通用拟声(底层操作) ───
   flip: '/sounds/flip.mp3',
-  target: '/sounds/target.mp3',
-  draw: '/sounds/draw.mp3',
-  discard: '/sounds/discard.mp3',
-  give: '/sounds/give.mp3',
-  obtain: '/sounds/obtain.mp3',
-  pindian: '/sounds/pindian.mp3',
   card_place: '/sounds/card_place.mp3',
   shuffle: '/sounds/shuffle.mp3',
   // ─── 体力/伤害 ───
-  damage_physical: '/sounds/damage_physical.mp3',
+  // injure_1/2/3: 受伤惨叫(按伤害点数),见系统音效
   heal: '/sounds/heal.mp3',
   lose_health: '/sounds/lose_health.mp3',
-  dying: '/sounds/dying.mp3',
   death: '/sounds/death.mp3',
   // ─── 装备/标记 ───
   equip: '/sounds/equip.mp3',
   unequip: '/sounds/unequip.mp3',
-  mark: '/sounds/mark.mp3',
   chain: '/sounds/chain.mp3',
-  // ─── 判定 ───
-  judge: '/sounds/judge.mp3',
-  judge_attach: '/sounds/judge_attach.mp3',
-  judge_remove: '/sounds/judge_remove.mp3',
-  // ─── 技能 ───
-  skill_add: '/sounds/skill_add.mp3',
-  skill_remove: '/sounds/skill_remove.mp3',
-  transform: '/sounds/transform.mp3',
   // ─── 回合/阶段 ───
   turn_start: '/sounds/turn_start.mp3',
   turn_end: '/sounds/turn_end.mp3',
   phase_start: '/sounds/phase_start.mp3',
   phase_end: '/sounds/phase_end.mp3',
-  // ─── 询问 ───
-  slash_request: '/sounds/slash_request.mp3',
-  dodge_request: '/sounds/dodge_request.mp3',
+  // ─── 牌名语音(使用时按牌名动态播放) ───
+  // 标识符 = `card/${牌名}`,资源路径 = /sounds/card/{牌名}.mp3
+  // 例: 'card/杀' → /sounds/card/杀.mp3
 };
 
 /**
  * 根据 sound 标识符解析资源 URL。
- * 未在映射表中登记的标识符返回 null(调用方应跳过)。
+ * 支持通用标识符(如 'flip')和牌名标识符(如 'card/杀')。
+ * 未登记的标识符返回 null(调用方应跳过)。
  */
 export function resolveSoundUrl(soundId: string): string | null {
   return resourceManager.get(`sound/${soundId}`);

@@ -126,9 +126,15 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
       }
     }
   },
-  effect: { sound: 'death', animation: 'fade', duration: 1500 },
+  effect: { animation: 'fade', duration: 1500 },
   toViewEvents(state, atom): ViewEventSplit {
-    const view: ViewEvent = { type: '系统处理牌', player: atom.player };
+    const character = state.players[atom.player]?.character;
+    const view: ViewEvent = {
+      type: '系统处理牌',
+      player: atom.player,
+      // 按武将名播报专属死亡语音(无对应文件时 audioEngine 静默跳过)
+      ...(character ? { effect: { sound: `death/${character}` } as const } : {}),
+    };
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {

@@ -43,7 +43,7 @@ export const 置创牌: AtomDefinition<{ player: number }> = {
     // 重复判定结果写入 localVars 供不屈 hook 读取(apply 完成后 hook 才读)
     state.localVars['不屈/重复'] = duplicate;
   },
-  effect: { sound: 'draw', animation: 'flip', duration: 800 },
+  effect: { sound: 'flip', animation: 'flip', duration: 800 },
   toViewEvents(state, atom): ViewEventSplit {
     // ⚠ toViewEvents 在 apply 之前调用(state 尚未变更),须从 pre-apply state 独立计算:
     //   牌堆顶 = deck 末尾(apply 尚未 pop);重复判定对已有创牌列表(apply 尚未追加)

@@ -57,7 +57,7 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     // 设距离修正 vars(卸下 atom 清除)
     applyEquipVars(state, atom.player, slot, card);
   },
-  effect: { sound: 'equip', animation: 'glow', duration: 400 },
+  effect: { animation: 'glow', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const card = state.cardMap[atom.cardId];
     const slot = inferSlot(card.subtype)!;
@@ -69,6 +69,8 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
       slot,
       // 武器攻击范围:applyView 需要同步到 distanceVars.attackRange
       ...(slot === '武器' ? { range: card.range ?? 1 } : {}),
+      // 按装备名播报专属音效(无对应文件时 audioEngine 静默跳过)
+      effect: { sound: `equip/${card.name}` } as const,
     };
     return { ownerViews: new Map(), othersView: view };
   },

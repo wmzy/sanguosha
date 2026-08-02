@@ -10,6 +10,8 @@
 import type { GameView } from '../../engine/types';
 import { css, cx } from '@linaria/core';
 import { IDENTITY_COLORS, FACTION_BG } from './gameViewConstants';
+import { audioEngine } from '../sounds/audioEngine';
+import { useEffect, useRef } from 'react';
 
 export interface GameResultOverlayProps {
   /** 胜方:座次号字符串,或 '无人' */
@@ -75,6 +77,16 @@ export function GameResultOverlay({
   const myCamp = identityCamp(me?.identity);
   const iWon: boolean | null =
     isDraw || !me ? null : myCamp !== null && myCamp === winCamp;
+
+  // 胜负音效:组件挂载时播放一次(胜负结果揭晓)
+  const soundPlayed = useRef(false);
+  useEffect(() => {
+    if (soundPlayed.current) return;
+    soundPlayed.current = true;
+    if (isDraw) return;
+    if (iWon === null) return; // 旁观者不播音
+    audioEngine.play(iWon ? 'win' : 'lose', 0.6);
+  }, [isDraw, iWon]);
 
   return (
     <div className={overlayRoot}>

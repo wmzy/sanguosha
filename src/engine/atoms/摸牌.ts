@@ -65,9 +65,9 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
     }
     state.players[atom.player].hand.push(...plan.drawn);
   },
-  effect: { sound: 'draw', animation: 'slide', duration: 600 },
+  effect: { sound: 'flip', animation: 'slide', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {
-    const effect = { sound: 'draw' as const, animation: 'slide' as const, duration: 600 };
+    const effect = { sound: 'flip' as const, animation: 'slide' as const, duration: 600 };
     const plan = planDraw(state, atom.count);
     const cards = plan.drawn.map((id) => state.cardMap[id]).filter(Boolean);
     const base = {

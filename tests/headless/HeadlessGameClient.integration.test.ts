@@ -72,4 +72,33 @@ describe.skipIf(!serverUp)('HeadlessGameClient 集成', () => {
     hgc.disconnect();
     expect(reachedLobby).toBe(true);
   }, 10000);
+
+  // 回归：房间已开局时点「准备」必须上报错误，而不是静默吞掉（用户报告的「点击无响应」）。
+  it('已开局房间 sendReady → onError 收到明确错误', async () => {
+    const errors: string[] = [];
+    const hgc = new HeadlessGameClient(SERVER, {
+      onError: (e) => {
+        errors.push(e.message);
+      },
+    });
+    await hgc.createDebugRoom(2);
+    const deadline = Date.now() + 6000;
+    while (Date.now() < deadline && hgc.playerId === null) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(hgc.playerId).not.toBeNull();
+
+    // 开局（debug 房间任意座次可触发，跳过 allReady）
+    await hgc.sendStartGame();
+    // 等房间进入进行中（start 同步返回后 status 已变，直接继续）
+
+    // 已开局房间点准备：应触发 onError 而非静默
+    errors.length = 0;
+    await hgc.sendReady();
+    await new Promise((r) => setTimeout(r, 300));
+    hgc.disconnect();
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toContain('开局');
+  }, 12000);
 });
