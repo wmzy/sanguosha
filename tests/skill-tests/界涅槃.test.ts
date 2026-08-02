@@ -103,8 +103,9 @@ describe('界涅槃', () => {
     await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();
 
-    // 界涅槃主流程跑完后,询问三选一(请求回应 pending,requestType='界涅槃/选技能')
-    await PT.respond('界涅槃', { skill: '八阵' });
+    // 界涅槃主流程跑完后,逐个询问三选一(顺序 confirm)
+    // 选八阵:第一个 confirm 回 true
+    await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();
 
     // 庞统存活,回复至3点体力
@@ -161,8 +162,10 @@ describe('界涅槃', () => {
     await harness.waitForStable();
     await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();
-    // 三选一:选火计
-    await PT.respond('界涅槃', { skill: '火计' });
+    // 三选一:选火计→跳过八阵,确认火计
+    await PT.respond('界涅槃', { choice: false }); // 跳过八阵
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: true }); // 选火计
     await harness.waitForStable();
 
     expect(harness.state.players[0].skills).toContain('火计');
@@ -205,7 +208,11 @@ describe('界涅槃', () => {
     await harness.waitForStable();
     await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();
-    await PT.respond('界涅槃', { skill: '看破' });
+    await PT.respond('界涅槃', { choice: false }); // 跳过八阵
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: false }); // 跳过火计
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: true }); // 选看破
     await harness.waitForStable();
 
     expect(harness.state.players[0].skills).toContain('看破');
@@ -303,7 +310,11 @@ describe('界涅槃', () => {
     await harness.waitForStable();
     await PT.respond('界涅槃', { choice: true });
     await harness.waitForStable();
-    await PT.respond('界涅槃', { skill: '看破' });
+    await PT.respond('界涅槃', { choice: false }); // 跳过八阵
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: false }); // 跳过火计
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: true }); // 选看破
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(1);
     expect(harness.state.players[0].vars['界涅槃/used']).toBe(true);
