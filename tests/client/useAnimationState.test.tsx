@@ -119,6 +119,53 @@ describe('useAnimationState · 伤害检测(damageFlashIndices)', () => {
   });
 });
 
+describe('useAnimationState · 回血检测(healFlashIndices)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('玩家 HP 上升时记录回血座次并递增版本号(桃/桃园结义/急救)', () => {
+    const { result, rerender } = renderHook(({ view }) => useAnimationState(view, 0), {
+      initialProps: { view: makeView({ p0Hp: 3, p1Hp: 4 }) },
+    });
+    // P0 回血 3→4(出桃自救)
+    rerender({ view: makeView({ p0Hp: 4, p1Hp: 4 }) });
+    expect(result.current.healFlashIndices.get(0)).toBe(1);
+    // 伤害座次不受影响:回血不误触伤害闪烁
+    expect(result.current.damageFlashIndices.size).toBe(0);
+  });
+
+  it('连续回血版本号递增(不读旧 state 快照)', () => {
+    const { result, rerender } = renderHook(({ view }) => useAnimationState(view, 0), {
+      initialProps: { view: makeView({ p0Hp: 2 }) },
+    });
+    rerender({ view: makeView({ p0Hp: 3 }) });
+    expect(result.current.healFlashIndices.get(0)).toBe(1);
+    rerender({ view: makeView({ p0Hp: 4 }) });
+    expect(result.current.healFlashIndices.get(0)).toBe(2);
+  });
+
+  it('回血动画窗口(650ms)结束后自动清除', () => {
+    const { result, rerender } = renderHook(({ view }) => useAnimationState(view, 0), {
+      initialProps: { view: makeView({ p0Hp: 3 }) },
+    });
+    rerender({ view: makeView({ p0Hp: 4 }) });
+    expect(result.current.healFlashIndices.has(0)).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(650);
+    });
+    expect(result.current.healFlashIndices.has(0)).toBe(false);
+  });
+
+  it('HP 未上升时不记录回血(伤害/不变不算回血)', () => {
+    const { result, rerender } = renderHook(({ view }) => useAnimationState(view, 0), {
+      initialProps: { view: makeView({ p0Hp: 4 }) },
+    });
+    // HP 下降不算回血
+    rerender({ view: makeView({ p0Hp: 3 }) });
+    expect(result.current.healFlashIndices.size).toBe(0);
+  });
+});
+
 describe('useAnimationState · 阶段变化检测(phaseVersion / discardPhase)', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());

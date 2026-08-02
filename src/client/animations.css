@@ -73,6 +73,46 @@
   }
 }
 
+/* ─── 回血闪烁:HP 数字绿色脉冲(桃/桃园结义/急救等回复体力) ─── */
+@keyframes healFlash {
+  0% {
+    color: inherit;
+    transform: scale(1);
+    text-shadow: none;
+  }
+  15% {
+    color: #22dd55;
+    transform: scale(1.5);
+    text-shadow: 0 0 12px rgba(34, 221, 85, 0.8);
+  }
+  40% {
+    color: #44ee66;
+    transform: scale(1.25);
+    text-shadow: 0 0 8px rgba(68, 238, 102, 0.5);
+  }
+  100% {
+    color: inherit;
+    transform: scale(1);
+    text-shadow: none;
+  }
+}
+
+/* ─── 回血绿光覆盖层:在目标武将卡上播放 ─── */
+@keyframes healOverlay {
+  0% {
+    opacity: 0;
+    background: rgba(0, 255, 85, 0);
+  }
+  20% {
+    opacity: 1;
+    background: rgba(0, 255, 85, 0.18);
+  }
+  100% {
+    opacity: 0;
+    background: rgba(0, 255, 85, 0);
+  }
+}
+
 /* ─── 回合切换:阶段标签淡入上滑 ─── */
 @keyframes phaseIn {
   0% {

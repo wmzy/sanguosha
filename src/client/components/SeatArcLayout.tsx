@@ -42,6 +42,7 @@ export interface SeatArcLayoutProps {
   onSeatDoubleClick?: (index: number) => void;
   /** 动画 */
   damageFlashIndices: Map<number, number>;
+  healFlashIndices: Map<number, number>;
   turnVersion: number;
   /** 贴在座位区底部的操作坞(提示/倒计时/主按钮) */
   bottomSlot?: ReactNode;
@@ -59,6 +60,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
     onTargetClick,
     onSeatDoubleClick,
     damageFlashIndices,
+    healFlashIndices,
     turnVersion,
     bottomSlot,
   } = props;
@@ -93,6 +95,8 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
                 onSeatDoubleClick={onSeatDoubleClick}
                 isDamaged={damageFlashIndices.has(realIdx)}
                 damageVersion={damageFlashIndices.get(realIdx) ?? 0}
+                isHealed={healFlashIndices.has(realIdx)}
+                healVersion={healFlashIndices.get(realIdx) ?? 0}
                 isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
                 turnGlowVersion={turnVersion}
               />

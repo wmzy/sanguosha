@@ -28,6 +28,8 @@ export interface PlayerCardLargeProps {
   view: GameView;
   /** 动画状态(体力闪烁) */
   damageFlashIndices: Map<number, number>;
+  /** 回血动画状态(绿色闪烁) */
+  healFlashIndices: Map<number, number>;
   /** 是否可操作(debug 模式恒 true) */
   canOperate: boolean;
   /** 是否当前回合(用于「回合」徽章) */
@@ -50,6 +52,7 @@ export function PlayerCardLargeImpl({
   viewer,
   view,
   damageFlashIndices,
+  healFlashIndices,
   canOperate,
   isPerspectiveTurn,
   skillActions,
@@ -151,6 +154,7 @@ export function PlayerCardLargeImpl({
             className={cx(
               i < p.health ? styles.hpHeartFull : styles.hpHeartEmpty,
               damageFlashIndices.has(perspectiveIdx) && styles.hpFlash,
+              healFlashIndices.has(perspectiveIdx) && styles.hpHealFlash,
             )}
           >
             ♥
@@ -233,6 +237,8 @@ function playerCardLargePropsEqual(
     prev.isPerspectiveTurn === next.isPerspectiveTurn &&
     prev.damageFlashIndices.has(prev.perspectiveIdx) ===
       next.damageFlashIndices.has(next.perspectiveIdx) &&
+    prev.healFlashIndices.has(prev.perspectiveIdx) ===
+      next.healFlashIndices.has(next.perspectiveIdx) &&
     prev.onSkillAction === next.onSkillAction &&
     // skillActions:引用比较(useSkillActions 已 useMemo)
     prev.skillActions === next.skillActions &&

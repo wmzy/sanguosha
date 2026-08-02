@@ -5,11 +5,20 @@
 // 导致历史特效被重复播放(出杀后吃桃,杀的特效再次触发)。
 // 归并建议:此文件是特效渲染层(VfxLayer + useVfxPlayback)的测试基座,
 //   后续特效播放/回收/格式选择/目标定位相关回归均应追加到此处,勿再为单个 bug 新建孤岛文件。
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, cleanup, renderHook } from '@testing-library/react';
 import { VfxLayer } from '@/components/VfxLayer';
+import { useVfxPlayback } from '@/hooks/useVfxPlayback';
 import type { VfxPlaybackItem } from '@/hooks/useVfxPlayback';
 import type { GameView } from '../../src/engine/types';
+
+// mock resourceManager:让 useVfxPlayback 对所有 anim/* id 返回固定 url,无需真实资源。
+vi.mock('@/resources', () => ({
+  resourceManager: {
+    get: (id: unknown) =>
+      typeof id === 'string' && id.startsWith('anim/') ? `/fake${id.slice(5)}.apng` : null,
+  },
+}));
 
 /** 最小化 view:VfxLayer 仅用 view.players 查座次 DOM。无目标动效不查 DOM。 */
 function makeView(players: { index: number; name: string }[] = []): GameView {
@@ -71,5 +80,60 @@ describe('VfxLayer', () => {
     const slot = container.querySelector('img')?.parentElement;
     expect(slot?.style.left).toBe('50%');
     expect(slot?.style.top).toBe('50%');
+  });
+});
+
+describe('useVfxPlayback · target 提取优先级', () => {
+  // useVfxPlayback 监听 ingested 批次,按 effect.vfx 查 resourceManager 生成 item。
+  // target 提取优先级:target(伤害等) > player(自效型/判定) > source(使用牌) > undefined(居中)。
+  // 使用时/打出牌时 事件只携带 source(使用者),回退到 source 让牌的特效定位到使用者武将卡。
+
+  afterEach(cleanup);
+
+  it('使用时事件(只有 source)回退到 source——桃/酒特效定位到使用者武将卡', () => {
+    // 模拟桃使用:使用时事件携带 source=2(使用者),无 target/player。
+    const ingested = [
+      {
+        seq: 1,
+        event: {
+          type: '使用时',
+          source: 2,
+          cardId: 'c1',
+          cardName: '桃',
+          effect: { vfx: 'card/peach' },
+        },
+      },
+    ];
+    const { result } = renderHook(() => useVfxPlayback(ingested as never));
+    expect(result.current).toHaveLength(1);
+    // source 回退:桃/酒 selfTarget,使用者即目标 → target=2
+    expect(result.current[0].target).toBe(2);
+  });
+
+  it('伤害事件携带 target,优先于 source/player', () => {
+    // 模拟扣减体力:携带 target(受伤害者),优先于 source/player。
+    const ingested = [
+      {
+        seq: 1,
+        event: {
+          type: '扣减体力',
+          source: 0,
+          target: 3,
+          player: 1,
+          amount: 1,
+          effect: { vfx: 'card/damage' },
+        },
+      },
+    ];
+    const { result } = renderHook(() => useVfxPlayback(ingested as never));
+    expect(result.current[0].target).toBe(3);
+  });
+
+  it('无 target/player/source 的动效 target=undefined(居中)', () => {
+    const ingested = [
+      { seq: 1, event: { type: '回合', effect: { vfx: 'misc/turn' } } },
+    ];
+    const { result } = renderHook(() => useVfxPlayback(ingested as never));
+    expect(result.current[0].target).toBeUndefined();
   });
 });

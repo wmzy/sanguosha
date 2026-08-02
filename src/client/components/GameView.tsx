@@ -428,6 +428,7 @@ export function GameViewComponentImpl({
                 onTargetClick={handleTargetClick}
                 onSeatDoubleClick={onSeatDoubleClick}
                 damageFlashIndices={anim.damageFlashIndices}
+                healFlashIndices={anim.healFlashIndices}
                 turnVersion={anim.turnVersion}
                 bottomSlot={
                   <>
@@ -939,6 +940,7 @@ export function GameViewComponentImpl({
             isPerspectiveTurn && styles.playerCardTurn,
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatShaking,
             anim.damageFlashIndices.has(perspectiveIdx) && styles.seatDamageOverlay,
+            anim.healFlashIndices.has(perspectiveIdx) && styles.seatHealOverlay,
             // 可选自己为目标(铁索连环含自己):高亮可点
             selfTargetable && styles.seatCardClickable,
             // 已选自己为目标:高亮选中
@@ -955,6 +957,7 @@ export function GameViewComponentImpl({
               viewer={view.viewer}
               view={view}
               damageFlashIndices={anim.damageFlashIndices}
+              healFlashIndices={anim.healFlashIndices}
               canOperate={canOperate}
               isPerspectiveTurn={isPerspectiveTurn}
               skillActions={skillActions}

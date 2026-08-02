@@ -72,14 +72,13 @@ export function useVfxPlayback(
       if (!vfxId) continue;
       const url = resourceManager.get(`anim/${vfxId}`);
       if (!url) continue;
-      // 提取目标座次:伤害等动效携带 target;自效型(无 target)回退 player。
-      const ev = event as { target?: unknown; player?: unknown };
-      const target =
-        typeof ev.target === 'number' && Number.isFinite(ev.target)
-          ? ev.target
-          : typeof ev.player === 'number' && Number.isFinite(ev.player)
-            ? ev.player
-            : undefined;
+      // 提取目标座次,优先级:target(伤害等) > player(自效型/判定) > source(使用牌)。
+      // 使用时/打出牌时 事件只携带 source(使用者):桃/酒 selfTarget,使用者即目标,
+      // 回退到 source 让牌的特效定位到使用者武将卡,而非居屏幕中央。
+      const ev = event as { target?: unknown; player?: unknown; source?: unknown };
+      const asNum = (v: unknown): number | undefined =>
+        typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+      const target = asNum(ev.target) ?? asNum(ev.player) ?? asNum(ev.source);
       newItems.push({ key: `${seq}-${vfxId}`, url, target });
     }
     if (newItems.length > 0) {

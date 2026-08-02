@@ -376,6 +376,20 @@ export const seatDamageOverlay = css`
   }
   position: relative;
 `;
+export const hpHealFlash = css`
+  animation: healFlash 0.6s ease-out both;
+`;
+export const seatHealOverlay = css`
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    pointer-events: none;
+    animation: healOverlay 0.6s ease-out both;
+  }
+  position: relative;
+`;
 export const phaseAnimating = css`
   animation: phaseIn 0.35s ease-out both;
 `;

@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Added — 使用桃/酒等牌的动画效果在目标武将卡上播放
+
+使用桃、酒等牌时，牌的 VFX 特效（card/peach、card/analeptic APNG）此前居屏幕中央播放，没有定位到目标武将卡——伤害特效 card/damage 已定位到受伤害者武将卡，造成不对称。根因：`使用时` atom 的 ViewEvent 只携带 source（使用者）、不带 target，`useVfxPlayback` 提取 target 时无 target/player → undefined → VfxLayer 居中。桃/酒 selfTarget，使用者即目标，故 target 提取回退到 source 即可定位到目标武将卡。同时附带补全回血时座位卡的 HP 绿光动画（对称伤害红光），让回血场景在 HP 变化层也有视觉反馈。
+
+#### Changed
+- **useVfxPlayback target 提取加 source 回退**（根因）：target 优先级由 `target > player > undefined` 改为 `target > player > source > undefined`。使用时/打出牌时 事件只携带 source，回退到 source 让牌的特效定位到使用者武将卡；伤害(target)/判定(player)类事件优先级不变，不受影响。(`src/client/hooks/useVfxPlayback.ts`)
+
+#### Added — 回血时座位卡 HP 绿光动画（对称伤害红光）
+- **useAnimationState 检测 HP 上升**：新增 `healFlashIndices`(Map<座次,版本号>)，与伤害检测共用同一 HP 快照 effect——HP 上升时记录座次并递增版本号、650ms 后自动清除，HP 下降仍走 `damageFlashIndices`，两者互不误触。(`src/client/hooks/useAnimationState.ts`)
+- **回血 keyframes**：新增 `healFlash`(HP 红心绿色脉冲，对称 `damageFlash`)与 `healOverlay`(绿光覆盖层，对称 `damageOverlay`)。(`src/client/animations.css`)
+- **座位卡回血动画**：`PlayerSeatView` 新增 `isHealed`/`healVersion` props，座位卡应用 `seatHealOverlay`(绿光覆盖)、HP 红心应用 `hpHealFlash`(绿心脉冲)，`key` 含 healVersion 触发动画重放；memo 比较器纳入。(`src/client/components/PlayerSeatView.tsx`)
+- **视角大卡回血动画**：`PlayerCardLarge` 新增 `healFlashIndices` prop，HP 红心应用 `hpHealFlash`，memo 比较器纳入；大卡 wrapper(`GameView`)应用 `seatHealOverlay` 绿光覆盖。(`src/client/components/PlayerCardLarge.tsx`、`src/client/components/GameView.tsx`)
+- **动画状态透传**：`SeatArcLayout`/`GameView` 把 `healFlashIndices` 透传到各座次。(`src/client/components/SeatArcLayout.tsx`、`src/client/components/GameView.tsx`)
+- **样式导出**：gameViewStyles 导出 `hpHealFlash`/`seatHealOverlay`。(`src/client/components/gameViewStyles/seat.ts`)
+
+#### 测试
+- **useVfxPlayback target 提取测试**：`VfxLayer.test.tsx` 新增 3 例——使用时事件(只有 source)回退到 source(桃/酒使用者即目标)、伤害事件 target 优先于 source/player、无 target/player/source 的事件 target=undefined(居中)。回归 VFX 定位优先级。
+- **回血检测单元测试**：`useAnimationState.test.tsx` 新增 4 例——HP 上升记录回血座次并递增版本号(且不误触伤害闪烁)、连续回血版本递增、650ms 动画窗口后自动清除、HP 未上升不记录(伤害/不变不算回血)。
+
 ### Fixed — 界袁绍乱击无法使用；非主公时仍展示主公技
 
 界袁绍两个问题:(1)「乱击」技能按钮点了没反应，完全无法使用；(2)界袁绍非主公出场时角色卡仍展示主公技「界血裔」。两者根因不同。

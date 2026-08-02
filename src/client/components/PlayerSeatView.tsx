@@ -38,6 +38,10 @@ export interface PlayerSeatProps {
   isDamaged?: boolean;
   /** 伤害动画版本号(每次伤害递增,触发 key 变化重放动画) */
   damageVersion?: number;
+  /** 该玩家是否刚回复体力(桃/桃园结义/急救) */
+  isHealed?: boolean;
+  /** 回血动画版本号(每次回血递增,触发 key 变化重放动画) */
+  healVersion?: number;
   /** 是否触发新回合光环 */
   isTurnGlow?: boolean;
   turnGlowVersion?: number;
@@ -60,6 +64,8 @@ function PlayerSeatViewImpl({
   onSeatDoubleClick,
   isDamaged = false,
   damageVersion = 0,
+  isHealed = false,
+  healVersion = 0,
   isTurnGlow = false,
   turnGlowVersion = 0,
   hideIdentity = true,
@@ -102,12 +108,13 @@ function PlayerSeatViewImpl({
         selectedTargetNames.includes(player.name) && seatCardTargeted,
         isDamaged && seatShaking,
         isDamaged && seatDamageOverlay,
+        isHealed && seatHealOverlay,
         isTurnGlow && turnGlowing,
         isChained && seatCardChained,
       )}
       data-player-name={player.name}
       data-seat-index={index}
-      key={damageVersion > 0 ? `dmg-${damageVersion}` : undefined}
+      key={damageVersion > 0 || healVersion > 0 ? `dmg-${damageVersion}-heal-${healVersion}` : undefined}
       style={{ '--faction-color': factionColor } as React.CSSProperties}
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onSeatDoubleClick?.(index)}
@@ -170,7 +177,11 @@ function PlayerSeatViewImpl({
         {Array.from({ length: player.maxHealth }, (_, i) => (
           <span
             key={i}
-            className={cx(i < player.health ? hpHeartFull : hpHeartEmpty, isDamaged && hpFlash)}
+            className={cx(
+              i < player.health ? hpHeartFull : hpHeartEmpty,
+              isDamaged && hpFlash,
+              isHealed && hpHealFlash,
+            )}
           >
             ♥
           </span>
@@ -275,6 +286,8 @@ function playerSeatPropsEqual(prev: PlayerSeatProps, next: PlayerSeatProps): boo
     prev.isTargetable === next.isTargetable &&
     prev.isDamaged === next.isDamaged &&
     prev.damageVersion === next.damageVersion &&
+    prev.isHealed === next.isHealed &&
+    prev.healVersion === next.healVersion &&
     prev.isTurnGlow === next.isTurnGlow &&
     prev.turnGlowVersion === next.turnGlowVersion &&
     prev.hideIdentity === next.hideIdentity &&
@@ -585,4 +598,18 @@ const seatDamageOverlay = css`
 `;
 const turnGlowing = css`
   animation: newTurnGlow 0.8s ease-out both;
+`;
+const hpHealFlash = css`
+  animation: healFlash 0.6s ease-out both;
+`;
+const seatHealOverlay = css`
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    pointer-events: none;
+    animation: healOverlay 0.6s ease-out both;
+  }
+  position: relative;
 `;
