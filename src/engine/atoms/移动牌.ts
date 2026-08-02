@@ -73,10 +73,11 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       return { ownerViews: new Map(), othersView: view };
     }
 
-    // 手牌→处理区 = 打出(他人出牌时由 EventBanner 中央翻牌展示;
-    // 自己出牌时 EventBanner 跳过——已有 createCardFlyAnimation 手牌飞行动画)
+    // 手牌→处理区 = 使用/打出置入处理区。后续必有「使用时」/「打出牌时」atom
+    // 按牌名播报(card/{牌名}),此处不再叠 flip 拟声。自己出牌另有手牌飞行动画;
+    // 他人出牌由中央 PlayHistoryStrip 展示(duration 控制其停留时长)。
     if (atom.to.zone === '处理区' && fromPlayer !== undefined && cardInfo) {
-      const effect = { sound: 'flip' as const, animation: 'flip' as const, duration: 800 };
+      const effect = { animation: 'flip' as const, duration: 800 };
       const view: ViewEvent = {
         type: '打出',
         player: fromPlayer,

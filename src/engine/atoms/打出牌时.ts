@@ -13,14 +13,16 @@ export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = 
   apply() {
     // 事件标记——after hook 触发雷击/涯角等"打出牌时"时机技能
   },
-  effect: { sound: 'flip', animation: 'highlight', duration: 400 },
+  effect: { animation: 'highlight', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const cardName = state.cardMap[atom.cardId]?.name ?? atom.cardId;
+    // 打出按牌名播报语音(sound/card/{牌名}),与「使用时」对齐;无语音文件的牌静默跳过
     const view: ViewEvent = {
       type: '打出牌时',
       player: atom.player,
       cardId: atom.cardId,
       cardName,
+      effect: { sound: `card/${cardName}`, animation: 'highlight', duration: 400 },
     };
     return { ownerViews: new Map(), othersView: view };
   },

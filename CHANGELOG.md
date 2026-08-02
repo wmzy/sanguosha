@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 使用/打出牌的 flip 拟声与牌名播报重复
+
+使用/打出牌已有牌名播报(`sound/card/{牌名}`),但实际对局中仍能听到多余的 `flip` 拟声。根因是三个环节都在叠音:`移动牌` atom「手牌→处理区」分支生成的 `type:'打出'` 事件播 `flip`(且该事件被 `EventBanner` 对 `'打出'` return null 跳过,视觉不翻牌,只有声音在响——这是最隐蔽的一处);打出流程的「声明打出时」「打出牌时」也各播一次 flip。现统一对齐「使用时」:牌名播报由 `使用时`/`打出牌时` 负责,`移动牌` 的置入处理区与「声明打出时」不再播声音。
+
+#### Changed
+- **移动牌 atom 打出分支去 flip**(根因):`手牌→处理区` 分支的 `effect.sound='flip'` 去掉。该分支生成的 `type:'打出'` 事件本应由 `EventBanner` 翻牌展示,但 `EventBanner` 已对 `'打出'` return null(改由 PlayHistoryStrip 展示),animation 成死值、sound 却仍在响——与紧随其后的「使用时/打出牌时」牌名播报叠音。保留 duration(控制 PlayHistoryStrip 停留时长)。(`src/engine/atoms/移动牌.ts`)
+- **打出牌时 atom 改牌名播报**:toViewEvents 按 `cardName` 设置 `effect.sound = 'card/${cardName}'`,与「使用时」一致;静态 effect 去掉 `sound:'flip'`。(`src/engine/atoms/打出牌时.ts`)
+- **声明打出时 atom 去 flip**:静态 effect 去掉 `sound:'flip'`(声明阶段是转化替换点,牌名播报归「打出牌时」)。(`src/engine/atoms/声明打出时.ts`)
+- **文档同步**:`soundMap.ts` / `sounds/README.md` 把「打出」从 flip 适用范围移除,牌名语音说明扩展为「使用/打出时」。
+
 ### Fixed — 旁观等待界面不显示房间里都有谁
 
 旁观者以 spectator 身份进入「等待中」房间时，界面只显示玩家数量（2/3），看不到具体是谁在房间、谁已准备。

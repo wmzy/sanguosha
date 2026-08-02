@@ -6,7 +6,7 @@
 
 ```
 public/packs/base/sound/
-  flip.mp3              ← 通用卡牌操作拟声(摸牌/弃牌/打出/判定…)
+  flip.mp3              ← 通用卡牌操作拟声(摸牌/弃牌/判定…)
   shuffle.mp3           ← 重洗
   card_place.mp3        ← 整理牌堆
   heal.mp3              ← 回复体力
@@ -19,7 +19,7 @@ public/packs/base/sound/
   turn_end.mp3          ← 回合结束
   phase_start.mp3       ← 阶段开始
   phase_end.mp3         ← 阶段结束
-  card/                 ← 牌名语音(使用时按牌名播报)
+  card/                 ← 牌名语音(使用/打出时按牌名播报)
     杀.mp3  闪.mp3  桃.mp3  酒.mp3
     无中生有.mp3  过河拆桥.mp3  顺手牵羊.mp3
     无懈可击.mp3  乐不思蜀.mp3  闪电.mp3  兵粮寸断
@@ -31,7 +31,7 @@ public/packs/base/sound/
 
 ## 设计原则
 
-- **使用时**(打出锦囊/延时锦囊):按牌名播报语音(`sound/card/{牌名}`)
+- **使用/打出时**(使用/打出牌):按牌名播报语音(`sound/card/{牌名}`)
 - **底层操作**(摸牌/弃牌/获得…):统一用 `flip` 短促拟声
 - **目标/技能添加/移除/询问**:无音效(UI 视觉反馈即可)
 - 无对应语音文件的牌(如桃/南蛮入侵)→ audioEngine 静默跳过,后续可补音频
