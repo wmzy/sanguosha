@@ -29,7 +29,7 @@ export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
-    name: '界志继',
+    name: '志继',
     description: '觉醒技:准备阶段或结束阶段且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得"观星"',
   };
 }
