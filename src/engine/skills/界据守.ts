@@ -133,7 +133,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               }
             } else {
               // 非装备牌:弃置
-              await applyAtom(state, { type: '弃置', player: ownerId, cardIds: [chosenId] });
+              await applyAtom(state, { type: '弃置', player: ownerId, cardIds: [chosenId], voluntary: true });
             }
           }
         }

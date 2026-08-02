@@ -132,7 +132,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // ── 代价 ──
       if (cost === '弃手牌') {
-        await applyAtom(state, { type: '弃置', player: ownerId, cardIds: [cardId] });
+        await applyAtom(state, { type: '弃置', player: ownerId, cardIds: [cardId], voluntary: true });
       } else {
         // 置装备:把装备牌交到目标手中,再装备到目标(可替换原装备)
         const card = state.cardMap[cardId];

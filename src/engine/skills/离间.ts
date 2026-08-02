@@ -82,7 +82,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await pushFrame(st, '离间', ownerId, { ...params });
 
       // 1. 弃置一张牌(手牌或装备)
-      await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [cardId] });
+      await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [cardId], voluntary: true });
 
       // 2. A 视为对 B 使用决斗(虚拟使用,走完整 runUseFlow 时机序列)
       const virtualCardId = `离间:决斗:${A}:${B}:${st.seq}`;

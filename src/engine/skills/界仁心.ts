@@ -187,7 +187,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
 
     // 1) 弃置该装备牌(同时清手牌/装备区,系统规则的弃置 after-hook 会移除装备技能)
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [chosenId] });
+    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [chosenId], voluntary: true });
 
     // 2) 翻面:加标签(下一回合开始时消费)
     await flipFaceDown(ctx.state, ownerId, '仁心');

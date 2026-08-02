@@ -184,7 +184,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!card) return;
 
     // 弃置代价(手牌→弃牌堆)
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [cardId] });
+    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [cardId], voluntary: true });
 
     // 记录弃置牌颜色(后端 transform validate 读)
     const color = card.color;

@@ -93,7 +93,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 弃 1 张牌
     const discardCard = selfPlayer.hand[0];
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCard] });
+    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCard], voluntary: true });
 
     // 修改杀帧 resolvedTargets 中的当前目标为新目标
     const resolvedTargets = ctx.frame.params.resolvedTargets as number[] | undefined;

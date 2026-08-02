@@ -358,11 +358,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!discardCardId || !self.hand.includes(discardCardId)) return;
 
       // 弃置
-      await applyAtom(ctx.state, {
-        type: '弃置',
-        player: ownerId,
-        cardIds: [discardCardId],
-      });
+      await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
 
       // 步骤 3:选源玩家(有场上牌的任意存活角色)
       const playersWithCards = ctx.state.players.filter(

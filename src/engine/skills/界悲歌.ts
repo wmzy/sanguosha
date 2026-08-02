@@ -181,7 +181,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[DISCARD_CARD_KEY];
       if (typeof discardCardId === 'string') {
         // 弃置代价
-        await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
+        await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
       }
     }
 

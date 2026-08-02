@@ -226,7 +226,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 const discardId = state.localVars['界火计/弃牌'] as string | undefined;
                 // 使用者弃了 → 造成 1 点火焰伤害;没弃(超时)→ 无事发生
                 if (discardId && state.players[target]?.alive) {
-                  await applyAtom(state, { type: '弃置', player: from, cardIds: [discardId] });
+                  await applyAtom(state, { type: '弃置', player: from, cardIds: [discardId], voluntary: true });
                   await runDamageFlow(state, from, target, 1, cardId, '火焰');
                 }
               }

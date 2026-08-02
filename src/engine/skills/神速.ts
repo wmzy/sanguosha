@@ -291,7 +291,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });
 
       // 弃置装备牌
-      await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardId] });
+      await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardId], voluntary: true });
 
       // 虚拟杀
       if (typeof target === 'number' && ctx.state.players[target]?.alive) {

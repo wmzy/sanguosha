@@ -229,7 +229,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const isDamage = chosenOption === 'damage';
 
       // 4) 弃置红桃牌(弃置 atom 原生支持手牌/装备区跨区域弃牌)
-      await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [cardId] });
+      await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [cardId], voluntary: true });
 
       // 5) 执行所选选项
       if (isDamage) {

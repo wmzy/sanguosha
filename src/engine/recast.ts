@@ -19,6 +19,6 @@ export async function recastCard(
   player: number,
   cardId: string,
 ): Promise<void> {
-  await applyAtom(state, { type: '弃置', player, cardIds: [cardId] });
+  await applyAtom(state, { type: '弃置', player, cardIds: [cardId], voluntary: true });
   await applyAtom(state, { type: '摸牌', player, count: 1 });
 }

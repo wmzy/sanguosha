@@ -68,7 +68,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         handBefore.length > 0 && handBefore.every((id) => cardIds.includes(id));
 
       // 弃置 N 张
-      await applyAtom(state, { type: '弃置', player: from, cardIds });
+      await applyAtom(state, { type: '弃置', player: from, cardIds, voluntary: true });
       // 摸等量张;若弃置了所有手牌,额外多摸一张
       const drawCount = cardIds.length + (discardedAllHand ? 1 : 0);
       await applyAtom(state, { type: '摸牌', player: from, count: drawCount });

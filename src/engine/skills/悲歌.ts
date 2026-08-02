@@ -116,7 +116,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (typeof discardCardId !== 'string') return; // 不发动
 
     // 弃置代价
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
+    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
 
     // 判定(受伤角色);牌堆空则无法判定,悲歌效果不触发
     if (ctx.state.zones.deck.length === 0) return;

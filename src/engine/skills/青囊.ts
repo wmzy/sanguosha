@@ -62,7 +62,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await markOncePerTurn(state, from, '青囊');
       await pushFrame(state, '青囊', from, { ...params });
       // 弃置一张手牌
-      await applyAtom(state, { type: '弃置', player: from, cardIds: [cardId] });
+      await applyAtom(state, { type: '弃置', player: from, cardIds: [cardId], voluntary: true });
       // 令目标回复 1 点体力
       await applyAtom(state, { type: '回复体力', target, amount: 1, source: from });
       await popFrame(state);

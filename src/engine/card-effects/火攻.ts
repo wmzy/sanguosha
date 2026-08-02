@@ -73,7 +73,7 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
 
   const discardId = state.localVars['火攻/弃牌'] as string | undefined;
   if (discardId && state.players[target]?.alive) {
-    await applyAtom(state, { type: '弃置', player: source, cardIds: [discardId] });
+    await applyAtom(state, { type: '弃置', player: source, cardIds: [discardId], voluntary: true });
     await runDamageFlow(state, source, target, 1, cardId, '火焰');
   }
 }

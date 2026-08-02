@@ -201,6 +201,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           type: '弃置',
           player: ownerId,
           cardIds: [discardCardId],
+          voluntary: true,
         });
 
         // 按阶段附加效果

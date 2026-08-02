@@ -279,11 +279,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           delete ctx.state.localVars[EQUIP_KEY];
           if (equipCardIdRaw && equipCardIds(ctx.state, ownerId).includes(equipCardIdRaw)) {
             await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });
-            await applyAtom(ctx.state, {
-              type: '弃置',
-              player: ownerId,
-              cardIds: [equipCardIdRaw],
-            });
+            await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardIdRaw], voluntary: true });
             const target = await askKillTarget(ctx.state, ownerId, '界神速②');
             if (typeof target === 'number' && ctx.state.players[target]?.alive) {
               await virtualKill(ctx.state, ownerId, target);

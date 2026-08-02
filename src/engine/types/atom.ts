@@ -94,7 +94,7 @@ export type MoveReason =
 export type Atom =
   // 卡牌/资源
   | { type: '摸牌'; player: number; count: number }
-  | { type: '弃置'; player: number; cardIds: string[] }
+  | { type: '弃置'; player: number; cardIds: string[]; voluntary?: boolean }
   | { type: '移动牌'; cardId: string; from: ZoneLoc; to: ZoneLoc }
   // 移动牌编排时机标记(对齐 flow-redesign.md 模块 F / move.md):事件标记型,
   // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 move-flow.ts 的

@@ -2,12 +2,16 @@
 //   "当一名角色的手牌被弃置或获得后,你可以失去1点体力令其摸两张牌。"
 //
 // 测试场景:
-//   1. 弃置触发:P2 被弃置一张手牌 → 周泰触发奋激 → 失1体力 → P2 摸2张
-//   2. 获得(顺手牵羊)触发:P2 顺手牵羊拿周泰一张牌 → 周泰触发奋激 → 失1体力 → P2 摸2张
+//   1. 被动弃置触发:P2 被弃置一张手牌 → 周泰触发奋激 → 失1体力 → P2 摸2张
+//   2. 获得(顺手牵羊)触发:P2 拿周泰一张牌 → 周泰触发奋激 → 令失牌者(周泰)摸2张
 //   3. 不发动:周泰 confirm false → 无效果
 //   4. 周泰体力=1时发动奋失去体力 → 进入濒死(无桃)→ 死亡 → 目标不摸牌
+//   5. 主动弃牌不触发:周泰自己弃2张(贯石斧代价,voluntary)→ 奋激不触发
+//   6. 主动弃牌不触发:P2 主动弃牌(制衡代价,voluntary)→ 奋激不触发
+//   7. 被动弃置触发(过河拆桥):周泰被拆牌弃置(非 voluntary)→ 奋激触发 → 周泰摸2张
 //
-// 触发方式:用 弃置 atom 直接驱动(after-hook 挂在 弃置/获得)。
+// 触发方式:用 弃置/获得 atom 直接驱动(after-hook 挂在 弃置/获得)。
+// voluntary 字段标记主动弃牌(技能代价),奋激 弃置 hook 据此跳过。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -160,7 +164,7 @@ describe('奋激', () => {
   });
 
   // ─── 获得(顺手牵羊)触发 ────────────────────────────────────
-  it('P2 获得(顺手牵羊)周泰一张牌 → 周泰发动奋激 → P2 摸2张', async () => {
+  it('P2 获得(顺手牵羊)周泰一张牌 → 周泰发动奋激 → 令失牌者(周泰)摸2张', async () => {
     const ztCard = mkCard('zc1', '杀', '♠');
     const d1 = mkCard('d1', '桃', '♥');
     const d2 = mkCard('d2', '酒', '♣');
@@ -192,7 +196,7 @@ describe('奋激', () => {
       }),
     );
 
-    // P2 获得周泰的 zc1(顺手牵羊结算的内部就是 获得 atom)
+    // P2 获得周泰的 zc1(顺手牵羊结算的内部就是 获得 atom;from=失牌者周泰)
     void applyAtom(harness.state, { type: '获得', player: 1, cardId: 'zc1', from: 0 });
     await harness.waitForStable();
 
@@ -201,12 +205,13 @@ describe('奋激', () => {
     await ZT.respond('奋激', { choice: true });
     await harness.waitForStable();
 
-    // 周泰失1体力(4→3);P2 获得了 zc1 + 摸2 = 3 张
+    // 周泰失1体力(4→3);官方规则令失牌者(atom.from=周泰)摸2张 → 周泰 hand=[d1,d2]
     expect(harness.state.players[0].health).toBe(3);
-    expect(harness.state.players[1].hand.length).toBe(3);
-    expect(harness.state.players[1].hand).toContain('zc1');
-    expect(harness.state.players[1].hand).toContain('d1');
-    expect(harness.state.players[1].hand).toContain('d2');
+    expect(harness.state.players[0].hand.length).toBe(2);
+    expect(harness.state.players[0].hand).toContain('d1');
+    expect(harness.state.players[0].hand).toContain('d2');
+    // P2 仅获得 zc1,不摸牌
+    expect(harness.state.players[1].hand).toEqual(['zc1']);
   });
 
   // ─── 周泰体力=1时发动奋激 → 失血致死 → 目标不摸牌 ──────────
@@ -259,5 +264,154 @@ describe('奋激', () => {
     // 周泰死亡;P2 手牌空(目标未摸牌)
     expect(harness.state.players[0].alive).toBe(false);
     expect(harness.state.players[1].hand.length).toBe(0);
+  });
+
+  // ─── 主动弃牌(技能代价)不触发奋激 ──────────────────────────
+  // 贯石斧:周泰自己主动弃2张作为代价(voluntary: true)→ 奋激不应触发
+  it('贯石斧:周泰自己主动弃2张(voluntary)→ 奋激不触发', async () => {
+    const zc1 = mkCard('zc1', '杀');
+    const zc2 = mkCard('zc2', '闪');
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界周泰',
+            character: '界周泰',
+            skills: ['奋激'],
+            health: 4,
+            maxHealth: 4,
+            hand: [zc1.id, zc2.id],
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P2',
+            character: '反',
+            skills: [],
+          }),
+        ],
+        cardMap: { zc1, zc2 },
+        zones: { deck: [], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    // 贯石斧代价弃2张——主动弃牌(voluntary: true)
+    void applyAtom(harness.state, {
+      type: '弃置',
+      player: 0,
+      cardIds: ['zc1', 'zc2'],
+      voluntary: true,
+    });
+    await harness.waitForStable();
+
+    // 奋激不触发:无询问,周泰体力不变
+    harness.player('界周泰').expectNoPending();
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].hand.length).toBe(0);
+    expect(harness.state.zones.discardPile).toContain('zc1');
+    expect(harness.state.zones.discardPile).toContain('zc2');
+  });
+
+  // ─── 主动弃牌(他人代价)不触发奋激 ──────────────────────────
+  // 制衡:P2 主动弃自己的牌作为代价(voluntary: true)→ 周泰奋激不应触发
+  it('制衡:P2 主动弃牌(voluntary)→ 周泰奋激不触发', async () => {
+    const p2c1 = mkCard('p2c1', '杀');
+    const p2c2 = mkCard('p2c2', '闪');
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界周泰',
+            character: '界周泰',
+            skills: ['奋激'],
+            health: 4,
+            maxHealth: 4,
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P2',
+            character: '反',
+            hand: [p2c1.id, p2c2.id],
+            skills: [],
+          }),
+        ],
+        cardMap: { p2c1, p2c2 },
+        zones: { deck: [], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    // 制衡代价弃牌——P2 主动弃置(voluntary: true)
+    void applyAtom(harness.state, {
+      type: '弃置',
+      player: 1,
+      cardIds: ['p2c1'],
+      voluntary: true,
+    });
+    await harness.waitForStable();
+
+    // 奋激不触发:无询问,周泰体力不变
+    harness.player('界周泰').expectNoPending();
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[1].hand).toEqual(['p2c2']);
+  });
+
+  // ─── 被动弃置(过河拆桥)正常触发奋激 ────────────────────────
+  // 过河拆桥强制弃置周泰一张牌(非 voluntary)→ 奋激触发,令失牌者(周泰)摸2张
+  it('过河拆桥:周泰被拆牌弃置(非 voluntary)→ 奋激触发 → 周泰摸2张', async () => {
+    const zc1 = mkCard('zc1', '杀');
+    const d1 = mkCard('d1', '桃', '♥');
+    const d2 = mkCard('d2', '酒', '♣');
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界周泰',
+            character: '界周泰',
+            skills: ['奋激'],
+            health: 4,
+            maxHealth: 4,
+            hand: [zc1.id],
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P2',
+            character: '反',
+            skills: [],
+          }),
+        ],
+        cardMap: { zc1, d1, d2 },
+        zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    // 过河拆桥强制弃置周泰的牌(非 voluntary,被动弃置)
+    void applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['zc1'] });
+    await harness.waitForStable();
+
+    const ZT = harness.player('界周泰');
+    ZT.expectPending('请求回应');
+    await ZT.respond('奋激', { choice: true });
+    await harness.waitForStable();
+
+    // 周泰失1体力(4→3);失牌者=周泰 → 摸2张(d1,d2)
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[0].hand.length).toBe(2);
+    expect(harness.state.players[0].hand).toContain('d1');
+    expect(harness.state.players[0].hand).toContain('d2');
+    expect(harness.state.zones.discardPile).toContain('zc1');
   });
 });

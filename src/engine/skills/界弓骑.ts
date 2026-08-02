@@ -145,7 +145,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await pushFrame(st, SKILL_ID, from, { ...params });
 
       // 1. 弃置代价牌(走完整管线,触发反馈/旋风/枭姬等失牌副作用)
-      await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId] });
+      await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId], voluntary: true });
 
       // 2. 攻击范围无限 + 同花色杀无次数限制(本回合)。即便弃的牌花色为空(无色合卡),
       //    仍设 ACTIVE_VAR(范围无限对所有杀生效);SUIT_VAR 仅在花色非空时设。

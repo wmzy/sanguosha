@@ -108,7 +108,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
         delete st.localVars[DISCARD_KEY];
         if (discardCards && discardCards.length > 0) {
-          await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards });
+          await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards, voluntary: true });
         }
       }
 

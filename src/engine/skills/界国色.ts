@@ -345,7 +345,7 @@ async function executeOptionRemove(st: GameState, ownerId: number): Promise<void
   if (!tp.pendingTricks.some((t) => t.name === TRICK_NAME)) return;
 
   // 弃置方片牌(弃置 atom 原生支持手牌/装备区跨区域弃牌)
-  await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [cardId] });
+  await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [cardId], voluntary: true });
 
   // 弃置场上乐不思蜀(移除延时锦囊)
   await applyAtom(st, { type: '移除延时锦囊', player: trickTarget, trickName: TRICK_NAME });

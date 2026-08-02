@@ -51,7 +51,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         (params.cardIds as string[] | undefined) ??
         (typeof params.cardId === 'string' ? [params.cardId] : []);
       // 弃置 N 张
-      await applyAtom(state, { type: '弃置', player: from, cardIds });
+      await applyAtom(state, { type: '弃置', player: from, cardIds, voluntary: true });
       // 摸 N 张
       await applyAtom(state, { type: '摸牌', player: from, count: cardIds.length });
       await popFrame(state);

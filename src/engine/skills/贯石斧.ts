@@ -131,7 +131,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (selectedIds?.length !== 2) return;
 
     // 弃置选中的 2 张牌(手牌+装备区均可,用弃置 atom 统一处理)
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: selectedIds });
+    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: selectedIds, voluntary: true });
 
     // 清除已抵消标记:杀不再被抵消,将正常造成伤害(runSettlementPhase 检测标记被清除后继续 resolve)
     clearCancelled(ctx.state, atom.cardId, atom.target);

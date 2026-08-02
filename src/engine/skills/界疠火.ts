@@ -200,11 +200,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[COST_CARD_KEY];
       if (typeof costCard === 'string' && self.hand.includes(costCard)) {
         // 弃置选中的牌
-        await applyAtom(ctx.state, {
-          type: '弃置',
-          player: ownerId,
-          cardIds: [costCard],
-        });
+        await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [costCard], voluntary: true });
       } else {
         // 未选(超时/主动放弃)→ 失去1体力
         await applyAtom(ctx.state, { type: '失去体力', target: ownerId, amount: 1 });

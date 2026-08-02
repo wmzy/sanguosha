@@ -141,7 +141,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (st.players[from].equipment['武器'] === cardId) {
           await applyAtom(st, { type: '卸下', player: from, slot: '武器' });
         }
-        await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId] });
+        await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId], voluntary: true });
       }
 
       // 对 target 造成 1 点伤害(来源为典韦,强制伤害,不可被闪抵消)

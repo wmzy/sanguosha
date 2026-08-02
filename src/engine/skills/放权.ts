@@ -184,7 +184,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!discardCardId || !self.hand.includes(discardCardId)) {
           return; // 超时/不回应 → 未支付代价,不发动额外回合,放行正常回合结束
         }
-        await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId] });
+        await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
 
         // 请求选额外回合目标(排除自己、排除死亡)
         delete st.localVars[EXTRA_TARGET_KEY];

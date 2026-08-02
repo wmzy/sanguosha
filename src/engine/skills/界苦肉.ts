@@ -70,7 +70,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         (typeof params.cardId === 'string' ? [params.cardId] : []);
       await pushFrame(state, DISPLAY_NAME, from, {});
       // 1. 弃置一张牌(代价:手牌或装备)
-      await applyAtom(state, { type: '弃置', player: from, cardIds });
+      await applyAtom(state, { type: '弃置', player: from, cardIds, voluntary: true });
       // 2. 失去 1 点体力(非伤害——触发诈降 after-hook:摸3张 + 出牌阶段红色杀增益)
       await applyAtom(state, { type: '失去体力', target: from, amount: 1 });
       await popFrame(state);

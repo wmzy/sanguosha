@@ -98,7 +98,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await markOncePerTurn(state, ownerId, '结姻');
       await pushFrame(state, '结姻', ownerId, { cardIds, target });
       // 1. 弃置两张手牌
-      await applyAtom(state, { type: '弃置', player: ownerId, cardIds });
+      await applyAtom(state, { type: '弃置', player: ownerId, cardIds, voluntary: true });
       // 2. 令「你与目标」各回复 1 点体力(描述:你 与 一名已受伤男性角色 各 回复1点)
       //    先孙尚香后目标;回复体力 atom 限制不超过上限,满血则无效。
       await applyAtom(state, { type: '回复体力', target: ownerId, amount: 1, source: ownerId });

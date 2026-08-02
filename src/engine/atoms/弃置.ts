@@ -13,7 +13,7 @@ import { applyAtom } from '../create-engine';
  *  apply→afterApply 之间无其他 atom 运行,单键安全。 */
 const MOVED_HAND_KEY = '__弃置/手牌卡';
 
-export const 弃置: AtomDefinition<{ player: number; cardIds: string[] }> = {
+export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; voluntary?: boolean }> = {
   type: '弃置',
   validate(state, atom) {
     if (atom.cardIds.length === 0) return 'no cards to discard';

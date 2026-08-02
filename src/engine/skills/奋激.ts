@@ -2,12 +2,15 @@
 //   "当一名角色的手牌被弃置或获得后,你可以失去1点体力令其摸两张牌。"
 //
 // 时机:弃置 after-hook + 获得 after-hook。
-//   - 弃置 atom:一名角色的手牌/装备被弃置后(atom.player 是被弃置者)。
-//   - 获得 atom:一名角色获得一张牌后(atom.player 是获得者)。
-//   两个 hook 都以 atom.player 作为"被弃置/获得的角色的座次"——即奋激目标。
+//   - 弃置 atom:一名角色的手牌/装备被弃置后(atom.player 是被弃置者=目标)。
+//     主动弃牌(技能代价,atom.voluntary=true)不触发——如贯石斧/制衡/天香等代价弃牌。
+//   - 获得 atom:一名角色获得一张牌后(atom.from 是被获得者=失去牌的人=目标)。
+//     注意获得 atom 的 player 是获得者;官方规则令失去手牌的人摸牌,故目标取 atom.from。
+//     无 from(牌凭空产生,如摸牌)不触发。
+//   弃置目标 = atom.player;获得目标 = atom.from。
 //
 // 流程:
-//   1. 触发目标 = atom.player(任意角色,含周泰自己)。
+//   1. 触发目标 = atom.player(弃置)或 atom.from(获得);任意角色,含周泰自己。
 //   2. 周泰本人被询问是否发动(requestType 含目标座次,以隔离多目标并行触发)。
 //   3. 确认发动 → applyAtom(失去体力, 周泰, 1) → 若周泰存活则 applyAtom(摸牌, 目标, 2)。
 //      周泰失去体力可能进入濒死(由系统规则 runDyingFlow 处理;不屈可救)。
@@ -113,11 +116,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const atom = ctx.atom;
       if (atom.type !== '弃置') return;
       if (typeof atom.player !== 'number') return;
+      // 主动弃牌(玩家自己选择弃牌作为技能代价)不触发奋激
+      if ((atom as { voluntary?: boolean }).voluntary === true) return;
       await tryFenji(ctx, atom.player);
     },
   );
 
   // ── 获得 after-hook:一名角色获得一张牌后 ──
+  // 官方规则:令失去手牌的人摸牌。获得 atom 的 player 是获得者,from 是被获得者(失去牌的人)。
+  // 无 from(牌凭空产生,如摸牌)不触发——那是获得者凭空获得,无人失去牌。
   const unloadObtain = registerAfterHook(
     state,
     skill.id,
@@ -126,8 +133,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     async (ctx) => {
       const atom = ctx.atom;
       if (atom.type !== '获得') return;
-      if (typeof atom.player !== 'number') return;
-      await tryFenji(ctx, atom.player);
+      if (atom.from === undefined) return;
+      if (typeof atom.from !== 'number') return;
+      await tryFenji(ctx, atom.from);
     },
   );
 

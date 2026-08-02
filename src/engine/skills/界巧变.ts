@@ -315,6 +315,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             type: '弃置',
             player: ownerId,
             cardIds: [discardCardId],
+            voluntary: true,
           });
         } else {
           // mode === '变':移除 1 枚变标记

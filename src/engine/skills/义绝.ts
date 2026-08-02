@@ -124,7 +124,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await markOncePerTurn(st, from, '义绝');
 
       // ── 弃置代价牌 ──
-      await applyAtom(st, { type: '弃置', player: from, cardIds: [costCardId] });
+      await applyAtom(st, { type: '弃置', player: from, cardIds: [costCardId], voluntary: true });
 
       // ── 令目标展示一张手牌(目标自选) ──
       const targetPlayer = st.players[target];
