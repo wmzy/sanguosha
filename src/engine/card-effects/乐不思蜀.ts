@@ -8,17 +8,15 @@
 //   判定♥   → 无效，弃置
 
 import type { Card } from '../types';
-import type { ActionPrompt, GameView } from '../types';
+import type { ActionPrompt } from '../types';
 import { applyAtom } from '../create-engine';
 import { runJudgeFlow } from '../judge-flow';
-import { effectiveDistance } from '../distance';
-import { viewEffectiveDistance } from '../viewDistance';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 跳过出牌阶段的 tag 名 */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
 
-/** 乐不思蜀牌特有校验：距离 1 内的其他角色、判定区无同名 */
+/** 乐不思蜀牌特有校验：任意其他角色、判定区无同名（无距离限制） */
 function canUseIndulgence(
   state: import('../types').GameState,
   ownerId: number,
@@ -29,7 +27,6 @@ function canUseIndulgence(
   if (target === undefined) return '目标不合法';
   if (target === ownerId) return '不能对自己使用';
   if (!state.players[target]?.alive) return '目标已死亡';
-  if (effectiveDistance(state, ownerId, target) > 1) return '距离太远';
   if (state.players[target].pendingTricks.some((t) => t.name === '乐不思蜀'))
     return '目标判定区已有乐不思蜀';
   return null;
@@ -53,7 +50,7 @@ async function resolveIndulgence(ctx: ResolveCtx): Promise<void> {
 
 const indulgenceEffect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'distance', dist: 1, min: 1, max: 1 },
+  target: { kind: 'other', min: 1, max: 1 },
   delayed: true,
   cancelledBy: { cardName: '无懈可击', broadcast: true },
   canUse: canUseIndulgence,
@@ -62,12 +59,7 @@ const indulgenceEffect: CardEffect = {
     type: 'useCardAndTarget',
     title: '乐不思蜀',
     cardFilter: { filter: (c: Card) => c.name === '乐不思蜀', min: 1, max: 1 },
-    targetFilter: {
-      min: 1,
-      max: 1,
-      filter: (view: GameView, t: number) =>
-        viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
-    },
+    targetFilter: { min: 1, max: 1 },
   } as ActionPrompt,
   label: '乐不思蜀',
   style: 'danger',
