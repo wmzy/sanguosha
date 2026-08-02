@@ -1,17 +1,10 @@
 // 贯石斧(武器,攻击范围 3):
 //   目标角色使用【闪】后,你可以弃置 2 张牌(手牌或装备区),令此【杀】依然造成伤害。
 //
-// 两步流程(均通过 respond action):
-//   1. 询问闪 after hook:目标出闪 → confirm 询问"是否发动贯石斧"(requestType=贯石斧/confirm)
-//   2. 玩家选发动 → select prompt 让玩家选 2 张牌弃置(requestType=贯石斧/select)
-//   3. 弃完后把处理区的闪移到弃牌堆,杀.execute 检测处理区无闪 → 自行造成伤害
-// 贯石斧(武器,攻击范围 3):
-//   目标角色使用【闪】后,你可以弃置 2 张牌(手牌或装备区),令此【杀】依然造成伤害。
-//
-// 两步流程(均通过 respond action):
-//   1. 询问闪 after hook:目标出闪 → confirm 询问"是否发动贯石斧"(requestType=贯石斧/confirm)
-//   2. 玩家选发动 → select prompt 让玩家选 2 张牌弃置(requestType=贯石斧/select)
-//   3. 弃完后把处理区的闪移到弃牌堆,杀.execute 检测处理区无闪 → 自行造成伤害
+// 一步流程(respond action):
+//   1. 询问闪 after hook:目标出闪 → 直接弹选牌面板让玩家选 2 张牌弃置(requestType=贯石斧/select)
+//   2. 弃完后把处理区的闪移到弃牌堆,杀.execute 检测处理区无闪 → 自行造成伤害
+//   不选/超时 → 贯石斧不发动(杀正常被闪抵消)
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
@@ -28,7 +21,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
-  // 单一 respond action,按当前 pending 的 requestType 分流(confirm / select)
+  // respond action:玩家选 2 张牌弃置(不选/超时 → 不发动)
   registerAction(
     state,
     skill.id,
@@ -39,33 +32,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       if (slot.atom.type !== '请求回应') return '当前不需要回应';
       const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '贯石斧/confirm' && requestType !== '贯石斧/select') {
+      if (requestType !== '贯石斧/select') {
         return '当前不是贯石斧询问';
       }
-      // select 阶段:校验 cardIds
-      if (requestType === '贯石斧/select') {
-        const cardIds = params.cardIds;
-        if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张牌';
-        const self = state.players[ownerId];
-        if (!self) return 'player not found';
-        const [id1, id2] = cardIds as string[];
-        if (id1 === id2) return '不能选择同一张牌';
-        const equipIds = Object.values(self.equipment).filter(
-          (id): id is string => typeof id === 'string',
-        );
-        const allOwn = [id1, id2].every((id) => self.hand.includes(id) || equipIds.includes(id));
-        if (!allOwn) return '所选牌不在你的手牌或装备区';
-      }
+      const cardIds = params.cardIds;
+      if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张牌';
+      const self = state.players[ownerId];
+      if (!self) return 'player not found';
+      const [id1, id2] = cardIds as string[];
+      if (id1 === id2) return '不能选择同一张牌';
+      const equipIds = Object.values(self.equipment).filter(
+        (id): id is string => typeof id === 'string',
+      );
+      const allOwn = [id1, id2].every((id) => self.hand.includes(id) || equipIds.includes(id));
+      if (!allOwn) return '所选牌不在你的手牌或装备区';
       return null;
     },
     async (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      const requestType = (slot!.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType === '贯石斧/confirm') {
-        state.localVars['贯石斧/confirmed'] = params.choice === true || params.confirmed === true;
-      } else if (requestType === '贯石斧/select') {
-        state.localVars['贯石斧/selected'] = params.cardIds;
-      }
+      state.localVars['贯石斧/selected'] = params.cardIds;
     },
   );
 
@@ -91,25 +75,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const availableCount = self.hand.length + equipIds.length;
     if (availableCount < 2) return;
 
-    // 第一步:询问是否发动
-    delete ctx.state.localVars['贯石斧/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '贯石斧/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '贯石斧:是否弃2张牌强命?',
-        confirmLabel: '强命',
-        cancelLabel: '不发动',
-      },
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!ctx.state.localVars['贯石斧/confirmed']) return;
-    delete ctx.state.localVars['贯石斧/confirmed'];
-
-    // 第二步:让玩家选 2 张牌(手牌 + 装备区)
+    // 直接弹选牌面板:玩家选 2 张牌弃置(不选/超时 → 不发动)
     delete ctx.state.localVars['贯石斧/selected'];
     await applyAtom(ctx.state, {
       type: '请求回应',
@@ -117,14 +83,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       target: ownerId,
       prompt: {
         type: 'distribute',
-        title: '贯石斧:选择 2 张牌弃置',
+        title: '贯石斧:选择 2 张牌弃置强命(不选则不发动)',
         mode: 'select',
         source: 'handAndEquip',
         minTotal: 2,
         maxTotal: 2,
       },
       defaultChoice: false,
-      timeout: 20,
+      timeout: 30,
     });
     const selectedIds = ctx.state.localVars['贯石斧/selected'] as string[] | undefined;
     delete ctx.state.localVars['贯石斧/selected'];
@@ -145,10 +111,12 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     label: '贯石斧',
     style: 'danger',
     prompt: {
-      type: 'confirm',
-      title: '贯石斧:是否弃2张牌强命?',
-      confirmLabel: '强命',
-      cancelLabel: '不发动',
+      type: 'distribute',
+      title: '贯石斧:选择 2 张牌弃置强命(不选则不发动)',
+      mode: 'select',
+      source: 'handAndEquip',
+      minTotal: 2,
+      maxTotal: 2,
     },
   });
 }
