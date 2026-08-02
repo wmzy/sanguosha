@@ -5,7 +5,7 @@ import { applyAtom } from '../create-engine';
 import { createRng } from '../../shared/rng';
 import { registerActionEntry, unregisterActionEntry, instantiateSkill } from '../skill';
 
-import { getCharacterBaseId, LORD_CANDIDATES } from '../character-meta';
+import { getCharacterBaseId, isLord } from '../character-meta';
 
 /**
  * system 命名空间占位 ownerId(座次下标 -1,不对应任何玩家槽位)。
@@ -70,7 +70,10 @@ function pickLordCandidateGroups(groups: CharGroup[]): CharGroup[] {
   const nonLordPicked: CharGroup[] = [];
   for (const g of groups) {
     if (lordPicked.length >= CANDIDATES_LORD && nonLordPicked.length >= CANDIDATES_NON_LORD) break;
-    if (LORD_CANDIDATES.includes(g.baseId)) {
+    // 组内任一版本是主公(isLord)即归入主公候选池;覆盖界版新增主公技武将
+    // (如界袁绍:baseId='袁绍'不在 LORD_CANDIDATES,但 isLord('界袁绍')=true)
+    const hasLordVersion = g.versions.some((v) => isLord(v.name));
+    if (hasLordVersion) {
       if (lordPicked.length < CANDIDATES_LORD) lordPicked.push(g);
     } else {
       if (nonLordPicked.length < CANDIDATES_NON_LORD) nonLordPicked.push(g);

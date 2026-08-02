@@ -279,9 +279,12 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     label: DISPLAY_NAME,
     style: 'danger',
     prompt: {
-      type: 'useCard',
+      // useCardAndTarget 才会进入前端 transformMode(多卡转化);万箭齐发是 AOE
+      // 无需选目标,targetFilter max=0 表示不强制选目标(直接提交)。
+      type: 'useCardAndTarget',
       title: '选择 2 张同花色的手牌当万箭齐发使用(界版:可少选一个目标)',
       cardFilter: { filter: () => true, min: 2, max: 2 },
+      targetFilter: { min: 0, max: 0 },
     },
     transform: (card: Card) => ({
       name: '万箭齐发',

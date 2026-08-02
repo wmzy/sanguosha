@@ -553,23 +553,33 @@ export function GameViewComponentImpl({
                             const enough =
                               ids.length >= transformMode.minCards &&
                               ids.length <= transformMode.maxCards;
+                            // AOE 转化(乱击→万箭齐发)targetFilter.max=0 无需选目标
+                            const needsTarget = transformMode.targetFilter
+                              ? transformMode.targetFilter.max >= 1
+                              : true;
+                            const canSubmit = enough && (!needsTarget || !!selectedTarget);
                             return (
                               <button
                                 className={cx(
                                   styles.playBtn,
-                                  (!enough || !selectedTarget) && styles.btnDisabled,
+                                  !canSubmit && styles.btnDisabled,
                                 )}
                                 onClick={() =>
-                                  selectedTarget && enough && handleTransformPlay(selectedTarget)
+                                  canSubmit &&
+                                  handleTransformPlay(needsTarget ? selectedTarget! : '')
                                 }
-                                disabled={!enough || !selectedTarget}
+                                disabled={!canSubmit}
                               >
                                 使用{transformMode.wrapperName}
-                                {selectedTarget
-                                  ? ` → ${selectedTarget}`
-                                  : enough
-                                    ? ' (请选目标)'
-                                    : ` (还需选 ${transformMode.minCards - ids.length} 张)`}
+                                {!needsTarget
+                                  ? enough
+                                    ? ''
+                                    : ` (还需选 ${transformMode.minCards - ids.length} 张)`
+                                  : selectedTarget
+                                    ? ` → ${selectedTarget}`
+                                    : enough
+                                      ? ' (请选目标)'
+                                      : ` (还需选 ${transformMode.minCards - ids.length} 张)`}
                               </button>
                             );
                           })()}

@@ -311,10 +311,10 @@ describe('乱击', () => {
     const luange = actions.find((a) => a.skillId === '乱击' && a.actionType === 'transform');
     expect(luange).toBeDefined();
     expect(luange!.label).toBe('乱击');
-    expect(luange!.prompt.type).toBe('useCard');
+    expect(luange!.prompt.type).toBe('useCardAndTarget');
 
     const cardFilter =
-      luange!.prompt.type === 'useCard' ? luange!.prompt.cardFilter : null;
+      luange!.prompt.type === 'useCardAndTarget' ? luange!.prompt.cardFilter : null;
     expect(cardFilter).toBeDefined();
     expect(cardFilter!.min).toBe(2);
     expect(cardFilter!.max).toBe(2);

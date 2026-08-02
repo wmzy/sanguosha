@@ -20,6 +20,7 @@ import type {
   DistributePrompt,
   ConfirmPrompt,
   PendingView,
+  TargetFilter,
 } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
@@ -79,6 +80,8 @@ export interface TransformMode {
   maxCards: number;
   /** 多卡模式下选中的卡 id 列表(单卡模式用 selectedCardId) */
   selectedCardIds: string[];
+  /** 转化牌的目标过滤;max>=1 需选目标(丈八蛇矛→杀),max=0 为 AOE 无需选目标(乱击→万箭齐发) */
+  targetFilter?: TargetFilter;
 }
 
 /** distribute 上下文(主动技 + 被动遗计统一) */
@@ -688,6 +691,7 @@ export function usePlayInteraction(
                 minCards,
                 maxCards,
                 selectedCardIds: [],
+                targetFilter: prompt.targetFilter,
               });
               setSelectedCardId(null);
               setSelectedTarget(null);
@@ -734,14 +738,18 @@ export function usePlayInteraction(
   const handleTransformPlay = useCallback(
     (targetName: string) => {
       if (!transformMode) return;
-      const idx = nameToIndex(targetName);
-      if (idx < 0) return;
+      // AOE 转化(乱击→万箭齐发)targetFilter.max=0,无需选目标,直接提交。
+      const needsTarget = transformMode.targetFilter ? transformMode.targetFilter.max >= 1 : true;
+      const idx = needsTarget ? nameToIndex(targetName) : -1;
+      if (needsTarget && idx < 0) return;
 
       if (transformMode.minCards > 1) {
         const ids = transformMode.selectedCardIds;
         if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
         const shadowCardId = `${ids.join('#')}#${transformMode.skillId}`;
-        send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [
+        const mainParams: Record<string, Json> = { cardId: shadowCardId };
+        if (needsTarget) mainParams.targets = [idx];
+        send(transformMode.wrapperName, 'use', mainParams, [
           {
             skillId: transformMode.skillId,
             actionType: transformMode.actionType,
@@ -753,7 +761,9 @@ export function usePlayInteraction(
         const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
         if (!targetCard) return;
         const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
-        send(transformMode.wrapperName, 'use', { cardId: shadowCardId, targets: [idx] }, [
+        const mainParams: Record<string, Json> = { cardId: shadowCardId };
+        if (needsTarget) mainParams.targets = [idx];
+        send(transformMode.wrapperName, 'use', mainParams, [
           {
             skillId: transformMode.skillId,
             actionType: transformMode.actionType,

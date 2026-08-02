@@ -395,6 +395,39 @@ function zhangbaAction(ownerId = 0): SkillActionDef {
   };
 }
 
+/** 乱击(多卡转化→AOE)transform action:两张同花色当万箭齐发,targetFilter.max=0 无需选目标 */
+function luangeAction(ownerId = 0): SkillActionDef {
+  return {
+    skillId: '乱击',
+    ownerId,
+    actionType: 'transform',
+    label: '乱击',
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '乱击',
+      cardFilter: { filter: () => true, min: 2, max: 2 },
+      targetFilter: { min: 0, max: 0 },
+    },
+    transform: (card) => ({ name: '万箭齐发', sourceCardId: card.id, fromSkill: '乱击' }),
+  };
+}
+
+/** 万箭齐发 use action:AOE 无目标(useCard),供乱击转化后的 wrapper 查找 */
+function wanjianUseAction(ownerId = 0): SkillActionDef {
+  return {
+    skillId: '万箭齐发',
+    ownerId,
+    actionType: 'use',
+    label: '万箭齐发',
+    prompt: {
+      type: 'useCard',
+      title: '万箭齐发',
+      cardFilter: { filter: (c) => c.name === '万箭齐发', min: 1, max: 1 },
+    },
+  };
+}
+
 /** 可配置出牌阶段视图;P1 可装武器/置为死亡。 */
 function makePlayView(
   opts: { currentPlayerIndex?: number; phase?: GameView['phase']; p1Alive?: boolean; p1Weapon?: string } = {},
@@ -1266,6 +1299,41 @@ describe('usePlayInteraction · 转化模式(transformMode)', () => {
     act(() => result.current.handleCardClick(RED_CARD_A)); // 只选 1 张
     act(() => result.current.handleTransformPlay('P1'));
     expect(send).not.toHaveBeenCalled();
+  });
+
+  // 回归:乱击/界乱击转化万箭齐发是 AOE(prompt.type 须为 useCardAndTarget 才进
+  // transformMode,且 targetFilter.max=0 无需选目标)。此前 prompt.type='useCard' 走单卡
+  // 分支,乱击无法使用。验证:进 transformMode + targetFilter 传入 + 提交不带 targets。
+  it('多卡转化 AOE(乱击→万箭齐发):无需选目标,直接提交不带 targets', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [luangeAction(), wanjianUseAction()],
+        perspectiveHand: [RED_CARD_A, RED_CARD_B],
+        send,
+      }),
+    );
+    act(() => result.current.handleSkillAction(luangeAction()));
+    // AOE:targetFilter.max=0,正确传入 transformMode
+    expect(result.current.transformMode?.targetFilter).toEqual({ min: 0, max: 0 });
+    // 选两张
+    act(() => result.current.handleCardClick(RED_CARD_A));
+    act(() => result.current.handleCardClick(RED_CARD_B));
+    // AOE 无需选目标,空 targetName 直接提交
+    act(() => result.current.handleTransformPlay(''));
+    expect(send.mock.calls[0][0]).toBe('万箭齐发');
+    expect(send.mock.calls[0][1]).toBe('use');
+    // 关键:mainParams 不含 targets(AOE 无目标)
+    expect(send.mock.calls[0][2]).toEqual({ cardId: 'c-red-a#c-red-b#乱击' });
+    const preceding = send.mock.calls[0][3] as Array<{
+      skillId: string;
+      actionType: string;
+      params: Record<string, Json>;
+    }>;
+    expect(preceding).toEqual([
+      { skillId: '乱击', actionType: 'transform', params: { cardIds: ['c-red-a', 'c-red-b'] } },
+    ]);
   });
 
   it('多卡转化 FIFO 淘汰:选满 maxCards 后再选新牌→取消最早选中的', () => {

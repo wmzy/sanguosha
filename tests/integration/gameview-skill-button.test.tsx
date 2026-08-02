@@ -364,3 +364,40 @@ describe('GameView:chooseOption 选项选择(化身场景)', () => {
     });
   });
 });
+
+// 回归:主公技(护驾/激将/界血裔 等)仅在主公座次展示。界袁绍非主公时不应展示界血裔。
+// 修复前:PlayerCardLarge/PlayerSeatView 的 visibleSkills 不过滤主公技,非主公主公技仍展示。
+// 修复后:非主公(identity!=='主公')时隐藏 LORD_SKILLS 中的主公技。
+describe('GameView:主公技仅在主公座次展示', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('主公主公技(激将)展示;非主公主公技(护驾)隐藏', () => {
+    const base = makeView();
+    const view: GameView = {
+      ...base,
+      players: [
+        {
+          ...base.players[0],
+          name: '刘备',
+          character: '刘备',
+          identity: '主公',
+          skills: ['仁德', '激将'],
+        },
+        {
+          ...base.players[1],
+          name: '曹操',
+          character: '曹操',
+          identity: '反贼',
+          skills: ['护驾'],
+        },
+      ],
+    };
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+    // 主公刘备的激将(主公技)应展示
+    expect(screen.getAllByText('激将').length).toBeGreaterThan(0);
+    // 非主公曹操的护驾(主公技)不应展示
+    expect(screen.queryByText('护驾')).toBeNull();
+  });
+});

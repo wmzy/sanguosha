@@ -133,6 +133,25 @@ describe('选将分配:按身份发放 + 候选池入池', () => {
     }
   }, 10000);
 
+  // 回归:界袁绍是界版新增主公技武将(界血裔),baseId='袁绍' 不在 LORD_CANDIDATES,
+  // 但 character 定义 isLord:true。此前 pickLordCandidateGroups 用 LORD_CANDIDATES.includes(baseId)
+  // 判断,界袁绍无法进入主公候选 → 主公选不到 → 界血裔永远无法生效。修复后用 isLord 判断。
+  it('界袁绍(isLord 但 baseId 不在 LORD_CANDIDATES)进入主公候选', async () => {
+    expect(isLord('界袁绍')).toBe(true);
+    // 池:界袁绍(唯一 isLord) + 假武将
+    const pool: Array<{ name: string; skills: string[] }> = [
+      { name: '界袁绍', skills: [] },
+    ];
+    for (let i = 1; i < 25; i++) pool.push({ name: `武将${i}`, skills: [] });
+    void bootstrap(state, { characters: pool, playerCount: 4, seed: 1, gameId: 't' });
+    for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    await waitForStable(state);
+    const lordSlot = [...state.pendingSlots.values()][0];
+    expect(slotCandidates(lordSlot)).toContain('界袁绍');
+  }, 10000);
+
   it('池足够时:非主公按身份分配候选数且跨玩家不重复', async () => {
     // 25 武将:主公7 + 忠臣5 + 反贼4 + 内奸5 = 21,余量充足
     const pool = makeBigCharPool(25);

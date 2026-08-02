@@ -8,7 +8,7 @@ import type { GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
-import { getCharacterMeta } from '../../engine/character-meta';
+import { getCharacterMeta, LORD_SKILLS } from '../../engine/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
@@ -67,9 +67,13 @@ export function PlayerCardLargeImpl({
   const factionColor = FACTION_BG[faction] || '#8e44ad';
   const charImg = p.character ? getCharacterImage(p.character) : null;
   const identity = p.identity;
-  // 技能列表(过滤默认技能与装备技能)
+  const isLordSeat = identity === '主公';
+  // 技能列表(过滤默认技能与装备技能;非主公隐藏主公技)
   const visibleSkills = p.skills.filter(
-    (s) => !DEFAULT_SKILLS.has(s) && !EQUIPMENT_SKILL_NAMES.has(s),
+    (s) =>
+      !DEFAULT_SKILLS.has(s) &&
+      !EQUIPMENT_SKILL_NAMES.has(s) &&
+      (isLordSeat || !LORD_SKILLS.has(s)),
   );
   // 主动技(confirm/choosePlayer/转化类/distribute)渲染为可点按钮
   const triggerableActions = skillActions.filter(

@@ -6,6 +6,9 @@ export const 界袁绍 = {
   maxHealth: 4,
   gender: '男',
   faction: '群',
+  // 界袁绍拥有主公技「界血裔」,是常备主公。标版袁绍无主公技(baseId='袁绍' 不在
+  // LORD_CANDIDATES),此处显式声明 isLord 让选将主公候选池与 isLord() 判定正确识别。
+  isLord: true,
   skills: [
     { name: '界乱击', path: '../skills/界乱击' },
     { name: '界血裔', path: '../skills/界血裔' },

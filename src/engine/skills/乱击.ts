@@ -109,9 +109,12 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     label: '乱击',
     style: 'danger',
     prompt: {
-      type: 'useCard',
+      // useCardAndTarget 才会进入前端 transformMode(多卡转化);万箭齐发是 AOE
+      // 无需选目标,targetFilter max=0 表示不强制选目标(直接提交)。
+      type: 'useCardAndTarget',
       title: '选择 2 张同花色的手牌当万箭齐发使用',
       cardFilter: { filter: () => true, min: 2, max: 2 },
+      targetFilter: { min: 0, max: 0 },
     },
     // transform 接收第一张选中卡,返回 CardWrapper(供前端显示"万箭齐发")。
     // 多卡选牌 id 由前端在 handleTransformPlay 中拼成 ${id1}#${id2}#乱击。

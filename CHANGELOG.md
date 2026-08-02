@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 界袁绍乱击无法使用；非主公时仍展示主公技
+
+界袁绍两个问题:(1)「乱击」技能按钮点了没反应，完全无法使用；(2)界袁绍非主公出场时角色卡仍展示主公技「界血裔」。两者根因不同。
+
+**乱击无法使用**:乱击/界乱击的 transform action `prompt.type` 声明为 `'useCard'`,但前端 `handleSkillAction` 只在 `'useCardAndTarget'` 类型才进入多卡转化模式(`transformMode`,选 2 张手牌)。「useCard」走单卡分支,`cardIds` 只带 1 张,后端 validate 要求 2 张直接拒绝。标版丈八蛇矛(同样多卡转化)用的是 `useCardAndTarget` 所以正常,乱击漏改。万箭齐发是 AOE 无需选目标,故 `targetFilter` 需 `max:0`(丈八蛇矛转化杀是 `max:1` 需选目标)。
+
+**非主公主公技展示**:界袁绍 character 未声明 `isLord`,其 `baseId='袁绍'` 不在 `LORD_CANDIDATES`(标版袁绍无主公技),导致 `isLord('界袁绍')=false`。选将 `pickLordCandidateGroups` 用 `LORD_CANDIDATES.includes(baseId)` 判断主公候选,界袁绍永远进不了主公候选池 → 只能非主公出场 → 「界血裔」(主公技) 永远无效却仍展示。同时前端角色卡(`PlayerCardLarge`/`PlayerSeatView`)的 `visibleSkills` 不区分主公技,非主公也展示。
+
+#### Changed
+- **乱击/界乱击 transform prompt 改 `useCardAndTarget`**(根因1):加 `targetFilter: { min: 0, max: 0 }` 表示 AOE 无需选目标。与丈八蛇矛(`max:1`)对齐进入转化模式的条件。(`src/engine/skills/乱击.ts`、`src/engine/skills/界乱击.ts`)
+- **TransformMode 携带 targetFilter + AOE 无目标提交**:`TransformMode` 接口新增 `targetFilter` 字段,`handleSkillAction` 设置转化模式时传入;`handleTransformPlay` 据 `targetFilter.max` 判断是否需目标,AOE(`max:0`)直接提交不带 `targets`;`GameView` 多卡转化按钮据 `needsTarget` 决定是否要求选目标。(`src/client/hooks/usePlayInteraction.ts`、`src/client/components/GameView.tsx`)
+- **界袁绍声明 `isLord: true`**(根因2):界袁绍有主公技界血裔,是常备主公。标版袁绍无主公技(`baseId='袁绍'` 不能进 `LORD_CANDIDATES`),故界版显式声明。(`src/engine/cards/characters/界袁绍.ts`)
+- **选将主公候选改用 `isLord` 判断**:`pickLordCandidateGroups` 由 `LORD_CANDIDATES.includes(baseId)` 改为 `g.versions.some(v => isLord(v.name))`,识别界版新增主公技武将。(`src/engine/skills/开局.ts`)
+- **新增 `LORD_SKILLS` 集合 + 非主公主公技过滤**:在 `character-meta` 维护主公技技能 id 集合(护驾/激将/救援/制霸/暴虐/黄天/若愚 及其界版 + 界血裔),`PlayerCardLarge`/`PlayerSeatView` 的 `visibleSkills` 在非主公座次(`identity!=='主公'`)过滤掉主公技。(`src/engine/character-meta.ts`、`src/client/components/PlayerCardLarge.tsx`、`src/client/components/PlayerSeatView.tsx`)
+
+#### Added
+- **AOE 转化回归测试**:`usePlayInteraction.test.ts` 新增「乱击→万箭齐发无需选目标直接提交不带 targets」——锁定 `transformMode.targetFilter` 传入与 `handleTransformPlay` AOE 分支。
+- **界袁绍主公候选回归测试**:`char-select-distribution.test.ts` 新增「界袁绍(isLord 但 baseId 不在 LORD_CANDIDATES)进入主公候选」——锁定 `isLord('界袁绍')=true` 与 `pickLordCandidateGroups` 的 isLord 判断。
+- **主公技过滤回归测试**:`gameview-skill-button.test.tsx` 新增「主公主公技(激将)展示、非主公主公技(护驾)隐藏」。
+- **标版乱击测试 prompt.type 断言同步更新**(`useCard`→`useCardAndTarget`)。
+
 ### Fixed — 有目标的动效在对应武将卡上播放
 
 伤害等带目标的 Lottie/APNG 特效此前一律居屏幕中央播放,与「谁在受伤」脱节。`扣减体力` atom 的 ViewEvent 携带 `target` 与 `vfx:'card/damage'`,但 `useVfxPlayback` 只提取了 vfx 资源 ID、丢弃了 target,`VfxLayer` 也只做居中布局。观感即「张角受伤,伤害特效却盖在战场正中」。现把有目标的动效定位到目标座次的武将卡中心播放,无目标的动效仍居中。

@@ -14,7 +14,7 @@ import {
   EQUIPMENT_SKILL_NAMES,
   EQUIP_SLOT_ICON,
 } from './gameViewConstants';
-import { getCharacterMeta } from '../../engine/character-meta';
+import { getCharacterMeta, LORD_SKILLS } from '../../engine/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { displaySkillName } from '../utils/skillDisplay';
@@ -177,19 +177,22 @@ function PlayerSeatViewImpl({
         ))}
       </div>
       {/* 技能标签 */}
-      {player.skills
-        .filter((s) => !DEFAULT_SKILLS.has(s))
-        .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s)).length > 0 && (
-        <div className={skillRow}>
-          {player.skills
-            .filter((s) => !DEFAULT_SKILLS.has(s))
-            .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
-            .map((s) => (
+      {(() => {
+        const isLordSeat = player.identity === '主公';
+        const seatVisibleSkills = player.skills
+          .filter((s) => !DEFAULT_SKILLS.has(s))
+          .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
+          .filter((s) => isLordSeat || !LORD_SKILLS.has(s));
+        if (seatVisibleSkills.length === 0) return null;
+        return (
+          <div className={skillRow}>
+            {seatVisibleSkills.map((s) => (
               // 描述按原 id(s)查询;展示名去前导"界"
               <SkillTag key={s} name={displaySkillName(s)} description={getSkillDescription(s)} className={skillTag} />
             ))}
-        </div>
-      )}
+          </div>
+        );
+      })()}
       {/* 手牌数 + 基本信息 */}
       <div className={infoRow}>
         <span>手牌: {player.handCount}</span>
