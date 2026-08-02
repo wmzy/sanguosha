@@ -14,6 +14,14 @@ import { getAtomDef } from '../../engine/atom';
 /** 最小可见时长(ms),保证事件能被看清,即便 effect.duration 偏短 */
 const MIN_VISIBLE_MS = 400;
 
+/** 箭头类事件最小播放时长(ms),保证 ActionOverlay 有足够时间渲染箭头。
+ *  指定目标/成为目标 atom 的 effect.duration 仅 400ms,与 MIN_VISIBLE_MS 相同;
+ *  多个事件同批到达时队列快速推进,后续事件会在 400ms 内覆盖当前事件,
+ *  React 渲染周期 + findSeatEl DOM 查询来不及完成,箭头来不及渲染或一闪而过。 */
+const ARROW_MIN_MS = 1200;
+/** 需要延长播放时长的事件类型(携带 source+target 的箭头触发事件) */
+const ARROW_EVENT_TYPES = new Set(['指定目标', '成为目标']);
+
 /**
  * 结构性事件:回合/阶段开始·结束。这些事件无卡牌、无目标,中央横幅本就不渲染它们
  * (EventBanner 需 card 字段,ActionOverlay 需 target),进入播放队列只是 duration 空转,
@@ -81,7 +89,11 @@ export function useEventPlayback() {
     }
     const eventEffect = next.event.effect as { duration?: number } | undefined;
     const duration = eventEffect?.duration ?? staticDuration ?? MIN_VISIBLE_MS;
-    const wait = Math.max(duration, MIN_VISIBLE_MS);
+    // 箭头类事件(指定目标/成为目标)强制更长最小播放时长,避免后续事件过快覆盖、
+    // 箭头来不及渲染。其他事件仍走 MIN_VISIBLE_MS 下限。
+    const isArrowEvent = ARROW_EVENT_TYPES.has(next.event.type);
+    const minMs = isArrowEvent ? ARROW_MIN_MS : MIN_VISIBLE_MS;
+    const wait = Math.max(duration, minMs);
     timerRef.current = setTimeout(() => {
       lastPlayedSeqRef.current = next.seq;
       playNext();

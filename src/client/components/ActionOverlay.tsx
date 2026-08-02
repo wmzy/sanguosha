@@ -47,7 +47,7 @@ interface ActionInfo {
 }
 
 /** 从 ViewEvent 提取 ActionInfo。
- *  支持的事件:指定目标/成为目标/扣减体力/失去体力/打出。
+ *  支持的事件:指定目标/成为目标/扣减体力/失去体力/打出牌时。
  *  其他事件返回 null。 */
 function extractAction(event: ViewEventLike): ActionInfo | null {
   const t = event.type;
@@ -63,12 +63,13 @@ function extractAction(event: ViewEventLike): ActionInfo | null {
     // 扣减体力/失去体力 无 source,无箭头(只有浮层)
     return { source: source ?? target, target, eventType: t };
   }
-  if (t === '打出') {
-    // 打出事件:player=来源,无 target。需结合 cardName 显示「X 使用 Y」,
+  if (t === '打出牌时') {
+    // 打出牌时事件(player 打出某牌):player=来源,无 target。需结合 cardName 显示「X 使用 Y」,
     // 箭头从 source 指向 view.pending.target(若该 pending 命中某座次)。
+    // 引擎的「打出牌时」atom 直接携带 cardName(见 src/engine/atoms/打出牌时.ts)。
     const p = num(event.player);
     if (p === undefined) return null;
-    return { source: p, cardName: str((event.card as { name?: unknown } | undefined)?.name), eventType: t };
+    return { source: p, cardName: str(event.cardName), eventType: t };
   }
   if (t === '判定') {
     // 判定事件:player=判定者,judgeType=判定类型(乐不思蜀/闪电/八卦阵等),
@@ -147,11 +148,11 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
     let action = extractAction(event);
     if (!action) return;
 
-    // 群锦囊场景:打出事件 + 当前 pending 命中某座次 → 把目标设为该座次,
+    // 群锦囊场景:打出牌时事件 + 当前 pending 命中某座次 → 把目标设为该座次,
     // 浮层展示「X 使用 群锦囊」+ 箭头指向当前轮到结算的角色。
     const pendingTarget = viewRef.current.pending?.target;
     if (
-      action.eventType === '打出' &&
+      action.eventType === '打出牌时' &&
       action.cardName &&
       BROADCAST_TRICKS.has(action.cardName) &&
       pendingTarget !== undefined &&
