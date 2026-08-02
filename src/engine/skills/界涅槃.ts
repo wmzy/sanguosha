@@ -68,17 +68,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
       const rt = atom['requestType'] as string;
-      if (rt === CONFIRM_RT) {
-        // 是否发动:choice 布尔
-        return null;
-      }
-      if (rt === CHOOSE_RT) {
-        // 三选一:skill 必须在候选中
-        const skillName = params.skill as string | undefined;
-        if (typeof skillName !== 'string') return '需要 skill(技能名)';
-        if (!CHOOSABLE_SKILLS.includes(skillName)) return '必须从八阵/火计/看破中选一个';
-        return null;
-      }
+      if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可
       return '当前不是界涅槃询问';
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -86,12 +76,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const rt = (slot.atom as Record<string, unknown>).requestType as string;
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-      } else if (rt === CHOOSE_RT) {
-        const skillName = params.skill as string;
-        if (CHOOSABLE_SKILLS.includes(skillName)) {
-          st.localVars[SELECTED_KEY] = skillName;
-        }
-        delete st.localVars[CANDIDATES_KEY];
       }
     },
   );
@@ -166,30 +150,36 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount });
     }
 
-    // 5. 三选一:询问玩家从 八阵/火计/看破 中选一个,然后获得该技能
-    //    (官方"然后获得八阵/火计/看破中的一个")。参考化身.respond{skill} 模式。
+    // 5. 三选一:逐个询问是否获得 八阵/火计/看破
+    //    (官方"然后获得八阵/火计/看破中的一个")。
+    //    用顺序 confirm 替代单次 confirm(params.skill 不可达) —— 前端 confirm 只发 choice 布尔。
     //    庞统此时 health=3 且 alive,询问不会卡死濒死流程(濒死循环已退出)。
-    delete ctx.state.localVars[SELECTED_KEY];
-    ctx.state.localVars[CANDIDATES_KEY] = [...CHOOSABLE_SKILLS];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '界涅槃:请选择要获得的技能(八阵 / 火计 / 看破)',
-        confirmLabel: '确定',
-        cancelLabel: '取消',
-      },
-      defaultChoice: false,
-      timeout: 30,
-    });
-    const selected = ctx.state.localVars[SELECTED_KEY] as string | undefined;
-    if (selected && CHOOSABLE_SKILLS.includes(selected)) {
-      await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: selected });
+    let selected: string | undefined;
+    for (const skillName of CHOOSABLE_SKILLS) {
+      delete ctx.state.localVars[CONFIRMED_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: CONFIRM_RT,
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: `界涅槃:是否获得「${skillName}」?`,
+          confirmLabel: '获得',
+          cancelLabel: '不要',
+        },
+        defaultChoice: false,
+        timeout: 15,
+      });
+      if (ctx.state.localVars[CONFIRMED_KEY]) {
+        selected = skillName;
+        delete ctx.state.localVars[CONFIRMED_KEY];
+        break;
+      }
+      delete ctx.state.localVars[CONFIRMED_KEY];
     }
-    delete ctx.state.localVars[SELECTED_KEY];
-    delete ctx.state.localVars[CANDIDATES_KEY];
+    // 全部起时默认获得第一个(八阵)
+    if (!selected) selected = CHOOSABLE_SKILLS[0];
+    await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: selected });
   });
 
   return () => {};
