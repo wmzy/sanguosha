@@ -84,7 +84,7 @@ function zishouDiscardExcess(state: GameState): number | null {
       requestType?: string;
       prompt?: { cardFilter?: { min?: number } };
     };
-    if (atom.requestType === '自守/弃牌') {
+    if (atom.requestType === '界自守/弃牌') {
       return atom.prompt?.cardFilter?.min ?? null;
     }
   }
@@ -142,7 +142,7 @@ describe('界自守', () => {
 
     // 开局 → 摸牌阶段 → 询问是否发动自守
     await P0.triggerAction('回合管理', 'start');
-    expect(currentRequestType(harness.state)).toBe('自守/confirm');
+    expect(currentRequestType(harness.state)).toBe('界自守/confirm');
 
     // 确认发动
     await P0.respond('界自守', { choice: true });
@@ -196,7 +196,7 @@ describe('界自守', () => {
     const restoreAutoCompare = disableAutoCompare();
 
     await P0.triggerAction('回合管理', 'start');
-    expect(currentRequestType(harness.state)).toBe('自守/confirm');
+    expect(currentRequestType(harness.state)).toBe('界自守/confirm');
 
     // 不发动
     await P0.respond('界自守', { choice: false });
@@ -293,7 +293,7 @@ describe('界自守', () => {
 
     // 弃牌后手牌 5 张,进入结束阶段 → 自守弃牌惩罚(X=2)
     expect(harness.state.players[0].hand.length).toBe(5);
-    expect(currentRequestType(harness.state)).toBe('自守/弃牌');
+    expect(currentRequestType(harness.state)).toBe('界自守/弃牌');
     expect(zishouDiscardExcess(harness.state)).toBe(2);
 
     // 弃 2 张
@@ -373,7 +373,7 @@ describe('界自守', () => {
 
     // 弃牌后手牌 5 张,进入结束阶段 → 未造成伤害,无自守弃牌
     expect(harness.state.players[0].hand.length).toBe(5);
-    expect(currentRequestType(harness.state)).not.toBe('自守/弃牌');
+    expect(currentRequestType(harness.state)).not.toBe('界自守/弃牌');
     // damageDealt 未设
     expect(harness.state.turn.vars['自守/damageDealt']).toBeUndefined();
 

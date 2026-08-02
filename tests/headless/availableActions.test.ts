@@ -520,6 +520,62 @@ describe('enumerateAvailableActions', () => {
       actions.find((x) => x.message.actionType === 'recast'),
     ).toBeUndefined();
   });
+
+  // 断粮/界断粮:黑色杀同时匹配"杀"(主 use)和"断粮"(转化 use)。
+  // 修复前:NON_ALT_ACTION_TYPES 排除 use,断粮不出现在替代动作 → AI/玩家无法用黑杀发动断粮。
+  // 修复后:非主 use action 作为替代动作出现,断粮可被枚举。
+  const blackSlash: Card = {
+    id: 'c-blackspace',
+    name: '杀',
+    suit: '♠',
+    color: '黑',
+    rank: '7',
+    type: '基本牌',
+  };
+  const slashUseAction: SkillActionDef = {
+    skillId: '杀',
+    ownerId: 0,
+    actionType: 'use',
+    label: '杀',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '杀',
+      cardFilter: { filter: (c: Card) => c.name === '杀', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 1 },
+    },
+  };
+  const duanliangUseAction: SkillActionDef = {
+    skillId: '界断粮',
+    ownerId: 0,
+    actionType: 'use',
+    label: '界断粮',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '界断粮',
+      cardFilter: {
+        filter: (c: Card) => c.color === '黑' && (c.type === '基本牌' || c.type === '装备牌'),
+        min: 1,
+        max: 1,
+      },
+      targetFilter: { min: 1, max: 1 },
+    },
+  };
+
+  it('黑色杀同时匹配杀(主)和断粮(替代):断粮作为替代动作被枚举', () => {
+    const view = makeView(0, '出牌', [blackSlash]);
+    const actions = enumerateAvailableActions(view, 0, [slashUseAction, duanliangUseAction]);
+    // 主 use(杀)出现在 play 类别
+    const playKill = actions.find(
+      (x) => x.category === 'play' && x.message.skillId === '杀',
+    );
+    expect(playKill).toBeDefined();
+    // 断粮也出现在 play 类别(作为替代 use action)
+    const playDuanliang = actions.find(
+      (x) => x.category === 'play' && x.message.skillId === '界断粮',
+    );
+    expect(playDuanliang).toBeDefined();
+    expect(playDuanliang!.message.params.cardId).toBe('c-blackspace');
+  });
 });
 
 // 回归测试：choosePlayer prompt（突袭/select、激将、节命、奋威 等）

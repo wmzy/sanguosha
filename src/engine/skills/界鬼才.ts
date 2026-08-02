@@ -72,7 +72,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const atom = slot.atom as unknown as Record<string, unknown>;
       if (atom.type !== '请求回应') return '当前不需要回应';
       const reqType = atom.requestType as string;
-      if (reqType !== '鬼才/replace') return '当前不是鬼才询问';
+      if (reqType !== '界鬼才/replace') return '当前不是界鬼才询问';
       // 若选择替换:cardId 必须在手牌或装备区中;若选择不替换:无额外要求
       if (params.choice === true || params.confirmed === true) {
         const cardId = params.cardId as string;
@@ -108,7 +108,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars['鬼才/replaceCard'];
     await applyAtom(ctx.state, {
       type: '请求回应',
-      requestType: '鬼才/replace',
+      requestType: '界鬼才/replace',
       target: ownerId,
       prompt: {
         type: 'useCard',

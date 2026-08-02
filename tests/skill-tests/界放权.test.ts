@@ -64,7 +64,7 @@ describe('界放权', () => {
   });
 
   it('回归: 放权询问 requestType 前缀须等于技能 id(前端路由契约)', async () => {
-    // bug: 界放权曾复用放权的 requestType 常量值('放权/trigger'),
+    // bug: 界放权曾复用放权的 requestType 常量值('界放权/trigger'),
     //   前端按 requestType 前缀解析 skillId 得 '放权' ≠ 技能 id '界放权',
     //   dispatch 找不到 respond handler → 发动/不发动按钮都不可点击。
     const c1 = mkCard('c1', '杀', '♠', '5');

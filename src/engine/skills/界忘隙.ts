@@ -29,8 +29,8 @@ import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界忘隙';
 const DISPLAY_NAME = '忘隙';
-const CONFIRM_RT = '忘隙/confirm';
-const PICK_RT = '忘隙/pick';
+const CONFIRM_RT = '界忘隙/confirm';
+const PICK_RT = '界忘隙/pick';
 const CONFIRMED_KEY = '忘隙/confirmed';
 const PICK_KEY = '忘隙/pickChoice';
 

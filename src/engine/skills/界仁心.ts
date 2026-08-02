@@ -90,9 +90,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const atom = slot.atom as unknown as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
       const rt = atom['requestType'] as string;
-      if (rt !== '仁心/confirm' && rt !== '仁心/selectCard') return '当前不是仁心询问';
+      if (rt !== '界仁心/confirm' && rt !== '界仁心/selectCard') return '当前不是仁心询问';
 
-      if (rt === '仁心/selectCard') {
+      if (rt === '界仁心/selectCard') {
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string') return '请选择一张装备牌';
         const valid = listEquipmentChoices(st, ownerId);
@@ -103,9 +103,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
-      if (rt === '仁心/confirm') {
+      if (rt === '界仁心/confirm') {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-      } else if (rt === '仁心/selectCard') {
+      } else if (rt === '界仁心/selectCard') {
         const cid = params.cardId as string | undefined;
         if (typeof cid === 'string') st.localVars[CARD_CHOICE_KEY] = cid;
       }
@@ -132,7 +132,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars[CONFIRMED_KEY];
     await applyAtom(ctx.state, {
       type: '请求回应',
-      requestType: '仁心/confirm',
+      requestType: '界仁心/confirm',
       target: ownerId,
       prompt: {
         type: 'confirm',
@@ -161,7 +161,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[CARD_CHOICE_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
-        requestType: '仁心/selectCard',
+        requestType: '界仁心/selectCard',
         target: ownerId,
         prompt: {
           type: 'pickProcessingCard',

@@ -55,11 +55,11 @@ const SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';
 
 /** 贞烈发动确认 requestType(yes/no) */
-const CONFIRM_RT = '贞烈/confirm';
+const CONFIRM_RT = '界贞烈/confirm';
 /** 贞烈选项①/② requestType('gain' | 'miji') */
-const CHOOSE_RT = '贞烈/choose';
+const CHOOSE_RT = '界贞烈/choose';
 /** 贞烈选牌面板 requestType(交给 runPickTargetCardPanel) */
-const PICK_RT = '贞烈/选牌';
+const PICK_RT = '界贞烈/选牌';
 
 /** localVars:发动确认结果(boolean) */
 const CONFIRM_KEY = '贞烈/confirmed';

@@ -223,7 +223,7 @@ describe('界节命', () => {
     P0.expectPending('请求回应');
     const slot = [...harness.state.pendingSlots.values()][0];
     const atom = slot.atom as { requestType?: string };
-    expect(atom.requestType).toBe('节命/discard');
+    expect(atom.requestType).toBe('界节命/discard');
 
     // P0 弃 3 张
     const toDiscard = harness.state.players[0].hand.slice(0, 3);

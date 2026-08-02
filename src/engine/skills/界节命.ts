@@ -39,9 +39,9 @@ import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」
-const CONFIRM_RT = '节命/confirm';
-const TARGET_RT = '节命/target';
-const DISCARD_RT = '节命/discard';
+const CONFIRM_RT = '界节命/confirm';
+const TARGET_RT = '界节命/target';
+const DISCARD_RT = '界节命/discard';
 const CONFIRMED_KEY = '节命/confirmed';
 const TARGET_KEY = '节命/target';
 const DISCARD_KEY = '节命/discardCards';

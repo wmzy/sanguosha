@@ -32,8 +32,8 @@ import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 const BASIC_CHOICE_VAR = '仁德/basicChoice';
 const BASIC_TARGET_VAR = '仁德/basicTarget';
 // 请求回应的 requestType(隔离 respond 路由)
-const CHOICE_RT = '仁德/basicChoice';
-const TARGET_RT = '仁德/basicTarget';
+const CHOICE_RT = '界仁德/basicChoice';
+const TARGET_RT = '界仁德/basicTarget';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

@@ -203,7 +203,7 @@ describe('界裸衣', () => {
     expect(harness.state.players[0].tags).not.toContain('裸衣/bonus');
     const hasSkip = [...harness.state.pendingSlots.values()].some((s) => {
       const rt = (s.atom as { requestType?: string }).requestType;
-      return rt === '裸衣/skip';
+      return rt === '界裸衣/skip';
     });
     expect(hasSkip).toBe(false);
   });
@@ -434,7 +434,7 @@ describe('界裸衣', () => {
     // 无界裸衣询问 pending
     const hasJieLuoYi = [...harness.state.pendingSlots.values()].some((s) => {
       const rt = (s.atom as { requestType?: string }).requestType;
-      return rt === '裸衣/activate';
+      return rt === '界裸衣/activate';
     });
     expect(hasJieLuoYi).toBe(false);
   });
@@ -462,7 +462,7 @@ describe('界裸衣', () => {
 
     const hasJieLuoYi = [...harness.state.pendingSlots.values()].some((s) => {
       const rt = (s.atom as { requestType?: string }).requestType;
-      return rt === '裸衣/activate';
+      return rt === '界裸衣/activate';
     });
     expect(hasJieLuoYi).toBe(false);
     expect(harness.state.players[0].tags).not.toContain('裸衣/bonus');

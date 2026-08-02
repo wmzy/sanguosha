@@ -91,7 +91,7 @@ describe('界崩坏', () => {
     P0.expectPending('请求回应');
     const slot = [...harness.state.pendingSlots.values()][0];
     const atom = slot.atom as { requestType?: string };
-    expect(atom.requestType).toBe('崩坏/choose');
+    expect(atom.requestType).toBe('界崩坏/choose');
 
     // 选 confirm = 减体力上限
     await P0.respond('界崩坏', { choice: true });

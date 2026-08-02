@@ -30,8 +30,8 @@ import type {
 import { applyAtom } from '../create-engine';
 import { registerAction, registerBeforeHook } from '../skill';
 
-const TRIGGER_RT = '突袭/trigger';
-const SELECT_RT = '突袭/select';
+const TRIGGER_RT = '界突袭/trigger';
+const SELECT_RT = '界突袭/select';
 const TRIGGERED_KEY = '突袭/triggered';
 const TARGETS_KEY = '突袭/targets';
 

@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
-const CHOOSE_RT = '志继/choose';
+const CHOOSE_RT = '界志继/choose';
 const CHOICE_KEY = '志继/choice';
 const AWAKENED_KEY = '志继/awakened';
 

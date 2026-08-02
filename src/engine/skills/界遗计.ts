@@ -11,8 +11,8 @@ import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」
-const CONFIRM_RT = '遗计/giveConfirm'; // 界郭嘉:是否交牌
-const GIVE_RT = '遗计/giveCard'; // 界郭嘉:选牌+选目标(至多 2 张给至多 2 人)
+const CONFIRM_RT = '界遗计/giveConfirm'; // 界郭嘉:是否交牌
+const GIVE_RT = '界遗计/giveCard'; // 界郭嘉:选牌+选目标(至多 2 张给至多 2 人)
 const CONFIRMED_KEY = '遗计/confirmed';
 const ALLOC_KEY = '遗计/allocation';
 

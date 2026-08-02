@@ -21,7 +21,7 @@ import { skillLoaders } from './index';
 const SKIP_TAG = '据守/翻面';
 const SKIP_FLAG = '据守/skipAll';
 const USED_KEY = '据守/usedThisTurn';
-const DISCARD_RT = '据守/弃牌';
+const DISCARD_RT = '界据守/弃牌';
 const DISCARD_CHOICE_KEY = '据守/discardChoice';
 
 /** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */

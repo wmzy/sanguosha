@@ -134,7 +134,7 @@ describe('界恂恂', () => {
     const P1 = harness.player('P1');
 
     // 注入 ARRANGE pending,候选 4 张牌
-    injectPending(state, 0, '恂恂/arrange', {
+    injectPending(state, 0, '界恂恂/arrange', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b', 'c', 'd'],
@@ -162,7 +162,7 @@ describe('界恂恂', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '恂恂/arrange', {
+    injectPending(state, 0, '界恂恂/arrange', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b', 'c', 'd'],
@@ -192,7 +192,7 @@ describe('界恂恂', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '恂恂/confirm', { type: 'confirm', title: '是否发动?' });
+    injectPending(state, 0, '界恂恂/confirm', { type: 'confirm', title: '是否发动?' });
 
     await P1.expectAccepted({
       skillId: '界恂恂',
@@ -232,7 +232,7 @@ describe('界恂恂', () => {
     P1.expectPending('请求回应');
     const cslot = [...harness.state.pendingSlots.values()][0];
     const cAtom = cslot.atom as { requestType?: string; target?: number };
-    expect(cAtom.requestType).toBe('恂恂/confirm');
+    expect(cAtom.requestType).toBe('界恂恂/confirm');
     expect(cAtom.target).toBe(0);
 
     await P1.respond('界恂恂', { choice: true });
@@ -246,7 +246,7 @@ describe('界恂恂', () => {
       requestType?: string;
       prompt?: { cardIds?: string[] };
     };
-    expect(aAtom.requestType).toBe('恂恂/arrange');
+    expect(aAtom.requestType).toBe('界恂恂/arrange');
     expect(aAtom.prompt?.cardIds).toEqual(['o1', 'o2', 'o3', 'o4']); // top→bottom
 
     // 玩家选 o4, o1 置顶(o4 最先摸),o3, o2 置底

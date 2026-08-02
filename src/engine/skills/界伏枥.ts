@@ -44,7 +44,7 @@ const DMG_DEALT_KEY = '伏枥/damageDealt';
 /** localVars:玩家是否发动伏枥。 */
 const CONFIRMED_KEY = '伏枥/confirmed';
 /** requestType:确认发动询问。 */
-const CONFIRM_RT = '伏枥/confirm';
+const CONFIRM_RT = '界伏枥/confirm';
 
 /** 翻面标签(下一回合被消费,跳过整回合)。 */
 const FLIP_TAG = '伏枥/翻面';

@@ -84,9 +84,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const atom = slot.atom as unknown as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
       const rt = atom['requestType'] as string;
-      if (rt !== '称象/confirm' && rt !== '称象/select') return '当前不是称象询问';
+      if (rt !== '界称象/confirm' && rt !== '界称象/select') return '当前不是称象询问';
 
-      if (rt === '称象/select') {
+      if (rt === '界称象/select') {
         // 校验:所选 cardIds 必须是亮出牌(prompt.cardIds 静态列表)的子集,
         // 且点数和 ≤ 13(称象硬约束)
         const selectAtom = atom as { prompt?: { cardIds?: string[] } };
@@ -108,9 +108,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
-      if (rt === '称象/confirm') {
+      if (rt === '界称象/confirm') {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-      } else if (rt === '称象/select') {
+      } else if (rt === '界称象/select') {
         const ids = (params.cardIds as string[] | undefined) ?? [];
         st.localVars[SELECTION_KEY] = ids;
       }
@@ -145,7 +145,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[CONFIRMED_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
-        requestType: '称象/confirm',
+        requestType: '界称象/confirm',
         target: ownerId,
         prompt: {
           type: 'confirm',
@@ -165,7 +165,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[SELECTION_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
-        requestType: '称象/select',
+        requestType: '界称象/select',
         target: ownerId,
         prompt: {
           type: 'distribute',

@@ -129,7 +129,7 @@ describe('界称象', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '称象/select', {
+    injectPending(state, 0, '界称象/select', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b'],
@@ -161,7 +161,7 @@ describe('界称象', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '称象/select', {
+    injectPending(state, 0, '界称象/select', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b'], // 候选只有 a,b
@@ -191,7 +191,7 @@ describe('界称象', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '称象/confirm', { type: 'confirm', title: '是否发动?' });
+    injectPending(state, 0, '界称象/confirm', { type: 'confirm', title: '是否发动?' });
 
     await P1.expectAccepted({
       skillId: '界称象',
@@ -219,7 +219,7 @@ describe('界称象', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '称象/select', {
+    injectPending(state, 0, '界称象/select', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b'],
@@ -276,7 +276,7 @@ describe('界称象', () => {
     P1.expectPending('请求回应');
     const cslot = [...harness.state.pendingSlots.values()][0];
     const cAtom = cslot.atom as { requestType?: string; target?: number };
-    expect(cAtom.requestType).toBe('称象/confirm');
+    expect(cAtom.requestType).toBe('界称象/confirm');
     expect(cAtom.target).toBe(1);
 
     // P1 确认发动
@@ -289,7 +289,7 @@ describe('界称象', () => {
       requestType?: string;
       prompt?: { cardIds?: string[] };
     };
-    expect(sAtom.requestType).toBe('称象/select');
+    expect(sAtom.requestType).toBe('界称象/select');
     expect(sAtom.prompt?.cardIds).toEqual(['d4', 'd3', 'd2', 'd1']); // top→bottom
 
     // P1 选 d3(2点)和 d2(2点),共4点 ≤13
@@ -439,7 +439,7 @@ describe('界称象', () => {
       requestType?: string;
       prompt?: { cardIds?: string[] };
     };
-    expect(sAtom.requestType).toBe('称象/select');
+    expect(sAtom.requestType).toBe('界称象/select');
     expect(sAtom.prompt?.cardIds).toHaveLength(5);
     expect(sAtom.prompt?.cardIds).toEqual(['d5', 'd4', 'd3', 'd2', 'd1']); // top→bottom
 

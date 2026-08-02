@@ -43,7 +43,7 @@ import { defaultPlayActive, viewCanSlash } from '../action-active';
 
 const SKILL_ID = '界疠火';
 const DISPLAY_NAME = '疠火';
-const COST_RT = '疠火/cost';
+const COST_RT = '界疠火/cost';
 const COST_CARD_KEY = '疠火/costCard';
 
 export function createSkill(id: string, ownerId: number): Skill {

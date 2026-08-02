@@ -135,7 +135,7 @@ describe('界伏枥', () => {
     await harness.waitForStable();
 
     // 进入濒死 → 伏枥询问
-    expect(currentRequestType(harness.state)).toBe('伏枥/confirm');
+    expect(currentRequestType(harness.state)).toBe('界伏枥/confirm');
 
     // 确认发动
     await LH.respond('界伏枥', { choice: true });
@@ -196,7 +196,7 @@ describe('界伏枥', () => {
     await harness.waitForStable();
 
     // 伏枥询问 → 不发动
-    expect(currentRequestType(harness.state)).toBe('伏枥/confirm');
+    expect(currentRequestType(harness.state)).toBe('界伏枥/confirm');
     await LH.respond('界伏枥', { choice: false });
     await harness.waitForStable();
 
@@ -273,7 +273,7 @@ describe('界伏枥', () => {
     const requestTypes = [...harness.state.pendingSlots.values()].map(
       (s) => (s.atom as Record<string, unknown>).requestType,
     );
-    expect(requestTypes).not.toContain('伏枥/confirm');
+    expect(requestTypes).not.toContain('界伏枥/confirm');
 
     // 求桃:廖化无桃 → 死亡
     while (harness.state.pendingSlots.size > 0) {

@@ -15,7 +15,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
-const CHOOSE_RT = '奸雄/choose';
+const CHOOSE_RT = '界奸雄/choose';
 const WANTCARD_KEY = '奸雄/wantCard';
 const CHOICE_KEY = '奸雄/choice';
 

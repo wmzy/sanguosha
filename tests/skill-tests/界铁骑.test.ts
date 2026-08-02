@@ -85,7 +85,7 @@ describe('界铁骑', () => {
     P1.expectPending('请求回应'); // 界铁骑 confirm
     await P1.respond('界铁骑', { choice: true });
 
-    // 判定后 → P2 被询问弃同花色手牌(请求回应 requestType='铁骑/discard')
+    // 判定后 → P2 被询问弃同花色手牌(请求回应 requestType='界铁骑/discard')
     P2.expectPending('请求回应');
     await P2.respond('界铁骑', { cardId: 's1' }); // 弃红桃杀
 

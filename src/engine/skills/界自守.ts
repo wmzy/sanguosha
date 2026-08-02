@@ -40,9 +40,9 @@ const DISPLAY_NAME = '自守';
 /** localVars key:玩家是否发动自守(true=发动)。 */
 const CONFIRMED_KEY = '自守/confirmed';
 /** 询问 requestType:是否发动自守 */
-const CONFIRM_RT = '自守/confirm';
+const CONFIRM_RT = '界自守/confirm';
 /** 询问 requestType:弃牌阶段(自守惩罚) */
-const DISCARD_RT = '自守/弃牌';
+const DISCARD_RT = '界自守/弃牌';
 
 /** turn.vars key:本回合是否发动了自守(true=已发动)。回合结束自动清空。 */
 const ACTIVE_VAR = '自守/active';

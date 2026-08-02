@@ -24,7 +24,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
-const CHOOSE_RT = '崩坏/choose';
+const CHOOSE_RT = '界崩坏/choose';
 const CHOICE_KEY = '崩坏/choice'; // 'maxHealth' | 'health'
 const DISABLE_VAR = '崩坏/disabled'; // turn.vars:本回合禁用崩坏(由界酒池写入)
 

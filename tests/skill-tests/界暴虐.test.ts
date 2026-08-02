@@ -120,7 +120,7 @@ describe('界暴虐', () => {
     P0.expectPending('请求回应');
     const slot = [...harness.state.pendingSlots.values()][0];
     const atom = slot.atom as { requestType?: string };
-    expect(atom.requestType).toBe('暴虐/confirm');
+    expect(atom.requestType).toBe('界暴虐/confirm');
 
     // confirm 判定
     await P0.respond('界暴虐', { choice: true });

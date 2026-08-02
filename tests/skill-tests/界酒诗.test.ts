@@ -202,7 +202,7 @@ describe('界酒诗', () => {
     P0.expectPending('请求回应');
     const slot = [...harness.state.pendingSlots.values()][0];
     const atom = slot.atom as { requestType?: string };
-    expect(atom.requestType).toBe('酒诗/damageFlip');
+    expect(atom.requestType).toBe('界酒诗/damageFlip');
 
     // P0 选择翻回正面
     await P0.respond('界酒诗', { choice: true });
@@ -283,7 +283,7 @@ describe('界酒诗', () => {
     let hasDamageFlip = false;
     for (const slot of harness.state.pendingSlots.values()) {
       const a = slot.atom as { requestType?: string };
-      if (a.requestType === '酒诗/damageFlip') hasDamageFlip = true;
+      if (a.requestType === '界酒诗/damageFlip') hasDamageFlip = true;
     }
     expect(hasDamageFlip).toBe(false);
 

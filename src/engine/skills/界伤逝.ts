@@ -24,7 +24,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-const CONFIRM_RT = '伤逝/confirm';
+const CONFIRM_RT = '界伤逝/confirm';
 const CONFIRM_KEY = '伤逝/confirmed';
 
 /** 已损失体力值 X = max(0, maxHealth - health)。 */

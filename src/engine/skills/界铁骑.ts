@@ -41,7 +41,7 @@ const CONFIRM = '铁骑/confirmed';
 const TARGET_VAR = '铁骑/target';
 const SUIT_VAR = '铁骑/suit';
 const DISCARD_CARD = '铁骑/discardCard';
-const DISCARD_REQUEST = '铁骑/discard';
+const DISCARD_REQUEST = '界铁骑/discard';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -80,7 +80,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!slot) return '当前不需要回应';
         const atom = slot.atom as { type?: string; requestType?: string };
         if (atom.type !== '请求回应') return '当前不是请求回应';
-        if (atom.requestType === '铁骑/confirm') {
+        if (atom.requestType === '界铁骑/confirm') {
           return null; // 确认型:无需额外校验
         }
         if (atom.requestType === DISCARD_REQUEST) {
@@ -99,7 +99,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       async (st: GameState, params: Record<string, unknown>) => {
         const slot = st.pendingSlots.get(pid);
         const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
-        if (reqType === '铁骑/confirm') {
+        if (reqType === '界铁骑/confirm') {
           st.localVars[CONFIRM] = params.choice === true || params.confirmed === true;
         } else if (reqType === DISCARD_REQUEST) {
           st.localVars[DISCARD_CARD] = params.cardId as string;
@@ -126,7 +126,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars[CONFIRM];
     await applyAtom(ctx.state, {
       type: '请求回应',
-      requestType: '铁骑/confirm',
+      requestType: '界铁骑/confirm',
       target: ownerId,
       prompt: {
         type: 'confirm',

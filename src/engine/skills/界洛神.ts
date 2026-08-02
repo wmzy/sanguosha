@@ -63,7 +63,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const requestType = (
         state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
       ).requestType as string;
-      if (requestType !== '洛神/confirm' && requestType !== '洛神/continue') {
+      if (requestType !== '界洛神/confirm' && requestType !== '界洛神/continue') {
         return '当前不是洛神询问';
       }
       return null;
@@ -121,7 +121,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars['洛神/confirmed'];
     await applyAtom(ctx.state, {
       type: '请求回应',
-      requestType: '洛神/confirm',
+      requestType: '界洛神/confirm',
       target: ownerId,
       prompt: {
         type: 'confirm',
@@ -170,7 +170,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars['洛神/confirmed'];
       await applyAtom(ctx.state, {
         type: '请求回应',
-        requestType: '洛神/continue',
+        requestType: '界洛神/continue',
         target: ownerId,
         prompt: {
           type: 'confirm',

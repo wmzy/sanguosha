@@ -60,11 +60,11 @@ function currentRequestType(state: GameState): string | null {
   return (slots[0].atom as unknown as { requestType?: string }).requestType ?? null;
 }
 
-/** 是否存在 requestType==='英姿/confirm' 的 pending(锁定技应无此 pending) */
+/** 是否存在 requestType==='界英姿/confirm' 的 pending(锁定技应无此 pending) */
 function hasYingziConfirm(state: GameState): boolean {
   for (const slot of state.pendingSlots.values()) {
     const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-    if (rt === '英姿/confirm') return true;
+    if (rt === '界英姿/confirm') return true;
   }
   return false;
 }

@@ -53,11 +53,13 @@ export function findUseActionForCard(
 }
 
 /** 不属于"出牌阶段替代出牌方式"的 actionType 集合。
- *  use=主出牌(主按钮);respond=被动回应(pending 驱动);
+ *  respond=被动回应(pending 驱动);
  *  transform=转化技(transformMode 入口);distribute=分配(distributeMode 入口)。
  *  这些均有各自的交互入口,不应在选中牌后作为 altAction 按钮重复出现。
- *  剩余类型(如 recast=铁索连环重铸)才是真正的"同一张牌的其他出法"。 */
-const NON_ALT_ACTION_TYPES = new Set(['use', 'respond', 'transform', 'distribute']);
+ *  use 不排除:同一张牌可能被多个 use action 匹配(如黑杀同时匹配"杀"和"断粮"),
+ *  主 use action(findUseActionForCard 返回)作为主按钮,其余 use action 作为
+ *  替代出牌方式出现——这正是断粮/界断粮等转化类主动技的 UI 入口。 */
+const NON_ALT_ACTION_TYPES = new Set(['respond', 'transform', 'distribute']);
 
 /**
  * 找出适用于指定卡牌的替代出牌动作(如铁索连环·重铸)。
@@ -69,9 +71,12 @@ const NON_ALT_ACTION_TYPES = new Set(['use', 'respond', 'transform', 'distribute
 export function findAltActionsForCard(
   actions: SkillActionDef[],
   card: Card,
+  primaryAction?: SkillActionDef,
 ): SkillActionDef[] {
   return actions.filter((a) => {
     if (NON_ALT_ACTION_TYPES.has(a.actionType)) return false;
+    // 排除主 use action(避免与主按钮重复);非 use 类型不受影响(primaryAction 为 undefined)
+    if (primaryAction && a === primaryAction) return false;
     const filter = extractCardFilter(a.prompt);
     return filter ? filter(card) : false;
   });

@@ -23,8 +23,8 @@ import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界恂恂';
 const DISPLAY_NAME = '恂恂';
-const CONFIRM_RT = '恂恂/confirm';
-const ARRANGE_RT = '恂恂/arrange';
+const CONFIRM_RT = '界恂恂/confirm';
+const ARRANGE_RT = '界恂恂/arrange';
 const CONFIRMED_KEY = '恂恂/confirmed';
 const ARRANGE_KEY = '恂恂/arrangement';
 

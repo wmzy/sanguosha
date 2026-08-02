@@ -32,9 +32,9 @@ import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
 /** 是否发动趫猛的 requestType */
-const CONFIRM_REQUEST = '趫猛/confirm';
+const CONFIRM_REQUEST = '界趫猛/confirm';
 /** 选牌面板 requestType */
-const PICK_REQUEST = '趫猛/pick';
+const PICK_REQUEST = '界趫猛/pick';
 /** localVars key:是否发动(respond 写,hook 读) */
 const CONFIRMED_KEY = '趫猛/confirmed';
 /** localVars key:选牌结果(respond 写,hook 读) */

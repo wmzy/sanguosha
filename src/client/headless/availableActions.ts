@@ -267,7 +267,8 @@ function enumerateAltActions(
   if (!me?.hand) return [];
   const result: AvailableAction[] = [];
   for (const card of me.hand) {
-    const alts = findAltActionsForCard(skillActions, card);
+    const primary = findUseActionForCard(skillActions, card);
+    const alts = findAltActionsForCard(skillActions, card, primary);
     for (const action of alts) {
       if (!isActiveAction(action, ctx)) continue;
       const cardDesc = `${card.suit}${card.rank}`;

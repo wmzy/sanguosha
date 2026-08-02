@@ -276,7 +276,7 @@ describe('界秘计', () => {
     P0.expectPending('请求回应');
     // 通过 requestType 验证是 giveConfirm(强制发动已自动摸2张)
     const slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot.atom as { requestType?: string }).requestType).toBe('秘计/giveConfirm');
+    expect((slot.atom as { requestType?: string }).requestType).toBe('界秘计/giveConfirm');
 
     // 选择不分发
     await P0.respond('界秘计', { choice: false });
@@ -285,7 +285,7 @@ describe('界秘计', () => {
     // 然后主动询问是否发动(正常秘计)
     P0.expectPending('请求回应');
     const slot2 = [...harness.state.pendingSlots.values()][0];
-    expect((slot2.atom as { requestType?: string }).requestType).toBe('秘计/confirm');
+    expect((slot2.atom as { requestType?: string }).requestType).toBe('界秘计/confirm');
 
     // 选择主动发动 → 摸2张
     await P0.respond('界秘计', { choice: true });

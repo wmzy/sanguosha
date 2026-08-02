@@ -33,7 +33,7 @@ const USED_KEY = '乱武/used';
 /** 他人响应乱武询问的出杀选择(use action 内消费) */
 const CHOICE_VAR = '乱武/出杀';
 /** 他人响应乱武询问的 requestType */
-const REQUEST_TYPE = '乱武/出杀';
+const REQUEST_TYPE = '界乱武/出杀';
 /** 界版追加:贾诩选择"视为使用杀"目标的 requestType/localVars key */
 const FINAL_TARGET_VAR = '界乱武/最终杀目标';
 const FINAL_TARGET_RT = '界乱武/最终杀目标';

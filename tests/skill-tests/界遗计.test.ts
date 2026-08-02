@@ -134,7 +134,7 @@ describe('界遗计', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '遗计/giveCard', { type: 'distribute', mode: 'allocate' });
+    injectPending(state, 0, '界遗计/giveCard', { type: 'distribute', mode: 'allocate' });
 
     // 3 张牌(超 2)→ 拒绝
     await P1.expectRejected({
@@ -168,7 +168,7 @@ describe('界遗计', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '遗计/giveCard', { type: 'distribute', mode: 'allocate' });
+    injectPending(state, 0, '界遗计/giveCard', { type: 'distribute', mode: 'allocate' });
 
     // 3 个目标(超 2)→ 拒绝
     await P1.expectRejected({
@@ -201,7 +201,7 @@ describe('界遗计', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '遗计/giveCard', { type: 'distribute', mode: 'allocate' });
+    injectPending(state, 0, '界遗计/giveCard', { type: 'distribute', mode: 'allocate' });
 
     // 目标 0 是自己 → 拒绝
     await P1.expectRejected({
@@ -233,7 +233,7 @@ describe('界遗计', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '遗计/giveCard', { type: 'distribute', mode: 'allocate' });
+    injectPending(state, 0, '界遗计/giveCard', { type: 'distribute', mode: 'allocate' });
 
     // 合法 allocation:2 张牌分给 2 人
     await P1.expectAccepted({
@@ -271,7 +271,7 @@ describe('界遗计', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '遗计/giveConfirm', { type: 'confirm', title: '是否交牌?' });
+    injectPending(state, 0, '界遗计/giveConfirm', { type: 'confirm', title: '是否交牌?' });
 
     await P1.expectAccepted({
       skillId: '界遗计',
@@ -326,7 +326,7 @@ describe('界遗计', () => {
     P1.expectPending('请求回应');
     const cslot = [...harness.state.pendingSlots.values()][0];
     const cAtom = cslot.atom as { type: string; requestType?: string; target?: number };
-    expect(cAtom.requestType).toBe('遗计/giveConfirm');
+    expect(cAtom.requestType).toBe('界遗计/giveConfirm');
     expect(cAtom.target).toBe(1);
 
     // P1 摸了 2 张牌(界遗计关键合约:摸 2 张,非 1 张)
@@ -340,7 +340,7 @@ describe('界遗计', () => {
     P1.expectPending('请求回应');
     const gslot = [...harness.state.pendingSlots.values()][0];
     const gAtom = gslot.atom as { type: string; requestType?: string; prompt?: { type?: string } };
-    expect(gAtom.requestType).toBe('遗计/giveCard');
+    expect(gAtom.requestType).toBe('界遗计/giveCard');
     expect(gAtom.prompt?.type).toBe('distribute');
 
     // P1 把 2 张牌分给 P2 和 P3(至多 2 张给至多 2 人)
@@ -501,7 +501,7 @@ describe('界遗计', () => {
         allowSelf?: boolean;
       };
     };
-    expect(gAtom.requestType).toBe('遗计/giveCard');
+    expect(gAtom.requestType).toBe('界遗计/giveCard');
     expect(gAtom.prompt?.type).toBe('distribute');
     expect(gAtom.prompt?.mode).toBe('allocate');
     expect(gAtom.prompt?.source).toBe('hand');

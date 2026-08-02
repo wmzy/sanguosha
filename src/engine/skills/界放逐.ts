@@ -26,8 +26,8 @@ import type {
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
-const CONFIRM_RT = '放逐/confirm';
-const TARGET_RT = '放逐/target';
+const CONFIRM_RT = '界放逐/confirm';
+const TARGET_RT = '界放逐/target';
 const CONFIRMED_KEY = '放逐/confirmed';
 const TARGET_KEY = '放逐/target';
 

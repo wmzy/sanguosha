@@ -102,13 +102,13 @@ describe('界当先', () => {
     // 触发回合开始 → 当先 hook 询问是否获得杀
     void applyAtom(harness.state, { type: '回合开始', player: 0 });
     await harness.waitForStable();
-    expect(currentRequestType(harness.state)).toBe('当先/confirm');
+    expect(currentRequestType(harness.state)).toBe('界当先/confirm');
 
     // 确认获得杀
     await LH.respond('界当先', { choice: true });
     await harness.waitForStable();
     // 接下来询问来源
-    expect(currentRequestType(harness.state)).toBe('当先/source');
+    expect(currentRequestType(harness.state)).toBe('界当先/source');
 
     // 选牌堆(choice=true)
     await LH.respond('界当先', { choice: true });
@@ -187,7 +187,7 @@ describe('界当先', () => {
     // 触发回合开始 → 询问获得杀
     void applyAtom(harness.state, { type: '回合开始', player: 0 });
     await harness.waitForStable();
-    expect(currentRequestType(harness.state)).toBe('当先/confirm');
+    expect(currentRequestType(harness.state)).toBe('界当先/confirm');
 
     // 不获得杀
     await LH.respond('界当先', { choice: false });
@@ -305,7 +305,7 @@ describe('界当先', () => {
     await harness.waitForStable();
 
     // 界廖化(player 0)的当先未触发:无 当先/confirm 询问
-    expect(currentRequestType(harness.state)).not.toBe('当先/confirm');
+    expect(currentRequestType(harness.state)).not.toBe('界当先/confirm');
     // active 标志未设
     expect(harness.state.turn.vars['当先/active']).toBeUndefined();
   });

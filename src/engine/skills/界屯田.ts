@@ -35,7 +35,7 @@ import { applyAtom, frameCards } from '../create-engine';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
-const CONFIRM_RT = '屯田/confirm';
+const CONFIRM_RT = '界屯田/confirm';
 const CONFIRMED_KEY = '屯田/confirmed';
 const JUDGE_SUIT_KEY = '屯田/judgeSuit';
 const JUDGE_CARD_KEY = '屯田/judgeCardId';

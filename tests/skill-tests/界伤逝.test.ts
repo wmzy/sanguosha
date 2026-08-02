@@ -103,7 +103,7 @@ describe('界伤逝', () => {
     const slot = slots[0];
     const atom = slot.atom as { type: string; requestType?: string };
     expect(atom.type).toBe('请求回应');
-    expect(atom.requestType).toBe('伤逝/confirm');
+    expect(atom.requestType).toBe('界伤逝/confirm');
 
     // 确认发动
     await P0.respond('界伤逝', { choice: true });
@@ -319,7 +319,7 @@ describe('界伤逝', () => {
       // 伤逝 confirm → 确认摸牌
       const slot = [...harness.state.pendingSlots.values()][0];
       const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.requestType === '伤逝/confirm') {
+      if (atom.requestType === '界伤逝/confirm') {
         await P0.respond('界伤逝', { choice: true });
       } else {
         // 其他 pending(询问闪)直接 pass

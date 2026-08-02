@@ -31,9 +31,9 @@ import { skipPhase } from '../skip-phase';
 
 const BONUS_TAG = '裸衣/bonus';
 /** 询问①:是否发动界裸衣(亮牌+增伤) */
-const ACTIVATE_RT = '裸衣/activate';
+const ACTIVATE_RT = '界裸衣/activate';
 /** 询问②:是否跳过摸牌阶段获得匹配牌 */
-const SKIP_RT = '裸衣/skip';
+const SKIP_RT = '界裸衣/skip';
 const ACTIVATED_KEY = '裸衣/activated';
 const SKIP_KEY = '裸衣/skipChoice';
 

@@ -57,9 +57,9 @@ const CHOICE_KEY = '将驰/optionChoice';
 const CARD_KEY = '将驰/cardId';
 
 /** 询问 requestType */
-const ACTIVATE_RT = '将驰/activate';
-const CHOOSE_RT = '将驰/choose';
-const PICK_RT = '将驰/pick';
+const ACTIVATE_RT = '界将驰/activate';
+const CHOOSE_RT = '界将驰/choose';
+const PICK_RT = '界将驰/pick';
 
 /** turn.vars key:选项1激活(值=激活者 ownerId) */
 const CHOICE1_VAR = '将驰/choice1';

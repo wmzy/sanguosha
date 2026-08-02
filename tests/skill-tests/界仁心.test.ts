@@ -132,7 +132,7 @@ describe('界仁心', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '仁心/selectCard', {
+    injectPending(state, 0, '界仁心/selectCard', {
       type: 'pickProcessingCard',
       title: '选装备',
       cards: [
@@ -164,7 +164,7 @@ describe('界仁心', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '仁心/confirm', { type: 'confirm', title: '是否发动?' });
+    injectPending(state, 0, '界仁心/confirm', { type: 'confirm', title: '是否发动?' });
 
     await P1.expectAccepted({
       skillId: '界仁心',
@@ -251,7 +251,7 @@ describe('界仁心', () => {
     P2.expectPending('请求回应');
     const cslot = [...harness.state.pendingSlots.values()][0];
     const cAtom = cslot.atom as { requestType?: string; target?: number };
-    expect(cAtom.requestType).toBe('仁心/confirm');
+    expect(cAtom.requestType).toBe('界仁心/confirm');
     expect(cAtom.target).toBe(2);
 
     // P2 确认发动
@@ -338,7 +338,7 @@ describe('界仁心', () => {
       requestType?: string;
       prompt?: { cards?: Array<{ cardId: string }> };
     };
-    expect(sAtom.requestType).toBe('仁心/selectCard');
+    expect(sAtom.requestType).toBe('界仁心/selectCard');
     expect(sAtom.prompt?.cards?.map((c) => c.cardId)).toEqual(
       expect.arrayContaining(['w1', 'w2']),
     );

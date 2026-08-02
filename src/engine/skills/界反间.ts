@@ -19,7 +19,7 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
 /** 目标二选一请求类型。 */
-const CHOICE_REQUEST = '反间/choice';
+const CHOICE_REQUEST = '界反间/choice';
 /** 目标选择结果 localVars key。true = 选项1(弃同色);false/undefined = 选项2(失体力)。 */
 const CHOICE_KEY = '反间/choice';
 

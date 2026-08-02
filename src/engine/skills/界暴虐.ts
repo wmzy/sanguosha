@@ -38,7 +38,7 @@ import { applyAtom } from '../create-engine';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
-const CONFIRM_RT = '暴虐/confirm';
+const CONFIRM_RT = '界暴虐/confirm';
 const CONFIRMED_KEY = '暴虐/confirmed';
 
 export function createSkill(id: string, ownerId: number): Skill {

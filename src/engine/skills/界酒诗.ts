@@ -45,12 +45,12 @@ const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
 /** 翻面标签:加=背面朝上,清除=翻回正面。 */
 const FLIP_TAG = '酒诗/翻面';
-const USE_RT_CONFIRM = '酒诗/confirm';
+const USE_RT_CONFIRM = '界酒诗/confirm';
 const USE_CONFIRM_KEY = '酒诗/useConfirmed';
-const DAMAGE_FLIP_RT = '酒诗/damageFlip';
+const DAMAGE_FLIP_RT = '界酒诗/damageFlip';
 const DAMAGE_FLIP_KEY = '酒诗/damageFlipChoice';
 /** 共享给界落英 的翻回询问 localVars 键 */
-export const FLIP_BACK_RT = '酒诗/flipBack';
+export const FLIP_BACK_RT = '界酒诗/flipBack';
 export const FLIP_BACK_KEY = '酒诗/flipChoice';
 
 export function createSkill(id: string, ownerId: number): Skill {

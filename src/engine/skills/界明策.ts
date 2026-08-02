@@ -47,7 +47,7 @@ const DISPLAY_NAME = '明策';
 /** localVars key:target 对选项询问的回应(false=选项②摸牌, true=选项①出杀) */
 const CHOICE_KEY = '明策/choice';
 /** target 选项询问 requestType */
-const CHOICE_RT = '明策/choice';
+const CHOICE_RT = '界明策/choice';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

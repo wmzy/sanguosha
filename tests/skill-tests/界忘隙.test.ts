@@ -128,7 +128,7 @@ describe('界忘隙', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '忘隙/pick', {
+    injectPending(state, 0, '界忘隙/pick', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b'],
@@ -157,7 +157,7 @@ describe('界忘隙', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '忘隙/pick', {
+    injectPending(state, 0, '界忘隙/pick', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b'],
@@ -191,7 +191,7 @@ describe('界忘隙', () => {
     const P1 = harness.player('P1');
 
     // 候选范围只有 a, b
-    injectPending(state, 0, '忘隙/pick', {
+    injectPending(state, 0, '界忘隙/pick', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b'],
@@ -223,7 +223,7 @@ describe('界忘隙', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '忘隙/confirm', { type: 'confirm', title: '是否发动?' });
+    injectPending(state, 0, '界忘隙/confirm', { type: 'confirm', title: '是否发动?' });
 
     await P1.expectAccepted({
       skillId: '界忘隙',
@@ -248,7 +248,7 @@ describe('界忘隙', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    injectPending(state, 0, '忘隙/pick', {
+    injectPending(state, 0, '界忘隙/pick', {
       type: 'distribute',
       mode: 'select',
       cardIds: ['a', 'b'],
@@ -303,7 +303,7 @@ describe('界忘隙', () => {
     P1.expectPending('请求回应');
     const cslot = [...harness.state.pendingSlots.values()][0];
     const cAtom = cslot.atom as { requestType?: string; target?: number };
-    expect(cAtom.requestType).toBe('忘隙/confirm');
+    expect(cAtom.requestType).toBe('界忘隙/confirm');
     expect(cAtom.target).toBe(1);
 
     await P1.respond('界忘隙', { choice: true });
@@ -321,7 +321,7 @@ describe('界忘隙', () => {
       requestType?: string;
       prompt?: { cardIds?: string[] };
     };
-    expect(pAtom.requestType).toBe('忘隙/pick');
+    expect(pAtom.requestType).toBe('界忘隙/pick');
     expect(pAtom.prompt?.cardIds).toEqual(expect.arrayContaining(['g1', 'g2']));
 
     // P1 选 g1 给 P0
@@ -370,7 +370,7 @@ describe('界忘隙', () => {
     P0.expectPending('请求回应');
     const cslot = [...harness.state.pendingSlots.values()][0];
     const cAtom = cslot.atom as { requestType?: string; target?: number };
-    expect(cAtom.requestType).toBe('忘隙/confirm');
+    expect(cAtom.requestType).toBe('界忘隙/confirm');
     expect(cAtom.target).toBe(0);
 
     await P0.respond('界忘隙', { choice: true });
@@ -479,7 +479,7 @@ describe('界忘隙', () => {
     P0.expectPending('请求回应');
     const slot = [...harness.state.pendingSlots.values()][0];
     const atom = slot.atom as { requestType?: string };
-    expect(atom.requestType).toBe('忘隙/confirm');
+    expect(atom.requestType).toBe('界忘隙/confirm');
 
     // 关键:只有一次忘隙询问(来自对 P1 的伤害),自伤那次被过滤掉
     // 选择不发动以快速结束
@@ -547,7 +547,7 @@ describe('界忘隙', () => {
     P1.expectPending('请求回应');
     let slot = [...harness.state.pendingSlots.values()][0];
     let atom = slot.atom as { requestType?: string; prompt?: { cardIds?: string[] } };
-    expect(atom.requestType).toBe('忘隙/confirm');
+    expect(atom.requestType).toBe('界忘隙/confirm');
 
     // 第一次:发动
     await P1.respond('界忘隙', { choice: true });
@@ -558,7 +558,7 @@ describe('界忘隙', () => {
     P1.expectPending('请求回应');
     slot = [...harness.state.pendingSlots.values()][0];
     atom = slot.atom as { requestType?: string; prompt?: { cardIds?: string[] } };
-    expect(atom.requestType).toBe('忘隙/pick');
+    expect(atom.requestType).toBe('界忘隙/pick');
     const firstDrawn = atom.prompt!.cardIds!;
     expect(firstDrawn).toHaveLength(2);
     // 选第一张给 P0
@@ -570,7 +570,7 @@ describe('界忘隙', () => {
     P1.expectPending('请求回应');
     slot = [...harness.state.pendingSlots.values()][0];
     atom = slot.atom as { requestType?: string };
-    expect(atom.requestType).toBe('忘隙/confirm');
+    expect(atom.requestType).toBe('界忘隙/confirm');
 
     // 第二次:不发动(快速结束)
     await P1.respond('界忘隙', { choice: false });

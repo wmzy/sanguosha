@@ -36,7 +36,7 @@ import {
 
 const SKILL_ID = '界落英';
 const DISPLAY_NAME = '落英';
-const CHOOSE_RT = '落英/choose';
+const CHOOSE_RT = '界落英/choose';
 const CHOICE_KEY = '落英/choice';
 /** 回合外累计获得的"落英"牌数(供界酒诗翻回正面触发器读取)。在曹植回合开始时清零。 */
 const OUTSIDE_GAIN_COUNT_KEY = '落英/外得计数';
@@ -155,7 +155,7 @@ async function recordGainAndMaybeFlipBack(
   delete state.localVars['酒诗/flipChoice'];
   await applyAtom(state, {
     type: '请求回应',
-    requestType: '酒诗/flipBack',
+    requestType: '界酒诗/flipBack',
     target: ownerId,
     prompt: {
       type: 'confirm',

@@ -28,11 +28,11 @@ import { skipPhase } from '../skip-phase';
 import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 
 // 请求类型(requestType)——保持 神速/ 前缀(界版键名约定)
-const OPT1_RT = '神速/opt1'; // 选项1 confirm
-const OPT2_RT = '神速/opt2'; // 选项2 confirm
-const OPT3_RT = '神速/opt3'; // 选项3 confirm
-const TARGET_RT = '神速/target'; // 虚拟杀目标
-const EQUIP_RT = '神速/equip'; // 选项2 选弃装备
+const OPT1_RT = '界神速/opt1'; // 选项1 confirm
+const OPT2_RT = '界神速/opt2'; // 选项2 confirm
+const OPT3_RT = '界神速/opt3'; // 选项3 confirm
+const TARGET_RT = '界神速/target'; // 虚拟杀目标
+const EQUIP_RT = '界神速/equip'; // 选项2 选弃装备
 
 // 标签
 const SKIP_MO_TAG = '神速/跳过摸牌';

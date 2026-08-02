@@ -58,9 +58,9 @@ const CONFIRMED_KEY = '当先/confirmed';
 const SOURCE_KEY = '当先/sourceChoice';
 
 /** requestType:确认是否获得杀。 */
-const CONFIRM_RT = '当先/confirm';
+const CONFIRM_RT = '界当先/confirm';
 /** requestType:选择杀来源(牌堆 or 弃牌堆)。 */
-const SOURCE_RT = '当先/source';
+const SOURCE_RT = '界当先/source';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

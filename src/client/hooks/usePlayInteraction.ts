@@ -33,6 +33,7 @@ import {
   isActiveAction,
   isFreePlayWindow,
   resolveDistributeCardIds,
+  extractCardFilter,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
 
@@ -267,6 +268,9 @@ export function usePlayInteraction(
     Array<{ target: number; cardIds: string[] }>
   >([]);
   const [distTargetName, setDistTargetName] = useState<string | null>(null);
+  // altAction 覆盖:用户点击替代 use action(如断粮)按钮后,用它覆盖默认 selectedUseAction,
+  // 使后续选目标 + 提交走该 action 而非主 use action(如杀)。选中牌变化/提交后清除。
+  const [altActionOverride, setAltActionOverride] = useState<SkillActionDef | null>(null);
 
   // ─── distribute 上下文(主动技 + 被动遗计共用)───
   const perspectiveEquipment = view.players[perspectiveIdx]?.equipment ?? {};
@@ -387,6 +391,8 @@ export function usePlayInteraction(
       setSelectedCardId(null);
       setSelectedTarget(null);
     }
+    // 选中牌变化时清除 altAction 覆盖(避免覆盖指向已失效的牌)
+    setAltActionOverride(null);
   }, [selectedCardId, perspectiveHand]);
 
   // ─── 派生:选中的牌 + use action ───
@@ -406,9 +412,15 @@ export function usePlayInteraction(
       if (!selectedCard) return undefined;
       return skillActions.find(
         (a) => a.actionType === 'use' && a.skillId === transformMode.wrapperName,
-      );
+    );
     }
     if (!selectedCard) return undefined;
+    // altAction 覆盖:用户点了替代 use action(如断粮)后,用它而非默认匹配的主 use action。
+    // 仅当 override 的 cardFilter 仍匹配当前选中牌时生效(防迷叠)。
+    if (altActionOverride) {
+      const filter = extractCardFilter(altActionOverride.prompt);
+      if (filter && filter(selectedCard)) return altActionOverride;
+    }
     return findUseActionForCard(skillActions, selectedCard);
   })();
   const selectedTargetFilter =
@@ -431,7 +443,7 @@ export function usePlayInteraction(
   const altActions = (() => {
     if (!selectedCard) return [];
     const ctx = { view, perspectiveIdx };
-    return findAltActionsForCard(skillActions, selectedCard).filter((a) =>
+    return findAltActionsForCard(skillActions, selectedCard, selectedUseAction).filter((a) =>
       isActiveAction(a, ctx),
     );
   })();
@@ -698,7 +710,14 @@ export function usePlayInteraction(
               return;
             }
           }
-          if (!selectedCardId || !selectedTarget) return;
+          // 需要选中牌 + 目标。若已选牌但未选目标,设为 altActionOverride:
+          // 后续选目标后,selectedUseAction 会走此 action 提交(handlePlayCard)。
+          // 这让转化类主动技(断粮/界断粮)能从 altAction 按钮进入"选目标"流程。
+          if (!selectedCardId) return;
+          if (!selectedTarget) {
+            setAltActionOverride(action);
+            return;
+          }
           {
             const idx = nameToIndex(selectedTarget);
             if (idx < 0) return;

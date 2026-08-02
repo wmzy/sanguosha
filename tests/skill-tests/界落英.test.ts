@@ -110,7 +110,7 @@ describe('界落英', () => {
     state.pendingSlots.set(0, {
       atom: {
         type: '请求回应',
-        requestType: '落英/choose',
+        requestType: '界落英/choose',
         target: 0,
         prompt: { type: 'confirm', title: '?' },
       },
@@ -356,7 +356,7 @@ describe('界落英', () => {
       P0.expectPending('请求回应');
       const slot = [...harness.state.pendingSlots.values()][0];
       const atom = slot.atom as { requestType?: string };
-      expect(atom.requestType).toBe('酒诗/flipBack');
+      expect(atom.requestType).toBe('界酒诗/flipBack');
       await P0.respond('界酒诗', { choice: true });
       await harness.waitForStable();
 

@@ -41,10 +41,10 @@ const MIJI_PENDING_PREFIX = '秘计/pendingFrom贞烈/';
 /** 本次分发最大张数(供 giveCards validate 上限校验) */
 const GIVE_MAX_VAR = '界秘计/giveMax';
 /** 请求回应 requestType 常量 */
-const CONFIRM_RT = '秘计/confirm'; // 是否发动
-const GIVE_CONFIRM_RT = '秘计/giveConfirm'; // 是否分发
-const GIVE_TARGET_RT = '秘计/giveTarget'; // 选目标
-const GIVE_CARDS_RT = '秘计/giveCards'; // 选 0..X 张手牌
+const CONFIRM_RT = '界秘计/confirm'; // 是否发动
+const GIVE_CONFIRM_RT = '界秘计/giveConfirm'; // 是否分发
+const GIVE_TARGET_RT = '界秘计/giveTarget'; // 选目标
+const GIVE_CARDS_RT = '界秘计/giveCards'; // 选 0..X 张手牌
 
 /** localVars key */
 const CONFIRM_KEY = '界秘计/confirmed';
