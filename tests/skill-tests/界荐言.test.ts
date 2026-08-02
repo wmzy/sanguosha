@@ -299,12 +299,12 @@ describe('界荐言', () => {
     expect(harness.state.seq).toBe(seqBefore);
   });
 
-  // ─── 6. 目标必须是男性 ───────────────────────────────
+  // ─── 6. 目标必须是男性(官方"选择一名男性角色"含自己) ────
   it('无男性候选 → 拒绝(use 阶段即拒)', async () => {
     const kill = makeCard('kill1', '杀', '♠', 'A', '基本牌');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [], skills: ['界荐言'] }),
+        makePlayer({ index: 0, name: 'P0', hand: [], skills: ['界荐言'], character: '貂蝉' }),
         makePlayer({
           index: 1,
           name: 'P1',

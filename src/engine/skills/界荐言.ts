@@ -134,10 +134,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (st.phase !== '出牌') return '只能在出牌阶段使用';
       if (hasBlockingPending(st)) return '当前有未完成的询问';
       if (usedThisTurn(st, ownerId)) return '本回合已使用过荐言';
-      // 必须有男性其他角色(包括自己)可选——至少自己若是男性也可,但通常选他人。
-      // 实际目标在后续询问确定,此处仅校验是否有候选。
+      // 必须有男性角色可选(包括自己——官方"选择一名男性角色"未限定"其他")
       const hasCandidate = st.players.some(
-        (p, i) => i !== ownerId && isMaleAlive(st, i),
+        (_p, i) => isMaleAlive(st, i),
       );
       if (!hasCandidate) return '无男性角色可选';
       if (st.zones.deck.length === 0 && st.zones.discardPile.length === 0) return '牌堆已空';
@@ -191,7 +190,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             min: 1,
             max: 1,
             filter: (_view: GameView, t: number) =>
-              t !== ownerId && isMaleAlive(st, t),
+              isMaleAlive(st, t),
           },
           timeout: 20,
         });
