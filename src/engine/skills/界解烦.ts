@@ -71,11 +71,18 @@ function isWeaponCard(card: { type?: string; subtype?: string } | undefined): bo
   return !!card && card.type === '装备牌' && card.subtype === '武器';
 }
 
-/** 玩家手牌中的武器牌 cardId 列表 */
+/** 玩家可弃的武器牌 cardId 列表(手牌中的武器牌 + 装备区已装备的武器) */
 function weaponCardsInHand(state: GameState, player: number): string[] {
   const p = state.players[player];
   if (!p) return [];
-  return p.hand.filter((cid) => isWeaponCard(state.cardMap[cid]));
+  // 手牌中的武器牌(type=装备牌 subtype=武器)
+  const handWeapons = p.hand.filter((cid) => isWeaponCard(state.cardMap[cid]));
+  // 装备区武器槽已装备的武器(官方"弃置一张武器牌"含装备区)
+  const equipWeapon = p.equipment?.['武器'];
+  if (equipWeapon && typeof equipWeapon === 'string') {
+    return [...handWeapons, equipWeapon];
+  }
+  return handWeapons;
 }
 
 /** 列出所有攻击范围内包含 target 的存活其他角色(按座次顺序) */
