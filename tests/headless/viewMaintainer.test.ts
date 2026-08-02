@@ -171,4 +171,31 @@ describe('applyServerMessage', () => {
     expect(out.view!.log.length).toBe(2);
     expect(prevLog.length).toBe(1); // prev 未被污染
   });
+
+  it('event 的 view 增量深拷贝 players(避免座位卡 HP 冻结 + 伤害动画失效)', () => {
+    // 回归:viewReducer 原地突变 player 字段(扣减体力改 health 等)。若浅拷贝不复制
+    // players 数组,prev/next 的 player 元素同引用 → playerVisibleEqual 比较同一对象
+    // 永远判等 → 座位卡 HP 不更新(显示受伤前数值);且 useAnimationState 的
+    // [view.players] 依赖不变 → 伤害闪烁/震动动画失效。深拷贝每个 player 让 memo
+    // 比较器读到独立副本,正确触发重渲染。根因同 zones/log 浅拷贝遗漏。
+    const baseline = makeBaseline(0);
+    const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 0 });
+    const prevPlayers = start.view!.players;
+    const prevP0 = start.view!.players[0];
+    const evt = {
+      type: 'event',
+      seq: 1,
+      timestamp: 100,
+      view: { type: '扣减体力', target: 0, amount: 1 },
+    } as ServerMessage;
+    const out = applyServerMessage(start.view, start.lastSeq, evt);
+    // players 数组必须是新引用(否则 useAnimationState [view.players] 依赖不变)
+    expect(out.view!.players).not.toBe(prevPlayers);
+    // player 元素必须是新对象(否则 playerVisibleEqual 比较同一对象永远判等)
+    expect(out.view!.players[0]).not.toBe(prevP0);
+    // health 已扣减
+    expect(out.view!.players[0].health).toBe(3);
+    // prev 未被污染——viewReducer 突变的是新副本,不会回写 baseline
+    expect(prevP0.health).toBe(4);
+  });
 });

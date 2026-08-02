@@ -72,6 +72,24 @@ export function applyServerMessage(
         // 比较器看到同一引用 → length/末尾条目永远相等 → 日志面板冻结。
         view = {
           ...view,
+          // players 需深拷贝:viewReducer 原地突变 player 字段(health/hand/equipment/
+          // marks/skills…),若不拷贝则 prev/next 的 player 同引用,playerVisibleEqual
+          // 比较同一对象永远判等 → 座位卡 HP/装备/标记显示冻结;且 useAnimationState 的
+          // [view.players] 依赖不变 → 伤害闪烁动画失效。深拷贝每个 player 的数组/对象字段,
+          // 让 memo 比较器读到独立副本,正确触发 re-render(与 zones/log 同理)。
+          players: view.players.map((p) => ({
+            ...p,
+            hand: p.hand ? [...p.hand] : p.hand,
+            skills: [...(p.skills ?? [])],
+            marks: [...(p.marks ?? [])],
+            tags: [...(p.tags ?? [])],
+            equipment: { ...(p.equipment ?? {}) },
+            pendingTricks: [...(p.pendingTricks ?? [])],
+            judgeZone: [...(p.judgeZone ?? [])],
+            vars: p.vars ? { ...p.vars } : p.vars,
+            distanceVars: p.distanceVars ? { ...p.distanceVars } : p.distanceVars,
+            turnUsage: p.turnUsage ? { ...p.turnUsage } : p.turnUsage,
+          })),
           zones: view.zones
             ? { ...view.zones, processing: [...(view.zones.processing ?? [])] }
             : view.zones,

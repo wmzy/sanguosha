@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 使用杀未造成伤害仍播放受伤特效(座位卡 HP 冻结)
+
+出杀命中后,目标座位 HP 数字不更新(仍显示受伤前的值),但 card/damage 受伤动画与 injure 惨叫音效照常播放——观感即「没造成伤害却播放了受伤特效」。根因与 8099973b(「zones 浅拷贝」)同类:`viewMaintainer` 的 event 分支浅拷贝 view 时复制了 zones/log(避免 ZoneInfoBar/GameLog memo 冻结),却遗漏了 players 数组。viewReducer 原地突变 player 字段(扣减体力改 health 等),prev/next 的 player 元素同引用 → `playerVisibleEqual` 比较同一对象永远判等 → 座位卡(PlayerSeatView/PlayerCardLarge)memo 跳过重渲染,HP 不更新;同时 `useAnimationState` 的 `[view.players]` 依赖不变 → 伤害闪烁/震动动画失效。
+
+#### Changed
+- **viewMaintainer event 分支深拷贝 players**(根因):每个 player 创建新对象并复制其数组/对象字段(hand/skills/marks/tags/equipment/pendingTricks/judgeZone/vars/distanceVars/turnUsage),让 memo 比较器读到独立副本,正确触发重渲染。与 zones/log 浅拷贝遗漏同构。(`src/client/headless/viewMaintainer.ts`)
+- **回归测试**:`tests/headless/viewMaintainer.test.ts` 新增「event 增量深拷贝 players」——锁定扣减体力后 players 数组新引用、player 元素新对象、health 更新、prev 不被污染。回退修复即失败。
+
 ### Fixed — 吃桃展示了杀的特效
 
 APNG 卡牌特效会重复播放:`useVfxPlayback` 返回的 `items` 是累积式(每批新特效追加,从不缩减),而 `VfxLayer` 每次 `items` 变化都把整个数组并入活动列表。导致先出杀、再吃桃时,杀的特效被当作「新增」再次触发,叠加在桃的特效上——观感即「吃桃展示了杀的特效」。引擎层正确(用桃发 `vfx=card/peach`),资源映射与 `sound-test` 也正确,纯属前端渲染层的去重缺陷。
