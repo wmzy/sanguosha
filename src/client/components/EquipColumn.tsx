@@ -82,7 +82,10 @@ export function EquipColumnImpl({
     const id = cardId;
     const card = view.cardMap[id];
     const name = card?.name ?? id;
-    const activeSkill = activeSkillByEquipName.get(name);
+    // distribute 激活时:装备只作选牌候选,抑制技能触发(避免制衡选牌误弹装备技能
+    // confirm 弹窗,如寒冰剑的 respond-confirm action 无 activeWhen 在出牌阶段被判 active)。
+    const rawSkill = activeSkillByEquipName.get(name);
+    const activeSkill = isDistributeActive ? undefined : rawSkill;
     const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
     const isDistSelected = !!distSelectedEquipIds?.has(id);
     const clickable = !!activeSkill || isDistCandidate;

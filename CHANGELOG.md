@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 制衡选牌点击装备误弹技能 confirm(寒冰剑等)
+
+制衡选牌时点击装备区的寒冰剑(或其他自带 respond-confirm action 的装备),不选中该牌反而弹出该装备技能的「发动/不发动」弹窗,导致选择失败。所有 source='handAndEquip' 的 distribute 选牌(制衡/界制衡)均受影响。
+
+根因:寒冰剑等装备的 respond-confirm action 无 `activeWhen`,`isActiveAction` 回退到 `defaultPlayActive`(自己回合+出牌阶段+无阻塞 pending=制衡场景)判为 true。`EquipColumn` 据此把装备当作「可发动技能」,`handleClick` 优先走 `onSkillAction` 弹 confirm,而非 distribute 选牌。
+
+#### Changed
+- **EquipColumn distribute 抑制技能态**:`renderSlot` 中 distribute 激活时 `activeSkill` 强制为 `undefined`,装备只作选牌候选(`isDistCandidate` 优先),样式与 `handleClick` 统一走选牌路径。(`src/client/components/EquipColumn.tsx`)
+
+#### 测试
+- **回归测试**:`playercard-equip-distribute.test.tsx` 新增——distribute 激活 + 装备有 active respond-confirm action 时,点击触发选牌(`onEquipCardClick`)而非技能(`onSkillAction`)。
+
 ### Fixed — 自动跳过误跳过后续问询(南蛮入侵/决斗等)
 
 自动跳过在延迟跳过无懈可击广播问询时,若延迟期间 view 推进到新问询(如杀问询),旧延迟 skip 触发会误作用于新窗口——`pass()`/`send` 用实时 `pendingSeq`,命中新 slot,导致杀问询被误跳过。所有「无懈广播 + 后续实质问询」的锦囊(南蛮入侵/决斗/万箭齐发/借刀杀人/顺手牵羊/过河拆桥/火攻)均受影响。

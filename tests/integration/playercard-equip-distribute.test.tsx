@@ -10,7 +10,7 @@
 //   4. 点击候选装备 → 触发 onEquipCardClick 回调
 //
 // 技能语义(弃装备摸等量、限一次等)由 tests/skill-tests/制衡.test.ts 覆盖,此处不重复。
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { EquipColumn } from '../../src/client/components/EquipColumn';
 import { EQUIP_SLOT_ICON } from '../../src/client/components/gameViewConstants';
@@ -213,5 +213,42 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     expect(EQUIP_SLOT_ICON['进攻马']).not.toContain('+');
     expect(EQUIP_SLOT_ICON['防御马']).toContain('+');
     expect(EQUIP_SLOT_ICON['防御马']).not.toContain('-');
+  });
+
+  // ── 回归:制衡选牌时点击装备牌不应误触发装备技能(寒冰剑 confirm)──
+  // 根因:寒冰剑等装备的 respond-confirm action 无 activeWhen → defaultPlayActive
+  // 在制衡场景(自己回合+出牌阶段+无阻塞 pending)判为 true → EquipColumn 把它当作
+  // "可发动技能",handleClick 优先走 onSkillAction 弹 confirm,而非 distribute 选牌。
+  // 修复:distribute 激活时装备只作选牌候选,抑制技能触发。
+  it('distribute 激活 + 装备有 active 技能 action:点击触发选牌而非技能(回归寒冰剑)', () => {
+    const iceView = makeView({ 武器: 'ice' });
+    iceView.cardMap['ice'] = {
+      id: 'ice', name: '寒冰剑', suit: '♠', color: '黑', rank: '2', type: '装备牌', subtype: '武器',
+    };
+    // 寒冰剑 respond-confirm action(无 activeWhen → defaultPlayActive=true)
+    const iceAction = {
+      skillId: '寒冰剑', ownerId: 0, actionType: 'respond', label: '寒冰剑',
+      prompt: { type: 'confirm' as const, title: '寒冰剑:是否改为弃目标2张牌?' },
+    };
+    const skillSpy = vi.fn();
+    const equipSpy = vi.fn();
+    render(
+      <EquipColumn
+        perspectiveIdx={0}
+        view={iceView}
+        canOperate
+        skillActions={[iceAction]}
+        onSkillAction={skillSpy}
+        isDistributeActive
+        distCandidateEquipIds={new Set(['ice'])}
+        distSelectedEquipIds={new Set()}
+        onEquipCardClick={equipSpy}
+      />,
+    );
+    const btn = screen.getByRole('button', { name: /寒冰剑/ });
+    fireEvent.click(btn);
+    // 应触发 distribute 选牌,而非技能 confirm
+    expect(equipSpy).toHaveBeenCalledWith('ice');
+    expect(skillSpy).not.toHaveBeenCalled();
   });
 });
