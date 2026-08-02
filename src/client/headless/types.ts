@@ -97,7 +97,7 @@ export interface AiViewSnapshot {
     promptTitle: string;
     requestType: string;
     /** 选将询问时的候选武将列表（仅选将 pending 非空） */
-    candidates?: Array<{ name: string; skills: string[] }>;
+    candidates?: Array<{ name: string; skills: string[]; baseId?: string }>;
     /** choosePlayer 类(突袭/激将/奋威/界再起 等)的合法目标列表(可能含自己)。
      *  引擎投影层(请求回应.toViewEvents/buildView)已把 filter 结果注入
      *  prompt.candidates(number[]),filter 本身无法跨进程序列化,故此处映射成

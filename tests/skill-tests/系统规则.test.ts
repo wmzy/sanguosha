@@ -25,8 +25,9 @@ function makeCard(
   name: string,
   suit: '♠' | '♥' | '♣' | '♦',
   rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makePlayer(opts: {

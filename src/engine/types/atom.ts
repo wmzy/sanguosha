@@ -225,12 +225,12 @@ export type Atom =
   | {
       type: '选将询问';
       target: number;
-      candidates: Array<{ name: string; skills: string[] }>;
+      candidates: Array<{ name: string; skills: string[]; baseId?: string }>;
       prompt?: ActionPrompt;
     }
   | {
       type: '并行选将';
-      selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[] }> }>;
+      selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[]; baseId?: string }> }>;
     }
   | { type: '分配武将'; target: number; character: string; skills: string[] }
   | { type: '初始化洗牌'; seed: number }

@@ -14,7 +14,7 @@ export interface OverlaysLayerProps {
   // 选将状态(由 useCharSelect 派生,父组件传入)
   isCharSelectPending: boolean;
   charSelect: {
-    candidates: Array<{ name: string; skills: string[] }>;
+    candidates: Array<{ name: string; skills: string[]; baseId?: string }>;
     target: number;
     pending: PendingView | null;
   } | null;

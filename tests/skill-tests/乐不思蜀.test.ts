@@ -210,7 +210,7 @@ describe('乐不思蜀', () => {
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
 
     // toViewEvents 在 apply 之前调用:牌堆顶为判定结果,判定区延时锦囊为待判定牌
-    const split = 判定Atom.toViewEvents(state, { player: 1, judgeType: '乐不思蜀' })!;
+    const split = 判定Atom.toViewEvents!(state, { player: 1, judgeType: '乐不思蜀' })!;
     const view = split.othersView!;
     expect(view.card).toMatchObject({ name: '判定牌', suit: '♥', rank: '5' });
     expect(view.pendingCard).toMatchObject({ name: '乐不思蜀', suit: '♠', rank: 'A' });
@@ -230,7 +230,7 @@ describe('乐不思蜀', () => {
     });
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
 
-    const split = 判定Atom.toViewEvents(state, { player: 1, judgeType: '八卦阵' })!;
+    const split = 判定Atom.toViewEvents!(state, { player: 1, judgeType: '八卦阵' })!;
     const view = split.othersView!;
     expect(view.card).toMatchObject({ name: '判定牌', suit: '♥', rank: '5' });
     expect(view.pendingCard).toBeUndefined();

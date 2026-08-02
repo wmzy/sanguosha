@@ -136,7 +136,7 @@ export interface ChooseCharacterPrompt {
   title: string;
   description?: string;
   /** 可选武将列表 */
-  candidates: Array<{ name: string; skills: string[] }>;
+  candidates: Array<{ name: string; skills: string[]; baseId?: string }>;
 }
 
 /** 选牌面板(五谷丰登:从处理区亮出的 N 张明牌中选一张到手牌)。

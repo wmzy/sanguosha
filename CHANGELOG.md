@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 8 个基线 tsc 错误清零
+
+`npx tsc --noEmit` 存在 17 处(6 个文件)长期未处理的类型错误。逐个定位根因后全部修复。
+
+#### Changed
+- **鬼道/鬼才/界鬼道/界鬼才 (TS2367)**:`registerJudgeModifier` 的 handler 类型误用 `AtomAfterContext<AtomOfName<'判定'`>` 窄化 `ctx.atom.type` 为 `'判定'`,但运行时 ctx.atom 实际是「判定牌生效前」atom(由 judge-timing.ts 的 afterApply 调 runJudgeModifiers 从 atomStack 顶取出)。改为 `AtomAfterContext`(默认 Atom 全联合),`atom.type !== '判定牌生效前'` 比较不再报「无重叠」。(`src/engine/skill.ts`)
+- **viewMaintainer (TS2339)**:`ViewPlayer` 不含 `tags`/`judgeZone`/`vars`(这三个是 state player 的内部状态,不投影 GameView),深拷贝这三行是旧残留。删除。(`src/client/headless/viewMaintainer.ts`)
+- **选将 candidates 类型缺 baseId (TS2353)**:引擎 `flattenCharGroups` 运行时产出 `{ name, skills, baseId }`(开局.ts),但各处 candidates 类型声明漏了 `baseId`。给 `atom.ts` 选将询问/并行选将、`prompt.ts` ChooseCharacterPrompt、前端 OverlaysLayer/HeadlessGameClient/headless types/useCharSelect 共 8 处补 `baseId?: string`。(`src/engine/types/atom.ts`、`src/engine/types/prompt.ts`、`src/client/components/OverlaysLayer.tsx`、`src/client/headless/HeadlessGameClient.ts`、`src/client/headless/types.ts`、`src/client/hooks/useCharSelect.ts`)
+- **applyView-consistency.test (TS18048)**:`def.toViewEvents!(...)` 的 `!` 只断言方法存在不断言返回值,split 仍 `ViewEventSplit | undefined`。补返回值 `!`。(`tests/engine/applyView-consistency.test.ts`)
+- **乐不思蜀.test (TS2722)**:`判定Atom.toViewEvents(state, atom)` 的 `toViewEvents` 可选,调用报 possibly undefined。`!` 移到方法名后断言方法存在。(`tests/skill-tests/乐不思蜀.test.ts`)
+- **系统规则.test makeCard (TS2554)**:`makeCard` 仅 4 参数,但调用方传了 5 个(含 `type='装备牌'`)。补可选 `type` 参数,与其他测试文件的 makeCard 一致。(`tests/skill-tests/系统规则.test.ts`)
+
+#### 验证
+- `npx tsc --noEmit`:0 错误(从 17 清零)
+- 改动相关 8 个测试文件:76 passed
+- 全量套件:401/402 passed(唯一失败 skillDisplay 为已知顺序敏感 flaky,单独重跑全过,与本修改无关)
+
 ### Fixed — 借刀杀人无法选择杀的目标、出牌无响应
 
 借刀杀人选中后玩家只能点选一个目标(借刀对象 A),无法点选杀的目标 B,但「出牌」按钮可点,点击后无任何响应。根因:借刀杀人 use action 的 `prompt.targetFilter` 仅声明 `{ min: 1, max: 1 }` 单目标,**未声明双目标 `slots`**。前端 `derivePlayRules` 据此判 `hasSlots=false`,把借刀杀人当单目标牌:

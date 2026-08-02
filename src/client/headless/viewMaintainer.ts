@@ -82,11 +82,10 @@ export function applyServerMessage(
             hand: p.hand ? [...p.hand] : p.hand,
             skills: [...(p.skills ?? [])],
             marks: [...(p.marks ?? [])],
-            tags: [...(p.tags ?? [])],
+            // tags/judgeZone/vars 不进 GameView（ViewPlayer 无此字段，见 view.ts）——
+            // 它们是 state player 的内部状态，不投影到前端。原深拷贝是旧残留，类型报 TS2339。
             equipment: { ...(p.equipment ?? {}) },
             pendingTricks: [...(p.pendingTricks ?? [])],
-            judgeZone: [...(p.judgeZone ?? [])],
-            vars: p.vars ? { ...p.vars } : p.vars,
             distanceVars: p.distanceVars ? { ...p.distanceVars } : p.distanceVars,
             turnUsage: p.turnUsage ? { ...p.turnUsage } : p.turnUsage,
           })),

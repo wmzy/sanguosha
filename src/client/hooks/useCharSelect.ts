@@ -9,7 +9,7 @@ import { useSubmittedCharSelects } from './SubmittedCharSelectCtx';
 
 export interface CharSelectSlot {
   /** 候选武将 */
-  candidates: Array<{ name: string; skills: string[] }>;
+  candidates: Array<{ name: string; skills: string[]; baseId?: string }>;
   /** 选将 target 座次 */
   target: number;
   /** 原 pending(取 deadline/totalMs) */
@@ -28,7 +28,7 @@ export interface CharSelectState {
 }
 
 interface CharSelectAtom {
-  candidates: Array<{ name: string; skills: string[] }>;
+  candidates: Array<{ name: string; skills: string[]; baseId?: string }>;
 }
 
 /**
@@ -46,7 +46,7 @@ export function useCharSelect(view: GameView, perspectiveIdx: number): CharSelec
       : null;
 
   const isCharSelectPending = charSelectPending !== null;
-  const candidates: Array<{ name: string; skills: string[] }> = charSelectPending
+  const candidates: Array<{ name: string; skills: string[]; baseId?: string }> = charSelectPending
     ? ((charSelectPending.atom as unknown as CharSelectAtom).candidates ?? [])
     : [];
   const charSelectTarget = charSelectPending ? charSelectPending.target : -1;

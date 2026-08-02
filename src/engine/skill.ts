@@ -409,9 +409,13 @@ export function registerJudgeModifier(
   state: GameState,
   skillId: string,
   ownerId: number,
-  handler: (ctx: AtomAfterContext<AtomOfName<'判定'>>) => Promise<void>,
+  // handler 的 ctx.atom 运行时是「判定牌生效前」atom（由 judge-timing.ts 的 afterApply 调
+  // runJudgeModifiers 从 atomStack 顶取出），而非注册元数据里的 '判定'。故用默认 Atom 全联合
+  // 而非 AtomOfName<'判定'> 窄化——窄化会让 ctx.atom.type 收窄为 '判定'，与 '判定牌生效前'
+  // 比较报 TS2367（无重叠）。
+  handler: (ctx: AtomAfterContext) => Promise<void>,
 ): () => void {
-  const entry: AtomHookEntry = {
+    const entry: AtomHookEntry = {
     skillId, ownerId, atomType: '判定', phase: 'after',
     handler: handler as AtomHookEntry['handler'],
   };

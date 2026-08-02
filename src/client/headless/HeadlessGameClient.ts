@@ -465,7 +465,7 @@ export class HeadlessGameClient {
     if (pending.responseMode === 'silent' && pending.target === ownerId) return;
     const atom = pending.atom as {
       type: string;
-      candidates?: Array<{ name: string; skills: string[] }>;
+      candidates?: Array<{ name: string; skills: string[]; baseId?: string }>;
       requestType?: string;
     };
     // 选将询问：每个候选武将一个 selectChar action（引擎注册 系统规则:选将）
