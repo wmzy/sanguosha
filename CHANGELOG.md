@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 吃桃展示了杀的特效
+
+APNG 卡牌特效会重复播放:`useVfxPlayback` 返回的 `items` 是累积式(每批新特效追加,从不缩减),而 `VfxLayer` 每次 `items` 变化都把整个数组并入活动列表。导致先出杀、再吃桃时,杀的特效被当作「新增」再次触发,叠加在桃的特效上——观感即「吃桃展示了杀的特效」。引擎层正确(用桃发 `vfx=card/peach`),资源映射与 `sound-test` 也正确,纯属前端渲染层的去重缺陷。
+
+#### Changed
+- **VfxLayer 历史特效去重**(根因):新增 `processedKeysRef` 记录已入活动列表的 item key,`useEffect([items])` 仅并入未处理的新增项。每个特效按 `key`(seq-vfxId,全局唯一)只播放一次,items 累积不再引发重复。(`src/client/components/VfxLayer.tsx`)
+- **补充单元测试**:`tests/client/VfxLayer.test.tsx` 验证 items 累积时不重复播放(出杀后吃桃,杀不再次触发)与单批次多特效正常播放。
+
 ### Fixed — 使用/打出牌的 flip 拟声与牌名播报重复
 
 使用/打出牌已有牌名播报(`sound/card/{牌名}`),但实际对局中仍能听到多余的 `flip` 拟声。根因是三个环节都在叠音:`移动牌` atom「手牌→处理区」分支生成的 `type:'打出'` 事件播 `flip`(且该事件被 `EventBanner` 对 `'打出'` return null 跳过,视觉不翻牌,只有声音在响——这是最隐蔽的一处);打出流程的「声明打出时」「打出牌时」也各播一次 flip。现统一对齐「使用时」:牌名播报由 `使用时`/`打出牌时` 负责,`移动牌` 的置入处理区与「声明打出时」不再播声音。

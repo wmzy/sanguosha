@@ -29,12 +29,19 @@ interface VfxLayerProps {
 
 export function VfxLayer({ items }: VfxLayerProps) {
   const [active, setActive] = useState<ActiveVfx[]>([]);
+  // 已入活动列表的 item key 集合。
+  // useVfxPlayback 的 items 是累积式（每批新 vfx 追加，从不缩减），
+  // 若每次 items 变化都把整个数组并入 active，历史特效会被重复播放
+  // （出杀后再吃桃，杀的特效会再次触发）。用此集合去重，每个 key 只入一次。
+  const processedKeysRef = useRef(new Set<string>());
 
-  // 新 items 到来：并入活动列表（附加 startedAt 用于回收判定）
+  // 新 items 到来：仅并入未处理的新增项（附加 startedAt 用于回收判定）
   useEffect(() => {
-    if (items.length === 0) return;
+    const fresh = items.filter((i) => !processedKeysRef.current.has(i.key));
+    if (fresh.length === 0) return;
+    for (const f of fresh) processedKeysRef.current.add(f.key);
     const now = Date.now();
-    const newActive = items.map((item) => ({ ...item, startedAt: now }));
+    const newActive = fresh.map((item) => ({ ...item, startedAt: now }));
     setActive((prev) => [...prev, ...newActive]);
   }, [items]);
 
