@@ -61,6 +61,7 @@ import { useSoundPlayback } from '../hooks/useSoundPlayback';
 import { useVfxPlayback } from '../hooks/useVfxPlayback';
 
 import { SoundControl } from './SoundControl';
+import { AutoSkipManager } from './AutoSkipManager';
 import { VfxLayer } from './VfxLayer';
 import { PackManagerPanel } from './PackManagerPanel';
 import { useResourcePacks } from '../hooks/useResourcePacks';
@@ -371,6 +372,7 @@ export function GameViewComponentImpl({
             <div className={styles.headerRight}>
               {headerSlot}
               <div className={styles.toolbarGroup}>
+                <AutoSkipManager prefs={autoSkipPrefs} onToggle={toggleAutoSkip} />
                 <SoundControl />
                 <button
                   className={styles.toolbarBtn}

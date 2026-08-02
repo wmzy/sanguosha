@@ -52,6 +52,8 @@ export class HeadlessGameClient {
   private _autoSkippedDeadline: number | null = null;
   /** 自动跳过用户偏好(策略跳过开关)。AI 座次默认空(仅维度1强制生效)。 */
   private _autoSkipPrefs: AutoSkipPrefs = DEFAULT_PREFS;
+  /** 延迟自动跳过定时器(view 推进到新窗口时清理,避免旧 skip 误作用于新 pending)。 */
+  private _autoSkipTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}) {
     // 兼容旧 WS URL：ws://→http://, wss://→https://, 去掉 /ws 后缀
@@ -382,6 +384,7 @@ export class HeadlessGameClient {
       this._gameOverWinner = null;
       this._pendingNewEvents = [];
       this._autoSkippedDeadline = null;
+      if (this._autoSkipTimer) { clearTimeout(this._autoSkipTimer); this._autoSkipTimer = null; }
     }
     // 自动跳过决策(无法响应/策略跳过时代发 skip)
     if (viewChanged && this._view) {
@@ -911,6 +914,8 @@ export class HeadlessGameClient {
    *  以 pending.deadline 去重,同一窗口只跳一次。仅在非旁观者座次生效。 */
   private maybeAutoSkipBroadcast(): void {
     if (this._isSpectator) return;
+    // 清理上一个未触发的延迟 skip(防串扰:view 已推进到新 pending,旧 skip 不应再发)
+    if (this._autoSkipTimer) { clearTimeout(this._autoSkipTimer); this._autoSkipTimer = null; }
     const view = this._view;
     const pending = view?.pending;
     if (!pending) return;
@@ -932,8 +937,15 @@ export class HeadlessGameClient {
     if (decision.kind === 'act-now') {
       this.pass();
     } else {
-      // act-delayed:随机延迟后发 skip(防手牌信息泄露)
-      setTimeout(() => this.pass(), decision.ms);
+      // act-delayed:随机延迟后发 skip(防手牌信息泄露)。
+      // 触发前校验窗口未变(deadline 一致):延迟期间 view 可能推进到新 pending(如杀问询),
+      // 旧 skip 不得误作用于新窗口——pass() 用实时 _lastSeq 作 pendingSeq 会命中新 slot。
+      this._autoSkipTimer = setTimeout(() => {
+        this._autoSkipTimer = null;
+        const cur = this._view?.pending;
+        if (!cur || (cur.deadline ?? 0) !== deadline) return;
+        this.pass();
+      }, decision.ms);
     }
   }
 

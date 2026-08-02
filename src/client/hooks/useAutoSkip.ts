@@ -39,6 +39,9 @@ export function useAutoSkip(input: UseAutoSkipInput): void {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDeadlineRef = useRef<number | null>(null);
+  // 最新 view ref:延迟 skip 触发时校验窗口未变(防串扰双保险,与 headless maybeAutoSkipBroadcast 一致)
+  const latestViewRef = useRef(view);
+  latestViewRef.current = view;
 
   useEffect(() => {
     // 清理上一个定时器(pending 变化或组件卸载)
@@ -63,6 +66,9 @@ export function useAutoSkip(input: UseAutoSkipInput): void {
 
     lastDeadlineRef.current = deadline;
     const fire = () => {
+      // 防串扰:延迟期间 view 可能推进到新 pending(如杀问询),此时发 skip 会误作用于新窗口。
+      // effect 重跑的 clearTimeout 是主防御;此处比对决策时的 deadline 作双保险。
+      if ((latestViewRef.current.pending?.deadline ?? null) !== (pending.deadline ?? null)) return;
       send('__skip', 'skip', {});
       // 广播型:标记本地跳过(隐藏弹窗,与手动「不回应」一致)
       if (pending.target < 0) markBroadcastSkipped(broadcastKey);

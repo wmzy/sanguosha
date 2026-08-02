@@ -441,4 +441,41 @@ describe('HeadlessGameClient — 自动跳过决策(通用)', () => {
     expect(spy).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  it('延迟跳过期间 view 推进到新窗口 → 旧 skip 不误作用于新窗口(防串扰)', () => {
+    // 复现南蛮入侵/决斗场景:无懈广播被延迟跳过,延迟期间 view 推进到杀问询。
+    // 旧 setTimeout 触发时若不校验窗口,pass() 用实时 _lastSeq 会误跳过杀问询。
+    vi.useFakeTimers();
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const maybe = (hgc as unknown as { maybeAutoSkipBroadcast: () => void })
+      .maybeAutoSkipBroadcast.bind(hgc);
+    const sendSpy = vi.spyOn(hgc, 'sendAction');
+    const actionsSpy = vi.spyOn(hgc, 'getAvailableActions');
+
+    // 窗口1:广播无懈,P0 有闪(无无懈)→ 维度1 act-delayed(设 setTimeout)
+    const p1 = makeBroadcastPending();
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(p1, 0, [
+      { id: 'f1', name: '闪', suit: '♥', color: '红', rank: '5', type: '基本牌' },
+    ]);
+    actionsSpy.mockReturnValueOnce([{ category: 'skip' }] as never);
+    maybe();
+    expect(sendSpy).not.toHaveBeenCalled(); // 延迟中
+
+    // 窗口2:deadline 不同的新窗口,能响应 → wait(不应被跳过)
+    const p2 = makeBroadcastPending();
+    p2.deadline = (p1.deadline ?? 0) + 5000;
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(p2, 0, [
+      { id: 'w1', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' },
+    ]);
+    actionsSpy.mockReturnValueOnce([{ category: 'respond' }] as never);
+    maybe(); // 能响应 → wait
+
+    // 推进定时器:窗口1 的延迟 skip 到期
+    vi.advanceTimersByTime(2000);
+
+    // 旧 skip 不应作用于窗口2(玩家有无懈,应手动决策)
+    expect(sendSpy).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });

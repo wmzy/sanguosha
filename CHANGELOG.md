@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 自动跳过误跳过后续问询(南蛮入侵/决斗等)
+
+自动跳过在延迟跳过无懈可击广播问询时,若延迟期间 view 推进到新问询(如杀问询),旧延迟 skip 触发会误作用于新窗口——`pass()`/`send` 用实时 `pendingSeq`,命中新 slot,导致杀问询被误跳过。所有「无懈广播 + 后续实质问询」的锦囊(南蛮入侵/决斗/万箭齐发/借刀杀人/顺手牵羊/过河拆桥/火攻)均受影响。
+
+根因:headless `maybeAutoSkipBroadcast` 的 `setTimeout` 不保存 ref、不清理,延迟期间 view 变化后旧 timer 必然触发;前端 `useAutoSkip` 虽有 `clearTimeout`(effect 重跑),但 `fire()` 仍依赖实时 seq。
+
+#### Changed
+- **headless 延迟 skip 防串扰**:`HeadlessGameClient` 新增 `_autoSkipTimer` 字段;`maybeAutoSkipBroadcast` 开头清理未触发的旧 timer(新窗口到达即作废旧 skip);`setTimeout` 回调触发前校验 `view.pending.deadline` 与决策时一致才 `pass()`;游戏重置时清理 timer。(`src/client/headless/HeadlessGameClient.ts`)
+- **前端延迟 skip 双保险**:`useAutoSkip` 新增 `latestViewRef`,`fire()` 触发前比对决策时 `pending.deadline`,view 已推进到新窗口则丢弃 skip。与 headless 一致,防止 effect 重跑时序边界。(`src/client/hooks/useAutoSkip.ts`)
+
+#### 测试
+- **headless 防串扰回归**:`pass-skip.test.ts` 新增——延迟跳过期间 view 推进到能响应的新窗口,旧 skip 不误发(复现南蛮/决斗场景)。
+- **前端防串扰回归**:`useAutoSkip.test.tsx`(新)——renderHook + fake timer 验证延迟 skip 在 view 推进后不误发,且同一窗口内正常发 skip。
+
+### Added — 自动跳过管理面板(随时取消已勾选项)
+
+原「自动跳过此类询问」checkbox 仅在对应 pending 出现时显示(AwaitingPrompt 内),pending 消失后无法取消已勾选的项。新增常驻管理入口:顶部栏工具组(与音效/资源包按钮并排)显示已勾选数量徽章,默认折叠,hover(或键盘 focus)展开列表,逐项点击「取消」即可关闭。无勾选时不渲染。
+
+#### Changed
+- **AutoSkipManager 组件**:从 `prefs.optInSkip` 提取已勾选(true)项,渲染 trigger 按钮 + 数量徽章;CSS `:hover`/`:focus-within` 展开下拉(`[data-autoskip-dropdown]`),每项一个「取消」按钮调 `onToggle(requestType)`。(`src/client/components/AutoSkipManager.tsx`)
+- **GameView 接入**:toolbarGroup 渲染 `<AutoSkipManager>`,复用 `useAutoSkipPrefs` 的 `prefs`/`toggleOptIn`。(`src/client/components/GameView.tsx`)
+
+#### 测试
+- **AutoSkipManager 契约测试**:`AutoSkipManager.test.tsx`(新)——无勾选/仅 false 不渲染、渲染数量只计 true、点击取消回调传正确 requestType、多项独立取消。
+
 ### Added — 使用桃/酒等牌的动画效果在目标武将卡上播放
 
 使用桃、酒等牌时，牌的 VFX 特效（card/peach、card/analeptic APNG）此前居屏幕中央播放，没有定位到目标武将卡——伤害特效 card/damage 已定位到受伤害者武将卡，造成不对称。根因：`使用时` atom 的 ViewEvent 只携带 source（使用者）、不带 target，`useVfxPlayback` 提取 target 时无 target/player → undefined → VfxLayer 居中。桃/酒 selfTarget，使用者即目标，故 target 提取回退到 source 即可定位到目标武将卡。同时附带补全回血时座位卡的 HP 绿光动画（对称伤害红光），让回血场景在 HP 变化层也有视觉反馈。
